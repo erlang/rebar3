@@ -34,13 +34,72 @@
 %% ===================================================================
 
 compile(Config, Dir) ->
-    io:format(".erl compiling: ~s\n", [Dir]),
-    ok.
+    do_compile(Config, "src/*.erl", "ebin", ".erl", ".beam",
+               fun compile_erl/2),
+    do_compile(Config, "mibs/*.mib", "priv/mibs", ".mib", ".bin",
+               fun compile_mib/2).
 
 clean(Config, Dir) ->
-    rebar_utils:delete_files("ebin/*.beam").
+%    rebar_utils:delete_files("ebin/*.beam"),
+%    rebar_utils:delete_files("priv/mibs/*.bin").
+    ok.
 
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+do_compile(Config, SrcWildcard, OutDir, InExt, OutExt, CompileFn) ->
+    case filelib:wildcard(SrcWildcard) of
+        [] ->
+            ok;
+        Srcs when is_list(Srcs) ->
+            %% Build list of output files
+            Targets = [target_file(S, OutDir, InExt, OutExt) || S <- Srcs],
+            Files = lists:zip(Targets, Srcs),
+            
+            %% Make sure target directory exists
+            ok = filelib:ensure_dir(hd(Targets)),
+            
+            %% Start compiling
+            compile_each(Files, Config, CompileFn)
+    end.
+
+
+compile_each([], _Config, _CompileFn) ->
+    ok;
+compile_each([{Target, Src} | Rest], Config, CompileFn) ->
+    case needs_compile(Target, Src) of
+        true ->
+            ?CONSOLE("Compiling ~s\n", [Src]),
+            CompileFn(Src, Config);
+        false ->
+            ok
+    end,
+    compile_each(Rest, Config, CompileFn).
+            
+needs_compile(Target, Src) ->
+    filelib:last_modified(Target) < filelib:last_modified(Src).
+
+
+target_file(F, TargetDir, InExt, OutExt) ->
+    filename:join([TargetDir, filename:basename(F, InExt) ++ OutExt]).
+
+
+compile_erl(Source, Config) ->
+    Opts = rebar_config:get_list(Config, erlc_opts, []),
+    case compile:file(Source, [{i, "include"}, {outdir, "ebin"}, report] ++ Opts) of
+        {ok, _} ->
+            ok;
+        error ->
+            ?FAIL
+    end.
+
+compile_mib(Source, Config) ->
+    Opts = meab_config:get_list(mibc_opts, []),
+    case snmpc:compile(Source, [{outdir, "priv/mibs"}, {i, ["priv/mibs"]}] ++ Opts) of
+        {ok, _} ->
+            ok;
+        {error, compilation_failed} ->
+            ?FAIL
+    end.

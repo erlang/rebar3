@@ -25,7 +25,8 @@
 -module(rebar_config).
 
 -export([new/1,
-         get_modules/2]).
+         get_modules/2,
+         get_list/3]).
 
 -record(config, { dir,
                   opts }).
@@ -42,3 +43,12 @@ get_modules(Config, app) ->
         {ok, Modules} ->
             Modules
     end.
+
+get_list(Config, Key, Default) ->
+    case orddict:find(Key, Config#config.opts) of
+        error ->
+            Default;
+        {ok, List} ->
+            List
+    end.
+    

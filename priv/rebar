@@ -136,7 +136,7 @@ apply_command([{Type, Dir, File} | Rest], Command) ->
         ok ->
             apply_command(Rest, Command);
         Other ->
-            ?CONSOLE("Execution of ~p failed while processing ~s: ~p", [Command, Dir, Other])
+            ?CONSOLE("~p failed while processing ~s: ~p", [Command, Dir, Other])
     end.
 
 
