@@ -1,0 +1,151 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+
+%% -------------------------------------------------------------------
+%%
+%% rebar: Erlang Build Tools
+%%
+%% Copyright (c) 2009 Dave Smith (dizzyd@dizzyd.com)
+%%
+%% Permission is hereby granted, free of charge, to any person obtaining a copy
+%% of this software and associated documentation files (the "Software"), to deal
+%% in the Software without restriction, including without limitation the rights
+%% to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+%% copies of the Software, and to permit persons to whom the Software is
+%% furnished to do so, subject to the following conditions:
+%%
+%% The above copyright notice and this permission notice shall be included in
+%% all copies or substantial portions of the Software.
+%%
+%% THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+%% IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+%% FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+%% AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+%% LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+%% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+%% THE SOFTWARE.
+%% -------------------------------------------------------------------
+
+-include_lib("rebar/include/rebar.hrl").
+
+main([CommandStr | _Args]) ->
+    %% Pre-load the rebar app so that we get default configuration
+    application:load(rebar),
+
+    %% Convert the command into an atom for convenience
+    Command = list_to_atom(CommandStr),
+    
+    %% From the current working directory, search recursively and find
+    %% all the application and release directories. We always terminate the
+    %% recursion at an application or release directory.
+    Cwd = rebar_utils:get_cwd(),
+    case target_type(Cwd) of
+        undefined ->
+            Targets = find_targets(Cwd);
+        {Type, Filename} ->
+            Targets = [{Type, Cwd, Filename}]
+    end,
+
+    %% Filter out all the targets, based on the specified command.
+    FilteredTargets = [{Type, Dir, Filename} || {Type, Dir, Filename} <- Targets,
+                                                valid_command(Command, Type) == true],
+
+    %% Prefix all the app targets to the code path so that inter-app compilation
+    %% works properly
+    update_code_path(FilteredTargets),
+
+    %% Finally, apply the specified command to each target
+    apply_command(FilteredTargets, Command);
+main(_) ->
+    io:format("usage: rebar <command>\n").
+
+
+%%
+%% Recursively find all the targets starting at a root directory
+%%
+find_targets(Root) ->
+    {ok, Files} = file:list_dir(Root),
+    find_targets(Files, Root, []).
+
+find_targets([], _Root, Acc) ->
+    Acc;
+find_targets([F | Rest], Root, Acc) ->
+    AbsName = filename:join([Root, F]),
+    case target_type(AbsName) of
+        undefined ->
+            case filelib:is_dir(AbsName) of
+                true ->
+                    {ok, SubFiles} = file:list_dir(AbsName),
+                    Acc2 = find_targets(SubFiles, AbsName, Acc);
+                false ->
+                    Acc2 = Acc
+            end;
+        {Type, Filename} ->
+            Acc2 = [{Type, AbsName, Filename} | Acc]
+    end,
+    find_targets(Rest, Root, Acc2).
+
+%%
+%% Determine the target type of a given file: app, rel or undefined
+%%
+target_type(AbsName) ->
+    case rebar_app_utils:is_app_dir(AbsName) of
+        {true, AppFile} ->
+            {app, AppFile};
+        false ->
+            case rebar_rel_utils:is_rel_dir(AbsName) of
+                true ->
+                    {rel, ""};
+                false ->
+                    undefined
+            end
+    end.
+
+
+%%
+%% Given a command and target type, determine if the command is applicable
+%%
+valid_command(compile, app) -> true;
+valid_command(clean, _Any)  -> true;
+valid_command(_, _)         -> false.
+
+
+%%
+%% Add all application targets to the front of the code path
+%%
+update_code_path([]) ->     
+    ok;
+update_code_path([{app, Dir, _} | Rest]) ->
+    EbinDir = filename:join([Dir, "ebin"]),
+    true = code:add_patha(EbinDir),
+    update_code_path(Rest);
+update_code_path([_ | Rest]) ->
+    update_code_path(Rest).
+
+
+apply_command([], _Command) ->
+    ok;
+apply_command([{Type, Dir, File} | Rest], Command) ->
+    ok = file:set_cwd(Dir),
+    Config = rebar_config:new(Dir),
+
+    %% Pull the list of modules that are associated with Type operations. Each module
+    %% will be inspected for a function matching Command and if found, will execute that. 
+    Modules = rebar_config:get_modules(Config, Type),
+    case catch(run_modules(Modules, Command, Config, File)) of
+        ok ->
+            apply_command(Rest, Command);
+        Other ->
+            ?CONSOLE("Execution of ~p failed while processing ~s: ~p", [Command, Dir, Other])
+    end.
+
+
+run_modules([], _Command, _Config, _File) ->
+    ok;
+run_modules([Module | Rest], Command, Config, File) ->
+    case Module:Command(Config, File) of
+        ok ->
+            run_modules(Rest, Command, Config, File);
+        {error, Reason} ->
+            {error, Reason}
+    end.
