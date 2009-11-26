@@ -40,9 +40,12 @@ compile(Config, Dir) ->
                fun compile_mib/2).
 
 clean(Config, Dir) ->
-%    rebar_utils:delete_files("ebin/*.beam"),
-%    rebar_utils:delete_files("priv/mibs/*.bin").
+    %% TODO: This would be more portable if it used Erlang to traverse
+    %%       the dir structure and delete each file; however it would also
+    %%       much slower.
+    [] = os:cmd("rm -f ebin/*.beam priv/mibs/*.bin"),
     ok.
+
 
 
 %% ===================================================================
@@ -96,7 +99,7 @@ compile_erl(Source, Config) ->
     end.
 
 compile_mib(Source, Config) ->
-    Opts = meab_config:get_list(mibc_opts, []),
+    Opts = rebar_config:get_list(Config, mibc_opts, []),
     case snmpc:compile(Source, [{outdir, "priv/mibs"}, {i, ["priv/mibs"]}] ++ Opts) of
         {ok, _} ->
             ok;
