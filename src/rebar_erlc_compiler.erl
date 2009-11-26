@@ -35,9 +35,11 @@
 
 compile(Config, Dir) ->
     do_compile(Config, "src/*.erl", "ebin", ".erl", ".beam",
-               fun compile_erl/2),
+               fun compile_erl/2,
+               rebar_config:get_list(Config, erl_first_files, [])),
     do_compile(Config, "mibs/*.mib", "priv/mibs", ".mib", ".bin",
-               fun compile_mib/2).
+               fun compile_mib/2,
+               rebar_config:get_list(Config, mib_first_files, [])).
 
 clean(Config, Dir) ->
     %% TODO: This would be more portable if it used Erlang to traverse
@@ -52,14 +54,18 @@ clean(Config, Dir) ->
 %% Internal functions
 %% ===================================================================
 
-do_compile(Config, SrcWildcard, OutDir, InExt, OutExt, CompileFn) ->
+do_compile(Config, SrcWildcard, OutDir, InExt, OutExt, CompileFn, FirstFiles) ->
     case filelib:wildcard(SrcWildcard) of
         [] ->
             ok;
-        Srcs when is_list(Srcs) ->
+        FoundFiles when is_list(FoundFiles) ->
+            %% Ensure that the FirstFiles are compiled first; drop them from the
+            %% FoundFiles and then build a final list of sources
+            Srcs = FirstFiles ++ drop_each(FirstFiles, FoundFiles),
+            
             %% Build list of output files
             Targets = [target_file(S, OutDir, InExt, OutExt) || S <- Srcs],
-            Files = lists:zip(Targets, Srcs),
+            Files = lists:zip(Srcs, Targets),
             
             %% Make sure target directory exists
             ok = filelib:ensure_dir(hd(Targets)),
@@ -68,11 +74,15 @@ do_compile(Config, SrcWildcard, OutDir, InExt, OutExt, CompileFn) ->
             compile_each(Files, Config, CompileFn)
     end.
 
+drop_each([], List) ->
+    List;
+drop_each([Member | Rest], List) ->
+    drop_each(Rest, lists:delete(Member, List)).
 
 compile_each([], _Config, _CompileFn) ->
     ok;
-compile_each([{Target, Src} | Rest], Config, CompileFn) ->
-    case needs_compile(Target, Src) of
+compile_each([{Src, Target} | Rest], Config, CompileFn) ->
+    case needs_compile(Src, Target) of
         true ->
             ?CONSOLE("Compiling ~s\n", [Src]),
             CompileFn(Src, Config);
@@ -81,7 +91,7 @@ compile_each([{Target, Src} | Rest], Config, CompileFn) ->
     end,
     compile_each(Rest, Config, CompileFn).
             
-needs_compile(Target, Src) ->
+needs_compile(Src, Target) ->
     filelib:last_modified(Target) < filelib:last_modified(Src).
 
 

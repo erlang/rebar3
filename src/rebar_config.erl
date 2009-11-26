@@ -28,13 +28,34 @@
          get_modules/2,
          get_list/3]).
 
+-include("rebar.hrl").
+
 -record(config, { dir,
                   opts }).
 
+
+%% ===================================================================
+%% Public API
+%% ===================================================================
+
 new(Dir) ->
     {ok, DefaultConfig} = application:get_env(rebar, default_config),
-    #config { dir = Dir,
-              opts = orddict:from_list(DefaultConfig)}.
+    BaseDict = orddict:from_list(DefaultConfig),
+
+    %% Load terms from rebar.config, if it exists
+    ConfigFile = filename:join([Dir, "rebar.config"]),
+    case file:consult(ConfigFile) of
+        {ok, Terms} ->
+            Dict = merge_terms(Terms, BaseDict);
+        {error, enoent} ->
+            Dict = BaseDict;
+        Other ->
+            ?WARN("Failed to load ~s: ~p\n", [ConfigFile, Other]),
+            ?FAIL,
+            Dict = BaseDict
+    end,
+    #config { dir = Dir, opts = Dict }.
+
 
 get_modules(Config, app) ->
     case orddict:find(app_modules, Config#config.opts) of
@@ -52,3 +73,15 @@ get_list(Config, Key, Default) ->
             List
     end.
     
+
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
+
+merge_terms([], Dict) ->
+    Dict;
+merge_terms([{Key, Value} | Rest], Dict) ->
+    merge_terms(Rest, orddict:append(Key, Value, Dict));
+merge_terms([_ | Rest], Dict) ->
+    merge_terms(Rest, Dict).
