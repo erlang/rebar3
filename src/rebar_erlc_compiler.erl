@@ -100,7 +100,7 @@ target_file(F, TargetDir, InExt, OutExt) ->
 
 
 compile_erl(Source, Config) ->
-    Opts = rebar_config:get_list(Config, erlc_opts, []),
+    Opts = rebar_config:get_list(Config, erl_opts, []),
     case compile:file(Source, [{i, "include"}, {outdir, "ebin"}, report] ++ Opts) of
         {ok, _} ->
             ok;
@@ -109,7 +109,7 @@ compile_erl(Source, Config) ->
     end.
 
 compile_mib(Source, Config) ->
-    Opts = rebar_config:get_list(Config, mibc_opts, []),
+    Opts = rebar_config:get_list(Config, mib_opts, []),
     case snmpc:compile(Source, [{outdir, "priv/mibs"}, {i, ["priv/mibs"]}] ++ Opts) of
         {ok, _} ->
             ok;
