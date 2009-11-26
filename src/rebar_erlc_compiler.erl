@@ -22,7 +22,7 @@
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
--module(rebar_doterl_compiler).
+-module(rebar_erlc_compiler).
 
 -export([compile/2,
          clean/2]).
