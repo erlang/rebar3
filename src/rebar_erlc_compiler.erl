@@ -66,7 +66,7 @@ do_compile(Config, SrcWildcard, OutDir, InExt, OutExt, CompileFn, FirstFiles) ->
             %% Build list of output files
             Targets = [target_file(S, OutDir, InExt, OutExt) || S <- Srcs],
             Files = lists:zip(Srcs, Targets),
-            
+
             %% Make sure target directory exists
             ok = filelib:ensure_dir(hd(Targets)),
             
@@ -87,6 +87,7 @@ compile_each([{Src, Target} | Rest], Config, CompileFn) ->
             ?CONSOLE("Compiling ~s\n", [Src]),
             CompileFn(Src, Config);
         false ->
+            ?INFO("Skipping ~s\n", [Src]),
             ok
     end,
     compile_each(Rest, Config, CompileFn).
@@ -98,10 +99,12 @@ needs_compile(Src, Target) ->
 target_file(F, TargetDir, InExt, OutExt) ->
     filename:join([TargetDir, filename:basename(F, InExt) ++ OutExt]).
 
+compile_opts(Config, Key) ->
+    rebar_config:get_list(Config, Key, []).
 
 compile_erl(Source, Config) ->
-    Opts = rebar_config:get_list(Config, erl_opts, []),
-    case compile:file(Source, [{i, "include"}, {outdir, "ebin"}, report] ++ Opts) of
+    Opts = [{i, "include"}, {outdir, "ebin"}, report] ++ compile_opts(Config, erl_opts),
+    case compile:file(Source, Opts) of
         {ok, _} ->
             ok;
         error ->
@@ -109,8 +112,8 @@ compile_erl(Source, Config) ->
     end.
 
 compile_mib(Source, Config) ->
-    Opts = rebar_config:get_list(Config, mib_opts, []),
-    case snmpc:compile(Source, [{outdir, "priv/mibs"}, {i, ["priv/mibs"]}] ++ Opts) of
+    Opts = [{outdir, "priv/mibs"}, {i, ["priv/mibs"]}] ++ compile_opts(Config, mib_opts),
+    case snmpc:compile(Source, Opts) of
         {ok, _} ->
             ok;
         {error, compilation_failed} ->

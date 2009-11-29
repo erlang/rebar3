@@ -22,10 +22,9 @@
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
--module(rebar_app_utils).
+-module(rebar_app_installer).
 
--export([is_app_dir/0, is_app_dir/1,
-         load_app_file/1]).
+-export([install/2]).
 
 -include("rebar.hrl").
 
@@ -33,26 +32,37 @@
 %% Public API
 %% ===================================================================
 
-is_app_dir() ->
-    is_app_dir(rebar_util:get_cwd()).
+install(Config, File) ->
+    %% Load the app name and version from the .app file and construct
+    %% the app identifier
+    {ok, AppName, AppData} = rebar_app_utils:load_app_file(File),
+    Vsn = proplists:get_value(vsn, AppData),
+    AppId = ?FMT("~s-~s", [AppName, Vsn]),
+    ?CONSOLE("Installing: ~s\n", [AppId]),
 
-is_app_dir(Dir) ->
-    Fname = filename:join([Dir, "ebin/*.app"]),
-    case filelib:wildcard(Fname) of
-        [AppFile] ->
-            {true, AppFile};
-        _ ->
-            false
-    end.
+    %% Check the erlang lib directory to see if this app identifier
+    %% is already present.
+    AppDir = filename:join([code:lib_dir(), AppId]),
+    case filelib:is_dir(AppDir) of
+        true ->
+            %% Already exists -- check for force=1 global flag and only
+            %% continue if it's set
+            case rebar_config:get_global(force, "0") of
+                "0" ->
+                    ?ERROR("~s already exists. Installation failed."),
+                    ?FAIL;
+                "1" ->
+                    ?WARN("~s already exists, but forcibly overwriting."),                    
+            end;
+        false ->
+            ok
+    end,
 
-load_app_file(Filename) ->
-    case file:consult(Filename) of
-        {ok, [{application, AppName, AppData}]} ->
-            {ok, AppName, AppData};
-        {error, Reason} ->
-            ?ERROR("Failed to load app file from ~s: ~p\n", [Filename, Reason]),
-            error;
-        Other ->
-            ?ERROR("Unexpected terms from app file ~s: ~p\n", [Filename, Other]),
-            error
-    end.
+    %% Wipe out any previous versions
+    ok = rebar_file_utils:rm_rf(Appdir),
+
+    %% Re-create target
+    ok = rebar_file_utils:mkdir_p(AppDir),
+
+    %% By default we copy the ebin, include, src and priv directories
+    

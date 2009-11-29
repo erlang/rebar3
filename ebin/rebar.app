@@ -11,10 +11,14 @@
                   stdlib, 
                   sasl]},
   {env, [
+         %% Default log level
+         {log_level, error},
+         
          %% Key/value list of base/default configuration used by
          %% rebar_config during initialization
          {default_config, [
-                           {app_modules, [ rebar_erlc_compiler ]}
+                           {app_modules, [ rebar_erlc_compiler,
+                                           rebar_app_installer ]}
                            ]}
         ]}
 ]}.

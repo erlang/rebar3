@@ -22,77 +22,63 @@
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
--module(rebar_config).
+-module(rebar_log).
 
--export([new/1,
-         get_modules/2,
-         get_list/3,
-         set_global/2, get_global/2]).
-
--include("rebar.hrl").
-
--record(config, { dir,
-                  opts }).
-
+-export([init/0,
+         set_level/1, get_level/0,
+         log/3]).
 
 %% ===================================================================
 %% Public API
 %% ===================================================================
 
-new(Dir) ->
-    {ok, DefaultConfig} = application:get_env(rebar, default_config),
-    BaseDict = orddict:from_list(DefaultConfig),
-
-    %% Load terms from rebar.config, if it exists
-    ConfigFile = filename:join([Dir, "rebar.config"]),
-    case file:consult(ConfigFile) of
-        {ok, Terms} ->
-            Dict = merge_terms(Terms, BaseDict);
-        {error, enoent} ->
-            Dict = BaseDict;
-        Other ->
-            ?WARN("Failed to load ~s: ~p\n", [ConfigFile, Other]),
-            ?FAIL,
-            Dict = BaseDict
-    end,
-    #config { dir = Dir, opts = Dict }.
-
-
-get_modules(Config, app) ->
-    case orddict:find(app_modules, Config#config.opts) of
-        error ->
-            [];
-        {ok, Modules} ->
-            Modules
+init() ->
+    case rebar_config:get_global(verbose, "0") of
+        "1" ->
+            set_level(debug);
+        _ ->
+            set_level(error)
     end.
+            
 
-get_list(Config, Key, Default) ->
-    case orddict:find(Key, Config#config.opts) of
-        error ->
-            Default;
-        {ok, List} ->
-            List
-    end.
+set_level(Level) ->
+    ok = application:set_env(rebar, log_level, Level).
 
-set_global(Key, Value) ->
-    application:set_env(rebar_global, Key, Value).
-
-get_global(Key, Default) ->
-    case application:get_env(rebar_global, Key) of
+get_level() ->
+    case application:get_env(rebar, log_level) of
         undefined ->
-            Default;
+            error;
         {ok, Value} ->
             Value
     end.
 
+log(Level, Str, Args) ->
+    {ok, LogLevel} = application:get_env(rebar, log_level),
+    case should_log(LogLevel, Level) of
+        true ->
+            io:format(log_prefix(Level) ++ Str, Args);
+        false ->
+            ok
+    end.
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
-merge_terms([], Dict) ->
-    Dict;
-merge_terms([{Key, Value} | Rest], Dict) ->
-    merge_terms(Rest, orddict:store(Key, Value, Dict));
-merge_terms([_ | Rest], Dict) ->
-    merge_terms(Rest, Dict).
+should_log(debug, _)     -> true;
+should_log(info, debug)  -> false;
+should_log(info, _)      -> true;
+should_log(warn, debug)  -> false;
+should_log(warn, info)   -> false;
+should_log(warn, _)      -> true;
+should_log(error, error) -> true;
+should_log(error, _)     -> false;
+should_log(_, _)         -> false.
+    
+log_prefix(debug) -> "DEBUG:" ;
+log_prefix(info)  -> "INFO: ";
+log_prefix(warn)  -> "WARN: ";
+log_prefix(error) -> "ERROR: ".
+
+     
+    
