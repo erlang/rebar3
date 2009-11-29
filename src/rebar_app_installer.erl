@@ -49,20 +49,20 @@ install(Config, File) ->
             %% continue if it's set
             case rebar_config:get_global(force, "0") of
                 "0" ->
-                    ?ERROR("~s already exists. Installation failed."),
+                    ?ERROR("~s already exists. Installation failed.", []),
                     ?FAIL;
                 "1" ->
-                    ?WARN("~s already exists, but forcibly overwriting."),                    
+                    ?WARN("~s already exists, but forcibly overwriting.", [])
             end;
         false ->
             ok
-    end,
+    end.
 
     %% Wipe out any previous versions
-    ok = rebar_file_utils:rm_rf(Appdir),
+%    ok = rebar_file_utils:rm_rf(Appdir),
 
     %% Re-create target
-    ok = rebar_file_utils:mkdir_p(AppDir),
+%    ok = rebar_file_utils:mkdir_p(AppDir).
 
     %% By default we copy the ebin, include, src and priv directories
     

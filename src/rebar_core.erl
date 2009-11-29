@@ -26,6 +26,8 @@
 
 -export([run/1]).
 
+-include("rebar.hrl").
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -57,7 +59,7 @@ run(Args) ->
     update_code_path(Targets),
 
     %% Finally, apply the specified command to each target
-    apply_commands(Targets, Commands)
+    apply_commands(Targets, Commands).
 
 
 %% ===================================================================
