@@ -84,7 +84,10 @@ install(Config, File) ->
         [] ->
             ok;
         List ->
-            ok 
+            %% code:root_dir() gives $OTPROOT/lib/erlang on a stock install
+            %% so find the bin dir relative to that.
+            BinDir = filename:join([code:root_dir(), "..", "..", "bin"]),
+            install_binaries(List, AppDir, BinDir)
     end.
     
 
@@ -95,7 +98,7 @@ install(Config, File) ->
 install_binaries([], _AppDir, _BinDir) ->
     ok;
 install_binaries([Bin | Rest], AppDir, BinDir) ->
-    FqBin = filename:join([Bin, AppDir]),
+    FqBin = filename:join([AppDir, Bin]),
     rebar_file_utils:ln_sf(FqBin, BinDir),
     install_binaries(Rest, AppDir, BinDir).
  

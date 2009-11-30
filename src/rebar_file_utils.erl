@@ -26,7 +26,8 @@
 
 -export([rm_rf/1,
          mkdir_p/1,
-         cp_r/2]).
+         cp_r/2,
+         ln_sf/2]).
 
 -include("rebar.hrl").
 
