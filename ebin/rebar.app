@@ -19,6 +19,7 @@
          {default_config, [
                            {app_modules, [ rebar_protobuffs_compiler,
                                            rebar_erlc_compiler,
+                                           rebar_port_compiler,
                                            rebar_app_installer ]}
                            ]}
         ]}

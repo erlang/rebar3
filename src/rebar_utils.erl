@@ -24,9 +24,39 @@
 %% -------------------------------------------------------------------
 -module(rebar_utils).
 
--export([get_cwd/0]).
+-export([get_cwd/0,
+         get_os/0]).
+
+
+%% ====================================================================
+%% Public API
+%% ====================================================================
 
 get_cwd() ->
     {ok, Dir} = file:get_cwd(),
     Dir.
 
+
+get_os() ->
+    Arch = erlang:system_info(system_architecture),
+    case match_first([{"linux", linux}, {"darwin", darwin}], Arch) of
+        nomatch ->
+            {unknown, Arch};
+        ArchAtom ->
+            ArchAtom
+    end.
+
+
+%% ====================================================================
+%% Internal functions
+%% ====================================================================
+
+match_first([], Val) ->
+    nomatch;
+match_first([{Regex, MatchValue} | Rest], Val) ->
+    case re:run(Val, Regex, [{capture, none}]) of
+        match ->
+            MatchValue;
+        nomatch ->
+           match_first(Rest, Val)
+    end.
