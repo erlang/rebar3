@@ -1,11 +1,16 @@
 {application, rebar,
  [{description, "Rebar: Erlang Build Tool"},
   {vsn, "1"},
-  {modules, [ rebar_config,
-              rebar_utils,
-              rebar_app_utils,
+  {modules, [ rebar_app_utils,
+              rebar_config,
+              rebar_core,
+              rebar_erlc_compiler,
+              rebar_file_utils,
+              rebar_log,
+              rebar_otp_app,
+              rebar_protobuffs_compiler,
               rebar_rel_utils,
-              rebar_erlc_compiler]},
+              rebar_utils ]},
   {registered, []},
   {applications, [kernel, 
                   stdlib, 
@@ -20,7 +25,7 @@
                            {app_modules, [ rebar_protobuffs_compiler,
                                            rebar_erlc_compiler,
                                            rebar_port_compiler,
-                                           rebar_app_installer ]}
+                                           rebar_otp_app ]}
                            ]}
         ]}
 ]}.

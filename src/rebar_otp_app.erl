@@ -22,15 +22,25 @@
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
--module(rebar_app_installer).
+-module(rebar_otp_app).
 
--export([install/2]).
+-export([compile/2,
+         install/2]).
 
 -include("rebar.hrl").
 
 %% ===================================================================
 %% Public API
 %% ===================================================================
+
+compile(Config, File) ->
+    %% Load the app name and version from the .app file and construct
+    %% the app identifier
+    {ok, AppName, AppData} = rebar_app_utils:load_app_file(File),
+    validate_name(AppName, File),
+    validate_modules(AppName, proplists:get_value(modules, AppData)),
+    ok.
+
 
 install(Config, File) ->
     %% Load the app name and version from the .app file and construct
@@ -74,7 +84,10 @@ install(Config, File) ->
         [] ->
             ok;
         List ->
-            ok
+            %% code:root_dir() gives $OTPROOT/lib/erlang on a stock install
+            %% so find the bin dir relative to that.
+            BinDir = filename:join([code:root_dir(), "..", "..", "bin"]),
+            install_binaries(List, AppDir, BinDir)
     end.
     
 
@@ -85,6 +98,52 @@ install(Config, File) ->
 install_binaries([], _AppDir, _BinDir) ->
     ok;
 install_binaries([Bin | Rest], AppDir, BinDir) ->
-    FqBin = filename:join([Bin, AppDir]),
+    FqBin = filename:join([AppDir, Bin]),
     rebar_file_utils:ln_sf(FqBin, BinDir),
     install_binaries(Rest, AppDir, BinDir).
+ 
+validate_name(AppName, File) ->
+    %% Convert the .app file name to an atom -- check it against the identifier within the file
+    ExpApp = list_to_atom(filename:basename(File, ".app")),
+    case ExpApp == AppName of
+        true ->
+            ok;
+        false ->
+            ?ERROR("Invalid ~s: name of application (~p) must match filename.\n", [File, AppName]),
+            ?FAIL
+    end.
+
+validate_modules(AppName, undefined) ->
+            ?ERROR("Missing modules declaration in~p.app:\n~s", [AppName]),
+            ?FAIL;
+
+validate_modules(AppName, Mods) ->
+    %% Construct two sets -- one for the actual .beam files in ebin/ and one for the modules
+    %% listed in the .app file
+    EbinSet = ordsets:from_list([beam_to_mod(N) || N <- filelib:wildcard("ebin/*.beam")]),
+    ModSet = ordsets:from_list(Mods),
+
+    %% Identify .beam files listed in the .app, but not present in ebin/
+    case ordsets:subtract(ModSet, EbinSet) of
+        [] ->
+            ok;
+        MissingBeams ->
+            Msg1 = lists:flatten([io_lib:format("\t* ~p\n", [M]) || M <- MissingBeams]),
+            ?ERROR("One or more modules listed in ~p.app are not present in ebin/*.beam:\n~s", 
+                   [AppName, Msg1]),
+            ?FAIL
+    end,
+
+    %% Identify .beam files NOT list in the .app, but present in ebin/
+    case ordsets:subtract(EbinSet, ModSet) of
+        [] ->
+            ok;
+        MissingMods ->
+            Msg2 = lists:flatten([io_lib:format("\t* ~p\n", [M]) || M <- MissingMods]),
+            ?ERROR("On or more .beam files exist that are not listed in ~p.app:\n~s", 
+                   [AppName, Msg2]),
+            ?FAIL
+    end.
+
+beam_to_mod(Filename) ->
+    list_to_atom(filename:basename(Filename, ".beam")).
