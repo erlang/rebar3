@@ -10,4 +10,4 @@ erlc -I include -o ebin src/*.erl
 ## into erlang distro
 export ERL_LIBS=`(cd .. && pwd)`
 echo $ERL_LIBS
-priv/rebar install
+priv/rebar install ${@}
