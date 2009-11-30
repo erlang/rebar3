@@ -17,7 +17,8 @@
          %% Key/value list of base/default configuration used by
          %% rebar_config during initialization
          {default_config, [
-                           {app_modules, [ rebar_erlc_compiler,
+                           {app_modules, [ rebar_protobuffs_compiler,
+                                           rebar_erlc_compiler,
                                            rebar_app_installer ]}
                            ]}
         ]}
