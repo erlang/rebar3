@@ -33,7 +33,7 @@
 %% Public API
 %% ===================================================================
 
-compile(Config, Dir) ->
+compile(Config, _AppFile) ->
     do_compile(Config, "src/*.erl", "ebin", ".erl", ".beam",
                fun compile_erl/2,
                rebar_config:get_list(Config, erl_first_files, [])),
@@ -41,7 +41,7 @@ compile(Config, Dir) ->
                fun compile_mib/2,
                rebar_config:get_list(Config, mib_first_files, [])).
 
-clean(Config, Dir) ->
+clean(_Config, _AppFile) ->
     %% TODO: This would be more portable if it used Erlang to traverse
     %%       the dir structure and delete each file; however it would also
     %%       much slower.

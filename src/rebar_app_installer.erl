@@ -49,20 +49,42 @@ install(Config, File) ->
             %% continue if it's set
             case rebar_config:get_global(force, "0") of
                 "0" ->
-                    ?ERROR("~s already exists. Installation failed.", []),
+                    ?ERROR("~s already exists. Installation failed.\n", [AppId]),
                     ?FAIL;
                 "1" ->
-                    ?WARN("~s already exists, but forcibly overwriting.", [])
+                    ?WARN("~s already exists, but forcibly overwriting.\n", [AppId])
             end;
         false ->
             ok
-    end.
+    end,
 
     %% Wipe out any previous versions
-%    ok = rebar_file_utils:rm_rf(Appdir),
+    ok = rebar_file_utils:rm_rf(AppDir),
 
     %% Re-create target
-%    ok = rebar_file_utils:mkdir_p(AppDir).
+    ok = rebar_file_utils:mkdir_p(AppDir),
 
     %% By default we copy the ebin, include, src and priv directories
+    ok = rebar_file_utils:cp_r(["ebin", "src", "priv", "include"],
+                               AppDir),
+
+    %% Check the config to see if we have any binaries that need to be
+    %% linked into the erlang path
+    case rebar_config:get_list(Config, app_bin, []) of
+        [] ->
+            ok;
+        List ->
+            ok
+    end.
     
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
+
+install_binaries([], _AppDir, _BinDir) ->
+    ok;
+install_binaries([Bin | Rest], AppDir, BinDir) ->
+    FqBin = filename:join([Bin, AppDir]),
+    rebar_file_utils:ln_sf(FqBin, BinDir),
+    install_binaries(Rest, AppDir, BinDir).
