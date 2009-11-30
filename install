@@ -8,4 +8,6 @@ erlc -I include -o ebin src/*.erl
 
 ## Use application installer to perform actual installation
 ## into erlang distro
+export ERL_LIBS=`(cd .. && pwd)`
+echo $ERL_LIBS
 priv/rebar install
