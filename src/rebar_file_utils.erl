@@ -27,7 +27,8 @@
 -export([rm_rf/1,
          mkdir_p/1,
          cp_r/2,
-         ln_sf/2]).
+         ln_sf/2,
+         delete_each/1]).
 
 -include("rebar.hrl").
 
@@ -57,4 +58,17 @@ ln_sf(Source, Dest) ->
     end,
     [] = os:cmd(?FMT("ln -sf ~s ~s", [Source, Dest])),
     ok.
+
+delete_each([]) ->
+    ok;
+delete_each([File | Rest]) ->
+    case file:delete(File) of
+        ok ->
+            delete_each(Rest);
+        {error, enoent} ->
+            delete_each(Rest);
+        {error, Reason} ->
+            ?ERROR("Failed to delete file ~s: ~p\n", [File, Reason]),
+            ?FAIL
+    end.
         
