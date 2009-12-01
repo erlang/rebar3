@@ -27,6 +27,7 @@
 -export([new/1,
          get_modules/2,
          get_list/3,
+         get/3,
          set_global/2, get_global/2]).
 
 -include("rebar.hrl").
@@ -74,6 +75,14 @@ get_list(Config, Key, Default) ->
             List
     end.
 
+get(Config, Key, Default) ->
+    case orddict:find(Key, Config#config.opts) of
+        error ->
+            Default;
+        {ok, Value} ->
+            Value
+    end.
+    
 set_global(Key, Value) ->
     application:set_env(rebar_global, Key, Value).
 
