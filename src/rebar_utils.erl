@@ -25,8 +25,12 @@
 -module(rebar_utils).
 
 -export([get_cwd/0,
-         get_os/0]).
+         is_arch/1,
+         get_os/0,
+         sh/2,
+         sh_failfast/2]).
 
+-include("rebar.hrl").
 
 %% ====================================================================
 %% Public API
@@ -37,6 +41,15 @@ get_cwd() ->
     Dir.
 
 
+is_arch(ArchRegex) ->
+    Arch = erlang:system_info(system_architecture),
+    case re:run(Arch, ArchRegex, [{capture, none}]) of
+        match ->
+            true;
+        nomatch ->
+            false
+    end.
+
 get_os() ->
     Arch = erlang:system_info(system_architecture),
     case match_first([{"linux", linux}, {"darwin", darwin}], Arch) of
@@ -44,6 +57,22 @@ get_os() ->
             {unknown, Arch};
         ArchAtom ->
             ArchAtom
+    end.
+
+
+sh(Command, Env) ->
+    ?INFO("sh: ~s\n~p\n", [Command, Env]),
+    Port = open_port({spawn, Command}, [{env, Env}, exit_status, {line, 16384},
+                                        use_stdio, stderr_to_stdout]),
+    sh_loop(Port).
+
+sh_failfast(Command, Env) ->
+    case sh(Command, Env) of
+        ok ->
+            ok;
+        {error, Rc} ->
+            ?ERROR("~s failed with error: ~w\n", [Command, Rc]),
+            ?FAIL
     end.
 
 
@@ -59,4 +88,15 @@ match_first([{Regex, MatchValue} | Rest], Val) ->
             MatchValue;
         nomatch ->
            match_first(Rest, Val)
+    end.
+
+sh_loop(Port) ->            
+    receive
+        {Port, {data, {_, Line}}} ->
+            ?INFO("> ~s\n", [Line]),
+            sh_loop(Port);
+        {Port, {exit_status, 0}} ->
+            ok;
+        {Port, {exit_status, Rc}} ->
+            {error, Rc}
     end.
