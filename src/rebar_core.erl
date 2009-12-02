@@ -32,7 +32,7 @@
 %% Public API
 %% ===================================================================
 
-run(Args) ->
+run(Args) ->    
     %% Filter all the flags (i.e. string of form key=value) from the
     %% command line arguments. What's left will be the commands to run.
     Commands = filter_flags(Args, []),
@@ -100,6 +100,7 @@ find_targets(_Files, _Root, Acc, 10) ->
     Acc;
 find_targets([F | Rest], Root, Acc, Depth) ->
     AbsName = filename:join([Root, F]),
+    ?DEBUG("find_targets ~s ~s\n", [Root, F]),
     case target_type(AbsName) of
         undefined ->
             case filelib:is_dir(AbsName) of
@@ -123,21 +124,12 @@ target_type(AbsName) ->
             {app, AppFile};
         false ->
             case rebar_rel_utils:is_rel_dir(AbsName) of
-                true ->
-                    {rel, ""};
+                {true, ReltoolFile} ->
+                    {rel, ReltoolFile};
                 false ->
                     undefined
             end
     end.
-
-
-%%
-%% Given a command and target type, determine if the command is applicable
-%%
-valid_command(compile, app) -> true;
-valid_command(install, app) -> true;
-valid_command(clean, _Any)  -> true;
-valid_command(_, _)         -> false.
 
 
 %%
@@ -148,6 +140,7 @@ update_code_path([]) ->
 update_code_path([{app, Dir, _} | Rest]) ->
     EbinDir = filename:join([Dir, "ebin"]),
     true = code:add_patha(EbinDir),
+    ?DEBUG("Adding ~s to code path\n", [EbinDir]),
     update_code_path(Rest);
 update_code_path([_ | Rest]) ->
     update_code_path(Rest).
@@ -159,10 +152,7 @@ apply_commands(Targets, [CommandStr | Rest]) ->
     %% Convert the command into an atom for convenience
     Command = list_to_atom(CommandStr),
 
-    %% Filter out all the targets, based on the specified command.
-    FilteredTargets = [{Type, Dir, Filename} || {Type, Dir, Filename} <- Targets,
-                                                valid_command(Command, Type) == true],
-    case catch(apply_command(FilteredTargets, Command)) of
+    case catch(apply_command(Targets, Command)) of
         ok ->
             apply_commands(Targets, Rest);
         Other ->
@@ -180,6 +170,7 @@ apply_command([{Type, Dir, File} | Rest], Command) ->
         [] ->
             ok;
         Subdirs ->
+            ?DEBUG("Subdirs: ~p\n", [Subdirs]),
             update_code_path(Subdirs),
             case apply_command(Subdirs, Command) of
                 ok ->
@@ -189,43 +180,50 @@ apply_command([{Type, Dir, File} | Rest], Command) ->
             end
     end,
 
-    %% Provide some info on where we are
-    ?CONSOLE("==> ~s (~s)\n", [filename:basename(Dir), Command]),
 
     %% Pull the list of modules that are associated with Type operations. Each module
     %% will be inspected for a function matching Command and if found, will execute that. 
-    Modules = rebar_config:get_modules(Config, Type),
-    case catch(run_modules(Modules, Command, Config, File)) of
-        ok ->
+    Modules = select_modules(rebar_config:get_modules(Config, Type), Command, []),
+    case Modules of
+        [] ->
+            %% None of the modules implement the command; move on to next target
             apply_command(Rest, Command);
-        Other ->
-            ?ERROR("~p failed while processing ~s: ~p", [Command, Dir, Other]),
-            error
+        _ ->
+            %% Provide some info on where we are
+            ?CONSOLE("==> ~s (~s)\n", [filename:basename(Dir), Command]),
+
+            %% Run the available modules
+            case catch(run_modules(Modules, Command, Config, File)) of
+                ok ->
+                    apply_command(Rest, Command);
+                Other ->
+                    ?ERROR("~p failed while processing ~s: ~p", [Command, Dir, Other]),
+                    error
+            end
     end.
 
-subdirs([], Acc) ->
-    Acc;
-subdirs([Dir | Rest], Acc) ->
-    Subdir = filename:join([rebar_utils:get_cwd(), Dir]),
-    subdirs(Rest, Acc ++ find_targets(Subdir)).
 
+
+subdirs(Dirs, Acc) ->
+    lists:reverse(find_targets(Dirs, rebar_utils:get_cwd(), [], 1)).
+
+select_modules([], _Command, Acc) ->
+    lists:reverse(Acc);
+select_modules([Module | Rest], Command, Acc) ->
+    Exports = Module:module_info(exports),
+    case lists:member({Command, 2}, Exports) of
+        true ->
+            select_modules(Rest, Command, [Module | Acc]);
+        false ->
+            select_modules(Rest, Command, Acc)
+    end.
 
 run_modules([], _Command, _Config, _File) ->
     ok;
 run_modules([Module | Rest], Command, Config, File) ->
-    case invoke_command(Module, Command, Config, File) of
+    case Module:Command(Config, File) of
         ok ->
             run_modules(Rest, Command, Config, File);
         {error, Reason} ->
             {error, Reason}
-    end.
-
-invoke_command(Module, Command, Config, File) ->
-    Exports = Module:module_info(exports),
-    case lists:member({Command, 2}, Exports) of
-        true ->
-            Module:Command(Config, File);
-        false ->
-            ?DEBUG("Skipping ~s:~s/2 (not exported)\n", [Module, Command]),
-            ok
     end.

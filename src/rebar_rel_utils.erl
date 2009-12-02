@@ -30,9 +30,10 @@ is_rel_dir() ->
     is_rel_dir(rebar_util:get_cwd()).
 
 is_rel_dir(Dir) ->
-    case filelib:wildcard("*.rel") of
-        [_File] ->
-            true;
-        _ ->
+    Fname = filename:join([Dir, "reltool.config"]),
+    case filelib:is_file(Fname) of
+        true ->
+            {true, Fname};
+        false ->
             false
     end.

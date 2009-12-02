@@ -25,7 +25,9 @@
                            {app_modules, [ rebar_protobuffs_compiler,
                                            rebar_erlc_compiler,
                                            rebar_port_compiler,
-                                           rebar_otp_app ]}
+                                           rebar_otp_app ]},
+
+                           {rel_modules, [ rebar_reltool ]}
                            ]}
         ]}
 ]}.
