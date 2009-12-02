@@ -60,12 +60,9 @@ new(Dir) ->
 
 
 get_modules(Config, app) ->
-    case orddict:find(app_modules, Config#config.opts) of
-        error ->
-            [];
-        {ok, Modules} ->
-            Modules
-    end.
+    get_list(Config, app_modules, []);
+get_modules(Config, rel) ->
+    get_list(Config, rel_modules, []).
 
 get_list(Config, Key, Default) ->
     case orddict:find(Key, Config#config.opts) of
