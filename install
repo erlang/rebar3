@@ -3,11 +3,17 @@
 # Fail on first error
 set -e
 
-## Compile 
-erlc -I include -o ebin src/*.erl
+## Check path for exiting rebar instance -- if it's around, use it
+## for compilation (NOT installation!)
+`which -s rebar`
+if [ $? == 0 ]; then
+    rebar compile ${@}
+else
+    ## Use raw erlc..
+    erlc -I include -o ebin src/*.erl
+fi
 
 ## Use application installer to perform actual installation
 ## into erlang distro
 export ERL_LIBS=`(cd .. && pwd)`
-echo $ERL_LIBS
 priv/rebar install ${@}
