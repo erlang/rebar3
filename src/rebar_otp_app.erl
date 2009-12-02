@@ -46,6 +46,12 @@ install(Config, File) ->
     %% Load the app name and version from the .app file and construct
     %% the app identifier
     {ok, AppName, AppData} = rebar_app_utils:load_app_file(File),
+
+    %% Validate the .app file prior to installation
+    validate_name(AppName, File),
+    validate_modules(AppName, proplists:get_value(modules, AppData)),
+
+    %% Pull out the vsn and construct identifier
     Vsn = proplists:get_value(vsn, AppData),
     AppId = ?FMT("~s-~s", [AppName, Vsn]),
     ?CONSOLE("Installing: ~s\n", [AppId]),
@@ -74,9 +80,10 @@ install(Config, File) ->
     %% Re-create target
     ok = rebar_file_utils:mkdir_p(AppDir),
 
-    %% By default we copy the ebin, include, src and priv directories
-    ok = rebar_file_utils:cp_r(["ebin", "src", "priv", "include"],
-                               AppDir),
+    %% By default we copy the ebin, include, src and priv directories (if they exist)
+    Files = [F || F <- ["ebin", "src", "priv", "include"],
+                  filelib:last_modified(F) /= 0],
+    ok = rebar_file_utils:cp_r(Files, AppDir),
 
     %% Check the config to see if we have any binaries that need to be
     %% linked into the erlang path
@@ -101,6 +108,7 @@ install_binaries([Bin | Rest], AppDir, BinDir) ->
     FqBin = filename:join([AppDir, Bin]),
     rebar_file_utils:ln_sf(FqBin, BinDir),
     install_binaries(Rest, AppDir, BinDir).
+    
  
 validate_name(AppName, File) ->
     %% Convert the .app file name to an atom -- check it against the identifier within the file
@@ -147,3 +155,4 @@ validate_modules(AppName, Mods) ->
 
 beam_to_mod(Filename) ->
     list_to_atom(filename:basename(Filename, ".beam")).
+
