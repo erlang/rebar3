@@ -162,7 +162,7 @@ apply_commands(Targets, [CommandStr | Rest]) ->
     %% Filter out all the targets, based on the specified command.
     FilteredTargets = [{Type, Dir, Filename} || {Type, Dir, Filename} <- Targets,
                                                 valid_command(Command, Type) == true],
-    case apply_command(FilteredTargets, Command) of
+    case catch(apply_command(FilteredTargets, Command)) of
         ok ->
             apply_commands(Targets, Rest);
         Other ->
@@ -175,6 +175,20 @@ apply_command([{Type, Dir, File} | Rest], Command) ->
     ok = file:set_cwd(Dir),
     Config = rebar_config:new(Dir),
 
+    %% Look for subdirs configuration list -- if it exists, we're going to process those first
+    case subdirs(rebar_config:get_list(Config, subdirs, []), []) of
+        [] ->
+            ok;
+        Subdirs ->
+            update_code_path(Subdirs),
+            case apply_command(Subdirs, Command) of
+                ok ->
+                    ok = file:set_cwd(Dir);
+                error ->
+                    ?FAIL
+            end
+    end,
+
     %% Provide some info on where we are
     ?CONSOLE("==> ~s (~s)\n", [filename:basename(Dir), Command]),
 
@@ -185,8 +199,15 @@ apply_command([{Type, Dir, File} | Rest], Command) ->
         ok ->
             apply_command(Rest, Command);
         Other ->
-            ?ERROR("~p failed while processing ~s: ~p", [Command, Dir, Other])
+            ?ERROR("~p failed while processing ~s: ~p", [Command, Dir, Other]),
+            error
     end.
+
+subdirs([], Acc) ->
+    Acc;
+subdirs([Dir | Rest], Acc) ->
+    Subdir = filename:join([rebar_utils:get_cwd(), Dir]),
+    subdirs(Rest, Acc ++ find_targets(Subdir)).
 
 
 run_modules([], _Command, _Config, _File) ->
