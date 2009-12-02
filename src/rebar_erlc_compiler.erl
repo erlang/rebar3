@@ -60,18 +60,23 @@ do_compile(Config, SrcWildcard, OutDir, InExt, OutExt, CompileFn, FirstFiles) ->
             ok;
         FoundFiles when is_list(FoundFiles) ->
             %% Ensure that the FirstFiles are compiled first; drop them from the
-            %% FoundFiles and then build a final list of sources
-            Srcs = FirstFiles ++ drop_each(FirstFiles, FoundFiles),
-            
-            %% Build list of output files
-            Targets = [target_file(S, OutDir, InExt, OutExt) || S <- Srcs],
-            Files = lists:zip(Srcs, Targets),
+            %% FoundFiles and compile them in sequence
+            FirstTargets = [{Fs, target_file(Fs, OutDir, InExt, OutExt)} || Fs <- FirstFiles],
+            RestTargets = [{Fs, target_file(Fs, OutDir, InExt, OutExt)} ||
+                              Fs <- drop_each(FirstFiles, FoundFiles)],
 
-            %% Make sure target directory exists
-            ok = filelib:ensure_dir(hd(Targets)),
+            %% Make sure target directory exists 
+            ok = filelib:ensure_dir(target_file(hd(FoundFiles), OutDir, InExt, OutExt)),
+
+            %% Compile first targets in sequence
+            compile_each(FirstTargets, Config, CompileFn),
             
-            %% Start compiling
-            compile_each(Files, Config, CompileFn)
+            %% Spin up workers
+            Self = self(),
+            Pids = [spawn_monitor(fun() -> compile_worker(Self) end) || _I <- lists:seq(1,3)],
+
+            %% Process rest of targets
+            compile_queue(Pids, RestTargets, Config, CompileFn)
     end.
 
 drop_each([], List) ->
@@ -118,4 +123,49 @@ compile_mib(Source, Config) ->
             ok;
         {error, compilation_failed} ->
             ?FAIL
+    end.
+
+compile_queue([], [], _Config, _CompileFn) ->
+    ok;
+compile_queue(Pids, Targets, Config, CompileFn) ->
+    receive
+        {next, Worker} ->
+            case Targets of
+                [] ->
+                    Worker ! empty,
+                    compile_queue(Pids, Targets, Config, CompileFn);
+                [{Src, Target} | Rest] ->
+                    Worker ! {compile, Src, Target, Config, CompileFn},
+                    compile_queue(Pids, Rest, Config, CompileFn)
+            end;
+        
+        {compiled, Source} ->
+            ?CONSOLE("Compiled ~s\n", [Source]),
+            compile_queue(Pids, Targets, Config, CompileFn);
+        
+        {'DOWN', Mref, _, Pid, normal} ->
+            ?DEBUG("Worker exited cleanly\n", []),
+            Pids2 = lists:delete({Pid, Mref}, Pids),
+            compile_queue(Pids2, Targets, Config, CompileFn);
+        
+        {'DOWN', Mref, _, Pid, _} ->
+            ?DEBUG("Worker failed: ~p\n", [Info]),
+            ?FAIL
+    end.
+
+compile_worker(QueuePid) ->
+    QueuePid ! {next, self()},
+    receive
+        {compile, Src, Target, Config, CompileFn} ->
+            case needs_compile(Src, Target) of
+                true ->
+                    CompileFn(Src, Config),
+                    QueuePid ! {compiled, Src};
+                false ->
+                    ?INFO("Skipping ~s\n", [Src]),
+                    ok
+            end,
+            compile_worker(QueuePid);
+        empty ->
+            ok
     end.
