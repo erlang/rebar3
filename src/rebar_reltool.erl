@@ -28,6 +28,7 @@
          clean/2]).
 
 -include("rebar.hrl").
+-include_lib("reltool/src/reltool.hrl").
 
 %% ===================================================================
 %% Public API
@@ -35,15 +36,16 @@
 
 generate(Config, ReltoolFile) ->
     %% Load the reltool configuration from the file
-    case file:consult(ReltoolFile) of
-        {ok, [{sys, ReltoolConfig}]} ->
-            ok;
-        Other ->
-            ReltoolConfig = undefined,
-            ?ERROR("Failed to load expected config from ~s: ~p\n", [ReltoolFile, Other]),
-            ?FAIL
-    end,
+    ReltoolConfig = load_config(ReltoolFile),
 
+    %% Spin up reltool server and load our config into it
+    {ok, Server} = reltool:start_server([{sys, ReltoolConfig}]),
+
+    %% Do some validation of the reltool configuration; error messages out of
+    %% reltool are still pretty cryptic
+    validate_rel_apps(Server, ReltoolConfig),
+
+    %% Finally, run reltool
     case catch(run_reltool(Config, ReltoolConfig)) of
         ok ->
             ok;
@@ -56,13 +58,27 @@ generate(Config, ReltoolFile) ->
 
 
 clean(Config, ReltoolFile) ->
-    ok.
+    ReltoolConfig = load_config(ReltoolFile),
+    TargetDir = target_dir(Config, ReltoolConfig),
+    rebar_file_utils:rm_rf(TargetDir),
+    rebar_file_utils:delete_each(["reltool.spec"]).
 
 
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+load_config(ReltoolFile) ->
+    %% Load the reltool configuration from the file
+    case file:consult(ReltoolFile) of
+        {ok, [{sys, ReltoolConfig}]} ->
+            ReltoolConfig;
+        Other ->
+            ?ERROR("Failed to load expected config from ~s: ~p\n", [ReltoolFile, Other]),
+            ?FAIL
+    end.
+    
 
 %%
 %% Determine the name of the target directory; try the user provided name
@@ -82,16 +98,65 @@ target_dir(Config, ReltoolConfig) ->
           Name
   end.
 
+validate_rel_apps(ReltoolServer, ReltoolConfig) ->
+    case lists:keysearch(rel, 1, ReltoolConfig) of
+        {value, {rel, _Name, _Vsn, Apps}} ->
+            %% Identify all the apps that do NOT exist, based on what's available
+            %% from the reltool server
+            Missing = lists:sort([App || App <- Apps, 
+                                         app_exists(App, ReltoolServer) == false]),
+            case Missing of
+                [] ->
+                    ok;
+                _ ->
+                    ?ERROR("Apps in {rel, ...} section not found by reltool: ~p\n", [Missing]),
+                    ?FAIL
+            end;
+        {value, Rel} ->
+            %% Invalid release format!
+            ?ERROR("Invalid {rel, ...} section in reltools.config: ~p\n", [Rel]),
+            ?FAIL;
+        false ->
+            ok
+    end.
+
+app_exists(App, Server) when is_atom(App) ->
+    case reltool_server:get_app(Server, App) of
+        {ok, _} ->
+            true;
+        _ ->
+            false
+    end;
+app_exists(AppTuple, Server) when is_tuple(AppTuple) ->
+    app_exists(element(1, AppTuple), Server).
+                       
+
 run_reltool(Config, ReltoolConfig) ->
     {ok, Server} = reltool:start_server([{sys, ReltoolConfig}]),
-    {ok, Spec} = reltool:get_target_spec(Server),
-    TargetDir = target_dir(Config, ReltoolConfig),
-    ok = file:make_dir(TargetDir),
-    case reltool:eval_target_spec(Spec, code:root_dir(), TargetDir) of
-        ok ->
-            ok;
+    case reltool:get_target_spec(Server) of
+        {ok, Spec} ->
+            dump_spec(Spec),
+            TargetDir = target_dir(Config, ReltoolConfig),
+            ok = file:make_dir(TargetDir),
+            case reltool:eval_target_spec(Spec, code:root_dir(), TargetDir) of
+                ok ->
+                    ok;
+                {error, Reason} ->
+                    ?ERROR("Failed to generate target from spec: ~p\n", [Reason]),
+                    ?FAIL
+            end;
         {error, Reason} ->
-            ?ERROR("Failed to generate target from spec: ~p\n", [Reason]),
+            ?ERROR("Unable to generate spec: ~s\n", [Reason]),
             ?FAIL
     end.
     
+
+dump_spec(Spec) ->
+    case rebar_config:get_global(dump_spec, "0") of
+        "1" ->
+            SpecBin = list_to_binary(io_lib:print(Spec, 1, 120, -1)),
+            ok = file:write_file("reltool.spec", SpecBin);
+        _ ->
+            ok
+    end.
+            
