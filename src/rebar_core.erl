@@ -196,6 +196,8 @@ apply_command([{Type, Dir, File} | Rest], Command) ->
             case catch(run_modules(Modules, Command, Config, File)) of
                 ok ->
                     apply_command(Rest, Command);
+                {error, failed} ->
+                    error;
                 Other ->
                     ?ERROR("~p failed while processing ~s: ~p", [Command, Dir, Other]),
                     error
