@@ -28,7 +28,8 @@
          is_arch/1,
          get_os/0,
          sh/2,
-         sh_failfast/2]).
+         sh_failfast/2,
+	 now_str/0]).
 
 -include("rebar.hrl").
 
@@ -75,6 +76,10 @@ sh_failfast(Command, Env) ->
             ?FAIL
     end.
 
+now_str() ->
+    {{Year, Month, Day}, {Hour, Minute, Second}} = calendar:local_time(),
+    lists:flatten(io_lib:format("~4b/~2..0b/~2..0b ~2..0b:~2..0b:~2..0b", 
+				[Year, Month, Day, Hour, Minute, Second])).
 
 %% ====================================================================
 %% Internal functions
