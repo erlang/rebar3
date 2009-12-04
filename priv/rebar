@@ -29,4 +29,9 @@
 -include_lib("rebar/include/rebar.hrl").
 
 main(Args) ->
-    rebar_core:run(Args).
+    case rebar_core:run(Args) of
+        ok ->
+            ok;
+        _ ->
+            halt(1)
+    end.
