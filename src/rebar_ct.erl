@@ -102,13 +102,21 @@ clear_log(RawLog) ->
 %% calling ct with erl does not return non-zero on failure - have to check
 %% log results
 check_log(RawLog) ->
-    Msg = os:cmd("grep 'TEST COMPLETE' " ++ RawLog),
-    case string:str(Msg, ", 0 failed") of
-	0 ->
+    Msg = os:cmd("grep -e 'TEST COMPLETE' -e '{error,make_failed}' " ++ RawLog),
+    MakeFailed = string:str(Msg, "{error,make_failed}") =/= 0,
+    RunFailed = string:str(Msg, ", 0 failed") =:= 0,
+    if
+        MakeFailed ->
+	    show_log(RawLog),
+	    ?ERROR("Building tests failed\n",[]),
+	    ?FAIL;
+
+        RunFailed ->
 	    show_log(RawLog),
 	    ?ERROR("One or more tests failed\n",[]),
 	    ?FAIL;
-	_ ->
+
+	true ->
 	    ?CONSOLE("DONE. ~s\n", [Msg])
     end.
 		
