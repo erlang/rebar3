@@ -47,7 +47,13 @@ main(Args) ->
     end,
 
     %% Finally, update executable perms for our script
-    [] = os:cmd("chmod u+x rebar").
+    [] = os:cmd("chmod u+x rebar"),
+
+    %% Add a helpful message
+    io:format("Congratulations! You now have a self-contained script called \"rebar\" in\n"
+              "your current working directory. Place this script anywhere in your path\n"
+              "and you can use rebar to build OTP-compliant apps.\n").
+
                 
                     
 
