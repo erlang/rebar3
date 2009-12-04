@@ -4,6 +4,7 @@
   {modules, [ rebar_app_utils,
               rebar_config,
               rebar_core,
+	      rebar_ct,
               rebar_erlc_compiler,
               rebar_file_utils,
               rebar_log,
@@ -27,7 +28,8 @@
                            {app_modules, [ rebar_protobuffs_compiler,
                                            rebar_erlc_compiler,
                                            rebar_port_compiler,
-                                           rebar_otp_app ]},
+                                           rebar_otp_app,
+					   rebar_ct ]},
 
                            {rel_modules, [ rebar_reltool ]}
                            ]}
