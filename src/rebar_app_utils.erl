@@ -51,8 +51,8 @@ load_app_file(Filename) ->
             {ok, AppName, AppData};
         {error, Reason} ->
             ?ERROR("Failed to load app file from ~s: ~p\n", [Filename, Reason]),
-            error;
+            ?FAIL;
         Other ->
             ?ERROR("Unexpected terms from app file ~s: ~p\n", [Filename, Other]),
-            error
+            ?FAIL
     end.

@@ -38,7 +38,7 @@ run(Args) ->
     Commands = filter_flags(Args, []),
     
     %% Pre-load the rebar app so that we get default configuration
-    application:load(rebar),
+    ok = application:load(rebar),
 
     %% Initialize logging system
     rebar_log:init(),

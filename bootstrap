@@ -1,0 +1,53 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+
+main(Args) ->
+    %% Compile all src/*.erl to ebin
+    case make:files(filelib:wildcard("src/*.erl"), [{outdir, "ebin"}, {i, "include"}]) of
+        up_to_date ->
+            ok;
+        error ->
+            io:format("Failed to compile rebar files!\n"),
+            halt(1)
+    end,
+
+    %% Make sure file:consult can parse the .app file
+    case file:consult("ebin/rebar.app") of
+        {ok, _} ->
+            ok;
+        {error, Reason} ->
+            io:format("Invalid syntax in ebin/rebar.app: ~p\n", [Reason]),
+            halt(1)
+    end,
+
+    %% Add ebin/ to our path
+    true = code:add_path("ebin"),
+
+    %% Run rebar to do proper .app validation and such
+    rebar:main(["compile"] ++ Args),
+
+    %% Construct the archive of everything in ebin/ dir -- put it on the
+    %% top-level of the zip file so that code loading works properly.
+    Files = filelib:wildcard("*", "ebin"),
+    case zip:create("mem", Files, [{cwd, "ebin"}, memory]) of
+        {ok, {"mem", ZipBin}} ->
+            %% Archive was successfully created. Prefix that binary with our
+            %% header and write to "rebar" file
+            Script = <<"#!/usr/bin/env escript\n", ZipBin/binary>>,
+            case file:write_file("rebar", Script) of
+                ok ->
+                    ok;
+                {error, WriteError} ->
+                    io:format("Failed to write rebar script: ~p\n", [WriteError]),
+                    halt(1)
+            end;
+        {error, ZipError} ->
+            io:format("Failed to construct rebar script archive: ~p\n", [ZipError]),
+            halt(1)
+    end,
+
+    %% Finally, update executable perms for our script
+    [] = os:cmd("chmod u+x rebar").
+                
+                    
+
