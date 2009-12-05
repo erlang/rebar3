@@ -27,6 +27,9 @@
 -export([compile/2,
          clean/2]).
 
+ %% make available for rebar_eunit until there is a better option
+-export([do_compile/7, compile_opts/2]).
+
 -include("rebar.hrl").
 
 %% ===================================================================
