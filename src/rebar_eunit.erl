@@ -24,7 +24,8 @@
 %% -------------------------------------------------------------------
 %% 
 %% Targets:
-%% eunit - runs eunit tests (with suffix _tests.erl) in ./test
+%% eunit - runs eunit tests
+%% clean - remove .eunit directory
 %%
 %% Global options:
 %% verbose=1 - show extra output from the eunit test
@@ -38,67 +39,61 @@
 
 -include("rebar.hrl").
 
+-define(EUNIT_DIR, ".eunit").
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
 
 eunit(Config, File) ->
-    run_test_if_present("test", Config, File).
+    %% Make sure ?EUNIT_DIR/ directory exists (tack on dummy module)
+    ok = filelib:ensure_dir(?EUNIT_DIR ++ "/foo"),
+
+    %% Compile all erlang from src/ into ?EUNIT_DIR
+    rebar_erlc_compiler:do_compile(Config, "src/*.erl", ?EUNIT_DIR, ".erl", ".beam", fun compile_erl/2,
+                                   rebar_config:get_list(Config, erl_first_files, [])),
+
+    %% TODO: If there are other wildcards specified in eunit_sources, compile them
+
+    %% Save current code path and then prefix ?EUNIT_DIR on it so that our modules
+    %% are found there
+    InitCodePath = code:get_path(),
+    true = code:add_patha(?EUNIT_DIR),
+
+    %% Enable verbose in eunit if so requested..
+    case rebar_config:is_verbose() of
+        true ->
+            BaseOpts = [verbose];
+        false ->
+            BaseOpts = []
+    end,
+
+    %% Run eunit
+    EunitOpts = BaseOpts ++ rebar_config:get_list(Config, eunit_opts, []),
+    case catch(eunit:test({dir, ?EUNIT_DIR}, EunitOpts)) of
+        ok ->
+            ok;
+        _ ->
+            ?CONSOLE("One or more eunit tests failed.\n", []),
+            ?FAIL
+    end,
+
+    %% Restore code path
+    true = code:set_path(InitCodePath),
+    ok.
+
+clean(Config, File) ->
+    rebar_file_utils:rm_rf(?EUNIT_DIR).
+    
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
-run_test_if_present(TestDir, Config, File) ->
-    case filelib:is_dir(TestDir) of
-        false ->
-	    ?WARN("~s directory not present - skipping\n", [TestDir]),
-            ok;
-        true ->
-	    run_test(TestDir, Config, File)
-    end.
 
-run_test(TestDir, Config, _File) ->
-    case rebar_erlc_compiler:do_compile(Config, "test/*.erl", "test", ".erl", ".beam",
-                                        fun compile_test/2, []) of
-        ok ->
-            Cwd = rebar_utils:get_cwd(),
-            CodePath = code:get_path(),
-            true = code:add_patha(filename:join(Cwd, "test")),
-            
-            case rebar_config:get_global(verbose, "0") of
-                "0" ->
-            Verbose = [];
-                _ ->
-                    Verbose = [verbose]
-            end,
-            
-            Tests = find_tests(TestDir),
-            Opts = Verbose,
-            ?INFO("Running tests: ~p\n", [Tests]),
-
-            change_to_work_dir(Cwd),
-
-            case catch eunit:test(Tests, Opts) of
-                ok ->
-                    ok;
-                _ ->
-                    ?CONSOLE("One or more tests failed\n", []),
-                    ?FAIL
-            end,
-            
-            code:set_path(CodePath),
-            file:set_cwd(Cwd),
-            ok;
-
-        _Other ->
-            ?ERROR("Compiling eunit tests failed\n",[]),
-            ?FAIL
-    end.
-
-
-compile_test(Source, Config) ->
-    Opts = [{i, "include"}, {outdir, "test"}, debug_info, report] ++ 
-        rebar_erlc_compiler:compile_opts(Config, erl_opts),
+compile_erl(Source, Config) ->
+    ErlOpts = rebar_config:get_list(Config, erl_opts, []),
+    EunitOpts = rebar_config:get_list(Config, eunit_compile_opts, []),
+    Opts = [{i, "include"}, {outdir, ?EUNIT_DIR}, {d, 'TEST'}, debug_info, report] ++ ErlOpts ++ EunitOpts,
     case compile:file(Source, Opts) of
         {ok, _} ->
             ok;
@@ -106,36 +101,6 @@ compile_test(Source, Config) ->
             ?FAIL
     end.
 
-
-find_tests(TestDir) ->
-    case rebar_config:get_global(suite, undefined) of
-        undefined ->
-            {ok, Files} = file:list_dir(TestDir),
-            Filter = fun(Filename) ->
-                             lists:suffix("_tests.erl", Filename)
-                     end,
-            Erls = lists:filter(Filter, Files),
-            [list_to_atom(filename:basename(F, ".erl")) || F <- Erls];
-        Suite ->
-            %% Add the _tests suffix if missing
-            case lists:suffix("_tests", Suite) of
-                true ->
-                    [list_to_atom(Suite)];
-                false ->
-                    [list_to_atom(Suite ++ "_tests")]
-            end
-    end.
-
-%% Clear the contents of the work dir and change to it
-%%                
-change_to_work_dir(MainDir) ->                  
-    WorkDir = filename:join([MainDir, "logs", "eunit_work"]),
-    rebar_file_utils:rm_rf(WorkDir),
-    ok = filelib:ensure_dir(filename:join(WorkDir, "x")),
-    ok = file:set_cwd(WorkDir).
-
-
-    
 
                           
 
