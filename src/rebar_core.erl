@@ -43,7 +43,6 @@ run(["version"]) ->
     ?CONSOLE("Version ~s built ~s\n", [Vsn, ?BUILD_TIME]),
     ok;
 run(Args) ->
-    ?CONSOLE("Args: ~p\n", [Args]),
     %% Filter all the flags (i.e. string of form key=value) from the
     %% command line arguments. What's left will be the commands to run.
     Commands = filter_flags(Args, []),

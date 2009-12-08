@@ -91,9 +91,17 @@ clean(Config, File) ->
 %% ===================================================================
 
 compile_erl(Source, Config) ->
+    case is_quickcheck_avail() of
+        true ->
+            EqcOpts = [{d, 'EQC'}];
+        false ->
+            EqcOpts = []
+    end,
+    
     ErlOpts = rebar_config:get_list(Config, erl_opts, []),
     EunitOpts = rebar_config:get_list(Config, eunit_compile_opts, []),
-    Opts = [{i, "include"}, {outdir, ?EUNIT_DIR}, {d, 'TEST'}, debug_info, report] ++ ErlOpts ++ EunitOpts,
+    Opts = [{i, "include"}, {outdir, ?EUNIT_DIR}, {d, 'TEST'}, debug_info, report] ++
+        ErlOpts ++ EunitOpts ++ EqcOpts,
     case compile:file(Source, Opts) of
         {ok, _} ->
             ok;
@@ -101,6 +109,20 @@ compile_erl(Source, Config) ->
             ?FAIL
     end.
 
-
+is_quickcheck_avail() ->
+    case erlang:get(is_quickcheck_avail) of
+        undefined ->
+            case code:lib_dir(eqc, include) of
+                {error, bad_name} ->
+                    IsAvail = false;
+                Dir ->
+                    IsAvail = filelib:is_file(filename:join(Dir, "eqc.hrl"))
+            end,
+            erlang:put(is_quickcheck_avail, IsAvail),
+            ?DEBUG("Quickcheck availability: ~p\n", [IsAvail]),
+            IsAvail;
+        IsAvail ->
+            IsAvail
+    end.
                           
 
