@@ -50,6 +50,9 @@ run(Args) ->
     %% Pre-load the rebar app so that we get default configuration
     ok = application:load(rebar),
 
+    %% Make sure crypto is running
+    crypto:start(),
+
     %% Initialize logging system
     rebar_log:init(),
     
