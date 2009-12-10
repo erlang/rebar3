@@ -137,7 +137,20 @@ run_reltool(Config, ReltoolConfig) ->
         {ok, Spec} ->
             dump_spec(Spec),
             TargetDir = target_dir(Config, ReltoolConfig),
-            ok = file:make_dir(TargetDir),
+            case file:make_dir(TargetDir) of
+                ok ->
+                    ok;
+                {error, eexist} ->
+                    %% Output directory already exists; if force=1, wipe it out
+                    case rebar_config:get_global(force, "0") of
+                        "1" ->
+                            rebar_file_utils:rm_rf(TargetDir),
+                            ok = file:make_dir(TargetDir);
+                        _ ->
+                            ?ERROR("Release target directory ~p already exists!\n", [TargetDir]),
+                            ?FAIL
+                    end
+            end,            
             case reltool:eval_target_spec(Spec, code:root_dir(), TargetDir) of
                 ok ->
                     ok;
