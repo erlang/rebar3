@@ -26,6 +26,8 @@
 
 -export([run/1]).
 
+-export([app_dir/1, rel_dir/1]). % Ugh
+
 -include("rebar.hrl").
 
 %% ===================================================================
@@ -36,30 +38,23 @@ run(Args) ->
     %% Filter all the flags (i.e. string of form key=value) from the
     %% command line arguments. What's left will be the commands to run.
     Commands = filter_flags(Args, []),
+
+%    dbg:tracer(),
+    dbg:p(all, call),
+    dbg:tpl(rebar_core, []),
+    dbg:tpl(rebar_erlc_compiler, clean, []),
     
     %% Pre-load the rebar app so that we get default configuration
     ok = application:load(rebar),
 
     %% Initialize logging system
     rebar_log:init(),
-    
-    %% From the current working directory, search recursively and find
-    %% all the application and release directories. We always terminate the
-    %% recursion at an application or release directory.
-    Cwd = rebar_utils:get_cwd(),
-    case target_type(Cwd) of
-        undefined ->
-            Targets = find_targets(Cwd);
-        {Type, Filename} ->
-            Targets = [{Type, Cwd, Filename}]
-    end,
 
-    %% Prefix all the app targets to the code path so that inter-app compilation
-    %% works properly
-    update_code_path(Targets),
+    %% Convert command strings to atoms
+    CommandAtoms = [list_to_atom(C) || C <- Commands],
 
-    %% Finally, apply the specified command to each target
-    apply_commands(Targets, Commands).
+    %% Load rebar.config, if it exists
+    process_dir(rebar_utils:get_cwd(), rebar_config:new(), CommandAtoms).
 
 
 %% ===================================================================
@@ -84,118 +79,89 @@ filter_flags([Item | Rest], Commands) ->
             ?CONSOLE("Ignoring command line argument: ~p\n", [Other]),
             filter_flags(Rest, Commands)
     end.
-            
 
 
-%%
-%% Recursively find all the targets starting at a root directory
-%%
-find_targets(Root) ->
-    {ok, Files} = file:list_dir(Root),
-    find_targets(Files, Root, [], 1).
-
-find_targets([], _Root, Acc, _Depth) ->
-    Acc;
-find_targets(_Files, _Root, Acc, 10) ->
-    Acc;
-find_targets([F | Rest], Root, Acc, Depth) ->
-    AbsName = filename:join([Root, F]),
-    ?DEBUG("find_targets ~s ~s\n", [Root, F]),
-    case target_type(AbsName) of
-        undefined ->
-            case filelib:is_dir(AbsName) of
-                true ->
-                    {ok, SubFiles} = file:list_dir(AbsName),
-                    Acc2 = find_targets(SubFiles, AbsName, Acc, Depth+1);
-                false ->
-                    Acc2 = Acc
-            end;
-        {Type, Filename} ->
-            Acc2 = [{Type, AbsName, Filename} | Acc]
-    end,
-    find_targets(Rest, Root, Acc2, Depth).
-
-%%
-%% Determine the target type of a given file: app, rel or undefined
-%%
-target_type(AbsName) ->
-    case rebar_app_utils:is_app_dir(AbsName) of
-        {true, AppFile} ->
-            {app, AppFile};
-        false ->
-            case rebar_rel_utils:is_rel_dir(AbsName) of
-                {true, ReltoolFile} ->
-                    {rel, ReltoolFile};
-                false ->
-                    undefined
-            end
-    end.
-
-
-%%
-%% Add all application targets to the front of the code path
-%%
-update_code_path([]) ->     
-    ok;
-update_code_path([{app, Dir, _} | Rest]) ->
-    EbinDir = filename:join([Dir, "ebin"]),
-    true = code:add_patha(EbinDir),
-    ?DEBUG("Adding ~s to code path\n", [EbinDir]),
-    update_code_path(Rest);
-update_code_path([_ | Rest]) ->
-    update_code_path(Rest).
-
-
-apply_commands(_Targets, []) ->
-    ok;
-apply_commands(Targets, [CommandStr | Rest]) ->
-    %% Convert the command into an atom for convenience
-    Command = list_to_atom(CommandStr),
-
-    case catch(apply_command(Targets, Command)) of
-        ok ->
-            apply_commands(Targets, Rest);
-        Other ->
-            Other
-    end.
-
-apply_command([], _Command) ->
-    ok;
-apply_command([{Type, Dir, File} | Rest], Command) ->
+process_dir(Dir, ParentConfig, Commands) ->
     ok = file:set_cwd(Dir),
-    Config = rebar_config:new(Dir),
+    Config = rebar_config:new(ParentConfig),
 
-    %% Look for subdirs configuration list -- if it exists, we're going to process those first
-    case subdirs(rebar_config:get_list(Config, subdirs, []), []) of
+    %% Save the current code path and then update it with
+    %% lib_dirs. Children inherit parents code path, but we
+    %% also want to ensure that we restore everything to pristine
+    %% condition after processing this child
+    CurrentCodePath = update_code_path(Config),
+
+    %% If there are any subdirs specified, process those first...
+    case rebar_config:get(Config, sub_dirs, []) of
         [] ->
             ok;
         Subdirs ->
-            ?DEBUG("Subdirs: ~p\n", [Subdirs]),
-            update_code_path(Subdirs),
-            case apply_command(Subdirs, Command) of
-                ok ->
-                    ok = file:set_cwd(Dir);
-                error ->
-                    ?FAIL
-            end
+            %% Edge case: config is inherited, EXCEPT for sub_dir directives -- filter those out
+            FilteredConfig = rebar_config:delete(Config, sub_dirs),
+            [process_dir(filename:join(Dir, Subdir), FilteredConfig, Commands) || Subdir <- Subdirs],
+            ok = file:set_cwd(Dir)
     end,
 
+    %% Get the list of processing modules and check each one against
+    %% CWD to see if it's a fit -- if it is, use that set of modules
+    %% to process this dir.
+    {ok, AvailModuleSets} = application:get_env(rebar, modules),
+    case choose_module_set(AvailModuleSets, Dir) of
+        {ok, Modules, ModuleSetFile} ->
+            apply_commands(Commands, Modules, Config, ModuleSetFile);
+        none ->
+            ok
+    end,
 
-    %% Pull the list of modules that are associated with Type operations. Each module
-    %% will be inspected for a function matching Command and if found, will execute that. 
-    Modules = select_modules(rebar_config:get_modules(Config, Type), Command, []),
-    case Modules of
+    %% Once we're all done processing, reset the code path to whatever
+    %% the parent initialized it to
+    restore_code_path(CurrentCodePath),
+    ok.
+
+%%
+%% Give a list of module sets from rebar.app and a directory, find
+%% the appropriate subset of modules for this directory
+%%
+choose_module_set([], _Dir) ->
+    none;
+choose_module_set([{Fn, Modules} | Rest], Dir) ->
+    case ?MODULE:Fn(Dir) of
+        {true, File} ->
+            {ok, Modules, File};
+        false ->
+            choose_module_set(Rest, Dir)
+    end.
+
+%%
+%% Return .app file if the current directory is an OTP app
+%%
+app_dir(Dir) ->
+    rebar_app_utils:is_app_dir(Dir).
+
+%%
+%% Return the reltool.config file if the current directory is release directory
+%%
+rel_dir(Dir) ->
+    rebar_rel_utils:is_rel_dir(Dir).
+            
+    
+
+
+apply_commands([], Modules, Config, ModuleFile) ->
+    ok;
+apply_commands([Command | Rest], Modules, Config, ModuleFile) ->
+    case select_modules(Modules, Command, []) of
         [] ->
-            %% None of the modules implement the command; move on to next target
-            apply_command(Rest, Command);
-        _ ->
+            apply_commands(Rest, Modules, Config, ModuleFile);
+        TargetModules ->
             %% Provide some info on where we are
+            Dir = rebar_utils:get_cwd(),
             ?CONSOLE("==> ~s (~s)\n", [filename:basename(Dir), Command]),
 
             %% Run the available modules
-            case catch(run_modules(Modules, Command, Config, File)) of
+            case catch(run_modules(TargetModules, Command, Config, ModuleFile)) of
                 ok ->
-                    apply_command(Rest, Command);
+                    apply_commands(Rest, Modules, Config, ModuleFile);
                 {error, failed} ->
                     error;
                 Other ->
@@ -204,10 +170,33 @@ apply_command([{Type, Dir, File} | Rest], Command) ->
             end
     end.
 
+    
+update_code_path(Config) ->
+    case rebar_config:get(Config, lib_dirs, []) of
+        [] ->
+            no_change;
+        Paths ->
+            OldPath = code:get_path(),
+            LibPaths = expand_lib_dirs(Paths, rebar_utils:get_cwd(), []),
+            ok = code:add_pathsa(LibPaths),
+            {old, OldPath}
+    end.
+
+restore_code_path(no_change) ->
+    ok;
+restore_code_path({old, Path}) ->
+    true = code:set_path(Path),
+    ok.
+    
+
+expand_lib_dirs([], _Root, Acc) ->
+    Acc;
+expand_lib_dirs([Dir | Rest], Root, Acc) ->
+    Apps = filelib:wildcard(filename:join([Dir, '*', ebin])),
+    FqApps = [filename:join([Root, A]) || A <- Apps],
+    expand_lib_dirs(Rest, Root, Apps ++ FqApps).
 
 
-subdirs(Dirs, Acc) ->
-    lists:reverse(find_targets(Dirs, rebar_utils:get_cwd(), [], 1)).
 
 select_modules([], _Command, Acc) ->
     lists:reverse(Acc);
@@ -229,3 +218,5 @@ run_modules([Module | Rest], Command, Config, File) ->
         {error, Reason} ->
             {error, Reason}
     end.
+
+

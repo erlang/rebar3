@@ -24,10 +24,9 @@
 %% -------------------------------------------------------------------
 -module(rebar_config).
 
--export([new/1,
-         get_modules/2,
-         get_list/3,
-         get/3,
+-export([new/0, new/1,
+         get/3, get_list/3,
+         delete/2,
          set_global/2, get_global/2]).
 
 -include("rebar.hrl").
@@ -40,45 +39,34 @@
 %% Public API
 %% ===================================================================
 
-new(Dir) ->
-    {ok, DefaultConfig} = application:get_env(rebar, default_config),
-    BaseDict = orddict:from_list(DefaultConfig),
+new() ->
+    #config { dir = rebar_utils:get_cwd(),
+              opts = []}.
 
+new(ParentConfig) ->
     %% Load terms from rebar.config, if it exists
+    Dir = rebar_utils:get_cwd(),
     ConfigFile = filename:join([Dir, "rebar.config"]),
     case file:consult(ConfigFile) of
         {ok, Terms} ->
-            Dict = merge_terms(Terms, BaseDict);
+            Opts = Terms ++ ParentConfig#config.opts;
         {error, enoent} ->
-            Dict = BaseDict;
+            Opts = ParentConfig#config.opts;
         Other ->
+            Opts = undefined, % Keep erlc happy
             ?WARN("Failed to load ~s: ~p\n", [ConfigFile, Other]),
-            ?FAIL,
-            Dict = BaseDict
+            ?FAIL
     end,
-    #config { dir = Dir, opts = Dict }.
-
-
-get_modules(Config, app) ->
-    get_list(Config, app_modules, []);
-get_modules(Config, rel) ->
-    get_list(Config, rel_modules, []).
+    #config { dir = Dir, opts = Opts }.
 
 get_list(Config, Key, Default) ->
-    case orddict:find(Key, Config#config.opts) of
-        error ->
-            Default;
-        {ok, List} ->
-            List
-    end.
+    get(Config, Key, Default).
 
 get(Config, Key, Default) ->
-    case orddict:find(Key, Config#config.opts) of
-        error ->
-            Default;
-        {ok, Value} ->
-            Value
-    end.
+    proplists:get_value(Key, Config#config.opts, Default).
+
+delete(Config, Key) ->
+    Config#config { opts = proplists:delete(Key, Config#config.opts) }.
     
 set_global(Key, Value) ->
     application:set_env(rebar_global, Key, Value).
@@ -95,10 +83,3 @@ get_global(Key, Default) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
-
-merge_terms([], Dict) ->
-    Dict;
-merge_terms([{Key, Value} | Rest], Dict) ->
-    merge_terms(Rest, orddict:store(Key, Value, Dict));
-merge_terms([_ | Rest], Dict) ->
-    merge_terms(Rest, Dict).

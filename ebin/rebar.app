@@ -24,18 +24,16 @@
   {env, [
          %% Default log level
          {log_level, error},
-         
-         %% Key/value list of base/default configuration used by
-         %% rebar_config during initialization
-         {default_config, [
-                           {app_modules, [ rebar_protobuffs_compiler,
-                                           rebar_erlc_compiler,
-                                           rebar_port_compiler,
-                                           rebar_otp_app,
-					   rebar_ct,
-                                           rebar_eunit]},
 
-                           {rel_modules, [ rebar_reltool ]}
-                           ]}
+         %% Processing modules
+         {modules, [
+                    {app_dir, [ rebar_protobuffs_compiler,
+                                rebar_erlc_compiler,
+                                rebar_port_compiler,
+                                rebar_otp_app,
+                                rebar_ct,
+                                rebar_eunit]},
+                    {rel_dir, [ rebar_reltool ]}
+                   ]}
         ]}
 ]}.
