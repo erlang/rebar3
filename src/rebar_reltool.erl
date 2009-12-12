@@ -39,11 +39,11 @@ generate(Config, ReltoolFile) ->
     ReltoolConfig = load_config(ReltoolFile),
 
     %% Spin up reltool server and load our config into it
-    {ok, Server} = reltool:start_server([{sys, ReltoolConfig}]),
+    {ok, Server} = reltool:start_server([sys_tuple(ReltoolConfig)]),
 
     %% Do some validation of the reltool configuration; error messages out of
     %% reltool are still pretty cryptic
-    validate_rel_apps(Server, ReltoolConfig),
+    validate_rel_apps(Server, sys_tuple(ReltoolConfig)),
 
     %% Finally, run reltool
     case catch(run_reltool(Config, ReltoolConfig)) of
@@ -59,7 +59,7 @@ generate(Config, ReltoolFile) ->
 
 clean(Config, ReltoolFile) ->
     ReltoolConfig = load_config(ReltoolFile),
-    TargetDir = target_dir(Config, ReltoolConfig),
+    TargetDir = target_dir(Config, sys_tuple(ReltoolConfig)),
     rebar_file_utils:rm_rf(TargetDir),
     rebar_file_utils:delete_each(["reltool.spec"]).
 
@@ -69,11 +69,20 @@ clean(Config, ReltoolFile) ->
 %% Internal functions
 %% ===================================================================
 
+sys_tuple(ReltoolConfig) ->
+    case lists:keysearch(sys, 1, ReltoolConfig) of
+        {value, {sys, Data}} ->
+            {sys, Data};
+        false ->
+            ?ERROR("Failed to find {sys, ...} tuple in reltool.config.", []),
+            ?FAIL
+    end.
+
 load_config(ReltoolFile) ->
     %% Load the reltool configuration from the file
     case file:consult(ReltoolFile) of
-        {ok, [{sys, ReltoolConfig}]} ->
-            ReltoolConfig;
+        {ok, Terms} ->
+            Terms;
         Other ->
             ?ERROR("Failed to load expected config from ~s: ~p\n", [ReltoolFile, Other]),
             ?FAIL
@@ -85,7 +94,7 @@ load_config(ReltoolFile) ->
 %% first, or fall back to the release name if that's available. If neither
 %% is available, just use "target"
 %%
-target_dir(Config, ReltoolConfig) ->
+target_dir(Config, {sys, ReltoolConfig}) ->
   case rebar_config:get(Config, target_name, undefined) of
       undefined ->
           case lists:keysearch(rel, 1, ReltoolConfig) of
@@ -98,7 +107,7 @@ target_dir(Config, ReltoolConfig) ->
           Name
   end.
 
-validate_rel_apps(ReltoolServer, ReltoolConfig) ->
+validate_rel_apps(ReltoolServer, {sys, ReltoolConfig}) ->
     case lists:keysearch(rel, 1, ReltoolConfig) of
         {value, {rel, _Name, _Vsn, Apps}} ->
             %% Identify all the apps that do NOT exist, based on what's available
@@ -132,26 +141,22 @@ app_exists(AppTuple, Server) when is_tuple(AppTuple) ->
                        
 
 run_reltool(Config, ReltoolConfig) ->
-    {ok, Server} = reltool:start_server([{sys, ReltoolConfig}]),
+    {ok, Server} = reltool:start_server([sys_tuple(ReltoolConfig)]),
     case reltool:get_target_spec(Server) of
         {ok, Spec} ->
             dump_spec(Spec),
-            TargetDir = target_dir(Config, ReltoolConfig),
-            case file:make_dir(TargetDir) of
-                ok ->
-                    ok;
-                {error, eexist} ->
-                    %% Output directory already exists; if force=1, wipe it out
-                    case rebar_config:get_global(force, "0") of
-                        "1" ->
-                            rebar_file_utils:rm_rf(TargetDir),
-                            ok = file:make_dir(TargetDir);
-                        _ ->
-                            ?ERROR("Release target directory ~p already exists!\n", [TargetDir]),
-                            ?FAIL
-                    end
-            end,            
-            case reltool:eval_target_spec(Spec, code:root_dir(), TargetDir) of
+            TargetDir = target_dir(Config, sys_tuple(ReltoolConfig)),
+            mk_target_dir(TargetDir),
+
+            %% Post process the specification with rebar directives (if any exist)
+            FinalSpec = case lists:keysearch(rebar, 1, ReltoolConfig) of
+                            {value, {rebar, RebarConfig}} ->
+                                process_rebar_specs(RebarConfig, Spec);
+                            false ->
+                                Spec
+                        end,
+
+            case reltool:eval_target_spec(FinalSpec, code:root_dir(), TargetDir) of
                 ok ->
                     ok;
                 {error, Reason} ->
@@ -162,6 +167,23 @@ run_reltool(Config, ReltoolConfig) ->
             ?ERROR("Unable to generate spec: ~s\n", [Reason]),
             ?FAIL
     end.
+
+
+mk_target_dir(TargetDir) ->
+    case file:make_dir(TargetDir) of
+        ok ->
+            ok;
+        {error, eexist} ->
+            %% Output directory already exists; if force=1, wipe it out
+            case rebar_config:get_global(force, "0") of
+                "1" ->
+                    rebar_file_utils:rm_rf(TargetDir),
+                    ok = file:make_dir(TargetDir);
+                _ ->
+                    ?ERROR("Release target directory ~p already exists!\n", [TargetDir]),
+                    ?FAIL
+            end
+    end.               
     
 
 dump_spec(Spec) ->
@@ -173,3 +195,42 @@ dump_spec(Spec) ->
             ok
     end.
             
+post_process_spec(ReltoolConfig, Spec) ->
+    case lists:keysearch(rebar, 1, ReltoolConfig) of
+        {value, RebarConfig} ->
+            process_rebar_specs(RebarConfig, Spec);
+        false ->
+            Spec
+    end.
+
+process_rebar_specs([], Spec) ->
+    Spec;
+process_rebar_specs([{empty_dirs, Dirs} | Rest], Spec) ->
+    Spec2 = lists:foldl(fun(Dir, SpecAcc) ->
+                                spec_create_dir(filename:split(Dir), SpecAcc)
+                        end, Spec, Dirs),
+    process_rebar_specs(Rest, Spec2);
+process_rebar_specs([ Other | Rest], Spec) ->
+    ?WARN("Ignoring unknown rebar spec: ~p\n", [Other]),
+    process_rebar_specs(Rest, Spec).
+
+
+spec_create_dir([], Spec) ->
+    Spec;
+spec_create_dir([Path | Rest], Spec) ->
+    case lists:keysearch(Path, 2, Spec) of
+        {value, {create_dir, Path, Subspec}} ->
+            %% Directory already exists; process down into
+            %% Note: this is not tail recursive, but unless the directory structure
+            %% is insanely deep, shouldn't be a problem
+            lists:keystore(Path, 2, Spec, {create_dir, Path, spec_create_dir(Rest, Subspec)});
+        {value, Other} ->
+            %% Collision -- something other than create_dir is associated with this
+            %% portion of our path name.
+            ?ERROR("Collision of path name with existing tuple in spec: ~p\n", [Other]),
+            ?FAIL;
+        false ->
+            %% Directory doesn't yet exist
+            [{create_dir, Path, spec_create_dir(Rest, [])} | Spec]
+    end.
+
