@@ -27,4 +27,9 @@
 -export([main/1]).
 
 main(Args) ->
-    rebar_core:run(Args).
+    case catch(rebar_core:run(Args)) of
+        ok ->
+            ok;
+        _ ->
+            halt(1)
+    end.

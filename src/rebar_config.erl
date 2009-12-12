@@ -27,7 +27,8 @@
 -export([new/0, new/1,
          get/3, get_list/3,
          delete/2,
-         set_global/2, get_global/2]).
+         set_global/2, get_global/2,
+         is_verbose/0]).
 
 -include("rebar.hrl").
 
@@ -77,6 +78,14 @@ get_global(Key, Default) ->
             Default;
         {ok, Value} ->
             Value
+    end.
+
+is_verbose() ->
+    case get_global(verbose, "0") of
+        "1" ->
+            true;
+        _ ->
+            false
     end.
 
 

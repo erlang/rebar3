@@ -2,8 +2,21 @@
 %% -*- erlang -*-
 
 main(Args) ->
+    %% Get a string repr of build time
+    Built = build_time(),
+
+    %% Check for force=1 flag to force a rebuild
+    case lists:member("force=1", Args) of
+        true ->
+            [] = os:cmd("rm -rf ebin/*.beam"),
+            ok;
+        false ->
+            ok
+    end,
+    
     %% Compile all src/*.erl to ebin
-    case make:files(filelib:wildcard("src/*.erl"), [{outdir, "ebin"}, {i, "include"}]) of
+    case make:files(filelib:wildcard("src/*.erl"), [{outdir, "ebin"}, {i, "include"},
+                                                    {d, 'BUILD_TIME', Built}]) of
         up_to_date ->
             ok;
         error ->
@@ -55,5 +68,8 @@ main(Args) ->
               "and you can use rebar to build OTP-compliant apps.\n").
 
                 
-                    
+build_time() ->
+    {{Y, M, D}, {H, Min, S}} = calendar:now_to_universal_time(now()),
+    lists:flatten(io_lib:format("~4..0w~2..0w~2..0w_~2..0w~2..0w~2..0w", [Y, M, D, H, Min, S])).
+            
 

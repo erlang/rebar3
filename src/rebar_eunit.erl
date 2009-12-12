@@ -24,7 +24,8 @@
 %% -------------------------------------------------------------------
 %% 
 %% Targets:
-%% eunit - runs eunit tests (with suffix _tests.erl) in ./test
+%% eunit - runs eunit tests
+%% clean - remove .eunit directory
 %%
 %% Global options:
 %% verbose=1 - show extra output from the eunit test
@@ -38,67 +39,92 @@
 
 -include("rebar.hrl").
 
+-define(EUNIT_DIR, ".eunit").
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
 
 eunit(Config, File) ->
-    run_test_if_present("test", Config, File).
+    %% Make sure ?EUNIT_DIR/ directory exists (tack on dummy module)
+    ok = filelib:ensure_dir(?EUNIT_DIR ++ "/foo"),
+
+    %% Compile all erlang from src/ into ?EUNIT_DIR
+    rebar_erlc_compiler:do_compile(Config, "src/*.erl", ?EUNIT_DIR, ".erl", ".beam",
+                                   fun compile_erl/2,
+                                   rebar_config:get_list(Config, erl_first_files, [])),
+
+    %% Build a list of all the .beams in ?EUNIT_DIR -- use this for cover
+    %% and eunit testing. Normally you can just tell cover and/or eunit to
+    %% scan the directory for you, but eunit does a code:purge in conjunction
+    %% with that scan and causes any cover compilation info to be lost. So,
+    %% we do it by hand. :(
+    Modules = [list_to_atom(filename:basename(N, ".beam")) ||
+                  N <- filelib:wildcard("*.beam", "ebin")],
+
+    %% TODO: If there are other wildcards specified in eunit_sources, compile them
+
+    %% Save current code path and then prefix ?EUNIT_DIR on it so that our modules
+    %% are found there
+    InitCodePath = code:get_path(),
+    true = code:add_patha(?EUNIT_DIR),
+
+    %% Enable verbose in eunit if so requested..
+    case rebar_config:is_verbose() of
+        true ->
+            BaseOpts = [verbose];
+        false ->
+            BaseOpts = []
+    end,
+
+    %% If cover support is requested, set it up
+    case rebar_config:get(Config, cover_enabled, false) of
+        true ->
+            cover_init(Config);
+        _ ->
+            ok
+    end,
+
+    %% Run eunit
+    EunitOpts = BaseOpts ++ rebar_config:get_list(Config, eunit_opts, []),
+    EunitResult = (catch eunit:test(Modules, EunitOpts)),
+
+    %% Analyze cover modules
+    cover_analyze(Config, cover:modules()),
+
+    case EunitResult of
+        ok ->
+            ok;
+        _ ->
+            ?CONSOLE("One or more eunit tests failed.\n", []),
+            ?FAIL
+    end,
+
+
+    %% Restore code path
+    true = code:set_path(InitCodePath),
+    ok.
+
+clean(Config, File) ->
+    rebar_file_utils:rm_rf(?EUNIT_DIR).
+    
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
-run_test_if_present(TestDir, Config, File) ->
-    case filelib:is_dir(TestDir) of
-        false ->
-	    ?WARN("~s directory not present - skipping\n", [TestDir]),
-            ok;
+
+compile_erl(Source, Config) ->
+    case is_quickcheck_avail() of
         true ->
-	    run_test(TestDir, Config, File)
-    end.
-
-run_test(TestDir, Config, _File) ->
-    case rebar_erlc_compiler:do_compile(Config, "test/*.erl", "test", ".erl", ".beam",
-                                        fun compile_test/2, []) of
-        ok ->
-            Cwd = rebar_utils:get_cwd(),
-            CodePath = code:get_path(),
-            true = code:add_patha(filename:join(Cwd, "test")),
-            
-            case rebar_config:get_global(verbose, "0") of
-                "0" ->
-            Verbose = [];
-                _ ->
-                    Verbose = [verbose]
-            end,
-            
-            Tests = find_tests(TestDir),
-            Opts = Verbose,
-            ?INFO("Running tests: ~p\n", [Tests]),
-
-            change_to_work_dir(Cwd),
-
-            case catch eunit:test(Tests, Opts) of
-                ok ->
-                    ok;
-                _ ->
-                    ?CONSOLE("One or more tests failed\n", []),
-                    ?FAIL
-            end,
-            
-            code:set_path(CodePath),
-            file:set_cwd(Cwd),
-            ok;
-
-        _Other ->
-            ?ERROR("Compiling eunit tests failed\n",[]),
-            ?FAIL
-    end.
-
-
-compile_test(Source, Config) ->
-    Opts = [{i, "include"}, {outdir, "test"}, debug_info, report] ++ 
-        rebar_erlc_compiler:compile_opts(Config, erl_opts),
+            EqcOpts = [{d, 'EQC'}];
+        false ->
+            EqcOpts = []
+    end,
+    
+    ErlOpts = rebar_config:get_list(Config, erl_opts, []),
+    EunitOpts = rebar_config:get_list(Config, eunit_compile_opts, []),
+    Opts = [{i, "include"}, {outdir, ?EUNIT_DIR}, {d, 'TEST'}, debug_info, report] ++
+        ErlOpts ++ EunitOpts ++ EqcOpts,
     case compile:file(Source, Opts) of
         {ok, _} ->
             ok;
@@ -106,36 +132,98 @@ compile_test(Source, Config) ->
             ?FAIL
     end.
 
-
-find_tests(TestDir) ->
-    case rebar_config:get_global(suite, undefined) of
+is_quickcheck_avail() ->
+    case erlang:get(is_quickcheck_avail) of
         undefined ->
-            {ok, Files} = file:list_dir(TestDir),
-            Filter = fun(Filename) ->
-                             lists:suffix("_tests.erl", Filename)
-                     end,
-            Erls = lists:filter(Filter, Files),
-            [list_to_atom(filename:basename(F, ".erl")) || F <- Erls];
-        Suite ->
-            %% Add the _tests suffix if missing
-            case lists:suffix("_tests", Suite) of
-                true ->
-                    [list_to_atom(Suite)];
-                false ->
-                    [list_to_atom(Suite ++ "_tests")]
+            case code:lib_dir(eqc, include) of
+                {error, bad_name} ->
+                    IsAvail = false;
+                Dir ->
+                    IsAvail = filelib:is_file(filename:join(Dir, "eqc.hrl"))
+            end,
+            erlang:put(is_quickcheck_avail, IsAvail),
+            ?DEBUG("Quickcheck availability: ~p\n", [IsAvail]),
+            IsAvail;
+        IsAvail ->
+            IsAvail
+    end.
+                          
+cover_init(Config) ->
+    %% Make sure any previous runs of cover don't unduly influence
+    cover:reset(),
+
+    ?INFO("Cover compiling ~s\n", [rebar_utils:get_cwd()]),
+    
+    case cover:compile_beam_directory(?EUNIT_DIR) of
+        {error, Reason2} ->
+            ?ERROR("Cover compilation failed: ~p\n", [Reason2]),
+            ?FAIL;
+        Modules ->
+            %% It's not an error for cover compilation to fail partially, but we do want
+            %% to warn about them
+            [?CONSOLE("Cover compilation warning: ~p", [Desc]) || {error, Desc} <- Modules],
+
+            %% Identify the modules that were compiled successfully
+            case [ M || {ok, M} <- Modules] of
+                [] ->
+                    %% No modules compiled successfully...fail
+                    ?ERROR("Cover failed to compile any modules; aborting.\n", []),
+                    ?FAIL;
+                _ ->
+                    %% At least one module compiled successfully
+                    ok
             end
     end.
 
-%% Clear the contents of the work dir and change to it
-%%                
-change_to_work_dir(MainDir) ->                  
-    WorkDir = filename:join([MainDir, "logs", "eunit_work"]),
-    rebar_file_utils:rm_rf(WorkDir),
-    ok = filelib:ensure_dir(filename:join(WorkDir, "x")),
-    ok = file:set_cwd(WorkDir).
+cover_analyze(Config, []) ->
+    ok;
+cover_analyze(Config, Modules) ->    
+    %% Generate coverage info for all the cover-compiled modules 
+    Coverage = [cover_analyze_mod(M) || M <- Modules],
 
+    %% Write index of coverage info
+    cover_write_index(lists:sort(Coverage)),
 
+    %% Write coverage details for each file
+    [{ok, _} = cover:analyze_to_file(M, cover_file(M), [html]) || {M, _, _} <- Coverage],
+
+    Index = filename:join([rebar_utils:get_cwd(), ?EUNIT_DIR, "index.html"]),
+    ?CONSOLE("Cover analysis: ~s\n", [Index]).
     
 
-                          
+cover_analyze_mod(Module) ->
+    case cover:analyze(Module, coverage, module) of
+        {ok, {Module, {Covered, NotCovered}}} ->
+            {Module, Covered, NotCovered};
+        {error, Reason} ->
+            ?ERROR("Cover analyze failed for ~p: ~p ~p\n",
+                   [Module, Reason, code:which(Module)]),
+            {0,0}
+    end.
 
+cover_write_index(Coverage) ->
+    %% Calculate total coverage %
+    {Covered, NotCovered} = lists:foldl(fun({Mod, C, N}, {CAcc, NAcc}) ->
+                                                {CAcc + C, NAcc + N}
+                                        end, {0, 0}, Coverage),
+    TotalCoverage = percentage(Covered, NotCovered),
+
+    %% Write the report
+    {ok, F} = file:open(filename:join([?EUNIT_DIR, "index.html"]), [write]),
+    ok = file:write(F, "<html><head><title>Coverage Summary</title></head>\n"
+                    "<body><h1>Coverage Summary</h1>\n"),
+    ok = file:write(F, ?FMT("<h3>Total: ~w%</h3>\n", [TotalCoverage])),
+    ok = file:write(F, "<table><tr><th>Module</th><th>Coverage %</th></tr>\n"),
+
+    [ok = file:write(F, ?FMT("<tr><td><a href='~s.COVER.html'>~s</a></td><td>~w%</td>\n",
+                             [Module, Module, percentage(Cov, NotCov)])) ||
+        {Module, Cov, NotCov} <- Coverage],
+    ok = file:write(F, "</table></body></html>"),
+    file:close(F).
+
+cover_file(Module) ->    
+    filename:join([?EUNIT_DIR, atom_to_list(Module) ++ ".COVER.html"]).
+    
+    
+percentage(Cov, NotCov) ->
+    trunc((Cov / (Cov + NotCov)) * 100).
