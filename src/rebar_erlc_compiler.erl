@@ -111,11 +111,19 @@ compile_opts(Config, Key) ->
     rebar_config:get_list(Config, Key, []).
 
 compile_erl(Source, Config) ->
-    Opts = [{i, "include"}, {outdir, "ebin"}, report] ++ compile_opts(Config, erl_opts),
+    Opts = [{i, "include"}, {outdir, "ebin"}, report, return] ++ compile_opts(Config, erl_opts),
     case compile:file(Source, Opts) of
-        {ok, _} ->
+        {ok, _, []} ->
             ok;
-        error ->
+        {ok, _, _Warnings} ->
+            %% We got at least one warning -- if fail_on_warning is in options, fail
+            case lists:member(fail_on_warning, Opts) of
+                true ->
+                    ?FAIL;
+                false ->
+                    ok
+            end;
+        _ ->
             ?FAIL
     end.
 
@@ -141,6 +149,10 @@ compile_queue(Pids, Targets, Config, CompileFn) ->
                     Worker ! {compile, Src, Target, Config, CompileFn},
                     compile_queue(Pids, Rest, Config, CompileFn)
             end;
+
+        {fail, Error} ->
+            ?DEBUG("Worker compilation failed: ~p\n", [Error]),
+            ?FAIL;
         
         {compiled, Source} ->
             ?CONSOLE("Compiled ~s\n", [Source]),
@@ -162,13 +174,19 @@ compile_worker(QueuePid) ->
         {compile, Src, Target, Config, CompileFn} ->
             case needs_compile(Src, Target) of
                 true ->
-                    CompileFn(Src, Config),
-                    QueuePid ! {compiled, Src};
+                    case catch(CompileFn(Src, Config)) of
+                        ok ->
+                            QueuePid ! {compiled, Src},
+                            compile_worker(QueuePid);
+                        Error ->
+                            QueuePid ! {fail, Error},
+                            ok
+                    end;
                 false ->
                     ?INFO("Skipping ~s\n", [Src]),
-                    ok
-            end,
-            compile_worker(QueuePid);
+                    compile_worker(QueuePid)
+            end;
+
         empty ->
             ok
     end.
