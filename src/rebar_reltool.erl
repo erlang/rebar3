@@ -195,14 +195,6 @@ dump_spec(Spec) ->
             ok
     end.
             
-post_process_spec(ReltoolConfig, Spec) ->
-    case lists:keysearch(rebar, 1, ReltoolConfig) of
-        {value, RebarConfig} ->
-            process_rebar_specs(RebarConfig, Spec);
-        false ->
-            Spec
-    end.
-
 process_rebar_specs([], Spec) ->
     Spec;
 process_rebar_specs([{empty_dirs, Dirs} | Rest], Spec) ->
