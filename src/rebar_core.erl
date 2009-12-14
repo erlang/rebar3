@@ -171,10 +171,10 @@ apply_commands([Command | Rest], Modules, Config, ModuleFile) ->
                 ok ->
                     apply_commands(Rest, Modules, Config, ModuleFile);
                 {error, failed} ->
-                    error;
+                    ?FAIL;
                 Other ->
                     ?ERROR("~p failed while processing ~s: ~p", [Command, Dir, Other]),
-                    error
+                    ?FAIL              
             end
     end.
 
