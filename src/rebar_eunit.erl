@@ -85,9 +85,17 @@ eunit(Config, _File) ->
             ok
     end,
 
+    %% Move down into ?EUNIT_DIR while we run tests so any generated files
+    %% are created there (versus in the source dir)
+    Cwd = rebar_utils:get_cwd(),
+    file:set_cwd(?EUNIT_DIR),
+
     %% Run eunit
     EunitOpts = BaseOpts ++ rebar_config:get_list(Config, eunit_opts, []),
     EunitResult = (catch eunit:test(Modules, EunitOpts)),
+
+    %% Return to original working dir
+    file:set_cwd(Cwd),
 
     %% Analyze cover modules
     cover_analyze(Config, cover:modules()),
