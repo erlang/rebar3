@@ -45,7 +45,7 @@
 %% Public API
 %% ===================================================================
 
-eunit(Config, File) ->
+eunit(Config, _File) ->
     %% Make sure ?EUNIT_DIR/ directory exists (tack on dummy module)
     ok = filelib:ensure_dir(?EUNIT_DIR ++ "/foo"),
 
@@ -105,7 +105,7 @@ eunit(Config, File) ->
     true = code:set_path(InitCodePath),
     ok.
 
-clean(Config, File) ->
+clean(_Config, _File) ->
     rebar_file_utils:rm_rf(?EUNIT_DIR).
     
 
@@ -148,7 +148,7 @@ is_quickcheck_avail() ->
             IsAvail
     end.
                           
-cover_init(Config) ->
+cover_init(_Config) ->
     %% Make sure any previous runs of cover don't unduly influence
     cover:reset(),
 
@@ -175,9 +175,9 @@ cover_init(Config) ->
             end
     end.
 
-cover_analyze(Config, []) ->
+cover_analyze(_Config, []) ->
     ok;
-cover_analyze(Config, Modules) ->    
+cover_analyze(_Config, Modules) ->    
     %% Generate coverage info for all the cover-compiled modules 
     Coverage = [cover_analyze_mod(M) || M <- Modules],
 
@@ -203,7 +203,7 @@ cover_analyze_mod(Module) ->
 
 cover_write_index(Coverage) ->
     %% Calculate total coverage %
-    {Covered, NotCovered} = lists:foldl(fun({Mod, C, N}, {CAcc, NAcc}) ->
+    {Covered, NotCovered} = lists:foldl(fun({_Mod, C, N}, {CAcc, NAcc}) ->
                                                 {CAcc + C, NAcc + N}
                                         end, {0, 0}, Coverage),
     TotalCoverage = percentage(Covered, NotCovered),

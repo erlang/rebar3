@@ -33,7 +33,7 @@
 %% Public API
 %% ===================================================================
 
-compile(Config, File) ->
+compile(_Config, File) ->
     %% Load the app name and version from the .app file and construct
     %% the app identifier
     {ok, AppName, AppData} = rebar_app_utils:load_app_file(File),

@@ -48,11 +48,6 @@ run(Args) ->
     %% Filter all the flags (i.e. string of form key=value) from the
     %% command line arguments. What's left will be the commands to run.
     Commands = filter_flags(Args, []),
-
-%    dbg:tracer(),
-    dbg:p(all, call),
-    dbg:tpl(rebar_core, []),
-    dbg:tpl(rebar_erlc_compiler, clean, []),
     
     %% Pre-load the rebar app so that we get default configuration
     ok = application:load(rebar),
@@ -160,7 +155,7 @@ rel_dir(Dir) ->
     
 
 
-apply_commands([], Modules, Config, ModuleFile) ->
+apply_commands([], _Modules, _Config, _ModuleFile) ->
     ok;
 apply_commands([Command | Rest], Modules, Config, ModuleFile) ->
     case select_modules(Modules, Command, []) of
@@ -207,7 +202,7 @@ expand_lib_dirs([], _Root, Acc) ->
 expand_lib_dirs([Dir | Rest], Root, Acc) ->
     Apps = filelib:wildcard(filename:join([Dir, '*', ebin])),
     FqApps = [filename:join([Root, A]) || A <- Apps],
-    expand_lib_dirs(Rest, Root, Apps ++ FqApps).
+    expand_lib_dirs(Rest, Root, Acc ++ FqApps).
 
 
 

@@ -56,7 +56,7 @@ ln_sf(Source, Dest) ->
         false ->
             ActualDest = Dest
     end,
-    [] = os:cmd(?FMT("ln -sf ~s ~s", [Source, Dest])),
+    [] = os:cmd(?FMT("ln -sf ~s ~s", [Source, ActualDest])),
     ok.
 
 delete_each([]) ->

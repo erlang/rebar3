@@ -131,7 +131,7 @@ show_log(RawLog) ->
 	    ok
     end.
 
-make_cmd(TestDir, Config) ->
+make_cmd(TestDir, _Config) ->
     {ok, Cwd} = file:get_cwd(),
     LogDir = filename:join(Cwd, "logs"),
     Ebin = filename:join(Cwd, "ebin"),

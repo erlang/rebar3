@@ -151,7 +151,7 @@ compile_queue(Pids, Targets, Config, CompileFn) ->
             Pids2 = lists:delete({Pid, Mref}, Pids),
             compile_queue(Pids2, Targets, Config, CompileFn);
         
-        {'DOWN', Mref, _, Pid, Info} ->
+        {'DOWN', _Mref, _, _Pid, Info} ->
             ?DEBUG("Worker failed: ~p\n", [Info]),
             ?FAIL
     end.

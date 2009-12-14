@@ -150,7 +150,7 @@ run_cleanup_hook(Config) ->
     end.
 
 
-compile_each([], Config, Env, NewBins, ExistingBins) ->
+compile_each([], _Config, _Env, NewBins, ExistingBins) ->
     {lists:reverse(NewBins), lists:reverse(ExistingBins)};
 compile_each([Source | Rest], Config, Env, NewBins, ExistingBins) ->
     Ext = filename:extension(Source),
