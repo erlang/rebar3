@@ -29,6 +29,7 @@
 
 -include("rebar.hrl").
 -include_lib("reltool/src/reltool.hrl").
+-include_lib("kernel/include/file.hrl").
 
 %% ===================================================================
 %% Public API
@@ -144,7 +145,6 @@ run_reltool(Config, ReltoolConfig) ->
     {ok, Server} = reltool:start_server([sys_tuple(ReltoolConfig)]),
     case reltool:get_target_spec(Server) of
         {ok, Spec} ->
-            dump_spec(Spec),
             TargetDir = target_dir(Config, sys_tuple(ReltoolConfig)),
             mk_target_dir(TargetDir),
 
@@ -155,6 +155,8 @@ run_reltool(Config, ReltoolConfig) ->
                             false ->
                                 Spec
                         end,
+
+            dump_spec(FinalSpec),
 
             case reltool:eval_target_spec(FinalSpec, code:root_dir(), TargetDir) of
                 ok ->
@@ -197,6 +199,15 @@ dump_spec(Spec) ->
             
 process_rebar_specs([], Spec) ->
     Spec;
+process_rebar_specs([{overlay, Source} | Rest], Spec) ->
+    case file:list_dir(Source) of
+        {ok, Files} ->
+            OverlaySpec = spec_copy_overlay(Files, Source, []),
+            process_rebar_specs(Rest, [OverlaySpec | Spec]);
+        {error, Reason} ->
+            ?ERROR("Failed to list overlay directory ~p: ~p\n", [Source, Reason]),
+            ?FAIL
+    end;
 process_rebar_specs([{empty_dirs, Dirs} | Rest], Spec) ->
     Spec2 = lists:foldl(fun(Dir, SpecAcc) ->
                                 spec_create_dir(filename:split(Dir), SpecAcc)
@@ -226,3 +237,21 @@ spec_create_dir([Path | Rest], Spec) ->
             [{create_dir, Path, spec_create_dir(Rest, [])} | Spec]
     end.
 
+spec_copy_overlay([], _Dir, Acc) ->
+    lists:reverse(Acc);
+spec_copy_overlay([F | Rest], Dir, Acc) ->
+    Filename = filename:join(Dir, F),
+    {ok, Info} = file:read_file_info(Filename),
+    case Info#file_info.type of
+        directory ->
+            {ok, Files} = file:list_dir(Filename),
+            Entry = {create_dir, filename:basename(Filename), spec_copy_overlay(Files, Filename, [])},
+            spec_copy_overlay(Rest, Dir, [Entry | Acc]);
+        regular ->
+            Entry = {copy_file, filename:basename(F), filename:absname(Filename)},
+            spec_copy_overlay(Rest, Dir, [Entry | Acc]);
+        Other ->
+            ?DEBUG("Skipping ~p of type ~p\n", [F, Other]),
+            spec_copy_overlay(Rest, Dir, Acc)
+    end.
+    
