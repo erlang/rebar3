@@ -95,7 +95,7 @@ compile(Config, AppFile) ->
             case needs_link(SoName, NewBins) of
                 true ->
                     AllBins = string:join(NewBins ++ ExistingBins, " "),
-                    rebar_utils:sh_failfast(?FMT("$CC ~s $LDFLAGS $DRIVER_LDFLAGS -o ~s", [AllBins, SoName]), Env);
+                    rebar_utils:sh_failfast(?FMT("$CC $LDFLAGS $DRIVER_LDFLAGS ~s -o ~s", [AllBins, SoName]), Env);
                 false ->
                     ?INFO("Skipping relink of ~s\n", [SoName]),
                     ok
@@ -178,15 +178,17 @@ needs_compile(Source, Bin) ->
     filelib:last_modified(Bin) < filelib:last_modified(Source).
 
 needs_link(SoName, []) ->
+    ?DEBUG("2 Lad mod \n", []),
     filelib:last_modified(SoName) == 0;
 needs_link(SoName, NewBins) ->
     MaxLastMod = lists:max([filelib:last_modified(B) || B <- NewBins]),
     case filelib:last_modified(SoName) of
         0 ->
+            ?DEBUG("Last mod is 0 on ~s\n", [SoName]),
             true;
         Other ->
-            ?DEBUG("Checking ~p < ~p", [MaxLastMod, Other]),
-            MaxLastMod < Other
+            ?DEBUG("Checking ~p >= ~p", [MaxLastMod, Other]),
+            MaxLastMod >= Other
     end.
     
 merge_envs(OverrideEnvs, DefaultEnvs) ->
