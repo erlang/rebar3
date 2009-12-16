@@ -203,7 +203,7 @@ process_rebar_specs([{overlay, Source} | Rest], Spec) ->
     case file:list_dir(Source) of
         {ok, Files} ->
             OverlaySpec = spec_copy_overlay(Files, Source, []),
-            process_rebar_specs(Rest, [OverlaySpec | Spec]);
+            process_rebar_specs(Rest, Spec ++ OverlaySpec);
         {error, Reason} ->
             ?ERROR("Failed to list overlay directory ~p: ~p\n", [Source, Reason]),
             ?FAIL
