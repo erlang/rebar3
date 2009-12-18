@@ -1,6 +1,6 @@
 {application, rebar,
  [{description, "Rebar: Erlang Build Tool"},
-  {vsn, "1"},
+  {vsn, "2"},
   {modules, [ rebar,
               rebar_app_utils,
               rebar_config,
