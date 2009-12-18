@@ -95,7 +95,7 @@ compile(Config, AppFile) ->
             case needs_link(SoName, NewBins) of
                 true ->
                     AllBins = string:join(NewBins ++ ExistingBins, " "),
-                    rebar_utils:sh_failfast(?FMT("$CC $LDFLAGS $DRIVER_LDFLAGS ~s -o ~s", [AllBins, SoName]), Env);
+                    rebar_utils:sh_failfast(?FMT("$CC ~s $LDFLAGS $DRIVER_LDFLAGS -o ~s", [AllBins, SoName]), Env);
                 false ->
                     ?INFO("Skipping relink of ~s\n", [SoName]),
                     ok
