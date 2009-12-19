@@ -9,6 +9,7 @@
               rebar_erlc_compiler,
               rebar_eunit,
               rebar_file_utils,
+              rebar_lfe_compiler,
               rebar_log,
               rebar_otp_app,
               rebar_port_compiler,
@@ -29,6 +30,7 @@
          {modules, [
                     {app_dir, [ rebar_protobuffs_compiler,
                                 rebar_erlc_compiler,
+                                rebar_lfe_compiler,
                                 rebar_port_compiler,
                                 rebar_otp_app,
                                 rebar_ct,
