@@ -106,7 +106,8 @@ process_dir(Dir, ParentConfig, Commands) ->
         Subdirs ->
             %% Edge case: config is inherited, EXCEPT for sub_dir directives -- filter those out
             FilteredConfig = rebar_config:delete(Config, sub_dirs),
-            [process_dir(filename:join(Dir, Subdir), FilteredConfig, Commands) || Subdir <- Subdirs],
+            [process_dir(filename:join(Dir, Subdir), FilteredConfig, Commands) ||
+                Subdir <- Subdirs],
             ok = file:set_cwd(Dir)
     end,
 
