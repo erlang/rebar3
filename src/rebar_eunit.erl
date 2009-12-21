@@ -51,7 +51,7 @@ eunit(Config, _File) ->
 
     %% Compile all erlang from src/ into ?EUNIT_DIR
     rebar_erlc_compiler:do_compile(Config, "src/*.erl", ?EUNIT_DIR, ".erl", ".beam",
-                                   undefined, fun compile_erl/2,
+                                   fun rebar_erlc_compiler:list_hrls/2, fun compile_erl/2,
                                    rebar_config:get_list(Config, erl_first_files, [])),
 
     %% Build a list of all the .beams in ?EUNIT_DIR -- use this for cover
