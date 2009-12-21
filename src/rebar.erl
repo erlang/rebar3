@@ -50,6 +50,10 @@ main(Args) ->
     case catch(rebar_core:run(Args)) of
         ok ->
             ok;
-        _ ->
+        {error, failed} ->
+            halt(1);
+        Error ->
+            %% Nothing should percolate up from rebar_core; dump this error to console
+            io:format("Uncaught error in rebar_core: ~p\n", [Error]),
             halt(1)
     end.
