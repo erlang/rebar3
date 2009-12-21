@@ -37,7 +37,7 @@
 compile(Config, _AppFile) ->
     FirstFiles = rebar_config:get_list(Config, lfe_first_files, []),
     rebar_erlc_compiler:do_compile(Config, "src/*.lfe", "ebin", ".lfe", ".beam",
-                                   fun compile_lfe/2, FirstFiles).
+                                   undefined, fun compile_lfe/2, FirstFiles).
 
 
 %% ===================================================================
