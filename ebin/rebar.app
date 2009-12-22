@@ -7,6 +7,7 @@
               rebar_core,
               rebar_ct,
               rebar_erlc_compiler,
+              rebar_escripter,
               rebar_eunit,
               rebar_file_utils,
               rebar_lfe_compiler,
@@ -34,7 +35,8 @@
                                 rebar_port_compiler,
                                 rebar_otp_app,
                                 rebar_ct,
-                                rebar_eunit]},
+                                rebar_eunit,
+                                rebar_escripter]},
                     {rel_dir, [ rebar_reltool ]}
                    ]}
         ]}
