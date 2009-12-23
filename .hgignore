@@ -1,2 +1,2 @@
-.beam
-rebar
+\.beam
+^rebar$
