@@ -1,2 +1,4 @@
 \.beam
 ^rebar$
+.~
+\.orig
