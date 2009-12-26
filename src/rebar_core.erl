@@ -30,6 +30,7 @@
 
 -include("rebar.hrl").
 
+
 -ifndef(BUILD_TIME).
 -define(BUILD_TIME, "undefined").
 -endif.
@@ -92,35 +93,33 @@ filter_flags([Item | Rest], Commands) ->
 process_dir(Dir, ParentConfig, Commands) ->
     ok = file:set_cwd(Dir),
     Config = rebar_config:new(ParentConfig),
-
+    
     %% Save the current code path and then update it with
     %% lib_dirs. Children inherit parents code path, but we
     %% also want to ensure that we restore everything to pristine
     %% condition after processing this child
     CurrentCodePath = update_code_path(Config),
 
-    %% If there are any subdirs specified, process those first...
-    case rebar_config:get(Config, sub_dirs, []) of
-        [] ->
-            ok;
-        Subdirs ->
-            %% Edge case: config is inherited, EXCEPT for sub_dir directives -- filter those out
-            FilteredConfig = rebar_config:delete(Config, sub_dirs),
-            [process_dir(filename:join(Dir, Subdir), FilteredConfig, Commands) ||
-                Subdir <- Subdirs],
-            ok = file:set_cwd(Dir)
-    end,
-
     %% Get the list of processing modules and check each one against
     %% CWD to see if it's a fit -- if it is, use that set of modules
     %% to process this dir.
     {ok, AvailModuleSets} = application:get_env(rebar, modules),
-    case choose_module_set(AvailModuleSets, Dir) of
-        {ok, Modules, ModuleSetFile} ->
-            apply_commands(Commands, Modules, Config, ModuleSetFile);
-        none ->
-            ok
-    end,
+    {DirModules, ModuleSetFile} = choose_module_set(AvailModuleSets, Dir),
+
+    %% Get the list of modules for "any dir". This is a catch-all list of modules
+    %% that are processed in addion to modules associated with this directory
+    %5 type. These any_dir modules are processed FIRST.
+    {ok, AnyDirModules} = application:get_env(rebar, any_dir_modules),
+    Modules = AnyDirModules ++ DirModules,
+
+    %% Give the modules a chance to tweak config and indicate if there
+    %% are any other dirs that might need processing first.
+    {UpdatedConfig, Dirs} = acc_modules(select_modules(Modules, preprocess, []),
+                                        preprocess, Config, ModuleSetFile, []),
+    [process_dir(D, UpdatedConfig, Commands) || D <- Dirs],
+
+    %% Finally, process the current working directory
+    apply_commands(Commands, Modules, UpdatedConfig, ModuleSetFile),
 
     %% Once we're all done processing, reset the code path to whatever
     %% the parent initialized it to
@@ -128,15 +127,15 @@ process_dir(Dir, ParentConfig, Commands) ->
     ok.
 
 %%
-%% Give a list of module sets from rebar.app and a directory, find
+%% Given a list of module sets from rebar.app and a directory, find
 %% the appropriate subset of modules for this directory
 %%
 choose_module_set([], _Dir) ->
-    none;
+    {[], undefined};
 choose_module_set([{Fn, Modules} | Rest], Dir) ->
     case ?MODULE:Fn(Dir) of
         {true, File} ->
-            {ok, Modules, File};
+            {Modules, File};
         false ->
             choose_module_set(Rest, Dir)
     end.
@@ -228,4 +227,13 @@ run_modules([Module | Rest], Command, Config, File) ->
             {error, Reason}
     end.
 
-
+acc_modules([], _Command, Config, _File, Acc) ->
+    {Config, Acc};
+acc_modules([Module | Rest], Command, Config, File, Acc) ->
+    case Module:Command(Config, File) of
+        {ok, NewConfig, Result} when is_list(Result) ->
+            List = Result;
+        {ok, NewConfig, Result} ->
+            List = [Result]
+    end,
+    acc_modules(Rest, Command, NewConfig, File, List ++ Acc).
