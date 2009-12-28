@@ -32,7 +32,7 @@
 %% Public API
 %% ===================================================================
 
-escriptize(Config, AppFile) ->
+escriptize(_Config, AppFile) ->
     %% Extract the application name from the archive -- this will be be what
     %% we call the output script
     {ok, AppName, _AppData} = rebar_app_utils:load_app_file(AppFile),

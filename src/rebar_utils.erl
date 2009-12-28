@@ -85,7 +85,7 @@ now_str() ->
 %% Internal functions
 %% ====================================================================
 
-match_first([], Val) ->
+match_first([], _Val) ->
     nomatch;
 match_first([{Regex, MatchValue} | Rest], Val) ->
     case re:run(Val, Regex, [{capture, none}]) of
