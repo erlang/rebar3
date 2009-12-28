@@ -3,6 +3,8 @@
 
 -define(FAIL, throw({error, failed})).
 
+-define(ABORT(Str, Args), ?ERROR(Str, Args), halt(1)).
+
 -define(CONSOLE(Str, Args), io:format(Str, Args)).
 
 -define(DEBUG(Str, Args), rebar_log:log(debug, Str, Args)).
