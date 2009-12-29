@@ -46,18 +46,40 @@ run(["version"]) ->
     ?CONSOLE("Version ~s built ~s\n", [Vsn, ?BUILD_TIME]),
     ok;
 run(Args) ->
-    %% Filter all the flags (i.e. string of form key=value) from the
-    %% command line arguments. What's left will be the commands to run.
-    Commands = filter_flags(Args, []),
-    
     %% Pre-load the rebar app so that we get default configuration
     ok = application:load(rebar),
 
+    %% Parse getopt options
+    case getopt:parse(option_spec_list(), Args) of
+        {ok, {Options, NonOptArgs}} ->
+            case proplists:get_bool(help, Options) of
+                true ->
+                    %% display usage info
+                    getopt:usage(option_spec_list(), "rebar");
+                false ->
+                    %% Set global variables based on getopt options
+                    set_global_flag(Options, verbose),
+                    set_global_flag(Options, quiet),
+                    set_global_flag(Options, force),
+
+                    %% run rebar with supplied options
+                    run2(NonOptArgs)
+            end;
+        {error, {Reason, Data}} ->
+            ?ERROR("Error: ~s ~p~n~n", [Reason, Data]),
+            getopt:usage(option_spec_list(), "rebar")
+    end.
+
+run2(Args) ->
     %% Make sure crypto is running
     crypto:start(),
 
     %% Initialize logging system
     rebar_log:init(),
+
+    %% Filter all the flags (i.e. string of form key=value) from the
+    %% command line arguments. What's left will be the commands to run.
+    Commands = filter_flags(Args, []),
 
     %% Convert command strings to atoms
     CommandAtoms = [list_to_atom(C) || C <- Commands],
@@ -69,6 +91,30 @@ run(Args) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+%%
+%% set global flag based on getopt option boolean value
+%%
+set_global_flag(Options, Flag) ->
+    Value = case proplists:get_bool(Flag, Options) of
+                true ->
+                    "1";
+                false ->
+                    "0"
+            end,
+    rebar_config:set_global(Flag, Value).
+
+%%
+%% options accepted via getopt
+%%
+option_spec_list() ->
+    [
+     %% {Name, ShortOpt, LongOpt, ArgSpec, HelpMsg}
+     {help,    $h, "help",    undefined, "Show the program options"},
+     {verbose, $v, "verbose", undefined, "Be verbose about what gets done"},
+     {quiet,   $q, "quiet",   undefined, "Be quiet about what gets done"},
+     {force,   $f, "force",   undefined, "Force"}
+    ].
 
 %%
 %% Seperate all commands (single-words) from flags (key=value) and store
