@@ -33,4 +33,28 @@
 %% ===================================================================
 
 preprocess(Config, _) ->
-    {ok, Config, []}.
+    %% Get the directory where we will place downloaded deps
+    DepsDir = rebar_config:get(Config, deps_dir, "deps"),
+
+    %% Process the list of deps from the configuration
+    Dirs = process_deps(rebar_config:get(Config, deps, []), [], DepsDir),
+    {ok, Config, Dirs}.
+
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
+
+process_deps([], Acc, _Dir) ->
+    Acc;
+process_deps([App | Rest], Acc, Dir) when is_atom(App) ->
+    case code:lib_dir(App) of
+        {error, bad_name} ->
+            %% The requested app is not available on the code path
+            ?ABORT("~s: Dependency ~s not available.\n",
+                   [rebar_utils:get_cwd(), App]);
+        Path ->
+            ?INFO("Dependency ~s -> ~s\n", [App, Path])
+    end,
+    process_deps(Rest, Acc, Dir).
+
