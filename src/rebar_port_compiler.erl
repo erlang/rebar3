@@ -61,7 +61,7 @@
 %%               {port_envs, [{"x86_64.*-linux", "CFLAGS", "$CFLAGS -X86Options"}]}
 %%
 %% * port_pre_script - Tuple which specifies a pre-compilation script to run, and a filename that
-%%                     exists as a result of the script running. 
+%%                     exists as a result of the script running.
 %%
 %% * port_cleanup_script - String that specifies a script to run during cleanup. Use this to remove
 %%                         files/directories created by port_pre_script.
@@ -79,7 +79,7 @@ compile(Config, AppFile) ->
             DefaultEnvs  = filter_envs(default_env(), []),
             OverrideEnvs = filter_envs(rebar_config:get_list(Config, port_envs, []), []),
             Env = merge_envs(OverrideEnvs, DefaultEnvs),
-            
+
             %% One or more files are available for building. Run the pre-compile hook, if
             %% necessary.
             run_precompile_hook(Config, Env),
@@ -165,13 +165,13 @@ compile_each([Source | Rest], Config, Env, NewBins, ExistingBins) ->
                     rebar_utils:sh_failfast(?FMT("$CXX -c $CXXFLAGS $DRIVER_CFLAGS ~s -o ~s", [Source, Bin]), Env)
             end,
             compile_each(Rest, Config, Env, [Bin | NewBins], ExistingBins);
-        
+
         false ->
             ?INFO("Skipping ~s\n", [Source]),
             compile_each(Rest, Config, Env, NewBins, [Bin | ExistingBins])
     end.
 
-          
+
 
 needs_compile(Source, Bin) ->
     %% TODO: Generate depends using gcc -MM so we can also check for include changes
@@ -190,7 +190,7 @@ needs_link(SoName, NewBins) ->
             ?DEBUG("Checking ~p >= ~p", [MaxLastMod, Other]),
             MaxLastMod >= Other
     end.
-    
+
 merge_envs(OverrideEnvs, DefaultEnvs) ->
     orddict:merge(fun(Key, Override, Default) ->
                           expand_env_variable(Override, Key, Default)
@@ -271,6 +271,6 @@ so_name(AppFile) ->
             ?FAIL
     end,
 
-    %% Construct the driver name 
+    %% Construct the driver name
     ?FMT("priv/~s_drv.so", [AppName]).
 

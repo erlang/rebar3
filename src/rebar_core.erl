@@ -139,7 +139,7 @@ filter_flags([Item | Rest], Commands) ->
 process_dir(Dir, ParentConfig, Commands) ->
     ok = file:set_cwd(Dir),
     Config = rebar_config:new(ParentConfig),
-    
+
     %% Save the current code path and then update it with
     %% lib_dirs. Children inherit parents code path, but we
     %% also want to ensure that we restore everything to pristine
@@ -197,8 +197,8 @@ app_dir(Dir) ->
 %%
 rel_dir(Dir) ->
     rebar_rel_utils:is_rel_dir(Dir).
-            
-    
+
+
 
 
 apply_commands([], _Modules, _Config, _ModuleFile) ->
@@ -220,11 +220,11 @@ apply_commands([Command | Rest], Modules, Config, ModuleFile) ->
                     ?FAIL;
                 Other ->
                     ?ERROR("~p failed while processing ~s: ~p", [Command, Dir, Other]),
-                    ?FAIL              
+                    ?FAIL
             end
     end.
 
-    
+
 update_code_path(Config) ->
     case rebar_config:get(Config, lib_dirs, []) of
         [] ->
@@ -241,7 +241,7 @@ restore_code_path(no_change) ->
 restore_code_path({old, Path}) ->
     true = code:set_path(Path),
     ok.
-    
+
 
 expand_lib_dirs([], _Root, Acc) ->
     Acc;

@@ -69,12 +69,12 @@ do_compile(Config, SrcWildcard, OutDir, InExt, OutExt,
             RestTargets = [{Fs, target_file(Fs, OutDir, InExt, OutExt)} ||
                               Fs <- drop_each(FirstFiles, FoundFiles)],
 
-            %% Make sure target directory exists 
+            %% Make sure target directory exists
             ok = filelib:ensure_dir(target_file(hd(FoundFiles), OutDir, InExt, OutExt)),
 
             %% Compile first targets in sequence
             compile_each(FirstTargets, Config, IncludeFn, CompileFn),
-            
+
             %% Spin up workers
             Self = self(),
             Pids = [spawn_monitor(fun() -> compile_worker(Self) end) || _I <- lists:seq(1,3)],
@@ -100,7 +100,7 @@ compile_each([{Src, Target} | Rest], Config, IncludeFn, CompileFn) ->
             ok
     end,
     compile_each(Rest, Config, IncludeFn, CompileFn).
-            
+
 needs_compile(Src, Target, IncludeFn, Config) ->
     TargetLM = filelib:last_modified(Target),
     case TargetLM < filelib:last_modified(Src) of
@@ -125,7 +125,7 @@ compile_opts(Config, Key) ->
 
 list_hrls(Src, Config) ->
     case epp:open(Src, include_path(Src, Config)) of
-        {ok, Epp} -> 
+        {ok, Epp} ->
             %% check include for erlang files
             extract_includes(Epp, Src);
         _ ->
@@ -193,16 +193,16 @@ compile_queue(Pids, Targets, Config, IncludeFn, CompileFn) ->
         {fail, Error} ->
             ?DEBUG("Worker compilation failed: ~p\n", [Error]),
             ?FAIL;
-        
+
         {compiled, Source} ->
             ?CONSOLE("Compiled ~s\n", [Source]),
             compile_queue(Pids, Targets, Config, IncludeFn, CompileFn);
-        
+
         {'DOWN', Mref, _, Pid, normal} ->
             ?DEBUG("Worker exited cleanly\n", []),
             Pids2 = lists:delete({Pid, Mref}, Pids),
             compile_queue(Pids2, Targets, Config, IncludeFn, CompileFn);
-        
+
         {'DOWN', _Mref, _, _Pid, Info} ->
             ?DEBUG("Worker failed: ~p\n", [Info]),
             ?FAIL

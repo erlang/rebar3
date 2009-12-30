@@ -96,7 +96,7 @@ install(Config, File) ->
             BinDir = filename:join([code:root_dir(), "..", "..", "bin"]),
             install_binaries(List, AppDir, BinDir)
     end.
-    
+
 
 %% ===================================================================
 %% Internal functions
@@ -108,8 +108,8 @@ install_binaries([Bin | Rest], AppDir, BinDir) ->
     FqBin = filename:join([AppDir, Bin]),
     rebar_file_utils:ln_sf(FqBin, BinDir),
     install_binaries(Rest, AppDir, BinDir).
-    
- 
+
+
 validate_name(AppName, File) ->
     %% Convert the .app file name to an atom -- check it against the identifier within the file
     ExpApp = list_to_atom(filename:basename(File, ".app")),
@@ -137,7 +137,7 @@ validate_modules(AppName, Mods) ->
             ok;
         MissingBeams ->
             Msg1 = lists:flatten([io_lib:format("\t* ~p\n", [M]) || M <- MissingBeams]),
-            ?ERROR("One or more modules listed in ~p.app are not present in ebin/*.beam:\n~s", 
+            ?ERROR("One or more modules listed in ~p.app are not present in ebin/*.beam:\n~s",
                    [AppName, Msg1]),
             ?FAIL
     end,
@@ -148,7 +148,7 @@ validate_modules(AppName, Mods) ->
             ok;
         MissingMods ->
             Msg2 = lists:flatten([io_lib:format("\t* ~p\n", [M]) || M <- MissingMods]),
-            ?ERROR("On or more .beam files exist that are not listed in ~p.app:\n~s", 
+            ?ERROR("On or more .beam files exist that are not listed in ~p.app:\n~s",
                    [AppName, Msg2]),
             ?FAIL
     end.

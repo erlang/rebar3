@@ -22,7 +22,7 @@
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
-%% 
+%%
 %% Targets:
 %% eunit - runs eunit tests
 %% clean - remove .eunit directory
@@ -115,7 +115,7 @@ eunit(Config, _File) ->
 
 clean(_Config, _File) ->
     rebar_file_utils:rm_rf(?EUNIT_DIR).
-    
+
 
 %% ===================================================================
 %% Internal functions
@@ -128,7 +128,7 @@ compile_erl(Source, Config) ->
         false ->
             EqcOpts = []
     end,
-    
+
     ErlOpts = rebar_config:get_list(Config, erl_opts, []),
     EunitOpts = rebar_config:get_list(Config, eunit_compile_opts, []),
     Opts = [{i, "include"}, {outdir, ?EUNIT_DIR}, {d, 'TEST'}, debug_info, report] ++
@@ -155,13 +155,13 @@ is_quickcheck_avail() ->
         IsAvail ->
             IsAvail
     end.
-                          
+
 cover_init(_Config) ->
     %% Make sure any previous runs of cover don't unduly influence
     cover:reset(),
 
     ?INFO("Cover compiling ~s\n", [rebar_utils:get_cwd()]),
-    
+
     case cover:compile_beam_directory(?EUNIT_DIR) of
         {error, Reason2} ->
             ?ERROR("Cover compilation failed: ~p\n", [Reason2]),
@@ -185,8 +185,8 @@ cover_init(_Config) ->
 
 cover_analyze(_Config, []) ->
     ok;
-cover_analyze(_Config, Modules) ->    
-    %% Generate coverage info for all the cover-compiled modules 
+cover_analyze(_Config, Modules) ->
+    %% Generate coverage info for all the cover-compiled modules
     Coverage = [cover_analyze_mod(M) || M <- Modules],
 
     %% Write index of coverage info
@@ -197,7 +197,7 @@ cover_analyze(_Config, Modules) ->
 
     Index = filename:join([rebar_utils:get_cwd(), ?EUNIT_DIR, "index.html"]),
     ?CONSOLE("Cover analysis: ~s\n", [Index]).
-    
+
 
 cover_analyze_mod(Module) ->
     case cover:analyze(Module, coverage, module) of
@@ -229,9 +229,9 @@ cover_write_index(Coverage) ->
     ok = file:write(F, "</table></body></html>"),
     file:close(F).
 
-cover_file(Module) ->    
+cover_file(Module) ->
     filename:join([?EUNIT_DIR, atom_to_list(Module) ++ ".COVER.html"]).
-    
-    
+
+
 percentage(Cov, NotCov) ->
     trunc((Cov / (Cov + NotCov)) * 100).

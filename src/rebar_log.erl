@@ -39,7 +39,7 @@ init() ->
         _ ->
             set_level(error)
     end.
-            
+
 
 set_level(Level) ->
     ok = application:set_env(rebar, log_level, Level).
@@ -74,11 +74,11 @@ should_log(warn, _)      -> true;
 should_log(error, error) -> true;
 should_log(error, _)     -> false;
 should_log(_, _)         -> false.
-    
+
 log_prefix(debug) -> "DEBUG:" ;
 log_prefix(info)  -> "INFO: ";
 log_prefix(warn)  -> "WARN: ";
 log_prefix(error) -> "ERROR: ".
 
-     
-    
+
+

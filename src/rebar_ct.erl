@@ -22,7 +22,7 @@
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
-%% 
+%%
 %% Targets:
 %% test - runs common test suites in ./test
 %% int_test - runs suites in ./int_test
@@ -77,7 +77,7 @@ run_test(TestDir, Config, _File) ->
 	_ ->
 	    Output = " 2>&1 | tee -a " ++ RawLog
     end,
-    
+
     case rebar_utils:sh(Cmd ++ Output, [{"TESTDIR", TestDir}]) of
 	ok ->
 	    check_log(RawLog);
@@ -97,7 +97,7 @@ clear_log(RawLog) ->
 	{error, Reason} ->
 	    ?ERROR("Could not create log dir - ~p\n", [Reason]),
 	    ?FAIL
-    end.    
+    end.
 
 %% calling ct with erl does not return non-zero on failure - have to check
 %% log results
@@ -119,7 +119,7 @@ check_log(RawLog) ->
 	true ->
 	    ?CONSOLE("DONE. ~s\n", [Msg])
     end.
-		
+
 %% Show the log if it hasn't already been shown because verbose was on
 show_log(RawLog) ->
     ?CONSOLE("Showing log\n", []),
@@ -151,7 +151,7 @@ make_cmd(TestDir, _Config) ->
 				      " -env TEST_DIR \"~s\"",
 				      [Ebin,
 				       Include,
-				       net_adm:localhost(), 
+				       net_adm:localhost(),
 				       LogDir,
 				       filename:join(Cwd, TestDir)])) ++
 	get_ct_config_file(TestDir) ++
@@ -160,7 +160,7 @@ make_cmd(TestDir, _Config) ->
 	get_case(),
     RawLog = filename:join(LogDir, "raw.log"),
     {Cmd, RawLog}.
-     
+
 
 get_ct_config_file(TestDir) ->
     Config = filename:join(TestDir, "test.config"),

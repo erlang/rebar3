@@ -88,7 +88,7 @@ load_config(ReltoolFile) ->
             ?ERROR("Failed to load expected config from ~s: ~p\n", [ReltoolFile, Other]),
             ?FAIL
     end.
-    
+
 
 %%
 %% Determine the name of the target directory; try the user provided name
@@ -113,7 +113,7 @@ validate_rel_apps(ReltoolServer, {sys, ReltoolConfig}) ->
         {value, {rel, _Name, _Vsn, Apps}} ->
             %% Identify all the apps that do NOT exist, based on what's available
             %% from the reltool server
-            Missing = lists:sort([App || App <- Apps, 
+            Missing = lists:sort([App || App <- Apps,
                                          app_exists(App, ReltoolServer) == false]),
             case Missing of
                 [] ->
@@ -139,7 +139,7 @@ app_exists(App, Server) when is_atom(App) ->
     end;
 app_exists(AppTuple, Server) when is_tuple(AppTuple) ->
     app_exists(element(1, AppTuple), Server).
-                       
+
 
 run_reltool(Config, ReltoolConfig) ->
     {ok, Server} = reltool:start_server([sys_tuple(ReltoolConfig)]),
@@ -185,8 +185,8 @@ mk_target_dir(TargetDir) ->
                     ?ERROR("Release target directory ~p already exists!\n", [TargetDir]),
                     ?FAIL
             end
-    end.               
-    
+    end.
+
 
 dump_spec(Spec) ->
     case rebar_config:get_global(dump_spec, "0") of
@@ -196,7 +196,7 @@ dump_spec(Spec) ->
         _ ->
             ok
     end.
-            
+
 process_rebar_specs([], Spec) ->
     Spec;
 process_rebar_specs([{overlay, Source} | Rest], Spec) ->
@@ -254,4 +254,4 @@ spec_copy_overlay([F | Rest], Dir, Acc) ->
             ?DEBUG("Skipping ~p of type ~p\n", [F, Other]),
             spec_copy_overlay(Rest, Dir, Acc)
     end.
-    
+

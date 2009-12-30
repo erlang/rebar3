@@ -36,7 +36,7 @@ escriptize(_Config, AppFile) ->
     %% Extract the application name from the archive -- this will be be what
     %% we call the output script
     {ok, AppName, _AppData} = rebar_app_utils:load_app_file(AppFile),
-    
+
     %% Construct the archive of everything in ebin/ dir -- put it on the
     %% top-level of the zip file so that code loading works properly.
     Files = filelib:wildcard("*", "ebin"),

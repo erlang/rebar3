@@ -68,7 +68,7 @@ get(Config, Key, Default) ->
 
 delete(Config, Key) ->
     Config#config { opts = proplists:delete(Key, Config#config.opts) }.
-    
+
 set_global(Key, Value) ->
     application:set_env(rebar_global, Key, Value).
 

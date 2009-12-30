@@ -46,7 +46,7 @@ main(Args) ->
         false ->
             ok
     end,
-    
+
     case catch(rebar_core:run(Args)) of
         ok ->
             ok;
