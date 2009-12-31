@@ -49,17 +49,20 @@ run(Args) ->
     %% Pre-load the rebar app so that we get default configuration
     ok = application:load(rebar),
 
+    OptSpecList = option_spec_list(),
     %% Parse getopt options
-    case getopt:parse(option_spec_list(), Args) of
+    case getopt:parse(OptSpecList, Args) of
+        {ok, {_Options, []}} ->
+            %% no command to run specified
+            getopt:usage(OptSpecList, "rebar");
         {ok, {Options, NonOptArgs}} ->
             case proplists:get_bool(help, Options) of
                 true ->
-                    %% display usage info
-                    getopt:usage(option_spec_list(), "rebar");
+                    %% display help
+                    getopt:usage(OptSpecList, "rebar");
                 false ->
-                    %% Set global variables based on getopt options
+                    %% set global variables based on getopt options
                     set_global_flag(Options, verbose),
-                    set_global_flag(Options, quiet),
                     set_global_flag(Options, force),
 
                     %% run rebar with supplied options
@@ -67,19 +70,15 @@ run(Args) ->
             end;
         {error, {Reason, Data}} ->
             ?ERROR("Error: ~s ~p~n~n", [Reason, Data]),
-            getopt:usage(option_spec_list(), "rebar")
+            getopt:usage(OptSpecList, "rebar")
     end.
 
-run2(Args) ->
+run2(Commands) ->
     %% Make sure crypto is running
     crypto:start(),
 
     %% Initialize logging system
     rebar_log:init(),
-
-    %% Filter all the flags (i.e. string of form key=value) from the
-    %% command line arguments. What's left will be the commands to run.
-    Commands = filter_flags(Args, []),
 
     %% Convert command strings to atoms
     CommandAtoms = [list_to_atom(C) || C <- Commands],
@@ -96,12 +95,7 @@ run2(Args) ->
 %% set global flag based on getopt option boolean value
 %%
 set_global_flag(Options, Flag) ->
-    Value = case proplists:get_bool(Flag, Options) of
-                true ->
-                    "1";
-                false ->
-                    "0"
-            end,
+    Value = proplists:get_bool(Flag, Options),
     rebar_config:set_global(Flag, Value).
 
 %%
@@ -111,30 +105,9 @@ option_spec_list() ->
     [
      %% {Name, ShortOpt, LongOpt, ArgSpec, HelpMsg}
      {help,    $h, "help",    undefined, "Show the program options"},
-     {verbose, $v, "verbose", undefined, "Be verbose about what gets done"},
-     {quiet,   $q, "quiet",   undefined, "Be quiet about what gets done"},
-     {force,   $f, "force",   undefined, "Force"}
+     {verbose, $v, "verbose", {boolean, false}, "Be verbose about what gets done"},
+     {force,   $f, "force",   {boolean, false}, "Force"}
     ].
-
-%%
-%% Seperate all commands (single-words) from flags (key=value) and store
-%% values into the rebar_config global storage.
-%%
-filter_flags([], Commands) ->
-    lists:reverse(Commands);
-filter_flags([Item | Rest], Commands) ->
-    case string:tokens(Item, "=") of
-        [Command] ->
-            filter_flags(Rest, [Command | Commands]);
-        [KeyStr, Value] ->
-            Key = list_to_atom(KeyStr),
-            rebar_config:set_global(Key, Value),
-            filter_flags(Rest, Commands);
-        Other ->
-            ?CONSOLE("Ignoring command line argument: ~p\n", [Other]),
-            filter_flags(Rest, Commands)
-    end.
-
 
 process_dir(Dir, ParentConfig, Commands) ->
     ok = file:set_cwd(Dir),

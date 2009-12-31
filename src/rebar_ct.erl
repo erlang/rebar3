@@ -71,8 +71,8 @@ run_test_if_present(TestDir, Config, File) ->
 run_test(TestDir, Config, _File) ->
     {Cmd, RawLog} = make_cmd(TestDir, Config),
     clear_log(RawLog),
-    case rebar_config:get_global(verbose, "0") of
-	"0" ->
+    case rebar_config:is_verbose() of
+	true ->
 	    Output = " >> " ++ RawLog ++ " 2>&1";
 	_ ->
 	    Output = " 2>&1 | tee -a " ++ RawLog
@@ -123,8 +123,8 @@ check_log(RawLog) ->
 %% Show the log if it hasn't already been shown because verbose was on
 show_log(RawLog) ->
     ?CONSOLE("Showing log\n", []),
-    case rebar_config:get_global(verbose, "0") of
-	"0" ->
+    case rebar_config:is_verbose() of
+	true ->
 	    {ok, Contents} = file:read_file(RawLog),
 	    ?CONSOLE("~s", [Contents]);
 	_ ->

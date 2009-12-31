@@ -33,8 +33,8 @@
 %% ===================================================================
 
 init() ->
-    case rebar_config:get_global(verbose, "0") of
-        "1" ->
+    case rebar_config:is_verbose() of
+        true ->
             set_level(debug);
         _ ->
             set_level(error)

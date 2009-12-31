@@ -63,11 +63,11 @@ install(Config, File) ->
         true ->
             %% Already exists -- check for force=1 global flag and only
             %% continue if it's set
-            case rebar_config:get_global(force, "0") of
-                "0" ->
+            case rebar_config:get_global(force, false) of
+                false ->
                     ?ERROR("~s already exists. Installation failed.\n", [AppId]),
                     ?FAIL;
-                "1" ->
+                true ->
                     ?WARN("~s already exists, but forcibly overwriting.\n", [AppId])
             end;
         false ->
