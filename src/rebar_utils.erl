@@ -27,7 +27,7 @@
 -export([get_cwd/0,
          is_arch/1,
          get_os/0,
-         sh/2,
+         sh/2, sh/3,
          sh_failfast/2,
 	 now_str/0]).
 
@@ -62,19 +62,21 @@ get_os() ->
 
 
 sh(Command, Env) ->
-    ?INFO("sh: ~s\n~p\n", [Command, Env]),
-    Port = open_port({spawn, Command}, [{env, Env}, exit_status, {line, 16384},
-                                        use_stdio, stderr_to_stdout]),
-    sh_loop(Port).
+    sh(Command, Env, get_cwd()).
 
-sh_failfast(Command, Env) ->
-    case sh(Command, Env) of
+sh(Command, Env, Dir) ->
+    ?INFO("sh: ~s\n~p\n", [Command, Env]),
+    Port = open_port({spawn, Command}, [{cd, Dir}, {env, Env}, exit_status, {line, 16384},
+                                        use_stdio, stderr_to_stdout]),
+    case sh_loop(Port) of
         ok ->
             ok;
         {error, Rc} ->
-            ?ERROR("~s failed with error: ~w\n", [Command, Rc]),
-            ?FAIL
+            ?ABORT("~s failed with error: ~w\n", [Command, Rc])
     end.
+
+sh_failfast(Command, Env) ->
+    sh(Command, Env).
 
 now_str() ->
     {{Year, Month, Day}, {Hour, Minute, Second}} = calendar:local_time(),
@@ -95,10 +97,10 @@ match_first([{Regex, MatchValue} | Rest], Val) ->
            match_first(Rest, Val)
     end.
 
-sh_loop(Port) ->            
+sh_loop(Port) ->
     receive
         {Port, {data, {_, Line}}} ->
-            ?INFO("> ~s\n", [Line]),
+            ?CONSOLE("~s\n", [Line]),
             sh_loop(Port);
         {Port, {exit_status, 0}} ->
             ok;
