@@ -179,8 +179,8 @@ mk_target_dir(TargetDir) ->
             ok;
         {error, eexist} ->
             %% Output directory already exists; if force=1, wipe it out
-            case rebar_config:get_global(force, false) of
-                true ->
+            case rebar_config:get_global(force, "0") of
+                "1" ->
                     rebar_file_utils:rm_rf(TargetDir),
                     ok = file:make_dir(TargetDir);
                 _ ->

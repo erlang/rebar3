@@ -83,7 +83,12 @@ get_global(Key, Default) ->
     end.
 
 is_verbose() ->
-    get_global(verbose, false).
+    case get_global(verbose, "0") of
+        "1" ->
+            true;
+        _ ->
+            false
+    end.
 
 
 %% ===================================================================

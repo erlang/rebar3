@@ -11,9 +11,6 @@
 -module(getopt).
 -author('juanjo@comellas.org').
 
--export([parse/2, usage/2]).
-
-
 -define(TAB_LENGTH, 8).
 %% Indentation of the help messages in number of tabs.
 -define(INDENTATION, 3).
@@ -47,6 +44,8 @@
                    Help    :: string() | undefined
                   }.
 
+-export([parse/2, usage/2]).
+
 
 -spec parse([option_spec()], string() | [string()]) -> {ok, {[option()], [string()]}} | {error, {Reason :: atom(), Data :: any()}}.
 %%--------------------------------------------------------------------
@@ -72,20 +71,12 @@ parse(OptSpecList, CmdLine) ->
 -spec parse([option_spec()], [option()], [string()], integer(), [string()]) ->
     {ok, {[option()], [string()]}} | {error, {Reason :: atom(), Data:: any()}}.
 %% Process long options.
-parse(OptSpecList, OptAcc, ArgAcc, ArgPos, [[$-, $- | Name] = OptStr | Tail]) ->
-    {Option, Tail1} = 
-        case split_embedded_arg(Name) of
-            {Name1, Arg} ->
-                %% Get option that has its argument within the same string
-                %% separated by an equal ('=') character.
-                {get_option_embedded_arg(OptSpecList, OptStr, ?OPT_LONG, Name1, Arg), Tail};
-            _Name1 ->
-                get_option(OptSpecList, OptStr, ?OPT_LONG, Name, Tail)
-        end,
+parse(OptSpecList, OptAcc, ArgAcc, ArgPos, [[$-, $- | LongName] = OptStr | Tail]) ->
+    {Option, Tail1} = get_option(OptSpecList, OptStr, LongName, ?OPT_LONG, Tail),
     parse(OptSpecList, [Option | OptAcc], ArgAcc, ArgPos, Tail1);
 %% Process short options.
 parse(OptSpecList, OptAcc, ArgAcc, ArgPos, [[$-, ShortName] = OptStr | Tail]) ->
-    {Option, Tail1} = get_option(OptSpecList, OptStr, ?OPT_SHORT, ShortName, Tail),
+    {Option, Tail1} = get_option(OptSpecList, OptStr, ShortName, ?OPT_SHORT, Tail),
     parse(OptSpecList, [Option | OptAcc], ArgAcc, ArgPos, Tail1);
 %% Process multiple short options with no argument.
 parse(OptSpecList, OptAcc, ArgAcc, ArgPos, [[$- | ShortNameList] = OptStr | Tail]) ->
@@ -96,21 +87,12 @@ parse(OptSpecList, OptAcc, ArgAcc, ArgPos, [[$- | ShortNameList] = OptStr | Tail
           end, OptAcc, ShortNameList),
     parse(OptSpecList, NewOptAcc, ArgAcc, ArgPos, Tail);
 %% Process non-option arguments.
-parse(OptSpecList, OptAcc, ArgAcc, ArgPos, [OptStr | Tail]) ->
-    case split_embedded_arg(OptStr) of
-        {Name, Arg} ->
-            %% Get option that has its argument within the same string
-            %% separated by an equal ('=') character.
-            parse(OptSpecList, [get_option_embedded_arg(OptSpecList, OptStr, ?OPT_LONG, Name, Arg) | OptAcc],
-                  ArgAcc, ArgPos, Tail);
-        Arg ->
-            case find_non_option_arg(OptSpecList, ArgPos) of
-                {value, OptSpec} when ?IS_OPT_SPEC(OptSpec) ->
-                    parse(OptSpecList, [convert_option_arg(OptSpec, Arg) | OptAcc],
-                          ArgAcc, ArgPos + 1, Tail);
-                false ->
-                    parse(OptSpecList, OptAcc, [Arg | ArgAcc], ArgPos, Tail)
-            end
+parse(OptSpecList, OptAcc, ArgAcc, ArgPos, [Arg | Tail]) ->
+    case find_non_option_arg(OptSpecList, ArgPos) of
+        {value, OptSpec} when ?IS_OPT_SPEC(OptSpec) ->
+            parse(OptSpecList, [convert_option_arg(OptSpec, Arg) | OptAcc], ArgAcc, ArgPos + 1, Tail);
+        false ->
+            parse(OptSpecList, OptAcc, [Arg | ArgAcc], ArgPos, Tail)
     end;
 parse(OptSpecList, OptAcc, ArgAcc, _ArgPos, []) ->
     %% Once we have completed gathering the options we add the ones that were
@@ -118,74 +100,27 @@ parse(OptSpecList, OptAcc, ArgAcc, _ArgPos, []) ->
     {ok, {lists:reverse(append_default_args(OptSpecList, OptAcc)), lists:reverse(ArgAcc)}}.
 
 
--spec get_option([option_spec()], string(), integer(), string() | char(), [string()]) ->
+-spec get_option([option_spec()], string(), string() | char(), integer(), [string()]) ->
     {option(), [string()]}.
 %% @doc Retrieve the specification corresponding to an option matching a string
 %%      received on the command line.
-get_option(OptSpecList, OptStr, FieldPos, OptName, Tail) ->
+get_option(OptSpecList, OptStr, OptName, FieldPos, Tail) ->
     case lists:keysearch(OptName, FieldPos, OptSpecList) of
         {value, {Name, _Short, _Long, ArgSpec, _Help} = OptSpec} ->
             case ArgSpec of
                 undefined ->
                     {Name, Tail};
                 _ ->
-                    ArgSpecType = arg_spec_type(ArgSpec),
                     case Tail of
                         [Arg | Tail1] ->
-                            case (ArgSpecType =:= boolean) andalso not is_boolean_arg(Arg) of
-                                %% Special case for booleans: when the next string
-                                %% is an option we assume the value is 'true'.
-                                true ->
-                                    {{Name, true}, Tail};
-                                _ ->
-                                    {convert_option_arg(OptSpec, Arg), Tail1}
-                            end;
-                        [] ->
-                            case ArgSpecType of
-                                boolean ->
-                                    {{Name, true}, Tail};
-                                _ ->
-                                    throw({error, {missing_option_arg, Name}})
-                            end
+                            {convert_option_arg(OptSpec, Arg), Tail1};
+                                    [] ->
+                            throw({error, {missing_option_arg, Name}})
                     end
             end;
         false ->
             throw({error, {invalid_option, OptStr}})
     end.
-
-
--spec get_option_embedded_arg([option_spec()], string(), integer(), string(),
-                              string()) ->  option().
-%% @doc Retrieve the specification corresponding to an option matching a string
-%%      received on the command line that had its argument assigned within the
-%%      same string (e.g. "verbose=true").
-get_option_embedded_arg(OptSpecList, OptStr, FieldPos, OptName, Arg) ->
-    case lists:keysearch(OptName, FieldPos, OptSpecList) of
-        {value, {_Name, _Short, _Long, ArgSpec, _Help} = OptSpec} ->
-            case ArgSpec of
-                undefined ->
-                    throw({error, {invalid_option_arg, OptStr}});
-                _ ->
-                    convert_option_arg(OptSpec, Arg)
-            end;
-        false ->
-            throw({error, {invalid_option, OptStr}})
-    end.
-
-
--spec split_embedded_arg(string()) -> {Name :: string(), Arg :: string()} | string().
-%% @doc Split an option string that may contain and option with its argument
-%%      separated by an equal ('=') character (e.g. "port=1000").
-split_embedded_arg(OptStr) ->
-    split_embedded_arg(OptStr, OptStr, []).
-
-split_embedded_arg(_OptStr, [$= | Tail], Acc) ->
-    {lists:reverse(Acc), Tail};
-split_embedded_arg(OptStr, [Char | Tail], Acc) ->
-    split_embedded_arg(OptStr, Tail, [Char | Acc]);
-split_embedded_arg(OptStr, [], _Acc) ->
-    OptStr.
-
 
 -spec get_option_no_arg([option_spec()], string(), string() | char(), integer()) -> option().
 %% @doc Retrieve the specification corresponding to an option that has no
@@ -194,19 +129,11 @@ get_option_no_arg(OptSpecList, OptStr, OptName, FieldPos) ->
     case lists:keysearch(OptName, FieldPos, OptSpecList) of
         {value, {Name, _Short, _Long, undefined, _Help}} ->
             Name;
-        {value, {Name, _Short, _Long, ArgSpec, _Help}} ->
-            case arg_spec_type(ArgSpec) of
-                %% Special case for booleans: if there is no argument we assume
-                %% the value is 'true'.
-                boolean ->
-                    {Name, true};
-                _ ->
-                    throw({error, {missing_option_arg, Name}})
-            end;
+        {value, {Name, _Short, _Long, _ArgSpec, _Help}} ->
+            throw({error, {missing_option_arg, Name}});
         false ->
             throw({error, {invalid_option, OptStr}})
     end.
-
 
 -spec find_non_option_arg([option_spec()], integer()) -> {value, option_spec()} | false.
 %% @doc Find the option for the discrete argument in position specified in the
@@ -238,29 +165,22 @@ append_default_args([], OptAcc) ->
     OptAcc.
 
 
-%% -spec is_option(string()) -> boolean().
-%% is_option([Char | _Tail] = OptStr) ->
-%%     (Char =:= $-) orelse lists:member($=, OptStr).
-    
-
 -spec convert_option_arg(option_spec(), string()) -> [option()].
 %% @doc Convert the argument passed in the command line to the data type
-%%      indicated by the argument specification.
+%%      indicated byt the argument specification.
 convert_option_arg({Name, _Short, _Long, ArgSpec, _Help}, Arg) ->
     try
-        {Name, to_type(arg_spec_type(ArgSpec), Arg)}
+        Converted = case ArgSpec of
+                        {Type, _DefaultArg} ->
+                            to_type(Type, Arg);
+                        Type when is_atom(Type) ->
+                            to_type(Type, Arg)
+                    end,
+        {Name, Converted}
     catch
         error:_ ->
             throw({error, {invalid_option_arg, {Name, Arg}}})
     end.
-
-
--spec arg_spec_type(arg_spec()) -> arg_type() | undefined.
-arg_spec_type({Type, _DefaultArg}) ->
-    Type;
-arg_spec_type(Type) when is_atom(Type) ->
-    Type.
-
 
 -spec to_type(atom(), string()) -> arg_value().
 to_type(binary, Arg) ->
@@ -272,19 +192,13 @@ to_type(integer, Arg) ->
 to_type(float, Arg) ->
     list_to_float(Arg);
 to_type(boolean, Arg) ->
-    is_boolean_arg(Arg);
-to_type(_Type, Arg) ->
-    Arg.
-
-
--spec is_boolean_arg(string()) -> boolean().
-is_boolean_arg(Arg) ->
     LowerArg = string:to_lower(Arg),
     (LowerArg =:= "true") orelse (LowerArg =:= "t") orelse
     (LowerArg =:= "yes") orelse (LowerArg =:= "y") orelse
-    (LowerArg =:= "on") orelse (LowerArg =:= "enabled") orelse
-    (LowerArg =:= "1").
-    
+    (LowerArg =:= "on") orelse (LowerArg =:= "enabled");
+to_type(_Type, Arg) ->
+    Arg.
+
 
 -spec usage([option_spec()], string()) -> ok.
 %%--------------------------------------------------------------------
