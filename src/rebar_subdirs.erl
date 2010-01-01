@@ -35,10 +35,6 @@
 preprocess(Config, _) ->
     %% Get the list of subdirs specified in the config (if any).
     Cwd = rebar_utils:get_cwd(),
-    Subdirs = [filename:join(Cwd, Dir) || Dir <- rebar_config:get(Config, sub_dirs, [])],
-
-    %% Filter out the subdirs from the config so that processing in the
-    %% subdirs doesn't try to reprocess
-    Config2 = rebar_config:delete(Config, sub_dirs),
-    {ok, Config2, Subdirs}.
+    Subdirs = [filename:join(Cwd, Dir) || Dir <- rebar_config:get_local(Config, sub_dirs, [])],
+    {ok, Config, Subdirs}.
 
