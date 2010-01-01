@@ -26,26 +26,45 @@
 
 -include("rebar.hrl").
 
--export([preprocess/2]).
+-export([preprocess/2,
+         distclean/2]).
 
 %% ===================================================================
 %% Public API
 %% ===================================================================
 
 preprocess(Config, _) ->
-    %% Get the directory where we will place downloaded deps
-    DepsDir = rebar_config:get(Config, deps_dir, "deps"),
+    %% Get the directory where we will place downloaded deps. Take steps
+    %% to ensure that if we're doing a multi-level build, all the deps will
+    %% wind up in a single directory; avoiding potential pain from having
+    %% multiple copies of the same dep scattered throughout the source tree.
+    %%
+    %% The first definition of deps_dir is the one we use; we also fully
+    %% qualify it to ensure everyone sees it properly.
+    case rebar_config:get_all(Config, deps_dir) of
+        [] ->
+            DepsDir = filename:absname("deps");
+        AllDirs ->
+            DepsDir = filename:absname(hd(lists:reverse(AllDirs)))
+    end,
 
-    %% Process the list of deps from the configuration
-    case catch(process_deps(rebar_config:get(Config, deps, []), [], DepsDir)) of
+    ?DEBUG("~s: Using deps dir: ~s\n", [rebar_utils:get_cwd(), DepsDir]),
+    Config2 = rebar_config:set(Config, deps_dir, DepsDir),
+
+    %% Process the list of local deps from the configuration
+    case catch(process_deps(rebar_config:get_local(Config, deps, []), [], DepsDir)) of
         Dirs when is_list(Dirs) ->
-            %% Filter out deps from config so sub-dirs don't wind up trying to d/l deps again
-            Config2 = rebar_config:delete(Config, deps),
             {ok, Config2, Dirs};
         {'EXIT', Reason} ->
             ?ABORT("Error while processing dependencies: ~p\n", [Reason])
     end.
 
+distclean(Config, _) ->
+    %% Delete all the deps which we downloaded (or would have caused to be
+    %% downloaded).
+    DepsDir = rebar_config:get(Config, deps_dir, rebar_utils:get_cwd()),
+    ?DEBUG("Delete deps: ~p\n", [rebar_config:get(Config, deps, [])]),
+    delete_deps(rebar_config:get_local(Config, deps, []), DepsDir).
 
 %% ===================================================================
 %% Internal functions
@@ -60,7 +79,6 @@ process_deps([{App, VsnRegex} | Rest], Acc, Dir) when is_atom(App) ->
     require_app(App, VsnRegex),
     process_deps(Rest, Acc, Dir);
 process_deps([{App, VsnRegex, Source} | Rest], Acc, Dir) ->
-    ?DEBUG("Process deps: ~p\n", [Rest]),
     case is_app_available(App, VsnRegex) of
         true ->
             process_deps(Rest, Acc, Dir);
@@ -76,6 +94,22 @@ process_deps([{App, VsnRegex, Source} | Rest], Acc, Dir) ->
 process_deps([Other | _Rest], _Acc, _Dir) ->
     ?ABORT("Invalid dependency specification ~p in ~s\n",
            [Other, rebar_utils:get_cwd()]).
+
+
+delete_deps([], _DepsDir) ->
+    ok;
+delete_deps([{App, _VsnRegex, _Source} | Rest], DepsDir) ->
+    AppDir = filename:join(DepsDir, App),
+    case filelib:is_dir(AppDir) of
+        true ->
+            ?INFO("Delete dependency dir ~s\n", [AppDir]),
+            rebar_file_utils:rm_rf(AppDir);
+        false ->
+            ok
+    end,
+    delete_deps(Rest, DepsDir);
+delete_deps([_Other | Rest], DepsDir) ->
+    delete_deps(Rest, DepsDir).
 
 
 
