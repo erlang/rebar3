@@ -1,3 +1,5 @@
+%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% ex: ts=4 sw=4 et
 %% -------------------------------------------------------------------
 %%
 %% rebar: Erlang Build Tools
@@ -50,16 +52,19 @@ run(Args) ->
     ok = application:load(rebar),
 
     %% Parse getopt options
-    case getopt:parse(option_spec_list(), Args) of
+    OptSpecList = option_spec_list(),
+    case getopt:parse(OptSpecList, Args) of
+        {ok, {_Options, []}} ->
+            %% no command to run specified
+            getopt:usage(OptSpecList, "rebar");
         {ok, {Options, NonOptArgs}} ->
             case proplists:get_bool(help, Options) of
                 true ->
-                    %% display usage info
-                    getopt:usage(option_spec_list(), "rebar");
+                    %% display help
+                    getopt:usage(OptSpecList, "rebar");
                 false ->
                     %% Set global variables based on getopt options
                     set_global_flag(Options, verbose),
-                    set_global_flag(Options, quiet),
                     set_global_flag(Options, force),
 
                     %% run rebar with supplied options
@@ -67,7 +72,7 @@ run(Args) ->
             end;
         {error, {Reason, Data}} ->
             ?ERROR("Error: ~s ~p~n~n", [Reason, Data]),
-            getopt:usage(option_spec_list(), "rebar")
+            getopt:usage(OptSpecList, "rebar")
     end.
 
 run2(Args) ->
@@ -112,7 +117,6 @@ option_spec_list() ->
      %% {Name, ShortOpt, LongOpt, ArgSpec, HelpMsg}
      {help,    $h, "help",    undefined, "Show the program options"},
      {verbose, $v, "verbose", undefined, "Be verbose about what gets done"},
-     {quiet,   $q, "quiet",   undefined, "Be quiet about what gets done"},
      {force,   $f, "force",   undefined, "Force"}
     ].
 

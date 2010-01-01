@@ -1,3 +1,5 @@
+%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% ex: ts=4 sw=4 et
 %% -------------------------------------------------------------------
 %%
 %% rebar: Erlang Build Tools
