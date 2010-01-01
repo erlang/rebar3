@@ -47,44 +47,19 @@ run(["version"]) ->
     {ok, Vsn} = application:get_key(rebar, vsn),
     ?CONSOLE("Version ~s built ~s\n", [Vsn, ?BUILD_TIME]),
     ok;
-run(Args) ->
+run(RawArgs) ->
     %% Pre-load the rebar app so that we get default configuration
     ok = application:load(rebar),
 
-    %% Parse getopt options
-    OptSpecList = option_spec_list(),
-    case getopt:parse(OptSpecList, Args) of
-        {ok, {_Options, []}} ->
-            %% no command to run specified
-            getopt:usage(OptSpecList, "rebar");
-        {ok, {Options, NonOptArgs}} ->
-            case proplists:get_bool(help, Options) of
-                true ->
-                    %% display help
-                    getopt:usage(OptSpecList, "rebar");
-                false ->
-                    %% Set global variables based on getopt options
-                    set_global_flag(Options, verbose),
-                    set_global_flag(Options, force),
+    %% Parse out command line arguments -- what's left is a list of commands to
+    %% run
+    Commands = parse_args(RawArgs),
 
-                    %% run rebar with supplied options
-                    run2(NonOptArgs)
-            end;
-        {error, {Reason, Data}} ->
-            ?ERROR("Error: ~s ~p~n~n", [Reason, Data]),
-            getopt:usage(OptSpecList, "rebar")
-    end.
-
-run2(Args) ->
     %% Make sure crypto is running
     crypto:start(),
 
     %% Initialize logging system
     rebar_log:init(),
-
-    %% Filter all the flags (i.e. string of form key=value) from the
-    %% command line arguments. What's left will be the commands to run.
-    Commands = filter_flags(Args, []),
 
     %% Convert command strings to atoms
     CommandAtoms = [list_to_atom(C) || C <- Commands],
@@ -96,6 +71,40 @@ run2(Args) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+%%
+%% Parse command line arguments using getopt and also filtering out any
+%% key=value pairs. What's left is the list of commands to run
+%%
+parse_args(Args) ->
+    %% Parse getopt options
+    OptSpecList = option_spec_list(),
+    case getopt:parse(OptSpecList, Args) of
+        {ok, {_Options, []}} ->
+            %% no command to run specified
+            getopt:usage(OptSpecList, "rebar"),
+            halt(1);
+        {ok, {Options, NonOptArgs}} ->
+            case proplists:get_bool(help, Options) of
+                true ->
+                    %% display help
+                    getopt:usage(OptSpecList, "rebar"),
+                    halt(0);
+                false ->
+                    %% Set global variables based on getopt options
+                    set_global_flag(Options, verbose),
+                    set_global_flag(Options, force),
+
+                    %% Filter all the flags (i.e. strings of form key=value) from the
+                    %% command line arguments. What's left will be the commands to run.
+                    filter_flags(NonOptArgs, [])
+            end;
+        {error, {Reason, Data}} ->
+            ?ERROR("Error: ~s ~p~n~n", [Reason, Data]),
+            getopt:usage(OptSpecList, "rebar"),
+            halt(1)
+    end.
+
 
 %%
 %% set global flag based on getopt option boolean value
