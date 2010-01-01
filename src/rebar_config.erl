@@ -25,8 +25,9 @@
 -module(rebar_config).
 
 -export([new/0, new/1,
-         get/3, get_list/3,
-         delete/2,
+         get/3, get_local/3, get_list/3,
+         get_all/2,
+         set/3,
          set_global/2, get_global/2,
          is_verbose/0]).
 
@@ -50,24 +51,35 @@ new(ParentConfig) ->
     ConfigFile = filename:join([Dir, "rebar.config"]),
     case file:consult(ConfigFile) of
         {ok, Terms} ->
-            Opts = Terms ++ ParentConfig#config.opts;
+            %% Found a config file with some terms. We need to be able to
+            %% distinguish between local definitions (i.e. from the file
+            %% in the cwd) and inherited definitions. To accomplish this,
+            %% we use a marker in the proplist (since order matters) between
+            %% the new and old defs.
+            Opts = Terms ++ [local] ++ [Opt || Opt <- ParentConfig#config.opts, Opt /= local];
         {error, enoent} ->
-            Opts = ParentConfig#config.opts;
+            Opts = [local] ++ [Opt || Opt <- ParentConfig#config.opts, Opt /= local];
         Other ->
             Opts = undefined, % Keep erlc happy
-            ?WARN("Failed to load ~s: ~p\n", [ConfigFile, Other]),
-            ?FAIL
+            ?ABORT("Failed to load ~s: ~p\n", [ConfigFile, Other])
     end,
     #config { dir = Dir, opts = Opts }.
-
-get_list(Config, Key, Default) ->
-    get(Config, Key, Default).
 
 get(Config, Key, Default) ->
     proplists:get_value(Key, Config#config.opts, Default).
 
-delete(Config, Key) ->
-    Config#config { opts = proplists:delete(Key, Config#config.opts) }.
+get_list(Config, Key, Default) ->
+    get(Config, Key, Default).
+
+get_local(Config, Key, Default) ->
+    proplists:get_value(Key, local_opts(Config#config.opts, []), Default).
+
+get_all(Config, Key) ->
+    proplists:get_all_values(Key, Config#config.opts).
+
+set(Config, Key, Value) ->
+    Opts = proplists:delete(Key, Config#config.opts),
+    Config#config { opts = [{Key, Value} | Opts] }.
 
 set_global(Key, Value) ->
     application:set_env(rebar_global, Key, Value).
@@ -92,3 +104,10 @@ is_verbose() ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+local_opts([], Acc) ->
+    lists:reverse(Acc);
+local_opts([local | _Rest], Acc) ->
+    lists:reverse(Acc);
+local_opts([Item | Rest], Acc) ->
+    local_opts(Rest, [Item | Acc]).
