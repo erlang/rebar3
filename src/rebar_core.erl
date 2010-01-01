@@ -162,7 +162,12 @@ process_dir(Dir, ParentConfig, Commands) ->
     %% are any other dirs that might need processing first.
     {UpdatedConfig, Dirs} = acc_modules(select_modules(Modules, preprocess, []),
                                         preprocess, Config, ModuleSetFile, []),
+    ?DEBUG("~s subdirs: ~p\n", [Dir, Dirs]),
     [process_dir(D, UpdatedConfig, Commands) || D <- Dirs],
+
+    %% Make sure the CWD is reset properly; processing subdirs may have caused it
+    %% to change
+    ok = file:set_cwd(Dir),
 
     %% Finally, process the current working directory
     apply_commands(Commands, Modules, UpdatedConfig, ModuleSetFile),
@@ -239,7 +244,9 @@ update_code_path(Config) ->
 restore_code_path(no_change) ->
     ok;
 restore_code_path({old, Path}) ->
-    true = code:set_path(Path),
+    %% Verify that all of the paths still exist -- some dynamically add paths
+    %% can get blown away during clean.
+    true = code:set_path(lists:filter(fun filelib:is_file/1, Path)),
     ok.
 
 
