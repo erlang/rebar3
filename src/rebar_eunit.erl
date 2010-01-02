@@ -52,15 +52,19 @@ eunit(Config, _File) ->
     ok = filelib:ensure_dir(?EUNIT_DIR ++ "/foo"),
 
     %% Compile all erlang from src/ into ?EUNIT_DIR
-    rebar_erlc_compiler:do_compile(Config, "src/*.erl", ?EUNIT_DIR, ".erl", ".beam",
-                                   fun rebar_erlc_compiler:list_hrls/2, fun compile_erl/2,
-                                   rebar_config:get_list(Config, erl_first_files, [])),
+    rebar_base_compiler:run(Config, "src", ".erl", ?EUNIT_DIR, ".beam",
+                            rebar_config:get_list(Config, erl_first_files, []),
+                            fun compile_erl/3,
+                            [recurse_source_dir,
+                             {needs_compile_checks, [fun rebar_erlc_compiler:hrls_check/3]}]),
 
     %% Build a list of all the .beams in ?EUNIT_DIR -- use this for cover
     %% and eunit testing. Normally you can just tell cover and/or eunit to
     %% scan the directory for you, but eunit does a code:purge in conjunction
     %% with that scan and causes any cover compilation info to be lost. So,
     %% we do it by hand. :(
+    %%
+    %% TODO: Not currently compatible with package modules
     Modules = [list_to_atom(filename:basename(N, ".beam")) ||
                   N <- filelib:wildcard("*.beam", "ebin")],
 
@@ -123,7 +127,7 @@ clean(_Config, _File) ->
 %% Internal functions
 %% ===================================================================
 
-compile_erl(Source, Config) ->
+compile_erl(Source, Target, Config) ->
     case is_quickcheck_avail() of
         true ->
             EqcOpts = [{d, 'EQC'}];
@@ -133,7 +137,8 @@ compile_erl(Source, Config) ->
 
     ErlOpts = rebar_config:get_list(Config, erl_opts, []),
     EunitOpts = rebar_config:get_list(Config, eunit_compile_opts, []),
-    Opts = [{i, "include"}, {outdir, ?EUNIT_DIR}, {d, 'TEST'}, debug_info, report] ++
+    Opts = [{i, "include"}, {outdir, filename:dirname(Target)},
+            {d, 'TEST'}, debug_info, report] ++
         ErlOpts ++ EunitOpts ++ EqcOpts,
     case compile:file(Source, Opts) of
         {ok, _} ->

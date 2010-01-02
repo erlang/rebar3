@@ -82,14 +82,10 @@
 
 compile(Config, _AppFile) ->
     DtlOpts = erlydtl_opts(Config),
-    rebar_erlc_compiler:do_compile(
-      Config,
-      filename:join([option(doc_root, DtlOpts),
-                     ["*",option(source_ext, DtlOpts)]]),
-      option(out_dir, DtlOpts),
-      option(source_ext, DtlOpts),
-      option(module_ext, DtlOpts)++".beam",
-      fun referenced_dtls/2, fun compile_dtl/2, []).
+    rebar_base_compiler:run(Config, option(doc_root, DtlOpts), option(source_ext, DtlOpts),
+                            option(out_dir, DtlOpts), option(module_ext, DtlOpts) ++ ".beam",
+                            [], fun compile_dtl/3,
+                            [{needs_compile_checks, [fun referenced_dtls/3]}]).
 
 
 %% ===================================================================
@@ -107,13 +103,13 @@ default(out_dir)  -> "ebin";
 default(source_ext) -> ".dtl";
 default(module_ext) -> "_dtl".
 
-referenced_dtls(Source, Config) ->
-    Set = referenced_dtls([Source], Config,
+referenced_dtls(Source, _Target, Config) ->
+    Set = referenced_dtls1([Source], Config,
                           sets:add_element(Source, sets:new())),
     Final = sets:to_list(sets:del_element(Source, Set)),
     Final.
 
-referenced_dtls(Step, Config, Seen) ->
+referenced_dtls1(Step, Config, Seen) ->
     DtlOpts = erlydtl_opts(Config),
     ExtMatch = re:replace(option(source_ext, DtlOpts), "\.", "\\\\.",
                           [{return, list}]),
@@ -132,7 +128,7 @@ referenced_dtls(Step, Config, Seen) ->
                              sets:union(New, Seen))
     end.
 
-compile_dtl(Source, Config) ->
+compile_dtl(Source, _Target, Config) ->
     case code:which(erlydtl) of
         non_existing ->
             ?CONSOLE(

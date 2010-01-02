@@ -119,7 +119,8 @@ validate_name(AppName, File) ->
         true ->
             ok;
         false ->
-            ?ERROR("Invalid ~s: name of application (~p) must match filename.\n", [File, AppName]),
+            ?ERROR("Invalid ~s: name of application (~p) must match filename.\n",
+                   [File, AppName]),
             ?FAIL
     end.
 
@@ -130,7 +131,7 @@ validate_modules(AppName, undefined) ->
 validate_modules(AppName, Mods) ->
     %% Construct two sets -- one for the actual .beam files in ebin/ and one for the modules
     %% listed in the .app file
-    EbinSet = ordsets:from_list([beam_to_mod(N) || N <- filelib:wildcard("ebin/*.beam")]),
+    EbinSet = ordsets:from_list([beam_to_mod(N) || N <- beams()]),
     ModSet = ordsets:from_list(Mods),
 
     %% Identify .beam files listed in the .app, but not present in ebin/
@@ -156,5 +157,10 @@ validate_modules(AppName, Mods) ->
     end.
 
 beam_to_mod(Filename) ->
-    list_to_atom(filename:basename(Filename, ".beam")).
+    ["ebin" | Rest] = filename:split(Filename),
+    list_to_atom(filename:basename(string:join(Rest, "."), ".beam")).
+
+beams() ->
+    filelib:fold_files("ebin", ".*\.beam\$", true,
+                       fun(F, Acc) -> [F | Acc] end, []).
 

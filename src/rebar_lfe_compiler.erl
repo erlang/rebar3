@@ -38,15 +38,16 @@
 
 compile(Config, _AppFile) ->
     FirstFiles = rebar_config:get_list(Config, lfe_first_files, []),
-    rebar_erlc_compiler:do_compile(Config, "src/*.lfe", "ebin", ".lfe", ".beam",
-                                   undefined, fun compile_lfe/2, FirstFiles).
+    rebar_base_compiler:run(Config, "src", ".lfe", "ebin", ".beam",
+                            FirstFiles,
+                            fun compile_lfe/3, []).
 
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
-compile_lfe(Source, Config) ->
+compile_lfe(Source, _Target, Config) ->
     case code:which(lfe_comp) of
         non_existing ->
             ?CONSOLE("~n===============================================~n" ++
