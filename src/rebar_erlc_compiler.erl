@@ -124,6 +124,7 @@ internal_erl_compile(Source, Config, Outdir) ->
 
     %% Construct the target filename
     Target = filename:join([Outdir | string:tokens(Module, ".")]) ++ ".beam",
+    ok = filelib:ensure_dir(Target),
 
     %% If the file needs compilation, based on last mod date of includes or
     %% the target,
