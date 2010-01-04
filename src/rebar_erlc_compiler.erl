@@ -66,7 +66,7 @@ clean(_Config, _AppFile) ->
 
 doterl_compile(Config, Outdir) ->
     FirstErls = rebar_config:get_list(Config, erl_first_files, []),
-    RestErls  = [Source || Source <- rebar_utils:find_files("src", ".*.erl"),
+    RestErls  = [Source || Source <- rebar_utils:find_files("src", ".*\\.erl\$"),
                            lists:member(Source, FirstErls) == false],
     rebar_base_compiler:run(Config, FirstErls, RestErls,
                             fun(S, C) -> internal_erl_compile(S, C, Outdir) end).
