@@ -53,10 +53,14 @@ clean(_Config, _AppFile) ->
     %% directory structure in ebin with .beam files within. As such, we want
     %% to scan whatever is left in the ebin/ directory for sub-dirs which
     %% satisfy our criteria. TODO: Is there a better way to do this?
-    BeamFiles = filelib:fold_files("ebin", "^.*\\.beam\$", true,
-                                   fun(F, BeamFiles) -> BeamFiles ++ [F] end, []),
-    rebar_file_utils:delete_each(BeamFiles),
-    ok.
+    Dirs = ordsets:from_list([base_dir(F) ||
+                                 F <- rebar_utils:find_files("ebin", "^.*\\.beam\$")]),
+    case Dirs of
+        [] ->
+            ok;
+        _ ->
+            ok = rebar_file_utils:rm_rf(string:join(Dirs, " "))
+    end.
 
 
 
@@ -159,3 +163,7 @@ compile_mib(Source, _Target, Config) ->
         {error, compilation_failed} ->
             ?FAIL
     end.
+
+base_dir(Filename) ->
+    ["ebin" | Rest] = filename:split(Filename),
+    filename:join("ebin", hd(Rest)).
