@@ -31,7 +31,8 @@
          get_os/0,
          sh/2, sh/3,
          sh_failfast/2,
-	 now_str/0]).
+         find_files/2,
+         now_str/0]).
 
 -include("rebar.hrl").
 
@@ -79,6 +80,9 @@ sh(Command, Env, Dir) ->
 
 sh_failfast(Command, Env) ->
     sh(Command, Env).
+
+find_files(Dir, Regex) ->
+    filelib:fold_files(Dir, Regex, true, fun(F, Acc) -> [F | Acc] end, []).
 
 now_str() ->
     {{Year, Month, Day}, {Hour, Minute, Second}} = calendar:local_time(),

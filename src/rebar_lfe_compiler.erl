@@ -38,9 +38,8 @@
 
 compile(Config, _AppFile) ->
     FirstFiles = rebar_config:get_list(Config, lfe_first_files, []),
-    rebar_base_compiler:run(Config, "src", ".lfe", "ebin", ".beam",
-                            FirstFiles,
-                            fun compile_lfe/3, []).
+    rebar_base_compiler:run(Config, FirstFiles, "src", ".lfe", "ebin", ".beam",
+                            fun compile_lfe/3).
 
 
 %% ===================================================================

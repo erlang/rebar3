@@ -28,57 +28,67 @@
 
 -include("rebar.hrl").
 
--export([run/8]).
+-export([run/4, run/7, run/8]).
 
 
 %% ===================================================================
 %% Public API
 %% ===================================================================
 
-run(Config, SourceDir, SourceExt, TargetDir, TargetExt,
-    FirstFiles, CompileFn, Opts) ->
-    SourceExtRe = ".*\\" ++ SourceExt ++ [$$],
+run(Config, FirstFiles, RestFiles, CompileFn) ->
+    %% Compile the first files in sequence
+    compile_each(FirstFiles, Config, CompileFn),
 
-    %% Options:
-    %% recurse_source_dir
-    %% needs_compile_checks - [ fun/2 ]
-    Recursive = proplists:get_bool(recurse_source_dir, Opts),
-
-    %% Find all the source files we can
-    FoundFiles = filelib:fold_files(SourceDir, SourceExtRe, Recursive,
-                                 fun(F, Acc) -> [F | Acc] end, []),
-
-    %% Construct two lists of targets. "FirstTargets" is the list of files which
-    %% must be compiled first and in strict order; "RestTargets" is all remaining files
-    %% that may be compiled in any order.
-    FirstTargets = [{Fs, target_file(Fs, SourceDir, SourceExt, TargetDir, TargetExt)} ||
-                       Fs <- FirstFiles],
-    RestTargets = [{Fs, target_file(Fs, SourceDir, SourceExt, TargetDir, TargetExt)} ||
-                      Fs <- drop_each(FirstFiles, FoundFiles)],
-
-    %% Setup list of functions which determine if a file needs compilation or not. By
-    %% default we just check the last modified date
-    NeedsCompileFns = [ fun check_source_lastmod/3 ] ++
-        rebar_config:get(Config, needs_compile_checks, []),
-
-    %% Compile the first targets in sequence
-    compile_each(FirstTargets, Config, NeedsCompileFns, CompileFn),
-
-    %% Spin up workers
-    case RestTargets of
+    %% Spin up workers for the rest of the files
+    case RestFiles of
         [] ->
             ok;
         _ ->
             Self = self(),
-            F = fun() -> compile_worker(Self, Config, NeedsCompileFns, CompileFn) end,
+            F = fun() -> compile_worker(Self, Config, CompileFn) end,
             Pids = [spawn_monitor(F) || _I <- lists:seq(1,3)],
-            compile_queue(Pids, RestTargets)
+            compile_queue(Pids, RestFiles)
     end.
+
+run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt, Compile3Fn) ->
+    run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
+        Compile3Fn, [check_last_mod]).
+
+run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
+    Compile3Fn, Opts) ->
+    %% Convert simple extension to proper regex
+    SourceExtRe = ".*\\" ++ SourceExt ++ [$$],
+
+    %% Find all possible source files
+    FoundFiles = rebar_utils:find_files(SourceDir, SourceExtRe),
+
+    %% Remove first files from found files
+    RestFiles = [Source || Source <- FoundFiles,
+                           lists:member(Source, FirstFiles) == false],
+
+    %% Check opts for flag indicating that compile should check lastmod
+    CheckLastMod = proplists:get_bool(check_last_mod, Opts),
+
+    run(Config, FirstFiles, RestFiles,
+        fun(S, C) ->
+                Target = target_file(S, SourceDir, SourceExt, TargetDir, TargetExt),
+                simple_compile_wrapper(S, Target, Compile3Fn, C, CheckLastMod)
+        end).
 
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+simple_compile_wrapper(Source, Target, Compile3Fn, Config, false) ->
+    Compile3Fn(Source, Target, Config);
+simple_compile_wrapper(Source, Target, Compile3Fn, Config, true) ->
+    case filelib:last_modified(Target) < filelib:last_modified(Source) of
+        true ->
+            Compile3Fn(Source, Target, Config);
+        false ->
+            skipped
+    end.
 
 target_file(SourceFile, SourceDir, SourceExt, TargetDir, TargetExt) ->
     %% Remove all leading components of the source dir from the file -- we want
@@ -97,46 +107,25 @@ remove_common_path1(FilenameParts, _) ->
     filename:join(FilenameParts).
 
 
-drop_each([], List) ->
-    List;
-drop_each([Member | Rest], List) ->
-    drop_each(Rest, lists:delete(Member, List)).
-
-
-needs_compile(_SourceFile, _TargetFile, _Config, []) ->
-    false;
-needs_compile(SourceFile, TargetFile, Config, [Fn | Rest]) ->
-    case Fn(SourceFile, TargetFile, Config) of
-        true ->
-            true;
-        false ->
-            needs_compile(SourceFile, TargetFile, Config, Rest)
-    end.
-
-check_source_lastmod(SourceFile, TargetFile, _Config) ->
-    filelib:last_modified(TargetFile) < filelib:last_modified(SourceFile).
-
-compile(Source, Target, Config, NeedsCompileFns, CompileFn) ->
-    case needs_compile(Source, Target, Config, NeedsCompileFns) of
-        true ->
-            ok = filelib:ensure_dir(Target),
-            CompileFn(Source, Target, Config);
-        false ->
+compile(Source, Config, CompileFn) ->
+    case CompileFn(Source, Config) of
+        ok ->
+            ok;
+        skipped ->
             skipped
     end.
 
 
-
-compile_each([], _Config, _NeedsCompileFns, _CompileFn) ->
+compile_each([], _Config, _CompileFn) ->
     ok;
-compile_each([{Source, Target} | Rest], Config, NeedsCompileFns, CompileFn) ->
-    case compile(Source, Target, Config, NeedsCompileFns, CompileFn) of
+compile_each([Source | Rest], Config, CompileFn) ->
+    case compile(Source, Config, CompileFn) of
         ok ->
             ?CONSOLE("Compiled ~s\n", [Source]);
         skipped ->
             ?INFO("Skipped ~s\n", [Source])
     end,
-    compile_each(Rest, Config, NeedsCompileFns, CompileFn).
+    compile_each(Rest, Config, CompileFn).
 
 
 
@@ -149,8 +138,8 @@ compile_queue(Pids, Targets) ->
                 [] ->
                     Worker ! empty,
                     compile_queue(Pids, Targets);
-                [{Source, Target} | Rest] ->
-                    Worker ! {compile, Source, Target},
+                [Source | Rest] ->
+                    Worker ! {compile, Source},
                     compile_queue(Pids, Rest)
             end;
 
@@ -176,17 +165,17 @@ compile_queue(Pids, Targets) ->
             ?FAIL
     end.
 
-compile_worker(QueuePid, Config, NeedsCompileFns, CompileFn) ->
+compile_worker(QueuePid, Config, CompileFn) ->
     QueuePid ! {next, self()},
     receive
-        {compile, Source, Target} ->
-            case catch(compile(Source, Target, Config, NeedsCompileFns, CompileFn)) of
+        {compile, Source} ->
+            case catch(compile(Source, Config, CompileFn)) of
                 ok ->
                     QueuePid ! {compiled, Source},
-                    compile_worker(QueuePid, Config, NeedsCompileFns, CompileFn);
+                    compile_worker(QueuePid, Config, CompileFn);
                 skipped ->
                     QueuePid ! {skipped, Source},
-                    compile_worker(QueuePid, Config, NeedsCompileFns, CompileFn);
+                    compile_worker(QueuePid, Config, CompileFn);
                 Error ->
                     QueuePid ! {fail, Error},
                     ok

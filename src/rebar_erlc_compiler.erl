@@ -29,8 +29,7 @@
 -export([compile/2,
          clean/2]).
 
- %% make available for rebar_eunit until there is a better option
--export([hrls_check/3]).
+-export([doterl_compile/2]).
 
 -include("rebar.hrl").
 
@@ -39,16 +38,10 @@
 %% ===================================================================
 
 compile(Config, _AppFile) ->
-    rebar_base_compiler:run(Config, "src", ".erl", "ebin", ".beam",
-                            rebar_config:get_list(Config, erl_first_files, []),
-                            fun compile_erl/3,
-                            [recurse_source_dir,
-                             {needs_compile_checks, [fun hrls_check/3]}]),
-
-    rebar_base_compiler:run(Config, "mibs", ".mib", "priv/mibs", ".bin",
-                            rebar_config:get_list(Config, mib_first_files, []),
-                            fun compile_mib/3,
-                            []).
+    doterl_compile(Config, "ebin"),
+    rebar_base_compiler:run(Config, rebar_config:get_list(Config, mib_first_files, []),
+                            "mibs", ".mib", "priv/mibs", ".bin",
+                            fun compile_mib/3).
 
 clean(_Config, _AppFile) ->
     %% TODO: This would be more portable if it used Erlang to traverse
@@ -68,66 +61,97 @@ clean(_Config, _AppFile) ->
 
 
 %% ===================================================================
+%% .erl Compilation API (externally used by only eunit)
+%% ===================================================================
+
+doterl_compile(Config, Outdir) ->
+    FirstErls = rebar_config:get_list(Config, erl_first_files, []),
+    RestErls  = [Source || Source <- rebar_utils:find_files("src", ".*.erl"),
+                           lists:member(Source, FirstErls) == false],
+    rebar_base_compiler:run(Config, FirstErls, RestErls,
+                            fun(S, C) -> internal_erl_compile(S, C, Outdir) end).
+
+
+%% ===================================================================
 %% Internal functions
 %% ===================================================================
 
-hrls_check(Source, Target, Config) ->
-    TargetLastMod = filelib:last_modified(Target),
-    lists:any(fun(I) -> TargetLastMod < filelib:last_modified(I) end,
-              list_hrls(Source, Config)).
+include_path(Source, Config) ->
+    ErlOpts = rebar_config:get(Config, erl_opts, []),
+    [filename:dirname(Source)] ++ proplists:get_all_values(i, ErlOpts).
 
-
-list_hrls(Src, Config) ->
-    case epp:open(Src, include_path(Src, Config)) of
+inspect(Source, IncludePath) ->
+    ModuleDefault = filename:basename(Source, ".erl"),
+    case epp:open(Source, IncludePath) of
         {ok, Epp} ->
-            %% check include for erlang files
-            extract_includes(Epp, Src);
-        _ ->
-            false
+            inspect_epp(Epp, ModuleDefault, []);
+        {error, Reason} ->
+            ?DEBUG("Failed to inspect ~s: ~p\n", [Source, Reason]),
+            {ModuleDefault, []}
     end.
 
-
-extract_includes(Epp, Src) ->
+inspect_epp(Epp, Module, Includes) ->
     case epp:parse_erl_form(Epp) of
-        {ok, {attribute, 1, file, {Src, 1}}} ->
-            extract_includes(Epp, Src);
+        {ok, {attribute, _, module, ActualModule}} when is_list(ActualModule) ->
+            %% If the module name includes package info, we get a list of atoms...
+            case is_list(ActualModule) of
+                true ->
+                    ActualModuleStr = string:join([atom_to_list(P) || P <- ActualModule], ".");
+                false ->
+                    ActualModuleStr = atom_to_list(ActualModule)
+            end,
+            inspect_epp(Epp, ActualModuleStr, Includes);
+        {ok, {attribute, 1, file, {Module, 1}}} ->
+            inspect_epp(Epp, Module, Includes);
         {ok, {attribute, 1, file, {IncFile, 1}}} ->
-            [IncFile|extract_includes(Epp, Src)];
-        {ok, _} ->
-            extract_includes(Epp, Src);
+            inspect_epp(Epp, Module, [IncFile | Includes]);
         {eof, _} ->
             epp:close(Epp),
-            [];
-        {error, _Error} ->
-            extract_includes(Epp, Src)
+            {Module, Includes};
+        _ ->
+            inspect_epp(Epp, Module, Includes)
     end.
 
-include_path(Source, Config) ->
-    [filename:dirname(Source) | compile_opts(Config, i)].
+needs_compile(Source, Target, Hrls) ->
+    TargetLastMod = filelib:last_modified(Target),
+    lists:any(fun(I) -> TargetLastMod < filelib:last_modified(I) end,
+              [Source] ++ Hrls).
 
-compile_opts(Config, Key) ->
-    rebar_config:get_list(Config, Key, []).
 
-compile_erl(Source, Target, Config) ->
-    Opts = [{i, "include"}, {outdir, filename:dirname(Target)}, report, return] ++
-            compile_opts(Config, erl_opts),
-    case compile:file(Source, Opts) of
-        {ok, _, []} ->
-            ok;
-        {ok, _, _Warnings} ->
-            %% We got at least one warning -- if fail_on_warning is in options, fail
-            case lists:member(fail_on_warning, Opts) of
-                true ->
-                    ?FAIL;
-                false ->
-                    ok
+internal_erl_compile(Source, Config, Outdir) ->
+    %% Determine the target name and includes list by inspecting the source file
+    {Module, Hrls} = inspect(Source, include_path(Source, Config)),
+
+    %% Construct the target filename
+    Target = filename:join([Outdir | string:tokens(Module, ".")]) ++ ".beam",
+
+    %% If the file needs compilation, based on last mod date of includes or
+    %% the target,
+    case needs_compile(Source, Target, Hrls) of
+        true ->
+            Opts = [{i, "include"}, {outdir, filename:dirname(Target)}, report, return] ++
+                rebar_config:get(Config, erl_opts, []),
+            case compile:file(Source, Opts) of
+                {ok, _, []} ->
+                    ok;
+                {ok, _, _Warnings} ->
+                    %% We got at least one warning -- if fail_on_warning is in options, fail
+                    case lists:member(fail_on_warning, Opts) of
+                        true ->
+                            ?FAIL;
+                        false ->
+                            ok
+                    end;
+                _ ->
+                    ?FAIL
             end;
-        _ ->
-            ?FAIL
+        false ->
+            skipped
     end.
 
 compile_mib(Source, _Target, Config) ->
-    Opts = [{outdir, "priv/mibs"}, {i, ["priv/mibs"]}] ++ compile_opts(Config, mib_opts),
+    Opts = [{outdir, "priv/mibs"}, {i, ["priv/mibs"]}] ++
+        rebar_config:get(Config, mib_opts, []),
     case snmpc:compile(Source, Opts) of
         {ok, _} ->
             ok;

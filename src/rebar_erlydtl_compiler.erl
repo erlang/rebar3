@@ -82,10 +82,10 @@
 
 compile(Config, _AppFile) ->
     DtlOpts = erlydtl_opts(Config),
-    rebar_base_compiler:run(Config, option(doc_root, DtlOpts), option(source_ext, DtlOpts),
+    rebar_base_compiler:run(Config, [],
+                            option(doc_root, DtlOpts), option(source_ext, DtlOpts),
                             option(out_dir, DtlOpts), option(module_ext, DtlOpts) ++ ".beam",
-                            [], fun compile_dtl/3,
-                            [{needs_compile_checks, [fun referenced_dtls/3]}]).
+                            fun compile_dtl/3, [{check_last_mod, false}]).
 
 
 %% ===================================================================
@@ -128,7 +128,7 @@ referenced_dtls1(Step, Config, Seen) ->
                              sets:union(New, Seen))
     end.
 
-compile_dtl(Source, _Target, Config) ->
+compile_dtl(Source, Target, Config) ->
     case code:which(erlydtl) of
         non_existing ->
             ?CONSOLE(
@@ -140,6 +140,7 @@ compile_dtl(Source, _Target, Config) ->
                "===============================================~n~n", []),
             ?FAIL;
         _ ->
+            %% TODO: Check last mod on target and referenced DTLs here..
             DtlOpts = erlydtl_opts(Config),
             %% ensure that doc_root and out_dir are defined,
             %% using defaults if necessary

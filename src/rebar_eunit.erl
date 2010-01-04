@@ -51,12 +51,9 @@ eunit(Config, _File) ->
     %% Make sure ?EUNIT_DIR/ directory exists (tack on dummy module)
     ok = filelib:ensure_dir(?EUNIT_DIR ++ "/foo"),
 
-    %% Compile all erlang from src/ into ?EUNIT_DIR
-    rebar_base_compiler:run(Config, "src", ".erl", ?EUNIT_DIR, ".beam",
-                            rebar_config:get_list(Config, erl_first_files, []),
-                            fun compile_erl/3,
-                            [recurse_source_dir,
-                             {needs_compile_checks, [fun rebar_erlc_compiler:hrls_check/3]}]),
+    %% Compile erlang code to ?EUNIT_DIR, using a tweaked config
+    %% with appropriate defines for eunit
+    rebar_erlc_compiler:doterl_compile(eunit_config(Config), ?EUNIT_DIR),
 
     %% Build a list of all the .beams in ?EUNIT_DIR -- use this for cover
     %% and eunit testing. Normally you can just tell cover and/or eunit to
@@ -127,7 +124,7 @@ clean(_Config, _File) ->
 %% Internal functions
 %% ===================================================================
 
-compile_erl(Source, Target, Config) ->
+eunit_config(Config) ->
     case is_quickcheck_avail() of
         true ->
             EqcOpts = [{d, 'EQC'}];
@@ -137,15 +134,9 @@ compile_erl(Source, Target, Config) ->
 
     ErlOpts = rebar_config:get_list(Config, erl_opts, []),
     EunitOpts = rebar_config:get_list(Config, eunit_compile_opts, []),
-    Opts = [{i, "include"}, {outdir, filename:dirname(Target)},
-            {d, 'TEST'}, debug_info, report] ++
+    Opts = [{d, 'TEST'}, debug_info] ++
         ErlOpts ++ EunitOpts ++ EqcOpts,
-    case compile:file(Source, Opts) of
-        {ok, _} ->
-            ok;
-        error ->
-            ?FAIL
-    end.
+    rebar_config:set(Config, erl_opts, Opts).
 
 is_quickcheck_avail() ->
     case erlang:get(is_quickcheck_avail) of

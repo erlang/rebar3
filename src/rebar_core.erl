@@ -237,8 +237,8 @@ apply_commands([Command | Rest], Modules, Config, ModuleFile) ->
                 {error, failed} ->
                     ?FAIL;
                 Other ->
-                    ?ERROR("~p failed while processing ~s: ~p", [Command, Dir, Other]),
-                    ?FAIL
+                    ?ABORT("~p failed while processing ~s: ~s",
+                           [Command, Dir, io_lib:print(Other, 1,80,-1)])
             end
     end.
 
