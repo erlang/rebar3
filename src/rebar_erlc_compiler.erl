@@ -52,16 +52,11 @@ clean(_Config, _AppFile) ->
     %% Erlang compilation is recursive, so it's possible that we have a nested
     %% directory structure in ebin with .beam files within. As such, we want
     %% to scan whatever is left in the ebin/ directory for sub-dirs which
-    %% satisfy our criteria. TODO: Is there a better way to do this?
-    Dirs = ordsets:from_list([base_dir(F) ||
-                                 F <- rebar_utils:find_files("ebin", "^.*\\.beam\$")]),
-    case Dirs of
-        [] ->
-            ok;
-        _ ->
-            ok = rebar_file_utils:rm_rf(string:join(Dirs, " "))
-    end.
-
+    %% satisfy our criteria.
+    BeamFiles = rebar_utils:find_files("ebin", "^.*\\.beam$"),
+    rebar_file_utils:delete_each(BeamFiles),
+    lists:foreach(fun(Dir) -> delete_dir(Dir, dirs(Dir)) end, dirs("ebin")),
+    ok.
 
 
 %% ===================================================================
@@ -164,6 +159,11 @@ compile_mib(Source, _Target, Config) ->
             ?FAIL
     end.
 
-base_dir(Filename) ->
-    ["ebin" | Rest] = filename:split(Filename),
-    filename:join("ebin", hd(Rest)).
+dirs(Dir) ->
+    [F || F <- filelib:wildcard(filename:join([Dir, "*"])), filelib:is_dir(F)].
+
+delete_dir(Dir, []) ->
+    file:del_dir(Dir);
+delete_dir(Dir, Subdirs) ->
+    lists:foreach(fun(D) -> delete_dir(D, dirs(D)) end, Subdirs),
+    file:del_dir(Dir).

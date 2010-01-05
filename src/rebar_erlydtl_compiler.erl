@@ -103,31 +103,6 @@ default(out_dir)  -> "ebin";
 default(source_ext) -> ".dtl";
 default(module_ext) -> "_dtl".
 
-referenced_dtls(Source, _Target, Config) ->
-    Set = referenced_dtls1([Source], Config,
-                          sets:add_element(Source, sets:new())),
-    Final = sets:to_list(sets:del_element(Source, Set)),
-    Final.
-
-referenced_dtls1(Step, Config, Seen) ->
-    DtlOpts = erlydtl_opts(Config),
-    ExtMatch = re:replace(option(source_ext, DtlOpts), "\.", "\\\\.",
-                          [{return, list}]),
-    AllRefs = lists:append(
-                [ string:tokens(
-                    os:cmd(["grep -o [^\\\"]*",ExtMatch," ",F]),
-                    "\n")
-                  || F <- Step]),
-    DocRoot = option(doc_root, DtlOpts),
-    WithPaths = [ filename:join([DocRoot, F]) || F <- AllRefs ],
-    Existing = lists:filter(fun filelib:is_file/1, WithPaths),
-    New = sets:subtract(sets:from_list(Existing), Seen),
-    case sets:size(New) of
-        0 -> Seen;
-        _ -> referenced_dtls(sets:to_list(New), Config,
-                             sets:union(New, Seen))
-    end.
-
 compile_dtl(Source, Target, Config) ->
     case code:which(erlydtl) of
         non_existing ->
@@ -140,27 +115,67 @@ compile_dtl(Source, Target, Config) ->
                "===============================================~n~n", []),
             ?FAIL;
         _ ->
-            %% TODO: Check last mod on target and referenced DTLs here..
-            DtlOpts = erlydtl_opts(Config),
-            %% ensure that doc_root and out_dir are defined,
-            %% using defaults if necessary
-            Opts = [{out_dir, option(out_dir, DtlOpts)},
-                    {doc_root, option(doc_root, DtlOpts)},
-                    report, return],
-            case erlydtl:compile(Source,
-                                 module_name(Source,DtlOpts),
-                                 Opts++DtlOpts) of
-                ok -> ok;
-                Reason ->
-                    ?CONSOLE("Compiling template ~s failed:~n  ~p~n",
-                             [Source, Reason]),
-                    ?FAIL
+            case needs_compile(Source, Target, Config) of
+                true ->
+                    do_compile(Source, Target, Config);
+                false ->
+                    skipped
             end
     end.
 
-module_name(DtlPath, DtlOpts) ->
-    F = filename:basename(DtlPath),
-    SourceExt = option(source_ext, DtlOpts),
-    ModuleExt = option(module_ext, DtlOpts),
-    list_to_atom(lists:sublist(F, length(F)-length(SourceExt))
-                 ++ModuleExt).
+do_compile(Source, Target, Config) ->
+    %% TODO: Check last mod on target and referenced DTLs here..
+    DtlOpts = erlydtl_opts(Config),
+    %% ensure that doc_root and out_dir are defined,
+    %% using defaults if necessary
+    Opts = [{out_dir, option(out_dir, DtlOpts)},
+            {doc_root, option(doc_root, DtlOpts)},
+            report, return],
+    case erlydtl:compile(Source,
+                         module_name(Target),
+                         Opts++DtlOpts) of
+        ok -> ok;
+        Reason ->
+            ?CONSOLE("Compiling template ~s failed:~n  ~p~n",
+                     [Source, Reason]),
+            ?FAIL
+    end.
+
+module_name(Target) ->
+    F = filename:basename(Target),
+    string:substr(F, 1, length(F)-length(".beam")).
+
+needs_compile(Source, Target, Config) ->
+    LM = filelib:last_modified(Target),
+    case LM < filelib:last_modified(Source) of
+        true  -> true;
+        false ->
+            lists:any(fun(D) -> LM < filelib:last_modified(D) end,
+                      referenced_dtls(Source, Config))
+    end.
+
+referenced_dtls(Source, Config) ->
+    Set = referenced_dtls1([Source], Config,
+                          sets:add_element(Source, sets:new())),
+    Final = sets:to_list(sets:del_element(Source, Set)),
+    Final.
+
+referenced_dtls1(Step, Config, Seen) ->
+    DtlOpts = erlydtl_opts(Config),
+    ExtMatch = re:replace(option(source_ext, DtlOpts), "\.", "\\\\\\\\.",
+                          [{return, list}]),
+    AllRefs = lists:append(
+                [ string:tokens(
+                    os:cmd(["grep -o [^\\\"]*",ExtMatch," ",F]),
+                    "\n")
+                  || F <- Step]),
+    DocRoot = option(doc_root, DtlOpts),
+    WithPaths = [ filename:join([DocRoot, F]) || F <- AllRefs ],
+    Existing = lists:filter(fun filelib:is_file/1, WithPaths),
+    New = sets:subtract(sets:from_list(Existing), Seen),
+    case sets:size(New) of
+        0 -> Seen;
+        _ -> referenced_dtls1(sets:to_list(New), Config,
+                              sets:union(New, Seen))
+    end.
+
