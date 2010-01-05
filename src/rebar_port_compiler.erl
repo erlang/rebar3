@@ -90,7 +90,7 @@ compile(Config, AppFile) ->
             {NewBins, ExistingBins} = compile_each(Sources, Config, Env, [], []),
 
             %% Construct the driver name and make sure priv/ exists
-            SoName = so_name(AppFile),
+            SoName = so_name(Config, AppFile),
             ok = filelib:ensure_dir(SoName),
 
             %% Only relink if necessary, given the SoName and list of new binaries
@@ -110,7 +110,7 @@ clean(Config, AppFile) ->
     rebar_file_utils:delete_each([source_to_bin(S) || S <- Sources]),
 
     %% Delete the .so file
-    rebar_file_utils:delete_each([so_name(AppFile)]),
+    rebar_file_utils:delete_each([so_name(Config, AppFile)]),
 
     %% Run the cleanup script, if it exists
     run_cleanup_hook(Config).
@@ -263,16 +263,21 @@ source_to_bin(Source) ->
     Ext = filename:extension(Source),
     filename:rootname(Source, Ext) ++ ".o".
 
-so_name(AppFile) ->
-    %% Get the app name, which we'll use to generate the linked port driver name
-    case rebar_app_utils:load_app_file(AppFile) of
-        {ok, AppName, _} ->
-            ok;
-        error ->
-            AppName = undefined,
-            ?FAIL
-    end,
+so_name(Config, AppFile) ->
+    %% Check config to see if a custom so_name has been specified
+    PortName = case rebar_config:get(Config, so_name, undefined) of
+                   undefined ->
+                       %% Get the app name, which we'll use to
+                       %% generate the linked port driver name
+                       case rebar_app_utils:load_app_file(AppFile) of
+                           {ok, AppName, _} ->
+                               AppName;
+                           error ->
+                               ?FAIL
+                       end;
+                   Soname ->
+                       Soname
+               end,
 
     %% Construct the driver name
-    ?FMT("priv/~s_drv.so", [AppName]).
-
+    ?FMT("priv/~s_drv.so", [PortName]).
