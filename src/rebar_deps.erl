@@ -31,6 +31,8 @@
 -export([preprocess/2,
          distclean/2]).
 
+-define(HG_VERSION,  "1.4").
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -207,13 +209,31 @@ download_source(AppDir, {hg, Url, Rev}) ->
 %% ===================================================================
 
 source_engine_avail({hg, _, _}) ->
-    Res = os:cmd("which hg"),
-    ?DEBUG("which hg = ~p\n", [Res]),
-    case Res of
-        [] ->
+    Path = os:find_executable("hg"),
+    ?DEBUG("which hg = ~p\n", [Path]),
+    case Path of
+        false ->
             false;
         _ ->
-            true
+            ensure_required_scm_client(hg, Path)
     end;
 source_engine_avail(_) ->
     false.
+
+%% We expect the initial part of the version string to be of the form:
+%% "Mercurial Distributed SCM (version 1.4.1+20091201)". Rebar
+%% requires version 1.4 or higher.
+ensure_required_scm_client(hg, Path) ->
+    Info = os:cmd(Path ++ " --version"),
+    case re:run(Info, "version (\\d*\.\\d*\.\\d*)", [{capture, all_but_first, list}]) of
+        {match, [Vsn]} ->
+            case Vsn >= ?HG_VERSION of
+                true ->
+                    true;
+                false ->
+                    ?ABORT("Rebar requires version ~p or higher of hg (~p)~n",
+                        [?HG_VERSION, Path])
+            end;
+        _ ->
+            false
+    end.
