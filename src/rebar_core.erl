@@ -82,18 +82,25 @@ parse_args(Args) ->
     case getopt:parse(OptSpecList, Args) of
         {ok, {_Options, []}} ->
             %% no command to run specified
-            getopt:usage(OptSpecList, "rebar"),
+            help(),
             halt(1);
         {ok, {Options, NonOptArgs}} ->
             case proplists:get_bool(help, Options) of
                 true ->
                     %% display help
-                    getopt:usage(OptSpecList, "rebar"),
+                    help(),
                     halt(0);
                 false ->
                     %% Set global variables based on getopt options
                     set_global_flag(Options, verbose),
                     set_global_flag(Options, force),
+                    DefJobs = rebar_config:get_jobs(),
+                    case proplists:get_value(jobs, Options, DefJobs) of
+                        DefJobs ->
+                            ok;
+                        Jobs ->
+                            rebar_config:set_global(jobs, Jobs)
+                    end,
 
                     %% Filter all the flags (i.e. strings of form key=value) from the
                     %% command line arguments. What's left will be the commands to run.
@@ -101,10 +108,9 @@ parse_args(Args) ->
             end;
         {error, {Reason, Data}} ->
             ?ERROR("Error: ~s ~p~n~n", [Reason, Data]),
-            getopt:usage(OptSpecList, "rebar"),
+            help(),
             halt(1)
     end.
-
 
 %%
 %% set global flag based on getopt option boolean value
@@ -119,6 +125,21 @@ set_global_flag(Options, Flag) ->
     rebar_config:set_global(Flag, Value).
 
 %%
+%% print help/usage string
+%%
+help() ->
+    Jobs = rebar_config:get_jobs(),
+    io:format(
+"
+Usage: rebar [-h] [-v] [-f] [-j <jobs>] [key=value,...] <command,...>
+
+  -h, --help      Show the program options
+  -v, --verbose   Be verbose about what gets done
+  -f, --force     Force
+  -j, --jobs      Number of concurrent workers a command may use. Default: ~B
+", [Jobs]).
+
+%%
 %% options accepted via getopt
 %%
 option_spec_list() ->
@@ -126,7 +147,9 @@ option_spec_list() ->
      %% {Name, ShortOpt, LongOpt, ArgSpec, HelpMsg}
      {help,    $h, "help",    undefined, "Show the program options"},
      {verbose, $v, "verbose", undefined, "Be verbose about what gets done"},
-     {force,   $f, "force",   undefined, "Force"}
+     {force,   $f, "force",   undefined, "Force"},
+     {jobs,    $j, "jobs",    integer,
+      "Number of concurrent workers a command may use."}
     ].
 
 %%

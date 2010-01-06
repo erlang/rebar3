@@ -31,7 +31,7 @@
          get_all/2,
          set/3,
          set_global/2, get_global/2,
-         is_verbose/0]).
+         is_verbose/0, get_jobs/0]).
 
 -include("rebar.hrl").
 
@@ -83,6 +83,10 @@ set(Config, Key, Value) ->
     Opts = proplists:delete(Key, Config#config.opts),
     Config#config { opts = [{Key, Value} | Opts] }.
 
+set_global(jobs=Key, Value) when is_list(Value) ->
+    set_global(Key,list_to_integer(Value));
+set_global(jobs=Key, Value) when is_integer(Value) ->
+    application:set_env(rebar_global, Key, erlang:max(1,Value));
 set_global(Key, Value) ->
     application:set_env(rebar_global, Key, Value).
 
@@ -102,6 +106,8 @@ is_verbose() ->
             false
     end.
 
+get_jobs() ->
+    get_global(jobs, 3).
 
 %% ===================================================================
 %% Internal functions

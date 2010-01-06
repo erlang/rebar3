@@ -25,12 +25,15 @@
               rebar_utils,
               getopt ]},
   {registered, []},
-  {applications, [kernel, 
-                  stdlib, 
+  {applications, [kernel,
+                  stdlib,
                   sasl]},
   {env, [
          %% Default log level
          {log_level, error},
+
+         %% Default parallel jobs
+         {jobs, 3},
 
          %% any_dir processing modules
          {any_dir_modules, [
@@ -51,7 +54,7 @@
                                rebar_eunit,
                                rebar_escripter
                               ]},
-                    
+
                     {rel_dir, [
                                rebar_reltool
                               ]}
