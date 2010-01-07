@@ -1,3 +1,5 @@
+-record(config, { dir,
+                  opts }).
 
 -record(global_state, { working_dir }).
 
