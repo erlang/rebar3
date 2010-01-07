@@ -31,8 +31,6 @@
 -export([preprocess/2,
          distclean/2]).
 
--define(HG_VERSION,  "1.4").
-
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -90,7 +88,6 @@ process_deps([{App, VsnRegex, Source} | Rest], Acc, Dir) ->
             %% App may not be on the code path, or the version that is doesn't
             %% match our regex. Either way, we want to pull our revision into
             %% the deps dir and try to use that
-            require_source_engine(Source),
             AppDir = filename:join(Dir, App),
             use_source(AppDir, App, VsnRegex, Source),
             process_deps(Rest, [AppDir | Acc], Dir)
@@ -194,6 +191,7 @@ use_source(AppDir, App, VsnRegex, Source, Count) ->
                            [AppDir, VsnRegex])
             end;
         false ->
+            require_source_engine(Source),
             download_source(AppDir, Source),
             use_source(AppDir, App, VsnRegex, Source, Count-1)
     end.
@@ -201,39 +199,44 @@ use_source(AppDir, App, VsnRegex, Source, Count) ->
 download_source(AppDir, {hg, Url, Rev}) ->
     ok = filelib:ensure_dir(AppDir),
     Cmd = ?FMT("hg clone -u ~s ~s", [Rev, Url]),
-    rebar_utils:sh(Cmd, [], filename:dirname(AppDir)).
+    rebar_utils:sh(Cmd, [], filename:dirname(AppDir));
+download_source(AppDir, {git, Url, Rev}) ->
+    ok = filelib:ensure_dir(AppDir),
+    rebar_utils:sh(?FMT("git clone -n ~s", [Url]), [], filename:dirname(AppDir)),
+    rebar_utils:sh(?FMT("git checkout ~s", [Rev]), [], AppDir).
+
 
 
 %% ===================================================================
 %% Source helper functions
 %% ===================================================================
 
-source_engine_avail({hg, _, _}) ->
-    Path = os:find_executable("hg"),
-    ?DEBUG("which hg = ~p\n", [Path]),
-    case Path of
+source_engine_avail({Name, _, _}) when Name == hg; Name == git ->
+    case scm_client_vsn(Name) >= required_scm_client_vsn(Name) of
+        true ->
+            true;
         false ->
-            false;
-        _ ->
-            ensure_required_scm_client(hg, Path)
-    end;
-source_engine_avail(_) ->
-    false.
+            ?ABORT("Rebar requires version ~p or higher of ~s\n",
+                   [required_scm_client_vsn(Name), Name])
+    end.
 
-%% We expect the initial part of the version string to be of the form:
-%% "Mercurial Distributed SCM (version 1.4.1+20091201)". Rebar
-%% requires version 1.4 or higher.
-ensure_required_scm_client(hg, Path) ->
-    Info = os:cmd(Path ++ " --version"),
-    case re:run(Info, "version (\\d*\.\\d*\.\\d*)", [{capture, all_but_first, list}]) of
-        {match, [Vsn]} ->
-            case Vsn >= ?HG_VERSION of
-                true ->
-                    true;
-                false ->
-                    ?ABORT("Rebar requires version ~p or higher of hg (~p)~n",
-                        [?HG_VERSION, Path])
-            end;
+scm_client_vsn(false, _VsnArg, _VsnRegex) ->
+    false;
+scm_client_vsn(Path, VsnArg, VsnRegex) ->
+    Info = os:cmd(Path ++ VsnArg),
+    case re:run(Info, VsnRegex, [{capture, all_but_first, list}]) of
+        {match, Match} ->
+            list_to_tuple([list_to_integer(S) || S <- Match]);
         _ ->
             false
     end.
+
+required_scm_client_vsn(hg)  -> {1, 4};
+required_scm_client_vsn(git) -> {1, 6}.
+
+scm_client_vsn(hg) ->
+    scm_client_vsn(os:find_executable(hg), " --version", "version (\\d+).(\\d+)");
+scm_client_vsn(git) ->
+    scm_client_vsn(os:find_executable(git), " --version", "git version (\\d+).(\\d+)");
+scm_client_vsn(_) ->
+    undefined.
