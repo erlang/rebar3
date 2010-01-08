@@ -13,7 +13,7 @@ main(Args) ->
         false ->
             ok
     end,
-    
+
     %% Compile all src/*.erl to ebin
     case make:files(filelib:wildcard("src/*.erl"), [{outdir, "ebin"}, {i, "include"},
                                                     {d, 'BUILD_TIME', Built}]) of
@@ -39,10 +39,12 @@ main(Args) ->
     %% Run rebar to do proper .app validation and such
     rebar:main(["compile"] ++ Args),
 
-    %% Construct the archive of everything in ebin/ dir -- put it on the
-    %% top-level of the zip file so that code loading works properly.
-    Files = filelib:wildcard("*", "ebin"),
-    case zip:create("mem", Files, [{cwd, "ebin"}, memory]) of
+    %% Read the contents of the files in ebin and templates; note that we place
+    %% all the beam files at the top level of the code archive so that code loading
+    %% works properly.
+    Files = load_files("*", "ebin") ++ load_files("priv/templates/*", "."),
+
+    case zip:create("mem", Files, [memory]) of
         {ok, {"mem", ZipBin}} ->
             %% Archive was successfully created. Prefix that binary with our
             %% header and write to "rebar" file
@@ -67,9 +69,15 @@ main(Args) ->
               "your current working directory. Place this script anywhere in your path\n"
               "and you can use rebar to build OTP-compliant apps.\n").
 
-                
+
 build_time() ->
     {{Y, M, D}, {H, Min, S}} = calendar:now_to_universal_time(now()),
     lists:flatten(io_lib:format("~4..0w~2..0w~2..0w_~2..0w~2..0w~2..0w", [Y, M, D, H, Min, S])).
-            
 
+
+load_files(Wildcard, Dir) ->
+    [read_file(Filename, Dir) || Filename <- filelib:wildcard(Wildcard, Dir)].
+
+read_file(Filename, Dir) ->
+    {ok, Bin} = file:read_file(filename:join(Dir, Filename)),
+    {Filename, Bin}.
