@@ -27,6 +27,7 @@
 -module(rebar_templater).
 
 -export(['create-app'/2,
+         'create-node'/2,
          create/2]).
 
 -include("rebar.hrl").
@@ -40,6 +41,11 @@
 'create-app'(Config, File) ->
     %% Alias for create w/ template=simpleapp
     rebar_config:set_global(template, "simpleapp"),
+    create(Config, File).
+
+'create-node'(Config, File) ->
+    %% Alias for create w/ template=simplenode
+    rebar_config:set_global(template, "simplenode"),
     create(Config, File).
 
 create(_Config, _) ->
