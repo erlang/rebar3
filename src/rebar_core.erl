@@ -128,28 +128,26 @@ set_global_flag(Options, Flag) ->
 %% print help/usage string
 %%
 help() ->
-    Jobs = rebar_config:get_jobs(),
-    io:format(
-"
-Usage: rebar [-h] [-v] [-f] [-j <jobs>] [key=value,...] <command,...>
-
-  -h, --help      Show the program options
-  -v, --verbose   Be verbose about what gets done
-  -f, --force     Force
-  -j, --jobs      Number of concurrent workers a command may use. Default: ~B
-", [Jobs]).
+    OptSpecList = option_spec_list(),
+    getopt:usage(OptSpecList, escript:script_name(),
+                 "[var=value,...] <command,...>",
+                 [{"var=value", "rebar global variables (e.g. force=1)"},
+                  {"command", "Command to run (e.g. compile)"}]).
 
 %%
 %% options accepted via getopt
 %%
 option_spec_list() ->
+    Jobs = rebar_config:get_jobs(),
+    JobsHelp = io_lib:format(
+        "Number of concurrent workers a command may use. Default: ~B",
+        [Jobs]),
     [
      %% {Name, ShortOpt, LongOpt, ArgSpec, HelpMsg}
      {help,    $h, "help",    undefined, "Show the program options"},
      {verbose, $v, "verbose", undefined, "Be verbose about what gets done"},
      {force,   $f, "force",   undefined, "Force"},
-     {jobs,    $j, "jobs",    integer,
-      "Number of concurrent workers a command may use."}
+     {jobs,    $j, "jobs",    integer, JobsHelp}
     ].
 
 %%
