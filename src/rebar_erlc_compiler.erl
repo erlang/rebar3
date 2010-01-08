@@ -149,7 +149,8 @@ internal_erl_compile(Source, Config, Outdir) ->
             skipped
     end.
 
-compile_mib(Source, _Target, Config) ->
+compile_mib(Source, Target, Config) ->
+    ok = rebar_utils:ensure_dir(Target),
     Opts = [{outdir, "priv/mibs"}, {i, ["priv/mibs"]}] ++
         rebar_config:get(Config, mib_opts, []),
     case snmpc:compile(Source, Opts) of
