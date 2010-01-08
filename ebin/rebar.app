@@ -23,8 +23,10 @@
               rebar_rel_utils,
               rebar_reltool,
               rebar_subdirs,
+              rebar_templater,
               rebar_utils,
-              getopt ]},
+              getopt,
+              mustache ]},
   {registered, []},
   {applications, [kernel,
                   stdlib,
@@ -39,7 +41,8 @@
          %% any_dir processing modules
          {any_dir_modules, [
                             rebar_subdirs,
-                            rebar_deps
+                            rebar_deps,
+                            rebar_templater
                            ]},
 
          %% Dir specific processing modules

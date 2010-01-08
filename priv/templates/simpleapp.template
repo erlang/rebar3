@@ -1,0 +1,3 @@
+{file, "simpleapp.app", "ebin/{{appid}}.app"}.
+{file, "simpleapp_app.erl", "src/{{appid}}_app.erl"}.
+{file, "simpleapp_sup.erl", "src/{{appid}}_sup.erl"}.
