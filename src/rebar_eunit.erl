@@ -63,7 +63,7 @@ eunit(Config, _File) ->
     %%
     %% TODO: Not currently compatible with package modules
     Modules = [list_to_atom(filename:basename(N, ".beam")) ||
-                  N <- filelib:wildcard("*.beam", "ebin")],
+                  N <- filelib:wildcard("*.beam", ?EUNIT_DIR)],
 
     %% TODO: If there are other wildcards specified in eunit_sources, compile them
 
