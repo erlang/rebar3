@@ -11,5 +11,6 @@
                   kernel,
                   stdlib
                  ]},
+  {mod, { {{appid}}_app, []}},
   {env, []}
  ]}.
