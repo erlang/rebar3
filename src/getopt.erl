@@ -11,13 +11,14 @@
 -module(getopt).
 -author('juanjo@comellas.org').
 
--export([parse/2, usage/2]).
+-export([parse/2, usage/2, usage/3, usage/4]).
 
 
 -define(TAB_LENGTH, 8).
 %% Indentation of the help messages in number of tabs.
 -define(INDENTATION, 3).
 
+%% Position of each field in the option specification tuple.
 -define(OPT_NAME, 1).
 -define(OPT_SHORT, 2).
 -define(OPT_LONG, 3).
@@ -80,7 +81,7 @@ parse(OptSpecList, OptAcc, ArgAcc, _ArgPos, ["--" | Tail]) ->
 parse(OptSpecList, OptAcc, ArgAcc, ArgPos, [[$-, $- | OptArg] = OptStr | Tail]) ->
     parse_option_long(OptSpecList, OptAcc, ArgAcc, ArgPos, Tail, OptStr, OptArg);
 %% Process short options.
-parse(OptSpecList, OptAcc, ArgAcc, ArgPos, [[$- | OptArg] = OptStr | Tail]) ->
+parse(OptSpecList, OptAcc, ArgAcc, ArgPos, [[$- | [_Char | _] = OptArg] = OptStr | Tail]) ->
     parse_option_short(OptSpecList, OptAcc, ArgAcc, ArgPos, Tail, OptStr, OptArg);
 %% Process non-option arguments.
 parse(OptSpecList, OptAcc, ArgAcc, ArgPos, [Arg | Tail]) ->
@@ -97,13 +98,14 @@ parse(OptSpecList, OptAcc, ArgAcc, _ArgPos, []) ->
     {ok, {lists:reverse(append_default_options(OptSpecList, OptAcc)), lists:reverse(ArgAcc)}}.
 
 
-
-%% A long option can have the following formats:
-%% --foo      Single option 'foo', no argument
-%% --foo=bar  Single option 'foo', argument "bar"
-%% --foo bar  Single option 'foo', argument "bar"
 -spec parse_option_long([option_spec()], [option()], [string()], integer(), [string()], string(), string()) ->
-    {ok, {[option()], [string()]}} | {error, {Reason :: atom(), Data:: any()}}.
+          {ok, {[option()], [string()]}} | {error, {Reason :: atom(), Data:: any()}}.
+%% @doc Parse a long option, add it to the option accumulator and continue
+%%      parsing the rest of the arguments recursively.
+%%      A long option can have the following syntax:
+%%        --foo      Single option 'foo', no argument
+%%        --foo=bar  Single option 'foo', argument "bar"
+%%        --foo bar  Single option 'foo', argument "bar"
 parse_option_long(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptStr, OptArg) ->
     case split_assigned_arg(OptArg) of
         {Long, Arg} ->
@@ -126,6 +128,12 @@ parse_option_long(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptStr, OptArg) ->
     end.
 
 
+-spec parse_option_assigned_arg([option_spec()], [option()], [string()], integer(),
+                                [string()], string(), string(), string()) ->
+          {ok, {[option()], [string()]}} | {error, {Reason :: atom(), Data:: any()}}.
+%% @doc Parse an option where the argument is 'assigned' in the same string using
+%%      the '=' character, add it to the option accumulator and continue parsing the
+%%      rest of the arguments recursively. This syntax is only valid for long options.
 parse_option_assigned_arg(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptStr, Long, Arg) ->
     case lists:keysearch(Long, ?OPT_LONG, OptSpecList) of
         {value, {_Name, _Short, Long, ArgSpec, _Help} = OptSpec} ->
@@ -141,7 +149,7 @@ parse_option_assigned_arg(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptStr, Lon
 
 
 -spec split_assigned_arg(string()) -> {Name :: string(), Arg :: string()} | string().
-%% @doc Split an option string that may contain and option with its argument
+%% @doc Split an option string that may contain an option with its argument
 %%      separated by an equal ('=') character (e.g. "port=1000").
 split_assigned_arg(OptStr) ->
     split_assigned_arg(OptStr, OptStr, []).
@@ -154,14 +162,14 @@ split_assigned_arg(OptStr, [], _Acc) ->
     OptStr.
 
 
-
-
-%% A short option can have the following formats:
-%% -a       Single option 'a', no argument
-%% -a foo   Single option 'a', argument "foo"
-%% -afoo    Single option 'a', argument "foo"
-%% -abc     Multiple options: 'a'; 'b'; 'c'
-%% -bcafoo  Multiple options: 'b'; 'c'; 'a' with argument "foo"
+%% @doc Parse a short option, add it to the option accumulator and continue
+%%      parsing the rest of the arguments recursively.
+%%      A short option can have the following syntax:
+%%        -a       Single option 'a', no argument or implicit boolean argument
+%%        -a foo   Single option 'a', argument "foo"
+%%        -afoo    Single option 'a', argument "foo"
+%%        -abc     Multiple options: 'a'; 'b'; 'c'
+%%        -bcafoo  Multiple options: 'b'; 'c'; 'a' with argument "foo"
 -spec parse_option_short([option_spec()], [option()], [string()], integer(), [string()], string(), string()) ->
     {ok, {[option()], [string()]}} | {error, {Reason :: atom(), Data:: any()}}.
 parse_option_short(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptStr, [Short | Arg]) ->
@@ -228,7 +236,8 @@ find_non_option_arg([], _Pos) ->
 
 
 -spec append_default_options([option_spec()], [option()]) -> [option()].
-%% @doc Appends the default values of the options that are not present.
+%% @doc Append options that were not present in the command line arguments with
+%%      their default arguments.
 append_default_options([{Name, _Short, _Long, {_Type, DefaultArg}, _Help} | Tail], OptAcc) ->
     append_default_options(Tail,
                case lists:keymember(Name, 1, OptAcc) of
@@ -253,8 +262,6 @@ convert_option_no_arg({Name, _Short, _Long, ArgSpec, _Help}) ->
             {Name, true};
         boolean ->
             {Name, true};
-        {_Type, DefaultValue} ->
-            {Name, DefaultValue};
         _ ->
             throw({error, {missing_option_arg, Name}})
     end.
@@ -273,6 +280,7 @@ convert_option_arg({Name, _Short, _Long, ArgSpec, _Help}, Arg) ->
 
 
 -spec arg_spec_type(arg_spec()) -> arg_type() | undefined.
+%% @doc Retrieve the data type form an argument specification.
 arg_spec_type({Type, _DefaultArg}) ->
     Type;
 arg_spec_type(Type) when is_atom(Type) ->
@@ -280,6 +288,7 @@ arg_spec_type(Type) when is_atom(Type) ->
 
 
 -spec to_type(atom(), string()) -> arg_value().
+%% @doc Convert an argument string to its corresponding data type.
 to_type(binary, Arg) ->
     list_to_binary(Arg);
 to_type(atom, Arg) ->
@@ -289,19 +298,36 @@ to_type(integer, Arg) ->
 to_type(float, Arg) ->
     list_to_float(Arg);
 to_type(boolean, Arg) ->
-    is_boolean_arg(Arg);
+    LowerArg = string:to_lower(Arg),
+    case is_arg_true(LowerArg) of
+        true ->
+            true;
+        _ ->
+            case is_arg_false(LowerArg) of
+                true ->
+                    false;
+                false ->
+                    erlang:error(badarg)
+            end
+    end;
 to_type(_Type, Arg) ->
     Arg.
 
 
-% -spec is_valid_option([option_spec()], Opt :: char() | string(), FieldPos :: integer()) -> boolean().
-% is_valid_option(OptSpecList, Opt, FieldPos) ->
-%     case lists:keysearch(Opt, FieldPos, OptSpecList) of
-%         {value, {_Name, _Short, _Long, _ArgSpec, _Help}} ->
-%             true;
-%         _ ->
-%             false
-%     end.
+-spec is_arg_true(string()) -> boolean().
+is_arg_true(Arg) ->
+    (Arg =:= "true") orelse (Arg =:= "t") orelse
+    (Arg =:= "yes") orelse (Arg =:= "y") orelse
+    (Arg =:= "on") orelse (Arg =:= "enabled") orelse
+    (Arg =:= "1").
+
+    
+-spec is_arg_false(string()) -> boolean().
+is_arg_false(Arg) ->
+    (Arg =:= "false") orelse (Arg =:= "f") orelse
+    (Arg =:= "no") orelse (Arg =:= "n") orelse
+    (Arg =:= "off") orelse (Arg =:= "disabled") orelse
+    (Arg =:= "0").
 
 
 -spec is_valid_arg(arg_spec() | arg_type(), string()) -> boolean().
@@ -320,10 +346,7 @@ is_valid_arg(_Type, _Arg) ->
 -spec is_boolean_arg(string()) -> boolean().
 is_boolean_arg(Arg) ->
     LowerArg = string:to_lower(Arg),
-    (LowerArg =:= "true") orelse (LowerArg =:= "t") orelse
-    (LowerArg =:= "yes") orelse (LowerArg =:= "y") orelse
-    (LowerArg =:= "on") orelse (LowerArg =:= "enabled") orelse
-    (LowerArg =:= "1").
+    is_arg_true(LowerArg) orelse is_arg_false(LowerArg).
 
 
 -spec is_integer_arg(string()) -> boolean().
@@ -346,13 +369,44 @@ is_float_arg([]) ->
 
 -spec usage([option_spec()], string()) -> ok.
 %%--------------------------------------------------------------------
-%% @spec usage(OptSpecList :: option_spec_list(), ProgramName :: string()) -> ok.
+%% @spec usage(OptSpecList :: [option_spec()], ProgramName :: string()) -> ok.
 %% @doc  Show a message on stdout indicating the command line options and
 %%       arguments that are supported by the program.
 %%--------------------------------------------------------------------
 usage(OptSpecList, ProgramName) ->
     io:format("Usage: ~s~s~n~n~s~n",
               [ProgramName, usage_cmd_line(OptSpecList), usage_options(OptSpecList)]).
+
+
+-spec usage([option_spec()], string(), string()) -> ok.
+%%--------------------------------------------------------------------
+%% @spec usage(OptSpecList :: [option_spec()], ProgramName :: string(), CmdLineTail :: string()) -> ok.
+%% @doc  Show a message on stdout indicating the command line options and
+%%       arguments that are supported by the program. The CmdLineTail argument
+%%       is a string that is added to the end of the usage command line.
+%%--------------------------------------------------------------------
+usage(OptSpecList, ProgramName, CmdLineTail) ->
+    io:format("Usage: ~s~s ~s~n~n~s~n",
+              [ProgramName, usage_cmd_line(OptSpecList), CmdLineTail, usage_options(OptSpecList)]).
+
+
+-spec usage([option_spec()], string(), string(), [{string(), string()}]) -> ok.
+%%--------------------------------------------------------------------
+%% @spec usage(OptSpecList :: [option_spec()], ProgramName :: string(), 
+%%             CmdLineTail :: string(), OptionsTail :: [{string(), string()}]) -> ok.
+%% @doc  Show a message on stdout indicating the command line options and
+%%       arguments that are supported by the program. The CmdLineTail and OptionsTail
+%%       arguments are a string that is added to the end of the usage command line
+%%       and a list of tuples that are added to the end of the options' help lines.
+%%--------------------------------------------------------------------
+usage(OptSpecList, ProgramName, CmdLineTail, OptionsTail) ->
+    UsageOptions = lists:foldl(
+                     fun ({Prefix, Help}, Acc) ->
+                             add_option_help(Prefix, Help, Acc)
+                     end, usage_options_reverse(OptSpecList, []), OptionsTail),
+    io:format("Usage: ~s~s ~s~n~n~s~n",
+              [ProgramName, usage_cmd_line(OptSpecList), CmdLineTail,
+               lists:flatten(lists:reverse(UsageOptions))]).
 
 
 -spec usage_cmd_line([option_spec()]) -> string().
@@ -397,9 +451,9 @@ usage_cmd_line([], Acc) ->
 %% @doc Return a string with the help message for each of the options and
 %%      arguments.
 usage_options(OptSpecList) ->
-    usage_options(OptSpecList, []).
+    lists:flatten(lists:reverse(usage_options_reverse(OptSpecList, []))).
 
-usage_options([{Name, Short, Long, _ArgSpec, _Help} = OptSpec | Tail], Acc) ->
+usage_options_reverse([{Name, Short, Long, _ArgSpec, Help} | Tail], Acc) ->
     Prefix = 
         case Long of 
             undefined ->
@@ -421,14 +475,15 @@ usage_options([{Name, Short, Long, _ArgSpec, _Help} = OptSpec | Tail], Acc) ->
                         [$-, Short, $,, $\s, $-, $-, Long]
                 end
         end,
-    usage_options(Tail, add_option_help(OptSpec, Prefix, Acc));
-usage_options([], Acc) ->
-    lists:flatten(lists:reverse(Acc)).
+    usage_options_reverse(Tail, add_option_help(Prefix, Help, Acc));
+usage_options_reverse([], Acc) ->
+    Acc.
 
--spec add_option_help(option_spec(), Prefix :: string(), Acc :: string()) -> string().
+
+-spec add_option_help(Prefix :: string(), Help :: string(), Acc :: string()) -> string().
 %% @doc Add the help message corresponding to an option specification to a list
 %%      with the correct indentation.
-add_option_help({_Name, _Short, _Long, _ArgSpec, Help}, Prefix, Acc) when is_list(Help), Help =/= [] ->
+add_option_help(Prefix, Help, Acc) when is_list(Help), Help =/= [] ->
     FlatPrefix = lists:flatten(Prefix),
     case ((?INDENTATION * ?TAB_LENGTH) - 2 - length(FlatPrefix)) of
         TabSize when TabSize > 0 ->
@@ -444,8 +499,9 @@ add_option_help(_Opt, _Prefix, Acc) ->
     Acc.
 
 
+
 -spec ceiling(float()) -> integer().
-%% @doc Return the smallest integral valur not less than the argument.
+%% @doc Return the smallest integral value not less than the argument.
 ceiling(X) ->
     T = erlang:trunc(X),
     case (X - T) of
