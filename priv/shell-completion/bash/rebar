@@ -15,30 +15,19 @@ _rebar()
 
     if [[ ${cur} == --* ]] ; then
         COMPREPLY=( $(compgen -W "${lopts}" -- ${cur}) )
-        if [ -n "$COMPREPLY" ] ; then
-            # append space if matched
-            COMPREPLY="${COMPREPLY} "
-            # remove trailing space if --lopt=value option
-            COMPREPLY=${COMPREPLY/%= /=}
-        fi
-        return 0
     elif [[ ${cur} == -* ]] ; then
         COMPREPLY=( $(compgen -W "${sopts}" -- ${cur}) )
-        if [ -n "$COMPREPLY" ] ; then
-            # append space if matched
-            COMPREPLY="${COMPREPLY} "
-        fi
-        return 0
     else
         COMPREPLY=( $(compgen -W "${cmdsnvars}" -- ${cur}) )
-        if [ -n "$COMPREPLY" ] ; then
-            # append space if matched
-            COMPREPLY="${COMPREPLY} "
-            # remove trailing space if var= option
-            COMPREPLY=${COMPREPLY/%= /=}
-        fi
-        return 0
     fi
+
+    if [ -n "$COMPREPLY" ] ; then
+        # append space if matched
+        COMPREPLY="${COMPREPLY} "
+        # remove trailing space after equal sign
+        COMPREPLY=${COMPREPLY/%= /=}
+    fi
+    return 0
 }
 complete -o nospace -F _rebar rebar
 
