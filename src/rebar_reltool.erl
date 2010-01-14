@@ -246,8 +246,14 @@ spec_copy_overlay([F | Rest], Dir, Acc) ->
     {ok, Info} = file:read_file_info(Filename),
     case Info#file_info.type of
         directory ->
+            %% If this directory has the special name of "erts-vsn", we are going to replace "vsn" with the
+            %% actual erts vsn for the output directory name
+            case filename:basename(Filename) of
+                "erts-vsn" -> OutDir = "erts-" ++ erlang:system_info(version);
+                OutDir -> ok
+            end,
             {ok, Files} = file:list_dir(Filename),
-            Entry = {create_dir, filename:basename(Filename), spec_copy_overlay(Files, Filename, [])},
+            Entry = {create_dir, OutDir, spec_copy_overlay(Files, Filename, [])},
             spec_copy_overlay(Rest, Dir, [Entry | Acc]);
         regular ->
             Entry = {copy_file, filename:basename(F), filename:absname(Filename)},
