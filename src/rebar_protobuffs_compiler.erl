@@ -45,7 +45,8 @@ compile(_Config, _AppFile) ->
             case protobuffs_is_present() of
                 true ->
                     %% Build a list of output files - { Proto, Beam, Hrl }
-                    Targets = [{Proto, beam_file(Proto), hrl_file(Proto)} || Proto <- FoundFiles],
+                    Targets = [{Proto, beam_file(Proto), hrl_file(Proto)} ||
+                                  Proto <- FoundFiles],
 
                     %% Compile each proto file
                     compile_each(Targets);
@@ -109,6 +110,7 @@ compile_each([{Proto, Beam, Hrl} | Rest]) ->
                     %% into the ebin/ and include/ directories respectively
                     %% TODO: Protobuffs really needs to be better about this...sigh.
                     [] = os:cmd(?FMT("mv ~s ebin", [Beam])),
+                    filelib:ensure_dir(Hrl),
                     [] = os:cmd(?FMT("mv ~s include", [Hrl])),
                     ok;
                 Other ->
