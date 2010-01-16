@@ -101,7 +101,8 @@ option(Opt, DtlOpts) ->
 default(doc_root) -> "templates";
 default(out_dir)  -> "ebin";
 default(source_ext) -> ".dtl";
-default(module_ext) -> "_dtl".
+default(module_ext) -> "_dtl";
+default(custom_tags_dir) -> "". 
 
 compile_dtl(Source, Target, Config) ->
     case code:which(erlydtl) of
@@ -130,6 +131,7 @@ do_compile(Source, Target, Config) ->
     %% using defaults if necessary
     Opts = [{out_dir, option(out_dir, DtlOpts)},
             {doc_root, option(doc_root, DtlOpts)},
+            {custom_tags_dir, option(custom_tags_dir, DtlOpts)},
             report, return],
     case erlydtl:compile(Source,
                          module_name(Target),
