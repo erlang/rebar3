@@ -11,7 +11,7 @@ _rebar()
     cmdsnvars="analyze build_plt check_plt clean compile \
         create-app create-node eunit generate \
         int_test perf_test test \
-        case= force=1 jobs= suite= verbose=1"
+        case= force=1 jobs= suite= verbose=1 appid="
 
     if [[ ${cur} == --* ]] ; then
         COMPREPLY=( $(compgen -W "${lopts}" -- ${cur}) )
