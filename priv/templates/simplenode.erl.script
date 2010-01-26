@@ -24,7 +24,7 @@ APP_VSN=${START_ERL#* }
 
 BINDIR=$ROOTDIR/erts-$ERTS_VSN/bin
 EMU=beam
-PROGNAME=`echo $0 | sed 's/.*\///'`
+PROGNAME=`echo $0 | sed 's/.*\\///'`
 CMD="$BINDIR/erlexec"
 export EMU
 export ROOTDIR
