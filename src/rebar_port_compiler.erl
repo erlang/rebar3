@@ -271,7 +271,7 @@ so_name(Config, AppFile) ->
                        %% generate the linked port driver name
                        case rebar_app_utils:load_app_file(AppFile) of
                            {ok, AppName, _} ->
-                               AppName;
+                               lists:concat([AppName, "_drv.so"]);
                            error ->
                                ?FAIL
                        end;
@@ -280,4 +280,4 @@ so_name(Config, AppFile) ->
                end,
 
     %% Construct the driver name
-    ?FMT("priv/~s_drv.so", [PortName]).
+    ?FMT("priv/~s", [PortName]).
