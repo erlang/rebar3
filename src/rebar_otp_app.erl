@@ -151,7 +151,7 @@ validate_modules(AppName, Mods) ->
             ok;
         MissingMods ->
             Msg2 = lists:flatten([io_lib:format("\t* ~p\n", [M]) || M <- MissingMods]),
-            ?ERROR("On or more .beam files exist that are not listed in ~p.app:\n~s",
+            ?ERROR("One or more .beam files exist that are not listed in ~p.app:\n~s",
                    [AppName, Msg2]),
             ?FAIL
     end.
