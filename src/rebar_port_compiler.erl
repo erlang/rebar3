@@ -180,7 +180,6 @@ needs_compile(Source, Bin) ->
     filelib:last_modified(Bin) < filelib:last_modified(Source).
 
 needs_link(SoName, []) ->
-    ?DEBUG("2 Lad mod \n", []),
     filelib:last_modified(SoName) == 0;
 needs_link(SoName, NewBins) ->
     MaxLastMod = lists:max([filelib:last_modified(B) || B <- NewBins]),
@@ -219,7 +218,6 @@ compiler(_)      -> "$CC".
 %% it in InStr. References can have two forms: $FOO and ${FOO}
 %%
 expand_env_variable(InStr, VarName, VarValue) ->
-
     R1 = re:replace(InStr, "\\\$" ++ VarName, VarValue),
     re:replace(R1, "\\\${" ++ VarName ++ "}", VarValue, [{return, list}]).
 
