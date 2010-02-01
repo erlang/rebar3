@@ -29,7 +29,8 @@
 -export([compile/2,
          clean/2]).
 
--export([doterl_compile/2]).
+-export([doterl_compile/2,
+         doterl_compile/3]).
 
 -include("rebar.hrl").
 
@@ -63,12 +64,16 @@ clean(_Config, _AppFile) ->
 %% .erl Compilation API (externally used by only eunit)
 %% ===================================================================
 
-doterl_compile(Config, Outdir) ->
+doterl_compile(Config, OutDir) ->
+    doterl_compile(Config, OutDir, []).
+
+doterl_compile(Config, OutDir, MoreSources) ->
     FirstErls = rebar_config:get_list(Config, erl_first_files, []),
-    RestErls  = [Source || Source <- rebar_utils:find_files("src", ".*\\.erl\$"),
+    RestErls  = [Source || Source <- rebar_utils:find_files("src", ".*\\.erl\$") ++ MoreSources,
                            lists:member(Source, FirstErls) == false],
     rebar_base_compiler:run(Config, FirstErls, RestErls,
-                            fun(S, C) -> internal_erl_compile(S, C, Outdir) end).
+                            fun(S, C) -> internal_erl_compile(S, C, OutDir) end).
+
 
 
 %% ===================================================================
