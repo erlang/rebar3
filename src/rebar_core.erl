@@ -129,7 +129,7 @@ set_global_flag(Options, Flag) ->
 %%
 help() ->
     OptSpecList = option_spec_list(),
-    getopt:usage(OptSpecList, escript:script_name(),
+    getopt:usage(OptSpecList, "rebar",
                  "[var=value,...] <command,...>",
                  [{"var=value", "rebar global variables (e.g. force=1)"},
                   {"command", "Command to run (e.g. compile)"}]).
