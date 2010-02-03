@@ -2,3 +2,4 @@
 ^rebar$
 .~
 \.orig
+\.swp
