@@ -1,0 +1,2 @@
+{variables, [{srvid, "myserver"}]}.
+{file, "simplesrv.erl", "src/{{srvid}}.erl"}.
