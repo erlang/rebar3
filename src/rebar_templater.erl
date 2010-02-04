@@ -219,7 +219,7 @@ execute_template([], _TemplateType, _TemplateName, _Context, _Force, ExistingFil
             Help = "To force overwriting, specify force=1 on the command line.\n",
             ?ERROR("One or more files already exist on disk and were not generated:~n~s~s", [Msg , Help])
     end;
-execute_template([{file, Input, Output} | Rest], TemplateType, TemplateName, Context, Force, ExistingFiles) ->
+execute_template([{file, Input, Output, Render} | Rest], TemplateType, TemplateName, Context, Force, ExistingFiles) ->
     % determine if the target file already exists
     FileExists = filelib:is_file(Output),
 
@@ -234,7 +234,10 @@ execute_template([{file, Input, Output} | Rest], TemplateType, TemplateName, Con
                 true ->
                     ?CONSOLE("Writing ~s~n", [Output])
             end,
-            case file:write_file(Output, render(load_file(TemplateType, InputName), Context)) of
+            Rendered = if Render -> render(load_file(TemplateType, InputName), Context);
+                          true -> load_file(TemplateType, InputName)
+                       end,
+            case file:write_file(Output, Rendered) of
                 ok ->
                     execute_template(Rest, TemplateType, TemplateName, Context, Force, ExistingFiles);
                 {error, Reason} ->
@@ -253,6 +256,10 @@ execute_template([{dir, Name} | Rest], TemplateType, TemplateName, Context, Forc
     end;
 execute_template([{variables, _} | Rest], TemplateType, TemplateName, Context, Force, ExistingFiles) ->
     execute_template(Rest, TemplateType, TemplateName, Context, Force, ExistingFiles);
+execute_template([{file, Input, Output} | Rest], TemplateType, TemplateName, Context, Force, ExistingFiles) ->
+    %% old short-form of {file,_,_} is same as
+    %% new long-form of {file,_,_,true}
+    execute_template([{file, Input, Output, true}|Rest], TemplateType, TemplateName, Context, Force, ExistingFiles);
 execute_template([Other | Rest], TemplateType, TemplateName, Context, Force, ExistingFiles) ->
     ?WARN("Skipping unknown template instruction: ~p\n", [Other]),
     execute_template(Rest, TemplateType, TemplateName, Context, Force, ExistingFiles).
