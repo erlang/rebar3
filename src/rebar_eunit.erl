@@ -4,7 +4,7 @@
 %%
 %% rebar: Erlang Build Tools
 %%
-%% Copyright (c) 2009 Dave Smith (dizzyd@dizzyd.com)
+%% Copyright (c) 2009, 2010 Dave Smith (dizzyd@dizzyd.com)
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a copy
 %% of this software and associated documentation files (the "Software"), to deal
@@ -24,14 +24,21 @@
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
-%%
-%% Targets:
-%% eunit - runs eunit tests
-%% clean - remove .eunit directory
-%%
-%% Global options:
-%% verbose=1 - show extra output from the eunit test
-%% suite="foo"" - runs test/foo_tests.erl
+%% @author Dave Smith <dizzyd@dizzyd.com>
+%% @doc rebar_eunit supports the following commands:
+%% <ul>
+%%   <li>eunit - runs eunit tests</li>
+%%   <li>clean - remove .eunit directory</li>
+%% </ul>
+%% The following Global options are supported:
+%% <ul>
+%%   <li>verbose=1 - show extra output from the eunit test</li>
+%%   <li>suite="foo"" - runs test/foo_tests.erl</li>
+%% </ul>
+%% Additionally, for projects that have separate folders for the core
+%% implementation, and for the unit tests, then the following <code>rebar.config</code>
+%% option can be provided: <code>{eunit_compile_opts, [{src_dirs, ["dir"]}]}.</code>.
+%% @copyright 2009, 2010 Dave Smith
 %% -------------------------------------------------------------------
 -module(rebar_eunit).
 
@@ -61,9 +68,7 @@ eunit(Config, _File) ->
     %% with that scan and causes any cover compilation info to be lost. So,
     %% we do it by hand. :(
     %%
-    %% TODO: Not currently compatible with package modules
-    Modules = [list_to_atom(filename:basename(N, ".beam")) ||
-                  N <- filelib:wildcard("*.beam", ?EUNIT_DIR)],
+    Modules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- rebar_utils:beams(?EUNIT_DIR)],
 
     %% TODO: If there are other wildcards specified in eunit_sources, compile them
 

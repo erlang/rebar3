@@ -4,7 +4,7 @@
 %%
 %% rebar: Erlang Build Tools
 %%
-%% Copyright (c) 2009 Dave Smith (dizzyd@dizzyd.com)
+%% Copyright (c) 2009, 2010 Dave Smith (dizzyd@dizzyd.com)
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a copy
 %% of this software and associated documentation files (the "Software"), to deal
@@ -38,12 +38,14 @@
 %% Public API
 %% ===================================================================
 
+-spec compile(Config::#config{}, AppFile::string()) -> 'ok'.
 compile(Config, _AppFile) ->
     doterl_compile(Config, "ebin"),
     rebar_base_compiler:run(Config, rebar_config:get_list(Config, mib_first_files, []),
                             "mibs", ".mib", "priv/mibs", ".bin",
                             fun compile_mib/3).
 
+-spec clean(Config::#config{}, AppFile::string()) -> 'ok'.
 clean(_Config, _AppFile) ->
     %% TODO: This would be more portable if it used Erlang to traverse
     %%       the dir structure and delete each file; however it would also
@@ -64,26 +66,33 @@ clean(_Config, _AppFile) ->
 %% .erl Compilation API (externally used by only eunit)
 %% ===================================================================
 
+-spec doterl_compile(Config::#config{}, OutDir::string()) -> 'ok'.
 doterl_compile(Config, OutDir) ->
     doterl_compile(Config, OutDir, []).
 
 doterl_compile(Config, OutDir, MoreSources) ->
     FirstErls = rebar_config:get_list(Config, erl_first_files, []),
-    RestErls  = [Source || Source <- rebar_utils:find_files("src", ".*\\.erl\$") ++ MoreSources,
+    ErlOpts = rebar_config:get(Config, erl_opts, []),
+    %% Support the src_dirs option allowing multiple directories to
+    %% contain erlang source. This might be used, for example, should eunit tests be
+    %% separated from the core application source.
+    SrcDirs = src_dirs(proplists:append_values(src_dirs, ErlOpts)),
+    RestErls  = [Source || Source <- gather_src(SrcDirs, []) ++ MoreSources,
                            lists:member(Source, FirstErls) == false],
     rebar_base_compiler:run(Config, FirstErls, RestErls,
                             fun(S, C) -> internal_erl_compile(S, C, OutDir) end).
-
 
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
+-spec include_path(Source::string(), Config::#config{}) -> [string()].
 include_path(Source, Config) ->
     ErlOpts = rebar_config:get(Config, erl_opts, []),
     [filename:dirname(Source)] ++ proplists:get_all_values(i, ErlOpts).
 
+-spec inspect(Source::string(), IncludePath::[string()]) -> {string(), [string()]}.
 inspect(Source, IncludePath) ->
     ModuleDefault = filename:basename(Source, ".erl"),
     case epp:open(Source, IncludePath) of
@@ -94,9 +103,10 @@ inspect(Source, IncludePath) ->
             {ModuleDefault, []}
     end.
 
+-spec inspect_epp(Epp::pid(), Module::string(), Includes::[string()]) -> {string(), [string()]}.
 inspect_epp(Epp, Module, Includes) ->
     case epp:parse_erl_form(Epp) of
-        {ok, {attribute, _, module, ActualModule}} when is_list(ActualModule) ->
+        {ok, {attribute, _, module, ActualModule}} ->
             %% If the module name includes package info, we get a list of atoms...
             case is_list(ActualModule) of
                 true ->
@@ -116,12 +126,13 @@ inspect_epp(Epp, Module, Includes) ->
             inspect_epp(Epp, Module, Includes)
     end.
 
+-spec needs_compile(Source::string(), Target::string(), Hrls::[string()]) -> boolean().
 needs_compile(Source, Target, Hrls) ->
     TargetLastMod = filelib:last_modified(Target),
     lists:any(fun(I) -> TargetLastMod < filelib:last_modified(I) end,
               [Source] ++ Hrls).
 
-
+-spec internal_erl_compile(Source::string(), Config::#config{}, Outdir::string()) -> 'ok' | 'skipped'.
 internal_erl_compile(Source, Config, Outdir) ->
     %% Determine the target name and includes list by inspecting the source file
     {Module, Hrls} = inspect(Source, include_path(Source, Config)),
@@ -154,6 +165,7 @@ internal_erl_compile(Source, Config, Outdir) ->
             skipped
     end.
 
+-spec compile_mib(Source::string(), Target::string(), Config::#config{}) -> 'ok'.
 compile_mib(Source, Target, Config) ->
     ok = rebar_utils:ensure_dir(Target),
     Opts = [{outdir, "priv/mibs"}, {i, ["priv/mibs"]}] ++
@@ -165,9 +177,22 @@ compile_mib(Source, Target, Config) ->
             ?FAIL
     end.
 
+gather_src([], Srcs) ->
+    Srcs;
+gather_src([Dir|Rest], Srcs) ->
+    gather_src(Rest, Srcs ++ rebar_utils:find_files(Dir, ".*\\.erl\$")).
+
+-spec src_dirs(SrcDirs::[string()]) -> [string()].
+src_dirs([]) ->
+    ["src"];
+src_dirs(SrcDirs) ->
+    SrcDirs ++ src_dirs([]).
+
+-spec dirs(Dir::string()) -> [string()].
 dirs(Dir) ->
     [F || F <- filelib:wildcard(filename:join([Dir, "*"])), filelib:is_dir(F)].
 
+-spec delete_dir(Dir::string(), Subdirs::[string()]) -> 'ok' | {'error', atom()}.
 delete_dir(Dir, []) ->
     file:del_dir(Dir);
 delete_dir(Dir, Subdirs) ->

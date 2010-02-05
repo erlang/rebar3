@@ -28,7 +28,7 @@
 %% @doc rebar_dialyzer supports the following commands:
 %% <ul>
 %%   <li>analyze (essentially "dialyzer -r ebin")</li>
-%%   <li>build_plt (essentially "dialyzer --build_plt -r &rt;stdlib_lib&lt; &rt;kernel_lib&lt; &rt;mnesia_lib&lt;")</li>
+%%   <li>build_plt (essentially "dialyzer --build_plt -r &lt;app_dirs&gt;")</li>
 %%   <li>check_plt (essentially "dialyzer --check_plt")</li>
 %% </ul>
 %% A single option <code>plt</code> can be presented in the <code>dialyzer_opts</code>
@@ -59,8 +59,8 @@
 %% @doc Perform static analysis on the contents of the ebin directory.
 %% @spec analyze(Config::#config{}, File::string()) -> ok.
 -spec(analyze(Config::#config{}, File::string()) -> ok).
-analyze(Config, _File) ->
-    Plt = plt_path(Config),
+analyze(Config, File) ->
+    Plt = plt_path(Config, File),
     case dialyzer:plt_info(Plt) of
         {ok, _} ->
             try dialyzer:run([{files_rec, ["ebin"]}, {init_plt, Plt}]) of
@@ -82,17 +82,14 @@ analyze(Config, _File) ->
 %% @doc Build the PLT.
 %% @spec build_plt(Config::#config{}, File::string()) -> ok
 -spec(build_plt(Config::#config{}, File::string()) -> ok).
-build_plt(Config, _File) ->
-    Plt = plt_path(Config),
+build_plt(Config, File) ->
+    Plt = plt_path(Config, File),
 
-    %% This is the recommended minimal PLT for OTP
-    %% (see http://www.erlang.org/doc/apps/dialyzer/dialyzer_chapter.html#id2256857).
+    {ok, _AppName, AppData} = rebar_app_utils:load_app_file(File),
+    Apps = proplists:get_value(applications, AppData),
+    
     Warnings = dialyzer:run([{analysis_type, plt_build},
-                             {files_rec, [
-                                 filename:join(code:lib_dir(stdlib), "ebin"),
-                                 filename:join(code:lib_dir(kernel), "ebin"),
-                                 filename:join(code:lib_dir(mnesia), "ebin")
-                             ]},
+                             {files_rec, app_dirs(Apps)},
                              {output_plt, Plt}]),
     case Warnings of
         [] ->
@@ -105,8 +102,8 @@ build_plt(Config, _File) ->
 %% @doc Check whether the PLT is up-to-date (rebuilding it if not).
 %% @spec check_plt(Config::#config{}, File::string()) -> ok
 -spec(check_plt(Config::#config{}, File::string()) -> ok).
-check_plt(Config, _File) ->
-    Plt = plt_path(Config),
+check_plt(Config, File) ->
+    Plt = plt_path(Config, File),
     try dialyzer:run([{analysis_type, plt_check}, {init_plt, Plt}]) of
         [] ->
             ?CONSOLE("The PLT ~s is up-to-date~n", [Plt]);
@@ -123,8 +120,15 @@ check_plt(Config, _File) ->
 %% Internal functions
 %% ===================================================================
 
+%% @doc Obtain the library paths for the supplied applications.
+%% @spec app_dirs(Apps::[atom()]) -> [string()]
+-spec(app_dirs(Apps::[atom()]) -> [string()]).
+app_dirs(Apps) ->
+    [filename:join(Path, "ebin") ||
+        Path <- lists:map(fun(App) -> code:lib_dir(App) end, Apps), erlang:is_list(Path)].
+
 %% @doc Render the warnings on the console.
-%% @spec output_warnings(Warnings::[warning()]) -> void()
+%% @spec output_warnings(Warnings::[warning()]) -> none()
 -spec(output_warnings(Warnings::[warning()]) -> none()).
 output_warnings(Warnings) ->
     lists:foreach(fun(Warning) ->
@@ -133,13 +137,14 @@ output_warnings(Warnings) ->
 
 %% @doc If the plt option is present in rebar.config return its value, otherwise
 %% return $HOME/.dialyzer_plt.
-%% @spec plt_path(Config::#config{}) -> string()
--spec(plt_path(Config::#config{}) -> string()).
-plt_path(Config) ->
+%% @spec plt_path(Config::#config{}, File::string()) -> string()
+-spec(plt_path(Config::#config{}, File::string()) -> string()).
+plt_path(Config, File) ->
+    {ok, AppName, _AppData} = rebar_app_utils:load_app_file(File),
     DialyzerOpts = rebar_config:get(Config, dialyzer_opts, []),
     case proplists:get_value(plt, DialyzerOpts) of
         undefined ->
-            filename:join(os:getenv("HOME"), ".dialyzer_plt");
+            filename:join(os:getenv("HOME"), "." ++ atom_to_list(AppName) ++ "_dialyzer_plt");
         Plt ->
             Plt
     end.
