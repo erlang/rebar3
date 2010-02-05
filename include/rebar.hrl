@@ -5,7 +5,7 @@
 
 -define(FAIL, throw({error, failed})).
 
--define(ABORT(Str, Args), ?ERROR(Str, Args), halt(1)).
+-define(ABORT(Str, Args), ?ERROR(Str, Args), init:stop(1)).
 
 -define(CONSOLE(Str, Args), io:format(Str, Args)).
 
