@@ -254,7 +254,7 @@ default_env() ->
                                      " "])},
      {"DRIVER_LDFLAGS", lists:concat([" -L", code:lib_dir(erl_interface, lib),
                                       " -lerl_interface -lei"])},
-     {"ERLANG_ARCH", 8 * erlang:system_info(wordsize)},
+     {"ERLANG_ARCH", integer_to_list(8 * erlang:system_info(wordsize))},
      {"ERLANG_TARGET", erlang:system_info(system_architecture)}].
 
 
