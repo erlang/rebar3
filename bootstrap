@@ -1,4 +1,5 @@
 #!/usr/bin/env escript
+%% vim: syntax=erlang:et:ts=4
 %% -*- erlang -*-
 
 main(Args) ->
