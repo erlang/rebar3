@@ -48,7 +48,8 @@ get_cwd() ->
 
 
 is_arch(ArchRegex) ->
-    Arch = erlang:system_info(system_architecture),
+    Words = integer_to_list(8 * erlang:system_info(wordsize)),
+    Arch = erlang:system_info(system_architecture) ++ "-" ++ Words,
     case re:run(Arch, ArchRegex, [{capture, none}]) of
         match ->
             true;
