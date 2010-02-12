@@ -106,13 +106,20 @@ inspect(Source, IncludePath) ->
 -spec inspect_epp(Epp::pid(), Module::string(), Includes::[string()]) -> {string(), [string()]}.
 inspect_epp(Epp, Module, Includes) ->
     case epp:parse_erl_form(Epp) of
-        {ok, {attribute, _, module, ActualModule}} ->
-            %% If the module name includes package info, we get a list of atoms...
-            case is_list(ActualModule) of
-                true ->
+        {ok, {attribute, _, module, ModInfo}} ->
+            case ModInfo of
+                %% Typical module name, single atom
+                ActualModule when is_atom(ActualModule) ->
+                    ActualModuleStr = atom_to_list(ActualModule);
+                %% Packag-ized module name, list of atoms
+                ActualModule when is_list(ActualModule) ->
                     ActualModuleStr = string:join([atom_to_list(P) || P <- ActualModule], ".");
-                false ->
-                    ActualModuleStr = atom_to_list(ActualModule)
+                %% Parameterized module name, single atom
+                {ActualModule, _} when is_atom(ActualModule) ->
+                    ActualModuleStr = atom_to_list(ActualModule);
+                %% Parameterized and packagized module name, list of atoms
+                {ActualModule, _} when is_list(ActualModule) ->
+                    ActualModuleStr = string:join([atom_to_list(P) || P <- ActualModule], ".")
             end,
             inspect_epp(Epp, ActualModuleStr, Includes);
         {ok, {attribute, 1, file, {Module, 1}}} ->
