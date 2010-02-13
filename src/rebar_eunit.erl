@@ -58,9 +58,13 @@ eunit(Config, _File) ->
     %% Make sure ?EUNIT_DIR/ directory exists (tack on dummy module)
     ok = filelib:ensure_dir(?EUNIT_DIR ++ "/foo"),
 
+    %% grab all the test modules for inclusion in the compile stage
+    TestErls = rebar_utils:find_files("test", ".*\\.erl\$"),
+
     %% Compile erlang code to ?EUNIT_DIR, using a tweaked config
-    %% with appropriate defines for eunit
-    rebar_erlc_compiler:doterl_compile(eunit_config(Config), ?EUNIT_DIR),
+    %% with appropriate defines for eunit, and include all the test modules
+    %% as well.
+    rebar_erlc_compiler:doterl_compile(eunit_config(Config), ?EUNIT_DIR, TestErls),
 
     %% Build a list of all the .beams in ?EUNIT_DIR -- use this for cover
     %% and eunit testing. Normally you can just tell cover and/or eunit to
@@ -68,7 +72,36 @@ eunit(Config, _File) ->
     %% with that scan and causes any cover compilation info to be lost. So,
     %% we do it by hand. :(
     %%
-    Modules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- rebar_utils:beams(?EUNIT_DIR)],
+    %% TODO: Not currently compatible with package modules
+    Beams = [filename:basename(N, ".beam") || N <- rebar_utils:beams(?EUNIT_DIR)],
+
+    %% Grab two lists of test and non-test beam files
+    {TestBeams, ModuleBeams} = lists:partition(fun(B) ->
+                                    lists:suffix("_tests", B) end, Beams),
+
+    case rebar_config:get_global(suite, undefined) of
+        undefined ->
+            %% no suite defined, so include all modules
+            RealModules = ModuleBeams,
+
+            %% exclude any test modules that have a matching module
+            TestModules = [T || T <- TestBeams,
+                              lists:member(string:left(T, length(T) - 6), RealModules) == false];
+        SuiteName ->
+            %% suite defined, so only specify the module that relates to the
+            %% suite (if any)
+            RealModules = [M || M <- ModuleBeams, SuiteName =:= M],
+
+            %% only include the test suite if the main module doesn't exist
+            TestModules = case length(RealModules) of
+                              0 -> [T || T <- TestBeams, T =:= SuiteName ++ "_tests"];
+                              _ -> []
+                          end
+    end,
+
+    %% combine the modules and associated test modules into the resulting list
+    %% of modules to run tests on.
+    Modules = [list_to_atom(M) || M <- RealModules ++ TestModules],
 
     %% TODO: If there are other wildcards specified in eunit_sources, compile them
 
