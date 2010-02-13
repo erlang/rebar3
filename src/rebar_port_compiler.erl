@@ -253,7 +253,9 @@ default_env() ->
                                      " -I", filename:join(erts_dir(), include),
                                      " "])},
      {"DRIVER_LDFLAGS", lists:concat([" -L", code:lib_dir(erl_interface, lib),
-                                      " -lerl_interface -lei"])}].
+                                      " -lerl_interface -lei"])},
+     {"ERLANG_ARCH", integer_to_list(8 * erlang:system_info(wordsize))},
+     {"ERLANG_TARGET", rebar_utils:get_arch()}].
 
 
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env escript
-%% -*- erlang -*-
+%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% ex: ft=erlang ts=4 sw=4 et
 
 main(Args) ->
     %% Get a string repr of build time

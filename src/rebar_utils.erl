@@ -28,6 +28,7 @@
 
 -export([get_cwd/0,
          is_arch/1,
+         get_arch/0,
          get_os/0,
          sh/2, sh/3,
          sh_failfast/2,
@@ -48,13 +49,16 @@ get_cwd() ->
 
 
 is_arch(ArchRegex) ->
-    Arch = erlang:system_info(system_architecture),
-    case re:run(Arch, ArchRegex, [{capture, none}]) of
+    case re:run(get_arch(), ArchRegex, [{capture, none}]) of
         match ->
             true;
         nomatch ->
             false
     end.
+
+get_arch() ->
+    Words = integer_to_list(8 * erlang:system_info(wordsize)),
+    erlang:system_info(system_architecture) ++ "-" ++ Words.
 
 get_os() ->
     Arch = erlang:system_info(system_architecture),
