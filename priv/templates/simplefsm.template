@@ -1,2 +1,2 @@
 {variables, [{fsmid, "myfsm"}]}.
-{file, "simplefsm.erl", "src/{{fsmid}}.erl"}.
+{template, "simplefsm.erl", "src/{{fsmid}}.erl"}.
