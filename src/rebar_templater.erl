@@ -127,8 +127,9 @@ find_escript_templates() ->
                         re:run(Name, ?TEMPLATE_RE, [{capture, none}]) == match].
 
 find_disk_templates() ->
-    Files = rebar_utils:find_files(filename:join(os:getenv("HOME"), ".rebar/templates"), ?TEMPLATE_RE),
-    [{file, F} || F <- Files].
+    HomeFiles = rebar_utils:find_files(filename:join(os:getenv("HOME"), ".rebar/templates"), ?TEMPLATE_RE),
+    LocalFiles = rebar_utils:find_files(".", ?TEMPLATE_RE),
+    [{file, F} || F <- HomeFiles++LocalFiles].
 
 select_template([], Template) ->
     ?ABORT("Template ~s not found.\n", [Template]);
@@ -206,6 +207,34 @@ render(Bin, Context) ->
     Str = re:replace(Bin, "\"", "\\\\\"", [global, {return,list}]),
     mustache:render(Str, Context).
 
+write_file(Output, Data, Force) ->
+    %% determine if the target file already exists
+    FileExists = filelib:is_file(Output),
+
+    %% perform the function if we're allowed,
+    %% otherwise just process the next template
+    if
+        Force =:= "1"; FileExists =:= false ->
+            filelib:ensure_dir(Output),
+            if
+                {Force, FileExists} =:= {"1", true} ->
+                    ?CONSOLE("Writing ~s (forcibly overwriting)~n",
+                             [Output]);
+                true ->
+                    ?CONSOLE("Writing ~s~n", [Output])
+            end,
+            case file:write_file(Output, Data) of
+                ok ->
+                    ok;
+                {error, Reason} ->
+                    ?ABORT("Failed to write output file ~p: ~p\n",
+                           [Output, Reason])
+            end;
+        true ->
+            {error, exists}
+    end.
+
+
 %%
 %% Execute each instruction in a template definition file.
 %%
@@ -218,29 +247,25 @@ execute_template([], _TemplateType, _TemplateName, _Context, _Force, ExistingFil
             Help = "To force overwriting, specify force=1 on the command line.\n",
             ?ERROR("One or more files already exist on disk and were not generated:~n~s~s", [Msg , Help])
     end;
+execute_template([{template, Input, Output} | Rest], TemplateType, TemplateName, Context, Force, ExistingFiles) ->
+    InputName = filename:join(filename:dirname(TemplateName), Input),
+    case write_file(Output, render(load_file(TemplateType, InputName), Context), Force) of
+        ok ->
+            execute_template(Rest, TemplateType, TemplateName, Context,
+                             Force, ExistingFiles);
+        {error, exists} ->
+            execute_template(Rest, TemplateType, TemplateName, Context,
+                             Force, [Output|ExistingFiles])
+    end;
 execute_template([{file, Input, Output} | Rest], TemplateType, TemplateName, Context, Force, ExistingFiles) ->
-    % determine if the target file already exists
-    FileExists = filelib:is_file(Output),
-
-    % perform the function if we're allowed, otherwise just process the next template
-    if
-        Force =:= "1"; FileExists =:= false ->
-            InputName = filename:join(filename:dirname(TemplateName), Input),
-            filelib:ensure_dir(Output),
-            if
-                {Force, FileExists} =:= {"1", true} ->
-                    ?CONSOLE("Writing ~s (forcibly overwriting)~n", [Output]);
-                true ->
-                    ?CONSOLE("Writing ~s~n", [Output])
-            end,
-            case file:write_file(Output, render(load_file(TemplateType, InputName), Context)) of
-                ok ->
-                    execute_template(Rest, TemplateType, TemplateName, Context, Force, ExistingFiles);
-                {error, Reason} ->
-                    ?ABORT("Failed to write output file ~p: ~p\n", [Output, Reason])
-            end;
-        true ->
-            execute_template(Rest, TemplateType, TemplateName, Context, Force, [Output|ExistingFiles])
+    InputName = filename:join(filename:dirname(TemplateName), Input),
+    case write_file(Output, load_file(TemplateType, InputName), Force) of
+        ok ->
+            execute_template(Rest, TemplateType, TemplateName, Context,
+                             Force, ExistingFiles);
+        {error, exists} ->
+            execute_template(Rest, TemplateType, TemplateName, Context,
+                             Force, [Output|ExistingFiles])
     end;
 execute_template([{dir, Name} | Rest], TemplateType, TemplateName, Context, Force, ExistingFiles) ->
     case filelib:ensure_dir(filename:join(Name, "dummy")) of
@@ -249,6 +274,14 @@ execute_template([{dir, Name} | Rest], TemplateType, TemplateName, Context, Forc
         {error, Reason} ->
             ?ABORT("Failed while processing template instruction {dir, ~s}: ~p\n",
                    [Name, Reason])
+    end;
+execute_template([{chmod, Mod, File} | Rest], TemplateType, TemplateName, Context, Force, ExistingFiles) when is_integer(Mod) ->
+    case file:change_mode(File, Mod) of
+        ok ->
+            execute_template(Rest, TemplateType, TemplateName, Context, Force, ExistingFiles);
+        {error, Reason} ->
+            ?ABORT("Failed while processing template instruction {cmod, ~b, ~s}: ~p~n",
+                   [Mod, File, Reason])
     end;
 execute_template([{variables, _} | Rest], TemplateType, TemplateName, Context, Force, ExistingFiles) ->
     execute_template(Rest, TemplateType, TemplateName, Context, Force, ExistingFiles);

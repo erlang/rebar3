@@ -1,4 +1,4 @@
 {variables, [{appid, "myapp"}]}.
-{file, "simpleapp.app", "ebin/{{appid}}.app"}.
-{file, "simpleapp_app.erl", "src/{{appid}}_app.erl"}.
-{file, "simpleapp_sup.erl", "src/{{appid}}_sup.erl"}.
+{template, "simpleapp.app", "ebin/{{appid}}.app"}.
+{template, "simpleapp_app.erl", "src/{{appid}}_app.erl"}.
+{template, "simpleapp_sup.erl", "src/{{appid}}_sup.erl"}.
