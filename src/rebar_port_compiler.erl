@@ -247,7 +247,7 @@ expand_vars_loop(Vars0, Count) ->
     case orddict:from_list(Vars) of
         Vars0 ->
             Vars0;
-        Vars ->
+        _ ->
             expand_vars_loop(Vars, Count-1)
     end.
 
@@ -297,7 +297,7 @@ erts_dir() ->
     lists:concat([code:root_dir(), "/erts-", erlang:system_info(version)]).
 
 os_env() ->
-    [list_to_tuple(re:split(S, "=", [{return, list}])) || S <- os:getenv()].
+    [list_to_tuple(re:split(S, "=", [{return, list}, {parts, 2}])) || S <- os:getenv()].
 
 default_env() ->
     [{"CC", "gcc"},
