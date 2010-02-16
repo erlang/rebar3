@@ -35,7 +35,8 @@
          find_files/2,
          now_str/0,
          ensure_dir/1,
-         beam_to_mod/2, beams/1]).
+         beam_to_mod/2, beams/1,
+         abort/2]).
 
 -include("rebar.hrl").
 
@@ -92,7 +93,7 @@ find_files(Dir, Regex) ->
 
 now_str() ->
     {{Year, Month, Day}, {Hour, Minute, Second}} = calendar:local_time(),
-    lists:flatten(io_lib:format("~4b/~2..0b/~2..0b ~2..0b:~2..0b:~2..0b", 
+    lists:flatten(io_lib:format("~4b/~2..0b/~2..0b ~2..0b:~2..0b:~2..0b",
 				[Year, Month, Day, Hour, Minute, Second])).
 
 %% TODO: Review why filelib:ensure_dir/1 sometimes returns {error, eexist}.
@@ -112,6 +113,10 @@ ensure_dir(Path) ->
         Error ->
             Error
     end.
+
+abort(String, Args) ->
+    ?ERROR(String, Args),
+    halt(1).
 
 %% ====================================================================
 %% Internal functions

@@ -47,8 +47,10 @@
 %%               CFLAGS   - C compiler
 %%               CXXFLAGS - C++ compiler
 %%               LDFLAGS  - Link flags
-%%               DRIVER_CFLAGS  - default -I paths for erts and ei
-%%               DRIVER_LDFLAGS - default -L and -lerl_interface -lei
+%%               ERL_CFLAGS  - default -I paths for erts and ei
+%%               ERL_LDFLAGS - default -L and -lerl_interface -lei
+%%               DRV_CFLAGS  - flags that will be used for compiling the driver
+%%               DRV_LDFLAGS - flags that will be used for linking the driver
 %%
 %%               Note that if you wish to extend (vs. replace) these variables, you MUST
 %%               include a shell-style reference in your definition. E.g. to extend CFLAGS,
@@ -80,7 +82,7 @@ compile(Config, AppFile) ->
             %% default for this operating system. This enables max flexibility for users.
             DefaultEnvs  = filter_envs(default_env(), []),
             OverrideEnvs = filter_envs(rebar_config:get_list(Config, port_envs, []), []),
-            Env = merge_envs(OverrideEnvs, DefaultEnvs),
+            Env = expand_vars_loop(merge_each_var(os_env() ++ DefaultEnvs ++ OverrideEnvs, [])),
 
             %% One or more files are available for building. Run the pre-compile hook, if
             %% necessary.
@@ -97,7 +99,8 @@ compile(Config, AppFile) ->
             case needs_link(SoName, NewBins) of
                 true ->
                     AllBins = string:join(NewBins ++ ExistingBins, " "),
-                    rebar_utils:sh_failfast(?FMT("$CC ~s $LDFLAGS $DRIVER_LDFLAGS -o ~s", [AllBins, SoName]), Env);
+                    rebar_utils:sh_failfast(?FMT("$CC ~s $LDFLAGS $DRV_LDFLAGS -o ~s",
+                                                 [AllBins, SoName]), Env);
                 false ->
                     ?INFO("Skipping relink of ~s\n", [SoName]),
                     ok
@@ -162,9 +165,11 @@ compile_each([Source | Rest], Config, Env, NewBins, ExistingBins) ->
             ?CONSOLE("Compiling ~s\n", [Source]),
             case compiler(Ext) of
                 "$CC" ->
-                    rebar_utils:sh_failfast(?FMT("$CC -c $CFLAGS $DRIVER_CFLAGS ~s -o ~s", [Source, Bin]), Env);
+                    rebar_utils:sh_failfast(?FMT("$CC -c $CFLAGS $DRV_CFLAGS ~s -o ~s",
+                                                 [Source, Bin]), Env);
                 "$CXX" ->
-                    rebar_utils:sh_failfast(?FMT("$CXX -c $CXXFLAGS $DRIVER_CFLAGS ~s -o ~s", [Source, Bin]), Env)
+                    rebar_utils:sh_failfast(?FMT("$CXX -c $CXXFLAGS $DRV_CFLAGS ~s -o ~s",
+                                                 [Source, Bin]), Env)
             end,
             compile_each(Rest, Config, Env, [Bin | NewBins], ExistingBins);
 
@@ -192,13 +197,6 @@ needs_link(SoName, NewBins) ->
             MaxLastMod >= Other
     end.
 
-merge_envs(OverrideEnvs, DefaultEnvs) ->
-    orddict:merge(fun(Key, Override, Default) ->
-                          expand_env_variable(Override, Key, Default)
-                  end,
-                  orddict:from_list(OverrideEnvs),
-                  orddict:from_list(DefaultEnvs)).
-
 
 %%
 %% Choose a compiler variable, based on a provided extension
@@ -211,6 +209,62 @@ compiler(".CPP") -> "$CXX";
 compiler(".c++") -> "$CXX";
 compiler(".C")   -> "$CXX";
 compiler(_)      -> "$CC".
+
+
+%%
+%% Given a list of {Key, Value} environment variables, where Key may be defined
+%% multiple times, walk the list and expand each self-reference so that we
+%% end with a list of each variable singly-defined.
+%%
+merge_each_var([], Vars) ->
+    Vars;
+merge_each_var([{Key, Value} | Rest], Vars) ->
+    case orddict:find(Key, Vars) of
+        error ->
+            %% Nothing yet defined for this key/value. Expand any self-references
+            %% as blank.
+            Evalue = expand_env_variable(Value, Key, "");
+        {ok, Value0} ->
+            %% Use previous definition in expansion
+            Evalue = expand_env_variable(Value, Key, Value0)
+    end,
+    merge_each_var(Rest, orddict:store(Key, Evalue, Vars)).
+
+%%
+%% Give a unique list of {Key, Value} environment variables, expand each one
+%% for every other key until no further expansions are possible.
+%%
+expand_vars_loop(Vars) ->
+    expand_vars_loop(Vars, 10).
+
+expand_vars_loop(Vars0, 0) ->
+    ?ABORT("Max. expansion reached for ENV vars!\n", []);
+expand_vars_loop(Vars0, Count) ->
+    Vars = lists:foldl(fun({Key, Value}, Acc) ->
+                               expand_vars(Key, Value, Acc)
+                       end,
+                       Vars0, Vars0),
+    case orddict:from_list(Vars) of
+        Vars0 ->
+            Vars0;
+        Vars ->
+            expand_vars_loop(Vars, Count-1)
+    end.
+
+%%
+%% Expand all OTHER references to a given K/V pair
+%%
+expand_vars(Key, Value, Vars) ->
+    lists:foldl(fun({AKey, AValue}, Acc) ->
+                        case AKey of
+                            Key ->
+                                NewValue = AValue;
+                            _ ->
+                                NewValue = expand_env_variable(AValue, Key, Value)
+                        end,
+                        [{AKey, NewValue} | Acc]
+                end,
+                [], Vars).
 
 
 %%
@@ -242,18 +296,20 @@ filter_envs([{Key, Value} | Rest], Acc) ->
 erts_dir() ->
     lists:concat([code:root_dir(), "/erts-", erlang:system_info(version)]).
 
+os_env() ->
+    [list_to_tuple(re:split(S, "=", [{return, list}])) || S <- os:getenv()].
+
 default_env() ->
     [{"CC", "gcc"},
      {"CXX", "g++"},
-     {"CFLAGS", "-g -Wall -fPIC"},
-     {"CXXFLAGS", "-g -Wall -fPIC"},
-     {"LDFLAGS", "-shared"},
-     {"darwin", "LDFLAGS", "-bundle -flat_namespace -undefined suppress"},
-     {"DRIVER_CFLAGS", lists:concat([" -I", code:lib_dir(erl_interface, include),
-                                     " -I", filename:join(erts_dir(), include),
-                                     " "])},
-     {"DRIVER_LDFLAGS", lists:concat([" -L", code:lib_dir(erl_interface, lib),
-                                      " -lerl_interface -lei"])},
+     {"ERL_CFLAGS", lists:concat([" -I", code:lib_dir(erl_interface, include),
+                                  " -I", filename:join(erts_dir(), include),
+                                  " "])},
+     {"ERL_LDFLAGS", lists:concat([" -L", code:lib_dir(erl_interface, lib),
+                                   " -lerl_interface -lei"])},
+     {"DRV_CFLAGS", "-g -Wall -fPIC $ERL_CFLAGS"},
+     {"DRV_LDFLAGS", "-shared $ERL_LDFLAGS"},
+     {"darwin", "DRV_LDFLAGS", "-bundle -flat_namespace -undefined suppress $ERL_LDFLAGS"},
      {"ERLANG_ARCH", integer_to_list(8 * erlang:system_info(wordsize))},
      {"ERLANG_TARGET", rebar_utils:get_arch()}].
 
