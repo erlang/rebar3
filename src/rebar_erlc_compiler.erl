@@ -56,7 +56,7 @@ clean(_Config, _AppFile) ->
     %% directory structure in ebin with .beam files within. As such, we want
     %% to scan whatever is left in the ebin/ directory for sub-dirs which
     %% satisfy our criteria.
-    BeamFiles = rebar_utils:find_files("ebin", "^.*\\.beam$"),
+    BeamFiles = rebar_utils:find_files("ebin", "^.*\\.beam\$"),
     rebar_file_utils:delete_each(BeamFiles),
     lists:foreach(fun(Dir) -> delete_dir(Dir, dirs(Dir)) end, dirs("ebin")),
     ok.
@@ -79,8 +79,14 @@ doterl_compile(Config, OutDir, MoreSources) ->
     SrcDirs = src_dirs(proplists:append_values(src_dirs, ErlOpts)),
     RestErls  = [Source || Source <- gather_src(SrcDirs, []) ++ MoreSources,
                            lists:member(Source, FirstErls) == false],
+
+    %% Make sure that ebin/ is on the path
+    CurrPath = code:get_path(),
+    code:add_path("ebin"),
     rebar_base_compiler:run(Config, FirstErls, RestErls,
-                            fun(S, C) -> internal_erl_compile(S, C, OutDir) end).
+                            fun(S, C) -> internal_erl_compile(S, C, OutDir) end),
+    code:set_path(CurrPath),
+    ok.
 
 
 %% ===================================================================
