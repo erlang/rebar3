@@ -96,14 +96,7 @@ now_str() ->
     lists:flatten(io_lib:format("~4b/~2..0b/~2..0b ~2..0b:~2..0b:~2..0b",
 				[Year, Month, Day, Hour, Minute, Second])).
 
-%% TODO: Review why filelib:ensure_dir/1 sometimes returns {error, eexist}.
-%% There appears to be a race condition when calling ensure_dir from
-%% multiple processes simultaneously.
-%% This does not happen with -j1 but with anything higher than that.
-%% So -j2 or default jobs setting will reveal the issue.
-%% To reproduce make sure that the priv/mibs directory does not exist
-%% $ rm -r priv
-%% $ ./rebar -v compile
+%% TODO: filelib:ensure_dir/1 corrected in R13B04. Can be removed.
 ensure_dir(Path) ->
     case filelib:ensure_dir(Path) of
         ok ->
