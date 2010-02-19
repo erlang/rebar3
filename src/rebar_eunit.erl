@@ -58,7 +58,9 @@ eunit(Config, _File) ->
     %% Make sure ?EUNIT_DIR/ directory exists (tack on dummy module)
     ok = filelib:ensure_dir(?EUNIT_DIR ++ "/foo"),
 
-    %% grab all the test modules for inclusion in the compile stage
+    %% Obtain all the test modules for inclusion in the compile stage.
+    %% Notice: this could also be achieved with the following rebar.config option:
+    %% {eunit_compile_opts, [{src_dirs, ["test"]}]}
     TestErls = rebar_utils:find_files("test", ".*\\.erl\$"),
 
     %% Compile erlang code to ?EUNIT_DIR, using a tweaked config
@@ -69,106 +71,82 @@ eunit(Config, _File) ->
     %% Build a list of all the .beams in ?EUNIT_DIR -- use this for cover
     %% and eunit testing. Normally you can just tell cover and/or eunit to
     %% scan the directory for you, but eunit does a code:purge in conjunction
-    %% with that scan and causes any cover compilation info to be lost. So,
-    %% we do it by hand. :(
-    %%
-    %% TODO: Not currently compatible with package modules
-    Beams = [filename:basename(N, ".beam") || N <- rebar_utils:beams(?EUNIT_DIR)],
+    %% with that scan and causes any cover compilation info to be lost.
+    BeamFiles = rebar_utils:beams(?EUNIT_DIR),
+    Modules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- BeamFiles],
 
-    %% Grab two lists of test and non-test beam files
-    {TestBeams, ModuleBeams} = lists:partition(fun(B) ->
-                                    lists:suffix("_tests", B) end, Beams),
-
-    case rebar_config:get_global(suite, undefined) of
-        undefined ->
-            %% no suite defined, so include all modules
-            RealModules = ModuleBeams,
-
-            %% exclude any test modules that have a matching module
-            TestModules = [T || T <- TestBeams,
-                              lists:member(string:left(T, length(T) - 6), RealModules) == false];
-        SuiteName ->
-            %% suite defined, so only specify the module that relates to the
-            %% suite (if any)
-            RealModules = [M || M <- ModuleBeams, SuiteName =:= M],
-
-            %% only include the test suite if the main module doesn't exist
-            TestModules = case length(RealModules) of
-                              0 -> [T || T <- TestBeams, T =:= SuiteName ++ "_tests"];
-                              _ -> []
-                          end
-    end,
-
-    %% combine the modules and associated test modules into the resulting list
-    %% of modules to run tests on.
-    Modules = [list_to_atom(M) || M <- RealModules ++ TestModules],
-
-    %% TODO: If there are other wildcards specified in eunit_sources, compile them
-
-    %% Save current code path and then prefix ?EUNIT_DIR on it so that our modules
-    %% are found there
-    InitCodePath = code:get_path(),
-    true = code:add_patha(?EUNIT_DIR),
-
-    %% Enable verbose in eunit if so requested..
-    case rebar_config:is_verbose() of
-        true ->
-            BaseOpts = [verbose];
-        false ->
-            BaseOpts = []
-    end,
-
-    %% If cover support is requested, set it up
-    case rebar_config:get(Config, cover_enabled, false) of
-        true ->
-            cover_init(Config);
-        _ ->
-            ok
-    end,
-
-    %% Move down into ?EUNIT_DIR while we run tests so any generated files
-    %% are created there (versus in the source dir)
-    Cwd = rebar_utils:get_cwd(),
-    file:set_cwd(?EUNIT_DIR),
-
-    %% Run eunit
-    EunitOpts = BaseOpts ++ rebar_config:get_list(Config, eunit_opts, []),
-    EunitResult = (catch eunit:test(Modules, EunitOpts)),
-
-    %% Return to original working dir
-    file:set_cwd(Cwd),
-
-    %% Analyze cover modules
-    cover_analyze(Config, cover:modules()),
+    cover_init(Config, BeamFiles),
+    EunitResult = perform_eunit(Config, Modules),
+    perform_cover(Config, BeamFiles),
 
     case EunitResult of
         ok ->
             ok;
         _ ->
-            ?CONSOLE("One or more eunit tests failed.\n", []),
+            ?CONSOLE("One or more eunit tests failed.~n", []),
             ?FAIL
     end,
-
-
-    %% Restore code path
-    true = code:set_path(InitCodePath),
     ok.
 
 clean(_Config, _File) ->
     rebar_file_utils:rm_rf(?EUNIT_DIR).
 
-
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
+perform_eunit(Config, Modules) ->
+    %% suite defined, so only specify the module that relates to the
+    %% suite (if any)
+    Suite = rebar_config:get_global(suite, undefined),
+    EunitOpts = get_eunit_opts(Config),
+
+    OrigEnv = set_proc_env(),
+    EunitResult = perform_eunit(EunitOpts, Modules, Suite),
+    restore_proc_env(OrigEnv),
+    EunitResult.
+
+perform_eunit(EunitOpts, Modules, undefined) ->
+    (catch eunit:test(Modules, EunitOpts));
+perform_eunit(EunitOpts, _Modules, Suite) ->
+    (catch eunit:test(list_to_atom(Suite), EunitOpts)).
+
+set_proc_env() ->
+    %% Save current code path and then prefix ?EUNIT_DIR on it so that our modules
+    %% are found there
+    CodePath = code:get_path(),
+    true = code:add_patha(?EUNIT_DIR),
+
+    %% Move down into ?EUNIT_DIR while we run tests so any generated files
+    %% are created there (versus in the source dir)
+    Cwd = rebar_utils:get_cwd(),
+    file:set_cwd(?EUNIT_DIR),
+    {CodePath, Cwd}.
+
+restore_proc_env({CodePath, Cwd}) ->
+    %% Return to original working dir
+    file:set_cwd(Cwd),
+    %% Restore code path
+    true = code:set_path(CodePath).
+
+get_eunit_opts(Config) ->
+    %% Enable verbose in eunit if so requested..
+    BaseOpts = case rebar_config:is_verbose() of
+                   true ->
+                       [verbose];
+                   false ->
+                       []
+               end,
+
+    BaseOpts ++ rebar_config:get_list(Config, eunit_opts, []).
+
 eunit_config(Config) ->
-    case is_quickcheck_avail() of
-        true ->
-            EqcOpts = [{d, 'EQC'}];
-        false ->
-            EqcOpts = []
-    end,
+    EqcOpts = case is_quickcheck_avail() of
+                  true ->
+                      [{d, 'EQC'}];
+                  false ->
+                      []
+              end,
 
     ErlOpts = rebar_config:get_list(Config, erl_opts, []),
     EunitOpts = rebar_config:get_list(Config, eunit_compile_opts, []),
@@ -192,36 +170,22 @@ is_quickcheck_avail() ->
             IsAvail
     end.
 
-cover_init(_Config) ->
-    %% Make sure any previous runs of cover don't unduly influence
-    cover:reset(),
+perform_cover(Config, BeamFiles) ->
+    perform_cover(rebar_config:get(Config, cover_enabled, false), Config, BeamFiles).
 
-    ?INFO("Cover compiling ~s\n", [rebar_utils:get_cwd()]),
-
-    case cover:compile_beam_directory(?EUNIT_DIR) of
-        {error, Reason2} ->
-            ?ERROR("Cover compilation failed: ~p\n", [Reason2]),
-            ?FAIL;
-        Modules ->
-            %% It's not an error for cover compilation to fail partially, but we do want
-            %% to warn about them
-            [?CONSOLE("Cover compilation warning: ~p", [Desc]) || {error, Desc} <- Modules],
-
-            %% Identify the modules that were compiled successfully
-            case [ M || {ok, M} <- Modules] of
-                [] ->
-                    %% No modules compiled successfully...fail
-                    ?ERROR("Cover failed to compile any modules; aborting.\n", []),
-                    ?FAIL;
-                _ ->
-                    %% At least one module compiled successfully
-                    ok
-            end
-    end.
+perform_cover(false, _Config, _BeamFiles) ->
+    ok;
+perform_cover(true, Config, BeamFiles) ->
+    perform_cover(Config, BeamFiles, rebar_config:get_global(suite, undefined));
+perform_cover(Config, BeamFiles, undefined) ->
+    cover_analyze(Config, BeamFiles);
+perform_cover(Config, _BeamFiles, Suite) ->
+    cover_analyze(Config, [filename:join([?EUNIT_DIR | string:tokens(Suite, ".")]) ++ ".beam"]).
 
 cover_analyze(_Config, []) ->
     ok;
-cover_analyze(_Config, Modules) ->
+cover_analyze(_Config, BeamFiles) ->
+    Modules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- BeamFiles],
     %% Generate coverage info for all the cover-compiled modules
     Coverage = [cover_analyze_mod(M) || M <- Modules],
 
@@ -234,6 +198,30 @@ cover_analyze(_Config, Modules) ->
     Index = filename:join([rebar_utils:get_cwd(), ?EUNIT_DIR, "index.html"]),
     ?CONSOLE("Cover analysis: ~s\n", [Index]).
 
+cover_init(false, _BeamFiles) ->
+    ok;
+cover_init(true, BeamFiles) ->
+    %% Make sure any previous runs of cover don't unduly influence
+    cover:reset(),
+
+    ?INFO("Cover compiling ~s\n", [rebar_utils:get_cwd()]),
+
+    Compiled = [{Beam, cover:compile_beam(Beam)} || Beam <- BeamFiles],
+    case [Module || {_, {ok, Module}} <- Compiled] of
+        [] ->
+            %% No modules compiled successfully...fail
+            ?ERROR("Cover failed to compile any modules; aborting.~n", []),
+            ?FAIL;
+        _ ->
+            %% At least one module compiled successfully
+
+            %% It's not an error for cover compilation to fail partially, but we do want
+            %% to warn about them
+            [?CONSOLE("Cover compilation warning for ~p: ~p", [Beam, Desc]) || {Beam, {error, Desc}} <- Compiled]
+    end,
+    ok;
+cover_init(Config, BeamFiles) ->
+    cover_init(rebar_config:get(Config, cover_enabled, false), BeamFiles).
 
 cover_analyze_mod(Module) ->
     case cover:analyze(Module, coverage, module) of
@@ -267,7 +255,6 @@ cover_write_index(Coverage) ->
 
 cover_file(Module) ->
     filename:join([?EUNIT_DIR, atom_to_list(Module) ++ ".COVER.html"]).
-
 
 percentage(Cov, NotCov) ->
     trunc((Cov / (Cov + NotCov)) * 100).
