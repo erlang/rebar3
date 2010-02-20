@@ -53,14 +53,19 @@ install(Config, File) ->
     validate_name(AppName, File),
     validate_modules(AppName, proplists:get_value(modules, AppData)),
 
+    %% Get the target directory. The user can specify a target= directory
+    %% on the command line for convenience, or it defaults to the Erlang
+    %% install dir
+    TargetDir = rebar_config:get_global(target, code:lib_dir()),
+
     %% Pull out the vsn and construct identifier
     Vsn = proplists:get_value(vsn, AppData),
     AppId = ?FMT("~s-~s", [AppName, Vsn]),
-    ?CONSOLE("Installing: ~s\n", [AppId]),
+    ?CONSOLE("Installing: ~s to ~s\n", [AppId, TargetDir]),
 
     %% Check the erlang lib directory to see if this app identifier
     %% is already present.
-    AppDir = filename:join([code:lib_dir(), AppId]),
+    AppDir = filename:join([TargetDir, AppId]),
     case filelib:is_dir(AppDir) of
         true ->
             %% Already exists -- check for force=1 global flag and only
