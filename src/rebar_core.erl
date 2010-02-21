@@ -64,6 +64,11 @@ run(RawArgs) ->
     %% Convert command strings to atoms
     CommandAtoms = [list_to_atom(C) || C <- Commands],
 
+    %% Determine the location of the rebar executable; important for pulling
+    %% resources out of the escript
+    rebar_config:set_global(escript, filename:absname(escript:script_name())),
+    ?DEBUG("Rebar location: ~p\n", [rebar_config:get_global(escript, undefined)]),
+
     %% Load rebar.config, if it exists
     process_dir(rebar_utils:get_cwd(), rebar_config:new(), CommandAtoms).
 

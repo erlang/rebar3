@@ -72,8 +72,9 @@ create(_Config, _) ->
             case parse_vars(Vars, dict:new()) of
                 {error, Entry} ->
                     Context0 = undefined,
-                    ?ABORT("Failed while processing variables from template ~p. Variable definitions "
-                           "must follow form of [{atom(), term()}]. Failed at: ~p\n",
+                    ?ABORT("Failed while processing variables from template ~p."
+                           "Variable definitions must follow form of "
+                           "[{atom(), term()}]. Failed at: ~p\n",
                            [template_id(), Entry]);
                 Context0 ->
                     ok
@@ -110,7 +111,7 @@ create(_Config, _) ->
 %%
 cache_escript_files() ->
     {ok, Files} = escript:foldl(fun(Name, _, GetBin, Acc) -> [{Name, GetBin()} | Acc] end,
-                                [], escript:script_name()),
+                                [], rebar_config:get_global(escript, undefined)),
     erlang:put(escript_files, Files).
 
 
@@ -127,7 +128,8 @@ find_escript_templates() ->
                         re:run(Name, ?TEMPLATE_RE, [{capture, none}]) == match].
 
 find_disk_templates() ->
-    HomeFiles = rebar_utils:find_files(filename:join(os:getenv("HOME"), ".rebar/templates"), ?TEMPLATE_RE),
+    HomeFiles = rebar_utils:find_files(filename:join(os:getenv("HOME"),
+                                                     ".rebar/templates"), ?TEMPLATE_RE),
     LocalFiles = rebar_utils:find_files(".", ?TEMPLATE_RE),
     [{file, F} || F <- HomeFiles++LocalFiles].
 
