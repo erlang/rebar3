@@ -6,6 +6,7 @@
               rebar_base_compiler,
               rebar_config,
               rebar_core,
+              rebar_cleaner,
               rebar_ct,
               rebar_deps,
               rebar_dialyzer,
@@ -42,7 +43,8 @@
          {any_dir_modules, [
                             rebar_subdirs,
                             rebar_deps,
-                            rebar_templater
+                            rebar_templater,
+                            rebar_cleaner
                            ]},
 
          %% Dir specific processing modules
