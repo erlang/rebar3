@@ -237,7 +237,7 @@ merge_each_var([{Key, Value} | Rest], Vars) ->
 expand_vars_loop(Vars) ->
     expand_vars_loop(Vars, 10).
 
-expand_vars_loop(Vars0, 0) ->
+expand_vars_loop(_, 0) ->
     ?ABORT("Max. expansion reached for ENV vars!\n", []);
 expand_vars_loop(Vars0, Count) ->
     Vars = lists:foldl(fun({Key, Value}, Acc) ->
