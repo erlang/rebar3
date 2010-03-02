@@ -109,14 +109,14 @@ inspect(Source, IncludePath) ->
     ModuleDefault = filename:basename(Source, ".erl"),
     case epp:open(Source, IncludePath) of
         {ok, Epp} ->
-            inspect_epp(Epp, ModuleDefault, []);
+            inspect_epp(Epp, Source, ModuleDefault, []);
         {error, Reason} ->
             ?DEBUG("Failed to inspect ~s: ~p\n", [Source, Reason]),
             {ModuleDefault, []}
     end.
 
--spec inspect_epp(Epp::pid(), Module::string(), Includes::[string()]) -> {string(), [string()]}.
-inspect_epp(Epp, Module, Includes) ->
+-spec inspect_epp(Epp::pid(), Source::string(), Module::string(), Includes::[string()]) -> {string(), [string()]}.
+inspect_epp(Epp, Source, Module, Includes) ->
     case epp:parse_erl_form(Epp) of
         {ok, {attribute, _, module, ModInfo}} ->
             case ModInfo of
@@ -133,16 +133,18 @@ inspect_epp(Epp, Module, Includes) ->
                 {ActualModule, _} when is_list(ActualModule) ->
                     ActualModuleStr = string:join([atom_to_list(P) || P <- ActualModule], ".")
             end,
-            inspect_epp(Epp, ActualModuleStr, Includes);
+            inspect_epp(Epp, Source, ActualModuleStr, Includes);
         {ok, {attribute, 1, file, {Module, 1}}} ->
-            inspect_epp(Epp, Module, Includes);
+            inspect_epp(Epp, Source, Module, Includes);
+        {ok, {attribute, 1, file, {Source, 1}}} ->
+            inspect_epp(Epp, Source, Module, Includes);
         {ok, {attribute, 1, file, {IncFile, 1}}} ->
-            inspect_epp(Epp, Module, [IncFile | Includes]);
+            inspect_epp(Epp, Source, Module, [IncFile | Includes]);
         {eof, _} ->
             epp:close(Epp),
             {Module, Includes};
         _ ->
-            inspect_epp(Epp, Module, Includes)
+            inspect_epp(Epp, Source, Module, Includes)
     end.
 
 -spec needs_compile(Source::string(), Target::string(), Hrls::[string()]) -> boolean().
