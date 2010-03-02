@@ -44,12 +44,15 @@ run(Config, FirstFiles, RestFiles, CompileFn) ->
         [] ->
             ok;
         _ ->
+            % Sort RestFiles so that parse_transforms and behaviours are first
+            SortedRestFiles = [K || {K, _V} <- lists:keysort(2,
+                    [{F, compile_priority(F)} || F <- RestFiles ])],
             Self = self(),
             F = fun() -> compile_worker(Self, Config, CompileFn) end,
             Jobs = rebar_config:get_jobs(),
             ?DEBUG("Starting ~B compile worker(s)~n", [Jobs]),
             Pids = [spawn_monitor(F) || _I <- lists:seq(1,Jobs)],
-            compile_queue(Pids, RestFiles)
+            compile_queue(Pids, SortedRestFiles)
     end.
 
 run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt, Compile3Fn) ->
@@ -186,3 +189,32 @@ compile_worker(QueuePid, Config, CompileFn) ->
         empty ->
             ok
     end.
+
+compile_priority(File) ->
+    case epp_dodger:parse_file(File) of
+        {error, _} ->
+            10; % couldn't parse the file, default priority
+        {ok, Trees} ->
+            ?DEBUG("Computing priority of ~p\n", [File]),
+            F2 = fun({tree,arity_qualifier,_,
+                        {arity_qualifier,{tree,atom,_,behaviour_info},
+                            {tree,integer,_,1}}}, _) ->
+                    2;
+                ({tree,arity_qualifier,_,
+                        {arity_qualifier,{tree,atom,_,parse_transform},
+                            {tree,integer,_,2}}}, _) ->
+                    1;
+                (_, Acc) ->
+                    Acc
+            end,
+
+            F = fun({tree, attribute, _, {attribute, {tree, atom, _, export},
+                            [{tree, list, _, {list, List, none}}]}}, Acc) ->
+                    lists:foldl(F2, Acc, List);
+                (_, Acc) ->
+                    Acc
+            end,
+
+            lists:foldl(F, 10, Trees)
+    end.
+
