@@ -96,7 +96,7 @@ doterl_compile(Config, OutDir, MoreSources) ->
 -spec include_path(Source::string(), Config::#config{}) -> [string()].
 include_path(Source, Config) ->
     ErlOpts = rebar_config:get(Config, erl_opts, []),
-    [filename:dirname(Source)] ++ proplists:get_all_values(i, ErlOpts).
+    ["include", filename:dirname(Source)] ++ proplists:get_all_values(i, ErlOpts).
 
 -spec inspect(Source::string(), IncludePath::[string()]) -> {string(), [string()]}.
 inspect(Source, IncludePath) ->
