@@ -203,15 +203,19 @@ download_source(AppDir, {hg, Url, Rev}) ->
 download_source(AppDir, {git, Url, Rev}) ->
     ok = filelib:ensure_dir(AppDir),
     rebar_utils:sh(?FMT("git clone -n ~s", [Url]), [], filename:dirname(AppDir)),
-    rebar_utils:sh(?FMT("git checkout ~s", [Rev]), [], AppDir).
-
+    rebar_utils:sh(?FMT("git checkout ~s", [Rev]), [], AppDir);
+download_source(AppDir, {svn, Url, Rev}) ->
+    ok = filelib:ensure_dir(AppDir),
+    rebar_utils:sh(?FMT("svn checkout -r ~s ~s ~s",
+                        [Rev, Url, filename:basename(AppDir)]), [],
+                   filename:dirname(AppDir)).
 
 
 %% ===================================================================
 %% Source helper functions
 %% ===================================================================
 
-source_engine_avail({Name, _, _}) when Name == hg; Name == git ->
+source_engine_avail({Name, _, _}) when Name == hg; Name == git; Name == svn ->
     case scm_client_vsn(Name) >= required_scm_client_vsn(Name) of
         true ->
             true;
@@ -232,11 +236,14 @@ scm_client_vsn(Path, VsnArg, VsnRegex) ->
     end.
 
 required_scm_client_vsn(hg)  -> {1, 4};
-required_scm_client_vsn(git) -> {1, 6}.
+required_scm_client_vsn(git) -> {1, 6};
+required_scm_client_vsn(svn) -> {1, 6}.
 
 scm_client_vsn(hg) ->
     scm_client_vsn(os:find_executable(hg), " --version", "version (\\d+).(\\d+)");
 scm_client_vsn(git) ->
     scm_client_vsn(os:find_executable(git), " --version", "git version (\\d+).(\\d+)");
+scm_client_vsn(svn) ->
+    scm_client_vsn(os:find_executable(svn), " --version", "svn, version (\\d+).(\\d+)");
 scm_client_vsn(_) ->
     undefined.
