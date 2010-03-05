@@ -80,10 +80,16 @@ doterl_compile(Config, OutDir, MoreSources) ->
     RestErls  = [Source || Source <- gather_src(SrcDirs, []) ++ MoreSources,
                            lists:member(Source, FirstErls) == false],
 
+    % Sort RestErls so that parse_transforms and behaviours are first
+    % This should probably be somewhat combined with inspect_epp
+    SortedRestErls = [K || {K, _V} <- lists:keysort(2,
+        [{F, compile_priority(F)} || F <- RestErls ])],
+
+
     %% Make sure that ebin/ is on the path
     CurrPath = code:get_path(),
     code:add_path("ebin"),
-    rebar_base_compiler:run(Config, FirstErls, RestErls,
+    rebar_base_compiler:run(Config, FirstErls, SortedRestErls,
                             fun(S, C) -> internal_erl_compile(S, C, OutDir) end),
     code:set_path(CurrPath),
     ok.
@@ -96,21 +102,21 @@ doterl_compile(Config, OutDir, MoreSources) ->
 -spec include_path(Source::string(), Config::#config{}) -> [string()].
 include_path(Source, Config) ->
     ErlOpts = rebar_config:get(Config, erl_opts, []),
-    [filename:dirname(Source)] ++ proplists:get_all_values(i, ErlOpts).
+    ["include", filename:dirname(Source)] ++ proplists:get_all_values(i, ErlOpts).
 
 -spec inspect(Source::string(), IncludePath::[string()]) -> {string(), [string()]}.
 inspect(Source, IncludePath) ->
     ModuleDefault = filename:basename(Source, ".erl"),
     case epp:open(Source, IncludePath) of
         {ok, Epp} ->
-            inspect_epp(Epp, ModuleDefault, []);
+            inspect_epp(Epp, Source, ModuleDefault, []);
         {error, Reason} ->
             ?DEBUG("Failed to inspect ~s: ~p\n", [Source, Reason]),
             {ModuleDefault, []}
     end.
 
--spec inspect_epp(Epp::pid(), Module::string(), Includes::[string()]) -> {string(), [string()]}.
-inspect_epp(Epp, Module, Includes) ->
+-spec inspect_epp(Epp::pid(), Source::string(), Module::string(), Includes::[string()]) -> {string(), [string()]}.
+inspect_epp(Epp, Source, Module, Includes) ->
     case epp:parse_erl_form(Epp) of
         {ok, {attribute, _, module, ModInfo}} ->
             case ModInfo of
@@ -127,16 +133,18 @@ inspect_epp(Epp, Module, Includes) ->
                 {ActualModule, _} when is_list(ActualModule) ->
                     ActualModuleStr = string:join([atom_to_list(P) || P <- ActualModule], ".")
             end,
-            inspect_epp(Epp, ActualModuleStr, Includes);
+            inspect_epp(Epp, Source, ActualModuleStr, Includes);
         {ok, {attribute, 1, file, {Module, 1}}} ->
-            inspect_epp(Epp, Module, Includes);
+            inspect_epp(Epp, Source, Module, Includes);
+        {ok, {attribute, 1, file, {Source, 1}}} ->
+            inspect_epp(Epp, Source, Module, Includes);
         {ok, {attribute, 1, file, {IncFile, 1}}} ->
-            inspect_epp(Epp, Module, [IncFile | Includes]);
+            inspect_epp(Epp, Source, Module, [IncFile | Includes]);
         {eof, _} ->
             epp:close(Epp),
             {Module, Includes};
         _ ->
-            inspect_epp(Epp, Module, Includes)
+            inspect_epp(Epp, Source, Module, Includes)
     end.
 
 -spec needs_compile(Source::string(), Target::string(), Hrls::[string()]) -> boolean().
@@ -211,3 +219,32 @@ delete_dir(Dir, []) ->
 delete_dir(Dir, Subdirs) ->
     lists:foreach(fun(D) -> delete_dir(D, dirs(D)) end, Subdirs),
     file:del_dir(Dir).
+
+-spec compile_priority(File::string()) -> pos_integer().
+compile_priority(File) ->
+    case epp_dodger:parse_file(File) of
+        {error, _} ->
+            10; % couldn't parse the file, default priority
+        {ok, Trees} ->
+            ?DEBUG("Computing priority of ~p\n", [File]),
+            F2 = fun({tree,arity_qualifier,_,
+                        {arity_qualifier,{tree,atom,_,behaviour_info},
+                            {tree,integer,_,1}}}, _) ->
+                    2;
+                ({tree,arity_qualifier,_,
+                        {arity_qualifier,{tree,atom,_,parse_transform},
+                            {tree,integer,_,2}}}, _) ->
+                    1;
+                (_, Acc) ->
+                    Acc
+            end,
+
+            F = fun({tree, attribute, _, {attribute, {tree, atom, _, export},
+                            [{tree, list, _, {list, List, none}}]}}, Acc) ->
+                    lists:foldl(F2, Acc, List);
+                (_, Acc) ->
+                    Acc
+            end,
+
+            lists:foldl(F, 10, Trees)
+    end.
