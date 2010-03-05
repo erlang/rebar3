@@ -72,12 +72,15 @@ eunit(Config, _File) ->
     %% and eunit testing. Normally you can just tell cover and/or eunit to
     %% scan the directory for you, but eunit does a code:purge in conjunction
     %% with that scan and causes any cover compilation info to be lost.
-    BeamFiles = rebar_utils:beams(?EUNIT_DIR),
+    %% Filter out "*_tests" modules so eunit won't doubly run them and
+    %% so cover only calculates coverage on production code.
+    BeamFiles = [N || N <- rebar_utils:beams(?EUNIT_DIR), 
+                      string:str(N, "_tests.beam") =:= 0],
     Modules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- BeamFiles],
 
     cover_init(Config, BeamFiles),
     EunitResult = perform_eunit(Config, Modules),
-    perform_cover(Config, BeamFiles),
+    perform_cover(Config, Modules),
 
     case EunitResult of
         ok ->
@@ -176,18 +179,16 @@ perform_cover(Config, BeamFiles) ->
 perform_cover(false, _Config, _BeamFiles) ->
     ok;
 perform_cover(true, Config, BeamFiles) ->
-    perform_cover(Config, BeamFiles, rebar_config:get_global(suite, undefined));
-perform_cover(Config, BeamFiles, undefined) ->
-    cover_analyze(Config, BeamFiles);
-perform_cover(Config, _BeamFiles, Suite) ->
-    cover_analyze(Config, [filename:join([?EUNIT_DIR | string:tokens(Suite, ".")]) ++ ".beam"]).
+    cover_analyze(Config, BeamFiles).
 
 cover_analyze(_Config, []) ->
     ok;
-cover_analyze(_Config, BeamFiles) ->
-    Modules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- BeamFiles],
+cover_analyze(_Config, Modules) ->
+    Suite = list_to_atom(rebar_config:get_global(suite, "")),
+    FilteredModules = [M || M <- Modules, M =/= Suite],
+
     %% Generate coverage info for all the cover-compiled modules
-    Coverage = [cover_analyze_mod(M) || M <- Modules],
+    Coverage = [cover_analyze_mod(M) || M <- FilteredModules],
 
     %% Write index of coverage info
     cover_write_index(lists:sort(Coverage)),
