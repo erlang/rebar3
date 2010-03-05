@@ -36,7 +36,8 @@
          now_str/0,
          ensure_dir/1,
          beam_to_mod/2, beams/1,
-         abort/2]).
+         abort/2,
+         escript_foldl/3]).
 
 -include("rebar.hrl").
 
@@ -111,6 +112,14 @@ abort(String, Args) ->
     ?ERROR(String, Args),
     halt(1).
 
+escript_foldl(Fun, Acc, File) ->
+    case erlang:function_exported(zip, foldl, 3) of
+        true ->
+            emulate_escript_foldl(Fun, Acc, File);
+        false ->
+            escript:foldl(Fun, Acc, File)
+    end.
+
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
@@ -144,3 +153,21 @@ beams(Dir) ->
     filelib:fold_files(Dir, ".*\.beam\$", true,
                        fun(F, Acc) -> [F | Acc] end, []).
 
+emulate_escript_foldl(Fun, Acc, File) ->
+    case escript:extract(File, [compile_source]) of
+        {ok, [_Shebang, _Comment, _EmuArgs, Body]} ->
+            case Body of
+                {source, BeamCode} ->
+                    GetInfo = fun() -> file:read_file_info(File) end,
+                    GetBin = fun() -> BeamCode end,
+                    {ok, Fun(".", GetInfo, GetBin, Acc)};
+                {beam, BeamCode} ->
+                    GetInfo = fun() -> file:read_file_info(File) end,
+                    GetBin = fun() -> BeamCode end,
+                    {ok, Fun(".", GetInfo, GetBin, Acc)};
+                {archive, ArchiveBin} ->
+                    zip:foldl(Fun, Acc, {File, ArchiveBin})
+            end;
+        {error, Reason} ->
+            {error, Reason}
+    end.
