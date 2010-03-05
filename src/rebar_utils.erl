@@ -112,6 +112,9 @@ abort(String, Args) ->
     ?ERROR(String, Args),
     halt(1).
 
+%% TODO: Rename emulate_escript_foldl to escript_foldl and remove
+%% this function when the time is right. escript:foldl/3 was an
+%% undocumented exported fun and is going to be removed post-R13B04.
 escript_foldl(Fun, Acc, File) ->
     case erlang:function_exported(zip, foldl, 3) of
         true ->
