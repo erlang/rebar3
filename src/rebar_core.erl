@@ -85,32 +85,25 @@ parse_args(Args) ->
     %% Parse getopt options
     OptSpecList = option_spec_list(),
     case getopt:parse(OptSpecList, Args) of
-        {ok, {_Options, []}} ->
-            %% no command to run specified
-            help(),
-            halt(1);
         {ok, {Options, NonOptArgs}} ->
-            case proplists:get_bool(help, Options) of
-                true ->
-                    %% display help
-                    help(),
-                    halt(0);
-                false ->
-                    %% Set global variables based on getopt options
-                    set_global_flag(Options, verbose),
-                    set_global_flag(Options, force),
-                    DefJobs = rebar_config:get_jobs(),
-                    case proplists:get_value(jobs, Options, DefJobs) of
-                        DefJobs ->
-                            ok;
-                        Jobs ->
-                            rebar_config:set_global(jobs, Jobs)
-                    end,
+            %% Check options and maybe halt execution
+            {ok, continue} = print_help_maybe_halt(Options, NonOptArgs),
 
-                    %% Filter all the flags (i.e. strings of form key=value) from the
-                    %% command line arguments. What's left will be the commands to run.
-                    filter_flags(NonOptArgs, [])
-            end;
+            %% Set global variables based on getopt options
+            set_global_flag(Options, verbose),
+            set_global_flag(Options, force),
+            DefJobs = rebar_config:get_jobs(),
+            case proplists:get_value(jobs, Options, DefJobs) of
+                DefJobs ->
+                    ok;
+                Jobs ->
+                    rebar_config:set_global(jobs, Jobs)
+            end,
+
+            %% Filter all the flags (i.e. strings of form key=value) from the
+            %% command line arguments. What's left will be the commands to run.
+            filter_flags(NonOptArgs, []);
+
         {error, {Reason, Data}} ->
             ?ERROR("Error: ~s ~p~n~n", [Reason, Data]),
             help(),
@@ -130,6 +123,31 @@ set_global_flag(Options, Flag) ->
     rebar_config:set_global(Flag, Value).
 
 %%
+%% print help
+%%
+print_help_maybe_halt(Options, NonOptArgs) ->
+    case proplists:get_bool(help, Options) of
+        true ->
+            help(),
+            halt(0);
+        false ->
+            case proplists:get_bool(commands, Options) of
+                true ->
+                    commands(),
+                    halt(0);
+                false ->
+                    case NonOptArgs of
+                        [] ->
+                            io:format("No command to run specified!~n"),
+                            help(),
+                            halt(1);
+                        _ ->
+                            {ok, continue}
+                    end
+            end
+    end.
+
+%%
 %% print help/usage string
 %%
 help() ->
@@ -138,6 +156,32 @@ help() ->
                  "[var=value,...] <command,...>",
                  [{"var=value", "rebar global variables (e.g. force=1)"},
                   {"command", "Command to run (e.g. compile)"}]).
+
+%%
+%% print known commands
+%%
+commands() ->
+    io:format(<<
+"analyze                              Analyze with Dialyzer~n"
+"build_plt                            Build Dialyzer PLT~n"
+"check_plt                            Check Dialyzer PLT~n"
+"~n"
+"clean                                Clean~n"
+"compile                              Compile sources~n"
+"~n"
+"create      template= [var=foo,...]  Create skel based on template and vars~n"
+"create-app                           Create simple app skel~n"
+"create-node                          Create simple node skel~n"
+"~n"
+"generate    [dump_spec=0/1]          Build release with reltool~n"
+"install     [target=]                Install build into target~n"
+"~n"
+"eunit       [suite=foo]              Run eunit [test/foo_tests.erl] tests~n"
+"~n"
+"int_test    [suite=] [case=]         Run ct suites in ./int_test~n"
+"perf_test   [suite=] [case=]         Run ct suites in ./perf_test~n"
+"test        [suite=] [case=]         Run ct suites in ./test~n"
+>>).
 
 %%
 %% options accepted via getopt
@@ -149,10 +193,11 @@ option_spec_list() ->
         [Jobs]),
     [
      %% {Name, ShortOpt, LongOpt, ArgSpec, HelpMsg}
-     {help,    $h, "help",    undefined, "Show the program options"},
-     {verbose, $v, "verbose", undefined, "Be verbose about what gets done"},
-     {force,   $f, "force",   undefined, "Force"},
-     {jobs,    $j, "jobs",    integer, JobsHelp}
+     {help,     $h, "help",     undefined, "Show the program options"},
+     {commands, $c, "commands", undefined, "Show available commands"},
+     {verbose,  $v, "verbose",  undefined, "Be verbose about what gets done"},
+     {force,    $f, "force",    undefined, "Force"},
+     {jobs,     $j, "jobs",     integer,   JobsHelp}
     ].
 
 %%
