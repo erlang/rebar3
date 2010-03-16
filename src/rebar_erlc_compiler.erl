@@ -226,7 +226,6 @@ compile_priority(File) ->
         {error, _} ->
             10; % couldn't parse the file, default priority
         {ok, Trees} ->
-            ?DEBUG("Computing priority of ~p\n", [File]),
             F2 = fun({tree,arity_qualifier,_,
                         {arity_qualifier,{tree,atom,_,behaviour_info},
                             {tree,integer,_,1}}}, _) ->
