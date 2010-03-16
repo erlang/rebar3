@@ -176,45 +176,52 @@ filter_flags([Item | Rest], Commands) ->
 
 
 process_dir(Dir, ParentConfig, Commands) ->
-    ok = file:set_cwd(Dir),
-    Config = rebar_config:new(ParentConfig),
+    case filelib:is_dir(Dir) of
+        false ->
+            ?WARN("Skipping non-existent sub-dir: ~p\n", [Dir]),
+            ok;
 
-    %% Save the current code path and then update it with
-    %% lib_dirs. Children inherit parents code path, but we
-    %% also want to ensure that we restore everything to pristine
-    %% condition after processing this child
-    CurrentCodePath = update_code_path(Config),
+        true ->
+            ok = file:set_cwd(Dir),
+            Config = rebar_config:new(ParentConfig),
 
-    %% Get the list of processing modules and check each one against
-    %% CWD to see if it's a fit -- if it is, use that set of modules
-    %% to process this dir.
-    {ok, AvailModuleSets} = application:get_env(rebar, modules),
-    {DirModules, ModuleSetFile} = choose_module_set(AvailModuleSets, Dir),
+            %% Save the current code path and then update it with
+            %% lib_dirs. Children inherit parents code path, but we
+            %% also want to ensure that we restore everything to pristine
+            %% condition after processing this child
+            CurrentCodePath = update_code_path(Config),
 
-    %% Get the list of modules for "any dir". This is a catch-all list of modules
-    %% that are processed in addion to modules associated with this directory
-    %% type. These any_dir modules are processed FIRST.
-    {ok, AnyDirModules} = application:get_env(rebar, any_dir_modules),
-    Modules = AnyDirModules ++ DirModules,
+            %% Get the list of processing modules and check each one against
+            %% CWD to see if it's a fit -- if it is, use that set of modules
+            %% to process this dir.
+            {ok, AvailModuleSets} = application:get_env(rebar, modules),
+            {DirModules, ModuleSetFile} = choose_module_set(AvailModuleSets, Dir),
 
-    %% Give the modules a chance to tweak config and indicate if there
-    %% are any other dirs that might need processing first.
-    {UpdatedConfig, Dirs} = acc_modules(select_modules(Modules, preprocess, []),
-                                        preprocess, Config, ModuleSetFile, []),
-    ?DEBUG("~s subdirs: ~p\n", [Dir, Dirs]),
-    [process_dir(D, UpdatedConfig, Commands) || D <- Dirs],
+            %% Get the list of modules for "any dir". This is a catch-all list of modules
+            %% that are processed in addion to modules associated with this directory
+            %% type. These any_dir modules are processed FIRST.
+            {ok, AnyDirModules} = application:get_env(rebar, any_dir_modules),
+            Modules = AnyDirModules ++ DirModules,
 
-    %% Make sure the CWD is reset properly; processing subdirs may have caused it
-    %% to change
-    ok = file:set_cwd(Dir),
+            %% Give the modules a chance to tweak config and indicate if there
+            %% are any other dirs that might need processing first.
+            {UpdatedConfig, Dirs} = acc_modules(select_modules(Modules, preprocess, []),
+                                                preprocess, Config, ModuleSetFile, []),
+            ?DEBUG("~s subdirs: ~p\n", [Dir, Dirs]),
+            [process_dir(D, UpdatedConfig, Commands) || D <- Dirs],
 
-    %% Finally, process the current working directory
-    apply_commands(Commands, Modules, UpdatedConfig, ModuleSetFile),
+            %% Make sure the CWD is reset properly; processing subdirs may have caused it
+            %% to change
+            ok = file:set_cwd(Dir),
 
-    %% Once we're all done processing, reset the code path to whatever
-    %% the parent initialized it to
-    restore_code_path(CurrentCodePath),
-    ok.
+            %% Finally, process the current working directory
+            apply_commands(Commands, Modules, UpdatedConfig, ModuleSetFile),
+
+            %% Once we're all done processing, reset the code path to whatever
+            %% the parent initialized it to
+            restore_code_path(CurrentCodePath),
+            ok
+    end.
 
 %%
 %% Given a list of module sets from rebar.app and a directory, find

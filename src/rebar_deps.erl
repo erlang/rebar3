@@ -29,13 +29,55 @@
 -include("rebar.hrl").
 
 -export([preprocess/2,
-         distclean/2]).
+         'get-deps'/2,
+         'delete-deps'/2]).
 
 %% ===================================================================
 %% Public API
 %% ===================================================================
 
 preprocess(Config, _) ->
+    DepsDir = get_deps_dir(Config),
+    Config2 = rebar_config:set(Config, deps_dir, DepsDir),
+
+    %% Check for available deps, using the list of deps specified in our config.
+    %% We use the directory from the list of tuples for deps with source information to
+    %% update our list of directories to process.
+    case catch(check_deps(rebar_config:get_local(Config, deps, []), [], DepsDir)) of
+        Deps when is_list(Deps) ->
+            %% Walk all the deps and make sure they are available on the code path,
+            %% if the application we're interested in actually exists there.
+            ok = update_deps_code_path(Deps),
+            {ok, Config2, [Dir || {Dir, _, _, _} <- Deps]};
+        {'EXIT', Reason} ->
+            ?ABORT("Error while processing dependencies: ~p\n", [Reason])
+    end.
+
+'get-deps'(Config, _) ->
+    DepsDir = get_deps_dir(Config),
+
+    %% Get a list of deps that need to be downloaded
+    case catch(check_deps(rebar_config:get_local(Config, deps, []), [], DepsDir)) of
+        Deps when is_list(Deps) ->
+            %% Now for each dependency tuple, pull it
+            [use_source(Dir, App, VsnRegex, Source) || {Dir, App, VsnRegex, Source} <- Deps],
+            ok;
+        {'EXIT', Reason} ->
+            ?ABORT("Error while processing dependencies: ~p\n", [Reason])
+    end.
+
+'delete-deps'(Config, _) ->
+    %% Delete all the deps which we downloaded (or would have caused to be
+    %% downloaded).
+    DepsDir = rebar_config:get(Config, deps_dir, rebar_utils:get_cwd()),
+    ?DEBUG("Delete deps: ~p\n", [rebar_config:get(Config, deps, [])]),
+    delete_deps(rebar_config:get_local(Config, deps, []), DepsDir).
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
+
+get_deps_dir(Config) ->
     %% Get the directory where we will place downloaded deps. Take steps
     %% to ensure that if we're doing a multi-level build, all the deps will
     %% wind up in a single directory; avoiding potential pain from having
@@ -49,50 +91,40 @@ preprocess(Config, _) ->
         AllDirs ->
             DepsDir = filename:absname(hd(lists:reverse(AllDirs)))
     end,
-
     ?DEBUG("~s: Using deps dir: ~s\n", [rebar_utils:get_cwd(), DepsDir]),
-    Config2 = rebar_config:set(Config, deps_dir, DepsDir),
+    DepsDir.
 
-    %% Process the list of local deps from the configuration
-    case catch(process_deps(rebar_config:get_local(Config, deps, []), [], DepsDir)) of
-        Dirs when is_list(Dirs) ->
-            {ok, Config2, Dirs};
-        {'EXIT', Reason} ->
-            ?ABORT("Error while processing dependencies: ~p\n", [Reason])
-    end.
+update_deps_code_path([]) ->
+    ok;
+update_deps_code_path([{AppDir, App, VsnRegex, _Source} | Rest]) ->
+    case is_app_available(App, VsnRegex, AppDir) of
+        true ->
+            code:add_patha(filename:join(AppDir, ebin));
+        false ->
+            ok
+    end,
+    update_deps_code_path(Rest).
 
-distclean(Config, _) ->
-    %% Delete all the deps which we downloaded (or would have caused to be
-    %% downloaded).
-    DepsDir = rebar_config:get(Config, deps_dir, rebar_utils:get_cwd()),
-    ?DEBUG("Delete deps: ~p\n", [rebar_config:get(Config, deps, [])]),
-    delete_deps(rebar_config:get_local(Config, deps, []), DepsDir).
-
-%% ===================================================================
-%% Internal functions
-%% ===================================================================
-
-process_deps([], Acc, _Dir) ->
+check_deps([], Acc, _Dir) ->
     Acc;
-process_deps([App | Rest], Acc, Dir) when is_atom(App) ->
+check_deps([App | Rest], Acc, Dir) when is_atom(App) ->
     require_app(App, ".*"),
-    process_deps(Rest, Acc, Dir);
-process_deps([{App, VsnRegex} | Rest], Acc, Dir) when is_atom(App) ->
+    check_deps(Rest, Acc, Dir);
+check_deps([{App, VsnRegex} | Rest], Acc, Dir) when is_atom(App) ->
     require_app(App, VsnRegex),
-    process_deps(Rest, Acc, Dir);
-process_deps([{App, VsnRegex, Source} | Rest], Acc, Dir) ->
+    check_deps(Rest, Acc, Dir);
+check_deps([{App, VsnRegex, Source} | Rest], Acc, Dir) ->
     case is_app_available(App, VsnRegex) of
         true ->
-            process_deps(Rest, Acc, Dir);
+            check_deps(Rest, Acc, Dir);
         false ->
-            %% App may not be on the code path, or the version that is doesn't
-            %% match our regex. Either way, we want to pull our revision into
-            %% the deps dir and try to use that
+            %% App is not on our code path OR the version that is available
+            %% doesn't match our regex. Return a tuple containing the target dir
+            %% and source information.
             AppDir = filename:join(Dir, App),
-            use_source(AppDir, App, VsnRegex, Source),
-            process_deps(Rest, [AppDir | Acc], Dir)
+            check_deps(Rest, [{AppDir, App, VsnRegex, Source} | Acc], Dir)
     end;
-process_deps([Other | _Rest], _Acc, _Dir) ->
+check_deps([Other | _Rest], _Acc, _Dir) ->
     ?ABORT("Invalid dependency specification ~p in ~s\n",
            [Other, rebar_utils:get_cwd()]).
 
@@ -170,6 +202,7 @@ is_app_available(App, VsnRegex, Path) ->
     end.
 
 use_source(AppDir, App, VsnRegex, Source) ->
+    ?CONSOLE("Pulling ~p from ~p\n", [App, Source]),
     use_source(AppDir, App, VsnRegex, Source, 3).
 
 use_source(_AppDir, _App, _VsnRegex, Source, 0) ->
