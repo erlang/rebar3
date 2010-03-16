@@ -110,8 +110,11 @@ create(_Config, _) ->
 %% Scan the current escript for available files and cache in pdict.
 %%
 cache_escript_files() ->
-    {ok, Files} = escript:foldl(fun(Name, _, GetBin, Acc) -> [{Name, GetBin()} | Acc] end,
-                                [], rebar_config:get_global(escript, undefined)),
+    {ok, Files} = rebar_utils:escript_foldl(
+                      fun(Name, _, GetBin, Acc) ->
+                              [{Name, GetBin()} | Acc]
+                      end,
+                      [], rebar_config:get_global(escript, undefined)),
     erlang:put(escript_files, Files).
 
 
