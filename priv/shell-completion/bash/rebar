@@ -9,8 +9,8 @@ _rebar()
     sopts="-h -c -v -f -j"
     lopts=" --help --commands --verbose --force --jobs="
     cmdsnvars="analyze build_plt check_plt clean compile \
-        create-app create-node eunit generate \
-        install int_test perf_test test \
+        create-app create-node delete-deps eunit \
+        get-deps generate install int_test perf_test test \
         case= force=1 jobs= suite= verbose=1 appid= target= template="
 
     if [[ ${cur} == --* ]] ; then

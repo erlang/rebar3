@@ -123,7 +123,7 @@ set_global_flag(Options, Flag) ->
     rebar_config:set_global(Flag, Value).
 
 %%
-%% print help
+%% print help and maybe halt execution
 %%
 print_help_maybe_halt(Options, NonOptArgs) ->
     case proplists:get_bool(help, Options) of
@@ -172,6 +172,9 @@ commands() ->
 "create      template= [var=foo,...]  Create skel based on template and vars~n"
 "create-app                           Create simple app skel~n"
 "create-node                          Create simple node skel~n"
+"~n"
+"get-deps                             Fetch dependencies~n"
+"delete-deps                          Delete fetched dependencies~n"
 "~n"
 "generate    [dump_spec=0/1]          Build release with reltool~n"
 "install     [target=]                Install build into target~n"
