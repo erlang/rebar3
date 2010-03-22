@@ -10,6 +10,7 @@
               rebar_ct,
               rebar_deps,
               rebar_dialyzer,
+              rebar_asn1_compiler,
               rebar_erlc_compiler,
               rebar_escripter,
               rebar_eunit,
@@ -51,6 +52,7 @@
          {modules, [
                     {app_dir, [
                                rebar_protobuffs_compiler,
+                               rebar_asn1_compiler,
                                rebar_erlc_compiler,
                                rebar_lfe_compiler,
                                rebar_erlydtl_compiler,
