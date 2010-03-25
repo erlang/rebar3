@@ -29,6 +29,8 @@
 -include("rebar.hrl").
 
 -export([preprocess/2,
+         compile/2,
+         'check-deps'/2,
          'get-deps'/2,
          'delete-deps'/2]).
 
@@ -49,6 +51,23 @@ preprocess(Config, _) ->
             %% if the application we're interested in actually exists there.
             ok = update_deps_code_path(Deps),
             {ok, Config2, [Dir || {Dir, _, _, _} <- Deps]};
+        {'EXIT', Reason} ->
+            ?ABORT("Error while processing dependencies: ~p\n", [Reason])
+    end.
+
+compile(Config, AppFile) ->
+    'check-deps'(Config, AppFile).
+
+'check-deps'(Config, _) ->
+    %% Get a list of deps that need to be downloaded and display them only
+    DepsDir = get_deps_dir(Config),
+    case catch(check_deps(rebar_config:get_local(Config, deps, []), [], DepsDir)) of
+        [] ->
+            ok;
+        Deps when is_list(Deps) ->
+            [?CONSOLE("Dependency not available: ~p-~p (~p)\n", [App, VsnRegex, Source]) ||
+                {_Dir, App, VsnRegex, Source} <- Deps],
+            ?FAIL;
         {'EXIT', Reason} ->
             ?ABORT("Error while processing dependencies: ~p\n", [Reason])
     end.
