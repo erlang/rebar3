@@ -41,13 +41,13 @@
 -spec compile(Config::#config{}, AppFile::string()) -> 'ok'.
 compile(Config, _AppFile) ->
     rebar_base_compiler:run(Config,
-                            rebar_config:get_list(Config, xrl_yrl_first_files, []),
+                            rebar_config:get_list(Config, xrl_first_files, []),
                             "src", ".xrl", "src", ".erl",
-                            fun compile_xrl_yrl/3),
+                            fun compile_xrl/3),
     rebar_base_compiler:run(Config,
-                            rebar_config:get_list(Config, xrl_yrl_first_files, []),
+                            rebar_config:get_list(Config, yrl_first_files, []),
                             "src", ".yrl", "src", ".erl",
-                            fun compile_xrl_yrl/3),
+                            fun compile_yrl/3),
     doterl_compile(Config, "ebin"),
     rebar_base_compiler:run(Config, rebar_config:get_list(Config, mib_first_files, []),
                             "mibs", ".mib", "priv/mibs", ".bin",
@@ -211,12 +211,24 @@ compile_mib(Source, Target, Config) ->
             ?FAIL
     end.
 
--spec compile_xrl_yrl(Source::string(), Target::string(), Config::#config{}) -> 'ok'.
-compile_xrl_yrl(Source, Target, Config) ->
-    case xrl_yrl_needs_compile(Source, Target) of
+-spec compile_xrl(Source::string(), Target::string(), Config::#config{}) -> 'ok'.
+compile_xrl(Source, Target, Config) ->
+    Opts = [{scannerfile, Target}, {return, true}
+            |rebar_config:get(Config, xrl_opts, [])],
+    compile_xrl_yrl(Source, Target, Config, Opts, leex).
+
+-spec compile_yrl(Source::string(), Target::string(), Config::#config{}) -> 'ok'.
+compile_yrl(Source, Target, Config) ->
+    Opts = [{parserfile, Target}, {return, true}
+            |rebar_config:get(Config, yrl_opts, [])],
+    compile_xrl_yrl(Source, Target, Config, Opts, yecc).
+
+-spec compile_xrl_yrl(Source::string(), Target::string(), Config::#config{},
+                      Opts::list(), Mod::atom()) -> 'ok'.
+compile_xrl_yrl(Source, Target, Config, Opts, Mod) ->
+    case needs_compile(Source, Target, []) of
         true ->
-            {match, [Ext]} = re:run(Source, "[x|y]rl$", [{capture, first, list}]),
-            case compile_xrl_yrl1(Source, Target, Config, Ext) of
+            case Mod:file(Source, Opts) of
                 {ok, _, []} ->
                     ok;
                 {ok, _, _Warnings} ->
@@ -232,19 +244,6 @@ compile_xrl_yrl(Source, Target, Config) ->
         false ->
             skipped
     end.
-
-compile_xrl_yrl1(Source, Target, Config, "yrl") ->
-    Opts = [{parserfile, Target}, {return, true}
-            |rebar_config:get(Config, yrl_opts, [])],
-    yecc:file(Source, Opts);
-compile_xrl_yrl1(Source, Target, Config, "xrl") ->
-    Opts = [{scannerfile, Target}, {return, true}
-            |rebar_config:get(Config, xrl_opts, [])],
-    leex:file(Source, Opts).
-
--spec xrl_yrl_needs_compile(Source::string(), Target::string()) -> boolean().
-xrl_yrl_needs_compile(Source, Target) ->
-    filelib:last_modified(Target) < filelib:last_modified(Source).
 
 gather_src([], Srcs) ->
     Srcs;
