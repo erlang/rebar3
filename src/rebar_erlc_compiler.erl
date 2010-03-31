@@ -40,9 +40,14 @@
 
 -spec compile(Config::#config{}, AppFile::string()) -> 'ok'.
 compile(Config, _AppFile) ->
-    rebar_base_compiler:run(Config, rebar_config:get_list(Config, yrl_first_files, []),
+    rebar_base_compiler:run(Config,
+                            rebar_config:get_list(Config, xrl_yrl_first_files, []),
+                            "src", ".xrl", "src", ".erl",
+                            fun compile_xrl_yrl/3),
+    rebar_base_compiler:run(Config,
+                            rebar_config:get_list(Config, xrl_yrl_first_files, []),
                             "src", ".yrl", "src", ".erl",
-                            fun compile_yrl/3),
+                            fun compile_xrl_yrl/3),
     doterl_compile(Config, "ebin"),
     rebar_base_compiler:run(Config, rebar_config:get_list(Config, mib_first_files, []),
                             "mibs", ".mib", "priv/mibs", ".bin",
@@ -55,9 +60,9 @@ clean(_Config, _AppFile) ->
     %%       much slower.
     ok = rebar_file_utils:rm_rf("ebin/*.beam priv/mibs/*.bin"),
 
-    YrlFiles = rebar_utils:find_files("src", "^.*\\.yrl\$"),
+    YrlFiles = rebar_utils:find_files("src", "^.*\\.[x|y]rl\$"),
     rebar_file_utils:delete_each(
-      [ binary_to_list(iolist_to_binary(re:replace(F, "\\.yrl$", ".erl")))
+      [ binary_to_list(iolist_to_binary(re:replace(F, "\\.[x|y]rl$", ".erl")))
         || F <- YrlFiles  ]),
 
     %% Erlang compilation is recursive, so it's possible that we have a nested
@@ -206,13 +211,12 @@ compile_mib(Source, Target, Config) ->
             ?FAIL
     end.
 
--spec compile_yrl(Source::string(), Target::string(), Config::#config{}) -> 'ok'.
-compile_yrl(Source, Target, Config) ->
-    case yrl_needs_compile(Source, Target) of
+-spec compile_xrl_yrl(Source::string(), Target::string(), Config::#config{}) -> 'ok'.
+compile_xrl_yrl(Source, Target, Config) ->
+    case xrl_yrl_needs_compile(Source, Target) of
         true ->
-            Opts = [{parserfile, Target}, {return, true}
-                    |rebar_config:get(Config, yrl_opts, [])],
-            case yecc:file(Source, Opts) of
+            {match, [Ext]} = re:run(Source, "[x|y]rl$", [{capture, first, list}]),
+            case compile_xrl_yrl1(Source, Target, Config, Ext) of
                 {ok, _, []} ->
                     ok;
                 {ok, _, _Warnings} ->
@@ -229,8 +233,17 @@ compile_yrl(Source, Target, Config) ->
             skipped
     end.
 
--spec yrl_needs_compile(Source::string(), Target::string()) -> boolean().
-yrl_needs_compile(Source, Target) ->
+compile_xrl_yrl1(Source, Target, Config, "yrl") ->
+    Opts = [{parserfile, Target}, {return, true}
+            |rebar_config:get(Config, yrl_opts, [])],
+    yecc:file(Source, Opts);
+compile_xrl_yrl1(Source, Target, Config, "xrl") ->
+    Opts = [{scannerfile, Target}, {return, true}
+            |rebar_config:get(Config, xrl_opts, [])],
+    leex:file(Source, Opts).
+
+-spec xrl_yrl_needs_compile(Source::string(), Target::string()) -> boolean().
+xrl_yrl_needs_compile(Source, Target) ->
     filelib:last_modified(Target) < filelib:last_modified(Source).
 
 gather_src([], Srcs) ->
