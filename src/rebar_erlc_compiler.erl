@@ -40,6 +40,9 @@
 
 -spec compile(Config::#config{}, AppFile::string()) -> 'ok'.
 compile(Config, _AppFile) ->
+    rebar_base_compiler:run(Config, rebar_config:get_list(Config, yrl_first_files, []),
+                            "src", ".yrl", "src", ".erl",
+                            fun compile_yrl/3),
     doterl_compile(Config, "ebin"),
     rebar_base_compiler:run(Config, rebar_config:get_list(Config, mib_first_files, []),
                             "mibs", ".mib", "priv/mibs", ".bin",
@@ -51,6 +54,11 @@ clean(_Config, _AppFile) ->
     %%       the dir structure and delete each file; however it would also
     %%       much slower.
     ok = rebar_file_utils:rm_rf("ebin/*.beam priv/mibs/*.bin"),
+
+    YrlFiles = rebar_utils:find_files("src", "^.*\\.yrl\$"),
+    rebar_file_utils:delete_each(
+      [ binary_to_list(iolist_to_binary(re:replace(F, "\\.yrl$", ".erl")))
+        || F <- YrlFiles  ]),
 
     %% Erlang compilation is recursive, so it's possible that we have a nested
     %% directory structure in ebin with .beam files within. As such, we want
@@ -197,6 +205,33 @@ compile_mib(Source, Target, Config) ->
         {error, compilation_failed} ->
             ?FAIL
     end.
+
+-spec compile_yrl(Source::string(), Target::string(), Config::#config{}) -> 'ok'.
+compile_yrl(Source, Target, Config) ->
+    case yrl_needs_compile(Source, Target) of
+        true ->
+            Opts = [{parserfile, Target}, {return, true}
+                    |rebar_config:get(Config, yrl_opts, [])],
+            case yecc:file(Source, Opts) of
+                {ok, _, []} ->
+                    ok;
+                {ok, _, _Warnings} ->
+                    case lists:member(fail_on_warnings, Config) of
+                        true ->
+                            ?FAIL;
+                        false ->
+                            ok
+                    end;
+                _X ->
+                    ?FAIL
+            end;
+        false ->
+            skipped
+    end.
+
+-spec yrl_needs_compile(Source::string(), Target::string()) -> boolean().
+yrl_needs_compile(Source, Target) ->
+    filelib:last_modified(Target) < filelib:last_modified(Source).
 
 gather_src([], Srcs) ->
     Srcs;
