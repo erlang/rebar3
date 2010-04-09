@@ -173,6 +173,7 @@ commands() ->
 "create-app                           Create simple app skel~n"
 "create-node                          Create simple node skel~n"
 "~n"
+"check-deps                           Display to be fetched dependencies~n"
 "get-deps                             Fetch dependencies~n"
 "delete-deps                          Delete fetched dependencies~n"
 "~n"
