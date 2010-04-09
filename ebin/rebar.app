@@ -27,6 +27,7 @@
               rebar_subdirs,
               rebar_templater,
               rebar_utils,
+              rebar_xref,
               getopt,
               mustache ]},
   {registered, []},
@@ -61,7 +62,8 @@
                                rebar_ct,
                                rebar_eunit,
                                rebar_dialyzer,
-                               rebar_escripter
+                               rebar_escripter,
+                               rebar_xref
                               ]},
 
                     {rel_dir, [
