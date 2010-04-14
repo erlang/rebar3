@@ -17,7 +17,6 @@ main(Args) ->
 
     %% Compile all src/*.erl to ebin
     case make:files(filelib:wildcard("src/*.erl"), [{outdir, "ebin"}, {i, "include"},
-                                                    debug_info,
                                                     {d, 'BUILD_TIME', Built}]) of
         up_to_date ->
             ok;
