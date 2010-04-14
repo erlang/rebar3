@@ -250,8 +250,8 @@ use_source(AppDir, App, VsnRegex, Source, Count) ->
 
 download_source(AppDir, {hg, Url, Rev}) ->
     ok = filelib:ensure_dir(AppDir),
-    Cmd = ?FMT("hg clone -u ~s ~s", [Rev, Url]),
-    rebar_utils:sh(Cmd, [], filename:dirname(AppDir));
+    rebar_utils:sh(?FMT("hg clone -U ~s", [Url]), [], filename:dirname(AppDir)),
+    rebar_utils:sh(?FMT("hg update ~s", [Rev]), [], AppDir);
 download_source(AppDir, {git, Url, Rev}) ->
     ok = filelib:ensure_dir(AppDir),
     rebar_utils:sh(?FMT("git clone -n ~s", [Url]), [], filename:dirname(AppDir)),
@@ -293,7 +293,7 @@ scm_client_vsn(Path, VsnArg, VsnRegex) ->
             false
     end.
 
-required_scm_client_vsn(hg)  -> {1, 4};
+required_scm_client_vsn(hg)  -> {1, 3};
 required_scm_client_vsn(git) -> {1, 6};
 required_scm_client_vsn(bzr) -> {2, 0};
 required_scm_client_vsn(svn) -> {1, 6}.
