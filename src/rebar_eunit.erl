@@ -98,6 +98,10 @@ clean(_Config, _File) ->
 %% Internal functions
 %% ===================================================================
 
+eunit_dir() ->
+    {ok, Cwd} = file:get_cwd(),
+    filename:join(Cwd, ?EUNIT_DIR).
+
 perform_eunit(Config, Modules) ->
     %% suite defined, so only specify the module that relates to the
     %% suite (if any)
@@ -118,7 +122,7 @@ set_proc_env() ->
     %% Save current code path and then prefix ?EUNIT_DIR on it so that our modules
     %% are found there
     CodePath = code:get_path(),
-    true = code:add_patha(?EUNIT_DIR),
+    true = code:add_patha(eunit_dir()),
 
     %% Move down into ?EUNIT_DIR while we run tests so any generated files
     %% are created there (versus in the source dir)
