@@ -264,6 +264,7 @@ process_dir(Dir, ParentConfig, Commands) ->
             ok = file:set_cwd(Dir),
 
             %% Finally, process the current working directory
+            ?DEBUG("Commands: ~p Modules: ~p\n", [Commands, Modules]),
             apply_commands(Commands, Modules, UpdatedConfig, ModuleSetFile),
 
             %% Once we're all done processing, reset the code path to whatever
@@ -306,6 +307,8 @@ apply_commands([], _Modules, _Config, _ModuleFile) ->
 apply_commands([Command | Rest], Modules, Config, ModuleFile) ->
     case select_modules(Modules, Command, []) of
         [] ->
+            ?CONSOLE("WARNING: ~p command does not apply to directory ~s\n",
+                     [Command, rebar_utils:get_cwd()]),
             apply_commands(Rest, Modules, Config, ModuleFile);
         TargetModules ->
             %% Provide some info on where we are
