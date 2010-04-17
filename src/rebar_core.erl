@@ -161,31 +161,36 @@ help() ->
 %% print known commands
 %%
 commands() ->
-    io:format(<<
-"analyze                              Analyze with Dialyzer~n"
-"build_plt                            Build Dialyzer PLT~n"
-"check_plt                            Check Dialyzer PLT~n"
-"~n"
-"clean                                Clean~n"
-"compile                              Compile sources~n"
-"~n"
-"create      template= [var=foo,...]  Create skel based on template and vars~n"
-"create-app                           Create simple app skel~n"
-"create-node                          Create simple node skel~n"
-"~n"
-"check-deps                           Display to be fetched dependencies~n"
-"get-deps                             Fetch dependencies~n"
-"delete-deps                          Delete fetched dependencies~n"
-"~n"
-"generate    [dump_spec=0/1]          Build release with reltool~n"
-"install     [target=]                Install build into target~n"
-"~n"
-"eunit       [suite=foo]              Run eunit [test/foo_tests.erl] tests~n"
-"~n"
-"int_test    [suite=] [case=]         Run ct suites in ./int_test~n"
-"perf_test   [suite=] [case=]         Run ct suites in ./perf_test~n"
-"test        [suite=] [case=]         Run ct suites in ./test~n"
->>).
+    S = <<"
+analyze                              Analyze with Dialyzer
+build_plt                            Build Dialyzer PLT
+check_plt                            Check Dialyzer PLT
+
+clean                                Clean
+compile                              Compile sources
+
+create      template= [var=foo,...]  Create skel based on template and vars
+create-app                           Create simple app skel
+create-node                          Create simple node skel
+
+check-deps                           Display to be fetched dependencies
+get-deps                             Fetch dependencies
+delete-deps                          Delete fetched dependencies
+
+generate    [dump_spec=0/1]          Build release with reltool
+install     [target=]                Install build into target
+
+eunit       [suite=foo]              Run eunit [test/foo_tests.erl] tests
+
+int_test    [suite=] [case=]         Run ct suites in ./int_test
+perf_test   [suite=] [case=]         Run ct suites in ./perf_test
+test        [suite=] [case=]         Run ct suites in ./test
+
+xref                                 Run cross reference analysis
+">>,
+    io:put_chars(S),
+    %% workaround to delay exit until all output is written
+    timer:sleep(300).
 
 %%
 %% options accepted via getopt
