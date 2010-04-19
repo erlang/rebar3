@@ -294,7 +294,7 @@ scm_client_vsn(Path, VsnArg, VsnRegex) ->
     end.
 
 required_scm_client_vsn(hg)  -> {1, 1};
-required_scm_client_vsn(git) -> {1, 6};
+required_scm_client_vsn(git) -> {1, 5};
 required_scm_client_vsn(bzr) -> {2, 0};
 required_scm_client_vsn(svn) -> {1, 6}.
 
