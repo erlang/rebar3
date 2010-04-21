@@ -99,8 +99,7 @@ clean(_Config, _File) ->
 %% ===================================================================
 
 eunit_dir() ->
-    {ok, Cwd} = file:get_cwd(),
-    filename:join(Cwd, ?EUNIT_DIR).
+    filename:join(rebar_utils:get_cwd(), ?EUNIT_DIR).
 
 perform_eunit(Config, Modules) ->
     %% suite defined, so only specify the module that relates to the
