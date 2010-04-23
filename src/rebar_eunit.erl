@@ -63,6 +63,12 @@ eunit(Config, _File) ->
     %% {eunit_compile_opts, [{src_dirs, ["test"]}]}
     TestErls = rebar_utils:find_files("test", ".*\\.erl\$"),
 
+    %% Copy source files to eunit dir for cover in case they are not directly
+    %% in src but in a subdirectory of src. Cover only looks in cwd and ../src
+    %% for source files.
+    SrcErls = rebar_utils:find_files("src", ".*\\.erl\$"),
+    ok = rebar_file_utils:cp_r(SrcErls, ?EUNIT_DIR),
+
     %% Compile erlang code to ?EUNIT_DIR, using a tweaked config
     %% with appropriate defines for eunit, and include all the test modules
     %% as well.
