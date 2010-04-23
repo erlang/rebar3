@@ -74,7 +74,7 @@ eunit(Config, _File) ->
     %% with that scan and causes any cover compilation info to be lost.
     %% Filter out "*_tests" modules so eunit won't doubly run them and
     %% so cover only calculates coverage on production code.
-    BeamFiles = [N || N <- rebar_utils:beams(?EUNIT_DIR), 
+    BeamFiles = [N || N <- rebar_utils:beams(?EUNIT_DIR),
                       string:str(N, "_tests.beam") =:= 0],
     Modules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- BeamFiles],
 
@@ -99,8 +99,7 @@ clean(_Config, _File) ->
 %% ===================================================================
 
 eunit_dir() ->
-    {ok, Cwd} = file:get_cwd(),
-    filename:join(Cwd, ?EUNIT_DIR).
+    filename:join(rebar_utils:get_cwd(), ?EUNIT_DIR).
 
 perform_eunit(Config, Modules) ->
     %% suite defined, so only specify the module that relates to the
