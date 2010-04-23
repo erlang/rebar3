@@ -48,6 +48,10 @@ xref(Config, _) ->
                             {verbose, rebar_config:is_verbose()}]),
     {ok, _} = xref:add_directory(xref, "ebin"),
 
+    %% Save the code path prior to doing anything
+    OrigPath = code:get_path(),
+    code:add_path(filename:join(rebar_utils:get_cwd(), "ebin")),
+
     %% Get list of xref checks we want to run
     XrefChecks = rebar_config:get(Config, xref_checks, [exports_not_used,
                                                         undefined_function_calls]),
@@ -68,6 +72,9 @@ xref(Config, _) ->
             ok
     end,
 
+    %% Restore the original code path
+    code:set_path(OrigPath),
+
     ok.
 
 foobar() ->
@@ -87,7 +94,6 @@ check_exports_not_used(_Config) ->
 
 check_undefined_function_calls(_Config) ->
     {ok, UndefinedCalls0} = xref:analyze(xref, undefined_function_calls),
-
     UndefinedCalls = [{find_mfa_source(Caller), format_fa(Caller), format_mfa(Target)} ||
                          {Caller, Target} <- UndefinedCalls0],
     [?CONSOLE("~s:~w: Warning ~s calls undefined function ~s\n",
@@ -98,7 +104,7 @@ check_undefined_function_calls(_Config) ->
 
 code_path() ->
     [P || P <- code:get_path(),
-          filelib:is_dir(P)].
+          filelib:is_dir(P)] ++ [filename:join(rebar_utils:get_cwd(), "ebin")].
 
 %%
 %% Ignore behaviour functions, and explicitly marked functions
@@ -182,3 +188,4 @@ find_mfa_source({M, F, A}) ->
     Source = abstract_code_source_file(Code),
     Line = abstract_code_function_line(Code, F, A),
     {Source, Line}.
+
