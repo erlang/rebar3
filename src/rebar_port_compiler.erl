@@ -300,7 +300,8 @@ os_env() ->
     [list_to_tuple(re:split(S, "=", [{return, list}, {parts, 2}])) || S <- os:getenv()].
 
 default_env() ->
-    [{"CC", "gcc"},
+    [
+     {"CC", "gcc"},
      {"CXX", "g++"},
      {"ERL_CFLAGS", lists:concat([" -I", code:lib_dir(erl_interface, include),
                                   " -I", filename:join(erts_dir(), include),
@@ -311,7 +312,17 @@ default_env() ->
      {"DRV_LDFLAGS", "-shared $ERL_LDFLAGS"},
      {"darwin", "DRV_LDFLAGS", "-bundle -flat_namespace -undefined suppress $ERL_LDFLAGS"},
      {"ERLANG_ARCH", integer_to_list(8 * erlang:system_info(wordsize))},
-     {"ERLANG_TARGET", rebar_utils:get_arch()}].
+     {"ERLANG_TARGET", rebar_utils:get_arch()},
+
+     {"solaris.*-64$", "CFLAGS", "-D_REENTRANT -m64"}, % Solaris specific flags
+     {"solaris.*-64$", "LDFLAGS", "-m64"},
+
+     {"darwin9.*-64$", "CFLAGS", "-m64"}, % OS X Leopard flags for 64-bit
+     {"darwin9.*-64$", "LDFLAGS", "-arch x86_64"},
+
+     {"darwin10.*-32", "CFLAGS", "-m32"}, % OS X Snow Leopard flags for 32-bit
+     {"darwin10.*-32", "LDFLAGS", "-arch i386"}
+    ].
 
 
 
