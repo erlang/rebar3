@@ -325,12 +325,9 @@ so_name(Config, AppFile) ->
                    undefined ->
                        %% Get the app name, which we'll use to
                        %% generate the linked port driver name
-                       case rebar_app_utils:load_app_file(AppFile) of
-                           {ok, AppName, _} ->
-                               lists:concat([AppName, "_drv.so"]);
-                           error ->
-                               ?FAIL
-                       end;
+                       AppName = rebar_app_utils:app_name(AppFile),
+                       lists:concat([AppName, "_drv.so"]);
+
                    Soname ->
                        Soname
                end,

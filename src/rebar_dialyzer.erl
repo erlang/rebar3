@@ -85,9 +85,8 @@ analyze(Config, File) ->
 build_plt(Config, File) ->
     Plt = plt_path(Config, File),
 
-    {ok, _AppName, AppData} = rebar_app_utils:load_app_file(File),
-    Apps = proplists:get_value(applications, AppData),
-    
+    Apps = rebar_app_utils:app_applications(File),
+
     Warnings = dialyzer:run([{analysis_type, plt_build},
                              {files_rec, app_dirs(Apps)},
                              {output_plt, Plt}]),
@@ -140,7 +139,7 @@ output_warnings(Warnings) ->
 %% @spec plt_path(Config::#config{}, File::string()) -> string()
 -spec(plt_path(Config::#config{}, File::string()) -> string()).
 plt_path(Config, File) ->
-    {ok, AppName, _AppData} = rebar_app_utils:load_app_file(File),
+    AppName = rebar_app_utils:app_name(File),
     DialyzerOpts = rebar_config:get(Config, dialyzer_opts, []),
     case proplists:get_value(plt, DialyzerOpts) of
         undefined ->
