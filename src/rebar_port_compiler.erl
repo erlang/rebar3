@@ -39,6 +39,9 @@
 %%
 %% * port_sources - Erlang list of files and/or wildcard strings to be compiled
 %%
+%% * so_specs  - Erlang list of tuples of the form {"priv/so_name.so", ["c_src/object_file_name.o"]} useful for
+%%               building multiple *.so files.
+%%
 %% * port_envs - Erlang list of key/value pairs which will control the environment when
 %%               running the compiler and linker. By default, the following variables
 %%               are defined:
@@ -92,19 +95,21 @@ compile(Config, AppFile) ->
             {NewBins, ExistingBins} = compile_each(Sources, Config, Env, [], []),
 
             %% Construct the driver name and make sure priv/ exists
-            SoName = so_name(Config, AppFile),
-            ok = filelib:ensure_dir(SoName),
+            SoSpecs = so_specs(Config, AppFile, NewBins ++ ExistingBins),
+            ?INFO("Using specs ~p\n", [SoSpecs]),
+            lists:foreach(fun({SoName,_}) -> ok = filelib:ensure_dir(SoName) end, SoSpecs),
 
             %% Only relink if necessary, given the SoName and list of new binaries
-            case needs_link(SoName, NewBins) of
-                true ->
-                    AllBins = string:join(NewBins ++ ExistingBins, " "),
+            lists:foreach(fun({SoName,Bins}) ->
+                case needs_link(SoName, sets:to_list(sets:intersection([sets:from_list(Bins),sets:from_list(NewBins)]))) of
+                  true ->
                     rebar_utils:sh_failfast(?FMT("$CC ~s $LDFLAGS $DRV_LDFLAGS -o ~s",
-                                                 [AllBins, SoName]), Env);
-                false ->
+                                                  [string:join(Bins, " "), SoName]), Env);
+                  false ->
                     ?INFO("Skipping relink of ~s\n", [SoName]),
                     ok
-            end
+                end
+              end, SoSpecs)
     end.
 
 clean(Config, AppFile) ->
@@ -113,7 +118,7 @@ clean(Config, AppFile) ->
     rebar_file_utils:delete_each([source_to_bin(S) || S <- Sources]),
 
     %% Delete the .so file
-    rebar_file_utils:delete_each([so_name(Config, AppFile)]),
+    rebar_file_utils:delete_each(lists:map(fun({SoName,_}) -> SoName end, so_specs(Config, AppFile, expand_objects(Sources)))),
 
     %% Run the cleanup script, if it exists
     run_cleanup_hook(Config).
@@ -130,6 +135,11 @@ expand_sources([], Acc) ->
 expand_sources([Spec | Rest], Acc) ->
     Acc2 = filelib:wildcard(Spec) ++ Acc,
     expand_sources(Rest, Acc2).
+    
+expand_objects(Sources) ->
+  lists:map(fun(File) ->
+      filename:join([filename:dirname(File),filename:basename(File) ++ ".o"])
+    end, Sources).
 
 run_precompile_hook(Config, Env) ->
     case rebar_config:get(Config, port_pre_script, undefined) of
@@ -319,21 +329,19 @@ source_to_bin(Source) ->
     Ext = filename:extension(Source),
     filename:rootname(Source, Ext) ++ ".o".
 
-so_name(Config, AppFile) ->
+so_specs(Config, AppFile, Bins) ->
     %% Check config to see if a custom so_name has been specified
-    PortName = case rebar_config:get(Config, so_name, undefined) of
+    ?INFO("config ~p\n", [Config]),
+    case rebar_config:get(Config, so_specs, undefined) of
                    undefined ->
                        %% Get the app name, which we'll use to
                        %% generate the linked port driver name
                        case rebar_app_utils:load_app_file(AppFile) of
                            {ok, AppName, _} ->
-                               lists:concat([AppName, "_drv.so"]);
+                               SoName = ?FMT("priv/~s", [lists:concat([AppName, "_drv.so"])]),
+                               [{SoName, Bins}];
                            error ->
                                ?FAIL
                        end;
-                   Soname ->
-                       Soname
-               end,
-
-    %% Construct the driver name
-    ?FMT("priv/~s", [PortName]).
+                   SoSpecs -> SoSpecs
+               end.
