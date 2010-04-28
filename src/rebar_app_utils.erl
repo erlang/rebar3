@@ -85,11 +85,17 @@ app_vsn(AppFile) ->
 %% ===================================================================
 
 load_app_file(Filename) ->
-    case file:consult(Filename) of
-        {ok, [{application, AppName, AppData}]} ->
-            {ok, AppName, AppData};
-        {error, Reason} ->
-            {error, Reason};
-        Other ->
-            {error, {unexpected_terms, Other}}
+    case erlang:get({app_file, Filename}) of
+        undefined ->
+            case file:consult(Filename) of
+                {ok, [{application, AppName, AppData}]} ->
+                    erlang:put({app_file, Filename}, {AppName, AppData}),
+                    {ok, AppName, AppData};
+                {error, Reason} ->
+                    {error, Reason};
+                Other ->
+                    {error, {unexpected_terms, Other}}
+            end;
+        {AppName, AppData} ->
+            {ok, AppName, AppData}
     end.
