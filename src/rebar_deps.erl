@@ -195,9 +195,9 @@ is_app_available(App, VsnRegex) ->
 is_app_available(App, VsnRegex, Path) ->
     case rebar_app_utils:is_app_dir(Path) of
         {true, AppFile} ->
-            case rebar_app_utils:load_app_file(AppFile) of
-                {ok, App, AppData} ->
-                    {vsn, Vsn} = lists:keyfind(vsn, 1, AppData),
+            case rebar_app_utils:app_name(AppFile) of
+                App ->
+                    Vsn = rebar_app_utils:app_vsn(AppFile),
                     ?INFO("Looking for ~s-~s ; found ~s-~s at ~s\n",
                           [App, VsnRegex, App, Vsn, Path]),
                     case re:run(Vsn, VsnRegex, [{capture, none}]) of
@@ -208,11 +208,9 @@ is_app_available(App, VsnRegex, Path) ->
                                   [AppFile, Vsn, VsnRegex]),
                             false
                     end;
-                {ok, OtherApp, _} ->
+                OtherApp ->
                     ?WARN("~s has application id ~p; expected ~p\n", [AppFile, OtherApp, App]),
-                    false;
-                {error, Reason} ->
-                    ?ABORT("Failed to parse ~s: ~p\n", [AppFile, Reason])
+                    false
             end;
         false ->
             ?WARN("Expected ~s to be an app dir (containing ebin/*.app), but no .app found.\n",

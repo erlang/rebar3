@@ -27,7 +27,11 @@
 -module(rebar_app_utils).
 
 -export([is_app_dir/0, is_app_dir/1,
-         load_app_file/1]).
+         app_name/1,
+         app_applications/1,
+         app_vsn/1]).
+
+-export([load_app_file/1]). % TEMPORARY
 
 -include("rebar.hrl").
 
@@ -47,14 +51,51 @@ is_app_dir(Dir) ->
             false
     end.
 
-load_app_file(Filename) ->
-    case file:consult(Filename) of
-        {ok, [{application, AppName, AppData}]} ->
-            {ok, AppName, AppData};
+app_name(AppFile) ->
+    case load_app_file(AppFile) of
+        {ok, AppName, _} ->
+            AppName;
         {error, Reason} ->
-            ?ERROR("Failed to load app file from ~s: ~p\n", [Filename, Reason]),
-            ?FAIL;
-        Other ->
-            ?ERROR("Unexpected terms from app file ~s: ~p\n", [Filename, Other]),
-            ?FAIL
+            ?ABORT("Failed to extract name from ~s: ~p\n",
+                   [AppFile, Reason])
+    end.
+
+app_applications(AppFile) ->
+    case load_app_file(AppFile) of
+        {ok, _, AppInfo} ->
+            proplists:get_value(applications, AppInfo);
+        {error, Reason} ->
+            ?ABORT("Failed to extract applications from ~s: ~p\n",
+                   [AppFile, Reason])
+    end.
+
+app_vsn(AppFile) ->
+    case load_app_file(AppFile) of
+        {ok, _, AppInfo} ->
+            proplists:get_value(vsn, AppInfo);
+        {error, Reason} ->
+            ?ABORT("Failed to extract vsn from ~s: ~p\n",
+                   [AppFile, Reason])
+    end.
+
+
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
+
+load_app_file(Filename) ->
+    case erlang:get({app_file, Filename}) of
+        undefined ->
+            case file:consult(Filename) of
+                {ok, [{application, AppName, AppData}]} ->
+                    erlang:put({app_file, Filename}, {AppName, AppData}),
+                    {ok, AppName, AppData};
+                {error, Reason} ->
+                    {error, Reason};
+                Other ->
+                    {error, {unexpected_terms, Other}}
+            end;
+        {AppName, AppData} ->
+            {ok, AppName, AppData}
     end.
