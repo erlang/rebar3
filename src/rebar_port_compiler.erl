@@ -325,12 +325,15 @@ default_env() ->
      {"ERLANG_TARGET", rebar_utils:get_arch()},
 
      {"solaris.*-64$", "CFLAGS", "-D_REENTRANT -m64"}, % Solaris specific flags
+     {"solaris.*-64$", "CXXFLAGS", "-D_REENTRANT -m64"},
      {"solaris.*-64$", "LDFLAGS", "-m64"},
 
      {"darwin9.*-64$", "CFLAGS", "-m64"}, % OS X Leopard flags for 64-bit
+     {"darwin9.*-64$", "CXXFLAGS", "-m64"},
      {"darwin9.*-64$", "LDFLAGS", "-arch x86_64"},
 
      {"darwin10.*-32", "CFLAGS", "-m32"}, % OS X Snow Leopard flags for 32-bit
+     {"darwin10.*-32", "CXXFLAGS", "-m32"},
      {"darwin10.*-32", "LDFLAGS", "-arch i386"}
     ].
 
