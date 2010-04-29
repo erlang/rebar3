@@ -50,7 +50,13 @@ preprocess(Config, _) ->
             %% Walk all the deps and make sure they are available on the code path,
             %% if the application we're interested in actually exists there.
             ok = update_deps_code_path(Deps),
-            {ok, Config2, [Dir || {Dir, _, _, _} <- Deps]};
+            DepDirs = case rebar_config:get_global(skip_deps, false) of
+                          false ->
+                              [Dir || {Dir, _, _, _} <- Deps];
+                          _Specified ->
+                              []
+                      end,
+            {ok, Config2, DepDirs};
         {'EXIT', Reason} ->
             ?ABORT("Error while processing dependencies: ~p\n", [Reason])
     end.
