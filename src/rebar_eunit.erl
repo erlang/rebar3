@@ -67,7 +67,7 @@ eunit(Config, _File) ->
     %% in src but in a subdirectory of src. Cover only looks in cwd and ../src
     %% for source files.
     SrcErls = rebar_utils:find_files("src", ".*\\.erl\$"),
-    ok = rebar_file_utils:cp_r(SrcErls, ?EUNIT_DIR),
+    ok = rebar_file_utils:cp_r(SrcErls ++ TestErls, ?EUNIT_DIR),
 
     %% Compile erlang code to ?EUNIT_DIR, using a tweaked config
     %% with appropriate defines for eunit, and include all the test modules
