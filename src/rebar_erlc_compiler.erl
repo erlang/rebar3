@@ -38,6 +38,22 @@
 %% Public API
 %% ===================================================================
 
+%% Supported configuration variables:
+%%
+%% * erl_opts - Erlang list of options passed to compile:file/2
+%%              It is also possible to specify platform specific
+%%              options by specifying a triplet where the first string
+%%              is a regex that is checked against Erlang's system
+%%              architecture string. E.g. to define HAVE_SENDFILE only
+%%              on systems with sendfile() and define BACKLOG on
+%%              Linux/FreeBSD as 128 do:
+%%              {erl_opts, [{platform_define,
+%%                           "(linux|solaris|freebsd|darwin)",
+%%                           'HAVE_SENDFILE'},
+%%                          {platform_define, "(linux|freebsd)"
+%%                           'BACKLOG', 128}]}.
+%%
+
 -spec compile(Config::#config{}, AppFile::string()) -> 'ok'.
 compile(Config, _AppFile) ->
     rebar_base_compiler:run(Config,
@@ -85,7 +101,8 @@ doterl_compile(Config, OutDir) ->
 
 doterl_compile(Config, OutDir, MoreSources) ->
     FirstErls = rebar_config:get_list(Config, erl_first_files, []),
-    ErlOpts = rebar_config:get(Config, erl_opts, []),
+    ErlOpts = filter_defines(rebar_config:get(Config, erl_opts, []), []),
+    ?DEBUG("erl_opts ~p~n",[ErlOpts]),
     %% Support the src_dirs option allowing multiple directories to
     %% contain erlang source. This might be used, for example, should eunit tests be
     %% separated from the core application source.
@@ -103,7 +120,9 @@ doterl_compile(Config, OutDir, MoreSources) ->
     CurrPath = code:get_path(),
     code:add_path("ebin"),
     rebar_base_compiler:run(Config, FirstErls, SortedRestErls,
-                            fun(S, C) -> internal_erl_compile(S, C, OutDir) end),
+                            fun(S, C) -> internal_erl_compile(S, C, OutDir,
+                                                              ErlOpts)
+                            end),
     code:set_path(CurrPath),
     ok.
 
@@ -166,8 +185,9 @@ needs_compile(Source, Target, Hrls) ->
     lists:any(fun(I) -> TargetLastMod < filelib:last_modified(I) end,
               [Source] ++ Hrls).
 
--spec internal_erl_compile(Source::string(), Config::#config{}, Outdir::string()) -> 'ok' | 'skipped'.
-internal_erl_compile(Source, Config, Outdir) ->
+-spec internal_erl_compile(Source::string(), Config::#config{},
+                           Outdir::string(), ErlOpts::list()) -> 'ok' | 'skipped'.
+internal_erl_compile(Source, Config, Outdir, ErlOpts) ->
     %% Determine the target name and includes list by inspecting the source file
     {Module, Hrls} = inspect(Source, include_path(Source, Config)),
 
@@ -180,7 +200,7 @@ internal_erl_compile(Source, Config, Outdir) ->
     case needs_compile(Source, Target, Hrls) of
         true ->
             Opts = [{i, "include"}, {outdir, filename:dirname(Target)}, report, return] ++
-                rebar_config:get(Config, erl_opts, []),
+                ErlOpts,
             case compile:file(Source, Opts) of
                 {ok, _, []} ->
                     ok;
@@ -294,3 +314,27 @@ compile_priority(File) ->
 
             lists:foldl(F, 10, Trees)
     end.
+
+%%
+%% Filter a list of env vars such that only those which match the provided
+%% architecture regex (or do not have a regex) are returned.
+%%
+-spec filter_defines(ErlOpts::list(),Acc::list()) -> list().
+filter_defines([], Acc) ->
+    lists:reverse(Acc);
+filter_defines([{platform_define, ArchRegex, Key} | Rest], Acc) ->
+    case rebar_utils:is_arch(ArchRegex) of
+        true ->
+            filter_defines(Rest, [{d, Key} | Acc]);
+        false ->
+            filter_defines(Rest, Acc)
+    end;
+filter_defines([{platform_define, ArchRegex, Key, Value} | Rest], Acc) ->
+    case rebar_utils:is_arch(ArchRegex) of
+        true ->
+            filter_defines(Rest, [{d, Key, Value} | Acc]);
+        false ->
+            filter_defines(Rest, Acc)
+    end;
+filter_defines([Opt | Rest], Acc) ->
+    filter_defines(Rest, [Opt | Acc]).
