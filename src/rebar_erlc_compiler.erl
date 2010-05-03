@@ -316,8 +316,8 @@ compile_priority(File) ->
     end.
 
 %%
-%% Filter a list of env vars such that only those which match the provided
-%% architecture regex (or do not have a regex) are returned.
+%% Filter a list of erl_opts platform_define options such that only
+%% those which match the provided architecture regex are returned.
 %%
 -spec filter_defines(ErlOpts::list(),Acc::list()) -> list().
 filter_defines([], Acc) ->
