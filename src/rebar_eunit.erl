@@ -83,10 +83,11 @@ eunit(Config, _File) ->
     BeamFiles = [N || N <- rebar_utils:beams(?EUNIT_DIR),
                       string:str(N, "_tests.beam") =:= 0],
     Modules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- BeamFiles],
-
+    SrcModules = [rebar_utils:erl_to_mod(M) || M <- SrcErls],
+    
     cover_init(Config, BeamFiles),
     EunitResult = perform_eunit(Config, Modules),
-    perform_cover(Config, Modules),
+    perform_cover(Config, Modules, SrcModules),
 
     case EunitResult of
         ok ->
@@ -182,17 +183,18 @@ is_quickcheck_avail() ->
             IsAvail
     end.
 
-perform_cover(Config, BeamFiles) ->
-    perform_cover(rebar_config:get(Config, cover_enabled, false), Config, BeamFiles).
+perform_cover(Config, BeamFiles, SrcModules) ->
+    perform_cover(rebar_config:get(Config, cover_enabled, false), 
+                  Config, BeamFiles, SrcModules).
 
-perform_cover(false, _Config, _BeamFiles) ->
+perform_cover(false, _Config, _BeamFiles, _SrcModules) ->
     ok;
-perform_cover(true, Config, BeamFiles) ->
-    cover_analyze(Config, BeamFiles).
+perform_cover(true, Config, BeamFiles, SrcModules) ->
+    cover_analyze(Config, BeamFiles, SrcModules).
 
-cover_analyze(_Config, []) ->
+cover_analyze(_Config, [], _SrcModules) ->
     ok;
-cover_analyze(_Config, Modules) ->
+cover_analyze(_Config, Modules, SrcModules) ->
     Suite = list_to_atom(rebar_config:get_global(suite, "")),
     FilteredModules = [M || M <- Modules, M =/= Suite],
 
@@ -200,7 +202,7 @@ cover_analyze(_Config, Modules) ->
     Coverage = [cover_analyze_mod(M) || M <- FilteredModules],
 
     %% Write index of coverage info
-    cover_write_index(lists:sort(Coverage)),
+    cover_write_index(lists:sort(Coverage), SrcModules),
 
     %% Write coverage details for each file
     [{ok, _} = cover:analyze_to_file(M, cover_file(M), [html]) || {M, _, _} <- Coverage],
@@ -243,7 +245,19 @@ cover_analyze_mod(Module) ->
             {0,0}
     end.
 
-cover_write_index(Coverage) ->
+cover_write_index(Coverage, SrcModules) ->
+    {ok, F} = file:open(filename:join([?EUNIT_DIR, "index.html"]), [write]),
+    ok = file:write(F, "<html><head><title>Coverage Summary</title></head>\n"),
+    IsSrcCoverage = fun({Mod,_C,_N}) -> lists:member(Mod, SrcModules) end, 
+    {SrcCoverage, TestCoverage} = lists:partition(IsSrcCoverage, Coverage),
+    cover_write_index_section(F, "Source", SrcCoverage),
+    cover_write_index_section(F, "Test", TestCoverage),
+    ok = file:write(F, "</body></html>"),
+    file:close(F).
+
+cover_write_index_section(_F, _SectionName, []) ->
+    ok;
+cover_write_index_section(F, SectionName, Coverage) ->
     %% Calculate total coverage %
     {Covered, NotCovered} = lists:foldl(fun({_Mod, C, N}, {CAcc, NAcc}) ->
                                                 {CAcc + C, NAcc + N}
@@ -251,20 +265,19 @@ cover_write_index(Coverage) ->
     TotalCoverage = percentage(Covered, NotCovered),
 
     %% Write the report
-    {ok, F} = file:open(filename:join([?EUNIT_DIR, "index.html"]), [write]),
-    ok = file:write(F, "<html><head><title>Coverage Summary</title></head>\n"
-                    "<body><h1>Coverage Summary</h1>\n"),
-    ok = file:write(F, ?FMT("<h3>Total: ~w%</h3>\n", [TotalCoverage])),
+    ok = file:write(F, ?FMT("<body><h1>~s Summary</h1>\n", [SectionName])),
+    ok = file:write(F, ?FMT("<h3>Total: ~s</h3>\n", [TotalCoverage])),
     ok = file:write(F, "<table><tr><th>Module</th><th>Coverage %</th></tr>\n"),
 
-    [ok = file:write(F, ?FMT("<tr><td><a href='~s.COVER.html'>~s</a></td><td>~w%</td>\n",
+    [ok = file:write(F, ?FMT("<tr><td><a href='~s.COVER.html'>~s</a></td><td>~s</td>\n",
                              [Module, Module, percentage(Cov, NotCov)])) ||
         {Module, Cov, NotCov} <- Coverage],
-    ok = file:write(F, "</table></body></html>"),
-    file:close(F).
+    ok = file:write(F, "</table>\n").
 
 cover_file(Module) ->
     filename:join([?EUNIT_DIR, atom_to_list(Module) ++ ".COVER.html"]).
 
+percentage(0, 0) ->
+    "not executed";
 percentage(Cov, NotCov) ->
-    trunc((Cov / (Cov + NotCov)) * 100).
+    integer_to_list(trunc((Cov / (Cov + NotCov)) * 100)) ++ "%".

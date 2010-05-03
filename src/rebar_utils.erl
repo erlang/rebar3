@@ -36,6 +36,7 @@
          now_str/0,
          ensure_dir/1,
          beam_to_mod/2, beams/1,
+         erl_to_mod/1,
          abort/2,
          escript_foldl/3]).
 
@@ -152,6 +153,9 @@ sh_loop(Port) ->
 beam_to_mod(Dir, Filename) ->
     [Dir | Rest] = filename:split(Filename),
     list_to_atom(filename:basename(string:join(Rest, "."), ".beam")).
+
+erl_to_mod(Filename) ->
+    list_to_atom(filename:rootname(filename:basename(Filename))).
 
 beams(Dir) ->
     filelib:fold_files(Dir, ".*\.beam\$", true,
