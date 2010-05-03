@@ -344,18 +344,27 @@ source_to_bin(Source) ->
     filename:rootname(Source, Ext) ++ ".o".
 
 so_specs(Config, AppFile, Bins) ->
-    %% Check config to see if a custom so_name has been specified
-    ?INFO("config ~p\n", [Config]),
     case rebar_config:get(Config, so_specs, undefined) of
-                   undefined ->
-                       %% Get the app name, which we'll use to
-                       %% generate the linked port driver name
-                       case rebar_app_utils:load_app_file(AppFile) of
-                           {ok, AppName, _} ->
-                               SoName = ?FMT("priv/~s", [lists:concat([AppName, "_drv.so"])]),
-                               [{SoName, Bins}];
-                           error ->
-                               ?FAIL
-                       end;
-                   SoSpecs -> SoSpecs
-               end.
+        undefined ->
+            %% New form of so_specs is not provided. See if the old form of {so_name} is available
+            %% instead
+            SoName = case rebar_config:get(Config, so_name, undefined) of
+                         undefined ->
+                             %% Ok, neither old nor new form is available. Use the app name and
+                             %% generate a sensible default.
+                             case rebar_app_utils:load_app_file(AppFile) of
+                                 {ok, AppName, _} ->
+                                     ?FMT("priv/~s", [lists:concat([AppName, "_drv.so"])]);
+                                 error ->
+                                     ?FAIL
+                             end;
+
+                         AName ->
+                             %% Old form is available -- use it
+                             ?FMT("priv/~s", [AName])
+                     end,
+            [{SoName, Bins}];
+
+        SoSpecs ->
+            SoSpecs
+    end.
