@@ -41,11 +41,13 @@
 %% Public API
 %% ===================================================================
 
+run(["help"]) ->
+    help(),
+    ok;
 run(["version"]) ->
     %% Load application spec and display vsn and build time info
     ok = application:load(rebar),
-    {ok, Vsn} = application:get_key(rebar, vsn),
-    ?CONSOLE("Version ~s built ~s\n", [Vsn, ?BUILD_TIME]),
+    version(),
     ok;
 run(RawArgs) ->
     %% Pre-load the rebar app so that we get default configuration
@@ -87,7 +89,7 @@ parse_args(Args) ->
     case getopt:parse(OptSpecList, Args) of
         {ok, {Options, NonOptArgs}} ->
             %% Check options and maybe halt execution
-            {ok, continue} = print_help_maybe_halt(Options, NonOptArgs),
+            {ok, continue} = show_info_maybe_halt(Options, NonOptArgs),
 
             %% Set global variables based on getopt options
             set_global_flag(Options, verbose),
@@ -123,26 +125,32 @@ set_global_flag(Options, Flag) ->
     rebar_config:set_global(Flag, Value).
 
 %%
-%% print help and maybe halt execution
+%% show info and maybe halt execution
 %%
-print_help_maybe_halt(Options, NonOptArgs) ->
-    case proplists:get_bool(help, Options) of
+show_info_maybe_halt(Opts, NonOptArgs) ->
+    case proplists:get_bool(help, Opts) of
         true ->
             help(),
             halt(0);
         false ->
-            case proplists:get_bool(commands, Options) of
+            case proplists:get_bool(commands, Opts) of
                 true ->
                     commands(),
                     halt(0);
                 false ->
-                    case NonOptArgs of
-                        [] ->
-                            io:format("No command to run specified!~n"),
-                            help(),
-                            halt(1);
-                        _ ->
-                            {ok, continue}
+                    case proplists:get_bool(version, Opts) of
+                        true ->
+                            version(),
+                            halt(0);
+                        false ->
+                            case NonOptArgs of
+                                [] ->
+                                    ?CONSOLE("No command to run specified!~n",[]),
+                                    help(),
+                                    halt(1);
+                                _ ->
+                                    {ok, continue}
+                            end
                     end
             end
     end.
@@ -187,10 +195,20 @@ perf_test   [suite=] [case=]         Run ct suites in ./perf_test
 test        [suite=] [case=]         Run ct suites in ./test
 
 xref                                 Run cross reference analysis
+
+help                                 Show the program options
+version                              Show version information
 ">>,
     io:put_chars(S),
     %% workaround to delay exit until all output is written
     timer:sleep(300).
+
+%%
+%% show version information and halt
+%%
+version() ->
+    {ok, Vsn} = application:get_key(rebar, vsn),
+    ?CONSOLE("Version ~s built ~s\n", [Vsn, ?BUILD_TIME]).
 
 %%
 %% options accepted via getopt
@@ -205,6 +223,7 @@ option_spec_list() ->
      {help,     $h, "help",     undefined, "Show the program options"},
      {commands, $c, "commands", undefined, "Show available commands"},
      {verbose,  $v, "verbose",  undefined, "Be verbose about what gets done"},
+     {version,  $V, "version",  undefined, "Show version information"},
      {force,    $f, "force",    undefined, "Force"},
      {jobs,     $j, "jobs",     integer,   JobsHelp}
     ].
@@ -312,7 +331,7 @@ apply_commands([], _Modules, _Config, _ModuleFile) ->
 apply_commands([Command | Rest], Modules, Config, ModuleFile) ->
     case select_modules(Modules, Command, []) of
         [] ->
-            ?CONSOLE("WARNING: ~p command does not apply to directory ~s\n",
+            ?CONSOLE("WARNING: '~p' command does not apply to directory ~s\n",
                      [Command, rebar_utils:get_cwd()]),
             apply_commands(Rest, Modules, Config, ModuleFile);
         TargetModules ->

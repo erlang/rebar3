@@ -6,11 +6,12 @@ _rebar()
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    sopts="-h -c -v -f -j"
-    lopts=" --help --commands --verbose --force --jobs="
+    sopts="-h -c -v -V -f -j"
+    lopts=" --help --commands --verbose --force --jobs= --version"
     cmdsnvars="analyze build_plt check_plt check-deps clean compile \
         create create-app create-node delete-deps eunit \
-        get-deps generate install int_test perf_test test xref \
+        get-deps generate help install int_test perf_test test \
+        version xref \
         case= force=1 jobs= suite= verbose=1 appid= target= template="
 
     if [[ ${cur} == --* ]] ; then
