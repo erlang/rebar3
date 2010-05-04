@@ -24,6 +24,7 @@
               rebar_port_compiler,
               rebar_rel_utils,
               rebar_reltool,
+              rebar_require_vsn,
               rebar_subdirs,
               rebar_templater,
               rebar_utils,
@@ -43,6 +44,7 @@
 
          %% any_dir processing modules
          {any_dir_modules, [
+                            rebar_require_vsn,
                             rebar_subdirs,
                             rebar_deps,
                             rebar_templater,
