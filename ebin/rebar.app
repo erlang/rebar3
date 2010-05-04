@@ -22,6 +22,7 @@
               rebar_otp_app,
               rebar_port_compiler,
               rebar_protobuffs_compiler,
+              rebar_neotoma_compiler,
               rebar_port_compiler,
               rebar_post_script,
               rebar_rel_utils,
@@ -57,6 +58,7 @@
          {modules, [
                     {app_dir, [
                                rebar_protobuffs_compiler,
+                               rebar_neotoma_compiler,
                                rebar_asn1_compiler,
                                rebar_erlc_compiler,
                                rebar_lfe_compiler,
