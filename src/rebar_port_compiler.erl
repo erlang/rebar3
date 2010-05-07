@@ -352,12 +352,8 @@ so_specs(Config, AppFile, Bins) ->
                          undefined ->
                              %% Ok, neither old nor new form is available. Use the app name and
                              %% generate a sensible default.
-                             case rebar_app_utils:load_app_file(AppFile) of
-                                 {ok, AppName, _} ->
-                                     ?FMT("priv/~s", [lists:concat([AppName, "_drv.so"])]);
-                                 error ->
-                                     ?FAIL
-                             end;
+                             AppName = rebar_app_utils:app_name(AppFile),
+                             ?FMT("priv/~s", [lists:concat([AppName, "_drv.so"])]);
 
                          AName ->
                              %% Old form is available -- use it

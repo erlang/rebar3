@@ -27,6 +27,8 @@
 -module(rebar_app_utils).
 
 -export([is_app_dir/0, is_app_dir/1,
+         is_app_src/1,
+         app_src_to_app/1,
          app_name/1,
          app_applications/1,
          app_vsn/1]).
@@ -43,13 +45,30 @@ is_app_dir() ->
     is_app_dir(rebar_util:get_cwd()).
 
 is_app_dir(Dir) ->
-    Fname = filename:join([Dir, "ebin/*.app"]),
-    case filelib:wildcard(Fname) of
-        [AppFile] ->
-            {true, AppFile};
+    AppSrc = filename:join(Dir, "src/*.app.src"),
+    case filelib:wildcard(AppSrc) of
+        [AppSrcFile] ->
+            ?DEBUG("Found app.src: ~p\n", [AppSrcFile]),
+            {true, AppSrcFile};
         _ ->
-            false
+            App = filename:join([Dir, "ebin/*.app"]),
+            case filelib:wildcard(App) of
+                [AppFile] ->
+                    ?DEBUG("Found .app: ~p\n", [AppFile]),
+                    {true, AppFile};
+                _ ->
+                    false
+            end
     end.
+
+
+is_app_src(Filename) ->
+    %% If removing the extension .app.src yields a shorter name,
+    %% this is an .app.src file.
+    Filename /= filename:rootname(Filename, ".app.src").
+
+app_src_to_app(Filename) ->
+    filename:join("ebin", filename:basename(Filename, ".app.src") ++ ".app").
 
 app_name(AppFile) ->
     case load_app_file(AppFile) of
@@ -77,7 +96,6 @@ app_vsn(AppFile) ->
             ?ABORT("Failed to extract vsn from ~s: ~p\n",
                    [AppFile, Reason])
     end.
-
 
 
 %% ===================================================================

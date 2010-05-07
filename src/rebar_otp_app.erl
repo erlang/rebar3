@@ -27,6 +27,7 @@
 -module(rebar_otp_app).
 
 -export([compile/2,
+         clean/2,
          install/2]).
 
 -include("rebar.hrl").
@@ -36,12 +37,34 @@
 %% ===================================================================
 
 compile(_Config, File) ->
-    %% Load the app name and version from the .app file and construct
-    %% the app identifier
-    {ok, AppName, AppData} = rebar_app_utils:load_app_file(File),
-    validate_name(AppName, File),
-    validate_modules(AppName, proplists:get_value(modules, AppData)),
-    ok.
+    %% If we get an .app.src file, it needs to be pre-processed and
+    %% written out as a ebin/*.app file. That resulting file will then
+    %% be validated as usual.
+    case rebar_app_utils:is_app_src(File) of
+        true ->
+            AppFile = preprocess(File);
+        false ->
+            AppFile = File
+    end,
+
+    %% Load the app file and validate it.
+    case rebar_app_utils:load_app_file(AppFile) of
+        {ok, AppName, AppData} ->
+            validate_name(AppName, AppFile),
+            validate_modules(AppName, proplists:get_value(modules, AppData));
+        {error, Reason} ->
+            ?ABORT("Failed to load app file ~s: ~p\n", [AppFile, Reason])
+    end.
+
+clean(_Config, File) ->
+    %% If the app file is a .app.src, delete the generated .app file
+    case rebar_app_utils:is_app_src(File) of
+        true ->
+            file:delete(rebar_app_utils:app_src_to_app(File)),
+            ok;
+        false ->
+            ok
+    end.
 
 
 install(Config, File) ->
@@ -116,6 +139,25 @@ install_binaries([Bin | Rest], AppDir, BinDir) ->
     rebar_file_utils:ln_sf(FqBin, BinDir),
     install_binaries(Rest, AppDir, BinDir).
 
+preprocess(AppSrcFile) ->
+    case rebar_app_utils:load_app_file(AppSrcFile) of
+        {ok, AppName, AppData} ->
+            %% Get a list of all the modules available in ebin/ and update
+            %% the app data accordingly
+            A1 = lists:keystore(modules, 1, AppData, {modules, ebin_modules()}),
+
+            %% Build the final spec as a string
+            Spec = io_lib:format("~p.\n", [{application, AppName, A1}]),
+
+            %% Setup file .app filename and write new contents
+            AppFile = rebar_app_utils:app_src_to_app(AppSrcFile),
+            ok = file:write_file(AppFile, Spec),
+            AppFile;
+
+        {error, Reason} ->
+            ?ABORT("Failed to read ~s for preprocessing: ~p\n", [AppSrcFile, Reason])
+    end.
+
 
 validate_name(AppName, File) ->
     %% Convert the .app file name to an atom -- check it against the identifier within the file
@@ -136,7 +178,7 @@ validate_modules(AppName, undefined) ->
 validate_modules(AppName, Mods) ->
     %% Construct two sets -- one for the actual .beam files in ebin/ and one for the modules
     %% listed in the .app file
-    EbinSet = ordsets:from_list([rebar_utils:beam_to_mod("ebin", N) || N <- rebar_utils:beams("ebin")]),
+    EbinSet = ordsets:from_list(ebin_modules()),
     ModSet = ordsets:from_list(Mods),
 
     %% Identify .beam files listed in the .app, but not present in ebin/
@@ -160,3 +202,6 @@ validate_modules(AppName, Mods) ->
                    [AppName, Msg2]),
             ?FAIL
     end.
+
+ebin_modules() ->
+    lists:sort([rebar_utils:beam_to_mod("ebin", N) || N <- rebar_utils:beams("ebin")]).
