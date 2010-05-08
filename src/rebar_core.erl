@@ -287,6 +287,17 @@ process_dir(Dir, ParentConfig, Commands) ->
             %% to change
             ok = file:set_cwd(Dir),
 
+            %% http://bitbucket.org/basho/rebar/issue/5
+            %% If the compiler ran, run the preprocess again because a new ebin dir
+            %% may have been produced.
+            case Dirs =/= [] andalso lists:member(compile, Commands)  of
+                true ->
+                    acc_modules(select_modules(Modules, preprocess, []),
+                                preprocess, Config, ModuleSetFile, []);
+                false ->
+                    ok
+            end,
+
             %% Finally, process the current working directory
             ?DEBUG("Commands: ~p Modules: ~p\n", [Commands, Modules]),
             apply_commands(Commands, Modules, UpdatedConfig, ModuleSetFile),
