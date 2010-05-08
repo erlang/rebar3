@@ -178,8 +178,8 @@ clean                                Clean
 compile                              Compile sources
 
 create      template= [var=foo,...]  Create skel based on template and vars
-create-app                           Create simple app skel
-create-node                          Create simple node skel
+create-app  [appid=myapp]            Create simple app skel
+create-node [nodeid=mynode]          Create simple node skel
 
 check-deps                           Display to be fetched dependencies
 get-deps                             Fetch dependencies
