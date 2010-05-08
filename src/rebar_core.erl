@@ -271,7 +271,7 @@ process_dir(Dir, ParentConfig, Commands) ->
             {DirModules, ModuleSetFile} = choose_module_set(AvailModuleSets, Dir),
 
             %% Get the list of modules for "any dir". This is a catch-all list of modules
-            %% that are processed in addion to modules associated with this directory
+            %% that are processed in addition to modules associated with this directory
             %% type. These any_dir modules are processed FIRST.
             {ok, AnyDirModules} = application:get_env(rebar, any_dir_modules),
             Modules = AnyDirModules ++ DirModules,
