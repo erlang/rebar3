@@ -275,17 +275,17 @@ process_dir(Dir, ParentConfig, Commands) ->
             %% type. These any_dir modules are processed FIRST.
             {ok, AnyDirModules} = application:get_env(rebar, any_dir_modules),
 
-            %% Get the list of plug-in modules from rebar.config. These modules are
-            %% processed LAST.
-            {ok, PluginModules} = plugin_modules(Config),
-
-            Modules = AnyDirModules ++ DirModules ++ PluginModules,
+            Modules = AnyDirModules ++ DirModules,
 
             %% Give the modules a chance to tweak config and indicate if there
             %% are any other dirs that might need processing first.
             {UpdatedConfig, Dirs} = acc_modules(select_modules(Modules, preprocess, []),
                                                 preprocess, Config, ModuleSetFile, []),
             ?DEBUG("~s subdirs: ~p\n", [Dir, Dirs]),
+
+            %% Add ebin to path if this app has any plugins configured locally.
+            prep_plugin_modules(UpdatedConfig),
+
             [process_dir(D, UpdatedConfig, Commands) || D <- Dirs],
 
             %% Make sure the CWD is reset properly; processing subdirs may have caused it
@@ -303,9 +303,13 @@ process_dir(Dir, ParentConfig, Commands) ->
                     ok
             end,
 
+            %% Get the list of plug-in modules from rebar.config. These modules are
+            %% processed LAST and do not participate in preprocess.
+            {ok, PluginModules} = plugin_modules(UpdatedConfig),
+
             %% Finally, process the current working directory
-            ?DEBUG("Commands: ~p Modules: ~p\n", [Commands, Modules]),
-            apply_commands(Commands, Modules, UpdatedConfig, ModuleSetFile),
+            ?DEBUG("Commands: ~p Modules: ~p Plugins: ~p\n", [Commands, Modules, PluginModules]),
+            apply_commands(Commands, Modules ++ PluginModules, UpdatedConfig, ModuleSetFile),
 
             %% Once we're all done processing, reset the code path to whatever
             %% the parent initialized it to
@@ -328,16 +332,39 @@ choose_module_set([{Fn, Modules} | Rest], Dir) ->
     end.
 
 %%
+%% Add ebin to path if there are any local plugin modules for this app.
+%%
+prep_plugin_modules(Config) ->
+    case rebar_config:get_local(Config, rebar_plugins, []) of
+        [_H | _T] ->
+            code:add_path(filename:join([rebar_utils:get_cwd(), "ebin"]));
+        _ ->
+            ok
+    end.
+
+%%
 %% Return a flat list of rebar plugin modules.
 %%
 plugin_modules(Config) ->
     Modules = lists:flatten(rebar_config:get_all(Config, rebar_plugins)),
     plugin_modules(Config, Modules).
 
+ulist(L) ->
+    ulist(L, sets:new(), []).
+
+ulist([], _S, Acc) ->
+    lists:reverse(Acc);
+ulist([H | T], S, Acc) ->
+    case sets:is_element(H, S) of
+        true ->
+            ulist(T, S, Acc);
+        false ->
+            ulist(T, sets:add_element(H, S), [H | Acc])
+    end.
+
 plugin_modules(_Config, []) ->
     {ok, []};
-plugin_modules(Config, Modules) ->
-    code:add_path(filename:join([rebar_utils:get_cwd(), "ebin"])),
+plugin_modules(_Config, Modules) ->
     FoundModules = [M || M <- Modules, code:which(M) =/= non_existing],
     case (Modules =:= FoundModules) of
         true ->
@@ -346,7 +373,7 @@ plugin_modules(Config, Modules) ->
             ?DEBUG("Missing plugins: ~p\n", [Modules -- FoundModules]),
             ok
     end,
-    {ok, FoundModules}.
+    {ok, ulist(FoundModules)}.
 
 %%
 %% Return .app file if the current directory is an OTP app
