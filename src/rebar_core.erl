@@ -333,7 +333,7 @@ choose_module_set([{Fn, Modules} | Rest], Dir) ->
 plugin_modules(Config) ->
     Modules = lists:flatten(rebar_config:get_all(Config, rebar_plugins)),
     FoundModules = [M || M <- Modules, code:which(M) =/= non_existing],
-    case (Modules =/= FoundModules) of
+    case (Modules =:= FoundModules) of
         true ->
             ok;
         false ->
