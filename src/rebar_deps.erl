@@ -254,11 +254,11 @@ use_source(AppDir, App, VsnRegex, Source, Count) ->
 
 download_source(AppDir, {hg, Url, Rev}) ->
     ok = filelib:ensure_dir(AppDir),
-    rebar_utils:sh(?FMT("hg clone -U ~s", [Url]), [], filename:dirname(AppDir)),
+    rebar_utils:sh(?FMT("hg clone -U ~s ~s", [Url, filename:basename(AppDir)]), [], filename:dirname(AppDir)),
     rebar_utils:sh(?FMT("hg update ~s", [Rev]), [], AppDir);
 download_source(AppDir, {git, Url, Rev}) ->
     ok = filelib:ensure_dir(AppDir),
-    rebar_utils:sh(?FMT("git clone -n ~s", [Url]), [], filename:dirname(AppDir)),
+    rebar_utils:sh(?FMT("git clone -n ~s ~s", [Url, filename:basename(AppDir)]), [], filename:dirname(AppDir)),
     rebar_utils:sh(?FMT("git checkout ~s", [Rev]), [], AppDir);
 download_source(AppDir, {bzr, Url, Rev}) ->
     ok = filelib:ensure_dir(AppDir),
