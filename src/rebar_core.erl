@@ -274,7 +274,12 @@ process_dir(Dir, ParentConfig, Commands) ->
             %% that are processed in addition to modules associated with this directory
             %% type. These any_dir modules are processed FIRST.
             {ok, AnyDirModules} = application:get_env(rebar, any_dir_modules),
-            Modules = AnyDirModules ++ DirModules,
+
+            %% Get the list of plug-in modules from rebar.config. These modules are
+            %% processed LAST.
+            {ok, PluginModules} = plugin_modules(Config),
+
+            Modules = AnyDirModules ++ DirModules ++ PluginModules,
 
             %% Give the modules a chance to tweak config and indicate if there
             %% are any other dirs that might need processing first.
@@ -321,6 +326,21 @@ choose_module_set([{Fn, Modules} | Rest], Dir) ->
         false ->
             choose_module_set(Rest, Dir)
     end.
+
+%%
+%% Return a flat list of rebar plugin modules.
+%%
+plugin_modules(Config) ->
+    Modules = lists:flatten(rebar_config:get_all(Config, rebar_plugins)),
+    FoundModules = [M || M <- Modules, code:which(M) =/= non_existing],
+    case (Modules =/= FoundModules) of
+        true ->
+            ok;
+        false ->
+            ?DEBUG("Missing plugins: ~p\n", [Modules -- FoundModules]),
+            ok
+    end,
+    {ok, FoundModules}.
 
 %%
 %% Return .app file if the current directory is an OTP app
