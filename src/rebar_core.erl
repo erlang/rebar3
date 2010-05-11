@@ -331,7 +331,7 @@ apply_commands([], _Modules, _Config, _ModuleFile) ->
 apply_commands([Command | Rest], Modules, Config, ModuleFile) ->
     case select_modules(Modules, Command, []) of
         [] ->
-            ?CONSOLE("WARNING: '~p' command does not apply to directory ~s\n",
+            ?WARN("'~p' command does not apply to directory ~s\n",
                      [Command, rebar_utils:get_cwd()]),
             apply_commands(Rest, Modules, Config, ModuleFile);
         TargetModules ->
