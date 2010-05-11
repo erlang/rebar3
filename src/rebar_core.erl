@@ -332,6 +332,12 @@ choose_module_set([{Fn, Modules} | Rest], Dir) ->
 %%
 plugin_modules(Config) ->
     Modules = lists:flatten(rebar_config:get_all(Config, rebar_plugins)),
+    plugin_modules(Config, Modules).
+
+plugin_modules(_Config, []) ->
+    {ok, []};
+plugin_modules(Config, Modules) ->
+    code:add_path(filename:join([rebar_utils:get_cwd(), "ebin"])),
     FoundModules = [M || M <- Modules, code:which(M) =/= non_existing],
     case (Modules =:= FoundModules) of
         true ->
