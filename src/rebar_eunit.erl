@@ -238,12 +238,42 @@ cover_init(Config, BeamFiles) ->
 cover_analyze_mod(Module) ->
     case cover:analyze(Module, coverage, module) of
         {ok, {Module, {Covered, NotCovered}}} ->
-            {Module, Covered, NotCovered};
+            %% Modules that include the eunit header get an implicit
+            %% test/0 fun, which cover considers a runnable line, but
+            %% eunit:test(TestRepresentation) never calls.  Decrement
+            %% NotCovered in this case.
+            align_notcovered_count(Module, Covered, NotCovered,
+                                   is_eunitized(Module));
         {error, Reason} ->
             ?ERROR("Cover analyze failed for ~p: ~p ~p\n",
                    [Module, Reason, code:which(Module)]),
             {0,0}
     end.
+
+is_eunitized(Mod) ->
+    has_eunit_test_fun(Mod) andalso
+        has_eunit_header(Mod).
+
+has_eunit_test_fun(Mod) ->
+    length([F || {exports, Funs} <- Mod:module_info(),
+                    {F, 0} <- Funs,
+                    F == test]) =/= 0.
+
+has_eunit_header(Mod) ->
+    OrigEnv = set_proc_env(),
+    try has_header(Mod, "include/eunit.hrl")
+    after restore_proc_env(OrigEnv)
+    end.
+
+has_header(Mod, Header) ->
+    {ok, {_, [{abstract_code, {_, AC}}]}} = beam_lib:chunks(Mod, [abstract_code]),
+    length([F || {attribute, 1, file, {F, 1}} <- AC,
+                 string:str(F, Header) =/= 0]) =/= 0.
+
+align_notcovered_count(Module, Covered, NotCovered, false) ->
+    {Module, Covered, NotCovered};
+align_notcovered_count(Module, Covered, NotCovered, true) ->
+    {Module, Covered, NotCovered - 1}.
 
 cover_write_index(Coverage, SrcModules) ->
     {ok, F} = file:open(filename:join([?EUNIT_DIR, "index.html"]), [write]),

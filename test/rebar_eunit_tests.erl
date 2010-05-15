@@ -88,14 +88,25 @@ cover_with_suite_test_() ->
       {"Only production modules get coverage reports",
        assert_files_not_in("the temporary eunit directory",
                            [".eunit/myapp_mymod_tests.COVER.html",
-                            ".eunit/mysuite"])}]}.             
+                            ".eunit/mysuite.COVER.html"])}]}.
 
 expected_cover_generated_files() ->
     [".eunit/index.html",
      ".eunit/myapp_app.COVER.html",
      ".eunit/myapp_mymod.COVER.html",
      ".eunit/myapp_sup.COVER.html"].
-     
+
+cover_coverage_test_() ->
+    {"Coverage is accurately calculated",
+     setup, fun() -> setup_cover_project(), rebar("-v eunit") end,
+     fun teardown/1,
+
+     [{"Modules that include the EUnit header can still have 100% coverage",
+       %% cover notices the implicit EUnit test/0 func that never gets
+       %% called during eunit:test(TestRepresentation), so NotCounted
+       %% needs to be decremented in this case.
+       assert_full_coverage("myapp_mymod")}]}.
+
 %% ====================================================================
 %% Environment and Setup Tests
 %% ====================================================================
@@ -227,3 +238,12 @@ assert_files_not_in(Name, [File|T]) ->
      assert_files_not_in(Name, T)];   
 assert_files_not_in(_, []) -> [].
 
+assert_full_coverage(Mod) ->
+    fun() ->
+            {ok, F} = file:read_file(".eunit/index.html"),
+            Result = [X || X <- string:tokens(binary_to_list(F), "\n"),
+                           string:str(X, Mod) =/= 0,
+                           string:str(X, "100%") =/= 0],
+            file:close(F),
+            ?assert(length(Result) == 1)
+    end.
