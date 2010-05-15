@@ -179,7 +179,8 @@ compile_worker(QueuePid, Config, CompileFn) ->
                     QueuePid ! {skipped, Source},
                     compile_worker(QueuePid, Config, CompileFn);
                 Error ->
-                    QueuePid ! {fail, Error},
+                    QueuePid ! {fail, [{error, Error},
+                                       {source, Source}]},
                     ok
             end;
 

@@ -72,7 +72,9 @@ run(RawArgs) ->
     ?DEBUG("Rebar location: ~p\n", [rebar_config:get_global(escript, undefined)]),
 
     %% Load rebar.config, if it exists
-    process_dir(rebar_utils:get_cwd(), rebar_config:new(), CommandAtoms).
+    [process_dir(rebar_utils:get_cwd(), rebar_config:new(), [Command])
+     || Command <- CommandAtoms],
+    ok.
 
 
 %% ===================================================================
@@ -277,44 +279,82 @@ process_dir(Dir, ParentConfig, Commands) ->
 
             Modules = AnyDirModules ++ DirModules,
 
-            %% Give the modules a chance to tweak config and indicate if there
-            %% are any other dirs that might need processing first.
-            {UpdatedConfig, Dirs} = acc_modules(select_modules(Modules, preprocess, []),
-                                                preprocess, Config, ModuleSetFile, []),
-            ?DEBUG("~s subdirs: ~p\n", [Dir, Dirs]),
-
-            %% Add ebin to path if this app has any plugins configured locally.
-            prep_plugin_modules(UpdatedConfig),
-
-            [process_dir(D, UpdatedConfig, Commands) || D <- Dirs],
-
-            %% Make sure the CWD is reset properly; processing subdirs may have caused it
-            %% to change
-            ok = file:set_cwd(Dir),
-
-            %% http://bitbucket.org/basho/rebar/issue/5
-            %% If the compiler ran, run the preprocess again because a new ebin dir
-            %% may have been produced.
-            case Dirs =/= [] andalso lists:member(compile, Commands)  of
-                true ->
-                    acc_modules(select_modules(Modules, preprocess, []),
-                                preprocess, Config, ModuleSetFile, []);
-                false ->
-                    ok
-            end,
-
-            %% Get the list of plug-in modules from rebar.config. These modules are
-            %% processed LAST and do not participate in preprocess.
-            {ok, PluginModules} = plugin_modules(UpdatedConfig),
-
-            %% Finally, process the current working directory
-            ?DEBUG("Commands: ~p Modules: ~p Plugins: ~p\n", [Commands, Modules, PluginModules]),
-            apply_commands(Commands, Modules ++ PluginModules, UpdatedConfig, ModuleSetFile),
+            ok = process_subdirs(Dir, Modules, Config, ModuleSetFile, Commands),
 
             %% Once we're all done processing, reset the code path to whatever
             %% the parent initialized it to
             restore_code_path(CurrentCodePath),
             ok
+    end.
+
+
+%%
+%% Run the preprocessors and execute commands on all newly
+%% found Dirs until no new Dirs are found by the preprocessors.
+%%
+process_subdirs(Dir, Modules, Config, ModuleSetFile, Commands) ->
+    process_subdirs(Dir, Modules, Config, ModuleSetFile, Commands, sets:new()).
+
+process_subdirs(Dir, Modules, Config, ModuleSetFile, Commands, ProcessedDirs) ->
+    %% Give the modules a chance to tweak config and indicate if there
+    %% are any other dirs that might need processing first.
+    {UpdatedConfig, Dirs} = acc_modules(select_modules(Modules, preprocess, []),
+                                        preprocess, Config, ModuleSetFile, []),
+    ?DEBUG("~s subdirs: ~p\n", [Dir, Dirs]),
+
+    %% Add ebin to path if this app has any plugins configured locally.
+    prep_plugin_modules(UpdatedConfig),
+
+    %% Process subdirs that haven't already been processed.
+    F = fun (D, S) ->
+                case filelib:is_dir(D) andalso (not sets:is_element(D, S)) of
+                    true ->
+                        process_dir(D, UpdatedConfig, Commands),
+                        sets:add_element(D, S);
+                    false ->
+                        S
+                end
+        end,
+    NewProcessedDirs = lists:foldl(F, sets:add_element(parent, ProcessedDirs), Dirs),
+
+    %% http://bitbucket.org/basho/rebar/issue/5
+    %% If the compiler ran, run the preprocess again because a new ebin dir
+    %% may have been produced.
+    {UpdatedConfig1, _} = case (Dirs =/= [] andalso
+                                    lists:member(compile, Commands)) of
+                                  true ->
+                                      acc_modules(
+                                        select_modules(Modules, preprocess, []),
+                                        preprocess, UpdatedConfig, ModuleSetFile, []);
+                                  false ->
+                                      {UpdatedConfig, Dirs}
+                              end,
+
+    %% Make sure the CWD is reset properly; processing subdirs may have caused it
+    %% to change
+    ok = file:set_cwd(Dir),
+
+    %% Run the parent commands exactly once as well
+    case sets:is_element(parent, ProcessedDirs) of
+        true ->
+            ok;
+        false ->
+            %% Get the list of plug-in modules from rebar.config. These modules are
+            %% processed LAST and do not participate in preprocess.
+            {ok, PluginModules} = plugin_modules(UpdatedConfig1),
+
+            %% Finally, process the current working directory
+            ?DEBUG("Commands: ~p Modules: ~p Plugins: ~p\n", [Commands, Modules, PluginModules]),
+            apply_commands(Commands, Modules ++ PluginModules, UpdatedConfig1, ModuleSetFile)
+    end,
+
+    %% Repeat the process if there are new SeenDirs
+    case NewProcessedDirs =:= ProcessedDirs of
+        true ->
+            ok;
+        false ->
+            process_subdirs(Dir, Modules, UpdatedConfig1, ModuleSetFile, Commands,
+                            NewProcessedDirs)
     end.
 
 %%
@@ -347,7 +387,7 @@ prep_plugin_modules(Config) ->
 %%
 plugin_modules(Config) ->
     Modules = lists:flatten(rebar_config:get_all(Config, rebar_plugins)),
-    plugin_modules(Config, Modules).
+    plugin_modules(Config, ulist(Modules)).
 
 ulist(L) ->
     ulist(L, sets:new(), []).
@@ -373,7 +413,7 @@ plugin_modules(_Config, Modules) ->
             ?DEBUG("Missing plugins: ~p\n", [Modules -- FoundModules]),
             ok
     end,
-    {ok, ulist(FoundModules)}.
+    {ok, FoundModules}.
 
 %%
 %% Return .app file if the current directory is an OTP app

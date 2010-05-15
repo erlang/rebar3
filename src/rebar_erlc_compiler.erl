@@ -116,7 +116,8 @@ doterl_compile(Config, OutDir, MoreSources) ->
         [{F, compile_priority(F)} || F <- RestErls ])],
 
 
-    %% Make sure that ebin/ is on the path
+    %% Make sure that ebin/ exists and is on the path
+    ok = filelib:ensure_dir(filename:join("ebin", "dummy.beam")),
     CurrPath = code:get_path(),
     code:add_path("ebin"),
     rebar_base_compiler:run(Config, FirstErls, SortedRestErls,
