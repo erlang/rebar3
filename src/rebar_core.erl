@@ -298,8 +298,7 @@ process_subdirs(Dir, Modules, Config, ModuleSetFile, Command) ->
 process_subdirs(Dir, Modules, Config, ModuleSetFile, Command, ProcessedDirs) ->
     %% Give the modules a chance to tweak config and indicate if there
     %% are any other dirs that might need processing first.
-    {UpdatedConfig, Dirs} = acc_modules(select_modules(Modules, preprocess, []),
-                                        preprocess, Config, ModuleSetFile, []),
+    {UpdatedConfig, Dirs} = acc_modules(Modules, preprocess, Config, ModuleSetFile),
     ?DEBUG("~s subdirs: ~p\n", [Dir, Dirs]),
 
     %% Add ebin to path if this app has any plugins configured locally.
@@ -322,9 +321,8 @@ process_subdirs(Dir, Modules, Config, ModuleSetFile, Command, ProcessedDirs) ->
     %% may have been produced.
     {UpdatedConfig1, _} = case (Dirs =/= [] andalso compile == Command) of
                               true ->
-                                  acc_modules(
-                                    select_modules(Modules, preprocess, []),
-                                    preprocess, UpdatedConfig, ModuleSetFile, []);
+                                  acc_modules(Modules, preprocess, UpdatedConfig,
+                                              ModuleSetFile);
                               false ->
                                   {UpdatedConfig, Dirs}
                           end,
@@ -502,6 +500,10 @@ run_modules([Module | Rest], Command, Config, File) ->
         {error, Reason} ->
             {error, Reason}
     end.
+
+acc_modules(Modules, Command, Config, File) ->
+    acc_modules(select_modules(Modules, Command, []),
+                Command, Config, File, []).
 
 acc_modules([], _Command, Config, _File, Acc) ->
     {Config, Acc};
