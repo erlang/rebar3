@@ -72,7 +72,7 @@ run(RawArgs) ->
     ?DEBUG("Rebar location: ~p\n", [rebar_config:get_global(escript, undefined)]),
 
     %% Load rebar.config, if it exists
-    [process_dir(rebar_utils:get_cwd(), rebar_config:new(), [Command])
+    [process_dir(rebar_utils:get_cwd(), rebar_config:new(), Command)
      || Command <- CommandAtoms],
     ok.
 
@@ -250,7 +250,7 @@ filter_flags([Item | Rest], Commands) ->
     end.
 
 
-process_dir(Dir, ParentConfig, Commands) ->
+process_dir(Dir, ParentConfig, Command) ->
     case filelib:is_dir(Dir) of
         false ->
             ?WARN("Skipping non-existent sub-dir: ~p\n", [Dir]),
@@ -279,7 +279,7 @@ process_dir(Dir, ParentConfig, Commands) ->
 
             Modules = AnyDirModules ++ DirModules,
 
-            ok = process_subdirs(Dir, Modules, Config, ModuleSetFile, Commands),
+            ok = process_subdirs(Dir, Modules, Config, ModuleSetFile, Command),
 
             %% Once we're all done processing, reset the code path to whatever
             %% the parent initialized it to
@@ -289,13 +289,13 @@ process_dir(Dir, ParentConfig, Commands) ->
 
 
 %%
-%% Run the preprocessors and execute commands on all newly
+%% Run the preprocessors and execute the command on all newly
 %% found Dirs until no new Dirs are found by the preprocessors.
 %%
-process_subdirs(Dir, Modules, Config, ModuleSetFile, Commands) ->
-    process_subdirs(Dir, Modules, Config, ModuleSetFile, Commands, sets:new()).
+process_subdirs(Dir, Modules, Config, ModuleSetFile, Command) ->
+    process_subdirs(Dir, Modules, Config, ModuleSetFile, Command, sets:new()).
 
-process_subdirs(Dir, Modules, Config, ModuleSetFile, Commands, ProcessedDirs) ->
+process_subdirs(Dir, Modules, Config, ModuleSetFile, Command, ProcessedDirs) ->
     %% Give the modules a chance to tweak config and indicate if there
     %% are any other dirs that might need processing first.
     {UpdatedConfig, Dirs} = acc_modules(select_modules(Modules, preprocess, []),
@@ -309,7 +309,7 @@ process_subdirs(Dir, Modules, Config, ModuleSetFile, Commands, ProcessedDirs) ->
     F = fun (D, S) ->
                 case filelib:is_dir(D) andalso (not sets:is_element(D, S)) of
                     true ->
-                        process_dir(D, UpdatedConfig, Commands),
+                        process_dir(D, UpdatedConfig, Command),
                         sets:add_element(D, S);
                     false ->
                         S
@@ -320,15 +320,14 @@ process_subdirs(Dir, Modules, Config, ModuleSetFile, Commands, ProcessedDirs) ->
     %% http://bitbucket.org/basho/rebar/issue/5
     %% If the compiler ran, run the preprocess again because a new ebin dir
     %% may have been produced.
-    {UpdatedConfig1, _} = case (Dirs =/= [] andalso
-                                    lists:member(compile, Commands)) of
-                                  true ->
-                                      acc_modules(
-                                        select_modules(Modules, preprocess, []),
-                                        preprocess, UpdatedConfig, ModuleSetFile, []);
-                                  false ->
-                                      {UpdatedConfig, Dirs}
-                              end,
+    {UpdatedConfig1, _} = case (Dirs =/= [] andalso compile == Command) of
+                              true ->
+                                  acc_modules(
+                                    select_modules(Modules, preprocess, []),
+                                    preprocess, UpdatedConfig, ModuleSetFile, []);
+                              false ->
+                                  {UpdatedConfig, Dirs}
+                          end,
 
     %% Make sure the CWD is reset properly; processing subdirs may have caused it
     %% to change
@@ -344,8 +343,8 @@ process_subdirs(Dir, Modules, Config, ModuleSetFile, Commands, ProcessedDirs) ->
             {ok, PluginModules} = plugin_modules(UpdatedConfig1),
 
             %% Finally, process the current working directory
-            ?DEBUG("Commands: ~p Modules: ~p Plugins: ~p\n", [Commands, Modules, PluginModules]),
-            apply_commands(Commands, Modules ++ PluginModules, UpdatedConfig1, ModuleSetFile)
+            ?DEBUG("Command: ~p Modules: ~p Plugins: ~p\n", [Command, Modules, PluginModules]),
+            apply_command(Command, Modules ++ PluginModules, UpdatedConfig1, ModuleSetFile)
     end,
 
     %% Repeat the process if there are new SeenDirs
@@ -353,7 +352,7 @@ process_subdirs(Dir, Modules, Config, ModuleSetFile, Commands, ProcessedDirs) ->
         true ->
             ok;
         false ->
-            process_subdirs(Dir, Modules, UpdatedConfig1, ModuleSetFile, Commands,
+            process_subdirs(Dir, Modules, UpdatedConfig1, ModuleSetFile, Command,
                             NewProcessedDirs)
     end.
 
@@ -430,14 +429,12 @@ rel_dir(Dir) ->
 
 
 
-apply_commands([], _Modules, _Config, _ModuleFile) ->
-    ok;
-apply_commands([Command | Rest], Modules, Config, ModuleFile) ->
+apply_command(Command, Modules, Config, ModuleFile) ->
     case select_modules(Modules, Command, []) of
         [] ->
             ?WARN("'~p' command does not apply to directory ~s\n",
-                     [Command, rebar_utils:get_cwd()]),
-            apply_commands(Rest, Modules, Config, ModuleFile);
+                     [Command, rebar_utils:get_cwd()]);
+
         TargetModules ->
             %% Provide some info on where we are
             Dir = rebar_utils:get_cwd(),
@@ -446,7 +443,7 @@ apply_commands([Command | Rest], Modules, Config, ModuleFile) ->
             %% Run the available modules
             case catch(run_modules(TargetModules, Command, Config, ModuleFile)) of
                 ok ->
-                    apply_commands(Rest, Modules, Config, ModuleFile);
+                    ok;
                 {error, failed} ->
                     ?FAIL;
                 Other ->
