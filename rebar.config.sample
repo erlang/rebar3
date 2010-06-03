@@ -1,0 +1,107 @@
+%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% ex: ts=4 sw=4 ft=erlang et
+%% This is a sample rebar.conf file that shows examples of some of rebar's
+%% options.
+
+%% == Core ==
+
+%% Additional library directories to add to the code path
+{lib_dirs, []}.
+
+%% == Erlang Compiler ==
+
+%% Erlang files to compile before the rest. Rebar automatically compiles
+%% parse_transforms and custom behaviours before anything other than the files
+%% in this list.
+{erl_first_files, ["mymib1", "mymib2"]}.
+
+%% Erlang compiler options
+{erl_opts, [{i, "myinclude"}, {src_dirs, ["src1", "src2"]}]}.
+
+%% MIB Options?
+{mib_opts, []}.
+
+%% SNMP mibs to compile first?
+{mib_first_files, []}.
+
+%% == Port Compiler ==
+
+%% List and wildcard list of files to be compiled. Default is `"c_src/*.c"'
+{port_sources, []}.
+
+%% Port compilation environment variables. See rebar_port_compiler.erl for
+%% more info. Default is `[]'
+{port_envs, []}.
+
+%% Tuple which specifies a pre-compilation script to run, and a filename that
+%% exists as a result of the script running.
+{port_pre_script, {"script.sh", "skipfile"}}.
+
+%% String that specifies a script to run during cleanup. Use this to remove
+%% files/directories created by port_pre_script.
+{port_cleanup_script, "cleanup.sh"}.
+
+%% Custom name of the port driver .so file. Defaults to `<Application>_drv.so'.
+{so_name, "driver.so"}.
+
+%% == LFE Compiler ==
+
+%% LFE files to compile before the rest
+{lfe_first_files, []}.
+
+%% Options for the LFE compiler
+{lfe_opts, []}.
+
+%% == ErlyDTL Compiler ==
+
+%% Options for the ErlyDTL compiler
+{erlydtl_opts, []}.
+
+%% == EUnit ==
+
+%% Options for eunit:test()
+{eunit_opts, []}.
+
+%% Additional compile options for eunit. erl_opts from above is also used
+{eunit_compile_opts, []}.
+
+%% Whether to enable coverage reporting. Default is `false'
+{cover_enabled, false}.
+
+%% == Dialyzer ==
+
+%% Options for running the dialyzer, right now only `plt' is supported
+{dialyzer_opts, []}.
+
+%% == Cleanup ==
+
+%% Which files to cleanup
+{clean_files, ["file", "file2"]}.
+
+%% == Reltool ==
+
+%% Target directory for the release
+{target, "target"}.
+
+%% == OTP Applications ==
+
+%% Binaries to link into the erlang path?
+{app_bin, []}.
+
+%% == Dependancies ==
+
+%% Where to put any downloaded depandencies. Default is `deps'
+{deps_dir, ["deps"]}.
+
+%% What dependancies we have, depandencies can be of 3 forms, an application
+%% name as an atom, eg. mochiweb, a name and a version (from the .app file), or
+%% an application name, a version and the SCM details on how to fetch it (SCM
+%% type, location and revision). Rebar currently support git, hg, bzr and svn.
+{deps, [application_name, {application_name, "1.0.*"},
+        {application_name, "1.0.*"},
+        {hg, "http://bitbucket.org/basho/rebar/", "f3626d5858a6"}]}.
+
+%% == Subdirectories ==
+
+%% Subdirectories?
+{sub_dirs, ["dir1", "dir2"]}.
