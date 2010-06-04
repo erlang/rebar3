@@ -319,13 +319,14 @@ process_subdirs(Dir, Modules, Config, ModuleSetFile, Command, ProcessedDirs) ->
     %% http://bitbucket.org/basho/rebar/issue/5
     %% If the compiler ran, run the preprocess again because a new ebin dir
     %% may have been produced.
-    {UpdatedConfig1, _} = case (Dirs =/= [] andalso compile == Command) of
-                              true ->
-                                  acc_modules(Modules, preprocess, UpdatedConfig,
-                                              ModuleSetFile);
-                              false ->
-                                  {UpdatedConfig, Dirs}
-                          end,
+    %% {UpdatedConfig1, _} = case (Dirs =/= [] andalso compile == Command) of
+    %%                           true ->
+    %%                               acc_modules(Modules, preprocess, UpdatedConfig,
+    %%                                           ModuleSetFile);
+    %%                           false ->
+    %%                               {UpdatedConfig, Dirs}
+    %%                       end,
+    UpdatedConfig1 = UpdatedConfig,
 
     %% Make sure the CWD is reset properly; processing subdirs may have caused it
     %% to change
