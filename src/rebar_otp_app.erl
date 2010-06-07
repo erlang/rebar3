@@ -68,12 +68,22 @@ clean(_Config, File) ->
 
 
 install(Config, File) ->
+    %% If we get an .app.src file, it needs to be pre-processed and
+    %% written out as a ebin/*.app file. That resulting file will then
+    %% be validated as usual.
+    case rebar_app_utils:is_app_src(File) of
+        true ->
+            AppFile = preprocess(File);
+        false ->
+            AppFile = File
+    end,
+
     %% Load the app name and version from the .app file and construct
     %% the app identifier
-    {ok, AppName, AppData} = rebar_app_utils:load_app_file(File),
+    {ok, AppName, AppData} = rebar_app_utils:load_app_file(AppFile),
 
     %% Validate the .app file prior to installation
-    validate_name(AppName, File),
+    validate_name(AppName, AppFile),
     validate_modules(AppName, proplists:get_value(modules, AppData)),
 
     %% Get the target directory. The user can specify a target= directory
@@ -176,7 +186,7 @@ validate_name(AppName, File) ->
     end.
 
 validate_modules(AppName, undefined) ->
-            ?ERROR("Missing modules declaration in~p.app:\n~s", [AppName]),
+            ?ERROR("Missing modules declaration in~p.app:\n", [AppName]),
             ?FAIL;
 
 validate_modules(AppName, Mods) ->
