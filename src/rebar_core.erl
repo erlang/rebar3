@@ -316,18 +316,6 @@ process_subdirs(Dir, Modules, Config, ModuleSetFile, Command, ProcessedDirs) ->
         end,
     NewProcessedDirs = lists:foldl(F, sets:add_element(parent, ProcessedDirs), Dirs),
 
-    %% http://bitbucket.org/basho/rebar/issue/5
-    %% If the compiler ran, run the preprocess again because a new ebin dir
-    %% may have been produced.
-    %% {UpdatedConfig1, _} = case (Dirs =/= [] andalso compile == Command) of
-    %%                           true ->
-    %%                               acc_modules(Modules, preprocess, UpdatedConfig,
-    %%                                           ModuleSetFile);
-    %%                           false ->
-    %%                               {UpdatedConfig, Dirs}
-    %%                       end,
-    UpdatedConfig1 = UpdatedConfig,
-
     %% Make sure the CWD is reset properly; processing subdirs may have caused it
     %% to change
     ok = file:set_cwd(Dir),
@@ -339,11 +327,11 @@ process_subdirs(Dir, Modules, Config, ModuleSetFile, Command, ProcessedDirs) ->
         false ->
             %% Get the list of plug-in modules from rebar.config. These modules are
             %% processed LAST and do not participate in preprocess.
-            {ok, PluginModules} = plugin_modules(UpdatedConfig1),
+            {ok, PluginModules} = plugin_modules(UpdatedConfig),
 
             %% Finally, process the current working directory
             ?DEBUG("Command: ~p Modules: ~p Plugins: ~p\n", [Command, Modules, PluginModules]),
-            apply_command(Command, Modules ++ PluginModules, UpdatedConfig1, ModuleSetFile)
+            apply_command(Command, Modules ++ PluginModules, UpdatedConfig, ModuleSetFile)
     end,
 
     %% Repeat the process if there are new SeenDirs
@@ -351,7 +339,7 @@ process_subdirs(Dir, Modules, Config, ModuleSetFile, Command, ProcessedDirs) ->
         true ->
             ok;
         false ->
-            process_subdirs(Dir, Modules, UpdatedConfig1, ModuleSetFile, Command,
+            process_subdirs(Dir, Modules, UpdatedConfig, ModuleSetFile, Command,
                             NewProcessedDirs)
     end.
 
