@@ -14,7 +14,7 @@ files() ->
      {copy, "../../rebar", "rebar"},
 
      %% B application
-     {create, "repo/b/ebin/b.app", app(b)},
+     {create, "repo/b/src/b.app.src", app(b)},
      {copy, "b.rebar.config", "repo/b/rebar.config"},
      {copy, "b.hrl", "repo/b/include/b.hrl"},
 
@@ -26,11 +26,12 @@ files() ->
 run(_Dir) ->
     %% Initialize the b/c apps as mercurial repos so that dependencies pull
     %% properly
-    HgCmd = "hg init && hg add && hg commit -m 'Initial commit'",
-    retest_log:log(debug, "~s\n", [os:cmd("(cd repo/b && " ++ HgCmd ++ ")")]),
-    retest_log:log(debug, "~s\n", [os:cmd("(cd repo/c && " ++ HgCmd ++ ")")]),
+    HgCmd = "/bin/sh -c \"hg init && hg add && hg commit -m 'Initial commit'\"",
+    {ok, _} = retest_sh:run(HgCmd, [{dir, "repo/b"}]),
+    {ok, _} = retest_sh:run(HgCmd, [{dir, "repo/c"}]),
 
-    retest_log:log(debug, "~s\n", [os:cmd("./rebar get-deps compile")]),
+
+    {ok, _} = retest_sh:run("./rebar -v get-deps compile", []),
     ok.
 
 
