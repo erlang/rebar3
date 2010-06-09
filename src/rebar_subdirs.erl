@@ -38,5 +38,5 @@ preprocess(Config, _) ->
     %% Get the list of subdirs specified in the config (if any).
     Cwd = rebar_utils:get_cwd(),
     Subdirs = [filename:join(Cwd, Dir) || Dir <- rebar_config:get_local(Config, sub_dirs, [])],
-    {ok, Config, Subdirs}.
+    {ok, Subdirs}.
 

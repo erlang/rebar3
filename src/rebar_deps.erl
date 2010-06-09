@@ -29,157 +29,127 @@
 -include("rebar.hrl").
 
 -export([preprocess/2,
+         postprocess/2,
          compile/2,
          'check-deps'/2,
-         'get-deps'/2,
-         'delete-deps'/2]).
+         'get-deps'/2]).
+
+
+-record(dep, { dir,
+               app,
+               vsn_regex,
+               source }).
 
 %% ===================================================================
 %% Public API
 %% ===================================================================
 
 preprocess(Config, _) ->
-    DepsDir = get_deps_dir(Config),
-    Config2 = rebar_config:set(Config, deps_dir, DepsDir),
+    %% Get the list of deps for the current working directory and identify those
+    %% deps that are available/present.
+    Deps = rebar_config:get_local(Config, deps, []),
+    {AvailableDeps, MissingDeps} = find_deps(Deps),
 
-    %% Check for available deps, using the list of deps specified in our config.
-    %% We use the directory from the list of tuples for deps with source information to
-    %% update our list of directories to process.
-    case catch(check_deps(rebar_config:get_local(Config, deps, []), [], DepsDir)) of
-        Deps when is_list(Deps) ->
-            %% Walk all the deps and make sure they are available on the code path,
-            %% if the application we're interested in actually exists there.
-            ok = update_deps_code_path(Deps),
-            DepDirs = case rebar_config:get_global(skip_deps, false) of
-                          false ->
-                              [Dir || {Dir, _, _, _} <- Deps];
-                          _Specified ->
-                              []
-                      end,
-            {ok, Config2, DepDirs};
-        {'EXIT', Reason} ->
-            ?ABORT("Error while processing dependencies: ~p\n", [Reason])
+    ?DEBUG("Available deps: ~p\n", [AvailableDeps]),
+    ?DEBUG("Missing deps  : ~p\n", [MissingDeps]),
+
+    %% Add available deps to code path
+    update_deps_code_path(AvailableDeps),
+
+    %% Return all the available dep directories for process
+    %% TODO: Re-add support for skip_deps=true
+    {ok, [D#dep.dir || D <- AvailableDeps]}.
+
+postprocess(_Config, _) ->
+    case erlang:get(?MODULE) of
+        undefined ->
+            {ok, []};
+        Dirs ->
+            erlang:erase(?MODULE),
+            {ok, Dirs}
     end.
 
 compile(Config, AppFile) ->
     'check-deps'(Config, AppFile).
 
 'check-deps'(Config, _) ->
-    %% Get a list of deps that need to be downloaded and display them only
-    DepsDir = get_deps_dir(Config),
-    case catch(check_deps(rebar_config:get_local(Config, deps, []), [], DepsDir)) of
-        [] ->
+    %% Get the list of immediate (i.e. non-transitive) deps that are missing
+    Deps = rebar_config:get_local(Config, deps, []),
+    case find_deps(Deps) of
+        {_, []} ->
+            %% No missing deps
             ok;
-        Deps when is_list(Deps) ->
-            [?CONSOLE("Dependency not available: ~p-~p (~p)\n", [App, VsnRegex, Source]) ||
-                {_Dir, App, VsnRegex, Source} <- Deps],
-            ?FAIL;
-        {'EXIT', Reason} ->
-            ?ABORT("Error while processing dependencies: ~p\n", [Reason])
+        {_, MissingDeps} ->
+            [?CONSOLE("Dependency not available: ~p-~s (~p)\n",
+                      [D#dep.app, D#dep.vsn_regex, D#dep.source]) ||
+                D <- MissingDeps],
+            ?FAIL
     end.
 
 'get-deps'(Config, _) ->
-    DepsDir = get_deps_dir(Config),
+    %% Determine what deps are available and missing
+    Deps = rebar_config:get_local(Config, deps, []),
+    {_AvailableDeps, MissingDeps} = find_deps(Deps),
 
-    %% Get a list of deps that need to be downloaded
-    case catch(check_deps(rebar_config:get_local(Config, deps, []), [], DepsDir)) of
-        Deps when is_list(Deps) ->
-            %% Now for each dependency tuple, pull it
-            [use_source(Dir, App, VsnRegex, Source) || {Dir, App, VsnRegex, Source} <- Deps],
-            ok;
-        {'EXIT', Reason} ->
-            ?ABORT("Error while processing dependencies: ~p\n", [Reason])
-    end.
+    %% For each missing dep with a specified source, try to pull it.
+    PulledDeps = [use_source(D) || D <- MissingDeps, D#dep.source /= undefined],
 
-'delete-deps'(Config, _) ->
-    %% Delete all the deps which we downloaded (or would have caused to be
-    %% downloaded).
-    DepsDir = rebar_config:get(Config, deps_dir, rebar_utils:get_cwd()),
-    ?DEBUG("Delete deps: ~p\n", [rebar_config:get(Config, deps, [])]),
-    delete_deps(rebar_config:get_local(Config, deps, []), DepsDir).
+    %% Add each pulled dep to our list of dirs for post-processing. This yields
+    %% the necessary transitivity of the deps
+    erlang:put(?MODULE, [D#dep.dir || D <- PulledDeps]),
+    ok.
+
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
-get_deps_dir(Config) ->
-    %% Get the directory where we will place downloaded deps. Take steps
-    %% to ensure that if we're doing a multi-level build, all the deps will
-    %% wind up in a single directory; avoiding potential pain from having
-    %% multiple copies of the same dep scattered throughout the source tree.
-    %%
-    %% The first definition of deps_dir is the one we use; we also fully
-    %% qualify it to ensure everyone sees it properly.
-    case rebar_config:get_all(Config, deps_dir) of
-        [] ->
-            DepsDir = filename:absname("deps");
-        AllDirs ->
-            DepsDir = filename:absname(hd(lists:reverse(AllDirs)))
-    end,
-    ?DEBUG("~s: Using deps dir: ~s\n", [rebar_utils:get_cwd(), DepsDir]),
-    DepsDir.
+get_deps_dir() ->
+    BaseDir = rebar_config:get_global(base_dir, []),
+    filename:join(BaseDir, "deps").
 
 update_deps_code_path([]) ->
     ok;
-update_deps_code_path([{AppDir, App, VsnRegex, _Source} | Rest]) ->
-    case is_app_available(App, VsnRegex, AppDir) of
-        true ->
-            code:add_patha(filename:join(AppDir, ebin));
+update_deps_code_path([Dep | Rest]) ->
+    case is_app_available(Dep#dep.app, Dep#dep.vsn_regex, Dep#dep.dir) of
+        {true, _} ->
+            code:add_patha(filename:join(Dep#dep.dir, ebin));
         false ->
             ok
     end,
     update_deps_code_path(Rest).
 
-check_deps([], Acc, _Dir) ->
-    Acc;
-check_deps([App | Rest], Acc, Dir) when is_atom(App) ->
-    require_app(App, ".*"),
-    check_deps(Rest, Acc, Dir);
-check_deps([{App, VsnRegex} | Rest], Acc, Dir) when is_atom(App) ->
-    require_app(App, VsnRegex),
-    check_deps(Rest, Acc, Dir);
-check_deps([{App, VsnRegex, Source} | Rest], Acc, Dir) ->
+find_deps(Deps) ->
+    find_deps(Deps, {[], []}).
+
+find_deps([], {Avail, Missing}) ->
+    {lists:reverse(Avail), lists:reverse(Missing)};
+find_deps([App | Rest], Acc) when is_atom(App) ->
+    find_deps([{App, ".*", undefined} | Rest], Acc);
+find_deps([{App, VsnRegex} | Rest], Acc) when is_atom(App) ->
+    find_deps([{App, VsnRegex, undefined} | Rest], Acc);
+find_deps([{App, VsnRegex, Source} | Rest], {Avail, Missing}) ->
+    Dep = #dep { app = App,
+                 vsn_regex = VsnRegex,
+                 source = Source },
     case is_app_available(App, VsnRegex) of
-        true ->
-            check_deps(Rest, Acc, Dir);
+        {true, AppDir} ->
+            find_deps(Rest, {[Dep#dep { dir = AppDir } | Avail], Missing});
         false ->
-            %% App is not on our code path OR the version that is available
-            %% doesn't match our regex. Return a tuple containing the target dir
-            %% and source information.
-            AppDir = filename:join(Dir, App),
-            check_deps(Rest, [{AppDir, App, VsnRegex, Source} | Acc], Dir)
+            AppDir = filename:join(get_deps_dir(), Dep#dep.app),
+            case is_app_available(App, VsnRegex, AppDir) of
+                {true, AppDir} ->
+                    find_deps(Rest, {[Dep#dep { dir = AppDir } | Avail], Missing});
+                false ->
+                    find_deps(Rest, {Avail, [Dep#dep { dir = AppDir } | Missing]})
+            end
     end;
-check_deps([Other | _Rest], _Acc, _Dir) ->
+find_deps([Other | _Rest], _Acc) ->
     ?ABORT("Invalid dependency specification ~p in ~s\n",
            [Other, rebar_utils:get_cwd()]).
 
 
-delete_deps([], _DepsDir) ->
-    ok;
-delete_deps([{App, _VsnRegex, _Source} | Rest], DepsDir) ->
-    AppDir = filename:join(DepsDir, App),
-    case filelib:is_dir(AppDir) of
-        true ->
-            ?INFO("Delete dependency dir ~s\n", [AppDir]),
-            rebar_file_utils:rm_rf(AppDir);
-        false ->
-            ok
-    end,
-    delete_deps(Rest, DepsDir);
-delete_deps([_Other | Rest], DepsDir) ->
-    delete_deps(Rest, DepsDir).
 
-
-
-require_app(App, VsnRegex) ->
-    case is_app_available(App, VsnRegex) of
-        true ->
-            ok;
-        false ->
-            %% The requested app is not available on the code path
-            ?ABORT("~s: Dependency ~s-~s not available.\n",
-                   [rebar_utils:get_cwd(), App, VsnRegex])
-    end.
 
 require_source_engine(Source) ->
     case source_engine_avail(Source) of
@@ -208,7 +178,7 @@ is_app_available(App, VsnRegex, Path) ->
                           [App, VsnRegex, App, Vsn, Path]),
                     case re:run(Vsn, VsnRegex, [{capture, none}]) of
                         match ->
-                            true;
+                            {true, Path};
                         nomatch ->
                             ?WARN("~s has version ~p; requested regex was ~s\n",
                                   [AppFile, Vsn, VsnRegex]),
@@ -224,32 +194,33 @@ is_app_available(App, VsnRegex, Path) ->
             false
     end.
 
-use_source(AppDir, App, VsnRegex, Source) ->
-    ?CONSOLE("Pulling ~p from ~p\n", [App, Source]),
-    use_source(AppDir, App, VsnRegex, Source, 3).
+use_source(Dep) ->
+    use_source(Dep, 3).
 
-use_source(_AppDir, _App, _VsnRegex, Source, 0) ->
-    ?ABORT("Failed to acquire source from ~p after 3 tries.\n", [Source]);
-use_source(AppDir, App, VsnRegex, Source, Count) ->
-    case filelib:is_dir(AppDir) of
+use_source(Dep, 0) ->
+    ?ABORT("Failed to acquire source from ~p after 3 tries.\n", [Dep#dep.source]);
+use_source(Dep, Count) ->
+    case filelib:is_dir(Dep#dep.dir) of
         true ->
             %% Already downloaded -- verify the versioning matches up with our regex
-            case is_app_available(App, VsnRegex, AppDir) of
-                true ->
+            case is_app_available(Dep#dep.app, Dep#dep.vsn_regex, Dep#dep.dir) of
+                {true, _} ->
                     %% Available version matches up -- we're good to go; add the
                     %% app dir to our code path
-                    code:add_patha(filename:join(AppDir, ebin)),
-                    ok;
+                    code:add_patha(filename:join(Dep#dep.dir, ebin)),
+                    Dep;
                 false ->
                     %% The app that was downloaded doesn't match up (or had
                     %% errors or something). For the time being, abort.
                     ?ABORT("Dependency dir ~s does not satisfy version regex ~s.\n",
-                           [AppDir, VsnRegex])
+                           [Dep#dep.dir, Dep#dep.vsn_regex])
             end;
         false ->
-            require_source_engine(Source),
-            download_source(AppDir, Source),
-            use_source(AppDir, App, VsnRegex, Source, Count-1)
+            ?CONSOLE("Pulling ~p from ~p\n", [Dep#dep.app, Dep#dep.source]),
+            require_source_engine(Dep#dep.source),
+            TargetDir = filename:join(get_deps_dir(), Dep#dep.app),
+            download_source(TargetDir, Dep#dep.source),
+            use_source(Dep#dep { dir = TargetDir }, Count-1)
     end.
 
 download_source(AppDir, {hg, Url, Rev}) ->

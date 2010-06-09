@@ -28,8 +28,6 @@
 
 -export([run/1]).
 
--export([app_dir/1, rel_dir/1]). % Ugh
-
 -include("rebar.hrl").
 
 
@@ -71,8 +69,11 @@ run(RawArgs) ->
     rebar_config:set_global(escript, filename:absname(escript:script_name())),
     ?DEBUG("Rebar location: ~p\n", [rebar_config:get_global(escript, undefined)]),
 
+    %% Note the top-level directory for reference
+    rebar_config:set_global(base_dir, filename:absname(rebar_utils:get_cwd())),
+
     %% Load rebar.config, if it exists
-    [process_dir(rebar_utils:get_cwd(), rebar_config:new(), Command)
+    [process_dir(rebar_utils:get_cwd(), rebar_config:new(), Command, sets:new())
      || Command <- CommandAtoms],
     ok.
 
@@ -250,13 +251,14 @@ filter_flags([Item | Rest], Commands) ->
     end.
 
 
-process_dir(Dir, ParentConfig, Command) ->
+process_dir(Dir, ParentConfig, Command, DirSet) ->
     case filelib:is_dir(Dir) of
         false ->
             ?WARN("Skipping non-existent sub-dir: ~p\n", [Dir]),
-            ok;
+            DirSet;
 
         true ->
+            ?DEBUG("Entering ~s\n", [Dir]),
             ok = file:set_cwd(Dir),
             Config = rebar_config:new(ParentConfig),
 
@@ -272,76 +274,65 @@ process_dir(Dir, ParentConfig, Command) ->
             {ok, AvailModuleSets} = application:get_env(rebar, modules),
             {DirModules, ModuleSetFile} = choose_module_set(AvailModuleSets, Dir),
 
-            %% Get the list of modules for "any dir". This is a catch-all list of modules
-            %% that are processed in addition to modules associated with this directory
-            %% type. These any_dir modules are processed FIRST.
+            %% Get the list of modules for "any dir". This is a catch-all list
+            %% of modules that are processed in addition to modules associated
+            %% with this directory type. These any_dir modules are processed
+            %% FIRST.
             {ok, AnyDirModules} = application:get_env(rebar, any_dir_modules),
 
             Modules = AnyDirModules ++ DirModules,
 
-            ok = process_subdirs(Dir, Modules, Config, ModuleSetFile, Command),
+            %% Invoke 'preprocess' on the modules -- this yields a list of other
+            %% directories that should be processed _before_ the current one.
+            Predirs = acc_modules(Modules, preprocess, Config, ModuleSetFile),
+            ?DEBUG("Predirs: ~p\n", [Predirs]),
+            DirSet2 = process_each(Predirs, Command, Config, ModuleSetFile, DirSet),
+
+            %% Make sure the CWD is reset properly; processing the dirs may have
+            %% caused it to change
+            ok = file:set_cwd(Dir),
+
+            %% Execute the current command on this directory
+            execute(Command, Modules, Config, ModuleSetFile),
+
+            %% Mark the current directory as processed
+            DirSet3 = sets:add_element(Dir, DirSet2),
+
+            %% Invoke 'postprocess' on the modules -- this yields a list of other
+            %% directories that should be processed _after_ the current one.
+            Postdirs = acc_modules(Modules, postprocess, Config, ModuleSetFile),
+            ?DEBUG("Postdirs: ~p\n", [Postdirs]),
+            DirSet4 = process_each(Postdirs, Command, Config, ModuleSetFile, DirSet3),
+
+            %% Make sure the CWD is reset properly; processing the dirs may have
+            %% caused it to change
+            ok = file:set_cwd(Dir),
 
             %% Once we're all done processing, reset the code path to whatever
             %% the parent initialized it to
             restore_code_path(CurrentCodePath),
-            ok
+
+            %% Return the updated dirset as our result
+            DirSet4
     end.
 
 
 %%
-%% Run the preprocessors and execute the command on all newly
-%% found Dirs until no new Dirs are found by the preprocessors.
+%% Given a list of directories and a set of previously processed directories,
+%% process each one we haven't seen yet
 %%
-process_subdirs(Dir, Modules, Config, ModuleSetFile, Command) ->
-    process_subdirs(Dir, Modules, Config, ModuleSetFile, Command, sets:new()).
-
-process_subdirs(Dir, Modules, Config, ModuleSetFile, Command, ProcessedDirs) ->
-    %% Give the modules a chance to tweak config and indicate if there
-    %% are any other dirs that might need processing first.
-    {UpdatedConfig, Dirs} = acc_modules(Modules, preprocess, Config, ModuleSetFile),
-    ?DEBUG("~s subdirs: ~p\n", [Dir, Dirs]),
-
-    %% Add ebin to path if this app has any plugins configured locally.
-    prep_plugin_modules(UpdatedConfig),
-
-    %% Process subdirs that haven't already been processed.
-    F = fun (D, S) ->
-                case filelib:is_dir(D) andalso (not sets:is_element(D, S)) of
-                    true ->
-                        process_dir(D, UpdatedConfig, Command),
-                        sets:add_element(D, S);
-                    false ->
-                        S
-                end
-        end,
-    NewProcessedDirs = lists:foldl(F, sets:add_element(parent, ProcessedDirs), Dirs),
-
-    %% Make sure the CWD is reset properly; processing subdirs may have caused it
-    %% to change
-    ok = file:set_cwd(Dir),
-
-    %% Run the parent commands exactly once as well
-    case sets:is_element(parent, ProcessedDirs) of
+process_each([], _Command, _Config, _ModuleSetFile, DirSet) ->
+    DirSet;
+process_each([Dir | Rest], Command, Config, ModuleSetFile, DirSet) ->
+    case sets:is_element(Dir, DirSet) of
         true ->
-            ok;
+            ?DEBUG("Skipping ~s; already processed!\n", [Dir]),
+            process_each(Rest, Command, Config, ModuleSetFile, DirSet);
         false ->
-            %% Get the list of plug-in modules from rebar.config. These modules are
-            %% processed LAST and do not participate in preprocess.
-            {ok, PluginModules} = plugin_modules(UpdatedConfig),
-
-            %% Finally, process the current working directory
-            ?DEBUG("Command: ~p Modules: ~p Plugins: ~p\n", [Command, Modules, PluginModules]),
-            apply_command(Command, Modules ++ PluginModules, UpdatedConfig, ModuleSetFile)
-    end,
-
-    %% Repeat the process if there are new SeenDirs
-    case NewProcessedDirs =:= ProcessedDirs of
-        true ->
-            ok;
-        false ->
-            process_subdirs(Dir, Modules, UpdatedConfig, ModuleSetFile, Command,
-                            NewProcessedDirs)
+            DirSet2 = process_dir(Dir, Config, Command, DirSet),
+            process_each(Rest, Command, Config, ModuleSetFile, DirSet2)
     end.
+
 
 %%
 %% Given a list of module sets from rebar.app and a directory, find
@@ -349,74 +340,26 @@ process_subdirs(Dir, Modules, Config, ModuleSetFile, Command, ProcessedDirs) ->
 %%
 choose_module_set([], _Dir) ->
     {[], undefined};
-choose_module_set([{Fn, Modules} | Rest], Dir) ->
-    case ?MODULE:Fn(Dir) of
+choose_module_set([{Type, Modules} | Rest], Dir) ->
+    case is_dir_type(Type, Dir) of
         {true, File} ->
             {Modules, File};
         false ->
             choose_module_set(Rest, Dir)
     end.
 
-%%
-%% Add ebin to path if there are any local plugin modules for this app.
-%%
-prep_plugin_modules(Config) ->
-    case rebar_config:get_local(Config, rebar_plugins, []) of
-        [_H | _T] ->
-            code:add_path(filename:join([rebar_utils:get_cwd(), "ebin"]));
-        _ ->
-            ok
-    end.
+is_dir_type(app_dir, Dir) ->
+    rebar_app_utils:is_app_dir(Dir);
+is_dir_type(rel_dir, Dir) ->
+    rebar_rel_utils:is_rel_dir(Dir);
+is_dir_type(_, _) ->
+    false.
+
 
 %%
-%% Return a flat list of rebar plugin modules.
+%% Execute a command across all applicable modules
 %%
-plugin_modules(Config) ->
-    Modules = lists:flatten(rebar_config:get_all(Config, rebar_plugins)),
-    plugin_modules(Config, ulist(Modules)).
-
-ulist(L) ->
-    ulist(L, sets:new(), []).
-
-ulist([], _S, Acc) ->
-    lists:reverse(Acc);
-ulist([H | T], S, Acc) ->
-    case sets:is_element(H, S) of
-        true ->
-            ulist(T, S, Acc);
-        false ->
-            ulist(T, sets:add_element(H, S), [H | Acc])
-    end.
-
-plugin_modules(_Config, []) ->
-    {ok, []};
-plugin_modules(_Config, Modules) ->
-    FoundModules = [M || M <- Modules, code:which(M) =/= non_existing],
-    case (Modules =:= FoundModules) of
-        true ->
-            ok;
-        false ->
-            ?DEBUG("Missing plugins: ~p\n", [Modules -- FoundModules]),
-            ok
-    end,
-    {ok, FoundModules}.
-
-%%
-%% Return .app file if the current directory is an OTP app
-%%
-app_dir(Dir) ->
-    rebar_app_utils:is_app_dir(Dir).
-
-%%
-%% Return the reltool.config file if the current directory is release directory
-%%
-rel_dir(Dir) ->
-    rebar_rel_utils:is_rel_dir(Dir).
-
-
-
-
-apply_command(Command, Modules, Config, ModuleFile) ->
+execute(Command, Modules, Config, ModuleFile) ->
     case select_modules(Modules, Command, []) of
         [] ->
             ?WARN("'~p' command does not apply to directory ~s\n",
@@ -441,7 +384,7 @@ apply_command(Command, Modules, Config, ModuleFile) ->
 
 
 update_code_path(Config) ->
-    case rebar_config:get(Config, lib_dirs, []) of
+    case rebar_config:get_local(Config, lib_dirs, []) of
         [] ->
             no_change;
         Paths ->
@@ -490,17 +433,13 @@ run_modules([Module | Rest], Command, Config, File) ->
             {error, Reason}
     end.
 
+
 acc_modules(Modules, Command, Config, File) ->
     acc_modules(select_modules(Modules, Command, []),
                 Command, Config, File, []).
 
-acc_modules([], _Command, Config, _File, Acc) ->
-    {Config, Acc};
+acc_modules([], _Command, _Config, _File, Acc) ->
+    Acc;
 acc_modules([Module | Rest], Command, Config, File, Acc) ->
-    case Module:Command(Config, File) of
-        {ok, NewConfig, Result} when is_list(Result) ->
-            List = Result;
-        {ok, NewConfig, Result} ->
-            List = [Result]
-    end,
-    acc_modules(Rest, Command, NewConfig, File, List ++ Acc).
+    {ok, Dirs} = Module:Command(Config, File),
+    acc_modules(Rest, Command, Config, File, Acc ++ Dirs).
