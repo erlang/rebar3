@@ -56,9 +56,14 @@ preprocess(Config, _) ->
     %% Add available deps to code path
     update_deps_code_path(AvailableDeps),
 
-    %% Return all the available dep directories for process
-    %% TODO: Re-add support for skip_deps=true
-    {ok, [D#dep.dir || D <- AvailableDeps]}.
+    %% If skip_deps=true, don't worry about processing deps at all.
+    case rebar_config:get_global(skip_deps, false) of
+        false ->
+            %% Return all the available dep directories for process
+            {ok, [D#dep.dir || D <- AvailableDeps]};
+         _ ->
+            {ok, []}
+    end.
 
 postprocess(_Config, _) ->
     case erlang:get(?MODULE) of
