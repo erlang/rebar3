@@ -48,13 +48,11 @@ is_app_dir(Dir) ->
     AppSrc = filename:join(Dir, "src/*.app.src"),
     case filelib:wildcard(AppSrc) of
         [AppSrcFile] ->
-            ?DEBUG("Found app.src: ~p\n", [AppSrcFile]),
             {true, AppSrcFile};
         _ ->
             App = filename:join([Dir, "ebin/*.app"]),
             case filelib:wildcard(App) of
                 [AppFile] ->
-                    ?DEBUG("Found .app: ~p\n", [AppFile]),
                     {true, AppFile};
                 _ ->
                     false
