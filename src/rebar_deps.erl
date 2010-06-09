@@ -32,7 +32,8 @@
          postprocess/2,
          compile/2,
          'check-deps'/2,
-         'get-deps'/2]).
+         'get-deps'/2,
+         'delete-deps'/2]).
 
 
 -record(dep, { dir,
@@ -104,6 +105,9 @@ compile(Config, AppFile) ->
     erlang:put(?MODULE, [D#dep.dir || D <- PulledDeps]),
     ok.
 
+'delete-deps'(Config, _) ->
+    rebar_file_utils:rm_rf(get_deps_dir()).
+
 
 %% ===================================================================
 %% Internal functions
@@ -152,8 +156,6 @@ find_deps([{App, VsnRegex, Source} | Rest], {Avail, Missing}) ->
 find_deps([Other | _Rest], _Acc) ->
     ?ABORT("Invalid dependency specification ~p in ~s\n",
            [Other, rebar_utils:get_cwd()]).
-
-
 
 
 require_source_engine(Source) ->
