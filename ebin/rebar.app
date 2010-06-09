@@ -46,8 +46,8 @@
          %% any_dir processing modules
          {any_dir_modules, [
                             rebar_require_vsn,
-                            rebar_subdirs,
                             rebar_deps,
+                            rebar_subdirs,
                             rebar_templater,
                             rebar_cleaner
                            ]},
