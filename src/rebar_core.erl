@@ -292,8 +292,12 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
             %% caused it to change
             ok = file:set_cwd(Dir),
 
+            %% Get the list of plug-in modules from rebar.config. These modules are
+            %% processed LAST and do not participate in preprocess.
+            {ok, PluginModules} = plugin_modules(Config),
+
             %% Execute the current command on this directory
-            execute(Command, Modules, Config, ModuleSetFile),
+            execute(Command, Modules ++ PluginModules, Config, ModuleSetFile),
 
             %% Mark the current directory as processed
             DirSet3 = sets:add_element(Dir, DirSet2),
@@ -315,6 +319,7 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
             %% Return the updated dirset as our result
             DirSet4
     end.
+
 
 
 %%
@@ -443,3 +448,36 @@ acc_modules([], _Command, _Config, _File, Acc) ->
 acc_modules([Module | Rest], Command, Config, File, Acc) ->
     {ok, Dirs} = Module:Command(Config, File),
     acc_modules(Rest, Command, Config, File, Acc ++ Dirs).
+
+%%
+%% Return a flat list of rebar plugin modules.
+%%
+plugin_modules(Config) ->
+    Modules = lists:flatten(rebar_config:get_all(Config, rebar_plugins)),
+    plugin_modules(Config, ulist(Modules)).
+
+ulist(L) ->
+    ulist(L, []).
+
+ulist([], Acc) ->
+    lists:reverse(Acc);
+ulist([H | T], Acc) ->
+    case lists:is_member(H, Acc) of
+        true ->
+            ulist(T, Acc);
+        false ->
+            ulist(T, [H | Acc])
+    end.
+
+plugin_modules(_Config, []) ->
+    {ok, []};
+plugin_modules(_Config, Modules) ->
+    FoundModules = [M || M <- Modules, code:which(M) =/= non_existing],
+    case (Modules =:= FoundModules) of
+        true ->
+            ok;
+        false ->
+            ?WARN("Missing plugins: ~p\n", [Modules -- FoundModules]),
+            ok
+    end,
+    {ok, FoundModules}.
