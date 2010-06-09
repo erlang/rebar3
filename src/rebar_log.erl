@@ -77,9 +77,9 @@ should_log(error, error) -> true;
 should_log(error, _)     -> false;
 should_log(_, _)         -> false.
 
-log_prefix(debug) -> "DEBUG:" ;
-log_prefix(info)  -> "INFO: ";
-log_prefix(warn)  -> "WARN: ";
+log_prefix(debug) -> "DEBUG: ";
+log_prefix(info)  -> "INFO:  ";
+log_prefix(warn)  -> "WARN:  ";
 log_prefix(error) -> "ERROR: ".
 
 
