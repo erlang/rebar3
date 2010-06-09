@@ -11,7 +11,8 @@ files() ->
      {copy, "../rebar", "rebar"}].
 
 run(_Dir) ->
-    {ok, _} = retest:sh("./rebar compile").
+    {ok, _} = retest:sh("./rebar compile"),
+    ok.
 
 
 
