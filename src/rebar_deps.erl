@@ -106,7 +106,12 @@ compile(Config, AppFile) ->
     ok.
 
 'delete-deps'(Config, _) ->
-    rebar_file_utils:rm_rf(get_deps_dir()).
+    %% Delete all the available deps, if any
+    Deps = rebar_config:get_local(Config, deps, []),
+    {AvailableDeps, _} = find_deps(Deps),
+    [delete_dep(D) || D <- AvailableDeps],
+    ok.
+
 
 
 %% ===================================================================
@@ -157,6 +162,15 @@ find_deps([Other | _Rest], _Acc) ->
     ?ABORT("Invalid dependency specification ~p in ~s\n",
            [Other, rebar_utils:get_cwd()]).
 
+
+delete_dep(D) ->
+    case filelib:is_dir(D#dep.dir) of
+        true ->
+            ?INFO("Deleting dependency: ~s\n", [D#dep.dir]),
+            rebar_file_utils:rm_rf(D#dep.dir);
+        false ->
+            ok
+    end.
 
 require_source_engine(Source) ->
     case source_engine_avail(Source) of
