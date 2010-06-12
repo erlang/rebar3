@@ -50,7 +50,7 @@
 %%              {erl_opts, [{platform_define,
 %%                           "(linux|solaris|freebsd|darwin)",
 %%                           'HAVE_SENDFILE'},
-%%                          {platform_define, "(linux|freebsd)"
+%%                          {platform_define, "(linux|freebsd)",
 %%                           'BACKLOG', 128}]}.
 %%
 
