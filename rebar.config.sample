@@ -16,7 +16,10 @@
 {erl_first_files, ["mymib1", "mymib2"]}.
 
 %% Erlang compiler options
-{erl_opts, [{i, "myinclude"}, {src_dirs, ["src1", "src2"]}]}.
+{erl_opts, [{i, "myinclude"}, {src_dirs, ["src1", "src2"]},
+            {platform_define,
+            "(linux|solaris|freebsd|darwin)", 'HAVE_SENDFILE'},
+            {platform_define, "(linux|freebsd)", 'BACKLOG', 128}]}.
 
 %% MIB Options?
 {mib_opts, []}.
