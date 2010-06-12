@@ -46,6 +46,11 @@
 %% ===================================================================
 
 preprocess(Config, _) ->
+    %% Side effect to set deps_dir globally for all dependencies from top level down.
+    %% Means the root deps_dir is honoured or the default used globally
+    %% since it will be set on the first time through here
+    set_global_deps_dir(Config, rebar_config:get_global(deps_dir, [])),
+
     %% Get the list of deps for the current working directory and identify those
     %% deps that are available/present.
     Deps = rebar_config:get_local(Config, deps, []),
@@ -62,7 +67,7 @@ preprocess(Config, _) ->
         false ->
             %% Return all the available dep directories for process
             {ok, [D#dep.dir || D <- AvailableDeps]};
-         _ ->
+        _ ->
             {ok, []}
     end.
 
@@ -118,9 +123,18 @@ compile(Config, AppFile) ->
 %% Internal functions
 %% ===================================================================
 
+%% Added because of trans deps,
+%% need all deps in same dir and should be the one set by the root rebar.config
+%% Sets a default if root config has no deps_dir set
+set_global_deps_dir(Config, []) ->
+    rebar_config:set_global(deps_dir, rebar_config:get_local(Config, deps_dir, "deps"));
+set_global_deps_dir(_Config, _DepsDir) ->
+    ok.
+
 get_deps_dir() ->
     BaseDir = rebar_config:get_global(base_dir, []),
-    filename:join(BaseDir, "deps").
+    DepsDir = rebar_config:get_global(deps_dir, "deps"),
+    filename:join(BaseDir, DepsDir).
 
 update_deps_code_path([]) ->
     ok;
