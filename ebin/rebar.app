@@ -23,6 +23,7 @@
               rebar_port_compiler,
               rebar_protobuffs_compiler,
               rebar_port_compiler,
+              rebar_post_script,
               rebar_rel_utils,
               rebar_reltool,
               rebar_require_vsn,
@@ -67,7 +68,8 @@
                                rebar_dialyzer,
                                rebar_escripter,
                                rebar_edoc,
-                               rebar_xref
+                               rebar_xref,
+                               rebar_post_script
                               ]},
 
                     {rel_dir, [
