@@ -49,7 +49,7 @@ generate(Config, ReltoolFile) ->
     validate_rel_apps(Server, sys_tuple(ReltoolConfig)),
 
     %% Finally, run reltool
-    case catch(run_reltool(Config, ReltoolConfig)) of
+    case catch(run_reltool(Server, Config, ReltoolConfig)) of
         ok ->
             ok;
         {error, failed} ->
@@ -60,9 +60,9 @@ generate(Config, ReltoolFile) ->
     end.
 
 
-clean(Config, ReltoolFile) ->
+clean(_Config, ReltoolFile) ->
     ReltoolConfig = load_config(ReltoolFile),
-    TargetDir = target_dir(Config, sys_tuple(ReltoolConfig)),
+    TargetDir = target_dir(ReltoolConfig),
     rebar_file_utils:rm_rf(TargetDir),
     rebar_file_utils:delete_each(["reltool.spec"]).
 
@@ -72,43 +72,65 @@ clean(Config, ReltoolFile) ->
 %% Internal functions
 %% ===================================================================
 
+%%
+%% Load terms from reltool.config
+%%
+load_config(ReltoolFile) ->
+    case file:consult(ReltoolFile) of
+        {ok, Terms} ->
+            Terms;
+        Other ->
+            ?ABORT("Failed to load expected config from ~s: ~p\n", [ReltoolFile, Other])
+    end.
+
+%%
+%% Look for the {sys, [...]} tuple in the reltool.config file. Without this present, we
+%% can't run reltool.
+%%
 sys_tuple(ReltoolConfig) ->
     case lists:keysearch(sys, 1, ReltoolConfig) of
         {value, {sys, Data}} ->
             {sys, Data};
         false ->
-            ?ERROR("Failed to find {sys, ...} tuple in reltool.config.", []),
-            ?FAIL
+            ?ABORT("Failed to find {sys, [...]} tuple in reltool.config.", [])
     end.
 
-load_config(ReltoolFile) ->
-    %% Load the reltool configuration from the file
-    case file:consult(ReltoolFile) of
-        {ok, Terms} ->
-            Terms;
-        Other ->
-            ?ERROR("Failed to load expected config from ~s: ~p\n", [ReltoolFile, Other]),
-            ?FAIL
+%%
+%% Look for {target_dir, TargetDir} in the reltool config file; if none is
+%% found, use the name of the release as the default target directory.
+%%
+target_dir(ReltoolConfig) ->
+    case lists:keysearch(target_dir, 1, ReltoolConfig) of
+        {value, {target_dir, TargetDir}} ->
+            filename:absname(TargetDir);
+        false ->
+            {sys, SysInfo} = sys_tuple(ReltoolConfig),
+            case lists:keysearch(rel, 1, SysInfo) of
+                {value, {rel, Name, _Vsn, _Apps}} ->
+                    filename:absname(Name);
+                false ->
+                    filename:absname("target")
+            end
     end.
 
+%%
+%% Look for overlay_vars file reference. The user can override this from the
+%% command line (i.e. globals), so we check there first and then fall back to
+%% what is present in the reltool.config file
+%%
+overlay_vars(ReltoolConfig) ->
+    case rebar_config:get_global(overlay_vars, undefined) of
+        undefined ->
+            case lists:keysearch(overlay_vars, 1, ReltoolConfig) of
+                {value, {overlay_vars, File}} ->
+                    File;
+                false ->
+                    undefined
+            end;
+        File ->
+            File
+    end.
 
-%%
-%% Determine the name of the target directory; try the user provided name
-%% first, or fall back to the release name if that's available. If neither
-%% is available, just use "target"
-%%
-target_dir(Config, {sys, ReltoolConfig}) ->
-  case rebar_config:get(Config, target_name, undefined) of
-      undefined ->
-          case lists:keysearch(rel, 1, ReltoolConfig) of
-              {value, {rel, Name, _Vsn, _Apps}} ->
-                  Name;
-              false ->
-                  "target"
-          end;
-      Name ->
-          Name
-  end.
 
 validate_rel_apps(ReltoolServer, {sys, ReltoolConfig}) ->
     case lists:keysearch(rel, 1, ReltoolConfig) of
@@ -121,13 +143,11 @@ validate_rel_apps(ReltoolServer, {sys, ReltoolConfig}) ->
                 [] ->
                     ok;
                 _ ->
-                    ?ERROR("Apps in {rel, ...} section not found by reltool: ~p\n", [Missing]),
-                    ?FAIL
+                    ?ABORT("Apps in {rel, ...} section not found by reltool: ~p\n", [Missing])
             end;
         {value, Rel} ->
             %% Invalid release format!
-            ?ERROR("Invalid {rel, ...} section in reltools.config: ~p\n", [Rel]),
-            ?FAIL;
+            ?ABORT("Invalid {rel, ...} section in reltools.config: ~p\n", [Rel]);
         false ->
             ok
     end.
@@ -143,33 +163,53 @@ app_exists(AppTuple, Server) when is_tuple(AppTuple) ->
     app_exists(element(1, AppTuple), Server).
 
 
-run_reltool(Config, ReltoolConfig) ->
-    {ok, Server} = reltool:start_server([sys_tuple(ReltoolConfig)]),
+run_reltool(Server, Config, ReltoolConfig) ->
     case reltool:get_target_spec(Server) of
         {ok, Spec} ->
-            TargetDir = target_dir(Config, sys_tuple(ReltoolConfig)),
+            %% Pull the target dir and make sure it exists
+            TargetDir = target_dir(ReltoolConfig),
             mk_target_dir(TargetDir),
 
-            %% Post process the specification with rebar directives (if any exist)
-            FinalSpec = case lists:keysearch(rebar, 1, ReltoolConfig) of
-                            {value, {rebar, RebarConfig}} ->
-                                process_rebar_specs(RebarConfig, Spec);
-                            false ->
-                                Spec
-                        end,
+            %% Dump the spec, if necessary
+            dump_spec(Spec),
 
-            dump_spec(FinalSpec),
-
-            case reltool:eval_target_spec(FinalSpec, code:root_dir(), TargetDir) of
+            %% Have reltool actually run
+            case reltool:eval_target_spec(Spec, code:root_dir(), TargetDir) of
                 ok ->
                     ok;
                 {error, Reason} ->
-                    ?ERROR("Failed to generate target from spec: ~p\n", [Reason]),
-                    ?FAIL
+                    ?ABORT("Failed to generate target from spec: ~p\n", [Reason])
+            end,
+
+            %% Initialize overlay vars with some basics (that can get overwritten)
+            OverlayVars0 = [{erts_vsn, "erts-" ++ erlang:system_info(version)}],
+
+            %% Load up any variables specified by overlay_vars
+            OverlayVars = case overlay_vars(ReltoolConfig) of
+                              undefined ->
+                                  dict:new(OverlayVars0);
+                              File ->
+                                  case file:consult(File) of
+                                      {ok, Terms} ->
+                                          dict:from_list(OverlayVars0 ++ Terms);
+                                      {error, Reason2} ->
+                                          ?ABORT("Unable to load overlay_vars from ~s: ~p\n",
+                                                 [File, Reason2])
+                                  end
+                          end,
+
+            %% Finally, overlay the files specified by the overlay section
+            case lists:keysearch(overlay, 1, ReltoolConfig) of
+                {value, {overlay, Overlay}} when is_list(Overlay) ->
+                    execute_overlay(Overlay, OverlayVars, rebar_utils:get_cwd(), TargetDir);
+                {value, _} ->
+                    ?ABORT("{overlay, [...]} entry in reltool.config must be a list.\n", []);
+                false ->
+                    ?INFO("No {overlay, [...]} found in reltool.config.\n", [])
             end;
+
         {error, Reason} ->
-            ?ERROR("Unable to generate spec: ~s\n", [Reason]),
-            ?FAIL
+            ?ABORT("Unable to generate spec: ~s\n", [Reason])
     end.
 
 
@@ -199,67 +239,72 @@ dump_spec(Spec) ->
             ok
     end.
 
-process_rebar_specs([], Spec) ->
-    Spec;
-process_rebar_specs([{overlay, Source} | Rest], Spec) ->
-    case file:list_dir(Source) of
-        {ok, Files} ->
-            OverlaySpec = spec_copy_overlay(Files, Source, []),
-            process_rebar_specs(Rest, Spec ++ OverlaySpec);
-        {error, Reason} ->
-            ?ERROR("Failed to list overlay directory ~p: ~p\n", [Source, Reason]),
-            ?FAIL
-    end;
-process_rebar_specs([{empty_dirs, Dirs} | Rest], Spec) ->
-    Spec2 = lists:foldl(fun(Dir, SpecAcc) ->
-                                spec_create_dir(filename:split(Dir), SpecAcc)
-                        end, Spec, Dirs),
-    process_rebar_specs(Rest, Spec2);
-process_rebar_specs([ Other | Rest], Spec) ->
-    ?WARN("Ignoring unknown rebar spec: ~p\n", [Other]),
-    process_rebar_specs(Rest, Spec).
 
-
-spec_create_dir([], Spec) ->
-    Spec;
-spec_create_dir([Path | Rest], Spec) ->
-    case lists:keysearch(Path, 2, Spec) of
-        {value, {create_dir, Path, Subspec}} ->
-            %% Directory already exists; process down into
-            %% Note: this is not tail recursive, but unless the directory structure
-            %% is insanely deep, shouldn't be a problem
-            lists:keystore(Path, 2, Spec, {create_dir, Path, spec_create_dir(Rest, Subspec)});
-        {value, Other} ->
-            %% Collision -- something other than create_dir is associated with this
-            %% portion of our path name.
-            ?ERROR("Collision of path name with existing tuple in spec: ~p\n", [Other]),
-            ?FAIL;
+execute_overlay([], _Vars, _BaseDir, _TargetDir) ->
+    ok;
+execute_overlay([{mkdir, Out} | Rest], Vars, BaseDir, TargetDir) ->
+    OutFile = render(filename:join([TargetDir, Out, "dummy"]), Vars),
+    filelib:ensure_dir(OutFile),
+    ?DEBUG("Created dir ~s\n", [filename:dirname(OutFile)]),
+    execute_overlay(Rest, Vars, BaseDir, TargetDir);
+execute_overlay([{copy, In} | Rest], _Vars, BaseDir, TargetDir) ->
+    execute_overlay([{copy, In, ""} | Rest], _Vars, BaseDir, TargetDir);
+execute_overlay([{copy, In, Out} | Rest], Vars, BaseDir, TargetDir) ->
+    InFile = render(filename:join(BaseDir, In), Vars),
+    OutFile = render(filename:join(TargetDir, Out), Vars),
+    case filelib:is_dir(InFile) of
+        true ->
+            ok;
         false ->
-            %% Directory doesn't yet exist
-            [{create_dir, Path, spec_create_dir(Rest, [])} | Spec]
-    end.
+            ok = filelib:ensure_dir(OutFile)
+    end,
+    rebar_utils:sh(?FMT("cp -R ~p ~p", [InFile, OutFile])),
+    execute_overlay(Rest, Vars, BaseDir, TargetDir);
+execute_overlay([{template, In, Out} | Rest], Vars, BaseDir, TargetDir) ->
+    {ok, InFileData} = file:read_file(render(filename:join(BaseDir, In), Vars)),
+    OutFile = render(filename:join(TargetDir, Out), Vars),
+    ok = filelib:ensure_dir(OutFile),
+    case file:write_file(OutFile, render(InFileData, Vars)) of
+        ok ->
+            ?DEBUG("Templated ~p\n", [OutFile]),
+            execute_overlay(Rest, Vars, BaseDir, TargetDir);
+        {error, Reason} ->
+            ?ABORT("Failed to template ~p: ~p\n", [OutFile, Reason])
+    end;
+execute_overlay([{create, Out, Contents} | Rest], Vars, BaseDir, TargetDir) ->
+    OutFile = render(filename:join(TargetDir, Out), Vars),
+    ok = filelib:ensure_dir(OutFile),
+    case file:write_file(OutFile, Contents) of
+        ok ->
+            ?DEBUG("Created ~p\n", [OutFile]),
+            execute_overlay(Rest, Vars, BaseDir, TargetDir);
+        {error, Reason} ->
+            ?ABORT("Failed to create ~p: ~p\n", [OutFile, Reason])
+    end;
+execute_overlay([{replace, Out, Regex, Replacement} | Rest],
+                Vars, BaseDir, TargetDir) ->
+    execute_overlay([{replace, Out, Regex, Replacement, []} | Rest], Vars, BaseDir, TargetDir);
+execute_overlay([{replace, Out, Regex, Replacement, Opts} | Rest],
+                Vars, BaseDir, TargetDir) ->
+    Filename = render(filename:join(TargetDir, Out), Vars),
+    {ok, OrigData} = file:read_file(Filename),
+    Data = re:replace(OrigData, Regex, Replacement, [global, {return, binary}] ++ Opts),
+    case file:write_file(Filename, Data) of
+        ok ->
+            ?DEBUG("Edited ~s: s/~s/~s/\n", [Filename, Regex, Replacement]),
+            execute_overlay(Rest, Vars, BaseDir, TargetDir);
+        {error, Reason} ->
+            ?ABORT("Failed to edit ~p: ~p\n", [Filename, Reason])
+    end;
+execute_overlay([Other | _Rest], _Vars, _BaseDir, _TargetDir) ->
+    {error, {unsupported_operation, Other}}.
 
-spec_copy_overlay([], _Dir, Acc) ->
-    lists:reverse(Acc);
-spec_copy_overlay([F | Rest], Dir, Acc) ->
-    Filename = filename:join(Dir, F),
-    {ok, Info} = file:read_file_info(Filename),
-    case Info#file_info.type of
-        directory ->
-            %% If this directory has the special name of "erts-vsn", we are going to replace "vsn" with the
-            %% actual erts vsn for the output directory name
-            case filename:basename(Filename) of
-                "erts-vsn" -> OutDir = "erts-" ++ erlang:system_info(version);
-                OutDir -> ok
-            end,
-            {ok, Files} = file:list_dir(Filename),
-            Entry = {create_dir, OutDir, spec_copy_overlay(Files, Filename, [])},
-            spec_copy_overlay(Rest, Dir, [Entry | Acc]);
-        regular ->
-            Entry = {copy_file, filename:basename(F), filename:absname(Filename)},
-            spec_copy_overlay(Rest, Dir, [Entry | Acc]);
-        Other ->
-            ?DEBUG("Skipping ~p of type ~p\n", [F, Other]),
-            spec_copy_overlay(Rest, Dir, Acc)
-    end.
 
+
+%%
+%% Render a binary to a string, using mustache and the specified context
+%%
+render(Bin, Context) ->
+    %% Be sure to escape any double-quotes before rendering...
+    Str = re:replace(Bin, "\"", "\\\\\"", [global, {return,list}]),
+    mustache:render(Str, Context).
