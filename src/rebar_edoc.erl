@@ -59,4 +59,8 @@ doc(Config, File) ->
 clean(Config, _File) ->
     EDocOpts = rebar_config:get(Config, edoc_opts, []),
     DocDir = proplists:get_value(dir, EDocOpts, "doc"),
-    rebar_file_utils:rm_rf(DocDir).
+
+    %% Delete all files except overview.edoc
+    Files = [F || F <- rebar_utils:find_files(DocDir, ".*"),
+                  filename:basename(F) /= "overview.edoc"],
+    rebar_file_utils:delete_each(Files).
