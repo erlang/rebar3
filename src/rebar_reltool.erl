@@ -187,7 +187,7 @@ run_reltool(Server, Config, ReltoolConfig) ->
             %% Load up any variables specified by overlay_vars
             OverlayVars = case overlay_vars(ReltoolConfig) of
                               undefined ->
-                                  dict:new(OverlayVars0);
+                                  dict:from_list(OverlayVars0);
                               File ->
                                   case file:consult(File) of
                                       {ok, Terms} ->
