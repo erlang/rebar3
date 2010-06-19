@@ -462,7 +462,7 @@ ulist(L) ->
 ulist([], Acc) ->
     lists:reverse(Acc);
 ulist([H | T], Acc) ->
-    case lists:is_member(H, Acc) of
+    case lists:member(H, Acc) of
         true ->
             ulist(T, Acc);
         false ->
