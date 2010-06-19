@@ -163,7 +163,7 @@ app_exists(AppTuple, Server) when is_tuple(AppTuple) ->
     app_exists(element(1, AppTuple), Server).
 
 
-run_reltool(Server, Config, ReltoolConfig) ->
+run_reltool(Server, _Config, ReltoolConfig) ->
     case reltool:get_target_spec(Server) of
         {ok, Spec} ->
             %% Pull the target dir and make sure it exists

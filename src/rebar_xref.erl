@@ -77,9 +77,6 @@ xref(Config, _) ->
 
     ok.
 
-foobar() ->
-    ok.
-
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
@@ -137,7 +134,7 @@ ks(Key, List) ->
 
 display_mfas([], _Message) ->
     ok;
-display_mfas([{Mod, Fun, Args} = MFA | Rest], Message) ->
+display_mfas([{_Mod, Fun, Args} = MFA | Rest], Message) ->
     {Source, Line} = find_mfa_source(MFA),
     ?CONSOLE("~s:~w: Warning: function ~s/~w ~s\n", [Source, Line, Fun, Args, Message]),
     display_mfas(Rest, Message).
