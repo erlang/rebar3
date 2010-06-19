@@ -29,7 +29,7 @@
 -export([is_rel_dir/0, is_rel_dir/1]).
 
 is_rel_dir() ->
-    is_rel_dir(rebar_util:get_cwd()).
+    is_rel_dir(rebar_utils:get_cwd()).
 
 is_rel_dir(Dir) ->
     Fname = filename:join([Dir, "reltool.config"]),

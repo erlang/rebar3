@@ -42,7 +42,7 @@
 %% ===================================================================
 
 is_app_dir() ->
-    is_app_dir(rebar_util:get_cwd()).
+    is_app_dir(rebar_utils:get_cwd()).
 
 is_app_dir(Dir) ->
     AppSrc = filename:join(Dir, "src/*.app.src"),
