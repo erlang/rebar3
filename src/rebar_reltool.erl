@@ -261,11 +261,13 @@ execute_overlay([{copy, In, Out} | Rest], Vars, BaseDir, TargetDir) ->
     rebar_utils:sh(?FMT("cp -R ~p ~p", [InFile, OutFile]), []),
     execute_overlay(Rest, Vars, BaseDir, TargetDir);
 execute_overlay([{template, In, Out} | Rest], Vars, BaseDir, TargetDir) ->
-    {ok, InFileData} = file:read_file(render(filename:join(BaseDir, In), Vars)),
+    InFile = render(filename:join(BaseDir, In), Vars),
+    {ok, InFileData} = file:read_file(InFile),
     OutFile = render(filename:join(TargetDir, Out), Vars),
     ok = filelib:ensure_dir(OutFile),
     case file:write_file(OutFile, render(InFileData, Vars)) of
         ok ->
+            ok = apply_file_info(InFile, OutFile),
             ?DEBUG("Templated ~p\n", [OutFile]),
             execute_overlay(Rest, Vars, BaseDir, TargetDir);
         {error, Reason} ->
@@ -309,3 +311,8 @@ render(Bin, Context) ->
     Str0 = re:replace(Bin, "\\\\", "\\\\\\", [global, {return, list}]),
     Str1 = re:replace(Str0, "\"", "\\\\\"", [global, {return,list}]),
     mustache:render(Str1, Context).
+
+
+apply_file_info(InFile, OutFile) ->
+    {ok, FileInfo} = file:read_file_info(InFile),
+    ok = file:write_file_info(OutFile, FileInfo).
