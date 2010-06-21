@@ -306,5 +306,6 @@ execute_overlay([Other | _Rest], _Vars, _BaseDir, _TargetDir) ->
 %%
 render(Bin, Context) ->
     %% Be sure to escape any double-quotes before rendering...
-    Str = re:replace(Bin, "\"", "\\\\\"", [global, {return,list}]),
-    mustache:render(Str, Context).
+    Str0 = re:replace(Bin, "\\\\", "\\\\\\", [global, {return, list}]),
+    Str1 = re:replace(Str0, "\"", "\\\\\"", [global, {return,list}]),
+    mustache:render(Str1, Context).
