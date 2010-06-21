@@ -9,12 +9,12 @@
 files() ->
     [
      %% A1 application
-     {create, "apps/a1/ebin/a1.app", app(a1)},
+     {create, "apps/a1/ebin/a1.app", app(a1, [a1])},
      {copy, "a.rebar.config", "apps/a1/rebar.config"},
      {template, "a.erl", "apps/a1/src/a1.erl", dict:from_list([{module, a1}])},
 
      %% A2 application
-     {create, "apps/a2/ebin/a2.app", app(a2)},
+     {create, "apps/a2/ebin/a2.app", app(a2, [a2])},
      {copy, "a.rebar.config", "apps/a2/rebar.config"},
      {template, "a.erl", "apps/a2/src/a2.erl", dict:from_list([{module, a2}])},
 
@@ -22,12 +22,12 @@ files() ->
      {copy, "../../rebar", "rebar"},
 
      %% B application
-     {create, "repo/b/ebin/b.app", app(b)},
+     {create, "repo/b/ebin/b.app", app(b, [])},
      {copy, "b.rebar.config", "repo/b/rebar.config"},
      {copy, "b.hrl", "repo/b/include/b.hrl"},
 
      %% C application
-     {create, "repo/c/ebin/c.app", app(c)},
+     {create, "repo/c/ebin/c.app", app(c, [])},
      {copy, "c.hrl", "repo/c/include/c.hrl"}
     ].
 
@@ -47,11 +47,11 @@ run(_Dir) ->
 %%
 %% Generate the contents of a simple .app file
 %%
-app(Name) ->
+app(Name, Modules) ->
     App = {application, Name,
            [{description, atom_to_list(Name)},
             {vsn, "1"},
-            {modules, []},
+            {modules, Modules},
             {registered, []},
             {applications, [kernel, stdlib]}]},
     io_lib:format("~p.\n", [App]).
