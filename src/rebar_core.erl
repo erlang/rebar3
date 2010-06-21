@@ -26,7 +26,10 @@
 %% -------------------------------------------------------------------
 -module(rebar_core).
 
--export([run/1]).
+-export([run/1,
+         skip_dir/1,
+         is_skip_dir/1,
+         skip_dirs/0]).
 
 -include("rebar.hrl").
 
@@ -72,11 +75,28 @@ run(RawArgs) ->
     %% Note the top-level directory for reference
     rebar_config:set_global(base_dir, filename:absname(rebar_utils:get_cwd())),
 
-    %% Load rebar.config, if it exists
-    [process_dir(rebar_utils:get_cwd(), rebar_config:new(), Command, sets:new())
-     || Command <- CommandAtoms],
-    ok.
+    %% Process each command, resetting any state between each one
+    process_commands(CommandAtoms).
 
+skip_dir(Dir) ->
+    case erlang:get({skip_dir, Dir}) of
+        undefined ->
+            ?DEBUG("Adding skip dir: ~s\n", [Dir]),
+            erlang:put({skip_dir, Dir}, true);
+        true ->
+            ok
+    end.
+
+is_skip_dir(Dir) ->
+    case erlang:get({skip_dir, Dir}) of
+        undefined ->
+            false;
+        true ->
+            true
+    end.
+
+skip_dirs() ->
+    [Dir || {{skip_dir, Dir}, true} <- erlang:get()].
 
 %% ===================================================================
 %% Internal functions
@@ -250,6 +270,15 @@ filter_flags([Item | Rest], Commands) ->
             filter_flags(Rest, Commands)
     end.
 
+process_commands([]) ->
+    ok;
+process_commands([Command | Rest]) ->
+    %% Reset skip dirs
+    [erlang:erase({skip_dir, D}) || D <- skip_dirs()],
+
+    process_dir(rebar_utils:get_cwd(), rebar_config:new(), Command, sets:new()),
+    process_commands(Rest).
+
 
 process_dir(Dir, ParentConfig, Command, DirSet) ->
     case filelib:is_dir(Dir) of
@@ -292,12 +321,21 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
             %% caused it to change
             ok = file:set_cwd(Dir),
 
-            %% Get the list of plug-in modules from rebar.config. These modules are
-            %% processed LAST and do not participate in preprocess.
-            {ok, PluginModules} = plugin_modules(Config),
+            %% Check that this directory is not on the skip list
+            case is_skip_dir(Dir) of
+                true ->
+                    %% Do not execute the command on the directory, as some module
+                    %% as requested a skip on it.
+                    ?INFO("Skipping ~s in ~s\n", [Command, Dir]);
 
-            %% Execute the current command on this directory
-            execute(Command, Modules ++ PluginModules, Config, ModuleSetFile),
+                false ->
+                    %% Get the list of plug-in modules from rebar.config. These modules are
+                    %% processed LAST and do not participate in preprocess.
+                    {ok, PluginModules} = plugin_modules(Config),
+
+                    %% Execute the current command on this directory
+                    execute(Command, Modules ++ PluginModules, Config, ModuleSetFile)
+            end,
 
             %% Mark the current directory as processed
             DirSet3 = sets:add_element(Dir, DirSet2),

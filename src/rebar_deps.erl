@@ -62,14 +62,19 @@ preprocess(Config, _) ->
     %% Add available deps to code path
     update_deps_code_path(AvailableDeps),
 
-    %% If skip_deps=true, don't worry about processing deps at all.
+    %% If skip_deps=true, mark each dep dir as a skip_dir w/ the core so that
+    %% the current command doesn't run on the dep dir. However, pre/postprocess
+    %% WILL run (and we want it to) for transitivity purposes.
     case rebar_config:get_global(skip_deps, false) of
-        false ->
-            %% Return all the available dep directories for process
-            {ok, [D#dep.dir || D <- AvailableDeps]};
+        "true" ->
+            [rebar_core:skip_dir(D#dep.dir) || D <- AvailableDeps];
         _ ->
-            {ok, []}
-    end.
+            ok
+    end,
+
+    %% Return all the available dep directories for process
+    {ok, [D#dep.dir || D <- AvailableDeps]}.
+
 
 postprocess(_Config, _) ->
     case erlang:get(?MODULE) of
