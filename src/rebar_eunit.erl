@@ -63,7 +63,7 @@ eunit(Config, AppFile) ->
         true ->
             ok;
         false ->
-            ?CONSOLE("Skipping eunit on app ~p\n", [ThisApp]),
+            ?DEBUG("Skipping eunit on app: ~p\n", [ThisApp]),
             throw(ok)
     end,
 
