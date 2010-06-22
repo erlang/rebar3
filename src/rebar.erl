@@ -29,26 +29,6 @@
 -export([main/1]).
 
 main(Args) ->
-    %% HACK: Make sure the caller is running w/ r13b03 and reltool >= 0.5.2
-    case erlang:system_info(version) < "5.7.4" of
-        true ->
-            io:format("Rebar requires at least erts 5.7.4; this VM is using ~s\n",
-                      [erlang:system_info(version)]),
-            halt(1);
-        false ->
-            ok
-    end,
-
-    ReltoolVsn = filename:basename(code:lib_dir(reltool)),
-    case ReltoolVsn < "reltool-0.5.2" of
-        true ->
-            io:format("Rebar requires at least reltool-0.5.2; this VM is using ~s\n",
-                      [ReltoolVsn]),
-            halt(1);
-        false ->
-            ok
-    end,
-
     case catch(rebar_core:run(Args)) of
         ok ->
             ok;

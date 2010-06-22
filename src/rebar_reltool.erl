@@ -38,6 +38,9 @@
 %% ===================================================================
 
 generate(Config, ReltoolFile) ->
+    %% Make sure we have decent version of reltool available
+    check_vsn(),
+
     %% Load the reltool configuration from the file
     ReltoolConfig = load_config(ReltoolFile),
 
@@ -71,6 +74,21 @@ clean(_Config, ReltoolFile) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+check_vsn() ->
+    case code:lib_dir(reltool) of
+        {error, bad_name} ->
+            ?ABORT("Reltool support requires the reltool application to be installed!", []);
+        Path ->
+            ReltoolVsn = filename:basename(Path),
+            case ReltoolVsn < "reltool-0.5.2" of
+                true ->
+                    ?ABORT("Reltool support requires at least reltool-0.5.2; this VM is using ~s\n",
+                           [ReltoolVsn]);
+                false ->
+                    ok
+            end
+    end.
 
 %%
 %% Load terms from reltool.config
