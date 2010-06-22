@@ -6,6 +6,9 @@ main(Args) ->
     %% Get a string repr of build time
     Built = build_time(),
 
+    %% Get a string repr of hg changeset
+    HgInfo = "hg " ++ string:strip(os:cmd("hg identify -i"), both, $\n),
+
     %% Check for force=1 flag to force a rebuild
     case lists:member("force=1", Args) of
         true ->
@@ -17,7 +20,8 @@ main(Args) ->
 
     %% Compile all src/*.erl to ebin
     case make:files(filelib:wildcard("src/*.erl"), [{outdir, "ebin"}, {i, "include"},
-                                                    {d, 'BUILD_TIME', Built}]) of
+                                                    {d, 'BUILD_TIME', Built},
+                                                    {d, 'VCS_INFO', HgInfo}]) of
         up_to_date ->
             ok;
         error ->

@@ -38,6 +38,10 @@
 -define(BUILD_TIME, "undefined").
 -endif.
 
+-ifndef(VCS_INFO).
+-define(VCS_INFO, "undefined").
+-endif.
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -231,7 +235,7 @@ version                              Show version information
 %%
 version() ->
     {ok, Vsn} = application:get_key(rebar, vsn),
-    ?CONSOLE("Version ~s built ~s\n", [Vsn, ?BUILD_TIME]).
+    ?CONSOLE("rebar version: ~s date: ~s vcs: ~s\n", [Vsn, ?BUILD_TIME, ?VCS_INFO]).
 
 %%
 %% options accepted via getopt
