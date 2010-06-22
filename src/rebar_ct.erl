@@ -37,11 +37,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_ct).
 
--export([test/2,
-         int_test/2,
-         perf_test/2]).
-
--compile([export_all]).
+-export([ct/2]).
 
 -include("rebar.hrl").
 
@@ -49,14 +45,9 @@
 %% Public API
 %% ===================================================================
 
-test(Config, File) ->
+ct(Config, File) ->
     run_test_if_present("test", Config, File).
 
-int_test(Config, File) ->
-    run_test_if_present("int_test", Config, File).
-
-perf_test(Config, File) ->
-    run_test_if_present("perf_test", Config, File).
 
 %% ===================================================================
 %% Internal functions
@@ -64,29 +55,29 @@ perf_test(Config, File) ->
 run_test_if_present(TestDir, Config, File) ->
     case filelib:is_dir(TestDir) of
         false ->
-	    ?WARN("~s directory not present - skipping\n", [TestDir]),
+            ?WARN("~s directory not present - skipping\n", [TestDir]),
             ok;
         true ->
-	    run_test(TestDir, Config, File)
+            run_test(TestDir, Config, File)
     end.
 
 run_test(TestDir, Config, _File) ->
     {Cmd, RawLog} = make_cmd(TestDir, Config),
     clear_log(RawLog),
     case rebar_config:get_global(verbose, "0") of
-	"0" ->
-	    Output = " >> " ++ RawLog ++ " 2>&1";
-	_ ->
-	    Output = " 2>&1 | tee -a " ++ RawLog
+        "0" ->
+            Output = " >> " ++ RawLog ++ " 2>&1";
+        _ ->
+            Output = " 2>&1 | tee -a " ++ RawLog
     end,
 
     case rebar_utils:sh(Cmd ++ Output, [{"TESTDIR", TestDir}]) of
-	ok ->
-	    check_log(RawLog);
-	{error, _Rc} ->
-	    show_log(RawLog),
-	    ?ERROR("Executing tests failed.\n", []),
-	    ?FAIL
+        ok ->
+            check_log(RawLog);
+        {error, _Rc} ->
+            show_log(RawLog),
+            ?ERROR("Executing tests failed.\n", []),
+            ?FAIL
     end.
 
 
@@ -134,32 +125,32 @@ show_log(RawLog) ->
     end.
 
 make_cmd(TestDir, _Config) ->
-    {ok, Cwd} = file:get_cwd(),
+    Cwd = rebar_utils:get_cwd(),
     LogDir = filename:join(Cwd, "logs"),
-    Ebin = filename:join(Cwd, "ebin"),
+    EbinDir = filename:absname(filename:join(Cwd, "ebin")),
     IncludeDir = filename:join(Cwd, "include"),
     case filelib:is_dir(IncludeDir) of
-	true ->
-	    Include = " -I \"" ++ IncludeDir ++ "\"";
-	false ->
-	    Include = ""
+        true ->
+            Include = " -I \"" ++ IncludeDir ++ "\"";
+        false ->
+            Include = ""
     end,
 
-    Cmd = lists:flatten(io_lib:format("erl " % should we expand ERL_PATH?
-				      " -noshell -pa \"~s\" ~s"
-				      " -s ct_run script_start -s erlang halt"
-				      " -name test@~s"
-				      " -logdir \"~s\""
-				      " -env TEST_DIR \"~s\"",
-				      [Ebin,
-				       Include,
-				       net_adm:localhost(),
-				       LogDir,
-				       filename:join(Cwd, TestDir)])) ++
-	get_ct_config_file(TestDir) ++
-	get_config_file(TestDir) ++
-	get_suite(TestDir) ++
-	get_case(),
+    Cmd = ?FMT("erl " % should we expand ERL_PATH?
+               " -noshell -pa \"~s\" ~s"
+               " -s ct_run script_start -s erlang halt"
+               " -name test@~s"
+               " -logdir \"~s\""
+               " -env TEST_DIR \"~s\"",
+               [EbinDir,
+                Include,
+                net_adm:localhost(),
+                LogDir,
+                filename:join(Cwd, TestDir)]) ++
+        get_ct_config_file(TestDir) ++
+        get_config_file(TestDir) ++
+        get_suite(TestDir) ++
+        get_case(),
     RawLog = filename:join(LogDir, "raw.log"),
     {Cmd, RawLog}.
 
@@ -184,23 +175,23 @@ get_config_file(TestDir) ->
 
 get_suite(TestDir) ->
     case rebar_config:get_global(suite, undefined) of
-	undefined ->
-	    " -dir " ++ TestDir;
-	Suite ->
-	    Filename = filename:join(TestDir, Suite ++ "_SUITE.erl"),
-	    case filelib:is_regular(Filename) of
-		false ->
-		    ?ERROR("Suite ~s not found\n", [Suite]),
-		    ?FAIL;
-		true ->
-		    " -suite " ++ Filename
-	    end
+        undefined ->
+            " -dir " ++ TestDir;
+        Suite ->
+            Filename = filename:join(TestDir, Suite ++ "_SUITE.erl"),
+            case filelib:is_regular(Filename) of
+                false ->
+                    ?ERROR("Suite ~s not found\n", [Suite]),
+                    ?FAIL;
+                true ->
+                    " -suite " ++ Filename
+            end
     end.
 
 get_case() ->
     case rebar_config:get_global('case', undefined) of
-	undefined ->
-	    "";
-	Case ->
-	    " -case " ++ Case
+        undefined ->
+            "";
+        Case ->
+            " -case " ++ Case
     end.
