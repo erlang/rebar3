@@ -100,17 +100,22 @@ sys_tuple(ReltoolConfig) ->
 %% found, use the name of the release as the default target directory.
 %%
 target_dir(ReltoolConfig) ->
-    case lists:keysearch(target_dir, 1, ReltoolConfig) of
-        {value, {target_dir, TargetDir}} ->
-            filename:absname(TargetDir);
-        false ->
-            {sys, SysInfo} = sys_tuple(ReltoolConfig),
-            case lists:keysearch(rel, 1, SysInfo) of
-                {value, {rel, Name, _Vsn, _Apps}} ->
-                    filename:absname(Name);
+    case rebar_config:get_global(target_dir, undefined) of
+        undefined ->
+            case lists:keysearch(target_dir, 1, ReltoolConfig) of
+                {value, {target_dir, TargetDir}} ->
+                    filename:absname(TargetDir);
                 false ->
-                    filename:absname("target")
-            end
+                    {sys, SysInfo} = sys_tuple(ReltoolConfig),
+                    case lists:keysearch(rel, 1, SysInfo) of
+                        {value, {rel, Name, _Vsn, _Apps}} ->
+                            filename:absname(Name);
+                        false ->
+                            filename:absname("target")
+                    end
+            end;
+        TargetDir ->
+            filename:absname(TargetDir)
     end.
 
 %%
