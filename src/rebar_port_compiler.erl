@@ -85,7 +85,7 @@ compile(Config, AppFile) ->
             %% default for this operating system. This enables max flexibility for users.
             DefaultEnvs  = filter_envs(default_env(), []),
             OverrideEnvs = filter_envs(rebar_config:get_list(Config, port_envs, []), []),
-            Env = expand_vars_loop(merge_each_var(os_env() ++ DefaultEnvs ++ OverrideEnvs, [])),
+            Env = expand_vars_loop(merge_each_var(DefaultEnvs ++ OverrideEnvs ++ os_env(), [])),
 
             %% One or more files are available for building. Run the pre-compile hook, if
             %% necessary.
