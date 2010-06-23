@@ -55,8 +55,8 @@
 %% ===================================================================
 
 eunit(Config, AppFile) ->
-    %% Check for app global parameter; this ia comma-delimited list of apps
-    %% on which we want to run eunit
+    %% Check for app global parameter; this is a comma-delimited list
+    %% of apps on which we want to run eunit
     TargetApps = [list_to_atom(A) || A <- string:tokens(rebar_config:get_global(app, []), ",")],
     ThisApp = rebar_app_utils:app_name(AppFile),
     case lists:member(ThisApp, TargetApps) of
