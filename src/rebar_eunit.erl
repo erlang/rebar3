@@ -57,14 +57,21 @@
 eunit(Config, AppFile) ->
     %% Check for app global parameter; this is a comma-delimited list
     %% of apps on which we want to run eunit
-    TargetApps = [list_to_atom(A) || A <- string:tokens(rebar_config:get_global(app, []), ",")],
-    ThisApp = rebar_app_utils:app_name(AppFile),
-    case lists:member(ThisApp, TargetApps) of
-        true ->
+    case rebar_config:get_global(app, undefined) of
+        undefined ->
+            %% No app parameter specified, run everything..
             ok;
-        false ->
-            ?DEBUG("Skipping eunit on app: ~p\n", [ThisApp]),
-            throw(ok)
+
+        Apps ->
+            TargetApps = [list_to_atom(A) || A <- string:tokens(Apps, ",")],
+            ThisApp = rebar_app_utils:app_name(AppFile),
+            case lists:member(ThisApp, TargetApps) of
+                true ->
+                    ok;
+                false ->
+                    ?DEBUG("Skipping eunit on app: ~p\n", [ThisApp]),
+                    throw(ok)
+            end
     end,
 
     %% Make sure ?EUNIT_DIR/ directory exists (tack on dummy module)
