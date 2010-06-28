@@ -77,6 +77,13 @@ eunit(Config, AppFile) ->
     %% Make sure ?EUNIT_DIR/ directory exists (tack on dummy module)
     ok = filelib:ensure_dir(?EUNIT_DIR ++ "/foo"),
 
+    %% Setup code path prior to compilation so that parse_transforms and the like
+    %% work properly. Also, be sure to add ebin_dir() to the END of the code path
+    %% so that we don't have to jump through hoops to access the .app file
+    CodePath = code:get_path(),
+    true = code:add_patha(eunit_dir()),
+    true = code:add_pathz(ebin_dir()),
+
     %% Obtain all the test modules for inclusion in the compile stage.
     %% Notice: this could also be achieved with the following rebar.config option:
     %% {eunit_compile_opts, [{src_dirs, ["test"]}]}
@@ -112,9 +119,11 @@ eunit(Config, AppFile) ->
         ok ->
             ok;
         _ ->
-            ?CONSOLE("One or more eunit tests failed.~n", []),
-            ?FAIL
+            ?ABORT("One or more eunit tests failed.~n", [])
     end,
+
+    %% Restore code path
+    code:set_path(CodePath),
     ok.
 
 clean(_Config, _File) ->
@@ -127,39 +136,31 @@ clean(_Config, _File) ->
 eunit_dir() ->
     filename:join(rebar_utils:get_cwd(), ?EUNIT_DIR).
 
+ebin_dir() ->
+    filename:join(rebar_utils:get_cwd(), "ebin").
+
 perform_eunit(Config, Modules) ->
     %% suite defined, so only specify the module that relates to the
     %% suite (if any)
     Suite = rebar_config:get_global(suite, undefined),
     EunitOpts = get_eunit_opts(Config),
 
-    OrigEnv = set_proc_env(),
+    %% Move down into ?EUNIT_DIR while we run tests so any generated files
+    %% are created there (versus in the source dir)
+    Cwd = rebar_utils:get_cwd(),
+    file:set_cwd(?EUNIT_DIR),
+
     EunitResult = perform_eunit(EunitOpts, Modules, Suite),
-    restore_proc_env(OrigEnv),
+
+    %% Return to original working dir
+    file:set_cwd(Cwd),
+
     EunitResult.
 
 perform_eunit(EunitOpts, Modules, undefined) ->
     (catch eunit:test(Modules, EunitOpts));
 perform_eunit(EunitOpts, _Modules, Suite) ->
     (catch eunit:test(list_to_atom(Suite), EunitOpts)).
-
-set_proc_env() ->
-    %% Save current code path and then prefix ?EUNIT_DIR on it so that our modules
-    %% are found there
-    CodePath = code:get_path(),
-    true = code:add_patha(eunit_dir()),
-
-    %% Move down into ?EUNIT_DIR while we run tests so any generated files
-    %% are created there (versus in the source dir)
-    Cwd = rebar_utils:get_cwd(),
-    file:set_cwd(?EUNIT_DIR),
-    {CodePath, Cwd}.
-
-restore_proc_env({CodePath, Cwd}) ->
-    %% Return to original working dir
-    file:set_cwd(Cwd),
-    %% Restore code path
-    true = code:set_path(CodePath).
 
 get_eunit_opts(Config) ->
     %% Enable verbose in eunit if so requested..
@@ -271,18 +272,12 @@ cover_analyze_mod(Module) ->
 
 is_eunitized(Mod) ->
     has_eunit_test_fun(Mod) andalso
-        has_eunit_header(Mod).
+        has_header(Mod, "include/eunit.hrl").
 
 has_eunit_test_fun(Mod) ->
     length([F || {exports, Funs} <- Mod:module_info(),
                     {F, 0} <- Funs,
                     F == test]) =/= 0.
-
-has_eunit_header(Mod) ->
-    OrigEnv = set_proc_env(),
-    try has_header(Mod, "include/eunit.hrl")
-    after restore_proc_env(OrigEnv)
-    end.
 
 has_header(Mod, Header) ->
     {ok, {_, [{abstract_code, {_, AC}}]}} = beam_lib:chunks(Mod, [abstract_code]),
