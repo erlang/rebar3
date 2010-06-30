@@ -208,6 +208,8 @@ create      template= [var=foo,...]  Create skel based on template and vars
 create-app  [appid=myapp]            Create simple app skel
 create-node [nodeid=mynode]          Create simple node skel
 
+doc                                  Generate Erlang program documentation
+
 check-deps                           Display to be fetched dependencies
 get-deps                             Fetch dependencies
 delete-deps                          Delete fetched dependencies
