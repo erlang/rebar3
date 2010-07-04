@@ -280,7 +280,14 @@ has_eunit_test_fun(Mod) ->
                     F == test]) =/= 0.
 
 has_header(Mod, Header) ->
-    {ok, {_, [{abstract_code, {_, AC}}]}} = beam_lib:chunks(Mod, [abstract_code]),
+    Mod1 = case code:which(Mod) of 
+               cover_compiled -> 
+                   {file, File} = cover:is_compiled(Mod),
+                   File;
+               undefined -> Mod;
+               L -> L
+           end,
+    {ok, {_, [{abstract_code, {_, AC}}]}} = beam_lib:chunks(Mod1, [abstract_code]),
     length([F || {attribute, 1, file, {F, 1}} <- AC,
                  string:str(F, Header) =/= 0]) =/= 0.
 
