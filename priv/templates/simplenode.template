@@ -1,7 +1,7 @@
 {variables, [{nodeid, "mynode"}]}.
 {template, "simplenode.reltool.config", "reltool.config"}.
-{file, "simplenode.erl.script", "overlay/erts-vsn/bin/erl"}.
-{file, "simplenode.nodetool", "overlay/erts-vsn/bin/nodetool"}.
-{file, "simplenode.runner", "overlay/bin/{{nodeid}}"}.
-{file, "simplenode.app.config", "overlay/etc/app.config"}.
-{template, "simplenode.vm.args", "overlay/etc/vm.args"}.
+{file, "simplenode.erl.script", "files/erl"}.
+{file, "simplenode.nodetool", "files/nodetool"}.
+{file, "simplenode.runner", "files/{{nodeid}}"}.
+{file, "simplenode.app.config", "files/app.config"}.
+{template, "simplenode.vm.args", "files/vm.args"}.
