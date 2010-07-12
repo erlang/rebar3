@@ -311,8 +311,8 @@ os_env() ->
 
 default_env() ->
     [
-     {"CC", "gcc"},
-     {"CXX", "g++"},
+     {"CC", "cc"},
+     {"CXX", "c++"},
      {"ERL_CFLAGS", lists:concat([" -I", code:lib_dir(erl_interface, include),
                                   " -I", filename:join(erts_dir(), include),
                                   " "])},
