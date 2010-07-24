@@ -58,6 +58,7 @@
          %% Dir specific processing modules
          {modules, [
                     {app_dir, [
+                               rebar_pre_script,
                                rebar_protobuffs_compiler,
                                rebar_neotoma_compiler,
                                rebar_asn1_compiler,
@@ -72,8 +73,7 @@
                                rebar_escripter,
                                rebar_edoc,
                                rebar_xref,
-                               rebar_post_script,
-                               rebar_pre_script
+                               rebar_post_script
                               ]},
 
                     {rel_dir, [
