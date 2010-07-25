@@ -79,6 +79,9 @@ run(RawArgs) ->
     %% Note the top-level directory for reference
     rebar_config:set_global(base_dir, filename:absname(rebar_utils:get_cwd())),
 
+    %% Keep track of how many operations we do, so we can detect bad commands
+    erlang:put(operations, 0),
+
     %% Process each command, resetting any state between each one
     process_commands(CommandAtoms).
 
@@ -275,12 +278,26 @@ filter_flags([Item | Rest], Commands) ->
     end.
 
 process_commands([]) ->
-    ok;
+    case erlang:get(operations) of
+        0 ->
+            %% none of the commands had an effect
+            ?FAIL;
+        _ ->
+            ok
+    end;
 process_commands([Command | Rest]) ->
     %% Reset skip dirs
     [erlang:erase({skip_dir, D}) || D <- skip_dirs()],
+    Operations = erlang:get(operations),
 
     process_dir(rebar_utils:get_cwd(), rebar_config:new(), Command, sets:new()),
+    case erlang:get(operations) of
+        Operations ->
+            %% This command didn't do anything
+            ?CONSOLE("Command '~p' not understood\n", [Command]);
+        _ ->
+            ok
+    end,
     process_commands(Rest).
 
 
@@ -416,6 +433,9 @@ execute(Command, Modules, Config, ModuleFile) ->
             %% Provide some info on where we are
             Dir = rebar_utils:get_cwd(),
             ?CONSOLE("==> ~s (~s)\n", [filename:basename(Dir), Command]),
+
+            %% Increment the count of operations, since some module responds to this command
+            erlang:put(operations, erlang:get(operations) + 1),
 
             %% Run the available modules
             case catch(run_modules(TargetModules, Command, Config, ModuleFile)) of
