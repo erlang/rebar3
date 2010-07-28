@@ -124,7 +124,7 @@ show_log(RawLog) ->
 	    ok
     end.
 
-make_cmd(TestDir, _Config) ->
+make_cmd(TestDir, Config) ->
     Cwd = rebar_utils:get_cwd(),
     LogDir = filename:join(Cwd, "logs"),
     EbinDir = filename:absname(filename:join(Cwd, "ebin")),
@@ -147,6 +147,7 @@ make_cmd(TestDir, _Config) ->
                 net_adm:localhost(),
                 LogDir,
                 filename:join(Cwd, TestDir)]) ++
+        get_cover_config(Config, Cwd) ++
         get_ct_config_file(TestDir) ++
         get_config_file(TestDir) ++
         get_suite(TestDir) ++
@@ -154,6 +155,33 @@ make_cmd(TestDir, _Config) ->
     RawLog = filename:join(LogDir, "raw.log"),
     {Cmd, RawLog}.
 
+get_cover_config(Config, Cwd) ->
+    case rebar_config:get_local(Config, cover_enabled, false) of
+        false ->
+            "";
+        true ->
+            case filelib:fold_files(Cwd, ".*cover\.spec\$", true, fun collect_ct_specs/2, []) of
+				[] ->
+					?DEBUG("No cover spec found: ~s~n", [Cwd]),
+					"";
+				[Spec] ->
+					?DEBUG("Found cover file ~w~n", [Spec]),
+					" -cover " ++ Spec;
+				Specs ->
+					?ABORT("Multiple cover specs found: ~p~n", [Specs])
+			end
+	end.
+
+collect_ct_specs(F, Acc) ->
+    %% Ignore any specs under the deps/ directory. Do this pulling the dirname off the
+    %% the F and then splitting it into a list.
+    Parts = filename:split(filename:dirname(F)),
+    case lists:member("deps", Parts) of
+        true ->
+            Acc;                     % There is a directory named "deps" in path
+        false ->
+            [F | Acc]                % No "deps" directory in path
+    end.
 
 get_ct_config_file(TestDir) ->
     Config = filename:join(TestDir, "test.config"),
