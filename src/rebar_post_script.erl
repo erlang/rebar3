@@ -47,7 +47,7 @@ clean(Config, _) ->
 %% ===================================================================
 
 execute_post_script(Config, Key) ->
-    case rebar_config:get(Config, Key, undefined) of
+    case rebar_config:get_local(Config, Key, undefined) of
         undefined ->
             ok;
         Script ->
