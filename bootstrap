@@ -6,8 +6,9 @@ main(Args) ->
     %% Get a string repr of build time
     Built = build_time(),
 
-    %% Get a string repr of hg changeset
-    HgInfo = "hg " ++ string:strip(os:cmd("hg identify -i"), both, $\n),
+    %% Get a string repr of first matching VCS changeset
+    VcsInfo = vcs_info([{hg, ".hg", "hg identify -i"},
+                        {git, ".git", "git describe --always"}]),
 
     %% Check for force=1 flag to force a rebuild
     case lists:member("force=1", Args) of
@@ -15,13 +16,14 @@ main(Args) ->
             [] = os:cmd("rm -rf ebin/*.beam"),
             ok;
         false ->
+            os:cmd("rm -f ebin/rebar_core.beam"),
             ok
     end,
 
     %% Compile all src/*.erl to ebin
     case make:files(filelib:wildcard("src/*.erl"), [{outdir, "ebin"}, {i, "include"},
                                                     {d, 'BUILD_TIME', Built},
-                                                    {d, 'VCS_INFO', HgInfo}]) of
+                                                    {d, 'VCS_INFO', VcsInfo}]) of
         up_to_date ->
             ok;
         error ->
@@ -86,3 +88,13 @@ load_files(Wildcard, Dir) ->
 read_file(Filename, Dir) ->
     {ok, Bin} = file:read_file(filename:join(Dir, Filename)),
     {Filename, Bin}.
+
+vcs_info([]) ->
+    "No VCS info available.";
+vcs_info([{Id, Dir, Cmd} | Rest]) ->
+    case filelib:is_dir(Dir) of
+        true ->
+            lists:concat([Id, " ", string:strip(os:cmd(Cmd), both, $\n)]);
+        false ->
+            vcs_info(Rest)
+    end.
