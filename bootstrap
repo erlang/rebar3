@@ -13,11 +13,9 @@ main(Args) ->
     %% Check for force=1 flag to force a rebuild
     case lists:member("force=1", Args) of
         true ->
-            [] = os:cmd("rm -rf ebin/*.beam"),
-            ok;
+            rm("ebin/*.beam");
         false ->
-            os:cmd("rm -f ebin/rebar_core.beam"),
-            ok
+            rm("ebin/rebar_core.beam")
     end,
 
     %% Compile all src/*.erl to ebin
@@ -69,13 +67,27 @@ main(Args) ->
     end,
 
     %% Finally, update executable perms for our script
-    [] = os:cmd("chmod u+x rebar"),
-
+    case os:type() of
+        {unix,_} ->
+            [] = os:cmd("chmod u+x rebar"),
+            ok;
+        _ ->
+            ok
+    end,
+    
     %% Add a helpful message
     io:format("Congratulations! You now have a self-contained script called \"rebar\" in\n"
               "your current working directory. Place this script anywhere in your path\n"
               "and you can use rebar to build OTP-compliant apps.\n").
 
+rm(Path) ->
+    NativePath = filename:nativename(Path), 
+    Cmd = case os:type() of
+              {unix,_} -> "rm -f ";
+              {win32,_} -> "del /q "
+          end,
+    [] = os:cmd(Cmd ++ NativePath), 
+    ok.
 
 build_time() ->
     {{Y, M, D}, {H, Min, S}} = calendar:now_to_universal_time(now()),
