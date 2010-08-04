@@ -314,12 +314,12 @@ required_scm_client_vsn(bzr) -> {2, 0};
 required_scm_client_vsn(svn) -> {1, 6}.
 
 scm_client_vsn(hg) ->
-    scm_client_vsn(os:find_executable(hg), " --version", "version (\\d+).(\\d+)");
+    scm_client_vsn(rebar_utils:find_executable(hg), " --version", "version (\\d+).(\\d+)");
 scm_client_vsn(git) ->
-    scm_client_vsn(os:find_executable(git), " --version", "git version (\\d+).(\\d+)");
+    scm_client_vsn(rebar_utils:find_executable(git), " --version", "git version (\\d+).(\\d+)");
 scm_client_vsn(bzr) ->
-    scm_client_vsn(os:find_executable(bzr), " --version", "Bazaar \\(bzr\\) (\\d+).(\\d+)");
+    scm_client_vsn(rebar_utils:find_executable(bzr), " --version", "Bazaar \\(bzr\\) (\\d+).(\\d+)");
 scm_client_vsn(svn) ->
-    scm_client_vsn(os:find_executable(svn), " --version", "svn, version (\\d+).(\\d+)");
+    scm_client_vsn(rebar_utils:find_executable(svn), " --version", "svn, version (\\d+).(\\d+)");
 scm_client_vsn(_) ->
     undefined.

@@ -38,7 +38,8 @@
          beam_to_mod/2, beams/1,
          erl_to_mod/1,
          abort/2,
-         escript_foldl/3]).
+         escript_foldl/3,
+         find_executable/1]).
 
 -include("rebar.hrl").
 
@@ -124,6 +125,9 @@ escript_foldl(Fun, Acc, File) ->
         false ->
             escript:foldl(Fun, Acc, File)
     end.
+
+find_executable(Name) ->
+    "\"" ++ filename:nativename(os:find_executable(Name)) ++ "\"".
 
 %% ====================================================================
 %% Internal functions
