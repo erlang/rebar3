@@ -55,7 +55,7 @@ main(Args) ->
         {ok, {"mem", ZipBin}} ->
             %% Archive was successfully created. Prefix that binary with our
             %% header and write to "rebar" file
-            Script = <<"#!/usr/bin/env escript\n", ZipBin/binary>>,
+            Script = <<"#!/usr/bin/env escript\n%%! -noshell -noinput\n", ZipBin/binary>>,
             case file:write_file("rebar", Script) of
                 ok ->
                     ok;
