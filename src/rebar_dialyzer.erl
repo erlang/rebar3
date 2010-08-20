@@ -57,7 +57,7 @@
 %% ===================================================================
 
 %% @doc Perform static analysis on the contents of the ebin directory.
-%% @spec analyze(Config::#config{}, File::string()) -> ok.
+%% @spec analyze(Config::#config{}, File::string()) -> ok
 -spec(analyze(Config::#config{}, File::string()) -> ok).
 analyze(Config, File) ->
     Plt = plt_path(Config, File),
