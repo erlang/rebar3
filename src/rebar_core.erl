@@ -207,6 +207,7 @@ compile                              Compile sources
 create      template= [var=foo,...]  Create skel based on template and vars
 create-app  [appid=myapp]            Create simple app skel
 create-node [nodeid=mynode]          Create simple node skel
+list-templates                       List available templates
 
 doc                                  Generate Erlang program documentation
 

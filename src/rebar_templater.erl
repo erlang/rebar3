@@ -28,6 +28,7 @@
 
 -export(['create-app'/2,
          'create-node'/2,
+         'list-templates'/2,
          create/2]).
 
 -include("rebar.hrl").
@@ -47,6 +48,20 @@
     %% Alias for create w/ template=simplenode
     rebar_config:set_global(template, "simplenode"),
     create(Config, File).
+
+'list-templates'(_Config, _File) ->
+    %% Load a list of all the files in the escript -- cache it in the pdict
+    %% since we'll potentially need to walk it several times over the course
+    %% of a run.
+    cache_escript_files(),
+
+    %% Build a list of available templates
+    AvailTemplates = find_disk_templates() ++ find_escript_templates(),
+    ?CONSOLE("Available templates:\n", []),
+    [?CONSOLE("\t* ~s: ~s (~p)\n", [filename:basename(F, ".template"), F, Type]) ||
+        {Type, F} <- AvailTemplates],
+    ok.
+
 
 create(_Config, _) ->
     %% Load a list of all the files in the escript -- cache it in the pdict
