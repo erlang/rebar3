@@ -116,10 +116,12 @@ compile(Config, AppFile) ->
     ok.
 
 'delete-deps'(Config, _) ->
-    %% Delete all the available deps, if any
+    %% Delete all the available deps in our deps/ directory, if any
+    DepsDir = get_deps_dir(),
     Deps = rebar_config:get_local(Config, deps, []),
     {AvailableDeps, _} = find_deps(Deps),
-    [delete_dep(D) || D <- AvailableDeps],
+    [delete_dep(D) || D <- AvailableDeps,
+                      lists:prefix(DepsDir, D#dep.dir) == true],
     ok.
 
 
