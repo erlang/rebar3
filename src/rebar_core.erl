@@ -219,10 +219,7 @@ generate    [dump_spec=0/1]          Build release with reltool
 install     [target=]                Install build into target
 
 eunit       [suite=foo]              Run eunit [test/foo_tests.erl] tests
-
-int_test    [suite=] [case=]         Run ct suites in ./int_test
-perf_test   [suite=] [case=]         Run ct suites in ./perf_test
-test        [suite=] [case=]         Run ct suites in ./test
+ct          [suite=] [case=]         Run common_test suites in ./test
 
 xref                                 Run cross reference analysis
 
