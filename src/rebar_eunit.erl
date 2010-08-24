@@ -75,7 +75,7 @@ eunit(Config, AppFile) ->
     end,
 
     %% Make sure ?EUNIT_DIR/ and ebin/ directory exists (tack on dummy module)
-    ok = filelib:ensure_dir(?EUNIT_DIR ++ "/foo"),
+    ok = filelib:ensure_dir(eunit_dir() ++ "/foo"),
     ok = filelib:ensure_dir(ebin_dir() ++ "/foo"),
 
     %% Setup code path prior to compilation so that parse_transforms and the like
