@@ -219,7 +219,6 @@ get-deps                             Fetch dependencies
 delete-deps                          Delete fetched dependencies
 
 generate    [dump_spec=0/1]          Build release with reltool
-install     [target=]                Install build into target
 
 eunit       [suite=foo]              Run eunit [test/foo_tests.erl] tests
 ct          [suite=] [case=]         Run common_test suites in ./test
