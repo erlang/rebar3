@@ -9,3 +9,42 @@ you to save this as part of custom-set-variables:
 You can also tell Emacs to ignore file variables:
 (setq enable-local-variables nil
       enable-local-eval nil)
+
+
+Writing Commit Messages
+=======================
+
+  One line summary (< 50 characters)
+
+  Longer description (wrap at 72 characters)
+
+Summary
+-------
+
+* Less than 50 characters
+
+* What was changed
+
+* Imperative present tense (fix, add, change)
+
+    Fix bug 42
+    Add 'foobar' command
+    Change default timeout to 42
+
+* No period
+
+Description
+-----------
+
+* Wrap at 72 characters
+
+* Why, explain intention and implementation approach
+
+* Present tense
+
+Atomicity
+---------
+
+* Break up logical changes
+
+* Make whitespace changes separately
