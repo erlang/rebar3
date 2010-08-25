@@ -1,5 +1,5 @@
 Indenting
-~~~~~~~~~
+=========
 To have consistent indenting we have vi modeline/emacs local variable
 headers in rebar's source files. This works automatically with vi.
 With Emacs you have to declare 'erlang-indent-level set to 4'
