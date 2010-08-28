@@ -146,10 +146,19 @@ find_escript_templates() ->
                         re:run(Name, ?TEMPLATE_RE, [{capture, none}]) == match].
 
 find_disk_templates() ->
+    OtherTemplates = find_other_templates(),
     HomeFiles = rebar_utils:find_files(filename:join(os:getenv("HOME"),
                                                      ".rebar/templates"), ?TEMPLATE_RE),
     LocalFiles = rebar_utils:find_files(".", ?TEMPLATE_RE),
-    [{file, F} || F <- HomeFiles++LocalFiles].
+    [{file, F} || F <- OtherTemplates ++ HomeFiles ++ LocalFiles].
+
+find_other_templates() ->
+    case rebar_config:get_global(template_dir, undefined) of
+        undefined ->
+            [];
+        TemplateDir ->
+            rebar_utils:find_files(TemplateDir, ?TEMPLATE_RE)
+    end.
 
 select_template([], Template) ->
     ?ABORT("Template ~s not found.\n", [Template]);
