@@ -34,15 +34,20 @@
 %% Public API
 %% ===================================================================
 
-escriptize(_Config, AppFile) ->
+escriptize(Config, AppFile) ->
     %% Extract the application name from the archive -- this will be be what
     %% we call the output script
     AppName = rebar_app_utils:app_name(AppFile),
 
+    %% Look for a list of other applications (dependencies) to include
+    %% in the output file. We then use the .app files for each of these
+    %% to pull in all the .beam files.
+    InclBeams = get_app_beams(rebar_config:get_local(Config, escript_incl_apps, []), []),
+
     %% Construct the archive of everything in ebin/ dir -- put it on the
     %% top-level of the zip file so that code loading works properly.
-    Files = filelib:wildcard("*", "ebin"),
-    case zip:create("mem", Files, [{cwd, "ebin"}, memory]) of
+    Files = load_files("*", "ebin") ++ InclBeams,
+    case zip:create("mem", Files, [memory]) of
         {ok, {"mem", ZipBin}} ->
             %% Archive was successfully created. Prefix that binary with our
             %% header and write to our escript file
@@ -63,3 +68,30 @@ escriptize(_Config, AppFile) ->
     [] = os:cmd(?FMT("chmod u+x ~p", [AppName])),
     ok.
 
+
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
+
+get_app_beams([], Acc) ->
+    Acc;
+get_app_beams([App | Rest], Acc) ->
+    case code:lib_dir(App, ebin) of
+        {error, bad_name} ->
+            ?ABORT("Failed to get ebin/ directory for ~p escript_incl_apps.", [App]);
+        Path ->
+            Acc2 = [{filename:join([App, ebin, F]), file_contents(filename:join(Path, F))} ||
+                       F <- filelib:wildcard("*", Path)],
+            get_app_beams(Rest, Acc2 ++ Acc)
+    end.
+
+load_files(Wildcard, Dir) ->
+    [read_file(Filename, Dir) || Filename <- filelib:wildcard(Wildcard, Dir)].
+
+read_file(Filename, Dir) ->
+    {Filename, file_contents(filename:join(Dir, Filename))}.
+
+file_contents(Filename) ->
+    {ok, Bin} = file:read_file(Filename),
+    Bin.
