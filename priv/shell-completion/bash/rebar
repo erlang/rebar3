@@ -10,7 +10,7 @@ _rebar()
     lopts=" --help --commands --verbose --force --jobs= --version"
     cmdsnvars="analyze build_plt check_plt check-deps clean compile \
         create create-app create-node doc delete-deps eunit \
-        get-deps generate help int_test perf_test test \
+        get-deps generate help int_test list-templates perf_test test \
         version xref \
         case= force=1 jobs= suite= verbose=1 appid= skip_deps=1 \
         template= template_dir="
