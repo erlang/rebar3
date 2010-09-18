@@ -307,7 +307,8 @@ erts_dir() ->
     lists:concat([code:root_dir(), "/erts-", erlang:system_info(version)]).
 
 os_env() ->
-    [list_to_tuple(re:split(S, "=", [{return, list}, {parts, 2}])) || S <- os:getenv()].
+    Os = [list_to_tuple(re:split(S, "=", [{return, list}, {parts, 2}])) || S <- os:getenv()],
+    lists:keydelete([],1,Os). %% Remove Windows current disk and path
 
 default_env() ->
     [
@@ -344,6 +345,24 @@ source_to_bin(Source) ->
     filename:rootname(Source, Ext) ++ ".o".
 
 so_specs(Config, AppFile, Bins) ->
+    Specs = make_so_specs(Config, AppFile, Bins),
+    case os:type() of
+        {win32, nt} ->
+            [switch_so_to_dll(SoSpec) || SoSpec <- Specs];
+        _ ->
+            Specs
+    end.
+
+switch_so_to_dll(Orig = {Name, Spec}) ->
+    case filename:extension(Name) of
+        ".so" ->
+            {filename:rootname(Name, ".so") ++ ".dll", Spec};
+        _ ->
+            %% Not a .so; leave it
+            Orig
+    end.
+
+make_so_specs(Config, AppFile, Bins) ->
     case rebar_config:get(Config, so_specs, undefined) of
         undefined ->
             %% New form of so_specs is not provided. See if the old form of {so_name} is available

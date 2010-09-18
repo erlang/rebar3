@@ -77,8 +77,9 @@ get_os() ->
 sh(Command, Env) ->
     sh(Command, Env, get_cwd()).
 
-sh(Command, Env, Dir) ->
-    ?INFO("sh: ~s\n~p\n", [Command, Env]),
+sh(Command0, Env, Dir) ->
+    ?INFO("sh: ~s\n~p\n", [Command0, Env]),
+    Command = patch_on_windows(Command0, os:type()),
     Port = open_port({spawn, Command}, [{cd, Dir}, {env, Env}, exit_status, {line, 16384},
                                         use_stdio, stderr_to_stdout]),
     case sh_loop(Port) of
@@ -87,6 +88,18 @@ sh(Command, Env, Dir) ->
         {error, Rc} ->
             ?ABORT("~s failed with error: ~w\n", [Command, Rc])
     end.
+
+
+%% We need a bash shell to execute on windows
+%% also the port doesn't seem to close from time to time (mingw)
+patch_on_windows(Cmd, {win32,nt}) ->
+    case os:find_executable(bash) of
+        false -> Cmd;
+        Bash -> 
+            Bash ++ " -c \"" ++ Cmd ++ "; echo _port_cmd_status_ $?\" "
+    end;
+patch_on_windows(Command, _) ->
+    Command.
 
 sh_failfast(Command, Env) ->
     sh(Command, Env).
@@ -145,6 +158,12 @@ match_first([{Regex, MatchValue} | Rest], Val) ->
 
 sh_loop(Port) ->
     receive
+        {Port, {data, {_, "_port_cmd_status_ " ++ Status}}} ->
+            (catch erlang:port_close(Port)), % sigh () for indentation
+            case list_to_integer(Status) of
+                0  -> ok;
+                Rc -> {error, Rc}
+            end;
         {Port, {data, {_, Line}}} ->
             ?CONSOLE("~s\n", [Line]),
             sh_loop(Port);
