@@ -93,7 +93,7 @@ sh(Command0, Env, Dir) ->
 %% We need a bash shell to execute on windows
 %% also the port doesn't seem to close from time to time (mingw)
 patch_on_windows(Cmd, {win32,nt}) ->
-    case os:find_executable(bash) of
+    case os:find_executable("bash") of
         false -> Cmd;
         Bash -> 
             Bash ++ " -c \"" ++ Cmd ++ "; echo _port_cmd_status_ $?\" "
