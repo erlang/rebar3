@@ -127,8 +127,8 @@ app_dirs(Apps) ->
         Path <- lists:map(fun(App) -> code:lib_dir(App) end, Apps), erlang:is_list(Path)].
 
 %% @doc Render the warnings on the console.
-%% @spec output_warnings(Warnings::[warning()]) -> none()
--spec(output_warnings(Warnings::[warning()]) -> none()).
+%% @spec output_warnings(Warnings::[warning()]) -> 'ok'
+-spec(output_warnings(Warnings::[warning()]) -> 'ok').
 output_warnings(Warnings) ->
     lists:foreach(fun(Warning) ->
                       ?CONSOLE("~s", [dialyzer:format_warning(Warning)])
