@@ -71,14 +71,8 @@ run_test(TestDir, Config, _File) ->
             Output = " 2>&1 | tee -a " ++ RawLog
     end,
 
-    case rebar_utils:sh(Cmd ++ Output, [{"TESTDIR", TestDir}]) of
-        ok ->
-            check_log(RawLog);
-        {error, _Rc} ->
-            show_log(RawLog),
-            ?ERROR("Executing tests failed.\n", []),
-            ?FAIL
-    end.
+    rebar_utils:sh(Cmd ++ Output, [{"TESTDIR", TestDir}]),
+    check_log(RawLog).
 
 
 clear_log(RawLog) ->
