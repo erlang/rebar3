@@ -284,7 +284,8 @@ has_header(Mod, Header) ->
                cover_compiled -> 
                    {file, File} = cover:is_compiled(Mod),
                    File;
-               undefined -> Mod;
+               non_existing -> Mod;
+               preloaded -> Mod;
                L -> L
            end,
     {ok, {_, [{abstract_code, {_, AC}}]}} = beam_lib:chunks(Mod1, [abstract_code]),
