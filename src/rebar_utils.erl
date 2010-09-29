@@ -140,7 +140,11 @@ escript_foldl(Fun, Acc, File) ->
     end.
 
 find_executable(Name) ->
-    "\"" ++ filename:nativename(os:find_executable(Name)) ++ "\"".
+    case os:find_executable(Name) of
+        false -> false;
+        Path ->
+            "\"" ++ filename:nativename(Path) ++ "\""
+    end.
 
 %% ====================================================================
 %% Internal functions

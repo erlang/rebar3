@@ -1,3 +1,4 @@
+
 %% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 %% -------------------------------------------------------------------
@@ -196,9 +197,7 @@ delete_dep(D) ->
 require_source_engine(Source) ->
     case source_engine_avail(Source) of
         true ->
-            ok;
-        false ->
-            ?ABORT("No command line interface available to process ~p\n", [Source])
+            ok
     end.
 
 
@@ -295,14 +294,14 @@ download_source(AppDir, {svn, Url, Rev}) ->
 %% Source helper functions
 %% ===================================================================
 
-source_engine_avail({Name, _, _})
+source_engine_avail({Name, _, _}=Source)
   when Name == hg; Name == git; Name == svn; Name == bzr ->
     case scm_client_vsn(Name) >= required_scm_client_vsn(Name) of
         true ->
             true;
         false ->
-            ?ABORT("Rebar requires version ~p or higher of ~s\n",
-                   [required_scm_client_vsn(Name), Name])
+            ?ABORT("Rebar requires version ~p or higher of ~s to process ~p\n",
+                   [required_scm_client_vsn(Name), Name, Source])
     end.
 
 scm_client_vsn(false, _VsnArg, _VsnRegex) ->
@@ -322,12 +321,10 @@ required_scm_client_vsn(bzr) -> {2, 0};
 required_scm_client_vsn(svn) -> {1, 6}.
 
 scm_client_vsn(hg) ->
-    scm_client_vsn(rebar_utils:find_executable(hg), " --version", "version (\\d+).(\\d+)");
+    scm_client_vsn(rebar_utils:find_executable("hg"), " --version", "version (\\d+).(\\d+)");
 scm_client_vsn(git) ->
-    scm_client_vsn(rebar_utils:find_executable(git), " --version", "git version (\\d+).(\\d+)");
+    scm_client_vsn(rebar_utils:find_executable("git"), " --version", "git version (\\d+).(\\d+)");
 scm_client_vsn(bzr) ->
-    scm_client_vsn(rebar_utils:find_executable(bzr), " --version", "Bazaar \\(bzr\\) (\\d+).(\\d+)");
+    scm_client_vsn(rebar_utils:find_executable("bzr"), " --version", "Bazaar \\(bzr\\) (\\d+).(\\d+)");
 scm_client_vsn(svn) ->
-    scm_client_vsn(rebar_utils:find_executable(svn), " --version", "svn, version (\\d+).(\\d+)");
-scm_client_vsn(_) ->
-    undefined.
+    scm_client_vsn(rebar_utils:find_executable("svn"), " --version", "svn, version (\\d+).(\\d+)").
