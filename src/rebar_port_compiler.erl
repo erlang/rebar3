@@ -315,7 +315,7 @@ default_env() ->
      {"CC", "cc"},
      {"CXX", "c++"},
      {"ERL_CFLAGS", lists:concat([" -I", code:lib_dir(erl_interface, include),
-                                  " -I", filename:join(erts_dir(), include),
+                                  " -I", filename:join(erts_dir(), "include"),
                                   " "])},
      {"ERL_LDFLAGS", lists:concat([" -L", code:lib_dir(erl_interface, lib),
                                    " -lerl_interface -lei"])},

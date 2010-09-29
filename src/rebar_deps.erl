@@ -148,7 +148,7 @@ update_deps_code_path([]) ->
 update_deps_code_path([Dep | Rest]) ->
     case is_app_available(Dep#dep.app, Dep#dep.vsn_regex, Dep#dep.dir) of
         {true, _} ->
-            code:add_patha(filename:join(Dep#dep.dir, ebin));
+            code:add_patha(filename:join(Dep#dep.dir, "ebin"));
         false ->
             ok
     end,
@@ -249,7 +249,7 @@ use_source(Dep, Count) ->
                 {true, _} ->
                     %% Available version matches up -- we're good to go; add the
                     %% app dir to our code path
-                    code:add_patha(filename:join(Dep#dep.dir, ebin)),
+                    code:add_patha(filename:join(Dep#dep.dir, "ebin")),
                     Dep;
                 false ->
                     %% The app that was downloaded doesn't match up (or had
