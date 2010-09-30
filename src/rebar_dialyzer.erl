@@ -72,6 +72,8 @@ analyze(Config, File) ->
         {error, no_such_file} ->
             ?ABORT("The PLT ~s does not exist. Please perform the build_plt command to ~n"
                    "produce the initial PLT. Be aware this operation may take several minutes.", [Plt]);
+        {error, read_error} ->
+            ?ABORT("Unable to read PLT ~n~n", [Plt]);
         {error, not_valid} ->
             ?ABORT("The PLT ~s is not valid.~n", [Plt]);
         {error, _Reason} ->
