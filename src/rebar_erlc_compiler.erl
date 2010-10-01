@@ -253,7 +253,7 @@ compile_xrl_yrl(Source, Target, Config, Opts, Mod) ->
                 {ok, _, []} ->
                     ok;
                 {ok, _, _Warnings} ->
-                    case lists:member(fail_on_warnings, Config) of
+                    case lists:member(fail_on_warnings, Config#config.opts) of
                         true ->
                             ?FAIL;
                         false ->
