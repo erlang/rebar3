@@ -472,7 +472,7 @@ restore_code_path({old, Path}) ->
 expand_lib_dirs([], _Root, Acc) ->
     Acc;
 expand_lib_dirs([Dir | Rest], Root, Acc) ->
-    Apps = filelib:wildcard(filename:join([Dir, '*', ebin])),
+    Apps = filelib:wildcard(filename:join([Dir, "*", ebin])),
     FqApps = [filename:join([Root, A]) || A <- Apps],
     expand_lib_dirs(Rest, Root, Acc ++ FqApps).
 
