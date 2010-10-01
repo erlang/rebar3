@@ -75,9 +75,7 @@ analyze(Config, File) ->
         {error, read_error} ->
             ?ABORT("Unable to read PLT ~n~n", [Plt]);
         {error, not_valid} ->
-            ?ABORT("The PLT ~s is not valid.~n", [Plt]);
-        {error, _Reason} ->
-            ?ABORT("Unable to determine the validity of the PLT ~s~n", [Plt])
+            ?ABORT("The PLT ~s is not valid.~n", [Plt])
     end,
     ok.
 
