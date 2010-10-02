@@ -307,7 +307,7 @@ source_engine_avail({Name, _, _}=Source)
 scm_client_vsn(false, _VsnArg, _VsnRegex) ->
     false;
 scm_client_vsn(Path, VsnArg, VsnRegex) ->
-    Info = os:cmd(Path ++ VsnArg),
+    Info = os:cmd("LANG=C " ++ Path ++ VsnArg),
     case re:run(Info, VsnRegex, [{capture, all_but_first, list}]) of
         {match, Match} ->
             list_to_tuple([list_to_integer(S) || S <- Match]);
@@ -327,4 +327,4 @@ scm_client_vsn(git) ->
 scm_client_vsn(bzr) ->
     scm_client_vsn(rebar_utils:find_executable("bzr"), " --version", "Bazaar \\(bzr\\) (\\d+).(\\d+)");
 scm_client_vsn(svn) ->
-    scm_client_vsn(rebar_utils:find_executable("svn"), " --version", "svn, \\w+ (\\d+).(\\d+)").
+    scm_client_vsn(rebar_utils:find_executable("svn"), " --version", "svn, version (\\d+).(\\d+)").
