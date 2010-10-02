@@ -236,24 +236,24 @@ compile_mib(Source, Target, Config) ->
 compile_xrl(Source, Target, Config) ->
     Opts = [{scannerfile, Target}, {return, true}
             |rebar_config:get(Config, xrl_opts, [])],
-    compile_xrl_yrl(Source, Target, Config, Opts, leex).
+    compile_xrl_yrl(Source, Target, Opts, leex).
 
 -spec compile_yrl(Source::string(), Target::string(), Config::#config{}) -> 'ok'.
 compile_yrl(Source, Target, Config) ->
     Opts = [{parserfile, Target}, {return, true}
             |rebar_config:get(Config, yrl_opts, [])],
-    compile_xrl_yrl(Source, Target, Config, Opts, yecc).
+    compile_xrl_yrl(Source, Target, Opts, yecc).
 
--spec compile_xrl_yrl(Source::string(), Target::string(), Config::#config{},
-                      Opts::list(), Mod::atom()) -> 'ok'.
-compile_xrl_yrl(Source, Target, Config, Opts, Mod) ->
+-spec compile_xrl_yrl(Source::string(), Target::string(), Opts::list(),
+                      Mod::atom()) -> 'ok'.
+compile_xrl_yrl(Source, Target, Opts, Mod) ->
     case needs_compile(Source, Target, []) of
         true ->
             case Mod:file(Source, Opts) of
                 {ok, _, []} ->
                     ok;
                 {ok, _, _Warnings} ->
-                    case lists:member(fail_on_warnings, Config#config.opts) of
+                    case lists:member(fail_on_warning, Opts) of
                         true ->
                             ?FAIL;
                         false ->
