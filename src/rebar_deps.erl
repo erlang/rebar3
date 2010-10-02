@@ -327,4 +327,4 @@ scm_client_vsn(git) ->
 scm_client_vsn(bzr) ->
     scm_client_vsn(rebar_utils:find_executable("bzr"), " --version", "Bazaar \\(bzr\\) (\\d+).(\\d+)");
 scm_client_vsn(svn) ->
-    scm_client_vsn(rebar_utils:find_executable("svn"), " --version", "svn, version (\\d+).(\\d+)").
+    scm_client_vsn(rebar_utils:find_executable("svn"), " --version", "svn, \\w+ (\\d+).(\\d+)").
