@@ -1,4 +1,3 @@
-
 %% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 %% -------------------------------------------------------------------
@@ -109,14 +108,19 @@ compile(Config, AppFile) ->
 'get-deps'(Config, _) ->
     %% Determine what deps are available and missing
     Deps = rebar_config:get_local(Config, deps, []),
-    {_AvailableDeps, MissingDeps} = find_deps(Deps),
+    {AvailableDeps, MissingDeps} = find_deps(Deps),
 
     %% For each missing dep with a specified source, try to pull it.
-    PulledDeps = [use_source(D) || D <- MissingDeps, D#dep.source /= undefined],
+    PulledDeps0 = [use_source(D) || D <- MissingDeps, D#dep.source /= undefined],
+
+    %% For each available dep try to update the source to the specified
+    %% version.
+    PulledDeps1 = [update_source(D) || D <- AvailableDeps,
+                                       D#dep.source /= undefined],
 
     %% Add each pulled dep to our list of dirs for post-processing. This yields
     %% the necessary transitivity of the deps
-    erlang:put(?MODULE, [D#dep.dir || D <- PulledDeps]),
+    erlang:put(?MODULE, [D#dep.dir || D <- PulledDeps0 ++ PulledDeps1]),
     ok.
 
 'delete-deps'(Config, _) ->
@@ -127,7 +131,6 @@ compile(Config, AppFile) ->
     _ = [delete_dep(D) || D <- AvailableDeps,
 			  lists:prefix(DepsDir, D#dep.dir) == true],
     ok.
-
 
 
 %% ===================================================================
@@ -291,6 +294,27 @@ download_source(AppDir, {svn, Url, Rev}) ->
     rebar_utils:sh(?FMT("svn checkout -r ~s ~s ~s",
                         [Rev, Url, filename:basename(AppDir)]), [],
                    filename:dirname(AppDir)).
+
+update_source(Dep) ->
+    ?CONSOLE("Updating ~p from ~p\n", [Dep#dep.app, Dep#dep.source]),
+    require_source_engine(Dep#dep.source),
+    update_source(filename:join(get_deps_dir(), Dep#dep.app),
+                  Dep#dep.source),
+    Dep.
+
+update_source(AppDir, {git, _Url, {Type, Refspec}})
+  when Type =:= branch orelse
+       Type =:= tag ->
+    rebar_utils:sh(?FMT("git pull origin ~s", [Refspec]), [], AppDir);
+update_source(AppDir, {git, Url, Refspec}) ->
+    update_source(AppDir, {git, Url, {branch, Refspec}});
+update_source(AppDir, {svn, _Url, Rev}) ->
+    rebar_utils:sh(?FMT("svn up -r ~s", [Rev]), [], AppDir);
+update_source(AppDir, {hg, _Url, Rev}) ->
+    rebar_utils:sh(?FMT("hg pull -u -r ~s", [Rev]), [], AppDir);
+update_source(AppDir, {bzr, _Url, Rev}) ->
+    rebar_utils:sh(?FMT("bzr update -r ~s", [Rev]), [], AppDir).
+
 
 
 %% ===================================================================
