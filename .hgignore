@@ -4,3 +4,4 @@
 \.orig
 \.swp
 rt.work/*
+^.gitignore$
