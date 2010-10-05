@@ -110,17 +110,27 @@ doterl_compile(Config, OutDir, MoreSources) ->
     RestErls  = [Source || Source <- gather_src(SrcDirs, []) ++ MoreSources,
                            lists:member(Source, FirstErls) == false],
 
-    % Sort RestErls so that parse_transforms and behaviours are first
+    % Split RestErls so that parse_transforms and behaviours are instead added
+    % to erl_first_files, parse transforms first.
     % This should probably be somewhat combined with inspect_epp
-    SortedRestErls = [K || {K, _V} <- lists:keysort(2,
-        [{F, compile_priority(F)} || F <- RestErls ])],
+    [ParseTransforms, Behaviours, OtherErls] = lists:foldl(fun(F, [A, B, C]) ->
+                case compile_priority(F) of
+                    parse_transform ->
+                        [[F | A], B, C];
+                    behaviour ->
+                        [A, [F | B], C];
+                    _ ->
+                        [A, B, [F | C]]
+                end
+        end, [[], [], []], RestErls),
 
+    NewFirstErls = FirstErls ++ ParseTransforms ++ Behaviours,
 
     %% Make sure that ebin/ exists and is on the path
     ok = filelib:ensure_dir(filename:join("ebin", "dummy.beam")),
     CurrPath = code:get_path(),
     code:add_path("ebin"),
-    rebar_base_compiler:run(Config, FirstErls, SortedRestErls,
+    rebar_base_compiler:run(Config, NewFirstErls, OtherErls,
                             fun(S, C) -> internal_erl_compile(S, C, OutDir,
                                                               ErlOpts)
                             end),
@@ -297,11 +307,11 @@ compile_priority(File) ->
             F2 = fun({tree,arity_qualifier,_,
                         {arity_qualifier,{tree,atom,_,behaviour_info},
                             {tree,integer,_,1}}}, _) ->
-                    2;
+                    behaviour;
                 ({tree,arity_qualifier,_,
                         {arity_qualifier,{tree,atom,_,parse_transform},
                             {tree,integer,_,2}}}, _) ->
-                    1;
+                    parse_transform;
                 (_, Acc) ->
                     Acc
             end,
@@ -313,7 +323,7 @@ compile_priority(File) ->
                     Acc
             end,
 
-            lists:foldl(F, 10, Trees)
+            lists:foldl(F, normal, Trees)
     end.
 
 %%
