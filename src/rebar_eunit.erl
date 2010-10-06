@@ -214,7 +214,7 @@ perform_cover(true, Config, BeamFiles, SrcModules) ->
 
 cover_analyze(_Config, [], _SrcModules) ->
     ok;
-cover_analyze(_Config, Modules, SrcModules) ->
+cover_analyze(Config, Modules, SrcModules) ->
     Suite = list_to_atom(rebar_config:get_global(suite, "")),
     FilteredModules = [M || M <- Modules, M =/= Suite],
 
@@ -228,7 +228,15 @@ cover_analyze(_Config, Modules, SrcModules) ->
     [{ok, _} = cover:analyze_to_file(M, cover_file(M), [html]) || {M, _, _} <- Coverage],
 
     Index = filename:join([rebar_utils:get_cwd(), ?EUNIT_DIR, "index.html"]),
-    ?CONSOLE("Cover analysis: ~s\n", [Index]).
+    ?CONSOLE("Cover analysis: ~s\n", [Index]),
+
+    %% Print coverage report, if configured
+    case rebar_config:get(Config, cover_print_enabled, false) of
+        true ->
+            cover_print_coverage(lists:sort(Coverage));
+        false ->
+            ok
+    end.
 
 cover_init(false, _BeamFiles) ->
     ok;
@@ -325,6 +333,28 @@ cover_write_index_section(F, SectionName, Coverage) ->
                              [Module, Module, percentage(Cov, NotCov)])) ||
         {Module, Cov, NotCov} <- Coverage],
     ok = file:write(F, "</table>\n").
+
+cover_print_coverage(Coverage) ->
+    {Covered, NotCovered} = lists:foldl(fun({_Mod, C, N}, {CAcc, NAcc}) ->
+                                                {CAcc + C, NAcc + N}
+                                        end, {0, 0}, Coverage),
+    TotalCoverage = percentage(Covered, NotCovered),
+
+    %% Determine the longest module name for right-padding
+    Width = lists:foldl(fun({Mod, _, _}, Acc) ->
+                case length(atom_to_list(Mod)) of
+                    N when N > Acc ->
+                        N;
+                    _ ->
+                        Acc
+                end
+        end, 0, Coverage) * -1,
+
+    %% Print the output the console
+    ?CONSOLE("~nCode Coverage:~n", []),
+    [?CONSOLE("~*s : ~3s~n",
+            [Width, Mod, percentage(C, N)]) || {Mod, C, N} <- Coverage],
+    ?CONSOLE("~n~*s : ~s~n", [Width, "Total", TotalCoverage]).
 
 cover_file(Module) ->
     filename:join([?EUNIT_DIR, atom_to_list(Module) ++ ".COVER.html"]).

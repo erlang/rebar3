@@ -71,6 +71,9 @@
 %% Whether to enable coverage reporting. Default is `false'
 {cover_enabled, false}.
 
+%% Whether to print coverage report to console. Default is `false'
+{cover_print_enabled, false}.
+
 %% == Dialyzer ==
 
 %% Options for running the dialyzer, right now only `plt' is supported
