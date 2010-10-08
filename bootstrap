@@ -18,8 +18,17 @@ main(Args) ->
             rm("ebin/rebar_core.beam")
     end,
 
+    %% Add check for debug flag
+    case lists:member("debug", Args) of
+        true ->
+            DebugFlag = debug_info;
+        false ->
+            DebugFlag = undefined
+    end,
+
     %% Compile all src/*.erl to ebin
     case make:files(filelib:wildcard("src/*.erl"), [{outdir, "ebin"}, {i, "include"},
+                                                    DebugFlag,
                                                     {d, 'BUILD_TIME', Built},
                                                     {d, 'VCS_INFO', VcsInfo}]) of
         up_to_date ->
