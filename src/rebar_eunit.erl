@@ -123,7 +123,7 @@ eunit(Config, AppFile) ->
     end,
 
     %% Restore code path
-    code:set_path(CodePath),
+    true = code:set_path(CodePath),
     ok.
 
 clean(_Config, _File) ->
@@ -148,12 +148,12 @@ perform_eunit(Config, Modules) ->
     %% Move down into ?EUNIT_DIR while we run tests so any generated files
     %% are created there (versus in the source dir)
     Cwd = rebar_utils:get_cwd(),
-    file:set_cwd(?EUNIT_DIR),
+    ok = file:set_cwd(?EUNIT_DIR),
 
     EunitResult = perform_eunit(EunitOpts, Modules, Suite),
 
     %% Return to original working dir
-    file:set_cwd(Cwd),
+    ok = file:set_cwd(Cwd),
 
     EunitResult.
 
@@ -225,7 +225,9 @@ cover_analyze(Config, Modules, SrcModules) ->
     cover_write_index(lists:sort(Coverage), SrcModules),
 
     %% Write coverage details for each file
-    [{ok, _} = cover:analyze_to_file(M, cover_file(M), [html]) || {M, _, _} <- Coverage],
+    lists:foreach(fun({M, _, _}) ->
+                          {ok, _} = cover:analyze_to_file(M, cover_file(M), [html])
+                  end, Coverage),
 
     Index = filename:join([rebar_utils:get_cwd(), ?EUNIT_DIR, "index.html"]),
     ?CONSOLE("Cover analysis: ~s\n", [Index]),
@@ -255,11 +257,11 @@ cover_init(true, BeamFiles) ->
         _ ->
             %% At least one module compiled successfully
 
-            %% It's not an error for cover compilation to fail partially, but we do want
-            %% to warn about them
-            [?CONSOLE("Cover compilation warning for ~p: ~p", [Beam, Desc]) || {Beam, {error, Desc}} <- Compiled]
-    end,
-    ok;
+            %% It's not an error for cover compilation to fail partially,
+            %% but we do want to warn about them
+            _ = [?CONSOLE("Cover compilation warning for ~p: ~p", [Beam, Desc]) || {Beam, {error, Desc}} <- Compiled],
+            ok
+    end;
 cover_init(Config, BeamFiles) ->
     cover_init(rebar_config:get(Config, cover_enabled, false), BeamFiles).
 
@@ -313,7 +315,7 @@ cover_write_index(Coverage, SrcModules) ->
     cover_write_index_section(F, "Source", SrcCoverage),
     cover_write_index_section(F, "Test", TestCoverage),
     ok = file:write(F, "</body></html>"),
-    file:close(F).
+    ok = file:close(F).
 
 cover_write_index_section(_F, _SectionName, []) ->
     ok;
@@ -329,9 +331,10 @@ cover_write_index_section(F, SectionName, Coverage) ->
     ok = file:write(F, ?FMT("<h3>Total: ~s</h3>\n", [TotalCoverage])),
     ok = file:write(F, "<table><tr><th>Module</th><th>Coverage %</th></tr>\n"),
 
-    [ok = file:write(F, ?FMT("<tr><td><a href='~s.COVER.html'>~s</a></td><td>~s</td>\n",
-                             [Module, Module, percentage(Cov, NotCov)])) ||
-        {Module, Cov, NotCov} <- Coverage],
+    lists:foreach(fun({Module, Cov, NotCov}) ->
+                          ok = file:write(F, ?FMT("<tr><td><a href='~s.COVER.html'>~s</a></td><td>~s</td>\n",
+                                                  [Module, Module, percentage(Cov, NotCov)]))
+                  end, Coverage),
     ok = file:write(F, "</table>\n").
 
 cover_print_coverage(Coverage) ->
@@ -352,8 +355,10 @@ cover_print_coverage(Coverage) ->
 
     %% Print the output the console
     ?CONSOLE("~nCode Coverage:~n", []),
-    [?CONSOLE("~*s : ~3s~n",
-            [Width, Mod, percentage(C, N)]) || {Mod, C, N} <- Coverage],
+    lists:foreach(fun({Mod, C, N}) ->
+                          ?CONSOLE("~*s : ~3s~n",
+                                   [Width, Mod, percentage(C, N)])
+                  end, Coverage),
     ?CONSOLE("~n~*s : ~s~n", [Width, "Total", TotalCoverage]).
 
 cover_file(Module) ->

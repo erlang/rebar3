@@ -267,7 +267,7 @@ execute_overlay([], _Vars, _BaseDir, _TargetDir) ->
     ok;
 execute_overlay([{mkdir, Out} | Rest], Vars, BaseDir, TargetDir) ->
     OutFile = render(filename:join([TargetDir, Out, "dummy"]), Vars),
-    filelib:ensure_dir(OutFile),
+    ok = filelib:ensure_dir(OutFile),
     ?DEBUG("Created dir ~s\n", [filename:dirname(OutFile)]),
     execute_overlay(Rest, Vars, BaseDir, TargetDir);
 execute_overlay([{copy, In} | Rest], _Vars, BaseDir, TargetDir) ->

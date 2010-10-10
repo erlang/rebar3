@@ -50,7 +50,7 @@ xref(Config, _) ->
 
     %% Save the code path prior to doing anything
     OrigPath = code:get_path(),
-    code:add_path(filename:join(rebar_utils:get_cwd(), "ebin")),
+    true = code:add_path(filename:join(rebar_utils:get_cwd(), "ebin")),
 
     %% Get list of xref checks we want to run
     XrefChecks = rebar_config:get(Config, xref_checks, [exports_not_used,
@@ -73,7 +73,7 @@ xref(Config, _) ->
     end,
 
     %% Restore the original code path
-    code:set_path(OrigPath),
+    true = code:set_path(OrigPath),
 
     ok.
 
@@ -93,9 +93,10 @@ check_undefined_function_calls(_Config) ->
     {ok, UndefinedCalls0} = xref:analyze(xref, undefined_function_calls),
     UndefinedCalls = [{find_mfa_source(Caller), format_fa(Caller), format_mfa(Target)} ||
                          {Caller, Target} <- UndefinedCalls0],
-    [?CONSOLE("~s:~w: Warning ~s calls undefined function ~s\n",
-              [Source, Line, FunStr, Target]) ||
-        {{Source, Line}, FunStr, Target} <- UndefinedCalls],
+    lists:foreach(fun({{Source, Line}, FunStr, Target}) ->
+                          ?CONSOLE("~s:~w: Warning ~s calls undefined function ~s\n",
+                                   [Source, Line, FunStr, Target])
+                  end, UndefinedCalls),
     ok.
 
 
@@ -114,19 +115,18 @@ filter_away_ignored(UnusedExports) ->
     %% any functions marked to ignore. We then use this list to mask any functions
     %% marked as unused exports by xref
     F = fun(Mod) ->
-                Attrs  = ks(attributes, Mod:module_info()),
-                Ignore = ks(ignore_xref, Attrs),
-                Callbacks = [B:behaviour_info(callbacks) || B <- ks(behaviour, Attrs)],
+                Attrs  = kf(attributes, Mod:module_info()),
+                Ignore = kf(ignore_xref, Attrs),
+                Callbacks = [B:behaviour_info(callbacks) || B <- kf(behaviour, Attrs)],
                 [{Mod, F, A} || {F, A} <- Ignore ++ lists:flatten(Callbacks)]
         end,
     AttrIgnore = lists:flatten(lists:map(F, lists:usort([M || {M, _, _} <- UnusedExports]))),
     [X || X <- UnusedExports, not(lists:member(X, AttrIgnore))].
 
 
-
-ks(Key, List) ->
-    case lists:keysearch(Key, 1, List) of
-        {value, {Key, Value}} ->
+kf(Key, List) ->
+    case lists:keyfind(Key, 1, List) of
+        {Key, Value} ->
             Value;
         false ->
             []

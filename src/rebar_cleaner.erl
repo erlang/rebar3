@@ -36,5 +36,4 @@
 clean(Config, _AppFile) ->
     %% Get a list of files to delete from config and remove them
     FilesToClean = rebar_config:get(Config, clean_files, []),
-    [rebar_file_utils:rm_rf(F) || F <- FilesToClean],
-    ok.
+    lists:foreach(fun (F) -> rebar_file_utils:rm_rf(F) end, FilesToClean).

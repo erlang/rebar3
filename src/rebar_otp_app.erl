@@ -68,8 +68,7 @@ clean(_Config, File) ->
     %% If the app file is a .app.src, delete the generated .app file
     case rebar_app_utils:is_app_src(File) of
         true ->
-            file:delete(rebar_app_utils:app_src_to_app(File)),
-            ok;
+            file:delete(rebar_app_utils:app_src_to_app(File));
         false ->
             ok
     end.
@@ -94,7 +93,7 @@ preprocess(AppSrcFile) ->
             ok = file:write_file(AppFile, Spec),
 
             %% Make certain that the ebin/ directory is available on the code path
-            code:add_path(filename:absname(filename:dirname(AppFile))),
+            true = code:add_path(filename:absname(filename:dirname(AppFile))),
 
             AppFile;
 

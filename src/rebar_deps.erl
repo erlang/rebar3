@@ -68,7 +68,9 @@ preprocess(Config, _) ->
     %% WILL run (and we want it to) for transitivity purposes.
     case rebar_config:get_global(skip_deps, false) of
         "true" ->
-            [rebar_core:skip_dir(D#dep.dir) || D <- AvailableDeps];
+            lists:foreach(fun (#dep{dir = Dir}) ->
+				  rebar_core:skip_dir(Dir)
+			  end, AvailableDeps);
         _ ->
             ok
     end,
@@ -97,9 +99,10 @@ compile(Config, AppFile) ->
             %% No missing deps
             ok;
         {_, MissingDeps} ->
-            [?CONSOLE("Dependency not available: ~p-~s (~p)\n",
-                      [D#dep.app, D#dep.vsn_regex, D#dep.source]) ||
-                D <- MissingDeps],
+            lists:foreach(fun (#dep{app=App, vsn_regex=Vsn, source=Src}) ->
+			    ?CONSOLE("Dependency not available: ~p-~s (~p)\n",
+				     [App, Vsn, Src])
+			  end, MissingDeps),
             ?FAIL
     end.
 
@@ -121,8 +124,8 @@ compile(Config, AppFile) ->
     DepsDir = get_deps_dir(),
     Deps = rebar_config:get_local(Config, deps, []),
     {AvailableDeps, _} = find_deps(Deps),
-    [delete_dep(D) || D <- AvailableDeps,
-                      lists:prefix(DepsDir, D#dep.dir) == true],
+    _ = [delete_dep(D) || D <- AvailableDeps,
+			  lists:prefix(DepsDir, D#dep.dir) == true],
     ok.
 
 
@@ -149,9 +152,9 @@ update_deps_code_path([]) ->
 update_deps_code_path([Dep | Rest]) ->
     case is_app_available(Dep#dep.app, Dep#dep.vsn_regex, Dep#dep.dir) of
         {true, _} ->
-            code:add_patha(filename:join(Dep#dep.dir, "ebin"));
+            true = code:add_patha(filename:join(Dep#dep.dir, "ebin"));
         false ->
-            ok
+            true
     end,
     update_deps_code_path(Rest).
 
@@ -246,9 +249,9 @@ use_source(Dep, Count) ->
             %% Already downloaded -- verify the versioning matches up with our regex
             case is_app_available(Dep#dep.app, Dep#dep.vsn_regex, Dep#dep.dir) of
                 {true, _} ->
-                    %% Available version matches up -- we're good to go; add the
-                    %% app dir to our code path
-                    code:add_patha(filename:join(Dep#dep.dir, "ebin")),
+                    %% Available version matches up -- we're good to go;
+                    %% add the app dir to our code path
+                    true = code:add_patha(filename:join(Dep#dep.dir, "ebin")),
                     Dep;
                 false ->
                     %% The app that was downloaded doesn't match up (or had

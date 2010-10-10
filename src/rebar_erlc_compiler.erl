@@ -147,7 +147,7 @@ include_path(Source, Config) ->
     ErlOpts = rebar_config:get(Config, erl_opts, []),
     ["include", filename:dirname(Source)] ++ proplists:get_all_values(i, ErlOpts).
 
--spec inspect(Source::string(), IncludePath::[string()]) -> {string(), [string()]}.
+-spec inspect(Source::string(), IncludePath::[string(),...]) -> {string(), [string()]}.
 inspect(Source, IncludePath) ->
     ModuleDefault = filename:basename(Source, ".erl"),
     case epp:open(Source, IncludePath) of
@@ -281,7 +281,7 @@ gather_src([], Srcs) ->
 gather_src([Dir|Rest], Srcs) ->
     gather_src(Rest, Srcs ++ rebar_utils:find_files(Dir, ".*\\.erl\$")).
 
--spec src_dirs(SrcDirs::[string()]) -> [string()].
+-spec src_dirs(SrcDirs::[string()]) -> [string(),...].
 src_dirs([]) ->
     ["src"];
 src_dirs(SrcDirs) ->

@@ -110,7 +110,7 @@ compile_each([{Proto, Beam, Hrl} | Rest]) ->
                     %% into the ebin/ and include/ directories respectively
                     %% TODO: Protobuffs really needs to be better about this...sigh.
                     [] = os:cmd(?FMT("mv ~s ebin", [Beam])),
-                    filelib:ensure_dir(filename:join("include", Hrl)),
+                    ok = filelib:ensure_dir(filename:join("include", Hrl)),
                     [] = os:cmd(?FMT("mv ~s include", [Hrl])),
                     ok;
                 Other ->

@@ -285,7 +285,7 @@ arg_spec_type(Type) when is_atom(Type) ->
 
 
 %% @doc Convert an argument string to its corresponding data type.
--spec to_type(atom(), string()) -> arg_value().
+-spec to_type(arg_type(), string()) -> arg_value().
 to_type(binary, Arg) ->
     list_to_binary(Arg);
 to_type(atom, Arg) ->
@@ -327,7 +327,7 @@ is_arg_false(Arg) ->
     (Arg =:= "0").
 
 
--spec is_valid_arg(arg_spec() | arg_type(), string()) -> boolean().
+-spec is_valid_arg(arg_spec(), nonempty_string()) -> boolean().
 is_valid_arg({Type, _DefaultArg}, Arg) ->
     is_valid_arg(Type, Arg);
 is_valid_arg(boolean, Arg) ->

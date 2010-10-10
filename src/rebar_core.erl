@@ -63,7 +63,7 @@ run(RawArgs) ->
     Commands = parse_args(RawArgs),
 
     %% Make sure crypto is running
-    crypto:start(),
+    ok = crypto:start(),
 
     %% Initialize logging system
     rebar_log:init(),
@@ -286,10 +286,10 @@ process_commands([]) ->
     end;
 process_commands([Command | Rest]) ->
     %% Reset skip dirs
-    [erlang:erase({skip_dir, D}) || D <- skip_dirs()],
+    lists:foreach(fun (D) -> erlang:erase({skip_dir, D}) end, skip_dirs()),
     Operations = erlang:get(operations),
 
-    process_dir(rebar_utils:get_cwd(), rebar_config:new(), Command, sets:new()),
+    _ = process_dir(rebar_utils:get_cwd(), rebar_config:new(), Command, sets:new()),
     case erlang:get(operations) of
         Operations ->
             %% This command didn't do anything
