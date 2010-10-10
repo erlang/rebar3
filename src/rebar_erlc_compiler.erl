@@ -129,12 +129,12 @@ doterl_compile(Config, OutDir, MoreSources) ->
     %% Make sure that ebin/ exists and is on the path
     ok = filelib:ensure_dir(filename:join("ebin", "dummy.beam")),
     CurrPath = code:get_path(),
-    code:add_path("ebin"),
+    true = code:add_path("ebin"),
     rebar_base_compiler:run(Config, NewFirstErls, OtherErls,
                             fun(S, C) -> internal_erl_compile(S, C, OutDir,
                                                               ErlOpts)
                             end),
-    code:set_path(CurrPath),
+    true = code:set_path(CurrPath),
     ok.
 
 
@@ -298,11 +298,12 @@ delete_dir(Dir, Subdirs) ->
     lists:foreach(fun(D) -> delete_dir(D, dirs(D)) end, Subdirs),
     file:del_dir(Dir).
 
--spec compile_priority(File::string()) -> pos_integer().
+-spec compile_priority(File::string()) -> 'normal' | 'behaviour' |
+                                          'parse_transform'.
 compile_priority(File) ->
     case epp_dodger:parse_file(File) of
         {error, _} ->
-            10; % couldn't parse the file, default priority
+            normal; % couldn't parse the file, default priority
         {ok, Trees} ->
             F2 = fun({tree,arity_qualifier,_,
                         {arity_qualifier,{tree,atom,_,behaviour_info},

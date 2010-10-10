@@ -42,7 +42,7 @@
 
 xref(Config, _) ->
     %% Spin up xref
-    xref:start(xref),
+    {ok, _} = xref:start(xref),
     ok = xref:set_library_path(xref, code_path()),
     xref:set_default(xref, [{warnings, rebar_config:get(Config, xref_warnings, false)},
                             {verbose, rebar_config:is_verbose()}]),
