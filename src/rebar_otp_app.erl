@@ -35,7 +35,7 @@
 %% Public API
 %% ===================================================================
 
-compile(_Config, File) ->
+compile(Config, File) ->
     %% If we get an .app.src file, it needs to be pre-processed and
     %% written out as a ebin/*.app file. That resulting file will then
     %% be validated as usual.
@@ -50,7 +50,16 @@ compile(_Config, File) ->
     case rebar_app_utils:load_app_file(AppFile) of
         {ok, AppName, AppData} ->
             validate_name(AppName, AppFile),
-            validate_modules(AppName, proplists:get_value(modules, AppData));
+
+            %% In general, the list of modules is an important thing to validate
+            %% for compliance with OTP guidelines and upgrade procedures. However,
+            %% some people prefer not to validate this list.
+            case rebar_config:get_local(Config, validate_app_modules, true) of
+                true ->
+                    validate_modules(AppName, proplists:get_value(modules, AppData));
+                false ->
+                    ok
+            end;
         {error, Reason} ->
             ?ABORT("Failed to load app file ~s: ~p\n", [AppFile, Reason])
     end.
