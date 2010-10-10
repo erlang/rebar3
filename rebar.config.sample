@@ -94,6 +94,9 @@
 %% Binaries to link into the erlang path?
 {app_bin, []}.
 
+%% Enable validation of the OTP app module list. Default is 'true'
+{validate_app_modules, true}.
+
 %% == Dependancies ==
 
 %% Where to put any downloaded depandencies. Default is `deps'
