@@ -37,6 +37,7 @@
 %%          "src" by defualt
 %% module_ext: characters to append to the module's name.
 %%             "" by default
+%% source_ext: extension of peg source files
 -module(rebar_neotoma_compiler).
 
 -export([compile/2]).
@@ -66,7 +67,8 @@ option(Opt, Options) ->
 
 default(doc_root) -> "src";
 default(out_dir) -> "src";
-default(module_ext) -> "".
+default(module_ext) -> "";
+default(source_ext) -> ".peg".
 
 compile_neo(Source, Target, Config) ->
   case code:which(neotoma) of
