@@ -123,6 +123,7 @@ ensure_dir(Path) ->
             Error
     end.
 
+-spec abort(string(), [term()]) -> no_return().
 abort(String, Args) ->
     ?ERROR(String, Args),
     halt(1).
