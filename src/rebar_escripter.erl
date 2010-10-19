@@ -26,7 +26,8 @@
 %% -------------------------------------------------------------------
 -module(rebar_escripter).
 
--export([escriptize/2]).
+-export([escriptize/2,
+         clean/2]).
 
 -include("rebar.hrl").
 
@@ -35,9 +36,13 @@
 %% ===================================================================
 
 escriptize(Config, AppFile) ->
-    %% Extract the application name from the archive -- this will be be what
-    %% we call the output script
+    %% Extract the application name from the archive -- this is the default
+    %% name of the generated script
     AppName = rebar_app_utils:app_name(AppFile),
+
+    %% Get the output filename for the escript -- this may include dirs
+    Filename = rebar_config:get_local(Config, escript_name, AppName),
+    filelib:ensure_dir(Filename),
 
     %% Look for a list of other applications (dependencies) to include
     %% in the output file. We then use the .app files for each of these
@@ -52,7 +57,7 @@ escriptize(Config, AppFile) ->
             %% Archive was successfully created. Prefix that binary with our
             %% header and write to our escript file
             Script = <<"#!/usr/bin/env escript\n", ZipBin/binary>>,
-            case file:write_file(AppName, Script) of
+            case file:write_file(Filename, Script) of
                 ok ->
                     ok;
                 {error, WriteError} ->
@@ -65,9 +70,17 @@ escriptize(Config, AppFile) ->
     end,
 
     %% Finally, update executable perms for our script
-    [] = os:cmd(?FMT("chmod u+x ~p", [AppName])),
+    [] = os:cmd(?FMT("chmod u+x ~p", [Filename])),
     ok.
 
+clean(Config, AppFile) ->
+    %% Extract the application name from the archive -- this is the default
+    %% name of the generated script
+    AppName = rebar_app_utils:app_name(AppFile),
+
+    %% Get the output filename for the escript -- this may include dirs
+    Filename = rebar_config:get_local(Config, escript_name, AppName),
+    rebar_file_utils:delete_each([Filename]).
 
 
 %% ===================================================================
