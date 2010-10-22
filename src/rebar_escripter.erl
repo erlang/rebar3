@@ -42,7 +42,7 @@ escriptize(Config, AppFile) ->
 
     %% Get the output filename for the escript -- this may include dirs
     Filename = rebar_config:get_local(Config, escript_name, AppName),
-    filelib:ensure_dir(Filename),
+    ok = filelib:ensure_dir(Filename),
 
     %% Look for a list of other applications (dependencies) to include
     %% in the output file. We then use the .app files for each of these
