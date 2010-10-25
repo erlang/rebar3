@@ -200,9 +200,9 @@ help() ->
 %%
 commands() ->
     S = <<"
-analyze                              Analyze with Dialyzer
-build_plt                            Build Dialyzer PLT
-check_plt                            Check Dialyzer PLT
+dialyze                              Analyze with Dialyzer
+build-plt                            Build Dialyzer PLT
+check-plt                            Check Dialyzer PLT
 
 clean                                Clean
 compile                              Compile sources

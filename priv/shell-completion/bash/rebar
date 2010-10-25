@@ -8,8 +8,8 @@ _rebar()
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     sopts="-h -c -v -V -f -j"
     lopts=" --help --commands --verbose --force --jobs= --version"
-    cmdsnvars="analyze build_plt check_plt check-deps clean compile \
-        create create-app create-node ct doc delete-deps eunit \
+    cmdsnvars="build-plt check-plt check-deps clean compile \
+        create create-app create-node ct dialyze doc delete-deps eunit \
         get-deps generate help list-templates version xref \
         case= force=1 jobs= suite= verbose=1 appid= skip_deps=1 \
         template= template_dir="

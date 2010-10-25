@@ -76,8 +76,11 @@
 
 %% == Dialyzer ==
 
-%% Options for running the dialyzer, right now only `plt' is supported
-{dialyzer_opts, []}.
+%% Options for running dialyzer
+%% {plt, PltFile}
+%% 'src': run Dialyzer on the source files as in 'dialyzer --src'
+%% {warnings, [WarnOpts]}: turn on/off Dialyzer warnings
+{warnings_opts, [{plt, PltFile}, {warnings, [WarnOpts]}, src]}.
 
 %% == Cleanup ==
 
