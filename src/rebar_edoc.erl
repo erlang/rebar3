@@ -36,7 +36,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_edoc).
 
--export([doc/2, clean/2]).
+-export([doc/2]).
 
 -include("rebar.hrl").
 
@@ -52,15 +52,3 @@ doc(Config, File) ->
     EDocOpts = rebar_config:get(Config, edoc_opts, []),
     ok = edoc:application(AppName, ".", EDocOpts),
     ok.
-
-%% @doc Remove the generated Erlang program documentation.
-%% @spec clean(#config{}, string()) -> ok
--spec(clean(Config::#config{}, File::string()) -> ok).
-clean(Config, _File) ->
-    EDocOpts = rebar_config:get(Config, edoc_opts, []),
-    DocDir = proplists:get_value(dir, EDocOpts, "doc"),
-
-    %% Delete all files except overview.edoc
-    Files = [F || F <- rebar_utils:find_files(DocDir, ".*"),
-                  filename:basename(F) /= "overview.edoc"],
-    rebar_file_utils:delete_each(Files).
