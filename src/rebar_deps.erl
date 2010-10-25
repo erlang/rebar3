@@ -155,7 +155,9 @@ update_deps_code_path([]) ->
 update_deps_code_path([Dep | Rest]) ->
     case is_app_available(Dep#dep.app, Dep#dep.vsn_regex, Dep#dep.dir) of
         {true, _} ->
-            true = code:add_patha(filename:join(Dep#dep.dir, "ebin"));
+            Dir = filename:join(Dep#dep.dir, "ebin"),
+            ok = filelib:ensure_dir(filename:join(Dir, "dummy")),
+            true = code:add_patha(Dir);
         false ->
             true
     end,
@@ -249,9 +251,11 @@ use_source(Dep, Count) ->
             %% Already downloaded -- verify the versioning matches up with our regex
             case is_app_available(Dep#dep.app, Dep#dep.vsn_regex, Dep#dep.dir) of
                 {true, _} ->
+                    Dir = filename:join(Dep#dep.dir, "ebin"),
+                    ok = filelib:ensure_dir(filename:join(Dir, "dummy")),
                     %% Available version matches up -- we're good to go;
                     %% add the app dir to our code path
-                    true = code:add_patha(filename:join(Dep#dep.dir, "ebin")),
+                    true = code:add_patha(Dir),
                     Dep;
                 false ->
                     %% The app that was downloaded doesn't match up (or had
