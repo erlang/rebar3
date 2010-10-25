@@ -84,8 +84,8 @@ create(_Config, _) ->
     %% Load the template definition as is and get the list of variables the
     %% template requires.
     TemplateTerms = consult(load_file(Type, Template)),
-    case lists:keysearch(variables, 1, TemplateTerms) of
-        {value, {variables, Vars}} ->
+    case lists:keyfind(variables, 1, TemplateTerms) of
+        {variables, Vars} ->
             case parse_vars(Vars, dict:new()) of
                 {error, Entry} ->
                     Context0 = undefined,
@@ -270,8 +270,8 @@ write_file(Output, Data, Force) ->
 %% Execute each instruction in a template definition file.
 %%
 execute_template([], _TemplateType, _TemplateName, _Context, _Force, ExistingFiles) ->
-    case length(ExistingFiles) of
-        0 ->
+    case ExistingFiles of
+        [] ->
             ok;
         _ ->
             Msg = lists:flatten([io_lib:format("\t* ~p~n", [F]) || F <- lists:reverse(ExistingFiles)]),

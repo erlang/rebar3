@@ -106,9 +106,9 @@ load_config(ReltoolFile) ->
 %% can't run reltool.
 %%
 sys_tuple(ReltoolConfig) ->
-    case lists:keysearch(sys, 1, ReltoolConfig) of
-        {value, {sys, Data}} ->
-            {sys, Data};
+    case lists:keyfind(sys, 1, ReltoolConfig) of
+        {sys, _} = SysTuple ->
+            SysTuple;
         false ->
             ?ABORT("Failed to find {sys, [...]} tuple in reltool.config.", [])
     end.
@@ -120,13 +120,13 @@ sys_tuple(ReltoolConfig) ->
 target_dir(ReltoolConfig) ->
     case rebar_config:get_global(target_dir, undefined) of
         undefined ->
-            case lists:keysearch(target_dir, 1, ReltoolConfig) of
-                {value, {target_dir, TargetDir}} ->
+            case lists:keyfind(target_dir, 1, ReltoolConfig) of
+                {target_dir, TargetDir} ->
                     filename:absname(TargetDir);
                 false ->
                     {sys, SysInfo} = sys_tuple(ReltoolConfig),
-                    case lists:keysearch(rel, 1, SysInfo) of
-                        {value, {rel, Name, _Vsn, _Apps}} ->
+                    case lists:keyfind(rel, 1, SysInfo) of
+                        {rel, Name, _Vsn, _Apps} ->
                             filename:absname(Name);
                         false ->
                             filename:absname("target")
@@ -144,8 +144,8 @@ target_dir(ReltoolConfig) ->
 overlay_vars(ReltoolConfig) ->
     case rebar_config:get_global(overlay_vars, undefined) of
         undefined ->
-            case lists:keysearch(overlay_vars, 1, ReltoolConfig) of
-                {value, {overlay_vars, File}} ->
+            case lists:keyfind(overlay_vars, 1, ReltoolConfig) of
+                {overlay_vars, File} ->
                     File;
                 false ->
                     undefined
@@ -156,8 +156,10 @@ overlay_vars(ReltoolConfig) ->
 
 
 validate_rel_apps(ReltoolServer, {sys, ReltoolConfig}) ->
-    case lists:keysearch(rel, 1, ReltoolConfig) of
-        {value, {rel, _Name, _Vsn, Apps}} ->
+    case lists:keyfind(rel, 1, ReltoolConfig) of
+        false ->
+            ok;
+        {rel, _Name, _Vsn, Apps} ->
             %% Identify all the apps that do NOT exist, based on what's available
             %% from the reltool server
             Missing = lists:sort([App || App <- Apps,
@@ -168,11 +170,9 @@ validate_rel_apps(ReltoolServer, {sys, ReltoolConfig}) ->
                 _ ->
                     ?ABORT("Apps in {rel, ...} section not found by reltool: ~p\n", [Missing])
             end;
-        {value, Rel} ->
+        Rel ->
             %% Invalid release format!
-            ?ABORT("Invalid {rel, ...} section in reltools.config: ~p\n", [Rel]);
-        false ->
-            ok
+            ?ABORT("Invalid {rel, ...} section in reltools.config: ~p\n", [Rel])
     end.
 
 app_exists(App, Server) when is_atom(App) ->
@@ -330,9 +330,10 @@ execute_overlay([Other | _Rest], _Vars, _BaseDir, _TargetDir) ->
 %% Render a binary to a string, using mustache and the specified context
 %%
 render(Bin, Context) ->
+    ReOpts = [global, {return, list}],
     %% Be sure to escape any double-quotes before rendering...
-    Str0 = re:replace(Bin, "\\\\", "\\\\\\", [global, {return, list}]),
-    Str1 = re:replace(Str0, "\"", "\\\\\"", [global, {return,list}]),
+    Str0 = re:replace(Bin, "\\\\", "\\\\\\", ReOpts),
+    Str1 = re:replace(Str0, "\"", "\\\\\"", ReOpts),
     mustache:render(Str1, Context).
 
 

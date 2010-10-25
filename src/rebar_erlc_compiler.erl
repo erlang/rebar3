@@ -104,11 +104,11 @@ doterl_compile(Config, OutDir, MoreSources) ->
     ErlOpts = filter_defines(rebar_config:get(Config, erl_opts, []), []),
     ?DEBUG("erl_opts ~p~n",[ErlOpts]),
     %% Support the src_dirs option allowing multiple directories to
-    %% contain erlang source. This might be used, for example, should eunit tests be
-    %% separated from the core application source.
+    %% contain erlang source. This might be used, for example, should
+    %% eunit tests be separated from the core application source.
     SrcDirs = src_dirs(proplists:append_values(src_dirs, ErlOpts)),
     RestErls  = [Source || Source <- gather_src(SrcDirs, []) ++ MoreSources,
-                           lists:member(Source, FirstErls) == false],
+                           not lists:member(Source, FirstErls)],
 
     % Split RestErls so that parse_transforms and behaviours are instead added
     % to erl_first_files, parse transforms first.
@@ -131,8 +131,8 @@ doterl_compile(Config, OutDir, MoreSources) ->
     CurrPath = code:get_path(),
     true = code:add_path("ebin"),
     rebar_base_compiler:run(Config, NewFirstErls, OtherErls,
-                            fun(S, C) -> internal_erl_compile(S, C, OutDir,
-                                                              ErlOpts)
+                            fun(S, C) ->
+                                    internal_erl_compile(S, C, OutDir, ErlOpts)
                             end),
     true = code:set_path(CurrPath),
     ok.

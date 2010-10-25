@@ -74,13 +74,7 @@ clean(_Config, _AppFile) ->
 %% ===================================================================
 
 protobuffs_is_present() ->
-    case code:which(protobuffs_compile) of
-        non_existing ->
-            false;
-        _ ->
-            true
-    end.
-
+    code:which(protobuffs_compile) =/= non_existing.
 
 beam_file(Proto) ->
     filename:basename(Proto, ".proto") ++ "_pb.beam".

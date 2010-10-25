@@ -63,7 +63,7 @@ is_app_dir(Dir) ->
 is_app_src(Filename) ->
     %% If removing the extension .app.src yields a shorter name,
     %% this is an .app.src file.
-    Filename /= filename:rootname(Filename, ".app.src").
+    Filename =/= filename:rootname(Filename, ".app.src").
 
 app_src_to_app(Filename) ->
     filename:join("ebin", filename:basename(Filename, ".app.src") ++ ".app").
@@ -101,14 +101,15 @@ app_vsn(AppFile) ->
 %% ===================================================================
 
 load_app_file(Filename) ->
-    case erlang:get({app_file, Filename}) of
+    AppFile = {app_file, Filename},
+    case erlang:get(AppFile) of
         undefined ->
             case file:consult(Filename) of
                 {ok, [{application, AppName, AppData}]} ->
-                    erlang:put({app_file, Filename}, {AppName, AppData}),
+                    erlang:put(AppFile, {AppName, AppData}),
                     {ok, AppName, AppData};
-                {error, Reason} ->
-                    {error, Reason};
+                {error, _} = Error ->
+                    Error;
                 Other ->
                     {error, {unexpected_terms, Other}}
             end;

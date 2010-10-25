@@ -286,9 +286,8 @@ is_eunitized(Mod) ->
         has_header(Mod, "include/eunit.hrl").
 
 has_eunit_test_fun(Mod) ->
-    length([F || {exports, Funs} <- Mod:module_info(),
-                    {F, 0} <- Funs,
-                    F == test]) =/= 0.
+    [F || {exports, Funs} <- Mod:module_info(),
+	  {F, 0} <- Funs, F =:= test] =/= [].
 
 has_header(Mod, Header) ->
     Mod1 = case code:which(Mod) of 
@@ -300,8 +299,8 @@ has_header(Mod, Header) ->
                L -> L
            end,
     {ok, {_, [{abstract_code, {_, AC}}]}} = beam_lib:chunks(Mod1, [abstract_code]),
-    length([F || {attribute, 1, file, {F, 1}} <- AC,
-                 string:str(F, Header) =/= 0]) =/= 0.
+    [F || {attribute, 1, file, {F, 1}} <- AC,
+          string:str(F, Header) =/= 0] =/= [].
 
 align_notcovered_count(Module, Covered, NotCovered, false) ->
     {Module, Covered, NotCovered};

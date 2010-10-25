@@ -201,11 +201,8 @@ delete_dep(D) ->
     end.
 
 require_source_engine(Source) ->
-    case source_engine_avail(Source) of
-        true ->
-            ok
-    end.
-
+    true = source_engine_avail(Source),
+    ok.
 
 is_app_available(App, VsnRegex) ->
     case code:lib_dir(App) of

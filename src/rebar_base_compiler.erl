@@ -66,7 +66,7 @@ run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
 
     %% Remove first files from found files
     RestFiles = [Source || Source <- FoundFiles,
-                           lists:member(Source, FirstFiles) == false],
+                           not lists:member(Source, FirstFiles)],
 
     %% Check opts for flag indicating that compile should check lastmod
     CheckLastMod = proplists:get_bool(check_last_mod, Opts),

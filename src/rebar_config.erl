@@ -96,12 +96,7 @@ get_global(Key, Default) ->
     end.
 
 is_verbose() ->
-    case get_global(verbose, "0") of
-        "1" ->
-            true;
-        _ ->
-            false
-    end.
+    get_global(verbose, "0") =:= "1".
 
 get_jobs() ->
     get_global(jobs, 3).

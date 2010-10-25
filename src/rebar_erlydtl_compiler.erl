@@ -149,31 +149,27 @@ module_name(Target) ->
 
 needs_compile(Source, Target, Config) ->
     LM = filelib:last_modified(Target),
-    case LM < filelib:last_modified(Source) of
-        true  -> true;
-        false ->
-            lists:any(fun(D) -> LM < filelib:last_modified(D) end,
-                      referenced_dtls(Source, Config))
-    end.
+    LM < filelib:last_modified(Source) orelse
+        lists:any(fun(D) -> LM < filelib:last_modified(D) end,
+                  referenced_dtls(Source, Config)).
 
 referenced_dtls(Source, Config) ->
     Set = referenced_dtls1([Source], Config,
                           sets:add_element(Source, sets:new())),
-    Final = sets:to_list(sets:del_element(Source, Set)),
-    Final.
+    sets:to_list(sets:del_element(Source, Set)).
 
 referenced_dtls1(Step, Config, Seen) ->
     DtlOpts = erlydtl_opts(Config),
     ExtMatch = re:replace(option(source_ext, DtlOpts), "\.", "\\\\\\\\.",
                           [{return, list}]),
     AllRefs = lists:append(
-                [ string:tokens(
-                    os:cmd(["grep -o [^\\\"]*",ExtMatch," ",F]),
-                    "\n")
-                  || F <- Step]),
+                [string:tokens(
+                   os:cmd(["grep -o [^\\\"]*",ExtMatch," ",F]),
+                   "\n")
+                 || F <- Step]),
     DocRoot = option(doc_root, DtlOpts),
     WithPaths = [ filename:join([DocRoot, F]) || F <- AllRefs ],
-    Existing = lists:filter(fun filelib:is_file/1, WithPaths),
+    Existing = [F || F <- WithPaths, filelib:is_file(F)],
     New = sets:subtract(sets:from_list(Existing), Seen),
     case sets:size(New) of
         0 -> Seen;

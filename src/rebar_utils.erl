@@ -205,6 +205,6 @@ emulate_escript_foldl(Fun, Acc, File) ->
                 {archive, ArchiveBin} ->
                     zip:foldl(Fun, Acc, {File, ArchiveBin})
             end;
-        {error, Reason} ->
-            {error, Reason}
+        {error, _} = Error ->
+            Error
     end.

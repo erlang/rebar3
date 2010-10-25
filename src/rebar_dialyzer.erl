@@ -142,8 +142,8 @@ dialyze(Config, File) ->
 %% @spec app_dirs(Apps::[atom()]) -> [string()]
 -spec app_dirs(Apps::[atom()]) -> [string()].
 app_dirs(Apps) ->
-    [filename:join(Path, "ebin") ||
-        Path <- lists:map(fun(App) -> code:lib_dir(App) end, Apps), erlang:is_list(Path)].
+    [filename:join(Path, "ebin")
+     || Path <- [code:lib_dir(App) || App <- Apps], erlang:is_list(Path)].
 
 %% @doc Render the warnings on the console.
 %% @spec output_warnings(Warnings::[warning()]) -> 'ok'

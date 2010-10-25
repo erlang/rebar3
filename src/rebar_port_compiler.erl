@@ -137,9 +137,8 @@ expand_sources([Spec | Rest], Acc) ->
     expand_sources(Rest, Acc2).
     
 expand_objects(Sources) ->
-  lists:map(fun(File) ->
-      filename:join([filename:dirname(File),filename:basename(File) ++ ".o"])
-    end, Sources).
+    [filename:join([filename:dirname(F), filename:basename(F) ++ ".o"])
+     || F <- Sources].
 
 run_precompile_hook(Config, Env) ->
     case rebar_config:get(Config, port_pre_script, undefined) of

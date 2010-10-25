@@ -86,20 +86,21 @@ run(RawArgs) ->
     process_commands(CommandAtoms).
 
 skip_dir(Dir) ->
-    case erlang:get({skip_dir, Dir}) of
+    SkipDir = {skip_dir, Dir},
+    case erlang:get(SkipDir) of
         undefined ->
             ?DEBUG("Adding skip dir: ~s\n", [Dir]),
-            erlang:put({skip_dir, Dir}, true);
+            erlang:put(SkipDir, true);
         true ->
             ok
     end.
 
 is_skip_dir(Dir) ->
     case erlang:get({skip_dir, Dir}) of
-        undefined ->
-            false;
-        true ->
-            true
+	undefined ->
+	    false;
+	true ->
+	    true
     end.
 
 skip_dirs() ->
@@ -465,7 +466,7 @@ restore_code_path(no_change) ->
 restore_code_path({old, Path}) ->
     %% Verify that all of the paths still exist -- some dynamically add paths
     %% can get blown away during clean.
-    true = code:set_path(lists:filter(fun filelib:is_file/1, Path)),
+    true = code:set_path([F || F <- Path, filelib:is_file(F)]),
     ok.
 
 
@@ -495,8 +496,8 @@ run_modules([Module | Rest], Command, Config, File) ->
     case Module:Command(Config, File) of
         ok ->
             run_modules(Rest, Command, Config, File);
-        {error, Reason} ->
-            {error, Reason}
+        {error, _} = Error ->
+            Error
     end.
 
 
