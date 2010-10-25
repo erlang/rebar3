@@ -133,6 +133,12 @@ parse_args(Args) ->
                     rebar_config:set_global(jobs, Jobs)
             end,
 
+            %% Set the rebar config to use
+            case proplists:get_value(config, Options) of
+                undefined -> ok;
+                Conf -> rebar_config:set_global(config, Conf)
+            end,
+
             %% Filter all the flags (i.e. strings of form key=value) from the
             %% command line arguments. What's left will be the commands to run.
             filter_flags(NonOptArgs, []);
@@ -250,12 +256,13 @@ option_spec_list() ->
         [Jobs]),
     [
      %% {Name, ShortOpt, LongOpt, ArgSpec, HelpMsg}
-     {help,     $h, "help",     undefined, "Show the program options"},
-     {commands, $c, "commands", undefined, "Show available commands"},
-     {verbose,  $v, "verbose",  undefined, "Be verbose about what gets done"},
-     {version,  $V, "version",  undefined, "Show version information"},
-     {force,    $f, "force",    undefined, "Force"},
-     {jobs,     $j, "jobs",     integer,   JobsHelp}
+     {help,     $h, "help",       undefined, "Show the program options"},
+     {commands, $c, "commands",   undefined, "Show available commands"},
+     {verbose,  $v, "verbose",    undefined, "Be verbose about what gets done"},
+     {version,  $V, "version",    undefined, "Show version information"},
+     {force,    $f, "force",      undefined, "Force"},
+     {jobs,     $j, "jobs",       integer,   JobsHelp},
+     {config,   $C, "config",     string,    "Rebar config file to use"}
     ].
 
 %%

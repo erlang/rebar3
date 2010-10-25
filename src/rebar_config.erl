@@ -45,9 +45,19 @@ new() ->
               opts = []}.
 
 new(ParentConfig) ->
+    %% If we are at the top level we might want to load another rebar.config
+    %% We can be certain that we are at the top level if we don't have any
+    %% configs yet since if we are at another level we must have some config.
+    ConfName = case ParentConfig of
+                   {config, _, []} ->
+                       rebar_config:get_global(config, "rebar.config");
+                   _ ->
+                       "rebar.config"
+               end,
+
     %% Load terms from rebar.config, if it exists
     Dir = rebar_utils:get_cwd(),
-    ConfigFile = filename:join([Dir, "rebar.config"]),
+    ConfigFile = filename:join([Dir, ConfName]),
     case file:consult(ConfigFile) of
         {ok, Terms} ->
             %% Found a config file with some terms. We need to be able to
