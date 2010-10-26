@@ -27,9 +27,7 @@
 -module(rebar_file_utils).
 
 -export([rm_rf/1,
-         mkdir_p/1,
          cp_r/2,
-         ln_sf/2,
          delete_each/1]).
 
 -include("rebar.hrl").
@@ -42,23 +40,9 @@ rm_rf(Target) ->
     [] = os:cmd(?FMT("rm -rf ~s", [Target])),
     ok.
 
-mkdir_p(Target) ->
-    [] = os:cmd(?FMT("mkdir -p ~s", [Target])),
-    ok.
-
 cp_r(Sources, Dest) ->
     SourceStr = string:join(Sources, " "),
     [] = os:cmd(?FMT("cp -R ~s ~s", [SourceStr, Dest])),
-    ok.
-
-ln_sf(Source, Dest) ->
-    case filelib:is_dir(Dest) of
-        true ->
-            ActualDest = filename:join([Dest, filename:basename(Source)]);
-        false ->
-            ActualDest = Dest
-    end,
-    [] = os:cmd(?FMT("ln -sf ~s ~s", [Source, ActualDest])),
     ok.
 
 delete_each([]) ->
