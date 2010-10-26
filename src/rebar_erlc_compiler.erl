@@ -71,10 +71,8 @@ compile(Config, _AppFile) ->
 
 -spec clean(Config::#config{}, AppFile::string()) -> 'ok'.
 clean(_Config, _AppFile) ->
-    %% TODO: This would be more portable if it used Erlang to traverse
-    %%       the dir structure and delete each file; however it would also
-    %%       much slower.
-    ok = rebar_file_utils:rm_rf("ebin/*.beam priv/mibs/*.bin"),
+    lists:foreach(fun(F) -> ok = rebar_file_utils:rm_rf(F) end,
+                  ["ebin/*.beam", "priv/mibs/*.bin"]),
 
     YrlFiles = rebar_utils:find_files("src", "^.*\\.[x|y]rl\$"),
     rebar_file_utils:delete_each(

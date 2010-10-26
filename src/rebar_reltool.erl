@@ -281,7 +281,7 @@ execute_overlay([{copy, In, Out} | Rest], Vars, BaseDir, TargetDir) ->
         false ->
             ok = filelib:ensure_dir(OutFile)
     end,
-    rebar_utils:sh(?FMT("cp -R ~p ~p", [InFile, OutFile]), []),
+    rebar_file_utils:cp_r([InFile], OutFile),
     execute_overlay(Rest, Vars, BaseDir, TargetDir);
 execute_overlay([{template, In, Out} | Rest], Vars, BaseDir, TargetDir) ->
     InFile = render(filename:join(BaseDir, In), Vars),
