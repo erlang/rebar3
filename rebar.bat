@@ -1,2 +1,3 @@
 @echo off
-escript.exe rebar %*
+set rebarscript=%0
+escript.exe %rebarscript:.bat=% %*
