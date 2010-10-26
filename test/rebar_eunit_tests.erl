@@ -124,7 +124,8 @@ environment_test_() ->
 
 assert_rebar_runs() ->
     prepare_rebar_script(),
-    ?assert(string:str(os:cmd("./" ++ ?TMP_DIR ++ "rebar"), "Usage: rebar") =/= 0).
+    ?assert(string:str(os:cmd(filename:nativename("./" ++ ?TMP_DIR ++ "rebar")),
+                       "No command to run specified!") =/= 0).
 
 basic_setup_test_() ->
     {"Create a simple project with a 'test' directory, a test, and a module",
@@ -176,6 +177,7 @@ setup_environment() ->
 setup_basic_project() ->
     setup_environment(),
     rebar("create-app appid=myapp"),
+    file:make_dir("ebin"),
     file:make_dir("test"),
     file:write_file("test/myapp_mymod_tests.erl", ?myapp_mymod_tests),
     file:write_file("src/myapp_mymod.erl", ?myapp_mymod).
@@ -203,8 +205,7 @@ remove_tmp_dir(_) ->
         {unix, _} ->
             os:cmd("rm -rf " ++ ?TMP_DIR ++ " 2>/dev/null");
         {win32, _} ->
-            %% os:cmd("rmdir /S /Q " ++ ?TMP_DIR ++ " 2>NUL")
-            exit("Windows is not supported yet.")
+            os:cmd("rmdir /S /Q " ++ filename:nativename(?TMP_DIR))
     end.
 
 %% ====================================================================
@@ -213,13 +214,19 @@ remove_tmp_dir(_) ->
 
 prepare_rebar_script() ->
     {ok, _} = file:copy(?REBAR_SCRIPT, ?TMP_DIR ++ "rebar"),
-    [] = os:cmd("chmod u+x " ++ ?TMP_DIR ++ "rebar").
+    case os:type() of
+        {unix, _} ->
+            [] = os:cmd("chmod u+x " ++ ?TMP_DIR ++ "rebar");
+        {win32, _} ->
+            {ok, _} = file:copy(?REBAR_SCRIPT ++ ".bat",
+                                ?TMP_DIR ++ "rebar.bat")
+    end.
 
 rebar() ->
     rebar([]).
 
 rebar(Args) when is_list(Args) ->
-    Out = os:cmd("./rebar " ++ Args), 
+    Out = os:cmd(filename:nativename("./rebar") ++ " " ++ Args),
     %?debugMsg("**** Begin"), ?debugMsg(Out), ?debugMsg("**** End"),
     Out.
 
