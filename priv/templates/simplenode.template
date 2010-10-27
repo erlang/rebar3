@@ -1,7 +1,10 @@
 {variables, [{nodeid, "mynode"}]}.
 {template, "simplenode.reltool.config", "reltool.config"}.
 {file, "simplenode.erl.script", "files/erl"}.
+{chmod, 8#744, "files/erl"}.
 {file, "simplenode.nodetool", "files/nodetool"}.
+{chmod, 8#744, "files/nodetool"}.
 {file, "simplenode.runner", "files/{{nodeid}}"}.
+{chmod, 8#744, "files/{{nodeid}}"}.
 {file, "simplenode.app.config", "files/app.config"}.
 {template, "simplenode.vm.args", "files/vm.args"}.
