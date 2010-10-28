@@ -68,7 +68,15 @@ clean(_Config, File) ->
     %% If the app file is a .app.src, delete the generated .app file
     case rebar_app_utils:is_app_src(File) of
         true ->
-            file:delete(rebar_app_utils:app_src_to_app(File));
+            case file:delete(rebar_app_utils:app_src_to_app(File)) of
+                ok ->
+                    ok;
+                {error, enoent} ->
+                    %% The file not existing is OK, we can ignore the error.
+                    ok;
+                Other ->
+                    Other
+            end;
         false ->
             ok
     end.
