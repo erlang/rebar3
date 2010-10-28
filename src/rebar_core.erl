@@ -443,8 +443,11 @@ execute(Command, Modules, Config, ModuleFile) ->
                     ok;
                 {error, failed} ->
                     ?FAIL;
+                {Module, {error, _} = Other} ->
+                    ?ABORT("~p failed while processing ~s in module ~s: ~s\n",
+                           [Command, Dir, Module, io_lib:print(Other, 1,80,-1)]);
                 Other ->
-                    ?ABORT("~p failed while processing ~s: ~s",
+                    ?ABORT("~p failed while processing ~s: ~s\n",
                            [Command, Dir, io_lib:print(Other, 1,80,-1)])
             end
     end.
@@ -497,7 +500,7 @@ run_modules([Module | Rest], Command, Config, File) ->
         ok ->
             run_modules(Rest, Command, Config, File);
         {error, _} = Error ->
-            Error
+            {Module, Error}
     end.
 
 
