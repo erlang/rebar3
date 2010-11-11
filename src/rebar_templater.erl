@@ -104,8 +104,14 @@ create(_Config, _) ->
 
     %% For each variable, see if it's defined in global vars -- if it is, prefer that
     %% value over the defaults
-    Context = update_vars(dict:fetch_keys(Context0), Context0),
-    ?DEBUG("Template ~p context: ~p\n", [template_id(), dict:to_list(Context)]),
+    Context1 = update_vars(dict:fetch_keys(Context0), Context0),
+    ?DEBUG("Template ~p context: ~p\n", [template_id(), dict:to_list(Context1)]),
+
+    %% Handle variables that possibly include other variables in their
+    %% definition
+    Context = resolve_recursive_vars(dict:to_list(Context1), Context1),
+
+    ?DEBUG("Resolved Template ~p context: ~p\n", [template_id(), dict:to_list(Context1)]),
 
     %% Now, use our context to process the template definition -- this permits us to
     %% use variables within the definition for filenames.
@@ -204,6 +210,19 @@ update_vars([Key | Rest], Dict) ->
     Value = rebar_config:get_global(Key, dict:fetch(Key, Dict)),
     update_vars(Rest, dict:store(Key, Value, Dict)).
 
+
+%%
+%% Given a list of key value pairs, for each string value attempt to
+%% render it using Dict as the context. Storing the result in Dict as Key.
+%%
+
+resolve_recursive_vars([], Dict) ->
+    Dict;
+resolve_recursive_vars([{Key, Value0} | Rest], Dict) when is_list(Value0) ->
+    Value = render(list_to_binary(Value0), Dict),
+    resolve_recursive_vars(Rest, dict:store(Key, Value, Dict));
+resolve_recursive_vars([_Pair | Rest], Dict) ->
+    resolve_recursive_vars(Rest, Dict).
 
 %%
 %% Given a string or binary, parse it into a list of terms, ala file:consult/0
@@ -319,4 +338,3 @@ execute_template([{variables, _} | Rest], TemplateType, TemplateName, Context, F
 execute_template([Other | Rest], TemplateType, TemplateName, Context, Force, ExistingFiles) ->
     ?WARN("Skipping unknown template instruction: ~p\n", [Other]),
     execute_template(Rest, TemplateType, TemplateName, Context, Force, ExistingFiles).
-
