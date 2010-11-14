@@ -29,7 +29,6 @@
 %% <ul>
 %%   <li>doc (essentially erl -noshell -run edoc_run application "'$(&lt;app_name&gt;)'"
 %% '"."' '[&lt;options&gt;]')</li>
-%%   <li>clean</li>
 %% </ul>
 %% EDoc options can be given in the <code>edoc_opts</code> option in <code>rebar.config</code>.
 %% @copyright 2010 Dave Smith
