@@ -98,7 +98,7 @@ dialyze(Config, File) ->
     ok.
 
 %% @doc Build the PLT.
-%% @spec build-plt(Config::#config{}, File::string()) -> ok
+%% @spec 'build-plt'(Config::#config{}, File::string()) -> ok
 -spec 'build-plt'(Config::#config{}, File::string()) -> ok.
 'build-plt'(Config, File) ->
     Plt = new_plt_path(Config, File),
@@ -118,7 +118,7 @@ dialyze(Config, File) ->
     ok.
 
 %% @doc Check whether the PLT is up-to-date (rebuilding it if not).
-%% @spec check-plt(Config::#config{}, File::string()) -> ok
+%% @spec 'check-plt'(Config::#config{}, File::string()) -> ok
 -spec 'check-plt'(Config::#config{}, File::string()) -> ok.
 'check-plt'(Config, File) ->
     Plt = existing_plt_path(Config, File),
@@ -199,7 +199,7 @@ existing_plt_path(Config, File) ->
 
 %% @doc If the warnings option is present in rebar.config return its value,
 %% otherwise return [].
-%% @spec warnings(Config::#config{}) -> list().
+%% @spec warnings(Config::#config{}) -> list()
 -spec warnings(Config::#config{}) -> list().
 warnings(Config) ->
     DialyzerOpts = rebar_config:get(Config, dialyzer_opts, []),
