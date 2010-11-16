@@ -278,11 +278,11 @@ download_source(AppDir, {hg, Url, Rev}) ->
 download_source(AppDir, {git, Url, {branch, Branch}}) ->
     ok = filelib:ensure_dir(AppDir),
     rebar_utils:sh(?FMT("git clone -n ~s ~s", [Url, filename:basename(AppDir)]), [], filename:dirname(AppDir)),
-    rebar_utils:sh(?FMT("git checkout ~s", [Branch]), [], AppDir);
+    rebar_utils:sh(?FMT("git checkout -q origin/~s", [Branch]), [], AppDir);
 download_source(AppDir, {git, Url, {tag, Tag}}) ->
     ok = filelib:ensure_dir(AppDir),
     rebar_utils:sh(?FMT("git clone -n ~s ~s", [Url, filename:basename(AppDir)]), [], filename:dirname(AppDir)),
-    rebar_utils:sh(?FMT("git checkout -b ~s", [Tag]), [], AppDir);
+    rebar_utils:sh(?FMT("git checkout -q ~s", [Tag]), [], AppDir);
 download_source(AppDir, {git, Url, Rev}) ->
     download_source(AppDir, {git, Url, {branch, Rev}});
 download_source(AppDir, {bzr, Url, Rev}) ->
@@ -303,10 +303,12 @@ update_source(Dep) ->
                   Dep#dep.source),
     Dep.
 
-update_source(AppDir, {git, _Url, {Type, Refspec}})
-  when Type =:= branch orelse
-       Type =:= tag ->
-    rebar_utils:sh(?FMT("git pull origin ~s", [Refspec]), [], AppDir);
+update_source(AppDir, {git, _Url, {branch, Branch}}) ->
+    rebar_utils:sh(?FMT("git fetch origin", []), [], AppDir),
+    rebar_utils:sh(?FMT("git checkout -q origin/~s", [Branch]), [], AppDir);
+update_source(AppDir, {git, _Url, {tag, Tag}}) ->
+    rebar_utils:sh(?FMT("git fetch --tags origin", []), [], AppDir),
+    rebar_utils:sh(?FMT("git checkout -q ~s", [Tag]), [], AppDir);
 update_source(AppDir, {git, Url, Refspec}) ->
     update_source(AppDir, {git, Url, {branch, Refspec}});
 update_source(AppDir, {svn, _Url, Rev}) ->
