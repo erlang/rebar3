@@ -27,6 +27,11 @@
 %% SNMP mibs to compile first?
 {mib_first_files, []}.
 
+%% == EDoc ==
+
+%% EDoc options
+{edoc_opts, []}.
+
 %% == Port Compiler ==
 
 %% List and wildcard list of files to be compiled. Default is `"c_src/*.c"'
