@@ -8,6 +8,18 @@
 %% Additional library directories to add to the code path
 {lib_dirs, []}.
 
+%% Command to run before compiling
+{compile_pre_script, "./script.sh"}.
+
+%% Command to run after compiling
+{compile_post_script, "./script.sh"}.
+
+%% Command to run before cleaning
+{clean_pre_script, "./script.sh"}.
+
+%% Command to run after cleaning
+{clean_post_script, "./script.sh"}.
+
 %% == Erlang Compiler ==
 
 %% Erlang files to compile before the rest. Rebar automatically compiles
