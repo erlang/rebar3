@@ -158,7 +158,7 @@ update_deps_code_path([Dep | Rest]) ->
             Dir = filename:join(Dep#dep.dir, "ebin"),
             ok = filelib:ensure_dir(filename:join(Dir, "dummy")),
             true = code:add_patha(Dir);
-        false ->
+        {false, _} ->
             true
     end,
     update_deps_code_path(Rest).
@@ -179,12 +179,12 @@ find_deps([{App, VsnRegex, Source} | Rest], {Avail, Missing}) ->
     case is_app_available(App, VsnRegex) of
         {true, AppDir} ->
             find_deps(Rest, {[Dep#dep { dir = AppDir } | Avail], Missing});
-        false ->
+        {false, _} ->
             AppDir = filename:join(get_deps_dir(), Dep#dep.app),
             case is_app_available(App, VsnRegex, AppDir) of
                 {true, AppDir} ->
                     find_deps(Rest, {[Dep#dep { dir = AppDir } | Avail], Missing});
-                false ->
+                {false, _} ->
                     find_deps(Rest, {Avail, [Dep#dep { dir = AppDir } | Missing]})
             end
     end;
@@ -209,7 +209,7 @@ require_source_engine(Source) ->
 is_app_available(App, VsnRegex) ->
     case code:lib_dir(App) of
         {error, bad_name} ->
-            false;
+            {false, bad_name};
         Path ->
             is_app_available(App, VsnRegex, Path)
     end.
@@ -228,16 +228,16 @@ is_app_available(App, VsnRegex, Path) ->
                         nomatch ->
                             ?WARN("~s has version ~p; requested regex was ~s\n",
                                   [AppFile, Vsn, VsnRegex]),
-                            false
+                            {false, version_mismatch}
                     end;
                 OtherApp ->
                     ?WARN("~s has application id ~p; expected ~p\n", [AppFile, OtherApp, App]),
-                    false
+                    {false, name_mismatch}
             end;
         false ->
             ?WARN("Expected ~s to be an app dir (containing ebin/*.app), but no .app found.\n",
                   [Path]),
-            false
+            {false, missing_app_file}
     end.
 
 use_source(Dep) ->
@@ -257,11 +257,11 @@ use_source(Dep, Count) ->
                     %% add the app dir to our code path
                     true = code:add_patha(Dir),
                     Dep;
-                false ->
+                {false, Reason} ->
                     %% The app that was downloaded doesn't match up (or had
                     %% errors or something). For the time being, abort.
-                    ?ABORT("Dependency dir ~s does not satisfy version regex ~s.\n",
-                           [Dep#dep.dir, Dep#dep.vsn_regex])
+                    ?ABORT("Dependency dir ~s failed application validation "
+                        "with reason ~p.\n", [Dep#dep.dir, Reason])
             end;
         false ->
             ?CONSOLE("Pulling ~p from ~p\n", [Dep#dep.app, Dep#dep.source]),
