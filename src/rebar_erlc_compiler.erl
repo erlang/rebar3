@@ -57,15 +57,19 @@
 -spec compile(Config::#config{}, AppFile::string()) -> 'ok'.
 compile(Config, _AppFile) ->
     rebar_base_compiler:run(Config,
-                            rebar_config:get_list(Config, xrl_first_files, []),
+                            check_files(rebar_config:get_local(Config,
+                                    xrl_first_files, [])),
                             "src", ".xrl", "src", ".erl",
                             fun compile_xrl/3),
     rebar_base_compiler:run(Config,
-                            rebar_config:get_list(Config, yrl_first_files, []),
+                            check_files(rebar_config:get_local(Config,
+                                    yrl_first_files, [])),
                             "src", ".yrl", "src", ".erl",
                             fun compile_yrl/3),
     doterl_compile(Config, "ebin"),
-    rebar_base_compiler:run(Config, rebar_config:get_list(Config, mib_first_files, []),
+    rebar_base_compiler:run(Config,
+                            check_files(rebar_config:get_local(Config,
+                                    mib_first_files, [])),
                             "mibs", ".mib", "priv/mibs", ".bin",
                             fun compile_mib/3).
 
@@ -355,3 +359,16 @@ filter_defines([{platform_define, ArchRegex, Key, Value} | Rest], Acc) ->
     end;
 filter_defines([Opt | Rest], Acc) ->
     filter_defines(Rest, [Opt | Acc]).
+
+%%
+%% Ensure all files in a list are present and abort if one is missing
+%%
+-spec check_files(FileList::[string()]) -> [string()].
+check_files(FileList) ->
+    [check_file(F) || F <- FileList].
+
+check_file(File) ->
+    case filelib:is_regular(File) of
+        false -> ?ABORT("File ~p is missing, aborting\n", [File]);
+        true -> File
+    end.
