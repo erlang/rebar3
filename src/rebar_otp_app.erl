@@ -96,8 +96,13 @@ preprocess(Config, AppSrcFile) ->
             AppVars = load_app_vars(Config) ++ [{modules, ebin_modules()}],
             A1 = apply_app_vars(AppVars, AppData),
 
+
+            %% AppSrcFile may contain instructions for generating a vsn number
+            Vsn = rebar_app_utils:app_vsn(AppSrcFile),
+            A2 = lists:keystore(vsn, 1, A1, {vsn, Vsn}),
+
             %% Build the final spec as a string
-            Spec = io_lib:format("~p.\n", [{application, AppName, A1}]),
+            Spec = io_lib:format("~p.\n", [{application, AppName, A2}]),
 
             %% Setup file .app filename and write new contents
             AppFile = rebar_app_utils:app_src_to_app(AppSrcFile),

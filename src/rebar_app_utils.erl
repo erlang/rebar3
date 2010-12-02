@@ -89,7 +89,14 @@ app_applications(AppFile) ->
 app_vsn(AppFile) ->
     case load_app_file(AppFile) of
         {ok, _, AppInfo} ->
-            get_value(vsn, AppInfo, AppFile);
+            case get_value(vsn, AppInfo, AppFile) of
+                git ->
+                    Cmd = "git describe --tags --always",
+                    {ok, VsnString} = rebar_utils:sh(Cmd, []),
+                    string:strip(VsnString, right, $\n);
+                Version ->
+                    Version
+            end;
         {error, Reason} ->
             ?ABORT("Failed to extract vsn from ~s: ~p\n",
                    [AppFile, Reason])
