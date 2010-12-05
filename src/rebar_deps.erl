@@ -292,28 +292,31 @@ use_source(Dep, Count) ->
 
 download_source(AppDir, {hg, Url, Rev}) ->
     ok = filelib:ensure_dir(AppDir),
-    rebar_utils:sh(?FMT("hg clone -U ~s ~s", [Url, filename:basename(AppDir)]), [], filename:dirname(AppDir)),
-    rebar_utils:sh(?FMT("hg update ~s", [Rev]), [], AppDir);
+    rebar_utils:sh(?FMT("hg clone -U ~s ~s", [Url, filename:basename(AppDir)]),
+                   [{cd, filename:dirname(AppDir)}]),
+    rebar_utils:sh(?FMT("hg update ~s", [Rev]), [{cd, AppDir}]);
 download_source(AppDir, {git, Url, {branch, Branch}}) ->
     ok = filelib:ensure_dir(AppDir),
-    rebar_utils:sh(?FMT("git clone -n ~s ~s", [Url, filename:basename(AppDir)]), [], filename:dirname(AppDir)),
-    rebar_utils:sh(?FMT("git checkout -q origin/~s", [Branch]), [], AppDir);
+    rebar_utils:sh(?FMT("git clone -n ~s ~s", [Url, filename:basename(AppDir)]),
+                   [{cd, filename:dirname(AppDir)}]),
+    rebar_utils:sh(?FMT("git checkout -q origin/~s", [Branch]), [{cd, AppDir}]);
 download_source(AppDir, {git, Url, {tag, Tag}}) ->
     ok = filelib:ensure_dir(AppDir),
-    rebar_utils:sh(?FMT("git clone -n ~s ~s", [Url, filename:basename(AppDir)]), [], filename:dirname(AppDir)),
-    rebar_utils:sh(?FMT("git checkout -q ~s", [Tag]), [], AppDir);
+    rebar_utils:sh(?FMT("git clone -n ~s ~s", [Url, filename:basename(AppDir)]),
+                   [{cd, filename:dirname(AppDir)}]),
+    rebar_utils:sh(?FMT("git checkout -q ~s", [Tag]), [{cd, AppDir}]);
 download_source(AppDir, {git, Url, Rev}) ->
     download_source(AppDir, {git, Url, {branch, Rev}});
 download_source(AppDir, {bzr, Url, Rev}) ->
     ok = filelib:ensure_dir(AppDir),
     rebar_utils:sh(?FMT("bzr branch -r ~s ~s ~s",
-                        [Rev, Url, filename:basename(AppDir)]), [],
-                   filename:dirname(AppDir));
+                        [Rev, Url, filename:basename(AppDir)]),
+                   [{cd, filename:dirname(AppDir)}]);
 download_source(AppDir, {svn, Url, Rev}) ->
     ok = filelib:ensure_dir(AppDir),
     rebar_utils:sh(?FMT("svn checkout -r ~s ~s ~s",
-                        [Rev, Url, filename:basename(AppDir)]), [],
-                   filename:dirname(AppDir)).
+                        [Rev, Url, filename:basename(AppDir)]),
+                   [{cd, filename:dirname(AppDir)}]).
 
 update_source(Dep) ->
     %% It's possible when updating a source, that a given dep does not have a
@@ -333,19 +336,19 @@ update_source(Dep) ->
     end.
 
 update_source(AppDir, {git, _Url, {branch, Branch}}) ->
-    rebar_utils:sh(?FMT("git fetch origin", []), [], AppDir),
-    rebar_utils:sh(?FMT("git checkout -q origin/~s", [Branch]), [], AppDir);
+    rebar_utils:sh("git fetch origin", [{cd, AppDir}]),
+    rebar_utils:sh(?FMT("git checkout -q origin/~s", [Branch]), [{cd, AppDir}]);
 update_source(AppDir, {git, _Url, {tag, Tag}}) ->
-    rebar_utils:sh(?FMT("git fetch --tags origin", []), [], AppDir),
-    rebar_utils:sh(?FMT("git checkout -q ~s", [Tag]), [], AppDir);
+    rebar_utils:sh("git fetch --tags origin", [{cd, AppDir}]),
+    rebar_utils:sh(?FMT("git checkout -q ~s", [Tag]), [{cd, AppDir}]);
 update_source(AppDir, {git, Url, Refspec}) ->
     update_source(AppDir, {git, Url, {branch, Refspec}});
 update_source(AppDir, {svn, _Url, Rev}) ->
-    rebar_utils:sh(?FMT("svn up -r ~s", [Rev]), [], AppDir);
+    rebar_utils:sh(?FMT("svn up -r ~s", [Rev]), [{cd, AppDir}]);
 update_source(AppDir, {hg, _Url, Rev}) ->
-    rebar_utils:sh(?FMT("hg pull -u -r ~s", [Rev]), [], AppDir);
+    rebar_utils:sh(?FMT("hg pull -u -r ~s", [Rev]), [{cd, AppDir}]);
 update_source(AppDir, {bzr, _Url, Rev}) ->
-    rebar_utils:sh(?FMT("bzr update -r ~s", [Rev]), [], AppDir).
+    rebar_utils:sh(?FMT("bzr update -r ~s", [Rev]), [{cd, AppDir}]).
 
 
 
@@ -366,7 +369,8 @@ source_engine_avail({Name, _, _}=Source)
 scm_client_vsn(false, _VsnArg, _VsnRegex) ->
     false;
 scm_client_vsn(Path, VsnArg, VsnRegex) ->
-    Info = os:cmd("LANG=C " ++ Path ++ VsnArg),
+    {ok, Info} = rebar_utils:sh(Path ++ VsnArg, [{env, [{"LANG", "C"}]},
+                                                 {use_stdout, false}]),
     case re:run(Info, VsnRegex, [{capture, all_but_first, list}]) of
         {match, Match} ->
             list_to_tuple([list_to_integer(S) || S <- Match]);

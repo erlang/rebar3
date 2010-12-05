@@ -121,11 +121,16 @@ referenced_pegs1(Step, Config, Seen) ->
     NeoOpts = neotoma_opts(Config),
     ExtMatch = re:replace(option(source_ext, NeoOpts), "\.", "\\\\\\\\.",
                           [{return, list}]),
-    AllRefs = lists:append(
-                [string:tokens(
-                   os:cmd(["grep -o [^\\\"]*",ExtMatch," ",F]),
-                   "\n")
-                 || F <- Step]),
+    AllRefs =
+        lists:append(
+          lists:map(
+            fun(F) ->
+                    {ok, Res} = rebar_utils:sh(
+                                  lists:flatten(["grep -o [^\\\"]*",
+                                                 ExtMatch," ",F]),
+                                  [{use_stdout, false}]),
+                    string:tokens(Res, "\n")
+            end, Step)),
     DocRoot = option(doc_root, NeoOpts),
     WithPaths = [ filename:join([DocRoot, F]) || F <- AllRefs ],
     Existing = [F || F <- WithPaths, filelib:is_file(F)],

@@ -51,5 +51,6 @@ execute_pre_script(Config, Key) ->
         undefined ->
             ok;
         Script ->
-            rebar_utils:sh(Script, [])
+            {ok, _} = rebar_utils:sh(Script, []),
+            ok
     end.

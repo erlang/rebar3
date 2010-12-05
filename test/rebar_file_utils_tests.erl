@@ -215,6 +215,18 @@ cp_r_overwrite_dir_fail_test_() ->
                       [filename:join([?TMP_DIR,"source"])],
                       filename:join([?TMP_DIR,"dest"])))]}.
 
+mv_file_test_() ->
+    {"move a file to folder",
+     setup,
+     fun() ->
+             setup(),
+             rebar_file_utils:mv(filename:join([?TMP_DIR,"source","file1"]),
+                                 filename:join([?TMP_DIR,"dest"]))
+     end,
+     fun teardown/1,
+     [?_assert(filelib:is_file(filename:join([?TMP_DIR,"dest","file1"]))),
+      ?_assertNot(filelib:is_file(filename:join([?TMP_DIR,"source","file1"])))]}.
+
 %% ====================================================================
 %% Utilities
 %% ====================================================================

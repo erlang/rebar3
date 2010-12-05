@@ -89,7 +89,7 @@ compile(Config, AppFile) ->
 
             %% One or more files are available for building. Run the pre-compile hook, if
             %% necessary.
-            run_precompile_hook(Config, Env),
+            ok = run_precompile_hook(Config, Env),
 
             %% Compile each of the sources
             {NewBins, ExistingBins} = compile_each(Sources, Config, Env, [], []),
@@ -103,8 +103,9 @@ compile(Config, AppFile) ->
             lists:foreach(fun({SoName,Bins}) ->
                 case needs_link(SoName, sets:to_list(sets:intersection([sets:from_list(Bins),sets:from_list(NewBins)]))) of
                   true ->
-                    rebar_utils:sh_failfast(?FMT("$CC ~s $LDFLAGS $DRV_LDFLAGS -o ~s",
-                                                  [string:join(Bins, " "), SoName]), Env);
+                    rebar_utils:sh(?FMT("$CC ~s $LDFLAGS $DRV_LDFLAGS -o ~s",
+                                        [string:join(Bins, " "), SoName]),
+                                   [{env, Env}]);
                   false ->
                     ?INFO("Skipping relink of ~s\n", [SoName]),
                     ok
@@ -148,7 +149,8 @@ run_precompile_hook(Config, Env) ->
             case filelib:is_regular(BypassFileName) of
                 false ->
                     ?CONSOLE("Running ~s\n", [Script]),
-                    rebar_utils:sh_failfast(Script, Env);
+                    {ok, _} = rebar_utils:sh(Script, [{env, Env}]),
+                    ok;
                 true ->
                     ?INFO("~s exists; not running ~s\n", [BypassFileName, Script])
             end
@@ -160,7 +162,8 @@ run_cleanup_hook(Config) ->
             ok;
         Script ->
             ?CONSOLE("Running ~s\n", [Script]),
-            rebar_utils:sh_failfast(Script, [])
+            {ok, _} = rebar_utils:sh(Script, []),
+            ok
     end.
 
 
@@ -174,11 +177,12 @@ compile_each([Source | Rest], Config, Env, NewBins, ExistingBins) ->
             ?CONSOLE("Compiling ~s\n", [Source]),
             case compiler(Ext) of
                 "$CC" ->
-                    rebar_utils:sh_failfast(?FMT("$CC -c $CFLAGS $DRV_CFLAGS ~s -o ~s",
-                                                 [Source, Bin]), Env);
+                    rebar_utils:sh(?FMT("$CC -c $CFLAGS $DRV_CFLAGS ~s -o ~s",
+                                        [Source, Bin]), [{env, Env}]);
                 "$CXX" ->
-                    rebar_utils:sh_failfast(?FMT("$CXX -c $CXXFLAGS $DRV_CFLAGS ~s -o ~s",
-                                                 [Source, Bin]), Env)
+                    rebar_utils:sh(
+                      ?FMT("$CXX -c $CXXFLAGS $DRV_CFLAGS ~s -o ~s",
+                           [Source, Bin]), [{env, Env}])
             end,
             compile_each(Rest, Config, Env, [Bin | NewBins], ExistingBins);
 

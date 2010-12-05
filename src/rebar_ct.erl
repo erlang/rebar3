@@ -71,7 +71,7 @@ run_test(TestDir, Config, _File) ->
             Output = " 2>&1 | tee -a " ++ RawLog
     end,
 
-    rebar_utils:sh(Cmd ++ Output, [{"TESTDIR", TestDir}]),
+    rebar_utils:sh(Cmd ++ Output, [{env,[{"TESTDIR", TestDir}]}]),
     check_log(RawLog).
 
 
@@ -89,7 +89,9 @@ clear_log(RawLog) ->
 %% calling ct with erl does not return non-zero on failure - have to check
 %% log results
 check_log(RawLog) ->
-    Msg = os:cmd("grep -e 'TEST COMPLETE' -e '{error,make_failed}' " ++ RawLog),
+    {ok, Msg} =
+        rebar_utils:sh("grep -e 'TEST COMPLETE' -e '{error,make_failed}' "
+                       ++ RawLog, [{use_stdout, false}]),
     MakeFailed = string:str(Msg, "{error,make_failed}") =/= 0,
     RunFailed = string:str(Msg, ", 0 failed") =:= 0,
     if
