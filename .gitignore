@@ -5,3 +5,4 @@ rebar
 .*.swp
 rt.work
 .hgignore
+.eunit
