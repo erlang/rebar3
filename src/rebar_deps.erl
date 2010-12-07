@@ -373,5 +373,10 @@ has_vcs_dir(git, Dir) ->
     filelib:is_dir(filename:join(Dir, ".git"));
 has_vcs_dir(hg, Dir) ->
     filelib:is_dir(filename:join(Dir, ".hg"));
+has_vcs_dir(bzr, Dir) ->
+    filelib:is_dir(filename:join(Dir, ".bzr"));
+has_vcs_dir(svn, Dir) ->
+    filelib:is_dir(filename:join(Dir, ".svn"))
+        orelse filelib:is_dir(filename:join(Dir, "_svn"));
 has_vcs_dir(_, _) ->
     true.
