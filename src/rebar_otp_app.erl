@@ -39,11 +39,11 @@ compile(Config, File) ->
     %% If we get an .app.src file, it needs to be pre-processed and
     %% written out as a ebin/*.app file. That resulting file will then
     %% be validated as usual.
-    case rebar_app_utils:is_app_src(File) of
+    AppFile = case rebar_app_utils:is_app_src(File) of
         true ->
-            AppFile = preprocess(File);
+            preprocess(File);
         false ->
-            AppFile = File
+            File
     end,
 
     %% Load the app file and validate it.
