@@ -297,11 +297,21 @@ download_source(AppDir, {svn, Url, Rev}) ->
                    filename:dirname(AppDir)).
 
 update_source(Dep) ->
-    ?CONSOLE("Updating ~p from ~p\n", [Dep#dep.app, Dep#dep.source]),
-    require_source_engine(Dep#dep.source),
-    update_source(filename:join(get_deps_dir(), Dep#dep.app),
-                  Dep#dep.source),
-    Dep.
+    %% It's possible when updating a source, that a given dep does not have a
+    %% VCS directory, such as when a source archive is built of a project, with
+    %% all deps already downloaded/included. So, verify that the necessary VCS
+    %% directory exists before attempting to do the update.
+    AppDir = filename:join(get_deps_dir(), Dep#dep.app),
+    case has_vcs_dir(element(1, Dep#dep.source), AppDir) of
+        true ->
+            ?CONSOLE("Updating ~p from ~p\n", [Dep#dep.app, Dep#dep.source]),
+            require_source_engine(Dep#dep.source),
+            update_source(AppDir, Dep#dep.source),
+            Dep;
+        false ->
+            ?WARN("Skipping update for ~p: no VCS directory available!\n", [Dep]),
+            Dep
+    end.
 
 update_source(AppDir, {git, _Url, {branch, Branch}}) ->
     rebar_utils:sh(?FMT("git fetch origin", []), [], AppDir),
@@ -358,3 +368,10 @@ scm_client_vsn(bzr) ->
     scm_client_vsn(rebar_utils:find_executable("bzr"), " --version", "Bazaar \\(bzr\\) (\\d+).(\\d+)");
 scm_client_vsn(svn) ->
     scm_client_vsn(rebar_utils:find_executable("svn"), " --version", "svn, version (\\d+).(\\d+)").
+
+has_vcs_dir(git, Dir) ->
+    filelib:is_dir(filename:join(Dir, ".git"));
+has_vcs_dir(hg, Dir) ->
+    filelib:is_dir(filename:join(Dir, ".hg"));
+has_vcs_dir(_, _) ->
+    true.
