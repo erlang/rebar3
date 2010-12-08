@@ -130,13 +130,22 @@ make_cmd(TestDir, Config) ->
             Include = ""
     end,
 
+    %% Add the code path of the rebar process to the code path. This
+    %% includes the dependencies in the code path. The directories
+    %% that are part of the root Erlang install are filtered out to
+    %% avoid duplication
+    R = code:root_dir(),
+    NonLibCodeDirs = [P || P <- code:get_path(), lists:prefix(R, P) == false],
+    CodeDirs = [io_lib:format("\"~s\"", [Dir]) ||
+                   Dir <- [EbinDir|NonLibCodeDirs]],
+    CodePathString = string:join(CodeDirs, " "),
     Cmd = ?FMT("erl " % should we expand ERL_PATH?
-               " -noshell -pa \"~s\" ~s"
+               " -noshell -pa ~s ~s"
                " -s ct_run script_start -s erlang halt"
                " -name test@~s"
                " -logdir \"~s\""
                " -env TEST_DIR \"~s\"",
-               [EbinDir,
+               [CodePathString,
                 Include,
                 net_adm:localhost(),
                 LogDir,
