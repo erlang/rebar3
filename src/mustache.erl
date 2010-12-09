@@ -190,8 +190,6 @@ to_s(Val) when is_integer(Val) ->
   integer_to_list(Val);
 to_s(Val) when is_float(Val) ->
   io_lib:format("~.2f", [Val]);
-to_s(Val) when is_boolean(Val) ->
-  Val;
 to_s(Val) when is_atom(Val) ->
   atom_to_list(Val);
 to_s(Val) ->
