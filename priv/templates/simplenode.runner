@@ -79,7 +79,7 @@ case "$1" in
                 ;;
             CYGWIN*)
                 # UID PID PPID TTY STIME COMMAND
-                PID=`ps -efW|grep "$RUNNER_BASE_DIR/.*/[b]eam"|cut -d' ' -f1`
+                PID=`ps -efW|grep "$RUNNER_BASE_DIR/.*/[b]eam"|cut -d' ' -f2`
                 ;;
         esac
         $NODETOOL stop
