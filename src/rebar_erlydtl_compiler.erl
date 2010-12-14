@@ -109,7 +109,7 @@ compile_dtl(Source, Target, Config) ->
         non_existing ->
             ?CONSOLE(
                "~n===============================================~n"
-               " You need to install erlydtl to comple DTL templates~n"
+               " You need to install erlydtl to compile DTL templates~n"
                " Download the latest tarball release from github~n"
                "    http://code.google.com/p/erlydtl/~n"
                " and install it into your erlang library dir~n"
