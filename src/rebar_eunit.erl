@@ -189,7 +189,10 @@ eunit_config(Config) ->
     EunitOpts = rebar_config:get_list(Config, eunit_compile_opts, []),
     Opts = [{d, 'TEST'}, debug_info] ++
         ErlOpts ++ EunitOpts ++ EqcOpts,
-    rebar_config:set(Config, erl_opts, Opts).
+    Config1 = rebar_config:set(Config, erl_opts, Opts),
+
+    FirstErls = rebar_config:get_list(Config1, eunit_first_files, []),
+    rebar_config:set(Config1, erl_first_files, FirstErls).
 
 is_quickcheck_avail() ->
     case erlang:get(is_quickcheck_avail) of
