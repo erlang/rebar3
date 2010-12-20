@@ -41,7 +41,7 @@ compile(Config, File) ->
     %% be validated as usual.
     AppFile = case rebar_app_utils:is_app_src(File) of
         true ->
-            preprocess(File);
+            preprocess(Config, File);
         false ->
             File
     end,
@@ -86,12 +86,14 @@ clean(_Config, File) ->
 %% Internal functions
 %% ===================================================================
 
-preprocess(AppSrcFile) ->
+preprocess(Config, AppSrcFile) ->
     case rebar_app_utils:load_app_file(AppSrcFile) of
         {ok, AppName, AppData} ->
-            %% Get a list of all the modules available in ebin/ and update
-            %% the app data accordingly
-            A1 = lists:keystore(modules, 1, AppData, {modules, ebin_modules()}),
+            %% Look for a configuration file with vars we want to
+            %% substitute. Note that we include the list of modules available in
+            %% ebin/ and update the app data accordingly.
+            AppVars = load_app_vars(Config) ++ [{modules, ebin_modules()}],
+            A1 = apply_app_vars(AppVars, AppData),
 
             %% Build the final spec as a string
             Spec = io_lib:format("~p.\n", [{application, AppName, A1}]),
@@ -109,6 +111,22 @@ preprocess(AppSrcFile) ->
             ?ABORT("Failed to read ~s for preprocessing: ~p\n", [AppSrcFile, Reason])
     end.
 
+load_app_vars(Config) ->
+    case rebar_config:get_local(Config, app_vars_file, undefined) of
+        undefined ->
+            ?INFO("No app_vars_file defined.\n", []),
+            [];
+        Filename ->
+            ?INFO("Loading app vars from ~p\n", [Filename]),
+            {ok, Vars} = file:consult(Filename),
+            Vars
+    end.
+
+apply_app_vars([], AppData) ->
+    AppData;
+apply_app_vars([{Key, Value} | Rest], AppData) ->
+    AppData2 = lists:keystore(Key, 1, AppData, {Key, Value}),
+    apply_app_vars(Rest, AppData2).
 
 validate_name(AppName, File) ->
     %% Convert the .app file name to an atom -- check it against the identifier within the file
