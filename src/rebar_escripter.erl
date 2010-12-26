@@ -30,6 +30,7 @@
          clean/2]).
 
 -include("rebar.hrl").
+-include_lib("kernel/include/file.hrl").
 
 %% ===================================================================
 %% Public API
@@ -70,7 +71,8 @@ escriptize(Config, AppFile) ->
     end,
 
     %% Finally, update executable perms for our script
-    [] = os:cmd(?FMT("chmod u+x ~p", [Filename])),
+    {ok, #file_info{mode = Mode}} = file:read_file_info(Filename),
+    ok = file:change_mode(Filename, Mode bor 8#00100),
     ok.
 
 clean(Config, AppFile) ->
