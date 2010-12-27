@@ -228,6 +228,8 @@ internal_erl_compile(Source, Config, Outdir, ErlOpts) ->
                     %% We got at least one warning -- if fail_on_warning is in options, fail
                     case lists:member(fail_on_warning, Opts) of
                         true ->
+                            %% remove target to prevent overlooking this failure
+                            ok = file:delete(Target),
                             ?FAIL;
                         false ->
                             ok
