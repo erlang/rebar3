@@ -247,16 +247,19 @@ is_app_available(App, VsnRegex, Path) ->
                         nomatch ->
                             ?WARN("~s has version ~p; requested regex was ~s\n",
                                   [AppFile, Vsn, VsnRegex]),
-                            {false, version_mismatch}
+                            {false, {version_mismatch,
+                                     {AppFile,
+                                      {expected, VsnRegex}, {has, Vsn}}}}
                     end;
                 OtherApp ->
                     ?WARN("~s has application id ~p; expected ~p\n", [AppFile, OtherApp, App]),
-                    {false, name_mismatch}
+                    {false, {name_mismatch,
+                             {AppFile, {expected, App}, {has, OtherApp}}}}
             end;
         false ->
             ?WARN("Expected ~s to be an app dir (containing ebin/*.app), but no .app found.\n",
                   [Path]),
-            {false, missing_app_file}
+            {false, {missing_app_file, Path}}
     end.
 
 use_source(Dep) ->
@@ -280,7 +283,7 @@ use_source(Dep, Count) ->
                     %% The app that was downloaded doesn't match up (or had
                     %% errors or something). For the time being, abort.
                     ?ABORT("Dependency dir ~s failed application validation "
-                        "with reason ~p.\n", [Dep#dep.dir, Reason])
+                        "with reason:~n~p.\n", [Dep#dep.dir, Reason])
             end;
         false ->
             ?CONSOLE("Pulling ~p from ~p\n", [Dep#dep.app, Dep#dep.source]),
