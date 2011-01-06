@@ -103,6 +103,7 @@ compile_each([{Proto, Beam, Hrl} | Rest]) ->
                     %% Compilation worked, but we need to move the .beam and .hrl file
                     %% into the ebin/ and include/ directories respectively
                     %% TODO: Protobuffs really needs to be better about this...sigh.
+                    ok = filelib:ensure_dir(filename:join("ebin","dummy")),
                     [] = os:cmd(?FMT("mv ~s ebin", [Beam])),
                     ok = filelib:ensure_dir(filename:join("include", Hrl)),
                     [] = os:cmd(?FMT("mv ~s include", [Hrl])),
