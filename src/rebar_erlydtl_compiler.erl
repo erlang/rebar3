@@ -174,7 +174,7 @@ referenced_dtls1(Step, Config, Seen) ->
             end, Step)),
     DocRoot = option(doc_root, DtlOpts),
     WithPaths = [ filename:join([DocRoot, F]) || F <- AllRefs ],
-    Existing = [F || F <- WithPaths, filelib:is_file(F)],
+    Existing = [F || F <- WithPaths, filelib:is_regular(F)],
     New = sets:subtract(sets:from_list(Existing), Seen),
     case sets:size(New) of
         0 -> Seen;

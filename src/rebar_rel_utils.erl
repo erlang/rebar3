@@ -33,7 +33,7 @@ is_rel_dir() ->
 
 is_rel_dir(Dir) ->
     Fname = filename:join([Dir, "reltool.config"]),
-    case filelib:is_file(Fname) of
+    case filelib:is_regular(Fname) of
         true ->
             {true, Fname};
         false ->

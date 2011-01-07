@@ -259,7 +259,7 @@ render(Bin, Context) ->
 
 write_file(Output, Data, Force) ->
     %% determine if the target file already exists
-    FileExists = filelib:is_file(Output),
+    FileExists = filelib:is_regular(Output),
 
     %% perform the function if we're allowed,
     %% otherwise just process the next template

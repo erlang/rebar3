@@ -195,7 +195,7 @@ is_quickcheck_avail() ->
                 {error, bad_name} ->
                     IsAvail = false;
                 Dir ->
-                    IsAvail = filelib:is_file(filename:join(Dir, "eqc.hrl"))
+                    IsAvail = filelib:is_regular(filename:join(Dir, "eqc.hrl"))
             end,
             erlang:put(is_quickcheck_avail, IsAvail),
             ?DEBUG("Quickcheck availability: ~p\n", [IsAvail]),
