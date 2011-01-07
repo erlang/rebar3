@@ -111,7 +111,7 @@ filter_away_ignored(UnusedExports) ->
     %% Functions can be ignored by using
     %% -ignore_xref([{F, A}, ...]).
 
-    %% Setup a filter function that build a list of behaviour callbacks and/or
+    %% Setup a filter function that builds a list of behaviour callbacks and/or
     %% any functions marked to ignore. We then use this list to mask any functions
     %% marked as unused exports by xref
     F = fun(Mod) ->

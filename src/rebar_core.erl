@@ -476,8 +476,8 @@ update_code_path(Config) ->
 restore_code_path(no_change) ->
     ok;
 restore_code_path({old, Path}) ->
-    %% Verify that all of the paths still exist -- some dynamically add paths
-    %% can get blown away during clean.
+    %% Verify that all of the paths still exist -- some dynamically
+    %% added paths can get blown away during clean.
     true = code:set_path([F || F <- Path, filelib:is_file(F)]),
     ok.
 
