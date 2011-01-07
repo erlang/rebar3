@@ -80,7 +80,7 @@ app_name(AppFile) ->
 app_applications(AppFile) ->
     case load_app_file(AppFile) of
         {ok, _, AppInfo} ->
-            proplists:get_value(applications, AppInfo);
+            get_value(applications, AppInfo, AppFile);
         {error, Reason} ->
             ?ABORT("Failed to extract applications from ~s: ~p\n",
                    [AppFile, Reason])
@@ -89,7 +89,7 @@ app_applications(AppFile) ->
 app_vsn(AppFile) ->
     case load_app_file(AppFile) of
         {ok, _, AppInfo} ->
-            proplists:get_value(vsn, AppInfo);
+            get_value(vsn, AppInfo, AppFile);
         {error, Reason} ->
             ?ABORT("Failed to extract vsn from ~s: ~p\n",
                    [AppFile, Reason])
@@ -115,4 +115,12 @@ load_app_file(Filename) ->
             end;
         {AppName, AppData} ->
             {ok, AppName, AppData}
+    end.
+
+get_value(Key, AppInfo, AppFile) ->
+    case proplists:get_value(Key, AppInfo) of
+        undefined ->
+            ?ABORT("Failed to get app value '~p' from '~s'~n", [Key, AppFile]);
+        Value ->
+            Value
     end.
