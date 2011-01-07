@@ -453,10 +453,11 @@ execute(Command, Modules, Config, ModuleFile) ->
                     ?FAIL;
                 {Module, {error, _} = Other} ->
                     ?ABORT("~p failed while processing ~s in module ~s: ~s\n",
-                           [Command, Dir, Module, io_lib:print(Other, 1,80,-1)]);
+                           [Command, Dir, Module,
+                            io_lib:print(Other, 1, 80, -1)]);
                 Other ->
                     ?ABORT("~p failed while processing ~s: ~s\n",
-                           [Command, Dir, io_lib:print(Other, 1,80,-1)])
+                           [Command, Dir, io_lib:print(Other, 1, 80, -1)])
             end
     end.
 

@@ -263,8 +263,8 @@ write_file(Output, Data, Force) ->
 
     %% perform the function if we're allowed,
     %% otherwise just process the next template
-    if
-        Force =:= "1"; FileExists =:= false ->
+    case Force =:= "1" orelse FileExists =:= false of
+        true ->
             ok = filelib:ensure_dir(Output),
             if
                 {Force, FileExists} =:= {"1", true} ->
@@ -280,7 +280,7 @@ write_file(Output, Data, Force) ->
                     ?ABORT("Failed to write output file ~p: ~p\n",
                            [Output, Reason])
             end;
-        true ->
+        false ->
             {error, exists}
     end.
 
