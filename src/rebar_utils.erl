@@ -166,9 +166,7 @@ expand_sh_flag({abort_on_error, Message}) ->
      end};
 expand_sh_flag(abort_on_error) ->
     {error_handler,
-     fun(Command, Rc) ->
-             ?ABORT("~s failed with error: ~w\n", [Command, Rc])
-     end};
+     fun log_and_abort/2};
 expand_sh_flag(use_stdout) ->
     {output_handler,
      fun(Line, Acc) ->
@@ -184,6 +182,10 @@ expand_sh_flag({cd, Dir}) ->
     {port_settings, {cd, Dir}};
 expand_sh_flag({env, Env}) ->
     {port_settings, {env, Env}}.
+
+-spec log_and_abort(string(), integer()) -> no_return().
+log_and_abort(Command, Rc) ->
+    ?ABORT("~s failed with error: ~w\n", [Command, Rc]).
 
 sh_loop(Port, Fun, Acc) ->
     receive
