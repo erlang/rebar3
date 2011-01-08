@@ -29,7 +29,6 @@
 -export([get_cwd/0,
          is_arch/1,
          get_arch/0,
-         get_os/0,
          sh/2,
          find_files/2,
          now_str/0,
@@ -62,15 +61,6 @@ is_arch(ArchRegex) ->
 get_arch() ->
     Words = integer_to_list(8 * erlang:system_info(wordsize)),
     erlang:system_info(system_architecture) ++ "-" ++ Words.
-
-get_os() ->
-    Arch = erlang:system_info(system_architecture),
-    case match_first([{"linux", linux}, {"darwin", darwin}], Arch) of
-        nomatch ->
-            {unknown, Arch};
-        ArchAtom ->
-            ArchAtom
-    end.
 
 %%
 %% Options = [Option] -- defaults to [use_stdout, abort_on_error]
@@ -163,16 +153,6 @@ find_executable(Name) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
-
-match_first([], _Val) ->
-    nomatch;
-match_first([{Regex, MatchValue} | Rest], Val) ->
-    case re:run(Val, Regex, [{capture, none}]) of
-        match ->
-            MatchValue;
-        nomatch ->
-           match_first(Rest, Val)
-    end.
 
 expand_sh_flag(return_on_error) ->
     {error_handler,
