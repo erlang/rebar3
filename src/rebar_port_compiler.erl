@@ -119,7 +119,10 @@ clean(Config, AppFile) ->
     rebar_file_utils:delete_each([source_to_bin(S) || S <- Sources]),
 
     %% Delete the .so file
-    rebar_file_utils:delete_each(lists:map(fun({SoName,_}) -> SoName end, so_specs(Config, AppFile, expand_objects(Sources)))),
+    ExtractSoName = fun({SoName, _}) -> SoName end,
+    rebar_file_utils:delete_each([ExtractSoName(S)
+                                  || S <- so_specs(Config, AppFile,
+                                                   expand_objects(Sources))]),
 
     %% Run the cleanup script, if it exists
     run_cleanup_hook(Config).

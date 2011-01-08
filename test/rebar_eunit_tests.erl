@@ -252,5 +252,5 @@ assert_full_coverage(Mod) ->
                            string:str(X, Mod) =/= 0,
                            string:str(X, "100%") =/= 0],
             file:close(F),
-            ?assert(length(Result) == 1)
+            ?assert(length(Result) =:= 1)
     end.

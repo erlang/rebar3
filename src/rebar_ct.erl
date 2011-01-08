@@ -137,7 +137,7 @@ make_cmd(TestDir, Config) ->
     %% that are part of the root Erlang install are filtered out to
     %% avoid duplication
     R = code:root_dir(),
-    NonLibCodeDirs = [P || P <- code:get_path(), lists:prefix(R, P) == false],
+    NonLibCodeDirs = [P || P <- code:get_path(), not lists:prefix(R, P)],
     CodeDirs = [io_lib:format("\"~s\"", [Dir]) ||
                    Dir <- [EbinDir|NonLibCodeDirs]],
     CodePathString = string:join(CodeDirs, " "),

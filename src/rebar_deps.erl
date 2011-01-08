@@ -134,8 +134,9 @@ compile(Config, AppFile) ->
     DepsDir = get_deps_dir(),
     Deps = rebar_config:get_local(Config, deps, []),
     {AvailableDeps, _} = find_deps(find, Deps),
-    _ = [delete_dep(D) || D <- AvailableDeps,
-			  lists:prefix(DepsDir, D#dep.dir) == true],
+    _ = [delete_dep(D)
+         || D <- AvailableDeps,
+            lists:prefix(DepsDir, D#dep.dir)],
     ok.
 
 
@@ -339,11 +340,13 @@ update_source(Dep) ->
     end.
 
 update_source(AppDir, {git, _Url, {branch, Branch}}) ->
-    rebar_utils:sh("git fetch origin", [{cd, AppDir}]),
-    rebar_utils:sh(?FMT("git checkout -q origin/~s", [Branch]), [{cd, AppDir}]);
+    ShOpts = [{cd, AppDir}],
+    rebar_utils:sh("git fetch origin", ShOpts),
+    rebar_utils:sh(?FMT("git checkout -q origin/~s", [Branch]), ShOpts);
 update_source(AppDir, {git, _Url, {tag, Tag}}) ->
-    rebar_utils:sh("git fetch --tags origin", [{cd, AppDir}]),
-    rebar_utils:sh(?FMT("git checkout -q ~s", [Tag]), [{cd, AppDir}]);
+    ShOpts = [{cd, AppDir}],
+    rebar_utils:sh("git fetch --tags origin", ShOpts),
+    rebar_utils:sh(?FMT("git checkout -q ~s", [Tag]), ShOpts);
 update_source(AppDir, {git, Url, Refspec}) ->
     update_source(AppDir, {git, Url, {branch, Refspec}});
 update_source(AppDir, {svn, _Url, Rev}) ->

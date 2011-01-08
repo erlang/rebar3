@@ -75,8 +75,8 @@ sh(Command0, Options0) ->
     ?INFO("sh: ~s\n~p\n", [Command0, Options0]),
 
     DefaultOptions = [use_stdout, abort_on_error],
-    Options = lists:map(fun expand_sh_flag/1,
-                         proplists:compact(Options0 ++ DefaultOptions)),
+    Options = [expand_sh_flag(V)
+               || V <- proplists:compact(Options0 ++ DefaultOptions)],
 
     ErrorHandler = proplists:get_value(error_handler, Options),
     OutputHandler = proplists:get_value(output_handler, Options),
@@ -87,8 +87,8 @@ sh(Command0, Options0) ->
     Port = open_port({spawn, Command}, PortSettings),
 
     case sh_loop(Port, OutputHandler, []) of
-        {ok, Output} ->
-            {ok, Output};
+        {ok, _Output} = Ok ->
+            Ok;
         {error, Rc} ->
             ErrorHandler(Command, Rc)
     end.
@@ -179,10 +179,10 @@ expand_sh_flag({use_stdout, false}) ->
      fun(Line, Acc) ->
              [Acc | Line]
      end};
-expand_sh_flag({cd, Dir}) ->
-    {port_settings, {cd, Dir}};
-expand_sh_flag({env, Env}) ->
-    {port_settings, {env, Env}}.
+expand_sh_flag({cd, _CdArg} = Cd) ->
+    {port_settings, Cd};
+expand_sh_flag({env, _EnvArg} = Env) ->
+    {port_settings, Env}.
 
 -spec log_and_abort(string(), integer()) -> no_return().
 log_and_abort(Command, Rc) ->

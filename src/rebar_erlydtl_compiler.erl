@@ -164,14 +164,13 @@ referenced_dtls1(Step, Config, Seen) ->
                           [{return, list}]),
     AllRefs =
         lists:append(
-          lists:map(
-            fun(F) ->
-                    {ok, Res} = rebar_utils:sh(
-                                  lists:flatten(["grep -o [^\\\"]*",
-                                                 ExtMatch," ",F]),
-                                  [{use_stdout, false}]),
-                    string:tokens(Res, "\n")
-            end, Step)),
+          [begin
+               {ok, Res} = rebar_utils:sh(
+                             lists:flatten(["grep -o [^\\\"]*",
+                                            ExtMatch," ",F]),
+                             [{use_stdout, false}]),
+               string:tokens(Res, "\n")
+           end || F <- Step]),
     DocRoot = option(doc_root, DtlOpts),
     WithPaths = [ filename:join([DocRoot, F]) || F <- AllRefs ],
     Existing = [F || F <- WithPaths, filelib:is_regular(F)],

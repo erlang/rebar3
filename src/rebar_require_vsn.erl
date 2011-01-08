@@ -45,7 +45,8 @@ eunit(Config, _) ->
 
 check_versions(Config) ->
     ErtsRegex = rebar_config:get(Config, require_erts_vsn, ".*"),
-    case re:run(erlang:system_info(version), ErtsRegex, [{capture, none}]) of
+    ReOpts = [{capture, none}],
+    case re:run(erlang:system_info(version), ErtsRegex, ReOpts) of
         match ->
             ?DEBUG("Matched required ERTS version: ~s -> ~s\n",
                    [erlang:system_info(version), ErtsRegex]);
@@ -55,7 +56,7 @@ check_versions(Config) ->
     end,
 
     OtpRegex = rebar_config:get(Config, require_otp_vsn, ".*"),
-    case re:run(erlang:system_info(otp_release), OtpRegex, [{capture, none}]) of
+    case re:run(erlang:system_info(otp_release), OtpRegex, ReOpts) of
         match ->
             ?DEBUG("Matched required OTP release: ~s -> ~s\n",
                    [erlang:system_info(otp_release), OtpRegex]);

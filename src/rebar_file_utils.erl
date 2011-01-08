@@ -49,8 +49,8 @@ rm_rf(Target) ->
             ok;
         {win32, _} ->
             Filelist = filelib:wildcard(Target),
-            Dirs = lists:filter(fun filelib:is_dir/1,Filelist),
-            Files = lists:subtract(Filelist,Dirs),
+            Dirs = [F || F <- Filelist, filelib:is_dir(F)],
+            Files = Filelist -- Dirs,
             ok = delete_each(Files),
             ok = delete_each_dir_win32(Dirs),
             ok
@@ -82,9 +82,10 @@ mv(Source, Dest) ->
                              [filename:nativename(Source),
                               filename:nativename(Dest)]),
                         [{use_stdout, false}, return_on_error]),
-            case length(R) == 0 of
-                true -> ok;
-                false ->
+            case R of
+                [] ->
+                    ok;
+                _ ->
                     {error, lists:flatten(
                               io_lib:format("Failed to move ~s to ~s~n",
                                             [Source, Dest]))}
@@ -130,25 +131,24 @@ xcopy_win32(Source,Dest)->
                                     [Source, Dest]))}
     end.
 
-cp_r_win32({true,SourceDir},{true,DestDir}) ->
+cp_r_win32({true, SourceDir}, {true, DestDir}) ->
     % from directory to directory
     SourceBase = filename:basename(SourceDir),
-    ok = case file:make_dir(filename:join(DestDir,SourceBase)) of
-             {error,eexist} -> ok;
+    ok = case file:make_dir(filename:join(DestDir, SourceBase)) of
+             {error, eexist} -> ok;
              Other -> Other
          end,
-    ok = xcopy_win32(SourceDir,filename:join(DestDir,SourceBase));
-cp_r_win32({false,Source},{true,DestDir}) ->
+    ok = xcopy_win32(SourceDir, filename:join(DestDir, SourceBase));
+cp_r_win32({false, Source} = S,{true, DestDir}) ->
     % from file to directory
-    cp_r_win32({false,Source},
-               {false,filename:join(DestDir,filename:basename(Source))});
-cp_r_win32({false,Source},{false,Dest}) ->
+    cp_r_win32(S, {false, filename:join(DestDir, filename:basename(Source))});
+cp_r_win32({false, Source},{false, Dest}) ->
     % from file to file
-    {ok,_} = file:copy(Source,Dest),
+    {ok,_} = file:copy(Source, Dest),
     ok;
 cp_r_win32(Source,Dest) ->
-    Dst = {filelib:is_dir(Dest),Dest},
+    Dst = {filelib:is_dir(Dest), Dest},
     lists:foreach(fun(Src) ->
-                          ok = cp_r_win32({filelib:is_dir(Src),Src},Dst)
+                          ok = cp_r_win32({filelib:is_dir(Src), Src}, Dst)
                   end, filelib:wildcard(Source)),
     ok.

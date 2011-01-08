@@ -222,13 +222,15 @@ run_reltool(Server, _Config, ReltoolConfig) ->
                           end,
 
             %% Finally, overlay the files specified by the overlay section
-            case lists:keysearch(overlay, 1, ReltoolConfig) of
-                {value, {overlay, Overlay}} when is_list(Overlay) ->
-                    execute_overlay(Overlay, OverlayVars, rebar_utils:get_cwd(), TargetDir);
-                {value, _} ->
-                    ?ABORT("{overlay, [...]} entry in reltool.config must be a list.\n", []);
+            case lists:keyfind(overlay, 1, ReltoolConfig) of
+                {overlay, Overlay} when is_list(Overlay) ->
+                    execute_overlay(Overlay, OverlayVars, rebar_utils:get_cwd(),
+                                    TargetDir);
                 false ->
-                    ?INFO("No {overlay, [...]} found in reltool.config.\n", [])
+                    ?INFO("No {overlay, [...]} found in reltool.config.\n", []);
+                _ ->
+                    ?ABORT("{overlay, [...]} entry in reltool.config "
+                           "must be a list.\n", [])
             end;
 
         {error, Reason} ->

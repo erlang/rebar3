@@ -193,7 +193,7 @@ existing_plt_path(Config, File) ->
                             ?ABORT("No PLT found~n", [])
                     end
             end;
-        [$~|[$/|Plt]] ->
+        "~/" ++ Plt ->
             filename:join(Home,Plt);
         Plt ->
             Plt
