@@ -121,7 +121,7 @@ filter_away_ignored(UnusedExports) ->
                 [{Mod, F, A} || {F, A} <- Ignore ++ lists:flatten(Callbacks)]
         end,
     AttrIgnore = lists:flatten(lists:map(F, lists:usort([M || {M, _, _} <- UnusedExports]))),
-    [X || X <- UnusedExports, not(lists:member(X, AttrIgnore))].
+    [X || X <- UnusedExports, not lists:member(X, AttrIgnore)].
 
 
 kf(Key, List) ->
@@ -147,6 +147,7 @@ format_fa({_M, F, A}) ->
 
 %%
 %% Extract an element from a tuple, or undefined if N > tuple size
+%%
 safe_element(N, Tuple) ->
     case catch(element(N, Tuple)) of
         {'EXIT', {badarg, _}} ->
@@ -154,23 +155,6 @@ safe_element(N, Tuple) ->
         Value ->
             Value
     end.
-
-%%
-%% Extract the line number for a given function def
-%%
-abstract_code_function_line(Code, Name, Args) ->
-    [{function, Line, Name, _, _}] = [E || E <- Code,
-                                           safe_element(1, E) == function,
-                                           safe_element(3, E) == Name,
-                                           safe_element(4, E) == Args],
-    Line.
-
-%%
-%% Extract the original source filename from the abstract code
-%%
-abstract_code_source_file(Code) ->
-    [{attribute, 1, file, {Name, _}} | _] = Code,
-    Name.
 
 
 %%
@@ -182,7 +166,11 @@ find_mfa_source({M, F, A}) ->
     {M, Bin, _} = code:get_object_code(M),
     {ok, {M, [{abstract_code, AbstractCode}]}} = beam_lib:chunks(Bin, [abstract_code]),
     {raw_abstract_v1, Code} = AbstractCode,
-    Source = abstract_code_source_file(Code),
-    Line = abstract_code_function_line(Code, F, A),
+    %% Extract the original source filename from the abstract code
+    [{attribute, 1, file, {Source, _}} | _] = Code,
+    %% Extract the line number for a given function def
+    [{function, Line, F, _, _}] = [E || E <- Code,
+                                        safe_element(1, E) == function,
+                                        safe_element(3, E) == F,
+                                        safe_element(4, E) == A],
     {Source, Line}.
-
