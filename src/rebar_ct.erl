@@ -77,13 +77,13 @@ run_test(TestDir, Config, _File) ->
 
 clear_log(RawLog) ->
     case filelib:ensure_dir("logs/index.html") of
-	ok ->
-	    NowStr = rebar_utils:now_str(),
-	    LogHeader = "--- Test run on " ++ NowStr ++ " ---\n",
-	    ok = file:write_file(RawLog, LogHeader);
-	{error, Reason} ->
-	    ?ERROR("Could not create log dir - ~p\n", [Reason]),
-	    ?FAIL
+        ok ->
+            NowStr = rebar_utils:now_str(),
+            LogHeader = "--- Test run on " ++ NowStr ++ " ---\n",
+            ok = file:write_file(RawLog, LogHeader);
+        {error, Reason} ->
+            ?ERROR("Could not create log dir - ~p\n", [Reason]),
+            ?FAIL
     end.
 
 %% calling ct with erl does not return non-zero on failure - have to check
@@ -96,28 +96,28 @@ check_log(RawLog) ->
     RunFailed = string:str(Msg, ", 0 failed") =:= 0,
     if
         MakeFailed ->
-	    show_log(RawLog),
-	    ?ERROR("Building tests failed\n",[]),
-	    ?FAIL;
+            show_log(RawLog),
+            ?ERROR("Building tests failed\n",[]),
+            ?FAIL;
 
         RunFailed ->
-	    show_log(RawLog),
-	    ?ERROR("One or more tests failed\n",[]),
-	    ?FAIL;
+            show_log(RawLog),
+            ?ERROR("One or more tests failed\n",[]),
+            ?FAIL;
 
-	true ->
-	    ?CONSOLE("DONE. ~s\n", [Msg])
+        true ->
+            ?CONSOLE("DONE. ~s\n", [Msg])
     end.
 
 %% Show the log if it hasn't already been shown because verbose was on
 show_log(RawLog) ->
     ?CONSOLE("Showing log\n", []),
     case rebar_config:get_global(verbose, "0") of
-	"0" ->
-	    {ok, Contents} = file:read_file(RawLog),
-	    ?CONSOLE("~s", [Contents]);
-	_ ->
-	    ok
+        "0" ->
+            {ok, Contents} = file:read_file(RawLog),
+            ?CONSOLE("~s", [Contents]);
+        _ ->
+            ok
     end.
 
 make_cmd(TestDir, Config) ->
