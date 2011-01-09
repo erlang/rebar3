@@ -122,14 +122,19 @@ referenced_pegs1(Step, Config, Seen) ->
     ExtMatch = re:replace(option(source_ext, NeoOpts), "\.", "\\\\\\\\.",
                           [{return, list}]),
 
-    AllRefs = lists:append([begin
-                                {ok, Res} =
-                                    rebar_utils:sh(
-                                      lists:flatten(["grep -o [^\\\"]*",
-                                                     ExtMatch, " ", F]),
-                                      [{use_stdout, false}]),
-                                string:tokens(Res, "\n")
-                            end || F <- Step]),
+    ShOpts = [{use_stdout, false}, return_on_error],
+    AllRefs =
+        lists:append(
+          [begin
+               Cmd = lists:flatten(["grep -o [^\\\"]*",
+                                    ExtMatch, " ", F]),
+               case rebar_utils:sh(Cmd, ShOpts) of
+                   {ok, Res} ->
+                       string:tokens(Res, "\n");
+                   {error, _} ->
+                       ""
+               end
+           end || F <- Step]),
     DocRoot = option(doc_root, NeoOpts),
     WithPaths = [ filename:join([DocRoot, F]) || F <- AllRefs ],
     Existing = [F || F <- WithPaths, filelib:is_regular(F)],
