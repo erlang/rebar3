@@ -42,16 +42,29 @@
 %%
 %% * erl_opts - Erlang list of options passed to compile:file/2
 %%              It is also possible to specify platform specific
-%%              options by specifying a triplet where the first string
-%%              is a regex that is checked against Erlang's system
-%%              architecture string. E.g. to define HAVE_SENDFILE only
-%%              on systems with sendfile() and define BACKLOG on
-%%              Linux/FreeBSD as 128 do:
+%%              options by specifying a pair or a triplet where the
+%%              first string is a regex that is checked against the
+%%              string
+%%
+%%                OtpRelease ++ "-" ++ SysArch ++ "-" ++ Words.
+%%
+%%              where
+%%
+%%                OtpRelease = erlang:system_info(otp_release).
+%%                SysArch = erlang:system_info(system_architecture).
+%%                Words = integer_to_list(8 * erlang:system_info(wordsize)).
+%%
+%%              E.g. to define HAVE_SENDFILE only on systems with
+%%              sendfile(), to define BACKLOG on Linux/FreeBSD as 128,
+%%              and to define 'old_inets' for R13 OTP release do:
+%%
 %%              {erl_opts, [{platform_define,
 %%                           "(linux|solaris|freebsd|darwin)",
 %%                           'HAVE_SENDFILE'},
 %%                          {platform_define, "(linux|freebsd)",
-%%                           'BACKLOG', 128}]}.
+%%                           'BACKLOG', 128},
+%%                          {platform_define, "R13",
+%%                           'old_inets'}]}.
 %%
 
 -spec compile(Config::#config{}, AppFile::string()) -> 'ok'.

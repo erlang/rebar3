@@ -60,7 +60,8 @@ is_arch(ArchRegex) ->
 
 get_arch() ->
     Words = integer_to_list(8 * erlang:system_info(wordsize)),
-    erlang:system_info(system_architecture) ++ "-" ++ Words.
+    erlang:system_info(otp_release) ++ "-"
+        ++ erlang:system_info(system_architecture) ++ "-" ++ Words.
 
 %%
 %% Options = [Option] -- defaults to [use_stdout, abort_on_error]
