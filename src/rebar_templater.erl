@@ -75,11 +75,13 @@ create(_Config, _) ->
     AvailTemplates = find_disk_templates() ++ find_escript_templates(),
     ?DEBUG("Available templates: ~p\n", [AvailTemplates]),
 
+    TemplateId = template_id(),
+
     %% Using the specified template id, find the matching template file/type.
     %% Note that if you define the same template in both ~/.rebar/templates
     %% that is also present in the escript, the one on the file system will
     %% be preferred.
-    {Type, Template} = select_template(AvailTemplates, template_id()),
+    {Type, Template} = select_template(AvailTemplates, TemplateId),
 
     %% Load the template definition as is and get the list of variables the
     %% template requires.
@@ -92,31 +94,31 @@ create(_Config, _) ->
                     ?ABORT("Failed while processing variables from template ~p."
                            "Variable definitions must follow form of "
                            "[{atom(), term()}]. Failed at: ~p\n",
-                           [template_id(), Entry]);
+                           [TemplateId, Entry]);
                 Context0 ->
                     ok
             end;
         false ->
             ?WARN("No variables section found in template ~p; using empty context.\n",
-                  [template_id()]),
+                  [TemplateId]),
             Context0 = dict:new()
     end,
 
     %% For each variable, see if it's defined in global vars -- if it is, prefer that
     %% value over the defaults
     Context1 = update_vars(dict:fetch_keys(Context0), Context0),
-    ?DEBUG("Template ~p context: ~p\n", [template_id(), dict:to_list(Context1)]),
+    ?DEBUG("Template ~p context: ~p\n", [TemplateId, dict:to_list(Context1)]),
 
     %% Handle variables that possibly include other variables in their
     %% definition
     Context = resolve_recursive_vars(dict:to_list(Context1), Context1),
 
-    ?DEBUG("Resolved Template ~p context: ~p\n", [template_id(), dict:to_list(Context1)]),
+    ?DEBUG("Resolved Template ~p context: ~p\n", [TemplateId, dict:to_list(Context1)]),
 
     %% Now, use our context to process the template definition -- this permits us to
     %% use variables within the definition for filenames.
     FinalTemplate = consult(render(load_file(Type, Template), Context)),
-    ?DEBUG("Final template def ~p: ~p\n", [template_id(), FinalTemplate]),
+    ?DEBUG("Final template def ~p: ~p\n", [TemplateId, FinalTemplate]),
 
     %% Execute the instructions in the finalized template
     Force = rebar_config:get_global(force, "0"),
@@ -215,7 +217,6 @@ update_vars([Key | Rest], Dict) ->
 %% Given a list of key value pairs, for each string value attempt to
 %% render it using Dict as the context. Storing the result in Dict as Key.
 %%
-
 resolve_recursive_vars([], Dict) ->
     Dict;
 resolve_recursive_vars([{Key, Value0} | Rest], Dict) when is_list(Value0) ->
@@ -266,11 +267,11 @@ write_file(Output, Data, Force) ->
     case Force =:= "1" orelse FileExists =:= false of
         true ->
             ok = filelib:ensure_dir(Output),
-            if
-                {Force, FileExists} =:= {"1", true} ->
+            case {Force, FileExists} of
+                {"1", true} ->
                     ?CONSOLE("Writing ~s (forcibly overwriting)~n",
                              [Output]);
-                true ->
+                _ ->
                     ?CONSOLE("Writing ~s~n", [Output])
             end,
             case file:write_file(Output, Data) of
