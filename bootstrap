@@ -19,12 +19,10 @@ main(Args) ->
     end,
 
     %% Add check for debug flag
-    case lists:member("debug", Args) of
-        true ->
-            DebugFlag = debug_info;
-        false ->
-            DebugFlag = undefined
-    end,
+    DebugFlag = case lists:member("debug", Args) of
+                    true -> debug_info;
+                    false -> undefined
+                end,
 
     %% Compile all src/*.erl to ebin
     case make:files(filelib:wildcard("src/*.erl"), [{outdir, "ebin"}, {i, "include"},
