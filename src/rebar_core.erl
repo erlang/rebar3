@@ -120,7 +120,7 @@ parse_args(Args) ->
     case getopt:parse(OptSpecList, Args) of
         {ok, {Options, NonOptArgs}} ->
             %% Check options and maybe halt execution
-            {ok, continue} = show_info_maybe_halt(Options, NonOptArgs),
+            ok = show_info_maybe_halt(Options, NonOptArgs),
 
             %% Set global variables based on getopt options
             set_global_flag(Options, verbose),
@@ -165,31 +165,25 @@ set_global_flag(Options, Flag) ->
 %% show info and maybe halt execution
 %%
 show_info_maybe_halt(Opts, NonOptArgs) ->
-    case proplists:get_bool(help, Opts) of
-        true ->
+    false = show_info_maybe_halt(help, Opts, fun help/0),
+    false = show_info_maybe_halt(commands, Opts, fun commands/0),
+    false = show_info_maybe_halt(version, Opts, fun version/0),
+    case NonOptArgs of
+        [] ->
+            ?CONSOLE("No command to run specified!~n",[]),
             help(),
+            halt(1);
+        _ ->
+            ok
+    end.
+
+show_info_maybe_halt(O, Opts, F) ->
+    case proplists:get_bool(O, Opts) of
+        true ->
+            F(),
             halt(0);
         false ->
-            case proplists:get_bool(commands, Opts) of
-                true ->
-                    commands(),
-                    halt(0);
-                false ->
-                    case proplists:get_bool(version, Opts) of
-                        true ->
-                            version(),
-                            halt(0);
-                        false ->
-                            case NonOptArgs of
-                                [] ->
-                                    ?CONSOLE("No command to run specified!~n",[]),
-                                    help(),
-                                    halt(1);
-                                _ ->
-                                    {ok, continue}
-                            end
-                    end
-            end
+            false
     end.
 
 %%
