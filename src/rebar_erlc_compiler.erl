@@ -164,7 +164,7 @@ doterl_compile(Config, OutDir, MoreSources) ->
 %% Internal functions
 %% ===================================================================
 
--spec include_path(Source::string(), Config::#config{}) -> [string()].
+-spec include_path(Source::string(), Config::#config{}) -> [string(), ...].
 include_path(Source, Config) ->
     ErlOpts = rebar_config:get(Config, erl_opts, []),
     ["include", filename:dirname(Source)] ++ proplists:get_all_values(i, ErlOpts).
