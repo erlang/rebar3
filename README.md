@@ -89,3 +89,25 @@ Longer description (wrap at 72 characters)
 
 * Break up logical changes
 * Make whitespace changes separately
+
+Dialyzer and Tidier
+-------------------
+
+Before you submit a patch check for discrepancies with
+[Dialyzer](http://www.erlang.org/doc/man/dialyzer.html):
+
+<pre>
+$ cd rebar/
+$ ./bootstrap debug
+$ dialyzer ebin -Wunmatched_returns -Werror_handling -Wrace_conditions -Wunderspecs
+</pre>
+
+It is **strongly recommended** to check the code with
+[Tidier](http://tidier.softlab.ntua.gr:20000/tidier/getstarted).  
+Select all transformation options and enable **automatic**
+transformation.  
+If Tidier suggests a transformation apply the changes **manually**
+to the source code.  
+Do not use the code from the tarball (*out.tgz*) as it will have
+white-space changes  
+applied by Erlang's pretty-printer.
