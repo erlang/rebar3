@@ -66,8 +66,13 @@ You can also tell Emacs to ignore file variables:
 Writing Commit Messages
 -----------------------
 
-One line summary (< 50 characters)
+Structure your commit message like this:
+
+<pre>
+One line summary (less than 50 characters)
+
 Longer description (wrap at 72 characters)
+</pre>
 
 ### Summary
 
