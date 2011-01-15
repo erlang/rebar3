@@ -46,8 +46,12 @@ Clone the git repository:
 Contributing to rebar
 =====================
 
-Indentation
------------
+Coding style
+------------
+
+Avoid introducing trailing whitespace.
+
+### Indentation
 
 To have consistent indentation we have vi modeline/emacs local variable  
 headers in rebar's source files. This works automatically with vi.  
