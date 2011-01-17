@@ -49,7 +49,9 @@ Contributing to rebar
 Coding style
 ------------
 
-Avoid introducing trailing whitespace.
+Do not introduce trailing whitespace.
+
+Do not introduce lines longer than 80 characters.
 
 ### Indentation
 
