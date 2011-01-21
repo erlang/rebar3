@@ -1,4 +1,5 @@
-%% -*- erlang -*-
+%% -*- mode:erlang;tab-width:4;erlang-indent-level:4;indent-tabs-mode:nil -*-
+%% ex: ft=erlang ts=4 sw=4 et
 %% -------------------------------------------------------------------
 %%
 %% nodetool: Helper Script for interacting with live nodes
