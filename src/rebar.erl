@@ -90,7 +90,7 @@ parse_args(Args) ->
 
             %% Filter all the flags (i.e. strings of form key=value) from the
             %% command line arguments. What's left will be the commands to run.
-            filter_flags(NonOptArgs, []);
+            unabbreviate_command_names(filter_flags(NonOptArgs, []));
 
         {error, {Reason, Data}} ->
             ?ERROR("Error: ~s ~p~n~n", [Reason, Data]),
@@ -222,3 +222,67 @@ filter_flags([Item | Rest], Commands) ->
             ?CONSOLE("Ignoring command line argument: ~p\n", [Other]),
             filter_flags(Rest, Commands)
     end.
+
+command_names() ->
+    ["build-plt", "check-deps", "check-plt", "clean", "compile", "create",
+     "create-app", "create-node", "ct", "delete-deps", "dialyze", "doc",
+     "eunit", "generate", "get-deps", "help", "list-templates", "update-deps",
+     "version", "xref"].
+
+unabbreviate_command_names([]) ->
+    [];
+unabbreviate_command_names([Command | Commands]) ->
+    case get_command_name_candidates(Command) of
+        [] ->
+            %% let the rest of the code detect that the command doesn't exist
+            %% (this would perhaps be a good place to fail)
+            [Command | unabbreviate_command_names(Commands)];
+        [FullCommand] ->
+            [FullCommand | unabbreviate_command_names(Commands)];
+        Candidates ->
+            ?ABORT("Found more than one match for abbreviated command name "
+                   " '~s',~nplease be more specific. Possible candidates:~n"
+                   "  ~s~n",
+                   [Command, string:join(Candidates, ", ")])
+    end.
+
+get_command_name_candidates(Command) ->
+    %% Get the command names which match the given (abbreviated) command name.
+    %% * "c"        matches commands like compile, clean and create-app
+    %% * "create"   matches command create only, since it's unique
+    %% * "create-"  matches commands starting with create-
+    %% * "c-a"      matches create-app
+    %% * "create-a" matches create-app
+    %% * "c-app"    matches create-app
+    Candidates = [Candidate || Candidate <- command_names(),
+                                 is_command_name_candidate(Command, Candidate)],
+    %% Is there a complete match?  If so return only that, return a
+    %% list of candidates otherwise
+    case Candidates of
+        [Command] = Match -> Match;
+        _ -> Candidates
+    end.
+
+is_command_name_candidate(Command, Candidate) ->
+    lists:prefix(Command, Candidate)
+        orelse is_command_name_sub_word_candidate(Command, Candidate).
+
+is_command_name_sub_word_candidate(Command, Candidate) ->
+    %% Allow for parts of commands to be abbreviated, i.e. create-app
+    %% can be shortened to "create-a", "c-a" or "c-app" (but not
+    %% "create-" since that would be ambiguous).
+    CommandSubWords = re:split(Command, "-", [{return, list}]),
+    CandidateSubWords = re:split(Candidate, "-", [{return, list}]),
+    is_command_name_sub_word_candidate_aux(CommandSubWords, CandidateSubWords).
+
+is_command_name_sub_word_candidate_aux([CmdSW | CmdSWs], [CandSW | CandSWs]) ->
+    case lists:prefix(CmdSW, CandSW) of
+        true ->
+            is_command_name_sub_word_candidate_aux(CmdSWs, CandSWs);
+        false ->
+            false
+    end;
+is_command_name_sub_word_candidate_aux([], []) ->
+    true;
+is_command_name_sub_word_candidate_aux(_CmdSWs, _CandSWs) ->
+    false.

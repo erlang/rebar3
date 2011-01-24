@@ -46,22 +46,21 @@
 %% Public API
 %% ===================================================================
 
-run(["help"]) ->
-    rebar:help(),
-    ok;
-run(["version"]) ->
-    %% Load application spec and display vsn and build time info
-    ok = application:load(rebar),
-    rebar:version(),
-    ok;
 run(RawArgs) ->
     %% Pre-load the rebar app so that we get default configuration
     ok = application:load(rebar),
-
     %% Parse out command line arguments -- what's left is a list of commands to
-    %% run
-    Commands = rebar:parse_args(RawArgs),
+    %% run -- and start running commands
+    run_aux(rebar:parse_args(RawArgs)).
 
+run_aux(["help"]) ->
+    rebar:help(),
+    ok;
+run_aux(["version"]) ->
+    %% Display vsn and build time info
+    rebar:version(),
+    ok;
+run_aux(Commands) ->
     %% Make sure crypto is running
     ok = crypto:start(),
 
