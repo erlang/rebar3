@@ -258,9 +258,9 @@ get_command_name_candidates(Command) ->
                                  is_command_name_candidate(Command, Candidate)],
     %% Is there a complete match?  If so return only that, return a
     %% list of candidates otherwise
-    case Candidates of
-        [Command] = Match -> Match;
-        _ -> Candidates
+    case lists:member(Command, Candidates) of
+        true  -> [Command];
+        false -> Candidates
     end.
 
 is_command_name_candidate(Command, Candidate) ->
