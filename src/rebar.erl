@@ -33,6 +33,14 @@
 
 -include("rebar.hrl").
 
+-ifndef(BUILD_TIME).
+-define(BUILD_TIME, "undefined").
+-endif.
+
+-ifndef(VCS_INFO).
+-define(VCS_INFO, "undefined").
+-endif.
+
 %% ====================================================================
 %% Public API
 %% ====================================================================
