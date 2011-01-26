@@ -138,3 +138,12 @@
 
 %% Subdirectories?
 {sub_dirs, ["dir1", "dir2"]}.
+
+%% == Pre/Post Command Hooks ==
+
+{pre_hooks, [{clean, "./prepare_package_files.sh"},
+             {compile, "escript generate_headers"}]}.
+
+{post_hooks, [{clean, "touch file1.out"},
+              {eunit, "touch file2.out"},
+              {compile, "touch postcompile.out"}]}.

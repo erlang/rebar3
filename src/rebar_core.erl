@@ -223,7 +223,7 @@ execute(Command, Modules, Config, ModuleFile) ->
     case select_modules(Modules, Command, []) of
         [] ->
             ?WARN("'~p' command does not apply to directory ~s\n",
-                     [Command, rebar_utils:get_cwd()]);
+                  [Command, rebar_utils:get_cwd()]);
 
         TargetModules ->
             %% Provide some info on where we are
@@ -235,9 +235,11 @@ execute(Command, Modules, Config, ModuleFile) ->
             erlang:put(operations, erlang:get(operations) + 1),
 
             %% Run the available modules
+            apply_hooks(pre_hooks, Config, Command),
             case catch(run_modules(TargetModules, Command,
                                    Config, ModuleFile)) of
                 ok ->
+                    apply_hooks(post_hooks, Config, Command),
                     ok;
                 {error, failed} ->
                     ?FAIL;
@@ -302,6 +304,20 @@ run_modules([Module | Rest], Command, Config, File) ->
             {Module, Error}
     end.
 
+apply_hooks(Mode, Config, Command) ->
+    case rebar_config:get_local(Config, Mode, []) of
+        [] ->
+            skip;
+        Hooks when is_list(Hooks) ->
+            lists:foreach(fun apply_hook/1,
+                          [{Command, Hook} || Hook <- Hooks])
+    end.
+
+apply_hook({Command, {Command, Hook}}) ->
+    Msg = lists:flatten(io_lib:format("Command [~p] failed!~n", [Command])),
+    rebar_utils:sh(Hook, [{abort_on_error, Msg}]);
+apply_hook({Command, {HookCmd, _}}) when Command =/= HookCmd ->
+    skip.
 
 acc_modules(Modules, Command, Config, File) ->
     acc_modules(select_modules(Modules, Command, []),
