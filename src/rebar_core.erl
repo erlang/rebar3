@@ -26,7 +26,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_core).
 
--export([run/1,
+-export([process_commands/1,
          skip_dir/1,
          is_skip_dir/1,
          skip_dirs/0]).
@@ -45,44 +45,6 @@
 %% ===================================================================
 %% Public API
 %% ===================================================================
-
-run(RawArgs) ->
-    %% Pre-load the rebar app so that we get default configuration
-    ok = application:load(rebar),
-    %% Parse out command line arguments -- what's left is a list of commands to
-    %% run -- and start running commands
-    run_aux(rebar:parse_args(RawArgs)).
-
-run_aux(["help"]) ->
-    rebar:help(),
-    ok;
-run_aux(["version"]) ->
-    %% Display vsn and build time info
-    rebar:version(),
-    ok;
-run_aux(Commands) ->
-    %% Make sure crypto is running
-    ok = crypto:start(),
-
-    %% Initialize logging system
-    rebar_log:init(),
-
-    %% Convert command strings to atoms
-    CommandAtoms = [list_to_atom(C) || C <- Commands],
-
-    %% Determine the location of the rebar executable; important for pulling
-    %% resources out of the escript
-    rebar_config:set_global(escript, filename:absname(escript:script_name())),
-    ?DEBUG("Rebar location: ~p\n", [rebar_config:get_global(escript, undefined)]),
-
-    %% Note the top-level directory for reference
-    rebar_config:set_global(base_dir, filename:absname(rebar_utils:get_cwd())),
-
-    %% Keep track of how many operations we do, so we can detect bad commands
-    erlang:put(operations, 0),
-
-    %% Process each command, resetting any state between each one
-    process_commands(CommandAtoms).
 
 skip_dir(Dir) ->
     SkipDir = {skip_dir, Dir},
