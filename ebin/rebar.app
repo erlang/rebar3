@@ -32,6 +32,7 @@
               rebar_require_vsn,
               rebar_subdirs,
               rebar_templater,
+              rebar_upgrade,
               rebar_utils,
               rebar_xref,
               getopt,
@@ -79,7 +80,8 @@
                               ]},
 
                     {rel_dir, [
-                               rebar_reltool
+                               rebar_reltool,
+                               rebar_upgrade
                               ]}
                    ]}
         ]}
