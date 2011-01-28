@@ -385,16 +385,18 @@ make_so_specs(Config, AppFile, Bins) ->
         undefined ->
             %% New form of so_specs is not provided. See if the old form of {so_name} is available
             %% instead
+            Dir = "priv",
             SoName = case rebar_config:get(Config, so_name, undefined) of
                          undefined ->
                              %% Ok, neither old nor new form is available. Use the app name and
                              %% generate a sensible default.
                              AppName = rebar_app_utils:app_name(AppFile),
-                             ?FMT("priv/~s", [lists:concat([AppName, "_drv.so"])]);
+                             filename:join(Dir,
+                                           lists:concat([AppName, "_drv.so"]));
 
                          AName ->
                              %% Old form is available -- use it
-                             ?FMT("priv/~s", [AName])
+                             filename:join(Dir, AName)
                      end,
             [{SoName, Bins}];
 
