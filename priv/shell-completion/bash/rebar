@@ -10,9 +10,9 @@ _rebar()
     lopts=" --help --commands --verbose --force --jobs= --version"
     cmdsnvars="build-plt check-plt check-deps clean compile \
         create create-app create-node ct dialyze doc delete-deps eunit \
-        get-deps generate help list-templates update-deps version xref \
-        case= debug_info=1 force=1 jobs= suite= verbose=1 appid= \
-        skip_deps=1 template= template_dir="
+        get-deps generate generate-upgrade help list-templates update-deps \
+        version xref case= debug_info=1 force=1 jobs= suite= verbose=1 \
+        appid= previous_release= skip_deps=1 template= template_dir="
 
     if [[ ${cur} == --* ]] ; then
         COMPREPLY=( $(compgen -W "${lopts}" -- ${cur}) )
