@@ -165,21 +165,22 @@ get_cover_config(Config, Cwd) ->
         false ->
             "";
         true ->
-            case filelib:fold_files(Cwd, ".*cover\.spec\$", true, fun collect_ct_specs/2, []) of
-				[] ->
-					?DEBUG("No cover spec found: ~s~n", [Cwd]),
-					"";
-				[Spec] ->
-					?DEBUG("Found cover file ~w~n", [Spec]),
-					" -cover " ++ Spec;
-				Specs ->
-					?ABORT("Multiple cover specs found: ~p~n", [Specs])
-			end
-	end.
+            case filelib:fold_files(Cwd, ".*cover\.spec\$",
+                                    true, fun collect_ct_specs/2, []) of
+                [] ->
+                    ?DEBUG("No cover spec found: ~s~n", [Cwd]),
+                    "";
+                [Spec] ->
+                    ?DEBUG("Found cover file ~w~n", [Spec]),
+                    " -cover " ++ Spec;
+                Specs ->
+                    ?ABORT("Multiple cover specs found: ~p~n", [Specs])
+            end
+    end.
 
 collect_ct_specs(F, Acc) ->
-    %% Ignore any specs under the deps/ directory. Do this pulling the dirname off the
-    %% the F and then splitting it into a list.
+    %% Ignore any specs under the deps/ directory. Do this pulling
+    %% the dirname off the the F and then splitting it into a list.
     Parts = filename:split(filename:dirname(F)),
     case lists:member("deps", Parts) of
         true ->

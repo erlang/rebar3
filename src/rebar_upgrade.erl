@@ -159,10 +159,12 @@ run_systools(NewVer, Name) ->
 boot_files(Ver, Name) ->
     ok = file:make_dir(filename:join([".", "releases"])),
     ok = file:make_dir(filename:join([".", "releases", Ver])),
-    ok = file:make_symlink(filename:join(["start.boot"]),
-                           filename:join([".", "releases", Ver, Name ++ ".boot"])),
-    {ok, _} = file:copy(filename:join([".", Name, "releases", Ver, "start_clean.boot"]),
-                        filename:join([".", "releases", Ver, "start_clean.boot"])).
+    ok = file:make_symlink(
+           filename:join(["start.boot"]),
+           filename:join([".", "releases", Ver, Name ++ ".boot"])),
+    {ok, _} = file:copy(
+                filename:join([".", Name, "releases", Ver, "start_clean.boot"]),
+                filename:join([".", "releases", Ver, "start_clean.boot"])).
 
 make_tar(NameVer) ->
     Filename = NameVer ++ ".tar.gz",

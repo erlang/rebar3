@@ -83,8 +83,10 @@
 compile(Config, _AppFile) ->
     DtlOpts = erlydtl_opts(Config),
     rebar_base_compiler:run(Config, [],
-                            option(doc_root, DtlOpts), option(source_ext, DtlOpts),
-                            option(out_dir, DtlOpts), option(module_ext, DtlOpts) ++ ".beam",
+                            option(doc_root, DtlOpts),
+                            option(source_ext, DtlOpts),
+                            option(out_dir, DtlOpts),
+                            option(module_ext, DtlOpts) ++ ".beam",
                             fun compile_dtl/3, [{check_last_mod, false}]).
 
 
@@ -102,18 +104,18 @@ default(doc_root) -> "templates";
 default(out_dir)  -> "ebin";
 default(source_ext) -> ".dtl";
 default(module_ext) -> "_dtl";
-default(custom_tags_dir) -> "". 
+default(custom_tags_dir) -> "".
 
 compile_dtl(Source, Target, Config) ->
     case code:which(erlydtl) of
         non_existing ->
             ?CONSOLE(
-               "~n===============================================~n"
-               " You need to install erlydtl to compile DTL templates~n"
-               " Download the latest tarball release from github~n"
-               "    http://code.google.com/p/erlydtl/~n"
-               " and install it into your erlang library dir~n"
-               "===============================================~n~n", []),
+               <<"~n===============================================~n"
+                 " You need to install erlydtl to compile DTL templates~n"
+                 " Download the latest tarball release from github~n"
+                 "    http://code.google.com/p/erlydtl/~n"
+                 " and install it into your erlang library dir~n"
+                 "===============================================~n~n">>, []),
             ?FAIL;
         _ ->
             case needs_compile(Source, Target, Config) of

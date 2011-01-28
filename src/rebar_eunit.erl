@@ -36,8 +36,9 @@
 %%   <li>suite="foo"" - runs test/foo_tests.erl</li>
 %% </ul>
 %% Additionally, for projects that have separate folders for the core
-%% implementation, and for the unit tests, then the following <code>rebar.config</code>
-%% option can be provided: <code>{eunit_compile_opts, [{src_dirs, ["dir"]}]}.</code>.
+%% implementation, and for the unit tests, then the following
+%% <code>rebar.config</code> option can be provided:
+%% <code>{eunit_compile_opts, [{src_dirs, ["dir"]}]}.</code>.
 %% @copyright 2009, 2010 Dave Smith
 %% -------------------------------------------------------------------
 -module(rebar_eunit).
@@ -78,16 +79,17 @@ eunit(Config, AppFile) ->
     ok = filelib:ensure_dir(eunit_dir() ++ "/foo"),
     ok = filelib:ensure_dir(ebin_dir() ++ "/foo"),
 
-    %% Setup code path prior to compilation so that parse_transforms and the like
-    %% work properly. Also, be sure to add ebin_dir() to the END of the code path
-    %% so that we don't have to jump through hoops to access the .app file
+    %% Setup code path prior to compilation so that parse_transforms
+    %% and the like work properly. Also, be sure to add ebin_dir()
+    %% to the END of the code path so that we don't have to jump
+    %% through hoops to access the .app file
     CodePath = code:get_path(),
     true = code:add_patha(eunit_dir()),
     true = code:add_pathz(ebin_dir()),
 
     %% Obtain all the test modules for inclusion in the compile stage.
-    %% Notice: this could also be achieved with the following rebar.config option:
-    %% {eunit_compile_opts, [{src_dirs, ["test"]}]}
+    %% Notice: this could also be achieved with the following
+    %% rebar.config option: {eunit_compile_opts, [{src_dirs, ["test"]}]}
     TestErls = rebar_utils:find_files("test", ".*\\.erl\$"),
 
     %% Copy source files to eunit dir for cover in case they are not directly
@@ -99,7 +101,8 @@ eunit(Config, AppFile) ->
     %% Compile erlang code to ?EUNIT_DIR, using a tweaked config
     %% with appropriate defines for eunit, and include all the test modules
     %% as well.
-    rebar_erlc_compiler:doterl_compile(eunit_config(Config), ?EUNIT_DIR, TestErls),
+    rebar_erlc_compiler:doterl_compile(eunit_config(Config),
+                                       ?EUNIT_DIR, TestErls),
 
     %% Build a list of all the .beams in ?EUNIT_DIR -- use this for cover
     %% and eunit testing. Normally you can just tell cover and/or eunit to
@@ -111,7 +114,7 @@ eunit(Config, AppFile) ->
                       string:str(N, "_tests.beam") =:= 0],
     Modules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- BeamFiles],
     SrcModules = [rebar_utils:erl_to_mod(M) || M <- SrcErls],
-    
+
     cover_init(Config, BeamFiles),
     EunitResult = perform_eunit(Config, Modules),
     perform_cover(Config, Modules, SrcModules),
@@ -205,7 +208,7 @@ is_quickcheck_avail() ->
     end.
 
 perform_cover(Config, BeamFiles, SrcModules) ->
-    perform_cover(rebar_config:get(Config, cover_enabled, false), 
+    perform_cover(rebar_config:get(Config, cover_enabled, false),
                   Config, BeamFiles, SrcModules).
 
 perform_cover(false, _Config, _BeamFiles, _SrcModules) ->
@@ -227,7 +230,8 @@ cover_analyze(Config, Modules, SrcModules) ->
 
     %% Write coverage details for each file
     lists:foreach(fun({M, _, _}) ->
-                          {ok, _} = cover:analyze_to_file(M, cover_file(M), [html])
+                          {ok, _} = cover:analyze_to_file(M, cover_file(M),
+                                                          [html])
                   end, Coverage),
 
     Index = filename:join([rebar_utils:get_cwd(), ?EUNIT_DIR, "index.html"]),
@@ -260,7 +264,12 @@ cover_init(true, BeamFiles) ->
 
             %% It's not an error for cover compilation to fail partially,
             %% but we do want to warn about them
-            _ = [?CONSOLE("Cover compilation warning for ~p: ~p", [Beam, Desc]) || {Beam, {error, Desc}} <- Compiled],
+            PrintWarning =
+                fun(Beam, Desc) ->
+                        ?CONSOLE("Cover compilation warning for ~p: ~p",
+                                 [Beam, Desc])
+                end,
+            _ = [PrintWarning(Beam, Desc) || {Beam, {error, Desc}} <- Compiled],
             ok
     end;
 cover_init(Config, BeamFiles) ->
@@ -287,18 +296,19 @@ is_eunitized(Mod) ->
 
 has_eunit_test_fun(Mod) ->
     [F || {exports, Funs} <- Mod:module_info(),
-	  {F, 0} <- Funs, F =:= test] =/= [].
+          {F, 0} <- Funs, F =:= test] =/= [].
 
 has_header(Mod, Header) ->
-    Mod1 = case code:which(Mod) of 
-               cover_compiled -> 
+    Mod1 = case code:which(Mod) of
+               cover_compiled ->
                    {file, File} = cover:is_compiled(Mod),
                    File;
                non_existing -> Mod;
                preloaded -> Mod;
                L -> L
            end,
-    {ok, {_, [{abstract_code, {_, AC}}]}} = beam_lib:chunks(Mod1, [abstract_code]),
+    {ok, {_, [{abstract_code, {_, AC}}]}} = beam_lib:chunks(Mod1,
+                                                            [abstract_code]),
     [F || {attribute, 1, file, {F, 1}} <- AC,
           string:str(F, Header) =/= 0] =/= [].
 
@@ -310,7 +320,7 @@ align_notcovered_count(Module, Covered, NotCovered, true) ->
 cover_write_index(Coverage, SrcModules) ->
     {ok, F} = file:open(filename:join([?EUNIT_DIR, "index.html"]), [write]),
     ok = file:write(F, "<html><head><title>Coverage Summary</title></head>\n"),
-    IsSrcCoverage = fun({Mod,_C,_N}) -> lists:member(Mod, SrcModules) end, 
+    IsSrcCoverage = fun({Mod,_C,_N}) -> lists:member(Mod, SrcModules) end,
     {SrcCoverage, TestCoverage} = lists:partition(IsSrcCoverage, Coverage),
     cover_write_index_section(F, "Source", SrcCoverage),
     cover_write_index_section(F, "Test", TestCoverage),
@@ -331,9 +341,13 @@ cover_write_index_section(F, SectionName, Coverage) ->
     ok = file:write(F, ?FMT("<h3>Total: ~s</h3>\n", [TotalCoverage])),
     ok = file:write(F, "<table><tr><th>Module</th><th>Coverage %</th></tr>\n"),
 
+    FmtLink =
+        fun(Module, Cov, NotCov) ->
+                ?FMT("<tr><td><a href='~s.COVER.html'>~s</a></td><td>~s</td>\n",
+                     [Module, Module, percentage(Cov, NotCov)])
+        end,
     lists:foreach(fun({Module, Cov, NotCov}) ->
-                          ok = file:write(F, ?FMT("<tr><td><a href='~s.COVER.html'>~s</a></td><td>~s</td>\n",
-                                                  [Module, Module, percentage(Cov, NotCov)]))
+                          ok = file:write(F, FmtLink(Module, Cov, NotCov))
                   end, Coverage),
     ok = file:write(F, "</table>\n").
 
@@ -345,13 +359,13 @@ cover_print_coverage(Coverage) ->
 
     %% Determine the longest module name for right-padding
     Width = lists:foldl(fun({Mod, _, _}, Acc) ->
-                case length(atom_to_list(Mod)) of
-                    N when N > Acc ->
-                        N;
-                    _ ->
-                        Acc
-                end
-        end, 0, Coverage) * -1,
+                                case length(atom_to_list(Mod)) of
+                                    N when N > Acc ->
+                                        N;
+                                    _ ->
+                                        Acc
+                                end
+                        end, 0, Coverage) * -1,
 
     %% Print the output the console
     ?CONSOLE("~nCode Coverage:~n", []),

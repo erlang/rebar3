@@ -132,7 +132,7 @@ xcopy_win32(Source,Dest)->
     end.
 
 cp_r_win32({true, SourceDir}, {true, DestDir}) ->
-    % from directory to directory
+    %% from directory to directory
     SourceBase = filename:basename(SourceDir),
     ok = case file:make_dir(filename:join(DestDir, SourceBase)) of
              {error, eexist} -> ok;
@@ -140,10 +140,10 @@ cp_r_win32({true, SourceDir}, {true, DestDir}) ->
          end,
     ok = xcopy_win32(SourceDir, filename:join(DestDir, SourceBase));
 cp_r_win32({false, Source} = S,{true, DestDir}) ->
-    % from file to directory
+    %% from file to directory
     cp_r_win32(S, {false, filename:join(DestDir, filename:basename(Source))});
 cp_r_win32({false, Source},{false, Dest}) ->
-    % from file to file
+    %% from file to file
     {ok,_} = file:copy(Source, Dest),
     ok;
 cp_r_win32(Source,Dest) ->

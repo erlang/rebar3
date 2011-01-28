@@ -31,15 +31,19 @@
 %%   <li>build-plt (essentially "dialyzer --build_plt -r &lt;app_dirs&gt;")</li>
 %%   <li>check-plt (essentially "dialyzer --check_plt")</li>
 %% </ul>
-%% A single option <code>plt</code> can be presented in the <code>dialyzer_opts</code>
-%% options in <code>rebar.config</code>. If it is present, it is used as the PLT for the
-%% supported commands. Should it not be present, then the default is <code>$HOME/.dialyzer_plt</code>.
-%% @reference <a href="http://user.it.uu.se/~kostis/Papers/bugs05.pdf">Experience from developing the Dialyzer:
-%% A static analysis tool detecting defects in Erlang applications</a>
-%% @reference <a href="http://user.it.uu.se/~kostis/Papers/contracts.pdf">A Language for Specifying Type
-%% Contracts in Erlang and its Interaction with Success Typings</a>
-%% @reference <a href="http://user.it.uu.se/~kostis/Papers/wrangler.pdf">Gradual Typing of Erlang
-%% Programs: A Wrangler Experience</a>
+%% A single option <code>plt</code> can be presented in the
+%% <code>dialyzer_opts</code> options in <code>rebar.config</code>. If it
+%% is present, it is used as the PLT for the supported commands. Should it
+%% not be present, then the default is <code>$HOME/.dialyzer_plt</code>.
+%%
+%% @reference <a href="http://user.it.uu.se/~kostis/Papers/bugs05.pdf">
+%% Experience from developing the Dialyzer: A static analysis tool detecting
+%% defects in Erlang applications</a>
+%% @reference <a href="http://user.it.uu.se/~kostis/Papers/contracts.pdf">
+%% A Language for Specifying Type Contracts in Erlang and its Interaction
+%% with Success Typings</a>
+%% @reference <a href="http://user.it.uu.se/~kostis/Papers/wrangler.pdf">Gradual
+%% Typing of Erlang Programs: A Wrangler Experience</a>
 %% @copyright 2010 Dave Smith
 %% -------------------------------------------------------------------
 -module(rebar_dialyzer).
@@ -67,12 +71,12 @@ dialyze(Config, File) ->
                                                                dialyzer_opts,
                                                                [])),
             DialyzerOpts0 = case FromSrc of
-                               true ->
-                                   [{files_rec, ["src"]}, {init_plt, Plt},
-                                    {from, src_code}];
-                               false ->
-                                   [{files_rec, ["ebin"]}, {init_plt, Plt}]
-                           end,
+                                true ->
+                                    [{files_rec, ["src"]}, {init_plt, Plt},
+                                     {from, src_code}];
+                                false ->
+                                    [{files_rec, ["ebin"]}, {init_plt, Plt}]
+                            end,
             WarnOpts = warnings(Config),
             DialyzerOpts = case WarnOpts of
                                [] -> DialyzerOpts0;
@@ -150,7 +154,7 @@ app_dirs(Apps) ->
 -spec output_warnings(Warnings::[warning()]) -> 'ok'.
 output_warnings(Warnings) ->
     lists:foreach(fun(Warning) ->
-                      ?CONSOLE("~s", [dialyzer:format_warning(Warning)])
+                          ?CONSOLE("~s", [dialyzer:format_warning(Warning)])
                   end, Warnings).
 
 %% @doc If the plt option is present in rebar.config return its value, otherwise

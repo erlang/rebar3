@@ -113,7 +113,7 @@ find_files(Dir, Regex) ->
 now_str() ->
     {{Year, Month, Day}, {Hour, Minute, Second}} = calendar:local_time(),
     lists:flatten(io_lib:format("~4b/~2..0b/~2..0b ~2..0b:~2..0b:~2..0b",
-				[Year, Month, Day, Hour, Minute, Second])).
+                                [Year, Month, Day, Hour, Minute, Second])).
 
 %% TODO: filelib:ensure_dir/1 corrected in R13B04. Remove when we drop
 %% support for OTP releases older than R13B04.

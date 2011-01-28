@@ -64,6 +64,3 @@ check_versions(Config) ->
             ?ABORT("OTP release ~s does not match required regex ~s\n",
                    [erlang:system_info(otp_release), OtpRegex])
     end.
-
-
-

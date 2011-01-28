@@ -48,7 +48,8 @@ escriptize(Config, AppFile) ->
     %% Look for a list of other applications (dependencies) to include
     %% in the output file. We then use the .app files for each of these
     %% to pull in all the .beam files.
-    InclBeams = get_app_beams(rebar_config:get_local(Config, escript_incl_apps, []), []),
+    InclBeams = get_app_beams(
+                  rebar_config:get_local(Config, escript_incl_apps, []), []),
 
     %% Construct the archive of everything in ebin/ dir -- put it on the
     %% top-level of the zip file so that code loading works properly.
@@ -62,11 +63,13 @@ escriptize(Config, AppFile) ->
                 ok ->
                     ok;
                 {error, WriteError} ->
-                    ?ERROR("Failed to write ~p script: ~p\n", [AppName, WriteError]),
+                    ?ERROR("Failed to write ~p script: ~p\n",
+                           [AppName, WriteError]),
                     ?FAIL
             end;
         {error, ZipError} ->
-            ?ERROR("Failed to construct ~p escript: ~p\n", [AppName, ZipError]),
+            ?ERROR("Failed to construct ~p escript: ~p\n",
+                   [AppName, ZipError]),
             ?FAIL
     end,
 
@@ -94,9 +97,11 @@ get_app_beams([], Acc) ->
 get_app_beams([App | Rest], Acc) ->
     case code:lib_dir(App, ebin) of
         {error, bad_name} ->
-            ?ABORT("Failed to get ebin/ directory for ~p escript_incl_apps.", [App]);
+            ?ABORT("Failed to get ebin/ directory for "
+                   "~p escript_incl_apps.", [App]);
         Path ->
-            Acc2 = [{filename:join([App, ebin, F]), file_contents(filename:join(Path, F))} ||
+            Acc2 = [{filename:join([App, ebin, F]),
+                     file_contents(filename:join(Path, F))} ||
                        F <- filelib:wildcard("*", Path)],
             get_app_beams(Rest, Acc2 ++ Acc)
     end.

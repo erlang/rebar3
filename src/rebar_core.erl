@@ -50,10 +50,10 @@ skip_dir(Dir) ->
 
 is_skip_dir(Dir) ->
     case erlang:get({skip_dir, Dir}) of
-	undefined ->
-	    false;
-	true ->
-	    true
+        undefined ->
+            false;
+        true ->
+            true
     end.
 
 skip_dirs() ->
@@ -76,7 +76,8 @@ process_commands([Command | Rest]) ->
     lists:foreach(fun (D) -> erlang:erase({skip_dir, D}) end, skip_dirs()),
     Operations = erlang:get(operations),
 
-    _ = process_dir(rebar_utils:get_cwd(), rebar_config:new(), Command, sets:new()),
+    _ = process_dir(rebar_utils:get_cwd(), rebar_config:new(),
+                    Command, sets:new()),
     case erlang:get(operations) of
         Operations ->
             %% This command didn't do anything
@@ -108,7 +109,8 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
             %% CWD to see if it's a fit -- if it is, use that set of modules
             %% to process this dir.
             {ok, AvailModuleSets} = application:get_env(rebar, modules),
-            {DirModules, ModuleSetFile} = choose_module_set(AvailModuleSets, Dir),
+            {DirModules, ModuleSetFile} = choose_module_set(AvailModuleSets,
+                                                            Dir),
 
             %% Get the list of modules for "any dir". This is a catch-all list
             %% of modules that are processed in addition to modules associated
@@ -122,7 +124,8 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
             %% directories that should be processed _before_ the current one.
             Predirs = acc_modules(Modules, preprocess, Config, ModuleSetFile),
             ?DEBUG("Predirs: ~p\n", [Predirs]),
-            DirSet2 = process_each(Predirs, Command, Config, ModuleSetFile, DirSet),
+            DirSet2 = process_each(Predirs, Command, Config,
+                                   ModuleSetFile, DirSet),
 
             %% Make sure the CWD is reset properly; processing the dirs may have
             %% caused it to change
@@ -131,27 +134,30 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
             %% Check that this directory is not on the skip list
             case is_skip_dir(Dir) of
                 true ->
-                    %% Do not execute the command on the directory, as some module
-                    %% as requested a skip on it.
+                    %% Do not execute the command on the directory, as some
+                    %% module as requested a skip on it.
                     ?INFO("Skipping ~s in ~s\n", [Command, Dir]);
 
                 false ->
-                    %% Get the list of plug-in modules from rebar.config. These modules are
-                    %% processed LAST and do not participate in preprocess.
+                    %% Get the list of plug-in modules from rebar.config. These
+                    %% modules are processed LAST and do not participate
+                    %% in preprocess.
                     {ok, PluginModules} = plugin_modules(Config),
 
                     %% Execute the current command on this directory
-                    execute(Command, Modules ++ PluginModules, Config, ModuleSetFile)
+                    execute(Command, Modules ++ PluginModules,
+                            Config, ModuleSetFile)
             end,
 
             %% Mark the current directory as processed
             DirSet3 = sets:add_element(Dir, DirSet2),
 
-            %% Invoke 'postprocess' on the modules -- this yields a list of other
+            %% Invoke 'postprocess' on the modules. This yields a list of other
             %% directories that should be processed _after_ the current one.
             Postdirs = acc_modules(Modules, postprocess, Config, ModuleSetFile),
             ?DEBUG("Postdirs: ~p\n", [Postdirs]),
-            DirSet4 = process_each(Postdirs, Command, Config, ModuleSetFile, DirSet3),
+            DirSet4 = process_each(Postdirs, Command, Config,
+                                   ModuleSetFile, DirSet3),
 
             %% Make sure the CWD is reset properly; processing the dirs may have
             %% caused it to change
@@ -220,11 +226,13 @@ execute(Command, Modules, Config, ModuleFile) ->
             Dir = rebar_utils:get_cwd(),
             ?CONSOLE("==> ~s (~s)\n", [filename:basename(Dir), Command]),
 
-            %% Increment the count of operations, since some module responds to this command
+            %% Increment the count of operations, since some module
+            %% responds to this command
             erlang:put(operations, erlang:get(operations) + 1),
 
             %% Run the available modules
-            case catch(run_modules(TargetModules, Command, Config, ModuleFile)) of
+            case catch(run_modules(TargetModules, Command,
+                                   Config, ModuleFile)) of
                 ok ->
                     ok;
                 {error, failed} ->

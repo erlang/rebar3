@@ -99,13 +99,13 @@ create(_Config, _) ->
                     ok
             end;
         false ->
-            ?WARN("No variables section found in template ~p; using empty context.\n",
-                  [TemplateId]),
+            ?WARN("No variables section found in template ~p; "
+                  "using empty context.\n", [TemplateId]),
             Context0 = dict:new()
     end,
 
-    %% For each variable, see if it's defined in global vars -- if it is, prefer that
-    %% value over the defaults
+    %% For each variable, see if it's defined in global vars -- if it is,
+    %% prefer that value over the defaults
     Context1 = update_vars(dict:fetch_keys(Context0), Context0),
     ?DEBUG("Template ~p context: ~p\n", [TemplateId, dict:to_list(Context1)]),
 
@@ -113,10 +113,11 @@ create(_Config, _) ->
     %% definition
     Context = resolve_recursive_vars(dict:to_list(Context1), Context1),
 
-    ?DEBUG("Resolved Template ~p context: ~p\n", [TemplateId, dict:to_list(Context1)]),
+    ?DEBUG("Resolved Template ~p context: ~p\n",
+           [TemplateId, dict:to_list(Context1)]),
 
-    %% Now, use our context to process the template definition -- this permits us to
-    %% use variables within the definition for filenames.
+    %% Now, use our context to process the template definition -- this
+    %% permits us to use variables within the definition for filenames.
     FinalTemplate = consult(render(load_file(Type, Template), Context)),
     ?DEBUG("Final template def ~p: ~p\n", [TemplateId, FinalTemplate]),
 
@@ -136,10 +137,10 @@ create(_Config, _) ->
 %%
 cache_escript_files() ->
     {ok, Files} = rebar_utils:escript_foldl(
-                      fun(Name, _, GetBin, Acc) ->
-                              [{Name, GetBin()} | Acc]
-                      end,
-                      [], rebar_config:get_global(escript, undefined)),
+                    fun(Name, _, GetBin, Acc) ->
+                            [{Name, GetBin()} | Acc]
+                    end,
+                    [], rebar_config:get_global(escript, undefined)),
     erlang:put(escript_files, Files).
 
 
@@ -158,7 +159,8 @@ find_escript_templates() ->
 find_disk_templates() ->
     OtherTemplates = find_other_templates(),
     HomeFiles = rebar_utils:find_files(filename:join(os:getenv("HOME"),
-                                                     ".rebar/templates"), ?TEMPLATE_RE),
+                                                     ".rebar/templates"),
+                                       ?TEMPLATE_RE),
     LocalFiles = rebar_utils:find_files(".", ?TEMPLATE_RE),
     [{file, F} || F <- OtherTemplates ++ HomeFiles ++ LocalFiles].
 
@@ -289,18 +291,24 @@ write_file(Output, Data, Force) ->
 %%
 %% Execute each instruction in a template definition file.
 %%
-execute_template([], _TemplateType, _TemplateName, _Context, _Force, ExistingFiles) ->
+execute_template([], _TemplateType, _TemplateName, _Context,
+                 _Force, ExistingFiles) ->
     case ExistingFiles of
         [] ->
             ok;
         _ ->
-            Msg = lists:flatten([io_lib:format("\t* ~p~n", [F]) || F <- lists:reverse(ExistingFiles)]),
-            Help = "To force overwriting, specify force=1 on the command line.\n",
-            ?ERROR("One or more files already exist on disk and were not generated:~n~s~s", [Msg , Help])
+            Msg = lists:flatten([io_lib:format("\t* ~p~n", [F]) ||
+                                    F <- lists:reverse(ExistingFiles)]),
+            Help =
+                "To force overwriting, specify force=1 on the command line.\n",
+            ?ERROR("One or more files already exist on disk and "
+                   "were not generated:~n~s~s", [Msg , Help])
     end;
-execute_template([{template, Input, Output} | Rest], TemplateType, TemplateName, Context, Force, ExistingFiles) ->
+execute_template([{template, Input, Output} | Rest], TemplateType,
+                 TemplateName, Context, Force, ExistingFiles) ->
     InputName = filename:join(filename:dirname(TemplateName), Input),
-    case write_file(Output, render(load_file(TemplateType, InputName), Context), Force) of
+    case write_file(Output, render(load_file(TemplateType, InputName), Context),
+                    Force) of
         ok ->
             execute_template(Rest, TemplateType, TemplateName, Context,
                              Force, ExistingFiles);
@@ -308,34 +316,43 @@ execute_template([{template, Input, Output} | Rest], TemplateType, TemplateName,
             execute_template(Rest, TemplateType, TemplateName, Context,
                              Force, [Output|ExistingFiles])
     end;
-execute_template([{file, Input, Output} | Rest], TemplateType, TemplateName, Context, Force, ExistingFiles) ->
+execute_template([{file, Input, Output} | Rest], TemplateType, TemplateName,
+                 Context, Force, ExistingFiles) ->
     InputName = filename:join(filename:dirname(TemplateName), Input),
     case write_file(Output, load_file(TemplateType, InputName), Force) of
         ok ->
-            execute_template(Rest, TemplateType, TemplateName, Context,
-                             Force, ExistingFiles);
+            execute_template(Rest, TemplateType, TemplateName,
+                             Context, Force, ExistingFiles);
         {error, exists} ->
-            execute_template(Rest, TemplateType, TemplateName, Context,
-                             Force, [Output|ExistingFiles])
+            execute_template(Rest, TemplateType, TemplateName,
+                             Context, Force, [Output|ExistingFiles])
     end;
-execute_template([{dir, Name} | Rest], TemplateType, TemplateName, Context, Force, ExistingFiles) ->
+execute_template([{dir, Name} | Rest], TemplateType, TemplateName, Context,
+                 Force, ExistingFiles) ->
     case filelib:ensure_dir(filename:join(Name, "dummy")) of
         ok ->
-            execute_template(Rest, TemplateType, TemplateName, Context, Force, ExistingFiles);
+            execute_template(Rest, TemplateType, TemplateName,
+                             Context, Force, ExistingFiles);
         {error, Reason} ->
-            ?ABORT("Failed while processing template instruction {dir, ~s}: ~p\n",
-                   [Name, Reason])
+            ?ABORT("Failed while processing template instruction "
+                   "{dir, ~s}: ~p\n", [Name, Reason])
     end;
-execute_template([{chmod, Mod, File} | Rest], TemplateType, TemplateName, Context, Force, ExistingFiles) when is_integer(Mod) ->
+execute_template([{chmod, Mod, File} | Rest], TemplateType, TemplateName,
+                 Context, Force, ExistingFiles) when is_integer(Mod) ->
     case file:change_mode(File, Mod) of
         ok ->
-            execute_template(Rest, TemplateType, TemplateName, Context, Force, ExistingFiles);
+            execute_template(Rest, TemplateType, TemplateName,
+                             Context, Force, ExistingFiles);
         {error, Reason} ->
-            ?ABORT("Failed while processing template instruction {cmod, ~b, ~s}: ~p~n",
-                   [Mod, File, Reason])
+            ?ABORT("Failed while processing template instruction "
+                   "{cmod, ~b, ~s}: ~p~n", [Mod, File, Reason])
     end;
-execute_template([{variables, _} | Rest], TemplateType, TemplateName, Context, Force, ExistingFiles) ->
-    execute_template(Rest, TemplateType, TemplateName, Context, Force, ExistingFiles);
-execute_template([Other | Rest], TemplateType, TemplateName, Context, Force, ExistingFiles) ->
+execute_template([{variables, _} | Rest], TemplateType, TemplateName, Context,
+                 Force, ExistingFiles) ->
+    execute_template(Rest, TemplateType, TemplateName,
+                     Context, Force, ExistingFiles);
+execute_template([Other | Rest], TemplateType, TemplateName, Context,
+                 Force, ExistingFiles) ->
     ?WARN("Skipping unknown template instruction: ~p\n", [Other]),
-    execute_template(Rest, TemplateType, TemplateName, Context, Force, ExistingFiles).
+    execute_template(Rest, TemplateType, TemplateName, Context,
+                     Force, ExistingFiles).

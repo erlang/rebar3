@@ -78,13 +78,14 @@ clean(_Config, ReltoolFile) ->
 check_vsn() ->
     case code:lib_dir(reltool) of
         {error, bad_name} ->
-            ?ABORT("Reltool support requires the reltool application to be installed!", []);
+            ?ABORT("Reltool support requires the reltool application "
+                   "to be installed!", []);
         Path ->
             ReltoolVsn = filename:basename(Path),
             case ReltoolVsn < "reltool-0.5.2" of
                 true ->
-                    ?ABORT("Reltool support requires at least reltool-0.5.2; this VM is using ~s\n",
-                           [ReltoolVsn]);
+                    ?ABORT("Reltool support requires at least reltool-0.5.2; "
+                           "this VM is using ~s\n", [ReltoolVsn]);
                 false ->
                     ok
             end
@@ -98,12 +99,13 @@ load_config(ReltoolFile) ->
         {ok, Terms} ->
             Terms;
         Other ->
-            ?ABORT("Failed to load expected config from ~s: ~p\n", [ReltoolFile, Other])
+            ?ABORT("Failed to load expected config from ~s: ~p\n",
+                   [ReltoolFile, Other])
     end.
 
 %%
-%% Look for the {sys, [...]} tuple in the reltool.config file. Without this present, we
-%% can't run reltool.
+%% Look for the {sys, [...]} tuple in the reltool.config file.
+%% Without this present, we can't run reltool.
 %%
 sys_tuple(ReltoolConfig) ->
     case lists:keyfind(sys, 1, ReltoolConfig) of
@@ -160,15 +162,17 @@ validate_rel_apps(ReltoolServer, {sys, ReltoolConfig}) ->
         false ->
             ok;
         {rel, _Name, _Vsn, Apps} ->
-            %% Identify all the apps that do NOT exist, based on what's available
-            %% from the reltool server
-            Missing = lists:sort([App || App <- Apps,
-                                         app_exists(App, ReltoolServer) == false]),
+            %% Identify all the apps that do NOT exist, based on
+            %% what's available from the reltool server
+            Missing = lists:sort(
+                        [App || App <- Apps,
+                                app_exists(App, ReltoolServer) == false]),
             case Missing of
                 [] ->
                     ok;
                 _ ->
-                    ?ABORT("Apps in {rel, ...} section not found by reltool: ~p\n", [Missing])
+                    ?ABORT("Apps in {rel, ...} section not found by "
+                           "reltool: ~p\n", [Missing])
             end;
         Rel ->
             %% Invalid release format!
@@ -201,10 +205,12 @@ run_reltool(Server, _Config, ReltoolConfig) ->
                 ok ->
                     ok;
                 {error, Reason} ->
-                    ?ABORT("Failed to generate target from spec: ~p\n", [Reason])
+                    ?ABORT("Failed to generate target from spec: ~p\n",
+                           [Reason])
             end,
 
-            %% Initialize overlay vars with some basics (that can get overwritten)
+            %% Initialize overlay vars with some basics
+            %% (that can get overwritten)
             OverlayVars0 = [{erts_vsn, "erts-" ++ erlang:system_info(version)}],
 
             %% Load up any variables specified by overlay_vars
@@ -216,7 +222,8 @@ run_reltool(Server, _Config, ReltoolConfig) ->
                                       {ok, Terms} ->
                                           dict:from_list(OverlayVars0 ++ Terms);
                                       {error, Reason2} ->
-                                          ?ABORT("Unable to load overlay_vars from ~s: ~p\n",
+                                          ?ABORT("Unable to load overlay_vars "
+                                                 "from ~s: ~p\n",
                                                  [File, Reason2])
                                   end
                           end,
@@ -249,7 +256,8 @@ mk_target_dir(TargetDir) ->
                     rebar_file_utils:rm_rf(TargetDir),
                     ok = file:make_dir(TargetDir);
                 _ ->
-                    ?ERROR("Release target directory ~p already exists!\n", [TargetDir]),
+                    ?ERROR("Release target directory ~p already exists!\n",
+                           [TargetDir]),
                     ?FAIL
             end
     end.
@@ -310,12 +318,14 @@ execute_overlay([{create, Out, Contents} | Rest], Vars, BaseDir, TargetDir) ->
     end;
 execute_overlay([{replace, Out, Regex, Replacement} | Rest],
                 Vars, BaseDir, TargetDir) ->
-    execute_overlay([{replace, Out, Regex, Replacement, []} | Rest], Vars, BaseDir, TargetDir);
+    execute_overlay([{replace, Out, Regex, Replacement, []} | Rest],
+                    Vars, BaseDir, TargetDir);
 execute_overlay([{replace, Out, Regex, Replacement, Opts} | Rest],
                 Vars, BaseDir, TargetDir) ->
     Filename = render(filename:join(TargetDir, Out), Vars),
     {ok, OrigData} = file:read_file(Filename),
-    Data = re:replace(OrigData, Regex, Replacement, [global, {return, binary}] ++ Opts),
+    Data = re:replace(OrigData, Regex, Replacement,
+                      [global, {return, binary}] ++ Opts),
     case file:write_file(Filename, Data) of
         ok ->
             ?DEBUG("Edited ~s: s/~s/~s/\n", [Filename, Regex, Replacement]),

@@ -44,8 +44,11 @@ xref(Config, _) ->
     %% Spin up xref
     {ok, _} = xref:start(xref),
     ok = xref:set_library_path(xref, code_path()),
-    xref:set_default(xref, [{warnings, rebar_config:get(Config, xref_warnings, false)},
+
+    xref:set_default(xref, [{warnings,
+                             rebar_config:get(Config, xref_warnings, false)},
                             {verbose, rebar_config:is_verbose()}]),
+
     {ok, _} = xref:add_directory(xref, "ebin"),
 
     %% Save the code path prior to doing anything
@@ -53,8 +56,9 @@ xref(Config, _) ->
     true = code:add_path(filename:join(rebar_utils:get_cwd(), "ebin")),
 
     %% Get list of xref checks we want to run
-    XrefChecks = rebar_config:get(Config, xref_checks, [exports_not_used,
-                                                        undefined_function_calls]),
+    XrefChecks = rebar_config:get(Config, xref_checks,
+                                  [exports_not_used,
+                                   undefined_function_calls]),
 
     %% Look for exports that are unused by anything
     case lists:member(exports_not_used, XrefChecks) of
@@ -91,12 +95,15 @@ check_exports_not_used(_Config) ->
 
 check_undefined_function_calls(_Config) ->
     {ok, UndefinedCalls0} = xref:analyze(xref, undefined_function_calls),
-    UndefinedCalls = [{find_mfa_source(Caller), format_fa(Caller), format_mfa(Target)} ||
-                         {Caller, Target} <- UndefinedCalls0],
-    lists:foreach(fun({{Source, Line}, FunStr, Target}) ->
-                          ?CONSOLE("~s:~w: Warning ~s calls undefined function ~s\n",
-                                   [Source, Line, FunStr, Target])
-                  end, UndefinedCalls),
+    UndefinedCalls =
+        [{find_mfa_source(Caller), format_fa(Caller), format_mfa(Target)} ||
+            {Caller, Target} <- UndefinedCalls0],
+
+    lists:foreach(
+      fun({{Source, Line}, FunStr, Target}) ->
+              ?CONSOLE("~s:~w: Warning ~s calls undefined function ~s\n",
+                       [Source, Line, FunStr, Target])
+      end, UndefinedCalls),
     ok.
 
 
@@ -112,15 +119,18 @@ filter_away_ignored(UnusedExports) ->
     %% -ignore_xref([{F, A}, ...]).
 
     %% Setup a filter function that builds a list of behaviour callbacks and/or
-    %% any functions marked to ignore. We then use this list to mask any functions
-    %% marked as unused exports by xref
+    %% any functions marked to ignore. We then use this list to mask any
+    %% functions marked as unused exports by xref
     F = fun(Mod) ->
                 Attrs  = kf(attributes, Mod:module_info()),
                 Ignore = kf(ignore_xref, Attrs),
-                Callbacks = [B:behaviour_info(callbacks) || B <- kf(behaviour, Attrs)],
+                Callbacks =
+                    [B:behaviour_info(callbacks) || B <- kf(behaviour, Attrs)],
                 [{Mod, F, A} || {F, A} <- Ignore ++ lists:flatten(Callbacks)]
         end,
-    AttrIgnore = lists:flatten(lists:map(F, lists:usort([M || {M, _, _} <- UnusedExports]))),
+    AttrIgnore =
+        lists:flatten(
+          lists:map(F, lists:usort([M || {M, _, _} <- UnusedExports]))),
     [X || X <- UnusedExports, not lists:member(X, AttrIgnore)].
 
 
@@ -136,7 +146,8 @@ display_mfas([], _Message) ->
     ok;
 display_mfas([{_Mod, Fun, Args} = MFA | Rest], Message) ->
     {Source, Line} = find_mfa_source(MFA),
-    ?CONSOLE("~s:~w: Warning: function ~s/~w ~s\n", [Source, Line, Fun, Args, Message]),
+    ?CONSOLE("~s:~w: Warning: function ~s/~w ~s\n",
+             [Source, Line, Fun, Args, Message]),
     display_mfas(Rest, Message).
 
 format_mfa({M, F, A}) ->
@@ -164,8 +175,8 @@ safe_element(N, Tuple) ->
 %%
 find_mfa_source({M, F, A}) ->
     {M, Bin, _} = code:get_object_code(M),
-    {ok, {M, [{abstract_code, AbstractCode}]}} = beam_lib:chunks(Bin, [abstract_code]),
-    {raw_abstract_v1, Code} = AbstractCode,
+    AbstractCode = beam_lib:chunks(Bin, [abstract_code]),
+    {ok, {M, [{abstract_code, {raw_abstract_v1, Code}}]}} = AbstractCode,
     %% Extract the original source filename from the abstract code
     [{attribute, 1, file, {Source, _}} | _] = Code,
     %% Extract the line number for a given function def

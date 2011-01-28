@@ -49,12 +49,13 @@ compile(Config, _AppFile) ->
 compile_lfe(Source, _Target, Config) ->
     case code:which(lfe_comp) of
         non_existing ->
-            ?CONSOLE("~n===============================================~n" ++
-                     " You need to install LFE to compile LFE source~n" ++
-                     "Download the latest tarball release from github~n" ++
-                     "   http://github.com/rvirding/lfe/downloads~n" ++
-                     "  and install it into your erlang library dir~n" ++
-                     "===============================================~n~n", []),
+            ?CONSOLE(
+               <<"~n===============================================~n"
+                 " You need to install LFE to compile LFE source files~n"
+                 "Download the latest tarball release from github~n"
+                 "   https://github.com/rvirding/lfe/downloads~n"
+                 "  and install it into your erlang library dir~n"
+                 "===============================================~n~n">>, []),
             ?FAIL;
         _ ->
             Opts = [{i, "include"}, {outdir, "ebin"}, report, return] ++
