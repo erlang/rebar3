@@ -33,7 +33,7 @@ run(Dir) ->
 
     {ok, _} = retest_sh:run("./rebar get-deps compile", []),
 
-    true = filelib:is_file("ebin/a.beam"),
+    true = filelib:is_regular("ebin/a.beam"),
     ok.
 
 

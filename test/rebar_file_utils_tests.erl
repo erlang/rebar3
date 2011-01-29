@@ -96,7 +96,7 @@ cp_r_file_to_file_test_() ->
                                    filename:join([?TMP_DIR,"dest","new_file"]))
      end,
      fun teardown/1,
-     [?_assert(filelib:is_file(filename:join([?TMP_DIR,"dest","new_file"])))]}.
+     [?_assert(filelib:is_regular(filename:join([?TMP_DIR,"dest","new_file"])))]}.
 
 cp_r_file_to_dir_test_() ->
     {"cp_r copies a file to directory",
@@ -107,7 +107,7 @@ cp_r_file_to_dir_test_() ->
                                    filename:join([?TMP_DIR,"dest"]))
      end,
      fun teardown/1,
-     [?_assert(filelib:is_file(filename:join([?TMP_DIR,"dest","file1"])))]}.
+     [?_assert(filelib:is_regular(filename:join([?TMP_DIR,"dest","file1"])))]}.
 
 cp_r_dir_to_dir_test_() ->
     {"cp_r copies a directory to directory",
@@ -132,7 +132,7 @@ cp_r_wildcard_file_to_dir_test_() ->
                                    filename:join([?TMP_DIR,"dest"]))
      end,
      fun teardown/1,
-     [?_assert(filelib:is_file(filename:join([?TMP_DIR,"dest","file1"])))]}.
+     [?_assert(filelib:is_regular(filename:join([?TMP_DIR,"dest","file1"])))]}.
 
 cp_r_wildcard_dir_to_dir_test_() ->
     {"cp_r copies wildcard directory to directory",
@@ -224,8 +224,8 @@ mv_file_test_() ->
                                  filename:join([?TMP_DIR,"dest"]))
      end,
      fun teardown/1,
-     [?_assert(filelib:is_file(filename:join([?TMP_DIR,"dest","file1"]))),
-      ?_assertNot(filelib:is_file(filename:join([?TMP_DIR,"source","file1"])))]}.
+     [?_assert(filelib:is_regular(filename:join([?TMP_DIR,"dest","file1"]))),
+      ?_assertNot(filelib:is_regular(filename:join([?TMP_DIR,"source","file1"])))]}.
 
 %% ====================================================================
 %% Utilities
@@ -266,12 +266,12 @@ teardown(_) ->
 %% ====================================================================
 
 assert_files_in(Name, [File|T]) ->
-    [{Name ++ " has file: " ++ File, ?_assert(filelib:is_file(File))} |
+    [{Name ++ " has file: " ++ File, ?_assert(filelib:is_regular(File))} |
      assert_files_in(Name, T)];
 assert_files_in(_, []) -> [].
 
 assert_files_not_in(Name, [File|T]) ->
     [{Name ++ " does not have file: " ++ File,
-      ?_assertNot(filelib:is_file(File))} |
+      ?_assertNot(filelib:is_regular(File))} |
      assert_files_not_in(Name, T)];
 assert_files_not_in(_, []) -> [].
