@@ -54,7 +54,7 @@
             run_systools(NameVer, NewName),
 
             %% Boot file changes
-            boot_files(NewVer, NewName),
+            {ok, _} = boot_files(NewVer, NewName),
 
             %% Extract upgrade and tar it back up with changes
             make_tar(NameVer),
@@ -183,7 +183,7 @@ cleanup(NameVer, Name, Ver) ->
              filename:join([".", NameVer ++ ".script"]),
              filename:join([".", "relup"])
             ],
-    [ok = file:delete(F) || F <- Files],
+    lists:foreach(fun(F) -> ok = file:delete(F) end, Files),
 
     ok = remove_dir_tree("releases"),
     ok = remove_dir_tree("lib").
