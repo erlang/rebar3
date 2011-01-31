@@ -23,7 +23,7 @@ files() ->
      {copy, "c.hrl", "repo/c/include/c.hrl"}
     ].
 
-run(Dir) ->
+run(_Dir) ->
     %% Initialize the b/c apps as mercurial repos so that dependencies pull
     %% properly
     HgCmd = "/bin/sh -c \"hg init && hg add && hg commit -m 'Initial commit'\"",
