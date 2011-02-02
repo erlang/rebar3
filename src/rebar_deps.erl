@@ -131,7 +131,7 @@ compile(Config, AppFile) ->
 
 'delete-deps'(Config, _) ->
     %% Delete all the available deps in our deps/ directory, if any
-    DepsDir = get_deps_dir(),
+    {true, DepsDir} = get_deps_dir(),
     Deps = rebar_config:get_local(Config, deps, []),
     {AvailableDeps, _} = find_deps(find, Deps),
     _ = [delete_dep(D)
@@ -154,9 +154,21 @@ set_global_deps_dir(_Config, _DepsDir) ->
     ok.
 
 get_deps_dir() ->
+    get_deps_dir("").
+
+get_deps_dir(App) ->
     BaseDir = rebar_config:get_global(base_dir, []),
     DepsDir = rebar_config:get_global(deps_dir, "deps"),
-    filename:join(BaseDir, DepsDir).
+    {true, filename:join([BaseDir, DepsDir, App])}.
+
+get_lib_dir(App) ->
+    % Find App amongst the reachable lib directories
+    % Returns either the found path or a tagged tuple with a boolean
+    % to match get_deps_dir's return type
+    case code:lib_dir(App) of
+        {error, bad_name} -> {false, bad_name};
+        Path -> {true, Path}
+    end.
 
 update_deps_code_path([]) ->
     ok;
@@ -189,23 +201,41 @@ find_deps(Mode, [{App, VsnRegex, Source} | Rest], Acc) ->
     Dep = #dep { app = App,
                  vsn_regex = VsnRegex,
                  source = Source },
-    case is_app_available(App, VsnRegex) of
-        {true, AppDir} ->
-            find_deps(Mode, Rest, acc_deps(Mode, avail, Dep, AppDir, Acc));
-        {false, _} ->
-            AppDir = filename:join(get_deps_dir(), Dep#dep.app),
-            case is_app_available(App, VsnRegex, AppDir) of
-                {true, AppDir} ->
-                    find_deps(Mode, Rest,
-                              acc_deps(Mode, avail, Dep, AppDir, Acc));
-                {false, _} ->
-                    find_deps(Mode, Rest,
-                              acc_deps(Mode, missing, Dep, AppDir, Acc))
-            end
-    end;
+    {Availability, FoundDir} = find_dep(Dep),
+    find_deps(Mode, Rest, acc_deps(Mode, Availability, Dep, FoundDir, Acc));
 find_deps(_Mode, [Other | _Rest], _Acc) ->
     ?ABORT("Invalid dependency specification ~p in ~s\n",
            [Other, rebar_utils:get_cwd()]).
+
+find_dep(Dep) ->
+    % Find a dep based on its source,
+    % e.g. {git, "https://github.com/mochi/mochiweb.git", "HEAD"}
+    % Deps with a source must be found (or fetched) locally.
+    % Those without a source may be satisfied from lib directories (get_lib_dir).
+    find_dep(Dep, Dep#dep.source).
+
+find_dep(Dep, undefined) ->
+    % 'source' is undefined.  If Dep is not satisfied locally,
+    % go ahead and find it amongst the lib_dir's.
+    case find_dep_in_dir(Dep, get_deps_dir(Dep#dep.app)) of
+        {avail, Dir} -> {avail, Dir};
+        {missing, _} -> find_dep_in_dir(Dep, get_lib_dir(Dep#dep.app))
+    end;
+find_dep(Dep, _Source) ->
+    % _Source is defined.  Regardless of what it is, we must find it
+    % locally satisfied or fetch it from the original source
+    % into the project's deps
+    find_dep_in_dir(Dep, get_deps_dir(Dep#dep.app)).
+
+find_dep_in_dir(_Dep, {false, Dir}) ->
+    {missing, Dir};
+find_dep_in_dir(Dep, {true, Dir}) ->
+    App = Dep#dep.app,
+    VsnRegex = Dep#dep.vsn_regex,
+    case is_app_available(App, VsnRegex, Dir) of
+        {true, _AppFile} -> {avail, Dir};
+        {false, _}       -> {missing, Dir}
+    end.
 
 acc_deps(find, avail, Dep, AppDir, {Avail, Missing}) ->
     {[Dep#dep { dir = AppDir } | Avail], Missing};
@@ -227,15 +257,8 @@ require_source_engine(Source) ->
     true = source_engine_avail(Source),
     ok.
 
-is_app_available(App, VsnRegex) ->
-    case code:lib_dir(App) of
-        {error, bad_name} ->
-            {false, bad_name};
-        Path ->
-            is_app_available(App, VsnRegex, Path)
-    end.
-
 is_app_available(App, VsnRegex, Path) ->
+    ?DEBUG("is_app_available, looking for App ~p  with Path ~p~n", [App, Path]),
     case rebar_app_utils:is_app_dir(Path) of
         {true, AppFile} ->
             case rebar_app_utils:app_name(AppFile) of
@@ -293,7 +316,7 @@ use_source(Dep, Count) ->
         false ->
             ?CONSOLE("Pulling ~p from ~p\n", [Dep#dep.app, Dep#dep.source]),
             require_source_engine(Dep#dep.source),
-            TargetDir = filename:join(get_deps_dir(), Dep#dep.app),
+            {true, TargetDir} = get_deps_dir(Dep#dep.app),
             download_source(TargetDir, Dep#dep.source),
             use_source(Dep#dep { dir = TargetDir }, Count-1)
     end.
@@ -335,7 +358,7 @@ update_source(Dep) ->
     %% VCS directory, such as when a source archive is built of a project, with
     %% all deps already downloaded/included. So, verify that the necessary VCS
     %% directory exists before attempting to do the update.
-    AppDir = filename:join(get_deps_dir(), Dep#dep.app),
+    {true, AppDir} = get_deps_dir(Dep#dep.app),
     case has_vcs_dir(element(1, Dep#dep.source), AppDir) of
         true ->
             ?CONSOLE("Updating ~p from ~p\n", [Dep#dep.app, Dep#dep.source]),
