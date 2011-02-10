@@ -224,6 +224,8 @@ generate    [dump_spec=0/1]          Build release with reltool
 
 generate-upgrade  previous_release=path  Build an upgrade package
 
+generate-appups   previous_release=path Generate appup files
+
 eunit       [suite=foo]              Run eunit [test/foo_tests.erl] tests
 ct          [suite=] [case=]         Run common_test suites in ./test
 
@@ -277,8 +279,8 @@ filter_flags([Item | Rest], Commands) ->
 command_names() ->
     ["build-plt", "check-deps", "check-plt", "clean", "compile", "create",
      "create-app", "create-node", "ct", "delete-deps", "dialyze", "doc",
-     "eunit", "generate", "generate-upgrade", "get-deps", "help",
-     "list-templates", "update-deps", "version", "xref"].
+     "eunit", "generate", "generate-appups", "generate-upgrade", "get-deps",
+     "help", "list-templates", "update-deps", "version", "xref"].
 
 unabbreviate_command_names([]) ->
     [];

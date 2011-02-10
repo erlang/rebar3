@@ -3,6 +3,7 @@
   {vsn, "2"},
   {modules, [ rebar,
               rebar_abnfc_compiler,
+              rebar_appups,
               rebar_app_utils,
               rebar_base_compiler,
               rebar_config,
@@ -80,6 +81,7 @@
                               ]},
 
                     {rel_dir, [
+                               rebar_appups,
                                rebar_reltool,
                                rebar_upgrade
                               ]}

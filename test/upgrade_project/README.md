@@ -21,6 +21,7 @@
 
     rebar compile
     rebar generate
+    rebar generate-appups previous_release=dummy_0.1
     rebar generate-upgrade previous_release=dummy_0.1
     tar -zvtf rel/dummy_0.2.tar.gz
 

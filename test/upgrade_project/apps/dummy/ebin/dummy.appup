@@ -1,8 +1,0 @@
-{"0.2",
-    [{"0.1",[
-                {update, dummy_server, {advanced, [foo]}}
-            ]}],
-    [{"0.1",[
-                {update, dummy_server, {advanced, [foo]}}
-            ]}]
-}.
