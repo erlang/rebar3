@@ -7,6 +7,7 @@ RUNNER_SCRIPT_DIR=$(cd ${0%/*} && pwd)
 RUNNER_BASE_DIR=${RUNNER_SCRIPT_DIR%/*}
 RUNNER_ETC_DIR=$RUNNER_BASE_DIR/etc
 RUNNER_LOG_DIR=$RUNNER_BASE_DIR/log
+# Note the trailing slash on $PIPE_DIR/
 PIPE_DIR=/tmp/$RUNNER_BASE_DIR/
 RUNNER_USER=
 
@@ -61,8 +62,7 @@ case "$1" in
         HEART_COMMAND="$RUNNER_BASE_DIR/bin/$SCRIPT start"
         export HEART_COMMAND
         mkdir -p $PIPE_DIR
-        # Note the trailing slash on $PIPE_DIR/
-        $ERTS_PATH/run_erl -daemon $PIPE_DIR/ $RUNNER_LOG_DIR "exec $RUNNER_BASE_DIR/bin/$SCRIPT console" 2>&1
+        $ERTS_PATH/run_erl -daemon $PIPE_DIR $RUNNER_LOG_DIR "exec $RUNNER_BASE_DIR/bin/$SCRIPT console" 2>&1
         ;;
 
     stop)
