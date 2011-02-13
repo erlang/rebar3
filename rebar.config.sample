@@ -86,6 +86,9 @@
 %% Additional compile options for eunit. erl_opts from above is also used
 {eunit_compile_opts, []}.
 
+%% Same as erl_first_files, but used only when running 'eunit'
+{eunit_first_files, []}.
+
 %% Whether to enable coverage reporting. Default is `false'
 {cover_enabled, false}.
 
