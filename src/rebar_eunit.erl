@@ -43,9 +43,8 @@
 %% -------------------------------------------------------------------
 -module(rebar_eunit).
 
--export([eunit/2]).
-
--compile([export_all]).
+-export([eunit/2,
+         clean/2]).
 
 -include("rebar.hrl").
 
