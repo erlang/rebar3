@@ -126,15 +126,22 @@ eunit(Config, AppFile) ->
     rebar_erlc_compiler:doterl_compile(eunit_config(Config),
                                        ?EUNIT_DIR, TestErls),
 
-    %% Build a list of all the .beams in ?EUNIT_DIR -- use this for cover
-    %% and eunit testing. Normally you can just tell cover and/or eunit to
-    %% scan the directory for you, but eunit does a code:purge in conjunction
-    %% with that scan and causes any cover compilation info to be lost.
-    %% Filter out "*_tests" modules so eunit won't doubly run them and
-    %% so cover only calculates coverage on production code.
-    BeamFiles = [N || N <- rebar_utils:beams(?EUNIT_DIR),
-                      string:str(N, "_tests.beam") =:= 0],
-    Modules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- BeamFiles],
+    %% Build a list of all the .beams in ?EUNIT_DIR -- use this for
+    %% cover and eunit testing. Normally you can just tell cover
+    %% and/or eunit to scan the directory for you, but eunit does a
+    %% code:purge in conjunction with that scan and causes any cover
+    %% compilation info to be lost.  Filter out "*_tests" modules so
+    %% eunit won't doubly run them and so cover only calculates
+    %% coverage on production code.  However, keep "*_tests" modules
+    %% that are not automatically included by eunit.
+    AllBeamFiles = rebar_utils:beams(?EUNIT_DIR),
+    {BeamFiles, TestBeamFiles} =
+        lists:partition(fun(N) -> string:str(N, "_tests.beam") =:= 0 end,
+                        AllBeamFiles),
+    OtherBeamFiles = TestBeamFiles --
+        [filename:rootname(N) ++ "_tests.beam" || N <- AllBeamFiles],
+    ModuleBeamFiles = BeamFiles ++ OtherBeamFiles,
+    Modules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- ModuleBeamFiles],
     SrcModules = [rebar_utils:erl_to_mod(M) || M <- SrcErls],
 
     {ok, CoverLog} = cover_init(Config, BeamFiles),
