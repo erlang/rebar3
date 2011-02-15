@@ -152,7 +152,7 @@ doterl_compile(Config, OutDir, MoreSources) ->
     %% Make sure that ebin/ exists and is on the path
     ok = filelib:ensure_dir(filename:join("ebin", "dummy.beam")),
     CurrPath = code:get_path(),
-    true = code:add_path("ebin"),
+    true = code:add_path(filename:absname("ebin")),
     rebar_base_compiler:run(Config, NewFirstErls, OtherErls,
                             fun(S, C) ->
                                     internal_erl_compile(S, C, OutDir, ErlOpts)
