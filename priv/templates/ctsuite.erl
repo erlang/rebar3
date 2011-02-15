@@ -59,11 +59,11 @@ groups() -> [].
 all() ->
     [ {exports, Functions} | _ ] = ?MODULE:module_info(),
     [ FName || {FName, _} <- lists:filter(
-                               fun ({module_info,_}) -> false ;
-                                   ({all,_}) -> false ;
-                                   ({init_per_suite,1}) -> false ;
-                                   ({end_per_suite,1}) -> false ;
-                                   ({_,1}) -> true ;
+                               fun ({module_info,_}) -> false;
+                                   ({all,_}) -> false;
+                                   ({init_per_suite,1}) -> false;
+                                   ({end_per_suite,1}) -> false;
+                                   ({_,1}) -> true;
                                    ({_,_}) -> false
                                end, Functions)].
 
