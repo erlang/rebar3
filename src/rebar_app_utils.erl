@@ -90,12 +90,11 @@ app_vsn(AppFile) ->
     case load_app_file(AppFile) of
         {ok, _, AppInfo} ->
             case get_value(vsn, AppInfo, AppFile) of
-                git ->
-                    Cmd = "git describe --tags --always",
-                    {ok, VsnString} = rebar_utils:sh(Cmd, []),
-                    string:strip(VsnString, right, $\n);
-                Version ->
-                    Version
+                git -> vcs_vsn(git);
+                hg -> vcs_vsn(hg);
+                bzr -> vcs_vsn(bzr);
+                svn -> vcs_vsn(svn);
+                Version -> Version
             end;
         {error, Reason} ->
             ?ABORT("Failed to extract vsn from ~s: ~p\n",
@@ -131,3 +130,13 @@ get_value(Key, AppInfo, AppFile) ->
         Value ->
             Value
     end.
+
+vcs_vsn(Vcs) ->
+    Cmd = vcs_vsn_cmd(Vcs),
+    {ok, VsnString} = rebar_utils:sh(Cmd, [{use_stdout, false}]),
+    string:strip(VsnString, right, $\n).
+
+vcs_vsn_cmd(git) -> "git describe --always --tags";
+vcs_vsn_cmd(hg) -> "hg identify -i";
+vcs_vsn_cmd(bzr) -> "bzr revno";
+vcs_vsn_cmd(svn) -> "svnversion".
