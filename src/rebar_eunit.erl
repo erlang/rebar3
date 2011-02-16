@@ -177,33 +177,40 @@ get_eunit_opts(Config) ->
     BaseOpts ++ rebar_config:get_list(Config, eunit_opts, []).
 
 eunit_config(Config) ->
-    EqcOpts = case is_quickcheck_avail() of
-                  true ->
-                      [{d, 'EQC'}];
-                  false ->
-                      []
-              end,
+    EqcOpts = eqc_opts(),
+    PropErOpts = proper_opts(),
 
     ErlOpts = rebar_config:get_list(Config, erl_opts, []),
     EunitOpts = rebar_config:get_list(Config, eunit_compile_opts, []),
     Opts = [{d, 'TEST'}, debug_info] ++
-        ErlOpts ++ EunitOpts ++ EqcOpts,
+        ErlOpts ++ EunitOpts ++ EqcOpts ++ PropErOpts,
     Config1 = rebar_config:set(Config, erl_opts, Opts),
 
     FirstErls = rebar_config:get_list(Config1, eunit_first_files, []),
     rebar_config:set(Config1, erl_first_files, FirstErls).
 
-is_quickcheck_avail() ->
-    case erlang:get(is_quickcheck_avail) of
+
+eqc_opts() ->
+    define_if('PROPER', is_lib_avail(is_eqc_avail, eqc,
+                                     "eqc.hrl", "QuickCheck")).
+proper_opts() ->
+    define_if('EQC', is_lib_avail(is_proper_avail, proper,
+                                  "proper.hrl", "PropEr")).
+
+define_if(Def, true) -> [{d, Def}];
+define_if(_Def, false) -> [].
+
+is_lib_avail(DictKey, Mod, Hrl, Name) ->
+    case erlang:get(DictKey) of
         undefined ->
-            case code:lib_dir(eqc, include) of
-                {error, bad_name} ->
-                    IsAvail = false;
-                Dir ->
-                    IsAvail = filelib:is_regular(filename:join(Dir, "eqc.hrl"))
-            end,
-            erlang:put(is_quickcheck_avail, IsAvail),
-            ?DEBUG("Quickcheck availability: ~p\n", [IsAvail]),
+            IsAvail = case code:lib_dir(Mod, include) of
+                          {error, bad_name} ->
+                              false;
+                          Dir ->
+                              filelib:is_regular(filename:join(Dir, Hrl))
+                      end,
+            erlang:put(DictKey, IsAvail),
+            ?DEBUG("~s availability: ~p\n", [Name, IsAvail]),
             IsAvail;
         IsAvail ->
             IsAvail
