@@ -108,7 +108,7 @@ file_to_name(File) ->
     filename:rootname(filename:basename(File)).
 
 genappup_which_apps(UpgradedApps, [First|Rest]) ->
-    List = proplists:delete(First, UpgradedApps),
+    List = proplists:delete(list_to_atom(First), UpgradedApps),
     genappup_which_apps(List, Rest);
 genappup_which_apps(Apps, []) ->
     Apps.
