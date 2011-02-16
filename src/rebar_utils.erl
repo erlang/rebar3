@@ -38,9 +38,6 @@
          abort/2,
          escript_foldl/3,
          find_executable/1,
-         get_reltool_release_info/1,
-         get_rel_release_info/2,
-         get_previous_release_path/0,
          prop_check/3]).
 
 -include("rebar.hrl").
@@ -153,38 +150,6 @@ find_executable(Name) ->
         false -> false;
         Path ->
             "\"" ++ filename:nativename(Path) ++ "\""
-    end.
-
-%% Get release name and version from a reltool.config
-get_reltool_release_info(ReltoolFile) ->
-    %% expect sys to be the first proplist in reltool.config
-    case file:consult(ReltoolFile) of
-        {ok, [{sys, Config}| _]} ->
-            %% expect the first rel in the proplist to be the one you want
-            {rel, Name, Ver, _} = proplists:lookup(rel, Config),
-            {Name, Ver};
-        _ ->
-            ?ABORT("Failed to parse ~s~n", [ReltoolFile])
-    end.
-
-%% Get release name and version from a rel file
-get_rel_release_info(Name, Path) ->
-    [RelFile] = filelib:wildcard(filename:join([Path, "releases", "*",
-                                                Name ++ ".rel"])),
-    [BinDir|_] = re:replace(RelFile, Name ++ "\\.rel", ""),
-    {ok, [{release, {Name1, Ver}, _, _}]} =
-        file:consult(filename:join([binary_to_list(BinDir),
-                                    Name ++ ".rel"])),
-    {Name1, Ver}.
-
-%% Get the previous release path from a global variable
-get_previous_release_path() ->
-    case rebar_config:get_global(previous_release, false) of
-        false ->
-            ?ABORT("previous_release=PATH is required to "
-                   "create upgrade package~n", []);
-        OldVerPath ->
-            OldVerPath
     end.
 
 %% Helper function for checking values and aborting when needed

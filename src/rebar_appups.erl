@@ -40,13 +40,13 @@
 
 'generate-appups'(_Config, ReltoolFile) ->
     %% Get the old release path
-    OldVerPath = rebar_utils:get_previous_release_path(),
+    OldVerPath = rebar_rel_utils:get_previous_release_path(),
 
     %% Get the new and old release name and versions
-    {Name, _Ver} = rebar_utils:get_reltool_release_info(ReltoolFile),
+    {Name, _Ver} = rebar_rel_utils:get_reltool_release_info(ReltoolFile),
     NewVerPath = filename:join([".", Name]),
-    {NewName, NewVer} = rebar_utils:get_rel_release_info(Name, NewVerPath),
-    {OldName, OldVer} = rebar_utils:get_rel_release_info(Name, OldVerPath),
+    {NewName, NewVer} = rebar_rel_utils:get_rel_release_info(Name, NewVerPath),
+    {OldName, OldVer} = rebar_rel_utils:get_rel_release_info(Name, OldVerPath),
 
     %% Run some simple checks
     true = rebar_utils:prop_check(NewVer =/= OldVer,
@@ -86,8 +86,10 @@
 %% ===================================================================
 
 get_upgraded_apps(OldAppFiles, NewAppFiles) ->
-    OldAppsVer = [get_app_version(AppFile) || AppFile <- OldAppFiles],
-    NewAppsVer = [get_app_version(AppFile) || AppFile <- NewAppFiles],
+    OldAppsVer = [{rebar_app_utils:app_name(AppFile), 
+                   rebar_app_utils:app_vsn(AppFile)} || AppFile <- OldAppFiles],
+    NewAppsVer = [{rebar_app_utils:app_name(AppFile), 
+                   rebar_app_utils:app_vsn(AppFile)} || AppFile <- NewAppFiles],
     UpgradedApps = lists:subtract(NewAppsVer, OldAppsVer),
     lists:map(
       fun({App, NewVer}) ->
@@ -95,14 +97,6 @@ get_upgraded_apps(OldAppFiles, NewAppFiles) ->
               {App, {OldVer, NewVer}}
       end,
       UpgradedApps).
-
-get_app_version(File) ->
-    case file:consult(File) of
-        {ok,[{application, Name,[_,{vsn,Ver}|_]}]} ->
-            {Name, Ver};
-        _ ->
-            ?ABORT("Failed to parse ~s~n", [File])
-    end.
 
 file_to_name(File) ->
     filename:rootname(filename:basename(File)).

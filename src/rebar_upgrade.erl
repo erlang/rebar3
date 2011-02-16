@@ -4,7 +4,7 @@
 %%
 %% rebar: Erlang Build Tools
 %%
-%% Copyright (c) 2011 Joe Williams <joe@joetify.com>
+%% Copyright (c) 2011 Joe Williams (joe@joetify.com)
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a copy
 %% of this software and associated documentation files (the "Software"), to deal
@@ -32,90 +32,68 @@
 
 -export(['generate-upgrade'/2]).
 
-%% public api
+%% ====================================================================
+%% Public API
+%% ====================================================================
 
 'generate-upgrade'(_Config, ReltoolFile) ->
-    case rebar_config:get_global(previous_release, false) of
-        false ->
-            ?ABORT("previous_release=PATH is required to "
-                   "create upgrade package~n", []);
-        OldVerPath ->
-            %% Run checks to make sure that building a package is possible
-            {NewName, NewVer} = run_checks(OldVerPath, ReltoolFile),
-            NameVer = NewName ++ "_" ++ NewVer,
+    %% Get the old release path
+    OldVerPath = rebar_rel_utils:get_previous_release_path(),
+    
+    %% Run checks to make sure that building a package is possible
+    {NewName, NewVer} = run_checks(OldVerPath, ReltoolFile),
+    NameVer = NewName ++ "_" ++ NewVer,
 
-            %% Save the code path prior to doing anything
-            OrigPath = code:get_path(),
+    %% Save the code path prior to doing anything
+    OrigPath = code:get_path(),
 
-            %% Prepare the environment for building the package
-            ok = setup(OldVerPath, NewName, NewVer, NameVer),
+    %% Prepare the environment for building the package
+    ok = setup(OldVerPath, NewName, NewVer, NameVer),
 
-            %% Build the package
-            run_systools(NameVer, NewName),
+    %% Build the package
+    run_systools(NameVer, NewName),
 
-            %% Boot file changes
-            {ok, _} = boot_files(NewVer, NewName),
+    %% Boot file changes
+    {ok, _} = boot_files(NewVer, NewName),
 
-            %% Extract upgrade and tar it back up with changes
-            make_tar(NameVer),
+    %% Extract upgrade and tar it back up with changes
+    make_tar(NameVer),
 
-            %% Clean up files that systools created
-            ok = cleanup(NameVer, NewName, NewVer),
+    %% Clean up files that systools created
+    ok = cleanup(NameVer, NewName, NewVer),
 
-            %% Restore original path
-            true = code:set_path(OrigPath),
+    %% Restore original path
+    true = code:set_path(OrigPath),
 
-            ok
-    end.
+    ok.
 
-%% internal api
+%% ===================================================================
+%% Internal functions
+%% ==================================================================
 
 run_checks(OldVerPath, ReltoolFile) ->
-    true = prop_check(filelib:is_dir(OldVerPath),
+    true = rebar_utils:prop_check(filelib:is_dir(OldVerPath),
                       "Release directory doesn't exist (~p)~n", [OldVerPath]),
 
-    {Name, Ver} = get_release_name(ReltoolFile),
+    {Name, Ver} = rebar_rel_utils:get_reltool_release_info(ReltoolFile),
 
     NamePath = filename:join([".", Name]),
-    true = prop_check(filelib:is_dir(NamePath),
+    true = rebar_utils:prop_check(filelib:is_dir(NamePath),
                       "Release directory doesn't exist (~p)~n", [NamePath]),
 
-    {NewName, NewVer} = get_release_version(Name, NamePath),
-    {OldName, OldVer} = get_release_version(Name, OldVerPath),
+    {NewName, NewVer} = rebar_rel_utils:get_rel_release_info(Name, NamePath),
+    {OldName, OldVer} = rebar_rel_utils:get_rel_release_info(Name, OldVerPath),
 
-    true = prop_check(NewName == OldName,
+    true = rebar_utils:prop_check(NewName == OldName,
                       "New and old .rel release names do not match~n", []),
-    true = prop_check(Name == NewName,
+    true = rebar_utils:prop_check(Name == NewName,
                       "Reltool and .rel release names do not match~n", []),
-    true = prop_check(NewVer =/= OldVer,
+    true = rebar_utils:prop_check(NewVer =/= OldVer,
                       "New and old .rel contain the same version~n", []),
-    true = prop_check(Ver == NewVer,
+    true = rebar_utils:prop_check(Ver == NewVer,
                       "Reltool and .rel versions do not match~n", []),
 
     {NewName, NewVer}.
-
-get_release_name(ReltoolFile) ->
-    %% expect sys to be the first proplist in reltool.config
-    case file:consult(ReltoolFile) of
-        {ok, [{sys, Config}| _]} ->
-            %% expect the first rel in the proplist to be the one you want
-            {rel, Name, Ver, _} = proplists:lookup(rel, Config),
-            {Name, Ver};
-        _ ->
-            ?ABORT("Failed to parse ~s~n", [ReltoolFile])
-    end.
-
-get_release_version(Name, Path) ->
-    [RelFile] = filelib:wildcard(filename:join([Path, "releases", "*",
-                                                Name ++ ".rel"])),
-    [BinDir|_] = re:replace(RelFile, Name ++ "\\.rel", ""),
-    {ok, [{release, {Name1, Ver}, _, _}]} =
-        file:consult(filename:join([binary_to_list(BinDir),
-                                    Name ++ ".rel"])),
-    {Name1, Ver}.
-
-prop_check(true, _, _) -> true;
-prop_check(false, Msg, Args) -> ?ABORT(Msg, Args).
 
 setup(OldVerPath, NewName, NewVer, NameVer) ->
     NewRelPath = filename:join([".", NewName]),
