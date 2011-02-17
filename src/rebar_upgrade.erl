@@ -39,7 +39,7 @@
 'generate-upgrade'(_Config, ReltoolFile) ->
     %% Get the old release path
     OldVerPath = rebar_rel_utils:get_previous_release_path(),
-    
+
     %% Run checks to make sure that building a package is possible
     {NewName, NewVer} = run_checks(OldVerPath, ReltoolFile),
     NameVer = NewName ++ "_" ++ NewVer,

@@ -26,7 +26,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_rel_utils).
 
--export([is_rel_dir/0, 
+-export([is_rel_dir/0,
          is_rel_dir/1,
          get_reltool_release_info/1,
          get_rel_release_info/1,
@@ -73,7 +73,7 @@ get_rel_release_info(Name, Path) ->
     [RelFile] = filelib:wildcard(filename:join([Path, "releases", "*",
                                                 Name ++ ".rel"])),
     [BinDir|_] = re:replace(RelFile, Name ++ "\\.rel", ""),
-    get_rel_release_info(filename:join([binary_to_list(BinDir), 
+    get_rel_release_info(filename:join([binary_to_list(BinDir),
                                         Name ++ ".rel"])).
 
 %% Get the previous release path from a global variable

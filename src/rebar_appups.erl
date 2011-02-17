@@ -86,9 +86,9 @@
 %% ===================================================================
 
 get_upgraded_apps(OldAppFiles, NewAppFiles) ->
-    OldAppsVer = [{rebar_app_utils:app_name(AppFile), 
+    OldAppsVer = [{rebar_app_utils:app_name(AppFile),
                    rebar_app_utils:app_vsn(AppFile)} || AppFile <- OldAppFiles],
-    NewAppsVer = [{rebar_app_utils:app_name(AppFile), 
+    NewAppsVer = [{rebar_app_utils:app_name(AppFile),
                    rebar_app_utils:app_vsn(AppFile)} || AppFile <- NewAppFiles],
     UpgradedApps = lists:subtract(NewAppsVer, OldAppsVer),
     lists:map(
