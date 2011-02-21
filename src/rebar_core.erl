@@ -280,8 +280,8 @@ expand_lib_dirs([Dir | Rest], Root, Acc) ->
 select_modules([], _Command, Acc) ->
     lists:reverse(Acc);
 select_modules([Module | Rest], Command, Acc) ->
-    Exports = Module:module_info(exports),
-    case lists:member({Command, 2}, Exports) of
+    {module, Module} = code:ensure_loaded(Module),
+    case erlang:function_exported(Module, Command, 2) of
         true ->
             select_modules(Rest, Command, [Module | Acc]);
         false ->
