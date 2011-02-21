@@ -1,4 +1,4 @@
-%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 %% -------------------------------------------------------------------
 %%
@@ -42,34 +42,47 @@
 %%
 %% * erl_opts - Erlang list of options passed to compile:file/2
 %%              It is also possible to specify platform specific
-%%              options by specifying a triplet where the first string
-%%              is a regex that is checked against Erlang's system
-%%              architecture string. E.g. to define HAVE_SENDFILE only
-%%              on systems with sendfile() and define BACKLOG on
-%%              Linux/FreeBSD as 128 do:
+%%              options by specifying a pair or a triplet where the
+%%              first string is a regex that is checked against the
+%%              string
+%%
+%%                OtpRelease ++ "-" ++ SysArch ++ "-" ++ Words.
+%%
+%%              where
+%%
+%%                OtpRelease = erlang:system_info(otp_release).
+%%                SysArch = erlang:system_info(system_architecture).
+%%                Words = integer_to_list(8 * erlang:system_info(wordsize)).
+%%
+%%              E.g. to define HAVE_SENDFILE only on systems with
+%%              sendfile(), to define BACKLOG on Linux/FreeBSD as 128,
+%%              and to define 'old_inets' for R13 OTP release do:
+%%
 %%              {erl_opts, [{platform_define,
 %%                           "(linux|solaris|freebsd|darwin)",
 %%                           'HAVE_SENDFILE'},
 %%                          {platform_define, "(linux|freebsd)",
-%%                           'BACKLOG', 128}]}.
+%%                           'BACKLOG', 128},
+%%                          {platform_define, "R13",
+%%                           'old_inets'}]}.
 %%
 
 -spec compile(Config::#config{}, AppFile::string()) -> 'ok'.
 compile(Config, _AppFile) ->
     rebar_base_compiler:run(Config,
-                            check_files(rebar_config:get_local(Config,
-                                    xrl_first_files, [])),
+                            check_files(rebar_config:get_local(
+                                          Config, xrl_first_files, [])),
                             "src", ".xrl", "src", ".erl",
                             fun compile_xrl/3),
     rebar_base_compiler:run(Config,
-                            check_files(rebar_config:get_local(Config,
-                                    yrl_first_files, [])),
+                            check_files(rebar_config:get_local(
+                                          Config, yrl_first_files, [])),
                             "src", ".yrl", "src", ".erl",
                             fun compile_yrl/3),
     doterl_compile(Config, "ebin"),
     rebar_base_compiler:run(Config,
-                            check_files(rebar_config:get_local(Config,
-                                    mib_first_files, [])),
+                            check_files(rebar_config:get_local(
+                                          Config, mib_first_files, [])),
                             "mibs", ".mib", "priv/mibs", ".bin",
                             fun compile_mib/3).
 
@@ -119,26 +132,27 @@ doterl_compile(Config, OutDir, MoreSources) ->
     RestErls  = [Source || Source <- gather_src(SrcDirs, []) ++ MoreSources,
                            not lists:member(Source, FirstErls)],
 
-    % Split RestErls so that parse_transforms and behaviours are instead added
-    % to erl_first_files, parse transforms first.
-    % This should probably be somewhat combined with inspect_epp
-    [ParseTransforms, Behaviours, OtherErls] = lists:foldl(fun(F, [A, B, C]) ->
-                case compile_priority(F) of
-                    parse_transform ->
-                        [[F | A], B, C];
-                    behaviour ->
-                        [A, [F | B], C];
-                    _ ->
-                        [A, B, [F | C]]
-                end
-        end, [[], [], []], RestErls),
+    %% Split RestErls so that parse_transforms and behaviours are instead added
+    %% to erl_first_files, parse transforms first.
+    %% This should probably be somewhat combined with inspect_epp
+    [ParseTransforms, Behaviours, OtherErls] =
+        lists:foldl(fun(F, [A, B, C]) ->
+                            case compile_priority(F) of
+                                parse_transform ->
+                                    [[F | A], B, C];
+                                behaviour ->
+                                    [A, [F | B], C];
+                                _ ->
+                                    [A, B, [F | C]]
+                            end
+                    end, [[], [], []], RestErls),
 
     NewFirstErls = FirstErls ++ ParseTransforms ++ Behaviours,
 
     %% Make sure that ebin/ exists and is on the path
     ok = filelib:ensure_dir(filename:join("ebin", "dummy.beam")),
     CurrPath = code:get_path(),
-    true = code:add_path("ebin"),
+    true = code:add_path(filename:absname("ebin")),
     rebar_base_compiler:run(Config, NewFirstErls, OtherErls,
                             fun(S, C) ->
                                     internal_erl_compile(S, C, OutDir, ErlOpts)
@@ -151,12 +165,14 @@ doterl_compile(Config, OutDir, MoreSources) ->
 %% Internal functions
 %% ===================================================================
 
--spec include_path(Source::string(), Config::#config{}) -> [string()].
+-spec include_path(Source::string(), Config::#config{}) -> [string(), ...].
 include_path(Source, Config) ->
     ErlOpts = rebar_config:get(Config, erl_opts, []),
-    ["include", filename:dirname(Source)] ++ proplists:get_all_values(i, ErlOpts).
+    ["include", filename:dirname(Source)]
+        ++ proplists:get_all_values(i, ErlOpts).
 
--spec inspect(Source::string(), IncludePath::[string(),...]) -> {string(), [string()]}.
+-spec inspect(Source::string(),
+              IncludePath::[string(),...]) -> {string(), [string()]}.
 inspect(Source, IncludePath) ->
     ModuleDefault = filename:basename(Source, ".erl"),
     case epp:open(Source, IncludePath) of
@@ -167,7 +183,8 @@ inspect(Source, IncludePath) ->
             {ModuleDefault, []}
     end.
 
--spec inspect_epp(Epp::pid(), Source::string(), Module::string(), Includes::[string()]) -> {string(), [string()]}.
+-spec inspect_epp(Epp::pid(), Source::string(), Module::string(),
+                  Includes::[string()]) -> {string(), [string()]}.
 inspect_epp(Epp, Source, Module, Includes) ->
     case epp:parse_erl_form(Epp) of
         {ok, {attribute, _, module, ModInfo}} ->
@@ -177,13 +194,15 @@ inspect_epp(Epp, Source, Module, Includes) ->
                     ActualModuleStr = atom_to_list(ActualModule);
                 %% Packag-ized module name, list of atoms
                 ActualModule when is_list(ActualModule) ->
-                    ActualModuleStr = string:join([atom_to_list(P) || P <- ActualModule], ".");
+                    ActualModuleStr = string:join([atom_to_list(P) ||
+                                                      P <- ActualModule], ".");
                 %% Parameterized module name, single atom
                 {ActualModule, _} when is_atom(ActualModule) ->
                     ActualModuleStr = atom_to_list(ActualModule);
                 %% Parameterized and packagized module name, list of atoms
                 {ActualModule, _} when is_list(ActualModule) ->
-                    ActualModuleStr = string:join([atom_to_list(P) || P <- ActualModule], ".")
+                    ActualModuleStr = string:join([atom_to_list(P) ||
+                                                      P <- ActualModule], ".")
             end,
             inspect_epp(Epp, Source, ActualModuleStr, Includes);
         {ok, {attribute, 1, file, {Module, 1}}} ->
@@ -199,14 +218,16 @@ inspect_epp(Epp, Source, Module, Includes) ->
             inspect_epp(Epp, Source, Module, Includes)
     end.
 
--spec needs_compile(Source::string(), Target::string(), Hrls::[string()]) -> boolean().
+-spec needs_compile(Source::string(), Target::string(),
+                    Hrls::[string()]) -> boolean().
 needs_compile(Source, Target, Hrls) ->
     TargetLastMod = filelib:last_modified(Target),
     lists:any(fun(I) -> TargetLastMod < filelib:last_modified(I) end,
               [Source] ++ Hrls).
 
 -spec internal_erl_compile(Source::string(), Config::#config{},
-                           Outdir::string(), ErlOpts::list()) -> 'ok' | 'skipped'.
+                           Outdir::string(),
+                           ErlOpts::list()) -> 'ok' | 'skipped'.
 internal_erl_compile(Source, Config, Outdir, ErlOpts) ->
     %% Determine the target name and includes list by inspecting the source file
     {Module, Hrls} = inspect(Source, include_path(Source, Config)),
@@ -219,15 +240,18 @@ internal_erl_compile(Source, Config, Outdir, ErlOpts) ->
     %% the target,
     case needs_compile(Source, Target, Hrls) of
         true ->
-            Opts = [{i, "include"}, {outdir, filename:dirname(Target)}, report, return] ++
-                ErlOpts,
+            Opts = [{outdir, filename:dirname(Target)}] ++
+                ErlOpts ++ [{i, "include"}, report, return],
             case compile:file(Source, Opts) of
                 {ok, _, []} ->
                     ok;
                 {ok, _, _Warnings} ->
-                    %% We got at least one warning -- if fail_on_warning is in options, fail
+                    %% We got at least one warning -- if fail_on_warning
+                    %% is in options, fail
                     case lists:member(fail_on_warning, Opts) of
                         true ->
+                            %% remove target to prevent overlooking this failure
+                            ok = file:delete(Target),
                             ?FAIL;
                         false ->
                             ok
@@ -239,7 +263,8 @@ internal_erl_compile(Source, Config, Outdir, ErlOpts) ->
             skipped
     end.
 
--spec compile_mib(Source::string(), Target::string(), Config::#config{}) -> 'ok'.
+-spec compile_mib(Source::string(), Target::string(),
+                  Config::#config{}) -> 'ok'.
 compile_mib(Source, Target, Config) ->
     ok = rebar_utils:ensure_dir(Target),
     Opts = [{outdir, "priv/mibs"}, {i, ["priv/mibs"]}] ++
@@ -251,13 +276,15 @@ compile_mib(Source, Target, Config) ->
             ?FAIL
     end.
 
--spec compile_xrl(Source::string(), Target::string(), Config::#config{}) -> 'ok'.
+-spec compile_xrl(Source::string(), Target::string(),
+                  Config::#config{}) -> 'ok'.
 compile_xrl(Source, Target, Config) ->
     Opts = [{scannerfile, Target}, {return, true}
             |rebar_config:get(Config, xrl_opts, [])],
     compile_xrl_yrl(Source, Target, Opts, leex).
 
--spec compile_yrl(Source::string(), Target::string(), Config::#config{}) -> 'ok'.
+-spec compile_yrl(Source::string(), Target::string(),
+                  Config::#config{}) -> 'ok'.
 compile_yrl(Source, Target, Config) ->
     Opts = [{parserfile, Target}, {return, true}
             |rebar_config:get(Config, yrl_opts, [])],
@@ -300,7 +327,8 @@ src_dirs(SrcDirs) ->
 dirs(Dir) ->
     [F || F <- filelib:wildcard(filename:join([Dir, "*"])), filelib:is_dir(F)].
 
--spec delete_dir(Dir::string(), Subdirs::[string()]) -> 'ok' | {'error', atom()}.
+-spec delete_dir(Dir::string(),
+                 Subdirs::[string()]) -> 'ok' | {'error', atom()}.
 delete_dir(Dir, []) ->
     file:del_dir(Dir);
 delete_dir(Dir, Subdirs) ->
@@ -315,23 +343,24 @@ compile_priority(File) ->
             normal; % couldn't parse the file, default priority
         {ok, Trees} ->
             F2 = fun({tree,arity_qualifier,_,
-                        {arity_qualifier,{tree,atom,_,behaviour_info},
-                            {tree,integer,_,1}}}, _) ->
-                    behaviour;
-                ({tree,arity_qualifier,_,
-                        {arity_qualifier,{tree,atom,_,parse_transform},
-                            {tree,integer,_,2}}}, _) ->
-                    parse_transform;
-                (_, Acc) ->
-                    Acc
-            end,
+                      {arity_qualifier,{tree,atom,_,behaviour_info},
+                       {tree,integer,_,1}}}, _) ->
+                         behaviour;
+                    ({tree,arity_qualifier,_,
+                      {arity_qualifier,{tree,atom,_,parse_transform},
+                       {tree,integer,_,2}}}, _) ->
+                         parse_transform;
+                    (_, Acc) ->
+                         Acc
+                 end,
 
-            F = fun({tree, attribute, _, {attribute, {tree, atom, _, export},
-                            [{tree, list, _, {list, List, none}}]}}, Acc) ->
-                    lists:foldl(F2, Acc, List);
-                (_, Acc) ->
-                    Acc
-            end,
+            F = fun({tree, attribute, _,
+                     {attribute, {tree, atom, _, export},
+                      [{tree, list, _, {list, List, none}}]}}, Acc) ->
+                        lists:foldl(F2, Acc, List);
+                   (_, Acc) ->
+                        Acc
+                end,
 
             lists:foldl(F, normal, Trees)
     end.

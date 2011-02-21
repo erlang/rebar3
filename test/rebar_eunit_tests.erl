@@ -1,4 +1,4 @@
-%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 %% -------------------------------------------------------------------
 %%
@@ -119,7 +119,7 @@ environment_test_() ->
        ?_assert(filelib:is_dir(?TMP_DIR))},
 
       {"Ensure the rebar script can be found, copied, and run",
-       [?_assert(filelib:is_file(?REBAR_SCRIPT)),
+       [?_assert(filelib:is_regular(?REBAR_SCRIPT)),
         fun assert_rebar_runs/0]}]}.
 
 assert_rebar_runs() ->
@@ -236,12 +236,12 @@ assert_dirs_in(Name, [Dir|T]) ->
 assert_dirs_in(_, []) -> [].
 
 assert_files_in(Name, [File|T]) ->
-    [{Name ++ " has file: " ++ File, ?_assert(filelib:is_file(File))} |
+    [{Name ++ " has file: " ++ File, ?_assert(filelib:is_regular(File))} |
      assert_files_in(Name, T)];   
 assert_files_in(_, []) -> [].
 
 assert_files_not_in(Name, [File|T]) ->
-    [{Name ++ " does not have file: " ++ File, ?_assertNot(filelib:is_file(File))} |
+    [{Name ++ " does not have file: " ++ File, ?_assertNot(filelib:is_regular(File))} |
      assert_files_not_in(Name, T)];   
 assert_files_not_in(_, []) -> [].
 
@@ -252,5 +252,5 @@ assert_full_coverage(Mod) ->
                            string:str(X, Mod) =/= 0,
                            string:str(X, "100%") =/= 0],
             file:close(F),
-            ?assert(length(Result) == 1)
+            ?assert(length(Result) =:= 1)
     end.

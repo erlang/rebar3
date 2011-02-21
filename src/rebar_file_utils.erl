@@ -1,4 +1,4 @@
-%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 %% -------------------------------------------------------------------
 %%
@@ -28,6 +28,7 @@
 
 -export([rm_rf/1,
          cp_r/2,
+         mv/2,
          delete_each/1]).
 
 -include("rebar.hrl").
@@ -42,23 +43,53 @@
 -spec rm_rf(Target::string()) -> ok.
 rm_rf(Target) ->
     case os:type() of
-        {unix,_} ->
-            [] = os:cmd(?FMT("rm -rf ~s", [Target])),
+        {unix, _} ->
+            {ok, []} = rebar_utils:sh(?FMT("rm -rf ~s", [Target]),
+                                      [{use_stdout, false}, return_on_error]),
             ok;
-        {win32,_} ->
-            ok = rm_rf_win32(Target)
+        {win32, _} ->
+            Filelist = filelib:wildcard(Target),
+            Dirs = [F || F <- Filelist, filelib:is_dir(F)],
+            Files = Filelist -- Dirs,
+            ok = delete_each(Files),
+            ok = delete_each_dir_win32(Dirs),
+            ok
     end.
 
 -spec cp_r(Sources::list(string()), Dest::string()) -> ok.
 cp_r(Sources, Dest) ->
     case os:type() of
-        {unix,_} ->
+        {unix, _} ->
             SourceStr = string:join(Sources, " "),
-            [] = os:cmd(?FMT("cp -R ~s ~s", [SourceStr, Dest])),
+            {ok, []} = rebar_utils:sh(?FMT("cp -R ~s ~s", [SourceStr, Dest]),
+                                      [{use_stdout, false}, return_on_error]),
             ok;
-        {win32,_} ->
+        {win32, _} ->
             lists:foreach(fun(Src) -> ok = cp_r_win32(Src,Dest) end, Sources),
             ok
+    end.
+
+-spec mv(Source::string(), Dest::string()) -> ok.
+mv(Source, Dest) ->
+    case os:type() of
+        {unix, _} ->
+            {ok, []} = rebar_utils:sh(?FMT("mv ~s ~s", [Source, Dest]),
+                                      [{use_stdout, false}, return_on_error]),
+            ok;
+        {win32, _} ->
+            {ok, R} = rebar_utils:sh(
+                        ?FMT("cmd " "/c move /y ~s ~s 1> nul",
+                             [filename:nativename(Source),
+                              filename:nativename(Dest)]),
+                        [{use_stdout, false}, return_on_error]),
+            case R of
+                [] ->
+                    ok;
+                _ ->
+                    {error, lists:flatten(
+                              io_lib:format("Failed to move ~s to ~s~n",
+                                            [Source, Dest]))}
+            end
     end.
 
 delete_each([]) ->
@@ -78,51 +109,46 @@ delete_each([File | Rest]) ->
 %% Internal functions
 %% ===================================================================
 
-rm_rf_win32(Target) ->
-    Filelist = filelib:wildcard(Target),
-    Dirs = lists:filter(fun filelib:is_dir/1,Filelist),
-    Files = lists:subtract(Filelist,Dirs),
-    ok = delete_each(Files),
-    ok = delete_each_dir_win32(Dirs),
-    ok.
-
 delete_each_dir_win32([]) -> ok;
 delete_each_dir_win32([Dir | Rest]) ->
-    [] = os:cmd(?FMT("rd /q /s ~s", [filename:nativename(Dir)])),
+    {ok, []} = rebar_utils:sh(?FMT("cmd /c rd /q /s ~s",
+                                   [filename:nativename(Dir)]),
+                              [{use_stdout, false}, return_on_error]),
     delete_each_dir_win32(Rest).
 
 xcopy_win32(Source,Dest)->
-    R = os:cmd(?FMT("xcopy ~s ~s /q /y /e 2> nul",
-                    [filename:nativename(Source), filename:nativename(Dest)])),
-    case string:str(R,"\r\n") > 0 of
+    {ok, R} = rebar_utils:sh(
+                ?FMT("cmd /c xcopy ~s ~s /q /y /e 2> nul",
+                     [filename:nativename(Source), filename:nativename(Dest)]),
+                [{use_stdout, false}, return_on_error]),
+    case length(R) > 0 of
         %% when xcopy fails, stdout is empty and and error message is printed
         %% to stderr (which is redirected to nul)
         true -> ok;
         false ->
             {error, lists:flatten(
-                      io_lib:format("Failed to xcopy from ~s to ~s\n",
-                                     [Source, Dest]))}
+                      io_lib:format("Failed to xcopy from ~s to ~s~n",
+                                    [Source, Dest]))}
     end.
 
-cp_r_win32({true,SourceDir},{true,DestDir}) ->
-    % from directory to directory
+cp_r_win32({true, SourceDir}, {true, DestDir}) ->
+    %% from directory to directory
     SourceBase = filename:basename(SourceDir),
-    ok = case file:make_dir(filename:join(DestDir,SourceBase)) of
-             {error,eexist} -> ok;
+    ok = case file:make_dir(filename:join(DestDir, SourceBase)) of
+             {error, eexist} -> ok;
              Other -> Other
          end,
-    ok = xcopy_win32(SourceDir,filename:join(DestDir,SourceBase));
-cp_r_win32({false,Source},{true,DestDir}) ->
-    % from file to directory
-    cp_r_win32({false,Source},
-               {false,filename:join(DestDir,filename:basename(Source))});
-cp_r_win32({false,Source},{false,Dest}) ->
-    % from file to file
-    {ok,_} = file:copy(Source,Dest),
+    ok = xcopy_win32(SourceDir, filename:join(DestDir, SourceBase));
+cp_r_win32({false, Source} = S,{true, DestDir}) ->
+    %% from file to directory
+    cp_r_win32(S, {false, filename:join(DestDir, filename:basename(Source))});
+cp_r_win32({false, Source},{false, Dest}) ->
+    %% from file to file
+    {ok,_} = file:copy(Source, Dest),
     ok;
 cp_r_win32(Source,Dest) ->
-    Dst = {filelib:is_dir(Dest),Dest},
+    Dst = {filelib:is_dir(Dest), Dest},
     lists:foreach(fun(Src) ->
-                          ok = cp_r_win32({filelib:is_dir(Src),Src},Dst)
+                          ok = cp_r_win32({filelib:is_dir(Src), Src}, Dst)
                   end, filelib:wildcard(Source)),
     ok.

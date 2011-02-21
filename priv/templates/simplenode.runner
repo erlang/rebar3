@@ -7,6 +7,7 @@ RUNNER_SCRIPT_DIR=$(cd ${0%/*} && pwd)
 RUNNER_BASE_DIR=${RUNNER_SCRIPT_DIR%/*}
 RUNNER_ETC_DIR=$RUNNER_BASE_DIR/etc
 RUNNER_LOG_DIR=$RUNNER_BASE_DIR/log
+# Note the trailing slash on $PIPE_DIR/
 PIPE_DIR=/tmp/$RUNNER_BASE_DIR/
 RUNNER_USER=
 
@@ -58,10 +59,10 @@ case "$1" in
             echo "Node is already running!"
             exit 1
         fi
-        export HEART_COMMAND="$RUNNER_BASE_DIR/bin/$SCRIPT start"
+        HEART_COMMAND="$RUNNER_BASE_DIR/bin/$SCRIPT start"
+        export HEART_COMMAND
         mkdir -p $PIPE_DIR
-        # Note the trailing slash on $PIPE_DIR/
-        $ERTS_PATH/run_erl -daemon $PIPE_DIR/ $RUNNER_LOG_DIR "exec $RUNNER_BASE_DIR/bin/$SCRIPT console" 2>&1
+        $ERTS_PATH/run_erl -daemon $PIPE_DIR $RUNNER_LOG_DIR "exec $RUNNER_BASE_DIR/bin/$SCRIPT console" 2>&1
         ;;
 
     stop)
@@ -70,16 +71,16 @@ case "$1" in
             Linux|Darwin|FreeBSD|DragonFly|NetBSD|OpenBSD)
                 # PID COMMAND
                 PID=`ps ax -o pid= -o command=|\
-                    grep "$RUNNER_BASE_DIR/.*/[b]eam"|cut -d' ' -f1`
+                    grep "$RUNNER_BASE_DIR/.*/[b]eam"|awk '{print $1}'`
                 ;;
             SunOS)
                 # PID COMMAND
                 PID=`ps -ef -o pid= -o args=|\
-                    grep "$RUNNER_BASE_DIR/.*/[b]eam"|cut -d' ' -f1`
+                    grep "$RUNNER_BASE_DIR/.*/[b]eam"|awk '{print $1}'`
                 ;;
             CYGWIN*)
                 # UID PID PPID TTY STIME COMMAND
-                PID=`ps -efW|grep "$RUNNER_BASE_DIR/.*/[b]eam"|cut -d' ' -f2`
+                PID=`ps -efW|grep "$RUNNER_BASE_DIR/.*/[b]eam"|awk '{print $2}'`
                 ;;
         esac
         $NODETOOL stop
@@ -116,13 +117,19 @@ case "$1" in
         $ERTS_PATH/to_erl $PIPE_DIR
         ;;
 
-    console)
+    console|console_clean)
+        # .boot file typically just $SCRIPT (ie, the app name)
+        # however, for debugging, sometimes start_clean.boot is useful:
+        case "$1" in
+            console)        BOOTFILE=$SCRIPT ;;
+            console_clean)  BOOTFILE=start_clean ;;
+        esac
         # Setup beam-required vars
         ROOTDIR=$RUNNER_BASE_DIR
         BINDIR=$ROOTDIR/erts-$ERTS_VSN/bin
         EMU=beam
         PROGNAME=`echo $0 | sed 's/.*\\///'`
-        CMD="$BINDIR/erlexec -boot $RUNNER_BASE_DIR/releases/$APP_VSN/$SCRIPT -embedded -config $RUNNER_ETC_DIR/app.config -args_file $RUNNER_ETC_DIR/vm.args -- ${1+"$@"}"
+        CMD="$BINDIR/erlexec -boot $RUNNER_BASE_DIR/releases/$APP_VSN/$BOOTFILE -embedded -config $RUNNER_ETC_DIR/app.config -args_file $RUNNER_ETC_DIR/vm.args -- ${1+"$@"}"
         export EMU
         export ROOTDIR
         export BINDIR

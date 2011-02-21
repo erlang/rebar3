@@ -1,4 +1,4 @@
-%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 %% -------------------------------------------------------------------
 %%
@@ -27,10 +27,12 @@
 %% @author Dave Smith <dizzyd@dizzyd.com>
 %% @doc rebar_edoc supports the following command:
 %% <ul>
-%%   <li>doc (essentially erl -noshell -run edoc_run application "'$(&lt;app_name&gt;)'"
+%%   <li>doc (essentially erl -noshell -run edoc_run application
+%% "'$(&lt;app_name&gt;)'"
 %% '"."' '[&lt;options&gt;]')</li>
 %% </ul>
-%% EDoc options can be given in the <code>edoc_opts</code> option in <code>rebar.config</code>.
+%% EDoc options can be given in the <code>edoc_opts</code> option in
+%% <code>rebar.config</code>.
 %% @copyright 2010 Dave Smith
 %% -------------------------------------------------------------------
 -module(rebar_edoc).

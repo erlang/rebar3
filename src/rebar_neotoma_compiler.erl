@@ -1,4 +1,4 @@
-%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 %% -------------------------------------------------------------------
 %%
@@ -27,7 +27,7 @@
 
 %% The rebar_neotoma module is a plugin for rebar that compiles
 %% neotoma peg files.  By default, it compiles all src/*.peg to src/*.erl
-%% 
+%%
 %% Configuration options should be placed in rebar.config under
 %% neotoma_opts.  Available options include:
 %%
@@ -52,9 +52,10 @@ compile(Config, _AppFile) ->
   NeoOpts = neotoma_opts(Config),
   rebar_base_compiler:run(Config, [],
                           option(doc_root, NeoOpts), ".peg",
-                          option(out_dir, NeoOpts), option(module_ext, NeoOpts) ++ ".beam",
+                          option(out_dir, NeoOpts),
+                          option(module_ext, NeoOpts) ++ ".beam",
                           fun compile_neo/3, [{check_last_mod,false}]).
-                            
+
 %% ============================================================================
 %% Public API
 %% ============================================================================
@@ -71,47 +72,48 @@ default(module_ext) -> "";
 default(source_ext) -> ".peg".
 
 compile_neo(Source, Target, Config) ->
-  case code:which(neotoma) of
-    non_existing ->
-      ?CONSOLE(
-         "~n===============================================~n"
-         " You need to install neotoma to compile PEG grammars~n"
-         " Download the latest tarball release from github~n"
-         "    http://github.com/seancribbs/neotoma~n"
-         " and install it into your erlang library dir~n"
-         "===============================================~n~n", []),
-      ?FAIL;
-    _ ->
-        case needs_compile(Source, Target, Config) of
-            true ->
-                do_compile(Source, Target, Config);
-            false ->
-                skipped
-        end
-  end.
-  
+    case code:which(neotoma) of
+        non_existing ->
+            ?CONSOLE(
+               <<"~n===============================================~n"
+                 " You need to install neotoma to compile PEG grammars~n"
+                 " Download the latest tarball release from github~n"
+                 "    https://github.com/seancribbs/neotoma~n"
+                 " and install it into your erlang library dir~n"
+                 "===============================================~n~n">>, []),
+            ?FAIL;
+        _ ->
+            case needs_compile(Source, Target, Config) of
+                true ->
+                    do_compile(Source, Target, Config);
+                false ->
+                    skipped
+            end
+    end.
+
 do_compile(Source, _Target, Config) ->
     %% TODO: Check last mod on target and referenced DTLs here..
     NeoOpts = neotoma_opts(Config),
     %% ensure that doc_root and out_dir are defined,
     %% using defaults if necessary
     Opts = [{output, option(out_dir, NeoOpts)},
-            {module, list_to_atom(filename:basename(Source, ".peg") ++ option(module_ext, NeoOpts))}],
+            {module, list_to_atom(filename:basename(Source, ".peg")
+                                  ++ option(module_ext, NeoOpts))}],
     case neotoma:file(Source, Opts ++ NeoOpts) of
-        ok -> 
+        ok ->
           ok;
         Reason ->
             ?CONSOLE("Compiling peg ~s failed:~n  ~p~n",
                      [Source, Reason]),
             ?FAIL
     end.
-  
+
 needs_compile(Source, Target, Config) ->
     LM = filelib:last_modified(Target),
     LM < filelib:last_modified(Source) orelse
         lists:any(fun(D) -> LM < filelib:last_modified(D) end,
                   referenced_pegs(Source, Config)).
-    
+
 referenced_pegs(Source, Config) ->
     Set = referenced_pegs1([Source], Config,
                           sets:add_element(Source, sets:new())),
@@ -121,14 +123,23 @@ referenced_pegs1(Step, Config, Seen) ->
     NeoOpts = neotoma_opts(Config),
     ExtMatch = re:replace(option(source_ext, NeoOpts), "\.", "\\\\\\\\.",
                           [{return, list}]),
-    AllRefs = lists:append(
-                [string:tokens(
-                   os:cmd(["grep -o [^\\\"]*",ExtMatch," ",F]),
-                   "\n")
-                 || F <- Step]),
+
+    ShOpts = [{use_stdout, false}, return_on_error],
+    AllRefs =
+        lists:append(
+          [begin
+               Cmd = lists:flatten(["grep -o [^\\\"]*",
+                                    ExtMatch, " ", F]),
+               case rebar_utils:sh(Cmd, ShOpts) of
+                   {ok, Res} ->
+                       string:tokens(Res, "\n");
+                   {error, _} ->
+                       ""
+               end
+           end || F <- Step]),
     DocRoot = option(doc_root, NeoOpts),
     WithPaths = [ filename:join([DocRoot, F]) || F <- AllRefs ],
-    Existing = [F || F <- WithPaths, filelib:is_file(F)],
+    Existing = [F || F <- WithPaths, filelib:is_regular(F)],
     New = sets:subtract(sets:from_list(Existing), Seen),
     case sets:size(New) of
         0 -> Seen;

@@ -2,6 +2,8 @@
  [{description, "Rebar: Erlang Build Tool"},
   {vsn, "2"},
   {modules, [ rebar,
+              rebar_abnfc_compiler,
+              rebar_appups,
               rebar_app_utils,
               rebar_base_compiler,
               rebar_config,
@@ -31,6 +33,7 @@
               rebar_require_vsn,
               rebar_subdirs,
               rebar_templater,
+              rebar_upgrade,
               rebar_utils,
               rebar_xref,
               getopt,
@@ -59,6 +62,7 @@
          {modules, [
                     {app_dir, [
                                rebar_pre_script,
+                               rebar_abnfc_compiler,
                                rebar_protobuffs_compiler,
                                rebar_neotoma_compiler,
                                rebar_asn1_compiler,
@@ -77,7 +81,9 @@
                               ]},
 
                     {rel_dir, [
-                               rebar_reltool
+                               rebar_appups,
+                               rebar_reltool,
+                               rebar_upgrade
                               ]}
                    ]}
         ]}

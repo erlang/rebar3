@@ -1,4 +1,4 @@
-%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 %% -------------------------------------------------------------------
 %%
@@ -51,5 +51,6 @@ execute_post_script(Config, Key) ->
         undefined ->
             ok;
         Script ->
-            rebar_utils:sh(Script, [])
+            {ok, _} = rebar_utils:sh(Script, []),
+            ok
     end.

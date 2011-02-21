@@ -23,7 +23,7 @@ files() ->
      {copy, "c.hrl", "repo/c/include/c.hrl"}
     ].
 
-run(Dir) ->
+run(_Dir) ->
     %% Initialize the b/c apps as mercurial repos so that dependencies pull
     %% properly
     HgCmd = "/bin/sh -c \"hg init && hg add && hg commit -m 'Initial commit'\"",
@@ -33,7 +33,7 @@ run(Dir) ->
 
     {ok, _} = retest_sh:run("./rebar get-deps compile", []),
 
-    true = filelib:is_file("ebin/a.beam"),
+    true = filelib:is_regular("ebin/a.beam"),
     ok.
 
 

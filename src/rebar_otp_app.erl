@@ -1,4 +1,4 @@
-%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 %% -------------------------------------------------------------------
 %%
@@ -40,11 +40,11 @@ compile(Config, File) ->
     %% written out as a ebin/*.app file. That resulting file will then
     %% be validated as usual.
     AppFile = case rebar_app_utils:is_app_src(File) of
-        true ->
-            preprocess(File);
-        false ->
-            File
-    end,
+                  true ->
+                      preprocess(Config, File);
+                  false ->
+                      File
+              end,
 
     %% Load the app file and validate it.
     case rebar_app_utils:load_app_file(AppFile) of
@@ -52,11 +52,12 @@ compile(Config, File) ->
             validate_name(AppName, AppFile),
 
             %% In general, the list of modules is an important thing to validate
-            %% for compliance with OTP guidelines and upgrade procedures. However,
-            %% some people prefer not to validate this list.
+            %% for compliance with OTP guidelines and upgrade procedures.
+            %% However, some people prefer not to validate this list.
             case rebar_config:get_local(Config, validate_app_modules, true) of
                 true ->
-                    validate_modules(AppName, proplists:get_value(modules, AppData));
+                    validate_modules(AppName,
+                                     proplists:get_value(modules, AppData));
                 false ->
                     ok
             end;
@@ -86,48 +87,75 @@ clean(_Config, File) ->
 %% Internal functions
 %% ===================================================================
 
-preprocess(AppSrcFile) ->
+preprocess(Config, AppSrcFile) ->
     case rebar_app_utils:load_app_file(AppSrcFile) of
         {ok, AppName, AppData} ->
-            %% Get a list of all the modules available in ebin/ and update
-            %% the app data accordingly
-            A1 = lists:keystore(modules, 1, AppData, {modules, ebin_modules()}),
+            %% Look for a configuration file with vars we want to
+            %% substitute. Note that we include the list of modules available in
+            %% ebin/ and update the app data accordingly.
+            AppVars = load_app_vars(Config) ++ [{modules, ebin_modules()}],
+            A1 = apply_app_vars(AppVars, AppData),
+
+
+            %% AppSrcFile may contain instructions for generating a vsn number
+            Vsn = rebar_app_utils:app_vsn(AppSrcFile),
+            A2 = lists:keystore(vsn, 1, A1, {vsn, Vsn}),
 
             %% Build the final spec as a string
-            Spec = io_lib:format("~p.\n", [{application, AppName, A1}]),
+            Spec = io_lib:format("~p.\n", [{application, AppName, A2}]),
 
             %% Setup file .app filename and write new contents
             AppFile = rebar_app_utils:app_src_to_app(AppSrcFile),
             ok = file:write_file(AppFile, Spec),
 
-            %% Make certain that the ebin/ directory is available on the code path
+            %% Make certain that the ebin/ directory is available
+            %% on the code path
             true = code:add_path(filename:absname(filename:dirname(AppFile))),
 
             AppFile;
 
         {error, Reason} ->
-            ?ABORT("Failed to read ~s for preprocessing: ~p\n", [AppSrcFile, Reason])
+            ?ABORT("Failed to read ~s for preprocessing: ~p\n",
+                   [AppSrcFile, Reason])
     end.
 
+load_app_vars(Config) ->
+    case rebar_config:get_local(Config, app_vars_file, undefined) of
+        undefined ->
+            ?INFO("No app_vars_file defined.\n", []),
+            [];
+        Filename ->
+            ?INFO("Loading app vars from ~p\n", [Filename]),
+            {ok, Vars} = file:consult(Filename),
+            Vars
+    end.
+
+apply_app_vars([], AppData) ->
+    AppData;
+apply_app_vars([{Key, Value} | Rest], AppData) ->
+    AppData2 = lists:keystore(Key, 1, AppData, {Key, Value}),
+    apply_app_vars(Rest, AppData2).
 
 validate_name(AppName, File) ->
-    %% Convert the .app file name to an atom -- check it against the identifier within the file
+    %% Convert the .app file name to an atom -- check it against the
+    %% identifier within the file
     ExpApp = list_to_atom(filename:basename(File, ".app")),
     case ExpApp == AppName of
         true ->
             ok;
         false ->
-            ?ERROR("Invalid ~s: name of application (~p) must match filename.\n",
-                   [File, AppName]),
+            ?ERROR("Invalid ~s: name of application (~p) "
+                   "must match filename.\n", [File, AppName]),
             ?FAIL
     end.
 
 validate_modules(AppName, undefined) ->
-            ?ERROR("Missing modules declaration in~p.app:\n", [AppName]),
-            ?FAIL;
+    ?ERROR("Missing modules declaration in~p.app:\n", [AppName]),
+    ?FAIL;
 
 validate_modules(AppName, Mods) ->
-    %% Construct two sets -- one for the actual .beam files in ebin/ and one for the modules
+    %% Construct two sets -- one for the actual .beam files in ebin/
+    %% and one for the modules
     %% listed in the .app file
     EbinSet = ordsets:from_list(ebin_modules()),
     ModSet = ordsets:from_list(Mods),
@@ -137,9 +165,10 @@ validate_modules(AppName, Mods) ->
         [] ->
             ok;
         MissingBeams ->
-            Msg1 = lists:flatten([io_lib:format("\t* ~p\n", [M]) || M <- MissingBeams]),
-            ?ERROR("One or more modules listed in ~p.app are not present in ebin/*.beam:\n~s",
-                   [AppName, Msg1]),
+            Msg1 = lists:flatten([io_lib:format("\t* ~p\n", [M]) ||
+                                     M <- MissingBeams]),
+            ?ERROR("One or more modules listed in ~p.app are not "
+                   "present in ebin/*.beam:\n~s", [AppName, Msg1]),
             ?FAIL
     end,
 
@@ -148,11 +177,13 @@ validate_modules(AppName, Mods) ->
         [] ->
             ok;
         MissingMods ->
-            Msg2 = lists:flatten([io_lib:format("\t* ~p\n", [M]) || M <- MissingMods]),
-            ?ERROR("One or more .beam files exist that are not listed in ~p.app:\n~s",
-                   [AppName, Msg2]),
+            Msg2 = lists:flatten([io_lib:format("\t* ~p\n", [M]) ||
+                                     M <- MissingMods]),
+            ?ERROR("One or more .beam files exist that are not "
+                   "listed in ~p.app:\n~s", [AppName, Msg2]),
             ?FAIL
     end.
 
 ebin_modules() ->
-    lists:sort([rebar_utils:beam_to_mod("ebin", N) || N <- rebar_utils:beams("ebin")]).
+    lists:sort([rebar_utils:beam_to_mod("ebin", N) ||
+                   N <- rebar_utils:beams("ebin")]).

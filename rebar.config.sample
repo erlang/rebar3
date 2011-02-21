@@ -1,4 +1,4 @@
-%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% -*- mode: erlang;erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 ft=erlang et
 %% This is a sample rebar.conf file that shows examples of some of rebar's
 %% options.
@@ -31,7 +31,8 @@
 {erl_opts, [{i, "myinclude"}, {src_dirs, ["src1", "src2"]},
             {platform_define,
             "(linux|solaris|freebsd|darwin)", 'HAVE_SENDFILE'},
-            {platform_define, "(linux|freebsd)", 'BACKLOG', 128}]}.
+            {platform_define, "(linux|freebsd)", 'BACKLOG', 128},
+            {platform_define, "R13", 'old_inets'}]}.
 
 %% MIB Options?
 {mib_opts, []}.
@@ -84,6 +85,9 @@
 
 %% Additional compile options for eunit. erl_opts from above is also used
 {eunit_compile_opts, []}.
+
+%% Same as erl_first_files, but used only when running 'eunit'
+{eunit_first_files, []}.
 
 %% Whether to enable coverage reporting. Default is `false'
 {cover_enabled, false}.

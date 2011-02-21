@@ -1,4 +1,4 @@
-%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 %% -------------------------------------------------------------------
 %%
@@ -80,7 +80,7 @@ app_name(AppFile) ->
 app_applications(AppFile) ->
     case load_app_file(AppFile) of
         {ok, _, AppInfo} ->
-            proplists:get_value(applications, AppInfo);
+            get_value(applications, AppInfo, AppFile);
         {error, Reason} ->
             ?ABORT("Failed to extract applications from ~s: ~p\n",
                    [AppFile, Reason])
@@ -89,7 +89,7 @@ app_applications(AppFile) ->
 app_vsn(AppFile) ->
     case load_app_file(AppFile) of
         {ok, _, AppInfo} ->
-            proplists:get_value(vsn, AppInfo);
+            vcs_vsn(get_value(vsn, AppInfo, AppFile));
         {error, Reason} ->
             ?ABORT("Failed to extract vsn from ~s: ~p\n",
                    [AppFile, Reason])
@@ -116,3 +116,26 @@ load_app_file(Filename) ->
         {AppName, AppData} ->
             {ok, AppName, AppData}
     end.
+
+get_value(Key, AppInfo, AppFile) ->
+    case proplists:get_value(Key, AppInfo) of
+        undefined ->
+            ?ABORT("Failed to get app value '~p' from '~s'~n", [Key, AppFile]);
+        Value ->
+            Value
+    end.
+
+vcs_vsn(Vcs) ->
+    case vcs_vsn_cmd(Vcs) of
+        {unknown, VsnString} ->
+            VsnString;
+        Cmd ->
+            {ok, VsnString} = rebar_utils:sh(Cmd, [{use_stdout, false}]),
+            string:strip(VsnString, right, $\n)
+    end.
+
+vcs_vsn_cmd(git) -> "git describe --always --tags";
+vcs_vsn_cmd(hg)  -> "hg identify -i";
+vcs_vsn_cmd(bzr) -> "bzr revno";
+vcs_vsn_cmd(svn) -> "svnversion";
+vcs_vsn_cmd(Version) -> {unknown, Version}.

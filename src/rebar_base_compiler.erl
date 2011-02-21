@@ -1,4 +1,4 @@
-%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 %% -------------------------------------------------------------------
 %%
@@ -52,7 +52,8 @@ run(Config, FirstFiles, RestFiles, CompileFn) ->
             compile_queue(Pids, RestFiles)
     end.
 
-run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt, Compile3Fn) ->
+run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
+    Compile3Fn) ->
     run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
         Compile3Fn, [check_last_mod]).
 
@@ -73,7 +74,8 @@ run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
 
     run(Config, FirstFiles, RestFiles,
         fun(S, C) ->
-                Target = target_file(S, SourceDir, SourceExt, TargetDir, TargetExt),
+                Target = target_file(S, SourceDir, SourceExt,
+                                     TargetDir, TargetExt),
                 simple_compile_wrapper(S, Target, Compile3Fn, C, CheckLastMod)
         end).
 

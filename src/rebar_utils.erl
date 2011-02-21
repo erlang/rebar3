@@ -1,4 +1,4 @@
-%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 %% -------------------------------------------------------------------
 %%
@@ -29,9 +29,7 @@
 -export([get_cwd/0,
          is_arch/1,
          get_arch/0,
-         get_os/0,
-         sh/2, sh/3,
-         sh_failfast/2,
+         sh/2,
          find_files/2,
          now_str/0,
          ensure_dir/1,
@@ -39,7 +37,8 @@
          erl_to_mod/1,
          abort/2,
          escript_foldl/3,
-         find_executable/1]).
+         find_executable/1,
+         prop_check/3]).
 
 -include("rebar.hrl").
 
@@ -62,47 +61,52 @@ is_arch(ArchRegex) ->
 
 get_arch() ->
     Words = integer_to_list(8 * erlang:system_info(wordsize)),
-    erlang:system_info(system_architecture) ++ "-" ++ Words.
+    erlang:system_info(otp_release) ++ "-"
+        ++ erlang:system_info(system_architecture) ++ "-" ++ Words.
 
-get_os() ->
-    Arch = erlang:system_info(system_architecture),
-    case match_first([{"linux", linux}, {"darwin", darwin}], Arch) of
-        nomatch ->
-            {unknown, Arch};
-        ArchAtom ->
-            ArchAtom
-    end.
+%%
+%% Options = [Option] -- defaults to [use_stdout, abort_on_error]
+%% Option = ErrorOption | OutputOption | {cd, string()} | {env, Env}
+%% ErrorOption = return_on_error | abort_on_error | {abort_on_error, string()}
+%% OutputOption = use_stdout | {use_stdout, bool()}
+%% Env = [{string(), Val}]
+%% Val = string() | false
+%%
+sh(Command0, Options0) ->
+    ?INFO("sh: ~s\n~p\n", [Command0, Options0]),
 
+    DefaultOptions = [use_stdout, abort_on_error],
+    Options = [expand_sh_flag(V)
+               || V <- proplists:compact(Options0 ++ DefaultOptions)],
 
-sh(Command, Env) ->
-    sh(Command, Env, get_cwd()).
+    ErrorHandler = proplists:get_value(error_handler, Options),
+    OutputHandler = proplists:get_value(output_handler, Options),
 
-sh(Command0, Env, Dir) ->
-    ?INFO("sh: ~s\n~p\n", [Command0, Env]),
-    Command = patch_on_windows(Command0, os:type()),
-    Port = open_port({spawn, Command}, [{cd, Dir}, {env, Env}, exit_status, {line, 16384},
-                                        use_stdio, stderr_to_stdout]),
-    case sh_loop(Port) of
-        ok ->
-            ok;
+    Command = patch_on_windows(Command0),
+    PortSettings = proplists:get_all_values(port_settings, Options) ++
+        [exit_status, {line, 16384}, use_stdio, stderr_to_stdout, hide],
+    Port = open_port({spawn, Command}, PortSettings),
+
+    case sh_loop(Port, OutputHandler, []) of
+        {ok, _Output} = Ok ->
+            Ok;
         {error, Rc} ->
-            ?ABORT("~s failed with error: ~w\n", [Command, Rc])
+            ErrorHandler(Command, Rc)
     end.
-
 
 %% We need a bash shell to execute on windows
 %% also the port doesn't seem to close from time to time (mingw)
-patch_on_windows(Cmd, {win32,nt}) ->
-    case find_executable("bash") of
-        false -> Cmd;
-        Bash -> 
-            Bash ++ " -c \"" ++ Cmd ++ "; echo _port_cmd_status_ $?\" "
-    end;
-patch_on_windows(Command, _) ->
-    Command.
-
-sh_failfast(Command, Env) ->
-    sh(Command, Env).
+patch_on_windows(Cmd) ->
+    case os:type() of
+        {win32,nt} ->
+            case find_executable("bash") of
+                false -> Cmd;
+                Bash ->
+                    Bash ++ " -c \"" ++ Cmd ++ "; echo _port_cmd_status_ $?\" "
+            end;
+        _ ->
+            Cmd
+    end.
 
 find_files(Dir, Regex) ->
     filelib:fold_files(Dir, Regex, true, fun(F, Acc) -> [F | Acc] end, []).
@@ -110,7 +114,7 @@ find_files(Dir, Regex) ->
 now_str() ->
     {{Year, Month, Day}, {Hour, Minute, Second}} = calendar:local_time(),
     lists:flatten(io_lib:format("~4b/~2..0b/~2..0b ~2..0b:~2..0b:~2..0b",
-				[Year, Month, Day, Hour, Minute, Second])).
+                                [Year, Month, Day, Hour, Minute, Second])).
 
 %% TODO: filelib:ensure_dir/1 corrected in R13B04. Remove when we drop
 %% support for OTP releases older than R13B04.
@@ -148,33 +152,61 @@ find_executable(Name) ->
             "\"" ++ filename:nativename(Path) ++ "\""
     end.
 
+%% Helper function for checking values and aborting when needed
+prop_check(true, _, _) -> true;
+prop_check(false, Msg, Args) -> ?ABORT(Msg, Args).
+
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
 
-match_first([], _Val) ->
-    nomatch;
-match_first([{Regex, MatchValue} | Rest], Val) ->
-    case re:run(Val, Regex, [{capture, none}]) of
-        match ->
-            MatchValue;
-        nomatch ->
-           match_first(Rest, Val)
-    end.
+expand_sh_flag(return_on_error) ->
+    {error_handler,
+     fun(_Command, Rc) ->
+             {error, Rc}
+     end};
+expand_sh_flag({abort_on_error, Message}) ->
+    {error_handler,
+     fun(_Command, _Rc) ->
+             ?ABORT(Message, [])
+     end};
+expand_sh_flag(abort_on_error) ->
+    {error_handler,
+     fun log_and_abort/2};
+expand_sh_flag(use_stdout) ->
+    {output_handler,
+     fun(Line, Acc) ->
+             ?CONSOLE("~s", [Line]),
+             [Acc | Line]
+     end};
+expand_sh_flag({use_stdout, false}) ->
+    {output_handler,
+     fun(Line, Acc) ->
+             [Acc | Line]
+     end};
+expand_sh_flag({cd, _CdArg} = Cd) ->
+    {port_settings, Cd};
+expand_sh_flag({env, _EnvArg} = Env) ->
+    {port_settings, Env}.
 
-sh_loop(Port) ->
+-spec log_and_abort(string(), integer()) -> no_return().
+log_and_abort(Command, Rc) ->
+    ?ABORT("~s failed with error: ~w\n", [Command, Rc]).
+
+sh_loop(Port, Fun, Acc) ->
     receive
         {Port, {data, {_, "_port_cmd_status_ " ++ Status}}} ->
             (catch erlang:port_close(Port)), % sigh () for indentation
             case list_to_integer(Status) of
-                0  -> ok;
+                0  -> {ok, lists:flatten(Acc)};
                 Rc -> {error, Rc}
             end;
-        {Port, {data, {_, Line}}} ->
-            ?CONSOLE("~s\n", [Line]),
-            sh_loop(Port);
+        {Port, {data, {eol, Line}}} ->
+            sh_loop(Port, Fun, Fun(Line ++ "\n", Acc));
+        {Port, {data, {noeol, Line}}} ->
+            sh_loop(Port, Fun, Fun(Line, Acc));
         {Port, {exit_status, 0}} ->
-            ok;
+            {ok, lists:flatten(Acc)};
         {Port, {exit_status, Rc}} ->
             {error, Rc}
     end.

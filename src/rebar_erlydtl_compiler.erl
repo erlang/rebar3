@@ -1,4 +1,4 @@
-%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 %% -------------------------------------------------------------------
 %%
@@ -83,8 +83,10 @@
 compile(Config, _AppFile) ->
     DtlOpts = erlydtl_opts(Config),
     rebar_base_compiler:run(Config, [],
-                            option(doc_root, DtlOpts), option(source_ext, DtlOpts),
-                            option(out_dir, DtlOpts), option(module_ext, DtlOpts) ++ ".beam",
+                            option(doc_root, DtlOpts),
+                            option(source_ext, DtlOpts),
+                            option(out_dir, DtlOpts),
+                            option(module_ext, DtlOpts) ++ ".beam",
                             fun compile_dtl/3, [{check_last_mod, false}]).
 
 
@@ -102,18 +104,18 @@ default(doc_root) -> "templates";
 default(out_dir)  -> "ebin";
 default(source_ext) -> ".dtl";
 default(module_ext) -> "_dtl";
-default(custom_tags_dir) -> "". 
+default(custom_tags_dir) -> "".
 
 compile_dtl(Source, Target, Config) ->
     case code:which(erlydtl) of
         non_existing ->
             ?CONSOLE(
-               "~n===============================================~n"
-               " You need to install erlydtl to comple DTL templates~n"
-               " Download the latest tarball release from github~n"
-               "    http://code.google.com/p/erlydtl/~n"
-               " and install it into your erlang library dir~n"
-               "===============================================~n~n", []),
+               <<"~n===============================================~n"
+                 " You need to install erlydtl to compile DTL templates~n"
+                 " Download the latest tarball release from github~n"
+                 "    http://code.google.com/p/erlydtl/~n"
+                 " and install it into your erlang library dir~n"
+                 "===============================================~n~n">>, []),
             ?FAIL;
         _ ->
             case needs_compile(Source, Target, Config) of
@@ -162,18 +164,26 @@ referenced_dtls1(Step, Config, Seen) ->
     DtlOpts = erlydtl_opts(Config),
     ExtMatch = re:replace(option(source_ext, DtlOpts), "\.", "\\\\\\\\.",
                           [{return, list}]),
-    AllRefs = lists:append(
-                [string:tokens(
-                   os:cmd(["grep -o [^\\\"]*",ExtMatch," ",F]),
-                   "\n")
-                 || F <- Step]),
+
+    ShOpts = [{use_stdout, false}, return_on_error],
+    AllRefs =
+        lists:append(
+          [begin
+               Cmd = lists:flatten(["grep -o [^\\\"]*",
+                                    ExtMatch, " ", F]),
+               case rebar_utils:sh(Cmd, ShOpts) of
+                   {ok, Res} ->
+                       string:tokens(Res, "\n");
+                   {error, _} ->
+                       ""
+               end
+           end || F <- Step]),
     DocRoot = option(doc_root, DtlOpts),
     WithPaths = [ filename:join([DocRoot, F]) || F <- AllRefs ],
-    Existing = [F || F <- WithPaths, filelib:is_file(F)],
+    Existing = [F || F <- WithPaths, filelib:is_regular(F)],
     New = sets:subtract(sets:from_list(Existing), Seen),
     case sets:size(New) of
         0 -> Seen;
         _ -> referenced_dtls1(sets:to_list(New), Config,
                               sets:union(New, Seen))
     end.
-

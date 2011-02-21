@@ -1,4 +1,4 @@
-%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 %% -------------------------------------------------------------------
 %%
@@ -37,13 +37,20 @@
 
 %% Supported configuration variables:
 %%
-%% * port_sources - Erlang list of files and/or wildcard strings to be compiled
+%% * port_sources - Erlang list of files and/or wildcard strings to be
+%%                  compiled. Platform specific sources can be specified
+%%                  by enclosing a string in a tuple of the form
+%%                  {Regex, String} wherein Regex is a regular expression
+%%                  that is checked against the system architecture.
 %%
-%% * so_specs  - Erlang list of tuples of the form {"priv/so_name.so", ["c_src/object_file_name.o"]} useful for
-%%               building multiple *.so files.
+%% * so_specs  - Erlang list of tuples of the form
+%%               {"priv/so_name.so", ["c_src/object_file_name.o"]}
+%%               useful for building multiple *.so files.
 %%
-%% * port_envs - Erlang list of key/value pairs which will control the environment when
-%%               running the compiler and linker. By default, the following variables
+%% * port_envs - Erlang list of key/value pairs which will control
+%%               the environment when running the compiler and linker.
+%%
+%%               By default, the following variables
 %%               are defined:
 %%               CC       - C compiler
 %%               CXX      - C++ compiler
@@ -55,70 +62,92 @@
 %%               DRV_CFLAGS  - flags that will be used for compiling the driver
 %%               DRV_LDFLAGS - flags that will be used for linking the driver
 %%
-%%               Note that if you wish to extend (vs. replace) these variables, you MUST
-%%               include a shell-style reference in your definition. E.g. to extend CFLAGS,
-%%               do something like:
+%%               Note that if you wish to extend (vs. replace) these variables,
+%%               you MUST include a shell-style reference in your definition.
+%%               e.g. to extend CFLAGS, do something like:
 %%
 %%               {port_envs, [{"CFLAGS", "$CFLAGS -MyOtherOptions"}]}
 %%
-%%               It is also possible to specify platform specific options by specifying a triplet
-%%               where the first string is a regex that is checked against erlang's system architecture
-%%               string. E.g. to specify a CFLAG that only applies to x86_64 on linux do:
+%%               It is also possible to specify platform specific options
+%%               by specifying a tripletwhere the first string is a regex
+%%               that is checked against erlang's system architecture string.
+%%               e.g. to specify a CFLAG that only applies to x86_64 on linux
+%%               do:
 %%
-%%               {port_envs, [{"x86_64.*-linux", "CFLAGS", "$CFLAGS -X86Options"}]}
+%%               {port_envs, [{"x86_64.*-linux", "CFLAGS",
+%%                             "$CFLAGS -X86Options"}]}
 %%
-%% * port_pre_script - Tuple which specifies a pre-compilation script to run, and a filename that
-%%                     exists as a result of the script running.
+%% * port_pre_script - Tuple which specifies a pre-compilation script to run,
+%%                     and a filename that exists as a result of the script
+%%                     running.
 %%
-%% * port_cleanup_script - String that specifies a script to run during cleanup. Use this to remove
-%%                         files/directories created by port_pre_script.
+%% * port_cleanup_script - String that specifies a script to run during cleanup.
+%%                         Use this to remove files/directories created by
+%%                         port_pre_script.
 %%
 
 compile(Config, AppFile) ->
     %% Compose list of sources from config file -- defaults to c_src/*.c
-    Sources = expand_sources(rebar_config:get_list(Config, port_sources, ["c_src/*.c"]), []),
+    Sources = expand_sources(rebar_config:get_list(Config, port_sources,
+                                                   ["c_src/*.c"]), []),
     case Sources of
         [] ->
             ok;
         _ ->
-            %% Extract environment values from the config (if specified) and merge with the
-            %% default for this operating system. This enables max flexibility for users.
+            %% Extract environment values from the config (if specified) and
+            %% merge with the default for this operating system. This enables
+            %% max flexibility for users.
             DefaultEnvs  = filter_envs(default_env(), []),
-            OverrideEnvs = filter_envs(rebar_config:get_list(Config, port_envs, []), []),
-            Env = expand_vars_loop(merge_each_var(DefaultEnvs ++ OverrideEnvs ++ os_env(), [])),
+            PortEnvs = rebar_config:get_list(Config, port_envs, []),
+            OverrideEnvs = filter_envs(PortEnvs, []),
+            RawEnv = DefaultEnvs ++ OverrideEnvs ++ os_env(),
+            Env = expand_vars_loop(merge_each_var(RawEnv, [])),
 
-            %% One or more files are available for building. Run the pre-compile hook, if
-            %% necessary.
-            run_precompile_hook(Config, Env),
+            %% One or more files are available for building.
+            %% Run the pre-compile hook, if necessary.
+            ok = run_precompile_hook(Config, Env),
 
             %% Compile each of the sources
-            {NewBins, ExistingBins} = compile_each(Sources, Config, Env, [], []),
+            {NewBins, ExistingBins} = compile_each(Sources, Config, Env,
+                                                   [], []),
 
             %% Construct the driver name and make sure priv/ exists
             SoSpecs = so_specs(Config, AppFile, NewBins ++ ExistingBins),
             ?INFO("Using specs ~p\n", [SoSpecs]),
-            lists:foreach(fun({SoName,_}) -> ok = filelib:ensure_dir(SoName) end, SoSpecs),
+            lists:foreach(fun({SoName,_}) ->
+                                  ok = filelib:ensure_dir(SoName)
+                          end, SoSpecs),
 
-            %% Only relink if necessary, given the SoName and list of new binaries
-            lists:foreach(fun({SoName,Bins}) ->
-                case needs_link(SoName, sets:to_list(sets:intersection([sets:from_list(Bins),sets:from_list(NewBins)]))) of
-                  true ->
-                    rebar_utils:sh_failfast(?FMT("$CC ~s $LDFLAGS $DRV_LDFLAGS -o ~s",
-                                                  [string:join(Bins, " "), SoName]), Env);
-                  false ->
-                    ?INFO("Skipping relink of ~s\n", [SoName]),
-                    ok
-                end
+            %% Only relink if necessary, given the SoName
+            %% and list of new binaries
+            lists:foreach(
+              fun({SoName,Bins}) ->
+                      AllBins = [sets:from_list(Bins), sets:from_list(NewBins)],
+                      Intersection = sets:intersection(AllBins),
+                      case needs_link(SoName, sets:to_list(Intersection)) of
+                          true ->
+                              rebar_utils:sh(
+                                ?FMT("$CC ~s $LDFLAGS $DRV_LDFLAGS -o ~s",
+                                     [string:join(Bins, " "), SoName]),
+                                [{env, Env}]);
+                          false ->
+                              ?INFO("Skipping relink of ~s\n", [SoName]),
+                              ok
+                      end
               end, SoSpecs)
     end.
 
 clean(Config, AppFile) ->
     %% Build a list of sources so as to derive all the bins we generated
-    Sources = expand_sources(rebar_config:get_list(Config, port_sources, ["c_src/*.c"]), []),
+    Sources = expand_sources(rebar_config:get_list(Config, port_sources,
+                                                   ["c_src/*.c"]), []),
     rebar_file_utils:delete_each([source_to_bin(S) || S <- Sources]),
 
     %% Delete the .so file
-    rebar_file_utils:delete_each(lists:map(fun({SoName,_}) -> SoName end, so_specs(Config, AppFile, expand_objects(Sources)))),
+    ExtractSoName = fun({SoName, _}) -> SoName end,
+    rebar_file_utils:delete_each([ExtractSoName(S)
+                                  || S <- so_specs(Config, AppFile,
+                                                   expand_objects(Sources))]),
 
     %% Run the cleanup script, if it exists
     run_cleanup_hook(Config).
@@ -132,10 +161,18 @@ clean(Config, AppFile) ->
 
 expand_sources([], Acc) ->
     Acc;
+expand_sources([{ArchRegex, Spec} | Rest], Acc) ->
+    case rebar_utils:is_arch(ArchRegex) of
+        true ->
+            Acc2 = filelib:wildcard(Spec) ++ Acc,
+            expand_sources(Rest, Acc2);
+        false ->
+            expand_sources(Rest, Acc)
+    end;
 expand_sources([Spec | Rest], Acc) ->
     Acc2 = filelib:wildcard(Spec) ++ Acc,
     expand_sources(Rest, Acc2).
-    
+
 expand_objects(Sources) ->
     [filename:join([filename:dirname(F), filename:basename(F) ++ ".o"])
      || F <- Sources].
@@ -148,9 +185,11 @@ run_precompile_hook(Config, Env) ->
             case filelib:is_regular(BypassFileName) of
                 false ->
                     ?CONSOLE("Running ~s\n", [Script]),
-                    rebar_utils:sh_failfast(Script, Env);
+                    {ok, _} = rebar_utils:sh(Script, [{env, Env}]),
+                    ok;
                 true ->
-                    ?INFO("~s exists; not running ~s\n", [BypassFileName, Script])
+                    ?INFO("~s exists; not running ~s\n",
+                          [BypassFileName, Script])
             end
     end.
 
@@ -160,7 +199,8 @@ run_cleanup_hook(Config) ->
             ok;
         Script ->
             ?CONSOLE("Running ~s\n", [Script]),
-            rebar_utils:sh_failfast(Script, [])
+            {ok, _} = rebar_utils:sh(Script, []),
+            ok
     end.
 
 
@@ -174,11 +214,12 @@ compile_each([Source | Rest], Config, Env, NewBins, ExistingBins) ->
             ?CONSOLE("Compiling ~s\n", [Source]),
             case compiler(Ext) of
                 "$CC" ->
-                    rebar_utils:sh_failfast(?FMT("$CC -c $CFLAGS $DRV_CFLAGS ~s -o ~s",
-                                                 [Source, Bin]), Env);
+                    rebar_utils:sh(?FMT("$CC -c $CFLAGS $DRV_CFLAGS ~s -o ~s",
+                                        [Source, Bin]), [{env, Env}]);
                 "$CXX" ->
-                    rebar_utils:sh_failfast(?FMT("$CXX -c $CXXFLAGS $DRV_CFLAGS ~s -o ~s",
-                                                 [Source, Bin]), Env)
+                    rebar_utils:sh(
+                      ?FMT("$CXX -c $CXXFLAGS $DRV_CFLAGS ~s -o ~s",
+                           [Source, Bin]), [{env, Env}])
             end,
             compile_each(Rest, Config, Env, [Bin | NewBins], ExistingBins);
 
@@ -187,10 +228,9 @@ compile_each([Source | Rest], Config, Env, NewBins, ExistingBins) ->
             compile_each(Rest, Config, Env, NewBins, [Bin | ExistingBins])
     end.
 
-
-
 needs_compile(Source, Bin) ->
-    %% TODO: Generate depends using gcc -MM so we can also check for include changes
+    %% TODO: Generate depends using gcc -MM so we can also
+    %% check for include changes
     filelib:last_modified(Bin) < filelib:last_modified(Source).
 
 needs_link(SoName, []) ->
@@ -230,8 +270,8 @@ merge_each_var([], Vars) ->
 merge_each_var([{Key, Value} | Rest], Vars) ->
     case orddict:find(Key, Vars) of
         error ->
-            %% Nothing yet defined for this key/value. Expand any self-references
-            %% as blank.
+            %% Nothing yet defined for this key/value.
+            %% Expand any self-references as blank.
             Evalue = expand_env_variable(Value, Key, "");
         {ok, Value0} ->
             %% Use previous definition in expansion
@@ -264,16 +304,17 @@ expand_vars_loop(Vars0, Count) ->
 %% Expand all OTHER references to a given K/V pair
 %%
 expand_vars(Key, Value, Vars) ->
-    lists:foldl(fun({AKey, AValue}, Acc) ->
-                        case AKey of
-                            Key ->
-                                NewValue = AValue;
-                            _ ->
-                                NewValue = expand_env_variable(AValue, Key, Value)
-                        end,
-                        [{AKey, NewValue} | Acc]
-                end,
-                [], Vars).
+    lists:foldl(
+      fun({AKey, AValue}, Acc) ->
+              case AKey of
+                  Key ->
+                      NewValue = AValue;
+                  _ ->
+                      NewValue = expand_env_variable(AValue, Key, Value)
+              end,
+              [{AKey, NewValue} | Acc]
+      end,
+      [], Vars).
 
 
 %%
@@ -306,7 +347,8 @@ erts_dir() ->
     lists:concat([code:root_dir(), "/erts-", erlang:system_info(version)]).
 
 os_env() ->
-    Os = [list_to_tuple(re:split(S, "=", [{return, list}, {parts, 2}])) || S <- os:getenv()],
+    Os = [list_to_tuple(re:split(S, "=", [{return, list}, {parts, 2}])) ||
+             S <- os:getenv()],
     lists:keydelete([],1,Os). %% Remove Windows current disk and path
 
 default_env() ->
@@ -320,7 +362,8 @@ default_env() ->
                                    " -lerl_interface -lei"])},
      {"DRV_CFLAGS", "-g -Wall -fPIC $ERL_CFLAGS"},
      {"DRV_LDFLAGS", "-shared $ERL_LDFLAGS"},
-     {"darwin", "DRV_LDFLAGS", "-bundle -flat_namespace -undefined suppress $ERL_LDFLAGS"},
+     {"darwin", "DRV_LDFLAGS",
+      "-bundle -flat_namespace -undefined suppress $ERL_LDFLAGS"},
      {"ERLANG_ARCH", integer_to_list(8 * erlang:system_info(wordsize))},
      {"ERLANG_TARGET", rebar_utils:get_arch()},
 
@@ -364,18 +407,20 @@ switch_so_to_dll(Orig = {Name, Spec}) ->
 make_so_specs(Config, AppFile, Bins) ->
     case rebar_config:get(Config, so_specs, undefined) of
         undefined ->
-            %% New form of so_specs is not provided. See if the old form of {so_name} is available
-            %% instead
+            %% New form of so_specs is not provided. See if the old form
+            %% of {so_name} is available instead
+            Dir = "priv",
             SoName = case rebar_config:get(Config, so_name, undefined) of
                          undefined ->
-                             %% Ok, neither old nor new form is available. Use the app name and
-                             %% generate a sensible default.
+                             %% Ok, neither old nor new form is available. Use
+                             %% the app name and generate a sensible default.
                              AppName = rebar_app_utils:app_name(AppFile),
-                             ?FMT("priv/~s", [lists:concat([AppName, "_drv.so"])]);
+                             filename:join(Dir,
+                                           lists:concat([AppName, "_drv.so"]));
 
                          AName ->
                              %% Old form is available -- use it
-                             ?FMT("priv/~s", [AName])
+                             filename:join(Dir, AName)
                      end,
             [{SoName, Bins}];
 

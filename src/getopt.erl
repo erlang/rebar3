@@ -13,6 +13,13 @@
 
 -export([parse/2, usage/2, usage/3, usage/4]).
 
+-export_type([arg_type/0,
+	      arg_value/0,
+	      arg_spec/0,
+	      simple_option/0,
+	      compound_option/0,
+	      option/0,
+	      option_spec/0]).
 
 -define(TAB_LENGTH, 8).
 %% Indentation of the help messages in number of tabs.
@@ -75,10 +82,10 @@ parse(OptSpecList, OptAcc, ArgAcc, _ArgPos, ["--" | Tail]) ->
     % Any argument present after the terminator is not considered an option.
     {ok, {lists:reverse(append_default_options(OptSpecList, OptAcc)), lists:reverse(ArgAcc, Tail)}};
 %% Process long options.
-parse(OptSpecList, OptAcc, ArgAcc, ArgPos, [[$-, $- | OptArg] = OptStr | Tail]) ->
+parse(OptSpecList, OptAcc, ArgAcc, ArgPos, ["--" ++ OptArg = OptStr | Tail]) ->
     parse_option_long(OptSpecList, OptAcc, ArgAcc, ArgPos, Tail, OptStr, OptArg);
 %% Process short options.
-parse(OptSpecList, OptAcc, ArgAcc, ArgPos, [[$- | [_Char | _] = OptArg] = OptStr | Tail]) ->
+parse(OptSpecList, OptAcc, ArgAcc, ArgPos, ["-" ++ ([_Char | _] = OptArg) = OptStr | Tail]) ->
     parse_option_short(OptSpecList, OptAcc, ArgAcc, ArgPos, Tail, OptStr, OptArg);
 %% Process non-option arguments.
 parse(OptSpecList, OptAcc, ArgAcc, ArgPos, [Arg | Tail]) ->
@@ -111,11 +118,11 @@ parse_option_long(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptStr, OptArg) ->
             parse_option_assigned_arg(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptStr, Long, Arg);
 
         Long ->
-            case lists:keysearch(Long, ?OPT_LONG, OptSpecList) of
-                {value, {Name, _Short, Long, undefined, _Help}} ->
+            case lists:keyfind(Long, ?OPT_LONG, OptSpecList) of
+                {Name, _Short, Long, undefined, _Help} ->
                     parse(OptSpecList, [Name | OptAcc], ArgAcc, ArgPos, Args);
-                
-                {value, {_Name, _Short, Long, _ArgSpec, _Help} = OptSpec} ->
+
+                {_Name, _Short, Long, _ArgSpec, _Help} = OptSpec ->
                     % The option argument string is empty, but the option requires
                     % an argument, so we look into the next string in the list.
                     parse_option_next_arg(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptSpec);
@@ -132,8 +139,8 @@ parse_option_long(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptStr, OptArg) ->
                                 [string()], string(), string(), string()) ->
           {ok, {[option()], [string()]}}.
 parse_option_assigned_arg(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptStr, Long, Arg) ->
-    case lists:keysearch(Long, ?OPT_LONG, OptSpecList) of
-        {value, {_Name, _Short, Long, ArgSpec, _Help} = OptSpec} ->
+    case lists:keyfind(Long, ?OPT_LONG, OptSpecList) of
+        {_Name, _Short, Long, ArgSpec, _Help} = OptSpec ->
             case ArgSpec of
                 undefined ->
                     throw({error, {invalid_option_arg, OptStr}});
@@ -151,7 +158,7 @@ parse_option_assigned_arg(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptStr, Lon
 split_assigned_arg(OptStr) ->
     split_assigned_arg(OptStr, OptStr, []).
 
-split_assigned_arg(_OptStr, [$= | Tail], Acc) ->
+split_assigned_arg(_OptStr, "=" ++ Tail, Acc) ->
     {lists:reverse(Acc), Tail};
 split_assigned_arg(OptStr, [Char | Tail], Acc) ->
     split_assigned_arg(OptStr, Tail, [Char | Acc]);
@@ -170,11 +177,11 @@ split_assigned_arg(OptStr, [], _Acc) ->
 -spec parse_option_short([option_spec()], [option()], [string()], integer(), [string()], string(), string()) ->
     {ok, {[option()], [string()]}}.
 parse_option_short(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptStr, [Short | Arg]) ->
-    case lists:keysearch(Short, ?OPT_SHORT, OptSpecList) of
-        {value, {Name, Short, _Long, undefined, _Help}} ->
+    case lists:keyfind(Short, ?OPT_SHORT, OptSpecList) of
+        {Name, Short, _Long, undefined, _Help} ->
             parse_option_short(OptSpecList, [Name | OptAcc], ArgAcc, ArgPos, Args, OptStr, Arg);
 
-        {value, {_Name, Short, _Long, ArgSpec, _Help} = OptSpec} ->
+        {_Name, Short, _Long, ArgSpec, _Help} = OptSpec ->
             case Arg of
                 [] ->
                     % The option argument string is empty, but the option requires
@@ -217,7 +224,7 @@ parse_option_next_arg(OptSpecList, OptAcc, ArgAcc, ArgPos, [] = Args, {Name, _Sh
         _ ->
             throw({error, {missing_option_arg, Name}})
     end.
-    
+
 
 %% @doc Find the option for the discrete argument in position specified in the
 %%      Pos argument.
@@ -318,7 +325,7 @@ is_arg_true(Arg) ->
     (Arg =:= "on") orelse (Arg =:= "enabled") orelse
     (Arg =:= "1").
 
-    
+
 -spec is_arg_false(string()) -> boolean().
 is_arg_false(Arg) ->
     (Arg =:= "false") orelse (Arg =:= "f") orelse
@@ -362,7 +369,7 @@ is_float_arg([_Head | _Tail]) ->
     false;
 is_float_arg([]) ->
     true.
-  
+
 
 %% @doc  Show a message on stdout indicating the command line options and
 %%       arguments that are supported by the program.
@@ -441,8 +448,8 @@ usage_options(OptSpecList) ->
     lists:flatten(lists:reverse(usage_options_reverse(OptSpecList, []))).
 
 usage_options_reverse([{Name, Short, Long, _ArgSpec, Help} | Tail], Acc) ->
-    Prefix = 
-        case Long of 
+    Prefix =
+        case Long of
             undefined ->
                 case Short of
                     % Neither short nor long form (non-option argument).
