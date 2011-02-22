@@ -62,7 +62,7 @@ compile_lfe(Source, Target, Config) ->
             ?FAIL;
         _ ->
             Opts = [{i, "include"}, {outdir, "ebin"}, report, return] ++
-                rebar_config:get_list(Config, erl_opts, []),
+                rebar_config:get_list(Config, lfe_opts, []),
             case lfe_comp:file(Source, Opts) of
                 {ok, _, []} ->
                     ok;
@@ -74,6 +74,7 @@ compile_lfe(Source, Target, Config) ->
                         false ->
                             ok
                     end;
-                _ -> ?FAIL
+                _ ->
+                    ?FAIL
             end
     end.
