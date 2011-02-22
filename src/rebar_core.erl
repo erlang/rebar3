@@ -76,6 +76,10 @@ process_commands([Command | Rest]) ->
     lists:foreach(fun (D) -> erlang:erase({skip_dir, D}) end, skip_dirs()),
     Operations = erlang:get(operations),
 
+    %% Convert the code path so that all the entries are absolute paths.
+    %% If not, code:set_path() may choke on invalid relative paths when trying
+    %% to restore the code path from inside a subdirectory.
+    true = rebar_utils:expand_code_path(),
     _ = process_dir(rebar_utils:get_cwd(), rebar_config:new(),
                     Command, sets:new()),
     case erlang:get(operations) of

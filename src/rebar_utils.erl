@@ -38,7 +38,8 @@
          abort/2,
          escript_foldl/3,
          find_executable/1,
-         prop_check/3]).
+         prop_check/3,
+         expand_code_path/0]).
 
 -include("rebar.hrl").
 
@@ -155,6 +156,14 @@ find_executable(Name) ->
 %% Helper function for checking values and aborting when needed
 prop_check(true, _, _) -> true;
 prop_check(false, Msg, Args) -> ?ABORT(Msg, Args).
+
+%% Convert all the entries in the code path to absolute paths.
+expand_code_path() ->
+    CodePath = lists:foldl(fun (Path, Acc) ->
+                                   [filename:absname(Path) | Acc]
+                           end, [], code:get_path()),
+    code:set_path(lists:reverse(CodePath)).
+
 
 %% ====================================================================
 %% Internal functions
