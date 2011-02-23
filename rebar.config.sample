@@ -8,18 +8,6 @@
 %% Additional library directories to add to the code path
 {lib_dirs, []}.
 
-%% Command to run before compiling
-{compile_pre_script, "./script.sh"}.
-
-%% Command to run after compiling
-{compile_post_script, "./script.sh"}.
-
-%% Command to run before cleaning
-{clean_pre_script, "./script.sh"}.
-
-%% Command to run after cleaning
-{clean_post_script, "./script.sh"}.
-
 %% == Erlang Compiler ==
 
 %% Erlang files to compile before the rest. Rebar automatically compiles
@@ -53,14 +41,6 @@
 %% Port compilation environment variables. See rebar_port_compiler.erl for
 %% more info. Default is `[]'
 {port_envs, []}.
-
-%% Tuple which specifies a pre-compilation script to run, and a filename that
-%% exists as a result of the script running.
-{port_pre_script, {"script.sh", "skipfile"}}.
-
-%% String that specifies a script to run during cleanup. Use this to remove
-%% files/directories created by port_pre_script.
-{port_cleanup_script, "cleanup.sh"}.
 
 %% Custom name of the port driver .so file. Defaults to `<Application>_drv.so'.
 {so_name, "driver.so"}.

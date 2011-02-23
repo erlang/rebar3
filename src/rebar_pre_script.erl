@@ -51,6 +51,24 @@ execute_pre_script(Config, Key) ->
         undefined ->
             ok;
         Script ->
+            deprecated(Key),
             {ok, _} = rebar_utils:sh(Script, []),
             ok
     end.
+
+deprecated(compile_pre_script) ->
+    ?CONSOLE(
+       <<
+         "WARNING: option deprecated~n"
+         "Config option 'compile_pre_script' has been deprecated in favor"
+         " of ~n{pre_hooks, [{compile, \"script\"}]}.~nFuture builds of"
+         " rebar will remove the option 'compile_pre_script'.~n~n"
+       >>, []);
+deprecated(clean_pre_script) ->
+    ?CONSOLE(
+       <<
+         "WARNING: option deprecated~n"
+         "Config option 'clean_pre_script' has been deprecated in favor"
+         " of ~n{pre_hooks, [{clean, \"script\"}]}.~nFuture builds of"
+         " rebar will remove the option 'clean_pre_script'.~n~n"
+       >>, []).
