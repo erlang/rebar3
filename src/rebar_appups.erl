@@ -56,10 +56,10 @@
              "Reltool and .rel release names do not match~n", []),
 
     %% Get lists of the old and new app files
-    OldAppFiles = rebar_utils:find_files(
-                    filename:join([OldVerPath, "lib"]), "^.*.app$"),
-    NewAppFiles = rebar_utils:find_files(
-                    filename:join([NewName, "lib"]), "^.*.app$"),
+    OldAppFiles = filelib:wildcard(
+                    filename:join([OldVerPath, "lib", "*", "ebin", "*.app"])),
+    NewAppFiles = filelib:wildcard(
+                    filename:join([NewName, "lib", "*", "ebin", "*.app"])),
 
     %% Find all the apps that have been upgraded
     UpgradedApps = get_upgraded_apps(OldAppFiles, NewAppFiles),
