@@ -55,14 +55,8 @@
              NewName == OldName,
              "Reltool and .rel release names do not match~n", []),
 
-    %% Get lists of the old and new app files
-    OldAppFiles = filelib:wildcard(
-                    filename:join([OldVerPath, "lib", "*", "ebin", "*.app"])),
-    NewAppFiles = filelib:wildcard(
-                    filename:join([NewName, "lib", "*", "ebin", "*.app"])),
-
     %% Find all the apps that have been upgraded
-    UpgradedApps = get_upgraded_apps(OldAppFiles, NewAppFiles),
+    UpgradedApps = get_upgraded_apps(Name, OldVerPath, NewVerPath),
 
     %% Get a list of any appup files that exist in the new release
     NewAppUpFiles = rebar_utils:find_files(
@@ -85,18 +79,24 @@
 %% Internal functions
 %% ===================================================================
 
-get_upgraded_apps(OldAppFiles, NewAppFiles) ->
-    OldAppsVer = [{rebar_app_utils:app_name(AppFile),
-                   rebar_app_utils:app_vsn(AppFile)} || AppFile <- OldAppFiles],
-    NewAppsVer = [{rebar_app_utils:app_name(AppFile),
-                   rebar_app_utils:app_vsn(AppFile)} || AppFile <- NewAppFiles],
-    UpgradedApps = lists:subtract(NewAppsVer, OldAppsVer),
-    lists:map(
-      fun({App, NewVer}) ->
-              {App, OldVer} = proplists:lookup(App, OldAppsVer),
-              {App, {OldVer, NewVer}}
-      end,
-      UpgradedApps).
+get_upgraded_apps(Name, OldVerPath, NewVerPath) ->
+    OldApps = rebar_rel_utils:get_rel_apps(Name, OldVerPath),
+    NewApps = rebar_rel_utils:get_rel_apps(Name, NewVerPath),
+
+    Sorted = lists:umerge(lists:sort(NewApps), lists:sort(OldApps)),
+    AddedorChanged = lists:subtract(Sorted, OldApps),
+    DeletedorChanged = lists:subtract(Sorted, NewApps),
+    ?DEBUG("Added or Changed: ~p~n", [AddedorChanged]),
+    ?DEBUG("Deleted or Changed: ~p~n", [DeletedorChanged]),
+
+    AddedDeletedChanged = lists:ukeysort(1, lists:append(DeletedorChanged,
+                                                         AddedorChanged)),
+    UpgradedApps = lists:subtract(AddedorChanged, AddedDeletedChanged),
+    ?DEBUG("Upgraded Apps:~p~n", [UpgradedApps]),
+
+    [{AppName, {proplists:get_value(AppName, OldApps), NewVer}}
+     || {AppName, NewVer} <- UpgradedApps].
+
 
 file_to_name(File) ->
     filename:rootname(filename:basename(File)).
