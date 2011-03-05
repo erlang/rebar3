@@ -31,7 +31,10 @@
          get_reltool_release_info/1,
          get_rel_release_info/1,
          get_rel_release_info/2,
-         get_previous_release_path/0]).
+         get_rel_apps/1,
+         get_rel_apps/2,
+         get_previous_release_path/0,
+         get_rel_file_path/2]).
 
 -include("rebar.hrl").
 
@@ -70,11 +73,29 @@ get_rel_release_info(RelFile) ->
 
 %% Get release name and version from a name and a path
 get_rel_release_info(Name, Path) ->
+    RelPath = get_rel_file_path(Name, Path),
+    get_rel_release_info(RelPath).
+
+%% Get list of apps included in a release from a rel file
+get_rel_apps(RelFile) ->
+    case file:consult(RelFile) of
+        {ok, [{release, _, _, Apps}]} ->
+            Apps;
+        _ ->
+            ?ABORT("Failed to parse ~s~n", [RelFile])
+    end.
+
+%% Get list of apps included in a release from a name and a path
+get_rel_apps(Name, Path) ->
+    RelPath = get_rel_file_path(Name, Path),
+    get_rel_apps(RelPath).
+
+%% Get rel file path from name and path
+get_rel_file_path(Name, Path) ->
     [RelFile] = filelib:wildcard(filename:join([Path, "releases", "*",
                                                 Name ++ ".rel"])),
     [BinDir|_] = re:replace(RelFile, Name ++ "\\.rel", ""),
-    get_rel_release_info(filename:join([binary_to_list(BinDir),
-                                        Name ++ ".rel"])).
+    filename:join([binary_to_list(BinDir), Name ++ ".rel"]).
 
 %% Get the previous release path from a global variable
 get_previous_release_path() ->

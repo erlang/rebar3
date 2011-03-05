@@ -141,32 +141,57 @@ make_cmd(TestDir, Config) ->
     CodeDirs = [io_lib:format("\"~s\"", [Dir]) ||
                    Dir <- [EbinDir|NonLibCodeDirs]],
     CodePathString = string:join(CodeDirs, " "),
-    Cmd = ?FMT("erl " % should we expand ERL_PATH?
-               " -noshell -pa ~s ~s"
-               " -s ct_run script_start -s erlang halt"
-               " -name test@~s"
-               " -logdir \"~s\""
-               " -env TEST_DIR \"~s\"",
-               [CodePathString,
-                Include,
-                net_adm:localhost(),
-                LogDir,
-                filename:join(Cwd, TestDir)]) ++
-        get_cover_config(Config, Cwd) ++
-        get_ct_config_file(TestDir) ++
-        get_config_file(TestDir) ++
-        get_suite(TestDir) ++
-        get_case(),
+    Cmd = case get_ct_specs(Cwd) of
+        undefined ->
+            ?FMT("erl " % should we expand ERL_PATH?
+                       " -noshell -pa ~s ~s"
+                       " -s ct_run script_start -s erlang halt"
+                       " -name test@~s"
+                       " -logdir \"~s\""
+                       " -env TEST_DIR \"~s\"",
+                       [CodePathString,
+                        Include,
+                        net_adm:localhost(),
+                        LogDir,
+                        filename:join(Cwd, TestDir)]) ++
+                get_cover_config(Config, Cwd) ++
+                get_ct_config_file(TestDir) ++
+                get_config_file(TestDir) ++
+                get_suite(TestDir) ++
+                get_case();
+        SpecFlags ->
+            ?FMT("erl " % should we expand ERL_PATH?
+                       " -noshell -pa ~s ~s"
+                       " -s ct_run script_start -s erlang halt"
+                       " -name test@~s"
+                       " -logdir \"~s\""
+                       " -env TEST_DIR \"~s\"",
+                       [CodePathString,
+                        Include,
+                        net_adm:localhost(),
+                        LogDir,
+                        filename:join(Cwd, TestDir)]) ++
+                SpecFlags ++ get_cover_config(Config, Cwd)
+    end,
     RawLog = filename:join(LogDir, "raw.log"),
     {Cmd, RawLog}.
+
+get_ct_specs(Cwd) ->
+    case collect_glob(Cwd, ".*\.test\.spec\$") of
+        [] -> undefined;
+        [Spec] ->
+            " -spec " ++ Spec;
+        Specs ->
+            " -spec " ++
+                lists:flatten([io_lib:format("~s ", [Spec]) || Spec <- Specs])
+    end.
 
 get_cover_config(Config, Cwd) ->
     case rebar_config:get_local(Config, cover_enabled, false) of
         false ->
             "";
         true ->
-            case filelib:fold_files(Cwd, ".*cover\.spec\$",
-                                    true, fun collect_ct_specs/2, []) of
+            case collect_glob(Cwd, ".*cover\.spec\$") of
                 [] ->
                     ?DEBUG("No cover spec found: ~s~n", [Cwd]),
                     "";
@@ -178,15 +203,18 @@ get_cover_config(Config, Cwd) ->
             end
     end.
 
-collect_ct_specs(F, Acc) ->
+collect_glob(Cwd, Glob) ->
+    filelib:fold_files(Cwd, Glob, true, fun collect_files/2, []).
+
+collect_files(F, Acc) ->
     %% Ignore any specs under the deps/ directory. Do this pulling
     %% the dirname off the the F and then splitting it into a list.
     Parts = filename:split(filename:dirname(F)),
     case lists:member("deps", Parts) of
         true ->
-            Acc;                     % There is a directory named "deps" in path
+            Acc;                % There is a directory named "deps" in path
         false ->
-            [F | Acc]                % No "deps" directory in path
+            [F | Acc]           % No "deps" directory in path
     end.
 
 get_ct_config_file(TestDir) ->
