@@ -191,11 +191,12 @@ eunit_config(Config) ->
 
 
 eqc_opts() ->
-    define_if('PROPER', is_lib_avail(is_eqc_avail, eqc,
-                                     "eqc.hrl", "QuickCheck")).
+    define_if('EQC', is_lib_avail(is_eqc_avail, eqc,
+                                  "eqc.hrl", "QuickCheck")).
+
 proper_opts() ->
-    define_if('EQC', is_lib_avail(is_proper_avail, proper,
-                                  "proper.hrl", "PropEr")).
+    define_if('PROPER', is_lib_avail(is_proper_avail, proper,
+                                     "proper.hrl", "PropEr")).
 
 define_if(Def, true) -> [{d, Def}];
 define_if(_Def, false) -> [].
