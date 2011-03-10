@@ -53,22 +53,6 @@ Do not introduce trailing whitespace.
 
 Do not introduce lines longer than 80 characters.
 
-### Indentation
-
-To have consistent indentation we have vi modeline/emacs local variable  
-headers in rebar's source files. This works automatically with vi.  
-With Emacs you have to declare <code>'erlang-indent-level</code>
-set to <code>4</code>  
-as a safe local variable value. If not configured Emacs will prompt  
-you to save this as part of custom-set-variables:
-
-    '(safe-local-variable-values (quote ((erlang-indent-level . 4))))
-You can also tell Emacs to ignore file variables:
-
-    (setq enable-local-variables nil
-          enable-local-eval nil)
-
-
 Writing Commit Messages
 -----------------------
 
