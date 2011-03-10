@@ -46,8 +46,7 @@
 %% ===================================================================
 
 %% @doc Generate Erlang program documentation.
-%% @spec doc(#config{}, string()) -> ok
--spec(doc(Config::#config{}, File::string()) -> ok).
+-spec doc(Config::rebar_config:config(), File::file:filename()) -> ok.
 doc(Config, File) ->
     {ok, AppName, _AppData} = rebar_app_utils:load_app_file(File),
     EDocOpts = rebar_config:get(Config, edoc_opts, []),

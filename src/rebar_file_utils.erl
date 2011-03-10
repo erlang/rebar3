@@ -39,8 +39,7 @@
 
 %% @doc Remove files and directories.
 %% Target is a single filename, directoryname or wildcard expression.
-%% @spec rm_rf(string()) -> ok
--spec rm_rf(Target::string()) -> ok.
+-spec rm_rf(Target::file:filename()) -> ok.
 rm_rf(Target) ->
     case os:type() of
         {unix, _} ->
@@ -56,7 +55,7 @@ rm_rf(Target) ->
             ok
     end.
 
--spec cp_r(Sources::list(string()), Dest::string()) -> ok.
+-spec cp_r(Sources::list(string()), Dest::file:filename()) -> ok.
 cp_r(Sources, Dest) ->
     case os:type() of
         {unix, _} ->
@@ -69,7 +68,7 @@ cp_r(Sources, Dest) ->
             ok
     end.
 
--spec mv(Source::string(), Dest::string()) -> ok.
+-spec mv(Source::string(), Dest::file:filename()) -> ok.
 mv(Source, Dest) ->
     case os:type() of
         {unix, _} ->

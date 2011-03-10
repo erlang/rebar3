@@ -61,8 +61,7 @@
 %% ===================================================================
 
 %% @doc Perform static analysis on the contents of the ebin directory.
-%% @spec dialyze(Config::#config{}, File::string()) -> ok
--spec dialyze(Config::#config{}, File::string()) -> ok.
+-spec dialyze(Config::rebar_config:config(), File::file:filename()) -> ok.
 dialyze(Config, File) ->
     Plt = existing_plt_path(Config, File),
     case dialyzer:plt_info(Plt) of
@@ -102,8 +101,7 @@ dialyze(Config, File) ->
     ok.
 
 %% @doc Build the PLT.
-%% @spec 'build-plt'(Config::#config{}, File::string()) -> ok
--spec 'build-plt'(Config::#config{}, File::string()) -> ok.
+-spec 'build-plt'(Config::rebar_config:config(), File::file:filename()) -> ok.
 'build-plt'(Config, File) ->
     Plt = new_plt_path(Config, File),
 
@@ -122,8 +120,7 @@ dialyze(Config, File) ->
     ok.
 
 %% @doc Check whether the PLT is up-to-date (rebuilding it if not).
-%% @spec 'check-plt'(Config::#config{}, File::string()) -> ok
--spec 'check-plt'(Config::#config{}, File::string()) -> ok.
+-spec 'check-plt'(Config::rebar_config:config(), File::file:filename()) -> ok.
 'check-plt'(Config, File) ->
     Plt = existing_plt_path(Config, File),
     try dialyzer:run([{analysis_type, plt_check}, {init_plt, Plt}]) of
@@ -143,24 +140,22 @@ dialyze(Config, File) ->
 %% ===================================================================
 
 %% @doc Obtain the library paths for the supplied applications.
-%% @spec app_dirs(Apps::[atom()]) -> [string()]
--spec app_dirs(Apps::[atom()]) -> [string()].
+-spec app_dirs(Apps::[atom()]) -> [file:filename()].
 app_dirs(Apps) ->
     [filename:join(Path, "ebin")
      || Path <- [code:lib_dir(App) || App <- Apps], erlang:is_list(Path)].
 
 %% @doc Render the warnings on the console.
-%% @spec output_warnings(Warnings::[warning()]) -> 'ok'
 -spec output_warnings(Warnings::[warning()]) -> 'ok'.
 output_warnings(Warnings) ->
     lists:foreach(fun(Warning) ->
                           ?CONSOLE("~s", [dialyzer:format_warning(Warning)])
                   end, Warnings).
 
-%% @doc If the plt option is present in rebar.config return its value, otherwise
-%% return $HOME/.dialyzer_plt.
-%% @spec new_plt_path(Config::#config{}, File::string()) -> string()
--spec new_plt_path(Config::#config{}, File::string()) -> string().
+%% @doc If the plt option is present in rebar.config return its value,
+%% otherwise return $HOME/.dialyzer_plt.
+-spec new_plt_path(Config::rebar_config:config(),
+                   File::file:filename()) -> file:filename().
 new_plt_path(Config, File) ->
     AppName = rebar_app_utils:app_name(File),
     DialyzerOpts = rebar_config:get(Config, dialyzer_opts, []),
@@ -175,8 +170,8 @@ new_plt_path(Config, File) ->
 %% @doc If the plt option is present in rebar.config and the file exists
 %% return its value or if ~/.AppName_dialyzer_plt exists return that.
 %% Otherwise return ~/.dialyzer_plt if it exists or abort.
-%% @spec existing_plt_path(Config::#config{}, File::string()) -> string()
--spec existing_plt_path(Config::#config{}, File::string()) -> string().
+-spec existing_plt_path(Config::rebar_config:config(),
+                        File::file:filename()) -> file:filename().
 existing_plt_path(Config, File) ->
     AppName = rebar_app_utils:app_name(File),
     DialyzerOpts = rebar_config:get(Config, dialyzer_opts, []),
@@ -205,8 +200,7 @@ existing_plt_path(Config, File) ->
 
 %% @doc If the warnings option is present in rebar.config return its value,
 %% otherwise return [].
-%% @spec warnings(Config::#config{}) -> list()
--spec warnings(Config::#config{}) -> list().
+-spec warnings(Config::rebar_config:config()) -> list().
 warnings(Config) ->
     DialyzerOpts = rebar_config:get(Config, dialyzer_opts, []),
     proplists:get_value(warnings, DialyzerOpts, []).

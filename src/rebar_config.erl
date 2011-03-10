@@ -35,6 +35,14 @@
 
 -include("rebar.hrl").
 
+-record(config, { dir :: file:filename(),
+                  opts :: list() }).
+
+%% Types that can be used from other modules -- alphabetically ordered.
+-export_type([config/0]).
+
+%% data types
+-opaque config() :: #config{}.
 
 %% ===================================================================
 %% Public API
