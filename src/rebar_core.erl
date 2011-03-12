@@ -305,19 +305,13 @@ run_modules([Module | Rest], Command, Config, File) ->
     end.
 
 apply_hooks(Mode, Config, Command) ->
-    case rebar_config:get_local(Config, Mode, []) of
-        [] ->
-            skip;
-        Hooks when is_list(Hooks) ->
-            lists:foreach(fun apply_hook/1,
-                          [{Command, Hook} || Hook <- Hooks])
-    end.
+    Hooks = rebar_config:get_local(Config, Mode, []),
+    lists:foreach(fun apply_hook/1,
+                  [Hook || Hook <- Hooks, element(1, Hook) =:= Command]).
 
-apply_hook({Command, {Command, Hook}}) ->
+apply_hook({Command, Hook}) ->
     Msg = lists:flatten(io_lib:format("Command [~p] failed!~n", [Command])),
-    rebar_utils:sh(Hook, [{abort_on_error, Msg}]);
-apply_hook({Command, {HookCmd, _}}) when Command =/= HookCmd ->
-    skip.
+    rebar_utils:sh(Hook, [{abort_on_error, Msg}]).
 
 acc_modules(Modules, Command, Config, File) ->
     acc_modules(select_modules(Modules, Command, []),
