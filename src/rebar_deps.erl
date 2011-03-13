@@ -162,9 +162,9 @@ get_deps_dir(App) ->
     {true, filename:join([BaseDir, DepsDir, App])}.
 
 get_lib_dir(App) ->
-    % Find App amongst the reachable lib directories
-    % Returns either the found path or a tagged tuple with a boolean
-    % to match get_deps_dir's return type
+    %% Find App amongst the reachable lib directories
+    %% Returns either the found path or a tagged tuple with a boolean
+    %% to match get_deps_dir's return type
     case code:lib_dir(App) of
         {error, bad_name} -> {false, bad_name};
         Path -> {true, Path}
@@ -208,23 +208,23 @@ find_deps(_Mode, [Other | _Rest], _Acc) ->
            [Other, rebar_utils:get_cwd()]).
 
 find_dep(Dep) ->
-    % Find a dep based on its source,
-    % e.g. {git, "https://github.com/mochi/mochiweb.git", "HEAD"}
-    % Deps with a source must be found (or fetched) locally.
-    % Those without a source may be satisfied from lib directories (get_lib_dir).
+    %% Find a dep based on its source,
+    %% e.g. {git, "https://github.com/mochi/mochiweb.git", "HEAD"}
+    %% Deps with a source must be found (or fetched) locally.
+    %% Those without a source may be satisfied from lib dir (get_lib_dir).
     find_dep(Dep, Dep#dep.source).
 
 find_dep(Dep, undefined) ->
-    % 'source' is undefined.  If Dep is not satisfied locally,
-    % go ahead and find it amongst the lib_dir's.
+    %% 'source' is undefined.  If Dep is not satisfied locally,
+    %% go ahead and find it amongst the lib_dir's.
     case find_dep_in_dir(Dep, get_deps_dir(Dep#dep.app)) of
         {avail, Dir} -> {avail, Dir};
         {missing, _} -> find_dep_in_dir(Dep, get_lib_dir(Dep#dep.app))
     end;
 find_dep(Dep, _Source) ->
-    % _Source is defined.  Regardless of what it is, we must find it
-    % locally satisfied or fetch it from the original source
-    % into the project's deps
+    %% _Source is defined.  Regardless of what it is, we must find it
+    %% locally satisfied or fetch it from the original source
+    %% into the project's deps
     find_dep_in_dir(Dep, get_deps_dir(Dep#dep.app)).
 
 find_dep_in_dir(_Dep, {false, Dir}) ->
