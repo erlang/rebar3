@@ -218,7 +218,7 @@ find_dep(Dep, undefined) ->
     %% 'source' is undefined.  If Dep is not satisfied locally,
     %% go ahead and find it amongst the lib_dir's.
     case find_dep_in_dir(Dep, get_deps_dir(Dep#dep.app)) of
-        {avail, Dir} -> {avail, Dir};
+        {avail, _Dir} = Avail -> Avail;
         {missing, _} -> find_dep_in_dir(Dep, get_lib_dir(Dep#dep.app))
     end;
 find_dep(Dep, _Source) ->
