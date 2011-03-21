@@ -127,7 +127,7 @@ make_cmd(TestDir, Config) ->
     IncludeDir = filename:join(Cwd, "include"),
     case filelib:is_dir(IncludeDir) of
         true ->
-            Include = " -I \"" ++ IncludeDir ++ "\"";
+            Include = " -include \"" ++ IncludeDir ++ "\"";
         false ->
             Include = ""
     end,
