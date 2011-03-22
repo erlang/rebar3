@@ -125,12 +125,12 @@ make_cmd(TestDir, Config) ->
     LogDir = filename:join(Cwd, "logs"),
     EbinDir = filename:absname(filename:join(Cwd, "ebin")),
     IncludeDir = filename:join(Cwd, "include"),
-    case filelib:is_dir(IncludeDir) of
-        true ->
-            Include = " -include \"" ++ IncludeDir ++ "\"";
-        false ->
-            Include = ""
-    end,
+    Include = case filelib:is_dir(IncludeDir) of
+                  true ->
+                      " -include \"" ++ IncludeDir ++ "\"";
+                  false ->
+                      ""
+              end,
 
     %% Add the code path of the rebar process to the code path. This
     %% includes the dependencies in the code path. The directories
@@ -142,8 +142,8 @@ make_cmd(TestDir, Config) ->
                    Dir <- [EbinDir|NonLibCodeDirs]],
     CodePathString = string:join(CodeDirs, " "),
     Cmd = case get_ct_specs(Cwd) of
-        undefined ->
-            ?FMT("erl " % should we expand ERL_PATH?
+              undefined ->
+                  ?FMT("erl " % should we expand ERL_PATH?
                        " -noshell -pa ~s ~s"
                        " -s ct_run script_start -s erlang halt"
                        " -name test@~s"
@@ -154,13 +154,13 @@ make_cmd(TestDir, Config) ->
                         net_adm:localhost(),
                         LogDir,
                         filename:join(Cwd, TestDir)]) ++
-                get_cover_config(Config, Cwd) ++
-                get_ct_config_file(TestDir) ++
-                get_config_file(TestDir) ++
-                get_suite(TestDir) ++
-                get_case();
-        SpecFlags ->
-            ?FMT("erl " % should we expand ERL_PATH?
+                      get_cover_config(Config, Cwd) ++
+                      get_ct_config_file(TestDir) ++
+                      get_config_file(TestDir) ++
+                      get_suite(TestDir) ++
+                      get_case();
+              SpecFlags ->
+                  ?FMT("erl " % should we expand ERL_PATH?
                        " -noshell -pa ~s ~s"
                        " -s ct_run script_start -s erlang halt"
                        " -name test@~s"
@@ -171,8 +171,8 @@ make_cmd(TestDir, Config) ->
                         net_adm:localhost(),
                         LogDir,
                         filename:join(Cwd, TestDir)]) ++
-                SpecFlags ++ get_cover_config(Config, Cwd)
-    end,
+                      SpecFlags ++ get_cover_config(Config, Cwd)
+          end,
     RawLog = filename:join(LogDir, "raw.log"),
     {Cmd, RawLog}.
 
