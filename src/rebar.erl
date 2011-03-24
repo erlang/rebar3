@@ -298,6 +298,7 @@ generate-upgrade  previous_release=path  Build an upgrade package
 generate-appups   previous_release=path  Generate appup files
 
 eunit       [suites=foo]             Run eunit [test/foo_tests.erl] tests
+eunit-compile                        Compile sources for EUnit run
 ct          [suites=] [case=]        Run common_test suites
 
 xref                                 Run cross reference analysis
@@ -361,10 +362,9 @@ filter_flags(Config, [Item | Rest], Commands) ->
 
 command_names() ->
     ["check-deps", "clean", "compile", "create", "create-app", "create-node",
-     "ct", "delete-deps", "doc", "eunit", "generate", "generate-appups",
-     "generate-upgrade", "get-deps", "help", "list-deps", "list-templates",
-     "update-deps", "overlay", "shell", "version", "xref"].
-
+     "ct", "delete-deps", "doc", "eunit", "eunit-compile", "generate",
+     "generate-appups", "generate-upgrade", "get-deps", "help", "list-deps",
+     "list-templates", "update-deps", "overlay", "shell", "version", "xref"].
 
 unabbreviate_command_names([]) ->
     [];

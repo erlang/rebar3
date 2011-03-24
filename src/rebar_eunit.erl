@@ -54,7 +54,8 @@
 -module(rebar_eunit).
 
 -export([eunit/2,
-         clean/2]).
+         clean/2,
+         'eunit-compile'/2]).
 
 -include("rebar.hrl").
 
@@ -65,62 +66,11 @@
 %% ===================================================================
 
 eunit(Config, _AppFile) ->
-    %% Make sure ?EUNIT_DIR/ and ebin/ directory exists (append dummy module)
-    ok = filelib:ensure_dir(filename:join(eunit_dir(), "dummy")),
-    ok = filelib:ensure_dir(filename:join(ebin_dir(), "dummy")),
+    ok = ensure_dirs(),
+    %% Save code path
+    CodePath = setup_code_path(),
 
-    %% Setup code path prior to compilation so that parse_transforms
-    %% and the like work properly. Also, be sure to add ebin_dir()
-    %% to the END of the code path so that we don't have to jump
-    %% through hoops to access the .app file
-    CodePath = code:get_path(),
-    true = code:add_patha(eunit_dir()),
-    true = code:add_pathz(ebin_dir()),
-
-    %% Obtain all the test modules for inclusion in the compile stage.
-    %% Notice: this could also be achieved with the following
-    %% rebar.config option: {eunit_compile_opts, [{src_dirs, ["test"]}]}
-    TestErls = rebar_utils:find_files("test", ".*\\.erl\$"),
-
-    %% Copy source files to eunit dir for cover in case they are not directly
-    %% in src but in a subdirectory of src. Cover only looks in cwd and ../src
-    %% for source files. Also copy files from src_dirs.
-    ErlOpts = rebar_utils:erl_opts(Config),
-
-    SrcDirs = rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts)),
-    SrcErls = lists:foldl(
-                fun(Dir, Acc) ->
-                        Files = rebar_utils:find_files(Dir, ".*\\.erl\$"),
-                        lists:append(Acc, Files)
-                end, [], SrcDirs),
-
-    %% If it is not the first time rebar eunit is executed, there will be source
-    %% files already present in ?EUNIT_DIR. Since some SCMs (like Perforce) set
-    %% the source files as being read only (unless they are checked out), we
-    %% need to be sure that the files already present in ?EUNIT_DIR are writable
-    %% before doing the copy. This is done here by removing any file that was
-    %% already present before calling rebar_file_utils:cp_r.
-
-    %% Get the full path to a file that was previously copied in ?EUNIT_DIR
-    ToCleanUp = fun(F, Acc) ->
-                        F2 = filename:basename(F),
-                        F3 = filename:join([?EUNIT_DIR, F2]),
-                        case filelib:is_regular(F3) of
-                            true -> [F3|Acc];
-                            false -> Acc
-                        end
-                end,
-
-    ok = rebar_file_utils:delete_each(lists:foldl(ToCleanUp, [], TestErls)),
-    ok = rebar_file_utils:delete_each(lists:foldl(ToCleanUp, [], SrcErls)),
-
-    ok = rebar_file_utils:cp_r(SrcErls ++ TestErls, ?EUNIT_DIR),
-
-    %% Compile erlang code to ?EUNIT_DIR, using a tweaked config
-    %% with appropriate defines for eunit, and include all the test modules
-    %% as well.
-    ok = rebar_erlc_compiler:doterl_compile(eunit_config(Config),
-                                            ?EUNIT_DIR, TestErls),
+    {ok, SrcErls} = eunit_compile(Config),
 
     %% Build a list of all the .beams in ?EUNIT_DIR -- use this for
     %% cover and eunit testing. Normally you can just tell cover
@@ -171,9 +121,80 @@ eunit(Config, _AppFile) ->
 clean(_Config, _File) ->
     rebar_file_utils:rm_rf(?EUNIT_DIR).
 
+'eunit-compile'(Config, _File) ->
+    ok = ensure_dirs(),
+    %% Save code path
+    CodePath = setup_code_path(),
+    {ok, _SrcErls} = eunit_compile(Config),
+    %% Restore code path
+    true = code:set_path(CodePath),
+    ok.
+
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+eunit_compile(Config) ->
+    %% Obtain all the test modules for inclusion in the compile stage.
+    %% Notice: this could also be achieved with the following
+    %% rebar.config option: {eunit_compile_opts, [{src_dirs, ["test"]}]}
+    TestErls = rebar_utils:find_files("test", ".*\\.erl\$"),
+
+    %% Copy source files to eunit dir for cover in case they are not directly
+    %% in src but in a subdirectory of src. Cover only looks in cwd and ../src
+    %% for source files. Also copy files from src_dirs.
+    ErlOpts = rebar_utils:erl_opts(Config),
+
+    SrcDirs = rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts)),
+    SrcErls = lists:foldl(
+                fun(Dir, Acc) ->
+                        Files = rebar_utils:find_files(Dir, ".*\\.erl\$"),
+                        lists:append(Acc, Files)
+                end, [], SrcDirs),
+
+    %% If it is not the first time rebar eunit is executed, there will be source
+    %% files already present in ?EUNIT_DIR. Since some SCMs (like Perforce) set
+    %% the source files as being read only (unless they are checked out), we
+    %% need to be sure that the files already present in ?EUNIT_DIR are writable
+    %% before doing the copy. This is done here by removing any file that was
+    %% already present before calling rebar_file_utils:cp_r.
+
+    %% Get the full path to a file that was previously copied in ?EUNIT_DIR
+    ToCleanUp = fun(F, Acc) ->
+                        F2 = filename:basename(F),
+                        F3 = filename:join([?EUNIT_DIR, F2]),
+                        case filelib:is_regular(F3) of
+                            true -> [F3|Acc];
+                            false -> Acc
+                        end
+                end,
+
+    ok = rebar_file_utils:delete_each(lists:foldl(ToCleanUp, [], TestErls)),
+    ok = rebar_file_utils:delete_each(lists:foldl(ToCleanUp, [], SrcErls)),
+
+    ok = rebar_file_utils:cp_r(SrcErls ++ TestErls, ?EUNIT_DIR),
+
+    %% Compile erlang code to ?EUNIT_DIR, using a tweaked config
+    %% with appropriate defines for eunit, and include all the test modules
+    %% as well.
+    ok = rebar_erlc_compiler:doterl_compile(eunit_config(Config),
+                                            ?EUNIT_DIR, TestErls),
+    {ok, SrcErls}.
+
+ensure_dirs() ->
+    %% Make sure ?EUNIT_DIR/ and ebin/ directory exists (append dummy module)
+    ok = filelib:ensure_dir(filename:join(eunit_dir(), "dummy")),
+    ok = filelib:ensure_dir(filename:join(ebin_dir(), "dummy")).
+
+setup_code_path() ->
+    %% Setup code path prior to compilation so that parse_transforms
+    %% and the like work properly. Also, be sure to add ebin_dir()
+    %% to the END of the code path so that we don't have to jump
+    %% through hoops to access the .app file
+    CodePath = code:get_path(),
+    true = code:add_patha(eunit_dir()),
+    true = code:add_pathz(ebin_dir()),
+    CodePath.
 
 eunit_dir() ->
     filename:join(rebar_utils:get_cwd(), ?EUNIT_DIR).
