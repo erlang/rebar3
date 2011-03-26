@@ -35,7 +35,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 %% Assuming this test is run inside the rebar 'eunit'
-%% command, the current working directory will be '.eunit'
+%% command, the current working directory will be '.test'
 -define(REBAR_SCRIPT, "../rebar").
 
 -define(TMP_DIR, "tmp_eunit/").
@@ -70,7 +70,7 @@ cover_test_() ->
 
       {"Only production modules get coverage reports",
        assert_files_not_in("the temporary eunit directory",
-                           [".eunit/myapp_mymod_tests.COVER.html"])}]}.
+                           [".test/myapp_mymod_tests.COVER.html"])}]}.
 
 cover_with_suite_test_() ->
     {"Ensure Cover runs with Tests in a test dir and a test suite",
@@ -83,21 +83,21 @@ cover_with_suite_test_() ->
 
      [{"Cover reports are generated for module",
        assert_files_in("the temporary eunit directory",
-                           [".eunit/index.html",
-                            ".eunit/mysuite.COVER.html"])},
+                           [".test/index.html",
+                            ".test/mysuite.COVER.html"])},
 
       {"Only production modules get coverage reports",
        assert_files_not_in("the temporary eunit directory",
-                           [".eunit/myapp_app.COVER.html",
-                            ".eunit/myapp_mymod.COVER.html",
-                            ".eunit/myapp_sup.COVER.html",
-                            ".eunit/myapp_mymod_tests.COVER.html"])}]}.
+                           [".test/myapp_app.COVER.html",
+                            ".test/myapp_mymod.COVER.html",
+                            ".test/myapp_sup.COVER.html",
+                            ".test/myapp_mymod_tests.COVER.html"])}]}.
 
 expected_cover_generated_files() ->
-    [".eunit/index.html",
-     ".eunit/myapp_app.COVER.html",
-     ".eunit/myapp_mymod.COVER.html",
-     ".eunit/myapp_sup.COVER.html"].
+    [".test/index.html",
+     ".test/myapp_app.COVER.html",
+     ".test/myapp_mymod.COVER.html",
+     ".test/myapp_sup.COVER.html"].
 
 cover_coverage_test_() ->
     {"Coverage is accurately calculated",
@@ -246,7 +246,7 @@ assert_files_not_in(_, []) -> [].
 
 assert_full_coverage(Mod) ->
     fun() ->
-            {ok, F} = file:read_file(".eunit/index.html"),
+            {ok, F} = file:read_file(".test/index.html"),
             Result = [X || X <- string:tokens(binary_to_list(F), "\n"),
                            string:str(X, Mod) =/= 0,
                            string:str(X, "100%") =/= 0],

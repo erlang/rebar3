@@ -9,8 +9,8 @@ _rebar()
     sopts="-h -c -v -V -f -j"
     lopts=" --help --commands --verbose --force --jobs= --version"
     cmdsnvars="check-deps clean compile create create-app create-node ct \
-        doc delete-deps escriptize eunit eunit-compile get-deps generate \
-        generate-upgrade help list-deps list-templates update-deps version \
+        doc delete-deps escriptize eunit get-deps generate generate-upgrade \
+        help list-deps list-templates qc test-compile update-deps version \
         xref overlay apps= case= force=1 jobs= suites= verbose=1 appid= \
         previous_release= nodeid= root_dir= skip_deps=true skip_apps= \
         template= template_dir="

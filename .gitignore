@@ -5,8 +5,6 @@ rebar
 .*.swp
 rt.work
 .hgignore
-.eunit
+.test
 dialyzer_warnings
-xref_warnings
 rebar.cmd
-rebar.ps1

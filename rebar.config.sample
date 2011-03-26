@@ -88,6 +88,11 @@
 %% Option to use short names (i.e., -sname test) when starting ct
 {ct_use_short_names, true}.
 
+%% == QuickCheck ==
+
+%% If qc_mod is unspecified, rebar tries to detect Triq or EQC
+{qc_opts, [{qc_mod, module()}, Options]}.
+
 %% == Cleanup ==
 
 %% Which files to cleanup

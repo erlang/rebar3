@@ -7,7 +7,7 @@ all:
 	./bootstrap
 
 clean:
-	@rm -rf rebar ebin/*.beam inttest/rt.work rt.work .eunit
+	@rm -rf rebar ebin/*.beam inttest/rt.work rt.work .test
 
 debug:
 	@./bootstrap debug

@@ -49,8 +49,9 @@
          get_deprecated_local/4, get_deprecated_local/5,
          delayed_halt/1,
          erl_opts/1,
-         src_dirs/1
-        ]).
+         src_dirs/1,
+         test_dir/0,
+         ebin_dir/0]).
 
 -include("rebar.hrl").
 
@@ -305,6 +306,12 @@ src_dirs([]) ->
     ["src"];
 src_dirs(SrcDirs) ->
     SrcDirs.
+
+test_dir() ->
+    filename:join(rebar_utils:get_cwd(), ?TEST_DIR).
+
+ebin_dir() ->
+    filename:join(rebar_utils:get_cwd(), "ebin").
 
 %% ====================================================================
 %% Internal functions

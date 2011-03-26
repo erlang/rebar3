@@ -29,9 +29,8 @@
 -export([compile/2,
          clean/2]).
 
-%% for internal use by only eunit
--export([doterl_compile/2,
-         doterl_compile/3]).
+%% for internal use by only eunit and qc
+-export([test_compile/1]).
 
 -include("rebar.hrl").
 
@@ -111,10 +110,112 @@ clean(_Config, _AppFile) ->
     lists:foreach(fun(Dir) -> delete_dir(Dir, dirs(Dir)) end, dirs("ebin")),
     ok.
 
+%% ===================================================================
+%% .erl Compilation API (externally used by only eunit and qc)
+%% ===================================================================
+
+test_compile(Config) ->
+    %% Obtain all the test modules for inclusion in the compile stage.
+    %% Notice: this could also be achieved with the following
+    %% rebar.config option: {eunit_compile_opts, [{src_dirs, ["test"]}]}
+    TestErls = rebar_utils:find_files("test", ".*\\.erl\$"),
+
+    %% Copy source files to eunit dir for cover in case they are not directly
+    %% in src but in a subdirectory of src. Cover only looks in cwd and ../src
+    %% for source files. Also copy files from src_dirs.
+    ErlOpts = rebar_utils:erl_opts(Config),
+
+    SrcDirs = rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts)),
+    SrcErls = lists:foldl(
+                fun(Dir, Acc) ->
+                        Files = rebar_utils:find_files(Dir, ".*\\.erl\$"),
+                        lists:append(Acc, Files)
+                end, [], SrcDirs),
+
+    %% If it is not the first time rebar eunit is executed, there will be source
+    %% files already present in ?TEST_DIR. Since some SCMs (like Perforce) set
+    %% the source files as being read only (unless they are checked out), we
+    %% need to be sure that the files already present in ?TEST_DIR are writable
+    %% before doing the copy. This is done here by removing any file that was
+    %% already present before calling rebar_file_utils:cp_r.
+
+    %% Get the full path to a file that was previously copied in ?TEST_DIR
+    ToCleanUp = fun(F, Acc) ->
+                        F2 = filename:basename(F),
+                        F3 = filename:join([?TEST_DIR, F2]),
+                        case filelib:is_regular(F3) of
+                            true -> [F3|Acc];
+                            false -> Acc
+                        end
+                end,
+
+    ok = rebar_file_utils:delete_each(lists:foldl(ToCleanUp, [], TestErls)),
+    ok = rebar_file_utils:delete_each(lists:foldl(ToCleanUp, [], SrcErls)),
+
+    ok = rebar_file_utils:cp_r(SrcErls ++ TestErls, ?TEST_DIR),
+
+    %% Compile erlang code to ?TEST_DIR, using a tweaked config
+    %% with appropriate defines for eunit, and include all the test modules
+    %% as well.
+    ok = doterl_compile(test_compile_config(Config), ?TEST_DIR, TestErls),
+
+    {ok, SrcErls}.
 
 %% ===================================================================
-%% .erl Compilation API (externally used by only eunit)
+%% Internal functions
 %% ===================================================================
+
+test_compile_config(Config) ->
+    {Config1, TriqOpts} = triq_opts(Config),
+    {Config2, PropErOpts} = proper_opts(Config1),
+    {Config3, EqcOpts} = eqc_opts(Config2),
+
+    ErlOpts = rebar_config:get_list(Config3, erl_opts, []),
+    EunitOpts = rebar_config:get_list(Config3, eunit_compile_opts, []),
+    Opts0 = [{d, 'TEST'}] ++
+        ErlOpts ++ EunitOpts ++ TriqOpts ++ PropErOpts ++ EqcOpts,
+    Opts = [O || O <- Opts0, O =/= no_debug_info],
+    Config4 = rebar_config:set(Config3, erl_opts, Opts),
+
+    FirstErls = rebar_config:get_list(Config4, eunit_first_files, []),
+    rebar_config:set(Config4, erl_first_files, FirstErls).
+
+triq_opts(Config) ->
+    {NewConfig, IsAvail} = is_lib_avail(Config, is_triq_avail, triq,
+                                        "triq.hrl", "Triq"),
+    Opts = define_if('TRIQ', IsAvail),
+    {NewConfig, Opts}.
+
+proper_opts(Config) ->
+    {NewConfig, IsAvail} = is_lib_avail(Config, is_proper_avail, proper,
+                                        "proper.hrl", "PropEr"),
+    Opts = define_if('PROPER', IsAvail),
+    {NewConfig, Opts}.
+
+eqc_opts(Config) ->
+    {NewConfig, IsAvail} = is_lib_avail(Config, is_eqc_avail, eqc,
+                                        "eqc.hrl", "QuickCheck"),
+    Opts = define_if('EQC', IsAvail),
+    {NewConfig, Opts}.
+
+define_if(Def, true) -> [{d, Def}];
+define_if(_Def, false) -> [].
+
+is_lib_avail(Config, DictKey, Mod, Hrl, Name) ->
+    case rebar_config:get_xconf(Config, DictKey, undefined) of
+        undefined ->
+            IsAvail = case code:lib_dir(Mod, include) of
+                          {error, bad_name} ->
+                              false;
+                          Dir ->
+                              filelib:is_regular(filename:join(Dir, Hrl))
+                      end,
+            NewConfig = rebar_config:set_xconf(Config, DictKey, IsAvail),
+            ?DEBUG("~s availability: ~p\n", [Name, IsAvail]),
+            {NewConfig, IsAvail};
+        IsAvail ->
+            {Config, IsAvail}
+    end.
 
 -spec doterl_compile(Config::rebar_config:config(),
                      OutDir::file:filename()) -> 'ok'.
