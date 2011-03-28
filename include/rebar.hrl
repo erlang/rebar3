@@ -1,8 +1,6 @@
 -record(config, { dir,
                   opts }).
 
--record(global_state, { working_dir }).
-
 -define(FAIL, throw({error, failed})).
 
 -define(ABORT(Str, Args), rebar_utils:abort(Str, Args)).
