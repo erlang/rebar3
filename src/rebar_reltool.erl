@@ -290,6 +290,21 @@ execute_overlay([{copy, In, Out} | Rest], Vars, BaseDir, TargetDir) ->
     end,
     rebar_file_utils:cp_r([InFile], OutFile),
     execute_overlay(Rest, Vars, BaseDir, TargetDir);
+execute_overlay([{template_wildcard, Wildcard, OutDir} | Rest], Vars, BaseDir, TargetDir) ->
+    %% Generate a series of {template, In, Out} instructions from the wildcard
+    %% that will get processed per normal
+    Ifun = fun(F, Acc0) ->
+                   [{template, F, filename:join(OutDir, filename:basename(F))} | Acc0]
+           end,
+    NewInstrs = lists:foldl(Ifun, Rest, filelib:wildcard(Wildcard, BaseDir)),
+    case length(NewInstrs) == length(Rest) of
+        true ->
+            ?WARN("template_wildcard: ~s did not match any files!\n", [Wildcard]);
+        false ->
+            ok
+    end,
+    ?DEBUG("template_wildcard: ~s expanded to ~p\n", [Wildcard, NewInstrs]),
+    execute_overlay(NewInstrs, Vars, BaseDir, TargetDir);
 execute_overlay([{template, In, Out} | Rest], Vars, BaseDir, TargetDir) ->
     InFile = render(filename:join(BaseDir, In), Vars),
     {ok, InFileData} = file:read_file(InFile),
