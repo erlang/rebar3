@@ -61,54 +61,59 @@ xref(Config, _) ->
                                    undefined_function_calls]),
 
     %% Look for exports that are unused by anything
-    case lists:member(exports_not_used, XrefChecks) of
-        true ->
-            check_exports_not_used(Config);
-        false ->
-            ok
-    end,
+    ExportsNoWarn =
+        case lists:member(exports_not_used, XrefChecks) of
+            true ->
+                check_exports_not_used();
+            false ->
+                true
+        end,
 
     %% Look for calls to undefined functions
-    case lists:member(undefined_function_calls, XrefChecks) of
-        true ->
-            check_undefined_function_calls(Config);
-        false ->
-            ok
-    end,
-
+    UndefNoWarn =
+        case lists:member(undefined_function_calls, XrefChecks) of
+            true ->
+                check_undefined_function_calls();
+            false ->
+                true
+        end,
     %% Restore the original code path
     true = code:set_path(OrigPath),
 
     %% Stop xref
     stopped = xref:stop(xref),
 
-    ok.
+    case lists:all(fun(NoWarn) -> NoWarn end, [ExportsNoWarn, UndefNoWarn]) of
+        true ->
+            ok;
+        false ->
+            ?FAIL
+    end.
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
-check_exports_not_used(_Config) ->
+check_exports_not_used() ->
     {ok, UnusedExports0} = xref:analyze(xref, exports_not_used),
     UnusedExports = filter_away_ignored(UnusedExports0),
 
     %% Report all the unused functions
     display_mfas(UnusedExports, "is unused export (Xref)"),
-    ok.
+    UnusedExports =:= [].
 
-check_undefined_function_calls(_Config) ->
+check_undefined_function_calls() ->
     {ok, UndefinedCalls0} = xref:analyze(xref, undefined_function_calls),
     UndefinedCalls =
-        [{find_mfa_source(Caller), format_fa(Caller), format_mfa(Target)} ||
-            {Caller, Target} <- UndefinedCalls0],
+        [{find_mfa_source(Caller), format_fa(Caller), format_mfa(Target)}
+         || {Caller, Target} <- UndefinedCalls0],
 
     lists:foreach(
       fun({{Source, Line}, FunStr, Target}) ->
               ?CONSOLE("~s:~w: Warning ~s calls undefined function ~s\n",
                        [Source, Line, FunStr, Target])
       end, UndefinedCalls),
-    ok.
-
+    UndefinedCalls =:= [].
 
 code_path() ->
     [P || P <- code:get_path(),
