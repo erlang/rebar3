@@ -89,7 +89,8 @@ app_applications(AppFile) ->
 app_vsn(AppFile) ->
     case load_app_file(AppFile) of
         {ok, _, AppInfo} ->
-            vcs_vsn(get_value(vsn, AppInfo, AppFile));
+            AppDir = filename:dirname(filename:dirname(AppFile)),
+            vcs_vsn(get_value(vsn, AppInfo, AppFile), AppDir);
         {error, Reason} ->
             ?ABORT("Failed to extract vsn from ~s: ~p\n",
                    [AppFile, Reason])
@@ -125,12 +126,12 @@ get_value(Key, AppInfo, AppFile) ->
             Value
     end.
 
-vcs_vsn(Vcs) ->
+vcs_vsn(Vcs, Dir) ->
     case vcs_vsn_cmd(Vcs) of
         {unknown, VsnString} ->
             VsnString;
         Cmd ->
-            {ok, VsnString} = rebar_utils:sh(Cmd, [{use_stdout, false}]),
+            {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),
             string:strip(VsnString, right, $\n)
     end.
 

@@ -75,7 +75,7 @@ get_arch() ->
 %% Val = string() | false
 %%
 sh(Command0, Options0) ->
-    ?INFO("sh: ~s\n~p\n", [Command0, Options0]),
+    ?INFO("sh info:\n\tcwd: ~p\n\tcmd: ~s\n\topts: ~p\n", [get_cwd(), Command0, Options0]),
 
     DefaultOptions = [use_stdout, abort_on_error],
     Options = [expand_sh_flag(V)
