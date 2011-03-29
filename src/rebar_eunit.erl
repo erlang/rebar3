@@ -182,13 +182,13 @@ eunit_config(Config) ->
 
     ErlOpts = rebar_config:get_list(Config, erl_opts, []),
     EunitOpts = rebar_config:get_list(Config, eunit_compile_opts, []),
-    Opts = [{d, 'TEST'}, debug_info] ++
+    Opts0 = [{d, 'TEST'}] ++
         ErlOpts ++ EunitOpts ++ EqcOpts ++ PropErOpts,
+    Opts = [O || O <- Opts0, O =/= no_debug_info],
     Config1 = rebar_config:set(Config, erl_opts, Opts),
 
     FirstErls = rebar_config:get_list(Config1, eunit_first_files, []),
     rebar_config:set(Config1, erl_first_files, FirstErls).
-
 
 eqc_opts() ->
     define_if('EQC', is_lib_avail(is_eqc_avail, eqc,

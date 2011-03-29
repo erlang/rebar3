@@ -118,13 +118,12 @@ doterl_compile(Config, OutDir) ->
 doterl_compile(Config, OutDir, MoreSources) ->
     FirstErls = rebar_config:get_list(Config, erl_first_files, []),
     RawErlOpts = filter_defines(rebar_config:get(Config, erl_opts, []), []),
-    ErlOpts =
-        case rebar_config:get_global(debug_info, "0") of
-            "0" ->
-                RawErlOpts;
-            _ ->
-                [debug_info|RawErlOpts]
-        end,
+    ErlOpts = case proplists:is_defined(no_debug_info, RawErlOpts) of
+                  true ->
+                      [O || O <- RawErlOpts, O =/= no_debug_info];
+                  _ ->
+                      [debug_info|RawErlOpts]
+              end,
     ?DEBUG("erl_opts ~p~n",[ErlOpts]),
     %% Support the src_dirs option allowing multiple directories to
     %% contain erlang source. This might be used, for example, should
