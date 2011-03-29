@@ -139,22 +139,31 @@ target_dir(ReltoolConfig) ->
     end.
 
 %%
-%% Look for overlay_vars file reference. The user can override this from the
-%% command line (i.e. globals), so we check there first and then fall back to
-%% what is present in the reltool.config file
+%% Look for overlay_vars file reference. If the user provides an overlay_vars on
+%% the command line (i.e. a global), the terms from that file OVERRIDE the one
+%% listed in reltool.config. To re-iterate, this means you can specify a
+%% variable in the file from reltool.config and then override that value by
+%% providing an additional file on the command-line.
 %%
-overlay_vars(ReltoolConfig) ->
-    case rebar_config:get_global(overlay_vars, undefined) of
-        undefined ->
-            case lists:keyfind(overlay_vars, 1, ReltoolConfig) of
-                {overlay_vars, File} ->
-                    File;
-                false ->
-                    undefined
-            end;
-        File ->
-            File
+overlay_vars(Vars0, ReltoolConfig) ->
+    BaseVars = load_vars_file(proplists:get_value(overlay_vars, ReltoolConfig)),
+    OverrideVars = load_vars_file(rebar_config:get_global(overlay_vars, undefined)),
+    M = fun(_Key, _Base, Override) -> Override end,
+    dict:merge(M, dict:merge(M, Vars0, BaseVars), OverrideVars).
+
+%%
+%% If a filename is provided, construct a dict of terms
+%%
+load_vars_file(undefined) ->
+    dict:new();
+load_vars_file(File) ->
+    case file:consult(File) of
+        {ok, Terms} ->
+            dict:from_list(Terms);
+        {error, Reason} ->
+            ?ABORT("Unable to load overlay_vars from ~s: ~p\n", [File, Reason])
     end.
+
 
 
 validate_rel_apps(ReltoolServer, {sys, ReltoolConfig}) ->
@@ -211,22 +220,10 @@ run_reltool(Server, _Config, ReltoolConfig) ->
 
             %% Initialize overlay vars with some basics
             %% (that can get overwritten)
-            OverlayVars0 = [{erts_vsn, "erts-" ++ erlang:system_info(version)}],
+            OverlayVars0 = dict:from_list([{erts_vsn, "erts-" ++ erlang:system_info(version)}]),
 
             %% Load up any variables specified by overlay_vars
-            OverlayVars = case overlay_vars(ReltoolConfig) of
-                              undefined ->
-                                  dict:from_list(OverlayVars0);
-                              File ->
-                                  case file:consult(File) of
-                                      {ok, Terms} ->
-                                          dict:from_list(OverlayVars0 ++ Terms);
-                                      {error, Reason2} ->
-                                          ?ABORT("Unable to load overlay_vars "
-                                                 "from ~s: ~p\n",
-                                                 [File, Reason2])
-                                  end
-                          end,
+            OverlayVars = overlay_vars(OverlayVars0, ReltoolConfig),
 
             %% Finally, overlay the files specified by the overlay section
             case lists:keyfind(overlay, 1, ReltoolConfig) of
