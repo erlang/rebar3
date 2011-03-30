@@ -104,17 +104,33 @@ create(_Config, _) ->
             Context0 = dict:new()
     end,
 
+    %% Load variables from disk file, if provided
+    Context1 = case rebar_config:get_global(template_vars, undefined) of
+                   undefined ->
+                       Context0;
+                   File ->
+                       case file:consult(File) of
+                           {ok, Terms} ->
+                               %% TODO: Cleanup/merge with similar code in rebar_reltool
+                               M = fun(_Key, _Base, Override) -> Override end,
+                               dict:merge(M, Context0, dict:from_list(Terms));
+                           {error, Reason} ->
+                               ?ABORT("Unable to load template_vars from ~s: ~p\n",
+                                      [File, Reason])
+                       end
+               end,
+
     %% For each variable, see if it's defined in global vars -- if it is,
     %% prefer that value over the defaults
-    Context1 = update_vars(dict:fetch_keys(Context0), Context0),
+    Context2 = update_vars(dict:fetch_keys(Context1), Context1),
     ?DEBUG("Template ~p context: ~p\n", [TemplateId, dict:to_list(Context1)]),
 
     %% Handle variables that possibly include other variables in their
     %% definition
-    Context = resolve_recursive_vars(dict:to_list(Context1), Context1),
+    Context = resolve_recursive_vars(dict:to_list(Context2), Context2),
 
     ?DEBUG("Resolved Template ~p context: ~p\n",
-           [TemplateId, dict:to_list(Context1)]),
+           [TemplateId, dict:to_list(Context)]),
 
     %% Now, use our context to process the template definition -- this
     %% permits us to use variables within the definition for filenames.
