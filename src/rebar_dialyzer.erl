@@ -119,7 +119,7 @@ dialyze(Config, File) ->
     end,
     ok.
 
-%% @doc Check whether the PLT is up-to-date (rebuilding it if not).
+%% @doc Check whether the PLT is up-to-date.
 -spec 'check-plt'(Config::rebar_config:config(), File::file:filename()) -> ok.
 'check-plt'(Config, File) ->
     Plt = existing_plt_path(Config, File),
@@ -128,10 +128,10 @@ dialyze(Config, File) ->
             ?CONSOLE("The PLT ~s is up-to-date~n", [Plt]);
         _ ->
             %% @todo Determine whether this is the correct summary.
-            ?CONSOLE("The PLT ~s is not up-to-date~n", [Plt])
+            ?ABORT("The PLT ~s is not up-to-date~n", [Plt])
     catch
         throw:{dialyzer_error, _Reason} ->
-            ?CONSOLE("The PLT ~s is not valid.~n", [Plt])
+            ?ABORT("The PLT ~s is not valid.~n", [Plt])
     end,
     ok.
 
