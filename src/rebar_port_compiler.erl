@@ -27,7 +27,8 @@
 -module(rebar_port_compiler).
 
 -export([compile/2,
-         clean/2]).
+         clean/2,
+         setup_env/1]).
 
 -include("rebar.hrl").
 
@@ -94,14 +95,7 @@ compile(Config, AppFile) ->
         [] ->
             ok;
         _ ->
-            %% Extract environment values from the config (if specified) and
-            %% merge with the default for this operating system. This enables
-            %% max flexibility for users.
-            DefaultEnvs  = filter_envs(default_env(), []),
-            PortEnvs = rebar_config:get_list(Config, port_envs, []),
-            OverrideEnvs = filter_envs(PortEnvs, []),
-            RawEnv = DefaultEnvs ++ OverrideEnvs ++ os_env(),
-            Env = expand_vars_loop(merge_each_var(RawEnv, [])),
+            Env = setup_env(Config),
 
             %% One or more files are available for building.
             %% Run the pre-compile hook, if necessary.
@@ -152,8 +146,15 @@ clean(Config, AppFile) ->
     %% Run the cleanup script, if it exists
     run_cleanup_hook(Config).
 
-
-
+setup_env(Config) ->
+    %% Extract environment values from the config (if specified) and
+    %% merge with the default for this operating system. This enables
+    %% max flexibility for users.
+    DefaultEnvs  = filter_envs(default_env(), []),
+    PortEnvs = rebar_config:get_list(Config, port_envs, []),
+    OverrideEnvs = filter_envs(PortEnvs, []),
+    RawEnv = DefaultEnvs ++ OverrideEnvs ++ os_env(),
+    expand_vars_loop(merge_each_var(RawEnv, [])).
 
 %% ===================================================================
 %% Internal functions

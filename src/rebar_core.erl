@@ -234,12 +234,15 @@ execute(Command, Modules, Config, ModuleFile) ->
             %% responds to this command
             erlang:put(operations, erlang:get(operations) + 1),
 
+            %% Check for and get command specific environments
+            Env = setup_envs(Config, Modules),
+
             %% Run the available modules
-            apply_hooks(pre_hooks, Config, Command),
+            apply_hooks(pre_hooks, Config, Command, Env),
             case catch(run_modules(TargetModules, Command,
                                    Config, ModuleFile)) of
                 ok ->
-                    apply_hooks(post_hooks, Config, Command),
+                    apply_hooks(post_hooks, Config, Command, Env),
                     ok;
                 {error, failed} ->
                     ?FAIL;
@@ -304,14 +307,19 @@ run_modules([Module | Rest], Command, Config, File) ->
             {Module, Error}
     end.
 
-apply_hooks(Mode, Config, Command) ->
+apply_hooks(Mode, Config, Command, Env) ->
     Hooks = rebar_config:get_local(Config, Mode, []),
     lists:foreach(fun apply_hook/1,
-                  [Hook || Hook <- Hooks, element(1, Hook) =:= Command]).
+                  [{Env, Hook} || Hook <- Hooks, element(1, Hook) =:= Command]).
 
-apply_hook({Command, Hook}) ->
+apply_hook({Env, {Command, Hook}}) ->
     Msg = lists:flatten(io_lib:format("Command [~p] failed!~n", [Command])),
-    rebar_utils:sh(Hook, [{abort_on_error, Msg}]).
+    rebar_utils:sh(Hook, [{env, Env}, {abort_on_error, Msg}]).
+
+setup_envs(Config, Modules) ->
+    lists:flatten([M:setup_env(Config) ||
+                      M <- Modules,
+                      erlang:function_exported(M, setup_env, 1)]).
 
 acc_modules(Modules, Command, Config, File) ->
     acc_modules(select_modules(Modules, Command, []),
