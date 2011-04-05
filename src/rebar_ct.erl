@@ -46,8 +46,20 @@
 %% ===================================================================
 
 ct(Config, File) ->
-    run_test_if_present("test", Config, File).
-
+    case rebar_config:get_global(app, undefined) of
+        undefined ->
+            %% No app parameter specified, run everything..
+            run_test_if_present("test", Config, File);
+        Apps ->
+            TargetApps = [list_to_atom(A) || A <- string:tokens(Apps, ",")],
+            ThisApp = rebar_app_utils:app_name(File),
+            case lists:member(ThisApp, TargetApps) of
+                true ->
+                    run_test_if_present("test", Config, File);
+                false ->
+                    ?DEBUG("Skipping common_test on app: ~p\n", [ThisApp])
+            end
+    end.
 
 %% ===================================================================
 %% Internal functions
