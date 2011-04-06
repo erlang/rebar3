@@ -12,7 +12,7 @@ _rebar()
         create create-app create-node ct dialyze doc delete-deps eunit \
         get-deps generate generate-upgrade help list-templates update-deps \
         version xref case= force=1 jobs= suite= verbose=1 appid= \
-        previous_release= skip_deps=1 template= template_dir="
+        previous_release= skip_deps=1 skip_app= template= template_dir="
 
     if [[ ${cur} == --* ]] ; then
         COMPREPLY=( $(compgen -W "${lopts}" -- ${cur}) )
