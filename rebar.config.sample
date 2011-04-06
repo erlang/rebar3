@@ -75,6 +75,11 @@
 %% Whether to print coverage report to console. Default is `false'
 {cover_print_enabled, false}.
 
+%% == Common Test ==
+
+%% Option to pass extra parameters when launching Common Test
+{ct_extra_params, "-boot start_sasl -s myapp"}.
+
 %% == Dialyzer ==
 
 %% Options for running dialyzer

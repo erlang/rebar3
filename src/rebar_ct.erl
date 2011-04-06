@@ -145,15 +145,17 @@ make_cmd(TestDir, Config) ->
               undefined ->
                   ?FMT("erl " % should we expand ERL_PATH?
                        " -noshell -pa ~s ~s"
-                       " -s ct_run script_start -s erlang halt"
                        " -name test@~s"
                        " -logdir \"~s\""
-                       " -env TEST_DIR \"~s\"",
+                       " -env TEST_DIR \"~s\""
+                       " ~s"
+                       " -s ct_run script_start -s erlang halt",
                        [CodePathString,
                         Include,
                         net_adm:localhost(),
                         LogDir,
-                        filename:join(Cwd, TestDir)]) ++
+                        filename:join(Cwd, TestDir),
+                        get_extra_params(Config)]) ++
                       get_cover_config(Config, Cwd) ++
                       get_ct_config_file(TestDir) ++
                       get_config_file(TestDir) ++
@@ -162,19 +164,24 @@ make_cmd(TestDir, Config) ->
               SpecFlags ->
                   ?FMT("erl " % should we expand ERL_PATH?
                        " -noshell -pa ~s ~s"
-                       " -s ct_run script_start -s erlang halt"
                        " -name test@~s"
                        " -logdir \"~s\""
-                       " -env TEST_DIR \"~s\"",
+                       " -env TEST_DIR \"~s\""
+                       " ~s"
+                       " -s ct_run script_start -s erlang halt",
                        [CodePathString,
                         Include,
                         net_adm:localhost(),
                         LogDir,
-                        filename:join(Cwd, TestDir)]) ++
+                        filename:join(Cwd, TestDir),
+                        get_extra_params(Config)]) ++
                       SpecFlags ++ get_cover_config(Config, Cwd)
           end,
     RawLog = filename:join(LogDir, "raw.log"),
     {Cmd, RawLog}.
+
+get_extra_params(Config) ->
+    rebar_config:get_local(Config, ct_extra_params, "").
 
 get_ct_specs(Cwd) ->
     case collect_glob(Cwd, ".*\.test\.spec\$") of
