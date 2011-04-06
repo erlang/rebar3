@@ -128,3 +128,9 @@
 {post_hooks, [{clean, "touch file1.out"},
               {eunit, "touch file2.out"},
               {compile, "touch postcompile.out"}]}.
+
+%% == xref ==
+
+{xref_warnings, false}.
+%% xref checks to run
+{xref_checks, [exports_not_used, undefined_function_calls]}.
