@@ -56,19 +56,10 @@ execute_post_script(Config, Key) ->
             ok
     end.
 
-deprecated(compile_post_script) ->
-    ?CONSOLE(
-       <<
-         "WARNING: option deprecated~n"
-         "Config option 'compile_post_script' has been deprecated in favor"
-         " of ~noption {post_hooks, [{compile, \"script\"}]}.~nFuture builds "
-         "of rebar will remove the option 'compile_post_script'.~n~n"
-       >>, []);
-deprecated(clean_post_script) ->
-    ?CONSOLE(
-       <<
-         "WARNING: option deprecated~n"
-         "Config option 'clean_post_script' has been deprecated in favor"
-         " of ~noption {post_hooks, [{clean, \"script\"}]}.~nFuture builds "
-         "of rebar will remove the option 'clean_post_script'.~n~n"
-       >>, []).
+
+deprecated(Key=compile_post_script) ->
+    ?DEPRECATED(Key, {post_hooks, [{compile, "script"}]},
+                "in a future build of rebar");
+deprecated(Key=clean_post_script) ->
+    ?DEPRECATED(Key, {post_hooks, [{clean, "script"}]},
+                "in a future build of rebar").

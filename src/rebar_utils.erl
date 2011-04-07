@@ -39,7 +39,8 @@
          escript_foldl/3,
          find_executable/1,
          prop_check/3,
-         expand_code_path/0]).
+         expand_code_path/0,
+         deprecated/3, deprecated/4]).
 
 -include("rebar.hrl").
 
@@ -249,3 +250,20 @@ emulate_escript_foldl(Fun, Acc, File) ->
         {error, _} = Error ->
             Error
     end.
+
+deprecated(Old, New, Opts, When) ->
+    case lists:member(Old, Opts) of
+        true ->
+            deprecated(Old, New, When);
+        false ->
+            ok
+    end.
+
+deprecated(Old, New, When) ->
+    io:format(
+      <<
+        "WARNING: option deprecated~n"
+        "Config option '~p' has been deprecated~n"
+        "in favor of '~p'.~n"
+        "'~p' will be removed ~s.~n~n"
+      >>, [Old, New, Old, When]).

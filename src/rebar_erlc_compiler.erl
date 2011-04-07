@@ -69,6 +69,10 @@
 
 -spec compile(Config::rebar_config:config(), AppFile::file:filename()) -> 'ok'.
 compile(Config, _AppFile) ->
+    ?DEPRECATED(fail_on_warning, warnings_as_errors,
+                rebar_config:get_list(Config, erl_opts, []),
+                "once OTP R15 is released"),
+
     rebar_base_compiler:run(Config,
                             check_files(rebar_config:get_local(
                                           Config, xrl_first_files, [])),

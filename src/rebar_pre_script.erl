@@ -56,19 +56,9 @@ execute_pre_script(Config, Key) ->
             ok
     end.
 
-deprecated(compile_pre_script) ->
-    ?CONSOLE(
-       <<
-         "WARNING: option deprecated~n"
-         "Config option 'compile_pre_script' has been deprecated in favor"
-         " of ~n{pre_hooks, [{compile, \"script\"}]}.~nFuture builds of"
-         " rebar will remove the option 'compile_pre_script'.~n~n"
-       >>, []);
-deprecated(clean_pre_script) ->
-    ?CONSOLE(
-       <<
-         "WARNING: option deprecated~n"
-         "Config option 'clean_pre_script' has been deprecated in favor"
-         " of ~n{pre_hooks, [{clean, \"script\"}]}.~nFuture builds of"
-         " rebar will remove the option 'clean_pre_script'.~n~n"
-       >>, []).
+deprecated(Key=compile_pre_script) ->
+    ?DEPRECATED(Key, {pre_hooks, [{compile, "script"}]},
+                "in a future build of rebar");
+deprecated(Key=clean_pre_script) ->
+    ?DEPRECATED(Key, {pre_hooks, [{clean, "script"}]},
+                "in a future build of rebar").
