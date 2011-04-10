@@ -31,6 +31,10 @@
          'list-templates'/2,
          create/2]).
 
+%% API for other utilities that need templating functionality
+-export([resolve_variables/2,
+         render/2]).
+
 -include("rebar.hrl").
 
 -define(TEMPLATE_RE, ".*\\.template\$").
@@ -127,7 +131,7 @@ create(_Config, _) ->
 
     %% Handle variables that possibly include other variables in their
     %% definition
-    Context = resolve_recursive_vars(dict:to_list(Context2), Context2),
+    Context = resolve_variables(dict:to_list(Context2), Context2),
 
     ?DEBUG("Resolved Template ~p context: ~p\n",
            [TemplateId, dict:to_list(Context)]),
@@ -142,6 +146,28 @@ create(_Config, _) ->
     execute_template(FinalTemplate, Type, Template, Context, Force, []).
 
 
+%%
+%% Given a list of key value pairs, for each string value attempt to
+%% render it using Dict as the context. Storing the result in Dict as Key.
+%%
+resolve_variables([], Dict) ->
+    Dict;
+resolve_variables([{Key, Value0} | Rest], Dict) when is_list(Value0) ->
+    Value = render(list_to_binary(Value0), Dict),
+    resolve_variables(Rest, dict:store(Key, Value, Dict));
+resolve_variables([_Pair | Rest], Dict) ->
+    resolve_variables(Rest, Dict).
+
+
+%%
+%% Render a binary to a string, using mustache and the specified context
+%%
+render(Bin, Context) ->
+    %% Be sure to escape any double-quotes before rendering...
+    ReOpts = [global, {return, list}],
+    Str0 = re:replace(Bin, "\\\\", "\\\\\\", ReOpts),
+    Str1 = re:replace(Str0, "\"", "\\\\\"", ReOpts),
+    mustache:render(Str1, Context).
 
 
 %% ===================================================================
@@ -232,18 +258,6 @@ update_vars([Key | Rest], Dict) ->
 
 
 %%
-%% Given a list of key value pairs, for each string value attempt to
-%% render it using Dict as the context. Storing the result in Dict as Key.
-%%
-resolve_recursive_vars([], Dict) ->
-    Dict;
-resolve_recursive_vars([{Key, Value0} | Rest], Dict) when is_list(Value0) ->
-    Value = render(list_to_binary(Value0), Dict),
-    resolve_recursive_vars(Rest, dict:store(Key, Value, Dict));
-resolve_recursive_vars([_Pair | Rest], Dict) ->
-    resolve_recursive_vars(Rest, Dict).
-
-%%
 %% Given a string or binary, parse it into a list of terms, ala file:consult/0
 %%
 consult(Str) when is_list(Str) ->
@@ -267,14 +281,6 @@ consult(Cont, Str, Acc) ->
             consult(Cont1, eof, Acc)
     end.
 
-
-%%
-%% Render a binary to a string, using mustache and the specified context
-%%
-render(Bin, Context) ->
-    %% Be sure to escape any double-quotes before rendering...
-    Str = re:replace(Bin, "\"", "\\\\\"", [global, {return,list}]),
-    mustache:render(Str, Context).
 
 write_file(Output, Data, Force) ->
     %% determine if the target file already exists
