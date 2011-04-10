@@ -129,10 +129,30 @@ get_value(Key, AppInfo, AppFile) ->
 vcs_vsn(Vcs, Dir) ->
     case vcs_vsn_cmd(Vcs) of
         {unknown, VsnString} ->
+            ?DEBUG("vcs_vsn: Unknown VCS atom in vsn field: ~p\n", [Vcs]),
             VsnString;
         Cmd ->
-            {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),
-            string:strip(VsnString, right, $\n)
+            %% If there is a valid VCS directory in the application directory,
+            %% use that version info
+            Extension = lists:concat([".", Vcs]),
+            case filelib:is_dir(filename:join(Dir, Extension)) of
+                true ->
+                    ?DEBUG("vcs_vsn: Primary vcs used for ~s\n", [Dir]),
+                    vcs_vsn_invoke(Cmd, Dir);
+                false ->
+                    %% No VCS directory found for the app. Depending on source
+                    %% tree structure, there may be one higher up, but that can
+                    %% yield unexpected results when used with deps. So, we
+                    %% fallback to searching for a priv/vsn.Vcs file.
+                    case file:read_file(filename:join([Dir, "priv", "vsn" ++ Extension])) of
+                        {ok, VsnBin} ->
+                            ?DEBUG("vcs_vsn: Read ~s from priv/vsn.~p\n", [VsnBin, Vcs]),
+                            string:strip(binary_to_list(VsnBin), right, $\n);
+                        {error, enoent} ->
+                            ?DEBUG("vcs_vsn: Fallback to vcs for ~s\n", [Dir]),
+                            vcs_vsn_invoke(Cmd, Dir)
+                    end
+            end
     end.
 
 vcs_vsn_cmd(git) -> "git describe --always --tags";
@@ -140,3 +160,7 @@ vcs_vsn_cmd(hg)  -> "hg identify -i";
 vcs_vsn_cmd(bzr) -> "bzr revno";
 vcs_vsn_cmd(svn) -> "svnversion";
 vcs_vsn_cmd(Version) -> {unknown, Version}.
+
+vcs_vsn_invoke(Cmd, Dir) ->
+    {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),
+    string:strip(VsnString, right, $\n).
