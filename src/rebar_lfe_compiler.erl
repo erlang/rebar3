@@ -37,10 +37,6 @@
 %% ===================================================================
 
 compile(Config, _AppFile) ->
-    ?DEPRECATED(fail_on_warning, warnings_as_errors,
-                rebar_config:get_list(Config, lfe_opts, []),
-                "once OTP R15 is released"),
-
     FirstFiles = rebar_config:get_list(Config, lfe_first_files, []),
     rebar_base_compiler:run(Config, FirstFiles, "src", ".lfe", "ebin", ".beam",
                             fun compile_lfe/3).
@@ -66,7 +62,7 @@ compile_lfe(Source, Target, Config) ->
             ?FAIL;
         _ ->
             Opts = [{i, "include"}, {outdir, "ebin"}, report, return] ++
-                rebar_config:get_list(Config, lfe_opts, []),
+                rebar_config:get_list(Config, erl_opts, []),
             case lfe_comp:file(Source, Opts) of
                 {ok, _, []} ->
                     ok;

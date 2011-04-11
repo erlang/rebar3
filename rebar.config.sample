@@ -50,8 +50,7 @@
 %% LFE files to compile before the rest
 {lfe_first_files, []}.
 
-%% Options for the LFE compiler
-{lfe_opts, []}.
+%% Options for the LFE compiler: reuse {erl_opts, []}
 
 %% == ErlyDTL Compiler ==
 
