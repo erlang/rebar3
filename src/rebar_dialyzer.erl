@@ -34,7 +34,8 @@
 %% A single option <code>plt</code> can be presented in the
 %% <code>dialyzer_opts</code> options in <code>rebar.config</code>. If it
 %% is present, it is used as the PLT for the supported commands. Should it
-%% not be present, then the default is <code>$HOME/.dialyzer_plt</code>.
+%% not be present, then the default is <code>$HOME/.dialyzer_plt</code> or
+%% <code>$REBAR_PLT_DIR/.dialyzer_plt</code> if $REBAR_PLT_DIR is defined.
 %%
 %% @reference <a href="http://user.it.uu.se/~kostis/Papers/bugs05.pdf">
 %% Experience from developing the Dialyzer: A static analysis tool detecting
@@ -153,7 +154,7 @@ output_warnings(Warnings) ->
                   end, Warnings).
 
 %% @doc If the plt option is present in rebar.config return its value,
-%% otherwise return $HOME/.dialyzer_plt.
+%% otherwise return $HOME/.dialyzer_plt or $REBAR_PLT_DIR/.dialyzer_plt.
 -spec new_plt_path(Config::rebar_config:config(),
                    File::file:filename()) -> file:filename().
 new_plt_path(Config, File) ->
@@ -161,39 +162,53 @@ new_plt_path(Config, File) ->
     DialyzerOpts = rebar_config:get(Config, dialyzer_opts, []),
     case proplists:get_value(plt, DialyzerOpts) of
         undefined ->
-            filename:join(os:getenv("HOME"),
-                          "." ++ atom_to_list(AppName) ++ "_dialyzer_plt");
+            case os:getenv("REBAR_PLT_DIR") of
+                false ->
+                    filename:join(os:getenv("HOME"),
+                                  "." ++ atom_to_list(AppName)
+                                  ++ "_dialyzer_plt");
+                PltDir ->
+                    filename:join(PltDir, "." ++ atom_to_list(AppName)
+                                  ++ "_dialyzer_plt")
+            end;
         Plt ->
             Plt
     end.
 
 %% @doc If the plt option is present in rebar.config and the file exists
-%% return its value or if ~/.AppName_dialyzer_plt exists return that.
-%% Otherwise return ~/.dialyzer_plt if it exists or abort.
+%% return its value or if $HOME/.AppName_dialyzer_plt exists return that.
+%% Otherwise return $HOME/.dialyzer_plt if it exists or abort.
+%% If $REBAR_PLT_DIR is defined, it is used instead of $HOME.
 -spec existing_plt_path(Config::rebar_config:config(),
                         File::file:filename()) -> file:filename().
 existing_plt_path(Config, File) ->
     AppName = rebar_app_utils:app_name(File),
     DialyzerOpts = rebar_config:get(Config, dialyzer_opts, []),
     Home = os:getenv("HOME"),
+    Base = case os:getenv("REBAR_PLT_DIR") of
+               false ->
+                   Home;
+               PltDir ->
+                   PltDir
+           end,
     case proplists:get_value(plt, DialyzerOpts) of
         undefined ->
-            AppPlt = filename:join(Home, "." ++ atom_to_list(AppName)
+            AppPlt = filename:join(Base, "." ++ atom_to_list(AppName)
                                    ++ "_dialyzer_plt"),
             case filelib:is_regular(AppPlt) of
                 true ->
                     AppPlt;
                 false ->
-                    HomePlt = filename:join(Home, ".dialyzer_plt"),
-                    case filelib:is_regular(HomePlt) of
+                    BasePlt = filename:join(Base, ".dialyzer_plt"),
+                    case filelib:is_regular(BasePlt) of
                         true ->
-                            HomePlt;
+                            BasePlt;
                         false ->
                             ?ABORT("No PLT found~n", [])
                     end
             end;
         "~/" ++ Plt ->
-            filename:join(Home,Plt);
+            filename:join(Home, Plt);
         Plt ->
             Plt
     end.
