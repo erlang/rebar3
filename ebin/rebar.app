@@ -1,3 +1,6 @@
+%% -*- mode: erlang;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% ex: ts=4 sw=4 ft=erlang et
+
 {application, rebar,
  [{description, "Rebar: Erlang Build Tool"},
   {vsn, "2"},
