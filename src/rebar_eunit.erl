@@ -247,7 +247,10 @@ cover_analyze(Config, Modules, SrcModules) ->
     %% suite can be a comma seperated list of modules to test
     Suite = [list_to_atom(S) ||
                 S <- string:tokens(rebar_config:get_global(suite, ""), ",")],
-    FilteredModules = [M || M <- Modules, lists:member(M, Suite)],
+    FilteredModules = case Suite of
+                          [] -> Modules;
+                          _  -> [M || M <- Modules, lists:member(M, Suite)]
+                      end,
 
     %% Generate coverage info for all the cover-compiled modules
     Coverage = [cover_analyze_mod(M) || M <- FilteredModules],
