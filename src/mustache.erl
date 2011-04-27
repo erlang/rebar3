@@ -1,17 +1,17 @@
 %% The MIT License
-%% 
+%%
 %% Copyright (c) 2009 Tom Preston-Werner <tom@mojombo.com>
-%% 
+%%
 %% Permission is hereby granted, free of charge, to any person obtaining a copy
 %% of this software and associated documentation files (the "Software"), to deal
 %% in the Software without restriction, including without limitation the rights
 %% to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 %% copies of the Software, and to permit persons to whom the Software is
 %% furnished to do so, subject to the following conditions:
-%% 
+%%
 %% The above copyright notice and this permission notice shall be included in
 %% all copies or substantial portions of the Software.
-%% 
+%%
 %% THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 %% IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 %% FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -30,6 +30,10 @@
 -record(mstate, {mod = undefined,
                  section_re = undefined,
                  tag_re = undefined}).
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
 
 compile(Body) when is_list(Body) ->
   State = #mstate{},
@@ -129,8 +133,8 @@ compile_tags(T, State) ->
       Content = string:substr(T, C0 + 1, C1),
       Kind = tag_kind(T, K),
       Result = compile_tag(Kind, Content, State),
-      "[\"" ++ Front ++ 
-        "\" | [" ++ Result ++ 
+      "[\"" ++ Front ++
+        "\" | [" ++ Result ++
         " | " ++ compile_tags(Back, State) ++ "]]";
     nomatch ->
       "[\"" ++ T ++ "\"]"
@@ -214,4 +218,12 @@ escape([X | Rest], Acc) ->
 start([T]) ->
   Out = render(list_to_atom(T)),
   io:format(Out ++ "~n", []).
-      
+
+-ifdef(TEST).
+
+simple_test() ->
+    Ctx = dict:from_list([{name, "world"}]),
+    Result = render("Hello {{name}}!", Ctx),
+    ?assertEqual("Hello world!", Result).
+
+-endif.
