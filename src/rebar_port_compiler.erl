@@ -249,7 +249,7 @@ needs_link(SoName, NewBins) ->
             ?DEBUG("Last mod is 0 on ~s\n", [SoName]),
             true;
         Other ->
-            ?DEBUG("Checking ~p >= ~p", [MaxLastMod, Other]),
+            ?DEBUG("Checking ~p >= ~p\n", [MaxLastMod, Other]),
             MaxLastMod >= Other
     end.
 
