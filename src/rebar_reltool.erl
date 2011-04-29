@@ -341,7 +341,7 @@ execute_overlay([{replace, Out, Regex, Replacement, Opts} | Rest],
                 Vars, BaseDir, TargetDir) ->
     Filename = rebar_templater:render(filename:join(TargetDir, Out), Vars),
     {ok, OrigData} = file:read_file(Filename),
-    Data = re:replace(OrigData, Regex, Replacement,
+    Data = re:replace(OrigData, Regex, rebar_templater:render(Replacement, Vars),
                       [global, {return, binary}] ++ Opts),
     case file:write_file(Filename, Data) of
         ok ->
