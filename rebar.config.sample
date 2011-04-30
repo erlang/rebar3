@@ -45,6 +45,10 @@
 %% Custom name of the port driver .so file. Defaults to `<Application>_drv.so'.
 {so_name, "driver.so"}.
 
+%% so_specs - useful for building multiple *.so files
+%%            from one or more object files
+{so_specs, [{"priv/so_name.so", ["c_src/object_file_name.o"]}]}.
+
 %% == LFE Compiler ==
 
 %% LFE files to compile before the rest
