@@ -123,6 +123,19 @@
 %% Subdirectories?
 {sub_dirs, ["dir1", "dir2"]}.
 
+%% == Plugins ==
+
+%% Plugins you wish to include.
+%% These can include any module on the code path, including deps.
+%% Alternatively, plugins can be placed as source files in the plugin_dir, in
+%% which case they will be compiled and loaded dynamically at runtime.
+{plugins, [plugin1, plugin2]}.
+
+%% Override the directory in which plugin sources can be found.
+%% Defaults to ./plugins
+{plugin_dir, "some_other_directory"}.
+
+
 %% == Pre/Post Command Hooks ==
 
 {pre_hooks, [{clean, "./prepare_package_files.sh"},

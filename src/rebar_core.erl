@@ -380,13 +380,57 @@ ulist([H | T], Acc) ->
 
 plugin_modules(_Config, []) ->
     {ok, []};
-plugin_modules(_Config, Modules) ->
+plugin_modules(Config, Modules) ->
     FoundModules = [M || M <- Modules, code:which(M) =/= non_existing],
-    case (Modules =:= FoundModules) of
+    plugin_modules(Config, FoundModules, Modules -- FoundModules).
+
+plugin_modules(_Config, FoundModules, []) ->
+    {ok, FoundModules};
+plugin_modules(Config, FoundModules, MissingModules) ->
+    {Loaded, NotLoaded} = load_plugin_modules(Config, MissingModules),
+    AllViablePlugins = FoundModules ++ Loaded,
+    case length(NotLoaded) > 0 of
         true ->
-            ok;
+            %% NB: we continue to ignore this situation, as did the original code
+            ?WARN("Missing plugins: ~p\n", NotLoaded);
         false ->
-            ?WARN("Missing plugins: ~p\n", [Modules -- FoundModules]),
+            ?DEBUG("Loaded plugins: ~p~n", [AllViablePlugins]),
             ok
     end,
-    {ok, FoundModules}.
+    {ok, AllViablePlugins}.
+
+load_plugin_modules(Config, Modules) ->
+    PluginDir = case rebar_config:get_local(Config, plugin_dir, undefined) of
+                    undefined ->
+                        filename:join(rebar_utils:get_cwd(), "plugins");
+                    Dir ->
+                        Dir
+                end,
+    Sources = rebar_utils:find_files(PluginDir, ".*\.erl\$"),
+    Loaded = [load_plugin(Src) || Src <- Sources],
+    FilterMissing = is_missing_plugin(Loaded),
+    NotLoaded = [V || V <- Modules, FilterMissing(V)],
+    {Loaded, NotLoaded}.
+
+is_missing_plugin(Loaded) ->
+    fun(Mod) -> not lists:member(Mod, Loaded) end.
+
+load_plugin(Src) ->
+    case compile:file(Src, [binary, return_errors]) of
+        {ok, Mod, Bin} ->
+            load_plugin_module(Mod, Bin, Src);
+        {error, Errors, _Warnings} ->
+            ?ABORT("Plugin ~s contains compilation errors: ~p~n",
+                   [Src, Errors])
+    end.
+
+load_plugin_module(Mod, Bin, Src) ->
+    case code:is_loaded(Mod) of
+        {file, Loaded} ->
+            ?ABORT("Plugin ~p clashes with previously loaded module ~p~n",
+                   [Mod, Loaded]);
+        false ->
+            ?INFO("Loading plugin ~p from ~s~n", [Mod, Src]),
+            {module, Mod} = code:load_binary(Mod, Src, Bin),
+            Mod
+    end.
