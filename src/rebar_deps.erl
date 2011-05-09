@@ -31,6 +31,7 @@
 -export([preprocess/2,
          postprocess/2,
          compile/2,
+         setup_env/1,
          'check-deps'/2,
          'get-deps'/2,
          'update-deps'/2,
@@ -91,6 +92,18 @@ postprocess(_Config, _) ->
 
 compile(Config, AppFile) ->
     'check-deps'(Config, AppFile).
+
+%% set REBAR_DEPS_DIR and ERL_LIBS environment variables
+setup_env(_Config) ->
+    {true, DepsDir} = get_deps_dir(),
+    %% include rebar's DepsDir in ERL_LIBS
+    ERL_LIBS = case os:getenv("ERL_LIBS") of
+                   false ->
+                       {"ERL_LIBS", DepsDir};
+                   PrevValue ->
+                       {"ERL_LIBS", DepsDir ++ ":" ++ PrevValue}
+               end,
+    [{"REBAR_DEPS_DIR", DepsDir}, ERL_LIBS].
 
 'check-deps'(Config, _) ->
     %% Get the list of immediate (i.e. non-transitive) deps that are missing
