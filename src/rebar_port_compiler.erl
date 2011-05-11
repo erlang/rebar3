@@ -275,15 +275,15 @@ compiler(_)      -> "$CC".
 merge_each_var([], Vars) ->
     Vars;
 merge_each_var([{Key, Value} | Rest], Vars) ->
-    case orddict:find(Key, Vars) of
-        error ->
-            %% Nothing yet defined for this key/value.
-            %% Expand any self-references as blank.
-            Evalue = expand_env_variable(Value, Key, "");
-        {ok, Value0} ->
-            %% Use previous definition in expansion
-            Evalue = expand_env_variable(Value, Key, Value0)
-    end,
+    Evalue = case orddict:find(Key, Vars) of
+                 error ->
+                     %% Nothing yet defined for this key/value.
+                     %% Expand any self-references as blank.
+                     expand_env_variable(Value, Key, "");
+                 {ok, Value0} ->
+                     %% Use previous definition in expansion
+                     expand_env_variable(Value, Key, Value0)
+             end,
     merge_each_var(Rest, orddict:store(Key, Evalue, Vars)).
 
 %%
@@ -313,12 +313,12 @@ expand_vars_loop(Vars0, Count) ->
 expand_vars(Key, Value, Vars) ->
     lists:foldl(
       fun({AKey, AValue}, Acc) ->
-              case AKey of
-                  Key ->
-                      NewValue = AValue;
-                  _ ->
-                      NewValue = expand_env_variable(AValue, Key, Value)
-              end,
+              NewValue = case AKey of
+                             Key ->
+                                 AValue;
+                             _ ->
+                                 expand_env_variable(AValue, Key, Value)
+                         end,
               [{AKey, NewValue} | Acc]
       end,
       [], Vars).
