@@ -34,13 +34,15 @@
 
 shell(_Config, _AppFile) ->
 
+    %% backwards way to say we only want this executed
+    %% for the "top level" directory
     case is_deps_dir(rebar_utils:get_cwd()) of
-	false ->
-	    true = code:add_pathz(ebin_dir()),
-	    
-	    user_drv:start(),
+        false ->
+            true = code:add_pathz(ebin_dir()),
 
-	    %% this call never returns (until user quits shell)
+            user_drv:start(),
+
+            %% this call never returns (until user quits shell)
 	    shell:server(false, false);
 
 	true ->
