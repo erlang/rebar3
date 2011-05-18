@@ -342,7 +342,8 @@ command_names() ->
     ["check-deps", "clean", "compile", "create", "create-app", "create-node",
      "ct", "delete-deps", "doc", "eunit", "generate", "generate-appups",
      "generate-upgrade", "get-deps", "help", "list-deps", "list-templates",
-     "update-deps", "overlay", "version", "xref"].
+     "update-deps", "overlay", "shell", "version", "xref"].
+
 
 unabbreviate_command_names([]) ->
     [];
