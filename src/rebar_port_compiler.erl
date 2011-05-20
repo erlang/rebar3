@@ -153,7 +153,7 @@ setup_env(Config) ->
     DefaultEnvs  = filter_envs(default_env(), []),
     PortEnvs = rebar_config:get_list(Config, port_envs, []),
     OverrideEnvs = filter_envs(PortEnvs, []),
-    RawEnv = DefaultEnvs ++ OverrideEnvs ++ os_env(),
+    RawEnv = apply_defaults(os_env(), DefaultEnvs) ++ OverrideEnvs,
     expand_vars_loop(merge_each_var(RawEnv, [])).
 
 %% ===================================================================
@@ -266,7 +266,24 @@ compiler(".c++") -> "$CXX";
 compiler(".C")   -> "$CXX";
 compiler(_)      -> "$CC".
 
-
+%%
+%% Given a list of {Key, Value} variables, and another list of default
+%% {Key, Value} variables, return a merged list where the rule is if the
+%% default is expandable expand it with the value of the variable list,
+%% otherwise just return the value of the variable.
+%%
+apply_defaults(Vars, Defaults) ->
+    dict:to_list(
+        dict:merge(fun(Key, VarValue, DefaultValue) ->
+                        case is_expandable(DefaultValue) of
+                             true ->
+                                 expand_env_variable(DefaultValue,
+                                                     Key, VarValue);
+                             false -> VarValue
+                        end
+                    end,
+                    dict:from_list(Vars),
+                    dict:from_list(Defaults))).
 %%
 %% Given a list of {Key, Value} environment variables, where Key may be defined
 %% multiple times, walk the list and expand each self-reference so that we
@@ -325,6 +342,16 @@ expand_vars(Key, Value, Vars) ->
 
 
 %%
+%% Given a string, determine if it is expandable
+%%
+is_expandable(InStr) ->
+    case re:run(InStr,"\\\$",[{capture,none}]) of
+        match -> true;
+        nomatch -> false
+    end.
+
+
+%%
 %% Given env. variable FOO we want to expand all references to
 %% it in InStr. References can have two forms: $FOO and ${FOO}
 %%
@@ -374,17 +401,20 @@ default_env() ->
      {"ERLANG_ARCH", integer_to_list(8 * erlang:system_info(wordsize))},
      {"ERLANG_TARGET", rebar_utils:get_arch()},
 
-     {"solaris.*-64$", "CFLAGS", "-D_REENTRANT -m64"}, % Solaris specific flags
-     {"solaris.*-64$", "CXXFLAGS", "-D_REENTRANT -m64"},
-     {"solaris.*-64$", "LDFLAGS", "-m64"},
+     %% Solaris specific flags
+     {"solaris.*-64$", "CFLAGS", "-D_REENTRANT -m64 $CFLAGS"},
+     {"solaris.*-64$", "CXXFLAGS", "-D_REENTRANT -m64 $CXXFLAGS"},
+     {"solaris.*-64$", "LDFLAGS", "-m64 $LDFLAGS"},
 
-     {"darwin9.*-64$", "CFLAGS", "-m64"}, % OS X Leopard flags for 64-bit
-     {"darwin9.*-64$", "CXXFLAGS", "-m64"},
-     {"darwin9.*-64$", "LDFLAGS", "-arch x86_64"},
+     %% OS X Leopard flags for 64-bit
+     {"darwin9.*-64$", "CFLAGS", "-m64 $CFLAGS"},
+     {"darwin9.*-64$", "CXXFLAGS", "-m64 $CXXFLAGS"},
+     {"darwin9.*-64$", "LDFLAGS", "-arch x86_64 $LDFLAGS"},
 
-     {"darwin10.*-32", "CFLAGS", "-m32"}, % OS X Snow Leopard flags for 32-bit
-     {"darwin10.*-32", "CXXFLAGS", "-m32"},
-     {"darwin10.*-32", "LDFLAGS", "-arch i386"}
+     %% OS X Snow Leopard flags for 32-bit
+     {"darwin10.*-32", "CFLAGS", "-m32 $CFLAGS"},
+     {"darwin10.*-32", "CXXFLAGS", "-m32 $CXXFLAGS"},
+     {"darwin10.*-32", "LDFLAGS", "-arch i386 $LDFLAGS"}
     ].
 
 
