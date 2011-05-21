@@ -32,15 +32,17 @@ Clone the git repository:
 
 #### Building rebar
 
-    $ cd rebar/
-    $ ./bootstrap
-    Recompile: src/getopt
-    ...
-    Recompile: src/rebar_utils
-    ==> rebar (compile)
-    Congratulations! You now have a self-contained script called "rebar" in
-    your current working directory. Place this script anywhere in your path
-    and you can use rebar to build OTP-compliant apps.
+```sh
+$ cd rebar
+$ ./bootstrap
+Recompile: src/getopt
+...
+Recompile: src/rebar_utils
+==> rebar (compile)
+Congratulations! You now have a self-contained script called "rebar" in
+your current working directory. Place this script anywhere in your path
+and you can use rebar to build OTP-compliant apps.
+```
 
 
 Contributing to rebar
@@ -85,9 +87,9 @@ Longer description (wrap at 72 characters)
 * Less than 50 characters
 * What was changed
 * Imperative present tense (fix, add, change)
-> Fix bug 123  
-> Add 'foobar' command  
-> Change default timeout to 123  
+  * `Fix bug 123`
+  * `Add 'foobar' command`
+  * `Change default timeout to 123`
 * No period
 
 ### Description
@@ -107,17 +109,18 @@ Dialyzer and Tidier
 Before you submit a patch check for discrepancies with
 [Dialyzer](http://www.erlang.org/doc/man/dialyzer.html):
 
-<pre>
-$ cd rebar/
+```sh
+$ cd rebar
 $ ./bootstrap debug
 $ dialyzer ebin -Wunmatched_returns -Werror_handling -Wrace_conditions -Wunderspecs
-</pre>
+```
 
 The following discrepancies are known and safe to ignore:
-<pre>
+
+```
 rebar_utils.erl:147: Call to missing or unexported function escript:foldl/3
 rebar_utils.erl:180: The created fun has no local return
-</pre>
+```
 
 It is **strongly recommended** to check the code with
 [Tidier](http://tidier.softlab.ntua.gr:20000/tidier/getstarted).  
