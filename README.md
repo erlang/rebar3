@@ -115,13 +115,8 @@ $ dialyzer ebin -Wunmatched_returns -Werror_handling -Wrace_conditions -Wundersp
 
 The following discrepancies are known and safe to ignore:
 <pre>
-rebar_templater.erl:249: The call rebar_templater:consult(
-                                Cont1::erl_scan:return_cont(),'eof',
-                                Acc::[any()])
-                         contains an opaque term as 1st argument when terms
-                         of different types are expected in these positions
-rebar_utils.erl:144: Call to missing or unexported function escript:foldl/3
-rebar_utils.erl:165: The created fun has no local return
+rebar_utils.erl:147: Call to missing or unexported function escript:foldl/3
+rebar_utils.erl:180: The created fun has no local return
 </pre>
 
 It is **strongly recommended** to check the code with
