@@ -55,7 +55,7 @@ Do not commit to master in your fork.
 
 Provide a clean branch without any merge commits from upstream.
 
-Usually you should collapse (squash) any intermediate commits into the original single commit.
+Usually you should squash any intermediate commits into the original single commit.
 
 Code style
 ----------
@@ -67,7 +67,7 @@ Do not mix spaces and tabs.
 Do not introduce lines longer than 80 characters.
 
 [erlang-mode (emacs)](http://www.erlang.org/doc/man/erlang.el.html) indentation is preferred.
-If you prefer vi, consider extending emacs with [Vimpulse](http://www.emacswiki.org/emacs/Vimpulse).
+vi-only users are encouraged to give [Vimpulse](http://www.emacswiki.org/emacs/Vimpulse) a try.
 
 Writing Commit Messages
 -----------------------
