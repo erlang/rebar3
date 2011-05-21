@@ -46,12 +46,28 @@ Clone the git repository:
 Contributing to rebar
 =====================
 
-Coding style
-------------
+Pull requests and branching
+---------------------------
+
+Use one topic branch per pull request.
+
+Do not commit to master in your fork.
+
+Provide a clean branch without any merge commits from upstream.
+
+Usually you should collapse (squash) any intermediate commits into the original single commit.
+
+Code style
+----------
 
 Do not introduce trailing whitespace.
 
+Do not mix spaces and tabs.
+
 Do not introduce lines longer than 80 characters.
+
+[erlang-mode (emacs)](http://www.erlang.org/doc/man/erlang.el.html) indentation is preferred.
+If you prefer vi, consider extending emacs with [Vimpulse](http://www.emacswiki.org/emacs/Vimpulse).
 
 Writing Commit Messages
 -----------------------
