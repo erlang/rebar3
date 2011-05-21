@@ -115,20 +115,21 @@ compile(Config, AppFile) ->
             %% Only relink if necessary, given the SoName
             %% and list of new binaries
             lists:foreach(
-              fun({SoName,Bins}) ->
-                      AllBins = [sets:from_list(Bins), sets:from_list(NewBins)],
-                      Intersection = sets:intersection(AllBins),
-                      case needs_link(SoName, sets:to_list(Intersection)) of
-                          true ->
-                              rebar_utils:sh(
-                                ?FMT("$CC ~s $LDFLAGS $DRV_LDFLAGS -o ~s",
-                                     [string:join(Bins, " "), SoName]),
-                                [{env, Env}]);
-                          false ->
-                              ?INFO("Skipping relink of ~s\n", [SoName]),
-                              ok
-                      end
-              end, SoSpecs)
+                    fun({SoName,Bins}) ->
+                            AllBins = [sets:from_list(Bins),
+                                       sets:from_list(NewBins)],
+                            NewBins1 = sets:intersection(AllBins),
+                            case needs_link(SoName, sets:to_list(NewBins1)) of
+                                true ->
+                                    Fmt = "$CC ~s $LDFLAGS $DRV_LDFLAGS -o ~s",
+                                    Vars = [string:join(Bins, " "), SoName],
+                                    rebar_utils:sh(?FMT(Fmt, Vars),
+                                                   [{env, Env}]);
+                                false ->
+                                    ?INFO("Skipping relink of ~s\n", [SoName]),
+                                    ok
+                            end
+                    end, SoSpecs)
     end.
 
 clean(Config, AppFile) ->
@@ -225,8 +226,8 @@ compile_each([Source | Rest], Config, Env, NewBins, ExistingBins) ->
                                         [Source, Bin]), [{env, Env}]);
                 "$CXX" ->
                     rebar_utils:sh(
-                      ?FMT("$CXX -c $CXXFLAGS $DRV_CFLAGS ~s -o ~s",
-                           [Source, Bin]), [{env, Env}])
+                                  ?FMT("$CXX -c $CXXFLAGS $DRV_CFLAGS ~s -o ~s",
+                                       [Source, Bin]), [{env, Env}])
             end,
             compile_each(Rest, Config, Env, [Bin | NewBins], ExistingBins);
 
@@ -274,16 +275,16 @@ compiler(_)      -> "$CC".
 %%
 apply_defaults(Vars, Defaults) ->
     dict:to_list(
-        dict:merge(fun(Key, VarValue, DefaultValue) ->
-                        case is_expandable(DefaultValue) of
-                             true ->
-                                 expand_env_variable(DefaultValue,
-                                                     Key, VarValue);
-                             false -> VarValue
-                        end
-                    end,
-                    dict:from_list(Vars),
-                    dict:from_list(Defaults))).
+           dict:merge(fun(Key, VarValue, DefaultValue) ->
+                              case is_expandable(DefaultValue) of
+                                  true ->
+                                      expand_env_variable(DefaultValue,
+                                                          Key, VarValue);
+                                  false -> VarValue
+                              end
+                      end,
+                      dict:from_list(Vars),
+                      dict:from_list(Defaults))).
 %%
 %% Given a list of {Key, Value} environment variables, where Key may be defined
 %% multiple times, walk the list and expand each self-reference so that we
@@ -329,16 +330,16 @@ expand_vars_loop(Vars0, Count) ->
 %%
 expand_vars(Key, Value, Vars) ->
     lists:foldl(
-      fun({AKey, AValue}, Acc) ->
-              NewValue = case AKey of
-                             Key ->
-                                 AValue;
-                             _ ->
-                                 expand_env_variable(AValue, Key, Value)
-                         end,
-              [{AKey, NewValue} | Acc]
-      end,
-      [], Vars).
+            fun({AKey, AValue}, Acc) ->
+                    NewValue = case AKey of
+                                   Key ->
+                                       AValue;
+                                   _ ->
+                                       expand_env_variable(AValue, Key, Value)
+                               end,
+                    [{AKey, NewValue} | Acc]
+            end,
+            [], Vars).
 
 
 %%
