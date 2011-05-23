@@ -244,8 +244,8 @@ version                              Show version information
 option_spec_list() ->
     Jobs = rebar_config:get_jobs(),
     JobsHelp = io_lib:format(
-          "Number of concurrent workers a command may use. Default: ~B",
-          [Jobs]),
+                 "Number of concurrent workers a command may use. Default: ~B",
+                 [Jobs]),
     [
      %% {Name, ShortOpt, LongOpt, ArgSpec, HelpMsg}
      {help,     $h, "help",     undefined, "Show the program options"},
