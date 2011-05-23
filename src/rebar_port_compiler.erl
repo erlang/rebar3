@@ -116,7 +116,8 @@ compile(Config, AppFile) ->
             %% and list of new binaries
             lists:foreach(
               fun({SoName,Bins}) ->
-                      AllBins = [sets:from_list(Bins), sets:from_list(NewBins)],
+                      AllBins = [sets:from_list(Bins),
+                                 sets:from_list(NewBins)],
                       Intersection = sets:intersection(AllBins),
                       case needs_link(SoName, sets:to_list(Intersection)) of
                           true ->
@@ -274,16 +275,17 @@ compiler(_)      -> "$CC".
 %%
 apply_defaults(Vars, Defaults) ->
     dict:to_list(
-        dict:merge(fun(Key, VarValue, DefaultValue) ->
-                        case is_expandable(DefaultValue) of
+      dict:merge(fun(Key, VarValue, DefaultValue) ->
+                         case is_expandable(DefaultValue) of
                              true ->
                                  expand_env_variable(DefaultValue,
                                                      Key, VarValue);
                              false -> VarValue
-                        end
-                    end,
-                    dict:from_list(Vars),
-                    dict:from_list(Defaults))).
+                         end
+                 end,
+                 dict:from_list(Vars),
+                 dict:from_list(Defaults))).
+
 %%
 %% Given a list of {Key, Value} environment variables, where Key may be defined
 %% multiple times, walk the list and expand each self-reference so that we
@@ -340,7 +342,6 @@ expand_vars(Key, Value, Vars) ->
       end,
       [], Vars).
 
-
 %%
 %% Given a string, determine if it is expandable
 %%
@@ -349,7 +350,6 @@ is_expandable(InStr) ->
         match -> true;
         nomatch -> false
     end.
-
 
 %%
 %% Given env. variable FOO we want to expand all references to
