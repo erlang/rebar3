@@ -56,7 +56,7 @@
              "Reltool and .rel release names do not match~n", []),
 
     %% Find all the apps that have been upgraded
-    UpgradedApps = get_upgraded_apps(Name, OldVerPath, NewVerPath),
+    {_Added, _Removed, Upgraded} = get_apps(Name, OldVerPath, NewVerPath),
 
     %% Get a list of any appup files that exist in the new release
     NewAppUpFiles = rebar_utils:find_files(
@@ -68,10 +68,10 @@
                           end, NewAppUpFiles),
 
     %% Create a list of apps that don't already have appups
-    Apps = genappup_which_apps(UpgradedApps, AppUpApps),
+    UpgradeApps = genappup_which_apps(Upgraded, AppUpApps),
 
-    %% Generate appup files
-    generate_appup_files(Name, OldVerPath, Apps),
+    %% Generate appup files for upgraded apps
+    generate_appup_files(Name, OldVerPath, UpgradeApps),
 
     ok.
 
@@ -79,24 +79,43 @@
 %% Internal functions
 %% ===================================================================
 
-get_upgraded_apps(Name, OldVerPath, NewVerPath) ->
+get_apps(Name, OldVerPath, NewVerPath) ->
     OldApps = rebar_rel_utils:get_rel_apps(Name, OldVerPath),
+    ?DEBUG("Old Version Apps: ~p~n", [OldApps]),
+
     NewApps = rebar_rel_utils:get_rel_apps(Name, NewVerPath),
+    ?DEBUG("New Version Apps: ~p~n", [NewApps]),
 
-    Sorted = lists:umerge(lists:sort(NewApps), lists:sort(OldApps)),
-    AddedorChanged = lists:subtract(Sorted, OldApps),
-    DeletedorChanged = lists:subtract(Sorted, NewApps),
-    ?DEBUG("Added or Changed: ~p~n", [AddedorChanged]),
-    ?DEBUG("Deleted or Changed: ~p~n", [DeletedorChanged]),
+    Added = app_list_diff(NewApps, OldApps),
+    ?DEBUG("Added: ~p~n", [Added]),
 
-    AddedDeletedChanged = lists:ukeysort(1, lists:append(DeletedorChanged,
-                                                         AddedorChanged)),
-    UpgradedApps = lists:subtract(AddedorChanged, AddedDeletedChanged),
-    ?DEBUG("Upgraded Apps:~p~n", [UpgradedApps]),
+    Removed = app_list_diff(OldApps, NewApps),
+    ?DEBUG("Removed: ~p~n", [Removed]),
 
-    [{AppName, {proplists:get_value(AppName, OldApps), NewVer}}
-     || {AppName, NewVer} <- UpgradedApps].
+    PossiblyUpgraded = proplists:get_keys(NewApps),
 
+    UpgradedApps = [upgraded_app(AppName,
+                                 proplists:get_value(AppName, OldApps),
+                                 proplists:get_value(AppName, NewApps))
+                    || AppName <- PossiblyUpgraded],
+
+    Upgraded = lists:dropwhile(fun(Elem) ->
+                                       Elem == false
+                               end, lists:sort(UpgradedApps)),
+
+    ?DEBUG("Upgraded: ~p~n", [Upgraded]),
+
+    {Added, Removed, Upgraded}.
+
+upgraded_app(AppName, OldAppVer, NewAppVer) when OldAppVer /= NewAppVer ->
+    {AppName, {OldAppVer, NewAppVer}};
+upgraded_app(_, _, _) ->
+    false.
+
+app_list_diff(List1, List2) ->
+    List3 = lists:umerge(lists:sort(proplists:get_keys(List1)),
+                         lists:sort(proplists:get_keys(List2))),
+    lists:subtract(List3, proplists:get_keys(List2)).
 
 file_to_name(File) ->
     filename:rootname(filename:basename(File)).

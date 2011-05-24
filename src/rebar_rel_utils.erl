@@ -80,7 +80,7 @@ get_rel_release_info(Name, Path) ->
 get_rel_apps(RelFile) ->
     case file:consult(RelFile) of
         {ok, [{release, _, _, Apps}]} ->
-            Apps;
+            make_proplist(Apps, []);
         _ ->
             ?ABORT("Failed to parse ~s~n", [RelFile])
     end.
@@ -106,3 +106,16 @@ get_previous_release_path() ->
         OldVerPath ->
             OldVerPath
     end.
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
+
+make_proplist([{_,_}=H|T], Acc) ->
+     make_proplist(T, [H|Acc]);
+make_proplist([H|T], Acc) ->
+     App = erlang:element(1, H),
+     Ver = erlang:element(2, H),
+     make_proplist(T, [{App,Ver}|Acc]);
+make_proplist([], Acc) ->
+     Acc.
