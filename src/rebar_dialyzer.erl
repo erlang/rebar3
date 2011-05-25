@@ -55,7 +55,7 @@
 
 -include("rebar.hrl").
 
--type(warning() :: {atom(), {string(), integer()}, any()}).
+-type warning() :: {atom(), {string(), integer()}, any()}.
 
 %% ===================================================================
 %% Public API
@@ -84,7 +84,10 @@ dialyze(Config, File) ->
                            end,
             ?DEBUG("DialyzerOpts: ~p~n", [DialyzerOpts]),
             try dialyzer:run(DialyzerOpts) of
-                Warnings -> output_warnings(Warnings)
+                [] ->
+                    ok;
+                Warnings ->
+                    print_warnings(Warnings)
             catch
                 throw:{dialyzer_error, Reason} ->
                     ?ABORT("~s~n", [Reason])
@@ -116,7 +119,7 @@ dialyze(Config, File) ->
         [] ->
             ?INFO("The built PLT can be found in ~s~n", [Plt]);
         _ ->
-            output_warnings(Warnings)
+            print_warnings(Warnings)
     end,
     ok.
 
@@ -147,11 +150,12 @@ app_dirs(Apps) ->
      || Path <- [code:lib_dir(App) || App <- Apps], erlang:is_list(Path)].
 
 %% @doc Render the warnings on the console.
--spec output_warnings(Warnings::[warning()]) -> 'ok'.
-output_warnings(Warnings) ->
+-spec print_warnings(Warnings::[warning(), ...]) -> no_return().
+print_warnings(Warnings) ->
     lists:foreach(fun(Warning) ->
                           ?CONSOLE("~s", [dialyzer:format_warning(Warning)])
-                  end, Warnings).
+                  end, Warnings),
+    ?FAIL.
 
 %% @doc If the plt option is present in rebar.config return its value,
 %% otherwise return $HOME/.dialyzer_plt or $REBAR_PLT_DIR/.dialyzer_plt.
