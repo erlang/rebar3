@@ -97,10 +97,6 @@ compile(Config, AppFile) ->
         _ ->
             Env = setup_env(Config),
 
-            %% One or more files are available for building.
-            %% Run the pre-compile hook, if necessary.
-            ok = run_precompile_hook(Config, Env),
-
             %% Compile each of the sources
             {NewBins, ExistingBins} = compile_each(Sources, Config, Env,
                                                    [], []),
@@ -142,10 +138,7 @@ clean(Config, AppFile) ->
     ExtractSoName = fun({SoName, _}) -> SoName end,
     rebar_file_utils:delete_each([ExtractSoName(S)
                                   || S <- so_specs(Config, AppFile,
-                                                   expand_objects(Sources))]),
-
-    %% Run the cleanup script, if it exists
-    run_cleanup_hook(Config).
+                                                   expand_objects(Sources))]).
 
 setup_env(Config) ->
     %% Extract environment values from the config (if specified) and
@@ -178,39 +171,6 @@ expand_sources([Spec | Rest], Acc) ->
 expand_objects(Sources) ->
     [filename:join([filename:dirname(F), filename:basename(F) ++ ".o"])
      || F <- Sources].
-
-run_precompile_hook(Config, Env) ->
-    case rebar_config:get(Config, port_pre_script, undefined) of
-        undefined ->
-            ok;
-        {Script, BypassFileName} ->
-            ?DEPRECATED(port_pre_script,
-                        {pre_hooks, [{compile, "script"}]},
-                        "in a future build of rebar"),
-            case filelib:is_regular(BypassFileName) of
-                false ->
-                    ?CONSOLE("Running ~s\n", [Script]),
-                    {ok, _} = rebar_utils:sh(Script, [{env, Env}]),
-                    ok;
-                true ->
-                    ?INFO("~s exists; not running ~s\n",
-                          [BypassFileName, Script])
-            end
-    end.
-
-run_cleanup_hook(Config) ->
-    case rebar_config:get(Config, port_cleanup_script, undefined) of
-        undefined ->
-            ok;
-        Script ->
-            ?DEPRECATED(port_cleanup_script,
-                        {post_hooks, [{clean, "script"}]},
-                        "in a future build of rebar"),
-            ?CONSOLE("Running ~s\n", [Script]),
-            {ok, _} = rebar_utils:sh(Script, []),
-            ok
-    end.
-
 
 compile_each([], _Config, _Env, NewBins, ExistingBins) ->
     {lists:reverse(NewBins), lists:reverse(ExistingBins)};
