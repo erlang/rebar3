@@ -38,11 +38,11 @@
 
 %% Supported configuration variables:
 %%
-%% * port_sources - Erlang list of files and/or wildcard strings to be
-%%                  compiled. Platform specific sources can be specified
-%%                  by enclosing a string in a tuple of the form
-%%                  {Regex, String} wherein Regex is a regular expression
-%%                  that is checked against the system architecture.
+%% * port_sources - Erlang list of filenames or wildcards to be compiled. May
+%%                  also contain a tuple consisting of a regular expression to
+%%                  be applied against the system architecture and a list of
+%%                  filenames or wildcards to include should the expression
+%%                  pass.
 %%
 %% * so_specs  - Erlang list of tuples of the form
 %%               {"priv/so_name.so", ["c_src/object_file_name.o"]}
@@ -166,7 +166,7 @@ expand_sources([], Acc) ->
 expand_sources([{ArchRegex, Spec} | Rest], Acc) ->
     case rebar_utils:is_arch(ArchRegex) of
         true ->
-            Acc2 = filelib:wildcard(Spec) ++ Acc,
+            Acc2 = expand_sources(Spec, Acc),
             expand_sources(Rest, Acc2);
         false ->
             expand_sources(Rest, Acc)

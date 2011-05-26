@@ -35,8 +35,11 @@
 
 %% == Port Compiler ==
 
-%% List and wildcard list of files to be compiled. Default is `"c_src/*.c"'
-{port_sources, []}.
+%% List of filenames or wildcards to be compiled. May also contain a tuple
+%% consisting of a regular expression to be applied against the system
+%% architecture and a list of filenames or wildcards to include should the
+%% expression pass. Default is `"c_src/*.c"'
+{port_sources, ["c_src/*.c", {"R14", ["c_src/*.c"]}]}.
 
 %% Port compilation environment variables. See rebar_port_compiler.erl for
 %% more info. Default is `[]'
