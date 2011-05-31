@@ -29,6 +29,7 @@
 -export([get_cwd/0,
          is_arch/1,
          get_arch/0,
+         wordsize/0,
          sh/2,
          find_files/2,
          now_str/0,
@@ -62,15 +63,18 @@ is_arch(ArchRegex) ->
     end.
 
 get_arch() ->
-    Words = try erlang:system_info({wordsize, external}) of
-                Val ->
-                    integer_to_list(8 * Val)
-            catch
-                error:badarg ->
-                    integer_to_list(8 * erlang:system_info(wordsize))
-            end,
+    Words = wordsize(),
     erlang:system_info(otp_release) ++ "-"
         ++ erlang:system_info(system_architecture) ++ "-" ++ Words.
+
+wordsize() ->
+    try erlang:system_info({wordsize, external}) of
+        Val ->
+            integer_to_list(8 * Val)
+    catch
+        error:badarg ->
+            integer_to_list(8 * erlang:system_info(wordsize))
+    end.
 
 %%
 %% Options = [Option] -- defaults to [use_stdout, abort_on_error]
