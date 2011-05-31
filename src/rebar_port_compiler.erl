@@ -398,7 +398,14 @@ default_env() ->
      {"DRV_LDFLAGS", "-shared $ERL_LDFLAGS"},
      {"darwin", "DRV_LDFLAGS",
       "-bundle -flat_namespace -undefined suppress $ERL_LDFLAGS"},
-     {"ERLANG_ARCH", integer_to_list(8 * erlang:system_info(wordsize))},
+     {"ERLANG_ARCH",
+      try erlang:system_info({wordsize, external}) of
+          Val ->
+              integer_to_list(8 * Val)
+      catch
+          error:badarg ->
+              integer_to_list(8 * erlang:system_info(wordsize))
+      end},
      {"ERLANG_TARGET", rebar_utils:get_arch()},
 
      %% Solaris specific flags

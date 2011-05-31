@@ -62,7 +62,13 @@ is_arch(ArchRegex) ->
     end.
 
 get_arch() ->
-    Words = integer_to_list(8 * erlang:system_info(wordsize)),
+    Words = try erlang:system_info({wordsize, external}) of
+                Val ->
+                    integer_to_list(8 * Val)
+            catch
+                error:badarg ->
+                    integer_to_list(8 * erlang:system_info(wordsize))
+            end,
     erlang:system_info(otp_release) ++ "-"
         ++ erlang:system_info(system_architecture) ++ "-" ++ Words.
 

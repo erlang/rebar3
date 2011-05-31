@@ -52,7 +52,8 @@
 %%
 %%                OtpRelease = erlang:system_info(otp_release).
 %%                SysArch = erlang:system_info(system_architecture).
-%%                Words = integer_to_list(8 * erlang:system_info(wordsize)).
+%%                Words = integer_to_list(8 *
+%%                            erlang:system_info({wordsize, external})).
 %%
 %%              E.g. to define HAVE_SENDFILE only on systems with
 %%              sendfile(), to define BACKLOG on Linux/FreeBSD as 128,
