@@ -36,7 +36,7 @@
 %% ===================================================================
 
 compile(_Config, _AppFile) ->
-    case filelib:wildcard("src/*.proto") of
+    case rebar_utils:find_files("src", ".*\\.proto$") of
         [] ->
             ok;
         FoundFiles ->
@@ -60,7 +60,7 @@ compile(_Config, _AppFile) ->
 
 clean(_Config, _AppFile) ->
     %% Get a list of generated .beam and .hrl files and then delete them
-    Protos = filelib:wildcard("src/*.proto"),
+    Protos = rebar_utils:find_files("src", ".*\\.proto$"),
     BeamFiles = [fq_beam_file(F) || F <- Protos],
     HrlFiles = [fq_hrl_file(F) || F <- Protos],
     Targets = BeamFiles ++ HrlFiles,
