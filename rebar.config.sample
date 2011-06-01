@@ -86,14 +86,6 @@
 %% Option to pass extra parameters when launching Common Test
 {ct_extra_params, "-boot start_sasl -s myapp"}.
 
-%% == Dialyzer ==
-
-%% Options for running dialyzer
-%% {plt, PltFile}
-%% 'src': run Dialyzer on the source files as in 'dialyzer --src'
-%% {warnings, [WarnOpts]}: turn on/off Dialyzer warnings
-{dialyzer_opts, [{plt, PltFile}, {warnings, [WarnOpts]}, src]}.
-
 %% == Cleanup ==
 
 %% Which files to cleanup

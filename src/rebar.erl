@@ -203,10 +203,6 @@ show_info_maybe_halt(O, Opts, F) ->
 %%
 commands() ->
     S = <<"
-dialyze                              Analyze with Dialyzer
-build-plt                            Build Dialyzer PLT
-check-plt                            Check Dialyzer PLT
-
 clean                                Clean
 compile                              Compile sources
 
@@ -278,8 +274,8 @@ filter_flags([Item | Rest], Commands) ->
 
 command_names() ->
     ["build-plt", "check-deps", "check-plt", "clean", "compile", "create",
-     "create-app", "create-node", "ct", "delete-deps", "dialyze", "doc",
-     "eunit", "generate", "generate-appups", "generate-upgrade", "get-deps",
+     "create-app", "create-node", "ct", "delete-deps", "doc", "eunit",
+     "generate", "generate-appups", "generate-upgrade", "get-deps",
      "help", "list-templates", "update-deps", "version", "xref"].
 
 unabbreviate_command_names([]) ->

@@ -14,7 +14,6 @@
               rebar_cleaner,
               rebar_ct,
               rebar_deps,
-              rebar_dialyzer,
               rebar_asn1_compiler,
               rebar_edoc,
               rebar_erlc_compiler,
@@ -73,7 +72,6 @@
                                rebar_otp_app,
                                rebar_ct,
                                rebar_eunit,
-                               rebar_dialyzer,
                                rebar_escripter,
                                rebar_edoc,
                                rebar_xref
