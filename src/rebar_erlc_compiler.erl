@@ -252,9 +252,9 @@ internal_erl_compile(Source, Config, Outdir, ErlOpts) ->
     case needs_compile(Source, Target, Hrls) of
         true ->
             Opts = [{outdir, filename:dirname(Target)}] ++
-                ErlOpts ++ [{i, "include"}, report, return],
+                ErlOpts ++ [{i, "include"}, report, return_errors],
             case compile:file(Source, Opts) of
-                {ok, _, []} ->
+                {ok, _} ->
                     ok;
                 _ ->
                     ?FAIL
