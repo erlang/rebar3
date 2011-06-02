@@ -324,17 +324,15 @@ is_command_name_sub_word_candidate(Command, Candidate) ->
     %% Allow for parts of commands to be abbreviated, i.e. create-app
     %% can be shortened to "create-a", "c-a" or "c-app" (but not
     %% "create-" since that would be ambiguous).
-    CommandSubWords = re:split(Command, "-", [{return, list}]),
-    CandidateSubWords = re:split(Candidate, "-", [{return, list}]),
+    ReOpts = [{return, list}],
+    CommandSubWords = re:split(Command, "-", ReOpts),
+    CandidateSubWords = re:split(Candidate, "-", ReOpts),
     is_command_name_sub_word_candidate_aux(CommandSubWords, CandidateSubWords).
 
-is_command_name_sub_word_candidate_aux([CmdSW | CmdSWs], [CandSW | CandSWs]) ->
-    case lists:prefix(CmdSW, CandSW) of
-        true ->
-            is_command_name_sub_word_candidate_aux(CmdSWs, CandSWs);
-        false ->
-            false
-    end;
+is_command_name_sub_word_candidate_aux([CmdSW | CmdSWs],
+                                       [CandSW | CandSWs]) ->
+    lists:prefix(CmdSW, CandSW) andalso
+        is_command_name_sub_word_candidate_aux(CmdSWs, CandSWs);
 is_command_name_sub_word_candidate_aux([], []) ->
     true;
 is_command_name_sub_word_candidate_aux(_CmdSWs, _CandSWs) ->

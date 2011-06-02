@@ -302,7 +302,7 @@ execute_overlay([{template_wildcard, Wildcard, OutDir} | Rest], Vars, BaseDir, T
                    [{template, F, filename:join(OutDir, filename:basename(F))} | Acc0]
            end,
     NewInstrs = lists:foldl(Ifun, Rest, filelib:wildcard(Wildcard, BaseDir)),
-    case length(NewInstrs) == length(Rest) of
+    case length(NewInstrs) =:= length(Rest) of
         true ->
             ?WARN("template_wildcard: ~s did not match any files!\n", [Wildcard]);
         false ->

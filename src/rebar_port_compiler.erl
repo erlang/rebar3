@@ -362,7 +362,7 @@ os_env() ->
     Os = [list_to_tuple(re:split(S, "=", [{return, list}, {parts, 2}])) ||
              S <- os:getenv()],
     %% Drop variables without a name (win32)
-    [{K, V} || {K, V} <- Os, K =/= []].
+    [T1 || {K, _V} = T1 <- Os, K =/= []].
 
 default_env() ->
     [

@@ -63,9 +63,7 @@
                       filename:join([NewName, "lib"]), "^.*.appup$"),
 
     %% Convert the list of appup files into app names
-    AppUpApps = lists:map(fun(File) ->
-                                  file_to_name(File)
-                          end, NewAppUpFiles),
+    AppUpApps = [file_to_name(File) || File <- NewAppUpFiles],
 
     %% Create a list of apps that don't already have appups
     UpgradeApps = genappup_which_apps(Upgraded, AppUpApps),
@@ -115,7 +113,7 @@ upgraded_app(_, _, _) ->
 app_list_diff(List1, List2) ->
     List3 = lists:umerge(lists:sort(proplists:get_keys(List1)),
                          lists:sort(proplists:get_keys(List2))),
-    lists:subtract(List3, proplists:get_keys(List2)).
+    List3 -- proplists:get_keys(List2).
 
 file_to_name(File) ->
     filename:rootname(filename:basename(File)).
@@ -180,13 +178,10 @@ generate_instruction_advanced(Name, _, _) ->
 
 get_behavior(List) ->
     Attributes = proplists:get_value(attributes, List),
-    Behavior = case proplists:get_value(behavior, Attributes) of
-                   undefined ->
-                       proplists:get_value(behaviour, Attributes);
-                   Else ->
-                       Else
-               end,
-    Behavior.
+    case proplists:get_value(behavior, Attributes) of
+        undefined -> proplists:get_value(behaviour, Attributes);
+        Else -> Else
+    end.
 
 is_code_change(List) ->
     Exports = proplists:get_value(exports, List),
