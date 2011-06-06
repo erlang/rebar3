@@ -273,10 +273,10 @@ filter_flags([Item | Rest], Commands) ->
     end.
 
 command_names() ->
-    ["build-plt", "check-deps", "check-plt", "clean", "compile", "create",
-     "create-app", "create-node", "ct", "delete-deps", "doc", "eunit",
-     "generate", "generate-appups", "generate-upgrade", "get-deps",
-     "help", "list-templates", "update-deps", "version", "xref"].
+    ["check-deps", "clean", "compile", "create", "create-app", "create-node",
+     "ct", "delete-deps", "doc", "eunit", "generate", "generate-appups",
+     "generate-upgrade", "get-deps", "help", "list-templates", "update-deps",
+     "version", "xref"].
 
 unabbreviate_command_names([]) ->
     [];
