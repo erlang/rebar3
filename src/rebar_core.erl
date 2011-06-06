@@ -148,9 +148,17 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
                     %% in preprocess.
                     {ok, PluginModules} = plugin_modules(Config),
 
+                    %% Execute any before_command plugins on this directory
+                    execute_pre(Command, PluginModules,
+                                Config, ModuleSetFile),
+
                     %% Execute the current command on this directory
                     execute(Command, Modules ++ PluginModules,
-                            Config, ModuleSetFile)
+                            Config, ModuleSetFile),
+
+                    %% Execute any after_command plugins on this directory
+                    execute_post(Command, PluginModules,
+                                 Config, ModuleSetFile)
             end,
 
             %% Mark the current directory as processed
@@ -215,6 +223,17 @@ is_dir_type(rel_dir, Dir) ->
 is_dir_type(_, _) ->
     false.
 
+execute_pre(Command, Modules, Config, ModuleFile) ->
+    execute_plugin_hook("pre_", Command, Modules,
+                        Config, ModuleFile).
+
+execute_post(Command, Modules, Config, ModuleFile) ->
+    execute_plugin_hook("post_", Command, Modules,
+                        Config, ModuleFile).
+
+execute_plugin_hook(Hook, Command, Modules, Config, ModuleFile) ->
+    HookFunction = list_to_atom(Hook ++ atom_to_list(Command)),
+    execute(HookFunction, Modules, Config, ModuleFile).
 
 %%
 %% Execute a command across all applicable modules
