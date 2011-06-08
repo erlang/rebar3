@@ -70,13 +70,12 @@
 
 -spec compile(Config::rebar_config:config(), AppFile::file:filename()) -> 'ok'.
 compile(Config, _AppFile) ->
-    %% TODO: enable as soon as OTP patch has been accepted
-    %% ?DEPRECATED(fail_on_warning, warnings_as_errors,
-    %%             rebar_config:get_list(Config, xrl_opts, []),
-    %%             "once R15 is released"),
-    %% ?DEPRECATED(fail_on_warning, warnings_as_errors,
-    %%             rebar_config:get_list(Config, yrl_opts, []),
-    %%             "once R15 is released"),
+    ?DEPRECATED(xrl_opts, fail_on_warning, warnings_as_errors,
+                rebar_config:get_list(Config, xrl_opts, []),
+                "once R14B04 is released"),
+    ?DEPRECATED(yrl_opts, fail_on_warning, warnings_as_errors,
+                rebar_config:get_list(Config, yrl_opts, []),
+                "once R14B04 is released"),
 
     rebar_base_compiler:run(Config,
                             check_files(rebar_config:get_local(
@@ -299,7 +298,7 @@ compile_xrl_yrl(Source, Target, Opts, Mod) ->
                 {ok, _, []} ->
                     ok;
                 {ok, _, _Warnings} ->
-                    %% TODO: remove once R15 is released
+                    %% TODO: remove once R14B04 is released
                     case lists:member(fail_on_warning, Opts) of
                         true ->
                             ?FAIL;

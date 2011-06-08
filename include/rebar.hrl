@@ -11,8 +11,8 @@
 
 -define(FMT(Str, Args), lists:flatten(io_lib:format(Str, Args))).
 
--define(DEPRECATED(Old, New, Opts, When),
-        rebar_utils:deprecated(Old, New, Opts, When)).
+-define(DEPRECATED(Key, Old, New, Opts, When),
+        rebar_utils:deprecated(Key, Old, New, Opts, When)).
 
--define(DEPRECATED(Old, New, When),
-        rebar_utils:deprecated(Old, New, When)).
+-define(DEPRECATED(Key, Old, New, When),
+        rebar_utils:deprecated(Key, Old, New, When)).
