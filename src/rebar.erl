@@ -217,7 +217,7 @@ check-deps                           Display to be fetched dependencies
 get-deps                             Fetch dependencies
 update-deps                          Update fetched dependencies
 delete-deps                          Delete fetched dependencies
-list-deps                            List fetched dependencies
+list-deps                            List dependencies
 
 generate    [dump_spec=0/1]          Build release with reltool
 
@@ -276,8 +276,8 @@ filter_flags([Item | Rest], Commands) ->
 command_names() ->
     ["check-deps", "clean", "compile", "create", "create-app", "create-node",
      "ct", "delete-deps", "doc", "eunit", "generate", "generate-appups",
-     "generate-upgrade", "get-deps", "help", "list-templates", "update-deps",
-     "version", "xref"].
+     "generate-upgrade", "get-deps", "help", "list-deps", "list-templates",
+     "update-deps", "version", "xref"].
 
 unabbreviate_command_names([]) ->
     [];

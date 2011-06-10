@@ -10,7 +10,7 @@ _rebar()
     lopts=" --help --commands --verbose --force --jobs= --version"
     cmdsnvars="check-deps clean compile create create-app create-node \
         ct doc delete-deps eunit get-deps generate generate-upgrade \
-        help list-templates update-deps version xref \
+        help list-deps list-templates update-deps version xref \
         case= force=1 jobs= suite= verbose=1 appid= previous_release= \
         skip_deps=true skip_app= template= template_dir="
 
