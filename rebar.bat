@@ -1,4 +1,4 @@
 @echo off
 setlocal
-set rebarscript=%0
-escript.exe %rebarscript:.bat=% %*
+set rebarscript=%~f0
+escript.exe "%rebarscript:.bat=%" %*
