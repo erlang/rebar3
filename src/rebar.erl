@@ -217,6 +217,7 @@ check-deps                           Display to be fetched dependencies
 get-deps                             Fetch dependencies
 update-deps                          Update fetched dependencies
 delete-deps                          Delete fetched dependencies
+list-deps                            List fetched dependencies
 
 generate    [dump_spec=0/1]          Build release with reltool
 
