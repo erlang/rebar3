@@ -58,7 +58,11 @@ escriptize(Config, AppFile) ->
         {ok, {"mem", ZipBin}} ->
             %% Archive was successfully created. Prefix that binary with our
             %% header and write to our escript file
-            Script = <<"#!/usr/bin/env escript\n", ZipBin/binary>>,
+            Shebang = rebar_config:get(Config, escript_shebang,
+                                       "#!/usr/bin/env escript\n"),
+            Comment = rebar_config:get(Config, escript_comment, "%%\n"),
+            EmuArgs = rebar_config:get(Config, escript_emu_args, "%%!\n"),
+            Script = iolist_to_binary([Shebang, Comment, EmuArgs, ZipBin]),
             case file:write_file(Filename, Script) of
                 ok ->
                     ok;
