@@ -27,6 +27,7 @@
 -module(rebar_subdirs).
 
 -include("rebar.hrl").
+-include_lib("kernel/include/file.hrl").
 
 -export([preprocess/2]).
 
@@ -37,6 +38,38 @@
 preprocess(Config, _) ->
     %% Get the list of subdirs specified in the config (if any).
     Cwd = rebar_utils:get_cwd(),
-    Subdirs = [filename:join(Cwd, Dir) ||
-                  Dir <- rebar_config:get_local(Config, sub_dirs, [])],
+    Subdirs0 = rebar_config:get_local(Config, sub_dirs, []),
+    Check = check_loop(Cwd),
+    ok = lists:foreach(Check, Subdirs0),
+    Subdirs = [filename:join(Cwd, Dir) || Dir <- Subdirs0],
     {ok, Subdirs}.
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
+
+check_loop(Cwd) ->
+    RebarConfig = filename:join(Cwd, "rebar.config"),
+    fun(Dir0) ->
+            IsSymlink = case file:read_link_info(Dir0) of
+                            {ok, #file_info{type=symlink}} ->
+                                {true, resolve_symlink(Dir0)};
+                            _ ->
+                                {false, Dir0}
+                        end,
+            case IsSymlink of
+                {false, Dir="."} ->
+                    ?ERROR("endless loop detected:~nsub_dirs"
+                           " entry ~p in ~s~n", [Dir, RebarConfig]);
+                {true, Cwd} ->
+                    ?ERROR("endless loop detected:~nsub_dirs"
+                           " entry ~p in ~s is a symlink to \".\"~n",
+                           [Dir0, RebarConfig]);
+                _ ->
+                    ok
+            end
+    end.
+
+resolve_symlink(Dir0) ->
+    {ok, Dir} = file:read_link(Dir0),
+    Dir.
