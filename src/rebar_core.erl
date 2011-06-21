@@ -26,7 +26,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_core).
 
--export([process_commands/1,
+-export([process_commands/2,
          skip_dir/1,
          is_skip_dir/1,
          skip_dirs/0]).
@@ -63,7 +63,7 @@ skip_dirs() ->
 %% Internal functions
 %% ===================================================================
 
-process_commands([]) ->
+process_commands([], _ParentConfig) ->
     case erlang:get(operations) of
         0 ->
             %% none of the commands had an effect
@@ -71,7 +71,7 @@ process_commands([]) ->
         _ ->
             ok
     end;
-process_commands([Command | Rest]) ->
+process_commands([Command | Rest], ParentConfig) ->
     %% Reset skip dirs
     lists:foreach(fun (D) -> erlang:erase({skip_dir, D}) end, skip_dirs()),
     Operations = erlang:get(operations),
@@ -80,7 +80,7 @@ process_commands([Command | Rest]) ->
     %% If not, code:set_path() may choke on invalid relative paths when trying
     %% to restore the code path from inside a subdirectory.
     true = rebar_utils:expand_code_path(),
-    _ = process_dir(rebar_utils:get_cwd(), rebar_config:new(),
+    _ = process_dir(rebar_utils:get_cwd(), ParentConfig,
                     Command, sets:new()),
     case erlang:get(operations) of
         Operations ->
@@ -89,7 +89,7 @@ process_commands([Command | Rest]) ->
         _ ->
             ok
     end,
-    process_commands(Rest).
+    process_commands(Rest, ParentConfig).
 
 
 process_dir(Dir, ParentConfig, Command, DirSet) ->

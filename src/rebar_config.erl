@@ -52,7 +52,15 @@ new() ->
     #config { dir = rebar_utils:get_cwd(),
               opts = []}.
 
-new(ParentConfig) ->
+new(ConfigFile) when is_list(ConfigFile) ->
+    case consult_file(ConfigFile) of
+        {ok, Opts} ->
+            #config { dir = rebar_utils:get_cwd(),
+                      opts = Opts };
+        Other ->
+            ?ABORT("Failed to load ~s: ~p~n", [ConfigFile, Other])
+    end;
+new(#config{}=ParentConfig)->
     %% If we are at the top level we might want to load another rebar.config
     %% We can be certain that we are at the top level if we don't have any
     %% configs yet since if we are at another level we must have some config.
@@ -66,7 +74,7 @@ new(ParentConfig) ->
     %% Load terms from rebar.config, if it exists
     Dir = rebar_utils:get_cwd(),
     ConfigFile = filename:join([Dir, ConfName]),
-    Opts = case file:consult(ConfigFile) of
+    Opts = case consult_file(ConfigFile) of
                {ok, Terms} ->
                    %% Found a config file with some terms. We need to
                    %% be able to distinguish between local definitions
@@ -125,6 +133,10 @@ get_jobs() ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+consult_file(File) ->
+    ?DEBUG("Consult config file ~p~n", [File]),
+    file:consult(File).
 
 local_opts([], Acc) ->
     lists:reverse(Acc);

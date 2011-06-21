@@ -98,8 +98,19 @@ run_aux(Commands) ->
     %% Keep track of how many operations we do, so we can detect bad commands
     erlang:put(operations, 0),
 
+    %% If $HOME/.rebar/config exists load and use as global config
+    GlobalConfigFile = filename:join(os:getenv("HOME"), ".rebar/config"),
+    GlobalConfig = case filelib:is_regular(GlobalConfigFile) of
+                       true ->
+                           ?DEBUG("Load global config file ~p~n",
+                                  [GlobalConfigFile]),
+                           rebar_config:new(GlobalConfigFile);
+                       false ->
+                           rebar_config:new()
+                   end,
+
     %% Process each command, resetting any state between each one
-    rebar_core:process_commands(CommandAtoms).
+    rebar_core:process_commands(CommandAtoms, GlobalConfig).
 
 %%
 %% print help/usage string
