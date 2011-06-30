@@ -42,14 +42,16 @@ generate(Config, ReltoolFile) ->
     check_vsn(),
 
     %% Load the reltool configuration from the file
-    ReltoolConfig = load_config(ReltoolFile),
+    ReltoolConfig = rebar_rel_utils:load_config(ReltoolFile),
+
+    Sys = rebar_rel_utils:get_sys_tuple(ReltoolConfig),
 
     %% Spin up reltool server and load our config into it
-    {ok, Server} = reltool:start_server([sys_tuple(ReltoolConfig)]),
+    {ok, Server} = reltool:start_server([Sys]),
 
     %% Do some validation of the reltool configuration; error messages out of
     %% reltool are still pretty cryptic
-    validate_rel_apps(Server, sys_tuple(ReltoolConfig)),
+    validate_rel_apps(Server, Sys),
 
     %% Finally, run reltool
     case catch(run_reltool(Server, Config, ReltoolConfig)) of
@@ -64,8 +66,8 @@ generate(Config, ReltoolFile) ->
 
 
 clean(_Config, ReltoolFile) ->
-    ReltoolConfig = load_config(ReltoolFile),
-    TargetDir = target_dir(ReltoolConfig),
+    ReltoolConfig = rebar_rel_utils:load_config(ReltoolFile),
+    TargetDir = rebar_rel_utils:get_target_dir(ReltoolConfig),
     rebar_file_utils:rm_rf(TargetDir),
     rebar_file_utils:delete_each(["reltool.spec"]).
 
@@ -89,53 +91,6 @@ check_vsn() ->
                 false ->
                     ok
             end
-    end.
-
-%%
-%% Load terms from reltool.config
-%%
-load_config(ReltoolFile) ->
-    case file:consult(ReltoolFile) of
-        {ok, Terms} ->
-            Terms;
-        Other ->
-            ?ABORT("Failed to load expected config from ~s: ~p\n",
-                   [ReltoolFile, Other])
-    end.
-
-%%
-%% Look for the {sys, [...]} tuple in the reltool.config file.
-%% Without this present, we can't run reltool.
-%%
-sys_tuple(ReltoolConfig) ->
-    case lists:keyfind(sys, 1, ReltoolConfig) of
-        {sys, _} = SysTuple ->
-            SysTuple;
-        false ->
-            ?ABORT("Failed to find {sys, [...]} tuple in reltool.config.", [])
-    end.
-
-%%
-%% Look for {target_dir, TargetDir} in the reltool config file; if none is
-%% found, use the name of the release as the default target directory.
-%%
-target_dir(ReltoolConfig) ->
-    case rebar_config:get_global(target_dir, undefined) of
-        undefined ->
-            case lists:keyfind(target_dir, 1, ReltoolConfig) of
-                {target_dir, TargetDir} ->
-                    filename:absname(TargetDir);
-                false ->
-                    {sys, SysInfo} = sys_tuple(ReltoolConfig),
-                    case lists:keyfind(rel, 1, SysInfo) of
-                        {rel, Name, _Vsn, _Apps} ->
-                            filename:absname(Name);
-                        false ->
-                            filename:absname("target")
-                    end
-            end;
-        TargetDir ->
-            filename:absname(TargetDir)
     end.
 
 %%
@@ -203,7 +158,7 @@ run_reltool(Server, _Config, ReltoolConfig) ->
     case reltool:get_target_spec(Server) of
         {ok, Spec} ->
             %% Pull the target dir and make sure it exists
-            TargetDir = target_dir(ReltoolConfig),
+            TargetDir = rebar_rel_utils:get_target_dir(ReltoolConfig),
             mk_target_dir(TargetDir),
 
             %% Dump the spec, if necessary

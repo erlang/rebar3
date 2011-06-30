@@ -40,11 +40,15 @@
 
 'generate-appups'(_Config, ReltoolFile) ->
     %% Get the old release path
-    OldVerPath = rebar_rel_utils:get_previous_release_path(),
+    ReltoolConfig = rebar_rel_utils:load_config(ReltoolFile),
+    TargetParentDir = rebar_rel_utils:get_target_parent_dir(ReltoolConfig),
+
+    OldVerPath = filename:join([TargetParentDir,
+                      rebar_rel_utils:get_previous_release_path()]),
 
     %% Get the new and old release name and versions
     {Name, _Ver} = rebar_rel_utils:get_reltool_release_info(ReltoolFile),
-    NewVerPath = filename:join([".", Name]),
+    NewVerPath = filename:join([TargetParentDir, Name]),
     {NewName, NewVer} = rebar_rel_utils:get_rel_release_info(Name, NewVerPath),
     {OldName, OldVer} = rebar_rel_utils:get_rel_release_info(Name, OldVerPath),
 
@@ -60,7 +64,7 @@
 
     %% Get a list of any appup files that exist in the new release
     NewAppUpFiles = rebar_utils:find_files(
-                      filename:join([NewName, "lib"]), "^.*.appup$"),
+                      filename:join([NewVerPath, "lib"]), "^.*.appup$"),
 
     %% Convert the list of appup files into app names
     AppUpApps = [file_to_name(File) || File <- NewAppUpFiles],
@@ -69,7 +73,7 @@
     UpgradeApps = genappup_which_apps(Upgraded, AppUpApps),
 
     %% Generate appup files for upgraded apps
-    generate_appup_files(Name, OldVerPath, UpgradeApps),
+    generate_appup_files(NewVerPath, OldVerPath, UpgradeApps),
 
     ok.
 
@@ -124,10 +128,10 @@ genappup_which_apps(UpgradedApps, [First|Rest]) ->
 genappup_which_apps(Apps, []) ->
     Apps.
 
-generate_appup_files(Name, OldVerPath, [{App, {OldVer, NewVer}}|Rest]) ->
-    OldEbinDir = filename:join([".", OldVerPath, "lib",
+generate_appup_files(NewVerPath, OldVerPath, [{App, {OldVer, NewVer}}|Rest]) ->
+    OldEbinDir = filename:join([OldVerPath, "lib",
                                 atom_to_list(App) ++ "-" ++ OldVer, "ebin"]),
-    NewEbinDir = filename:join([".", Name, "lib",
+    NewEbinDir = filename:join([NewVerPath, "lib",
                                 atom_to_list(App) ++ "-" ++ NewVer, "ebin"]),
 
     {AddedFiles, DeletedFiles, ChangedFiles} = beam_lib:cmp_dirs(NewEbinDir,
@@ -147,7 +151,7 @@ generate_appup_files(Name, OldVerPath, [{App, {OldVer, NewVer}}|Rest]) ->
                                         OldVer, Inst, OldVer])),
 
     ?CONSOLE("Generated appup for ~p~n", [App]),
-    generate_appup_files(Name, OldVerPath, Rest);
+    generate_appup_files(NewVerPath, OldVerPath, Rest);
 generate_appup_files(_, _, []) ->
     ?CONSOLE("Appup generation complete~n", []).
 
