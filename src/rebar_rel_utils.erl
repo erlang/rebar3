@@ -34,7 +34,11 @@
          get_rel_apps/1,
          get_rel_apps/2,
          get_previous_release_path/0,
-         get_rel_file_path/2]).
+         get_rel_file_path/2,
+         load_config/1,
+         get_sys_tuple/1,
+         get_target_dir/1,
+         get_target_parent_dir/1]).
 
 -include("rebar.hrl").
 
@@ -51,16 +55,11 @@ is_rel_dir(Dir) ->
     end.
 
 %% Get release name and version from a reltool.config
-get_reltool_release_info(ReltoolFile) ->
-    %% expect sys to be the first proplist in reltool.config
-    case file:consult(ReltoolFile) of
-        {ok, [{sys, Config}| _]} ->
-            %% expect the first rel in the proplist to be the one you want
-            {rel, Name, Ver, _} = proplists:lookup(rel, Config),
-            {Name, Ver};
-        _ ->
-            ?ABORT("Failed to parse ~s~n", [ReltoolFile])
-    end.
+get_reltool_release_info(ReltoolConfig) ->
+    %% expect the first rel in the proplist to be the one you want
+    {sys, Config} = get_sys_tuple(ReltoolConfig),
+    {rel, Name, Ver, _} = proplists:lookup(rel, Config),
+    {Name, Ver}.
 
 %% Get release name and version from a rel file
 get_rel_release_info(RelFile) ->
@@ -105,6 +104,59 @@ get_previous_release_path() ->
                    "create upgrade package~n", []);
         OldVerPath ->
             OldVerPath
+    end.
+
+%%
+%% Load terms from reltool.config
+%%
+load_config(ReltoolFile) ->
+    case file:consult(ReltoolFile) of
+        {ok, Terms} ->
+            Terms;
+        Other ->
+            ?ABORT("Failed to load expected config from ~s: ~p\n",
+                   [ReltoolFile, Other])
+    end.
+
+%%
+%% Look for the {sys, [...]} tuple in the reltool.config file.
+%% Without this present, we can't run reltool.
+%%
+get_sys_tuple(ReltoolConfig) ->
+    case lists:keyfind(sys, 1, ReltoolConfig) of
+        {sys, _} = SysTuple ->
+            SysTuple;
+        false ->
+            ?ABORT("Failed to find {sys, [...]} tuple in reltool.config.", [])
+    end.
+
+%%
+%% Look for {target_dir, TargetDir} in the reltool config file; if none is
+%% found, use the name of the release as the default target directory.
+%%
+get_target_dir(ReltoolConfig) ->
+    case rebar_config:get_global(target_dir, undefined) of
+        undefined ->
+            case lists:keyfind(target_dir, 1, ReltoolConfig) of
+                {target_dir, TargetDir} ->
+                    filename:absname(TargetDir);
+                false ->
+                    {sys, SysInfo} = get_sys_tuple(ReltoolConfig),
+                    case lists:keyfind(rel, 1, SysInfo) of
+                        {rel, Name, _Vsn, _Apps} ->
+                            filename:absname(Name);
+                        false ->
+                            filename:absname("target")
+                    end
+            end;
+        TargetDir ->
+            filename:absname(TargetDir)
+    end.
+
+get_target_parent_dir(ReltoolConfig) ->
+    case lists:reverse(tl(lists:reverse(filename:split(get_target_dir(ReltoolConfig))))) of
+        [] -> ".";
+        Components -> filename:join(Components)
     end.
 
 %% ===================================================================

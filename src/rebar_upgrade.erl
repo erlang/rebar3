@@ -38,29 +38,34 @@
 
 'generate-upgrade'(_Config, ReltoolFile) ->
     %% Get the old release path
-    OldVerPath = rebar_rel_utils:get_previous_release_path(),
+    ReltoolConfig = rebar_rel_utils:load_config(ReltoolFile),
+    TargetParentDir = rebar_rel_utils:get_target_parent_dir(ReltoolConfig),
+    TargetDir = rebar_rel_utils:get_target_dir(ReltoolConfig),
+
+    OldVerPath = filename:join([TargetParentDir,
+                      rebar_rel_utils:get_previous_release_path()]),
 
     %% Run checks to make sure that building a package is possible
-    {NewName, NewVer} = run_checks(OldVerPath, ReltoolFile),
+    {NewVerPath, NewName, NewVer} = run_checks(OldVerPath, ReltoolConfig),
     NameVer = NewName ++ "_" ++ NewVer,
 
     %% Save the code path prior to doing anything
     OrigPath = code:get_path(),
 
     %% Prepare the environment for building the package
-    ok = setup(OldVerPath, NewName, NewVer, NameVer),
+    ok = setup(OldVerPath, NewVerPath, NewName, NewVer, NameVer),
 
     %% Build the package
     run_systools(NameVer, NewName),
 
     %% Boot file changes
-    {ok, _} = boot_files(NewVer, NewName),
+    {ok, _} = boot_files(TargetDir, NewVer, NewName),
 
     %% Extract upgrade and tar it back up with changes
     make_tar(NameVer),
 
     %% Clean up files that systools created
-    ok = cleanup(NameVer, NewName, NewVer),
+    ok = cleanup(NameVer),
 
     %% Restore original path
     true = code:set_path(OrigPath),
@@ -71,18 +76,19 @@
 %% Internal functions
 %% ==================================================================
 
-run_checks(OldVerPath, ReltoolFile) ->
+run_checks(OldVerPath, ReltoolConfig) ->
     true = rebar_utils:prop_check(filelib:is_dir(OldVerPath),
                       "Release directory doesn't exist (~p)~n", [OldVerPath]),
 
-    {Name, Ver} = rebar_rel_utils:get_reltool_release_info(ReltoolFile),
+    {Name, Ver} = rebar_rel_utils:get_reltool_release_info(ReltoolConfig),
 
-    NamePath = filename:join([".", Name]),
-    true = rebar_utils:prop_check(filelib:is_dir(NamePath),
-                      "Release directory doesn't exist (~p)~n", [NamePath]),
+    NewVerPath = filename:join([
+                      rebar_rel_utils:get_target_parent_dir(ReltoolConfig),
+                      Name]),
+    true = rebar_utils:prop_check(filelib:is_dir(NewVerPath),
+                      "Release directory doesn't exist (~p)~n", [NewVerPath]),
 
-    {NewName, NewVer} = NewNameAndVer =
-        rebar_rel_utils:get_rel_release_info(Name, NamePath),
+    {NewName, NewVer} = rebar_rel_utils:get_rel_release_info(Name, NewVerPath),
     {OldName, OldVer} = rebar_rel_utils:get_rel_release_info(Name, OldVerPath),
 
     true = rebar_utils:prop_check(NewName == OldName,
@@ -94,11 +100,10 @@ run_checks(OldVerPath, ReltoolFile) ->
     true = rebar_utils:prop_check(Ver == NewVer,
                       "Reltool and .rel versions do not match~n", []),
 
-    NewNameAndVer.
+    {NewVerPath, NewName, NewVer}.
 
-setup(OldVerPath, NewName, NewVer, NameVer) ->
-    NewRelPath = filename:join([".", NewName]),
-    Src = filename:join([NewRelPath, "releases",
+setup(OldVerPath, NewVerPath, NewName, NewVer, NameVer) ->
+    Src = filename:join([NewVerPath, "releases",
                          NewVer, NewName ++ ".rel"]),
     Dst = filename:join([".", NameVer ++ ".rel"]),
     {ok, _} = file:copy(Src, Dst),
@@ -108,9 +113,9 @@ setup(OldVerPath, NewName, NewVer, NameVer) ->
                                                          "releases", "*"])),
                          filelib:wildcard(filename:join([OldVerPath,
                                                          "lib", "*", "ebin"])),
-                         filelib:wildcard(filename:join([NewRelPath,
+                         filelib:wildcard(filename:join([NewVerPath,
                                                          "lib", "*", "ebin"])),
-                         filelib:wildcard(filename:join([NewRelPath, "*"]))
+                         filelib:wildcard(filename:join([NewVerPath, "*"]))
                         ])).
 
 run_systools(NewVer, Name) ->
@@ -135,30 +140,35 @@ run_systools(NewVer, Name) ->
             end
     end.
 
-boot_files(Ver, Name) ->
-    ok = file:make_dir(filename:join([".", "releases"])),
-    ok = file:make_dir(filename:join([".", "releases", Ver])),
+boot_files(TargetDir, Ver, Name) ->
+    Tmp = "_tmp",
+    ok = file:make_dir(filename:join([".", Tmp])),
+    ok = file:make_dir(filename:join([".", Tmp, "releases"])),
+    ok = file:make_dir(filename:join([".", Tmp, "releases", Ver])),
     ok = file:make_symlink(
            filename:join(["start.boot"]),
-           filename:join([".", "releases", Ver, Name ++ ".boot"])),
+           filename:join([".", Tmp, "releases", Ver, Name ++ ".boot"])),
     {ok, _} = file:copy(
-                filename:join([".", Name, "releases", Ver, "start_clean.boot"]),
-                filename:join([".", "releases", Ver, "start_clean.boot"])).
+                filename:join([TargetDir, "releases", Ver, "start_clean.boot"]),
+                filename:join([".", Tmp, "releases", Ver, "start_clean.boot"])).
 
 make_tar(NameVer) ->
     Filename = NameVer ++ ".tar.gz",
-    ok = erl_tar:extract(Filename, [compressed]),
-    ok = file:delete(Filename),
-    {ok, Tar} = erl_tar:open(Filename, [write, compressed]),
+    {ok, Cwd} = file:get_cwd(),
+    Absname = filename:join([Cwd, Filename]),
+    ok = file:set_cwd("_tmp"),
+    ok = erl_tar:extract(Absname, [compressed]),
+    ok = file:delete(Absname),
+    {ok, Tar} = erl_tar:open(Absname, [write, compressed]),
     ok = erl_tar:add(Tar, "lib", []),
     ok = erl_tar:add(Tar, "releases", []),
     ok = erl_tar:close(Tar),
+    ok = file:set_cwd(Cwd),
     ?CONSOLE("~s upgrade package created~n", [NameVer]).
 
-cleanup(NameVer, Name, Ver) ->
+cleanup(NameVer) ->
     ?DEBUG("Removing files needed for building the upgrade~n", []),
     Files = [
-             filename:join([".", "releases", Ver, Name ++ ".boot"]),
              filename:join([".", NameVer ++ ".rel"]),
              filename:join([".", NameVer ++ ".boot"]),
              filename:join([".", NameVer ++ ".script"]),
@@ -166,18 +176,17 @@ cleanup(NameVer, Name, Ver) ->
             ],
     lists:foreach(fun(F) -> ok = file:delete(F) end, Files),
 
-    ok = remove_dir_tree("releases"),
-    ok = remove_dir_tree("lib").
+    ok = remove_dir_tree("_tmp").
 
-%% taken from http://www.erlang.org/doc/system_principles/create_target.html
+%% adapted from http://www.erlang.org/doc/system_principles/create_target.html
 remove_dir_tree(Dir) ->
     remove_all_files(".", [Dir]).
 remove_all_files(Dir, Files) ->
     lists:foreach(fun(File) ->
                           FilePath = filename:join([Dir, File]),
-                          {ok, FileInfo} = file:read_file_info(FilePath),
-                          case FileInfo#file_info.type of
-                              directory ->
+                          {ok, FileInfo, Link} = file_info(FilePath),
+                          case {Link, FileInfo#file_info.type} of
+                              {false, directory} ->
                                   {ok, DirFiles} = file:list_dir(FilePath),
                                   remove_all_files(FilePath, DirFiles),
                                   file:del_dir(FilePath);
@@ -185,3 +194,14 @@ remove_all_files(Dir, Files) ->
                                   file:delete(FilePath)
                           end
                   end, Files).
+
+file_info(Path) ->
+    case file:read_file_info(Path) of
+        {ok, Info} ->
+            {ok, Info, false};
+        {error, enoent} ->
+            {ok, Info} = file:read_link_info(Path),
+            {ok, Info, true};
+        Error ->
+            Error
+    end.
