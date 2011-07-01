@@ -174,7 +174,7 @@ generate_instruction_advanced(Name, _, code_change) ->
     {update, Name, {advanced, []}};
 generate_instruction_advanced(Name, _, _) ->
     %% Anything else
-    {update, Name}.
+    {load_module, Name}.
 
 get_behavior(List) ->
     Attributes = proplists:get_value(attributes, List),
