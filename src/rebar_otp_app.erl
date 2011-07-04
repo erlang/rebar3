@@ -150,7 +150,7 @@ validate_name(AppName, File) ->
     end.
 
 validate_modules(AppName, undefined) ->
-    ?ERROR("Missing modules declaration in~p.app:\n", [AppName]),
+    ?ERROR("Missing modules declaration in ~p.app~n", [AppName]),
     ?FAIL;
 
 validate_modules(AppName, Mods) ->
