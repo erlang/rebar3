@@ -241,8 +241,15 @@ execute_plugin_hook(Hook, Command, Modules, Config, ModuleFile) ->
 execute(Command, Modules, Config, ModuleFile) ->
     case select_modules(Modules, Command, []) of
         [] ->
-            ?WARN("'~p' command does not apply to directory ~s\n",
-                  [Command, rebar_utils:get_cwd()]);
+            Cmd = atom_to_list(Command),
+            case lists:prefix("pre_", Cmd)
+                orelse lists:prefix("post_", Cmd) of
+                true ->
+                    ok;
+                false ->
+                    ?WARN("'~p' command does not apply to directory ~s\n",
+                          [Command, rebar_utils:get_cwd()])
+            end;
 
         TargetModules ->
             %% Provide some info on where we are
