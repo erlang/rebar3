@@ -59,10 +59,10 @@ check_loop(Cwd) ->
                         end,
             case IsSymlink of
                 {false, Dir="."} ->
-                    ?ERROR("endless loop detected:~nsub_dirs"
+                    ?ERROR("infinite loop detected:~nsub_dirs"
                            " entry ~p in ~s~n", [Dir, RebarConfig]);
                 {true, Cwd} ->
-                    ?ERROR("endless loop detected:~nsub_dirs"
+                    ?ERROR("infinite loop detected:~nsub_dirs"
                            " entry ~p in ~s is a symlink to \".\"~n",
                            [Dir0, RebarConfig]);
                 _ ->
