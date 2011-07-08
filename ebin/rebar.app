@@ -27,7 +27,6 @@
               rebar_port_compiler,
               rebar_protobuffs_compiler,
               rebar_neotoma_compiler,
-              rebar_port_compiler,
               rebar_rel_utils,
               rebar_reltool,
               rebar_require_vsn,
