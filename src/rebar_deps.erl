@@ -411,7 +411,11 @@ update_source(AppDir, {bzr, _Url, Rev}) ->
 %% Source helper functions
 %% ===================================================================
 
-source_engine_avail({Name, _, _}=Source)
+source_engine_avail(Source) ->
+    Name = element(1, Source),
+    source_engine_avail(Name, Source).
+
+source_engine_avail(Name, Source)
   when Name == hg; Name == git; Name == svn; Name == bzr ->
     case scm_client_vsn(Name) >= required_scm_client_vsn(Name) of
         true ->
