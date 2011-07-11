@@ -128,6 +128,8 @@ genappup_which_apps(UpgradedApps, [First|Rest]) ->
 genappup_which_apps(Apps, []) ->
     Apps.
 
+generate_appup_files(NewVerPath, OldVerPath, [{_App, {undefined, _}}|Rest]) ->
+    generate_appup_files(NewVerPath, OldVerPath, Rest);
 generate_appup_files(NewVerPath, OldVerPath, [{App, {OldVer, NewVer}}|Rest]) ->
     OldEbinDir = filename:join([OldVerPath, "lib",
                                 atom_to_list(App) ++ "-" ++ OldVer, "ebin"]),
