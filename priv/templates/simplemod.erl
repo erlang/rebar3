@@ -7,4 +7,4 @@
 -endif.
 
 my_func() ->
-  ok.
+    ok.

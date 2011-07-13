@@ -4,7 +4,7 @@
 ## as escript depends on erl and in turn, erl depends on having access to a
 ## bootscript (start.boot). Note that this script is ONLY invoked as a side-effect
 ## of running escript -- the embedded node bypasses erl and uses erlexec directly
-## (as it should). 
+## (as it should).
 ##
 ## Note that this script makes the assumption that there is a start_clean.boot
 ## file available in $ROOTDIR/release/VSN.
