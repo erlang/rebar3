@@ -60,7 +60,7 @@ new(ConfigFile) when is_list(ConfigFile) ->
         Other ->
             ?ABORT("Failed to load ~s: ~p~n", [ConfigFile, Other])
     end;
-new(#config{}=ParentConfig)->
+new(#config{opts=Opts0}=ParentConfig)->
     %% If we are at the top level we might want to load another rebar.config
     %% We can be certain that we are at the top level if we don't have any
     %% configs yet since if we are at another level we must have some config.
@@ -83,10 +83,10 @@ new(#config{}=ParentConfig)->
                    %% in the proplist (since order matters) between
                    %% the new and old defs.
                    Terms ++ [local] ++
-                       [Opt || Opt <- ParentConfig#config.opts, Opt /= local];
+                       [Opt || Opt <- Opts0, Opt /= local];
                {error, enoent} ->
                    [local] ++
-                       [Opt || Opt <- ParentConfig#config.opts, Opt /= local];
+                       [Opt || Opt <- Opts0, Opt /= local];
                Other ->
                    ?ABORT("Failed to load ~s: ~p\n", [ConfigFile, Other])
            end,
