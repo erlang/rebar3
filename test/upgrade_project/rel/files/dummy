@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # -*- tab-width:4;indent-tabs-mode:nil -*-
 # ex: ts=4 sw=4 et
 
@@ -23,14 +23,14 @@ cd $RUNNER_BASE_DIR
 mkdir -p $RUNNER_LOG_DIR
 
 # Extract the target node name from node.args
-NAME_ARG=`grep -e '-[s]*name' $RUNNER_ETC_DIR/vm.args`
+NAME_ARG=`egrep '^-s?name' $RUNNER_ETC_DIR/vm.args`
 if [ -z "$NAME_ARG" ]; then
     echo "vm.args needs to have either -name or -sname parameter."
     exit 1
 fi
 
 # Extract the target cookie
-COOKIE_ARG=`grep -e '-setcookie' $RUNNER_ETC_DIR/vm.args`
+COOKIE_ARG=`grep '^-setcookie' $RUNNER_ETC_DIR/vm.args`
 if [ -z "$COOKIE_ARG" ]; then
     echo "vm.args needs to have a -setcookie parameter."
     exit 1
@@ -62,7 +62,8 @@ case "$1" in
         HEART_COMMAND="$RUNNER_BASE_DIR/bin/$SCRIPT start"
         export HEART_COMMAND
         mkdir -p $PIPE_DIR
-        $ERTS_PATH/run_erl -daemon $PIPE_DIR $RUNNER_LOG_DIR "exec $RUNNER_BASE_DIR/bin/$SCRIPT console" 2>&1
+        shift # remove $1
+        $ERTS_PATH/run_erl -daemon $PIPE_DIR $RUNNER_LOG_DIR "exec $RUNNER_BASE_DIR/bin/$SCRIPT console $@" 2>&1
         ;;
 
     stop)
@@ -84,6 +85,10 @@ case "$1" in
                 ;;
         esac
         $NODETOOL stop
+        ES=$?
+        if [ "$ES" -ne 0 ]; then
+            exit $ES
+        fi
         while `kill -0 $PID 2>/dev/null`;
         do
             sleep 1
@@ -93,28 +98,41 @@ case "$1" in
     restart)
         ## Restart the VM without exiting the process
         $NODETOOL restart
+        ES=$?
+        if [ "$ES" -ne 0 ]; then
+            exit $ES
+        fi
         ;;
 
     reboot)
         ## Restart the VM completely (uses heart to restart it)
         $NODETOOL reboot
+        ES=$?
+        if [ "$ES" -ne 0 ]; then
+            exit $ES
+        fi
         ;;
 
     ping)
         ## See if the VM is alive
         $NODETOOL ping
+        ES=$?
+        if [ "$ES" -ne 0 ]; then
+            exit $ES
+        fi
         ;;
 
     attach)
         # Make sure a node IS running
         RES=`$NODETOOL ping`
-        if [ "$RES" != "pong" ]; then
+        ES=$?
+        if [ "$ES" -ne 0 ]; then
             echo "Node is not running!"
-            exit 1
+            exit $ES
         fi
 
         shift
-        $ERTS_PATH/to_erl $PIPE_DIR
+        exec $ERTS_PATH/to_erl $PIPE_DIR
         ;;
 
     console|console_clean)
@@ -129,7 +147,7 @@ case "$1" in
         BINDIR=$ROOTDIR/erts-$ERTS_VSN/bin
         EMU=beam
         PROGNAME=`echo $0 | sed 's/.*\\///'`
-        CMD="$BINDIR/erlexec -boot $RUNNER_BASE_DIR/releases/$APP_VSN/$BOOTFILE -embedded -config $RUNNER_ETC_DIR/app.config -args_file $RUNNER_ETC_DIR/vm.args -- ${1+"$@"}"
+        CMD="$BINDIR/erlexec -boot $RUNNER_BASE_DIR/releases/$APP_VSN/$BOOTFILE -mode embedded -config $RUNNER_ETC_DIR/app.config -args_file $RUNNER_ETC_DIR/vm.args -- ${1+"$@"}"
         export EMU
         export ROOTDIR
         export BINDIR
