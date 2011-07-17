@@ -200,8 +200,8 @@ find_escript_templates() ->
 
 find_disk_templates() ->
     OtherTemplates = find_other_templates(),
-    HomeFiles = rebar_utils:find_files(filename:join(os:getenv("HOME"),
-                                                     ".rebar/templates"),
+    HomeFiles = rebar_utils:find_files(filename:join([os:getenv("HOME"),
+                                                      ".rebar", "templates"]),
                                        ?TEMPLATE_RE),
     LocalFiles = rebar_utils:find_files(".", ?TEMPLATE_RE),
     [{file, F} || F <- OtherTemplates ++ HomeFiles ++ LocalFiles].

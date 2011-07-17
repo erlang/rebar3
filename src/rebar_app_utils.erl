@@ -45,12 +45,12 @@ is_app_dir() ->
     is_app_dir(rebar_utils:get_cwd()).
 
 is_app_dir(Dir) ->
-    AppSrc = filename:join(Dir, "src/*.app.src"),
+    AppSrc = filename:join([Dir, "src", "*.app.src"]),
     case filelib:wildcard(AppSrc) of
         [AppSrcFile] ->
             {true, AppSrcFile};
         _ ->
-            App = filename:join([Dir, "ebin/*.app"]),
+            App = filename:join([Dir, "ebin", "*.app"]),
             case filelib:wildcard(App) of
                 [AppFile] ->
                     {true, AppFile};
