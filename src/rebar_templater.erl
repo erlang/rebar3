@@ -362,13 +362,13 @@ execute_template([{dir, Name} | Rest], TemplateType, TemplateName, Context,
 execute_template([{copy, Input, Output} | Rest], TemplateType, TemplateName,
                  Context, Force, ExistingFiles) ->
     InputName = filename:join(filename:dirname(TemplateName), Input),
-    case rebar_file_utils:cp_r([InputName ++ "/*"], Output) of
+    try rebar_file_utils:cp_r([InputName ++ "/*"], Output) of
         ok ->
             execute_template(Rest, TemplateType, TemplateName,
-                             Context, Force, ExistingFiles);
-        {error, Reason} ->
+                             Context, Force, ExistingFiles)
+    catch _:_ ->
             ?ABORT("Failed while processing template instruction "
-                   "{dir, ~s, ~s}: ~p\n", [Input, Output, Reason])
+                   "{dir, ~s, ~s}~n", [Input, Output])
     end;
 execute_template([{chmod, Mod, File} | Rest], TemplateType, TemplateName,
                  Context, Force, ExistingFiles) when is_integer(Mod) ->
