@@ -27,7 +27,7 @@ init() ->
 new() ->
     ?nif_stub.
 
-myfunction(Ref) ->
+myfunction(_Ref) ->
     ?nif_stub.
 
 %% ===================================================================
