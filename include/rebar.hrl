@@ -13,6 +13,3 @@
 
 -define(DEPRECATED(Key, Old, New, Opts, When),
         rebar_utils:deprecated(Key, Old, New, Opts, When)).
-
--define(DEPRECATED(Key, Old, New, When),
-        rebar_utils:deprecated(Key, Old, New, When)).
