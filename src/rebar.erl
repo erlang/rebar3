@@ -108,9 +108,10 @@ run_aux(Commands) ->
                        false ->
                            rebar_config:new()
                    end,
+    BaseConfig = rebar_config:base_config(GlobalConfig),
 
     %% Process each command, resetting any state between each one
-    rebar_core:process_commands(CommandAtoms, GlobalConfig).
+    rebar_core:process_commands(CommandAtoms, BaseConfig).
 
 %%
 %% print help/usage string

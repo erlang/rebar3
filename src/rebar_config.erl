@@ -26,7 +26,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_config).
 
--export([new/0, new/1,
+-export([new/0, new/1, base_config/1,
          get/3, get_local/3, get_list/3,
          get_all/2,
          set/3,
@@ -48,9 +48,13 @@
 %% Public API
 %% ===================================================================
 
+base_config(#config{opts=Opts0}) ->
+    ConfName = rebar_config:get_global(config, "rebar.config"),
+    new(Opts0, ConfName).
+
 new() ->
     #config { dir = rebar_utils:get_cwd(),
-              opts = []}.
+              opts = [] }.
 
 new(ConfigFile) when is_list(ConfigFile) ->
     case consult_file(ConfigFile) of
@@ -60,17 +64,10 @@ new(ConfigFile) when is_list(ConfigFile) ->
         Other ->
             ?ABORT("Failed to load ~s: ~p~n", [ConfigFile, Other])
     end;
-new(#config{opts=Opts0}=ParentConfig)->
-    %% If we are at the top level we might want to load another rebar.config
-    %% We can be certain that we are at the top level if we don't have any
-    %% configs yet since if we are at another level we must have some config.
-    ConfName = case ParentConfig of
-                   {config, _, []} ->
-                       rebar_config:get_global(config, "rebar.config");
-                   _ ->
-                       "rebar.config"
-               end,
+new(_ParentConfig=#config{opts=Opts0})->
+    new(Opts0, "rebar.config").
 
+new(Opts0, ConfName) ->
     %% Load terms from rebar.config, if it exists
     Dir = rebar_utils:get_cwd(),
     ConfigFile = filename:join([Dir, ConfName]),
