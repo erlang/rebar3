@@ -87,15 +87,19 @@ compile(Config, _AppFile) ->
                                           Config, yrl_first_files, [])),
                             "src", ".yrl", "src", ".erl",
                             fun compile_yrl/3),
-    doterl_compile(Config, "ebin"),
     rebar_base_compiler:run(Config,
                             check_files(rebar_config:get_local(
                                           Config, mib_first_files, [])),
                             "mibs", ".mib", "priv/mibs", ".bin",
-                            fun compile_mib/3).
+                            fun compile_mib/3),
+    doterl_compile(Config, "ebin").
 
 -spec clean(Config::rebar_config:config(), AppFile::file:filename()) -> 'ok'.
 clean(_Config, _AppFile) ->
+    MibFiles = rebar_utils:find_files("mibs", "^.*\\.mib\$"),
+    MIBs = [filename:rootname(filename:basename(MIB)) || MIB <- MibFiles],
+    rebar_file_utils:delete_each(
+      [filename:join(["include",MIB++".hrl"]) || MIB <- MIBs]),
     lists:foreach(fun(F) -> ok = rebar_file_utils:rm_rf(F) end,
                   ["ebin/*.beam", "priv/mibs/*.bin"]),
 
@@ -270,6 +274,10 @@ compile_mib(Source, Target, Config) ->
         rebar_config:get(Config, mib_opts, []),
     case snmpc:compile(Source, Opts) of
         {ok, _} ->
+            Mib = filename:rootname(Target),
+            ok = snmpc:mib_to_hrl(Mib),
+            Hrl_filename = Mib ++ ".hrl",
+            rebar_file_utils:mv(Hrl_filename,"include"),
             ok;
         {error, compilation_failed} ->
             ?FAIL
