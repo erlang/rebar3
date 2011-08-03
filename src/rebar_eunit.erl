@@ -128,9 +128,12 @@ eunit(Config, AppFile) ->
     Modules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- BeamFiles],
     SrcModules = [rebar_utils:erl_to_mod(M) || M <- SrcErls],
 
-    cover_init(Config, BeamFiles),
+    {ok, CoverLog} = cover_init(Config, BeamFiles),
+
     EunitResult = perform_eunit(Config, Modules),
     perform_cover(Config, Modules, SrcModules),
+
+    cover_close(CoverLog),
 
     case EunitResult of
         ok ->
@@ -275,9 +278,25 @@ cover_analyze(Config, Modules, SrcModules) ->
             ok
     end.
 
-cover_init(false, _BeamFiles) ->
+cover_close(not_enabled) ->
     ok;
+cover_close(F) ->
+    ok = file:close(F).
+
+cover_init(false, _BeamFiles) ->
+    {ok, not_enabled};
 cover_init(true, BeamFiles) ->
+    %% Attempt to start the cover server, then set it's group leader to
+    %% .eunit/cover.log, so all cover log messages will go there instead of
+    %% to stdout.
+    {_,CoverPid} = cover:start(),
+
+    {ok, F} = file:open(
+                filename:join([?EUNIT_DIR, "cover.log"]),
+                [write]),
+
+    group_leader(F, CoverPid),
+
     %% Make sure any previous runs of cover don't unduly influence
     cover:reset(),
 
@@ -300,7 +319,7 @@ cover_init(true, BeamFiles) ->
                                  [Beam, Desc])
                 end,
             _ = [PrintWarning(Beam, Desc) || {Beam, {error, Desc}} <- Compiled],
-            ok
+            {ok, F}
     end;
 cover_init(Config, BeamFiles) ->
     cover_init(rebar_config:get(Config, cover_enabled, false), BeamFiles).
