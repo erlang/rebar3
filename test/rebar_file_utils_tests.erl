@@ -225,7 +225,8 @@ mv_file_test_() ->
      end,
      fun teardown/1,
      [?_assert(filelib:is_regular(filename:join([?TMP_DIR,"dest","file1"]))),
-      ?_assertNot(filelib:is_regular(filename:join([?TMP_DIR,"source","file1"])))]}.
+      ?_assertNot(filelib:is_regular(
+                    filename:join([?TMP_DIR,"source","file1"])))]}.
 
 %% ====================================================================
 %% Utilities
