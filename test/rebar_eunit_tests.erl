@@ -168,46 +168,40 @@ basic_setup_test_() ->
          "myfunc_test() -> ?assertMatch(ok, myapp_mymod:myfunc()).\n"]).
 
 make_tmp_dir() ->
-    file:make_dir(?TMP_DIR).
+    ok = file:make_dir(?TMP_DIR).
 
 setup_environment() ->
-    make_tmp_dir(),
+    ok = make_tmp_dir(),
     prepare_rebar_script(),
-    file:set_cwd(?TMP_DIR).
+    ok = file:set_cwd(?TMP_DIR).
 
 setup_basic_project() ->
     setup_environment(),
     rebar("create-app appid=myapp"),
-    file:make_dir("ebin"),
-    file:make_dir("test"),
-    file:write_file("test/myapp_mymod_tests.erl", ?myapp_mymod_tests),
-    file:write_file("src/myapp_mymod.erl", ?myapp_mymod).
+    ok = file:make_dir("ebin"),
+    ok = file:make_dir("test"),
+    ok = file:write_file("test/myapp_mymod_tests.erl", ?myapp_mymod_tests),
+    ok = file:write_file("src/myapp_mymod.erl", ?myapp_mymod).
 
 setup_cover_project() ->
     setup_basic_project(),
-    file:write_file("rebar.config", "{cover_enabled, true}.\n").
+    ok = file:write_file("rebar.config", "{cover_enabled, true}.\n").
 
 setup_cover_project_with_suite() ->
     setup_cover_project(),
-    file:write_file("test/mysuite.erl", ?mysuite),
-    file:write_file("test/myapp_mymod_defined_in_mysuite_tests.erl",
-                    ?myapp_mymod_defined_in_mysuite_tests).
+    ok = file:write_file("test/mysuite.erl", ?mysuite),
+    ok = file:write_file("test/myapp_mymod_defined_in_mysuite_tests.erl",
+                         ?myapp_mymod_defined_in_mysuite_tests).
 
 teardown(_) ->
-    file:set_cwd(".."),
-    remove_tmp_dir(),
-    ok.
+    ok = file:set_cwd(".."),
+    ok = remove_tmp_dir().
 
 remove_tmp_dir() ->
     remove_tmp_dir(arg_for_eunit).
 
 remove_tmp_dir(_) ->
-    case os:type() of
-        {unix, _} ->
-            os:cmd("rm -rf " ++ ?TMP_DIR ++ " 2>/dev/null");
-        {win32, _} ->
-            os:cmd("rmdir /S /Q " ++ filename:nativename(?TMP_DIR))
-    end.
+    ok = rebar_file_utils:rm_rf(?TMP_DIR).
 
 %% ====================================================================
 %% Helper Functions
@@ -252,6 +246,6 @@ assert_full_coverage(Mod) ->
             Result = [X || X <- string:tokens(binary_to_list(F), "\n"),
                            string:str(X, Mod) =/= 0,
                            string:str(X, "100%") =/= 0],
-            file:close(F),
+            ok = file:close(F),
             ?assert(length(Result) =:= 1)
     end.
