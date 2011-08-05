@@ -208,10 +208,11 @@ remove_tmp_dir(_) ->
 %% ====================================================================
 
 prepare_rebar_script() ->
-    {ok, _} = file:copy(?REBAR_SCRIPT, ?TMP_DIR ++ "rebar"),
+    Rebar = ?TMP_DIR ++ "rebar",
+    {ok, _} = file:copy(?REBAR_SCRIPT, Rebar),
     case os:type() of
         {unix, _} ->
-            [] = os:cmd("chmod u+x " ++ ?TMP_DIR ++ "rebar");
+            [] = os:cmd("chmod u+x " ++ Rebar);
         {win32, _} ->
             {ok, _} = file:copy(?REBAR_SCRIPT ++ ".bat",
                                 ?TMP_DIR ++ "rebar.bat")
