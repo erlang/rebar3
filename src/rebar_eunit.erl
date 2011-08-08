@@ -288,8 +288,16 @@ cover_init(false, _BeamFiles) ->
 cover_init(true, BeamFiles) ->
     %% Attempt to start the cover server, then set it's group leader to
     %% .eunit/cover.log, so all cover log messages will go there instead of
-    %% to stdout.
-    {_,CoverPid} = cover:start(),
+    %% to stdout. If the cover server is already started we'll reuse that
+    %% pid.
+    {ok, CoverPid} = case cover:start() of
+                         {ok, P} ->
+                             {ok, P};
+                         {error,{already_started, P}} ->
+                             {ok, P};
+                         {error, Reason} ->
+                             {error, Reason}
+                     end,
 
     {ok, F} = file:open(
                 filename:join([?EUNIT_DIR, "cover.log"]),
