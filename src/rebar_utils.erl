@@ -41,7 +41,8 @@
          find_executable/1,
          prop_check/3,
          expand_code_path/0,
-         deprecated/5]).
+         deprecated/5,
+         expand_env_variable/3]).
 
 -include("rebar.hrl").
 
@@ -94,7 +95,7 @@ sh(Command0, Options0) ->
     ErrorHandler = proplists:get_value(error_handler, Options),
     OutputHandler = proplists:get_value(output_handler, Options),
 
-    Command = patch_on_windows(Command0),
+    Command = patch_on_windows(Command0, proplists:get_value(env, Options, [])),
     PortSettings = proplists:get_all_values(port_settings, Options) ++
         [exit_status, {line, 16384}, use_stdio, stderr_to_stdout, hide],
     Port = open_port({spawn, Command}, PortSettings),
@@ -106,9 +107,11 @@ sh(Command0, Options0) ->
             ErrorHandler(Command, Err)
     end.
 
-%% We need a bash shell to execute on windows
-%% also the port doesn't seem to close from time to time (mingw)
-patch_on_windows(Cmd) ->
+%% We use a bash shell to execute on windows if available. Otherwise we do the
+%% shell variable substitution ourselves and hope that the command doesn't use
+%% any shell magic. Also the port doesn't seem to close from time to time
+%% (mingw).
+patch_on_windows(Cmd, Env) ->
     case os:type() of
         {win32,nt} ->
             case find_executable("bash") of
@@ -117,7 +120,10 @@ patch_on_windows(Cmd) ->
                     Bash ++ " -c \"" ++ Cmd ++ "; echo _port_cmd_status_ $?\" "
             end;
         _ ->
-            Cmd
+            lists:foldl(fun({Key, Value}, Acc) ->
+                                expand_env_variable(Acc, Key, Value)
+                        end,
+                        Cmd, Env)
     end.
 
 find_files(Dir, Regex) ->
@@ -174,6 +180,20 @@ expand_code_path() ->
                                    [filename:absname(Path) | Acc]
                            end, [], code:get_path()),
     code:set_path(lists:reverse(CodePath)).
+
+%%
+%% Given env. variable FOO we want to expand all references to
+%% it in InStr. References can have two forms: $FOO and ${FOO}
+%% The end of form $FOO is delimited with whitespace or eol
+%%
+expand_env_variable(InStr, VarName, RawVarValue) ->
+    VarValue = re:replace(RawVarValue, "\\\\", "\\\\\\\\",
+                          [global, {return, list}]),
+    R1 = re:replace(InStr, "\\\$" ++ VarName ++ "\\s", VarValue ++ " ",
+                    [global]),
+    R2 = re:replace(R1, "\\\$" ++ VarName ++ "\$", VarValue),
+    re:replace(R2, "\\\${" ++ VarName ++ "}", VarValue,
+               [global, {return, list}]).
 
 
 %% ====================================================================

@@ -247,8 +247,8 @@ apply_defaults(Vars, Defaults) ->
       dict:merge(fun(Key, VarValue, DefaultValue) ->
                          case is_expandable(DefaultValue) of
                              true ->
-                                 expand_env_variable(DefaultValue,
-                                                     Key, VarValue);
+                                 rebar_utils:expand_env_variable(DefaultValue,
+                                                                 Key, VarValue);
                              false -> VarValue
                          end
                  end,
@@ -267,10 +267,10 @@ merge_each_var([{Key, Value} | Rest], Vars) ->
                  error ->
                      %% Nothing yet defined for this key/value.
                      %% Expand any self-references as blank.
-                     expand_env_variable(Value, Key, "");
+                     rebar_utils:expand_env_variable(Value, Key, "");
                  {ok, Value0} ->
                      %% Use previous definition in expansion
-                     expand_env_variable(Value, Key, Value0)
+                     rebar_utils:expand_env_variable(Value, Key, Value0)
              end,
     merge_each_var(Rest, orddict:store(Key, Evalue, Vars)).
 
@@ -305,7 +305,7 @@ expand_vars(Key, Value, Vars) ->
                              Key ->
                                  AValue;
                              _ ->
-                                 expand_env_variable(AValue, Key, Value)
+                                 rebar_utils:expand_env_variable(AValue, Key, Value)
                          end,
               [{AKey, NewValue} | Acc]
       end,
@@ -313,8 +313,8 @@ expand_vars(Key, Value, Vars) ->
 
 expand_command(TmplName, Env, InFiles, OutFile) ->
     Cmd0 = proplists:get_value(TmplName, Env),
-    Cmd1 = expand_env_variable(Cmd0, "PORT_IN_FILES", InFiles),
-    Cmd2 = expand_env_variable(Cmd1, "PORT_OUT_FILE", OutFile),
+    Cmd1 = rebar_utils:expand_env_variable(Cmd0, "PORT_IN_FILES", InFiles),
+    Cmd2 = rebar_utils:expand_env_variable(Cmd1, "PORT_OUT_FILE", OutFile),
     re:replace(Cmd2, "\\\$\\w+|\\\${\\w+}", "", [global, {return, list}]).
 
 %%
@@ -325,18 +325,6 @@ is_expandable(InStr) ->
         match -> true;
         nomatch -> false
     end.
-
-%%
-%% Given env. variable FOO we want to expand all references to
-%% it in InStr. References can have two forms: $FOO and ${FOO}
-%% The end of form $FOO is delimited with whitespace or eol
-%%
-expand_env_variable(InStr, VarName, VarValue) ->
-    R1 = re:replace(InStr, "\\\$" ++ VarName ++ "\\s", VarValue ++ " ",
-                    [global]),
-    R2 = re:replace(R1, "\\\$" ++ VarName ++ "\$", VarValue),
-    re:replace(R2, "\\\${" ++ VarName ++ "}", VarValue,
-               [global, {return, list}]).
 
 %%
 %% Filter a list of env vars such that only those which match the provided
