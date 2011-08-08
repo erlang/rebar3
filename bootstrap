@@ -81,19 +81,19 @@ main(Args) ->
         _ ->
             ok
     end,
-    
+
     %% Add a helpful message
     io:format("Congratulations! You now have a self-contained script called \"rebar\" in\n"
               "your current working directory. Place this script anywhere in your path\n"
               "and you can use rebar to build OTP-compliant apps.\n").
 
 rm(Path) ->
-    NativePath = filename:nativename(Path), 
+    NativePath = filename:nativename(Path),
     Cmd = case os:type() of
               {unix,_} -> "rm -f ";
               {win32,_} -> "del /q "
           end,
-    [] = os:cmd(Cmd ++ NativePath), 
+    [] = os:cmd(Cmd ++ NativePath),
     ok.
 
 build_time() ->
