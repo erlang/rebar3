@@ -8,3 +8,5 @@
 {chmod, 8#744, "files/{{nodeid}}"}.
 {file, "simplenode.app.config", "files/app.config"}.
 {template, "simplenode.vm.args", "files/vm.args"}.
+{template, "simplenode.windows.runner.cmd", "files/{{nodeid}}.cmd"}.
+{file, "simplenode.windows.start_erl.cmd", "files/start_erl.cmd"}.
