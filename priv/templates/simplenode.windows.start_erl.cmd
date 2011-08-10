@@ -1,6 +1,7 @@
-@rem Do not use "echo off" to not affect any child calls.
 @setlocal
 
+@rem Parse arguments. erlsrv.exe prepends erl arguments prior to first ++.
+@rem Other args are position dependent.
 @set args="%*"
 @for /F "delims=++ tokens=1,2,3" %%I in (%args%) do @(
     @call :set_trim erl_args %%I
