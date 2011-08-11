@@ -29,6 +29,15 @@
 %% <ul>
 %%   <li>eunit - runs eunit tests</li>
 %%   <li>clean - remove .eunit directory</li>
+%%   <li>reset_after_eunit::boolean() - default = true.
+%%       If true, try to "reset" VM state to approximate state prior to
+%%       running the EUnit tests:
+%%       <ul>
+%%          <li> Stop net_kernel if it was started </li>
+%%          <li> Stop OTP applications not running before EUnit tests were run </li>
+%%          <li> Kill processes not running before EUnit tests were run </li>
+%%          <li> Reset OTP application environment variables  </li>
+%%       </ul> </li>
 %% </ul>
 %% The following Global options are supported:
 %% <ul>
@@ -130,10 +139,19 @@ eunit(Config, AppFile) ->
 
     {ok, CoverLog} = cover_init(Config, BeamFiles),
 
+    StatusBefore = status_before_eunit(),
     EunitResult = perform_eunit(Config, Modules),
     perform_cover(Config, Modules, SrcModules),
 
     cover_close(CoverLog),
+
+    case proplists:get_value(reset_after_eunit, get_eunit_opts(Config),
+                             true) of
+        true ->
+            reset_after_eunit(StatusBefore);
+        false ->
+            ok
+    end,
 
     case EunitResult of
         ok ->
@@ -439,3 +457,99 @@ percentage(0, 0) ->
     "not executed";
 percentage(Cov, NotCov) ->
     integer_to_list(trunc((Cov / (Cov + NotCov)) * 100)) ++ "%".
+
+get_app_names() ->
+    [AppName || {AppName, _, _} <- application:loaded_applications()].
+
+status_before_eunit() ->
+    Apps = get_app_names(),
+    AppEnvs = [{App, application:get_all_env(App)} || App <- Apps],
+    {erlang:processes(), erlang:is_alive(), AppEnvs, ets:tab2list(ac_tab)}.
+
+reset_after_eunit({OldProcesses, WasAlive, OldAppEnvs, _OldACs}) ->
+    IsAlive = erlang:is_alive(),
+    if not WasAlive andalso IsAlive ->
+            ?DEBUG("Stopping net kernel....\n", []),
+            erl_epmd:stop(),
+            net_kernel:stop(),
+            timer:sleep(100);
+       true ->
+            ok
+    end,
+
+    Processes = erlang:processes(),
+    kill_extras(Processes -- OldProcesses),
+
+    OldApps = [App || {App, _} <- OldAppEnvs],
+    Apps = get_app_names(),
+    [begin
+         case lists:member(App, OldApps) of
+             true  -> ok;
+             false -> application:stop(App)
+         end,
+         application:unset_env(App, K)
+     end || App <- Apps, App /= rebar,
+            {K, _V} <- application:get_all_env(App)],
+
+    reconstruct_app_env_vars(Apps),
+    ok.
+
+kill_extras(Pids) ->
+    KeepProcs = [cover_server, eunit_server, inet_gethost_native_sup,
+                 inet_gethost_native, timer_server],
+    Killed = [begin
+                  Info = case erlang:process_info(Pid) of
+                             undefined -> [];
+                             Else      -> Else
+                         end,
+                  Keep = case proplists:get_value(registered_name, Info) of
+                             undefined ->
+                                 false;
+                             Name ->
+                                 lists:member(Name, KeepProcs)
+                         end,
+                  if Keep ->
+                          ok;
+                     true ->
+                          ?DEBUG("Kill ~p ~p\n", [Pid, Info]),
+                          exit(Pid, kill),
+                          Pid
+                  end
+              end || Pid <- Pids],
+    case lists:usort(Killed) -- [ok] of
+        [] ->
+            ?DEBUG("No processes to kill\n", []),
+            [];
+        Else ->
+            [wait_until_dead(Pid) || Pid <- Else],
+            Else
+    end.
+
+reconstruct_app_env_vars([App|Apps]) ->
+    CmdLine0 = proplists:get_value(App, init:get_arguments(), []),
+    CmdVars = [{list_to_atom(K), list_to_atom(V)} || {K, V} <- CmdLine0],
+    AppFile = (catch code:lib_dir(App) ++ 
+                   "/ebin/" ++ atom_to_list(App) ++ ".app"),
+    AppVars = case file:consult(AppFile) of
+                  {ok, [{application, App, Ps}]} ->
+                      proplists:get_value(env, Ps, []);
+                  _ ->
+                      []
+              end,
+    AllVars = CmdVars ++ AppVars,
+    ?DEBUG("Reconstruct ~p ~p\n", [App, AllVars]),
+    [application:set_env(App, K, V) || {K, V} <- AllVars],
+    reconstruct_app_env_vars(Apps);
+reconstruct_app_env_vars([]) ->
+    ok.
+
+wait_until_dead(Pid) when is_pid(Pid) ->
+    Ref = monitor(process, Pid),
+    receive
+        {'DOWN', Ref, process, _Obj, Info} ->
+            Info
+    after 10*1000 ->
+            exit({timeout_waiting_for, Pid})
+    end;
+wait_until_dead(_) ->
+    ok.
