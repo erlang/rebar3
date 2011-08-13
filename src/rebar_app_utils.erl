@@ -163,7 +163,7 @@ vcs_vsn(Vcs, Dir) ->
             end
     end.
 
-vcs_vsn_cmd(git) -> "git describe --always --tags";
+vcs_vsn_cmd(git) -> "git describe --always --tags `git log -n 1 --pretty=format:%h .`";
 vcs_vsn_cmd(hg)  -> "hg identify -i";
 vcs_vsn_cmd(bzr) -> "bzr revno";
 vcs_vsn_cmd(svn) -> "svnversion";
