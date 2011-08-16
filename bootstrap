@@ -59,7 +59,9 @@ main(Args) ->
     case zip:create("mem", Files, [memory]) of
         {ok, {"mem", ZipBin}} ->
             %% Archive was successfully created. Prefix that binary with our
-            %% header and write to "rebar" file
+            %% header and write to "rebar" file.
+            %% Without -noshell -noinput escript consumes all input that would
+            %% otherwise go to the shell for the next command.
             Script = <<"#!/usr/bin/env escript\n%%! -noshell -noinput\n", ZipBin/binary>>,
             case file:write_file("rebar", Script) of
                 ok ->
