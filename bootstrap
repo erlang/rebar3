@@ -25,10 +25,11 @@ main(Args) ->
                 end,
 
     %% Compile all src/*.erl to ebin
-    case make:files(filelib:wildcard("src/*.erl"), [{outdir, "ebin"}, {i, "include"},
-                                                    DebugFlag,
-                                                    {d, 'BUILD_TIME', Built},
-                                                    {d, 'VCS_INFO', VcsInfo}]) of
+    case make:files(filelib:wildcard("src/*.erl"),
+                    [{outdir, "ebin"}, {i, "include"},
+                     DebugFlag,
+                     {d, 'BUILD_TIME', Built},
+                     {d, 'VCS_INFO', VcsInfo}]) of
         up_to_date ->
             ok;
         error ->
@@ -51,9 +52,9 @@ main(Args) ->
     %% Run rebar to do proper .app validation and such
     rebar:main(["compile"] ++ Args),
 
-    %% Read the contents of the files in ebin and templates; note that we place
-    %% all the beam files at the top level of the code archive so that code loading
-    %% works properly.
+    %% Read the contents of the files in ebin and templates; note that we
+    %% place all the beam files at the top level of the code archive so
+    %% that code loading works properly.
     Files = load_files("*", "ebin") ++ load_files("priv/templates/*", "."),
 
     case zip:create("mem", Files, [memory]) of
@@ -62,16 +63,19 @@ main(Args) ->
             %% header and write to "rebar" file.
             %% Without -noshell -noinput escript consumes all input that would
             %% otherwise go to the shell for the next command.
-            Script = <<"#!/usr/bin/env escript\n%%! -noshell -noinput\n", ZipBin/binary>>,
+            Script = <<"#!/usr/bin/env escript\n%%! -noshell -noinput\n",
+                       ZipBin/binary>>,
             case file:write_file("rebar", Script) of
                 ok ->
                     ok;
                 {error, WriteError} ->
-                    io:format("Failed to write rebar script: ~p\n", [WriteError]),
+                    io:format("Failed to write rebar script: ~p\n",
+                              [WriteError]),
                     halt(1)
             end;
         {error, ZipError} ->
-            io:format("Failed to construct rebar script archive: ~p\n", [ZipError]),
+            io:format("Failed to construct rebar script archive: ~p\n",
+                      [ZipError]),
             halt(1)
     end,
 
@@ -85,8 +89,10 @@ main(Args) ->
     end,
 
     %% Add a helpful message
-    io:format("Congratulations! You now have a self-contained script called \"rebar\" in\n"
-              "your current working directory. Place this script anywhere in your path\n"
+    io:format("Congratulations! You now have a self-contained script called"
+              " \"rebar\" in\n"
+              "your current working directory. "
+              "Place this script anywhere in your path\n"
               "and you can use rebar to build OTP-compliant apps.\n").
 
 rm(Path) ->
@@ -100,7 +106,8 @@ rm(Path) ->
 
 build_time() ->
     {{Y, M, D}, {H, Min, S}} = calendar:now_to_universal_time(now()),
-    lists:flatten(io_lib:format("~4..0w~2..0w~2..0w_~2..0w~2..0w~2..0w", [Y, M, D, H, Min, S])).
+    lists:flatten(io_lib:format("~4..0w~2..0w~2..0w_~2..0w~2..0w~2..0w",
+                                [Y, M, D, H, Min, S])).
 
 
 load_files(Wildcard, Dir) ->
