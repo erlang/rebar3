@@ -291,17 +291,17 @@ cover_init(true, BeamFiles) ->
     %% to stdout. If the cover server is already started we'll reuse that
     %% pid.
     {ok, CoverPid} = case cover:start() of
-                         {ok, P} ->
-                             {ok, P};
+                         {ok, _P} = OkStart ->
+                             OkStart;
                          {error,{already_started, P}} ->
                              {ok, P};
-                         {error, Reason} ->
-                             {error, Reason}
+                         {error, _Reason} = ErrorStart ->
+                             ErrorStart
                      end,
 
-    {ok, F} = file:open(
-                filename:join([?EUNIT_DIR, "cover.log"]),
-                [write]),
+    {ok, F} = OkOpen = file:open(
+                         filename:join([?EUNIT_DIR, "cover.log"]),
+                         [write]),
 
     group_leader(F, CoverPid),
 
@@ -327,7 +327,7 @@ cover_init(true, BeamFiles) ->
                                  [Beam, Desc])
                 end,
             _ = [PrintWarning(Beam, Desc) || {Beam, {error, Desc}} <- Compiled],
-            {ok, F}
+            OkOpen
     end;
 cover_init(Config, BeamFiles) ->
     cover_init(rebar_config:get(Config, cover_enabled, false), BeamFiles).

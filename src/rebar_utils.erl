@@ -187,13 +187,12 @@ expand_code_path() ->
 %% The end of form $FOO is delimited with whitespace or eol
 %%
 expand_env_variable(InStr, VarName, RawVarValue) ->
-    VarValue = re:replace(RawVarValue, "\\\\", "\\\\\\\\",
-                          [global, {return, list}]),
+    ReOpts = [global, {return, list}],
+    VarValue = re:replace(RawVarValue, "\\\\", "\\\\\\\\", ReOpts),
     R1 = re:replace(InStr, "\\\$" ++ VarName ++ "\\s", VarValue ++ " ",
                     [global]),
     R2 = re:replace(R1, "\\\$" ++ VarName ++ "\$", VarValue),
-    re:replace(R2, "\\\${" ++ VarName ++ "}", VarValue,
-               [global, {return, list}]).
+    re:replace(R2, "\\\${" ++ VarName ++ "}", VarValue, ReOpts).
 
 
 %% ====================================================================
