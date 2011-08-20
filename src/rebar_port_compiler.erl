@@ -248,7 +248,8 @@ apply_defaults(Vars, Defaults) ->
                          case is_expandable(DefaultValue) of
                              true ->
                                  rebar_utils:expand_env_variable(DefaultValue,
-                                                                 Key, VarValue);
+                                                                 Key,
+                                                                 VarValue);
                              false -> VarValue
                          end
                  end,
@@ -305,7 +306,8 @@ expand_vars(Key, Value, Vars) ->
                              Key ->
                                  AValue;
                              _ ->
-                                 rebar_utils:expand_env_variable(AValue, Key, Value)
+                                 rebar_utils:expand_env_variable(AValue,
+                                                                 Key, Value)
                          end,
               [{AKey, NewValue} | Acc]
       end,
