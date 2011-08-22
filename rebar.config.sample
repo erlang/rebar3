@@ -106,10 +106,10 @@
 
 %% == Dependencies ==
 
-%% Where to put any downloaded depandencies. Default is `deps'
+%% Where to put any downloaded dependencies. Default is `deps'
 {deps_dir, ["deps"]}.
 
-%% What dependancies we have, depandencies can be of 3 forms, an application
+%% What dependencies we have, dependencies can be of 3 forms, an application
 %% name as an atom, eg. mochiweb, a name and a version (from the .app file), or
 %% an application name, a version and the SCM details on how to fetch it (SCM
 %% type, location and revision). Rebar currently supports git, hg, bzr and svn.
