@@ -495,6 +495,10 @@ reset_after_eunit({OldProcesses, WasAlive, OldAppEnvs, _OldACs}) ->
     ok.
 
 kill_extras(Pids) ->
+    %% Killing any of the procs below will either:
+    %% 1. Interfere with stuff that we don't want interfered with, or
+    %% 2. May/will force the 'kernel' app to shutdown, which *will*
+    %%    interfere with rebar's ability To Do Useful Stuff(tm).
     KeepProcs = [cover_server, eunit_server, inet_gethost_native_sup,
                  inet_gethost_native, timer_server],
     Killed = [begin
