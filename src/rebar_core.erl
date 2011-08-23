@@ -85,7 +85,8 @@ process_commands([Command | Rest], ParentConfig) ->
     case erlang:get(operations) of
         Operations ->
             %% This command didn't do anything
-            ?CONSOLE("Command '~p' not understood\n", [Command]);
+            ?CONSOLE("Command '~p' not understood or not applicable~n",
+                     [Command]);
         _ ->
             ok
     end,
