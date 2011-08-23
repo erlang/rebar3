@@ -528,8 +528,9 @@ kill_extras(Pids) ->
 reconstruct_app_env_vars([App|Apps]) ->
     CmdLine0 = proplists:get_value(App, init:get_arguments(), []),
     CmdVars = [{list_to_atom(K), list_to_atom(V)} || {K, V} <- CmdLine0],
-    AppFile = (catch code:lib_dir(App) ++ 
-                   "/ebin/" ++ atom_to_list(App) ++ ".app"),
+    AppFile = (catch filename:join([code:lib_dir(App),
+                                    "ebin",
+                                    atom_to_list(App) ++ ".app"])),
     AppVars = case file:consult(AppFile) of
                   {ok, [{application, App, Ps}]} ->
                       proplists:get_value(env, Ps, []);
