@@ -472,7 +472,7 @@ reset_after_eunit({OldProcesses, WasAlive, OldAppEnvs, _OldACs}) ->
             ?DEBUG("Stopping net kernel....\n", []),
             erl_epmd:stop(),
             net_kernel:stop(),
-            timer:sleep(100);
+            pause_until_net_kernel_stopped();
        true ->
             ok
     end,
@@ -553,3 +553,19 @@ wait_until_dead(Pid) when is_pid(Pid) ->
     end;
 wait_until_dead(_) ->
     ok.
+
+pause_until_net_kernel_stopped() ->
+    pause_until_net_kernel_stopped(10).
+
+pause_until_net_kernel_stopped(0) ->
+    exit(net_kernel_stop_failed);
+pause_until_net_kernel_stopped(N) ->
+    try
+        _ = net_kernel:i(),
+        timer:sleep(100),
+        pause_until_net_kernel_stopped(N - 1)
+    catch
+        error:badarg ->
+            ?DEBUG("Stopped net kernel.\n", []),
+            ok
+    end.
