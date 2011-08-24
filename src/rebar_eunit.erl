@@ -499,20 +499,33 @@ kill_extras(Pids) ->
     %% 1. Interfere with stuff that we don't want interfered with, or
     %% 2. May/will force the 'kernel' app to shutdown, which *will*
     %%    interfere with rebar's ability To Do Useful Stuff(tm).
-    KeepProcs = [cover_server, eunit_server, inet_gethost_native_sup,
-                 inet_gethost_native, timer_server],
+    %% This list may require changes as OTP versions and/or
+    %% rebar use cases change.
+    KeepProcs = [cover_server, eunit_server,
+                 eqc, eqc_license, eqc_locked],
     Killed = [begin
                   Info = case erlang:process_info(Pid) of
                              undefined -> [];
                              Else      -> Else
                          end,
-                  Keep = case proplists:get_value(registered_name, Info) of
-                             undefined ->
-                                 false;
-                             Name ->
-                                 lists:member(Name, KeepProcs)
-                         end,
-                  if Keep ->
+                  Keep1 = case proplists:get_value(registered_name, Info) of
+                              undefined ->
+                                  false;
+                              Name ->
+                                  lists:member(Name, KeepProcs)
+                          end,
+                  Keep2 = case proplists:get_value(dictionary, Info) of
+                              undefined ->
+                                  false;
+                              Ds ->
+                                  case proplists:get_value('$ancestors', Ds) of
+                                      undefined ->
+                                          false;
+                                      As ->
+                                          lists:member(kernel_sup, As)
+                                  end
+                          end,
+                  if Keep1 orelse Keep2 ->
                           ok;
                      true ->
                           ?DEBUG("Kill ~p ~p\n", [Pid, Info]),
