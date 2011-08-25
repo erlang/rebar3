@@ -471,25 +471,25 @@ reset_after_eunit({OldProcesses, WasAlive, OldAppEnvs, _OldACs}) ->
     if not WasAlive andalso IsAlive ->
             ?DEBUG("Stopping net kernel....\n", []),
             erl_epmd:stop(),
-            net_kernel:stop(),
+            _ = net_kernel:stop(),
             pause_until_net_kernel_stopped();
        true ->
             ok
     end,
 
     Processes = erlang:processes(),
-    kill_extras(Processes -- OldProcesses),
+    _ = kill_extras(Processes -- OldProcesses),
 
     OldApps = [App || {App, _} <- OldAppEnvs],
     Apps = get_app_names(),
-    [begin
-         case lists:member(App, OldApps) of
-             true  -> ok;
-             false -> application:stop(App)
-         end,
-         application:unset_env(App, K)
-     end || App <- Apps, App /= rebar,
-            {K, _V} <- application:get_all_env(App)],
+    _ = [begin
+             _ = case lists:member(App, OldApps) of
+                     true  -> ok;
+                     false -> application:stop(App)
+                 end,
+             ok = application:unset_env(App, K)
+         end || App <- Apps, App /= rebar,
+                {K, _V} <- application:get_all_env(App)],
 
     reconstruct_app_env_vars(Apps),
     ok.
@@ -538,7 +538,7 @@ kill_extras(Pids) ->
             ?DEBUG("No processes to kill\n", []),
             [];
         Else ->
-            [wait_until_dead(Pid) || Pid <- Else],
+            lists:foreach(fun(Pid) -> wait_until_dead(Pid) end, Else),
             Else
     end.
 
@@ -556,7 +556,7 @@ reconstruct_app_env_vars([App|Apps]) ->
               end,
     AllVars = CmdVars ++ AppVars,
     ?DEBUG("Reconstruct ~p ~p\n", [App, AllVars]),
-    [application:set_env(App, K, V) || {K, V} <- AllVars],
+    lists:foreach(fun({K, V}) -> application:set_env(App, K, V) end, AllVars),
     reconstruct_app_env_vars(Apps);
 reconstruct_app_env_vars([]) ->
     ok.
