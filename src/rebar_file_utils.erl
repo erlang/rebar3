@@ -43,7 +43,9 @@
 rm_rf(Target) ->
     case os:type() of
         {unix, _} ->
-            {ok, []} = rebar_utils:sh(?FMT("rm -rf ~s", [Target]),
+            EscTarget = re:replace(Target, " ", "\\\\ ",
+                                   [global, {return, list}]),
+            {ok, []} = rebar_utils:sh(?FMT("rm -rf ~s", [EscTarget]),
                                       [{use_stdout, false}, return_on_error]),
             ok;
         {win32, _} ->
@@ -60,7 +62,8 @@ cp_r(Sources, Dest) ->
     case os:type() of
         {unix, _} ->
             SourceStr = string:join(Sources, " "),
-            {ok, []} = rebar_utils:sh(?FMT("cp -R ~s ~s", [SourceStr, Dest]),
+            {ok, []} = rebar_utils:sh(?FMT("cp -R \"~s\" \"~s\"",
+                                           [SourceStr, Dest]),
                                       [{use_stdout, false}, return_on_error]),
             ok;
         {win32, _} ->
@@ -72,12 +75,12 @@ cp_r(Sources, Dest) ->
 mv(Source, Dest) ->
     case os:type() of
         {unix, _} ->
-            {ok, []} = rebar_utils:sh(?FMT("mv ~s ~s", [Source, Dest]),
+            {ok, []} = rebar_utils:sh(?FMT("mv \"~s\" \"~s\"", [Source, Dest]),
                                       [{use_stdout, false}, return_on_error]),
             ok;
         {win32, _} ->
             {ok, R} = rebar_utils:sh(
-                        ?FMT("cmd " "/c move /y ~s ~s 1> nul",
+                        ?FMT("cmd " "/c move /y \"~s\" \"~s\" 1> nul",
                              [filename:nativename(Source),
                               filename:nativename(Dest)]),
                         [{use_stdout, false}, return_on_error]),
@@ -110,14 +113,14 @@ delete_each([File | Rest]) ->
 
 delete_each_dir_win32([]) -> ok;
 delete_each_dir_win32([Dir | Rest]) ->
-    {ok, []} = rebar_utils:sh(?FMT("cmd /c rd /q /s ~s",
+    {ok, []} = rebar_utils:sh(?FMT("cmd /c rd /q /s \"~s\"",
                                    [filename:nativename(Dir)]),
                               [{use_stdout, false}, return_on_error]),
     delete_each_dir_win32(Rest).
 
 xcopy_win32(Source,Dest)->
     {ok, R} = rebar_utils:sh(
-                ?FMT("cmd /c xcopy ~s ~s /q /y /e 2> nul",
+                ?FMT("cmd /c xcopy \"~s\" \"~s\" /q /y /e 2> nul",
                      [filename:nativename(Source), filename:nativename(Dest)]),
                 [{use_stdout, false}, return_on_error]),
     case length(R) > 0 of
