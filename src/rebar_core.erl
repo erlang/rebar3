@@ -389,7 +389,7 @@ plugin_modules(_Config, FoundModules, []) ->
 plugin_modules(Config, FoundModules, MissingModules) ->
     {Loaded, NotLoaded} = load_plugin_modules(Config, MissingModules),
     AllViablePlugins = FoundModules ++ Loaded,
-    case length(NotLoaded) > 0 of
+    case NotLoaded =/= [] of
         true ->
             %% NB: we continue to ignore this situation, as did the original code
             ?WARN("Missing plugins: ~p\n", NotLoaded);
