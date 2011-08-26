@@ -32,6 +32,7 @@
          wordsize/0,
          sh/2,
          find_files/2,
+         find_files/3,
          now_str/0,
          ensure_dir/1,
          beam_to_mod/2, beams/1,
@@ -127,7 +128,11 @@ patch_on_windows(Cmd, Env) ->
     end.
 
 find_files(Dir, Regex) ->
-    filelib:fold_files(Dir, Regex, true, fun(F, Acc) -> [F | Acc] end, []).
+    find_files(Dir, Regex, true).
+
+find_files(Dir, Regex, Recursive) ->
+    filelib:fold_files(Dir, Regex, Recursive,
+                       fun(F, Acc) -> [F | Acc] end, []).
 
 now_str() ->
     {{Year, Month, Day}, {Hour, Minute, Second}} = calendar:local_time(),
