@@ -406,7 +406,13 @@ load_plugin_modules(Config, Modules) ->
                     Dir ->
                         Dir
                 end,
-    Sources = rebar_utils:find_files(PluginDir, ".*\.erl\$"),
+
+    %% Find relevant sources
+    Erls = string:join([atom_to_list(M)++"\\.erl" || M <- Modules], "|"),
+    RE = ".*" ++ Erls ++ "\$",
+    Sources = rebar_utils:find_files(PluginDir, RE),
+
+    %% Compile and load plugins
     Loaded = [load_plugin(Src) || Src <- Sources],
     FilterMissing = is_missing_plugin(Loaded),
     NotLoaded = [V || V <- Modules, FilterMissing(V)],
