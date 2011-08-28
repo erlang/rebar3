@@ -562,7 +562,7 @@ reconstruct_app_env_vars([]) ->
     ok.
 
 wait_until_dead(Pid) when is_pid(Pid) ->
-    Ref = monitor(process, Pid),
+    Ref = erlang:monitor(process, Pid),
     receive
         {'DOWN', Ref, process, _Obj, Info} ->
             Info
