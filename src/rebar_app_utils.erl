@@ -166,7 +166,9 @@ vcs_vsn(Vcs, Dir) ->
     end.
 
 vcs_vsn_cmd(git) ->
-    %% git describe a committish to accomodate for subtrees or deps/apps
+    %% Explicitly git-describe a committish to accomodate for projects
+    %% in subdirs which don't have a GIT_DIR. In that case we will
+    %% get a description of the last commit that touched the subdir.
     "git describe --always --tags `git log -n 1 --pretty=format:%h .`";
 vcs_vsn_cmd(hg)  -> "hg identify -i";
 vcs_vsn_cmd(bzr) -> "bzr revno";
