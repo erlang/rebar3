@@ -166,7 +166,7 @@ vcs_vsn(Vcs, Dir) ->
     end.
 
 vcs_vsn_cmd(git) ->
-    %% Explicitly git-describe a committish to accomodate for projects
+    %% Explicitly git-describe a committish to accommodate for projects
     %% in subdirs which don't have a GIT_DIR. In that case we will
     %% get a description of the last commit that touched the subdir.
     "git describe --always --tags `git log -n 1 --pretty=format:%h .`";
