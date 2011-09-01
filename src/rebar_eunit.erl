@@ -144,7 +144,7 @@ eunit(Config, AppFile) ->
     Modules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- ModuleBeamFiles],
     SrcModules = [rebar_utils:erl_to_mod(M) || M <- SrcErls],
 
-    {ok, CoverLog} = cover_init(Config, BeamFiles),
+    {ok, CoverLog} = cover_init(Config, ModuleBeamFiles),
 
     StatusBefore = status_before_eunit(),
     EunitResult = perform_eunit(Config, Modules),
