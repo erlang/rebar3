@@ -39,7 +39,7 @@
 
 %% @doc Remove files and directories.
 %% Target is a single filename, directoryname or wildcard expression.
--spec rm_rf(Target::file:filename()) -> ok.
+-spec rm_rf(Target::string()) -> ok.
 rm_rf(Target) ->
     case os:type() of
         {unix, _} ->
