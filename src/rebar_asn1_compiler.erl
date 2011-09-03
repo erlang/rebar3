@@ -44,27 +44,33 @@ compile(Config, _AppFile) ->
 
 -spec clean(Config::rebar_config:config(), AppFile::file:filename()) -> 'ok'.
 clean(_Config, _AppFile) ->
-    rebar_file_utils:delete_each(asn_generated_files("asn1", "src")),
+    GeneratedFiles = asn_generated_files("asn1", "src", "include"),
+    ok = rebar_file_utils:delete_each(GeneratedFiles),
     ok.
 
 -spec compile_asn1(file:filename(), file:filename(),
                    rebar_config:config()) -> ok.
 compile_asn1(Source, Target, Config) ->
-    ok = rebar_utils:ensure_dir(Target),
+    ok = filelib:ensure_dir(Target),
+    ok = filelib:ensure_dir(filename:join("include", "dummy.hrl")),
     Opts = [{outdir, "src"}, noobj] ++ rebar_config:get(Config, asn1_opts, []),
     case asn1ct:compile(Source, Opts) of
         ok ->
+            Asn1 = filename:basename(Source, ".asn1"),
+            HrlFile = filename:join("src", Asn1 ++ ".hrl"),
+            ok = rebar_file_utils:mv(HrlFile, "include"),
             ok;
         {error, _Reason} ->
             ?FAIL
     end.
 
-asn_generated_files(AsnDir, SrcDir) ->
+asn_generated_files(AsnDir, SrcDir, IncDir) ->
     lists:foldl(
-        fun(AsnFile, Acc) ->
-                Base = filename:rootname(filename:basename(AsnFile)),
-                filelib:wildcard(filename:join([SrcDir, Base ++ ".*"])) ++ Acc
-        end,
-        [],
-        filelib:wildcard(filename:join([AsnDir, "*.asn1"]))
-       ).
+      fun(AsnFile, Acc) ->
+              Base = filename:rootname(filename:basename(AsnFile)),
+              [filename:join([IncDir, Base ++ ".hrl"])|
+               filelib:wildcard(filename:join([SrcDir, Base ++ ".*"]))] ++ Acc
+      end,
+      [],
+      filelib:wildcard(filename:join([AsnDir, "*.asn1"]))
+     ).
