@@ -110,9 +110,7 @@ Before you submit a patch check for discrepancies with
 [Dialyzer](http://www.erlang.org/doc/man/dialyzer.html):
 
 ```sh
-$ cd rebar
-$ ./bootstrap debug
-$ dialyzer ebin -Wunmatched_returns -Werror_handling -Wrace_conditions -Wunderspecs
+$ make check
 ```
 
 The following discrepancies are known and safe to ignore:
