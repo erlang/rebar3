@@ -61,8 +61,9 @@ rm_rf(Target) ->
 cp_r(Sources, Dest) ->
     case os:type() of
         {unix, _} ->
-            SourceStr = string:join(Sources, " "),
-            {ok, []} = rebar_utils:sh(?FMT("cp -R \"~s\" \"~s\"",
+            QuotedSources = ["\"" ++ Src ++ "\"" || Src <- Sources],
+            SourceStr = string:join(QuotedSources, " "),
+            {ok, []} = rebar_utils:sh(?FMT("cp -R ~s \"~s\"",
                                            [SourceStr, Dest]),
                                       [{use_stdout, false}, return_on_error]),
             ok;
