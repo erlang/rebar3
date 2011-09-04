@@ -69,7 +69,7 @@ Do not mix spaces and tabs.
 Do not introduce lines longer than 80 characters.
 
 [erlang-mode (emacs)](http://www.erlang.org/doc/man/erlang.el.html) indentation is preferred.
-vi-only users are encouraged to give [Vimpulse](http://www.emacswiki.org/emacs/Vimpulse) a try.
+vi-only users are encouraged to give [Vim emulation](http://emacswiki.org/emacs/Evil) ([more info](https://gitorious.org/evil/pages/Home)) a try.
 
 Writing Commit Messages
 -----------------------
