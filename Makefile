@@ -10,4 +10,4 @@ debug:
 check: debug
 	-@./rebar xref
 	-@dialyzer ebin --verbose -Wunmatched_returns -Werror_handling \
-		-Wrace_conditions -Wunderspecs
+		-Wrace_conditions
