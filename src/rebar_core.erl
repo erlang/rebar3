@@ -102,7 +102,7 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
         true ->
             ?DEBUG("Entering ~s\n", [Dir]),
             ok = file:set_cwd(Dir),
-            Config = rebar_config:new(ParentConfig),
+            Config = maybe_load_local_config(Dir, ParentConfig),
 
             %% Save the current code path and then update it with
             %% lib_dirs. Children inherit parents code path, but we
@@ -184,7 +184,18 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
             DirSet4
     end.
 
+maybe_load_local_config(Dir, ParentConfig) ->
+    %% We need to ensure we don't overwrite custom
+    %% config when we are dealing with base_dir.
+    case processing_base_dir(Dir) of
+        true ->
+            ParentConfig;
+        false ->
+            rebar_config:new(ParentConfig)
+    end.
 
+processing_base_dir(Dir) ->
+    Dir == rebar_config:get_global(base_dir, undefined).
 
 %%
 %% Given a list of directories and a set of previously processed directories,
