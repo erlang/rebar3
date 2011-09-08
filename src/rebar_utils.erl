@@ -105,7 +105,7 @@ sh(Command0, Options0) ->
     case sh_loop(Port, OutputHandler, []) of
         {ok, _Output} = Ok ->
             Ok;
-        {error, Err} ->
+        {error, {_Rc, _Output}=Err} ->
             ErrorHandler(Command, Err)
     end.
 
@@ -211,9 +211,7 @@ expand_sh_flag(return_on_error) ->
      end};
 expand_sh_flag({abort_on_error, Message}) ->
     {error_handler,
-     fun(_Command, _Err) ->
-             ?ABORT(Message, [])
-     end};
+     log_msg_and_abort(Message)};
 expand_sh_flag(abort_on_error) ->
     {error_handler,
      fun log_and_abort/2};
@@ -233,9 +231,17 @@ expand_sh_flag({cd, _CdArg} = Cd) ->
 expand_sh_flag({env, _EnvArg} = Env) ->
     {port_settings, Env}.
 
--spec log_and_abort(string(), integer()) -> no_return().
+-type err_handler() :: fun((string(), {integer(), string()}) -> no_return()).
+-spec log_msg_and_abort(string()) -> err_handler().
+log_msg_and_abort(Message) ->
+    fun(_Command, {_Rc, _Output}) ->
+            ?ABORT(Message, [])
+    end.
+
+-spec log_and_abort(string(), {integer(), string()}) -> no_return().
 log_and_abort(Command, {Rc, Output}) ->
-    ?ABORT("~s failed with error: ~w and output:~n~s~n", [Command, Rc, Output]).
+    ?ABORT("~s failed with error: ~w and output:~n~s~n",
+           [Command, Rc, Output]).
 
 sh_loop(Port, Fun, Acc) ->
     receive

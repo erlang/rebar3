@@ -117,7 +117,6 @@ The following discrepancies are known and safe to ignore:
 
 ```
 rebar_utils.erl:147: Call to missing or unexported function escript:foldl/3
-rebar_utils.erl:180: The created fun has no local return
 ```
 
 It is **strongly recommended** to check the code with
