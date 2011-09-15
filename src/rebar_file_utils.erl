@@ -43,8 +43,7 @@
 rm_rf(Target) ->
     case os:type() of
         {unix, _} ->
-            EscTarget = re:replace(Target, " ", "\\\\ ",
-                                   [global, {return, list}]),
+            EscTarget = escape_spaces(Target),
             {ok, []} = rebar_utils:sh(?FMT("rm -rf ~s", [EscTarget]),
                                       [{use_stdout, false}, return_on_error]),
             ok;
@@ -61,8 +60,8 @@ rm_rf(Target) ->
 cp_r(Sources, Dest) ->
     case os:type() of
         {unix, _} ->
-            QuotedSources = ["\"" ++ Src ++ "\"" || Src <- Sources],
-            SourceStr = string:join(QuotedSources, " "),
+            EscSources = [escape_spaces(Src) || Src <- Sources],
+            SourceStr = string:join(EscSources, " "),
             {ok, []} = rebar_utils:sh(?FMT("cp -R ~s \"~s\"",
                                            [SourceStr, Dest]),
                                       [{use_stdout, false}, return_on_error]),
@@ -76,7 +75,9 @@ cp_r(Sources, Dest) ->
 mv(Source, Dest) ->
     case os:type() of
         {unix, _} ->
-            {ok, []} = rebar_utils:sh(?FMT("mv \"~s\" \"~s\"", [Source, Dest]),
+            EscSource = escape_spaces(Source),
+            EscDest = escape_spaces(Dest),
+            {ok, []} = rebar_utils:sh(?FMT("mv ~s ~s", [EscSource, EscDest]),
                                       [{use_stdout, false}, return_on_error]),
             ok;
         {win32, _} ->
@@ -155,3 +156,6 @@ cp_r_win32(Source,Dest) ->
                           ok = cp_r_win32({filelib:is_dir(Src), Src}, Dst)
                   end, filelib:wildcard(Source)),
     ok.
+
+escape_spaces(Str) ->
+    re:replace(Str, " ", "\\\\ ", [global, {return, list}]).
