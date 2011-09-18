@@ -46,7 +46,8 @@
 %% ===================================================================
 
 ct(Config, File) ->
-    run_test_if_present("test", Config, File).
+    TestDir = rebar_config:get_local(Config, ct_dir, "test"),
+    run_test_if_present(TestDir, Config, File).
 
 %% ===================================================================
 %% Internal functions

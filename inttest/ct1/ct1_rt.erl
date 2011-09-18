@@ -6,7 +6,8 @@
 files() ->
     [{create, "ebin/a1.app", app(a1)},
      {copy, "../../rebar", "rebar"},
-     {copy, "test_SUITE.erl", "test/test_SUITE.erl"}].
+     {copy, "rebar.config", "rebar.config"},
+     {copy, "test_SUITE.erl", "itest/test_SUITE.erl"}].
 
 run(_Dir) ->
     {ok, _} = retest:sh("./rebar compile ct"),
