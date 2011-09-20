@@ -392,7 +392,7 @@ plugin_modules(Config, FoundModules, MissingModules) ->
     case NotLoaded =/= [] of
         true ->
             %% NB: we continue to ignore this situation, as did the original code
-            ?WARN("Missing plugins: ~p\n", NotLoaded);
+            ?WARN("Missing plugins: ~p\n", [NotLoaded]);
         false ->
             ?DEBUG("Loaded plugins: ~p~n", [AllViablePlugins]),
             ok
