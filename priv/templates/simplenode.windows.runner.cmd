@@ -27,7 +27,7 @@
 @rem TODO: attach, ping, restart and reboot
 
 :usage
-@echo Usage: %0 {install|uninstall|start|stop|restart}
+@echo Usage: %0 {install|uninstall|start|stop|restart|console}
 @goto :EOF
 
 :install
