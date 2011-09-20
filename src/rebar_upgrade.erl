@@ -32,6 +32,8 @@
 
 -export(['generate-upgrade'/2]).
 
+-define(TMP, "_tmp").
+
 %% ====================================================================
 %% Public API
 %% ====================================================================
@@ -141,22 +143,21 @@ run_systools(NewVer, Name) ->
     end.
 
 boot_files(TargetDir, Ver, Name) ->
-    Tmp = "_tmp",
-    ok = file:make_dir(filename:join([".", Tmp])),
-    ok = file:make_dir(filename:join([".", Tmp, "releases"])),
-    ok = file:make_dir(filename:join([".", Tmp, "releases", Ver])),
+    ok = file:make_dir(filename:join([".", ?TMP])),
+    ok = file:make_dir(filename:join([".", ?TMP, "releases"])),
+    ok = file:make_dir(filename:join([".", ?TMP, "releases", Ver])),
     ok = file:make_symlink(
            filename:join(["start.boot"]),
-           filename:join([".", Tmp, "releases", Ver, Name ++ ".boot"])),
+           filename:join([".", ?TMP, "releases", Ver, Name ++ ".boot"])),
     {ok, _} = file:copy(
                 filename:join([TargetDir, "releases", Ver, "start_clean.boot"]),
-                filename:join([".", Tmp, "releases", Ver, "start_clean.boot"])).
+                filename:join([".", ?TMP, "releases", Ver, "start_clean.boot"])).
 
 make_tar(NameVer) ->
     Filename = NameVer ++ ".tar.gz",
     {ok, Cwd} = file:get_cwd(),
     Absname = filename:join([Cwd, Filename]),
-    ok = file:set_cwd("_tmp"),
+    ok = file:set_cwd(?TMP),
     ok = erl_tar:extract(Absname, [compressed]),
     ok = file:delete(Absname),
     {ok, Tar} = erl_tar:open(Absname, [write, compressed]),
@@ -176,7 +177,7 @@ cleanup(NameVer) ->
             ],
     lists:foreach(fun(F) -> ok = file:delete(F) end, Files),
 
-    ok = remove_dir_tree("_tmp").
+    ok = remove_dir_tree(?TMP).
 
 %% adapted from http://www.erlang.org/doc/system_principles/create_target.html
 remove_dir_tree(Dir) ->

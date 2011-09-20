@@ -55,11 +55,16 @@ is_rel_dir(Dir) ->
     end.
 
 %% Get release name and version from a reltool.config
-get_reltool_release_info(ReltoolConfig) ->
-    %% expect the first rel in the proplist to be the one you want
-    {sys, Config} = get_sys_tuple(ReltoolConfig),
+get_reltool_release_info([{sys, Config}| _]) ->
     {rel, Name, Ver, _} = proplists:lookup(rel, Config),
-    {Name, Ver}.
+    {Name, Ver};
+get_reltool_release_info(ReltoolFile) when is_list(ReltoolFile) ->
+    case file:consult(ReltoolFile) of
+        {ok, ReltoolConfig} ->
+            get_reltool_release_info(ReltoolConfig);
+        _ ->
+            ?ABORT("Failed to parse ~s~n", [ReltoolFile])
+    end.
 
 %% Get release name and version from a rel file
 get_rel_release_info(RelFile) ->
