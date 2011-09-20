@@ -173,10 +173,17 @@ run_reltool(Server, _Config, ReltoolConfig) ->
                            [Reason])
             end,
 
+            {BootRelName, BootRelVsn} = 
+                rebar_rel_utils:get_reltool_release_info(ReltoolConfig),
+
+            ok = create_RELEASES(TargetDir, BootRelName, BootRelVsn),
+
             %% Initialize overlay vars with some basics
             %% (that can get overwritten)
-            OverlayVars0 = dict:from_list([{erts_vsn, "erts-" ++ erlang:system_info(version)},
-                                           {target_dir, TargetDir}]),
+            OverlayVars0 = 
+                dict:from_list([{erts_vsn, "erts-" ++ erlang:system_info(version)},
+                                {rel_vsn, BootRelVsn},
+                                {target_dir, TargetDir}]),
 
             %% Load up any variables specified by overlay_vars
             OverlayVars1 = overlay_vars(OverlayVars0, ReltoolConfig),
@@ -312,3 +319,15 @@ execute_overlay([Other | _Rest], _Vars, _BaseDir, _TargetDir) ->
 apply_file_info(InFile, OutFile) ->
     {ok, FileInfo} = file:read_file_info(InFile),
     ok = file:write_file_info(OutFile, FileInfo).
+
+create_RELEASES(TargetDir, RelName, RelVsn) ->
+    ReleasesDir = filename:join(TargetDir, "releases"),
+    case release_handler:create_RELEASES(TargetDir, ReleasesDir,
+              filename:join([ReleasesDir, RelVsn, RelName ++ ".rel"]),
+              filename:join(TargetDir, "lib")) of
+        ok ->
+            ok;
+        {error, Reason} ->
+            ?ABORT("Failed to create RELEASES file: ~p\n",
+                   [Reason])
+    end.
