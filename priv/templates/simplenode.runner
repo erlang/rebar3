@@ -21,21 +21,6 @@ cd $RUNNER_BASE_DIR
 
 # Make sure log directory exists
 mkdir -p $RUNNER_LOG_DIR
-
-# Extract the target node name from node.args
-NAME_ARG=`egrep '^-s?name' $RUNNER_ETC_DIR/vm.args`
-if [ -z "$NAME_ARG" ]; then
-    echo "vm.args needs to have either -name or -sname parameter."
-    exit 1
-fi
-
-# Extract the target cookie
-COOKIE_ARG=`grep '^-setcookie' $RUNNER_ETC_DIR/vm.args`
-if [ -z "$COOKIE_ARG" ]; then
-    echo "vm.args needs to have a -setcookie parameter."
-    exit 1
-fi
-
 # Identify the script name
 SCRIPT=`basename $0`
 
@@ -44,11 +29,12 @@ START_ERL=`cat $RUNNER_BASE_DIR/releases/start_erl.data`
 ERTS_VSN=${START_ERL% *}
 APP_VSN=${START_ERL#* }
 
-# Add ERTS bin dir to our path
-ERTS_PATH=$RUNNER_BASE_DIR/erts-$ERTS_VSN/bin
-
-# Setup command to control the node
-NODETOOL="$ERTS_PATH/escript $ERTS_PATH/nodetool $NAME_ARG $COOKIE_ARG"
+# Use releases/VSN/vm.args if it exists otherwise use etc/vm.args
+if [ -e "$RUNNER_BASE_DIR/releases/$APP_VSN/vm.args" ]; then
+    VMARGS_PATH="$RUNNER_BASE_DIR/releases/$APP_VSN/vm.args"
+else
+    VMARGS_PATH="$RUNNER_ETC_DIR/vm.args"
+fi
 
 # Use releases/VSN/sys.config if it exists otherwise use etc/app.config
 if [ -e "$RUNNER_BASE_DIR/releases/$APP_VSN/sys.config" ]; then
@@ -57,12 +43,25 @@ else
     CONFIG_PATH="$RUNNER_ETC_DIR/app.config"
 fi
 
-# Use releases/VSN/vm.args if it exists otherwise use etc/vm.args
-if [-e "$RUNNER_BASE_DIR/releases/$APP_VSN/vm.args" ]; then
-    VMARGS_PATH="$RUNNER_BASE_DIR/releases/$APP_VSN/vm.args"
-else
-    VMARGS_PATH="$RUNNER_ETC_DIR/vm.args"
+# Extract the target node name from node.args
+NAME_ARG=`egrep '^-s?name' $VMARGS_PATH`
+if [ -z "$NAME_ARG" ]; then
+    echo "vm.args needs to have either -name or -sname parameter."
+    exit 1
 fi
+
+# Extract the target cookie
+COOKIE_ARG=`grep '^-setcookie' $VMARGS_PATH`
+if [ -z "$COOKIE_ARG" ]; then
+    echo "vm.args needs to have a -setcookie parameter."
+    exit 1
+fi
+
+# Add ERTS bin dir to our path
+ERTS_PATH=$RUNNER_BASE_DIR/erts-$ERTS_VSN/bin
+
+# Setup command to control the node
+NODETOOL="$ERTS_PATH/escript $ERTS_PATH/nodetool $NAME_ARG $COOKIE_ARG"
 
 # Check the first argument for instructions
 case "$1" in
