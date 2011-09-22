@@ -188,8 +188,14 @@ find_mfa_source({M, F, A}) ->
     %% Extract the original source filename from the abstract code
     [{attribute, 1, file, {Source, _}} | _] = Code,
     %% Extract the line number for a given function def
-    [{function, Line, F, _, _}] = [E || E <- Code,
-                                        safe_element(1, E) == function,
-                                        safe_element(3, E) == F,
-                                        safe_element(4, E) == A],
-    {Source, Line}.
+    Fn = [E || E <- Code,
+               safe_element(1, E) == function,
+               safe_element(3, E) == F,
+               safe_element(4, E) == A],
+    case Fn of
+        [{function, Line, F, _, _}] -> {Source, Line};
+        %% do not crash if functions are exported, even though they
+        %% are not in the source.
+        %% parameterized modules add new/1 and instance/1 for example.
+        [] -> {Source, function_not_found}
+    end.
