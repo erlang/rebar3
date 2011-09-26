@@ -22,13 +22,13 @@
 
 @if exist %releases_dir%\%release_version%\sys.config (
     @set app_config=%releases_dir%\%release_version%\sys.config
-) @else (
+) else (
     @set app_config=%node_root%\etc\app.config
 )
 
 @if exist %releases_dir%\%release_version%\vm.args (
     @set vm_args=%releases_dir%\%release_version%\vm.args
-) @else (
+) else (
     @set vm_args=%node_root%\etc\vm.args
 )
 
