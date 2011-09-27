@@ -232,6 +232,7 @@ delete-deps                          Delete fetched dependencies
 list-deps                            List dependencies
 
 generate    [dump_spec=0/1]          Build release with reltool
+overlay                              Run reltool overlays only
 
 generate-upgrade  previous_release=path  Build an upgrade package
 
@@ -289,7 +290,7 @@ command_names() ->
     ["check-deps", "clean", "compile", "create", "create-app", "create-node",
      "ct", "delete-deps", "doc", "eunit", "generate", "generate-appups",
      "generate-upgrade", "get-deps", "help", "list-deps", "list-templates",
-     "update-deps", "version", "xref"].
+     "update-deps", "overlay", "version", "xref"].
 
 unabbreviate_command_names([]) ->
     [];
