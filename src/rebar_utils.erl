@@ -109,22 +109,16 @@ sh(Command0, Options0) ->
             ErrorHandler(Command, Err)
     end.
 
-%% We use a bash shell to execute on windows if available. Otherwise we do the
-%% shell variable substitution ourselves and hope that the command doesn't use
-%% any shell magic. Also the port doesn't seem to close from time to time
-%% (mingw).
+%% We do the shell variable substitution ourselves on Windows and hope that the
+%% command doesn't use any other shell magic.
 patch_on_windows(Cmd, Env) ->
     case os:type() of
         {win32,nt} ->
-            case find_executable("bash") of
-                false -> Cmd;
-                Bash ->
-                    Bash ++ " -c \"" ++ Cmd ++ "; echo _port_cmd_status_ $?\" "
-            end;
+            "cmd /q /c " ++ lists:foldl(fun({Key, Value}, Acc) ->
+                                            expand_env_variable(Acc, Key, Value)
+                                        end, Cmd, Env);
         _ ->
-            lists:foldl(fun({Key, Value}, Acc) ->
-                                expand_env_variable(Acc, Key, Value)
-                        end, Cmd, Env)
+            Cmd
     end.
 
 find_files(Dir, Regex) ->
@@ -245,12 +239,6 @@ log_and_abort(Command, {Rc, Output}) ->
 
 sh_loop(Port, Fun, Acc) ->
     receive
-        {Port, {data, {_, "_port_cmd_status_ " ++ Status}}} ->
-            (catch erlang:port_close(Port)), % sigh () for indentation
-            case list_to_integer(Status) of
-                0  -> {ok, lists:flatten(Acc)};
-                Rc -> {error, Rc}
-            end;
         {Port, {data, {eol, Line}}} ->
             sh_loop(Port, Fun, Fun(Line ++ "\n", Acc));
         {Port, {data, {noeol, Line}}} ->
