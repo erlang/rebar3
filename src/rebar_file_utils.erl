@@ -82,7 +82,7 @@ mv(Source, Dest) ->
             ok;
         {win32, _} ->
             {ok, R} = rebar_utils:sh(
-                        ?FMT("cmd " "/c move /y \"~s\" \"~s\" 1> nul",
+                        ?FMT("move /y \"~s\" \"~s\" 1> nul",
                              [filename:nativename(Source),
                               filename:nativename(Dest)]),
                         [{use_stdout, false}, return_on_error]),
@@ -115,14 +115,14 @@ delete_each([File | Rest]) ->
 
 delete_each_dir_win32([]) -> ok;
 delete_each_dir_win32([Dir | Rest]) ->
-    {ok, []} = rebar_utils:sh(?FMT("cmd /c rd /q /s \"~s\"",
+    {ok, []} = rebar_utils:sh(?FMT("rd /q /s \"~s\"",
                                    [filename:nativename(Dir)]),
                               [{use_stdout, false}, return_on_error]),
     delete_each_dir_win32(Rest).
 
 xcopy_win32(Source,Dest)->
     {ok, R} = rebar_utils:sh(
-                ?FMT("cmd /c xcopy \"~s\" \"~s\" /q /y /e 2> nul",
+                ?FMT("xcopy \"~s\" \"~s\" /q /y /e 2> nul",
                      [filename:nativename(Source), filename:nativename(Dest)]),
                 [{use_stdout, false}, return_on_error]),
     case length(R) > 0 of
