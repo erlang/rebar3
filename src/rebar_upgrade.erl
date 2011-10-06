@@ -151,7 +151,10 @@ boot_files(TargetDir, Ver, Name) ->
            filename:join([".", ?TMP, "releases", Ver, Name ++ ".boot"])),
     {ok, _} = file:copy(
                 filename:join([TargetDir, "releases", Ver, "start_clean.boot"]),
-                filename:join([".", ?TMP, "releases", Ver, "start_clean.boot"])).
+                filename:join([".", ?TMP, "releases", Ver, "start_clean.boot"])),
+    {ok, _} = file:copy(
+                filename:join([TargetDir, "releases", Ver, "vm.args"]),
+                filename:join([".", ?TMP, "releases", Ver, "vm.args"])).
 
 make_tar(NameVer) ->
     Filename = NameVer ++ ".tar.gz",
