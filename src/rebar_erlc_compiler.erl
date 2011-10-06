@@ -70,13 +70,6 @@
 
 -spec compile(Config::rebar_config:config(), AppFile::file:filename()) -> 'ok'.
 compile(Config, _AppFile) ->
-    ?DEPRECATED(xrl_opts, fail_on_warning, warnings_as_errors,
-                rebar_config:get_list(Config, xrl_opts, []),
-                "once R14B04 is released"),
-    ?DEPRECATED(yrl_opts, fail_on_warning, warnings_as_errors,
-                rebar_config:get_list(Config, yrl_opts, []),
-                "once R14B04 is released"),
-
     rebar_base_compiler:run(Config,
                             check_files(rebar_config:get_local(
                                           Config, xrl_first_files, [])),
@@ -287,15 +280,13 @@ compile_mib(Source, Target, Config) ->
 -spec compile_xrl(Source::file:filename(), Target::file:filename(),
                   Config::rebar_config:config()) -> 'ok'.
 compile_xrl(Source, Target, Config) ->
-    Opts = [{scannerfile, Target}, {return, true}
-            | rebar_config:get(Config, xrl_opts, [])],
+    Opts = [{scannerfile, Target} | rebar_config:get(Config, xrl_opts, [])],
     compile_xrl_yrl(Source, Target, Opts, leex).
 
 -spec compile_yrl(Source::file:filename(), Target::file:filename(),
                   Config::rebar_config:config()) -> 'ok'.
 compile_yrl(Source, Target, Config) ->
-    Opts = [{parserfile, Target}, {return, true}
-            | rebar_config:get(Config, yrl_opts, [])],
+    Opts = [{parserfile, Target} | rebar_config:get(Config, yrl_opts, [])],
     compile_xrl_yrl(Source, Target, Opts, yecc).
 
 -spec compile_xrl_yrl(Source::file:filename(), Target::file:filename(),
@@ -304,16 +295,8 @@ compile_xrl_yrl(Source, Target, Opts, Mod) ->
     case needs_compile(Source, Target, []) of
         true ->
             case Mod:file(Source, Opts) of
-                {ok, _, []} ->
+                {ok, _} ->
                     ok;
-                {ok, _, _Warnings} ->
-                    %% TODO: remove once R14B04 is released
-                    case lists:member(fail_on_warning, Opts) of
-                        true ->
-                            ?FAIL;
-                        false ->
-                            ok
-                    end;
                 _X ->
                     ?FAIL
             end;
