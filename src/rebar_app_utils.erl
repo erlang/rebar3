@@ -139,6 +139,8 @@ vcs_vsn(Vcs, Dir) ->
         {unknown, VsnString} ->
             ?DEBUG("vcs_vsn: Unknown VCS atom in vsn field: ~p\n", [Vcs]),
             VsnString;
+        {cmd, CmdString} ->
+            vcs_vsn_invoke(CmdString, Dir);
         Cmd ->
             %% If there is a valid VCS directory in the application directory,
             %% use that version info
@@ -173,6 +175,7 @@ vcs_vsn_cmd(git) ->
 vcs_vsn_cmd(hg)  -> "hg identify -i";
 vcs_vsn_cmd(bzr) -> "bzr revno";
 vcs_vsn_cmd(svn) -> "svnversion";
+vcs_vsn_cmd({cmd, _Cmd}=Custom) -> Custom;
 vcs_vsn_cmd(Version) -> {unknown, Version}.
 
 vcs_vsn_invoke(Cmd, Dir) ->
