@@ -38,6 +38,7 @@
          load_config/1,
          get_sys_tuple/1,
          get_target_dir/1,
+         get_root_dir/1,
          get_target_parent_dir/1]).
 
 -include("rebar.hrl").
@@ -156,6 +157,23 @@ get_target_dir(ReltoolConfig) ->
             end;
         TargetDir ->
             filename:absname(TargetDir)
+    end.
+
+%%
+%% Look for {root_dir, RootDir} in the reltool config file; if none is
+%% found, use the name of the release as the default target directory.
+%%
+get_root_dir(ReltoolConfig) ->
+    case rebar_config:get_global(root_dir, undefined) of
+        undefined ->
+            case lists:keyfind(root_dir, 1, ReltoolConfig) of
+                {root_dir, RootDir} ->
+                    filename:absname(RootDir);
+                false ->
+                    code:root_dir()
+            end;
+        RootDir ->
+            filename:absname(RootDir)
     end.
 
 get_target_parent_dir(ReltoolConfig) ->
