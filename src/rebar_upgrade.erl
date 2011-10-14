@@ -124,19 +124,23 @@ run_systools(NewVer, Name) ->
     Opts = [silent],
     NameList = [Name],
     case systools:make_relup(NewVer, NameList, NameList, Opts) of
-        {error, _, _Message} ->
-            ?ABORT("Systools aborted with: ~p~n", [_Message]);
+        {error, _, Msg} ->
+            ?ABORT("Systools [systools:make_relup/4] aborted with: ~p~n",
+                   [Msg]);
         _ ->
             ?DEBUG("Relup created~n", []),
             case systools:make_script(NewVer, Opts) of
-                {error, _, _Message1} ->
-                    ?ABORT("Systools aborted with: ~p~n", [_Message1]);
+                {error, _, Msg1} ->
+                    ?ABORT("Systools [systools:make_script/2] "
+                           "aborted with: ~p~n", [Msg1]);
                 _ ->
                     ?DEBUG("Script created~n", []),
                     case systools:make_tar(NewVer, Opts) of
-                        {error, _, _Message2} ->
-                            ?ABORT("Systools aborted with: ~p~n", [_Message2]);
+                        {error, _, Msg2} ->
+                            ?ABORT("Systools [systools:make_tar/2] "
+                                   "aborted with: ~p~n", [Msg2]);
                         _ ->
+                            ?DEBUG("Tarball created~n", []),
                             ok
                     end
             end
@@ -149,9 +153,10 @@ boot_files(TargetDir, Ver, Name) ->
     ok = file:make_symlink(
            filename:join(["start.boot"]),
            filename:join([".", ?TMP, "releases", Ver, Name ++ ".boot"])),
-    {ok, _} = file:copy(
-                filename:join([TargetDir, "releases", Ver, "start_clean.boot"]),
-                filename:join([".", ?TMP, "releases", Ver, "start_clean.boot"])),
+    {ok, _} =
+        file:copy(
+          filename:join([TargetDir, "releases", Ver, "start_clean.boot"]),
+          filename:join([".", ?TMP, "releases", Ver, "start_clean.boot"])),
     {ok, _} = file:copy(
                 filename:join([TargetDir, "releases", Ver, "vm.args"]),
                 filename:join([".", ?TMP, "releases", Ver, "vm.args"])).
