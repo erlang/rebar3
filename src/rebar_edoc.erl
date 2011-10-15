@@ -48,7 +48,26 @@
 %% @doc Generate Erlang program documentation.
 -spec doc(Config::rebar_config:config(), File::file:filename()) -> ok.
 doc(Config, File) ->
+    %% Save code path
+    CodePath = setup_code_path(),
     {ok, AppName, _AppData} = rebar_app_utils:load_app_file(File),
     EDocOpts = rebar_config:get(Config, edoc_opts, []),
     ok = edoc:application(AppName, ".", EDocOpts),
+    %% Restore code path
+    true = code:set_path(CodePath),
     ok.
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
+
+setup_code_path() ->
+    %% Setup code path prior to calling edoc so that edown, asciiedoc,
+    %% and the like can work properly when generating their own
+    %% documentation.
+    CodePath = code:get_path(),
+    true = code:add_patha(ebin_dir()),
+    CodePath.
+
+ebin_dir() ->
+    filename:join(rebar_utils:get_cwd(), "ebin").
