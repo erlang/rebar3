@@ -157,6 +157,11 @@ boot_files(TargetDir, Ver, Name) ->
         file:copy(
           filename:join([TargetDir, "releases", Ver, "start_clean.boot"]),
           filename:join([".", ?TMP, "releases", Ver, "start_clean.boot"])),
+
+    {ok, _} = file:copy(
+                filename:join([TargetDir, "releases", Ver, "sys.config"]),
+                filename:join([".", ?TMP, "releases", Ver, "sys.config"])),
+
     {ok, _} = file:copy(
                 filename:join([TargetDir, "releases", Ver, "vm.args"]),
                 filename:join([".", ?TMP, "releases", Ver, "vm.args"])).
