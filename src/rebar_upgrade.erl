@@ -111,13 +111,12 @@ setup(OldVerPath, NewVerPath, NewName, NewVer, NameVer) ->
     {ok, _} = file:copy(Src, Dst),
     ok = code:add_pathsa(
            lists:append([
+                         filelib:wildcard(filename:join([NewVerPath,
+                                                         "lib", "*", "ebin"])),
                          filelib:wildcard(filename:join([OldVerPath,
                                                          "releases", "*"])),
                          filelib:wildcard(filename:join([OldVerPath,
-                                                         "lib", "*", "ebin"])),
-                         filelib:wildcard(filename:join([NewVerPath,
-                                                         "lib", "*", "ebin"])),
-                         filelib:wildcard(filename:join([NewVerPath, "*"]))
+                                                         "lib", "*", "ebin"]))
                         ])).
 
 run_systools(NewVer, Name) ->
