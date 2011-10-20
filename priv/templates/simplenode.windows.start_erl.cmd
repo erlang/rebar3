@@ -4,7 +4,7 @@
 @rem Other args are position dependent.
 @set args="%*"
 @for /F "delims=++ tokens=1,2,3" %%I in (%args%) do @(
-    @call :set_trim erl_args %%I
+    @set erl_args=%%I
     @call :set_trim node_name %%J
     @call :set_trim node_root %%K
 )
