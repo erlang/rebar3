@@ -380,15 +380,15 @@ execute_template([{chmod, Mod, File} | Rest], TemplateType, TemplateName,
             ?ABORT("Failed while processing template instruction "
                    "{cmod, ~b, ~s}: ~p~n", [Mod, File, Reason])
     end;
-execute_template([{symlink, Target, LinkName} | Rest], TemplateType, TemplateName,
+execute_template([{symlink, Existing, New} | Rest], TemplateType, TemplateName,
                  Context, Force, ExistingFiles) ->
-    case file:make_symlink(Target, LinkName) of
+    case file:make_symlink(Existing, New) of
         ok ->
             execute_template(Rest, TemplateType, TemplateName,
                              Context, Force, ExistingFiles);
         {error, Reason} ->
             ?ABORT("Failed while processing template instruction "
-                   "{symlink, ~s, ~s}: ~p~n", [Target, LinkName, Reason])
+                   "{symlink, ~s, ~s}: ~p~n", [Existing, New, Reason])
     end;
 execute_template([{variables, _} | Rest], TemplateType, TemplateName, Context,
                  Force, ExistingFiles) ->
