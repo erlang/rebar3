@@ -122,14 +122,8 @@ doterl_compile(Config, OutDir) ->
 
 doterl_compile(Config, OutDir, MoreSources) ->
     FirstErls = rebar_config:get_list(Config, erl_first_files, []),
-    RawErlOpts = filter_defines(rebar_config:get(Config, erl_opts, []), []),
-    ErlOpts = case proplists:is_defined(no_debug_info, RawErlOpts) of
-                  true ->
-                      [O || O <- RawErlOpts, O =/= no_debug_info];
-                  _ ->
-                      [debug_info|RawErlOpts]
-              end,
-    ?DEBUG("erl_opts ~p~n",[ErlOpts]),
+    ErlOpts = erl_opts(Config),
+    ?DEBUG("erl_opts ~p~n", [ErlOpts]),
     %% Support the src_dirs option allowing multiple directories to
     %% contain erlang source. This might be used, for example, should
     %% eunit tests be separated from the core application source.
@@ -169,6 +163,18 @@ doterl_compile(Config, OutDir, MoreSources) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+erl_opts(Config) ->
+    RawErlOpts = filter_defines(rebar_config:get(Config, erl_opts, []), []),
+    GlobalDefines = lists:map(fun(D) -> list_to_atom(D) end,
+                              rebar_config:get_global(defines, [])),
+    Opts = GlobalDefines ++ RawErlOpts,
+    case proplists:is_defined(no_debug_info, Opts) of
+        true ->
+            [O || O <- Opts, O =/= no_debug_info];
+        _ ->
+            [debug_info|Opts]
+    end.
 
 -spec include_path(Source::file:filename(),
                    Config::rebar_config:config()) -> [file:filename(), ...].

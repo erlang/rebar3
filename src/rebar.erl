@@ -135,6 +135,9 @@ parse_args(Args) ->
             %% Check options and maybe halt execution
             ok = show_info_maybe_halt(Options, NonOptArgs),
 
+            GlobalDefines = proplists:get_all_values(defines, Options),
+            rebar_config:set_global(defines, GlobalDefines),
+
             %% Set global variables based on getopt options
             set_global_flag(Options, verbose),
             set_global_flag(Options, force),
@@ -263,6 +266,7 @@ option_spec_list() ->
      {verbose,  $v, "verbose",  undefined, "Be verbose about what gets done"},
      {version,  $V, "version",  undefined, "Show version information"},
      {force,    $f, "force",    undefined, "Force"},
+     {defines,  $D, undefined,   string,    "Define compiler macro"},
      {jobs,     $j, "jobs",     integer,   JobsHelp},
      {config,   $C, "config",   string,    "Rebar config file to use"}
     ].
