@@ -166,13 +166,13 @@ doterl_compile(Config, OutDir, MoreSources) ->
 
 erl_opts(Config) ->
     RawErlOpts = filter_defines(rebar_config:get(Config, erl_opts, []), []),
-    GlobalDefines = lists:map(fun(D) -> list_to_atom(D) end,
-                              rebar_config:get_global(defines, [])),
+    GlobalDefines = [{d, list_to_atom(D)} ||
+                        D <- rebar_config:get_global(defines, [])],
     Opts = GlobalDefines ++ RawErlOpts,
     case proplists:is_defined(no_debug_info, Opts) of
         true ->
             [O || O <- Opts, O =/= no_debug_info];
-        _ ->
+        false ->
             [debug_info|Opts]
     end.
 
