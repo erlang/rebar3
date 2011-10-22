@@ -154,13 +154,23 @@ setup_env(Config) ->
     %% max flexibility for users.
     DefaultEnvs  = filter_envs(default_env(), []),
     PortEnvs = rebar_config:get_list(Config, port_envs, []),
-    OverrideEnvs = filter_envs(PortEnvs, []),
+    OverrideEnvs = global_defines() ++ filter_envs(PortEnvs, []),
     RawEnv = apply_defaults(os_env(), DefaultEnvs) ++ OverrideEnvs,
     expand_vars_loop(merge_each_var(RawEnv, [])).
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+global_defines() ->
+    [begin
+         case string:tokens(D, "=") of
+             [Var, Val] ->
+                 {Var, Val};
+             [Def] ->
+                 {Def, "1"}
+         end
+     end || D <- rebar_config:get_global(defines, [])].
 
 expand_sources([], Acc) ->
     Acc;
