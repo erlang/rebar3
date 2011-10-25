@@ -67,7 +67,17 @@ run(RawArgs) ->
     ok = application:load(rebar),
     %% Parse out command line arguments -- what's left is a list of commands to
     %% run -- and start running commands
-    run_aux(parse_args(RawArgs)).
+    Args = parse_args(RawArgs),
+
+    case rebar_config:get_global(enable_profiling, false) of
+        true ->
+            io:format("Profiling!\n"),
+            fprof:apply(fun(A) -> run_aux(A) end, [Args]),
+            fprof:profile(),
+            fprof:analyse();
+        _ ->
+            run_aux(Args)
+    end.
 
 run_aux(["help"]) ->
     help(),
@@ -137,6 +147,10 @@ parse_args(Args) ->
 
             GlobalDefines = proplists:get_all_values(defines, Options),
             rebar_config:set_global(defines, GlobalDefines),
+
+            %% Setup profiling flag
+            rebar_config:set_global(enable_profiling,
+                                    proplists:get_bool(profile, Options)),
 
             %% Set global variables based on getopt options
             set_global_flag(Options, verbose),
@@ -268,7 +282,8 @@ option_spec_list() ->
      {force,    $f, "force",    undefined, "Force"},
      {defines,  $D, undefined,   string,    "Define compiler macro"},
      {jobs,     $j, "jobs",     integer,   JobsHelp},
-     {config,   $C, "config",   string,    "Rebar config file to use"}
+     {config,   $C, "config",   string,    "Rebar config file to use"},
+     {profile,  $p, "profile",  undefined,  "Profile this run of rebar"}
     ].
 
 %%
