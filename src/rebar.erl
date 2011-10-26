@@ -72,9 +72,12 @@ run(RawArgs) ->
     case rebar_config:get_global(enable_profiling, false) of
         true ->
             io:format("Profiling!\n"),
-            fprof:apply(fun(A) -> run_aux(A) end, [Args]),
-            fprof:profile(),
-            fprof:analyse();
+            try
+                fprof:apply(fun(A) -> run_aux(A) end, [Args])
+            after
+                fprof:profile(),
+                fprof:analyse([{dest, "fprof.analysis"}])
+            end;
         _ ->
             run_aux(Args)
     end.
