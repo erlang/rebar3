@@ -290,38 +290,51 @@ merge_each_var([{Key, Value} | Rest], Vars) ->
 %% for every other key until no further expansions are possible.
 %%
 expand_vars_loop(Vars) ->
-    expand_vars_loop(Vars, 10).
+    expand_vars_loop(Vars, [], dict:from_list(Vars), 10).
 
-expand_vars_loop(_, 0) ->
+expand_vars_loop(_Pending, _Recurse, _Vars, 0) ->
     ?ABORT("Max. expansion reached for ENV vars!\n", []);
-expand_vars_loop(Vars0, Count) ->
-    Vars = lists:foldl(fun({Key, Value}, Acc) ->
-                               expand_vars(Key, Value, Acc)
-                       end,
-                       Vars0, Vars0),
-    case orddict:from_list(Vars) of
-        Vars0 ->
-            Vars0;
-        _ ->
-            expand_vars_loop(Vars, Count-1)
+expand_vars_loop([], [], Vars, _Count) ->
+    lists:keysort(1, dict:to_list(Vars));
+expand_vars_loop([], Recurse, Vars, Count) ->
+    expand_vars_loop(Recurse, [], Vars, Count-1);
+expand_vars_loop([{K, V} | Rest], Recurse, Vars, Count) ->
+    %% Identify the variables that need expansion in this value
+    case re:run(V, "\\\${?(\\w+)}?", [global, {capture, all_but_first, list}]) of
+        {match, Matches} ->
+            %% Identify the unique variables that need to be expanded
+            UniqueMatches = lists:usort([M || [M] <- Matches]),
+
+            %% For each variable, expand it and return the final value. Note that
+            %% if we have a bunch of unresolvable variables, nothing happens and
+            %% we don't bother attempting further expansion
+            case expand_keys_in_value(UniqueMatches, V, Vars) of
+                V ->
+                    %% No change after expansion; move along
+                    expand_vars_loop(Rest, Recurse, Vars, Count);
+                Expanded ->
+                    %% Some expansion occurred; move to next k/v but revist
+                    %% this value in the next loop to check for further expansion
+                    NewVars = dict:store(K, Expanded, Vars),
+                    expand_vars_loop(Rest, [{K, Expanded} | Recurse], NewVars, Count)
+            end;
+
+        nomatch ->
+            %% No values in this variable need expansion; move along
+            expand_vars_loop(Rest, Recurse, Vars, Count)
     end.
 
-%%
-%% Expand all OTHER references to a given K/V pair
-%%
-expand_vars(Key, Value, Vars) ->
-    lists:foldl(
-      fun({AKey, AValue}, Acc) ->
-              NewValue = case AKey of
-                             Key ->
-                                 AValue;
-                             _ ->
-                                 rebar_utils:expand_env_variable(AValue,
-                                                                 Key, Value)
-                         end,
-              [{AKey, NewValue} | Acc]
-      end,
-      [], Vars).
+expand_keys_in_value([], Value, _Vars) ->
+    Value;
+expand_keys_in_value([Key | Rest], Value, Vars) ->
+    NewValue = case dict:find(Key, Vars) of
+                   {ok, KValue} ->
+                       rebar_utils:expand_env_variable(Value, Key, KValue);
+                   error ->
+                       Value
+               end,
+    expand_keys_in_value(Rest, NewValue, Vars).
+
 
 expand_command(TmplName, Env, InFiles, OutFile) ->
     Cmd0 = proplists:get_value(TmplName, Env),
