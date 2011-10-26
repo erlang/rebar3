@@ -300,23 +300,27 @@ expand_vars_loop([], Recurse, Vars, Count) ->
     expand_vars_loop(Recurse, [], Vars, Count-1);
 expand_vars_loop([{K, V} | Rest], Recurse, Vars, Count) ->
     %% Identify the variables that need expansion in this value
-    case re:run(V, "\\\${?(\\w+)}?", [global, {capture, all_but_first, list}]) of
+    ReOpts = [global, {capture, all_but_first, list}],
+    case re:run(V, "\\\${?(\\w+)}?", ReOpts) of
         {match, Matches} ->
             %% Identify the unique variables that need to be expanded
             UniqueMatches = lists:usort([M || [M] <- Matches]),
 
-            %% For each variable, expand it and return the final value. Note that
-            %% if we have a bunch of unresolvable variables, nothing happens and
-            %% we don't bother attempting further expansion
+            %% For each variable, expand it and return the final
+            %% value. Note that if we have a bunch of unresolvable
+            %% variables, nothing happens and we don't bother
+            %% attempting further expansion
             case expand_keys_in_value(UniqueMatches, V, Vars) of
                 V ->
                     %% No change after expansion; move along
                     expand_vars_loop(Rest, Recurse, Vars, Count);
                 Expanded ->
-                    %% Some expansion occurred; move to next k/v but revist
-                    %% this value in the next loop to check for further expansion
+                    %% Some expansion occurred; move to next k/v but
+                    %% revisit this value in the next loop to check
+                    %% for further expansion
                     NewVars = dict:store(K, Expanded, Vars),
-                    expand_vars_loop(Rest, [{K, Expanded} | Recurse], NewVars, Count)
+                    expand_vars_loop(Rest, [{K, Expanded} | Recurse],
+                                     NewVars, Count)
             end;
 
         nomatch ->
