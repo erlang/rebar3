@@ -283,10 +283,10 @@ option_spec_list() ->
      {verbose,  $v, "verbose",  undefined, "Be verbose about what gets done"},
      {version,  $V, "version",  undefined, "Show version information"},
      {force,    $f, "force",    undefined, "Force"},
-     {defines,  $D, undefined,   string,    "Define compiler macro"},
+     {defines,  $D, undefined,  string,    "Define compiler macro"},
      {jobs,     $j, "jobs",     integer,   JobsHelp},
      {config,   $C, "config",   string,    "Rebar config file to use"},
-     {profile,  $p, "profile",  undefined,  "Profile this run of rebar"}
+     {profile,  $p, "profile",  undefined, "Profile this run of rebar"}
     ].
 
 %%
