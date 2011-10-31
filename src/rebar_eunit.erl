@@ -484,9 +484,6 @@ reset_after_eunit({OldProcesses, WasAlive, OldAppEnvs, _OldACs}) ->
             ok
     end,
 
-    Processes = erlang:processes(),
-    _ = kill_extras(Processes -- OldProcesses),
-
     OldApps = [App || {App, _} <- OldAppEnvs],
     Apps = get_app_names(),
     _ = [begin
@@ -499,6 +496,10 @@ reset_after_eunit({OldProcesses, WasAlive, OldAppEnvs, _OldACs}) ->
                 {K, _V} <- application:get_all_env(App)],
 
     reconstruct_app_env_vars(Apps),
+
+    Processes = erlang:processes(),
+    _ = kill_extras(Processes -- OldProcesses),
+
     ok.
 
 kill_extras(Pids) ->
