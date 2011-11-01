@@ -196,7 +196,7 @@ expand_env_variable(InStr, VarName, RawVarValue) ->
             %% Given variable "FOO": match $FOO\s | $FOOeol | ${FOO}
             RegEx = io_lib:format("\\\$(~s(\\s|$)|{~s})", [VarName, VarName]),
             ReOpts = [global, {return, list}],
-            re:replace(InStr, RegEx, VarValue ++ "\\2", ReOpts)
+            re:replace(InStr, RegEx, [VarValue, "\\2"], ReOpts)
     end.
 
 
