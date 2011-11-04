@@ -86,14 +86,6 @@
 %%               {port_envs, [{"x86_64.*-linux", "CFLAGS",
 %%                             "$CFLAGS -X86Options"}]}
 %%
-%% * port_pre_script - Tuple which specifies a pre-compilation script to run,
-%%                     and a filename that exists as a result of the script
-%%                     running.
-%%
-%% * port_cleanup_script - String that specifies a script to run during cleanup.
-%%                         Use this to remove files/directories created by
-%%                         port_pre_script.
-%%
 
 compile(Config, AppFile) ->
     %% Compose list of sources from config file -- defaults to c_src/*.c
