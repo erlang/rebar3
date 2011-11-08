@@ -177,7 +177,7 @@ parse_args(Args) ->
             unabbreviate_command_names(filter_flags(NonOptArgs, []));
 
         {error, {Reason, Data}} ->
-            ?ERROR("Error: ~s ~p~n~n", [Reason, Data]),
+            ?ERROR("~s ~p~n~n", [Reason, Data]),
             help(),
             halt(1)
     end.
