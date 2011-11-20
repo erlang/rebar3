@@ -118,7 +118,7 @@ get_previous_release_path() ->
 load_config(ReltoolFile) ->
     case file:consult(ReltoolFile) of
         {ok, Terms} ->
-            Terms;
+            expand_version(Terms, filename:dirname(ReltoolFile));
         Other ->
             ?ABORT("Failed to load expected config from ~s: ~p\n",
                    [ReltoolFile, Other])
@@ -208,3 +208,17 @@ make_proplist([H|T], Acc) ->
      make_proplist(T, [{App,Ver}|Acc]);
 make_proplist([], Acc) ->
      Acc.
+
+expand_version(ReltoolConfig, Dir) ->
+    case lists:keyfind(sys, 1, ReltoolConfig) of
+        {sys, Sys} ->
+            ExpandedSys = {sys, [expand_rel_version(Term, Dir) || Term <- Sys]},
+            lists:keyreplace(sys, 1, ReltoolConfig, ExpandedSys);
+        _ ->
+            ReltoolConfig
+    end.
+
+expand_rel_version({rel, Name, Version, Apps}, Dir) ->
+    {rel, Name, rebar_utils:vcs_vsn(Version, Dir), Apps};
+expand_rel_version(Other, _Dir) ->
+    Other.
