@@ -159,28 +159,41 @@ get_target_dir(ReltoolConfig) ->
             filename:absname(TargetDir)
     end.
 
-%%
-%% Look for {root_dir, RootDir} in the reltool config file; if none is
-%% found, use the name of the release as the default target directory.
-%%
-get_root_dir(ReltoolConfig) ->
-    case rebar_config:get_global(root_dir, undefined) of
-        undefined ->
-            case lists:keyfind(root_dir, 1, ReltoolConfig) of
-                {root_dir, RootDir} ->
-                    filename:absname(RootDir);
-                false ->
-                    code:root_dir()
-            end;
-        RootDir ->
-            filename:absname(RootDir)
-    end.
-
 get_target_parent_dir(ReltoolConfig) ->
     TargetDir = get_target_dir(ReltoolConfig),
     case lists:reverse(tl(lists:reverse(filename:split(TargetDir)))) of
         [] -> ".";
         Components -> filename:join(Components)
+    end.
+
+%%
+%% Look for root_dir in sys tuple and command line; fall back to
+%% code:root_dir().
+%%
+get_root_dir(ReltoolConfig) ->
+    {sys, SysInfo} = get_sys_tuple(ReltoolConfig),
+    SysRootDirTuple = lists:keyfind(root_dir, 1, SysInfo),
+    CmdRootDir = rebar_config:get_global(root_dir, undefined),
+    case {SysRootDirTuple, CmdRootDir} of
+        %% root_dir in sys typle and no root_dir on cmd-line
+        {{root_dir, SysRootDir}, undefined} ->
+            SysRootDir;
+        %% root_dir in sys typle and also root_dir on cmd-line
+        {{root_dir, SysRootDir}, CmdRootDir} when CmdRootDir =/= undefined ->
+            case string:equal(SysRootDir, CmdRootDir) of
+                true ->
+                    ok;
+                false ->
+                    ?WARN("overriding reltool.config root_dir with "
+                          "different command line root_dir~n", [])
+            end,
+            CmdRootDir;
+        %% no root_dir in sys typle and no root_dir on cmd-line
+        {false, undefined} ->
+            code:root_dir();
+        %% no root_dir in sys tuple but root_dir on cmd-line
+        {false, CmdRootDir} when CmdRootDir =/= undefined ->
+            CmdRootDir
     end.
 
 %% ===================================================================
