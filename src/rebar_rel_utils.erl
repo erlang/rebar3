@@ -177,7 +177,8 @@ get_root_dir(ReltoolConfig) ->
     end.
 
 get_target_parent_dir(ReltoolConfig) ->
-    case lists:reverse(tl(lists:reverse(filename:split(get_target_dir(ReltoolConfig))))) of
+    TargetDir = get_target_dir(ReltoolConfig),
+    case lists:reverse(tl(lists:reverse(filename:split(TargetDir)))) of
         [] -> ".";
         Components -> filename:join(Components)
     end.
