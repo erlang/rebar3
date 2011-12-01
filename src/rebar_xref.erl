@@ -40,7 +40,13 @@
 %% Public API
 %% ===================================================================
 
-xref(Config, _) ->
+xref(Config, _X) ->
+    case rebar_utils:is_skipped_app() of
+        true  -> ok;
+        false -> xref0(Config, _X)
+    end.
+
+xref0(Config, _) ->
     %% Spin up xref
     {ok, _} = xref:start(xref),
     ok = xref:set_library_path(xref, code_path()),

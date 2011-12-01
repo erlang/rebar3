@@ -43,7 +43,9 @@
          prop_check/3,
          expand_code_path/0,
          deprecated/5,
-         expand_env_variable/3]).
+         expand_env_variable/3,
+         is_skipped_app/0
+        ]).
 
 -include("rebar.hrl").
 
@@ -197,6 +199,42 @@ expand_env_variable(InStr, VarName, RawVarValue) ->
             RegEx = io_lib:format("\\\$(~s(\\s|$)|{~s})", [VarName, VarName]),
             ReOpts = [global, {return, list}],
             re:replace(InStr, RegEx, [VarValue, "\\2"], ReOpts)
+    end.
+
+%%
+%% Return: true , if we are in the context of a 'Skipped App', else: false
+%% (Example: rebar xref skip_app=mochiweb,webmachine)
+is_skipped_app() ->
+    case rebar_config:get_global(skip_app, undefined) of
+        undefined ->
+            %% no skip list
+            false;
+
+        SkipApps ->
+
+            case string:tokens(SkipApps, ",") of
+                [] ->
+                    %% no tokens
+                    false;
+
+                SkipAppsTokens ->
+
+                    %% Where we are at the moment
+                    Cwd = rebar_utils:get_cwd(),
+
+                    %% Return true if app should be skipped
+                    SkipPred = fun(App) ->
+                                       case re:run(Cwd, App) of
+                                           {match,_} -> true;
+                                           _         -> false
+                                       end
+                               end,
+
+                    %% Check if 'we' are among the skipped apps.
+                    lists:foldl(fun(SkippedApp, Bool) ->
+                                        SkipPred(SkippedApp) or Bool
+                                end, false, SkipAppsTokens)
+            end
     end.
 
 
