@@ -354,8 +354,17 @@ run_modules([Module | Rest], Command, Config, File) ->
 apply_hooks(Mode, Config, Command, Env) ->
     Hooks = rebar_config:get_local(Config, Mode, []),
     lists:foreach(fun apply_hook/1,
-                  [{Env, Hook} || Hook <- Hooks, element(1, Hook) =:= Command]).
+                  [{Env, Hook} || Hook <- Hooks,
+                                  element(1, Hook) =:= Command orelse
+                                      element(2, Hook) =:= Command]).
 
+apply_hook({Env, {Arch, Command, Hook}}) ->
+    case rebar_utils:is_arch(Arch) of
+        true ->
+            apply_hook({Env, {Command, Hook}});
+        false ->
+            ok
+    end;
 apply_hook({Env, {Command, Hook}}) ->
     Msg = lists:flatten(io_lib:format("Command [~p] failed!~n", [Command])),
     rebar_utils:sh(Hook, [{env, Env}, {abort_on_error, Msg}]).
