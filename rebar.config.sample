@@ -142,9 +142,12 @@
 %% == Pre/Post Command Hooks ==
 
 {pre_hooks, [{clean, "./prepare_package_files.sh"},
-             {compile, "escript generate_headers"}]}.
+             {"linux", compile, "c_src/build_linux.sh"},
+             {compile, "escript generate_headers"},
+             {compile, "escript check_headers"}]}.
 
 {post_hooks, [{clean, "touch file1.out"},
+              {"freebsd", compile, "c_src/freebsd_tweaks.sh"},
               {eunit, "touch file2.out"},
               {compile, "touch postcompile.out"}]}.
 
