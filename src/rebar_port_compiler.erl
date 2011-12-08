@@ -392,6 +392,14 @@ os_env() ->
     %% Drop variables without a name (win32)
     [T1 || {K, _V} = T1 <- Os, K =/= []].
 
+erl_interface_dir(Subdir) ->
+    case code:lib_dir(erl_interface, Subdir) of
+        {error, bad_name} ->
+            throw({error, {erl_interface,Subdir,"code:lib_dir(erl_interface)"
+                           "is unable to find the erl_interface library."}});
+        Dir -> Dir
+    end.
+
 default_env() ->
     [
      {"CXX_TEMPLATE",
@@ -402,13 +410,13 @@ default_env() ->
       "$CC $PORT_IN_FILES $LDFLAGS $DRV_LDFLAGS -o $PORT_OUT_FILE"},
      {"CC", "cc"},
      {"CXX", "c++"},
-     {"ERL_CFLAGS", lists:concat([" -I", code:lib_dir(erl_interface, include),
+     {"ERL_CFLAGS", lists:concat([" -I", erl_interface_dir(include),
                                   " -I", filename:join(erts_dir(), "include"),
                                   " "])},
      {"ERL_LDFLAGS", " -L$ERL_EI_LIBDIR -lerl_interface -lei"},
      {"DRV_CFLAGS", "-g -Wall -fPIC $ERL_CFLAGS"},
      {"DRV_LDFLAGS", "-shared $ERL_LDFLAGS"},
-     {"ERL_EI_LIBDIR", code:lib_dir(erl_interface, lib)},
+     {"ERL_EI_LIBDIR", erl_interface_dir(lib)},
      {"darwin", "DRV_LDFLAGS",
       "-bundle -flat_namespace -undefined suppress $ERL_LDFLAGS"},
      {"ERLANG_ARCH", rebar_utils:wordsize()},
