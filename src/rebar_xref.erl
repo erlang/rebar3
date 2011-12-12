@@ -46,6 +46,10 @@ xref(Config, _X) ->
         false -> xref0(Config, _X)
     end.
 
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
+
 xref0(Config, _) ->
     %% Spin up xref
     {ok, _} = xref:start(xref),
@@ -95,10 +99,6 @@ xref0(Config, _) ->
         false ->
             ?FAIL
     end.
-
-%% ===================================================================
-%% Internal functions
-%% ===================================================================
 
 check_exports_not_used() ->
     {ok, UnusedExports0} = xref:analyze(xref, exports_not_used),
