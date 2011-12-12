@@ -31,7 +31,8 @@
          app_src_to_app/1,
          app_name/1,
          app_applications/1,
-         app_vsn/1]).
+         app_vsn/1,
+         is_skipped_app/0]).
 
 -export([load_app_file/1]). % TEMPORARY
 
@@ -104,6 +105,41 @@ app_vsn(AppFile) ->
                    [AppFile, Reason])
     end.
 
+%%
+%% Return: true, if we are in the context of a 'Skipped App', else: false
+%% (Example: rebar xref skip_app=mochiweb,webmachine)
+is_skipped_app() ->
+    case rebar_config:get_global(skip_app, undefined) of
+        undefined ->
+            %% no skip list
+            false;
+
+        SkipApps ->
+
+            case string:tokens(SkipApps, ",") of
+                [] ->
+                    %% no tokens
+                    false;
+
+                SkipAppsTokens ->
+
+                    %% Where we are at the moment
+                    Cwd = rebar_utils:get_cwd(),
+
+                    %% Return true if app should be skipped
+                    SkipPred = fun(App) ->
+                                       case re:run(Cwd, App) of
+                                           {match,_} -> true;
+                                           _         -> false
+                                       end
+                               end,
+
+                    %% Check if 'we' are among the skipped apps.
+                    lists:foldl(fun(SkippedApp, Bool) ->
+                                        SkipPred(SkippedApp) or Bool
+                                end, false, SkipAppsTokens)
+            end
+    end.
 
 %% ===================================================================
 %% Internal functions

@@ -41,7 +41,7 @@
 %% ===================================================================
 
 xref(Config, _X) ->
-    case rebar_utils:is_skipped_app() of
+    case rebar_app_utils:is_skipped_app() of
         true  -> ok;
         false -> xref0(Config, _X)
     end.
