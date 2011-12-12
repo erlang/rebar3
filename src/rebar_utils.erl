@@ -56,7 +56,6 @@ get_cwd() ->
     {ok, Dir} = file:get_cwd(),
     Dir.
 
-
 is_arch(ArchRegex) ->
     case re:run(get_arch(), ArchRegex, [{capture, none}]) of
         match ->

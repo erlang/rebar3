@@ -32,7 +32,7 @@
          app_name/1,
          app_applications/1,
          app_vsn/1,
-         is_skipped_app/0]).
+         is_skipped_app/1]).
 
 -export([load_app_file/1]). % TEMPORARY
 
@@ -105,40 +105,26 @@ app_vsn(AppFile) ->
                    [AppFile, Reason])
     end.
 
-%%
-%% Return: true, if we are in the context of a 'Skipped App', else: false
-%% (Example: rebar xref skip_app=mochiweb,webmachine)
-is_skipped_app() ->
-    case rebar_config:get_global(skip_app, undefined) of
+is_skipped_app(AppFile) ->
+    ThisApp = app_name(AppFile),
+    %% Check for apps global parameter; this is a comma-delimited list
+    %% of apps on which we want to run commands
+    case get_apps() of
         undefined ->
-            %% no skip list
-            false;
-
-        SkipApps ->
-
-            case string:tokens(SkipApps, ",") of
-                [] ->
-                    %% no tokens
+            %% No apps parameter specified, check the skip_apps list..
+            case get_skip_apps() of
+                undefined ->
+                    %% No skip_apps list, run everything..
                     false;
-
-                SkipAppsTokens ->
-
-                    %% Where we are at the moment
-                    Cwd = rebar_utils:get_cwd(),
-
-                    %% Return true if app should be skipped
-                    SkipPred = fun(App) ->
-                                       case re:run(Cwd, App) of
-                                           {match,_} -> true;
-                                           _         -> false
-                                       end
-                               end,
-
-                    %% Check if 'we' are among the skipped apps.
-                    lists:foldl(fun(SkippedApp, Bool) ->
-                                        SkipPred(SkippedApp) or Bool
-                                end, false, SkipAppsTokens)
-            end
+                SkipApps ->
+                    TargetApps = [list_to_atom(A) ||
+                                     A <- string:tokens(SkipApps, ",")],
+                    is_skipped_app(ThisApp, TargetApps)
+            end;
+        Apps ->
+            %% run only selected apps
+            TargetApps = [list_to_atom(A) || A <- string:tokens(Apps, ",")],
+            is_selected_app(ThisApp, TargetApps)
     end.
 
 %% ===================================================================
@@ -224,3 +210,47 @@ vcs_vsn_cmd(Version) -> {unknown, Version}.
 vcs_vsn_invoke(Cmd, Dir) ->
     {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),
     string:strip(VsnString, right, $\n).
+
+%% apps= for selecting apps
+is_selected_app(ThisApp, TargetApps) ->
+    case lists:member(ThisApp, TargetApps) of
+        false ->
+            {true, ThisApp};
+        true ->
+            false
+    end.
+
+%% skip_apps= for filtering apps
+is_skipped_app(ThisApp, TargetApps) ->
+    case lists:member(ThisApp, TargetApps) of
+        false ->
+            false;
+        true ->
+            {true, ThisApp}
+    end.
+
+get_apps() ->
+    get_global_cs_opt(app, apps).
+
+get_skip_apps() ->
+    get_global_cs_opt(skip_app, skip_apps).
+
+get_global_cs_opt(Old, New) ->
+    Apps = rebar_config:get_global(New, undefined),
+    case rebar_config:get_global(Old, undefined) of
+        undefined ->
+            case Apps of
+                undefined ->
+                    undefined;
+                Apps ->
+                    Apps
+            end;
+        App ->
+            rebar_utils:deprecated(Old, Old, New, "soon"),
+            case Apps of
+                undefined ->
+                    App;
+                Apps ->
+                    string:join([App, Apps], ",")
+            end
+    end.

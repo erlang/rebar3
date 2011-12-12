@@ -40,17 +40,7 @@
 %% Public API
 %% ===================================================================
 
-xref(Config, _X) ->
-    case rebar_app_utils:is_skipped_app() of
-        true  -> ok;
-        false -> xref0(Config, _X)
-    end.
-
-%% ===================================================================
-%% Internal functions
-%% ===================================================================
-
-xref0(Config, _) ->
+xref(Config, _) ->
     %% Spin up xref
     {ok, _} = xref:start(xref),
     ok = xref:set_library_path(xref, code_path()),
@@ -99,6 +89,10 @@ xref0(Config, _) ->
         false ->
             ?FAIL
     end.
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
 
 check_exports_not_used() ->
     {ok, UnusedExports0} = xref:analyze(xref, exports_not_used),
