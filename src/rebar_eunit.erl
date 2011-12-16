@@ -85,6 +85,27 @@ eunit(Config, _AppFile) ->
     %% in src but in a subdirectory of src. Cover only looks in cwd and ../src
     %% for source files.
     SrcErls = rebar_utils:find_files("src", ".*\\.erl\$"),
+
+    %% If it is not the first time rebar eunit is executed, there will be source
+    %% files already present in ?EUNIT_DIR. Since some SCMs (like Perforce) set
+    %% the source files as being read only (unless they are checked out), we
+    %% need to be sure that the files already present in ?EUNIT_DIR are writable
+    %% before doing the copy. This is done here by removing any file that was
+    %% already present before calling rebar_file_utils:cp_r.
+
+    %% Get the full path to a file that was previously copied in ?EUNIT_DIR
+    ToCleanUp = fun(F, Acc) ->
+        F2 = filename:basename(F),
+        F3 = filename:join([?EUNIT_DIR, F2]),
+        case filelib:is_regular(F3) of
+           true -> [F3|Acc];
+           false -> Acc
+        end
+    end,
+
+    ok = rebar_file_utils:delete_each(lists:foldl(ToCleanUp, [], TestErls)),
+    ok = rebar_file_utils:delete_each(lists:foldl(ToCleanUp, [], SrcErls)),
+
     ok = rebar_file_utils:cp_r(SrcErls ++ TestErls, ?EUNIT_DIR),
 
     %% Compile erlang code to ?EUNIT_DIR, using a tweaked config
