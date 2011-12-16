@@ -256,7 +256,7 @@ overlay                              Run reltool overlays only
 
 generate-upgrade  previous_release=path  Build an upgrade package
 
-generate-appups   previous_release=path Generate appup files
+generate-appups   previous_release=path  Generate appup files
 
 eunit       [suite=foo]              Run eunit [test/foo_tests.erl] tests
 ct          [suite=] [case=]         Run common_test suites in ./test
