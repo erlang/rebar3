@@ -115,23 +115,30 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
             %% to process this dir.
             {ok, AvailModuleSets} = application:get_env(rebar, modules),
             ModuleSet = choose_module_set(AvailModuleSets, Dir),
-            {_DirModules, ModuleSetFile} = ModuleSet,
+            maybe_process_dir(ModuleSet, Config, CurrentCodePath,
+                              Dir, Command, DirSet)
+    end.
 
-            case lists:reverse(ModuleSetFile) of
-                "ppa." ++ _ ->
-                    %% .app file
-                    maybe_process_dir0(ModuleSetFile, ModuleSet, Config,
-                                       CurrentCodePath, Dir,
-                                       Command, DirSet);
-                "crs.ppa." ++ _ ->
-                    %% .app.src file
-                    maybe_process_dir0(ModuleSetFile, ModuleSet, Config,
-                                       CurrentCodePath, Dir,
-                                       Command, DirSet);
-                _ ->
-                    process_dir0(Dir, Command, DirSet, Config,
-                                 CurrentCodePath, ModuleSet)
-            end
+maybe_process_dir({[], undefined}=ModuleSet, Config, CurrentCodePath,
+                  Dir, Command, DirSet) ->
+    process_dir0(Dir, Command, DirSet, Config, CurrentCodePath, ModuleSet);
+maybe_process_dir({_, ModuleSetFile}=ModuleSet, Config, CurrentCodePath,
+                  Dir, Command, DirSet) ->
+    case lists:reverse(ModuleSetFile) of
+        "ppa." ++ _ ->
+            %% .app file
+            maybe_process_dir0(ModuleSetFile, ModuleSet,
+                               Config, CurrentCodePath, Dir,
+                               Command, DirSet);
+        "crs.ppa." ++ _ ->
+            %% .app.src file
+            maybe_process_dir0(ModuleSetFile, ModuleSet,
+                               Config, CurrentCodePath, Dir,
+                               Command, DirSet);
+        _ ->
+            %% not an app dir, no need to consider apps=/skip_apps=
+            process_dir0(Dir, Command, DirSet, Config,
+                         CurrentCodePath, ModuleSet)
     end.
 
 maybe_process_dir0(AppFile, ModuleSet, Config, CurrentCodePath,
