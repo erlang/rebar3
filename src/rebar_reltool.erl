@@ -211,7 +211,7 @@ run_reltool(Server, _Config, ReltoolConfig) ->
                            [Reason])
             end,
 
-            {BootRelName, BootRelVsn} = 
+            {BootRelName, BootRelVsn} =
                 rebar_rel_utils:get_reltool_release_info(ReltoolConfig),
 
             ok = create_RELEASES(TargetDir, BootRelName, BootRelVsn),
