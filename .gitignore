@@ -6,3 +6,5 @@ rebar
 rt.work
 .hgignore
 .eunit
+rebar.cmd
+rebar.ps1

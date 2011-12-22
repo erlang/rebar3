@@ -79,10 +79,14 @@ main(Args) ->
             halt(1)
     end,
 
-    %% Finally, update executable perms for our script
+    %% Finally, update executable perms for our script on *nix,
+    %%  or write out script files on win32.
     case os:type() of
         {unix,_} ->
             [] = os:cmd("chmod u+x rebar"),
+            ok;
+        {win32,_} ->
+            write_windows_scripts(),
             ok;
         _ ->
             ok
@@ -126,3 +130,18 @@ vcs_info([{Id, Dir, Cmd} | Rest]) ->
         false ->
             vcs_info(Rest)
     end.
+
+write_windows_scripts() ->
+    PowershellScript=
+        "$basedir = Split-Path -Parent $MyInvocation.MyCommand.Path\r\n"
+        "$rebar = Join-Path $basedir \"rebar\"\r\n"
+        "escript.exe $rebar $args\r\n",
+    CmdScript=
+        "@echo off\r\n"
+        "setlocal\r\n"
+        "set rebarscript=%~f0\r\n"
+        "escript.exe \"%rebarscript:.bat=%i\" %*\r\n",
+    file:write_file("rebar.cmd", CmdScript),
+    UTF16BE = {utf16, big},
+    file:write_file("rebar.ps1", [unicode:encoding_to_bom(UTF16BE),
+            unicode:characters_to_binary(PowershellScript, utf8, UTF16BE)]).
