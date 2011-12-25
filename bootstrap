@@ -141,7 +141,9 @@ write_windows_scripts() ->
         "setlocal\r\n"
         "set rebarscript=%~f0\r\n"
         "escript.exe \"%rebarscript:.bat=%i\" %*\r\n",
-    file:write_file("rebar.cmd", CmdScript),
+    ok = file:write_file("rebar.cmd", CmdScript),
     UTF16BE = {utf16, big},
-    file:write_file("rebar.ps1", [unicode:encoding_to_bom(UTF16BE),
-            unicode:characters_to_binary(PowershellScript, utf8, UTF16BE)]).
+    ok = file:write_file("rebar.ps1",
+                         [unicode:encoding_to_bom(UTF16BE),
+                          unicode:characters_to_binary(PowershellScript,
+                                                       utf8, UTF16BE)]).
