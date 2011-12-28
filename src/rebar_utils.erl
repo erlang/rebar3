@@ -43,8 +43,8 @@
          prop_check/3,
          expand_code_path/0,
          deprecated/4, deprecated/5,
-         expand_env_variable/3
-        ]).
+         expand_env_variable/3,
+         vcs_vsn/2]).
 
 -include("rebar.hrl").
 
@@ -199,6 +199,39 @@ expand_env_variable(InStr, VarName, RawVarValue) ->
             re:replace(InStr, RegEx, [VarValue, "\\2"], ReOpts)
     end.
 
+vcs_vsn(Vcs, Dir) ->
+    case vcs_vsn_cmd(Vcs) of
+        {unknown, VsnString} ->
+            ?DEBUG("vcs_vsn: Unknown VCS atom in vsn field: ~p\n", [Vcs]),
+            VsnString;
+        {cmd, CmdString} ->
+            vcs_vsn_invoke(CmdString, Dir);
+        Cmd ->
+            %% If there is a valid VCS directory in the application directory,
+            %% use that version info
+            Extension = lists:concat([".", Vcs]),
+            case filelib:is_dir(filename:join(Dir, Extension)) of
+                true ->
+                    ?DEBUG("vcs_vsn: Primary vcs used for ~s\n", [Dir]),
+                    vcs_vsn_invoke(Cmd, Dir);
+                false ->
+                    %% No VCS directory found for the app. Depending on source
+                    %% tree structure, there may be one higher up, but that can
+                    %% yield unexpected results when used with deps. So, we
+                    %% fallback to searching for a priv/vsn.Vcs file.
+                    VsnFile = filename:join([Dir, "priv", "vsn" ++ Extension]),
+                    case file:read_file(VsnFile) of
+                        {ok, VsnBin} ->
+                            ?DEBUG("vcs_vsn: Read ~s from priv/vsn.~p\n",
+                                   [VsnBin, Vcs]),
+                            string:strip(binary_to_list(VsnBin), right, $\n);
+                        {error, enoent} ->
+                            ?DEBUG("vcs_vsn: Fallback to vcs for ~s\n", [Dir]),
+                            vcs_vsn_invoke(Cmd, Dir)
+                    end
+            end
+    end.
+
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
@@ -299,3 +332,25 @@ deprecated(Key, Old, New, When) ->
         "in favor of '~p'.~n"
         "'~p' will be removed ~s.~n~n">>,
       [Key, Old, New, Old, When]).
+
+vcs_vsn_cmd(git) ->
+    %% Explicitly git-describe a committish to accommodate for projects
+    %% in subdirs which don't have a GIT_DIR. In that case we will
+    %% get a description of the last commit that touched the subdir.
+    case os:type() of
+        {win32,nt} ->
+            "FOR /F \"usebackq tokens=* delims=\" %i in "
+            "(`git log -n 1 \"--pretty=format:%h\" .`) do "
+            "@git describe --always --tags %i";
+        _ ->
+            "git describe --always --tags `git log -n 1 --pretty=format:%h .`"
+    end;
+vcs_vsn_cmd(hg)  -> "hg identify -i";
+vcs_vsn_cmd(bzr) -> "bzr revno";
+vcs_vsn_cmd(svn) -> "svnversion";
+vcs_vsn_cmd({cmd, _Cmd}=Custom) -> Custom;
+vcs_vsn_cmd(Version) -> {unknown, Version}.
+
+vcs_vsn_invoke(Cmd, Dir) ->
+    {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),
+    string:strip(VsnString, right, $\n).
