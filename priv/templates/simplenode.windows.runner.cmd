@@ -31,7 +31,7 @@
 @goto :EOF
 
 :install
-@%erts_bin%\erlsrv.exe add %service_name% -c "Erlang node %node_name% in %node_root%" -w %node_root% -m %node_root%\bin\start_erl.cmd -args " ++ %node_name% ++ %node_root%" -stopaction "init:stop()."
+@%erts_bin%\erlsrv.exe add %service_name% -c "Erlang node %node_name% in %node_root%" -sname %node_name% -w %node_root% -m %node_root%\bin\start_erl.cmd -args " ++ %node_name% ++ %node_root%" -stopaction "init:stop()."
 @goto :EOF
 
 :uninstall
