@@ -64,7 +64,7 @@
     {ok, _} = boot_files(TargetDir, NewVer, NewName),
 
     %% Extract upgrade and tar it back up with changes
-    make_tar(NameVer),
+    make_tar(NameVer, NewVer, NewName),
 
     %% Clean up files that systools created
     ok = cleanup(NameVer),
@@ -149,9 +149,14 @@ boot_files(TargetDir, Ver, Name) ->
     ok = file:make_dir(filename:join([".", ?TMP])),
     ok = file:make_dir(filename:join([".", ?TMP, "releases"])),
     ok = file:make_dir(filename:join([".", ?TMP, "releases", Ver])),
-    ok = file:make_symlink(
-           filename:join(["start.boot"]),
-           filename:join([".", ?TMP, "releases", Ver, Name ++ ".boot"])),
+    case os:type() of
+        {win32,_} ->
+            ok;
+        _ ->
+            ok = file:make_symlink(
+                filename:join(["start.boot"]),
+                filename:join([".", ?TMP, "releases", Ver, Name ++ ".boot"]))
+    end,
     {ok, _} =
         file:copy(
           filename:join([TargetDir, "releases", Ver, "start_clean.boot"]),
@@ -165,13 +170,20 @@ boot_files(TargetDir, Ver, Name) ->
                 filename:join([TargetDir, "releases", Ver, "vm.args"]),
                 filename:join([".", ?TMP, "releases", Ver, "vm.args"])).
 
-make_tar(NameVer) ->
+make_tar(NameVer, NewVer, NewName) ->
     Filename = NameVer ++ ".tar.gz",
     {ok, Cwd} = file:get_cwd(),
     Absname = filename:join([Cwd, Filename]),
     ok = file:set_cwd(?TMP),
     ok = erl_tar:extract(Absname, [compressed]),
     ok = file:delete(Absname),
+    case os:type() of
+        {win32,_} ->
+            {ok, _} = file:copy(
+                filename:join([".", "releases", NewVer, "start.boot"]),
+                filename:join([".", "releases", NewVer, NewName ++ ".boot"]));
+        _ -> ok
+    end,
     {ok, Tar} = erl_tar:open(Absname, [write, compressed]),
     ok = erl_tar:add(Tar, "lib", []),
     ok = erl_tar:add(Tar, "releases", []),
