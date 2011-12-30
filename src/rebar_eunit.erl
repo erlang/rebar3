@@ -477,7 +477,11 @@ kill_extras(Pids) ->
     %% This list may require changes as OTP versions and/or
     %% rebar use cases change.
     KeepProcs = [cover_server, eunit_server,
-                 eqc, eqc_license, eqc_locked],
+                 eqc, eqc_license, eqc_locked,
+                 %% inet_gethost_native is started on demand, when
+                 %% doing name lookups. It is under kernel_sup, under
+                 %% a supervisor_bridge.
+                 inet_gethost_native],
     Killed = [begin
                   Info = case erlang:process_info(Pid) of
                              undefined -> [];
