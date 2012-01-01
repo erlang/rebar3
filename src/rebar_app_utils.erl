@@ -175,27 +175,7 @@ is_skipped_app(ThisApp, TargetApps) ->
     end.
 
 get_apps() ->
-    get_global_cs_opt(app, apps).
+    rebar_utils:get_deprecated_global(app, apps, "soon").
 
 get_skip_apps() ->
-    get_global_cs_opt(skip_app, skip_apps).
-
-get_global_cs_opt(Old, New) ->
-    Apps = rebar_config:get_global(New, undefined),
-    case rebar_config:get_global(Old, undefined) of
-        undefined ->
-            case Apps of
-                undefined ->
-                    undefined;
-                Apps ->
-                    Apps
-            end;
-        App ->
-            rebar_utils:deprecated(Old, Old, New, "soon"),
-            case Apps of
-                undefined ->
-                    App;
-                Apps ->
-                    string:join([App, Apps], ",")
-            end
-    end.
+    rebar_utils:get_deprecated_global(skip_app, skip_apps, "soon").

@@ -44,7 +44,8 @@
          expand_code_path/0,
          deprecated/4, deprecated/5,
          expand_env_variable/3,
-         vcs_vsn/2]).
+         vcs_vsn/2,
+         get_deprecated_global/3]).
 
 -include("rebar.hrl").
 
@@ -230,6 +231,20 @@ vcs_vsn(Vcs, Dir) ->
                             vcs_vsn_invoke(Cmd, Dir)
                     end
             end
+    end.
+
+get_deprecated_global(OldOpt, NewOpt, When) ->
+    case rebar_config:get_global(OldOpt, undefined) of
+        undefined ->
+            case rebar_config:get_global(NewOpt, undefined) of
+                undefined ->
+                    undefined;
+                New ->
+                    New
+            end;
+        Old ->
+            deprecated(OldOpt, OldOpt, NewOpt, When),
+            Old
     end.
 
 %% ====================================================================
