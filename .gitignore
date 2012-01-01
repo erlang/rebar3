@@ -6,5 +6,7 @@ rebar
 rt.work
 .hgignore
 .eunit
+dialyzer_warnings
+xref_warnings
 rebar.cmd
 rebar.ps1

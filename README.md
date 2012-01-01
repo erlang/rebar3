@@ -14,8 +14,9 @@ locations (git, hg, etc).
 Building
 --------
 
-Information on building and installing Erlang/OTP can be found
-in the `INSTALL.md` document.
+Information on building and installing [Erlang/OTP](http://www.erlang.org)
+can be found [here](https://github.com/erlang/otp/wiki/Installation)
+([more info](https://github.com/erlang/otp/blob/master/INSTALL.md)).
 
 ### Dependencies
 
@@ -28,7 +29,9 @@ Should you want to clone the rebar repository, you will also require git.
 
 Clone the git repository:
 
-    $ git clone git://github.com/basho/rebar.git
+```sh
+$ git clone git://github.com/basho/rebar.git
+```
 
 #### Building rebar
 
@@ -69,7 +72,8 @@ Do not mix spaces and tabs.
 Do not introduce lines longer than 80 characters.
 
 [erlang-mode (emacs)](http://www.erlang.org/doc/man/erlang.el.html) indentation is preferred.
-vi-only users are encouraged to give [Vim emulation](http://emacswiki.org/emacs/Evil) ([more info](https://gitorious.org/evil/pages/Home)) a try.
+vi-only users are encouraged to give [Vim emulation](http://emacswiki.org/emacs/Evil)
+([more info](https://gitorious.org/evil/pages/Home)) a try.
 
 Writing Commit Messages
 -----------------------
@@ -106,18 +110,32 @@ Longer description (wrap at 72 characters)
 Dialyzer and Tidier
 -------------------
 
-Before you submit a patch check for discrepancies with
-[Dialyzer](http://www.erlang.org/doc/man/dialyzer.html):
+Before you submit a patch check for
+[xref](http://www.erlang.org/doc/man/xref.html) and
+[Dialyzer](http://www.erlang.org/doc/man/dialyzer.html)
+warnings.
+
+A successful run of ``make check`` looks like:
 
 ```sh
 $ make check
+Recompile: src/rebar_core
+==> rebar (compile)
+Command 'debug' not understood or not applicable
+Congratulations! You now have a self-contained script called "rebar" in
+your current working directory. Place this script anywhere in your path
+and you can use rebar to build OTP-compliant apps.
+make: [xref_warnings] Error 1 (ignored)
+make: [dialyzer_warnings] Error 2 (ignored)
 ```
 
-The following discrepancies are known and safe to ignore:
-
-```
-rebar_utils.erl:147: Call to missing or unexported function escript:foldl/3
-```
+[xref](http://www.erlang.org/doc/man/xref.html) and
+[Dialyzer](http://www.erlang.org/doc/man/dialyzer.html) warnings are compared
+against a set of safe-to-ignore warnings  
+found in
+[dialyzer_reference](https://raw.github.com/tuncer/rebar/maint/dialyzer_reference)
+and
+[xref_reference](https://raw.github.com/tuncer/rebar/maint/xref_reference).
 
 It is **strongly recommended** to check the code with
 [Tidier](http://tidier.softlab.ntua.gr:20000/tidier/getstarted).  
