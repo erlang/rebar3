@@ -35,22 +35,16 @@
 
 %% == Port Compiler ==
 
-%% List of filenames or wildcards to be compiled. May also contain a tuple
-%% consisting of a regular expression to be applied against the system
-%% architecture and a list of filenames or wildcards to include should the
-%% expression pass. Default is `"c_src/*.c"'
-{port_sources, ["c_src/*.c", {"R14", ["c_src/*.c"]}]}.
-
 %% Port compilation environment variables. See rebar_port_compiler.erl for
 %% more info. Default is `[]'
 {port_envs, []}.
 
-%% Custom name of the port driver .so file. Defaults to `<Application>_drv.so'.
-{so_name, "driver.so"}.
-
-%% so_specs - useful for building multiple *.so files
-%%            from one or more object files
-{so_specs, [{"priv/so_name.so", ["c_src/object_file_name.o"]}]}.
+%% port_specs
+%% List of filenames or wildcards to be compiled. May also contain a tuple
+%% consisting of a regular expression to be applied against the system
+%% architecture as a filter.
+{port_specs, [{"priv/so_name.so", ["c_src/*.c"]},
+              {"linux", "priv/hello_linux", ["c_src/hello_linux.c"]]}.
 
 %% == LFE Compiler ==
 

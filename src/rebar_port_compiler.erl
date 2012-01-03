@@ -38,21 +38,14 @@
 
 %% Supported configuration variables:
 %%
-%% * port_sources - Erlang list of filenames or wildcards to be compiled. May
-%%                  also contain a tuple consisting of a regular expression to
-%%                  be applied against the system architecture and a list of
-%%                  filenames or wildcards to include should the expression
-%%                  pass.
-%%
-%% * so_specs  - Erlang list of tuples of the form
-%%               {"priv/so_name.so", ["c_src/object_file_name.o"]}
-%%               useful for building multiple *.so files.
+%% * port_specs - Erlang list of tuples of the forms
+%%                {arch_regex(), "priv/foo.so", ["c_src/foo.c"]}
+%%                {"priv/foo", ["c_src/foo.c"]}
 %%
 %% * port_envs - Erlang list of key/value pairs which will control
 %%               the environment when running the compiler and linker.
 %%
-%%               By default, the following variables
-%%               are defined:
+%%               By default, the following variables are defined:
 %%               CC       - C compiler
 %%               CXX      - C++ compiler
 %%               CFLAGS   - C compiler
@@ -60,12 +53,17 @@
 %%               LDFLAGS  - Link flags
 %%               ERL_CFLAGS  - default -I paths for erts and ei
 %%               ERL_LDFLAGS - default -L and -lerl_interface -lei
-%%               DRV_CFLAGS  - flags that will be used for compiling the driver
-%%               DRV_LDFLAGS - flags that will be used for linking the driver
+%%               DRV_CFLAGS  - flags that will be used for compiling
+%%               DRV_LDFLAGS - flags that will be used for linking
+%%               EXE_CFLAGS  - flags that will be used for compiling
+%%               EXE_LDFLAGS - flags that will be used for linking
 %%               ERL_EI_LIBDIR - ei library directory
-%%               CXX_TEMPLATE  - C++ command template
-%%               CC_TEMPLATE   - C command template
-%%               LINK_TEMPLATE - Linker command template
+%%               DRV_CXX_TEMPLATE  - C++ command template
+%%               DRV_CC_TEMPLATE   - C command template
+%%               DRV_LINK_TEMPLATE - Linker command template
+%%               EXE_CXX_TEMPLATE  - C++ command template
+%%               EXE_CC_TEMPLATE   - C command template
+%%               EXE_LINK_TEMPLATE - Linker command template
 %%               PORT_IN_FILES - contains a space separated list of input
 %%                    file(s), (used in command template)
 %%               PORT_OUT_FILE - contains the output filename (used in
@@ -78,8 +76,8 @@
 %%               {port_envs, [{"CFLAGS", "$CFLAGS -MyOtherOptions"}]}
 %%
 %%               It is also possible to specify platform specific options
-%%               by specifying a tripletwhere the first string is a regex
-%%               that is checked against erlang's system architecture string.
+%%               by specifying a triplet where the first string is a regex
+%%               that is checked against Erlang's system architecture string.
 %%               e.g. to specify a CFLAG that only applies to x86_64 on linux
 %%               do:
 %%
@@ -88,64 +86,75 @@
 %%
 
 compile(Config, AppFile) ->
-    %% Compose list of sources from config file -- defaults to c_src/*.c
-    Sources = expand_sources(rebar_config:get_list(Config, port_sources,
-                                                   ["c_src/*.c"]), []),
-    case Sources of
+    rebar_utils:deprecated(port_sources, port_specs, Config, "soon"),
+    rebar_utils:deprecated(so_name, port_specs, Config, "soon"),
+    rebar_utils:deprecated(so_specs, port_specs, Config, "soon"),
+
+    SourceFiles = get_sources(Config),
+
+    case SourceFiles of
         [] ->
             ok;
         _ ->
             Env = setup_env(Config),
 
             %% Compile each of the sources
-            {NewBins, ExistingBins} = compile_each(Sources, Config, Env,
+            {NewBins, ExistingBins} = compile_each(SourceFiles, Config, Env,
                                                    [], []),
 
-            %% Construct the driver name and make sure priv/ exists
-            SoSpecs = so_specs(Config, AppFile, NewBins ++ ExistingBins),
-            ?INFO("Using specs ~p\n", [SoSpecs]),
-            lists:foreach(fun({SoName,_}) ->
-                                  ok = filelib:ensure_dir(SoName)
-                          end, SoSpecs),
+            %% Construct the target filename and make sure that the
+            %% target directory exists
+            Specs = port_specs(Config, AppFile, NewBins ++ ExistingBins),
+            ?INFO("Using specs ~p\n", [Specs]),
+            lists:foreach(fun({_, Target,_}) ->
+                                  ok = filelib:ensure_dir(Target);
+                             ({Target, _}) ->
+                                  ok = filelib:ensure_dir(Target)
+                          end, Specs),
 
-            %% Only relink if necessary, given the SoName
+            %% Only relink if necessary, given the Target
             %% and list of new binaries
             lists:foreach(
-              fun({SoName,Bins}) ->
+              fun({Target, Sources}) ->
+                      Bins = lists:map(fun source_to_bin/1, Sources),
                       AllBins = [sets:from_list(Bins),
                                  sets:from_list(NewBins)],
                       Intersection = sets:intersection(AllBins),
-                      case needs_link(SoName, sets:to_list(Intersection)) of
+                      case needs_link(Target, sets:to_list(Intersection)) of
                           true ->
-                              Cmd = expand_command("LINK_TEMPLATE", Env,
+                              LinkTemplate = select_link_template(Target),
+                              Cmd = expand_command(LinkTemplate, Env,
                                                    string:join(Bins, " "),
-                                                   SoName),
+                                                   Target),
                               rebar_utils:sh(Cmd, [{env, Env}]);
                           false ->
-                              ?INFO("Skipping relink of ~s\n", [SoName]),
+                              ?INFO("Skipping relink of ~s\n", [Target]),
                               ok
                       end
-              end, SoSpecs)
+              end, Specs)
     end.
 
 clean(Config, AppFile) ->
     %% Build a list of sources so as to derive all the bins we generated
-    Sources = expand_sources(rebar_config:get_list(Config, port_sources,
-                                                   ["c_src/*.c"]), []),
+    Sources = get_sources(Config),
     rebar_file_utils:delete_each([source_to_bin(S) || S <- Sources]),
 
-    %% Delete the .so file
-    ExtractSoName = fun({SoName, _}) -> SoName end,
-    rebar_file_utils:delete_each([ExtractSoName(S)
-                                  || S <- so_specs(Config, AppFile,
-                                                   expand_objects(Sources))]).
+    %% Delete the target file
+    ExtractTarget = fun({_, Target, _}) ->
+                            Target;
+                       ({Target, _}) ->
+                            Target
+                    end,
+    rebar_file_utils:delete_each([ExtractTarget(S)
+                                  || S <- port_specs(Config, AppFile,
+                                                     expand_objects(Sources))]).
 
 setup_env(Config) ->
     %% Extract environment values from the config (if specified) and
     %% merge with the default for this operating system. This enables
     %% max flexibility for users.
     DefaultEnvs  = filter_envs(default_env(), []),
-    PortEnvs = rebar_config:get_list(Config, port_envs, []),
+    PortEnvs = port_envs(Config),
     OverrideEnvs = global_defines() ++ filter_envs(PortEnvs, []),
     RawEnv = apply_defaults(os_env(), DefaultEnvs) ++ OverrideEnvs,
     expand_vars_loop(merge_each_var(RawEnv, [])).
@@ -159,6 +168,36 @@ global_defines() ->
     Flags = string:join(["-D" ++ D || D <- Defines], " "),
     [{"ERL_CFLAGS", "$ERL_CFLAGS " ++ Flags}].
 
+get_sources(Config) ->
+    case rebar_config:get_list(Config, port_specs, []) of
+        [] ->
+            %% TODO: DEPRECATED: remove
+            expand_sources(rebar_config:get_list(Config, port_sources,
+                                                 ["c_src/*.c"]), []);
+        PortSpecs ->
+            expand_port_specs(PortSpecs)
+    end.
+
+expand_port_specs(Specs) ->
+    lists:append(lists:map(fun({_, Target, FileSpecs}) ->
+                                   expand_file_specs(Target, FileSpecs);
+                              ({Target, FileSpecs}) ->
+                                   expand_file_specs(Target, FileSpecs)
+                           end, filter_port_specs(Specs))).
+
+expand_file_specs(Target, FileSpecs) ->
+    Sources = lists:append([filelib:wildcard(FS) || FS <- FileSpecs]),
+    [{Target, Src} || Src <- Sources].
+
+filter_port_specs(Specs) ->
+    lists:filter(fun({ArchRegex, _, _}) ->
+                         rebar_utils:is_arch(ArchRegex);
+                    ({_, _}) ->
+                         true
+                 end, Specs).
+
+
+%% TODO: DEPRECATED: remove
 expand_sources([], Acc) ->
     Acc;
 expand_sources([{ArchRegex, Spec} | Rest], Acc) ->
@@ -174,33 +213,34 @@ expand_sources([Spec | Rest], Acc) ->
     expand_sources(Rest, Acc2).
 
 expand_objects(Sources) ->
-    [filename:join([filename:dirname(F), filename:basename(F) ++ ".o"])
-     || F <- Sources].
+    [expand_object(".o", Src) || Src <- Sources].
+
+expand_object(Ext, {_Target, Source}) ->
+    expand_object(Ext, Source);
+expand_object(Ext, Source) ->
+    filename:join(filename:dirname(Source), filename:basename(Source) ++ Ext).
 
 compile_each([], _Config, _Env, NewBins, ExistingBins) ->
     {lists:reverse(NewBins), lists:reverse(ExistingBins)};
-compile_each([Source | Rest], Config, Env, NewBins, ExistingBins) ->
+compile_each([RawSource | Rest], Config, Env, NewBins, ExistingBins) ->
+    %% TODO: DEPRECATED: remove
+    {Type, Source} = source_type(RawSource),
     Ext = filename:extension(Source),
     Bin = filename:rootname(Source, Ext) ++ ".o",
     case needs_compile(Source, Bin) of
         true ->
             ?CONSOLE("Compiling ~s\n", [Source]),
-            case compiler(Ext) of
-                "$CC" ->
-                    rebar_utils:sh(expand_command("CC_TEMPLATE", Env,
-                                                  Source, Bin),
-                                   [{env, Env}]);
-                "$CXX" ->
-                    rebar_utils:sh(expand_command("CXX_TEMPLATE", Env,
-                                                  Source, Bin),
-                                   [{env, Env}])
-            end,
+            Template = select_compile_template(Type, compiler(Ext)),
+            rebar_utils:sh(expand_command(Template, Env, Source, Bin),
+                           [{env, Env}]),
             compile_each(Rest, Config, Env, [Bin | NewBins], ExistingBins);
-
         false ->
             ?INFO("Skipping ~s\n", [Source]),
             compile_each(Rest, Config, Env, NewBins, [Bin | ExistingBins])
     end.
+
+source_type({Target, Source}) -> {target_type(Target), Source};
+source_type(Source)           -> {drv, Source}.
 
 needs_compile(Source, Bin) ->
     %% TODO: Generate depends using gcc -MM so we can also
@@ -342,6 +382,33 @@ is_expandable(InStr) ->
         nomatch -> false
     end.
 
+port_envs(Config) ->
+    PortEnvs = rebar_config:get_list(Config, port_envs, []),
+    %% TODO: remove migration of deprecated port_envs (DRV_-/EXE_-less vars)
+    %%       when the deprecation grace period ends
+    WarnAndConvertVar = fun(Var) ->
+                                New = "DRV_" ++ Var,
+                                rebar_utils:deprecated(Var, New, "soon"),
+                                New
+                        end,
+    ConvertVar = fun(Var="CXX_TEMPLATE") -> WarnAndConvertVar(Var);
+                    (Var="CC_TEMPLATE")  -> WarnAndConvertVar(Var);
+                    (Var="LINK_TEMPLATE") -> WarnAndConvertVar(Var);
+                    (Var) -> Var
+                 end,
+    %% Also warn about references to deprecated vars? omitted for
+    %% performance reasons.
+    ReplaceVars = fun(Val) ->
+                          re:replace(Val, "\\$(CXX|CC|LINK)(_TEMPLATE)",
+                                     "DRV_\\1\\2", [{return,list}, global])
+                  end,
+    Convert = fun({ArchRegex, Var, Val}) ->
+                      {ArchRegex, ConvertVar(Var), ReplaceVars(Val)};
+                 ({Var, Val}) ->
+                      {ConvertVar(Var), ReplaceVars(Val)}
+              end,
+    [Convert(Env) || Env <- PortEnvs].
+
 %%
 %% Filter a list of env vars such that only those which match the provided
 %% architecture regex (or do not have a regex) are returned.
@@ -368,6 +435,30 @@ os_env() ->
     %% Drop variables without a name (win32)
     [T1 || {K, _V} = T1 <- Os, K =/= []].
 
+select_compile_template(drv, Compiler) ->
+    select_compile_drv_template(Compiler);
+select_compile_template(exe, Compiler) ->
+    select_compile_exe_template(Compiler).
+
+select_compile_drv_template("$CC")  -> "DRV_CC_TEMPLATE";
+select_compile_drv_template("$CXX") -> "DRV_CXX_TEMPLATE".
+
+select_compile_exe_template("$CC")  -> "EXE_CC_TEMPLATE";
+select_compile_exe_template("$CXX") -> "EXE_CXX_TEMPLATE".
+
+select_link_template(Target) ->
+    case target_type(Target) of
+        drv -> "DRV_LINK_TEMPLATE";
+        exe -> "EXE_LINK_TEMPLATE"
+    end.
+
+target_type(Target) -> target_type1(filename:extension(Target)).
+
+target_type1(".so")  -> drv;
+target_type1(".dll") -> drv;
+target_type1("")     -> exe;
+target_type1(".exe") -> exe.
+
 erl_interface_dir(Subdir) ->
     case code:lib_dir(erl_interface, Subdir) of
         {error, bad_name} ->
@@ -378,25 +469,35 @@ erl_interface_dir(Subdir) ->
 
 default_env() ->
     [
-     {"CXX_TEMPLATE",
-      "$CXX -c $CXXFLAGS $DRV_CFLAGS $PORT_IN_FILES -o $PORT_OUT_FILE"},
-     {"CC_TEMPLATE",
-      "$CC -c $CFLAGS $DRV_CFLAGS $PORT_IN_FILES -o $PORT_OUT_FILE"},
-     {"LINK_TEMPLATE",
-      "$CC $PORT_IN_FILES $LDFLAGS $DRV_LDFLAGS -o $PORT_OUT_FILE"},
-     {"CC", "cc"},
+     {"CC" , "cc"},
      {"CXX", "c++"},
+     {"DRV_CXX_TEMPLATE",
+      "$CXX -c $CXXFLAGS $DRV_CFLAGS $PORT_IN_FILES -o $PORT_OUT_FILE"},
+     {"DRV_CC_TEMPLATE",
+      "$CC -c $CFLAGS $DRV_CFLAGS $PORT_IN_FILES -o $PORT_OUT_FILE"},
+     {"DRV_LINK_TEMPLATE",
+      "$CC $PORT_IN_FILES $LDFLAGS $DRV_LDFLAGS -o $PORT_OUT_FILE"},
+     {"EXE_CXX_TEMPLATE",
+      "$CXX -c $CXXFLAGS $EXE_CFLAGS $PORT_IN_FILES -o $PORT_OUT_FILE"},
+     {"EXE_CC_TEMPLATE",
+      "$CC -c $CFLAGS $EXE_CFLAGS $PORT_IN_FILES -o $PORT_OUT_FILE"},
+     {"EXE_LINK_TEMPLATE",
+      "$CC $PORT_IN_FILES $LDFLAGS $EXE_LDFLAGS -o $PORT_OUT_FILE"},
+     {"DRV_CFLAGS" , "-g -Wall -fPIC $ERL_CFLAGS"},
+     {"DRV_LDFLAGS", "-shared $ERL_LDFLAGS"},
+     {"EXE_CFLAGS" , "-g -Wall -fPIC $ERL_CFLAGS"},
+     {"EXE_LDFLAGS", "$ERL_LDFLAGS"},
+
      {"ERL_CFLAGS", lists:concat([" -I", erl_interface_dir(include),
                                   " -I", filename:join(erts_dir(), "include"),
                                   " "])},
-     {"ERL_LDFLAGS", " -L$ERL_EI_LIBDIR -lerl_interface -lei"},
-     {"DRV_CFLAGS", "-g -Wall -fPIC $ERL_CFLAGS"},
-     {"DRV_LDFLAGS", "-shared $ERL_LDFLAGS"},
      {"ERL_EI_LIBDIR", erl_interface_dir(lib)},
+     {"ERL_LDFLAGS"  , " -L$ERL_EI_LIBDIR -lerl_interface -lei"},
+     {"ERLANG_ARCH"  , rebar_utils:wordsize()},
+     {"ERLANG_TARGET", rebar_utils:get_arch()},
+
      {"darwin", "DRV_LDFLAGS",
       "-bundle -flat_namespace -undefined suppress $ERL_LDFLAGS"},
-     {"ERLANG_ARCH", rebar_utils:wordsize()},
-     {"ERLANG_TARGET", rebar_utils:get_arch()},
 
      %% Solaris specific flags
      {"solaris.*-64$", "CFLAGS", "-D_REENTRANT -m64 $CFLAGS"},
@@ -419,30 +520,54 @@ default_env() ->
      {"darwin11.*-32", "LDFLAGS", "-arch i386 $LDFLAGS"}
     ].
 
-
-
+source_to_bin({_Target, Source}) ->
+    source_to_bin(Source);
 source_to_bin(Source) ->
     Ext = filename:extension(Source),
     filename:rootname(Source, Ext) ++ ".o".
 
-so_specs(Config, AppFile, Bins) ->
-    Specs = make_so_specs(Config, AppFile, Bins),
+port_specs(Config, AppFile, Bins) ->
+    Specs = make_port_specs(Config, AppFile, Bins),
     case os:type() of
         {win32, nt} ->
-            [switch_so_to_dll(SoSpec) || SoSpec <- Specs];
+            [switch_to_dll_or_exe(Spec) || Spec <- Specs];
         _ ->
             Specs
     end.
 
-switch_so_to_dll(Orig = {Name, Spec}) ->
+switch_to_dll_or_exe(Orig = {Name, Spec}) ->
     case filename:extension(Name) of
         ".so" ->
             {filename:rootname(Name, ".so") ++ ".dll", Spec};
+        [] ->
+            {Name ++ ".exe", Spec};
         _ ->
             %% Not a .so; leave it
             Orig
     end.
 
+make_port_specs(Config, AppFile, Bins) ->
+    case rebar_config:get(Config, port_specs, undefined) of
+        undefined ->
+            %% TODO: DEPRECATED: remove
+            make_so_specs(Config, AppFile, Bins);
+        PortSpecs ->
+            %% filter based on ArchRegex
+            Specs0 = lists:filter(fun({ArchRegex, _Target, _Sources}) ->
+                                          rebar_utils:is_arch(ArchRegex);
+                                     (_) ->
+                                          true
+                                  end, PortSpecs),
+            %% TODO: DEPRECATED: remove support for non-port_specs syntax
+            %% drop ArchRegex from specs
+            lists:map(fun({_, Target, Sources}) ->
+                              {Target, Sources};
+                         (Spec) ->
+                              Spec
+                      end, Specs0)
+    end.
+
+%% DEPRECATED
 make_so_specs(Config, AppFile, Bins) ->
     case rebar_config:get(Config, so_specs, undefined) of
         undefined ->
