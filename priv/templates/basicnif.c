@@ -1,6 +1,6 @@
 #include "erl_nif.h"
 
-static ErlNifResourceType* {{module}}_RESOURCE;
+static ErlNifResourceType* {{module}}_RESOURCE = NULL;
 
 typedef struct
 {
@@ -50,6 +50,8 @@ static int on_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
                                                      flags, NULL);
     if (rt == NULL)
         return -1;
+
+    {{module}}_RESOURCE = rt;
 
     return 0;
 }
