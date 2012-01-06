@@ -234,17 +234,17 @@ vcs_vsn(Vcs, Dir) ->
     end.
 
 get_deprecated_global(OldOpt, NewOpt, When) ->
-    case rebar_config:get_global(OldOpt, undefined) of
+    case rebar_config:get_global(NewOpt, undefined) of
         undefined ->
-            case rebar_config:get_global(NewOpt, undefined) of
+            case rebar_config:get_global(OldOpt, undefined) of
                 undefined ->
                     undefined;
-                New ->
-                    New
+                Old ->
+                    deprecated(OldOpt, OldOpt, NewOpt, When),
+                    Old
             end;
-        Old ->
-            deprecated(OldOpt, OldOpt, NewOpt, When),
-            Old
+        New ->
+            New
     end.
 
 %% ====================================================================
