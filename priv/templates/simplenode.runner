@@ -149,6 +149,28 @@ case "$1" in
         exec $ERTS_PATH/to_erl $PIPE_DIR
         ;;
 
+    upgrade)
+        if [ -z "$2" ]; then
+            echo "Missing upgrade package argument"
+            echo "Usage: $SCRIPT upgrade {package base name}"
+            echo "NOTE {package base name} MUST NOT include the .tar.gz suffix"
+            exit 1
+        fi
+
+        # Make sure a node IS running
+        RES=`$NODETOOL ping`
+        ES=$?
+        if [ "$ES" -ne 0 ]; then
+            echo "Node is not running!"
+            exit $ES
+        fi
+
+        node_name=`echo $NAME_ARG | awk '{print $2}'`
+        erlang_cookie=`echo $COOKIE_ARG | awk '{print $2}'`
+
+        $ERTS_PATH/escript $RUNNER_BASE_DIR/bin/install_upgrade.escript $node_name $erlang_cookie $2
+        ;;
+
     console|console_clean)
         # .boot file typically just $SCRIPT (ie, the app name)
         # however, for debugging, sometimes start_clean.boot is useful:
@@ -204,7 +226,7 @@ case "$1" in
         exec $CMD -- ${1+"$@"}
         ;;
     *)
-        echo "Usage: $SCRIPT {start|foreground|stop|restart|reboot|ping|console|console_clean|attach}"
+        echo "Usage: $SCRIPT {start|foreground|stop|restart|reboot|ping|console|console_clean|attach|upgrade}"
         exit 1
         ;;
 esac
