@@ -88,37 +88,18 @@
 %%
 
 compile(Config, AppFile) ->
-    %% Allow the user to specify that dependent files get built first
-    FirstFiles = expand_sources(rebar_config:get(Config,
-                                                 port_first_files, []), []),
-
     %% Compose list of sources from config file -- defaults to c_src/*.c
     Sources = expand_sources(rebar_config:get_list(Config, port_sources,
                                                    ["c_src/*.c"]), []),
-    Env = setup_env(Config),
-
-    {FirstNewBins, FirstExistingBins} = case FirstFiles of
-                                            [] ->
-                                                {[], []};
-                                            _ ->
-                                            compile_each(FirstFiles, Config,
-                                                         Env, [], [])
-                                        end,
     case Sources of
         [] ->
             ok;
         _ ->
-
-            %% Remove first files from found files
-            RestFiles = [Source || Source <- Sources,
-                                   not lists:member(Source, FirstFiles)],
+            Env = setup_env(Config),
 
             %% Compile each of the sources
-            {NewBins, ExistingBins} = compile_each(RestFiles, Config, Env,
-                                                     [], []),
-
-            NewBins = FirstNewBins ++ NewBins,
-            ExistingBins = FirstExistingBins ++ ExistingBins,
+            {NewBins, ExistingBins} = compile_each(Sources, Config, Env,
+                                                   [], []),
 
             %% Construct the driver name and make sure priv/ exists
             SoSpecs = so_specs(Config, AppFile, NewBins ++ ExistingBins),

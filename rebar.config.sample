@@ -41,9 +41,6 @@
 %% expression pass. Default is `"c_src/*.c"'
 {port_sources, ["c_src/*.c", {"R14", ["c_src/*.c"]}]}.
 
-%% Port files to compile before the rest.
-{port_first_files, ["c_src/first.c", "c_src/second.c"]}.
-
 %% Port compilation environment variables. See rebar_port_compiler.erl for
 %% more info. Default is `[]'
 {port_envs, []}.
