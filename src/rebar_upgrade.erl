@@ -179,10 +179,13 @@ make_tar(NameVer, NewVer, NewName) ->
     ok = file:delete(Absname),
     case os:type() of
         {win32,_} ->
-            {ok, _} = file:copy(
-                filename:join([".", "releases", NewVer, "start.boot"]),
-                filename:join([".", "releases", NewVer, NewName ++ ".boot"]));
-        _ -> ok
+            {ok, _} =
+                file:copy(
+                  filename:join([".", "releases", NewVer, "start.boot"]),
+                  filename:join([".", "releases", NewVer, NewName ++ ".boot"])),
+            ok;
+        _ ->
+            ok
     end,
     {ok, Tar} = erl_tar:open(Absname, [write, compressed]),
     ok = erl_tar:add(Tar, "lib", []),
