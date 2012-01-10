@@ -42,7 +42,7 @@
          find_executable/1,
          prop_check/3,
          expand_code_path/0,
-         deprecated/4, deprecated/5,
+         deprecated/3, deprecated/4,
          expand_env_variable/3,
          vcs_vsn/2,
          get_deprecated_global/3]).
@@ -108,18 +108,6 @@ sh(Command0, Options0) ->
             Ok;
         {error, {_Rc, _Output}=Err} ->
             ErrorHandler(Command, Err)
-    end.
-
-%% We do the shell variable substitution ourselves on Windows and hope that the
-%% command doesn't use any other shell magic.
-patch_on_windows(Cmd, Env) ->
-    case os:type() of
-        {win32,nt} ->
-            "cmd /q /c " ++ lists:foldl(fun({Key, Value}, Acc) ->
-                                            expand_env_variable(Acc, Key, Value)
-                                        end, Cmd, Env);
-        _ ->
-            Cmd
     end.
 
 find_files(Dir, Regex) ->
@@ -240,16 +228,44 @@ get_deprecated_global(OldOpt, NewOpt, When) ->
                 undefined ->
                     undefined;
                 Old ->
-                    deprecated(OldOpt, OldOpt, NewOpt, When),
+                    deprecated(OldOpt, NewOpt, When),
                     Old
             end;
         New ->
             New
     end.
 
+deprecated(Old, New, Opts, When) ->
+    case lists:member(Old, Opts) of
+        true ->
+            deprecated(Old, New, When);
+        false ->
+            ok
+    end.
+
+deprecated(Old, New, When) ->
+    io:format(
+      <<"WARNING: deprecated ~p option used~n"
+        "Option '~p' has been deprecated~n"
+        "in favor of '~p'.~n"
+        "'~p' will be removed ~s.~n~n">>,
+      [Old, Old, New, Old, When]).
+
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
+
+%% We do the shell variable substitution ourselves on Windows and hope that the
+%% command doesn't use any other shell magic.
+patch_on_windows(Cmd, Env) ->
+    case os:type() of
+        {win32,nt} ->
+            "cmd /q /c " ++ lists:foldl(fun({Key, Value}, Acc) ->
+                                            expand_env_variable(Acc, Key, Value)
+                                        end, Cmd, Env);
+        _ ->
+            Cmd
+    end.
 
 expand_sh_flag(return_on_error) ->
     {error_handler,
@@ -331,22 +347,6 @@ emulate_escript_foldl(Fun, Acc, File) ->
         {error, _} = Error ->
             Error
     end.
-
-deprecated(Key, Old, New, Opts, When) ->
-    case lists:member(Old, Opts) of
-        true ->
-            deprecated(Key, Old, New, When);
-        false ->
-            ok
-    end.
-
-deprecated(Key, Old, New, When) ->
-    io:format(
-      <<"WARNING: deprecated ~p option used~n"
-        "Option '~p' has been deprecated~n"
-        "in favor of '~p'.~n"
-        "'~p' will be removed ~s.~n~n">>,
-      [Key, Old, New, Old, When]).
 
 vcs_vsn_cmd(git) ->
     %% Explicitly git-describe a committish to accommodate for projects
