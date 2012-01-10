@@ -140,7 +140,7 @@ write_windows_scripts() ->
         "@echo off\r\n"
         "setlocal\r\n"
         "set rebarscript=%~f0\r\n"
-        "escript.exe \"%rebarscript:.bat=%i\" %*\r\n",
+        "escript.exe \"%rebarscript:.cmd=%\" %*\r\n",
     ok = file:write_file("rebar.cmd", CmdScript),
     UTF16BE = {utf16, big},
     ok = file:write_file("rebar.ps1",
