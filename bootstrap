@@ -132,18 +132,9 @@ vcs_info([{Id, Dir, Cmd} | Rest]) ->
     end.
 
 write_windows_scripts() ->
-    PowershellScript=
-        "$basedir = Split-Path -Parent $MyInvocation.MyCommand.Path\r\n"
-        "$rebar = Join-Path $basedir \"rebar\"\r\n"
-        "escript.exe $rebar $args\r\n",
     CmdScript=
         "@echo off\r\n"
         "setlocal\r\n"
         "set rebarscript=%~f0\r\n"
         "escript.exe \"%rebarscript:.cmd=%\" %*\r\n",
-    ok = file:write_file("rebar.cmd", CmdScript),
-    UTF16BE = {utf16, big},
-    ok = file:write_file("rebar.ps1",
-                         [unicode:encoding_to_bom(UTF16BE),
-                          unicode:characters_to_binary(PowershellScript,
-                                                       utf8, UTF16BE)]).
+    ok = file:write_file("rebar.cmd", CmdScript).
