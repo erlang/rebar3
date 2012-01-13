@@ -201,7 +201,7 @@ update_deps_code_path([Dep | Rest]) ->
         {true, _} ->
             Dir = filename:join(Dep#dep.dir, "ebin"),
             ok = filelib:ensure_dir(filename:join(Dir, "dummy")),
-            ?DEBUG("Adding ~s to code path", [Dir]),
+            ?DEBUG("Adding ~s to code path~n", [Dir]),
             true = code:add_patha(Dir);
         {false, _} ->
             true
