@@ -201,13 +201,13 @@ get_root_dir(ReltoolConfig) ->
 %% ===================================================================
 
 make_proplist([{_,_}=H|T], Acc) ->
-     make_proplist(T, [H|Acc]);
+    make_proplist(T, [H|Acc]);
 make_proplist([H|T], Acc) ->
-     App = element(1, H),
-     Ver = element(2, H),
-     make_proplist(T, [{App,Ver}|Acc]);
+    App = element(1, H),
+    Ver = element(2, H),
+    make_proplist(T, [{App,Ver}|Acc]);
 make_proplist([], Acc) ->
-     Acc.
+    Acc.
 
 expand_version(ReltoolConfig, Dir) ->
     case lists:keyfind(sys, 1, ReltoolConfig) of

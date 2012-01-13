@@ -260,9 +260,10 @@ deprecated(Old, New, When) ->
 patch_on_windows(Cmd, Env) ->
     case os:type() of
         {win32,nt} ->
-            "cmd /q /c " ++ lists:foldl(fun({Key, Value}, Acc) ->
-                                            expand_env_variable(Acc, Key, Value)
-                                        end, Cmd, Env);
+            "cmd /q /c "
+                ++ lists:foldl(fun({Key, Value}, Acc) ->
+                                       expand_env_variable(Acc, Key, Value)
+                               end, Cmd, Env);
         _ ->
             Cmd
     end.
@@ -355,8 +356,8 @@ vcs_vsn_cmd(git) ->
     case os:type() of
         {win32,nt} ->
             "FOR /F \"usebackq tokens=* delims=\" %i in "
-            "(`git log -n 1 \"--pretty=format:%h\" .`) do "
-            "@git describe --always --tags %i";
+                "(`git log -n 1 \"--pretty=format:%h\" .`) do "
+                "@git describe --always --tags %i";
         _ ->
             "git describe --always --tags `git log -n 1 --pretty=format:%h .`"
     end;
