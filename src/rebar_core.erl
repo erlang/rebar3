@@ -124,18 +124,14 @@ maybe_process_dir({[], undefined}=ModuleSet, Config, CurrentCodePath,
     process_dir0(Dir, Command, DirSet, Config, CurrentCodePath, ModuleSet);
 maybe_process_dir({_, ModuleSetFile}=ModuleSet, Config, CurrentCodePath,
                   Dir, Command, DirSet) ->
-    case lists:reverse(ModuleSetFile) of
-        "ppa." ++ _ ->
-            %% .app file
+    case lists:suffix(".app", ModuleSetFile)
+        orelse lists:suffix(".app.src", ModuleSetFile) of
+        true ->
+            %% .app or .app.src file, check if is_skipped_app
             maybe_process_dir0(ModuleSetFile, ModuleSet,
                                Config, CurrentCodePath, Dir,
                                Command, DirSet);
-        "crs.ppa." ++ _ ->
-            %% .app.src file
-            maybe_process_dir0(ModuleSetFile, ModuleSet,
-                               Config, CurrentCodePath, Dir,
-                               Command, DirSet);
-        _ ->
+        false ->
             %% not an app dir, no need to consider apps=/skip_apps=
             process_dir0(Dir, Command, DirSet, Config,
                          CurrentCodePath, ModuleSet)
