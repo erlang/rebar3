@@ -238,9 +238,7 @@ show_info_maybe_halt(O, Opts, F) ->
     case proplists:get_bool(O, Opts) of
         true ->
             F(),
-            halt(0),
-            %% workaround to delay exit until all output is written
-            receive after infinity -> ok end;
+            rebar_utils:delayed_halt(0);
         false ->
             false
     end.

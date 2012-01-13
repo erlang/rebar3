@@ -1,2 +1,2 @@
 
-rebar_utils.erl:151: Call to missing or unexported function escript:foldl/3
+rebar_utils.erl:152: Call to missing or unexported function escript:foldl/3

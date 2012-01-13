@@ -45,7 +45,8 @@
          deprecated/3, deprecated/4,
          expand_env_variable/3,
          vcs_vsn/2,
-         get_deprecated_global/3]).
+         get_deprecated_global/3,
+         delayed_halt/1]).
 
 -include("rebar.hrl").
 
@@ -137,7 +138,7 @@ ensure_dir(Path) ->
 -spec abort(string(), [term()]) -> no_return().
 abort(String, Args) ->
     ?ERROR(String, Args),
-    halt(1).
+    delayed_halt(1).
 
 %% TODO: Rename emulate_escript_foldl to escript_foldl and remove
 %% this function when the time is right. escript:foldl/3 was an
@@ -269,6 +270,18 @@ deprecated(Old, New, When) ->
         "in favor of '~p'.~n"
         "'~p' will be removed ~s.~n~n">>,
       [Old, Old, New, Old, When]).
+
+-spec delayed_halt(integer()) -> no_return().
+delayed_halt(Code) ->
+    case os:type() of
+        {win32, nt} ->
+            timer:sleep(100),
+            halt(Code);
+        _ ->
+            halt(Code),
+            %% workaround to delay exit until all output is written
+            receive after infinity -> ok end
+    end.
 
 %% ====================================================================
 %% Internal functions
