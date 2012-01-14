@@ -166,9 +166,11 @@ process_dir0(Dir, Command, DirSet, Config, CurrentCodePath,
     %% directories that should be processed _before_ the current one.
     Predirs = acc_modules(Modules, preprocess, Config, ModuleSetFile),
 
+    SubdirAssoc = remember_cwd_subdir(Dir, Predirs),
+
     %% Get the list of plug-in modules from rebar.config. These
     %% modules may participate in preprocess and postprocess.
-    {ok, PluginModules} = plugin_modules(Config),
+    {ok, PluginModules} = plugin_modules(Config, SubdirAssoc),
 
     PluginPredirs = acc_modules(PluginModules, preprocess,
                                 Config, ModuleSetFile),
@@ -225,6 +227,20 @@ process_dir0(Dir, Command, DirSet, Config, CurrentCodePath,
 
     %% Return the updated dirset as our result
     DirSet4.
+
+remember_cwd_subdir(Cwd, Subdirs) ->
+    Store = fun(Dir, Dict) ->
+                    case dict:find(Dir, Dict) of
+                        error ->
+                            ?DEBUG("Associate sub_dir ~s with ~s~n", [Dir, Cwd]),
+                            dict:store(Dir, Cwd, Dict);
+                        {ok, Existing} ->
+                            ?ABORT("sub_dir ~s already associated with ~s~n",
+                                   [Dir, Existing]),
+                            Dict
+                    end
+            end,
+    lists:foldl(Store, dict:new(), Subdirs).
 
 maybe_load_local_config(Dir, ParentConfig) ->
     %% We need to ensure we don't overwrite custom
@@ -426,9 +442,9 @@ acc_modules([Module | Rest], Command, Config, File, Acc) ->
 %%
 %% Return a flat list of rebar plugin modules.
 %%
-plugin_modules(Config) ->
+plugin_modules(Config, SubdirAssoc) ->
     Modules = lists:flatten(rebar_config:get_all(Config, plugins)),
-    plugin_modules(Config, ulist(Modules)).
+    plugin_modules(Config, SubdirAssoc, ulist(Modules)).
 
 ulist(L) ->
     ulist(L, []).
@@ -443,16 +459,16 @@ ulist([H | T], Acc) ->
             ulist(T, [H | Acc])
     end.
 
-plugin_modules(_Config, []) ->
+plugin_modules(_Config, _SubdirAssoc, []) ->
     {ok, []};
-plugin_modules(Config, Modules) ->
+plugin_modules(Config, SubdirAssoc, Modules) ->
     FoundModules = [M || M <- Modules, code:which(M) =/= non_existing],
-    plugin_modules(Config, FoundModules, Modules -- FoundModules).
+    plugin_modules(Config, SubdirAssoc, FoundModules, Modules -- FoundModules).
 
-plugin_modules(_Config, FoundModules, []) ->
+plugin_modules(_Config, _SubdirAssoc, FoundModules, []) ->
     {ok, FoundModules};
-plugin_modules(Config, FoundModules, MissingModules) ->
-    {Loaded, NotLoaded} = load_plugin_modules(Config, MissingModules),
+plugin_modules(Config, SubdirAssoc, FoundModules, MissingModules) ->
+    {Loaded, NotLoaded} = load_plugin_modules(Config, SubdirAssoc, MissingModules),
     AllViablePlugins = FoundModules ++ Loaded,
     case NotLoaded =/= [] of
         true ->
@@ -464,10 +480,11 @@ plugin_modules(Config, FoundModules, MissingModules) ->
     end,
     {ok, AllViablePlugins}.
 
-load_plugin_modules(Config, Modules) ->
+load_plugin_modules(Config, SubdirAssoc, Modules) ->
+    Cwd = rebar_utils:get_cwd(),
     PluginDir = case rebar_config:get_local(Config, plugin_dir, undefined) of
                     undefined ->
-                        filename:join(rebar_utils:get_cwd(), "plugins");
+                        filename:join(Cwd, "plugins");
                     Dir ->
                         Dir
                 end,
@@ -475,8 +492,8 @@ load_plugin_modules(Config, Modules) ->
     %% Find relevant sources in base_dir and plugin_dir
     Erls = string:join([atom_to_list(M)++"\\.erl" || M <- Modules], "|"),
     RE = "^" ++ Erls ++ "\$",
-    BaseDir = rebar_config:get_global(base_dir, []),
-    %% If a plugin is found in base_dir and plugin_dir the clash
+    BaseDir = get_plugin_base_dir(Cwd, SubdirAssoc),
+    %% If a plugin is found both in base_dir and plugin_dir, the clash
     %% will provoke an error and we'll abort.
     Sources = rebar_utils:find_files(PluginDir, RE, false)
         ++ rebar_utils:find_files(BaseDir, RE, false),
@@ -486,6 +503,14 @@ load_plugin_modules(Config, Modules) ->
     FilterMissing = is_missing_plugin(Loaded),
     NotLoaded = [V || V <- Modules, FilterMissing(V)],
     {Loaded, NotLoaded}.
+
+get_plugin_base_dir(Cwd, SubdirAssoc) ->
+    case dict:find(Cwd, SubdirAssoc) of
+        {ok, BaseDir} ->
+            BaseDir;
+        error ->
+            Cwd
+    end.
 
 is_missing_plugin(Loaded) ->
     fun(Mod) -> not lists:member(Mod, Loaded) end.
