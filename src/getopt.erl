@@ -53,6 +53,8 @@
                    ArgSpec :: arg_spec(),
                    Help    :: string() | undefined
                   }.
+%% Output streams
+-type output_stream() :: 'standard_io' | 'standard_error'.
 
 
 %% @doc  Parse the command line options and arguments returning a list of tuples
@@ -91,7 +93,7 @@ parse(OptSpecList, OptAcc, ArgAcc, ArgPos, ["-" ++ ([_Char | _] = OptArg) = OptS
 parse(OptSpecList, OptAcc, ArgAcc, ArgPos, [Arg | Tail]) ->
     case find_non_option_arg(OptSpecList, ArgPos) of
         {value, OptSpec} when ?IS_OPT_SPEC(OptSpec) ->
-            parse(OptSpecList, [convert_option_arg(OptSpec, Arg) | OptAcc],
+            parse(OptSpecList, add_option_arg(OptSpec, Arg, OptAcc),
                   ArgAcc, ArgPos + 1, Tail);
         false ->
             parse(OptSpecList, OptAcc, [Arg | ArgAcc], ArgPos, Tail)
@@ -145,7 +147,7 @@ parse_option_assigned_arg(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptStr, Lon
                 undefined ->
                     throw({error, {invalid_option_arg, OptStr}});
                 _ ->
-                    parse(OptSpecList, [convert_option_arg(OptSpec, Arg) | OptAcc], ArgAcc, ArgPos, Args)
+                    parse(OptSpecList, add_option_arg(OptSpec, Arg, OptAcc), ArgAcc, ArgPos, Args)
             end;
         false ->
             throw({error, {invalid_option, OptStr}})
@@ -174,6 +176,7 @@ split_assigned_arg(OptStr, [], _Acc) ->
 %%        -afoo    Single option 'a', argument "foo"
 %%        -abc     Multiple options: 'a'; 'b'; 'c'
 %%        -bcafoo  Multiple options: 'b'; 'c'; 'a' with argument "foo"
+%%        -aaa     Multiple repetitions of option 'a' (only valid for options with integer arguments)
 -spec parse_option_short([option_spec()], [option()], [string()], integer(), [string()], string(), string()) ->
     {ok, {[option()], [string()]}}.
 parse_option_short(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptStr, [Short | Arg]) ->
@@ -184,16 +187,22 @@ parse_option_short(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptStr, [Short | A
         {_Name, Short, _Long, ArgSpec, _Help} = OptSpec ->
             case Arg of
                 [] ->
-                    % The option argument string is empty, but the option requires
-                    % an argument, so we look into the next string in the list.
+                    %% The option argument string is empty, but the option requires
+                    %% an argument, so we look into the next string in the list.
                     parse_option_next_arg(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptSpec);
 
                 _ ->
                     case is_valid_arg(ArgSpec, Arg) of
                         true ->
-                            parse(OptSpecList, [convert_option_arg(OptSpec, Arg) | OptAcc], ArgAcc, ArgPos, Args);
+                            parse(OptSpecList, add_option_arg(OptSpec, Arg, OptAcc), ArgAcc, ArgPos, Args);
                         _ ->
-                            parse_option_short(OptSpecList, [convert_option_no_arg(OptSpec) | OptAcc], ArgAcc, ArgPos, Args, OptStr, Arg)
+                            %% There are 2 valid cases in which we may not receive the expected argument:
+                            %% 1) When the expected argument is a boolean: in this case the presence
+                            %%    of the option makes the argument true.
+                            %% 2) When the expected argument is an integer: in this case the presence
+                            %%    of the option sets the value to 1 and any additional appearances of
+                            %%    the option increment it by 1 (e.g. "-vvv" would return {verbose, 3}).
+                            parse_option_short(OptSpecList, add_option_no_arg(OptSpec, OptAcc), ArgAcc, ArgPos, Args, OptStr, Arg)
                     end
             end;
 
@@ -205,25 +214,34 @@ parse_option_short(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, _OptStr, []) ->
 
 
 %% @doc Retrieve the argument for an option from the next string in the list of
-%%      command-line parameters.
+%%      command-line parameters or set the value of the argument from the argument
+%%      specification (for boolean and integer arguments), if possible.
 parse_option_next_arg(OptSpecList, OptAcc, ArgAcc, ArgPos, [Arg | Tail] = Args, {Name, _Short, _Long, ArgSpec, _Help} = OptSpec) ->
-    % Special case for booleans: when the next string is an option we assume
-    % the value is 'true'.
-    case (arg_spec_type(ArgSpec) =:= boolean) andalso not is_boolean_arg(Arg) of
+    ArgSpecType = arg_spec_type(ArgSpec),
+    case (ArgSpecType =:= boolean) andalso not is_boolean_arg(Arg) of
         true ->
-            parse(OptSpecList, [{Name, true} | OptAcc], ArgAcc, ArgPos, Args);
-        _ ->
-            parse(OptSpecList, [convert_option_arg(OptSpec, Arg) | OptAcc], ArgAcc, ArgPos, Tail)
+            %% Special case for booleans: when the next string is not a boolean
+            %% argument we assume the value is 'true'.
+            parse(OptSpecList, add_arg(OptSpec, true, OptAcc), ArgAcc, ArgPos, Args);
+        false ->
+            case (ArgSpecType =:= integer) andalso not is_integer_arg(Arg) of
+                true ->
+                    %% Special case for integer arguments: if the option had not been set
+                    %% before we set the value to 1; if not we increment the previous value
+                    %% the option had. This is needed to support options like "-vvv" to
+                    %% return something like {verbose, 3}.
+                    parse(OptSpecList, add_implicit_integer_arg(OptSpec, OptAcc), ArgAcc, ArgPos, Args);
+                false ->
+                    try
+                        parse(OptSpecList, add_arg(OptSpec, to_type(ArgSpecType, Arg), OptAcc), ArgAcc, ArgPos, Tail)
+                    catch
+                        error:_ ->
+                            throw({error, {invalid_option_arg, {Name, Arg}}})
+                    end
+            end
     end;
-parse_option_next_arg(OptSpecList, OptAcc, ArgAcc, ArgPos, [] = Args, {Name, _Short, _Long, ArgSpec, _Help}) ->
-    % Special case for booleans: when the next string is missing we assume the
-    % value is 'true'.
-    case arg_spec_type(ArgSpec) of
-        boolean ->
-            parse(OptSpecList, [{Name, true} | OptAcc], ArgAcc, ArgPos, Args);
-        _ ->
-            throw({error, {missing_option_arg, Name}})
-    end.
+parse_option_next_arg(OptSpecList, OptAcc, ArgAcc, ArgPos, [] = Args, OptSpec) ->
+    parse(OptSpecList, add_option_no_arg(OptSpec, OptAcc), ArgAcc, ArgPos, Args).
 
 
 %% @doc Find the option for the discrete argument in position specified in the
@@ -257,30 +275,70 @@ append_default_options([], OptAcc) ->
     OptAcc.
 
 
--spec convert_option_no_arg(option_spec()) -> compound_option().
-convert_option_no_arg({Name, _Short, _Long, ArgSpec, _Help}) ->
-    case ArgSpec of
-        % Special case for booleans: if there is no argument we assume
-        % the value is 'true'.
-        {boolean, _DefaultValue} ->
-            {Name, true};
+%% @doc Add an option with no argument.
+-spec add_option_no_arg(option_spec(), [option()]) -> [option()].
+add_option_no_arg({Name, _Short, _Long, ArgSpec, _Help} = OptSpec, OptAcc) ->
+    case arg_spec_type(ArgSpec) of
         boolean ->
-            {Name, true};
+            %% Special case for boolean arguments: if there is no argument we
+            %% set the value to 'true'.
+            add_arg(OptSpec, true, OptAcc);
+        integer ->
+            %% Special case for integer arguments: if the option had not been set
+            %% before we set the value to 1; if not we increment the previous value
+            %% the option had. This is needed to support options like "-vvv" to
+            %% return something like {verbose, 3}.
+            add_implicit_integer_arg(OptSpec, OptAcc);
         _ ->
             throw({error, {missing_option_arg, Name}})
     end.
 
 
-%% @doc Convert the argument passed in the command line to the data type
-%%      indicated by the argument specification.
--spec convert_option_arg(option_spec(), string()) -> compound_option().
-convert_option_arg({Name, _Short, _Long, ArgSpec, _Help}, Arg) ->
-    try
-        {Name, to_type(arg_spec_type(ArgSpec), Arg)}
-    catch
-        error:_ ->
-            throw({error, {invalid_option_arg, {Name, Arg}}})
+%% @doc Add an option with argument converting it to the data type indicated by the
+%%      argument specification.
+-spec add_option_arg(option_spec(), string(), [option()]) -> [option()].
+add_option_arg({Name, _Short, _Long, ArgSpec, _Help} = OptSpec, Arg, OptAcc) ->
+    ArgSpecType = arg_spec_type(ArgSpec),
+    case (ArgSpecType =:= boolean) andalso not is_boolean_arg(Arg) of
+        true ->
+            %% Special case for booleans: when the next string is not a boolean
+            %% argument we assume the value is 'true'.
+            add_arg(OptSpec, true, OptAcc);
+        false ->
+            case (ArgSpecType =:= integer) andalso not is_integer_arg(Arg) of
+                true ->
+                    %% Special case for integer arguments: if the option had not been set
+                    %% before we set the value to 1; if not we increment the previous value
+                    %% the option had. This is needed to support options like "-vvv" to
+                    %% return something like {verbose, 3}.
+                    add_implicit_integer_arg(OptSpec, OptAcc);
+                false ->
+                    try
+                       add_arg(OptSpec, to_type(ArgSpecType, Arg), OptAcc)
+                    catch
+                        error:_ ->
+                            throw({error, {invalid_option_arg, {Name, Arg}}})
+                    end
+            end
     end.
+
+
+%% Add an option with an integer argument.
+-spec add_implicit_integer_arg(option_spec(), [option()]) -> [option()].
+add_implicit_integer_arg({Name, _Short, _Long, _ArgSpec, _Help}, OptAcc) ->
+    case lists:keyfind(Name, 1, OptAcc) of
+        {Name, Count} ->
+            lists:keyreplace(Name, 1, OptAcc, {Name, Count + 1});
+        false ->
+            [{Name, 1} | OptAcc]
+    end.
+
+
+%% @doc Add an option with an argument and convert it to the data type corresponding
+%%      to the argument specification.
+-spec add_arg(option_spec(), arg_value(), [option()]) -> [option()].
+add_arg({Name, _Short, _Long, _ArgSpec, _Help}, Arg, OptAcc) ->
+    [{Name, Arg} | lists:keydelete(Name, 1, OptAcc)].
 
 
 %% @doc Retrieve the data type form an argument specification.
@@ -371,34 +429,52 @@ is_float_arg([]) ->
     true.
 
 
-%% @doc  Show a message on stdout indicating the command line options and
+%% @doc  Show a message on stderr indicating the command line options and
 %%       arguments that are supported by the program.
 -spec usage([option_spec()], string()) -> ok.
 usage(OptSpecList, ProgramName) ->
-    io:format("Usage: ~s~s~n~n~s~n",
-              [ProgramName, usage_cmd_line(OptSpecList), usage_options(OptSpecList)]).
+	usage(OptSpecList, ProgramName, standard_error).
 
 
-%% @doc  Show a message on stdout indicating the command line options and
+%% @doc  Show a message on stderr or stdout indicating the command line options and
+%%       arguments that are supported by the program.
+-spec usage([option_spec()], string(), output_stream() | string()) -> ok.
+usage(OptSpecList, ProgramName, OutputStream) when is_atom(OutputStream) ->
+    io:format(OutputStream, "Usage: ~s~s~n~n~s~n",
+              [ProgramName, usage_cmd_line(OptSpecList), usage_options(OptSpecList)]);
+%% @doc  Show a message on stderr indicating the command line options and
 %%       arguments that are supported by the program. The CmdLineTail argument
 %%       is a string that is added to the end of the usage command line.
--spec usage([option_spec()], string(), string()) -> ok.
 usage(OptSpecList, ProgramName, CmdLineTail) ->
-    io:format("Usage: ~s~s ~s~n~n~s~n",
-              [ProgramName, usage_cmd_line(OptSpecList), CmdLineTail, usage_options(OptSpecList)]).
+	usage(OptSpecList, ProgramName, CmdLineTail, standard_error).
 
 
-%% @doc  Show a message on stdout indicating the command line options and
+%% @doc  Show a message on stderr or stdout indicating the command line options and
+%%       arguments that are supported by the program. The CmdLineTail argument
+%%       is a string that is added to the end of the usage command line.
+-spec usage([option_spec()], string(), string(), output_stream() | [{string(), string()}]) -> ok.
+usage(OptSpecList, ProgramName, CmdLineTail, OutputStream) when is_atom(OutputStream) ->
+	io:format(OutputStream, "Usage: ~s~s ~s~n~n~s~n",
+              [ProgramName, usage_cmd_line(OptSpecList), CmdLineTail, usage_options(OptSpecList)]);
+%% @doc  Show a message on stderr indicating the command line options and
 %%       arguments that are supported by the program. The CmdLineTail and OptionsTail
 %%       arguments are a string that is added to the end of the usage command line
 %%       and a list of tuples that are added to the end of the options' help lines.
--spec usage([option_spec()], string(), string(), [{string(), string()}]) -> ok.
 usage(OptSpecList, ProgramName, CmdLineTail, OptionsTail) ->
+	usage(OptSpecList, ProgramName, CmdLineTail, OptionsTail, standard_error).
+
+
+%% @doc  Show a message on stderr or stdout indicating the command line options and
+%%       arguments that are supported by the program. The CmdLineTail and OptionsTail
+%%       arguments are a string that is added to the end of the usage command line
+%%       and a list of tuples that are added to the end of the options' help lines.
+-spec usage([option_spec()], string(), string(), [{string(), string()}], output_stream()) -> ok.
+usage(OptSpecList, ProgramName, CmdLineTail, OptionsTail, OutputStream) ->
     UsageOptions = lists:foldl(
                      fun ({Prefix, Help}, Acc) ->
                              add_option_help(Prefix, Help, Acc)
                      end, usage_options_reverse(OptSpecList, []), OptionsTail),
-    io:format("Usage: ~s~s ~s~n~n~s~n",
+    io:format(OutputStream, "Usage: ~s~s ~s~n~n~s~n",
               [ProgramName, usage_cmd_line(OptSpecList), CmdLineTail,
                lists:flatten(lists:reverse(UsageOptions))]).
 
