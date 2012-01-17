@@ -49,22 +49,22 @@
 %% ============================================================================
 
 compile(Config, _AppFile) ->
-  NeoOpts = neotoma_opts(Config),
-  rebar_base_compiler:run(Config, [],
-                          option(doc_root, NeoOpts), ".peg",
-                          option(out_dir, NeoOpts),
-                          option(module_ext, NeoOpts) ++ ".beam",
-                          fun compile_neo/3, [{check_last_mod,false}]).
+    NeoOpts = neotoma_opts(Config),
+    rebar_base_compiler:run(Config, [],
+                            option(doc_root, NeoOpts), ".peg",
+                            option(out_dir, NeoOpts),
+                            option(module_ext, NeoOpts) ++ ".beam",
+                            fun compile_neo/3, [{check_last_mod,false}]).
 
 %% ============================================================================
 %% Public API
 %% ============================================================================
 
 neotoma_opts(Config) ->
-  rebar_config:get(Config, neotoma_opts, []).
+    rebar_config:get(Config, neotoma_opts, []).
 
 option(Opt, Options) ->
-  proplists:get_value(Opt, Options, default(Opt)).
+    proplists:get_value(Opt, Options, default(Opt)).
 
 default(doc_root) -> "src";
 default(out_dir) -> "src";
@@ -116,7 +116,7 @@ needs_compile(Source, Target, Config) ->
 
 referenced_pegs(Source, Config) ->
     Set = referenced_pegs1([Source], Config,
-                          sets:add_element(Source, sets:new())),
+                           sets:add_element(Source, sets:new())),
     sets:to_list(sets:del_element(Source, Set)).
 
 referenced_pegs1(Step, Config, Seen) ->

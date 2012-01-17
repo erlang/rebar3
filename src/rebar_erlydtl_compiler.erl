@@ -157,7 +157,7 @@ needs_compile(Source, Target, Config) ->
 
 referenced_dtls(Source, Config) ->
     Set = referenced_dtls1([Source], Config,
-                          sets:add_element(Source, sets:new())),
+                           sets:add_element(Source, sets:new())),
     sets:to_list(sets:del_element(Source, Set)).
 
 referenced_dtls1(Step, Config, Seen) ->
