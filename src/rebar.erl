@@ -278,11 +278,12 @@ option_spec_list() ->
     JobsHelp = io_lib:format(
                  "Number of concurrent workers a command may use. Default: ~B",
                  [Jobs]),
+    VerboseHelp = "Verbosity level (-v, -vv, -vvv, --verbose 3). Default: 0",
     [
      %% {Name, ShortOpt, LongOpt, ArgSpec, HelpMsg}
      {help,     $h, "help",     undefined, "Show the program options"},
      {commands, $c, "commands", undefined, "Show available commands"},
-     {verbose,  $v, "verbose",  integer,   "Verbosity level"},
+     {verbose,  $v, "verbose",  integer,   VerboseHelp},
      {version,  $V, "version",  undefined, "Show version information"},
      {force,    $f, "force",    undefined, "Force"},
      {defines,  $D, undefined,  string,    "Define compiler macro"},
