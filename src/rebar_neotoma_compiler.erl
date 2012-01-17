@@ -74,7 +74,7 @@ default(source_ext) -> ".peg".
 compile_neo(Source, Target, Config) ->
     case code:which(neotoma) of
         non_existing ->
-            ?CONSOLE(
+            ?ERROR(
                <<"~n===============================================~n"
                  " You need to install neotoma to compile PEG grammars~n"
                  " Download the latest tarball release from github~n"
@@ -101,10 +101,10 @@ do_compile(Source, _Target, Config) ->
                                   ++ option(module_ext, NeoOpts))}],
     case neotoma:file(Source, Opts ++ NeoOpts) of
         ok ->
-          ok;
+            ok;
         Reason ->
-            ?CONSOLE("Compiling peg ~s failed:~n  ~p~n",
-                     [Source, Reason]),
+            ?ERROR("Compiling peg ~s failed:~n  ~p~n",
+                   [Source, Reason]),
             ?FAIL
     end.
 

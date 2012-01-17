@@ -109,7 +109,7 @@ default(custom_tags_dir) -> "".
 compile_dtl(Source, Target, Config) ->
     case code:which(erlydtl) of
         non_existing ->
-            ?CONSOLE(
+            ?ERROR(
                <<"~n===============================================~n"
                  " You need to install erlydtl to compile DTL templates~n"
                  " Download the latest tarball release from github~n"
@@ -140,8 +140,8 @@ do_compile(Source, Target, Config) ->
                          Opts++DtlOpts) of
         ok -> ok;
         Reason ->
-            ?CONSOLE("Compiling template ~s failed:~n  ~p~n",
-                     [Source, Reason]),
+            ?ERROR("Compiling template ~s failed:~n  ~p~n",
+                   [Source, Reason]),
             ?FAIL
     end.
 
