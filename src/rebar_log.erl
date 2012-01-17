@@ -27,7 +27,7 @@
 -module(rebar_log).
 
 -export([init/0,
-         set_level/1, get_level/0,
+         set_level/1, get_level/0, default_level/0,
          log/3]).
 
 %% ===================================================================
@@ -35,13 +35,12 @@
 %% ===================================================================
 
 init() ->
-    case rebar_config:get_global(verbose, "0") of
-        "1" ->
-            set_level(debug);
-        _ ->
-            set_level(error)
+    case valid_level(rebar_config:get_global(verbose, error_level())) of
+        0 -> set_level(error);
+        1 -> set_level(warn);
+        2 -> set_level(info);
+        3 -> set_level(debug)
     end.
-
 
 set_level(Level) ->
     ok = application:set_env(rebar, log_level, Level).
@@ -63,9 +62,17 @@ log(Level, Str, Args) ->
             ok
     end.
 
+default_level() -> error_level().
+
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+valid_level(Level) ->
+    erlang:max(error_level(), erlang:min(Level, debug_level())).
+
+error_level() -> 0.
+debug_level() -> 3.
 
 should_log(debug, _)     -> true;
 should_log(info, debug)  -> false;

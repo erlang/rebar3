@@ -109,7 +109,7 @@ set(Config, Key, Value) ->
 set_global(jobs=Key, Value) when is_list(Value) ->
     set_global(Key, list_to_integer(Value));
 set_global(jobs=Key, Value) when is_integer(Value) ->
-    application:set_env(rebar_global, Key, erlang:max(1,Value));
+    application:set_env(rebar_global, Key, erlang:max(1, Value));
 set_global(Key, Value) ->
     application:set_env(rebar_global, Key, Value).
 
@@ -122,7 +122,8 @@ get_global(Key, Default) ->
     end.
 
 is_verbose() ->
-    get_global(verbose, "0") =:= "1".
+    DefaulLevel = rebar_log:default_level(),
+    get_global(verbose, DefaulLevel) > DefaulLevel.
 
 get_jobs() ->
     get_global(jobs, 3).

@@ -156,7 +156,9 @@ parse_args(Args) ->
                                     proplists:get_bool(profile, Options)),
 
             %% Set global variables based on getopt options
-            set_global_flag(Options, verbose),
+            LogLevel = proplists:get_value(verbose, Options,
+                                           rebar_log:default_level()),
+            rebar_config:set_global(verbose, LogLevel),
             set_global_flag(Options, force),
             DefJobs = rebar_config:get_jobs(),
             case proplists:get_value(jobs, Options, DefJobs) of
@@ -280,7 +282,7 @@ option_spec_list() ->
      %% {Name, ShortOpt, LongOpt, ArgSpec, HelpMsg}
      {help,     $h, "help",     undefined, "Show the program options"},
      {commands, $c, "commands", undefined, "Show available commands"},
-     {verbose,  $v, "verbose",  undefined, "Be verbose about what gets done"},
+     {verbose,  $v, "verbose",  integer,   "Verbosity level"},
      {version,  $V, "version",  undefined, "Show version information"},
      {force,    $f, "force",    undefined, "Force"},
      {defines,  $D, undefined,  string,    "Define compiler macro"},
@@ -299,8 +301,14 @@ filter_flags([Item | Rest], Commands) ->
     case string:tokens(Item, "=") of
         [Command] ->
             filter_flags(Rest, [Command | Commands]);
-        [KeyStr, Value] ->
+        [KeyStr, RawValue] ->
             Key = list_to_atom(KeyStr),
+            Value = case Key of
+                        verbose ->
+                            list_to_integer(RawValue);
+                        _ ->
+                            RawValue
+                    end,
             rebar_config:set_global(Key, Value),
             filter_flags(Rest, Commands);
         Other ->
