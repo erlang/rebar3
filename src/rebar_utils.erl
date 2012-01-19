@@ -189,6 +189,17 @@ expand_env_variable(InStr, VarName, RawVarValue) ->
     end.
 
 vcs_vsn(Vcs, Dir) ->
+    Key = {Vcs, Dir},
+    case ets:lookup(rebar_vsn_cache, Key) of
+        [{Key, VsnString}] ->
+            VsnString;
+        [] ->
+            VsnString = vcs_vsn_1(Vcs, Dir),
+            ets:insert(rebar_vsn_cache, {Key, VsnString}),
+            VsnString
+    end.
+
+vcs_vsn_1(Vcs, Dir) ->
     case vcs_vsn_cmd(Vcs) of
         {unknown, VsnString} ->
             ?DEBUG("vcs_vsn: Unknown VCS atom in vsn field: ~p\n", [Vcs]),

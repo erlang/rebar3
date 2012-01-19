@@ -90,6 +90,9 @@ process_commands([Command | Rest], ParentConfig) ->
         _ ->
             ok
     end,
+    %% Wipe out vsn cache to avoid invalid hits when
+    %% dependencies are updated
+    ets:delete_all_objects(rebar_vsn_cache),
     process_commands(Rest, ParentConfig).
 
 
