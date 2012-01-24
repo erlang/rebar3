@@ -155,14 +155,9 @@ setup_env(Config) ->
 %% ===================================================================
 
 global_defines() ->
-    [begin
-         case string:tokens(D, "=") of
-             [Var, Val] ->
-                 {Var, Val};
-             [Def] ->
-                 {Def, "1"}
-         end
-     end || D <- rebar_config:get_global(defines, [])].
+    Defines = rebar_config:get_global(defines, []),
+    Flags = string:join(["-D" ++ D || D <- Defines], " "),
+    [{"ERL_CFLAGS", "$ERL_CFLAGS " ++ Flags}].
 
 expand_sources([], Acc) ->
     Acc;

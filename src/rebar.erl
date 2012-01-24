@@ -156,9 +156,7 @@ parse_args(Args) ->
                                     proplists:get_bool(profile, Options)),
 
             %% Set global variables based on getopt options
-            LogLevel = proplists:get_value(verbose, Options,
-                                           rebar_log:default_level()),
-            rebar_config:set_global(verbose, LogLevel),
+            set_log_level(Options),
             set_global_flag(Options, force),
             DefJobs = rebar_config:get_jobs(),
             case proplists:get_value(jobs, Options, DefJobs) of
@@ -183,6 +181,18 @@ parse_args(Args) ->
             help(),
             halt(1)
     end.
+
+%%
+%% set log level based on getopt option
+%%
+set_log_level(Options) ->
+    LogLevel = case proplists:get_all_values(verbose, Options) of
+                   [] ->
+                       rebar_log:default_level();
+                   Verbosities ->
+                       lists:last(Verbosities)
+               end,
+    rebar_config:set_global(verbose, LogLevel).
 
 %%
 %% show version information and halt
