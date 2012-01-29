@@ -18,7 +18,7 @@
 %% Erlang compiler options
 {erl_opts, [no_debug_info, {i, "myinclude"}, {src_dirs, ["src1", "src2"]},
             {platform_define,
-            "(linux|solaris|freebsd|darwin)", 'HAVE_SENDFILE'},
+             "(linux|solaris|freebsd|darwin)", 'HAVE_SENDFILE'},
             {platform_define, "(linux|freebsd)", 'BACKLOG', 128},
             {platform_define, "R13", 'old_inets'}]}.
 
