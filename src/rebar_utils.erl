@@ -88,8 +88,8 @@ wordsize() ->
 %% Val = string() | false
 %%
 sh(Command0, Options0) ->
-    ?INFO("sh info:\n\tcwd: ~p\n\tcmd: ~s\n\topts: ~p\n",
-          [get_cwd(), Command0, Options0]),
+    ?INFO("sh info:\n\tcwd: ~p\n\tcmd: ~s\n", [get_cwd(), Command0]),
+    ?DEBUG("\topts: ~p\n", [Options0]),
 
     DefaultOptions = [use_stdout, abort_on_error],
     Options = [expand_sh_flag(V)
