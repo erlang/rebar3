@@ -226,4 +226,9 @@ simple_test() ->
     Result = render("Hello {{name}}!", Ctx),
     ?assertEqual("Hello world!", Result).
 
+integer_values_too_test() ->
+    Ctx = dict:from_list([{name, "Chris"}, {value, 10000}]),
+    Result = render("Hello {{name}}~nYou have just won ${{value}}!", Ctx),
+    ?assertEqual("Hello Chris~nYou have just won $10000!", Result).
+
 -endif.
