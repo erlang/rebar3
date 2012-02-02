@@ -190,10 +190,11 @@ expand_env_variable(InStr, VarName, RawVarValue) ->
 
 vcs_vsn(Vcs, Dir) ->
     Key = {Vcs, Dir},
-    case ets:lookup(rebar_vsn_cache, Key) of
-        [{Key, VsnString}] ->
-            VsnString;
-        [] ->
+    try ets:lookup_element(rebar_vsn_cache, Key, 2) of
+        VsnString ->
+            VsnString
+    catch
+        error:badarg ->
             VsnString = vcs_vsn_1(Vcs, Dir),
             ets:insert(rebar_vsn_cache, {Key, VsnString}),
             VsnString
