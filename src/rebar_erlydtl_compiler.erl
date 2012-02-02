@@ -82,12 +82,16 @@
 
 compile(Config, _AppFile) ->
     DtlOpts = erlydtl_opts(Config),
-    rebar_base_compiler:run(Config, [],
-                            option(doc_root, DtlOpts),
-                            option(source_ext, DtlOpts),
-                            option(out_dir, DtlOpts),
-                            option(module_ext, DtlOpts) ++ ".beam",
-                            fun compile_dtl/3, [{check_last_mod, false}]).
+    OrigPath = code:get_path(),
+    true = code:add_path(filename:join(rebar_utils:get_cwd(), "ebin")),
+    Result = rebar_base_compiler:run(Config, [],
+                                     option(doc_root, DtlOpts),
+                                     option(source_ext, DtlOpts),
+                                     option(out_dir, DtlOpts),
+                                     option(module_ext, DtlOpts) ++ ".beam",
+                                     fun compile_dtl/3, [{check_last_mod, false}]),
+    true = code:set_path(OrigPath),
+    Result.
 
 
 %% ===================================================================
