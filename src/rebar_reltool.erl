@@ -31,7 +31,6 @@
          clean/2]).
 
 -include("rebar.hrl").
--include_lib("reltool/src/reltool.hrl").
 -include_lib("kernel/include/file.hrl").
 
 %% ===================================================================
