@@ -37,14 +37,16 @@
 
 %% Port compilation environment variables. See rebar_port_compiler.erl for
 %% more info. Default is `[]'
-{port_env, []}.
+{port_env, [{"CFLAGS", "$CFLAGS -Ifoo"},
+            {"freebsd", "LDFLAGS", "$LDFLAGS -lfoo"}]}.
 
 %% port_specs
 %% List of filenames or wildcards to be compiled. May also contain a tuple
 %% consisting of a regular expression to be applied against the system
 %% architecture as a filter.
 {port_specs, [{"priv/so_name.so", ["c_src/*.c"]},
-              {"linux", "priv/hello_linux", ["c_src/hello_linux.c"]]}.
+              {"linux", "priv/hello_linux", ["c_src/hello_linux.c"]},
+              {"linux", "priv/hello_linux", ["c_src/*.c"], [{env, []}]}}.
 
 %% == LFE Compiler ==
 

@@ -31,12 +31,17 @@
          get_all/2,
          set/3,
          set_global/2, get_global/2,
-         is_verbose/0, get_jobs/0]).
+         is_verbose/0, get_jobs/0,
+         set_env/3, get_env/2]).
 
 -include("rebar.hrl").
 
 -record(config, { dir :: file:filename(),
-                  opts :: list() }).
+                  opts = [] :: list(),
+                  envs = [] :: list({module(), env()}) }).
+
+-type env()     :: [env_var()].
+-type env_var() :: {string(), string()}.
 
 %% Types that can be used from other modules -- alphabetically ordered.
 -export_type([config/0]).
@@ -53,8 +58,7 @@ base_config(#config{opts=Opts0}) ->
     new(Opts0, ConfName).
 
 new() ->
-    #config { dir = rebar_utils:get_cwd(),
-              opts = [] }.
+    #config{dir = rebar_utils:get_cwd()}.
 
 new(ConfigFile) when is_list(ConfigFile) ->
     case consult_file(ConfigFile) of
@@ -88,7 +92,7 @@ new(Opts0, ConfName) ->
                    ?ABORT("Failed to load ~s: ~p\n", [ConfigFile, Other])
            end,
 
-    #config { dir = Dir, opts = Opts }.
+    #config{dir = Dir, opts = Opts}.
 
 get(Config, Key, Default) ->
     proplists:get_value(Key, Config#config.opts, Default).
@@ -142,6 +146,17 @@ consult_file(File) ->
                     file:consult(File)
             end
     end.
+
+set_env(Config, Mod, Env) ->
+    OldEnvs = Config#config.envs,
+    NewEnvs = case lists:keymember(Mod, 1, OldEnvs) of
+                  true  -> lists:keyreplace(Mod, 1, OldEnvs, {Mod, Env});
+                  false -> [{Mod,Env}|OldEnvs]
+              end,
+    Config#config{envs=NewEnvs}.
+
+get_env(Config, Mod) ->
+    proplists:get_value(Mod, Config#config.envs, []).
 
 %% ===================================================================
 %% Internal functions

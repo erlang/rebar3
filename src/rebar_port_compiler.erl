@@ -39,8 +39,9 @@
 %% Supported configuration variables:
 %%
 %% * port_specs - Erlang list of tuples of the forms
-%%                {arch_regex(), "priv/foo.so", ["c_src/foo.c"]}
-%%                {"priv/foo", ["c_src/foo.c"]}
+%%                {ArchRegex, TargetFile, Sources, Options}
+%%                {ArchRegex, TargetFile, Sources}
+%%                {TargetFile, Sources}
 %%
 %% * port_env - Erlang list of key/value pairs which will control
 %%              the environment when running the compiler and linker.
@@ -85,43 +86,55 @@
 %%                           "$CFLAGS -X86Options"}]}
 %%
 
+%% TODO: reconsider keeping both sources and objects once
+%%       support for deprecated options has been remove.
+%%       remove [] as valid value for sources, objects, and opts
+%%       when removing deprecated options.
+-record(spec, {type::'drv' | 'exe',
+               target::file:filename(),
+               sources = [] :: [file:filename(), ...] | [],
+               objects = [] :: [file:filename(), ...] | [],
+               opts = [] ::list() | []}).
+
 compile(Config, AppFile) ->
     rebar_utils:deprecated(port_sources, port_specs, Config, "soon"),
     rebar_utils:deprecated(so_name, port_specs, Config, "soon"),
     rebar_utils:deprecated(so_specs, port_specs, Config, "soon"),
 
-    SourceFiles = get_sources(Config),
+    %% TODO: remove SpecType and OldSources make get_specs/2
+    %%       return list(#spec{}) when removing deprecated options
+    {SpecType, {OldSources, Specs}} = get_specs(Config, AppFile),
 
-    case SourceFiles of
-        [] ->
-            ok;
-        _ ->
-            Env = setup_env(Config),
+    case {SpecType, OldSources, Specs} of
+        {old, [], _} ->
+            ok;                                 % old specs empty
+        {new, [], []} ->
+            ok;                                 % port_specs empty
+
+        _ ->                                    % have old/new specs
+
+            SharedEnv = rebar_config:get_env(Config, ?MODULE),
 
             %% Compile each of the sources
-            {NewBins, ExistingBins} = compile_each(SourceFiles, Config, Env,
-                                                   [], []),
+            NewBins = compile_sources(OldSources, Specs, SharedEnv),
 
-            %% Construct the target filename and make sure that the
-            %% target directory exists
-            Specs = port_specs(Config, AppFile, NewBins ++ ExistingBins),
+            %% Make sure that the target directories exist
             ?INFO("Using specs ~p\n", [Specs]),
-            lists:foreach(fun({_, Target,_}) ->
-                                  ok = filelib:ensure_dir(Target);
-                             ({Target, _}) ->
+            lists:foreach(fun(#spec{target=Target}) ->
                                   ok = filelib:ensure_dir(Target)
                           end, Specs),
 
             %% Only relink if necessary, given the Target
             %% and list of new binaries
             lists:foreach(
-              fun({Target, Bins}) ->
+              fun(#spec{target=Target, objects=Bins, opts=Opts}) ->
                       AllBins = [sets:from_list(Bins),
                                  sets:from_list(NewBins)],
                       Intersection = sets:intersection(AllBins),
                       case needs_link(Target, sets:to_list(Intersection)) of
                           true ->
                               LinkTemplate = select_link_template(Target),
+                              Env = proplists:get_value(env, Opts, SharedEnv),
                               Cmd = expand_command(LinkTemplate, Env,
                                                    string:join(Bins, " "),
                                                    Target),
@@ -134,112 +147,82 @@ compile(Config, AppFile) ->
     end.
 
 clean(Config, AppFile) ->
-    %% Build a list of sources so as to derive all the bins we generated
-    Sources = get_sources(Config),
-    rebar_file_utils:delete_each([source_to_bin(S) || S <- Sources]),
+    %% TODO: remove SpecType and OldSources make get_specs/2
+    %%       return list(#spec{}) when removing deprecated options
+    {SpecType, {OldSources, Specs}} = get_specs(Config, AppFile),
 
-    %% Delete the target file
-    ExtractTarget = fun({_, Target, _}) ->
-                            Target;
-                       ({Target, _}) ->
-                            Target
-                    end,
-    rebar_file_utils:delete_each([ExtractTarget(S)
-                                  || S <- port_specs(Config, AppFile,
-                                                     expand_objects(Sources))]).
+    case {SpecType, OldSources, Specs} of
+        {old, [], _} ->
+            ok;                                 % old specs empty
+        {new, [], []} ->
+            ok;                                 % port_specs empty
+
+        _ ->                                    % have old/new specs
+
+            lists:foreach(fun(#spec{target=Target, objects=Objects}) ->
+                                  rebar_file_utils:delete_each([Target]),
+                                  rebar_file_utils:delete_each(Objects)
+                          end, Specs)
+    end.
 
 setup_env(Config) ->
-    %% Extract environment values from the config (if specified) and
-    %% merge with the default for this operating system. This enables
-    %% max flexibility for users.
-    DefaultEnv  = filter_env(default_env(), []),
-    PortEnv = port_env(Config),
-    OverrideEnv = global_defines() ++ filter_env(PortEnv, []),
-    RawEnv = apply_defaults(os_env(), DefaultEnv) ++ OverrideEnv,
-    expand_vars_loop(merge_each_var(RawEnv, [])).
+    setup_env(Config, []).
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+setup_env(Config, ExtraEnv) ->
+    %% Extract environment values from the config (if specified) and
+    %% merge with the default for this operating system. This enables
+    %% max flexibility for users.
+    DefaultEnv  = filter_env(default_env(), []),
+    PortEnv = filter_env(port_env(Config), []),
+    OverrideEnv = global_defines() ++ PortEnv ++ filter_env(ExtraEnv, []),
+    RawEnv = apply_defaults(os_env(), DefaultEnv) ++ OverrideEnv,
+    expand_vars_loop(merge_each_var(RawEnv, [])).
 
 global_defines() ->
     Defines = rebar_config:get_global(defines, []),
     Flags = string:join(["-D" ++ D || D <- Defines], " "),
     [{"ERL_CFLAGS", "$ERL_CFLAGS " ++ Flags}].
 
-get_sources(Config) ->
-    case rebar_config:get_list(Config, port_specs, []) of
-        [] ->
-            %% TODO: DEPRECATED: remove
-            expand_sources(rebar_config:get_list(Config, port_sources,
-                                                 ["c_src/*.c"]), []);
-        PortSpecs ->
-            expand_port_specs(PortSpecs)
-    end.
+replace_extension(File, NewExt) ->
+    OldExt = filename:extension(File),
+    replace_extension(File, OldExt, NewExt).
 
-expand_port_specs(Specs) ->
-    lists:flatmap(fun({_, Target, FileSpecs}) ->
-                          expand_file_specs(Target, FileSpecs);
-                     ({Target, FileSpecs}) ->
-                          expand_file_specs(Target, FileSpecs)
-                  end, filter_port_specs(Specs)).
+replace_extension(File, OldExt, NewExt) ->
+    filename:rootname(File, OldExt) ++ NewExt.
 
-expand_file_specs(Target, FileSpecs) ->
-    Sources = lists:flatmap(fun filelib:wildcard/1, FileSpecs),
-    [{Target, Src} || Src <- Sources].
+%%
+%% == compile and link ==
+%%
 
-filter_port_specs(Specs) ->
-    lists:filter(fun({ArchRegex, _, _}) ->
-                         rebar_utils:is_arch(ArchRegex);
-                    ({_, _}) ->
-                         true
-                 end, Specs).
+compile_sources([], Specs, SharedEnv) ->        % port_spec
+    lists:foldl(
+      fun(#spec{sources=Sources, type=Type, opts=Opts}, NewBins) ->
+              Env = proplists:get_value(env, Opts, SharedEnv),
+              compile_each(Sources, Type, Env, NewBins)
+      end, [], Specs);
+compile_sources(OldSources, _Specs, SharedEnv) -> % deprecated
+    compile_each(OldSources, drv, SharedEnv, []).
 
-
-%% TODO: DEPRECATED: remove
-expand_sources([], Acc) ->
-    Acc;
-expand_sources([{ArchRegex, Spec} | Rest], Acc) ->
-    case rebar_utils:is_arch(ArchRegex) of
-        true ->
-            Acc2 = expand_sources(Spec, Acc),
-            expand_sources(Rest, Acc2);
-        false ->
-            expand_sources(Rest, Acc)
-    end;
-expand_sources([Spec | Rest], Acc) ->
-    Acc2 = filelib:wildcard(Spec) ++ Acc,
-    expand_sources(Rest, Acc2).
-
-expand_objects(Sources) ->
-    [expand_object(".o", Src) || Src <- Sources].
-
-expand_object(Ext, {_Target, Source}) ->
-    expand_object(Ext, Source);
-expand_object(Ext, Source) ->
-    filename:join(filename:dirname(Source), filename:basename(Source) ++ Ext).
-
-compile_each([], _Config, _Env, NewBins, ExistingBins) ->
-    {lists:reverse(NewBins), lists:reverse(ExistingBins)};
-compile_each([RawSource | Rest], Config, Env, NewBins, ExistingBins) ->
-    %% TODO: DEPRECATED: remove
-    {Type, Source} = source_type(RawSource),
+compile_each([], _Type, _Env, NewBins) ->
+    lists:reverse(NewBins);
+compile_each([Source | Rest], Type, Env, NewBins) ->
     Ext = filename:extension(Source),
-    Bin = filename:rootname(Source, Ext) ++ ".o",
+    Bin = replace_extension(Source, Ext, ".o"),
     case needs_compile(Source, Bin) of
         true ->
             ?CONSOLE("Compiling ~s\n", [Source]),
             Template = select_compile_template(Type, compiler(Ext)),
             rebar_utils:sh(expand_command(Template, Env, Source, Bin),
                            [{env, Env}]),
-            compile_each(Rest, Config, Env, [Bin | NewBins], ExistingBins);
+            compile_each(Rest, Type, Env, [Bin | NewBins]);
         false ->
             ?INFO("Skipping ~s\n", [Source]),
-            compile_each(Rest, Config, Env, NewBins, [Bin | ExistingBins])
+            compile_each(Rest, Type, Env, NewBins)
     end.
-
-source_type({Target, Source}) -> {target_type(Target), Source};
-source_type(Source)           -> {drv, Source}.
 
 needs_compile(Source, Bin) ->
     %% TODO: Generate depends using gcc -MM so we can also
@@ -259,6 +242,127 @@ needs_link(SoName, NewBins) ->
             MaxLastMod >= Other
     end.
 
+%%
+%% == port_specs ==
+%%
+
+get_specs(Config, AppFile) ->
+    case rebar_config:get(Config, port_specs, undefined) of
+        undefined ->
+            %% TODO: DEPRECATED: remove support for non-port_specs syntax
+            {old, old_get_specs(Config, AppFile)};
+        PortSpecs ->
+            {new, get_port_specs(Config, PortSpecs)}
+    end.
+
+get_port_specs(Config, PortSpecs) ->
+    Filtered = filter_port_specs(PortSpecs),
+    OsType = os:type(),
+    {[], [get_port_spec(Config, OsType, Spec) || Spec <- Filtered]}.
+
+filter_port_specs(Specs) ->
+    [S || S <- Specs, filter_port_spec(S)].
+
+filter_port_spec({ArchRegex, _, _, _}) ->
+    rebar_utils:is_arch(ArchRegex);
+filter_port_spec({ArchRegex, _, _}) ->
+    rebar_utils:is_arch(ArchRegex);
+filter_port_spec({_, _}) ->
+    true.
+
+get_port_spec(Config, OsType, {Target, Sources}) ->
+    get_port_spec(Config, OsType, {undefined, Target, Sources, []});
+get_port_spec(Config, OsType, {Arch, Target, Sources}) ->
+    get_port_spec(Config, OsType, {Arch, Target, Sources, []});
+get_port_spec(Config, OsType, {_Arch, Target, Sources, Opts}) ->
+    SourceFiles = port_sources(Sources),
+    ObjectFiles = port_objects(SourceFiles),
+    #spec{type=target_type(Target),
+          target=maybe_switch_extension(OsType, Target),
+          sources=SourceFiles,
+          objects=ObjectFiles,
+          opts=port_opts(Config, Opts)}.
+
+port_sources(Sources) ->
+    lists:flatmap(fun filelib:wildcard/1, Sources).
+
+port_objects(SourceFiles) ->
+    [replace_extension(O, ".o") || O <- SourceFiles].
+
+port_opts(Config, Opts) ->
+    [port_opt(Config, O) || O <- Opts].
+
+port_opt(Config, {env, Env}) ->
+    {env, setup_env(Config, Env)};
+port_opt(_Config, Opt) ->
+    Opt.
+
+maybe_switch_extension({win32, nt}, Target) ->
+    switch_to_dll_or_exe(Target);
+maybe_switch_extension(_OsType, Target) ->
+    Target.
+
+switch_to_dll_or_exe(Target) ->
+    case filename:extension(Target) of
+        ".so" -> filename:rootname(Target, ".so") ++ ".dll";
+        []    -> Target ++ ".exe";
+        Other -> Other
+    end.
+
+%% TODO: DEPRECATED: remove support for non-port_specs syntax [old_*()]
+old_get_specs(Config, AppFile) ->
+    OsType = os:type(),
+    SourceFiles = old_get_sources(Config),
+    Specs =
+        case rebar_config:get(Config, so_specs, undefined) of
+            undefined ->
+                Objects = port_objects(SourceFiles),
+                %% New form of so_specs is not provided. See if the old form
+                %% of {so_name} is available instead
+                Dir = "priv",
+                SoName = case rebar_config:get(Config, so_name, undefined) of
+                             undefined ->
+                                 %% Ok, neither old nor new form is
+                                 %% available. Use the app name and
+                                 %% generate a sensible default.
+                                 AppName = rebar_app_utils:app_name(AppFile),
+                                 DrvName = ?FMT("~s_drv.so", [AppName]),
+                                 filename:join([Dir, DrvName]);
+                             AName ->
+                                 %% Old form is available -- use it
+                                 filename:join(Dir, AName)
+                         end,
+                [old_get_so_spec({SoName, Objects}, OsType)];
+            SoSpecs ->
+                [old_get_so_spec(S, OsType) || S <- SoSpecs]
+        end,
+    {SourceFiles, Specs}.
+
+old_get_sources(Config) ->
+    RawSources = rebar_config:get_list(Config, port_sources,
+                                       ["c_src/*.c"]),
+    FilteredSources = old_filter_port_sources(RawSources),
+    old_expand_sources(FilteredSources).
+
+old_filter_port_sources(PortSources) ->
+    [S || S <- PortSources, old_is_arch_port_sources(S)].
+
+old_is_arch_port_sources({Arch, _Sources}) -> rebar_utils:is_arch(Arch);
+old_is_arch_port_sources(_Sources)         -> true.
+
+old_expand_sources(Sources) ->
+    lists:flatmap(fun filelib:wildcard/1, Sources).
+
+old_get_so_spec({Target, Objects}, OsType) ->
+    #spec{type=drv,
+          target=maybe_switch_extension(OsType, Target),
+          sources=[],
+          objects=Objects,
+          opts=[]}.
+
+%%
+%% == port_env ==
+%%
 
 %%
 %% Choose a compiler variable, based on a provided extension
@@ -365,7 +469,6 @@ expand_keys_in_value([Key | Rest], Value, Vars) ->
                end,
     expand_keys_in_value(Rest, NewValue, Vars).
 
-
 expand_command(TmplName, Env, InFiles, OutFile) ->
     Cmd0 = proplists:get_value(TmplName, Env),
     Cmd1 = rebar_utils:expand_env_variable(Cmd0, "PORT_IN_FILES", InFiles),
@@ -425,7 +528,6 @@ filter_env([{ArchRegex, Key, Value} | Rest], Acc) ->
     end;
 filter_env([{Key, Value} | Rest], Acc) ->
     filter_env(Rest, [{Key, Value} | Acc]).
-
 
 erts_dir() ->
     lists:concat([code:root_dir(), "/erts-", erlang:system_info(version)]).
@@ -520,81 +622,3 @@ default_env() ->
      {"darwin11.*-32", "CXXFLAGS", "-m32 $CXXFLAGS"},
      {"darwin11.*-32", "LDFLAGS", "-arch i386 $LDFLAGS"}
     ].
-
-source_to_bin({_Target, Source}) ->
-    source_to_bin(Source);
-source_to_bin(Source) ->
-    Ext = filename:extension(Source),
-    filename:rootname(Source, Ext) ++ ".o".
-
-port_specs(Config, AppFile, Bins) ->
-    Specs = make_port_specs(Config, AppFile, Bins),
-    case os:type() of
-        {win32, nt} ->
-            [switch_to_dll_or_exe(Spec) || Spec <- Specs];
-        _ ->
-            Specs
-    end.
-
-switch_to_dll_or_exe(Orig = {Name, Spec}) ->
-    case filename:extension(Name) of
-        ".so" ->
-            {filename:rootname(Name, ".so") ++ ".dll", Spec};
-        [] ->
-            {Name ++ ".exe", Spec};
-        _ ->
-            %% Not a .so; leave it
-            Orig
-    end.
-
-make_port_specs(Config, AppFile, Bins) ->
-    case rebar_config:get(Config, port_specs, undefined) of
-        undefined ->
-            %% TODO: DEPRECATED: remove
-            make_so_specs(Config, AppFile, Bins);
-        PortSpecs ->
-            %% filter based on ArchRegex
-            Specs0 = lists:filter(fun({ArchRegex, _Target, _Sources}) ->
-                                          rebar_utils:is_arch(ArchRegex);
-                                     (_) ->
-                                          true
-                                  end, PortSpecs),
-            %% TODO: DEPRECATED: remove support for non-port_specs syntax
-
-
-            %% drop ArchRegex from specs
-            lists:map(fun({_, Target, RawSources}) ->
-                              {Target, sources_to_bins(RawSources)};
-                         ({Target, RawSources}) ->
-                              {Target, sources_to_bins(RawSources)}
-                      end, Specs0)
-    end.
-
-sources_to_bins(RawSources) ->
-    Sources = lists:flatmap(fun filelib:wildcard/1, RawSources),
-    lists:map(fun source_to_bin/1, Sources).
-
-%% DEPRECATED
-make_so_specs(Config, AppFile, Bins) ->
-    case rebar_config:get(Config, so_specs, undefined) of
-        undefined ->
-            %% New form of so_specs is not provided. See if the old form
-            %% of {so_name} is available instead
-            Dir = "priv",
-            SoName = case rebar_config:get(Config, so_name, undefined) of
-                         undefined ->
-                             %% Ok, neither old nor new form is available. Use
-                             %% the app name and generate a sensible default.
-                             AppName = rebar_app_utils:app_name(AppFile),
-                             filename:join(Dir,
-                                           lists:concat([AppName, "_drv.so"]));
-
-                         AName ->
-                             %% Old form is available -- use it
-                             filename:join(Dir, AName)
-                     end,
-            [{SoName, Bins}];
-
-        SoSpecs ->
-            SoSpecs
-    end.
