@@ -179,14 +179,14 @@ get_sources(Config) ->
     end.
 
 expand_port_specs(Specs) ->
-    lists:append(lists:map(fun({_, Target, FileSpecs}) ->
-                                   expand_file_specs(Target, FileSpecs);
-                              ({Target, FileSpecs}) ->
-                                   expand_file_specs(Target, FileSpecs)
-                           end, filter_port_specs(Specs))).
+    lists:flatmap(fun({_, Target, FileSpecs}) ->
+                          expand_file_specs(Target, FileSpecs);
+                     ({Target, FileSpecs}) ->
+                          expand_file_specs(Target, FileSpecs)
+                  end, filter_port_specs(Specs)).
 
 expand_file_specs(Target, FileSpecs) ->
-    Sources = lists:append([filelib:wildcard(FS) || FS <- FileSpecs]),
+    Sources = lists:flatmap(fun filelib:wildcard/1, FileSpecs),
     [{Target, Src} || Src <- Sources].
 
 filter_port_specs(Specs) ->
