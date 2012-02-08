@@ -141,6 +141,8 @@ doterl_compile(Config, OutDir, MoreSources) ->
                                     [[F | A], B, C];
                                 behaviour ->
                                     [A, [F | B], C];
+                                callback ->
+                                    [A, [F | B], C];
                                 _ ->
                                     [A, B, [F | C]]
                             end
@@ -334,6 +336,7 @@ delete_dir(Dir, Subdirs) ->
     file:del_dir(Dir).
 
 -spec compile_priority(File::file:filename()) -> 'normal' | 'behaviour' |
+                                                 'callback' |
                                                  'parse_transform'.
 compile_priority(File) ->
     case epp_dodger:parse_file(File) of
@@ -356,6 +359,9 @@ compile_priority(File) ->
                      {attribute, {tree, atom, _, export},
                       [{tree, list, _, {list, List, none}}]}}, Acc) ->
                         lists:foldl(F2, Acc, List);
+                   ({tree, attribute, _,
+                     {attribute, {tree, atom, _, callback},_}}, _Acc) ->
+                        callback;
                    (_, Acc) ->
                         Acc
                 end,
