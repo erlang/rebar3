@@ -113,7 +113,10 @@
 {deps, [application_name,
         {application_name, "1.0.*"},
         {application_name, "1.0.*",
-         {git, "git://github.com/basho/rebar.git", {branch, "master"}}}]}.
+         {git, "git://github.com/basho/rebar.git", {branch, "master"}}},
+        {application_name, "1.0.*",
+         {git, "git://github.com/basho/rebar.git", {branch, "master"}},
+         [{alt_url, "https://github.com/basho/rebar.git"}]}]}.
 
 %% == Subdirectories ==
 

@@ -12,7 +12,8 @@ _rebar()
         ct doc delete-deps eunit get-deps generate generate-upgrade \
         help list-deps list-templates update-deps version xref overlay \
         apps= case= force=1 jobs= suites= verbose=1 appid= previous_release= \
-        nodeid= root_dir= skip_deps=true skip_apps= template= template_dir="
+        nodeid= root_dir= skip_deps=true skip_apps= template= template_dir= \
+        alt_urls=true"
 
     if [[ ${cur} == --* ]] ; then
         COMPREPLY=( $(compgen -W "${lopts}" -- ${cur}) )
