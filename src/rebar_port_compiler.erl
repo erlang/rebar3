@@ -115,11 +115,11 @@ compile(Config, AppFile) ->
             %% Only relink if necessary, given the Target
             %% and list of new binaries
             lists:foreach(
-              fun({Target, Sources}) ->
-                      Bins = lists:map(fun source_to_bin/1, Sources),
+              fun({Target, Bins}) ->
                       AllBins = [sets:from_list(Bins),
                                  sets:from_list(NewBins)],
                       Intersection = sets:intersection(AllBins),
+                      ?DEBUG("Bins: ~p NewBins: ~p~n", [Bins, NewBins]),
                       case needs_link(Target, sets:to_list(Intersection)) of
                           true ->
                               LinkTemplate = select_link_template(Target),
@@ -559,13 +559,19 @@ make_port_specs(Config, AppFile, Bins) ->
                                           true
                                   end, PortSpecs),
             %% TODO: DEPRECATED: remove support for non-port_specs syntax
+
+
             %% drop ArchRegex from specs
-            lists:map(fun({_, Target, Sources}) ->
-                              {Target, Sources};
-                         (Spec) ->
-                              Spec
+            lists:map(fun({_, Target, RawSources}) ->
+                              {Target, sources_to_bins(RawSources)};
+                         ({Target, RawSources}) ->
+                              {Target, sources_to_bins(RawSources)}
                       end, Specs0)
     end.
+
+sources_to_bins(RawSources) ->
+    Sources = lists:flatmap(fun filelib:wildcard/1, RawSources),
+    lists:map(fun source_to_bin/1, Sources).
 
 %% DEPRECATED
 make_so_specs(Config, AppFile, Bins) ->
