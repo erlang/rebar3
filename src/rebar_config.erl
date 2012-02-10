@@ -26,7 +26,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_config).
 
--export([new/0, new/1, base_config/1,
+-export([new/0, new/1, base_config/1, consult_file/1,
          get/3, get_local/3, get_list/3,
          get_all/2,
          set/3,
@@ -128,13 +128,50 @@ is_verbose() ->
 get_jobs() ->
     get_global(jobs, 3).
 
+consult_file(File) ->
+    case filename:extension(File) of
+        ".script" ->
+            consult_and_eval(remove_script_ext(File), File);
+        _ ->
+            Script = File ++ ".script",
+            case filelib:is_regular(Script) of
+                true ->
+                    consult_and_eval(File, Script);
+                false ->
+                    ?DEBUG("Consult config file ~p~n", [File]),
+                    file:consult(File)
+            end
+    end.
+
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
-consult_file(File) ->
-    ?DEBUG("Consult config file ~p~n", [File]),
-    file:consult(File).
+consult_and_eval(File, Script) ->
+    ?DEBUG("Evaluating config script ~p~n", [Script]),
+    ConfigData = try_consult(File),
+    file:script(File, bs([{'CONFIG', ConfigData}, {'SCRIPT', File}])).
+
+
+remove_script_ext(F) ->
+    "tpircs." ++ Rev = lists:reverse(F),
+    lists:reverse(Rev).
+
+try_consult(File) ->
+    case file:consult(File) of
+        {ok, Terms} ->
+            ?DEBUG("Consult config file ~p~n", [File]),
+            Terms;
+        {error, enoent}  -> [];
+        {error, Reason} ->
+            ?ABORT("Failed to read config file ~s: ~p~n", [File, Reason])
+    end.
+
+bs(Vars) ->
+    lists:foldl(fun({K,V}, Bs) ->
+                        erl_eval:add_binding(K, V, Bs)
+                end, erl_eval:new_bindings(), Vars).
+
 
 local_opts([], Acc) ->
     lists:reverse(Acc);

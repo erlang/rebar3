@@ -48,12 +48,20 @@ is_rel_dir() ->
 
 is_rel_dir(Dir) ->
     Fname = filename:join([Dir, "reltool.config"]),
-    case filelib:is_regular(Fname) of
-        true ->
-            {true, Fname};
-        false ->
-            false
-    end.
+    Scriptname = Fname ++ ".script",
+    Res = case filelib:is_regular(Scriptname) of
+              true ->
+                  {true, Scriptname};
+              false ->
+                  case filelib:is_regular(Fname) of
+                      true ->
+                          {true, Fname};
+                      false ->
+                          false
+                  end
+          end,
+    ?DEBUG("is_rel_dir(~s) -> ~p~n", [Dir, Res]),
+    Res.
 
 %% Get release name and version from a reltool.config
 get_reltool_release_info([{sys, Config}| _]) ->
@@ -116,7 +124,7 @@ get_previous_release_path() ->
 %% Load terms from reltool.config
 %%
 load_config(ReltoolFile) ->
-    case file:consult(ReltoolFile) of
+    case rebar_config:consult_file(ReltoolFile) of
         {ok, Terms} ->
             expand_version(Terms, filename:dirname(ReltoolFile));
         Other ->
