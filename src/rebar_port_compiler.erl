@@ -119,7 +119,6 @@ compile(Config, AppFile) ->
                       AllBins = [sets:from_list(Bins),
                                  sets:from_list(NewBins)],
                       Intersection = sets:intersection(AllBins),
-                      ?DEBUG("Bins: ~p NewBins: ~p~n", [Bins, NewBins]),
                       case needs_link(Target, sets:to_list(Intersection)) of
                           true ->
                               LinkTemplate = select_link_template(Target),
