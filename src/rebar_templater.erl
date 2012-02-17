@@ -368,7 +368,7 @@ execute_template([{copy, Input, Output} | Rest], TemplateType, TemplateName,
                              Context, Force, ExistingFiles)
     catch _:_ ->
             ?ABORT("Failed while processing template instruction "
-                   "{dir, ~s, ~s}~n", [Input, Output])
+                   "{copy, ~s, ~s}~n", [Input, Output])
     end;
 execute_template([{chmod, Mod, File} | Rest], TemplateType, TemplateName,
                  Context, Force, ExistingFiles) when is_integer(Mod) ->
@@ -378,7 +378,7 @@ execute_template([{chmod, Mod, File} | Rest], TemplateType, TemplateName,
                              Context, Force, ExistingFiles);
         {error, Reason} ->
             ?ABORT("Failed while processing template instruction "
-                   "{cmod, ~b, ~s}: ~p~n", [Mod, File, Reason])
+                   "{chmod, ~b, ~s}: ~p~n", [Mod, File, Reason])
     end;
 execute_template([{symlink, Existing, New} | Rest], TemplateType, TemplateName,
                  Context, Force, ExistingFiles) ->
