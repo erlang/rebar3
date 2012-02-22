@@ -74,7 +74,7 @@ case "$1" in
         fi
         shift # remove $1
         RUN_PARAM=$(printf "\'%s\' " "$@")
-        HEART_COMMAND="$RUNNER_BASE_DIR/bin/$SCRIPT start"
+        HEART_COMMAND="$RUNNER_BASE_DIR/bin/$SCRIPT start $RUN_PARAM"
         export HEART_COMMAND
         mkdir -p $PIPE_DIR
         $ERTS_PATH/run_erl -daemon $PIPE_DIR $RUNNER_LOG_DIR "exec $RUNNER_BASE_DIR/bin/$SCRIPT console $RUN_PARAM" 2>&1
