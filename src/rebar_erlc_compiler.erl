@@ -321,7 +321,7 @@ gather_src([Dir|Rest], Srcs) ->
 src_dirs([]) ->
     ["src"];
 src_dirs(SrcDirs) ->
-    SrcDirs ++ src_dirs([]).
+    SrcDirs.
 
 -spec dirs(Dir::file:filename()) -> [file:filename()].
 dirs(Dir) ->
