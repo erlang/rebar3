@@ -35,7 +35,7 @@
 @echo Unknown command: "%1"
 
 :usage
-@echo Usage: %~n0 {install,uninstall,start,stop,restart,console,query,attach,upgrade}
+@echo Usage: %~n0 [install^|uninstall^|start^|stop^|restart^|console^|query^|attach^|upgrade]
 @goto :EOF
 
 :install
