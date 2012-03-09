@@ -42,47 +42,47 @@
 %%                {arch_regex(), "priv/foo.so", ["c_src/foo.c"]}
 %%                {"priv/foo", ["c_src/foo.c"]}
 %%
-%% * port_envs - Erlang list of key/value pairs which will control
-%%               the environment when running the compiler and linker.
+%% * port_env - Erlang list of key/value pairs which will control
+%%              the environment when running the compiler and linker.
 %%
-%%               By default, the following variables are defined:
-%%               CC       - C compiler
-%%               CXX      - C++ compiler
-%%               CFLAGS   - C compiler
-%%               CXXFLAGS - C++ compiler
-%%               LDFLAGS  - Link flags
-%%               ERL_CFLAGS  - default -I paths for erts and ei
-%%               ERL_LDFLAGS - default -L and -lerl_interface -lei
-%%               DRV_CFLAGS  - flags that will be used for compiling
-%%               DRV_LDFLAGS - flags that will be used for linking
-%%               EXE_CFLAGS  - flags that will be used for compiling
-%%               EXE_LDFLAGS - flags that will be used for linking
-%%               ERL_EI_LIBDIR - ei library directory
-%%               DRV_CXX_TEMPLATE  - C++ command template
-%%               DRV_CC_TEMPLATE   - C command template
-%%               DRV_LINK_TEMPLATE - Linker command template
-%%               EXE_CXX_TEMPLATE  - C++ command template
-%%               EXE_CC_TEMPLATE   - C command template
-%%               EXE_LINK_TEMPLATE - Linker command template
-%%               PORT_IN_FILES - contains a space separated list of input
-%%                    file(s), (used in command template)
-%%               PORT_OUT_FILE - contains the output filename (used in
-%%                    command template)
+%%              By default, the following variables are defined:
+%%              CC       - C compiler
+%%              CXX      - C++ compiler
+%%              CFLAGS   - C compiler
+%%              CXXFLAGS - C++ compiler
+%%              LDFLAGS  - Link flags
+%%              ERL_CFLAGS  - default -I paths for erts and ei
+%%              ERL_LDFLAGS - default -L and -lerl_interface -lei
+%%              DRV_CFLAGS  - flags that will be used for compiling
+%%              DRV_LDFLAGS - flags that will be used for linking
+%%              EXE_CFLAGS  - flags that will be used for compiling
+%%              EXE_LDFLAGS - flags that will be used for linking
+%%              ERL_EI_LIBDIR - ei library directory
+%%              DRV_CXX_TEMPLATE  - C++ command template
+%%              DRV_CC_TEMPLATE   - C command template
+%%              DRV_LINK_TEMPLATE - Linker command template
+%%              EXE_CXX_TEMPLATE  - C++ command template
+%%              EXE_CC_TEMPLATE   - C command template
+%%              EXE_LINK_TEMPLATE - Linker command template
+%%              PORT_IN_FILES - contains a space separated list of input
+%%                   file(s), (used in command template)
+%%              PORT_OUT_FILE - contains the output filename (used in
+%%                   command template)
 %%
-%%               Note that if you wish to extend (vs. replace) these variables,
-%%               you MUST include a shell-style reference in your definition.
-%%               e.g. to extend CFLAGS, do something like:
+%%              Note that if you wish to extend (vs. replace) these variables,
+%%              you MUST include a shell-style reference in your definition.
+%%              e.g. to extend CFLAGS, do something like:
 %%
-%%               {port_envs, [{"CFLAGS", "$CFLAGS -MyOtherOptions"}]}
+%%              {port_env, [{"CFLAGS", "$CFLAGS -MyOtherOptions"}]}
 %%
-%%               It is also possible to specify platform specific options
-%%               by specifying a triplet where the first string is a regex
-%%               that is checked against Erlang's system architecture string.
-%%               e.g. to specify a CFLAG that only applies to x86_64 on linux
-%%               do:
+%%              It is also possible to specify platform specific options
+%%              by specifying a triplet where the first string is a regex
+%%              that is checked against Erlang's system architecture string.
+%%              e.g. to specify a CFLAG that only applies to x86_64 on linux
+%%              do:
 %%
-%%               {port_envs, [{"x86_64.*-linux", "CFLAGS",
-%%                             "$CFLAGS -X86Options"}]}
+%%              {port_env, [{"x86_64.*-linux", "CFLAGS",
+%%                           "$CFLAGS -X86Options"}]}
 %%
 
 compile(Config, AppFile) ->
@@ -152,10 +152,10 @@ setup_env(Config) ->
     %% Extract environment values from the config (if specified) and
     %% merge with the default for this operating system. This enables
     %% max flexibility for users.
-    DefaultEnvs  = filter_envs(default_env(), []),
-    PortEnvs = port_envs(Config),
-    OverrideEnvs = global_defines() ++ filter_envs(PortEnvs, []),
-    RawEnv = apply_defaults(os_env(), DefaultEnvs) ++ OverrideEnvs,
+    DefaultEnv  = filter_env(default_env(), []),
+    PortEnv = port_env(Config),
+    OverrideEnv = global_defines() ++ filter_env(PortEnv, []),
+    RawEnv = apply_defaults(os_env(), DefaultEnv) ++ OverrideEnv,
     expand_vars_loop(merge_each_var(RawEnv, [])).
 
 %% ===================================================================
@@ -381,9 +381,11 @@ is_expandable(InStr) ->
         nomatch -> false
     end.
 
-port_envs(Config) ->
-    PortEnvs = rebar_config:get_list(Config, port_envs, []),
-    %% TODO: remove migration of deprecated port_envs (DRV_-/EXE_-less vars)
+port_env(Config) ->
+    %% TODO: remove support for deprecated port_envs option
+    PortEnv = rebar_utils:get_deprecated_list(Config, port_envs, port_env,
+                                              [], "soon"),
+    %% TODO: remove migration of deprecated port_env DRV_-/EXE_-less vars
     %%       when the deprecation grace period ends
     WarnAndConvertVar = fun(Var) ->
                                 New = "DRV_" ++ Var,
@@ -406,23 +408,23 @@ port_envs(Config) ->
                  ({Var, Val}) ->
                       {ConvertVar(Var), ReplaceVars(Val)}
               end,
-    [Convert(Env) || Env <- PortEnvs].
+    [Convert(EnvVar) || EnvVar <- PortEnv].
 
 %%
 %% Filter a list of env vars such that only those which match the provided
 %% architecture regex (or do not have a regex) are returned.
 %%
-filter_envs([], Acc) ->
+filter_env([], Acc) ->
     lists:reverse(Acc);
-filter_envs([{ArchRegex, Key, Value} | Rest], Acc) ->
+filter_env([{ArchRegex, Key, Value} | Rest], Acc) ->
     case rebar_utils:is_arch(ArchRegex) of
         true ->
-            filter_envs(Rest, [{Key, Value} | Acc]);
+            filter_env(Rest, [{Key, Value} | Acc]);
         false ->
-            filter_envs(Rest, Acc)
+            filter_env(Rest, Acc)
     end;
-filter_envs([{Key, Value} | Rest], Acc) ->
-    filter_envs(Rest, [{Key, Value} | Acc]).
+filter_env([{Key, Value} | Rest], Acc) ->
+    filter_env(Rest, [{Key, Value} | Acc]).
 
 
 erts_dir() ->

@@ -37,7 +37,7 @@
 
 %% Port compilation environment variables. See rebar_port_compiler.erl for
 %% more info. Default is `[]'
-{port_envs, []}.
+{port_env, []}.
 
 %% port_specs
 %% List of filenames or wildcards to be compiled. May also contain a tuple
