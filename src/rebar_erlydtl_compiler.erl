@@ -114,12 +114,12 @@ compile_dtl(Source, Target, Config) ->
     case code:which(erlydtl) of
         non_existing ->
             ?ERROR(
-               <<"~n===============================================~n"
+                 "~n===============================================~n"
                  " You need to install erlydtl to compile DTL templates~n"
                  " Download the latest tarball release from github~n"
                  "    http://code.google.com/p/erlydtl/~n"
                  " and install it into your erlang library dir~n"
-                 "===============================================~n~n">>, []),
+                 "===============================================~n~n", []),
             ?FAIL;
         _ ->
             case needs_compile(Source, Target, Config) of

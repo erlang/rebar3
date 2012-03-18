@@ -48,17 +48,15 @@ compile(Config, _AppFile) ->
 compile_lfe(Source, _Target, Config) ->
     case code:which(lfe_comp) of
         non_existing ->
-            ?ERROR(<<
-                     "~n"
-                     "*** MISSING LFE COMPILER ***~n"
-                     "  You must do one of the following:~n"
-                     "    a) Install LFE globally in your erl libs~n"
-                     "    b) Add LFE as a dep for your project, eg:~n"
-                     "       {lfe, \"0.6.1\",~n"
-                     "        {git, \"git://github.com/rvirding/lfe\",~n"
-                     "         {tag, \"v0.6.1\"}}}~n"
-                     "~n"
-                   >>, []),
+            ?ERROR("~n"
+                   "*** MISSING LFE COMPILER ***~n"
+                   "  You must do one of the following:~n"
+                   "    a) Install LFE globally in your erl libs~n"
+                   "    b) Add LFE as a dep for your project, eg:~n"
+                   "       {lfe, \"0.6.1\",~n"
+                   "        {git, \"git://github.com/rvirding/lfe\",~n"
+                   "         {tag, \"v0.6.1\"}}}~n"
+                   "~n", []),
             ?FAIL;
         _ ->
             Opts = [{i, "include"}, {outdir, "ebin"}, report]
