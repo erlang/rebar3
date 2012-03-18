@@ -84,13 +84,12 @@ abnfc_is_present() ->
 compile_abnfc(Source, _Target, Config) ->
     case abnfc_is_present() of
         false ->
-            ?ERROR(
-                 "~n===============================================~n"
-                 " You need to install abnfc to compile ABNF grammars~n"
-                 " Download the latest tarball release from github~n"
-                 "    https://github.com/nygge/abnfc~n"
-                 " and install it into your erlang library dir~n"
-                 "===============================================~n~n", []),
+            ?ERROR("~n===============================================~n"
+                   " You need to install abnfc to compile ABNF grammars~n"
+                   " Download the latest tarball release from github~n"
+                   "    https://github.com/nygge/abnfc~n"
+                   " and install it into your erlang library dir~n"
+                   "===============================================~n~n", []),
             ?FAIL;
         true ->
             AbnfcOpts = abnfc_opts(Config),

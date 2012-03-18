@@ -89,7 +89,8 @@ compile(Config, _AppFile) ->
                                      option(source_ext, DtlOpts),
                                      option(out_dir, DtlOpts),
                                      option(module_ext, DtlOpts) ++ ".beam",
-                                     fun compile_dtl/3, [{check_last_mod, false}]),
+                                     fun compile_dtl/3,
+                                     [{check_last_mod, false}]),
     true = code:set_path(OrigPath),
     Result.
 
@@ -113,13 +114,12 @@ default(custom_tags_dir) -> "".
 compile_dtl(Source, Target, Config) ->
     case code:which(erlydtl) of
         non_existing ->
-            ?ERROR(
-                 "~n===============================================~n"
-                 " You need to install erlydtl to compile DTL templates~n"
-                 " Download the latest tarball release from github~n"
-                 "    http://code.google.com/p/erlydtl/~n"
-                 " and install it into your erlang library dir~n"
-                 "===============================================~n~n", []),
+            ?ERROR("~n===============================================~n"
+                   " You need to install erlydtl to compile DTL templates~n"
+                   " Download the latest tarball release from github~n"
+                   "    http://code.google.com/p/erlydtl/~n"
+                   " and install it into your erlang library dir~n"
+                   "===============================================~n~n", []),
             ?FAIL;
         _ ->
             case needs_compile(Source, Target, Config) of

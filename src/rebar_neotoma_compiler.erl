@@ -74,13 +74,12 @@ default(source_ext) -> ".peg".
 compile_neo(Source, Target, Config) ->
     case code:which(neotoma) of
         non_existing ->
-            ?ERROR(
-                 "~n===============================================~n"
-                 " You need to install neotoma to compile PEG grammars~n"
-                 " Download the latest tarball release from github~n"
-                 "    https://github.com/seancribbs/neotoma~n"
-                 " and install it into your erlang library dir~n"
-                 "===============================================~n~n", []),
+            ?ERROR("~n===============================================~n"
+                   " You need to install neotoma to compile PEG grammars~n"
+                   " Download the latest tarball release from github~n"
+                   "    https://github.com/seancribbs/neotoma~n"
+                   " and install it into your erlang library dir~n"
+                   "===============================================~n~n", []),
             ?FAIL;
         _ ->
             case needs_compile(Source, Target, Config) of
