@@ -293,14 +293,23 @@ deprecated(Old, New, When) ->
 
 -spec delayed_halt(integer()) -> no_return().
 delayed_halt(Code) ->
-    case os:type() of
-        {win32, nt} ->
-            timer:sleep(100),
+    %% Work around buffer flushing issue in erlang:halt if OTP older
+    %% than R15B01.
+    %% TODO: remove workaround once we require R15B01 or newer
+    %% R15B01 introduced erlang:halt/2
+    case erlang:is_builtin(erlang, halt, 2) of
+        true ->
             halt(Code);
-        _ ->
-            halt(Code),
-            %% workaround to delay exit until all output is written
-            receive after infinity -> ok end
+        false ->
+            case os:type() of
+                {win32, nt} ->
+                    timer:sleep(100),
+                    halt(Code);
+                _ ->
+                    halt(Code),
+                    %% workaround to delay exit until all output is written
+                    receive after infinity -> ok end
+            end
     end.
 
 %% ====================================================================
