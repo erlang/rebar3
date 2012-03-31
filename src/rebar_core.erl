@@ -235,7 +235,9 @@ remember_cwd_subdir(Cwd, Subdirs) ->
                             ?DEBUG("Associate sub_dir ~s with ~s~n", [Dir, Cwd]),
                             dict:store(Dir, Cwd, Dict);
                         {ok, Existing} ->
-                            ?ABORT("sub_dir ~s already associated with ~s~n",
+                            ?ABORT("Internal consistency assertion failed.~n"
+                                   "sub_dir ~s already associated with ~s.~n"
+                                   "Duplicate sub_dirs or deps entries?",
                                    [Dir, Existing]),
                             Dict
                     end
