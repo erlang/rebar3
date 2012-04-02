@@ -103,7 +103,14 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
             DirSet;
 
         true ->
-            ?DEBUG("Entering ~s\n", [Dir]),
+            AbsDir = filename:absname(Dir),
+            case processing_base_dir(Dir) of
+                false ->
+                    ?CONSOLE("==> Entering directory `~s'\n", [AbsDir]);
+                true ->
+                    ok
+            end,
+
             ok = file:set_cwd(Dir),
             Config = maybe_load_local_config(Dir, ParentConfig),
 
@@ -118,8 +125,17 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
             %% to process this dir.
             {ok, AvailModuleSets} = application:get_env(rebar, modules),
             ModuleSet = choose_module_set(AvailModuleSets, Dir),
-            maybe_process_dir(ModuleSet, Config, CurrentCodePath,
-                              Dir, Command, DirSet)
+            Res = maybe_process_dir(ModuleSet, Config, CurrentCodePath,
+                                    Dir, Command, DirSet),
+
+            case processing_base_dir(Dir) of
+                false ->
+                    ?CONSOLE("==> Leaving directory `~s'\n", [AbsDir]);
+                true ->
+                    ok
+            end,
+
+            Res
     end.
 
 maybe_process_dir({[], undefined}=ModuleSet, Config, CurrentCodePath,
