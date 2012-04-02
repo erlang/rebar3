@@ -11,11 +11,8 @@ debug:
 
 check: debug xref dialyzer
 
-xref: xref_warnings
-	@diff -U0 xref_reference xref_warnings
-
-xref_warnings:
-	-@./rebar xref > xref_warnings
+xref:
+	-@./rebar xref
 
 dialyzer: dialyzer_warnings
 	@diff -U0 dialyzer_reference dialyzer_warnings

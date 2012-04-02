@@ -1,2 +1,0 @@
-==> rebar (xref)
-src/rebar_utils.erl:148: Warning escript_foldl/3 calls undefined function escript:foldl/3

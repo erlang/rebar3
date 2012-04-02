@@ -151,5 +151,15 @@
 %% == xref ==
 
 {xref_warnings, false}.
+
 %% xref checks to run
 {xref_checks, [exports_not_used, undefined_function_calls]}.
+
+%% Optional custom xref queries (xref manual has details) specified as
+%%     {xref_queries, [{query_string(), expected_query_result()},...]}
+%% The following for example removes all references to ejabberd:*_msg/4
+%% functions from undefined external function calls as those are in a
+%% generated module
+{xref_queries,
+  [{"(XC - UC) || (XU - X - B"
+    " - (\"ejabberd_logger\":\".*_msg\"/\"4\"))",[]}]}.

@@ -77,13 +77,19 @@ xref(Config, _) ->
             false ->
                 true
         end,
+
+    %% Run custom queries
+    QueryChecks = rebar_config:get(Config, xref_queries, []),
+    QueryNoWarn = lists:all(fun check_query/1, QueryChecks),
+
     %% Restore the original code path
     true = code:set_path(OrigPath),
 
     %% Stop xref
     stopped = xref:stop(xref),
 
-    case lists:all(fun(NoWarn) -> NoWarn end, [ExportsNoWarn, UndefNoWarn]) of
+    case lists:all(fun(NoWarn) -> NoWarn end,
+                   [ExportsNoWarn, UndefNoWarn, QueryNoWarn]) of
         true ->
             ok;
         false ->
@@ -114,6 +120,17 @@ check_undefined_function_calls() ->
                        [Source, Line, FunStr, Target])
       end, UndefinedCalls),
     UndefinedCalls =:= [].
+
+check_query({Query, Value}) ->
+    {ok, Answer} = xref:q(xref, Query),
+    case Answer =:= Value of
+        false ->
+            ?CONSOLE("Query ~s~n answer ~p~n did not match ~p~n",
+                     [Query, Answer, Value]),
+            false;
+        _     ->
+            true
+    end.
 
 code_path() ->
     [P || P <- code:get_path(),
