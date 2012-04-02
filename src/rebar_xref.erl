@@ -88,12 +88,11 @@ xref(Config, _) ->
     %% Stop xref
     stopped = xref:stop(xref),
 
-    case lists:all(fun(NoWarn) -> NoWarn end,
-                   [ExportsNoWarn, UndefNoWarn, QueryNoWarn]) of
+    case lists:member(false, [ExportsNoWarn, UndefNoWarn, QueryNoWarn]) of
         true ->
-            ok;
+            ?FAIL;
         false ->
-            ?FAIL
+            ok
     end.
 
 %% ===================================================================
