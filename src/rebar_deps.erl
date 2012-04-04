@@ -97,11 +97,17 @@ compile(Config, AppFile) ->
 setup_env(_Config) ->
     {true, DepsDir} = get_deps_dir(),
     %% include rebar's DepsDir in ERL_LIBS
+    Separator = case os:type() of
+                    {win32, nt} ->
+                        ";";
+                    _ ->
+                        ":"
+                end,
     ERL_LIBS = case os:getenv("ERL_LIBS") of
                    false ->
                        {"ERL_LIBS", DepsDir};
                    PrevValue ->
-                       {"ERL_LIBS", DepsDir ++ ":" ++ PrevValue}
+                       {"ERL_LIBS", DepsDir ++ Separator ++ PrevValue}
                end,
     [{"REBAR_DEPS_DIR", DepsDir}, ERL_LIBS].
 
