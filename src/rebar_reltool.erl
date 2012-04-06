@@ -150,7 +150,7 @@ load_vars_file(File) ->
         {ok, Terms} ->
             dict:from_list(Terms);
         {error, Reason} ->
-            ?ABORT("Unable to load overlay_vars from ~s: ~p\n", [File, Reason])
+            ?ABORT("Unable to load overlay_vars from ~p: ~p\n", [File, Reason])
     end.
 
 
