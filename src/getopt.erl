@@ -466,34 +466,34 @@ is_non_neg_float_arg([]) ->
     true.
 
 
-%% @doc  Show a message on stderr indicating the command line options and
+%% @doc  Show a message on standard_error indicating the command line options and
 %%       arguments that are supported by the program.
 -spec usage([option_spec()], string()) -> ok.
 usage(OptSpecList, ProgramName) ->
 	usage(OptSpecList, ProgramName, standard_error).
 
 
-%% @doc  Show a message on stderr or stdout indicating the command line options and
+%% @doc  Show a message on standard_error or standard_io indicating the command line options and
 %%       arguments that are supported by the program.
 -spec usage([option_spec()], string(), output_stream() | string()) -> ok.
 usage(OptSpecList, ProgramName, OutputStream) when is_atom(OutputStream) ->
     io:format(OutputStream, "Usage: ~s~s~n~n~s~n",
               [ProgramName, usage_cmd_line(OptSpecList), usage_options(OptSpecList)]);
-%% @doc  Show a message on stderr indicating the command line options and
+%% @doc  Show a message on standard_error indicating the command line options and
 %%       arguments that are supported by the program. The CmdLineTail argument
 %%       is a string that is added to the end of the usage command line.
 usage(OptSpecList, ProgramName, CmdLineTail) ->
 	usage(OptSpecList, ProgramName, CmdLineTail, standard_error).
 
 
-%% @doc  Show a message on stderr or stdout indicating the command line options and
+%% @doc  Show a message on standard_error or standard_io indicating the command line options and
 %%       arguments that are supported by the program. The CmdLineTail argument
 %%       is a string that is added to the end of the usage command line.
 -spec usage([option_spec()], string(), string(), output_stream() | [{string(), string()}]) -> ok.
 usage(OptSpecList, ProgramName, CmdLineTail, OutputStream) when is_atom(OutputStream) ->
 	io:format(OutputStream, "Usage: ~s~s ~s~n~n~s~n",
               [ProgramName, usage_cmd_line(OptSpecList), CmdLineTail, usage_options(OptSpecList)]);
-%% @doc  Show a message on stderr indicating the command line options and
+%% @doc  Show a message on standard_error indicating the command line options and
 %%       arguments that are supported by the program. The CmdLineTail and OptionsTail
 %%       arguments are a string that is added to the end of the usage command line
 %%       and a list of tuples that are added to the end of the options' help lines.
@@ -501,7 +501,7 @@ usage(OptSpecList, ProgramName, CmdLineTail, OptionsTail) ->
 	usage(OptSpecList, ProgramName, CmdLineTail, OptionsTail, standard_error).
 
 
-%% @doc  Show a message on stderr or stdout indicating the command line options and
+%% @doc  Show a message on standard_error or standard_io indicating the command line options and
 %%       arguments that are supported by the program. The CmdLineTail and OptionsTail
 %%       arguments are a string that is added to the end of the usage command line
 %%       and a list of tuples that are added to the end of the options' help lines.
