@@ -178,8 +178,33 @@ case "$1" in
         exec $CMD -- ${1+"$@"}
         ;;
 
+    foreground)
+        # start up the release in the foreground for use by runit
+        # or other supervision services
+
+        BOOTFILE=$SCRIPT
+        FOREGROUNDOPTIONS="-noinput +Bd"
+
+        # Setup beam-required vars
+        ROOTDIR=$RUNNER_BASE_DIR
+        BINDIR=$ROOTDIR/erts-$ERTS_VSN/bin
+        EMU=beam
+        PROGNAME=`echo $0 | sed 's/.*\///'`
+        CMD="$BINDIR/erlexec $FOREGROUNDOPTIONS -boot $RUNNER_BASE_DIR/releases/$APP_VSN/$BOOTFILE -config $CONFIG_PATH -args_file $VMARGS_PATH"
+        export EMU
+        export ROOTDIR
+        export BINDIR
+        export PROGNAME
+
+        # Dump environment info for logging purposes
+        echo "Exec: $CMD" -- ${1+"$@"}
+        echo "Root: $ROOTDIR"
+
+        # Start the VM
+        exec $CMD -- ${1+"$@"}
+        ;;
     *)
-        echo "Usage: $SCRIPT {start|stop|restart|reboot|ping|console|console_clean|attach}"
+        echo "Usage: $SCRIPT {start|foreground|stop|restart|reboot|ping|console|console_clean|attach}"
         exit 1
         ;;
 esac
