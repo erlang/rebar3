@@ -205,7 +205,7 @@ process_dir0(Dir, Command, DirSet, Config, CurrentCodePath,
     case is_skip_dir(Dir) of
         true ->
             %% Do not execute the command on the directory, as some
-            %% module as requested a skip on it.
+            %% module has requested a skip on it.
             ?INFO("Skipping ~s in ~s\n", [Command, Dir]);
 
         false ->
