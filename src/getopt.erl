@@ -442,7 +442,7 @@ is_boolean_arg(Arg) ->
 
 
 -spec is_integer_arg(string()) -> boolean().
-is_integer_arg([$- | Tail]) ->
+is_integer_arg("-" ++ Tail) ->
     is_non_neg_integer_arg(Tail);
 is_integer_arg(Arg) ->
     is_non_neg_integer_arg(Arg).
