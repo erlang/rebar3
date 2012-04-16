@@ -193,9 +193,7 @@ expand_env_variable(InStr, VarName, RawVarValue) ->
 
 vcs_vsn(Vcs, Dir) ->
     Key = {Vcs, Dir},
-    try ets:lookup_element(rebar_vsn_cache, Key, 2) of
-        VsnString ->
-            VsnString
+    try ets:lookup_element(rebar_vsn_cache, Key, 2)
     catch
         error:badarg ->
             VsnString = vcs_vsn_1(Vcs, Dir),
