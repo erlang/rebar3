@@ -165,7 +165,7 @@ get_env(Config, Mod) ->
 consult_and_eval(File, Script) ->
     ?DEBUG("Evaluating config script ~p~n", [Script]),
     ConfigData = try_consult(File),
-    file:script(Script, bs([{'CONFIG', ConfigData}, {'SCRIPT', File}])).
+    file:script(Script, bs([{'CONFIG', ConfigData}, {'SCRIPT', Script}])).
 
 
 remove_script_ext(F) ->
