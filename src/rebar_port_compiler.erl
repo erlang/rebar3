@@ -247,7 +247,7 @@ needs_link(SoName, NewBins) ->
 %%
 
 get_specs(Config, AppFile) ->
-    case rebar_config:get(Config, port_specs, undefined) of
+    case rebar_config:get_local(Config, port_specs, undefined) of
         undefined ->
             %% TODO: DEPRECATED: remove support for non-port_specs syntax
             {old, old_get_specs(Config, AppFile)};
@@ -314,24 +314,25 @@ old_get_specs(Config, AppFile) ->
     OsType = os:type(),
     SourceFiles = old_get_sources(Config),
     Specs =
-        case rebar_config:get(Config, so_specs, undefined) of
+        case rebar_config:get_local(Config, so_specs, undefined) of
             undefined ->
                 Objects = port_objects(SourceFiles),
                 %% New form of so_specs is not provided. See if the old form
                 %% of {so_name} is available instead
                 Dir = "priv",
-                SoName = case rebar_config:get(Config, so_name, undefined) of
-                             undefined ->
-                                 %% Ok, neither old nor new form is
-                                 %% available. Use the app name and
-                                 %% generate a sensible default.
-                                 AppName = rebar_app_utils:app_name(AppFile),
-                                 DrvName = ?FMT("~s_drv.so", [AppName]),
-                                 filename:join([Dir, DrvName]);
-                             AName ->
-                                 %% Old form is available -- use it
-                                 filename:join(Dir, AName)
-                         end,
+                SoName =
+                    case rebar_config:get_local(Config, so_name, undefined) of
+                        undefined ->
+                            %% Ok, neither old nor new form is
+                            %% available. Use the app name and
+                            %% generate a sensible default.
+                            AppName = rebar_app_utils:app_name(AppFile),
+                            DrvName = ?FMT("~s_drv.so", [AppName]),
+                            filename:join([Dir, DrvName]);
+                        AName ->
+                            %% Old form is available -- use it
+                            filename:join(Dir, AName)
+                    end,
                 [old_get_so_spec({SoName, Objects}, OsType)];
             SoSpecs ->
                 [old_get_so_spec(S, OsType) || S <- SoSpecs]
@@ -339,8 +340,8 @@ old_get_specs(Config, AppFile) ->
     {SourceFiles, Specs}.
 
 old_get_sources(Config) ->
-    RawSources = rebar_config:get_list(Config, port_sources,
-                                       ["c_src/*.c"]),
+    RawSources = rebar_config:get_local(Config, port_sources,
+                                        ["c_src/*.c"]),
     FilteredSources = old_filter_port_sources(RawSources),
     old_expand_sources(FilteredSources).
 
