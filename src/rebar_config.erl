@@ -187,7 +187,6 @@ bs(Vars) ->
                         erl_eval:add_binding(K, V, Bs)
                 end, erl_eval:new_bindings(), Vars).
 
-
 local_opts([], Acc) ->
     lists:reverse(Acc);
 local_opts([local | _Rest], Acc) ->
