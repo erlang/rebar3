@@ -50,6 +50,14 @@ if [ -z "$NAME_ARG" ]; then
     exit 1
 fi
 
+# Extract the name type and name from the NAME_ARG for REMSH
+REMSH_TYPE=`echo $NAME_ARG | awk '{print $1}'`
+REMSH_NAME=`echo $NAME_ARG | awk '{print $2}'`
+
+# Note the `date +%s`, used to allow multiple remsh to the same node transparently
+REMSH_NAME_ARG="$REMSH_TYPE attach`date +%s`@`echo $REMSH_NAME | awk -F@ '{print $2}'`"
+REMSH_REMSH_ARG="-remsh $REMSH_NAME"
+
 # Extract the target cookie
 COOKIE_ARG=`grep '^-setcookie' $VMARGS_PATH`
 if [ -z "$COOKIE_ARG" ]; then
@@ -63,6 +71,9 @@ ERTS_PATH=$RUNNER_BASE_DIR/erts-$ERTS_VSN/bin
 # Setup command to control the node
 NODETOOL="$ERTS_PATH/escript $ERTS_PATH/nodetool $NAME_ARG $COOKIE_ARG"
 
+# Setup remote shell command to control node
+REMSH="$ERTS_PATH/erl $REMSH_NAME_ARG $REMSH_REMSH_ARG $COOKIE_ARG"
+
 # Check the first argument for instructions
 case "$1" in
     start)
@@ -72,11 +83,12 @@ case "$1" in
             echo "Node is already running!"
             exit 1
         fi
-        HEART_COMMAND="$RUNNER_BASE_DIR/bin/$SCRIPT start"
+        shift # remove $1
+        RUN_PARAM=$(printf "\'%s\' " "$@")
+        HEART_COMMAND="$RUNNER_BASE_DIR/bin/$SCRIPT start $RUN_PARAM"
         export HEART_COMMAND
         mkdir -p $PIPE_DIR
-        shift # remove $1
-        $ERTS_PATH/run_erl -daemon $PIPE_DIR $RUNNER_LOG_DIR "exec $RUNNER_BASE_DIR/bin/$SCRIPT console $@" 2>&1
+        $ERTS_PATH/run_erl -daemon $PIPE_DIR $RUNNER_LOG_DIR "exec $RUNNER_BASE_DIR/bin/$SCRIPT console $RUN_PARAM" 2>&1
         ;;
 
     stop)
@@ -148,6 +160,41 @@ case "$1" in
         exec $ERTS_PATH/to_erl $PIPE_DIR
         ;;
 
+    remote_console)
+        # Make sure a node IS running
+        RES=`$NODETOOL ping`
+        ES=$?
+        if [ "$ES" -ne 0 ]; then
+            echo "Node is not running!"
+            exit $ES
+        fi
+
+        shift
+        exec $REMSH
+        ;;
+
+    upgrade)
+        if [ -z "$2" ]; then
+            echo "Missing upgrade package argument"
+            echo "Usage: $SCRIPT upgrade {package base name}"
+            echo "NOTE {package base name} MUST NOT include the .tar.gz suffix"
+            exit 1
+        fi
+
+        # Make sure a node IS running
+        RES=`$NODETOOL ping`
+        ES=$?
+        if [ "$ES" -ne 0 ]; then
+            echo "Node is not running!"
+            exit $ES
+        fi
+
+        node_name=`echo $NAME_ARG | awk '{print $2}'`
+        erlang_cookie=`echo $COOKIE_ARG | awk '{print $2}'`
+
+        $ERTS_PATH/escript $RUNNER_BASE_DIR/bin/install_upgrade.escript $node_name $erlang_cookie $2
+        ;;
+
     console|console_clean)
         # .boot file typically just $SCRIPT (ie, the app name)
         # however, for debugging, sometimes start_clean.boot is useful:
@@ -160,25 +207,50 @@ case "$1" in
         BINDIR=$ROOTDIR/erts-$ERTS_VSN/bin
         EMU=beam
         PROGNAME=`echo $0 | sed 's/.*\\///'`
-        CMD="$BINDIR/erlexec -boot $RUNNER_BASE_DIR/releases/$APP_VSN/$BOOTFILE -mode embedded -config $CONFIG_PATH -args_file $VMARGS_PATH -- ${1+"$@"}"
+        CMD="$BINDIR/erlexec -boot $RUNNER_BASE_DIR/releases/$APP_VSN/$BOOTFILE -mode embedded -config $CONFIG_PATH -args_file $VMARGS_PATH"
         export EMU
         export ROOTDIR
         export BINDIR
         export PROGNAME
 
         # Dump environment info for logging purposes
-        echo "Exec: $CMD"
+        echo "Exec: $CMD" -- ${1+"$@"}
         echo "Root: $ROOTDIR"
 
         # Log the startup
         logger -t "$SCRIPT[$$]" "Starting up"
 
         # Start the VM
-        exec $CMD
+        exec $CMD -- ${1+"$@"}
         ;;
 
+    foreground)
+        # start up the release in the foreground for use by runit
+        # or other supervision services
+
+        BOOTFILE=$SCRIPT
+        FOREGROUNDOPTIONS="-noinput +Bd"
+
+        # Setup beam-required vars
+        ROOTDIR=$RUNNER_BASE_DIR
+        BINDIR=$ROOTDIR/erts-$ERTS_VSN/bin
+        EMU=beam
+        PROGNAME=`echo $0 | sed 's/.*\///'`
+        CMD="$BINDIR/erlexec $FOREGROUNDOPTIONS -boot $RUNNER_BASE_DIR/releases/$APP_VSN/$BOOTFILE -config $CONFIG_PATH -args_file $VMARGS_PATH"
+        export EMU
+        export ROOTDIR
+        export BINDIR
+        export PROGNAME
+
+        # Dump environment info for logging purposes
+        echo "Exec: $CMD" -- ${1+"$@"}
+        echo "Root: $ROOTDIR"
+
+        # Start the VM
+        exec $CMD -- ${1+"$@"}
+        ;;
     *)
-        echo "Usage: $SCRIPT {start|stop|restart|reboot|ping|console|console_clean|attach}"
+        echo "Usage: $SCRIPT {start|foreground|stop|restart|reboot|ping|console|console_clean|attach|remote_console|upgrade}"
         exit 1
         ;;
 esac

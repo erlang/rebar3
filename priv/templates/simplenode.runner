@@ -50,6 +50,14 @@ if [ -z "$NAME_ARG" ]; then
     exit 1
 fi
 
+# Extract the name type and name from the NAME_ARG for REMSH
+REMSH_TYPE=`echo $NAME_ARG | awk '{print $1}'`
+REMSH_NAME=`echo $NAME_ARG | awk '{print $2}'`
+
+# Note the `date +%s`, used to allow multiple remsh to the same node transparently
+REMSH_NAME_ARG="$REMSH_TYPE remsh`date +%s`@`echo $REMSH_NAME | awk -F@ '{print $2}'`"
+REMSH_REMSH_ARG="-remsh $REMSH_NAME"
+
 # Extract the target cookie
 COOKIE_ARG=`grep '^-setcookie' $VMARGS_PATH`
 if [ -z "$COOKIE_ARG" ]; then
@@ -62,6 +70,9 @@ ERTS_PATH=$RUNNER_BASE_DIR/erts-$ERTS_VSN/bin
 
 # Setup command to control the node
 NODETOOL="$ERTS_PATH/escript $ERTS_PATH/nodetool $NAME_ARG $COOKIE_ARG"
+
+# Setup remote shell command to control node
+REMSH="$ERTS_PATH/erl $REMSH_NAME_ARG $REMSH_REMSH_ARG $COOKIE_ARG"
 
 # Check the first argument for instructions
 case "$1" in
@@ -149,6 +160,19 @@ case "$1" in
         exec $ERTS_PATH/to_erl $PIPE_DIR
         ;;
 
+    remote_console)
+        # Make sure a node IS running
+        RES=`$NODETOOL ping`
+        ES=$?
+        if [ "$ES" -ne 0 ]; then
+            echo "Node is not running!"
+            exit $ES
+        fi
+
+        shift
+        exec $REMSH
+        ;;
+
     upgrade)
         if [ -z "$2" ]; then
             echo "Missing upgrade package argument"
@@ -226,7 +250,7 @@ case "$1" in
         exec $CMD -- ${1+"$@"}
         ;;
     *)
-        echo "Usage: $SCRIPT {start|foreground|stop|restart|reboot|ping|console|console_clean|attach|upgrade}"
+        echo "Usage: $SCRIPT {start|foreground|stop|restart|reboot|ping|console|console_clean|attach|remote_console|upgrade}"
         exit 1
         ;;
 esac
