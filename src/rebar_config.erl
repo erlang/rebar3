@@ -38,10 +38,7 @@
 
 -record(config, { dir :: file:filename(),
                   opts = [] :: list(),
-                  envs = [] :: list({module(), env()}) }).
-
--type env()     :: [env_var()].
--type env_var() :: {string(), string()}.
+                  envs = new_env() :: dict() }).
 
 %% Types that can be used from other modules -- alphabetically ordered.
 -export_type([config/0]).
@@ -149,14 +146,11 @@ consult_file(File) ->
 
 set_env(Config, Mod, Env) ->
     OldEnvs = Config#config.envs,
-    NewEnvs = case lists:keymember(Mod, 1, OldEnvs) of
-                  true  -> lists:keyreplace(Mod, 1, OldEnvs, {Mod, Env});
-                  false -> [{Mod,Env}|OldEnvs]
-              end,
+    NewEnvs = dict:store(Mod, Env, OldEnvs),
     Config#config{envs=NewEnvs}.
 
 get_env(Config, Mod) ->
-    proplists:get_value(Mod, Config#config.envs, []).
+    dict:fetch(Mod, Config#config.envs).
 
 %% ===================================================================
 %% Internal functions
@@ -193,3 +187,6 @@ local_opts([local | _Rest], Acc) ->
     lists:reverse(Acc);
 local_opts([Item | Rest], Acc) ->
     local_opts(Rest, [Item | Acc]).
+
+new_env() ->
+    dict:new().
