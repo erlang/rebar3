@@ -29,12 +29,12 @@
 -export([is_app_dir/0, is_app_dir/1,
          is_app_src/1,
          app_src_to_app/1,
-         app_name/1,
-         app_applications/1,
-         app_vsn/1,
-         is_skipped_app/1]).
+         app_name/2,
+         app_applications/2,
+         app_vsn/2,
+         is_skipped_app/2]).
 
--export([load_app_file/1]). % TEMPORARY
+-export([load_app_file/2]). % TEMPORARY
 
 -include("rebar.hrl").
 
@@ -77,75 +77,80 @@ is_app_src(Filename) ->
 app_src_to_app(Filename) ->
     filename:join("ebin", filename:basename(Filename, ".app.src") ++ ".app").
 
-app_name(AppFile) ->
-    case load_app_file(AppFile) of
-        {ok, AppName, _} ->
-            AppName;
+app_name(Config, AppFile) ->
+    case load_app_file(Config, AppFile) of
+        {ok, NewConfig, AppName, _} ->
+            {NewConfig, AppName};
         {error, Reason} ->
             ?ABORT("Failed to extract name from ~s: ~p\n",
                    [AppFile, Reason])
     end.
 
-app_applications(AppFile) ->
-    case load_app_file(AppFile) of
-        {ok, _, AppInfo} ->
-            get_value(applications, AppInfo, AppFile);
+app_applications(Config, AppFile) ->
+    case load_app_file(Config, AppFile) of
+        {ok, NewConfig, _, AppInfo} ->
+            {NewConfig, get_value(applications, AppInfo, AppFile)};
         {error, Reason} ->
             ?ABORT("Failed to extract applications from ~s: ~p\n",
                    [AppFile, Reason])
     end.
 
-app_vsn(AppFile) ->
-    case load_app_file(AppFile) of
-        {ok, _, AppInfo} ->
+app_vsn(Config, AppFile) ->
+    case load_app_file(Config, AppFile) of
+        {ok, Config1, _, AppInfo} ->
             AppDir = filename:dirname(filename:dirname(AppFile)),
-            rebar_utils:vcs_vsn(get_value(vsn, AppInfo, AppFile), AppDir);
+            rebar_utils:vcs_vsn(Config1, get_value(vsn, AppInfo, AppFile),
+                                AppDir);
         {error, Reason} ->
             ?ABORT("Failed to extract vsn from ~s: ~p\n",
                    [AppFile, Reason])
     end.
 
-is_skipped_app(AppFile) ->
-    ThisApp = app_name(AppFile),
+is_skipped_app(Config, AppFile) ->
+    {Config1, ThisApp} = app_name(Config, AppFile),
     %% Check for apps global parameter; this is a comma-delimited list
     %% of apps on which we want to run commands
-    case get_apps() of
-        undefined ->
-            %% No apps parameter specified, check the skip_apps list..
-            case get_skip_apps() of
-                undefined ->
-                    %% No skip_apps list, run everything..
-                    false;
-                SkipApps ->
-                    TargetApps = [list_to_atom(A) ||
-                                     A <- string:tokens(SkipApps, ",")],
-                    is_skipped_app(ThisApp, TargetApps)
-            end;
-        Apps ->
-            %% run only selected apps
-            TargetApps = [list_to_atom(A) || A <- string:tokens(Apps, ",")],
-            is_selected_app(ThisApp, TargetApps)
-    end.
+    Skipped =
+        case get_apps() of
+            undefined ->
+                %% No apps parameter specified, check the skip_apps list..
+                case get_skip_apps() of
+                    undefined ->
+                        %% No skip_apps list, run everything..
+                        false;
+                    SkipApps ->
+                        TargetApps = [list_to_atom(A) ||
+                                         A <- string:tokens(SkipApps, ",")],
+                        is_skipped(ThisApp, TargetApps)
+                end;
+            Apps ->
+                %% run only selected apps
+                TargetApps = [list_to_atom(A) || A <- string:tokens(Apps, ",")],
+                is_selected(ThisApp, TargetApps)
+        end,
+    {Config1, Skipped}.
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
-load_app_file(Filename) ->
+load_app_file(Config, Filename) ->
     AppFile = {app_file, Filename},
-    case erlang:get(AppFile) of
-        undefined ->
+    case rebar_config:get_xconf(Config, {appfile, AppFile}) of
+        error ->
             case file:consult(Filename) of
                 {ok, [{application, AppName, AppData}]} ->
-                    erlang:put(AppFile, {AppName, AppData}),
-                    {ok, AppName, AppData};
+                    Config1 = rebar_config:set_xconf(Config,
+                                                     {appfile, AppFile},
+                                                     {AppName, AppData}),
+                    {ok, Config1, AppName, AppData};
                 {error, _} = Error ->
                     Error;
                 Other ->
                     {error, {unexpected_terms, Other}}
             end;
-        {AppName, AppData} ->
-            {ok, AppName, AppData}
+        {ok, {AppName, AppData}} ->
+            {ok, Config, AppName, AppData}
     end.
 
 get_value(Key, AppInfo, AppFile) ->
@@ -157,7 +162,7 @@ get_value(Key, AppInfo, AppFile) ->
     end.
 
 %% apps= for selecting apps
-is_selected_app(ThisApp, TargetApps) ->
+is_selected(ThisApp, TargetApps) ->
     case lists:member(ThisApp, TargetApps) of
         false ->
             {true, ThisApp};
@@ -166,7 +171,7 @@ is_selected_app(ThisApp, TargetApps) ->
     end.
 
 %% skip_apps= for filtering apps
-is_skipped_app(ThisApp, TargetApps) ->
+is_skipped(ThisApp, TargetApps) ->
     case lists:member(ThisApp, TargetApps) of
         false ->
             false;

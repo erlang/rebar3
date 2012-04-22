@@ -32,13 +32,19 @@
          set/3,
          set_global/2, get_global/2,
          is_verbose/0, get_jobs/0,
-         set_env/3, get_env/2]).
+         set_env/3, get_env/2,
+         set_skip_dir/2, is_skip_dir/2, reset_skip_dirs/1,
+         clean_config/2,
+         set_xconf/3, get_xconf/2, erase_xconf/2, reset_xconf/1]).
 
 -include("rebar.hrl").
 
 -record(config, { dir :: file:filename(),
                   opts = [] :: list(),
-                  envs = new_env() :: dict() }).
+                  envs = new_env() :: dict(),
+                  %% cross-directory config
+                  skip_dirs = new_skip_dirs() :: dict(),
+                  xconf = new_xconf() :: dict() }).
 
 %% Types that can be used from other modules -- alphabetically ordered.
 -export_type([config/0]).
@@ -46,13 +52,15 @@
 %% data types
 -opaque config() :: #config{}.
 
+-define(DEFAULT_NAME, "rebar.config").
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
 
-base_config(#config{opts=Opts0}) ->
-    ConfName = rebar_config:get_global(config, "rebar.config"),
-    new(Opts0, ConfName).
+base_config(GlobalConfig) ->
+    ConfName = rebar_config:get_global(config, ?DEFAULT_NAME),
+    new(GlobalConfig, ConfName).
 
 new() ->
     #config{dir = rebar_utils:get_cwd()}.
@@ -65,31 +73,8 @@ new(ConfigFile) when is_list(ConfigFile) ->
         Other ->
             ?ABORT("Failed to load ~s: ~p~n", [ConfigFile, Other])
     end;
-new(_ParentConfig=#config{opts=Opts0})->
-    new(Opts0, "rebar.config").
-
-new(Opts0, ConfName) ->
-    %% Load terms from rebar.config, if it exists
-    Dir = rebar_utils:get_cwd(),
-    ConfigFile = filename:join([Dir, ConfName]),
-    Opts = case consult_file(ConfigFile) of
-               {ok, Terms} ->
-                   %% Found a config file with some terms. We need to
-                   %% be able to distinguish between local definitions
-                   %% (i.e. from the file in the cwd) and inherited
-                   %% definitions. To accomplish this, we use a marker
-                   %% in the proplist (since order matters) between
-                   %% the new and old defs.
-                   Terms ++ [local] ++
-                       [Opt || Opt <- Opts0, Opt /= local];
-               {error, enoent} ->
-                   [local] ++
-                       [Opt || Opt <- Opts0, Opt /= local];
-               Other ->
-                   ?ABORT("Failed to load ~s: ~p\n", [ConfigFile, Other])
-           end,
-
-    #config{dir = Dir, opts = Opts}.
+new(_ParentConfig=#config{opts=Opts0, skip_dirs=SkipDirs, xconf=Xconf})->
+    new(#config{opts=Opts0, skip_dirs=SkipDirs, xconf=Xconf}, ?DEFAULT_NAME).
 
 get(Config, Key, Default) ->
     proplists:get_value(Key, Config#config.opts, Default).
@@ -145,16 +130,73 @@ consult_file(File) ->
     end.
 
 set_env(Config, Mod, Env) ->
-    OldEnvs = Config#config.envs,
-    NewEnvs = dict:store(Mod, Env, OldEnvs),
-    Config#config{envs=NewEnvs}.
+    NewEnvs = dict:store(Mod, Env, Config#config.envs),
+    Config#config{envs = NewEnvs}.
 
 get_env(Config, Mod) ->
     dict:fetch(Mod, Config#config.envs).
 
+set_skip_dir(Config, Dir) ->
+    OldSkipDirs = Config#config.skip_dirs,
+    NewSkipDirs = case is_skip_dir(Config, Dir) of
+                      false ->
+                          ?DEBUG("Adding skip dir: ~s\n", [Dir]),
+                          dict:store(Dir, true, OldSkipDirs);
+                      true ->
+                          OldSkipDirs
+                  end,
+    Config#config{skip_dirs = NewSkipDirs}.
+
+is_skip_dir(Config, Dir) ->
+    dict:is_key(Dir, Config#config.skip_dirs).
+
+reset_skip_dirs(Config) ->
+    Config#config{skip_dirs = new_skip_dirs()}.
+
+set_xconf(Config, Key, Value) ->
+    NewXconf = dict:store(Key, Value, Config#config.xconf),
+    Config#config{xconf=NewXconf}.
+
+get_xconf(Config, Key) ->
+    dict:find(Key, Config#config.xconf).
+
+erase_xconf(Config, Key) ->
+    NewXconf = dict:erase(Key, Config#config.xconf),
+    Config#config{xconf = NewXconf}.
+
+reset_xconf(Config) ->
+    Config#config{xconf = new_xconf()}.
+
+clean_config(Old, New) ->
+    New#config{opts=Old#config.opts}.
+
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+new(ParentConfig, ConfName) ->
+    %% Load terms from rebar.config, if it exists
+    Dir = rebar_utils:get_cwd(),
+    ConfigFile = filename:join([Dir, ConfName]),
+    Opts0 = ParentConfig#config.opts,
+    Opts = case consult_file(ConfigFile) of
+               {ok, Terms} ->
+                   %% Found a config file with some terms. We need to
+                   %% be able to distinguish between local definitions
+                   %% (i.e. from the file in the cwd) and inherited
+                   %% definitions. To accomplish this, we use a marker
+                   %% in the proplist (since order matters) between
+                   %% the new and old defs.
+                   Terms ++ [local] ++
+                       [Opt || Opt <- Opts0, Opt /= local];
+               {error, enoent} ->
+                   [local] ++
+                       [Opt || Opt <- Opts0, Opt /= local];
+               Other ->
+                   ?ABORT("Failed to load ~s: ~p\n", [ConfigFile, Other])
+           end,
+
+    ParentConfig#config{dir = Dir, opts = Opts}.
 
 consult_and_eval(File, Script) ->
     ?DEBUG("Evaluating config script ~p~n", [Script]),
@@ -171,7 +213,8 @@ try_consult(File) ->
         {ok, Terms} ->
             ?DEBUG("Consult config file ~p~n", [File]),
             Terms;
-        {error, enoent}  -> [];
+        {error, enoent} ->
+            [];
         {error, Reason} ->
             ?ABORT("Failed to read config file ~s: ~p~n", [File, Reason])
     end.
@@ -188,5 +231,8 @@ local_opts([local | _Rest], Acc) ->
 local_opts([Item | Rest], Acc) ->
     local_opts(Rest, [Item | Acc]).
 
-new_env() ->
-    dict:new().
+new_env() -> dict:new().
+
+new_skip_dirs() -> dict:new().
+
+new_xconf() -> dict:new().

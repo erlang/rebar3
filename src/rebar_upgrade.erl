@@ -38,9 +38,9 @@
 %% Public API
 %% ====================================================================
 
-'generate-upgrade'(_Config, ReltoolFile) ->
+'generate-upgrade'(Config0, ReltoolFile) ->
     %% Get the old release path
-    ReltoolConfig = rebar_rel_utils:load_config(ReltoolFile),
+    {Config, ReltoolConfig} = rebar_rel_utils:load_config(Config0, ReltoolFile),
     TargetParentDir = rebar_rel_utils:get_target_parent_dir(ReltoolConfig),
     TargetDir = rebar_rel_utils:get_target_dir(ReltoolConfig),
 
@@ -72,7 +72,7 @@
     %% Restore original path
     true = code:set_path(OrigPath),
 
-    ok.
+    {ok, Config}.
 
 %% ===================================================================
 %% Internal functions

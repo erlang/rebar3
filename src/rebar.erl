@@ -103,9 +103,6 @@ run_aux(Commands) ->
     %% Initialize logging system
     rebar_log:init(),
 
-    %% Initialize vsn cache
-    _VsnCacheTab = ets:new(rebar_vsn_cache,[named_table, public]),
-
     %% Convert command strings to atoms
     CommandAtoms = [list_to_atom(C) || C <- Commands],
 
@@ -117,9 +114,6 @@ run_aux(Commands) ->
 
     %% Note the top-level directory for reference
     rebar_config:set_global(base_dir, filename:absname(rebar_utils:get_cwd())),
-
-    %% Keep track of how many operations we do, so we can detect bad commands
-    erlang:put(operations, 0),
 
     %% If $HOME/.rebar/config exists load and use as global config
     GlobalConfigFile = filename:join([os:getenv("HOME"), ".rebar", "config"]),
@@ -133,8 +127,13 @@ run_aux(Commands) ->
                    end,
     BaseConfig = rebar_config:base_config(GlobalConfig),
 
+    %% Keep track of how many operations we do, so we can detect bad commands
+    BaseConfig1 = rebar_config:set_xconf(BaseConfig, operations, 0),
+    %% Initialize vsn cache
+    BaseConfig2 = rebar_config:set_xconf(BaseConfig1, vsn_cache, dict:new()),
+
     %% Process each command, resetting any state between each one
-    rebar_core:process_commands(CommandAtoms, BaseConfig).
+    rebar_core:process_commands(CommandAtoms, BaseConfig2).
 
 %%
 %% print help/usage string

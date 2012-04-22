@@ -37,12 +37,12 @@
 %% Public API
 %% ===================================================================
 
-generate(Config, ReltoolFile) ->
+generate(Config0, ReltoolFile) ->
     %% Make sure we have decent version of reltool available
     check_vsn(),
 
     %% Load the reltool configuration from the file
-    ReltoolConfig = rebar_rel_utils:load_config(ReltoolFile),
+    {Config, ReltoolConfig} = rebar_rel_utils:load_config(Config0, ReltoolFile),
 
     Sys = rebar_rel_utils:get_sys_tuple(ReltoolConfig),
 
@@ -56,7 +56,7 @@ generate(Config, ReltoolFile) ->
     %% Finally, run reltool
     case catch(run_reltool(Server, Config, ReltoolConfig)) of
         ok ->
-            ok;
+            {ok, Config};
         {error, failed} ->
             ?ABORT;
         Other2 ->
@@ -64,18 +64,17 @@ generate(Config, ReltoolFile) ->
             ?ABORT
     end.
 
-overlay(_Config, ReltoolFile) ->
+overlay(Config, ReltoolFile) ->
     %% Load the reltool configuration from the file
-    ReltoolConfig = rebar_rel_utils:load_config(ReltoolFile),
-    process_overlay(ReltoolConfig).
+    {Config1, ReltoolConfig} = rebar_rel_utils:load_config(Config, ReltoolFile),
+    {Config1, process_overlay(ReltoolConfig)}.
 
-clean(_Config, ReltoolFile) ->
-    ReltoolConfig = rebar_rel_utils:load_config(ReltoolFile),
+clean(Config, ReltoolFile) ->
+    {Config1, ReltoolConfig} = rebar_rel_utils:load_config(Config, ReltoolFile),
     TargetDir = rebar_rel_utils:get_target_dir(ReltoolConfig),
     rebar_file_utils:rm_rf(TargetDir),
-    rebar_file_utils:delete_each(["reltool.spec"]).
-
-
+    rebar_file_utils:delete_each(["reltool.spec"]),
+    {ok, Config1}.
 
 %% ===================================================================
 %% Internal functions

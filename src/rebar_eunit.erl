@@ -64,7 +64,7 @@
 %% Public API
 %% ===================================================================
 
-eunit(Config, _AppFile) ->
+eunit(Config0, _AppFile) ->
     %% Make sure ?EUNIT_DIR/ and ebin/ directory exists (append dummy module)
     ok = filelib:ensure_dir(filename:join(eunit_dir(), "dummy")),
     ok = filelib:ensure_dir(filename:join(ebin_dir(), "dummy")),
@@ -85,7 +85,7 @@ eunit(Config, _AppFile) ->
     %% Copy source files to eunit dir for cover in case they are not directly
     %% in src but in a subdirectory of src. Cover only looks in cwd and ../src
     %% for source files. Also copy files from src_dirs.
-    ErlOpts = rebar_utils:erl_opts(Config),
+    ErlOpts = rebar_utils:erl_opts(Config0),
 
     SrcDirs = rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts)),
     SrcErls = lists:foldl(
@@ -119,8 +119,8 @@ eunit(Config, _AppFile) ->
     %% Compile erlang code to ?EUNIT_DIR, using a tweaked config
     %% with appropriate defines for eunit, and include all the test modules
     %% as well.
-    rebar_erlc_compiler:doterl_compile(eunit_config(Config),
-                                       ?EUNIT_DIR, TestErls),
+    Config = eunit_config(Config0),
+    rebar_erlc_compiler:doterl_compile(Config, ?EUNIT_DIR, TestErls),
 
     %% Build a list of all the .beams in ?EUNIT_DIR -- use this for
     %% cover and eunit testing. Normally you can just tell cover
@@ -166,7 +166,7 @@ eunit(Config, _AppFile) ->
 
     %% Restore code path
     true = code:set_path(CodePath),
-    ok.
+    {ok, Config}.
 
 clean(_Config, _File) ->
     rebar_file_utils:rm_rf(?EUNIT_DIR).
@@ -218,44 +218,48 @@ get_eunit_opts(Config) ->
     BaseOpts ++ rebar_config:get_list(Config, eunit_opts, []).
 
 eunit_config(Config) ->
-    EqcOpts = eqc_opts(),
-    PropErOpts = proper_opts(),
+    {Config1, EqcOpts} = eqc_opts(Config),
+    {Config2, PropErOpts} = proper_opts(Config1),
 
-    ErlOpts = rebar_config:get_list(Config, erl_opts, []),
-    EunitOpts = rebar_config:get_list(Config, eunit_compile_opts, []),
+    ErlOpts = rebar_config:get_list(Config2, erl_opts, []),
+    EunitOpts = rebar_config:get_list(Config2, eunit_compile_opts, []),
     Opts0 = [{d, 'TEST'}] ++
         ErlOpts ++ EunitOpts ++ EqcOpts ++ PropErOpts,
     Opts = [O || O <- Opts0, O =/= no_debug_info],
-    Config1 = rebar_config:set(Config, erl_opts, Opts),
+    Config3 = rebar_config:set(Config2, erl_opts, Opts),
 
-    FirstErls = rebar_config:get_list(Config1, eunit_first_files, []),
-    rebar_config:set(Config1, erl_first_files, FirstErls).
+    FirstErls = rebar_config:get_list(Config3, eunit_first_files, []),
+    rebar_config:set(Config3, erl_first_files, FirstErls).
 
-eqc_opts() ->
-    define_if('EQC', is_lib_avail(is_eqc_avail, eqc,
-                                  "eqc.hrl", "QuickCheck")).
+eqc_opts(Config) ->
+    {NewConfig, IsAvail} = is_lib_avail(Config, is_eqc_avail, eqc,
+                                        "eqc.hrl", "QuickCheck"),
+    Opts = define_if('EQC', IsAvail),
+    {NewConfig, Opts}.
 
-proper_opts() ->
-    define_if('PROPER', is_lib_avail(is_proper_avail, proper,
-                                     "proper.hrl", "PropEr")).
+proper_opts(Config) ->
+    {NewConfig, IsAvail} = is_lib_avail(Config, is_proper_avail, proper,
+                                        "proper.hrl", "PropEr"),
+    Opts = define_if('PROPER', IsAvail),
+    {NewConfig, Opts}.
 
 define_if(Def, true) -> [{d, Def}];
 define_if(_Def, false) -> [].
 
-is_lib_avail(DictKey, Mod, Hrl, Name) ->
-    case erlang:get(DictKey) of
-        undefined ->
+is_lib_avail(Config, DictKey, Mod, Hrl, Name) ->
+    case rebar_config:get_xconf(Config, DictKey) of
+        error ->
             IsAvail = case code:lib_dir(Mod, include) of
                           {error, bad_name} ->
                               false;
                           Dir ->
                               filelib:is_regular(filename:join(Dir, Hrl))
                       end,
-            erlang:put(DictKey, IsAvail),
+            NewConfig = rebar_config:set_xconf(Config, DictKey, IsAvail),
             ?DEBUG("~s availability: ~p\n", [Name, IsAvail]),
-            IsAvail;
-        IsAvail ->
-            IsAvail
+            {NewConfig, IsAvail};
+        {ok, IsAvail} ->
+            {Config, IsAvail}
     end.
 
 perform_cover(Config, BeamFiles, SrcModules) ->

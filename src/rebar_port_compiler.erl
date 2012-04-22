@@ -96,14 +96,14 @@
                objects = [] :: [file:filename(), ...] | [],
                opts = [] ::list() | []}).
 
-compile(Config, AppFile) ->
-    rebar_utils:deprecated(port_sources, port_specs, Config, "soon"),
-    rebar_utils:deprecated(so_name, port_specs, Config, "soon"),
-    rebar_utils:deprecated(so_specs, port_specs, Config, "soon"),
+compile(Config0, AppFile) ->
+    rebar_utils:deprecated(port_sources, port_specs, Config0, "soon"),
+    rebar_utils:deprecated(so_name, port_specs, Config0, "soon"),
+    rebar_utils:deprecated(so_specs, port_specs, Config0, "soon"),
 
     %% TODO: remove SpecType and OldSources make get_specs/2
     %%       return list(#spec{}) when removing deprecated options
-    {SpecType, {OldSources, Specs}} = get_specs(Config, AppFile),
+    {Config, {SpecType, {OldSources, Specs}}} = get_specs(Config0, AppFile),
 
     case {SpecType, OldSources, Specs} of
         {old, [], _} ->
@@ -149,7 +149,7 @@ compile(Config, AppFile) ->
 clean(Config, AppFile) ->
     %% TODO: remove SpecType and OldSources make get_specs/2
     %%       return list(#spec{}) when removing deprecated options
-    {SpecType, {OldSources, Specs}} = get_specs(Config, AppFile),
+    {Config1, {SpecType, {OldSources, Specs}}} = get_specs(Config, AppFile),
 
     case {SpecType, OldSources, Specs} of
         {old, [], _} ->
@@ -163,7 +163,8 @@ clean(Config, AppFile) ->
                                   rebar_file_utils:delete_each([Target]),
                                   rebar_file_utils:delete_each(Objects)
                           end, Specs)
-    end.
+    end,
+    {ok, Config1}.
 
 setup_env(Config) ->
     setup_env(Config, []).
@@ -264,9 +265,10 @@ get_specs(Config, AppFile) ->
     case rebar_config:get_local(Config, port_specs, undefined) of
         undefined ->
             %% TODO: DEPRECATED: remove support for non-port_specs syntax
-            {old, old_get_specs(Config, AppFile)};
+            {Config1, Specs} = old_get_specs(Config, AppFile),
+            {Config1, {old, Specs}};
         PortSpecs ->
-            {new, get_port_specs(Config, PortSpecs)}
+            {Config, {new, get_port_specs(Config, PortSpecs)}}
     end.
 
 get_port_specs(Config, PortSpecs) ->
@@ -327,31 +329,32 @@ switch_to_dll_or_exe(Target) ->
 old_get_specs(Config, AppFile) ->
     OsType = os:type(),
     SourceFiles = old_get_sources(Config),
-    Specs =
+    {NewConfig, Specs} =
         case rebar_config:get_local(Config, so_specs, undefined) of
             undefined ->
                 Objects = port_objects(SourceFiles),
                 %% New form of so_specs is not provided. See if the old form
                 %% of {so_name} is available instead
                 Dir = "priv",
-                SoName =
+                {Config2, SoName} =
                     case rebar_config:get_local(Config, so_name, undefined) of
                         undefined ->
                             %% Ok, neither old nor new form is
                             %% available. Use the app name and
                             %% generate a sensible default.
-                            AppName = rebar_app_utils:app_name(AppFile),
+                            {Config1, AppName} =
+                                rebar_app_utils:app_name(Config, AppFile),
                             DrvName = ?FMT("~s_drv.so", [AppName]),
-                            filename:join([Dir, DrvName]);
+                            {Config1, filename:join([Dir, DrvName])};
                         AName ->
                             %% Old form is available -- use it
-                            filename:join(Dir, AName)
+                            {Config, filename:join(Dir, AName)}
                     end,
-                [old_get_so_spec({SoName, Objects}, OsType)];
+                {Config2, [old_get_so_spec({SoName, Objects}, OsType)]};
             SoSpecs ->
-                [old_get_so_spec(S, OsType) || S <- SoSpecs]
+                {Config, [old_get_so_spec(S, OsType) || S <- SoSpecs]}
         end,
-    {SourceFiles, Specs}.
+    {NewConfig, {SourceFiles, Specs}}.
 
 old_get_sources(Config) ->
     RawSources = rebar_config:get_local(Config, port_sources,

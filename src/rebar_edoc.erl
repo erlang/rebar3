@@ -45,15 +45,14 @@
 %% Public API
 %% ===================================================================
 
-%% @doc Generate Erlang program documentation.
--spec doc(Config::rebar_config:config(), File::file:filename()) -> ok.
 doc(Config, File) ->
     %% Save code path
     CodePath = setup_code_path(),
 
     %% Get the edoc_opts and app file info
     EDocOpts = rebar_config:get(Config, edoc_opts, []),
-    {ok, AppName, _AppData} = rebar_app_utils:load_app_file(File),
+    {ok, Config1, AppName, _AppData} =
+        rebar_app_utils:load_app_file(Config, File),
 
     %% Determine the age of the summary file
     EDocInfoName = filename:join(proplists:get_value(dir, EDocOpts, "doc"),
@@ -77,7 +76,7 @@ doc(Config, File) ->
 
     %% Restore code path
     true = code:set_path(CodePath),
-    ok.
+    {ok, Config1}.
 
 %% ===================================================================
 %% Internal functions

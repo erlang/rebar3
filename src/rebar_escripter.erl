@@ -36,10 +36,10 @@
 %% Public API
 %% ===================================================================
 
-escriptize(Config, AppFile) ->
+escriptize(Config0, AppFile) ->
     %% Extract the application name from the archive -- this is the default
     %% name of the generated script
-    AppName = rebar_app_utils:app_name(AppFile),
+    {Config, AppName} = rebar_app_utils:app_name(Config0, AppFile),
 
     %% Get the output filename for the escript -- this may include dirs
     Filename = rebar_config:get_local(Config, escript_name, AppName),
@@ -85,16 +85,17 @@ escriptize(Config, AppFile) ->
     %% Finally, update executable perms for our script
     {ok, #file_info{mode = Mode}} = file:read_file_info(Filename),
     ok = file:change_mode(Filename, Mode bor 8#00111),
-    ok.
+    {ok, Config}.
 
-clean(Config, AppFile) ->
+clean(Config0, AppFile) ->
     %% Extract the application name from the archive -- this is the default
     %% name of the generated script
-    AppName = rebar_app_utils:app_name(AppFile),
+    {Config, AppName} = rebar_app_utils:app_name(Config0, AppFile),
 
     %% Get the output filename for the escript -- this may include dirs
     Filename = rebar_config:get_local(Config, escript_name, AppName),
-    rebar_file_utils:delete_each([Filename]).
+    rebar_file_utils:delete_each([Filename]),
+    {ok, Config}.
 
 %% ===================================================================
 %% Internal functions
