@@ -40,7 +40,10 @@
   {registered, []},
   {applications, [kernel,
                   stdlib,
-                  sasl]},
+                  sasl,
+                  crypto,
+                  syntax_tools,
+                  tools]},
   {env, [
          %% Default log level
          {log_level, error},
