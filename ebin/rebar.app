@@ -41,6 +41,7 @@
   {applications, [kernel,
                   stdlib,
                   sasl,
+                  compiler,
                   crypto,
                   syntax_tools,
                   tools]},
