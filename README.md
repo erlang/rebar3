@@ -125,7 +125,7 @@ Command 'debug' not understood or not applicable
 Congratulations! You now have a self-contained script called "rebar" in
 your current working directory. Place this script anywhere in your path
 and you can use rebar to build OTP-compliant apps.
-make: [xref_warnings] Error 1 (ignored)
+==> rebar (xref)
 make: [dialyzer_warnings] Error 2 (ignored)
 ```
 
