@@ -423,9 +423,8 @@ emulate_escript_foldl(Fun, Acc, File) ->
     end.
 
 vcs_vsn_cmd(git) ->
-    %% Explicitly git-describe a committish to accommodate for projects
-    %% in subdirs which don't have a GIT_DIR. In that case we will
-    %% get a description of the last commit that touched the subdir.
+    %% git describe the last commit that touched CWD
+    %% required for correct versioning of apps in subdirs, such as apps/app1
     case os:type() of
         {win32,nt} ->
             "FOR /F \"usebackq tokens=* delims=\" %i in "
