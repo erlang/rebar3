@@ -149,7 +149,7 @@ overlay_vars(Config, Vars0, ReltoolConfig) ->
 load_vars_file(undefined) ->
     dict:new();
 load_vars_file(File) ->
-    case file:consult(File) of
+    case rebar_config:consult_file(File) of
         {ok, Terms} ->
             dict:from_list(Terms);
         {error, Reason} ->
