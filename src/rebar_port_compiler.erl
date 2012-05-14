@@ -304,9 +304,9 @@ maybe_switch_extension(_OsType, Target) ->
 
 switch_to_dll_or_exe(Target) ->
     case filename:extension(Target) of
-        ".so" -> filename:rootname(Target, ".so") ++ ".dll";
-        []    -> Target ++ ".exe";
-        Other -> Other
+        ".so"  -> filename:rootname(Target, ".so") ++ ".dll";
+        []     -> Target ++ ".exe";
+        _Other -> Target
     end.
 
 %% TODO: DEPRECATED: remove support for non-port_specs syntax [old_*()]
