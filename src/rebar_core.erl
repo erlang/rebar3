@@ -104,12 +104,7 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
 
         true ->
             AbsDir = filename:absname(Dir),
-            ShouldPrintDir = case {is_skip_dir(Dir), processing_base_dir(Dir)} of
-                                 {false, false} ->
-                                     true;
-                                 _ ->
-                                     false
-                             end,
+            ShouldPrintDir = not (is_skip_dir(Dir) orelse processing_base_dir(Dir)),
 
             case ShouldPrintDir of
                 true ->
