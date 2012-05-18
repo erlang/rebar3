@@ -53,36 +53,9 @@ main(Args) ->
     %% Add ebin/ to our path
     true = code:add_path("ebin"),
 
-    %% Run rebar to do proper .app validation and such
-    rebar:main(["compile"] ++ Args),
-
-    TempDir = make_temp_dir(),
-    ok = copy_files(TempDir), %% Copy the ebin and priv/templates
-    {ok, Dirs} = file:list_dir(TempDir),
-
-    case zip:create("mem", Dirs, [memory, {cwd, TempDir}]) of
-        {ok, {"mem", ZipBin}} ->
-            ok = rebar_file_utils:rm_rf(TempDir),
-            %% Archive was successfully created. Prefix that binary with our
-            %% header and write to "rebar" file.
-            %% Without -noshell -noinput escript consumes all input that would
-            %% otherwise go to the shell for the next command.
-            Script = <<"#!/usr/bin/env escript\n%%! -noshell -noinput\n",
-                       ZipBin/binary>>,
-            case file:write_file("rebar", Script) of
-                ok ->
-                    ok;
-                {error, WriteError} ->
-                    io:format("Failed to write rebar script: ~p\n",
-                              [WriteError]),
-                    halt(1)
-            end;
-        {error, ZipError} ->
-            ok = rebar_file_utils:rm_rf(TempDir),
-            io:format("Failed to construct rebar script archive: ~p\n",
-                      [ZipError]),
-            halt(1)
-    end,
+    %% Run rebar compile to do proper .app validation etc.
+    %% and rebar escriptize to create the rebar script
+    rebar:main(["compile", "escriptize"] ++ Args),
 
     %% Finally, update executable perms for our script on *nix,
     %%  or write out script files on win32.
@@ -104,37 +77,6 @@ main(Args) ->
               "Place this script anywhere in your path\n"
               "and you can use rebar to build OTP-compliant apps.\n").
 
-make_temp_dir() ->
-    case temp_name("rebar.") of
-        {ok, TempDir} ->
-            case file:make_dir(TempDir) of
-                ok ->
-                    TempDir;
-                Error ->
-                    io:format("Failed to create temporary directory: ~p~n",
-                              [Error]),
-                    halt(1),
-                    Error
-            end;
-        Error ->
-            io:format("Failed to create temporary directory: ~p~n",
-                      [Error]),
-            halt(1)
-    end.
-
-temp_name(Prefix) ->
-    temp_name(Prefix, 5).
-
-temp_name(_Prefix, 0) ->
-    {error, eexist};
-temp_name(Prefix, N) ->
-    Hash = erlang:phash2(make_ref()),
-    Name = Prefix ++ integer_to_list(Hash),
-    case filelib:is_file(Name) of
-        false -> {ok, Name};
-        true  -> temp_name(Prefix, N-1)
-    end.
-
 rm(Path) ->
     NativePath = filename:nativename(Path),
     Cmd = case os:type() of
@@ -148,26 +90,6 @@ build_time() ->
     {{Y, M, D}, {H, Min, S}} = calendar:now_to_universal_time(now()),
     lists:flatten(io_lib:format("~4..0w~2..0w~2..0w_~2..0w~2..0w~2..0w",
                                 [Y, M, D, H, Min, S])).
-
-copy_files(Temp) ->
-    BaseEbinDir = filename:join("rebar", "ebin"),
-    BaseTemplatesDir = filename:join("priv", "templates"),
-    EbinDir = filename:join(Temp, BaseEbinDir),
-    TemplatesDir = filename:join(Temp, BaseTemplatesDir),
-
-    %% prepare directory structure
-    lists:foreach(
-      fun(Dir) ->
-              ok = filelib:ensure_dir(filename:join(Dir, "dummy"))
-      end, [EbinDir, TemplatesDir]),
-
-    %% copy content of ebin
-    EbinSrc = filename:join(["ebin", "*"]),
-    ok = rebar_file_utils:cp_r([EbinSrc], EbinDir),
-
-    %% copy content of priv/templates
-    TemplatesSrc = filename:join(BaseTemplatesDir, "*"),
-    ok = rebar_file_utils:cp_r([TemplatesSrc], TemplatesDir).
 
 vcs_info([]) ->
     "No VCS info available.";

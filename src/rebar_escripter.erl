@@ -101,15 +101,12 @@ make_temp_dir(AppName) ->
                 ok ->
                     TempDir;
                 Error ->
-                    io:format("Failed to create temporary directory: ~p~n",
-                              [Error]),
-                    halt(1),
-                    Error
+                    ?ABORT("Failed to create temporary directory: ~p~n",
+                           [Error])
             end;
         Error ->
-            io:format("Failed to create temporary directory: ~p~n",
-                      [Error]),
-            halt(1)
+            ?ABORT("Failed to create temporary directory: ~p~n",
+                   [Error])
     end.
 
 temp_name(Prefix) ->
@@ -130,20 +127,26 @@ copy_files(Config, AppName, Temp) ->
     EbinDir = filename:join(Temp, BaseEbinDir),
 
     %% Look for a list of other applications (dependencies) to include
-    %% in the output file. We then use the .app files for each of these
-    %% to pull in all the .beam files.
+    %% in the output file. We then use the .app files for each of
+    %% these to pull in all the .beam files.
     InclApps = rebar_config:get_local(Config, escript_incl_apps, []),
     InclEbinDirs = get_app_ebin_dirs(InclApps, []),
     %% copy incl_apps files
     lists:foreach(fun(Src) -> ok = copy_files(Src, EbinDir) end, InclEbinDirs),
 
-    %% copy script's beam files
+    %% Look for a list of extra files to copy
+    InclExtr = rebar_config:get_local(Config, escript_incl_extra, []),
+    lists:foreach(fun({Src, Dst}) ->
+                          copy_files(Src, filename:join(Temp, Dst))
+                  end, InclExtr),
+
+    %% copy script's beam files and app file
     EbinSrc = filename:join(["ebin", "*"]),
     ok = copy_files(EbinSrc, EbinDir).
 
 copy_files(Src, Dst) ->
     ok = filelib:ensure_dir(filename:join(Dst, "dummy")),
-    ok = rebar_file_utils:cp_r([Src], Dst).
+    rebar_file_utils:cp_r([Src], Dst).
 
 get_app_ebin_dirs([], Acc) ->
     Acc;
