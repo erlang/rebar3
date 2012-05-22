@@ -85,6 +85,9 @@
 %% Option to pass extra parameters when launching Common Test
 {ct_extra_params, "-boot start_sasl -s myapp"}.
 
+%% Option to use short names (i.e., -sname test) when starting ct
+{ct_use_short_names, true}.
+
 %% == Cleanup ==
 
 %% Which files to cleanup
