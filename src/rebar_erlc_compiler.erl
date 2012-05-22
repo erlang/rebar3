@@ -318,11 +318,14 @@ compile_yrl(Source, Target, Config) ->
 compile_xrl_yrl(Source, Target, Opts, Mod) ->
     case needs_compile(Source, Target, []) of
         true ->
-            case Mod:file(Source, Opts) of
+            case Mod:file(Source, Opts ++ [{return, true}]) of
                 {ok, _} ->
                     ok;
-                _X ->
-                    ?ABORT
+                {ok, _Mod, Ws} ->
+                    {ok, format_errors(Source, "Warning: ", Ws)};
+                {error, Es, Ws} ->
+                    {error, format_errors(Source, Es),
+                     format_errors(Source, "Warning: ", Ws)}
             end;
         false ->
             skipped
