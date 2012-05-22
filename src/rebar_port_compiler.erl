@@ -214,14 +214,28 @@ compile_each([Source | Rest], Type, Env, NewBins) ->
     Bin = replace_extension(Source, Ext, ".o"),
     case needs_compile(Source, Bin) of
         true ->
-            ?CONSOLE("Compiling ~s\n", [Source]),
             Template = select_compile_template(Type, compiler(Ext)),
-            rebar_utils:sh(expand_command(Template, Env, Source, Bin),
-                           [{env, Env}]),
+            Cmd = expand_command(Template, Env, Source, Bin),
+            ShOpts = [{env, Env}, return_on_error, {use_stdout, false}],
+            exec_compiler(Source, Cmd, ShOpts),
             compile_each(Rest, Type, Env, [Bin | NewBins]);
         false ->
             ?INFO("Skipping ~s\n", [Source]),
             compile_each(Rest, Type, Env, NewBins)
+    end.
+
+exec_compiler(Source, Cmd, ShOpts) ->
+    case rebar_utils:sh(Cmd, ShOpts) of
+        {error, {_RC, RawError}} ->
+            AbsSource = filename:absname(Source),
+            ?CONSOLE("Compiling ~s\n", [AbsSource]),
+            Error = re:replace(RawError, Source, AbsSource,
+                               [{return, list}, global]),
+            ?CONSOLE("~s", [Error]),
+            ?ABORT;
+        {ok, Output} ->
+            ?CONSOLE("Compiling ~s\n", [Source]),
+            ?CONSOLE("~s", [Output])
     end.
 
 needs_compile(Source, Bin) ->
