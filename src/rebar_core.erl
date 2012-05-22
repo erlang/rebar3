@@ -119,17 +119,6 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
             DirSet;
 
         true ->
-            AbsDir = filename:absname(Dir),
-            ShouldPrintDir = not (is_skip_dir(Dir)
-                                  orelse processing_base_dir(Dir)),
-
-            case ShouldPrintDir of
-                true ->
-                    ?CONSOLE("==> Entering directory `~s'\n", [AbsDir]);
-                _ ->
-                    ok
-            end,
-
             ok = file:set_cwd(Dir),
             Config = maybe_load_local_config(Dir, ParentConfig),
 
@@ -144,17 +133,8 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
             %% to process this dir.
             {ok, AvailModuleSets} = application:get_env(rebar, modules),
             ModuleSet = choose_module_set(AvailModuleSets, Dir),
-            Res = maybe_process_dir(ModuleSet, Config, CurrentCodePath,
-                                    Dir, Command, DirSet),
-
-            case ShouldPrintDir of
-                true ->
-                    ?CONSOLE("==> Leaving directory `~s'\n", [AbsDir]);
-                false ->
-                    ok
-            end,
-
-            Res
+            maybe_process_dir(ModuleSet, Config, CurrentCodePath,
+                              Dir, Command, DirSet)
     end.
 
 maybe_process_dir({[], undefined}=ModuleSet, Config, CurrentCodePath,

@@ -116,9 +116,10 @@ compile(Source, Config, CompileFn) ->
         ok ->
             ok;
         skipped ->
-            skipped
+            skipped;
+        Error ->
+            Error
     end.
-
 
 compile_each([], _Config, _CompileFn) ->
     ok;
@@ -126,12 +127,17 @@ compile_each([Source | Rest], Config, CompileFn) ->
     case compile(Source, Config, CompileFn) of
         ok ->
             ?CONSOLE("Compiled ~s\n", [Source]);
+        {ok, Warnings} ->
+            report(Warnings),
+            ?CONSOLE("Compiled ~s\n", [Source]);
         skipped ->
-            ?INFO("Skipped ~s\n", [Source])
+            ?INFO("Skipped ~s\n", [Source]);
+        Error ->
+            maybe_report(Error),
+            ?DEBUG("Compilation failed: ~p\n", [Error]),
+            ?ABORT
     end,
     compile_each(Rest, Config, CompileFn).
-
-
 
 compile_queue([], []) ->
     ok;
@@ -148,8 +154,14 @@ compile_queue(Pids, Targets) ->
             end;
 
         {fail, Error} ->
+            maybe_report(Error),
             ?DEBUG("Worker compilation failed: ~p\n", [Error]),
             ?ABORT;
+
+        {compiled, Source, Warnings} ->
+            report(Warnings),
+            ?CONSOLE("Compiled ~s\n", [Source]),
+            compile_queue(Pids, Targets);
 
         {compiled, Source} ->
             ?CONSOLE("Compiled ~s\n", [Source]),
@@ -174,6 +186,9 @@ compile_worker(QueuePid, Config, CompileFn) ->
     receive
         {compile, Source} ->
             case catch(compile(Source, Config, CompileFn)) of
+                {ok, Ws} ->
+                    QueuePid ! {compiled, Source, Ws},
+                    compile_worker(QueuePid, Config, CompileFn);
                 ok ->
                     QueuePid ! {compiled, Source},
                     compile_worker(QueuePid, Config, CompileFn);
@@ -189,3 +204,14 @@ compile_worker(QueuePid, Config, CompileFn) ->
         empty ->
             ok
     end.
+
+maybe_report([{error, {error, _Es, _Ws}=ErrorsAndWarnings}, {source, _}]) ->
+    maybe_report(ErrorsAndWarnings);
+maybe_report({error, Es, Ws}) ->
+    report(Es),
+    report(Ws);
+maybe_report(_) ->
+    ok.
+
+report(Messages) ->
+    lists:foreach(fun(Msg) -> io:format("~s~n", [Msg]) end, Messages).
