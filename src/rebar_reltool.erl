@@ -223,7 +223,7 @@ run_reltool(Server, _Config, ReltoolConfig) ->
 
 
 mk_target_dir(TargetDir) ->
-    case file:make_dir(TargetDir) of
+    case filelib:ensure_dir(filename:join(TargetDir, "dummy")) of
         ok ->
             ok;
         {error, eexist} ->
@@ -236,7 +236,11 @@ mk_target_dir(TargetDir) ->
                     ?ERROR("Release target directory ~p already exists!\n",
                            [TargetDir]),
                     ?FAIL
-            end
+            end;
+        {error, Reason} ->
+            ?ERROR("Failed to make target dir ~p: ~s\n",
+                [TargetDir, file:format_error(Reason)]),
+            ?FAIL
     end.
 
 
