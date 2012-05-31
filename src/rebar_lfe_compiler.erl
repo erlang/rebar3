@@ -59,11 +59,14 @@ compile_lfe(Source, _Target, Config) ->
                    "~n", []),
             ?ABORT;
         _ ->
-            Opts = [{i, "include"}, {outdir, "ebin"}, report]
+            Opts = [{i, "include"}, {outdir, "ebin"}, return]
                 ++ rebar_config:get_list(Config, erl_opts, []),
             case lfe_comp:file(Source, Opts) of
-                {ok, _} ->
-                    ok;
+                {ok, _Mod, Ws} ->
+                    {ok, rebar_base_compiler:format_warnings(Source, Ws)};
+                {error, Es, Ws} ->
+                    {error, rebar_base_compiler:format_errors(Source, Es),
+                     rebar_base_compiler:format_warnings(Source, Ws, Opts)};
                 _ ->
                     ?ABORT
             end
