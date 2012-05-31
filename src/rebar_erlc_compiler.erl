@@ -265,7 +265,7 @@ internal_erl_compile(Source, Config, Outdir, ErlOpts) ->
                     {ok, rebar_base_compiler:format_warnings(Source, Ws)};
                 {error, Es, Ws} ->
                     {error, rebar_base_compiler:format_errors(Source, Es),
-                     rebar_base_compiler:format_warnings(Source, Ws)}
+                     rebar_base_compiler:format_warnings(Source, Ws, Opts)}
             end;
         false ->
             skipped
@@ -313,7 +313,7 @@ compile_xrl_yrl(Source, Target, Opts, Mod) ->
                     {ok, rebar_base_compiler:format_warnings(Source, Ws)};
                 {error, Es, Ws} ->
                     {error, rebar_base_compiler:format_errors(Source, Es),
-                     rebar_base_compiler:format_warnings(Source, Ws)}
+                     rebar_base_compiler:format_warnings(Source, Ws, Opts)}
             end;
         false ->
             skipped

@@ -29,7 +29,7 @@
 -include("rebar.hrl").
 
 -export([run/4, run/7, run/8,
-         format_errors/2, format_warnings/2]).
+         format_errors/2, format_warnings/2, format_warnings/3]).
 
 
 %% ===================================================================
@@ -84,7 +84,14 @@ format_errors(Source, Errors) ->
     format_errors(Source, "", Errors).
 
 format_warnings(Source, Warnings) ->
-    format_errors(Source, "Warning: ", Warnings).
+    format_warnings(Source, Warnings, []).
+
+format_warnings(Source, Warnings, Opts) ->
+    Prefix = case lists:member(warnings_as_errors, Opts) of
+                 true -> "";
+                 false -> "Warning: "
+             end,
+    format_errors(Source, Prefix, Warnings).
 
 %% ===================================================================
 %% Internal functions
