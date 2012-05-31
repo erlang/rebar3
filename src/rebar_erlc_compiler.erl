@@ -262,26 +262,14 @@ internal_erl_compile(Source, Config, Outdir, ErlOpts) ->
                 {ok, _Mod} ->
                     ok;
                 {ok, _Mod, Ws} ->
-                    {ok, format_errors(Source, "Warning: ", Ws)};
+                    {ok, rebar_base_compiler:format_warnings(Source, Ws)};
                 {error, Es, Ws} ->
-                    {error, format_errors(Source, Es),
-                     format_errors(Source, "Warning: ", Ws)}
+                    {error, rebar_base_compiler:format_errors(Source, Es),
+                     rebar_base_compiler:format_warnings(Source, Ws)}
             end;
         false ->
             skipped
     end.
-
-format_errors(Source, Errors) ->
-    format_errors(Source, "", Errors).
-
-format_errors(Source, Extra, Errors) ->
-    AbsSource = filename:absname(Source),
-    [lists:append([format_error(AbsSource, Extra, Desc) || Desc <- Descs])
-     || {_, Descs} <- Errors].
-
-format_error(AbsSource, Extra, {Line, Mod, Desc}) ->
-    ErrorDesc = Mod:format_error(Desc),
-    ?FMT("~s:~b: ~s~s", [AbsSource, Line, Extra, ErrorDesc]).
 
 -spec compile_mib(Source::file:filename(), Target::file:filename(),
                   Config::rebar_config:config()) -> 'ok'.
@@ -322,10 +310,10 @@ compile_xrl_yrl(Source, Target, Opts, Mod) ->
                 {ok, _} ->
                     ok;
                 {ok, _Mod, Ws} ->
-                    {ok, format_errors(Source, "Warning: ", Ws)};
+                    {ok, rebar_base_compiler:format_warnings(Source, Ws)};
                 {error, Es, Ws} ->
-                    {error, format_errors(Source, Es),
-                     format_errors(Source, "Warning: ", Ws)}
+                    {error, rebar_base_compiler:format_errors(Source, Es),
+                     rebar_base_compiler:format_warnings(Source, Ws)}
             end;
         false ->
             skipped

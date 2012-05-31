@@ -28,7 +28,8 @@
 
 -include("rebar.hrl").
 
--export([run/4, run/7, run/8]).
+-export([run/4, run/7, run/8,
+         format_errors/2, format_warnings/2]).
 
 
 %% ===================================================================
@@ -79,6 +80,11 @@ run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
                 simple_compile_wrapper(S, Target, Compile3Fn, C, CheckLastMod)
         end).
 
+format_errors(Source, Errors) ->
+    format_errors(Source, "", Errors).
+
+format_warnings(Source, Warnings) ->
+    format_errors(Source, "Warning: ", Warnings).
 
 %% ===================================================================
 %% Internal functions
@@ -215,3 +221,12 @@ maybe_report(_) ->
 
 report(Messages) ->
     lists:foreach(fun(Msg) -> io:format("~s~n", [Msg]) end, Messages).
+
+format_errors(Source, Extra, Errors) ->
+    AbsSource = filename:absname(Source),
+    [lists:append([format_error(AbsSource, Extra, Desc) || Desc <- Descs])
+     || {_, Descs} <- Errors].
+
+format_error(AbsSource, Extra, {Line, Mod, Desc}) ->
+    ErrorDesc = Mod:format_error(Desc),
+    ?FMT("~s:~b: ~s~s", [AbsSource, Line, Extra, ErrorDesc]).
