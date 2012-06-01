@@ -239,7 +239,7 @@ mk_target_dir(TargetDir) ->
             end;
         {error, Reason} ->
             ?ERROR("Failed to make target dir ~p: ~s\n",
-                [TargetDir, file:format_error(Reason)]),
+                   [TargetDir, file:format_error(Reason)]),
             ?FAIL
     end.
 
@@ -259,7 +259,8 @@ dump_spec(Spec) ->
 execute_overlay([], _Vars, _BaseDir, _TargetDir) ->
     ok;
 execute_overlay([{mkdir, Out} | Rest], Vars, BaseDir, TargetDir) ->
-    OutFile = rebar_templater:render(filename:join([TargetDir, Out, "dummy"]), Vars),
+    OutFile = rebar_templater:render(
+                filename:join([TargetDir, Out, "dummy"]), Vars),
     ok = filelib:ensure_dir(OutFile),
     ?DEBUG("Created dir ~s\n", [filename:dirname(OutFile)]),
     execute_overlay(Rest, Vars, BaseDir, TargetDir);
@@ -276,16 +277,19 @@ execute_overlay([{copy, In, Out} | Rest], Vars, BaseDir, TargetDir) ->
     end,
     rebar_file_utils:cp_r([InFile], OutFile),
     execute_overlay(Rest, Vars, BaseDir, TargetDir);
-execute_overlay([{template_wildcard, Wildcard, OutDir} | Rest], Vars, BaseDir, TargetDir) ->
+execute_overlay([{template_wildcard, Wildcard, OutDir} | Rest], Vars,
+                BaseDir, TargetDir) ->
     %% Generate a series of {template, In, Out} instructions from the wildcard
     %% that will get processed per normal
     Ifun = fun(F, Acc0) ->
-                   [{template, F, filename:join(OutDir, filename:basename(F))} | Acc0]
+                   [{template, F,
+                     filename:join(OutDir, filename:basename(F))} | Acc0]
            end,
     NewInstrs = lists:foldl(Ifun, Rest, filelib:wildcard(Wildcard, BaseDir)),
     case length(NewInstrs) =:= length(Rest) of
         true ->
-            ?WARN("template_wildcard: ~s did not match any files!\n", [Wildcard]);
+            ?WARN("template_wildcard: ~s did not match any files!\n",
+                  [Wildcard]);
         false ->
             ok
     end,
@@ -322,7 +326,8 @@ execute_overlay([{replace, Out, Regex, Replacement, Opts} | Rest],
                 Vars, BaseDir, TargetDir) ->
     Filename = rebar_templater:render(filename:join(TargetDir, Out), Vars),
     {ok, OrigData} = file:read_file(Filename),
-    Data = re:replace(OrigData, Regex, rebar_templater:render(Replacement, Vars),
+    Data = re:replace(OrigData, Regex,
+                      rebar_templater:render(Replacement, Vars),
                       [global, {return, binary}] ++ Opts),
     case file:write_file(Filename, Data) of
         ok ->
@@ -341,9 +346,10 @@ apply_file_info(InFile, OutFile) ->
 
 create_RELEASES(TargetDir, RelName, RelVsn) ->
     ReleasesDir = filename:join(TargetDir, "releases"),
-    case release_handler:create_RELEASES(TargetDir, ReleasesDir,
-              filename:join([ReleasesDir, RelVsn, RelName ++ ".rel"]),
-              filename:join(TargetDir, "lib")) of
+    case release_handler:create_RELEASES(
+           TargetDir, ReleasesDir,
+           filename:join([ReleasesDir, RelVsn, RelName ++ ".rel"]),
+           filename:join(TargetDir, "lib")) of
         ok ->
             ok;
         {error, Reason} ->
