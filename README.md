@@ -27,15 +27,14 @@ Should you want to clone the rebar repository, you will also require git.
 
 #### Downloading
 
-Clone the git repository:
+You can download a pre-built binary version of rebar from:
 
-```sh
-$ git clone git://github.com/basho/rebar.git
-```
+https://github.com/basho/rebar/wiki/rebar
 
 #### Building rebar
 
 ```sh
+$ git clone git://github.com/basho/rebar.git
 $ cd rebar
 $ ./bootstrap
 Recompile: src/getopt
