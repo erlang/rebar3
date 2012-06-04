@@ -20,3 +20,8 @@ dialyzer: dialyzer_warnings
 dialyzer_warnings:
 	-@dialyzer -q -n ebin -Wunmatched_returns -Werror_handling \
 		-Wrace_conditions > dialyzer_warnings
+
+binary: VSN = $(shell ./rebar -V)
+binary: clean all
+	cp rebar ../rebar.wiki/rebar
+	(cd ../rebar.wiki && git commit -m "Update $(VSN)" rebar)
