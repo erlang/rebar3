@@ -120,7 +120,7 @@ compile_dtl(Source, Target, Config) ->
                    "    http://code.google.com/p/erlydtl/~n"
                    " and install it into your erlang library dir~n"
                    "===============================================~n~n", []),
-            ?FAIL;
+            ?ABORT;
         _ ->
             case needs_compile(Source, Target, Config) of
                 true ->
@@ -146,7 +146,7 @@ do_compile(Source, Target, Config) ->
         Reason ->
             ?ERROR("Compiling template ~s failed:~n  ~p~n",
                    [Source, Reason]),
-            ?FAIL
+            ?ABORT
     end.
 
 module_name(Target) ->

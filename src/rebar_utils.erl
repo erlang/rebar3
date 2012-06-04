@@ -37,7 +37,7 @@
          ensure_dir/1,
          beam_to_mod/2, beams/1,
          erl_to_mod/1,
-         abort/2,
+         abort/0, abort/2,
          escript_foldl/3,
          find_executable/1,
          prop_check/3,
@@ -137,10 +137,14 @@ ensure_dir(Path) ->
             Error
     end.
 
+-spec abort() -> no_return().
+abort() ->
+    delayed_halt(1).
+
 -spec abort(string(), [term()]) -> no_return().
 abort(String, Args) ->
     ?ERROR(String, Args),
-    delayed_halt(1).
+    abort().
 
 %% TODO: Rename emulate_escript_foldl to escript_foldl and remove
 %% this function when the time is right. escript:foldl/3 was an

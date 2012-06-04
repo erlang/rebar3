@@ -83,7 +83,7 @@ clear_log(RawLog) ->
             ok = file:write_file(RawLog, LogHeader);
         {error, Reason} ->
             ?ERROR("Could not create log dir - ~p\n", [Reason]),
-            ?FAIL
+            ?ABORT
     end.
 
 %% calling ct with erl does not return non-zero on failure - have to check
@@ -98,12 +98,12 @@ check_log(RawLog) ->
         MakeFailed ->
             show_log(RawLog),
             ?ERROR("Building tests failed\n",[]),
-            ?FAIL;
+            ?ABORT;
 
         RunFailed ->
             show_log(RawLog),
             ?ERROR("One or more tests failed\n",[]),
-            ?FAIL;
+            ?ABORT;
 
         true ->
             ?CONSOLE("DONE.\n~s\n", [Msg])
@@ -257,7 +257,7 @@ find_suite_path(Suite, TestDir) ->
     case filelib:is_regular(Path) of
         false ->
             ?ERROR("Suite ~s not found\n", [Suite]),
-            ?FAIL;
+            ?ABORT;
         true ->
             Path
     end.

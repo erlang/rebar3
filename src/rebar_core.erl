@@ -67,7 +67,7 @@ process_commands([], _ParentConfig) ->
     case erlang:get(operations) of
         0 ->
             %% none of the commands had an effect
-            ?FAIL;
+            ?ABORT;
         _ ->
             ok
     end;
@@ -362,7 +362,7 @@ execute(Command, Modules, Config, ModuleFile, Env) ->
                     apply_hooks(post_hooks, Config, Command, Env),
                     ok;
                 {error, failed} ->
-                    ?FAIL;
+                    ?ABORT;
                 {Module, {error, _} = Other} ->
                     ?ABORT("~p failed while processing ~s in module ~s: ~s\n",
                            [Command, Dir, Module,

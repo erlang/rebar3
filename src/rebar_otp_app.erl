@@ -146,12 +146,12 @@ validate_name(AppName, File) ->
         false ->
             ?ERROR("Invalid ~s: name of application (~p) "
                    "must match filename.\n", [File, AppName]),
-            ?FAIL
+            ?ABORT
     end.
 
 validate_modules(AppName, undefined) ->
     ?ERROR("Missing modules declaration in ~p.app~n", [AppName]),
-    ?FAIL;
+    ?ABORT;
 
 validate_modules(AppName, Mods) ->
     %% Construct two sets -- one for the actual .beam files in ebin/
@@ -169,7 +169,7 @@ validate_modules(AppName, Mods) ->
                                      M <- MissingBeams]),
             ?ERROR("One or more modules listed in ~p.app are not "
                    "present in ebin/*.beam:\n~s", [AppName, Msg1]),
-            ?FAIL
+            ?ABORT
     end,
 
     %% Identify .beam files NOT list in the .app, but present in ebin/
@@ -181,7 +181,7 @@ validate_modules(AppName, Mods) ->
                                      M <- MissingMods]),
             ?ERROR("One or more .beam files exist that are not "
                    "listed in ~p.app:\n~s", [AppName, Msg2]),
-            ?FAIL
+            ?ABORT
     end.
 
 ebin_modules() ->

@@ -90,7 +90,7 @@ compile_abnfc(Source, _Target, Config) ->
                    "    https://github.com/nygge/abnfc~n"
                    " and install it into your erlang library dir~n"
                    "===============================================~n~n", []),
-            ?FAIL;
+            ?ABORT;
         true ->
             AbnfcOpts = abnfc_opts(Config),
             SourceExt = option(source_ext, AbnfcOpts),
@@ -103,6 +103,6 @@ compile_abnfc(Source, _Target, Config) ->
                 Error ->
                     ?ERROR("Compiling grammar ~s failed:~n  ~p~n",
                            [Source, Error]),
-                    ?FAIL
+                    ?ABORT
             end
     end.

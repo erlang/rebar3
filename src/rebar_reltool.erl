@@ -58,10 +58,10 @@ generate(Config, ReltoolFile) ->
         ok ->
             ok;
         {error, failed} ->
-            ?FAIL;
+            ?ABORT;
         Other2 ->
             ?ERROR("Unexpected error: ~p\n", [Other2]),
-            ?FAIL
+            ?ABORT
     end.
 
 overlay(_Config, ReltoolFile) ->
@@ -235,12 +235,12 @@ mk_target_dir(TargetDir) ->
                 _ ->
                     ?ERROR("Release target directory ~p already exists!\n",
                            [TargetDir]),
-                    ?FAIL
+                    ?ABORT
             end;
         {error, Reason} ->
             ?ERROR("Failed to make target dir ~p: ~s\n",
                    [TargetDir, file:format_error(Reason)]),
-            ?FAIL
+            ?ABORT
     end.
 
 

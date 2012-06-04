@@ -149,7 +149,7 @@ compile_queue(Pids, Targets) ->
 
         {fail, Error} ->
             ?DEBUG("Worker compilation failed: ~p\n", [Error]),
-            ?FAIL;
+            ?ABORT;
 
         {compiled, Source} ->
             ?CONSOLE("Compiled ~s\n", [Source]),
@@ -166,7 +166,7 @@ compile_queue(Pids, Targets) ->
 
         {'DOWN', _Mref, _, _Pid, Info} ->
             ?DEBUG("Worker failed: ~p\n", [Info]),
-            ?FAIL
+            ?ABORT
     end.
 
 compile_worker(QueuePid, Config, CompileFn) ->

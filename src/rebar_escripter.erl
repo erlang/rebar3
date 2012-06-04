@@ -69,12 +69,12 @@ escriptize(Config, AppFile) ->
                 {error, WriteError} ->
                     ?ERROR("Failed to write ~p script: ~p\n",
                            [AppName, WriteError]),
-                    ?FAIL
+                    ?ABORT
             end;
         {error, ZipError} ->
             ?ERROR("Failed to construct ~p escript: ~p\n",
                    [AppName, ZipError]),
-            ?FAIL
+            ?ABORT
     end,
 
     %% Finally, update executable perms for our script

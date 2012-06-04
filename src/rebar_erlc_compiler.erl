@@ -261,7 +261,7 @@ internal_erl_compile(Source, Config, Outdir, ErlOpts) ->
                 {ok, _} ->
                     ok;
                 _ ->
-                    ?FAIL
+                    ?ABORT
             end;
         false ->
             skipped
@@ -282,7 +282,7 @@ compile_mib(Source, Target, Config) ->
             rebar_file_utils:mv(Hrl_filename, "include"),
             ok;
         {error, compilation_failed} ->
-            ?FAIL
+            ?ABORT
     end.
 
 -spec compile_xrl(Source::file:filename(), Target::file:filename(),
@@ -306,7 +306,7 @@ compile_xrl_yrl(Source, Target, Opts, Mod) ->
                 {ok, _} ->
                     ok;
                 _X ->
-                    ?FAIL
+                    ?ABORT
             end;
         false ->
             skipped

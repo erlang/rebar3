@@ -329,7 +329,7 @@ cover_init(true, BeamFiles) ->
         [] ->
             %% No modules compiled successfully...fail
             ?ERROR("Cover failed to compile any modules; aborting.~n", []),
-            ?FAIL;
+            ?ABORT;
         _ ->
             %% At least one module compiled successfully
 

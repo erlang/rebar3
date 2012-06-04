@@ -53,7 +53,7 @@ compile(_Config, _AppFile) ->
                 false ->
                     ?ERROR("Protobuffs library not present in code path!\n",
                            []),
-                    ?FAIL
+                    ?ABORT
             end
     end.
 
@@ -115,7 +115,7 @@ compile_each([{Proto, Beam, Hrl} | Rest]) ->
                 Other ->
                     ?ERROR("Protobuff compile of ~s failed: ~p\n",
                            [Proto, Other]),
-                    ?FAIL
+                    ?ABORT
             end;
         false ->
             ok
