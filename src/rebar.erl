@@ -53,7 +53,7 @@ main(Args) ->
     case catch(run(Args)) of
         ok ->
             ok;
-        {error, failed} ->
+        rebar_abort ->
             rebar_utils:delayed_halt(1);
         Error ->
             %% Nothing should percolate up from rebar_core;
@@ -161,6 +161,9 @@ parse_args(Args) ->
             %% Setup profiling flag
             rebar_config:set_global(enable_profiling,
                                     proplists:get_bool(profile, Options)),
+
+            %% Setup flag to keep running after a single command fails
+            rebar_config:set_global(keep_going, proplists:get_bool(keep_going, Options)),
 
             %% Set global variables based on getopt options
             set_log_level(Options),
@@ -304,7 +307,8 @@ option_spec_list() ->
      {defines,  $D, undefined,  string,    "Define compiler macro"},
      {jobs,     $j, "jobs",     integer,   JobsHelp},
      {config,   $C, "config",   string,    "Rebar config file to use"},
-     {profile,  $p, "profile",  undefined, "Profile this run of rebar"}
+     {profile,  $p, "profile",  undefined, "Profile this run of rebar"},
+     {keep_going, $k, "keep-going", undefined, "Keep running after a command fails"}
     ].
 
 %%
