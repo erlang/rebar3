@@ -24,12 +24,16 @@ main(Args) ->
                     false -> undefined
                 end,
 
+    %% Extract the system info of the version of OTP we use to compile rebar
+    OtpInfo = string:strip(erlang:system_info(otp_release), both, $\n),
+
     %% Compile all src/*.erl to ebin
     case make:files(filelib:wildcard("src/*.erl"),
                     [{outdir, "ebin"}, {i, "include"},
                      DebugFlag,
                      {d, 'BUILD_TIME', Built},
-                     {d, 'VCS_INFO', VcsInfo}]) of
+                     {d, 'VCS_INFO', VcsInfo},
+                     {d, 'OTP_INFO', OtpInfo}]) of
         up_to_date ->
             ok;
         error ->

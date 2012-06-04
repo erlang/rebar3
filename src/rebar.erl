@@ -41,6 +41,10 @@
 -define(VCS_INFO, "undefined").
 -endif.
 
+-ifndef(OTP_INFO).
+-define(OTP_INFO, "undefined").
+-endif.
+
 %% ====================================================================
 %% Public API
 %% ====================================================================
@@ -202,8 +206,8 @@ set_log_level(Options) ->
 %%
 version() ->
     {ok, Vsn} = application:get_key(rebar, vsn),
-    ?CONSOLE("rebar version: ~s date: ~s vcs: ~s\n",
-             [Vsn, ?BUILD_TIME, ?VCS_INFO]).
+    ?CONSOLE("rebar ~s ~s ~s ~s\n",
+             [Vsn, ?OTP_INFO, ?BUILD_TIME, ?VCS_INFO]).
 
 
 %%
