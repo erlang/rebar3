@@ -139,7 +139,7 @@ ensure_dir(Path) ->
 
 -spec abort() -> no_return().
 abort() ->
-    delayed_halt(1).
+    throw(rebar_abort).
 
 -spec abort(string(), [term()]) -> no_return().
 abort(String, Args) ->

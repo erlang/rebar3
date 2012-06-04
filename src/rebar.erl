@@ -54,12 +54,12 @@ main(Args) ->
         ok ->
             ok;
         {error, failed} ->
-            halt(1);
+            rebar_utils:delayed_halt(1);
         Error ->
             %% Nothing should percolate up from rebar_core;
             %% Dump this error to console
             io:format("Uncaught error in rebar_core: ~p\n", [Error]),
-            halt(1)
+            rebar_utils:delayed_halt(1)
     end.
 
 %% ====================================================================
@@ -186,7 +186,7 @@ parse_args(Args) ->
         {error, {Reason, Data}} ->
             ?ERROR("~s ~p~n~n", [Reason, Data]),
             help(),
-            halt(1)
+            rebar_utils:delayed_halt(1)
     end.
 
 %%
@@ -233,7 +233,7 @@ show_info_maybe_halt(Opts, NonOptArgs) ->
         [] ->
             ?CONSOLE("No command to run specified!~n",[]),
             help(),
-            halt(1);
+            rebar_utils:delayed_halt(1);
         _ ->
             ok
     end.
