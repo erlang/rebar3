@@ -29,7 +29,7 @@
 -include("rebar.hrl").
 
 -export([run/4, run/7, run/8,
-         format_errors/2, format_warnings/2, format_warnings/3]).
+         ok_tuple/2, error_tuple/4]).
 
 
 %% ===================================================================
@@ -80,18 +80,11 @@ run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
                 simple_compile_wrapper(S, Target, Compile3Fn, C, CheckLastMod)
         end).
 
-format_errors(Source, Errors) ->
-    format_errors(Source, "", Errors).
+ok_tuple(Source, Ws) ->
+    {ok, format_warnings(Source, Ws)}.
 
-format_warnings(Source, Warnings) ->
-    format_warnings(Source, Warnings, []).
-
-format_warnings(Source, Warnings, Opts) ->
-    Prefix = case lists:member(warnings_as_errors, Opts) of
-                 true -> "";
-                 false -> "Warning: "
-             end,
-    format_errors(Source, Prefix, Warnings).
+error_tuple(Source, Es, Ws, Opts) ->
+    {error, format_errors(Source, Es), format_warnings(Source, Ws, Opts)}.
 
 %% ===================================================================
 %% Internal functions
@@ -217,6 +210,19 @@ compile_worker(QueuePid, Config, CompileFn) ->
         empty ->
             ok
     end.
+
+format_errors(Source, Errors) ->
+    format_errors(Source, "", Errors).
+
+format_warnings(Source, Warnings) ->
+    format_warnings(Source, Warnings, []).
+
+format_warnings(Source, Warnings, Opts) ->
+    Prefix = case lists:member(warnings_as_errors, Opts) of
+                 true -> "";
+                 false -> "Warning: "
+             end,
+    format_errors(Source, Prefix, Warnings).
 
 maybe_report([{error, {error, _Es, _Ws}=ErrorsAndWarnings}, {source, _}]) ->
     maybe_report(ErrorsAndWarnings);

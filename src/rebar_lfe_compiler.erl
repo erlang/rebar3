@@ -63,10 +63,9 @@ compile_lfe(Source, _Target, Config) ->
                 ++ rebar_config:get_list(Config, erl_opts, []),
             case lfe_comp:file(Source, Opts) of
                 {ok, _Mod, Ws} ->
-                    {ok, rebar_base_compiler:format_warnings(Source, Ws)};
+                    rebar_base_compiler:ok_tuple(Source, Ws);
                 {error, Es, Ws} ->
-                    {error, rebar_base_compiler:format_errors(Source, Es),
-                     rebar_base_compiler:format_warnings(Source, Ws, Opts)};
+                    rebar_base_compiler:error_tuple(Source, Es, Ws, Opts);
                 _ ->
                     ?ABORT
             end

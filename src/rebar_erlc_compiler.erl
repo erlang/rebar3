@@ -262,10 +262,9 @@ internal_erl_compile(Source, Config, Outdir, ErlOpts) ->
                 {ok, _Mod} ->
                     ok;
                 {ok, _Mod, Ws} ->
-                    {ok, rebar_base_compiler:format_warnings(Source, Ws)};
+                    rebar_base_compiler:ok_tuple(Source, Ws);
                 {error, Es, Ws} ->
-                    {error, rebar_base_compiler:format_errors(Source, Es),
-                     rebar_base_compiler:format_warnings(Source, Ws, Opts)}
+                    rebar_base_compiler:error_tuple(Source, Es, Ws, Opts)
             end;
         false ->
             skipped
@@ -310,10 +309,9 @@ compile_xrl_yrl(Source, Target, Opts, Mod) ->
                 {ok, _} ->
                     ok;
                 {ok, _Mod, Ws} ->
-                    {ok, rebar_base_compiler:format_warnings(Source, Ws)};
+                    rebar_base_compiler:ok_tuple(Source, Ws);
                 {error, Es, Ws} ->
-                    {error, rebar_base_compiler:format_errors(Source, Es),
-                     rebar_base_compiler:format_warnings(Source, Ws, Opts)}
+                    rebar_base_compiler:error_tuple(Source, Es, Ws, Opts)
             end;
         false ->
             skipped
