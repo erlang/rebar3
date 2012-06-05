@@ -234,6 +234,9 @@ format_errors(Source, Extra, Errors) ->
     [lists:append([format_error(AbsSource, Extra, Desc) || Desc <- Descs])
      || {_, Descs} <- Errors].
 
+format_error(AbsSource, Extra, {{Line, Column}, Mod, Desc}) ->
+    ErrorDesc = Mod:format_error(Desc),
+    ?FMT("~s:~w:~w: ~s~s", [AbsSource, Line, Column, Extra, ErrorDesc]);
 format_error(AbsSource, Extra, {Line, Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
-    ?FMT("~s:~b: ~s~s", [AbsSource, Line, Extra, ErrorDesc]).
+    ?FMT("~s:~w: ~s~s", [AbsSource, Line, Extra, ErrorDesc]).
