@@ -56,14 +56,14 @@ doc(Config, File) ->
     {ok, AppName, _AppData} = rebar_app_utils:load_app_file(File),
 
     %% Determine the age of the summary file
-    SummaryFilename = filename:join(proplists:get_value(dir, EDocOpts, "doc"),
-                                    "overview-summary.html"),
-    SummaryLastMod = filelib:last_modified(SummaryFilename),
+    EDocInfoName = filename:join(proplists:get_value(dir, EDocOpts, "doc"),
+                                    "edoc-info"),
+    EDocInfoLastMod = filelib:last_modified(EDocInfoName),
 
     %% For each source directory, look for a more recent file than
     %% SumaryLastMod; in that case, we go ahead and do a full regen
     NeedsRegen = newer_file_exists(proplists:get_value(source_path, EDocOpts, ["src"]),
-                                   SummaryLastMod),
+                                   EDocInfoLastMod),
 
     case NeedsRegen of
         true ->
@@ -98,7 +98,7 @@ newer_file_exists(Paths, LastMod) ->
                         FLast = filelib:last_modified(Filename),
                         case FLast > LastMod of
                             true ->
-                                ?DEBUG("~p is more recent than overview-summary.html: ~120p > ~120p\n",
+                                ?DEBUG("~p is more recent than edoc-info: ~120p > ~120p\n",
                                        [Filename, FLast, LastMod]),
                                 throw(newer_file_exists);
                             false ->
