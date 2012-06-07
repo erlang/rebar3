@@ -62,7 +62,8 @@ doc(Config, File) ->
 
     %% For each source directory, look for a more recent file than
     %% SumaryLastMod; in that case, we go ahead and do a full regen
-    NeedsRegen = newer_file_exists(proplists:get_value(source_path, EDocOpts, ["src"]),
+    NeedsRegen = newer_file_exists(proplists:get_value(source_path,
+                                                       EDocOpts, ["src"]),
                                    EDocInfoLastMod),
 
     case NeedsRegen of
@@ -98,7 +99,8 @@ newer_file_exists(Paths, LastMod) ->
                         FLast = filelib:last_modified(Filename),
                         case FLast > LastMod of
                             true ->
-                                ?DEBUG("~p is more recent than edoc-info: ~120p > ~120p\n",
+                                ?DEBUG("~p is more recent than edoc-info: "
+                                       "~120p > ~120p\n",
                                        [Filename, FLast, LastMod]),
                                 throw(newer_file_exists);
                             false ->
@@ -106,8 +108,10 @@ newer_file_exists(Paths, LastMod) ->
                         end
                 end,
     try
-        lists:foldl(fun(P, _) -> filelib:fold_files(P, ".*.erl", true, CheckFile, false) end,
-                    undefined, Paths),
+        lists:foldl(fun(P, _) ->
+                            filelib:fold_files(P, ".*.erl", true,
+                                               CheckFile, false)
+                    end, undefined, Paths),
         false
     catch
         throw:newer_file_exists ->
