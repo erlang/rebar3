@@ -50,9 +50,30 @@
 doc(Config, File) ->
     %% Save code path
     CodePath = setup_code_path(),
-    {ok, AppName, _AppData} = rebar_app_utils:load_app_file(File),
+
+    %% Get the edoc_opts and app file info
     EDocOpts = rebar_config:get(Config, edoc_opts, []),
-    ok = edoc:application(AppName, ".", EDocOpts),
+    {ok, AppName, _AppData} = rebar_app_utils:load_app_file(File),
+
+    %% Determine the age of the summary file
+    EDocInfoName = filename:join(proplists:get_value(dir, EDocOpts, "doc"),
+                                    "edoc-info"),
+    EDocInfoLastMod = filelib:last_modified(EDocInfoName),
+
+    %% For each source directory, look for a more recent file than
+    %% SumaryLastMod; in that case, we go ahead and do a full regen
+    NeedsRegen = newer_file_exists(proplists:get_value(source_path, EDocOpts, ["src"]),
+                                   EDocInfoLastMod),
+
+    case NeedsRegen of
+        true ->
+            ?INFO("Regenerating edocs for ~p\n", [AppName]),
+            ok = edoc:application(AppName, ".", EDocOpts);
+        false ->
+            ?INFO("Skipping regeneration of edocs for ~p\n", [AppName]),
+            ok
+    end,
+
     %% Restore code path
     true = code:set_path(CodePath),
     ok.
@@ -71,3 +92,25 @@ setup_code_path() ->
 
 ebin_dir() ->
     filename:join(rebar_utils:get_cwd(), "ebin").
+
+newer_file_exists(Paths, LastMod) ->
+    CheckFile = fun(Filename, _) ->
+                        FLast = filelib:last_modified(Filename),
+                        case FLast > LastMod of
+                            true ->
+                                ?DEBUG("~p is more recent than edoc-info: ~120p > ~120p\n",
+                                       [Filename, FLast, LastMod]),
+                                throw(newer_file_exists);
+                            false ->
+                                false
+                        end
+                end,
+    try
+        lists:foldl(fun(P, _) -> filelib:fold_files(P, ".*.erl", true, CheckFile, false) end,
+                    undefined, Paths),
+        false
+    catch
+        throw:newer_file_exists ->
+            true
+    end.
+
