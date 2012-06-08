@@ -202,22 +202,23 @@ inspect(Source, IncludePath) ->
 inspect_epp(Epp, Source, Module, Includes) ->
     case epp:parse_erl_form(Epp) of
         {ok, {attribute, _, module, ModInfo}} ->
-            case ModInfo of
-                %% Typical module name, single atom
-                ActualModule when is_atom(ActualModule) ->
-                    ActualModuleStr = atom_to_list(ActualModule);
-                %% Packag-ized module name, list of atoms
-                ActualModule when is_list(ActualModule) ->
-                    ActualModuleStr = string:join([atom_to_list(P) ||
-                                                      P <- ActualModule], ".");
-                %% Parameterized module name, single atom
-                {ActualModule, _} when is_atom(ActualModule) ->
-                    ActualModuleStr = atom_to_list(ActualModule);
-                %% Parameterized and packagized module name, list of atoms
-                {ActualModule, _} when is_list(ActualModule) ->
-                    ActualModuleStr = string:join([atom_to_list(P) ||
-                                                      P <- ActualModule], ".")
-            end,
+            ActualModuleStr =
+                case ModInfo of
+                    %% Typical module name, single atom
+                    ActualModule when is_atom(ActualModule) ->
+                        atom_to_list(ActualModule);
+                    %% Packag-ized module name, list of atoms
+                    ActualModule when is_list(ActualModule) ->
+                        string:join([atom_to_list(P) ||
+                                        P <- ActualModule], ".");
+                    %% Parameterized module name, single atom
+                    {ActualModule, _} when is_atom(ActualModule) ->
+                        atom_to_list(ActualModule);
+                    %% Parameterized and packagized module name, list of atoms
+                    {ActualModule, _} when is_list(ActualModule) ->
+                        string:join([atom_to_list(P) ||
+                                        P <- ActualModule], ".")
+                end,
             inspect_epp(Epp, Source, ActualModuleStr, Includes);
         {ok, {attribute, 1, file, {Module, 1}}} ->
             inspect_epp(Epp, Source, Module, Includes);
