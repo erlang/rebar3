@@ -145,14 +145,14 @@ make_cmd(TestDir, Config) ->
               undefined ->
                   ?FMT("erl " % should we expand ERL_PATH?
                        " -noshell -pa ~s ~s"
-                       " -name test@~s"
+                       " ~s"
                        " -logdir \"~s\""
                        " -env TEST_DIR \"~s\""
                        " ~s"
                        " -s ct_run script_start -s erlang halt",
                        [CodePathString,
                         Include,
-                        net_adm:localhost(),
+                        build_name(Config),
                         LogDir,
                         filename:join(Cwd, TestDir),
                         get_extra_params(Config)]) ++
@@ -164,14 +164,14 @@ make_cmd(TestDir, Config) ->
               SpecFlags ->
                   ?FMT("erl " % should we expand ERL_PATH?
                        " -noshell -pa ~s ~s"
-                       " -name test@~s"
+                       " ~s"
                        " -logdir \"~s\""
                        " -env TEST_DIR \"~s\""
                        " ~s"
                        " -s ct_run script_start -s erlang halt",
                        [CodePathString,
                         Include,
-                        net_adm:localhost(),
+                        build_name(Config),
                         LogDir,
                         filename:join(Cwd, TestDir),
                         get_extra_params(Config)]) ++
@@ -179,6 +179,12 @@ make_cmd(TestDir, Config) ->
           end,
     RawLog = filename:join(LogDir, "raw.log"),
     {Cmd, RawLog}.
+
+build_name(Config) ->
+    case rebar_config:get_local(Config, ct_use_short_names, false) of
+        true -> "-sname test";
+        false -> " -name test@" ++ net_adm:localhost()
+    end.
 
 get_extra_params(Config) ->
     rebar_config:get_local(Config, ct_extra_params, "").
