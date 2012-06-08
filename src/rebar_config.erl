@@ -32,7 +32,7 @@
          set/3,
          set_global/2, get_global/2,
          is_verbose/0, get_jobs/0,
-         set_env/3, get_env/2,
+         set_env/3, get_env/2, reset_env/1,
          set_skip_dir/2, is_skip_dir/2, reset_skip_dirs/1,
          clean_config/2,
          set_xconf/3, get_xconf/2, erase_xconf/2, reset_xconf/1]).
@@ -135,6 +135,9 @@ set_env(Config, Mod, Env) ->
 
 get_env(Config, Mod) ->
     dict:fetch(Mod, Config#config.envs).
+
+reset_env(Config) ->
+    Config#config{envs = new_env()}.
 
 set_skip_dir(Config, Dir) ->
     OldSkipDirs = Config#config.skip_dirs,

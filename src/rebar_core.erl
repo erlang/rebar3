@@ -218,7 +218,7 @@ process_dir0(Dir, Command, DirSet, Config0, CurrentCodePath,
     %% the parent initialized it to
     restore_code_path(CurrentCodePath),
 
-    %% Return the updated {config, dirset} as our result
+    %% Return the updated {config, dirset} as result
     Res.
 
 remember_cwd_subdir(Cwd, Subdirs) ->
@@ -256,7 +256,9 @@ processing_base_dir(Dir) ->
 %% process each one we haven't seen yet
 %%
 process_each([], _Command, Config, _ModuleSetFile, DirSet) ->
-    {Config, DirSet};
+    %% reset cached setup_env
+    Config1 = rebar_config:reset_env(Config),
+    {Config1, DirSet};
 process_each([Dir | Rest], Command, Config, ModuleSetFile, DirSet) ->
     case sets:is_element(Dir, DirSet) of
         true ->
@@ -265,7 +267,9 @@ process_each([Dir | Rest], Command, Config, ModuleSetFile, DirSet) ->
         false ->
             {Config1, DirSet2} = process_dir(Dir, Config, Command, DirSet),
             Config2 = rebar_config:clean_config(Config, Config1),
-            process_each(Rest, Command, Config2, ModuleSetFile, DirSet2)
+            %% reset cached setup_env
+            Config3 = rebar_config:reset_env(Config2),
+            process_each(Rest, Command, Config3, ModuleSetFile, DirSet2)
     end.
 
 
