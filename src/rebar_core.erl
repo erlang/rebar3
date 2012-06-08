@@ -82,8 +82,8 @@ process_commands([Command | Rest], ParentConfig) ->
         Operations = erlang:get(operations),
 
         %% Convert the code path so that all the entries are absolute paths.
-        %% If not, code:set_path() may choke on invalid relative paths when trying
-        %% to restore the code path from inside a subdirectory.
+        %% If not, code:set_path() may choke on invalid relative paths when
+        %% trying to restore the code path from inside a subdirectory.
         true = rebar_utils:expand_code_path(),
         _ = process_dir(rebar_utils:get_cwd(), ParentConfig,
                         Command, sets:new()),
@@ -120,7 +120,8 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
 
         true ->
             AbsDir = filename:absname(Dir),
-            ShouldPrintDir = not (is_skip_dir(Dir) orelse processing_base_dir(Dir)),
+            ShouldPrintDir = not (is_skip_dir(Dir)
+                                  orelse processing_base_dir(Dir)),
 
             case ShouldPrintDir of
                 true ->
@@ -272,7 +273,8 @@ remember_cwd_subdir(Cwd, Subdirs) ->
     Store = fun(Dir, Dict) ->
                     case dict:find(Dir, Dict) of
                         error ->
-                            ?DEBUG("Associate sub_dir ~s with ~s~n", [Dir, Cwd]),
+                            ?DEBUG("Associate sub_dir ~s with ~s~n",
+                                   [Dir, Cwd]),
                             dict:store(Dir, Cwd, Dict);
                         {ok, Existing} ->
                             ?ABORT("Internal consistency assertion failed.~n"
@@ -514,11 +516,13 @@ plugin_modules(Config, SubdirAssoc, Modules) ->
 plugin_modules(_Config, _SubdirAssoc, FoundModules, []) ->
     {ok, FoundModules};
 plugin_modules(Config, SubdirAssoc, FoundModules, MissingModules) ->
-    {Loaded, NotLoaded} = load_plugin_modules(Config, SubdirAssoc, MissingModules),
+    {Loaded, NotLoaded} = load_plugin_modules(Config, SubdirAssoc,
+                                              MissingModules),
     AllViablePlugins = FoundModules ++ Loaded,
     case NotLoaded =/= [] of
         true ->
-            %% NB: we continue to ignore this situation, as did the original code
+            %% NB: we continue to ignore this situation, as did the
+            %% original code
             ?WARN("Missing plugins: ~p\n", [NotLoaded]);
         false ->
             ?DEBUG("Loaded plugins: ~p~n", [AllViablePlugins]),

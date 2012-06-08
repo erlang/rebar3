@@ -57,7 +57,7 @@ doc(Config, File) ->
 
     %% Determine the age of the summary file
     EDocInfoName = filename:join(proplists:get_value(dir, EDocOpts, "doc"),
-                                    "edoc-info"),
+                                 "edoc-info"),
     EDocInfoLastMod = filelib:last_modified(EDocInfoName),
 
     %% For each source directory, look for a more recent file than

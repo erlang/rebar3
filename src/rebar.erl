@@ -163,7 +163,8 @@ parse_args(Args) ->
                                     proplists:get_bool(profile, Options)),
 
             %% Setup flag to keep running after a single command fails
-            rebar_config:set_global(keep_going, proplists:get_bool(keep_going, Options)),
+            rebar_config:set_global(keep_going,
+                                    proplists:get_bool(keep_going, Options)),
 
             %% Set global variables based on getopt options
             set_log_level(Options),
@@ -308,7 +309,8 @@ option_spec_list() ->
      {jobs,     $j, "jobs",     integer,   JobsHelp},
      {config,   $C, "config",   string,    "Rebar config file to use"},
      {profile,  $p, "profile",  undefined, "Profile this run of rebar"},
-     {keep_going, $k, "keep-going", undefined, "Keep running after a command fails"}
+     {keep_going, $k, "keep-going", undefined,
+      "Keep running after a command fails"}
     ].
 
 %%
