@@ -66,9 +66,11 @@
              BaseName = filename:basename(F, ".template"),
              {ok, Template} = file:consult(F),
              {_, VarList} = lists:keyfind(variables, 1, Template),
-             Vars = lists:foldl(fun({V,_}, Acc) -> [atom_to_list(V)|Acc] end, [], VarList),
-             ?CONSOLE("\t* ~s: ~s (~p) (variables: ~p)\n", [BaseName, F, Type, 
-                                                            string:join(Vars, ", ")])
+             Vars = lists:foldl(fun({V,_}, Acc) ->
+                                        [atom_to_list(V) | Acc]
+                                end, [], VarList),
+             ?CONSOLE("\t* ~s: ~s (~p) (variables: ~p)\n",
+                      [BaseName, F, Type, string:join(Vars, ", ")])
          end || {Type, F} <- AvailTemplates],
     ok.
 
