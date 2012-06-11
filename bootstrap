@@ -8,7 +8,7 @@ main(Args) ->
 
     %% Get a string repr of first matching VCS changeset
     VcsInfo = vcs_info([{hg, ".hg", "hg identify -i"},
-                        {git, ".git", "git describe --always"}]),
+                        {git, ".git", "git describe --always --tags"}]),
 
     %% Check for force=1 flag to force a rebuild
     case lists:member("force=1", Args) of
