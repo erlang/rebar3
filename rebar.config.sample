@@ -78,6 +78,9 @@
 %% Whether to print coverage report to console. Default is `false'
 {cover_print_enabled, false}.
 
+%% Whether to export coverage report to file. Default is `false'
+{cover_export_enabled, false}.
+
 %% == Common Test ==
 
 %% Override the default "test" directory in which SUITEs are located

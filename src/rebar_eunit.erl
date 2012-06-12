@@ -223,6 +223,14 @@ cover_analyze(Config, FilteredModules, SrcModules) ->
     Index = filename:join([rebar_utils:get_cwd(), ?TEST_DIR, "index.html"]),
     ?CONSOLE("Cover analysis: ~s\n", [Index]),
 
+    %% Export coverage data, if configured
+    case rebar_config:get(Config, cover_export_enabled, false) of
+        true ->
+            cover_export_coverdata();
+        false ->
+            ok
+    end,
+
     %% Print coverage report, if configured
     case rebar_config:get(Config, cover_print_enabled, false) of
         true ->
@@ -387,6 +395,17 @@ cover_print_coverage(Coverage) ->
 
 cover_file(Module) ->
     filename:join([?TEST_DIR, atom_to_list(Module) ++ ".COVER.html"]).
+
+cover_export_coverdata() ->
+    ExportFile = filename:join([rebar_utils:get_cwd(),
+                                ?TEST_DIR,
+                                "eunit.coverdata"]),
+    case cover:export(ExportFile) of
+        ok ->
+            ?CONSOLE("Coverdata export: ~s~n", [ExportFile]);
+        {error,Reason} ->
+            ?ERROR("Coverdata export failed: ~p~n", [Reason])
+    end.
 
 percentage(0, 0) ->
     "not executed";
