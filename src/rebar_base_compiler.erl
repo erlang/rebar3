@@ -233,7 +233,7 @@ maybe_report(_) ->
     ok.
 
 report(Messages) ->
-    lists:foreach(fun(Msg) -> io:format("~s~n", [Msg]) end, Messages).
+    lists:foreach(fun(Msg) -> io:format("~s", [Msg]) end, Messages).
 
 format_errors(Source, Extra, Errors) ->
     AbsSource = filename:absname(Source),
@@ -242,7 +242,7 @@ format_errors(Source, Extra, Errors) ->
 
 format_error(AbsSource, Extra, {{Line, Column}, Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
-    ?FMT("~s:~w:~w: ~s~s", [AbsSource, Line, Column, Extra, ErrorDesc]);
+    ?FMT("~s:~w:~w: ~s~s~n", [AbsSource, Line, Column, Extra, ErrorDesc]);
 format_error(AbsSource, Extra, {Line, Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
-    ?FMT("~s:~w: ~s~s", [AbsSource, Line, Extra, ErrorDesc]).
+    ?FMT("~s:~w: ~s~s~n", [AbsSource, Line, Extra, ErrorDesc]).
