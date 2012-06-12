@@ -237,7 +237,7 @@ report(Messages) ->
 
 format_errors(Source, Extra, Errors) ->
     AbsSource = filename:absname(Source),
-    [lists:append([format_error(AbsSource, Extra, Desc) || Desc <- Descs])
+    [[format_error(AbsSource, Extra, Desc) || Desc <- Descs]
      || {_, Descs} <- Errors].
 
 format_error(AbsSource, Extra, {{Line, Column}, Mod, Desc}) ->
