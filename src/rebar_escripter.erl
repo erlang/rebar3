@@ -95,32 +95,19 @@ clean(Config, AppFile) ->
 %% ===================================================================
 
 make_temp_dir(AppName) ->
-    case temp_name(AppName ++ ".") of
-        {ok, TempDir} ->
-            case file:make_dir(TempDir) of
-                ok ->
-                    TempDir;
-                Error ->
-                    ?ABORT("Failed to create temporary directory: ~p~n",
-                           [Error])
-            end;
+    TempDir = temp_name(AppName ++ "."),
+    case file:make_dir(TempDir) of
+        ok ->
+            ?CONSOLE("TempDir: ~p~n", [TempDir]),
+            TempDir;
         Error ->
             ?ABORT("Failed to create temporary directory: ~p~n",
                    [Error])
     end.
 
 temp_name(Prefix) ->
-    temp_name(Prefix, 5).
-
-temp_name(_Prefix, 0) ->
-    {error, eexist};
-temp_name(Prefix, N) ->
     Hash = erlang:phash2(make_ref()),
-    Name = Prefix ++ integer_to_list(Hash),
-    case filelib:is_file(Name) of
-        false -> {ok, Name};
-        true  -> temp_name(Prefix, N-1)
-    end.
+    Prefix ++ integer_to_list(Hash).
 
 copy_files(Config, AppName, Temp) ->
     BaseEbinDir = filename:join(AppName, "ebin"),
@@ -157,7 +144,7 @@ get_app_ebin_dirs([App | Rest], Acc) ->
                    "~p escript_incl_apps.", [App]);
         Path ->
             %% TODO: shouldn't we also include .app files? escript
-            %%       supports multiple app files in one ebin/
+            %% should support multiple app files in one ebin/
             Acc2 = filename:join(Path, "*.beam"),
             get_app_ebin_dirs(Rest, [Acc2|Acc])
     end.
