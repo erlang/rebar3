@@ -98,7 +98,6 @@ make_temp_dir(AppName) ->
     TempDir = temp_name(AppName ++ "."),
     case file:make_dir(TempDir) of
         ok ->
-            ?CONSOLE("TempDir: ~p~n", [TempDir]),
             TempDir;
         Error ->
             ?ABORT("Failed to create temporary directory: ~p~n",
