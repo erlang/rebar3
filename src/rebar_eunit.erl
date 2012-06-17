@@ -43,7 +43,7 @@
 %% The following Global options are supported:
 %% <ul>
 %%   <li>verbose=1 - show extra output from the eunit test</li>
-%%   <li>suite="foo"" - runs test/foo_tests.erl</li>
+%%   <li>suites="foo,bar" - runs test/foo_tests.erl and test/bar_tests.erl</li>
 %% </ul>
 %% Additionally, for projects that have separate folders for the core
 %% implementation, and for the unit tests, then the following
