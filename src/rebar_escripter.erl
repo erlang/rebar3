@@ -45,14 +45,22 @@ escriptize(Config, AppFile) ->
     Filename = rebar_config:get_local(Config, escript_name, AppName),
     ok = filelib:ensure_dir(Filename),
 
-    AppNameString = atom_to_list(AppName),
-    TempDir = make_temp_dir(AppNameString),
-    ok = copy_files(Config, AppNameString, TempDir),
-    {ok, Dirs} = file:list_dir(TempDir),
+    %% Look for a list of other applications (dependencies) to include
+    %% in the output file. We then use the .app files for each of these
+    %% to pull in all the .beam files.
+    InclBeams = get_app_beams(
+                  rebar_config:get_local(Config, escript_incl_apps, []), []),
 
-    case zip:create("mem", Dirs, [memory, {cwd, TempDir}]) of
+    %% Look for a list extra files to include in the output file.
+    %% For internal rebar-private use only. Do not use outside rebar.
+    InclExtra = get_extra(Config),
+
+    %% Construct the archive of everything in ebin/ dir -- put it on the
+    %% top-level of the zip file so that code loading works properly.
+    Files = load_files("*", "ebin") ++ InclBeams ++ InclExtra,
+
+    case zip:create("mem", Files, [memory]) of
         {ok, {"mem", ZipBin}} ->
-            ok = rebar_file_utils:rm_rf(TempDir),
             %% Archive was successfully created. Prefix that binary with our
             %% header and write to our escript file
             Shebang = rebar_config:get(Config, escript_shebang,
@@ -69,7 +77,6 @@ escriptize(Config, AppFile) ->
                     ?ABORT
             end;
         {error, ZipError} ->
-            ok = rebar_file_utils:rm_rf(TempDir),
             ?ERROR("Failed to construct ~p escript: ~p\n",
                    [AppName, ZipError]),
             ?ABORT
@@ -89,62 +96,36 @@ clean(Config, AppFile) ->
     Filename = rebar_config:get_local(Config, escript_name, AppName),
     rebar_file_utils:delete_each([Filename]).
 
-
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
-make_temp_dir(AppName) ->
-    TempDir = temp_name(AppName ++ "."),
-    case file:make_dir(TempDir) of
-        ok ->
-            TempDir;
-        Error ->
-            ?ABORT("Failed to create temporary directory: ~p~n",
-                   [Error])
-    end.
-
-temp_name(Prefix) ->
-    Hash = erlang:phash2(make_ref()),
-    Prefix ++ integer_to_list(Hash).
-
-copy_files(Config, AppName, Temp) ->
-    BaseEbinDir = filename:join(AppName, "ebin"),
-    EbinDir = filename:join(Temp, BaseEbinDir),
-
-    %% Look for a list of other applications (dependencies) to include
-    %% in the output file. We then use the .app files for each of
-    %% these to pull in all the .beam files.
-    InclApps = rebar_config:get_local(Config, escript_incl_apps, []),
-    InclEbinDirs = get_app_ebin_dirs(InclApps, []),
-    %% copy incl_apps files
-    lists:foreach(fun(Src) -> ok = copy_files(Src, EbinDir) end, InclEbinDirs),
-
-    %% Look for a list of extra files to copy.
-    %% For internal rebar-private use only. Do not use outside rebar.
-    InclExtr = rebar_config:get_local(Config, escript_incl_extra, []),
-    lists:foreach(fun({Src, Dst}) ->
-                          copy_files(Src, filename:join(Temp, Dst))
-                  end, InclExtr),
-
-    %% copy script's beam files and app file
-    EbinSrc = filename:join(["ebin", "*"]),
-    ok = copy_files(EbinSrc, EbinDir).
-
-copy_files(Src, Dst) ->
-    ok = filelib:ensure_dir(filename:join(Dst, "dummy")),
-    rebar_file_utils:cp_r([Src], Dst).
-
-get_app_ebin_dirs([], Acc) ->
+get_app_beams([], Acc) ->
     Acc;
-get_app_ebin_dirs([App | Rest], Acc) ->
+get_app_beams([App | Rest], Acc) ->
     case code:lib_dir(App, ebin) of
         {error, bad_name} ->
             ?ABORT("Failed to get ebin/ directory for "
                    "~p escript_incl_apps.", [App]);
         Path ->
-            %% TODO: shouldn't we also include .app files? escript
-            %% should support multiple app files in one ebin/
-            Acc2 = filename:join(Path, "*.beam"),
-            get_app_ebin_dirs(Rest, [Acc2|Acc])
+            Acc2 = [{filename:join([App, ebin, F]),
+                     file_contents(filename:join(Path, F))} ||
+                       F <- filelib:wildcard("*", Path)],
+            get_app_beams(Rest, Acc2 ++ Acc)
     end.
+
+get_extra(Config) ->
+    Extra = rebar_config:get_local(Config, escript_incl_extra, []),
+    lists:foldl(fun({Wildcard, Dir}, Files) ->
+                        load_files(Wildcard, Dir) ++ Files
+                end, [], Extra).
+
+load_files(Wildcard, Dir) ->
+    [read_file(Filename, Dir) || Filename <- filelib:wildcard(Wildcard, Dir)].
+
+read_file(Filename, Dir) ->
+    {Filename, file_contents(filename:join(Dir, Filename))}.
+
+file_contents(Filename) ->
+    {ok, Bin} = file:read_file(Filename),
+    Bin.
