@@ -487,8 +487,7 @@ expand_keys_in_value([Key | Rest], Value, Vars) ->
 expand_command(TmplName, Env, InFiles, OutFile) ->
     Cmd0 = proplists:get_value(TmplName, Env),
     Cmd1 = rebar_utils:expand_env_variable(Cmd0, "PORT_IN_FILES", InFiles),
-    Cmd2 = rebar_utils:expand_env_variable(Cmd1, "PORT_OUT_FILE", OutFile),
-    re:replace(Cmd2, "\\\$\\w+|\\\${\\w+}", "", [global, {return, list}]).
+    rebar_utils:expand_env_variable(Cmd1, "PORT_OUT_FILE", OutFile).
 
 %%
 %% Given a string, determine if it is expandable

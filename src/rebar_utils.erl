@@ -337,10 +337,12 @@ get_deprecated_3(Get, Config, OldOpt, NewOpt, Default, When) ->
 patch_on_windows(Cmd, Env) ->
     case os:type() of
         {win32,nt} ->
-            "cmd /q /c "
+            Cmd1 = "cmd /q /c "
                 ++ lists:foldl(fun({Key, Value}, Acc) ->
                                        expand_env_variable(Acc, Key, Value)
-                               end, Cmd, Env);
+                               end, Cmd, Env),
+            %% Remove left-over vars
+            re:replace(Cmd1, "\\\$\\w+|\\\${\\w+}", "", [global, {return, list}]);
         _ ->
             Cmd
     end.
