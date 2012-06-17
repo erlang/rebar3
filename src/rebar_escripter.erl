@@ -120,7 +120,8 @@ copy_files(Config, AppName, Temp) ->
     %% copy incl_apps files
     lists:foreach(fun(Src) -> ok = copy_files(Src, EbinDir) end, InclEbinDirs),
 
-    %% Look for a list of extra files to copy
+    %% Look for a list of extra files to copy.
+    %% For internal rebar-private use only. Do not use outside rebar.
     InclExtr = rebar_config:get_local(Config, escript_incl_extra, []),
     lists:foreach(fun({Src, Dst}) ->
                           copy_files(Src, filename:join(Temp, Dst))
