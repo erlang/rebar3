@@ -45,7 +45,7 @@
          deprecated/3, deprecated/4,
          expand_env_variable/3,
          vcs_vsn/2,
-         get_deprecated_global/3,
+         get_deprecated_global/3, get_deprecated_global/4,
          get_deprecated_list/4, get_deprecated_list/5,
          get_deprecated_local/4, get_deprecated_local/5,
          delayed_halt/1]).
@@ -243,10 +243,10 @@ get_deprecated_global(OldOpt, NewOpt, When) ->
 
 get_deprecated_global(OldOpt, NewOpt, Default, When) ->
     case rebar_config:get_global(NewOpt, Default) of
-        undefined ->
+        Default ->
             case rebar_config:get_global(OldOpt, Default) of
-                undefined ->
-                    undefined;
+                Default ->
+                    Default;
                 Old ->
                     deprecated(OldOpt, NewOpt, When),
                     Old
@@ -254,7 +254,6 @@ get_deprecated_global(OldOpt, NewOpt, Default, When) ->
         New ->
             New
     end.
-
 
 get_deprecated_list(Config, OldOpt, NewOpt, When) ->
     get_deprecated_list(Config, OldOpt, NewOpt, undefined, When).
