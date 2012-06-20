@@ -159,7 +159,7 @@ make_cmd(TestDir, Config) ->
                       get_cover_config(Config, Cwd) ++
                       get_ct_config_file(TestDir) ++
                       get_config_file(TestDir) ++
-                      get_suite(TestDir) ++
+                      get_suites(TestDir) ++
                       get_case();
               SpecFlags ->
                   ?FMT("erl " % should we expand ERL_PATH?
@@ -248,7 +248,7 @@ get_config_file(TestDir) ->
             " -config " ++ Config
     end.
 
-get_suite(TestDir) ->
+get_suites(TestDir) ->
     case rebar_utils:get_deprecated_global(suite, suites, "soon") of
         undefined ->
             " -dir " ++ TestDir;
