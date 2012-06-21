@@ -43,6 +43,10 @@ compile(Config, _) ->
 eunit(Config, _) ->
     check_versions(Config).
 
+%% ====================================================================
+%% Internal functions
+%% ====================================================================
+
 check_versions(Config) ->
     ErtsRegex = rebar_config:get(Config, require_erts_vsn, ".*"),
     ReOpts = [{capture, none}],
