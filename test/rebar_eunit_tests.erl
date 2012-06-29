@@ -77,18 +77,21 @@ cover_with_suite_test_() ->
      setup,
      fun() ->
              setup_cover_project_with_suite(),
-             rebar("-v eunit suite=mysuite")
+             rebar("-v eunit suites=mysuite")
      end,
      fun teardown/1,
 
-     [{"All cover reports are generated",
+     [{"Cover reports are generated for module",
        assert_files_in("the temporary eunit directory",
-                       expected_cover_generated_files())},
+                           [".eunit/index.html",
+                            ".eunit/mysuite.COVER.html"])},
 
       {"Only production modules get coverage reports",
        assert_files_not_in("the temporary eunit directory",
-                           [".eunit/myapp_mymod_tests.COVER.html",
-                            ".eunit/mysuite.COVER.html"])}]}.
+                           [".eunit/myapp_app.COVER.html",
+                            ".eunit/myapp_mymod.COVER.html",
+                            ".eunit/myapp_sup.COVER.html",
+                            ".eunit/myapp_mymod_tests.COVER.html"])}]}.
 
 expected_cover_generated_files() ->
     [".eunit/index.html",
@@ -247,6 +250,5 @@ assert_full_coverage(Mod) ->
             Result = [X || X <- string:tokens(binary_to_list(F), "\n"),
                            string:str(X, Mod) =/= 0,
                            string:str(X, "100%") =/= 0],
-            ok = file:close(F),
             ?assert(length(Result) =:= 1)
     end.
