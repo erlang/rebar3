@@ -62,16 +62,17 @@
     %% Build a list of available templates
     AvailTemplates = find_disk_templates() ++ find_escript_templates(),
     ?CONSOLE("Available templates:\n", []),
-    _ = [begin
-             BaseName = filename:basename(F, ".template"),
-             TemplateTerms = consult(load_file(Type, F)),
-             {_, VarList} = lists:keyfind(variables, 1, TemplateTerms),
-             Vars = lists:foldl(fun({V,_}, Acc) ->
-                                        [atom_to_list(V) | Acc]
-                                end, [], VarList),
-             ?CONSOLE("  * ~s: ~s (~p) (variables: ~p)\n",
-                      [BaseName, F, Type, string:join(Vars, ", ")])
-         end || {Type, F} <- AvailTemplates],
+    lists:foreach(
+      fun({Type, F}) ->
+              BaseName = filename:basename(F, ".template"),
+              TemplateTerms = consult(load_file(Type, F)),
+              {_, VarList} = lists:keyfind(variables, 1, TemplateTerms),
+              Vars = lists:foldl(fun({V,_}, Acc) ->
+                                         [atom_to_list(V) | Acc]
+                                 end, [], VarList),
+              ?CONSOLE("  * ~s: ~s (~p) (variables: ~p)\n",
+                       [BaseName, F, Type, string:join(Vars, ", ")])
+      end, AvailTemplates),
     ok.
 
 
