@@ -64,8 +64,8 @@
     ?CONSOLE("Available templates:\n", []),
     _ = [begin
              BaseName = filename:basename(F, ".template"),
-             {ok, Template} = file:consult(F),
-             {_, VarList} = lists:keyfind(variables, 1, Template),
+             TemplateTerms = consult(load_file(Type, F)),
+             {_, VarList} = lists:keyfind(variables, 1, TemplateTerms),
              Vars = lists:foldl(fun({V,_}, Acc) ->
                                         [atom_to_list(V) | Acc]
                                 end, [], VarList),
