@@ -264,7 +264,7 @@ update_vars([Key | Rest], Dict) ->
 
 
 %%
-%% Given a string or binary, parse it into a list of terms, ala file:consult/0
+%% Given a string or binary, parse it into a list of terms, ala file:consult/1
 %%
 consult(Str) when is_list(Str) ->
     consult([], Str, []);
