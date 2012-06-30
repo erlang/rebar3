@@ -130,13 +130,15 @@ and you can use rebar to build OTP-compliant apps.
 make: [dialyzer_warnings] Error 2 (ignored)
 ```
 
-[xref](http://www.erlang.org/doc/man/xref.html) and
 [Dialyzer](http://www.erlang.org/doc/man/dialyzer.html) warnings are compared
 against a set of safe-to-ignore warnings  
 found in
-[dialyzer_reference](https://raw.github.com/tuncer/rebar/maint/dialyzer_reference)
+[dialyzer_reference](https://raw.github.com/basho/rebar/master/dialyzer_reference)
 and
-[xref_reference](https://raw.github.com/tuncer/rebar/maint/xref_reference).
+
+[xref](http://www.erlang.org/doc/man/xref.html) is run with custom queries
+to suppress safe-to-ignore warnings
+[xref_queries](https://raw.github.com/basho/rebar/master/rebar.config)
 
 It is **strongly recommended** to check the code with
 [Tidier](http://tidier.softlab.ntua.gr:20000/tidier/getstarted).  
