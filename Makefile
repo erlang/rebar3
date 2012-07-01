@@ -2,8 +2,6 @@
 
 REBAR=$(PWD)/rebar
 RETEST=$(PWD)/deps/retest/retest
-EUNIT_DIR=$(PWD)/.eunit
-RETEST_DIR=$(PWD)/.rt.work
 
 all:
 	./bootstrap
