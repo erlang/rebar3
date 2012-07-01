@@ -18,7 +18,7 @@ files() ->
      {create, "ebin/fish.app", app(fish, [fish])}
     ].
 
-run(Dir) ->
+run(_Dir) ->
     ?assertMatch({ok, _}, retest_sh:run("./rebar fwibble -v", [])),
     ?assertEqual(false, filelib:is_regular("fwibble.test")),
     Ref = retest:sh("./rebar -C bad.config -v clean", [{async, true}]),
