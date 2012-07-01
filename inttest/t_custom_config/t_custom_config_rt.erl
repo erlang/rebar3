@@ -11,7 +11,7 @@ files() ->
 
 run(Dir) ->
     retest_log:log(debug, "Running in Dir: ~s~n", [Dir]),
-    Ref = retest:sh("./rebar -C custom.config check-deps -v", [{async, true}]),
+    Ref = retest:sh("./rebar -C custom.config check-deps -vvv", [{async, true}]),
     {ok, Captured} =
         retest:sh_expect(Ref,
                          "DEBUG: Consult config file .*/custom.config.*",
