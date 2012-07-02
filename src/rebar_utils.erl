@@ -31,8 +31,7 @@
          get_arch/0,
          wordsize/0,
          sh/2,
-         find_files/2,
-         find_files/3,
+         find_files/2, find_files/3,
          now_str/0,
          ensure_dir/1,
          beam_to_mod/2, beams/1,
@@ -42,15 +41,16 @@
          find_executable/1,
          prop_check/3,
          expand_code_path/0,
-         deprecated/3, deprecated/4,
          expand_env_variable/3,
          vcs_vsn/2,
+         deprecated/3, deprecated/4,
          get_deprecated_global/3, get_deprecated_global/4,
          get_deprecated_list/4, get_deprecated_list/5,
          get_deprecated_local/4, get_deprecated_local/5,
          delayed_halt/1,
-         erl_opts/1, src_dirs/1
-     ]).
+         erl_opts/1,
+         src_dirs/1
+        ]).
 
 -include("rebar.hrl").
 
