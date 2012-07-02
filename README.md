@@ -115,7 +115,7 @@ Before you submit a patch, run ``make check`` to execute
 the test suite and check for  
 [xref](http://www.erlang.org/doc/man/xref.html) and
 [Dialyzer](http://www.erlang.org/doc/man/dialyzer.html)
-warnings.
+warnings. You may have to run ``make clean`` first.
 
 [Dialyzer](http://www.erlang.org/doc/man/dialyzer.html) warnings are compared
 against a set of safe-to-ignore warnings found in  
