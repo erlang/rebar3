@@ -87,13 +87,12 @@ eunit(Config, _AppFile) ->
     %% for source files. Also copy files from src_dirs.
     ErlOpts = rebar_utils:erl_opts(Config),
 
+    SrcDirs = rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts)),
     SrcErls = lists:foldl(
-        fun(Dir, Acc) ->
-                lists:append(Acc, rebar_utils:find_files(Dir, ".*\\.erl\$"))
-        end,
-        [],
-        rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts))
-    ),
+                fun(Dir, Acc) ->
+                        Files = rebar_utils:find_files(Dir, ".*\\.erl\$"),
+                        lists:append(Acc, Files)
+                end, [], SrcDirs),
     ?DEBUG("SrcErls: ~s\n", [SrcErls]),
 
     %% If it is not the first time rebar eunit is executed, there will be source
