@@ -1,4 +1,4 @@
-.PHONY: dialyzer_warnings xref_warnings deps test
+.PHONY: clean dialyzer_warnings xref_warnings deps test
 
 REBAR=$(PWD)/rebar
 RETEST=$(PWD)/deps/retest/retest
@@ -7,7 +7,7 @@ all:
 	./bootstrap
 
 clean:
-	@rm -rf rebar ebin/*.beam inttest/rt.work
+	@rm -rf rebar ebin/*.beam inttest/rt.work rt.work .eunit
 
 debug:
 	@./bootstrap debug
@@ -26,13 +26,13 @@ dialyzer_warnings:
 
 binary: VSN = $(shell ./rebar -V)
 binary: clean all
-	cp rebar ../rebar.wiki/rebar
+	@cp rebar ../rebar.wiki/rebar
 	(cd ../rebar.wiki && git commit -m "Update $(VSN)" rebar)
 
 deps:
-	REBAR_EXTRA_DEPS=1 ./rebar get-deps
-	cd deps/retest && $(REBAR) compile escriptize
+	@REBAR_EXTRA_DEPS=1 ./rebar get-deps
+	@(cd deps/retest && $(REBAR) compile escriptize)
 
 test:
-	$(REBAR) eunit
-	$(RETEST) inttest
+	@$(REBAR) eunit
+	@$(RETEST) inttest
