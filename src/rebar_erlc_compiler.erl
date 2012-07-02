@@ -122,12 +122,12 @@ doterl_compile(Config, OutDir) ->
 
 doterl_compile(Config, OutDir, MoreSources) ->
     FirstErls = rebar_config:get_list(Config, erl_first_files, []),
-    ErlOpts = erl_opts(Config),
+    ErlOpts = rebar_utils:erl_opts(Config),
     ?DEBUG("erl_opts ~p~n", [ErlOpts]),
     %% Support the src_dirs option allowing multiple directories to
     %% contain erlang source. This might be used, for example, should
     %% eunit tests be separated from the core application source.
-    SrcDirs = src_dirs(proplists:append_values(src_dirs, ErlOpts)),
+    SrcDirs = rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts)),
     RestErls  = [Source || Source <- gather_src(SrcDirs, []) ++ MoreSources,
                            not lists:member(Source, FirstErls)],
 
@@ -165,18 +165,6 @@ doterl_compile(Config, OutDir, MoreSources) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
-
-erl_opts(Config) ->
-    RawErlOpts = filter_defines(rebar_config:get(Config, erl_opts, []), []),
-    GlobalDefines = [{d, list_to_atom(D)} ||
-                        D <- rebar_config:get_global(defines, [])],
-    Opts = GlobalDefines ++ RawErlOpts,
-    case proplists:is_defined(no_debug_info, Opts) of
-        true ->
-            [O || O <- Opts, O =/= no_debug_info];
-        false ->
-            [debug_info|Opts]
-    end.
 
 -spec include_path(Source::file:filename(),
                    Config::rebar_config:config()) -> [file:filename(), ...].
@@ -322,11 +310,6 @@ gather_src([], Srcs) ->
 gather_src([Dir|Rest], Srcs) ->
     gather_src(Rest, Srcs ++ rebar_utils:find_files(Dir, ".*\\.erl\$")).
 
--spec src_dirs(SrcDirs::[string()]) -> [file:filename(), ...].
-src_dirs([]) ->
-    ["src"];
-src_dirs(SrcDirs) ->
-    SrcDirs.
 
 -spec dirs(Dir::file:filename()) -> [file:filename()].
 dirs(Dir) ->
@@ -373,30 +356,6 @@ compile_priority(File) ->
 
             lists:foldl(F, normal, Trees)
     end.
-
-%%
-%% Filter a list of erl_opts platform_define options such that only
-%% those which match the provided architecture regex are returned.
-%%
--spec filter_defines(ErlOpts::list(), Acc::list()) -> list().
-filter_defines([], Acc) ->
-    lists:reverse(Acc);
-filter_defines([{platform_define, ArchRegex, Key} | Rest], Acc) ->
-    case rebar_utils:is_arch(ArchRegex) of
-        true ->
-            filter_defines(Rest, [{d, Key} | Acc]);
-        false ->
-            filter_defines(Rest, Acc)
-    end;
-filter_defines([{platform_define, ArchRegex, Key, Value} | Rest], Acc) ->
-    case rebar_utils:is_arch(ArchRegex) of
-        true ->
-            filter_defines(Rest, [{d, Key, Value} | Acc]);
-        false ->
-            filter_defines(Rest, Acc)
-    end;
-filter_defines([Opt | Rest], Acc) ->
-    filter_defines(Rest, [Opt | Acc]).
 
 %%
 %% Ensure all files in a list are present and abort if one is missing

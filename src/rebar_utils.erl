@@ -48,7 +48,9 @@
          get_deprecated_global/3, get_deprecated_global/4,
          get_deprecated_list/4, get_deprecated_list/5,
          get_deprecated_local/4, get_deprecated_local/5,
-         delayed_halt/1]).
+         delayed_halt/1,
+         erl_opts/1, src_dirs/1
+     ]).
 
 -include("rebar.hrl").
 
@@ -452,3 +454,47 @@ vcs_vsn_cmd(Version) -> {unknown, Version}.
 vcs_vsn_invoke(Cmd, Dir) ->
     {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),
     string:strip(VsnString, right, $\n).
+
+%% @doc Return list of erl_opts
+-spec erl_opts(rebar_config:config()) -> list().
+erl_opts(Config) ->
+    RawErlOpts = filter_defines(rebar_config:get(Config, erl_opts, []), []),
+    GlobalDefines = [{d, list_to_atom(D)} ||
+                        D <- rebar_config:get_global(defines, [])],
+    Opts = GlobalDefines ++ RawErlOpts,
+    case proplists:is_defined(no_debug_info, Opts) of
+        true ->
+            [O || O <- Opts, O =/= no_debug_info];
+        false ->
+            [debug_info|Opts]
+    end.
+
+-spec src_dirs(SrcDirs::[string()]) -> [file:filename(), ...].
+src_dirs([]) ->
+    ["src"];
+src_dirs(SrcDirs) ->
+    SrcDirs.
+
+%%
+%% Filter a list of erl_opts platform_define options such that only
+%% those which match the provided architecture regex are returned.
+%%
+-spec filter_defines(ErlOpts::list(), Acc::list()) -> list().
+filter_defines([], Acc) ->
+    lists:reverse(Acc);
+filter_defines([{platform_define, ArchRegex, Key} | Rest], Acc) ->
+    case rebar_utils:is_arch(ArchRegex) of
+        true ->
+            filter_defines(Rest, [{d, Key} | Acc]);
+        false ->
+            filter_defines(Rest, Acc)
+    end;
+filter_defines([{platform_define, ArchRegex, Key, Value} | Rest], Acc) ->
+    case rebar_utils:is_arch(ArchRegex) of
+        true ->
+            filter_defines(Rest, [{d, Key, Value} | Acc]);
+        false ->
+            filter_defines(Rest, Acc)
+    end;
+filter_defines([Opt | Rest], Acc) ->
+    filter_defines(Rest, [Opt | Acc]).
