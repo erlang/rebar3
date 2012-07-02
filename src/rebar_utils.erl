@@ -283,6 +283,26 @@ delayed_halt(Code) ->
             end
     end.
 
+%% @doc Return list of erl_opts
+-spec erl_opts(rebar_config:config()) -> list().
+erl_opts(Config) ->
+    RawErlOpts = filter_defines(rebar_config:get(Config, erl_opts, []), []),
+    GlobalDefines = [{d, list_to_atom(D)} ||
+                        D <- rebar_config:get_global(defines, [])],
+    Opts = GlobalDefines ++ RawErlOpts,
+    case proplists:is_defined(no_debug_info, Opts) of
+        true ->
+            [O || O <- Opts, O =/= no_debug_info];
+        false ->
+            [debug_info|Opts]
+    end.
+
+-spec src_dirs(SrcDirs::[string()]) -> [file:filename(), ...].
+src_dirs([]) ->
+    ["src"];
+src_dirs(SrcDirs) ->
+    SrcDirs.
+
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
@@ -454,26 +474,6 @@ vcs_vsn_cmd(Version) -> {unknown, Version}.
 vcs_vsn_invoke(Cmd, Dir) ->
     {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),
     string:strip(VsnString, right, $\n).
-
-%% @doc Return list of erl_opts
--spec erl_opts(rebar_config:config()) -> list().
-erl_opts(Config) ->
-    RawErlOpts = filter_defines(rebar_config:get(Config, erl_opts, []), []),
-    GlobalDefines = [{d, list_to_atom(D)} ||
-                        D <- rebar_config:get_global(defines, [])],
-    Opts = GlobalDefines ++ RawErlOpts,
-    case proplists:is_defined(no_debug_info, Opts) of
-        true ->
-            [O || O <- Opts, O =/= no_debug_info];
-        false ->
-            [debug_info|Opts]
-    end.
-
--spec src_dirs(SrcDirs::[string()]) -> [file:filename(), ...].
-src_dirs([]) ->
-    ["src"];
-src_dirs(SrcDirs) ->
-    SrcDirs.
 
 %%
 %% Filter a list of erl_opts platform_define options such that only
