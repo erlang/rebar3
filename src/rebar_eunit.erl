@@ -84,8 +84,17 @@ eunit(Config, _AppFile) ->
 
     %% Copy source files to eunit dir for cover in case they are not directly
     %% in src but in a subdirectory of src. Cover only looks in cwd and ../src
-    %% for source files.
-    SrcErls = rebar_utils:find_files("src", ".*\\.erl\$"),
+    %% for source files. Also copy files from src_dirs.
+    ErlOpts = rebar_utils:erl_opts(Config),
+
+    SrcErls = lists:foldl(
+        fun(Dir, Acc) ->
+                lists:append(Acc, rebar_utils:find_files(Dir, ".*\\.erl\$"))
+        end,
+        [],
+        rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts))
+    ),
+    ?DEBUG("SrcErls: ~s\n", [SrcErls]),
 
     %% If it is not the first time rebar eunit is executed, there will be source
     %% files already present in ?EUNIT_DIR. Since some SCMs (like Perforce) set
