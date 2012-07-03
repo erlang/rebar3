@@ -57,6 +57,8 @@ rm_rf(Target) ->
     end.
 
 -spec cp_r(Sources::list(string()), Dest::file:filename()) -> ok.
+cp_r([], _Dest) ->
+    ok;
 cp_r(Sources, Dest) ->
     case os:type() of
         {unix, _} ->
