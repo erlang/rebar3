@@ -41,6 +41,7 @@
 
 -record(config, { dir :: file:filename(),
                   opts = [] :: list(),
+                  %% TODO: consider storing envs in xconf
                   envs = new_env() :: dict(),
                   %% cross-directory config
                   skip_dirs = new_skip_dirs() :: dict(),
@@ -170,6 +171,7 @@ erase_xconf(Config, Key) ->
 reset_xconf(Config) ->
     Config#config{xconf = new_xconf()}.
 
+%% TODO: reconsider after config inheritance removal/redesign
 clean_config(Old, New) ->
     New#config{opts=Old#config.opts}.
 

@@ -68,6 +68,7 @@ process_commands([Command | Rest], ParentConfig) ->
                 _ ->
                     ok
             end,
+            %% TODO: reconsider after config inheritance removal/redesign
             ParentConfig3 = rebar_config:clean_config(ParentConfig1, ParentConfig2),
             %% Wipe out vsn cache to avoid invalid hits when
             %% dependencies are updated
