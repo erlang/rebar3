@@ -43,15 +43,13 @@
 %% Public API
 %% ===================================================================
 
-'create-app'(Config, File) ->
+'create-app'(_Config, _File) ->
     %% Alias for create w/ template=simpleapp
-    rebar_config:set_global(template, "simpleapp"),
-    create(Config, File).
+    create("simpleapp").
 
-'create-node'(Config, File) ->
+'create-node'(_Config, _File) ->
     %% Alias for create w/ template=simplenode
-    rebar_config:set_global(template, "simplenode"),
-    create(Config, File).
+    create("simplenode").
 
 'list-templates'(_Config, _File) ->
     {AvailTemplates, Files} = find_templates(),
@@ -70,12 +68,39 @@
       end, AvailTemplates),
     ok.
 
-
 create(_Config, _) ->
+    TemplateId = template_id(),
+    create(TemplateId).
+
+%%
+%% Given a list of key value pairs, for each string value attempt to
+%% render it using Dict as the context. Storing the result in Dict as Key.
+%%
+resolve_variables([], Dict) ->
+    Dict;
+resolve_variables([{Key, Value0} | Rest], Dict) when is_list(Value0) ->
+    Value = render(list_to_binary(Value0), Dict),
+    resolve_variables(Rest, dict:store(Key, Value, Dict));
+resolve_variables([_Pair | Rest], Dict) ->
+    resolve_variables(Rest, Dict).
+
+%%
+%% Render a binary to a string, using mustache and the specified context
+%%
+render(Bin, Context) ->
+    %% Be sure to escape any double-quotes before rendering...
+    ReOpts = [global, {return, list}],
+    Str0 = re:replace(Bin, "\\\\", "\\\\\\", ReOpts),
+    Str1 = re:replace(Str0, "\"", "\\\\\"", ReOpts),
+    mustache:render(Str1, Context).
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
+
+create(TemplateId) ->
     {AvailTemplates, Files} = find_templates(),
     ?DEBUG("Available templates: ~p\n", [AvailTemplates]),
-
-    TemplateId = template_id(),
 
     %% Using the specified template id, find the matching template file/type.
     %% Note that if you define the same template in both ~/.rebar/templates
@@ -140,35 +165,6 @@ create(_Config, _) ->
     %% Execute the instructions in the finalized template
     Force = rebar_config:get_global(force, "0"),
     execute_template(Files, FinalTemplate, Type, Template, Context, Force, []).
-
-
-%%
-%% Given a list of key value pairs, for each string value attempt to
-%% render it using Dict as the context. Storing the result in Dict as Key.
-%%
-resolve_variables([], Dict) ->
-    Dict;
-resolve_variables([{Key, Value0} | Rest], Dict) when is_list(Value0) ->
-    Value = render(list_to_binary(Value0), Dict),
-    resolve_variables(Rest, dict:store(Key, Value, Dict));
-resolve_variables([_Pair | Rest], Dict) ->
-    resolve_variables(Rest, Dict).
-
-
-%%
-%% Render a binary to a string, using mustache and the specified context
-%%
-render(Bin, Context) ->
-    %% Be sure to escape any double-quotes before rendering...
-    ReOpts = [global, {return, list}],
-    Str0 = re:replace(Bin, "\\\\", "\\\\\\", ReOpts),
-    Str1 = re:replace(Str0, "\"", "\\\\\"", ReOpts),
-    mustache:render(Str1, Context).
-
-
-%% ===================================================================
-%% Internal functions
-%% ===================================================================
 
 find_templates() ->
     %% Load a list of all the files in the escript -- cache them since
