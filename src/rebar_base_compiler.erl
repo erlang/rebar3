@@ -235,15 +235,17 @@ maybe_report(_) ->
 report(Messages) ->
     lists:foreach(fun(Msg) -> io:format("~s", [Msg]) end, Messages).
 
-format_errors(Config, Source, Extra, Errors) ->
-    AbsSource = case rebar_utils:processing_base_dir(Config) of
-                    true ->
-                        Source;
-                    false ->
-                        filename:absname(Source)
-                end,
-    [[format_error(AbsSource, Extra, Desc) || Desc <- Descs]
-     || {_, Descs} <- Errors].
+format_errors(Config, _MainSource, Extra, Errors) ->
+    [begin
+         AbsSource = case rebar_utils:processing_base_dir(Config) of
+                         true ->
+                             Source;
+                         false ->
+                             filename:absname(Source)
+                     end,
+         [format_error(AbsSource, Extra, Desc) || Desc <- Descs]
+     end
+     || {Source, Descs} <- Errors].
 
 format_error(AbsSource, Extra, {{Line, Column}, Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
