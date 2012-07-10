@@ -84,7 +84,7 @@ escriptize(Config, AppFile) ->
 
     %% Finally, update executable perms for our script
     {ok, #file_info{mode = Mode}} = file:read_file_info(Filename),
-    ok = file:change_mode(Filename, Mode bor 8#00100),
+    ok = file:change_mode(Filename, Mode bor 8#00111),
     ok.
 
 clean(Config, AppFile) ->
