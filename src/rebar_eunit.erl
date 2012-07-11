@@ -93,7 +93,6 @@ eunit(Config, _AppFile) ->
                         Files = rebar_utils:find_files(Dir, ".*\\.erl\$"),
                         lists:append(Acc, Files)
                 end, [], SrcDirs),
-    ?DEBUG("SrcErls: ~s\n", [SrcErls]),
 
     %% If it is not the first time rebar eunit is executed, there will be source
     %% files already present in ?EUNIT_DIR. Since some SCMs (like Perforce) set
