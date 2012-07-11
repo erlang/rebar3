@@ -140,8 +140,7 @@ eunit(Config, _AppFile) ->
     ModuleBeamFiles = BeamFiles ++ OtherBeamFiles,
     Modules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- ModuleBeamFiles],
     SrcModules = [rebar_utils:erl_to_mod(M) || M <- SrcErls],
-    Suites = get_suites(),
-    FilteredModules = filtered_modules(Modules, Suites),
+    FilteredModules = filter_modules(Modules),
 
     {ok, CoverLog} = cover_init(Config, ModuleBeamFiles),
 
@@ -183,13 +182,14 @@ eunit_dir() ->
 ebin_dir() ->
     filename:join(rebar_utils:get_cwd(), "ebin").
 
-get_suites() ->
-    Suites = rebar_utils:get_deprecated_global(suite, suites, [], "soon"),
-    [list_to_atom(Suite) || Suite <- string:tokens(Suites, ",")].
+filter_modules(Modules) ->
+    RawSuites = rebar_utils:get_deprecated_global(suite, suites, [], "soon"),
+    Suites = [list_to_atom(Suite) || Suite <- string:tokens(RawSuites, ",")],
+    filter_modules(Modules, Suites).
 
-filtered_modules(Modules, []) ->
+filter_modules(Modules, []) ->
     Modules;
-filtered_modules(Modules, Suites) ->
+filter_modules(Modules, Suites) ->
     [M || M <- Modules, lists:member(M, Suites)].
 
 perform_eunit(Config, FilteredModules) ->
