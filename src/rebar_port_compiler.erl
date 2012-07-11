@@ -634,5 +634,29 @@ default_env() ->
      %% OS X Lion flags for 32-bit
      {"darwin11.*-32", "CFLAGS", "-m32 $CFLAGS"},
      {"darwin11.*-32", "CXXFLAGS", "-m32 $CXXFLAGS"},
-     {"darwin11.*-32", "LDFLAGS", "-arch i386 $LDFLAGS"}
+     {"darwin11.*-32", "LDFLAGS", "-arch i386 $LDFLAGS"},
+
+     %% Windows specific flags
+     %% add MS Visual C++ support to rebar on Windows
+     {"win32", "CC", "cl.exe"},
+     {"win32", "CXX", "cl.exe"},
+     {"win32", "LINKER", "link.exe"},
+     {"win32", "DRV_CXX_TEMPLATE",
+     %% DRV_* and EXE_* Templates are identical
+      "$CXX /c $CXXFLAGS $DRV_CFLAGS $PORT_IN_FILES /Fo$PORT_OUT_FILE"},
+     {"win32", "DRV_CC_TEMPLATE",
+      "$CC /c $CFLAGS $DRV_CFLAGS $PORT_IN_FILES /Fo$PORT_OUT_FILE"},
+     {"win32", "DRV_LINK_TEMPLATE",
+      "$LINKER $PORT_IN_FILES $LDFLAGS $DRV_LDFLAGS /OUT:$PORT_OUT_FILE"},
+     %% DRV_* and EXE_* Templates are identical
+     {"win32", "EXE_CXX_TEMPLATE",
+      "$CXX /c $CXXFLAGS $EXE_CFLAGS $PORT_IN_FILES /Fo$PORT_OUT_FILE"},
+     {"win32", "EXE_CC_TEMPLATE",
+      "$CC /c $CFLAGS $EXE_CFLAGS $PORT_IN_FILES /Fo$PORT_OUT_FILE"},
+     {"win32", "EXE_LINK_TEMPLATE",
+      "$LINKER $PORT_IN_FILES $LDFLAGS $EXE_LDFLAGS /OUT:$PORT_OUT_FILE"},
+     %% ERL_CFLAGS are ok as -I even though strictly it should be /I
+     {"win32", "ERL_LDFLAGS", " /LIBPATH:$ERL_EI_LIBDIR erl_interface.lib ei.lib"},
+     {"win32", "DRV_CFLAGS", "/Zi /Wall $ERL_CFLAGS"},
+     {"win32", "DRV_LDFLAGS", "/DLL $ERL_LDFLAGS"}
     ].
