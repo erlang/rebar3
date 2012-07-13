@@ -64,7 +64,7 @@
 %% Public API
 %% ===================================================================
 
-eunit(Config0, _AppFile) ->
+eunit(Config, _AppFile) ->
     %% Make sure ?EUNIT_DIR/ and ebin/ directory exists (append dummy module)
     ok = filelib:ensure_dir(filename:join(eunit_dir(), "dummy")),
     ok = filelib:ensure_dir(filename:join(ebin_dir(), "dummy")),
@@ -85,7 +85,7 @@ eunit(Config0, _AppFile) ->
     %% Copy source files to eunit dir for cover in case they are not directly
     %% in src but in a subdirectory of src. Cover only looks in cwd and ../src
     %% for source files. Also copy files from src_dirs.
-    ErlOpts = rebar_utils:erl_opts(Config0),
+    ErlOpts = rebar_utils:erl_opts(Config),
 
     SrcDirs = rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts)),
     SrcErls = lists:foldl(
@@ -119,8 +119,8 @@ eunit(Config0, _AppFile) ->
     %% Compile erlang code to ?EUNIT_DIR, using a tweaked config
     %% with appropriate defines for eunit, and include all the test modules
     %% as well.
-    Config = eunit_config(Config0),
-    rebar_erlc_compiler:doterl_compile(Config, ?EUNIT_DIR, TestErls),
+    ok = rebar_erlc_compiler:doterl_compile(eunit_config(Config),
+                                            ?EUNIT_DIR, TestErls),
 
     %% Build a list of all the .beams in ?EUNIT_DIR -- use this for
     %% cover and eunit testing. Normally you can just tell cover
@@ -166,7 +166,7 @@ eunit(Config0, _AppFile) ->
 
     %% Restore code path
     true = code:set_path(CodePath),
-    {ok, Config}.
+    ok.
 
 clean(_Config, _File) ->
     rebar_file_utils:rm_rf(?EUNIT_DIR).
