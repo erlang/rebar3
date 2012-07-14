@@ -179,12 +179,13 @@ setup_env(Config, ExtraEnv) ->
     %% max flexibility for users.
     DefaultEnv  = filter_env(default_env(), []),
     PortEnv = filter_env(port_env(Config), []),
-    OverrideEnv = global_defines() ++ PortEnv ++ filter_env(ExtraEnv, []),
+    GlobalDefines = global_defines(Config),
+    OverrideEnv = GlobalDefines ++ PortEnv ++ filter_env(ExtraEnv, []),
     RawEnv = apply_defaults(os_env(), DefaultEnv) ++ OverrideEnv,
     expand_vars_loop(merge_each_var(RawEnv, [])).
 
-global_defines() ->
-    Defines = rebar_config:get_global(defines, []),
+global_defines(Config) ->
+    Defines = rebar_config:get_global(Config, defines, []),
     Flags = string:join(["-D" ++ D || D <- Defines], " "),
     [{"ERL_CFLAGS", "$ERL_CFLAGS " ++ Flags}].
 

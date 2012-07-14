@@ -139,7 +139,7 @@ eunit(Config, _AppFile) ->
     ModuleBeamFiles = BeamFiles ++ OtherBeamFiles,
     Modules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- ModuleBeamFiles],
     SrcModules = [rebar_utils:erl_to_mod(M) || M <- SrcErls],
-    FilteredModules = filter_modules(Modules),
+    FilteredModules = filter_modules(Config, Modules),
 
     {ok, CoverLog} = cover_init(Config, ModuleBeamFiles),
 
@@ -181,14 +181,15 @@ eunit_dir() ->
 ebin_dir() ->
     filename:join(rebar_utils:get_cwd(), "ebin").
 
-filter_modules(Modules) ->
-    RawSuites = rebar_utils:get_deprecated_global(suite, suites, [], "soon"),
+filter_modules(Config, Modules) ->
+    RawSuites = rebar_utils:get_deprecated_global(Config, suite, suites,
+                                                  [], "soon"),
     Suites = [list_to_atom(Suite) || Suite <- string:tokens(RawSuites, ",")],
-    filter_modules(Modules, Suites).
+    filter_modules1(Modules, Suites).
 
-filter_modules(Modules, []) ->
+filter_modules1(Modules, []) ->
     Modules;
-filter_modules(Modules, Suites) ->
+filter_modules1(Modules, Suites) ->
     [M || M <- Modules, lists:member(M, Suites)].
 
 perform_eunit(Config, FilteredModules) ->
@@ -208,7 +209,7 @@ perform_eunit(Config, FilteredModules) ->
 
 get_eunit_opts(Config) ->
     %% Enable verbose in eunit if so requested..
-    BaseOpts = case rebar_config:is_verbose() of
+    BaseOpts = case rebar_config:is_verbose(Config) of
                    true ->
                        [verbose];
                    false ->
@@ -247,8 +248,8 @@ define_if(Def, true) -> [{d, Def}];
 define_if(_Def, false) -> [].
 
 is_lib_avail(Config, DictKey, Mod, Hrl, Name) ->
-    case rebar_config:get_xconf(Config, DictKey) of
-        error ->
+    case rebar_config:get_xconf(Config, DictKey, undefined) of
+        undefined ->
             IsAvail = case code:lib_dir(Mod, include) of
                           {error, bad_name} ->
                               false;
@@ -258,7 +259,7 @@ is_lib_avail(Config, DictKey, Mod, Hrl, Name) ->
             NewConfig = rebar_config:set_xconf(Config, DictKey, IsAvail),
             ?DEBUG("~s availability: ~p\n", [Name, IsAvail]),
             {NewConfig, IsAvail};
-        {ok, IsAvail} ->
+        IsAvail ->
             {Config, IsAvail}
     end.
 

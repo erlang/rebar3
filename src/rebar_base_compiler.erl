@@ -47,7 +47,7 @@ run(Config, FirstFiles, RestFiles, CompileFn) ->
         _ ->
             Self = self(),
             F = fun() -> compile_worker(Self, Config, CompileFn) end,
-            Jobs = rebar_config:get_jobs(),
+            Jobs = rebar:get_jobs(Config),
             ?DEBUG("Starting ~B compile worker(s)~n", [Jobs]),
             Pids = [spawn_monitor(F) || _I <- lists:seq(1,Jobs)],
             compile_queue(Pids, RestFiles)

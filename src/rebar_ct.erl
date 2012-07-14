@@ -64,7 +64,7 @@ run_test_if_present(TestDir, Config, File) ->
 run_test(TestDir, Config, _File) ->
     {Cmd, RawLog} = make_cmd(TestDir, Config),
     clear_log(RawLog),
-    case rebar_config:is_verbose() of
+    case rebar_config:is_verbose(Config) of
         false ->
             Output = " >> " ++ RawLog ++ " 2>&1";
         true ->
@@ -72,7 +72,7 @@ run_test(TestDir, Config, _File) ->
     end,
 
     rebar_utils:sh(Cmd ++ Output, [{env,[{"TESTDIR", TestDir}]}]),
-    check_log(RawLog).
+    check_log(Config, RawLog).
 
 
 clear_log(RawLog) ->
@@ -88,7 +88,7 @@ clear_log(RawLog) ->
 
 %% calling ct with erl does not return non-zero on failure - have to check
 %% log results
-check_log(RawLog) ->
+check_log(Config, RawLog) ->
     {ok, Msg} =
         rebar_utils:sh("grep -e 'TEST COMPLETE' -e '{error,make_failed}' "
                        ++ RawLog, [{use_stdout, false}]),
@@ -96,12 +96,12 @@ check_log(RawLog) ->
     RunFailed = string:str(Msg, ", 0 failed") =:= 0,
     if
         MakeFailed ->
-            show_log(RawLog),
+            show_log(Config, RawLog),
             ?ERROR("Building tests failed\n",[]),
             ?ABORT;
 
         RunFailed ->
-            show_log(RawLog),
+            show_log(Config, RawLog),
             ?ERROR("One or more tests failed\n",[]),
             ?ABORT;
 
@@ -110,9 +110,9 @@ check_log(RawLog) ->
     end.
 
 %% Show the log if it hasn't already been shown because verbose was on
-show_log(RawLog) ->
+show_log(Config, RawLog) ->
     ?CONSOLE("Showing log\n", []),
-    case rebar_config:is_verbose() of
+    case rebar_config:is_verbose(Config) of
         false ->
             {ok, Contents} = file:read_file(RawLog),
             ?CONSOLE("~s", [Contents]);
@@ -159,8 +159,8 @@ make_cmd(TestDir, Config) ->
                       get_cover_config(Config, Cwd) ++
                       get_ct_config_file(TestDir) ++
                       get_config_file(TestDir) ++
-                      get_suites(TestDir) ++
-                      get_case();
+                      get_suites(Config, TestDir) ++
+                      get_case(Config);
               SpecFlags ->
                   ?FMT("erl " % should we expand ERL_PATH?
                        " -noshell -pa ~s ~s"
@@ -248,8 +248,8 @@ get_config_file(TestDir) ->
             " -config " ++ Config
     end.
 
-get_suites(TestDir) ->
-    case rebar_utils:get_deprecated_global(suite, suites, "soon") of
+get_suites(Config, TestDir) ->
+    case rebar_utils:get_deprecated_global(Config, suite, suites, "soon") of
         undefined ->
             " -dir " ++ TestDir;
         Suites ->
@@ -268,8 +268,8 @@ find_suite_path(Suite, TestDir) ->
             Path
     end.
 
-get_case() ->
-    case rebar_config:get_global('case', undefined) of
+get_case(Config) ->
+    case rebar_config:get_global(Config, 'case', undefined) of
         undefined ->
             "";
         Case ->

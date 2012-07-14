@@ -26,16 +26,17 @@
 %% -------------------------------------------------------------------
 -module(rebar_log).
 
--export([init/0,
-         set_level/1, get_level/0, default_level/0,
+-export([init/1,
+         set_level/1, default_level/0,
          log/3]).
 
 %% ===================================================================
 %% Public API
 %% ===================================================================
 
-init() ->
-    case valid_level(rebar_config:get_global(verbose, error_level())) of
+init(Config) ->
+    Verbosity = rebar_config:get_global(Config, verbose, default_level()),
+    case valid_level(Verbosity) of
         0 -> set_level(error);
         1 -> set_level(warn);
         2 -> set_level(info);
@@ -44,14 +45,6 @@ init() ->
 
 set_level(Level) ->
     ok = application:set_env(rebar, log_level, Level).
-
-get_level() ->
-    case application:get_env(rebar, log_level) of
-        undefined ->
-            error;
-        {ok, Value} ->
-            Value
-    end.
 
 log(Level, Str, Args) ->
     {ok, LogLevel} = application:get_env(rebar, log_level),

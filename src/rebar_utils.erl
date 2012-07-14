@@ -44,7 +44,7 @@
          expand_env_variable/3,
          vcs_vsn/3,
          deprecated/3, deprecated/4,
-         get_deprecated_global/3, get_deprecated_global/4,
+         get_deprecated_global/4, get_deprecated_global/5,
          get_deprecated_list/4, get_deprecated_list/5,
          get_deprecated_local/4, get_deprecated_local/5,
          delayed_halt/1,
@@ -200,7 +200,7 @@ expand_env_variable(InStr, VarName, RawVarValue) ->
 
 vcs_vsn(Config, Vcs, Dir) ->
     Key = {Vcs, Dir},
-    {ok, Cache} = rebar_config:get_xconf(Config, vsn_cache),
+    Cache = rebar_config:get_xconf(Config, vsn_cache),
     case dict:find(Key, Cache) of
         error ->
             VsnString = vcs_vsn_1(Vcs, Dir),
@@ -211,13 +211,13 @@ vcs_vsn(Config, Vcs, Dir) ->
             {Config, VsnString}
     end.
 
-get_deprecated_global(OldOpt, NewOpt, When) ->
-    get_deprecated_global(OldOpt, NewOpt, undefined, When).
+get_deprecated_global(Config, OldOpt, NewOpt, When) ->
+    get_deprecated_global(Config, OldOpt, NewOpt, undefined, When).
 
-get_deprecated_global(OldOpt, NewOpt, Default, When) ->
-    case rebar_config:get_global(NewOpt, Default) of
+get_deprecated_global(Config, OldOpt, NewOpt, Default, When) ->
+    case rebar_config:get_global(Config, NewOpt, Default) of
         Default ->
-            case rebar_config:get_global(OldOpt, Default) of
+            case rebar_config:get_global(Config, OldOpt, Default) of
                 Default ->
                     Default;
                 Old ->
@@ -291,7 +291,7 @@ delayed_halt(Code) ->
 erl_opts(Config) ->
     RawErlOpts = filter_defines(rebar_config:get(Config, erl_opts, []), []),
     GlobalDefines = [{d, list_to_atom(D)} ||
-                        D <- rebar_config:get_global(defines, [])],
+                        D <- rebar_config:get_global(Config, defines, [])],
     Opts = GlobalDefines ++ RawErlOpts,
     case proplists:is_defined(no_debug_info, Opts) of
         true ->

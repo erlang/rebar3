@@ -47,7 +47,7 @@ xref(Config, _) ->
 
     xref:set_default(xref, [{warnings,
                              rebar_config:get(Config, xref_warnings, false)},
-                            {verbose, rebar_config:is_verbose()}]),
+                            {verbose, rebar_config:is_verbose(Config)}]),
 
     {ok, _} = xref:add_directory(xref, "ebin"),
 

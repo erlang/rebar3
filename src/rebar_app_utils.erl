@@ -111,10 +111,10 @@ is_skipped_app(Config, AppFile) ->
     %% Check for apps global parameter; this is a comma-delimited list
     %% of apps on which we want to run commands
     Skipped =
-        case get_apps() of
+        case get_apps(Config) of
             undefined ->
                 %% No apps parameter specified, check the skip_apps list..
-                case get_skip_apps() of
+                case get_skip_apps(Config) of
                     undefined ->
                         %% No skip_apps list, run everything..
                         false;
@@ -136,8 +136,8 @@ is_skipped_app(Config, AppFile) ->
 
 load_app_file(Config, Filename) ->
     AppFile = {app_file, Filename},
-    case rebar_config:get_xconf(Config, {appfile, AppFile}) of
-        error ->
+    case rebar_config:get_xconf(Config, {appfile, AppFile}, undefined) of
+        undefined ->
             case file:consult(Filename) of
                 {ok, [{application, AppName, AppData}]} ->
                     Config1 = rebar_config:set_xconf(Config,
@@ -149,7 +149,7 @@ load_app_file(Config, Filename) ->
                 Other ->
                     {error, {unexpected_terms, Other}}
             end;
-        {ok, {AppName, AppData}} ->
+        {AppName, AppData} ->
             {ok, Config, AppName, AppData}
     end.
 
@@ -179,8 +179,8 @@ is_skipped(ThisApp, TargetApps) ->
             {true, ThisApp}
     end.
 
-get_apps() ->
-    rebar_utils:get_deprecated_global(app, apps, "soon").
+get_apps(Config) ->
+    rebar_utils:get_deprecated_global(Config, app, apps, "soon").
 
-get_skip_apps() ->
-    rebar_utils:get_deprecated_global(skip_app, skip_apps, "soon").
+get_skip_apps(Config) ->
+    rebar_utils:get_deprecated_global(Config, skip_app, skip_apps, "soon").

@@ -33,13 +33,13 @@
          get_rel_release_info/2,
          get_rel_apps/1,
          get_rel_apps/2,
-         get_previous_release_path/0,
+         get_previous_release_path/1,
          get_rel_file_path/2,
          load_config/2,
          get_sys_tuple/1,
-         get_target_dir/1,
-         get_root_dir/1,
-         get_target_parent_dir/1]).
+         get_target_dir/2,
+         get_root_dir/2,
+         get_target_parent_dir/2]).
 
 -include("rebar.hrl").
 
@@ -111,8 +111,8 @@ get_rel_file_path(Name, Path) ->
     filename:join([binary_to_list(BinDir), Name ++ ".rel"]).
 
 %% Get the previous release path from a global variable
-get_previous_release_path() ->
-    case rebar_config:get_global(previous_release, false) of
+get_previous_release_path(Config) ->
+    case rebar_config:get_global(Config, previous_release, false) of
         false ->
             ?ABORT("previous_release=PATH is required to "
                    "create upgrade package~n", []);
@@ -148,8 +148,8 @@ get_sys_tuple(ReltoolConfig) ->
 %% Look for {target_dir, TargetDir} in the reltool config file; if none is
 %% found, use the name of the release as the default target directory.
 %%
-get_target_dir(ReltoolConfig) ->
-    case rebar_config:get_global(target_dir, undefined) of
+get_target_dir(Config, ReltoolConfig) ->
+    case rebar_config:get_global(Config, target_dir, undefined) of
         undefined ->
             case lists:keyfind(target_dir, 1, ReltoolConfig) of
                 {target_dir, TargetDir} ->
@@ -167,8 +167,8 @@ get_target_dir(ReltoolConfig) ->
             filename:absname(TargetDir)
     end.
 
-get_target_parent_dir(ReltoolConfig) ->
-    TargetDir = get_target_dir(ReltoolConfig),
+get_target_parent_dir(Config, ReltoolConfig) ->
+    TargetDir = get_target_dir(Config, ReltoolConfig),
     case lists:reverse(tl(lists:reverse(filename:split(TargetDir)))) of
         [] -> ".";
         Components -> filename:join(Components)
@@ -178,10 +178,10 @@ get_target_parent_dir(ReltoolConfig) ->
 %% Look for root_dir in sys tuple and command line; fall back to
 %% code:root_dir().
 %%
-get_root_dir(ReltoolConfig) ->
+get_root_dir(Config, ReltoolConfig) ->
     {sys, SysInfo} = get_sys_tuple(ReltoolConfig),
     SysRootDirTuple = lists:keyfind(root_dir, 1, SysInfo),
-    CmdRootDir = rebar_config:get_global(root_dir, undefined),
+    CmdRootDir = rebar_config:get_global(Config, root_dir, undefined),
     case {SysRootDirTuple, CmdRootDir} of
         %% root_dir in sys typle and no root_dir on cmd-line
         {{root_dir, SysRootDir}, undefined} ->

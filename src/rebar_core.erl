@@ -35,7 +35,7 @@
 %% ===================================================================
 
 process_commands([], ParentConfig) ->
-    AbortTrapped = rebar_config:get_global(abort_trapped, false),
+    AbortTrapped = rebar_config:get_xconf(ParentConfig, abort_trapped, false),
     case {get_operations(ParentConfig), AbortTrapped} of
         {0, _} ->
             %% None of the commands had any effect
@@ -49,7 +49,7 @@ process_commands([], ParentConfig) ->
 process_commands([Command | Rest], ParentConfig) ->
     %% Reset skip dirs
     ParentConfig1 = rebar_config:reset_skip_dirs(ParentConfig),
-    Operations = rebar_config:get_xconf(ParentConfig1, operations),
+    Operations = get_operations(ParentConfig1),
 
     ParentConfig4 =
         try
@@ -75,13 +75,13 @@ process_commands([Command | Rest], ParentConfig) ->
             rebar_config:set_xconf(ParentConfig3, vsn_cache, dict:new())
         catch
             throw:rebar_abort ->
-                case rebar_config:get_global(keep_going, false) of
+                case rebar_config:get_xconf(ParentConfig1, keep_going, false) of
                     false ->
                         ?ABORT;
                     true ->
                         ?WARN("Continuing on after abort: ~p\n", [Rest]),
-                        rebar_config:set_global(abort_trapped, true),
-                        ParentConfig1
+                        rebar_config:set_xconf(ParentConfig1,
+                                               abort_trapped, true)
                 end
         end,
     process_commands(Rest, ParentConfig4).
@@ -242,15 +242,15 @@ remember_cwd_subdir(Cwd, Subdirs) ->
 maybe_load_local_config(Dir, ParentConfig) ->
     %% We need to ensure we don't overwrite custom
     %% config when we are dealing with base_dir.
-    case processing_base_dir(Dir) of
+    case processing_base_dir(ParentConfig, Dir) of
         true ->
             ParentConfig;
         false ->
             rebar_config:new(ParentConfig)
     end.
 
-processing_base_dir(Dir) ->
-    Dir == rebar_config:get_global(base_dir, undefined).
+processing_base_dir(Config, Dir) ->
+    Dir == rebar_config:get_xconf(Config, base_dir).
 
 %%
 %% Given a list of directories and a set of previously processed directories,
@@ -357,8 +357,7 @@ increment_operations(Config) ->
     rebar_config:set_xconf(Config, operations, Operations + 1).
 
 get_operations(Config) ->
-    {ok, Operations} = rebar_config:get_xconf(Config, operations),
-    Operations.
+    rebar_config:get_xconf(Config, operations).
 
 update_code_path(Config) ->
     case rebar_config:get_local(Config, lib_dirs, []) of

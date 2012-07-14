@@ -30,17 +30,18 @@
          get/3, get_local/3, get_list/3,
          get_all/2,
          set/3,
-         set_global/2, get_global/2,
-         is_verbose/0, get_jobs/0,
+         set_global/3, get_global/3,
+         is_verbose/1,
          set_env/3, get_env/2, reset_env/1,
          set_skip_dir/2, is_skip_dir/2, reset_skip_dirs/1,
          clean_config/2,
-         set_xconf/3, get_xconf/2, erase_xconf/2, reset_xconf/1]).
+         set_xconf/3, get_xconf/2, get_xconf/3, erase_xconf/2]).
 
 -include("rebar.hrl").
 
 -record(config, { dir :: file:filename(),
                   opts = [] :: list(),
+                  globals = new_globals() :: dict(),
                   %% TODO: consider storing envs in xconf
                   envs = new_env() :: dict(),
                   %% cross-directory config
@@ -60,7 +61,7 @@
 %% ===================================================================
 
 base_config(GlobalConfig) ->
-    ConfName = rebar_config:get_global(config, ?DEFAULT_NAME),
+    ConfName = rebar_config:get_global(GlobalConfig, config, ?DEFAULT_NAME),
     new(GlobalConfig, ConfName).
 
 new() ->
@@ -74,8 +75,10 @@ new(ConfigFile) when is_list(ConfigFile) ->
         Other ->
             ?ABORT("Failed to load ~s: ~p~n", [ConfigFile, Other])
     end;
-new(_ParentConfig=#config{opts=Opts0, skip_dirs=SkipDirs, xconf=Xconf})->
-    new(#config{opts=Opts0, skip_dirs=SkipDirs, xconf=Xconf}, ?DEFAULT_NAME).
+new(_ParentConfig=#config{opts=Opts0, globals=Globals, skip_dirs=SkipDirs,
+                          xconf=Xconf}) ->
+    new(#config{opts=Opts0, globals=Globals, skip_dirs=SkipDirs, xconf=Xconf},
+        ?DEFAULT_NAME).
 
 get(Config, Key, Default) ->
     proplists:get_value(Key, Config#config.opts, Default).
@@ -93,27 +96,26 @@ set(Config, Key, Value) ->
     Opts = proplists:delete(Key, Config#config.opts),
     Config#config { opts = [{Key, Value} | Opts] }.
 
-set_global(jobs=Key, Value) when is_list(Value) ->
-    set_global(Key, list_to_integer(Value));
-set_global(jobs=Key, Value) when is_integer(Value) ->
-    application:set_env(rebar_global, Key, erlang:max(1, Value));
-set_global(Key, Value) ->
-    application:set_env(rebar_global, Key, Value).
+set_global(Config, jobs=Key, Value) when is_list(Value) ->
+    set_global(Config, Key, list_to_integer(Value));
+set_global(Config, jobs=Key, Value) when is_integer(Value) ->
+    NewGlobals = dict:store(Key, erlang:max(1, Value), Config#config.globals),
+    Config#config{globals = NewGlobals};
+set_global(Config, Key, Value) ->
+    NewGlobals = dict:store(Key, Value, Config#config.globals),
+    Config#config{globals = NewGlobals}.
 
-get_global(Key, Default) ->
-    case application:get_env(rebar_global, Key) of
-        undefined ->
+get_global(Config, Key, Default) ->
+    case dict:find(Key, Config#config.globals) of
+        error ->
             Default;
         {ok, Value} ->
             Value
     end.
 
-is_verbose() ->
+is_verbose(Config) ->
     DefaulLevel = rebar_log:default_level(),
-    get_global(verbose, DefaulLevel) > DefaulLevel.
-
-get_jobs() ->
-    get_global(jobs, 3).
+    get_global(Config, verbose, DefaulLevel) > DefaulLevel.
 
 consult_file(File) ->
     case filename:extension(File) of
@@ -162,14 +164,20 @@ set_xconf(Config, Key, Value) ->
     Config#config{xconf=NewXconf}.
 
 get_xconf(Config, Key) ->
-    dict:find(Key, Config#config.xconf).
+    {ok, Value} = dict:find(Key, Config#config.xconf),
+    Value.
+
+get_xconf(Config, Key, Default) ->
+    case dict:find(Key, Config#config.xconf) of
+        error ->
+            Default;
+        {ok, Value} ->
+            Value
+    end.
 
 erase_xconf(Config, Key) ->
     NewXconf = dict:erase(Key, Config#config.xconf),
     Config#config{xconf = NewXconf}.
-
-reset_xconf(Config) ->
-    Config#config{xconf = new_xconf()}.
 
 %% TODO: reconsider after config inheritance removal/redesign
 clean_config(Old, New) ->
@@ -208,7 +216,6 @@ consult_and_eval(File, Script) ->
     ConfigData = try_consult(File),
     file:script(Script, bs([{'CONFIG', ConfigData}, {'SCRIPT', Script}])).
 
-
 remove_script_ext(F) ->
     "tpircs." ++ Rev = lists:reverse(F),
     lists:reverse(Rev).
@@ -235,6 +242,8 @@ local_opts([local | _Rest], Acc) ->
     lists:reverse(Acc);
 local_opts([Item | Rest], Acc) ->
     local_opts(Rest, [Item | Acc]).
+
+new_globals() -> dict:new().
 
 new_env() -> dict:new().
 
