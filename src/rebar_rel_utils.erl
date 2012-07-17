@@ -107,8 +107,7 @@ get_rel_apps(Name, Path) ->
 get_rel_file_path(Name, Path) ->
     [RelFile] = filelib:wildcard(filename:join([Path, "releases", "*",
                                                 Name ++ ".rel"])),
-    [BinDir|_] = re:replace(RelFile, Name ++ "\\.rel", ""),
-    filename:join([binary_to_list(BinDir), Name ++ ".rel"]).
+    RelFile.
 
 %% Get the previous release path from a global variable
 get_previous_release_path(Config) ->
