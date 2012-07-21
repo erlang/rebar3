@@ -81,7 +81,7 @@ clean(Config, ReltoolFile) ->
 %% ===================================================================
 
 check_vsn() ->
-    application:load(reltool),
+    _ = application:load(reltool),
     ReltoolVsn =
         case lists:keysearch(reltool, 1, application:loaded_applications()) of
             {value, {_, _, V}} ->
