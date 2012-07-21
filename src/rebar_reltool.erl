@@ -81,19 +81,20 @@ clean(Config, ReltoolFile) ->
 %% ===================================================================
 
 check_vsn() ->
-    case code:lib_dir(reltool) of
-        {error, bad_name} ->
-            ?ABORT("Reltool support requires the reltool application "
-                   "to be installed!", []);
-        Path ->
-            ReltoolVsn = filename:basename(Path),
-            case ReltoolVsn < "reltool-0.5.2" of
-                true ->
-                    ?ABORT("Reltool support requires at least reltool-0.5.2; "
-                           "this VM is using ~s\n", [ReltoolVsn]);
-                false ->
-                    ok
-            end
+    application:load(reltool),
+    ReltoolVsn =
+        case lists:keysearch(reltool, 1, application:loaded_applications()) of
+            {value, {_, _, V}} ->
+                V;
+            _ ->
+                ""
+        end,
+    case ReltoolVsn < "0.5.2" of
+        true ->
+            ?ABORT("Reltool support requires at least reltool-0.5.2; "
+                   "this VM is using ~s\n", [ReltoolVsn]);
+        false ->
+            ok
     end.
 
 process_overlay(ReltoolConfig) ->
