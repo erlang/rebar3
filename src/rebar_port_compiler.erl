@@ -530,7 +530,7 @@ default_env() ->
      {"win32", "CXX", "cl.exe"},
      {"win32", "LINKER", "link.exe"},
      {"win32", "DRV_CXX_TEMPLATE",
-     %% DRV_* and EXE_* Templates are identical
+      %% DRV_* and EXE_* Templates are identical
       "$CXX /c $CXXFLAGS $DRV_CFLAGS $PORT_IN_FILES /Fo$PORT_OUT_FILE"},
      {"win32", "DRV_CC_TEMPLATE",
       "$CC /c $CFLAGS $DRV_CFLAGS $PORT_IN_FILES /Fo$PORT_OUT_FILE"},
