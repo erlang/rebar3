@@ -249,7 +249,7 @@ get_config_file(TestDir) ->
     end.
 
 get_suites(Config, TestDir) ->
-    case rebar_utils:get_deprecated_global(Config, suite, suites, "soon") of
+    case rebar_config:get_global(Config, suites, undefined) of
         undefined ->
             " -dir " ++ TestDir;
         Suites ->

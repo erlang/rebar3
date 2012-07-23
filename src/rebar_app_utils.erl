@@ -180,7 +180,7 @@ is_skipped(ThisApp, TargetApps) ->
     end.
 
 get_apps(Config) ->
-    rebar_utils:get_deprecated_global(Config, app, apps, "soon").
+    rebar_config:get_global(Config, apps, undefined).
 
 get_skip_apps(Config) ->
-    rebar_utils:get_deprecated_global(Config, skip_app, skip_apps, "soon").
+    rebar_config:get_global(Config, skip_apps, undefined).

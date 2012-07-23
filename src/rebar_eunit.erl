@@ -148,8 +148,7 @@ setup_code_path() ->
     CodePath.
 
 filter_modules(Config, Modules) ->
-    RawSuites = rebar_utils:get_deprecated_global(Config, suite, suites,
-                                                  [], "soon"),
+    RawSuites = rebar_config:get_global(Config, suites, ""),
     Suites = [list_to_atom(Suite) || Suite <- string:tokens(RawSuites, ",")],
     filter_modules1(Modules, Suites).
 
