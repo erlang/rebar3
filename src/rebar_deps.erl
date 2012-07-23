@@ -52,8 +52,7 @@ preprocess(Config, _) ->
     %% Side effect to set deps_dir globally for all dependencies from
     %% top level down. Means the root deps_dir is honoured or the default
     %% used globally since it will be set on the first time through here
-    DepsDir = rebar_config:get_global(Config, deps_dir, []),
-    Config1 = set_global_deps_dir(Config, DepsDir),
+    Config1 = set_shared_deps_dir(Config, get_shared_deps_dir(Config, [])),
 
     %% Get the list of deps for the current working directory and identify those
     %% deps that are available/present.
@@ -184,18 +183,21 @@ setup_env(Config) ->
 %% Added because of trans deps,
 %% need all deps in same dir and should be the one set by the root rebar.config
 %% Sets a default if root config has no deps_dir set
-set_global_deps_dir(Config, []) ->
-    rebar_config:set_global(Config, deps_dir,
-                            rebar_config:get_local(Config, deps_dir, "deps"));
-set_global_deps_dir(Config, _DepsDir) ->
+set_shared_deps_dir(Config, []) ->
+    rebar_config:set_xconf(Config, deps_dir,
+                           rebar_config:get_local(Config, deps_dir, "deps"));
+set_shared_deps_dir(Config, _DepsDir) ->
     Config.
+
+get_shared_deps_dir(Config, Default) ->
+    rebar_config:get_xconf(Config, deps_dir, Default).
 
 get_deps_dir(Config) ->
     get_deps_dir(Config, "").
 
 get_deps_dir(Config, App) ->
     BaseDir = rebar_config:get_xconf(Config, base_dir, []),
-    DepsDir = rebar_config:get_global(Config, deps_dir, "deps"),
+    DepsDir = get_shared_deps_dir(Config, "deps"),
     {true, filename:join([BaseDir, DepsDir, App])}.
 
 dep_dirs(Deps) ->
