@@ -135,9 +135,13 @@ tarball (*out.tgz*) as it will have white-space changes applied by Erlang's pret
 Community and Resources
 -----------------------
 
-In case of problems that cannot be solved through documentation or examples, you may want to try to contact members of the community for help. The community is also where you want to go for questions about how to extend rebar, fill in bug reports, and so on.
+In case of problems that cannot be solved through documentation or examples, you may  
+want to try to contact members of the community for help. The community is also where  
+you want to go for questions about how to extend rebar, fill in bug reports, and so on.
 
-The main place to go for questions is the [rebar mailing list](http://lists.basho.com/pipermail/rebar_lists.basho.com/). If you need quick feedback, you can try the #rebar channel on [irc.freenode.net](http://freenode.net). Be sure to check the [wiki](https://github.com/basho/rebar/wiki) first, just to be sure you're not asking about things with well known answers.
+The main place to go for questions is the [rebar mailing list](http://lists.basho.com/pipermail/rebar_lists.basho.com/). If you need quick feedback,  
+you can try the #rebar channel on [irc.freenode.net](http://freenode.net). Be sure to check the [wiki](https://github.com/basho/rebar/wiki) first,  
+just to be sure you're not asking about things with well known answers.
 
 For bug reports, roadmaps, and issues, visit the [github issues page](https://github.com/basho/rebar/issues).
 
