@@ -350,7 +350,7 @@ apply_file_info(InFile, OutFile) ->
 create_RELEASES(TargetDir, RelName, RelVsn) ->
     ReleasesDir = filename:join(TargetDir, "releases"),
     case release_handler:create_RELEASES(
-           TargetDir, ReleasesDir,
+           ".", ReleasesDir,
            filename:join([ReleasesDir, RelVsn, RelName ++ ".rel"]),
            filename:join(TargetDir, "lib")) of
         ok ->
