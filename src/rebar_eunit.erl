@@ -48,7 +48,7 @@
 %% Additionally, for projects that have separate folders for the core
 %% implementation, and for the unit tests, then the following
 %% <code>rebar.config</code> option can be provided:
-%% <code>{eunit_compile_opts, [{src_dirs, ["dir"]}]}.</code>.
+%% <code>{test_compile_opts, [{src_dirs, ["dir"]}]}.</code>.
 %% @copyright 2009, 2010 Dave Smith
 %% -------------------------------------------------------------------
 -module(rebar_eunit).

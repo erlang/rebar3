@@ -117,7 +117,7 @@ clean(_Config, _AppFile) ->
 test_compile(Config) ->
     %% Obtain all the test modules for inclusion in the compile stage.
     %% Notice: this could also be achieved with the following
-    %% rebar.config option: {eunit_compile_opts, [{src_dirs, ["test"]}]}
+    %% rebar.config option: {test_compile_opts, [{src_dirs, ["test"]}]}
     TestErls = rebar_utils:find_files("test", ".*\\.erl\$"),
 
     %% Copy source files to eunit dir for cover in case they are not directly
@@ -171,13 +171,13 @@ test_compile_config(Config) ->
     {Config3, EqcOpts} = eqc_opts(Config2),
 
     ErlOpts = rebar_config:get_list(Config3, erl_opts, []),
-    EunitOpts = rebar_config:get_list(Config3, eunit_compile_opts, []),
+    EunitOpts = rebar_config:get_list(Config3, test_compile_opts, []),
     Opts0 = [{d, 'TEST'}] ++
         ErlOpts ++ EunitOpts ++ TriqOpts ++ PropErOpts ++ EqcOpts,
     Opts = [O || O <- Opts0, O =/= no_debug_info],
     Config4 = rebar_config:set(Config3, erl_opts, Opts),
 
-    FirstErls = rebar_config:get_list(Config4, eunit_first_files, []),
+    FirstErls = rebar_config:get_list(Config4, test_first_files, []),
     rebar_config:set(Config4, erl_first_files, FirstErls).
 
 triq_opts(Config) ->
