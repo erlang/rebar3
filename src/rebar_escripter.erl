@@ -51,7 +51,7 @@ escriptize(Config0, AppFile) ->
     InclBeams = get_app_beams(
                   rebar_config:get_local(Config, escript_incl_apps, []), []),
 
-    %% Look for a list extra files to include in the output file.
+    %% Look for a list of extra files to include in the output file.
     %% For internal rebar-private use only. Do not use outside rebar.
     InclExtra = get_extra(Config),
 
