@@ -86,6 +86,9 @@
 %% Override the default "test" directory in which SUITEs are located
 {ct_dir, "itest"}.
 
+%% Override the default "logs" directory in which SUITEs are logged
+{ct_log_dir, "test/logs"}.
+
 %% Option to pass extra parameters when launching Common Test
 {ct_extra_params, "-boot start_sasl -s myapp"}.
 
