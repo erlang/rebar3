@@ -156,15 +156,15 @@ setup_env(Config, ExtraEnv) ->
     DefaultEnv  = filter_env(default_env(), []),
     RawPortEnv = rebar_config:get_list(Config, port_env, []),
     PortEnv = filter_env(RawPortEnv, []),
-    GlobalDefines = global_defines(Config),
-    OverrideEnv = GlobalDefines ++ PortEnv ++ filter_env(ExtraEnv, []),
+    Defines = get_defines(Config),
+    OverrideEnv = Defines ++ PortEnv ++ filter_env(ExtraEnv, []),
     RawEnv = apply_defaults(os_env(), DefaultEnv) ++ OverrideEnv,
     expand_vars_loop(merge_each_var(RawEnv, [])).
 
-global_defines(Config) ->
-    Defines = rebar_config:get_global(Config, defines, []),
-    Flags = string:join(["-D" ++ D || D <- Defines], " "),
-    [{"ERL_CFLAGS", "$ERL_CFLAGS " ++ Flags}].
+get_defines(Config) ->
+    RawDefines = rebar_config:get_xconf(Config, defines, []),
+    Defines = string:join(["-D" ++ D || D <- RawDefines], " "),
+    [{"ERL_CFLAGS", "$ERL_CFLAGS " ++ Defines}].
 
 replace_extension(File, NewExt) ->
     OldExt = filename:extension(File),
