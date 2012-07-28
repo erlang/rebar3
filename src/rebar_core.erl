@@ -39,10 +39,10 @@ process_commands([], ParentConfig) ->
     case {get_operations(ParentConfig), AbortTrapped} of
         {0, _} ->
             %% None of the commands had any effect
-            ?ABORT;
+            ?FAIL;
         {_, true} ->
             %% An abort was previously trapped
-            ?ABORT;
+            ?FAIL;
         _ ->
             ok
     end;
@@ -77,7 +77,7 @@ process_commands([Command | Rest], ParentConfig) ->
             throw:rebar_abort ->
                 case rebar_config:get_xconf(ParentConfig1, keep_going, false) of
                     false ->
-                        ?ABORT;
+                        ?FAIL;
                     true ->
                         ?WARN("Continuing on after abort: ~p\n", [Rest]),
                         rebar_config:set_xconf(ParentConfig1,
@@ -339,7 +339,7 @@ execute(Command, Modules, Config, ModuleFile, Env) ->
                     apply_hooks(post_hooks, NewConfig, Command, Env),
                     NewConfig;
                 {error, failed} ->
-                    ?ABORT;
+                    ?FAIL;
                 {Module, {error, _} = Other} ->
                     ?ABORT("~p failed while processing ~s in module ~s: ~s\n",
                            [Command, Dir, Module,

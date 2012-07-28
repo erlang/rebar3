@@ -123,7 +123,7 @@ setup_env(Config) ->
                                   ?CONSOLE("Dependency not available: "
                                            "~p-~s (~p)\n", [App, Vsn, Src])
                           end, MissingDeps),
-            ?ABORT
+            ?FAIL
     end.
 
 'get-deps'(Config, _) ->

@@ -375,7 +375,7 @@ compile_mib(Source, Target, Config) ->
             rebar_file_utils:mv(Hrl_filename, "include"),
             ok;
         {error, compilation_failed} ->
-            ?ABORT
+            ?FAIL
     end.
 
 -spec compile_xrl(Source::file:filename(), Target::file:filename(),

@@ -141,7 +141,7 @@ compile_each([Source | Rest], Config, CompileFn) ->
         Error ->
             maybe_report(Error),
             ?DEBUG("Compilation failed: ~p\n", [Error]),
-            ?ABORT
+            ?FAIL
     end,
     compile_each(Rest, Config, CompileFn).
 
@@ -162,7 +162,7 @@ compile_queue(Pids, Targets) ->
         {fail, Error} ->
             maybe_report(Error),
             ?DEBUG("Worker compilation failed: ~p\n", [Error]),
-            ?ABORT;
+            ?FAIL;
 
         {compiled, Source, Warnings} ->
             report(Warnings),
@@ -184,7 +184,7 @@ compile_queue(Pids, Targets) ->
 
         {'DOWN', _Mref, _, _Pid, Info} ->
             ?DEBUG("Worker failed: ~p\n", [Info]),
-            ?ABORT
+            ?FAIL
     end.
 
 compile_worker(QueuePid, Config, CompileFn) ->

@@ -57,7 +57,7 @@ compile_lfe(Source, _Target, Config) ->
                    "        {git, \"git://github.com/rvirding/lfe\",~n"
                    "         {tag, \"v0.6.1\"}}}~n"
                    "~n", []),
-            ?ABORT;
+            ?FAIL;
         _ ->
             Opts = [{i, "include"}, {outdir, "ebin"}, return]
                 ++ rebar_config:get_list(Config, erl_opts, []),
@@ -67,6 +67,6 @@ compile_lfe(Source, _Target, Config) ->
                 {error, Es, Ws} ->
                     rebar_base_compiler:error_tuple(Source, Es, Ws, Opts);
                 _ ->
-                    ?ABORT
+                    ?FAIL
             end
     end.

@@ -90,7 +90,7 @@ xref(Config, _) ->
 
     case lists:member(false, [ExportsNoWarn, UndefNoWarn, QueryNoWarn]) of
         true ->
-            ?ABORT;
+            ?FAIL;
         false ->
             ok
     end.

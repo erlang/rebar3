@@ -209,7 +209,7 @@ exec_compiler(Source, Cmd, ShOpts) ->
             Error = re:replace(RawError, Source, AbsSource,
                                [{return, list}, global]),
             ?CONSOLE("~s", [Error]),
-            ?ABORT;
+            ?FAIL;
         {ok, Output} ->
             ?CONSOLE("Compiling ~s\n", [Source]),
             ?CONSOLE("~s", [Output])

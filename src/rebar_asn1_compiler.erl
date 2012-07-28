@@ -65,7 +65,7 @@ compile_asn1(Source, Target, Config) ->
                     ok
             end;
         {error, _Reason} ->
-            ?ABORT
+            ?FAIL
     end.
 
 asn_generated_files(AsnDir, SrcDir, IncDir) ->

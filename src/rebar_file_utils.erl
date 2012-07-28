@@ -108,7 +108,7 @@ delete_each([File | Rest]) ->
             delete_each(Rest);
         {error, Reason} ->
             ?ERROR("Failed to delete file ~s: ~p\n", [File, Reason]),
-            ?ABORT
+            ?FAIL
     end.
 
 %% ===================================================================
