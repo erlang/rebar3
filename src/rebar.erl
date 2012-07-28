@@ -301,7 +301,7 @@ test-compile                         Compile sources for eunit/qc run
 eunit       [suites=foo]             Run eunit [test/foo_tests.erl] tests
 ct          [suites=] [case=]        Run common_test suites
 
-qc                                   Test QuichCheck properties
+qc                                   Test QuickCheck properties
 
 xref                                 Run cross reference analysis
 
