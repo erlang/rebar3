@@ -297,7 +297,9 @@ generate-upgrade  previous_release=path  Build an upgrade package
 
 generate-appups   previous_release=path  Generate appup files
 
-eunit       [suites=foo]             Run eunit [test/foo_tests.erl] tests
+eunit       [suites=foo]             Run eunit tests [foo.erl and test/foo_tests.erl]
+            [suites=foo] [tests=bar] Run specific eunit tests [first test name starting
+                                     with 'bar' in foo.erl and test/foo_tests.erl]
 ct          [suites=] [case=]        Run common_test suites
 
 qc                                   Test QuickCheck properties
