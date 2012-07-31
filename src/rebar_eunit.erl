@@ -120,6 +120,7 @@ clean(_Config, _File) ->
     rebar_file_utils:rm_rf(?TEST_DIR).
 
 'test-compile'(Config, _File) ->
+    ?CONSOLE("NOTICE: Using experimental 'test-compile' command~n", []),
     ok = ensure_dirs(),
     %% Save code path
     CodePath = setup_code_path(),

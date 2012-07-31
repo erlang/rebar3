@@ -33,6 +33,7 @@
 -export([shell/2]).
 
 shell(_Config, _AppFile) ->
+    ?CONSOLE("NOTICE: Using experimental 'shell' command~n", []),
     %% backwards way to say we only want this executed
     %% for the "top level" directory
     case is_deps_dir(rebar_utils:get_cwd()) of
