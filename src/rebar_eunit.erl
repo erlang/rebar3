@@ -78,6 +78,18 @@ eunit(Config, _AppFile) ->
     %% eunit won't doubly run them and so cover only calculates
     %% coverage on production code.  However, keep "*_tests" modules
     %% that are not automatically included by eunit.
+    %%
+    %% From 'Primitives' in the EUnit User's Guide
+    %% http://www.erlang.org/doc/apps/eunit/chapter.html
+    %% "In addition, EUnit will also look for another module whose
+    %% name is ModuleName plus the suffix _tests, and if it exists,
+    %% all the tests from that module will also be added. (If
+    %% ModuleName already contains the suffix _tests, this is not
+    %% done.) E.g., the specification {module, mymodule} will run all
+    %% tests in the modules mymodule and mymodule_tests. Typically,
+    %% the _tests module should only contain test cases that use the
+    %% public interface of the main module (and no other code)."
+
     AllBeamFiles = rebar_utils:beams(?TEST_DIR),
     {BeamFiles, TestBeamFiles} =
         lists:partition(fun(N) -> string:str(N, "_tests.beam") =:= 0 end,
