@@ -47,10 +47,8 @@
                   skip_dirs = new_skip_dirs() :: dict(),
                   xconf = new_xconf() :: dict() }).
 
-%% Types that can be used from other modules -- alphabetically ordered.
 -export_type([config/0]).
 
-%% data types
 -opaque config() :: #config{}.
 
 -define(DEFAULT_NAME, "rebar.config").
