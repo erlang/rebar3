@@ -32,7 +32,7 @@
          set/3,
          set_global/3, get_global/3,
          is_verbose/1,
-         set_env/3, get_env/2, reset_env/1,
+         save_env/3, get_env/2, reset_envs/1,
          set_skip_dir/2, is_skip_dir/2, reset_skip_dirs/1,
          clean_config/2,
          set_xconf/3, get_xconf/2, get_xconf/3, erase_xconf/2]).
@@ -42,9 +42,8 @@
 -record(config, { dir :: file:filename(),
                   opts = [] :: list(),
                   globals = new_globals() :: dict(),
-                  %% TODO: consider storing envs in xconf
                   envs = new_env() :: dict(),
-                  %% cross-directory config
+                  %% cross-directory/-command config
                   skip_dirs = new_skip_dirs() :: dict(),
                   xconf = new_xconf() :: dict() }).
 
@@ -132,14 +131,14 @@ consult_file(File) ->
             end
     end.
 
-set_env(Config, Mod, Env) ->
+save_env(Config, Mod, Env) ->
     NewEnvs = dict:store(Mod, Env, Config#config.envs),
     Config#config{envs = NewEnvs}.
 
 get_env(Config, Mod) ->
     dict:fetch(Mod, Config#config.envs).
 
-reset_env(Config) ->
+reset_envs(Config) ->
     Config#config{envs = new_env()}.
 
 set_skip_dir(Config, Dir) ->

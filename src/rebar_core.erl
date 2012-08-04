@@ -257,8 +257,8 @@ processing_base_dir(Config, Dir) ->
 %% process each one we haven't seen yet
 %%
 process_each([], _Command, Config, _ModuleSetFile, DirSet) ->
-    %% reset cached setup_env
-    Config1 = rebar_config:reset_env(Config),
+    %% reset cached (setup_env) envs
+    Config1 = rebar_config:reset_envs(Config),
     {Config1, DirSet};
 process_each([Dir | Rest], Command, Config, ModuleSetFile, DirSet) ->
     case sets:is_element(Dir, DirSet) of
@@ -268,8 +268,8 @@ process_each([Dir | Rest], Command, Config, ModuleSetFile, DirSet) ->
         false ->
             {Config1, DirSet2} = process_dir(Dir, Config, Command, DirSet),
             Config2 = rebar_config:clean_config(Config, Config1),
-            %% reset cached setup_env
-            Config3 = rebar_config:reset_env(Config2),
+            %% reset cached (setup_env) envs
+            Config3 = rebar_config:reset_envs(Config2),
             process_each(Rest, Command, Config3, ModuleSetFile, DirSet2)
     end.
 
@@ -434,7 +434,7 @@ setup_envs(Config, Modules) ->
                         case erlang:function_exported(M, setup_env, 1) of
                             true ->
                                 Env = M:setup_env(C),
-                                C1 = rebar_config:set_env(C, M, Env),
+                                C1 = rebar_config:save_env(C, M, Env),
                                 {C1, E++Env};
                             false ->
                                 T
