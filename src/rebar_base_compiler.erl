@@ -29,8 +29,7 @@
 -include("rebar.hrl").
 
 -export([run/4, run/7, run/8,
-         ok_tuple/2, error_tuple/4]).
-
+         ok_tuple/3, error_tuple/5]).
 
 %% ===================================================================
 %% Public API
@@ -80,11 +79,12 @@ run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
                 simple_compile_wrapper(S, Target, Compile3Fn, C, CheckLastMod)
         end).
 
-ok_tuple(Source, Ws) ->
-    {ok, format_warnings(Source, Ws)}.
+ok_tuple(Config, Source, Ws) ->
+    {ok, format_warnings(Config, Source, Ws)}.
 
-error_tuple(Source, Es, Ws, Opts) ->
-    {error, format_errors(Source, Es), format_warnings(Source, Ws, Opts)}.
+error_tuple(Config, Source, Es, Ws, Opts) ->
+    {error, format_errors(Config, Source, Es),
+     format_warnings(Config, Source, Ws, Opts)}.
 
 %% ===================================================================
 %% Internal functions
@@ -211,18 +211,18 @@ compile_worker(QueuePid, Config, CompileFn) ->
             ok
     end.
 
-format_errors(Source, Errors) ->
-    format_errors(Source, "", Errors).
+format_errors(Config, Source, Errors) ->
+    format_errors(Config, Source, "", Errors).
 
-format_warnings(Source, Warnings) ->
-    format_warnings(Source, Warnings, []).
+format_warnings(Config, Source, Warnings) ->
+    format_warnings(Config, Source, Warnings, []).
 
-format_warnings(Source, Warnings, Opts) ->
+format_warnings(Config, Source, Warnings, Opts) ->
     Prefix = case lists:member(warnings_as_errors, Opts) of
                  true -> "";
                  false -> "Warning: "
              end,
-    format_errors(Source, Prefix, Warnings).
+    format_errors(Config, Source, Prefix, Warnings).
 
 maybe_report([{error, {error, _Es, _Ws}=ErrorsAndWarnings}, {source, _}]) ->
     maybe_report(ErrorsAndWarnings);
@@ -235,8 +235,13 @@ maybe_report(_) ->
 report(Messages) ->
     lists:foreach(fun(Msg) -> io:format("~s", [Msg]) end, Messages).
 
-format_errors(Source, Extra, Errors) ->
-    AbsSource = filename:absname(Source),
+format_errors(Config, Source, Extra, Errors) ->
+    AbsSource = case rebar_utils:processing_base_dir(Config) of
+                    true ->
+                        Source;
+                    false ->
+                        filename:absname(Source)
+                end,
     [[format_error(AbsSource, Extra, Desc) || Desc <- Descs]
      || {_, Descs} <- Errors].
 

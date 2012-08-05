@@ -100,7 +100,7 @@ compile(Config, _AppFile) ->
             SharedEnv = rebar_config:get_env(Config, ?MODULE),
 
             %% Compile each of the sources
-            NewBins = compile_sources(Specs, SharedEnv),
+            NewBins = compile_sources(Config, Specs, SharedEnv),
 
             %% Make sure that the target directories exist
             ?INFO("Using specs ~p\n", [Specs]),
@@ -177,16 +177,16 @@ replace_extension(File, OldExt, NewExt) ->
 %% == compile and link ==
 %%
 
-compile_sources(Specs, SharedEnv) ->
+compile_sources(Config, Specs, SharedEnv) ->
     lists:foldl(
       fun(#spec{sources=Sources, type=Type, opts=Opts}, NewBins) ->
               Env = proplists:get_value(env, Opts, SharedEnv),
-              compile_each(Sources, Type, Env, NewBins)
+              compile_each(Config, Sources, Type, Env, NewBins)
       end, [], Specs).
 
-compile_each([], _Type, _Env, NewBins) ->
+compile_each(_Config, [], _Type, _Env, NewBins) ->
     lists:reverse(NewBins);
-compile_each([Source | Rest], Type, Env, NewBins) ->
+compile_each(Config, [Source | Rest], Type, Env, NewBins) ->
     Ext = filename:extension(Source),
     Bin = replace_extension(Source, Ext, ".o"),
     case needs_compile(Source, Bin) of
@@ -194,17 +194,22 @@ compile_each([Source | Rest], Type, Env, NewBins) ->
             Template = select_compile_template(Type, compiler(Ext)),
             Cmd = expand_command(Template, Env, Source, Bin),
             ShOpts = [{env, Env}, return_on_error, {use_stdout, false}],
-            exec_compiler(Source, Cmd, ShOpts),
-            compile_each(Rest, Type, Env, [Bin | NewBins]);
+            exec_compiler(Config, Source, Cmd, ShOpts),
+            compile_each(Config, Rest, Type, Env, [Bin | NewBins]);
         false ->
             ?INFO("Skipping ~s\n", [Source]),
-            compile_each(Rest, Type, Env, NewBins)
+            compile_each(Config, Rest, Type, Env, NewBins)
     end.
 
-exec_compiler(Source, Cmd, ShOpts) ->
+exec_compiler(Config, Source, Cmd, ShOpts) ->
     case rebar_utils:sh(Cmd, ShOpts) of
         {error, {_RC, RawError}} ->
-            AbsSource = filename:absname(Source),
+            AbsSource = case rebar_utils:processing_base_dir(Config) of
+                            true ->
+                                Source;
+                            false ->
+                                filename:absname(Source)
+                        end,
             ?CONSOLE("Compiling ~s\n", [AbsSource]),
             Error = re:replace(RawError, Source, AbsSource,
                                [{return, list}, global]),

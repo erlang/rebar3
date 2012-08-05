@@ -242,15 +242,12 @@ remember_cwd_subdir(Cwd, Subdirs) ->
 maybe_load_local_config(Dir, ParentConfig) ->
     %% We need to ensure we don't overwrite custom
     %% config when we are dealing with base_dir.
-    case processing_base_dir(ParentConfig, Dir) of
+    case rebar_utils:processing_base_dir(ParentConfig, Dir) of
         true ->
             ParentConfig;
         false ->
             rebar_config:new(ParentConfig)
     end.
-
-processing_base_dir(Config, Dir) ->
-    Dir == rebar_config:get_xconf(Config, base_dir).
 
 %%
 %% Given a list of directories and a set of previously processed directories,
