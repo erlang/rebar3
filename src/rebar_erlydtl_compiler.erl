@@ -83,7 +83,7 @@
 compile(Config, _AppFile) ->
     DtlOpts = erlydtl_opts(Config),
     OrigPath = code:get_path(),
-    true = code:add_path(filename:join(rebar_utils:get_cwd(), "ebin")),
+    true = code:add_path(rebar_utils:ebin_dir()),
     Result = rebar_base_compiler:run(Config, [],
                                      option(doc_root, DtlOpts),
                                      option(source_ext, DtlOpts),

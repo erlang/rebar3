@@ -38,7 +38,7 @@ shell(_Config, _AppFile) ->
     %% for the "top level" directory
     case is_deps_dir(rebar_utils:get_cwd()) of
         false ->
-            true = code:add_pathz(ebin_dir()),
+            true = code:add_pathz(rebar_utils:ebin_dir()),
             user_drv:start(),
             %% this call never returns (until user quits shell)
             shell:server(false, false);
@@ -46,9 +46,6 @@ shell(_Config, _AppFile) ->
             ok
     end,
     ok.
-
-ebin_dir() ->
-    filename:join(rebar_utils:get_cwd(), "ebin").
 
 is_deps_dir(Dir) ->
     case lists:reverse(filename:split(Dir)) of

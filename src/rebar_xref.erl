@@ -53,7 +53,7 @@ xref(Config, _) ->
 
     %% Save the code path prior to doing anything
     OrigPath = code:get_path(),
-    true = code:add_path(filename:join(rebar_utils:get_cwd(), "ebin")),
+    true = code:add_path(rebar_utils:ebin_dir()),
 
     %% Get list of xref checks we want to run
     XrefChecks = rebar_config:get(Config, xref_checks,
