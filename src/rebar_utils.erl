@@ -309,10 +309,10 @@ src_dirs(SrcDirs) ->
     SrcDirs.
 
 test_dir() ->
-    filename:join(rebar_utils:get_cwd(), ?TEST_DIR).
+    filename:join(get_cwd(), ?TEST_DIR).
 
 ebin_dir() ->
-    filename:join(rebar_utils:get_cwd(), "ebin").
+    filename:join(get_cwd(), "ebin").
 
 processing_base_dir(Config) ->
     Cwd = rebar_utils:get_cwd(),
