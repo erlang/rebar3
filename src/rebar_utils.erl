@@ -302,7 +302,7 @@ erl_opts(Config) ->
             [debug_info|Opts]
     end.
 
--spec src_dirs(SrcDirs::[string()]) -> [file:filename(), ...].
+-spec src_dirs([string()]) -> [file:filename(), ...].
 src_dirs([]) ->
     ["src"];
 src_dirs(SrcDirs) ->
@@ -497,7 +497,6 @@ vcs_vsn_invoke(Cmd, Dir) ->
 %% Filter a list of erl_opts platform_define options such that only
 %% those which match the provided architecture regex are returned.
 %%
--spec filter_defines(ErlOpts::list(), Acc::list()) -> list().
 filter_defines([], Acc) ->
     lists:reverse(Acc);
 filter_defines([{platform_define, ArchRegex, Key} | Rest], Acc) ->
