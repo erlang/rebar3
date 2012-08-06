@@ -54,18 +54,7 @@ doc(Config, File) ->
     {ok, Config1, AppName, _AppData} =
         rebar_app_utils:load_app_file(Config, File),
 
-    %% Determine the age of the summary file
-    EDocInfoName = filename:join(proplists:get_value(dir, EDocOpts, "doc"),
-                                 "edoc-info"),
-    EDocInfoLastMod = filelib:last_modified(EDocInfoName),
-
-    %% For each source directory, look for a more recent file than
-    %% SumaryLastMod; in that case, we go ahead and do a full regen
-    NeedsRegen = newer_file_exists(proplists:get_value(source_path,
-                                                       EDocOpts, ["src"]),
-                                   EDocInfoLastMod),
-
-    case NeedsRegen of
+    case needs_regen(EDocOpts) of
         true ->
             ?INFO("Regenerating edocs for ~p\n", [AppName]),
             ok = edoc:application(AppName, ".", EDocOpts);
@@ -90,27 +79,41 @@ setup_code_path() ->
     true = code:add_patha(rebar_utils:ebin_dir()),
     CodePath.
 
-newer_file_exists(Paths, LastMod) ->
-    CheckFile = fun(Filename, _) ->
-                        FLast = filelib:last_modified(Filename),
-                        case FLast > LastMod of
-                            true ->
-                                ?DEBUG("~p is more recent than edoc-info: "
-                                       "~120p > ~120p\n",
-                                       [Filename, FLast, LastMod]),
-                                throw(newer_file_exists);
-                            false ->
-                                false
-                        end
-                end,
+-type path_spec() :: {'file', file:filename()} | file:filename().
+-spec newer_file_exists(Paths::[path_spec()], OldFile::string()) -> boolean().
+newer_file_exists(Paths, OldFile) ->
+    OldModTime = filelib:last_modified(OldFile),
+
+    ThrowIfNewer = fun(Fn, _Acc) ->
+                           FModTime = filelib:last_modified(Fn),
+                           (FModTime > OldModTime) andalso
+                               throw({newer_file_exists, {Fn, FModTime}})
+                   end,
+
     try
-        lists:foldl(fun(P, _) ->
+        lists:foldl(fun({file, F}, _) ->
+                            ThrowIfNewer(F, false);
+                       (P, _) ->
                             filelib:fold_files(P, ".*.erl", true,
-                                               CheckFile, false)
-                    end, undefined, Paths),
-        false
+                                               ThrowIfNewer, false)
+                    end, undefined, Paths)
     catch
-        throw:newer_file_exists ->
+        throw:{newer_file_exists, {Filename, FMod}} ->
+            ?DEBUG("~p is more recent than ~p: "
+                   "~120p > ~120p\n",
+                   [Filename, OldFile, FMod, OldModTime]),
             true
     end.
 
+%% Needs regen if any dependent file is changed since the last
+%% edoc run. Dependent files are the erlang source files,
+%% and the overview file, if it exists.
+-spec needs_regen(edoc:proplist()) -> boolean().
+needs_regen(EDocOpts) ->
+    DocDir = proplists:get_value(dir, EDocOpts, "doc"),
+    EDocInfoName = filename:join(DocDir, "edoc-info"),
+    OverviewFile = proplists:get_value(overview, EDocOpts, "overview.edoc"),
+    EDocOverviewName = filename:join(DocDir, OverviewFile),
+    SrcPaths = proplists:get_value(source_path, EDocOpts, ["src"]),
+
+    newer_file_exists([{file, EDocOverviewName} | SrcPaths], EDocInfoName).
