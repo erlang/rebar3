@@ -106,7 +106,7 @@ preprocess(Config, AppSrcFile) ->
 
             %% Setup file .app filename and write new contents
             AppFile = rebar_app_utils:app_src_to_app(AppSrcFile),
-            ok = file:write_file(AppFile, Spec),
+            ok = rebar_file_utils:write_file_if_contents_differ(AppFile, Spec),
 
             %% Make certain that the ebin/ directory is available
             %% on the code path

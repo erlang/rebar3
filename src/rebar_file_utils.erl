@@ -29,7 +29,8 @@
 -export([rm_rf/1,
          cp_r/2,
          mv/2,
-         delete_each/1]).
+         delete_each/1,
+         write_file_if_contents_differ/2]).
 
 -include("rebar.hrl").
 
@@ -109,6 +110,17 @@ delete_each([File | Rest]) ->
         {error, Reason} ->
             ?ERROR("Failed to delete file ~s: ~p\n", [File, Reason]),
             ?FAIL
+    end.
+
+write_file_if_contents_differ(Filename, Bytes) ->
+    ToWrite = iolist_to_binary(Bytes),
+    case file:read_file(Filename) of
+        {ok, ToWrite} ->
+            ok;
+        {ok,  _} ->
+            file:write_file(Filename, ToWrite);
+        {error,  _} ->
+            file:write_file(Filename, ToWrite)
     end.
 
 %% ===================================================================
