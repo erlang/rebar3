@@ -358,9 +358,9 @@ internal_erl_compile(Config, Source, Outdir, ErlOpts) ->
             skipped
     end.
 
--spec compile_mib(rebar_config:config(), file:filename(),
-                  file:filename()) -> 'ok'.
-compile_mib(Config, Source, Target) ->
+-spec compile_mib(file:filename(), file:filename(),
+                  rebar_config:config()) -> 'ok'.
+compile_mib(Source, Target, Config) ->
     ok = rebar_utils:ensure_dir(Target),
     ok = rebar_utils:ensure_dir(filename:join("include", "dummy.hrl")),
     Opts = [{outdir, "priv/mibs"}, {i, ["priv/mibs"]}] ++
