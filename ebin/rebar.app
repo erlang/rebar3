@@ -3,7 +3,7 @@
 
 {application, rebar,
  [{description, "Rebar: Erlang Build Tool"},
-  {vsn, "3.0.0"},
+  {vsn, "2.9.0"},
   {modules, [ rebar,
               rebar_abnfc_compiler,
               rebar_app_utils,
