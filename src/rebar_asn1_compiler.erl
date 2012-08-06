@@ -36,13 +36,13 @@
 %% Public API
 %% ===================================================================
 
--spec compile(Config::rebar_config:config(), AppFile::file:filename()) -> 'ok'.
+-spec compile(rebar_config:config(), file:filename()) -> 'ok'.
 compile(Config, _AppFile) ->
     rebar_base_compiler:run(Config, filelib:wildcard("asn1/*.asn1"),
                             "asn1", ".asn1", "src", ".erl",
                             fun compile_asn1/3).
 
--spec clean(Config::rebar_config:config(), AppFile::file:filename()) -> 'ok'.
+-spec clean(rebar_config:config(), file:filename()) -> 'ok'.
 clean(_Config, _AppFile) ->
     GeneratedFiles = asn_generated_files("asn1", "src", "include"),
     ok = rebar_file_utils:delete_each(GeneratedFiles),

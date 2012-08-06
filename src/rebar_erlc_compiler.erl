@@ -68,7 +68,7 @@
 %%                           'old_inets'}]}.
 %%
 
--spec compile(Config::rebar_config:config(), AppFile::file:filename()) -> 'ok'.
+-spec compile(rebar_config:config(), file:filename()) -> 'ok'.
 compile(Config, _AppFile) ->
     rebar_base_compiler:run(Config,
                             check_files(rebar_config:get_local(
