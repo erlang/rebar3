@@ -293,7 +293,7 @@ delayed_halt(Code) ->
 erl_opts(Config) ->
     RawErlOpts = filter_defines(rebar_config:get(Config, erl_opts, []), []),
     Defines = [{d, list_to_atom(D)} ||
-                        D <- rebar_config:get_xconf(Config, defines, [])],
+                  D <- rebar_config:get_xconf(Config, defines, [])],
     Opts = Defines ++ RawErlOpts,
     case proplists:is_defined(no_debug_info, Opts) of
         true ->
