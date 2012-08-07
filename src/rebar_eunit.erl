@@ -397,9 +397,7 @@ cover_file(Module) ->
     filename:join([?TEST_DIR, atom_to_list(Module) ++ ".COVER.html"]).
 
 cover_export_coverdata() ->
-    ExportFile = filename:join([rebar_utils:get_cwd(),
-                                ?TEST_DIR,
-                                "eunit.coverdata"]),
+    ExportFile = filename:join(rebar_utils:test_dir(), "eunit.coverdata"),
     case cover:export(ExportFile) of
         ok ->
             ?CONSOLE("Coverdata export: ~s~n", [ExportFile]);
