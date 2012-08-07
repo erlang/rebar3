@@ -401,7 +401,7 @@ cover_export_coverdata() ->
     case cover:export(ExportFile) of
         ok ->
             ?CONSOLE("Coverdata export: ~s~n", [ExportFile]);
-        {error,Reason} ->
+        {error, Reason} ->
             ?ERROR("Coverdata export failed: ~p~n", [Reason])
     end.
 
