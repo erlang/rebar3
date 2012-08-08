@@ -128,7 +128,13 @@ run(Config, QC, QCOpts) ->
                    [Errors])
     end.
 
-qc_module(QC=triq, _QCOpts, M) -> QC:module(M);
+qc_module(QC=triq, _QCOpts, M) ->
+    case QC:module(M) of
+        true ->
+            [];
+        Failed ->
+            [Failed]
+    end;
 qc_module(QC=eqc, QCOpts, M) -> QC:module(QCOpts, M).
 
 find_prop_mods() ->
