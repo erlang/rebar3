@@ -119,7 +119,8 @@ run(Config, QC, QCOpts) ->
     %% as well.
     {ok, _SrcErls} = rebar_erlc_compiler:test_compile(Config),
 
-    case lists:flatten([qc_module(QC, QCOpts, M) || M <- find_prop_mods()]) of
+    TestModule = fun(M) -> qc_module(QC, QCOpts, M) end,
+    case lists:flatmap(TestModule, find_prop_mods()) of
         [] ->
             true = code:set_path(CodePath),
             ok;
