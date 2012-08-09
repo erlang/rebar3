@@ -177,7 +177,7 @@ prop_check(false, Msg, Args) -> ?ABORT(Msg, Args).
 
 %% Convert all the entries in the code path to absolute paths.
 expand_code_path() ->
-    CodePath = lists:foldl(fun (Path, Acc) ->
+    CodePath = lists:foldl(fun(Path, Acc) ->
                                    [filename:absname(Path) | Acc]
                            end, [], code:get_path()),
     code:set_path(lists:reverse(CodePath)).
