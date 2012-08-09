@@ -54,8 +54,7 @@
 -module(rebar_eunit).
 
 -export([eunit/2,
-         clean/2,
-         'test-compile'/2]).
+         clean/2]).
 
 -include("rebar.hrl").
 
@@ -67,9 +66,25 @@ eunit(Config, _AppFile) ->
     ok = ensure_dirs(),
     %% Save code path
     CodePath = setup_code_path(),
-
+    CompileOnly = rebar_utils:get_experimental_global(Config, compile_only,
+                                                      false),
     {ok, SrcErls} = rebar_erlc_compiler:test_compile(Config),
+    case CompileOnly of
+        "true" ->
+            true = code:set_path(CodePath),
+            ?CONSOLE("Compiled modules for eunit~n", []);
+        false ->
+            run_eunit(Config, CodePath, SrcErls)
+    end.
 
+clean(_Config, _File) ->
+    rebar_file_utils:rm_rf(?TEST_DIR).
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
+
+run_eunit(Config, CodePath, SrcErls) ->
     %% Build a list of all the .beams in ?TEST_DIR -- use this for
     %% cover and eunit testing. Normally you can just tell cover
     %% and/or eunit to scan the directory for you, but eunit does a
@@ -127,23 +142,6 @@ eunit(Config, _AppFile) ->
     %% Restore code path
     true = code:set_path(CodePath),
     ok.
-
-clean(_Config, _File) ->
-    rebar_file_utils:rm_rf(?TEST_DIR).
-
-'test-compile'(Config, _File) ->
-    ?CONSOLE("NOTICE: Using experimental 'test-compile' command~n", []),
-    ok = ensure_dirs(),
-    %% Save code path
-    CodePath = setup_code_path(),
-    {ok, _SrcErls} = rebar_erlc_compiler:test_compile(Config),
-    %% Restore code path
-    true = code:set_path(CodePath),
-    ok.
-
-%% ===================================================================
-%% Internal functions
-%% ===================================================================
 
 ensure_dirs() ->
     %% Make sure ?TEST_DIR/ and ebin/ directory exists (append dummy module)

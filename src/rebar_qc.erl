@@ -114,11 +114,22 @@ run(Config, QC, QCOpts) ->
     ok = filelib:ensure_dir(?TEST_DIR ++ "/foo"),
     CodePath = setup_codepath(),
 
+    CompileOnly = rebar_utils:get_experimental_global(Config, compile_only,
+                                                      false),
     %% Compile erlang code to ?TEST_DIR, using a tweaked config
     %% with appropriate defines, and include all the test modules
     %% as well.
     {ok, _SrcErls} = rebar_erlc_compiler:test_compile(Config),
 
+    case CompileOnly of
+        "true" ->
+            true = code:set_path(CodePath),
+            ?CONSOLE("Compiled modules for qc~n", []);
+        false ->
+            run1(QC, QCOpts, CodePath)
+    end.
+
+run1(QC, QCOpts, CodePath) ->
     TestModule = fun(M) -> qc_module(QC, QCOpts, M) end,
     case lists:flatmap(TestModule, find_prop_mods()) of
         [] ->
