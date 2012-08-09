@@ -51,7 +51,6 @@
          delayed_halt/1,
          erl_opts/1,
          src_dirs/1,
-         test_dir/0,
          ebin_dir/0,
          processing_base_dir/1, processing_base_dir/2]).
 
@@ -318,9 +317,6 @@ src_dirs([]) ->
     ["src"];
 src_dirs(SrcDirs) ->
     SrcDirs.
-
-test_dir() ->
-    filename:join(get_cwd(), ?TEST_DIR).
 
 ebin_dir() ->
     filename:join(get_cwd(), "ebin").

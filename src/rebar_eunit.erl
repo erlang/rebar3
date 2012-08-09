@@ -28,7 +28,7 @@
 %% @doc rebar_eunit supports the following commands:
 %% <ul>
 %%   <li>eunit - runs eunit tests</li>
-%%   <li>clean - remove ?TEST_DIR directory</li>
+%%   <li>clean - remove ?EUNIT_DIR directory</li>
 %%   <li>reset_after_eunit::boolean() - default = true.
 %%       If true, try to "reset" VM state to approximate state prior to
 %%       running the EUnit tests:
@@ -58,6 +58,8 @@
 
 -include("rebar.hrl").
 
+-define(EUNIT_DIR, ".eunit").
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -68,7 +70,8 @@ eunit(Config, _AppFile) ->
     CodePath = setup_code_path(),
     CompileOnly = rebar_utils:get_experimental_global(Config, compile_only,
                                                       false),
-    {ok, SrcErls} = rebar_erlc_compiler:test_compile(Config, "eunit"),
+    {ok, SrcErls} = rebar_erlc_compiler:test_compile(Config, "eunit",
+                                                     ?EUNIT_DIR),
     case CompileOnly of
         "true" ->
             true = code:set_path(CodePath),
@@ -78,14 +81,14 @@ eunit(Config, _AppFile) ->
     end.
 
 clean(_Config, _File) ->
-    rebar_file_utils:rm_rf(?TEST_DIR).
+    rebar_file_utils:rm_rf(?EUNIT_DIR).
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
 run_eunit(Config, CodePath, SrcErls) ->
-    %% Build a list of all the .beams in ?TEST_DIR -- use this for
+    %% Build a list of all the .beams in ?EUNIT_DIR -- use this for
     %% cover and eunit testing. Normally you can just tell cover
     %% and/or eunit to scan the directory for you, but eunit does a
     %% code:purge in conjunction with that scan and causes any cover
@@ -105,14 +108,14 @@ run_eunit(Config, CodePath, SrcErls) ->
     %% the _tests module should only contain test cases that use the
     %% public interface of the main module (and no other code)."
 
-    AllBeamFiles = rebar_utils:beams(?TEST_DIR),
+    AllBeamFiles = rebar_utils:beams(?EUNIT_DIR),
     {BeamFiles, TestBeamFiles} =
         lists:partition(fun(N) -> string:str(N, "_tests.beam") =:= 0 end,
                         AllBeamFiles),
     OtherBeamFiles = TestBeamFiles --
         [filename:rootname(N) ++ "_tests.beam" || N <- AllBeamFiles],
     ModuleBeamFiles = BeamFiles ++ OtherBeamFiles,
-    Modules = [rebar_utils:beam_to_mod(?TEST_DIR, N) || N <- ModuleBeamFiles],
+    Modules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- ModuleBeamFiles],
     SrcModules = [rebar_utils:erl_to_mod(M) || M <- SrcErls],
     FilteredModules = filter_modules(Config, Modules),
 
@@ -144,9 +147,12 @@ run_eunit(Config, CodePath, SrcErls) ->
     ok.
 
 ensure_dirs() ->
-    %% Make sure ?TEST_DIR/ and ebin/ directory exists (append dummy module)
-    ok = filelib:ensure_dir(filename:join(rebar_utils:test_dir(), "dummy")),
+    %% Make sure ?EUNIT_DIR/ and ebin/ directory exists (append dummy module)
+    ok = filelib:ensure_dir(filename:join(eunit_dir(), "dummy")),
     ok = filelib:ensure_dir(filename:join(rebar_utils:ebin_dir(), "dummy")).
+
+eunit_dir() ->
+    filename:join(rebar_utils:get_cwd(), ?EUNIT_DIR).
 
 setup_code_path() ->
     %% Setup code path prior to compilation so that parse_transforms
@@ -154,7 +160,7 @@ setup_code_path() ->
     %% to the END of the code path so that we don't have to jump
     %% through hoops to access the .app file
     CodePath = code:get_path(),
-    true = code:add_patha(rebar_utils:test_dir()),
+    true = code:add_patha(eunit_dir()),
     true = code:add_pathz(rebar_utils:ebin_dir()),
     CodePath.
 
@@ -171,10 +177,10 @@ filter_modules1(Modules, Suites) ->
 perform_eunit(Config, FilteredModules) ->
     EunitOpts = get_eunit_opts(Config),
 
-    %% Move down into ?TEST_DIR while we run tests so any generated files
+    %% Move down into ?EUNIT_DIR while we run tests so any generated files
     %% are created there (versus in the source dir)
     Cwd = rebar_utils:get_cwd(),
-    ok = file:set_cwd(?TEST_DIR),
+    ok = file:set_cwd(?EUNIT_DIR),
 
     EunitResult = (catch eunit:test(FilteredModules, EunitOpts)),
 
@@ -218,7 +224,7 @@ cover_analyze(Config, FilteredModules, SrcModules) ->
                                                           [html])
                   end, Coverage),
 
-    Index = filename:join([rebar_utils:get_cwd(), ?TEST_DIR, "index.html"]),
+    Index = filename:join([rebar_utils:get_cwd(), ?EUNIT_DIR, "index.html"]),
     ?CONSOLE("Cover analysis: ~s\n", [Index]),
 
     %% Export coverage data, if configured
@@ -246,7 +252,7 @@ cover_init(false, _BeamFiles) ->
     {ok, not_enabled};
 cover_init(true, BeamFiles) ->
     %% Attempt to start the cover server, then set it's group leader to
-    %% ?TEST_DIR/cover.log, so all cover log messages will go there instead of
+    %% ?EUNIT_DIR/cover.log, so all cover log messages will go there instead of
     %% to stdout. If the cover server is already started we'll reuse that
     %% pid.
     {ok, CoverPid} = case cover:start() of
@@ -259,7 +265,7 @@ cover_init(true, BeamFiles) ->
                      end,
 
     {ok, F} = OkOpen = file:open(
-                         filename:join([?TEST_DIR, "cover.log"]),
+                         filename:join([?EUNIT_DIR, "cover.log"]),
                          [write]),
 
     group_leader(F, CoverPid),
@@ -334,7 +340,7 @@ align_notcovered_count(Module, Covered, NotCovered, true) ->
     {Module, Covered, NotCovered - 1}.
 
 cover_write_index(Coverage, SrcModules) ->
-    {ok, F} = file:open(filename:join([?TEST_DIR, "index.html"]), [write]),
+    {ok, F} = file:open(filename:join([?EUNIT_DIR, "index.html"]), [write]),
     ok = file:write(F, "<html><head><title>Coverage Summary</title></head>\n"),
     IsSrcCoverage = fun({Mod,_C,_N}) -> lists:member(Mod, SrcModules) end,
     {SrcCoverage, TestCoverage} = lists:partition(IsSrcCoverage, Coverage),
@@ -392,10 +398,10 @@ cover_print_coverage(Coverage) ->
     ?CONSOLE("~n~*s : ~s~n", [Width, "Total", TotalCoverage]).
 
 cover_file(Module) ->
-    filename:join([?TEST_DIR, atom_to_list(Module) ++ ".COVER.html"]).
+    filename:join([?EUNIT_DIR, atom_to_list(Module) ++ ".COVER.html"]).
 
 cover_export_coverdata() ->
-    ExportFile = filename:join(rebar_utils:test_dir(), "eunit.coverdata"),
+    ExportFile = filename:join(eunit_dir(), "eunit.coverdata"),
     case cover:export(ExportFile) of
         ok ->
             ?CONSOLE("Coverdata export: ~s~n", [ExportFile]);

@@ -30,7 +30,7 @@
          clean/2]).
 
 %% for internal use by only eunit and qc
--export([test_compile/2]).
+-export([test_compile/3]).
 
 -include("rebar.hrl").
 
@@ -114,7 +114,7 @@ clean(_Config, _AppFile) ->
 %% .erl Compilation API (externally used by only eunit and qc)
 %% ===================================================================
 
-test_compile(Config, Cmd) ->
+test_compile(Config, Cmd, OutDir) ->
     %% Obtain all the test modules for inclusion in the compile stage.
     %% Notice: this could also be achieved with the following
     %% rebar.config option: {test_compile_opts, [{src_dirs, ["test"]}]}
@@ -133,16 +133,16 @@ test_compile(Config, Cmd) ->
                 end, [], SrcDirs),
 
     %% If it is not the first time rebar eunit is executed, there will be source
-    %% files already present in ?TEST_DIR. Since some SCMs (like Perforce) set
+    %% files already present in OutDir. Since some SCMs (like Perforce) set
     %% the source files as being read only (unless they are checked out), we
-    %% need to be sure that the files already present in ?TEST_DIR are writable
+    %% need to be sure that the files already present in OutDir are writable
     %% before doing the copy. This is done here by removing any file that was
     %% already present before calling rebar_file_utils:cp_r.
 
-    %% Get the full path to a file that was previously copied in ?TEST_DIR
+    %% Get the full path to a file that was previously copied in OutDir
     ToCleanUp = fun(F, Acc) ->
                         F2 = filename:basename(F),
-                        F3 = filename:join([?TEST_DIR, F2]),
+                        F3 = filename:join([OutDir, F2]),
                         case filelib:is_regular(F3) of
                             true -> [F3|Acc];
                             false -> Acc
@@ -152,12 +152,12 @@ test_compile(Config, Cmd) ->
     ok = rebar_file_utils:delete_each(lists:foldl(ToCleanUp, [], TestErls)),
     ok = rebar_file_utils:delete_each(lists:foldl(ToCleanUp, [], SrcErls)),
 
-    ok = rebar_file_utils:cp_r(SrcErls ++ TestErls, ?TEST_DIR),
+    ok = rebar_file_utils:cp_r(SrcErls ++ TestErls, OutDir),
 
-    %% Compile erlang code to ?TEST_DIR, using a tweaked config
+    %% Compile erlang code to OutDir, using a tweaked config
     %% with appropriate defines for eunit, and include all the test modules
     %% as well.
-    ok = doterl_compile(test_compile_config(Config, Cmd), ?TEST_DIR, TestErls),
+    ok = doterl_compile(test_compile_config(Config, Cmd), OutDir, TestErls),
 
     {ok, SrcErls}.
 
