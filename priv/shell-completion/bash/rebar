@@ -11,7 +11,7 @@ _rebar()
     cmdsnvars="check-deps clean compile create create-app create-node ct \
         doc delete-deps escriptize eunit get-deps generate generate-upgrade \
         help list-deps list-templates qc update-deps version xref overlay \
-        overlay apps= case= force=1 jobs= suites= verbose=1 appid= \
+        apps= case= force=1 jobs= suites= verbose=1 appid= \
         previous_release= nodeid= root_dir= skip_deps=true skip_apps= \
         template= template_dir="
 
