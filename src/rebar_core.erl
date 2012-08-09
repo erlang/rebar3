@@ -372,9 +372,11 @@ restore_code_path(no_change) ->
 restore_code_path({old, Path}) ->
     %% Verify that all of the paths still exist -- some dynamically
     %% added paths can get blown away during clean.
-    true = code:set_path([F || F <- Path, filelib:is_file(F)]),
+    true = code:set_path([F || F <- Path, erl_prim_loader_is_file(F)]),
     ok.
 
+erl_prim_loader_is_file(File) ->
+    erl_prim_loader:read_file_info(File) =/= error.
 
 expand_lib_dirs([], _Root, Acc) ->
     Acc;
