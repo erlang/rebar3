@@ -104,6 +104,10 @@ load_qc_mod(Mod) ->
             ?ABORT("Failed to load QC lib '~p'~n", [Mod])
     end.
 
+ensure_dirs() ->
+    ok = filelib:ensure_dir(filename:join(qc_dir(), "dummy")),
+    ok = filelib:ensure_dir(filename:join(rebar_utils:ebin_dir(), "dummy")).
+
 setup_codepath() ->
     CodePath = code:get_path(),
     true = code:add_patha(qc_dir()),
@@ -116,7 +120,7 @@ qc_dir() ->
 run(Config, QC, QCOpts) ->
     ?DEBUG("qc_opts: ~p~n", [QCOpts]),
 
-    ok = filelib:ensure_dir(filename:join(qc_dir(), "foo")),
+    ok = ensure_dirs(),
     CodePath = setup_codepath(),
 
     CompileOnly = rebar_utils:get_experimental_global(Config, compile_only,
