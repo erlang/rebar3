@@ -68,7 +68,7 @@ eunit(Config, _AppFile) ->
     CodePath = setup_code_path(),
     CompileOnly = rebar_utils:get_experimental_global(Config, compile_only,
                                                       false),
-    {ok, SrcErls} = rebar_erlc_compiler:test_compile(Config),
+    {ok, SrcErls} = rebar_erlc_compiler:test_compile(Config, "eunit"),
     case CompileOnly of
         "true" ->
             true = code:set_path(CodePath),

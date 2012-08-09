@@ -30,7 +30,7 @@
          clean/2]).
 
 %% for internal use by only eunit and qc
--export([test_compile/1]).
+-export([test_compile/2]).
 
 -include("rebar.hrl").
 
@@ -114,7 +114,7 @@ clean(_Config, _AppFile) ->
 %% .erl Compilation API (externally used by only eunit and qc)
 %% ===================================================================
 
-test_compile(Config) ->
+test_compile(Config, Cmd) ->
     %% Obtain all the test modules for inclusion in the compile stage.
     %% Notice: this could also be achieved with the following
     %% rebar.config option: {test_compile_opts, [{src_dirs, ["test"]}]}
@@ -157,7 +157,7 @@ test_compile(Config) ->
     %% Compile erlang code to ?TEST_DIR, using a tweaked config
     %% with appropriate defines for eunit, and include all the test modules
     %% as well.
-    ok = doterl_compile(test_compile_config(Config), ?TEST_DIR, TestErls),
+    ok = doterl_compile(test_compile_config(Config, Cmd), ?TEST_DIR, TestErls),
 
     {ok, SrcErls}.
 
@@ -165,19 +165,21 @@ test_compile(Config) ->
 %% Internal functions
 %% ===================================================================
 
-test_compile_config(Config) ->
+test_compile_config(Config, Cmd) ->
     {Config1, TriqOpts} = triq_opts(Config),
     {Config2, PropErOpts} = proper_opts(Config1),
     {Config3, EqcOpts} = eqc_opts(Config2),
 
     ErlOpts = rebar_config:get_list(Config3, erl_opts, []),
-    EunitOpts = rebar_config:get_list(Config3, test_compile_opts, []),
+    OptsAtom = list_to_atom(Cmd ++ "_compile_opts"),
+    EunitOpts = rebar_config:get_list(Config3, OptsAtom, []),
     Opts0 = [{d, 'TEST'}] ++
         ErlOpts ++ EunitOpts ++ TriqOpts ++ PropErOpts ++ EqcOpts,
     Opts = [O || O <- Opts0, O =/= no_debug_info],
     Config4 = rebar_config:set(Config3, erl_opts, Opts),
 
-    FirstErls = rebar_config:get_list(Config4, test_first_files, []),
+    FirstFilesAtom = list_to_atom(Cmd ++ "_first_files"),
+    FirstErls = rebar_config:get_list(Config4, FirstFilesAtom, []),
     rebar_config:set(Config4, erl_first_files, FirstErls).
 
 triq_opts(Config) ->

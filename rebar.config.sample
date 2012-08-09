@@ -22,13 +22,6 @@
             {platform_define, "(linux|freebsd)", 'BACKLOG', 128},
             {platform_define, "R13", 'old_inets'}]}.
 
-%% Additional compile options for test-compile. erl_opts is also used
-{test_compile_opts, []}.
-
-%% Same as erl_first_files, but used only when running 'test-compile', 'eunit',
-%% or 'qc'
-{test_first_files, []}.
-
 %% MIB Options?
 {mib_opts, []}.
 
@@ -72,6 +65,14 @@
 %% Options for eunit:test()
 {eunit_opts, []}.
 
+%% Additional compile options for eunit. erl_opts is also used
+{eunit_compile_opts, []}.
+
+%% Same as erl_first_files, but used only when running 'eunit'
+{eunit_first_files, []}.
+
+%% == Cover ==
+
 %% Whether to enable coverage reporting. Default is `false'
 {cover_enabled, false}.
 
@@ -99,6 +100,12 @@
 
 %% If qc_mod is unspecified, rebar tries to detect Triq or EQC
 {qc_opts, [{qc_mod, module()}, Options]}.
+
+%% Additional compile options for qc. erl_opts is also used
+{qc_compile_opts, []}.
+
+%% Same as erl_first_files, but used only when running 'qc'
+{qc_first_files, []}.
 
 %% == Cleanup ==
 

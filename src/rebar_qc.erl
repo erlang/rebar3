@@ -119,7 +119,7 @@ run(Config, QC, QCOpts) ->
     %% Compile erlang code to ?TEST_DIR, using a tweaked config
     %% with appropriate defines, and include all the test modules
     %% as well.
-    {ok, _SrcErls} = rebar_erlc_compiler:test_compile(Config),
+    {ok, _SrcErls} = rebar_erlc_compiler:test_compile(Config, "qc"),
 
     case CompileOnly of
         "true" ->
