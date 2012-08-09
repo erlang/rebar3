@@ -68,15 +68,27 @@ preprocess(Config, _) ->
     %% If skip_deps=true, mark each dep dir as a skip_dir w/ the core so that
     %% the current command doesn't run on the dep dir. However, pre/postprocess
     %% WILL run (and we want it to) for transitivity purposes.
+    %%
+    %% Also, if skip_deps=comma,separated,app,list, then only the given
+    %% dependencies are skipped.
     NewConfig = case rebar_config:get_global(Config3, skip_deps, false) of
-                    "true" ->
-                        lists:foldl(
-                          fun(#dep{dir = Dir}, C) ->
-                                  rebar_config:set_skip_dir(C, Dir)
-                          end, Config3, AvailableDeps);
-                    _ ->
-                        Config3
-                end,
+        "true" ->
+            lists:foldl(
+                fun(#dep{dir = Dir}, C) ->
+                        rebar_config:set_skip_dir(C, Dir)
+                end, Config3, AvailableDeps);
+        Apps when is_list(Apps) ->
+            SkipApps = [list_to_atom(App) || App <- string:tokens(Apps, ",")],
+            lists:foldl(
+                fun(#dep{dir = Dir, app = App}, C) ->
+                        case lists:member(App, SkipApps) of
+                            true -> rebar_config:set_skip_dir(C, Dir);
+                            false -> C
+                        end
+                end, Config3, AvailableDeps);
+        _ ->
+            Config3
+    end,
 
     %% Return all the available dep directories for process
     {ok, NewConfig, dep_dirs(AvailableDeps)}.
