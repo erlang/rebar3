@@ -45,7 +45,7 @@
          vcs_vsn/3,
          deprecated/3, deprecated/4,
          get_deprecated_global/4, get_deprecated_global/5,
-         get_experimental_global/3,
+         get_experimental_global/3, get_experimental_local/3,
          get_deprecated_list/4, get_deprecated_list/5,
          get_deprecated_local/4, get_deprecated_local/5,
          delayed_halt/1,
@@ -217,28 +217,14 @@ get_deprecated_global(Config, OldOpt, NewOpt, When) ->
     get_deprecated_global(Config, OldOpt, NewOpt, undefined, When).
 
 get_deprecated_global(Config, OldOpt, NewOpt, Default, When) ->
-    case rebar_config:get_global(Config, NewOpt, Default) of
-        Default ->
-            case rebar_config:get_global(Config, OldOpt, Default) of
-                Default ->
-                    Default;
-                Old ->
-                    deprecated(OldOpt, NewOpt, When),
-                    Old
-            end;
-        New ->
-            New
-    end.
+    get_deprecated_3(fun rebar_config:get_global/3,
+                     Config, OldOpt, NewOpt, Default, When).
 
 get_experimental_global(Config, Opt, Default) ->
-    Val = rebar_config:get_global(Config, Opt, Default),
-    case Val of
-        Default ->
-            Default;
-        Val ->
-            ?CONSOLE("NOTICE: Using experimental option '~p'~n", [Opt]),
-            Val
-    end.
+    get_experimental_3(fun rebar_config:get_global/3, Config, Opt, Default).
+
+get_experimental_local(Config, Opt, Default) ->
+    get_experimental_3(fun rebar_config:get_local/3, Config, Opt, Default).
 
 get_deprecated_list(Config, OldOpt, NewOpt, When) ->
     get_deprecated_list(Config, OldOpt, NewOpt, undefined, When).
@@ -348,6 +334,16 @@ get_deprecated_3(Get, Config, OldOpt, NewOpt, Default, When) ->
             end;
         New ->
             New
+    end.
+
+get_experimental_3(Get, Config, Opt, Default) ->
+    Val = Get(Config, Opt, Default),
+    case Val of
+        Default ->
+            Default;
+        Val ->
+            ?CONSOLE("NOTICE: Using experimental option '~p'~n", [Opt]),
+            Val
     end.
 
 %% We do the shell variable substitution ourselves on Windows and hope that the
