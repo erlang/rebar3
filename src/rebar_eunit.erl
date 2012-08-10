@@ -251,7 +251,7 @@ cover_close(F) ->
 cover_init(false, _BeamFiles) ->
     {ok, not_enabled};
 cover_init(true, BeamFiles) ->
-    %% Attempt to start the cover server, then set it's group leader to
+    %% Attempt to start the cover server, then set its group leader to
     %% ?EUNIT_DIR/cover.log, so all cover log messages will go there instead of
     %% to stdout. If the cover server is already started we'll reuse that
     %% pid.
