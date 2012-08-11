@@ -173,6 +173,7 @@ filter_suites1(Modules, Suites) ->
     [M || M <- Modules, lists:member(M, Suites)].
 
 get_tests(Config, SuitesProvided, ModuleBeamFiles, FilteredModules) ->
+    %% TODO: make tests= work with no suites= provided
     case SuitesProvided of
         false ->
             %% No specific suites have been provided, use ModuleBeamFiles
