@@ -31,10 +31,6 @@
                  section_re = undefined,
                  tag_re = undefined}).
 
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
--endif.
-
 compile(Body) when is_list(Body) ->
   State = #mstate{},
   CompiledTemplate = pre_compile(Body, State),
@@ -113,9 +109,9 @@ compile_section(Name, Content, State) ->
   Result = compiler(Content, State),
   "fun() -> " ++
     "case mustache:get(" ++ Name ++ ", Ctx, " ++ atom_to_list(Mod) ++ ") of " ++
-      "true -> " ++
+      "\"true\" -> " ++
         Result ++ "; " ++
-      "false -> " ++
+      "\"false\" -> " ++
         "[]; " ++
       "List when is_list(List) -> " ++
         "[fun(Ctx) -> " ++ Result ++ " end(dict:merge(CFun, SubCtx, Ctx)) || SubCtx <- List]; " ++
@@ -154,9 +150,21 @@ compile_tag("{", Content, State) ->
 compile_tag("!", _Content, _State) ->
   "[]".
 
+template_dir(Mod) ->
+  DefaultDirPath = filename:dirname(code:which(Mod)),
+  case application:get_env(mustache, templates_dir) of
+    {ok, DirPath} when is_list(DirPath) ->
+      case filelib:ensure_dir(DirPath) of
+        ok -> DirPath;
+        _  -> DefaultDirPath
+      end;
+    _ ->
+      DefaultDirPath
+  end.
 template_path(Mod) ->
-  ModPath = code:which(Mod),
-  re:replace(ModPath, "\.beam$", ".mustache", [{return, list}]).
+  DirPath = template_dir(Mod),
+  Basename = atom_to_list(Mod),
+  filename:join(DirPath, Basename ++ ".mustache").
 
 get(Key, Ctx) when is_list(Key) ->
   {ok, Mod} = dict:find('__mod__', Ctx),
@@ -218,17 +226,3 @@ escape([X | Rest], Acc) ->
 start([T]) ->
   Out = render(list_to_atom(T)),
   io:format(Out ++ "~n", []).
-
--ifdef(TEST).
-
-simple_test() ->
-    Ctx = dict:from_list([{name, "world"}]),
-    Result = render("Hello {{name}}!", Ctx),
-    ?assertEqual("Hello world!", Result).
-
-integer_values_too_test() ->
-    Ctx = dict:from_list([{name, "Chris"}, {value, 10000}]),
-    Result = render("Hello {{name}}~nYou have just won ${{value}}!", Ctx),
-    ?assertEqual("Hello Chris~nYou have just won $10000!", Result).
-
--endif.
