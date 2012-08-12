@@ -148,12 +148,13 @@ file_contents(Filename) ->
     {ok, Bin} = file:read_file(Filename),
     Bin.
 
-%% given a filename return zip archive dir entries for each sub-dir
+%% Given a filename, return zip archive dir entries for each sub-dir.
+%% Required to work around issues fixed in OTP-10071.
 dir_entries(File) ->
     Dirs = dirs(File),
     [{Dir ++ "/", <<>>} || Dir <- Dirs].
 
-%% given "foo/bar/baz" return ["foo", "foo/bar", "foo/bar/baz"]
+%% Given "foo/bar/baz", return ["foo", "foo/bar", "foo/bar/baz"].
 dirs(Dir) ->
     dirs1(filename:split(Dir), "", []).
 

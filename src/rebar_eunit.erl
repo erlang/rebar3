@@ -112,6 +112,7 @@ run_eunit(Config, CodePath, SrcErls) ->
     %% Get modules to be run in eunit
     AllModules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- AllBeamFiles],
     {SuitesProvided, FilteredModules} = filter_suites(Config, AllModules),
+    %% TODO: make tests= work with no suites= provided
     Tests = get_tests(Config, SuitesProvided, ModuleBeamFiles, FilteredModules),
 
     SrcModules = [rebar_utils:erl_to_mod(M) || M <- SrcErls],
@@ -173,7 +174,6 @@ filter_suites1(Modules, Suites) ->
     [M || M <- Modules, lists:member(M, Suites)].
 
 get_tests(Config, SuitesProvided, ModuleBeamFiles, FilteredModules) ->
-    %% TODO: make tests= work with no suites= provided
     case SuitesProvided of
         false ->
             %% No specific suites have been provided, use ModuleBeamFiles
