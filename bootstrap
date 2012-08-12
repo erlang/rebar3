@@ -7,15 +7,16 @@ main(Args) ->
     Built = build_time(),
 
     %% Get a string repr of first matching VCS changeset
-    VcsInfo = vcs_info([{hg, ".hg", "hg identify -i"},
-                        {git, ".git", "git describe --always --tags"}]),
+    VcsInfo = vcs_info([{hg, ".hg", "hg identify -i", "hg status"},
+                        {git, ".git", "git describe --always --tags",
+                         "git status -s"}]),
 
     %% Check for force=1 flag to force a rebuild
     case lists:member("force=1", Args) of
         true ->
             rm("ebin/*.beam");
         false ->
-            rm("ebin/rebar_core.beam")
+            rm("ebin/rebar.beam")
     end,
 
     %% Add check for debug flag
@@ -93,10 +94,17 @@ build_time() ->
 
 vcs_info([]) ->
     "No VCS info available.";
-vcs_info([{Id, Dir, Cmd} | Rest]) ->
+vcs_info([{Id, Dir, VsnCmd, StatusCmd} | Rest]) ->
     case filelib:is_dir(Dir) of
         true ->
-            lists:concat([Id, " ", string:strip(os:cmd(Cmd), both, $\n)]);
+            Vsn = string:strip(os:cmd(VsnCmd), both, $\n),
+            Status = case string:strip(os:cmd(StatusCmd), both, $\n) of
+                         [] ->
+                             "";
+                         _ ->
+                             "-dirty"
+                     end,
+            lists:concat([Id, " ", Vsn, Status]);
         false ->
             vcs_info(Rest)
     end.
