@@ -8,3 +8,5 @@ rt.work
 .test
 dialyzer_warnings
 rebar.cmd
+.eunit
+deps
