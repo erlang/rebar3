@@ -257,11 +257,10 @@ doterl_compile(Config, OutDir, MoreSources) ->
     ok = filelib:ensure_dir(filename:join("ebin", "dummy.beam")),
     CurrPath = code:get_path(),
     true = code:add_path(filename:absname("ebin")),
+    OutDir1 = proplists:get_value(outdir, ErlOpts, OutDir),
     rebar_base_compiler:run(Config, NewFirstErls, OtherErls,
                             fun(S, C) ->
-                                    internal_erl_compile(C, S,
-                                                         proplists:get_value(outdir, ErlOpts, OutDir),
-                                                         ErlOpts)
+                                    internal_erl_compile(C, S, OutDir1, ErlOpts)
                             end),
     true = code:set_path(CurrPath),
     ok.
