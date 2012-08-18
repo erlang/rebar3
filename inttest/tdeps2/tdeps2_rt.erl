@@ -38,11 +38,8 @@ run(_Dir) ->
     {ok, _} = retest_sh:run(HgCmd, [{dir, "repo/b"}]),
     {ok, _} = retest_sh:run(HgCmd, [{dir, "repo/c"}]),
 
-
     {ok, _} = retest_sh:run("./rebar -v get-deps compile", []),
     ok.
-
-
 
 %%
 %% Generate the contents of a simple .app file
