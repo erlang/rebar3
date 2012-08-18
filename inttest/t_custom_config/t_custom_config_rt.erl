@@ -11,16 +11,17 @@ files() ->
 
 run(Dir) ->
     retest_log:log(debug, "Running in Dir: ~s~n", [Dir]),
-    Ref = retest:sh("./rebar -C custom.config check-deps -vvv", [{async, true}]),
+    Ref = retest:sh("./rebar -C custom.config check-deps -vvv",
+                    [{async, true}]),
     {ok, Captured} =
         retest:sh_expect(Ref,
                          "DEBUG: Consult config file .*/custom.config.*",
                          [{capture, all, list}]),
     {ok, Missing} =
         retest:sh_expect(Ref,
-                     "DEBUG: Missing deps  : \\[\\{dep,bad_name,"
-                     "boo,\"\\.\",undefined\\}\\]",
-                     [{capture, all, list}]),
+                         "DEBUG: Missing deps  : \\[\\{dep,bad_name,"
+                         "boo,\"\\.\",undefined\\}\\]",
+                         [{capture, all, list}]),
     retest_log:log(debug, "[CAPTURED]: ~s~n", [Captured]),
     retest_log:log(debug, "[Missing]: ~s~n", [Missing]),
     ok.

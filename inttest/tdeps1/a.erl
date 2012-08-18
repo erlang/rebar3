@@ -6,4 +6,3 @@
 
 hello() ->
     io:format("~s\n", [?HELLO]).
-
