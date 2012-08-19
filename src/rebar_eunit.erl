@@ -219,8 +219,17 @@ build_tests(Config, Modules) ->
                 RawTests ->
                     ?CONSOLE("    Running test function(s):~n", []),
                     F = fun({M, F2}, Acc) ->
-                                ?CONSOLE("      ~p:~p/0~n", [M, F2]),
-                                [eunit_test:function_wrapper(M, F2)|Acc]
+                            ?CONSOLE("      ~p:~p/0~n", [M, F2]),
+                            FNameStr = atom_to_list(F2),
+                            NewFunction = case re:run(FNameStr, "_test_") =/= nomatch of
+                                true ->
+                                    %% Generator
+                                    {generator, eunit_test:function_wrapper(M, F2)};
+                                _ ->
+                                    %% Normal test
+                                    eunit_test:function_wrapper(M, F2)
+                            end,
+                            [NewFunction|Acc]
                         end,
                     lists:foldl(F, [], RawTests)
             end

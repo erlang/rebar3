@@ -118,6 +118,24 @@ eunit_with_suites_and_tests_test_() ->
                {"Selected suite tests is run once",
                 ?_assert(string:str(RebarOut, "Test passed") =/= 0)}]
       end},
+     {"Ensure EUnit runs a specific generator test defined in a selected suite",
+      setup, fun() ->
+                     setup_project_with_multiple_modules(),
+                     rebar("-v eunit suites=myapp_mymod3 tests=mygenerator")
+             end,
+      fun teardown/1,
+      fun(RebarOut) ->
+              [{"Selected suite's generator test is found and run",
+                ?_assert(string:str(RebarOut,
+                                    "myapp_mymod3:mygenerator_test_/0") =/= 0)},
+
+                {"Selected suite's generator test raises an error",
+                ?_assert(string:str(RebarOut,
+                                    "assertEqual_failed") =/= 0)},
+
+               {"Selected suite tests is run once",
+                ?_assert(string:str(RebarOut, "Failed: 1.") =/= 0)}]
+      end},
      {"Ensure EUnit runs specific tests defined in selected suites",
       setup, fun() ->
                      setup_project_with_multiple_modules(),
@@ -289,6 +307,13 @@ basic_setup_test_() ->
          "myfunc2_test() -> ?assertMatch(ok, myapp_mymod2:myfunc2()).\n",
          "common_name_test() -> ?assert(true).\n"]).
 
+-define(myapp_mymod3,
+        ["-module(myapp_mymod3).\n",
+         "-export([myfunc3/0]).\n",
+         "-include_lib(\"eunit/include/eunit.hrl\").\n",
+         "myfunc3() -> ok.\n",
+         "mygenerator_test_() -> [?_assertEqual(true, false)].\n"]).
+
 -define(mysuite,
         ["-module(mysuite).\n",
          "-export([all_test_/0]).\n",
@@ -320,7 +345,8 @@ setup_basic_project() ->
 setup_project_with_multiple_modules() ->
     setup_basic_project(),
     ok = file:write_file("test/myapp_mymod2_tests.erl", ?myapp_mymod2_tests),
-    ok = file:write_file("src/myapp_mymod2.erl", ?myapp_mymod2).
+    ok = file:write_file("src/myapp_mymod2.erl", ?myapp_mymod2),
+    ok = file:write_file("src/myapp_mymod3.erl", ?myapp_mymod3).
 
 setup_cover_project() ->
     setup_basic_project(),
