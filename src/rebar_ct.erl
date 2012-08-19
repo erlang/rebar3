@@ -59,7 +59,7 @@ run_test_if_present(TestDir, LogDir, Config, File) ->
             ?WARN("~s directory not present - skipping\n", [TestDir]),
             ok;
         true ->
-            case filelib:wildcard(TestDir ++ "/*_SUITE.erl") of
+            case filelib:wildcard(TestDir ++ "/*_SUITE.{beam,erl}") of
                 [] ->
                     ?WARN("~s directory present, but no common_test"
                        ++ " SUITES - skipping\n", [TestDir]),
