@@ -300,6 +300,11 @@ generate-appups   previous_release=path  Generate appup files
 eunit       [suites=foo]             Run eunit tests [foo.erl and test/foo_tests.erl]
             [suites=foo] [tests=bar] Run specific eunit tests [first test name starting
                                      with 'bar' in foo.erl and test/foo_tests.erl]
+            [tests=bar]              For every existing suite, run the first test whose
+                                     name starts with bar and, if no such test exists,
+                                     run the test whose name starts with bar in
+                                     the suite's _tests module
+
 ct          [suites=] [case=]        Run common_test suites
 
 qc                                   Test QuickCheck properties

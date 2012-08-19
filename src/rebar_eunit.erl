@@ -51,6 +51,12 @@
 %%      suites="foo,bar" tests="baz"- runs first test with name starting
 %%      with 'baz' in foo.erl, test/foo_tests.erl and tests in bar.erl,
 %%      test/bar_tests.erl
+%%   </li>
+%%   <li>
+%%      tests="baz"- For every existing suite, run the first test whose
+%%      name starts with bar and, if no such test exists, run the test
+%%      whose name starts with bar in the suite's _tests module
+%%   </li>
 %% </ul>
 %% Additionally, for projects that have separate folders for the core
 %% implementation, and for the unit tests, then the following
@@ -112,7 +118,8 @@ run_eunit(Config, CodePath, SrcErls) ->
     %% Get modules to be run in eunit
     AllModules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- AllBeamFiles],
     {SuitesProvided, FilteredModules} = filter_suites(Config, AllModules),
-    %% TODO: make tests= work with no suites= provided
+
+    %% build the tests
     Tests = get_tests(Config, SuitesProvided, ModuleBeamFiles, FilteredModules),
 
     SrcModules = [rebar_utils:erl_to_mod(M) || M <- SrcErls],
@@ -174,7 +181,7 @@ filter_suites1(Modules, Suites) ->
     [M || M <- Modules, lists:member(M, Suites)].
 
 get_tests(Config, SuitesProvided, ModuleBeamFiles, FilteredModules) ->
-    case SuitesProvided of
+    Modules = case SuitesProvided of
         false ->
             %% No specific suites have been provided, use ModuleBeamFiles
             %% which filters out "*_tests" modules so eunit won't doubly run
@@ -194,18 +201,19 @@ get_tests(Config, SuitesProvided, ModuleBeamFiles, FilteredModules) ->
             %% public interface of the main module (and no other code)."
             [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- ModuleBeamFiles];
         true ->
-            %% Specific suites have been provided, return the existing modules
-            build_tests(Config, FilteredModules)
-    end.
+            %% Specific suites have been provided, return the filtered modules
+            FilteredModules
+    end,
+    build_tests(Config, Modules).
 
-build_tests(Config, SuitesModules) ->
+build_tests(Config, Modules) ->
     RawFunctions = rebar_utils:get_experimental_global(Config, tests, ""),
     Tests = [list_to_atom(F1) || F1 <- string:tokens(RawFunctions, ",")],
     case Tests of
         [] ->
-            SuitesModules;
+            Modules;
         Functions ->
-            case build_tests1(SuitesModules, Functions, []) of
+            case build_tests1(Modules, Functions, []) of
                 [] ->
                     [];
                 RawTests ->
