@@ -129,7 +129,7 @@ eunit_with_suites_and_tests_test_() ->
                 ?_assert(string:str(RebarOut,
                                     "myapp_mymod3:mygenerator_test_/0") =/= 0)},
 
-                {"Selected suite's generator test raises an error",
+               {"Selected suite's generator test raises an error",
                 ?_assert(string:str(RebarOut,
                                     "assertEqual_failed") =/= 0)},
 

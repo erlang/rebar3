@@ -119,7 +119,7 @@ run_eunit(Config, CodePath, SrcErls) ->
     AllModules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- AllBeamFiles],
     {SuitesProvided, FilteredModules} = filter_suites(Config, AllModules),
 
-    %% build the tests
+    %% Get matching tests
     Tests = get_tests(Config, SuitesProvided, ModuleBeamFiles, FilteredModules),
 
     SrcModules = [rebar_utils:erl_to_mod(M) || M <- SrcErls],
@@ -169,6 +169,10 @@ setup_code_path() ->
     true = code:add_pathz(rebar_utils:ebin_dir()),
     CodePath.
 
+%%
+%% == filter suites ==
+%%
+
 filter_suites(Config, Modules) ->
     RawSuites = rebar_config:get_global(Config, suites, ""),
     SuitesProvided = RawSuites =/= "",
@@ -180,65 +184,59 @@ filter_suites1(Modules, []) ->
 filter_suites1(Modules, Suites) ->
     [M || M <- Modules, lists:member(M, Suites)].
 
+%%
+%% == get matching tests ==
+%%
 get_tests(Config, SuitesProvided, ModuleBeamFiles, FilteredModules) ->
     Modules = case SuitesProvided of
-        false ->
-            %% No specific suites have been provided, use ModuleBeamFiles
-            %% which filters out "*_tests" modules so eunit won't doubly run
-            %% them and cover only calculates coverage on production code.
-            %% However, keep "*_tests" modules that are not automatically
-            %% included by eunit.
-            %%
-            %% From 'Primitives' in the EUnit User's Guide
-            %% http://www.erlang.org/doc/apps/eunit/chapter.html
-            %% "In addition, EUnit will also look for another module whose
-            %% name is ModuleName plus the suffix _tests, and if it exists,
-            %% all the tests from that module will also be added. (If
-            %% ModuleName already contains the suffix _tests, this is not
-            %% done.) E.g., the specification {module, mymodule} will run all
-            %% tests in the modules mymodule and mymodule_tests. Typically,
-            %% the _tests module should only contain test cases that use the
-            %% public interface of the main module (and no other code)."
-            [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- ModuleBeamFiles];
-        true ->
-            %% Specific suites have been provided, return the filtered modules
-            FilteredModules
-    end,
-    build_tests(Config, Modules).
+                  false ->
+                      %% No specific suites have been provided, use
+                      %% ModuleBeamFiles which filters out "*_tests" modules
+                      %% so eunit won't doubly run them and cover only
+                      %% calculates coverage on production code. However,
+                      %% keep "*_tests" modules that are not automatically
+                      %% included by eunit.
+                      %%
+                      %% From 'Primitives' in the EUnit User's Guide
+                      %% http://www.erlang.org/doc/apps/eunit/chapter.html
+                      %% "In addition, EUnit will also look for another
+                      %% module whose name is ModuleName plus the suffix
+                      %% _tests, and if it exists, all the tests from that
+                      %% module will also be added. (If ModuleName already
+                      %% contains the suffix _tests, this is not done.) E.g.,
+                      %% the specification {module, mymodule} will run all
+                      %% tests in the modules mymodule and mymodule_tests.
+                      %% Typically, the _tests module should only contain
+                      %% test cases that use the public interface of the main
+                      %% module (and no other code)."
+                      [rebar_utils:beam_to_mod(?EUNIT_DIR, N) ||
+                          N <- ModuleBeamFiles];
+                  true ->
+                      %% Specific suites have been provided, return the
+                      %% filtered modules
+                      FilteredModules
+              end,
+    get_matching_tests(Config, Modules).
 
-build_tests(Config, Modules) ->
+get_matching_tests(Config, Modules) ->
     RawFunctions = rebar_utils:get_experimental_global(Config, tests, ""),
     Tests = [list_to_atom(F1) || F1 <- string:tokens(RawFunctions, ",")],
     case Tests of
         [] ->
             Modules;
         Functions ->
-            case build_tests1(Modules, Functions, []) of
+            case get_matching_tests1(Modules, Functions, []) of
                 [] ->
                     [];
                 RawTests ->
-                    ?CONSOLE("    Running test function(s):~n", []),
-                    F = fun({M, F2}, Acc) ->
-                            ?CONSOLE("      ~p:~p/0~n", [M, F2]),
-                            FNameStr = atom_to_list(F2),
-                            NewFunction = case re:run(FNameStr, "_test_") =/= nomatch of
-                                true ->
-                                    %% Generator
-                                    {generator, eunit_test:function_wrapper(M, F2)};
-                                _ ->
-                                    %% Normal test
-                                    eunit_test:function_wrapper(M, F2)
-                            end,
-                            [NewFunction|Acc]
-                        end,
-                    lists:foldl(F, [], RawTests)
+                    make_test_wrappers(RawTests)
             end
     end.
 
-build_tests1([], _Functions, TestFunctions) ->
+get_matching_tests1([], _Functions, TestFunctions) ->
     TestFunctions;
 
-build_tests1([Module|TModules], Functions, TestFunctions) ->
+get_matching_tests1([Module|TModules], Functions, TestFunctions) ->
     %% Get module exports
     ModuleStr = atom_to_list(Module),
     ModuleExports = get_beam_test_exports(ModuleStr),
@@ -246,11 +244,12 @@ build_tests1([Module|TModules], Functions, TestFunctions) ->
     TestModuleStr = string:concat(ModuleStr, "_tests"),
     TestModuleExports = get_beam_test_exports(TestModuleStr),
     %% Build tests {M, F} list
-    Tests = build_tests2(Functions, {Module, ModuleExports},
+    Tests = get_matching_tests2(Functions, {Module, ModuleExports},
                          {list_to_atom(TestModuleStr), TestModuleExports}),
-    build_tests1(TModules, Functions, lists:merge([TestFunctions, Tests])).
+    get_matching_tests1(TModules, Functions,
+                        lists:merge([TestFunctions, Tests])).
 
-build_tests2(Functions, {Mod, ModExports}, {TestMod, TestModExports}) ->
+get_matching_tests2(Functions, {Mod, ModExports}, {TestMod, TestModExports}) ->
     %% Look for matching functions into ModExports
     ModExportsStr = [atom_to_list(E1) || E1 <- ModExports],
     TestModExportsStr = [atom_to_list(E2) || E2 <- TestModExports],
@@ -308,6 +307,34 @@ get_beam_test_exports(ModuleStr) ->
             []
     end.
 
+make_test_wrappers(RawTests) ->
+    ?CONSOLE("    Running test function(s):~n", []),
+    F = fun({M, F2}, Acc) ->
+                ?CONSOLE("      ~p:~p/0~n", [M, F2]),
+                FNameStr = atom_to_list(F2),
+                NewFunction =
+                    case re:run(FNameStr, "_test_") of
+                        nomatch ->
+                            %% Normal test
+                            eunit_test(M, F2);
+                        _ ->
+                            %% Generator
+                            eunit_generator(M, F2)
+                    end,
+                [NewFunction|Acc]
+        end,
+    lists:foldl(F, [], RawTests).
+
+eunit_test(M, F) ->
+    eunit_test:function_wrapper(M, F).
+
+eunit_generator(M, F) ->
+    {generator, eunit_test:function_wrapper(M, F)}.
+
+%%
+%% == run tests ==
+%%
+
 perform_eunit(Config, Tests) ->
     EunitOpts = get_eunit_opts(Config),
 
@@ -333,6 +360,10 @@ get_eunit_opts(Config) ->
                end,
 
     BaseOpts ++ rebar_config:get_list(Config, eunit_opts, []).
+
+%%
+%% == code coverage ==
+%%
 
 perform_cover(Config, BeamFiles, SrcModules) ->
     perform_cover(rebar_config:get(Config, cover_enabled, false),
@@ -486,7 +517,7 @@ cover_write_index(Coverage, SrcModules) ->
 cover_write_index_section(_F, _SectionName, []) ->
     ok;
 cover_write_index_section(F, SectionName, Coverage) ->
-    %% Calculate total coverage %
+    %% Calculate total coverage
     {Covered, NotCovered} = lists:foldl(fun({_Mod, C, N}, {CAcc, NAcc}) ->
                                                 {CAcc + C, NAcc + N}
                                         end, {0, 0}, Coverage),
@@ -548,13 +579,17 @@ percentage(0, 0) ->
 percentage(Cov, NotCov) ->
     integer_to_list(trunc((Cov / (Cov + NotCov)) * 100)) ++ "%".
 
-get_app_names() ->
-    [AppName || {AppName, _, _} <- application:loaded_applications()].
+%%
+%% == reset_after_eunit ==
+%%
 
 status_before_eunit() ->
     Apps = get_app_names(),
     AppEnvs = [{App, application:get_all_env(App)} || App <- Apps],
     {erlang:processes(), erlang:is_alive(), AppEnvs, ets:tab2list(ac_tab)}.
+
+get_app_names() ->
+    [AppName || {AppName, _, _} <- application:loaded_applications()].
 
 reset_after_eunit({OldProcesses, WasAlive, OldAppEnvs, _OldACs}) ->
     IsAlive = erlang:is_alive(),
