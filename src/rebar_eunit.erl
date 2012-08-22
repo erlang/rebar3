@@ -245,7 +245,7 @@ get_matching_tests1([Module|TModules], Functions, TestFunctions) ->
     TestModuleExports = get_beam_test_exports(TestModuleStr),
     %% Build tests {M, F} list
     Tests = get_matching_tests2(Functions, {Module, ModuleExports},
-                         {list_to_atom(TestModuleStr), TestModuleExports}),
+                                {list_to_atom(TestModuleStr), TestModuleExports}),
     get_matching_tests1(TModules, Functions,
                         lists:merge([TestFunctions, Tests])).
 
