@@ -44,7 +44,7 @@
 xref(Config, _) ->
     %% Spin up xref
     {ok, _} = xref:start(xref),
-    ok = xref:set_library_path(xref, code_path()),
+    ok = xref:set_library_path(xref, code_path(Config)),
 
     xref:set_default(xref, [{warnings,
                              rebar_config:get(Config, xref_warnings, false)},
@@ -132,9 +132,12 @@ check_query({Query, Value}) ->
             true
     end.
 
-code_path() ->
-    [P || P <- code:get_path(),
-          filelib:is_dir(P)] ++ [filename:join(rebar_utils:get_cwd(), "ebin")].
+code_path(Config) ->
+    BaseDir = rebar_config:get_xconf(Config, base_dir),
+    [P || P <- code:get_path() ++
+              [filename:join(BaseDir, filename:join(SubDir, "ebin"))
+               || SubDir <- rebar_config:get(Config, sub_dirs, [])],
+          filelib:is_dir(P)].
 
 %%
 %% Ignore behaviour functions, and explicitly marked functions
