@@ -140,6 +140,10 @@ run_eunit(Config, CodePath, SrcErls) ->
             ok
     end,
 
+    %% Stop cover to clean the cover_server state. This is important if we want
+    %% eunit+cover to not slow down when analyzing many Erlang modules.
+    ok = cover:stop(),
+
     case EunitResult of
         ok ->
             ok;
@@ -418,16 +422,16 @@ cover_init(false, _BeamFiles) ->
     {ok, not_enabled};
 cover_init(true, BeamFiles) ->
     %% Attempt to start the cover server, then set its group leader to
-    %% ?EUNIT_DIR/cover.log, so all cover log messages will go there instead of
-    %% to stdout. If the cover server is already started we'll reuse that
-    %% pid.
-    {ok, CoverPid} = case cover:start() of
-                         {ok, _P} = OkStart ->
-                             OkStart;
-                         {error,{already_started, P}} ->
-                             {ok, P};
-                         {error, _Reason} = ErrorStart ->
-                             ErrorStart
+    %% .eunit/cover.log, so all cover log messages will go there instead of
+    %% to stdout. If the cover server is already started, we'll kill that
+    %% server and start a new one in order not to inherit a polluted
+    %% cover_server state.
+    {ok, CoverPid} = case whereis(cover_server) of
+                         undefined ->
+                             cover:start();
+                         _         ->
+                             cover:stop(),
+                             cover:start()
                      end,
 
     {ok, F} = OkOpen = file:open(
@@ -435,9 +439,6 @@ cover_init(true, BeamFiles) ->
                          [write]),
 
     group_leader(F, CoverPid),
-
-    %% Make sure any previous runs of cover don't unduly influence
-    cover:reset(),
 
     ?INFO("Cover compiling ~s\n", [rebar_utils:get_cwd()]),
 
