@@ -28,7 +28,8 @@
 
 %% -------------------------------------------------------------------
 %% This module borrows heavily from http://github.com/etnt/exrefcheck project as
-%% written by Torbjorn Tornkvist <tobbe@kreditor.se>, Daniel Luna and others.
+%% written by Torbjorn Tornkvist <tobbe@kreditor.se>, Daniel Luna
+%% <daniel@lunas.se> and others.
 %% -------------------------------------------------------------------
 -module(rebar_xref).
 
