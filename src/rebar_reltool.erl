@@ -156,8 +156,6 @@ load_vars_file(File) ->
             ?ABORT("Unable to load overlay_vars from ~p: ~p\n", [File, Reason])
     end.
 
-
-
 validate_rel_apps(ReltoolServer, {sys, ReltoolConfig}) ->
     case lists:keyfind(rel, 1, ReltoolConfig) of
         false ->
@@ -189,7 +187,6 @@ app_exists(App, Server) when is_atom(App) ->
     end;
 app_exists(AppTuple, Server) when is_tuple(AppTuple) ->
     app_exists(element(1, AppTuple), Server).
-
 
 run_reltool(Server, Config, ReltoolConfig) ->
     case reltool:get_target_spec(Server) of
@@ -224,7 +221,6 @@ run_reltool(Server, Config, ReltoolConfig) ->
             ?ABORT("Unable to generate spec: ~s\n", [Reason])
     end.
 
-
 mk_target_dir(Config, TargetDir) ->
     case filelib:ensure_dir(filename:join(TargetDir, "dummy")) of
         ok ->
@@ -245,7 +241,6 @@ mk_target_dir(Config, TargetDir) ->
                    [TargetDir, file:format_error(Reason)]),
             ?FAIL
     end.
-
 
 dump_spec(Config, Spec) ->
     case rebar_config:get_global(Config, dump_spec, "0") of
