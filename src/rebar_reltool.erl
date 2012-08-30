@@ -344,10 +344,22 @@ apply_file_info(InFile, OutFile) ->
 
 create_RELEASES(TargetDir, RelName, RelVsn) ->
     ReleasesDir = filename:join(TargetDir, "releases"),
+    RelFile = filename:join([ReleasesDir, RelVsn, RelName ++ ".rel"]),
+    Apps = rebar_rel_utils:get_rel_apps(RelFile),
+    TargetLib = filename:join(TargetDir,"lib"),
+
+    AppDirs =
+        [ {App, Vsn, TargetLib}
+          || {App, Vsn} <- Apps,
+             filelib:is_dir(
+               filename:join(TargetLib,
+                             lists:concat([App, "-", Vsn]))) ],
+
     case release_handler:create_RELEASES(
-           ".", ReleasesDir,
-           filename:join([ReleasesDir, RelVsn, RelName ++ ".rel"]),
-           filename:join(TargetDir, "lib")) of
+           code:root_dir(),
+           ReleasesDir,
+           RelFile,
+           AppDirs) of
         ok ->
             ok;
         {error, Reason} ->
