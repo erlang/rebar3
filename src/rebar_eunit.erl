@@ -313,6 +313,13 @@ get_beam_test_exports(ModuleStr) ->
     end.
 
 make_test_wrappers(RawTests) ->
+    %% eunit_test:function_wrapper/2 was renamed to mf_wrapper/2 in R15B02
+    {module, eunit_test} = code:ensure_loaded(eunit_test),
+    WrapperFun = case erlang:function_exported(eunit_test, mf_wrapper, 2) of
+                     true  -> fun eunit_test:mf_wrapper/2;
+                     false -> fun eunit_test:function_wrapper/2
+                 end,
+
     ?CONSOLE("    Running test function(s):~n", []),
     F = fun({M, F2}, Acc) ->
                 ?CONSOLE("      ~p:~p/0~n", [M, F2]),
@@ -321,20 +328,20 @@ make_test_wrappers(RawTests) ->
                     case re:run(FNameStr, "_test_") of
                         nomatch ->
                             %% Normal test
-                            eunit_test(M, F2);
+                            eunit_test(WrapperFun, M, F2);
                         _ ->
                             %% Generator
-                            eunit_generator(M, F2)
+                            eunit_generator(WrapperFun, M, F2)
                     end,
                 [NewFunction|Acc]
         end,
     lists:foldl(F, [], RawTests).
 
-eunit_test(M, F) ->
-    eunit_test:function_wrapper(M, F).
+eunit_test(WrapperFun, M, F) ->
+    WrapperFun(M, F).
 
-eunit_generator(M, F) ->
-    {generator, eunit_test:function_wrapper(M, F)}.
+eunit_generator(WrapperFun, M, F) ->
+    {generator, WrapperFun(M, F)}.
 
 %%
 %% == run tests ==
