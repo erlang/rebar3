@@ -519,15 +519,10 @@ default_env() ->
      {"darwin9.*-64$", "CXXFLAGS", "-m64 $CXXFLAGS"},
      {"darwin9.*-64$", "LDFLAGS", "-arch x86_64 $LDFLAGS"},
 
-     %% OS X Snow Leopard flags for 32-bit
-     {"darwin10.*-32", "CFLAGS", "-m32 $CFLAGS"},
-     {"darwin10.*-32", "CXXFLAGS", "-m32 $CXXFLAGS"},
-     {"darwin10.*-32", "LDFLAGS", "-arch i386 $LDFLAGS"},
-
-     %% OS X Lion flags for 32-bit
-     {"darwin11.*-32", "CFLAGS", "-m32 $CFLAGS"},
-     {"darwin11.*-32", "CXXFLAGS", "-m32 $CXXFLAGS"},
-     {"darwin11.*-32", "LDFLAGS", "-arch i386 $LDFLAGS"},
+     %% OS X Snow Leopard, Lion, and Mountain Lion flags for 32-bit
+     {"darwin1[0-2].*-32", "CFLAGS", "-m32 $CFLAGS"},
+     {"darwin1[0-2].*-32", "CXXFLAGS", "-m32 $CXXFLAGS"},
+     {"darwin1[0-2].*-32", "LDFLAGS", "-arch i386 $LDFLAGS"},
 
      %% Windows specific flags
      %% add MS Visual C++ support to rebar on Windows
