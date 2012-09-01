@@ -314,6 +314,7 @@ get_beam_test_exports(ModuleStr) ->
 
 make_test_wrappers(RawTests) ->
     %% eunit_test:function_wrapper/2 was renamed to mf_wrapper/2 in R15B02
+    %% TODO: remove check/fallback once at least R15B02 is required
     {module, eunit_test} = code:ensure_loaded(eunit_test),
     WrapperFun = case erlang:function_exported(eunit_test, mf_wrapper, 2) of
                      true  -> fun eunit_test:mf_wrapper/2;
