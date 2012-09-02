@@ -72,16 +72,15 @@ run_test_if_present(TestDir, LogDir, Config, File) ->
 run_test(TestDir, LogDir, Config, _File) ->
     {Cmd, RawLog} = make_cmd(TestDir, LogDir, Config),
     clear_log(LogDir, RawLog),
-    case rebar_config:is_verbose(Config) of
-        false ->
-            Output = " >> " ++ RawLog ++ " 2>&1";
-        true ->
-            Output = " 2>&1 | tee -a " ++ RawLog
-    end,
+    Output = case rebar_config:is_verbose(Config) of
+                 false ->
+                     " >> " ++ RawLog ++ " 2>&1";
+                 true ->
+                     " 2>&1 | tee -a " ++ RawLog
+             end,
 
     rebar_utils:sh(Cmd ++ Output, [{env,[{"TESTDIR", TestDir}]}]),
     check_log(Config, RawLog).
-
 
 clear_log(LogDir, RawLog) ->
     case filelib:ensure_dir(filename:join(LogDir, "index.html")) of
