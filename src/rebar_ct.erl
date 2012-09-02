@@ -71,6 +71,7 @@ run_test_if_present(TestDir, LogDir, Config, File) ->
 
 run_test(TestDir, LogDir, Config, _File) ->
     {Cmd, RawLog} = make_cmd(TestDir, LogDir, Config),
+    ?DEBUG("ct_run cmd:~n~p~n", [Cmd]),
     clear_log(LogDir, RawLog),
     Output = case rebar_config:is_verbose(Config) of
                  false ->
