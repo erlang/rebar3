@@ -6,7 +6,7 @@
 files() ->
     [{create, "ebin/foo.app", app(foo)},
      {copy, "../../rebar", "rebar"},
-     {copy, "foo.test.spec", "test/foo.test.spec"},
+     {copy, "foo.test.spec", "foo.test.spec"},
      {copy, "foo_SUITE.erl", "test/foo_SUITE.erl"}].
 
 run(_Dir) ->
