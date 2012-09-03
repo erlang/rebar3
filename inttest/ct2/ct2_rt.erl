@@ -10,7 +10,7 @@ files() ->
      {copy, "foo_SUITE.erl", "test/foo_SUITE.erl"}].
 
 run(_Dir) ->
-    {ok, _} = retest:sh("./rebar compile ct -v"),
+    {ok, _} = retest:sh("./rebar compile ct -vvv"),
     ok.
 
 %%
