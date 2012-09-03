@@ -233,7 +233,7 @@ get_matching_tests(Config, Modules) ->
                 [] ->
                     [];
                 RawTests ->
-                    make_test_wrappers(RawTests)
+                    make_test_primitives(RawTests)
             end
     end.
 
@@ -312,14 +312,18 @@ get_beam_test_exports(ModuleStr) ->
             []
     end.
 
-make_test_wrappers(RawTests) ->
-    %% eunit_test:function_wrapper/2 was renamed to mf_wrapper/2 in R15B02
-    %% TODO: remove check/fallback once at least R15B02 is required
+make_test_primitives(RawTests) ->
+    %% Use {test,M,F} and {generator,M,F} if at least R15B02. Otherwise,
+    %% use eunit_test:function_wrapper/2 fallback.
+    %% eunit_test:function_wrapper/2 was renamed to eunit_test:mf_wrapper/2
+    %% in R15B02; use that as >= R15B02 check.
+    %% TODO: remove fallback and use only {test,M,F} and {generator,M,F}
+    %% primitives once at least R15B02 is required.
     {module, eunit_test} = code:ensure_loaded(eunit_test),
-    WrapperFun = case erlang:function_exported(eunit_test, mf_wrapper, 2) of
-                     true  -> fun eunit_test:mf_wrapper/2;
-                     false -> fun eunit_test:function_wrapper/2
-                 end,
+    MakePrimitive = case erlang:function_exported(eunit_test, mf_wrapper, 2) of
+                        true  -> fun eunit_primitive/3;
+                        false -> fun pre15b02_eunit_primitive/3
+                    end,
 
     ?CONSOLE("    Running test function(s):~n", []),
     F = fun({M, F2}, Acc) ->
@@ -329,20 +333,22 @@ make_test_wrappers(RawTests) ->
                     case re:run(FNameStr, "_test_") of
                         nomatch ->
                             %% Normal test
-                            eunit_test(WrapperFun, M, F2);
+                            MakePrimitive(test, M, F2);
                         _ ->
                             %% Generator
-                            eunit_generator(WrapperFun, M, F2)
+                            MakePrimitive(generator, M, F2)
                     end,
                 [NewFunction|Acc]
         end,
     lists:foldl(F, [], RawTests).
 
-eunit_test(WrapperFun, M, F) ->
-    WrapperFun(M, F).
+eunit_primitive(Type, M, F) ->
+    {Type, M, F}.
 
-eunit_generator(WrapperFun, M, F) ->
-    {generator, WrapperFun(M, F)}.
+pre15b02_eunit_primitive(test, M, F) ->
+    eunit_test:function_wrapper(M, F);
+pre15b02_eunit_primitive(generator, M, F) ->
+    {generator, eunit_test:function_wrapper(M, F)}.
 
 %%
 %% == run tests ==
