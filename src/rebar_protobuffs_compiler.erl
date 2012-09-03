@@ -35,7 +35,7 @@
 %% Public API
 %% ===================================================================
 
-compile(_Config, _AppFile) ->
+compile(Config, _AppFile) ->
     case rebar_utils:find_files("src", ".*\\.proto$") of
         [] ->
             ok;
@@ -49,7 +49,7 @@ compile(_Config, _AppFile) ->
                                   Proto <- FoundFiles],
 
                     %% Compile each proto file
-                    compile_each(Targets);
+                    compile_each(Config, Targets);
                 false ->
                     ?ERROR("Protobuffs library not present in code path!\n",
                            []),
@@ -95,13 +95,15 @@ needs_compile(Proto, Beam) ->
     ActualBeam = filename:join(["ebin", filename:basename(Beam)]),
     filelib:last_modified(ActualBeam) < filelib:last_modified(Proto).
 
-compile_each([]) ->
+compile_each(_, []) ->
     ok;
-compile_each([{Proto, Beam, Hrl} | Rest]) ->
+compile_each(Config, [{Proto, Beam, Hrl} | Rest]) ->
     case needs_compile(Proto, Beam) of
         true ->
             ?CONSOLE("Compiling ~s\n", [Proto]),
-            case protobuffs_compile:scan_file(Proto) of
+            ErlOpts = rebar_utils:erl_opts(Config),
+            case protobuffs_compile:scan_file(Proto,
+                                              [{compile_flags,ErlOpts}]) of
                 ok ->
                     %% Compilation worked, but we need to move the
                     %% beam and .hrl file into the ebin/ and include/
@@ -120,7 +122,7 @@ compile_each([{Proto, Beam, Hrl} | Rest]) ->
         false ->
             ok
     end,
-    compile_each(Rest).
+    compile_each(Config, Rest).
 
 delete_each([]) ->
     ok;
