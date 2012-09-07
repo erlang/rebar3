@@ -138,7 +138,7 @@ load_app_file(Config, Filename) ->
     AppFile = {app_file, Filename},
     case rebar_config:get_xconf(Config, {appfile, AppFile}, undefined) of
         undefined ->
-            case file:consult(Filename) of
+            case consult_app_file(Filename) of
                 {ok, [{application, AppName, AppData}]} ->
                     Config1 = rebar_config:set_xconf(Config,
                                                      {appfile, AppFile},
@@ -151,6 +151,28 @@ load_app_file(Config, Filename) ->
             end;
         {AppName, AppData} ->
             {ok, Config, AppName, AppData}
+    end.
+
+%% In the case of *.app.src we want to give the user the ability to
+%% dynamically script the application resource file (think dynamic version
+%% string, etc.), in a way similar to what can be done with the rebar
+%% config. However, in the case of *.app, rebar should not manipulate
+%% that file. This enforces that dichotomy between app and app.src.
+consult_app_file(Filename) ->
+    case lists:suffix(".app.src", Filename) of
+        false ->
+            file:consult(Filename);
+        true ->
+            %% TODO: EXPERIMENTAL For now let's warn the user if a
+            %% script is going to be run.
+            case filelib:is_regular([Filename, ".script"]) of
+                true ->
+                    ?CONSOLE("NOTICE: Using experimental *.app.src.script "
+                             "functionality on ~s ~n", [Filename]);
+                _ ->
+                    ok
+            end,
+            rebar_config:consult_file(Filename)
     end.
 
 get_value(Key, AppInfo, AppFile) ->
