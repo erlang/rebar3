@@ -397,7 +397,9 @@ cover_analyze(_Config, [], _SrcModules) ->
     ok;
 cover_analyze(Config, FilteredModules, SrcModules) ->
     %% Generate coverage info for all the cover-compiled modules
-    Coverage = lists:flatten([cover_analyze_mod(M) || M <- FilteredModules]),
+    Coverage = lists:flatten([cover_analyze_mod(M)
+                              || M <- FilteredModules,
+                                 cover:is_compiled(M) =/= false]),
 
     %% Write index of coverage info
     cover_write_index(lists:sort(Coverage), SrcModules),

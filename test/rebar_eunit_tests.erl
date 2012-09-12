@@ -198,13 +198,18 @@ cover_test_() ->
      setup, fun() -> setup_cover_project(), rebar("-v eunit") end,
      fun teardown/1,
 
-     [{"All cover reports are generated",
-       assert_files_in("the temporary eunit directory",
-                       expected_cover_generated_files())},
+     fun(RebarOut) ->
+             [{"Error messages are not present",
+               ?_assert(string:str(RebarOut, "Cover analyze failed for") =:= 0)},
 
-      {"Only production modules get coverage reports",
-       assert_files_not_in("the temporary eunit directory",
-                           [".eunit/myapp_mymod_tests.COVER.html"])}]}.
+              {"All cover reports are generated",
+               assert_files_in("the temporary eunit directory",
+                               expected_cover_generated_files())},
+
+              {"Only production modules get coverage reports",
+               assert_files_not_in("the temporary eunit directory",
+                                   [".eunit/myapp_mymod_tests.COVER.html"])}]
+     end}.
 
 cover_with_suite_test_() ->
     {"Ensure Cover runs with Tests in a test dir and a test suite",
@@ -215,17 +220,22 @@ cover_with_suite_test_() ->
      end,
      fun teardown/1,
 
-     [{"Cover reports are generated for module",
-       assert_files_in("the temporary eunit directory",
-                       [".eunit/index.html",
-                        ".eunit/mysuite.COVER.html"])},
+     fun(RebarOut) ->
+             [{"Error messages are not present",
+               ?_assert(string:str(RebarOut, "Cover analyze failed for") =:= 0)},
 
-      {"Only production modules get coverage reports",
-       assert_files_not_in("the temporary eunit directory",
-                           [".eunit/myapp_app.COVER.html",
-                            ".eunit/myapp_mymod.COVER.html",
-                            ".eunit/myapp_sup.COVER.html",
-                            ".eunit/myapp_mymod_tests.COVER.html"])}]}.
+              {"Cover reports are generated for module",
+               assert_files_in("the temporary eunit directory",
+                               [".eunit/index.html",
+                                ".eunit/mysuite.COVER.html"])},
+
+              {"Only production modules get coverage reports",
+               assert_files_not_in("the temporary eunit directory",
+                                   [".eunit/myapp_app.COVER.html",
+                                    ".eunit/myapp_mymod.COVER.html",
+                                    ".eunit/myapp_sup.COVER.html",
+                                    ".eunit/myapp_mymod_tests.COVER.html"])}]
+     end}.
 
 expected_cover_generated_files() ->
     [".eunit/index.html",
