@@ -146,10 +146,10 @@ filter_away_ignored(UnusedExports) ->
     %% any functions marked to ignore. We then use this list to mask any
     %% functions marked as unused exports by xref
     F = fun(Mod) ->
-                Attrs  = kf(attributes, Mod:module_info()),
-                Ignore = kf(ignore_xref, Attrs),
-                Callbacks =
-                    [B:behaviour_info(callbacks) || B <- kf(behaviour, Attrs)],
+                Attrs  = Mod:module_info(attributes),
+                Ignore = keyall(ignore_xref, Attrs),
+                Callbacks = [B:behaviour_info(callbacks)
+                             || B <- keyall(behaviour, Attrs)],
                 [{Mod, F, A} || {F, A} <- Ignore ++ lists:flatten(Callbacks)]
         end,
     AttrIgnore =
@@ -157,14 +157,8 @@ filter_away_ignored(UnusedExports) ->
           lists:map(F, lists:usort([M || {M, _, _} <- UnusedExports]))),
     [X || X <- UnusedExports, not lists:member(X, AttrIgnore)].
 
-
-kf(Key, List) ->
-    case lists:keyfind(Key, 1, List) of
-        {Key, Value} ->
-            Value;
-        false ->
-            []
-    end.
+keyall(Key, List) ->
+    lists:flatmap(fun({K, L}) when Key =:= K -> L; (_) -> [] end, List).
 
 display_mfas([], _Message) ->
     ok;
