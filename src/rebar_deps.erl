@@ -184,9 +184,9 @@ setup_env(Config) ->
 %% need all deps in same dir and should be the one set by the root rebar.config
 %% Sets a default if root config has no deps_dir set
 set_shared_deps_dir(Config, []) ->
-    rebar_config:set_xconf(Config, deps_dir,
-                           rebar_config:get_local(Config, deps_dir, 
-                            rebar_config:get_global(Config, deps_dir, "deps")));
+    GlobalDepsDir = rebar_config:get_global(Config, deps_dir, "deps"),
+    DepsDir = rebar_config:get_local(Config, deps_dir, GlobalDepsDir),
+    rebar_config:set_xconf(Config, deps_dir, DepsDir);
 set_shared_deps_dir(Config, _DepsDir) ->
     Config.
 
