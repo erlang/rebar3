@@ -475,10 +475,11 @@ vcs_vsn_1(Vcs, Dir) ->
             end
     end.
 
-vcs_vsn_cmd(git) -> "git describe --always --tags";
-vcs_vsn_cmd(hg)  -> "hg identify -i";
-vcs_vsn_cmd(bzr) -> "bzr revno";
-vcs_vsn_cmd(svn) -> "svnversion";
+vcs_vsn_cmd(git)    -> "git describe --always --tags";
+vcs_vsn_cmd(hg)     -> "hg identify -i";
+vcs_vsn_cmd(bzr)    -> "bzr revno";
+vcs_vsn_cmd(svn)    -> "svnversion";
+vcs_vsn_cmd(fossil) -> "fossil info";
 vcs_vsn_cmd({cmd, _Cmd}=Custom) -> Custom;
 vcs_vsn_cmd(Version) -> {unknown, Version}.
 
