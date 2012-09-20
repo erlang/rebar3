@@ -133,7 +133,8 @@
 %% What dependencies we have, dependencies can be of 3 forms, an application
 %% name as an atom, eg. mochiweb, a name and a version (from the .app file), or
 %% an application name, a version and the SCM details on how to fetch it (SCM
-%% type, location and revision). Rebar currently supports git, hg, bzr and svn.
+%% type, location and revision).
+%% Rebar currently supports git, hg, bzr, svn, and rsync.
 {deps, [application_name,
         {application_name, "1.0.*"},
         {application_name, "1.0.*",
