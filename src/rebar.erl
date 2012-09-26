@@ -87,11 +87,10 @@ run(RawArgs) ->
         true ->
             io:format("Profiling!\n"),
             try
-                fprof:apply(fun([C, A]) -> run_aux(C, A) end,
-                            [BaseConfig1, Cmds])
+                fprof:apply(fun run_aux/2, [BaseConfig1, Cmds])
             after
-                fprof:profile(),
-                fprof:analyse([{dest, "fprof.analysis"}])
+                ok = fprof:profile(),
+                ok = fprof:analyse([{dest, "fprof.analysis"}])
             end;
         false ->
             run_aux(BaseConfig1, Cmds)
