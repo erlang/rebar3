@@ -356,7 +356,8 @@ patch_on_windows(Cmd, Env) ->
                                        expand_env_variable(Acc, Key, Value)
                                end, Cmd, Env),
             %% Remove left-over vars
-            re:replace(Cmd1, "\\\$\\w+|\\\${\\w+}", "", [global, {return, list}]);
+            re:replace(Cmd1, "\\\$\\w+|\\\${\\w+}", "",
+                       [global, {return, list}]);
         _ ->
             Cmd
     end.
