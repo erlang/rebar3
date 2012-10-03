@@ -108,7 +108,7 @@ newer_file_exists(Paths, OldFile) ->
 %% Needs regen if any dependent file is changed since the last
 %% edoc run. Dependent files are the erlang source files,
 %% and the overview file, if it exists.
--spec needs_regen(edoc:proplist()) -> boolean().
+-spec needs_regen(proplists:proplist()) -> boolean().
 needs_regen(EDocOpts) ->
     DocDir = proplists:get_value(dir, EDocOpts, "doc"),
     EDocInfoName = filename:join(DocDir, "edoc-info"),
