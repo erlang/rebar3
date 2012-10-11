@@ -20,7 +20,7 @@ run(Dir) ->
     {ok, Missing} =
         retest:sh_expect(Ref,
                          "DEBUG: Missing deps  : \\[\\{dep,bad_name,"
-                         "boo,\"\\.\",undefined\\}\\]",
+                         "boo,\"\\.\",undefined,false\\}\\]",
                          [{capture, all, list}]),
     retest_log:log(debug, "[CAPTURED]: ~s~n", [Captured]),
     retest_log:log(debug, "[Missing]: ~s~n", [Missing]),

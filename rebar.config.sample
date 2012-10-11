@@ -138,7 +138,20 @@
 {deps, [application_name,
         {application_name, "1.0.*"},
         {application_name, "1.0.*",
-         {git, "git://github.com/basho/rebar.git", {branch, "master"}}}]}.
+         {git, "git://github.com/basho/rebar.git", {branch, "master"}}},
+
+%% Dependencies can be marked as 'raw'. Rebar does not require such dependencies
+%% to have a standard Erlang/OTP layout which assumes the presence of either
+%% "src/dependency_name.app.src" or "ebin/dependency_name.app" files.
+%%
+%% 'raw' dependencies can still contain 'rebar.config' and even can have the
+%% proper OTP directory layout, but they won't be compiled.
+%%
+%% Only a subset of rebar commands will be executed on the 'raw' subdirectories:
+%% get-deps, update-deps, check-deps, list-deps and delete-deps.
+        {application_name, "",
+         {git, "git://github.com/basho/rebar.git", {branch, "master"}},
+         [raw]}]}.
 
 %% == Subdirectories ==
 
