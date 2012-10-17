@@ -190,11 +190,17 @@ do_compile(Source, Target, DtlOpts) ->
                          module_name(Target),
                          Opts) of
         ok -> ok;
+        {error, {File, [{Pos, _Mod, Err}]}} ->
+            ?ERROR("Compiling template ~p failed:~n    (~s): ~p~n",
+                [File, err_location(Pos), Err]);
         Reason ->
             ?ERROR("Compiling template ~s failed:~n  ~p~n",
                    [Source, Reason]),
             ?FAIL
     end.
+
+err_location({L,C}) -> io_lib:format("line:~w, col:~w", [L, C]);
+err_location(L)     -> io_lib:format("line:~w", [L]).
 
 module_name(Target) ->
     F = filename:basename(Target),
