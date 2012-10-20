@@ -37,6 +37,7 @@
          get_rel_file_path/2,
          load_config/2,
          get_sys_tuple/1,
+         get_excl_lib_tuple/1,
          get_target_dir/2,
          get_root_dir/2,
          get_target_parent_dir/2]).
@@ -142,6 +143,13 @@ get_sys_tuple(ReltoolConfig) ->
         false ->
             ?ABORT("Failed to find {sys, [...]} tuple in reltool.config.", [])
     end.
+
+%%
+%% Look for the {excl_lib, ...} tuple in sys tuple of the reltool.config file.
+%% Without this present, return false.
+%%
+get_excl_lib_tuple(ReltoolConfig) ->
+    lists:keyfind(excl_lib, 1, element(2, get_sys_tuple(ReltoolConfig))).
 
 %%
 %% Look for {target_dir, TargetDir} in the reltool config file; if none is
