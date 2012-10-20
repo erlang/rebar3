@@ -67,7 +67,7 @@ generate(Config0, ReltoolFile) ->
 overlay(Config, ReltoolFile) ->
     %% Load the reltool configuration from the file
     {Config1, ReltoolConfig} = rebar_rel_utils:load_config(Config, ReltoolFile),
-    {Config1, process_overlay(Config, ReltoolConfig)}.
+    {process_overlay(Config, ReltoolConfig), Config1}.
 
 clean(Config, ReltoolFile) ->
     {Config1, ReltoolConfig} = rebar_rel_utils:load_config(Config, ReltoolFile),
