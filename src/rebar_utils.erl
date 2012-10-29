@@ -75,8 +75,7 @@ is_arch(ArchRegex) ->
 get_arch() ->
     Words = wordsize(),
     erlang:system_info(otp_release) ++ "-"
-        ++ erlang:system_info(system_architecture) ++ "-" ++ Words
-        ++ "-" ++ os_family().
+        ++ erlang:system_info(system_architecture) ++ "-" ++ Words.
 
 wordsize() ->
     try erlang:system_info({wordsize, external}) of
@@ -317,10 +316,6 @@ processing_base_dir(Config, Dir) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
-
-os_family() ->
-    {OsFamily, _} = os:type(),
-    atom_to_list(OsFamily).
 
 get_deprecated_3(Get, Config, OldOpt, NewOpt, Default, When) ->
     case Get(Config, NewOpt, Default) of
