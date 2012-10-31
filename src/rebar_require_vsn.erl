@@ -67,4 +67,33 @@ check_versions(Config) ->
         nomatch ->
             ?ABORT("OTP release ~s does not match required regex ~s\n",
                    [erlang:system_info(otp_release), OtpRegex])
+    end,
+
+    case rebar_config:get(Config, require_min_otp_vsn, undefined) of
+        undefined -> ?DEBUG("Min OTP version unconfigured~n", []);
+        MinOtpVsn ->
+            {MinMaj, MinMin} = version_tuple(MinOtpVsn, "configured"),
+            {OtpMaj, OtpMin} = version_tuple(erlang:system_info(otp_release),
+                                             "OTP Release"),
+            case {OtpMaj, OtpMin} >= {MinMaj, MinMin} of
+                true ->
+                    ?DEBUG("~s satisfies the requirement for vsn ~s~n", 
+                           [erlang:system_info(otp_release), 
+                            MinOtpVsn]);
+                false -> 
+                    ?ABORT("OTP release ~s or later is required, you have: ~s~n",
+                           [MinOtpVsn,
+                            erlang:system_info(otp_release)])
+            end            
+    end.
+
+version_tuple(OtpRelease, Type) ->
+    case re:run(OtpRelease, "R(\\d+)B?-?(\\d+)?", [{capture, all, list}]) of 
+        {match, [_Full, Maj, Min]} ->
+            {list_to_integer(Maj), list_to_integer(Min)};
+        {match, [_Full, Maj]} ->
+            {list_to_integer(Maj), 0};
+        nomatch ->
+            ?ABORT("Cannot parse ~s version string: ~s~n",
+                   [Type, OtpRelease])
     end.
