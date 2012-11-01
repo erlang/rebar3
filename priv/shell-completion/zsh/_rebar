@@ -49,19 +49,19 @@ _rebar () {
         'xref[Run cross reference analysis]' \
         'help[Show the program options]' \
         'version[Show version information]' \
-        'apps[Application name]:' \
-        'case[Case]:' \
-        'dump_spec[Dump specify]:' \
+        'apps[Application names to process]:' \
+        'case[Common Test case]:' \
+        'dump_spec[Dump reltool spec]:' \
         'jobs[Number of workers]::workers:(0 1 2 3 4 5 6 7 8 9)' \
-        'suites[Suites name]::suite name:_path_files -W "(src test)" -g "*.erl(:r)"' \
+        'suites[Common Test suites]::suite name:_path_files -W "(src test)" -g "*.erl(:r)"' \
         'verbose[Verbosity level]::verbosity level:(0 1 2 3)' \
         'appid[Application id]:' \
-        'previous_release[Previous release number]:' \
+        'previous_release[Previous release path]:' \
         'nodeid[Node id]:' \
-        'root_dir[Root directory]::directory:_files -/' \
-        'skip_deps[Switch to skip deps]::flag:(true false)' \
-        'skip_app[Switch to skip app]::flag:(true false)' \
-        'template[Templace name]:' \
+        'root_dir[Reltool config root directory]::directory:_files -/' \
+        'skip_deps[Skip deps]::flag:(true false)' \
+        'skip_apps[Application names to not process]::flag:(true false)' \
+        'template[Template name]:' \
         'template_dir[Template directory]::directory:_files -/' \
         && ret=0
       ;;
