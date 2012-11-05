@@ -6,7 +6,7 @@ _rebar()
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    sopts="-h -c -v -V -f -D -j -C -p -k"
+    sopts="-h -c -v -V -f -D -j -C -p -k -r"
     lopts="--help \
         --commands \
         --verbose \
@@ -15,6 +15,7 @@ _rebar()
         --config \
         --profile \
         --keep-going \
+        --recursive \
         --version"
     cmdsnvars="check-deps \
         clean \
@@ -35,7 +36,9 @@ _rebar()
         help \
         list-deps \
         list-templates \
+        prepare-deps \
         qc \
+        refresh-deps \
         update-deps \
         version \
         xref \

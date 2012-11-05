@@ -206,8 +206,10 @@ help() ->
        "  ~p~n"
        "  ~p~n"
        "  ~p~n"
+       "  ~p~n"
        "  ~p~n",
        [
+        {recursive_cmds, []},
         {lib_dirs, []},
         {sub_dirs, ["dir1", "dir2"]},
         {plugins, [plugin1, plugin2]},
@@ -254,19 +256,23 @@ save_options(Config, {Options, NonOptArgs}) ->
     Config3 = rebar_config:set_xconf(Config2, keep_going,
                                      proplists:get_bool(keep_going, Options)),
 
+    %% Setup flag to enable recursive application of commands
+    Config4 = rebar_config:set_xconf(Config3, recursive,
+                                     proplists:get_bool(recursive, Options)),
+
     %% Set global variables based on getopt options
-    Config4 = set_global_flag(Config3, Options, force),
-    Config5 = case proplists:get_value(jobs, Options, ?DEFAULT_JOBS) of
+    Config5 = set_global_flag(Config4, Options, force),
+    Config6 = case proplists:get_value(jobs, Options, ?DEFAULT_JOBS) of
                   ?DEFAULT_JOBS ->
-                      Config4;
+                      Config5;
                   Jobs ->
-                      rebar_config:set_global(Config4, jobs, Jobs)
+                      rebar_config:set_global(Config5, jobs, Jobs)
               end,
 
     %% Filter all the flags (i.e. strings of form key=value) from the
     %% command line arguments. What's left will be the commands to run.
-    {Config6, RawCmds} = filter_flags(Config5, NonOptArgs, []),
-    {Config6, unabbreviate_command_names(RawCmds)}.
+    {Config7, RawCmds} = filter_flags(Config6, NonOptArgs, []),
+    {Config7, unabbreviate_command_names(RawCmds)}.
 
 %%
 %% set log level based on getopt option
@@ -358,6 +364,9 @@ list-templates                           List available templates
 
 doc                                      Generate Erlang program documentation
 
+prepare-deps                             Run 'rebar -r get-deps compile'
+refresh-deps                             Run 'rebar -r update-deps compile'
+
 check-deps                               Display to be fetched dependencies
 get-deps                                 Fetch dependencies
 update-deps                              Update fetched dependencies
@@ -420,7 +429,9 @@ option_spec_list() ->
      {config,   $C, "config",   string,    "Rebar config file to use"},
      {profile,  $p, "profile",  undefined, "Profile this run of rebar"},
      {keep_going, $k, "keep-going", undefined,
-      "Keep running after a command fails"}
+      "Keep running after a command fails"},
+     {recursive, $r, "recursive", boolean,
+      "Apply commands to subdirs and dependencies"}
     ].
 
 %%
@@ -469,7 +480,9 @@ command_names() ->
      "help",
      "list-deps",
      "list-templates",
+     "prepare-deps",
      "qc",
+     "refresh-deps",
      "update-deps",
      "overlay",
      "shell",

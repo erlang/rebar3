@@ -38,6 +38,7 @@
               rebar_upgrade,
               rebar_utils,
               rebar_xref,
+              rebar_metacmds,
               rebar_getopt,
               rebar_mustache ]},
   {registered, []},
@@ -80,7 +81,8 @@
                                rebar_escripter,
                                rebar_edoc,
                                rebar_shell,
-                               rebar_xref
+                               rebar_xref,
+                               rebar_metacmds
                               ]},
 
                     {rel_dir, [
@@ -88,6 +90,13 @@
                                rebar_reltool,
                                rebar_upgrade
                               ]}
-                   ]}
+                   ]},
+         {recursive_cmds, [
+                           'get-deps',
+                           'check-deps',
+                           'delete-deps',
+                           'list-deps',
+                           'update-deps'
+                          ]}
         ]}
  ]}.

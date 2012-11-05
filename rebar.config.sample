@@ -5,6 +5,9 @@
 
 %% == Core ==
 
+%% Extend list of always recursive commands
+{recursive_cmds, []}.
+
 %% Check required ERTS or OTP release version
 {require_erts_vsn, ".*"}.
 {require_otp_vsn, ".*"}.
