@@ -27,6 +27,7 @@
 -module(rebar).
 
 -export([main/1,
+         run/2,
          help/0,
          parse_args/1,
          version/0,
@@ -52,6 +53,7 @@
 %% Public API
 %% ====================================================================
 
+%% escript Entry point
 main(Args) ->
     case catch(run(Args)) of
         ok ->
@@ -64,6 +66,11 @@ main(Args) ->
             io:format("Uncaught error in rebar_core: ~p\n", [Error]),
             rebar_utils:delayed_halt(1)
     end.
+
+%% Erlang-API entry point
+run(BaseConfig, Commands) ->
+    application:load(rebar),
+    run_aux(BaseConfig, Commands).
 
 %% ====================================================================
 %% Internal functions
