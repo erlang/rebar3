@@ -53,9 +53,10 @@ process_commands([Command | Rest], ParentConfig) ->
 
     ParentConfig4 =
         try
-            %% Convert the code path so that all the entries are absolute paths.
-            %% If not, code:set_path() may choke on invalid relative paths when trying
-            %% to restore the code path from inside a subdirectory.
+            %% Convert the code path so that all the entries are
+            %% absolute paths. If not, code:set_path() may choke on
+            %% invalid relative paths when trying to restore the code
+            %% path from inside a subdirectory.
             true = rebar_utils:expand_code_path(),
             {ParentConfig2, _DirSet} = process_dir(rebar_utils:get_cwd(),
                                                    ParentConfig1, Command,
@@ -68,8 +69,9 @@ process_commands([Command | Rest], ParentConfig) ->
                 _ ->
                     ok
             end,
-            %% TODO: reconsider after config inheritance removal/redesign
-            ParentConfig3 = rebar_config:clean_config(ParentConfig1, ParentConfig2),
+            %% TODO: reconsider after config inheritance removal/re-design
+            ParentConfig3 = rebar_config:clean_config(ParentConfig1,
+                                                      ParentConfig2),
             %% Wipe out vsn cache to avoid invalid hits when
             %% dependencies are updated
             rebar_config:set_xconf(ParentConfig3, vsn_cache, dict:new())
@@ -107,29 +109,29 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
             %% to process this dir.
             {ok, AvailModuleSets} = application:get_env(rebar, modules),
             ModuleSet = choose_module_set(AvailModuleSets, Dir),
-            maybe_process_dir(ModuleSet, Config, CurrentCodePath,
+            skip_or_process_dir(ModuleSet, Config, CurrentCodePath,
                               Dir, Command, DirSet)
     end.
 
-maybe_process_dir({[], undefined}=ModuleSet, Config, CurrentCodePath,
+skip_or_process_dir({[], undefined}=ModuleSet, Config, CurrentCodePath,
                   Dir, Command, DirSet) ->
-    process_dir0(Dir, Command, DirSet, Config, CurrentCodePath, ModuleSet);
-maybe_process_dir({_, ModuleSetFile}=ModuleSet, Config, CurrentCodePath,
+    process_dir1(Dir, Command, DirSet, Config, CurrentCodePath, ModuleSet);
+skip_or_process_dir({_, ModuleSetFile}=ModuleSet, Config, CurrentCodePath,
                   Dir, Command, DirSet) ->
     case lists:suffix(".app.src", ModuleSetFile)
         orelse lists:suffix(".app", ModuleSetFile) of
         true ->
             %% .app or .app.src file, check if is_skipped_app
-            maybe_process_dir0(ModuleSetFile, ModuleSet,
+            skip_or_process_dir1(ModuleSetFile, ModuleSet,
                                Config, CurrentCodePath, Dir,
                                Command, DirSet);
         false ->
             %% not an app dir, no need to consider apps=/skip_apps=
-            process_dir0(Dir, Command, DirSet, Config,
+            process_dir1(Dir, Command, DirSet, Config,
                          CurrentCodePath, ModuleSet)
     end.
 
-maybe_process_dir0(AppFile, ModuleSet, Config, CurrentCodePath,
+skip_or_process_dir1(AppFile, ModuleSet, Config, CurrentCodePath,
                    Dir, Command, DirSet) ->
     case rebar_app_utils:is_skipped_app(Config, AppFile) of
         {Config1, {true, SkippedApp}} ->
@@ -137,11 +139,11 @@ maybe_process_dir0(AppFile, ModuleSet, Config, CurrentCodePath,
             Config2 = increment_operations(Config1),
             {Config2, DirSet};
         {Config1, false} ->
-            process_dir0(Dir, Command, DirSet, Config1,
+            process_dir1(Dir, Command, DirSet, Config1,
                          CurrentCodePath, ModuleSet)
     end.
 
-process_dir0(Dir, Command, DirSet, Config0, CurrentCodePath,
+process_dir1(Dir, Command, DirSet, Config0, CurrentCodePath,
              {DirModules, ModuleSetFile}) ->
     %% Get the list of modules for "any dir". This is a catch-all list
     %% of modules that are processed in addition to modules associated
@@ -269,7 +271,6 @@ process_each([Dir | Rest], Command, Config, ModuleSetFile, DirSet) ->
             Config3 = rebar_config:reset_envs(Config2),
             process_each(Rest, Command, Config3, ModuleSetFile, DirSet2)
     end.
-
 
 %%
 %% Given a list of module sets from rebar.app and a directory, find
