@@ -38,6 +38,8 @@
          'delete-deps'/2,
          'list-deps'/2]).
 
+%% for internal use only
+-export([info/2]).
 
 -record(dep, { dir,
                app,
@@ -202,6 +204,40 @@ do_check_deps(Config) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+info(help, compile) ->
+    info_help("Display to be fetched dependencies");
+info(help, 'check-deps') ->
+    info_help("Display to be fetched dependencies");
+info(help, 'get-deps') ->
+    info_help("Fetch dependencies");
+info(help, 'update-deps') ->
+    info_help("Update fetched dependencies");
+info(help, 'delete-deps') ->
+    info_help("Delete fetched dependencies");
+info(help, 'list-deps') ->
+    info_help("List dependencies").
+
+info_help(Description) ->
+    ?CONSOLE(
+       "~s.~n"
+       "~n"
+       "Valid rebar.config options:~n"
+       "  ~p~n"
+       "  ~p~n"
+       "Valid command line options:~n"
+       "  deps_dir=\"deps\" (override default or rebar.config deps_dir)~n",
+       [
+        Description,
+        {deps_dir, "deps"},
+        {deps, [application_name,
+                {application_name, "1.0.*"},
+                {application_name, "1.0.*",
+                 {git, "git://github.com/basho/rebar.git", {branch, "master"}}},
+                {application_name, "",
+                 {git, "git://github.com/basho/rebar.git", {branch, "master"}},
+                 [raw]}]}
+       ]).
 
 %% Added because of trans deps,
 %% need all deps in same dir and should be the one set by the root rebar.config

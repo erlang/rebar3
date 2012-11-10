@@ -32,6 +32,9 @@
 
 -export(['generate-upgrade'/2]).
 
+%% for internal use only
+-export([info/2]).
+
 -define(TMP, "_tmp").
 
 %% ====================================================================
@@ -79,6 +82,13 @@
 %% ===================================================================
 %% Internal functions
 %% ==================================================================
+
+info(help, 'generate-upgrade') ->
+    ?CONSOLE("Build an upgrade package.~n"
+             "~n"
+             "Valid command line options:~n"
+             "  previous_release=path~n",
+             []).
 
 run_checks(Config, OldVerPath, ReltoolConfig) ->
     true = rebar_utils:prop_check(filelib:is_dir(OldVerPath),

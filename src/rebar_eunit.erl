@@ -61,13 +61,16 @@
 %% Additionally, for projects that have separate folders for the core
 %% implementation, and for the unit tests, then the following
 %% <code>rebar.config</code> option can be provided:
-%% <code>{test_compile_opts, [{src_dirs, ["dir"]}]}.</code>.
+%% <code>{eunit_compile_opts, [{src_dirs, ["src", "dir"]}]}.</code>.
 %% @copyright 2009, 2010 Dave Smith
 %% -------------------------------------------------------------------
 -module(rebar_eunit).
 
 -export([eunit/2,
          clean/2]).
+
+%% for internal use only
+-export([info/2]).
 
 -include("rebar.hrl").
 
@@ -99,6 +102,40 @@ clean(_Config, _File) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+info(help, eunit) ->
+    info_help("Run eunit tests");
+info(help, clean) ->
+    Description = ?FMT("Delete eunit test dir (~s)", [?EUNIT_DIR]),
+    info_help(Description).
+
+info_help(Description) ->
+    ?CONSOLE(
+       "~s.~n"
+       "~n"
+       "Valid rebar.config options:~n"
+       "  ~p~n"
+       "  ~p~n"
+       "  ~p~n"
+       "  ~p~n"
+       "  ~p~n"
+       "  ~p~n"
+       "Valid command line options:~n"
+       "  suites=\"foo,bar\" (Run tests in foo.erl, test/foo_tests.erl and~n"
+       "                    tests in bar.erl, test/bar_tests.erl)~n"
+       "  tests=\"baz\" (For every existing suite, run the first test whose~n"
+       "               name starts with bar and, if no such test exists,~n"
+       "               run the test whose name starts with bar in the~n"
+       "               suite's _tests module)~n",
+       [
+        Description,
+        {eunit_opts, []},
+        {eunit_compile_opts, []},
+        {eunit_first_files, []},
+        {cover_enabled, false},
+        {cover_print_enabled, false},
+        {cover_export_enabled, false}
+       ]).
 
 run_eunit(Config, CodePath, SrcErls) ->
     %% Build a list of all the .beams in ?EUNIT_DIR -- use this for

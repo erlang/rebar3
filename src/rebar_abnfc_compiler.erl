@@ -47,6 +47,9 @@
 
 -export([compile/2]).
 
+%% for internal use only
+-export([info/2]).
+
 -include("rebar.hrl").
 
 %% ===================================================================
@@ -62,10 +65,22 @@ compile(Config, _AppFile) ->
                             option(module_ext, DtlOpts) ++ ".erl",
                             fun compile_abnfc/3).
 
-
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+info(help, compile) ->
+    ?CONSOLE(
+       "Build ABNF (*.abnf) sources.~n"
+       "~n"
+       "Valid rebar.config options:~n"
+       "  ~p~n",
+       [
+        {abnfc_opts, [{doc_root, "src"},
+                      {out_dir, "src"},
+                      {source_ext, ".abnfc"},
+                      {module_ext, ""}]}
+       ]).
 
 abnfc_opts(Config) ->
     rebar_config:get(Config, abnfc_opts, []).

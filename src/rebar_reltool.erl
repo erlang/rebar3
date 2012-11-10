@@ -30,6 +30,9 @@
          overlay/2,
          clean/2]).
 
+%% for internal use only
+-export([info/2]).
+
 -include("rebar.hrl").
 -include_lib("kernel/include/file.hrl").
 
@@ -79,6 +82,32 @@ clean(Config, ReltoolFile) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+info(help, generate) ->
+    info_help("Build release with reltool");
+info(help, clean) ->
+    info_help("Delete release");
+info(help, overlay) ->
+    info_help("Run reltool overlays only").
+
+info_help(Description) ->
+    ?CONSOLE(
+       "~s.~n"
+       "~n"
+       "Valid rebar.config options:~n"
+       "  ~n"
+       "Valid reltool.config options:~n"
+       "  {sys, []}~n"
+       "  {target_dir, \"target\"}~n"
+       "  {overlay_vars, \"overlay\"}~n"
+       "  {overlay, []}~n"
+       "Valid command line options:~n"
+       "  target_dir=target~n"
+       "  overlay_vars=VarsFile~n"
+       "  dump_spec=1 (write reltool target spec to reltool.spec)~n",
+       [
+        Description
+       ]).
 
 check_vsn() ->
     %% TODO: use application:load and application:get_key once we require

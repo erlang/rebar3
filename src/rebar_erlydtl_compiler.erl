@@ -96,6 +96,9 @@
 
 -export([compile/2]).
 
+%% for internal use only
+-export([info/2]).
+
 -include("rebar.hrl").
 
 %% ===================================================================
@@ -123,10 +126,23 @@ compile(Config, _AppFile) ->
     true = code:set_path(OrigPath),
     Result.
 
-
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+info(help, compile) ->
+    ?CONSOLE(
+       "Build ErlyDtl (*.dtl) sources.~n"
+       "~n"
+       "Valid rebar.config options:~n"
+       "  ~p~n",
+       [
+        {erlydtl_opts, [{doc_root,   "templates"},
+                        {out_dir,    "ebin"},
+                        {source_ext, ".dtl"},
+                        {module_ext, "_dtl"},
+                        {recursive, true}]}
+       ]).
 
 erlydtl_opts(Config) ->
     Opts = rebar_config:get(Config, erlydtl_opts, []),
@@ -135,11 +151,14 @@ erlydtl_opts(Config) ->
         [] ->
             [lists:keysort(1, Tuples)];
         Lists ->
-            lists:map(fun(L) ->
-                lists:keysort(1, lists:foldl(fun({K,T}, Acc) ->
-                    lists:keystore(K, 1, Acc, {K, T})
-                end, Tuples, L))
-            end, Lists)
+            lists:map(
+              fun(L) ->
+                      lists:keysort(1,
+                                    lists:foldl(
+                                      fun({K,T}, Acc) ->
+                                              lists:keystore(K, 1, Acc, {K, T})
+                                      end, Tuples, L))
+              end, Lists)
     end.
 
 option(Opt, DtlOpts) ->

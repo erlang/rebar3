@@ -30,6 +30,9 @@
 
 -export([compile/2]).
 
+%% for internal use only
+-export([info/2]).
+
 -include("rebar.hrl").
 
 %% ===================================================================
@@ -44,6 +47,14 @@ compile(Config, _AppFile) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+info(help, compile) ->
+    ?CONSOLE(
+       "Build Lisp Flavoured Erlang (*.lfe) sources.~n"
+       "~n"
+       "Valid rebar.config options:~n"
+       "  erl_opts is reused.'~n",
+       []).
 
 compile_lfe(Source, _Target, Config) ->
     case code:which(lfe_comp) of

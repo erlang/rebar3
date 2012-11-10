@@ -31,6 +31,9 @@
 
 -export(['generate-appups'/2]).
 
+%% for internal use only
+-export([info/2]).
+
 -define(APPUPFILEFORMAT, "%% appup generated for ~p by rebar (~p)~n"
         "{~p, [{~p, ~p}], [{~p, []}]}.~n").
 
@@ -81,6 +84,13 @@
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+info(help, 'generate-appups') ->
+    ?CONSOLE("Generate appup files.~n"
+             "~n"
+             "Valid command line options:~n"
+             "  previous_release=path~n",
+             []).
 
 get_apps(Name, OldVerPath, NewVerPath) ->
     OldApps = rebar_rel_utils:get_rel_apps(Name, OldVerPath),

@@ -29,6 +29,9 @@
 -export([escriptize/2,
          clean/2]).
 
+%% for internal use only
+-export([info/2]).
+
 -include("rebar.hrl").
 -include_lib("kernel/include/file.hrl").
 
@@ -107,6 +110,30 @@ clean(Config0, AppFile) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+info(help, escriptize) ->
+    info_help("Generate escript archive");
+info(help, clean) ->
+    info_help("Delete generated escript archive").
+
+info_help(Description) ->
+    ?CONSOLE(
+       "~s.~n"
+       "~n"
+       "Valid rebar.config options:~n"
+       "  ~p~n"
+       "  ~p~n"
+       "  ~p~n"
+       "  ~p~n"
+       "  ~p~n",
+       [
+        Description,
+        {escript_name, "application"},
+        {escript_incl_apps, []},
+        {escript_shebang, "#!/usr/bin/env escript\n"},
+        {escript_comment, "%%\n"},
+        {escript_emu_args, "%%! -pa application/application/ebin\n"}
+       ]).
 
 get_app_beams([], Acc) ->
     Acc;

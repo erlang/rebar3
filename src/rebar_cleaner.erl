@@ -28,6 +28,9 @@
 
 -export([clean/2]).
 
+%% for internal use only
+-export([info/2]).
+
 -include("rebar.hrl").
 
 %% ===================================================================
@@ -37,3 +40,17 @@ clean(Config, _AppFile) ->
     %% Get a list of files to delete from config and remove them
     FilesToClean = rebar_config:get(Config, clean_files, []),
     lists:foreach(fun (F) -> rebar_file_utils:rm_rf(F) end, FilesToClean).
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
+
+info(help, clean) ->
+    ?CONSOLE(
+       "Delete list of files.~n"
+       "~n"
+       "Valid rebar.config options:~n"
+       "  ~p~n",
+       [
+        {clean_files, ["file", "file2"]}
+       ]).

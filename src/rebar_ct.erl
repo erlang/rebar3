@@ -39,6 +39,9 @@
 
 -export([ct/2]).
 
+%% for internal use only
+-export([info/2]).
+
 -include("rebar.hrl").
 
 %% ===================================================================
@@ -53,6 +56,26 @@ ct(Config, File) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+info(help, ct) ->
+    ?CONSOLE(
+       "Run common_test suites.~n"
+       "~n"
+       "Valid rebar.config options:~n"
+       "  ~p~n"
+       "  ~p~n"
+       "  ~p~n"
+       "  ~p~n"
+       "Valid command line options:~n"
+       "  suites=foo,bar - run <test>/foo_SUITE and <test>/bar_SUITE~n"
+       "  case=\"mycase\" - run individual test case foo_SUITE:mycase~n",
+       [
+        {ct_dir, "itest"},
+        {ct_log_dir, "test/logs"},
+        {ct_extra_params, "-boot start_sasl -s myapp"},
+        {ct_use_short_names, true}
+       ]).
+
 run_test_if_present(TestDir, LogDir, Config, File) ->
     case filelib:is_dir(TestDir) of
         false ->
