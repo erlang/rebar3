@@ -227,8 +227,8 @@ referenced_dtls1(Step, DtlOpts, Seen) ->
     AllRefs =
         lists:append(
           [begin
-               Cmd = lists:flatten(["grep -o [^\\\"]*",
-                                    ExtMatch, " ", F]),
+               Cmd = lists:flatten(["grep -o [^\\\"]*\\",
+                                    ExtMatch, "[^\\\"]* ", F]),
                case rebar_utils:sh(Cmd, ShOpts) of
                    {ok, Res} ->
                        string:tokens(Res, "\n");
