@@ -69,7 +69,7 @@ main(Args) ->
 
 %% Erlang-API entry point
 run(BaseConfig, Commands) ->
-    application:load(rebar),
+    _ = application:load(rebar),
     run_aux(BaseConfig, Commands).
 
 %% ====================================================================
