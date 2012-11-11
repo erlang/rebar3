@@ -92,8 +92,8 @@
                objects = [] :: [file:filename(), ...],
                opts = [] ::list() | []}).
 
-compile(Config, _AppFile) ->
-    case get_specs(Config) of
+compile(Config, AppFile) ->
+    case get_specs(Config, AppFile) of
         [] ->
             ok;
         Specs ->
@@ -130,8 +130,8 @@ compile(Config, _AppFile) ->
               end, Specs)
     end.
 
-clean(Config, _AppFile) ->
-    case get_specs(Config) of
+clean(Config, AppFile) ->
+    case get_specs(Config, AppFile) of
         [] ->
             ok;
         Specs ->
@@ -154,7 +154,12 @@ setup_env(Config, ExtraEnv) ->
     %% merge with the default for this operating system. This enables
     %% max flexibility for users.
     DefaultEnv  = filter_env(default_env(), []),
-    RawPortEnv = rebar_config:get_list(Config, port_env, []),
+
+    %% Get any port-specific envs; use port_env first and then fallback
+    %% to port_envs for compatibility
+    RawPortEnv = rebar_config:get_list(Config, port_env,
+                          rebar_config:get_list(Config, port_envs, [])),
+
     PortEnv = filter_env(RawPortEnv, []),
     Defines = get_defines(Config),
     OverrideEnv = Defines ++ PortEnv ++ filter_env(ExtraEnv, []),
@@ -242,11 +247,37 @@ needs_link(SoName, NewBins) ->
 %% == port_specs ==
 %%
 
-get_specs(Config) ->
-    PortSpecs = rebar_config:get_local(Config, port_specs, []),
-    Filtered = filter_port_specs(PortSpecs),
-    OsType = os:type(),
-    [get_port_spec(Config, OsType, Spec) || Spec <- Filtered].
+get_specs(Config, AppFile) ->
+    case rebar_config:get_local(Config, port_specs, []) of
+        [] ->
+            %% No spec provided. Construct a spec
+            %% from old-school so_name and sources
+            [port_spec_from_legacy(Config, AppFile)];
+        PortSpecs ->
+            Filtered = filter_port_specs(PortSpecs),
+            OsType = os:type(),
+            [get_port_spec(Config, OsType, Spec) || Spec <- Filtered]
+    end.
+
+port_spec_from_legacy(Config, AppFile) ->
+    %% Get the target from the so_name variable
+    Target = case rebar_config:get(Config, so_name, undefined) of
+                 undefined ->
+                     %% Generate a sensible default from app file
+                     {_, AppName} = rebar_app_utils:app_name(Config, AppFile),
+                     filename:join("priv",
+                                   lists:concat([AppName, "_drv.so"]));
+                 AName ->
+                     %% Old form is available -- use it
+                     filename:join("priv", AName)
+             end,
+    %% Get the list of source files from port_sources
+    Sources = port_sources(rebar_config:get_list(Config, port_sources,
+                                                 ["c_src/*.c"])),
+    #spec { type = target_type(Target),
+            target = maybe_switch_extension(os:type(), Target),
+            sources = Sources,
+            objects = port_objects(Sources) }.
 
 filter_port_specs(Specs) ->
     [S || S <- Specs, filter_port_spec(S)].
