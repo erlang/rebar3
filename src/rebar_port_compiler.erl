@@ -248,16 +248,17 @@ needs_link(SoName, NewBins) ->
 %%
 
 get_specs(Config, AppFile) ->
-    case rebar_config:get_local(Config, port_specs, []) of
-        [] ->
-            %% No spec provided. Construct a spec
-            %% from old-school so_name and sources
-            [port_spec_from_legacy(Config, AppFile)];
-        PortSpecs ->
-            Filtered = filter_port_specs(PortSpecs),
-            OsType = os:type(),
-            [get_port_spec(Config, OsType, Spec) || Spec <- Filtered]
-    end.
+    Specs = case rebar_config:get_local(Config, port_specs, []) of
+                [] ->
+                    %% No spec provided. Construct a spec
+                    %% from old-school so_name and sources
+                    [port_spec_from_legacy(Config, AppFile)];
+                PortSpecs ->
+                    Filtered = filter_port_specs(PortSpecs),
+                    OsType = os:type(),
+                    [get_port_spec(Config, OsType, Spec) || Spec <- Filtered]
+            end,
+    [S || S <- Specs, S#spec.sources /= []].
 
 port_spec_from_legacy(Config, AppFile) ->
     %% Get the target from the so_name variable
