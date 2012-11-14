@@ -46,7 +46,7 @@
 %% architecture as a filter.
 {port_specs, [{"priv/so_name.so", ["c_src/*.c"]},
               {"linux", "priv/hello_linux", ["c_src/hello_linux.c"]},
-              {"linux", "priv/hello_linux", ["c_src/*.c"], [{env, []}]}}.
+              {"linux", "priv/hello_linux", ["c_src/*.c"], [{env, []}]}]}.
 
 %% == LFE Compiler ==
 
