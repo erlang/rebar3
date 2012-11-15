@@ -133,7 +133,7 @@ erlydtl_opts(Config) ->
     Tuples = [{K,V} || {K,V} <- Opts],
     case [L || L <- Opts, is_list(L), not io_lib:printable_list(L)] of
         [] ->
-            lists:keysort(1, Tuples);
+            [lists:keysort(1, Tuples)];
         Lists ->
             lists:map(fun(L) ->
                 lists:keysort(1, lists:foldl(fun({K,T}, Acc) ->
