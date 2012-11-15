@@ -16,7 +16,9 @@
 {erl_first_files, ["mymib1", "mymib2"]}.
 
 %% Erlang compiler options
-{erl_opts, [no_debug_info, {i, "myinclude"}, {src_dirs, ["src1", "src2"]},
+{erl_opts, [no_debug_info,
+            {i, "myinclude"},
+            {src_dirs, ["src", "src2", "src3"]},
             {platform_define,
              "(linux|solaris|freebsd|darwin)", 'HAVE_SENDFILE'},
             {platform_define, "(linux|freebsd)", 'BACKLOG', 128},
@@ -46,7 +48,7 @@
 %% architecture as a filter.
 {port_specs, [{"priv/so_name.so", ["c_src/*.c"]},
               {"linux", "priv/hello_linux", ["c_src/hello_linux.c"]},
-              {"linux", "priv/hello_linux", ["c_src/*.c"], [{env, []}]}}.
+              {"linux", "priv/hello_linux", ["c_src/*.c"], [{env, []}]}]}.
 
 %% == LFE Compiler ==
 
@@ -139,16 +141,19 @@
         {application_name, "1.0.*"},
         {application_name, "1.0.*",
          {git, "git://github.com/basho/rebar.git", {branch, "master"}}},
-
-%% Dependencies can be marked as 'raw'. Rebar does not require such dependencies
-%% to have a standard Erlang/OTP layout which assumes the presence of either
-%% "src/dependency_name.app.src" or "ebin/dependency_name.app" files.
-%%
-%% 'raw' dependencies can still contain 'rebar.config' and even can have the
-%% proper OTP directory layout, but they won't be compiled.
-%%
-%% Only a subset of rebar commands will be executed on the 'raw' subdirectories:
-%% get-deps, update-deps, check-deps, list-deps and delete-deps.
+        %% Dependencies can be marked as 'raw'. Rebar does not require
+        %% such dependencies to have a standard Erlang/OTP layout
+        %% which assumes the presence of either
+        %% "src/dependency_name.app.src" or "ebin/dependency_name.app"
+        %% files.
+        %%
+        %% 'raw' dependencies can still contain 'rebar.config' and
+        %% even can have the proper OTP directory layout, but they
+        %% won't be compiled.
+        %%
+        %% Only a subset of rebar commands will be executed on the
+        %% 'raw' subdirectories: get-deps, update-deps, check-deps,
+        %% list-deps and delete-deps.
         {application_name, "",
          {git, "git://github.com/basho/rebar.git", {branch, "master"}},
          [raw]}]}.

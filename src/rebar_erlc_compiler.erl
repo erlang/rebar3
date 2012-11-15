@@ -117,7 +117,7 @@ clean(_Config, _AppFile) ->
 test_compile(Config, Cmd, OutDir) ->
     %% Obtain all the test modules for inclusion in the compile stage.
     %% Notice: this could also be achieved with the following
-    %% rebar.config option: {test_compile_opts, [{src_dirs, ["test"]}]}
+    %% rebar.config option: {test_compile_opts, [{src_dirs, ["src", "test"]}]}
     TestErls = rebar_utils:find_files("test", ".*\\.erl\$"),
 
     %% Copy source files to eunit dir for cover in case they are not directly
