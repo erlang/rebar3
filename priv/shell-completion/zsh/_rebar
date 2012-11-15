@@ -43,6 +43,7 @@ _rebar () {
         'overlay[Run reltool overlays only]' \
         'generate-appups[Generate appup files]' \
         'generate-upgrade[Build an upgrade package]' \
+        'escriptize[Create stand-alone escript executable]' \
         'eunit[Run eunit tests]' \
         'ct[Run common_test suites]' \
         'qc[Test QuickCheck properties]' \
@@ -51,7 +52,6 @@ _rebar () {
         'version[Show version information]' \
         'apps[Application names to process]:' \
         'case[Common Test case]:' \
-        'dump_spec[Dump reltool spec]:' \
         'jobs[Number of workers]::workers:(0 1 2 3 4 5 6 7 8 9)' \
         'suites[Common Test suites]::suite name:_path_files -W "(src test)" -g "*.erl(:r)"' \
         'verbose[Verbosity level]::verbosity level:(0 1 2 3)' \
