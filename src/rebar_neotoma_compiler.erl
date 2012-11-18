@@ -57,7 +57,7 @@ compile(Config, _AppFile) ->
                             fun compile_neo/3, [{check_last_mod,false}]).
 
 %% ============================================================================
-%% Public API
+%% Internal functions
 %% ============================================================================
 
 neotoma_opts(Config) ->
