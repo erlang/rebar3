@@ -77,18 +77,18 @@ check_versions(Config) ->
                                              "OTP Release"),
             case {OtpMaj, OtpMin} >= {MinMaj, MinMin} of
                 true ->
-                    ?DEBUG("~s satisfies the requirement for vsn ~s~n", 
-                           [erlang:system_info(otp_release), 
+                    ?DEBUG("~s satisfies the requirement for vsn ~s~n",
+                           [erlang:system_info(otp_release),
                             MinOtpVsn]);
-                false -> 
+                false ->
                     ?ABORT("OTP release ~s or later is required, you have: ~s~n",
                            [MinOtpVsn,
                             erlang:system_info(otp_release)])
-            end            
+            end
     end.
 
 version_tuple(OtpRelease, Type) ->
-    case re:run(OtpRelease, "R(\\d+)B?-?(\\d+)?", [{capture, all, list}]) of 
+    case re:run(OtpRelease, "R(\\d+)B?-?(\\d+)?", [{capture, all, list}]) of
         {match, [_Full, Maj, Min]} ->
             {list_to_integer(Maj), list_to_integer(Min)};
         {match, [_Full, Maj]} ->
