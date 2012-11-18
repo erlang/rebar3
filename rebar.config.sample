@@ -35,6 +35,18 @@
 %% SNMP mibs to compile first?
 {mib_first_files, []}.
 
+%% leex options
+{xrl_opts, []}.
+
+%% leex files to compile first
+{xrl_first_files, []}.
+
+%% yecc options
+{yrl_opts, []}.
+
+%% yecc files to compile first
+{yrl_first_files, []}.
+
 %% == EDoc ==
 
 %% EDoc options
