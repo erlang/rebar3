@@ -67,6 +67,13 @@
               {"linux", "priv/hello_linux", ["c_src/hello_linux.c"]},
               {"linux", "priv/hello_linux", ["c_src/*.c"], [{env, []}]}]}.
 
+%% == escriptize ==
+{escript_name, "application"}.
+{escript_incl_apps, []}.
+{escript_shebang, "#!/usr/bin/env escript\n"}.
+{escript_comment, "%%\n"}.
+{escript_emu_args, "%%! -pa ~s/~s/ebin\n"}.
+
 %% == LFE Compiler ==
 
 %% LFE files to compile before the rest
