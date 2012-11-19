@@ -138,11 +138,6 @@
 %% Which files to cleanup
 {clean_files, ["file", "file2"]}.
 
-%% == Reltool ==
-
-%% Target directory for the release
-{target, "target"}.
-
 %% == OTP Applications ==
 
 %% Enable validation of the OTP app module list. Default is 'true'
