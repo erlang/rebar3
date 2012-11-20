@@ -399,7 +399,7 @@ expand_vars_loop([], Recurse, Vars, Count) ->
     expand_vars_loop(Recurse, [], Vars, Count-1);
 expand_vars_loop([{K, V} | Rest], Recurse, Vars, Count) ->
     %% Identify the variables that need expansion in this value
-    ReOpts = [global, {capture, all_but_first, list}],
+    ReOpts = [global, {capture, all_but_first, list}, unicode],
     case re:run(V, "\\\${?(\\w+)}?", ReOpts) of
         {match, Matches} ->
             %% Identify the unique variables that need to be expanded
@@ -472,8 +472,8 @@ erts_dir() ->
     lists:concat([code:root_dir(), "/erts-", erlang:system_info(version)]).
 
 os_env() ->
-    Os = [list_to_tuple(re:split(S, "=", [{return, list}, {parts, 2}])) ||
-             S <- os:getenv()],
+    ReOpts = [{return, list}, {parts, 2}, unicode],
+    Os = [list_to_tuple(re:split(S, "=", ReOpts)) || S <- os:getenv()],
     %% Drop variables without a name (win32)
     [T1 || {K, _V} = T1 <- Os, K =/= []].
 
