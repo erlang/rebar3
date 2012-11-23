@@ -72,7 +72,7 @@
 {escript_incl_apps, []}.
 {escript_shebang, "#!/usr/bin/env escript\n"}.
 {escript_comment, "%%\n"}.
-{escript_emu_args, "%%! -pa ~s/~s/ebin\n"}.
+{escript_emu_args, "%%! -pa application/application/ebin\n"}.
 
 %% == LFE Compiler ==
 
