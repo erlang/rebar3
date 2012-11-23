@@ -26,7 +26,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_qc).
 
--export([qc/2, triq/2, eqc/2]).
+-export([qc/2, triq/2, eqc/2, clean/2]).
 
 -include("rebar.hrl").
 
@@ -49,6 +49,9 @@ eqc(Config, _AppFile) ->
     ?CONSOLE("NOTICE: Using experimental 'eqc' command~n", []),
     ok = load_qc_mod(eqc),
     run_qc(Config, qc_opts(Config), eqc).
+
+clean(_Config, _File) ->
+    rebar_file_utils:rm_rf(?QC_DIR).
 
 %% ===================================================================
 %% Internal functions
