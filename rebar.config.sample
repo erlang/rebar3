@@ -5,6 +5,11 @@
 
 %% == Core ==
 
+%% Check required ERTS or OTP release version
+{require_erts_vsn, ".*"}.
+{require_otp_vsn, ".*"}.
+{require_min_otp_vsn, ".*"}.
+
 %% Additional library directories to add to the code path
 {lib_dirs, []}.
 
@@ -30,6 +35,18 @@
 %% SNMP mibs to compile first?
 {mib_first_files, []}.
 
+%% leex options
+{xrl_opts, []}.
+
+%% leex files to compile first
+{xrl_first_files, []}.
+
+%% yecc options
+{yrl_opts, []}.
+
+%% yecc files to compile first
+{yrl_first_files, []}.
+
 %% == EDoc ==
 
 %% EDoc options
@@ -49,6 +66,13 @@
 {port_specs, [{"priv/so_name.so", ["c_src/*.c"]},
               {"linux", "priv/hello_linux", ["c_src/hello_linux.c"]},
               {"linux", "priv/hello_linux", ["c_src/*.c"], [{env, []}]}]}.
+
+%% == escriptize ==
+{escript_name, "application"}.
+{escript_incl_apps, []}.
+{escript_shebang, "#!/usr/bin/env escript\n"}.
+{escript_comment, "%%\n"}.
+{escript_emu_args, "%%! -pa ~s/~s/ebin\n"}.
 
 %% == LFE Compiler ==
 
@@ -114,15 +138,7 @@
 %% Which files to cleanup
 {clean_files, ["file", "file2"]}.
 
-%% == Reltool ==
-
-%% Target directory for the release
-{target, "target"}.
-
 %% == OTP Applications ==
-
-%% Binaries to link into the erlang path?
-{app_bin, []}.
 
 %% Enable validation of the OTP app module list. Default is 'true'
 {validate_app_modules, true}.

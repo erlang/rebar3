@@ -265,11 +265,6 @@ doterl_compile(Config, OutDir, MoreSources) ->
     true = code:set_path(CurrPath),
     ok.
 
-
-%% ===================================================================
-%% Internal functions
-%% ===================================================================
-
 -spec include_path(file:filename(),
                    rebar_config:config()) -> [file:filename(), ...].
 include_path(Source, Config) ->
@@ -413,7 +408,6 @@ gather_src([], Srcs) ->
     Srcs;
 gather_src([Dir|Rest], Srcs) ->
     gather_src(Rest, Srcs ++ rebar_utils:find_files(Dir, ".*\\.erl\$")).
-
 
 -spec dirs(file:filename()) -> [file:filename()].
 dirs(Dir) ->
