@@ -6,14 +6,57 @@ _rebar()
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    sopts="-h -c -v -V -f -j"
-    lopts=" --help --commands --verbose --force --jobs= --version"
-    cmdsnvars="check-deps clean compile create create-app create-node ct \
-        doc delete-deps escriptize eunit get-deps generate generate-appups \
-        generate-upgrade help list-deps list-templates qc update-deps \
-        version xref overlay apps= case= dump_spec=1 force=1 jobs= suites= \
-        verbose=1 appid= previous_release= nodeid= root_dir= skip_deps=true \
-        skip_apps= template= template_dir="
+    sopts="-h -c -v -V -f -D -j -C -p -k"
+    lopts="--help \
+        --commands \
+        --verbose \
+        --force \
+        --jobs \
+        --config \
+        --profile \
+        --keep-going \
+        --version"
+    cmdsnvars="check-deps \
+        clean \
+        compile \
+        create \
+        create-app \
+        create-node \
+        ct \
+        doc \
+        delete-deps \
+        escriptize \
+        eunit \
+        get-deps \
+        generate \
+        generate-appups \
+        generate-upgrade \
+        help \
+        list-deps \
+        list-templates \
+        qc \
+        update-deps \
+        version \
+        xref \
+        overlay \
+        apps= \
+        case= \
+        dump_spec=1 \
+        force=1 \
+        jobs= \
+        suites= \
+        verbose=1 \
+        appid= \
+        overlay_vars= \
+        previous_release= \
+        nodeid= \
+        root_dir= \
+        skip_deps=true \
+        skip_apps= \
+        target_dir= \
+        template= \
+        template_dir= \
+        tests="
 
     if [[ ${cur} == --* ]] ; then
         COMPREPLY=( $(compgen -W "${lopts}" -- ${cur}) )
