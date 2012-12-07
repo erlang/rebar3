@@ -101,8 +101,12 @@ preprocess(Config, AppSrcFile) ->
             {Config2, Vsn} = rebar_app_utils:app_vsn(Config1, AppSrcFile),
             A2 = lists:keystore(vsn, 1, A1, {vsn, Vsn}),
 
+            %% systools:make_relup/4 fails with {missing_param, registered}
+            %% without a 'registered' value.
+            A3 = ensure_registered(A2),
+
             %% Build the final spec as a string
-            Spec = io_lib:format("~p.\n", [{application, AppName, A2}]),
+            Spec = io_lib:format("~p.\n", [{application, AppName, A3}]),
 
             %% Setup file .app filename and write new contents
             AppFile = rebar_app_utils:app_src_to_app(AppSrcFile),
@@ -187,3 +191,12 @@ validate_modules(AppName, Mods) ->
 ebin_modules() ->
     lists:sort([rebar_utils:beam_to_mod("ebin", N) ||
                    N <- rebar_utils:beams("ebin")]).
+
+ensure_registered(AppData) ->
+    case lists:keyfind(registered, 1, AppData) of
+        false ->
+            [{registered, []} | AppData];
+        {registered, _} ->
+            %% We could further check whether the value is a list of atoms.
+            AppData
+    end.
