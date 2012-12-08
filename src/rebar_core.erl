@@ -265,8 +265,7 @@ remember_cwd_predirs(Cwd, Predirs) ->
                             ?ABORT("Internal consistency assertion failed.~n"
                                    "sub_dir ~s already associated with ~s.~n"
                                    "Duplicate sub_dirs or deps entries?",
-                                   [Dir, Existing]),
-                            Dict
+                                   [Dir, Existing])
                     end
             end,
     lists:foldl(Store, dict:new(), Predirs).
