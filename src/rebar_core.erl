@@ -139,21 +139,21 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
             {ok, AvailModuleSets} = application:get_env(rebar, modules),
             ModuleSet = choose_module_set(AvailModuleSets, Dir),
             skip_or_process_dir(ModuleSet, Config, CurrentCodePath,
-                              Dir, Command, DirSet)
+                                Dir, Command, DirSet)
     end.
 
 skip_or_process_dir({[], undefined}=ModuleSet, Config, CurrentCodePath,
-                  Dir, Command, DirSet) ->
+                    Dir, Command, DirSet) ->
     process_dir1(Dir, Command, DirSet, Config, CurrentCodePath, ModuleSet);
 skip_or_process_dir({_, ModuleSetFile}=ModuleSet, Config, CurrentCodePath,
-                  Dir, Command, DirSet) ->
+                    Dir, Command, DirSet) ->
     case lists:suffix(".app.src", ModuleSetFile)
         orelse lists:suffix(".app", ModuleSetFile) of
         true ->
             %% .app or .app.src file, check if is_skipped_app
             skip_or_process_dir1(ModuleSetFile, ModuleSet,
-                               Config, CurrentCodePath, Dir,
-                               Command, DirSet);
+                                 Config, CurrentCodePath, Dir,
+                                 Command, DirSet);
         false ->
             %% not an app dir, no need to consider apps=/skip_apps=
             process_dir1(Dir, Command, DirSet, Config,
@@ -161,7 +161,7 @@ skip_or_process_dir({_, ModuleSetFile}=ModuleSet, Config, CurrentCodePath,
     end.
 
 skip_or_process_dir1(AppFile, ModuleSet, Config, CurrentCodePath,
-                   Dir, Command, DirSet) ->
+                     Dir, Command, DirSet) ->
     case rebar_app_utils:is_skipped_app(Config, AppFile) of
         {Config1, {true, SkippedApp}} ->
             ?DEBUG("Skipping app: ~p~n", [SkippedApp]),
