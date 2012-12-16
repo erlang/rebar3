@@ -629,7 +629,8 @@ reset_after_eunit({OldProcesses, WasAlive, OldAppEnvs, _OldACs}) ->
                  end,
              ok = application:unset_env(App, K)
          end || App <- Apps, App /= rebar,
-                {K, _V} <- application:get_all_env(App)],
+                {K, _V} <- application:get_all_env(App),
+                K =/= included_applications],
 
     reconstruct_app_env_vars(Apps),
 
