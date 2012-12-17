@@ -762,7 +762,6 @@ pause_until_net_kernel_stopped(0) ->
     exit(net_kernel_stop_failed);
 pause_until_net_kernel_stopped(N) ->
     try
-        _ = net_kernel:i(),
         timer:sleep(100),
         pause_until_net_kernel_stopped(N - 1)
     catch
