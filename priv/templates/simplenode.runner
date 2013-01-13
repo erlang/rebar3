@@ -136,13 +136,15 @@ if [ -e "$RUNNER_BASE_DIR/releases/$APP_VSN/runner_script.data" ]; then
 fi
 
 if [ -z "$RUNNER_SCRIPT_DATA" ]; then
-    echo "normal release"
     ROOTDIR=$RUNNER_BASE_DIR
     ERTS_PATH=$RUNNER_BASE_DIR/erts-$ERTS_VSN/bin
-    NODETOOL="$ERTS_PATH/escript $ERTS_PATH/nodetool $NAME_ARG $COOKIE_ARG"
+    if [ -e "$RUNNER_BASE_DIR/releases/$APP_VSN/nodetool" ]; then
+        NODETOOL="$ERTS_PATH/escript $RUNNER_BASE_DIR/releases/$APP_VSN/nodetool $NAME_ARG $COOKIE_ARG"
+    else
+        NODETOOL="$ERTS_PATH/escript $ERTS_PATH/nodetool $NAME_ARG $COOKIE_ARG"
+    fi
     SLIM_ARGS=
 elif [ "$RUNNER_SCRIPT_DATA" = "slim" ]; then
-    echo "slim release"
     # Setup system paths
     SYSTEM_ERL_PATH=`which erl`
     if [ ! -x "$SYSTEM_ERL_PATH" ]; then
@@ -155,15 +157,14 @@ elif [ "$RUNNER_SCRIPT_DATA" = "slim" ]; then
     unset SYSTEM_ERL_PATH
     unset SYSTEM_HOME_BIN
 
-    # Setup nodetool path. Is it nice to place nodetool script under releases?
     LOCAL_ERTS_PATH=$RUNNER_BASE_DIR/erts-$ERTS_VSN/bin
-    NODETOOL="$ERTS_PATH/escript $LOCAL_ERTS_PATH/nodetool $NAME_ARG $COOKIE_ARG"
+    NODETOOL="$ERTS_PATH/escript $RUNNER_BASE_DIR/releases/$APP_VSN/nodetool $NAME_ARG $COOKIE_ARG"
     unset LOCAL_ERL_PATH
 
     # Setup additional arguments for slim release
     SLIM_ARGS="-boot_var RELTOOL_EXT_LIB $RUNNER_BASE_DIR/lib -sasl releases_dir \"$RUNNER_BASE_DIR/releases\""
 else
-    echo "unknown runner_script.data"
+    echo "Unknown runner_script.data"
     exit 1
 fi
 
