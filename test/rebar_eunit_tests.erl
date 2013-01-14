@@ -337,7 +337,15 @@ basic_setup_test_() ->
          "myfunc_test() -> ?assertMatch(ok, myapp_mymod:myfunc()).\n"]).
 
 make_tmp_dir() ->
-    ok = file:make_dir(?TMP_DIR).
+    case file:make_dir(?TMP_DIR) of
+        ok ->
+            ok;
+        {error, eexist} ->
+            remove_tmp_dir(),
+            make_tmp_dir();
+        Error ->
+            throw(Error)
+    end.
 
 setup_environment() ->
     ok = make_tmp_dir(),
@@ -389,8 +397,8 @@ prepare_rebar_script() ->
         {unix, _} ->
             [] = os:cmd("chmod u+x " ++ Rebar);
         {win32, _} ->
-            {ok, _} = file:copy(?REBAR_SCRIPT ++ ".bat",
-                                ?TMP_DIR ++ "rebar.bat")
+            {ok, _} = file:copy(?REBAR_SCRIPT ++ ".cmd",
+                                ?TMP_DIR ++ "rebar.cmd")
     end.
 
 rebar() ->
