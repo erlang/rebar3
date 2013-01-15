@@ -1,4 +1,3 @@
-
 -module({{appid}}_sup).
 
 -behaviour(supervisor).
