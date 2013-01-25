@@ -81,6 +81,9 @@ resolve_variables([], Dict) ->
 resolve_variables([{Key, Value0} | Rest], Dict) when is_list(Value0) ->
     Value = render(list_to_binary(Value0), Dict),
     resolve_variables(Rest, dict:store(Key, Value, Dict));
+resolve_variables([{Key, {list, Dicts}} | Rest], Dict) when is_list(Dicts) ->
+    %% just un-tag it so mustache can use it
+    resolve_variables(Rest, dict:store(Key, Dicts, Dict));
 resolve_variables([_Pair | Rest], Dict) ->
     resolve_variables(Rest, Dict).
 
@@ -134,14 +137,14 @@ create1(Config, TemplateId) ->
                    undefined ->
                        Context0;
                    File ->
-                       case file:consult(File) of
-                           {ok, Terms} ->
-                               %% TODO: Cleanup/merge with similar code in rebar_reltool
-                               M = fun(_Key, _Base, Override) -> Override end,
-                               dict:merge(M, Context0, dict:from_list(Terms));
+                       case consult(load_file([], file, File)) of
                            {error, Reason} ->
                                ?ABORT("Unable to load template_vars from ~s: ~p\n",
-                                      [File, Reason])
+                                      [File, Reason]);
+                           Terms ->
+                               %% TODO: Cleanup/merge with similar code in rebar_reltool
+                               M = fun(_Key, _Base, Override) -> Override end,
+                               dict:merge(M, Context0, dict:from_list(Terms))
                        end
                end,
 
@@ -275,7 +278,7 @@ consult(Cont, Str, Acc) ->
             case Result of
                 {ok, Tokens, _} ->
                     {ok, Term} = erl_parse:parse_term(Tokens),
-                    consult([], Remaining, [Term | Acc]);
+                    consult([], Remaining, [maybe_dict(Term) | Acc]);
                 {eof, _Other} ->
                     lists:reverse(Acc);
                 {error, Info, _} ->
@@ -284,6 +287,13 @@ consult(Cont, Str, Acc) ->
         {more, Cont1} ->
             consult(Cont1, eof, Acc)
     end.
+
+
+maybe_dict({Key, {list, Dicts}}) ->
+    %% this is a 'list' element; a list of lists representing dicts
+    {Key, {list, [dict:from_list(D) || D <- Dicts]}};
+maybe_dict(Term) ->
+    Term.
 
 
 write_file(Output, Data, Force) ->
