@@ -57,27 +57,19 @@ xref(Config, _) ->
     true = code:add_path(rebar_utils:ebin_dir()),
 
     %% Get list of xref checks we want to run
-    XrefChecks = rebar_config:get(Config, xref_checks,
+    ConfXrefChecks = rebar_config:get(Config, xref_checks,
                                   [exports_not_used,
                                    undefined_function_calls]),
 
-    %% Look for exports that are unused by anything
-    ExportsNoWarn =
-        case lists:member(exports_not_used, XrefChecks) of
-            true ->
-                check_exports_not_used();
-            false ->
-                true
-        end,
+    SupportedXrefs = [undefined_function_calls, undefined_functions,
+                        locals_not_used, exports_not_used,
+                        deprecated_function_calls, deprecated_functions],
 
-    %% Look for calls to undefined functions
-    UndefNoWarn =
-        case lists:member(undefined_function_calls, XrefChecks) of
-            true ->
-                check_undefined_function_calls();
-            false ->
-                true
-        end,
+    XrefChecks = sets:to_list(sets:intersection(sets:from_list(SupportedXrefs),
+                                sets:from_list(ConfXrefChecks))),
+
+    %% Run xref checks
+    XrefNoWarn = xref_checks(XrefChecks),
 
     %% Run custom queries
     QueryChecks = rebar_config:get(Config, xref_queries, []),
@@ -89,7 +81,7 @@ xref(Config, _) ->
     %% Stop xref
     stopped = xref:stop(xref),
 
-    case lists:member(false, [ExportsNoWarn, UndefNoWarn, QueryNoWarn]) of
+    case lists:member(false, [XrefNoWarn, QueryNoWarn]) of
         true ->
             ?FAIL;
         false ->
@@ -100,26 +92,16 @@ xref(Config, _) ->
 %% Internal functions
 %% ===================================================================
 
-check_exports_not_used() ->
-    {ok, UnusedExports0} = xref:analyze(xref, exports_not_used),
-    UnusedExports = filter_away_ignored(UnusedExports0),
-
-    %% Report all the unused functions
-    display_mfas(UnusedExports, "is unused export (Xref)"),
-    UnusedExports =:= [].
-
-check_undefined_function_calls() ->
-    {ok, UndefinedCalls0} = xref:analyze(xref, undefined_function_calls),
-    UndefinedCalls =
-        [{find_mfa_source(Caller), format_fa(Caller), format_mfa(Target)}
-         || {Caller, Target} <- UndefinedCalls0],
-
-    lists:foreach(
-      fun({{Source, Line}, FunStr, Target}) ->
-              ?CONSOLE("~s:~w: Warning ~s calls undefined function ~s\n",
-                       [Source, Line, FunStr, Target])
-      end, UndefinedCalls),
-    UndefinedCalls =:= [].
+xref_checks(XrefChecks) ->
+    XrefWarnCount = lists:foldl(
+        fun(XrefCheck, Acc) ->
+            {ok, Results} = xref:analyze(xref, XrefCheck),
+            FilteredResults =filter_xref_results(XrefCheck, Results),
+            lists:foreach(fun(Res) -> display_xrefresult(XrefCheck, Res) end, FilteredResults),
+            Acc + length(FilteredResults)
+        end,
+        0, XrefChecks),
+    XrefWarnCount =:= 0.
 
 check_query({Query, Value}) ->
     {ok, Answer} = xref:q(xref, Query),
@@ -147,41 +129,101 @@ code_path(Config) ->
 %%
 %% Ignore behaviour functions, and explicitly marked functions
 %%
-filter_away_ignored(UnusedExports) ->
-    %% Functions can be ignored by using
-    %% -ignore_xref([{F, A}, ...]).
+%% Functions can be ignored by using
+%% -ignore_xref([{F, A}, {M, F, A}...]).
 
-    %% Setup a filter function that builds a list of behaviour callbacks and/or
-    %% any functions marked to ignore. We then use this list to mask any
-    %% functions marked as unused exports by xref
-    F = fun(Mod) ->
-                Attrs  = Mod:module_info(attributes),
-                Ignore = keyall(ignore_xref, Attrs),
-                Callbacks = [B:behaviour_info(callbacks)
-                             || B <- keyall(behaviour, Attrs)],
-                [{Mod, F, A} || {F, A} <- Ignore ++ lists:flatten(Callbacks)]
+get_xref_ignorelist(Mod, XrefCheck) ->
+    %% Get ignore_xref attribute and combine them in one list
+    Attributes =
+        try
+            Mod:module_info(attributes)
+        catch
+            _Class:_Error -> []
         end,
-    AttrIgnore =
-        lists:flatten(
-          lists:map(F, lists:usort([M || {M, _, _} <- UnusedExports]))),
-    [X || X <- UnusedExports, not lists:member(X, AttrIgnore)].
+
+    Ignore_xref = keyall(ignore_xref, Attributes),
+
+    Behaviour_callbacks = case XrefCheck of
+            exports_not_used -> [B:behaviour_info(callbacks) || B <- keyall(behaviour, Attributes)];
+            _ -> []
+    end,
+
+    % And create a flat {M,F,A} list
+    lists:foldl(
+        fun(El,Acc) ->
+            case El of
+                {F, A} -> [{Mod,F,A} | Acc];
+                {M, F, A} -> [{M,F,A} | Acc]
+            end
+        end, [],lists:flatten([Ignore_xref, Behaviour_callbacks])).
 
 keyall(Key, List) ->
     lists:flatmap(fun({K, L}) when Key =:= K -> L; (_) -> [] end, List).
 
-display_mfas([], _Message) ->
-    ok;
-display_mfas([{_Mod, Fun, Args} = MFA | Rest], Message) ->
-    {Source, Line} = find_mfa_source(MFA),
-    ?CONSOLE("~s:~w: Warning: function ~s/~w ~s\n",
-             [Source, Line, Fun, Args, Message]),
-    display_mfas(Rest, Message).
+parse_xref_result(XrefResult) ->
+    case XrefResult of
+        {_, MFAt} -> MFAt;
+        MFAt -> MFAt
+    end.
+
+filter_xref_results(XrefCheck, XrefResults) ->
+    SearchModules = lists:usort(lists:map(
+        fun(Res) ->
+            case Res of
+                {Mt,_Ft,_At} -> Mt;
+                {{Ms,_Fs,_As},{_Mt,_Ft,_At}} -> Ms;
+                _ -> undefined
+            end
+        end, XrefResults)),
+
+    Ignores = lists:flatten([
+        get_xref_ignorelist(Module,XrefCheck) || Module <- SearchModules]),
+
+    [Result || Result <- XrefResults,
+        not lists:member(parse_xref_result(Result),Ignores)].
+
+display_xrefresult(Type, XrefResult) ->
+    { Source, SMFA, TMFA } = case XrefResult of
+        {MFASource, MFATarget} ->
+            {format_mfa_source(MFASource), format_mfa(MFASource),
+                format_mfa(MFATarget)};
+        MFATarget ->
+            {format_mfa_source(MFATarget), format_mfa(MFATarget),
+                undefined}
+    end,
+    case Type of
+        undefined_function_calls ->
+            ?CONSOLE("~sWarning: ~s calls undefined function ~s (Xref)\n",
+                [Source, SMFA, TMFA]);
+        undefined_functions ->
+            ?CONSOLE("~sWarning: ~s is undefined function (Xref)\n",
+                [Source, SMFA]);
+        locals_not_used ->
+            ?CONSOLE("~sWarning: ~s is unused local function (Xref)\n",
+                [Source, SMFA]);
+        exports_not_used ->
+            ?CONSOLE("~sWarning: ~s is unused export (Xref)\n",
+                [Source, SMFA]);
+        deprecated_function_calls ->
+            ?CONSOLE("~sWarning: ~s calls deprecated function ~s (Xref)\n",
+                [Source, SMFA, TMFA]);
+        deprecated_functions ->
+            ?CONSOLE("~sWarning: ~s is deprecated function (Xref)\n",
+                [Source, SMFA]);
+        Other ->
+            ?CONSOLE("~sWarning: ~s - ~s xref check: ~s (Xref)\n",
+                [Source, SMFA, TMFA, Other])
+    end.
 
 format_mfa({M, F, A}) ->
     ?FMT("~s:~s/~w", [M, F, A]).
 
-format_fa({_M, F, A}) ->
-    ?FMT("~s/~w", [F, A]).
+format_mfa_source(MFA) ->
+    case find_mfa_source(MFA) of
+        {module_not_found, function_not_found} -> "";
+        {Source, function_not_found} -> ?FMT("~s: ", [Source]);
+        {Source, Line} -> ?FMT("~s:~w: ", [Source, Line])
+    end.
 
 %%
 %% Extract an element from a tuple, or undefined if N > tuple size
@@ -201,7 +243,12 @@ safe_element(N, Tuple) ->
 %% being too paranoid here.
 %%
 find_mfa_source({M, F, A}) ->
-    {M, Bin, _} = code:get_object_code(M),
+    case code:get_object_code(M) of
+        error -> {module_not_found, function_not_found};
+        {M, Bin, _} -> find_function_source(M,F,A,Bin)
+    end.
+
+find_function_source(M, F, A, Bin) ->
     AbstractCode = beam_lib:chunks(Bin, [abstract_code]),
     {ok, {M, [{abstract_code, {raw_abstract_v1, Code}}]}} = AbstractCode,
     %% Extract the original source filename from the abstract code
