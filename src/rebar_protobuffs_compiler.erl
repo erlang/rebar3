@@ -29,6 +29,9 @@
 -export([compile/2,
          clean/2]).
 
+%% for internal use only
+-export([info/2]).
+
 -include("rebar.hrl").
 
 %% ===================================================================
@@ -57,7 +60,6 @@ compile(Config, _AppFile) ->
             end
     end.
 
-
 clean(_Config, _AppFile) ->
     %% Get a list of generated .beam and .hrl files and then delete them
     Protos = rebar_utils:find_files("src", ".*\\.proto$"),
@@ -71,10 +73,23 @@ clean(_Config, _AppFile) ->
             delete_each(Targets)
     end.
 
-
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+info(help, compile) ->
+    info_help("Build Protobuffs (*.proto) sources");
+info(help, clean) ->
+    info_help("Delete Protobuffs (*.proto) build results").
+
+info_help(Description) ->
+    ?CONSOLE(
+       "~s.~n"
+       "~n"
+       "Valid rebar.config options:~n"
+       "  erl_opts is passed as compile_flags to "
+       "protobuffs_compile:scan_file/2~n",
+       [Description]).
 
 protobuffs_is_present() ->
     code:which(protobuffs_compile) =/= non_existing.
@@ -115,7 +130,7 @@ compile_each(Config, [{Proto, Beam, Hrl} | Rest]) ->
                     ok = rebar_file_utils:mv(Hrl, "include"),
                     ok;
                 Other ->
-                    ?ERROR("Protobuff compile of ~s failed: ~p\n",
+                    ?ERROR("Protobuffs compile of ~s failed: ~p\n",
                            [Proto, Other]),
                     ?FAIL
             end;

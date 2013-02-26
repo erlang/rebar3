@@ -39,6 +39,9 @@
 
 -export([doc/2]).
 
+%% for internal use only
+-export([info/2]).
+
 -include("rebar.hrl").
 
 %% ===================================================================
@@ -70,6 +73,14 @@ doc(Config, File) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+info(help, doc) ->
+    ?CONSOLE(
+       "Generate Erlang program documentation.~n"
+       "~n"
+       "Valid rebar.config options:~n"
+       "  {edoc_opts, []} (see edoc:application/3 documentation)~n",
+       []).
 
 setup_code_path() ->
     %% Setup code path prior to calling edoc so that edown, asciiedoc,

@@ -28,6 +28,9 @@
 
 -export([qc/2, triq/2, eqc/2, clean/2]).
 
+%% for internal use only
+-export([info/2]).
+
 -include("rebar.hrl").
 
 -define(QC_DIR, ".qc").
@@ -56,6 +59,19 @@ clean(_Config, _File) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+info(help, qc) ->
+    ?CONSOLE(
+       "Test QuickCheck properties.~n"
+       "~n"
+       "Valid rebar.config options:~n"
+       "  {qc_opts, [{qc_mod, module()}, Options]}~n"
+       "  ~p~n"
+       "  ~p~n",
+       [
+        {qc_compile_opts, []},
+        {qc_first_files, []}
+       ]).
 
 -define(TRIQ_MOD, triq).
 -define(EQC_MOD, eqc).

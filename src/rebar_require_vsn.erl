@@ -33,6 +33,9 @@
 -export([compile/2,
          eunit/2]).
 
+%% for internal use only
+-export([info/2]).
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -46,6 +49,25 @@ eunit(Config, _) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
+
+info(help, compile) ->
+    info_help();
+info(help, eunit) ->
+    info_help().
+
+info_help() ->
+    ?CONSOLE(
+       "Check required ERTS or OTP release version.~n"
+       "~n"
+       "Valid rebar.config options:~n"
+       "  ~p~n"
+       "  ~p~n"
+       "  ~p~n",
+       [
+        {require_erts_vsn, ".*"},
+        {require_otp_vsn, ".*"},
+        {require_min_otp_vsn, ".*"}
+       ]).
 
 check_versions(Config) ->
     ErtsRegex = rebar_config:get(Config, require_erts_vsn, ".*"),

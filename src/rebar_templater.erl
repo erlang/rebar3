@@ -35,6 +35,9 @@
 -export([resolve_variables/2,
          render/2]).
 
+%% for internal use only
+-export([info/2]).
+
 -include("rebar.hrl").
 
 -define(TEMPLATE_RE, ".*\\.template\$").
@@ -97,6 +100,27 @@ render(Bin, Context) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+info(help, create) ->
+    ?CONSOLE(
+       "Create skel based on template and vars.~n"
+       "~n"
+       "Valid command line options:~n"
+       "  template= [var=foo,...]~n", []);
+info(help, 'create-app') ->
+    ?CONSOLE(
+       "Create simple app skel.~n"
+       "~n"
+       "Valid command line options:~n"
+       "  [appid=myapp]~n", []);
+info(help, 'create-node') ->
+    ?CONSOLE(
+       "Create simple node skel.~n"
+       "~n"
+       "Valid command line options:~n"
+       "  [nodeid=mynode]~n", []);
+info(help, 'list-templates') ->
+    ?CONSOLE("List available templates.~n", []).
 
 create1(Config, TemplateId) ->
     {AvailTemplates, Files} = find_templates(Config),

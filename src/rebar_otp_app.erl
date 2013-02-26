@@ -29,6 +29,9 @@
 -export([compile/2,
          clean/2]).
 
+%% for internal use only
+-export([info/2]).
+
 -include("rebar.hrl").
 
 %% ===================================================================
@@ -82,10 +85,25 @@ clean(_Config, File) ->
             ok
     end.
 
-
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+info(help, compile) ->
+    info_help("Validate .app file");
+info(help, clean) ->
+    info_help("Delete .app file if generated from .app.src").
+
+info_help(Description) ->
+    ?CONSOLE(
+       "~s.~n"
+       "~n"
+       "Valid rebar.config options:~n"
+       "  ~p~n",
+       [
+        Description,
+        {validate_app_modules, true}
+       ]).
 
 preprocess(Config, AppSrcFile) ->
     case rebar_app_utils:load_app_file(Config, AppSrcFile) of

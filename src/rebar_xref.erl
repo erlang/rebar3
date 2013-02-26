@@ -37,6 +37,9 @@
 
 -export([xref/2]).
 
+%% for internal use only
+-export([info/2]).
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -99,6 +102,22 @@ xref(Config, _) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+info(help, xref) ->
+    ?CONSOLE(
+       "Run cross reference analysis.~n"
+       "~n"
+       "Valid rebar.config options:~n"
+       "  ~p~n"
+       "  ~p~n"
+       "  ~p~n",
+       [
+        {xref_warnings, false},
+        {xref_checks, [exports_not_used, undefined_function_calls]},
+        {xref_queries,
+         [{"(xc - uc) || (xu - x - b"
+           " - (\"mod\":\".*foo\"/\"4\"))",[]}]}
+       ]).
 
 check_exports_not_used() ->
     {ok, UnusedExports0} = xref:analyze(xref, exports_not_used),

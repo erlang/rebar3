@@ -30,6 +30,9 @@
 -export([compile/2,
          clean/2]).
 
+%% for internal use only
+-export([info/2]).
+
 -include("rebar.hrl").
 
 %% ===================================================================
@@ -47,6 +50,23 @@ clean(_Config, _AppFile) ->
     GeneratedFiles = asn_generated_files("asn1", "src", "include"),
     ok = rebar_file_utils:delete_each(GeneratedFiles),
     ok.
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
+
+info(help, compile) ->
+    info_help("Build ASN.1 (*.asn1) sources");
+info(help, clean) ->
+    info_help("Delete ASN.1 (*.asn1) results").
+
+info_help(Description) ->
+    ?CONSOLE(
+       "~s.~n"
+       "~n"
+       "Valid rebar.config options:~n"
+       "  {asn1_opts, []} (see asn1ct:compile/2 documentation)~n",
+       [Description]).
 
 -spec compile_asn1(file:filename(), file:filename(),
                    rebar_config:config()) -> ok.

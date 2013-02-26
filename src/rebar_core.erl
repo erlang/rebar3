@@ -26,13 +26,42 @@
 %% -------------------------------------------------------------------
 -module(rebar_core).
 
--export([process_commands/2]).
+-export([process_commands/2, help/2]).
 
 -include("rebar.hrl").
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+help(ParentConfig, Commands) ->
+    %% get all core modules
+    {ok, AnyDirModules} = application:get_env(rebar, any_dir_modules),
+    {ok, RawCoreModules} = application:get_env(rebar, modules),
+    AppDirModules = proplists:get_value(app_dir, RawCoreModules),
+    RelDirModules = proplists:get_value(rel_dir, RawCoreModules),
+    CoreModules = AnyDirModules ++ AppDirModules ++ RelDirModules,
+
+    %% get plugin modules
+    Predirs = [],
+    Dir = rebar_utils:get_cwd(),
+    SubdirAssoc = remember_cwd_subdir(Dir, Predirs),
+    Config = maybe_load_local_config(Dir, ParentConfig),
+    {ok, PluginModules} = plugin_modules(Config, SubdirAssoc),
+
+    AllModules = CoreModules ++ PluginModules,
+
+    lists:foreach(
+      fun(Cmd) ->
+              ?CONSOLE("==> help ~p~n~n", [Cmd]),
+              CmdModules = select_modules(AllModules, Cmd, []),
+              Modules = select_modules(CmdModules, info, []),
+              lists:foreach(fun(M) ->
+                                    ?CONSOLE("=== ~p:~p ===~n", [M, Cmd]),
+                                    M:info(help, Cmd),
+                                    ?CONSOLE("~n", [])
+                            end, Modules)
+      end, Commands).
 
 process_commands([], ParentConfig) ->
     AbortTrapped = rebar_config:get_xconf(ParentConfig, abort_trapped, false),
