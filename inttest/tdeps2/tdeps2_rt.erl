@@ -34,9 +34,9 @@ files() ->
 run(_Dir) ->
     %% Initialize the b/c apps as mercurial repos so that dependencies pull
     %% properly
-    HgCmd = "/bin/sh -c \"hg init && hg add && hg commit -m 'Initial commit'\"",
-    {ok, _} = retest_sh:run(HgCmd, [{dir, "repo/b"}]),
-    {ok, _} = retest_sh:run(HgCmd, [{dir, "repo/c"}]),
+    GitCmd = "/bin/sh -c \"git init && git add -A && git commit -a -m 'Initial commit'\"",
+    {ok, _} = retest_sh:run(GitCmd, [{dir, "repo/b"}]),
+    {ok, _} = retest_sh:run(GitCmd, [{dir, "repo/c"}]),
 
     {ok, _} = retest_sh:run("./rebar -v get-deps compile", []),
     ok.
