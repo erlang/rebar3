@@ -233,9 +233,9 @@ info_help(Description) ->
         {deps, [application_name,
                 {application_name, "1.0.*"},
                 {application_name, "1.0.*",
-                 {git, "git://github.com/basho/rebar.git", {branch, "master"}}},
+                 {git, "git://github.com/rebar/rebar.git", {branch, "master"}}},
                 {application_name, "",
-                 {git, "git://github.com/basho/rebar.git", {branch, "master"}},
+                 {git, "git://github.com/rebar/rebar.git", {branch, "master"}},
                  [raw]}]}
        ]).
 

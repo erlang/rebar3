@@ -156,7 +156,7 @@
 {deps, [application_name,
         {application_name, "1.0.*"},
         {application_name, "1.0.*",
-         {git, "git://github.com/basho/rebar.git", {branch, "master"}}},
+         {git, "git://github.com/rebar/rebar.git", {branch, "master"}}},
         %% Dependencies can be marked as 'raw'. Rebar does not require
         %% such dependencies to have a standard Erlang/OTP layout
         %% which assumes the presence of either
@@ -171,7 +171,7 @@
         %% 'raw' subdirectories: get-deps, update-deps, check-deps,
         %% list-deps and delete-deps.
         {application_name, "",
-         {git, "git://github.com/basho/rebar.git", {branch, "master"}},
+         {git, "git://github.com/rebar/rebar.git", {branch, "master"}},
          [raw]}]}.
 
 %% == Subdirectories ==
