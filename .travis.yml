@@ -4,4 +4,4 @@ otp_release:
   - R15B
   - R14B04
   - R14B03
-script: "make debug xref clean all deps test"
+script: "make travis"
