@@ -24,7 +24,7 @@ dialyzer: dialyzer_warnings
 	@diff -U0 dialyzer_reference dialyzer_warnings
 
 dialyzer_warnings:
-	-@dialyzer -q -n ebin -Wunmatched_returns -Werror_handling \
+	-@dialyzer -q -nn -n ebin -Wunmatched_returns -Werror_handling \
 		-Wrace_conditions > dialyzer_warnings
 
 binary: VSN = $(shell ./rebar -V)
