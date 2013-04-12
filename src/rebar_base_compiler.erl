@@ -226,6 +226,8 @@ format_warnings(Config, Source, Warnings, Opts) ->
 
 maybe_report([{error, {error, _Es, _Ws}=ErrorsAndWarnings}, {source, _}]) ->
     maybe_report(ErrorsAndWarnings);
+maybe_report([{error, E}, {source, S}]) ->
+    report(["unexpected error compiling " ++ S, io_lib:fwrite("~n~p~n", [E])]);
 maybe_report({error, Es, Ws}) ->
     report(Es),
     report(Ws);
