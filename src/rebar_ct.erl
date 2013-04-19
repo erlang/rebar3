@@ -108,8 +108,16 @@ run_test(TestDir, LogDir, Config, _File) ->
                      " 2>&1 | tee -a " ++ RawLog
              end,
 
-    rebar_utils:sh(Cmd ++ Output, [{env,[{"TESTDIR", TestDir}]}]),
-    check_log(Config, RawLog).
+    case rebar_utils:sh(Cmd ++ Output, [{env,[{"TESTDIR", TestDir}]}, return_on_error]) of
+        {ok,_} ->
+            %% in older versions of ct_run, this could have been a failure
+            %% that returned a non-0 code. Check for that!
+            check_success_log(Config, RawLog);
+        {error,Res} ->
+            %% In newer ct_run versions, this may be a sign of a good compile
+            %% that failed cases. In older version, it's a worse error.
+            check_fail_log(Config, RawLog, Cmd ++ Output, Res)
+    end.
 
 clear_log(LogDir, RawLog) ->
     case filelib:ensure_dir(filename:join(LogDir, "index.html")) of
@@ -124,7 +132,16 @@ clear_log(LogDir, RawLog) ->
 
 %% calling ct with erl does not return non-zero on failure - have to check
 %% log results
-check_log(Config, RawLog) ->
+check_success_log(Config, RawLog) ->
+    check_log(Config, RawLog, fun(Msg) -> ?CONSOLE("DONE.\n~s\n", [Msg]) end).
+
+check_fail_log(Config, RawLog, Command, {Rc, Output}) ->
+    check_log(Config, RawLog, fun(_Msg) ->
+            ?ABORT("~s failed with error: ~w and output:~n~s~n",
+                   [Command, Rc, Output])
+    end).
+
+check_log(Config,RawLog,Fun) ->
     {ok, Msg} =
         rebar_utils:sh("grep -e 'TEST COMPLETE' -e '{error,make_failed}' "
                        ++ RawLog, [{use_stdout, false}]),
@@ -142,8 +159,9 @@ check_log(Config, RawLog) ->
             ?FAIL;
 
         true ->
-            ?CONSOLE("DONE.\n~s\n", [Msg])
+            Fun(Msg)
     end.
+
 
 %% Show the log if it hasn't already been shown because verbose was on
 show_log(Config, RawLog) ->
