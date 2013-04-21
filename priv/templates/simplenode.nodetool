@@ -6,8 +6,6 @@
 %% nodetool: Helper Script for interacting with live nodes
 %%
 %% -------------------------------------------------------------------
--mode(compile).
-
 main(Args) ->
     ok = start_epmd(),
     %% Extract the args
