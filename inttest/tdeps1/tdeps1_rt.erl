@@ -35,6 +35,8 @@ run(_Dir) ->
     %% properly
     GitCmds = ["git init",
                "git add -A",
+               "git config user.email 'tdeps@example.com'",
+               "git config user.name 'tdeps'",
                "git commit -a -m 'Initial Commit'"],
     apply_cmds(GitCmds, [{dir, "repo/b"}]),
     apply_cmds(GitCmds, [{dir, "repo/c"}]),
