@@ -23,12 +23,21 @@ files() ->
      {copy, "c.hrl", "repo/c/include/c.hrl"}
     ].
 
+apply_cmds([], _Params) ->
+    ok;
+apply_cmds([Cmd | Rest], Params) ->
+    io:format("Running: ~s (~p)\n", [Cmd, Params]),
+    {ok, _} = retest_sh:run(Cmd, Params),
+    apply_cmds(Rest, Params).
+
 run(_Dir) ->
     %% Initialize the b/c apps as git repos so that dependencies pull
     %% properly
-    GitCmd = "/bin/sh -c \"git init && git add -A && git commit --author 'tdeps <tdeps@example.com>' -a -m 'Initial commit'\"",
-    {ok, _} = retest_sh:run(GitCmd, [{dir, "repo/b"}]),
-    {ok, _} = retest_sh:run(GitCmd, [{dir, "repo/c"}]),
+    GitCmds = ["git init",
+               "git add -A",
+               "git commit -a -m 'Initial Commit'"],
+    apply_cmds(GitCmds, [{dir, "repo/b"}]),
+    apply_cmds(GitCmds, [{dir, "repo/c"}]),
 
     {ok, _} = retest_sh:run("./rebar get-deps compile", []),
 
