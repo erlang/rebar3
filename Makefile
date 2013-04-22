@@ -38,6 +38,6 @@ deps:
 
 test:
 	@$(REBAR) eunit
-	@$(RETEST) inttest
+	@$(RETEST) -v inttest
 
 travis: clean debug xref clean all deps test
