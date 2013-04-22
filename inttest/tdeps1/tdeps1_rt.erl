@@ -26,7 +26,7 @@ files() ->
 run(_Dir) ->
     %% Initialize the b/c apps as git repos so that dependencies pull
     %% properly
-    GitCmd = "/bin/sh -c \"git init && git add -A && git commit -a -m 'Initial commit'\"",
+    GitCmd = "/bin/sh -c \"git init && git add -A && git commit --author 'tdeps <tdeps@example.com>' -a -m 'Initial commit'\"",
     {ok, _} = retest_sh:run(GitCmd, [{dir, "repo/b"}]),
     {ok, _} = retest_sh:run(GitCmd, [{dir, "repo/c"}]),
 
