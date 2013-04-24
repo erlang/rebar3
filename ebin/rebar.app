@@ -14,6 +14,7 @@
               rebar_cleaner,
               rebar_config,
               rebar_core,
+              rebar_cover_utils,
               rebar_ct,
               rebar_deps,
               rebar_edoc,

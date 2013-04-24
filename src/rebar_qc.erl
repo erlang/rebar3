@@ -4,7 +4,7 @@
 %%
 %% rebar: Erlang Build Tools
 %%
-%% Copyright (c) 2011-2012 Tuncer Ayaz
+%% Copyright (c) 2011-2014 Tuncer Ayaz
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a copy
 %% of this software and associated documentation files (the "Software"), to deal
@@ -68,11 +68,17 @@ info(help, qc) ->
        "  {qc_opts, [{qc_mod, module()}, Options]}~n"
        "  ~p~n"
        "  ~p~n"
+       "  ~p~n"
+       "  ~p~n"
+       "  ~p~n"
        "Valid command line options:~n"
        "  compile_only=true (Compile but do not test properties)",
        [
         {qc_compile_opts, []},
-        {qc_first_files, []}
+        {qc_first_files, []},
+        {cover_enabled, false},
+        {cover_print_enabled, false},
+        {cover_export_enabled, false}
        ]);
 info(help, clean) ->
     Description = ?FMT("Delete QuickCheck test dir (~s)", [?QC_DIR]),
@@ -151,21 +157,40 @@ run(Config, QC, QCOpts) ->
     %% Compile erlang code to ?QC_DIR, using a tweaked config
     %% with appropriate defines, and include all the test modules
     %% as well.
-    {ok, _SrcErls} = rebar_erlc_compiler:test_compile(Config, "qc", ?QC_DIR),
+    {ok, SrcErls} = rebar_erlc_compiler:test_compile(Config, "qc", ?QC_DIR),
 
     case CompileOnly of
         "true" ->
             true = code:set_path(CodePath),
             ?CONSOLE("Compiled modules for qc~n", []);
         false ->
-            run1(QC, QCOpts, CodePath)
+            run1(QC, QCOpts, Config, CodePath, SrcErls)
     end.
 
-run1(QC, QCOpts, CodePath) ->
+run1(QC, QCOpts, Config, CodePath, SrcErls) ->
+
+    AllBeamFiles = rebar_utils:beams(?QC_DIR),
+    AllModules = [rebar_utils:beam_to_mod(?QC_DIR, N)
+                  || N <- AllBeamFiles],
+    PropMods = find_prop_mods(),
+    FilteredModules = AllModules -- PropMods,
+
+    SrcModules = [rebar_utils:erl_to_mod(M) || M <- SrcErls],
+
+    {ok, CoverLog} = rebar_cover_utils:init(Config, AllBeamFiles, qc_dir()),
+
     TestModule = fun(M) -> qc_module(QC, QCOpts, M) end,
-    case lists:flatmap(TestModule, find_prop_mods()) of
+    QCResult = lists:flatmap(TestModule, PropMods),
+
+    rebar_cover_utils:perform_cover(Config, FilteredModules, SrcModules,
+                                    qc_dir()),
+    rebar_cover_utils:close(CoverLog),
+    ok = cover:stop(),
+
+    true = code:set_path(CodePath),
+
+    case QCResult of
         [] ->
-            true = code:set_path(CodePath),
             ok;
         Errors ->
             ?ABORT("One or more QC properties didn't hold true:~n~p~n",
