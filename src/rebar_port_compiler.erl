@@ -100,7 +100,8 @@ compile(Config, AppFile) ->
         [] ->
             ok;
         Specs ->
-            SharedEnv = rebar_config:get_env(Config, ?MODULE),
+            SharedEnv = rebar_config:get_env(Config, rebar_deps) ++
+                rebar_config:get_env(Config, ?MODULE),
 
             %% Compile each of the sources
             NewBins = compile_sources(Config, Specs, SharedEnv),
