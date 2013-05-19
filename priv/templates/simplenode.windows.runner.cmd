@@ -30,6 +30,7 @@
 @set epmd="%erts_bin%\epmd.exe"
 @set escript="%erts_bin%\escript.exe"
 @set werl="%erts_bin%\werl.exe"
+@set nodetool="%erts_bin%\nodetool"
 
 @if "%1"=="usage" @goto usage
 @if "%1"=="install" @goto install
@@ -38,13 +39,14 @@
 @if "%1"=="stop" @goto stop
 @if "%1"=="restart" @call :stop && @goto start
 @if "%1"=="console" @goto console
+@if "%1"=="ping" @goto ping
 @if "%1"=="query" @goto query
 @if "%1"=="attach" @goto attach
 @if "%1"=="upgrade" @goto upgrade
 @echo Unknown command: "%1"
 
 :usage
-@echo Usage: %~n0 [install^|uninstall^|start^|stop^|restart^|console^|query^|attach^|upgrade]
+@echo Usage: %~n0 [install^|uninstall^|start^|stop^|restart^|console^|ping^|query^|attach^|upgrade]
 @goto :EOF
 
 :install
@@ -69,6 +71,11 @@
 
 :console
 @start "%node_name% console" %werl% -boot "%node_boot_script%" -config "%sys_config%" -args_file "%vm_args%" -sname %node_name%
+@goto :EOF
+
+:ping
+@%escript% %nodetool% ping -sname "%node_name%" -setcookie "%erlang_cookie%"
+@exit %ERRORLEVEL%
 @goto :EOF
 
 :query
