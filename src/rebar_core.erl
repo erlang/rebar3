@@ -530,35 +530,41 @@ plugin_modules(Config, PredirsAssoc, FoundModules, MissingModules) ->
 
 load_plugin_modules(Config, PredirsAssoc, Modules) ->
     Cwd = rebar_utils:get_cwd(),
-    PluginDir = case rebar_config:get_local(Config, plugin_dir, undefined) of
-                    undefined ->
-                        filename:join(Cwd, "plugins");
-                    Dir ->
-                        Dir
-                end,
+    PluginDirs = case rebar_config:get_local(Config, plugin_dir, undefined) of
+        undefined ->
+            % Plugin can be in the project's "plugins" folder
+            [filename:join(Cwd, "plugins")];
+        Dir ->
+            [Dir]
+    end ++
+    % We also want to include this case:
+    % Plugin can be in "plugins" directory of the plugin base directory. For
+    % example, Cwd depends on Plugin, and deps/Plugin/plugins/Plugin.erl is the
+    % plugin.
+    [
+        filename:join(Dir, "plugins") ||
+        Dir <- get_plugin_base_dirs(Cwd, PredirsAssoc)
+    ],
 
     %% Find relevant sources in base_dir and plugin_dir
     Erls = string:join([atom_to_list(M)++"\\.erl" || M <- Modules], "|"),
     RE = "^" ++ Erls ++ "\$",
-    BaseDir = get_plugin_base_dir(Cwd, PredirsAssoc),
     %% If a plugin is found both in base_dir and plugin_dir, the clash
     %% will provoke an error and we'll abort.
-    Sources = rebar_utils:find_files(PluginDir, RE, false)
-        ++ rebar_utils:find_files(BaseDir, RE, false),
+    Sources = [rebar_utils:find_files(PD, RE, false) || PD <- PluginDirs],
 
     %% Compile and load plugins
-    Loaded = [load_plugin(Src) || Src <- Sources],
+    Loaded = [load_plugin(Src) || Src <- lists:append(Sources)],
     FilterMissing = is_missing_plugin(Loaded),
     NotLoaded = [V || V <- Modules, FilterMissing(V)],
     {Loaded, NotLoaded}.
 
-get_plugin_base_dir(Cwd, PredirsAssoc) ->
-    case dict:find(Cwd, PredirsAssoc) of
-        {ok, BaseDir} ->
-            BaseDir;
-        error ->
-            Cwd
-    end.
+%% @doc PredirsAssoc is a dictionary of plugindir -> 'parent' pairs
+%% 'parent' in this case depends on plugin; therefore we have to give
+%% all plugins that Cwd ('parent' in this case) depends on.
+get_plugin_base_dirs(Cwd, PredirsAssoc) ->
+    [PluginDir || {PluginDir, Master} <- dict:to_list(PredirsAssoc),
+        Master =:= Cwd].
 
 is_missing_plugin(Loaded) ->
     fun(Mod) -> not lists:member(Mod, Loaded) end.
