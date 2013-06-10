@@ -15,7 +15,7 @@ fi
 # clear it so if we invoke other scripts, they run as ksh
 unset POSIX_SHELL
 
-RUNNER_SCRIPT_DIR=$(cd ${0%/*} && pwd)
+RUNNER_SCRIPT_DIR=$(cd ${0%/*} && pwd -P)
 
 CALLER_DIR=$PWD
 
