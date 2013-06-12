@@ -175,6 +175,7 @@ qc_module(QC=triq, _QCOpts, M) ->
         Failed ->
             [Failed]
     end;
+qc_module(QC=eqc, [], M) -> QC:module(M);
 qc_module(QC=eqc, QCOpts, M) -> QC:module(QCOpts, M).
 
 find_prop_mods() ->
