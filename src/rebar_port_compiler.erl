@@ -498,9 +498,19 @@ erts_dir() ->
 
 os_env() ->
     ReOpts = [{return, list}, {parts, 2}, unicode],
-    Os = [list_to_tuple(re:split(S, "=", ReOpts)) || S <- os:getenv()],
+    Os = [list_to_tuple(re:split(S, "=", ReOpts)) ||
+             S <- lists:filter(fun discard_deps_vars/1, os:getenv())],
     %% Drop variables without a name (win32)
     [T1 || {K, _V} = T1 <- Os, K =/= []].
+
+%%
+%% To avoid having multiple repetitions of the same environment variables
+%% (ERL_LIBS), avoid exporting any variables that may cause conflict with
+%% those exported by the rebar_deps module (ERL_LIBS, REBAR_DEPS_DIR)
+%%
+discard_deps_vars("ERL_LIBS=" ++ _Value)       -> false;
+discard_deps_vars("REBAR_DEPS_DIR=" ++ _Value) -> false;
+discard_deps_vars(_Var)                        -> true.
 
 select_compile_template(drv, Compiler) ->
     select_compile_drv_template(Compiler);
