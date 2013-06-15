@@ -10,6 +10,7 @@ clean:
 	@rm -rf rebar ebin/*.beam inttest/rt.work rt.work .eunit
 
 distclean: clean
+	@rm -f dialyzer_warnings
 	@rm -rf deps
 
 debug:
