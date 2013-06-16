@@ -524,9 +524,9 @@ align_notcovered_count(Module, Covered, NotCovered, true) ->
 
 cover_write_index(Coverage, SrcModules) ->
     {ok, F} = file:open(filename:join([?EUNIT_DIR, "index.html"]), [write]),
-    ok = file:write(F, "<!DOCTYPE HTML><html>\n" ++
-                        "<head><meta charset=\"utf-8\">" ++
-                        "<title>Coverage Summary</title></head>\n" ++
+    ok = file:write(F, "<!DOCTYPE HTML><html>\n"
+                        "<head><meta charset=\"utf-8\">"
+                        "<title>Coverage Summary</title></head>\n"
                         "<body>\n"),
     IsSrcCoverage = fun({Mod,_C,_N}) -> lists:member(Mod, SrcModules) end,
     {SrcCoverage, TestCoverage} = lists:partition(IsSrcCoverage, Coverage),
