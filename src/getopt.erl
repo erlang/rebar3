@@ -11,19 +11,11 @@
 -module(getopt).
 -author('juanjo@comellas.org').
 
--export([parse/2, usage/2, usage/3, usage/4]).
+-export([parse/2, usage/2, usage/3, usage/4, tokenize/1]).
+-export([usage_cmd_line/2]).
 
--export_type([arg_type/0,
-	      arg_value/0,
-	      arg_spec/0,
-	      simple_option/0,
-	      compound_option/0,
-	      option/0,
-	      option_spec/0]).
-
--define(TAB_LENGTH, 8).
-%% Indentation of the help messages in number of tabs.
--define(INDENTATION, 3).
+-define(LINE_LENGTH, 75).
+-define(MIN_USAGE_COMMAND_LINE_OPTION_LENGTH, 25).
 
 %% Position of each field in the option specification tuple.
 -define(OPT_NAME, 1).
@@ -33,42 +25,48 @@
 -define(OPT_HELP, 5).
 
 -define(IS_OPT_SPEC(Opt), (tuple_size(Opt) =:= ?OPT_HELP)).
-
+-define(IS_WHITESPACE(Char), ((Char) =:= $\s orelse (Char) =:= $\t orelse
+                              (Char) =:= $\n orelse (Char) =:= $\r)).
 
 %% Atom indicating the data type that an argument can be converted to.
--type arg_type() :: 'atom' | 'binary' | 'boolean' | 'float' | 'integer' | 'string'.
+-type arg_type()                                :: 'atom' | 'binary' | 'boolean' | 'float' | 'integer' | 'string'.
 %% Data type that an argument can be converted to.
--type arg_value() :: atom() | binary() | boolean() | float() | integer() | string().
+-type arg_value()                               :: atom() | binary() | boolean() | float() | integer() | string().
 %% Argument specification.
--type arg_spec() :: arg_type() | {arg_type(), arg_value()} | undefined.
+-type arg_spec()                                :: arg_type() | {arg_type(), arg_value()} | undefined.
 %% Option type and optional default argument.
--type simple_option() :: atom().
--type compound_option() :: {atom(), arg_value()}.
--type option() :: simple_option() | compound_option().
+-type simple_option()                           :: atom().
+-type compound_option()                         :: {atom(), arg_value()}.
+-type option()                                  :: simple_option() | compound_option().
 %% Command line option specification.
 -type option_spec() :: {
-                   Name    :: atom(),
-                   Short   :: char() | undefined,
-                   Long    :: string() | undefined,
-                   ArgSpec :: arg_spec(),
-                   Help    :: string() | undefined
+                   Name                         :: atom(),
+                   Short                        :: char() | undefined,
+                   Long                         :: string() | undefined,
+                   ArgSpec                      :: arg_spec(),
+                   Help                         :: string() | undefined
                   }.
 %% Output streams
--type output_stream() :: 'standard_io' | 'standard_error'.
+-type output_stream()                           :: 'standard_io' | 'standard_error'.
+
+%% For internal use
+-type usage_line()                              :: {OptionText :: string(), HelpText :: string()}.
+-type usage_line_with_length()                  :: {OptionLength :: non_neg_integer(), OptionText :: string(), HelpText :: string()}.
+
+
+-export_type([arg_type/0, arg_value/0, arg_spec/0, simple_option/0, compound_option/0, option/0, option_spec/0]).
 
 
 %% @doc  Parse the command line options and arguments returning a list of tuples
 %%       and/or atoms using the Erlang convention for sending options to a
 %%       function.
 -spec parse([option_spec()], string() | [string()]) ->
-    {ok, {[option()], [string()]}} | {error, {Reason :: atom(), Data :: any()}}.
-parse(OptSpecList, CmdLine) ->
+                   {ok, {[option()], [string()]}} | {error, {Reason :: atom(), Data :: any()}}.
+parse(OptSpecList, CmdLine) when is_list(CmdLine) ->
     try
         Args = if
-                   is_integer(hd(CmdLine)) ->
-                       string:tokens(CmdLine, " \t\n");
-                   true ->
-                       CmdLine
+                   is_integer(hd(CmdLine)) -> tokenize(CmdLine);
+                   true                    -> CmdLine
                end,
         parse(OptSpecList, [], [], 0, Args)
     catch
@@ -78,7 +76,7 @@ parse(OptSpecList, CmdLine) ->
 
 
 -spec parse([option_spec()], [option()], [string()], integer(), [string()]) ->
-    {ok, {[option()], [string()]}}.
+                   {ok, {[option()], [string()]}}.
 %% Process the option terminator.
 parse(OptSpecList, OptAcc, ArgAcc, _ArgPos, ["--" | Tail]) ->
     %% Any argument present after the terminator is not considered an option.
@@ -110,7 +108,7 @@ parse(OptSpecList, OptAcc, ArgAcc, _ArgPos, []) ->
 %%        --foo=bar  Single option 'foo', argument "bar"
 %%        --foo bar  Single option 'foo', argument "bar"
 -spec parse_long_option([option_spec()], [option()], [string()], integer(), [string()], string(), string()) ->
-          {ok, {[option()], [string()]}}.
+                               {ok, {[option()], [string()]}}.
 parse_long_option(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptStr, OptArg) ->
     case split_assigned_arg(OptArg) of
         {Long, Arg} ->
@@ -197,7 +195,7 @@ parse_long_option_next_arg(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, {Name, _Sh
 %%        -bcafoo  Multiple options: 'b'; 'c'; 'a' with argument "foo"
 %%        -aaa     Multiple repetitions of option 'a' (only valid for options with integer arguments)
 -spec parse_short_option([option_spec()], [option()], [string()], integer(), [string()], string(), string()) ->
-    {ok, {[option()], [string()]}}.
+                                {ok, {[option()], [string()]}}.
 parse_short_option(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptStr, OptArg) ->
     parse_short_option(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, OptStr, first, OptArg).
 
@@ -258,7 +256,7 @@ parse_short_option_next_arg(OptSpecList, OptAcc, ArgAcc, ArgPos, Args, {Name, _S
 %%      Pos argument.
 -spec find_non_option_arg([option_spec()], integer()) -> {value, option_spec()} | false.
 find_non_option_arg([{_Name, undefined, undefined, _ArgSpec, _Help} = OptSpec | _Tail], 0) ->
-     {value, OptSpec};
+    {value, OptSpec};
 find_non_option_arg([{_Name, undefined, undefined, _ArgSpec, _Help} | Tail], Pos) ->
     find_non_option_arg(Tail, Pos - 1);
 find_non_option_arg([_Head | Tail], Pos) ->
@@ -272,12 +270,12 @@ find_non_option_arg([], _Pos) ->
 -spec append_default_options([option_spec()], [option()]) -> [option()].
 append_default_options([{Name, _Short, _Long, {_Type, DefaultArg}, _Help} | Tail], OptAcc) ->
     append_default_options(Tail,
-               case lists:keymember(Name, 1, OptAcc) of
-                   false ->
-                       [{Name, DefaultArg} | OptAcc];
-                   _ ->
-                       OptAcc
-               end);
+                           case lists:keymember(Name, 1, OptAcc) of
+                               false ->
+                                   [{Name, DefaultArg} | OptAcc];
+                               _ ->
+                                   OptAcc
+                           end);
 %% For options with no default argument.
 append_default_options([_Head | Tail], OptAcc) ->
     append_default_options(Tail, OptAcc);
@@ -470,152 +468,375 @@ is_non_neg_float_arg([]) ->
 %%       arguments that are supported by the program.
 -spec usage([option_spec()], string()) -> ok.
 usage(OptSpecList, ProgramName) ->
-	usage(OptSpecList, ProgramName, standard_error).
+    usage(OptSpecList, ProgramName, standard_error).
 
 
 %% @doc  Show a message on standard_error or standard_io indicating the command line options and
 %%       arguments that are supported by the program.
 -spec usage([option_spec()], string(), output_stream() | string()) -> ok.
 usage(OptSpecList, ProgramName, OutputStream) when is_atom(OutputStream) ->
-    io:format(OutputStream, "Usage: ~s~s~n~n~s~n",
-              [ProgramName, usage_cmd_line(OptSpecList), usage_options(OptSpecList)]);
+    io:format(OutputStream, "~s~n~n~s~n",
+              [usage_cmd_line(ProgramName, OptSpecList), usage_options(OptSpecList)]);
 %% @doc  Show a message on standard_error indicating the command line options and
 %%       arguments that are supported by the program. The CmdLineTail argument
 %%       is a string that is added to the end of the usage command line.
 usage(OptSpecList, ProgramName, CmdLineTail) ->
-	usage(OptSpecList, ProgramName, CmdLineTail, standard_error).
+    usage(OptSpecList, ProgramName, CmdLineTail, standard_error).
 
 
 %% @doc  Show a message on standard_error or standard_io indicating the command line options and
 %%       arguments that are supported by the program. The CmdLineTail argument
 %%       is a string that is added to the end of the usage command line.
--spec usage([option_spec()], string(), string(), output_stream() | [{string(), string()}]) -> ok.
+-spec usage([option_spec()], ProgramName :: string(), CmdLineTail :: string(), output_stream() | [{string(), string()}]) -> ok.
 usage(OptSpecList, ProgramName, CmdLineTail, OutputStream) when is_atom(OutputStream) ->
-	io:format(OutputStream, "Usage: ~s~s ~s~n~n~s~n",
-              [ProgramName, usage_cmd_line(OptSpecList), CmdLineTail, usage_options(OptSpecList)]);
+    io:format(OutputStream, "~s~n~n~s~n",
+              [usage_cmd_line(ProgramName, OptSpecList, CmdLineTail), usage_options(OptSpecList)]);
 %% @doc  Show a message on standard_error indicating the command line options and
 %%       arguments that are supported by the program. The CmdLineTail and OptionsTail
 %%       arguments are a string that is added to the end of the usage command line
 %%       and a list of tuples that are added to the end of the options' help lines.
 usage(OptSpecList, ProgramName, CmdLineTail, OptionsTail) ->
-	usage(OptSpecList, ProgramName, CmdLineTail, OptionsTail, standard_error).
+    usage(OptSpecList, ProgramName, CmdLineTail, OptionsTail, standard_error).
 
 
 %% @doc  Show a message on standard_error or standard_io indicating the command line options and
 %%       arguments that are supported by the program. The CmdLineTail and OptionsTail
 %%       arguments are a string that is added to the end of the usage command line
 %%       and a list of tuples that are added to the end of the options' help lines.
--spec usage([option_spec()], string(), string(), [{string(), string()}], output_stream()) -> ok.
+-spec usage([option_spec()], ProgramName :: string(), CmdLineTail :: string(),
+            [{OptionName :: string(), Help :: string()}], output_stream()) -> ok.
 usage(OptSpecList, ProgramName, CmdLineTail, OptionsTail, OutputStream) ->
-    UsageOptions = lists:foldl(
-                     fun ({Prefix, Help}, Acc) ->
-                             add_option_help(Prefix, Help, Acc)
-                     end, usage_options_reverse(OptSpecList, []), OptionsTail),
-    io:format(OutputStream, "Usage: ~s~s ~s~n~n~s~n",
-              [ProgramName, usage_cmd_line(OptSpecList), CmdLineTail,
-               lists:flatten(lists:reverse(UsageOptions))]).
+    io:format(OutputStream, "~s~n~n~s~n",
+              [usage_cmd_line(ProgramName, OptSpecList, CmdLineTail), usage_options(OptSpecList, OptionsTail)]).
 
 
-%% @doc Return a string with the syntax for the command line options and
-%%      arguments.
--spec usage_cmd_line([option_spec()]) -> string().
-usage_cmd_line(OptSpecList) ->
-    usage_cmd_line(OptSpecList, []).
+-spec usage_cmd_line(ProgramName :: string(), [option_spec()]) -> iolist().
+usage_cmd_line(ProgramName, OptSpecList) ->
+    usage_cmd_line(ProgramName, OptSpecList, "").
 
-usage_cmd_line([{Name, Short, Long, ArgSpec, _Help} | Tail], Acc) ->
-    CmdLine =
-        case ArgSpec of
-            undefined ->
-                if
-                    %% For options with short form and no argument.
-                    Short =/= undefined ->
-                        [$\s, $[, $-, Short, $]];
-                    %% For options with only long form and no argument.
-                    Long =/= undefined ->
-                        [$\s, $[, $-, $-, Long, $]];
-                    true ->
-                        []
-                end;
-            _ ->
-                if
-                    %% For options with short form and argument.
-                    Short =/= undefined ->
-                        [$\s, $[, $-, Short, $\s, $<, atom_to_list(Name), $>, $]];
-                    %% For options with only long form and argument.
-                    Long =/= undefined ->
-                        [$\s, $[, $-, $-, Long, $\s, $<, atom_to_list(Name), $>, $]];
-                    %% For options with neither short nor long form and argument.
-                    true ->
-                        [$\s, $<, atom_to_list(Name), $>]
-                end
-        end,
-    usage_cmd_line(Tail, [CmdLine | Acc]);
-usage_cmd_line([], Acc) ->
-    lists:flatten(lists:reverse(Acc)).
+-spec usage_cmd_line(ProgramName :: string(), [option_spec()], CmdLineTail :: string()) -> iolist().
+usage_cmd_line(ProgramName, OptSpecList, CmdLineTail) ->
+    Prefix = "Usage: " ++ ProgramName,
+    PrefixLength = length(Prefix),
+    LineLength = line_length(),
+    %% Only align the command line options after the program name when there is
+    %% enough room to do so (i.e. at least 25 characters). If not, show the
+    %% command line options below the program name with a 2-character indentation.
+    if
+        (LineLength - PrefixLength) > ?MIN_USAGE_COMMAND_LINE_OPTION_LENGTH ->
+            Indentation = lists:duplicate(PrefixLength, $\s),
+            [FirstOptLine | OptLines] = usage_cmd_line_options(LineLength - PrefixLength, OptSpecList, CmdLineTail),
+            IndentedOptLines = [[Indentation | OptLine] || OptLine <- OptLines],
+            [Prefix, FirstOptLine | IndentedOptLines];
+        true ->
+            IndentedOptLines = [[" " | OptLine] || OptLine <- usage_cmd_line_options(LineLength, OptSpecList, CmdLineTail)],
+            [Prefix, $\n, IndentedOptLines]
+    end.
 
 
-%% @doc Return a string with the help message for each of the options and
-%%      arguments.
--spec usage_options([option_spec()]) -> string().
-usage_options(OptSpecList) ->
-    lists:flatten(lists:reverse(usage_options_reverse(OptSpecList, []))).
+%% @doc Return a list of the lines corresponding to the usage command line
+%%      already wrapped according to the maximum MaxLineLength.
+-spec usage_cmd_line_options(MaxLineLength :: non_neg_integer(), [option_spec()], CmdLineTail :: string()) -> iolist().
+usage_cmd_line_options(MaxLineLength, OptSpecList, CmdLineTail) ->
+    usage_cmd_line_options(MaxLineLength, OptSpecList ++ string:tokens(CmdLineTail, " "), [], 0, []).
 
-usage_options_reverse([{Name, Short, Long, _ArgSpec, Help} | Tail], Acc) ->
-    Prefix =
-        case Long of
-            undefined ->
-                case Short of
-                    %% Neither short nor long form (non-option argument).
-                    undefined ->
-                        [$<, atom_to_list(Name), $>];
-                    %% Only short form.
-                    _ ->
-                        [$-, Short]
-                end;
-            _ ->
-                case Short of
-                    %% Only long form.
-                    undefined ->
-                        [$-, $- | Long];
-                    %% Both short and long form.
-                    _ ->
-                        [$-, Short, $,, $\s, $-, $- | Long]
-                end
-        end,
-    usage_options_reverse(Tail, add_option_help(Prefix, Help, Acc));
-usage_options_reverse([], Acc) ->
-    Acc.
-
-
-%% @doc Add the help message corresponding to an option specification to a list
-%%      with the correct indentation.
--spec add_option_help(Prefix :: string(), Help :: string(), Acc :: string()) -> string().
-add_option_help(Prefix, Help, Acc) when is_list(Help), Help =/= [] ->
-    FlatPrefix = lists:flatten(Prefix),
-    case ((?INDENTATION * ?TAB_LENGTH) - 2 - length(FlatPrefix)) of
-        TabSize when TabSize > 0 ->
-            Tab = lists:duplicate(ceiling(TabSize / ?TAB_LENGTH), $\t),
-            [[$\s, $\s, FlatPrefix, Tab, Help, $\n] | Acc];
-        _ ->
-            % The indentation for the option description is 3 tabs (i.e. 24 characters)
-            % IMPORTANT: Change the number of tabs below if you change the
-            %            value of the INDENTATION macro.
-            [[$\t, $\t, $\t, Help, $\n], [$\s, $\s, FlatPrefix, $\n] | Acc]
+usage_cmd_line_options(MaxLineLength, [OptSpec | Tail], LineAcc, LineAccLength, Acc) ->
+    Option = [$\s | lists:flatten(usage_cmd_line_option(OptSpec))],
+    OptionLength = length(Option),
+    %% We accumulate the options in LineAcc until its length is over the
+    %% maximum allowed line length. When that happens, we append the line in
+    %% LineAcc to the list with all the lines in the command line (Acc).
+    NewLineAccLength = LineAccLength + OptionLength,
+    if
+        NewLineAccLength < MaxLineLength ->
+            usage_cmd_line_options(MaxLineLength, Tail, [Option | LineAcc], NewLineAccLength, Acc);
+        true ->
+            usage_cmd_line_options(MaxLineLength, Tail, [Option], OptionLength + 1,
+                                   [lists:reverse([$\n | LineAcc]) | Acc])
     end;
-add_option_help(_Opt, _Prefix, Acc) ->
-    Acc.
+usage_cmd_line_options(MaxLineLength, [], [_ | _] = LineAcc, _LineAccLength, Acc) ->
+    %% If there was a non-empty line in LineAcc when there are no more options
+    %% to process, we add it to the list of lines to return.
+    usage_cmd_line_options(MaxLineLength, [], [], 0, [lists:reverse(LineAcc) | Acc]);
+usage_cmd_line_options(_MaxLineLength, [], [], _LineAccLength, Acc) ->
+    lists:reverse(Acc).
 
 
+-spec usage_cmd_line_option(option_spec()) -> string().
+usage_cmd_line_option({_Name, Short, _Long, undefined, _Help}) when Short =/= undefined ->
+    %% For options with short form and no argument.
+    [$[, $-, Short, $]];
+usage_cmd_line_option({_Name, _Short, Long, undefined, _Help}) when Long =/= undefined ->
+    %% For options with only long form and no argument.
+    [$[, $-, $-, Long, $]];
+usage_cmd_line_option({_Name, _Short, _Long, undefined, _Help}) ->
+    [];
+usage_cmd_line_option({Name, Short, Long, ArgSpec, _Help}) when is_atom(ArgSpec) ->
+    %% For options with no default argument.
+    if
+        %% For options with short form and argument.
+        Short =/= undefined -> [$[, $-, Short, $\s, $<, atom_to_list(Name), $>, $]];
+        %% For options with only long form and argument.
+        Long =/= undefined  -> [$[, $-, $-, Long, $\s, $<, atom_to_list(Name), $>, $]];
+        %% For options with neither short nor long form and argument.
+        true                -> [$[, $<, atom_to_list(Name), $>, $]]
+    end;
+usage_cmd_line_option({Name, Short, Long, ArgSpec, _Help}) when is_tuple(ArgSpec) ->
+    %% For options with default argument.
+    if
+        %% For options with short form and default argument.
+        Short =/= undefined -> [$[, $-, Short, $\s, $[, $<, atom_to_list(Name), $>, $], $]];
+        %% For options with only long form and default argument.
+        Long =/= undefined  -> [$[, $-, $-, Long, $\s, $[, $<, atom_to_list(Name), $>, $], $]];
+        %% For options with neither short nor long form and default argument.
+        true                -> [$[, $<, atom_to_list(Name), $>, $]]
+    end;
+usage_cmd_line_option(Option) when is_list(Option) ->
+    %% For custom options that are added to the command line.
+    Option.
 
-%% @doc Return the smallest integral value not less than the argument.
--spec ceiling(float()) -> integer().
-ceiling(X) ->
-    T = erlang:trunc(X),
-    case (X - T) of
-        % Neg when Neg < 0 ->
-        %    T;
-        Pos when Pos > 0 ->
-            T + 1;
+
+%% @doc Return a list of help messages to print for each of the options and arguments.
+-spec usage_options([option_spec()]) -> [string()].
+usage_options(OptSpecList) ->
+    usage_options(OptSpecList, []).
+
+
+%% @doc Return a list of usage lines to print for each of the options and arguments.
+-spec usage_options([option_spec()], [{OptionName :: string(), Help :: string()}]) -> [string()].
+usage_options(OptSpecList, CustomHelp) ->
+    %% Add the usage lines corresponding to the option specifications.
+    {MaxOptionLength0, UsageLines0} = add_option_spec_help_lines(OptSpecList, 0, []),
+    %% Add the custom usage lines.
+    {MaxOptionLength, UsageLines} = add_custom_help_lines(CustomHelp, MaxOptionLength0, UsageLines0),
+    MaxLineLength = line_length(),
+    lists:reverse([format_usage_line(MaxOptionLength + 1, MaxLineLength, UsageLine) || UsageLine <- UsageLines]).
+
+
+-spec add_option_spec_help_lines([option_spec()], PrevMaxOptionLength :: non_neg_integer(), [usage_line_with_length()]) ->
+                                        {MaxOptionLength :: non_neg_integer(), [usage_line_with_length()]}.
+add_option_spec_help_lines([OptSpec | Tail], PrevMaxOptionLength, Acc) ->
+    OptionText = usage_option_text(OptSpec),
+    HelpText = usage_help_text(OptSpec),
+    {MaxOptionLength, ColsWithLength} = get_max_option_length({OptionText, HelpText}, PrevMaxOptionLength),
+    add_option_spec_help_lines(Tail, MaxOptionLength, [ColsWithLength | Acc]);
+add_option_spec_help_lines([], MaxOptionLength, Acc) ->
+    {MaxOptionLength, Acc}.
+
+
+-spec add_custom_help_lines([usage_line()], PrevMaxOptionLength :: non_neg_integer(), [usage_line_with_length()]) ->
+                                   {MaxOptionLength :: non_neg_integer(), [usage_line_with_length()]}.
+add_custom_help_lines([CustomCols | Tail], PrevMaxOptionLength, Acc) ->
+    {MaxOptionLength, ColsWithLength} = get_max_option_length(CustomCols, PrevMaxOptionLength),
+    add_custom_help_lines(Tail, MaxOptionLength, [ColsWithLength | Acc]);
+add_custom_help_lines([], MaxOptionLength, Acc) ->
+    {MaxOptionLength, Acc}.
+
+
+-spec usage_option_text(option_spec()) -> string().
+usage_option_text({Name, undefined, undefined, _ArgSpec, _Help}) ->
+    %% Neither short nor long form (non-option argument).
+    "<" ++ atom_to_list(Name) ++ ">";
+usage_option_text({_Name, Short, undefined, _ArgSpec, _Help}) ->
+    %% Only short form.
+    [$-, Short];
+usage_option_text({_Name, undefined, Long, _ArgSpec, _Help}) ->
+    %% Only long form.
+    [$-, $- | Long];
+usage_option_text({_Name, Short, Long, _ArgSpec, _Help}) ->
+    %% Both short and long form.
+    [$-, Short, $,, $\s, $-, $- | Long].
+
+
+-spec usage_help_text(option_spec()) -> string().
+usage_help_text({_Name, _Short, _Long, {_ArgType, ArgValue}, [_ | _] = Help}) ->
+    Help ++ " [default: " ++ default_arg_value_to_string(ArgValue) ++ "]";
+usage_help_text({_Name, _Short, _Long, _ArgSpec, Help}) ->
+    Help.
+
+
+%% @doc Calculate the maximum width of the column that shows the option's short
+%%      and long form.
+-spec get_max_option_length(usage_line(), PrevMaxOptionLength :: non_neg_integer()) ->
+                                   {MaxOptionLength :: non_neg_integer(), usage_line_with_length()}.
+get_max_option_length({OptionText, HelpText}, PrevMaxOptionLength) ->
+    OptionLength = length(OptionText),
+    {erlang:max(OptionLength, PrevMaxOptionLength), {OptionLength, OptionText, HelpText}}.
+
+
+%% @doc Format the usage line that is shown for the options' usage. Each usage
+%%      line has 2 columns. The first column shows the options in their short
+%%      and long form. The second column shows the wrapped (if necessary) help
+%%      text lines associated with each option. e.g.:
+%%
+%%        -h, --host  Database server host name or IP address; this is the
+%%                    hostname of the server where the database is running
+%%                    [default: localhost]
+%%        -p, --port  Database server port [default: 1000]
+%%
+-spec format_usage_line(MaxOptionLength :: non_neg_integer(), MaxLineLength :: non_neg_integer(),
+                        usage_line_with_length()) -> iolist().
+format_usage_line(MaxOptionLength, MaxLineLength, {OptionLength, OptionText, [_ | _] = HelpText})
+  when MaxOptionLength < (MaxLineLength div 2) ->
+    %% If the width of the column where the options are shown is smaller than
+    %% half the width of a console line then we show the help text line aligned
+    %% next to its corresponding option, with a separation of at least 2
+    %% characters.
+    [Head | Tail] = wrap_text_line(MaxLineLength - MaxOptionLength - 3, HelpText),
+    FirstLineIndentation = lists:duplicate(MaxOptionLength - OptionLength + 1, $\s),
+    Indentation = [$\n | lists:duplicate(MaxOptionLength + 3, $\s)],
+    ["  ", OptionText, FirstLineIndentation, Head,
+     [[Indentation, Line] || Line <- Tail], $\n];
+format_usage_line(_MaxOptionLength, MaxLineLength, {_OptionLength, OptionText, [_ | _] = HelpText}) ->
+    %% If the width of the first column is bigger than the width of a console
+    %% line, we show the help text on the next line with an indentation of 6
+    %% characters.
+    HelpLines = wrap_text_line(MaxLineLength - 6, HelpText),
+    ["  ", OptionText, [["\n      ", Line] || Line <- HelpLines], $\n];
+format_usage_line(_MaxOptionLength, _MaxLineLength, {_OptionLength, OptionText, _HelpText}) ->
+    ["  ", OptionText, $\n].
+
+
+%% @doc Wrap a text line converting it into several text lines so that the
+%%      length of each one of them is never over HelpLength characters.
+-spec wrap_text_line(Length :: non_neg_integer(), Text :: string()) -> [string()].
+wrap_text_line(Length, Text) ->
+    wrap_text_line(Length, Text, [], 0, []).
+
+wrap_text_line(Length, [Char | Tail], Acc, Count, CurrentLineAcc) when Count < Length ->
+    wrap_text_line(Length, Tail, Acc, Count + 1, [Char | CurrentLineAcc]);
+wrap_text_line(Length, [_ | _] = Help, Acc, Count, CurrentLineAcc) ->
+    %% Look for the first whitespace character in the current (reversed) line
+    %% buffer to get a wrapped line. If there is no whitespace just cut the
+    %% line at the position corresponding to the maximum length.
+    {NextLineAcc, WrappedLine} = case string:cspan(CurrentLineAcc, " \t") of
+                                     WhitespacePos when WhitespacePos < Count ->
+                                         lists:split(WhitespacePos, CurrentLineAcc);
+                                     _ ->
+                                         {[], CurrentLineAcc}
+                                 end,
+    wrap_text_line(Length, Help, [lists:reverse(WrappedLine) | Acc], length(NextLineAcc), NextLineAcc);
+wrap_text_line(_Length, [], Acc, _Count, [_ | _] = CurrentLineAcc) ->
+    %% If there was a non-empty line when we reached the buffer, add it to the accumulator
+    lists:reverse([lists:reverse(CurrentLineAcc) | Acc]);
+wrap_text_line(_Length, [], Acc, _Count, _CurrentLineAcc) ->
+    lists:reverse(Acc).
+
+
+default_arg_value_to_string(Value) when is_atom(Value) ->
+    atom_to_list(Value);
+default_arg_value_to_string(Value) when is_binary(Value) ->
+    binary_to_list(Value);
+default_arg_value_to_string(Value) when is_integer(Value) ->
+    integer_to_list(Value);
+default_arg_value_to_string(Value) when is_float(Value) ->
+    float_to_list(Value);
+default_arg_value_to_string(Value) ->
+    Value.
+
+
+%% @doc Tokenize a command line string with support for single and double
+%%      quoted arguments (needed for arguments that have embedded whitespace).
+%%      The function also supports the expansion of environment variables in
+%%      both the Unix (${VAR}; $VAR) and Windows (%VAR%) formats. It does NOT
+%%      support wildcard expansion of paths.
+-spec tokenize(CmdLine :: string()) -> [nonempty_string()].
+tokenize(CmdLine) ->
+    tokenize(CmdLine, [], []).
+
+-spec tokenize(CmdLine :: string(), Acc :: [string()], ArgAcc :: string()) -> [string()].
+tokenize([Sep | Tail], Acc, ArgAcc) when ?IS_WHITESPACE(Sep) ->
+    NewAcc = case ArgAcc of
+                 [_ | _] ->
+                     %% Found separator: add to the list of arguments.
+                     [lists:reverse(ArgAcc) | Acc];
+                 [] ->
+                     %% Found separator with no accumulated argument; discard it.
+                     Acc
+             end,
+    tokenize(Tail, NewAcc, []);
+tokenize([QuotationMark | Tail], Acc, ArgAcc) when QuotationMark =:= $"; QuotationMark =:= $' ->
+    %% Quoted argument (might contain spaces, tabs, etc.)
+    tokenize_quoted_arg(QuotationMark, Tail, Acc, ArgAcc);
+tokenize([Char | _Tail] = CmdLine, Acc, ArgAcc) when Char =:= $$; Char =:= $% ->
+    %% Unix and Windows environment variable expansion: ${VAR}; $VAR; %VAR%
+    {NewCmdLine, Var} = expand_env_var(CmdLine),
+    tokenize(NewCmdLine, Acc, lists:reverse(Var, ArgAcc));
+tokenize([$\\, Char | Tail], Acc, ArgAcc) ->
+    %% Escaped char.
+    tokenize(Tail, Acc, [Char | ArgAcc]);
+tokenize([Char | Tail], Acc, ArgAcc) ->
+    tokenize(Tail, Acc, [Char | ArgAcc]);
+tokenize([], Acc, []) ->
+    lists:reverse(Acc);
+tokenize([], Acc, ArgAcc) ->
+    lists:reverse([lists:reverse(ArgAcc) | Acc]).
+
+-spec tokenize_quoted_arg(QuotationMark :: char(), CmdLine :: string(), Acc :: [string()], ArgAcc :: string()) -> [string()].
+tokenize_quoted_arg(QuotationMark, [QuotationMark | Tail], Acc, ArgAcc) ->
+    %% End of quoted argument
+    tokenize(Tail, Acc, ArgAcc);
+tokenize_quoted_arg(QuotationMark, [$\\, Char | Tail], Acc, ArgAcc) ->
+    %% Escaped char.
+    tokenize_quoted_arg(QuotationMark, Tail, Acc, [Char | ArgAcc]);
+tokenize_quoted_arg($" = QuotationMark, [Char | _Tail] = CmdLine, Acc, ArgAcc) when Char =:= $$; Char =:= $% ->
+    %% Unix and Windows environment variable expansion (only for double-quoted arguments): ${VAR}; $VAR; %VAR%
+    {NewCmdLine, Var} = expand_env_var(CmdLine),
+    tokenize_quoted_arg(QuotationMark, NewCmdLine, Acc, lists:reverse(Var, ArgAcc));
+tokenize_quoted_arg(QuotationMark, [Char | Tail], Acc, ArgAcc) ->
+    tokenize_quoted_arg(QuotationMark, Tail, Acc, [Char | ArgAcc]);
+tokenize_quoted_arg(_QuotationMark, CmdLine, Acc, ArgAcc) ->
+    tokenize(CmdLine, Acc, ArgAcc).
+
+
+-spec expand_env_var(CmdLine :: nonempty_string()) -> {string(), string()}.
+expand_env_var(CmdLine) ->
+    case CmdLine of
+        "${" ++ Tail ->
+            expand_env_var("${", $}, Tail, []);
+        "$" ++ Tail ->
+            expand_env_var("$", Tail, []);
+        "%" ++ Tail ->
+            expand_env_var("%", $%, Tail, [])
+    end.
+
+-spec expand_env_var(Prefix :: string(), EndMark :: char(), CmdLine :: string(), Acc :: string()) -> {string(), string()}.
+expand_env_var(Prefix, EndMark, [Char | Tail], Acc)
+  when (Char >= $A andalso Char =< $Z) orelse (Char >= $a andalso Char =< $z) orelse
+       (Char >= $0 andalso Char =< $9) orelse (Char =:= $_) ->
+    expand_env_var(Prefix, EndMark, Tail, [Char | Acc]);
+expand_env_var(Prefix, EndMark, [EndMark | Tail], Acc) ->
+    {Tail, get_env_var(Prefix, [EndMark], Acc)};
+expand_env_var(Prefix, _EndMark, CmdLine, Acc) ->
+    {CmdLine, Prefix ++ lists:reverse(Acc)}.
+
+
+-spec expand_env_var(Prefix :: string(), CmdLine :: string(), Acc :: string()) -> {string(), string()}.
+expand_env_var(Prefix, [Char | Tail], Acc)
+  when (Char >= $A andalso Char =< $Z) orelse (Char >= $a andalso Char =< $z) orelse
+       (Char >= $0 andalso Char =< $9) orelse (Char =:= $_) ->
+    expand_env_var(Prefix, Tail, [Char | Acc]);
+expand_env_var(Prefix, CmdLine, Acc) ->
+    {CmdLine, get_env_var(Prefix, "", Acc)}.
+
+
+-spec get_env_var(Prefix :: string(), Suffix :: string(), Acc :: string()) -> string().
+get_env_var(Prefix, Suffix, [_ | _] = Acc) ->
+    Name = lists:reverse(Acc),
+    %% Only expand valid/existing variables.
+    case os:getenv(Name) of
+        false -> Prefix ++ Name ++ Suffix;
+        Value -> Value
+    end;
+get_env_var(Prefix, Suffix, []) ->
+    Prefix ++ Suffix.
+
+
+-spec line_length() -> non_neg_integer().
+line_length() ->
+    case io:columns() of
+        {ok, Columns} when Columns < ?LINE_LENGTH ->
+            Columns - 1;
         _ ->
-            T
+            ?LINE_LENGTH
     end.
