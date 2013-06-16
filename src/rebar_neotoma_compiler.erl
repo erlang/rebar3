@@ -56,8 +56,8 @@ compile(Config, _AppFile) ->
     rebar_base_compiler:run(Config, [],
                             option(doc_root, NeoOpts), ".peg",
                             option(out_dir, NeoOpts),
-                            option(module_ext, NeoOpts) ++ ".beam",
-                            fun compile_neo/3, [{check_last_mod,false}]).
+                            option(module_ext, NeoOpts) ++ ".erl",
+                            fun compile_neo/3, [{check_last_mod, true}]).
 
 %% ============================================================================
 %% Internal functions
