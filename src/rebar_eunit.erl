@@ -223,7 +223,7 @@ filter_suites(Config, Modules) ->
 filter_suites1(Modules, []) ->
     Modules;
 filter_suites1(Modules, Suites) ->
-    [M || M <- Modules, lists:member(M, Suites)].
+    [M || M <- Suites, lists:member(M, Modules)].
 
 %%
 %% == get matching tests ==
