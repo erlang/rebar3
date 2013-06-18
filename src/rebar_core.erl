@@ -414,7 +414,7 @@ expand_lib_dirs([Dir | Rest], Root, Acc) ->
     Apps = filelib:wildcard(filename:join([Dir, "*", "ebin"])),
     FqApps = case filename:pathtype(Dir) of
                  absolute -> Apps;
-                 relative -> [filename:join([Root, A]) || A <- Apps]
+                 _        -> [filename:join([Root, A]) || A <- Apps]
              end,
     expand_lib_dirs(Rest, Root, Acc ++ FqApps).
 
