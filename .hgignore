@@ -1,7 +1,0 @@
-\.beam
-^rebar$
-.~
-\.orig
-\.swp
-rt.work/*
-^.gitignore$
