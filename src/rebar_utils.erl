@@ -191,7 +191,7 @@ expand_env_variable(InStr, VarName, RawVarValue) ->
             %% No variables to expand
             InStr;
         _ ->
-            VarValue = re:replace(RawVarValue, "\\\\", "\\\\\\\\", [global]),
+            VarValue = re:replace(RawVarValue, "\\\\", "\\\\\\\\", [global, unicode]),
             %% Use a regex to match/replace:
             %% Given variable "FOO": match $FOO\s | $FOOeol | ${FOO}
             RegEx = io_lib:format("\\\$(~s(\\s|$)|{~s})", [VarName, VarName]),
