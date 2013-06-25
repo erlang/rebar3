@@ -108,6 +108,7 @@ sh(Command0, Options0) ->
     Command = patch_on_windows(Command0, proplists:get_value(env, Options, [])),
     PortSettings = proplists:get_all_values(port_settings, Options) ++
         [exit_status, {line, 16384}, use_stdio, stderr_to_stdout, hide],
+    ?DEBUG("Port Cmd: ~p\nPort Opts: ~p\n", [Command, PortSettings]),
     Port = open_port({spawn, Command}, PortSettings),
 
     case sh_loop(Port, OutputHandler, []) of
