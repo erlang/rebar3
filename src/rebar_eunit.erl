@@ -561,7 +561,10 @@ align_notcovered_count(Module, Covered, NotCovered, true) ->
 
 cover_write_index(Coverage, SrcModules) ->
     {ok, F} = file:open(filename:join([?EUNIT_DIR, "index.html"]), [write]),
-    ok = file:write(F, "<html><head><title>Coverage Summary</title></head>\n"),
+    ok = file:write(F, "<!DOCTYPE HTML><html>\n"
+                        "<head><meta charset=\"utf-8\">"
+                        "<title>Coverage Summary</title></head>\n"
+                        "<body>\n"),
     IsSrcCoverage = fun({Mod,_C,_N}) -> lists:member(Mod, SrcModules) end,
     {SrcCoverage, TestCoverage} = lists:partition(IsSrcCoverage, Coverage),
     cover_write_index_section(F, "Source", SrcCoverage),
@@ -579,7 +582,7 @@ cover_write_index_section(F, SectionName, Coverage) ->
     TotalCoverage = percentage(Covered, NotCovered),
 
     %% Write the report
-    ok = file:write(F, ?FMT("<body><h1>~s Summary</h1>\n", [SectionName])),
+    ok = file:write(F, ?FMT("<h1>~s Summary</h1>\n", [SectionName])),
     ok = file:write(F, ?FMT("<h3>Total: ~s</h3>\n", [TotalCoverage])),
     ok = file:write(F, "<table><tr><th>Module</th><th>Coverage %</th></tr>\n"),
 
