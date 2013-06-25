@@ -198,7 +198,7 @@ make_cmd(TestDir, RawLogDir, Config) ->
                   false ->
                       "erl -noshell -s ct_run script_start -s erlang halt";
                   _ ->
-                      "ct_run"
+                      "ct_run -noshell"
               end,
 
     %% Add the code path of the rebar process to the code path. This
