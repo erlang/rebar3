@@ -37,6 +37,9 @@
 
 -export([xref/2]).
 
+%% for internal use only
+-export([info/2]).
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -58,14 +61,15 @@ xref(Config, _) ->
 
     %% Get list of xref checks we want to run
     ConfXrefChecks = rebar_config:get(Config, xref_checks,
-                                  [exports_not_used,
-                                   undefined_function_calls]),
+                                      [exports_not_used,
+                                       undefined_function_calls]),
 
     SupportedXrefs = [undefined_function_calls, undefined_functions,
-                        locals_not_used, exports_not_used,
-                        deprecated_function_calls, deprecated_functions],
+                      locals_not_used, exports_not_used,
+                      deprecated_function_calls, deprecated_functions],
 
-    XrefChecks = sets:to_list(sets:intersection(sets:from_list(SupportedXrefs),
+    XrefChecks = sets:to_list(sets:intersection(
+                                sets:from_list(SupportedXrefs),
                                 sets:from_list(ConfXrefChecks))),
 
     %% Run xref checks
@@ -92,16 +96,36 @@ xref(Config, _) ->
 %% Internal functions
 %% ===================================================================
 
+info(help, xref) ->
+    ?CONSOLE(
+       "Run cross reference analysis.~n"
+       "~n"
+       "Valid rebar.config options:~n"
+       "  ~p~n"
+       "  ~p~n"
+       "  ~p~n",
+       [
+        {xref_warnings, false},
+        {xref_checks, [undefined_function_calls, undefined_functions,
+                       locals_not_used, exports_not_used,
+                       deprecated_function_calls, deprecated_functions]},
+        {xref_queries,
+         [{"(xc - uc) || (xu - x - b"
+           " - (\"mod\":\".*foo\"/\"4\"))",[]}]}
+       ]).
+
 xref_checks(XrefChecks) ->
-    XrefWarnCount = lists:foldl(
-        fun(XrefCheck, Acc) ->
-            {ok, Results} = xref:analyze(xref, XrefCheck),
-            FilteredResults =filter_xref_results(XrefCheck, Results),
-            lists:foreach(fun(Res) -> display_xrefresult(XrefCheck, Res) end, FilteredResults),
-            Acc + length(FilteredResults)
-        end,
-        0, XrefChecks),
+    XrefWarnCount = lists:foldl(fun run_xref_check/2, 0, XrefChecks),
     XrefWarnCount =:= 0.
+
+run_xref_check(XrefCheck, Acc) ->
+    {ok, Results} = xref:analyze(xref, XrefCheck),
+    FilteredResults =filter_xref_results(XrefCheck, Results),
+    lists:foreach(fun(Res) ->
+                          display_xref_result(XrefCheck, Res)
+                  end,
+                  FilteredResults),
+    Acc + length(FilteredResults).
 
 check_query({Query, Value}) ->
     {ok, Answer} = xref:q(xref, Query),
@@ -141,78 +165,75 @@ get_xref_ignorelist(Mod, XrefCheck) ->
             _Class:_Error -> []
         end,
 
-    Ignore_xref = keyall(ignore_xref, Attributes),
+    IgnoreXref = keyall(ignore_xref, Attributes),
 
-    Behaviour_callbacks = case XrefCheck of
-            exports_not_used -> [B:behaviour_info(callbacks) || B <- keyall(behaviour, Attributes)];
-            _ -> []
-    end,
+    BehaviourCallbacks = get_behaviour_callbacks(XrefCheck, Attributes),
 
-    % And create a flat {M,F,A} list
+    %% And create a flat {M,F,A} list
     lists:foldl(
-        fun(El,Acc) ->
-            case El of
-                {F, A} -> [{Mod,F,A} | Acc];
-                {M, F, A} -> [{M,F,A} | Acc]
-            end
-        end, [],lists:flatten([Ignore_xref, Behaviour_callbacks])).
+      fun({F, A}, Acc) -> [{Mod,F,A} | Acc];
+         ({M, F, A}, Acc) -> [{M,F,A} | Acc]
+      end, [], lists:flatten([IgnoreXref, BehaviourCallbacks])).
 
 keyall(Key, List) ->
     lists:flatmap(fun({K, L}) when Key =:= K -> L; (_) -> [] end, List).
 
-parse_xref_result(XrefResult) ->
-    case XrefResult of
-        {_, MFAt} -> MFAt;
-        MFAt -> MFAt
-    end.
+get_behaviour_callbacks(exports_not_used, Attributes) ->
+    [B:behaviour_info(callbacks) || B <- keyall(behaviour, Attributes)];
+get_behaviour_callbacks(_XrefCheck, _Attributes) ->
+    [].
+
+parse_xref_result({_, MFAt}) -> MFAt;
+parse_xref_result(MFAt) -> MFAt.
 
 filter_xref_results(XrefCheck, XrefResults) ->
-    SearchModules = lists:usort(lists:map(
-        fun(Res) ->
-            case Res of
-                {Mt,_Ft,_At} -> Mt;
-                {{Ms,_Fs,_As},{_Mt,_Ft,_At}} -> Ms;
-                _ -> undefined
-            end
-        end, XrefResults)),
+    SearchModules = lists:usort(
+                      lists:map(
+                        fun({Mt,_Ft,_At}) -> Mt;
+                           ({{Ms,_Fs,_As},{_Mt,_Ft,_At}}) -> Ms;
+                           (_) -> undefined
+                        end, XrefResults)),
 
-    Ignores = lists:flatten([
-        get_xref_ignorelist(Module,XrefCheck) || Module <- SearchModules]),
+    Ignores = lists:flatmap(fun(Module) ->
+                                    get_xref_ignorelist(Module, XrefCheck)
+                            end, SearchModules),
 
     [Result || Result <- XrefResults,
-        not lists:member(parse_xref_result(Result),Ignores)].
+               not lists:member(parse_xref_result(Result), Ignores)].
 
-display_xrefresult(Type, XrefResult) ->
+display_xref_result(Type, XrefResult) ->
     { Source, SMFA, TMFA } = case XrefResult of
-        {MFASource, MFATarget} ->
-            {format_mfa_source(MFASource), format_mfa(MFASource),
-                format_mfa(MFATarget)};
-        MFATarget ->
-            {format_mfa_source(MFATarget), format_mfa(MFATarget),
-                undefined}
-    end,
+                                 {MFASource, MFATarget} ->
+                                     {format_mfa_source(MFASource),
+                                      format_mfa(MFASource),
+                                      format_mfa(MFATarget)};
+                                 MFATarget ->
+                                     {format_mfa_source(MFATarget),
+                                      format_mfa(MFATarget),
+                                      undefined}
+                             end,
     case Type of
         undefined_function_calls ->
             ?CONSOLE("~sWarning: ~s calls undefined function ~s (Xref)\n",
-                [Source, SMFA, TMFA]);
+                     [Source, SMFA, TMFA]);
         undefined_functions ->
             ?CONSOLE("~sWarning: ~s is undefined function (Xref)\n",
-                [Source, SMFA]);
+                     [Source, SMFA]);
         locals_not_used ->
             ?CONSOLE("~sWarning: ~s is unused local function (Xref)\n",
-                [Source, SMFA]);
+                     [Source, SMFA]);
         exports_not_used ->
             ?CONSOLE("~sWarning: ~s is unused export (Xref)\n",
-                [Source, SMFA]);
+                     [Source, SMFA]);
         deprecated_function_calls ->
             ?CONSOLE("~sWarning: ~s calls deprecated function ~s (Xref)\n",
-                [Source, SMFA, TMFA]);
+                     [Source, SMFA, TMFA]);
         deprecated_functions ->
             ?CONSOLE("~sWarning: ~s is deprecated function (Xref)\n",
-                [Source, SMFA]);
+                     [Source, SMFA]);
         Other ->
             ?CONSOLE("~sWarning: ~s - ~s xref check: ~s (Xref)\n",
-                [Source, SMFA, TMFA, Other])
+                     [Source, SMFA, TMFA, Other])
     end.
 
 format_mfa({M, F, A}) ->
@@ -235,7 +256,6 @@ safe_element(N, Tuple) ->
         Value ->
             Value
     end.
-
 
 %%
 %% Given a MFA, find the file and LOC where it's defined. Note that

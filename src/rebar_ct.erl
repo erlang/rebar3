@@ -108,7 +108,8 @@ run_test(TestDir, LogDir, Config, _File) ->
                      " 2>&1 | tee -a " ++ RawLog
              end,
 
-    case rebar_utils:sh(Cmd ++ Output, [{env,[{"TESTDIR", TestDir}]}, return_on_error]) of
+    ShOpts = [{env,[{"TESTDIR", TestDir}]}, return_on_error],
+    case rebar_utils:sh(Cmd ++ Output, ShOpts) of
         {ok,_} ->
             %% in older versions of ct_run, this could have been a failure
             %% that returned a non-0 code. Check for that!
@@ -135,11 +136,16 @@ clear_log(LogDir, RawLog) ->
 check_success_log(Config, RawLog) ->
     check_log(Config, RawLog, fun(Msg) -> ?CONSOLE("DONE.\n~s\n", [Msg]) end).
 
-check_fail_log(Config, RawLog, Command, {Rc, Output}) ->
-    check_log(Config, RawLog, fun(_Msg) ->
+-type err_handler() :: fun((string()) -> no_return()).
+-spec failure_logger(string(), {integer(), string()}) -> err_handler().
+failure_logger(Command, {Rc, Output}) ->
+    fun(_Msg) ->
             ?ABORT("~s failed with error: ~w and output:~n~s~n",
                    [Command, Rc, Output])
-    end).
+    end.
+
+check_fail_log(Config, RawLog, Command, Result) ->
+    check_log(Config, RawLog, failure_logger(Command, Result)).
 
 check_log(Config,RawLog,Fun) ->
     {ok, Msg} =
