@@ -192,6 +192,15 @@ make_cmd(TestDir, RawLogDir, Config) ->
                       ""
               end,
 
+    %% Check for the availability of ct_run; if we can't find it, generate a
+    %% warning and use the old school, less reliable approach to running CT.
+    BaseCmd = case os:find_executable("ct_run") of
+                  false ->
+                      "erl -noshell -s ct_run script_start -s erlang halt";
+                  _ ->
+                      "ct_run"
+              end,
+
     %% Add the code path of the rebar process to the code path. This
     %% includes the dependencies in the code path. The directories
     %% that are part of the root Erlang install are filtered out to
@@ -203,14 +212,15 @@ make_cmd(TestDir, RawLogDir, Config) ->
     CodePathString = string:join(CodeDirs, " "),
     Cmd = case get_ct_specs(Cwd) of
               undefined ->
-                  ?FMT("erl " % should we expand ERL_PATH?
-                       " -noshell -pa ~s ~s"
+                  ?FMT("~s"
+                       " -pa ~s"
+                       " ~s"
                        " ~s"
                        " -logdir \"~s\""
                        " -env TEST_DIR \"~s\""
-                       " ~s"
-                       " -s ct_run script_start -s erlang halt",
-                       [CodePathString,
+                       " ~s",
+                       [BaseCmd,
+                        CodePathString,
                         Include,
                         build_name(Config),
                         LogDir,
@@ -222,14 +232,15 @@ make_cmd(TestDir, RawLogDir, Config) ->
                       get_suites(Config, TestDir) ++
                       get_case(Config);
               SpecFlags ->
-                  ?FMT("erl " % should we expand ERL_PATH?
-                       " -noshell -pa ~s ~s"
+                  ?FMT("~s"
+                       " -pa ~s"
+                       " ~s"
                        " ~s"
                        " -logdir \"~s\""
                        " -env TEST_DIR \"~s\""
-                       " ~s"
-                       " -s ct_run script_start -s erlang halt",
-                       [CodePathString,
+                       " ~s",
+                       [BaseCmd,
+                        CodePathString,
                         Include,
                         build_name(Config),
                         LogDir,
