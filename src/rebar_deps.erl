@@ -308,7 +308,8 @@ find_deps(Config, Mode, [{App, VsnRegex} | Rest], Acc) when is_atom(App) ->
     find_deps(Config, Mode, [{App, VsnRegex, undefined} | Rest], Acc);
 find_deps(Config, Mode, [{App, VsnRegex, Source} | Rest], Acc) ->
     find_deps(Config, Mode, [{App, VsnRegex, Source, []} | Rest], Acc);
-find_deps(Config, Mode, [{App, VsnRegex, Source, Opts} | Rest], Acc) when is_list(Opts) ->
+find_deps(Config, Mode, [{App, VsnRegex, Source, Opts} | Rest], Acc)
+  when is_list(Opts) ->
     Dep = #dep { app = App,
                  vsn_regex = VsnRegex,
                  source = Source,
