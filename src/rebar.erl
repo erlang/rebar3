@@ -183,6 +183,9 @@ help() ->
                  [{"var=value", "rebar global variables (e.g. force=1)"},
                   {"command", "Command to run (e.g. compile)"}]),
     ?CONSOLE(
+       "Type 'rebar help <CMD1> <CMD2>' for help on specific commands."
+       "~n~n", []),
+    ?CONSOLE(
        "Core rebar.config options:~n"
        "  ~p~n"
        "  ~p~n"
