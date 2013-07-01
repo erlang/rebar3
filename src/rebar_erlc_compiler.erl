@@ -36,6 +36,8 @@
 -include("rebar.hrl").
 -include_lib("stdlib/include/erl_compile.hrl").
 
+-define(REBAR_BUILD_INFO, ".rebar.build.info").
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -102,6 +104,9 @@ clean(_Config, _AppFile) ->
     rebar_file_utils:delete_each(
       [ binary_to_list(iolist_to_binary(re:replace(F, "\\.[x|y]rl$", ".erl")))
         || F <- YrlFiles ]),
+
+    %% Delete the build graph, if any
+    rebar_file_utils:rm_rf(filename:join("ebin", ?REBAR_BUILD_INFO)),
 
     %% Erlang compilation is recursive, so it's possible that we have a nested
     %% directory structure in ebin with .beam files within. As such, we want
@@ -269,35 +274,35 @@ doterl_compile(Config, OutDir, MoreSources) ->
     SrcDirs = rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts)),
     RestErls  = [Source || Source <- gather_src(SrcDirs, []) ++ MoreSources,
                            not lists:member(Source, FirstErls)],
-
-    %% Split RestErls so that parse_transforms and behaviours are instead added
-    %% to erl_first_files, parse transforms first.
-    %% This should probably be somewhat combined with inspect_epp
-    [ParseTransforms, Behaviours, OtherErls] =
-        lists:foldl(fun(F, [A, B, C]) ->
-                            case compile_priority(F) of
-                                parse_transform ->
-                                    [[F | A], B, C];
-                                behaviour ->
-                                    [A, [F | B], C];
-                                callback ->
-                                    [A, [F | B], C];
-                                _ ->
-                                    [A, B, [F | C]]
-                            end
-                    end, [[], [], []], RestErls),
-
-    NewFirstErls = FirstErls ++ ParseTransforms ++ Behaviours,
-
     %% Make sure that ebin/ exists and is on the path
     ok = filelib:ensure_dir(filename:join("ebin", "dummy.beam")),
     CurrPath = code:get_path(),
     true = code:add_path(filename:absname("ebin")),
     OutDir1 = proplists:get_value(outdir, ErlOpts, OutDir),
-    rebar_base_compiler:run(Config, NewFirstErls, OtherErls,
-                            fun(S, C) ->
-                                    internal_erl_compile(C, S, OutDir1, ErlOpts)
-                            end),
+    G = init_graph(Config, RestErls),
+    %% Split RestErls so that parse_transforms and behaviours are instead added
+    %% to erl_first_files, parse transforms first.
+    {OtherFirstErls, OtherErls} =
+        lists:partition(
+          fun(F) ->
+                  case [Erl || Erl <- get_children(G, F),
+                               filename:extension(Erl) == ".erl"] of
+                      [] ->
+                          %% There are no files dependent on this file.
+                          false;
+                      _ ->
+                          %% There are some files dependent on the file.
+                          %% Thus the file has higher priority
+                          %% and should be compiled in the first place.
+                          true
+                  end
+          end, RestErls),
+    NewFirstErls = FirstErls ++ OtherFirstErls,
+    rebar_base_compiler:run(
+      Config, NewFirstErls, OtherErls,
+      fun(S, C) ->
+              internal_erl_compile(C, S, OutDir1, ErlOpts, G)
+      end),
     true = code:set_path(CurrPath),
     ok.
 
@@ -305,56 +310,8 @@ doterl_compile(Config, OutDir, MoreSources) ->
                    rebar_config:config()) -> [file:filename(), ...].
 include_path(Source, Config) ->
     ErlOpts = rebar_config:get(Config, erl_opts, []),
-    ["include", filename:dirname(Source)]
-        ++ proplists:get_all_values(i, ErlOpts).
-
--spec inspect(file:filename(),
-              [file:filename(), ...]) -> {string(), [string()]}.
-inspect(Source, IncludePath) ->
-    ModuleDefault = filename:basename(Source, ".erl"),
-    case epp:open(Source, IncludePath) of
-        {ok, Epp} ->
-            inspect_epp(Epp, Source, ModuleDefault, []);
-        {error, Reason} ->
-            ?DEBUG("Failed to inspect ~s: ~p\n", [Source, Reason]),
-            {ModuleDefault, []}
-    end.
-
--spec inspect_epp(pid(), file:filename(), file:filename(),
-                  [string()]) -> {string(), [string()]}.
-inspect_epp(Epp, Source, Module, Includes) ->
-    case epp:parse_erl_form(Epp) of
-        {ok, {attribute, _, module, ModInfo}} ->
-            ActualModuleStr =
-                case ModInfo of
-                    %% Typical module name, single atom
-                    ActualModule when is_atom(ActualModule) ->
-                        atom_to_list(ActualModule);
-                    %% Packag-ized module name, list of atoms
-                    ActualModule when is_list(ActualModule) ->
-                        string:join([atom_to_list(P) ||
-                                        P <- ActualModule], ".");
-                    %% Parameterized module name, single atom
-                    {ActualModule, _} when is_atom(ActualModule) ->
-                        atom_to_list(ActualModule);
-                    %% Parameterized and packagized module name, list of atoms
-                    {ActualModule, _} when is_list(ActualModule) ->
-                        string:join([atom_to_list(P) ||
-                                        P <- ActualModule], ".")
-                end,
-            inspect_epp(Epp, Source, ActualModuleStr, Includes);
-        {ok, {attribute, 1, file, {Module, 1}}} ->
-            inspect_epp(Epp, Source, Module, Includes);
-        {ok, {attribute, 1, file, {Source, 1}}} ->
-            inspect_epp(Epp, Source, Module, Includes);
-        {ok, {attribute, 1, file, {IncFile, 1}}} ->
-            inspect_epp(Epp, Source, Module, [IncFile | Includes]);
-        {eof, _} ->
-            epp:close(Epp),
-            {Module, Includes};
-        _ ->
-            inspect_epp(Epp, Source, Module, Includes)
-    end.
+    lists:usort(["include", filename:dirname(Source)]
+                ++ proplists:get_all_values(i, ErlOpts)).
 
 -spec needs_compile(file:filename(), file:filename(),
                     [string()]) -> boolean().
@@ -363,11 +320,136 @@ needs_compile(Source, Target, Hrls) ->
     lists:any(fun(I) -> TargetLastMod < filelib:last_modified(I) end,
               [Source] ++ Hrls).
 
+init_graph(Config, Erls) ->
+    KeepGraph = rebar_config:get_list(Config, keep_build_info, false),
+    G = restore_graph("ebin", KeepGraph),
+    lists:foreach(
+      fun(Erl) ->
+              update_graph(G, Erl, include_path(Erl, Config))
+      end, Erls),
+    store_graph(G, "ebin", KeepGraph),
+    G.
+
+update_graph(G, Source, IncludePath) ->
+    case digraph:vertex(G, Source) of
+        {_, LastUpdated} ->
+            LastModified = filelib:last_modified(Source),
+            if LastModified == 0 ->
+                    %% The file doesn't exist anymore,
+                    %% erase it from the graph.
+                    %% All the edges will be erased automatically.
+                    digraph:del_vertex(G, Source);
+               LastUpdated < LastModified ->
+                    modify_graph(G, Source, IncludePath);
+               true ->
+                    ok
+            end;
+        false ->
+            modify_graph(G, Source, IncludePath)
+    end.
+
+modify_graph(G, Source, IncludePath) ->
+    case file:open(Source, [read]) of
+        {ok, Fd} ->
+            Incls = parse_attrs(Fd, []),
+            AbsIncls = expand_file_names(Incls, IncludePath),
+            catch file:close(Fd),
+            LastUpdated = {date(), time()},
+            digraph:add_vertex(G, Source, LastUpdated),
+            lists:foreach(
+              fun(Incl) ->
+                      update_graph(G, Incl, IncludePath),
+                      digraph:add_edge(G, Source, Incl)
+              end, AbsIncls);
+        _Err ->
+            ok
+    end.
+
+restore_graph(_OutDir, _KeepGraph = false) ->
+    digraph:new();
+restore_graph(OutDir, _KeepGraph = true) ->
+    File = filename:join(OutDir, ?REBAR_BUILD_INFO),
+    G = digraph:new(),
+    case file:read_file(File) of
+        {ok, Data} ->
+            case catch binary_to_term(Data) of
+                {'EXIT', _} ->
+                    ok;
+                {Vs, Es} ->
+                    lists:foreach(
+                      fun({V, LastUpdated}) ->
+                              digraph:add_vertex(G, V, LastUpdated)
+                      end, Vs),
+                    lists:foreach(
+                      fun({V1, V2}) ->
+                              digraph:add_edge(G, V1, V2)
+                      end, Es)
+            end;
+        _Err ->
+            ok
+    end,
+    G.
+
+store_graph(_G, _OutDir, _KeepGraph = false) ->
+    ok;
+store_graph(G, OutDir, _KeepGraph = true) ->
+    Vs = lists:map(
+           fun(V) ->
+                   digraph:vertex(G, V)
+           end, digraph:vertices(G)),
+    Es = lists:flatmap(
+           fun({V, _}) ->
+                   lists:map(
+                     fun(E) ->
+                             {_, V1, V2, _} = digraph:edge(G, E),
+                             {V1, V2}
+                     end, digraph:out_edges(G, V))
+           end, Vs),
+    File = filename:join(OutDir, ?REBAR_BUILD_INFO),
+    file:write_file(File, term_to_binary({Vs, Es})).
+
+-spec expand_file_names([file:filename()],
+                        [file:filename()]) -> [file:filename()].
+expand_file_names(Files, IncludePath) ->
+    %% We check if Files exist by itself or
+    %% within the directories listed in IncludePath.
+    %% Return the list of files matched.
+    lists:flatmap(
+      fun(Incl) ->
+              case filelib:is_regular(Incl) of
+                  true ->
+                      [Incl];
+                  false ->
+                      lists:flatmap(
+                        fun(Path) ->
+                                FullPath = filename:join(Path, Incl),
+                                case filelib:is_regular(FullPath) of
+                                    true ->
+                                        [FullPath];
+                                    false ->
+                                        []
+                                end
+                        end, IncludePath)
+              end
+      end, Files).
+
+-spec get_parents(digraph(), file:filename()) -> [file:filename()].
+get_parents(G, Source) ->
+    %% Return all files which the Source depends upon.
+    digraph_utils:reachable_neighbours([Source], G).
+
+-spec get_children(digraph(), file:filename()) -> [file:filename()].
+get_children(G, Source) ->
+    %% Return all files dependent on the Source.
+    digraph_utils:reaching_neighbours([Source], G).
+
 -spec internal_erl_compile(rebar_config:config(), file:filename(),
-                           file:filename(), list()) -> 'ok' | 'skipped'.
-internal_erl_compile(Config, Source, Outdir, ErlOpts) ->
+                           file:filename(), list(),
+                           digraph()) -> 'ok' | 'skipped'.
+internal_erl_compile(Config, Source, Outdir, ErlOpts, G) ->
     %% Determine the target name and includes list by inspecting the source file
-    {Module, Hrls} = inspect(Source, include_path(Source, Config)),
+    Module = filename:basename(Source, ".erl"),
+    Hrls = get_parents(G, Source),
 
     %% Construct the target filename
     Target = filename:join([Outdir | string:tokens(Module, ".")]) ++ ".beam",
@@ -463,38 +545,60 @@ delete_dir(Dir, Subdirs) ->
     lists:foreach(fun(D) -> delete_dir(D, dirs(D)) end, Subdirs),
     file:del_dir(Dir).
 
--spec compile_priority(file:filename()) -> 'normal' | 'behaviour' |
-                                           'callback' |
-                                           'parse_transform'.
-compile_priority(File) ->
-    case epp_dodger:parse_file(File) of
-        {error, _} ->
-            normal; % couldn't parse the file, default priority
-        {ok, Trees} ->
-            F2 = fun({tree,arity_qualifier,_,
-                      {arity_qualifier,{tree,atom,_,behaviour_info},
-                       {tree,integer,_,1}}}, _) ->
-                         behaviour;
-                    ({tree,arity_qualifier,_,
-                      {arity_qualifier,{tree,atom,_,parse_transform},
-                       {tree,integer,_,2}}}, _) ->
-                         parse_transform;
-                    (_, Acc) ->
-                         Acc
-                 end,
+parse_attrs(Fd, Includes) ->
+    case io:parse_erl_form(Fd, "") of
+        {ok, Form, _Line} ->
+            case erl_syntax:type(Form) of
+                attribute ->
+                    NewIncludes = process_attr(Form, Includes),
+                    parse_attrs(Fd, NewIncludes);
+                _ ->
+                    parse_attrs(Fd, Includes)
+            end;
+        {eof, _} ->
+            Includes;
+        _Err ->
+            parse_attrs(Fd, Includes)
+    end.
 
-            F = fun({tree, attribute, _,
-                     {attribute, {tree, atom, _, export},
-                      [{tree, list, _, {list, List, none}}]}}, Acc) ->
-                        lists:foldl(F2, Acc, List);
-                   ({tree, attribute, _,
-                     {attribute, {tree, atom, _, callback},_}}, _Acc) ->
-                        callback;
-                   (_, Acc) ->
-                        Acc
-                end,
+process_attr(Form, Includes) ->
+    try
+        AttrName = erl_syntax:atom_value(erl_syntax:attribute_name(Form)),
+        process_attr(AttrName, Form, Includes)
+    catch _:_ ->
+            Includes
+    end.
 
-            lists:foldl(F, normal, Trees)
+process_attr(import, Form, Includes) ->
+    case erl_syntax_lib:analyze_import_attribute(Form) of
+        {Mod, _Funs} ->
+            [atom_to_list(Mod) ++ ".erl"|Includes];
+        Mod ->
+            [atom_to_list(Mod) ++ ".erl"|Includes]
+    end;
+process_attr(file, Form, Includes) ->
+    {File, _} = erl_syntax_lib:analyze_file_attribute(Form),
+    [File|Includes];
+process_attr(include, Form, Includes) ->
+    [FileNode] = erl_syntax:attribute_arguments(Form),
+    File = erl_syntax:string_value(FileNode),
+    [File|Includes];
+process_attr(include_lib, Form, Includes) ->
+    [FileNode] = erl_syntax:attribute_arguments(Form),
+    File = erl_syntax:string_value(FileNode),
+    [File|Includes];
+process_attr(behaviour, Form, Includes) ->
+    [FileNode] = erl_syntax:attribute_arguments(Form),
+    File = erl_syntax:atom_name(FileNode) ++ ".erl",
+    [File|Includes];
+process_attr(compile, Form, Includes) ->
+    [Arg] = erl_syntax:attribute_arguments(Form),
+    case erl_syntax:concrete(Arg) of
+        {parse_transform, Mod} ->
+            [atom_to_list(Mod) ++ ".erl"|Includes];
+        L when is_list(L) ->
+            {_, Mod} = lists:keyfind(parse_transform, 1, L),
+            [atom_to_list(Mod) ++ ".erl"|Includes]
     end.
 
 %%
