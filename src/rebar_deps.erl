@@ -245,7 +245,13 @@ info_help(Description) ->
 %% Sets a default if root config has no deps_dir set
 set_shared_deps_dir(Config, []) ->
     LocalDepsDir = rebar_config:get_local(Config, deps_dir, "deps"),
-    DepsDir = rebar_config:get_global(Config, deps_dir, LocalDepsDir),
+    GlobalDepsDir = rebar_config:get_global(Config, deps_dir, LocalDepsDir),
+    DepsDir = case os:getenv("REBAR_DEPS_DIR") of
+                  false ->
+                      GlobalDepsDir;
+                  Dir ->
+                      Dir
+              end,
     rebar_config:set_xconf(Config, deps_dir, DepsDir);
 set_shared_deps_dir(Config, _DepsDir) ->
     Config.
