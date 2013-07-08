@@ -85,10 +85,36 @@ fi
 REMSH_TYPE=`echo $NAME_ARG | awk '{print $1}'`
 REMSH_NAME=`echo $NAME_ARG | awk '{print $2}'`
 
+# Test if REMSH_NAME contains a @ and set REMSH_HOSTNAME_PART 
+# and REMSH_NAME_PART according REMSH_TYPE
+MAYBE_FQDN_HOSTNAME=`hostname`
+HOSTNAME=`echo $MAYBE_FQDN_HOSTNAME | awk -F. '{print $1}'`
+
+REMSH_HOSTNAME_PART="$MAYBE_FQDN_HOSTNAME"
+case "$REMSH_NAME" in
+    *@*)
+        REMSH_HOSTNAME_PART=`echo $REMSH_NAME | awk -F@ '{print $2}'`
+        REMSH_NAME_PART=`echo $REMSH_NAME | awk -F@ '{print $1}'`
+        ;;
+    *)
+        REMSH_NAME_PART="$REMSH_NAME"
+        if [ "$REMSH_TYPE" = "-sname" ]; then
+            REMSH_HOSTNAME_PART= "$HOSTNAME"
+        else
+            # -name type, check if `hostname` is fqdn
+            if [ "$MAYBE_FQDN_HOSTNAME" = "$HOSTNAME" ]; then
+                echo "Hostname must be a fqdn domain name when node is configured with long names"
+                echo "and the full node name isn't configured in vm.args"
+                exit 1
+            fi
+        fi
+        ;;
+esac
+
 # Note the `date +%s`, used to allow multiple remsh to the same node
 # transparently
-REMSH_NAME_ARG="$REMSH_TYPE remsh`date +%s`@`echo $REMSH_NAME | awk -F@ '{print $2}'`"
-REMSH_REMSH_ARG="-remsh $REMSH_NAME"
+REMSH_NAME_ARG="$REMSH_TYPE remsh`date +%s`@$REMSH_HOSTNAME_PART"
+REMSH_REMSH_ARG="-remsh $REMSH_NAME_PART@$REMSH_HOSTNAME_PART"
 
 # Extract the target cookie
 COOKIE_ARG=`grep '^\-setcookie' $VMARGS_PATH`
