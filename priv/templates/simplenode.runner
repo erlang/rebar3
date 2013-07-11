@@ -136,7 +136,7 @@ ERTS_PATH=$RUNNER_BASE_DIR/erts-$ERTS_VSN/bin
 NODETOOL="$ERTS_PATH/escript $ERTS_PATH/nodetool $NAME_ARG $COOKIE_ARG"
 
 # Setup remote shell command to control node
-REMSH="$ERTS_PATH/erl $REMSH_NAME_ARG $REMSH_REMSH_ARG $COOKIE_ARG"
+REMSH="$ERTS_PATH/erl -hidden $REMSH_NAME_ARG $REMSH_REMSH_ARG $COOKIE_ARG"
 
 # Common functions
 
