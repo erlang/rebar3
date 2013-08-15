@@ -155,12 +155,10 @@ run_eunit(Config, CodePath, SrcErls) ->
         [filename:rootname(N) ++ "_tests.beam" || N <- AllBeamFiles],
     ModuleBeamFiles = randomize_suites(Config, BeamFiles ++ OtherBeamFiles),
 
-    %% Get modules to be run in eunit
+    %% Get matching tests and modules
     AllModules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- AllBeamFiles],
-    {SuitesProvided, FilteredModules} = filter_suites(Config, AllModules),
-
-    %% Get matching tests
-    Tests = get_tests(Config, SuitesProvided, ModuleBeamFiles, FilteredModules),
+    {Tests, CoverageModules} =
+        get_tests_and_modules(Config, ModuleBeamFiles, AllModules),
 
     SrcModules = [rebar_utils:erl_to_mod(M) || M <- SrcErls],
 
@@ -169,7 +167,7 @@ run_eunit(Config, CodePath, SrcErls) ->
     StatusBefore = status_before_eunit(),
     EunitResult = perform_eunit(Config, Tests),
 
-    perform_cover(Config, FilteredModules, SrcModules),
+    perform_cover(Config, CoverageModules, SrcModules),
     cover_close(CoverLog),
 
     case proplists:get_value(reset_after_eunit, get_eunit_opts(Config),
@@ -214,18 +212,23 @@ setup_code_path() ->
     CodePath.
 
 %%
-%% == filter suites ==
+%% == get matching tests ==
 %%
+get_tests_and_modules(Config, ModuleBeamFiles, AllModules) ->
+    SelectedSuites = get_selected_suites(Config, AllModules),
+    {Tests, QualifiedTests} = get_qualified_and_unqualified_tests(Config),
+    Modules = get_test_modules(SelectedSuites, Tests,
+                               QualifiedTests, ModuleBeamFiles),
+    CoverageModules = get_coverage_modules(AllModules, Modules, QualifiedTests),
+    MatchedTests = get_matching_tests(Modules, Tests, QualifiedTests),
+    {MatchedTests, CoverageModules}.
 
-filter_suites(Config, Modules) ->
+%%
+%% == get suites specified via 'suites' option ==
+%%
+get_selected_suites(Config, Modules) ->
     RawSuites = get_suites(Config),
-    SuitesProvided = RawSuites =/= "",
     Suites = [list_to_atom(Suite) || Suite <- string:tokens(RawSuites, ",")],
-    {SuitesProvided, filter_suites1(Modules, Suites)}.
-
-filter_suites1(Modules, []) ->
-    Modules;
-filter_suites1(Modules, Suites) ->
     [M || M <- Suites, lists:member(M, Modules)].
 
 get_suites(Config) ->
@@ -236,6 +239,32 @@ get_suites(Config) ->
             Suites
     end.
 
+get_qualified_and_unqualified_tests(Config) ->
+    RawFunctions = rebar_utils:get_experimental_global(Config, tests, ""),
+    FunctionNames = [FunctionName ||
+                        FunctionName <- string:tokens(RawFunctions, ",")],
+    get_qualified_and_unqualified_tests1(FunctionNames, [], []).
+
+get_qualified_and_unqualified_tests1([], Functions, QualifiedFunctions) ->
+    {Functions, QualifiedFunctions};
+get_qualified_and_unqualified_tests1([TestName|TestNames], Functions,
+                                     QualifiedFunctions) ->
+    case string:tokens(TestName, ":") of
+        [TestName] ->
+            Function = list_to_atom(TestName),
+            get_qualified_and_unqualified_tests1(
+              TestNames, [Function|Functions], QualifiedFunctions);
+        [ModuleName, FunctionName] ->
+            M = list_to_atom(ModuleName),
+            F = list_to_atom(FunctionName),
+            get_qualified_and_unqualified_tests1(TestNames, Functions,
+                                                 [{M, F}|QualifiedFunctions]);
+        _ ->
+            ?ABORT("Unsupported test function specification: ~s~n", [TestName])
+    end.
+
+%% Provide modules which are to be searched for tests.
+%% Several scenarios are possible:
 %%
 %% == randomize suites ==
 %%
@@ -265,60 +294,66 @@ randomize_suites1(Modules, Seed) ->
 
 %%
 %% == get matching tests ==
+%% 1) Specific tests have been provided and/or
+%% no unqualified tests have been specified and
+%% there were some qualified tests, then we can search for
+%% functions in specified suites (or in empty set of suites).
 %%
-get_tests(Config, SuitesProvided, ModuleBeamFiles, FilteredModules) ->
-    Modules = case SuitesProvided of
-                  false ->
-                      %% No specific suites have been provided, use
-                      %% ModuleBeamFiles which filters out "*_tests" modules
-                      %% so eunit won't doubly run them and cover only
-                      %% calculates coverage on production code. However,
-                      %% keep "*_tests" modules that are not automatically
-                      %% included by eunit.
-                      %%
-                      %% From 'Primitives' in the EUnit User's Guide
-                      %% http://www.erlang.org/doc/apps/eunit/chapter.html
-                      %% "In addition, EUnit will also look for another
-                      %% module whose name is ModuleName plus the suffix
-                      %% _tests, and if it exists, all the tests from that
-                      %% module will also be added. (If ModuleName already
-                      %% contains the suffix _tests, this is not done.) E.g.,
-                      %% the specification {module, mymodule} will run all
-                      %% tests in the modules mymodule and mymodule_tests.
-                      %% Typically, the _tests module should only contain
-                      %% test cases that use the public interface of the main
-                      %% module (and no other code)."
-                      [rebar_utils:beam_to_mod(?EUNIT_DIR, N) ||
-                          N <- ModuleBeamFiles];
-                  true ->
-                      %% Specific suites have been provided, return the
-                      %% filtered modules
-                      FilteredModules
-              end,
-    get_matching_tests(Config, Modules).
-
-get_tests(Config) ->
-    case rebar_config:get_global(Config, tests, "") of
-        "" ->
-            rebar_config:get_global(Config, test, "");
-        Suites ->
-            Suites
+%% 2) Neither specific suites nor qualified test names have been
+%% provided use ModuleBeamFiles which filters out "*_tests"
+%% modules so EUnit won't doubly run them and cover only
+%% calculates coverage on production code. However,
+%% keep "*_tests" modules that are not automatically
+%% included by EUnit.
+%%
+%% From 'Primitives' in the EUnit User's Guide
+%% http://www.erlang.org/doc/apps/eunit/chapter.html
+%% "In addition, EUnit will also look for another
+%% module whose name is ModuleName plus the suffix
+%% _tests, and if it exists, all the tests from that
+%% module will also be added. (If ModuleName already
+%% contains the suffix _tests, this is not done.) E.g.,
+%% the specification {module, mymodule} will run all
+%% tests in the modules mymodule and mymodule_tests.
+%% Typically, the _tests module should only contain
+%% test cases that use the public interface of the main
+%% module (and no other code)."
+get_test_modules(SelectedSuites, Tests, QualifiedTests, ModuleBeamFiles) ->
+    SuitesProvided = SelectedSuites =/= [],
+    OnlyQualifiedTestsProvided = QualifiedTests =/= [] andalso Tests =:= [],
+    if
+        SuitesProvided orelse OnlyQualifiedTestsProvided ->
+            SelectedSuites;
+        true ->
+            [rebar_utils:beam_to_mod(?EUNIT_DIR, N) ||
+                N <- ModuleBeamFiles]
     end.
 
-get_matching_tests(Config, Modules) ->
-    RawFunctions = get_tests(Config),
-    Tests = [list_to_atom(F1) || F1 <- string:tokens(RawFunctions, ",")],
-    case Tests of
-        [] ->
-            Modules;
-        Functions ->
-            case get_matching_tests1(Modules, Functions, []) of
-                [] ->
-                    [];
-                RawTests ->
-                    make_test_primitives(RawTests)
-            end
-    end.
+get_coverage_modules(AllModules, Modules, QualifiedTests) ->
+    ModuleFilterMapper =
+        fun({M, _}) ->
+                case lists:member(M, AllModules) of
+                    true -> {true, M};
+                    _-> false
+                end
+        end,
+    ModulesFromQualifiedTests = lists:zf(ModuleFilterMapper, QualifiedTests),
+    lists:usort(Modules ++ ModulesFromQualifiedTests).
+
+get_matching_tests(Modules, [], []) ->
+    Modules;
+get_matching_tests(Modules, [], QualifiedTests) ->
+    FilteredQualifiedTests = filter_qualified_tests(Modules, QualifiedTests),
+    lists:merge(Modules, make_test_primitives(FilteredQualifiedTests));
+get_matching_tests(Modules, Tests, QualifiedTests) ->
+    AllTests = lists:merge(QualifiedTests,
+                           get_matching_tests1(Modules, Tests, [])),
+    make_test_primitives(AllTests).
+
+filter_qualified_tests(Modules, QualifiedTests) ->
+    TestsFilter = fun({Module, _Function}) ->
+                          lists:all(fun(M) -> M =/= Module end, Modules) end,
+    lists:filter(TestsFilter, QualifiedTests).
 
 get_matching_tests1([], _Functions, TestFunctions) ->
     TestFunctions;
@@ -608,9 +643,9 @@ align_notcovered_count(Module, Covered, NotCovered, true) ->
 cover_write_index(Coverage, SrcModules) ->
     {ok, F} = file:open(filename:join([?EUNIT_DIR, "index.html"]), [write]),
     ok = file:write(F, "<!DOCTYPE HTML><html>\n"
-                        "<head><meta charset=\"utf-8\">"
-                        "<title>Coverage Summary</title></head>\n"
-                        "<body>\n"),
+                    "<head><meta charset=\"utf-8\">"
+                    "<title>Coverage Summary</title></head>\n"
+                    "<body>\n"),
     IsSrcCoverage = fun({Mod,_C,_N}) -> lists:member(Mod, SrcModules) end,
     {SrcCoverage, TestCoverage} = lists:partition(IsSrcCoverage, Coverage),
     cover_write_index_section(F, "Source", SrcCoverage),

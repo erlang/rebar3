@@ -191,6 +191,46 @@ eunit_with_suites_and_tests_test_() ->
 
                {"Selected suite tests is run once",
                 ?_assert(string:str(RebarOut, "All 2 tests passed") =/= 0)}]
+      end},
+     {"Ensure EUnit runs a specific test by qualified function name",
+      setup,
+      fun() ->
+              setup_project_with_multiple_modules(),
+              rebar("-v eunit tests=myapp_mymod:myprivate_test")
+      end,
+      fun teardown/1,
+      fun(RebarOut) ->
+              [{"Selected test is run",
+                [?_assert(string:str(RebarOut,
+                                     "myapp_mymod:myprivate_test/0")
+                          =/= 0)]},
+
+               {"Only selected test is run",
+                [?_assert(string:str(RebarOut,
+                                     "Test passed.") =/= 0)]}]
+      end},
+     {"Ensure EUnit runs a specific test by qualified function "
+      ++ "name and tests from other module",
+      setup,
+      fun() ->
+              setup_project_with_multiple_modules(),
+              rebar("-v eunit suites=myapp_mymod3 "
+                    ++ "tests=myapp_mymod:myprivate_test")
+      end,
+      fun teardown/1,
+      fun(RebarOut) ->
+              [{"Selected test is run",
+                [?_assert(string:str(RebarOut,
+                                     "myapp_mymod:myprivate_test/0") =/= 0)]},
+
+               {"Tests from module are run",
+                [?_assert(string:str(RebarOut,
+                                     "myapp_mymod3:") =/= 0)]},
+
+               {"Only selected tests are run",
+                [?_assert(string:str(RebarOut,
+                                     "Failed: 1.  Skipped: 0.  Passed: 1")
+                          =/= 0)]}]
       end}].
 
 cover_test_() ->
