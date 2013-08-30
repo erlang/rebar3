@@ -288,18 +288,24 @@ get_cover_config(Config, Cwd) ->
     end.
 
 collect_glob(Cwd, Glob) ->
-    filelib:fold_files(Cwd, Glob, true, fun collect_files/2, []).
+    CwdParts = filename:split(Cwd),
+    filelib:fold_files(Cwd, Glob, true, fun(F, Acc) ->
+        %% Ignore any specs under the deps/ directory. Do this pulling
+        %% the dirname off the the F and then splitting it into a list.
+        Parts = filename:split(filename:dirname(F)),
+        Parts2 = remove_common_prefix(Parts, CwdParts),
+        case lists:member("deps", Parts2) of
+            true ->
+                Acc;                % There is a directory named "deps" in path
+            false ->
+                [F | Acc]           % No "deps" directory in path
+        end
+    end, []).
 
-collect_files(F, Acc) ->
-    %% Ignore any specs under the deps/ directory. Do this pulling
-    %% the dirname off the the F and then splitting it into a list.
-    Parts = filename:split(filename:dirname(F)),
-    case lists:member("deps", Parts) of
-        true ->
-            Acc;                % There is a directory named "deps" in path
-        false ->
-            [F | Acc]           % No "deps" directory in path
-    end.
+remove_common_prefix([H1|T1], [H1|T2]) ->
+    remove_common_prefix(T1, T2);
+remove_common_prefix(L1, _) ->
+    L1.
 
 get_ct_config_file(TestDir) ->
     Config = filename:join(TestDir, "test.config"),
