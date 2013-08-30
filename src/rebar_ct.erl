@@ -280,7 +280,7 @@ get_cover_config(Config, Cwd) ->
                     ?DEBUG("No cover spec found: ~s~n", [Cwd]),
                     "";
                 [Spec] ->
-                    ?DEBUG("Found cover file ~w~n", [Spec]),
+                    ?DEBUG("Found cover file ~s~n", [Spec]),
                     " -cover " ++ Spec;
                 Specs ->
                     ?ABORT("Multiple cover specs found: ~p~n", [Specs])
