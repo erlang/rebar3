@@ -146,7 +146,7 @@ code_path(Config) ->
     %% functions, even though those functions are present as part
     %% of compilation. H/t to @dluna. Long term we should tie more
     %% properly into the overall compile code path if possible.
-    BaseDir = rebar_config:get_xconf(Config, base_dir),
+    BaseDir = rebar_utils:base_dir(Config),
     [P || P <- code:get_path() ++
               rebar_config:get(Config, xref_extra_paths, []) ++
               [filename:join(BaseDir, filename:join(SubDir, "ebin"))
