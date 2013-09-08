@@ -34,6 +34,7 @@
          info/2]).
 
 -include("rebar.hrl").
+-include_lib("stdlib/include/erl_compile.hrl").
 
 %% ===================================================================
 %% Public API
@@ -401,7 +402,14 @@ compile_mib(Source, Target, Config) ->
     case snmpc:compile(Source, Opts) of
         {ok, _} ->
             Mib = filename:rootname(Target),
-            ok = snmpc:mib_to_hrl(Mib),
+            MibToHrlOpts =
+                case proplists:get_value(verbosity, Opts, undefined) of
+                    undefined ->
+                        #options{specific = []};
+                    Verbosity ->
+                        #options{specific = [{verbosity, Verbosity}]}
+                end,
+            ok = snmpc:mib_to_hrl(Mib, Mib, MibToHrlOpts),
             Hrl_filename = Mib ++ ".hrl",
             rebar_file_utils:mv(Hrl_filename, "include"),
             ok;
