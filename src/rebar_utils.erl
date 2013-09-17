@@ -31,6 +31,7 @@
          get_arch/0,
          wordsize/0,
          sh/2,
+         sh_send/3,
          find_files/2, find_files/3,
          now_str/0,
          ensure_dir/1,
@@ -86,6 +87,24 @@ wordsize() ->
         error:badarg ->
             integer_to_list(8 * erlang:system_info(wordsize))
     end.
+
+sh_send(Command0, String, Options0) ->
+    ?INFO("sh_send info:\n\tcwd: ~p\n\tcmd: ~s < ~s\n", [get_cwd(), Command0, String]),
+    ?DEBUG("\topts: ~p\n", [Options0]),
+
+    DefaultOptions = [use_stdout, abort_on_error],
+    Options = [expand_sh_flag(V)
+               || V <- proplists:compact(Options0 ++ DefaultOptions)],
+
+    Command = patch_on_windows(Command0, proplists:get_value(env, Options, [])),
+    PortSettings = proplists:get_all_values(port_settings, Options) ++
+        [exit_status, {line, 16384}, use_stdio, stderr_to_stdout, hide],
+    Port = open_port({spawn, Command}, PortSettings),
+
+    %% allow us to send some data to the shell command's STDIN
+    %% Erlang doesn't let us get any reply after sending an EOF, though...
+    Port ! {self(), {command, String}},
+    port_close(Port).
 
 %%
 %% Options = [Option] -- defaults to [use_stdout, abort_on_error]
@@ -478,6 +497,7 @@ vcs_vsn_1(Vcs, Dir) ->
     end.
 
 vcs_vsn_cmd(git)    -> "git describe --always --tags";
+vcs_vsn_cmd(p4)     -> "echo #head";
 vcs_vsn_cmd(hg)     -> "hg identify -i";
 vcs_vsn_cmd(bzr)    -> "bzr revno";
 vcs_vsn_cmd(svn)    -> "svnversion";
