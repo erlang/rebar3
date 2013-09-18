@@ -149,7 +149,7 @@ check_fail_log(Config, RawLog, Command, Result) ->
 
 check_log(Config,RawLog,Fun) ->
     {ok, Msg} =
-        rebar_utils:sh("grep -e 'TEST COMPLETE' -e '{error,make_failed}' "
+        rebar_utils:sh("grep -e \"TEST COMPLETE\" -e \"{error,make_failed}\" "
                        ++ RawLog, [{use_stdout, false}]),
     MakeFailed = string:str(Msg, "{error,make_failed}") =/= 0,
     RunFailed = string:str(Msg, ", 0 failed") =:= 0,
