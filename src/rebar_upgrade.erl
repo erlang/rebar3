@@ -184,13 +184,23 @@ boot_files(TargetDir, Ver, Name) ->
           filename:join([TargetDir, "releases", Ver, "start_clean.boot"]),
           filename:join([".", ?TMP, "releases", Ver, "start_clean.boot"])),
 
-    {ok, _} = file:copy(
-                filename:join([TargetDir, "releases", Ver, "sys.config"]),
-                filename:join([".", ?TMP, "releases", Ver, "sys.config"])),
+    SysConfig = filename:join([TargetDir, "releases", Ver, "sys.config"]),
+    case filelib:is_regular(SysConfig) of 
+      true -> 
+        {ok, _} = file:copy(
+                SysConfig,
+                filename:join([".", ?TMP, "releases", Ver, "sys.config"]));
+      false -> ok
+    end,
 
-    {ok, _} = file:copy(
-                filename:join([TargetDir, "releases", Ver, "vm.args"]),
-                filename:join([".", ?TMP, "releases", Ver, "vm.args"])).
+    VmArgs = filename:join([TargetDir, "releases", Ver, "vm.args"]),
+    case filelib:is_regular(VmArgs) of 
+      true -> 
+        {ok, _} = file:copy(
+                VmArgs,
+                filename:join([".", ?TMP, "releases", Ver, "vm.args"]));
+      false -> {ok, 0}
+    end.
 
 make_tar(NameVer, NewVer, NewName) ->
     Filename = NameVer ++ ".tar.gz",
