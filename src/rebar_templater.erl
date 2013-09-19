@@ -347,6 +347,10 @@ write_file(Output, Data, Force) ->
             {error, exists}
     end.
 
+prepend_instructions(Instructions, Rest) when is_list(Instructions) ->
+    Instructions ++ Rest;
+prepend_instructions(Instruction, Rest) ->
+    [Instruction|Rest].
 
 %%
 %% Execute each instruction in a template definition file.
@@ -364,6 +368,23 @@ execute_template(_Files, [], _TemplateType, _TemplateName,
             ?ERROR("One or more files already exist on disk and "
                    "were not generated:~n~s~s", [Msg , Help])
     end;
+execute_template(Files, [{'if', Cond, True} | Rest], TemplateType,
+                 TemplateName, Context, Force, ExistingFiles) ->
+    execute_template(Files, [{'if', Cond, True, []}|Rest], TemplateType,
+                     TemplateName, Context, Force, ExistingFiles);
+execute_template(Files, [{'if', Cond, True, False} | Rest], TemplateType,
+                 TemplateName, Context, Force, ExistingFiles) ->
+    Instructions = case dict:find(Cond, Context) of
+                       {ok, true} ->
+                           True;
+                       {ok, "true"} ->
+                           True;
+                       _ ->
+                           False
+                   end,
+    execute_template(Files, prepend_instructions(Instructions, Rest),
+                     TemplateType, TemplateName, Context, Force,
+                     ExistingFiles);
 execute_template(Files, [{template, Input, Output} | Rest], TemplateType,
                  TemplateName, Context, Force, ExistingFiles) ->
     InputName = filename:join(filename:dirname(TemplateName), Input),
