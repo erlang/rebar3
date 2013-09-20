@@ -1,7 +1,7 @@
 Contributing to rebar
 ---------------------
 
-Before implementing a new feature, you should submit a ticket for discussion on your plans.  
+Before implementing a new feature, please submit a ticket to discuss your plans.  
 The feature might have been rejected already, or the implementation might already be decided.
 
 See [Community and Resources](README.md#community-and-resources).
