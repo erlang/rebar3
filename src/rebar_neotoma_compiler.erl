@@ -70,10 +70,10 @@ info(help, compile) ->
        "Valid rebar.config options:~n"
        "  ~p~n",
        [
-        {neotom_opts, [{doc_root, "src"},
-                       {out_dir, "src"},
-                       {source_ext, ".peg"},
-                       {module_ext, ""}]}
+        {neotoma_opts, [{doc_root, "src"},
+                        {out_dir, "src"},
+                        {source_ext, ".peg"},
+                        {module_ext, ""}]}
        ]).
 
 neotoma_opts(Config) ->
