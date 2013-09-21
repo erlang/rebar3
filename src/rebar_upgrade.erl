@@ -185,21 +185,22 @@ boot_files(TargetDir, Ver, Name) ->
           filename:join([".", ?TMP, "releases", Ver, "start_clean.boot"])),
 
     SysConfig = filename:join([TargetDir, "releases", Ver, "sys.config"]),
-    case filelib:is_regular(SysConfig) of 
-      true -> 
-        {ok, _} = file:copy(
-                SysConfig,
-                filename:join([".", ?TMP, "releases", Ver, "sys.config"]));
-      false -> ok
-    end,
+    _ = case filelib:is_regular(SysConfig) of
+            true ->
+                {ok, _} = file:copy(
+                            SysConfig,
+                            filename:join([".", ?TMP, "releases", Ver,
+                                           "sys.config"]));
+            false -> ok
+        end,
 
     VmArgs = filename:join([TargetDir, "releases", Ver, "vm.args"]),
-    case filelib:is_regular(VmArgs) of 
-      true -> 
-        {ok, _} = file:copy(
-                VmArgs,
-                filename:join([".", ?TMP, "releases", Ver, "vm.args"]));
-      false -> {ok, 0}
+    case filelib:is_regular(VmArgs) of
+        true ->
+            {ok, _} = file:copy(
+                        VmArgs,
+                        filename:join([".", ?TMP, "releases", Ver, "vm.args"]));
+        false -> {ok, 0}
     end.
 
 make_tar(NameVer, NewVer, NewName) ->
