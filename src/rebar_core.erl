@@ -163,6 +163,13 @@ skip_or_process_dir({_, ModuleSetFile}=ModuleSet, Config, CurrentCodePath,
 skip_or_process_dir1(AppFile, ModuleSet, Config, CurrentCodePath,
                      Dir, Command, DirSet) ->
     case rebar_app_utils:is_skipped_app(Config, AppFile) of
+        {Config1, {true, _SkippedApp}} when Command == 'update-deps' ->
+            %% update-deps does its own app skipping. Unfortunately there's no
+            %% way to signal this to rebar_core, so we have to explicitly do it
+            %% here... Otherwise if you use app=, it'll skip the toplevel
+            %% directory and nothing will be updated.
+             process_dir1(Dir, Command, DirSet, Config1,
+                         CurrentCodePath, ModuleSet);
         {Config1, {true, SkippedApp}} ->
             ?DEBUG("Skipping app: ~p~n", [SkippedApp]),
             Config2 = increment_operations(Config1),

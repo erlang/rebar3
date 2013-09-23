@@ -600,7 +600,10 @@ update_deps_int(Config0, UDD) ->
 
     %% Update each dep
     UpdatedDeps = [update_source(Config1, D)
-                   || D <- Deps, D#dep.source =/= undefined, not lists:member(D, UDD)],
+                   || D <- Deps, D#dep.source =/= undefined,
+                      not lists:member(D, UDD),
+                      not should_skip_update_dep(Config1, D)
+                  ],
 
     lists:foldl(fun(Dep, {Config, Updated}) ->
                         {true, AppDir} = get_deps_dir(Config, Dep#dep.app),
@@ -628,6 +631,16 @@ update_deps_int(Config0, UDD) ->
                                                lists:sort(Updated))}
                 end, {Config1, lists:umerge(lists:sort(UpdatedDeps),
                                             lists:sort(UDD))}, UpdatedDeps).
+
+should_skip_update_dep(Config, Dep) ->
+    {true, AppDir} = get_deps_dir(Config, Dep#dep.app),
+    {true, AppFile} = rebar_app_utils:is_app_dir(AppDir),
+    case rebar_app_utils:is_skipped_app(Config, AppFile) of
+        {_Config, {true, _SkippedApp}} ->
+            true;
+        _ ->
+            false
+    end.
 
 %% Recursively walk the deps and build a list of them.
 collect_deps(Dir, C) ->
