@@ -560,7 +560,8 @@ update_source1(AppDir, {git, Url, ""}) ->
 update_source1(AppDir, {git, _Url, {branch, Branch}}) ->
     ShOpts = [{cd, AppDir}],
     rebar_utils:sh("git fetch origin", ShOpts),
-    rebar_utils:sh(?FMT("git checkout -q origin/~s", [Branch]), ShOpts);
+    rebar_utils:sh(?FMT("git checkout -q ~s", [Branch]), ShOpts),
+    rebar_utils:sh(?FMT("git pull --ff-only --no-rebase -q origin ~s", [Branch]), ShOpts);
 update_source1(AppDir, {git, _Url, {tag, Tag}}) ->
     ShOpts = [{cd, AppDir}],
     rebar_utils:sh("git fetch --tags origin", ShOpts),
