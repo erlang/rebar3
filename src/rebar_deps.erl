@@ -634,12 +634,16 @@ update_deps_int(Config0, UDD) ->
 
 should_skip_update_dep(Config, Dep) ->
     {true, AppDir} = get_deps_dir(Config, Dep#dep.app),
-    {true, AppFile} = rebar_app_utils:is_app_dir(AppDir),
-    case rebar_app_utils:is_skipped_app(Config, AppFile) of
-        {_Config, {true, _SkippedApp}} ->
-            true;
-        _ ->
-            false
+    case rebar_app_utils:is_app_dir(AppDir) of
+        false ->
+            false;
+        {true, AppFile} ->
+            case rebar_app_utils:is_skipped_app(Config, AppFile) of
+                {_Config, {true, _SkippedApp}} ->
+                    true;
+                _ ->
+                    false
+            end
     end.
 
 %% Recursively walk the deps and build a list of them.
