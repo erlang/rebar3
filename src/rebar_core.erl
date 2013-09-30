@@ -168,7 +168,7 @@ skip_or_process_dir1(AppFile, ModuleSet, Config, CurrentCodePath,
             %% way to signal this to rebar_core, so we have to explicitly do it
             %% here... Otherwise if you use app=, it'll skip the toplevel
             %% directory and nothing will be updated.
-             process_dir1(Dir, Command, DirSet, Config1,
+            process_dir1(Dir, Command, DirSet, Config1,
                          CurrentCodePath, ModuleSet);
         {Config1, {true, SkippedApp}} ->
             ?DEBUG("Skipping app: ~p~n", [SkippedApp]),
@@ -181,7 +181,7 @@ skip_or_process_dir1(AppFile, ModuleSet, Config, CurrentCodePath,
 
 process_dir1(Dir, Command, DirSet, Config, CurrentCodePath,
              {DirModules, ModuleSetFile}) ->
-    Config0 = rebar_config:set(Config, command, Command),
+    Config0 = rebar_config:set(Config, current_command, Command),
     %% Get the list of modules for "any dir". This is a catch-all list
     %% of modules that are processed in addition to modules associated
     %% with this directory type. These any_dir modules are processed
