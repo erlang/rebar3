@@ -70,8 +70,8 @@ compile_lfe(Source, _Target, Config) ->
                    "~n", []),
             ?FAIL;
         _ ->
-            Opts = [{i, "include"}, {outdir, "ebin"}, return]
-                ++ rebar_config:get_list(Config, erl_opts, []),
+            ErlOpts = rebar_utils:erl_opts(Config),
+            Opts = [{i, "include"}, {outdir, "ebin"}, return] ++ ErlOpts,
             case lfe_comp:file(Source, Opts) of
                 {ok, _Mod, Ws} ->
                     rebar_base_compiler:ok_tuple(Config, Source, Ws);
