@@ -157,7 +157,8 @@ test_compile(Config, Cmd, OutDir) ->
     %% Compile erlang code to OutDir, using a tweaked config
     %% with appropriate defines for eunit, and include all the test modules
     %% as well.
-    ok = doterl_compile(test_compile_config(Config, Cmd), OutDir, TestErls),
+    ok = doterl_compile(test_compile_config(Config, ErlOpts, Cmd),
+                        OutDir, TestErls),
 
     {ok, SrcErls}.
 
@@ -201,12 +202,11 @@ info_help(Description) ->
         {yrl_first_files, []}
        ]).
 
-test_compile_config(Config, Cmd) ->
+test_compile_config(Config, ErlOpts, Cmd) ->
     {Config1, TriqOpts} = triq_opts(Config),
     {Config2, PropErOpts} = proper_opts(Config1),
     {Config3, EqcOpts} = eqc_opts(Config2),
 
-    ErlOpts = rebar_config:get_list(Config3, erl_opts, []),
     OptsAtom = list_to_atom(Cmd ++ "_compile_opts"),
     EunitOpts = rebar_config:get_list(Config3, OptsAtom, []),
     Opts0 = [{d, 'TEST'}] ++
