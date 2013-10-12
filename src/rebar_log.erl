@@ -30,6 +30,11 @@
          set_level/1, default_level/0,
          log/3]).
 
+-define(ERROR_LEVEL, 0).
+-define(WARN_LEVEL,  1).
+-define(INFO_LEVEL,  2).
+-define(DEBUG_LEVEL, 3).
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -37,10 +42,10 @@
 init(Config) ->
     Verbosity = rebar_config:get_global(Config, verbose, default_level()),
     case valid_level(Verbosity) of
-        0 -> set_level(error);
-        1 -> set_level(warn);
-        2 -> set_level(info);
-        3 -> set_level(debug)
+        ?ERROR_LEVEL -> set_level(error);
+        ?WARN_LEVEL  -> set_level(warn);
+        ?INFO_LEVEL  -> set_level(info);
+        ?DEBUG_LEVEL -> set_level(debug)
     end.
 
 set_level(Level) ->
@@ -55,17 +60,16 @@ log(Level, Str, Args) ->
             ok
     end.
 
-default_level() -> error_level().
+default_level() -> ?WARN_LEVEL.
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
 valid_level(Level) ->
-    erlang:max(error_level(), erlang:min(Level, debug_level())).
+    erlang:max(?ERROR_LEVEL, erlang:min(Level, ?DEBUG_LEVEL)).
 
-error_level() -> 0.
-debug_level() -> 3.
+error_level() -> ?ERROR_LEVEL.
 
 should_log(debug, _)     -> true;
 should_log(info, debug)  -> false;
