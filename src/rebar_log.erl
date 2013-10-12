@@ -27,7 +27,9 @@
 -module(rebar_log).
 
 -export([init/1,
-         set_level/1, default_level/0,
+         set_level/1,
+         error_level/0,
+         default_level/0,
          log/3]).
 
 -define(ERROR_LEVEL, 0).
@@ -60,6 +62,7 @@ log(Level, Str, Args) ->
             ok
     end.
 
+error_level() -> ?ERROR_LEVEL.
 default_level() -> ?WARN_LEVEL.
 
 %% ===================================================================
@@ -68,8 +71,6 @@ default_level() -> ?WARN_LEVEL.
 
 valid_level(Level) ->
     erlang:max(?ERROR_LEVEL, erlang:min(Level, ?DEBUG_LEVEL)).
-
-error_level() -> ?ERROR_LEVEL.
 
 should_log(debug, _)     -> true;
 should_log(info, debug)  -> false;
