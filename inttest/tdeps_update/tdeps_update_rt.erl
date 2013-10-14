@@ -2,7 +2,7 @@
 
 -compile(export_all).
 
-%% Exercises update deps, with recuseive dependency updates.
+%% Exercises update deps, with recursive dependency updates.
 %% Initially:
 %%     A(v0.5) -> B(v0.2.3) -> C(v1.0)
 %% But after updating A to 0.6:
