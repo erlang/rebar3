@@ -399,18 +399,19 @@ update_code_path(Config) ->
         [] ->
             no_change;
         Paths ->
-            OldPath = code:get_path(),
             LibPaths = expand_lib_dirs(Paths, rebar_utils:get_cwd(), []),
             ok = code:add_pathsa(LibPaths),
-            {old, OldPath}
+            %% track just the paths we added, so we can remove them without
+            %% removing other paths added by this dep
+            {added, LibPaths}
     end.
 
 restore_code_path(no_change) ->
     ok;
-restore_code_path({old, Path}) ->
+restore_code_path({added, Paths}) ->
     %% Verify that all of the paths still exist -- some dynamically
     %% added paths can get blown away during clean.
-    true = code:set_path([F || F <- Path, erl_prim_loader_is_file(F)]),
+    [true = code:del_path(F) || F <- Paths, erl_prim_loader_is_file(F)],
     ok.
 
 erl_prim_loader_is_file(File) ->
