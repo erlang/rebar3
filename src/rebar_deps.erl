@@ -187,15 +187,15 @@ do_check_deps(Config) ->
     DepOwners = rebar_config:get(Config2, depowner, dict:new()),
 
     %% check for conflicting deps
-    [?ERROR("Conflicting dependencies for ~p: ~p~n", [K,
-                                                      [{"From: " ++ string:join(dict:fetch(D,
-                                                                               DepOwners),
-                                                                               ", "),
-                                                        {D#dep.vsn_regex,
-                                                         D#dep.source}} || D <- V]]) ||
-           {K, V} <- dict:to_list(lists:foldl(fun(Dep, Acc) ->
-                                                      dict:append(Dep#dep.app, Dep, Acc)
-                                              end, dict:new(), UpdatedDeps)), length(V) > 1],
+    _ = [?ERROR("Conflicting dependencies for ~p: ~p~n",
+                [K, [{"From: " ++ string:join(dict:fetch(D, DepOwners), ", "),
+                      {D#dep.vsn_regex, D#dep.source}} || D <- V]])
+         || {K, V} <- dict:to_list(
+                        lists:foldl(
+                          fun(Dep, Acc) ->
+                                  dict:append(Dep#dep.app, Dep, Acc)
+                          end, dict:new(), UpdatedDeps)),
+            length(V) > 1],
 
     %% Add each updated dep to our list of dirs for post-processing. This yields
     %% the necessary transitivity of the deps
