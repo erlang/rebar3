@@ -183,8 +183,9 @@ do_check_deps(Config) ->
     {ok, save_dep_dirs(Config2, lists:reverse(PulledDeps))}.
 
 'update-deps'(Config, _) ->
-    {Config2, UpdatedDeps} = update_deps_int(rebar_config:set(Config, depowner, dict:new()), []),
-    DepOwners = rebar_config:get(Config2, depowner, dict:new()),
+    Config1 = rebar_config:set_xconf(Config, depowner, dict:new()),
+    {Config2, UpdatedDeps} = update_deps_int(Config1, []),
+    DepOwners = rebar_config:get_xconf(Config2, depowner, dict:new()),
 
     %% check for conflicting deps
     _ = [?ERROR("Conflicting dependencies for ~p: ~p~n",
@@ -620,11 +621,12 @@ update_deps_int(Config0, UDD) ->
                         ok = file:set_cwd(AppDir),
                         Config3 = rebar_config:new(Config2),
                         %% track where a dep comes from...
-                        Config4 = rebar_config:set(Config3, depowner,
-                                                   dict:append(Dep, ConfDir,
-                                                               rebar_config:get(Config3,
-                                                                                depowner,
-                                                                                dict:new()))),
+                        DepOwner = dict:append(
+                                     Dep, ConfDir,
+                                     rebar_config:get_xconf(Config3, depowner,
+                                                            dict:new())),
+                        Config4 = rebar_config:set_xconf(Config3, depowner,
+                                                         DepOwner),
 
                         {Config5, Res} = update_deps_int(Config4, Updated),
                         {Config5, lists:umerge(lists:sort(Res),
