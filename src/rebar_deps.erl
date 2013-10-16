@@ -72,7 +72,7 @@ preprocess(Config, _) ->
     %% deps-related can be executed on their directories.
     NonRawAvailableDeps = [D || D <- AvailableDeps, not D#dep.is_raw],
 
-    case rebar_config:get(Config, current_command, undefined) of
+    case rebar_config:get_xconf(Config, current_command, undefined) of
         'update-deps' ->
             %% Skip ALL of the dep folders, we do this because we don't want
             %% any other calls to preprocess() for update-deps beyond the
