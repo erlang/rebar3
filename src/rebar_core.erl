@@ -411,7 +411,7 @@ restore_code_path(no_change) ->
 restore_code_path({added, Paths}) ->
     %% Verify that all of the paths still exist -- some dynamically
     %% added paths can get blown away during clean.
-    [true = code:del_path(F) || F <- Paths, erl_prim_loader_is_file(F)],
+    [code:del_path(F) || F <- Paths, erl_prim_loader_is_file(F)],
     ok.
 
 erl_prim_loader_is_file(File) ->
