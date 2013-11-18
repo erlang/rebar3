@@ -16,6 +16,7 @@ fi
 unset POSIX_SHELL
 
 RUNNER_SCRIPT_DIR=$(cd ${0%/*} && pwd -P)
+RUNNER_SCRIPT=${0##*/}
 
 CALLER_DIR=$PWD
 
