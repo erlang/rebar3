@@ -119,8 +119,7 @@ clean(Config, _AppFile) ->
 
     YrlFiles = rebar_utils:find_files("src", "^.*\\.[x|y]rl\$"),
     rebar_file_utils:delete_each(
-      [ binary_to_list(iolist_to_binary(re:replace(F, "\\.[x|y]rl$", ".erl")))
-        || F <- YrlFiles ]),
+      [re:replace(F, "\\.[xy]rl$", ".erl", [{return,list}]) || F <- YrlFiles]),
 
     %% Delete the build graph, if any
     rebar_file_utils:rm_rf(erlcinfo_file(Config)),
