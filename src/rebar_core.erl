@@ -181,7 +181,7 @@ skip_or_process_dir1(AppFile, ModuleSet, Config, CurrentCodePath,
 
 process_dir1(Dir, Command, DirSet, Config, CurrentCodePath,
              {DirModules, ModuleSetFile}) ->
-    Config0 = rebar_config:set(Config, current_command, Command),
+    Config0 = rebar_config:set_xconf(Config, current_command, Command),
     %% Get the list of modules for "any dir". This is a catch-all list
     %% of modules that are processed in addition to modules associated
     %% with this directory type. These any_dir modules are processed

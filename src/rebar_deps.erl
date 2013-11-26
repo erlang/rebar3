@@ -72,43 +72,49 @@ preprocess(Config, _) ->
     %% deps-related can be executed on their directories.
     NonRawAvailableDeps = [D || D <- AvailableDeps, not D#dep.is_raw],
 
-    case rebar_config:get(Config, current_command, undefined) of
+    case rebar_config:get_xconf(Config, current_command, undefined) of
         'update-deps' ->
             %% Skip ALL of the dep folders, we do this because we don't want
             %% any other calls to preprocess() for update-deps beyond the
             %% toplevel directory. They aren't actually harmful, but they slow
             %% things down unnecessarily.
-            NewConfig = lists:foldl(fun(D, Acc) ->
-                                             rebar_config:set_skip_dir(Acc, D#dep.dir)
-                                     end, Config3, collect_deps(rebar_utils:get_cwd(), Config3)),
+            NewConfig = lists:foldl(
+                          fun(D, Acc) ->
+                                  rebar_config:set_skip_dir(Acc, D#dep.dir)
+                          end,
+                          Config3,
+                          collect_deps(rebar_utils:get_cwd(), Config3)),
             %% Return the empty list, as we don't want anything processed before
             %% us.
             {ok, NewConfig, []};
         _ ->
-            %% If skip_deps=true, mark each dep dir as a skip_dir w/ the core so that
-            %% the current command doesn't run on the dep dir. However, pre/postprocess
-            %% WILL run (and we want it to) for transitivity purposes.
+            %% If skip_deps=true, mark each dep dir as a skip_dir w/ the core
+            %% so that the current command doesn't run on the dep dir.
+            %% However, pre/postprocess WILL run (and we want it to) for
+            %% transitivity purposes.
             %%
             %% Also, if skip_deps=comma,separated,app,list, then only the given
             %% dependencies are skipped.
-            NewConfig = case rebar_config:get_global(Config3, skip_deps, false) of
-                "true" ->
-                    lists:foldl(
-                        fun(#dep{dir = Dir}, C) ->
-                                rebar_config:set_skip_dir(C, Dir)
-                        end, Config3, AvailableDeps);
-                Apps when is_list(Apps) ->
-                    SkipApps = [list_to_atom(App) || App <- string:tokens(Apps, ",")],
-                    lists:foldl(
-                        fun(#dep{dir = Dir, app = App}, C) ->
-                                case lists:member(App, SkipApps) of
-                                    true -> rebar_config:set_skip_dir(C, Dir);
-                                    false -> C
-                                end
-                        end, Config3, AvailableDeps);
-                _ ->
-                    Config3
-            end,
+            NewConfig =
+                case rebar_config:get_global(Config3, skip_deps, false) of
+                    "true" ->
+                        lists:foldl(
+                          fun(#dep{dir = Dir}, C) ->
+                                  rebar_config:set_skip_dir(C, Dir)
+                          end, Config3, AvailableDeps);
+                    Apps when is_list(Apps) ->
+                        SkipApps = [list_to_atom(App) ||
+                                       App <- string:tokens(Apps, ",")],
+                        lists:foldl(
+                          fun(#dep{dir = Dir, app = App}, C) ->
+                                  case lists:member(App, SkipApps) of
+                                      true -> rebar_config:set_skip_dir(C, Dir);
+                                      false -> C
+                                  end
+                          end, Config3, AvailableDeps);
+                    _ ->
+                        Config3
+                end,
 
             %% Return all the available dep directories for process
             {ok, NewConfig, dep_dirs(NonRawAvailableDeps)}
@@ -183,19 +189,20 @@ do_check_deps(Config) ->
     {ok, save_dep_dirs(Config2, lists:reverse(PulledDeps))}.
 
 'update-deps'(Config, _) ->
-    {Config2, UpdatedDeps} = update_deps_int(rebar_config:set(Config, depowner, dict:new()), []),
-    DepOwners = rebar_config:get(Config2, depowner, dict:new()),
+    Config1 = rebar_config:set_xconf(Config, depowner, dict:new()),
+    {Config2, UpdatedDeps} = update_deps_int(Config1, []),
+    DepOwners = rebar_config:get_xconf(Config2, depowner, dict:new()),
 
     %% check for conflicting deps
-    [?ERROR("Conflicting dependencies for ~p: ~p~n", [K,
-                                                      [{"From: " ++ string:join(dict:fetch(D,
-                                                                               DepOwners),
-                                                                               ", "),
-                                                        {D#dep.vsn_regex,
-                                                         D#dep.source}} || D <- V]]) ||
-           {K, V} <- dict:to_list(lists:foldl(fun(Dep, Acc) ->
-                                                      dict:append(Dep#dep.app, Dep, Acc)
-                                              end, dict:new(), UpdatedDeps)), length(V) > 1],
+    _ = [?ERROR("Conflicting dependencies for ~p: ~p~n",
+                [K, [{"From: " ++ string:join(dict:fetch(D, DepOwners), ", "),
+                      {D#dep.vsn_regex, D#dep.source}} || D <- V]])
+         || {K, V} <- dict:to_list(
+                        lists:foldl(
+                          fun(Dep, Acc) ->
+                                  dict:append(Dep#dep.app, Dep, Acc)
+                          end, dict:new(), UpdatedDeps)),
+            length(V) > 1],
 
     %% Add each updated dep to our list of dirs for post-processing. This yields
     %% the necessary transitivity of the deps
@@ -439,7 +446,8 @@ is_app_available(Config, App, VsnRegex, Path, _IsRaw = false) ->
             {Config, {false, {missing_app_file, Path}}}
     end;
 is_app_available(Config, App, _VsnRegex, Path, _IsRaw = true) ->
-    ?DEBUG("is_app_available, looking for Raw Depencency ~p with Path ~p~n", [App, Path]),
+    ?DEBUG("is_app_available, looking for Raw Depencency ~p with Path ~p~n",
+           [App, Path]),
     case filelib:is_dir(Path) of
         true ->
             %% TODO: look for version string in <Path>/VERSION file? Not clear
@@ -462,8 +470,8 @@ use_source(Config, Dep, Count) ->
     case filelib:is_dir(Dep#dep.dir) of
         true ->
             %% Already downloaded -- verify the versioning matches the regex
-            case is_app_available(Config, Dep#dep.app,
-                                  Dep#dep.vsn_regex, Dep#dep.dir, Dep#dep.is_raw) of
+            case is_app_available(Config, Dep#dep.app, Dep#dep.vsn_regex,
+                                  Dep#dep.dir, Dep#dep.is_raw) of
                 {Config1, {true, _}} ->
                     Dir = filename:join(Dep#dep.dir, "ebin"),
                     ok = filelib:ensure_dir(filename:join(Dir, "dummy")),
@@ -561,7 +569,8 @@ update_source1(AppDir, {git, _Url, {branch, Branch}}) ->
     ShOpts = [{cd, AppDir}],
     rebar_utils:sh("git fetch origin", ShOpts),
     rebar_utils:sh(?FMT("git checkout -q ~s", [Branch]), ShOpts),
-    rebar_utils:sh(?FMT("git pull --ff-only --no-rebase -q origin ~s", [Branch]), ShOpts);
+    rebar_utils:sh(
+      ?FMT("git pull --ff-only --no-rebase -q origin ~s", [Branch]),ShOpts);
 update_source1(AppDir, {git, _Url, {tag, Tag}}) ->
     ShOpts = [{cd, AppDir}],
     rebar_utils:sh("git fetch origin", ShOpts),
@@ -607,24 +616,27 @@ update_deps_int(Config0, UDD) ->
 
     lists:foldl(fun(Dep, {Config, Updated}) ->
                         {true, AppDir} = get_deps_dir(Config, Dep#dep.app),
-                        Config2 = case has_vcs_dir(element(1, Dep#dep.source), AppDir) of
-                            false ->
-                                %% If the dep did not exist (maybe it was added)
-                                %% clone it. We'll traverse ITS deps below. and
-                                %% clone them if needed.
-                                {C1, _D1} = use_source(Config, Dep),
-                                C1;
-                            true ->
-                                Config
-                        end,
+                        Config2 = case has_vcs_dir(element(1, Dep#dep.source),
+                                                   AppDir) of
+                                      false ->
+                                          %% If the dep did not exist (maybe it
+                                          %% was added), clone it.
+                                          %% We'll traverse ITS deps below and
+                                          %% clone them if needed.
+                                          {C1, _D1} = use_source(Config, Dep),
+                                          C1;
+                                      true ->
+                                          Config
+                                  end,
                         ok = file:set_cwd(AppDir),
                         Config3 = rebar_config:new(Config2),
                         %% track where a dep comes from...
-                        Config4 = rebar_config:set(Config3, depowner,
-                                                   dict:append(Dep, ConfDir,
-                                                               rebar_config:get(Config3,
-                                                                                depowner,
-                                                                                dict:new()))),
+                        DepOwner = dict:append(
+                                     Dep, ConfDir,
+                                     rebar_config:get_xconf(Config3, depowner,
+                                                            dict:new())),
+                        Config4 = rebar_config:set_xconf(Config3, depowner,
+                                                         DepOwner),
 
                         {Config5, Res} = update_deps_int(Config4, Updated),
                         {Config5, lists:umerge(lists:sort(Res),
@@ -655,7 +667,8 @@ collect_deps(Dir, C) ->
             {Config1, Deps} = find_deps(Config, read, RawDeps),
 
             lists:flatten(Deps ++ [begin
-                                       {true, AppDir} = get_deps_dir(Config1, Dep#dep.app),
+                                       {true, AppDir} = get_deps_dir(
+                                                          Config1, Dep#dep.app),
                                        collect_deps(AppDir, C)
                                    end || Dep <- Deps]);
         _ ->
