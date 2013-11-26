@@ -546,8 +546,6 @@ download_source(AppDir, {rsync, Url}) ->
     rebar_utils:sh(?FMT("rsync -az --delete ~s/ ~s", [Url, AppDir]), []);
 download_source(AppDir, {fossil, Url}) ->
     download_source(AppDir, {fossil, Url, ""});
-download_source(AppDir, {fossil, Url, latest}) ->
-    download_source(AppDir, {fossil, Url, ""});
 download_source(AppDir, {fossil, Url, Version}) ->
     Repository = filename:join(AppDir, filename:basename(AppDir) ++ ".fossil"),
     ok = filelib:ensure_dir(Repository),
@@ -602,8 +600,6 @@ update_source1(AppDir, {bzr, _Url, Rev}) ->
 update_source1(AppDir, {rsync, Url}) ->
     rebar_utils:sh(?FMT("rsync -az --delete ~s/ ~s",[Url,AppDir]),[]);
 update_source1(AppDir, {fossil, Url}) ->
-    update_source1(AppDir, {fossil, Url, ""});
-update_source1(AppDir, {fossil, Url, latest}) ->
     update_source1(AppDir, {fossil, Url, ""});
 update_source1(AppDir, {fossil, _Url, Version}) ->
     ok = file:set_cwd(AppDir),
