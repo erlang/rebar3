@@ -20,21 +20,37 @@ files() ->
     [
      {copy, "../../rebar", "rebar"},
      {copy, "rebar.config", "rebar.config"},
+     {copy, "base_dir_cwd_plugin.erl", "base_dir_cwd_plugin.erl"},
      {create, "ebin/fish.app", app(fish, [])},
 
-     {create, "deps/dependsonplugin/ebin/dependsonplugin.app",
-        app(dependsonplugin, [])},
      {copy, "rebar_dependsonplugin.config",
-        "deps/dependsonplugin/rebar.config"},
+      "deps/dependsonplugin/rebar.config"},
+     {create, "deps/dependsonplugin/ebin/dependsonplugin.app",
+      app(dependsonplugin, [])},
+
+     {copy, "rebar_testplugin.config", "deps/testplugin/rebar.config"},
      {copy, "testplugin_mod.erl",
-        "deps/testplugin/plugins/testplugin_mod.erl"},
-     {create, "deps/testplugin/ebin/testplugin.app",
-        app(testplugin, [])}
+      "deps/testplugin/plugins/testplugin_mod.erl"},
+     {copy, "dep_cwd_plugin.erl", "deps/testplugin/dep_cwd_plugin.erl"},
+     {create, "deps/testplugin/ebin/testplugin.app", app(testplugin, [])}
     ].
 
 run(_Dir) ->
     ?assertMatch({ok, _}, retest_sh:run("./rebar compile", [])),
-    ?assertEqual(true, filelib:is_regular("deps/dependsonplugin/pre.compile")),
+
+    ?assertEqual(true, filelib:is_regular("base_dir_cwd_pre.compile")),
+
+    ?assertEqual(true, filelib:is_regular(
+                         "deps/dependsonplugin/base_dir_cwd_pre.compile")),
+    ?assertEqual(true, filelib:is_regular(
+                         "deps/dependsonplugin/plugin_pre.compile")),
+
+    ?assertEqual(true, filelib:is_regular(
+                         "deps/testplugin/base_dir_cwd_pre.compile")),
+    ?assertEqual(true, filelib:is_regular(
+                         "deps/testplugin/dep_cwd_pre.compile")),
+    ?assertEqual(true, filelib:is_regular(
+                         "deps/testplugin/plugin_pre.compile")),
     ok.
 
 %%
