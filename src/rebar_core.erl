@@ -577,7 +577,7 @@ get_base_plugin_dirs(Cwd, PredirsAssoc) ->
     [filename:join(Dir, "plugins") ||
         Dir <- get_plugin_base_dirs(Cwd, PredirsAssoc)].
 
-%% @doc PredirsAssoc is a dictionary of plugindir -> 'parent' pairs
+%% @doc PredirsAssoc is a dictionary of plugindir -> 'parent' pairs.
 %% 'parent' in this case depends on plugin; therefore we have to give
 %% all plugins that Cwd ('parent' in this case) depends on.
 get_plugin_base_dirs(Cwd, PredirsAssoc) ->
