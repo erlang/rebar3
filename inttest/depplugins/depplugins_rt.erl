@@ -4,11 +4,14 @@
 %%%
 %%% It has three applications:
 %%% <ol>
-%%%   <li>fish. top-level module, has one dependency: `dependsonplugin'.</li>
-%%%   <li>dependsonplugin. This depends on some pre-compile actions by the
-%%%       plugin. In the test the plugin creates a file `pre.compile' in the
-%%%       top-level folder of this application.</li>
-%%%   <li>testplugin. This is a plugin application which creates the file.</li>
+%%%   <li>fish. top-level app, has one dependency: `dependsonplugin'.
+%%%       It also loads a plugin from CWD which creates
+%%%       base_dir_cwd_pre.compile on pre_compile.</li>
+%%%   <li>dependsonplugin, has one dependency: `testplugin' and loads
+%%%       the testplugin_mod plugin.</li>
+%%%   <li>testplugin. This is a plugin application which creates
+%%%       plugin_pre.compile on pre_compile. It also loads a plugin from CWD
+%%%       which creates dep_cwd_pre.compile on pre_compile.</li>
 %%% </ol>
 
 -module(depplugins_rt).
