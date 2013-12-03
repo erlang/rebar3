@@ -30,7 +30,8 @@
          set_level/1,
          error_level/0,
          default_level/0,
-         log/3]).
+         log/3,
+         log/4]).
 
 -define(ERROR_LEVEL, 0).
 -define(WARN_LEVEL,  1).
@@ -54,10 +55,13 @@ set_level(Level) ->
     ok = application:set_env(rebar, log_level, Level).
 
 log(Level, Str, Args) ->
+    log(standard_io, Level, Str, Args).
+
+log(Device, Level, Str, Args) ->
     {ok, LogLevel} = application:get_env(rebar, log_level),
     case should_log(LogLevel, Level) of
         true ->
-            io:format(log_prefix(Level) ++ Str, Args);
+            io:format(Device, log_prefix(Level) ++ Str, Args);
         false ->
             ok
     end.
