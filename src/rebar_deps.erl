@@ -257,13 +257,27 @@ info_help(Description) ->
        [
         Description,
         {deps_dir, "deps"},
-        {deps, [application_name,
-                {application_name, "1.0.*"},
-                {application_name, "1.0.*",
-                 {git, "git://github.com/rebar/rebar.git", {branch, "master"}}},
-                {application_name, "",
-                 {git, "git://github.com/rebar/rebar.git", {branch, "master"}},
-                 [raw]}]}
+        {deps,
+         [app_name,
+          {rebar, "1.0.*"},
+          {rebar, ".*",
+           {git, "git://github.com/rebar/rebar.git"}},
+          {rebar, ".*",
+           {git, "git://github.com/rebar/rebar.git", "Rev"}},
+          {rebar, "1.0.*",
+           {git, "git://github.com/rebar/rebar.git", {branch, "master"}}},
+          {rebar, "1.0.0",
+           {git, "git://github.com/rebar/rebar.git", {tag, "1.0.0"}}},
+          {rebar, "",
+           {git, "git://github.com/rebar/rebar.git", {branch, "master"}},
+           [raw]},
+          {app_name, ".*", {hg, "https://www.example.org/url"}},
+          {app_name, ".*", {rsync, "Url"}},
+          {app_name, ".*", {svn, "https://www.example.org/url"}},
+          {app_name, ".*", {svn, "svn://svn.example.org/url"}},
+          {app_name, ".*", {bzr, "https://www.example.org/url", "Rev"}},
+          {app_name, ".*", {fossil, "https://www.example.org/url"}},
+          {app_name, ".*", {fossil, "https://www.example.org/url", "Vsn"}}]}
        ]).
 
 %% Added because of trans deps,
@@ -532,8 +546,6 @@ download_source(AppDir, {rsync, Url}) ->
     rebar_utils:sh(?FMT("rsync -az --delete ~s/ ~s", [Url, AppDir]), []);
 download_source(AppDir, {fossil, Url}) ->
     download_source(AppDir, {fossil, Url, ""});
-download_source(AppDir, {fossil, Url, latest}) ->
-    download_source(AppDir, {fossil, Url, ""});
 download_source(AppDir, {fossil, Url, Version}) ->
     Repository = filename:join(AppDir, filename:basename(AppDir) ++ ".fossil"),
     ok = filelib:ensure_dir(Repository),
@@ -588,8 +600,6 @@ update_source1(AppDir, {bzr, _Url, Rev}) ->
 update_source1(AppDir, {rsync, Url}) ->
     rebar_utils:sh(?FMT("rsync -az --delete ~s/ ~s",[Url,AppDir]),[]);
 update_source1(AppDir, {fossil, Url}) ->
-    update_source1(AppDir, {fossil, Url, ""});
-update_source1(AppDir, {fossil, Url, latest}) ->
     update_source1(AppDir, {fossil, Url, ""});
 update_source1(AppDir, {fossil, _Url, Version}) ->
     ok = file:set_cwd(AppDir),
