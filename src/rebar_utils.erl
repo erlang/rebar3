@@ -200,12 +200,12 @@ expand_env_variable(InStr, VarName, RawVarValue) ->
             re:replace(InStr, RegEx, [VarValue, "\\2"], ReOpts)
     end.
 
-vcs_vsn(Config, Vcs, Dir) ->
-    Key = {Vcs, Dir},
+vcs_vsn(Config, Vsn, Dir) ->
+    Key = {Vsn, Dir},
     Cache = rebar_config:get_xconf(Config, vsn_cache),
     case dict:find(Key, Cache) of
         error ->
-            VsnString = vcs_vsn_1(Vcs, Dir),
+            VsnString = vcs_vsn_1(Vsn, Dir),
             Cache1 = dict:store(Key, VsnString, Cache),
             Config1 = rebar_config:set_xconf(Config, vsn_cache, Cache1),
             {Config1, VsnString};
@@ -441,11 +441,12 @@ emulate_escript_foldl(Fun, Acc, File) ->
 
 vcs_vsn_1(Vcs, Dir) ->
     case vcs_vsn_cmd(Vcs) of
-        {unknown, VsnString} ->
-            ?DEBUG("vcs_vsn: Unknown VCS atom in vsn field: ~p\n", [Vcs]),
+        {plain, VsnString} ->
             VsnString;
         {cmd, CmdString} ->
             vcs_vsn_invoke(CmdString, Dir);
+        unknown ->
+            ?ABORT("vcs_vsn: Unknown vsn format: ~p\n", [Vcs]);
         Cmd ->
             %% If there is a valid VCS directory in the application directory,
             %% use that version info
@@ -478,7 +479,8 @@ vcs_vsn_cmd(bzr)    -> "bzr revno";
 vcs_vsn_cmd(svn)    -> "svnversion";
 vcs_vsn_cmd(fossil) -> "fossil info";
 vcs_vsn_cmd({cmd, _Cmd}=Custom) -> Custom;
-vcs_vsn_cmd(Version) -> {unknown, Version}.
+vcs_vsn_cmd(Version) when is_list(Version) -> {plain, Version};
+vcs_vsn_cmd(_) -> unknown.
 
 vcs_vsn_invoke(Cmd, Dir) ->
     {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),
