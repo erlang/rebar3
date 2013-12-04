@@ -4,7 +4,7 @@
 %% TODO: Change temporary retest fork back to dizzyd/retest after merge
 %% ExtraDeps = [{retest, ".*", {git, "git://github.com/dizzyd/retest.git"}}],
 ExtraDeps = [{retest, ".*",
-              {git, "git://github.com/tuncer/retest.git", "next"}}],
+              {git, "git://github.com/dizzyd/retest.git"}}],
 
 case os:getenv("REBAR_EXTRA_DEPS") of
     false ->
