@@ -38,7 +38,7 @@
               rebar_upgrade,
               rebar_utils,
               rebar_xref,
-              getopt,
+              rebar_getopt,
               mustache ]},
   {registered, []},
   {applications, [kernel,

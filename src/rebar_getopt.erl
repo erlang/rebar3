@@ -8,10 +8,11 @@
 %%% a copy of the New BSD license with this software. If not, it can be
 %%% retrieved from: http://www.opensource.org/licenses/bsd-license.php
 %%%-------------------------------------------------------------------
--module(getopt).
+-module(rebar_getopt).
 -author('juanjo@comellas.org').
 
--export([parse/2, usage/2, usage/3, usage/4, tokenize/1]).
+-export([parse/2, check/2, parse_and_check/2, format_error/2,
+         usage/2, usage/3, usage/4, tokenize/1]).
 -export([usage_cmd_line/2]).
 
 -define(LINE_LENGTH, 75).
@@ -57,11 +58,52 @@
 -export_type([arg_type/0, arg_value/0, arg_spec/0, simple_option/0, compound_option/0, option/0, option_spec/0]).
 
 
-%% @doc  Parse the command line options and arguments returning a list of tuples
-%%       and/or atoms using the Erlang convention for sending options to a
-%%       function.
+%% @doc Parse the command line options and arguments returning a list of tuples
+%%      and/or atoms using the Erlang convention for sending options to a
+%%      function.  Additionally perform check if all required options (the ones
+%%      without default values) are present.  The function is a combination of
+%%      two calls: parse/2 and check/2.
+-spec parse_and_check([option_spec()], string() | [string()]) ->
+                {ok, {[option()], [string()]}} | {error, {Reason :: atom(), Data :: term()}}.
+parse_and_check(OptSpecList, CmdLine) when is_list(OptSpecList), is_list(CmdLine) ->
+    case parse(OptSpecList, CmdLine) of
+        {ok, {Opts, _}} = Result ->
+            case check(OptSpecList, Opts) of
+                ok    -> Result;
+                Error -> Error
+            end;
+        Error ->
+            Error
+    end.
+
+%% @doc Check the parsed command line arguments returning ok if all required
+%%      options (i.e. that don't have defaults) are present, and returning
+%%      error otherwise.
+-spec check([option_spec()], [option()]) ->
+                ok | {error, {Reason :: atom(), Option :: atom()}}.
+check(OptSpecList, ParsedOpts) when is_list(OptSpecList), is_list(ParsedOpts) ->
+    try
+        RequiredOpts = [Name || {Name, _, _, Arg, _} <- OptSpecList,
+                                not is_tuple(Arg) andalso Arg =/= undefined],
+        lists:foreach(fun (Option) ->
+            case proplists:is_defined(Option, ParsedOpts) of
+                true ->
+                    ok;
+                false ->
+                    throw({error, {missing_required_option, Option}})
+            end
+        end, RequiredOpts)
+    catch
+        _:Error ->
+            Error
+    end.
+
+
+%% @doc Parse the command line options and arguments returning a list of tuples
+%%      and/or atoms using the Erlang convention for sending options to a
+%%      function.
 -spec parse([option_spec()], string() | [string()]) ->
-                   {ok, {[option()], [string()]}} | {error, {Reason :: atom(), Data :: any()}}.
+                   {ok, {[option()], [string()]}} | {error, {Reason :: atom(), Data :: term()}}.
 parse(OptSpecList, CmdLine) when is_list(CmdLine) ->
     try
         Args = if
@@ -99,6 +141,24 @@ parse(OptSpecList, OptAcc, ArgAcc, _ArgPos, []) ->
     %% Once we have completed gathering the options we add the ones that were
     %% not present but had default arguments in the specification.
     {ok, {lists:reverse(append_default_options(OptSpecList, OptAcc)), lists:reverse(ArgAcc)}}.
+
+
+%% @doc Format the error code returned by prior call to parse/2 or check/2.
+-spec format_error([option_spec()], {error, {Reason :: atom(), Data :: term()}} |
+                   {Reason :: term(), Data :: term()}) -> string().
+format_error(OptSpecList, {error, Reason}) ->
+    format_error(OptSpecList, Reason);
+format_error(OptSpecList, {missing_required_option, Name}) ->
+    {_Name, Short, Long, _Type, _Help} = lists:keyfind(Name, 1, OptSpecList),
+    lists:flatten(["missing required option: -", [Short], " (", to_string(Long), ")"]);
+format_error(_OptSpecList, {invalid_option, OptStr}) ->
+    lists:flatten(["invalid option: ", to_string(OptStr)]);
+format_error(_OptSpecList, {invalid_option_arg, {Name, Arg}}) ->
+    lists:flatten(["option \'", to_string(Name) ++ "\' has invalid argument: ", to_string(Arg)]);
+format_error(_OptSpecList, {invalid_option_arg, OptStr}) ->
+    lists:flatten(["invalid option argument: ", to_string(OptStr)]);
+format_error(_OptSpecList, {Reason, Data}) ->
+    lists:flatten([to_string(Reason), " ", to_string(Data)]).
 
 
 %% @doc Parse a long option, add it to the option accumulator and continue
@@ -698,7 +758,7 @@ format_usage_line(_MaxOptionLength, _MaxLineLength, {_OptionLength, OptionText, 
 
 
 %% @doc Wrap a text line converting it into several text lines so that the
-%%      length of each one of them is never over HelpLength characters.
+%%      length of each one of them is never over Length characters.
 -spec wrap_text_line(Length :: non_neg_integer(), Text :: string()) -> [string()].
 wrap_text_line(Length, Text) ->
     wrap_text_line(Length, Text, [], 0, []).
@@ -730,7 +790,7 @@ default_arg_value_to_string(Value) when is_binary(Value) ->
 default_arg_value_to_string(Value) when is_integer(Value) ->
     integer_to_list(Value);
 default_arg_value_to_string(Value) when is_float(Value) ->
-    float_to_list(Value);
+    lists:flatten(io_lib:format("~w", [Value]));
 default_arg_value_to_string(Value) ->
     Value.
 
@@ -832,7 +892,7 @@ get_env_var(Prefix, Suffix, []) ->
     Prefix ++ Suffix.
 
 
--spec line_length() -> non_neg_integer().
+-spec line_length() -> 0..?LINE_LENGTH.
 line_length() ->
     case io:columns() of
         {ok, Columns} when Columns < ?LINE_LENGTH ->
@@ -840,3 +900,15 @@ line_length() ->
         _ ->
             ?LINE_LENGTH
     end.
+
+
+-spec to_string(term()) -> string().
+to_string(List) when is_list(List) ->
+    case io_lib:printable_list(List) of
+        true  -> List;
+        false -> io_lib:format("~p", [List])
+    end;
+to_string(Atom) when is_atom(Atom) ->
+    atom_to_list(Atom);
+to_string(Value) ->
+    io_lib:format("~p", [Value]).
