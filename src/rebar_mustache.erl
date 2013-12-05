@@ -23,13 +23,15 @@
 %% See the README at http://github.com/mojombo/mustache.erl for additional
 %% documentation and usage examples.
 
--module(mustache).  %% v0.1.0
+-module(rebar_mustache).  %% v0.1.0
 -author("Tom Preston-Werner").
 -export([compile/1, compile/2, render/1, render/2, render/3, get/2, get/3, escape/1, start/1]).
 
 -record(mstate, {mod = undefined,
                  section_re = undefined,
                  tag_re = undefined}).
+
+-define(MUSTACHE_STR, "rebar_mustache").
 
 compile(Body) when is_list(Body) ->
   State = #mstate{},
@@ -108,7 +110,7 @@ compile_section(Name, Content, State) ->
   Mod = State#mstate.mod,
   Result = compiler(Content, State),
   "fun() -> " ++
-    "case mustache:get(" ++ Name ++ ", Ctx, " ++ atom_to_list(Mod) ++ ") of " ++
+    "case " ++ ?MUSTACHE_STR ++ ":get(" ++ Name ++ ", Ctx, " ++ atom_to_list(Mod) ++ ") of " ++
       "\"true\" -> " ++
         Result ++ "; " ++
       "\"false\" -> " ++
@@ -143,10 +145,10 @@ tag_kind(T, {K0, K1}) ->
 
 compile_tag(none, Content, State) ->
   Mod = State#mstate.mod,
-  "mustache:escape(mustache:get(" ++ Content ++ ", Ctx, " ++ atom_to_list(Mod) ++ "))";
+  ?MUSTACHE_STR ++ ":escape(" ++ ?MUSTACHE_STR ++ ":get(" ++ Content ++ ", Ctx, " ++ atom_to_list(Mod) ++ "))";
 compile_tag("{", Content, State) ->
   Mod = State#mstate.mod,
-  "mustache:get(" ++ Content ++ ", Ctx, " ++ atom_to_list(Mod) ++ ")";
+  ?MUSTACHE_STR ++ ":get(" ++ Content ++ ", Ctx, " ++ atom_to_list(Mod) ++ ")";
 compile_tag("!", _Content, _State) ->
   "[]".
 

@@ -39,7 +39,7 @@
               rebar_utils,
               rebar_xref,
               rebar_getopt,
-              mustache ]},
+              rebar_mustache ]},
   {registered, []},
   {applications, [kernel,
                   stdlib,
