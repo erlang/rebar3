@@ -385,6 +385,17 @@ execute_template(Files, [{'if', Cond, True, False} | Rest], TemplateType,
     execute_template(Files, prepend_instructions(Instructions, Rest),
                      TemplateType, TemplateName, Context, Force,
                      ExistingFiles);
+execute_template(Files, [{'case', Variable, Value, Instructions} | Rest], TemplateType,
+                 TemplateName, Context, Force, ExistingFiles) ->
+    Instructions2 = case dict:find(Variable, Context) of
+                       {ok, Value} ->
+                           Instructions;
+                       _ ->
+                           []
+                   end,
+    execute_template(Files, prepend_instructions(Instructions2, Rest),
+                     TemplateType, TemplateName, Context, Force,
+                     ExistingFiles);
 execute_template(Files, [{template, Input, Output} | Rest], TemplateType,
                  TemplateName, Context, Force, ExistingFiles) ->
     InputName = filename:join(filename:dirname(TemplateName), Input),
