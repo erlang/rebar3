@@ -31,7 +31,8 @@
          error_level/0,
          default_level/0,
          log/3,
-         log/4]).
+         log/4,
+         is_verbose/1]).
 
 -define(ERROR_LEVEL, 0).
 -define(WARN_LEVEL,  1).
@@ -68,6 +69,9 @@ log(Device, Level, Str, Args) ->
 
 error_level() -> ?ERROR_LEVEL.
 default_level() -> ?WARN_LEVEL.
+
+is_verbose(Config) ->
+    rebar_config:get_xconf(Config, is_verbose, false).
 
 %% ===================================================================
 %% Internal functions

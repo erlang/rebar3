@@ -258,20 +258,27 @@ save_options(Config, {Options, NonOptArgs}) ->
 %% set log level based on getopt option
 %%
 set_log_level(Config, Options) ->
-    Level = case proplists:get_bool(quiet, Options) of
-                true ->
-                    rebar_log:error_level();
-                false ->
-                    DefaultLevel = rebar_log:default_level(),
-                    case proplists:get_all_values(verbose, Options) of
-                        [] ->
-                            DefaultLevel;
-                        Verbosities ->
-                            DefaultLevel + lists:last(Verbosities)
-                    end
-            end,
+    {IsVerbose, Level} =
+        case proplists:get_bool(quiet, Options) of
+            true ->
+                {false, rebar_log:error_level()};
+            false ->
+                DefaultLevel = rebar_log:default_level(),
+                case proplists:get_all_values(verbose, Options) of
+                    [] ->
+                        {false, DefaultLevel};
+                    Verbosities ->
+                        {true, DefaultLevel + lists:last(Verbosities)}
+                end
+        end,
 
-    rebar_config:set_global(Config, verbose, Level).
+    case IsVerbose of
+        true ->
+            Config1 = rebar_config:set_xconf(Config, is_verbose, true),
+            rebar_config:set_global(Config1, verbose, Level);
+        false ->
+            rebar_config:set_global(Config, verbose, Level)
+    end.
 
 %%
 %% show version information and halt
