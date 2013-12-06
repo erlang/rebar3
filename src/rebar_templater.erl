@@ -385,10 +385,11 @@ execute_template(Files, [{'if', Cond, True, False} | Rest], TemplateType,
     execute_template(Files, prepend_instructions(Instructions, Rest),
                      TemplateType, TemplateName, Context, Force,
                      ExistingFiles);
-execute_template(Files, [{'case', Variable, Value, Instructions} | Rest], TemplateType,
+execute_template(Files, [{'case', Variable, Values, Instructions} | Rest], TemplateType,
                  TemplateName, Context, Force, ExistingFiles) ->
-    Instructions2 = case dict:find(Variable, Context) of
-                       {ok, Value} ->
+    {ok, Value} = dict:find(Variable, Context),
+    Instructions2 = case lists:member(Value, Values) of
+                       true ->
                            Instructions;
                        _ ->
                            []
