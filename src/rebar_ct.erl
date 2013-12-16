@@ -101,7 +101,7 @@ run_test(TestDir, LogDir, Config, _File) ->
     {Cmd, RawLog} = make_cmd(TestDir, LogDir, Config),
     ?DEBUG("ct_run cmd:~n~p~n", [Cmd]),
     clear_log(LogDir, RawLog),
-    Output = case rebar_config:is_verbose(Config) of
+    Output = case rebar_log:is_verbose(Config) of
                  false ->
                      " >> " ++ RawLog ++ " 2>&1";
                  true ->
@@ -172,7 +172,7 @@ check_log(Config,RawLog,Fun) ->
 %% Show the log if it hasn't already been shown because verbose was on
 show_log(Config, RawLog) ->
     ?CONSOLE("Showing log\n", []),
-    case rebar_config:is_verbose(Config) of
+    case rebar_log:is_verbose(Config) of
         false ->
             {ok, Contents} = file:read_file(RawLog),
             ?CONSOLE("~s", [Contents]);

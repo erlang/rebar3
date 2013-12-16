@@ -258,13 +258,27 @@ save_options(Config, {Options, NonOptArgs}) ->
 %% set log level based on getopt option
 %%
 set_log_level(Config, Options) ->
-    LogLevel = case proplists:get_all_values(verbose, Options) of
-                   [] ->
-                       rebar_log:default_level();
-                   Verbosities ->
-                       lists:last(Verbosities)
-               end,
-    rebar_config:set_global(Config, verbose, LogLevel).
+    {IsVerbose, Level} =
+        case proplists:get_bool(quiet, Options) of
+            true ->
+                {false, rebar_log:error_level()};
+            false ->
+                DefaultLevel = rebar_log:default_level(),
+                case proplists:get_all_values(verbose, Options) of
+                    [] ->
+                        {false, DefaultLevel};
+                    Verbosities ->
+                        {true, DefaultLevel + lists:last(Verbosities)}
+                end
+        end,
+
+    case IsVerbose of
+        true ->
+            Config1 = rebar_config:set_xconf(Config, is_verbose, true),
+            rebar_config:set_global(Config1, verbose, Level);
+        false ->
+            rebar_config:set_global(Config, verbose, Level)
+    end.
 
 %%
 %% show version information and halt
@@ -375,12 +389,12 @@ option_spec_list() ->
     JobsHelp = io_lib:format(
                  "Number of concurrent workers a command may use. Default: ~B",
                  [Jobs]),
-    VerboseHelp = "Verbosity level (-v, -vv, -vvv, --verbose 3). Default: 0",
     [
      %% {Name, ShortOpt, LongOpt, ArgSpec, HelpMsg}
      {help,     $h, "help",     undefined, "Show the program options"},
      {commands, $c, "commands", undefined, "Show available commands"},
-     {verbose,  $v, "verbose",  integer,   VerboseHelp},
+     {verbose,  $v, "verbose",  integer,   "Verbosity level (-v, -vv)"},
+     {quiet,    $q, "quiet",    boolean,   "Quiet, only print error messages"},
      {version,  $V, "version",  undefined, "Show version information"},
      {force,    $f, "force",    undefined, "Force"},
      {defines,  $D, undefined,  string,    "Define compiler macro"},

@@ -408,7 +408,7 @@ perform_eunit(Config, Tests) ->
 
 get_eunit_opts(Config) ->
     %% Enable verbose in eunit if so requested..
-    BaseOpts = case rebar_config:is_verbose(Config) of
+    BaseOpts = case rebar_log:is_verbose(Config) of
                    true ->
                        [verbose];
                    false ->

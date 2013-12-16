@@ -50,7 +50,7 @@
                   tools]},
   {env, [
          %% Default log level
-         {log_level, error},
+         {log_level, warn},
 
          %% any_dir processing modules
          {any_dir_modules, [
