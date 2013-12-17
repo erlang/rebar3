@@ -75,8 +75,8 @@ compile_dia(Source, Target, Config) ->
     case diameter_dict_util:parse({path, Source}, []) of
         {ok, Spec} ->
             FileName = dia_filename(Source, Spec),
-            diameter_codegen:from_dict(FileName, Spec, Opts, erl),
-            diameter_codegen:from_dict(FileName, Spec, Opts, hrl),
+            _ = diameter_codegen:from_dict(FileName, Spec, Opts, erl),
+            _ = diameter_codegen:from_dict(FileName, Spec, Opts, hrl),
             HrlFile = filename:join("src", FileName ++ ".hrl"),
             case filelib:is_regular(HrlFile) of
                 true ->
