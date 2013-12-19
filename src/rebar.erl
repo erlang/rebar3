@@ -438,6 +438,7 @@ command_names() ->
      "compile",
      "create",
      "create-app",
+     "create-lib",
      "create-node",
      "ct",
      "delete-deps",

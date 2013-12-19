@@ -1,5 +1,3 @@
-%% See LICENSE for licensing information.
-%% -*- coding: utf-8 -*-
 -module({{libid}}).
 
 %% {{libid}}: {{libid}} library's entry point.
