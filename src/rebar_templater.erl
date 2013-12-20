@@ -27,6 +27,7 @@
 -module(rebar_templater).
 
 -export(['create-app'/2,
+         'create-lib'/2,
          'create-node'/2,
          'list-templates'/2,
          create/2]).
@@ -49,6 +50,10 @@
 'create-app'(Config, _File) ->
     %% Alias for create w/ template=simpleapp
     create1(Config, "simpleapp").
+
+'create-lib'(Config, _File) ->
+    %% Alias for create w/ template=simplelib
+    create1(Config, "simplelib").
 
 'create-node'(Config, _File) ->
     %% Alias for create w/ template=simplenode
@@ -116,6 +121,12 @@ info(help, 'create-app') ->
        "~n"
        "Valid command line options:~n"
        "  [appid=myapp]~n", []);
+info(help, 'create-lib') ->
+    ?CONSOLE(
+       "Create simple lib skel.~n"
+       "~n"
+       "Valid command line options:~n"
+       "  [libid=mylib]~n", []);
 info(help, 'create-node') ->
     ?CONSOLE(
        "Create simple node skel.~n"

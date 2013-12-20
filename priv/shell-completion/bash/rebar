@@ -21,6 +21,7 @@ _rebar()
         compile \
         create \
         create-app \
+        create-lib \
         create-node \
         ct \
         doc \

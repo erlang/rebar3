@@ -1,0 +1,14 @@
+{application, {{libid}},
+ [
+  {description, "An Erlang {{libid}} library"},
+  {vsn, "1"},
+  {modules, [
+             {{libid}}
+            ]},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {env, []}
+ ]}.
