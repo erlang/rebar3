@@ -6,6 +6,14 @@
 -define(TIMEOUT, 60000).
 -define(INFO(Fmt,Args), io:format(Fmt,Args)).
 
+%% TODO: This script currently does NOT support slim releases.
+%% Necessary steps to upgrade a slim release are as follows:
+%% 1. unpack relup archive manually
+%% 2. copy releases directory and necessary libraries
+%% 3. using release_hander:set_unpacked/2 .
+%% For more details, see https://github.com/rebar/rebar/pull/52
+%% and https://github.com/rebar/rebar/issues/202
+
 main([NodeName, Cookie, ReleasePackage]) ->
     TargetNode = start_distribution(NodeName, Cookie),
     {ok, Vsn} = rpc:call(TargetNode, release_handler, unpack_release,
