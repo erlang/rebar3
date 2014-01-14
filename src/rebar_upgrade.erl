@@ -87,7 +87,8 @@ info(help, 'generate-upgrade') ->
     ?CONSOLE("Build an upgrade package.~n"
              "~n"
              "Valid command line options:~n"
-             "  previous_release=path~n",
+             "  previous_release=path~n"
+             "  target_dir=target_dir (optional)~n",
              []).
 
 run_checks(Config, OldVerPath, ReltoolConfig) ->
@@ -97,10 +98,7 @@ run_checks(Config, OldVerPath, ReltoolConfig) ->
 
     {Name, Ver} = rebar_rel_utils:get_reltool_release_info(ReltoolConfig),
 
-    NewVerPath =
-        filename:join(
-          [rebar_rel_utils:get_target_parent_dir(Config, ReltoolConfig),
-           Name]),
+    NewVerPath = rebar_rel_utils:get_target_dir(Config, ReltoolConfig),
     true = rebar_utils:prop_check(filelib:is_dir(NewVerPath),
                                   "Release directory doesn't exist (~p)~n",
                                   [NewVerPath]),
