@@ -163,15 +163,6 @@ consult_app_file(Filename) ->
         false ->
             file:consult(Filename);
         true ->
-            %% TODO: EXPERIMENTAL For now let's warn the user if a
-            %% script is going to be run.
-            case filelib:is_regular([Filename, ".script"]) of
-                true ->
-                    ?CONSOLE("NOTICE: Using experimental *.app.src.script "
-                             "functionality on ~s ~n", [Filename]);
-                _ ->
-                    ok
-            end,
             rebar_config:consult_file(Filename)
     end.
 

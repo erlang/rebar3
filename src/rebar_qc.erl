@@ -142,8 +142,7 @@ run(Config, QC, QCOpts) ->
     ok = ensure_dirs(),
     CodePath = setup_codepath(),
 
-    CompileOnly = rebar_utils:get_experimental_global(Config, compile_only,
-                                                      false),
+    CompileOnly = rebar_config:get_global(Config, compile_only, false),
     %% Compile erlang code to ?QC_DIR, using a tweaked config
     %% with appropriate defines, and include all the test modules
     %% as well.
