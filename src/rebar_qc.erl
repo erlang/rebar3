@@ -67,7 +67,9 @@ info(help, qc) ->
        "Valid rebar.config options:~n"
        "  {qc_opts, [{qc_mod, module()}, Options]}~n"
        "  ~p~n"
-       "  ~p~n",
+       "  ~p~n"
+       "Valid command line options:~n"
+       "  compile_only=true (Compile but do not test properties)",
        [
         {qc_compile_opts, []},
         {qc_first_files, []}
