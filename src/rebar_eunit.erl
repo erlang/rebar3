@@ -84,8 +84,7 @@ eunit(Config, _AppFile) ->
     ok = ensure_dirs(),
     %% Save code path
     CodePath = setup_code_path(),
-    CompileOnly = rebar_utils:get_experimental_global(Config, compile_only,
-                                                      false),
+    CompileOnly = rebar_config:get_global(Config, compile_only, false),
     {ok, SrcErls} = rebar_erlc_compiler:test_compile(Config, "eunit",
                                                      ?EUNIT_DIR),
     case CompileOnly of
@@ -261,7 +260,7 @@ get_tests(Config, SuitesProvided, ModuleBeamFiles, FilteredModules) ->
     get_matching_tests(Config, Modules).
 
 get_matching_tests(Config, Modules) ->
-    RawFunctions = rebar_utils:get_experimental_global(Config, tests, ""),
+    RawFunctions = rebar_config:get_global(Config, tests, ""),
     Tests = [list_to_atom(F1) || F1 <- string:tokens(RawFunctions, ",")],
     case Tests of
         [] ->
