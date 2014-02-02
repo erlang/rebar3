@@ -178,7 +178,7 @@ compile_dtl(Config, Source, Target, DtlOpts) ->
             ?ERROR("~n===============================================~n"
                    " You need to install erlydtl to compile DTL templates~n"
                    " Download the latest tarball release from github~n"
-                   "    http://code.google.com/p/erlydtl/~n"
+                   "    https://github.com/erlydtl/erlydtl/releases~n"
                    " and install it into your erlang library dir~n"
                    "===============================================~n~n", []),
             ?FAIL;
@@ -194,6 +194,11 @@ compile_dtl(Config, Source, Target, DtlOpts) ->
 do_compile(Config, Source, Target, DtlOpts) ->
     %% TODO: Check last mod on target and referenced DTLs here..
 
+    %% erlydtl >= 0.8.1 does not use the extra indirection using the
+    %% compiler_options. Kept for backward compatibility with older
+    %% versions of erlydtl.
+    CompilerOptions = option(compiler_options, DtlOpts),
+
     %% ensure that doc_root and out_dir are defined,
     %% using defaults if necessary
     Opts = lists:ukeymerge(1,
@@ -202,7 +207,8 @@ do_compile(Config, Source, Target, DtlOpts) ->
                 [{out_dir, option(out_dir, DtlOpts)},
                  {doc_root, option(doc_root, DtlOpts)},
                  {custom_tags_dir, option(custom_tags_dir, DtlOpts)},
-                 {compiler_options, option(compiler_options, DtlOpts)}])),
+                 {compiler_options, CompilerOptions}
+                 |CompilerOptions])),
     ?INFO("Compiling \"~s\" -> \"~s\" with options:~n    ~s~n",
         [Source, Target, io_lib:format("~p", [Opts])]),
     case erlydtl:compile(Source,
@@ -220,7 +226,9 @@ do_compile(Config, Source, Target, DtlOpts) ->
             rebar_base_compiler:error_tuple(Config, Source, [Error], [], Opts);
         {error, Msg} ->
             Es = [{Source, [{erlydtl_parser, Msg}]}],
-            rebar_base_compiler:error_tuple(Config, Source, Es, [], Opts)
+            rebar_base_compiler:error_tuple(Config, Source, Es, [], Opts);
+        {error, Es, Ws} ->
+            rebar_base_compiler:error_tuple(Config, Source, Es, Ws, Opts)
     end.
 
 module_name(Target) ->
