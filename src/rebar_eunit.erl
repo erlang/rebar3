@@ -120,9 +120,9 @@ info_help(Description) ->
        "  ~p~n"
        "  ~p~n"
        "Valid command line options:~n"
-       "  suites=\"foo,bar\" (Run tests in foo.erl, test/foo_tests.erl and~n"
+       "  suite[s]=\"foo,bar\" (Run tests in foo.erl, test/foo_tests.erl and~n"
        "                    tests in bar.erl, test/bar_tests.erl)~n"
-       "  tests=\"baz\" (For every existing suite, run the first test whose~n"
+       "  test[s]=\"baz\" (For every existing suite, run the first test whose~n"
        "               name starts with bar and, if no such test exists,~n"
        "               run the test whose name starts with bar in the~n"
        "               suite's _tests module)~n"
@@ -215,7 +215,7 @@ setup_code_path() ->
 %%
 
 filter_suites(Config, Modules) ->
-    RawSuites = rebar_config:get_global(Config, suites, ""),
+    RawSuites = get_suites(Config),
     SuitesProvided = RawSuites =/= "",
     Suites = [list_to_atom(Suite) || Suite <- string:tokens(RawSuites, ",")],
     {SuitesProvided, filter_suites1(Modules, Suites)}.
@@ -224,6 +224,14 @@ filter_suites1(Modules, []) ->
     Modules;
 filter_suites1(Modules, Suites) ->
     [M || M <- Suites, lists:member(M, Modules)].
+
+get_suites(Config) ->
+    case rebar_config:get_global(Config, suites, "") of
+        "" ->
+            rebar_config:get_global(Config, suite, "");
+        Suites ->
+            Suites
+    end.
 
 %%
 %% == get matching tests ==
@@ -259,8 +267,16 @@ get_tests(Config, SuitesProvided, ModuleBeamFiles, FilteredModules) ->
               end,
     get_matching_tests(Config, Modules).
 
+get_tests(Config) ->
+    case rebar_config:get_global(Config, tests, "") of
+        "" ->
+            rebar_config:get_global(Config, test, "");
+        Suites ->
+            Suites
+    end.
+
 get_matching_tests(Config, Modules) ->
-    RawFunctions = rebar_config:get_global(Config, tests, ""),
+    RawFunctions = get_tests(Config),
     Tests = [list_to_atom(F1) || F1 <- string:tokens(RawFunctions, ",")],
     case Tests of
         [] ->

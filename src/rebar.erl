@@ -333,51 +333,51 @@ show_info_maybe_halt(O, Opts, F) ->
 %%
 commands() ->
     S = <<"
-clean                                Clean
-compile                              Compile sources
+clean                                    Clean
+compile                                  Compile sources
 
-escriptize                           Generate escript archive
+escriptize                               Generate escript archive
 
-create      template= [var=foo,...]  Create skel based on template and vars
-create-app  [appid=myapp]            Create simple app skel
-create-lib  [libid=mylib]            Create simple lib skel
-create-node [nodeid=mynode]          Create simple node skel
-list-templates                       List available templates
+create      template= [var=foo,...]      Create skel based on template and vars
+create-app  [appid=myapp]                Create simple app skel
+create-lib  [libid=mylib]                Create simple lib skel
+create-node [nodeid=mynode]              Create simple node skel
+list-templates                           List available templates
 
-doc                                  Generate Erlang program documentation
+doc                                      Generate Erlang program documentation
 
-check-deps                           Display to be fetched dependencies
-get-deps                             Fetch dependencies
-update-deps                          Update fetched dependencies
-delete-deps                          Delete fetched dependencies
-list-deps                            List dependencies
+check-deps                               Display to be fetched dependencies
+get-deps                                 Fetch dependencies
+update-deps                              Update fetched dependencies
+delete-deps                              Delete fetched dependencies
+list-deps                                List dependencies
 
-generate    [dump_spec=0/1]          Build release with reltool
-overlay                              Run reltool overlays only
+generate    [dump_spec=0/1]              Build release with reltool
+overlay                                  Run reltool overlays only
 
 generate-upgrade  previous_release=path  Build an upgrade package
 
 generate-appups   previous_release=path  Generate appup files
 
-eunit       [suites=foo]             Run eunit tests in foo.erl and
-                                     test/foo_tests.erl
-            [suites=foo] [tests=bar] Run specific eunit tests [first test name
-                                     starting with 'bar' in foo.erl and
-                                     test/foo_tests.erl]
-            [tests=bar]              For every existing suite, run the first
-                                     test whose name starts with bar and, if
-                                     no such test exists, run the test whose
-                                     name starts with bar in the suite's
-                                     _tests module
+eunit       [suite[s]=foo]               Run eunit tests in foo.erl and
+                                         test/foo_tests.erl
+            [suite[s]=foo] [test[s]=bar] Run specific eunit tests [first test
+                                         name starting with 'bar' in foo.erl
+                                         and test/foo_tests.erl]
+            [test[s]=bar]                For every existing suite, run the first
+                                         test whose name starts with bar and, if
+                                         no such test exists, run the test whose
+                                         name starts with bar in the suite's
+                                         _tests module
 
-ct          [suites=] [case=]        Run common_test suites
+ct          [suite[s]=] [case=]          Run common_test suites
 
-qc                                   Test QuickCheck properties
+qc                                       Test QuickCheck properties
 
-xref                                 Run cross reference analysis
+xref                                     Run cross reference analysis
 
-help                                 Show the program options
-version                              Show version information
+help                                     Show the program options
+version                                  Show version information
 ">>,
     io:put_chars(S).
 
