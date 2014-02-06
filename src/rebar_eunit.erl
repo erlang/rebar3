@@ -126,6 +126,9 @@ info_help(Description) ->
        "               name starts with bar and, if no such test exists,~n"
        "               run the test whose name starts with bar in the~n"
        "               suite's _tests module)~n"
+       "  random_suite_order=true (Run tests in random order)~n"
+       "  random_suite_order=Seed (Run tests in random order,~n"
+       "                           with the PRNG seeded with Seed)~n"
        "  compile_only=true (Compile but do not run tests)",
        [
         Description,
