@@ -221,6 +221,11 @@
 
 {xref_warnings, false}.
 
+%% optional extra paths to include in xref:set_library_path/2.
+%% specified relative location of rebar.config.
+%% e.g. {xref_extra_paths,["../gtknode/src"]}
+{xref_extra_paths,[]}.
+
 %% xref checks to run
 {xref_checks, [undefined_function_calls, undefined_functions,
                locals_not_used, exports_not_used,

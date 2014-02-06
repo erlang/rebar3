@@ -103,9 +103,11 @@ info(help, xref) ->
        "Valid rebar.config options:~n"
        "  ~p~n"
        "  ~p~n"
+       "  ~p~n"
        "  ~p~n",
        [
         {xref_warnings, false},
+        {xref_extra_paths,[]},
         {xref_checks, [undefined_function_calls, undefined_functions,
                        locals_not_used, exports_not_used,
                        deprecated_function_calls, deprecated_functions]},
@@ -146,6 +148,7 @@ code_path(Config) ->
     %% properly into the overall compile code path if possible.
     BaseDir = rebar_config:get_xconf(Config, base_dir),
     [P || P <- code:get_path() ++
+              rebar_config:get(Config, xref_extra_paths, []) ++
               [filename:join(BaseDir, filename:join(SubDir, "ebin"))
                || SubDir <- rebar_config:get(Config, sub_dirs, [])],
           filelib:is_dir(P)].
