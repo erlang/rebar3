@@ -126,6 +126,9 @@ info_help(Description) ->
        "               name starts with bar and, if no such test exists,~n"
        "               run the test whose name starts with bar in the~n"
        "               suite's _tests module)~n"
+       "  random_suite_order=true (Run tests in random order)~n"
+       "  random_suite_order=Seed (Run tests in random order,~n"
+       "                           with the PRNG seeded with Seed)~n"
        "  compile_only=true (Compile but do not run tests)",
        [
         Description,
@@ -150,7 +153,7 @@ run_eunit(Config, CodePath, SrcErls) ->
                         AllBeamFiles),
     OtherBeamFiles = TestBeamFiles --
         [filename:rootname(N) ++ "_tests.beam" || N <- AllBeamFiles],
-    ModuleBeamFiles = BeamFiles ++ OtherBeamFiles,
+    ModuleBeamFiles = randomize_suites(Config, BeamFiles ++ OtherBeamFiles),
 
     %% Get modules to be run in eunit
     AllModules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- AllBeamFiles],
@@ -232,6 +235,33 @@ get_suites(Config) ->
         Suites ->
             Suites
     end.
+
+%%
+%% == randomize suites ==
+%%
+
+randomize_suites(Config, Modules) ->
+    case rebar_config:get_global(Config, random_suite_order, undefined) of
+        undefined ->
+            Modules;
+        "true" ->
+            Seed = crypto:rand_uniform(1, 65535),
+            randomize_suites1(Modules, Seed);
+        String ->
+            try list_to_integer(String) of
+                Seed ->
+                    randomize_suites1(Modules, Seed)
+            catch
+                error:badarg ->
+                    ?ERROR("Bad random seed provided: ~p~n", [String]),
+                    ?FAIL
+            end
+    end.
+
+randomize_suites1(Modules, Seed) ->
+    random:seed(35, Seed, 1337),
+    ?CONSOLE("Randomizing suite order with seed ~b~n", [Seed]),
+    [X||{_,X} <- lists:sort([{random:uniform(), M} || M <- Modules])].
 
 %%
 %% == get matching tests ==

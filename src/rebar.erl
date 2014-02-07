@@ -369,6 +369,8 @@ eunit       [suite[s]=foo]               Run eunit tests in foo.erl and
                                          no such test exists, run the test whose
                                          name starts with bar in the suite's
                                          _tests module
+            [random_suite_order=true]    Run tests in a random order, either with
+            [random_suite_order=Seed]    a random seed for the PRNG, or a specific one.
 
 ct          [suite[s]=] [case=]          Run common_test suites
 
