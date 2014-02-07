@@ -320,13 +320,21 @@ get_config_file(TestDir) ->
     end.
 
 get_suites(Config, TestDir) ->
-    case rebar_config:get_global(Config, suites, undefined) of
+    case get_suites(Config) of
         undefined ->
             " -dir " ++ TestDir;
         Suites ->
             Suites1 = string:tokens(Suites, ","),
             Suites2 = [find_suite_path(Suite, TestDir) || Suite <- Suites1],
             string:join([" -suite"] ++ Suites2, " ")
+    end.
+
+get_suites(Config) ->
+    case rebar_config:get_global(Config, suites, undefined) of
+        undefined ->
+            rebar_config:get_global(Config, suite, undefined); 
+        Suites ->
+            Suites
     end.
 
 find_suite_path(Suite, TestDir) ->
