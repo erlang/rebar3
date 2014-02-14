@@ -217,6 +217,8 @@ do_compile(Config, Source, Target, DtlOpts) ->
                          Opts) of
         ok ->
             ok;
+        {ok, _Mod} ->
+            ok;
         {ok, _Mod, Ws} ->
             rebar_base_compiler:ok_tuple(Config, Source, Ws);
         {ok, _Mod, _Bin, Ws} ->
