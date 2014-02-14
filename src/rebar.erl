@@ -188,6 +188,16 @@ help() ->
        "Type 'rebar help <CMD1> <CMD2>' for help on specific commands."
        "~n~n", []),
     ?CONSOLE(
+       "rebar allows you to abbreviate the command to run:~n"
+       "$ rebar co           # same as rebar compile~n"
+       "$ rebar eu           # same as rebar eunit~n"
+       "$ rebar g-d          # same as rebar get-deps~n"
+       "$ rebar x eu         # same as rebar xref eunit~n"
+       "$ rebar l-d          # same as rebar list-deps~n"
+       "$ rebar l-d l-t      # same as rebar list-deps list-templates~n"
+       "$ rebar list-d l-te  # same as rebar list-deps list-templates~n"
+       "~n", []),
+    ?CONSOLE(
        "Core rebar.config options:~n"
        "  ~p~n"
        "  ~p~n"
