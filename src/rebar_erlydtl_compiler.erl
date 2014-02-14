@@ -199,16 +199,17 @@ do_compile(Config, Source, Target, DtlOpts) ->
     %% versions of erlydtl.
     CompilerOptions = option(compiler_options, DtlOpts),
 
+    Sorted = proplists:unfold(
+               lists:sort(
+                 [{out_dir, option(out_dir, DtlOpts)},
+                  {doc_root, option(doc_root, DtlOpts)},
+                  {custom_tags_dir, option(custom_tags_dir, DtlOpts)},
+                  {compiler_options, CompilerOptions}
+                  |CompilerOptions])),
+
     %% ensure that doc_root and out_dir are defined,
     %% using defaults if necessary
-    Opts = lists:ukeymerge(1,
-            DtlOpts,
-            lists:sort(
-                [{out_dir, option(out_dir, DtlOpts)},
-                 {doc_root, option(doc_root, DtlOpts)},
-                 {custom_tags_dir, option(custom_tags_dir, DtlOpts)},
-                 {compiler_options, CompilerOptions}
-                 |CompilerOptions])),
+    Opts = lists:ukeymerge(1, DtlOpts, Sorted),
     ?INFO("Compiling \"~s\" -> \"~s\" with options:~n    ~s~n",
         [Source, Target, io_lib:format("~p", [Opts])]),
     case erlydtl:compile(Source,
