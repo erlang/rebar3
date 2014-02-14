@@ -245,7 +245,8 @@ find_disk_templates(Config) ->
     HomeFiles = rebar_utils:find_files(filename:join([os:getenv("HOME"),
                                                       ".rebar", "templates"]),
                                        ?TEMPLATE_RE),
-    LocalFiles = rebar_utils:find_files(".", ?TEMPLATE_RE),
+    Recursive = rebar_config:is_recursive(Config),
+    LocalFiles = rebar_utils:find_files(".", ?TEMPLATE_RE, Recursive),
     [{file, F} || F <- OtherTemplates ++ HomeFiles ++ LocalFiles].
 
 find_other_templates(Config) ->
