@@ -496,8 +496,9 @@ run_modules([Module | Rest], Command, Config, File) ->
             {Module, Error}
     end.
 
-apply_hooks(Mode, Config, Command, Env) ->
+apply_hooks(Mode, Config, Command, Env0) ->
     Hooks = rebar_config:get_local(Config, Mode, []),
+    Env = rebar_utils:patch_env(Config, Env0),
     lists:foreach(fun apply_hook/1,
                   [{Env, Hook} || Hook <- Hooks,
                                   element(1, Hook) =:= Command orelse
