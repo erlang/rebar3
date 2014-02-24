@@ -184,6 +184,8 @@ help() ->
                        "[var=value,...] <command,...>",
                        [{"var=value", "rebar global variables (e.g. force=1)"},
                         {"command", "Command to run (e.g. compile)"}]),
+
+    ?CONSOLE("To see a list of built-in commands, execute rebar -c.~n~n", []),
     ?CONSOLE(
        "Type 'rebar help <CMD1> <CMD2>' for help on specific commands."
        "~n~n", []),
