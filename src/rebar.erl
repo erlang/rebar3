@@ -371,18 +371,19 @@ generate-upgrade  previous_release=path  Build an upgrade package
 
 generate-appups   previous_release=path  Generate appup files
 
-eunit       [suite[s]=foo]               Run eunit tests in foo.erl and
+eunit       [suite[s]=foo]               Run EUnit tests in foo.erl and
                                          test/foo_tests.erl
-            [suite[s]=foo] [test[s]=bar] Run specific eunit tests [first test
+            [suite[s]=foo] [test[s]=bar] Run specific EUnit tests [first test
                                          name starting with 'bar' in foo.erl
                                          and test/foo_tests.erl]
             [test[s]=bar]                For every existing suite, run the first
                                          test whose name starts with bar and, if
                                          no such test exists, run the test whose
                                          name starts with bar in the suite's
-                                         _tests module
-            [random_suite_order=true]    Run tests in a random order, either with
-            [random_suite_order=Seed]    a random seed for the PRNG, or a specific one.
+                                         _tests module.
+            [random_suite_order=true]    Run tests in a random order, either
+            [random_suite_order=Seed]    with a random seed for the PRNG, or a
+                                         specific one.
 
 ct          [suite[s]=] [case=]          Run common_test suites
 
