@@ -259,7 +259,7 @@ randomize_suites(Config, Modules) ->
     end.
 
 randomize_suites1(Modules, Seed) ->
-    random:seed(35, Seed, 1337),
+    _ = random:seed(35, Seed, 1337),
     ?CONSOLE("Randomizing suite order with seed ~b~n", [Seed]),
     [X||{_,X} <- lists:sort([{random:uniform(), M} || M <- Modules])].
 
