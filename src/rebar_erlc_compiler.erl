@@ -596,6 +596,8 @@ process_attr(compile, Form, Includes) ->
     case erl_syntax:concrete(Arg) of
         {parse_transform, Mod} ->
             [atom_to_list(Mod) ++ ".erl"|Includes];
+        {core_transform, Mod} ->
+            [atom_to_list(Mod) ++ ".erl"|Includes];
         L when is_list(L) ->
             {_, Mod} = lists:keyfind(parse_transform, 1, L),
             [atom_to_list(Mod) ++ ".erl"|Includes]
