@@ -146,12 +146,13 @@ test_compile(Config, Cmd, OutDir) ->
                         lists:append(Acc, Files)
                 end, [], SrcDirs),
 
-    %% If it is not the first time rebar eunit is executed, there will be source
-    %% files already present in OutDir. Since some SCMs (like Perforce) set
-    %% the source files as being read only (unless they are checked out), we
-    %% need to be sure that the files already present in OutDir are writable
-    %% before doing the copy. This is done here by removing any file that was
-    %% already present before calling rebar_file_utils:cp_r.
+    %% If it is not the first time rebar eunit or rebar qc is executed,
+    %% there will be source files already present in OutDir. Since some
+    %% SCMs (like Perforce) set the source files as being read only (unless
+    %% they are checked out), we need to be sure that the files already
+    %% present in OutDir are writable before doing the copy. This is done
+    %% here by removing any file that was already present before calling
+    %% rebar_file_utils:cp_r.
 
     %% Get the full path to a file that was previously copied in OutDir
     ToCleanUp = fun(F, Acc) ->
