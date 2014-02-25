@@ -173,7 +173,7 @@ test_compile(Config, Cmd, OutDir) ->
     %% with appropriate defines for eunit, and include all the test modules
     %% as well.
     ok = doterl_compile(test_compile_config(Config, ErlOpts, Cmd),
-                        OutDir, TestErls),
+                        OutDir, TestErls, ErlOpts),
 
     {ok, SrcErls}.
 
@@ -272,11 +272,11 @@ is_lib_avail(Config, DictKey, Mod, Hrl, Name) ->
 
 -spec doterl_compile(rebar_config:config(), file:filename()) -> 'ok'.
 doterl_compile(Config, OutDir) ->
-    doterl_compile(Config, OutDir, []).
-
-doterl_compile(Config, OutDir, MoreSources) ->
-    ErlFirstFiles = rebar_config:get_list(Config, erl_first_files, []),
     ErlOpts = rebar_utils:erl_opts(Config),
+    doterl_compile(Config, OutDir, [], ErlOpts).
+
+doterl_compile(Config, OutDir, MoreSources, ErlOpts) ->
+    ErlFirstFiles = rebar_config:get_list(Config, erl_first_files, []),
     ?DEBUG("erl_opts ~p~n", [ErlOpts]),
     %% Support the src_dirs option allowing multiple directories to
     %% contain erlang source. This might be used, for example, should
