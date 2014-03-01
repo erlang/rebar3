@@ -34,7 +34,8 @@
          eunit/2]).
 
 %% for internal use only
--export([info/2]).
+-export([info/2,
+         version_tuple/2]).
 
 %% ===================================================================
 %% Public API
@@ -110,7 +111,7 @@ check_versions(Config) ->
     end.
 
 version_tuple(OtpRelease, Type) ->
-    case re:run(OtpRelease, "R(\\d+)B?-?(\\d+)?", [{capture, all, list}]) of
+    case re:run(OtpRelease, "R?(\\d+)B?-?(\\d+)?", [{capture, all, list}]) of
         {match, [_Full, Maj, Min]} ->
             {list_to_integer(Maj), list_to_integer(Min)};
         {match, [_Full, Maj]} ->
