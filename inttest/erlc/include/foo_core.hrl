@@ -1,0 +1,1 @@
+-define(FOO_CORE, foo_core).
