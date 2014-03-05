@@ -1,6 +1,7 @@
 -module(testplugin_mod).
--compile(export_all).
+-export([pre_compile/2]).
 
-pre_compile(Config, _) ->
-    ok = file:write_file("pre.compile", <<"Yadda!">>),
-    rebar_log:log(info, "Wrote ~p/pre.compile~n", [rebar_utils:get_cwd()]).
+pre_compile(_, _) ->
+    File = "plugin_pre.compile",
+    ok = file:write_file(File, <<"Yadda!">>),
+    rebar_log:log(info, "Wrote ~p/~s~n", [rebar_utils:get_cwd(), File]).
