@@ -304,7 +304,7 @@ get_deps_dir(Config) ->
     get_deps_dir(Config, "").
 
 get_deps_dir(Config, App) ->
-    BaseDir = rebar_config:get_xconf(Config, base_dir, []),
+    BaseDir = rebar_utils:base_dir(Config),
     DepsDir = get_shared_deps_dir(Config, "deps"),
     {true, filename:join([BaseDir, DepsDir, App])}.
 

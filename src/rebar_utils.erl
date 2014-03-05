@@ -52,6 +52,7 @@
          erl_opts/1,
          src_dirs/1,
          ebin_dir/0,
+         base_dir/1,
          processing_base_dir/1, processing_base_dir/2]).
 
 -include("rebar.hrl").
@@ -307,12 +308,15 @@ src_dirs(SrcDirs) ->
 ebin_dir() ->
     filename:join(get_cwd(), "ebin").
 
+base_dir(Config) ->
+    rebar_config:get_xconf(Config, base_dir).
+
 processing_base_dir(Config) ->
     Cwd = rebar_utils:get_cwd(),
     processing_base_dir(Config, Cwd).
 
 processing_base_dir(Config, Dir) ->
-    Dir =:= rebar_config:get_xconf(Config, base_dir).
+    Dir =:= base_dir(Config).
 
 %% ====================================================================
 %% Internal functions
