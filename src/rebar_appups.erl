@@ -50,6 +50,8 @@
     PrevRelPath = rebar_rel_utils:get_previous_release_path(Config),
     OldVerPath = filename:join([TargetParentDir, PrevRelPath]),
 
+    ModDeps = rebar_config:get(Config, module_deps, []),
+
     %% Get the new and old release name and versions
     {Name, _Ver} = rebar_rel_utils:get_reltool_release_info(ReltoolConfig),
     NewVerPath = filename:join([TargetParentDir, Name]),
@@ -77,7 +79,7 @@
     UpgradeApps = genappup_which_apps(Upgraded, AppUpApps),
 
     %% Generate appup files for upgraded apps
-    generate_appup_files(NewVerPath, OldVerPath, UpgradeApps),
+    generate_appup_files(NewVerPath, OldVerPath, ModDeps, UpgradeApps),
 
     {ok, Config1}.
 
@@ -139,9 +141,9 @@ genappup_which_apps(UpgradedApps, [First|Rest]) ->
 genappup_which_apps(Apps, []) ->
     Apps.
 
-generate_appup_files(NewVerPath, OldVerPath, [{_App, {undefined, _}}|Rest]) ->
-    generate_appup_files(NewVerPath, OldVerPath, Rest);
-generate_appup_files(NewVerPath, OldVerPath, [{App, {OldVer, NewVer}}|Rest]) ->
+generate_appup_files(NewVerPath, OldVerPath, ModDeps, [{_App, {undefined, _}}|Rest]) ->
+    generate_appup_files(NewVerPath, OldVerPath, ModDeps, Rest);
+generate_appup_files(NewVerPath, OldVerPath, ModDeps, [{App, {OldVer, NewVer}}|Rest]) ->
     OldEbinDir = filename:join([OldVerPath, "lib",
                                 atom_to_list(App) ++ "-" ++ OldVer, "ebin"]),
     NewEbinDir = filename:join([NewVerPath, "lib",
@@ -150,9 +152,14 @@ generate_appup_files(NewVerPath, OldVerPath, [{App, {OldVer, NewVer}}|Rest]) ->
     {AddedFiles, DeletedFiles, ChangedFiles} = beam_lib:cmp_dirs(NewEbinDir,
                                                                  OldEbinDir),
 
+    ChangedNames = [list_to_atom(file_to_name(F)) || {F, _} <- ChangedFiles],
+    ModDeps1 = [{N, [M1 || M1 <- M, lists:member(M1, ChangedNames)]}
+                || {N, M} <- ModDeps],
+
     Added = [generate_instruction(added, File) || File <- AddedFiles],
     Deleted = [generate_instruction(deleted, File) || File <- DeletedFiles],
-    Changed = [generate_instruction(changed, File) || File <- ChangedFiles],
+    Changed = [generate_instruction(changed, ModDeps1, File)
+               || File <- ChangedFiles],
 
     Inst = lists:append([Added, Deleted, Changed]),
 
@@ -164,8 +171,8 @@ generate_appup_files(NewVerPath, OldVerPath, [{App, {OldVer, NewVer}}|Rest]) ->
                                         OldVer, Inst, OldVer])),
 
     ?CONSOLE("Generated appup for ~p~n", [App]),
-    generate_appup_files(NewVerPath, OldVerPath, Rest);
-generate_appup_files(_, _, []) ->
+    generate_appup_files(NewVerPath, OldVerPath, ModDeps, Rest);
+generate_appup_files(_, _, _, []) ->
     ?CONSOLE("Appup generation complete~n", []).
 
 generate_instruction(added, File) ->
@@ -173,25 +180,27 @@ generate_instruction(added, File) ->
     {add_module, Name};
 generate_instruction(deleted, File) ->
     Name = list_to_atom(file_to_name(File)),
-    {delete_module, Name};
-generate_instruction(changed, {File, _}) ->
+    {delete_module, Name}.
+
+generate_instruction(changed, ModDeps, {File, _}) ->
     {ok, {Name, List}} = beam_lib:chunks(File, [attributes, exports]),
     Behavior = get_behavior(List),
     CodeChange = is_code_change(List),
-    generate_instruction_advanced(Name, Behavior, CodeChange).
+    Deps = proplists:get_value(Name, ModDeps, []),
+    generate_instruction_advanced(Name, Behavior, CodeChange, Deps).
 
-generate_instruction_advanced(Name, undefined, undefined) ->
+generate_instruction_advanced(Name, undefined, undefined, Deps) ->
     %% Not a behavior or code change, assume purely functional
-    {load_module, Name};
-generate_instruction_advanced(Name, [supervisor], _) ->
+    {load_module, Name, Deps};
+generate_instruction_advanced(Name, [supervisor], _, _) ->
     %% Supervisor
     {update, Name, supervisor};
-generate_instruction_advanced(Name, _, code_change) ->
+generate_instruction_advanced(Name, _, code_change, Deps) ->
     %% Includes code_change export
-    {update, Name, {advanced, []}};
-generate_instruction_advanced(Name, _, _) ->
+    {update, Name, {advanced, []}, Deps};
+generate_instruction_advanced(Name, _, _, Deps) ->
     %% Anything else
-    {load_module, Name}.
+    {load_module, Name, Deps}.
 
 get_behavior(List) ->
     Attributes = proplists:get_value(attributes, List),
