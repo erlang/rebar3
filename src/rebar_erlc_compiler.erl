@@ -146,12 +146,13 @@ test_compile(Config, Cmd, OutDir) ->
                         lists:append(Acc, Files)
                 end, [], SrcDirs),
 
-    %% If it is not the first time rebar eunit is executed, there will be source
-    %% files already present in OutDir. Since some SCMs (like Perforce) set
-    %% the source files as being read only (unless they are checked out), we
-    %% need to be sure that the files already present in OutDir are writable
-    %% before doing the copy. This is done here by removing any file that was
-    %% already present before calling rebar_file_utils:cp_r.
+    %% If it is not the first time rebar eunit or rebar qc is executed,
+    %% there will be source files already present in OutDir. Since some
+    %% SCMs (like Perforce) set the source files as being read only (unless
+    %% they are checked out), we need to be sure that the files already
+    %% present in OutDir are writable before doing the copy. This is done
+    %% here by removing any file that was already present before calling
+    %% rebar_file_utils:cp_r.
 
     %% Get the full path to a file that was previously copied in OutDir
     ToCleanUp = fun(F, Acc) ->
@@ -172,7 +173,7 @@ test_compile(Config, Cmd, OutDir) ->
     %% with appropriate defines for eunit, and include all the test modules
     %% as well.
     ok = doterl_compile(test_compile_config(Config, ErlOpts, Cmd),
-                        OutDir, TestErls),
+                        OutDir, TestErls, ErlOpts),
 
     {ok, SrcErls}.
 
@@ -271,11 +272,11 @@ is_lib_avail(Config, DictKey, Mod, Hrl, Name) ->
 
 -spec doterl_compile(rebar_config:config(), file:filename()) -> 'ok'.
 doterl_compile(Config, OutDir) ->
-    doterl_compile(Config, OutDir, []).
-
-doterl_compile(Config, OutDir, MoreSources) ->
-    ErlFirstFiles = rebar_config:get_list(Config, erl_first_files, []),
     ErlOpts = rebar_utils:erl_opts(Config),
+    doterl_compile(Config, OutDir, [], ErlOpts).
+
+doterl_compile(Config, OutDir, MoreSources, ErlOpts) ->
+    ErlFirstFiles = rebar_config:get_list(Config, erl_first_files, []),
     ?DEBUG("erl_opts ~p~n", [ErlOpts]),
     %% Support the src_dirs option allowing multiple directories to
     %% contain erlang source. This might be used, for example, should
