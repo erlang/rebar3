@@ -207,7 +207,10 @@ help() ->
        "  ~p~n"
        "  ~p~n"
        "  ~p~n"
-       "  ~p~n",
+       "  ~p~n"
+       "Core command line options:~n"
+       "  apps=app1,app2 (specify apps to process)~n"
+       "  skip_apps=app1,app2 (specify apps to skip)~n",
        [
         {recursive_cmds, []},
         {lib_dirs, []},
