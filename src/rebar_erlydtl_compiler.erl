@@ -89,7 +89,7 @@
 %%          {doc_root, "src"}, {module_ext, "_dtl"}
 %%      ],
 %%      [
-%%          {doc_root, "templates", {module_ext, ""}, {source_ext, ".html"}
+%%          {doc_root, "templates"}, {module_ext, ""}, {source_ext, ".html"}
 %%      ]
 %%   ]}.
 -module(rebar_erlydtl_compiler).
