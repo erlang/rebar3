@@ -39,7 +39,7 @@ files() ->
     ].
 
 run(_Dir) ->
-    ?assertMatch({ok, _}, retest_sh:run("./rebar -r compile", [])),
+    ?assertMatch({ok, _}, retest_sh:run("./rebar compile", [])),
 
     ?assertEqual(true, filelib:is_regular("base_dir_cwd_pre.compile")),
 

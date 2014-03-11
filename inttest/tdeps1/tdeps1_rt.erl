@@ -42,7 +42,7 @@ run(_Dir) ->
     apply_cmds(GitCmds, [{dir, "repo/c"}]),
 
     {ok, _} = retest_sh:run("./rebar get-deps", []),
-    {ok, _} = retest_sh:run("./rebar -r compile", []),
+    {ok, _} = retest_sh:run("./rebar compile", []),
 
     true = filelib:is_regular("ebin/a.beam"),
     ok.

@@ -50,7 +50,7 @@ run(_Dir) ->
     ok = apply_cmds(GitCmds, [{dir, "repo/c"}]),
 
     {ok, _} = retest_sh:run("./rebar -v get-deps", []),
-    {ok, _} = retest_sh:run("./rebar -v -r compile", []),
+    {ok, _} = retest_sh:run("./rebar -v compile", []),
     ok.
 
 %%
