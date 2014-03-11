@@ -122,25 +122,43 @@ process_dir(Dir, ParentConfig, Command, DirSet) ->
         false ->
             ?WARN("Skipping non-existent sub-dir: ~p\n", [Dir]),
             {ParentConfig, DirSet};
+        true ->
+            maybe_process_dir(Dir, ParentConfig, Command, DirSet)
+    end.
 
+maybe_process_dir(Dir, ParentConfig, Command, DirSet) ->
+    case should_cd_into_dir(Dir, ParentConfig, Command) of
         true ->
             ok = file:set_cwd(Dir),
             Config = maybe_load_local_config(Dir, ParentConfig),
 
             %% Save the current code path and then update it with
-            %% lib_dirs. Children inherit parents code path, but we
-            %% also want to ensure that we restore everything to pristine
+            %% lib_dirs. Children inherit parents code path, but we also
+            %% want to ensure that we restore everything to pristine
             %% condition after processing this child
             CurrentCodePath = update_code_path(Config),
 
-            %% Get the list of processing modules and check each one against
-            %% CWD to see if it's a fit -- if it is, use that set of modules
-            %% to process this dir.
+            %% Get the list of processing modules and check each one
+            %% against CWD to see if it's a fit -- if it is, use that
+            %% set of modules to process this dir.
             {ok, AvailModuleSets} = application:get_env(rebar, modules),
             ModuleSet = choose_module_set(AvailModuleSets, Dir),
             skip_or_process_dir(ModuleSet, Config, CurrentCodePath,
-                                Dir, Command, DirSet)
+                                Dir, Command, DirSet);
+        false ->
+            {ParentConfig, DirSet}
     end.
+
+should_cd_into_dir(Dir, Config, Command) ->
+    rebar_utils:processing_base_dir(Config, Dir) orelse
+        rebar_config:is_recursive(Config) orelse
+        is_recursive_command(Config, Command).
+
+is_recursive_command(Config, Command) ->
+    {ok, AppCmds} = application:get_env(rebar, recursive_cmds),
+    ConfCmds = rebar_config:get_local(Config, recursive_cmds, []),
+    RecursiveCmds = AppCmds ++ ConfCmds,
+    lists:member(Command, RecursiveCmds).
 
 skip_or_process_dir({[], undefined}=ModuleSet, Config, CurrentCodePath,
                     Dir, Command, DirSet) ->
