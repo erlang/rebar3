@@ -152,13 +152,33 @@ maybe_process_dir(Dir, ParentConfig, Command, DirSet) ->
 should_cd_into_dir(Dir, Config, Command) ->
     rebar_utils:processing_base_dir(Config, Dir) orelse
         rebar_config:is_recursive(Config) orelse
-        is_recursive_command(Config, Command).
+        is_recursive_command(Config, Command) orelse
+        is_generate_in_rel_dir(Command, Dir).
 
+%% Check whether the command is part of the built-in (or extended via
+%% rebar.config) list of default-recursive commands.
 is_recursive_command(Config, Command) ->
     {ok, AppCmds} = application:get_env(rebar, recursive_cmds),
     ConfCmds = rebar_config:get_local(Config, recursive_cmds, []),
     RecursiveCmds = AppCmds ++ ConfCmds,
     lists:member(Command, RecursiveCmds).
+
+%% If the directory we're about to process contains
+%% reltool.config[.script] and the command to be applied is
+%% 'generate', then it's safe to process. We do this to retain the
+%% behavior of specifying {sub_dirs, ["rel"]} and have "rebar generate"
+%% pick up rel/reltool.config[.script]. Without this workaround you'd
+%% have to run "rebar -r generate" (which you don't want to do if you
+%% have deps or other sub_dirs) or "cd rel && rebar generate".
+is_generate_in_rel_dir(generate, Dir) ->
+    case rebar_rel_utils:is_rel_dir(Dir) of
+        {true, _} ->
+            true;
+        false ->
+            false
+    end;
+is_generate_in_rel_dir(_, _) ->
+    false.
 
 skip_or_process_dir({[], undefined}=ModuleSet, Config, CurrentCodePath,
                     Dir, Command, DirSet) ->
