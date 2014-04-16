@@ -73,7 +73,10 @@ info(help, qc) ->
        [
         {qc_compile_opts, []},
         {qc_first_files, []}
-       ]).
+       ]);
+info(help, clean) ->
+    Description = ?FMT("Delete QuickCheck test dir (~s)", [?QC_DIR]),
+    ?CONSOLE("~s.~n", [Description]).
 
 -define(TRIQ_MOD, triq).
 -define(EQC_MOD, eqc).
