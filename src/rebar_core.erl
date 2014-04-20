@@ -123,12 +123,7 @@ process_dir(Dir, Command, ParentConfig, DirSet) ->
             ?WARN("Skipping non-existent sub-dir: ~p\n", [Dir]),
             {ParentConfig, DirSet};
         true ->
-            maybe_process_dir(Dir, Command, ParentConfig, DirSet)
-    end.
-
-maybe_process_dir(Dir, Command, ParentConfig, DirSet) ->
-    case should_cd_into_dir(Dir, Command, ParentConfig) of
-        true ->
+            WouldCd = would_cd_into_dir(Dir, Command, ParentConfig),
             ok = file:set_cwd(Dir),
             Config = maybe_load_local_config(Dir, ParentConfig),
 
@@ -144,12 +139,18 @@ maybe_process_dir(Dir, Command, ParentConfig, DirSet) ->
             {ok, AvailModuleSets} = application:get_env(rebar, modules),
             ModuleSet = choose_module_set(AvailModuleSets, Dir),
             skip_or_process_dir(Dir, Command, Config, DirSet, CurrentCodePath,
-                                ModuleSet);
-        false ->
-            {ParentConfig, DirSet}
+                                ModuleSet, WouldCd)
     end.
 
-should_cd_into_dir(Dir, Command, Config) ->
+would_cd_into_dir(Dir, Command, Config) ->
+    case would_cd_into_dir1(Dir, Command, Config) of
+        true ->
+            would_cd;
+        false ->
+            would_not_cd
+    end.
+
+would_cd_into_dir1(Dir, Command, Config) ->
     rebar_utils:processing_base_dir(Config, Dir) orelse
         rebar_config:is_recursive(Config) orelse
         is_recursive_command(Command, Config) orelse
@@ -181,24 +182,25 @@ is_generate_in_rel_dir(_, _) ->
     false.
 
 skip_or_process_dir(Dir, Command, Config, DirSet, CurrentCodePath,
-                    {[], undefined}=ModuleSet) ->
-    process_dir1(Dir, Command, Config, DirSet, CurrentCodePath, ModuleSet);
+                    {[], undefined}=ModuleSet, WouldCd) ->
+    process_dir1(Dir, Command, Config, DirSet, CurrentCodePath, ModuleSet,
+                 WouldCd);
 skip_or_process_dir(Dir, Command, Config, DirSet, CurrentCodePath,
-                    {_, File}=ModuleSet) ->
+                    {_, File}=ModuleSet, WouldCd) ->
     case lists:suffix(".app.src", File)
         orelse lists:suffix(".app", File) of
         true ->
             %% .app or .app.src file, check if is_skipped_app
             skip_or_process_dir1(Dir, Command, Config, DirSet, CurrentCodePath,
-                                 ModuleSet, File);
+                                 ModuleSet, WouldCd, File);
         false ->
             %% not an app dir, no need to consider apps=/skip_apps=
             process_dir1(Dir, Command, Config, DirSet, CurrentCodePath,
-                         ModuleSet)
+                         ModuleSet, WouldCd)
     end.
 
 skip_or_process_dir1(Dir, Command, Config, DirSet, CurrentCodePath, ModuleSet,
-                     AppFile) ->
+                     WouldCd, AppFile) ->
     case rebar_app_utils:is_skipped_app(Config, AppFile) of
         {Config1, {true, _SkippedApp}} when Command == 'update-deps' ->
             %% update-deps does its own app skipping. Unfortunately there's no
@@ -206,18 +208,19 @@ skip_or_process_dir1(Dir, Command, Config, DirSet, CurrentCodePath, ModuleSet,
             %% here... Otherwise if you use app=, it'll skip the toplevel
             %% directory and nothing will be updated.
             process_dir1(Dir, Command, Config1, DirSet, CurrentCodePath,
-                         ModuleSet);
+                         ModuleSet, WouldCd);
         {Config1, {true, SkippedApp}} ->
             ?DEBUG("Skipping app: ~p~n", [SkippedApp]),
             {increment_operations(Config1), DirSet};
         {Config1, false} ->
             process_dir1(Dir, Command, Config1, DirSet, CurrentCodePath,
-                         ModuleSet)
+                         ModuleSet, WouldCd)
     end.
 
 process_dir1(Dir, Command, Config, DirSet, CurrentCodePath,
-             {DirModules, File}) ->
+             {DirModules, File}, WouldCd) ->
     Config0 = rebar_config:set_xconf(Config, current_command, Command),
+
     %% Get the list of modules for "any dir". This is a catch-all list
     %% of modules that are processed in addition to modules associated
     %% with this directory type. These any_dir modules are processed
@@ -251,38 +254,18 @@ process_dir1(Dir, Command, Config, DirSet, CurrentCodePath,
     %% caused it to change
     ok = file:set_cwd(Dir),
 
-    %% Check that this directory is not on the skip list
-    Config7 = case rebar_config:is_skip_dir(Config3, Dir) of
-                  true ->
-                      %% Do not execute the command on the directory, as some
-                      %% module has requested a skip on it.
-                      ?INFO("Skipping ~s in ~s\n", [Command, Dir]),
-                      Config3;
-
-                  false ->
-                      %% Check for and get command specific environments
-                      {Config4, Env} = setup_envs(Config3, Modules),
-
-                      %% Execute any before_command plugins on this directory
-                      Config5 = execute_pre(Command, PluginModules, Config4,
-                                            File, Env),
-
-                      %% Execute the current command on this directory
-                      Config6 = execute(Command, AllModules, Config5, File,
-                                        Env),
-
-                      %% Execute any after_command plugins on this directory
-                      execute_post(Command, PluginModules, Config6, File, Env)
-              end,
+    %% Maybe apply command to Dir
+    Config4 = maybe_execute(Dir, Command, Config3, Modules, PluginModules,
+                            AllModules, File, WouldCd),
 
     %% Mark the current directory as processed
     DirSet3 = sets:add_element(Dir, DirSet2),
 
     %% Invoke 'postprocess' on the modules. This yields a list of other
     %% directories that should be processed _after_ the current one.
-    {Config8, Postdirs} = acc_modules(AllModules, postprocess, Config7, File),
+    {Config5, Postdirs} = acc_modules(AllModules, postprocess, Config4, File),
     ?DEBUG("Postdirs: ~p\n", [Postdirs]),
-    Res = process_each(Postdirs, Command, Config8, DirSet3, File),
+    Res = process_each(Postdirs, Command, Config5, DirSet3, File),
 
     %% Make sure the CWD is reset properly; processing the dirs may have
     %% caused it to change
@@ -294,6 +277,33 @@ process_dir1(Dir, Command, Config, DirSet, CurrentCodePath,
 
     %% Return the updated {config, dirset} as result
     Res.
+
+maybe_execute(Dir, Command, Config, Modules, PluginModules, AllModules, File,
+              would_cd) ->
+    %% Check that this directory is not on the skip list
+    case rebar_config:is_skip_dir(Config, Dir) of
+        true ->
+            %% Do not execute the command on the directory, as some
+            %% module has requested a skip on it.
+            ?INFO("Skipping ~s in ~s\n", [Command, Dir]),
+            Config;
+
+        false ->
+            %% Check for and get command specific environments
+            {Config1, Env} = setup_envs(Config, Modules),
+
+            %% Execute any before_command plugins on this directory
+            Config2 = execute_pre(Command, PluginModules, Config1, File, Env),
+
+            %% Execute the current command on this directory
+            Config3 = execute(Command, AllModules, Config2, File, Env),
+
+            %% Execute any after_command plugins on this directory
+            execute_post(Command, PluginModules, Config3, File, Env)
+    end;
+maybe_execute(_Dir, _Command, Config, _Modules, _PluginModules, _AllModules,
+              _File, would_not_cd) ->
+    Config.
 
 remember_cwd_predirs(Cwd, Predirs) ->
     Store = fun(Dir, Dict) ->
