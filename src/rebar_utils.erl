@@ -398,8 +398,9 @@ log_msg_and_abort(Message) ->
 
 -spec log_and_abort(string(), {integer(), string()}) -> no_return().
 log_and_abort(Command, {Rc, Output}) ->
-    ?ABORT("~s failed with error: ~w and output:~n~s~n",
-           [Command, Rc, Output]).
+    ?ABORT("sh(~s)~n"
+           "failed with return code ~w and the following output:~n"
+           "~s~n", [Command, Rc, Output]).
 
 sh_loop(Port, Fun, Acc) ->
     receive

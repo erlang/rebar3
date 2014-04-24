@@ -46,7 +46,7 @@ rm_rf(Target) ->
         {unix, _} ->
             EscTarget = escape_spaces(Target),
             {ok, []} = rebar_utils:sh(?FMT("rm -rf ~s", [EscTarget]),
-                                      [{use_stdout, false}, return_on_error]),
+                                      [{use_stdout, false}, abort_on_error]),
             ok;
         {win32, _} ->
             Filelist = filelib:wildcard(Target),
@@ -67,7 +67,7 @@ cp_r(Sources, Dest) ->
             SourceStr = string:join(EscSources, " "),
             {ok, []} = rebar_utils:sh(?FMT("cp -R ~s \"~s\"",
                                            [SourceStr, Dest]),
-                                      [{use_stdout, false}, return_on_error]),
+                                      [{use_stdout, false}, abort_on_error]),
             ok;
         {win32, _} ->
             lists:foreach(fun(Src) -> ok = cp_r_win32(Src,Dest) end, Sources),
@@ -81,7 +81,7 @@ mv(Source, Dest) ->
             EscSource = escape_spaces(Source),
             EscDest = escape_spaces(Dest),
             {ok, []} = rebar_utils:sh(?FMT("mv ~s ~s", [EscSource, EscDest]),
-                                      [{use_stdout, false}, return_on_error]),
+                                      [{use_stdout, false}, abort_on_error]),
             ok;
         {win32, _} ->
             {ok, R} = rebar_utils:sh(

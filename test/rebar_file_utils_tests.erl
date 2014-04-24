@@ -191,7 +191,7 @@ cp_r_overwrite_file_fail_test_() ->
                     filename:join([?TMP_DIR,"dest","file1"]),0)
      end,
      fun teardown/1,
-     [?_assertError({badmatch,_},
+     [?_assertThrow(rebar_abort,
                     rebar_file_utils:cp_r(
                       [filename:join([?TMP_DIR,"source","file1"])],
                       filename:join([?TMP_DIR,"dest"])))]}.
@@ -210,7 +210,7 @@ cp_r_overwrite_dir_fail_test_() ->
                     filename:join([?TMP_DIR,"dest","source","file1"]),0)
      end,
      fun teardown/1,
-     [?_assertError({badmatch,_},
+     [?_assertThrow(rebar_abort,
                     rebar_file_utils:cp_r(
                       [filename:join([?TMP_DIR,"source"])],
                       filename:join([?TMP_DIR,"dest"])))]}.
