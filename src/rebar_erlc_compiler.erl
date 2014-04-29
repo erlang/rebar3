@@ -134,12 +134,13 @@ test_compile(Config, Cmd, OutDir) ->
     %% Obtain all the test modules for inclusion in the compile stage.
     TestErls = rebar_utils:find_files("test", ".*\\.erl\$"),
 
+    ErlOpts = rebar_utils:erl_opts(Config),
+    {Config1, ErlOpts1} = test_compile_config_and_opts(Config, ErlOpts, Cmd),
+
     %% Copy source files to eunit dir for cover in case they are not directly
     %% in src but in a subdirectory of src. Cover only looks in cwd and ../src
     %% for source files. Also copy files from src_dirs.
-    ErlOpts = rebar_utils:erl_opts(Config),
-
-    SrcDirs = rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts)),
+    SrcDirs = rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts1)),
     SrcErls = lists:foldl(
                 fun(Dir, Acc) ->
                         Files = rebar_utils:find_files(Dir, ".*\\.erl\$"),
@@ -172,8 +173,7 @@ test_compile(Config, Cmd, OutDir) ->
     %% Compile erlang code to OutDir, using a tweaked config
     %% with appropriate defines for eunit, and include all the test modules
     %% as well.
-    ok = doterl_compile(test_compile_config(Config, ErlOpts, Cmd),
-                        OutDir, TestErls, ErlOpts),
+    ok = doterl_compile(Config1, OutDir, TestErls, ErlOpts1),
 
     {ok, SrcErls}.
 
@@ -217,21 +217,22 @@ info_help(Description) ->
         {yrl_first_files, []}
        ]).
 
-test_compile_config(Config, ErlOpts, Cmd) ->
+test_compile_config_and_opts(Config, ErlOpts, Cmd) ->
     {Config1, TriqOpts} = triq_opts(Config),
     {Config2, PropErOpts} = proper_opts(Config1),
     {Config3, EqcOpts} = eqc_opts(Config2),
 
     OptsAtom = list_to_atom(Cmd ++ "_compile_opts"),
-    EunitOpts = rebar_config:get_list(Config3, OptsAtom, []),
+    TestOpts = rebar_config:get_list(Config3, OptsAtom, []),
     Opts0 = [{d, 'TEST'}] ++
-        ErlOpts ++ EunitOpts ++ TriqOpts ++ PropErOpts ++ EqcOpts,
+        ErlOpts ++ TestOpts ++ TriqOpts ++ PropErOpts ++ EqcOpts,
     Opts = [O || O <- Opts0, O =/= no_debug_info],
     Config4 = rebar_config:set(Config3, erl_opts, Opts),
 
     FirstFilesAtom = list_to_atom(Cmd ++ "_first_files"),
     FirstErls = rebar_config:get_list(Config4, FirstFilesAtom, []),
-    rebar_config:set(Config4, erl_first_files, FirstErls).
+    Config5 = rebar_config:set(Config4, erl_first_files, FirstErls),
+    {Config5, Opts}.
 
 triq_opts(Config) ->
     {NewConfig, IsAvail} = is_lib_avail(Config, is_triq_avail, triq,
