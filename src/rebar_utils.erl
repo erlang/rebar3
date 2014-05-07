@@ -316,7 +316,8 @@ processing_base_dir(Config) ->
     processing_base_dir(Config, Cwd).
 
 processing_base_dir(Config, Dir) ->
-    Dir =:= base_dir(Config).
+    Dir_abs = filename:absname(Dir),
+    Dir_abs =:= filename:absname(base_dir(Config)).
 
 %% ====================================================================
 %% Internal functions
