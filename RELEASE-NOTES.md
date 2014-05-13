@@ -1,3 +1,36 @@
+# Rebar 2.3.0
+
+* rebar/56: [add preprocess support for edoc](https://github.com/basho/rebar/pull/56)
+* rebar/90: [look for new and old versions in the target parent](https://github.com/basho/rebar/pull/90)
+* rebar/95: [Propagate exit status from nodetool to runner script](https://github.com/basho/rebar/pull/95)
+* rebar/98: [Restore R13B03 compatibility](https://github.com/basho/rebar/pull/98)
+* rebar/115: [specify the erlang system module name while calling monitor/2](https://github.com/basho/rebar/pull/115)
+* rebar/129: [Allow plugins to participate in pre and post processing](https://github.com/basho/rebar/pull/129)
+* rebar/139: [@ characters before elses were causing the script to not run](https://github.com/basho/rebar/pull/139)
+* rebar/175: [Common Test changes to add configurable log dir and improve testing framework overlaps.](https://github.com/basho/rebar/pull/175)
+* rebar/188: [Generated rebar.cmd needs a tweak](https://github.com/basho/rebar/issues/188)
+* rebar/208: [Is the "Release Handling" wiki page out of date?](https://github.com/basho/rebar/issues/208)
+* rebar/219: [remove dependency on erl_interface](https://github.com/basho/rebar/pull/219)
+* rebar/220: [add crypto, syntax_tools and tools to applications key as dependencies](https://github.com/basho/rebar/pull/220)
+* rebar/221: [Versioning scheme](https://github.com/basho/rebar/issues/221)
+* rebar/223: [ebadf if run under nohup](https://github.com/basho/rebar/issues/223)
+* rebar/224: [When generating a release rebar should expand VCS version in the top directory (git)](https://github.com/basho/rebar/pull/224)
+* rebar/226: [make check dialyzer error](https://github.com/basho/rebar/issues/226)
+* rebar/228: [about load plugin modules](https://github.com/basho/rebar/issues/228)
+* rebar/230: [Support ct_run using short name](https://github.com/basho/rebar/pull/230)
+* rebar/232: [bug about ./rebar generate ](https://github.com/basho/rebar/issues/232)
+* rebar/233: [Add {git_format, Format} notation for vsn entries](https://github.com/basho/rebar/pull/233)
+* rebar/234: [Use ?INFO instead of ?CONSOLE when printing directory changes](https://github.com/basho/rebar/pull/234)
+* rebar/237: [Allow rebar.config and reltool.config to be configured](https://github.com/basho/rebar/pull/237)
+* rebar/252: [eunit suite=<suite name> fails if there is a rebar dependency defined.](https://github.com/basho/rebar/issues/252)
+* rebar/253: [rebar creates templates in deps as well as main](https://github.com/basho/rebar/issues/253)
+* rebar/254: [Force running eunit tests via -k cmdline switch](https://github.com/basho/rebar/pull/254)
+* rebar/265: [Fix rebar_base_compiler:format_errors/3 for errors in include files](https://github.com/basho/rebar/pull/265)
+* rebar/267: [Add 'eunit-compile' cmd (Suggested-by: Joe Norton)](https://github.com/basho/rebar/pull/267)
+* rebar/268: [Add 'qc' command](https://github.com/basho/rebar/pull/268)
+* rebar/269: [Add qc and test-compile commands](https://github.com/basho/rebar/pull/269)
+
+
 # Rebar 2.2.0
 
 ## PR's Merged
