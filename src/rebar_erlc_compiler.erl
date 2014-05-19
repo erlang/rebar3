@@ -538,7 +538,7 @@ internal_erl_compile(Config, Source, OutDir, ErlOpts, G) ->
     %% Determine the target name and includes list by inspecting the source file
     Module = filename:basename(Source, ".erl"),
     Parents = get_parents(G, Source),
-    log_files(?FMT("~s depends on", [Source]), Parents),
+    log_files(?FMT("Dependencies of ~s", [Source]), Parents),
 
     %% Construct the target filename
     Target = filename:join([OutDir | string:tokens(Module, ".")]) ++ ".beam",

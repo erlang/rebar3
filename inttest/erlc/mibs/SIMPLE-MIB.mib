@@ -1,0 +1,26 @@
+-- SIMPLE-MIB.
+-- This is just a simple MIB used for testing!
+--
+
+
+SIMPLE-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, enterprises
+        FROM SNMPv2-SMI;
+
+ericsson MODULE-IDENTITY
+    LAST-UPDATED
+        "201403060000Z"
+    ORGANIZATION
+        "rebar"
+    CONTACT-INFO
+        "rebar <rebar@example.com>
+	 or
+	 whoever is currently responsible for the SIMPLE
+	 enterprise MIB tree branch (enterprises.999)."
+    DESCRIPTION
+        "This very small module is made available
+	for mib-compilation testing."
+    ::= { enterprises 999 }
+END

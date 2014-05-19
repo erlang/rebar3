@@ -1,0 +1,1 @@
+-define(FOO_EXTRA, foo_extra).
