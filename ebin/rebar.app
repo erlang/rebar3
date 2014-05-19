@@ -93,7 +93,7 @@
                    ]},
          {recursive_cmds, [
                            'check-deps',
-                           'compile',
+                           compile,
                            'delete-deps',
                            'get-deps',
                            'list-deps',
