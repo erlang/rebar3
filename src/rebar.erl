@@ -409,6 +409,9 @@ qc                                       Test QuickCheck properties
 
 xref                                     Run cross reference analysis
 
+shell                                    Start a shell similar to
+                                         'erl -pa ebin -pa deps/*/ebin'
+
 help                                     Show the program options
 version                                  Show version information
 ">>,
