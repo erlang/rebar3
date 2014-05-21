@@ -130,11 +130,43 @@ cd $USE_DIR
 # Make sure log directory exists
 mkdir -p $USE_DIR/log
 
-# Add ERTS bin dir to our path
-ERTS_PATH=$RUNNER_BASE_DIR/erts-$ERTS_VSN/bin
+RUNNER_SCRIPT_DATA=
+if [ -e "$RUNNER_BASE_DIR/releases/$APP_VSN/runner_script.data" ]; then
+    RUNNER_SCRIPT_DATA=`cat $RUNNER_BASE_DIR/releases/$APP_VSN/runner_script.data`
+fi
 
-# Setup command to control the node
-NODETOOL="$ERTS_PATH/escript $ERTS_PATH/nodetool $NAME_ARG $COOKIE_ARG"
+if [ -z "$RUNNER_SCRIPT_DATA" ]; then
+    ROOTDIR=$RUNNER_BASE_DIR
+    ERTS_PATH=$RUNNER_BASE_DIR/erts-$ERTS_VSN/bin
+    if [ -e "$RUNNER_BASE_DIR/releases/$APP_VSN/nodetool" ]; then
+        NODETOOL="$ERTS_PATH/escript $RUNNER_BASE_DIR/releases/$APP_VSN/nodetool $NAME_ARG $COOKIE_ARG"
+    else
+        NODETOOL="$ERTS_PATH/escript $ERTS_PATH/nodetool $NAME_ARG $COOKIE_ARG"
+    fi
+    SLIM_ARGS=
+elif [ "$RUNNER_SCRIPT_DATA" = "slim" ]; then
+    # Setup system paths
+    SYSTEM_ERL_PATH=`which erl`
+    if [ ! -x "$SYSTEM_ERL_PATH" ]; then
+        echo "Failed to find erl. Is Erlang/OTP available in PATH?"
+        exit 1
+    fi
+    SYSTEM_HOME_BIN=${SYSTEM_ERL_PATH%/*}
+    ROOTDIR=$SYSTEM_HOME_BIN/../lib/erlang
+    ERTS_PATH=$ROOTDIR/erts-$ERTS_VSN/bin
+    unset SYSTEM_ERL_PATH
+    unset SYSTEM_HOME_BIN
+
+    LOCAL_ERTS_PATH=$RUNNER_BASE_DIR/erts-$ERTS_VSN/bin
+    NODETOOL="$ERTS_PATH/escript $RUNNER_BASE_DIR/releases/$APP_VSN/nodetool $NAME_ARG $COOKIE_ARG"
+    unset LOCAL_ERL_PATH
+
+    # Setup additional arguments for slim release
+    SLIM_ARGS="-boot_var RELTOOL_EXT_LIB $RUNNER_BASE_DIR/lib -sasl releases_dir \"$RUNNER_BASE_DIR/releases\""
+else
+    echo "Unknown runner_script.data"
+    exit 1
+fi
 
 # Setup remote shell command to control node
 REMSH="$ERTS_PATH/erl -hidden $REMSH_NAME_ARG $REMSH_REMSH_ARG $COOKIE_ARG"
@@ -310,11 +342,10 @@ case "$1" in
                 ;;
         esac
         # Setup beam-required vars
-        ROOTDIR=$RUNNER_BASE_DIR
         BINDIR=$ROOTDIR/erts-$ERTS_VSN/bin
         EMU=beam
         PROGNAME=`echo $0 | sed 's/.*\\///'`
-        CMD="$BINDIR/erlexec -boot $RUNNER_BASE_DIR/releases/$APP_VSN/$BOOTFILE -mode embedded -config $CONFIG_PATH -args_file $VMARGS_PATH"
+        CMD="$BINDIR/erlexec $SLIM_ARGS -boot $RUNNER_BASE_DIR/releases/$APP_VSN/$BOOTFILE -mode embedded -config $CONFIG_PATH -args_file $VMARGS_PATH"
         export EMU
         export ROOTDIR
         export BINDIR
@@ -339,11 +370,10 @@ case "$1" in
         FOREGROUNDOPTIONS="-noinput +Bd"
 
         # Setup beam-required vars
-        ROOTDIR=$RUNNER_BASE_DIR
         BINDIR=$ROOTDIR/erts-$ERTS_VSN/bin
         EMU=beam
         PROGNAME=`echo $0 | sed 's/.*\///'`
-        CMD="$BINDIR/erlexec $FOREGROUNDOPTIONS -boot $RUNNER_BASE_DIR/releases/$APP_VSN/$BOOTFILE -config $CONFIG_PATH -args_file $VMARGS_PATH"
+        CMD="$BINDIR/erlexec $SLIM_ARGS $FOREGROUNDOPTIONS -boot $RUNNER_BASE_DIR/releases/$APP_VSN/$BOOTFILE -config $CONFIG_PATH -args_file $VMARGS_PATH"
         export EMU
         export ROOTDIR
         export BINDIR

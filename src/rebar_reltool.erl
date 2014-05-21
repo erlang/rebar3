@@ -147,15 +147,12 @@ process_overlay(Config, ReltoolConfig) ->
                                                     OverlayVars1),
 
     %% Finally, overlay the files specified by the overlay section
-    case lists:keyfind(overlay, 1, ReltoolConfig) of
-        {overlay, Overlay} when is_list(Overlay) ->
+    case overlay_files(ReltoolConfig) of
+        [] ->
+            ok;
+        Overlay ->
             execute_overlay(Overlay, OverlayVars, rebar_utils:get_cwd(),
-                            TargetDir);
-        false ->
-            ?INFO("No {overlay, [...]} found in reltool.config.\n", []);
-        _ ->
-            ?ABORT("{overlay, [...]} entry in reltool.config "
-                   "must be a list.\n", [])
+                            TargetDir)
     end.
 
 %%
@@ -291,6 +288,26 @@ dump_spec(Config, Spec) ->
             ok
     end.
 
+
+overlay_files(ReltoolConfig) ->
+    Original = case lists:keyfind(overlay, 1, ReltoolConfig) of
+                   {overlay, Overlay} when is_list(Overlay) ->
+                       Overlay;
+                   false ->
+                       ?INFO("No {overlay, [...]} found in reltool.config.\n", []),
+                       [];
+                   _ ->
+                       ?ABORT("{overlay, [...]} entry in reltool.config "
+                              "must be a list.\n", [])
+               end,
+    SlimAddition = case rebar_rel_utils:get_excl_lib_tuple(ReltoolConfig) of
+                       {excl_lib, otp_root} ->
+                           [{create, "releases/{{rel_vsn}}/runner_script.data",
+                             "slim\n"}];
+                       false ->
+                           []
+                   end,
+    Original ++ SlimAddition.
 
 %% TODO: Merge functionality here with rebar_templater
 
