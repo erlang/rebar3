@@ -30,27 +30,40 @@
 
 -include("rebar.hrl").
 
--export([shell/2]).
+-export([shell/2, info/2]).
+
+%% NOTE:
+%% this is an attempt to replicate `erl -pa ./ebin -pa deps/*/ebin`. it is
+%% mostly successful but does stop and then restart the user io system to get
+%% around issues with rebar being an escript and starting in `noshell` mode.
+%% it also lacks the ctrl-c interrupt handler that `erl` features. ctrl-c will
+%% immediately kill the script. ctrl-g, however, works fine
 
 shell(_Config, _AppFile) ->
-    ?CONSOLE("NOTICE: Using experimental 'shell' command~n", []),
-    %% backwards way to say we only want this executed
-    %% for the "top level" directory
-    case is_deps_dir(rebar_utils:get_cwd()) of
-        false ->
-            true = code:add_pathz(rebar_utils:ebin_dir()),
-            user_drv:start(),
-            %% this call never returns (until user quits shell)
-            shell:server(false, false);
-        true ->
-            ok
-    end,
-    ok.
+    true = code:add_pathz(rebar_utils:ebin_dir()),
+    %% terminate the current user
+    ok = supervisor:terminate_child(kernel_sup, user),
+    %% start a new shell (this also starts a new user under the correct group)
+    user_drv:start(),
+    %% enable error_logger's tty output
+    ok = error_logger:swap_handler(tty),
+    %% disable the simple error_logger (which may have been added multiple
+    %% times). removes at most the error_logger added by init and the
+    %% error_logger added by the tty handler
+    ok = remove_error_handler(3),
+    %% this call never returns (until user quits shell)
+    timer:sleep(infinity).
 
-is_deps_dir(Dir) ->
-    case lists:reverse(filename:split(Dir)) of
-        [_, "deps" | _] ->
-            true;
-        _V ->
-            false
+info(help, shell) ->
+    ?CONSOLE(
+       "Start a shell with project and deps preloaded similar to~n"
+       "'erl -pa ebin -pa deps/*/ebin'.~n",
+       []).
+
+remove_error_handler(0) ->
+    ?WARN("Unable to remove simple error_logger handler~n", []);
+remove_error_handler(N) ->
+    case gen_event:delete_handler(error_logger, error_logger, []) of
+        {error, module_not_found} -> ok;
+        {error_logger, _} -> remove_error_handler(N-1)
     end.
