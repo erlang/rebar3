@@ -100,7 +100,7 @@ case "$REMSH_NAME" in
     *)
         REMSH_NAME_PART="$REMSH_NAME"
         if [ "$REMSH_TYPE" = "-sname" ]; then
-            REMSH_HOSTNAME_PART= "$HOSTNAME"
+            REMSH_HOSTNAME_PART="$HOSTNAME"
         else
             # -name type, check if `hostname` is fqdn
             if [ "$MAYBE_FQDN_HOSTNAME" = "$HOSTNAME" ]; then
