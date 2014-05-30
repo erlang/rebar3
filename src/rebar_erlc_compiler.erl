@@ -417,7 +417,7 @@ update_erlcinfo(G, Source, Dirs) ->
                     digraph:del_vertex(G, Source),
                     modified;
                LastUpdated < LastModified ->
-                    modify_erlcinfo(G, Source, Dirs);
+                    modify_erlcinfo(G, Source, Dirs),
                     modified;
                true ->
                     unmodified
