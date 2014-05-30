@@ -291,7 +291,7 @@ collect_glob(Cwd, Glob) ->
     CwdParts = filename:split(Cwd),
     filelib:fold_files(Cwd, Glob, true, fun(F, Acc) ->
         %% Ignore any specs under the deps/ directory. Do this pulling
-        %% the dirname off the the F and then splitting it into a list.
+        %% the dirname off the F and then splitting it into a list.
         Parts = filename:split(filename:dirname(F)),
         Parts2 = remove_common_prefix(Parts, CwdParts),
         case lists:member("deps", Parts2) of
