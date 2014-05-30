@@ -409,17 +409,17 @@ init_erlcinfo(Config, Erls) ->
 update_erlcinfo(G, Source, Dirs) ->
     case digraph:vertex(G, Source) of
         {_, LastUpdated} ->
-            LastModified = filelib:last_modified(Source),
-            if LastModified == 0 ->
+            case filelib:last_modified(Source) of
+                0 ->
                     %% The file doesn't exist anymore,
                     %% erase it from the graph.
                     %% All the edges will be erased automatically.
                     digraph:del_vertex(G, Source),
                     modified;
-               LastUpdated < LastModified ->
+                LastModified when LastUpdated < LastModified ->
                     modify_erlcinfo(G, Source, Dirs),
                     modified;
-               true ->
+                _ ->
                     unmodified
             end;
         false ->
