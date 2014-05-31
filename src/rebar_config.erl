@@ -39,13 +39,21 @@
 
 -include("rebar.hrl").
 
+-ifdef(namespaced_types).
+% dict:dict() exists starting from Erlang 17.
+-type rebar_dict() :: dict:dict().
+-else.
+% dict() has been obsoleted in Erlang 17 and deprecated in 18.
+-type rebar_dict() :: dict().
+-endif.
+
 -record(config, { dir :: file:filename(),
                   opts = [] :: list(),
-                  globals = new_globals() :: dict(),
-                  envs = new_env() :: dict(),
+                  globals = new_globals() :: rebar_dict(),
+                  envs = new_env() :: rebar_dict(),
                   %% cross-directory/-command config
-                  skip_dirs = new_skip_dirs() :: dict(),
-                  xconf = new_xconf() :: dict() }).
+                  skip_dirs = new_skip_dirs() :: rebar_dict(),
+                  xconf = new_xconf() :: rebar_dict() }).
 
 -export_type([config/0]).
 
