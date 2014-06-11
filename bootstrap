@@ -28,10 +28,20 @@ main(Args) ->
     %% Extract the system info of the version of OTP we use to compile rebar
     OtpInfo = string:strip(erlang:system_info(otp_release), both, $\n),
 
+    %% Types dict:dict() and digraph:digraph() have been introduced in Erlang 17.
+    %% At the same time, their counterparts dict() and digraph() are to be deprecated
+    %% in Erlang 18. namespaced_types option is used to select proper type name
+    %% depending of the OTP version used.
+    NamespacedTypes = case is_otp(OtpInfo, "^[0-9]+") of
+                          true -> {d, namespaced_types};
+                          false -> undefined
+                      end,
+
     %% Compile all src/*.erl to ebin
     case make:files(filelib:wildcard("src/*.erl"),
                     [{outdir, "ebin"}, {i, "include"},
                      DebugFlag,
+                     NamespacedTypes,
                      {d, 'BUILD_TIME', Built},
                      {d, 'VCS_INFO', VcsInfo},
                      {d, 'OTP_INFO', OtpInfo}]) of
@@ -78,6 +88,12 @@ main(Args) ->
               "your current working directory. "
               "Place this script anywhere in your path\n"
               "and you can use rebar to build OTP-compliant apps.\n").
+
+is_otp(OtpInfo, Regex) ->
+     case re:run(OtpInfo, Regex, [{capture, none}]) of
+          match -> true;
+          nomatch -> false
+     end.
 
 rm(Path) ->
     NativePath = filename:nativename(Path),
