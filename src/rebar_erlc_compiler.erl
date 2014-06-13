@@ -148,11 +148,9 @@ test_compile(Config, Cmd, OutDir) ->
     %% in src but in a subdirectory of src. Cover only looks in cwd and ../src
     %% for source files. Also copy files from src_dirs.
     SrcDirs = rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts1)),
-    SrcErls = lists:foldl(
-                fun(Dir, Acc) ->
-                        Files = rebar_utils:find_files(Dir, ".*\\.erl\$"),
-                        lists:append(Acc, Files)
-                end, [], SrcDirs),
+    SrcErls = lists:flatmap(
+                fun (Dir) -> rebar_utils:find_files(Dir, ".*\\.erl$") end,
+                SrcDirs),
 
     %% If it is not the first time rebar eunit or rebar qc is executed,
     %% there will be source files already present in OutDir. Since some
@@ -163,17 +161,17 @@ test_compile(Config, Cmd, OutDir) ->
     %% rebar_file_utils:cp_r.
 
     %% Get the full path to a file that was previously copied in OutDir
-    ToCleanUp = fun(F, Acc) ->
+    ToCleanUp = fun(F) ->
                         F2 = filename:basename(F),
                         F3 = filename:join([OutDir, F2]),
                         case filelib:is_regular(F3) of
-                            true -> [F3|Acc];
-                            false -> Acc
+                            true -> F3;
+                            false -> []
                         end
                 end,
 
-    ok = rebar_file_utils:delete_each(lists:foldl(ToCleanUp, [], TestErls)),
-    ok = rebar_file_utils:delete_each(lists:foldl(ToCleanUp, [], SrcErls)),
+    ok = rebar_file_utils:delete_each(lists:flatmap(ToCleanUp, TestErls)),
+    ok = rebar_file_utils:delete_each(lists:flatmap(ToCleanUp, SrcErls)),
 
     ok = rebar_file_utils:cp_r(SrcErls ++ TestErls, OutDir),
 
