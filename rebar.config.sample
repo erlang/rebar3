@@ -155,7 +155,7 @@
 %% name as an atom, eg. mochiweb, a name and a version (from the .app file), or
 %% an application name, a version and the SCM details on how to fetch it (SCM
 %% type, location and revision).
-%% Rebar currently supports git, hg, bzr, svn, rsync, and fossil.
+%% Rebar currently supports git, hg, bzr, svn, rsync, fossil, and p4.
 {deps, [app_name,
         {rebar, "1.0.*"},
         {rebar, ".*",
@@ -188,7 +188,8 @@
         {app_name, ".*", {svn, "svn://svn.example.org/url"}},
         {app_name, ".*", {bzr, "https://www.example.org/url", "Rev"}},
         {app_name, ".*", {fossil, "https://www.example.org/url"}},
-        {app_name, ".*", {fossil, "https://www.example.org/url", "Vsn"}}]}.
+        {app_name, ".*", {fossil, "https://www.example.org/url", "Vsn"}},
+        {app_name, ".*", {p4, "//depot/subdir/app_dir"}}]}.
 
 %% == Subdirectories ==
 
