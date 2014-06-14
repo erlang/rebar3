@@ -157,7 +157,7 @@ run_eunit(Config, CodePath, SrcErls) ->
 
     %% Get matching tests and modules
     AllModules = [rebar_utils:beam_to_mod(?EUNIT_DIR, N) || N <- AllBeamFiles],
-    {Tests, CoverageModules} =
+    {Tests, FilteredModules} =
         get_tests_and_modules(Config, ModuleBeamFiles, AllModules),
 
     SrcModules = [rebar_utils:erl_to_mod(M) || M <- SrcErls],
@@ -168,7 +168,7 @@ run_eunit(Config, CodePath, SrcErls) ->
     StatusBefore = status_before_eunit(),
     EunitResult = perform_eunit(Config, Tests),
 
-    rebar_cover_utils:perform_cover(Config, CoverageModules, SrcModules,
+    rebar_cover_utils:perform_cover(Config, FilteredModules, SrcModules,
                                     eunit_dir()),
     rebar_cover_utils:close(CoverLog),
 
@@ -221,9 +221,9 @@ get_tests_and_modules(Config, ModuleBeamFiles, AllModules) ->
     {Tests, QualifiedTests} = get_qualified_and_unqualified_tests(Config),
     Modules = get_test_modules(SelectedSuites, Tests,
                                QualifiedTests, ModuleBeamFiles),
-    CoverageModules = get_coverage_modules(AllModules, Modules, QualifiedTests),
+    FilteredModules = get_matching_modules(AllModules, Modules, QualifiedTests),
     MatchedTests = get_matching_tests(Modules, Tests, QualifiedTests),
-    {MatchedTests, CoverageModules}.
+    {MatchedTests, FilteredModules}.
 
 %%
 %% == get suites specified via 'suites' option ==
@@ -331,7 +331,7 @@ get_test_modules(SelectedSuites, Tests, QualifiedTests, ModuleBeamFiles) ->
                 N <- ModuleBeamFiles]
     end.
 
-get_coverage_modules(AllModules, Modules, QualifiedTests) ->
+get_matching_modules(AllModules, Modules, QualifiedTests) ->
     ModuleFilterMapper =
         fun({M, _}) ->
                 case lists:member(M, AllModules) of
