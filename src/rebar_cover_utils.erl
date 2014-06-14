@@ -30,7 +30,8 @@
 %% for internal use only
 -export([init/3,
          perform_cover/4,
-         close/1]).
+         close/1,
+         exit/0]).
 
 -include("rebar.hrl").
 
@@ -51,6 +52,9 @@ close(not_enabled) ->
     ok;
 close(F) ->
     ok = file:close(F).
+
+exit() ->
+   cover:stop().
 
 init(false, _BeamFiles, _TargetDir) ->
     {ok, not_enabled};

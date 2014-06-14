@@ -182,7 +182,7 @@ run_eunit(Config, CodePath, SrcErls) ->
 
     %% Stop cover to clean the cover_server state. This is important if we want
     %% eunit+cover to not slow down when analyzing many Erlang modules.
-    ok = cover:stop(),
+    ok = rebar_cover_utils:exit(),
 
     case EunitResult of
         ok ->

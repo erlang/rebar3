@@ -185,7 +185,7 @@ run1(QC, QCOpts, Config, CodePath, SrcErls) ->
     rebar_cover_utils:perform_cover(Config, FilteredModules, SrcModules,
                                     qc_dir()),
     rebar_cover_utils:close(CoverLog),
-    ok = cover:stop(),
+    ok = rebar_cover_utils:exit(),
 
     true = code:set_path(CodePath),
 
