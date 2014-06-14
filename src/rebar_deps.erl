@@ -40,6 +40,7 @@
 
 %% for internal use only
 -export([info/2]).
+-export([get_deps_dir/1]).
 
 -record(dep, { dir,
                app,
