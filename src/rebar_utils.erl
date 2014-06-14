@@ -54,7 +54,8 @@
          src_dirs/1,
          ebin_dir/0,
          base_dir/1,
-         processing_base_dir/1, processing_base_dir/2]).
+         processing_base_dir/1, processing_base_dir/2,
+         patch_env/2]).
 
 -include("rebar.hrl").
 
@@ -337,6 +338,23 @@ processing_base_dir(Config) ->
 processing_base_dir(Config, Dir) ->
     AbsDir = filename:absname(Dir),
     AbsDir =:= base_dir(Config).
+
+%% @doc Returns the list of environment variables including 'REBAR' which points to the
+%% rebar executable used to execute the currently running command. The environment is
+%% not modified if rebar was invoked programmatically.
+-spec patch_env(rebar_config:config(), [{string(), string()}]) -> [{string(), string()}].
+patch_env(Config, []) ->
+    % if we reached an empty list the env did not contain the REBAR variable
+    case rebar_config:get_xconf(Config, escript, "") of
+        "" -> % rebar was invoked programmatically
+            [];
+        Path ->
+            [{"REBAR", Path}]
+    end;
+patch_env(_Config, [{"REBAR", _} | _]=All) ->
+    All;
+patch_env(Config, [E | Rest]) ->
+    [E | patch_env(Config, Rest)].
 
 %% ====================================================================
 %% Internal functions
