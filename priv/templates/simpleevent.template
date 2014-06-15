@@ -1,0 +1,2 @@
+{variables, [{eventid, "myevent"}]}.
+{template, "simpleevent.erl", "src/{{eventid}}.erl"}.
