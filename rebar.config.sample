@@ -21,7 +21,7 @@
 %% Erlang files to compile before the rest. Rebar automatically compiles
 %% parse_transforms and custom behaviours before anything other than the files
 %% in this list.
-{erl_first_files, ["mymib1", "mymib2"]}.
+{erl_first_files, ["src/mymib1.erl", "src/mymib2.erl"]}.
 
 %% Erlang compiler options
 {erl_opts, [no_debug_info,

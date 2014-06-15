@@ -216,7 +216,7 @@ info_help(Description) ->
                      "(linux|solaris|freebsd|darwin)", 'HAVE_SENDFILE'},
                     {platform_define, "(linux|freebsd)", 'BACKLOG', 128},
                     {platform_define, "R13", 'old_inets'}]},
-        {erl_first_files, ["mymib1", "mymib2"]},
+        {erl_first_files, ["src/mymib1.erl", "src/mymib2.erl"]},
         {mib_opts, []},
         {mib_first_files, []},
         {xrl_opts, []},
@@ -230,6 +230,13 @@ test_compile_config_and_opts(Config, ErlOpts, Cmd) ->
     {Config2, PropErOpts} = proper_opts(Config1),
     {Config3, EqcOpts} = eqc_opts(Config2),
 
+    %% NOTE: For consistency, all *_first_files lists should be
+    %% retrieved via rebar_config:get_local. Right now
+    %% erl_first_files, eunit_first_files, and qc_first_files use
+    %% rebar_config:get_list and are inherited, but xrl_first_files
+    %% and yrl_first_files use rebar_config:get_local. Inheritance of
+    %% *_first_files is questionable as the file would need to exist
+    %% in all project directories for it to work.
     OptsAtom = list_to_atom(Cmd ++ "_compile_opts"),
     TestOpts = rebar_config:get_list(Config3, OptsAtom, []),
     Opts0 = [{d, 'TEST'}] ++
@@ -285,20 +292,28 @@ doterl_compile(Config, OutDir) ->
     doterl_compile(Config, OutDir, [], ErlOpts).
 
 doterl_compile(Config, OutDir, MoreSources, ErlOpts) ->
-    ErlFirstFiles = rebar_config:get_list(Config, erl_first_files, []),
+    ErlFirstFilesConf = rebar_config:get_list(Config, erl_first_files, []),
     ?DEBUG("erl_opts ~p~n", [ErlOpts]),
     %% Support the src_dirs option allowing multiple directories to
     %% contain erlang source. This might be used, for example, should
     %% eunit tests be separated from the core application source.
     SrcDirs = rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts)),
-    RestErls  = [Source || Source <- gather_src(SrcDirs, []) ++ MoreSources,
-                           not lists:member(Source, ErlFirstFiles)],
+    AllErlFiles = gather_src(SrcDirs, []) ++ MoreSources,
+    %% NOTE: If and when erl_first_files is not inherited anymore
+    %% (rebar_config:get_local instead of rebar_config:get_list), consider
+    %% logging a warning message for any file listed in erl_first_files which
+    %% wasn't found via gather_src.
+    {ErlFirstFiles, RestErls} =
+        lists:partition(
+          fun(Source) ->
+                  lists:member(Source, ErlFirstFilesConf)
+          end, AllErlFiles),
     %% Make sure that ebin/ exists and is on the path
     ok = filelib:ensure_dir(filename:join("ebin", "dummy.beam")),
     CurrPath = code:get_path(),
     true = code:add_path(filename:absname("ebin")),
     OutDir1 = proplists:get_value(outdir, ErlOpts, OutDir),
-    G = init_erlcinfo(Config, RestErls),
+    G = init_erlcinfo(Config, AllErlFiles),
     %% Split RestErls so that files which are depended on are treated
     %% like erl_first_files.
     {OtherFirstErls, OtherErls} =
@@ -395,8 +410,8 @@ check_erlcinfo(Config, _) ->
     ?ABORT("~s file is invalid. Please delete before next run.~n",
            [erlcinfo_file(Config)]).
 
-erlcinfo_file(Config) ->
-    filename:join([rebar_utils:base_dir(Config), ".rebar", ?ERLCINFO_FILE]).
+erlcinfo_file(_Config) ->
+    filename:join([rebar_utils:get_cwd(), ".rebar", ?ERLCINFO_FILE]).
 
 init_erlcinfo(Config, Erls) ->
     G = restore_erlcinfo(Config),
