@@ -39,7 +39,7 @@
 %% ===================================================================
 
 compile(Config, _AppFile) ->
-    case rebar_utils:find_files("src", ".*\\.proto$") of
+    case rebar_utils:find_files("src", "^[^._].*\\.proto$") of
         [] ->
             ok;
         FoundFiles ->

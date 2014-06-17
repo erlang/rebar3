@@ -28,8 +28,11 @@
 
 -include("rebar.hrl").
 
--export([run/4, run/7, run/8,
-         ok_tuple/3, error_tuple/5]).
+-export([run/4,
+         run/7,
+         run/8,
+         ok_tuple/3,
+         error_tuple/5]).
 
 %% ===================================================================
 %% Public API
@@ -60,7 +63,7 @@ run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
 run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
     Compile3Fn, Opts) ->
     %% Convert simple extension to proper regex
-    SourceExtRe = ".*\\" ++ SourceExt ++ [$$],
+    SourceExtRe = "^[^._].*\\" ++ SourceExt ++ [$$],
 
     Recursive = proplists:get_value(recursive, Opts, true),
     %% Find all possible source files

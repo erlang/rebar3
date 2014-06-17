@@ -47,7 +47,9 @@ main(Args) ->
                       end,
 
     %% Compile all src/*.erl to ebin
-    case make:files(filelib:wildcard("src/*.erl"),
+    %% To not accidentally try to compile files like Mac OS X resource forks,
+    %% we only look for rebar source files that start with a letter.
+    case make:files(filelib:wildcard("src/[a-zA-Z]*.erl"),
                     [{outdir, "ebin"}, {i, "include"},
                      DebugFlag,
                      NamespacedTypes,
