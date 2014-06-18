@@ -1,3 +1,24 @@
+# Rebar 2.4.0
+
+* rebar/52: [Slim release support](https://github.com/rebar/rebar/pull/52)
+* rebar/112: [Add code coverage analysis functionality to `qc'](https://github.com/rebar/rebar/pull/112)
+* rebar/119: [Add qualified name tests specification (see #118)](https://github.com/rebar/rebar/pull/119)
+* rebar/130: [ct fixes](https://github.com/rebar/rebar/pull/130)
+* rebar/136: [Add support for the Perforce VCS client via the "p4" tool](https://github.com/rebar/rebar/pull/136)
+* rebar/195: [Switch template instructions](https://github.com/rebar/rebar/pull/195)
+* rebar/229: [Add REBAR to environment before executing hooks](https://github.com/rebar/rebar/pull/229)
+* rebar/260: [Quote include/lib paths to handle spaces in Erlang installs (fixes build on windows)](https://github.com/rebar/rebar/pull/260)
+* rebar/280: [improve output when using `rebar shell`](https://github.com/rebar/rebar/pull/280)
+* rebar/281: [Move include/rebar.hrl to src/rebar.hrl](https://github.com/rebar/rebar/pull/281)
+* rebar/284: [Error 'Command not found' when sname is used](https://github.com/rebar/rebar/pull/284)
+* rebar/285: [Fix #249 (erlc regression)](https://github.com/rebar/rebar/pull/285)
+* rebar/288: [Extend and document contributing rules](https://github.com/rebar/rebar/pull/288)
+* rebar/289: [erlc: fix typo in update_erlcinfo/3 clause that would make the function fail](https://github.com/rebar/rebar/pull/289)
+* rebar/290: [erlc: replace if expression with case of](https://github.com/rebar/rebar/pull/290)
+* rebar/292: [Namespaced types: fix build for 17.0](https://github.com/rebar/rebar/pull/292)
+* rebar/296: [Add gen_event template](https://github.com/rebar/rebar/pull/296)
+
+
 # Rebar 2.3.1
 
 ## PR's Merged
