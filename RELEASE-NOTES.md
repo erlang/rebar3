@@ -1,3 +1,7 @@
+# Rebar 2.5.0
+
+* Reverted rebar/281: [Move include/rebar.hrl to src/rebar.hrl](https://github.com/rebar/rebar/pull/281) as it broke backwards compatibility
+
 # Rebar 2.4.0
 
 * rebar/52: [Slim release support](https://github.com/rebar/rebar/pull/52)
