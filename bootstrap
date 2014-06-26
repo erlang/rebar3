@@ -7,10 +7,10 @@ main(Args) ->
         true ->
             usage(),
             halt(0);
-          false ->
+        false ->
             ok
-    end,    
-    
+    end,
+
     %% Get a string repr of build time
     Built = build_time(),
 
@@ -99,9 +99,9 @@ main(Args) ->
 
 usage() ->
   io:format("Usage: bootstrap [OPTION]...~n"),
-  io:format("    force=1\t unconditional build~n"),
-  io:format("    debug\t add debug information~n").
-  
+  io:format("    force=1   unconditional build~n"),
+  io:format("    debug     add debug information~n").
+
 is_otp(OtpInfo, Regex) ->
      case re:run(OtpInfo, Regex, [{capture, none}]) of
           match -> true;
