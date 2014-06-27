@@ -217,15 +217,13 @@ make_cmd(TestDir, RawLogDir, Config) ->
                        " ~s"
                        " ~s"
                        " -logdir \"~s\""
-                       " -env TEST_DIR \"~s\""
-                       " ~s",
+                       " -env TEST_DIR \"~s\"",
                        [BaseCmd,
                         CodePathString,
                         Include,
                         build_name(Config),
                         LogDir,
-                        filename:join(Cwd, TestDir),
-                        get_extra_params(Config)]) ++
+                        filename:join(Cwd, TestDir)]) ++
                       get_cover_config(Config, Cwd) ++
                       get_ct_config_file(TestDir) ++
                       get_config_file(TestDir) ++
@@ -237,19 +235,18 @@ make_cmd(TestDir, RawLogDir, Config) ->
                        " ~s"
                        " ~s"
                        " -logdir \"~s\""
-                       " -env TEST_DIR \"~s\""
-                       " ~s",
+                       " -env TEST_DIR \"~s\"",
                        [BaseCmd,
                         CodePathString,
                         Include,
                         build_name(Config),
                         LogDir,
-                        filename:join(Cwd, TestDir),
-                        get_extra_params(Config)]) ++
+                        filename:join(Cwd, TestDir)]) ++
                       SpecFlags ++ get_cover_config(Config, Cwd)
           end,
+    Cmd1 = Cmd ++ get_extra_params(Config),
     RawLog = filename:join(LogDir, "raw.log"),
-    {Cmd, RawLog}.
+    {Cmd1, RawLog}.
 
 build_name(Config) ->
     case rebar_config:get_local(Config, ct_use_short_names, false) of
@@ -258,7 +255,12 @@ build_name(Config) ->
     end.
 
 get_extra_params(Config) ->
-    rebar_config:get_local(Config, ct_extra_params, "").
+    case rebar_config:get_local(Config, ct_extra_params, undefined) of
+        undefined ->
+            "";
+        Defined ->
+            " " ++ Defined
+    end.
 
 get_ct_specs(Cwd) ->
     case collect_glob(Cwd, ".*\.test\.spec\$") of
