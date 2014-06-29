@@ -40,10 +40,10 @@
 -include("rebar.hrl").
 
 -ifdef(namespaced_types).
-% dict:dict() exists starting from Erlang 17.
+%% dict:dict() exists starting from Erlang 17.
 -type rebar_dict() :: dict:dict().
 -else.
-% dict() has been obsoleted in Erlang 17 and deprecated in 18.
+%% dict() has been obsoleted in Erlang 17 and deprecated in 18.
 -type rebar_dict() :: dict().
 -endif.
 

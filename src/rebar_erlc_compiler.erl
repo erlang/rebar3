@@ -48,10 +48,10 @@
         }).
 
 -ifdef(namespaced_types).
-% digraph:digraph() exists starting from Erlang 17.
+%% digraph:digraph() exists starting from Erlang 17.
 -type rebar_digraph() :: digraph:digraph().
 -else.
-% digraph() has been obsoleted in Erlang 17 and deprecated in 18.
+%% digraph() has been obsoleted in Erlang 17 and deprecated in 18.
 -type rebar_digraph() :: digraph().
 -endif.
 
