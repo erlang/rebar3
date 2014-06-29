@@ -41,7 +41,7 @@
 
 -ifdef(namespaced_types).
 %% dict:dict() exists starting from Erlang 17.
--type rebar_dict() :: dict:dict().
+-type rebar_dict() :: dict:dict(term(), term()).
 -else.
 %% dict() has been obsoleted in Erlang 17 and deprecated in 18.
 -type rebar_dict() :: dict().
