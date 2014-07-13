@@ -32,7 +32,7 @@ main(Args) ->
     %% Erlang 17.
     %% At the same time, their counterparts dict() and digraph() are to be
     %% deprecated in Erlang 18. namespaced_types option is used to select
-    %% proper type name depending of the OTP version used.
+    %% proper type name depending on the OTP version used.
     NamespacedTypes = case is_otp(OtpInfo, "^[0-9]+") of
                           true -> {d, namespaced_types};
                           false -> undefined
