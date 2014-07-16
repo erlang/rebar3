@@ -32,29 +32,38 @@
          wordsize/0,
          sh/2,
          sh_send/3,
-         find_files/2, find_files/3,
+         find_files/2,
+         find_files/3,
          now_str/0,
          ensure_dir/1,
-         beam_to_mod/2, beams/1,
+         beam_to_mod/2,
+         beams/1,
          erl_to_mod/1,
-         abort/0, abort/2,
+         abort/0,
+         abort/2,
          escript_foldl/3,
          find_executable/1,
          prop_check/3,
          expand_code_path/0,
          expand_env_variable/3,
          vcs_vsn/3,
-         deprecated/3, deprecated/4,
-         get_deprecated_global/4, get_deprecated_global/5,
-         get_experimental_global/3, get_experimental_local/3,
-         get_deprecated_list/4, get_deprecated_list/5,
-         get_deprecated_local/4, get_deprecated_local/5,
+         deprecated/3,
+         deprecated/4,
+         get_deprecated_global/4,
+         get_deprecated_global/5,
+         get_experimental_global/3,
+         get_experimental_local/3,
+         get_deprecated_list/4,
+         get_deprecated_list/5,
+         get_deprecated_local/4,
+         get_deprecated_local/5,
          delayed_halt/1,
          erl_opts/1,
          src_dirs/1,
          ebin_dir/0,
          base_dir/1,
-         processing_base_dir/1, processing_base_dir/2,
+         processing_base_dir/1,
+         processing_base_dir/2,
          patch_env/2]).
 
 -include("rebar.hrl").
@@ -90,7 +99,8 @@ wordsize() ->
     end.
 
 sh_send(Command0, String, Options0) ->
-    ?INFO("sh_send info:\n\tcwd: ~p\n\tcmd: ~s < ~s\n", [get_cwd(), Command0, String]),
+    ?INFO("sh_send info:\n\tcwd: ~p\n\tcmd: ~s < ~s\n",
+          [get_cwd(), Command0, String]),
     ?DEBUG("\topts: ~p\n", [Options0]),
 
     DefaultOptions = [use_stdout, abort_on_error],
@@ -339,12 +349,14 @@ processing_base_dir(Config, Dir) ->
     AbsDir = filename:absname(Dir),
     AbsDir =:= base_dir(Config).
 
-%% @doc Returns the list of environment variables including 'REBAR' which points to the
-%% rebar executable used to execute the currently running command. The environment is
-%% not modified if rebar was invoked programmatically.
--spec patch_env(rebar_config:config(), [{string(), string()}]) -> [{string(), string()}].
+%% @doc Returns the list of environment variables including 'REBAR' which
+%% points to the rebar executable used to execute the currently running
+%% command. The environment is not modified if rebar was invoked
+%% programmatically.
+-spec patch_env(rebar_config:config(), [{string(), string()}])
+               -> [{string(), string()}].
 patch_env(Config, []) ->
-    % if we reached an empty list the env did not contain the REBAR variable
+    %% If we reached an empty list, the env did not contain the REBAR variable.
     case rebar_config:get_xconf(Config, escript, "") of
         "" -> % rebar was invoked programmatically
             [];
