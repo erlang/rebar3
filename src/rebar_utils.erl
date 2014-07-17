@@ -384,14 +384,32 @@ otp_release1([$R,N|_]=Rel) when is_integer(N) ->
 %% If OTP >= 17.x, erlang:system_info(otp_release) returns just the
 %% major version number, we have to read the full version from
 %% a file. See http://www.erlang.org/doc/system_principles/versions.html
+%% Read vsn strinf from the 'OTP_VERSION' file and return as list without
+%% the "\n".
 otp_release1(Rel) ->
     File = filename:join([code:root_dir(), "releases", Rel, "OTP_VERSION"]),
     {ok, Vsn} = file:read_file(File),
+
     %% NOTE: It's fine to rely on the binary module here because we
     %% can be sure that it's available when the otp_release string
     %% does not begin with $R.
-    %% Return as list without the "\n".
-    binary:bin_to_list(Vsn, {0, byte_size(Vsn) - 1}).
+    Size = byte_size(Vsn),
+    %% The shortest vsn string consists of at least two digits
+    %% followed by "\n". Therefore, it's safe to assume Size >= 3.
+    case binary:part(Vsn, {Size, -3}) of
+        <<"**\n">> ->
+            %% The OTP documentation mentions that a system patched
+            %% using the otp_patch_apply tool available to licensed
+            %% customers will leave a '**' suffix in the version as a
+            %% flag saying the system consists of application versions
+            %% from multiple OTP versions. We ignore this flag and
+            %% drop the suffix, given for all intents and purposes, we
+            %% cannot obtain relevant information from it as far as
+            %% tooling is concerned.
+            binary:bin_to_list(Vsn, {0, Size - 3});
+        _ ->
+            binary:bin_to_list(Vsn, {0, Size - 1})
+    end.
 
 get_deprecated_3(Get, Config, OldOpt, NewOpt, Default, When) ->
     case Get(Config, NewOpt, Default) of

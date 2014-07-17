@@ -28,16 +28,20 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
-otp_release_test() ->
-    ?_assert(check_otp_release()).
-
-check_otp_release() ->
+check_otp_release_test() ->
     case rebar_utils:otp_release() of
         %% <= R16
         [$R,N|_] when is_integer(N) ->
-            true;
+            ?assert(true);
         %% >= 17.x
         [N|_]=Rel when is_integer(N) ->
             %% Check that it has at least Major.Minor
-            length(string:tokens(Rel, ".")) > 1
+            ?assert(length(string:tokens(Rel, ".")) > 1),
+
+            %% If otp_patch_apply was used and the release version has
+            %% a "**" suffix, we drop that part in otp_release/0.
+            ?assertEqual(0, string:str(Rel, "*")),
+
+            %% Check that "\n" is dropped in otp_release/0.
+            ?assertEqual(0, string:str(Rel, "\n"))
     end.
