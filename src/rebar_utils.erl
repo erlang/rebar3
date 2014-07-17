@@ -66,6 +66,9 @@
          processing_base_dir/2,
          patch_env/2]).
 
+%% for internal use only
+-export([otp_release/0]).
+
 -include("rebar.hrl").
 
 %% ====================================================================
@@ -86,7 +89,7 @@ is_arch(ArchRegex) ->
 
 get_arch() ->
     Words = wordsize(),
-    erlang:system_info(otp_release) ++ "-"
+    otp_release() ++ "-"
         ++ erlang:system_info(system_architecture) ++ "-" ++ Words.
 
 wordsize() ->
@@ -371,6 +374,24 @@ patch_env(Config, [E | Rest]) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
+
+otp_release() ->
+    otp_release1(erlang:system_info(otp_release)).
+
+%% If OTP <= R16, otp_release is already what we want.
+otp_release1([$R,N|_]=Rel) when is_integer(N) ->
+    Rel;
+%% If OTP >= 17.x, erlang:system_info(otp_release) returns just the
+%% major version number, we have to read the full version from
+%% a file. See http://www.erlang.org/doc/system_principles/versions.html
+otp_release1(Rel) ->
+    File = filename:join([code:root_dir(), "releases", Rel, "OTP_VERSION"]),
+    {ok, Vsn} = file:read_file(File),
+    %% NOTE: It's fine to rely on the binary module here because we
+    %% can be sure that it's available when the otp_release string
+    %% does not begin with $R.
+    %% Return as list without the "\n".
+    binary:bin_to_list(Vsn, {0, byte_size(Vsn) - 1}).
 
 get_deprecated_3(Get, Config, OldOpt, NewOpt, Default, When) ->
     case Get(Config, NewOpt, Default) of
