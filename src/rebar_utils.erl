@@ -384,15 +384,15 @@ otp_release1([$R,N|_]=Rel) when is_integer(N) ->
 %% If OTP >= 17.x, erlang:system_info(otp_release) returns just the
 %% major version number, we have to read the full version from
 %% a file. See http://www.erlang.org/doc/system_principles/versions.html
-%% Read vsn strinf from the 'OTP_VERSION' file and return as list without
+%% Read vsn string from the 'OTP_VERSION' file and return as list without
 %% the "\n".
 otp_release1(Rel) ->
     File = filename:join([code:root_dir(), "releases", Rel, "OTP_VERSION"]),
     {ok, Vsn} = file:read_file(File),
 
-    %% NOTE: It's fine to rely on the binary module here because we
-    %% can be sure that it's available when the otp_release string
-    %% does not begin with $R.
+    %% It's fine to rely on the binary module here because we can
+    %% be sure that it's available when the otp_release string does
+    %% not begin with $R.
     Size = byte_size(Vsn),
     %% The shortest vsn string consists of at least two digits
     %% followed by "\n". Therefore, it's safe to assume Size >= 3.

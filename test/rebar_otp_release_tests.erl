@@ -35,7 +35,7 @@ check_otp_release_test() ->
             ?assert(true);
         %% >= 17.x
         [N|_]=Rel when is_integer(N) ->
-            %% Check that it has at least Major.Minor
+            %% Check that it has at least Major.Minor.
             ?assert(length(string:tokens(Rel, ".")) > 1),
 
             %% If otp_patch_apply was used and the release version has
