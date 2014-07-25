@@ -242,7 +242,7 @@ get_suites(Config) ->
     end.
 
 get_qualified_and_unqualified_tests(Config) ->
-    RawFunctions = rebar_utils:get_experimental_global(Config, tests, ""),
+    RawFunctions = rebar_config:get_global(Config, tests, ""),
     FunctionNames = [FunctionName ||
                         FunctionName <- string:tokens(RawFunctions, ",")],
     get_qualified_and_unqualified_tests1(FunctionNames, [], []).
