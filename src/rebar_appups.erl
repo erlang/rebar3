@@ -70,7 +70,7 @@
 
     %% Get a list of any appup files that exist in the new release
     NewAppUpFiles = rebar_utils:find_files(
-                      filename:join([NewVerPath, "lib"]), "^.*.appup$"),
+                      filename:join([NewVerPath, "lib"]), "^[^._].*.appup$"),
 
     %% Convert the list of appup files into app names
     AppUpApps = [file_to_name(File) || File <- NewAppUpFiles],

@@ -47,6 +47,8 @@
           info = {[], []} :: erlc_info()
         }).
 
+-define(RE_PREFIX, "^[^._]").
+
 -ifdef(namespaced_types).
 %% digraph:graph() exists starting from Erlang 17.
 -type rebar_digraph() :: digraph:graph().
@@ -110,14 +112,14 @@ compile(Config, _AppFile) ->
 
 -spec clean(rebar_config:config(), file:filename()) -> 'ok'.
 clean(Config, _AppFile) ->
-    MibFiles = rebar_utils:find_files("mibs", "^.*\\.mib\$"),
+    MibFiles = rebar_utils:find_files("mibs", ?RE_PREFIX".*\\.mib\$"),
     MIBs = [filename:rootname(filename:basename(MIB)) || MIB <- MibFiles],
     rebar_file_utils:delete_each(
       [filename:join(["include",MIB++".hrl"]) || MIB <- MIBs]),
     lists:foreach(fun(F) -> ok = rebar_file_utils:rm_rf(F) end,
                   ["ebin/*.beam", "priv/mibs/*.bin"]),
 
-    YrlFiles = rebar_utils:find_files("src", "^.*\\.[x|y]rl\$"),
+    YrlFiles = rebar_utils:find_files("src", ?RE_PREFIX".*\\.[x|y]rl\$"),
     rebar_file_utils:delete_each(
       [ binary_to_list(iolist_to_binary(re:replace(F, "\\.[x|y]rl$", ".erl")))
         || F <- YrlFiles ]),
@@ -129,7 +131,7 @@ clean(Config, _AppFile) ->
     %% directory structure in ebin with .beam files within. As such, we want
     %% to scan whatever is left in the ebin/ directory for sub-dirs which
     %% satisfy our criteria.
-    BeamFiles = rebar_utils:find_files("ebin", "^.*\\.beam\$"),
+    BeamFiles = rebar_utils:find_files("ebin", ?RE_PREFIX".*\\.beam\$"),
     rebar_file_utils:delete_each(BeamFiles),
     lists:foreach(fun(Dir) -> delete_dir(Dir, dirs(Dir)) end, dirs("ebin")),
     ok.
@@ -140,7 +142,7 @@ clean(Config, _AppFile) ->
 
 test_compile(Config, Cmd, OutDir) ->
     %% Obtain all the test modules for inclusion in the compile stage.
-    TestErls = rebar_utils:find_files("test", ".*\\.erl\$"),
+    TestErls = rebar_utils:find_files("test", ?RE_PREFIX".*\\.erl\$"),
 
     ErlOpts = rebar_utils:erl_opts(Config),
     {Config1, ErlOpts1} = test_compile_config_and_opts(Config, ErlOpts, Cmd),
@@ -151,7 +153,8 @@ test_compile(Config, Cmd, OutDir) ->
     SrcDirs = rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts1)),
     SrcErls = lists:foldl(
                 fun(Dir, Acc) ->
-                        Files = rebar_utils:find_files(Dir, ".*\\.erl\$"),
+                        Files = rebar_utils:find_files(
+                                  Dir, ?RE_PREFIX".*\\.erl\$"),
                         lists:append(Acc, Files)
                 end, [], SrcDirs),
 
@@ -645,7 +648,8 @@ compile_xrl_yrl(Config, Source, Target, Opts, Mod) ->
 gather_src([], Srcs) ->
     Srcs;
 gather_src([Dir|Rest], Srcs) ->
-    gather_src(Rest, Srcs ++ rebar_utils:find_files(Dir, ".*\\.erl\$")).
+    gather_src(
+      Rest, Srcs ++ rebar_utils:find_files(Dir, ?RE_PREFIX".*\\.erl\$")).
 
 -spec dirs(file:filename()) -> [file:filename()].
 dirs(Dir) ->
