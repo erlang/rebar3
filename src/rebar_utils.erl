@@ -36,7 +36,7 @@
          find_files/3,
          now_str/0,
          ensure_dir/1,
-         beam_to_mod/2,
+         beam_to_mod/1,
          beams/1,
          erl_to_mod/1,
          abort/0,
@@ -503,9 +503,8 @@ sh_loop(Port, Fun, Acc) ->
             {error, {Rc, lists:flatten(lists:reverse(Acc))}}
     end.
 
-beam_to_mod(Dir, Filename) ->
-    [Dir | Rest] = filename:split(Filename),
-    list_to_atom(filename:basename(string:join(Rest, "."), ".beam")).
+beam_to_mod(Filename) ->
+    list_to_atom(filename:basename(Filename, ".beam")).
 
 erl_to_mod(Filename) ->
     list_to_atom(filename:rootname(filename:basename(Filename))).

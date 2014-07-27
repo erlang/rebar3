@@ -91,8 +91,8 @@
 %%                           'old_inets'}]}.
 %%
 
--spec compile(rebar_config:config(), file:filename()) -> 'ok'.
-compile(Config, _AppFile) ->
+-spec compile(rebar_config:config(), file:name()) -> 'ok'.
+compile(Config, Dir) ->
     rebar_base_compiler:run(Config,
                             check_files(rebar_config:get_local(
                                           Config, xrl_first_files, [])),
@@ -108,7 +108,7 @@ compile(Config, _AppFile) ->
                                           Config, mib_first_files, [])),
                             "mibs", ".mib", "priv/mibs", ".bin",
                             fun compile_mib/3),
-    doterl_compile(Config, "ebin").
+    doterl_compile(Config, Dir).
 
 -spec clean(rebar_config:config(), file:filename()) -> 'ok'.
 clean(Config, _AppFile) ->
@@ -159,10 +159,10 @@ test_compile(Config, Cmd, OutDir) ->
                 end, [], SrcDirs),
 
     %% If it is not the first time rebar eunit or rebar qc is executed,
-    %% there will be source files already present in OutDir. Since some
+    %% there will be source files already present in Dir. Since some
     %% SCMs (like Perforce) set the source files as being read only (unless
     %% they are checked out), we need to be sure that the files already
-    %% present in OutDir are writable before doing the copy. This is done
+    %% present in Dir are writable before doing the copy. This is done
     %% here by removing any file that was already present before calling
     %% rebar_file_utils:cp_r.
 
@@ -290,17 +290,20 @@ is_lib_avail(Config, DictKey, Mod, Hrl, Name) ->
     end.
 
 -spec doterl_compile(rebar_config:config(), file:filename()) -> 'ok'.
-doterl_compile(Config, OutDir) ->
+doterl_compile(Config, Dir) ->
     ErlOpts = rebar_utils:erl_opts(Config),
-    doterl_compile(Config, OutDir, [], ErlOpts).
+    doterl_compile(Config, Dir, [], ErlOpts).
 
-doterl_compile(Config, OutDir, MoreSources, ErlOpts) ->
-    ErlFirstFilesConf = rebar_config:get_list(Config, erl_first_files, []),
+doterl_compile(Config, Dir, MoreSources, ErlOpts) ->
+    OutDir = filename:join(Dir, "ebin"),
+    ErlFirstFilesConf = rebar_config:get_list(Config, erl_first_modules, []),
     ?DEBUG("erl_opts ~p~n", [ErlOpts]),
     %% Support the src_dirs option allowing multiple directories to
     %% contain erlang source. This might be used, for example, should
     %% eunit tests be separated from the core application source.
-    SrcDirs = rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts)),
+    SrcDirs = lists:map(fun(X) ->
+                                filename:join(Dir, X)
+                        end, rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts))),
     AllErlFiles = gather_src(SrcDirs, []) ++ MoreSources,
     %% NOTE: If and when erl_first_files is not inherited anymore
     %% (rebar_config:get_local instead of rebar_config:get_list), consider
@@ -309,12 +312,12 @@ doterl_compile(Config, OutDir, MoreSources, ErlOpts) ->
     {ErlFirstFiles, RestErls} =
         lists:partition(
           fun(Source) ->
-                  lists:member(Source, ErlFirstFilesConf)
+                  lists:member(list_to_atom(filename:basename(Source, ".erl")), ErlFirstFilesConf)
           end, AllErlFiles),
     %% Make sure that ebin/ exists and is on the path
-    ok = filelib:ensure_dir(filename:join("ebin", "dummy.beam")),
+    ok = filelib:ensure_dir(filename:join([Dir, "ebin", "dummy.beam"])),
     CurrPath = code:get_path(),
-    true = code:add_path(filename:absname("ebin")),
+    true = code:add_path(filename:absname(filename:join(Dir, "ebin"))),
     OutDir1 = proplists:get_value(outdir, ErlOpts, OutDir),
     G = init_erlcinfo(Config, AllErlFiles),
     %% Split RestErls so that files which are depended on are treated
@@ -353,7 +356,7 @@ doterl_compile(Config, OutDir, MoreSources, ErlOpts) ->
     rebar_base_compiler:run(
       Config, FirstErls, OtherErls,
       fun(S, C) ->
-              internal_erl_compile(C, S, OutDir1, ErlOpts, G)
+              internal_erl_compile(C, Dir, S, OutDir1, ErlOpts, G)
       end),
     true = code:set_path(CurrPath),
     ok.
@@ -394,7 +397,8 @@ u_add_element(Elem, [])           -> [Elem].
                    rebar_config:config()) -> [file:filename(), ...].
 include_path(Source, Config) ->
     ErlOpts = rebar_config:get(Config, erl_opts, []),
-    lists:usort(["include", filename:dirname(Source)]
+    Dir = filename:join(lists:droplast(filename:split(filename:dirname(Source)))),
+    lists:usort([filename:join(Dir, "include"), filename:dirname(Source)]
                 ++ proplists:get_all_values(i, ErlOpts)).
 
 -spec needs_compile(file:filename(), file:filename(),
@@ -558,10 +562,10 @@ get_children(G, Source) ->
     %% Return all files dependent on the Source.
     digraph_utils:reaching_neighbours([Source], G).
 
--spec internal_erl_compile(rebar_config:config(), file:filename(),
+-spec internal_erl_compile(rebar_config:config(), file:filename(), file:filename(),
                            file:filename(), list(),
                            rebar_digraph()) -> 'ok' | 'skipped'.
-internal_erl_compile(Config, Source, OutDir, ErlOpts, G) ->
+internal_erl_compile(Config, Dir, Source, OutDir, ErlOpts, G) ->
     %% Determine the target name and includes list by inspecting the source file
     Module = filename:basename(Source, ".erl"),
     Parents = get_parents(G, Source),
@@ -576,7 +580,7 @@ internal_erl_compile(Config, Source, OutDir, ErlOpts, G) ->
     case needs_compile(Source, Target, Parents) of
         true ->
             Opts = [{outdir, filename:dirname(Target)}] ++
-                ErlOpts ++ [{i, "include"}, return],
+                ErlOpts ++ [{i, filename:join(Dir, "include")}, return],
             case compile:file(Source, Opts) of
                 {ok, _Mod} ->
                     ok;

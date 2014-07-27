@@ -94,37 +94,56 @@
 %%   ]}.
 -module(rebar_erlydtl_compiler).
 
--export([compile/2]).
+-behaviour(rebar_provider).
+
+-export([init/1,
+         do/1]).
 
 %% for internal use only
 -export([info/2]).
 
 -include("rebar.hrl").
 
+-define(PROVIDER, erlydtl).
+-define(DEPS, [app_builder]).
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
 
-compile(Config, _AppFile) ->
+-spec init(rebar_config:config()) -> {ok, rebar_config:config()}.
+init(State) ->
+    State1 = rebar_config:add_provider(State, #provider{name = ?PROVIDER,
+                                                        provider_impl = ?MODULE,
+                                                        provides = compile,
+                                                        bare = false,
+                                                        deps = ?DEPS,
+                                                        example = "compile",
+                                                        short_desc = "",
+                                                        desc = "",
+                                                        opts = []}),
+    {ok, State1}.
+
+do(Config) ->
     MultiDtlOpts = erlydtl_opts(Config),
     OrigPath = code:get_path(),
     true = code:add_path(rebar_utils:ebin_dir()),
 
     Result = lists:foldl(fun(DtlOpts, _) ->
-            rebar_base_compiler:run(Config, [],
-                                     option(doc_root, DtlOpts),
-                                     option(source_ext, DtlOpts),
-                                     option(out_dir, DtlOpts),
-                                     option(module_ext, DtlOpts) ++ ".beam",
-                                     fun(S, T, C) ->
-                                        compile_dtl(C, S, T, DtlOpts)
-                                     end,
-                                     [{check_last_mod, false},
-                                      {recursive, option(recursive, DtlOpts)}])
-        end, ok, MultiDtlOpts),
+                                 rebar_base_compiler:run(Config, [],
+                                                         option(doc_root, DtlOpts),
+                                                         option(source_ext, DtlOpts),
+                                                         option(out_dir, DtlOpts),
+                                                         option(module_ext, DtlOpts) ++ ".beam",
+                                                         fun(S, T, C) ->
+                                                                 compile_dtl(C, S, T, DtlOpts)
+                                                         end,
+                                                         [{check_last_mod, false},
+                                                          {recursive, option(recursive, DtlOpts)}])
+                         end, ok, MultiDtlOpts),
 
     true = code:set_path(OrigPath),
-    Result.
+    {Result, Config}.
 
 %% ===================================================================
 %% Internal functions

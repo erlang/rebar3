@@ -4,7 +4,7 @@ REBAR=$(PWD)/rebar
 RETEST=$(PWD)/deps/retest/retest
 
 all:
-	./bootstrap
+	./bootstrap/bootstrap
 
 clean:
 	@rm -rf rebar ebin/*.beam inttest/rt.work rt.work .eunit
@@ -15,7 +15,7 @@ distclean: clean
 	@rm -rf deps
 
 debug:
-	@./bootstrap debug
+	@./bootstrap/bootstrap debug
 
 check: debug xref dialyzer deps test
 

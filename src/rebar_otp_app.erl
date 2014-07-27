@@ -38,31 +38,33 @@
 %% Public API
 %% ===================================================================
 
-compile(Config, File) ->
+compile(Config, App) ->
     %% If we get an .app.src file, it needs to be pre-processed and
     %% written out as a ebin/*.app file. That resulting file will then
     %% be validated as usual.
-    {Config1, AppFile} = case rebar_app_utils:is_app_src(File) of
-                             true ->
-                                 preprocess(Config, File);
-                             false ->
-                                 {Config, File}
-                         end,
+    Dir = rebar_app_info:dir(App),
+    {Config2, App1} = case rebar_app_info:app_file_src(App) of
+                          undefined ->
+                              {Config, App};
+                          AppFileSrc ->
+                              {Config1, File} = preprocess(Config, Dir, AppFileSrc),
+                              {Config1, rebar_app_info:app_file(App, File)}
+                      end,
 
     %% Load the app file and validate it.
-    case rebar_app_utils:load_app_file(Config1, AppFile) of
-        {ok, Config2, AppName, AppData} ->
+    AppFile = rebar_app_info:app_file(App1),
+    case rebar_app_utils:load_app_file(Config2, AppFile) of
+        {ok, Config3, AppName, AppData} ->
             validate_name(AppName, AppFile),
-
             %% In general, the list of modules is an important thing to validate
             %% for compliance with OTP guidelines and upgrade procedures.
             %% However, some people prefer not to validate this list.
-            case rebar_config:get_local(Config1, validate_app_modules, true) of
+            case rebar_config:get_local(Config3, validate_app_modules, true) of
                 true ->
                     Modules = proplists:get_value(modules, AppData),
-                    {validate_modules(AppName, Modules), Config2};
+                    {validate_modules(Dir, AppName, Modules), App1};
                 false ->
-                    {ok, Config2}
+                    {ok, App1}
             end;
         {error, Reason} ->
             ?ABORT("Failed to load app file ~s: ~p\n", [AppFile, Reason])
@@ -105,13 +107,13 @@ info_help(Description) ->
         {validate_app_modules, true}
        ]).
 
-preprocess(Config, AppSrcFile) ->
+preprocess(Config, Dir, AppSrcFile) ->
     case rebar_app_utils:load_app_file(Config, AppSrcFile) of
         {ok, Config1, AppName, AppData} ->
             %% Look for a configuration file with vars we want to
             %% substitute. Note that we include the list of modules available in
             %% ebin/ and update the app data accordingly.
-            AppVars = load_app_vars(Config1) ++ [{modules, ebin_modules()}],
+            AppVars = load_app_vars(Config1) ++ [{modules, ebin_modules(Dir)}],
             A1 = apply_app_vars(AppVars, AppData),
 
 
@@ -171,15 +173,15 @@ validate_name(AppName, File) ->
             ?FAIL
     end.
 
-validate_modules(AppName, undefined) ->
+validate_modules(_Dir, AppName, undefined) ->
     ?ERROR("Missing modules declaration in ~p.app~n", [AppName]),
     ?FAIL;
 
-validate_modules(AppName, Mods) ->
+validate_modules(Dir, AppName, Mods) ->
     %% Construct two sets -- one for the actual .beam files in ebin/
     %% and one for the modules
     %% listed in the .app file
-    EbinSet = ordsets:from_list(ebin_modules()),
+    EbinSet = ordsets:from_list(ebin_modules(Dir)),
     ModSet = ordsets:from_list(Mods),
 
     %% Identify .beam files listed in the .app, but not present in ebin/
@@ -206,9 +208,9 @@ validate_modules(AppName, Mods) ->
             ?FAIL
     end.
 
-ebin_modules() ->
-    lists:sort([rebar_utils:beam_to_mod("ebin", N) ||
-                   N <- rebar_utils:beams("ebin")]).
+ebin_modules(Dir) ->
+    lists:sort([rebar_utils:beam_to_mod(N) ||
+                   N <- rebar_utils:beams(filename:join(Dir, "ebin"))]).
 
 ensure_registered(AppData) ->
     case lists:keyfind(registered, 1, AppData) of

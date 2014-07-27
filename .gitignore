@@ -9,3 +9,4 @@
 /.eunit
 /deps
 /.rebar
+rebar.lock

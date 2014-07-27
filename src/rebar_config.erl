@@ -26,7 +26,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_config).
 
--export([new/0, new/1, base_config/1, consult_file/1,
+-export([new/0, new/1, new2/2, base_config/1, consult_file/1,
          get/3, get_local/3, get_list/3,
          get_all/2,
          set/3,
@@ -34,7 +34,11 @@
          is_recursive/1,
          save_env/3, get_env/2, reset_envs/1,
          set_skip_dir/2, is_skip_dir/2, reset_skip_dirs/1,
-         clean_config/2,
+         create_logic_providers/2,
+         providers/1, providers/2, add_provider/2,
+         add_dep/2, get_dep/2, deps/2, deps/1, deps_graph/1, deps_graph/2, deps_to_build/1,
+         goals/1, goals/2,
+         get_app/2, apps_to_build/1, apps_to_build/2, add_app/2, replace_app/3,
          set_xconf/3, get_xconf/2, get_xconf/3, erase_xconf/2]).
 
 -include("rebar.hrl").
@@ -49,9 +53,16 @@
 
 -record(config, { dir :: file:filename(),
                   opts = [] :: list(),
+                  local_opts = [] :: list(),
                   globals = new_globals() :: rebar_dict(),
                   envs = new_env() :: rebar_dict(),
                   %% cross-directory/-command config
+                  goals = [],
+                  providers = [],
+                  apps_to_build = [],
+                  deps_to_build = [],
+                  deps = [],
+                  deps_graph = undefined,
                   skip_dirs = new_skip_dirs() :: rebar_dict(),
                   xconf = new_xconf() :: rebar_dict() }).
 
@@ -60,6 +71,7 @@
 -opaque config() :: #config{}.
 
 -define(DEFAULT_NAME, "rebar.config").
+-define(LOCK_FILE, "rebar.lock").
 
 %% ===================================================================
 %% Public API
@@ -80,10 +92,43 @@ new(ConfigFile) when is_list(ConfigFile) ->
         Other ->
             ?ABORT("Failed to load ~s: ~p~n", [ConfigFile, Other])
     end;
-new(_ParentConfig=#config{opts=Opts0, globals=Globals, skip_dirs=SkipDirs,
-                          xconf=Xconf}) ->
+new(_ParentConfig=#config{opts=Opts0, globals=Globals, skip_dirs=SkipDirs, xconf=Xconf}) ->
     new(#config{opts=Opts0, globals=Globals, skip_dirs=SkipDirs, xconf=Xconf},
         ?DEFAULT_NAME).
+
+new(ParentConfig, ConfName) ->
+    %% Load terms from rebar.config, if it exists
+    Dir = rebar_utils:get_cwd(),
+    new(ParentConfig, ConfName, Dir).
+
+new2(_ParentConfig=#config{opts=Opts0, globals=Globals, skip_dirs=SkipDirs, xconf=Xconf}, Dir) ->
+    new(#config{opts=Opts0, globals=Globals, skip_dirs=SkipDirs, xconf=Xconf},
+        ?DEFAULT_NAME, Dir).
+
+new(ParentConfig, ConfName, Dir) ->
+    ConfigFile = filename:join([Dir, ConfName]),
+    Opts0 = ParentConfig#config.opts,
+    Opts = case consult_file(ConfigFile) of
+               {ok, Terms} ->
+                   Terms;
+               {error, enoent} ->
+                   [];
+               Other ->
+                   ?ABORT("Failed to load ~s: ~p\n", [ConfigFile, Other])
+           end,
+
+    Opts1 = case consult_file(?LOCK_FILE) of
+                {ok, [D]} ->
+                    lists:keyreplace(deps, 1, Opts, {deps, D});
+                _ ->
+                    Opts
+            end,
+
+    ProviderModules = [],
+    create_logic_providers(ProviderModules, ParentConfig#config{dir=Dir
+                                                               ,local_opts=Opts1
+                                                               ,opts=Opts0}).
+
 
 get(Config, Key, Default) ->
     proplists:get_value(Key, Config#config.opts, Default).
@@ -92,7 +137,7 @@ get_list(Config, Key, Default) ->
     get(Config, Key, Default).
 
 get_local(Config, Key, Default) ->
-    proplists:get_value(Key, local_opts(Config#config.opts, []), Default).
+    proplists:get_value(Key, Config#config.local_opts, Default).
 
 get_all(Config, Key) ->
     proplists:get_all_values(Key, Config#config.opts).
@@ -121,6 +166,8 @@ get_global(Config, Key, Default) ->
 is_recursive(Config) ->
     get_xconf(Config, recursive, false).
 
+consult_file(File) when is_binary(File) ->
+    consult_file(binary_to_list(File));
 consult_file(File) ->
     case filename:extension(File) of
         ".script" ->
@@ -183,37 +230,67 @@ erase_xconf(Config, Key) ->
     NewXconf = dict:erase(Key, Config#config.xconf),
     Config#config{xconf = NewXconf}.
 
-%% TODO: reconsider after config inheritance removal/redesign
-clean_config(Old, New) ->
-    New#config{opts=Old#config.opts}.
+get_dep(#config{deps=Apps}, Name) ->
+    lists:keyfind(Name, 2, Apps).
+
+deps(#config{deps=Apps}) ->
+    Apps.
+
+deps(Config, Apps) ->
+    Config#config{deps=Apps}.
+
+deps_graph(#config{deps_graph=Graph}) ->
+    Graph.
+
+deps_graph(Config, Graph) ->
+    Config#config{deps_graph=Graph}.
+
+get_app(#config{apps_to_build=Apps}, Name) ->
+    lists:keyfind(Name, 2, Apps).
+
+apps_to_build(#config{apps_to_build=Apps}) ->
+    Apps.
+
+apps_to_build(Config, Apps) ->
+    Config#config{apps_to_build=Apps}.
+
+add_app(Config=#config{apps_to_build=Apps}, App) ->
+    Config#config{apps_to_build=[App | Apps]}.
+
+replace_app(Config=#config{apps_to_build=Apps}, Name, App) ->
+    Apps1 = lists:keydelete(Name, 2, Apps),
+    Config#config{apps_to_build=[App | Apps1]}.
+
+deps_to_build(#config{deps_to_build=Apps}) ->
+    Apps.
+
+add_dep(Config=#config{deps_to_build=Apps}, App) ->
+    Config#config{deps_to_build=[App | Apps]}.
+
+providers(#config{providers=Providers}) ->
+    Providers.
+
+providers(Config, NewProviders) ->
+    Config#config{providers=NewProviders}.
+
+goals(#config{goals=Goals}) ->
+    Goals.
+
+goals(Config, Goals) ->
+    Config#config{goals=Goals}.
+
+add_provider(Config=#config{providers=Providers}, Provider) ->
+    Config#config{providers=[Provider | Providers]}.
+
+create_logic_providers(ProviderModules, State0) ->
+    lists:foldl(fun(ProviderMod, Acc) ->
+                        {ok, State1} = rebar_provider:new(ProviderMod, Acc),
+                        State1
+                end, State0, ProviderModules).
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
-
-new(ParentConfig, ConfName) ->
-    %% Load terms from rebar.config, if it exists
-    Dir = rebar_utils:get_cwd(),
-    ConfigFile = filename:join([Dir, ConfName]),
-    Opts0 = ParentConfig#config.opts,
-    Opts = case consult_file(ConfigFile) of
-               {ok, Terms} ->
-                   %% Found a config file with some terms. We need to
-                   %% be able to distinguish between local definitions
-                   %% (i.e. from the file in the cwd) and inherited
-                   %% definitions. To accomplish this, we use a marker
-                   %% in the proplist (since order matters) between
-                   %% the new and old defs.
-                   Terms ++ [local] ++
-                       [Opt || Opt <- Opts0, Opt /= local];
-               {error, enoent} ->
-                   [local] ++
-                       [Opt || Opt <- Opts0, Opt /= local];
-               Other ->
-                   ?ABORT("Failed to load ~s: ~p\n", [ConfigFile, Other])
-           end,
-
-    ParentConfig#config{dir = Dir, opts = Opts}.
 
 consult_and_eval(File, Script) ->
     ?DEBUG("Evaluating config script ~p~n", [Script]),
@@ -239,13 +316,6 @@ bs(Vars) ->
     lists:foldl(fun({K,V}, Bs) ->
                         erl_eval:add_binding(K, V, Bs)
                 end, erl_eval:new_bindings(), Vars).
-
-local_opts([], Acc) ->
-    lists:reverse(Acc);
-local_opts([local | _Rest], Acc) ->
-    lists:reverse(Acc);
-local_opts([Item | Rest], Acc) ->
-    local_opts(Rest, [Item | Acc]).
 
 new_globals() -> dict:new().
 

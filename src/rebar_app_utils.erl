@@ -75,7 +75,10 @@ is_app_src(Filename) ->
     Filename =/= filename:rootname(Filename, ".app.src").
 
 app_src_to_app(Filename) ->
-    filename:join("ebin", filename:basename(Filename, ".app.src") ++ ".app").
+    Path = filename:join(lists:droplast(filename:split(filename:dirname(Filename)))),
+    AppFile = filename:join([Path, "ebin", filename:basename(Filename, ".app.src") ++ ".app"]),
+    filelib:ensure_dir(AppFile),
+    AppFile.
 
 app_name(Config, AppFile) ->
     case load_app_file(Config, AppFile) of

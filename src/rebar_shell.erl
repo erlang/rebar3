@@ -28,9 +28,37 @@
 -module(rebar_shell).
 -author("Kresten Krab Thorup <krab@trifork.com>").
 
+-behaviour(rebar_provider).
+
+-export([init/1,
+         do/1]).
+
 -include("rebar.hrl").
 
--export([shell/2, info/2]).
+-define(PROVIDER, shell).
+-define(DEPS, [app_builder]).
+
+%% ===================================================================
+%% Public API
+%% ===================================================================
+
+-spec init(rebar_config:config()) -> {ok, rebar_config:config()}.
+init(State) ->
+    State1 = rebar_config:add_provider(State, #provider{name = ?PROVIDER,
+                                                        provider_impl = ?MODULE,
+                                                        provides = shell,
+                                                        bare = false,
+                                                        deps = ?DEPS,
+                                                        example = "rebar shell",
+                                                        short_desc = "",
+                                                        desc = "",
+                                                        opts = []}),
+    {ok, State1}.
+
+-spec do(rebar_config:config()) -> {ok, rebar_config:config()} | relx:error().
+do(Config) ->
+    shell(),
+    {ok, Config}.
 
 %% NOTE:
 %% this is an attempt to replicate `erl -pa ./ebin -pa deps/*/ebin`. it is
@@ -39,7 +67,7 @@
 %% it also lacks the ctrl-c interrupt handler that `erl` features. ctrl-c will
 %% immediately kill the script. ctrl-g, however, works fine
 
-shell(_Config, _AppFile) ->
+shell() ->
     true = code:add_pathz(rebar_utils:ebin_dir()),
     %% scan all processes for any with references to the old user and save them to
     %% update later

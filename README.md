@@ -13,6 +13,80 @@ configuration work. rebar also provides dependency management, enabling
 application writers to easily re-use common libraries from a variety of
 locations (git, hg, etc).
 
+3.0
+====
+
+This is an experimental branch.
+
+### Commands
+
+| Command    | Description |
+|----------- |------------ |
+| compile    | Build project |
+| shell      | Run shell with project apps in path |
+| escriptize | Create escript from project |
+| release    | Build release of project |
+| tar        | Package release into tarball |
+
+### Missing
+
+* Pre and post hooks
+* Compilers besides erlc
+
+### Changes
+
+* Fetches and builds deps if missing when running any command that relies on them
+* Automatically recognizes `apps` and `libs` directory structure
+* `escriptize` requires `escript_top_level_app` set in `rebar.config`
+* Relx for releases
+
+### Gone
+
+* Reltool integeration
+
+### Providers
+
+Providers are the modules that do the work to fulfill a user's command.
+
+Example:
+
+```erlang
+-module(rebar_prv_something).
+
+-behaviour(rebar_provider).
+
+-export([init/1,
+         do/1]).
+
+-include("rebar.hrl").
+
+-define(PROVIDER, something).
+-define(DEPS, []).
+
+%% ===================================================================
+%% Public API
+%% ===================================================================
+
+-spec init(rebar_config:config()) -> {ok, rebar_config:config()}.
+init(State) ->
+    State1 = rebar_config:add_provider(State, #provider{name = ?PROVIDER,
+                                                        provider_impl = ?MODULE,
+                                                        provides = something,
+                                                        bare = false,
+                                                        deps = ?DEPS,
+                                                        example = "rebar something",
+                                                        short_desc = "",
+                                                        desc = "",
+                                                        opts = []}),
+    {ok, State1}.
+
+-spec do(rebar_config:config()) -> {ok, rebar_config:config()} | relx:error().
+do(Config) ->
+    %% Do something
+    {ok, Config}.
+```
+
+
 Building
 --------
 
@@ -37,7 +111,7 @@ https://github.com/rebar/rebar/wiki/rebar
 ```sh
 $ git clone git://github.com/rebar/rebar.git
 $ cd rebar
-$ ./bootstrap
+$ ./bootstrap/bootstrap
 Recompile: src/getopt
 ...
 Recompile: src/rebar_utils

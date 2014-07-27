@@ -145,10 +145,8 @@ init_config({Options, _NonOptArgs}) ->
 
     BaseConfig = rebar_config:base_config(GlobalConfig2),
 
-    %% Keep track of how many operations we do, so we can detect bad commands
-    BaseConfig1 = rebar_config:set_xconf(BaseConfig, operations, 0),
     %% Initialize vsn cache
-    rebar_config:set_xconf(BaseConfig1, vsn_cache, dict:new()).
+    rebar_config:set_xconf(BaseConfig, vsn_cache, dict:new()).
 
 init_config1(BaseConfig) ->
     %% Determine the location of the rebar executable; important for pulling
@@ -173,7 +171,10 @@ run_aux(BaseConfig, Commands) ->
     BaseConfig1 = init_config1(BaseConfig),
 
     %% Process each command, resetting any state between each one
-    rebar_core:process_commands(CommandAtoms, BaseConfig1).
+    {ok, Providers} = application:get_env(rebar, providers),
+    BaseConfig2 = rebar_config:create_logic_providers(Providers, BaseConfig1),
+    rebar_core:process_commands(CommandAtoms, BaseConfig2),
+    ok.
 
 %%
 %% print help/usage string
@@ -382,13 +383,6 @@ update-deps                              Update fetched dependencies
 delete-deps                              Delete fetched dependencies
 list-deps                                List dependencies
 
-generate    [dump_spec=0/1]              Build release with reltool
-overlay                                  Run reltool overlays only
-
-generate-upgrade  previous_release=path  Build an upgrade package
-
-generate-appups   previous_release=path  Generate appup files
-
 eunit       [suite[s]=foo]               Run EUnit tests in foo.erl and
                                          test/foo_tests.erl
             [suite[s]=foo] [test[s]=bar] Run specific EUnit tests [first test
@@ -476,6 +470,7 @@ command_names() ->
      "check-deps",
      "clean",
      "compile",
+     "release",
      "create",
      "create-app",
      "create-lib",
@@ -485,9 +480,6 @@ command_names() ->
      "doc",
      "eunit",
      "escriptize",
-     "generate",
-     "generate-appups",
-     "generate-upgrade",
      "get-deps",
      "help",
      "list-deps",

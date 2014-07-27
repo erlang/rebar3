@@ -26,6 +26,11 @@
 %% -------------------------------------------------------------------
 -module(rebar_escripter).
 
+-behaviour(rebar_provider).
+
+-export([init/1,
+         do/1]).
+
 -export([escriptize/2,
          clean/2]).
 
@@ -35,9 +40,32 @@
 -include("rebar.hrl").
 -include_lib("kernel/include/file.hrl").
 
+-define(PROVIDER, escriptize).
+-define(DEPS, [app_builder]).
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
+
+-spec init(rebar_config:config()) -> {ok, rebar_config:config()}.
+init(State) ->
+    State1 = rebar_config:add_provider(State, #provider{name = ?PROVIDER,
+                                                        provider_impl = ?MODULE,
+                                                        provides = escriptize,
+                                                        bare = false,
+                                                        deps = ?DEPS,
+                                                        example = "escriptize",
+                                                        short_desc = "",
+                                                        desc = "",
+                                                        opts = []}),
+    {ok, State1}.
+
+-spec do(rebar_config:config()) -> {ok, rebar_config:config()} | relx:error().
+do(Config) ->
+    AppName = rebar_config:get_local(Config, escript_top_level_app, undefined),
+    App = rebar_config:get_app(Config, AppName),
+    {ok, Config1} = escriptize(Config, rebar_app_info:app_file(App)),
+    {ok, Config1}.
 
 escriptize(Config0, AppFile) ->
     %% Extract the application name from the archive -- this is the default
