@@ -26,7 +26,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_core).
 
--export([process_commands/2, help/2]).
+-export([process_commands/3, help/2]).
 
 -include("rebar.hrl").
 
@@ -53,14 +53,14 @@ help(ParentConfig, Commands) ->
                             end, Providers)
       end, Commands).
 
-process_commands(Commands, ParentConfig) ->
+process_commands(Command, Args, ParentConfig) ->
     true = rebar_utils:expand_code_path(),
     LibDirs = rebar_config:get_local(ParentConfig, lib_dirs, ["apps", "libs", "."]),
     DepsDir = rebar_deps:get_deps_dir(ParentConfig),
     _UpdatedCodePaths = update_code_path([DepsDir | LibDirs]),
 
     ParentConfig2 = rebar_app_discover:do(ParentConfig, LibDirs),
-    TargetProviders = rebar_provider:get_target_providers(Commands, ParentConfig2),
+    TargetProviders = rebar_provider:get_target_providers(Command, ParentConfig2),
     ParentConfig3 =
         lists:foldl(fun(TargetProvider, Conf) ->
                             Provider = rebar_provider:get_provider(TargetProvider, rebar_config:providers(Conf)),

@@ -166,15 +166,15 @@ run_aux(BaseConfig, Commands) ->
         {error,{already_started,crypto}} -> ok
     end,
 
-    %% Convert command strings to atoms
-    CommandAtoms = [list_to_atom(C) || C <- Commands],
+    [Command | Args] = Commands,
+    CommandAtom = list_to_atom(Command),
 
     BaseConfig1 = init_config1(BaseConfig),
 
     %% Process each command, resetting any state between each one
     {ok, Providers} = application:get_env(rebar, providers),
     BaseConfig2 = rebar_config:create_logic_providers(Providers, BaseConfig1),
-    rebar_core:process_commands(CommandAtoms, BaseConfig2),
+    rebar_core:process_commands(CommandAtom, Args, BaseConfig2),
     ok.
 
 %%

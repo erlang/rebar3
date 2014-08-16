@@ -81,10 +81,12 @@ impl(Provider) ->
 format(#provider{provider_impl=Mod}) ->
     erlang:atom_to_list(Mod).
 
-get_target_providers(Targets, State) ->
+get_target_providers(Target, State) ->
     Providers = rebar_config:providers(State),
-    TargetProviders = lists:filter(fun(#provider{provides=T}) ->
-                                           lists:member(T, Targets)
+    TargetProviders = lists:filter(fun(#provider{name=T}) when T =:= Target->
+                                           true;
+                                      (#provider{name=T}) ->
+                                           false
                                    end, Providers),
     process_deps(TargetProviders, Providers).
 

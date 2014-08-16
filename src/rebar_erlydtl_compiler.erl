@@ -104,8 +104,8 @@
 
 -include("rebar.hrl").
 
--define(PROVIDER, erlydtl).
--define(DEPS, [app_builder]).
+-define(PROVIDER, compile).
+-define(DEPS, []).
 
 %% ===================================================================
 %% Public API
@@ -115,7 +115,6 @@
 init(State) ->
     State1 = rebar_config:add_provider(State, #provider{name = ?PROVIDER,
                                                         provider_impl = ?MODULE,
-                                                        provides = compile,
                                                         bare = false,
                                                         deps = ?DEPS,
                                                         example = "compile",

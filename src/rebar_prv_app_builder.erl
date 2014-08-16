@@ -7,7 +7,7 @@
 
 -include("rebar.hrl").
 
--define(PROVIDER, app_builder).
+-define(PROVIDER, compile).
 -define(DEPS, [deps]).
 
 %% ===================================================================
@@ -18,10 +18,9 @@
 init(State) ->
     State1 = rebar_config:add_provider(State, #provider{name = ?PROVIDER,
                                                         provider_impl = ?MODULE,
-                                                        provides = build,
                                                         bare = false,
                                                         deps = ?DEPS,
-                                                        example = "rebar build",
+                                                        example = "rebar compile",
                                                         short_desc = "",
                                                         desc = "",
                                                         opts = []}),

@@ -36,7 +36,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, shell).
--define(DEPS, [app_builder]).
+-define(DEPS, [compile]).
 
 %% ===================================================================
 %% Public API
