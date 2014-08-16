@@ -38,6 +38,7 @@
 %% for internal use only
 -export([info/2]).
 -export([get_deps_dir/1]).
+-export([get_deps_dir/2]).
 
 -define(PROVIDER, deps).
 -define(DEPS, []).
@@ -152,12 +153,13 @@ get_deps_dir(Config) ->
     BaseDir = rebar_utils:base_dir(Config),
     get_deps_dir(BaseDir, "deps").
 
+get_deps_dir(DepsDir, App) ->
+    filename:join(DepsDir, App).
+
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
-get_deps_dir(DepsDir, App) ->
-    filename:join(DepsDir, App).
 
 -spec gather_application_info(file:name(), file:filename()) ->
                                      {ok, rebar_app_info:t()} |

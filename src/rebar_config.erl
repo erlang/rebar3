@@ -30,6 +30,7 @@
          get/3, get_local/3, get_list/3,
          get_all/2,
          set/3,
+         command_args/1, command_args/2,
          set_global/3, get_global/3,
          is_recursive/1,
          save_env/3, get_env/2, reset_envs/1,
@@ -56,6 +57,7 @@
                   local_opts = [] :: list(),
                   globals = new_globals() :: rebar_dict(),
                   envs = new_env() :: rebar_dict(),
+                  command_args = [] :: list(),
                   %% cross-directory/-command config
                   goals = [],
                   providers = [],
@@ -119,7 +121,7 @@ new(ParentConfig, ConfName, Dir) ->
 
     Opts1 = case consult_file(?LOCK_FILE) of
                 {ok, [D]} ->
-                    lists:keyreplace(deps, 1, Opts, {deps, D});
+                    [{lock_deps, D} | Opts];
                 _ ->
                     Opts
             end,
@@ -229,6 +231,12 @@ get_xconf(Config, Key, Default) ->
 erase_xconf(Config, Key) ->
     NewXconf = dict:erase(Key, Config#config.xconf),
     Config#config{xconf = NewXconf}.
+
+command_args(#config{command_args=CmdArgs}) ->
+    CmdArgs.
+
+command_args(Config, CmdArgs) ->
+    Config#config{command_args=CmdArgs}.
 
 get_dep(#config{deps=Apps}, Name) ->
     lists:keyfind(Name, 2, Apps).

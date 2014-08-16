@@ -11,6 +11,7 @@
          app_file/1,
          app_file/2,
          original_vsn/1,
+         original_vsn/2,
          dir/1,
          dir/2]).
 
@@ -83,6 +84,10 @@ app_file(AppInfo=#app_info_t{}, AppFile) ->
 -spec original_vsn(t()) -> string().
 original_vsn(#app_info_t{original_vsn=Vsn}) ->
     Vsn.
+
+-spec original_vsn(t(), string()) -> string().
+original_vsn(AppInfo=#app_info_t{}, Vsn) ->
+    AppInfo#app_info_t{original_vsn=Vsn}.
 
 -spec dir(t()) -> file:name().
 dir(#app_info_t{dir=Dir}) ->

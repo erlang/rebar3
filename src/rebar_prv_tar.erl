@@ -21,7 +21,6 @@
 init(State) ->
     State1 = rebar_config:add_provider(State, #provider{name = ?PROVIDER,
                                                         provider_impl = ?MODULE,
-                                                        provides = tar,
                                                         bare = false,
                                                         deps = ?DEPS,
                                                         example = "rebar tar",

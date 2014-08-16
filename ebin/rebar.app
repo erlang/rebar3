@@ -29,6 +29,7 @@
               rebar_qc,
               rebar_require_vsn,
               rebar_prv_release,
+              rebar_prv_update,
               rebar_shell,
               rebar_subdirs,
               rebar_prv_tar,
@@ -58,6 +59,7 @@
                      rebar_prv_app_builder,
                      rebar_shell,
                      rebar_prv_tar,
+                     rebar_prv_update,
                      rebar_prv_release]}
         ]}
  ]}.

@@ -23,6 +23,7 @@ This is an experimental branch.
 | Command    | Description |
 |----------- |------------ |
 | compile    | Build project |
+| update <dep>   | Update dep source |
 | shell      | Run shell with project apps in path |
 | escriptize | Create escript from project |
 | release    | Build release of project |

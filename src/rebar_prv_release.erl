@@ -11,7 +11,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, release).
--define(DEPS, [app_builder]).
+-define(DEPS, [compile]).
 
 %% ===================================================================
 %% Public API
@@ -21,7 +21,6 @@
 init(State) ->
     State1 = rebar_config:add_provider(State, #provider{name = ?PROVIDER,
                                                         provider_impl = ?MODULE,
-                                                        provides = release,
                                                         bare = false,
                                                         deps = ?DEPS,
                                                         example = "rebar release",

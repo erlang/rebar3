@@ -26,7 +26,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_core).
 
--export([process_commands/3, help/2]).
+-export([process_commands/2, help/2]).
 
 -include("rebar.hrl").
 
@@ -53,7 +53,7 @@ help(ParentConfig, Commands) ->
                             end, Providers)
       end, Commands).
 
-process_commands(Command, Args, ParentConfig) ->
+process_commands(Command, ParentConfig) ->
     true = rebar_utils:expand_code_path(),
     LibDirs = rebar_config:get_local(ParentConfig, lib_dirs, ["apps", "libs", "."]),
     DepsDir = rebar_deps:get_deps_dir(ParentConfig),

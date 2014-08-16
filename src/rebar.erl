@@ -79,7 +79,7 @@ run(BaseConfig, Commands) ->
 
 run(["help"|RawCmds]) when RawCmds =/= [] ->
     ok = load_rebar_app(),
-    Cmds = unabbreviate_command_names(RawCmds),
+    Cmds = RawCmds,
     Args = parse_args(Cmds),
     BaseConfig = init_config(Args),
     {BaseConfig1, _} = save_options(BaseConfig, Args),
@@ -174,7 +174,7 @@ run_aux(BaseConfig, Commands) ->
     %% Process each command, resetting any state between each one
     {ok, Providers} = application:get_env(rebar, providers),
     BaseConfig2 = rebar_config:create_logic_providers(Providers, BaseConfig1),
-    rebar_core:process_commands(CommandAtom, Args, BaseConfig2),
+    rebar_core:process_commands(CommandAtom, rebar_config:command_args(BaseConfig2, Args)),
     ok.
 
 %%
@@ -190,50 +190,7 @@ help() ->
     ?CONSOLE("To see a list of built-in commands, execute rebar -c.~n~n", []),
     ?CONSOLE(
        "Type 'rebar help <CMD1> <CMD2>' for help on specific commands."
-       "~n~n", []),
-    ?CONSOLE(
-       "rebar allows you to abbreviate the command to run:~n"
-       "$ rebar co           # same as rebar compile~n"
-       "$ rebar eu           # same as rebar eunit~n"
-       "$ rebar g-d          # same as rebar get-deps~n"
-       "$ rebar x eu         # same as rebar xref eunit~n"
-       "$ rebar l-d          # same as rebar list-deps~n"
-       "$ rebar l-d l-t      # same as rebar list-deps list-templates~n"
-       "$ rebar list-d l-te  # same as rebar list-deps list-templates~n"
-       "~n", []),
-    ?CONSOLE(
-       "Core rebar.config options:~n"
-       "  ~p~n"
-       "  ~p~n"
-       "  ~p~n"
-       "  ~p~n"
-       "  ~p~n"
-       "  ~p~n"
-       "  ~p~n"
-       "  ~p~n"
-       "  ~p~n"
-       "  ~p~n"
-       "Core command line options:~n"
-       "  apps=app1,app2 (specify apps to process)~n"
-       "  skip_apps=app1,app2 (specify apps to skip)~n",
-       [
-        {recursive_cmds, []},
-        {require_erts_vsn, ".*"},
-        {require_otp_vsn, ".*"},
-        {require_min_otp_vsn, ".*"},
-        {lib_dirs, []},
-        {sub_dirs, ["dir1", "dir2"]},
-        {plugins, [plugin1, plugin2]},
-        {plugin_dir, "some_other_directory"},
-        {pre_hooks, [{clean, "./prepare_package_files.sh"},
-                     {"linux", compile, "c_src/build_linux.sh"},
-                     {compile, "escript generate_headers"},
-                     {compile, "escript check_headers"}]},
-        {post_hooks, [{clean, "touch file1.out"},
-                      {"freebsd", compile, "c_src/freebsd_tweaks.sh"},
-                      {eunit, "touch file2.out"},
-                      {compile, "touch postcompile.out"}]}
-       ]).
+       "~n~n", []).
 
 %%
 %% Parse command line arguments using getopt and also filtering out any
@@ -283,7 +240,7 @@ save_options(Config, {Options, NonOptArgs}) ->
     %% Filter all the flags (i.e. strings of form key=value) from the
     %% command line arguments. What's left will be the commands to run.
     {Config7, RawCmds} = filter_flags(Config6, NonOptArgs, []),
-    {Config7, unabbreviate_command_names(RawCmds)}.
+    {Config7, RawCmds}.
 
 %%
 %% set log level based on getopt option
@@ -367,45 +324,10 @@ compile                                  Compile sources
 
 escriptize                               Generate escript archive
 
-create      template= [var=foo,...]      Create skel based on template and vars
-create-app  [appid=myapp]                Create simple app skel
-create-lib  [libid=mylib]                Create simple lib skel
-create-node [nodeid=mynode]              Create simple node skel
-list-templates                           List available templates
-
-doc                                      Generate Erlang program documentation
-
-prepare-deps                             Run 'rebar -r get-deps compile'
-refresh-deps                             Run 'rebar -r update-deps compile'
-
-check-deps                               Display to be fetched dependencies
-get-deps                                 Fetch dependencies
-update-deps                              Update fetched dependencies
-delete-deps                              Delete fetched dependencies
-list-deps                                List dependencies
-
-eunit       [suite[s]=foo]               Run EUnit tests in foo.erl and
-                                         test/foo_tests.erl
-            [suite[s]=foo] [test[s]=bar] Run specific EUnit tests [first test
-                                         name starting with 'bar' in foo.erl
-                                         and test/foo_tests.erl]
-            [test[s]=bar]                For every existing suite, run the first
-                                         test whose name starts with bar and, if
-                                         no such test exists, run the test whose
-                                         name starts with bar in the suite's
-                                         _tests module.
-            [random_suite_order=true]    Run tests in a random order, either
-            [random_suite_order=Seed]    with a random seed for the PRNG, or a
-                                         specific one.
-
-ct          [suite[s]=] [case=]          Run common_test suites
-
-qc                                       Test QuickCheck properties
-
-xref                                     Run cross reference analysis
-
 shell                                    Start a shell similar to
                                          'erl -pa ebin -pa deps/*/ebin'
+
+update [dep]                             Update source dep
 
 help                                     Show the program options
 version                                  Show version information
@@ -468,85 +390,12 @@ filter_flags(Config, [Item | Rest], Commands) ->
 
 command_names() ->
     [
-     "check-deps",
      "clean",
      "compile",
      "release",
-     "create",
-     "create-app",
-     "create-lib",
-     "create-node",
-     "ct",
-     "delete-deps",
-     "doc",
-     "eunit",
+     "update",
      "escriptize",
-     "get-deps",
      "help",
-     "list-deps",
-     "list-templates",
-     "prepare-deps",
-     "qc",
-     "refresh-deps",
-     "update-deps",
-     "overlay",
      "shell",
-     "version",
-     "xref"
+     "version"
     ].
-
-unabbreviate_command_names([]) ->
-    [];
-unabbreviate_command_names([Command | Commands]) ->
-    case get_command_name_candidates(Command) of
-        [] ->
-            %% let the rest of the code detect that the command doesn't exist
-            %% (this would perhaps be a good place to fail)
-            [Command | unabbreviate_command_names(Commands)];
-        [FullCommand] ->
-            [FullCommand | unabbreviate_command_names(Commands)];
-        Candidates ->
-            ?ABORT("Found more than one match for abbreviated command name "
-                   " '~s',~nplease be more specific. Possible candidates:~n"
-                   "  ~s~n",
-                   [Command, string:join(Candidates, ", ")])
-    end.
-
-get_command_name_candidates(Command) ->
-    %% Get the command names which match the given (abbreviated) command name.
-    %% * "c"        matches commands like compile, clean and create-app
-    %% * "create"   matches command create only, since it's unique
-    %% * "create-"  matches commands starting with create-
-    %% * "c-a"      matches create-app
-    %% * "create-a" matches create-app
-    %% * "c-app"    matches create-app
-    Candidates = [Candidate || Candidate <- command_names(),
-                               is_command_name_candidate(Command, Candidate)],
-    %% Is there a complete match?  If so return only that, return a
-    %% list of candidates otherwise
-    case lists:member(Command, Candidates) of
-        true  -> [Command];
-        false -> Candidates
-    end.
-
-is_command_name_candidate(Command, Candidate) ->
-    lists:prefix(Command, Candidate)
-        orelse is_command_name_sub_word_candidate(Command, Candidate).
-
-is_command_name_sub_word_candidate(Command, Candidate) ->
-    %% Allow for parts of commands to be abbreviated, i.e. create-app
-    %% can be shortened to "create-a", "c-a" or "c-app" (but not
-    %% "create-" since that would be ambiguous).
-    ReOpts = [{return, list}],
-    CommandSubWords = re:split(Command, "-", ReOpts),
-    CandidateSubWords = re:split(Candidate, "-", ReOpts),
-    is_command_name_sub_word_candidate_aux(CommandSubWords, CandidateSubWords).
-
-is_command_name_sub_word_candidate_aux([CmdSW | CmdSWs],
-                                       [CandSW | CandSWs]) ->
-    lists:prefix(CmdSW, CandSW) andalso
-        is_command_name_sub_word_candidate_aux(CmdSWs, CandSWs);
-is_command_name_sub_word_candidate_aux([], []) ->
-    true;
-is_command_name_sub_word_candidate_aux(_CmdSWs, _CandSWs) ->
-    false.

@@ -55,6 +55,7 @@ compile(Config, App) ->
     AppFile = rebar_app_info:app_file(App1),
     case rebar_app_utils:load_app_file(Config2, AppFile) of
         {ok, Config3, AppName, AppData} ->
+            AppVsn = proplists:get_value(vsn, AppData),
             validate_name(AppName, AppFile),
             %% In general, the list of modules is an important thing to validate
             %% for compliance with OTP guidelines and upgrade procedures.
@@ -62,9 +63,9 @@ compile(Config, App) ->
             case rebar_config:get_local(Config3, validate_app_modules, true) of
                 true ->
                     Modules = proplists:get_value(modules, AppData),
-                    {validate_modules(Dir, AppName, Modules), App1};
+                    {validate_modules(Dir, AppName, Modules), rebar_app_info:original_vsn(App1, AppVsn)};
                 false ->
-                    {ok, App1}
+                    {ok, rebar_app_info:original_vsn(App1, AppVsn)}
             end;
         {error, Reason} ->
             ?ABORT("Failed to load app file ~s: ~p\n", [AppFile, Reason])
