@@ -26,7 +26,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_config).
 
--export([new/0, new/1, new2/2, base_config/1, consult_file/1,
+-export([new/0, new/1, new/2, new2/2, base_config/1, consult_file/1,
          get/3, get_local/3, get_list/3,
          get_all/2,
          set/3,
@@ -96,7 +96,7 @@ new(_ParentConfig=#config{opts=Opts0, globals=Globals, skip_dirs=SkipDirs, xconf
     new(#config{opts=Opts0, globals=Globals, skip_dirs=SkipDirs, xconf=Xconf},
         ?DEFAULT_NAME).
 
-new(ParentConfig, ConfName) ->
+new(ParentConfig=#config{}, ConfName) ->
     %% Load terms from rebar.config, if it exists
     Dir = rebar_utils:get_cwd(),
     new(ParentConfig, ConfName, Dir).

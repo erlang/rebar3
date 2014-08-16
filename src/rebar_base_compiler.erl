@@ -135,14 +135,14 @@ compile_each([], _Config, _CompileFn) ->
 compile_each([Source | Rest], Config, CompileFn) ->
     case compile(Source, Config, CompileFn) of
         ok ->
-            ?CONSOLE("Compiled ~s\n", [Source]);
+            ?INFO("Compiled ~s\n", [Source]);
         {ok, Warnings} ->
             report(Warnings),
-            ?CONSOLE("Compiled ~s\n", [Source]);
+            ?INFO("Compiled ~s\n", [Source]);
         skipped ->
-            ?INFO("Skipped ~s\n", [Source]);
+            ?DEBUG("Skipped ~s\n", [Source]);
         Error ->
-            ?CONSOLE("Compiling ~s failed:\n",
+            ?INFO("Compiling ~s failed:\n",
                      [maybe_absname(Config, Source)]),
             maybe_report(Error),
             ?DEBUG("Compilation failed: ~p\n", [Error]),
@@ -181,7 +181,7 @@ compile_queue(Config, Pids, Targets) ->
             compile_queue(Config, Pids, Targets);
 
         {skipped, Source} ->
-            ?INFO("Skipped ~s\n", [Source]),
+            ?DEBUG("Skipped ~s\n", [Source]),
             compile_queue(Config, Pids, Targets);
 
         {'DOWN', Mref, _, Pid, normal} ->

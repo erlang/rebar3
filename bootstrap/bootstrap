@@ -79,8 +79,10 @@ main(Args) ->
 
     %% Run rebar compile to do proper .app validation etc.
     %% and rebar escriptize to create the rebar script
-    RebarArgs = Args -- ["debug"], %% Avoid trying to run 'debug' command
-    rebar:main(["compile", "escriptize"] ++ RebarArgs),
+    %RebarArgs = Args -- ["debug"], %% Avoid trying to run 'debug' command
+    %rebar:main(["compile", "escriptize"] ++ RebarArgs),
+
+    os:cmd("./bootstrap/rebar compile escriptize"),
 
     %% Finally, update executable perms for our script on *nix,
     %%  or write out script files on win32.

@@ -70,6 +70,7 @@ main(Args) ->
 %% Erlang-API entry point
 run(BaseConfig, Commands) ->
     _ = application:load(rebar),
+    ok = rebar_log:init(api, BaseConfig),
     run_aux(BaseConfig, Commands).
 
 %% ====================================================================
@@ -141,7 +142,7 @@ init_config({Options, _NonOptArgs}) ->
 
     GlobalConfig2 = set_log_level(GlobalConfig1, Options),
     %% Initialize logging system
-    ok = rebar_log:init(GlobalConfig2),
+    ok = rebar_log:init(command_line, GlobalConfig2),
 
     BaseConfig = rebar_config:base_config(GlobalConfig2),
 

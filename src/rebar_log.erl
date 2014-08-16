@@ -26,12 +26,11 @@
 %% -------------------------------------------------------------------
 -module(rebar_log).
 
--export([init/1,
+-export([init/2,
          set_level/1,
          error_level/0,
          default_level/0,
          log/3,
-         log/4,
          is_verbose/1]).
 
 -define(ERROR_LEVEL, 0).
@@ -43,32 +42,26 @@
 %% Public API
 %% ===================================================================
 
-init(Config) ->
+init(Caller, Config) ->
     Verbosity = rebar_config:get_global(Config, verbose, default_level()),
-    case valid_level(Verbosity) of
-        ?ERROR_LEVEL -> set_level(error);
-        ?WARN_LEVEL  -> set_level(warn);
-        ?INFO_LEVEL  -> set_level(info);
-        ?DEBUG_LEVEL -> set_level(debug)
-    end.
+    Level = case valid_level(Verbosity) of
+                ?ERROR_LEVEL -> error;
+                ?WARN_LEVEL  -> warn;
+                ?INFO_LEVEL  -> info;
+                ?DEBUG_LEVEL -> debug
+            end,
+    Log = ec_cmd_log:new(Level, Caller),
+    application:set_env(rebar, log, Log).
 
 set_level(Level) ->
     ok = application:set_env(rebar, log_level, Level).
 
 log(Level, Str, Args) ->
-    log(standard_io, Level, Str, Args).
-
-log(Device, Level, Str, Args) ->
-    {ok, LogLevel} = application:get_env(rebar, log_level),
-    case should_log(LogLevel, Level) of
-        true ->
-            io:format(Device, log_prefix(Level) ++ Str, Args);
-        false ->
-            ok
-    end.
+    {ok, LogState} = application:get_env(rebar, log),
+    ec_cmd_log:Level(LogState, Str, Args).
 
 error_level() -> ?ERROR_LEVEL.
-default_level() -> ?WARN_LEVEL.
+default_level() -> ?INFO_LEVEL.
 
 is_verbose(Config) ->
     rebar_config:get_xconf(Config, is_verbose, false).
@@ -79,18 +72,3 @@ is_verbose(Config) ->
 
 valid_level(Level) ->
     erlang:max(?ERROR_LEVEL, erlang:min(Level, ?DEBUG_LEVEL)).
-
-should_log(debug, _)     -> true;
-should_log(info, debug)  -> false;
-should_log(info, _)      -> true;
-should_log(warn, debug)  -> false;
-should_log(warn, info)   -> false;
-should_log(warn, _)      -> true;
-should_log(error, error) -> true;
-should_log(error, _)     -> false;
-should_log(_, _)         -> false.
-
-log_prefix(debug) -> "DEBUG: ";
-log_prefix(info)  -> "INFO:  ";
-log_prefix(warn)  -> "WARN:  ";
-log_prefix(error) -> "ERROR: ".

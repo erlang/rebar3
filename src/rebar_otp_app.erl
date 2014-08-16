@@ -146,7 +146,7 @@ preprocess(Config, Dir, AppSrcFile) ->
 load_app_vars(Config) ->
     case rebar_config:get_local(Config, app_vars_file, undefined) of
         undefined ->
-            ?INFO("No app_vars_file defined.\n", []),
+            ?DEBUG("No app_vars_file defined.\n", []),
             [];
         Filename ->
             ?INFO("Loading app vars from ~p\n", [Filename]),

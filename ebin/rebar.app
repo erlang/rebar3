@@ -45,6 +45,7 @@
                   crypto,
                   syntax_tools,
                   tools,
+                  erlware_commons,
                   relx]},
   {env, [
         %% Default log level

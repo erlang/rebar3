@@ -33,8 +33,8 @@ do(Config) ->
     Apps = rebar_config:apps_to_build(Config),
     Config1 =
         lists:foldl(fun(AppInfo, ConfigAcc) ->
-                            ?CONSOLE("Building ~p version ~p~n", [rebar_app_info:name(AppInfo)
-                                                                 ,rebar_app_info:original_vsn(AppInfo)]),
+                            ?INFO("Building ~p version ~p~n", [rebar_app_info:name(AppInfo)
+                                                              ,rebar_app_info:original_vsn(AppInfo)]),
                             {_AppInfo1, ConfigAcc1} = build(ConfigAcc, AppInfo),
                             ConfigAcc
                     end, Config, Deps++Apps),
