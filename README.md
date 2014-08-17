@@ -23,11 +23,15 @@ This is an experimental branch.
 | Command    | Description |
 |----------- |------------ |
 | compile    | Build project |
+| do         |
 | update <dep>   | Update dep source |
 | shell      | Run shell with project apps in path |
 | escriptize | Create escript from project |
 | release    | Build release of project |
 | tar        | Package release into tarball |
+| new        | |
+| eunit      | |
+| ct         | |
 
 ### Missing
 
@@ -72,7 +76,6 @@ Example:
 init(State) ->
     State1 = rebar_config:add_provider(State, #provider{name = ?PROVIDER,
                                                         provider_impl = ?MODULE,
-                                                        provides = something,
                                                         bare = false,
                                                         deps = ?DEPS,
                                                         example = "rebar something",
