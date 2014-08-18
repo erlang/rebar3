@@ -17,9 +17,9 @@
 %% Public API
 %% ===================================================================
 
--spec init(rebar_config:config()) -> {ok, rebar_config:config()}.
+-spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_config:add_provider(State, #provider{name = ?PROVIDER,
+    State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
                                                         provider_impl = ?MODULE,
                                                         bare = false,
                                                         deps = ?DEPS,
@@ -29,8 +29,8 @@ init(State) ->
                                                         opts = []}),
     {ok, State1}.
 
--spec do(rebar_config:config()) -> {ok, rebar_config:config()} | relx:error().
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
 do(Config) ->
-    RelxConfig = rebar_config:get_local(Config, relx, []),
+    RelxConfig = rebar_state:get_local(Config, relx, []),
     relx:main("release"),
     {ok, Config}.

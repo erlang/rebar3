@@ -26,7 +26,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_core).
 
--export([process_commands/2, help/2]).
+-export([process_command/2]).
 
 -include("rebar.hrl").
 
@@ -34,39 +34,20 @@
 %% Internal functions
 %% ===================================================================
 
-help(ParentConfig, Commands) ->
-    {ok, AllProviders} = application:get_env(rebar, providers),
-
-    %% get plugin providers
-    Dir = rebar_utils:get_cwd(),
-    _Config = maybe_load_local_config(Dir, ParentConfig),
-
-    lists:foreach(
-      fun(Cmd) ->
-              ?CONSOLE("==> help ~p~n~n", [Cmd]),
-              CmdProviders = rebar_provider:get_target_provider(Cmd, AllProviders),
-              Providers = rebar_provider:get_target_provider(info, CmdProviders),
-              lists:foreach(fun(M) ->
-                                    ?CONSOLE("=== ~p:~p ===~n", [M, Cmd]),
-                                    M:info(help, Cmd),
-                                    ?CONSOLE("~n", [])
-                            end, Providers)
-      end, Commands).
-
-process_commands(Command, ParentConfig) ->
+process_command(State, Command) ->
     true = rebar_utils:expand_code_path(),
-    LibDirs = rebar_config:get_local(ParentConfig, lib_dirs, ["apps", "libs", "."]),
-    DepsDir = rebar_deps:get_deps_dir(ParentConfig),
+    LibDirs = rebar_state:get(State, lib_dirs, ?DEFAULT_LIB_DIRS),
+    DepsDir = rebar_state:get(State, deps_dir, "deps"),
     _UpdatedCodePaths = update_code_path([DepsDir | LibDirs]),
+    rebar_deps:setup_env(State),
+    State2 = rebar_app_discover:do(State, LibDirs),
+    TargetProviders = rebar_provider:get_target_providers(Command, State2),
 
-    ParentConfig2 = rebar_app_discover:do(ParentConfig, LibDirs),
-    TargetProviders = rebar_provider:get_target_providers(Command, ParentConfig2),
-    ParentConfig3 =
-        lists:foldl(fun(TargetProvider, Conf) ->
-                            Provider = rebar_provider:get_provider(TargetProvider, rebar_config:providers(Conf)),
-                            {ok, Conf1} = rebar_provider:do(Provider, Conf),
-                            Conf1
-                    end, ParentConfig2, TargetProviders).
+    lists:foldl(fun(TargetProvider, Conf) ->
+                        Provider = rebar_provider:get_provider(TargetProvider, rebar_state:providers(Conf)),
+                        {ok, Conf1} = rebar_provider:do(Provider, Conf),
+                        Conf1
+                end, State2, TargetProviders).
 
 update_code_path([]) ->
     no_change;
@@ -86,13 +67,3 @@ expand_lib_dirs([Dir | Rest], Root, Acc) ->
                  _        -> [filename:join([Root, A]) || A <- Apps]
              end,
     expand_lib_dirs(Rest, Root, Acc ++ FqApps).
-
-maybe_load_local_config(Dir, ParentConfig) ->
-    %% We need to ensure we don't overwrite custom
-    %% config when we are dealing with base_dir.
-    case rebar_utils:processing_base_dir(ParentConfig, Dir) of
-        true ->
-            ParentConfig;
-        false ->
-            rebar_config:new(ParentConfig)
-    end.

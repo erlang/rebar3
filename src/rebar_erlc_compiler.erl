@@ -91,26 +91,26 @@
 %%                           'old_inets'}]}.
 %%
 
--spec compile(rebar_config:config(), file:name()) -> 'ok'.
+-spec compile(rebar_state:t(), file:name()) -> 'ok'.
 compile(Config, Dir) ->
     rebar_base_compiler:run(Config,
-                            check_files(rebar_config:get_local(
+                            check_files(rebar_state:get(
                                           Config, xrl_first_files, [])),
                             "src", ".xrl", "src", ".erl",
                             fun compile_xrl/3),
     rebar_base_compiler:run(Config,
-                            check_files(rebar_config:get_local(
+                            check_files(rebar_state:get(
                                           Config, yrl_first_files, [])),
                             "src", ".yrl", "src", ".erl",
                             fun compile_yrl/3),
     rebar_base_compiler:run(Config,
-                            check_files(rebar_config:get_local(
+                            check_files(rebar_state:get(
                                           Config, mib_first_files, [])),
                             "mibs", ".mib", "priv/mibs", ".bin",
                             fun compile_mib/3),
     doterl_compile(Config, Dir).
 
--spec clean(rebar_config:config(), file:filename()) -> 'ok'.
+-spec clean(rebar_state:t(), file:filename()) -> 'ok'.
 clean(Config, _AppFile) ->
     MibFiles = rebar_utils:find_files("mibs", ?RE_PREFIX".*\\.mib\$"),
     MIBs = [filename:rootname(filename:basename(MIB)) || MIB <- MibFiles],
@@ -234,22 +234,22 @@ test_compile_config_and_opts(Config, ErlOpts, Cmd) ->
     {Config3, EqcOpts} = eqc_opts(Config2),
 
     %% NOTE: For consistency, all *_first_files lists should be
-    %% retrieved via rebar_config:get_local. Right now
+    %% retrieved via rebar_state:get. Right now
     %% erl_first_files, eunit_first_files, and qc_first_files use
-    %% rebar_config:get_list and are inherited, but xrl_first_files
-    %% and yrl_first_files use rebar_config:get_local. Inheritance of
+    %% rebar_state:get_list and are inherited, but xrl_first_files
+    %% and yrl_first_files use rebar_state:get. Inheritance of
     %% *_first_files is questionable as the file would need to exist
     %% in all project directories for it to work.
     OptsAtom = list_to_atom(Cmd ++ "_compile_opts"),
-    TestOpts = rebar_config:get_list(Config3, OptsAtom, []),
+    TestOpts = rebar_state:get_list(Config3, OptsAtom, []),
     Opts0 = [{d, 'TEST'}] ++
         ErlOpts ++ TestOpts ++ TriqOpts ++ PropErOpts ++ EqcOpts,
     Opts = [O || O <- Opts0, O =/= no_debug_info],
-    Config4 = rebar_config:set(Config3, erl_opts, Opts),
+    Config4 = rebar_state:set(Config3, erl_opts, Opts),
 
     FirstFilesAtom = list_to_atom(Cmd ++ "_first_files"),
-    FirstErls = rebar_config:get_list(Config4, FirstFilesAtom, []),
-    Config5 = rebar_config:set(Config4, erl_first_files, FirstErls),
+    FirstErls = rebar_state:get_list(Config4, FirstFilesAtom, []),
+    Config5 = rebar_state:set(Config4, erl_first_files, FirstErls),
     {Config5, Opts}.
 
 triq_opts(Config) ->
@@ -274,7 +274,7 @@ define_if(Def, true) -> [{d, Def}];
 define_if(_Def, false) -> [].
 
 is_lib_avail(Config, DictKey, Mod, Hrl, Name) ->
-    case rebar_config:get_xconf(Config, DictKey, undefined) of
+    case rebar_state:get_xconf(Config, DictKey, undefined) of
         undefined ->
             IsAvail = case code:lib_dir(Mod, include) of
                           {error, bad_name} ->
@@ -282,21 +282,21 @@ is_lib_avail(Config, DictKey, Mod, Hrl, Name) ->
                           Dir ->
                               filelib:is_regular(filename:join(Dir, Hrl))
                       end,
-            NewConfig = rebar_config:set_xconf(Config, DictKey, IsAvail),
+            NewConfig = rebar_state:set_xconf(Config, DictKey, IsAvail),
             ?DEBUG("~s availability: ~p\n", [Name, IsAvail]),
             {NewConfig, IsAvail};
         IsAvail ->
             {Config, IsAvail}
     end.
 
--spec doterl_compile(rebar_config:config(), file:filename()) -> 'ok'.
+-spec doterl_compile(rebar_state:t(), file:filename()) -> 'ok'.
 doterl_compile(Config, Dir) ->
     ErlOpts = rebar_utils:erl_opts(Config),
     doterl_compile(Config, Dir, [], ErlOpts).
 
 doterl_compile(Config, Dir, MoreSources, ErlOpts) ->
     OutDir = filename:join(Dir, "ebin"),
-    ErlFirstFilesConf = rebar_config:get_list(Config, erl_first_modules, []),
+    ErlFirstFilesConf = rebar_state:get(Config, erl_first_modules, []),
     ?DEBUG("erl_opts ~p~n", [ErlOpts]),
     %% Support the src_dirs option allowing multiple directories to
     %% contain erlang source. This might be used, for example, should
@@ -306,7 +306,7 @@ doterl_compile(Config, Dir, MoreSources, ErlOpts) ->
                         end, rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts))),
     AllErlFiles = gather_src(SrcDirs, []) ++ MoreSources,
     %% NOTE: If and when erl_first_files is not inherited anymore
-    %% (rebar_config:get_local instead of rebar_config:get_list), consider
+    %% (rebar_state:get instead of rebar_state:get_list), consider
     %% logging a warning message for any file listed in erl_first_files which
     %% wasn't found via gather_src.
     {ErlFirstFiles, RestErls} =
@@ -394,9 +394,9 @@ u_add_element(Elem, [E1|Set])     -> [E1|u_add_element(Elem, Set)];
 u_add_element(Elem, [])           -> [Elem].
 
 -spec include_path(file:filename(),
-                   rebar_config:config()) -> [file:filename(), ...].
+                   rebar_state:t()) -> [file:filename(), ...].
 include_path(Source, Config) ->
-    ErlOpts = rebar_config:get(Config, erl_opts, []),
+    ErlOpts = rebar_state:get(Config, erl_opts, []),
     Dir = filename:join(lists:droplast(filename:split(filename:dirname(Source)))),
     lists:usort([filename:join(Dir, "include"), filename:dirname(Source)]
                 ++ proplists:get_all_values(i, ErlOpts)).
@@ -562,7 +562,7 @@ get_children(G, Source) ->
     %% Return all files dependent on the Source.
     digraph_utils:reaching_neighbours([Source], G).
 
--spec internal_erl_compile(rebar_config:config(), file:filename(), file:filename(),
+-spec internal_erl_compile(rebar_state:t(), file:filename(), file:filename(),
                            file:filename(), list(),
                            rebar_digraph()) -> 'ok' | 'skipped'.
 internal_erl_compile(Config, Dir, Source, OutDir, ErlOpts, G) ->
@@ -595,12 +595,12 @@ internal_erl_compile(Config, Dir, Source, OutDir, ErlOpts, G) ->
     end.
 
 -spec compile_mib(file:filename(), file:filename(),
-                  rebar_config:config()) -> 'ok'.
+                  rebar_state:t()) -> 'ok'.
 compile_mib(Source, Target, Config) ->
     ok = rebar_utils:ensure_dir(Target),
     ok = rebar_utils:ensure_dir(filename:join("include", "dummy.hrl")),
     Opts = [{outdir, "priv/mibs"}, {i, ["priv/mibs"]}] ++
-        rebar_config:get(Config, mib_opts, []),
+        rebar_state:get(Config, mib_opts, []),
     case snmpc:compile(Source, Opts) of
         {ok, _} ->
             Mib = filename:rootname(Target),
@@ -620,18 +620,18 @@ compile_mib(Source, Target, Config) ->
     end.
 
 -spec compile_xrl(file:filename(), file:filename(),
-                  rebar_config:config()) -> 'ok'.
+                  rebar_state:t()) -> 'ok'.
 compile_xrl(Source, Target, Config) ->
-    Opts = [{scannerfile, Target} | rebar_config:get(Config, xrl_opts, [])],
+    Opts = [{scannerfile, Target} | rebar_state:get(Config, xrl_opts, [])],
     compile_xrl_yrl(Config, Source, Target, Opts, leex).
 
 -spec compile_yrl(file:filename(), file:filename(),
-                  rebar_config:config()) -> 'ok'.
+                  rebar_state:t()) -> 'ok'.
 compile_yrl(Source, Target, Config) ->
-    Opts = [{parserfile, Target} | rebar_config:get(Config, yrl_opts, [])],
+    Opts = [{parserfile, Target} | rebar_state:get(Config, yrl_opts, [])],
     compile_xrl_yrl(Config, Source, Target, Opts, yecc).
 
--spec compile_xrl_yrl(rebar_config:config(), file:filename(),
+-spec compile_xrl_yrl(rebar_state:t(), file:filename(),
                       file:filename(), list(), module()) -> 'ok'.
 compile_xrl_yrl(Config, Source, Target, Opts, Mod) ->
     case needs_compile(Source, Target, []) of

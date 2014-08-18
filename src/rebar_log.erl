@@ -42,8 +42,7 @@
 %% Public API
 %% ===================================================================
 
-init(Caller, Config) ->
-    Verbosity = rebar_config:get_global(Config, verbose, default_level()),
+init(Caller, Verbosity) ->
     Level = case valid_level(Verbosity) of
                 ?ERROR_LEVEL -> error;
                 ?WARN_LEVEL  -> warn;

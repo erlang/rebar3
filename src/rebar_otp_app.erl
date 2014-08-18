@@ -60,7 +60,7 @@ compile(Config, App) ->
             %% In general, the list of modules is an important thing to validate
             %% for compliance with OTP guidelines and upgrade procedures.
             %% However, some people prefer not to validate this list.
-            case rebar_config:get_local(Config3, validate_app_modules, true) of
+            case rebar_state:get(Config3, validate_app_modules, true) of
                 true ->
                     Modules = proplists:get_value(modules, AppData),
                     {validate_modules(Dir, AppName, Modules), rebar_app_info:original_vsn(App1, AppVsn)};
@@ -138,14 +138,13 @@ preprocess(Config, Dir, AppSrcFile) ->
             true = code:add_path(filename:absname(filename:dirname(AppFile))),
 
             {Config2, AppFile};
-
         {error, Reason} ->
             ?ABORT("Failed to read ~s for preprocessing: ~p\n",
                    [AppSrcFile, Reason])
     end.
 
 load_app_vars(Config) ->
-    case rebar_config:get_local(Config, app_vars_file, undefined) of
+    case rebar_state:get(Config, app_vars_file, undefined) of
         undefined ->
             ?DEBUG("No app_vars_file defined.\n", []),
             [];

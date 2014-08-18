@@ -137,23 +137,23 @@ is_skipped_app(Config, AppFile) ->
 %% Internal functions
 %% ===================================================================
 
-load_app_file(Config, Filename) ->
+load_app_file(State, Filename) ->
     AppFile = {app_file, Filename},
-    case rebar_config:get_xconf(Config, {appfile, AppFile}, undefined) of
+    case rebar_state:get(State, {appfile, AppFile}, undefined) of
         undefined ->
             case consult_app_file(Filename) of
                 {ok, [{application, AppName, AppData}]} ->
-                    Config1 = rebar_config:set_xconf(Config,
-                                                     {appfile, AppFile},
-                                                     {AppName, AppData}),
-                    {ok, Config1, AppName, AppData};
+                    State1 = rebar_state:set(State,
+                                             {appfile, AppFile},
+                                             {AppName, AppData}),
+                    {ok, State1, AppName, AppData};
                 {error, _} = Error ->
                     Error;
                 Other ->
                     {error, {unexpected_terms, Other}}
             end;
         {AppName, AppData} ->
-            {ok, Config, AppName, AppData}
+            {ok, State, AppName, AppData}
     end.
 
 %% In the case of *.app.src we want to give the user the ability to
@@ -166,7 +166,7 @@ consult_app_file(Filename) ->
         false ->
             file:consult(Filename);
         true ->
-            rebar_config:consult_file(Filename)
+            {ok, rebar_config:consult_file(Filename)}
     end.
 
 get_value(Key, AppInfo, AppFile) ->

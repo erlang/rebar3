@@ -3,11 +3,11 @@
 -export([do/2,
          find_apps/1]).
 
-do(Config, LibDirs) ->
+do(State, LibDirs) ->
     Apps = find_apps(LibDirs),
-    lists:foldl(fun(AppInfo, ConfigAcc) ->
-                        rebar_config:add_app(ConfigAcc, AppInfo)
-            end, Config, Apps).
+    lists:foldl(fun(AppInfo, StateAcc) ->
+                        rebar_state:add_app(StateAcc, AppInfo)
+            end, State, Apps).
 
 -spec all_app_dirs(list(file:name())) -> list(file:name()).
 all_app_dirs(LibDirs) ->
@@ -72,13 +72,14 @@ create_app_info(AppDir, AppFile) ->
             AbsCwd = filename:absname(rebar_utils:get_cwd()),
             {ok, AppInfo} = rebar_app_info:new(AppName, AppVsn, AppDir),
             RebarConfig = filename:join(AppDir, "rebar.config"),
-            AppConfig = case filelib:is_file(RebarConfig) of
+            AppState = case filelib:is_file(RebarConfig) of
                             true ->
-                                rebar_config:new(RebarConfig);
+                                Terms = rebar_config:consult_file(RebarConfig),
+                                rebar_state:new(Terms);
                             false ->
-                                rebar_config:new()
+                                rebar_state:new()
                         end,
-            AppConfig1 = rebar_config:set_xconf(AppConfig, base_dir, AbsCwd),
-            AppInfo1 = rebar_app_info:config(AppInfo, AppConfig1),
+            AppState1 = rebar_state:set(AppState, base_dir, AbsCwd),
+            AppInfo1 = rebar_app_info:config(AppInfo, AppState1),
             rebar_app_info:dir(AppInfo1, AppDir)
     end.

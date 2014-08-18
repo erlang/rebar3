@@ -47,9 +47,9 @@
 %% Public API
 %% ===================================================================
 
--spec init(rebar_config:config()) -> {ok, rebar_config:config()}.
+-spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_config:add_provider(State, #provider{name = ?PROVIDER,
+    State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
                                                         provider_impl = ?MODULE,
                                                         bare = false,
                                                         deps = ?DEPS,
@@ -59,10 +59,10 @@ init(State) ->
                                                         opts = []}),
     {ok, State1}.
 
--spec do(rebar_config:config()) -> {ok, rebar_config:config()} | relx:error().
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
 do(Config) ->
-    AppName = rebar_config:get_local(Config, escript_top_level_app, undefined),
-    App = rebar_config:get_app(Config, AppName),
+    AppName = rebar_state:get_local(Config, escript_top_level_app, undefined),
+    App = rebar_state:get_app(Config, AppName),
     {ok, Config1} = escriptize(Config, rebar_app_info:app_file(App)),
     {ok, Config1}.
 
@@ -73,14 +73,14 @@ escriptize(Config0, AppFile) ->
     AppNameStr = atom_to_list(AppName),
 
     %% Get the output filename for the escript -- this may include dirs
-    Filename = rebar_config:get_local(Config, escript_name, AppName),
+    Filename = rebar_state:get_local(Config, escript_name, AppName),
     ok = filelib:ensure_dir(Filename),
 
     %% Look for a list of other applications (dependencies) to include
     %% in the output file. We then use the .app files for each of these
     %% to pull in all the .beam files.
     InclBeams = get_app_beams(
-                  rebar_config:get_local(Config, escript_incl_apps, []), []),
+                  rebar_state:get_local(Config, escript_incl_apps, []), []),
 
     %% Look for a list of extra files to include in the output file.
     %% For internal rebar-private use only. Do not use outside rebar.
@@ -97,12 +97,12 @@ escriptize(Config0, AppFile) ->
         {ok, {"mem", ZipBin}} ->
             %% Archive was successfully created. Prefix that binary with our
             %% header and write to our escript file
-            Shebang = rebar_config:get(Config, escript_shebang,
+            Shebang = rebar_state:get(Config, escript_shebang,
                                        "#!/usr/bin/env escript\n"),
-            Comment = rebar_config:get(Config, escript_comment, "%%\n"),
+            Comment = rebar_state:get(Config, escript_comment, "%%\n"),
             DefaultEmuArgs = ?FMT("%%! -pa ~s/~s/ebin\n",
                                   [AppNameStr, AppNameStr]),
-            EmuArgs = rebar_config:get(Config, escript_emu_args,
+            EmuArgs = rebar_state:get(Config, escript_emu_args,
                                        DefaultEmuArgs),
             Script = iolist_to_binary([Shebang, Comment, EmuArgs, ZipBin]),
             case file:write_file(Filename, Script) of
@@ -130,7 +130,7 @@ clean(Config0, AppFile) ->
     {Config, AppName} = rebar_app_utils:app_name(Config0, AppFile),
 
     %% Get the output filename for the escript -- this may include dirs
-    Filename = rebar_config:get_local(Config, escript_name, AppName),
+    Filename = rebar_state:get_local(Config, escript_name, AppName),
     rebar_file_utils:delete_each([Filename]),
     {ok, Config}.
 
@@ -176,7 +176,7 @@ get_app_beams([App | Rest], Acc) ->
     end.
 
 get_extra(Config) ->
-    Extra = rebar_config:get_local(Config, escript_incl_extra, []),
+    Extra = rebar_state:get_local(Config, escript_incl_extra, []),
     lists:foldl(fun({Wildcard, Dir}, Files) ->
                         load_files(Wildcard, Dir) ++ Files
                 end, [], Extra).

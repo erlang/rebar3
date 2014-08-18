@@ -41,27 +41,27 @@
 -export([get_deps_dir/2]).
 
 -define(PROVIDER, deps).
--define(DEPS, []).
+-define(DEPS, [app_discovery]).
 
 %% ===================================================================
 %% Public API
 %% ===================================================================
 
--spec init(rebar_config:config()) -> {ok, rebar_config:config()}.
+-spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_config:add_provider(State, #provider{name = ?PROVIDER,
-                                                        provider_impl = ?MODULE,
-                                                        bare = false,
-                                                        deps = ?DEPS,
-                                                        example = "rebar deps",
-                                                        short_desc = "",
-                                                        desc = "",
-                                                        opts = []}),
+    State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
+                                                       provider_impl = ?MODULE,
+                                                       bare = false,
+                                                       deps = ?DEPS,
+                                                       example = "rebar deps",
+                                                       short_desc = "",
+                                                       desc = "",
+                                                       opts = []}),
     {ok, State1}.
 
--spec do(rebar_config:config()) -> {ok, rebar_config:config()} | relx:error().
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
 do(Config) ->
-    Deps = rebar_config:get_local(Config, deps, []),
+    Deps = rebar_state:get(Config, deps, []),
     Goals = lists:map(fun({Name, "", _}) ->
                               Name;
                          ({Name, ".*", _}) ->
@@ -71,9 +71,9 @@ do(Config) ->
                       end, Deps),
 
     {Config1, Deps1} = update_deps(Config, Deps),
-    Config2 = rebar_config:deps(Config1, Deps1),
+    Config2 = rebar_state:set(Config1, deps, Deps1),
 
-    {ok, rebar_config:goals(Config2, Goals)}.
+    {ok, rebar_state:set(Config2, goals, Goals)}.
 
 update_deps(Config, Deps) ->
     DepsDir = get_deps_dir(Config),
@@ -94,8 +94,9 @@ update_deps(Config, Deps) ->
 handle_deps(Deps, Found) ->
     NewDeps =
         lists:foldl(fun(X, DepsAcc) ->
-                            C = rebar_config:new2(rebar_config:new(), rebar_app_info:dir(X)),
-                            LocalDeps = rebar_config:get_local(C, deps, []),
+                            C = rebar_config:consult(rebar_app_info:dir(X)),
+                            S = rebar_state:new(rebar_state:new(), C, rebar_app_info:dir(X)),
+                            LocalDeps = rebar_state:get(S, deps, []),
                             [LocalDeps | DepsAcc]
                     end, [], Found),
     NewDeps1 = lists:flatten(NewDeps),
@@ -106,7 +107,7 @@ handle_deps(Deps, Found) ->
                  end, lists:usort(Deps), lists:usort(NewDeps1)).
 
 download_missing_deps(Config, DepsDir, Found, Deps) ->
-    Apps = rebar_config:apps_to_build(Config),
+    Apps = rebar_state:apps_to_build(Config),
     Missing = lists:filter(fun(X) ->
                                not lists:any(fun(F) ->
                                                      element(1, X) =:= element(2, F)
@@ -125,14 +126,14 @@ download_missing_deps(Config, DepsDir, Found, Deps) ->
     Config1 = lists:foldl(fun(X, ConfigAcc) ->
                                   TargetDir = get_deps_dir(DepsDir, element(1, X)),
                                   [AppSrc] = rebar_app_discover:find_apps([TargetDir]),
-                                  rebar_config:add_dep(ConfigAcc, AppSrc)
+                                  rebar_state:add_app(ConfigAcc, AppSrc)
                           end, Config, Missing),
 
     {Config1, Missing}.
 
 %% set REBAR_DEPS_DIR and ERL_LIBS environment variables
 setup_env(Config) ->
-    {true, DepsDir} = get_deps_dir(Config),
+    DepsDir = get_deps_dir(Config),
     %% include rebar's DepsDir in ERL_LIBS
     Separator = case os:type() of
                     {win32, nt} ->
@@ -149,8 +150,8 @@ setup_env(Config) ->
     [{"REBAR_DEPS_DIR", DepsDir}, ERL_LIBS].
 
 
-get_deps_dir(Config) ->
-    BaseDir = rebar_utils:base_dir(Config),
+get_deps_dir(State) ->
+    BaseDir = rebar_state:get(State, base_dir, ""),
     get_deps_dir(BaseDir, "deps").
 
 get_deps_dir(DepsDir, App) ->

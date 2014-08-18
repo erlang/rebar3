@@ -22,3 +22,7 @@
                     short_desc :: string(),    % A one line short description of the task
                     example :: string(),       % An example of the task usage
                     opts :: list()}).          % The list of options that the task requires/understands
+
+-define(DEFAULT_LIB_DIRS, ["apps", "libs", "."]).
+-define(DEFAULT_CONFIG_FILE, "rebar.config").
+-define(LOCK_FILE, "rebar.lock").

@@ -111,9 +111,9 @@
 %% Public API
 %% ===================================================================
 
--spec init(rebar_config:config()) -> {ok, rebar_config:config()}.
+-spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_config:add_provider(State, #provider{name = ?PROVIDER,
+    State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
                                                         provider_impl = ?MODULE,
                                                         bare = false,
                                                         deps = ?DEPS,
@@ -163,7 +163,7 @@ info(help, compile) ->
        ]).
 
 erlydtl_opts(Config) ->
-    Opts = rebar_config:get(Config, erlydtl_opts, []),
+    Opts = rebar_state:get(Config, erlydtl_opts, []),
     Tuples = [{K,V} || {K,V} <- Opts],
     case [L || L <- Opts, is_list(L), not io_lib:printable_list(L)] of
         [] ->

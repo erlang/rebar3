@@ -61,7 +61,6 @@
          erl_opts/1,
          src_dirs/1,
          ebin_dir/0,
-         base_dir/1,
          processing_base_dir/1,
          processing_base_dir/2,
          patch_env/2]).
@@ -129,7 +128,7 @@ sh_send(Command0, String, Options0) ->
 %% Val = string() | false
 %%
 sh(Command0, Options0) ->
-    ?INFO("sh info:\n\tcwd: ~p\n\tcmd: ~s\n", [get_cwd(), Command0]),
+    ?DEBUG("sh info:\n\tcwd: ~p\n\tcmd: ~s\n", [get_cwd(), Command0]),
     ?DEBUG("\topts: ~p\n", [Options0]),
 
     DefaultOptions = [use_stdout, abort_on_error],
@@ -236,12 +235,12 @@ expand_env_variable(InStr, VarName, RawVarValue) ->
 
 vcs_vsn(Config, Vsn, Dir) ->
     Key = {Vsn, Dir},
-    Cache = rebar_config:get_xconf(Config, vsn_cache),
+    Cache = rebar_state:get(Config, vsn_cache, dict:new()),
     case dict:find(Key, Cache) of
         error ->
             VsnString = vcs_vsn_1(Vsn, Dir),
             Cache1 = dict:store(Key, VsnString, Cache),
-            Config1 = rebar_config:set_xconf(Config, vsn_cache, Cache1),
+            Config1 = rebar_state:set(Config, vsn_cache, Cache1),
             {Config1, VsnString};
         {ok, VsnString} ->
             {Config, VsnString}
@@ -251,27 +250,27 @@ get_deprecated_global(Config, OldOpt, NewOpt, When) ->
     get_deprecated_global(Config, OldOpt, NewOpt, undefined, When).
 
 get_deprecated_global(Config, OldOpt, NewOpt, Default, When) ->
-    get_deprecated_3(fun rebar_config:get_global/3,
+    get_deprecated_3(fun rebar_state:get/3,
                      Config, OldOpt, NewOpt, Default, When).
 
 get_experimental_global(Config, Opt, Default) ->
-    get_experimental_3(fun rebar_config:get_global/3, Config, Opt, Default).
+    get_experimental_3(fun rebar_state:get/3, Config, Opt, Default).
 
 get_experimental_local(Config, Opt, Default) ->
-    get_experimental_3(fun rebar_config:get_local/3, Config, Opt, Default).
+    get_experimental_3(fun rebar_state:get/3, Config, Opt, Default).
 
 get_deprecated_list(Config, OldOpt, NewOpt, When) ->
     get_deprecated_list(Config, OldOpt, NewOpt, undefined, When).
 
 get_deprecated_list(Config, OldOpt, NewOpt, Default, When) ->
-    get_deprecated_3(fun rebar_config:get_list/3,
+    get_deprecated_3(fun rebar_state:get_list/3,
                      Config, OldOpt, NewOpt, Default, When).
 
 get_deprecated_local(Config, OldOpt, NewOpt, When) ->
     get_deprecated_local(Config, OldOpt, NewOpt, undefined, When).
 
 get_deprecated_local(Config, OldOpt, NewOpt, Default, When) ->
-    get_deprecated_3(fun rebar_config:get_local/3,
+    get_deprecated_3(fun rebar_state:get/3,
                      Config, OldOpt, NewOpt, Default, When).
 
 deprecated(Old, New, Opts, When) when is_list(Opts) ->
@@ -282,7 +281,7 @@ deprecated(Old, New, Opts, When) when is_list(Opts) ->
             ok
     end;
 deprecated(Old, New, Config, When) ->
-    case rebar_config:get(Config, Old, undefined) of
+    case rebar_state:get(Config, Old, undefined) of
         undefined ->
             ok;
         _ ->
@@ -319,11 +318,11 @@ delayed_halt(Code) ->
     end.
 
 %% @doc Return list of erl_opts
--spec erl_opts(rebar_config:config()) -> list().
+-spec erl_opts(rebar_state:config()) -> list().
 erl_opts(Config) ->
-    RawErlOpts = filter_defines(rebar_config:get(Config, erl_opts, []), []),
+    RawErlOpts = filter_defines(rebar_state:get(Config, erl_opts, []), []),
     Defines = [{d, list_to_atom(D)} ||
-                  D <- rebar_config:get_xconf(Config, defines, [])],
+                  D <- rebar_state:get(Config, defines, [])],
     Opts = Defines ++ RawErlOpts,
     case proplists:is_defined(no_debug_info, Opts) of
         true ->
@@ -341,26 +340,23 @@ src_dirs(SrcDirs) ->
 ebin_dir() ->
     filename:join(get_cwd(), "ebin").
 
-base_dir(Config) ->
-    rebar_config:get_xconf(Config, base_dir).
-
-processing_base_dir(Config) ->
+processing_base_dir(State) ->
     Cwd = rebar_utils:get_cwd(),
-    processing_base_dir(Config, Cwd).
+    processing_base_dir(State, Cwd).
 
-processing_base_dir(Config, Dir) ->
+processing_base_dir(State, Dir) ->
     AbsDir = filename:absname(Dir),
-    AbsDir =:= base_dir(Config).
+    AbsDir =:= rebar_state:get(State, base_dir).
 
 %% @doc Returns the list of environment variables including 'REBAR' which
 %% points to the rebar executable used to execute the currently running
 %% command. The environment is not modified if rebar was invoked
 %% programmatically.
--spec patch_env(rebar_config:config(), [{string(), string()}])
+-spec patch_env(rebar_state:config(), [{string(), string()}])
                -> [{string(), string()}].
 patch_env(Config, []) ->
     %% If we reached an empty list, the env did not contain the REBAR variable.
-    case rebar_config:get_xconf(Config, escript, "") of
+    case rebar_state:get(Config, escript, "") of
         "" -> % rebar was invoked programmatically
             [];
         Path ->

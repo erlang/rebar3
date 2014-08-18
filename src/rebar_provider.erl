@@ -22,8 +22,8 @@
 
 -ifdef(have_callback_support).
 
--callback init(rebar_config:config()) -> {ok, rebar_config:config()} | relx:error().
--callback do(rebar_config:config()) ->  {ok, rebar_config:config()} | relx:error().
+-callback init(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
+-callback do(rebar_state:t()) ->  {ok, rebar_state:t()} | relx:error().
 
 -else.
 
@@ -48,8 +48,8 @@ behaviour_info(_) ->
 %%
 %% @param ModuleName The module name.
 %% @param State0 The current state of the system
--spec new(module(), rebar_config:config()) ->
-                 {ok, rebar_config:config()} | relx:error().
+-spec new(module(), rebar_state:t()) ->
+                 {ok, rebar_state:t()}.
 new(ModuleName, State0) when is_atom(ModuleName) ->
     case code:which(ModuleName) of
         non_existing ->
@@ -62,8 +62,8 @@ new(ModuleName, State0) when is_atom(ModuleName) ->
 %%
 %% @param Provider the provider object
 %% @param State the current state of the system
--spec do(Provider::t(), rebar_config:config()) ->
-                {ok, rebar_config:config()} | relx:error().
+-spec do(Provider::t(), rebar_state:t()) ->
+                {ok, rebar_state:t()}.
 do(Provider, State) ->
     (Provider#provider.provider_impl):do(State).
 
@@ -82,7 +82,7 @@ format(#provider{provider_impl=Mod}) ->
     erlang:atom_to_list(Mod).
 
 get_target_providers(Target, State) ->
-    Providers = rebar_config:providers(State),
+    Providers = rebar_state:providers(State),
     TargetProviders = lists:filter(fun(#provider{name=T}) when T =:= Target->
                                            true;
                                       (#provider{name=T}) ->
