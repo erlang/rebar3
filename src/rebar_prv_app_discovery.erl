@@ -32,5 +32,5 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
 do(State) ->
     LibDirs = rebar_state:get(State, lib_dirs, ?DEFAULT_LIB_DIRS),
-    State1 = rebar_app_discover:do(State, ["deps" | LibDirs]),
+    State1 = rebar_app_discover:do(State, LibDirs),
     {ok, State1}.

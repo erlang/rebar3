@@ -37,17 +37,17 @@
 process_command(State, Command) ->
     true = rebar_utils:expand_code_path(),
     LibDirs = rebar_state:get(State, lib_dirs, ?DEFAULT_LIB_DIRS),
-    DepsDir = rebar_state:get(State, deps_dir, "deps"),
+    DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIRS),
     _UpdatedCodePaths = update_code_path([DepsDir | LibDirs]),
     rebar_deps:setup_env(State),
-    State2 = rebar_app_discover:do(State, LibDirs),
-    TargetProviders = rebar_provider:get_target_providers(Command, State2),
+
+    TargetProviders = rebar_provider:get_target_providers(Command, State),
 
     lists:foldl(fun(TargetProvider, Conf) ->
                         Provider = rebar_provider:get_provider(TargetProvider, rebar_state:providers(Conf)),
                         {ok, Conf1} = rebar_provider:do(Provider, Conf),
                         Conf1
-                end, State2, TargetProviders).
+                end, State, TargetProviders).
 
 update_code_path([]) ->
     no_change;

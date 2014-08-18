@@ -173,11 +173,11 @@ compile_queue(Config, Pids, Targets) ->
 
         {compiled, Source, Warnings} ->
             report(Warnings),
-            ?CONSOLE("Compiled ~s\n", [Source]),
+            ?INFO("Compiled ~s\n", [Source]),
             compile_queue(Config, Pids, Targets);
 
         {compiled, Source} ->
-            ?CONSOLE("Compiled ~s\n", [Source]),
+            ?INFO("Compiled ~s\n", [Source]),
             compile_queue(Config, Pids, Targets);
 
         {skipped, Source} ->

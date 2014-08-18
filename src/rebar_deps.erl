@@ -79,12 +79,13 @@ update_deps(Config, Deps) ->
     DepsDir = get_deps_dir(Config),
 
     %% Find available apps to fulfill dependencies
+    UnbuiltApps = rebar_app_discover:find_unbuilt_apps([DepsDir]),
     FoundApps = rebar_app_discover:find_apps([DepsDir]),
 
     %% Resolve deps and their dependencies
-    Deps1 = handle_deps(Deps, FoundApps),
+    Deps1 = handle_deps(Deps, UnbuiltApps++FoundApps),
 
-    case download_missing_deps(Config, DepsDir, FoundApps, Deps1) of
+    case download_missing_deps(Config, DepsDir, FoundApps, UnbuiltApps, Deps1) of
         {Config1, []} ->
             {Config1, Deps1};
         {Config1, _} ->
@@ -106,12 +107,11 @@ handle_deps(Deps, Found) ->
                          element(1, A) =:= element(1, B)
                  end, lists:usort(Deps), lists:usort(NewDeps1)).
 
-download_missing_deps(Config, DepsDir, Found, Deps) ->
-    Apps = rebar_state:apps_to_build(Config),
+download_missing_deps(Config, DepsDir, Found, Unbuilt, Deps) ->
     Missing = lists:filter(fun(X) ->
                                not lists:any(fun(F) ->
                                                      element(1, X) =:= element(2, F)
-                                             end, Found++Apps)
+                                             end, Found++Unbuilt)
                        end, Deps),
     ec_plists:foreach(fun(X) ->
                               TargetDir = get_deps_dir(DepsDir, element(1, X)),
@@ -125,7 +125,7 @@ download_missing_deps(Config, DepsDir, Found, Deps) ->
 
     Config1 = lists:foldl(fun(X, ConfigAcc) ->
                                   TargetDir = get_deps_dir(DepsDir, element(1, X)),
-                                  [AppSrc] = rebar_app_discover:find_apps([TargetDir]),
+                                  [AppSrc] = rebar_app_discover:find_unbuilt_apps([TargetDir]),
                                   rebar_state:add_app(ConfigAcc, AppSrc)
                           end, Config, Missing),
 
@@ -160,64 +160,6 @@ get_deps_dir(DepsDir, App) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
-
-
--spec gather_application_info(file:name(), file:filename()) ->
-                                     {ok, rebar_app_info:t()} |
-                                     {warning, Reason::term()} |
-                                     {error, Reason::term()}.
-gather_application_info(EbinDir, File) ->
-    AppDir = filename:dirname(EbinDir),
-    case file:consult(File) of
-        {ok, [{application, AppName, AppDetail}]} ->
-            validate_application_info(EbinDir, File, AppName, AppDetail);
-        {error, Reason} ->
-            {warning, {unable_to_load_app, AppDir, Reason}};
-        _ ->
-            {warning, {invalid_app_file, File}}
-    end.
-
--spec validate_application_info(file:name(),
-                                file:name(),
-                                atom(),
-                                proplists:proplist()) ->
-                                       {ok, list()} |
-                                       {warning, Reason::term()} |
-                                       {error, Reason::term()}.
-validate_application_info(EbinDir, AppFile, AppName, AppDetail) ->
-    AppDir = filename:dirname(EbinDir),
-    case get_modules_list(AppFile, AppDetail) of
-        {ok, List} ->
-            has_all_beams(EbinDir, List);
-        Error ->
-            Error
-    end.
-
--spec get_modules_list(file:name(), proplists:proplist()) ->
-                              {ok, list()} |
-                              {warning, Reason::term()} |
-                              {error, Reason::term()}.
-get_modules_list(AppFile, AppDetail) ->
-    case proplists:get_value(modules, AppDetail) of
-        undefined ->
-            {warning, {invalid_app_file, AppFile}};
-        ModulesList ->
-            {ok, ModulesList}
-    end.
-
--spec has_all_beams(file:name(), list()) ->
-                           ok | {error, Reason::term()}.
-has_all_beams(EbinDir, [Module | ModuleList]) ->
-    BeamFile = filename:join([EbinDir,
-                              list_to_binary(atom_to_list(Module) ++ ".beam")]),
-    case filelib:is_file(BeamFile) of
-        true ->
-            has_all_beams(EbinDir, ModuleList);
-        false ->
-            {warning, {missing_beam_file, Module, BeamFile}}
-    end;
-has_all_beams(_, []) ->
-    ok.
 
 info(help, 'deps') ->
     info_help("Display dependencies").

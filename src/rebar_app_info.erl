@@ -10,8 +10,11 @@
          app_file_src/2,
          app_file/1,
          app_file/2,
+         app_details/1,
+         app_details/2,
          original_vsn/1,
          original_vsn/2,
+         ebin_dir/1,
          dir/1,
          dir/2]).
 
@@ -22,6 +25,7 @@
                      app_file :: file:name(),
                      config :: rebar_config:config() | undefined,
                      original_vsn :: string(),
+                     app_details :: list(),
                      dir :: file:name(),
                      source :: string() | undefined}).
 
@@ -81,6 +85,14 @@ app_file(#app_info_t{app_file=AppFile}) ->
 app_file(AppInfo=#app_info_t{}, AppFile) ->
     AppInfo#app_info_t{app_file=AppFile}.
 
+-spec app_details(t()) -> list().
+app_details(#app_info_t{app_details=AppDetails}) ->
+    AppDetails.
+
+-spec app_details(t(), list()) -> t().
+app_details(AppInfo=#app_info_t{}, AppDetails) ->
+    AppInfo#app_info_t{app_details=AppDetails}.
+
 -spec original_vsn(t()) -> string().
 original_vsn(#app_info_t{original_vsn=Vsn}) ->
     Vsn.
@@ -92,6 +104,11 @@ original_vsn(AppInfo=#app_info_t{}, Vsn) ->
 -spec dir(t()) -> file:name().
 dir(#app_info_t{dir=Dir}) ->
     Dir.
+
 -spec dir(t(), file:name()) -> t().
 dir(AppInfo=#app_info_t{}, Dir) ->
     AppInfo#app_info_t{dir=Dir}.
+
+-spec ebin_dir(t()) -> file:name().
+ebin_dir(#app_info_t{dir=Dir}) ->
+    filename:join(Dir, "ebin").
