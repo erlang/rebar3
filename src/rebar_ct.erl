@@ -225,7 +225,7 @@ make_cmd(TestDir, RawLogDir, State) ->
     %% that are part of the root Erlang install are filtered out to
     %% avoid duplication
     Apps = rebar_state:apps_to_build(State),
-    DepsDir = rebar_deps:get_deps_dir(State),
+    DepsDir = rebar_prv_deps:get_deps_dir(State),
     DepsDirEbin = filename:join([DepsDir, "*", "ebin"]),
     AppDirs = [filename:join(rebar_app_info:dir(A), "ebin") || A <- Apps],
     CodeDirs = [io_lib:format("\"~s\"", [Dir]) || Dir <- [DepsDirEbin | AppDirs]],
@@ -311,7 +311,7 @@ get_cover_config(State, Cwd) ->
     end.
 
 collect_glob(State, Cwd, Glob) ->
-    DepsDir = rebar_deps:get_deps_dir(State),
+    DepsDir = rebar_prv_deps:get_deps_dir(State),
     CwdParts = filename:split(Cwd),
     filelib:fold_files(Cwd, Glob, true, fun(F, Acc) ->
         %% Ignore any specs under the deps/ directory. Do this pulling

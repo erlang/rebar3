@@ -144,7 +144,7 @@ download_missing_deps(State, DepsDir, Found, Unbuilt, Deps) ->
                                                      to_binary(dep_name(X)) =:= to_binary(rebar_app_info:name(F))
                                              end, Found++Unbuilt)
                        end, Deps),
-    lists:foreach(fun({DepName, _DepVsn, DepSource}) ->
+    ec_plists:map(fun({DepName, _DepVsn, DepSource}) ->
                           TargetDir = get_deps_dir(DepsDir, DepName),
                           case filelib:is_dir(TargetDir) of
                               true ->
@@ -152,22 +152,17 @@ download_missing_deps(State, DepsDir, Found, Unbuilt, Deps) ->
                               false ->
                                   ?INFO("Fetching ~s ~s~n", [element(1, DepSource)
                                                             ,element(2, DepSource)]),
-                                  rebar_fetch:download_source(TargetDir, DepSource)
+                                  rebar_fetch:download_source(TargetDir, DepSource),
+                                  case rebar_app_discover:find_unbuilt_apps([TargetDir]) of
+                                      [AppSrc] ->
+                                          _AppInfo1 = rebar_prv_app_builder:build(State, AppSrc);
+                                      [] ->
+                                          []
+                                  end
                           end
                   end, Missing),
 
-    State1 = lists:foldl(fun(X, StateAcc) ->
-                                  TargetDir = get_deps_dir(DepsDir, dep_name(X)),
-                                  case rebar_app_discover:find_unbuilt_apps([TargetDir]) of
-                                      [AppSrc] ->
-                                          {_AppInfo1, StateAcc1} = rebar_prv_app_builder:build(StateAcc, AppSrc),
-                                          StateAcc1;
-                                      [] ->
-                                          StateAcc
-                                  end
-                          end, State, Missing),
-
-    {State1, []}.
+    {State, []}.
 
 %% set REBAR_DEPS_DIR and ERL_LIBS environment variables
 setup_env(State) ->

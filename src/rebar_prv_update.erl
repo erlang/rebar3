@@ -35,10 +35,10 @@ do(State) ->
         [Name] ->
             ?INFO("Updating ~s~n", [Name]),
 
-            DepsDir = rebar_deps:get_deps_dir(State),
+            DepsDir = rebar_prv_deps:get_deps_dir(State),
             Deps = rebar_state:get_local(State, deps, []),
             {_, _, Source} = lists:keyfind(list_to_atom(Name), 1, Deps),
-            TargetDir = rebar_deps:get_deps_dir(DepsDir, Name),
+            TargetDir = rebar_prv_deps:get_deps_dir(DepsDir, Name),
             rebar_fetch:update_source1(TargetDir, Source),
 
             [App] = rebar_app_discover:find_apps([TargetDir]),

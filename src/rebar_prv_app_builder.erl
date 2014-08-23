@@ -28,15 +28,14 @@ init(State) ->
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
-do(Config) ->
-    Apps = rebar_state:apps_to_build(Config),
-    Config1 =
-        lists:foldl(fun(AppInfo, ConfigAcc) ->
-                            ?INFO("Compiling ~p ~s~n", [rebar_app_info:name(AppInfo)
-                                                       ,rebar_app_info:original_vsn(AppInfo)]),
-                            {_AppInfo1, ConfigAcc1} = build(ConfigAcc, AppInfo),
-                            ConfigAcc1
-                    end, Config, Apps),
+do(State) ->
+    Apps = rebar_state:apps_to_build(State),
+
+    lists:foreach(fun(AppInfo) ->
+                          ?INFO("Compiling ~p ~s~n", [rebar_app_info:name(AppInfo)
+                                                     ,rebar_app_info:original_vsn(AppInfo)]),
+                          _AppInfo1 = build(State, AppInfo)
+                  end, Apps),
 
     %% DepsDir = get_deps_dir(Config1),
     %% LockDeps = lists:map(fun({Name, Vsn, Source}) ->
@@ -44,13 +43,12 @@ do(Config) ->
     %%                              rebar_fetch:new(Dir, Name, Vsn, Source)
     %%                      end, rebar_state:deps(Config)),
     %% ok = file:write_file("./rebar.lock", io_lib:format("~p.~n", [LockDeps])),
-    {ok, Config1}.
+    {ok, State}.
 
-build(Config, AppInfo) ->
-    {ok, AppInfo1} = rebar_otp_app:compile(Config, AppInfo),
-    Config1 = rebar_state:apps_to_build(Config, AppInfo1),
-    rebar_erlc_compiler:compile(Config, rebar_app_info:dir(AppInfo1)),
-    {AppInfo1, Config1}.
+build(State, AppInfo) ->
+    {ok, AppInfo1} = rebar_otp_app:compile(State, AppInfo),
+    rebar_erlc_compiler:compile(State, rebar_app_info:dir(AppInfo1)),
+    AppInfo1.
 
 %% ===================================================================
 %% Internal functions
