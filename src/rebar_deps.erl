@@ -75,15 +75,12 @@ do(State) ->
                                       atom_to_binary(Name, utf8)
                               end, Deps),
             {ok, Solved} = rlx_depsolver:solve(Graph, Goals),
-
             M = lists:map(fun({Name, Vsn}) ->
-                                  {ok, P} = ec_lists:find(fun(App) ->
-                                                                  Name =:= proplists:get_value(<<"name">>, App)
-                                                                      andalso to_binary(rlx_depsolver:format_version(Vsn)) =:= proplists:get_value(<<"vsn">>, App)
-                                                          end, Packages),
+                                  FmtVsn = to_binary(rlx_depsolver:format_version(Vsn)),
+                                  {ok, P} = dict:find({Name, FmtVsn}, Packages),
                                   Link = proplists:get_value(<<"link">>, P),
                                   {Name, Vsn, {Name
-                                              ,to_binary(rlx_depsolver:format_version(Vsn))
+                                              ,FmtVsn
                                               ,Link}}
                           end, Solved),
 

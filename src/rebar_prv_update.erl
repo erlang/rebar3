@@ -47,12 +47,12 @@ do(State) ->
             State1 = rebar_state:replace_app(State, rebar_app_info:name(AppInfo1), AppInfo1),
             rebar_erlc_compiler:compile(State, rebar_app_info:dir(AppInfo1)),
 
-                                                %update_lock_file(State, AppInfo1, Source),
+            %update_lock_file(State, AppInfo1, Source),
 
-            {ok, State};
+            {ok, State1};
         [] ->
             ?INFO("Updating package index...", []),
-            Url = rebar_state:get(State, rebar_packages_url, ""),
+            Url = rebar_state:get(State, rebar_packages_url, "http://localhost:8080"),
             ec_file:mkdir_p(filename:join([os:getenv("HOME"), ".rebar"])),
             PackagesFile = filename:join([os:getenv("HOME"), ".rebar", "packages"]),
             {ok, RequestId} = httpc:request(get, {Url, []}, [], [{stream, PackagesFile}, {sync, false}]),
