@@ -14,7 +14,7 @@
               rebar_core,
               rebar_cover_utils,
               rebar_ct,
-              rebar_deps,
+              rebar_prv_deps,
               rebar_edoc,
               rebar_erlc_compiler,
               rebar_erlydtl_compiler,
@@ -57,7 +57,7 @@
 
         %% any_dir processing modules
         {providers, [rebar_escripter,
-                     rebar_deps,
+                     rebar_prv_deps,
                      rebar_erlydtl_compiler,
                      rebar_prv_app_builder,
                      rebar_prv_app_discovery,

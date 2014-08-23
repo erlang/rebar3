@@ -42,16 +42,16 @@
 %% Public API
 %% ===================================================================
 
-new(app, DirName, Config) ->
-    create1(Config, DirName, "simpleapp");
-new(lib, DirName, Config) ->
-    create1(Config, DirName, "simplelib");
-new(node, DirName, Config) ->
+new(app, DirName, State) ->
+    create1(State, DirName, "simpleapp");
+new(lib, DirName, State) ->
+    create1(State, DirName, "simplelib");
+new(node, DirName, State) ->
     %% Alias for create w/ template=simplenode
-    create1(Config, DirName, "simplenode").
+    create1(State, DirName, "simplenode").
 
-list_templates(Config) ->
-    {AvailTemplates, Files} = find_templates(Config),
+list_templates(State) ->
+    {AvailTemplates, Files} = find_templates(State),
     ?DEBUG("Available templates: ~p\n", [AvailTemplates]),
 
     lists:foreach(
@@ -67,9 +67,9 @@ list_templates(Config) ->
       end, AvailTemplates),
     ok.
 
-create(Config) ->
-    TemplateId = template_id(Config),
-    create1(Config, "", TemplateId).
+create(State) ->
+    TemplateId = template_id(State),
+    create1(State, "", TemplateId).
 
 %%
 %% Given a list of key value pairs, for each string value attempt to
@@ -100,10 +100,10 @@ render(Bin, Context) ->
 %% Internal functions
 %% ===================================================================
 
-create1(Config, AppDir, TemplateId) ->
+create1(State, AppDir, TemplateId) ->
     ec_file:mkdir_p(AppDir),
     file:set_cwd(AppDir),
-    {AvailTemplates, Files} = find_templates(Config),
+    {AvailTemplates, Files} = find_templates(State),
     ?DEBUG("Available templates: ~p\n", [AvailTemplates]),
 
     %% Using the specified template id, find the matching template file/type.
@@ -134,7 +134,7 @@ create1(Config, AppDir, TemplateId) ->
     end,
 
     %% Load variables from disk file, if provided
-    Context1 = case rebar_state:get(Config, template_vars, undefined) of
+    Context1 = case rebar_state:get(State, template_vars, undefined) of
                    undefined ->
                        Context0;
                    File ->
@@ -151,7 +151,7 @@ create1(Config, AppDir, TemplateId) ->
 
     %% For each variable, see if it's defined in global vars -- if it is,
     %% prefer that value over the defaults
-    Context2 = update_vars(Config, dict:fetch_keys(Context1), Context1),
+    Context2 = update_vars(State, dict:fetch_keys(Context1), Context1),
     ?DEBUG("Template ~p context: ~p\n", [TemplateId, dict:to_list(Context1)]),
 
     %% Handle variables that possibly include other variables in their
@@ -167,17 +167,17 @@ create1(Config, AppDir, TemplateId) ->
     ?DEBUG("Final template def ~p: ~p\n", [TemplateId, FinalTemplate]),
 
     %% Execute the instructions in the finalized template
-    Force = rebar_state:get(Config, force, "0"),
+    Force = rebar_state:get(State, force, "0"),
     execute_template(Files, FinalTemplate, Type, Template, Context, Force, []).
 
-find_templates(Config) ->
+find_templates(State) ->
     %% Load a list of all the files in the escript -- cache them since
     %% we'll potentially need to walk it several times over the course of
     %% a run.
-    Files = cache_escript_files(Config),
+    Files = cache_escript_files(State),
 
     %% Build a list of available templates
-    AvailTemplates = find_disk_templates(Config)
+    AvailTemplates = find_disk_templates(State)
         ++ find_escript_templates(Files),
 
     {AvailTemplates, Files}.
@@ -185,16 +185,16 @@ find_templates(Config) ->
 %%
 %% Scan the current escript for available files
 %%
-cache_escript_files(Config) ->
+cache_escript_files(State) ->
     {ok, Files} = rebar_utils:escript_foldl(
                     fun(Name, _, GetBin, Acc) ->
                             [{Name, GetBin()} | Acc]
                     end,
-                    [], rebar_state:get(Config, escript)),
+                    [], rebar_state:get(State, escript)),
     Files.
 
-template_id(Config) ->
-    case rebar_state:get(Config, template, undefined) of
+template_id(State) ->
+    case rebar_state:get(State, template, undefined) of
         undefined ->
             ?ABORT("No template specified.\n", []);
         TemplateId ->
@@ -206,16 +206,16 @@ find_escript_templates(Files) ->
      || {Name, _Bin} <- Files,
         re:run(Name, ?TEMPLATE_RE, [{capture, none}]) == match].
 
-find_disk_templates(Config) ->
-    OtherTemplates = find_other_templates(Config),
+find_disk_templates(State) ->
+    OtherTemplates = find_other_templates(State),
     HomeFiles = rebar_utils:find_files(filename:join([os:getenv("HOME"),
                                                       ".rebar", "templates"]),
                                        ?TEMPLATE_RE),
     LocalFiles = rebar_utils:find_files(".", ?TEMPLATE_RE, true),
     [{file, F} || F <- OtherTemplates ++ HomeFiles ++ LocalFiles].
 
-find_other_templates(Config) ->
-    case rebar_state:get(Config, template_dir, undefined) of
+find_other_templates(State) ->
+    case rebar_state:get(State, template_dir, undefined) of
         undefined ->
             [];
         TemplateDir ->
@@ -258,11 +258,11 @@ parse_vars(Other, _Dict) ->
 %% Given a list of keys in Dict, see if there is a corresponding value defined
 %% in the global config; if there is, update the key in Dict with it
 %%
-update_vars(_Config, [], Dict) ->
+update_vars(_State, [], Dict) ->
     Dict;
-update_vars(Config, [Key | Rest], Dict) ->
-    Value = rebar_state:get(Config, Key, dict:fetch(Key, Dict)),
-    update_vars(Config, Rest, dict:store(Key, Value, Dict)).
+update_vars(State, [Key | Rest], Dict) ->
+    Value = rebar_state:get(State, Key, dict:fetch(Key, Dict)),
+    update_vars(State, Rest, dict:store(Key, Value, Dict)).
 
 
 %%
