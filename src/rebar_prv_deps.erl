@@ -62,7 +62,9 @@ init(State) ->
 do(State) ->
     %% Read in package index and dep graph
     {Packages, Graph} = get_packages(State),
+    PtDeps = rebar_state:get(State, pt_deps, []),
     SrcDeps = rebar_state:get(State, src_deps, []),
+    {State1, _PtDeps1} = update_deps(State, PtDeps),
     {State1, SrcDeps1} = update_deps(State, SrcDeps),
 
     case rebar_state:get(State1, deps, []) of
@@ -144,7 +146,7 @@ download_missing_deps(State, DepsDir, Found, Unbuilt, Deps) ->
                                                      to_binary(dep_name(X)) =:= to_binary(rebar_app_info:name(F))
                                              end, Found++Unbuilt)
                        end, Deps),
-    ec_plists:map(fun({DepName, _DepVsn, DepSource}) ->
+    lists:map(fun({DepName, _DepVsn, DepSource}) ->
                           TargetDir = get_deps_dir(DepsDir, DepName),
                           case filelib:is_dir(TargetDir) of
                               true ->
@@ -155,7 +157,11 @@ download_missing_deps(State, DepsDir, Found, Unbuilt, Deps) ->
                                   rebar_fetch:download_source(TargetDir, DepSource),
                                   case rebar_app_discover:find_unbuilt_apps([TargetDir]) of
                                       [AppSrc] ->
-                                          _AppInfo1 = rebar_prv_app_builder:build(State, AppSrc);
+                                          C = rebar_config:consult(rebar_app_info:dir(AppSrc)),
+                                          S = rebar_state:new(rebar_state:new()
+                                                             ,C
+                                                             ,rebar_app_info:dir(AppSrc)),
+                                          _AppInfo1 = rebar_prv_app_builder:build(S, AppSrc);
                                       [] ->
                                           []
                                   end
