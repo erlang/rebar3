@@ -31,7 +31,11 @@ do(State) ->
     case rebar_state:command_args(State) of
         [TemplateName] ->
             Template = list_to_atom(TemplateName),
-            rebar_templater:new(Template, State),
+            rebar_templater:new(Template, "", State),
+            {ok, State};
+        [TemplateName, DirName] ->
+            Template = list_to_atom(TemplateName),
+            rebar_templater:new(Template, DirName, State),
             {ok, State};
         [] ->
             {ok, State}

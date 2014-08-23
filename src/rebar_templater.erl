@@ -26,7 +26,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_templater).
 
--export([new/2,
+-export([new/3,
          list_templates/1,
          create/1]).
 
@@ -42,13 +42,13 @@
 %% Public API
 %% ===================================================================
 
-new(app, Config) ->
-    create1(Config, "simpleapp");
-new(lib, Config) ->
-    create1(Config, "simplelib");
-new(node, Config) ->
+new(app, DirName, Config) ->
+    create1(Config, DirName, "simpleapp");
+new(lib, DirName, Config) ->
+    create1(Config, DirName, "simplelib");
+new(node, DirName, Config) ->
     %% Alias for create w/ template=simplenode
-    create1(Config, "simplenode").
+    create1(Config, DirName, "simplenode").
 
 list_templates(Config) ->
     {AvailTemplates, Files} = find_templates(Config),
@@ -69,7 +69,7 @@ list_templates(Config) ->
 
 create(Config) ->
     TemplateId = template_id(Config),
-    create1(Config, TemplateId).
+    create1(Config, "", TemplateId).
 
 %%
 %% Given a list of key value pairs, for each string value attempt to
@@ -100,7 +100,9 @@ render(Bin, Context) ->
 %% Internal functions
 %% ===================================================================
 
-create1(Config, TemplateId) ->
+create1(Config, AppDir, TemplateId) ->
+    ec_file:mkdir_p(AppDir),
+    file:set_cwd(AppDir),
     {AvailTemplates, Files} = find_templates(Config),
     ?DEBUG("Available templates: ~p\n", [AvailTemplates]),
 
