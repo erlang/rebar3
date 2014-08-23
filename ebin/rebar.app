@@ -30,7 +30,9 @@
               rebar_prv_app_discovery,
               rebar_require_vsn,
               rebar_prv_release,
+              rebar_prv_new,
               rebar_prv_update,
+              rebar_mustache,
               rebar_shell,
               rebar_state,
               rebar_prv_tar,
@@ -62,6 +64,7 @@
                      rebar_shell,
                      rebar_ct,
                      rebar_prv_tar,
+                     rebar_prv_new,
                      rebar_prv_update,
                      rebar_prv_release]}
         ]}

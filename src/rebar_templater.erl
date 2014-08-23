@@ -26,18 +26,13 @@
 %% -------------------------------------------------------------------
 -module(rebar_templater).
 
--export(['create-app'/2,
-         'create-lib'/2,
-         'create-node'/2,
-         'list-templates'/2,
-         create/2]).
+-export([new/2,
+         list_templates/1,
+         create/1]).
 
 %% API for other utilities that need templating functionality
 -export([resolve_variables/2,
          render/2]).
-
-%% for internal use only
--export([info/2]).
 
 -include("rebar.hrl").
 
@@ -47,19 +42,15 @@
 %% Public API
 %% ===================================================================
 
-'create-app'(Config, _File) ->
-    %% Alias for create w/ template=simpleapp
-    create1(Config, "simpleapp").
-
-'create-lib'(Config, _File) ->
-    %% Alias for create w/ template=simplelib
-    create1(Config, "simplelib").
-
-'create-node'(Config, _File) ->
+new(app, Config) ->
+    create1(Config, "simpleapp");
+new(lib, Config) ->
+    create1(Config, "simplelib");
+new(node, Config) ->
     %% Alias for create w/ template=simplenode
     create1(Config, "simplenode").
 
-'list-templates'(Config, _File) ->
+list_templates(Config) ->
     {AvailTemplates, Files} = find_templates(Config),
     ?DEBUG("Available templates: ~p\n", [AvailTemplates]),
 
@@ -76,7 +67,7 @@
       end, AvailTemplates),
     ok.
 
-create(Config, _) ->
+create(Config) ->
     TemplateId = template_id(Config),
     create1(Config, TemplateId).
 
@@ -108,33 +99,6 @@ render(Bin, Context) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
-
-info(help, create) ->
-    ?CONSOLE(
-       "Create skel based on template and vars.~n"
-       "~n"
-       "Valid command line options:~n"
-       "  template= [var=foo,...]~n", []);
-info(help, 'create-app') ->
-    ?CONSOLE(
-       "Create simple app skel.~n"
-       "~n"
-       "Valid command line options:~n"
-       "  [appid=myapp]~n", []);
-info(help, 'create-lib') ->
-    ?CONSOLE(
-       "Create simple lib skel.~n"
-       "~n"
-       "Valid command line options:~n"
-       "  [libid=mylib]~n", []);
-info(help, 'create-node') ->
-    ?CONSOLE(
-       "Create simple node skel.~n"
-       "~n"
-       "Valid command line options:~n"
-       "  [nodeid=mynode]~n", []);
-info(help, 'list-templates') ->
-    ?CONSOLE("List available templates.~n", []).
 
 create1(Config, TemplateId) ->
     {AvailTemplates, Files} = find_templates(Config),
@@ -168,7 +132,7 @@ create1(Config, TemplateId) ->
     end,
 
     %% Load variables from disk file, if provided
-    Context1 = case rebar_config:get_global(Config, template_vars, undefined) of
+    Context1 = case rebar_state:get(Config, template_vars, undefined) of
                    undefined ->
                        Context0;
                    File ->
@@ -201,7 +165,7 @@ create1(Config, TemplateId) ->
     ?DEBUG("Final template def ~p: ~p\n", [TemplateId, FinalTemplate]),
 
     %% Execute the instructions in the finalized template
-    Force = rebar_config:get_global(Config, force, "0"),
+    Force = rebar_state:get(Config, force, "0"),
     execute_template(Files, FinalTemplate, Type, Template, Context, Force, []).
 
 find_templates(Config) ->
@@ -224,11 +188,11 @@ cache_escript_files(Config) ->
                     fun(Name, _, GetBin, Acc) ->
                             [{Name, GetBin()} | Acc]
                     end,
-                    [], rebar_config:get_xconf(Config, escript)),
+                    [], rebar_state:get(Config, escript)),
     Files.
 
 template_id(Config) ->
-    case rebar_config:get_global(Config, template, undefined) of
+    case rebar_state:get(Config, template, undefined) of
         undefined ->
             ?ABORT("No template specified.\n", []);
         TemplateId ->
@@ -245,12 +209,11 @@ find_disk_templates(Config) ->
     HomeFiles = rebar_utils:find_files(filename:join([os:getenv("HOME"),
                                                       ".rebar", "templates"]),
                                        ?TEMPLATE_RE),
-    Recursive = rebar_config:is_recursive(Config),
-    LocalFiles = rebar_utils:find_files(".", ?TEMPLATE_RE, Recursive),
+    LocalFiles = rebar_utils:find_files(".", ?TEMPLATE_RE, true),
     [{file, F} || F <- OtherTemplates ++ HomeFiles ++ LocalFiles].
 
 find_other_templates(Config) ->
-    case rebar_config:get_global(Config, template_dir, undefined) of
+    case rebar_state:get(Config, template_dir, undefined) of
         undefined ->
             [];
         TemplateDir ->
@@ -296,7 +259,7 @@ parse_vars(Other, _Dict) ->
 update_vars(_Config, [], Dict) ->
     Dict;
 update_vars(Config, [Key | Rest], Dict) ->
-    Value = rebar_config:get_global(Config, Key, dict:fetch(Key, Dict)),
+    Value = rebar_state:get(Config, Key, dict:fetch(Key, Dict)),
     update_vars(Config, Rest, dict:store(Key, Value, Dict)).
 
 
