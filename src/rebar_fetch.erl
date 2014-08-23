@@ -114,7 +114,14 @@ download_source(AppDir, {fossil, Url, Version}) ->
     rebar_utils:sh(?FMT("fossil clone ~s ~s", [Url, Repository]),
                    [{cd, AppDir}]),
     rebar_utils:sh(?FMT("fossil open ~s ~s --nested", [Repository, Version]),
-                   []).
+                   []);
+download_source(AppDir, {AppName, AppVersion, Url}) when is_binary(AppName)
+                                                       , is_binary(AppVersion) ->
+    TmpDir = ec_file:insecure_mkdtemp(),
+    TmpFile = binary_to_list(filename:join(TmpDir, <<AppName/binary, "-", AppVersion/binary>>)),
+    {ok, saved_to_file} = httpc:request(get, {binary_to_list(Url), []}, [], [{stream, TmpFile}]),
+    ok = erl_tar:extract(TmpFile, [{cwd, filename:dirname(AppDir)}, compressed]),
+    ok.
 
 update_source1(AppDir, Args) when element(1, Args) =:= p4 ->
     download_source(AppDir, Args);

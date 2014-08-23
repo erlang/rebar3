@@ -63,12 +63,15 @@
          ebin_dir/0,
          processing_base_dir/1,
          processing_base_dir/2,
-         patch_env/2]).
+         patch_env/2,
+         indent/1]).
 
 %% for internal use only
 -export([otp_release/0]).
 
 -include("rebar.hrl").
+
+-define(ONE_LEVEL_INDENT, "     ").
 
 %% ====================================================================
 %% Public API
@@ -598,3 +601,8 @@ filter_defines([{platform_define, ArchRegex, Key, Value} | Rest], Acc) ->
     end;
 filter_defines([Opt | Rest], Acc) ->
     filter_defines(Rest, [Opt | Acc]).
+
+%% @doc ident to the level specified
+-spec indent(non_neg_integer()) -> iolist().
+indent(Amount) when erlang:is_integer(Amount) ->
+    [?ONE_LEVEL_INDENT || _ <- lists:seq(1, Amount)].

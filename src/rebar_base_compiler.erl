@@ -135,12 +135,12 @@ compile_each([], _Config, _CompileFn) ->
 compile_each([Source | Rest], Config, CompileFn) ->
     case compile(Source, Config, CompileFn) of
         ok ->
-            ?INFO("Compiled ~s\n", [Source]);
+            ?INFO("~sCompiled ~s\n", [rebar_utils:indent(1), Source]);
         {ok, Warnings} ->
             report(Warnings),
-            ?INFO("Compiled ~s\n", [Source]);
+            ?INFO("~sCompiled ~s\n", [rebar_utils:indent(1), Source]);
         skipped ->
-            ?DEBUG("Skipped ~s\n", [Source]);
+            ?DEBUG("~sSkipped ~s\n", [rebar_utils:indent(1), Source]);
         Error ->
             ?INFO("Compiling ~s failed:\n",
                      [maybe_absname(Config, Source)]),
@@ -165,7 +165,7 @@ compile_queue(Config, Pids, Targets) ->
             end;
 
         {fail, {_, {source, Source}}=Error} ->
-            ?CONSOLE("Compiling ~s failed:\n",
+            ?ERROR("Compiling ~s failed:\n",
                      [maybe_absname(Config, Source)]),
             maybe_report(Error),
             ?DEBUG("Worker compilation failed: ~p\n", [Error]),
@@ -173,17 +173,15 @@ compile_queue(Config, Pids, Targets) ->
 
         {compiled, Source, Warnings} ->
             report(Warnings),
-            ?INFO("Compiled ~s\n", [Source]),
+            ?INFO("~sCompiled ~s\n", [rebar_utils:indent(1), Source]),
             compile_queue(Config, Pids, Targets);
 
         {compiled, Source} ->
-            ?INFO("Compiled ~s\n", [Source]),
+            ?INFO("~sCompiled ~s\n", [rebar_utils:indent(1), Source]),
             compile_queue(Config, Pids, Targets);
-
         {skipped, Source} ->
-            ?DEBUG("Skipped ~s\n", [Source]),
+            ?DEBUG("~sSkipped ~s~n", [rebar_utils:indent(1), Source]),
             compile_queue(Config, Pids, Targets);
-
         {'DOWN', Mref, _, Pid, normal} ->
             ?DEBUG("Worker exited cleanly\n", []),
             Pids2 = lists:delete({Pid, Mref}, Pids),

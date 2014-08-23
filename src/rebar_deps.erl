@@ -36,7 +36,6 @@
 -export([setup_env/1]).
 
 %% for internal use only
--export([info/2]).
 -export([get_deps_dir/1]).
 -export([get_deps_dir/2]).
 
@@ -54,42 +53,62 @@ init(State) ->
                                                        bare = false,
                                                        deps = ?DEPS,
                                                        example = "rebar deps",
-                                                       short_desc = "",
-                                                       desc = "",
+                                                       short_desc = "Install dependencies",
+                                                       desc = info_help("Install dependencies"),
                                                        opts = []}),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
-do(Config) ->
-    Deps = rebar_state:get(Config, deps, []),
-    Goals = lists:map(fun({Name, "", _}) ->
-                              Name;
-                         ({Name, ".*", _}) ->
-                              Name;
-                         ({Name, Vsn, _}) ->
-                              {Name, Vsn}
-                      end, Deps),
+do(State) ->
+    %% Read in package index and dep graph
+    {Packages, Graph} = get_packages(State),
+    SrcDeps = rebar_state:get(State, src_deps, []),
+    {State1, SrcDeps1} = update_deps(State, SrcDeps),
 
-    {Config1, Deps1} = update_deps(Config, Deps),
-    Config2 = rebar_state:set(Config1, deps, Deps1),
+    case rebar_state:get(State1, deps, []) of
+        [] ->
+            {ok, rebar_state:set(State1, deps, SrcDeps1)};
+        Deps ->
+            Goals = lists:map(fun({Name, Vsn}) ->
+                                      {atom_to_binary(Name, utf8), Vsn};
+                                 (Name) ->
+                                      atom_to_binary(Name, utf8)
+                              end, Deps),
+            {ok, Solved} = rlx_depsolver:solve(Graph, Goals),
 
-    {ok, rebar_state:set(Config2, goals, Goals)}.
+            M = lists:map(fun({Name, Vsn}) ->
+                                  {ok, P} = ec_lists:find(fun(App) ->
+                                                                  Name =:= proplists:get_value(<<"name">>, App)
+                                                                      andalso to_binary(rlx_depsolver:format_version(Vsn)) =:= proplists:get_value(<<"vsn">>, App)
+                                                          end, Packages),
+                                  Link = proplists:get_value(<<"link">>, P),
+                                  {Name, Vsn, {Name
+                                              ,to_binary(rlx_depsolver:format_version(Vsn))
+                                              ,Link}}
+                          end, Solved),
 
-update_deps(Config, Deps) ->
-    DepsDir = get_deps_dir(Config),
+            {State2, Deps1} = update_deps(State1, M),
+            State3 = rebar_state:set(State2, deps, Deps1),
+
+            {ok, rebar_state:set(State3, goals, Goals)}
+    end.
+
+update_deps(State, Deps) ->
+    DepsDir = get_deps_dir(State),
 
     %% Find available apps to fulfill dependencies
+    %% Should only have to do this once, not every iteration
     UnbuiltApps = rebar_app_discover:find_unbuilt_apps([DepsDir]),
     FoundApps = rebar_app_discover:find_apps([DepsDir]),
 
     %% Resolve deps and their dependencies
     Deps1 = handle_deps(Deps, UnbuiltApps++FoundApps),
 
-    case download_missing_deps(Config, DepsDir, FoundApps, UnbuiltApps, Deps1) of
-        {Config1, []} ->
-            {Config1, Deps1};
-        {Config1, _} ->
-            update_deps(Config1, Deps1)
+    case download_missing_deps(State, DepsDir, FoundApps, UnbuiltApps, Deps1) of
+        {State1, []} ->
+            {State1, Deps1};
+        {State1, _} ->
+            update_deps(State1, Deps1)
     end.
 
 handle_deps(Deps, Found) ->
@@ -104,36 +123,58 @@ handle_deps(Deps, Found) ->
 
     %% Weed out duplicates
     lists:umerge(fun(A, B) ->
-                         element(1, A) =:= element(1, B)
+                         dep_name(A) =:= dep_name(B)
                  end, lists:usort(Deps), lists:usort(NewDeps1)).
 
-download_missing_deps(Config, DepsDir, Found, Unbuilt, Deps) ->
+dep_name({Name, _, _}) ->
+    Name;
+dep_name({Name, _}) ->
+    Name;
+dep_name(Name) ->
+    Name.
+
+
+to_binary(X) when is_binary(X) ->
+    X;
+to_binary(X) when is_atom(X) ->
+    atom_to_binary(X, utf8);
+to_binary(X) when is_list(X) ->
+    iolist_to_binary(X).
+
+download_missing_deps(State, DepsDir, Found, Unbuilt, Deps) ->
     Missing = lists:filter(fun(X) ->
                                not lists:any(fun(F) ->
-                                                     element(1, X) =:= element(2, F)
+                                                     to_binary(dep_name(X)) =:= to_binary(rebar_app_info:name(F))
                                              end, Found++Unbuilt)
                        end, Deps),
-    ec_plists:foreach(fun(X) ->
-                              TargetDir = get_deps_dir(DepsDir, element(1, X)),
-                              case filelib:is_dir(TargetDir) of
-                                  true ->
-                                      ok;
-                                  false ->
-                                      rebar_fetch:download_source(TargetDir, element(3, X))
-                              end
-                      end, Missing),
+    lists:foreach(fun({DepName, _DepVsn, DepSource}) ->
+                          TargetDir = get_deps_dir(DepsDir, DepName),
+                          case filelib:is_dir(TargetDir) of
+                              true ->
+                                  ok;
+                              false ->
+                                  ?INFO("Fetching ~s ~s~n", [element(1, DepSource)
+                                                            ,element(2, DepSource)]),
+                                  rebar_fetch:download_source(TargetDir, DepSource)
+                          end
+                  end, Missing),
 
-    Config1 = lists:foldl(fun(X, ConfigAcc) ->
-                                  TargetDir = get_deps_dir(DepsDir, element(1, X)),
-                                  [AppSrc] = rebar_app_discover:find_unbuilt_apps([TargetDir]),
-                                  rebar_state:add_app(ConfigAcc, AppSrc)
-                          end, Config, Missing),
+    State1 = lists:foldl(fun(X, StateAcc) ->
+                                  TargetDir = get_deps_dir(DepsDir, dep_name(X)),
+                                  case rebar_app_discover:find_unbuilt_apps([TargetDir]) of
+                                      [AppSrc] ->
+                                          {_AppInfo1, StateAcc1} = rebar_prv_app_builder:build(StateAcc, AppSrc),
+                                          StateAcc1;
+                                      [] ->
+                                          StateAcc
+                                  end
+                          end, State, Missing),
 
-    {Config1, Missing}.
+    {State1, []}.
 
 %% set REBAR_DEPS_DIR and ERL_LIBS environment variables
-setup_env(Config) ->
-    DepsDir = get_deps_dir(Config),
+setup_env(State) ->
+    DepsDir = get_deps_dir(State),
     %% include rebar's DepsDir in ERL_LIBS
     Separator = case os:type() of
                     {win32, nt} ->
@@ -161,41 +202,54 @@ get_deps_dir(DepsDir, App) ->
 %% Internal functions
 %% ===================================================================
 
-info(help, 'deps') ->
-    info_help("Display dependencies").
+get_packages(State) ->
+    RebarDir = rebar_state:get(State, global_rebar_dir, filename:join(os:getenv("HOME"), ".rebar")),
+    PackagesFile = filename:join(RebarDir, "packages"),
+    case ec_file:exists(PackagesFile) of
+        true ->
+            try
+                {ok, Binary} = file:read_file(PackagesFile),
+                binary_to_term(Binary)
+            catch
+                _:_ ->
+                    ?ERROR("Bad packages index, try to fix with `rebar update`~n", []),
+                    {[], rlx_depsolver:new()}
+            end;
+        false ->
+            {[], rlx_depsolver:new()}
+    end.
 
 info_help(Description) ->
-    ?CONSOLE(
-       "~s.~n"
-       "~n"
-       "Valid rebar.config options:~n"
-       "  ~p~n"
-       "  ~p~n"
-       "Valid command line options:~n"
-       "  deps_dir=\"deps\" (override default or rebar.config deps_dir)~n",
-       [
-        Description,
-        {deps_dir, "deps"},
-        {deps,
-         [app_name,
-          {rebar, "1.0.*"},
-          {rebar, ".*",
-           {git, "git://github.com/rebar/rebar.git"}},
-          {rebar, ".*",
-           {git, "git://github.com/rebar/rebar.git", "Rev"}},
-          {rebar, "1.0.*",
-           {git, "git://github.com/rebar/rebar.git", {branch, "master"}}},
-          {rebar, "1.0.0",
-           {git, "git://github.com/rebar/rebar.git", {tag, "1.0.0"}}},
-          {rebar, "",
-           {git, "git://github.com/rebar/rebar.git", {branch, "master"}},
-           [raw]},
-          {app_name, ".*", {hg, "https://www.example.org/url"}},
-          {app_name, ".*", {rsync, "Url"}},
-          {app_name, ".*", {svn, "https://www.example.org/url"}},
-          {app_name, ".*", {svn, "svn://svn.example.org/url"}},
-          {app_name, ".*", {bzr, "https://www.example.org/url", "Rev"}},
-          {app_name, ".*", {fossil, "https://www.example.org/url"}},
-          {app_name, ".*", {fossil, "https://www.example.org/url", "Vsn"}},
-          {app_name, ".*", {p4, "//depot/subdir/app_dir"}}]}
-       ]).
+    io_lib:format("~s.~n"
+                 "~n"
+                 "Valid rebar.config options:~n"
+                 "  ~p~n"
+                 "  ~p~n"
+                 "Valid command line options:~n"
+                 "  deps_dir=\"deps\" (override default or rebar.config deps_dir)~n",
+                 [
+                 Description,
+                 {deps_dir, "deps"},
+                 {deps,
+                  [app_name,
+                   {rebar, "1.0.*"},
+                   {rebar, ".*",
+                    {git, "git://github.com/rebar/rebar.git"}},
+                   {rebar, ".*",
+                    {git, "git://github.com/rebar/rebar.git", "Rev"}},
+                   {rebar, "1.0.*",
+                    {git, "git://github.com/rebar/rebar.git", {branch, "master"}}},
+                   {rebar, "1.0.0",
+                    {git, "git://github.com/rebar/rebar.git", {tag, "1.0.0"}}},
+                   {rebar, "",
+                    {git, "git://github.com/rebar/rebar.git", {branch, "master"}},
+                    [raw]},
+                   {app_name, ".*", {hg, "https://www.example.org/url"}},
+                   {app_name, ".*", {rsync, "Url"}},
+                   {app_name, ".*", {svn, "https://www.example.org/url"}},
+                   {app_name, ".*", {svn, "svn://svn.example.org/url"}},
+                   {app_name, ".*", {bzr, "https://www.example.org/url", "Rev"}},
+                   {app_name, ".*", {fossil, "https://www.example.org/url"}},
+                   {app_name, ".*", {fossil, "https://www.example.org/url", "Vsn"}},
+                   {app_name, ".*", {p4, "//depot/subdir/app_dir"}}]}
+                 ]).

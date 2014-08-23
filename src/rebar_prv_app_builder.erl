@@ -3,7 +3,8 @@
 -behaviour(rebar_provider).
 
 -export([init/1,
-         do/1]).
+         do/1,
+         build/2]).
 
 -include("rebar.hrl").
 
@@ -47,17 +48,10 @@ do(Config) ->
 
 build(Config, AppInfo) ->
     {ok, AppInfo1} = rebar_otp_app:compile(Config, AppInfo),
-    Config1 = rebar_state:add_app(Config, AppInfo1),
+    Config1 = rebar_state:apps_to_build(Config, AppInfo1),
     rebar_erlc_compiler:compile(Config, rebar_app_info:dir(AppInfo1)),
     {AppInfo1, Config1}.
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
-
-get_deps_dir(Config) ->
-    BaseDir = rebar_utils:base_dir(Config),
-    get_deps_dir(BaseDir, deps).
-
-get_deps_dir(DepsDir, App) ->
-    filename:join(DepsDir, atom_to_list(App)).

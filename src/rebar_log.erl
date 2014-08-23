@@ -62,8 +62,8 @@ log(Level, Str, Args) ->
 error_level() -> ?ERROR_LEVEL.
 default_level() -> ?INFO_LEVEL.
 
-is_verbose(Config) ->
-    rebar_config:get_xconf(Config, is_verbose, false).
+is_verbose(State) ->
+    rebar_state:get(State, is_verbose, false).
 
 %% ===================================================================
 %% Internal functions

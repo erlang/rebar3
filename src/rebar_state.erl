@@ -7,8 +7,7 @@
          set_skip_dir/2, is_skip_dir/2, reset_skip_dirs/1,
          create_logic_providers/2,
 
-         add_app/2, apps_to_build/1, apps_to_build/2,
-         deps_to_build/1, deps_to_build/2,
+         apps_to_build/1, apps_to_build/2,
 
          providers/1, providers/2, add_provider/2]).
 
@@ -30,10 +29,10 @@
                   envs = new_env() :: rebar_dict(),
                   command_args = [] :: list(),
 
+                  apps = dict:new() :: rebar_dict(),
                   goals = [],
                   providers = [],
                   apps_to_build = [],
-                  deps_to_build = [],
                   skip_dirs = new_skip_dirs() :: rebar_dict() }).
 
 -export_type([t/0]).
@@ -75,9 +74,6 @@ get(State, Key) ->
 get(State, Key, Default) ->
     proplists:get_value(Key, State#state_t.opts, Default).
 
-get_local(State, Key, Default) ->
-    proplists:get_value(Key, State#state_t.local_opts, Default).
-
 set(State, Key, Value) ->
     Opts = proplists:delete(Key, State#state_t.opts),
     State#state_t { opts = [{Key, Value} | Opts] }.
@@ -105,39 +101,19 @@ command_args(#state_t{command_args=CmdArgs}) ->
 command_args(State, CmdArgs) ->
     State#state_t{command_args=CmdArgs}.
 
-get_app(#state_t{apps_to_build=Apps}, Name) ->
-    lists:keyfind(Name, 2, Apps).
-
 apps_to_build(#state_t{apps_to_build=Apps}) ->
     Apps.
 
-apps_to_build(State, Apps) ->
-    State#state_t{apps_to_build=Apps}.
-
-deps_to_build(#state_t{deps_to_build=Deps}) ->
-    Deps.
-
-deps_to_build(State, Deps) ->
-    State#state_t{deps_to_build=Deps}.
-
-add_app(State=#state_t{apps_to_build=Apps}, App) ->
+apps_to_build(State=#state_t{apps_to_build=Apps}, Apps) when is_list(Apps) ->
+    State#state_t{apps_to_build=Apps};
+apps_to_build(State=#state_t{apps_to_build=Apps}, App) ->
     State#state_t{apps_to_build=[App | Apps]}.
-
-replace_app(State=#state_t{apps_to_build=Apps}, Name, App) ->
-    Apps1 = lists:keydelete(Name, 2, Apps),
-    State#state_t{apps_to_build=[App | Apps1]}.
 
 providers(#state_t{providers=Providers}) ->
     Providers.
 
 providers(State, NewProviders) ->
     State#state_t{providers=NewProviders}.
-
-goals(#state_t{goals=Goals}) ->
-    Goals.
-
-goals(State, Goals) ->
-    State#state_t{goals=Goals}.
 
 add_provider(State=#state_t{providers=Providers}, Provider) ->
     State#state_t{providers=[Provider | Providers]}.

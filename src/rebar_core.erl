@@ -44,7 +44,8 @@ process_command(State, Command) ->
     TargetProviders = rebar_provider:get_target_providers(Command, State),
 
     lists:foldl(fun(TargetProvider, Conf) ->
-                        Provider = rebar_provider:get_provider(TargetProvider, rebar_state:providers(Conf)),
+                        Provider = rebar_provider:get_provider(TargetProvider
+                                                              ,rebar_state:providers(Conf)),
                         {ok, Conf1} = rebar_provider:do(Provider, Conf),
                         Conf1
                 end, State, TargetProviders).

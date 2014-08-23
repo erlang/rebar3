@@ -15,7 +15,6 @@
 
 -record(provider,  {name :: atom(),            % The 'user friendly' name of the task
                     provider_impl :: atom(),   % The implementation of the task, maybe fun or
-                    provides :: atom(),
                     bare :: boolean(),         % Indicates whether a build config is needed
                     deps :: [atom()],          % The list of dependencies
                     desc :: string(),          % The description for the task

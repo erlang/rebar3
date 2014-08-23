@@ -162,7 +162,10 @@ run_aux(BaseConfig, Commands) ->
         ok -> ok;
         {error,{already_started,crypto}} -> ok
     end,
-
+    application:start(asn1),
+    application:start(public_key),
+    application:start(ssl),
+    inets:start(),
     [Command | Args] = Commands,
     CommandAtom = list_to_atom(Command),
 
