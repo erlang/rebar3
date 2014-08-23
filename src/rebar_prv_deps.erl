@@ -152,7 +152,7 @@ download_missing_deps(State, DepsDir, Found, Unbuilt, Deps) ->
                               true ->
                                   ok;
                               false ->
-                                  ?INFO("Fetching ~s ~s~n", [element(1, DepSource)
+                                  ?INFO("Fetching ~s ~s~n", [DepName
                                                             ,element(2, DepSource)]),
                                   rebar_fetch:download_source(TargetDir, DepSource),
                                   case rebar_app_discover:find_unbuilt_apps([TargetDir]) of
