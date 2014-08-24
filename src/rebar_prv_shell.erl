@@ -25,7 +25,7 @@
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
 
--module(rebar_shell).
+-module(rebar_prv_shell).
 -author("Kresten Krab Thorup <krab@trifork.com>").
 
 -behaviour(rebar_provider).
