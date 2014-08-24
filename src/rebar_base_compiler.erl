@@ -135,10 +135,10 @@ compile_each([], _Config, _CompileFn) ->
 compile_each([Source | Rest], Config, CompileFn) ->
     case compile(Source, Config, CompileFn) of
         ok ->
-            ?INFO("~sCompiled ~s\n", [rebar_utils:indent(1), filename:basename(Source)]);
+            ?DEBUG("~sCompiled ~s\n", [rebar_utils:indent(1), filename:basename(Source)]);
         {ok, Warnings} ->
             report(Warnings),
-            ?INFO("~sCompiled ~s\n", [rebar_utils:indent(1), filename:basename(Source)]);
+            ?DEBUG("~sCompiled ~s\n", [rebar_utils:indent(1), filename:basename(Source)]);
         skipped ->
             ?DEBUG("~sSkipped ~s\n", [rebar_utils:indent(1), filename:basename(Source)]);
         Error ->
@@ -173,11 +173,11 @@ compile_queue(Config, Pids, Targets) ->
 
         {compiled, Source, Warnings} ->
             report(Warnings),
-            ?INFO("~sCompiled ~s\n", [rebar_utils:indent(1), filename:basename(Source)]),
+            ?DEBUG("~sCompiled ~s\n", [rebar_utils:indent(1), filename:basename(Source)]),
             compile_queue(Config, Pids, Targets);
 
         {compiled, Source} ->
-            ?INFO("~sCompiled ~s\n", [rebar_utils:indent(1), filename:basename(Source)]),
+            ?DEBUG("~sCompiled ~s\n", [rebar_utils:indent(1), filename:basename(Source)]),
             compile_queue(Config, Pids, Targets);
         {skipped, Source} ->
             ?DEBUG("~sSkipped ~s~n", [rebar_utils:indent(1), filename:basename(Source)]),

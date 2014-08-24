@@ -20,7 +20,7 @@
 
 -export_type([t/0]).
 
--record(app_info_t, {name :: atom(),
+-record(app_info_t, {name :: binary(),
                      app_file_src :: file:name() | undefined,
                      app_file :: file:name(),
                      config :: rebar_config:config() | undefined,
@@ -44,11 +44,10 @@ new() ->
     {ok, #app_info_t{}}.
 
 %% @doc build a complete version of the app info with all fields set.
--spec new(atom(), string(), file:name()) ->
+-spec new(atom() | binary() | string(), string(), file:name()) ->
                  {ok, t()}.
-new(AppName, Vsn, Dir)
-  when erlang:is_atom(AppName) ->
-    {ok, #app_info_t{name=AppName,
+new(AppName, Vsn, Dir) ->
+    {ok, #app_info_t{name=ec_cnv:to_binary(AppName),
                      original_vsn=Vsn,
                      dir=Dir}}.
 
@@ -56,10 +55,9 @@ new(AppName, Vsn, Dir)
 name(#app_info_t{name=Name}) ->
     Name.
 
--spec name(t(), atom()) -> t().
-name(AppInfo=#app_info_t{}, AppName)
-  when erlang:is_atom(AppName) ->
-    AppInfo#app_info_t{name=AppName}.
+-spec name(t(), atom() | binary() | string()) -> t().
+name(AppInfo=#app_info_t{}, AppName) ->
+    AppInfo#app_info_t{name=ec_cnv:to_binary(AppName)}.
 
 -spec config(t()) -> rebar_config:confg().
 config(#app_info_t{config=Config}) ->

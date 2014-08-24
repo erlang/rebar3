@@ -9,7 +9,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, compile).
--define(DEPS, [deps]).
+-define(DEPS, [install_deps]).
 
 %% ===================================================================
 %% Public API
@@ -32,7 +32,7 @@ do(State) ->
     Apps = rebar_state:apps_to_build(State),
 
     lists:foreach(fun(AppInfo) ->
-                          ?INFO("Compiling ~p ~s~n", [rebar_app_info:name(AppInfo)
+                          ?INFO("Compiling ~s ~s~n", [rebar_app_info:name(AppInfo)
                                                      ,rebar_app_info:original_vsn(AppInfo)]),
                           _AppInfo1 = build(State, AppInfo)
                   end, Apps),
