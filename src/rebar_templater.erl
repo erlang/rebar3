@@ -61,7 +61,7 @@ list_templates(State) ->
               Vars = lists:foldl(fun({V,_}, Acc) ->
                                          [atom_to_list(V) | Acc]
                                  end, [], VarList),
-              ?CONSOLE("  * ~s: ~s (~p) (variables: ~p)\n",
+              ?INFO("  * ~s: ~s (~p) (variables: ~p)\n",
                        [BaseName, F, Type, string:join(Vars, ", ")])
       end, AvailTemplates),
     ok.
@@ -307,10 +307,10 @@ write_file(Output, Data, Force) ->
             ok = filelib:ensure_dir(Output),
             case {Force, FileExists} of
                 {"1", true} ->
-                    ?CONSOLE("Writing ~s (forcibly overwriting)~n",
+                    ?INFO("Writing ~s (forcibly overwriting)~n",
                              [Output]);
                 _ ->
-                    ?CONSOLE("Writing ~s~n", [Output])
+                    ?INFO("Writing ~s~n", [Output])
             end,
             case file:write_file(Output, Data) of
                 ok ->
