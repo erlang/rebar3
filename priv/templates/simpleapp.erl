@@ -1,36 +1,21 @@
 %%%-------------------------------------------------------------------
 %% @copyright {{copyright_holder}} ({{copyright_year}})
 %% @author {{author_name}} <{{author_email}}>
-%% @doc {{appid}} top level supervisor.
+%% @doc {{appid}} public API
 %% @end
 %%%-------------------------------------------------------------------
 
--module({{appid}}_sup).
-
--behaviour(supervisor).
+-module({{appid}}).
 
 %% API
--export([start_link/0]).
-
-%% Supervisor callbacks
--export([init/1]).
-
--define(SERVER, ?MODULE).
+-export([
+        ]).
 
 %%====================================================================
-%% API functions
+%% API
 %%====================================================================
 
-start_link() ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
-%%====================================================================
-%% Supervisor callbacks
-%%====================================================================
-
-%% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
-init([]) ->
-    {ok, { {one_for_all, 0, 1}, []} }.
 
 %%====================================================================
 %% Internal functions

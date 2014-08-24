@@ -2,16 +2,12 @@
  [
    {description, "{{appid}}"}
   ,{vsn, "0.1.0"}
-  ,{registered, [{{appid}}_sup]}
+  ,{registered, []}
   ,{applications,
     [kernel
      ,stdlib
     ]}
-  ,{mod, { {{appid}}, []}}
   ,{env,
     [
-    ]}
-  ,{start_phases,
-    [{listen, []}
     ]}
  ]}.

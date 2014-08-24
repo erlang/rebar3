@@ -43,12 +43,11 @@
 %% ===================================================================
 
 new(app, DirName, State) ->
-    create1(State, DirName, "simpleapp");
+    create1(State, DirName, "otpapp");
 new(lib, DirName, State) ->
-    create1(State, DirName, "simplelib");
-new(node, DirName, State) ->
-    %% Alias for create w/ template=simplenode
-    create1(State, DirName, "simplenode").
+    create1(State, DirName, "otplib");
+new(rel, DirName, State) ->
+    create1(State, DirName, "otpapp").
 
 list_templates(State) ->
     {AvailTemplates, Files} = find_templates(State),

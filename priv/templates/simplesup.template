@@ -1,0 +1,8 @@
+{variables, [{appid, "myapp"}
+            ,{supid, "my"}
+            ,{copyright_year, "2014"}
+            ,{copyright_holder, "Geoff Cant"}
+            ,{author_name, "Geoff Cant"}
+            ,{author_email, "nem@erlang.geek.nz"}
+            ]}.
+{template, "simplesup.erl", "src/{{appid}}_{{supid}}_sup.erl"}.

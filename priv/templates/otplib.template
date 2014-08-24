@@ -1,0 +1,13 @@
+{variables, [{appid, "myapp"}
+            ,{copyright_year, "2014"}
+            ,{copyright_holder, "Geoff Cant"}
+            ,{author_name, "Geoff Cant"}
+            ,{author_email, "nem@erlang.geek.nz"}
+            ]}.
+{template, "simpleapp.erl", "src/{{appid}}.erl"}.
+{template, "otplib.app.src", "src/{{appid}}.app.src"}.
+{template, "simplelogging.hrl", "src/{{appid}}_log.hrl"}.
+{template, "simple_rebar.config", "rebar.config"}.
+{template, "simpleapp_gitignore", ".gitignore"}.
+{template, "LICENSE", "LICENSE"}.
+{template, "README.md", "README.md"}.

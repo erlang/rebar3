@@ -7,7 +7,7 @@
     [kernel
      ,stdlib
     ]}
-  ,{mod, { {{appid}}, []}}
+  ,{mod, { {{appid}}, []} }
   ,{env,
     [
     ]}

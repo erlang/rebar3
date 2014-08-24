@@ -1,0 +1,2 @@
+{variables, [{appid, "myapp"}]}.
+{template, "simplelogging.hrl", "src/{{appid}}_log.hrl"}.
