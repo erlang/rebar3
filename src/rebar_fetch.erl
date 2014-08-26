@@ -44,10 +44,16 @@ current_ref(AppDir, {git, _, _}) ->
     string:strip(os:cmd("git --git-dir='" ++ AppDir ++ "/.git' rev-parse --verify HEAD"), both, $\n).
 
 download_source(AppDir, Source) ->
-    ec_file:mkdir_p(AppDir),
     TmpDir = ec_file:insecure_mkdtemp(),
-    download_source_tmp(TmpDir, Source),
-    ok = ec_file:copy(TmpDir, binary_to_list(filename:absname(AppDir)), [recursive]).
+    case download_source_tmp(TmpDir, Source) of
+        ok ->
+            ec_file:mkdir_p(AppDir),
+            ok = ec_file:copy(TmpDir, binary_to_list(filename:absname(AppDir)), [recursive]);
+        {tarball, File} ->
+            ok = erl_tar:extract(File, [{cwd,
+                                         (filename:dirname(filename:absname(binary_to_list(AppDir))))}
+                                        ,compressed])
+    end.
 
 download_source_tmp(TmpDir, {p4, Url}) ->
     download_source_tmp(TmpDir, {p4, Url, "#head"});
@@ -116,10 +122,9 @@ download_source_tmp(TmpDir, {fossil, Url, Version}) ->
                    []);
 download_source_tmp(TmpDir, {AppName, AppVersion, Url}) when is_binary(AppName)
                                                            , is_binary(AppVersion) ->
-    TmpFile = binary_to_list(filename:join(TmpDir, <<AppName/binary, "-", AppVersion/binary>>)),
+    TmpFile = binary_to_list(filename:join(TmpDir, <<AppName/binary, "-", AppVersion/binary, ".tar.gz">>)),
     {ok, saved_to_file} = httpc:request(get, {binary_to_list(Url), []}, [], [{stream, TmpFile}]),
-    ok = erl_tar:extract(TmpFile, [{cwd, filename:dirname(TmpDir)}, compressed]),
-    ok.
+    {tarball, TmpFile}.
 
 update_source1(AppDir, Args) when element(1, Args) =:= p4 ->
     download_source_tmp(AppDir, Args);

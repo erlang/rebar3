@@ -165,7 +165,6 @@ handle_src_deps(Deps, Found, Goals) ->
                         C = rebar_config:consult(rebar_app_info:dir(X)),
                         S = rebar_state:new(rebar_state:new(), C, rebar_app_info:dir(X)),
                         {ParsedDeps, NewGoals} = parse_deps(rebar_state:get(S, deps, [])),
-                        %lists:keymerge(2, DepsAcc, ParsedDeps)
                         {ParsedDeps++DepsAcc, NewGoals++GoalsAcc}
                 end, {Deps, Goals}, Found).
 
@@ -198,13 +197,24 @@ download_missing_deps(State, DepsDir, Found, Unbuilt, Deps) ->
 
 parse_deps(Deps) ->
     lists:foldl(fun({Name, Vsn}, {SrcDepsAcc, GoalsAcc}) ->
-                        {SrcDepsAcc, [{ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)} | GoalsAcc]};
+                        {SrcDepsAcc, [parse_goal(ec_cnv:to_binary(Name)
+                                                ,ec_cnv:to_binary(Vsn)) | GoalsAcc]};
                    (Name, {SrcDepsAcc, GoalsAcc}) when is_atom(Name) ->
                         {SrcDepsAcc, [ec_cnv:to_binary(Name) | GoalsAcc]};
                    (SrcDep, {SrcDepsAcc, GoalsAcc}) ->
                         Dep = new(SrcDep),
                         {[Dep | SrcDepsAcc], GoalsAcc}
                 end, {[], []}, Deps).
+
+parse_goal(Name, Constraint) ->
+    case re:run(Constraint, "([^\\d]*)(\\d.*)", [{capture, [1,2], binary}]) of
+        {match, [<<>>, Vsn]} ->
+            {Name, Vsn};
+        {match, [Op, Vsn]} ->
+            {Name, Vsn, binary_to_atom(Op, utf8)};
+        nomatch ->
+            fail
+    end.
 
 info(Description) ->
     io_lib:format("~s.~n"
