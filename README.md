@@ -23,15 +23,21 @@ This is an experimental branch.
 | Command    | Description |
 |----------- |------------ |
 | compile    | Build project |
-| do         |
-| update <dep>   | Update dep source |
+| update     | Update package index |
+| pkgs       | List available packages |
 | shell      | Run shell with project apps in path |
 | escriptize | Create escript from project |
+
+The following commands are still in the works.
+
+| Command    | Description |
+|----------- |------------ |
 | release    | Build release of project |
 | tar        | Package release into tarball |
 | new        | |
 | eunit      | |
 | ct         | |
+| do         | |
 
 ### Missing
 

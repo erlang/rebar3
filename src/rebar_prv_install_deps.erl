@@ -138,7 +138,7 @@ update_deps(State, Deps) ->
     UnbuiltApps = rebar_app_discover:find_unbuilt_apps([DepsDir]),
     FoundApps = rebar_app_discover:find_apps([DepsDir]),
 
-    download_missing_deps(State, DepsDir, FoundApps, UnbuiltApps, Deps).
+    download_missing_deps(State, DepsDir, FoundApps, Deps).
 
 
 %% Find source deps to build and download
@@ -147,12 +147,12 @@ update_src_deps(State, Deps, Goals) ->
 
     %% Find available apps to fulfill dependencies
     %% Should only have to do this once, not every iteration
-    UnbuiltApps = rebar_app_discover:find_unbuilt_apps([DepsDir]),
+    %UnbuiltApps = rebar_app_discover:find_unbuilt_apps([DepsDir]),
     FoundApps = rebar_app_discover:find_apps([DepsDir]),
 
     %% Resolve deps and their dependencies
-    {Deps1, NewGoals} = handle_src_deps(Deps, UnbuiltApps++FoundApps, Goals),
-    case download_missing_deps(State, DepsDir, FoundApps, UnbuiltApps, Deps1) of
+    {Deps1, NewGoals} = handle_src_deps(Deps, FoundApps, Goals),
+    case download_missing_deps(State, DepsDir, FoundApps, Deps1) of
         {State1, []} ->
             {State1, Deps1, NewGoals};
         {State1, Missing} ->
@@ -169,12 +169,12 @@ handle_src_deps(Deps, Found, Goals) ->
                 end, {Deps, Goals}, Found).
 
 %% Fetch missing deps from source
-download_missing_deps(State, DepsDir, Found, Unbuilt, Deps) ->
+download_missing_deps(State, DepsDir, Found, Deps) ->
     Missing =
         lists:filter(fun(#dep{name=Name}) ->
                             not lists:any(fun(F) ->
                                                   Name =:= rebar_app_info:name(F)
-                                          end, Found++Unbuilt)
+                                          end, Found)
                     end, Deps),
     lists:foreach(fun(#dep{name=Name, source=Source}) ->
                           TargetDir = get_deps_dir(DepsDir, Name),

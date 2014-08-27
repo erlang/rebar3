@@ -46,7 +46,7 @@ current_ref(AppDir, {git, _, _}) ->
 download_source(AppDir, Source) ->
     TmpDir = ec_file:insecure_mkdtemp(),
     case download_source_tmp(TmpDir, Source) of
-        ok ->
+        {ok, _} ->
             ec_file:mkdir_p(AppDir),
             ok = ec_file:copy(TmpDir, binary_to_list(filename:absname(AppDir)), [recursive]);
         {tarball, File} ->

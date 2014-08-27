@@ -52,7 +52,7 @@ do(State) ->
             {ok, State1};
         [] ->
             ?INFO("Updating package index...", []),
-            Url = rebar_state:get(State, rebar_packages_url, "http://localhost:8080"),
+            Url = rebar_state:get(State, rebar_packages_url, "http://polar-caverns-6802.herokuapp.com/"),
             ec_file:mkdir_p(filename:join([os:getenv("HOME"), ".rebar"])),
             PackagesFile = filename:join([os:getenv("HOME"), ".rebar", "packages"]),
             {ok, RequestId} = httpc:request(get, {Url, []}, [], [{stream, PackagesFile}, {sync, false}]),
@@ -62,7 +62,6 @@ do(State) ->
 wait(RequestId, State) ->
     receive
         {http, {RequestId, saved_to_file}} ->
-            io:format("~n"),
             {ok, State}
     after
         500 ->
