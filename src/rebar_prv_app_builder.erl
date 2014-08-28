@@ -37,12 +37,8 @@ do(State) ->
                           _AppInfo1 = build(State, AppInfo)
                   end, Apps),
 
-    %% DepsDir = get_deps_dir(Config1),
-    %% LockDeps = lists:map(fun({Name, Vsn, Source}) ->
-    %%                              Dir = get_deps_dir(DepsDir, Name),
-    %%                              rebar_fetch:new(Dir, Name, Vsn, Source)
-    %%                      end, rebar_state:deps(Config)),
-    %% ok = file:write_file("./rebar.lock", io_lib:format("~p.~n", [LockDeps])),
+    LockDeps = rebar_state:get(State, deps, []),
+    ok = file:write_file("./rebar.lock", io_lib:format("~p.~n", [LockDeps])),
     {ok, State}.
 
 build(State, AppInfo) ->

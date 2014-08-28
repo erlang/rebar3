@@ -73,10 +73,10 @@ do(State) ->
         Deps ->
             %% Split source deps form binary deps, needed to keep backwards compatibility
             {SrcDeps, Goals} = parse_deps(Deps),
-            case update_src_deps(State, SrcDeps, Goals) of
-                {State1, SrcDeps1, []} ->
-                    {ok, rebar_state:set(State1, deps, SrcDeps1)};
-                {State1, SrcDeps1, Goals1} ->
+            case update_src_deps(State, SrcDeps, Goals, []) of
+                {State1, SrcDeps1, [], Locked} ->
+                    {ok, rebar_state:set(State1, deps, Locked)};
+                {State1, SrcDeps1, Goals1, Locked} ->
                     {ok, Solved} = rlx_depsolver:solve(Graph, Goals1),
                     M = lists:map(fun({Name, Vsn}) ->
                                           FmtVsn = ec_cnv:to_binary(rlx_depsolver:format_version(Vsn)),
@@ -88,8 +88,8 @@ do(State) ->
                                                      ,FmtVsn
                                                      ,Link}}
                                   end, Solved),
-                    {State2, Deps1} = update_deps(State1, M),
-                    State3 = rebar_state:set(State2, deps, SrcDeps1++Deps1),
+                    {State2, Deps1, Locked2} = update_deps(State1, M),
+                    State3 = rebar_state:set(State2, deps, Locked++Locked2),
                     {ok, rebar_state:set(State3, goals, Goals1)}
             end
     end.
@@ -140,9 +140,8 @@ update_deps(State, Deps) ->
 
     download_missing_deps(State, DepsDir, FoundApps, Deps).
 
-
 %% Find source deps to build and download
-update_src_deps(State, Deps, Goals) ->
+update_src_deps(State, Deps, Goals, Locked) ->
     DepsDir = get_deps_dir(State),
 
     %% Find available apps to fulfill dependencies
@@ -153,10 +152,10 @@ update_src_deps(State, Deps, Goals) ->
     %% Resolve deps and their dependencies
     {Deps1, NewGoals} = handle_src_deps(Deps, FoundApps, Goals),
     case download_missing_deps(State, DepsDir, FoundApps, Deps1) of
-        {State1, []} ->
-            {State1, Deps1, NewGoals};
-        {State1, Missing} ->
-            update_src_deps(State1, Missing, NewGoals)
+        {State1, [], []} ->
+            {State1, Deps1, NewGoals, Locked};
+        {State1, Missing, Locked1} ->
+            update_src_deps(State1, Missing, NewGoals, Locked1++Locked)
     end.
 
 %% Collect deps of new deps
@@ -175,25 +174,29 @@ download_missing_deps(State, DepsDir, Found, Deps) ->
                             not lists:any(fun(F) ->
                                                   Name =:= rebar_app_info:name(F)
                                           end, Found)
-                    end, Deps),
-    lists:foreach(fun(#dep{name=Name, source=Source}) ->
-                          TargetDir = get_deps_dir(DepsDir, Name),
-                          ?INFO("Fetching ~s ~s~n", [Name
-                                                    ,element(2, Source)]),
-                          rebar_fetch:download_source(TargetDir, Source),
-                          case rebar_app_discover:find_unbuilt_apps([TargetDir]) of
-                              [AppSrc] ->
-                                  C = rebar_config:consult(rebar_app_info:dir(AppSrc)),
-                                  S = rebar_state:new(rebar_state:new()
-                                                     ,C
-                                                     ,rebar_app_info:dir(AppSrc)),
-                                  rebar_prv_app_builder:build(S, AppSrc);
-                              [] ->
-                                  []
-                          end
-              end, Missing),
+                     end, Deps),
+    Locked = lists:map(fun(Dep=#dep{name=Name, source=Source}) ->
+                               TargetDir = get_deps_dir(DepsDir, Name),
+                               ?INFO("Fetching ~s ~s~n", [Name
+                                                         ,element(2, Source)]),
+                               rebar_fetch:download_source(TargetDir, Source),
+                               case rebar_app_discover:find_unbuilt_apps([TargetDir]) of
+                                   [AppSrc] ->
+                                       C = rebar_config:consult(rebar_app_info:dir(AppSrc)),
+                                       S = rebar_state:new(rebar_state:new()
+                                                          ,C
+                                                          ,rebar_app_info:dir(AppSrc)),
+                                       AppInfo = rebar_prv_app_builder:build(S, AppSrc),
+                                       Ref = rebar_fetch:current_ref(binary_to_list(TargetDir), Source),
+                                       {Name
+                                       ,ec_cnv:to_binary(rebar_app_info:original_vsn(AppInfo))
+                                       ,erlang:setelement(3, Source, Ref)};
+                                   [] ->
+                                       Source
+                               end
+                       end, Missing),
 
-    {State, Missing}.
+    {State, Missing, Locked}.
 
 parse_deps(Deps) ->
     lists:foldl(fun({Name, Vsn}, {SrcDepsAcc, GoalsAcc}) ->
