@@ -52,7 +52,8 @@ do(State) ->
             {ok, State1};
         [] ->
             ?INFO("Updating package index...", []),
-            Url = rebar_state:get(State, rebar_packages_url, "http://polar-caverns-6802.herokuapp.com/"),
+            Url = url(State),
+            io:format("Url ~s~n", [Url]),
             ec_file:mkdir_p(filename:join([os:getenv("HOME"), ".rebar"])),
             PackagesFile = filename:join([os:getenv("HOME"), ".rebar", "packages"]),
             {ok, RequestId} = httpc:request(get, {Url, []}, [], [{stream, PackagesFile}, {sync, false}]),
@@ -68,3 +69,15 @@ wait(RequestId, State) ->
             io:format("."),
             wait(RequestId, State)
     end.
+
+url(State) ->
+    SystemArch = erlang:system_info(system_architecture),
+    ErtsVsn = erlang:system_info(version),
+    {glibc, GlibcVsn, _, _} = erlang:system_info(allocator),
+    GlibcVsnStr = io_lib:format("~p.~p", GlibcVsn),
+
+    Qs = [io_lib:format("~s=~s", [X, Y]) || {X, Y} <- [{"arch", SystemArch}
+                                                      ,{"erts", ErtsVsn}
+                                                      ,{"glibc", GlibcVsnStr}]],
+    Url = rebar_state:get(State, rebar_packages_url, "http://polar-caverns-6802.herokuapp.com"),
+    Url ++ "?" ++ string:join(Qs, "&").
