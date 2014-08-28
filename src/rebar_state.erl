@@ -59,7 +59,7 @@ new(ParentState, Config, Dir) ->
     _Opts = ParentState#state_t.opts,
     LocalOpts = case rebar_config:consult_file(?LOCK_FILE) of
                     {ok, [D]} ->
-                        [{lock_deps, D} | Config];
+                        [{locks, D} | Config];
                     _ ->
                         Config
                 end,

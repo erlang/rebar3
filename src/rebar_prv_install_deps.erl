@@ -66,32 +66,38 @@ init(State) ->
 do(State) ->
     %% Read in package index and dep graph
     {Packages, Graph} = rebar_packages:get_packages(State),
-
-    case rebar_state:get(State, deps, []) of
+    case rebar_state:get(State, locks, []) of
         [] ->
-            {ok, State};
-        Deps ->
-            %% Split source deps form binary deps, needed to keep backwards compatibility
-            {SrcDeps, Goals} = parse_deps(Deps),
-            case update_src_deps(State, SrcDeps, Goals, []) of
-                {State1, SrcDeps1, [], Locked} ->
-                    {ok, rebar_state:set(State1, deps, Locked)};
-                {State1, SrcDeps1, Goals1, Locked} ->
-                    {ok, Solved} = rlx_depsolver:solve(Graph, Goals1),
-                    M = lists:map(fun({Name, Vsn}) ->
-                                          FmtVsn = ec_cnv:to_binary(rlx_depsolver:format_version(Vsn)),
-                                          {ok, P} = dict:find({Name, FmtVsn}, Packages),
-                                          Link = proplists:get_value(<<"link">>, P),
-                                          #dep{name=Name,
-                                              vsn=FmtVsn,
-                                              source={Name
-                                                     ,FmtVsn
-                                                     ,Link}}
-                                  end, Solved),
-                    {State2, Deps1, Locked2} = update_deps(State1, M),
-                    State3 = rebar_state:set(State2, deps, Locked++Locked2),
-                    {ok, rebar_state:set(State3, goals, Goals1)}
-            end
+            case rebar_state:get(State, deps, []) of
+                [] ->
+                    {ok, State};
+                Deps ->
+                    %% Split source deps form binary deps, needed to keep backwards compatibility
+                    {SrcDeps, Goals} = parse_deps(Deps),
+                    case update_src_deps(State, SrcDeps, Goals, []) of
+                        {State1, SrcDeps1, [], Locked} ->
+                            {ok, rebar_state:set(State1, locks, Locked)};
+                        {State1, SrcDeps1, Goals1, Locked} ->
+                            {ok, Solved} = rlx_depsolver:solve(Graph, Goals1),
+                            M = lists:map(fun({Name, Vsn}) ->
+                                                  FmtVsn = ec_cnv:to_binary(rlx_depsolver:format_version(Vsn)),
+                                                  {ok, P} = dict:find({Name, FmtVsn}, Packages),
+                                                  Link = proplists:get_value(<<"link">>, P),
+                                                  #dep{name=Name,
+                                                       vsn=FmtVsn,
+                                                       source={Name
+                                                              ,FmtVsn
+                                                              ,Link}}
+                                          end, Solved),
+                            {State2, Deps1, Locked2} = update_deps(State1, M),
+                            State3 = rebar_state:set(State2, locks, Locked++Locked2),
+                            {ok, rebar_state:set(State3, goals, Goals1)}
+                    end
+            end;
+        Locks ->
+            Locks1 = [new(Lock) || Lock <- Locks],
+            {State2, _, _} = update_deps(State, Locks1),
+            {ok, State2}
     end.
 
 %% set REBAR_DEPS_DIR and ERL_LIBS environment variables
@@ -124,8 +130,12 @@ get_deps_dir(DepsDir, App) ->
 %% Internal functions
 %% ===================================================================
 
-new({Name, Vsn, Source})->
+new({Name, Vsn, Source}) when is_tuple(Source) ->
     #dep{name=ec_cnv:to_binary(Name), vsn=ec_cnv:to_binary(Vsn), source=Source};
+new({Name, Vsn, Source}) when is_binary(Source) ->
+    #dep{name=ec_cnv:to_binary(Name)
+        ,vsn=ec_cnv:to_binary(Vsn)
+        ,source={ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn), Source}};
 new(Name) ->
     #dep{name=ec_cnv:to_binary(Name)}.
 

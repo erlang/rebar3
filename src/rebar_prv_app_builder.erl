@@ -37,8 +37,7 @@ do(State) ->
                           _AppInfo1 = build(State, AppInfo)
                   end, Apps),
 
-    LockDeps = rebar_state:get(State, deps, []),
-    ok = file:write_file("./rebar.lock", io_lib:format("~p.~n", [LockDeps])),
+    rebar_lock:create(State),
     {ok, State}.
 
 build(State, AppInfo) ->

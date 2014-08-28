@@ -131,6 +131,13 @@ init_config({Options, _NonOptArgs}) ->
                      rebar_config:consult_file(ConfigFile)
              end,
 
+    Config1 = case rebar_config:consult_file(?LOCK_FILE) of
+                  [D] ->
+                      [{locks, D} | Config];
+                  _ ->
+                      Config
+              end,
+
     %% If $HOME/.rebar/config exists load and use as global config
     GlobalConfigFile = filename:join([os:getenv("HOME"), ".rebar", "config"]),
     State = case filelib:is_regular(GlobalConfigFile) of
@@ -138,9 +145,9 @@ init_config({Options, _NonOptArgs}) ->
                     ?DEBUG("Load global config file ~p~n",
                            [GlobalConfigFile]),
                     rebar_config:consult_file(GlobalConfigFile),
-                    rebar_state:new(GlobalConfigFile, Config);
+                    rebar_state:new(GlobalConfigFile, Config1);
                 false ->
-                    rebar_state:new(Config)
+                    rebar_state:new(Config1)
             end,
 
     %% Initialize vsn cache
