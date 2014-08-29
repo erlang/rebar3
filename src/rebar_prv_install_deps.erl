@@ -74,7 +74,7 @@ do(State) ->
                 Deps ->
                     %% Split source deps form binary deps, needed to keep backwards compatibility
                     {SrcDeps, Goals} = parse_deps(Deps),
-                    case update_src_deps(State, SrcDeps, Goals, []) of
+                    case update_src_deps(State, SrcDeps, Goals, [], []) of
                         {State1, SrcDeps1, [], Locked} ->
                             {ok, rebar_state:set(State1, locks, Locked)};
                         {State1, SrcDeps1, Goals1, Locked} ->
@@ -89,14 +89,14 @@ do(State) ->
                                                               ,FmtVsn
                                                               ,Link}}
                                           end, Solved),
-                            {State2, Deps1, Locked2} = update_deps(State1, M),
+                            {State2, Deps1, _, Locked2} = update_deps(State1, M),
                             State3 = rebar_state:set(State2, locks, Locked++Locked2),
                             {ok, rebar_state:set(State3, goals, Goals1)}
                     end
             end;
         Locks ->
             Locks1 = [new(Lock) || Lock <- Locks],
-            {State2, _, _} = update_deps(State, Locks1),
+            {State2, _, _, _} = update_deps(State, Locks1),
             {ok, State2}
     end.
 
@@ -148,24 +148,39 @@ update_deps(State, Deps) ->
     UnbuiltApps = rebar_app_discover:find_unbuilt_apps([DepsDir]),
     FoundApps = rebar_app_discover:find_apps([DepsDir]),
 
-    download_missing_deps(State, DepsDir, FoundApps, Deps).
+    download_missing_deps(State, DepsDir, UnbuiltApps++FoundApps, Deps).
 
 %% Find source deps to build and download
-update_src_deps(State, Deps, Goals, Locked) ->
+update_src_deps(State, Deps, Goals, SrcApps, Locked) ->
     DepsDir = get_deps_dir(State),
 
     %% Find available apps to fulfill dependencies
     %% Should only have to do this once, not every iteration
-    %UnbuiltApps = rebar_app_discover:find_unbuilt_apps([DepsDir]),
+    UnbuiltApps = rebar_app_discover:find_unbuilt_apps([DepsDir]),
     FoundApps = rebar_app_discover:find_apps([DepsDir]),
 
     %% Resolve deps and their dependencies
-    {Deps1, NewGoals} = handle_src_deps(Deps, FoundApps, Goals),
-    case download_missing_deps(State, DepsDir, FoundApps, Deps1) of
-        {State1, [], []} ->
-            {State1, Deps1, NewGoals, Locked};
-        {State1, Missing, Locked1} ->
-            update_src_deps(State1, Missing, NewGoals, Locked1++Locked)
+    {Deps1, NewGoals} = handle_src_deps(Deps, UnbuiltApps++FoundApps, Goals),
+    case download_missing_deps(State, DepsDir, UnbuiltApps++FoundApps, Deps1) of
+        {State1, [], SrcApps1, []} ->
+            Locked1 = lists:map(fun(AppSrc) ->
+                                        Source = rebar_app_info:source(AppSrc),
+                                        Name = rebar_app_info:name(AppSrc),
+                                        C = rebar_config:consult(rebar_app_info:dir(AppSrc)),
+                                        S = rebar_state:new(rebar_state:new()
+                                                           ,C
+                                                           ,rebar_app_info:dir(AppSrc)),
+                                        TargetDir = get_deps_dir(DepsDir, Name),
+                                        Ref = rebar_fetch:current_ref(binary_to_list(TargetDir), Source),
+                                        AppInfo = rebar_prv_app_builder:build(S, AppSrc),
+
+                                        {Name
+                                        ,ec_cnv:to_binary(rebar_app_info:original_vsn(AppInfo))
+                                        ,erlang:setelement(3, Source, Ref)}
+                                end, SrcApps1++SrcApps),
+            {State1, Deps1, NewGoals, Locked1++Locked};
+        {State1, Missing, SrcApps1, Locked1} ->
+            update_src_deps(State1, Missing, NewGoals, SrcApps1++SrcApps, Locked1++Locked)
     end.
 
 %% Collect deps of new deps
@@ -185,28 +200,20 @@ download_missing_deps(State, DepsDir, Found, Deps) ->
                                                   Name =:= rebar_app_info:name(F)
                                           end, Found)
                      end, Deps),
-    Locked = lists:map(fun(Dep=#dep{name=Name, source=Source}) ->
+    {SrcApps, Locked} = lists:foldl(fun(Dep=#dep{name=Name, source=Source}, {SrcAppsAcc, LockedAcc}) ->
                                TargetDir = get_deps_dir(DepsDir, Name),
                                ?INFO("Fetching ~s ~s~n", [Name
                                                          ,element(2, Source)]),
                                rebar_fetch:download_source(TargetDir, Source),
                                case rebar_app_discover:find_unbuilt_apps([TargetDir]) of
                                    [AppSrc] ->
-                                       C = rebar_config:consult(rebar_app_info:dir(AppSrc)),
-                                       S = rebar_state:new(rebar_state:new()
-                                                          ,C
-                                                          ,rebar_app_info:dir(AppSrc)),
-                                       AppInfo = rebar_prv_app_builder:build(S, AppSrc),
-                                       Ref = rebar_fetch:current_ref(binary_to_list(TargetDir), Source),
-                                       {Name
-                                       ,ec_cnv:to_binary(rebar_app_info:original_vsn(AppInfo))
-                                       ,erlang:setelement(3, Source, Ref)};
+                                       {[rebar_app_info:source(AppSrc, Source) | SrcAppsAcc], LockedAcc};
                                    [] ->
-                                       Source
+                                       {SrcAppsAcc, [Source | LockedAcc]}
                                end
-                       end, Missing),
+                       end, {[], []}, Missing),
 
-    {State, Missing, Locked}.
+    {State, Missing, lists:reverse(SrcApps), Locked}.
 
 parse_deps(Deps) ->
     lists:foldl(fun({Name, Vsn}, {SrcDepsAcc, GoalsAcc}) ->

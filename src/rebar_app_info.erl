@@ -16,7 +16,9 @@
          original_vsn/2,
          ebin_dir/1,
          dir/1,
-         dir/2]).
+         dir/2,
+         source/1,
+         source/2]).
 
 -export_type([t/0]).
 
@@ -110,3 +112,11 @@ dir(AppInfo=#app_info_t{}, Dir) ->
 -spec ebin_dir(t()) -> file:name().
 ebin_dir(#app_info_t{dir=Dir}) ->
     filename:join(Dir, "ebin").
+
+-spec source(t(), string()) -> t().
+source(AppInfo=#app_info_t{}, Source) ->
+    AppInfo#app_info_t{source=Source}.
+
+-spec source(t()) -> string().
+source(#app_info_t{source=Source}) ->
+    Source.

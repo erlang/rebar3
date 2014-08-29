@@ -51,9 +51,8 @@ do(State) ->
 
             {ok, State1};
         [] ->
-            ?INFO("Updating package index...", []),
+            ?INFO("Updating package index...~n", []),
             Url = url(State),
-            io:format("Url ~s~n", [Url]),
             ec_file:mkdir_p(filename:join([os:getenv("HOME"), ".rebar"])),
             PackagesFile = filename:join([os:getenv("HOME"), ".rebar", "packages"]),
             {ok, RequestId} = httpc:request(get, {Url, []}, [], [{stream, PackagesFile}, {sync, false}]),

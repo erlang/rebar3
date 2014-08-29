@@ -32,8 +32,6 @@ do(State) ->
     Apps = rebar_state:apps_to_build(State),
 
     lists:foreach(fun(AppInfo) ->
-                          ?INFO("Compiling ~s ~s~n", [rebar_app_info:name(AppInfo)
-                                                     ,rebar_app_info:original_vsn(AppInfo)]),
                           _AppInfo1 = build(State, AppInfo)
                   end, Apps),
 
@@ -41,6 +39,8 @@ do(State) ->
     {ok, State}.
 
 build(State, AppInfo) ->
+    ?INFO("Compiling ~s ~s~n", [rebar_app_info:name(AppInfo)
+                               ,rebar_app_info:original_vsn(AppInfo)]),
     rebar_erlc_compiler:compile(State, rebar_app_info:dir(AppInfo)),
     {ok, AppInfo1} = rebar_otp_app:compile(State, AppInfo),
     AppInfo1.
