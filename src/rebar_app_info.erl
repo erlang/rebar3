@@ -1,6 +1,8 @@
 -module(rebar_app_info).
 
 -export([new/0,
+         new/1,
+         new/2,
          new/3,
          name/1,
          name/2,
@@ -15,6 +17,8 @@
          original_vsn/1,
          original_vsn/2,
          ebin_dir/1,
+         deps/1,
+         deps/2,
          dir/1,
          dir/2,
          source/1,
@@ -28,6 +32,7 @@
                      config :: rebar_config:config() | undefined,
                      original_vsn :: string(),
                      app_details :: list(),
+                     deps=[] :: list(),
                      dir :: file:name(),
                      source :: string() | undefined}).
 
@@ -44,6 +49,17 @@
 -spec new() -> {ok, t()}.
 new() ->
     {ok, #app_info_t{}}.
+
+-spec new(atom() | binary() | string()) ->
+                 {ok, t()}.
+new(AppName) ->
+    {ok, #app_info_t{name=ec_cnv:to_binary(AppName)}}.
+
+-spec new(atom() | binary() | string(), string()) ->
+                 {ok, t()}.
+new(AppName, Vsn) ->
+    {ok, #app_info_t{name=ec_cnv:to_binary(AppName),
+                     original_vsn=Vsn}}.
 
 %% @doc build a complete version of the app info with all fields set.
 -spec new(atom() | binary() | string(), string(), file:name()) ->
@@ -100,6 +116,14 @@ original_vsn(#app_info_t{original_vsn=Vsn}) ->
 -spec original_vsn(t(), string()) -> string().
 original_vsn(AppInfo=#app_info_t{}, Vsn) ->
     AppInfo#app_info_t{original_vsn=Vsn}.
+
+-spec deps(t()) -> list().
+deps(#app_info_t{deps=Deps}) ->
+    Deps.
+
+-spec deps(t(), list()) -> t().
+deps(AppInfo=#app_info_t{}, Deps) ->
+    AppInfo#app_info_t{deps=Deps}.
 
 -spec dir(t()) -> file:name().
 dir(#app_info_t{dir=Dir}) ->

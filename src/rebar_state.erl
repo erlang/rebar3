@@ -9,6 +9,9 @@
 
          apps_to_build/1, apps_to_build/2,
 
+         goals/1, goals/2,
+         src_deps/1, src_deps/2,
+
          providers/1, providers/2, add_provider/2]).
 
 -include("rebar.hrl").
@@ -29,6 +32,7 @@
                   envs = new_env() :: rebar_dict(),
                   command_args = [] :: list(),
 
+                  src_deps = [] :: [rebar_app_info:t()],
                   apps = dict:new() :: rebar_dict(),
                   goals = [],
                   providers = [],
@@ -101,11 +105,27 @@ command_args(#state_t{command_args=CmdArgs}) ->
 command_args(State, CmdArgs) ->
     State#state_t{command_args=CmdArgs}.
 
+goals(#state_t{goals=Goals}) ->
+    Goals.
+
+goals(State=#state_t{goals=Goals}, NewGoals) when is_list(Goals) ->
+    State#state_t{goals=NewGoals};
+goals(State=#state_t{goals=Goals}, Goal) ->
+    State#state_t{goals=[Goal | Goals]}.
+
+src_deps(#state_t{src_deps=SrcDeps}) ->
+    SrcDeps.
+
+src_deps(State=#state_t{src_deps=SrcDeps}, NewSrcDeps) when is_list(SrcDeps) ->
+    State#state_t{src_deps=NewSrcDeps};
+src_deps(State=#state_t{src_deps=SrcDeps}, SrcDep) ->
+    State#state_t{src_deps=[SrcDep | SrcDeps]}.
+
 apps_to_build(#state_t{apps_to_build=Apps}) ->
     Apps.
 
-apps_to_build(State=#state_t{apps_to_build=Apps}, Apps) when is_list(Apps) ->
-    State#state_t{apps_to_build=Apps};
+apps_to_build(State=#state_t{apps_to_build=Apps}, NewApps) when is_list(NewApps) ->
+    State#state_t{apps_to_build=NewApps};
 apps_to_build(State=#state_t{apps_to_build=Apps}, App) ->
     State#state_t{apps_to_build=[App | Apps]}.
 
