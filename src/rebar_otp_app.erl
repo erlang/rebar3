@@ -42,7 +42,7 @@ compile(Config, App) ->
     %% If we get an .app.src file, it needs to be pre-processed and
     %% written out as a ebin/*.app file. That resulting file will then
     %% be validated as usual.
-    Dir = rebar_app_info:dir(App),
+    Dir = ec_cnv:to_list(rebar_app_info:dir(App)),
     {Config2, App1} = case rebar_app_info:app_file_src(App) of
                           undefined ->
                               {Config, App};

@@ -86,14 +86,30 @@ config(AppInfo=#app_info_t{}, Config) ->
     AppInfo#app_info_t{config=Config}.
 
 -spec app_file_src(t()) -> file:name().
+app_file_src(#app_info_t{app_file_src=undefined, dir=Dir, name=Name}) ->
+    AppFileSrc = filename:join([Dir, "src", <<Name/binary, ".app.src">>]),
+    case filelib:is_file(AppFileSrc) of
+        true ->
+            ec_cnv:to_list(AppFileSrc);
+        false ->
+            undefined
+    end;
 app_file_src(#app_info_t{app_file_src=AppFileSrc}) ->
-    AppFileSrc.
+    ec_cnv:to_list(AppFileSrc).
 
 -spec app_file_src(t(), file:name()) -> t().
 app_file_src(AppInfo=#app_info_t{}, AppFileSrc) ->
     AppInfo#app_info_t{app_file_src=AppFileSrc}.
 
 -spec app_file(t()) -> file:name().
+app_file(#app_info_t{app_file=undefined, dir=Dir, name=Name}) ->
+    AppFile = filename:join([Dir, "ebin", <<Name/binary, ".app">>]),
+    case filelib:is_file(AppFile) of
+        true ->
+            AppFile;
+        false ->
+            undefined
+    end;
 app_file(#app_info_t{app_file=AppFile}) ->
     AppFile.
 

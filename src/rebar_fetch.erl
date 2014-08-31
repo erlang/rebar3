@@ -45,13 +45,14 @@ current_ref(AppDir, {git, _, _}) ->
 
 download_source(AppDir, Source) ->
     TmpDir = ec_file:insecure_mkdtemp(),
+    AppDir1 = ec_cnv:to_list(AppDir),
     case download_source_tmp(TmpDir, Source) of
         {ok, _} ->
-            ec_file:mkdir_p(AppDir),
-            ok = ec_file:copy(TmpDir, binary_to_list(filename:absname(AppDir)), [recursive]);
+            ec_file:mkdir_p(AppDir1),
+            ok = ec_file:copy(TmpDir, filename:absname(AppDir1), [recursive]);
         {tarball, File} ->
             ok = erl_tar:extract(File, [{cwd,
-                                         (filename:dirname(filename:absname(binary_to_list(AppDir))))}
+                                         (filename:dirname(filename:absname(AppDir1)))}
                                         ,compressed])
     end.
 

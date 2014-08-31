@@ -1,7 +1,0 @@
-SIMPLE-ASN DEFINITIONS ::= BEGIN
-
-    SimpleMessage ::= SEQUENCE {
-        id INTEGER
-    }
-
-END

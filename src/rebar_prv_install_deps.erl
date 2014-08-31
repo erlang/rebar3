@@ -69,28 +69,43 @@ do(State) ->
                     {ok, State};
                 Deps ->
                     %% Split source deps form binary deps, needed to keep backwards compatibility
-                    {SrcDeps, Goals} = parse_deps(Deps),
-                    State1 = rebar_state:src_deps(rebar_state:goals(State, Goals), SrcDeps),
+                    DepsDir = get_deps_dir(State),
+                    {SrcDeps, Goals} = parse_deps(DepsDir, Deps),
+                    State1 = rebar_state:src_deps(rebar_state:goals(State, Goals), lists:ukeysort(2, SrcDeps)),
                     State2 = update_src_deps(State1),
-                    Goals1 = rebar_state:goals(State2),
-                    {ok, Solved} = rlx_depsolver:solve(Graph, Goals1),
-                    Final = lists:map(fun({Name, Vsn}) ->
-                                              FmtVsn = ec_cnv:to_binary(rlx_depsolver:format_version(Vsn)),
-                                              {ok, P} = dict:find({Name, FmtVsn}, Packages),
-                                              PkgDeps = proplists:get_value(<<"deps">>, P),
-                                              Link = proplists:get_value(<<"link">>, P),
-                                              Source = {Name, FmtVsn, Link},
-                                              {ok, AppInfo} = rebar_app_info:new(Name, FmtVsn),
-                                              AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
-                                              rebar_app_info:source(AppInfo1, Source)
-                                      end, Solved),
-                    ProjectApps = lists:map(fun(X) ->
-                                                    rebar_app_info:deps(X, [rebar_app_info:name(Y) || Y <- SrcDeps] ++ [element(1, G) || G <- Goals])
-                                            end, rebar_state:apps_to_build(State2)),
-                    FinalDeps = ProjectApps ++ rebar_state:src_deps(State2) ++ Final,
-                    {ok, Sort} = rebar_topo:sort_apps(FinalDeps),
-                    [io:format("Build ~p~n", [rebar_app_info:name(A)]) || A <- Sort],
-                    {ok, State2}
+                    case rebar_state:goals(State2) of
+                        [] ->
+                            ProjectApps = lists:map(fun(X) ->
+                                                            rebar_app_info:deps(X, [rebar_app_info:name(Y) || Y <- SrcDeps])
+                                                    end, rebar_state:apps_to_build(State2)),
+                            FinalDeps = ProjectApps ++ rebar_state:src_deps(State2),
+                            {ok, Sort} = rebar_topo:sort_apps(FinalDeps),
+                            State3 = rebar_state:apps_to_build(State2, Sort),
+                            {ok, State3};
+                        Goals1 ->
+                            {ok, Solved} = rlx_depsolver:solve(Graph, Goals1),
+                            Final = lists:map(fun({Name, Vsn}) ->
+                                                      FmtVsn = ec_cnv:to_binary(rlx_depsolver:format_version(Vsn)),
+                                                      {ok, P} = dict:find({Name, FmtVsn}, Packages),
+                                                      PkgDeps = proplists:get_value(<<"deps">>, P),
+                                                      Link = proplists:get_value(<<"link">>, P),
+                                                      Source = {Name, FmtVsn, Link},
+                                                      {ok, AppInfo} = rebar_app_info:new(Name, FmtVsn),
+                                                      AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
+                                                      AppInfo2 =
+                                                          rebar_app_info:dir(AppInfo1, get_deps_dir(DepsDir, <<Name/binary, "-", FmtVsn/binary>>)),
+                                                      AppInfo3 = rebar_app_info:source(AppInfo2, Source),
+                                                      ok = maybe_fetch(AppInfo3),
+                                                      AppInfo3
+                                              end, Solved),
+                            ProjectApps = lists:map(fun(X) ->
+                                                            rebar_app_info:deps(X, [rebar_app_info:name(Y) || Y <- SrcDeps] ++ [element(1, G) || G <- Goals1])
+                                                    end, rebar_state:apps_to_build(State2)),
+                            FinalDeps = ProjectApps ++ rebar_state:src_deps(State2) ++ Final,
+                            {ok, Sort} = rebar_topo:sort_apps(FinalDeps),
+                            State3 = rebar_state:apps_to_build(State2, Sort),
+                            {ok, State3}
+                    end
             end;
         _Locks ->
             {ok, State}
@@ -126,32 +141,40 @@ get_deps_dir(DepsDir, App) ->
 %% Internal functions
 %% ===================================================================
 
-%% Fetch missing binary deps
-update_deps(State) ->
-    State.
-
 update_src_deps(State) ->
     SrcDeps = rebar_state:src_deps(State),
-    case lists:foldl(fun(AppInfo, {StateAcc, SrcDepsAcc, GoalsAcc}) ->
-                             ok = maybe_fetch(StateAcc, AppInfo),
-                             C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
-                             S = rebar_state:new(rebar_state:new(), C, rebar_app_info:dir(AppInfo)),
-                             Deps = rebar_state:get(S, deps, []),
-                             {SrcDeps1, Goals} = parse_deps(Deps),
-                             NewSrcDeps = SrcDeps1++SrcDepsAcc,
-                             {StateAcc, NewSrcDeps, Goals++GoalsAcc}
-                     end, {State, [], rebar_state:goals(State)}, SrcDeps) of
-        {State1, [], NewGoals} ->
-            rebar_state:goals(State1, NewGoals);
-        {State1, NewSrcDeps, NewGoals}->
-            State2 = rebar_state:src_deps(rebar_state:goals(State1, NewGoals), SrcDeps++NewSrcDeps),
-            update_src_deps(State2)
+    DepsDir = get_deps_dir(State),
+    case lists:foldl(fun(AppInfo, {SrcDepsAcc, GoalsAcc}) ->
+                             ok = maybe_fetch(AppInfo),
+                             {NewSrcDeps, NewGoals} = handle_dep(DepsDir, AppInfo),
+                             {lists:ukeymerge(2, SrcDepsAcc, lists:ukeysort(2, NewSrcDeps)), NewGoals++GoalsAcc}
+                     end, {SrcDeps, rebar_state:goals(State)}, SrcDeps) of
+        {SrcDeps, NewGoals} ->
+            rebar_state:goals(State, NewGoals);
+        {NewSrcDeps, NewGoals} ->
+            io:format("NEWSRC ~p~n", [NewSrcDeps]),
+            State1 = rebar_state:src_deps(rebar_state:goals(State, NewGoals), NewSrcDeps),
+            update_src_deps(State1)
     end.
 
-maybe_fetch(_State, _Dep) ->
-    ok.
+handle_dep(DepsDir, AppInfo) ->
+    C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
+    S = rebar_state:new(rebar_state:new(), C, rebar_app_info:dir(AppInfo)),
+    Deps = rebar_state:get(S, deps, []),
+    parse_deps(DepsDir, Deps).
 
-parse_deps(Deps) ->
+maybe_fetch(AppInfo) ->
+    AppDir = rebar_app_info:dir(AppInfo),
+    case filelib:is_dir(AppDir) of
+        false ->
+            ?INFO("Fetching ~s~n", [rebar_app_info:name(AppInfo)]),
+            Source = rebar_app_info:source(AppInfo),
+            rebar_fetch:download_source(AppDir, Source);
+        true ->
+            ok
+    end.
+
+parse_deps(DepsDir, Deps) ->
     lists:foldl(fun({Name, Vsn}, {SrcDepsAcc, GoalsAcc}) ->
                         {SrcDepsAcc, [parse_goal(ec_cnv:to_binary(Name)
                                                 ,ec_cnv:to_binary(Vsn)) | GoalsAcc]};
@@ -159,7 +182,8 @@ parse_deps(Deps) ->
                         {SrcDepsAcc, [ec_cnv:to_binary(Name) | GoalsAcc]};
                    ({Name, _, Source}, {SrcDepsAcc, GoalsAcc}) ->
                         {ok, Dep} = rebar_app_info:new(Name),
-                        Dep1 = rebar_app_info:source(Dep, Source),
+                        Dep1 = rebar_app_info:source(
+                                 rebar_app_info:dir(Dep, get_deps_dir(DepsDir, Name)), Source),
                         {[Dep1 | SrcDepsAcc], GoalsAcc}
                 end, {[], []}, Deps).
 

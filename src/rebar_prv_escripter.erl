@@ -24,7 +24,7 @@
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
--module(rebar_escripter).
+-module(rebar_prv_escripter).
 
 -behaviour(rebar_provider).
 

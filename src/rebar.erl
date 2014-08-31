@@ -189,10 +189,10 @@ run_aux(BaseConfig, Commands) ->
 %%
 help() ->
     OptSpecList = option_spec_list(),
-    rebar_getopt:usage(OptSpecList, "rebar",
-                       "[var=value,...] <command,...>",
-                       [{"var=value", "rebar global variables (e.g. force=1)"},
-                        {"command", "Command to run (e.g. compile)"}]),
+    getopt:usage(OptSpecList, "rebar",
+                 "[var=value,...] <command,...>",
+                 [{"var=value", "rebar global variables (e.g. force=1)"},
+                  {"command", "Command to run (e.g. compile)"}]),
 
     ?CONSOLE("To see a list of built-in commands, execute rebar -c.~n~n", []),
     ?CONSOLE(
@@ -206,7 +206,7 @@ help() ->
 parse_args(RawArgs) ->
     %% Parse getopt options
     OptSpecList = option_spec_list(),
-    case rebar_getopt:parse(OptSpecList, RawArgs) of
+    case getopt:parse(OptSpecList, RawArgs) of
         {ok, Args} ->
             Args;
         {error, {Reason, Data}} ->
