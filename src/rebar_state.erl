@@ -33,9 +33,9 @@
                   envs = new_env() :: rebar_dict(),
                   command_args = [] :: list(),
 
-                  src_deps = [] :: [rebar_app_info:t()],
+                  src_deps = ordsets:new() :: ordsets:ordset(rebar_app_info:t()),
                   binary_deps = [],
-                  project_apps = [],
+                  project_apps = ordsets:new() :: ordsets:ordset(rebar_app_info:t()),
 
                   providers = [],
                   skip_dirs = new_skip_dirs() :: rebar_dict() }).
@@ -105,7 +105,6 @@ command_args(#state_t{command_args=CmdArgs}) ->
 
 command_args(State, CmdArgs) ->
     State#state_t{command_args=CmdArgs}.
-
 
 deps_names(State) ->
     Deps = rebar_state:get(State, deps, []),
