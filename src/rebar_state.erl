@@ -7,9 +7,10 @@
          set_skip_dir/2, is_skip_dir/2, reset_skip_dirs/1,
          create_logic_providers/2,
 
-         apps_to_build/1, apps_to_build/2,
+         project_apps/1, project_apps/2,
 
-         goals/1, goals/2,
+         deps_names/1,
+         binary_deps/1, binary_deps/2,
          src_deps/1, src_deps/2,
 
          providers/1, providers/2, add_provider/2]).
@@ -33,10 +34,10 @@
                   command_args = [] :: list(),
 
                   src_deps = [] :: [rebar_app_info:t()],
-                  apps = dict:new() :: rebar_dict(),
-                  goals = [],
+                  binary_deps = [],
+                  project_apps = [],
+
                   providers = [],
-                  apps_to_build = [],
                   skip_dirs = new_skip_dirs() :: rebar_dict() }).
 
 -export_type([t/0]).
@@ -105,13 +106,22 @@ command_args(#state_t{command_args=CmdArgs}) ->
 command_args(State, CmdArgs) ->
     State#state_t{command_args=CmdArgs}.
 
-goals(#state_t{goals=Goals}) ->
-    Goals.
 
-goals(State=#state_t{goals=Goals}, NewGoals) when is_list(Goals) ->
-    State#state_t{goals=NewGoals};
-goals(State=#state_t{goals=Goals}, Goal) ->
-    State#state_t{goals=[Goal | Goals]}.
+deps_names(State) ->
+    Deps = rebar_state:get(State, deps, []),
+    lists:map(fun(Dep) when is_tuple(Dep) ->
+                      ec_cnv:to_binary(element(1, Dep));
+                 (Dep) when is_atom(Dep) ->
+                      ec_cnv:to_binary(Dep)
+              end, Deps).
+
+binary_deps(#state_t{binary_deps=BinaryDeps}) ->
+    BinaryDeps.
+
+binary_deps(State=#state_t{binary_deps=BinaryDeps}, NewBinaryDeps) when is_list(BinaryDeps) ->
+    State#state_t{binary_deps=NewBinaryDeps};
+binary_deps(State=#state_t{binary_deps=BinaryDeps}, BinaryDep) ->
+    State#state_t{binary_deps=[BinaryDep | BinaryDeps]}.
 
 src_deps(#state_t{src_deps=SrcDeps}) ->
     SrcDeps.
@@ -121,13 +131,13 @@ src_deps(State=#state_t{src_deps=SrcDeps}, NewSrcDeps) when is_list(SrcDeps) ->
 src_deps(State=#state_t{src_deps=SrcDeps}, SrcDep) ->
     State#state_t{src_deps=[SrcDep | SrcDeps]}.
 
-apps_to_build(#state_t{apps_to_build=Apps}) ->
+project_apps(#state_t{project_apps=Apps}) ->
     Apps.
 
-apps_to_build(State=#state_t{apps_to_build=Apps}, NewApps) when is_list(NewApps) ->
-    State#state_t{apps_to_build=NewApps};
-apps_to_build(State=#state_t{apps_to_build=Apps}, App) ->
-    State#state_t{apps_to_build=[App | Apps]}.
+project_apps(State=#state_t{}, NewApps) when is_list(NewApps) ->
+    State#state_t{project_apps=NewApps};
+project_apps(State=#state_t{project_apps=Apps}, App) ->
+    State#state_t{project_apps=[App | Apps]}.
 
 providers(#state_t{providers=Providers}) ->
     Providers.

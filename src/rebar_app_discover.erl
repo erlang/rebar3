@@ -7,8 +7,9 @@
 
 do(State, LibDirs) ->
     Apps = find_apps(LibDirs, all),
+    ProjectDeps = rebar_state:deps_names(State),
     lists:foldl(fun(AppInfo, StateAcc) ->
-                        rebar_state:apps_to_build(StateAcc, AppInfo)
+                        rebar_state:project_apps(StateAcc, rebar_app_info:deps(AppInfo, ProjectDeps))
             end, State, Apps).
 
 -spec all_app_dirs(list(file:name())) -> list(file:name()).
@@ -35,14 +36,9 @@ app_dirs(LibDir) ->
                            "*.app"]),
 
     lists:usort(lists:foldl(fun(Path, Acc) ->
-                                    Files = filelib:wildcard(to_list(Path)),
+                                    Files = filelib:wildcard(ec_cnv:to_list(Path)),
                                     [app_dir(File) || File <- Files] ++ Acc
                             end, [], [Path1, Path2, Path3, Path4])).
-
-to_list(S) when is_list(S) ->
-    S;
-to_list(S) when is_binary(S) ->
-    binary_to_list(S).
 
 find_unbuilt_apps(LibDirs) ->
     find_apps(LibDirs, invalid).
@@ -149,7 +145,7 @@ get_modules_list(AppFile, AppDetail) ->
                            ok | {error, Reason::term()}.
 has_all_beams(EbinDir, [Module | ModuleList]) ->
     BeamFile = filename:join([EbinDir,
-                              list_to_binary(atom_to_list(Module) ++ ".beam")]),
+                              ec_cnv:to_list(Module) ++ ".beam"]),
     case filelib:is_file(BeamFile) of
         true ->
             has_all_beams(EbinDir, ModuleList);
