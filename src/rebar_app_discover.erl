@@ -6,7 +6,9 @@
          find_apps/2]).
 
 do(State, LibDirs) ->
-    Apps = find_apps(LibDirs, all),
+    BaseDir = rebar_state:dir(State),
+    Dirs = [filename:join(BaseDir, LibDir) || LibDir <- LibDirs],
+    Apps = find_apps(Dirs, all),
     ProjectDeps = rebar_state:deps_names(State),
     lists:foldl(fun(AppInfo, StateAcc) ->
                         rebar_state:project_apps(StateAcc, rebar_app_info:deps(AppInfo, ProjectDeps))

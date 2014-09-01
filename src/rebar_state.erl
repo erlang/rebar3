@@ -4,6 +4,7 @@
          get/2, get/3, set/3,
          command_args/1, command_args/2,
 
+         dir/1, dir/2,
          set_skip_dir/2, is_skip_dir/2, reset_skip_dirs/1,
          create_logic_providers/2,
 
@@ -105,6 +106,12 @@ command_args(#state_t{command_args=CmdArgs}) ->
 
 command_args(State, CmdArgs) ->
     State#state_t{command_args=CmdArgs}.
+
+dir(#state_t{dir=Dir}) ->
+    Dir.
+
+dir(State=#state_t{}, Dir) ->
+    State#state_t{dir=filename:absname(Dir)}.
 
 deps_names(State) ->
     Deps = rebar_state:get(State, deps, []),

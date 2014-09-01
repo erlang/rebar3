@@ -4,6 +4,7 @@
          new/1,
          new/2,
          new/3,
+         new/4,
          name/1,
          name/2,
          config/1,
@@ -22,7 +23,9 @@
          dir/1,
          dir/2,
          source/1,
-         source/2]).
+         source/2,
+         valid/1,
+         valid/2]).
 
 -export_type([t/0]).
 
@@ -34,7 +37,8 @@
                      app_details :: list(),
                      deps=[] :: list(),
                      dir :: file:name(),
-                     source :: string() | undefined}).
+                     source :: string() | undefined,
+                     valid :: boolean()}).
 
 %%============================================================================
 %% types
@@ -68,6 +72,15 @@ new(AppName, Vsn, Dir) ->
     {ok, #app_info_t{name=ec_cnv:to_binary(AppName),
                      original_vsn=Vsn,
                      dir=Dir}}.
+
+%% @doc build a complete version of the app info with all fields set.
+-spec new(atom() | binary() | string(), string(), file:name(), list()) ->
+                 {ok, t()}.
+new(AppName, Vsn, Dir, Deps) ->
+    {ok, #app_info_t{name=ec_cnv:to_binary(AppName),
+                     original_vsn=Vsn,
+                     dir=Dir,
+                     deps=Deps}}.
 
 -spec name(t()) -> atom().
 name(#app_info_t{name=Name}) ->
@@ -160,3 +173,13 @@ source(AppInfo=#app_info_t{}, Source) ->
 -spec source(t()) -> string().
 source(#app_info_t{source=Source}) ->
     Source.
+
+-spec valid(t()) -> boolean().
+valid(#app_info_t{dir=Dir, valid=undefined}) ->
+    true;
+valid(#app_info_t{valid=Valid}) ->
+    Valid.
+
+-spec valid(t(), boolean()) -> t().
+valid(AppInfo=#app_info_t{}, Valid) ->
+    AppInfo#app_info_t{valid=Valid}.

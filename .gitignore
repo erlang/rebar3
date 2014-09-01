@@ -1,4 +1,6 @@
-/ebin/*.beam
+*.beam
+test/*_data
+logs
 /rebar
 *~
 *.orig
