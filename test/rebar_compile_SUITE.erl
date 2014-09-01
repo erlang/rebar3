@@ -1,4 +1,4 @@
--module(rebar_install_deps_SUITE).
+-module(rebar_compile_SUITE).
 
 -export([suite/0,
          init_per_suite/1,
