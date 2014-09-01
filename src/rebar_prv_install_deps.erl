@@ -57,7 +57,7 @@ init(State) ->
                                                        provider_impl = ?MODULE,
                                                        bare = false,
                                                        deps = ?DEPS,
-                                                       example = "rebar deps",
+                                                       example = "",
                                                        short_desc = "Install dependencies",
                                                        desc = info("Install dependencies"),
                                                        opts = []}),
