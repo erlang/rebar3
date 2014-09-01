@@ -31,7 +31,7 @@ init_per_testcase(_, Config) ->
     [{apps, AppsDir}, {state, State} | Config].
 
 all() ->
-    [built_basic_app].
+    [build_basic_app].
 
 build_basic_app(Config) ->
     AppDir = proplists:get_value(apps, Config),

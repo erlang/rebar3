@@ -138,12 +138,19 @@ handle_deps(State, Deps) ->
                                end, S)
              end,
 
-    FinalDeps = ordsets:union([ordsets:from_list(ProjectApps)
-                              ,rebar_state:src_deps(State2)
+    Source = ProjectApps ++ ordsets:to_list(rebar_state:src_deps(State2)),
+    AllDeps = ordsets:union([ordsets:from_list(ProjectApps)
+                              ,ordsets:to_list(rebar_state:src_deps(State2))
                               ,ordsets:from_list(Solved)]),
+
     %% Sort all apps to build order
-    {ok, Sort} = rebar_topo:sort_apps(ordsets:to_list(FinalDeps)),
-    {ok, rebar_state:project_apps(State2, Sort)}.
+    State3 = rebar_state:set(State2, all_deps, AllDeps),
+    {ok, Sort} = rebar_topo:sort_apps(ordsets:to_list(Source)),
+    {ok, rebar_state:set(State3, deps_to_build, lists:dropwhile(fun is_valid/1, Sort) -- ProjectApps)}.
+
+-spec is_valid(rebar_app_info:t()) -> boolean().
+is_valid(App) ->
+    rebar_app_info:valid(App).
 
 -spec package_to_app(file:name(), dict:dict(), binary(), binary()) -> rebar_app_info:t().
 package_to_app(DepsDir, Packages, Name, Vsn) ->
@@ -205,9 +212,8 @@ parse_deps(DepsDir, Deps) ->
                    (Name, {SrcDepsAcc, BinaryDepsAcc}) when is_atom(Name) ->
                         {SrcDepsAcc, [ec_cnv:to_binary(Name) | BinaryDepsAcc]};
                    ({Name, _, Source}, {SrcDepsAcc, BinaryDepsAcc}) ->
-                        {ok, Dep} = rebar_app_info:new(Name),
-                        Dep1 = rebar_app_info:source(
-                                 rebar_app_info:dir(Dep, get_deps_dir(DepsDir, Name)), Source),
+                        {ok, Dep} = rebar_app_info:discover(get_deps_dir(DepsDir, Name)),
+                        Dep1 = rebar_app_info:source(Dep, Source),
                         {ordsets:add_element(Dep1, SrcDepsAcc), BinaryDepsAcc}
                 end, {ordsets:new(), []}, Deps).
 

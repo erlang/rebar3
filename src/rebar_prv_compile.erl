@@ -29,13 +29,14 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
 do(State) ->
-    Apps = rebar_state:project_apps(State),
+    ProjectApps = rebar_state:project_apps(State),
+    Deps = rebar_state:get(State, deps_to_build, []),
 
     lists:foreach(fun(AppInfo) ->
                           C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
                           S = rebar_state:new(rebar_state:new(), C, rebar_app_info:dir(AppInfo)),
-                          _AppInfo1 = build(S, AppInfo)
-                  end, Apps),
+                          build(S, AppInfo)
+                  end, Deps++ProjectApps),
 
     rebar_lock:create(State),
     {ok, State}.

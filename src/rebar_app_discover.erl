@@ -3,7 +3,9 @@
 -export([do/2,
          find_unbuilt_apps/1,
          find_apps/1,
-         find_apps/2]).
+         find_apps/2,
+         find_app/2,
+         validate_application_info/1]).
 
 do(State, LibDirs) ->
     BaseDir = rebar_state:dir(State),
@@ -50,51 +52,54 @@ find_apps(LibDirs) ->
 
 find_apps(LibDirs, Validate) ->
     lists:filtermap(fun(AppDir) ->
-                      AppFile = filelib:wildcard(filename:join([AppDir, "ebin", "*.app"])),
-                      AppSrcFile = filelib:wildcard(filename:join([AppDir, "src", "*.app.src"])),
-                      case AppFile of
-                          [File] ->
-                              AppInfo = create_app_info(AppDir, File),
-                              AppInfo1 = rebar_app_info:app_file(AppInfo, File),
-                              AppInfo2 = case AppSrcFile of
-                                             [F] ->
-                                                 rebar_app_info:app_file_src(AppInfo1, F);
-                                             [] ->
-                                                 AppInfo1
-                                         end,
-                              case Validate of
-                                  valid ->
-                                      case validate_application_info(AppInfo2) of
-                                          true ->
-                                              {true, AppInfo2};
-                                          false ->
-                                              false
-                                      end;
-                                  invalid ->
-                                      case validate_application_info(AppInfo2) of
-                                          false ->
-                                              {true, AppInfo2};
-                                          true ->
-                                              false
-                                      end;
-                                  all ->
-                                      {true, AppInfo2}
-                              end;
-                          [] ->
-                              case AppSrcFile of
-                                  [File] ->
-                                      case Validate of
-                                          V when V =:= invalid ; V =:= all ->
-                                              AppInfo = create_app_info(AppDir, File),
-                                              {true, rebar_app_info:app_file_src(AppInfo, File)};
-                                          valid ->
-                                              false
-                                      end;
-                                  [] ->
-                                      false
-                              end
-                      end
-              end, all_app_dirs(LibDirs)).
+                            find_app(AppDir, Validate)
+                    end, all_app_dirs(LibDirs)).
+
+find_app(AppDir, Validate) ->
+    AppFile = filelib:wildcard(filename:join([AppDir, "ebin", "*.app"])),
+    AppSrcFile = filelib:wildcard(filename:join([AppDir, "src", "*.app.src"])),
+    case AppFile of
+        [File] ->
+            AppInfo = create_app_info(AppDir, File),
+            AppInfo1 = rebar_app_info:app_file(AppInfo, File),
+            AppInfo2 = case AppSrcFile of
+                           [F] ->
+                               rebar_app_info:app_file_src(AppInfo1, F);
+                           [] ->
+                               AppInfo1
+                       end,
+            case Validate of
+                valid ->
+                    case validate_application_info(AppInfo2) of
+                        true ->
+                            {true, AppInfo2};
+                        false ->
+                            false
+                    end;
+                invalid ->
+                    case validate_application_info(AppInfo2) of
+                        false ->
+                            {true, AppInfo2};
+                        true ->
+                            false
+                    end;
+                all ->
+                    {true, AppInfo2}
+            end;
+        [] ->
+            case AppSrcFile of
+                [File] ->
+                    case Validate of
+                        V when V =:= invalid ; V =:= all ->
+                            AppInfo = create_app_info(AppDir, File),
+                            {true, rebar_app_info:app_file_src(AppInfo, File)};
+                        valid ->
+                            false
+                    end;
+                [] ->
+                    false
+            end
+    end.
 
 app_dir(AppFile) ->
     filename:join(lists:droplast(filename:split(filename:dirname(AppFile)))).

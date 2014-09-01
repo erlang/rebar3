@@ -5,6 +5,7 @@
          new/2,
          new/3,
          new/4,
+         discover/1,
          name/1,
          name/2,
          config/1,
@@ -81,6 +82,14 @@ new(AppName, Vsn, Dir, Deps) ->
                      original_vsn=Vsn,
                      dir=Dir,
                      deps=Deps}}.
+
+%% @doc discover a complete version of the app info with all fields set.
+-spec discover(file:name()) ->
+                 {ok, t()}.
+discover(Dir) ->
+    {true, AppInfo} = rebar_app_discover:find_app(Dir, all),
+    {ok, AppInfo}.
+
 
 -spec name(t()) -> atom().
 name(#app_info_t{name=Name}) ->
@@ -175,8 +184,8 @@ source(#app_info_t{source=Source}) ->
     Source.
 
 -spec valid(t()) -> boolean().
-valid(#app_info_t{dir=Dir, valid=undefined}) ->
-    true;
+valid(AppInfo=#app_info_t{valid=undefined}) ->
+    rebar_app_discover:validate_application_info(AppInfo);
 valid(#app_info_t{valid=Valid}) ->
     Valid.
 

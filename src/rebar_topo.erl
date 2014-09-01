@@ -91,15 +91,13 @@ format_error({cycle, Pairs}) ->
 %%====================================================================
 -spec names_to_apps([atom()], [rebar_app_info:t()]) -> [rebar_app_info:t()].
 names_to_apps(Names, Apps) ->
- [find_app_by_name(Name, Apps) || Name <- Names].
+ [element(2, App) || App <- [find_app_by_name(Name, Apps) || Name <- Names], App =/= error].
 
--spec find_app_by_name(atom(), [rebar_app_info:t()]) -> rebar_app_info:t().
+-spec find_app_by_name(atom(), [rebar_app_info:t()]) -> {ok, rebar_app_info:t()} | error.
 find_app_by_name(Name, Apps) ->
-    {ok, App1} =
-        ec_lists:find(fun(App) ->
-                              rebar_app_info:name(App) =:= Name
-                      end, Apps),
-    App1.
+    ec_lists:find(fun(App) ->
+                          rebar_app_info:name(App) =:= Name
+                  end, Apps).
 
 -spec apps_to_pairs([rebar_app_info:t()]) -> [pair()].
 apps_to_pairs(Apps) ->
