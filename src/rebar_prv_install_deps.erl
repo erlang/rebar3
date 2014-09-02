@@ -139,12 +139,11 @@ handle_deps(State, Deps) ->
              end,
 
     Source = ProjectApps ++ ordsets:to_list(rebar_state:src_deps(State2)),
-    AllDeps = ordsets:union([ordsets:from_list(ProjectApps)
-                              ,ordsets:to_list(rebar_state:src_deps(State2))
-                              ,ordsets:from_list(Solved)]),
+    AllDeps = ordsets:union([ordsets:to_list(rebar_state:src_deps(State2))
+                            ,ordsets:from_list(Solved)]),
 
     %% Sort all apps to build order
-    State3 = rebar_state:set(State2, all_deps, AllDeps -- ProjectApps),
+    State3 = rebar_state:set(State2, all_deps, AllDeps),
     {ok, Sort} = rebar_topo:sort_apps(ordsets:to_list(Source)),
     {ok, rebar_state:set(State3, deps_to_build, lists:dropwhile(fun is_valid/1, Sort) -- ProjectApps)}.
 
