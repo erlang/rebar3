@@ -9,7 +9,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, compile).
--define(DEPS, [install_deps]).
+-define(DEPS, [lock]).
 
 %% ===================================================================
 %% Public API
@@ -38,7 +38,6 @@ do(State) ->
                           build(S, AppInfo)
                   end, Deps++ProjectApps),
 
-    rebar_lock:create(State),
     {ok, State}.
 
 build(State, AppInfo) ->

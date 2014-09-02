@@ -16,7 +16,7 @@
               rebar_fetch,
               rebar_file_utils,
               rebar_log,
-              rebar_lock,
+              rebar_prv_lock,
               rebar_otp_app,
               rebar_provider,
               rebar_packages,
@@ -54,6 +54,7 @@
         %% any_dir processing modules
         {providers, [rebar_prv_escripter,
                      rebar_prv_deps,
+                     rebar_prv_lock,
                      rebar_prv_install_deps,
                      rebar_prv_packages,
                      rebar_erlydtl_compiler,

@@ -8,7 +8,7 @@
 -module(rebar_fetch).
 
 -export([new/4,
-         current_ref/2,
+         lock_source/2,
          download_source/2,
          update_source1/2,
          source_engine_avail/1,
@@ -27,8 +27,8 @@
          }).
 
 new(Dir, App, Vsn, Source) ->
-    Ref = current_ref(Dir, Source),
-    {App, Vsn, setelement(3, Source, Ref)}.
+    NewSource = lock_source(Dir, Source),
+    {App, Vsn, NewSource}.
 
 init_p4_settings(Basename) ->
     #p4_settings{client =
@@ -40,8 +40,11 @@ init_p4_settings(Basename) ->
                                  ++ "-Rebar-automated-download"
                      end}.
 
-current_ref(AppDir, {git, _, _}) ->
-    string:strip(os:cmd("git --git-dir='" ++ AppDir ++ "/.git' rev-parse --verify HEAD"), both, $\n).
+lock_source(AppDir, {git, Url, _}) ->
+    Ref = string:strip(os:cmd("git --git-dir='" ++ AppDir ++ "/.git' rev-parse --verify HEAD"), both, $\n),
+    {git, Url, Ref};
+lock_source(_AppDir, Source) ->
+    Source.
 
 download_source(AppDir, Source) ->
     TmpDir = ec_file:insecure_mkdtemp(),
@@ -121,9 +124,8 @@ download_source_tmp(TmpDir, {fossil, Url, Version}) ->
                    [{cd, TmpDir}]),
     rebar_utils:sh(?FMT("fossil open ~s ~s --nested", [Repository, Version]),
                    []);
-download_source_tmp(TmpDir, {AppName, AppVersion, Url}) when is_binary(AppName)
-                                                           , is_binary(AppVersion) ->
-    TmpFile = binary_to_list(filename:join(TmpDir, <<AppName/binary, "-", AppVersion/binary, ".tar.gz">>)),
+download_source_tmp(TmpDir, Url) ->
+    TmpFile = filename:join(TmpDir, "package.tar.gz"),
     {ok, saved_to_file} = httpc:request(get, {binary_to_list(Url), []}, [], [{stream, TmpFile}]),
     {tarball, TmpFile}.
 

@@ -144,7 +144,7 @@ handle_deps(State, Deps) ->
                               ,ordsets:from_list(Solved)]),
 
     %% Sort all apps to build order
-    State3 = rebar_state:set(State2, all_deps, AllDeps),
+    State3 = rebar_state:set(State2, all_deps, AllDeps -- ProjectApps),
     {ok, Sort} = rebar_topo:sort_apps(ordsets:to_list(Source)),
     {ok, rebar_state:set(State3, deps_to_build, lists:dropwhile(fun is_valid/1, Sort) -- ProjectApps)}.
 
@@ -164,7 +164,7 @@ package_to_app(DepsDir, Packages, Name, Vsn) ->
     AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
     AppInfo2 =
         rebar_app_info:dir(AppInfo1, get_deps_dir(DepsDir, <<Name/binary, "-", FmtVsn/binary>>)),
-    rebar_app_info:source(AppInfo2, {Name, FmtVsn, Link}).
+    rebar_app_info:source(AppInfo2, Link).
 
 -spec update_src_deps(rebar_state:t()) -> rebat_state:t().
 update_src_deps(State) ->
