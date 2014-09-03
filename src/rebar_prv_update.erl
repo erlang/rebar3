@@ -35,21 +35,16 @@ do(State) ->
         [Name] ->
             ?INFO("Updating ~s~n", [Name]),
 
-            DepsDir = rebar_prv_deps:get_deps_dir(State),
-            Deps = rebar_state:get_local(State, deps, []),
+            DepsDir = rebar_prv_install_deps:get_deps_dir(State),
+            Deps = rebar_state:get(State, deps, []),
             {_, _, Source} = lists:keyfind(list_to_atom(Name), 1, Deps),
-            TargetDir = rebar_prv_deps:get_deps_dir(DepsDir, Name),
+            TargetDir = rebar_prv_install_deps:get_deps_dir(DepsDir, Name),
             rebar_fetch:update_source1(TargetDir, Source),
-
-            [App] = rebar_app_discover:find_apps([TargetDir]),
-
-            {ok, AppInfo1} = rebar_otp_app:compile(State, App),
-            State1 = rebar_state:replace_app(State, rebar_app_info:name(AppInfo1), AppInfo1),
-            rebar_erlc_compiler:compile(State, rebar_app_info:dir(AppInfo1)),
-
-            %update_lock_file(State, AppInfo1, Source),
-
-            {ok, State1};
+            State1 = rebar_state:set(State, locks, []),
+            {ok, State2} = rebar_prv_install_deps:do(State1),
+            {ok, State3} = rebar_prv_lock:do(State2),
+            {ok, State4} = rebar_prv_compile:do(State3),
+            {ok, State4};
         [] ->
             ?INFO("Updating package index...~n", []),
             Url = url(State),
