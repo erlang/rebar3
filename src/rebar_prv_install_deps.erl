@@ -69,8 +69,7 @@ do(State) ->
         [] ->
             handle_deps(State, ordsets:from_list(rebar_state:get(State, deps, [])));
         Locks ->
-            handle_deps(State, ordsets:from_list(Locks)),
-            {ok, State}
+            handle_deps(State, ordsets:from_list(Locks))
     end.
 
 %% set REBAR_DEPS_DIR and ERL_LIBS environment variables
@@ -146,7 +145,7 @@ handle_deps(State, Deps) ->
     %% Sort all apps to build order
     State3 = rebar_state:set(State2, all_deps, AllDeps),
     {ok, Sort} = rebar_topo:sort_apps(ordsets:to_list(Source)),
-    {ok, rebar_state:set(State3, deps_to_build, lists:dropwhile(fun is_valid/1, Sort) -- ProjectApps)}.
+    {ok, rebar_state:set(State3, deps_to_build, lists:dropwhile(fun is_valid/1, Sort -- ProjectApps))}.
 
 -spec is_valid(rebar_app_info:t()) -> boolean().
 is_valid(App) ->
@@ -211,9 +210,14 @@ parse_deps(DepsDir, Deps) ->
                                                 ,ec_cnv:to_binary(Vsn)) | BinaryDepsAcc]};
                    (Name, {SrcDepsAcc, BinaryDepsAcc}) when is_atom(Name) ->
                         {SrcDepsAcc, [ec_cnv:to_binary(Name) | BinaryDepsAcc]};
-                   ({Name, _Vsn, Source}, {SrcDepsAcc, BinaryDepsAcc}) when is_tuple (Source) ->
-                        {ok, Dep} =
-                            rebar_app_info:discover(ec_cnv:to_list(get_deps_dir(DepsDir, Name))),
+                   ({Name, Vsn, Source}, {SrcDepsAcc, BinaryDepsAcc}) when is_tuple (Source) ->
+                        Dir = ec_cnv:to_list(get_deps_dir(DepsDir, Name)),
+                        {ok, Dep} = case rebar_app_info:discover(Dir) of
+                                        {ok, App} ->
+                                            {ok, App};
+                                        not_found ->
+                                            rebar_app_info:new(Name, Vsn, Dir)
+                                    end,
                         Dep1 = rebar_app_info:source(Dep, Source),
                         {ordsets:add_element(Dep1, SrcDepsAcc), BinaryDepsAcc}
                 end, {ordsets:new(), []}, Deps).

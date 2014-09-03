@@ -35,7 +35,7 @@
                      app_file :: file:name(),
                      config :: rebar_config:config() | undefined,
                      original_vsn :: string(),
-                     app_details :: list(),
+                     app_details=[] :: list(),
                      deps=[] :: list(),
                      dir :: file:name(),
                      source :: string() | undefined,
@@ -87,9 +87,12 @@ new(AppName, Vsn, Dir, Deps) ->
 -spec discover(file:name()) ->
                  {ok, t()}.
 discover(Dir) ->
-    {true, AppInfo} = rebar_app_discover:find_app(Dir, all),
-    {ok, AppInfo}.
-
+    case rebar_app_discover:find_app(Dir, all) of
+        {true, AppInfo} ->
+            {ok, AppInfo};
+        _ ->
+            not_found
+    end.
 
 -spec name(t()) -> atom().
 name(#app_info_t{name=Name}) ->
