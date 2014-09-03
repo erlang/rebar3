@@ -28,16 +28,27 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
 do(State) ->
-    AllDeps = rebar_state:get(State, all_deps, []),
-    Locks = lists:map(fun(Dep) ->
-                              Dir = rebar_app_info:dir(Dep),
-                              {rebar_app_info:name(Dep)
-                              ,rebar_app_info:original_vsn(Dep)
-                              ,rebar_fetch:lock_source(Dir, rebar_app_info:source(Dep))}
-                      end, AllDeps),
-    Dir = rebar_state:dir(State),
-    file:write_file(filename:join(Dir, "rebar.lock"), io_lib:format("~p.~n", [Locks])),
-    {ok, rebar_state:set(State, locks, Locks)}.
+    case rebar_state:get(State, locks, []) of
+        [] ->
+            AllDeps = rebar_state:get(State, all_deps, []),
+            Locks = lists:map(fun(Dep) ->
+                                      Dir = rebar_app_info:dir(Dep),
+                                      case rebar_app_info:source(Dep) of
+                                          Source when is_tuple(Source) ->
+                                              {rebar_app_info:name(Dep)
+                                              ,rebar_app_info:original_vsn(Dep)
+                                              ,rebar_fetch:lock_source(Dir, Source)};
+                                          _Source ->
+                                              {rebar_app_info:name(Dep)
+                                              ,rebar_app_info:original_vsn(Dep)}
+                                      end
+                              end, AllDeps),
+            Dir = rebar_state:dir(State),
+            file:write_file(filename:join(Dir, "rebar.lock"), io_lib:format("~p.~n", [Locks])),
+            {ok, rebar_state:set(State, locks, Locks)};
+        _Locks ->
+            {ok, State}
+    end.
 
 info(_) ->
     "".

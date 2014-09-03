@@ -68,7 +68,8 @@ do(State) ->
     case rebar_state:get(State, locks, []) of
         [] ->
             handle_deps(State, ordsets:from_list(rebar_state:get(State, deps, [])));
-        _Locks ->
+        Locks ->
+            handle_deps(State, ordsets:from_list(Locks)),
             {ok, State}
     end.
 
@@ -210,8 +211,9 @@ parse_deps(DepsDir, Deps) ->
                                                 ,ec_cnv:to_binary(Vsn)) | BinaryDepsAcc]};
                    (Name, {SrcDepsAcc, BinaryDepsAcc}) when is_atom(Name) ->
                         {SrcDepsAcc, [ec_cnv:to_binary(Name) | BinaryDepsAcc]};
-                   ({Name, _, Source}, {SrcDepsAcc, BinaryDepsAcc}) ->
-                        {ok, Dep} = rebar_app_info:discover(get_deps_dir(DepsDir, Name)),
+                   ({Name, _Vsn, Source}, {SrcDepsAcc, BinaryDepsAcc}) when is_tuple (Source) ->
+                        {ok, Dep} =
+                            rebar_app_info:discover(ec_cnv:to_list(get_deps_dir(DepsDir, Name))),
                         Dep1 = rebar_app_info:source(Dep, Source),
                         {ordsets:add_element(Dep1, SrcDepsAcc), BinaryDepsAcc}
                 end, {ordsets:new(), []}, Deps).
