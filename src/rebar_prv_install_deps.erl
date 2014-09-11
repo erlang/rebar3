@@ -57,7 +57,7 @@ init(State) ->
                                                        provider_impl = ?MODULE,
                                                        bare = false,
                                                        deps = ?DEPS,
-                                                       example = "",
+                                                       example = undefined,
                                                        short_desc = "Install dependencies",
                                                        desc = info("Install dependencies"),
                                                        opts = []}),
@@ -89,7 +89,6 @@ setup_env(State) ->
                        {"ERL_LIBS", DepsDir ++ Separator ++ PrevValue}
                end,
     [{"REBAR_DEPS_DIR", DepsDir}, ERL_LIBS].
-
 
 -spec get_deps_dir(rebar_state:t()) -> file:filename_all().
 get_deps_dir(State) ->
@@ -126,7 +125,6 @@ handle_deps(State, Deps) ->
                  BinaryDeps1 ->
                      %% Find binary deps needed
                      {ok, S} = rlx_depsolver:solve(Graph, BinaryDeps1),
-
                      %% Create app_info record for each binary dep
                      lists:map(fun({Name, Vsn}) ->
                                        AppInfo = package_to_app(DepsDir
