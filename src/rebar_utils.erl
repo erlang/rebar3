@@ -27,6 +27,7 @@
 -module(rebar_utils).
 
 -export([droplast/1,
+         filtermap/2,
          get_cwd/0,
          is_arch/1,
          get_arch/0,
@@ -84,6 +85,17 @@ droplast(L) ->
 get_cwd() ->
     {ok, Dir} = file:get_cwd(),
     Dir.
+
+filtermap(F, [Hd|Tail]) ->
+    case F(Hd) of
+        true ->
+            [Hd|filtermap(F, Tail)];
+        {true,Val} ->
+            [Val|filtermap(F, Tail)];
+        false ->
+            filtermap(F, Tail)
+    end;
+filtermap(F, []) when is_function(F, 1) -> [].
 
 is_arch(ArchRegex) ->
     case re:run(get_arch(), ArchRegex, [{capture, none}]) of

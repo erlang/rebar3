@@ -51,9 +51,9 @@ find_apps(LibDirs) ->
     find_apps(LibDirs, valid).
 
 find_apps(LibDirs, Validate) ->
-    lists:filtermap(fun(AppDir) ->
-                            find_app(AppDir, Validate)
-                    end, all_app_dirs(LibDirs)).
+    rebar_utils:filtermap(fun(AppDir) ->
+                                  find_app(AppDir, Validate)
+                          end, all_app_dirs(LibDirs)).
 
 find_app(AppDir, Validate) ->
     AppFile = filelib:wildcard(filename:join([AppDir, "ebin", "*.app"])),
