@@ -149,7 +149,7 @@ handle_deps(State, Deps) ->
 is_valid(App) ->
     rebar_app_info:valid(App).
 
--spec package_to_app(file:name(), dict:dict(), binary(), binary()) -> rebar_app_info:t().
+-spec package_to_app(file:name(), rlx_depsolver:t(), binary(), binary()) -> rebar_app_info:t().
 package_to_app(DepsDir, Packages, Name, Vsn) ->
     FmtVsn = ec_cnv:to_binary(rlx_depsolver:format_version(Vsn)),
 
