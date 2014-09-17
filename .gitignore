@@ -1,6 +1,7 @@
 *.beam
 test/*_data
 logs
+rebar3
 /rebar
 *~
 *.orig
