@@ -31,6 +31,5 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
 do(Config) ->
-    RelxConfig = rebar_state:get_local(Config, relx, []),
     relx:main("release"),
     {ok, Config}.

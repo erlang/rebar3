@@ -1,3 +1,4 @@
+{variables, []}.
 {template, "app.erl", "src/{{appid}}_app.erl"}.
 {template, "sup.erl", "src/{{appid}}_sup.erl"}.
 {template, "otp_lib.app.src", "src/{{appid}}.app.src"}.
