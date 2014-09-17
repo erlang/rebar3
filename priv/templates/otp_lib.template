@@ -1,6 +1,5 @@
 {variables, []}.
-{template, "app.erl", "src/{{appid}}_app.erl"}.
-{template, "sup.erl", "src/{{appid}}_sup.erl"}.
+{template, "mod.erl", "src/{{appid}}.erl"}.
 {template, "otp_lib.app.src", "src/{{appid}}.app.src"}.
 {template, "rebar.config", "rebar.config"}.
 {template, "gitignore", ".gitignore"}.
