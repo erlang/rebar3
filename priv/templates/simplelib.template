@@ -1,3 +1,0 @@
-{variables, [{libid, "mylib"}]}.
-{template, "simplelib.app.src", "src/{{libid}}.app.src"}.
-{template, "simplelib.erl", "src/{{libid}}.erl"}.

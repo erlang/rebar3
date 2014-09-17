@@ -1,2 +1,0 @@
-{variables, [{appid, "myapp"}]}.
-{template, "simpleapp_gitignore", ".gitignore"}.

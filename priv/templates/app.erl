@@ -1,21 +1,26 @@
 %%%-------------------------------------------------------------------
-%% @copyright {{copyright_holder}} ({{copyright_year}})
-%% @author {{author_name}} <{{author_email}}>
 %% @doc {{appid}} public API
 %% @end
 %%%-------------------------------------------------------------------
 
--module({{appid}}).
+-module({{appid}}_app).
 
-%% API
--export([
-        ]).
+-behaviour(application).
+
+%% Application callbacks
+-export([start/2
+        ,stop/1]).
 
 %%====================================================================
 %% API
 %%====================================================================
 
+start(_StartType, _StartArgs) ->
+    {{appid}}_sup:start_link().
 
+%%--------------------------------------------------------------------
+stop(_State) ->
+    ok.
 
 %%====================================================================
 %% Internal functions

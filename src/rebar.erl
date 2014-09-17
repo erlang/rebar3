@@ -156,12 +156,8 @@ init_config({Options, _NonOptArgs}) ->
 init_config1(BaseConfig) ->
     %% Determine the location of the rebar executable; important for pulling
     %% resources out of the escript
-    %ScriptName = filename:absname(escript:script_name()),
-    %BaseConfig1 = rebar_state:set(BaseConfig, escript, ScriptName),
-    %?DEBUG("Rebar location: ~p\n", [ScriptName]),
-    %% Note the top-level directory for reference
-    AbsCwd = filename:absname(rebar_utils:get_cwd()),
-    rebar_state:set(BaseConfig, base_dir, AbsCwd).
+    ScriptName = filename:absname(escript:script_name()),
+    rebar_state:set(BaseConfig, escript, ScriptName).
 
 run_aux(BaseConfig, Commands) ->
     %% Make sure crypto is running
@@ -176,13 +172,13 @@ run_aux(BaseConfig, Commands) ->
     [Command | Args] = Commands,
     CommandAtom = list_to_atom(Command),
 
-    %BaseConfig1 = init_config1(BaseConfig),
+    BaseConfig1 = init_config1(BaseConfig),
 
     %% Process each command, resetting any state between each one
-    BaseConfig1 = rebar_state:set(BaseConfig, base_dir, filename:absname(rebar_state:dir(BaseConfig))),
+    BaseConfig2 = rebar_state:set(BaseConfig1, base_dir, filename:absname(rebar_state:dir(BaseConfig1))),
     {ok, Providers} = application:get_env(rebar, providers),
-    BaseConfig2 = rebar_state:create_logic_providers(Providers, BaseConfig1),
-    rebar_core:process_command(rebar_state:command_args(BaseConfig2, Args), CommandAtom),
+    BaseConfig3 = rebar_state:create_logic_providers(Providers, BaseConfig2),
+    rebar_core:process_command(rebar_state:command_args(BaseConfig3, Args), CommandAtom),
     ok.
 
 %%

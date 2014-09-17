@@ -1,0 +1,7 @@
+{template, "app.erl", "src/{{appid}}_app.erl"}.
+{template, "sup.erl", "src/{{appid}}_sup.erl"}.
+{template, "otp_lib.app.src", "src/{{appid}}.app.src"}.
+{template, "rebar.config", "rebar.config"}.
+{template, "gitignore", ".gitignore"}.
+{template, "LICENSE", "LICENSE"}.
+{template, "README.md", "README.md"}.

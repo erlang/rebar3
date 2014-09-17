@@ -1,11 +1,9 @@
 %%%-------------------------------------------------------------------
-%% @copyright {{copyright_holder}} ({{copyright_year}})
-%% @author {{author_name}} <{{author_email}}>
-%% @doc {{supid}} supervisor
+%% @doc {{appid}} top level supervisor.
 %% @end
 %%%-------------------------------------------------------------------
 
--module({{appid}}_{{supid}}_sup).
+-module({{appid}}_sup).
 
 -behaviour(supervisor).
 

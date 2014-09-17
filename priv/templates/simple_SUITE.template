@@ -1,7 +1,0 @@
-{variables, [{test, "mytest"}
-            ,{copyright_year, "2014"}
-            ,{copyright_holder, "Geoff Cant"}
-            ,{author_name, "Geoff Cant"}
-            ,{author_email, "nem@erlang.geek.nz"}
-            ]}.
-{template, "simple_SUITE.erl", "test/{{test}}_SUITE.erl"}.

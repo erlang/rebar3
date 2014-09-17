@@ -43,11 +43,11 @@
 %% ===================================================================
 
 new(app, DirName, State) ->
-    create1(State, DirName, "otpapp");
+    create1(State, DirName, "otp_app");
 new(lib, DirName, State) ->
-    create1(State, DirName, "otplib");
+    create1(State, DirName, "otp_lib");
 new(rel, DirName, State) ->
-    create1(State, DirName, "otpapp").
+    create1(State, DirName, "otp_rel").
 
 list_templates(State) ->
     {AvailTemplates, Files} = find_templates(State),
@@ -113,29 +113,30 @@ create1(State, AppDir, TemplateId) ->
 
     %% Load the template definition as is and get the list of variables the
     %% template requires.
+    Context0 = dict:from_list([{appid, AppDir}]),
     TemplateTerms = consult(load_file(Files, Type, Template)),
     case lists:keyfind(variables, 1, TemplateTerms) of
         {variables, Vars} ->
-            case parse_vars(Vars, dict:new()) of
+            case parse_vars(Vars, Context0) of
                 {error, Entry} ->
-                    Context0 = undefined,
+                    Context1 = undefined,
                     ?ABORT("Failed while processing variables from template ~p."
                            "Variable definitions must follow form of "
                            "[{atom(), term()}]. Failed at: ~p\n",
                            [TemplateId, Entry]);
-                Context0 ->
+                Context1 ->
                     ok
             end;
         false ->
             ?WARN("No variables section found in template ~p; "
                   "using empty context.\n", [TemplateId]),
-            Context0 = dict:new()
+            Context1 = Context0
     end,
 
     %% Load variables from disk file, if provided
-    Context1 = case rebar_state:get(State, template_vars, undefined) of
+    Context2 = case rebar_state:get(State, template_vars, undefined) of
                    undefined ->
-                       Context0;
+                       Context1;
                    File ->
                        case consult(load_file([], file, File)) of
                            {error, Reason} ->
@@ -144,18 +145,18 @@ create1(State, AppDir, TemplateId) ->
                            Terms ->
                                %% TODO: Cleanup/merge with similar code in rebar_reltool
                                M = fun(_Key, _Base, Override) -> Override end,
-                               dict:merge(M, Context0, dict:from_list(Terms))
+                               dict:merge(M, Context1, dict:from_list(Terms))
                        end
                end,
 
     %% For each variable, see if it's defined in global vars -- if it is,
     %% prefer that value over the defaults
-    Context2 = update_vars(State, dict:fetch_keys(Context1), Context1),
-    ?DEBUG("Template ~p context: ~p\n", [TemplateId, dict:to_list(Context1)]),
+    Context3 = update_vars(State, dict:fetch_keys(Context2), Context1),
+    ?DEBUG("Template ~p context: ~p\n", [TemplateId, dict:to_list(Context2)]),
 
     %% Handle variables that possibly include other variables in their
     %% definition
-    Context = resolve_variables(dict:to_list(Context2), Context2),
+    Context = resolve_variables(dict:to_list(Context3), Context3),
 
     ?DEBUG("Resolved Template ~p context: ~p\n",
            [TemplateId, dict:to_list(Context)]),
