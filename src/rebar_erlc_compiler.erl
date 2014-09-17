@@ -397,7 +397,7 @@ u_add_element(Elem, [])           -> [Elem].
                    rebar_state:t()) -> [file:filename(), ...].
 include_path(Source, Config) ->
     ErlOpts = rebar_state:get(Config, erl_opts, []),
-    Dir = filename:join(lists:droplast(filename:split(filename:dirname(Source)))),
+    Dir = filename:join(rebar_utils:droplast(filename:split(filename:dirname(Source)))),
     lists:usort([filename:join(Dir, "include"), filename:dirname(Source)]
                 ++ proplists:get_all_values(i, ErlOpts)).
 

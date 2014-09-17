@@ -26,7 +26,8 @@
 %% -------------------------------------------------------------------
 -module(rebar_utils).
 
--export([get_cwd/0,
+-export([droplast/1,
+         get_cwd/0,
          is_arch/1,
          get_arch/0,
          wordsize/0,
@@ -76,6 +77,9 @@
 %% ====================================================================
 %% Public API
 %% ====================================================================
+
+droplast(L) ->
+    lists:reverse(tl(lists:reverse(L))).
 
 get_cwd() ->
     {ok, Dir} = file:get_cwd(),

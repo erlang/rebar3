@@ -75,7 +75,7 @@ is_app_src(Filename) ->
     Filename =/= filename:rootname(Filename, ".app.src").
 
 app_src_to_app(Filename) ->
-    Path = filename:join(lists:droplast(filename:split(filename:dirname(Filename)))),
+    Path = filename:join(rebar_utils:droplast(filename:split(filename:dirname(Filename)))),
     AppFile = filename:join([Path, "ebin", filename:basename(Filename, ".app.src") ++ ".app"]),
     filelib:ensure_dir(AppFile),
     AppFile.

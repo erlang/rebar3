@@ -102,7 +102,7 @@ find_app(AppDir, Validate) ->
     end.
 
 app_dir(AppFile) ->
-    filename:join(lists:droplast(filename:split(filename:dirname(AppFile)))).
+    filename:join(rebar_utils:droplast(filename:split(filename:dirname(AppFile)))).
 
 create_app_info(AppDir, AppFile) ->
     case file:consult(AppFile) of
