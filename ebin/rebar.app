@@ -4,7 +4,7 @@
 {application, rebar,
  [{description, "Rebar: Erlang Build Tool"},
   {vsn, "3.0.0"},
-  {modules, [ rebar,
+  {modules, [ rebar3,
               rebar_app_utils,
               rebar_app_info,
               rebar_app_discover,
