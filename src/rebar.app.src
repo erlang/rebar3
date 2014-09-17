@@ -1,0 +1,38 @@
+%% -*- mode: erlang;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% ex: ts=4 sw=4 ft=erlang et
+
+{application, rebar,
+ [{description, "Rebar: Erlang Build Tool"},
+  {vsn, "3.0.0"},
+  {modules, []},
+  {registered, []},
+  {applications, [kernel,
+                  stdlib,
+                  sasl,
+                  compiler,
+                  crypto,
+                  syntax_tools,
+                  tools,
+                  erlware_commons,
+                  relx,
+                  inets]},
+  {env, [
+        %% Default log level
+        {log_level, warn},
+
+        %% any_dir processing modules
+        {providers, [rebar_prv_escripter,
+                     rebar_prv_deps,
+                     rebar_prv_lock,
+                     rebar_prv_install_deps,
+                     rebar_prv_packages,
+                     rebar_erlydtl_compiler,
+                     rebar_prv_compile,
+                     rebar_prv_app_discovery,
+                     rebar_prv_shell,
+                     rebar_prv_tar,
+                     rebar_prv_new,
+                     rebar_prv_update,
+                     rebar_prv_release]}
+        ]}
+ ]}.

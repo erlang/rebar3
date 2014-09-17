@@ -37,6 +37,7 @@
 -include("rebar.hrl").
 
 -define(TEMPLATE_RE, "^[^._].*\\.template\$").
+-define(ERLYDTL_COMPILE_OPTS, [report_warnings, return_errors, {auto_escape, false}, {out_dir, false}]).
 
 %% ===================================================================
 %% Public API
@@ -80,20 +81,19 @@ resolve_variables([{Key, Value0} | Rest], Dict) when is_list(Value0) ->
     Value = render(list_to_binary(Value0), Dict),
     resolve_variables(Rest, dict:store(Key, Value, Dict));
 resolve_variables([{Key, {list, Dicts}} | Rest], Dict) when is_list(Dicts) ->
-    %% just un-tag it so mustache can use it
+    %% just un-tag it so erlydtl can use it
     resolve_variables(Rest, dict:store(Key, Dicts, Dict));
 resolve_variables([_Pair | Rest], Dict) ->
     resolve_variables(Rest, Dict).
 
 %%
-%% Render a binary to a string, using mustache and the specified context
+%% Render a binary to a string, using erlydtl and the specified context
 %%
-render(Bin, Context) ->
-    %% Be sure to escape any double-quotes before rendering...
-    ReOpts = [global, {return, list}],
-    Str0 = re:replace(Bin, "\\\\", "\\\\\\", ReOpts),
-    Str1 = re:replace(Str0, "\"", "\\\\\"", ReOpts),
-    rebar_mustache:render(Str1, Context).
+render(Template, Context) when is_atom(Template) ->
+    Template:render(Context);
+render(Template, Context) ->
+    Module = list_to_atom(Template++"_dtl"),
+    Module:render(Context).
 
 %% ===================================================================
 %% Internal functions
@@ -156,19 +156,19 @@ create1(State, AppDir, TemplateId) ->
 
     %% Handle variables that possibly include other variables in their
     %% definition
-    Context = resolve_variables(dict:to_list(Context3), Context3),
+    %Context = resolve_variables(dict:to_list(Context3), Context3),
 
-    ?DEBUG("Resolved Template ~p context: ~p\n",
-           [TemplateId, dict:to_list(Context)]),
+    %?DEBUG("Resolved Template ~p context: ~p\n",
+           %[TemplateId, dict:to_list(Context)]),
 
     %% Now, use our context to process the template definition -- this
     %% permits us to use variables within the definition for filenames.
-    FinalTemplate = consult(render(load_file(Files, Type, Template), Context)),
-    ?DEBUG("Final template def ~p: ~p\n", [TemplateId, FinalTemplate]),
+    %FinalTemplate = consult(render(load_file(Files, Type, Template), Context)),
+    %?DEBUG("Final template def ~p: ~p\n", [TemplateId, FinalTemplate]),
 
     %% Execute the instructions in the finalized template
     Force = rebar_state:get(State, force, "0"),
-    execute_template(Files, FinalTemplate, Type, Template, Context, Force, []).
+    execute_template([], TemplateTerms, Type, TemplateId, Context3, Force, []).
 
 find_templates(State) ->
     %% Load a list of all the files in the escript -- cache them since
@@ -377,8 +377,12 @@ execute_template(Files, [{'case', Variable, Values, Instructions} | Rest], Templ
 execute_template(Files, [{template, Input, Output} | Rest], TemplateType,
                  TemplateName, Context, Force, ExistingFiles) ->
     InputName = filename:join(filename:dirname(TemplateName), Input),
-    File = load_file(Files, TemplateType, InputName),
-    case write_file(Output, render(File, Context), Force) of
+    %File = load_file(Files, TemplateType, InputName),
+    OutputTemplateName = make_template_name("rebar_output_template", Output),
+    {ok, OutputTemplateName1} = erlydtl:compile_template(Output, OutputTemplateName, ?ERLYDTL_COMPILE_OPTS),
+    {ok, OutputRendered} = OutputTemplateName1:render(dict:to_list(Context)),
+    {ok, Rendered} = render(Input, dict:to_list(Context)),
+    case write_file(lists:flatten(io_lib:format("~s", [OutputRendered])), Rendered, Force) of
         ok ->
             execute_template(Files, Rest, TemplateType, TemplateName,
                              Context, Force, ExistingFiles);
@@ -449,3 +453,13 @@ execute_template(Files, [Other | Rest], TemplateType, TemplateName,
     ?WARN("Skipping unknown template instruction: ~p\n", [Other]),
     execute_template(Files, Rest, TemplateType, TemplateName, Context,
                      Force, ExistingFiles).
+
+-spec make_template_name(string(), term()) -> module().
+make_template_name(Base, Value) ->
+    %% Seed so we get different values each time
+    random:seed(erlang:now()),
+    Hash = erlang:phash2(Value),
+    Ran = random:uniform(10000000),
+    erlang:list_to_atom(Base ++ "_" ++
+                            erlang:integer_to_list(Hash) ++
+                            "_" ++ erlang:integer_to_list(Ran)).

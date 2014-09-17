@@ -13,3 +13,5 @@ rebar3
 /deps
 /.rebar
 rebar.lock
+priv/templates/*.dtl.erl
+ebin/rebar.app
