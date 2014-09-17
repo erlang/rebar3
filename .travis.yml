@@ -5,3 +5,6 @@ otp_release:
   - R15B01
   - 17.0
 script: "make travis"
+branches:
+  only:
+    - rebar3

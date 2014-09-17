@@ -88,7 +88,7 @@ main(Args) ->
     %%  or write out script files on win32.
     case os:type() of
         {unix,_} ->
-            [] = os:cmd("chmod u+x rebar"),
+            [] = os:cmd("chmod u+x rebar3"),
             ok;
         {win32,_} ->
             write_windows_scripts(),
