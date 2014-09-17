@@ -35,6 +35,7 @@ binary: clean all
 	(cd ../rebar.wiki && git commit -m "Update $(VSN)" rebar)
 
 test:
-	ct_run -pa deps/*/ebin -pa ebin -include include -dir test
+	mkdir -p test/logs
+	ct_run -pa deps/*/ebin -pa ebin -include include -logdir test/logs -dir test
 
 travis: all test
