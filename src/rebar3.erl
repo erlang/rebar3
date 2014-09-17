@@ -156,8 +156,13 @@ init_config({Options, _NonOptArgs}) ->
 init_config1(BaseConfig) ->
     %% Determine the location of the rebar executable; important for pulling
     %% resources out of the escript
-    ScriptName = filename:absname(escript:script_name()),
-    rebar_state:set(BaseConfig, escript, ScriptName).
+    try
+        ScriptName = filename:absname(escript:script_name()),
+        rebar_state:set(BaseConfig, escript, ScriptName)
+    catch
+        _:_ ->
+            BaseConfig
+    end.
 
 run_aux(BaseConfig, Commands) ->
     %% Make sure crypto is running

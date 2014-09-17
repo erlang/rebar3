@@ -25,7 +25,7 @@ init_per_testcase(_, Config) ->
     DataDir = proplists:get_value(data_dir, Config),
     AppsDir = filename:join([DataDir, create_random_name("apps_dir1_")]),
     ok = ec_file:mkdir_p(AppsDir),
-    Verbosity = rebar:log_level([]),
+    Verbosity = rebar3:log_level([]),
     rebar_log:init(command_line, Verbosity),
     State = rebar_state:new(),
     [{apps, AppsDir}, {state, State} | Config].
@@ -43,7 +43,7 @@ build_basic_app(Config) ->
 
     ConfigFile = filename:join([AppDir, "rebar.config"]),
     write_config(ConfigFile, []),
-    rebar:run(rebar_state:new(State, [], AppDir), ["compile"]),
+    rebar3:run(rebar_state:new(State, [], AppDir), ["compile"]),
 
     %% Verify app was built
     [App] = rebar_app_discover:find_apps([AppDir]),
