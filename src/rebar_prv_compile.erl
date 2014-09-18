@@ -22,7 +22,7 @@ init(State) ->
                                                         bare = false,
                                                         deps = ?DEPS,
                                                         example = "rebar compile",
-                                                        short_desc = "",
+                                                        short_desc = "Compile apps .app.src and .erl files.",
                                                         desc = "",
                                                         opts = []}),
     {ok, State1}.

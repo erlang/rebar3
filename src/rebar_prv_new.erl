@@ -21,7 +21,7 @@ init(State) ->
                                                        bare = false,
                                                        deps = ?DEPS,
                                                        example = "rebar new <template>",
-                                                       short_desc = "",
+                                                       short_desc = "Create new project from templates.",
                                                        desc = info(create),
                                                        opts = []}),
     {ok, State1}.

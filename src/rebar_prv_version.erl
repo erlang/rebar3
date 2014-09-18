@@ -1,7 +1,7 @@
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 
--module(rebar_prv_release).
+-module(rebar_prv_version).
 
 -behaviour(rebar_provider).
 
@@ -10,8 +10,8 @@
 
 -include("rebar.hrl").
 
--define(PROVIDER, release).
--define(DEPS, [compile]).
+-define(PROVIDER, version).
+-define(DEPS, []).
 
 %% ===================================================================
 %% Public API
@@ -23,13 +23,13 @@ init(State) ->
                                                        provider_impl = ?MODULE,
                                                        bare = false,
                                                        deps = ?DEPS,
-                                                       example = "rebar release",
-                                                       short_desc = "Build release of project.",
+                                                       example = "rebar version",
+                                                       short_desc = "Print version for rebar and current Erlang.",
                                                        desc = "",
                                                        opts = []}),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
-do(Config) ->
-    relx:main("release"),
-    {ok, Config}.
+do(State) ->
+    rebar3:version(),
+    {ok, State}.

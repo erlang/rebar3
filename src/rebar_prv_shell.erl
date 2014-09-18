@@ -49,7 +49,7 @@ init(State) ->
                                                         bare = false,
                                                         deps = ?DEPS,
                                                         example = "rebar shell",
-                                                        short_desc = "",
+                                                        short_desc = "Run shell with project apps and deps in path.",
                                                         desc = "",
                                                         opts = []}),
     {ok, State1}.

@@ -24,7 +24,7 @@ init(State) ->
                                                         bare = false,
                                                         deps = ?DEPS,
                                                         example = "rebar tar",
-                                                        short_desc = "",
+                                                        short_desc = "Tar archive of release built of project.",
                                                         desc = "",
                                                         opts = []}),
     {ok, State1}.

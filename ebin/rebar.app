@@ -10,11 +10,11 @@
                         rebar_erlydtl_compiler,rebar_fetch,rebar_file_utils,
                         rebar_log,rebar_otp_app,rebar_packages,rebar_provider,
                         rebar_prv_app_discovery,rebar_prv_compile,
-                        rebar_prv_deps,rebar_prv_escripter,
+                        rebar_prv_deps,rebar_prv_escripter,rebar_prv_help,
                         rebar_prv_install_deps,rebar_prv_lock,rebar_prv_new,
                         rebar_prv_packages,rebar_prv_release,rebar_prv_shell,
-                        rebar_prv_tar,rebar_prv_update,rebar_state,
-                        rebar_templater,rebar_topo,rebar_utils,
+                        rebar_prv_tar,rebar_prv_update,rebar_prv_version,
+                        rebar_state,rebar_templater,rebar_topo,rebar_utils,
                         'relx.config_dtl','sup.erl_dtl','sys.config_dtl',
                         'vm.args_dtl']},
               {registered,[]},
@@ -26,4 +26,5 @@
                                 rebar_prv_packages,rebar_erlydtl_compiler,
                                 rebar_prv_compile,rebar_prv_app_discovery,
                                 rebar_prv_shell,rebar_prv_tar,rebar_prv_new,
-                                rebar_prv_update,rebar_prv_release]}]}]}.
+                                rebar_prv_update,rebar_prv_release,
+                                rebar_prv_version,rebar_prv_help]}]}]}.

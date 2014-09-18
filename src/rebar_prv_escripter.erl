@@ -53,8 +53,8 @@ init(State) ->
                                                         provider_impl = ?MODULE,
                                                         bare = false,
                                                         deps = ?DEPS,
-                                                        example = "escriptize",
-                                                        short_desc = "",
+                                                        example = "rebar escriptize",
+                                                        short_desc = "Build escript from project.",
                                                         desc = "",
                                                         opts = []}),
     {ok, State1}.

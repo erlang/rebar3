@@ -17,7 +17,7 @@ init(State) ->
                                                        bare = false,
                                                        deps = ?DEPS,
                                                        example = "rebar pkgs",
-                                                       short_desc = "List available packages",
+                                                       short_desc = "List available packages.",
                                                        desc = info("List available packages"),
                                                        opts = []}),
     {ok, State1}.

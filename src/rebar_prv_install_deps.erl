@@ -55,7 +55,7 @@
 init(State) ->
     State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
                                                        provider_impl = ?MODULE,
-                                                       bare = false,
+                                                       bare = true,
                                                        deps = ?DEPS,
                                                        example = undefined,
                                                        short_desc = "Install dependencies",

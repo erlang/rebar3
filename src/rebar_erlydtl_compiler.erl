@@ -104,7 +104,7 @@
 
 -include("rebar.hrl").
 
--define(PROVIDER, compile).
+-define(PROVIDER, erlydtl).
 -define(DEPS, []).
 
 %% ===================================================================
@@ -114,13 +114,13 @@
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
     State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
-                                                        provider_impl = ?MODULE,
-                                                        bare = false,
-                                                        deps = ?DEPS,
-                                                        example = "compile",
-                                                        short_desc = "",
-                                                        desc = "",
-                                                        opts = []}),
+                                                       provider_impl = ?MODULE,
+                                                       bare = false,
+                                                       deps = ?DEPS,
+                                                       example = "rebar erlydtl compile",
+                                                       short_desc = "Compile erlydtl templates.",
+                                                       desc = "",
+                                                       opts = []}),
     {ok, State1}.
 
 do(Config) ->

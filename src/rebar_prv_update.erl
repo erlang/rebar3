@@ -24,7 +24,7 @@ init(State) ->
                                                        bare = false,
                                                        deps = ?DEPS,
                                                        example = "rebar update cowboy",
-                                                       short_desc = "",
+                                                       short_desc = "Update package index or individual dependency.",
                                                        desc = "",
                                                        opts = []}),
     {ok, State1}.

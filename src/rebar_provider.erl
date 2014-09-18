@@ -6,6 +6,7 @@
          impl/1,
          get_provider/2,
          get_target_providers/2,
+         help/1,
          format/1]).
 
 -export_type([t/0]).
@@ -73,13 +74,26 @@ do(Provider, State) ->
 impl(Provider) ->
     Provider#provider.name.
 
+help(State) ->
+    Providers = rebar_state:providers(State),
+    Help = lists:sort([{ec_cnv:to_list(P#provider.name), P#provider.short_desc} || P <- Providers,
+                                                                                   P#provider.bare =/= true]),
+    Longest = lists:max([length(X) || {X, _} <- Help]),
+
+    lists:foreach(fun({Name, ShortDesc}) ->
+                          Length = length(Name),
+                          Spacing = lists:duplicate(Longest - Length + 8, " "),
+                          io:format("~s~s~s~n", [Name, Spacing, ShortDesc])
+                  end, Help).
+
+
 %% @doc print the provider module name
 %%
 %% @param T - The provider
 %% @return An iolist describing the provider
 -spec format(t()) -> iolist().
-format(#provider{provider_impl=Mod}) ->
-    erlang:atom_to_list(Mod).
+format(#provider{name=Name}) ->
+    atom_to_list(Name).
 
 get_target_providers(Target, State) ->
     Providers = rebar_state:providers(State),
