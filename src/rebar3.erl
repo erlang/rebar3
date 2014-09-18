@@ -141,7 +141,7 @@ run_aux(State, Args) ->
     {ok, Providers} = application:get_env(rebar, providers),
     State3 = rebar_state:create_logic_providers(Providers, State2),
     Task = rebar_state:get(State3, task, "help"),
-    rebar_core:process_command(rebar_state:command_args(State3, Args), ec_cnv:to_atom(Task)),
+    rebar_core:process_command(rebar_state:command_args(State3, Args), list_to_atom(Task)),
     ok.
 
 %%

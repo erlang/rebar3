@@ -43,7 +43,7 @@ build_basic_app(Config) ->
 
     ConfigFile = filename:join([AppDir, "rebar.config"]),
     write_config(ConfigFile, []),
-    rebar3:run(rebar_state:new(State, [], AppDir), ["compile"]),
+    rebar3:run(rebar_state:new(State, [], AppDir), "compile"),
 
     %% Verify app was built
     [App] = rebar_app_discover:find_apps([AppDir]),
