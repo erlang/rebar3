@@ -30,10 +30,6 @@
 
 -include("rebar.hrl").
 
-%% ===================================================================
-%% Internal functions
-%% ===================================================================
-
 process_command(State, Command) ->
     true = rebar_utils:expand_code_path(),
     LibDirs = rebar_state:get(State, lib_dirs, ?DEFAULT_LIB_DIRS),
@@ -49,6 +45,10 @@ process_command(State, Command) ->
                         {ok, Conf1} = rebar_provider:do(Provider, Conf),
                         Conf1
                 end, State, TargetProviders).
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
 
 update_code_path([]) ->
     no_change;

@@ -33,18 +33,8 @@ init(State) ->
 do(State) ->
     case rebar_state:command_args(State) of
         [Name] ->
-            ?INFO("Updating ~s~n", [Name]),
-
-            DepsDir = rebar_prv_install_deps:get_deps_dir(State),
-            Deps = rebar_state:get(State, deps, []),
-            {_, _, Source} = lists:keyfind(list_to_atom(Name), 1, Deps),
-            TargetDir = rebar_prv_install_deps:get_deps_dir(DepsDir, Name),
-            rebar_fetch:update_source1(TargetDir, Source),
-            State1 = rebar_state:set(State, locks, []),
-            {ok, State2} = rebar_prv_install_deps:do(State1),
-            {ok, State3} = rebar_prv_lock:do(State2),
-            {ok, State4} = rebar_prv_compile:do(State3),
-            {ok, State4};
+            ?ERROR("NOT IMPLEMENTED: Updating ~s~n", [Name]),
+            {ok, State};
         [] ->
             ?INFO("Updating package index...~n", []),
             Url = url(State),
