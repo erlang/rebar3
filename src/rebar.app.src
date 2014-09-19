@@ -36,6 +36,7 @@
                      rebar_prv_update,
                      rebar_prv_release,
                      rebar_prv_version,
+                     rebar_prv_common_test,
                      rebar_prv_help]}
         ]}
  ]}.
