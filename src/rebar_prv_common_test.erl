@@ -32,23 +32,29 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
 do(State) ->
-    % Run common tests.
-    % CommandArguments = rebar_state:command_args(State),
-    Logdir = filename:join([rebar_state:dir(State), "logs"]),
-    ok = ensure_logdir(Logdir),
-    % @todo check for test dir, figure out how Tristan does nice errors
-    Testdir = filename:join([rebar_state:dir(State), "test"]),
-    case ec_file:is_dir(Testdir) of
-        false ->
-            ?INFO("Test directory ~s does not exist:\n",
-                  [Testdir]),
-            ?FAIL;
-        _ -> ok
-    end,
-    Opts = [{dir, Testdir},
-            {logdir, Logdir}],
+    Opts = build_options(State),
     ct:run_test(Opts),
     {ok, State}.
+
+build_options(State) ->
+    Arguments = rebar_state:command_args(State),
+    Opts = parse_args(Arguments, []),
+    lists:keymerge(1, Opts, defaults(State)).
+
+defaults(State) ->
+    Logdir = filename:join([rebar_state:dir(State), "logs"]),
+    ok = ensure_logdir(Logdir),
+    Testdir = filename:join([rebar_state:dir(State), "test"]),
+    ok = ensure_testdir(Testdir),
+    [{dir, Testdir},
+     {logdir, Logdir}].
+
+parse_args([], Opts) ->
+    Opts;
+parse_args([Pair|Rest], Opts) ->
+    [Key, Val] = string:tokens(Pair, "="),
+    Key0 = list_to_atom(Key),
+    parse_args(Rest, [{Key0, string:tokens(Val, " ")}|Opts]).
 
 ensure_logdir(Logdir) ->
     case ec_file:is_dir(Logdir) of
@@ -56,4 +62,13 @@ ensure_logdir(Logdir) ->
             ok;
         false ->
             ec_file:mkdir_path(Logdir)
+    end.
+
+ensure_testdir(Testdir) ->
+    case ec_file:is_dir(Testdir) of
+        false ->
+            ?INFO("Test directory ~s does not exist:\n",
+                  [Testdir]),
+            ?FAIL;
+        _ -> ok
     end.
