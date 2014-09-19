@@ -27,6 +27,7 @@ init(State) ->
                                                        short_desc = "Print version for rebar and current Erlang.",
                                                        desc = "",
                                                        opts = []}),
+
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().

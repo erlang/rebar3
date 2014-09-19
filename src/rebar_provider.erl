@@ -66,7 +66,17 @@ new(ModuleName, State0) when is_atom(ModuleName) ->
 -spec do(Provider::t(), rebar_state:t()) ->
                 {ok, rebar_state:t()}.
 do(Provider, State) ->
-    (Provider#provider.provider_impl):do(State).
+    {PreHooks, PostHooks} = rebar_state:hooks(State, Provider#provider.name),
+    {ok, State1} = run_hook_plugins(PreHooks, State),
+    {ok, State2} = (Provider#provider.provider_impl):do(State1),
+    run_hook_plugins(PostHooks, State2).
+
+run_hook_plugins(Hooks, State) ->
+    State1 = lists:foldl(fun(Hook, StateAcc) ->
+                                 {ok, StateAcc1} = rebar_provider:do(Hook, StateAcc),
+                                 StateAcc1
+                         end, State, Hooks),
+    {ok, State1}.
 
 %%% @doc get the name of the module that implements the provider
 %%% @param Provider the provider object

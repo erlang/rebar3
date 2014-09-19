@@ -50,7 +50,7 @@ init(State) ->
                                                         deps = ?DEPS,
                                                         example = "rebar shell",
                                                         short_desc = "Run shell with project apps and deps in path.",
-                                                        desc = "",
+                                                        desc = info(),
                                                         opts = []}),
     {ok, State1}.
 
@@ -91,12 +91,8 @@ shell() ->
     %% this call never returns (until user quits shell)
     timer:sleep(infinity).
 
-info(help, shell) ->
-    ?CONSOLE(
-        "Start a shell with project and deps preloaded similar to~n"
-        "'erl -pa ebin -pa deps/*/ebin'.~n",
-        []
-    ).
+info() ->
+    "Start a shell with project and deps preloaded similar to~n'erl -pa ebin -pa deps/*/ebin'.~n".
 
 remove_error_handler(0) ->
     ?WARN("Unable to remove simple error_logger handler~n", []);

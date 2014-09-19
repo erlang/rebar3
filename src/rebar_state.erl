@@ -14,6 +14,7 @@
          binary_deps/1, binary_deps/2,
          src_deps/1, src_deps/2,
 
+         prepend_hook/3, append_hook/3, hooks/2,
          providers/1, providers/2, add_provider/2]).
 
 -include("rebar.hrl").
@@ -39,6 +40,7 @@
                   project_apps = ordsets:new() :: ordsets:ordset(rebar_app_info:t()),
 
                   providers = [],
+                  hooks = [],
                   skip_dirs = new_skip_dirs() :: rebar_dict() }).
 
 -export_type([t/0]).
@@ -159,6 +161,17 @@ create_logic_providers(ProviderModules, State0) ->
                         {ok, State1} = rebar_provider:new(ProviderMod, Acc),
                         State1
                 end, State0, ProviderModules).
+
+prepend_hook(State=#state_t{hooks=Hooks}, Target, Hook) ->
+    {PreHooks, PostHooks} = proplists:get_value(Target, Hooks, {[], []}),
+    State#state_t{hooks=[{Target, {[Hook | PreHooks], PostHooks}} | proplists:delete(Target, Hooks)]}.
+
+append_hook(State=#state_t{hooks=Hooks}, Target, Hook) ->
+    {PreHooks, PostHooks} = proplists:get_value(Target, Hooks, {[], []}),
+    State#state_t{hooks=[{Target, {PreHooks, [Hook | PostHooks]}} | proplists:delete(Target, Hooks)]}.
+
+hooks(#state_t{hooks=Hooks}, Target) ->
+    proplists:get_value(Target, Hooks, {[], []}).
 
 %% ===================================================================
 %% Internal functions
