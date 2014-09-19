@@ -1,7 +1,8 @@
 -module(rebar_provider).
 
 %% API
--export([new/2,
+-export([create/1,
+         new/2,
          do/2,
          impl/1,
          get_provider/2,
@@ -59,6 +60,17 @@ new(ModuleName, State0) when is_atom(ModuleName) ->
             ModuleName:init(State0)
     end.
 
+-spec create([{atom(), any()}]) -> t().
+create(Attrs) ->
+    #provider{name=proplists:get_value(name, Attrs, undefined)
+             ,provider_impl=proplists:get_value(provider_impl, Attrs, undefined)
+             ,bare=proplists:get_value(bare, Attrs, false)
+             ,deps=proplists:get_value(deps, Attrs, [])
+             ,desc=proplists:get_value(desc, Attrs, "")
+             ,short_desc=proplists:get_value(short_desc, Attrs, "")
+             ,example=proplists:get_value(example, Attrs, "")
+             ,opts=proplists:get_value(opts, Attrs, [])}.
+
 %% @doc Manipulate the state of the system, that new state
 %%
 %% @param Provider the provider object
@@ -109,7 +121,7 @@ get_target_providers(Target, State) ->
     Providers = rebar_state:providers(State),
     TargetProviders = lists:filter(fun(#provider{name=T}) when T =:= Target->
                                            true;
-                                      (#provider{name=T}) ->
+                                      (_) ->
                                            false
                                    end, Providers),
     process_deps(TargetProviders, Providers).
