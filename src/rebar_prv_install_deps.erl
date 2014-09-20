@@ -124,7 +124,6 @@ handle_deps(State, Deps) ->
 
     %% Sort all apps to build order
     State3 = rebar_state:set(State2, all_deps, AllDeps),
-
     {ok, State3}.
 
 
