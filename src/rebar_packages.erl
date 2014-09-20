@@ -16,8 +16,8 @@ get_packages(State) ->
             catch
                 _:_ ->
                     ?ERROR("Bad packages index, try to fix with `rebar update`~n", []),
-                    {[], rlx_depsolver:new()}
+                    {[], rlx_depsolver:new_graph()}
             end;
         false ->
-            {[], rlx_depsolver:new()}
+            {[], rlx_depsolver:new_graph()}
     end.
