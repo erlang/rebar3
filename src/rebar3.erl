@@ -141,10 +141,12 @@ run_aux(State, Args) ->
     State2 = rebar_state:set(State1, base_dir, filename:absname(rebar_state:dir(State1))),
     {ok, Providers} = application:get_env(rebar, providers),
 
-    rebar_plugins:install(State2),
-    State3 = rebar_state:create_logic_providers(Providers, State2),
-    Task = rebar_state:get(State3, task, "help"),
-    rebar_core:process_command(rebar_state:command_args(State3, Args), list_to_atom(Task)),
+    {ok, PluginProviders, State3} = rebar_plugins:install(State2),
+    rebar_core:update_code_path(State),
+
+    State4 = rebar_state:create_logic_providers(Providers++PluginProviders, State3),
+    Task = rebar_state:get(State4, task, "help"),
+    rebar_core:process_command(rebar_state:command_args(State4, Args), list_to_atom(Task)),
     ok.
 
 %%

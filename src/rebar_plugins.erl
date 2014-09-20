@@ -12,8 +12,26 @@
 %% ===================================================================
 
 install(State) ->
-    BaseDir = rebar_state:get(State, base_dir, ""),
-    State1 = rebar_state:set(State, base_dir, "plugins"),
+    State1 = rebar_state:set(State, deps_dir, "plugins"),
+
     Plugins = rebar_state:get(State1, plugins, []),
     {ok, State2} = rebar_prv_install_deps:handle_deps(State1, Plugins),
-    {ok, rebar_state:set(State2, base_dir, BaseDir)}.
+
+    Apps = rebar_state:get(State2, all_deps),
+    lists:foreach(fun(AppInfo) ->
+                          C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
+                          S = rebar_state:new(rebar_state:new(), C, rebar_app_info:dir(AppInfo)),
+                          rebar_prv_compile:build(S, AppInfo)
+                  end, Apps),
+
+    PluginProviders = plugin_providers(Plugins),
+    {ok, PluginProviders, rebar_state:set(State2, deps_dir, ?DEFAULT_DEPS_DIR)}.
+
+plugin_providers(Plugins) ->
+    lists:map(fun({Plugin, _, _}) when is_atom(Plugin) ->
+                      Plugin;
+                 ({Plugin, _}) when is_atom(Plugin) ->
+                      Plugin;
+                 (Plugin) when is_atom(Plugin) ->
+                      Plugin
+              end, Plugins).

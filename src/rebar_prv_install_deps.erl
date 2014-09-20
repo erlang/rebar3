@@ -33,8 +33,7 @@
 
 -include("rebar.hrl").
 
--export([setup_env/1,
-         handle_deps/2]).
+-export([handle_deps/2]).
 
 %% for internal use only
 -export([get_deps_dir/1]).
@@ -78,29 +77,11 @@ do(State) ->
     {ok, Sort} = rebar_topo:sort_apps(ordsets:to_list(Source)),
     {ok, rebar_state:set(State1, deps_to_build, lists:dropwhile(fun is_valid/1, Sort -- ProjectApps))}.
 
-
-%% set REBAR_DEPS_DIR and ERL_LIBS environment variables
-setup_env(State) ->
-    DepsDir = get_deps_dir(State),
-    %% include rebar's DepsDir in ERL_LIBS
-    Separator = case os:type() of
-                    {win32, nt} ->
-                        ";";
-                    _ ->
-                        ":"
-                end,
-    ERL_LIBS = case os:getenv("ERL_LIBS") of
-                   false ->
-                       {"ERL_LIBS", DepsDir};
-                   PrevValue ->
-                       {"ERL_LIBS", DepsDir ++ Separator ++ PrevValue}
-               end,
-    [{"REBAR_DEPS_DIR", DepsDir}, ERL_LIBS].
-
 -spec get_deps_dir(rebar_state:t()) -> file:filename_all().
 get_deps_dir(State) ->
     BaseDir = rebar_state:get(State, base_dir, ""),
-    get_deps_dir(BaseDir, "deps").
+    DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
+    get_deps_dir(BaseDir, DepsDir).
 
 -spec get_deps_dir(file:filename_all(), rebar_state:t()) -> file:filename_all().
 get_deps_dir(DepsDir, App) ->
@@ -113,7 +94,7 @@ handle_deps(State, Deps) ->
     %% Read in package index and dep graph
     {Packages, Graph} = rebar_packages:get_packages(State),
 
-    %% Split source deps form binary deps, needed to keep backwards compatibility
+    %% Split source deps from binary deps, needed to keep backwards compatibility
     DepsDir = get_deps_dir(State),
     {SrcDeps, BinaryDeps} = parse_deps(DepsDir, Deps),
     State1 = rebar_state:src_deps(rebar_state:binary_deps(State, BinaryDeps),

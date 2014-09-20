@@ -26,16 +26,12 @@
 %% -------------------------------------------------------------------
 -module(rebar_core).
 
--export([process_command/2]).
+-export([process_command/2
+        ,update_code_path/1]).
 
 -include("rebar.hrl").
 
 process_command(State, Command) ->
-    true = rebar_utils:expand_code_path(),
-    LibDirs = rebar_state:get(State, lib_dirs, ?DEFAULT_LIB_DIRS),
-    DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIRS),
-    _UpdatedCodePaths = update_code_path([DepsDir | LibDirs]),
-
     %% ? rebar_prv_install_deps:setup_env(State),
 
     TargetProviders = rebar_provider:get_target_providers(Command, State),
@@ -47,13 +43,21 @@ process_command(State, Command) ->
                         Conf1
                 end, State, TargetProviders).
 
+update_code_path(State) ->
+    true = rebar_utils:expand_code_path(),
+    LibDirs = rebar_state:get(State, lib_dirs, ?DEFAULT_LIB_DIRS),
+    DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
+    PluginsDir = rebar_state:get(State, plugins_dir, ?DEFAULT_PLUGINS_DIR),
+    _UpdatedCodePaths = update_code_path_([DepsDir, PluginsDir | LibDirs]).
+
+
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
-update_code_path([]) ->
+update_code_path_([]) ->
     no_change;
-update_code_path(Paths) ->
+update_code_path_(Paths) ->
     LibPaths = expand_lib_dirs(Paths, rebar_utils:get_cwd(), []),
     ok = code:add_pathsa(LibPaths),
     %% track just the paths we added, so we can remove them without
