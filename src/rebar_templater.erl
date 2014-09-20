@@ -47,6 +47,8 @@ new(app, DirName, State) ->
     create1(State, DirName, "otp_app");
 new(lib, DirName, State) ->
     create1(State, DirName, "otp_lib");
+new(plugin, DirName, State) ->
+    create1(State, DirName, "plugin");
 new(rel, DirName, State) ->
     create1(State, DirName, "otp_rel").
 

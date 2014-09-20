@@ -1,0 +1,29 @@
+-module({{appid}}).
+
+-behaviour(rebar_provider).
+
+-export([init/1,
+         do/1]).
+
+-define(PROVIDER, {{appid}}).
+-define(DEPS, []).
+
+%% ===================================================================
+%% Public API
+%% ===================================================================
+
+-spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
+init(State) ->
+    State1 = rebar_state:(State, rebar_provider:create([{name, ?PROVIDER},
+                                                        {provider_impl, ?MODULE},
+                                                        {bare, false},
+                                                        {deps, ?DEPS},
+                                                        {example, "rebar {{appid}}"},
+                                                        {short_desc, "{{appid}} plugin."},
+                                                        {desc, ""},
+                                                        {opts, []}])),
+    {ok, State1}.
+
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
+do(State) ->
+    {ok, State}.

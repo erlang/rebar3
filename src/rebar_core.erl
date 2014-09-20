@@ -35,7 +35,8 @@ process_command(State, Command) ->
     LibDirs = rebar_state:get(State, lib_dirs, ?DEFAULT_LIB_DIRS),
     DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIRS),
     _UpdatedCodePaths = update_code_path([DepsDir | LibDirs]),
-    rebar_prv_install_deps:setup_env(State),
+
+    %% ? rebar_prv_install_deps:setup_env(State),
 
     TargetProviders = rebar_provider:get_target_providers(Command, State),
 
