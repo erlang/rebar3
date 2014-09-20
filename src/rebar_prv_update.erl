@@ -36,7 +36,7 @@ do(State) ->
             ?ERROR("NOT IMPLEMENTED: Updating ~s~n", [Name]),
             AllDeps = rebar_state:get(State, all_deps, []),
             {ok, App} = rebar_app_utils:find(list_to_binary(Name), AllDeps),
-            rebar_prv_install_deps:handle_deps(State, [list_to_binary(Name)]),
+            rebar_prv_install_deps:handle_deps(State, [list_to_atom(Name)], true),
             {ok, State};
         [] ->
             ?INFO("Updating package index...~n", []),

@@ -33,7 +33,8 @@
 
 -include("rebar.hrl").
 
--export([handle_deps/2]).
+-export([handle_deps/2,
+         handle_deps/3]).
 
 %% for internal use only
 -export([get_deps_dir/1]).
@@ -88,9 +89,13 @@ get_deps_dir(DepsDir, App) ->
     filename:join(DepsDir, App).
 
 -spec handle_deps(rebar_state:t(), [dep()]) -> {ok, rebar_state:t()}.
-handle_deps(State, []) ->
-    {ok, State};
 handle_deps(State, Deps) ->
+    handle_deps(State, Deps, false).
+
+-spec handle_deps(rebar_state:t(), [dep()], boolean()) -> {ok, rebar_state:t()}.
+handle_deps(State, [], _) ->
+    {ok, State};
+handle_deps(State, Deps, Update) ->
     %% Read in package index and dep graph
     {Packages, Graph} = rebar_packages:get_packages(State),
 
@@ -101,7 +106,7 @@ handle_deps(State, Deps) ->
                                   SrcDeps),
 
     %% Fetch transitive src deps
-    State2 = update_src_deps(State1),
+    State2 = update_src_deps(State1, Update),
     Solved = case rebar_state:binary_deps(State2) of
                  [] -> %% No binary deps
                      [];
@@ -114,7 +119,7 @@ handle_deps(State, Deps) ->
                                                                ,Packages
                                                                ,Name
                                                                ,Vsn),
-                                       ok = maybe_fetch(AppInfo, State2),
+                                       ok = maybe_fetch(AppInfo, Update),
                                        AppInfo
                                end, S)
              end,
@@ -149,12 +154,12 @@ package_to_app(DepsDir, Packages, Name, Vsn) ->
         rebar_app_info:dir(AppInfo1, get_deps_dir(DepsDir, <<Name/binary, "-", FmtVsn/binary>>)),
     rebar_app_info:source(AppInfo2, Link).
 
--spec update_src_deps(rebar_state:t()) -> rebat_state:t().
-update_src_deps(State) ->
+-spec update_src_deps(rebar_state:t(), boolean()) -> rebat_state:t().
+update_src_deps(State, Update) ->
     SrcDeps = rebar_state:src_deps(State),
     DepsDir = get_deps_dir(State),
     case lists:foldl(fun(AppInfo, {SrcDepsAcc, BinaryDepsAcc}) ->
-                             ok = maybe_fetch(AppInfo, State),
+                             ok = maybe_fetch(AppInfo, Update),
                              {AppInfo1, NewSrcDeps, NewBinaryDeps} = handle_dep(DepsDir, AppInfo),
                              {ordsets:union(ordsets:add_element(AppInfo1, SrcDepsAcc), NewSrcDeps)
                              ,NewBinaryDeps++BinaryDepsAcc}
@@ -163,7 +168,7 @@ update_src_deps(State) ->
             rebar_state:src_deps(rebar_state:binary_deps(State, NewBinaryDeps), NewSrcDeps);
         {NewSrcDeps, NewBinaryDeps} ->
             State1 = rebar_state:src_deps(rebar_state:binary_deps(State, NewBinaryDeps), NewSrcDeps),
-            update_src_deps(State1)
+            update_src_deps(State1, Update)
     end.
 
 -spec handle_dep(binary(), rebar_state:t()) -> {[rebar_app_info:t()], [binary_dep()]}.
@@ -175,23 +180,30 @@ handle_dep(DepsDir, AppInfo) ->
     {SrcDeps, BinaryDeps} = parse_deps(DepsDir, Deps),
     {AppInfo1, SrcDeps, BinaryDeps}.
 
--spec maybe_fetch(rebar_app_info:t(), rebar_state:t()) -> ok.
-maybe_fetch(AppInfo, _State) ->
+-spec maybe_fetch(rebar_app_info:t(), boolean()) -> ok.
+maybe_fetch(AppInfo, Update) ->
     AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
     %Apps = rebar_app_discover:find_apps([get_deps_dir(State)], all),
     %case rebar_app_utils:find(rebar_app_info:name(AppInfo), Apps) of
-    case rebar_app_utils:is_app_dir(filename:absname(AppDir)++"-*") of
-        {true, _} ->
-            ok;
+    Exists = case rebar_app_utils:is_app_dir(filename:absname(AppDir)++"-*") of
+                 {true, _} ->
+                     true;
+                 _ ->
+                     case rebar_app_utils:is_app_dir(filename:absname(AppDir)) of
+                         {true, _} ->
+                             true;
+                         _ ->
+                             false
+                     end
+             end,
+
+    case not Exists orelse Update of
+        true ->
+            ?INFO("Fetching ~s~n", [rebar_app_info:name(AppInfo)]),
+            Source = rebar_app_info:source(AppInfo),
+            rebar_fetch:download_source(AppDir, Source);
         _ ->
-            case rebar_app_utils:is_app_dir(filename:absname(AppDir)) of
-                {true, _} ->
-                    ok;
-                _ ->
-                    ?INFO("Fetching ~s~n", [rebar_app_info:name(AppInfo)]),
-                    Source = rebar_app_info:source(AppInfo),
-                    rebar_fetch:download_source(AppDir, Source)
-            end
+            ok
     end.
 
 -spec parse_deps(binary(), [dep()]) -> {ordsets:ordset(rebar_app_info:t()), [binary_dep()]}.
