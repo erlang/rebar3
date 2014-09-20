@@ -27,6 +27,8 @@ This is an experimental branch.
 | pkgs       | List available packages |
 | shell      | Run shell with project apps in path |
 | escriptize | Create escript from project |
+| new        | Create new rebar project from templates |
+| do         | Higher-order provider to run multiple tasks in sequence |
 
 The following commands are still in the works.
 
@@ -34,10 +36,8 @@ The following commands are still in the works.
 |----------- |------------ |
 | release    | Build release of project |
 | tar        | Package release into tarball |
-| new        | |
 | eunit      | |
 | ct         | |
-| do         | |
 
 ### Missing
 
@@ -69,8 +69,6 @@ Example:
 -export([init/1,
          do/1]).
 
--include("rebar.hrl").
-
 -define(PROVIDER, something).
 -define(DEPS, []).
 
@@ -80,17 +78,17 @@ Example:
 
 -spec init(rebar_config:config()) -> {ok, rebar_config:config()}.
 init(State) ->
-    State1 = rebar_config:add_provider(State, #provider{name = ?PROVIDER,
-                                                        provider_impl = ?MODULE,
-                                                        bare = false,
-                                                        deps = ?DEPS,
-                                                        example = "rebar something",
-                                                        short_desc = "",
-                                                        desc = "",
-                                                        opts = []}),
+    State1 = rebar_config:add_provider(State, rebar_provider:create([{name, ?PROVIDER},
+                                                                    {provider_impl, ?MODULE},
+                                                                    {bare, false},
+                                                                    {deps, ?DEPS},
+                                                                    {example, "rebar dummy"},
+                                                                    {short_desc, "dummy plugin."},
+                                                                    {desc, ""},
+                                                                    {opts, []}])),
     {ok, State1}.
 
--spec do(rebar_config:config()) -> {ok, rebar_config:config()} | relx:error().
+-spec do(rebar_config:config()) -> {ok, rebar_config:config()}.
 do(Config) ->
     %% Do something
     {ok, Config}.
