@@ -114,7 +114,7 @@ handle_deps(State, Deps) ->
                                                                ,Packages
                                                                ,Name
                                                                ,Vsn),
-                                       ok = maybe_fetch(AppInfo),
+                                       ok = maybe_fetch(AppInfo, State2),
                                        AppInfo
                                end, S)
              end,
@@ -154,7 +154,7 @@ update_src_deps(State) ->
     SrcDeps = rebar_state:src_deps(State),
     DepsDir = get_deps_dir(State),
     case lists:foldl(fun(AppInfo, {SrcDepsAcc, BinaryDepsAcc}) ->
-                             ok = maybe_fetch(AppInfo),
+                             ok = maybe_fetch(AppInfo, State),
                              {AppInfo1, NewSrcDeps, NewBinaryDeps} = handle_dep(DepsDir, AppInfo),
                              {ordsets:union(ordsets:add_element(AppInfo1, SrcDepsAcc), NewSrcDeps)
                              ,NewBinaryDeps++BinaryDepsAcc}
@@ -175,16 +175,17 @@ handle_dep(DepsDir, AppInfo) ->
     {SrcDeps, BinaryDeps} = parse_deps(DepsDir, Deps),
     {AppInfo1, SrcDeps, BinaryDeps}.
 
--spec maybe_fetch(rebar_app_info:t()) -> ok.
-maybe_fetch(AppInfo) ->
+-spec maybe_fetch(rebar_app_info:t(), rebar_state:t()) -> ok.
+maybe_fetch(AppInfo, State) ->
     AppDir = rebar_app_info:dir(AppInfo),
-    case filelib:is_dir(AppDir) of
-        false ->
+    Apps = rebar_app_discover:find_apps([get_deps_dir(State)], all),
+    case rebar_app_utils:find(rebar_app_info:name(AppInfo), Apps) of
+        {ok, _} ->
+            ok;
+        _ ->
             ?INFO("Fetching ~s~n", [rebar_app_info:name(AppInfo)]),
             Source = rebar_app_info:source(AppInfo),
-            rebar_fetch:download_source(AppDir, Source);
-        true ->
-            ok
+            rebar_fetch:download_source(AppDir, Source)
     end.
 
 -spec parse_deps(binary(), [dep()]) -> {ordsets:ordset(rebar_app_info:t()), [binary_dep()]}.

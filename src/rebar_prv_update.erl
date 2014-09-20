@@ -11,7 +11,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, update).
--define(DEPS, []).
+-define(DEPS, [install_deps]).
 
 %% ===================================================================
 %% Public API
@@ -29,11 +29,14 @@ init(State) ->
                                                        opts = []}),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()} | rebar:error().
 do(State) ->
     case rebar_state:command_args(State) of
         [Name] ->
             ?ERROR("NOT IMPLEMENTED: Updating ~s~n", [Name]),
+            AllDeps = rebar_state:get(State, all_deps, []),
+            {ok, App} = rebar_app_utils:find(list_to_binary(Name), AllDeps),
+            rebar_prv_install_deps:handle_deps(State, [list_to_binary(Name)]),
             {ok, State};
         [] ->
             ?INFO("Updating package index...~n", []),

@@ -55,6 +55,7 @@ find_apps(LibDirs, Validate) ->
                                   find_app(AppDir, Validate)
                           end, all_app_dirs(LibDirs)).
 
+-spec find_app(list(), boolean()) -> rebar_app_info:t() | false.
 find_app(AppDir, Validate) ->
     AppFile = filelib:wildcard(filename:join([AppDir, "ebin", "*.app"])),
     AppSrcFile = filelib:wildcard(filename:join([AppDir, "src", "*.app.src"])),

@@ -26,7 +26,8 @@
 %% -------------------------------------------------------------------
 -module(rebar_app_utils).
 
--export([is_app_dir/0, is_app_dir/1,
+-export([find/2,
+         is_app_dir/0, is_app_dir/1,
          is_app_src/1,
          app_src_to_app/1,
          app_name/2,
@@ -41,6 +42,17 @@
 %% ===================================================================
 %% Public API
 %% ===================================================================
+
+-spec find(binary(), [rebar_app_info:t()]) -> {ok, rebar_app_info:t()} | error.
+find(Name, Apps) ->
+    ec_lists:find(fun(App) -> rebar_app_info:name(App) =:= Name end, Apps).
+
+-spec find(binary(), binary(), [rebar_app_info:t()]) -> {ok, rebar_app_info:t()} | error.
+find(Name, Vsn, Apps) ->
+    ec_lists:find(fun(App) ->
+                          rebar_app_info:name(App) =:= Name
+                              andalso rebar_app_info:original_vsn(App) =:= Vsn
+                  end, Apps).
 
 is_app_dir() ->
     is_app_dir(rebar_utils:get_cwd()).
