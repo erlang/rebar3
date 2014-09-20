@@ -33,7 +33,8 @@
 
 -include("rebar.hrl").
 
--export([setup_env/1]).
+-export([setup_env/1,
+         handle_deps/2]).
 
 %% for internal use only
 -export([get_deps_dir/1]).
@@ -65,12 +66,18 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
 do(State) ->
-    case rebar_state:get(State, locks, []) of
-        [] ->
-            handle_deps(State, ordsets:from_list(rebar_state:get(State, deps, [])));
-        Locks ->
-            handle_deps(State, ordsets:from_list(Locks))
-    end.
+    ProjectApps = rebar_state:project_apps(State),
+    {ok, State1} = case rebar_state:get(State, locks, []) of
+                       [] ->
+                           handle_deps(State, ordsets:from_list(rebar_state:get(State, deps, [])));
+                       Locks ->
+                           handle_deps(State, ordsets:from_list(Locks))
+                   end,
+
+    Source = ProjectApps ++ ordsets:to_list(rebar_state:src_deps(State1)),
+    {ok, Sort} = rebar_topo:sort_apps(ordsets:to_list(Source)),
+    {ok, rebar_state:set(State1, deps_to_build, lists:dropwhile(fun is_valid/1, Sort -- ProjectApps))}.
+
 
 %% set REBAR_DEPS_DIR and ERL_LIBS environment variables
 setup_env(State) ->
@@ -99,17 +106,12 @@ get_deps_dir(State) ->
 get_deps_dir(DepsDir, App) ->
     filename:join(DepsDir, App).
 
-%% ===================================================================
-%% Internal functions
-%% ===================================================================
-
 -spec handle_deps(rebar_state:t(), [dep()]) -> {ok, rebar_state:t()}.
 handle_deps(State, []) ->
     {ok, State};
 handle_deps(State, Deps) ->
     %% Read in package index and dep graph
     {Packages, Graph} = rebar_packages:get_packages(State),
-    ProjectApps = rebar_state:project_apps(State),
 
     %% Split source deps form binary deps, needed to keep backwards compatibility
     DepsDir = get_deps_dir(State),
@@ -136,14 +138,18 @@ handle_deps(State, Deps) ->
                                end, S)
              end,
 
-    Source = ProjectApps ++ ordsets:to_list(rebar_state:src_deps(State2)),
     AllDeps = ordsets:union([ordsets:to_list(rebar_state:src_deps(State2))
                             ,ordsets:from_list(Solved)]),
 
     %% Sort all apps to build order
     State3 = rebar_state:set(State2, all_deps, AllDeps),
-    {ok, Sort} = rebar_topo:sort_apps(ordsets:to_list(Source)),
-    {ok, rebar_state:set(State3, deps_to_build, lists:dropwhile(fun is_valid/1, Sort -- ProjectApps))}.
+
+    {ok, State3}.
+
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
 
 -spec is_valid(rebar_app_info:t()) -> boolean().
 is_valid(App) ->
