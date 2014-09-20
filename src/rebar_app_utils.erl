@@ -27,6 +27,7 @@
 -module(rebar_app_utils).
 
 -export([find/2,
+         find/3,
          is_app_dir/0, is_app_dir/1,
          is_app_src/1,
          app_src_to_app/1,
@@ -54,9 +55,11 @@ find(Name, Vsn, Apps) ->
                               andalso rebar_app_info:original_vsn(App) =:= Vsn
                   end, Apps).
 
+-spec is_app_dir() -> {true, file:name()} | false.
 is_app_dir() ->
     is_app_dir(rebar_utils:get_cwd()).
 
+-spec is_app_dir(file:name()) -> {true, file:name()} | false.
 is_app_dir(Dir) ->
     SrcDir = filename:join([Dir, "src"]),
     AppSrc = filename:join([SrcDir, "*.app.src"]),

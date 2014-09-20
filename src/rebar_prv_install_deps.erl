@@ -176,16 +176,22 @@ handle_dep(DepsDir, AppInfo) ->
     {AppInfo1, SrcDeps, BinaryDeps}.
 
 -spec maybe_fetch(rebar_app_info:t(), rebar_state:t()) -> ok.
-maybe_fetch(AppInfo, State) ->
-    AppDir = rebar_app_info:dir(AppInfo),
-    Apps = rebar_app_discover:find_apps([get_deps_dir(State)], all),
-    case rebar_app_utils:find(rebar_app_info:name(AppInfo), Apps) of
-        {ok, _} ->
+maybe_fetch(AppInfo, _State) ->
+    AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
+    %Apps = rebar_app_discover:find_apps([get_deps_dir(State)], all),
+    %case rebar_app_utils:find(rebar_app_info:name(AppInfo), Apps) of
+    case rebar_app_utils:is_app_dir(filename:absname(AppDir)++"-*") of
+        {true, _} ->
             ok;
         _ ->
-            ?INFO("Fetching ~s~n", [rebar_app_info:name(AppInfo)]),
-            Source = rebar_app_info:source(AppInfo),
-            rebar_fetch:download_source(AppDir, Source)
+            case rebar_app_utils:is_app_dir(filename:absname(AppDir)) of
+                {true, _} ->
+                    ok;
+                _ ->
+                    ?INFO("Fetching ~s~n", [rebar_app_info:name(AppInfo)]),
+                    Source = rebar_app_info:source(AppInfo),
+                    rebar_fetch:download_source(AppDir, Source)
+            end
     end.
 
 -spec parse_deps(binary(), [dep()]) -> {ordsets:ordset(rebar_app_info:t()), [binary_dep()]}.
