@@ -114,11 +114,10 @@ handle_deps(State, Deps, Update) ->
                      %% Find binary deps needed
                      {ok, S} = rlx_depsolver:solve(Graph, BinaryDeps1),
                      %% Create app_info record for each binary dep
-                     lists:map(fun({Name, Vsn}) ->
+                     lists:map(fun(Pkg) ->
                                        AppInfo = package_to_app(DepsDir
                                                                ,Packages
-                                                               ,Name
-                                                               ,Vsn),
+                                                               ,Pkg),
                                        maybe_fetch(AppInfo, Update),
                                        AppInfo
                                end, S)
@@ -127,7 +126,7 @@ handle_deps(State, Deps, Update) ->
     AllDeps = lists:keymerge(2
                             ,rebar_state:src_apps(State2)
                             ,Solved),
-    io:format("All ~p~n", [AllDeps]),
+
     %% Sort all apps to build order
     State3 = rebar_state:set(State2, all_deps, AllDeps),
     {ok, State3}.
@@ -141,15 +140,11 @@ handle_deps(State, Deps, Update) ->
 is_valid(App) ->
     rebar_app_info:valid(App).
 
--spec package_to_app(file:filename_all(), dict:dict(), rlx_depsolver:name(), rlx_depsolver:vsn()) -> rebar_app_info:t().
-package_to_app(DepsDir, Packages, Name, Vsn) ->
-    FmtVsn = case Vsn of
-                 'NO_VSN' ->
-                     <<"NO_VSN">>;
-                 _ ->
-                     iolist_to_binary(rlx_depsolver:format_version(Vsn))
-             end,
-
+-spec package_to_app(file:filename_all(), dict:dict(),
+                    rlx_depsolver:pkg()) -> rebar_app_info:t().
+package_to_app(DepsDir, Packages, Pkg={_, Vsn}) ->
+    Name = ec_cnv:to_binary(rlx_depsolver:dep_pkg(Pkg)),
+    FmtVsn = iolist_to_binary(rlx_depsolver:format_version(Vsn)),
     {ok, P} = dict:find({Name, FmtVsn}, Packages),
     PkgDeps = proplists:get_value(<<"deps">>, P),
     Link = proplists:get_value(<<"link">>, P),

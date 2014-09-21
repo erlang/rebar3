@@ -33,9 +33,9 @@
 -export_type([t/0]).
 
 -record(app_info_t, {name :: binary(),
-                     app_file_src :: file:name() | undefined,
-                     app_file :: file:name(),
-                     config :: rebar_config:config() | undefined,
+                     app_file_src :: file:filename_all() | undefined,
+                     app_file :: file:filename_all() | undefined,
+                     config :: rebar_state:t() | undefined,
                      original_vsn :: string() | undefined,
                      app_details=[] :: list(),
                      deps=[] :: list(),
@@ -87,7 +87,7 @@ new(AppName, Vsn, Dir, Deps) ->
                      deps=Deps}}.
 
 %% @doc discover a complete version of the app info with all fields set.
--spec discover(file:name()) -> {ok, t()} | not_found.
+-spec discover(file:filename_all()) -> {ok, t()} | not_found.
 discover(Dir) ->
     case rebar_app_discover:find_app(Dir, all) of
         {true, AppInfo} ->
@@ -104,15 +104,15 @@ name(#app_info_t{name=Name}) ->
 name(AppInfo=#app_info_t{}, AppName) ->
     AppInfo#app_info_t{name=ec_cnv:to_binary(AppName)}.
 
--spec config(t()) -> rebar_config:confg().
+-spec config(t()) -> rebar_state:t().
 config(#app_info_t{config=Config}) ->
     Config.
 
--spec config(t(), rebar_config:confg()) -> t().
+-spec config(t(), rebar_state:t()) -> t().
 config(AppInfo=#app_info_t{}, Config) ->
     AppInfo#app_info_t{config=Config}.
 
--spec app_file_src(t()) -> file:name().
+-spec app_file_src(t()) -> file:filename_all() | undefined.
 app_file_src(#app_info_t{app_file_src=undefined, dir=Dir, name=Name}) ->
     AppFileSrc = filename:join([ec_cnv:to_list(Dir), "src", ec_cnv:to_list(Name)++".app.src"]),
     case filelib:is_file(AppFileSrc) of
@@ -124,11 +124,11 @@ app_file_src(#app_info_t{app_file_src=undefined, dir=Dir, name=Name}) ->
 app_file_src(#app_info_t{app_file_src=AppFileSrc}) ->
     ec_cnv:to_list(AppFileSrc).
 
--spec app_file_src(t(), file:name()) -> t().
+-spec app_file_src(t(), file:filename_all()) -> t().
 app_file_src(AppInfo=#app_info_t{}, AppFileSrc) ->
     AppInfo#app_info_t{app_file_src=ec_cnv:to_list(AppFileSrc)}.
 
--spec app_file(t()) -> file:name().
+-spec app_file(t()) -> file:filename_all() | undefined.
 app_file(#app_info_t{app_file=undefined, dir=Dir, name=Name}) ->
     AppFile = filename:join([ec_cnv:to_list(Dir), "ebin", ec_cnv:to_list(Name)++".app"]),
     case filelib:is_file(AppFile) of
@@ -140,9 +140,9 @@ app_file(#app_info_t{app_file=undefined, dir=Dir, name=Name}) ->
 app_file(#app_info_t{app_file=AppFile}) ->
     AppFile.
 
--spec app_file(t(), file:name()) -> t().
+-spec app_file(t(), file:filename_all()) -> t().
 app_file(AppInfo=#app_info_t{}, AppFile) ->
-    AppInfo#app_info_t{app_file=ec_cnv:to_list(AppFile)}.
+    AppInfo#app_info_t{app_file=AppFile}.
 
 -spec app_details(t()) -> list().
 app_details(#app_info_t{app_details=AppDetails}) ->

@@ -55,7 +55,7 @@ find_apps(LibDirs, Validate) ->
                                   find_app(AppDir, Validate)
                           end, all_app_dirs(LibDirs)).
 
--spec find_app(list(), boolean()) -> rebar_app_info:t() | false.
+-spec find_app(file:filename_all(), valid | invalid | all) -> {true, rebar_app_info:t()} | false.
 find_app(AppDir, Validate) ->
     AppFile = filelib:wildcard(filename:join([AppDir, "ebin", "*.app"])),
     AppSrcFile = filelib:wildcard(filename:join([AppDir, "src", "*.app.src"])),
@@ -140,7 +140,7 @@ validate_application_info(AppInfo) ->
             false
     end.
 
--spec get_modules_list(file:name(), proplists:proplist()) ->
+-spec get_modules_list(file:filename_all(), proplists:proplist()) ->
                               {ok, list()} |
                               {warning, Reason::term()} |
                               {error, Reason::term()}.
@@ -152,7 +152,7 @@ get_modules_list(AppFile, AppDetail) ->
             {ok, ModulesList}
     end.
 
--spec has_all_beams(file:name(), list()) -> boolean().
+-spec has_all_beams(file:filename_all(), list()) -> boolean().
 has_all_beams(EbinDir, [Module | ModuleList]) ->
     BeamFile = filename:join([EbinDir,
                               ec_cnv:to_list(Module) ++ ".beam"]),

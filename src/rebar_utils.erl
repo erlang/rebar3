@@ -325,7 +325,7 @@ delayed_halt(Code) ->
     end.
 
 %% @doc Return list of erl_opts
--spec erl_opts(rebar_state:config()) -> list().
+-spec erl_opts(rebar_state:t()) -> list().
 erl_opts(Config) ->
     RawErlOpts = filter_defines(rebar_state:get(Config, erl_opts, []), []),
     Defines = [{d, list_to_atom(D)} ||
@@ -359,7 +359,7 @@ processing_base_dir(State, Dir) ->
 %% points to the rebar executable used to execute the currently running
 %% command. The environment is not modified if rebar was invoked
 %% programmatically.
--spec patch_env(rebar_state:config(), [{string(), string()}])
+-spec patch_env(rebar_state:t(), [{string(), string()}])
                -> [{string(), string()}].
 patch_env(Config, []) ->
     %% If we reached an empty list, the env did not contain the REBAR variable.
