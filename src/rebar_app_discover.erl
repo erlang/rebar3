@@ -105,6 +105,7 @@ find_app(AppDir, Validate) ->
 app_dir(AppFile) ->
     filename:join(rebar_utils:droplast(filename:split(filename:dirname(AppFile)))).
 
+-spec create_app_info(file:name(), file:name()) -> rebar_app_info:t() | error.
 create_app_info(AppDir, AppFile) ->
     case file:consult(AppFile) of
         {ok, [{application, AppName, AppDetails}]} ->
@@ -122,7 +123,9 @@ create_app_info(AppDir, AppFile) ->
             AppState1 = rebar_state:set(AppState, base_dir, AbsCwd),
             AppInfo1 = rebar_app_info:config(
                          rebar_app_info:app_details(AppInfo, AppDetails), AppState1),
-            rebar_app_info:dir(AppInfo1, AppDir)
+            rebar_app_info:dir(AppInfo1, AppDir);
+        _ ->
+            error
     end.
 
 -spec validate_application_info(rebar_app_info:t()) -> boolean().
@@ -149,8 +152,7 @@ get_modules_list(AppFile, AppDetail) ->
             {ok, ModulesList}
     end.
 
--spec has_all_beams(file:name(), list()) ->
-                           ok | {error, Reason::term()}.
+-spec has_all_beams(file:name(), list()) -> boolean().
 has_all_beams(EbinDir, [Module | ModuleList]) ->
     BeamFile = filename:join([EbinDir,
                               ec_cnv:to_list(Module) ++ ".beam"]),

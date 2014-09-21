@@ -37,7 +37,7 @@
                   command_args = [] :: list(),
 
                   src_deps = [] :: [rebar_app_info:t()],
-                  src_apps = [] :: dict:dict(),
+                  src_apps = [] :: [rebar_app_info:t()],
                   binary_deps = [],
                   project_apps = [] :: [rebar_app_info:t()],
 
@@ -68,7 +68,7 @@ new(ParentState=#state_t{}, Config) ->
 new(ParentState, Config, Dir) ->
     _Opts = ParentState#state_t.opts,
     LocalOpts = case rebar_config:consult_file(?LOCK_FILE) of
-                    {ok, [D]} ->
+                    [D] ->
                         [{locks, D} | Config];
                     _ ->
                         Config
@@ -144,7 +144,7 @@ src_deps(State=#state_t{src_deps=SrcDeps}, SrcDep) ->
 src_apps(#state_t{src_apps=SrcApps}) ->
     SrcApps.
 
-src_apps(State=#state_t{src_apps=SrcApps}, NewSrcApps) when is_list(NewSrcApps) ->
+src_apps(State=#state_t{src_apps=_SrcApps}, NewSrcApps) when is_list(NewSrcApps) ->
     State#state_t{src_apps=NewSrcApps};
 src_apps(State=#state_t{src_apps=SrcApps}, NewSrcApp) ->
     State#state_t{src_apps=[NewSrcApp | SrcApps]}.
@@ -163,6 +163,7 @@ providers(#state_t{providers=Providers}) ->
 providers(State, NewProviders) ->
     State#state_t{providers=NewProviders}.
 
+-spec add_provider(t(), rebar_provider:t()) -> t().
 add_provider(State=#state_t{providers=Providers}, Provider) ->
     State#state_t{providers=[Provider | Providers]}.
 

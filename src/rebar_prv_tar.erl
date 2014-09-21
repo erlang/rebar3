@@ -29,7 +29,7 @@ init(State) ->
                                                         opts = []}),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
-do(Config) ->
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
+do(State) ->
     relx:main("release tar"),
-    {ok, Config}.
+    {ok, State}.

@@ -33,8 +33,7 @@
          app_src_to_app/1,
          app_name/2,
          app_applications/2,
-         app_vsn/2,
-         is_skipped_app/2]).
+         app_vsn/2]).
 
 -export([load_app_file/2]). % TEMPORARY
 
@@ -124,30 +123,6 @@ app_vsn(Config, AppFile) ->
                    [AppFile, Reason])
     end.
 
-is_skipped_app(Config, AppFile) ->
-    {Config1, ThisApp} = app_name(Config, AppFile),
-    %% Check for apps global parameter; this is a comma-delimited list
-    %% of apps on which we want to run commands
-    Skipped =
-        case get_apps(Config) of
-            undefined ->
-                %% No apps parameter specified, check the skip_apps list..
-                case get_skip_apps(Config) of
-                    undefined ->
-                        %% No skip_apps list, run everything..
-                        false;
-                    SkipApps ->
-                        TargetApps = [list_to_atom(A) ||
-                                         A <- string:tokens(SkipApps, ",")],
-                        is_skipped(ThisApp, TargetApps)
-                end;
-            Apps ->
-                %% run only selected apps
-                TargetApps = [list_to_atom(A) || A <- string:tokens(Apps, ",")],
-                is_selected(ThisApp, TargetApps)
-        end,
-    {Config1, Skipped}.
-
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
@@ -191,27 +166,3 @@ get_value(Key, AppInfo, AppFile) ->
         Value ->
             Value
     end.
-
-%% apps= for selecting apps
-is_selected(ThisApp, TargetApps) ->
-    case lists:member(ThisApp, TargetApps) of
-        false ->
-            {true, ThisApp};
-        true ->
-            false
-    end.
-
-%% skip_apps= for filtering apps
-is_skipped(ThisApp, TargetApps) ->
-    case lists:member(ThisApp, TargetApps) of
-        false ->
-            false;
-        true ->
-            {true, ThisApp}
-    end.
-
-get_apps(Config) ->
-    rebar_config:get_global(Config, apps, undefined).
-
-get_skip_apps(Config) ->
-    rebar_config:get_global(Config, skip_apps, undefined).

@@ -29,7 +29,7 @@ init(State) ->
                                                        opts = []}),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
 do(Config) ->
     relx:main("release"),
     {ok, Config}.

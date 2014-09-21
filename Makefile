@@ -1,7 +1,9 @@
-.PHONY: clean dialyzer_warnings xref_warnings deps test
+.PHONY: clean xref_warnings deps test
 
 REBAR=$(PWD)/rebar3
 RETEST=$(PWD)/deps/retest/retest
+
+DEPS_PLT=$(CURDIR)/.depsolver_plt
 
 all:
 	./bootstrap/bootstrap
@@ -11,23 +13,24 @@ clean:
 	@rm -f .rebarinfo
 
 distclean: clean
-	@rm -f dialyzer_warnings
 	@rm -rf deps
 
 debug:
 	@./bootstrap/bootstrap debug
 
-check: debug xref dialyzer deps test
+check: debug xref deps test
 
 xref:
 	@./rebar3 xref
 
-dialyzer: dialyzer_warnings
-	@diff -U0 dialyzer_reference dialyzer_warnings
+$(DEPS_PLT):
+	@echo Building local erts plt at $(DEPS_PLT)
+	@echo
+	dialyzer --output_plt $(DEPS_PLT) --build_plt \
+	--apps erts kernel stdlib -r deps
 
-dialyzer_warnings:
-	-@dialyzer -q -nn -n ebin -Wunmatched_returns -Werror_handling \
-		-Wrace_conditions > dialyzer_warnings
+dialyzer: $(DEPS_PLT)
+	dialyzer --fullpath --plt $(DEPS_PLT) -Wno_opaque -Wrace_conditions -r ./ebin
 
 binary: VSN = $(shell ./rebar3 -V)
 binary: clean all

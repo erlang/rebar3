@@ -87,13 +87,12 @@ new(AppName, Vsn, Dir, Deps) ->
                      deps=Deps}}.
 
 %% @doc discover a complete version of the app info with all fields set.
--spec discover(file:name()) ->
-                 {ok, t()}.
+-spec discover(file:name()) -> {ok, t()} | not_found.
 discover(Dir) ->
     case rebar_app_discover:find_app(Dir, all) of
         {true, AppInfo} ->
             {ok, AppInfo};
-        _ ->
+        false ->
             not_found
     end.
 
@@ -157,7 +156,7 @@ app_details(AppInfo=#app_info_t{}, AppDetails) ->
 original_vsn(#app_info_t{original_vsn=Vsn}) ->
     Vsn.
 
--spec original_vsn(t(), string()) -> string().
+-spec original_vsn(t(), string()) -> t().
 original_vsn(AppInfo=#app_info_t{}, Vsn) ->
     AppInfo#app_info_t{original_vsn=Vsn}.
 
@@ -172,7 +171,7 @@ deps(AppInfo=#app_info_t{}, Deps) ->
 dep_level(AppInfo=#app_info_t{}, Level) ->
     AppInfo#app_info_t{dep_level=Level}.
 
-dep_level(AppInfo=#app_info_t{dep_level=Level}) ->
+dep_level(#app_info_t{dep_level=Level}) ->
     Level.
 
 -spec dir(t()) -> file:name().

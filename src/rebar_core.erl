@@ -55,8 +55,6 @@ update_code_path(State) ->
 %% Internal functions
 %% ===================================================================
 
-update_code_path_([]) ->
-    no_change;
 update_code_path_(Paths) ->
     LibPaths = expand_lib_dirs(Paths, rebar_utils:get_cwd(), []),
     ok = code:add_pathsa(LibPaths),

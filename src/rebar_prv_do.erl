@@ -29,7 +29,7 @@ init(State) ->
                                                        opts = []}),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
 do(State) ->
     Tasks = args_to_tasks(rebar_state:command_args(State)),
     State1 = lists:foldl(fun(TaskArgs, StateAcc) ->

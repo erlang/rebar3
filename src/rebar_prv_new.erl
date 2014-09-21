@@ -22,7 +22,7 @@ init(State) ->
                                                        deps = ?DEPS,
                                                        example = "rebar new <template>",
                                                        short_desc = "Create new project from templates.",
-                                                       desc = info(create),
+                                                       desc = info(),
                                                        opts = []}),
     {ok, State1}.
 
@@ -45,29 +45,9 @@ do(State) ->
 %% Internal functions
 %% ===================================================================
 
-info(create) ->
+info() ->
     io_lib:format(
-       "Create skel based on template and vars.~n"
-       "~n"
-       "Valid command line options:~n"
-       "  template= [var=foo,...]~n", []);
-info(create_app) ->
-    io_lib:format(
-       "Create simple app skel.~n"
-       "~n"
-       "Valid command line options:~n"
-       "  [appid=myapp]~n", []);
-info(create_lib) ->
-    io_lib:format(
-       "Create simple lib skel.~n"
-       "~n"
-       "Valid command line options:~n"
-       "  [libid=mylib]~n", []);
-info(create_node) ->
-    io_lib:format(
-       "Create simple node skel.~n"
-       "~n"
-       "Valid command line options:~n"
-       "  [nodeid=mynode]~n", []);
-info(list_templates) ->
-    io_lib:format("List available templates.~n", []).
+      "Create rebar project based on template and vars.~n"
+      "~n"
+      "Valid command line options:~n"
+      "  template= [var=foo,...]~n", []).
