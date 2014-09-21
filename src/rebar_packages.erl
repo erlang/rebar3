@@ -12,7 +12,8 @@ get_packages(State) ->
         true ->
             try
                 {ok, Binary} = file:read_file(PackagesFile),
-                binary_to_term(Binary)
+                {List, Graph} = binary_to_term(Binary),
+                {List, Graph}
             catch
                 _:_ ->
                     ?ERROR("Bad packages index, try to fix with `rebar update`~n", []),

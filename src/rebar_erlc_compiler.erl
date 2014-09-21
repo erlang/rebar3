@@ -248,7 +248,7 @@ test_compile_config_and_opts(Config, ErlOpts, Cmd) ->
     Config4 = rebar_state:set(Config3, erl_opts, Opts),
 
     FirstFilesAtom = list_to_atom(Cmd ++ "_first_files"),
-    FirstErls = rebar_state:get_list(Config4, FirstFilesAtom, []),
+    FirstErls = rebar_state:get(Config4, FirstFilesAtom, []),
     Config5 = rebar_state:set(Config4, erl_first_files, FirstErls),
     {Config5, Opts}.
 
@@ -274,7 +274,7 @@ define_if(Def, true) -> [{d, Def}];
 define_if(_Def, false) -> [].
 
 is_lib_avail(Config, DictKey, Mod, Hrl, Name) ->
-    case rebar_state:get_xconf(Config, DictKey, undefined) of
+    case rebar_state:get(Config, DictKey, undefined) of
         undefined ->
             IsAvail = case code:lib_dir(Mod, include) of
                           {error, bad_name} ->
@@ -282,17 +282,17 @@ is_lib_avail(Config, DictKey, Mod, Hrl, Name) ->
                           Dir ->
                               filelib:is_regular(filename:join(Dir, Hrl))
                       end,
-            NewConfig = rebar_state:set_xconf(Config, DictKey, IsAvail),
+            NewConfig = rebar_state:set(Config, DictKey, IsAvail),
             ?DEBUG("~s availability: ~p\n", [Name, IsAvail]),
             {NewConfig, IsAvail};
         IsAvail ->
             {Config, IsAvail}
     end.
 
--spec doterl_compile(rebar_state:t(), file:filename()) -> 'ok'.
-doterl_compile(Config, Dir) ->
-    ErlOpts = rebar_utils:erl_opts(Config),
-    doterl_compile(Config, Dir, [], ErlOpts).
+-spec doterl_compile(rebar_state:t(), file:filename()) -> ok.
+doterl_compile(State, Dir) ->
+    ErlOpts = rebar_utils:erl_opts(State),
+    doterl_compile(State, Dir, [], ErlOpts).
 
 doterl_compile(Config, Dir, MoreSources, ErlOpts) ->
     OutDir = filename:join(Dir, "ebin"),

@@ -31,5 +31,5 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
 do(State) ->
-    relx:main("release tar"),
+    relx:main(["release tar"]),
     {ok, State}.

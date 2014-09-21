@@ -22,24 +22,8 @@
 
 -type provider_name() :: atom().
 
--ifdef(have_callback_support).
-
--callback init(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
--callback do(rebar_state:t()) ->  {ok, rebar_state:t()} | relx:error().
-
--else.
-
-%% In the case where R14 or lower is being used to compile the system
-%% we need to export a behaviour info
--export([behaviour_info/1]).
--spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
-behaviour_info(callbacks) ->
-    [{init, 1},
-     {do, 1}];
-behaviour_info(_) ->
-    undefined.
-
--endif.
+-callback init(rebar_state:t()) -> {ok, rebar_state:t()}.
+-callback do(rebar_state:t()) ->  {ok, rebar_state:t()}.
 
 %%%===================================================================
 %%% API
@@ -50,17 +34,17 @@ behaviour_info(_) ->
 %%
 %% @param ModuleName The module name.
 %% @param State0 The current state of the system
--spec new(module(), rebar_state:t()) ->
-                 {ok, rebar_state:t()}.
-new(ModuleName, State0) when is_atom(ModuleName) ->
+-spec new(module(), rebar_state:t()) -> {ok, rebar_state:t()}.
+new(ModuleName, State) when is_atom(ModuleName) ->
     case code:which(ModuleName) of
         non_existing ->
-            ?ERROR("Module ~p does not exist.", [ModuleName]);
+            ?ERROR("Module ~p does not exist.", [ModuleName]),
+            {ok, State};
         _ ->
-            ModuleName:init(State0)
+            ModuleName:init(State)
     end.
 
--spec create([{atom(), any()}]) -> t().
+-spec create(list()) -> t().
 create(Attrs) ->
     #provider{name=proplists:get_value(name, Attrs, undefined)
              ,provider_impl=proplists:get_value(provider_impl, Attrs, undefined)
@@ -75,14 +59,14 @@ create(Attrs) ->
 %%
 %% @param Provider the provider object
 %% @param State the current state of the system
--spec do(Provider::t(), rebar_state:t()) ->
-                {ok, rebar_state:t()}.
+-spec do(Provider::t(), rebar_state:t()) -> {ok, rebar_state:t()}.
 do(Provider, State) ->
     {PreHooks, PostHooks} = rebar_state:hooks(State, Provider#provider.name),
     {ok, State1} = run_hook_plugins(PreHooks, State),
     {ok, State2} = (Provider#provider.provider_impl):do(State1),
     run_hook_plugins(PostHooks, State2).
 
+-spec run_hook_plugins([t()], rebar_state:t()) -> {ok, rebar_state:t()}.
 run_hook_plugins(Hooks, State) ->
     State1 = lists:foldl(fun(Hook, StateAcc) ->
                                  {ok, StateAcc1} = rebar_provider:do(Hook, StateAcc),

@@ -45,16 +45,16 @@
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
     State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
-                                                        provider_impl = ?MODULE,
-                                                        bare = false,
-                                                        deps = ?DEPS,
-                                                        example = "rebar shell",
-                                                        short_desc = "Run shell with project apps and deps in path.",
-                                                        desc = info(),
-                                                        opts = []}),
+                                                       provider_impl = ?MODULE,
+                                                       bare = false,
+                                                       deps = ?DEPS,
+                                                       example = "rebar shell",
+                                                       short_desc = "Run shell with project apps and deps in path.",
+                                                       desc = info(),
+                                                       opts = []}),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
 do(Config) ->
     shell(),
     {ok, Config}.

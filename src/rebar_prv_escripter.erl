@@ -59,7 +59,7 @@ init(State) ->
                                                         opts = []}),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
 do(Config) ->
     AppName = rebar_state:get(Config, escript_top_level_app, undefined),
     App = rebar_state:get_app(Config, AppName),

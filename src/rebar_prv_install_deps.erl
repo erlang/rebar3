@@ -179,7 +179,7 @@ update_src_deps(Level, State, Update) ->
             update_src_deps(Level+1, State2, Update)
     end.
 
--spec handle_dep(binary(), rebar_state:t()) -> {[rebar_app_info:t()], [binary_dep()]}.
+-spec handle_dep(binary(), rebar_state:t()) -> {rebar_app_info:t(), [rebar_app_info:t()], [binary_dep()]}.
 handle_dep(DepsDir, AppInfo) ->
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
     S = rebar_state:new(rebar_state:new(), C, rebar_app_info:dir(AppInfo)),

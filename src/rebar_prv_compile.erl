@@ -27,7 +27,7 @@ init(State) ->
                                                         opts = []}),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
 do(State) ->
     ProjectApps = rebar_state:project_apps(State),
     Deps = rebar_state:get(State, deps_to_build, []),

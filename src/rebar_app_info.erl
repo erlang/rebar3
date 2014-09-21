@@ -41,7 +41,7 @@
                      deps=[] :: list(),
                      dep_level :: integer(),
                      dir :: file:name(),
-                     source :: string() | undefined,
+                     source :: string() | tuple() | undefined,
                      valid :: boolean()}).
 
 %%============================================================================
@@ -190,7 +190,7 @@ ebin_dir(#app_info_t{dir=Dir}) ->
 source(AppInfo=#app_info_t{}, Source) ->
     AppInfo#app_info_t{source=Source}.
 
--spec source(t()) -> string().
+-spec source(t()) -> string() | tuple().
 source(#app_info_t{source=Source}) ->
     Source.
 

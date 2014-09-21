@@ -5,7 +5,6 @@
          command_args/1, command_args/2,
 
          dir/1, dir/2,
-         set_skip_dir/2, is_skip_dir/2, reset_skip_dirs/1,
          create_logic_providers/2,
 
          project_apps/1, project_apps/2,
@@ -20,34 +19,23 @@
 
 -include("rebar.hrl").
 
--ifdef(namespaced_types).
-%% dict:dict() exists starting from Erlang 17.
--type rebar_dict() :: dict:dict(term(), term()).
--else.
-%% dict() has been obsoleted in Erlang 17 and deprecated in 18.
--type rebar_dict() :: dict().
--endif.
+-record(state_t, {dir :: file:name(),
+                  opts = [],
 
--record(state_t, {dir :: file:filename(),
-                  opts = [] :: list(),
-                  local_opts = [] :: list(),
-                  config = new_globals() :: rebar_dict(),
+                  command_args = [],
 
-                  envs = new_env() :: rebar_dict(),
-                  command_args = [] :: list(),
-
-                  src_deps = [] :: [rebar_app_info:t()],
-                  src_apps = [] :: [rebar_app_info:t()],
+                  src_deps = [],
+                  src_apps = [],
                   binary_deps = [],
-                  project_apps = [] :: [rebar_app_info:t()],
+                  project_apps = [],
 
                   providers = [],
-                  hooks = [],
-                  skip_dirs = new_skip_dirs() :: rebar_dict() }).
+                  hooks = []}).
+
 
 -export_type([t/0]).
 
--opaque t() :: #state_t{}.
+-type t() :: record(state_t).
 
 -spec new() -> t().
 new() ->
@@ -84,26 +72,10 @@ get(State, Key) ->
 get(State, Key, Default) ->
     proplists:get_value(Key, State#state_t.opts, Default).
 
+-spec set(t(), any(), any()) -> t().
 set(State, Key, Value) ->
     Opts = proplists:delete(Key, State#state_t.opts),
     State#state_t { opts = [{Key, Value} | Opts] }.
-
-set_skip_dir(State, Dir) ->
-    OldSkipDirs = State#state_t.skip_dirs,
-    NewSkipDirs = case is_skip_dir(State, Dir) of
-                      false ->
-                          ?DEBUG("Adding skip dir: ~s\n", [Dir]),
-                          dict:store(Dir, true, OldSkipDirs);
-                      true ->
-                          OldSkipDirs
-                  end,
-    State#state_t{skip_dirs = NewSkipDirs}.
-
-is_skip_dir(State, Dir) ->
-    dict:is_key(Dir, State#state_t.skip_dirs).
-
-reset_skip_dirs(State) ->
-    State#state_t{skip_dirs = new_skip_dirs()}.
 
 command_args(#state_t{command_args=CmdArgs}) ->
     CmdArgs.
@@ -181,15 +153,10 @@ append_hook(State=#state_t{hooks=Hooks}, Target, Hook) ->
     {PreHooks, PostHooks} = proplists:get_value(Target, Hooks, {[], []}),
     State#state_t{hooks=[{Target, {PreHooks, [Hook | PostHooks]}} | proplists:delete(Target, Hooks)]}.
 
+-spec hooks(t(), atom()) -> {[rebar_provider:t()], [rebar_provider:t()]}.
 hooks(#state_t{hooks=Hooks}, Target) ->
     proplists:get_value(Target, Hooks, {[], []}).
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
-
-new_globals() -> dict:new().
-
-new_env() -> dict:new().
-
-new_skip_dirs() -> dict:new().

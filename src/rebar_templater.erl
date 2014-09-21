@@ -378,7 +378,7 @@ execute_template(Files, [{'case', Variable, Values, Instructions} | Rest], Templ
                      ExistingFiles);
 execute_template(Files, [{template, Input, Output} | Rest], TemplateType,
                  TemplateName, Context, Force, ExistingFiles) ->
-    InputName = filename:join(filename:dirname(TemplateName), Input),
+    _InputName = filename:join(filename:dirname(TemplateName), Input),
     %File = load_file(Files, TemplateType, InputName),
     OutputTemplateName = make_template_name("rebar_output_template", Output),
     {ok, OutputTemplateName1} = erlydtl:compile_template(Output, OutputTemplateName, ?ERLYDTL_COMPILE_OPTS),
