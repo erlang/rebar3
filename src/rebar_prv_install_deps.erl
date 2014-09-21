@@ -69,13 +69,13 @@ do(State) ->
     ProjectApps = rebar_state:project_apps(State),
     {ok, State1} = case rebar_state:get(State, locks, []) of
                        [] ->
-                           handle_deps(State, ordsets:from_list(rebar_state:get(State, deps, [])));
+                           handle_deps(State, rebar_state:get(State, deps, []));
                        Locks ->
-                           handle_deps(State, ordsets:from_list(Locks))
+                           handle_deps(State, Locks)
                    end,
 
-    Source = ProjectApps ++ ordsets:to_list(rebar_state:src_deps(State1)),
-    {ok, Sort} = rebar_topo:sort_apps(ordsets:to_list(Source)),
+    Source = ProjectApps ++ rebar_state:src_deps(State1),
+    {ok, Sort} = rebar_topo:sort_apps(Source),
     {ok, rebar_state:set(State1, deps_to_build, lists:dropwhile(fun is_valid/1, Sort -- ProjectApps))}.
 
 -spec get_deps_dir(rebar_state:t()) -> file:filename_all().
@@ -106,7 +106,7 @@ handle_deps(State, Deps, Update) ->
                                   SrcDeps),
 
     %% Fetch transitive src deps
-    State2 = update_src_deps(State1, Update),
+    State2 = update_src_deps(0, State1, Update),
     Solved = case rebar_state:binary_deps(State2) of
                  [] -> %% No binary deps
                      [];
@@ -124,9 +124,10 @@ handle_deps(State, Deps, Update) ->
                                end, S)
              end,
 
-    AllDeps = ordsets:union([ordsets:to_list(rebar_state:src_deps(State2))
-                            ,ordsets:from_list(Solved)]),
-
+    AllDeps = lists:keymerge(2
+                            ,rebar_state:src_apps(State2)
+                            ,Solved),
+    io:format("All ~p~n", [AllDeps]),
     %% Sort all apps to build order
     State3 = rebar_state:set(State2, all_deps, AllDeps),
     {ok, State3}.
@@ -154,21 +155,28 @@ package_to_app(DepsDir, Packages, Name, Vsn) ->
         rebar_app_info:dir(AppInfo1, get_deps_dir(DepsDir, <<Name/binary, "-", FmtVsn/binary>>)),
     rebar_app_info:source(AppInfo2, Link).
 
--spec update_src_deps(rebar_state:t(), boolean()) -> rebat_state:t().
-update_src_deps(State, Update) ->
+-spec update_src_deps(integer(), rebar_state:t(), boolean()) -> rebat_state:t().
+update_src_deps(Level, State, Update) ->
     SrcDeps = rebar_state:src_deps(State),
     DepsDir = get_deps_dir(State),
-    case lists:foldl(fun(AppInfo, {SrcDepsAcc, BinaryDepsAcc}) ->
-                             ok = maybe_fetch(AppInfo, Update),
-                             {AppInfo1, NewSrcDeps, NewBinaryDeps} = handle_dep(DepsDir, AppInfo),
-                             {ordsets:union(ordsets:add_element(AppInfo1, SrcDepsAcc), NewSrcDeps)
-                             ,NewBinaryDeps++BinaryDepsAcc}
-                     end, {ordsets:new(), rebar_state:binary_deps(State)}, SrcDeps) of
-        {NewSrcDeps, NewBinaryDeps} when length(SrcDeps) =:= length(NewSrcDeps) ->
-            rebar_state:src_deps(rebar_state:binary_deps(State, NewBinaryDeps), NewSrcDeps);
-        {NewSrcDeps, NewBinaryDeps} ->
-            State1 = rebar_state:src_deps(rebar_state:binary_deps(State, NewBinaryDeps), NewSrcDeps),
-            update_src_deps(State1, Update)
+    case lists:foldl(fun(AppInfo, {SrcDepsAcc, BinaryDepsAcc, StateAcc}) ->
+                             case maybe_fetch(AppInfo, Update) of
+                                 true ->
+                                     {AppInfo1, NewSrcDeps, NewBinaryDeps} =
+                                         handle_dep(DepsDir, AppInfo),
+                                     AppInfo2 = rebar_app_info:dep_level(AppInfo1, Level),
+                                     {NewSrcDeps ++ SrcDepsAcc
+                                     ,NewBinaryDeps++BinaryDepsAcc
+                                     ,rebar_state:src_apps(StateAcc, AppInfo2)};
+                                 false ->
+                                     {SrcDepsAcc, BinaryDepsAcc, State}
+                             end
+                     end, {[], rebar_state:binary_deps(State), State}, SrcDeps) of
+        {NewSrcDeps, NewBinaryDeps, State1} when length(SrcDeps) =:= length(NewSrcDeps) ->
+            rebar_state:src_deps(rebar_state:binary_deps(State1, NewBinaryDeps), NewSrcDeps);
+        {NewSrcDeps, NewBinaryDeps, State1} ->
+            State2 = rebar_state:src_deps(rebar_state:binary_deps(State1, NewBinaryDeps), NewSrcDeps),
+            update_src_deps(Level+1, State2, Update)
     end.
 
 -spec handle_dep(binary(), rebar_state:t()) -> {[rebar_app_info:t()], [binary_dep()]}.
@@ -180,7 +188,7 @@ handle_dep(DepsDir, AppInfo) ->
     {SrcDeps, BinaryDeps} = parse_deps(DepsDir, Deps),
     {AppInfo1, SrcDeps, BinaryDeps}.
 
--spec maybe_fetch(rebar_app_info:t(), boolean()) -> ok.
+-spec maybe_fetch(rebar_app_info:t(), boolean()) -> boolean().
 maybe_fetch(AppInfo, Update) ->
     AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
     %Apps = rebar_app_discover:find_apps([get_deps_dir(State)], all),
@@ -201,12 +209,13 @@ maybe_fetch(AppInfo, Update) ->
         true ->
             ?INFO("Fetching ~s~n", [rebar_app_info:name(AppInfo)]),
             Source = rebar_app_info:source(AppInfo),
-            rebar_fetch:download_source(AppDir, Source);
+            rebar_fetch:download_source(AppDir, Source),
+            true;
         _ ->
-            ok
+            false
     end.
 
--spec parse_deps(binary(), [dep()]) -> {ordsets:ordset(rebar_app_info:t()), [binary_dep()]}.
+-spec parse_deps(binary(), [dep()]) -> {[rebar_app_info:t()], [binary_dep()]}.
 parse_deps(DepsDir, Deps) ->
     lists:foldl(fun({Name, Vsn}, {SrcDepsAcc, BinaryDepsAcc}) ->
                         {SrcDepsAcc, [parse_goal(ec_cnv:to_binary(Name)
@@ -222,8 +231,8 @@ parse_deps(DepsDir, Deps) ->
                                             rebar_app_info:new(Name, Vsn, Dir)
                                     end,
                         Dep1 = rebar_app_info:source(Dep, Source),
-                        {ordsets:add_element(Dep1, SrcDepsAcc), BinaryDepsAcc}
-                end, {ordsets:new(), []}, Deps).
+                        {[Dep1 | SrcDepsAcc], BinaryDepsAcc}
+                end, {[], []}, Deps).
 
 -spec parse_goal(binary(), binary()) -> binary_dep().
 parse_goal(Name, Constraint) ->

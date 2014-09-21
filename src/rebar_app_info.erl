@@ -21,6 +21,8 @@
          ebin_dir/1,
          deps/1,
          deps/2,
+         dep_level/1,
+         dep_level/2,
          dir/1,
          dir/2,
          source/1,
@@ -37,6 +39,7 @@
                      original_vsn :: string(),
                      app_details=[] :: list(),
                      deps=[] :: list(),
+                     dep_level :: integer(),
                      dir :: file:name(),
                      source :: string() | undefined,
                      valid :: boolean()}).
@@ -165,6 +168,12 @@ deps(#app_info_t{deps=Deps}) ->
 -spec deps(t(), list()) -> t().
 deps(AppInfo=#app_info_t{}, Deps) ->
     AppInfo#app_info_t{deps=Deps}.
+
+dep_level(AppInfo=#app_info_t{}, Level) ->
+    AppInfo#app_info_t{dep_level=Level}.
+
+dep_level(AppInfo=#app_info_t{dep_level=Level}) ->
+    Level.
 
 -spec dir(t()) -> file:name().
 dir(#app_info_t{dir=Dir}) ->

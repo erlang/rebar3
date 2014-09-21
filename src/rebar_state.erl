@@ -13,6 +13,7 @@
          deps_names/1,
          binary_deps/1, binary_deps/2,
          src_deps/1, src_deps/2,
+         src_apps/1, src_apps/2,
 
          prepend_hook/3, append_hook/3, hooks/2,
          providers/1, providers/2, add_provider/2]).
@@ -35,9 +36,10 @@
                   envs = new_env() :: rebar_dict(),
                   command_args = [] :: list(),
 
-                  src_deps = ordsets:new() :: ordsets:ordset(rebar_app_info:t()),
+                  src_deps = [] :: [rebar_app_info:t()],
+                  src_apps = [] :: dict:dict(),
                   binary_deps = [],
-                  project_apps = ordsets:new() :: ordsets:ordset(rebar_app_info:t()),
+                  project_apps = [] :: [rebar_app_info:t()],
 
                   providers = [],
                   hooks = [],
@@ -138,6 +140,14 @@ src_deps(State=#state_t{src_deps=SrcDeps}, NewSrcDeps) when is_list(SrcDeps) ->
     State#state_t{src_deps=NewSrcDeps};
 src_deps(State=#state_t{src_deps=SrcDeps}, SrcDep) ->
     State#state_t{src_deps=[SrcDep | SrcDeps]}.
+
+src_apps(#state_t{src_apps=SrcApps}) ->
+    SrcApps.
+
+src_apps(State=#state_t{src_apps=SrcApps}, NewSrcApps) when is_list(NewSrcApps) ->
+    State#state_t{src_apps=NewSrcApps};
+src_apps(State=#state_t{src_apps=SrcApps}, NewSrcApp) ->
+    State#state_t{src_apps=[NewSrcApp | SrcApps]}.
 
 project_apps(#state_t{project_apps=Apps}) ->
     Apps.

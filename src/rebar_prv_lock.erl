@@ -40,7 +40,8 @@ do(State) ->
                                           Source when is_tuple(Source) ->
                                               {rebar_app_info:name(Dep)
                                               ,rebar_app_info:original_vsn(Dep)
-                                              ,rebar_fetch:lock_source(Dir, Source)};
+                                              ,rebar_fetch:lock_source(Dir, Source)
+                                              ,rebar_app_info:dep_level(Dep)};
                                           _Source ->
                                               {rebar_app_info:name(Dep)
                                               ,rebar_app_info:original_vsn(Dep)}
