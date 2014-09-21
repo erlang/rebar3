@@ -4,7 +4,7 @@
 
 -include("rebar.hrl").
 
--spec get_packages(rebar_state:t()) -> {list(), rlx_depsolver:t()}.
+-spec get_packages(rebar_state:t()) -> {dict:dict(), tuple()}.
 get_packages(State) ->
     RebarDir = rebar_state:get(State, global_rebar_dir, filename:join(os:getenv("HOME"), ".rebar")),
     PackagesFile = filename:join(RebarDir, "packages"),

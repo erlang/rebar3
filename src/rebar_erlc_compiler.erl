@@ -241,7 +241,7 @@ test_compile_config_and_opts(Config, ErlOpts, Cmd) ->
     %% *_first_files is questionable as the file would need to exist
     %% in all project directories for it to work.
     OptsAtom = list_to_atom(Cmd ++ "_compile_opts"),
-    TestOpts = rebar_state:get_list(Config3, OptsAtom, []),
+    TestOpts = rebar_state:get(Config3, OptsAtom, []),
     Opts0 = [{d, 'TEST'}] ++
         ErlOpts ++ TestOpts ++ TriqOpts ++ PropErOpts ++ EqcOpts,
     Opts = [O || O <- Opts0, O =/= no_debug_info],

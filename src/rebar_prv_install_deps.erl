@@ -84,7 +84,7 @@ get_deps_dir(State) ->
     DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
     get_deps_dir(BaseDir, DepsDir).
 
--spec get_deps_dir(file:filename_all(), rebar_state:t()) -> file:filename_all().
+-spec get_deps_dir(file:filename_all(), file:filename_all()) -> file:filename_all().
 get_deps_dir(DepsDir, App) ->
     filename:join(DepsDir, App).
 
@@ -119,7 +119,7 @@ handle_deps(State, Deps, Update) ->
                                                                ,Packages
                                                                ,Name
                                                                ,Vsn),
-                                       ok = maybe_fetch(AppInfo, Update),
+                                       maybe_fetch(AppInfo, Update),
                                        AppInfo
                                end, S)
              end,
@@ -141,9 +141,14 @@ handle_deps(State, Deps, Update) ->
 is_valid(App) ->
     rebar_app_info:valid(App).
 
--spec package_to_app(file:name(), rlx_depsolver:t(), binary(), binary()) -> rebar_app_info:t().
+-spec package_to_app(file:filename_all(), dict:dict(), rlx_depsolver:name(), rlx_depsolver:vsn()) -> rebar_app_info:t().
 package_to_app(DepsDir, Packages, Name, Vsn) ->
-    FmtVsn = ec_cnv:to_binary(rlx_depsolver:format_version(Vsn)),
+    FmtVsn = case Vsn of
+                 'NO_VSN' ->
+                     <<"NO_VSN">>;
+                 _ ->
+                     iolist_to_binary(rlx_depsolver:format_version(Vsn))
+             end,
 
     {ok, P} = dict:find({Name, FmtVsn}, Packages),
     PkgDeps = proplists:get_value(<<"deps">>, P),
@@ -155,7 +160,7 @@ package_to_app(DepsDir, Packages, Name, Vsn) ->
         rebar_app_info:dir(AppInfo1, get_deps_dir(DepsDir, <<Name/binary, "-", FmtVsn/binary>>)),
     rebar_app_info:source(AppInfo2, Link).
 
--spec update_src_deps(integer(), rebar_state:t(), boolean()) -> rebat_state:t().
+-spec update_src_deps(integer(), rebar_state:t(), boolean()) -> rebar_state:t().
 update_src_deps(Level, State, Update) ->
     SrcDeps = rebar_state:src_deps(State),
     DepsDir = get_deps_dir(State),
@@ -179,7 +184,8 @@ update_src_deps(Level, State, Update) ->
             update_src_deps(Level+1, State2, Update)
     end.
 
--spec handle_dep(binary(), rebar_state:t()) -> {rebar_app_info:t(), [rebar_app_info:t()], [binary_dep()]}.
+-spec handle_dep(file:filename_all(), rebar_app_info:t()) ->
+                        {rebar_app_info:t(), [rebar_app_info:t()], [binary_dep()]}.
 handle_dep(DepsDir, AppInfo) ->
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
     S = rebar_state:new(rebar_state:new(), C, rebar_app_info:dir(AppInfo)),

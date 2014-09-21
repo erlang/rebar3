@@ -34,6 +34,7 @@
          wordsize/0,
          sh/2,
          sh_send/3,
+         escript_foldl/3,
          find_files/2,
          find_files/3,
          now_str/0,
@@ -43,7 +44,6 @@
          erl_to_mod/1,
          abort/0,
          abort/2,
-         escript_foldl/3,
          find_executable/1,
          prop_check/3,
          expand_code_path/0,
@@ -202,18 +202,6 @@ abort() ->
 abort(String, Args) ->
     ?ERROR(String, Args),
     abort().
-
-%% TODO: Rename emulate_escript_foldl to escript_foldl and remove
-%% this function when the time is right. escript:foldl/3 was an
-%% undocumented exported fun and has been removed in R14.
-escript_foldl(Fun, Acc, File) ->
-    {module, zip} = code:ensure_loaded(zip),
-    case erlang:function_exported(zip, foldl, 3) of
-        true ->
-            emulate_escript_foldl(Fun, Acc, File);
-        false ->
-            escript:foldl(Fun, Acc, File)
-    end.
 
 find_executable(Name) ->
     case os:find_executable(Name) of
@@ -528,7 +516,7 @@ beams(Dir) ->
     filelib:fold_files(Dir, ".*\.beam\$", true,
                        fun(F, Acc) -> [F | Acc] end, []).
 
-emulate_escript_foldl(Fun, Acc, File) ->
+escript_foldl(Fun, Acc, File) ->
     case escript:extract(File, [compile_source]) of
         {ok, [_Shebang, _Comment, _EmuArgs, Body]} ->
             case Body of

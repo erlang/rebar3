@@ -36,7 +36,7 @@
                      app_file_src :: file:name() | undefined,
                      app_file :: file:name(),
                      config :: rebar_config:config() | undefined,
-                     original_vsn :: string(),
+                     original_vsn :: string() | undefined,
                      app_details=[] :: list(),
                      deps=[] :: list(),
                      dep_level :: integer(),
@@ -47,7 +47,7 @@
 %%============================================================================
 %% types
 %%============================================================================
--opaque t() :: record(app_info_t).
+-type t() :: record(app_info_t).
 
 %%============================================================================
 %% API
@@ -186,7 +186,7 @@ dir(AppInfo=#app_info_t{}, Dir) ->
 ebin_dir(#app_info_t{dir=Dir}) ->
     filename:join(Dir, "ebin").
 
--spec source(t(), string()) -> t().
+-spec source(t(), string() | tuple()) -> t().
 source(AppInfo=#app_info_t{}, Source) ->
     AppInfo#app_info_t{source=Source}.
 

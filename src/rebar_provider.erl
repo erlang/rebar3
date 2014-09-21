@@ -18,7 +18,7 @@
 %%% Types
 %%%===================================================================
 
--opaque t() :: record(provider).
+-type t() :: record(provider).
 
 -type provider_name() :: atom().
 
@@ -156,6 +156,6 @@ reorder_providers(OProviderList) ->
     case rebar_topo:sort(OProviderList) of
         {ok, ProviderList} ->
             ProviderList;
-        {cycle, _} ->
+        {error, {cycle, _}} ->
             ?ERROR("There was a cycle in the provider list. Unable to complete build!", [])
     end.

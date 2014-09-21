@@ -80,7 +80,7 @@ create(State) ->
 resolve_variables([], Dict) ->
     Dict;
 resolve_variables([{Key, Value0} | Rest], Dict) when is_list(Value0) ->
-    Value = render(list_to_binary(Value0), Dict),
+    Value = render(Value0, Dict),
     resolve_variables(Rest, dict:store(Key, Value, Dict));
 resolve_variables([{Key, {list, Dicts}} | Rest], Dict) when is_list(Dicts) ->
     %% just un-tag it so erlydtl can use it

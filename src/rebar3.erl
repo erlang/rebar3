@@ -103,8 +103,8 @@ init_config({Options, _NonOptArgs}) ->
                 true ->
                     ?DEBUG("Load global config file ~p~n",
                            [GlobalConfigFile]),
-                    rebar_config:consult_file(GlobalConfigFile),
-                    rebar_state:new(GlobalConfigFile, Config1);
+                    GlobalConfig = rebar_state:new(rebar_config:consult_file(GlobalConfigFile)),
+                    rebar_state:new(GlobalConfig, Config1);
                 false ->
                     rebar_state:new(Config1)
             end,

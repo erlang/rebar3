@@ -230,24 +230,15 @@ do_compile(Config, Source, Target, DtlOpts) ->
     Opts = lists:ukeymerge(1, DtlOpts, Sorted),
     ?INFO("Compiling \"~s\" -> \"~s\" with options:~n    ~s~n",
         [Source, Target, io_lib:format("~p", [Opts])]),
-    case erlydtl:compile(Source,
-                         module_name(Target),
+    case erlydtl:compile(ec_cnv:to_binary(Source),
+                         ec_cnv:to_atom(module_name(Target)),
                          Opts) of
-        ok ->
-            ok;
         {ok, _Mod} ->
             ok;
         {ok, _Mod, Ws} ->
             rebar_base_compiler:ok_tuple(Config, Source, Ws);
-        {ok, _Mod, _Bin, Ws} ->
-            rebar_base_compiler:ok_tuple(Config, Source, Ws);
         error ->
             rebar_base_compiler:error_tuple(Config, Source, [], [], Opts);
-        {error, {_File, _Msgs} = Error} ->
-            rebar_base_compiler:error_tuple(Config, Source, [Error], [], Opts);
-        {error, Msg} ->
-            Es = [{Source, [{erlydtl_parser, Msg}]}],
-            rebar_base_compiler:error_tuple(Config, Source, Es, [], Opts);
         {error, Es, Ws} ->
             rebar_base_compiler:error_tuple(Config, Source, Es, Ws, Opts)
     end.
