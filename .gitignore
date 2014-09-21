@@ -1,3 +1,4 @@
+.depsolver_plt
 *.beam
 test/*_data
 logs
