@@ -25,7 +25,7 @@ init(State) ->
                                                 bare = false,
                                                 deps = ?DEPS,
                                                 example = "rebar ct",
-                                                short_desc = "Run common tests",
+                                                short_desc = "Run Common Tests",
                                                 desc = "",
                                                 opts = []}),
     {ok, State1}.
