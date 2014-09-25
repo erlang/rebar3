@@ -140,7 +140,7 @@ handle_deps(State, Deps, Update) ->
 is_valid(App) ->
     rebar_app_info:valid(App).
 
--spec package_to_app(file:filename_all(), dict:dict(),
+-spec package_to_app(file:filename_all(), rebar_dict(),
                     rlx_depsolver:pkg()) -> rebar_app_info:t().
 package_to_app(DepsDir, Packages, Pkg={_, Vsn}) ->
     Name = ec_cnv:to_binary(rlx_depsolver:dep_pkg(Pkg)),

@@ -27,3 +27,9 @@
 -define(DEFAULT_PLUGINS_DIR, "_plugins").
 -define(DEFAULT_CONFIG_FILE, "rebar.config").
 -define(LOCK_FILE, "rebar.lock").
+
+-ifdef(namespaced_types).
+-type rebar_dict() :: dict:dict().
+-else.
+-type rebar_dict() :: dict().
+-endif.
