@@ -74,7 +74,7 @@ do(State) ->
                            handle_deps(State, Locks)
                    end,
 
-    Source = ProjectApps ++ rebar_state:src_deps(State1),
+    Source = ProjectApps ++ rebar_state:get(State1, all_deps),
     {ok, Sort} = rebar_topo:sort_apps(Source),
     {ok, rebar_state:set(State1, deps_to_build, lists:dropwhile(fun is_valid/1, Sort -- ProjectApps))}.
 
@@ -123,14 +123,13 @@ handle_deps(State, Deps, Update) ->
                                end, S)
              end,
 
-    AllDeps = lists:keymerge(2
-                            ,rebar_state:src_apps(State2)
-                            ,Solved),
+    AllDeps = lists:keymerge(2, lists:keymerge(2
+                                              ,rebar_state:src_apps(State2)
+                                              ,Solved), SrcDeps),
 
     %% Sort all apps to build order
     State3 = rebar_state:set(State2, all_deps, AllDeps),
     {ok, State3}.
-
 
 %% ===================================================================
 %% Internal functions

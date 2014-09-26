@@ -103,7 +103,7 @@ apps_to_pairs(Apps) ->
 
 -spec app_to_pairs(rebar_app_info:t()) -> [pair()].
 app_to_pairs(App) ->
-    [{DepApp, rebar_app_info:name(App)} ||
+    [{ec_cnv:to_binary(DepApp), rebar_app_info:name(App)} ||
         DepApp <-
             rebar_app_info:deps(App)].
 

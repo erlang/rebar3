@@ -110,8 +110,9 @@ create_app_info(AppDir, AppFile) ->
     case file:consult(AppFile) of
         {ok, [{application, AppName, AppDetails}]} ->
             AppVsn = proplists:get_value(vsn, AppDetails),
+            AppDeps = proplists:get_value(applications, AppDetails, []),
             AbsCwd = filename:absname(rebar_utils:get_cwd()),
-            {ok, AppInfo} = rebar_app_info:new(AppName, AppVsn, AppDir),
+            {ok, AppInfo} = rebar_app_info:new(AppName, AppVsn, AppDir, AppDeps),
             RebarConfig = filename:join(AppDir, "rebar.config"),
             AppState = case filelib:is_file(RebarConfig) of
                             true ->
@@ -131,13 +132,17 @@ create_app_info(AppDir, AppFile) ->
 -spec validate_application_info(rebar_app_info:t()) -> boolean().
 validate_application_info(AppInfo) ->
     EbinDir = rebar_app_info:ebin_dir(AppInfo),
-    AppFile = rebar_app_info:app_file(AppInfo),
-    AppDetail = rebar_app_info:app_details(AppInfo),
-    case get_modules_list(AppFile, AppDetail) of
-        {ok, List} ->
-            has_all_beams(EbinDir, List);
-        _Error ->
-            false
+    case rebar_app_info:app_file(AppInfo) of
+        undefined ->
+            false;
+        AppFile ->
+            AppDetail = rebar_app_info:app_details(AppInfo),
+            case get_modules_list(AppFile, AppDetail) of
+                {ok, List} ->
+                    has_all_beams(EbinDir, List);
+                _Error ->
+                    false
+            end
     end.
 
 -spec get_modules_list(file:filename_all(), proplists:proplist()) ->
