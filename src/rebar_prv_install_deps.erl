@@ -92,7 +92,7 @@ get_deps_dir(DepsDir, App) ->
 handle_deps(State, Deps) ->
     handle_deps(State, Deps, false).
 
--spec handle_deps(rebar_state:t(), [dep()], boolean()) -> {ok, rebar_state:t()}.
+-spec handle_deps(rebar_state:t(), [dep()], false | {true, integer()}) -> {ok, rebar_state:t()}.
 handle_deps(State, [], _) ->
     {ok, State};
 handle_deps(State, Deps, Update) ->
@@ -160,16 +160,35 @@ update_src_deps(Level, State, Update) ->
     SrcDeps = rebar_state:src_deps(State),
     DepsDir = get_deps_dir(State),
     case lists:foldl(fun(AppInfo, {SrcDepsAcc, BinaryDepsAcc, StateAcc}) ->
-                             case maybe_fetch(AppInfo, Update) of
-                                 true ->
-                                     {AppInfo1, NewSrcDeps, NewBinaryDeps} =
-                                         handle_dep(DepsDir, AppInfo),
-                                     AppInfo2 = rebar_app_info:dep_level(AppInfo1, Level),
-                                     {NewSrcDeps ++ SrcDepsAcc
-                                     ,NewBinaryDeps++BinaryDepsAcc
-                                     ,rebar_state:src_apps(StateAcc, AppInfo2)};
-                                 false ->
-                                     {SrcDepsAcc, BinaryDepsAcc, State}
+                             Name = rebar_app_info:name(AppInfo),
+                             Locks = rebar_state:get(State, locks, []),
+                             {_, _, _, DepLevel} = lists:keyfind(Name, 1, Locks),
+                             case Update of
+                                 {true, UpdateName, UpdateLevel} when UpdateLevel < DepLevel
+                                                                    ; Name =:= UpdateName ->
+                                     case maybe_fetch(AppInfo, true) of
+                                         true ->
+                                             {AppInfo1, NewSrcDeps, NewBinaryDeps} =
+                                                 handle_dep(DepsDir, AppInfo),
+                                             AppInfo2 = rebar_app_info:dep_level(AppInfo1, Level),
+                                             {NewSrcDeps ++ SrcDepsAcc
+                                             ,NewBinaryDeps++BinaryDepsAcc
+                                             ,rebar_state:src_apps(StateAcc, AppInfo2)};
+                                         false ->
+                                             {SrcDepsAcc, BinaryDepsAcc, State}
+                                     end;
+                                 _ ->
+                                     case maybe_fetch(AppInfo, false) of
+                                         true ->
+                                             {AppInfo1, NewSrcDeps, NewBinaryDeps} =
+                                                 handle_dep(DepsDir, AppInfo),
+                                             AppInfo2 = rebar_app_info:dep_level(AppInfo1, Level),
+                                             {NewSrcDeps ++ SrcDepsAcc
+                                             ,NewBinaryDeps++BinaryDepsAcc
+                                             ,rebar_state:src_apps(StateAcc, AppInfo2)};
+                                         false ->
+                                             {SrcDepsAcc, BinaryDepsAcc, State}
+                                     end
                              end
                      end, {[], rebar_state:binary_deps(State), State}, SrcDeps) of
         {NewSrcDeps, NewBinaryDeps, State1} when length(SrcDeps) =:= length(NewSrcDeps) ->
@@ -224,6 +243,16 @@ parse_deps(DepsDir, Deps) ->
                    (Name, {SrcDepsAcc, BinaryDepsAcc}) when is_atom(Name) ->
                         {SrcDepsAcc, [ec_cnv:to_binary(Name) | BinaryDepsAcc]};
                    ({Name, Vsn, Source}, {SrcDepsAcc, BinaryDepsAcc}) when is_tuple (Source) ->
+                        Dir = ec_cnv:to_list(get_deps_dir(DepsDir, Name)),
+                        {ok, Dep} = case rebar_app_info:discover(Dir) of
+                                        {ok, App} ->
+                                            {ok, App};
+                                        not_found ->
+                                            rebar_app_info:new(Name, Vsn, Dir)
+                                    end,
+                        Dep1 = rebar_app_info:source(Dep, Source),
+                        {[Dep1 | SrcDepsAcc], BinaryDepsAcc};
+                   ({Name, Vsn, Source, _Level}, {SrcDepsAcc, BinaryDepsAcc}) when is_tuple (Source) ->
                         Dir = ec_cnv:to_list(get_deps_dir(DepsDir, Name)),
                         {ok, Dep} = case rebar_app_info:discover(Dir) of
                                         {ok, App} ->
