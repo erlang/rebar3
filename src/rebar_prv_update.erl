@@ -11,7 +11,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, update).
--define(DEPS, [lock]).
+-define(DEPS, []).
 
 %% ===================================================================
 %% Public API
@@ -46,22 +46,17 @@ do(State) ->
             end;
         [] ->
             ?INFO("Updating package index...~n", []),
-            Url = url(State),
-            %{ok, [Home]} = init:get_argument(home),
-            ec_file:mkdir_p(filename:join([os:getenv("HOME"), ".rebar"])),
-            PackagesFile = filename:join([os:getenv("HOME"), ".rebar", "packages"]),
-            {ok, RequestId} = httpc:request(get, {Url, []}, [], [{stream, PackagesFile}, {sync, false}]),
-            wait(RequestId, State)
-    end.
-
-wait(RequestId, State) ->
-    receive
-        {http, {RequestId, saved_to_file}} ->
-            {ok, State}
-    after
-        500 ->
-            io:format("."),
-            wait(RequestId, State)
+            try
+                Url = url(State),
+                                                %{ok, [Home]} = init:get_argument(home),
+                ec_file:mkdir_p(filename:join([os:getenv("HOME"), ".rebar"])),
+                PackagesFile = filename:join([os:getenv("HOME"), ".rebar", "packages"]),
+                {ok, RequestId} = httpc:request(get, {Url, []}, [], [{stream, PackagesFile}
+                                                                    ,{sync, true}])
+            catch
+                _:_ ->
+                    {error, io_lib:format("Failed to write package index.~n", [])}
+            end
     end.
 
 url(State) ->
