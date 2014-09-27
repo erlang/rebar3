@@ -54,7 +54,8 @@ main(Args) ->
         Error ->
             %% Nothing should percolate up from rebar_core;
             %% Dump this error to console
-            io:format("Uncaught error in rebar_core: ~p\n", [Error]),
+            ?ERROR("Uncaught error in rebar_core. Run with -vvv to see stacktrace~n", []),
+            ?DEBUG("Uncaught error: ~p~n", [Error]),
             rebar_utils:delayed_halt(1)
     end.
 
