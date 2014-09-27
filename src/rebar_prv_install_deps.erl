@@ -74,7 +74,7 @@ do(State) ->
                            handle_deps(State, Locks)
                    end,
 
-    Source = ProjectApps ++ rebar_state:get(State1, all_deps),
+    Source = ProjectApps ++ rebar_state:src_deps(State1),
     {ok, Sort} = rebar_topo:sort_apps(Source),
     {ok, rebar_state:set(State1, deps_to_build, lists:dropwhile(fun is_valid/1, Sort -- ProjectApps))}.
 
@@ -151,7 +151,7 @@ package_to_app(DepsDir, Packages, Pkg={_, Vsn}) ->
     {ok, AppInfo} = rebar_app_info:new(Name, FmtVsn),
     AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
     AppInfo2 =
-        rebar_app_info:dir(AppInfo1, get_deps_dir(DepsDir, <<Name/binary, "-", FmtVsn/binary>>)),
+        rebar_app_info:dir(AppInfo1, get_deps_dir(DepsDir, Name)),
     rebar_app_info:source(AppInfo2, Link).
 
 -spec update_src_deps(integer(), rebar_state:t(), boolean()) -> rebar_state:t().
@@ -161,18 +161,23 @@ update_src_deps(Level, State, Update) ->
     case lists:foldl(fun(AppInfo, {SrcDepsAcc, BinaryDepsAcc, StateAcc}) ->
                              Name = rebar_app_info:name(AppInfo),
                              Locks = rebar_state:get(State, locks, []),
-                             {_, _, _, DepLevel} = lists:keyfind(Name, 1, Locks),
                              case Update of
-                                 {true, UpdateName, UpdateLevel} when UpdateLevel < DepLevel
-                                                                    ; Name =:= UpdateName ->
-                                     case maybe_fetch(AppInfo, true) of
+                                 {true, UpdateName, UpdateLevel} ->
+                                     {_, _, _, DepLevel} = lists:keyfind(Name, 1, Locks),
+                                     case UpdateLevel < DepLevel
+                                         orelse Name =:= UpdateName of
                                          true ->
-                                             {AppInfo1, NewSrcDeps, NewBinaryDeps} =
-                                                 handle_dep(DepsDir, AppInfo),
-                                             AppInfo2 = rebar_app_info:dep_level(AppInfo1, Level),
-                                             {NewSrcDeps ++ SrcDepsAcc
-                                             ,NewBinaryDeps++BinaryDepsAcc
-                                             ,rebar_state:src_apps(StateAcc, AppInfo2)};
+                                             case maybe_fetch(AppInfo, true) of
+                                                 true ->
+                                                     {AppInfo1, NewSrcDeps, NewBinaryDeps} =
+                                                         handle_dep(DepsDir, AppInfo),
+                                                     AppInfo2 = rebar_app_info:dep_level(AppInfo1, Level),
+                                                     {NewSrcDeps ++ SrcDepsAcc
+                                                     ,NewBinaryDeps++BinaryDepsAcc
+                                                     ,rebar_state:src_apps(StateAcc, AppInfo2)};
+                                                 false ->
+                                                     {SrcDepsAcc, BinaryDepsAcc, State}
+                                             end;
                                          false ->
                                              {SrcDepsAcc, BinaryDepsAcc, State}
                                      end;
@@ -190,10 +195,10 @@ update_src_deps(Level, State, Update) ->
                                      end
                              end
                      end, {[], rebar_state:binary_deps(State), State}, SrcDeps) of
-        {NewSrcDeps, NewBinaryDeps, State1} when length(SrcDeps) =:= length(NewSrcDeps) ->
-            rebar_state:src_deps(rebar_state:binary_deps(State1, NewBinaryDeps), NewSrcDeps);
-        {NewSrcDeps, NewBinaryDeps, State1} ->
-            State2 = rebar_state:src_deps(rebar_state:binary_deps(State1, NewBinaryDeps), NewSrcDeps),
+        {[], NewBinaryDeps, State1} ->
+            rebar_state:binary_deps(State1, NewBinaryDeps);
+        {_NewSrcDeps, NewBinaryDeps, State1} ->
+            State2 = rebar_state:binary_deps(State1, NewBinaryDeps),
             update_src_deps(Level+1, State2, Update)
     end.
 

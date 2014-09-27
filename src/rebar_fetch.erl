@@ -49,14 +49,16 @@ lock_source(_AppDir, Source) ->
 download_source(AppDir, Source) ->
     TmpDir = ec_file:insecure_mkdtemp(),
     AppDir1 = ec_cnv:to_list(AppDir),
+    ec_file:mkdir_p(AppDir1),
     case download_source_tmp(TmpDir, Source) of
         {ok, _} ->
-            ec_file:mkdir_p(AppDir1),
             ok = ec_file:copy(TmpDir, filename:absname(AppDir1), [recursive]);
         {tarball, File} ->
-            ok = erl_tar:extract(File, [{cwd,
-                                         (filename:dirname(filename:absname(AppDir1)))}
-                                        ,compressed])
+            ok = erl_tar:extract(File, [{cwd, TmpDir}
+                                        ,compressed]),
+            BaseName = filename:basename(AppDir1),
+            [FromDir] = filelib:wildcard(filename:join(TmpDir, BaseName++"-*")),
+            ec_file:copy(FromDir, AppDir1, [recursive])
     end.
 
 download_source_tmp(TmpDir, {p4, Url}) ->
