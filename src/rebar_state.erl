@@ -111,7 +111,9 @@ src_deps(#state_t{src_deps=SrcDeps}) ->
 src_deps(State=#state_t{src_deps=SrcDeps}, NewSrcDeps) when is_list(SrcDeps) ->
     State#state_t{src_deps=NewSrcDeps};
 src_deps(State=#state_t{src_deps=SrcDeps}, SrcDep) ->
-    State#state_t{src_deps=[SrcDep | SrcDeps]}.
+    Name = rebar_app_info:name(SrcDep),
+    NewSrcDeps = lists:keystore(Name, 2, SrcDeps, SrcDep),
+    State#state_t{src_deps=NewSrcDeps}.
 
 src_apps(#state_t{src_apps=SrcApps}) ->
     SrcApps.
@@ -119,7 +121,9 @@ src_apps(#state_t{src_apps=SrcApps}) ->
 src_apps(State=#state_t{src_apps=_SrcApps}, NewSrcApps) when is_list(NewSrcApps) ->
     State#state_t{src_apps=NewSrcApps};
 src_apps(State=#state_t{src_apps=SrcApps}, NewSrcApp) ->
-    State#state_t{src_apps=[NewSrcApp | SrcApps]}.
+    Name = rebar_app_info:name(NewSrcApp),
+    NewSrcApps = lists:keystore(Name, 2, SrcApps, NewSrcApp),
+    State#state_t{src_apps=NewSrcApps}.
 
 project_apps(#state_t{project_apps=Apps}) ->
     Apps.

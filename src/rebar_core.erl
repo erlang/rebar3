@@ -31,17 +31,25 @@
 
 -include("rebar.hrl").
 
+-spec process_command(rebar_state:t(), atom()) -> {ok, rebar_state:t()} | {error, string()}.
 process_command(State, Command) ->
     %% ? rebar_prv_install_deps:setup_env(State),
 
     TargetProviders = rebar_provider:get_target_providers(Command, State),
+    do(TargetProviders, State).
 
-    lists:foldl(fun(TargetProvider, Conf) ->
-                        Provider = rebar_provider:get_provider(TargetProvider
-                                                              ,rebar_state:providers(Conf)),
-                        {ok, Conf1} = rebar_provider:do(Provider, Conf),
-                        Conf1
-                end, State, TargetProviders).
+-spec do([atom()], rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
+do([], State) ->
+    {ok, State};
+do([ProviderName | Rest], State) ->
+    Provider = rebar_provider:get_provider(ProviderName
+                                          ,rebar_state:providers(State)),
+    case rebar_provider:do(Provider, State) of
+        {ok, State1} ->
+            do(Rest, State1);
+        {error, Error} ->
+            {error, Error}
+    end.
 
 update_code_path(State) ->
     true = rebar_utils:expand_code_path(),

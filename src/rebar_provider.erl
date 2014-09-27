@@ -23,7 +23,7 @@
 -type provider_name() :: atom().
 
 -callback init(rebar_state:t()) -> {ok, rebar_state:t()}.
--callback do(rebar_state:t()) ->  {ok, rebar_state:t()}.
+-callback do(rebar_state:t()) ->  {ok, rebar_state:t()} | {error, string()}.
 
 %%%===================================================================
 %%% API
@@ -59,20 +59,21 @@ create(Attrs) ->
 %%
 %% @param Provider the provider object
 %% @param State the current state of the system
--spec do(Provider::t(), rebar_state:t()) -> {ok, rebar_state:t()}.
+-spec do(Provider::t(), rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(Provider, State) ->
     {PreHooks, PostHooks} = rebar_state:hooks(State, Provider#provider.name),
-    {ok, State1} = run_hook_plugins(PreHooks, State),
-    {ok, State2} = (Provider#provider.provider_impl):do(State1),
-    run_hook_plugins(PostHooks, State2).
+    run_all([PreHooks++Provider | PostHooks], State).
 
--spec run_hook_plugins([t()], rebar_state:t()) -> {ok, rebar_state:t()}.
-run_hook_plugins(Hooks, State) ->
-    State1 = lists:foldl(fun(Hook, StateAcc) ->
-                                 {ok, StateAcc1} = rebar_provider:do(Hook, StateAcc),
-                                 StateAcc1
-                         end, State, Hooks),
-    {ok, State1}.
+-spec run_all([t()], rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
+run_all([], State) ->
+    {ok, State};
+run_all([Provider | Rest], State) ->
+    case (Provider#provider.provider_impl):do(State) of
+        {ok, State1} ->
+            run_all(Rest, State1);
+        {error, Error} ->
+            {error, Error}
+    end.
 
 %%% @doc get the name of the module that implements the provider
 %%% @param Provider the provider object

@@ -29,7 +29,7 @@ init(State) ->
                                                        opts = []}),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     LibDirs = rebar_state:get(State, lib_dirs, ?DEFAULT_LIB_DIRS),
     State1 = rebar_app_discover:do(State, LibDirs),

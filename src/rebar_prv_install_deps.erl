@@ -64,7 +64,7 @@ init(State) ->
                                                        opts = []}),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     ProjectApps = rebar_state:project_apps(State),
     {ok, State1} = case rebar_state:get(State, locks, []) of
@@ -123,9 +123,9 @@ handle_deps(State, Deps, Update) ->
                                end, S)
              end,
 
-    AllDeps = lists:keymerge(2, lists:keymerge(2
-                                              ,rebar_state:src_apps(State2)
-                                              ,Solved), SrcDeps),
+    AllDeps = lists:ukeymerge(2
+                            ,lists:ukeysort(2, rebar_state:src_apps(State2))
+                            ,lists:ukeysort(2, Solved)),
 
     %% Sort all apps to build order
     State3 = rebar_state:set(State2, all_deps, AllDeps),
@@ -191,7 +191,8 @@ update_src_deps(Level, State, Update) ->
                                              ,NewBinaryDeps++BinaryDepsAcc
                                              ,rebar_state:src_apps(StateAcc, AppInfo2)};
                                          false ->
-                                             {SrcDepsAcc, BinaryDepsAcc, State}
+                                             AppInfo1 = rebar_app_info:dep_level(AppInfo, Level),
+                                             {SrcDepsAcc, BinaryDepsAcc, rebar_state:src_apps(StateAcc, AppInfo1)}
                                      end
                              end
                      end, {[], rebar_state:binary_deps(State), State}, SrcDeps) of

@@ -48,6 +48,9 @@ main(Args) ->
             ok;
         rebar_abort ->
             rebar_utils:delayed_halt(1);
+        {error, Error} ->
+            ?ERROR(Error, []),
+            rebar_utils:delayed_halt(1);
         Error ->
             %% Nothing should percolate up from rebar_core;
             %% Dump this error to console
@@ -146,8 +149,7 @@ run_aux(State, Args) ->
 
     State4 = rebar_state:create_logic_providers(Providers++PluginProviders, State3),
     Task = rebar_state:get(State4, task, "help"),
-    rebar_core:process_command(rebar_state:command_args(State4, Args), list_to_atom(Task)),
-    ok.
+    rebar_core:process_command(rebar_state:command_args(State4, Args), list_to_atom(Task)).
 
 %%
 %% Parse command line arguments using getopt and also filtering out any

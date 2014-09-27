@@ -54,7 +54,7 @@ init(State) ->
                                                        opts = []}),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(Config) ->
     shell(),
     {ok, Config}.
