@@ -44,7 +44,7 @@
 %% escript Entry point
 main(Args) ->
     case catch(run(Args)) of
-        ok ->
+        {ok, _State} ->
             ok;
         rebar_abort ->
             rebar_utils:delayed_halt(1);

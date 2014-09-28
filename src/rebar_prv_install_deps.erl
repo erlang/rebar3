@@ -74,7 +74,7 @@ do(State) ->
                            handle_deps(State, Locks)
                    end,
 
-    Source = ProjectApps ++ rebar_state:src_deps(State1),
+    Source = ProjectApps ++ rebar_state:src_apps(State1),
     {ok, Sort} = rebar_topo:sort_apps(Source),
     {ok, rebar_state:set(State1, deps_to_build, lists:dropwhile(fun is_valid/1, Sort -- ProjectApps))}.
 
@@ -191,16 +191,21 @@ update_src_deps(Level, State, Update) ->
                                              ,NewBinaryDeps++BinaryDepsAcc
                                              ,rebar_state:src_apps(StateAcc, AppInfo2)};
                                          false ->
-                                             AppInfo1 = rebar_app_info:dep_level(AppInfo, Level),
-                                             {SrcDepsAcc, BinaryDepsAcc, rebar_state:src_apps(StateAcc, AppInfo1)}
+                                             {AppInfo1, NewSrcDeps, NewBinaryDeps} =
+                                                 handle_dep(DepsDir, AppInfo),
+                                             AppInfo2 = rebar_app_info:dep_level(AppInfo1, Level),
+                                             {NewSrcDeps ++ SrcDepsAcc
+                                             ,NewBinaryDeps++BinaryDepsAcc
+                                             ,rebar_state:src_apps(StateAcc, AppInfo2)}
                                      end
                              end
                      end, {[], rebar_state:binary_deps(State), State}, SrcDeps) of
         {[], NewBinaryDeps, State1} ->
             rebar_state:binary_deps(State1, NewBinaryDeps);
-        {_NewSrcDeps, NewBinaryDeps, State1} ->
+        {NewSrcDeps, NewBinaryDeps, State1} ->
             State2 = rebar_state:binary_deps(State1, NewBinaryDeps),
-            update_src_deps(Level+1, State2, Update)
+            State3 = rebar_state:src_deps(State2, NewSrcDeps),
+            update_src_deps(Level+1, State3, Update)
     end.
 
 -spec handle_dep(file:filename_all(), rebar_app_info:t()) ->

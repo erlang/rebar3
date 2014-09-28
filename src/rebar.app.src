@@ -33,6 +33,7 @@
                      rebar_prv_tar,
                      rebar_prv_new,
                      rebar_prv_update,
+                     rebar_prv_upgrade,
                      rebar_prv_release,
                      rebar_prv_version,
                      rebar_prv_help]}
