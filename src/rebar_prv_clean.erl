@@ -1,7 +1,7 @@
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 
--module(rebar_prv_release).
+-module(rebar_prv_clean).
 
 -behaviour(rebar_provider).
 
@@ -10,8 +10,8 @@
 
 -include("rebar.hrl").
 
--define(PROVIDER, release).
--define(DEPS, [compile]).
+-define(PROVIDER, clean).
+-define(DEPS, [app_discovery]).
 
 %% ===================================================================
 %% Public API
@@ -23,13 +23,17 @@ init(State) ->
                                                        provider_impl = ?MODULE,
                                                        bare = false,
                                                        deps = ?DEPS,
-                                                       example = "rebar release",
-                                                       short_desc = "Build release of project.",
+                                                       example = "rebar clean",
+                                                       short_desc = "Remove compiled beam files from apps.",
                                                        desc = "",
                                                        opts = []}),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    relx:main(["release"]),
+    ProjectApps = rebar_state:project_apps(State),
+    lists:foreach(fun(AppInfo) ->
+                          ?INFO("Cleaning out ~s...~n", [rebar_app_info:name(AppInfo)]),
+                          rebar_erlc_compiler:clean(State, ec_cnv:to_list(rebar_app_info:dir(AppInfo)))
+                  end, ProjectApps),
     {ok, State}.
