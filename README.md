@@ -23,10 +23,11 @@ This is an experimental branch.
 | Command    | Description |
 |----------- |------------ |
 | compile    | Build project |
+| clean      | Remove project apps beam files |
 | update     | Update package index |
+| upgrade    | Fetch latest version of dep |
 | pkgs       | List available packages |
 | shell      | Run shell with project apps in path |
-| escriptize | Create escript from project |
 | new        | Create new rebar project from templates |
 | do         | Higher-order provider to run multiple tasks in sequence |
 
@@ -76,9 +77,9 @@ Example:
 %% Public API
 %% ===================================================================
 
--spec init(rebar_config:config()) -> {ok, rebar_config:config()}.
+-spec init(rebar_state:state()) -> {ok, rebar_state:state()}.
 init(State) ->
-    State1 = rebar_config:add_provider(State, rebar_provider:create([{name, ?PROVIDER},
+    State1 = rebar_state:add_provider(State, rebar_provider:create([{name, ?PROVIDER},
                                                                     {provider_impl, ?MODULE},
                                                                     {bare, false},
                                                                     {deps, ?DEPS},
@@ -88,10 +89,10 @@ init(State) ->
                                                                     {opts, []}])),
     {ok, State1}.
 
--spec do(rebar_config:config()) -> {ok, rebar_config:config()}.
-do(Config) ->
+-spec do(rebar_state:state()) -> {ok, rebar_state:state()}.
+do(State) ->
     %% Do something
-    {ok, Config}.
+    {ok, State}.
 ```
 
 
