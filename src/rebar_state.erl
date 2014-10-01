@@ -10,7 +10,7 @@
          project_apps/1, project_apps/2,
 
          deps_names/1,
-         binary_deps/1, binary_deps/2,
+         pkg_deps/1, pkg_deps/2,
          src_deps/1, src_deps/2,
          src_apps/1, src_apps/2,
 
@@ -26,7 +26,7 @@
 
                   src_deps = [],
                   src_apps = [],
-                  binary_deps = [],
+                  pkg_deps = [],
                   project_apps = [],
 
                   providers = [],
@@ -97,13 +97,13 @@ deps_names(State) ->
                       ec_cnv:to_binary(Dep)
               end, Deps).
 
-binary_deps(#state_t{binary_deps=BinaryDeps}) ->
-    BinaryDeps.
+pkg_deps(#state_t{pkg_deps=PkgDeps}) ->
+    PkgDeps.
 
-binary_deps(State=#state_t{binary_deps=BinaryDeps}, NewBinaryDeps) when is_list(BinaryDeps) ->
-    State#state_t{binary_deps=NewBinaryDeps};
-binary_deps(State=#state_t{binary_deps=BinaryDeps}, BinaryDep) ->
-    State#state_t{binary_deps=[BinaryDep | BinaryDeps]}.
+pkg_deps(State=#state_t{pkg_deps=PkgDeps}, NewPkgDeps) when is_list(PkgDeps) ->
+    State#state_t{pkg_deps=NewPkgDeps};
+pkg_deps(State=#state_t{pkg_deps=PkgDeps}, PkgDep) ->
+    State#state_t{pkg_deps=[PkgDep | PkgDeps]}.
 
 src_deps(#state_t{src_deps=SrcDeps}) ->
     SrcDeps.
