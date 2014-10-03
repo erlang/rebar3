@@ -1,6 +1,6 @@
 -module(rebar_prv_compile).
 
--behaviour(rebar_provider).
+-behaviour(provider).
 
 -export([init/1,
          do/1,
@@ -17,14 +17,14 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
-                                                        provider_impl = ?MODULE,
-                                                        bare = false,
-                                                        deps = ?DEPS,
-                                                        example = "rebar compile",
-                                                        short_desc = "Compile apps .app.src and .erl files.",
-                                                        desc = "",
-                                                        opts = []}),
+    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
+                                                               {module, ?MODULE},
+                                                               {bare, false},
+                                                               {deps, ?DEPS},
+                                                               {example, "rebar compile"},
+                                                               {short_desc, "Compile apps .app.src and .erl files."},
+                                                               {desc, ""},
+                                                               {opts, []}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.

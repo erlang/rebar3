@@ -3,7 +3,7 @@
 
 -module(rebar_prv_tar).
 
--behaviour(rebar_provider).
+-behaviour(provider).
 
 -export([init/1,
          do/1]).
@@ -19,17 +19,22 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
-                                                        provider_impl = ?MODULE,
-                                                        bare = false,
-                                                        deps = ?DEPS,
-                                                        example = "rebar tar",
-                                                        short_desc = "Tar archive of release built of project.",
-                                                        desc = "",
-                                                        opts = []}),
+    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
+                                                               {module, ?MODULE},
+                                                               {bare, false},
+                                                               {deps, ?DEPS},
+                                                               {example, "rebar tar"},
+                                                               {short_desc, "Tar archive of release built of project."},
+                                                               {desc, ""},
+                                                               {opts, []}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    relx:main(["release tar"]),
+    case rebar_state:get(State, relx, []) of
+        [] ->
+            relx:main(["release tar"]);
+        Config ->
+            relx:main([{config, Config}], ["release tar"])
+    end,
     {ok, State}.

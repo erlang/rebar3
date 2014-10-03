@@ -139,28 +139,39 @@ providers(#state_t{providers=Providers}) ->
 providers(State, NewProviders) ->
     State#state_t{providers=NewProviders}.
 
--spec add_provider(t(), rebar_provider:t()) -> t().
+-spec add_provider(t(), providers:t()) -> t().
 add_provider(State=#state_t{providers=Providers}, Provider) ->
     State#state_t{providers=[Provider | Providers]}.
 
 create_logic_providers(ProviderModules, State0) ->
     lists:foldl(fun(ProviderMod, Acc) ->
-                        {ok, State1} = rebar_provider:new(ProviderMod, Acc),
+                        {ok, State1} = providers:new(ProviderMod, Acc),
                         State1
                 end, State0, ProviderModules).
 
-prepend_hook(State=#state_t{hooks=Hooks}, Target, Hook) ->
-    {PreHooks, PostHooks} = proplists:get_value(Target, Hooks, {[], []}),
-    State#state_t{hooks=[{Target, {[Hook | PreHooks], PostHooks}} | proplists:delete(Target, Hooks)]}.
+prepend_hook(State=#state_t{providers=Providers}, Target, Hook) ->
+    State#state_t{providers=add_hook(pre, Providers, Target, Hook)}.
 
-append_hook(State=#state_t{hooks=Hooks}, Target, Hook) ->
-    {PreHooks, PostHooks} = proplists:get_value(Target, Hooks, {[], []}),
-    State#state_t{hooks=[{Target, {PreHooks, [Hook | PostHooks]}} | proplists:delete(Target, Hooks)]}.
+append_hook(State=#state_t{providers=Providers}, Target, Hook) ->
+    State#state_t{providers=add_hook(post, Providers, Target, Hook)}.
 
--spec hooks(t(), atom()) -> {[rebar_provider:t()], [rebar_provider:t()]}.
-hooks(#state_t{hooks=Hooks}, Target) ->
-    proplists:get_value(Target, Hooks, {[], []}).
+-spec hooks(t(), atom()) -> {[providers:t()], [providers:t()]}.
+hooks(_State=#state_t{providers=Providers}, Target) ->
+    Provider = providers:get_provider(Target, Providers),
+    providers:hooks(Provider).
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+add_hook(Which, Providers, Target, Hook) ->
+    Provider = providers:get_provider(Target, Providers),
+    Hooks = providers:hooks(Provider),
+    NewHooks = add_hook(Which, Hooks, Hook),
+    NewProvider = providers:hooks(Provider, NewHooks),
+    [NewProvider | lists:delete(Provider, Providers)].
+
+add_hook(pre, {PreHooks, PostHooks}, Hook) ->
+    {[Hook | PreHooks], PostHooks};
+add_hook(post, {PreHooks, PostHooks}, Hook) ->
+    {PreHooks, [Hook | PostHooks]}.

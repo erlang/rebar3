@@ -3,7 +3,7 @@
 
 -module(rebar_prv_help).
 
--behaviour(rebar_provider).
+-behaviour(provider).
 
 -export([init/1,
          do/1]).
@@ -19,14 +19,14 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
-                                                       provider_impl = ?MODULE,
-                                                       bare = false,
-                                                       deps = ?DEPS,
-                                                       example = "rebar help <task>",
-                                                       short_desc = "Display a list of tasks or help for a given task or subtask.",
-                                                       desc = "",
-                                                       opts = []}),
+    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
+                                                               {module, ?MODULE},
+                                                               {bare, false},
+                                                               {deps, ?DEPS},
+                                                               {example, "rebar help <task>"},
+                                                               {short_desc, "Display a list of tasks or help for a given task or subtask."},
+                                                               {desc, ""},
+                                                               {opts, []}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
@@ -43,6 +43,6 @@ help(State) ->
     getopt:usage(OptSpecList, "rebar", "", []),
     ?CONSOLE("~nSeveral tasks are available:~n", []),
 
-    rebar_provider:help(State),
+    providers:help(State),
 
     ?CONSOLE("~nRun 'rebar help <TASK>' for details.~n~n", []).

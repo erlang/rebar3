@@ -1,6 +1,6 @@
 -module(rebar_prv_packages).
 
--behaviour(rebar_provider).
+-behaviour(provider).
 
 -export([init/1,
          do/1]).
@@ -12,14 +12,14 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
-                                                       provider_impl = ?MODULE,
-                                                       bare = false,
-                                                       deps = ?DEPS,
-                                                       example = "rebar pkgs",
-                                                       short_desc = "List available packages.",
-                                                       desc = info("List available packages"),
-                                                       opts = []}),
+    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
+                                                               {module, ?MODULE},
+                                                               {bare, false},
+                                                               {deps, ?DEPS},
+                                                               {example, "rebar pkgs"},
+                                                               {short_desc, "List available packages."},
+                                                               {desc, info("List available packages")},
+                                                               {opts, []}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.

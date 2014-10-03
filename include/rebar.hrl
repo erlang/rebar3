@@ -13,15 +13,6 @@
 
 -define(FMT(Str, Args), lists:flatten(io_lib:format(Str, Args))).
 
--record(provider,  {name :: atom(),            % The 'user friendly' name of the task
-                    provider_impl :: atom(),   % The implementation of the task, maybe fun or
-                    bare :: boolean(),         % Indicates whether a build config is needed
-                    deps :: [atom()],          % The list of dependencies
-                    desc :: string(),          % The description for the task
-                    short_desc :: string(),    % A one line short description of the task
-                    example :: string() | undefined,       % An example of the task usage
-                    opts :: list()}).          % The list of options that the task requires/understands
-
 -define(DEFAULT_LIB_DIRS, ["apps", "libs", "."]).
 -define(DEFAULT_DEPS_DIR, "_deps").
 -define(DEFAULT_PLUGINS_DIR, "_plugins").

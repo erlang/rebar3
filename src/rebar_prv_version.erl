@@ -3,7 +3,7 @@
 
 -module(rebar_prv_version).
 
--behaviour(rebar_provider).
+-behaviour(provider).
 
 -export([init/1,
          do/1]).
@@ -19,14 +19,14 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
-                                                       provider_impl = ?MODULE,
-                                                       bare = false,
-                                                       deps = ?DEPS,
-                                                       example = "rebar version",
-                                                       short_desc = "Print version for rebar and current Erlang.",
-                                                       desc = "",
-                                                       opts = []}),
+    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
+                                                               {module, ?MODULE},
+                                                               {bare, false},
+                                                               {deps, ?DEPS},
+                                                               {example, "rebar version"},
+                                                               {short_desc, "Print version for rebar and current Erlang."},
+                                                               {desc, ""},
+                                                               {opts, []}])),
 
     {ok, State1}.
 
