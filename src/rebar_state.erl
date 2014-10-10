@@ -54,7 +54,7 @@ new(ParentState=#state_t{}, Config) ->
 
 -spec new(t(), list(), file:name()) -> t().
 new(ParentState, Config, Dir) ->
-    _Opts = ParentState#state_t.opts,
+    Opts = ParentState#state_t.opts,
     LocalOpts = case rebar_config:consult_file(?LOCK_FILE) of
                     [D] ->
                         [{locks, D} | Config];
@@ -64,7 +64,7 @@ new(ParentState, Config, Dir) ->
 
     ProviderModules = [],
     create_logic_providers(ProviderModules, ParentState#state_t{dir=Dir
-                                                               ,opts=LocalOpts}).
+                                                               ,opts=lists:umerge(LocalOpts, Opts)}).
 
 get(State, Key) ->
     proplists:get_value(Key, State#state_t.opts).

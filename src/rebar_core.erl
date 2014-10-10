@@ -39,12 +39,17 @@ process_command(State, Command) ->
     CommandProvider = providers:get_provider(Command
                                             ,Providers),
     Opts = providers:opts(CommandProvider)++rebar3:global_option_spec_list(),
-    case getopt:parse(Opts, rebar_state:command_args(State)) of
-        {ok, Args} ->
-            State2 = rebar_state:command_parsed_args(State, Args),
-            do(TargetProviders, State2);
-        {error, {invalid_option, Option}} ->
-            {error, io_lib:format("Invalid option ~s on task ~p", [Option, Command])}
+    case Command of
+        do ->
+            do(TargetProviders, State);
+        _ ->
+            case getopt:parse(Opts, rebar_state:command_args(State)) of
+                {ok, Args} ->
+                    State2 = rebar_state:command_parsed_args(State, Args),
+                    do(TargetProviders, State2);
+                {error, {invalid_option, Option}} ->
+                    {error, io_lib:format("Invalid option ~s on task ~p", [Option, Command])}
+            end
     end.
 
 -spec do([atom()], rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
