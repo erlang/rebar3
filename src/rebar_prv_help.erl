@@ -39,15 +39,7 @@ do(State) ->
             help(State);
         Name ->
             Providers = rebar_state:providers(State),
-            Provider = providers:get_provider(list_to_atom(Name), Providers),
-            Opts = providers:opts(Provider),
-            case providers:desc(Provider) of
-                Desc when length(Desc) > 0 ->
-                    io:format(Desc++"~n~n");
-                _ ->
-                    ok
-            end,
-            getopt:usage(Opts, "rebar "++Name, "", [])
+            providers:help(Name, Providers)
     end,
     {ok, State}.
 
