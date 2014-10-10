@@ -25,13 +25,30 @@ init(State) ->
                                                                {deps, ?DEPS},
                                                                {example, "rebar help <task>"},
                                                                {short_desc, "Display a list of tasks or help for a given task or subtask."},
-                                                               {desc, ""},
-                                                               {opts, []}])),
+                                                               {desc, "Display a list of tasks or help for a given task or subtask."},
+                                                               {opts, [
+                                                                      {help_task, undefined, undefined, string, "Task to print help for."}
+                                                                      ]}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    help(State),
+    {Args, _} = rebar_state:command_parsed_args(State),
+    case proplists:get_value(help_task, Args, undefined) of
+        undefined ->
+            help(State);
+        Name ->
+            Providers = rebar_state:providers(State),
+            Provider = providers:get_provider(list_to_atom(Name), Providers),
+            Opts = providers:opts(Provider),
+            case providers:desc(Provider) of
+                Desc when length(Desc) > 0 ->
+                    io:format(Desc++"~n~n");
+                _ ->
+                    ok
+            end,
+            getopt:usage(Opts, "rebar "++Name, "", [])
+    end,
     {ok, State}.
 
 %%
