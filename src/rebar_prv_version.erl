@@ -32,6 +32,5 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    io:format("REST ~p~n", [rebar_state:command_args(State)]),
     rebar3:version(),
     {ok, State}.
