@@ -24,19 +24,21 @@ This is an experimental branch.
 |----------- |------------ |
 | compile    | Build project |
 | clean      | Remove project apps beam files |
+| do         | Higher-order provider to run multiple tasks in sequence |
+| help       | Print help for rebar or task |
+| new        | Create new rebar project from templates |
+| pkgs       | List available packages |
+| release    | Build release of project |
+| tar        | Package release into tarball |
+| shell      | Run shell with project apps in path |
 | update     | Update package index |
 | upgrade    | Fetch latest version of dep |
-| pkgs       | List available packages |
-| shell      | Run shell with project apps in path |
-| new        | Create new rebar project from templates |
-| do         | Higher-order provider to run multiple tasks in sequence |
+| version    | Print current version of Erlang/OTP and rebar |
 
 The following commands are still in the works.
 
 | Command    | Description |
 |----------- |------------ |
-| release    | Build release of project |
-| tar        | Package release into tarball |
 | eunit      | |
 | ct         | |
 
@@ -80,7 +82,7 @@ Example:
 -spec init(rebar_state:state()) -> {ok, rebar_state:state()}.
 init(State) ->
     State1 = rebar_state:add_provider(State, rebar_provider:create([{name, ?PROVIDER},
-                                                                    {provider_impl, ?MODULE},
+                                                                    {module, ?MODULE},
                                                                     {bare, false},
                                                                     {deps, ?DEPS},
                                                                     {example, "rebar dummy"},
