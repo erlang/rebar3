@@ -11,12 +11,18 @@
 -define(PROVIDER, compile).
 -define(DEPS, [lock]).
 
+-define(DEFAULT_JOBS, 3).
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
+    Jobs = ?DEFAULT_JOBS,
+    JobsHelp = io_lib:format(
+                 "Number of concurrent workers a command may use. Default: ~B",
+                 [Jobs]),
     State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
                                                                {module, ?MODULE},
                                                                {bare, false},
@@ -24,7 +30,9 @@ init(State) ->
                                                                {example, "rebar compile"},
                                                                {short_desc, "Compile apps .app.src and .erl files."},
                                                                {desc, ""},
-                                                               {opts, []}])),
+                                                               {opts, [
+                                                                      {jobs,     $j, "jobs",     integer,   JobsHelp}
+                                                                      ]}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.

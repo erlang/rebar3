@@ -3,6 +3,7 @@
 -export([new/0, new/1, new/2, new/3,
          get/2, get/3, set/3,
          command_args/1, command_args/2,
+         command_parsed_args/1, command_parsed_args/2,
 
          dir/1, dir/2,
          create_logic_providers/2,
@@ -23,15 +24,14 @@
                   opts = [],
 
                   command_args = [],
+                  command_parsed_args = [],
 
                   src_deps = [],
                   src_apps = [],
                   pkg_deps = [],
                   project_apps = [],
 
-                  providers = [],
-                  hooks = []}).
-
+                  providers = []}).
 
 -export_type([t/0]).
 
@@ -82,6 +82,12 @@ command_args(#state_t{command_args=CmdArgs}) ->
 
 command_args(State, CmdArgs) ->
     State#state_t{command_args=CmdArgs}.
+
+command_parsed_args(#state_t{command_parsed_args=CmdArgs}) ->
+    CmdArgs.
+
+command_parsed_args(State, CmdArgs) ->
+    State#state_t{command_parsed_args=CmdArgs}.
 
 dir(#state_t{dir=Dir}) ->
     Dir.

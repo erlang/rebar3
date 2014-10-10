@@ -73,7 +73,6 @@ remove_script_ext(F) ->
 try_consult(File) ->
     case file:consult(File) of
         {ok, Terms} ->
-            ?DEBUG("Consult config file ~p~n", [File]),
             Terms;
         {error, enoent} ->
             [];

@@ -36,14 +36,23 @@ process_command(State, Command) ->
     %% ? rebar_prv_install_deps:setup_env(State),
     Providers = rebar_state:providers(State),
     TargetProviders = providers:get_target_providers(Command, Providers),
-    do(TargetProviders, State).
+    CommandProvider = providers:get_provider(Command
+                                            ,Providers),
+    Opts = providers:opts(CommandProvider)++rebar3:global_option_spec_list(),
+    case getopt:parse(Opts, rebar_state:command_args(State)) of
+        {ok, Args} ->
+            State2 = rebar_state:command_parsed_args(State, Args),
+            do(TargetProviders, State2);
+        {error, {invalid_option, Option}} ->
+            {error, io_lib:format("Invalid option ~s on task ~p", [Option, Command])}
+    end.
 
 -spec do([atom()], rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do([], State) ->
     {ok, State};
 do([ProviderName | Rest], State) ->
     Provider = providers:get_provider(ProviderName
-                                          ,rebar_state:providers(State)),
+                                     ,rebar_state:providers(State)),
     case providers:do(Provider, State) of
         {ok, State1} ->
             do(Rest, State1);
