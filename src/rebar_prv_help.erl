@@ -39,9 +39,14 @@ do(State) ->
             help(State);
         Name ->
             Providers = rebar_state:providers(State),
-            providers:help(Name, Providers)
-    end,
-    {ok, State}.
+            case providers:get_provider(Name, Providers) of
+                [] ->
+                    {error, io_lib:format("Unknown task ~s", [Name])};
+                Provider ->
+                    providers:help(Provider),
+                    {ok, State}
+            end
+    end.
 
 %%
 %% print help/usage string
