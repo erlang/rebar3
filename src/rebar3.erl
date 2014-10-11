@@ -144,7 +144,7 @@ run_aux(State, RawArgs) ->
     {ok, Providers} = application:get_env(rebar, providers),
 
     {ok, PluginProviders, State3} = rebar_plugins:install(State2),
-    rebar_core:update_code_path(State),
+    rebar_core:update_code_path(State3),
 
     State4 = rebar_state:create_logic_providers(Providers++PluginProviders, State3),
     {Task, Args} = parse_args(RawArgs),

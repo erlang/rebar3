@@ -36,8 +36,7 @@ process_command(State, Command) ->
     %% ? rebar_prv_install_deps:setup_env(State),
     Providers = rebar_state:providers(State),
     TargetProviders = providers:get_target_providers(Command, Providers),
-    CommandProvider = providers:get_provider(Command
-                                            ,Providers),
+    CommandProvider = providers:get_provider(Command, Providers),
     Opts = providers:opts(CommandProvider)++rebar3:global_option_spec_list(),
     case Command of
         do ->
