@@ -20,7 +20,7 @@
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
     JobsHelp = io_lib:format(
-                 "Number of concurrent workers a command may use. Default: ~B",
+                 "Number of concurrent workers the compiler may use. Default: ~B",
                  [?DEFAULT_JOBS]),
     State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
                                                                {module, ?MODULE},
