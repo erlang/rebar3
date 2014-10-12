@@ -26,7 +26,7 @@ init(State) ->
                                                                {example, "rebar release"},
                                                                {short_desc, "Build release of project."},
                                                                {desc, ""},
-                                                               {opts, []}])),
+                                                               {opts, relx:opt_spec_list()}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
