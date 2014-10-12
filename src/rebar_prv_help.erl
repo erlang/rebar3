@@ -36,10 +36,11 @@ do(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     case proplists:get_value(help_task, Args, undefined) of
         undefined ->
-            help(State);
+            help(State),
+            {ok, State};
         Name ->
             Providers = rebar_state:providers(State),
-            case providers:get_provider(Name, Providers) of
+            case providers:get_provider(list_to_atom(Name), Providers) of
                 [] ->
                     {error, io_lib:format("Unknown task ~s", [Name])};
                 Provider ->
