@@ -111,15 +111,15 @@ compile(Config, Dir) ->
     doterl_compile(Config, Dir).
 
 -spec clean(rebar_state:t(), file:filename()) -> 'ok'.
-clean(Config, _AppFile) ->
-    MibFiles = rebar_utils:find_files("mibs", ?RE_PREFIX".*\\.mib\$"),
+clean(Config, AppDir) ->
+    MibFiles = rebar_utils:find_files(filename:join(AppDir, "mibs"), ?RE_PREFIX".*\\.mib\$"),
     MIBs = [filename:rootname(filename:basename(MIB)) || MIB <- MibFiles],
     rebar_file_utils:delete_each(
-      [filename:join(["include",MIB++".hrl"]) || MIB <- MIBs]),
+      [filename:join([AppDir, "include",MIB++".hrl"]) || MIB <- MIBs]),
     lists:foreach(fun(F) -> ok = rebar_file_utils:rm_rf(F) end,
-                  ["ebin/*.beam", "priv/mibs/*.bin"]),
+                  [filename:join(AppDir, "ebin/*.beam"), filename:join(AppDir, "priv/mibs/*.bin")]),
 
-    YrlFiles = rebar_utils:find_files("src", ?RE_PREFIX".*\\.[x|y]rl\$"),
+    YrlFiles = rebar_utils:find_files(filename:join(AppDir, "src"), ?RE_PREFIX".*\\.[x|y]rl\$"),
     rebar_file_utils:delete_each(
       [ binary_to_list(iolist_to_binary(re:replace(F, "\\.[x|y]rl$", ".erl")))
         || F <- YrlFiles ]),
@@ -131,9 +131,9 @@ clean(Config, _AppFile) ->
     %% directory structure in ebin with .beam files within. As such, we want
     %% to scan whatever is left in the ebin/ directory for sub-dirs which
     %% satisfy our criteria.
-    BeamFiles = rebar_utils:find_files("ebin", ?RE_PREFIX".*\\.beam\$"),
+    BeamFiles = rebar_utils:find_files(filename:join(AppDir, "ebin"), ?RE_PREFIX".*\\.beam\$"),
     rebar_file_utils:delete_each(BeamFiles),
-    lists:foreach(fun(Dir) -> delete_dir(Dir, dirs(Dir)) end, dirs("ebin")),
+    lists:foreach(fun(Dir) -> delete_dir(Dir, dirs(Dir)) end, dirs(filename:join(AppDir, "ebin"))),
     ok.
 
 %% ===================================================================
