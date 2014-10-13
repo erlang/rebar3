@@ -126,9 +126,10 @@ init(State) ->
 do(Config) ->
     MultiDtlOpts = erlydtl_opts(Config),
     OrigPath = code:get_path(),
-    true = code:add_path(rebar_utils:ebin_dir()),
+    %true = code:add_path(rebar_utils:ebin_dir()),
 
     Result = lists:foldl(fun(DtlOpts, _) ->
+                                 file:make_dir(option(out_dir, DtlOpts)),
                                  rebar_base_compiler:run(Config, [],
                                                          option(doc_root, DtlOpts),
                                                          option(source_ext, DtlOpts),
@@ -231,7 +232,7 @@ do_compile(Config, Source, Target, DtlOpts) ->
     ?INFO("Compiling \"~s\" -> \"~s\" with options:~n    ~s~n",
         [Source, Target, io_lib:format("~p", [Opts])]),
     case erlydtl:compile(ec_cnv:to_binary(Source),
-                         ec_cnv:to_atom(module_name(Target)),
+                         list_to_atom(module_name(Target)),
                          Opts) of
         {ok, _Mod} ->
             ok;

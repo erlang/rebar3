@@ -75,8 +75,12 @@ do(State) ->
                    end,
 
     Source = ProjectApps ++ rebar_state:src_apps(State1),
-    {ok, Sort} = rebar_topo:sort_apps(Source),
-    {ok, rebar_state:set(State1, deps_to_build, lists:dropwhile(fun is_valid/1, Sort -- ProjectApps))}.
+    case rebar_topo:sort_apps(Source) of
+        {ok, Sort} ->
+            {ok, rebar_state:set(State1, deps_to_build, lists:dropwhile(fun is_valid/1, Sort -- ProjectApps))};
+        {error, Error} ->
+            {error, Error}
+    end.
 
 -spec get_deps_dir(rebar_state:t()) -> file:filename_all().
 get_deps_dir(State) ->
@@ -114,19 +118,22 @@ handle_deps(State, Deps, Update) ->
                      %% Find pkg deps needed
                      {ok, S} = rlx_depsolver:solve(Graph, PkgDeps1),
                      %% Create app_info record for each pkg dep
-                     lists:map(fun(Pkg) ->
-                                       AppInfo = package_to_app(DepsDir
-                                                               ,Packages
-                                                               ,Pkg),
-                                       maybe_fetch(AppInfo, Update),
-                                       AppInfo
-                               end, S)
+                     lists:flatmap(fun(Pkg) ->
+                                           AppInfo = package_to_app(DepsDir
+                                                                   ,Packages
+                                                                   ,Pkg),
+                                           case maybe_fetch(AppInfo, Update) of
+                                               false ->
+                                                   [];
+                                               true ->
+                                                   AppInfo
+                                           end
+                                   end, S)
              end,
 
     AllDeps = lists:ukeymerge(2
                             ,lists:ukeysort(2, rebar_state:src_apps(State2))
                             ,lists:ukeysort(2, Solved)),
-
     %% Sort all apps to build order
     State3 = rebar_state:set(State2, all_deps, AllDeps),
     {ok, State3}.
@@ -221,28 +228,33 @@ handle_dep(DepsDir, AppInfo) ->
 -spec maybe_fetch(rebar_app_info:t(), boolean()) -> boolean().
 maybe_fetch(AppInfo, Update) ->
     AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
-    %Apps = rebar_app_discover:find_apps([get_deps_dir(State)], all),
-    %case rebar_app_utils:find(rebar_app_info:name(AppInfo), Apps) of
-    Exists = case rebar_app_utils:is_app_dir(filename:absname(AppDir)++"-*") of
-                 {true, _} ->
-                     true;
-                 _ ->
-                     case rebar_app_utils:is_app_dir(filename:absname(AppDir)) of
+    Apps = rebar_app_discover:find_apps(["_checkouts"], all),
+    case rebar_app_utils:find(rebar_app_info:name(AppInfo), Apps) of
+        {ok, _} ->
+            %% Don't fetch dep if it exists in the _checkouts dir
+            false;
+        error ->
+            Exists = case rebar_app_utils:is_app_dir(filename:absname(AppDir)++"-*") of
                          {true, _} ->
                              true;
                          _ ->
-                             false
-                     end
-             end,
+                             case rebar_app_utils:is_app_dir(filename:absname(AppDir)) of
+                                 {true, _} ->
+                                     true;
+                                 _ ->
+                                     false
+                             end
+                     end,
 
-    case not Exists orelse Update of
-        true ->
-            ?INFO("Fetching ~s~n", [rebar_app_info:name(AppInfo)]),
-            Source = rebar_app_info:source(AppInfo),
-            rebar_fetch:download_source(AppDir, Source),
-            true;
-        _ ->
-            false
+            case not Exists orelse Update of
+                true ->
+                    ?INFO("Fetching ~s~n", [rebar_app_info:name(AppInfo)]),
+                    Source = rebar_app_info:source(AppInfo),
+                    rebar_fetch:download_source(AppDir, Source),
+                    true;
+                _ ->
+                    false
+            end
     end.
 
 -spec parse_deps(binary(), [dep()]) -> {[rebar_app_info:t()], [pkg_dep()]}.

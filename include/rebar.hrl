@@ -13,7 +13,7 @@
 
 -define(FMT(Str, Args), lists:flatten(io_lib:format(Str, Args))).
 
--define(DEFAULT_LIB_DIRS, ["apps", "libs", "."]).
+-define(DEFAULT_LIB_DIRS, ["_checkouts", "apps", "libs", "."]).
 -define(DEFAULT_DEPS_DIR, "_deps").
 -define(DEFAULT_PLUGINS_DIR, "_plugins").
 -define(DEFAULT_CONFIG_FILE, "rebar.config").

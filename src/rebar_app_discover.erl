@@ -13,7 +13,8 @@ do(State, LibDirs) ->
     Apps = find_apps(Dirs, all),
     ProjectDeps = rebar_state:deps_names(State),
     lists:foldl(fun(AppInfo, StateAcc) ->
-                        rebar_state:project_apps(StateAcc, rebar_app_info:deps(AppInfo, ProjectDeps))
+                        ProjectDeps1 = lists:delete(rebar_app_info:name(AppInfo), ProjectDeps),
+                        rebar_state:project_apps(StateAcc, rebar_app_info:deps(AppInfo, ProjectDeps1))
             end, State, Apps).
 
 -spec all_app_dirs(list(file:name())) -> list(file:name()).
