@@ -42,8 +42,9 @@ do(State) ->
     Deps = rebar_state:get(State1, deps_to_build, []),
 
     lists:foreach(fun(AppInfo) ->
-                          C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
-                          S = rebar_state:new(State1, C, rebar_app_info:dir(AppInfo)),
+                          AppDir = rebar_app_info:dir(AppInfo),
+                          C = rebar_config:consult(AppDir),
+                          S = rebar_state:new(State1, C, AppDir),
                           build(S, AppInfo)
                   end, Deps++ProjectApps),
 

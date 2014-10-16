@@ -30,42 +30,25 @@
          filtermap/2,
          get_cwd/0,
          is_arch/1,
-         get_arch/0,
-         wordsize/0,
          sh/2,
          sh_send/3,
          escript_foldl/3,
          find_files/2,
          find_files/3,
-         now_str/0,
          ensure_dir/1,
          beam_to_mod/1,
          beams/1,
-         erl_to_mod/1,
-         abort/0,
-         abort/2,
          find_executable/1,
-         prop_check/3,
          expand_code_path/0,
-         expand_env_variable/3,
          vcs_vsn/3,
          deprecated/3,
          deprecated/4,
-         get_deprecated_global/4,
-         get_deprecated_global/5,
-         get_experimental_global/3,
-         get_experimental_local/3,
-         get_deprecated_list/4,
-         get_deprecated_list/5,
-         get_deprecated_local/4,
-         get_deprecated_local/5,
          delayed_halt/1,
          erl_opts/1,
          src_dirs/1,
          ebin_dir/0,
          processing_base_dir/1,
          processing_base_dir/2,
-         patch_env/2,
          indent/1]).
 
 %% for internal use only
@@ -177,11 +160,6 @@ find_files(Dir, Regex, Recursive) ->
     filelib:fold_files(Dir, Regex, Recursive,
                        fun(F, Acc) -> [F | Acc] end, []).
 
-now_str() ->
-    {{Year, Month, Day}, {Hour, Minute, Second}} = calendar:local_time(),
-    lists:flatten(io_lib:format("~4b/~2..0b/~2..0b ~2..0b:~2..0b:~2..0b",
-                                [Year, Month, Day, Hour, Minute, Second])).
-
 %% TODO: filelib:ensure_dir/1 corrected in R13B04. Remove when we drop
 %% support for OTP releases older than R13B04.
 ensure_dir(Path) ->
@@ -194,15 +172,6 @@ ensure_dir(Path) ->
             Error
     end.
 
--spec abort() -> no_return().
-abort() ->
-    throw(rebar_abort).
-
--spec abort(string(), [term()]) -> no_return().
-abort(String, Args) ->
-    ?ERROR(String, Args),
-    abort().
-
 find_executable(Name) ->
     case os:find_executable(Name) of
         false -> false;
@@ -210,35 +179,12 @@ find_executable(Name) ->
             "\"" ++ filename:nativename(Path) ++ "\""
     end.
 
-%% Helper function for checking values and aborting when needed
-prop_check(true, _, _) -> true;
-prop_check(false, Msg, Args) -> ?ABORT(Msg, Args).
-
 %% Convert all the entries in the code path to absolute paths.
 expand_code_path() ->
     CodePath = lists:foldl(fun(Path, Acc) ->
                                    [filename:absname(Path) | Acc]
                            end, [], code:get_path()),
     code:set_path(lists:reverse(CodePath)).
-
-%%
-%% Given env. variable FOO we want to expand all references to
-%% it in InStr. References can have two forms: $FOO and ${FOO}
-%% The end of form $FOO is delimited with whitespace or eol
-%%
-expand_env_variable(InStr, VarName, RawVarValue) ->
-    case string:chr(InStr, $$) of
-        0 ->
-            %% No variables to expand
-            InStr;
-        _ ->
-            ReOpts = [global, unicode, {return, list}],
-            VarValue = re:replace(RawVarValue, "\\\\", "\\\\\\\\", ReOpts),
-            %% Use a regex to match/replace:
-            %% Given variable "FOO": match $FOO\s | $FOOeol | ${FOO}
-            RegEx = io_lib:format("\\\$(~s(\\s|$)|{~s})", [VarName, VarName]),
-            re:replace(InStr, RegEx, [VarValue, "\\2"], ReOpts)
-    end.
 
 vcs_vsn(Config, Vsn, Dir) ->
     Key = {Vsn, Dir},
@@ -252,33 +198,6 @@ vcs_vsn(Config, Vsn, Dir) ->
         {ok, VsnString} ->
             {Config, VsnString}
     end.
-
-get_deprecated_global(Config, OldOpt, NewOpt, When) ->
-    get_deprecated_global(Config, OldOpt, NewOpt, undefined, When).
-
-get_deprecated_global(Config, OldOpt, NewOpt, Default, When) ->
-    get_deprecated_3(fun rebar_state:get/3,
-                     Config, OldOpt, NewOpt, Default, When).
-
-get_experimental_global(Config, Opt, Default) ->
-    get_experimental_3(fun rebar_state:get/3, Config, Opt, Default).
-
-get_experimental_local(Config, Opt, Default) ->
-    get_experimental_3(fun rebar_state:get/3, Config, Opt, Default).
-
-get_deprecated_list(Config, OldOpt, NewOpt, When) ->
-    get_deprecated_list(Config, OldOpt, NewOpt, undefined, When).
-
-get_deprecated_list(Config, OldOpt, NewOpt, Default, When) ->
-    get_deprecated_3(fun rebar_state:get_list/3,
-                     Config, OldOpt, NewOpt, Default, When).
-
-get_deprecated_local(Config, OldOpt, NewOpt, When) ->
-    get_deprecated_local(Config, OldOpt, NewOpt, undefined, When).
-
-get_deprecated_local(Config, OldOpt, NewOpt, Default, When) ->
-    get_deprecated_3(fun rebar_state:get/3,
-                     Config, OldOpt, NewOpt, Default, When).
 
 deprecated(Old, New, Opts, When) when is_list(Opts) ->
     case lists:member(Old, Opts) of
@@ -355,25 +274,6 @@ processing_base_dir(State, Dir) ->
     AbsDir = filename:absname(Dir),
     AbsDir =:= rebar_state:get(State, base_dir).
 
-%% @doc Returns the list of environment variables including 'REBAR' which
-%% points to the rebar executable used to execute the currently running
-%% command. The environment is not modified if rebar was invoked
-%% programmatically.
--spec patch_env(rebar_state:t(), [{string(), string()}])
-               -> [{string(), string()}].
-patch_env(Config, []) ->
-    %% If we reached an empty list, the env did not contain the REBAR variable.
-    case rebar_state:get(Config, escript, "") of
-        "" -> % rebar was invoked programmatically
-            [];
-        Path ->
-            [{"REBAR", Path}]
-    end;
-patch_env(_Config, [{"REBAR", _} | _]=All) ->
-    All;
-patch_env(Config, [E | Rest]) ->
-    [E | patch_env(Config, Rest)].
-
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
@@ -414,30 +314,6 @@ otp_release1(Rel) ->
             binary:bin_to_list(Vsn, {0, Size - 1})
     end.
 
-get_deprecated_3(Get, Config, OldOpt, NewOpt, Default, When) ->
-    case Get(Config, NewOpt, Default) of
-        Default ->
-            case Get(Config, OldOpt, Default) of
-                Default ->
-                    Default;
-                Old ->
-                    deprecated(OldOpt, NewOpt, When),
-                    Old
-            end;
-        New ->
-            New
-    end.
-
-get_experimental_3(Get, Config, Opt, Default) ->
-    Val = Get(Config, Opt, Default),
-    case Val of
-        Default ->
-            Default;
-        Val ->
-            ?CONSOLE("NOTICE: Using experimental option '~p'~n", [Opt]),
-            Val
-    end.
-
 %% We do the shell variable substitution ourselves on Windows and hope that the
 %% command doesn't use any other shell magic.
 patch_on_windows(Cmd, Env) ->
@@ -452,6 +328,25 @@ patch_on_windows(Cmd, Env) ->
                        [global, {return, list}]);
         _ ->
             Cmd
+    end.
+
+%%
+%% Given env. variable FOO we want to expand all references to
+%% it in InStr. References can have two forms: $FOO and ${FOO}
+%% The end of form $FOO is delimited with whitespace or eol
+%%
+expand_env_variable(InStr, VarName, RawVarValue) ->
+    case string:chr(InStr, $$) of
+        0 ->
+            %% No variables to expand
+            InStr;
+        _ ->
+            ReOpts = [global, unicode, {return, list}],
+            VarValue = re:replace(RawVarValue, "\\\\", "\\\\\\\\", ReOpts),
+            %% Use a regex to match/replace:
+            %% Given variable "FOO": match $FOO\s | $FOOeol | ${FOO}
+            RegEx = io_lib:format("\\\$(~s(\\s|$)|{~s})", [VarName, VarName]),
+            re:replace(InStr, RegEx, [VarValue, "\\2"], ReOpts)
     end.
 
 expand_sh_flag(return_on_error) ->
@@ -508,9 +403,6 @@ sh_loop(Port, Fun, Acc) ->
 
 beam_to_mod(Filename) ->
     list_to_atom(filename:basename(Filename, ".beam")).
-
-erl_to_mod(Filename) ->
-    list_to_atom(filename:rootname(filename:basename(Filename))).
 
 beams(Dir) ->
     filelib:fold_files(Dir, ".*\.beam\$", true,

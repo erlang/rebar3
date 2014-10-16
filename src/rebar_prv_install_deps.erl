@@ -118,17 +118,12 @@ handle_deps(State, Deps, Update) ->
                      %% Find pkg deps needed
                      {ok, S} = rlx_depsolver:solve(Graph, PkgDeps1),
                      %% Create app_info record for each pkg dep
-                     lists:flatmap(fun(Pkg) ->
-                                           AppInfo = package_to_app(DepsDir
-                                                                   ,Packages
-                                                                   ,Pkg),
-                                           case maybe_fetch(AppInfo, Update) of
-                                               false ->
-                                                   [];
-                                               true ->
-                                                   AppInfo
-                                           end
-                                   end, S)
+                     [AppInfo || Pkg <- S,
+                                 AppInfo <- package_to_app(DepsDir
+                                                          ,Packages
+                                                          ,Pkg),
+                                 maybe_fetch(AppInfo, Update)]
+
              end,
 
     AllDeps = lists:ukeymerge(2
@@ -147,7 +142,7 @@ is_valid(App) ->
     rebar_app_info:valid(App).
 
 -spec package_to_app(file:filename_all(), rebar_dict(),
-                    rlx_depsolver:pkg()) -> rebar_app_info:t().
+                    rlx_depsolver:pkg()) -> [rebar_app_info:t()].
 package_to_app(DepsDir, Packages, Pkg={_, Vsn}) ->
     Name = ec_cnv:to_binary(rlx_depsolver:dep_pkg(Pkg)),
     FmtVsn = iolist_to_binary(rlx_depsolver:format_version(Vsn)),
@@ -159,7 +154,7 @@ package_to_app(DepsDir, Packages, Pkg={_, Vsn}) ->
     AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
     AppInfo2 =
         rebar_app_info:dir(AppInfo1, get_deps_dir(DepsDir, Name)),
-    rebar_app_info:source(AppInfo2, Link).
+    [rebar_app_info:source(AppInfo2, Link)].
 
 -spec update_src_deps(integer(), rebar_state:t(), boolean()) -> rebar_state:t().
 update_src_deps(Level, State, Update) ->
