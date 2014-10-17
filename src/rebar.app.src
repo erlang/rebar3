@@ -25,7 +25,6 @@
                      rebar_prv_deps,
                      rebar_prv_do,
                      rebar_prv_lock,
-                     rebar_prv_test_deps,
                      rebar_prv_install_deps,
                      rebar_prv_packages,
                      rebar_erlydtl_compiler,
@@ -38,6 +37,7 @@
                      rebar_prv_upgrade,
                      rebar_prv_release,
                      rebar_prv_version,
-                     rebar_prv_help]}
+                     rebar_prv_help,
+                     rebar_prv_test_deps]}
         ]}
  ]}.

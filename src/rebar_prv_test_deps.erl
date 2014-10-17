@@ -16,10 +16,13 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
+    Providers = rebar_state:providers(State),
+    CompileProvider = providers:get_provider(compile, Providers),
     State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
                                                                {module, ?MODULE},
                                                                {bare, true},
                                                                {deps, ?DEPS},
+                                                               {hooks, {[], [CompileProvider]}},
                                                                {example, undefined},
                                                                {short_desc, "Install dependencies needed only for testing."},
                                                                {desc, ""},
@@ -38,13 +41,13 @@ do(State) ->
 
     case rebar_topo:sort_apps(ProjectApps1++AllDeps) of
         {ok, Sort} ->
-            ToBuild = lists:dropwhile(fun rebar_app_info:valid/1, Sort),
-            lists:foreach(fun(AppInfo) ->
-                                  AppDir = rebar_app_info:dir(AppInfo),
-                                  C = rebar_config:consult(AppDir),
-                                  S = rebar_state:new(State1, C, AppDir),
-                                  rebar_prv_compile:build(S, AppInfo)
-                          end, ToBuild),
+            _ToBuild = lists:dropwhile(fun rebar_app_info:valid/1, Sort),
+            %% lists:foreach(fun(AppInfo) ->
+            %%                       AppDir = rebar_app_info:dir(AppInfo),
+            %%                       C = rebar_config:consult(AppDir),
+            %%                       S = rebar_state:new(State1, C, AppDir),
+            %%                       rebar_prv_compile:build(S, AppInfo)
+            %%               end, ToBuild),
             {ok, State1};
         {error, Error} ->
             {error, Error}
