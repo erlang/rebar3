@@ -64,7 +64,7 @@ main(Args) ->
 run(BaseState, Command) ->
     _ = application:load(rebar),
     BaseState1 = rebar_state:set(BaseState, task, Command),
-    run_aux(BaseState1, []).
+    run_aux(BaseState1, [Command]).
 
 %% ====================================================================
 %% Internal functions
