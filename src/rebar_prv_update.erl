@@ -37,12 +37,13 @@ do(State) ->
                                                 %{ok, [Home]} = init:get_argument(home),
         ec_file:mkdir_p(filename:join([os:getenv("HOME"), ".rebar"])),
         PackagesFile = filename:join([os:getenv("HOME"), ".rebar", "packages"]),
-        {ok, RequestId} = httpc:request(get, {Url, []}, [], [{stream, PackagesFile}
-                                                            ,{sync, true}])
+        {ok, _RequestId} = httpc:request(get, {Url, []}, [], [{stream, PackagesFile}
+                                                             ,{sync, true}])
     catch
         _:_ ->
             {error, io_lib:format("Failed to write package index.~n", [])}
-    end.
+    end,
+    {ok, State}.
 
 url(State) ->
     SystemArch = erlang:system_info(system_architecture),
