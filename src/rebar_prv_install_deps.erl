@@ -77,7 +77,7 @@ do(State) ->
     Source = ProjectApps ++ rebar_state:src_apps(State1),
     case rebar_topo:sort_apps(Source) of
         {ok, Sort} ->
-            {ok, rebar_state:set(State1, deps_to_build, lists:dropwhile(fun is_valid/1, Sort -- ProjectApps))};
+            {ok, rebar_state:set(State1, deps_to_build, lists:dropwhile(fun rebar_app_info:valid/1, Sort -- ProjectApps))};
         {error, Error} ->
             {error, Error}
     end.
@@ -136,10 +136,6 @@ handle_deps(State, Deps, Update) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
-
--spec is_valid(rebar_app_info:t()) -> boolean().
-is_valid(App) ->
-    rebar_app_info:valid(App).
 
 -spec package_to_app(file:filename_all(), rebar_dict(),
                     rlx_depsolver:pkg()) -> [rebar_app_info:t()].

@@ -32,6 +32,8 @@
          is_arch/1,
          sh/2,
          sh_send/3,
+         abort/0,
+         abort/2,
          escript_foldl/3,
          find_files/2,
          find_files/3,
@@ -407,6 +409,14 @@ beam_to_mod(Filename) ->
 beams(Dir) ->
     filelib:fold_files(Dir, ".*\.beam\$", true,
                        fun(F, Acc) -> [F | Acc] end, []).
+
+-spec abort() -> no_return().
+abort() ->
+    throw(rebar_abort).
+-spec abort(string(), [term()]) -> no_return().
+abort(String, Args) ->
+    ?ERROR(String, Args),
+    abort().
 
 escript_foldl(Fun, Acc, File) ->
     case escript:extract(File, [compile_source]) of
