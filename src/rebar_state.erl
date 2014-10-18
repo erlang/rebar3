@@ -28,7 +28,7 @@
 
                   src_deps = [],
                   src_apps = [],
-                  pkg_deps = [],
+                  pkg_deps = [] :: [rlx_depsolver:constraint()],
                   project_apps = [],
 
                   providers = []}).
@@ -103,6 +103,7 @@ deps_names(State) ->
                       ec_cnv:to_binary(Dep)
               end, Deps).
 
+-spec pkg_deps(t()) -> [rlx_depsolver:constraint()].
 pkg_deps(#state_t{pkg_deps=PkgDeps}) ->
     PkgDeps.
 

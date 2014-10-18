@@ -41,7 +41,7 @@ do(State) ->
         Name ->
             Providers = rebar_state:providers(State),
             case providers:get_provider(list_to_atom(Name), Providers) of
-                [] ->
+                not_found ->
                     {error, io_lib:format("Unknown task ~s", [Name])};
                 Provider ->
                     providers:help(Provider),

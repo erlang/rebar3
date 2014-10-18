@@ -48,9 +48,11 @@ app_dirs(LibDir) ->
 find_unbuilt_apps(LibDirs) ->
     find_apps(LibDirs, invalid).
 
+-spec find_apps([file:filename_all()]) -> [rebar_app_info:t()].
 find_apps(LibDirs) ->
     find_apps(LibDirs, valid).
 
+-spec find_apps([file:filename_all()], valid | invalid | all) -> [rebar_app_info:t()].
 find_apps(LibDirs, Validate) ->
     rebar_utils:filtermap(fun(AppDir) ->
                                   find_app(AppDir, Validate)

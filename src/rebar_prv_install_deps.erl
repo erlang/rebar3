@@ -96,7 +96,7 @@ get_deps_dir(DepsDir, App) ->
 handle_deps(State, Deps) ->
     handle_deps(State, Deps, false).
 
--spec handle_deps(rebar_state:t(), [dep()], false | {true, integer()}) -> {ok, rebar_state:t()}.
+-spec handle_deps(rebar_state:t(), [dep()], boolean() | {true, binary(), integer()}) -> {ok, rebar_state:t()}.
 handle_deps(State, [], _) ->
     {ok, State};
 handle_deps(State, Deps, Update) ->
@@ -113,7 +113,7 @@ handle_deps(State, Deps, Update) ->
     State2 = update_src_deps(0, State1, Update),
     Solved = case rebar_state:pkg_deps(State2) of
                  [] -> %% No pkg deps
-                     [];
+                      [];
                  PkgDeps1 ->
                      %% Find pkg deps needed
                      {ok, S} = rlx_depsolver:solve(Graph, PkgDeps1),
@@ -123,7 +123,6 @@ handle_deps(State, Deps, Update) ->
                                                           ,Packages
                                                           ,Pkg),
                                  maybe_fetch(AppInfo, Update)]
-
              end,
 
     AllDeps = lists:ukeymerge(2
@@ -137,20 +136,21 @@ handle_deps(State, Deps, Update) ->
 %% Internal functions
 %% ===================================================================
 
--spec package_to_app(file:filename_all(), rebar_dict(),
-                    rlx_depsolver:pkg()) -> [rebar_app_info:t()].
+%-spec package_to_app(any(), ) -> []. % [rebar_app_info:t()].
 package_to_app(DepsDir, Packages, Pkg={_, Vsn}) ->
     Name = ec_cnv:to_binary(rlx_depsolver:dep_pkg(Pkg)),
     FmtVsn = iolist_to_binary(rlx_depsolver:format_version(Vsn)),
-    {ok, P} = dict:find({Name, FmtVsn}, Packages),
-    PkgDeps = proplists:get_value(<<"deps">>, P),
-    Link = proplists:get_value(<<"link">>, P),
-
-    {ok, AppInfo} = rebar_app_info:new(Name, FmtVsn),
-    AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
-    AppInfo2 =
-        rebar_app_info:dir(AppInfo1, get_deps_dir(DepsDir, Name)),
-    [rebar_app_info:source(AppInfo2, Link)].
+    case dict:find({Name, FmtVsn}, Packages) of
+        error ->
+            [];
+        {ok, P} ->
+            PkgDeps = proplists:get_value(<<"deps">>, P, []),
+            Link = proplists:get_value(<<"link">>, P, ""),
+            {ok, AppInfo} = rebar_app_info:new(Name, FmtVsn),
+            AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
+            AppInfo2 = rebar_app_info:dir(AppInfo1, get_deps_dir(DepsDir, Name)),
+            [rebar_app_info:source(AppInfo2, Link)]
+    end.
 
 -spec update_src_deps(integer(), rebar_state:t(), boolean()) -> rebar_state:t().
 update_src_deps(Level, State, Update) ->
@@ -216,7 +216,7 @@ handle_dep(DepsDir, AppInfo) ->
     {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps),
     {AppInfo1, SrcDeps, PkgDeps}.
 
--spec maybe_fetch(rebar_app_info:t(), boolean()) -> boolean().
+-spec maybe_fetch(rebar_app_info:t(), boolean() | {true, binary(), integer()}) -> boolean().
 maybe_fetch(AppInfo, Update) ->
     AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
     Apps = rebar_app_discover:find_apps(["_checkouts"], all),

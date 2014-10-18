@@ -32,14 +32,13 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     Tasks = args_to_tasks(rebar_state:command_args(State)),
-    State1 = lists:foldl(fun(TaskArgs, {ok, StateAcc}) ->
+    lists:foldl(fun(TaskArgs, {ok, StateAcc}) ->
                                  [TaskStr | Args] = string:tokens(TaskArgs, " "),
                                  Task = list_to_atom(TaskStr),
                                  StateAcc1 = rebar_state:set(StateAcc, task, Task),
                                  StateAcc2 = rebar_state:command_args(StateAcc1, Args),
                                  rebar_core:process_command(StateAcc2, Task)
-                       end, {ok, State}, Tasks),
-    {ok, State1}.
+                       end, {ok, State}, Tasks).
 
 args_to_tasks(Args) ->
     [string:strip(T) || T <- string:tokens(string:join(Args, " "), ",")].

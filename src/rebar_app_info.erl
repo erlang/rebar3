@@ -1,7 +1,6 @@
 -module(rebar_app_info).
 
--export([new/0,
-         new/1,
+-export([new/1,
          new/2,
          new/3,
          new/4,
@@ -36,7 +35,7 @@
                      app_file_src :: file:filename_all() | undefined,
                      app_file :: file:filename_all() | undefined,
                      config :: rebar_state:t() | undefined,
-                     original_vsn :: string() | undefined,
+                     original_vsn :: binary() | string() | undefined,
                      app_details=[] :: list(),
                      deps=[] :: list(),
                      dep_level :: integer(),
@@ -54,23 +53,19 @@
 %% ============================================================================
 %% @doc Build a new, empty, app info value. This is not of a lot of use and you
 %% probably wont be doing this much.
--spec new() -> {ok, t()}.
-new() ->
-    {ok, #app_info_t{}}.
-
 -spec new(atom() | binary() | string()) ->
                  {ok, t()}.
 new(AppName) ->
     {ok, #app_info_t{name=ec_cnv:to_binary(AppName)}}.
 
--spec new(atom() | binary() | string(), string()) ->
+-spec new(atom() | binary() | string(), binary() | string()) ->
                  {ok, t()}.
 new(AppName, Vsn) ->
     {ok, #app_info_t{name=ec_cnv:to_binary(AppName),
                      original_vsn=Vsn}}.
 
 %% @doc build a complete version of the app info with all fields set.
--spec new(atom() | binary() | string(), string(), file:name()) ->
+-spec new(atom() | binary() | string(), binary() | string(), file:name()) ->
                  {ok, t()}.
 new(AppName, Vsn, Dir) ->
     {ok, #app_info_t{name=ec_cnv:to_binary(AppName),
@@ -78,7 +73,7 @@ new(AppName, Vsn, Dir) ->
                      dir=Dir}}.
 
 %% @doc build a complete version of the app info with all fields set.
--spec new(atom() | binary() | string(), string(), file:name(), list()) ->
+-spec new(atom() | binary() | string(), binary() | string(), file:name(), list()) ->
                  {ok, t()}.
 new(AppName, Vsn, Dir, Deps) ->
     {ok, #app_info_t{name=ec_cnv:to_binary(AppName),
@@ -96,7 +91,7 @@ discover(Dir) ->
             not_found
     end.
 
--spec name(t()) -> atom().
+-spec name(t()) -> binary().
 name(#app_info_t{name=Name}) ->
     Name.
 

@@ -94,7 +94,7 @@ names_to_apps(Names, Apps) ->
 -spec find_app_by_name(atom(), [rebar_app_info:t()]) -> {ok, rebar_app_info:t()} | error.
 find_app_by_name(Name, Apps) ->
     ec_lists:find(fun(App) ->
-                          rebar_app_info:name(App) =:= Name
+                          ec_cnv:to_atom(rebar_app_info:name(App)) =:= ec_cnv:to_atom(Name)
                   end, Apps).
 
 -spec apps_to_pairs([rebar_app_info:t()]) -> [pair()].
@@ -103,20 +103,20 @@ apps_to_pairs(Apps) ->
 
 -spec app_to_pairs(rebar_app_info:t()) -> [pair()].
 app_to_pairs(App) ->
-    [{ec_cnv:to_binary(DepApp), rebar_app_info:name(App)} ||
+    [{ec_cnv:to_atom(DepApp), ec_cnv:to_atom(rebar_app_info:name(App))} ||
         DepApp <-
             rebar_app_info:deps(App)].
 
 
 %% @doc Iterate over the system.  @private
 -spec iterate([pair()], [name()], [name()]) ->
-    {ok, [name()]} | relx:error().
+    {ok, [name()]} | {error, iolist()}.
 iterate([], L, All) ->
     {ok, remove_duplicates(L ++ subtract(All, L))};
 iterate(Pairs, L, All) ->
     case subtract(lhs(Pairs), rhs(Pairs)) of
         []  ->
-            format_error({cycle, Pairs});
+            {error, format_error({cycle, Pairs})};
         Lhs ->
             iterate(remove_pairs(Lhs, Pairs), L ++ Lhs, All)
     end.
@@ -186,15 +186,13 @@ topo_2_test() ->
 
 topo_pairs_cycle_test() ->
     Pairs = [{app2, app1}, {app1, app2}, {stdlib, app1}],
-    ?assertMatch({error, {_, {cycle, [{app2, app1}, {app1, app2}]}}},
-                 sort(Pairs)).
+    ?assertMatch({error, _}, sort(Pairs)).
 
 topo_apps_cycle_test() ->
     {ok, App1} = rebar_app_info:new(app1, "0.1", "/no-dir", [app2]),
     {ok, App2} = rebar_app_info:new(app2, "0.1", "/no-dir", [app1]),
     Apps = [App1, App2],
-    ?assertMatch({error, {_, {cycle, [{app2,app1},{app1,app2}]}}},
-                 sort_apps(Apps)).
+    ?assertMatch({error, _}, sort_apps(Apps)).
 
 topo_apps_good_test() ->
     Apps = [App ||
