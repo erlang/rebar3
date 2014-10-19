@@ -155,47 +155,23 @@ package_to_app(DepsDir, Packages, Pkg={_, Vsn}) ->
 -spec update_src_deps(integer(), rebar_state:t(), boolean()) -> rebar_state:t().
 update_src_deps(Level, State, Update) ->
     SrcDeps = rebar_state:src_deps(State),
-    DepsDir = get_deps_dir(State),
     case lists:foldl(fun(AppInfo, {SrcDepsAcc, PkgDepsAcc, StateAcc}) ->
-                             Name = rebar_app_info:name(AppInfo),
-                             Locks = rebar_state:get(State, locks, []),
                              case Update of
                                  {true, UpdateName, UpdateLevel} ->
-                                     {_, _, _, DepLevel} = lists:keyfind(Name, 1, Locks),
-                                     case UpdateLevel < DepLevel
-                                         orelse Name =:= UpdateName of
-                                         true ->
-                                             case maybe_fetch(AppInfo, true) of
-                                                 true ->
-                                                     {AppInfo1, NewSrcDeps, NewPkgDeps} =
-                                                         handle_dep(DepsDir, AppInfo),
-                                                     AppInfo2 = rebar_app_info:dep_level(AppInfo1, Level),
-                                                     {NewSrcDeps ++ SrcDepsAcc
-                                                     ,NewPkgDeps++PkgDepsAcc
-                                                     ,rebar_state:src_apps(StateAcc, AppInfo2)};
-                                                 false ->
-                                                     {SrcDepsAcc, PkgDepsAcc, State}
-                                             end;
-                                         false ->
-                                             {SrcDepsAcc, PkgDepsAcc, State}
-                                     end;
+                                     handle_update(AppInfo
+                                                  ,UpdateName
+                                                  ,UpdateLevel
+                                                  ,SrcDepsAcc
+                                                  ,PkgDepsAcc
+                                                  ,Level
+                                                  ,StateAcc);
                                  _ ->
-                                     case maybe_fetch(AppInfo, false) of
-                                         true ->
-                                             {AppInfo1, NewSrcDeps, NewPkgDeps} =
-                                                 handle_dep(DepsDir, AppInfo),
-                                             AppInfo2 = rebar_app_info:dep_level(AppInfo1, Level),
-                                             {NewSrcDeps ++ SrcDepsAcc
-                                             ,NewPkgDeps++PkgDepsAcc
-                                             ,rebar_state:src_apps(StateAcc, AppInfo2)};
-                                         false ->
-                                             {AppInfo1, NewSrcDeps, NewPkgDeps} =
-                                                 handle_dep(DepsDir, AppInfo),
-                                             AppInfo2 = rebar_app_info:dep_level(AppInfo1, Level),
-                                             {NewSrcDeps ++ SrcDepsAcc
-                                             ,NewPkgDeps++PkgDepsAcc
-                                             ,rebar_state:src_apps(StateAcc, AppInfo2)}
-                                     end
+                                     maybe_fetch(AppInfo, false),
+                                     handle_dep(AppInfo
+                                               ,SrcDepsAcc
+                                               ,PkgDepsAcc
+                                               ,Level
+                                               ,StateAcc)
                              end
                      end, {[], rebar_state:pkg_deps(State), State}, SrcDeps) of
         {[], NewPkgDeps, State1} ->
@@ -205,6 +181,37 @@ update_src_deps(Level, State, Update) ->
             State3 = rebar_state:src_deps(State2, NewSrcDeps),
             update_src_deps(Level+1, State3, Update)
     end.
+
+handle_update(AppInfo, UpdateName, UpdateLevel, SrcDeps, PkgDeps, Level, State) ->
+    Name = rebar_app_info:name(AppInfo),
+    Locks = rebar_state:get(State, locks, []),
+    {_, _, _, DepLevel} = lists:keyfind(Name, 1, Locks),
+    case UpdateLevel < DepLevel
+        orelse Name =:= UpdateName of
+        true ->
+            case maybe_fetch(AppInfo, true) of
+                true ->
+                    handle_dep(AppInfo
+                              ,SrcDeps
+                              ,PkgDeps
+                              ,Level
+                              ,State);
+
+                false ->
+                    {SrcDeps, PkgDeps, State}
+            end;
+        false ->
+            {SrcDeps, PkgDeps, State}
+    end.
+
+handle_dep(AppInfo, SrcDeps, PkgDeps, Level, State) ->
+    DepsDir = get_deps_dir(State),
+    {AppInfo1, NewSrcDeps, NewPkgDeps} =
+        handle_dep(DepsDir, AppInfo),
+    AppInfo2 = rebar_app_info:dep_level(AppInfo1, Level),
+    {NewSrcDeps ++ SrcDeps
+    ,NewPkgDeps++PkgDeps
+    ,rebar_state:src_apps(State, AppInfo2)}.
 
 -spec handle_dep(file:filename_all(), rebar_app_info:t()) ->
                         {rebar_app_info:t(), [rebar_app_info:t()], [pkg_dep()]}.
