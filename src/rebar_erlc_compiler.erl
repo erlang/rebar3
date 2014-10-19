@@ -96,17 +96,17 @@ compile(Config, Dir) ->
     rebar_base_compiler:run(Config,
                             check_files(rebar_state:get(
                                           Config, xrl_first_files, [])),
-                            "src", ".xrl", "src", ".erl",
+                            filename:join(Dir, "src"), ".xrl", filename:join(Dir, "src"), ".erl",
                             fun compile_xrl/3),
     rebar_base_compiler:run(Config,
                             check_files(rebar_state:get(
                                           Config, yrl_first_files, [])),
-                            "src", ".yrl", "src", ".erl",
+                            filename:join(Dir, "src"), ".yrl", filename:join(Dir, "src"), ".erl",
                             fun compile_yrl/3),
     rebar_base_compiler:run(Config,
                             check_files(rebar_state:get(
                                           Config, mib_first_files, [])),
-                            "mibs", ".mib", "priv/mibs", ".bin",
+                            filename:join(Dir, "mibs"), ".mib", filename:join([Dir, "priv", "mibs"]), ".bin",
                             fun compile_mib/3),
     doterl_compile(Config, Dir).
 
@@ -634,16 +634,19 @@ compile_yrl(Source, Target, Config) ->
 -spec compile_xrl_yrl(rebar_state:t(), file:filename(),
                       file:filename(), list(), module()) -> 'ok'.
 compile_xrl_yrl(Config, Source, Target, Opts, Mod) ->
+    Dir = rebar_state:dir(Config),
+    Opts1 = [{includefile, filename:join(Dir, I)} || {includefile, I} <- Opts,
+                                                     filename:pathtype(I) =:= relative],
     case needs_compile(Source, Target, []) of
         true ->
-            case Mod:file(Source, Opts ++ [{return, true}]) of
+            case Mod:file(Source, Opts1 ++ [{return, true}]) of
                 {ok, _} ->
                     ok;
                 {ok, _Mod, Ws} ->
                     rebar_base_compiler:ok_tuple(Config, Source, Ws);
                 {error, Es, Ws} ->
                     rebar_base_compiler:error_tuple(Config, Source,
-                                                    Es, Ws, Opts)
+                                                    Es, Ws, Opts1)
             end;
         false ->
             skipped
