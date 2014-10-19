@@ -231,7 +231,7 @@ do_compile(Config, Source, Target, DtlOpts) ->
     Opts = lists:ukeymerge(1, DtlOpts, Sorted),
     ?INFO("Compiling \"~s\" -> \"~s\" with options:~n    ~s~n",
         [Source, Target, io_lib:format("~p", [Opts])]),
-    case erlydtl:compile(ec_cnv:to_binary(Source),
+    case erlydtl:compile_file(ec_cnv:to_list(Source),
                          list_to_atom(module_name(Target)),
                          Opts) of
         {ok, _Mod} ->
