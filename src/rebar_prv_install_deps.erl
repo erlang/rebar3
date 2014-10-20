@@ -136,7 +136,6 @@ handle_deps(State, Deps, Update) ->
 %% Internal functions
 %% ===================================================================
 
-%-spec package_to_app(any(), ) -> []. % [rebar_app_info:t()].
 package_to_app(DepsDir, Packages, Pkg={_, Vsn}) ->
     Name = ec_cnv:to_binary(rlx_depsolver:dep_pkg(Pkg)),
     FmtVsn = iolist_to_binary(rlx_depsolver:format_version(Vsn)),
@@ -263,26 +262,22 @@ parse_deps(DepsDir, Deps) ->
                    (Name, {SrcDepsAcc, PkgDepsAcc}) when is_atom(Name) ->
                         {SrcDepsAcc, [ec_cnv:to_binary(Name) | PkgDepsAcc]};
                    ({Name, Vsn, Source}, {SrcDepsAcc, PkgDepsAcc}) when is_tuple (Source) ->
-                        Dir = ec_cnv:to_list(get_deps_dir(DepsDir, Name)),
-                        {ok, Dep} = case rebar_app_info:discover(Dir) of
-                                        {ok, App} ->
-                                            {ok, App};
-                                        not_found ->
-                                            rebar_app_info:new(Name, Vsn, Dir)
-                                    end,
-                        Dep1 = rebar_app_info:source(Dep, Source),
-                        {[Dep1 | SrcDepsAcc], PkgDepsAcc};
+                        Dep = new_dep(DepsDir, Name, Vsn, Source),
+                        {[Dep | SrcDepsAcc], PkgDepsAcc};
                    ({Name, Vsn, Source, _Level}, {SrcDepsAcc, PkgDepsAcc}) when is_tuple (Source) ->
-                        Dir = ec_cnv:to_list(get_deps_dir(DepsDir, Name)),
-                        {ok, Dep} = case rebar_app_info:discover(Dir) of
-                                        {ok, App} ->
-                                            {ok, App};
-                                        not_found ->
-                                            rebar_app_info:new(Name, Vsn, Dir)
-                                    end,
-                        Dep1 = rebar_app_info:source(Dep, Source),
-                        {[Dep1 | SrcDepsAcc], PkgDepsAcc}
+                        Dep = new_dep(DepsDir, Name, Vsn, Source),
+                        {[Dep | SrcDepsAcc], PkgDepsAcc}
                 end, {[], []}, Deps).
+
+new_dep(DepsDir, Name, Vsn, Source) ->
+    Dir = ec_cnv:to_list(get_deps_dir(DepsDir, Name)),
+    {ok, Dep} = case rebar_app_info:discover(Dir) of
+                    {ok, App} ->
+                        {ok, App};
+                    not_found ->
+                        rebar_app_info:new(Name, Vsn, Dir)
+                end,
+    rebar_app_info:source(Dep, Source).
 
 -spec parse_goal(binary(), binary()) -> pkg_dep().
 parse_goal(Name, Constraint) ->
@@ -300,9 +295,7 @@ info(Description) ->
                  "~n"
                  "Valid rebar.config options:~n"
                  "  ~p~n"
-                 "  ~p~n"
-                 "Valid command line options:~n"
-                 "  deps_dir=\"deps\" (override default or rebar.config deps_dir)~n",
+                 "  ~p~n",
                  [
                  Description,
                  {deps_dir, "deps"},
