@@ -6,7 +6,8 @@
 -behaviour(provider).
 
 -export([init/1,
-         do/1]).
+         do/1,
+         format_error/2]).
 
 -include("rebar.hrl").
 
@@ -39,6 +40,10 @@ do(State) ->
                                  StateAcc2 = rebar_state:command_args(StateAcc1, Args),
                                  rebar_core:process_command(StateAcc2, Task)
                        end, {ok, State}, Tasks).
+
+-spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
+format_error(Reason, State) ->
+    {io_lib:format("~p", [Reason]), State}.
 
 args_to_tasks(Args) ->
     [string:strip(T) || T <- string:tokens(string:join(Args, " "), ",")].

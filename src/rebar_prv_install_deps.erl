@@ -29,7 +29,8 @@
 -behaviour(provider).
 
 -export([init/1,
-         do/1]).
+         do/1,
+         format_error/2]).
 
 -include("rebar.hrl").
 
@@ -82,6 +83,10 @@ do(State) ->
             {error, Error}
     end.
 
+-spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
+format_error(Reason, State) ->
+    {io_lib:format("~p", [Reason]), State}.
+
 -spec get_deps_dir(rebar_state:t()) -> file:filename_all().
 get_deps_dir(State) ->
     BaseDir = rebar_state:get(State, base_dir, ""),
@@ -96,7 +101,8 @@ get_deps_dir(DepsDir, App) ->
 handle_deps(State, Deps) ->
     handle_deps(State, Deps, false).
 
--spec handle_deps(rebar_state:t(), [dep()], boolean() | {true, binary(), integer()}) -> {ok, rebar_state:t()}.
+-spec handle_deps(rebar_state:t(), [dep()], boolean() | {true, binary(), integer()})
+                 -> {ok, rebar_state:t()}.
 handle_deps(State, [], _) ->
     {ok, State};
 handle_deps(State, Deps, Update) ->

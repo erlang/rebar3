@@ -6,7 +6,8 @@
 -behaviour(provider).
 
 -export([init/1,
-         do/1]).
+         do/1,
+         format_error/2]).
 
 -include("rebar.hrl").
 
@@ -38,3 +39,7 @@ do(State) ->
             relx:main([{config, Config}], ["release tar"])
     end,
     {ok, State}.
+
+-spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
+format_error(Reason, State) ->
+    {io_lib:format("~p", [Reason]), State}.

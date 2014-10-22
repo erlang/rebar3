@@ -31,7 +31,8 @@
 -behaviour(provider).
 
 -export([init/1,
-         do/1]).
+         do/1,
+         format_error/2]).
 
 -include("rebar.hrl").
 
@@ -58,6 +59,10 @@ init(State) ->
 do(Config) ->
     shell(),
     {ok, Config}.
+
+-spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
+format_error(Reason, State) ->
+    {io_lib:format("~p", [Reason]), State}.
 
 %% NOTE:
 %% this is an attempt to replicate `erl -pa ./ebin -pa deps/*/ebin`. it is
