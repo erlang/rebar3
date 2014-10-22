@@ -152,8 +152,13 @@ add_provider(State=#state_t{providers=Providers}, Provider) ->
 
 create_logic_providers(ProviderModules, State0) ->
     lists:foldl(fun(ProviderMod, Acc) ->
-                        {ok, State1} = providers:new(ProviderMod, Acc),
-                        State1
+                        case providers:new(ProviderMod, Acc) of
+                            {error, Reason} ->
+                                ?ERROR(Reason++"~n", []),
+                                Acc;
+                            {ok, State1} ->
+                                State1
+                        end
                 end, State0, ProviderModules).
 
 prepend_hook(State=#state_t{providers=Providers}, Target, Hook) ->
