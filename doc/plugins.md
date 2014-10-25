@@ -5,18 +5,13 @@
 
 # Plugins #
 
-Rebar3's system is based on the concept of
-*[providers](https://github.com/tsloughter/providers)*. A provider has three
-callbacks:
+Rebar3's system is based on the concept of *[providers](https://github.com/tsloughter/providers)*. A provider has three callbacks:
 
 - `init(State) -> {ok, NewState}`, which helps set up the state required, state dependencies, etc.
 - `do(State) -> {ok, NewState} | {error, String}`, which does the actual work.
-- `format_error(Error, State) -> {String, NewState}`, which allows to print errors
-  when they happen, and to filter out sensitive elements from the state.
+- `format_error(Error, State) -> {String, NewState}`, which allows to print errors when they happen, and to filter out sensitive elements from the state.
 
-A provider should also be an OTP Library application, which can be fetched as
-any other Erlang dependency, except for Rebar3 rather than your own system or
-application.
+A provider should also be an OTP Library application, which can be fetched as any other Erlang dependency, except for Rebar3 rather than your own system or application.
 
 This document contains the following elements:
 
@@ -40,10 +35,8 @@ This document contains the following elements:
 ## Tutorial ##
 
 ### First version ###
-In this tutorial, we'll show how to start from scratch, and get a basic plugin
-written. The plugin will be quite simple: it will look for instances of 'TODO:'
-lines in comments and report them as warnings. The final code for the plugin
-can be found on [bitbucket](https://bitbucket.org/ferd/rebar3-todo-plugin).
+
+In this tutorial, we'll show how to start from scratch, and get a basic plugin written. The plugin will be quite simple: it will look for instances of 'TODO:' lines in comments and report them as warnings. The final code for the plugin can be found on [bitbucket](https://bitbucket.org/ferd/rebar3-todo-plugin).
 
 The first step is to create a new OTP Application that will contain the plugin:
 
@@ -64,8 +57,7 @@ Let's edit the app file to make sure the description is fine:
 ]}.
 ```
 
-Open up the `provider_todo.erl` file and make sure you have the following
-skeleton in place:
+Open up the `provider_todo.erl` file and make sure you have the following skeleton in place:
 
 ```erlang
 -module(provider_todo).
@@ -105,12 +97,9 @@ format_error(Reason, State) ->
     {io_lib:format("~p", [Reason]), State}.
 ```
 
-This shows all the basic content needed. Note that we leave the `DEPS` macro to
-the value `app_discovery`, used to mean that the plugin should at least find
-the project's source code (excluding dependencies).
+This shows all the basic content needed. Note that we leave the `DEPS` macro to the value `app_discovery`, used to mean that the plugin should at least find the project's source code (excluding dependencies).
 
-In this case, we need to change very little in `init/1`. Here's the new
-provider description:
+In this case, we need to change very little in `init/1`. Here's the new provider description:
 
 ```erlang
         Provider = providers:create([
@@ -127,10 +116,7 @@ provider description:
     ]),
 ```
 
-Instead, most of the work will need to be done directly in `do/1`. We'll use the
-`rebar_state` module to fetch all the applications we need. This can be done by
-calling the `project_apps/1` function, which returns the list of the project's
-top-level applications.
+Instead, most of the work will need to be done directly in `do/1`. We'll use the `rebar_state` module to fetch all the applications we need. This can be done by calling the `project_apps/1` function, which returns the list of the project's top-level applications.
 
 ```erlang
 do(State) ->
@@ -138,13 +124,9 @@ do(State) ->
     {ok, State}.
 ```
 
-This, on a high level, means that we'll check each top-level app one at a time
-(there may often be more than one top-level application when working with
-releases)
+This, on a high level, means that we'll check each top-level app one at a time (there may often be more than one top-level application when working with releases)
 
-The rest is filler code specific to the plugin, in charge of reading each
-app path, go read code in there, and find instances of 'TODO:' in comments
-in the code:
+The rest is filler code specific to the plugin, in charge of reading each app path, go read code in there, and find instances of 'TODO:' in comments in the code:
 
 ```erlang
 check_todo_app(App) ->
@@ -183,8 +165,7 @@ display_todos(App, FileMatches) ->
 
 Just using `io:format/2` to output is going to be fine.
 
-To test the plugin, push it to a source repository somewhere. Pick one of your
-projects, and add something  to the rebar.config:
+To test the plugin, push it to a source repository somewhere. Pick one of your projects, and add something  to the rebar.config:
 
 ```erlang
 {plugins, [
@@ -204,17 +185,13 @@ Application merklet
       todo: consider endianness for absolute portability
 ```
 
-Rebar3 will download and install the plugin, and figure out when to run it.
-Once compiled, it can be run at any time again.
+Rebar3 will download and install the plugin, and figure out when to run it. Once compiled, it can be run at any time again.
 
 ### Optionally Search Deps ###
 
-Let's extend things a bit. Maybe from time to time (when cutting a release),
-we'd like to make sure none of our dependencies contain 'TODO:'s either.
+Let's extend things a bit. Maybe from time to time (when cutting a release), we'd like to make sure none of our dependencies contain 'TODO:'s either.
 
-To do this, we'll need to go parse command line arguments a bit, and
-change our execution model. The `?DEPS` macro will now need to specify that
-the `todo` provider can only run *after* dependencies have been installed:
+To do this, we'll need to go parse command line arguments a bit, and change our execution model. The `?DEPS` macro will now need to specify that the `todo` provider can only run *after* dependencies have been installed:
 
 ```erlang
 -define(DEPS, [install_deps]).
@@ -228,9 +205,7 @@ We can add the option to the list we use to configure the provider in `init/1`:
 ]},
 ```
 
-Meaning that deps can be flagged in by using the option `-d` (or `--deps`), and
-if it's not defined, well, we get the default value `undefined`. The last
-element of the 4-tuple is documentation for the option.
+Meaning that deps can be flagged in by using the option `-d` (or `--deps`), and if it's not defined, well, we get the default value `undefined`. The last element of the 4-tuple is documentation for the option.
 
 And then we can implement the switch to figure out what to search:
 
@@ -253,13 +228,9 @@ discovery_type(State) ->
     end.
 ```
 
-The `deps` option is found using `rebar_state:command_parsed_args(State)`,
-which will return a proplist of terms on the command-line after 'todo',
-and will take care of validating whether the flags are accepted or not. The
-rest can remain the same.
+The `deps` option is found using `rebar_state:command_parsed_args(State)`, which will return a proplist of terms on the command-line after 'todo', and will take care of validating whether the flags are accepted or not. The rest can remain the same.
 
-Push the new code for the plugin, and try it again on a project with
-dependencies:
+Push the new code for the plugin, and try it again on a project with dependencies:
 
 ```
 → rebar3 todo --deps
@@ -295,5 +266,4 @@ Usage: rebar todo [-d]
   -d, --deps  also run against dependencies
 ```
 
-That's it, the todo plugin is now complete! It's ready to ship and be
-included in other repositories.
+That's it, the todo plugin is now complete! It's ready to ship and be included in other repositories.
