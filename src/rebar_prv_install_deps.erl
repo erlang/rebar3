@@ -116,7 +116,8 @@ handle_deps(State, Deps, Update) ->
                                   SrcDeps),
 
     %% Fetch transitive src deps
-    State2 = update_src_deps(0, State1, Update),
+    {State2, _Seen} = update_src_deps(0, State1, Update, sets:new()),
+
     Solved = case rebar_state:pkg_deps(State2) of
                  [] -> %% No pkg deps
                       [];
@@ -128,7 +129,7 @@ handle_deps(State, Deps, Update) ->
                                  AppInfo <- package_to_app(DepsDir
                                                           ,Packages
                                                           ,Pkg),
-                                 maybe_fetch(AppInfo, Update)]
+                                 maybe_fetch(AppInfo, Update, sets:new())]
              end,
 
     AllDeps = lists:ukeymerge(2
@@ -157,11 +158,13 @@ package_to_app(DepsDir, Packages, Pkg={_, Vsn}) ->
             [rebar_app_info:source(AppInfo2, Link)]
     end.
 
--spec update_src_deps(integer(), rebar_state:t(), boolean()) -> rebar_state:t().
-update_src_deps(Level, State, Update) ->
+-spec update_src_deps(integer(), rebar_state:t(), boolean(), sets:set(binary())) ->
+                             {rebar_state:t(), [binary()]}.
+update_src_deps(Level, State, Update, Seen) ->
     SrcDeps = rebar_state:src_deps(State),
-    case lists:foldl(fun(AppInfo, {SrcDepsAcc, PkgDepsAcc, StateAcc}) ->
-                             case Update of
+    case lists:foldl(fun(AppInfo, {SrcDepsAcc, PkgDepsAcc, StateAcc, SeenAcc}) ->
+                             SeenAcc1 = sets:add_element(rebar_app_info:name(AppInfo), SeenAcc),
+                             {SrcDepsAcc1, PkgDepsAcc1, StateAcc1} = case Update of
                                  {true, UpdateName, UpdateLevel} ->
                                      handle_update(AppInfo
                                                   ,UpdateName
@@ -171,20 +174,21 @@ update_src_deps(Level, State, Update) ->
                                                   ,Level
                                                   ,StateAcc);
                                  _ ->
-                                     maybe_fetch(AppInfo, false),
+                                     maybe_fetch(AppInfo, false, SeenAcc),
                                      handle_dep(AppInfo
                                                ,SrcDepsAcc
                                                ,PkgDepsAcc
                                                ,Level
                                                ,StateAcc)
-                             end
-                     end, {[], rebar_state:pkg_deps(State), State}, SrcDeps) of
-        {[], NewPkgDeps, State1} ->
-            rebar_state:pkg_deps(State1, NewPkgDeps);
-        {NewSrcDeps, NewPkgDeps, State1} ->
+                             end,
+                             {SrcDepsAcc1, PkgDepsAcc1, StateAcc1, SeenAcc1}
+                     end, {[], rebar_state:pkg_deps(State), State, Seen}, SrcDeps) of
+        {[], NewPkgDeps, State1, Seen1} ->
+            {rebar_state:pkg_deps(State1, NewPkgDeps), Seen1};
+        {NewSrcDeps, NewPkgDeps, State1, Seen1} ->
             State2 = rebar_state:pkg_deps(State1, NewPkgDeps),
             State3 = rebar_state:src_deps(State2, NewSrcDeps),
-            update_src_deps(Level+1, State3, Update)
+            update_src_deps(Level+1, State3, Update, Seen1)
     end.
 
 handle_update(AppInfo, UpdateName, UpdateLevel, SrcDeps, PkgDeps, Level, State) ->
@@ -194,7 +198,7 @@ handle_update(AppInfo, UpdateName, UpdateLevel, SrcDeps, PkgDeps, Level, State) 
     case UpdateLevel < DepLevel
         orelse Name =:= UpdateName of
         true ->
-            case maybe_fetch(AppInfo, true) of
+            case maybe_fetch(AppInfo, true, []) of
                 true ->
                     handle_dep(AppInfo
                               ,SrcDeps
@@ -228,8 +232,9 @@ handle_dep(DepsDir, AppInfo) ->
     {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps),
     {AppInfo1, SrcDeps, PkgDeps}.
 
--spec maybe_fetch(rebar_app_info:t(), boolean() | {true, binary(), integer()}) -> boolean().
-maybe_fetch(AppInfo, Update) ->
+-spec maybe_fetch(rebar_app_info:t(), boolean() | {true, binary(), integer()},
+                 sets:set(binary())) -> boolean().
+maybe_fetch(AppInfo, Update, Seen) ->
     AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
     Apps = rebar_app_discover:find_apps(["_checkouts"], all),
     case rebar_app_utils:find(rebar_app_info:name(AppInfo), Apps) of
@@ -256,6 +261,8 @@ maybe_fetch(AppInfo, Update) ->
                     rebar_fetch:download_source(AppDir, Source),
                     true;
                 _ ->
+                    io:format("Was ~p seen: ~p~n", [rebar_app_info:name(AppInfo)
+                                                   ,sets:is_element(rebar_app_info:name(AppInfo), Seen)]),
                     false
             end
     end.
