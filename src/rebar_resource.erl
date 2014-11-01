@@ -4,6 +4,16 @@
 
 -export([]).
 
+-export_types([resource/0
+              ,type/0
+              ,location/0
+              ,ref/0]).
+
+-type resource() :: {type(), location(), ref()}.
+-type type() :: atom().
+-type location() :: string().
+-type ref() :: any().
+
 -ifdef(have_callback_support).
 
 %% In the case where R14 or lower is being used to compile the system
@@ -19,7 +29,8 @@ behaviour_info(_) ->
 
 -else.
 
--callback lock(string(), tuple()) ->  ok.
--callback download(string(), tuple()) -> ok.
+-callback lock(file:filename_all(), tuple()) ->  rebar_resource:resource().
+-callback download(file:filename_all(), tuple()) ->
+    {tarball, file:filename_all()} | {ok, any()} | {error, any()}.
 
 -endif.

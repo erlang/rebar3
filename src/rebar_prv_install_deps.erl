@@ -68,19 +68,25 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     ProjectApps = rebar_state:project_apps(State),
-    {ok, State1} = case rebar_state:get(State, locks, []) of
-                       [] ->
-                           handle_deps(State, rebar_state:get(State, deps, []));
-                       Locks ->
-                           handle_deps(State, Locks)
-                   end,
+    try
+        {ok, State1} = case rebar_state:get(State, locks, []) of
+                           [] ->
+                               handle_deps(State, rebar_state:get(State, deps, []));
+                           Locks ->
+                               handle_deps(State, Locks)
+                       end,
 
-    Source = ProjectApps ++ rebar_state:src_apps(State1),
-    case rebar_topo:sort_apps(Source) of
-        {ok, Sort} ->
-            {ok, rebar_state:set(State1, deps_to_build, lists:dropwhile(fun rebar_app_info:valid/1, Sort -- ProjectApps))};
-        {error, Error} ->
-            {error, Error}
+        Source = ProjectApps ++ rebar_state:src_apps(State1),
+        case rebar_topo:sort_apps(Source) of
+            {ok, Sort} ->
+                {ok, rebar_state:set(State1, deps_to_build,
+                                     lists:dropwhile(fun rebar_app_info:valid/1, Sort -- ProjectApps))};
+            {error, Error} ->
+                {error, Error}
+        end
+    catch
+        _:Reason ->
+            Reason
     end.
 
 -spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
@@ -102,7 +108,7 @@ handle_deps(State, Deps) ->
     handle_deps(State, Deps, false).
 
 -spec handle_deps(rebar_state:t(), [dep()], boolean() | {true, binary(), integer()})
-                 -> {ok, rebar_state:t()}.
+                 -> {ok, rebar_state:t()} | {error, string()}.
 handle_deps(State, [], _) ->
     {ok, State};
 handle_deps(State, Deps, Update) ->
@@ -120,7 +126,7 @@ handle_deps(State, Deps, Update) ->
 
     Solved = case rebar_state:pkg_deps(State2) of
                  [] -> %% No pkg deps
-                      [];
+                     [];
                  PkgDeps1 ->
                      %% Find pkg deps needed
                      {ok, S} = rlx_depsolver:solve(Graph, PkgDeps1),
@@ -133,8 +139,8 @@ handle_deps(State, Deps, Update) ->
              end,
 
     AllDeps = lists:ukeymerge(2
-                            ,lists:ukeysort(2, rebar_state:src_apps(State2))
-                            ,lists:ukeysort(2, Solved)),
+                             ,lists:ukeysort(2, rebar_state:src_apps(State2))
+                             ,lists:ukeysort(2, Solved)),
     %% Sort all apps to build order
     State3 = rebar_state:set(State2, all_deps, AllDeps),
     {ok, State3}.
@@ -164,23 +170,25 @@ update_src_deps(Level, State, Update, Seen) ->
     SrcDeps = rebar_state:src_deps(State),
     case lists:foldl(fun(AppInfo, {SrcDepsAcc, PkgDepsAcc, StateAcc, SeenAcc}) ->
                              SeenAcc1 = sets:add_element(rebar_app_info:name(AppInfo), SeenAcc),
-                             {SrcDepsAcc1, PkgDepsAcc1, StateAcc1} = case Update of
-                                 {true, UpdateName, UpdateLevel} ->
-                                     handle_update(AppInfo
-                                                  ,UpdateName
-                                                  ,UpdateLevel
-                                                  ,SrcDepsAcc
-                                                  ,PkgDepsAcc
-                                                  ,Level
-                                                  ,StateAcc);
-                                 _ ->
-                                     maybe_fetch(AppInfo, false, SeenAcc),
-                                     handle_dep(AppInfo
-                                               ,SrcDepsAcc
-                                               ,PkgDepsAcc
-                                               ,Level
-                                               ,StateAcc)
-                             end,
+                             {SrcDepsAcc1, PkgDepsAcc1, StateAcc1} =
+                                 case Update of
+                                     {true, UpdateName, UpdateLevel} ->
+                                         handle_update(AppInfo
+                                                      ,UpdateName
+                                                      ,UpdateLevel
+                                                      ,SrcDepsAcc
+                                                      ,PkgDepsAcc
+                                                      ,Level
+                                                      ,StateAcc);
+                                     _ ->
+                                         maybe_fetch(AppInfo, false, SeenAcc),
+                                         handle_dep(AppInfo
+                                                   ,SrcDepsAcc
+                                                   ,PkgDepsAcc
+                                                   ,Level
+                                                   ,StateAcc)
+
+                                 end,
                              {SrcDepsAcc1, PkgDepsAcc1, StateAcc1, SeenAcc1}
                      end, {[], rebar_state:pkg_deps(State), State, Seen}, SrcDeps) of
         {[], NewPkgDeps, State1, Seen1} ->
@@ -258,8 +266,12 @@ maybe_fetch(AppInfo, Update, Seen) ->
                 true ->
                     ?INFO("Fetching ~s~n", [rebar_app_info:name(AppInfo)]),
                     Source = rebar_app_info:source(AppInfo),
-                    rebar_fetch:download_source(AppDir, Source),
-                    true;
+                    case rebar_fetch:download_source(AppDir, Source) of
+                        {error, _}=Error ->
+                            throw(Error);
+                        Result ->
+                            Result
+                    end;
                 _ ->
                     io:format("Was ~p seen: ~p~n", [rebar_app_info:name(AppInfo)
                                                    ,sets:is_element(rebar_app_info:name(AppInfo), Seen)]),

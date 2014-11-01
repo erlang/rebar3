@@ -12,20 +12,54 @@
 
 -include("rebar.hrl").
 
-lock_source(AppDir, Source) ->
-    rebar_git_resource:lock(AppDir, Source).
+%% map short versions of resources to module names
+-define(RESOURCES, [{git, rebar_git_resource}, {pkg, rebar_pkg_resource}]).
 
-download_source(AppDir, Source) ->
-    TmpDir = ec_file:insecure_mkdtemp(),
-    AppDir1 = ec_cnv:to_list(AppDir),
-    ec_file:mkdir_p(AppDir1),
-    case rebar_git_resource:download(TmpDir, Source) of
-        {ok, _} ->
-            ok = ec_file:copy(TmpDir, filename:absname(AppDir1), [recursive]);
-        {tarball, File} ->
-            ok = erl_tar:extract(File, [{cwd, TmpDir}
-                                       ,compressed]),
-            BaseName = filename:basename(AppDir1),
-            [FromDir] = filelib:wildcard(filename:join(TmpDir, BaseName++"-*")),
-            ec_file:copy(FromDir, AppDir1, [recursive])
+-spec lock_source(file:filename_all(), rebar_resource:resource()) ->
+                         rebar_resource:resource() | {error, string()}.
+lock_source(AppDir, Source) ->
+    case get_resource_type(Source) of
+        {error, _}=Error ->
+            Error;
+        Module ->
+            Module:lock(AppDir, Source)
     end.
+
+-spec download_source(file:filename_all(), rebar_resource:resource()) -> true | {error, any()}.
+download_source(AppDir, Source) ->
+    case get_resource_type(Source) of
+        {error, _}=Error ->
+            Error;
+        Module ->
+            TmpDir = ec_file:insecure_mkdtemp(),
+            AppDir1 = ec_cnv:to_list(AppDir),
+            ec_file:mkdir_p(AppDir1),
+            case Module:download(TmpDir, Source) of
+                {ok, _} ->
+                    ok = ec_file:copy(TmpDir, filename:absname(AppDir1), [recursive]),
+                    true;
+                {tarball, File} ->
+                    ok = erl_tar:extract(File, [{cwd, TmpDir}
+                                               ,compressed]),
+                    BaseName = filename:basename(AppDir1),
+                    [FromDir] = filelib:wildcard(filename:join(TmpDir, BaseName++"-*")),
+                    ok = ec_file:copy(FromDir, AppDir1, [recursive]),
+                    true
+            end
+    end.
+
+get_resource_type({Type, Location, _}) ->
+    case lists:keyfind(Type, 1, ?RESOURCES) of
+        false ->
+            case code:which(Type) of
+                non_existing ->
+                    {error, io_lib:format("Cannot fetch dependency ~s.~n"
+                                         "     No module for resource type ~p", [Location, Type])};
+                _ ->
+                    Type
+            end;
+        {Type, Module} ->
+            Module
+    end;
+get_resource_type(_) ->
+    rebar_pkg_resource.
