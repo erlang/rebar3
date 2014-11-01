@@ -23,7 +23,8 @@
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [{lock, 2},
-     {download, 2}];
+     {download, 2},
+     {needs_update,2}];
 behaviour_info(_) ->
     undefined.
 
@@ -31,6 +32,8 @@ behaviour_info(_) ->
 
 -callback lock(file:filename_all(), tuple()) ->  rebar_resource:resource().
 -callback download(file:filename_all(), tuple()) ->
+    {tarball, file:filename_all()} | {ok, any()} | {error, any()}.
+-callback needs_update(file:filename_all(), tuple()) ->
     {tarball, file:filename_all()} | {ok, any()} | {error, any()}.
 
 -endif.

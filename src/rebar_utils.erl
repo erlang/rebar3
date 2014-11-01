@@ -135,7 +135,7 @@ sh(Command0, Options0) ->
     ?DEBUG("sh info:\n\tcwd: ~p\n\tcmd: ~s\n", [get_cwd(), Command0]),
     ?DEBUG("\topts: ~p\n", [Options0]),
 
-    DefaultOptions = [use_stdout, abort_on_error],
+    DefaultOptions = [{use_stdout, false}, abort_on_error],
     Options = [expand_sh_flag(V)
                || V <- proplists:compact(Options0 ++ DefaultOptions)],
 

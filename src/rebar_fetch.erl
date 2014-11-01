@@ -8,7 +8,8 @@
 -module(rebar_fetch).
 
 -export([lock_source/2,
-         download_source/2]).
+         download_source/2,
+         needs_update/2]).
 
 -include("rebar.hrl").
 
@@ -36,6 +37,8 @@ download_source(AppDir, Source) ->
             ec_file:mkdir_p(AppDir1),
             case Module:download(TmpDir, Source) of
                 {ok, _} ->
+                    code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
+                    ec_file:remove(filename:absname(AppDir1), [recursive]),
                     ok = ec_file:copy(TmpDir, filename:absname(AppDir1), [recursive]),
                     true;
                 {tarball, File} ->
@@ -43,9 +46,20 @@ download_source(AppDir, Source) ->
                                                ,compressed]),
                     BaseName = filename:basename(AppDir1),
                     [FromDir] = filelib:wildcard(filename:join(TmpDir, BaseName++"-*")),
-                    ok = ec_file:copy(FromDir, AppDir1, [recursive]),
+                    code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
+                    ec_file:remove(filename:absname(AppDir1), [recursive]),
+                    ok = ec_file:copy(FromDir, filename:absname(AppDir1), [recursive]),
                     true
             end
+    end.
+
+-spec needs_update(file:filename_all(), rebar_resource:resource()) -> boolean() | {error, string()}.
+needs_update(AppDir, Source) ->
+    case get_resource_type(Source) of
+        {error, _}=Error ->
+            Error;
+        Module ->
+            Module:needs_update(AppDir, Source)
     end.
 
 get_resource_type({Type, Location, _}) ->
@@ -53,7 +67,7 @@ get_resource_type({Type, Location, _}) ->
         false ->
             case code:which(Type) of
                 non_existing ->
-                    {error, io_lib:format("Cannot fetch dependency ~s.~n"
+                    {error, io_lib:format("Cannot handle dependency ~s.~n"
                                          "     No module for resource type ~p", [Location, Type])};
                 _ ->
                     Type

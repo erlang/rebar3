@@ -86,7 +86,7 @@ do(State) ->
         end
     catch
         _:Reason ->
-            Reason
+            {error, Reason}
     end.
 
 -spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
@@ -267,15 +267,30 @@ maybe_fetch(AppInfo, Update, Seen) ->
                     ?INFO("Fetching ~s~n", [rebar_app_info:name(AppInfo)]),
                     Source = rebar_app_info:source(AppInfo),
                     case rebar_fetch:download_source(AppDir, Source) of
-                        {error, _}=Error ->
-                            throw(Error);
+                        {error, Reason} ->
+                            throw(Reason);
                         Result ->
                             Result
                     end;
                 _ ->
-                    io:format("Was ~p seen: ~p~n", [rebar_app_info:name(AppInfo)
-                                                   ,sets:is_element(rebar_app_info:name(AppInfo), Seen)]),
-                    false
+                    case sets:is_element(rebar_app_info:name(AppInfo), Seen) of
+                        true ->
+                            false;
+                        false ->
+                            Source = rebar_app_info:source(AppInfo),
+                            case rebar_fetch:needs_update(AppDir, Source) of
+                                true ->
+                                    ?INFO("Updating ~s~n", [rebar_app_info:name(AppInfo)]),
+                                    case rebar_fetch:download_source(AppDir, Source) of
+                                        {error, Reason} ->
+                                            throw(Reason);
+                                        Result ->
+                                            Result
+                                    end;
+                                false ->
+                                    false
+                            end
+                    end
             end
     end.
 
