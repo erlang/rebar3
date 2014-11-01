@@ -61,7 +61,7 @@ sort_apps(Apps) ->
         {ok, Names} ->
             {ok, names_to_apps(Names, Apps)};
         E ->
-            {error, E}
+            E
     end.
 
 %% @doc Do a topological sort on the list of pairs.
