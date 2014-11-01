@@ -16,6 +16,8 @@ lock(AppDir, {git, Url, _}) ->
             ,both, $\n),
     {git, Url, {ref, Ref}}.
 
+%% Return true if either the git url or tag/branch/ref is not the same as the currently
+%% checked out git repo for the dep
 needs_update(Dir, {git, Url, {tag, Tag}}) ->
     {ok, CurrentUrl} = rebar_utils:sh(?FMT("git config --get remote.origin.url", []),
                                       [{cd, Dir}]),

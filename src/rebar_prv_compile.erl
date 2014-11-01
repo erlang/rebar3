@@ -50,7 +50,11 @@ do(State) ->
                           C = rebar_config:consult(AppDir),
                           S = rebar_state:new(rebar_state:new(), C, AppDir),
                           S1 = rebar_state:set(S, jobs, Jobs),
-                          build(S1, AppInfo)
+
+                          %% Legacy hook support
+                          run_compile_hooks(AppDir, pre_hooks, S1),
+                          build(S1, AppInfo),
+                          run_compile_hooks(AppDir, post_hooks, S1)
                   end, Deps),
 
     %% Use the project State for building project apps
@@ -58,7 +62,12 @@ do(State) ->
                           AppDir = rebar_app_info:dir(AppInfo),
                           C = rebar_config:consult(AppDir),
                           S = rebar_state:new(State1, C, AppDir),
-                          build(S, AppInfo)
+
+                          %% Legacy hook support
+                          %% TODO: for multi-app projects run top-level hooks only once
+                          run_compile_hooks(AppDir, pre_hooks, S),
+                          build(S, AppInfo),
+                          run_compile_hooks(AppDir, pre_hooks, S)
                   end, ProjectApps),
 
     {ok, State1}.
@@ -81,3 +90,24 @@ handle_args(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     Jobs = proplists:get_value(jobs, Args, ?DEFAULT_JOBS),
     {ok, rebar_state:set(State, jobs, Jobs)}.
+
+run_compile_hooks(Dir, Type, State) ->
+    Hooks = rebar_state:get(State, Type, []),
+    lists:foreach(fun({_, compile, _}=Hook) ->
+                          apply_hook(Dir, [], Hook);
+                     ({compile, _}=Hook)->
+                          apply_hook(Dir, [], Hook);
+                     (_) ->
+                          continue
+                  end, Hooks).
+
+apply_hook(Dir, Env, {Arch, Command, Hook}) ->
+    case rebar_utils:is_arch(Arch) of
+        true ->
+            apply_hook(Dir, Env, {Command, Hook});
+        false ->
+            ok
+    end;
+apply_hook(Dir, Env, {Command, Hook}) ->
+    Msg = lists:flatten(io_lib:format("Hook for ~p failed!~n", [Command])),
+    rebar_utils:sh(Hook, [{cd, Dir}, {env, Env}, {abort_on_error, Msg}]).

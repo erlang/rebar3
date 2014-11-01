@@ -85,6 +85,7 @@ do(State) ->
                 {error, Error}
         end
     catch
+        %% maybe_fetch will maybe_throw an exception to break out of some loops
         _:Reason ->
             {error, Reason}
     end.
