@@ -38,16 +38,28 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     {ok, State1} = handle_args(State),
+    Jobs = rebar_state:get(State1, jobs),
 
     ProjectApps = rebar_state:project_apps(State1),
     Deps = rebar_state:get(State1, deps_to_build, []),
 
+    %% Need to allow global config vars used on deps
+    %% Right now no way to differeniate and just give deps a new state
+    lists:foreach(fun(AppInfo) ->
+                          AppDir = rebar_app_info:dir(AppInfo),
+                          C = rebar_config:consult(AppDir),
+                          S = rebar_state:new(rebar_state:new(), C, AppDir),
+                          S1 = rebar_state:set(S, jobs, Jobs),
+                          build(S1, AppInfo)
+                  end, Deps),
+
+    %% Use the project State for building project apps
     lists:foreach(fun(AppInfo) ->
                           AppDir = rebar_app_info:dir(AppInfo),
                           C = rebar_config:consult(AppDir),
                           S = rebar_state:new(State1, C, AppDir),
                           build(S, AppInfo)
-                  end, Deps++ProjectApps),
+                  end, ProjectApps),
 
     {ok, State1}.
 
