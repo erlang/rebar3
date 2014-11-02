@@ -63,6 +63,13 @@ needs_update(AppDir, Source) ->
     end.
 
 get_resource_type({Type, Location, _}) ->
+    find_resource_module(Type, Location);
+get_resource_type({Type, _, _, Location}) ->
+    find_resource_module(Type, Location);
+get_resource_type(_) ->
+    rebar_pkg_resource.
+
+find_resource_module(Type, Location) ->
     case lists:keyfind(Type, 1, ?RESOURCES) of
         false ->
             case code:which(Type) of
@@ -74,6 +81,4 @@ get_resource_type({Type, Location, _}) ->
             end;
         {Type, Module} ->
             Module
-    end;
-get_resource_type(_) ->
-    rebar_pkg_resource.
+    end.

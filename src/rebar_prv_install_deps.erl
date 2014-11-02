@@ -162,7 +162,7 @@ package_to_app(DepsDir, Packages, Pkg={_, Vsn}) ->
             {ok, AppInfo} = rebar_app_info:new(Name, FmtVsn),
             AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
             AppInfo2 = rebar_app_info:dir(AppInfo1, get_deps_dir(DepsDir, Name)),
-            [rebar_app_info:source(AppInfo2, Link)]
+            [rebar_app_info:source(AppInfo2, {pkg, Name, FmtVsn, Link})]
     end.
 
 -spec update_src_deps(integer(), rebar_state:t(), boolean(), sets:set(binary())) ->

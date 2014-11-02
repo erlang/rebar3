@@ -49,10 +49,12 @@ main(Args) ->
             ok;
         rebar_abort ->
             rebar_utils:delayed_halt(1);
+        {error, rebar_abort} ->
+            rebar_utils:delayed_halt(1);
         {error, {Module, Reason}} ->
             ?ERROR(Module:format_error(Reason, []), []),
             rebar_utils:delayed_halt(1);
-        {error, Error} ->
+        {error, Error} when is_list(Error) ->
             ?ERROR(Error++"~n", []),
             rebar_utils:delayed_halt(1);
         Error ->
