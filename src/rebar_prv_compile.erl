@@ -31,7 +31,7 @@ init(State) ->
                                                                {short_desc, "Compile apps .app.src and .erl files."},
                                                                {desc, ""},
                                                                {opts, [
-                                                                      {jobs,     $j, "jobs",     integer,   JobsHelp}
+                                                                      {jobs, $j, "jobs", integer, JobsHelp}
                                                                       ]}])),
     {ok, State1}.
 
