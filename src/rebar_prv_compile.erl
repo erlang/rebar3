@@ -58,17 +58,21 @@ do(State) ->
                   end, Deps),
 
     %% Use the project State for building project apps
+    Cwd = rebar_utils:get_cwd(),
+    run_compile_hooks(Cwd, pre_hooks, State1),
+    %% Set hooks to empty so top-level hooks aren't run for each project app
+    State2 = rebar_state:set(rebar_state:set(State1, post_hooks, []), pre_hooks, []),
     lists:foreach(fun(AppInfo) ->
                           AppDir = rebar_app_info:dir(AppInfo),
                           C = rebar_config:consult(AppDir),
-                          S = rebar_state:new(State1, C, AppDir),
+                          S = rebar_state:new(State2, C, AppDir),
 
                           %% Legacy hook support
-                          %% TODO: for multi-app projects run top-level hooks only once
                           run_compile_hooks(AppDir, pre_hooks, S),
                           build(S, AppInfo),
-                          run_compile_hooks(AppDir, pre_hooks, S)
+                          run_compile_hooks(AppDir, post_hooks, S)
                   end, ProjectApps),
+    run_compile_hooks(Cwd, post_hooks, State1),
 
     {ok, State1}.
 
