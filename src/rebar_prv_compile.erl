@@ -45,33 +45,16 @@ do(State) ->
 
     %% Need to allow global config vars used on deps
     %% Right now no way to differeniate and just give deps a new state
-    lists:foreach(fun(AppInfo) ->
-                          AppDir = rebar_app_info:dir(AppInfo),
-                          C = rebar_config:consult(AppDir),
-                          S = rebar_state:new(rebar_state:new(), C, AppDir),
-                          S1 = rebar_state:set(S, jobs, Jobs),
-
-                          %% Legacy hook support
-                          run_compile_hooks(AppDir, pre_hooks, S1),
-                          build(S1, AppInfo),
-                          run_compile_hooks(AppDir, post_hooks, S1)
-                  end, Deps),
+    EmptyState = rebar_state:new(),
+    EmptyState1 = rebar_state:set(EmptyState, jobs, Jobs),
+    build_apps(EmptyState1, Deps),
 
     %% Use the project State for building project apps
     Cwd = rebar_utils:get_cwd(),
     run_compile_hooks(Cwd, pre_hooks, State1),
     %% Set hooks to empty so top-level hooks aren't run for each project app
     State2 = rebar_state:set(rebar_state:set(State1, post_hooks, []), pre_hooks, []),
-    lists:foreach(fun(AppInfo) ->
-                          AppDir = rebar_app_info:dir(AppInfo),
-                          C = rebar_config:consult(AppDir),
-                          S = rebar_state:new(State2, C, AppDir),
-
-                          %% Legacy hook support
-                          run_compile_hooks(AppDir, pre_hooks, S),
-                          build(S, AppInfo),
-                          run_compile_hooks(AppDir, post_hooks, S)
-                  end, ProjectApps),
+    build_apps(State2, ProjectApps),
     run_compile_hooks(Cwd, post_hooks, State1),
 
     {ok, State1}.
@@ -79,6 +62,18 @@ do(State) ->
 -spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
 format_error(Reason, State) ->
     {io_lib:format("~p", [Reason]), State}.
+
+build_apps(State, Apps) ->
+    lists:foreach(fun(AppInfo) ->
+                          AppDir = rebar_app_info:dir(AppInfo),
+                          C = rebar_config:consult(AppDir),
+                          S = rebar_state:new(State, C, AppDir),
+
+                          %% Legacy hook support
+                          run_compile_hooks(AppDir, pre_hooks, S),
+                          build(S, AppInfo),
+                          run_compile_hooks(AppDir, post_hooks, S)
+                  end, Apps).
 
 build(State, AppInfo) ->
     ?INFO("Compiling ~s~n", [rebar_app_info:name(AppInfo)]),
