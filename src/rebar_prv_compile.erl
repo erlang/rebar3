@@ -51,11 +51,11 @@ do(State) ->
 
     %% Use the project State for building project apps
     Cwd = rebar_utils:get_cwd(),
-    run_compile_hooks(Cwd, pre_hooks, State1),
+    rebar_hooks:run_compile_hooks(Cwd, pre_hooks, compile, State1),
     %% Set hooks to empty so top-level hooks aren't run for each project app
     State2 = rebar_state:set(rebar_state:set(State1, post_hooks, []), pre_hooks, []),
     build_apps(State2, ProjectApps),
-    run_compile_hooks(Cwd, post_hooks, State1),
+    rebar_hooks:run_compile_hooks(Cwd, post_hooks, compile, State1),
 
     {ok, State1}.
 
@@ -70,9 +70,9 @@ build_apps(State, Apps) ->
                           S = rebar_state:new(State, C, AppDir),
 
                           %% Legacy hook support
-                          run_compile_hooks(AppDir, pre_hooks, S),
+                          rebar_hooks:run_compile_hooks(AppDir, pre_hooks, compile, S),
                           build(S, AppInfo),
-                          run_compile_hooks(AppDir, post_hooks, S)
+                          rebar_hooks:run_compile_hooks(AppDir, post_hooks, compile, S)
                   end, Apps).
 
 build(State, AppInfo) ->
@@ -89,24 +89,3 @@ handle_args(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     Jobs = proplists:get_value(jobs, Args, ?DEFAULT_JOBS),
     {ok, rebar_state:set(State, jobs, Jobs)}.
-
-run_compile_hooks(Dir, Type, State) ->
-    Hooks = rebar_state:get(State, Type, []),
-    lists:foreach(fun({_, compile, _}=Hook) ->
-                          apply_hook(Dir, [], Hook);
-                     ({compile, _}=Hook)->
-                          apply_hook(Dir, [], Hook);
-                     (_) ->
-                          continue
-                  end, Hooks).
-
-apply_hook(Dir, Env, {Arch, Command, Hook}) ->
-    case rebar_utils:is_arch(Arch) of
-        true ->
-            apply_hook(Dir, Env, {Command, Hook});
-        false ->
-            ok
-    end;
-apply_hook(Dir, Env, {Command, Hook}) ->
-    Msg = lists:flatten(io_lib:format("Hook for ~p failed!~n", [Command])),
-    rebar_utils:sh(Hook, [{cd, Dir}, {env, Env}, {abort_on_error, Msg}]).
