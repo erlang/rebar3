@@ -473,6 +473,9 @@ vcs_vsn_1(Vcs, Dir) ->
             end
     end.
 
+%% Temp work around for repos like relx that use "semver"
+vcs_vsn_cmd(VCS, Dir) when VCS =:= semver ; VCS =:= "semver" ->
+    rebar_git_resource:make_vsn(Dir);
 vcs_vsn_cmd(VCS, Dir) when VCS =:= git ; VCS =:= "git" ->
     rebar_git_resource:make_vsn(Dir);
 vcs_vsn_cmd(VCS, Dir) when VCS =:= pkg ; VCS =:= "pkg" ->
