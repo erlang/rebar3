@@ -24,6 +24,7 @@ This is an experimental branch.
 |----------- |------------ |
 | compile    | Build project |
 | clean      | Remove project apps beam files |
+| ct         | Run Common Test suites |
 | do         | Higher-order provider to run multiple tasks in sequence |
 | help       | Print help for rebar or task |
 | new        | Create new rebar project from templates |
@@ -40,12 +41,6 @@ The following commands are still in the works.
 | Command    | Description |
 |----------- |------------ |
 | eunit      | |
-| ct         | |
-
-### Missing
-
-* Pre and post hooks
-* Compilers besides erlc
 
 ### Changes
 
