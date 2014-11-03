@@ -46,7 +46,7 @@ main(Args) ->
                           false -> undefined
                       end,
 
-    os:cmd("./bootstrap/rebar get-deps compile -r"),
+    os:cmd("./bootstrap/rebar get-deps compile"),
 
     %% Compile all src/*.erl to ebin
     %% To not accidentally try to compile files like Mac OS X resource forks,

@@ -3,11 +3,11 @@
 
 -module(rebar_prv_common_test).
 
--behaviour(rebar_provider).
+-behaviour(provider).
 
 -export([init/1,
-         format_error/2,
-         do/1]).
+         do/1,
+         format_error/2]).
 
 -include("rebar.hrl").
 
