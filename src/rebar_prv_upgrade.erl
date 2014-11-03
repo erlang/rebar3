@@ -38,10 +38,14 @@ init(State) ->
 do(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     Name = proplists:get_value(package, Args),
-    ?INFO("Updating ~s~n", [Name]),
     Locks = rebar_state:get(State, locks, []),
     case lists:keyfind(ec_cnv:to_binary(Name), 1, Locks) of
         {_, _, _, Level} ->
+            Deps = rebar_state:get(State, deps),
+            Dep = lists:keyfind(list_to_atom(Name), 1, Deps),
+            rebar_prv_install_deps:handle_deps(State, [Dep], {true, ec_cnv:to_binary(Name), Level}),
+            {ok, State};
+        {_, _, _, _, Level} ->
             Deps = rebar_state:get(State, deps),
             Dep = lists:keyfind(list_to_atom(Name), 1, Deps),
             rebar_prv_install_deps:handle_deps(State, [Dep], {true, ec_cnv:to_binary(Name), Level}),

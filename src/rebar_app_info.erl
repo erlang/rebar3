@@ -38,7 +38,7 @@
                      original_vsn :: binary() | string() | undefined,
                      app_details=[] :: list(),
                      deps=[] :: list(),
-                     dep_level :: integer(),
+                     dep_level=0 :: integer(),
                      dir :: file:name(),
                      source :: string() | tuple() | undefined,
                      valid :: boolean()}).
