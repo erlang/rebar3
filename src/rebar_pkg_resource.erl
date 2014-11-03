@@ -6,7 +6,8 @@
 
 -export([lock/2
         ,download/2
-        ,needs_update/2]).
+        ,needs_update/2
+        ,make_vsn/1]).
 
 -include("rebar.hrl").
 
@@ -26,3 +27,6 @@ download(Dir, {pkg, _Name, _Vsn, Url}) ->
     TmpFile = filename:join(Dir, "package.tar.gz"),
     {ok, saved_to_file} = httpc:request(get, {binary_to_list(Url), []}, [], [{stream, TmpFile}]),
     {tarball, TmpFile}.
+
+make_vsn(_) ->
+    {error, "Replacing version of type pkg not supported."}.

@@ -6,7 +6,8 @@
 
 -export([lock/2
         ,download/2
-        ,needs_update/2]).
+        ,needs_update/2
+        ,make_vsn/1]).
 
 -include("rebar.hrl").
 
@@ -79,3 +80,67 @@ download(Dir, {git, Url, Rev}) ->
     rebar_utils:sh(?FMT("git clone -n ~s ~s", [Url, filename:basename(Dir)]),
                    [{cd, filename:dirname(Dir)}]),
     rebar_utils:sh(?FMT("git checkout -q ~s", [Rev]), [{cd, Dir}]).
+
+make_vsn(Dir) ->
+    Cwd = file:get_cwd(),
+    try
+        ok = file:set_cwd(Dir),
+        {Vsn, RawRef, RawCount} = collect_default_refcount(),
+        {plain, build_vsn_string(Vsn, RawRef, RawCount)}
+    after
+        file:set_cwd(Cwd)
+    end.
+
+%% Internal functions
+
+collect_default_refcount() ->
+    %% Get the tag timestamp and minimal ref from the system. The
+    %% timestamp is really important from an ordering perspective.
+    RawRef = os:cmd("git log -n 1 --pretty=format:'%h\n' "),
+
+    {Tag, TagVsn} = parse_tags(),
+    RawCount =
+        case Tag of
+            undefined ->
+                os:cmd("git rev-list HEAD | wc -l");
+            _ ->
+                get_patch_count(Tag)
+        end,
+    {TagVsn, RawRef, RawCount}.
+
+build_vsn_string(Vsn, RawRef, RawCount) ->
+    %% Cleanup the tag and the Ref information. Basically leading 'v's and
+    %% whitespace needs to go away.
+    RefTag = case RawRef of
+                 undefined ->
+                     "";
+                 RawRef ->
+                     [".ref", re:replace(RawRef, "\\s", "", [global])]
+             end,
+    Count = erlang:iolist_to_binary(re:replace(RawCount, "\\s", "", [global])),
+
+    %% Create the valid [semver](http://semver.org) version from the tag
+    case Count of
+        <<"0">> ->
+            erlang:binary_to_list(erlang:iolist_to_binary(Vsn));
+        _ ->
+            erlang:binary_to_list(erlang:iolist_to_binary([Vsn, "+build.",
+                                                           Count, RefTag]))
+    end.
+
+get_patch_count(RawRef) ->
+    Ref = re:replace(RawRef, "\\s", "", [global]),
+    Cmd = io_lib:format("git rev-list ~s..HEAD | wc -l",
+                         [Ref]),
+    os:cmd(Cmd).
+
+parse_tags() ->
+    first_valid_tag(os:cmd("git log --oneline --decorate  | fgrep \"tag: \" -1000")).
+
+first_valid_tag(Line) ->
+    case re:run(Line, "(\\(|\\s)tag:\\s(v([^,\\)]+))", [{capture, [2, 3], list}]) of
+        {match,[Tag, Vsn]} ->
+            {Tag, Vsn};
+        nomatch ->
+            {undefined, "0.0.0"}
+    end.
