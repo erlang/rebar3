@@ -92,12 +92,13 @@
 %%          {doc_root, "templates"}, {module_ext, ""}, {source_ext, ".html"}
 %%      ]
 %%   ]}.
--module(rebar_erlydtl_compiler).
+-module(rebar_prv_erlydtl_compiler).
 
--behaviour(rebar_provider).
+-behaviour(provider).
 
 -export([init/1,
-         do/1]).
+         do/1,
+         format_error/2]).
 
 %% for internal use only
 -export([info/2]).
@@ -113,22 +114,23 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
-                                                       provider_impl = ?MODULE,
-                                                       bare = false,
-                                                       deps = ?DEPS,
-                                                       example = "rebar erlydtl compile",
-                                                       short_desc = "Compile erlydtl templates.",
-                                                       desc = "",
-                                                       opts = []}),
+    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
+                                                               {module, ?MODULE},
+                                                               {bare, false},
+                                                               {deps, ?DEPS},
+                                                               {example, "rebar erlydtl compile"},
+                                                               {short_desc, "Compile erlydtl templates."},
+                                                               {desc, ""},
+                                                               {opts, []}])),
     {ok, State1}.
 
 do(Config) ->
     MultiDtlOpts = erlydtl_opts(Config),
     OrigPath = code:get_path(),
-    true = code:add_path(rebar_utils:ebin_dir()),
+    %true = code:add_path(rebar_utils:ebin_dir()),
 
     Result = lists:foldl(fun(DtlOpts, _) ->
+                                 file:make_dir(option(out_dir, DtlOpts)),
                                  rebar_base_compiler:run(Config, [],
                                                          option(doc_root, DtlOpts),
                                                          option(source_ext, DtlOpts),
@@ -143,6 +145,10 @@ do(Config) ->
 
     true = code:set_path(OrigPath),
     {Result, Config}.
+
+-spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
+format_error(Reason, State) ->
+    {io_lib:format("~p", [Reason]), State}.
 
 %% ===================================================================
 %% Internal functions
@@ -230,24 +236,15 @@ do_compile(Config, Source, Target, DtlOpts) ->
     Opts = lists:ukeymerge(1, DtlOpts, Sorted),
     ?INFO("Compiling \"~s\" -> \"~s\" with options:~n    ~s~n",
         [Source, Target, io_lib:format("~p", [Opts])]),
-    case erlydtl:compile(Source,
-                         module_name(Target),
+    case erlydtl:compile_file(ec_cnv:to_list(Source),
+                         list_to_atom(module_name(Target)),
                          Opts) of
-        ok ->
-            ok;
         {ok, _Mod} ->
             ok;
         {ok, _Mod, Ws} ->
             rebar_base_compiler:ok_tuple(Config, Source, Ws);
-        {ok, _Mod, _Bin, Ws} ->
-            rebar_base_compiler:ok_tuple(Config, Source, Ws);
         error ->
             rebar_base_compiler:error_tuple(Config, Source, [], [], Opts);
-        {error, {_File, _Msgs} = Error} ->
-            rebar_base_compiler:error_tuple(Config, Source, [Error], [], Opts);
-        {error, Msg} ->
-            Es = [{Source, [{erlydtl_parser, Msg}]}],
-            rebar_base_compiler:error_tuple(Config, Source, Es, [], Opts);
         {error, Es, Ws} ->
             rebar_base_compiler:error_tuple(Config, Source, Es, Ws, Opts)
     end.

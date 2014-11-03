@@ -54,20 +54,18 @@
 %% applications. This implies that you have already done the
 %% constraint solve before you pass the list of apps here to be
 %% sorted.
--spec sort_apps([rebar_app_info:t()]) ->
-                       {ok, [rebar_app_info:t()]} |
-                       relx:error().
+-spec sort_apps([rebar_app_info:t()]) -> {ok, [rebar_app_info:t()]} | {error, any()}.
 sort_apps(Apps) ->
     Pairs = apps_to_pairs(Apps),
     case sort(Pairs) of
         {ok, Names} ->
             {ok, names_to_apps(Names, Apps)};
         E ->
-            E
+            {error, E}
     end.
 
 %% @doc Do a topological sort on the list of pairs.
--spec sort([pair()]) -> {ok, [atom()]} | relx:error().
+-spec sort([pair()]) -> {ok, [atom()]} | {error, any()}.
 sort(Pairs) ->
     iterate(Pairs, [], all(Pairs)).
 
@@ -78,9 +76,9 @@ format_error({cycle, Pairs}) ->
      "before we can continue:\n",
     case Pairs of
         [{P1, P2}] ->
-            [rebar_util:indent(2), erlang:atom_to_list(P2), "->", erlang:atom_to_list(P1)];
+            [rebar_utils:indent(2), erlang:atom_to_list(P2), "->", erlang:atom_to_list(P1)];
         [{P1, P2} | Rest] ->
-            [rebar_util:indent(2), erlang:atom_to_list(P2), "->", erlang:atom_to_list(P1),
+            [rebar_utils:indent(2), erlang:atom_to_list(P2), "->", erlang:atom_to_list(P1),
              [["-> ", erlang:atom_to_list(PP2), " -> ", erlang:atom_to_list(PP1)] || {PP1, PP2} <- Rest]];
         [] ->
             []
@@ -91,12 +89,12 @@ format_error({cycle, Pairs}) ->
 %%====================================================================
 -spec names_to_apps([atom()], [rebar_app_info:t()]) -> [rebar_app_info:t()].
 names_to_apps(Names, Apps) ->
- [element(2, App) || App <- [find_app_by_name(Name, Apps) || Name <- Names], App =/= error].
+    [element(2, App) || App <- [find_app_by_name(Name, Apps) || Name <- Names], App =/= error].
 
 -spec find_app_by_name(atom(), [rebar_app_info:t()]) -> {ok, rebar_app_info:t()} | error.
 find_app_by_name(Name, Apps) ->
     ec_lists:find(fun(App) ->
-                          rebar_app_info:name(App) =:= Name
+                          ec_cnv:to_atom(rebar_app_info:name(App)) =:= ec_cnv:to_atom(Name)
                   end, Apps).
 
 -spec apps_to_pairs([rebar_app_info:t()]) -> [pair()].
@@ -105,20 +103,20 @@ apps_to_pairs(Apps) ->
 
 -spec app_to_pairs(rebar_app_info:t()) -> [pair()].
 app_to_pairs(App) ->
-    [{DepApp, rebar_app_info:name(App)} ||
+    [{ec_cnv:to_atom(DepApp), ec_cnv:to_atom(rebar_app_info:name(App))} ||
         DepApp <-
             rebar_app_info:deps(App)].
 
 
 %% @doc Iterate over the system.  @private
 -spec iterate([pair()], [name()], [name()]) ->
-    {ok, [name()]} | relx:error().
+    {ok, [name()]} | {error, iolist()}.
 iterate([], L, All) ->
     {ok, remove_duplicates(L ++ subtract(All, L))};
 iterate(Pairs, L, All) ->
     case subtract(lhs(Pairs), rhs(Pairs)) of
         []  ->
-            ?ERROR(format_error({cycle, Pairs}), []);
+            {error, format_error({cycle, Pairs})};
         Lhs ->
             iterate(remove_pairs(Lhs, Pairs), L ++ Lhs, All)
     end.
@@ -188,29 +186,27 @@ topo_2_test() ->
 
 topo_pairs_cycle_test() ->
     Pairs = [{app2, app1}, {app1, app2}, {stdlib, app1}],
-    ?assertMatch({error, {_, {cycle, [{app2, app1}, {app1, app2}]}}},
-                 sort(Pairs)).
+    ?assertMatch({error, _}, sort(Pairs)).
 
 topo_apps_cycle_test() ->
-    {ok, App1} = rebar_app_info:new(app1, "0.1", "/no-dir", [app2], [stdlib]),
-    {ok, App2} = rebar_app_info:new(app2, "0.1", "/no-dir", [app1], []),
+    {ok, App1} = rebar_app_info:new(app1, "0.1", "/no-dir", [app2]),
+    {ok, App2} = rebar_app_info:new(app2, "0.1", "/no-dir", [app1]),
     Apps = [App1, App2],
-    ?assertMatch({error, {_, {cycle, [{app2,app1},{app1,app2}]}}},
-                 sort_apps(Apps)).
+    ?assertMatch({error, _}, sort_apps(Apps)).
 
 topo_apps_good_test() ->
     Apps = [App ||
                {ok, App} <-
-                   [rebar_app_info:new(app1, "0.1", "/no-dir", [app2, zapp1], [stdlib, kernel]),
-                    rebar_app_info:new(app2, "0.1", "/no-dir", [app3], []),
-                    rebar_app_info:new(app3, "0.1", "/no-dir", [kernel], []),
-                    rebar_app_info:new(zapp1, "0.1", "/no-dir", [app2,app3,zapp2], []),
-                    rebar_app_info:new(stdlib, "0.1", "/no-dir", [], []),
-                    rebar_app_info:new(kernel, "0.1", "/no-dir", [], []),
-                    rebar_app_info:new(zapp2, "0.1", "/no-dir", [], [])]],
+                   [rebar_app_info:new(app1, "0.1", "/no-dir", [app2, zapp1]),
+                    rebar_app_info:new(app2, "0.1", "/no-dir", [app3]),
+                    rebar_app_info:new(app3, "0.1", "/no-dir", [kernel]),
+                    rebar_app_info:new(zapp1, "0.1", "/no-dir", [app2,app3,zapp2]),
+                    rebar_app_info:new(stdlib, "0.1", "/no-dir", []),
+                    rebar_app_info:new(kernel, "0.1", "/no-dir", []),
+                    rebar_app_info:new(zapp2, "0.1", "/no-dir", [])]],
     {ok, Sorted} = sort_apps(Apps),
     ?assertMatch([stdlib, kernel, zapp2,
                   app3, app2, zapp1, app1],
-                 [rebar_app_info:name(App) || App <- Sorted]).
+                 [ec_cnv:to_atom(rebar_app_info:name(App)) || App <- Sorted]).
 
 -endif.

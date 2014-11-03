@@ -1,3 +1,4 @@
+.depsolver_plt
 *.beam
 test/*_data
 logs
@@ -14,4 +15,4 @@ rebar3
 /.rebar
 rebar.lock
 priv/templates/*.dtl.erl
-ebin/rebar.app
+ebin

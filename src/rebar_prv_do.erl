@@ -3,10 +3,11 @@
 
 -module(rebar_prv_do).
 
--behaviour(rebar_provider).
+-behaviour(provider).
 
 -export([init/1,
-         do/1]).
+         do/1,
+         format_error/2]).
 
 -include("rebar.hrl").
 
@@ -19,27 +20,30 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
-                                                       provider_impl = ?MODULE,
-                                                       bare = false,
-                                                       deps = ?DEPS,
-                                                       example = "rebar3 do <task1>, <task2>, ...",
-                                                       short_desc = "Higher order provider for running multiple tasks in a sequence.",
-                                                       desc = "",
-                                                       opts = []}),
+    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
+                                                               {module, ?MODULE},
+                                                               {bare, false},
+                                                               {deps, ?DEPS},
+                                                               {example, "rebar3 do <task1>, <task2>, ..."},
+                                                               {short_desc, "Higher order provider for running multiple tasks in a sequence."},
+                                                               {desc, ""},
+                                                               {opts, []}])),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     Tasks = args_to_tasks(rebar_state:command_args(State)),
-    State1 = lists:foldl(fun(TaskArgs, StateAcc) ->
+    lists:foldl(fun(TaskArgs, {ok, StateAcc}) ->
                                  [TaskStr | Args] = string:tokens(TaskArgs, " "),
                                  Task = list_to_atom(TaskStr),
                                  StateAcc1 = rebar_state:set(StateAcc, task, Task),
                                  StateAcc2 = rebar_state:command_args(StateAcc1, Args),
                                  rebar_core:process_command(StateAcc2, Task)
-                       end, State, Tasks),
-    {ok, State1}.
+                       end, {ok, State}, Tasks).
+
+-spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
+format_error(Reason, State) ->
+    {io_lib:format("~p", [Reason]), State}.
 
 args_to_tasks(Args) ->
     [string:strip(T) || T <- string:tokens(string:join(Args, " "), ",")].

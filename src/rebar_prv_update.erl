@@ -3,10 +3,11 @@
 
 -module(rebar_prv_update).
 
--behaviour(rebar_provider).
+-behaviour(provider).
 
 -export([init/1,
-         do/1]).
+         do/1,
+         format_error/2]).
 
 -include("rebar.hrl").
 
@@ -19,41 +20,35 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
-                                                       provider_impl = ?MODULE,
-                                                       bare = false,
-                                                       deps = ?DEPS,
-                                                       example = "rebar update cowboy",
-                                                       short_desc = "Update package index or individual dependency.",
-                                                       desc = "",
-                                                       opts = []}),
+    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
+                                                               {module, ?MODULE},
+                                                               {bare, false},
+                                                               {deps, ?DEPS},
+                                                               {example, "rebar update"},
+                                                               {short_desc, "Update package index."},
+                                                               {desc, ""},
+                                                               {opts, []}])),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    case rebar_state:command_args(State) of
-        [Name] ->
-            ?ERROR("NOT IMPLEMENTED: Updating ~s~n", [Name]),
-            {ok, State};
-        [] ->
-            ?INFO("Updating package index...~n", []),
-            Url = url(State),
-            %{ok, [Home]} = init:get_argument(home),
-            ec_file:mkdir_p(filename:join([os:getenv("HOME"), ".rebar"])),
-            PackagesFile = filename:join([os:getenv("HOME"), ".rebar", "packages"]),
-            {ok, RequestId} = httpc:request(get, {Url, []}, [], [{stream, PackagesFile}, {sync, false}]),
-            wait(RequestId, State)
-    end.
+    ?INFO("Updating package index...~n", []),
+    try
+        Url = url(State),
+                                                %{ok, [Home]} = init:get_argument(home),
+        ec_file:mkdir_p(filename:join([os:getenv("HOME"), ".rebar"])),
+        PackagesFile = filename:join([os:getenv("HOME"), ".rebar", "packages"]),
+        {ok, _RequestId} = httpc:request(get, {Url, []}, [], [{stream, PackagesFile}
+                                                             ,{sync, true}])
+    catch
+        _:_ ->
+            {error, io_lib:format("Failed to write package index.~n", [])}
+    end,
+    {ok, State}.
 
-wait(RequestId, State) ->
-    receive
-        {http, {RequestId, saved_to_file}} ->
-            {ok, State}
-    after
-        500 ->
-            io:format("."),
-            wait(RequestId, State)
-    end.
+-spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
+format_error(Reason, State) ->
+    {io_lib:format("~p", [Reason]), State}.
 
 url(State) ->
     SystemArch = erlang:system_info(system_architecture),

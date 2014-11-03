@@ -1,9 +1,10 @@
 -module(rebar_prv_new).
 
--behaviour(rebar_provider).
+-behaviour(provider).
 
 -export([init/1,
-         do/1]).
+         do/1,
+         format_error/2]).
 
 -include("rebar.hrl").
 
@@ -16,17 +17,17 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
-                                                       provider_impl = ?MODULE,
-                                                       bare = false,
-                                                       deps = ?DEPS,
-                                                       example = "rebar new <template>",
-                                                       short_desc = "Create new project from templates.",
-                                                       desc = info(create),
-                                                       opts = []}),
+    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
+                                                               {module, ?MODULE},
+                                                               {bare, false},
+                                                               {deps, ?DEPS},
+                                                               {example, "rebar new <template>"},
+                                                               {short_desc, "Create new project from templates."},
+                                                               {desc, info()},
+                                                               {opts, []}])),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     case rebar_state:command_args(State) of
         [TemplateName] ->
@@ -41,33 +42,17 @@ do(State) ->
             {ok, State}
     end.
 
+-spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
+format_error(Reason, State) ->
+    {io_lib:format("~p", [Reason]), State}.
+
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
-info(create) ->
+info() ->
     io_lib:format(
-       "Create skel based on template and vars.~n"
-       "~n"
-       "Valid command line options:~n"
-       "  template= [var=foo,...]~n", []);
-info(create_app) ->
-    io_lib:format(
-       "Create simple app skel.~n"
-       "~n"
-       "Valid command line options:~n"
-       "  [appid=myapp]~n", []);
-info(create_lib) ->
-    io_lib:format(
-       "Create simple lib skel.~n"
-       "~n"
-       "Valid command line options:~n"
-       "  [libid=mylib]~n", []);
-info(create_node) ->
-    io_lib:format(
-       "Create simple node skel.~n"
-       "~n"
-       "Valid command line options:~n"
-       "  [nodeid=mynode]~n", []);
-info(list_templates) ->
-    io_lib:format("List available templates.~n", []).
+      "Create rebar project based on template and vars.~n"
+      "~n"
+      "Valid command line options:~n"
+      "  template= [var=foo,...]~n", []).

@@ -1,7 +1,7 @@
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 
--module(rebar_prv_tar).
+-module(rebar_prv_clean).
 
 -behaviour(provider).
 
@@ -11,8 +11,8 @@
 
 -include("rebar.hrl").
 
--define(PROVIDER, tar).
--define(DEPS, []).
+-define(PROVIDER, clean).
+-define(DEPS, [app_discovery]).
 
 %% ===================================================================
 %% Public API
@@ -24,20 +24,19 @@ init(State) ->
                                                                {module, ?MODULE},
                                                                {bare, false},
                                                                {deps, ?DEPS},
-                                                               {example, "rebar tar"},
-                                                               {short_desc, "Tar archive of release built of project."},
+                                                               {example, "rebar clean"},
+                                                               {short_desc, "Remove compiled beam files from apps."},
                                                                {desc, ""},
                                                                {opts, []}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    case rebar_state:get(State, relx, []) of
-        [] ->
-            relx:main(["release tar"]);
-        Config ->
-            relx:main([{config, Config}], ["release tar"])
-    end,
+    ProjectApps = rebar_state:project_apps(State),
+    lists:foreach(fun(AppInfo) ->
+                          ?INFO("Cleaning out ~s...~n", [rebar_app_info:name(AppInfo)]),
+                          rebar_erlc_compiler:clean(State, ec_cnv:to_list(rebar_app_info:dir(AppInfo)))
+                  end, ProjectApps),
     {ok, State}.
 
 -spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.

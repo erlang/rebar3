@@ -4,7 +4,7 @@ rebar
 rebar is an Erlang build tool that makes it easy to compile and test Erlang
 applications, port drivers and releases.
 
-[![Build Status](https://secure.travis-ci.org/rebar/rebar.png?branch=master)](http://travis-ci.org/rebar/rebar)
+[![Build Status](https://travis-ci.org/tsloughter/rebar.svg?branch=rebar3)](https://travis-ci.org/tsloughter/rebar)
 
 rebar is a self-contained Erlang script, so it's easy to distribute or even
 embed directly in a project. Where possible, rebar uses standard Erlang/OTP
@@ -23,21 +23,24 @@ This is an experimental branch.
 | Command    | Description |
 |----------- |------------ |
 | compile    | Build project |
-| update     | Update package index |
+| clean      | Remove project apps beam files |
+| do         | Higher-order provider to run multiple tasks in sequence |
+| help       | Print help for rebar or task |
+| new        | Create new rebar project from templates |
 | pkgs       | List available packages |
+| release    | Build release of project |
+| tar        | Package release into tarball |
 | shell      | Run shell with project apps in path |
-| escriptize | Create escript from project |
+| update     | Update package index |
+| upgrade    | Fetch latest version of dep |
+| version    | Print current version of Erlang/OTP and rebar |
 
 The following commands are still in the works.
 
 | Command    | Description |
 |----------- |------------ |
-| release    | Build release of project |
-| tar        | Package release into tarball |
-| new        | |
 | eunit      | |
 | ct         | |
-| do         | |
 
 ### Missing
 
@@ -69,8 +72,6 @@ Example:
 -export([init/1,
          do/1]).
 
--include("rebar.hrl").
-
 -define(PROVIDER, something).
 -define(DEPS, []).
 
@@ -78,22 +79,22 @@ Example:
 %% Public API
 %% ===================================================================
 
--spec init(rebar_config:config()) -> {ok, rebar_config:config()}.
+-spec init(rebar_state:state()) -> {ok, rebar_state:state()}.
 init(State) ->
-    State1 = rebar_config:add_provider(State, #provider{name = ?PROVIDER,
-                                                        provider_impl = ?MODULE,
-                                                        bare = false,
-                                                        deps = ?DEPS,
-                                                        example = "rebar something",
-                                                        short_desc = "",
-                                                        desc = "",
-                                                        opts = []}),
+    State1 = rebar_state:add_provider(State, rebar_provider:create([{name, ?PROVIDER},
+                                                                    {module, ?MODULE},
+                                                                    {bare, false},
+                                                                    {deps, ?DEPS},
+                                                                    {example, "rebar dummy"},
+                                                                    {short_desc, "dummy plugin."},
+                                                                    {desc, ""},
+                                                                    {opts, []}])),
     {ok, State1}.
 
--spec do(rebar_config:config()) -> {ok, rebar_config:config()} | relx:error().
-do(Config) ->
+-spec do(rebar_state:state()) -> {ok, rebar_state:state()}.
+do(State) ->
     %% Do something
-    {ok, Config}.
+    {ok, State}.
 ```
 
 

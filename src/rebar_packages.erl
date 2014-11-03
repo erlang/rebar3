@@ -4,7 +4,7 @@
 
 -include("rebar.hrl").
 
--spec get_packages(rebar_state:t()) -> {list(), rlx_depsolver:t()}.
+-spec get_packages(rebar_state:t()) -> {rebar_dict(), rlx_depsolver:t()}.
 get_packages(State) ->
     RebarDir = rebar_state:get(State, global_rebar_dir, filename:join(os:getenv("HOME"), ".rebar")),
     PackagesFile = filename:join(RebarDir, "packages"),
@@ -12,12 +12,13 @@ get_packages(State) ->
         true ->
             try
                 {ok, Binary} = file:read_file(PackagesFile),
-                binary_to_term(Binary)
+                {Dict, Graph} = binary_to_term(Binary),
+                {Dict, Graph}
             catch
                 _:_ ->
                     ?ERROR("Bad packages index, try to fix with `rebar update`~n", []),
-                    {[], rlx_depsolver:new()}
+                    {dict:new(), rlx_depsolver:new_graph()}
             end;
         false ->
-            {[], rlx_depsolver:new()}
+            {dict:new(), rlx_depsolver:new_graph()}
     end.

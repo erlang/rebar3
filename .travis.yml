@@ -1,10 +1,21 @@
 language: erlang
 otp_release:
+  - 17.0
   - R16B02
   - R16B01
   - R15B01
-  - 17.0
-script: "make travis"
+script: make travis
 branches:
   only:
     - rebar3
+before_deploy: "rm -rf !(rebar3)"
+deploy:
+  on:
+    branch: rebar3
+    condition: $TRAVIS_OTP_RELEASE = R15B01
+  provider: s3
+  access_key_id: AKIAIKQB2JZYYNIWC72Q
+  secret_access_key:
+    secure: JoPSFeISsq7RbkgQLbz/DdLATgGhyuSjjIAwv0lZkhkHspmchArnt9hjDTxmkk8ApPcqDhp8iPEII6E8f2tltTA7djpxx8fO6a7DLyJnDe7QL4Qu1zSMmy91JmkapjDb8VqdAyvUmzAuCp91rfQPsgDiVQNrBSdCfy7LcTZyk3M=
+  bucket: "rebar3"
+  skip_cleanup: true

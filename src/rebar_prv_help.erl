@@ -3,10 +3,11 @@
 
 -module(rebar_prv_help).
 
--behaviour(rebar_provider).
+-behaviour(provider).
 
 -export([init/1,
-         do/1]).
+         do/1,
+         format_error/2]).
 
 -include("rebar.hrl").
 
@@ -19,30 +20,49 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
-                                                       provider_impl = ?MODULE,
-                                                       bare = false,
-                                                       deps = ?DEPS,
-                                                       example = "rebar help <task>",
-                                                       short_desc = "Display a list of tasks or help for a given task or subtask.",
-                                                       desc = "",
-                                                       opts = []}),
+    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
+                                                               {module, ?MODULE},
+                                                               {bare, false},
+                                                               {deps, ?DEPS},
+                                                               {example, "rebar help <task>"},
+                                                               {short_desc, "Display a list of tasks or help for a given task or subtask."},
+                                                               {desc, "Display a list of tasks or help for a given task or subtask."},
+                                                               {opts, [
+                                                                      {help_task, undefined, undefined, string, "Task to print help for."}
+                                                                      ]}])),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    help(State),
-    {ok, State}.
+    {Args, _} = rebar_state:command_parsed_args(State),
+    case proplists:get_value(help_task, Args, undefined) of
+        undefined ->
+            help(State),
+            {ok, State};
+        Name ->
+            Providers = rebar_state:providers(State),
+            case providers:get_provider(list_to_atom(Name), Providers) of
+                not_found ->
+                    {error, io_lib:format("Unknown task ~s", [Name])};
+                Provider ->
+                    providers:help(Provider),
+                    {ok, State}
+            end
+    end.
+
+-spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
+format_error(Reason, State) ->
+    {io_lib:format("~p", [Reason]), State}.
 
 %%
 %% print help/usage string
 %%
 help(State) ->
     ?CONSOLE("Rebar is a tool for working with Erlang projects.~n~n", []),
-    OptSpecList = rebar3:option_spec_list(),
+    OptSpecList = rebar3:global_option_spec_list(),
     getopt:usage(OptSpecList, "rebar", "", []),
     ?CONSOLE("~nSeveral tasks are available:~n", []),
 
-    rebar_provider:help(State),
+    providers:help(rebar_state:providers(State)),
 
     ?CONSOLE("~nRun 'rebar help <TASK>' for details.~n~n", []).

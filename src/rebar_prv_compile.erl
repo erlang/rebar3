@@ -1,9 +1,10 @@
 -module(rebar_prv_compile).
 
--behaviour(rebar_provider).
+-behaviour(provider).
 
 -export([init/1,
          do/1,
+         format_error/2,
          build/2]).
 
 -include("rebar.hrl").
@@ -11,34 +12,48 @@
 -define(PROVIDER, compile).
 -define(DEPS, [lock]).
 
+-define(DEFAULT_JOBS, 3).
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
-                                                        provider_impl = ?MODULE,
-                                                        bare = false,
-                                                        deps = ?DEPS,
-                                                        example = "rebar compile",
-                                                        short_desc = "Compile apps .app.src and .erl files.",
-                                                        desc = "",
-                                                        opts = []}),
+    JobsHelp = io_lib:format(
+                 "Number of concurrent workers the compiler may use. Default: ~B",
+                 [?DEFAULT_JOBS]),
+    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
+                                                               {module, ?MODULE},
+                                                               {bare, false},
+                                                               {deps, ?DEPS},
+                                                               {example, "rebar compile"},
+                                                               {short_desc, "Compile apps .app.src and .erl files."},
+                                                               {desc, ""},
+                                                               {opts, [
+                                                                      {jobs,     $j, "jobs",     integer,   JobsHelp}
+                                                                      ]}])),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    ProjectApps = rebar_state:project_apps(State),
-    Deps = rebar_state:get(State, deps_to_build, []),
+    {ok, State1} = handle_args(State),
+
+    ProjectApps = rebar_state:project_apps(State1),
+    Deps = rebar_state:get(State1, deps_to_build, []),
 
     lists:foreach(fun(AppInfo) ->
-                          C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
-                          S = rebar_state:new(rebar_state:new(), C, rebar_app_info:dir(AppInfo)),
+                          AppDir = rebar_app_info:dir(AppInfo),
+                          C = rebar_config:consult(AppDir),
+                          S = rebar_state:new(State1, C, AppDir),
                           build(S, AppInfo)
                   end, Deps++ProjectApps),
 
-    {ok, State}.
+    {ok, State1}.
+
+-spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
+format_error(Reason, State) ->
+    {io_lib:format("~p", [Reason]), State}.
 
 build(State, AppInfo) ->
     ?INFO("Compiling ~s~n", [rebar_app_info:name(AppInfo)]),
@@ -49,3 +64,8 @@ build(State, AppInfo) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+handle_args(State) ->
+    {Args, _} = rebar_state:command_parsed_args(State),
+    Jobs = proplists:get_value(jobs, Args, ?DEFAULT_JOBS),
+    {ok, rebar_state:set(State, jobs, Jobs)}.

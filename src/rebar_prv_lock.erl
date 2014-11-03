@@ -1,9 +1,10 @@
 -module(rebar_prv_lock).
 
--behaviour(rebar_provider).
+-behaviour(provider).
 
 -export([init/1,
-         do/1]).
+         do/1,
+         format_error/2]).
 
 -include("rebar.hrl").
 
@@ -16,17 +17,17 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
-                                                       provider_impl = ?MODULE,
-                                                       bare = true,
-                                                       deps = ?DEPS,
-                                                       example = "",
-                                                       short_desc = "Locks dependencies.",
-                                                       desc = info("Locks dependencies"),
-                                                       opts = []}),
+    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
+                                                               {module, ?MODULE},
+                                                               {bare, true},
+                                                               {deps, ?DEPS},
+                                                               {example, ""},
+                                                               {short_desc, "Locks dependencies."},
+                                                               {desc, info("Locks dependencies")},
+                                                               {opts, []}])),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     case rebar_state:get(State, locks, []) of
         [] ->
@@ -40,7 +41,8 @@ do(State) ->
                                           Source when is_tuple(Source) ->
                                               {rebar_app_info:name(Dep)
                                               ,rebar_app_info:original_vsn(Dep)
-                                              ,rebar_fetch:lock_source(Dir, Source)};
+                                              ,rebar_fetch:lock_source(Dir, Source)
+                                              ,rebar_app_info:dep_level(Dep)};
                                           _Source ->
                                               {rebar_app_info:name(Dep)
                                               ,rebar_app_info:original_vsn(Dep)}
@@ -52,6 +54,10 @@ do(State) ->
         _Locks ->
             {ok, State}
     end.
+
+-spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
+format_error(Reason, State) ->
+    {io_lib:format("~p", [Reason]), State}.
 
 info(_) ->
     "".

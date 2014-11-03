@@ -35,11 +35,11 @@
 %% Public API
 %% ===================================================================
 
--spec consult(file:name()) -> {ok, any()}.
+-spec consult(file:name()) -> [any()].
 consult(Dir) ->
     consult_file(filename:join(Dir, ?DEFAULT_CONFIG_FILE)).
 
--spec consult_file(file:name()) -> {ok, any()}.
+-spec consult_file(file:name()) -> [any()].
 consult_file(File) when is_binary(File) ->
     consult_file(binary_to_list(File));
 consult_file(File) ->
@@ -73,7 +73,6 @@ remove_script_ext(F) ->
 try_consult(File) ->
     case file:consult(File) of
         {ok, Terms} ->
-            ?DEBUG("Consult config file ~p~n", [File]),
             Terms;
         {error, enoent} ->
             [];

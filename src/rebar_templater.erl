@@ -47,6 +47,8 @@ new(app, DirName, State) ->
     create1(State, DirName, "otp_app");
 new(lib, DirName, State) ->
     create1(State, DirName, "otp_lib");
+new(plugin, DirName, State) ->
+    create1(State, DirName, "plugin");
 new(rel, DirName, State) ->
     create1(State, DirName, "otp_rel").
 
@@ -78,7 +80,7 @@ create(State) ->
 resolve_variables([], Dict) ->
     Dict;
 resolve_variables([{Key, Value0} | Rest], Dict) when is_list(Value0) ->
-    Value = render(list_to_binary(Value0), Dict),
+    Value = render(Value0, Dict),
     resolve_variables(Rest, dict:store(Key, Value, Dict));
 resolve_variables([{Key, {list, Dicts}} | Rest], Dict) when is_list(Dicts) ->
     %% just un-tag it so erlydtl can use it
@@ -376,7 +378,7 @@ execute_template(Files, [{'case', Variable, Values, Instructions} | Rest], Templ
                      ExistingFiles);
 execute_template(Files, [{template, Input, Output} | Rest], TemplateType,
                  TemplateName, Context, Force, ExistingFiles) ->
-    InputName = filename:join(filename:dirname(TemplateName), Input),
+    _InputName = filename:join(filename:dirname(TemplateName), Input),
     %File = load_file(Files, TemplateType, InputName),
     OutputTemplateName = make_template_name("rebar_output_template", Output),
     {ok, OutputTemplateName1} = erlydtl:compile_template(Output, OutputTemplateName, ?ERLYDTL_COMPILE_OPTS),

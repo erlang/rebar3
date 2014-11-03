@@ -25,7 +25,7 @@ init_per_testcase(_, Config) ->
     DataDir = proplists:get_value(data_dir, Config),
     AppsDir = filename:join([DataDir, create_random_name("apps_dir1_")]),
     ok = ec_file:mkdir_p(AppsDir),
-    Verbosity = rebar3:log_level([]),
+    Verbosity = rebar3:log_level(),
     rebar_log:init(command_line, Verbosity),
     State = rebar_state:new(),
     [{apps, AppsDir}, {state, State} | Config].

@@ -99,7 +99,7 @@ main(Args) ->
 
     %% Add a helpful message
     io:format("Congratulations! You now have a self-contained script called"
-              " \"rebar\" in\n"
+              " \"rebar3\" in\n"
               "your current working directory. "
               "Place this script anywhere in your path\n"
               "and you can use rebar to build OTP-compliant apps.\n").

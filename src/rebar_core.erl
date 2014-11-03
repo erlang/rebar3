@@ -26,33 +26,61 @@
 %% -------------------------------------------------------------------
 -module(rebar_core).
 
--export([process_command/2]).
+-export([process_command/2
+        ,update_code_path/1]).
 
 -include("rebar.hrl").
 
+-spec process_command(rebar_state:t(), atom()) -> {ok, rebar_state:t()} | {error, string()}.
 process_command(State, Command) ->
+    %% ? rebar_prv_install_deps:setup_env(State),
+    Providers = rebar_state:providers(State),
+    TargetProviders = providers:get_target_providers(Command, Providers),
+    case providers:get_provider(Command, Providers) of
+        not_found ->
+            {error, io_lib:format("Command ~p not found", [Command])};
+        CommandProvider ->
+            Opts = providers:opts(CommandProvider)++rebar3:global_option_spec_list(),
+            case Command of
+                do ->
+                    do(TargetProviders, State);
+                _ ->
+                    case getopt:parse(Opts, rebar_state:command_args(State)) of
+                        {ok, Args} ->
+                            State2 = rebar_state:command_parsed_args(State, Args),
+                            do(TargetProviders, State2);
+                        {error, {invalid_option, Option}} ->
+                            {error, io_lib:format("Invalid option ~s on task ~p", [Option, Command])}
+                    end
+            end
+    end.
+
+-spec do([atom()], rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
+do([], State) ->
+    {ok, State};
+do([ProviderName | Rest], State) ->
+    Provider = providers:get_provider(ProviderName
+                                     ,rebar_state:providers(State)),
+    case providers:do(Provider, State) of
+        {ok, State1} ->
+            do(Rest, State1);
+        {error, Error} ->
+            {error, Error}
+    end.
+
+update_code_path(State) ->
     true = rebar_utils:expand_code_path(),
     LibDirs = rebar_state:get(State, lib_dirs, ?DEFAULT_LIB_DIRS),
-    DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIRS),
-    _UpdatedCodePaths = update_code_path([DepsDir | LibDirs]),
-    rebar_prv_install_deps:setup_env(State),
+    DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
+    PluginsDir = rebar_state:get(State, plugins_dir, ?DEFAULT_PLUGINS_DIR),
+    _UpdatedCodePaths = update_code_path_([DepsDir, PluginsDir | LibDirs]).
 
-    TargetProviders = rebar_provider:get_target_providers(Command, State),
-
-    lists:foldl(fun(TargetProvider, Conf) ->
-                        Provider = rebar_provider:get_provider(TargetProvider
-                                                              ,rebar_state:providers(Conf)),
-                        {ok, Conf1} = rebar_provider:do(Provider, Conf),
-                        Conf1
-                end, State, TargetProviders).
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
-update_code_path([]) ->
-    no_change;
-update_code_path(Paths) ->
+update_code_path_(Paths) ->
     LibPaths = expand_lib_dirs(Paths, rebar_utils:get_cwd(), []),
     ok = code:add_pathsa(LibPaths),
     %% track just the paths we added, so we can remove them without

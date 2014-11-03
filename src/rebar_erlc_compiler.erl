@@ -96,30 +96,30 @@ compile(Config, Dir) ->
     rebar_base_compiler:run(Config,
                             check_files(rebar_state:get(
                                           Config, xrl_first_files, [])),
-                            "src", ".xrl", "src", ".erl",
+                            filename:join(Dir, "src"), ".xrl", filename:join(Dir, "src"), ".erl",
                             fun compile_xrl/3),
     rebar_base_compiler:run(Config,
                             check_files(rebar_state:get(
                                           Config, yrl_first_files, [])),
-                            "src", ".yrl", "src", ".erl",
+                            filename:join(Dir, "src"), ".yrl", filename:join(Dir, "src"), ".erl",
                             fun compile_yrl/3),
     rebar_base_compiler:run(Config,
                             check_files(rebar_state:get(
                                           Config, mib_first_files, [])),
-                            "mibs", ".mib", "priv/mibs", ".bin",
+                            filename:join(Dir, "mibs"), ".mib", filename:join([Dir, "priv", "mibs"]), ".bin",
                             fun compile_mib/3),
     doterl_compile(Config, Dir).
 
 -spec clean(rebar_state:t(), file:filename()) -> 'ok'.
-clean(Config, _AppFile) ->
-    MibFiles = rebar_utils:find_files("mibs", ?RE_PREFIX".*\\.mib\$"),
+clean(Config, AppDir) ->
+    MibFiles = rebar_utils:find_files(filename:join(AppDir, "mibs"), ?RE_PREFIX".*\\.mib\$"),
     MIBs = [filename:rootname(filename:basename(MIB)) || MIB <- MibFiles],
     rebar_file_utils:delete_each(
-      [filename:join(["include",MIB++".hrl"]) || MIB <- MIBs]),
+      [filename:join([AppDir, "include",MIB++".hrl"]) || MIB <- MIBs]),
     lists:foreach(fun(F) -> ok = rebar_file_utils:rm_rf(F) end,
-                  ["ebin/*.beam", "priv/mibs/*.bin"]),
+                  [filename:join(AppDir, "ebin/*.beam"), filename:join(AppDir, "priv/mibs/*.bin")]),
 
-    YrlFiles = rebar_utils:find_files("src", ?RE_PREFIX".*\\.[x|y]rl\$"),
+    YrlFiles = rebar_utils:find_files(filename:join(AppDir, "src"), ?RE_PREFIX".*\\.[x|y]rl\$"),
     rebar_file_utils:delete_each(
       [ binary_to_list(iolist_to_binary(re:replace(F, "\\.[x|y]rl$", ".erl")))
         || F <- YrlFiles ]),
@@ -131,9 +131,9 @@ clean(Config, _AppFile) ->
     %% directory structure in ebin with .beam files within. As such, we want
     %% to scan whatever is left in the ebin/ directory for sub-dirs which
     %% satisfy our criteria.
-    BeamFiles = rebar_utils:find_files("ebin", ?RE_PREFIX".*\\.beam\$"),
+    BeamFiles = rebar_utils:find_files(filename:join(AppDir, "ebin"), ?RE_PREFIX".*\\.beam\$"),
     rebar_file_utils:delete_each(BeamFiles),
-    lists:foreach(fun(Dir) -> delete_dir(Dir, dirs(Dir)) end, dirs("ebin")),
+    lists:foreach(fun(Dir) -> delete_dir(Dir, dirs(Dir)) end, dirs(filename:join(AppDir, "ebin"))),
     ok.
 
 %% ===================================================================
@@ -241,14 +241,14 @@ test_compile_config_and_opts(Config, ErlOpts, Cmd) ->
     %% *_first_files is questionable as the file would need to exist
     %% in all project directories for it to work.
     OptsAtom = list_to_atom(Cmd ++ "_compile_opts"),
-    TestOpts = rebar_state:get_list(Config3, OptsAtom, []),
+    TestOpts = rebar_state:get(Config3, OptsAtom, []),
     Opts0 = [{d, 'TEST'}] ++
         ErlOpts ++ TestOpts ++ TriqOpts ++ PropErOpts ++ EqcOpts,
     Opts = [O || O <- Opts0, O =/= no_debug_info],
     Config4 = rebar_state:set(Config3, erl_opts, Opts),
 
     FirstFilesAtom = list_to_atom(Cmd ++ "_first_files"),
-    FirstErls = rebar_state:get_list(Config4, FirstFilesAtom, []),
+    FirstErls = rebar_state:get(Config4, FirstFilesAtom, []),
     Config5 = rebar_state:set(Config4, erl_first_files, FirstErls),
     {Config5, Opts}.
 
@@ -274,7 +274,7 @@ define_if(Def, true) -> [{d, Def}];
 define_if(_Def, false) -> [].
 
 is_lib_avail(Config, DictKey, Mod, Hrl, Name) ->
-    case rebar_state:get_xconf(Config, DictKey, undefined) of
+    case rebar_state:get(Config, DictKey, undefined) of
         undefined ->
             IsAvail = case code:lib_dir(Mod, include) of
                           {error, bad_name} ->
@@ -282,17 +282,17 @@ is_lib_avail(Config, DictKey, Mod, Hrl, Name) ->
                           Dir ->
                               filelib:is_regular(filename:join(Dir, Hrl))
                       end,
-            NewConfig = rebar_state:set_xconf(Config, DictKey, IsAvail),
+            NewConfig = rebar_state:set(Config, DictKey, IsAvail),
             ?DEBUG("~s availability: ~p\n", [Name, IsAvail]),
             {NewConfig, IsAvail};
         IsAvail ->
             {Config, IsAvail}
     end.
 
--spec doterl_compile(rebar_state:t(), file:filename()) -> 'ok'.
-doterl_compile(Config, Dir) ->
-    ErlOpts = rebar_utils:erl_opts(Config),
-    doterl_compile(Config, Dir, [], ErlOpts).
+-spec doterl_compile(rebar_state:t(), file:filename()) -> ok.
+doterl_compile(State, Dir) ->
+    ErlOpts = rebar_utils:erl_opts(State),
+    doterl_compile(State, Dir, [], ErlOpts).
 
 doterl_compile(Config, Dir, MoreSources, ErlOpts) ->
     OutDir = filename:join(Dir, "ebin"),
@@ -634,16 +634,19 @@ compile_yrl(Source, Target, Config) ->
 -spec compile_xrl_yrl(rebar_state:t(), file:filename(),
                       file:filename(), list(), module()) -> 'ok'.
 compile_xrl_yrl(Config, Source, Target, Opts, Mod) ->
+    Dir = rebar_state:dir(Config),
+    Opts1 = [{includefile, filename:join(Dir, I)} || {includefile, I} <- Opts,
+                                                     filename:pathtype(I) =:= relative],
     case needs_compile(Source, Target, []) of
         true ->
-            case Mod:file(Source, Opts ++ [{return, true}]) of
+            case Mod:file(Source, Opts1 ++ [{return, true}]) of
                 {ok, _} ->
                     ok;
                 {ok, _Mod, Ws} ->
                     rebar_base_compiler:ok_tuple(Config, Source, Ws);
                 {error, Es, Ws} ->
                     rebar_base_compiler:error_tuple(Config, Source,
-                                                    Es, Ws, Opts)
+                                                    Es, Ws, Opts1)
             end;
         false ->
             skipped

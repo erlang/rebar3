@@ -28,10 +28,11 @@
 -module(rebar_prv_shell).
 -author("Kresten Krab Thorup <krab@trifork.com>").
 
--behaviour(rebar_provider).
+-behaviour(provider).
 
 -export([init/1,
-         do/1]).
+         do/1,
+         format_error/2]).
 
 -include("rebar.hrl").
 
@@ -44,20 +45,24 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, #provider{name = ?PROVIDER,
-                                                        provider_impl = ?MODULE,
-                                                        bare = false,
-                                                        deps = ?DEPS,
-                                                        example = "rebar shell",
-                                                        short_desc = "Run shell with project apps and deps in path.",
-                                                        desc = info(),
-                                                        opts = []}),
+    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
+                                                               {module, ?MODULE},
+                                                               {bare, false},
+                                                               {deps, ?DEPS},
+                                                               {example, "rebar shell"},
+                                                               {short_desc, "Run shell with project apps and deps in path."},
+                                                               {desc, info()},
+                                                               {opts, []}])),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()} | relx:error().
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(Config) ->
     shell(),
     {ok, Config}.
+
+-spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
+format_error(Reason, State) ->
+    {io_lib:format("~p", [Reason]), State}.
 
 %% NOTE:
 %% this is an attempt to replicate `erl -pa ./ebin -pa deps/*/ebin`. it is
