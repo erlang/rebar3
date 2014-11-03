@@ -34,9 +34,9 @@ init(State) ->
 do(State) ->
     case rebar_state:get(State, relx, []) of
         [] ->
-            relx:main(["release tar"]);
+            relx:main(["release", "tar"]);
         Config ->
-            relx:main([{config, Config}], ["release tar"])
+            relx:main([{config, Config}], ["release", "tar"])
     end,
     {ok, State}.
 
