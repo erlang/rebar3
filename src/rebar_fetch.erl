@@ -59,7 +59,12 @@ needs_update(AppDir, Source) ->
         {error, _}=Error ->
             Error;
         Module ->
-            Module:needs_update(AppDir, Source)
+            try
+                Module:needs_update(AppDir, Source)
+            catch
+                _:_ ->
+                    true
+            end
     end.
 
 get_resource_type({Type, Location, _}) ->

@@ -135,7 +135,7 @@ sh(Command0, Options0) ->
     ?DEBUG("sh info:\n\tcwd: ~p\n\tcmd: ~s\n", [get_cwd(), Command0]),
     ?DEBUG("\topts: ~p\n", [Options0]),
 
-    DefaultOptions = [{use_stdout, false}, abort_on_error],
+    DefaultOptions = [{use_stdout, false}, debug_and_abort_on_error],
     Options = [expand_sh_flag(V)
                || V <- proplists:compact(Options0 ++ DefaultOptions)],
 
@@ -359,9 +359,9 @@ expand_sh_flag(return_on_error) ->
 expand_sh_flag({abort_on_error, Message}) ->
     {error_handler,
      log_msg_and_abort(Message)};
-expand_sh_flag(abort_on_error) ->
+expand_sh_flag(debug_and_abort_on_error) ->
     {error_handler,
-     fun log_and_abort/2};
+     fun debug_and_abort/2};
 expand_sh_flag(use_stdout) ->
     {output_handler,
      fun(Line, Acc) ->
@@ -385,11 +385,12 @@ log_msg_and_abort(Message) ->
             ?ABORT(Message, [])
     end.
 
--spec log_and_abort(string(), {integer(), string()}) -> no_return().
-log_and_abort(Command, {Rc, Output}) ->
-    ?ABORT("sh(~s)~n"
-           "failed with return code ~w and the following output:~n"
-           "~s~n", [Command, Rc, Output]).
+-spec debug_and_abort(string(), {integer(), string()}) -> no_return().
+debug_and_abort(Command, {Rc, Output}) ->
+    ?DEBUG("sh(~s)~n"
+          "failed with return code ~w and the following output:~n"
+          "~s~n", [Command, Rc, Output]),
+    throw(rebar_abort).
 
 sh_loop(Port, Fun, Acc) ->
     receive
