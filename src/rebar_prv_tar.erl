@@ -27,16 +27,18 @@ init(State) ->
                                                                {example, "rebar tar"},
                                                                {short_desc, "Tar archive of release built of project."},
                                                                {desc, ""},
-                                                               {opts, []}])),
+                                                               {opts, relx:opt_spec_list()}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    Options = rebar_state:command_args(State),
+    AllOptions = string:join(["release", "tar" | Options], " "),
     case rebar_state:get(State, relx, []) of
         [] ->
-            relx:main(["release", "tar"]);
+            relx:main(AllOptions);
         Config ->
-            relx:main([{config, Config}], ["release", "tar"])
+            relx:main([{config, Config}], AllOptions)
     end,
     {ok, State}.
 
