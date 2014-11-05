@@ -142,7 +142,7 @@ clean(Config, AppDir) ->
 
 test_compile(Config, Cmd, OutDir) ->
     %% Obtain all the test modules for inclusion in the compile stage.
-    TestErls = rebar_utils:find_files("test", ?RE_PREFIX".*\\.erl\$"),
+    TestErls = rebar_utils:find_files(filename:absname("test"), ?RE_PREFIX".*\\.erl\$"),
 
     ErlOpts = rebar_utils:erl_opts(Config),
     {Config1, ErlOpts1} = test_compile_config_and_opts(Config, ErlOpts, Cmd),
@@ -154,7 +154,7 @@ test_compile(Config, Cmd, OutDir) ->
     SrcErls = lists:foldl(
                 fun(Dir, Acc) ->
                         Files = rebar_utils:find_files(
-                                  Dir, ?RE_PREFIX".*\\.erl\$"),
+                                  filename:absname(Dir), ?RE_PREFIX".*\\.erl\$"),
                         lists:append(Acc, Files)
                 end, [], SrcDirs),
 

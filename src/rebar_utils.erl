@@ -39,6 +39,8 @@
          find_files/3,
          ensure_dir/1,
          beam_to_mod/1,
+         beam_to_mod/2,
+         erl_to_mod/1,
          beams/1,
          find_executable/1,
          expand_code_path/0,
@@ -356,6 +358,9 @@ expand_sh_flag(return_on_error) ->
      fun(_Command, Err) ->
              {error, Err}
      end};
+expand_sh_flag(abort_on_error) ->
+    {error_handler,
+     fun log_and_abort/2};
 expand_sh_flag({abort_on_error, Message}) ->
     {error_handler,
      log_msg_and_abort(Message)};
@@ -385,6 +390,12 @@ log_msg_and_abort(Message) ->
             ?ABORT(Message, [])
     end.
 
+-spec log_and_abort(string(), {integer(), string()}) -> no_return().
+log_and_abort(Command, {Rc, Output}) ->
+    ?ABORT("sh(~s)~n"
+          "failed with return code ~w and the following output:~n"
+          "~s~n", [Command, Rc, Output]).
+
 -spec debug_and_abort(string(), {integer(), string()}) -> no_return().
 debug_and_abort(Command, {Rc, Output}) ->
     ?DEBUG("sh(~s)~n"
@@ -404,8 +415,15 @@ sh_loop(Port, Fun, Acc) ->
             {error, {Rc, lists:flatten(lists:reverse(Acc))}}
     end.
 
+beam_to_mod(Dir, Filename) ->
+    [Dir | Rest] = filename:split(Filename),
+    list_to_atom(filename:basename(string:join(Rest, "."), ".beam")).
+
 beam_to_mod(Filename) ->
     list_to_atom(filename:basename(Filename, ".beam")).
+
+erl_to_mod(Filename) ->
+    list_to_atom(filename:rootname(filename:basename(Filename))).
 
 beams(Dir) ->
     filelib:fold_files(Dir, ".*\.beam\$", true,
