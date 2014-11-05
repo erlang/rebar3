@@ -12,6 +12,8 @@
 -include("rebar.hrl").
 
 lock(AppDir, {git, Url, _}) ->
+    lock(AppDir, {git, Url});
+lock(AppDir, {git, Url}) ->
     Ref = string:strip(
             os:cmd("git --git-dir='" ++ AppDir ++ "/.git' rev-parse --verify HEAD")
             ,both, $\n),
@@ -55,10 +57,10 @@ needs_update(Dir, {git, Url, Ref}) ->
 
 download(Dir, {git, Url}) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.~n", []),
-    download(Dir, {git, Url, {branch, "HEAD"}});
+    download(Dir, {git, Url, {branch, "master"}});
 download(Dir, {git, Url, ""}) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.~n", []),
-    download(Dir, {git, Url, {branch, "HEAD"}});
+    download(Dir, {git, Url, {branch, "master"}});
 download(Dir, {git, Url, {branch, Branch}}) ->
     ok = filelib:ensure_dir(Dir),
     rebar_utils:sh(?FMT("git clone ~s ~s -b ~s --single-branch",

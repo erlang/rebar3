@@ -67,6 +67,8 @@ needs_update(AppDir, Source) ->
             end
     end.
 
+get_resource_type({Type, Location}) ->
+    find_resource_module(Type, Location);
 get_resource_type({Type, Location, _}) ->
     find_resource_module(Type, Location);
 get_resource_type({Type, _, _, Location}) ->
