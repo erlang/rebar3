@@ -6,4 +6,4 @@ An Erlang {{appid}} library.
 Build
 -----
 
-    $ rebar compile
+    $ rebar3 compile
