@@ -91,7 +91,7 @@ do(State) ->
 Building
 --------
 
-Recommended installation of [Erlang/OTP](http://www.erlang.org) is binary packages from [Erlang Solutoins](https://www.erlang-solutions.com/downloads/download-erlang-otp). For source it is recommended you use [erln8](http://metadave.github.io/erln8/) or [kerl](https://github.com/yrashk/kerl).
+Recommended installation of [Erlang/OTP](http://www.erlang.org) is binary packages from [Erlang Solutions](https://www.erlang-solutions.com/downloads/download-erlang-otp). For source it is recommended you use [erln8](http://metadave.github.io/erln8/) or [kerl](https://github.com/yrashk/kerl).
 
 ### Dependencies
 
