@@ -34,12 +34,17 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
 do(State) ->
     Opts = build_options(State),
+    expand_test_deps(filename:absname(rebar_state:get(State, test_deps_dir, ?DEFAULT_TEST_DEPS_DIR))),
     ct:run_test(Opts),
     {ok, State}.
 
 -spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
 format_error(Reason, State) ->
     {io_lib:format("~p", [Reason]), State}.
+
+expand_test_deps(Dir) ->
+    Apps = filelib:wildcard(filename:join([Dir, "*", "ebin"])),
+    ok = code:add_pathsa(Apps).
 
 ct_opts(State) ->
     DefaultTestDir = filename:join([rebar_state:dir(State), "test"]),

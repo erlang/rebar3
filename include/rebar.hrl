@@ -16,6 +16,7 @@
 -define(DEFAULT_LIB_DIRS, ["_checkouts", "apps", "libs", "."]).
 -define(DEFAULT_DEPS_DIR, "_deps").
 -define(DEFAULT_PLUGINS_DIR, "_plugins").
+-define(DEFAULT_TEST_DEPS_DIR, "_tdeps").
 -define(DEFAULT_CONFIG_FILE, "rebar.config").
 -define(LOCK_FILE, "rebar.lock").
 
