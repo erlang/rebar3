@@ -26,26 +26,21 @@ This is an experimental branch.
 | clean      | Remove project apps beam files |
 | ct         | Run Common Test suites |
 | do         | Higher-order provider to run multiple tasks in sequence |
+| eunit      | Run eunit tests |
 | help       | Print help for rebar or task |
 | new        | Create new rebar project from templates |
 | pkgs       | List available packages |
 | release    | Build release of project |
-| tar        | Package release into tarball |
 | shell      | Run shell with project apps in path |
+| tar        | Package release into tarball |
 | update     | Update package index |
 | upgrade    | Fetch latest version of dep |
 | version    | Print current version of Erlang/OTP and rebar |
 
-The following commands are still in the works.
-
-| Command    | Description |
-|----------- |------------ |
-| eunit      | |
-
 ### Changes
 
 * Fetches and builds deps if missing when running any command that relies on them
-* Automatically recognizes `apps` and `libs` directory structure
+* Automatically recognizes `apps` and `lib` directory structure
 * `escriptize` requires `escript_top_level_app` set in `rebar.config`
 * Relx for releases
 
@@ -96,31 +91,26 @@ do(State) ->
 Building
 --------
 
-Information on building and installing [Erlang/OTP](http://www.erlang.org) can
-be found [here](https://github.com/erlang/otp/wiki/Installation) ([more
-info](https://github.com/erlang/otp/blob/master/INSTALL.md)).
+Recommended installation of [Erlang/OTP](http://www.erlang.org) is binary packages from [Erlang Solutoins](https://www.erlang-solutions.com/downloads/download-erlang-otp). For source it is recommended you use [erln8](http://metadave.github.io/erln8/) or [kerl](https://github.com/yrashk/kerl).
 
 ### Dependencies
 
-To build rebar you will need a working installation of Erlang R13B03 (or later).
+To build rebar you will need a working installation of Erlang R15 (or later).
 
 Should you want to clone the rebar repository, you will also require git.
 
 #### Downloading
 
-You can download a pre-built binary version of rebar from:
+You can download a pre-built binary version of rebar3 based on the last commit from:
 
-https://github.com/rebar/rebar/wiki/rebar
+https://s3.amazonaws.com/rebar3/rebar3
 
 #### Building rebar
 
 ```sh
-$ git clone git://github.com/rebar/rebar.git
+$ git clone git://github.com/tsloughter/rebar.git
 $ cd rebar
 $ ./bootstrap/bootstrap
-Recompile: src/getopt
-...
-Recompile: src/rebar_utils
 ==> rebar (compile)
 Congratulations! You now have a self-contained script called "rebar" in
 your current working directory. Place this script anywhere in your path
