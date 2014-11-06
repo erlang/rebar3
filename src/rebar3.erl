@@ -52,7 +52,13 @@ main(Args) ->
         {error, rebar_abort} ->
             rebar_utils:delayed_halt(1);
         {error, {Module, Reason}} ->
-            ?ERROR(Module:format_error(Reason, []), []),
+            case code:which(Module) of
+                non_existing ->
+                    ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace~n", []),
+                    ?DEBUG("Uncaught error: ~p ~p~n", [Module, Reason]);
+                _ ->
+                    ?ERROR(Module:format_error(Reason, []), [])
+            end,
             rebar_utils:delayed_halt(1);
         {error, Error} when is_list(Error) ->
             ?ERROR(Error++"~n", []),
