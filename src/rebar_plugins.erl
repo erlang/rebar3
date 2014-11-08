@@ -12,6 +12,7 @@
 %% ===================================================================
 
 install(State) ->
+    %% Set deps_dir to a different dir for plugin so they don't collide
     DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
     State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
     expand_plugins(?DEFAULT_PLUGINS_DIR),

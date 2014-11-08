@@ -35,6 +35,7 @@ do(State) ->
     Names = [ec_cnv:to_binary(element(1, Dep)) || Dep <- TestDeps],
     ProjectApps1 = [rebar_app_info:deps(A, Names) || A <- ProjectApps],
 
+    %% Set deps_dir to a different dir for test deps so they don't collide
     TestDepsDir = rebar_state:get(State, test_deps_dir, ?DEFAULT_TEST_DEPS_DIR),
     DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
     State1 = rebar_state:set(State, deps_dir, TestDepsDir),
