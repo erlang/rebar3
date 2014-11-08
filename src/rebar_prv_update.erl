@@ -32,23 +32,24 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    ?INFO("Updating package index...~n", []),
+    ?INFO("Updating package index...", []),
     try
         Url = url(State),
-                                                %{ok, [Home]} = init:get_argument(home),
-        ec_file:mkdir_p(filename:join([os:getenv("HOME"), ".rebar"])),
-        PackagesFile = filename:join([os:getenv("HOME"), ".rebar", "packages"]),
+        {ok, [[Home]]} = init:get_argument(home),
+        PackagesFile = filename:join([Home, ".rebar", "packages"]),
+        filelib:ensure_dir(PackagesFile),
         {ok, _RequestId} = httpc:request(get, {Url, []}, [], [{stream, PackagesFile}
                                                              ,{sync, true}])
     catch
         _:_ ->
-            {error, io_lib:format("Failed to write package index.~n", [])}
+            {error, {?MODULE, package_index_write}}
     end,
+
     {ok, State}.
 
 -spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
-format_error(Reason, State) ->
-    {io_lib:format("~p", [Reason]), State}.
+format_error(package_index_write, State) ->
+    {"Failed to write package index.", State}.
 
 url(State) ->
     SystemArch = erlang:system_info(system_architecture),
