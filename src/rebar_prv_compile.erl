@@ -72,7 +72,8 @@ build_apps(State, Apps) ->
                           %% Legacy hook support
                           rebar_hooks:run_compile_hooks(AppDir, pre_hooks, compile, S),
                           build(S, AppInfo),
-                          rebar_hooks:run_compile_hooks(AppDir, post_hooks, compile, S)
+                          rebar_hooks:run_compile_hooks(AppDir, post_hooks, compile, S),
+                          true = code:add_patha(filename:join(AppDir, "ebin"))
                   end, Apps).
 
 build(State, AppInfo) ->
