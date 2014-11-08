@@ -29,11 +29,13 @@ handle_plugin(Plugin, State) ->
         Apps = rebar_state:get(State1, all_deps, []),
         ToBuild = lists:dropwhile(fun rebar_app_info:valid/1, Apps),
         lists:foreach(fun(AppInfo) ->
-                              C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
-                              S = rebar_state:new(rebar_state:new(), C, rebar_app_info:dir(AppInfo)),
-                              rebar_prv_compile:build(S, AppInfo)
+                              AppDir = rebar_app_info:dir(AppInfo),
+                              C = rebar_config:consult(AppDir),
+                              S = rebar_state:new(rebar_state:new(), C, AppDir),
+                              rebar_prv_compile:build(S, AppInfo),
+                              true = code:add_patha(filename:join(AppDir, "ebin"))
                       end, ToBuild),
-        expand_plugins(?DEFAULT_PLUGINS_DIR),
+
         plugin_providers(Plugin)
     catch
         C:T ->
