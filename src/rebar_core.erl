@@ -70,9 +70,10 @@ do([ProviderName | Rest], State) ->
 
 update_code_path(State) ->
     true = rebar_utils:expand_code_path(),
+    BaseDir = rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR),
     LibDirs = rebar_state:get(State, lib_dirs, ?DEFAULT_LIB_DIRS),
-    DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
-    PluginsDir = rebar_state:get(State, plugins_dir, ?DEFAULT_PLUGINS_DIR),
+    DepsDir = filename:join(BaseDir, rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR)),
+    PluginsDir = filename:join(BaseDir, rebar_state:get(State, plugins_dir, ?DEFAULT_PLUGINS_DIR)),
     _UpdatedCodePaths = update_code_path_([DepsDir, PluginsDir | LibDirs]).
 
 
