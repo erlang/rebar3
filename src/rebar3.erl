@@ -30,7 +30,6 @@
          run/2,
          global_option_spec_list/0,
          init_config/0,
-         init_config1/1,
          set_options/2,
          parse_args/1,
          version/0,
@@ -87,13 +86,43 @@ run(RawArgs) ->
 
     case erlang:system_info(version) of
         "6.1" ->
-            ?WARN("Due to a filelib bug in Erlang 17.1 it is recommended you update to a newer release.", []);
+            ?WARN("Due to a filelib bug in Erlang 17.1 it is recommended"
+                 "you update to a newer release.", []);
         _ ->
             ok
     end,
 
     {BaseConfig1, _Args1} = set_options(BaseConfig, {[], []}),
     run_aux(BaseConfig1, RawArgs).
+
+run_aux(State, RawArgs) ->
+    %% Make sure crypto is running
+    case crypto:start() of
+        ok -> ok;
+        {error,{already_started,crypto}} -> ok
+    end,
+    application:start(asn1),
+    application:start(public_key),
+    application:start(ssl),
+    inets:start(),
+
+    %% Process each command, resetting any state between each one
+    State2 = case rebar_state:get(State, base_dir, undefined) of
+                 undefined ->
+                     rebar_state:set(State, base_dir, filename:absname(rebar_state:dir(State)));
+                 Dir ->
+                     rebar_state:set(State, base_dir, filename:absname(Dir))
+             end,
+
+    {ok, Providers} = application:get_env(rebar, providers),
+
+    {ok, PluginProviders, State3} = rebar_plugins:install(State2),
+    rebar_core:update_code_path(State3),
+
+    State4 = rebar_state:create_logic_providers(Providers++PluginProviders, State3),
+    {Task, Args} = parse_args(RawArgs),
+
+    rebar_core:process_command(rebar_state:command_args(State4, Args), list_to_atom(Task)).
 
 init_config() ->
     %% Initialize logging system
@@ -126,50 +155,19 @@ init_config() ->
                     rebar_state:new(Config1)
             end,
 
-    %% Initialize vsn cache
-    rebar_state:set(State, vsn_cache, dict:new()).
-
-init_config1(BaseConfig) ->
     %% Determine the location of the rebar executable; important for pulling
     %% resources out of the escript
-    try
-        ScriptName = filename:absname(escript:script_name()),
-        rebar_state:set(BaseConfig, escript, ScriptName)
-    catch
-        _:_ ->
-            BaseConfig
-    end.
-
-run_aux(State, RawArgs) ->
-    %% Make sure crypto is running
-    case crypto:start() of
-        ok -> ok;
-        {error,{already_started,crypto}} -> ok
-    end,
-    application:start(asn1),
-    application:start(public_key),
-    application:start(ssl),
-    inets:start(),
-
-    State1 = init_config1(State),
-
-    %% Process each command, resetting any state between each one
-    State2 = case rebar_state:get(State1, base_dir, undefined) of
-                 undefined ->
-                     rebar_state:set(State1, base_dir, filename:absname(rebar_state:dir(State1)));
-                 Dir ->
-                     rebar_state:set(State1, base_dir, filename:absname(Dir))
+    State1 = try
+                 ScriptName = filename:absname(escript:script_name()),
+                 rebar_state:set(State, escript, ScriptName)
+             catch
+                 _:_ ->
+                     State
              end,
 
-    {ok, Providers} = application:get_env(rebar, providers),
-
-    {ok, PluginProviders, State3} = rebar_plugins:install(State2),
-    rebar_core:update_code_path(State3),
-
-    State4 = rebar_state:create_logic_providers(Providers++PluginProviders, State3),
-    {Task, Args} = parse_args(RawArgs),
-
-    rebar_core:process_command(rebar_state:command_args(State4, Args), list_to_atom(Task)).
+    %% TODO: Do we need this still? I think it may still be used.
+    %% Initialize vsn cache
+    rebar_state:set(State1, vsn_cache, dict:new()).
 
 %%
 %% Parse command line arguments using getopt and also filtering out any
@@ -224,6 +222,8 @@ version() ->
              [Vsn, erlang:system_info(otp_release), erlang:system_info(version)]).
 
 
+
+%% TODO: Actually make it 'global'
 %%
 %% set global flag based on getopt option boolean value
 %%
