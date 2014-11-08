@@ -32,13 +32,9 @@ Now we can use rebar3 to fetch all dependencies and build both the dependencies 
 ```shell
 $ rebar3 compile
 ===> Fetching gproc
-Cloning into '.tmp_dir109479658516'...
 ===> Fetching ranch
-Cloning into '.tmp_dir725384773580'...
 ===> Fetching cowboy
-Cloning into '.tmp_dir285325769000'...
 ===> Fetching cowlib
-Cloning into '.tmp_dir924054839613'...
 ===> Compiling gproc
 /home/tristan/Devel/minasan/_deps/gproc/src/gproc_dist.erl:23: Warning: behaviour gen_leader undefined
 ===> Compiling cowlib
@@ -120,7 +116,6 @@ Rebar3 has the concept of test dependencies. These dependencies will only be fet
 ```shell
 $ rebar ct
 ===> Fetching meck
-Cloning into '.tmp_dir772710363032'...
 ===> Compiling meck
 ===> Compiling minasan
 ```
