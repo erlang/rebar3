@@ -82,7 +82,7 @@ run(BaseState, Command) ->
 %% ====================================================================
 
 run(RawArgs) ->
-    ok = load_rebar_app(),
+    _ = application:load(rebar),
     BaseConfig = init_config(),
 
     case erlang:system_info(version) of
@@ -94,10 +94,6 @@ run(RawArgs) ->
 
     {BaseConfig1, _Args1} = set_options(BaseConfig, {[], []}),
     run_aux(BaseConfig1, RawArgs).
-
-load_rebar_app() ->
-    %% Pre-load the rebar app so that we get default configuration
-    ok = application:load(rebar).
 
 init_config() ->
     %% Initialize logging system
@@ -158,7 +154,13 @@ run_aux(State, RawArgs) ->
     State1 = init_config1(State),
 
     %% Process each command, resetting any state between each one
-    State2 = rebar_state:set(State1, base_dir, filename:absname(rebar_state:dir(State1))),
+    State2 = case rebar_state:get(State1, base_dir, undefined) of
+                 undefined ->
+                     rebar_state:set(State1, base_dir, filename:absname(rebar_state:dir(State1)));
+                 Dir ->
+                     rebar_state:set(State1, base_dir, filename:absname(Dir))
+             end,
+
     {ok, Providers} = application:get_env(rebar, providers),
 
     {ok, PluginProviders, State3} = rebar_plugins:install(State2),

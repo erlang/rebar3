@@ -12,6 +12,7 @@
 %% ===================================================================
 
 install(State) ->
+    DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
     State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
     expand_plugins(?DEFAULT_PLUGINS_DIR),
     Plugins = rebar_state:get(State1, plugins, []),
@@ -19,7 +20,7 @@ install(State) ->
                                                     handle_plugin(Plugin, State1)
                                             end, Plugins),
 
-    {ok, PluginProviders, rebar_state:set(State1, deps_dir, ?DEFAULT_DEPS_DIR)}.
+    {ok, PluginProviders, rebar_state:set(State1, deps_dir, DepsDir)}.
 
 handle_plugin(Plugin, State) ->
     try
