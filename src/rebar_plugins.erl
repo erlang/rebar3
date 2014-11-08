@@ -13,26 +13,53 @@
 
 install(State) ->
     State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
-
+    expand_plugins(?DEFAULT_PLUGINS_DIR),
     Plugins = rebar_state:get(State1, plugins, []),
-    {ok, State2} = rebar_prv_install_deps:handle_deps(State1, Plugins),
+    PluginProviders = rebar_utils:filtermap(fun(Plugin) ->
+                                                    handle_plugin(Plugin, State1)
+                                            end, Plugins),
 
-    Apps = rebar_state:get(State2, all_deps, []),
-    ToBuild = lists:dropwhile(fun rebar_app_info:valid/1, Apps),
-    lists:foreach(fun(AppInfo) ->
-                          C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
-                          S = rebar_state:new(rebar_state:new(), C, rebar_app_info:dir(AppInfo)),
-                          rebar_prv_compile:build(S, AppInfo)
-                  end, ToBuild),
+    {ok, PluginProviders, rebar_state:set(State1, deps_dir, ?DEFAULT_DEPS_DIR)}.
 
-    PluginProviders = plugin_providers(Plugins),
-    {ok, PluginProviders, rebar_state:set(State2, deps_dir, ?DEFAULT_DEPS_DIR)}.
+handle_plugin(Plugin, State) ->
+    try
+        {ok, State1} = rebar_prv_install_deps:handle_deps(State, [Plugin]),
+        Apps = rebar_state:get(State1, all_deps, []),
+        ToBuild = lists:dropwhile(fun rebar_app_info:valid/1, Apps),
+        lists:foreach(fun(AppInfo) ->
+                              C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
+                              S = rebar_state:new(rebar_state:new(), C, rebar_app_info:dir(AppInfo)),
+                              rebar_prv_compile:build(S, AppInfo)
+                      end, ToBuild),
+        expand_plugins(?DEFAULT_PLUGINS_DIR),
+        plugin_providers(Plugin)
+    catch
+        C:T ->
+            ?DEBUG("~p ~p", [C, T]),
+            ?WARN("Plugin ~p not available. It will not be used.~n", [Plugin]),
+            false
+    end.
 
-plugin_providers(Plugins) ->
-    lists:map(fun({Plugin, _, _}) when is_atom(Plugin) ->
-                      Plugin;
-                 ({Plugin, _}) when is_atom(Plugin) ->
-                      Plugin;
-                 (Plugin) when is_atom(Plugin) ->
-                      Plugin
-              end, Plugins).
+plugin_providers({Plugin, _, _}) when is_atom(Plugin) ->
+    validate_plugin(Plugin);
+plugin_providers({Plugin, _}) when is_atom(Plugin) ->
+    validate_plugin(Plugin);
+plugin_providers(Plugin) when is_atom(Plugin) ->
+    validate_plugin(Plugin).
+
+validate_plugin(Plugin) ->
+    Exports = sets:from_list(Plugin:module_info(exports)),
+    Required = sets:from_list([{init,1},
+                               {do,1},
+                               {format_error,2}]),
+    case sets:is_subset(Required,  Exports) of
+        false ->
+            ?WARN("Plugin ~p is not a provider. It will not be used.~n", [Plugin]),
+            false;
+        true ->
+            {true, Plugin}
+    end.
+
+expand_plugins(Dir) ->
+    Apps = filelib:wildcard(filename:join([Dir, "*", "ebin"])),
+    ok = code:add_pathsa(Apps).

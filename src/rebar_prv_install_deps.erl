@@ -130,7 +130,13 @@ handle_deps(State, Deps, Update) ->
                      [];
                  PkgDeps1 ->
                      %% Find pkg deps needed
-                     {ok, S} = rlx_depsolver:solve(Graph, PkgDeps1),
+                     S = case rlx_depsolver:solve(Graph, PkgDeps1) of
+                             {ok, Solution} ->
+                                 Solution;
+                             Reason ->
+                                 throw({error, {rlx_depsolver, Reason}})
+                         end,
+
                      %% Create app_info record for each pkg dep
                      [AppInfo || Pkg <- S,
                                  AppInfo <- package_to_app(DepsDir
