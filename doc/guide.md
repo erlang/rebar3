@@ -57,7 +57,23 @@ Dependencies are listed in `rebar.config` file under the `deps` key:
         ]}.
 ```
 
-Then you'll most likely want to add the dependency to one of your project's application's `.app.src` file under applications.
+Now you can add the dep to one of your project's application's `.app.src` file under applications:
+
+```erlang
+{application, <APPNAME>,
+ [{description, ""},
+  {vsn, "<APPVSN>"},
+  {registered, []},
+  {modules, []},
+  {applications, [
+                 kernel
+                 ,stdlib
+                 ,cowboy
+                 ]},
+  {mod, {<APPNAME>_app, []}},
+  {env, []}
+ ]}.
+```
 
 ## Rebar3 Conventions
 
@@ -73,6 +89,23 @@ Rebar3 is entirely based on building OTP applications and releases.
 `rebar.lock` contains the exact reference id to a commit that was used to build the project. Committing this file allows you to specify a branch in `rebar.config` for a dependency and still have reproducable builds because if the `rebar.lock` file exists when a rebar3 project is being built the contents of deps in rebar.config are ignored.
 
 ## Checkout Dependencies
+
+Often while developing you find yourself working on mulitple applications from separate repos together. To simplify this process `rebar3` will look in the directory `_checkouts` for applications to override a dependency.
+
+For example, you are working on project `app1` which depends on `app2`. You want to have your modifications to `app2` used by `app1`:
+
+```shell
+[app1] $ pwd
+/home/user/code/app1
+[app1] $ cat rebar.config
+{deps, [
+   {app2, "", {git, "git://github.com:user/app2.git", {branch, "master"}}}
+]}.
+[app1] $ ls -l _checkouts
+lrwxrwxrwx app2 -> /home/user/code/app2
+```
+
+Since a symlink to `app2` exists in `_checkouts` there will not be a fetch of `app2` by `rebar3` when the project is built.
 
 ## Tests
 
