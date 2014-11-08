@@ -84,6 +84,14 @@ run(BaseState, Command) ->
 run(RawArgs) ->
     ok = load_rebar_app(),
     BaseConfig = init_config(),
+
+    case erlang:system_info(version) of
+        "6.1" ->
+            ?WARN("Due to a filelib bug in Erlang 17.1 it is recommended you update to a newer release.~n", []);
+        _ ->
+            ok
+    end,
+
     {BaseConfig1, _Args1} = set_options(BaseConfig, {[], []}),
     run_aux(BaseConfig1, RawArgs).
 
