@@ -157,7 +157,6 @@ run_aux(State, RawArgs) ->
 
     State1 = init_config1(State),
 
-    code:add_pathsa([filename:join(rebar_utils:get_cwd(), "plugins")]),
     %% Process each command, resetting any state between each one
     State2 = rebar_state:set(State1, base_dir, filename:absname(rebar_state:dir(State1))),
     {ok, Providers} = application:get_env(rebar, providers),
