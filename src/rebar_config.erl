@@ -53,7 +53,7 @@ consult_file(File) ->
                     {ok, Terms} = consult_and_eval(File, Script),
                     Terms;
                 false ->
-                    ?DEBUG("Consult config file ~p~n", [File]),
+                    ?DEBUG("Consult config file ~p", [File]),
                     try_consult(File)
             end
     end.
@@ -63,7 +63,7 @@ consult_file(File) ->
 %% ===================================================================
 
 consult_and_eval(File, Script) ->
-    ?DEBUG("Evaluating config script ~p~n", [Script]),
+    ?DEBUG("Evaluating config script ~p", [Script]),
     StateData = try_consult(File),
     file:script(Script, bs([{'CONFIG', StateData}, {'SCRIPT', Script}])).
 
@@ -77,7 +77,7 @@ try_consult(File) ->
         {error, enoent} ->
             [];
         {error, Reason} ->
-            ?ABORT("Failed to read config file ~s: ~p~n", [File, Reason])
+            ?ABORT("Failed to read config file ~s: ~p", [File, Reason])
     end.
 
 bs(Vars) ->

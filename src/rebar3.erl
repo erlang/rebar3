@@ -54,20 +54,20 @@ main(Args) ->
         {error, {Module, Reason}} ->
             case code:which(Module) of
                 non_existing ->
-                    ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace~n", []),
-                    ?DEBUG("Uncaught error: ~p ~p~n", [Module, Reason]);
+                    ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace", []),
+                    ?DEBUG("Uncaught error: ~p ~p", [Module, Reason]);
                 _ ->
                     ?ERROR(Module:format_error(Reason, []), [])
             end,
             rebar_utils:delayed_halt(1);
         {error, Error} when is_list(Error) ->
-            ?ERROR(Error++"~n", []),
+            ?ERROR(Error, []),
             rebar_utils:delayed_halt(1);
         Error ->
             %% Nothing should percolate up from rebar_core;
             %% Dump this error to console
-            ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace~n", []),
-            ?DEBUG("Uncaught error: ~p~n", [Error]),
+            ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace", []),
+            ?DEBUG("Uncaught error: ~p", [Error]),
             rebar_utils:delayed_halt(1)
     end.
 
@@ -87,7 +87,7 @@ run(RawArgs) ->
 
     case erlang:system_info(version) of
         "6.1" ->
-            ?WARN("Due to a filelib bug in Erlang 17.1 it is recommended you update to a newer release.~n", []);
+            ?WARN("Due to a filelib bug in Erlang 17.1 it is recommended you update to a newer release.", []);
         _ ->
             ok
     end,
@@ -122,7 +122,7 @@ init_config() ->
     GlobalConfigFile = filename:join([os:getenv("HOME"), ".rebar", "config"]),
     State = case filelib:is_regular(GlobalConfigFile) of
                 true ->
-                    ?DEBUG("Load global config file ~p~n",
+                    ?DEBUG("Load global config file ~p",
                            [GlobalConfigFile]),
                     GlobalConfig = rebar_state:new(rebar_config:consult_file(GlobalConfigFile)),
                     rebar_state:new(GlobalConfig, Config1);
@@ -218,7 +218,7 @@ log_level() ->
 %%
 version() ->
     {ok, Vsn} = application:get_key(rebar, vsn),
-    ?CONSOLE("rebar ~s on Erlang/OTP ~s Erts ~s~n",
+    ?CONSOLE("rebar ~s on Erlang/OTP ~s Erts ~s",
              [Vsn, erlang:system_info(otp_release), erlang:system_info(version)]).
 
 

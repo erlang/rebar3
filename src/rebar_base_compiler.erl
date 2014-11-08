@@ -50,7 +50,7 @@ run(Config, FirstFiles, RestFiles, CompileFn) ->
             Self = self(),
             F = fun() -> compile_worker(Self, Config, CompileFn) end,
             Jobs = rebar_state:get(Config, jobs, 3),
-            ?DEBUG("Starting ~B compile worker(s)~n", [Jobs]),
+            ?DEBUG("Starting ~B compile worker(s)", [Jobs]),
             Pids = [spawn_monitor(F) || _I <- lists:seq(1,Jobs)],
             compile_queue(Config, Pids, RestFiles)
     end.
@@ -135,17 +135,17 @@ compile_each([], _Config, _CompileFn) ->
 compile_each([Source | Rest], Config, CompileFn) ->
     case compile(Source, Config, CompileFn) of
         ok ->
-            ?DEBUG("~sCompiled ~s\n", [rebar_utils:indent(1), filename:basename(Source)]);
+            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]);
         {ok, Warnings} ->
             report(Warnings),
-            ?DEBUG("~sCompiled ~s\n", [rebar_utils:indent(1), filename:basename(Source)]);
+            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]);
         skipped ->
-            ?DEBUG("~sSkipped ~s\n", [rebar_utils:indent(1), filename:basename(Source)]);
+            ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), filename:basename(Source)]);
         Error ->
-            ?INFO("Compiling ~s failed:\n",
+            ?INFO("Compiling ~s failed:",
                      [maybe_absname(Config, Source)]),
             maybe_report(Error),
-            ?DEBUG("Compilation failed: ~p\n", [Error]),
+            ?DEBUG("Compilation failed: ~p", [Error]),
             ?FAIL
     end,
     compile_each(Rest, Config, CompileFn).
@@ -165,30 +165,30 @@ compile_queue(Config, Pids, Targets) ->
             end;
 
         {fail, {_, {source, Source}}=Error} ->
-            ?ERROR("Compiling ~s failed:\n",
+            ?ERROR("Compiling ~s failed:",
                      [maybe_absname(Config, Source)]),
             maybe_report(Error),
-            ?DEBUG("Worker compilation failed: ~p\n", [Error]),
+            ?DEBUG("Worker compilation failed: ~p", [Error]),
             ?FAIL;
 
         {compiled, Source, Warnings} ->
             report(Warnings),
-            ?DEBUG("~sCompiled ~s\n", [rebar_utils:indent(1), filename:basename(Source)]),
+            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]),
             compile_queue(Config, Pids, Targets);
 
         {compiled, Source} ->
-            ?DEBUG("~sCompiled ~s\n", [rebar_utils:indent(1), filename:basename(Source)]),
+            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]),
             compile_queue(Config, Pids, Targets);
         {skipped, Source} ->
-            ?DEBUG("~sSkipped ~s~n", [rebar_utils:indent(1), filename:basename(Source)]),
+            ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), filename:basename(Source)]),
             compile_queue(Config, Pids, Targets);
         {'DOWN', Mref, _, Pid, normal} ->
-            ?DEBUG("Worker exited cleanly\n", []),
+            ?DEBUG("Worker exited cleanly", []),
             Pids2 = lists:delete({Pid, Mref}, Pids),
             compile_queue(Config, Pids2, Targets);
 
         {'DOWN', _Mref, _, _Pid, Info} ->
-            ?DEBUG("Worker failed: ~p\n", [Info]),
+            ?DEBUG("Worker failed: ~p", [Info]),
             ?FAIL
     end.
 
@@ -231,7 +231,7 @@ format_warnings(Config, Source, Warnings, Opts) ->
 maybe_report({{error, {error, _Es, _Ws}=ErrorsAndWarnings}, {source, _}}) ->
     maybe_report(ErrorsAndWarnings);
 maybe_report([{error, E}, {source, S}]) ->
-    report(["unexpected error compiling " ++ S, io_lib:fwrite("~n~p~n", [E])]);
+    report(["unexpected error compiling " ++ S, io_lib:fwrite("~n~p", [E])]);
 maybe_report({error, Es, Ws}) ->
     report(Es),
     report(Ws);
@@ -250,13 +250,13 @@ format_errors(Config, _MainSource, Extra, Errors) ->
 
 format_error(AbsSource, Extra, {{Line, Column}, Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
-    ?FMT("~s:~w:~w: ~s~s~n", [AbsSource, Line, Column, Extra, ErrorDesc]);
+    ?FMT("~s:~w:~w: ~s~s", [AbsSource, Line, Column, Extra, ErrorDesc]);
 format_error(AbsSource, Extra, {Line, Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
-    ?FMT("~s:~w: ~s~s~n", [AbsSource, Line, Extra, ErrorDesc]);
+    ?FMT("~s:~w: ~s~s", [AbsSource, Line, Extra, ErrorDesc]);
 format_error(AbsSource, Extra, {Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
-    ?FMT("~s: ~s~s~n", [AbsSource, Extra, ErrorDesc]).
+    ?FMT("~s: ~s~s", [AbsSource, Extra, ErrorDesc]).
 
 maybe_absname(Config, Filename) ->
     case rebar_utils:processing_base_dir(Config) of

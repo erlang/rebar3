@@ -76,7 +76,7 @@ build_apps(State, Apps) ->
                   end, Apps).
 
 build(State, AppInfo) ->
-    ?INFO("Compiling ~s~n", [rebar_app_info:name(AppInfo)]),
+    ?INFO("Compiling ~s", [rebar_app_info:name(AppInfo)]),
     rebar_erlc_compiler:compile(State, ec_cnv:to_list(rebar_app_info:dir(AppInfo))),
     {ok, AppInfo1} = rebar_otp_app:compile(State, AppInfo),
     AppInfo1.

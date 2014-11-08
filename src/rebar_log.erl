@@ -57,7 +57,7 @@ set_level(Level) ->
 
 log(Level, Str, Args) ->
     {ok, LogState} = application:get_env(rebar, log),
-    ec_cmd_log:Level(LogState, Str, Args).
+    ec_cmd_log:Level(LogState, Str++"~n", Args).
 
 error_level() -> ?ERROR_LEVEL.
 default_level() -> ?INFO_LEVEL.

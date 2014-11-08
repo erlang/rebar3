@@ -297,7 +297,7 @@ doterl_compile(State, Dir) ->
 doterl_compile(Config, Dir, MoreSources, ErlOpts) ->
     OutDir = filename:join(Dir, "ebin"),
     ErlFirstFilesConf = rebar_state:get(Config, erl_first_modules, []),
-    ?DEBUG("erl_opts ~p~n", [ErlOpts]),
+    ?DEBUG("erl_opts ~p", [ErlOpts]),
     %% Support the src_dirs option allowing multiple directories to
     %% contain erlang source. This might be used, for example, should
     %% eunit tests be separated from the core application source.
@@ -352,7 +352,7 @@ doterl_compile(Config, Dir, MoreSources, ErlOpts) ->
     %% handling this in internal_erl_compile, we also avoid extra
     %% needs_compile/2 calls.
     FirstErls = ErlFirstFiles ++ uo_merge(OtherFirstErlsDeps, OtherFirstErls),
-    ?DEBUG("Files to compile first: ~p~n", [FirstErls]),
+    ?DEBUG("Files to compile first: ~p", [FirstErls]),
     rebar_base_compiler:run(
       Config, FirstErls, OtherErls,
       fun(S, C) ->
@@ -411,10 +411,10 @@ needs_compile(Source, Target, Parents) ->
 check_erlcinfo(_Config, #erlcinfo{vsn=?ERLCINFO_VSN}) ->
     ok;
 check_erlcinfo(Config, #erlcinfo{vsn=Vsn}) ->
-    ?ABORT("~s file version is incompatible. expected: ~b got: ~b~n",
+    ?ABORT("~s file version is incompatible. expected: ~b got: ~b",
            [erlcinfo_file(Config), ?ERLCINFO_VSN, Vsn]);
 check_erlcinfo(Config, _) ->
-    ?ABORT("~s file is invalid. Please delete before next run.~n",
+    ?ABORT("~s file is invalid. Please delete before next run.",
            [erlcinfo_file(Config)]).
 
 erlcinfo_file(_Config) ->
@@ -492,7 +492,7 @@ restore_erlcinfo(Config) ->
                 error:badarg ->
                     ?ERROR(
                        "Failed (binary_to_term) to restore rebar info file."
-                       " Discard file.~n", []),
+                       " Discard file.", []),
                     ok
             end;
         _Err ->
@@ -778,7 +778,7 @@ check_file(File) ->
 log_files(Prefix, Files) ->
     case Files of
         [] ->
-            ?DEBUG("~s: ~p~n", [Prefix, Files]);
+            ?DEBUG("~s: ~p", [Prefix, Files]);
         _ ->
-            ?DEBUG("~s:~n~p~n", [Prefix, Files])
+            ?DEBUG("~s:~n~p", [Prefix, Files])
     end.

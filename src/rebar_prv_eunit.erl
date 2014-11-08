@@ -93,7 +93,7 @@ run_eunit(Config, CodePath, SrcErls) ->
         ok ->
             ok;
         _ ->
-            ?ABORT("One or more eunit tests failed.~n", [])
+            ?ABORT("One or more eunit tests failed.", [])
     end,
     %% Restore code path
     true = rebar_utils:cleanup_code_path(CodePath),
@@ -158,7 +158,7 @@ get_qualified_and_unqualified_tests1([TestName|TestNames], Functions,
             get_qualified_and_unqualified_tests1(TestNames, Functions,
                                                  [{M, F}|QualifiedFunctions]);
         _ ->
-            ?ABORT("Unsupported test function specification: ~s~n", [TestName])
+            ?ABORT("Unsupported test function specification: ~s", [TestName])
     end.
 %% Provide modules which are to be searched for tests.
 %% Several scenarios are possible:
@@ -178,7 +178,7 @@ randomize_suites(Config, Modules) ->
                     randomize_suites1(Modules, Seed)
             catch
                 error:badarg ->
-                    ?ERROR("Bad random seed provided: ~p~n", [String]),
+                    ?ERROR("Bad random seed provided: ~p", [String]),
                     ?FAIL
             end
     end.

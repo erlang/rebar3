@@ -84,7 +84,7 @@ init(true, BeamFiles, TargetDir) ->
     case [Module || {_, {ok, Module}} <- Compiled] of
         [] ->
             %% No modules compiled successfully...fail
-            ?ERROR("Cover failed to compile any modules; aborting.~n", []),
+            ?ERROR("Cover failed to compile any modules; aborting.", []),
             ?FAIL;
         _ ->
             %% At least one module compiled successfully
@@ -236,12 +236,12 @@ print_coverage(Coverage) ->
                         end, 0, Coverage) * -1,
 
     %% Print the output the console
-    ?CONSOLE("~nCode Coverage:~n", []),
+    ?CONSOLE("~nCode Coverage:", []),
     lists:foreach(fun({Mod, C, N}) ->
-                          ?CONSOLE("~*s : ~4s~n",
+                          ?CONSOLE("~*s : ~4s",
                                    [Width, Mod, percentage(C, N)])
                   end, Coverage),
-    ?CONSOLE("~n~*s : ~s~n", [Width, "Total", TotalCoverage]).
+    ?CONSOLE("~n~*s : ~s", [Width, "Total", TotalCoverage]).
 
 cover_file(Module, TargetDir) ->
     filename:join([TargetDir, atom_to_list(Module) ++ ".COVER.html"]).
@@ -250,9 +250,9 @@ export_coverdata(TargetDir) ->
     ExportFile = filename:join(TargetDir, "cover.coverdata"),
     case cover:export(ExportFile) of
         ok ->
-            ?CONSOLE("Coverdata export: ~s~n", [ExportFile]);
+            ?CONSOLE("Coverdata export: ~s", [ExportFile]);
         {error, Reason} ->
-            ?ERROR("Coverdata export failed: ~p~n", [Reason])
+            ?ERROR("Coverdata export failed: ~p", [Reason])
     end.
 
 percentage(0, 0) ->

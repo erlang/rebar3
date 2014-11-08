@@ -271,7 +271,7 @@ maybe_fetch(AppInfo, Update, Seen) ->
 
             case not Exists orelse Update of
                 true ->
-                    ?INFO("Fetching ~s~n", [rebar_app_info:name(AppInfo)]),
+                    ?INFO("Fetching ~s", [rebar_app_info:name(AppInfo)]),
                     Source = rebar_app_info:source(AppInfo),
                     case rebar_fetch:download_source(AppDir, Source) of
                         {error, Reason} ->
@@ -287,7 +287,7 @@ maybe_fetch(AppInfo, Update, Seen) ->
                             Source = rebar_app_info:source(AppInfo),
                             case rebar_fetch:needs_update(AppDir, Source) of
                                 true ->
-                                    ?INFO("Updating ~s~n", [rebar_app_info:name(AppInfo)]),
+                                    ?INFO("Updating ~s", [rebar_app_info:name(AppInfo)]),
                                     case rebar_fetch:download_source(AppDir, Source) of
                                         {error, Reason} ->
                                             throw(Reason);

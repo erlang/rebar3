@@ -68,7 +68,7 @@ compile(Config, App) ->
                     {ok, rebar_app_info:original_vsn(App1, AppVsn)}
             end;
         {error, Reason} ->
-            ?ABORT("Failed to load app file ~s: ~p\n", [AppFile, Reason])
+            ?ABORT("Failed to load app file ~s: ~p", [AppFile, Reason])
     end.
 
 clean(_Config, File) ->
@@ -102,7 +102,7 @@ info_help(Description) ->
        "~s.~n"
        "~n"
        "Valid rebar.config options:~n"
-       "  ~p~n",
+       "  ~p",
        [
         Description,
         {validate_app_modules, true}
@@ -139,17 +139,17 @@ preprocess(Config, Dir, AppSrcFile) ->
 
             {Config2, AppFile};
         {error, Reason} ->
-            ?ABORT("Failed to read ~s for preprocessing: ~p\n",
+            ?ABORT("Failed to read ~s for preprocessing: ~p",
                    [AppSrcFile, Reason])
     end.
 
 load_app_vars(Config) ->
     case rebar_state:get(Config, app_vars_file, undefined) of
         undefined ->
-            ?DEBUG("No app_vars_file defined.\n", []),
+            ?DEBUG("No app_vars_file defined.", []),
             [];
         Filename ->
-            ?INFO("Loading app vars from ~p\n", [Filename]),
+            ?INFO("Loading app vars from ~p", [Filename]),
             {ok, Vars} = file:consult(Filename),
             Vars
     end.
@@ -169,12 +169,12 @@ validate_name(AppName, File) ->
             ok;
         false ->
             ?ERROR("Invalid ~s: name of application (~p) "
-                   "must match filename.\n", [File, AppName]),
+                   "must match filename.", [File, AppName]),
             ?FAIL
     end.
 
 validate_modules(_Dir, AppName, undefined) ->
-    ?ERROR("Missing modules declaration in ~p.app~n", [AppName]),
+    ?ERROR("Missing modules declaration in ~p.app", [AppName]),
     ?FAIL;
 
 validate_modules(Dir, AppName, Mods) ->
@@ -189,10 +189,10 @@ validate_modules(Dir, AppName, Mods) ->
         [] ->
             ok;
         MissingBeams ->
-            Msg1 = lists:flatten([io_lib:format("\t* ~p\n", [M]) ||
+            Msg1 = lists:flatten([io_lib:format("\t* ~p", [M]) ||
                                      M <- MissingBeams]),
             ?ERROR("One or more modules listed in ~p.app are not "
-                   "present in ebin/*.beam:\n~s", [AppName, Msg1]),
+                   "present in ebin/*.beam:~n~s", [AppName, Msg1]),
             ?FAIL
     end,
 

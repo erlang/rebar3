@@ -28,7 +28,7 @@ needs_update(Dir, {git, Url, {tag, Tag}}) ->
                                    [{cd, Dir}]),
     Current1 = string:strip(string:strip(Current, both, $\n), both, $\r),
     CurrentUrl1 = string:strip(string:strip(CurrentUrl, both, $\n), both, $\r),
-    ?DEBUG("Comparing git tag ~s with ~s and url ~s with ~s~n", [Tag, Current1, Url, CurrentUrl1]),
+    ?DEBUG("Comparing git tag ~s with ~s and url ~s with ~s", [Tag, Current1, Url, CurrentUrl1]),
     not ((Current1 =:= Tag) andalso (CurrentUrl1 =:= Url));
 needs_update(Dir, {git, Url, {branch, Branch}}) ->
     {ok, CurrentUrl} = rebar_utils:sh(?FMT("git config --get remote.origin.url", []),
@@ -37,7 +37,7 @@ needs_update(Dir, {git, Url, {branch, Branch}}) ->
                                    [{cd, Dir}]),
     Current1 = string:strip(string:strip(Current, both, $\n), both, $\r),
     CurrentUrl1 = string:strip(string:strip(CurrentUrl, both, $\n), both, $\r),
-    ?DEBUG("Comparing git branch ~s with ~s and url ~s with ~s~n", [Branch, Current1, Url, CurrentUrl1]),
+    ?DEBUG("Comparing git branch ~s with ~s and url ~s with ~s", [Branch, Current1, Url, CurrentUrl1]),
     not ((Current1 =:= Branch) andalso (CurrentUrl1 =:= Url));
 needs_update(Dir, {git, Url, Ref}) ->
     case Ref of
@@ -52,14 +52,14 @@ needs_update(Dir, {git, Url, Ref}) ->
                                    [{cd, Dir}]),
     Current1 = string:strip(string:strip(Current, both, $\n), both, $\r),
     CurrentUrl1 = string:strip(string:strip(CurrentUrl, both, $\n), both, $\r),
-    ?DEBUG("Comparing git ref ~s with ~s and url ~s with ~s~n", [Ref1, Current1, Url, CurrentUrl1]),
+    ?DEBUG("Comparing git ref ~s with ~s and url ~s with ~s", [Ref1, Current1, Url, CurrentUrl1]),
     not ((Current1 =:= Ref1) andalso (CurrentUrl1 =:= Url)).
 
 download(Dir, {git, Url}) ->
-    ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.~n", []),
+    ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
     download(Dir, {git, Url, {branch, "master"}});
 download(Dir, {git, Url, ""}) ->
-    ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.~n", []),
+    ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
     download(Dir, {git, Url, {branch, "master"}});
 download(Dir, {git, Url, {branch, Branch}}) ->
     ok = filelib:ensure_dir(Dir),
@@ -77,7 +77,7 @@ download(Dir, {git, Url, {ref, Ref}}) ->
                    [{cd, filename:dirname(Dir)}]),
     rebar_utils:sh(?FMT("git checkout -q ~s", [Ref]), [{cd, Dir}]);
 download(Dir, {git, Url, Rev}) ->
-    ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.~n", []),
+    ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
     ok = filelib:ensure_dir(Dir),
     rebar_utils:sh(?FMT("git clone -n ~s ~s", [Url, filename:basename(Dir)]),
                    [{cd, filename:dirname(Dir)}]),

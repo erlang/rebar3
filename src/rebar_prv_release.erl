@@ -34,13 +34,18 @@ init(State) ->
 do(State) ->
     Options = rebar_state:command_args(State),
     AllOptions = string:join(["release" | Options], " "),
-    case rebar_state:get(State, relx, []) of
-        [] ->
-            relx:main(AllOptions);
-        Config ->
-            relx:main([{config, Config}], AllOptions)
-    end,
-    {ok, State}.
+    try
+        case rebar_state:get(State, relx, []) of
+            [] ->
+                relx:main(AllOptions);
+            Config ->
+                relx:main([{config, Config}], AllOptions)
+        end,
+        {ok, State}
+    catch
+        throw:T ->
+            {error, {rlx_prv_release, T}}
+    end.
 
 -spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
 format_error(Reason, State) ->

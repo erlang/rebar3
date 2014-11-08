@@ -100,7 +100,7 @@ info() ->
     "Start a shell with project and deps preloaded similar to~n'erl -pa ebin -pa deps/*/ebin'.~n".
 
 remove_error_handler(0) ->
-    ?WARN("Unable to remove simple error_logger handler~n", []);
+    ?WARN("Unable to remove simple error_logger handler", []);
 remove_error_handler(N) ->
     case gen_event:delete_handler(error_logger, error_logger, []) of
         {error, module_not_found} -> ok;
@@ -109,7 +109,7 @@ remove_error_handler(N) ->
 
 %% Timeout is a period to wait before giving up
 wait_until_user_started(0) ->
-    ?ABORT("Timeout exceeded waiting for `user` to register itself~n", []),
+    ?ABORT("Timeout exceeded waiting for `user` to register itself", []),
     erlang:error(timeout);
 wait_until_user_started(Timeout) ->
     case whereis(user) of

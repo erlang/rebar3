@@ -223,7 +223,7 @@ deprecated(Old, New, When) ->
       <<"WARNING: deprecated ~p option used~n"
         "Option '~p' has been deprecated~n"
         "in favor of '~p'.~n"
-        "'~p' will be removed ~s.~n~n">>,
+        "'~p' will be removed ~s.~n">>,
       [Old, Old, New, Old, When]).
 
 -spec delayed_halt(integer()) -> no_return().
@@ -394,13 +394,13 @@ log_msg_and_abort(Message) ->
 log_and_abort(Command, {Rc, Output}) ->
     ?ABORT("sh(~s)~n"
           "failed with return code ~w and the following output:~n"
-          "~s~n", [Command, Rc, Output]).
+          "~s", [Command, Rc, Output]).
 
 -spec debug_and_abort(string(), {integer(), string()}) -> no_return().
 debug_and_abort(Command, {Rc, Output}) ->
     ?DEBUG("sh(~s)~n"
           "failed with return code ~w and the following output:~n"
-          "~s~n", [Command, Rc, Output]),
+          "~s", [Command, Rc, Output]),
     throw(rebar_abort).
 
 sh_loop(Port, Fun, Acc) ->

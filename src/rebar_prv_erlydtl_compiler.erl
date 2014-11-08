@@ -159,7 +159,7 @@ info(help, compile) ->
        "Build ErlyDtl (*.dtl) sources.~n"
        "~n"
        "Valid rebar.config options:~n"
-       "  ~p~n",
+       "  ~p",
        [
         {erlydtl_opts, [{doc_root,   "templates"},
                         {out_dir,    "ebin"},
@@ -204,7 +204,7 @@ compile_dtl(Config, Source, Target, DtlOpts) ->
                    " Download the latest tarball release from github~n"
                    "    https://github.com/erlydtl/erlydtl/releases~n"
                    " and install it into your erlang library dir~n"
-                   "===============================================~n~n", []),
+                   "===============================================~n", []),
             ?FAIL;
         _ ->
             case needs_compile(Source, Target, DtlOpts) of
@@ -234,7 +234,7 @@ do_compile(Config, Source, Target, DtlOpts) ->
     %% ensure that doc_root and out_dir are defined,
     %% using defaults if necessary
     Opts = lists:ukeymerge(1, DtlOpts, Sorted),
-    ?INFO("Compiling \"~s\" -> \"~s\" with options:~n    ~s~n",
+    ?INFO("Compiling \"~s\" -> \"~s\" with options:~n    ~s",
         [Source, Target, io_lib:format("~p", [Opts])]),
     case erlydtl:compile_file(ec_cnv:to_list(Source),
                          list_to_atom(module_name(Target)),

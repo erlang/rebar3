@@ -310,10 +310,10 @@ write_file(Output, Data, Force) ->
             ok = filelib:ensure_dir(Output),
             case {Force, FileExists} of
                 {"1", true} ->
-                    ?INFO("Writing ~s (forcibly overwriting)~n",
+                    ?INFO("Writing ~s (forcibly overwriting)",
                              [Output]);
                 _ ->
-                    ?INFO("Writing ~s~n", [Output])
+                    ?INFO("Writing ~s", [Output])
             end,
             case file:write_file(Output, Data) of
                 ok ->
@@ -423,7 +423,7 @@ execute_template(Files, [{copy, Input, Output} | Rest], TemplateType,
                              Context, Force, ExistingFiles)
     catch _:_ ->
             ?ABORT("Failed while processing template instruction "
-                   "{copy, ~s, ~s}~n", [Input, Output])
+                   "{copy, ~s, ~s}", [Input, Output])
     end;
 execute_template(Files, [{chmod, Mod, File} | Rest], TemplateType,
                  TemplateName, Context, Force, ExistingFiles)
@@ -434,7 +434,7 @@ execute_template(Files, [{chmod, Mod, File} | Rest], TemplateType,
                              Context, Force, ExistingFiles);
         {error, Reason} ->
             ?ABORT("Failed while processing template instruction "
-                   "{chmod, ~b, ~s}: ~p~n", [Mod, File, Reason])
+                   "{chmod, ~b, ~s}: ~p", [Mod, File, Reason])
     end;
 execute_template(Files, [{symlink, Existing, New} | Rest], TemplateType,
                  TemplateName, Context, Force, ExistingFiles) ->
@@ -444,7 +444,7 @@ execute_template(Files, [{symlink, Existing, New} | Rest], TemplateType,
                              Context, Force, ExistingFiles);
         {error, Reason} ->
             ?ABORT("Failed while processing template instruction "
-                   "{symlink, ~s, ~s}: ~p~n", [Existing, New, Reason])
+                   "{symlink, ~s, ~s}: ~p", [Existing, New, Reason])
     end;
 execute_template(Files, [{variables, _} | Rest], TemplateType,
                  TemplateName, Context, Force, ExistingFiles) ->
