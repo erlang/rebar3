@@ -26,6 +26,7 @@ This is an experimental branch.
 | clean      | Remove project apps beam files |
 | ct         | Run Common Test suites |
 | do         | Higher-order provider to run multiple tasks in sequence |
+| dialyzer   | Run the Dialyzer analyzer on the project |
 | eunit      | Run eunit tests |
 | help       | Print help for rebar or task |
 | new        | Create new rebar project from templates |
