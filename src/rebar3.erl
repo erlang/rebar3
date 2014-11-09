@@ -56,7 +56,8 @@ main(Args) ->
                     ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace", []),
                     ?DEBUG("Uncaught error: ~p ~p", [Module, Reason]);
                 _ ->
-                    ?ERROR(Module:format_error(Reason, []), [])
+                    {Error, _} = Module:format_error(Reason, []),
+                    ?ERROR(Error, [])
             end,
             rebar_utils:delayed_halt(1);
         {error, Error} when is_list(Error) ->

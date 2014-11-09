@@ -24,6 +24,7 @@
         %% any_dir processing modules
         {providers, [rebar_prv_clean,
                      rebar_prv_deps,
+                     rebar_prv_dialyzer,
                      rebar_prv_do,
                      rebar_prv_eunit,
                      rebar_prv_lock,

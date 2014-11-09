@@ -1,0 +1,105 @@
+%% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% ex: ts=4 sw=4 et
+
+-module(rebar_prv_dialyzer).
+
+-behaviour(provider).
+
+-export([init/1,
+         do/1,
+         format_error/2]).
+
+-include("rebar.hrl").
+
+-define(PROVIDER, dialyzer).
+-define(DEPS, [compile]).
+
+%% ===================================================================
+%% Public API
+%% ===================================================================
+
+-spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
+init(State) ->
+    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
+                                                               {module, ?MODULE},
+                                                               {bare, false},
+                                                               {deps, ?DEPS},
+                                                               {example, "rebar dialyzer"},
+                                                               {short_desc, "Run the Dialyzer analyzer on the project."},
+                                                               {desc, ""},
+                                                               {opts, []}])),
+    {ok, State1}.
+
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
+do(State) ->
+    ?INFO("Dialyzer starting, this may take a while...", []),
+    BuildDir = rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR),
+    {ProjectPlt, _DepPlt} = get_plt_location(BuildDir),
+    Apps = rebar_state:project_apps(State),
+    ?INFO("Doing plt for project apps...", []),
+
+    try
+        update_dep_plt(State, ProjectPlt, Apps),
+        WarningTypes = rebar_state:get(State, dialyzer_warnings, default_warnings()),
+        Paths = [filename:join(rebar_app_info:dir(App), "ebin") || App <- Apps],
+        Opts = [{analysis_type, succ_typings},
+                {from, byte_code},
+                {files_rec, Paths},
+                {warnings, WarningTypes},
+                {plts, [ProjectPlt]}],
+
+        case dialyzer:run(Opts) of
+            [] ->
+                {ok, State};
+            Warnings ->
+                [?WARN(dialyzer:format_warning(Warning), []) || Warning <- Warnings],
+                {ok, State}
+        end
+    catch
+        _:{dialyzer_error, Error} ->
+            {error, {?MODULE, {error_processing_apps, Error, Apps}}}
+    end.
+
+-spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
+format_error({error_processing_apps, Error, _Apps}, State) ->
+    {io_lib:format("Error in dialyzing apps: ~s", [Error]), State};
+format_error(Reason, State) ->
+    {io_lib:format("~p", [Reason]), State}.
+
+%% Internal functions
+
+get_plt_location(BuildDir) ->
+    {filename:join([BuildDir, ".project.plt"]),
+     filename:join([BuildDir, ".deps.plt"])}.
+
+update_dep_plt(_State, DepPlt, AppList) ->
+    Opts0 =
+        case filelib:is_file(DepPlt) of
+            true ->
+                ?INFO("Plt is built, checking/updating ...", []),
+                [{analysis_type, plt_check},
+                 {plts, [DepPlt]}];
+            false ->
+                ?INFO("Building the plt, this is really going to "
+                               "take a long time ...", []),
+                [{analysis_type, plt_build},
+                 {output_plt, DepPlt}]
+        end,
+    Paths = [filename:join(rebar_app_info:dir(App), "ebin") || App <- AppList],
+    Opts = [{files_rec, Paths},
+            {from, byte_code}] ++ Opts0,
+
+    dialyzer:run(Opts).
+
+default_warnings() ->
+    [no_return,
+     no_unused,
+     no_improper_lists,
+     no_fun_app,
+     no_match,
+     no_opaque,
+     no_fail_call,
+     error_handling,
+     race_conditions,
+     unmatched_returns,
+     underspecs].
