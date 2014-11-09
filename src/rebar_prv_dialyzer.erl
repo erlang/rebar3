@@ -34,11 +34,14 @@ init(State) ->
 do(State) ->
     ?INFO("Dialyzer starting, this may take a while...", []),
     BuildDir = rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR),
-    {ProjectPlt, _DepPlt} = get_plt_location(BuildDir),
+    {ProjectPlt, DepPlt} = get_plt_location(BuildDir),
     Apps = rebar_state:project_apps(State),
-    ?INFO("Doing plt for project apps...", []),
+    Deps = rebar_state:get(State, all_deps, []),
 
     try
+        ?INFO("Doing plt for dependencies...", []),
+        update_dep_plt(State, DepPlt, Deps),
+        ?INFO("Doing plt for project apps...", []),
         update_dep_plt(State, ProjectPlt, Apps),
         WarningTypes = rebar_state:get(State, dialyzer_warnings, default_warnings()),
         Paths = [filename:join(rebar_app_info:dir(App), "ebin") || App <- Apps],
@@ -46,7 +49,7 @@ do(State) ->
                 {from, byte_code},
                 {files_rec, Paths},
                 {warnings, WarningTypes},
-                {plts, [ProjectPlt]}],
+                {plts, [ProjectPlt, DepPlt]}],
 
         case dialyzer:run(Opts) of
             [] ->
@@ -77,12 +80,11 @@ update_dep_plt(_State, DepPlt, AppList) ->
     Opts0 =
         case filelib:is_file(DepPlt) of
             true ->
-                ?INFO("Plt is built, checking/updating ...", []),
+                ?INFO("Plt is built, checking/updating...", []),
                 [{analysis_type, plt_check},
                  {plts, [DepPlt]}];
             false ->
-                ?INFO("Building the plt, this is really going to "
-                               "take a long time ...", []),
+                ?INFO("Building the plt, this will take a while...", []),
                 [{analysis_type, plt_build},
                  {output_plt, DepPlt}]
         end,
