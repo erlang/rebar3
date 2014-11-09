@@ -52,7 +52,8 @@ do(State) ->
             [] ->
                 {ok, State};
             Warnings ->
-                [?WARN(dialyzer:format_warning(Warning), []) || Warning <- Warnings],
+                [?CONSOLE(string:strip(dialyzer:format_warning(Warning), right, $\n), []) ||
+                    Warning <- Warnings],
                 {ok, State}
         end
     catch
