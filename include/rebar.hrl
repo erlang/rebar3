@@ -20,6 +20,7 @@
 -define(DEFAULT_TEST_DEPS_DIR, "_tdeps").
 -define(DEFAULT_CONFIG_FILE, "rebar.config").
 -define(LOCK_FILE, "rebar.lock").
+-define(HOME_DIR, ".rebar3").
 
 -ifdef(namespaced_types).
 -type rebar_dict() :: dict:dict().

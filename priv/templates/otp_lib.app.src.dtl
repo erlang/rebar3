@@ -1,12 +1,9 @@
 {application, {{appid}},
- [
- {description, "{{appid}}"}
+ [{description, "{{desc}}"}
  ,{vsn, "0.1.0"}
  ,{registered, []}
  ,{applications,
-   [kernel
-   ,stdlib
-   ]}
+    [kernel,stdlib]}
  ,{env,[]}
  ,{modules, []}
  ]}.

@@ -1,7 +1,11 @@
-{variables, []}.
-{template, "plugin.erl", "src/{{appid}}.erl"}.
-{template, "otp_lib.app.src", "src/{{appid}}.app.src"}.
-{template, "rebar.config", "rebar.config"}.
-{template, "gitignore", ".gitignore"}.
-{template, "LICENSE", "LICENSE"}.
-{template, "plugin_README.md", "README.md"}.
+{description, "Rebar3 plugin"}.
+{variables, [
+    {appid, "myplugin", "Name of the plugin"},
+    {desc, "A rebar plugin", "Short description of the plugin's purpose"}
+]}.
+{template, "plugin.erl.dtl", "src/{{appid}}.erl"}.
+{template, "otp_lib.app.src.dtl", "src/{{appid}}.app.src"}.
+{template, "rebar.config.dtl", "rebar.config"}.
+{template, "gitignore.dtl", ".gitignore"}.
+{template, "LICENSE.dtl", "LICENSE"}.
+{template, "plugin_README.md.dtl", "README.md"}.
