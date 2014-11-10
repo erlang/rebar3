@@ -8,8 +8,8 @@
 Rebar3's system is based on the concept of *[providers](https://github.com/tsloughter/providers)*. A provider has three callbacks:
 
 - `init(State) -> {ok, NewState}`, which helps set up the state required, state dependencies, etc.
-- `do(State) -> {ok, NewState} | {error, String}`, which does the actual work.
-- `format_error(Error, State) -> {String, NewState}`, which allows to print errors when they happen, and to filter out sensitive elements from the state.
+- `do(State) -> {ok, NewState} | {error, Error}`, which does the actual work.
+- `format_error(Error) -> String`, which allows to print errors when they happen, and to filter out sensitive elements from the state.
 
 A provider should also be an OTP Library application, which can be fetched as any other Erlang dependency, except for Rebar3 rather than your own system or application.
 
@@ -63,7 +63,7 @@ Open up the `provider_todo.erl` file and make sure you have the following skelet
 -module(provider_todo).
 -behaviour(provider).
 
--export([init/1, do/1, format_error/2]).
+-export([init/1, do/1, format_error/1]).
 
 -include_lib("rebar3/include/rebar.hrl").
 
@@ -92,9 +92,9 @@ init(State) ->
 do(State) ->
     {ok, State}.
 
--spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
-format_error(Reason, State) ->
-    {io_lib:format("~p", [Reason]), State}.
+-spec format_error(any()) -> iolist().
+format_error(Reason) ->
+    io_lib:format("~p", [Reason]).
 ```
 
 This shows all the basic content needed. Note that we leave the `DEPS` macro to the value `app_discovery`, used to mean that the plugin should at least find the project's source code (excluding dependencies).
@@ -235,14 +235,10 @@ Push the new code for the plugin, and try it again on a project with dependencie
 ```
 → rebar3 todo --deps
 ===> Fetching provider_todo
-Cloning into '.tmp_dir846673888664'...
 ===> Compiling provider_todo
 ===> Fetching bootstrap
-Cloning into '.tmp_dir57833696240'...
 ===> Fetching file_monitor
-Cloning into '.tmp_dir403349997533'...
 ===> Fetching recon
-Cloning into '.tmp_dir390854228780'...
 [...]
 Application dirmon
     /Users/ferd/code/self/figsync/apps/dirmon/src/dirmon_tracker.erl
