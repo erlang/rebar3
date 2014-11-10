@@ -7,7 +7,7 @@
 
 -export([init/1,
          do/1,
-         format_error/2]).
+         format_error/1]).
 
 -include("rebar.hrl").
 
@@ -34,13 +34,17 @@ init(State) ->
 do(State) ->
     Options = rebar_state:command_args(State),
     DepsDir = rebar_prv_install_deps:get_deps_dir(State),
+    OutputDir = filename:join(rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR), "releases"),
     AllOptions = string:join(["release" | Options], " "),
     try
         case rebar_state:get(State, relx, []) of
             [] ->
-                relx:main([{lib_dirs, [DepsDir]}], AllOptions);
+                relx:main([{lib_dirs, [DepsDir]}
+                          ,{output_dir, OutputDir}], AllOptions);
             Config ->
-                relx:main([{lib_dirs, [DepsDir]}, {config, Config}], AllOptions)
+                relx:main([{lib_dirs, [DepsDir]}
+                          ,{config, Config}
+                          ,{output_dir, OutputDir}], AllOptions)
         end,
         {ok, State}
     catch
@@ -48,6 +52,6 @@ do(State) ->
             {error, {rlx_prv_release, T}}
     end.
 
--spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
-format_error(Reason, State) ->
-    {io_lib:format("~p", [Reason]), State}.
+-spec format_error(any()) -> iolist().
+format_error(Reason) ->
+    io_lib:format("~p", [Reason]).

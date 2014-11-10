@@ -7,7 +7,7 @@
 
 -export([init/1,
          do/1,
-         format_error/2]).
+         format_error/1]).
 
 -include("rebar.hrl").
 
@@ -43,6 +43,6 @@ do(State) ->
     end,
     {ok, State}.
 
--spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
-format_error(Reason, State) ->
-    {io_lib:format("~p", [Reason]), State}.
+-spec format_error(any()) -> iolist().
+format_error(Reason) ->
+    io_lib:format("~p", [Reason]).

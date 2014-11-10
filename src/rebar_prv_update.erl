@@ -7,7 +7,7 @@
 
 -export([init/1,
          do/1,
-         format_error/2]).
+         format_error/1]).
 
 -include("rebar.hrl").
 
@@ -47,9 +47,9 @@ do(State) ->
 
     {ok, State}.
 
--spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
-format_error(package_index_write, State) ->
-    {"Failed to write package index.", State}.
+-spec format_error(any()) -> iolist().
+format_error(package_index_write) ->
+    "Failed to write package index.".
 
 url(State) ->
     SystemArch = erlang:system_info(system_architecture),

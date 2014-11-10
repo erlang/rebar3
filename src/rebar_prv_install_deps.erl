@@ -30,7 +30,7 @@
 
 -export([init/1,
          do/1,
-         format_error/2]).
+         format_error/1]).
 
 -include("rebar.hrl").
 
@@ -90,9 +90,9 @@ do(State) ->
             {error, Reason}
     end.
 
--spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
-format_error(Reason, State) ->
-    {io_lib:format("~p", [Reason]), State}.
+-spec format_error(any()) -> iolist().
+format_error(Reason) ->
+    io_lib:format("~p", [Reason]).
 
 -spec get_deps_dir(rebar_state:t()) -> file:filename_all().
 get_deps_dir(State) ->

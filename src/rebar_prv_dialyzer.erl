@@ -7,7 +7,7 @@
 
 -export([init/1,
          do/1,
-         format_error/2]).
+         format_error/1]).
 
 -include("rebar.hrl").
 
@@ -64,11 +64,11 @@ do(State) ->
             {error, {?MODULE, {error_processing_apps, Error, Apps}}}
     end.
 
--spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
-format_error({error_processing_apps, Error, _Apps}, State) ->
-    {io_lib:format("Error in dialyzing apps: ~s", [Error]), State};
-format_error(Reason, State) ->
-    {io_lib:format("~p", [Reason]), State}.
+-spec format_error(any()) -> iolist().
+format_error({error_processing_apps, Error, _Apps}) ->
+    io_lib:format("Error in dialyzing apps: ~s", [Error]);
+format_error(Reason) ->
+    io_lib:format("~p", [Reason]).
 
 %% Internal functions
 
