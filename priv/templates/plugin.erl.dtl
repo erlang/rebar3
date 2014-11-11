@@ -1,29 +1,36 @@
--module({{appid}}).
+-module({{name}}).
+-behaviour(provider).
 
--behaviour(rebar_provider).
+-export([init/1, do/1, format_error/2]).
 
--export([init/1,
-         do/1]).
+-include_lib("rebar3/include/rebar.hrl").
 
--define(PROVIDER, {{appid}}).
--define(DEPS, []).
+-define(PROVIDER, todo).
+-define(DEPS, [app_discovery]).
 
 %% ===================================================================
 %% Public API
 %% ===================================================================
-
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, rebar_provider:create([{name, ?PROVIDER},
-                                                                    {provider_impl, ?MODULE},
-                                                                    {bare, false},
-                                                                    {deps, ?DEPS},
-                                                                    {example, "rebar {{appid}}"},
-                                                                    {short_desc, "{{appid}} plugin."},
-                                                                    {desc, ""},
-                                                                    {opts, []}])),
-    {ok, State1}.
+    Provider = providers:create([
+            {name, ?PROVIDER},          % The 'user friendly' name of the task
+            {module, ?MODULE},          % The module implementation of the task
+            {bare, true},               % The task can be run by the user, always true
+            {deps, ?DEPS},              % The list of dependencies
+            {example, "rebar {{name}}"}, % How to use the plugin
+            {opts, []}                  % list of options understood by the plugin
+            {short_desc, {{desc}}},
+            {desc, ""}
+    ]),
+    {ok, rebar_state:add_provider(State, Provider)}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
+
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     {ok, State}.
+
+-spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
+format_error(Reason, State) ->
+    {io_lib:format("~p", [Reason]), State}.
+

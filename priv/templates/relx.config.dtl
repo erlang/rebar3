@@ -1,6 +1,6 @@
 %% -*- mode: Erlang; fill-column: 80; comment-column: 75; -*-
-{release, {'{{appid}}', "0.1.0"},
- [{{appid}},
+{release, {'{{name}}', "0.1.0"},
+ [{{name}},
   sasl]}.
 
 {sys_config, "./config/sys.config"}.

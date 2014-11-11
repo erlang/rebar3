@@ -1,0 +1,15 @@
+{description, "OTP Release structure for executable programs"}.
+{variables, [
+    {name, "myapp", "Name of the OTP release. An app with this name will also be created."},
+    {desc, "An OTP application", "Short description of the release's main app's purpose"}
+]}.
+{template, "app.erl.dtl", "{{apps_dir}}/{{name}}/src/{{name}}_app.erl"}.
+{template, "sup.erl.dtl", "{{apps_dir}}/{{name}}/src/{{name}}_sup.erl"}.
+{template, "otp_app.app.src.dtl", "{{apps_dir}}/{{name}}/src/{{name}}.app.src"}.
+{template, "rebar.config.dtl", "rebar.config"}.
+{template, "relx.config.dtl", "relx.config"}.
+{template, "sys.config.dtl", "config/sys.config"}.
+{template, "vm.args.dtl", "config/vm.args"}.
+{template, "gitignore.dtl", ".gitignore"}.
+{template, "LICENSE.dtl", "LICENSE"}.
+{template, "README.md.dtl", "README.md"}.

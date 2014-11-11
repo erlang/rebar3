@@ -1,0 +1,11 @@
+{description, "OTP Library application (no processes)"}.
+{variables, [
+    {name, "mylib", "Name of the OTP library application"},
+    {desc, "An OTP library", "Short description of the app"}
+]}.
+{template, "mod.erl.dtl", "src/{{name}}.erl"}.
+{template, "otp_lib.app.src.dtl", "src/{{name}}.app.src"}.
+{template, "rebar.config.dtl", "rebar.config"}.
+{template, "gitignore.dtl", ".gitignore"}.
+{template, "LICENSE.dtl", "LICENSE"}.
+{template, "README.md.dtl", "README.md"}.

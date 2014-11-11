@@ -1,7 +1,7 @@
-{{appid}}
+{{name}}
 =====
 
-Rebar3 plugin
+{{desc}}
 
 Build
 -----
@@ -11,4 +11,17 @@ Build
 Use
 ---
 
-    $ rebar3 {{appid}}
+Add the plugin to your rebar config:
+
+    {plugins, [
+        { {{name}}, ".*", {git, "git@host:user/{{name}}.git", {tag, "0.1.0"}}}
+    ]}.
+
+Then just call your plugin directly in an existing application:
+
+
+    $ rebar3 {{name}}
+    ===> Fetching {{name}}
+    Cloning into '.tmp_dir539136867963'...
+    ===> Compiling {{name}}
+    <Plugin Output>

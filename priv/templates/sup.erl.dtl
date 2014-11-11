@@ -1,9 +1,9 @@
 %%%-------------------------------------------------------------------
-%% @doc {{appid}} top level supervisor.
+%% @doc {{name}} top level supervisor.
 %% @end
 %%%-------------------------------------------------------------------
 
--module({{appid}}_sup).
+-module({{name}}_sup).
 
 -behaviour(supervisor).
 

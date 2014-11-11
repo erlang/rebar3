@@ -1,7 +1,7 @@
-{{appid}}
+{{name}}
 =====
 
-An Erlang {{appid}} library.
+{{desc}}
 
 Build
 -----

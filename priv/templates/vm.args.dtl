@@ -1,6 +1,6 @@
--name {{appid}}
+-name {{name}}
 
--setcookie {{appid}}_cookie
+-setcookie {{name}}_cookie
 
 +K true
 +A30
