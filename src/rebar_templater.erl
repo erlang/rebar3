@@ -26,7 +26,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_templater).
 
--export([new/3,
+-export([new/4,
          list_templates/1]).
 
 %% API for other utilities that need templating functionality
@@ -43,12 +43,12 @@
 %% ===================================================================
 
 %% Apply a template
-new(Template, Vars, State) ->
+new(Template, Vars, Force, State) ->
     {AvailTemplates, Files} = find_templates(State),
     ?DEBUG("Looking for ~p~n", [Template]),
     case lists:keyfind(Template, 1, AvailTemplates) of
         false -> {not_found, Template};
-        TemplateTup -> create(TemplateTup, Files, Vars)
+        TemplateTup -> create(TemplateTup, Files, Vars, Force)
     end.
 
 %% Give a list of templates with their expanded content
@@ -157,24 +157,24 @@ drop_var_docs([{K,V}|Rest]) -> [{K,V} | drop_var_docs(Rest)].
 
 %% Load the template index, resolve all variables, and then execute
 %% the template.
-create({Template, Type, File}, Files, UserVars) ->
+create({Template, Type, File}, Files, UserVars, Force) ->
     TemplateTerms = consult(load_file(Files, Type, File)),
     Vars = drop_var_docs(override_vars(UserVars, get_template_vars(TemplateTerms))),
     TemplateCwd = filename:dirname(File),
-    execute_template(TemplateTerms, Files, {Template, Type, TemplateCwd}, Vars).
+    execute_template(TemplateTerms, Files, {Template, Type, TemplateCwd}, Vars, Force).
 
 %% Run template instructions one at a time.
-execute_template([], _, {Template,_,_}, _) ->
+execute_template([], _, {Template,_,_}, _, _) ->
     ?DEBUG("Template ~s applied~n", [Template]),
     ok;
 %% We can't execute the description
-execute_template([{description, _} | Terms], Files, Template, Vars) ->
-    execute_template(Terms, Files, Template, Vars);
+execute_template([{description, _} | Terms], Files, Template, Vars, Force) ->
+    execute_template(Terms, Files, Template, Vars, Force);
 %% We can't execute variables
-execute_template([{variables, _} | Terms], Files, Template, Vars) ->
-    execute_template(Terms, Files, Template, Vars);
+execute_template([{variables, _} | Terms], Files, Template, Vars, Force) ->
+    execute_template(Terms, Files, Template, Vars, Force);
 %% Create a directory
-execute_template([{dir, Path} | Terms], Files, Template, Vars) ->
+execute_template([{dir, Path} | Terms], Files, Template, Vars, Force) ->
     ?DEBUG("Creating directory ~p~n", [Path]),
     case ec_file:mkdir_p(expand_path(Path, Vars)) of
         ok ->
@@ -183,45 +183,45 @@ execute_template([{dir, Path} | Terms], Files, Template, Vars) ->
             ?ABORT("Failed while processing template instruction "
                    "{dir, ~p}: ~p~n", [Path, Reason])
     end,
-    execute_template(Terms, Files, Template, Vars);
+    execute_template(Terms, Files, Template, Vars, Force);
 %% Change permissions on a file
-execute_template([{chmod, File, Perm} | Terms], Files, Template, Vars) ->
+execute_template([{chmod, File, Perm} | Terms], Files, Template, Vars, Force) ->
     Path = expand_path(File, Vars),
     case file:change_mode(Path, Perm) of
         ok ->
-            execute_template(Terms, Files, Template, Vars);
+            execute_template(Terms, Files, Template, Vars, Force);
         {error, Reason} ->
             ?ABORT("Failed while processing template instruction "
                    "{chmod, ~.8#, ~p}: ~p~n", [Perm, File, Reason])
     end;
 %% Create a raw untemplated file
-execute_template([{file, From, To} | Terms], Files, {Template, Type, Cwd}, Vars) ->
+execute_template([{file, From, To} | Terms], Files, {Template, Type, Cwd}, Vars, Force) ->
     ?DEBUG("Creating file ~p~n", [To]),
     Data = load_file(Files, Type, filename:join(Cwd, From)),
     Out = expand_path(To,Vars),
-    case write_file(Out, Data, false) of
+    case write_file(Out, Data, Force) of
         ok -> ok;
         {error, exists} -> ?INFO("File ~p already exists.~n", [Out])
     end,
-    execute_template(Terms, Files, {Template, Type, Cwd}, Vars);
+    execute_template(Terms, Files, {Template, Type, Cwd}, Vars, Force);
 %% Operate on a django template
-execute_template([{template, From, To} | Terms], Files, {Template, Type, Cwd}, Vars) ->
+execute_template([{template, From, To} | Terms], Files, {Template, Type, Cwd}, Vars, Force) ->
     ?DEBUG("Executing template file ~p~n", [From]),
     Out = expand_path(To, Vars),
     Tpl = load_file(Files, Type, filename:join(Cwd, From)),
     TplName = make_template_name("rebar_template", Out),
     {ok, Mod} = erlydtl:compile_template(Tpl, TplName, ?ERLYDTL_COMPILE_OPTS),
     {ok, Output} = Mod:render(Vars),
-    case write_file(Out, Output, false) of
+    case write_file(Out, Output, Force) of
         ok -> ok;
         {error, exists} -> ?INFO("File ~p already exists~n", [Out])
     end,
-    execute_template(Terms, Files, {Template, Type, Cwd}, Vars);
+    execute_template(Terms, Files, {Template, Type, Cwd}, Vars, Force);
 %% Unknown
-execute_template([Instruction|Terms], Files, Tpl={Template,_,_}, Vars) ->
+execute_template([Instruction|Terms], Files, Tpl={Template,_,_}, Vars, Force) ->
     ?WARN("Unknown template instruction ~p in template ~s",
           [Instruction, Template]),
-    execute_template(Terms, Files, Tpl, Vars).
+    execute_template(Terms, Files, Tpl, Vars, Force).
 
 %% Workaround to allow variable substitution in path names without going
 %% through the ErlyDTL compilation step. Parse the string and replace
@@ -346,11 +346,11 @@ write_file(Output, Data, Force) ->
 
     %% perform the function if we're allowed,
     %% otherwise just process the next template
-    case Force =:= "1" orelse FileExists =:= false of
+    case Force orelse FileExists =:= false of
         true ->
             ok = filelib:ensure_dir(Output),
             case {Force, FileExists} of
-                {"1", true} ->
+                {true, true} ->
                     ?INFO("Writing ~s (forcibly overwriting)",
                              [Output]);
                 _ ->

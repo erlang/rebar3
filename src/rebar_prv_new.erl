@@ -17,14 +17,17 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
-                                                               {module, ?MODULE},
-                                                               {bare, false},
-                                                               {deps, ?DEPS},
-                                                               {example, "rebar new <template>"},
-                                                               {short_desc, "Create new project from templates."},
-                                                               {desc, info()},
-                                                               {opts, []}])),
+    Provider = providers:create([
+        {name, ?PROVIDER},
+        {module, ?MODULE},
+        {bare, false},
+        {deps, ?DEPS},
+        {example, "rebar new <template>"},
+        {short_desc, "Create new project from templates."},
+        {desc, info()},
+        {opts, [{force, $f, "force", undefined, "overwrite existing files"}]}
+    ]),
+    State1 = rebar_state:add_provider(State, Provider),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
@@ -37,7 +40,8 @@ do(State) ->
             end,
             {ok, State};
         [TemplateName | Opts] ->
-            ok = rebar_templater:new(TemplateName, parse_opts(Opts), State),
+            Force = is_forced(State),
+            ok = rebar_templater:new(TemplateName, parse_opts(Opts), Force, State),
             {ok, State};
         [] ->
             show_short_templates(rebar_templater:list_templates(State)),
@@ -58,6 +62,13 @@ info() ->
       "~n"
       "Valid command line options:~n"
       "  template= [var=foo,...]~n", []).
+
+is_forced(State) ->
+    {Args, _} = rebar_state:command_parsed_args(State),
+    case proplists:get_value(force, Args) of
+        undefined -> false;
+        _ -> true
+    end.
 
 parse_opts([]) -> [];
 parse_opts([Opt|Opts]) -> [parse_opt(Opt, "") | parse_opts(Opts)].
