@@ -1,8 +1,5 @@
 #### TODO ####
 
-- write a rebar3 template for plugin writing, make it easier on our poor souls
-- rework the tutorial to use the rebar3 template for plugins
-
 # Plugins #
 
 Rebar3's system is based on the concept of *[providers](https://github.com/tsloughter/providers)*. A provider has three callbacks:
@@ -24,13 +21,40 @@ This document contains the following elements:
 
 ## Using a Plugin ##
 
+To use the a plugin, add it to the rebar.config:
+
+```erlang
+{plugins, [
+  {plugin_name, ".*", {git, "git@host:user/name-of-plugin.git", {tag, "v1.0.0"}}}
+]}.
+```
+
+Then you can just call it directly:
+
+```
+→ rebar3 plugin_name
+===> Fetching plugin_name
+Cloning into '.tmp_dir539136867963'...
+===> Compiling plugin_name
+<PLUGIN OUTPUT>
+```
+
 ## Reference ##
+
+TODO
 
 ### Provider Interface ###
 
+TODO
+
 ### List of Possible Dependencies ###
 
+TODO
+
 ### Rebar State Manipulation ###
+
+TODO
+
 
 ## Tutorial ##
 
@@ -42,22 +66,10 @@ The first step is to create a new OTP Application that will contain the plugin:
 
     → git init
     Initialized empty Git repository in /Users/ferd/code/self/rebar3-todo-plugin/.git/
-    → mkdir src
-    → touch src/provider_todo.erl src/provider_todo.app.src
+    → rebar3 new plugin provider_todo desc="example rebar3 plugin"
+    ...
 
-Let's edit the app file to make sure the description is fine:
-
-```erlang
-{application, provider_todo, [
-  {description, "example rebar3 plubin"},
-  {vsn, "0.1.0"},
-  {registered, []},
-  {applications, [kernel, stdlib]},
-  {env, []}
-]}.
-```
-
-Open up the `provider_todo.erl` file and make sure you have the following skeleton in place:
+Open up the `src/provider_todo.erl` file and make sure you have the following skeleton in place:
 
 ```erlang
 -module(provider_todo).
@@ -80,9 +92,9 @@ init(State) ->
             {module, ?MODULE},          % The module implementation of the task
             {bare, true},               % The task can be run by the user, always true
             {deps, ?DEPS},              % The list of dependencies
-            {example, "rebar $PLUGIN"}, % How to use the plugin
+            {example, "rebar provider_todo"}, % How to use the plugin
             {opts, []}                  % list of options understood by the plugin
-            {short_desc, ""},
+            {short_desc, "example rebar3 plugin"},
             {desc, ""}
     ]),
     {ok, rebar_state:add_provider(State, Provider)}.

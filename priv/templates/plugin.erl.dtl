@@ -20,7 +20,7 @@ init(State) ->
             {deps, ?DEPS},              % The list of dependencies
             {example, "rebar {{name}}"}, % How to use the plugin
             {opts, []}                  % list of options understood by the plugin
-            {short_desc, {{desc}}},
+            {short_desc, "{{desc}}"},
             {desc, ""}
     ]),
     {ok, rebar_state:add_provider(State, Provider)}.
@@ -30,7 +30,7 @@ init(State) ->
 do(State) ->
     {ok, State}.
 
--spec format_error(any(), rebar_state:t()) ->  {iolist(), rebar_state:t()}.
+-spec format_error(any()) ->  iolist().
 format_error(Reason, State) ->
-    {io_lib:format("~p", [Reason]), State}.
+    io_lib:format("~p", [Reason]).
 
