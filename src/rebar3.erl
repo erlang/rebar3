@@ -143,8 +143,9 @@ init_config() ->
                       Config
               end,
 
-    %% If $HOME/.rebar/config exists load and use as global config
-    GlobalConfigFile = filename:join([os:getenv("HOME"), ".rebar", "config"]),
+    %% If $HOME/.rebar3/config exists load and use as global config
+    Home = rebar_utils:home_dir(),
+    GlobalConfigFile = filename:join([Home, ?CONFIG_DIR, "config"]),
     State = case filelib:is_regular(GlobalConfigFile) of
                 true ->
                     ?DEBUG("Load global config file ~p",

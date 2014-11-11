@@ -6,7 +6,8 @@
 
 -spec get_packages(rebar_state:t()) -> {rebar_dict(), rlx_depsolver:t()}.
 get_packages(State) ->
-    RebarDir = rebar_state:get(State, global_rebar_dir, filename:join(os:getenv("HOME"), ".rebar")),
+    Home = rebar_utils:home_dir(),
+    RebarDir = rebar_state:get(State, global_rebar_dir, filename:join(Home, ?CONFIG_DIR)),
     PackagesFile = filename:join(RebarDir, "packages"),
     case ec_file:exists(PackagesFile) of
         true ->

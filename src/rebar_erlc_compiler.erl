@@ -418,7 +418,7 @@ check_erlcinfo(Config, _) ->
            [erlcinfo_file(Config)]).
 
 erlcinfo_file(_Config) ->
-    filename:join([rebar_utils:get_cwd(), ".rebar", ?ERLCINFO_FILE]).
+    filename:join([rebar_utils:get_cwd(), ?CONFIG_DIR, ?ERLCINFO_FILE]).
 
 init_erlcinfo(Config, Erls) ->
     G = restore_erlcinfo(Config),

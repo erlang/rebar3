@@ -35,8 +35,8 @@ do(State) ->
     ?INFO("Updating package index...", []),
     try
         Url = url(State),
-        {ok, [[Home]]} = init:get_argument(home),
-        PackagesFile = filename:join([Home, ".rebar", "packages"]),
+        Home = rebar_utils:home_dir(),
+        PackagesFile = filename:join([Home, ?CONFIG_DIR, "packages"]),
         filelib:ensure_dir(PackagesFile),
         {ok, _RequestId} = httpc:request(get, {Url, []}, [], [{stream, PackagesFile}
                                                              ,{sync, true}])

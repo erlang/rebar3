@@ -143,8 +143,8 @@ default_variables() ->
 %% Load variable definitions from the 'Globals' file in the home template
 %% directory
 global_variables() ->
-    {ok, [[Home]]} = init:get_argument(home),
-    GlobalFile = filename:join([Home, ?HOME_DIR, "templates", "globals"]),
+    Home = rebar_utils:home_dir(),
+    GlobalFile = filename:join([Home, ?CONFIG_DIR, "templates", "globals"]),
     case file:consult(GlobalFile) of
         {error, enoent} -> [];
         {ok, Data} -> proplists:get_value(variables, Data, [])
@@ -270,8 +270,8 @@ find_escript_templates(Files) ->
 %% Fetch template indexes that sit on disk in the user's HOME
 find_disk_templates(State) ->
     OtherTemplates = find_other_templates(State),
-    {ok, [[Home]]} = init:get_argument(home),
-    HomeFiles = rebar_utils:find_files(filename:join([Home, ?HOME_DIR, "templates"]),
+    Home = rebar_utils:home_dir(),
+    HomeFiles = rebar_utils:find_files(filename:join([Home, ?CONFIG_DIR, "templates"]),
                                        ?TEMPLATE_RE),
     LocalFiles = rebar_utils:find_files(".", ?TEMPLATE_RE, true),
     [{file, F} || F <- OtherTemplates ++ HomeFiles ++ LocalFiles].

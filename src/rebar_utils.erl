@@ -26,7 +26,8 @@
 %% -------------------------------------------------------------------
 -module(rebar_utils).
 
--export([droplast/1,
+-export([home_dir/0,
+         droplast/1,
          filtermap/2,
          get_cwd/0,
          is_arch/1,
@@ -65,6 +66,10 @@
 %% ====================================================================
 %% Public API
 %% ====================================================================
+
+home_dir() ->
+    {ok, [[Home]]} = init:get_argument(home),
+    Home.
 
 droplast(L) ->
     lists:reverse(tl(lists:reverse(L))).
