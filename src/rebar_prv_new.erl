@@ -71,7 +71,15 @@ is_forced(State) ->
     end.
 
 parse_opts([]) -> [];
-parse_opts([Opt|Opts]) -> [parse_opt(Opt, "") | parse_opts(Opts)].
+parse_opts([Opt|Opts]) -> [parse_first_opt(Opt, "") | parse_opts1(Opts)].
+
+parse_opts1([]) -> [];
+parse_opts1([Opt|Opts]) -> [parse_opt(Opt, "") | parse_opts1(Opts)].
+
+%% If the first argument meets no '=', we got a default 'name' argument
+parse_first_opt("", Acc) -> {name, lists:reverse(Acc)};
+parse_first_opt("="++Rest, Acc) -> parse_opt("="++Rest, Acc);
+parse_first_opt([H|Str], Acc) -> parse_first_opt(Str, [H|Acc]).
 
 %% We convert to atoms dynamically. Horrible in general, but fine in a
 %% build system's templating tool.

@@ -1,10 +1,10 @@
 {description, "Rebar3 plugin"}.
 {variables, [
-    {appid, "myplugin", "Name of the plugin"},
+    {name, "myplugin", "Name of the plugin"},
     {desc, "A rebar plugin", "Short description of the plugin's purpose"}
 ]}.
-{template, "plugin.erl.dtl", "src/{{appid}}.erl"}.
-{template, "otp_lib.app.src.dtl", "src/{{appid}}.app.src"}.
+{template, "plugin.erl.dtl", "src/{{name}}.erl"}.
+{template, "otp_lib.app.src.dtl", "src/{{name}}.app.src"}.
 {template, "rebar.config.dtl", "rebar.config"}.
 {template, "gitignore.dtl", ".gitignore"}.
 {template, "LICENSE.dtl", "LICENSE"}.

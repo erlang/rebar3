@@ -50,7 +50,7 @@ Details for each individual plugin can be obtained by calling `rebar3 new help <
             built-in template
             Description: Rebar3 plugin
             Variables:
-                    appid="myplugin" (Name of the plugin)
+                    name="myplugin" (Name of the plugin)
                     desc="A rebar plugin" (Short description of the plugin's purpose)
                     date="2014-11-10"
                     datetime="2014-11-10T18:29:41+00:00"
@@ -62,6 +62,17 @@ Details for each individual plugin can be obtained by calling `rebar3 new help <
 All the variables there have their default values shown, and an optional explanation in parentheses.
 
 The variables can also be [overriden globally](#global-variables).
+
+A template can be run by calling:
+
+    → ./rebar3 new plugin name=demo author_name="Fred H."
+    ...
+
+Alternatively, the `name` variable is special -- if the first argument to a template has no key associated with it, `name` is automatically added. The call above is therefore equivalent to:
+
+    → ./rebar3 new plugin demo author_name="Fred H."
+    ...
+
 
 ## Custom Templates ##
 
@@ -107,11 +118,11 @@ We'll start with an index for our template, called `ct_suite.template`:
 ```erlang
 {description, "A basic Common Test suite for an OTP application"}.
 {variables, [
-    {suite, "suite", "Name of the suite, prepended to the standard _SUITE suffix"}
+    {name, "suite", "Name of the suite, prepended to the standard _SUITE suffix"}
 ]}.
 
 {dir, "test"}.
-{template, "ct_suite.erl.dtl", "test/{{suite}}_SUITE.erl"}.
+{template, "ct_suite.erl.dtl", "test/{{name}}_SUITE.erl"}.
 ```
 
 This tells rebar3 to create the test directory and to evaluate an [ErlyDTL](https://github.com/erlydtl/erlydtl) template. All the paths are relative to the current working directory.
@@ -119,7 +130,7 @@ This tells rebar3 to create the test directory and to evaluate an [ErlyDTL](http
 Let's create the template file:
 
 ```erlang
--module({{suite}}_SUITE).
+-module({{name}}_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl"). % Eunit macros for convenience
@@ -145,7 +156,7 @@ fail(_Config) ->
     ?assert(false).
 ```
 
-This one does very simple variable substitution for the name (using `{{suite}}`) and that's all it needs.
+This one does very simple variable substitution for the name (using `{{name}}`) and that's all it needs.
 
 Let's get to any existing project you have and try it:
 
@@ -164,7 +175,7 @@ Let's look at the details:
             custom template (/home/ferd/.rebar3/templates/ct_suite.template)
             Description: A basic Common Test suite for an OTP application
             Variables:
-                    suite="suite" (Name of the suite, prepended to the standard _SUITE suffix)
+                    name="suite" (Name of the suite, prepended to the standard _SUITE suffix)
                     date="2014-11-10"
                     datetime="2014-11-10T18:46:33+00:00"
                     author_name="Anonymous"
@@ -174,9 +185,7 @@ Let's look at the details:
 
 The documentation from variables and the description are well in place. To apply the template, go to any of your OTP application's top-level directory:
 
-    → ./rebar3 new ct_suite suite=demo
+    → ./rebar3 new ct_suite demo
     ===> Writing test/demo_SUITE.erl
 
 And you will see the code in place.
-
-~

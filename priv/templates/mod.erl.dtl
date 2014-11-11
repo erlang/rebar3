@@ -1,4 +1,4 @@
--module({{appid}}).
+-module({{name}}).
 
 %% API exports
 -export([]).

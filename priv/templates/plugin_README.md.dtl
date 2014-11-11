@@ -1,4 +1,4 @@
-{{appid}}
+{{name}}
 =====
 
 {{desc}}
@@ -14,14 +14,14 @@ Use
 Add the plugin to your rebar config:
 
     {plugins, [
-        { {{appid}}, ".*", {git, "git@host:user/{{appid}}.git", {tag, "0.1.0"}}}
+        { {{name}}, ".*", {git, "git@host:user/{{name}}.git", {tag, "0.1.0"}}}
     ]}.
 
 Then just call your plugin directly in an existing application:
 
 
-    $ rebar3 {{appid}}
-    ===> Fetching {{appid}}
+    $ rebar3 {{name}}
+    ===> Fetching {{name}}
     Cloning into '.tmp_dir539136867963'...
-    ===> Compiling {{appid}}
+    ===> Compiling {{name}}
     <Plugin Output>
