@@ -5,7 +5,7 @@ Rebar was a great step forward for Erlang development but with time has proven t
 ## Creating a New Project
 
 ```shell
-$ rebar3 new rel myrelease
+$ rebar3 new release myrelease
 ===> Writing apps/myrelease/src/myrelease_app.erl
 ===> Writing apps/myrelease/src/myrelease_sup.erl
 ===> Writing apps/myrelease/src/myrelease.app.src
