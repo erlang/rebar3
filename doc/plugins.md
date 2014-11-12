@@ -1,5 +1,3 @@
-#### TODO ####
-
 # Plugins #
 
 Rebar3's system is based on the concept of *[providers](https://github.com/tsloughter/providers)*. A provider has three callbacks:
