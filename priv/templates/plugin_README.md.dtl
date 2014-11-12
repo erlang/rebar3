@@ -22,6 +22,5 @@ Then just call your plugin directly in an existing application:
 
     $ rebar3 {{name}}
     ===> Fetching {{name}}
-    Cloning into '.tmp_dir539136867963'...
     ===> Compiling {{name}}
     <Plugin Output>

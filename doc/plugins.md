@@ -32,7 +32,6 @@ Then you can just call it directly:
 ```
 → rebar3 plugin_name
 ===> Fetching plugin_name
-Cloning into '.tmp_dir539136867963'...
 ===> Compiling plugin_name
 <PLUGIN OUTPUT>
 ```
@@ -188,7 +187,6 @@ Then you can just call it directly:
 ```
 → rebar3 todo
 ===> Fetching provider_todo
-Cloning into '.tmp_dir539136867963'...
 ===> Compiling provider_todo
 Application merklet
     /Users/ferd/code/self/merklet/src/merklet.erl
