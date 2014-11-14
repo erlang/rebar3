@@ -35,11 +35,14 @@ do(State) ->
     ?INFO("Updating package index...", []),
     try
         Url = url(State),
+        TmpDir = ec_file:insecure_mkdtemp(),
+        TmpFile = filename:join(TmpDir, "packages"),
         Home = rebar_utils:home_dir(),
         PackagesFile = filename:join([Home, ?CONFIG_DIR, "packages"]),
         filelib:ensure_dir(PackagesFile),
-        {ok, _RequestId} = httpc:request(get, {Url, []}, [], [{stream, PackagesFile}
-                                                             ,{sync, true}])
+        {ok, _RequestId} = httpc:request(get, {Url, []}, [], [{stream, TmpFile}
+                                                             ,{sync, true}]),
+        ok = ec_file:copy(TmpFile, PackagesFile)
     catch
         _:_ ->
             {error, {?MODULE, package_index_write}}
