@@ -1,7 +1,7 @@
 rebar
 =====
 
-rebar is an Erlang build tool that makes it easy to compile and test Erlang
+rebar [3.0](#30) is an Erlang build tool that makes it easy to compile and test Erlang
 applications, port drivers and releases.
 
 [![Build Status](https://travis-ci.org/rebar/rebar3.svg?branch=master)](https://travis-ci.org/rebar/rebar3)
@@ -16,7 +16,11 @@ locations (git, hg, etc).
 3.0
 ====
 
-This is an experimental branch.
+This is an experimental branch, considered to be pre-alpha, and still 
+very unstable. Use at your own risk, and expect no support.
+
+Compatibility with rebar 2.0 has been broken, and features removed to
+limit scope.
 
 ### Commands
 
