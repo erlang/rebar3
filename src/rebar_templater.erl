@@ -138,7 +138,7 @@ default_variables() ->
      {author_name, "Anonymous"},
      {author_email, "anonymous@example.org"},
      {copyright_year, integer_to_list(Y)},
-     {apps_dir, "apps/", "Directory where applications will be created if needed"}].
+     {apps_dir, "apps", "Directory where applications will be created if needed"}].
 
 %% Load variable definitions from the 'Globals' file in the home template
 %% directory
