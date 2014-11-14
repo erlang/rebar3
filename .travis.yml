@@ -7,7 +7,7 @@ otp_release:
 script: make travis
 branches:
   only:
-    - rebar3
+    - master
 before_deploy: "rm -rf !(rebar3)"
 deploy:
   on:
