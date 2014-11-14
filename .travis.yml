@@ -11,7 +11,7 @@ branches:
 before_deploy: "rm -rf !(rebar3)"
 deploy:
   on:
-    branch: rebar3
+    branch: master
     condition: $TRAVIS_OTP_RELEASE = R15B01
   provider: s3
   access_key_id: AKIAJAPYAQEFYCYSNL7Q
