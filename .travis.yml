@@ -14,8 +14,8 @@ deploy:
     branch: rebar3
     condition: $TRAVIS_OTP_RELEASE = R15B01
   provider: s3
-  access_key_id: AKIAIKQB2JZYYNIWC72Q
+  access_key_id: AKIAJAPYAQEFYCYSNL7Q
   secret_access_key:
-    secure: JoPSFeISsq7RbkgQLbz/DdLATgGhyuSjjIAwv0lZkhkHspmchArnt9hjDTxmkk8ApPcqDhp8iPEII6E8f2tltTA7djpxx8fO6a7DLyJnDe7QL4Qu1zSMmy91JmkapjDb8VqdAyvUmzAuCp91rfQPsgDiVQNrBSdCfy7LcTZyk3M=
+    secure: "BUv2KQABv0Q4e8DAVNBRTc/lXHWt27yCN46Fdgo1IrcSSIiP+hq2yXzQcXLbPwkEu6pxUZQtL3mvKbt6l7uw3wFrcRfFAi1PGTITAW8MTmxtwcZIBcHSk3XOzDbkK+fYYcaddszmt7hDzzEFPtmYXiNgnaMIVeynhQLgcCcIRRQ="
   bucket: "rebar3"
   skip_cleanup: true

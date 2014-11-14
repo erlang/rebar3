@@ -4,7 +4,7 @@ rebar
 rebar is an Erlang build tool that makes it easy to compile and test Erlang
 applications, port drivers and releases.
 
-[![Build Status](https://travis-ci.org/tsloughter/rebar.svg?branch=rebar3)](https://travis-ci.org/tsloughter/rebar)
+[![Build Status](https://travis-ci.org/rebar/rebar3.svg?branch=rebar3)](https://travis-ci.org/rebar/rebar3)
 
 rebar is a self-contained Erlang script, so it's easy to distribute or even
 embed directly in a project. Where possible, rebar uses standard Erlang/OTP
