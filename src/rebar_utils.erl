@@ -54,7 +54,8 @@
          ebin_dir/0,
          processing_base_dir/1,
          processing_base_dir/2,
-         indent/1]).
+         indent/1,
+         cleanup_code_path/1]).
 
 %% for internal use only
 -export([otp_release/0]).
@@ -542,3 +543,17 @@ filter_defines([Opt | Rest], Acc) ->
 -spec indent(non_neg_integer()) -> iolist().
 indent(Amount) when erlang:is_integer(Amount) ->
     [?ONE_LEVEL_INDENT || _ <- lists:seq(1, Amount)].
+
+cleanup_code_path(OrigPath) ->
+    CurrentPath = code:get_path(),
+    AddedPaths = CurrentPath -- OrigPath,
+    %% If someone has removed paths, it's hard to get them back into
+    %% the right order, but since this is currently rare, we can just
+    %% fall back to code:set_path/1.
+    case CurrentPath -- AddedPaths of
+        OrigPath ->
+            _ = [code:del_path(Path) || Path <- AddedPaths],
+            true;
+        _ ->
+            code:set_path(OrigPath)
+    end.
