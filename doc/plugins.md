@@ -61,10 +61,11 @@ In this tutorial, we'll show how to start from scratch, and get a basic plugin w
 
 The first step is to create a new OTP Application that will contain the plugin:
 
-    → git init
-    Initialized empty Git repository in /Users/ferd/code/self/rebar3-todo-plugin/.git/
     → rebar3 new plugin provider_todo desc="example rebar3 plugin"
     ...
+    → cd provider_todo
+    → git init
+    Initialized empty Git repository in /Users/ferd/code/self/provider_todo/.git/
 
 Open up the `src/provider_todo.erl` file and make sure you have the following skeleton in place:
 

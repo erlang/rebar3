@@ -73,6 +73,7 @@ Alternatively, the `name` variable is special -- if the first argument to a temp
     → ./rebar3 new plugin demo author_name="Fred H."
     ...
 
+Then go to the directory created for the project by rebar3.
 
 ## Custom Templates ##
 
