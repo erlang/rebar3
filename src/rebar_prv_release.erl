@@ -34,7 +34,7 @@ init(State) ->
 do(State) ->
     Options = rebar_state:command_args(State),
     DepsDir = rebar_prv_install_deps:get_deps_dir(State),
-    OutputDir = filename:join(rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR), "releases"),
+    OutputDir = filename:join(rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR), "_rel"),
     AllOptions = string:join(["release" | Options], " "),
     try
         case rebar_state:get(State, relx, []) of

@@ -12,7 +12,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, tar).
--define(DEPS, []).
+-define(DEPS, [compile]).
 
 %% ===================================================================
 %% Public API
