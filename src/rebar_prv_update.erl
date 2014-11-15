@@ -55,13 +55,8 @@ format_error(package_index_write) ->
     "Failed to write package index.".
 
 url(State) ->
-    SystemArch = erlang:system_info(system_architecture),
     ErtsVsn = erlang:system_info(version),
-    {glibc, GlibcVsn, _, _} = erlang:system_info(allocator),
-    GlibcVsnStr = io_lib:format("~p.~p", GlibcVsn),
 
-    Qs = [io_lib:format("~s=~s", [X, Y]) || {X, Y} <- [{"arch", SystemArch}
-                                                      ,{"erts", ErtsVsn}
-                                                      ,{"glibc", GlibcVsnStr}]],
-    Url = rebar_state:get(State, rebar_packages_url, "http://polar-caverns-6802.herokuapp.com"),
+    Qs = [io_lib:format("~s=~s", [X, Y]) || {X, Y} <- [{"erts", ErtsVsn}]],
+    Url = rebar_state:get(State, rebar_packages_url, "http://packages.rebar3.org/packages"),
     Url ++ "?" ++ string:join(Qs, "&").
