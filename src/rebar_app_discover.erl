@@ -70,7 +70,9 @@ find_app(AppDir, Validate) ->
                            [F] ->
                                rebar_app_info:app_file_src(AppInfo1, F);
                            [] ->
-                               AppInfo1
+                               AppInfo1;
+                           Other when is_list(Other) ->
+                               throw({error, {multiple_app_files, Other}})
                        end,
             case Validate of
                 valid ->
@@ -101,8 +103,12 @@ find_app(AppDir, Validate) ->
                             false
                     end;
                 [] ->
-                    false
-            end
+                    false;
+                Other when is_list(Other) ->
+                    throw({error, {multiple_app_files, Other}})
+            end;
+        Other when is_list(Other) ->
+            throw({error, {multiple_app_files, Other}})
     end.
 
 app_dir(AppFile) ->
