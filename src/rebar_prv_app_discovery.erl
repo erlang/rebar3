@@ -33,9 +33,16 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     LibDirs = rebar_state:get(State, lib_dirs, ?DEFAULT_LIB_DIRS),
-    State1 = rebar_app_discover:do(State, LibDirs),
-    {ok, State1}.
+    try
+        State1 = rebar_app_discover:do(State, LibDirs),
+        {ok, State1}
+    catch
+        throw:{error, Error}->
+            {error, {?MODULE, Error}}
+    end.
 
--spec format_error(any()) ->  iolist().
+-spec format_error(any()) -> iolist().
+format_error({multiple_app_files, Files}) ->
+    io_lib:format("Multiple app files found in one app dir: ~s", [string:join(Files, " and ")]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
