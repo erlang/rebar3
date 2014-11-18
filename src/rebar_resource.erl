@@ -14,7 +14,7 @@
 -type location() :: string().
 -type ref() :: any().
 
--ifdef(have_callback_support).
+-ifdef(no_callback_support).
 
 %% In the case where R14 or lower is being used to compile the system
 %% we need to export a behaviour info
