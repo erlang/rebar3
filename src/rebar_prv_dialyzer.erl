@@ -95,14 +95,6 @@ update_dep_plt(_State, DepPlt, AppList) ->
     dialyzer:run(Opts).
 
 default_warnings() ->
-    [no_return,
-     no_unused,
-     no_improper_lists,
-     no_fun_app,
-     no_match,
-     no_opaque,
-     no_fail_call,
-     error_handling,
-     race_conditions,
+    [error_handling,
      unmatched_returns,
      underspecs].
