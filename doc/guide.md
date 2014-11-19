@@ -23,7 +23,7 @@ $ rebar3 new release myrelease
 First, checkout the project and change directories to the project root.
 
 ```shell
-$ git clone git://github.com/tsloughter/minansan.git
+$ git clone git://github.com/tsloughter/minasan.git
 $ cd minansan
 ```
 
