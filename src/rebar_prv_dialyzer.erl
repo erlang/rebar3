@@ -33,34 +33,15 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     ?INFO("Dialyzer starting, this may take a while...", []),
-    BuildDir = rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR),
-    {ProjectPlt, DepPlt} = get_plt_location(BuildDir),
-    Apps = rebar_state:project_apps(State),
+    State1 = set_plt_location(State),
+    Apps = rebar_state:project_apps(State1),
     Deps = rebar_state:get(State, all_deps, []),
 
     try
-        ?INFO("Doing plt for dependencies...", []),
-        update_dep_plt(State, DepPlt, Deps),
-        ?INFO("Doing plt for project apps...", []),
-        update_dep_plt(State, ProjectPlt, Apps),
-        WarningTypes = rebar_state:get(State, dialyzer_warnings, default_warnings()),
-        Paths = [filename:join(rebar_app_info:dir(App), "ebin") || App <- Apps],
-        Opts = [{analysis_type, succ_typings},
-                {from, byte_code},
-                {files_rec, Paths},
-                {warnings, WarningTypes},
-                {plts, [ProjectPlt, DepPlt]}],
-
-        case dialyzer:run(Opts) of
-            [] ->
-                {ok, State};
-            Warnings ->
-                [?CONSOLE(string:strip(dialyzer:format_warning(Warning), right, $\n), []) ||
-                    Warning <- Warnings],
-                {ok, State}
-        end
+        {ok, State2} = update_plt(State1, Apps, Deps),
+        succ_typings(State2, Apps)
     catch
-        _:{dialyzer_error, Error} ->
+        throw:{dialyzer_error, Error} ->
             {error, {?MODULE, {error_processing_apps, Error, Apps}}}
     end.
 
@@ -72,27 +53,165 @@ format_error(Reason) ->
 
 %% Internal functions
 
-get_plt_location(BuildDir) ->
-    {filename:join([BuildDir, ".project.plt"]),
-     filename:join([BuildDir, ".deps.plt"])}.
+set_plt_location(State) ->
+    BuildDir = rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR),
+    DefaultPlt = filename:join([BuildDir, ".deps.plt"]),
+    Plt = rebar_state:get(State, plt, DefaultPlt),
+    rebar_state:set(State, plt, Plt).
 
-update_dep_plt(_State, DepPlt, AppList) ->
-    Opts0 =
-        case filelib:is_file(DepPlt) of
-            true ->
-                ?INFO("Plt is built, checking/updating...", []),
-                [{analysis_type, plt_check},
-                 {plts, [DepPlt]}];
-            false ->
-                ?INFO("Building the plt, this will take a while...", []),
-                [{analysis_type, plt_build},
-                 {output_plt, DepPlt}]
-        end,
-    Paths = [filename:join(rebar_app_info:dir(App), "ebin") || App <- AppList],
-    Opts = [{files_rec, Paths},
-            {from, byte_code}] ++ Opts0,
+update_plt(State, Apps, Deps) ->
+    ?INFO("Updating plt...", []),
+    Files = get_plt_files(State, Apps, Deps),
+    case read_plt(State) of
+        {ok, OldFiles} ->
+            check_plt(State, OldFiles, Files);
+        {error, no_such_file} ->
+            build_plt(State, Files)
+    end.
 
-    dialyzer:run(Opts).
+get_plt_files(State, Apps, Deps) ->
+    case rebar_state:get(State, plt_apps) of
+        undefined ->
+            apps_to_files(Deps);
+        PltApps ->
+            app_names_to_files(PltApps, Apps ++ Deps)
+    end.
+
+apps_to_files(Apps) ->
+    lists:flatmap(fun app_to_files/1, Apps).
+
+app_to_files(App) ->
+    AppDetails = rebar_app_info:app_details(App),
+    Modules = proplists:get_value(modules, AppDetails, []),
+    EbinDir = rebar_app_info:ebin_dir(App),
+    modules_to_files(Modules, EbinDir).
+
+modules_to_files(Modules, EbinDir) ->
+    Ext = code:objfile_extension(),
+    Mod2File = fun(Module) -> module_to_file(Module, EbinDir, Ext) end,
+    rebar_utils:filtermap(Mod2File, Modules).
+
+module_to_file(Module, EbinDir, Ext) ->
+    File = filename:join(EbinDir, atom_to_list(Module) ++ Ext),
+    case filelib:is_file(File) of
+        true ->
+            {true, File};
+        false ->
+            ?CONSOLE("Unknown module ~s", [Module]),
+            false
+    end.
+
+app_names_to_files(AppNames, Apps) ->
+    lists:flatmap(fun(AppName) -> app_name_to_files(AppName, Apps) end,
+                  AppNames).
+
+app_name_to_files(AppName, Apps) ->
+    case rebar_app_utils:find(ec_cnv:to_binary(AppName), Apps) of
+        {ok, App} ->
+            app_to_files(App);
+        error ->
+            app_name_to_files(AppName)
+    end.
+
+app_name_to_files(AppName) ->
+    case code:lib_dir(AppName) of
+        {error, _} ->
+            ?CONSOLE("Unknown application ~s", [AppName]),
+            [];
+        AppDir ->
+            app_dir_to_files(AppDir, AppName)
+    end.
+
+app_dir_to_files(AppDir, AppName) ->
+    EbinDir = filename:join(AppDir, "ebin"),
+    AppFile = filename:join(EbinDir, atom_to_list(AppName) ++ ".app"),
+    case file:consult(AppFile) of
+        {ok, [{application, AppName, AppDetails}]} ->
+            Modules = proplists:get_value(modules, AppDetails, []),
+            modules_to_files(Modules, EbinDir);
+        _ ->
+            Error = io_lib:format("Could not parse ~p", [AppFile]),
+            throw({dialyzer_error, Error})
+    end.
+
+read_plt(State) ->
+    Plt = rebar_state:get(State, plt),
+    case dialyzer:plt_info(Plt) of
+        {ok, Info} ->
+            Files = proplists:get_value(files, Info, []),
+            {ok, Files};
+        {error, no_such_file} = Error ->
+            Error;
+        {error, read_error} ->
+            Error = io_lib:format("Could not read the PLT file ~p", [Plt]),
+            throw({dialyzer_error, Error})
+    end.
+
+check_plt(State, OldList, FilesList) ->
+    Old = sets:from_list(OldList),
+    Files = sets:from_list(FilesList),
+    Remove = sets:subtract(Old, Files),
+    {ok, State1} = remove_plt(State, sets:to_list(Remove)),
+    Check = sets:intersection(Files, Old),
+    {ok, State2} = check_plt(State1, sets:to_list(Check)),
+    Add = sets:subtract(Files, Old),
+    add_plt(State2, sets:to_list(Add)).
+
+remove_plt(State, []) ->
+    {ok, State};
+remove_plt(State, Files) ->
+    ?INFO("Removing ~b files from plt...", [length(Files)]),
+    run_plt(State, plt_remove, Files).
+
+check_plt(State, []) ->
+    {ok, State};
+check_plt(State, Files) ->
+    ?INFO("Checking ~b files in plt...", [length(Files)]),
+    run_plt(State, plt_check, Files).
+
+add_plt(State, []) ->
+    {ok, State};
+add_plt(State, Files) ->
+    ?INFO("Adding ~b files to plt...", [length(Files)]),
+    run_plt(State, plt_add, Files).
+
+run_plt(State, Analysis, Files) ->
+    Plt = rebar_state:get(State, plt),
+    Opts = [{analysis_type, Analysis},
+            {init_plt, Plt},
+            {from, byte_code},
+            {files, Files}],
+    run_dialyzer(State, Opts).
+
+build_plt(State, Files) ->
+    Plt = rebar_state:get(State, plt),
+    ?INFO("Building PLT with ~b files...", [length(Files)]),
+    Opts = [{analysis_type, plt_build},
+            {output_plt, Plt},
+            {files, Files}],
+    run_dialyzer(State, Opts).
+
+succ_typings(State, Apps) ->
+    ?INFO("Doing success typing analysis...", []),
+    Files = apps_to_files(Apps),
+    Plt = rebar_state:get(State, plt),
+    Opts = [{analysis_type, succ_typings},
+            {from, byte_code},
+            {files, Files},
+            {plts, [Plt]}],
+    run_dialyzer(State, Opts).
+
+run_dialyzer(State, Opts) ->
+    Warnings = rebar_state:get(State, dialyzer_warnings, default_warnings()),
+    Opts2 = [{get_warnings, true},
+             {warnings, Warnings} |
+             Opts],
+    _ = [?CONSOLE(format_warning(Warning), [])
+         || Warning <- dialyzer:run(Opts2)],
+    {ok, State}.
+
+format_warning(Warning) ->
+    string:strip(dialyzer:format_warning(Warning), right, $\n).
 
 default_warnings() ->
     [error_handling,
