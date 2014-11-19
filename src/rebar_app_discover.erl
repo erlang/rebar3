@@ -119,7 +119,7 @@ create_app_info(AppDir, AppFile) ->
     case file:consult(AppFile) of
         {ok, [{application, AppName, AppDetails}]} ->
             AppVsn = proplists:get_value(vsn, AppDetails),
-            %AppDeps = proplists:get_value(applications, AppDetails, []),
+            Applications = proplists:get_value(applications, AppDetails, []),
             C = rebar_config:consult(AppDir),
             S = rebar_state:new(rebar_state:new(), C, AppDir),
             AppDeps = rebar_state:deps_names(S),
@@ -134,8 +134,9 @@ create_app_info(AppDir, AppFile) ->
                                 rebar_state:new()
                         end,
             AppState1 = rebar_state:set(AppState, base_dir, AbsCwd),
-            AppInfo1 = rebar_app_info:config(
-                         rebar_app_info:app_details(AppInfo, AppDetails), AppState1),
+            AppInfo1 = rebar_app_info:applications(rebar_app_info:config(
+                                                     rebar_app_info:app_details(AppInfo, AppDetails)
+                                                     ,AppState1), Applications),
             rebar_app_info:dir(AppInfo1, AppDir);
         _ ->
             error

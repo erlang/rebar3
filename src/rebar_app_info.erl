@@ -18,6 +18,8 @@
          original_vsn/1,
          original_vsn/2,
          ebin_dir/1,
+         applications/1,
+         applications/2,
          deps/1,
          deps/2,
          dep_level/1,
@@ -37,6 +39,7 @@
                      config :: rebar_state:t() | undefined,
                      original_vsn :: binary() | string() | undefined,
                      app_details=[] :: list(),
+                     applications=[] :: list(),
                      deps=[] :: list(),
                      dep_level=0 :: integer(),
                      dir :: file:name(),
@@ -154,6 +157,14 @@ original_vsn(#app_info_t{original_vsn=Vsn}) ->
 -spec original_vsn(t(), string()) -> t().
 original_vsn(AppInfo=#app_info_t{}, Vsn) ->
     AppInfo#app_info_t{original_vsn=Vsn}.
+
+-spec applications(t()) -> list().
+applications(#app_info_t{applications=Applications}) ->
+    Applications.
+
+-spec applications(t(), list()) -> t().
+applications(AppInfo=#app_info_t{}, Applications) ->
+    AppInfo#app_info_t{applications=Applications}.
 
 -spec deps(t()) -> list().
 deps(#app_info_t{deps=Deps}) ->
