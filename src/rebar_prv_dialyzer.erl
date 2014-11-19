@@ -211,7 +211,15 @@ run_dialyzer(State, Opts) ->
     {ok, State}.
 
 format_warning(Warning) ->
-    string:strip(dialyzer:format_warning(Warning), right, $\n).
+    string:strip(dialyzer_format_warning(Warning), right, $\n).
+
+dialyzer_format_warning(Warning) ->
+    case dialyzer:format_warning(Warning) of
+        ":0: " ++ Warning2 ->
+            Warning2;
+        Warning2 ->
+            Warning2
+    end.
 
 default_warnings() ->
     [error_handling,
