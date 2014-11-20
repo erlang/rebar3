@@ -42,17 +42,18 @@ desc() ->
     "`dialyzer_warnings` - a list of dialyzer warnings\n"
     "`dialyzer_plt` - the PLT file to use\n"
     "`dialyzer_plt_apps` - a list of applications to include in the PLT file*\n"
+    "`dialyzer_base_plt` - the base PLT file to use**\n"
+    "`dialyzer_base_plt_dir` - the base PLT directory**\n"
+    "`dialyzer_base_plt_apps` - a list of applications to include in the base "
+    "PLT file**\n"
     "\n"
     "*If this configuration is not present a selection of applications will be "
     "used based on the `applications` and `included_applications` fields in "
     "the relevant .app files.\n"
-    "\n"
-    "Note that it may take a long time to build the initial PLT file. Once a "
-    "PLT file (defaults to `.rebar.plt`) has been created for a project it can "
-    "safely be copied and reused in another project. If a PLT file has been "
-    "copied from another project this command will do the minimial alterations "
-    "to the PLT file for use in the new project. This will likely be faster "
-    "than building a new PLT file from scratch.".
+    "**The base PLT is a PLT containing the core OTP applications often "
+    "required for a project's PLT. One base PLT is created per OTP version and "
+    "stored in `dialyzer_base_plt_dir` (defaults to $HOME/.rebar3/). A base "
+    "PLT is used to create a project's initial PLT.".
 
 short_desc() ->
     "Run the Dialyzer analyzer on the project.".
@@ -60,13 +61,12 @@ short_desc() ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     ?INFO("Dialyzer starting, this may take a while...", []),
-    State1 = set_plt_location(State),
-    Apps = rebar_state:project_apps(State1),
-    Deps = rebar_state:get(State, all_deps, []),
+    Plt = get_plt_location(State),
+    Apps = rebar_state:project_apps(State),
 
     try
-        {ok, State2} = update_plt(State1, Apps, Deps),
-        succ_typings(State2, Apps)
+        {ok, State1} = update_proj_plt(State, Plt, Apps),
+        succ_typings(State1, Plt, Apps)
     catch
         throw:{dialyzer_error, Error} ->
             {error, {?MODULE, {error_processing_apps, Error, Apps}}}
@@ -80,78 +80,87 @@ format_error(Reason) ->
 
 %% Internal functions
 
-set_plt_location(State) ->
+get_plt_location(State) ->
     BuildDir = rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR),
-    DefaultPlt = filename:join([BuildDir, ".rebar.plt"]),
-    Plt = rebar_state:get(State, dialyzer_plt, DefaultPlt),
-    rebar_state:set(State, dialyzer_plt, Plt).
+    DefaultPlt = filename:join([BuildDir, default_plt()]),
+    rebar_state:get(State, dialyzer_plt, DefaultPlt).
 
-update_plt(State, Apps, Deps) ->
+default_plt() ->
+    ".rebar3.otp-" ++ otp_version() ++ ".plt".
+
+otp_version() ->
+    Release = erlang:system_info(otp_release),
+    try otp_version(Release) of
+        Vsn ->
+            Vsn
+    catch
+        error:_ ->
+            Release
+    end.
+
+otp_version(Release) ->
+    File = filename:join([code:root_dir(), "releases", Release, "OTP_VERSION"]),
+    {ok, Contents} = file:read_file(File),
+    [Vsn] = binary:split(Contents, [<<$\n>>], [global, trim]),
+    [_ | _] = unicode:characters_to_list(Vsn).
+
+update_proj_plt(State, Plt, Apps) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     case proplists:get_value(update_plt, Args) of
         false ->
             {ok, State};
         _ ->
-            do_update_plt(State, Apps, Deps)
+            do_update_proj_plt(State, Plt, Apps)
     end.
 
-do_update_plt(State, Apps, Deps) ->
+do_update_proj_plt(State, Plt, Apps) ->
     ?INFO("Updating plt...", []),
-    Files = get_plt_files(State, Apps, Deps),
-    case read_plt(State) of
+    Files = get_plt_files(State, Apps),
+    case read_plt(State, Plt) of
         {ok, OldFiles} ->
-            check_plt(State, OldFiles, Files);
+            check_plt(State, Plt, OldFiles, Files);
         {error, no_such_file} ->
-            build_plt(State, Files)
+            build_proj_plt(State, Plt, Files)
     end.
 
-get_plt_files(State, Apps, Deps) ->
-    case rebar_state:get(State, dialyzer_plt_apps) of
-        undefined ->
-            default_plt_files(Apps, Deps);
-        PltApps ->
-            app_names_to_files(PltApps, Apps ++ Deps)
-    end.
-
-default_plt_files(Apps, Deps) ->
+get_plt_files(State, Apps) ->
+    PltApps = rebar_state:get(State, dialyzer_plt_apps, []),
     DepApps = lists:flatmap(fun rebar_app_info:applications/1, Apps),
-    default_plt_files(default_plt_apps() ++ DepApps, Apps, Deps, [], []).
+    get_plt_files([erts] ++ PltApps ++ DepApps, Apps, [], []).
 
 default_plt_apps() ->
     [erts,
      kernel,
      stdlib].
 
-default_plt_files([], _, _, _, Files) ->
+get_plt_files([], _, _, Files) ->
     Files;
-default_plt_files([AppName | DepApps], Apps, Deps, PltApps, Files) ->
-    case lists:member(AppName, PltApps) of
+get_plt_files([AppName | DepApps], Apps, PltApps, Files) ->
+    case lists:member(AppName, PltApps) orelse app_member(AppName, Apps) of
         true ->
-            default_plt_files(DepApps, Apps, Deps, PltApps, Files);
+            get_plt_files(DepApps, Apps, PltApps, Files);
         false ->
-            {DepApps2, Files2} = app_name_to_info(AppName, Apps, Deps),
+            {DepApps2, Files2} = app_name_to_info(AppName),
             DepApps3 = DepApps2 ++ DepApps,
             Files3 = Files2 ++ Files,
-            default_plt_files(DepApps3, Apps, Deps, [AppName | PltApps], Files3)
+            get_plt_files(DepApps3, Apps, [AppName | PltApps], Files3)
     end.
 
-app_name_to_info(AppName, Apps, Deps) ->
+app_member(AppName, Apps) ->
     case rebar_app_utils:find(ec_cnv:to_binary(AppName), Apps) of
-        {ok, App} ->
-            % Don't include project app files in plt
-            {rebar_app_info:applications(App), []};
+        {ok, _App} ->
+            true;
         error ->
-            app_name_to_info(AppName, Deps)
+            false
     end.
 
 apps_to_files(Apps) ->
     lists:flatmap(fun app_to_files/1, Apps).
 
 app_to_files(App) ->
-    AppDetails = rebar_app_info:app_details(App),
-    Modules = proplists:get_value(modules, AppDetails, []),
-    EbinDir = rebar_app_info:ebin_dir(App),
-    modules_to_files(Modules, EbinDir).
+    AppName = ec_cnv:to_atom(rebar_app_info:name(App)),
+    {_, Files} = app_name_to_info(AppName),
+    Files.
 
 modules_to_files(Modules, EbinDir) ->
     Ext = code:objfile_extension(),
@@ -168,22 +177,12 @@ module_to_file(Module, EbinDir, Ext) ->
             false
     end.
 
-app_names_to_files(AppNames, Apps) ->
+app_names_to_files(AppNames) ->
     ToFiles = fun(AppName) ->
-                      {_, Files} = app_name_to_info(AppName, Apps),
+                      {_, Files} = app_name_to_info(AppName),
                       Files
               end,
     lists:flatmap(ToFiles, AppNames).
-
-app_name_to_info(AppName, Apps) ->
-    case rebar_app_utils:find(ec_cnv:to_binary(AppName), Apps) of
-        {ok, App} ->
-            DepApps = rebar_app_info:applications(App),
-            Files = app_to_files(App),
-            {DepApps, Files};
-        error ->
-            app_name_to_info(AppName)
-    end.
 
 app_name_to_info(AppName) ->
     case code:lib_dir(AppName) of
@@ -210,8 +209,7 @@ app_dir_to_info(AppDir, AppName) ->
             throw({dialyzer_error, Error})
     end.
 
-read_plt(State) ->
-    Plt = rebar_state:get(State, dialyzer_plt),
+read_plt(_State, Plt) ->
     case dialyzer:plt_info(Plt) of
         {ok, Info} ->
             Files = proplists:get_value(files, Info, []),
@@ -223,67 +221,101 @@ read_plt(State) ->
             throw({dialyzer_error, Error})
     end.
 
-check_plt(State, OldList, FilesList) ->
+check_plt(State, Plt, OldList, FilesList) ->
     Old = sets:from_list(OldList),
     Files = sets:from_list(FilesList),
     Remove = sets:subtract(Old, Files),
-    {ok, State1} = remove_plt(State, sets:to_list(Remove)),
+    {ok, State1} = remove_plt(State, Plt, sets:to_list(Remove)),
     Check = sets:intersection(Files, Old),
-    {ok, State2} = check_plt(State1, sets:to_list(Check)),
+    {ok, State2} = check_plt(State1, Plt, sets:to_list(Check)),
     Add = sets:subtract(Files, Old),
-    add_plt(State2, sets:to_list(Add)).
+    add_plt(State2, Plt, sets:to_list(Add)).
 
-remove_plt(State, []) ->
+remove_plt(State, _Plt, []) ->
     {ok, State};
-remove_plt(State, Files) ->
-    ?INFO("Removing ~b files from plt...", [length(Files)]),
-    run_plt(State, plt_remove, Files).
+remove_plt(State, Plt, Files) ->
+    ?INFO("Removing ~b files from ~p...", [length(Files), Plt]),
+    run_plt(State, Plt, plt_remove, Files).
 
-check_plt(State, []) ->
+check_plt(State, _Plt, []) ->
     {ok, State};
-check_plt(State, Files) ->
-    ?INFO("Checking ~b files in plt...", [length(Files)]),
-    run_plt(State, plt_check, Files).
+check_plt(State, Plt, Files) ->
+    ?INFO("Checking ~b files in ~p...", [length(Files), Plt]),
+    run_plt(State, Plt, plt_check, Files).
 
-add_plt(State, []) ->
+add_plt(State, _Plt, []) ->
     {ok, State};
-add_plt(State, Files) ->
-    ?INFO("Adding ~b files to plt...", [length(Files)]),
-    run_plt(State, plt_add, Files).
+add_plt(State, Plt, Files) ->
+    ?INFO("Adding ~b files to ~p...", [length(Files), Plt]),
+    run_plt(State, Plt, plt_add, Files).
 
-run_plt(State, Analysis, Files) ->
-    Plt = rebar_state:get(State, dialyzer_plt),
+run_plt(State, Plt, Analysis, Files) ->
     Opts = [{analysis_type, Analysis},
             {init_plt, Plt},
             {from, byte_code},
             {files, Files}],
     run_dialyzer(State, Opts).
 
-build_plt(State, Files) ->
-    Plt = rebar_state:get(State, dialyzer_plt),
-    ?INFO("Adding ~b files to plt...", [length(Files)]),
+build_plt(State, Plt, Files) ->
+    ?INFO("Adding ~b files to ~p...", [length(Files), Plt]),
     Opts = [{analysis_type, plt_build},
             {output_plt, Plt},
             {files, Files}],
     run_dialyzer(State, Opts).
 
-succ_typings(State, Apps) ->
+build_proj_plt(State, Plt, Files) ->
+    BasePlt = get_base_plt_location(State),
+    BaseFiles = get_base_plt_files(State),
+    {ok, State1} = update_base_plt(State, BasePlt, BaseFiles),
+    ?INFO("Copying ~p to ~p...", [BasePlt, Plt]),
+    case file:copy(BasePlt, Plt) of
+        {ok, _} ->
+            check_plt(State1, Plt, BaseFiles, Files);
+        {error, Reason} ->
+            Error = io_lib:format("Could not copy PLT from ~p to ~p: ~p",
+                                  [BasePlt, Plt, file:format_error(Reason)]),
+            throw({dialyzer_error, Error})
+    end.
+
+get_base_plt_location(State) ->
+    Home = rebar_utils:home_dir(),
+    GlobalConfigDir = filename:join(Home, ?CONFIG_DIR),
+    BaseDir = rebar_state:get(State, dialyzer_base_plt_dir, GlobalConfigDir),
+    BasePlt = rebar_state:get(State, dialyzer_base_plt, default_plt()),
+    filename:join(BaseDir, BasePlt).
+
+get_base_plt_files(State) ->
+    BasePltApps = rebar_state:get(State, dialyzer_base_plt_apps,
+                                  default_plt_apps()),
+    app_names_to_files(BasePltApps).
+
+update_base_plt(State, BasePlt, BaseFiles) ->
+    ?INFO("Updating base plt...", []),
+    case read_plt(State, BasePlt) of
+        {ok, OldBaseFiles} ->
+            check_plt(State, BasePlt, OldBaseFiles, BaseFiles);
+        {error, no_such_file} ->
+            _ = filelib:ensure_dir(BasePlt),
+            build_plt(State, BasePlt, BaseFiles)
+    end.
+
+succ_typings(State, Plt, Apps) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     case proplists:get_value(succ_typings, Args) of
         false ->
             {ok, State};
         _ ->
-            do_succ_typings(State, Apps)
+            do_succ_typings(State, Plt, Apps)
     end.
 
-do_succ_typings(State, Apps) ->
+do_succ_typings(State, Plt, Apps) ->
     ?INFO("Doing success typing analysis...", []),
     Files = apps_to_files(Apps),
-    Plt = rebar_state:get(State, dialyzer_plt),
+    ?INFO("Analyzing ~b files with ~p...", [length(Files), Plt]),
     Opts = [{analysis_type, succ_typings},
             {from, byte_code},
             {files, Files},
-            {plts, [Plt]}],
+            {init_plt, Plt}],
     run_dialyzer(State, Opts).
 
 run_dialyzer(State, Opts) ->
