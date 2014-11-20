@@ -20,6 +20,8 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
+    Opts = [{update_plt, $u, "update-plt", boolean, "Enable updating the PLT. Default: true"},
+            {succ_typings, $s, "succ-typings", boolean, "Enable success typing analysis. Default: true"}],
     State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
                                                                {module, ?MODULE},
                                                                {bare, false},
@@ -27,7 +29,7 @@ init(State) ->
                                                                {example, "rebar dialyzer"},
                                                                {short_desc, "Run the Dialyzer analyzer on the project."},
                                                                {desc, ""},
-                                                               {opts, []}])),
+                                                               {opts, Opts}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
@@ -60,6 +62,15 @@ set_plt_location(State) ->
     rebar_state:set(State, plt, Plt).
 
 update_plt(State, Apps, Deps) ->
+    {Args, _} = rebar_state:command_parsed_args(State),
+    case proplists:get_value(update_plt, Args) of
+        false ->
+            {ok, State};
+        _ ->
+            do_update_plt(State, Apps, Deps)
+    end.
+
+do_update_plt(State, Apps, Deps) ->
     ?INFO("Updating plt...", []),
     Files = get_plt_files(State, Apps, Deps),
     case read_plt(State) of
@@ -232,6 +243,15 @@ build_plt(State, Files) ->
     run_dialyzer(State, Opts).
 
 succ_typings(State, Apps) ->
+    {Args, _} = rebar_state:command_parsed_args(State),
+    case proplists:get_value(succ_typings, Args) of
+        false ->
+            {ok, State};
+        _ ->
+            do_succ_typings(State, Apps)
+    end.
+
+do_succ_typings(State, Apps) ->
     ?INFO("Doing success typing analysis...", []),
     Files = apps_to_files(Apps),
     Plt = rebar_state:get(State, plt),
@@ -260,7 +280,6 @@ dialyzer_format_warning(Warning) ->
         Warning2 ->
             Warning2
     end.
-
 default_warnings() ->
     [error_handling,
      unmatched_returns,
