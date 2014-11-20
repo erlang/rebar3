@@ -16,7 +16,7 @@ locations (git, hg, etc).
 3.0 Pre-Alpha
 ====
 
-This is an experimental branch, considered to be pre-alpha, and still 
+This is an experimental branch, considered to be pre-alpha, and still
 very unstable. Use at your own risk, and expect no support. See
 [the related announcement](http://lists.basho.com/pipermail/rebar_lists.basho.com/2014-November/002087.html).
 
@@ -43,11 +43,17 @@ limit scope.
 | upgrade    | Fetch latest version of dep |
 | version    | Print current version of Erlang/OTP and rebar |
 
+### Commands still to do
+
+| Command    | Description |
+|----------- |------------ |
+| escriptize | Generate escript of project |
+
+
 ### Changes
 
 * Fetches and builds deps if missing when running any command that relies on them
 * Automatically recognizes `apps` and `lib` directory structure
-* `escriptize` requires `escript_top_level_app` set in `rebar.config`
 * Relx for releases
 
 ### Gone
