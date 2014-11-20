@@ -27,10 +27,35 @@ init(State) ->
                                                                {bare, false},
                                                                {deps, ?DEPS},
                                                                {example, "rebar dialyzer"},
-                                                               {short_desc, "Run the Dialyzer analyzer on the project."},
-                                                               {desc, ""},
+                                                               {short_desc, short_desc()},
+                                                               {desc, desc()},
                                                                {opts, Opts}])),
     {ok, State1}.
+
+desc() ->
+    short_desc() ++ "\n"
+    "\n"
+    "This command will build, and keep up-to-date, a suitable PLT and will use "
+    "it to carry out success typing analysis on the current project.\n"
+    "\n"
+    "The following (optional) configurations can be added to a rebar.config:\n"
+    "`dialyzer_warnings` - a list of dialyzer warnings\n"
+    "`dialyzer_plt` - the PLT file to use\n"
+    "`dialyzer_plt_apps` - a list of applications to include in the PLT file*\n"
+    "\n"
+    "*If this configuration is not present a selection of applications will be "
+    "used based on the `applications` and `included_applications` fields in "
+    "the relevant .app files.\n"
+    "\n"
+    "Note that it may take a long time to build the initial PLT file. Once a "
+    "PLT file (defaults to `.rebar.plt`) has been created for a project it can "
+    "safely be copied and reused in another project. If a PLT file has been "
+    "copied from another project this command will do the minimial alterations "
+    "to the PLT file for use in the new project. This will likely be faster "
+    "than building a new PLT file from scratch.".
+
+short_desc() ->
+    "Run the Dialyzer analyzer on the project.".
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
@@ -57,9 +82,9 @@ format_error(Reason) ->
 
 set_plt_location(State) ->
     BuildDir = rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR),
-    DefaultPlt = filename:join([BuildDir, ".deps.plt"]),
-    Plt = rebar_state:get(State, plt, DefaultPlt),
-    rebar_state:set(State, plt, Plt).
+    DefaultPlt = filename:join([BuildDir, ".rebar.plt"]),
+    Plt = rebar_state:get(State, dialyzer_plt, DefaultPlt),
+    rebar_state:set(State, dialyzer_plt, Plt).
 
 update_plt(State, Apps, Deps) ->
     {Args, _} = rebar_state:command_parsed_args(State),
@@ -81,7 +106,7 @@ do_update_plt(State, Apps, Deps) ->
     end.
 
 get_plt_files(State, Apps, Deps) ->
-    case rebar_state:get(State, plt_apps) of
+    case rebar_state:get(State, dialyzer_plt_apps) of
         undefined ->
             default_plt_files(Apps, Deps);
         PltApps ->
@@ -186,7 +211,7 @@ app_dir_to_info(AppDir, AppName) ->
     end.
 
 read_plt(State) ->
-    Plt = rebar_state:get(State, plt),
+    Plt = rebar_state:get(State, dialyzer_plt),
     case dialyzer:plt_info(Plt) of
         {ok, Info} ->
             Files = proplists:get_value(files, Info, []),
@@ -227,7 +252,7 @@ add_plt(State, Files) ->
     run_plt(State, plt_add, Files).
 
 run_plt(State, Analysis, Files) ->
-    Plt = rebar_state:get(State, plt),
+    Plt = rebar_state:get(State, dialyzer_plt),
     Opts = [{analysis_type, Analysis},
             {init_plt, Plt},
             {from, byte_code},
@@ -235,8 +260,8 @@ run_plt(State, Analysis, Files) ->
     run_dialyzer(State, Opts).
 
 build_plt(State, Files) ->
-    Plt = rebar_state:get(State, plt),
-    ?INFO("Building PLT with ~b files...", [length(Files)]),
+    Plt = rebar_state:get(State, dialyzer_plt),
+    ?INFO("Adding ~b files to plt...", [length(Files)]),
     Opts = [{analysis_type, plt_build},
             {output_plt, Plt},
             {files, Files}],
@@ -254,7 +279,7 @@ succ_typings(State, Apps) ->
 do_succ_typings(State, Apps) ->
     ?INFO("Doing success typing analysis...", []),
     Files = apps_to_files(Apps),
-    Plt = rebar_state:get(State, plt),
+    Plt = rebar_state:get(State, dialyzer_plt),
     Opts = [{analysis_type, succ_typings},
             {from, byte_code},
             {files, Files},
