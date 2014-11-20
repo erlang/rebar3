@@ -72,9 +72,40 @@ update_plt(State, Apps, Deps) ->
 get_plt_files(State, Apps, Deps) ->
     case rebar_state:get(State, plt_apps) of
         undefined ->
-            apps_to_files(Deps);
+            default_plt_files(Apps, Deps);
         PltApps ->
             app_names_to_files(PltApps, Apps ++ Deps)
+    end.
+
+default_plt_files(Apps, Deps) ->
+    DepApps = lists:flatmap(fun rebar_app_info:applications/1, Apps),
+    default_plt_files(default_plt_apps() ++ DepApps, Apps, Deps, [], []).
+
+default_plt_apps() ->
+    [erts,
+     kernel,
+     stdlib].
+
+default_plt_files([], _, _, _, Files) ->
+    Files;
+default_plt_files([AppName | DepApps], Apps, Deps, PltApps, Files) ->
+    case lists:member(AppName, PltApps) of
+        true ->
+            default_plt_files(DepApps, Apps, Deps, PltApps, Files);
+        false ->
+            {DepApps2, Files2} = app_name_to_info(AppName, Apps, Deps),
+            DepApps3 = DepApps2 ++ DepApps,
+            Files3 = Files2 ++ Files,
+            default_plt_files(DepApps3, Apps, Deps, [AppName | PltApps], Files3)
+    end.
+
+app_name_to_info(AppName, Apps, Deps) ->
+    case rebar_app_utils:find(ec_cnv:to_binary(AppName), Apps) of
+        {ok, App} ->
+            % Don't include project app files in plt
+            {rebar_app_info:applications(App), []};
+        error ->
+            app_name_to_info(AppName, Deps)
     end.
 
 apps_to_files(Apps) ->
@@ -102,33 +133,42 @@ module_to_file(Module, EbinDir, Ext) ->
     end.
 
 app_names_to_files(AppNames, Apps) ->
-    lists:flatmap(fun(AppName) -> app_name_to_files(AppName, Apps) end,
-                  AppNames).
+    ToFiles = fun(AppName) ->
+                      {_, Files} = app_name_to_info(AppName, Apps),
+                      Files
+              end,
+    lists:flatmap(ToFiles, AppNames).
 
-app_name_to_files(AppName, Apps) ->
+app_name_to_info(AppName, Apps) ->
     case rebar_app_utils:find(ec_cnv:to_binary(AppName), Apps) of
         {ok, App} ->
-            app_to_files(App);
+            DepApps = rebar_app_info:applications(App),
+            Files = app_to_files(App),
+            {DepApps, Files};
         error ->
-            app_name_to_files(AppName)
+            app_name_to_info(AppName)
     end.
 
-app_name_to_files(AppName) ->
+app_name_to_info(AppName) ->
     case code:lib_dir(AppName) of
         {error, _} ->
             ?CONSOLE("Unknown application ~s", [AppName]),
-            [];
+            {[], []};
         AppDir ->
-            app_dir_to_files(AppDir, AppName)
+            app_dir_to_info(AppDir, AppName)
     end.
 
-app_dir_to_files(AppDir, AppName) ->
+app_dir_to_info(AppDir, AppName) ->
     EbinDir = filename:join(AppDir, "ebin"),
     AppFile = filename:join(EbinDir, atom_to_list(AppName) ++ ".app"),
     case file:consult(AppFile) of
         {ok, [{application, AppName, AppDetails}]} ->
+            DepApps = proplists:get_value(applications, AppDetails, []),
+            IncApps = proplists:get_value(included_applications, AppDetails,
+                                          []),
             Modules = proplists:get_value(modules, AppDetails, []),
-            modules_to_files(Modules, EbinDir);
+            Files = modules_to_files(Modules, EbinDir),
+            {IncApps ++ DepApps, Files};
         _ ->
             Error = io_lib:format("Could not parse ~p", [AppFile]),
             throw({dialyzer_error, Error})
