@@ -132,6 +132,7 @@ get_plt_files(State, Apps) ->
 
 default_plt_apps() ->
     [erts,
+     crypto,
      kernel,
      stdlib].
 
