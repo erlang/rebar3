@@ -157,36 +157,6 @@ app_member(AppName, Apps) ->
             false
     end.
 
-apps_to_files(Apps) ->
-    lists:flatmap(fun app_to_files/1, Apps).
-
-app_to_files(App) ->
-    AppName = ec_cnv:to_atom(rebar_app_info:name(App)),
-    {_, Files} = app_name_to_info(AppName),
-    Files.
-
-modules_to_files(Modules, EbinDir) ->
-    Ext = code:objfile_extension(),
-    Mod2File = fun(Module) -> module_to_file(Module, EbinDir, Ext) end,
-    rebar_utils:filtermap(Mod2File, Modules).
-
-module_to_file(Module, EbinDir, Ext) ->
-    File = filename:join(EbinDir, atom_to_list(Module) ++ Ext),
-    case filelib:is_file(File) of
-        true ->
-            {true, File};
-        false ->
-            ?CONSOLE("Unknown module ~s", [Module]),
-            false
-    end.
-
-app_names_to_files(AppNames) ->
-    ToFiles = fun(AppName) ->
-                      {_, Files} = app_name_to_info(AppName),
-                      Files
-              end,
-    lists:flatmap(ToFiles, AppNames).
-
 app_name_to_info(AppName) ->
     case code:lib_dir(AppName) of
         {error, _} ->
@@ -210,6 +180,21 @@ app_dir_to_info(AppDir, AppName) ->
         _ ->
             Error = io_lib:format("Could not parse ~p", [AppFile]),
             throw({dialyzer_error, Error})
+    end.
+
+modules_to_files(Modules, EbinDir) ->
+    Ext = code:objfile_extension(),
+    Mod2File = fun(Module) -> module_to_file(Module, EbinDir, Ext) end,
+    rebar_utils:filtermap(Mod2File, Modules).
+
+module_to_file(Module, EbinDir, Ext) ->
+    File = filename:join(EbinDir, atom_to_list(Module) ++ Ext),
+    case filelib:is_file(File) of
+        true ->
+            {true, File};
+        false ->
+            ?CONSOLE("Unknown module ~s", [Module]),
+            false
     end.
 
 read_plt(_State, Plt) ->
@@ -259,13 +244,6 @@ run_plt(State, Plt, Analysis, Files) ->
             {files, Files}],
     run_dialyzer(State, Opts).
 
-build_plt(State, Plt, Files) ->
-    ?INFO("Adding ~b files to ~p...", [length(Files), Plt]),
-    Opts = [{analysis_type, plt_build},
-            {output_plt, Plt},
-            {files, Files}],
-    run_dialyzer(State, Opts).
-
 build_proj_plt(State, Plt, Files) ->
     BasePlt = get_base_plt_location(State),
     BaseFiles = get_base_plt_files(State),
@@ -292,6 +270,13 @@ get_base_plt_files(State) ->
                                   default_plt_apps()),
     app_names_to_files(BasePltApps).
 
+app_names_to_files(AppNames) ->
+    ToFiles = fun(AppName) ->
+                      {_, Files} = app_name_to_info(AppName),
+                      Files
+              end,
+    lists:flatmap(ToFiles, AppNames).
+
 update_base_plt(State, BasePlt, BaseFiles) ->
     ?INFO("Updating base plt...", []),
     case read_plt(State, BasePlt) of
@@ -301,6 +286,13 @@ update_base_plt(State, BasePlt, BaseFiles) ->
             _ = filelib:ensure_dir(BasePlt),
             build_plt(State, BasePlt, BaseFiles)
     end.
+
+build_plt(State, Plt, Files) ->
+    ?INFO("Adding ~b files to ~p...", [length(Files), Plt]),
+    Opts = [{analysis_type, plt_build},
+            {output_plt, Plt},
+            {files, Files}],
+    run_dialyzer(State, Opts).
 
 succ_typings(State, Plt, Apps) ->
     {Args, _} = rebar_state:command_parsed_args(State),
@@ -321,6 +313,14 @@ do_succ_typings(State, Plt, Apps) ->
             {init_plt, Plt}],
     run_dialyzer(State, Opts).
 
+apps_to_files(Apps) ->
+    lists:flatmap(fun app_to_files/1, Apps).
+
+app_to_files(App) ->
+    AppName = ec_cnv:to_atom(rebar_app_info:name(App)),
+    {_, Files} = app_name_to_info(AppName),
+    Files.
+
 run_dialyzer(State, Opts) ->
     Warnings = rebar_state:get(State, dialyzer_warnings, default_warnings()),
     Opts2 = [{get_warnings, true},
@@ -340,6 +340,7 @@ dialyzer_format_warning(Warning) ->
         Warning2 ->
             Warning2
     end.
+
 default_warnings() ->
     [error_handling,
      unmatched_returns,
