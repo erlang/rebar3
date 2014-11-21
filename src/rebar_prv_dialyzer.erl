@@ -42,6 +42,8 @@ desc() ->
     "`dialyzer_warnings` - a list of dialyzer warnings\n"
     "`dialyzer_plt` - the PLT file to use\n"
     "`dialyzer_plt_apps` - a list of applications to include in the PLT file*\n"
+    "`dialyzer_plt_warnings` - display warnings when updating a PLT file "
+    "(boolean)\n"
     "`dialyzer_base_plt` - the base PLT file to use**\n"
     "`dialyzer_base_plt_dir` - the base PLT directory**\n"
     "`dialyzer_base_plt_apps` - a list of applications to include in the base "
@@ -238,7 +240,9 @@ add_plt(State, Plt, Files) ->
     run_plt(State, Plt, plt_add, Files).
 
 run_plt(State, Plt, Analysis, Files) ->
+    GetWarnings = rebar_state:get(State, dialyzer_plt_warnings, false),
     Opts = [{analysis_type, Analysis},
+            {get_warnings, GetWarnings},
             {init_plt, Plt},
             {from, byte_code},
             {files, Files}],
@@ -289,7 +293,9 @@ update_base_plt(State, BasePlt, BaseFiles) ->
 
 build_plt(State, Plt, Files) ->
     ?INFO("Adding ~b files to ~p...", [length(Files), Plt]),
+    GetWarnings = rebar_state:get(State, dialyzer_plt_warnings, false),
     Opts = [{analysis_type, plt_build},
+            {get_warnings, GetWarnings},
             {output_plt, Plt},
             {files, Files}],
     run_dialyzer(State, Opts).
@@ -308,6 +314,7 @@ do_succ_typings(State, Plt, Apps) ->
     Files = apps_to_files(Apps),
     ?INFO("Analyzing ~b files with ~p...", [length(Files), Plt]),
     Opts = [{analysis_type, succ_typings},
+            {get_warnings, true},
             {from, byte_code},
             {files, Files},
             {init_plt, Plt}],
@@ -323,9 +330,7 @@ app_to_files(App) ->
 
 run_dialyzer(State, Opts) ->
     Warnings = rebar_state:get(State, dialyzer_warnings, default_warnings()),
-    Opts2 = [{get_warnings, true},
-             {warnings, Warnings} |
-             Opts],
+    Opts2 = [{warnings, Warnings} | Opts],
     _ = [?CONSOLE(format_warning(Warning), [])
          || Warning <- dialyzer:run(Opts2)],
     {ok, State}.
