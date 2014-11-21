@@ -47,9 +47,9 @@ desc() ->
     "`dialyzer_base_plt_apps` - a list of applications to include in the base "
     "PLT file**\n"
     "\n"
-    "*If this configuration is not present a selection of applications will be "
-    "used based on the `applications` and `included_applications` fields in "
-    "the relevant .app files.\n"
+    "*The applications in `dialyzer_base_plt_apps` and any `applications` and "
+    "`included_applications` listed in their .app files will be added to the "
+    "list.\n"
     "**The base PLT is a PLT containing the core OTP applications often "
     "required for a project's PLT. One base PLT is created per OTP version and "
     "stored in `dialyzer_base_plt_dir` (defaults to $HOME/.rebar3/). A base "
@@ -124,9 +124,11 @@ do_update_proj_plt(State, Plt, Apps) ->
     end.
 
 get_plt_files(State, Apps) ->
+    BasePltApps = rebar_state:get(State, dialyzer_base_plt_apps,
+                                  default_plt_apps()),
     PltApps = rebar_state:get(State, dialyzer_plt_apps, []),
     DepApps = lists:flatmap(fun rebar_app_info:applications/1, Apps),
-    get_plt_files([erts] ++ PltApps ++ DepApps, Apps, [], []).
+    get_plt_files(BasePltApps ++ PltApps ++ DepApps, Apps, [], []).
 
 default_plt_apps() ->
     [erts,
