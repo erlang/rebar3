@@ -4,10 +4,10 @@
 
 -export([]).
 
--export_types([resource/0
-              ,type/0
-              ,location/0
-              ,ref/0]).
+-export_type([resource/0
+             ,type/0
+             ,location/0
+             ,ref/0]).
 
 -type resource() :: {type(), location(), ref()}.
 -type type() :: atom().
