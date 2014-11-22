@@ -28,7 +28,7 @@
 
                   src_deps = [],
                   src_apps = [],
-                  pkg_deps = [] :: [rebar_packages:constraint()],
+                  pkg_deps = [] :: [rebar_packages:package()],
                   project_apps = [],
 
                   providers = []}).
@@ -103,7 +103,7 @@ deps_names(State) ->
                       ec_cnv:to_binary(Dep)
               end, Deps).
 
--spec pkg_deps(t()) -> [rebar_packages:constraint()].
+-spec pkg_deps(t()) -> [rebar_packages:package()].
 pkg_deps(#state_t{pkg_deps=PkgDeps}) ->
     PkgDeps.
 
