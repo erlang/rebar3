@@ -77,7 +77,7 @@ do(State) ->
                        end,
 
         Source = ProjectApps ++ rebar_state:src_apps(State1),
-        case rebar_topo:sort_apps(Source) of
+        case rebar_digraph:sort_apps(Source) of
             {ok, Sort} ->
                 {ok, rebar_state:set(State1, deps_to_build,
                                      lists:dropwhile(fun rebar_app_info:valid/1, Sort -- ProjectApps))};
