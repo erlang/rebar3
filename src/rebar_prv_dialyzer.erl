@@ -354,7 +354,7 @@ app_to_files(App) ->
 run_dialyzer(State, Opts) ->
     Warnings = rebar_state:get(State, dialyzer_warnings, default_warnings()),
     Opts2 = [{warnings, Warnings} | Opts],
-    _ = [?CONSOLE(format_warning(Warning), [])
+    _ = [?CONSOLE("~s", [format_warning(Warning)])
          || Warning <- dialyzer:run(Opts2)],
     {ok, State}.
 
