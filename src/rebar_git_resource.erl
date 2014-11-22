@@ -22,23 +22,20 @@ lock(AppDir, {git, Url}) ->
 %% Return true if either the git url or tag/branch/ref is not the same as the currently
 %% checked out git repo for the dep
 needs_update(Dir, {git, Url, {tag, Tag}}) ->
-    {ok, CurrentUrl} = rebar_utils:sh(?FMT("git config --get remote.origin.url", []),
-                                      [{cd, Dir}]),
     {ok, Current} = rebar_utils:sh(?FMT("git describe --tags --exact-match", []),
                                    [{cd, Dir}]),
     Current1 = string:strip(string:strip(Current, both, $\n), both, $\r),
-    CurrentUrl1 = string:strip(string:strip(CurrentUrl, both, $\n), both, $\r),
-    ?DEBUG("Comparing git tag ~s with ~s and url ~s with ~s", [Tag, Current1, Url, CurrentUrl1]),
-    not ((Current1 =:= Tag) andalso (CurrentUrl1 =:= Url));
+
+    ?DEBUG("Comparing git tag ~s with ~s", [Tag, Current1]),
+    not ((Current1 =:= Tag) andalso compare_url(Dir, Url));
 needs_update(Dir, {git, Url, {branch, Branch}}) ->
-    {ok, CurrentUrl} = rebar_utils:sh(?FMT("git config --get remote.origin.url", []),
-                                      [{cd, Dir}]),
     {ok, Current} = rebar_utils:sh(?FMT("git symbolic-ref -q --short HEAD", []),
                                    [{cd, Dir}]),
     Current1 = string:strip(string:strip(Current, both, $\n), both, $\r),
-    CurrentUrl1 = string:strip(string:strip(CurrentUrl, both, $\n), both, $\r),
-    ?DEBUG("Comparing git branch ~s with ~s and url ~s with ~s", [Branch, Current1, Url, CurrentUrl1]),
-    not ((Current1 =:= Branch) andalso (CurrentUrl1 =:= Url));
+    ?DEBUG("Comparing git branch ~s with ~s", [Branch, Current1]),
+    not ((Current1 =:= Branch) andalso compare_url(Dir, Url));
+needs_update(Dir, {git, Url, "master"}) ->
+    needs_update(Dir, {git, Url, {branch, "master"}});
 needs_update(Dir, {git, Url, Ref}) ->
     case Ref of
         {ref, Ref1} ->
@@ -46,14 +43,30 @@ needs_update(Dir, {git, Url, Ref}) ->
         Ref1 ->
             Ref1
     end,
-    {ok, CurrentUrl} = rebar_utils:sh(?FMT("git config --get remote.origin.url", []),
-                                      [{cd, Dir}]),
+
     {ok, Current} = rebar_utils:sh(?FMT("git rev-parse -q HEAD", []),
                                    [{cd, Dir}]),
     Current1 = string:strip(string:strip(Current, both, $\n), both, $\r),
+    ?DEBUG("Comparing git ref ~s with ~s", [Ref1, Current1]),
+    not ((Current1 =:= Ref1) andalso compare_url(Dir, Url)).
+
+compare_url(Dir, Url) ->
+    {ok, CurrentUrl} = rebar_utils:sh(?FMT("git config --get remote.origin.url", []),
+                                      [{cd, Dir}]),
     CurrentUrl1 = string:strip(string:strip(CurrentUrl, both, $\n), both, $\r),
-    ?DEBUG("Comparing git ref ~s with ~s and url ~s with ~s", [Ref1, Current1, Url, CurrentUrl1]),
-    not ((Current1 =:= Ref1) andalso (CurrentUrl1 =:= Url)).
+    ParsedUrl = parse_git_url(Url),
+    ParsedCurrentUrl = parse_git_url(CurrentUrl1),
+    ParsedCurrentUrl =:= ParsedUrl.
+
+parse_git_url("git@" ++ HostPath) ->
+    [Host, Path] = string:tokens(HostPath, ":"),
+    {Host, filename:rootname(Path, ".git")};
+parse_git_url("git://" ++ HostPath) ->
+    [Host | Path] = string:tokens(HostPath, "/"),
+    {Host, filename:rootname(filename:join(Path), ".git")};
+parse_git_url("https://" ++ HostPath) ->
+    [Host | Path] = string:tokens(HostPath, "/"),
+    {Host, filename:rootname(filename:join(Path), ".git")}.
 
 download(Dir, {git, Url}) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
