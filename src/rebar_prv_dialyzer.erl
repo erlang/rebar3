@@ -160,16 +160,39 @@ app_member(AppName, Apps) ->
     end.
 
 app_name_to_info(AppName) ->
-    case code:lib_dir(AppName) of
+    case app_name_to_ebin(AppName) of
         {error, _} ->
             ?CONSOLE("Unknown application ~s", [AppName]),
             {[], []};
-        AppDir ->
-            app_dir_to_info(AppDir, AppName)
+        EbinDir ->
+            ebin_to_info(EbinDir, AppName)
     end.
 
-app_dir_to_info(AppDir, AppName) ->
-    EbinDir = filename:join(AppDir, "ebin"),
+app_name_to_ebin(AppName) ->
+    case code:lib_dir(AppName, ebin) of
+        {error, bad_name} ->
+            search_ebin(AppName);
+        EbinDir ->
+            check_ebin(EbinDir, AppName)
+    end.
+
+check_ebin(EbinDir, AppName) ->
+    case filelib:is_dir(EbinDir) of
+        true ->
+            EbinDir;
+        false ->
+            search_ebin(AppName)
+    end.
+
+search_ebin(AppName) ->
+    case code:where_is_file(atom_to_list(AppName) ++ ".app") of
+        non_existing ->
+            {error, bad_name};
+        AppFile ->
+            filename:dirname(AppFile)
+    end.
+
+ebin_to_info(EbinDir, AppName) ->
     AppFile = filename:join(EbinDir, atom_to_list(AppName) ++ ".app"),
     case file:consult(AppFile) of
         {ok, [{application, AppName, AppDetails}]} ->
@@ -331,7 +354,7 @@ app_to_files(App) ->
 run_dialyzer(State, Opts) ->
     Warnings = rebar_state:get(State, dialyzer_warnings, default_warnings()),
     Opts2 = [{warnings, Warnings} | Opts],
-    _ = [?CONSOLE(format_warning(Warning), [])
+    _ = [?CONSOLE("~s", [format_warning(Warning)])
          || Warning <- dialyzer:run(Opts2)],
     {ok, State}.
 
