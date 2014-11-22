@@ -2,24 +2,13 @@
 
 -export([get_packages/1]).
 
--export_type([constraint/0]).
+-export_type([package/0]).
 
 -include("rebar.hrl").
 
--type pkg_name() :: string() | binary() | atom().
-
--type vsn() :: 'NO_VSN'
-             | ec_semver:semver().
-
--type constraint_op() ::
-        '=' | gte | '>=' | lte | '<='
-      | gt | '>' | lt | '<' | pes | '~>' | between.
-
--type constraint() :: pkg_name()
-                    | {pkg_name(), vsn()}
-                    | {pkg_name(), vsn(), constraint_op()}
-                    | {pkg_name(), vsn(), vsn(), between}.
-
+-type pkg_name() :: binary() | atom().
+-type vsn() :: binary().
+-type package() :: pkg_name() | {pkg_name(), vsn()}.
 
 -spec get_packages(rebar_state:t()) -> {rebar_dict(), rebar_digraph()}.
 get_packages(State) ->
