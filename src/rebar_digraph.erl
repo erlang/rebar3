@@ -18,7 +18,9 @@ restore_graph({Vs, Es}) ->
     Graph.
 
 solve(Graph, Vertices) ->
-    solve(Graph, Vertices, dict:new()).
+    solve(Graph, Vertices, lists:foldl(fun({Key, _}=N, Solution) ->
+                                               dict:store(Key, N, Solution)
+                                       end, dict:new(), Vertices)).
 
 solve(_Graph, [], Solution) ->
     {_, Vertices} = lists:unzip(dict:to_list(Solution)),
@@ -28,8 +30,7 @@ solve(Graph, Vertices, Solution) ->
         lists:foldl(fun(V, {NewVertices, SolutionAcc}) ->
                         OutNeighbors = digraph:out_neighbours(Graph, V),
                         lists:foldl(fun({Key, _}=N, {NewVertices1, SolutionAcc1}) ->
-                                            case dict:is_key(Key, SolutionAcc1) orelse
-                                                lists:keymember(Key, 1, Vertices) of
+                                            case dict:is_key(Key, SolutionAcc1) of
                                                 true ->
                                                     {NewVertices1, SolutionAcc1};
                                                 false ->
