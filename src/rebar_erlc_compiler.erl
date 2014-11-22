@@ -38,6 +38,14 @@
 
 -define(ERLCINFO_VSN, 1).
 -define(ERLCINFO_FILE, "erlcinfo").
+-type erlc_info_v() :: {digraph:vertex(), term()} | 'false'.
+-type erlc_info_e() :: {digraph:vertex(), digraph:vertex()}.
+-type erlc_info() :: {list(erlc_info_v()), list(erlc_info_e())}.
+-record(erlcinfo,
+        {
+          vsn = ?ERLCINFO_VSN :: pos_integer(),
+          info = {[], []} :: erlc_info()
+        }).
 
 -define(RE_PREFIX, "^[^._]").
 
@@ -392,11 +400,20 @@ needs_compile(Source, Target, Parents) ->
     lists:any(fun(I) -> TargetLastMod < filelib:last_modified(I) end,
               [Source] ++ Parents).
 
+check_erlcinfo(_Config, #erlcinfo{vsn=?ERLCINFO_VSN}) ->
+    ok;
+check_erlcinfo(Config, #erlcinfo{vsn=Vsn}) ->
+    ?ABORT("~s file version is incompatible. expected: ~b got: ~b",
+           [erlcinfo_file(Config), ?ERLCINFO_VSN, Vsn]);
+check_erlcinfo(Config, _) ->
+    ?ABORT("~s file is invalid. Please delete before next run.",
+           [erlcinfo_file(Config)]).
+
 erlcinfo_file(_Config) ->
     filename:join([rebar_utils:get_cwd(), ?CONFIG_DIR, ?ERLCINFO_FILE]).
 
 init_erlcinfo(Config, Erls) ->
-    G = rebar_digraph:restore_graph(erlcinfo_file(Config)),
+    G = restore_erlcinfo(Config),
     %% Get a unique list of dirs based on the source files' locations.
     %% This is used for finding files in sub dirs of the configured
     %% src_dirs. For example, src/sub_dir/foo.erl.
@@ -408,7 +425,7 @@ init_erlcinfo(Config, Erls) ->
     Updates = [update_erlcinfo(G, Erl, include_path(Erl, Config) ++ Dirs)
                || Erl <- Erls],
     Modified = lists:member(modified, Updates),
-    ok = rebar_digraph:store_graph(G, erlcinfo_file(Config), Modified),
+    ok = store_erlcinfo(G, Config, Modified),
     G.
 
 update_erlcinfo(G, Source, Dirs) ->
@@ -444,6 +461,56 @@ modify_erlcinfo(G, Source, Dirs) ->
               update_erlcinfo(G, Incl, Dirs),
               digraph:add_edge(G, Source, Incl)
       end, AbsIncls).
+
+restore_erlcinfo(Config) ->
+    File = erlcinfo_file(Config),
+    G = digraph:new(),
+    case file:read_file(File) of
+        {ok, Data} ->
+            try binary_to_term(Data) of
+                Erlcinfo ->
+                    ok = check_erlcinfo(Config, Erlcinfo),
+                    #erlcinfo{info=ErlcInfo} = Erlcinfo,
+                    {Vs, Es} = ErlcInfo,
+                    lists:foreach(
+                      fun({V, LastUpdated}) ->
+                              digraph:add_vertex(G, V, LastUpdated)
+                      end, Vs),
+                    lists:foreach(
+                      fun({V1, V2}) ->
+                              digraph:add_edge(G, V1, V2)
+                      end, Es)
+            catch
+                error:badarg ->
+                    ?ERROR(
+                       "Failed (binary_to_term) to restore rebar info file."
+                       " Discard file.", []),
+                    ok
+            end;
+        _Err ->
+            ok
+    end,
+    G.
+
+store_erlcinfo(_G, _Config, _Modified = false) ->
+    ok;
+store_erlcinfo(G, Config, _Modified) ->
+    Vs = lists:map(
+           fun(V) ->
+                   digraph:vertex(G, V)
+           end, digraph:vertices(G)),
+    Es = lists:flatmap(
+           fun({V, _}) ->
+                   lists:map(
+                     fun(E) ->
+                             {_, V1, V2, _} = digraph:edge(G, E),
+                             {V1, V2}
+                     end, digraph:out_edges(G, V))
+           end, Vs),
+    File = erlcinfo_file(Config),
+    ok = filelib:ensure_dir(File),
+    Data = term_to_binary(#erlcinfo{info={Vs, Es}}, [{compressed, 9}]),
+    file:write_file(File, Data).
 
 %% NOTE: If, for example, one of the entries in Files, refers to
 %% gen_server.erl, that entry will be dropped. It is dropped because
