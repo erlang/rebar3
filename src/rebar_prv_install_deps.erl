@@ -130,7 +130,7 @@ handle_deps(State, Deps, Update) ->
                      [];
                  PkgDeps1 ->
                      %% Find pkg deps needed
-                     S = case rlx_depsolver:solve(Graph, PkgDeps1) of
+                     S = case rebar_digraph:solve(Graph, PkgDeps1) of
                              {ok, Solution} ->
                                  Solution;
                              Reason ->

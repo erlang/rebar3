@@ -27,3 +27,19 @@
 -else.
 -type rebar_dict() :: dict().
 -endif.
+
+-ifdef(namespaced_types).
+-type rebar_digraph() :: digraph:graph().
+-else.
+-type rebar_digraph() :: digraph().
+-endif.
+
+-define(GRAPH_VSN, 2).
+-type v() :: {digraph:vertex(), term()} | 'false'.
+-type e() :: {digraph:vertex(), digraph:vertex()}.
+-type graph() :: {list(v()), list(e())}.
+-record(graph,
+        {
+          vsn = ?GRAPH_VSN :: pos_integer(),
+          info = {[], []} :: graph()
+        }).

@@ -14,12 +14,12 @@ get_packages(State) ->
             try
                 {ok, Binary} = file:read_file(PackagesFile),
                 {Dict, Graph} = binary_to_term(Binary),
-                {Dict, Graph}
+                {Dict, rebar_digraph:restore_graph(Graph)}
             catch
                 _:_ ->
                     ?ERROR("Bad packages index, try to fix with `rebar update`~n", []),
-                    {dict:new(), rlx_depsolver:new_graph()}
+                    {dict:new(), digraph:new()}
             end;
         false ->
-            {dict:new(), rlx_depsolver:new_graph()}
+            {dict:new(), digraph:new()}
     end.
