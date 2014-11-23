@@ -1,14 +1,15 @@
 -module(rebar_digraph).
 
--export([sort_apps/1
+-export([compile_order/1
         ,restore_graph/1
-        ,solve/2
+        ,cull_deps/2
         ,subgraph/2
         ,format_error/1]).
 
 -include("rebar.hrl").
 
-sort_apps(Apps) ->
+%% Sort apps with topological sort to get proper build order
+compile_order(Apps) ->
     Graph = digraph:new(),
     lists:foreach(fun(App) ->
                           Name = rebar_app_info:name(App),
@@ -50,15 +51,18 @@ restore_graph({Vs, Es}) ->
                   end, Es),
     Graph.
 
-solve(Graph, Vertices) ->
-    solve(Graph, Vertices, lists:foldl(fun({Key, _}=N, Solution) ->
+%% Pick packages to fullfill dependencies
+%% The first dep while traversing the graph is chosen and any conflicting
+%% dep encountered later on is ignored.
+cull_deps(Graph, Vertices) ->
+    cull_deps(Graph, Vertices, lists:foldl(fun({Key, _}=N, Solution) ->
                                                dict:store(Key, N, Solution)
                                        end, dict:new(), Vertices)).
 
-solve(_Graph, [], Solution) ->
+cull_deps(_Graph, [], Solution) ->
     {_, Vertices} = lists:unzip(dict:to_list(Solution)),
     {ok, Vertices};
-solve(Graph, Vertices, Solution) ->
+cull_deps(Graph, Vertices, Solution) ->
     {NV, NS} =
         lists:foldl(fun(V, {NewVertices, SolutionAcc}) ->
                         OutNeighbors = digraph:out_neighbours(Graph, V),
@@ -71,7 +75,7 @@ solve(Graph, Vertices, Solution) ->
                                             end
                                     end, {NewVertices, SolutionAcc}, OutNeighbors)
                     end, {[], Solution}, Vertices),
-    solve(Graph, NV, NS).
+    cull_deps(Graph, NV, NS).
 
 subgraph(Graph, Vertices) ->
     digraph_utils:subgraph(Graph, Vertices).

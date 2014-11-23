@@ -77,7 +77,7 @@ do(State) ->
                        end,
 
         Source = ProjectApps ++ rebar_state:src_apps(State1),
-        case rebar_digraph:sort_apps(Source) of
+        case rebar_digraph:compile_order(Source) of
             {ok, Sort} ->
                 {ok, rebar_state:set(State1, deps_to_build,
                                      lists:dropwhile(fun rebar_app_info:valid/1, Sort -- ProjectApps))};
@@ -130,7 +130,7 @@ handle_deps(State, Deps, Update) ->
                      [];
                  PkgDeps1 ->
                      %% Find pkg deps needed
-                     S = case rebar_digraph:solve(Graph, PkgDeps1) of
+                     S = case rebar_digraph:cull_deps(Graph, PkgDeps1) of
                              {ok, []} ->
                                  throw({rebar_digraph, no_solution});
                              {ok, Solution} ->
