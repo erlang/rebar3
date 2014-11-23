@@ -43,7 +43,7 @@ do(State) ->
     AllDeps = rebar_state:get(State2, all_deps, []),
     State3 = rebar_state:set(State2, deps_dir, DepsDir),
 
-    case rebar_topo:sort_apps(ProjectApps1++AllDeps) of
+    case rebar_digraph:sort_apps(ProjectApps1++AllDeps) of
         {ok, Sort} ->
             ToBuild = lists:dropwhile(fun rebar_app_info:valid/1, Sort -- ProjectApps1),
             State4 = rebar_state:set(State3, deps_to_build, ToBuild),

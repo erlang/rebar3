@@ -77,7 +77,7 @@ do(State) ->
                        end,
 
         Source = ProjectApps ++ rebar_state:src_apps(State1),
-        case rebar_topo:sort_apps(Source) of
+        case rebar_digraph:sort_apps(Source) of
             {ok, Sort} ->
                 {ok, rebar_state:set(State1, deps_to_build,
                                      lists:dropwhile(fun rebar_app_info:valid/1, Sort -- ProjectApps))};
@@ -130,11 +130,13 @@ handle_deps(State, Deps, Update) ->
                      [];
                  PkgDeps1 ->
                      %% Find pkg deps needed
-                     S = case rlx_depsolver:solve(Graph, PkgDeps1) of
+                     S = case rebar_digraph:solve(Graph, PkgDeps1) of
+                             {ok, []} ->
+                                 throw({rebar_digraph, no_solution});
                              {ok, Solution} ->
                                  Solution;
-                             Reason ->
-                                 throw({error, {rlx_depsolver, Reason}})
+                             [] ->
+                                 throw({rebar_digraph, no_solution})
                          end,
 
                      %% Create app_info record for each pkg dep
@@ -156,19 +158,17 @@ handle_deps(State, Deps, Update) ->
 %% Internal functions
 %% ===================================================================
 
-package_to_app(DepsDir, Packages, Pkg={_, Vsn}) ->
-    Name = ec_cnv:to_binary(rlx_depsolver:dep_pkg(Pkg)),
-    FmtVsn = iolist_to_binary(rlx_depsolver:format_version(Vsn)),
-    case dict:find({Name, FmtVsn}, Packages) of
+package_to_app(DepsDir, Packages, {Name, Vsn}) ->
+    case dict:find({Name, Vsn}, Packages) of
         error ->
             [];
         {ok, P} ->
             PkgDeps = proplists:get_value(<<"deps">>, P, []),
             Link = proplists:get_value(<<"link">>, P, ""),
-            {ok, AppInfo} = rebar_app_info:new(Name, FmtVsn),
+            {ok, AppInfo} = rebar_app_info:new(Name, Vsn),
             AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
             AppInfo2 = rebar_app_info:dir(AppInfo1, get_deps_dir(DepsDir, Name)),
-            [rebar_app_info:source(AppInfo2, {pkg, Name, FmtVsn, Link})]
+            [rebar_app_info:source(AppInfo2, {pkg, Name, Vsn, Link})]
     end.
 
 -spec update_src_deps(integer(), rebar_state:t(), boolean(), sets:set(binary())) ->

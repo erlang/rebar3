@@ -40,8 +40,8 @@ do(State) ->
         Home = rebar_utils:home_dir(),
         PackagesFile = filename:join([Home, ?CONFIG_DIR, "packages"]),
         filelib:ensure_dir(PackagesFile),
-        {ok, _RequestId} = httpc:request(get, {Url, []}, [], [{stream, TmpFile}
-                                                             ,{sync, true}]),
+        {ok, _RequestId} = httpc:request(get, {Url, [{"Accept", "application/erlang"}]},
+                                        [], [{stream, TmpFile}, {sync, true}]),
         ok = ec_file:copy(TmpFile, PackagesFile)
     catch
         _:_ ->
