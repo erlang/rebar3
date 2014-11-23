@@ -43,6 +43,8 @@ do(State) ->
 
     ProjectApps = rebar_state:project_apps(State1),
     Deps = rebar_state:get(State1, deps_to_build, []),
+    Cwd = rebar_utils:get_cwd(),
+    rebar_hooks:run_compile_hooks(Cwd, pre_hooks, compile, State1),
 
     %% Need to allow global config vars used on deps
     %% Right now no way to differeniate and just give deps a new state
@@ -51,8 +53,6 @@ do(State) ->
     build_apps(EmptyState1, Deps),
 
     %% Use the project State for building project apps
-    Cwd = rebar_utils:get_cwd(),
-    rebar_hooks:run_compile_hooks(Cwd, pre_hooks, compile, State1),
     %% Set hooks to empty so top-level hooks aren't run for each project app
     State2 = rebar_state:set(rebar_state:set(State1, post_hooks, []), pre_hooks, []),
     build_apps(State2, ProjectApps),
