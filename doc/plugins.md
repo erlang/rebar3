@@ -75,7 +75,7 @@ Open up the `src/provider_todo.erl` file and make sure you have the following sk
 
 -export([init/1, do/1, format_error/1]).
 
--include_lib("rebar3/include/rebar.hrl").
+-include_lib("rebar/include/rebar.hrl").
 
 -define(PROVIDER, todo).
 -define(DEPS, [app_discovery]).
@@ -91,7 +91,7 @@ init(State) ->
             {bare, true},               % The task can be run by the user, always true
             {deps, ?DEPS},              % The list of dependencies
             {example, "rebar provider_todo"}, % How to use the plugin
-            {opts, []}                  % list of options understood by the plugin
+            {opts, []},                % list of options understood by the plugin
             {short_desc, "example rebar3 plugin"},
             {desc, ""}
     ]),
