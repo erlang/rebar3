@@ -273,8 +273,7 @@ find_disk_templates(State) ->
     Home = rebar_utils:home_dir(),
     HomeFiles = rebar_utils:find_files(filename:join([Home, ?CONFIG_DIR, "templates"]),
                                        ?TEMPLATE_RE),
-    LocalFiles = rebar_utils:find_files(".", ?TEMPLATE_RE, true),
-    [{file, F} || F <- OtherTemplates ++ HomeFiles ++ LocalFiles].
+    [{file, F} || F <- OtherTemplates ++ HomeFiles].
 
 %% Fetch template indexes that sit on disk in custom areas
 find_other_templates(State) ->
