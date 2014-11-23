@@ -75,8 +75,6 @@ Open up the `src/provider_todo.erl` file and make sure you have the following sk
 
 -export([init/1, do/1, format_error/1]).
 
--include_lib("rebar3/include/rebar.hrl").
-
 -define(PROVIDER, todo).
 -define(DEPS, [app_discovery]).
 
