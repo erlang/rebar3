@@ -4,6 +4,7 @@ otp_release:
   - R16B02
   - R16B01
   - R15B01
+  - R14B04
 script: make travis
 branches:
   only:
