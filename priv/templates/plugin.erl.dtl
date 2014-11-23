@@ -19,7 +19,7 @@ init(State) ->
             {bare, true},               % The task can be run by the user, always true
             {deps, ?DEPS},              % The list of dependencies
             {example, "rebar {{name}}"}, % How to use the plugin
-            {opts, []}                  % list of options understood by the plugin
+            {opts, []},                  % list of options understood by the plugin
             {short_desc, "{{desc}}"},
             {desc, ""}
     ]),
@@ -33,4 +33,3 @@ do(State) ->
 -spec format_error(any()) ->  iolist().
 format_error(Reason, State) ->
     io_lib:format("~p", [Reason]).
-
