@@ -36,13 +36,20 @@ do(State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
     Opts1 = transform_opts(Opts),
     ok = create_dirs(Opts1),
-    expand_test_deps(filename:absname(rebar_state:get(State, test_deps_dir, ?DEFAULT_TEST_DEPS_DIR))),
-    ct:run_test(Opts1),
-    {ok, State}.
+    expand_test_deps(filename:absname(rebar_state:get(State, test_deps_dir,
+                                                      ?DEFAULT_TEST_DEPS_DIR))),
+    case ct:run_test(Opts1) of
+        {_, 0, _} -> {ok, State};
+        {_, FailedCount, _} -> {error, {?MODULE, {failures_running_tests,
+                                                  FailedCount}}};
+        {error, Reason} -> {error, {?MODULE, {error_running_tests, Reason}}}
+    end.
 
 -spec format_error(any()) -> iolist().
-format_error(Reason) ->
-    io_lib:format("~p", [Reason]).
+format_error({failures_running_tests, FailedCount}) ->
+    io_lib:format("Failures occured running tests: ~p", [FailedCount]);
+format_error({error_running_tests, Reason}) ->
+    io_lib:format("Error running tests: ~p", [Reason]).
 
 expand_test_deps(Dir) ->
     Apps = filelib:wildcard(filename:join([Dir, "*", "ebin"])),
