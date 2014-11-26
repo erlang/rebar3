@@ -33,9 +33,11 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
 do(State) ->
-    Opts = build_options(State),
+    {Opts, _} = rebar_state:command_parsed_args(State),
+    Opts1 = transform_opts(Opts),
+    ok = create_dirs(Opts1),
     expand_test_deps(filename:absname(rebar_state:get(State, test_deps_dir, ?DEFAULT_TEST_DEPS_DIR))),
-    ct:run_test(Opts),
+    ct:run_test(Opts1),
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
@@ -68,7 +70,7 @@ ct_opts(State) ->
      {cover, undefined, "cover", string, help(cover)}, %% file
      {cover_stop, undefined, "cover_stop", boolean, help(cover_stop)}, %% Boolean
      {event_handler, undefined, "event_handler", string, help(event_handler)}, %% EH | [EH] WHERE EH atom() | {atom(), InitArgs} | {[atom()], InitArgs}
-     {include, undefined, "include", string, help(include)},
+     {include, undefined, "include", string, help(include)}, % comma-seperated list
      {abort_if_missing_suites, undefined, "abort_if_missing_suites", {boolean, true},
       help(abort_if_missing_suites)}, %% boolean
      {multiply_timetraps, undefined, "multiply_timetraps", integer,
@@ -82,6 +84,96 @@ ct_opts(State) ->
      {basic_html, undefined, "basic_html", boolean, help(basic_html)}, %% Booloean
      {ct_hooks, undefined, "ct_hooks", string, help(ct_hooks)} %% List: [CTHModule | {CTHModule, CTHInitArgs}] where CTHModule is atom CthInitArgs is term
     ].
+
+transform_opts(Opts) ->
+    transform_opts(Opts, []).
+
+transform_opts([], Acc) -> Acc;
+transform_opts([{ct_hooks, CtHooks}|Rest], Acc) ->
+    transform_opts(Rest, [{ct_hooks, parse_term(CtHooks)}|Acc]);
+transform_opts([{force_stop, "skip_rest"}|Rest], Acc) ->
+    transform_opts(Rest, [{force_stop, skip_rest}|Acc]);
+transform_opts([{force_stop, _}|Rest], Acc) ->
+    transform_opts(Rest, [{force_stop, true}|Acc]);
+transform_opts([{repeat, Repeat}|Rest], Acc) ->
+    transform_opts(Rest, [{repeat,
+                           ec_cnv:to_integer(Repeat)}|Acc]);
+transform_opts([{create_priv_dir, CreatePrivDir}|Rest], Acc) ->
+    transform_opts(Rest, [{create_priv_dir,
+                           to_atoms(split_string(CreatePrivDir))}|Acc]);
+transform_opts([{multiply_timetraps, MultiplyTimetraps}|Rest], Acc) ->
+    transform_opts(Rest, [{multiply_timetraps,
+                           ec_cnv:to_integer(MultiplyTimetraps)}|Acc]);
+transform_opts([{event_handler, EventHandler}|Rest], Acc) ->
+    transform_opts(Rest, [{event_handler, parse_term(EventHandler)}|Acc]);
+transform_opts([{silent_connections, SilentConnections}|Rest], Acc) ->
+    transform_opts(Rest, [{silent_connections,
+                           to_atoms(split_string(SilentConnections))}|Acc]);
+transform_opts([{verbosity, "all"}|Rest], Acc) ->
+    transform_opts(Rest, [{verbosity, all}|Acc]);
+transform_opts([{verbosity, Verbosity}|Rest], Acc) ->
+    transform_opts(Rest, [{verbosity, parse_term(Verbosity)}|Acc]);
+transform_opts([{logopts, LogOpts}|Rest], Acc) ->
+    transform_opts(Rest, [{logopts, to_atoms(split_string(LogOpts))}|Acc]);
+transform_opts([{userconfig, UserConfig}|Rest], Acc) ->
+    transform_opts(Rest, [{userconfig, parse_term(UserConfig)}|Acc]);
+transform_opts([{testcase, Testcase}|Rest], Acc) ->
+    transform_opts(Rest, [{testcase, to_atoms(split_string(Testcase))}|Acc]);
+transform_opts([{group, Group}|Rest], Acc) -> % @TODO handle ""
+    % Input is a list or an atom. It can also be a nested list.
+    transform_opts(Rest, [{group, parse_term(Group)}|Acc]);
+transform_opts([{Key, Val}|Rest], Acc) when is_list(Val) ->
+    % Default to splitting a string on comma, that works fine for both flat
+    % lists of which there are many and single-items.
+    Val1 = case split_string(Val) of
+               [Val2] ->
+                   Val2;
+               Val2 ->
+                   Val2
+           end,
+    transform_opts(Rest, [{Key, Val1}|Acc]);
+transform_opts([{Key, Val}|Rest], Acc) ->
+    transform_opts(Rest, [{Key, Val}|Acc]).
+
+to_atoms(List) ->
+    lists:map(fun(X) -> list_to_atom(X) end, List).
+
+split_string(String) ->
+    string:tokens(String, ",").
+
+parse_term(String) ->
+    String1 = "[" ++ String ++ "].",
+    {ok, Tokens, _} = erl_scan:string(String1),
+    case erl_parse:parse_term(Tokens) of
+        {ok, [Terms]} ->
+            Terms;
+        Term ->
+            Term
+    end.
+
+create_dirs(Opts) ->
+    LogDir = proplists:get_value(logdir, Opts),
+    TestDir = proplists:get_value(dir, Opts),
+    ensure_logdir(LogDir),
+    ensure_testdir(TestDir),
+    ok.
+
+ensure_logdir(Logdir) ->
+    case ec_file:is_dir(Logdir) of
+        true ->
+            ok;
+        false ->
+            ec_file:mkdir_path(Logdir)
+    end.
+
+ensure_testdir(Testdir) ->
+    case ec_file:is_dir(Testdir) of
+        false ->
+            ?INFO("Test directory ~s does not exist:\n",
+                  [Testdir]),
+            ?FAIL;
+        _ -> ok
+    end.
 
 help(dir) ->
     "Test folder (default: test/)";
@@ -141,40 +233,3 @@ help(ct_hooks) ->
     "";
 help(userconfig) ->
     "".
-
-build_options(State) ->
-    Arguments = rebar_state:command_args(State),
-    Opts = parse_args(Arguments, []),
-    lists:keymerge(1, Opts, defaults(State)).
-
-defaults(State) ->
-    Logdir = filename:join([rebar_state:dir(State), "logs"]),
-    ok = ensure_logdir(Logdir),
-    Testdir = filename:join([rebar_state:dir(State), "test"]),
-    ok = ensure_testdir(Testdir),
-    [{dir, Testdir},
-     {logdir, Logdir}].
-
-parse_args([], Opts) ->
-    Opts;
-parse_args([Pair|Rest], Opts) ->
-    [Key, Val] = string:tokens(Pair, "="),
-    Key0 = list_to_atom(Key),
-    parse_args(Rest, [{Key0, string:tokens(Val, " ")}|Opts]).
-
-ensure_logdir(Logdir) ->
-    case ec_file:is_dir(Logdir) of
-        true ->
-            ok;
-        false ->
-            ec_file:mkdir_path(Logdir)
-    end.
-
-ensure_testdir(Testdir) ->
-    case ec_file:is_dir(Testdir) of
-        false ->
-            ?INFO("Test directory ~s does not exist:\n",
-                  [Testdir]),
-            ?FAIL;
-        _ -> ok
-    end.
