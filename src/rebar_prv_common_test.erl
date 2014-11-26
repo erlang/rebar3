@@ -113,11 +113,11 @@ transform_opts([{multiply_timetraps, MultiplyTimetraps}|Rest], Acc) ->
                            ec_cnv:to_integer(MultiplyTimetraps)}|Acc]);
 transform_opts([{event_handler, EventHandler}|Rest], Acc) ->
     transform_opts(Rest, [{event_handler, parse_term(EventHandler)}|Acc]);
+transform_opts([{silent_connections, "all"}|Rest], Acc) ->
+    transform_opts(Rest, [{silent_connections, all}|Acc]);
 transform_opts([{silent_connections, SilentConnections}|Rest], Acc) ->
     transform_opts(Rest, [{silent_connections,
                            to_atoms(split_string(SilentConnections))}|Acc]);
-transform_opts([{verbosity, "all"}|Rest], Acc) ->
-    transform_opts(Rest, [{verbosity, all}|Acc]);
 transform_opts([{verbosity, Verbosity}|Rest], Acc) ->
     transform_opts(Rest, [{verbosity, parse_term(Verbosity)}|Acc]);
 transform_opts([{logopts, LogOpts}|Rest], Acc) ->
