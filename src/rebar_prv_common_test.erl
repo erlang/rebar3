@@ -107,7 +107,7 @@ transform_opts([{repeat, Repeat}|Rest], Acc) ->
                            ec_cnv:to_integer(Repeat)}|Acc]);
 transform_opts([{create_priv_dir, CreatePrivDir}|Rest], Acc) ->
     transform_opts(Rest, [{create_priv_dir,
-                           to_atoms(split_string(CreatePrivDir))}|Acc]);
+                           to_atoms(CreatePrivDir)}|Acc]);
 transform_opts([{multiply_timetraps, MultiplyTimetraps}|Rest], Acc) ->
     transform_opts(Rest, [{multiply_timetraps,
                            ec_cnv:to_integer(MultiplyTimetraps)}|Acc]);
