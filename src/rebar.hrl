@@ -13,11 +13,13 @@
 
 -define(FMT(Str, Args), lists:flatten(io_lib:format(Str, Args))).
 
--define(DEFAULT_BASE_DIR, "").
+-define(DEFAULT_BASE_DIR, "_build").
+-define(DEFAULT_PROFILE_DIR, "default").
 -define(DEFAULT_LIB_DIRS, ["_checkouts", "apps", "lib", "."]).
--define(DEFAULT_DEPS_DIR, "_deps").
--define(DEFAULT_PLUGINS_DIR, "_plugins").
--define(DEFAULT_TEST_DEPS_DIR, "_tdeps").
+-define(DEFAULT_DEPS_DIR, "lib").
+-define(DEFAULT_PLUGINS_DIR, "plugins").
+-define(DEFAULT_TEST_DEPS_DIR, "test/lib").
+-define(DEFAULT_RELEASE_DIR, "rel").
 -define(DEFAULT_CONFIG_FILE, "rebar.config").
 -define(LOCK_FILE, "rebar.lock").
 -define(CONFIG_DIR, ".rebar3").

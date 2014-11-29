@@ -4,7 +4,7 @@
 
 run_compile_hooks(Dir, Type, Command, State) ->
     Hooks = rebar_state:get(State, Type, []),
-    Env = [{"REBAR_DEPS_DIR", rebar_prv_install_deps:get_deps_dir(State)}],
+    Env = [{"REBAR_DEPS_DIR", rebar_utils:deps_dir(State)}],
     lists:foreach(fun({_, C, _}=Hook) when C =:= Command ->
                           apply_hook(Dir, Env, Hook);
                      ({C, _}=Hook) when C =:= Command ->

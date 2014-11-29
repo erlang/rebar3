@@ -107,12 +107,9 @@ run_aux(State, RawArgs) ->
     inets:start(),
 
     %% Process each command, resetting any state between each one
-    State2 = case rebar_state:get(State, base_dir, undefined) of
-                 undefined ->
-                     rebar_state:set(State, base_dir, filename:absname(rebar_state:dir(State)));
-                 Dir ->
-                     rebar_state:set(State, base_dir, filename:absname(Dir))
-             end,
+    BaseDir = rebar_utils:base_dir(State),
+    State2 = rebar_state:set(State, base_dir,
+                            filename:join(filename:absname(rebar_state:dir(State)), BaseDir)),
 
     {ok, Providers} = application:get_env(rebar, providers),
 

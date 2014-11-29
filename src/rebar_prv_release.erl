@@ -12,7 +12,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, release).
--define(DEPS, [compile]).
+-define(DEPS, [{compile, default}, compile]).
 
 %% ===================================================================
 %% Public API
@@ -33,16 +33,16 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     Options = rebar_state:command_args(State),
-    DepsDir = rebar_prv_install_deps:get_deps_dir(State),
-    OutputDir = filename:join(rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR), "_rel"),
+    DepsDir = [rebar_utils:default_deps_dir(State)], % rebar_utils:deps_dir(State)],
+    OutputDir = filename:join(rebar_utils:profile_dir(State), ?DEFAULT_RELEASE_DIR),
     AllOptions = string:join(["release" | Options], " "),
     try
         case rebar_state:get(State, relx, []) of
             [] ->
-                relx:main([{lib_dirs, [DepsDir]}
+                relx:main([{lib_dirs, DepsDir}
                           ,{output_dir, OutputDir}], AllOptions);
             Config ->
-                relx:main([{lib_dirs, [DepsDir]}
+                relx:main([{lib_dirs, DepsDir}
                           ,{config, Config}
                           ,{output_dir, OutputDir}], AllOptions)
         end,

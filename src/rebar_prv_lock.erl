@@ -31,13 +31,14 @@ init(State) ->
 do(State) ->
     case rebar_state:get(State, locks, []) of
         [] ->
-            AllDeps = rebar_state:get(State, all_deps, []),
+            AllDeps = rebar_state:get(State, {all_deps, default}, []),
             Locks = lists:map(fun(Dep) ->
                                       Dir = rebar_app_info:dir(Dep),
+                                      Source = rebar_app_info:source(Dep),
 
                                       %% If source is tuple it is a source dep
                                       %% e.g. {git, "git://github.com/ninenines/cowboy.git", "master"}
-                                      case rebar_app_info:source(Dep) of
+                                      case Source of
                                           Source when is_tuple(Source) ->
                                               {rebar_app_info:name(Dep)
                                               ,rebar_app_info:original_vsn(Dep)

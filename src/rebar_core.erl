@@ -40,15 +40,18 @@ process_command(State, Command) ->
         not_found ->
             {error, io_lib:format("Command ~p not found", [Command])};
         CommandProvider ->
+            Profile = providers:profile(CommandProvider),
+            State1 = rebar_state:current_profile(State, Profile),
+            State2 = rebar_state:apply_profile(State1, Profile),
             Opts = providers:opts(CommandProvider)++rebar3:global_option_spec_list(),
             case Command of
                 do ->
-                    do(TargetProviders, State);
+                    do(TargetProviders, State2);
                 _ ->
-                    case getopt:parse(Opts, rebar_state:command_args(State)) of
+                    case getopt:parse(Opts, rebar_state:command_args(State2)) of
                         {ok, Args} ->
-                            State2 = rebar_state:command_parsed_args(State, Args),
-                            do(TargetProviders, State2);
+                            State3 = rebar_state:command_parsed_args(State2, Args),
+                            do(TargetProviders, State3);
                         {error, {invalid_option, Option}} ->
                             {error, io_lib:format("Invalid option ~s on task ~p", [Option, Command])}
                     end
@@ -58,22 +61,22 @@ process_command(State, Command) ->
 -spec do([atom()], rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do([], State) ->
     {ok, State};
-do([ProviderName | Rest], State) ->
+do([{ProviderName, Profile} | Rest], State) ->
+    State1 = rebar_state:current_profile(State, Profile),
     Provider = providers:get_provider(ProviderName
-                                     ,rebar_state:providers(State)),
-    case providers:do(Provider, State) of
-        {ok, State1} ->
-            do(Rest, State1);
+                                     ,rebar_state:providers(State1)),
+    case providers:do(Provider, State1) of
+        {ok, State2} ->
+            do(Rest, State2);
         {error, Error} ->
             {error, Error}
     end.
 
 update_code_path(State) ->
     true = rebar_utils:expand_code_path(),
-    BaseDir = rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR),
-    LibDirs = rebar_state:get(State, lib_dirs, ?DEFAULT_LIB_DIRS),
-    DepsDir = filename:join(BaseDir, rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR)),
-    PluginsDir = filename:join(BaseDir, rebar_state:get(State, plugins_dir, ?DEFAULT_PLUGINS_DIR)),
+    LibDirs = rebar_utils:lib_dirs(State),
+    DepsDir = rebar_utils:deps_dir(State),
+    PluginsDir = rebar_utils:plugins_dir(State),
     _UpdatedCodePaths = update_code_path_([DepsDir, PluginsDir | LibDirs]).
 
 

@@ -2,8 +2,14 @@
 
 -export([new/0, new/1, new/2, new/3,
          get/2, get/3, set/3,
+
+         current_profile/1,
+         current_profile/2,
+
          command_args/1, command_args/2,
          command_parsed_args/1, command_parsed_args/2,
+
+         apply_profile/2,
 
          dir/1, dir/2,
          create_logic_providers/2,
@@ -20,18 +26,20 @@
 
 -include("rebar.hrl").
 
--record(state_t, {dir :: file:name(),
-                  opts = [],
+-record(state_t, {dir                               :: file:name(),
+                  opts                = dict:new()  :: rebar_dict(),
 
-                  command_args = [],
+                  current_profile     = default     :: atom(),
+
+                  command_args        = [],
                   command_parsed_args = [],
 
-                  src_deps = [],
-                  src_apps = [],
-                  pkg_deps = [] :: [rebar_packages:package()],
-                  project_apps = [],
+                  src_deps            = [],
+                  src_apps            = [],
+                  pkg_deps            = []          :: [rebar_packages:package()],
+                  project_apps        = [],
 
-                  providers = []}).
+                  providers           = []}).
 
 -export_type([t/0]).
 
@@ -44,7 +52,7 @@ new() ->
 -spec new(list()) -> t().
 new(Config) when is_list(Config) ->
     #state_t { dir = rebar_utils:get_cwd(),
-               opts = Config }.
+               opts = dict:from_list(Config) }.
 
 -spec new(t(), list()) -> t().
 new(ParentState=#state_t{}, Config) ->
@@ -57,25 +65,39 @@ new(ParentState, Config, Dir) ->
     Opts = ParentState#state_t.opts,
     LocalOpts = case rebar_config:consult_file(?LOCK_FILE) of
                     [D] ->
-                        [{locks, D} | Config];
+                        dict:from_list([{locks, D} | Config]);
                     _ ->
-                        Config
+                        dict:from_list(Config)
                 end,
 
     ProviderModules = [],
-    create_logic_providers(ProviderModules, ParentState#state_t{dir=Dir
-                                                               ,opts=lists:umerge(LocalOpts, Opts)}).
+    create_logic_providers(ProviderModules
+                          ,ParentState#state_t{dir=Dir
+                                              ,opts=dict:merge(fun(_Key, Value1, _Value2) ->
+                                                                       Value1
+                                                               end, LocalOpts, Opts)}).
 
 get(State, Key) ->
-    proplists:get_value(Key, State#state_t.opts).
+    {ok, Value} = dict:find(Key, State#state_t.opts),
+    Value.
 
 get(State, Key, Default) ->
-    proplists:get_value(Key, State#state_t.opts, Default).
+    case dict:find(Key, State#state_t.opts) of
+        {ok, Value} ->
+            Value;
+        error ->
+            Default
+    end.
 
 -spec set(t(), any(), any()) -> t().
-set(State, Key, Value) ->
-    Opts = proplists:delete(Key, State#state_t.opts),
-    State#state_t { opts = [{Key, Value} | Opts] }.
+set(State=#state_t{opts=Opts}, Key, Value) ->
+    State#state_t{ opts = dict:store(Key, Value, Opts) }.
+
+current_profile(#state_t{current_profile=Profile}) ->
+    Profile.
+
+current_profile(State, Profile) ->
+    State#state_t{current_profile=Profile}.
 
 command_args(#state_t{command_args=CmdArgs}) ->
     CmdArgs.
@@ -89,19 +111,45 @@ command_parsed_args(#state_t{command_parsed_args=CmdArgs}) ->
 command_parsed_args(State, CmdArgs) ->
     State#state_t{command_parsed_args=CmdArgs}.
 
+apply_profile(State=#state_t{opts=Opts}, Profile) ->
+    ConfigProfiles = rebar_state:get(State, profiles, []),
+    Deps = rebar_state:get(State, deps, []),
+    Opts1 = dict:store({deps, default}, Deps, dict:erase(deps, Opts)),
+    ProfileOpts = dict:from_list(proplists:get_value(Profile, ConfigProfiles, [])),
+    State#state_t{opts=merge_opts(Profile, ProfileOpts, Opts1)}.
+
+merge_opts(Profile, Opts1, Opts2) ->
+    dict:fold(fun(deps, Value, OptsAcc) ->
+                      dict:store({deps, Profile}, Value, OptsAcc);
+                 (Key, Value, OptsAcc) ->
+                      case dict:fetch(Key, 1, Opts2) of
+                          {_, OldValue} when is_list(OldValue) ->
+                              case io_lib:printable_list(Value) of
+                                  true ->
+                                      dict:store(Key, OptsAcc, {Key, Value});
+                                  false ->
+                                      dict:store(Key, OptsAcc, {Key, lists:keymerge(1, lists:keysort(1, OldValue), lists:keysort(1, Value))})
+                              end;
+                          error ->
+                              dict:store(Key, Value, OptsAcc)
+                      end
+              end, Opts2, Opts1).
+
 dir(#state_t{dir=Dir}) ->
     Dir.
 
 dir(State=#state_t{}, Dir) ->
     State#state_t{dir=filename:absname(Dir)}.
 
-deps_names(State) ->
-    Deps = rebar_state:get(State, deps, []),
+deps_names(Deps) when is_list(Deps) ->
     lists:map(fun(Dep) when is_tuple(Dep) ->
                       ec_cnv:to_binary(element(1, Dep));
                  (Dep) when is_atom(Dep) ->
                       ec_cnv:to_binary(Dep)
-              end, Deps).
+              end, Deps);
+deps_names(State) ->
+    Deps = rebar_state:get(State, deps, []),
+    deps_names(Deps).
 
 -spec pkg_deps(t()) -> [rebar_packages:package()].
 pkg_deps(#state_t{pkg_deps=PkgDeps}) ->
@@ -138,7 +186,7 @@ project_apps(#state_t{project_apps=Apps}) ->
 project_apps(State=#state_t{}, NewApps) when is_list(NewApps) ->
     State#state_t{project_apps=NewApps};
 project_apps(State=#state_t{project_apps=Apps}, App) ->
-    State#state_t{project_apps=[App | Apps]}.
+    State#state_t{project_apps=lists:keystore(rebar_app_info:name(App), 2, Apps, App)}.
 
 providers(#state_t{providers=Providers}) ->
     Providers.
