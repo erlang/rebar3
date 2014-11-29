@@ -220,7 +220,7 @@ And then we can implement the switch to figure out what to search:
 do(State) ->
     Apps = case discovery_type(State) of
         project -> rebar_state:project_apps(State);
-        deps -> rebar_state:project_apps(State) ++ rebar_state:src_deps(State)
+        deps -> rebar_state:project_apps(State) ++ rebar_state:all_deps(State)
     end,
     lists:foreach(fun check_todo_app/1, Apps),
     {ok, State}.
