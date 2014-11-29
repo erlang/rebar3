@@ -91,12 +91,13 @@ do(State) ->
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
--spec handle_deps(rebar_state:t(), [dep()]) -> {ok, rebar_state:t()}.
+-spec handle_deps(rebar_state:t(), [dep()]) ->
+                         {ok, [rebar_app_info:t()], rebar_state:t()} | {error, string()}.
 handle_deps(State, Deps) ->
     handle_deps(State, Deps, false).
 
 -spec handle_deps(rebar_state:t(), [dep()], boolean() | {true, binary(), integer()})
-                 -> {ok, rebar_state:t()} | {error, string()}.
+                 -> {ok, [rebar_app_info:t()], rebar_state:t()} | {error, string()}.
 handle_deps(State, [], _) ->
     {ok, State};
 handle_deps(State, Deps, Update) ->

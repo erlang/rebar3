@@ -36,6 +36,7 @@
          default_profile_dir/1,
          default_profile_deps/1,
          home_dir/0,
+         global_config_dir/1,
 
          droplast/1,
          filtermap/2,
@@ -108,10 +109,13 @@ lib_dirs(State) ->
 default_profile_dir(State) ->
     filename:join(base_dir(State), "default").
 
--spec profile_dir(rebar_state:t()) -> file:filename_all().
 profile_dir(State) ->
-    Profile = rebar_state:current_profile(State),
-    filename:join(base_dir(State), atom_to_list(Profile)).
+    case rebar_state:current_profile(State) of
+        global ->
+            global_config_dir(State);
+        Profile ->
+            filename:join(base_dir(State), atom_to_list(Profile))
+    end.
 
 -spec default_profile_deps(rebar_state:t()) -> file:filename_all().
 default_profile_deps(State) ->
@@ -120,6 +124,10 @@ default_profile_deps(State) ->
 home_dir() ->
     {ok, [[Home]]} = init:get_argument(home),
     Home.
+
+global_config_dir(State) ->
+    Home = home_dir(),
+    rebar_state:get(State, global_rebar_dir, filename:join(Home, ?CONFIG_DIR)).
 
 droplast(L) ->
     lists:reverse(tl(lists:reverse(L))).

@@ -74,7 +74,7 @@ main(Args) ->
 run(BaseState, Command) ->
     _ = application:load(rebar),
     BaseState1 = rebar_state:set(BaseState, task, Command),
-    run_aux(BaseState1, [Command]).
+    run_aux(BaseState1, [], [Command]).
 
 %% ====================================================================
 %% Internal functions
@@ -82,7 +82,7 @@ run(BaseState, Command) ->
 
 run(RawArgs) ->
     _ = application:load(rebar),
-    BaseConfig = init_config(),
+    {GlobalPluginProviders, BaseConfig} = init_config(),
 
     case erlang:system_info(version) of
         "6.1" ->
@@ -93,9 +93,9 @@ run(RawArgs) ->
     end,
 
     {BaseConfig1, _Args1} = set_options(BaseConfig, {[], []}),
-    run_aux(BaseConfig1, RawArgs).
+    run_aux(BaseConfig1, GlobalPluginProviders, RawArgs).
 
-run_aux(State, RawArgs) ->
+run_aux(State, GlobalPluginProviders, RawArgs) ->
     %% Make sure crypto is running
     case crypto:start() of
         ok -> ok;
@@ -116,7 +116,8 @@ run_aux(State, RawArgs) ->
     {ok, PluginProviders, State3} = rebar_plugins:install(State2),
     rebar_core:update_code_path(State3),
 
-    State4 = rebar_state:create_logic_providers(Providers++PluginProviders, State3),
+    AllProviders = Providers++PluginProviders++GlobalPluginProviders,
+    State4 = rebar_state:create_logic_providers(AllProviders, State3),
     {Task, Args} = parse_args(RawArgs),
 
     rebar_core:process_command(rebar_state:command_args(State4, Args), list_to_atom(Task)).
@@ -147,9 +148,11 @@ init_config() ->
                 true ->
                     ?DEBUG("Load global config file ~p",
                            [GlobalConfigFile]),
-                    GlobalConfig = rebar_state:new(rebar_config:consult_file(GlobalConfigFile)),
-                    rebar_state:new(GlobalConfig, Config1);
+                    GlobalConfig = rebar_state:new(global, rebar_config:consult_file(GlobalConfigFile)),
+                    {ok, PluginProviders, GlobalConfig1} = rebar_plugins:install(GlobalConfig),
+                    rebar_state:new(GlobalConfig1, Config1);
                 false ->
+                    PluginProviders = [],
                     rebar_state:new(Config1)
             end,
 
@@ -165,7 +168,7 @@ init_config() ->
 
     %% TODO: Do we need this still? I think it may still be used.
     %% Initialize vsn cache
-    rebar_state:set(State1, vsn_cache, dict:new()).
+    {PluginProviders, rebar_state:set(State1, vsn_cache, dict:new())}.
 
 %%
 %% Parse command line arguments using getopt and also filtering out any

@@ -12,8 +12,7 @@
 
 -spec get_packages(rebar_state:t()) -> {rebar_dict(), rebar_digraph()}.
 get_packages(State) ->
-    Home = rebar_utils:home_dir(),
-    RebarDir = rebar_state:get(State, global_rebar_dir, filename:join(Home, ?CONFIG_DIR)),
+    RebarDir = rebar_utils:global_config_dir(State),
     PackagesFile = filename:join(RebarDir, "packages"),
     case ec_file:exists(PackagesFile) of
         true ->
