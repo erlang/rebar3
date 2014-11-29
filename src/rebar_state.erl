@@ -3,6 +3,9 @@
 -export([new/0, new/1, new/2, new/3,
          get/2, get/3, set/3,
 
+         lock/1,
+         lock/2,
+
          current_profile/1,
          current_profile/2,
 
@@ -15,11 +18,9 @@
          create_logic_providers/2,
 
          project_apps/1, project_apps/2,
+         all_deps/1, all_deps/2,
 
          deps_names/1,
-         pkg_deps/1, pkg_deps/2,
-         src_deps/1, src_deps/2,
-         src_apps/1, src_apps/2,
 
          prepend_hook/3, append_hook/3, hooks/2,
          providers/1, providers/2, add_provider/2]).
@@ -29,15 +30,14 @@
 -record(state_t, {dir                               :: file:name(),
                   opts                = dict:new()  :: rebar_dict(),
 
+                  lock                = [],
                   current_profile     = default     :: atom(),
 
                   command_args        = [],
                   command_parsed_args = [],
 
-                  src_deps            = [],
-                  src_apps            = [],
-                  pkg_deps            = []          :: [rebar_packages:package()],
-                  project_apps        = [],
+                  project_apps        = []          :: [rebar_app_into:t()],
+                  all_deps            = []          :: [rebar_app_into:t()],
 
                   providers           = []}).
 
@@ -99,6 +99,12 @@ current_profile(#state_t{current_profile=Profile}) ->
 current_profile(State, Profile) ->
     State#state_t{current_profile=Profile}.
 
+lock(#state_t{lock=Lock}) ->
+    Lock.
+
+lock(State=#state_t{lock=Lock}, App) ->
+    State#state_t{lock=[App | Lock]}.
+
 command_args(#state_t{command_args=CmdArgs}) ->
     CmdArgs.
 
@@ -151,35 +157,6 @@ deps_names(State) ->
     Deps = rebar_state:get(State, deps, []),
     deps_names(Deps).
 
--spec pkg_deps(t()) -> [rebar_packages:package()].
-pkg_deps(#state_t{pkg_deps=PkgDeps}) ->
-    PkgDeps.
-
-pkg_deps(State=#state_t{pkg_deps=PkgDeps}, NewPkgDeps) when is_list(PkgDeps) ->
-    State#state_t{pkg_deps=NewPkgDeps};
-pkg_deps(State=#state_t{pkg_deps=PkgDeps}, PkgDep) ->
-    State#state_t{pkg_deps=[PkgDep | PkgDeps]}.
-
-src_deps(#state_t{src_deps=SrcDeps}) ->
-    SrcDeps.
-
-src_deps(State=#state_t{src_deps=SrcDeps}, NewSrcDeps) when is_list(SrcDeps) ->
-    State#state_t{src_deps=NewSrcDeps};
-src_deps(State=#state_t{src_deps=SrcDeps}, SrcDep) ->
-    Name = rebar_app_info:name(SrcDep),
-    NewSrcDeps = lists:keystore(Name, 2, SrcDeps, SrcDep),
-    State#state_t{src_deps=NewSrcDeps}.
-
-src_apps(#state_t{src_apps=SrcApps}) ->
-    SrcApps.
-
-src_apps(State=#state_t{src_apps=_SrcApps}, NewSrcApps) when is_list(NewSrcApps) ->
-    State#state_t{src_apps=NewSrcApps};
-src_apps(State=#state_t{src_apps=SrcApps}, NewSrcApp) ->
-    Name = rebar_app_info:name(NewSrcApp),
-    NewSrcApps = lists:keystore(Name, 2, SrcApps, NewSrcApp),
-    State#state_t{src_apps=NewSrcApps}.
-
 project_apps(#state_t{project_apps=Apps}) ->
     Apps.
 
@@ -187,6 +164,12 @@ project_apps(State=#state_t{}, NewApps) when is_list(NewApps) ->
     State#state_t{project_apps=NewApps};
 project_apps(State=#state_t{project_apps=Apps}, App) ->
     State#state_t{project_apps=lists:keystore(rebar_app_info:name(App), 2, Apps, App)}.
+
+all_deps(#state_t{all_deps=Apps}) ->
+    Apps.
+
+all_deps(State=#state_t{}, NewApps) ->
+    State#state_t{all_deps=NewApps}.
 
 providers(#state_t{providers=Providers}) ->
     Providers.

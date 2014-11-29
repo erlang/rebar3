@@ -258,10 +258,5 @@ format_error(AbsSource, Extra, {Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
     ?FMT("~s: ~s~s~n", [AbsSource, Extra, ErrorDesc]).
 
-maybe_absname(Config, Filename) ->
-    case rebar_utils:processing_base_dir(Config) of
-        true ->
-            Filename;
-        false ->
-            filename:absname(Filename)
-    end.
+maybe_absname(_Config, Filename) ->
+    Filename.

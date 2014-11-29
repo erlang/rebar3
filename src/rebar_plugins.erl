@@ -26,7 +26,7 @@ install(State) ->
 handle_plugin(Plugin, State) ->
     try
         {ok, State1} = rebar_prv_install_deps:handle_deps(State, [Plugin]),
-        Apps = rebar_state:get(State1, all_deps, []),
+        Apps = rebar_state:all_deps(State1),
         ToBuild = lists:dropwhile(fun rebar_app_info:valid/1, Apps),
         lists:foreach(fun(AppInfo) ->
                               AppDir = rebar_app_info:dir(AppInfo),

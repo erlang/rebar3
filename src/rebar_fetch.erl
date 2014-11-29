@@ -19,52 +19,40 @@
 -spec lock_source(file:filename_all(), rebar_resource:resource()) ->
                          rebar_resource:resource() | {error, string()}.
 lock_source(AppDir, Source) ->
-    case get_resource_type(Source) of
-        {error, _}=Error ->
-            Error;
-        Module ->
-            Module:lock(AppDir, Source)
-    end.
+    Module = get_resource_type(Source),
+    Module:lock(AppDir, Source).
 
 -spec download_source(file:filename_all(), rebar_resource:resource()) -> true | {error, any()}.
 download_source(AppDir, Source) ->
-    case get_resource_type(Source) of
-        {error, _}=Error ->
-            Error;
-        Module ->
-            TmpDir = ec_file:insecure_mkdtemp(),
-            AppDir1 = ec_cnv:to_list(AppDir),
-            ec_file:mkdir_p(AppDir1),
-            case Module:download(TmpDir, Source) of
-                {ok, _} ->
-                    code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
-                    ec_file:remove(filename:absname(AppDir1), [recursive]),
-                    ok = ec_file:copy(TmpDir, filename:absname(AppDir1), [recursive]),
-                    true;
-                {tarball, File} ->
-                    ok = erl_tar:extract(File, [{cwd, TmpDir}
-                                               ,compressed]),
-                    BaseName = filename:basename(AppDir1),
-                    [FromDir] = filelib:wildcard(filename:join(TmpDir, BaseName++"-*")),
-                    code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
-                    ec_file:remove(filename:absname(AppDir1), [recursive]),
-                    ok = ec_file:copy(FromDir, filename:absname(AppDir1), [recursive]),
-                    true
-            end
+    Module = get_resource_type(Source),
+    TmpDir = ec_file:insecure_mkdtemp(),
+    AppDir1 = ec_cnv:to_list(AppDir),
+    ec_file:mkdir_p(AppDir1),
+    case Module:download(TmpDir, Source) of
+        {ok, _} ->
+            code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
+            ec_file:remove(filename:absname(AppDir1), [recursive]),
+            ok = ec_file:copy(TmpDir, filename:absname(AppDir1), [recursive]),
+            true;
+        {tarball, File} ->
+            ok = erl_tar:extract(File, [{cwd, TmpDir}
+                                       ,compressed]),
+            BaseName = filename:basename(AppDir1),
+            [FromDir] = filelib:wildcard(filename:join(TmpDir, BaseName++"-*")),
+            code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
+            ec_file:remove(filename:absname(AppDir1), [recursive]),
+            ok = ec_file:copy(FromDir, filename:absname(AppDir1), [recursive]),
+            true
     end.
 
 -spec needs_update(file:filename_all(), rebar_resource:resource()) -> boolean() | {error, string()}.
 needs_update(AppDir, Source) ->
-    case get_resource_type(Source) of
-        {error, _}=Error ->
-            Error;
-        Module ->
-            try
-                Module:needs_update(AppDir, Source)
-            catch
-                _:_ ->
-                    true
-            end
+    Module = get_resource_type(Source),
+    try
+        Module:needs_update(AppDir, Source)
+    catch
+        _:_ ->
+            true
     end.
 
 get_resource_type({Type, Location}) ->
