@@ -35,24 +35,27 @@ all() ->
 
 build_basic_app(Config) ->
     AppDir = proplists:get_value(apps, Config),
-    State = proplists:get_value(state, Config),
 
     Name = create_random_name("app1_"),
     Vsn = create_random_vsn(),
     create_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
-    ConfigFile = filename:join([AppDir, "rebar.config"]),
-    write_config(ConfigFile, []),
-    rebar3:run(rebar_state:new(State, [], AppDir), "compile"),
-
-    %% Verify app was built
-    [App] = rebar_app_discover:find_apps([AppDir]),
-
-    ?assertEqual(Name, ec_cnv:to_list(rebar_app_info:name(App))).
+    run_and_check(Config, [], "compile", [{app, Name}]).
 
 %%%===================================================================
 %%% Helper Functions
 %%%===================================================================
+
+run_and_check(Config, RebarConfig, Command, Expect) ->
+    AppDir = proplists:get_value(apps, Config),
+    State = proplists:get_value(state, Config),
+
+    rebar3:run(rebar_state:new(State, RebarConfig, AppDir), Command),
+
+    lists:foreach(fun({app, Name}) ->
+                          [App] = rebar_app_discover:find_apps([AppDir]),
+                          ?assertEqual(Name, ec_cnv:to_list(rebar_app_info:name(App)))
+                  end, Expect).
 
 create_app(AppDir, Name, Vsn, Deps) ->
     write_src_file(AppDir, Name),
