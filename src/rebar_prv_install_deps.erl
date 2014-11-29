@@ -99,7 +99,7 @@ handle_deps(State, Deps) ->
 -spec handle_deps(rebar_state:t(), [dep()], boolean() | {true, binary(), integer()})
                  -> {ok, [rebar_app_info:t()], rebar_state:t()} | {error, string()}.
 handle_deps(State, [], _) ->
-    {ok, State};
+    {ok, [], State};
 handle_deps(State, Deps, Update) ->
     %% Read in package index and dep graph
     {Packages, Graph} = rebar_packages:get_packages(State),

@@ -112,7 +112,6 @@ run_aux(State, GlobalPluginProviders, RawArgs) ->
                             filename:join(filename:absname(rebar_state:dir(State)), BaseDir)),
 
     {ok, Providers} = application:get_env(rebar, providers),
-
     {ok, PluginProviders, State3} = rebar_plugins:install(State2),
     rebar_core:update_code_path(State3),
 
