@@ -3,8 +3,10 @@
 -export([new/0, new/1, new/2, new/3,
          get/2, get/3, set/3,
 
-         lock/1,
-         lock/2,
+         opts/1,
+         default/1, default/2,
+
+         lock/1, lock/2,
 
          current_profile/1,
          current_profile/2,
@@ -104,11 +106,20 @@ get(State, Key, Default) ->
 set(State=#state_t{opts=Opts}, Key, Value) ->
     State#state_t{ opts = dict:store(Key, Value, Opts) }.
 
+default(#state_t{default=Opts}) ->
+    Opts.
+
+default(State, Opts) ->
+    State#state_t{default=Opts}.
+
+opts(#state_t{opts=Opts}) ->
+    Opts.
+
 current_profile(#state_t{current_profile=Profile}) ->
     Profile.
 
 current_profile(State, Profile) ->
-    State#state_t{current_profile=Profile}.
+    apply_profile(State#state_t{current_profile=Profile}, Profile).
 
 lock(#state_t{lock=Lock}) ->
     Lock.
@@ -140,15 +151,15 @@ merge_opts(Profile, Opts1, Opts2) ->
     dict:fold(fun(deps, Value, OptsAcc) ->
                       dict:store({deps, Profile}, Value, OptsAcc);
                  (Key, Value, OptsAcc) ->
-                      case dict:fetch(Key, 1, Opts2) of
-                          {_, OldValue} when is_list(OldValue) ->
+                      case dict:fetch(Key, Opts2) of
+                          OldValue when is_list(OldValue) ->
                               case io_lib:printable_list(Value) of
                                   true ->
-                                      dict:store(Key, OptsAcc, {Key, Value});
+                                      dict:store(Key, Value, OptsAcc);
                                   false ->
-                                      dict:store(Key, OptsAcc, {Key, lists:keymerge(1, lists:keysort(1, OldValue), lists:keysort(1, Value))})
+                                      dict:store(Key, lists:keymerge(1, lists:keysort(1, OldValue), lists:keysort(1, Value)), OptsAcc)
                               end;
-                          error ->
+                          _ ->
                               dict:store(Key, Value, OptsAcc)
                       end
               end, Opts2, Opts1).

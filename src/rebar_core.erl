@@ -42,15 +42,14 @@ process_command(State, Command) ->
         CommandProvider ->
             Profile = providers:profile(CommandProvider),
             State1 = rebar_state:current_profile(State, Profile),
-            State2 = rebar_state:apply_profile(State1, Profile),
             Opts = providers:opts(CommandProvider)++rebar3:global_option_spec_list(),
             case Command of
                 do ->
-                    do(TargetProviders, State2);
+                    do(TargetProviders, State1);
                 _ ->
-                    case getopt:parse(Opts, rebar_state:command_args(State2)) of
+                    case getopt:parse(Opts, rebar_state:command_args(State1)) of
                         {ok, Args} ->
-                            State3 = rebar_state:command_parsed_args(State2, Args),
+                            State3 = rebar_state:command_parsed_args(State1, Args),
                             do(TargetProviders, State3);
                         {error, {invalid_option, Option}} ->
                             {error, io_lib:format("Invalid option ~s on task ~p", [Option, Command])}

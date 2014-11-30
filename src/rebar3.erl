@@ -106,20 +106,28 @@ run_aux(State, GlobalPluginProviders, RawArgs) ->
     application:start(ssl),
     inets:start(),
 
+    State2 = case os:getenv("REBAR_PROFILE") of
+                 false ->
+                     State;
+                 Profile ->
+                     State1 = rebar_state:current_profile(State, list_to_atom(Profile)),
+                     rebar_state:default(State1, rebar_state:opts(State1))
+             end,
+
     %% Process each command, resetting any state between each one
-    BaseDir = rebar_utils:base_dir(State),
-    State2 = rebar_state:set(State, base_dir,
-                            filename:join(filename:absname(rebar_state:dir(State)), BaseDir)),
+    BaseDir = rebar_utils:base_dir(State2),
+    State3 = rebar_state:set(State2, base_dir,
+                            filename:join(filename:absname(rebar_state:dir(State2)), BaseDir)),
 
     {ok, Providers} = application:get_env(rebar, providers),
-    {ok, PluginProviders, State3} = rebar_plugins:install(State2),
-    rebar_core:update_code_path(State3),
+    {ok, PluginProviders, State4} = rebar_plugins:install(State3),
+    rebar_core:update_code_path(State4),
 
     AllProviders = Providers++PluginProviders++GlobalPluginProviders,
-    State4 = rebar_state:create_logic_providers(AllProviders, State3),
+    State5 = rebar_state:create_logic_providers(AllProviders, State4),
     {Task, Args} = parse_args(RawArgs),
 
-    rebar_core:process_command(rebar_state:command_args(State4, Args), list_to_atom(Task)).
+    rebar_core:process_command(rebar_state:command_args(State5, Args), list_to_atom(Task)).
 
 init_config() ->
     %% Initialize logging system
