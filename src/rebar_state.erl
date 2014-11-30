@@ -29,6 +29,7 @@
 
 -record(state_t, {dir                               :: file:name(),
                   opts                = dict:new()  :: rebar_dict(),
+                  default             = dict:new()  :: rebar_dict(),
 
                   lock                = [],
                   current_profile     = default     :: atom(),
@@ -51,15 +52,19 @@ new() ->
 
 -spec new(list()) -> t().
 new(Config) when is_list(Config) ->
+    Opts = dict:from_list(Config),
     #state_t { dir = rebar_utils:get_cwd(),
-               opts = dict:from_list(Config) }.
+               default = Opts,
+               opts = Opts }.
 
 -spec new(t() | atom(), list()) -> t().
 new(Profile, Config) when is_atom(Profile)
                         , is_list(Config) ->
+    Opts = dict:from_list(Config),
     #state_t { dir = rebar_utils:get_cwd(),
                current_profile = Profile,
-               opts = dict:from_list(Config) };
+               default = Opts,
+               opts = Opts };
 new(ParentState=#state_t{}, Config) ->
     %% Load terms from rebar.config, if it exists
     Dir = rebar_utils:get_cwd(),
@@ -74,13 +79,14 @@ new(ParentState, Config, Dir) ->
                     _ ->
                         dict:from_list(Config)
                 end,
-
+    NewOpts = dict:merge(fun(_Key, Value1, _Value2) ->
+                                 Value1
+                         end, LocalOpts, Opts),
     ProviderModules = [],
     create_logic_providers(ProviderModules
                           ,ParentState#state_t{dir=Dir
-                                              ,opts=dict:merge(fun(_Key, Value1, _Value2) ->
-                                                                       Value1
-                                                               end, LocalOpts, Opts)}).
+                                              ,opts=NewOpts
+                                              ,default=NewOpts}).
 
 get(State, Key) ->
     {ok, Value} = dict:find(Key, State#state_t.opts),
@@ -122,7 +128,8 @@ command_parsed_args(#state_t{command_parsed_args=CmdArgs}) ->
 command_parsed_args(State, CmdArgs) ->
     State#state_t{command_parsed_args=CmdArgs}.
 
-apply_profile(State=#state_t{opts=Opts}, Profile) ->
+%% Only apply profiles to the default profile
+apply_profile(State=#state_t{default=Opts}, Profile) ->
     ConfigProfiles = rebar_state:get(State, profiles, []),
     Deps = rebar_state:get(State, deps, []),
     Opts1 = dict:store({deps, default}, Deps, dict:erase(deps, Opts)),
