@@ -106,7 +106,7 @@ run_aux(State, GlobalPluginProviders, RawArgs) ->
     application:start(ssl),
     inets:start(),
 
-    State2 = case os:getenv("REBAR_PROFILE") of
+    State2 = case os:getenv("REBAR_DEFAULT_PROFILE") of
                  false ->
                      State;
                  Profile ->
