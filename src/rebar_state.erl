@@ -20,6 +20,7 @@
          create_logic_providers/2,
 
          project_apps/1, project_apps/2,
+         deps_to_build/1, deps_to_build/2,
          all_deps/1, all_deps/2,
 
          deps_names/1,
@@ -40,6 +41,7 @@
                   command_parsed_args = [],
 
                   project_apps        = []          :: [rebar_app_into:t()],
+                  deps_to_build       = []          :: [rebar_app_into:t()],
                   all_deps            = []          :: [rebar_app_into:t()],
 
                   providers           = []}).
@@ -187,6 +189,14 @@ project_apps(State=#state_t{}, NewApps) when is_list(NewApps) ->
     State#state_t{project_apps=NewApps};
 project_apps(State=#state_t{project_apps=Apps}, App) ->
     State#state_t{project_apps=lists:keystore(rebar_app_info:name(App), 2, Apps, App)}.
+
+deps_to_build(#state_t{deps_to_build=Apps}) ->
+    Apps.
+
+deps_to_build(State=#state_t{}, NewApps) when is_list(NewApps) ->
+    State#state_t{deps_to_build=NewApps};
+deps_to_build(State=#state_t{deps_to_build=Apps}, App) ->
+    State#state_t{deps_to_build=lists:keystore(rebar_app_info:name(App), 2, Apps, App)}.
 
 all_deps(#state_t{all_deps=Apps}) ->
     Apps.

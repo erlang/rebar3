@@ -78,8 +78,9 @@ do(State) ->
         Source = ProjectApps ++ SrcApps,
         case rebar_digraph:compile_order(Source) of
             {ok, Sort} ->
-                {ok, rebar_state:set(State1, deps_to_build,
-                                     lists:dropwhile(fun rebar_app_info:valid/1, Sort -- ProjectApps))};
+                {ok, rebar_state:deps_to_build(State1,
+                                              lists:dropwhile(fun rebar_app_info:valid/1
+                                                             , Sort -- ProjectApps))};
             {error, Error} ->
                 {error, Error}
         end

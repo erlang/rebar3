@@ -42,7 +42,7 @@ do(State) ->
     Jobs = rebar_state:get(State1, jobs),
 
     ProjectApps = rebar_state:project_apps(State1),
-    Deps = rebar_state:get(State1, deps_to_build, []),
+    Deps = rebar_state:deps_to_build(State1),
     Cwd = rebar_utils:get_cwd(),
     rebar_hooks:run_compile_hooks(Cwd, pre_hooks, compile, State1),
 
