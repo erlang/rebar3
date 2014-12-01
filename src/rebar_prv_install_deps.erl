@@ -37,6 +37,8 @@
 -export([handle_deps/2,
          handle_deps/3]).
 
+-export_type([dep/0]).
+
 -define(PROVIDER, install_deps).
 -define(DEPS, [app_discovery]).
 
@@ -91,12 +93,12 @@ do(State) ->
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
--spec handle_deps(rebar_state:t(), [dep()]) ->
+-spec handle_deps(rebar_state:t(), list()) ->
                          {ok, [rebar_app_info:t()], rebar_state:t()} | {error, string()}.
 handle_deps(State, Deps) ->
     handle_deps(State, Deps, false).
 
--spec handle_deps(rebar_state:t(), [dep()], boolean() | {true, binary(), integer()})
+-spec handle_deps(rebar_state:t(), list(), boolean() | {true, binary(), integer()})
                  -> {ok, [rebar_app_info:t()], rebar_state:t()} | {error, string()}.
 handle_deps(State, [], _) ->
     {ok, [], State};
@@ -121,9 +123,7 @@ handle_deps(State, Deps, Update) ->
                                        {ok, []} ->
                                            throw({rebar_digraph, no_solution});
                                        {ok, Solution} ->
-                                           Solution;
-                                       [] ->
-                                           throw({rebar_digraph, no_solution})
+                                           Solution
                                    end,
 
                                update_pkg_deps(S, Packages, Update, Seen, State1)
@@ -182,8 +182,7 @@ package_to_app(DepsDir, Packages, {Name, Vsn}) ->
             rebar_app_info:source(AppInfo2, {pkg, Name, Vsn, Link})
     end.
 
--spec update_src_deps(integer(), list(), list(), list(), rebar_state:t(), boolean(), sets:set(binary())) ->
-                             {rebar_state:t(), [binary()]}.
+-spec update_src_deps(non_neg_integer(), list(), list(), list(), rebar_state:t(), boolean(), sets:set(binary())) -> {rebar_state:t(), list(), list(), sets:set(binary())}.
 update_src_deps(Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen) ->
     case lists:foldl(fun(AppInfo, {SrcDepsAcc, PkgDepsAcc, SrcAppsAcc, StateAcc, SeenAcc}) ->
                              %% If not seen, add to list of locks to write out
@@ -323,7 +322,7 @@ maybe_fetch(State, AppInfo, Update, Seen) ->
             end
     end.
 
--spec parse_deps(rebar_state:t(), binary(), [dep()]) -> {[rebar_app_info:t()], [pkg_dep()]}.
+-spec parse_deps(rebar_state:t(), binary(), list()) -> {[rebar_app_info:t()], [pkg_dep()]}.
 parse_deps(State, DepsDir, Deps) ->
     lists:foldl(fun({Name, Vsn}, {SrcDepsAcc, PkgDepsAcc}) ->
                         {SrcDepsAcc, [parse_goal(ec_cnv:to_binary(Name)

@@ -57,7 +57,7 @@ process_command(State, Command) ->
             end
     end.
 
--spec do([atom()], rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
+-spec do([{atom(), atom()}], rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do([], State) ->
     {ok, State};
 do([{ProviderName, Profile} | Rest], State) ->

@@ -528,31 +528,7 @@ vcs_vsn_1(Vcs, Dir) ->
         unknown ->
             ?ABORT("vcs_vsn: Unknown vsn format: ~p\n", [Vcs]);
         {error, Reason} ->
-            ?ABORT("vcs_vsn: ~s\n", [Reason]);
-        Cmd ->
-            %% If there is a valid VCS directory in the application directory,
-            %% use that version info
-            Extension = lists:concat([".", Vcs]),
-            case filelib:is_dir(filename:join(Dir, Extension)) of
-                true ->
-                    ?DEBUG("vcs_vsn: Primary vcs used for ~s\n", [Dir]),
-                    vcs_vsn_invoke(Cmd, Dir);
-                false ->
-                    %% No VCS directory found for the app. Depending on source
-                    %% tree structure, there may be one higher up, but that can
-                    %% yield unexpected results when used with deps. So, we
-                    %% fallback to searching for a priv/vsn.Vcs file.
-                    VsnFile = filename:join([Dir, "priv", "vsn" ++ Extension]),
-                    case file:read_file(VsnFile) of
-                        {ok, VsnBin} ->
-                            ?DEBUG("vcs_vsn: Read ~s from priv/vsn.~p\n",
-                                   [VsnBin, Vcs]),
-                            string:strip(binary_to_list(VsnBin), right, $\n);
-                        {error, enoent} ->
-                            ?DEBUG("vcs_vsn: Fallback to vcs for ~s\n", [Dir]),
-                            vcs_vsn_invoke(Cmd, Dir)
-                    end
-            end
+            ?ABORT("vcs_vsn: ~s\n", [Reason])
     end.
 
 %% Temp work around for repos like relx that use "semver"

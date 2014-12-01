@@ -36,7 +36,7 @@ behaviour_info(_) ->
 -callback download(file:filename_all(), tuple()) ->
     {tarball, file:filename_all()} | {ok, any()} | {error, any()}.
 -callback needs_update(file:filename_all(), tuple()) ->
-    {tarball, file:filename_all()} | {ok, any()} | {error, any()}.
+    boolean().
 -callback make_vsn(file:filename_all()) ->
     {plain, string()} | {error, string()}.
 

@@ -25,6 +25,7 @@ install(State) ->
     State2 = rebar_state:set(State1, deps_dir, OldDepsDir),
     {ok, PluginProviders, State2}.
 
+-spec handle_plugin(rebar_prv_install_deps:dep(), rebar_state:t()) -> {true, any()} | false.
 handle_plugin(Plugin, State) ->
     try
         {ok, _, State1} = rebar_prv_install_deps:handle_deps(State, [Plugin]),
