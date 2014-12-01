@@ -143,7 +143,7 @@ command_parsed_args(State, CmdArgs) ->
 apply_profile(State=#state_t{default=Opts}, Profile) ->
     ConfigProfiles = rebar_state:get(State, profiles, []),
     Deps = rebar_state:get(State, deps, []),
-    Opts1 = dict:store({deps, default}, Deps, dict:erase(deps, Opts)),
+    Opts1 = dict:store({deps, default}, Deps, Opts),
     ProfileOpts = dict:from_list(proplists:get_value(Profile, ConfigProfiles, [])),
     State#state_t{opts=merge_opts(Profile, ProfileOpts, Opts1)}.
 
