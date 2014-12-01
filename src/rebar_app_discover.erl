@@ -124,7 +124,7 @@ create_app_info(AppDir, AppFile) ->
             C = rebar_config:consult(AppDir),
             S = rebar_state:new(rebar_state:new(), C, AppDir),
             AppDeps = rebar_state:deps_names(S),
-            AbsCwd = filename:absname(rebar_utils:get_cwd()),
+            AbsCwd = filename:absname(rebar_dir:get_cwd()),
             {ok, AppInfo} = rebar_app_info:new(AppName, AppVsn, AppDir, AppDeps),
             RebarConfig = filename:join(AppDir, "rebar.config"),
             AppState = case filelib:is_file(RebarConfig) of

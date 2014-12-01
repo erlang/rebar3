@@ -142,7 +142,7 @@ test_compile(Config, Cmd, OutDir) ->
     %% Copy source files to eunit dir for cover in case they are not directly
     %% in src but in a subdirectory of src. Cover only looks in cwd and ../src
     %% for source files. Also copy files from src_dirs.
-    SrcDirs = rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts1)),
+    SrcDirs = rebar_dir:src_dirs(proplists:append_values(src_dirs, ErlOpts1)),
     SrcErls = lists:foldl(
                 fun(Dir, Acc) ->
                         Files = rebar_utils:find_files(
@@ -295,7 +295,7 @@ doterl_compile(Config, Dir, MoreSources, ErlOpts) ->
     %% eunit tests be separated from the core application source.
     SrcDirs = lists:map(fun(X) ->
                                 filename:join(Dir, X)
-                        end, rebar_utils:src_dirs(proplists:append_values(src_dirs, ErlOpts))),
+                        end, rebar_dir:src_dirs(proplists:append_values(src_dirs, ErlOpts))),
     AllErlFiles = gather_src(SrcDirs, []) ++ MoreSources,
     %% NOTE: If and when erl_first_files is not inherited anymore
     %% (rebar_state:get instead of rebar_state:get_list), consider
@@ -410,7 +410,7 @@ check_erlcinfo(Config, _) ->
            [erlcinfo_file(Config)]).
 
 erlcinfo_file(_Config) ->
-    filename:join([rebar_utils:get_cwd(), ?CONFIG_DIR, ?ERLCINFO_FILE]).
+    filename:join([rebar_dir:get_cwd(), ?CONFIG_DIR, ?ERLCINFO_FILE]).
 
 init_erlcinfo(Config, Erls) ->
     G = restore_erlcinfo(Config),
@@ -589,8 +589,8 @@ internal_erl_compile(Config, Dir, Source, OutDir, ErlOpts, G) ->
 -spec compile_mib(file:filename(), file:filename(),
                   rebar_state:t()) -> 'ok'.
 compile_mib(Source, Target, Config) ->
-    ok = rebar_utils:ensure_dir(Target),
-    ok = rebar_utils:ensure_dir(filename:join("include", "dummy.hrl")),
+    ok = rebar_dir:ensure_dir(Target),
+    ok = rebar_dir:ensure_dir(filename:join("include", "dummy.hrl")),
     Opts = [{outdir, "priv/mibs"}, {i, ["priv/mibs"]}] ++
         rebar_state:get(Config, mib_opts, []),
     case snmpc:compile(Source, Opts) of

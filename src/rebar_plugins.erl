@@ -15,7 +15,7 @@ install(State) ->
     %% Set deps_dir to a different dir for plugin so they don't collide
     OldDepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
     State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
-    DepsDir = rebar_utils:deps_dir(State1),
+    DepsDir = rebar_dir:deps_dir(State1),
     expand_plugins(DepsDir),
     Plugins = rebar_state:get(State1, plugins, []),
     PluginProviders = rebar_utils:filtermap(fun(Plugin) ->

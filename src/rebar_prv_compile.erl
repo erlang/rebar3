@@ -43,7 +43,7 @@ do(State) ->
 
     ProjectApps = rebar_state:project_apps(State1),
     Deps = rebar_state:deps_to_build(State1),
-    Cwd = rebar_utils:get_cwd(),
+    Cwd = rebar_dir:get_cwd(),
     rebar_hooks:run_compile_hooks(Cwd, pre_hooks, compile, State1),
 
     %% Need to allow global config vars used on deps

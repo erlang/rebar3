@@ -115,7 +115,7 @@ run_aux(State, GlobalPluginProviders, RawArgs) ->
              end,
 
     %% Process each command, resetting any state between each one
-    BaseDir = rebar_utils:base_dir(State2),
+    BaseDir = rebar_dir:base_dir(State2),
     State3 = rebar_state:set(State2, base_dir,
                             filename:join(filename:absname(rebar_state:dir(State2)), BaseDir)),
 
@@ -149,7 +149,7 @@ init_config() ->
               end,
 
     %% If $HOME/.rebar3/config exists load and use as global config
-    Home = rebar_utils:home_dir(),
+    Home = rebar_dir:home_dir(),
     GlobalConfigFile = filename:join([Home, ?CONFIG_DIR, "config"]),
     State = case filelib:is_regular(GlobalConfigFile) of
                 true ->

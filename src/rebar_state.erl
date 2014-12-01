@@ -52,12 +52,12 @@
 
 -spec new() -> t().
 new() ->
-    #state_t{dir = rebar_utils:get_cwd()}.
+    #state_t{dir = rebar_dir:get_cwd()}.
 
 -spec new(list()) -> t().
 new(Config) when is_list(Config) ->
     Opts = dict:from_list(Config),
-    #state_t { dir = rebar_utils:get_cwd(),
+    #state_t { dir = rebar_dir:get_cwd(),
                default = Opts,
                opts = Opts }.
 
@@ -65,13 +65,13 @@ new(Config) when is_list(Config) ->
 new(Profile, Config) when is_atom(Profile)
                         , is_list(Config) ->
     Opts = dict:from_list(Config),
-    #state_t { dir = rebar_utils:get_cwd(),
+    #state_t { dir = rebar_dir:get_cwd(),
                current_profile = Profile,
                default = Opts,
                opts = Opts };
 new(ParentState=#state_t{}, Config) ->
     %% Load terms from rebar.config, if it exists
-    Dir = rebar_utils:get_cwd(),
+    Dir = rebar_dir:get_cwd(),
     new(ParentState, Config, Dir).
 
 -spec new(t(), list(), file:name()) -> t().

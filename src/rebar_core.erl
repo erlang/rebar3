@@ -73,9 +73,9 @@ do([{ProviderName, Profile} | Rest], State) ->
 
 update_code_path(State) ->
     true = rebar_utils:expand_code_path(),
-    LibDirs = rebar_utils:lib_dirs(State),
-    DepsDir = rebar_utils:deps_dir(State),
-    PluginsDir = rebar_utils:plugins_dir(State),
+    LibDirs = rebar_dir:lib_dirs(State),
+    DepsDir = rebar_dir:deps_dir(State),
+    PluginsDir = rebar_dir:plugins_dir(State),
     _UpdatedCodePaths = update_code_path_([DepsDir, PluginsDir | LibDirs]).
 
 
@@ -84,7 +84,7 @@ update_code_path(State) ->
 %% ===================================================================
 
 update_code_path_(Paths) ->
-    LibPaths = expand_lib_dirs(Paths, rebar_utils:get_cwd(), []),
+    LibPaths = expand_lib_dirs(Paths, rebar_dir:get_cwd(), []),
     ok = code:add_pathsa(LibPaths),
     %% track just the paths we added, so we can remove them without
     %% removing other paths added by this dep

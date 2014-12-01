@@ -101,9 +101,9 @@ run_eunit(Config, CodePath, SrcErls) ->
 ensure_dirs() ->
     %% Make sure ?EUNIT_DIR/ and ebin/ directory exists (append dummy module)
     ok = filelib:ensure_dir(filename:join(eunit_dir(), "dummy")),
-    ok = filelib:ensure_dir(filename:join(rebar_utils:ebin_dir(), "dummy")).
+    ok = filelib:ensure_dir(filename:join(rebar_dir:ebin_dir(), "dummy")).
 eunit_dir() ->
-    filename:join(rebar_utils:get_cwd(), ?EUNIT_DIR).
+    filename:join(rebar_dir:get_cwd(), ?EUNIT_DIR).
 setup_code_path() ->
     %% Setup code path prior to compilation so that parse_transforms
     %% and the like work properly. Also, be sure to add ebin_dir()
@@ -111,7 +111,7 @@ setup_code_path() ->
     %% through hoops to access the .app file
     CodePath = code:get_path(),
     true = code:add_patha(eunit_dir()),
-    true = code:add_pathz(rebar_utils:ebin_dir()),
+    true = code:add_pathz(rebar_dir:ebin_dir()),
     CodePath.
 %%
 %% == get matching tests ==
@@ -354,7 +354,7 @@ perform_eunit(Config, Tests) ->
     EunitOpts = get_eunit_opts(Config),
     %% Move down into ?EUNIT_DIR while we run tests so any generated files
     %% are created there (versus in the source dir)
-    Cwd = rebar_utils:get_cwd(),
+    Cwd = rebar_dir:get_cwd(),
     ok = file:set_cwd(?EUNIT_DIR),
     EunitResult = (catch eunit:test(Tests, EunitOpts)),
     %% Return to original working dir

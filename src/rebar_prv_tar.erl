@@ -32,9 +32,9 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    OutputDir = filename:join(rebar_utils:profile_dir(State), ?DEFAULT_RELEASE_DIR),
+    OutputDir = filename:join(rebar_dir:profile_dir(State), ?DEFAULT_RELEASE_DIR),
     Options = rebar_state:command_args(State),
-    DepsDir = rebar_utils:deps_dir(State),
+    DepsDir = rebar_dir:deps_dir(State),
     AllOptions = string:join(["release", "tar" | Options], " "),
     case rebar_state:get(State, relx, []) of
         [] ->

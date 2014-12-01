@@ -37,7 +37,7 @@ do(State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
     Opts1 = transform_opts(Opts),
     ok = create_dirs(Opts1),
-    expand_test_deps(filename:join(rebar_utils:profile_dir(State), ?DEFAULT_DEPS_DIR)),
+    expand_test_deps(filename:join(rebar_dir:profile_dir(State), ?DEFAULT_DEPS_DIR)),
     case ct:run_test(Opts1) of
         {_, 0, _} -> {ok, State};
         {_, FailedCount, _} -> {error, {?MODULE, {failures_running_tests,

@@ -48,7 +48,7 @@ do(State) ->
     EmptyState = rebar_state:new(),
     clean_apps(EmptyState, DepApps),
 
-    Cwd = rebar_utils:get_cwd(),
+    Cwd = rebar_dir:get_cwd(),
     rebar_hooks:run_compile_hooks(Cwd, pre_hooks, clean, State),
     clean_apps(State, ProjectApps),
     rebar_hooks:run_compile_hooks(Cwd, post_hooks, clean, State),

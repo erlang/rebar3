@@ -108,7 +108,7 @@ handle_deps(State, Deps, Update) ->
     {Packages, Graph} = rebar_packages:get_packages(State),
 
     %% Split source deps from pkg deps, needed to keep backwards compatibility
-    DepsDir = rebar_utils:deps_dir(State),
+    DepsDir = rebar_dir:deps_dir(State),
     {SrcDeps, PkgDeps} = parse_deps(State, DepsDir, Deps),
 
     %% Fetch transitive src deps
@@ -144,7 +144,7 @@ handle_deps(State, Deps, Update) ->
 
 update_pkg_deps(Pkgs, Packages, Update, Seen, State) ->
     %% Create app_info record for each pkg dep
-    DepsDir = rebar_utils:deps_dir(State),
+    DepsDir = rebar_dir:deps_dir(State),
     {Solved, _, State1}
         = lists:foldl(fun(Pkg, {Acc, SeenAcc, StateAcc}) ->
                               AppInfo = package_to_app(DepsDir
@@ -179,7 +179,7 @@ package_to_app(DepsDir, Packages, {Name, Vsn}) ->
             Link = proplists:get_value(<<"link">>, P, ""),
             {ok, AppInfo} = rebar_app_info:new(Name, Vsn),
             AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
-            AppInfo2 = rebar_app_info:dir(AppInfo1, rebar_utils:deps_dir(DepsDir, Name)),
+            AppInfo2 = rebar_app_info:dir(AppInfo1, rebar_dir:deps_dir(DepsDir, Name)),
             rebar_app_info:source(AppInfo2, {pkg, Name, Vsn, Link})
     end.
 
@@ -241,7 +241,7 @@ handle_update(AppInfo, UpdateName, UpdateLevel, SrcDeps, PkgDeps, SrcApps, Level
     end.
 
 handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State) ->
-    DepsDir = rebar_utils:deps_dir(State),
+    DepsDir = rebar_dir:deps_dir(State),
     {AppInfo1, NewSrcDeps, NewPkgDeps} =
         handle_dep(State, DepsDir, AppInfo),
     AppInfo2 = rebar_app_info:dep_level(AppInfo1, Level),
@@ -272,7 +272,7 @@ handle_dep(State, DepsDir, AppInfo) ->
                  sets:set(binary())) -> boolean().
 maybe_fetch(State, AppInfo, Update, Seen) ->
     AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
-    DefaultProfileDeps = rebar_utils:default_profile_deps(State),
+    DefaultProfileDeps = rebar_dir:default_profile_deps(State),
     Apps = rebar_app_discover:find_apps(["_checkouts", DefaultProfileDeps], all),
     case rebar_app_utils:find(rebar_app_info:name(AppInfo), Apps) of
         {ok, _} ->
@@ -339,7 +339,7 @@ parse_deps(State, DepsDir, Deps) ->
                 end, {[], []}, Deps).
 
 new_dep(State, DepsDir, Name, Vsn, Source) ->
-    Dirs = [ec_cnv:to_list(filename:join(rebar_utils:default_profile_deps(State), Name)),
+    Dirs = [ec_cnv:to_list(filename:join(rebar_dir:default_profile_deps(State), Name)),
             ec_cnv:to_list(filename:join(DepsDir, Name))],
     {ok, Dep} = case ec_lists:search(fun(Dir) ->
                                              rebar_app_info:discover(Dir)
