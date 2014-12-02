@@ -32,14 +32,18 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    OutputDir = filename:join(rebar_dir:profile_dir(State), ?DEFAULT_RELEASE_DIR),
     Options = rebar_state:command_args(State),
-    DepsDir = rebar_prv_install_deps:get_deps_dir(State),
+    DepsDir = rebar_dir:deps_dir(State),
     AllOptions = string:join(["release", "tar" | Options], " "),
     case rebar_state:get(State, relx, []) of
         [] ->
-            relx:main([{lib_dirs, [DepsDir]}], AllOptions);
+            relx:main([{lib_dirs, [DepsDir]
+                       ,{output_dir, OutputDir}}], AllOptions);
         Config ->
-            relx:main([{lib_dirs, [DepsDir]}, {config, Config}], AllOptions)
+            relx:main([{lib_dirs, [DepsDir]}
+                      ,{config, Config}
+                      ,{output_dir, OutputDir}], AllOptions)
     end,
     {ok, State}.
 

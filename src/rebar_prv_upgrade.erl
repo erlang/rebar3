@@ -42,9 +42,13 @@ do(State) ->
     case lists:keyfind(Name, 1, Locks) of
         {_, _, _, Level} ->
             Deps = rebar_state:get(State, deps),
-            Dep = lists:keyfind(binary_to_atom(Name, utf8), 1, Deps),
-            rebar_prv_install_deps:handle_deps(State, [Dep], {true, Name, Level}),
-            {ok, State};
+            case lists:keyfind(binary_to_atom(Name, utf8), 1, Deps) of
+                false ->
+                    {error, io_lib:format("No such dependency ~s~n", [Name])};
+                Dep ->
+                    rebar_prv_install_deps:handle_deps(State, [Dep], {true, Name, Level}),
+                    {ok, State}
+            end;
         _ ->
             {error, io_lib:format("No such dependency ~s~n", [Name])}
     end.

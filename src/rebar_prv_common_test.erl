@@ -12,7 +12,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, ct).
--define(DEPS, [test_deps, compile]).
+-define(DEPS, [{install_deps, default}, compile]).
 
 %% ===================================================================
 %% Public API
@@ -27,7 +27,8 @@ init(State) ->
                                  {example, "rebar ct"},
                                  {short_desc, "Run Common Tests"},
                                  {desc, ""},
-                                 {opts, ct_opts(State)}]),
+                                 {opts, ct_opts(State)},
+                                 {profile, test}]),
     State1 = rebar_state:add_provider(State, Provider),
     {ok, State1}.
 
@@ -36,8 +37,7 @@ do(State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
     Opts1 = transform_opts(Opts),
     ok = create_dirs(Opts1),
-    expand_test_deps(filename:absname(rebar_state:get(State, test_deps_dir,
-                                                      ?DEFAULT_TEST_DEPS_DIR))),
+    expand_test_deps(filename:join(rebar_dir:profile_dir(State), ?DEFAULT_DEPS_DIR)),
     case ct:run_test(Opts1) of
         {_, 0, _} -> {ok, State};
         {_, FailedCount, _} -> {error, {?MODULE, {failures_running_tests,

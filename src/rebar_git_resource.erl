@@ -126,12 +126,7 @@ collect_default_refcount() ->
 build_vsn_string(Vsn, RawRef, RawCount) ->
     %% Cleanup the tag and the Ref information. Basically leading 'v's and
     %% whitespace needs to go away.
-    RefTag = case RawRef of
-                 undefined ->
-                     "";
-                 RawRef ->
-                     [".ref", re:replace(RawRef, "\\s", "", [global])]
-             end,
+    RefTag = [".ref", re:replace(RawRef, "\\s", "", [global])],
     Count = erlang:iolist_to_binary(re:replace(RawCount, "\\s", "", [global])),
 
     %% Create the valid [semver](http://semver.org) version from the tag

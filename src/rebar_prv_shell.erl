@@ -72,7 +72,6 @@ format_error(Reason) ->
 %% immediately kill the script. ctrl-g, however, works fine
 
 shell() ->
-    true = code:add_pathz(rebar_utils:ebin_dir()),
     %% scan all processes for any with references to the old user and save them to
     %% update later
     NeedsUpdate = [Pid || Pid <- erlang:processes(),

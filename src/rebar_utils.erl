@@ -26,10 +26,8 @@
 %% -------------------------------------------------------------------
 -module(rebar_utils).
 
--export([home_dir/0,
-         droplast/1,
+-export([droplast/1,
          filtermap/2,
-         get_cwd/0,
          is_arch/1,
          sh/2,
          sh_send/3,
@@ -38,7 +36,6 @@
          escript_foldl/3,
          find_files/2,
          find_files/3,
-         ensure_dir/1,
          beam_to_mod/1,
          beam_to_mod/2,
          erl_to_mod/1,
@@ -50,10 +47,6 @@
          deprecated/4,
          delayed_halt/1,
          erl_opts/1,
-         src_dirs/1,
-         ebin_dir/0,
-         processing_base_dir/1,
-         processing_base_dir/2,
          indent/1,
          cleanup_code_path/1]).
 
@@ -68,16 +61,8 @@
 %% Public API
 %% ====================================================================
 
-home_dir() ->
-    {ok, [[Home]]} = init:get_argument(home),
-    Home.
-
 droplast(L) ->
     lists:reverse(tl(lists:reverse(L))).
-
-get_cwd() ->
-    {ok, Dir} = file:get_cwd(),
-    Dir.
 
 filtermap(F, [Hd|Tail]) ->
     case F(Hd) of
@@ -114,7 +99,7 @@ wordsize() ->
 
 sh_send(Command0, String, Options0) ->
     ?INFO("sh_send info:\n\tcwd: ~p\n\tcmd: ~s < ~s\n",
-          [get_cwd(), Command0, String]),
+          [rebar_dir:get_cwd(), Command0, String]),
     ?DEBUG("\topts: ~p\n", [Options0]),
 
     DefaultOptions = [use_stdout, abort_on_error],
@@ -140,7 +125,7 @@ sh_send(Command0, String, Options0) ->
 %% Val = string() | false
 %%
 sh(Command0, Options0) ->
-    ?DEBUG("sh info:\n\tcwd: ~p\n\tcmd: ~s\n", [get_cwd(), Command0]),
+    ?DEBUG("sh info:\n\tcwd: ~p\n\tcmd: ~s\n", [rebar_dir:get_cwd(), Command0]),
     ?DEBUG("\topts: ~p\n", [Options0]),
 
     DefaultOptions = [{use_stdout, false}, debug_and_abort_on_error],
@@ -169,18 +154,6 @@ find_files(Dir, Regex) ->
 find_files(Dir, Regex, Recursive) ->
     filelib:fold_files(Dir, Regex, Recursive,
                        fun(F, Acc) -> [F | Acc] end, []).
-
-%% TODO: filelib:ensure_dir/1 corrected in R13B04. Remove when we drop
-%% support for OTP releases older than R13B04.
-ensure_dir(Path) ->
-    case filelib:ensure_dir(Path) of
-        ok ->
-            ok;
-        {error,eexist} ->
-            ok;
-        Error ->
-            Error
-    end.
 
 find_executable(Name) ->
     case os:find_executable(Name) of
@@ -266,23 +239,6 @@ erl_opts(Config) ->
         false ->
             [debug_info|Opts]
     end.
-
--spec src_dirs([string()]) -> [file:filename(), ...].
-src_dirs([]) ->
-    ["src"];
-src_dirs(SrcDirs) ->
-    SrcDirs.
-
-ebin_dir() ->
-    filename:join(get_cwd(), "ebin").
-
-processing_base_dir(State) ->
-    Cwd = rebar_utils:get_cwd(),
-    processing_base_dir(State, Cwd).
-
-processing_base_dir(State, Dir) ->
-    AbsDir = filename:absname(Dir),
-    AbsDir =:= rebar_state:get(State, base_dir).
 
 %% ====================================================================
 %% Internal functions
@@ -471,31 +427,7 @@ vcs_vsn_1(Vcs, Dir) ->
         unknown ->
             ?ABORT("vcs_vsn: Unknown vsn format: ~p\n", [Vcs]);
         {error, Reason} ->
-            ?ABORT("vcs_vsn: ~s\n", [Reason]);
-        Cmd ->
-            %% If there is a valid VCS directory in the application directory,
-            %% use that version info
-            Extension = lists:concat([".", Vcs]),
-            case filelib:is_dir(filename:join(Dir, Extension)) of
-                true ->
-                    ?DEBUG("vcs_vsn: Primary vcs used for ~s\n", [Dir]),
-                    vcs_vsn_invoke(Cmd, Dir);
-                false ->
-                    %% No VCS directory found for the app. Depending on source
-                    %% tree structure, there may be one higher up, but that can
-                    %% yield unexpected results when used with deps. So, we
-                    %% fallback to searching for a priv/vsn.Vcs file.
-                    VsnFile = filename:join([Dir, "priv", "vsn" ++ Extension]),
-                    case file:read_file(VsnFile) of
-                        {ok, VsnBin} ->
-                            ?DEBUG("vcs_vsn: Read ~s from priv/vsn.~p\n",
-                                   [VsnBin, Vcs]),
-                            string:strip(binary_to_list(VsnBin), right, $\n);
-                        {error, enoent} ->
-                            ?DEBUG("vcs_vsn: Fallback to vcs for ~s\n", [Dir]),
-                            vcs_vsn_invoke(Cmd, Dir)
-                    end
-            end
+            ?ABORT("vcs_vsn: ~s\n", [Reason])
     end.
 
 %% Temp work around for repos like relx that use "semver"

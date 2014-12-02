@@ -78,7 +78,7 @@ init(true, BeamFiles, TargetDir) ->
 
     group_leader(F, CoverPid),
 
-    ?INFO("Cover compiling ~s\n", [rebar_utils:get_cwd()]),
+    ?INFO("Cover compiling ~s\n", [rebar_dir:get_cwd()]),
 
     Compiled = [{Beam, cover:compile_beam(Beam)} || Beam <- BeamFiles],
     case [Module || {_, {ok, Module}} <- Compiled] of
@@ -121,7 +121,7 @@ analyze(Config, FilteredModules, SrcModules, TargetDir) ->
                                               [html])
       end, Coverage),
 
-    Index = filename:join([rebar_utils:get_cwd(), TargetDir, "index.html"]),
+    Index = filename:join([rebar_dir:get_cwd(), TargetDir, "index.html"]),
     ?CONSOLE("Cover analysis: ~s\n", [Index]),
 
     %% Export coverage data, if configured

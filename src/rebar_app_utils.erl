@@ -56,7 +56,7 @@ find(Name, Vsn, Apps) ->
 
 -spec is_app_dir() -> {true, file:name()} | false.
 is_app_dir() ->
-    is_app_dir(rebar_utils:get_cwd()).
+    is_app_dir(rebar_dir:get_cwd()).
 
 -spec is_app_dir(file:name()) -> {true, file:name()} | false.
 is_app_dir(Dir) ->
