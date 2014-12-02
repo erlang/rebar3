@@ -108,7 +108,7 @@ run_aux(State, GlobalPluginProviders, RawArgs) ->
 
     State2 = case os:getenv("REBAR_DEFAULT_PROFILE") of
                  false ->
-                     State;
+                     rebar_state:current_profile(State, default);
                  Profile ->
                      State1 = rebar_state:current_profile(State, list_to_atom(Profile)),
                      rebar_state:default(State1, rebar_state:opts(State1))
