@@ -44,7 +44,7 @@ plugins_dir(State) ->
 
 -spec lib_dirs(rebar_state:t()) -> file:filename_all().
 lib_dirs(State) ->
-    rebar_state:get(State, lib_dirs, ?DEFAULT_LIB_DIRS).
+    rebar_state:get(State, project_app_dirs, ?DEFAULT_PROJECT_APP_DIRS).
 
 -spec default_profile_dir(rebar_state:t()) -> file:filename_all().
 default_profile_dir(State) ->
