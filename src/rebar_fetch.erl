@@ -28,14 +28,15 @@ download_source(AppDir, Source) ->
         Module = get_resource_type(Source),
         TmpDir = ec_file:insecure_mkdtemp(),
         AppDir1 = ec_cnv:to_list(AppDir),
-        ec_file:mkdir_p(AppDir1),
         case Module:download(TmpDir, Source) of
             {ok, _} ->
+                ec_file:mkdir_p(AppDir1),
                 code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
                 ec_file:remove(filename:absname(AppDir1), [recursive]),
                 ok = ec_file:copy(TmpDir, filename:absname(AppDir1), [recursive]),
                 true;
             {tarball, File} ->
+                ec_file:mkdir_p(AppDir1),
                 ok = erl_tar:extract(File, [{cwd, TmpDir}
                                            ,compressed]),
                 BaseName = filename:basename(AppDir1),
