@@ -121,23 +121,10 @@ create_app_info(AppDir, AppFile) ->
             AppVsn = proplists:get_value(vsn, AppDetails),
             Applications = proplists:get_value(applications, AppDetails, []),
             IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
-            C = rebar_config:consult(AppDir),
-            S = rebar_state:new(rebar_state:new(), C, AppDir),
-            AppDeps = rebar_state:deps_names(S),
-            AbsCwd = filename:absname(rebar_dir:get_cwd()),
-            {ok, AppInfo} = rebar_app_info:new(AppName, AppVsn, AppDir, AppDeps),
-            RebarConfig = filename:join(AppDir, "rebar.config"),
-            AppState = case filelib:is_file(RebarConfig) of
-                            true ->
-                                Terms = rebar_config:consult_file(RebarConfig),
-                                rebar_state:new(Terms);
-                            false ->
-                                rebar_state:new()
-                        end,
-            AppState1 = rebar_state:set(AppState, base_dir, AbsCwd),
-            AppInfo1 = rebar_app_info:applications(rebar_app_info:config(
-                                                     rebar_app_info:app_details(AppInfo, AppDetails)
-                                                     ,AppState1), IncludedApplications++Applications),
+            {ok, AppInfo} = rebar_app_info:new(AppName, AppVsn, AppDir, []),
+            AppInfo1 = rebar_app_info:applications(
+                         rebar_app_info:app_details(AppInfo, AppDetails),
+                         IncludedApplications++Applications),
             rebar_app_info:dir(AppInfo1, AppDir);
         _ ->
             error
