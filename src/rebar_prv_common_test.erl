@@ -38,11 +38,11 @@ do(State) ->
     Opts1 = transform_opts(Opts),
     ok = create_dirs(Opts1),
     expand_test_deps(filename:join(rebar_dir:profile_dir(State), ?DEFAULT_DEPS_DIR)),
-    case ct:run_test(Opts1) of
-        {_, 0, _} -> {ok, State};
-        {_, FailedCount, _} -> {error, {?MODULE, {failures_running_tests,
-                                                  FailedCount}}};
-        {error, Reason} -> {error, {?MODULE, {error_running_tests, Reason}}}
+    case handle_results(ct:run_test(Opts1)) of
+        {error, Reason} ->
+            {error, {?MODULE, Reason}};
+        ok ->
+            {ok, State}
     end.
 
 -spec format_error(any()) -> iolist().
@@ -240,3 +240,19 @@ help(ct_hooks) ->
     "";
 help(userconfig) ->
     "".
+
+handle_results([Result]) ->
+    handle_results(Result);
+handle_results([Result|Results]) when is_list(Results) ->
+    case handle_results(Result) of
+        ok ->
+            handle_results(Results);
+        Error ->
+            Error
+    end;
+handle_results({_, 0, _}) ->
+    ok;
+handle_results({_, FailedCount, _}) ->
+    {error, {failures_running_tests, FailedCount}};
+handle_results({error, Reason}) ->
+    {error, {error_running_tests, Reason}}.
