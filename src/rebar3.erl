@@ -47,9 +47,9 @@ main(Args) ->
         {ok, _State} ->
             ok;
         rebar_abort ->
-            rebar_utils:delayed_halt(1);
+            erlang:halt(1);
         {error, rebar_abort} ->
-            rebar_utils:delayed_halt(1);
+            erlang:halt(1);
         {error, {Module, Reason}} ->
             case code:which(Module) of
                 non_existing ->
@@ -58,16 +58,16 @@ main(Args) ->
                 _ ->
                     ?ERROR(Module:format_error(Reason), [])
             end,
-            rebar_utils:delayed_halt(1);
+            erlang:halt(1);
         {error, Error} when is_list(Error) ->
             ?ERROR(Error, []),
-            rebar_utils:delayed_halt(1);
+            erlang:halt(1);
         Error ->
             %% Nothing should percolate up from rebar_core;
             %% Dump this error to console
             ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace", []),
             ?DEBUG("Uncaught error: ~p", [Error]),
-            rebar_utils:delayed_halt(1)
+            erlang:halt(1)
     end.
 
 %% Erlang-API entry point

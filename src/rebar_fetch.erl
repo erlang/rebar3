@@ -11,6 +11,8 @@
          download_source/2,
          needs_update/2]).
 
+-export([format_error/1]).
+
 -include("rebar.hrl").
 
 %% map short versions of resources to module names
@@ -47,8 +49,8 @@ download_source(AppDir, Source) ->
                 true
         end
     catch
-        _:E ->
-            {error, E}
+        _:_ ->
+            {error, {rebar_fetch, {fetch_fail, Source}}}
     end.
 
 -spec needs_update(file:filename_all(), rebar_resource:resource()) -> boolean() | {error, string()}.
@@ -60,6 +62,9 @@ needs_update(AppDir, Source) ->
         _:_ ->
             true
     end.
+
+format_error({fetch_fail, Source}) ->
+    io_lib:format("Failed to fetch and copy dep: ~p", [Source]).
 
 get_resource_type({Type, Location}) ->
     find_resource_module(Type, Location);
