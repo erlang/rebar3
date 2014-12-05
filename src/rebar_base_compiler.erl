@@ -104,12 +104,8 @@ simple_compile_wrapper(Source, Target, Compile3Fn, Config, true) ->
     end.
 
 target_file(SourceFile, SourceDir, SourceExt, TargetDir, TargetExt) ->
-    %% Remove all leading components of the source dir from the file -- we want
-    %% to maintain the deeper structure (if any) of the source file path
     BaseFile = remove_common_path(SourceFile, SourceDir),
-    filename:join([TargetDir, filename:dirname(BaseFile),
-                   filename:basename(BaseFile, SourceExt) ++ TargetExt]).
-
+    filename:join([TargetDir, filename:basename(BaseFile, SourceExt) ++ TargetExt]).
 
 remove_common_path(Fname, Path) ->
     remove_common_path1(filename:split(Fname), filename:split(Path)).
