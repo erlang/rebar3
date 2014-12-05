@@ -207,7 +207,6 @@ update_src_deps(Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen) ->
                                                    ,SrcAppsAcc
                                                    ,Level
                                                    ,StateAcc1)
-
                                  end,
                              {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2, SeenAcc1}
                      end, {[], PkgDeps, SrcApps, State, Seen}, SrcDeps) of
