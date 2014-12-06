@@ -65,6 +65,7 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    ?INFO("Verifying dependencies...", []),
     Profile = rebar_state:current_profile(State),
     ProjectApps = rebar_state:project_apps(State),
     try
