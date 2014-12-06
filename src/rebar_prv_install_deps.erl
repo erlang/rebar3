@@ -187,28 +187,33 @@ package_to_app(DepsDir, Packages, {Name, Vsn}) ->
 update_src_deps(Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen) ->
     case lists:foldl(fun(AppInfo, {SrcDepsAcc, PkgDepsAcc, SrcAppsAcc, StateAcc, SeenAcc}) ->
                              %% If not seen, add to list of locks to write out
-                             {SeenAcc1, StateAcc1} = maybe_lock(AppInfo, SeenAcc, StateAcc),
-                             {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2} =
-                                 case Update of
-                                     {true, UpdateName, UpdateLevel} ->
-                                         handle_update(AppInfo
-                                                      ,UpdateName
-                                                      ,UpdateLevel
-                                                      ,SrcDepsAcc
-                                                      ,PkgDepsAcc
-                                                      ,SrcAppsAcc
-                                                      ,Level
-                                                      ,StateAcc1);
-                                     _ ->
-                                         maybe_fetch(StateAcc, AppInfo, false, SeenAcc),
-                                         handle_dep(AppInfo
-                                                   ,SrcDepsAcc
-                                                   ,PkgDepsAcc
-                                                   ,SrcAppsAcc
-                                                   ,Level
-                                                   ,StateAcc1)
-                                 end,
-                             {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2, SeenAcc1}
+                             case sets:is_element(rebar_app_info:name(AppInfo), SeenAcc) of
+                                 true ->
+                                     {SrcDepsAcc, PkgDepsAcc, SrcAppsAcc, StateAcc, SeenAcc};
+                                 false ->
+                                     {SeenAcc1, StateAcc1} = maybe_lock(AppInfo, SeenAcc, StateAcc),
+                                     {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2} =
+                                         case Update of
+                                             {true, UpdateName, UpdateLevel} ->
+                                                 handle_update(AppInfo
+                                                              ,UpdateName
+                                                              ,UpdateLevel
+                                                              ,SrcDepsAcc
+                                                              ,PkgDepsAcc
+                                                              ,SrcAppsAcc
+                                                              ,Level
+                                                              ,StateAcc1);
+                                             _ ->
+                                                 maybe_fetch(StateAcc, AppInfo, false, SeenAcc),
+                                                 handle_dep(AppInfo
+                                                           ,SrcDepsAcc
+                                                           ,PkgDepsAcc
+                                                           ,SrcAppsAcc
+                                                           ,Level
+                                                           ,StateAcc1)
+                                         end,
+                                     {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2, SeenAcc1}
+                             end
                      end, {[], PkgDeps, SrcApps, State, Seen}, SrcDeps) of
         {[], NewPkgDeps, NewSrcApps, State1, Seen1} ->
             {State1, NewSrcApps, NewPkgDeps, Seen1};
