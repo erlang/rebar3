@@ -70,6 +70,8 @@ do(State) ->
     ProjectApps = rebar_state:project_apps(State),
     try
         {ok, SrcApps, State1} = case {Profile, rebar_state:get(State, locks, [])} of
+                                    {default, []} ->
+                                        handle_deps(State, rebar_state:get(State, {deps, Profile}, []));
                                     {default, Locks} ->
                                         handle_deps(State, Locks);
                                     _ ->

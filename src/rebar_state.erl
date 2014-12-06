@@ -152,6 +152,10 @@ command_parsed_args(State, CmdArgs) ->
     State#state_t{command_parsed_args=CmdArgs}.
 
 %% Only apply profiles to the default profile
+apply_profile(State=#state_t{default=Opts}, default) ->
+    Deps = rebar_state:get(State, deps, []),
+    Opts1 = dict:store({deps, default}, Deps, Opts),
+    State#state_t{opts=Opts1};
 apply_profile(State=#state_t{default=Opts}, Profile) ->
     ConfigProfiles = rebar_state:get(State, profiles, []),
     Deps = rebar_state:get(State, deps, []),
@@ -172,6 +176,7 @@ merge_opts(Profile, NewOpts, OldOpts) ->
                          (_Key, NewValue, _OldValue) ->
                               NewValue
                       end, NewOpts, OldOpts),
+
     case dict:find(deps, NewOpts) of
         error ->
             dict:store({deps, Profile}, [], Dict);
