@@ -4,7 +4,8 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-all() -> [flat, pick_highest_left, pick_highest_right, pick_earliest].
+all() -> [flat, pick_highest_left, pick_highest_right, pick_earliest,
+          circular1, circular2].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -15,29 +16,42 @@ end_per_suite(_Config) ->
 
 init_per_testcase(Case, Config) ->
     {Deps, Expect} = deps(Case),
-    [{expect,
-      [case Dep of
+    Expected = case Expect of
+        {ok, List} -> {ok, format_expected_deps(List)};
+        {error, Reason} -> {error, Reason}
+    end,
+    [{expect, Expected} | setup_project(Case, Config, expand_deps(Deps))].
+
+format_expected_deps(Deps) ->
+    [case Dep of
         {N,V} -> {dep, N, V};
         N -> {dep, N}
-       end || Dep <- Expect]}
-     | setup_project(Case, Config, expand_deps(Deps))].
+     end || Dep <- Deps].
 
 deps(flat) ->
     {[{"B", []},
       {"C", []}],
-     ["B", "C"]};
+     {ok, ["B", "C"]}};
 deps(pick_highest_left) ->
     {[{"B", [{"C", "2", []}]},
       {"C", "1", []}],
-     ["B", {"C", "1"}]}; % Warn C2
+     {ok, ["B", {"C", "1"}]}}; % Warn C2
 deps(pick_highest_right) ->
     {[{"B", "1", []},
       {"C", [{"B", "2", []}]}],
-     [{"B","1"}, "C"]}; % Warn B2
+     {ok, [{"B","1"}, "C"]}}; % Warn B2
 deps(pick_earliest) ->
     {[{"B", [{"D", "1", []}]},
       {"C", [{"D", "2", []}]}],
-     ["B","C",{"D","1"}]}. % Warn D2
+     {ok, ["B","C",{"D","1"}]}}; % Warn D2
+deps(circular1) ->
+    {[{"B", [{"A", []}]}, % A is the top-level app
+      {"C", []}],
+     {error, no_sort}}; % circular dep
+deps(circular2) ->
+    {[{"B", [{"C", [{"B", []}]}]},
+      {"C", []}],
+     {error, no_sort}}. % circular dep
 
 end_per_testcase(_, Config) ->
     mock_git_resource:unmock(),
@@ -55,6 +69,7 @@ expand_deps([{Name, Vsn, Deps} | Rest]) ->
 setup_project(Case, Config0, Deps) ->
     Config = rebar_test_utils:init_rebar_state(Config0, atom_to_list(Case)),
     AppDir = ?config(apps, Config),
+    rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
     TopDeps = top_level_deps(Deps),
     RebarConf = rebar_test_utils:create_config(AppDir, [{deps, TopDeps}]),
     mock_git_resource:mock([{deps, flat_deps(Deps)}]),
@@ -76,6 +91,8 @@ flat(Config) -> run(Config).
 pick_highest_left(Config) -> run(Config).
 pick_highest_right(Config) -> run(Config).
 pick_earliest(Config) -> run(Config).
+circular1(Config) -> run(Config).
+circular2(Config) -> run(Config).
 
 run(Config) ->
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
