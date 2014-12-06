@@ -45,7 +45,6 @@
          vcs_vsn/3,
          deprecated/3,
          deprecated/4,
-         delayed_halt/1,
          erl_opts/1,
          indent/1,
          cleanup_code_path/1]).
@@ -204,27 +203,6 @@ deprecated(Old, New, When) ->
         "in favor of '~p'.~n"
         "'~p' will be removed ~s.~n">>,
       [Old, Old, New, Old, When]).
-
--spec delayed_halt(integer()) -> no_return().
-delayed_halt(Code) ->
-    %% Work around buffer flushing issue in erlang:halt if OTP older
-    %% than R15B01.
-    %% TODO: remove workaround once we require R15B01 or newer
-    %% R15B01 introduced erlang:halt/2
-    case erlang:is_builtin(erlang, halt, 2) of
-        true ->
-            halt(Code);
-        false ->
-            case os:type() of
-                {win32, nt} ->
-                    timer:sleep(100),
-                    halt(Code);
-                _ ->
-                    halt(Code),
-                    %% workaround to delay exit until all output is written
-                    receive after infinity -> ok end
-            end
-    end.
 
 %% @doc Return list of erl_opts
 -spec erl_opts(rebar_state:t()) -> list().

@@ -11,6 +11,8 @@
          download_source/2,
          needs_update/2]).
 
+-export([format_error/1]).
+
 -include("rebar.hrl").
 
 %% map short versions of resources to module names
@@ -28,14 +30,15 @@ download_source(AppDir, Source) ->
         Module = get_resource_type(Source),
         TmpDir = ec_file:insecure_mkdtemp(),
         AppDir1 = ec_cnv:to_list(AppDir),
-        ec_file:mkdir_p(AppDir1),
         case Module:download(TmpDir, Source) of
             {ok, _} ->
+                ec_file:mkdir_p(AppDir1),
                 code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
                 ec_file:remove(filename:absname(AppDir1), [recursive]),
                 ok = ec_file:copy(TmpDir, filename:absname(AppDir1), [recursive]),
                 true;
             {tarball, File} ->
+                ec_file:mkdir_p(AppDir1),
                 ok = erl_tar:extract(File, [{cwd, TmpDir}
                                            ,compressed]),
                 BaseName = filename:basename(AppDir1),
@@ -46,8 +49,8 @@ download_source(AppDir, Source) ->
                 true
         end
     catch
-        _:E ->
-            {error, E}
+        _:_ ->
+            {error, {rebar_fetch, {fetch_fail, Source}}}
     end.
 
 -spec needs_update(file:filename_all(), rebar_resource:resource()) -> boolean() | {error, string()}.
@@ -59,6 +62,9 @@ needs_update(AppDir, Source) ->
         _:_ ->
             true
     end.
+
+format_error({fetch_fail, Source}) ->
+    io_lib:format("Failed to fetch and copy dep: ~p", [Source]).
 
 get_resource_type({Type, Location}) ->
     find_resource_module(Type, Location);
