@@ -15,6 +15,6 @@
 }.
 
 {profiles, [{prod, [{relx, [{dev_mode, true},
-                            {include_erts, false},]}]
+                            {include_erts, false}]}]
             }]
 }.
