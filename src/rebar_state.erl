@@ -160,8 +160,6 @@ apply_profile(State=#state_t{default=Opts}, Profile) ->
     State#state_t{opts=merge_opts(Profile, ProfileOpts, Opts1)}.
 
 merge_opts(Profile, NewOpts, OldOpts) ->
-    io:format("Keys ~p~n", [dict:fetch_keys(NewOpts)]),
-    io:format("Keys ~p~n", [dict:fetch_keys(OldOpts)]),
     Dict = dict:merge(fun(_Key, NewValue, OldValue) when is_list(NewValue) ->
                               case io_lib:printable_list(NewValue) of
                                   true ->
@@ -177,7 +175,7 @@ merge_opts(Profile, NewOpts, OldOpts) ->
     case dict:find(deps, NewOpts) of
         error ->
             dict:store({deps, Profile}, [], Dict);
-        Deps ->
+        {ok, Deps} ->
             dict:store({deps, Profile}, Deps, Dict)
     end.
 

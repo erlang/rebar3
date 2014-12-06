@@ -65,15 +65,16 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    ?INFO("Verifying dependencies...", []),
     Profile = rebar_state:current_profile(State),
+    ?INFO("Verifying ~p dependencies...", [Profile]),
     ProjectApps = rebar_state:project_apps(State),
     try
-        {ok, SrcApps, State1} = case rebar_state:get(State, locks, []) of
-                                    [] ->
-                                        handle_deps(State, rebar_state:get(State, {deps, Profile}, []));
-                                    Locks ->
-                                        handle_deps(State, Locks)
+        {ok, SrcApps, State1} = case {Profile, rebar_state:get(State, locks, [])} of
+                                    {default, Locks} ->
+                                        handle_deps(State, Locks);
+                                    _ ->
+                                        %% If not the default profile, ignore locks file
+                                        handle_deps(State, rebar_state:get(State, {deps, Profile}, []))
                                 end,
 
         Source = ProjectApps ++ SrcApps,
