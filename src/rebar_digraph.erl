@@ -18,7 +18,15 @@ compile_order(Apps) ->
                   end, Apps),
     case digraph_utils:topsort(Graph) of
         false ->
-            {error, no_sort};
+            case digraph_utils:is_acyclic(Graph) of
+                true ->
+                    {error, no_sort};
+                false ->
+                    Cycles = lists:sort(
+                        [lists:sort(Comp) || Comp <- digraph_utils:strong_components(Graph),
+                                             length(Comp)>1]),
+                    {error, {cycles, Cycles}}
+            end;
         V ->
             {ok, names_to_apps(lists:reverse(V), Apps)}
     end.

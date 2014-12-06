@@ -45,27 +45,14 @@ run_and_check(Config, RebarConfig, Command, Expect) ->
     %% Assumes init_rebar_state has run first
     AppDir = ?config(apps, Config),
     State = ?config(state, Config),
-    {ok,_} = rebar3:run(rebar_state:new(State, RebarConfig, AppDir), Command),
-    BuildDir = filename:join([AppDir, "_build", "default", "lib"]),
-    Deps = rebar_app_discover:find_apps([BuildDir], all),
-    DepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Deps],
-    lists:foreach(
-        fun({app, Name}) ->
-                [App] = rebar_app_discover:find_apps([AppDir]),
-                ct:pal("Name: ~p", [Name]),
-                ?assertEqual(Name, ec_cnv:to_list(rebar_app_info:name(App)))
-        ;  ({dep, Name}) ->
-                ct:pal("Name: ~p", [Name]),
-                ?assertNotEqual(false, lists:keyfind(Name, 1, DepsNames))
-        ;  ({dep, Name, Vsn}) ->
-                ct:pal("Name: ~p, Vsn: ~p", [Name, Vsn]),
-                case lists:keyfind(Name, 1, DepsNames) of
-                    false ->
-                        error({app_not_found, Name});
-                    {Name, App} ->
-                        ?assertEqual(Vsn, rebar_app_info:original_vsn(App))
-                end
-        end, Expect).
+    Res = rebar3:run(rebar_state:new(State, RebarConfig, AppDir), Command),
+    case Expect of
+        {error, Reason} ->
+            ?assertEqual({error, Reason}, Res);
+        {ok, Expected} ->
+            {ok, _} = Res,
+            check_results(AppDir, Expected)
+    end.
 
 %% @doc Creates a dummy application including:
 %% - src/<file>.erl
@@ -108,6 +95,28 @@ create_random_vsn() ->
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
 %%%%%%%%%%%%%%%
+check_results(AppDir, Expected) ->
+    BuildDir = filename:join([AppDir, "_build", "default", "lib"]),
+    Deps = rebar_app_discover:find_apps([BuildDir], all),
+    DepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Deps],
+    lists:foreach(
+        fun({app, Name}) ->
+                [App] = rebar_app_discover:find_apps([AppDir]),
+                ct:pal("Name: ~p", [Name]),
+                ?assertEqual(Name, ec_cnv:to_list(rebar_app_info:name(App)))
+        ;  ({dep, Name}) ->
+                ct:pal("Name: ~p", [Name]),
+                ?assertNotEqual(false, lists:keyfind(Name, 1, DepsNames))
+        ;  ({dep, Name, Vsn}) ->
+                ct:pal("Name: ~p, Vsn: ~p", [Name, Vsn]),
+                case lists:keyfind(Name, 1, DepsNames) of
+                    false ->
+                        error({app_not_found, Name});
+                    {Name, App} ->
+                        ?assertEqual(Vsn, rebar_app_info:original_vsn(App))
+                end
+        end, Expected).
+
 write_src_file(Dir, Name) ->
     Erl = filename:join([Dir, "src", "not_a_real_src" ++ Name ++ ".erl"]),
     ok = filelib:ensure_dir(Erl),
@@ -136,3 +145,4 @@ get_app_metadata(Name, Vsn, Deps) ->
       {included_applications, []},
       {registered, []},
       {applications, Deps}]}.
+

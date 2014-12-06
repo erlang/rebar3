@@ -102,8 +102,8 @@ mock_download(Opts) ->
     meck:expect(
         ?MOD, download,
         fun (Dir, Git) ->
-            {git, Url, {_, Vsn}} = normalize_git(Git, Overrides, Default),
             filelib:ensure_dir(Dir),
+            {git, Url, {_, Vsn}} = normalize_git(Git, Overrides, Default),
             App = app(Url),
             AppDeps = proplists:get_value(App, Deps, []),
             rebar_test_utils:create_app(

@@ -81,6 +81,8 @@ do(State) ->
                 {ok, rebar_state:deps_to_build(State1,
                                               lists:dropwhile(fun rebar_app_info:valid/1
                                                              , Sort -- ProjectApps))};
+            {error, {cycles, Cycles}} ->
+                {error, {?MODULE, {cycles, Cycles}}};
             {error, Error} ->
                 {error, Error}
         end
@@ -91,6 +93,12 @@ do(State) ->
     end.
 
 -spec format_error(any()) -> iolist().
+format_error({cycles, Cycles}) ->
+    Prints = [["applications: ",
+               [io_lib:format("~s ", [Dep]) || Dep <- Cycle],
+               "depend on each other~n"]
+              || Cycle <- Cycles],
+    ["Dependency cycle(s) detected:~n", Prints];
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -151,7 +159,7 @@ update_pkg_deps(Pkgs, Packages, Update, Seen, State) ->
                                                       ,Packages
                                                       ,Pkg),
                               {SeenAcc1, StateAcc1} = maybe_lock(AppInfo, SeenAcc, StateAcc),
-                              case maybe_fetch(StateAcc1, AppInfo, Update, SeenAcc) of
+                              case maybe_fetch(StateAcc1, AppInfo, Update, SeenAcc1) of
                                   true ->
                                       {[AppInfo | Acc], SeenAcc1, StateAcc1};
                                   false ->
@@ -167,7 +175,7 @@ maybe_lock(AppInfo, Seen, State) ->
             {sets:add_element(Name, Seen),
              rebar_state:lock(State, AppInfo)};
         true ->
-            {sets:add_element(Name, Seen), State}
+            {Seen, State}
     end.
 
 package_to_app(DepsDir, Packages, {Name, Vsn}) ->
@@ -204,7 +212,7 @@ update_src_deps(Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen) ->
                                                               ,Level
                                                               ,StateAcc1);
                                              _ ->
-                                                 maybe_fetch(StateAcc, AppInfo, false, SeenAcc),
+                                                 maybe_fetch(StateAcc, AppInfo, false, SeenAcc1),
                                                  handle_dep(AppInfo
                                                            ,SrcDepsAcc
                                                            ,PkgDepsAcc
