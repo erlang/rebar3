@@ -7,7 +7,6 @@
 {template, "sup.erl.dtl", "{{name}}/{{apps_dir}}/{{name}}/src/{{name}}_sup.erl"}.
 {template, "otp_app.app.src.dtl", "{{name}}/{{apps_dir}}/{{name}}/src/{{name}}.app.src"}.
 {template, "relx_rebar.config.dtl", "{{name}}/rebar.config"}.
-{template, "relx.config.dtl", "{{name}}/relx.config"}.
 {template, "sys.config.dtl", "{{name}}/config/sys.config"}.
 {template, "vm.args.dtl", "{{name}}/config/vm.args"}.
 {template, "gitignore.dtl", "{{name}}/.gitignore"}.
