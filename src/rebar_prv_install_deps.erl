@@ -81,6 +81,8 @@ do(State) ->
                 {ok, rebar_state:deps_to_build(State1,
                                               lists:dropwhile(fun rebar_app_info:valid/1
                                                              , Sort -- ProjectApps))};
+            {error, {cycles, Cycles}} ->
+                {error, {?MODULE, {cycles, Cycles}}};
             {error, Error} ->
                 {error, Error}
         end
@@ -91,6 +93,12 @@ do(State) ->
     end.
 
 -spec format_error(any()) -> iolist().
+format_error({cycles, Cycles}) ->
+    Prints = [["applications: ",
+               [io_lib:format("~s ", [Dep]) || Dep <- Cycle],
+               "depend on each other~n"]
+              || Cycle <- Cycles],
+    ["Dependency cycle(s) detected:~n", Prints];
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 

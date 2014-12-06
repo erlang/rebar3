@@ -47,11 +47,11 @@ deps(pick_earliest) ->
 deps(circular1) ->
     {[{"B", [{"A", []}]}, % A is the top-level app
       {"C", []}],
-     {error, {cycles, [[<<"A">>,<<"B">>]]}}}; % circular dep
+     {error, {rebar_prv_install_deps, {cycles, [[<<"A">>,<<"B">>]]}}}};
 deps(circular2) ->
     {[{"B", [{"C", [{"B", []}]}]},
       {"C", []}],
-     {error, {cycles, [[<<"B">>,<<"C">>]]}}}. % circular dep
+     {error, {rebar_prv_install_deps, {cycles, [[<<"B">>,<<"C">>]]}}}}.
 
 end_per_testcase(_, Config) ->
     mock_git_resource:unmock(),
