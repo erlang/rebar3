@@ -47,11 +47,11 @@ deps(pick_earliest) ->
 deps(circular1) ->
     {[{"B", [{"A", []}]}, % A is the top-level app
       {"C", []}],
-     {error, no_sort}}; % circular dep
+     {error, {cycles, [[<<"A">>,<<"B">>]]}}}; % circular dep
 deps(circular2) ->
     {[{"B", [{"C", [{"B", []}]}]},
       {"C", []}],
-     {error, no_sort}}. % circular dep
+     {error, {cycles, [[<<"B">>,<<"C">>]]}}}. % circular dep
 
 end_per_testcase(_, Config) ->
     mock_git_resource:unmock(),
