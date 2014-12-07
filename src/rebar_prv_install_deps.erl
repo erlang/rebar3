@@ -351,11 +351,15 @@ parse_deps(State, DepsDir, Deps) ->
                                                 ,ec_cnv:to_binary(Vsn)) | PkgDepsAcc]};
                    (Name, {SrcDepsAcc, PkgDepsAcc}) when is_atom(Name) ->
                         {SrcDepsAcc, [ec_cnv:to_binary(Name) | PkgDepsAcc]};
-                   ({Name, Vsn, Source}, {SrcDepsAcc, PkgDepsAcc}) when is_tuple (Source) ->
-                        Dep = new_dep(State, DepsDir, Name, Vsn, Source),
+                   ({Name, Source}, {SrcDepsAcc, PkgDepsAcc}) when is_tuple (Source) ->
+                        Dep = new_dep(State, DepsDir, Name, [], Source),
                         {[Dep | SrcDepsAcc], PkgDepsAcc};
-                   ({Name, Vsn, Source, _Level}, {SrcDepsAcc, PkgDepsAcc}) when is_tuple (Source) ->
-                        Dep = new_dep(State, DepsDir, Name, Vsn, Source),
+                   ({Name, _Vsn, Source}, {SrcDepsAcc, PkgDepsAcc}) when is_tuple (Source) ->
+                        Dep = new_dep(State, DepsDir, Name, [], Source),
+                        {[Dep | SrcDepsAcc], PkgDepsAcc};
+                   ({Name, Source, Level}, {SrcDepsAcc, PkgDepsAcc}) when is_tuple (Source)
+                                                                         , is_integer(Level) ->
+                        Dep = new_dep(State, DepsDir, Name, [], Source),
                         {[Dep | SrcDepsAcc], PkgDepsAcc}
                 end, {[], []}, Deps).
 
