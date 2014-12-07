@@ -33,6 +33,7 @@
          format_error/1]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 -export([handle_deps/2,
          handle_deps/3]).
@@ -86,7 +87,7 @@ do(State) ->
                                               lists:dropwhile(fun rebar_app_info:valid/1
                                                              , Sort -- ProjectApps))};
             {error, {cycles, Cycles}} ->
-                {error, {?MODULE, {cycles, Cycles}}};
+                ?PRV_ERROR({cycles, Cycles});
             {error, Error} ->
                 {error, Error}
         end
