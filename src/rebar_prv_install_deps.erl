@@ -174,11 +174,16 @@ update_pkg_deps(Pkgs, Packages, Update, Seen, State) ->
 
 maybe_lock(AppInfo, Seen, State) ->
     Name = rebar_app_info:name(AppInfo),
-    case sets:is_element(Name, Seen) of
-        false ->
-            {sets:add_element(Name, Seen),
-             rebar_state:lock(State, AppInfo)};
-        true ->
+    case rebar_state:current_profile(State) of
+        default ->
+            case sets:is_element(Name, Seen) of
+                false ->
+                    {sets:add_element(Name, Seen),
+                     rebar_state:lock(State, AppInfo)};
+                true ->
+                    {Seen, State}
+            end;
+        _ ->
             {Seen, State}
     end.
 
