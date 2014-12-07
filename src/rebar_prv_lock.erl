@@ -39,7 +39,6 @@ do(State) ->
                                       %% If source is tuple it is a source dep
                                       %% e.g. {git, "git://github.com/ninenines/cowboy.git", "master"}
                                       {rebar_app_info:name(Dep)
-                                      ,rebar_app_info:original_vsn(Dep)
                                       ,rebar_fetch:lock_source(Dir, Source)
                                       ,rebar_app_info:dep_level(Dep)}
                               end, AllDeps),
