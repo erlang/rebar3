@@ -258,7 +258,7 @@ cache_escript_files(State) ->
                     fun(Name, _, GetBin, Acc) ->
                             [{Name, GetBin()} | Acc]
                     end,
-                    [], rebar_state:get(State, escript)),
+                    [], rebar_state:escript_path(State)),
     Files.
 
 %% Find all the template indexes hiding in the rebar3 escript.

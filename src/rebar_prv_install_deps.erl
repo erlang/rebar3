@@ -66,13 +66,17 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     Profile = rebar_state:current_profile(State),
+    ?INFO("Verifying ~p dependencies...", [Profile]),
     ProjectApps = rebar_state:project_apps(State),
     try
-        {ok, SrcApps, State1} = case rebar_state:get(State, locks, []) of
-                                    [] ->
+        {ok, SrcApps, State1} = case {Profile, rebar_state:get(State, locks, [])} of
+                                    {default, []} ->
                                         handle_deps(State, rebar_state:get(State, {deps, Profile}, []));
-                                    Locks ->
-                                        handle_deps(State, Locks)
+                                    {default, Locks} ->
+                                        handle_deps(State, Locks);
+                                    _ ->
+                                        %% If not the default profile, ignore locks file
+                                        handle_deps(State, rebar_state:get(State, {deps, Profile}, []))
                                 end,
 
         Source = ProjectApps ++ SrcApps,
@@ -170,11 +174,16 @@ update_pkg_deps(Pkgs, Packages, Update, Seen, State) ->
 
 maybe_lock(AppInfo, Seen, State) ->
     Name = rebar_app_info:name(AppInfo),
-    case sets:is_element(Name, Seen) of
-        false ->
-            {sets:add_element(Name, Seen),
-             rebar_state:lock(State, AppInfo)};
-        true ->
+    case rebar_state:current_profile(State) of
+        default ->
+            case sets:is_element(Name, Seen) of
+                false ->
+                    {sets:add_element(Name, Seen),
+                     rebar_state:lock(State, AppInfo)};
+                true ->
+                    {Seen, State}
+            end;
+        _ ->
             {Seen, State}
     end.
 

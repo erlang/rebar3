@@ -167,7 +167,7 @@ init_config() ->
     %% resources out of the escript
     State1 = try
                  ScriptName = filename:absname(escript:script_name()),
-                 rebar_state:set(State, escript, ScriptName)
+                 rebar_state:escript_path(State, ScriptName)
              catch
                  _:_ ->
                      State

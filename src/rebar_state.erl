@@ -6,6 +6,8 @@
          opts/1,
          default/1, default/2,
 
+         escript_path/1, escript_path/2,
+
          lock/1, lock/2,
 
          current_profile/1,
@@ -33,6 +35,8 @@
 -record(state_t, {dir                               :: file:name(),
                   opts                = dict:new()  :: rebar_dict(),
                   default             = dict:new()  :: rebar_dict(),
+
+                  escript_path                      :: undefined | file:filename_all(),
 
                   lock                = [],
                   current_profile     = default     :: atom(),
@@ -129,6 +133,12 @@ lock(#state_t{lock=Lock}) ->
 lock(State=#state_t{lock=Lock}, App) ->
     State#state_t{lock=[App | Lock]}.
 
+escript_path(#state_t{escript_path=EscriptPath}) ->
+    EscriptPath.
+
+escript_path(State, EscriptPath) ->
+    State#state_t{escript_path=EscriptPath}.
+
 command_args(#state_t{command_args=CmdArgs}) ->
     CmdArgs.
 
@@ -142,6 +152,10 @@ command_parsed_args(State, CmdArgs) ->
     State#state_t{command_parsed_args=CmdArgs}.
 
 %% Only apply profiles to the default profile
+apply_profile(State=#state_t{default=Opts}, default) ->
+    Deps = rebar_state:get(State, deps, []),
+    Opts1 = dict:store({deps, default}, Deps, Opts),
+    State#state_t{opts=Opts1};
 apply_profile(State=#state_t{default=Opts}, Profile) ->
     ConfigProfiles = rebar_state:get(State, profiles, []),
     Deps = rebar_state:get(State, deps, []),
@@ -149,22 +163,27 @@ apply_profile(State=#state_t{default=Opts}, Profile) ->
     ProfileOpts = dict:from_list(proplists:get_value(Profile, ConfigProfiles, [])),
     State#state_t{opts=merge_opts(Profile, ProfileOpts, Opts1)}.
 
-merge_opts(Profile, Opts1, Opts2) ->
-    dict:fold(fun(deps, Value, OptsAcc) ->
-                      dict:store({deps, Profile}, Value, OptsAcc);
-                 (Key, Value, OptsAcc) ->
-                      case dict:fetch(Key, Opts2) of
-                          OldValue when is_list(OldValue) ->
-                              case io_lib:printable_list(Value) of
+merge_opts(Profile, NewOpts, OldOpts) ->
+    Dict = dict:merge(fun(_Key, NewValue, OldValue) when is_list(NewValue) ->
+                              case io_lib:printable_list(NewValue) of
                                   true ->
-                                      dict:store(Key, Value, OptsAcc);
+                                      NewValue;
                                   false ->
-                                      dict:store(Key, lists:keymerge(1, lists:keysort(1, OldValue), lists:keysort(1, Value)), OptsAcc)
+                                      lists:keymerge(1
+                                                    ,lists:keysort(1, OldValue)
+                                                    ,lists:keysort(1, NewValue))
                               end;
-                          _ ->
-                              dict:store(Key, Value, OptsAcc)
-                      end
-              end, Opts2, Opts1).
+                         (_Key, NewValue, _OldValue) ->
+                              NewValue
+                      end, NewOpts, OldOpts),
+
+    case dict:find(deps, NewOpts) of
+        error ->
+            dict:store({deps, Profile}, [], Dict);
+        {ok, Deps} ->
+            dict:store({deps, Profile}, Deps, Dict)
+    end.
+
 
 dir(#state_t{dir=Dir}) ->
     Dir.
