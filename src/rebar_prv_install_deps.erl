@@ -207,6 +207,7 @@ update_src_deps(Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen) ->
                              %% If not seen, add to list of locks to write out
                              case sets:is_element(rebar_app_info:name(AppInfo), SeenAcc) of
                                  true ->
+                                     warn_skip_deps(AppInfo),
                                      {SrcDepsAcc, PkgDepsAcc, SrcAppsAcc, StateAcc, SeenAcc};
                                  false ->
                                      {SeenAcc1, StateAcc1} = maybe_lock(AppInfo, SeenAcc, StateAcc),
@@ -420,3 +421,9 @@ info(Description) ->
                    {app_name, ".*", {fossil, "https://www.example.org/url", "Vsn"}},
                    {app_name, ".*", {p4, "//depot/subdir/app_dir"}}]}
                  ]).
+
+warn_skip_deps(AppInfo) ->
+    ?WARN("Skipping ~s (from ~p) as an app of the same name "
+          "has already been fetched~n",
+          [rebar_app_info:name(AppInfo),
+           rebar_app_info:source(AppInfo)]).
