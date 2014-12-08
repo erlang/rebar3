@@ -35,15 +35,16 @@
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
--export([handle_deps/2,
-         handle_deps/3]).
+-export([handle_deps/3,
+         handle_deps/4]).
 
 -export_type([dep/0]).
 
 -define(PROVIDER, install_deps).
 -define(DEPS, [app_discovery]).
 
--type src_dep() :: {atom(), string(), {atom(), string(), string()}}.
+-type src_dep() :: {atom(), {atom(), string(), string()}}
+             | {atom(), string(), {atom(), string(), string()}}.
 -type pkg_dep() :: {atom(), binary()} | atom().
 
 -type dep() :: src_dep() | pkg_dep().
@@ -66,19 +67,19 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    Profile = rebar_state:current_profile(State),
-    ?INFO("Verifying ~p dependencies...", [Profile]),
-    ProjectApps = rebar_state:project_apps(State),
     try
-        {ok, SrcApps, State1} = case {Profile, rebar_state:get(State, locks, [])} of
-                                    {default, []} ->
-                                        handle_deps(State, rebar_state:get(State, {deps, Profile}, []));
-                                    {default, Locks} ->
-                                        handle_deps(State, Locks);
-                                    _ ->
-                                        %% If not the default profile, ignore locks file
-                                        handle_deps(State, rebar_state:get(State, {deps, Profile}, []))
-                                end,
+        ?INFO("Verifying dependencies...", []),
+        Profiles = rebar_state:current_profiles(State),
+        ProjectApps = rebar_state:project_apps(State),
+
+        {SrcApps, State1} =
+            lists:foldl(fun(Profile, {SrcAppsAcc, StateAcc}) ->
+                                {ok, NewSrcApps, NewState} =
+                                    handle_deps(Profile
+                                               ,StateAcc
+                                               ,rebar_state:get(StateAcc, {deps, Profile}, [])),
+                                {NewSrcApps++SrcAppsAcc, NewState}
+                        end, {[], State}, lists:reverse(Profiles)),
 
         Source = ProjectApps ++ SrcApps,
         case find_cycles(Source ++ rebar_state:all_deps(State1)) of
@@ -119,24 +120,25 @@ format_error({cycles, Cycles}) ->
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
--spec handle_deps(rebar_state:t(), list()) ->
+-spec handle_deps(atom(), rebar_state:t(), list()) ->
                          {ok, [rebar_app_info:t()], rebar_state:t()} | {error, string()}.
-handle_deps(State, Deps) ->
-    handle_deps(State, Deps, false).
+handle_deps(Profile, State, Deps) ->
+    handle_deps(Profile, State, Deps, false).
 
--spec handle_deps(rebar_state:t(), list(), boolean() | {true, binary(), integer()})
+-spec handle_deps(atom(), rebar_state:t(), list(), boolean() | {true, binary(), integer()})
                  -> {ok, [rebar_app_info:t()], rebar_state:t()} | {error, string()}.
-handle_deps(State, [], _) ->
+handle_deps(_Profile, State, [], _) ->
     {ok, [], State};
-handle_deps(State, Deps, Update) ->
+handle_deps(Profile, State, Deps, Update) ->
     %% Read in package index and dep graph
     {Packages, Graph} = rebar_packages:get_packages(State),
     %% Split source deps from pkg deps, needed to keep backwards compatibility
     DepsDir = rebar_dir:deps_dir(State),
-    {SrcDeps, PkgDeps} = parse_deps(State, DepsDir, Deps),
+    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps),
+
     %% Fetch transitive src deps
     {State1, SrcApps, PkgDeps1, Seen} =
-        update_src_deps(0, SrcDeps, PkgDeps, [], State, Update, sets:new()),
+        update_src_deps(Profile, 0, SrcDeps, PkgDeps, [], State, Update, sets:new()),
 
     {Solved, State2} = case PkgDeps1 of
                            [] -> %% No pkg deps
@@ -152,7 +154,7 @@ handle_deps(State, Deps, Update) ->
                                            [warn_skip_pkg(Pkg) || Pkg <- Discarded],
                                            Solution
                                    end,
-                               update_pkg_deps(S, Packages, Update, Seen, State1)
+                               update_pkg_deps(Profile, S, Packages, Update, Seen, State1)
                        end,
     AllDeps = lists:ukeymerge(2
                              ,lists:ukeysort(2, SrcApps)
@@ -166,7 +168,7 @@ handle_deps(State, Deps, Update) ->
 %% Internal functions
 %% ===================================================================
 
-update_pkg_deps(Pkgs, Packages, Update, Seen, State) ->
+update_pkg_deps(Profile, Pkgs, Packages, Update, Seen, State) ->
     %% Create app_info record for each pkg dep
     DepsDir = rebar_dir:deps_dir(State),
     {Solved, _, State1}
@@ -174,8 +176,8 @@ update_pkg_deps(Pkgs, Packages, Update, Seen, State) ->
                               AppInfo = package_to_app(DepsDir
                                                       ,Packages
                                                       ,Pkg),
-                              {SeenAcc1, StateAcc1} = maybe_lock(AppInfo, SeenAcc, StateAcc),
-                              case maybe_fetch(StateAcc1, AppInfo, Update, SeenAcc1) of
+                              {SeenAcc1, StateAcc1} = maybe_lock(Profile, AppInfo, SeenAcc, StateAcc),
+                              case maybe_fetch(AppInfo, Update, SeenAcc1) of
                                   true ->
                                       {[AppInfo | Acc], SeenAcc1, StateAcc1};
                                   false ->
@@ -184,9 +186,9 @@ update_pkg_deps(Pkgs, Packages, Update, Seen, State) ->
                       end, {[], Seen, State}, Pkgs),
     {Solved, State1}.
 
-maybe_lock(AppInfo, Seen, State) ->
+maybe_lock(Profile, AppInfo, Seen, State) ->
     Name = rebar_app_info:name(AppInfo),
-    case rebar_state:current_profile(State) of
+    case Profile of
         default ->
             case sets:is_element(Name, Seen) of
                 false ->
@@ -213,8 +215,8 @@ package_to_app(DepsDir, Packages, {Name, Vsn}) ->
             rebar_app_info:source(AppInfo2, {pkg, Name, Vsn, Link})
     end.
 
--spec update_src_deps(non_neg_integer(), list(), list(), list(), rebar_state:t(), boolean(), sets:set(binary())) -> {rebar_state:t(), list(), list(), sets:set(binary())}.
-update_src_deps(Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen) ->
+-spec update_src_deps(atom(), non_neg_integer(), list(), list(), list(), rebar_state:t(), boolean(), sets:set(binary())) -> {rebar_state:t(), list(), list(), sets:set(binary())}.
+update_src_deps(Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen) ->
     case lists:foldl(fun(AppInfo, {SrcDepsAcc, PkgDepsAcc, SrcAppsAcc, StateAcc, SeenAcc}) ->
                              %% If not seen, add to list of locks to write out
                              case sets:is_element(rebar_app_info:name(AppInfo), SeenAcc) of
@@ -222,7 +224,7 @@ update_src_deps(Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen) ->
                                      warn_skip_deps(AppInfo),
                                      {SrcDepsAcc, PkgDepsAcc, SrcAppsAcc, StateAcc, SeenAcc};
                                  false ->
-                                     {SeenAcc1, StateAcc1} = maybe_lock(AppInfo, SeenAcc, StateAcc),
+                                     {SeenAcc1, StateAcc1} = maybe_lock(Profile, AppInfo, SeenAcc, StateAcc),
                                      {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2} =
                                          case Update of
                                              {true, UpdateName, UpdateLevel} ->
@@ -235,7 +237,7 @@ update_src_deps(Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen) ->
                                                               ,Level
                                                               ,StateAcc1);
                                              _ ->
-                                                 maybe_fetch(StateAcc, AppInfo, false, SeenAcc1),
+                                                 maybe_fetch(AppInfo, false, SeenAcc1),
                                                  handle_dep(AppInfo
                                                            ,SrcDepsAcc
                                                            ,PkgDepsAcc
@@ -251,7 +253,7 @@ update_src_deps(Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen) ->
         {[], NewPkgDeps, NewSrcApps, State1, Seen1} ->
             {State1, NewSrcApps, NewPkgDeps, Seen1};
         {NewSrcDeps, NewPkgDeps, NewSrcApps, State1, Seen1} ->
-            update_src_deps(Level+1, NewSrcDeps, NewPkgDeps, NewSrcApps, State1, Update, Seen1)
+            update_src_deps(Profile, Level+1, NewSrcDeps, NewPkgDeps, NewSrcApps, State1, Update, Seen1)
     end.
 
 handle_update(AppInfo, UpdateName, UpdateLevel, SrcDeps, PkgDeps, SrcApps, Level, State) ->
@@ -261,7 +263,7 @@ handle_update(AppInfo, UpdateName, UpdateLevel, SrcDeps, PkgDeps, SrcApps, Level
     case UpdateLevel < DepLevel
         orelse Name =:= UpdateName of
         true ->
-            case maybe_fetch(State, AppInfo, true, []) of
+            case maybe_fetch(AppInfo, true, []) of
                 true ->
                     handle_dep(AppInfo
                               ,SrcDeps
@@ -290,27 +292,20 @@ handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State) ->
 -spec handle_dep(rebar_state:t(), file:filename_all(), rebar_app_info:t()) ->
                         {rebar_app_info:t(), [rebar_app_info:t()], [pkg_dep()]}.
 handle_dep(State, DepsDir, AppInfo) ->
-    Profile = rebar_state:current_profile(State),
+    Profiles = rebar_state:current_profiles(State),
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
     S = rebar_state:new(rebar_state:new(), C, rebar_app_info:dir(AppInfo)),
-    S1 = rebar_state:apply_profile(S, Profile),
-    Deps = case Profile of
-               default ->
-                   rebar_state:get(S1, {deps, Profile}, []);
-               _ ->
-                   rebar_state:get(S1, {deps, default}, []) ++
-                       rebar_state:get(S1, {deps, Profile}, [])
-           end,
+    S1 = rebar_state:apply_profiles(S, Profiles),
+    Deps = rebar_state:get(S1, deps, []),
     AppInfo1 = rebar_app_info:deps(AppInfo, rebar_state:deps_names(Deps)),
-    {SrcDeps, PkgDeps} = parse_deps(State, DepsDir, Deps),
+    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps),
     {AppInfo1, SrcDeps, PkgDeps}.
 
--spec maybe_fetch(rebar_state:t(), rebar_app_info:t(), boolean() | {true, binary(), integer()},
+-spec maybe_fetch(rebar_app_info:t(), boolean() | {true, binary(), integer()},
                  sets:set(binary())) -> boolean().
-maybe_fetch(State, AppInfo, Update, Seen) ->
+maybe_fetch(AppInfo, Update, Seen) ->
     AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
-    DefaultProfileDeps = rebar_dir:default_profile_deps(State),
-    Apps = rebar_app_discover:find_apps(["_checkouts", DefaultProfileDeps], all),
+    Apps = rebar_app_discover:find_apps(["_checkouts"], all),
     case rebar_app_utils:find(rebar_app_info:name(AppInfo), Apps) of
         {ok, _} ->
             %% Don't fetch dep if it exists in the _checkouts dir
@@ -360,28 +355,27 @@ maybe_fetch(State, AppInfo, Update, Seen) ->
             end
     end.
 
--spec parse_deps(rebar_state:t(), binary(), list()) -> {[rebar_app_info:t()], [pkg_dep()]}.
-parse_deps(State, DepsDir, Deps) ->
+-spec parse_deps(binary(), list()) -> {[rebar_app_info:t()], [pkg_dep()]}.
+parse_deps(DepsDir, Deps) ->
     lists:foldl(fun({Name, Vsn}, {SrcDepsAcc, PkgDepsAcc}) ->
                         {SrcDepsAcc, [parse_goal(ec_cnv:to_binary(Name)
                                                 ,ec_cnv:to_binary(Vsn)) | PkgDepsAcc]};
                    (Name, {SrcDepsAcc, PkgDepsAcc}) when is_atom(Name) ->
                         {SrcDepsAcc, [ec_cnv:to_binary(Name) | PkgDepsAcc]};
                    ({Name, Source}, {SrcDepsAcc, PkgDepsAcc}) when is_tuple (Source) ->
-                        Dep = new_dep(State, DepsDir, Name, [], Source),
+                        Dep = new_dep(DepsDir, Name, [], Source),
                         {[Dep | SrcDepsAcc], PkgDepsAcc};
                    ({Name, _Vsn, Source}, {SrcDepsAcc, PkgDepsAcc}) when is_tuple (Source) ->
-                        Dep = new_dep(State, DepsDir, Name, [], Source),
+                        Dep = new_dep(DepsDir, Name, [], Source),
                         {[Dep | SrcDepsAcc], PkgDepsAcc};
                    ({Name, Source, Level}, {SrcDepsAcc, PkgDepsAcc}) when is_tuple (Source)
                                                                          , is_integer(Level) ->
-                        Dep = new_dep(State, DepsDir, Name, [], Source),
+                        Dep = new_dep(DepsDir, Name, [], Source),
                         {[Dep | SrcDepsAcc], PkgDepsAcc}
                 end, {[], []}, Deps).
 
-new_dep(State, DepsDir, Name, Vsn, Source) ->
-    Dirs = [ec_cnv:to_list(filename:join(rebar_dir:default_profile_deps(State), Name)),
-            ec_cnv:to_list(filename:join(DepsDir, Name))],
+new_dep(DepsDir, Name, Vsn, Source) ->
+    Dirs = [ec_cnv:to_list(filename:join(DepsDir, Name))],
     {ok, Dep} = case ec_lists:search(fun(Dir) ->
                                              rebar_app_info:discover(Dir)
                                      end, Dirs) of

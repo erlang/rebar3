@@ -41,7 +41,7 @@ process_command(State, Command) ->
             {error, io_lib:format("Command ~p not found", [Command])};
         CommandProvider ->
             Profile = providers:profile(CommandProvider),
-            State1 = rebar_state:current_profile(State, Profile),
+            State1 = rebar_state:apply_profiles(State, [Profile]),
             Opts = providers:opts(CommandProvider)++rebar3:global_option_spec_list(),
             case Command of
                 do ->
@@ -49,8 +49,8 @@ process_command(State, Command) ->
                 _ ->
                     case getopt:parse(Opts, rebar_state:command_args(State1)) of
                         {ok, Args} ->
-                            State3 = rebar_state:command_parsed_args(State1, Args),
-                            do(TargetProviders, State3);
+                            State2 = rebar_state:command_parsed_args(State1, Args),
+                            do(TargetProviders, State2);
                         {error, {invalid_option, Option}} ->
                             {error, io_lib:format("Invalid option ~s on task ~p", [Option, Command])}
                     end
@@ -60,13 +60,12 @@ process_command(State, Command) ->
 -spec do([{atom(), atom()}], rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do([], State) ->
     {ok, State};
-do([{ProviderName, Profile} | Rest], State) ->
-    State1 = rebar_state:current_profile(State, Profile),
+do([{ProviderName, _} | Rest], State) ->
     Provider = providers:get_provider(ProviderName
-                                     ,rebar_state:providers(State1)),
-    case providers:do(Provider, State1) of
-        {ok, State2} ->
-            do(Rest, State2);
+                                     ,rebar_state:providers(State)),
+    case providers:do(Provider, State) of
+        {ok, State1} ->
+            do(Rest, State1);
         {error, Error} ->
             {error, Error}
     end.
@@ -76,8 +75,7 @@ update_code_path(State) ->
     LibDirs = rebar_dir:lib_dirs(State),
     DepsDir = rebar_dir:deps_dir(State),
     PluginsDir = rebar_dir:plugins_dir(State),
-    _UpdatedCodePaths = update_code_path_([DepsDir, PluginsDir | LibDirs]).
-
+    _UpdatedCodePaths = update_code_path_(lists:usort([DepsDir, PluginsDir | LibDirs])).
 
 %% ===================================================================
 %% Internal functions

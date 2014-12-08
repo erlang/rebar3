@@ -96,7 +96,7 @@ create_random_vsn() ->
 %%% Helpers %%%
 %%%%%%%%%%%%%%%
 check_results(AppDir, Expected) ->
-    BuildDir = filename:join([AppDir, "_build", "default", "lib"]),
+    BuildDir = filename:join([AppDir, "_build", "lib"]),
     Deps = rebar_app_discover:find_apps([BuildDir], all),
     DepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Deps],
     lists:foreach(
@@ -146,4 +146,3 @@ get_app_metadata(Name, Vsn, Deps) ->
       {included_applications, []},
       {registered, []},
       {applications, Deps}]}.
-

@@ -106,11 +106,11 @@ run_aux(State, GlobalPluginProviders, RawArgs) ->
     application:start(ssl),
     inets:start(),
 
-    State2 = case os:getenv("REBAR_DEFAULT_PROFILE") of
+    State2 = case os:getenv("REBAR_PROFILE") of
                  false ->
-                     rebar_state:current_profile(State, default);
+                     State;
                  Profile ->
-                     State1 = rebar_state:current_profile(State, list_to_atom(Profile)),
+                     State1 = rebar_state:apply_profiles(State, [list_to_atom(Profile)]),
                      rebar_state:default(State1, rebar_state:opts(State1))
              end,
 
@@ -143,7 +143,7 @@ init_config() ->
 
     Config1 = case rebar_config:consult_file(?LOCK_FILE) of
                   [D] ->
-                      [{locks, D} | Config];
+                      [{locks, D}, {{deps, default}, D} | Config];
                   _ ->
                       Config
               end,
