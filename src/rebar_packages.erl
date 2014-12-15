@@ -22,7 +22,7 @@ get_packages(State) ->
                 {Dict, rebar_digraph:restore_graph(Graph)}
             catch
                 _:_ ->
-                    ?ERROR("Bad packages index, try to fix with `rebar update`", []),
+                    ?ERROR("Bad packages index, try to fix with `rebar3 update`", []),
                     {dict:new(), digraph:new()}
             end;
         false ->
