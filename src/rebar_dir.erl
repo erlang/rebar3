@@ -5,10 +5,6 @@
          deps_dir/2,
          plugins_dir/1,
          lib_dirs/1,
-         profile_dir/1,
-         default_deps_dir/1,
-         default_profile_dir/1,
-         default_profile_deps/1,
          home_dir/0,
          global_config_dir/1,
          get_cwd/0,
@@ -26,41 +22,24 @@ base_dir(State) ->
 
 -spec deps_dir(rebar_state:t()) -> file:filename_all().
 deps_dir(State) ->
-    DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
-    filename:join(profile_dir(State), DepsDir).
+    filename:join(base_dir(State), rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR)).
 
 -spec deps_dir(file:filename_all(), file:filename_all()) -> file:filename_all().
 deps_dir(DepsDir, App) ->
     filename:join(DepsDir, App).
 
--spec default_deps_dir(rebar_state:t()) -> file:filename_all().
-default_deps_dir(State) ->
-    DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
-    filename:join([base_dir(State), "default", DepsDir]).
-
 -spec plugins_dir(rebar_state:t()) -> file:filename_all().
 plugins_dir(State) ->
-    filename:join(base_dir(State), rebar_state:get(State, plugins_dir, ?DEFAULT_PLUGINS_DIR)).
+    case lists:member(global, rebar_state:current_profiles(State)) of
+        true ->
+            filename:join([base_dir(State), global_config_dir(State), rebar_state:get(State, plugins_dir, ?DEFAULT_PLUGINS_DIR)]);
+        false ->
+            filename:join(base_dir(State), rebar_state:get(State, plugins_dir, ?DEFAULT_PLUGINS_DIR))
+    end.
 
 -spec lib_dirs(rebar_state:t()) -> file:filename_all().
 lib_dirs(State) ->
     rebar_state:get(State, project_app_dirs, ?DEFAULT_PROJECT_APP_DIRS).
-
--spec default_profile_dir(rebar_state:t()) -> file:filename_all().
-default_profile_dir(State) ->
-    filename:join(base_dir(State), "default").
-
-profile_dir(State) ->
-    case rebar_state:current_profile(State) of
-        global ->
-            global_config_dir(State);
-        Profile ->
-            filename:join(base_dir(State), atom_to_list(Profile))
-    end.
-
--spec default_profile_deps(rebar_state:t()) -> file:filename_all().
-default_profile_deps(State) ->
-    filename:join(default_profile_dir(State), ?DEFAULT_DEPS_DIR).
 
 home_dir() ->
     {ok, [[Home]]} = init:get_argument(home),

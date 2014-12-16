@@ -106,11 +106,11 @@ run_aux(State, GlobalPluginProviders, RawArgs) ->
     application:start(ssl),
     inets:start(),
 
-    State2 = case os:getenv("REBAR_DEFAULT_PROFILE") of
+    State2 = case os:getenv("REBAR_PROFILE") of
                  false ->
-                     rebar_state:current_profile(State, default);
+                     State;
                  Profile ->
-                     State1 = rebar_state:current_profile(State, list_to_atom(Profile)),
+                     State1 = rebar_state:apply_profiles(State, [list_to_atom(Profile)]),
                      rebar_state:default(State1, rebar_state:opts(State1))
              end,
 
@@ -127,7 +127,7 @@ run_aux(State, GlobalPluginProviders, RawArgs) ->
     State5 = rebar_state:create_logic_providers(AllProviders, State4),
     {Task, Args} = parse_args(RawArgs),
 
-    rebar_core:process_command(rebar_state:command_args(State5, Args), list_to_atom(Task)).
+    rebar_core:process_command(rebar_state:command_args(State5, Args), Task).
 
 init_config() ->
     %% Initialize logging system
@@ -143,7 +143,7 @@ init_config() ->
 
     Config1 = case rebar_config:consult_file(?LOCK_FILE) of
                   [D] ->
-                      [{locks, D} | Config];
+                      [{locks, D}, {{deps, default}, D} | Config];
                   _ ->
                       Config
               end,
@@ -177,10 +177,6 @@ init_config() ->
     %% Initialize vsn cache
     {PluginProviders, rebar_state:set(State1, vsn_cache, dict:new())}.
 
-%%
-%% Parse command line arguments using getopt and also filtering out any
-%% key=value pairs. What's left is the list of commands to run
-%%
 parse_args([]) ->
     parse_args(["help"]);
 parse_args([H | Rest]) when H =:= "-h"
@@ -189,8 +185,8 @@ parse_args([H | Rest]) when H =:= "-h"
 parse_args([H | Rest]) when H =:= "-v"
                           ; H =:= "--version" ->
     parse_args(["version" | Rest]);
-parse_args([RawTask | RawRest]) ->
-    {RawTask, RawRest}.
+parse_args([Task | RawRest]) ->
+    {list_to_atom(Task), RawRest}.
 
 set_options(State, {Options, NonOptArgs}) ->
     GlobalDefines = proplists:get_all_values(defines, Options),
@@ -251,7 +247,6 @@ global_option_spec_list() ->
     [
     %% {Name, ShortOpt, LongOpt, ArgSpec, HelpMsg}
     {help,     $h, "help",     undefined, "Print this help."},
-    %{verbose,  $v, "verbose",  integer,   "Verbosity level (-v, -vv)."},
     {version,  $V, "version",  undefined, "Show version information."},
     %{config,   $C, "config",   string,    "Rebar config file to use."},
     {task,     undefined, undefined, string, "Task to run."}

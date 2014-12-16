@@ -33,10 +33,9 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     Options = rebar_state:command_args(State),
-    DepsDir = rebar_dir:default_deps_dir(State),
-    ProfileDepsDir = rebar_dir:deps_dir(State),
-    LibDirs = lists:usort(rebar_utils:filtermap(fun ec_file:exists/1, [DepsDir, ProfileDepsDir])),
-    OutputDir = filename:join(rebar_dir:profile_dir(State), ?DEFAULT_RELEASE_DIR),
+    DepsDir = rebar_dir:deps_dir(State),
+    LibDirs = lists:usort(rebar_utils:filtermap(fun ec_file:exists/1, [DepsDir])),
+    OutputDir = filename:join(rebar_dir:base_dir(State), ?DEFAULT_RELEASE_DIR),
     AllOptions = string:join(["release" | Options], " "),
     try
         case rebar_state:get(State, relx, []) of

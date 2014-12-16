@@ -29,25 +29,20 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    case rebar_state:get(State, locks, []) of
-        [] ->
-            AllDeps = rebar_state:lock(State),
-            Locks = lists:map(fun(Dep) ->
-                                      Dir = rebar_app_info:dir(Dep),
-                                      Source = rebar_app_info:source(Dep),
+    AllDeps = rebar_state:lock(State),
+    Locks = lists:map(fun(Dep) ->
+                              Dir = rebar_app_info:dir(Dep),
+                              Source = rebar_app_info:source(Dep),
 
-                                      %% If source is tuple it is a source dep
-                                      %% e.g. {git, "git://github.com/ninenines/cowboy.git", "master"}
-                                      {rebar_app_info:name(Dep)
-                                      ,rebar_fetch:lock_source(Dir, Source)
-                                      ,rebar_app_info:dep_level(Dep)}
-                              end, AllDeps),
-            Dir = rebar_state:dir(State),
-            file:write_file(filename:join(Dir, "rebar.lock"), io_lib:format("~p.~n", [Locks])),
-            {ok, rebar_state:set(State, locks, Locks)};
-        _Locks ->
-            {ok, State}
-    end.
+                              %% If source is tuple it is a source dep
+                              %% e.g. {git, "git://github.com/ninenines/cowboy.git", "master"}
+                              {rebar_app_info:name(Dep)
+                              ,rebar_fetch:lock_source(Dir, Source)
+                              ,rebar_app_info:dep_level(Dep)}
+                      end, AllDeps),
+    Dir = rebar_state:dir(State),
+    file:write_file(filename:join(Dir, "rebar.lock"), io_lib:format("~p.~n", [Locks])),
+    {ok, State}.
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->

@@ -12,7 +12,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, ct).
--define(DEPS, [{install_deps, default}, compile]).
+-define(DEPS, [compile]).
 
 %% ===================================================================
 %% Public API
@@ -37,7 +37,6 @@ do(State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
     Opts1 = transform_opts(Opts),
     ok = create_dirs(Opts1),
-    expand_test_deps(filename:join(rebar_dir:profile_dir(State), ?DEFAULT_DEPS_DIR)),
     case handle_results(ct:run_test(Opts1)) of
         {error, Reason} ->
             {error, {?MODULE, Reason}};
@@ -50,10 +49,6 @@ format_error({failures_running_tests, FailedCount}) ->
     io_lib:format("Failures occured running tests: ~p", [FailedCount]);
 format_error({error_running_tests, Reason}) ->
     io_lib:format("Error running tests: ~p", [Reason]).
-
-expand_test_deps(Dir) ->
-    Apps = filelib:wildcard(filename:join([Dir, "*", "ebin"])),
-    ok = code:add_pathsa(Apps).
 
 ct_opts(State) ->
     DefaultTestDir = filename:join([rebar_state:dir(State), "test"]),
