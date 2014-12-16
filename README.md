@@ -27,6 +27,7 @@ limit scope.
 
 | Command    | Description |
 |----------- |------------ |
+| as         | Higher-order provider to run multiple tasks in sequence as certain profiles |
 | compile    | Build project |
 | clean      | Remove project apps beam files |
 | ct         | Run Common Test suites |
