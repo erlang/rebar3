@@ -40,13 +40,15 @@ process_command(State, Command) ->
         not_found ->
             {error, io_lib:format("Command ~p not found", [Command])};
         CommandProvider ->
-            Profile = providers:profile(CommandProvider),
-            State1 = rebar_state:apply_profiles(State, [Profile]),
-            Opts = providers:opts(CommandProvider)++rebar3:global_option_spec_list(),
             case Command of
-                do ->
-                    do(TargetProviders, State1);
+                Command when Command =:= do
+                           ; Command =:= as ->
+                    do(TargetProviders, State);
                 _ ->
+                    Profile = providers:profile(CommandProvider),
+                    State1 = rebar_state:apply_profiles(State, [Profile]),
+                    Opts = providers:opts(CommandProvider)++rebar3:global_option_spec_list(),
+
                     case getopt:parse(Opts, rebar_state:command_args(State1)) of
                         {ok, Args} ->
                             State2 = rebar_state:command_parsed_args(State1, Args),
