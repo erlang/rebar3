@@ -93,7 +93,14 @@ update_code_path_(Paths) ->
 expand_lib_dirs([], _Root, Acc) ->
     Acc;
 expand_lib_dirs([Dir | Rest], Root, Acc) ->
-    Apps = filelib:wildcard(filename:join([Dir, "*", "ebin"])),
+    %% The current dir should only have an ebin dir.
+    %% Other lib dirs contain app directories, so need the wildcard
+    Apps = case Dir of
+               "." ->
+                   [filename:join(Dir, "ebin")];
+               _ ->
+                   filelib:wildcard(filename:join([Dir, "*", "ebin"]))
+           end,
     FqApps = case filename:pathtype(Dir) of
                  absolute -> Apps;
                  _        -> [filename:join([Root, A]) || A <- Apps]
