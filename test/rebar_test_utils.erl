@@ -113,7 +113,8 @@ check_results(AppDir, Expected) ->
                     false ->
                         error({app_not_found, Name});
                     {Name, App} ->
-                        ?assertEqual(Vsn, rebar_app_info:original_vsn(App))
+                        ?assertEqual(iolist_to_binary(Vsn),
+                                     iolist_to_binary(rebar_app_info:original_vsn(App)))
                 end
         end, Expected).
 

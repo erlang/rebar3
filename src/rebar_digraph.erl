@@ -69,27 +69,31 @@ restore_graph({Vs, Es}) ->
 %% The first dep while traversing the graph is chosen and any conflicting
 %% dep encountered later on is ignored.
 cull_deps(Graph, Vertices) ->
-    cull_deps(Graph, Vertices, lists:foldl(fun({Key, _}=N, Solution) ->
-                                               dict:store(Key, N, Solution)
-                                       end, dict:new(), Vertices)).
+    cull_deps(Graph,
+              Vertices,
+              lists:foldl(fun({Key, _}=N, Solution) -> dict:store(Key, N, Solution) end,
+                          dict:new(), Vertices),
+              []).
 
-cull_deps(_Graph, [], Solution) ->
+cull_deps(_Graph, [], Solution, Discarded) ->
     {_, Vertices} = lists:unzip(dict:to_list(Solution)),
-    {ok, Vertices};
-cull_deps(Graph, Vertices, Solution) ->
-    {NV, NS} =
-        lists:foldl(fun(V, {NewVertices, SolutionAcc}) ->
+    {ok, Vertices, Discarded};
+cull_deps(Graph, Vertices, Solution, Discarded) ->
+    {NV, NS, DS} =
+        lists:foldl(fun(V, {NewVertices, SolutionAcc, DiscardedAcc}) ->
                         OutNeighbors = digraph:out_neighbours(Graph, V),
-                        lists:foldl(fun({Key, _}=N, {NewVertices1, SolutionAcc1}) ->
-                                            case dict:is_key(Key, SolutionAcc1) of
-                                                true ->
-                                                    {NewVertices1, SolutionAcc1};
-                                                false ->
-                                                    {[N | NewVertices1], dict:store(Key, N, SolutionAcc1)}
+                        lists:foldl(fun({Key, _}=N, {NewVertices1, SolutionAcc1, DiscardedAcc1}) ->
+                                            case dict:find(Key, SolutionAcc1) of
+                                                {ok, N} -> % already seen
+                                                    {NewVertices1, SolutionAcc1, DiscardedAcc1};
+                                                {ok, _} -> % conflict resolution!
+                                                    {NewVertices1, SolutionAcc1, [N|DiscardedAcc1]};
+                                                error ->
+                                                    {[N | NewVertices1], dict:store(Key, N, SolutionAcc1), DiscardedAcc1}
                                             end
-                                    end, {NewVertices, SolutionAcc}, OutNeighbors)
-                    end, {[], Solution}, Vertices),
-    cull_deps(Graph, NV, NS).
+                                    end, {NewVertices, SolutionAcc, DiscardedAcc}, OutNeighbors)
+                    end, {[], Solution, Discarded}, lists:sort(Vertices)),
+    cull_deps(Graph, NV, NS, DS).
 
 subgraph(Graph, Vertices) ->
     digraph_utils:subgraph(Graph, Vertices).

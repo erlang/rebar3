@@ -81,20 +81,32 @@ do(State) ->
                                 end,
 
         Source = ProjectApps ++ SrcApps,
-        case rebar_digraph:compile_order(Source) of
-            {ok, Sort} ->
-                {ok, rebar_state:deps_to_build(State1,
-                                              lists:dropwhile(fun rebar_app_info:valid/1
-                                                             , Sort -- ProjectApps))};
-            {error, {cycles, Cycles}} ->
+        case find_cycles(Source ++ rebar_state:all_deps(State1)) of
+            {cycles, Cycles} ->
                 ?PRV_ERROR({cycles, Cycles});
             {error, Error} ->
-                {error, Error}
+                {error, Error};
+            no_cycle ->
+                case rebar_digraph:compile_order(Source) of
+                    {ok, Sort} ->
+                        {ok, rebar_state:deps_to_build(State1,
+                                                    lists:dropwhile(fun rebar_app_info:valid/1,
+                                                                    Sort -- ProjectApps))};
+                    {error, Error} ->
+                        {error, Error}
+                end
         end
     catch
         %% maybe_fetch will maybe_throw an exception to break out of some loops
         _:Reason ->
             {error, Reason}
+    end.
+
+find_cycles(Apps) ->
+    case rebar_digraph:compile_order(Apps) of
+        {error, {cycles, Cycles}} -> {cycles, Cycles};
+        {error, Error} -> {error, Error};
+        {ok, _} -> no_cycle
     end.
 
 -spec format_error(any()) -> iolist().
@@ -119,11 +131,9 @@ handle_deps(State, [], _) ->
 handle_deps(State, Deps, Update) ->
     %% Read in package index and dep graph
     {Packages, Graph} = rebar_packages:get_packages(State),
-
     %% Split source deps from pkg deps, needed to keep backwards compatibility
     DepsDir = rebar_dir:deps_dir(State),
     {SrcDeps, PkgDeps} = parse_deps(State, DepsDir, Deps),
-
     %% Fetch transitive src deps
     {State1, SrcApps, PkgDeps1, Seen} =
         update_src_deps(0, SrcDeps, PkgDeps, [], State, Update, sets:new()),
@@ -134,15 +144,16 @@ handle_deps(State, Deps, Update) ->
                            PkgDeps2 ->
                                %% Find pkg deps needed
                                S = case rebar_digraph:cull_deps(Graph, PkgDeps2) of
-                                       {ok, []} ->
+                                       {ok, [], _} ->
                                            throw({rebar_digraph, no_solution});
-                                       {ok, Solution} ->
+                                       {ok, Solution, []} ->
+                                           Solution;
+                                       {ok, Solution, Discarded} ->
+                                           [warn_skip_pkg(Pkg) || Pkg <- Discarded],
                                            Solution
                                    end,
-
                                update_pkg_deps(S, Packages, Update, Seen, State1)
                        end,
-
     AllDeps = lists:ukeymerge(2
                              ,lists:ukeysort(2, SrcApps)
                              ,lists:ukeysort(2, Solved)),
@@ -193,7 +204,8 @@ package_to_app(DepsDir, Packages, {Name, Vsn}) ->
         error ->
             {error, missing_package};
         {ok, P} ->
-            PkgDeps = proplists:get_value(<<"deps">>, P, []),
+            PkgDeps = [{atom_to_binary(PkgName,utf8), list_to_binary(PkgVsn)}
+                       || {PkgName,PkgVsn} <- proplists:get_value(<<"deps">>, P, [])],
             Link = proplists:get_value(<<"link">>, P, ""),
             {ok, AppInfo} = rebar_app_info:new(Name, Vsn),
             AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
@@ -233,7 +245,9 @@ update_src_deps(Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen) ->
                                          end,
                                      {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2, SeenAcc1}
                              end
-                     end, {[], PkgDeps, SrcApps, State, Seen}, SrcDeps) of
+                     end,
+                     {[], PkgDeps, SrcApps, State, Seen},
+                     lists:sort(SrcDeps)) of
         {[], NewPkgDeps, NewSrcApps, State1, Seen1} ->
             {State1, NewSrcApps, NewPkgDeps, Seen1};
         {NewSrcDeps, NewPkgDeps, NewSrcApps, State1, Seen1} ->
@@ -427,3 +441,8 @@ warn_skip_deps(AppInfo) ->
           "has already been fetched~n",
           [rebar_app_info:name(AppInfo),
            rebar_app_info:source(AppInfo)]).
+
+warn_skip_pkg({Name, Source}) ->
+    ?WARN("Skipping ~s (version ~s from package index) as an app of the same "
+          "name has already been fetched~n",
+          [Name, Source]).

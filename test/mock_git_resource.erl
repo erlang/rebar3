@@ -105,7 +105,7 @@ mock_download(Opts) ->
             filelib:ensure_dir(Dir),
             {git, Url, {_, Vsn}} = normalize_git(Git, Overrides, Default),
             App = app(Url),
-            AppDeps = proplists:get_value(App, Deps, []),
+            AppDeps = proplists:get_value({App,Vsn}, Deps, []),
             rebar_test_utils:create_app(
                 Dir, App, Vsn,
                 [element(1,D) || D  <- AppDeps]

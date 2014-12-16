@@ -4,8 +4,14 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-all() -> [flat, pick_highest_left, pick_highest_right, pick_earliest,
-          circular1, circular2, circular_skip].
+all() -> [{group, git}, {group, pkg}].
+
+groups() ->
+    [{all, [], [flat, pick_highest_left, pick_highest_right,
+                pick_smallest1, pick_smallest2,
+                circular1, circular2, circular_skip]},
+     {git, [], [{group, all}]},
+     {pkg, [], [{group, all}]}].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -14,20 +20,31 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     application:stop(meck).
 
+init_per_group(git, Config) ->
+    [{deps_type, git} | Config];
+init_per_group(pkg, Config) ->
+    [{deps_type, pkg} | Config];
+init_per_group(_, Config) ->
+    Config.
+
+end_per_group(_, Config) ->
+    Config.
+
 init_per_testcase(Case, Config) ->
     {Deps, Warnings, Expect} = deps(Case),
     Expected = case Expect of
         {ok, List} -> {ok, format_expected_deps(List)};
         {error, Reason} -> {error, Reason}
     end,
+    DepsType = ?config(deps_type, Config),
     mock_warnings(),
     [{expect, Expected},
-     {warnings, Warnings} | setup_project(Case, Config, expand_deps(Deps))].
+     {warnings, Warnings}
+    | setup_project(Case, Config, expand_deps(DepsType, Deps))].
 
 end_per_testcase(_, Config) ->
     meck:unload(),
     Config.
-
 
 format_expected_deps(Deps) ->
     [case Dep of
@@ -64,10 +81,17 @@ deps(pick_highest_right) ->
       {"C", [{"B", "2", []}]}],
      [{"B","2"}],
      {ok, [{"B","1"}, "C"]}};
-deps(pick_earliest) ->
+deps(pick_smallest1) ->
     {[{"B", [{"D", "1", []}]},
       {"C", [{"D", "2", []}]}],
      [{"D","2"}],
+     %% we pick D1 because B < C
+     {ok, ["B","C",{"D","1"}]}};
+deps(pick_smallest2) ->
+    {[{"C", [{"D", "2", []}]},
+      {"B", [{"D", "1", []}]}],
+     [{"D","2"}],
+     %% we pick D1 because B < C
      {ok, ["B","C",{"D","1"}]}};
 deps(circular1) ->
     {[{"B", [{"A", []}]}, % A is the top-level app
@@ -80,39 +104,78 @@ deps(circular2) ->
      [],
      {error, {rebar_prv_install_deps, {cycles, [[<<"B">>,<<"C">>]]}}}};
 deps(circular_skip) ->
-    %% Never spot the circular dep due to being to low in the deps tree.
-    {[{"B", [{"C", "2", [{"D", []}]}]},
-      {"C", "1", [{"B",[]}]}],
+    %% Never spot the circular dep due to being to low in the deps tree
+    %% in source deps
+    {[{"B", [{"C", "2", [{"B", []}]}]},
+      {"C", "1", [{"D",[]}]}],
      [{"C","2"}],
      {ok, ["B", {"C","1"}, "D"]}}.
 
-expand_deps([]) -> [];
-expand_deps([{Name, Deps} | Rest]) ->
+expand_deps(_, []) -> [];
+expand_deps(git, [{Name, Deps} | Rest]) ->
     Dep = {Name, ".*", {git, "https://example.org/user/"++Name++".git", "master"}},
-    [{Dep, expand_deps(Deps)} | expand_deps(Rest)];
-expand_deps([{Name, Vsn, Deps} | Rest]) ->
+    [{Dep, expand_deps(git, Deps)} | expand_deps(git, Rest)];
+expand_deps(git, [{Name, Vsn, Deps} | Rest]) ->
     Dep = {Name, Vsn, {git, "https://example.org/user/"++Name++".git", {tag, Vsn}}},
-    [{Dep, expand_deps(Deps)} | expand_deps(Rest)].
+    [{Dep, expand_deps(git, Deps)} | expand_deps(git, Rest)];
+expand_deps(pkg, [{Name, Deps} | Rest]) ->
+    Dep = {pkg, Name, "0.0.0", "https://example.org/user/"++Name++".tar.gz"},
+    [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)];
+expand_deps(pkg, [{Name, Vsn, Deps} | Rest]) ->
+    Dep = {pkg, Name, Vsn, "https://example.org/user/"++Name++".tar.gz"},
+    [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)].
 
 setup_project(Case, Config0, Deps) ->
-    Config = rebar_test_utils:init_rebar_state(Config0, atom_to_list(Case)),
+    DepsType = ?config(deps_type, Config0),
+    Config = rebar_test_utils:init_rebar_state(
+            Config0,
+            atom_to_list(Case)++"_"++atom_to_list(DepsType)++"_"
+    ),
     AppDir = ?config(apps, Config),
     rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
     TopDeps = top_level_deps(Deps),
     RebarConf = rebar_test_utils:create_config(AppDir, [{deps, TopDeps}]),
-    mock_git_resource:mock([{deps, flat_deps(Deps)}]),
+    case DepsType of
+        git ->
+            mock_git_resource:mock([{deps, flat_deps(Deps)}]);
+        pkg ->
+            mock_pkg_resource:mock([{pkgdeps, flat_pkgdeps(Deps)}])
+    end,
     [{rebarconfig, RebarConf} | Config].
 
 
 flat_deps([]) -> [];
-flat_deps([{{Name,_Vsn,_Ref}, Deps} | Rest]) ->
-    [{Name, top_level_deps(Deps)}]
+flat_deps([{{Name,_Vsn,Ref}, Deps} | Rest]) ->
+    [{{Name,vsn_from_ref(Ref)}, top_level_deps(Deps)}]
     ++
     flat_deps(Deps)
     ++
     flat_deps(Rest).
 
-top_level_deps(Deps) -> [{list_to_atom(Name),Vsn,Ref} || {{Name,Vsn,Ref},_} <- Deps].
+vsn_from_ref({git, _, {_, Vsn}}) -> Vsn;
+vsn_from_ref({git, _, Vsn}) -> Vsn.
+
+flat_pkgdeps([]) -> [];
+flat_pkgdeps([{{pkg, Name, Vsn, _Url}, Deps} | Rest]) ->
+    [{{iolist_to_binary(Name),iolist_to_binary(Vsn)}, top_level_deps(Deps)}]
+    ++
+    flat_pkgdeps(Deps)
+    ++
+    flat_pkgdeps(Rest).
+
+top_level_deps([]) -> [];
+top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
+    [{list_to_atom(Name), Vsn, Ref} | top_level_deps(Deps)];
+top_level_deps([{{pkg, Name, Vsn, _URL}, _} | Deps]) ->
+    [{list_to_atom(Name), Vsn} | top_level_deps(Deps)].
+
+app_vsn([]) -> [];
+app_vsn([{Source, Deps} | Rest]) ->
+    {Name, Vsn} = case Source of
+        {N,V,_Ref} -> {N,V};
+        {pkg, N, V, _} -> {N,V}
+    end,
+    [{Name, Vsn}] ++ app_vsn(Deps) ++ app_vsn(Rest).
 
 mock_warnings() ->
     %% just let it do its thing, we check warnings through
@@ -123,7 +186,8 @@ mock_warnings() ->
 flat(Config) -> run(Config).
 pick_highest_left(Config) -> run(Config).
 pick_highest_right(Config) -> run(Config).
-pick_earliest(Config) -> run(Config).
+pick_smallest1(Config) -> run(Config).
+pick_smallest2(Config) -> run(Config).
 circular1(Config) -> run(Config).
 circular2(Config) -> run(Config).
 circular_skip(Config) -> run(Config).
@@ -133,21 +197,26 @@ run(Config) ->
     rebar_test_utils:run_and_check(
         Config, RebarConfig, "install_deps", ?config(expect, Config)
     ),
-    check_warnings(warning_calls(), ?config(warnings, Config)).
+    check_warnings(warning_calls(), ?config(warnings, Config), ?config(deps_type, Config)).
 
 warning_calls() ->
     History = meck:history(rebar_log),
     [{Str, Args} || {_, {rebar_log, log, [warn, Str, Args]}, _} <- History].
 
-check_warnings(_, []) ->
+check_warnings(_, [], _) ->
     ok;
-check_warnings(Warns, [{Name, Vsn} | Rest]) ->
+check_warnings(Warns, [{Name, Vsn} | Rest], Type) ->
     ct:pal("Checking for warning ~p in ~p", [{Name,Vsn},Warns]),
-    ?assert(in_warnings(Warns, Name, Vsn)),
-    check_warnings(Warns, Rest).
+    ?assert(in_warnings(Type, Warns, Name, Vsn)),
+    check_warnings(Warns, Rest, Type).
 
-in_warnings(Warns, NameRaw, VsnRaw) ->
+in_warnings(git, Warns, NameRaw, VsnRaw) ->
     Name = iolist_to_binary(NameRaw),
     1 =< length([1 || {_, [AppName, {git, _, {_, Vsn}}]} <- Warns,
-                      AppName =:= Name, Vsn =:= VsnRaw]).
+                      AppName =:= Name, Vsn =:= VsnRaw]);
+in_warnings(pkg, Warns, NameRaw, VsnRaw) ->
+    Name = iolist_to_binary(NameRaw),
+    Vsn = iolist_to_binary(VsnRaw),
+    1 =< length([1 || {_, [AppName, AppVsn]} <- Warns,
+                      AppName =:= Name, AppVsn =:= Vsn]).
 
