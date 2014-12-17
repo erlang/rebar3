@@ -276,6 +276,7 @@ build_proj_plt(State, Plt, Files) ->
     BaseFiles = get_base_plt_files(State),
     {ok, State1} = update_base_plt(State, BasePlt, BaseFiles),
     ?INFO("Copying ~p to ~p...", [BasePlt, Plt]),
+    _ = filelib:ensure_dir(Plt),
     case file:copy(BasePlt, Plt) of
         {ok, _} ->
             check_plt(State1, Plt, BaseFiles, Files);
