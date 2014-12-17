@@ -25,19 +25,41 @@ init(State) ->
                                  {deps, ?DEPS},
                                  {bare, false},
                                  {example, "rebar ct"},
-                                 {short_desc, "Run Common Tests"},
+                                 {short_desc, "Run Common Tests."},
                                  {desc, ""},
                                  {opts, ct_opts(State)},
                                  {profile, test}]),
     State1 = rebar_state:add_provider(State, Provider),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    {Opts, _} = rebar_state:command_parsed_args(State),
-    Opts1 = transform_opts(Opts),
-    ok = create_dirs(Opts1),
-    case handle_results(ct:run_test(Opts1)) of
+    ?INFO("Running Common Test suites...", []),
+    {RawOpts, _} = rebar_state:command_parsed_args(State),
+    Opts = [{auto_compile, false}] ++ transform_opts(RawOpts),
+    ProjectApps = rebar_state:project_apps(State),
+    OutDir = case proplists:get_value(outdir, RawOpts, undefined) of
+        undefined -> filename:join([rebar_state:dir(State),
+                                    ec_file:insecure_mkdtemp()]);
+        Path -> Path
+    end,
+    InDir = proplists:get_value(dir, Opts, []),
+    ok = create_dirs(Opts),
+    ?DEBUG("Compiling Common Test suites in: ~p", [OutDir]),
+    lists:foreach(fun(App) ->
+                      AppDir = rebar_app_info:dir(App),
+                      C = rebar_config:consult(AppDir),
+                      S = rebar_state:new(State, C, AppDir),
+                      %% combine `erl_first_files` and `common_test_first_files` and
+                      %% adjust compile opts to include `common_test_compile_opts`
+                      %% and `{src_dirs, "test"}`
+                      TestState = first_files(test_opts(S, InDir, OutDir)),
+                      ok = rebar_erlc_compiler:compile(TestState, AppDir)
+                  end, ProjectApps),
+    true = code:add_patha(OutDir),
+    CTOpts = resolve_ct_opts(State, Opts),
+    Result = handle_results(ct:run_test([{dir, OutDir}] ++ CTOpts)),
+    case Result of
         {error, Reason} ->
             {error, {?MODULE, Reason}};
         ok ->
@@ -51,9 +73,9 @@ format_error({error_running_tests, Reason}) ->
     io_lib:format("Error running tests: ~p", [Reason]).
 
 ct_opts(State) ->
-    DefaultTestDir = filename:join([rebar_state:dir(State), "test"]),
     DefaultLogsDir = filename:join([rebar_state:dir(State), "logs"]),
-    [{dir, undefined, "dir", {string, DefaultTestDir}, help(dir)}, %% dir
+    [{dir, undefined, "dir", string, help(dir)}, %% comma-seperated list
+     {outdir, undefined, "outdir", string, help(outdir)}, %% string
      {suite, undefined, "suite", string, help(suite)}, %% comma-seperated list
      {group, undefined, "group", string, help(group)}, %% comma-seperated list
      {testcase, undefined, "case", string, help(testcase)}, %% comma-seperated list
@@ -63,7 +85,7 @@ ct_opts(State) ->
      {config, undefined, "config", string, help(config)}, %% comma-seperated list
      {userconfig, undefined, "userconfig", string, help(userconfig)}, %% [{CallbackMod, CfgStrings}] | {CallbackMod, CfgStrings}
      {allow_user_terms, undefined, "allow_user_terms", boolean, help(allow_user_terms)}, %% Bool
-     {logdir, undefined, "logdir", {string, DefaultLogsDir}, help(logdir)}, %% string
+     {logdir, undefined, "logdir", {string, DefaultLogsDir}, help(logdir)}, %% dir
      {logopts, undefined, "logopts", string, help(logopts)}, %% enum, no_nl | no_src
      {verbosity, undefined, "verbosity", string, help(verbosity)}, %% Integer OR [{Category, VLevel}]
      {silent_connections, undefined, "silent_connections", string,
@@ -87,10 +109,74 @@ ct_opts(State) ->
      {ct_hooks, undefined, "ct_hooks", string, help(ct_hooks)} %% List: [CTHModule | {CTHModule, CTHInitArgs}] where CTHModule is atom CthInitArgs is term
     ].
 
+help(outdir) ->
+    "Output directory for compiled modules";
+help(dir) ->
+    "List of directories containing test suites (default: test)";
+help(suite) ->
+    "List of test suites to run";
+help(group) ->
+    "List of test groups to run";
+help(testcase) ->
+    "List of test cases to run";
+help(spec) ->
+    "List of test specs to run";
+help(join_specs) ->
+    ""; %% ??
+help(label) ->
+    "Test label";
+help(config) ->
+    "List of config files";
+help(allow_user_terms) ->
+    ""; %% ??
+help(logdir) ->
+    "Log folder";
+help(logopts) ->
+    ""; %% ??
+help(verbosity) ->
+    "Verbosity";
+help(silent_connections) ->
+    ""; %% ??
+help(stylesheet) ->
+    "Stylesheet to use for test results";
+help(cover) ->
+    "Cover file to use";
+help(cover_stop) ->
+    ""; %% ??
+help(event_handler) ->
+    "Event handlers to attach to the runner";
+help(include) ->
+    "Include folder";
+help(abort_if_missing_suites) ->
+    "Abort if suites are missing";
+help(multiply_timetraps) ->
+    ""; %% ??
+help(scale_timetraps) ->
+    ""; %% ??
+help(create_priv_dir) ->
+    ""; %% ??
+help(repeat) ->
+    "How often to repeat tests";
+help(duration) ->
+    "Max runtime (format: HHMMSS)";
+help(until) ->
+    "Run until (format: HHMMSS)";
+help(force_stop) ->
+    "Force stop after time";
+help(basic_html) ->
+    "Show basic HTML";
+help(ct_hooks) ->
+    "";
+help(userconfig) ->
+    "".
+
 transform_opts(Opts) ->
     transform_opts(Opts, []).
 
 transform_opts([], Acc) -> Acc;
+%% drop `outdir` so it's not passed to common_test
+transform_opts([{outdir, _}|Rest], Acc) ->
+    transform_opts(Rest, Acc);
 transform_opts([{ct_hooks, CtHooks}|Rest], Acc) ->
     transform_opts(Rest, [{ct_hooks, parse_term(CtHooks)}|Acc]);
 transform_opts([{force_stop, "skip_rest"}|Rest], Acc) ->
@@ -155,86 +241,51 @@ parse_term(String) ->
 
 create_dirs(Opts) ->
     LogDir = proplists:get_value(logdir, Opts),
-    TestDir = proplists:get_value(dir, Opts),
-    ensure_logdir(LogDir),
-    ensure_testdir(TestDir),
+    ensure_dir([LogDir]),
     ok.
 
-ensure_logdir(Logdir) ->
-    case ec_file:is_dir(Logdir) of
+ensure_dir([]) -> ok;
+ensure_dir([Dir|Rest]) ->
+    case ec_file:is_dir(Dir) of
         true ->
             ok;
         false ->
-            ec_file:mkdir_path(Logdir)
-    end.
+            ec_file:mkdir_path(Dir)
+    end,
+    ensure_dir(Rest).
 
-ensure_testdir(Testdir) ->
-    case ec_file:is_dir(Testdir) of
-        false ->
-            ?INFO("Test directory ~s does not exist:\n",
-                  [Testdir]),
-            ?FAIL;
-        _ -> ok
-    end.
+test_opts(State, InDir, OutDir) ->
+    ErlOpts = rebar_state:get(State, common_test_compile_opts, []) ++
+              rebar_utils:erl_opts(State),
+    TestOpts = [{outdir, OutDir}] ++
+               [{src_dirs, InDir}] ++
+               [{src_dirs, ["src", "test"]}] ++
+               ErlOpts,
+    rebar_state:set(State, erl_opts, TestOpts).
 
-help(dir) ->
-    "Test folder (default: test/)";
-help(suite) ->
-    "List of test suites to run";
-help(group) ->
-    "List of test groups to run";
-help(testcase) ->
-    "List of test cases to run";
-help(spec) ->
-    "List of test specs to run";
-help(join_specs) ->
-    ""; %% ??
-help(label) ->
-    "Test label";
-help(config) ->
-    "List of config files";
-help(allow_user_terms) ->
-    ""; %% ??
-help(logdir) ->
-    "Log folder";
-help(logopts) ->
-    ""; %% ??
-help(verbosity) ->
-    "Verbosity";
-help(silent_connections) ->
-    ""; %% ??
-help(stylesheet) ->
-    "Stylesheet to use for test results";
-help(cover) ->
-    "Cover file to use";
-help(cover_stop) ->
-    ""; %% ??
-help(event_handler) ->
-    "Event handlers to attach to the runner";
-help(include) ->
-    "Include folder";
-help(abort_if_missing_suites) ->
-    "Abort if suites are missing";
-help(multiply_timetraps) ->
-    ""; %% ??
-help(scale_timetraps) ->
-    ""; %% ??
-help(create_priv_dir) ->
-    ""; %% ??
-help(repeat) ->
-    "How often to repeat tests";
-help(duration) ->
-    "Max runtime (format: HHMMSS)";
-help(until) ->
-    "Run until (format: HHMMSS)";
-help(force_stop) ->
-    "Force stop after time";
-help(basic_html) ->
-    "Show basic HTML";
-help(ct_hooks) ->
-    "";
-help(userconfig) ->
-    "".
+first_files(State) ->
+    BaseFirst = rebar_state:get(State, erl_first_files, []),
+    CTFirst = rebar_state:get(State, common_test_first_files, []),
+    rebar_state:set(State, erl_first_modules, BaseFirst ++ CTFirst).
+
+resolve_ct_opts(State, Opts) ->
+    CTOpts = rebar_state:get(State, common_test_opts, []),
+    %% rebar has seperate input and output directories whereas `common_test`
+    %% uses only a single directory so handle `dir` elsewhere
+    CmdLineOpts = lists:keydelete(dir, 1, Opts),
+    merge_opts(CTOpts, CmdLineOpts, []).
+
+%% merge opts by iterating over opts defined in `rebar.config` and checking
+%% command line opts to see if opt is also defined there. if so, take that
+%% value (dropping the value from `rebar.config`) and continue until there
+%% are no more opts defined in `rebar.config` then append remaining command
+%% line opts
+merge_opts([], CmdLineOpts, Acc) -> [CmdLineOpts] ++ Acc;
+merge_opts([{K, V}|Rest], CmdLineOpts, Acc) ->
+    case lists:keytake(K, 1, CmdLineOpts) of
+        {K, Override, Rem} -> merge_opts(Rest, Rem, [{K, Override}] ++ Acc);
+        false -> merge_opts(Rest, CmdLineOpts, [{K, V}] ++ Acc)
+    end.
 
 handle_results([Result]) ->
     handle_results(Result);
