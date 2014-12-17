@@ -25,19 +25,28 @@ init(State) ->
                                  {deps, ?DEPS},
                                  {bare, false},
                                  {example, "rebar ct"},
-                                 {short_desc, "Run Common Tests"},
+                                 {short_desc, "Run Common Tests."},
                                  {desc, ""},
                                  {opts, ct_opts(State)},
                                  {profile, test}]),
     State1 = rebar_state:add_provider(State, Provider),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
-    Opts1 = transform_opts(Opts),
+    TmpDir = case proplists:get_value(dir, Opts, undefined) of
+        undefined -> filename:join([rebar_state:dir(State),
+                                    ec_file:insecure_mkdtemp()]);
+        Path -> Path
+    end,
+    Opts1 = transform_opts(Opts ++ [{auto_compile, false},
+                                    {dir, TmpDir}]),
     ok = create_dirs(Opts1),
-    case handle_results(ct:run_test(Opts1)) of
+    {ok, _SrcErls} = rebar_erlc_compiler:test_compile(State, "common_test",
+                                                      TmpDir),
+    Result = handle_results(ct:run_test(Opts1)),
+    case Result of
         {error, Reason} ->
             {error, {?MODULE, Reason}};
         ok ->
@@ -51,9 +60,8 @@ format_error({error_running_tests, Reason}) ->
     io_lib:format("Error running tests: ~p", [Reason]).
 
 ct_opts(State) ->
-    DefaultTestDir = filename:join([rebar_state:dir(State), "test"]),
     DefaultLogsDir = filename:join([rebar_state:dir(State), "logs"]),
-    [{dir, undefined, "dir", {string, DefaultTestDir}, help(dir)}, %% dir
+    [{dir, undefined, "dir", string, help(dir)}, %% dir
      {suite, undefined, "suite", string, help(suite)}, %% comma-seperated list
      {group, undefined, "group", string, help(group)}, %% comma-seperated list
      {testcase, undefined, "case", string, help(testcase)}, %% comma-seperated list
@@ -63,7 +71,7 @@ ct_opts(State) ->
      {config, undefined, "config", string, help(config)}, %% comma-seperated list
      {userconfig, undefined, "userconfig", string, help(userconfig)}, %% [{CallbackMod, CfgStrings}] | {CallbackMod, CfgStrings}
      {allow_user_terms, undefined, "allow_user_terms", boolean, help(allow_user_terms)}, %% Bool
-     {logdir, undefined, "logdir", {string, DefaultLogsDir}, help(logdir)}, %% string
+     {logdir, undefined, "logdir", {string, DefaultLogsDir}, help(logdir)}, %% dir
      {logopts, undefined, "logopts", string, help(logopts)}, %% enum, no_nl | no_src
      {verbosity, undefined, "verbosity", string, help(verbosity)}, %% Integer OR [{Category, VLevel}]
      {silent_connections, undefined, "silent_connections", string,
@@ -91,6 +99,9 @@ transform_opts(Opts) ->
     transform_opts(Opts, []).
 
 transform_opts([], Acc) -> Acc;
+%% append `ebin` to tmpdir so ct can find our suites
+transform_opts([{dir, Path}|Rest], Acc) ->
+    transform_opts(Rest, [{dir, filename:join(Path, "ebin")}|Acc]);
 transform_opts([{ct_hooks, CtHooks}|Rest], Acc) ->
     transform_opts(Rest, [{ct_hooks, parse_term(CtHooks)}|Acc]);
 transform_opts([{force_stop, "skip_rest"}|Rest], Acc) ->
@@ -155,29 +166,23 @@ parse_term(String) ->
 
 create_dirs(Opts) ->
     LogDir = proplists:get_value(logdir, Opts),
-    TestDir = proplists:get_value(dir, Opts),
-    ensure_logdir(LogDir),
-    ensure_testdir(TestDir),
+    OutDir = proplists:get_value(dir, Opts),
+    ensure_dir([LogDir, OutDir]),
     ok.
 
-ensure_logdir(Logdir) ->
-    case ec_file:is_dir(Logdir) of
+ensure_dir([]) -> ok;
+ensure_dir([Dir|Rest]) ->
+    case ec_file:is_dir(Dir) of
         true ->
             ok;
         false ->
-            ec_file:mkdir_path(Logdir)
-    end.
-
-ensure_testdir(Testdir) ->
-    case ec_file:is_dir(Testdir) of
-        false ->
-            ?INFO("Test directory ~s does not exist:\n",
-                  [Testdir]),
-            ?FAIL;
-        _ -> ok
-    end.
+            ec_file:mkdir_path(Dir)
+    end,
+    ensure_dir(Rest).
 
 help(dir) ->
+    "Temporary folder for compiling test artifacts";
+help(srcdir) ->
     "Test folder (default: test/)";
 help(suite) ->
     "List of test suites to run";
