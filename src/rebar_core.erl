@@ -37,8 +37,17 @@ process_command(State, Command) ->
     Providers = rebar_state:providers(State),
     TargetProviders = providers:get_target_providers(Command, Providers),
     case providers:get_provider(Command, Providers) of
-        not_found ->
-            {error, io_lib:format("Command ~p not found", [Command])};
+        not_found when is_atom(Command) ->
+            Namespace = Command,
+            process_command(State, {Namespace, do});
+        not_found when is_tuple(Command) ->
+            case Command of
+                {default,Cmd} ->
+                    {error, io_lib:format("Command ~p not found", [Cmd])};
+                {Namespace,Cmd} ->
+                    {error, io_lib:format("Command ~p not found in namespace ~p",
+                                          [Cmd, Namespace])}
+            end;
         CommandProvider ->
             case Command of
                 Command when Command =:= do
@@ -62,7 +71,7 @@ process_command(State, Command) ->
 -spec do([{atom(), atom()}], rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do([], State) ->
     {ok, State};
-do([{ProviderName, _} | Rest], State) ->
+do([ProviderName | Rest], State) ->
     Provider = providers:get_provider(ProviderName
                                      ,rebar_state:providers(State)),
     case providers:do(Provider, State) of
