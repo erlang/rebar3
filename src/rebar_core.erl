@@ -54,8 +54,13 @@ process_command(State, Command) ->
                 undefined ->
                     %% On the first run (Namespace = undefined), we use the
                     %% unfound command name to be a namespace.
-                    do([{default, do} | TargetProviders],
-                       rebar_state:namespace(State, Command));
+                    case providers:get_providers_by_namespace(Command, Providers) of
+                        [] ->
+                            {error, io_lib:format("Command ~p not found", [Command])};
+                        _ ->
+                            do([{default, do} | TargetProviders],
+                               rebar_state:namespace(State, Command))
+                    end;
                 default ->
                     {error, io_lib:format("Command ~p not found", [Command])};
                 _ ->
