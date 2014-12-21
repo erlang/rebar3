@@ -195,7 +195,7 @@ circular_skip(Config) -> run(Config).
 run(Config) ->
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
     rebar_test_utils:run_and_check(
-        Config, RebarConfig, "install_deps", ?config(expect, Config)
+        Config, RebarConfig, ["install_deps"], ?config(expect, Config)
     ),
     check_warnings(warning_calls(), ?config(warnings, Config), ?config(deps_type, Config)).
 
