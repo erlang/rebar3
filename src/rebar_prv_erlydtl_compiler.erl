@@ -105,7 +105,7 @@
 
 -include("rebar.hrl").
 
--define(PROVIDER, erlydtl).
+-define(PROVIDER, compile).
 -define(DEPS, []).
 
 %% ===================================================================
@@ -116,9 +116,10 @@
 init(State) ->
     State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
                                                                {module, ?MODULE},
+                                                               {namespace, erlydtl},
                                                                {bare, false},
                                                                {deps, ?DEPS},
-                                                               {example, "rebar erlydtl compile"},
+                                                               {example, "rebar3 erlydtl compile"},
                                                                {short_desc, "Compile erlydtl templates."},
                                                                {desc, ""},
                                                                {opts, []}])),
@@ -126,8 +127,6 @@ init(State) ->
 
 do(Config) ->
     MultiDtlOpts = erlydtl_opts(Config),
-    OrigPath = code:get_path(),
-    %true = code:add_path(rebar_utils:ebin_dir()),
 
     Result = lists:foldl(fun(DtlOpts, _) ->
                                  file:make_dir(option(out_dir, DtlOpts)),
@@ -143,7 +142,6 @@ do(Config) ->
                                                           {recursive, option(recursive, DtlOpts)}])
                          end, ok, MultiDtlOpts),
 
-    true = code:set_path(OrigPath),
     {Result, Config}.
 
 -spec format_error(any()) ->  iolist().
