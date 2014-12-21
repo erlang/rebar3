@@ -23,6 +23,7 @@
          project_apps/1, project_apps/2,
          deps_to_build/1, deps_to_build/2,
          all_deps/1, all_deps/2,
+         namespace/1, namespace/2,
 
          deps_names/1,
 
@@ -39,6 +40,7 @@
 
                   lock                = [],
                   current_profiles    = [default]     :: [atom()],
+                  namespace           = undefined     :: [atom()],
 
                   command_args        = [],
                   command_parsed_args = [],
@@ -219,6 +221,12 @@ all_deps(#state_t{all_deps=Apps}) ->
 
 all_deps(State=#state_t{}, NewApps) ->
     State#state_t{all_deps=NewApps}.
+
+namespace(#state_t{namespace=Namespace}) ->
+    Namespace.
+
+namespace(State=#state_t{}, Namespace) ->
+    State#state_t{namespace=Namespace}.
 
 providers(#state_t{providers=Providers}) ->
     Providers.

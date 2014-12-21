@@ -35,23 +35,41 @@
 process_command(State, Command) ->
     %% ? rebar_prv_install_deps:setup_env(State),
     Providers = rebar_state:providers(State),
-    TargetProviders = providers:get_target_providers(Command, Providers),
-    case providers:get_provider(Command, Providers) of
-        not_found when is_atom(Command) ->
-            Namespace = Command,
-            process_command(State, {Namespace, do});
-        not_found when is_tuple(Command) ->
-            case Command of
-                {default,Cmd} ->
-                    {error, io_lib:format("Command ~p not found", [Cmd])};
-                {Namespace,Cmd} ->
+    Namespace = rebar_state:namespace(State),
+    {TargetProviders, CommandProvider} =
+     case Namespace of
+        undefined ->
+            %% undefined namespace means 'default', but on the first run;
+            %% it is used as an implicit counter for the first vs. subsequent
+            %% runs.
+            {providers:get_target_providers(Command, Providers, default),
+             providers:get_provider(Command, Providers, default)};
+        _ ->
+            {providers:get_target_providers(Command, Providers, Namespace),
+             providers:get_provider(Command, Providers, Namespace)}
+    end,
+    case CommandProvider of
+        not_found ->
+            case Namespace of
+                undefined ->
+                    %% On the first run (Namespace = undefined), we use the
+                    %% unfound command name to be a namespace.
+                    do([{default, do} | TargetProviders],
+                       rebar_state:namespace(State, Command));
+                default ->
+                    {error, io_lib:format("Command ~p not found", [Command])};
+                _ ->
                     {error, io_lib:format("Command ~p not found in namespace ~p",
-                                          [Cmd, Namespace])}
+                                          [Command, Namespace])}
             end;
         CommandProvider ->
             case Command of
-                Command when Command =:= do
-                           ; Command =:= as ->
+                Command when Command =:= do, Namespace =:= undefined ->
+                    %% We're definitely in the default namespace. 'do' doesn't
+                    %% properly exist for non-default namespaces outside of
+                    %% dynamic dispatch calls for namespaces.
+                    do(TargetProviders, rebar_state:namespace(State, default));
+                Command when Command =:= do; Command =:= as ->
                     do(TargetProviders, State);
                 _ ->
                     Profile = providers:profile(CommandProvider),
