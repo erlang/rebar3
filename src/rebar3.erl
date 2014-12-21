@@ -71,10 +71,10 @@ main(Args) ->
     end.
 
 %% Erlang-API entry point
-run(BaseState, Command) ->
+run(BaseState, Commands) ->
     _ = application:load(rebar),
-    BaseState1 = rebar_state:set(BaseState, task, Command),
-    run_aux(BaseState1, [], [Command]).
+    BaseState1 = rebar_state:set(BaseState, task, Commands),
+    run_aux(BaseState1, [], Commands).
 
 %% ====================================================================
 %% Internal functions
