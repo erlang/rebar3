@@ -272,7 +272,7 @@ find_disk_templates(State) ->
     OtherTemplates = find_other_templates(State),
     Home = rebar_dir:home_dir(),
     HomeFiles = rebar_utils:find_files(filename:join([Home, ?CONFIG_DIR, "templates"]),
-                                       ?TEMPLATE_RE),
+                                       ?TEMPLATE_RE, true), % recursive
     [{file, F} || F <- OtherTemplates ++ HomeFiles].
 
 %% Fetch template indexes that sit on disk in custom areas
