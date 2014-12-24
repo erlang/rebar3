@@ -34,7 +34,7 @@ init(State) ->
 do(State) ->
     Options = rebar_state:command_args(State),
     DepsDir = rebar_dir:deps_dir(State),
-    LibDirs = lists:usort(rebar_utils:filtermap(fun ec_file:exists/1, [DepsDir])),
+    LibDirs = lists:usort(rebar_utils:filtermap(fun ec_file:exists/1, [DepsDir | ?DEFAULT_PROJECT_APP_DIRS])),
     OutputDir = filename:join(rebar_dir:base_dir(State), ?DEFAULT_RELEASE_DIR),
     AllOptions = string:join(["release" | Options], " "),
     try
