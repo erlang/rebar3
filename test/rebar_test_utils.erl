@@ -97,13 +97,19 @@ create_random_vsn() ->
 %%%%%%%%%%%%%%%
 check_results(AppDir, Expected) ->
     BuildDir = filename:join([AppDir, "_build", "lib"]),
+    Apps = rebar_app_discover:find_apps([AppDir]),
+    AppsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Apps],
     Deps = rebar_app_discover:find_apps([BuildDir], all),
     DepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Deps],
     lists:foreach(
         fun({app, Name}) ->
-                [App] = rebar_app_discover:find_apps([AppDir]),
                 ct:pal("Name: ~p", [Name]),
-                ?assertEqual(Name, ec_cnv:to_list(rebar_app_info:name(App)))
+                case lists:keyfind(Name, 1, AppsNames) of
+                    false ->
+                        error({app_not_found, Name});
+                    {Name, _App} ->
+                        ok
+                end
         ;  ({dep, Name}) ->
                 ct:pal("Name: ~p", [Name]),
                 ?assertNotEqual(false, lists:keyfind(Name, 1, DepsNames))
@@ -111,7 +117,7 @@ check_results(AppDir, Expected) ->
                 ct:pal("Name: ~p, Vsn: ~p", [Name, Vsn]),
                 case lists:keyfind(Name, 1, DepsNames) of
                     false ->
-                        error({app_not_found, Name});
+                        error({dep_not_found, Name});
                     {Name, App} ->
                         ?assertEqual(iolist_to_binary(Vsn),
                                      iolist_to_binary(rebar_app_info:original_vsn(App)))
