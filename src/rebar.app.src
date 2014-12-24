@@ -21,7 +21,6 @@
         %% Default log level
         {log_level, warn},
 
-        %% any_dir processing modules
         {providers, [rebar_prv_as,
                      rebar_prv_clean,
                      rebar_prv_deps,
