@@ -18,9 +18,9 @@ install(State) ->
     DepsDir = rebar_dir:deps_dir(State1),
     expand_plugins(DepsDir),
     Plugins = rebar_state:get(State1, plugins, []),
-    PluginProviders = rebar_utils:filtermap(fun(Plugin) ->
-                                                    handle_plugin(Plugin, State1)
-                                            end, Plugins),
+    PluginProviders = lists:flatten(rebar_utils:filtermap(fun(Plugin) ->
+                                                                  handle_plugin(Plugin, State1)
+                                                          end, Plugins)),
 
     State2 = rebar_state:set(State1, deps_dir, OldDepsDir),
     {ok, PluginProviders, State2}.
@@ -55,16 +55,22 @@ plugin_providers(Plugin) when is_atom(Plugin) ->
     validate_plugin(Plugin).
 
 validate_plugin(Plugin) ->
-    Exports = sets:from_list(Plugin:module_info(exports)),
-    Required = sets:from_list([{init,1},
-                               {do,1},
-                               {format_error,1}]),
-    case sets:is_subset(Required,  Exports) of
-        false ->
-            ?WARN("Plugin ~p is not a provider. It will not be used.~n", [Plugin]),
-            false;
-        true ->
-            {true, Plugin}
+    application:load(Plugin),
+    case application:get_env(Plugin, providers) of
+        {ok, Providers} ->
+            {true, Providers};
+        undefined ->
+            Exports = sets:from_list(Plugin:module_info(exports)),
+            Required = sets:from_list([{init,1},
+                                       {do,1},
+                                       {format_error,1}]),
+            case sets:is_subset(Required,  Exports) of
+                false ->
+                    ?WARN("Plugin ~p is not a provider. It will not be used.~n", [Plugin]),
+                    false;
+                true ->
+                    {true, Plugin}
+            end
     end.
 
 expand_plugins(Dir) ->
