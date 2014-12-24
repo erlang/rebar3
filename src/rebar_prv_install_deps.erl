@@ -357,11 +357,14 @@ maybe_fetch(AppInfo, Update, Seen) ->
 
 -spec parse_deps(binary(), list()) -> {[rebar_app_info:t()], [pkg_dep()]}.
 parse_deps(DepsDir, Deps) ->
-    lists:foldl(fun({Name, Vsn}, {SrcDepsAcc, PkgDepsAcc}) ->
+    lists:foldl(fun({Name, Vsn}, {SrcDepsAcc, PkgDepsAcc}) when is_list(Vsn) ->
                         {SrcDepsAcc, [parse_goal(ec_cnv:to_binary(Name)
                                                 ,ec_cnv:to_binary(Vsn)) | PkgDepsAcc]};
                    (Name, {SrcDepsAcc, PkgDepsAcc}) when is_atom(Name) ->
                         {SrcDepsAcc, [ec_cnv:to_binary(Name) | PkgDepsAcc]};
+                   ({Name, Source}, {SrcDepsAcc, PkgDepsAcc}) when is_tuple (Source) ->
+                        Dep = new_dep(DepsDir, Name, [], Source),
+                        {[Dep | SrcDepsAcc], PkgDepsAcc};
                    ({Name, Source}, {SrcDepsAcc, PkgDepsAcc}) when is_tuple (Source) ->
                         Dep = new_dep(DepsDir, Name, [], Source),
                         {[Dep | SrcDepsAcc], PkgDepsAcc};

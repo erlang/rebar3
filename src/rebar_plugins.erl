@@ -28,7 +28,8 @@ install(State) ->
 -spec handle_plugin(rebar_prv_install_deps:dep(), rebar_state:t()) -> {true, any()} | false.
 handle_plugin(Plugin, State) ->
     try
-        {ok, _, State1} = rebar_prv_install_deps:handle_deps(State, [Plugin]),
+        {ok, _, State1} = rebar_prv_install_deps:handle_deps(default, State, [Plugin]),
+
         Apps = rebar_state:all_deps(State1),
         ToBuild = lists:dropwhile(fun rebar_app_info:valid/1, Apps),
         lists:foreach(fun(AppInfo) ->
@@ -55,7 +56,7 @@ plugin_providers(Plugin) when is_atom(Plugin) ->
     validate_plugin(Plugin).
 
 validate_plugin(Plugin) ->
-    application:load(Plugin),
+    ok = application:load(Plugin),
     case application:get_env(Plugin, providers) of
         {ok, Providers} ->
             {true, Providers};
