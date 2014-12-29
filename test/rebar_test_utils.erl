@@ -19,11 +19,13 @@ init_rebar_state(Config, Name) ->
     application:load(rebar),
     DataDir = ?config(priv_dir, Config),
     AppsDir = filename:join([DataDir, create_random_name(Name)]),
+    CheckoutsDir = filename:join([AppsDir, "_checkouts"]),
     ok = ec_file:mkdir_p(AppsDir),
+    ok = ec_file:mkdir_p(CheckoutsDir),
     Verbosity = rebar3:log_level(),
     rebar_log:init(command_line, Verbosity),
     State = rebar_state:new([{base_dir, filename:join([AppsDir, "_build"])}]),
-    [{apps, AppsDir}, {state, State} | Config].
+    [{apps, AppsDir}, {checkouts, CheckoutsDir}, {state, State} | Config].
 
 %% @doc Takes common test config, a rebar config ([] if empty), a command to
 %% run ("install_deps", "compile", etc.), and a list of expected applications
@@ -97,10 +99,13 @@ create_random_vsn() ->
 %%%%%%%%%%%%%%%
 check_results(AppDir, Expected) ->
     BuildDir = filename:join([AppDir, "_build", "lib"]),
+    CheckoutsDir = filename:join([AppDir, "_checkouts"]),
     Apps = rebar_app_discover:find_apps([AppDir]),
     AppsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Apps],
     Deps = rebar_app_discover:find_apps([BuildDir], all),
     DepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Deps],
+    Checkouts = rebar_app_discover:find_apps([CheckoutsDir], all),
+    CheckoutsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Checkouts],
     lists:foreach(
         fun({app, Name}) ->
                 ct:pal("Name: ~p", [Name]),
@@ -110,6 +115,9 @@ check_results(AppDir, Expected) ->
                     {Name, _App} ->
                         ok
                 end
+        ;  ({checkout, Name}) ->
+                ct:pal("Name: ~p", [Name]),
+                ?assertNotEqual(false, lists:keyfind(Name, 1, CheckoutsNames))
         ;  ({dep, Name}) ->
                 ct:pal("Name: ~p", [Name]),
                 ?assertNotEqual(false, lists:keyfind(Name, 1, DepsNames))
