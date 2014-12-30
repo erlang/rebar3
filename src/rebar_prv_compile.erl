@@ -67,8 +67,13 @@ format_error(Reason) ->
 build_apps(State, Apps) ->
     lists:foreach(fun(AppInfo) ->
                           AppDir = rebar_app_info:dir(AppInfo),
-                          C = rebar_config:consult(AppDir),
-                          S = rebar_state:new(State, C, AppDir),
+                          S = case rebar_app_info:state(AppInfo) of
+                                  undefined ->
+                                      C = rebar_config:consult(AppDir),
+                                      rebar_state:new(State, C, AppDir);
+                                  AppState ->
+                                      AppState
+                              end,
 
                           %% Legacy hook support
                           rebar_hooks:run_compile_hooks(AppDir, pre_hooks, compile, S),

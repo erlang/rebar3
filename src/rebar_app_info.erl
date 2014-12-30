@@ -30,6 +30,8 @@
          dir/2,
          source/1,
          source/2,
+         state/1,
+         state/2,
          valid/1,
          valid/2]).
 
@@ -47,6 +49,7 @@
                      dep_level=0 :: integer(),
                      dir :: file:name(),
                      source :: string() | tuple() | undefined,
+                     state :: rebar_state:t() | undefined,
                      valid :: boolean()}).
 
 %%============================================================================
@@ -210,6 +213,14 @@ source(AppInfo=#app_info_t{}, Source) ->
 -spec source(t()) -> string() | tuple().
 source(#app_info_t{source=Source}) ->
     Source.
+
+-spec state(t(), rebar_state:t() | undefined) -> t().
+state(AppInfo=#app_info_t{}, State) ->
+    AppInfo#app_info_t{state=State}.
+
+-spec state(t()) -> rebar_state:t() | undefined.
+state(#app_info_t{state=State}) ->
+    State.
 
 -spec valid(t()) -> boolean().
 valid(AppInfo=#app_info_t{valid=undefined}) ->

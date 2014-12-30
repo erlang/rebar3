@@ -134,7 +134,7 @@ handle_deps(Profile, State, Deps, Update) ->
     {Packages, Graph} = rebar_packages:get_packages(State),
     %% Split source deps from pkg deps, needed to keep backwards compatibility
     DepsDir = rebar_dir:deps_dir(State),
-    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps),
+    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, State),
 
     %% Fetch transitive src deps
     {State1, SrcApps, PkgDeps1, Seen} =
@@ -293,16 +293,23 @@ handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State) ->
                         {rebar_app_info:t(), [rebar_app_info:t()], [pkg_dep()]}.
 handle_dep(State, DepsDir, AppInfo) ->
     Profiles = rebar_state:current_profiles(State),
+    Name = rebar_app_info:name(AppInfo),
+
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
-    S = rebar_state:new(rebar_state:new(), C, rebar_app_info:dir(AppInfo)),
-    S1 = rebar_state:apply_profiles(S, Profiles),
-    Deps = rebar_state:get(S1, deps, []),
-    AppInfo1 = rebar_app_info:deps(AppInfo, rebar_state:deps_names(Deps)),
-    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps),
-    {AppInfo1, SrcDeps, PkgDeps}.
+
+    S = rebar_app_info:state(AppInfo),
+    S1 = rebar_state:new(S, C, rebar_app_info:dir(AppInfo)),
+    S2 = rebar_state:apply_profiles(S1, Profiles),
+    S3 = rebar_state:apply_overrides(S2, Name),
+    AppInfo1 = rebar_app_info:state(AppInfo, S3),
+
+    Deps = rebar_state:get(S3, deps, []),
+    AppInfo2 = rebar_app_info:deps(AppInfo1, rebar_state:deps_names(Deps)),
+    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, S3),
+    {AppInfo2, SrcDeps, PkgDeps}.
 
 -spec maybe_fetch(rebar_app_info:t(), boolean() | {true, binary(), integer()},
-                 sets:set(binary())) -> boolean().
+                  sets:set(binary())) -> boolean().
 maybe_fetch(AppInfo, Update, Seen) ->
     AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
     Apps = rebar_app_discover:find_apps(["_checkouts"], all),
@@ -355,39 +362,44 @@ maybe_fetch(AppInfo, Update, Seen) ->
             end
     end.
 
--spec parse_deps(binary(), list()) -> {[rebar_app_info:t()], [pkg_dep()]}.
-parse_deps(DepsDir, Deps) ->
+-spec parse_deps(binary(), list(), list()) -> {[rebar_app_info:t()], [pkg_dep()]}.
+parse_deps(DepsDir, Deps, State) ->
     lists:foldl(fun({Name, Vsn}, {SrcDepsAcc, PkgDepsAcc}) when is_list(Vsn) ->
                         {SrcDepsAcc, [parse_goal(ec_cnv:to_binary(Name)
                                                 ,ec_cnv:to_binary(Vsn)) | PkgDepsAcc]};
                    (Name, {SrcDepsAcc, PkgDepsAcc}) when is_atom(Name) ->
                         {SrcDepsAcc, [ec_cnv:to_binary(Name) | PkgDepsAcc]};
                    ({Name, Source}, {SrcDepsAcc, PkgDepsAcc}) when is_tuple (Source) ->
-                        Dep = new_dep(DepsDir, Name, [], Source),
+                        Dep = new_dep(DepsDir, Name, [], Source, State),
                         {[Dep | SrcDepsAcc], PkgDepsAcc};
                    ({Name, Source}, {SrcDepsAcc, PkgDepsAcc}) when is_tuple (Source) ->
-                        Dep = new_dep(DepsDir, Name, [], Source),
+                        Dep = new_dep(DepsDir, Name, [], Source, State),
                         {[Dep | SrcDepsAcc], PkgDepsAcc};
                    ({Name, _Vsn, Source}, {SrcDepsAcc, PkgDepsAcc}) when is_tuple (Source) ->
-                        Dep = new_dep(DepsDir, Name, [], Source),
+                        Dep = new_dep(DepsDir, Name, [], Source, State),
                         {[Dep | SrcDepsAcc], PkgDepsAcc};
                    ({Name, Source, Level}, {SrcDepsAcc, PkgDepsAcc}) when is_tuple (Source)
-                                                                         , is_integer(Level) ->
-                        Dep = new_dep(DepsDir, Name, [], Source),
+                                                                        , is_integer(Level) ->
+                        Dep = new_dep(DepsDir, Name, [], Source, State),
                         {[Dep | SrcDepsAcc], PkgDepsAcc}
                 end, {[], []}, Deps).
 
-new_dep(DepsDir, Name, Vsn, Source) ->
-    Dirs = [ec_cnv:to_list(filename:join(DepsDir, Name))],
-    {ok, Dep} = case ec_lists:search(fun(Dir) ->
-                                             rebar_app_info:discover(Dir)
-                                     end, Dirs) of
-                    {ok, App, _} ->
+new_dep(DepsDir, Name, Vsn, Source, State) ->
+    Dir = ec_cnv:to_list(filename:join(DepsDir, Name)),
+    {ok, Dep} = case rebar_app_info:discover(Dir) of
+                    {ok, App} ->
                         {ok, App};
                     not_found ->
                         rebar_app_info:new(Name, Vsn, ec_cnv:to_list(filename:join(DepsDir, Name)))
                 end,
-    rebar_app_info:source(Dep, Source).
+    C = rebar_config:consult(rebar_app_info:dir(Dep)),
+    S = rebar_state:new(rebar_state:new(), C, rebar_app_info:dir(Dep)),
+
+    Overrides = rebar_state:get(State, overrides, []),
+    ParentOverrides = rebar_state:overrides(State),
+    Dep1 = rebar_app_info:state(Dep,
+                               rebar_state:overrides(S, ParentOverrides++Overrides)),
+    rebar_app_info:source(Dep1, Source).
 
 -spec parse_goal(binary(), binary()) -> pkg_dep().
 parse_goal(Name, Constraint) ->

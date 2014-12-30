@@ -27,6 +27,9 @@
 
          deps_names/1,
 
+         overrides/1, overrides/2,
+         apply_overrides/2,
+
          prepend_hook/3, append_hook/3, hooks/2,
          providers/1, providers/2, add_provider/2]).
 
@@ -49,6 +52,7 @@
                   deps_to_build       = []          :: [rebar_app_into:t()],
                   all_deps            = []          :: [rebar_app_into:t()],
 
+                  overrides           = [],
                   providers           = []}).
 
 -export_type([t/0]).
@@ -150,6 +154,35 @@ command_parsed_args(#state_t{command_parsed_args=CmdArgs}) ->
 command_parsed_args(State, CmdArgs) ->
     State#state_t{command_parsed_args=CmdArgs}.
 
+apply_overrides(State=#state_t{overrides=Overrides}, AppName) ->
+    Name = binary_to_atom(AppName, utf8),
+
+    %% Inefficient. We want the order we get here though.
+    State1 = lists:foldl(fun({override, O}, StateAcc) ->
+                                 lists:foldl(fun({Key, Value}, StateAcc1) ->
+                                                     rebar_state:set(StateAcc1, Key, Value)
+                                             end, StateAcc, O);
+                            (_, StateAcc) ->
+                                 StateAcc
+                         end, State, Overrides),
+
+    State2 = lists:foldl(fun({override, N, O}, StateAcc) when N =:= Name ->
+                                 lists:foldl(fun({Key, Value}, StateAcc1) ->
+                                                     rebar_state:set(StateAcc1, Key, Value)
+                                             end, StateAcc, O);
+                            (_, StateAcc) ->
+                                 StateAcc
+                         end, State1, Overrides),
+
+    lists:foldl(fun({add, N, O}, StateAcc) when N =:= Name ->
+                        lists:foldl(fun({Key, Value}, StateAcc1) ->
+                                            OldValue = rebar_state:get(StateAcc1, Key, []),
+                                            rebar_state:set(StateAcc1, Key, Value++OldValue)
+                                    end, StateAcc, O);
+                   (_, StateAcc) ->
+                        StateAcc
+                end, State2, Overrides).
+
 apply_profiles(State, Profile) when not is_list(Profile) ->
     apply_profiles(State, [Profile]);
 apply_profiles(State, [default]) ->
@@ -199,6 +232,12 @@ deps_names(Deps) when is_list(Deps) ->
 deps_names(State) ->
     Deps = rebar_state:get(State, deps, []),
     deps_names(Deps).
+
+overrides(#state_t{overrides=Overrides}) ->
+    Overrides.
+
+overrides(State=#state_t{}, Overrides) ->
+    State#state_t{overrides=Overrides}.
 
 project_apps(#state_t{project_apps=Apps}) ->
     Apps.
