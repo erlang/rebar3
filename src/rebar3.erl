@@ -142,7 +142,8 @@ init_config() ->
 
     Config1 = case rebar_config:consult_file(?LOCK_FILE) of
                   [D] ->
-                      [{locks, D}, {{deps, default}, D} | Config];
+                      % {{deps, default}, D}
+                      [{{locks, default}, D} | Config];
                   _ ->
                       Config
               end,

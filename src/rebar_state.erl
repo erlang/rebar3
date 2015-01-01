@@ -90,7 +90,8 @@ new(ParentState, Config, Dir) ->
     Opts = ParentState#state_t.opts,
     LocalOpts = case rebar_config:consult_file(filename:join(Dir, ?LOCK_FILE)) of
                     [D] ->
-                        dict:from_list([{locks, D}, {{deps, default}, D} | Config]);
+                        D1 = proplists:get_value(deps, Config, []),
+                        dict:from_list([{locks, D}, {{deps, default}, D1} | Config]);
                     _ ->
                         D = proplists:get_value(deps, Config, []),
                         dict:from_list([{{deps, default}, D} | Config])
