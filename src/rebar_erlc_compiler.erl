@@ -135,7 +135,7 @@ doterl_compile(State, Dir) ->
 
 doterl_compile(Config, Dir, MoreSources, ErlOpts) ->
     OutDir = filename:join(Dir, "ebin"),
-    ErlFirstFilesConf = rebar_state:get(Config, erl_first_modules, []),
+    ErlFirstFilesConf = rebar_state:get(Config, erl_first_files, []),
     ?DEBUG("erl_opts ~p", [ErlOpts]),
     %% Support the src_dirs option allowing multiple directories to
     %% contain erlang source. This might be used, for example, should
