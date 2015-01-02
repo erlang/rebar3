@@ -407,7 +407,7 @@ parse_dep({Name, _Vsn, Source}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when i
     Dep = new_dep(DepsDir, Name, [], Source, State),
     {[Dep | SrcDepsAcc], PkgDepsAcc};
 parse_dep({Name, Source, Level}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_tuple (Source)
-                                                              , is_integer(Level) ->
+                                                                              , is_integer(Level) ->
     Dep = new_dep(DepsDir, Name, [], Source, State),
     {[Dep | SrcDepsAcc], PkgDepsAcc}.
 
