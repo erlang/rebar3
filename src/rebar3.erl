@@ -142,7 +142,10 @@ init_config() ->
 
     Config1 = case rebar_config:consult_file(?LOCK_FILE) of
                   [D] ->
-                      [{locks, D}, {{deps, default}, D} | Config];
+                      %% We want the top level deps only from the lock file.
+                      %% This ensures deterministic overrides for configs.
+                      Deps = [X || X <- D, element(3, X) =:= 0],
+                      [{{locks, default}, D}, {{deps, default}, Deps} | Config];
                   _ ->
                       Config
               end,
