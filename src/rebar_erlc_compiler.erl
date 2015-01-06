@@ -105,7 +105,10 @@ clean(Config, AppDir) ->
     rebar_file_utils:delete_each(
       [filename:join([AppDir, "include",MIB++".hrl"]) || MIB <- MIBs]),
     lists:foreach(fun(F) -> ok = rebar_file_utils:rm_rf(F) end,
-                  [filename:join(AppDir, "ebin/*.beam"), filename:join(AppDir, "priv/mibs/*.bin")]),
+                  [filename:join(AppDir, "ebin/*.beam"),
+                   filename:join(AppDir, "priv/mibs/*.bin"),
+                   filename:join(AppDir, "ebin/*.app")
+                  ]),
 
     YrlFiles = rebar_utils:find_files(filename:join(AppDir, "src"), ?RE_PREFIX".*\\.[x|y]rl\$"),
     rebar_file_utils:delete_each(
