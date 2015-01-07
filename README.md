@@ -121,7 +121,7 @@ https://s3.amazonaws.com/rebar3/rebar3
 #### Building rebar
 
 ```sh
-$ git clone git://github.com/tsloughter/rebar.git
+$ git clone https://github.com/rebar/rebar3
 $ cd rebar
 $ ./bootstrap/bootstrap
 ==> rebar (compile)
