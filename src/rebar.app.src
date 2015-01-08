@@ -13,6 +13,8 @@
                   crypto,
                   syntax_tools,
                   tools,
+                  eunit,
+                  common_test,
                   erlware_commons,
                   providers,
                   relx,
