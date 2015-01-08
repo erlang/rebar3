@@ -36,14 +36,9 @@ init(State) ->
 do(State) ->
     ?INFO("Running Common Test suites...", []),
     {RawOpts, _} = rebar_state:command_parsed_args(State),
-    Opts = [{auto_compile, false}] ++ transform_opts(RawOpts),
+    {InDirs, OutDir} = split_ct_dirs(State, RawOpts),
+    Opts = transform_opts(RawOpts),
     ProjectApps = rebar_state:project_apps(State),
-    OutDir = case proplists:get_value(outdir, RawOpts, undefined) of
-        undefined -> filename:join([rebar_state:dir(State),
-                                    ec_file:insecure_mkdtemp()]);
-        Out -> Out
-    end,
-    InDir = proplists:get_value(dir, Opts, []),
     ok = create_dirs(Opts),
     ?DEBUG("Compiling Common Test suites in: ~p", [OutDir]),
     lists:foreach(fun(App) ->
@@ -53,13 +48,13 @@ do(State) ->
                       %% combine `erl_first_files` and `common_test_first_files` and
                       %% adjust compile opts to include `common_test_compile_opts`
                       %% and `{src_dirs, "test"}`
-                      TestState = first_files(test_opts(S, InDir, OutDir)),
+                      TestState = test_state(S, InDirs, OutDir),
                       ok = rebar_erlc_compiler:compile(TestState, AppDir)
                   end, ProjectApps),
     Path = code:get_path(),
     true = code:add_patha(OutDir),
-    CTOpts = resolve_ct_opts(State, Opts),
-    Result = handle_results(ct:run_test([{dir, OutDir}] ++ CTOpts)),
+    CTOpts = resolve_ct_opts(State, Opts, OutDir),
+    Result = handle_results(ct:run_test(CTOpts)),
     true = code:set_path(Path),
     case Result of
         {error, Reason} ->
@@ -114,7 +109,7 @@ ct_opts(State) ->
 help(outdir) ->
     "Output directory for compiled modules";
 help(dir) ->
-    "List of directories containing test suites (default: test)";
+    "List of additional directories containing test suites";
 help(suite) ->
     "List of test suites to run";
 help(group) ->
@@ -171,6 +166,23 @@ help(ct_hooks) ->
     "";
 help(userconfig) ->
     "".
+
+split_ct_dirs(State, RawOpts) ->
+    %% preserve the override nature of command line opts by only checking
+    %% `rebar.config` defined additional test dirs if none are defined via
+    %% command line flag
+    InDirs = case proplists:get_value(dir, RawOpts) of
+        undefined ->
+            CTOpts = rebar_state:get(State, common_test_opts, []),
+            proplists:get_value(dir, CTOpts, []);
+        Dirs -> split_string(Dirs)
+    end,
+    OutDir = case proplists:get_value(outdir, RawOpts) of
+        undefined -> filename:join([rebar_state:dir(State),
+                                    ec_file:insecure_mkdtemp()]);
+        Out -> Out
+    end,
+    {InDirs, OutDir}.
 
 transform_opts(Opts) ->
     transform_opts(Opts, []).
@@ -256,26 +268,28 @@ ensure_dir([Dir|Rest]) ->
     end,
     ensure_dir(Rest).
 
-test_opts(State, InDir, OutDir) ->
+test_state(State, InDirs, OutDir) ->
     ErlOpts = rebar_state:get(State, common_test_compile_opts, []) ++
               rebar_utils:erl_opts(State),
     TestOpts = [{outdir, OutDir}] ++
-               [{src_dirs, InDir}] ++
-               [{src_dirs, ["src", "test"]}] ++
+               [{src_dirs, ["src", "test"] ++ InDirs}] ++
                ErlOpts,
-    rebar_state:set(State, erl_opts, TestOpts).
+    first_files(rebar_state:set(State, erl_opts, TestOpts)).
 
 first_files(State) ->
     BaseFirst = rebar_state:get(State, erl_first_files, []),
     CTFirst = rebar_state:get(State, common_test_first_files, []),
     rebar_state:set(State, erl_first_modules, BaseFirst ++ CTFirst).
 
-resolve_ct_opts(State, Opts) ->
+resolve_ct_opts(State, CmdLineOpts, OutDir) ->
     CTOpts = rebar_state:get(State, common_test_opts, []),
+    Opts = lists:ukeymerge(1,
+                    lists:ukeysort(1, CmdLineOpts),
+                    lists:ukeysort(1, CTOpts)),
     %% rebar has seperate input and output directories whereas `common_test`
-    %% uses only a single directory so handle `dir` elsewhere
-    CmdLineOpts = lists:keydelete(dir, 1, Opts),
-    lists:ukeymerge(1, lists:ukeysort(1, CmdLineOpts), lists:ukeysort(1, CTOpts)).
+    %% uses only a single directory so set `dir` to our precompiled `OutDir`
+    %% and disable `auto_compile`
+    [{auto_compile, false}, {dir, OutDir}] ++ lists:keydelete(dir, 1, Opts).
 
 handle_results([Result]) ->
     handle_results(Result);
