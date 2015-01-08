@@ -275,19 +275,7 @@ resolve_ct_opts(State, Opts) ->
     %% rebar has seperate input and output directories whereas `common_test`
     %% uses only a single directory so handle `dir` elsewhere
     CmdLineOpts = lists:keydelete(dir, 1, Opts),
-    merge_opts(CTOpts, CmdLineOpts, []).
-
-%% merge opts by iterating over opts defined in `rebar.config` and checking
-%% command line opts to see if opt is also defined there. if so, take that
-%% value (dropping the value from `rebar.config`) and continue until there
-%% are no more opts defined in `rebar.config` then append remaining command
-%% line opts
-merge_opts([], CmdLineOpts, Acc) -> [CmdLineOpts] ++ Acc;
-merge_opts([{K, V}|Rest], CmdLineOpts, Acc) ->
-    case lists:keytake(K, 1, CmdLineOpts) of
-        {K, Override, Rem} -> merge_opts(Rest, Rem, [{K, Override}] ++ Acc);
-        false -> merge_opts(Rest, CmdLineOpts, [{K, V}] ++ Acc)
-    end.
+    lists:ukeymerge(1, lists:ukeysort(1, CmdLineOpts), lists:ukeysort(1, CTOpts)).
 
 handle_results([Result]) ->
     handle_results(Result);
