@@ -41,7 +41,7 @@ do(State) ->
     OutDir = case proplists:get_value(outdir, Opts, undefined) of
         undefined -> filename:join([rebar_state:dir(State),
                      ec_file:insecure_mkdtemp()]);
-        Path -> Path
+        Out -> Out
     end,
     ?DEBUG("Compiling EUnit instrumented modules in: ~p", [OutDir]),
     lists:foreach(fun(App) ->
@@ -54,11 +54,14 @@ do(State) ->
                       TestState = first_files(test_opts(S, OutDir)),
                       ok = rebar_erlc_compiler:compile(TestState, AppDir)
                   end, ProjectApps),
+    Path = code:get_path(),
     true = code:add_patha(OutDir),
     EUnitOpts = resolve_eunit_opts(State, Opts),
     AppsToTest = [{application, erlang:binary_to_atom(rebar_app_info:name(App), unicode)}
                   || App <- ProjectApps],
-    case handle_results(eunit:test(AppsToTest, EUnitOpts)) of
+    Result = eunit:test(AppsToTest, EUnitOpts),
+    true = code:set_path(Path),
+    case handle_results(Result) of
         {error, Reason} ->
             {error, {?MODULE, Reason}};
         ok ->

@@ -41,7 +41,7 @@ do(State) ->
     OutDir = case proplists:get_value(outdir, RawOpts, undefined) of
         undefined -> filename:join([rebar_state:dir(State),
                                     ec_file:insecure_mkdtemp()]);
-        Path -> Path
+        Out -> Out
     end,
     InDir = proplists:get_value(dir, Opts, []),
     ok = create_dirs(Opts),
@@ -56,9 +56,11 @@ do(State) ->
                       TestState = first_files(test_opts(S, InDir, OutDir)),
                       ok = rebar_erlc_compiler:compile(TestState, AppDir)
                   end, ProjectApps),
+    Path = code:get_path(),
     true = code:add_patha(OutDir),
     CTOpts = resolve_ct_opts(State, Opts),
     Result = handle_results(ct:run_test([{dir, OutDir}] ++ CTOpts)),
+    true = code:set_path(Path),
     case Result of
         {error, Reason} ->
             {error, {?MODULE, Reason}};
