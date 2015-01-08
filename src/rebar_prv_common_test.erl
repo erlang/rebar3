@@ -38,7 +38,7 @@ do(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     {InDirs, OutDir} = split_ct_dirs(State, RawOpts),
     Opts = transform_opts(RawOpts),
-    ProjectApps = rebar_state:project_apps(State),
+    TestApps = filter_checkouts(rebar_state:project_apps(State)),
     ok = create_dirs(Opts),
     ?DEBUG("Compiling Common Test suites in: ~p", [OutDir]),
     lists:foreach(fun(App) ->
@@ -50,7 +50,7 @@ do(State) ->
                       %% and `{src_dirs, "test"}`
                       TestState = test_state(S, InDirs, OutDir),
                       ok = rebar_erlc_compiler:compile(TestState, AppDir)
-                  end, ProjectApps),
+                  end, TestApps),
     Path = code:get_path(),
     true = code:add_patha(OutDir),
     CTOpts = resolve_ct_opts(State, Opts, OutDir),
@@ -251,6 +251,17 @@ parse_term(String) ->
             Terms;
         Term ->
             Term
+    end.
+
+filter_checkouts(Apps) -> filter_checkouts(Apps, []).
+
+filter_checkouts([], Acc) -> lists:reverse(Acc);
+filter_checkouts([App|Rest], Acc) ->
+    AppDir = filename:absname(rebar_app_info:dir(App)),
+    CheckoutsDir = filename:absname("_checkouts"),
+    case lists:prefix(CheckoutsDir, AppDir) of
+        true -> filter_checkouts(Rest, Acc);
+        false -> filter_checkouts(Rest, [App|Acc])
     end.
 
 create_dirs(Opts) ->

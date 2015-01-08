@@ -37,7 +37,7 @@ do(State) ->
     ?INFO("Performing EUnit tests...", []),
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     Opts = transform_opts(RawOpts, State),
-    ProjectApps = rebar_state:project_apps(State),
+    TestApps = filter_checkouts(rebar_state:project_apps(State)),
     OutDir = case proplists:get_value(outdir, Opts, undefined) of
         undefined -> filename:join([rebar_state:dir(State),
                      ec_file:insecure_mkdtemp()]);
@@ -53,12 +53,12 @@ do(State) ->
                       %% and `{src_dirs, "test"}`
                       TestState = first_files(test_opts(S, OutDir)),
                       ok = rebar_erlc_compiler:compile(TestState, AppDir)
-                  end, ProjectApps),
+                  end, TestApps),
     Path = code:get_path(),
     true = code:add_patha(OutDir),
     EUnitOpts = resolve_eunit_opts(State, Opts),
     AppsToTest = [{application, erlang:binary_to_atom(rebar_app_info:name(App), unicode)}
-                  || App <- ProjectApps],
+                  || App <- TestApps],
     Result = eunit:test(AppsToTest, EUnitOpts),
     true = code:set_path(Path),
     case handle_results(Result) of
@@ -92,6 +92,17 @@ transform_opts([{outdir, Path}|Rest], State, Acc) ->
     transform_opts(Rest, State, NewAcc);
 transform_opts([{Key, Val}|Rest], State, Acc) ->
     transform_opts(Rest, State, [{Key, Val}|Acc]).
+
+filter_checkouts(Apps) -> filter_checkouts(Apps, []).
+
+filter_checkouts([], Acc) -> lists:reverse(Acc);
+filter_checkouts([App|Rest], Acc) ->
+    AppDir = filename:absname(rebar_app_info:dir(App)),
+    CheckoutsDir = filename:absname("_checkouts"),
+    case lists:prefix(CheckoutsDir, AppDir) of
+        true -> filter_checkouts(Rest, Acc);
+        false -> filter_checkouts(Rest, [App|Acc])
+    end.
 
 test_opts(State, TmpDir) ->
     ErlOpts = rebar_state:get(State, eunit_compile_opts, []) ++
