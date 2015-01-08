@@ -51,6 +51,7 @@ do(State) ->
                       TestState = test_state(S, InDirs, OutDir),
                       ok = rebar_erlc_compiler:compile(TestState, AppDir)
                   end, TestApps),
+    ok = maybe_compile_extra_tests(TestApps, State, InDirs, OutDir),
     Path = code:get_path(),
     true = code:add_patha(OutDir),
     CTOpts = resolve_ct_opts(State, Opts, OutDir),
@@ -283,9 +284,16 @@ test_state(State, InDirs, OutDir) ->
     ErlOpts = rebar_state:get(State, common_test_compile_opts, []) ++
               rebar_utils:erl_opts(State),
     TestOpts = [{outdir, OutDir}] ++
-               [{src_dirs, ["src", "test"] ++ InDirs}] ++
-               ErlOpts,
+               add_test_dir(ErlOpts, InDirs),
     first_files(rebar_state:set(State, erl_opts, TestOpts)).
+
+add_test_dir(Opts, InDirs) ->
+    %% if no src_dirs are set we have to specify `src` or it won't
+    %% be built
+    case proplists:append_values(src_dirs, Opts) of
+        [] -> [{src_dirs, ["src", "test"|InDirs]}];
+        _ -> [{src_dirs, ["test"|InDirs]}]
+    end.
 
 first_files(State) ->
     BaseFirst = rebar_state:get(State, erl_first_files, []),
@@ -301,6 +309,22 @@ resolve_ct_opts(State, CmdLineOpts, OutDir) ->
     %% uses only a single directory so set `dir` to our precompiled `OutDir`
     %% and disable `auto_compile`
     [{auto_compile, false}, {dir, OutDir}] ++ lists:keydelete(dir, 1, Opts).
+
+maybe_compile_extra_tests(TestApps, State, InDirs, OutDir) ->
+    F = fun(App) -> rebar_app_info:dir(App) == rebar_dir:get_cwd() end,
+    case lists:filter(F, TestApps) of
+        %% compile just the `test` and extra test directories of the base dir
+        [] ->
+            ErlOpts = rebar_state:get(State, common_test_compile_opts, []) ++
+                      rebar_utils:erl_opts(State),
+            TestOpts = [{outdir, OutDir}] ++
+                       [{src_dirs, ["test"|InDirs]}] ++
+                       lists:keydelete(src_dirs, 1, ErlOpts),
+            TestState = first_files(rebar_state:set(State, erl_opts, TestOpts)),
+            rebar_erlc_compiler:compile(TestState, rebar_dir:get_cwd());
+        %% already compiled `./test` so do nothing
+        _ -> ok
+    end.
 
 handle_results([Result]) ->
     handle_results(Result);
