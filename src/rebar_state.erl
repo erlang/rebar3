@@ -48,9 +48,9 @@
                   command_args        = [],
                   command_parsed_args = [],
 
-                  project_apps        = []          :: [rebar_app_into:t()],
-                  deps_to_build       = []          :: [rebar_app_into:t()],
-                  all_deps            = []          :: [rebar_app_into:t()],
+                  project_apps        = []          :: [rebar_app_info:t()],
+                  deps_to_build       = []          :: [rebar_app_info:t()],
+                  all_deps            = []          :: [rebar_app_info:t()],
 
                   overrides           = [],
                   providers           = []}).
