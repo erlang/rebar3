@@ -62,6 +62,7 @@ run_and_check(Config, RebarConfig, Command, Expect) ->
 %% And returns a `rebar_app_info' object.
 create_app(AppDir, Name, Vsn, Deps) ->
     write_src_file(AppDir, Name),
+    write_test_file(AppDir, Name),
     write_app_src_file(AppDir, Name, Vsn, Deps),
     rebar_app_info:new(Name, Vsn, AppDir, Deps).
 
@@ -133,9 +134,14 @@ check_results(AppDir, Expected) ->
         end, Expected).
 
 write_src_file(Dir, Name) ->
-    Erl = filename:join([Dir, "src", "not_a_real_src" ++ Name ++ ".erl"]),
+    Erl = filename:join([Dir, "src", "not_a_real_src_" ++ Name ++ ".erl"]),
     ok = filelib:ensure_dir(Erl),
-    ok = ec_file:write(Erl, erl_src_file("not_a_real_src" ++ Name ++ ".erl")).
+    ok = ec_file:write(Erl, erl_src_file("not_a_real_src_" ++ Name ++ ".erl")).
+
+write_test_file(Dir, Name) ->
+    Erl = filename:join([Dir, "test", "not_a_real_src_" ++ Name ++ "_tests.erl"]),
+    ok = filelib:ensure_dir(Erl),
+    ok = ec_file:write(Erl, erl_test_file("not_a_real_src_" ++ Name ++ ".erl")).
 
 write_app_file(Dir, Name, Version, Deps) ->
     Filename = filename:join([Dir, "ebin", Name ++ ".app"]),
@@ -149,8 +155,25 @@ write_app_src_file(Dir, Name, Version, Deps) ->
 
 erl_src_file(Name) ->
     io_lib:format("-module(~s).\n"
-                 "-export([main/0]).\n"
-                 "main() -> ok.\n", [filename:basename(Name, ".erl")]).
+                  "-export([main/0]).\n"
+                  "main() -> ok.\n"
+                  "-ifdef(TEST).\n"
+                  "-include_lib(\"eunit/include/eunit.hrl\").\n"
+                  "some_test_() -> ?_assertEqual(ok, main()).\n"
+                  "-endif.\n", [filename:basename(Name, ".erl")]).
+
+erl_test_file(Name) ->
+    BaseName = filename:basename(Name, ".erl"),
+    io_lib:format("-module(~s_tests).\n"
+                  "-compile(export_all).\n"
+                  "-ifndef(some_define).\n"
+                  "-define(some_define, false).\n"
+                  "-endif.\n"
+                  "-ifdef(TEST).\n"
+                  "-include_lib(\"eunit/include/eunit.hrl\").\n"
+                  "some_test_() -> ?_assertEqual(ok, ~s:main()).\n"
+                  "define_test_() -> ?_assertEqual(true, ?some_define).\n"
+                  "-endif.\n", [BaseName, BaseName]).
 
 get_app_metadata(Name, Vsn, Deps) ->
     {application, erlang:list_to_atom(Name),
