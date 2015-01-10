@@ -38,11 +38,7 @@ do(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     Opts = transform_opts(RawOpts, State),
     TestApps = filter_checkouts(rebar_state:project_apps(State)),
-    OutDir = case proplists:get_value(outdir, Opts, undefined) of
-        undefined -> filename:join([rebar_state:dir(State),
-                     ec_file:insecure_mkdtemp()]);
-        Out -> Out
-    end,
+    OutDir = proplists:get_value(outdir, Opts, default_test_dir(State)),
     ?DEBUG("Compiling EUnit instrumented modules in: ~p", [OutDir]),
     lists:foreach(fun(App) ->
                       AppDir = rebar_app_info:dir(App),
@@ -104,6 +100,22 @@ filter_checkouts([App|Rest], Acc) ->
         true -> filter_checkouts(Rest, Acc);
         false -> filter_checkouts(Rest, [App|Acc])
     end.
+
+default_test_dir(State) ->
+    Tmp = case erlang:system_info(system_architecture) of
+        "win32" ->
+            "./tmp";
+        _SysArch ->
+            "/tmp"
+    end,
+    Root = filename:join([rebar_state:dir(State), Tmp]),
+    Project = filename:basename(rebar_state:dir(State)),
+    OutDir = filename:join([Root, Project ++ "_rebar3_eunit"]),
+    %% delete the directory if it exists so tests run with clean state
+    _ = ec_file:remove(OutDir, [recursive]),
+    %% recreate the directory
+    ok = filelib:ensure_dir(filename:join([OutDir, "dummy.beam"])),
+    OutDir.
 
 test_state(State, TmpDir) ->
     ErlOpts = rebar_state:get(State, eunit_compile_opts, []) ++

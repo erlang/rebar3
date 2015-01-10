@@ -178,12 +178,24 @@ split_ct_dirs(State, RawOpts) ->
             proplists:get_value(dir, CTOpts, []);
         Dirs -> split_string(Dirs)
     end,
-    OutDir = case proplists:get_value(outdir, RawOpts) of
-        undefined -> filename:join([rebar_state:dir(State),
-                                    ec_file:insecure_mkdtemp()]);
-        Out -> Out
-    end,
+    OutDir = proplists:get_value(outdir, RawOpts, default_test_dir(State)),
     {InDirs, OutDir}.
+
+default_test_dir(State) ->
+    Tmp = case erlang:system_info(system_architecture) of
+        "win32" ->
+            "./tmp";
+        _SysArch ->
+            "/tmp"
+    end,
+    Root = filename:join([rebar_state:dir(State), Tmp]),
+    Project = filename:basename(rebar_state:dir(State)),
+    OutDir = filename:join([Root, Project ++ "_rebar3_ct"]),
+    %% delete the directory if it exists so tests run with clean state
+    _ = ec_file:remove(OutDir, [recursive]),
+    %% recreate the directory
+    ok = filelib:ensure_dir(filename:join([OutDir, "dummy.beam"])),
+    OutDir.
 
 transform_opts(Opts) ->
     transform_opts(Opts, []).
