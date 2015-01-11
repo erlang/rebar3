@@ -20,8 +20,8 @@
          ebin_dir/1,
          applications/1,
          applications/2,
-         profile/1,
-         profile/2,
+         profiles/1,
+         profiles/2,
          deps/1,
          deps/2,
          dep_level/1,
@@ -45,7 +45,7 @@
                      app_details=[] :: list(),
                      applications=[] :: list(),
                      deps=[] :: list(),
-                     profile=default :: atom(),
+                     profiles=[default] :: atom(),
                      dep_level=0 :: integer(),
                      dir :: file:name(),
                      source :: string() | tuple() | undefined,
@@ -172,13 +172,13 @@ applications(#app_info_t{applications=Applications}) ->
 applications(AppInfo=#app_info_t{}, Applications) ->
     AppInfo#app_info_t{applications=Applications}.
 
--spec profile(t()) -> list().
-profile(#app_info_t{profile=Profile}) ->
-    Profile.
+-spec profiles(t()) -> list().
+profiles(#app_info_t{profiles=Profiles}) ->
+    Profiles.
 
--spec profile(t(), list()) -> t().
-profile(AppInfo=#app_info_t{}, Profile) ->
-    AppInfo#app_info_t{profile=Profile}.
+-spec profiles(t(), list()) -> t().
+profiles(AppInfo=#app_info_t{}, Profiles) ->
+    AppInfo#app_info_t{profiles=Profiles}.
 
 -spec deps(t()) -> list().
 deps(#app_info_t{deps=Deps}) ->

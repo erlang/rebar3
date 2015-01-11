@@ -77,8 +77,8 @@ process_command(State, Command) ->
                 Command when Command =:= do; Command =:= as ->
                     do(TargetProviders, State);
                 _ ->
-                    Profile = providers:profile(CommandProvider),
-                    State1 = rebar_state:apply_profiles(State, [Profile]),
+                    Profiles = providers:profiles(CommandProvider),
+                    State1 = rebar_state:apply_profiles(State, Profiles),
                     Opts = providers:opts(CommandProvider)++rebar3:global_option_spec_list(),
 
                     case getopt:parse(Opts, rebar_state:command_args(State1)) of
