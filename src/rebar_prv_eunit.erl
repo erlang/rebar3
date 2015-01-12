@@ -28,7 +28,7 @@ init(State) ->
                                  {short_desc, "Run EUnit Tests."},
                                  {desc, ""},
                                  {opts, eunit_opts(State)},
-                                 {profile, test}]),
+                                 {profiles, [test]}]),
     State1 = rebar_state:add_provider(State, Provider),
     {ok, State1}.
 
@@ -185,4 +185,3 @@ handle_results(error) ->
     {error, unknown_error};
 handle_results({error, Reason}) ->
     {error, {error_running_tests, Reason}}.
-
