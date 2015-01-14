@@ -249,7 +249,7 @@ update_src_deps(Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen, 
                                                               ,StateAcc1
                                                               ,LocksAcc);
                                              _ ->
-                                                 maybe_fetch(AppInfo, false, SeenAcc1),
+                                                 maybe_fetch(AppInfo, false, SeenAcc),
                                                  handle_dep(AppInfo
                                                            ,SrcDepsAcc
                                                            ,PkgDepsAcc
