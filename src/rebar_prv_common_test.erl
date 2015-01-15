@@ -310,7 +310,7 @@ add_test_dir(Opts, InDirs) ->
 first_files(State) ->
     BaseFirst = rebar_state:get(State, erl_first_files, []),
     CTFirst = rebar_state:get(State, common_test_first_files, []),
-    rebar_state:set(State, erl_first_modules, BaseFirst ++ CTFirst).
+    rebar_state:set(State, erl_first_files, BaseFirst ++ CTFirst).
 
 resolve_ct_opts(State, CmdLineOpts, OutDir) ->
     CTOpts = rebar_state:get(State, common_test_opts, []),
