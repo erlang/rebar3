@@ -149,7 +149,7 @@ test_defined([]) -> false.
 first_files(State) ->
     BaseFirst = rebar_state:get(State, erl_first_files, []),
     EUnitFirst = rebar_state:get(State, eunit_first_files, []),
-    rebar_state:set(State, erl_first_modules, BaseFirst ++ EUnitFirst).
+    rebar_state:set(State, erl_first_files, BaseFirst ++ EUnitFirst).
 
 resolve_eunit_opts(State, Opts) ->
     EUnitOpts = rebar_state:get(State, eunit_opts, []),
