@@ -33,13 +33,21 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     Tasks = args_to_tasks(rebar_state:command_args(State)),
-    lists:foldl(fun(TaskArgs, {ok, StateAcc}) ->
-                        [TaskStr | Args] = string:tokens(TaskArgs, " "),
-                        Task = list_to_atom(TaskStr),
-                        StateAcc1 = rebar_state:set(StateAcc, task, Task),
-                        StateAcc2 = rebar_state:command_args(StateAcc1, Args),
-                        rebar_core:process_command(StateAcc2, Task)
-                end, {ok, State}, Tasks).
+    do_tasks(Tasks, State).
+
+do_tasks([], State) ->
+    {ok, State};
+do_tasks([TaskArgs | Tail], State) ->
+    [TaskStr | Args] = string:tokens(TaskArgs, " "),
+    Task = list_to_atom(TaskStr),
+    State1 = rebar_state:set(State, task, Task),
+    State2 = rebar_state:command_args(State1, Args),
+    case rebar_core:process_command(State2, Task) of
+        {ok, State3} ->
+            do_tasks(Tail, State3);
+        Error ->
+            Error
+    end.
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
