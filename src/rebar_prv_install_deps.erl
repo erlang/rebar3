@@ -230,9 +230,16 @@ package_to_app(DepsDir, Packages, {Name, Vsn}) ->
 update_src_deps(Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen, Locks) ->
     case lists:foldl(fun(AppInfo, {SrcDepsAcc, PkgDepsAcc, SrcAppsAcc, StateAcc, SeenAcc, LocksAcc}) ->
                              %% If not seen, add to list of locks to write out
-                             case sets:is_element(rebar_app_info:name(AppInfo), SeenAcc) of
+                             Name = rebar_app_info:name(AppInfo),
+                             case sets:is_element(Name, SeenAcc) of
                                  true ->
-                                     warn_skip_deps(AppInfo),
+                                     %% If from lock file don't print warning about skipping
+                                     case lists:keymember(Name, 1, Locks) of
+                                         false ->
+                                             warn_skip_deps(AppInfo);
+                                         true ->
+                                             ok
+                                     end,
                                      {SrcDepsAcc, PkgDepsAcc, SrcAppsAcc, StateAcc, SeenAcc, LocksAcc};
                                  false ->
                                      {SeenAcc1, StateAcc1} = maybe_lock(Profile, AppInfo, SeenAcc, StateAcc, Level),
