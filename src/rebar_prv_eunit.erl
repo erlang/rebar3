@@ -102,19 +102,11 @@ filter_checkouts([App|Rest], Acc) ->
     end.
 
 default_test_dir(State) ->
-    Tmp = case erlang:system_info(system_architecture) of
-        "win32" ->
-            "./tmp";
-        _SysArch ->
-            "/tmp"
-    end,
+    Tmp = rebar_file_utils:system_tmpdir(),
     Root = filename:join([rebar_state:dir(State), Tmp]),
     Project = filename:basename(rebar_state:dir(State)),
     OutDir = filename:join([Root, Project ++ "_rebar3_eunit"]),
-    %% delete the directory if it exists so tests run with clean state
-    _ = ec_file:remove(OutDir, [recursive]),
-    %% recreate the directory
-    ok = filelib:ensure_dir(filename:join([OutDir, "dummy.beam"])),
+    ok = rebar_file_utils:reset_dir(OutDir),
     OutDir.
 
 test_state(State, TmpDir) ->

@@ -30,7 +30,10 @@
          cp_r/2,
          mv/2,
          delete_each/1,
-         write_file_if_contents_differ/2]).
+         write_file_if_contents_differ/2,
+         system_tmpdir/0,
+         system_tmpdir/1,
+         reset_dir/1]).
 
 -include("rebar.hrl").
 
@@ -122,6 +125,33 @@ write_file_if_contents_differ(Filename, Bytes) ->
         {error,  _} ->
             file:write_file(Filename, ToWrite)
     end.
+
+%% returns an os appropriate tmpdir given a path
+-spec system_tmpdir() -> file:filename(). 
+-spec system_tmpdir(PathComponents) -> file:filename() when
+      PathComponents :: [file:name()].
+
+system_tmpdir() -> system_tmpdir([]).
+system_tmpdir(PathComponents) ->
+    Tmp = case erlang:system_info(system_architecture) of
+        "win32" ->
+            "./tmp";
+        _SysArch ->
+            "/tmp"
+    end,
+    filename:join([Tmp|PathComponents]).
+
+%% recursively removes a directory and then recreates the same
+%%  directory but empty
+-spec reset_dir(Path) -> ok | {error, Reason} when
+      Path   :: file:name(),
+      Reason :: file:posix().
+
+reset_dir(Path) ->
+    %% delete the directory if it exists
+    _ = ec_file:remove(Path, [recursive]),
+    %% recreate the directory
+    filelib:ensure_dir(filename:join([Path, "dummy.beam"])).
 
 %% ===================================================================
 %% Internal functions
