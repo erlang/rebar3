@@ -287,7 +287,7 @@ update_src_deps(Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen, 
 
 handle_update(AppInfo, UpdateName, UpdateLevel, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
     Name = rebar_app_info:name(AppInfo),
-    {_, _, _, DepLevel} = lists:keyfind(Name, 1, Locks),
+    {_, _, DepLevel} = lists:keyfind(Name, 1, Locks),
     case UpdateLevel < DepLevel
         orelse Name =:= UpdateName of
         true ->
