@@ -69,7 +69,7 @@ clean_apps(State, Apps) ->
                           C = rebar_config:consult(AppDir),
                           S = rebar_state:new(State, C, AppDir),
 
-                          ?INFO("Cleaning out ~s...~n", [rebar_app_info:name(AppInfo)]),
+                          ?INFO("Cleaning out ~s...", [rebar_app_info:name(AppInfo)]),
                           %% Legacy hook support
                           rebar_hooks:run_compile_hooks(AppDir, pre_hooks, clean, S),
                           rebar_erlc_compiler:clean(State, ec_cnv:to_list(rebar_app_info:dir(AppInfo))),
