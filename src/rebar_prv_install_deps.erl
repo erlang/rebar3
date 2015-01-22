@@ -102,7 +102,7 @@ do(State) ->
         end
     catch
         %% maybe_fetch will maybe_throw an exception to break out of some loops
-        _:Reason ->
+        _:{error, Reason} ->
             {error, Reason}
     end.
 
@@ -114,6 +114,8 @@ find_cycles(Apps) ->
     end.
 
 -spec format_error(any()) -> iolist().
+format_error({parse_dep, Dep}) ->
+    io_lib:format("Failed parsing dep ~p~n", [Dep]);
 format_error({cycles, Cycles}) ->
     Prints = [["applications: ",
                [io_lib:format("~s ", [Dep]) || Dep <- Cycle],
@@ -325,7 +327,6 @@ handle_dep(State, DepsDir, AppInfo, Locks, Level) ->
     AppInfo1 = rebar_app_info:state(AppInfo, S3),
 
     Deps = rebar_state:get(S3, deps, []),
-
     %% Update lock level to be the level the dep will have in this dep tree
     NewLocks = [{DepName, Source, LockLevel+Level} ||
                    {DepName, Source, LockLevel} <- rebar_state:get(S3, {locks, default}, [])],
@@ -427,7 +428,10 @@ parse_dep({Name, _Vsn, Source}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when i
 parse_dep({Name, Source, Level}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_tuple(Source)
                                                                               , is_integer(Level) ->
     Dep = new_dep(DepsDir, Name, [], Source, State),
-    {[Dep | SrcDepsAcc], PkgDepsAcc}.
+    {[Dep | SrcDepsAcc], PkgDepsAcc};
+parse_dep(Dep, _, _, _) ->
+    throw(?PRV_ERROR({parse_dep, Dep})).
+
 
 new_dep(DepsDir, Name, Vsn, Source, State) ->
     Dir = ec_cnv:to_list(filename:join(DepsDir, Name)),
@@ -439,7 +443,6 @@ new_dep(DepsDir, Name, Vsn, Source, State) ->
                 end,
     C = rebar_config:consult(rebar_app_info:dir(Dep)),
     S = rebar_state:new(rebar_state:new(), C, rebar_app_info:dir(Dep)),
-
     Overrides = rebar_state:get(State, overrides, []),
     ParentOverrides = rebar_state:overrides(State),
     Dep1 = rebar_app_info:state(Dep,
