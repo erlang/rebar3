@@ -111,9 +111,9 @@ default_test_dir(State) ->
 
 test_state(State, TmpDir) ->
     ErlOpts = rebar_state:get(State, eunit_compile_opts, []) ++
-              rebar_utils:erl_opts(State),
+        rebar_utils:erl_opts(State),
     ErlOpts1 = [{outdir, TmpDir}] ++
-               add_test_dir(ErlOpts),
+        add_test_dir(ErlOpts),
     TestOpts = safe_define_test_macro(ErlOpts1),
     rebar_state:set(State, erl_opts, TestOpts).
 
@@ -121,9 +121,9 @@ add_test_dir(Opts) ->
     %% if no src_dirs are set we have to specify `src` or it won't
     %% be built
     case proplists:append_values(src_dirs, Opts) of
-        [] -> [{src_dirs, ["src", "test"]}];
-        Srcs -> [{src_dirs, ["test"|Srcs]}]
-    end ++ lists:keydelete(src_dirs, 1, Opts).
+        [] -> [{src_dirs, ["src", "test"]} | Opts];
+        _ -> [{src_dirs, ["test"]} | Opts]
+    end.
 
 safe_define_test_macro(Opts) ->
     %% defining a compile macro twice results in an exception so

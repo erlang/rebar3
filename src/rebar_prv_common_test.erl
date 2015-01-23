@@ -295,8 +295,8 @@ add_test_dir(Opts, InDirs) ->
     %% if no src_dirs are set we have to specify `src` or it won't
     %% be built
     case proplists:append_values(src_dirs, Opts) of
-        [] -> [{src_dirs, ["src", "test"|InDirs]}];
-        _ -> [{src_dirs, ["test"|InDirs]}]
+        [] -> [{src_dirs, ["src", "test" | InDirs]} | Opts];
+        _ -> [{src_dirs, ["test" | InDirs]} | Opts]
     end.
 
 first_files(State) ->
