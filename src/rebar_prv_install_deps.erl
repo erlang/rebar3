@@ -425,7 +425,8 @@ parse_dep({Name, Source}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_tupl
 parse_dep({Name, _Vsn, Source}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_tuple(Source) ->
     Dep = new_dep(DepsDir, Name, [], Source, State),
     {[Dep | SrcDepsAcc], PkgDepsAcc};
-parse_dep({Name, _Vsn, Source, _Opts}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_tuple(Source) ->
+parse_dep({Name, _Vsn, Source, Opts}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_tuple(Source) ->
+    ?WARN("Dependency option list ~p in ~p is not supported and will be ignored", [Opts, Name]),
     Dep = new_dep(DepsDir, Name, [], Source, State),
     {[Dep | SrcDepsAcc], PkgDepsAcc};
 parse_dep({Name, Source, Level}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_tuple(Source)
