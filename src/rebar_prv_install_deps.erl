@@ -205,8 +205,15 @@ maybe_lock(Profile, AppInfo, Seen, State, Level) ->
         default ->
             case sets:is_element(Name, Seen) of
                 false ->
-                    {sets:add_element(Name, Seen),
-                     rebar_state:lock(State, rebar_app_info:dep_level(AppInfo, Level))};
+                    AppName = rebar_app_info:name(AppInfo),
+                    Locks = rebar_state:lock(State),
+                    case lists:any(fun(App) -> rebar_app_info:name(App) =:= AppName end, Locks) of
+                        true ->
+                            {sets:add_element(Name, Seen), State};
+                        false ->
+                            {sets:add_element(Name, Seen),
+                             rebar_state:lock(State, rebar_app_info:dep_level(AppInfo, Level))}
+                    end;
                 true ->
                     {Seen, State}
             end;
