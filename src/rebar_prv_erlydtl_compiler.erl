@@ -126,6 +126,7 @@ init(State) ->
     {ok, State1}.
 
 do(Config) ->
+    ?INFO("Running erlydtl...", []),
     MultiDtlOpts = erlydtl_opts(Config),
 
     Result = lists:foldl(fun(DtlOpts, _) ->
