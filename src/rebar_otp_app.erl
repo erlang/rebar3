@@ -51,32 +51,8 @@ compile(State, App) ->
                       end,
 
     %% Load the app file and validate it.
-    AppFile = rebar_app_info:app_file(App1),
-    case rebar_app_utils:load_app_file(State2, AppFile) of
-        {ok, State3, AppName, AppData} ->
-            AppVsn = proplists:get_value(vsn, AppData),
-            case validate_name(AppName, AppFile) of
-                ok ->
-                    %% In general, the list of modules is an important thing to validate
-                    %% for compliance with OTP guidelines and upgrade procedures.
-                    %% However, some people prefer not to validate this list.
-                    case rebar_state:get(State3, validate_app_modules, true) of
-                        true ->
-                            case rebar_app_discover:validate_application_info(App1) of
-                                true ->
-                                    {ok, rebar_app_info:original_vsn(App1, AppVsn)};
-                                Error ->
-                                    Error
-                            end;
-                        false ->
-                            {ok, rebar_app_info:original_vsn(App1, AppVsn)}
-                    end;
-                Error ->
-                    Error
-            end;
-        {error, Reason} ->
-            ?PRV_ERROR({file_read, AppFile, Reason})
-    end.
+    validate_app(State2, App1).
+
 
 format_error({file_read, File, Reason}) ->
     io_lib:format("Failed to read ~s for processing: ~p", [File, Reason]);
@@ -103,6 +79,37 @@ clean(_State, File) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+validate_app(State, App) ->
+    AppFile = rebar_app_info:app_file(App),
+    case rebar_app_utils:load_app_file(State, AppFile) of
+        {ok, State1, AppName, AppData} ->
+            case validate_name(AppName, AppFile) of
+                ok ->
+                    validate_app_modules(State1, App, AppData);
+                Error ->
+                    Error
+            end;
+        {error, Reason} ->
+            ?PRV_ERROR({file_read, AppFile, Reason})
+    end.
+
+validate_app_modules(State, App, AppData) ->
+    %% In general, the list of modules is an important thing to validate
+    %% for compliance with OTP guidelines and upgrade procedures.
+    %% However, some people prefer not to validate this list.
+    AppVsn = proplists:get_value(vsn, AppData),
+    case rebar_state:get(State, validate_app_modules, true) of
+        true ->
+            case rebar_app_discover:validate_application_info(App) of
+                true ->
+                    {ok, rebar_app_info:original_vsn(App, AppVsn)};
+                Error ->
+                    Error
+            end;
+        false ->
+            {ok, rebar_app_info:original_vsn(App, AppVsn)}
+    end.
 
 preprocess(State, Dir, AppSrcFile) ->
     case rebar_app_utils:load_app_file(State, AppSrcFile) of
