@@ -27,51 +27,39 @@
 -module(rebar_otp_app).
 
 -export([compile/2,
+         format_error/1,
          clean/2]).
 
-%% for internal use only
--export([info/2]).
-
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 %% ===================================================================
 %% Public API
 %% ===================================================================
 
-compile(Config, App) ->
+compile(State, App) ->
     %% If we get an .app.src file, it needs to be pre-processed and
     %% written out as a ebin/*.app file. That resulting file will then
     %% be validated as usual.
     Dir = ec_cnv:to_list(rebar_app_info:dir(App)),
-    {Config2, App1} = case rebar_app_info:app_file_src(App) of
+    {State2, App1} = case rebar_app_info:app_file_src(App) of
                           undefined ->
-                              {Config, App};
+                              {State, App};
                           AppFileSrc ->
-                              {Config1, File} = preprocess(Config, Dir, AppFileSrc),
-                              {Config1, rebar_app_info:app_file(App, File)}
+                              {State1, File} = preprocess(State, Dir, AppFileSrc),
+                              {State1, rebar_app_info:app_file(App, File)}
                       end,
 
     %% Load the app file and validate it.
-    AppFile = rebar_app_info:app_file(App1),
-    case rebar_app_utils:load_app_file(Config2, AppFile) of
-        {ok, Config3, AppName, AppData} ->
-            AppVsn = proplists:get_value(vsn, AppData),
-            validate_name(AppName, AppFile),
-            %% In general, the list of modules is an important thing to validate
-            %% for compliance with OTP guidelines and upgrade procedures.
-            %% However, some people prefer not to validate this list.
-            case rebar_state:get(Config3, validate_app_modules, true) of
-                true ->
-                    Modules = proplists:get_value(modules, AppData),
-                    {validate_modules(Dir, AppName, Modules), rebar_app_info:original_vsn(App1, AppVsn)};
-                false ->
-                    {ok, rebar_app_info:original_vsn(App1, AppVsn)}
-            end;
-        {error, Reason} ->
-            ?ABORT("Failed to load app file ~s: ~p", [AppFile, Reason])
-    end.
+    validate_app(State2, App1).
 
-clean(_Config, File) ->
+
+format_error({file_read, File, Reason}) ->
+    io_lib:format("Failed to read ~s for processing: ~p", [File, Reason]);
+format_error({invalid_name, File, AppName}) ->
+    io_lib:format("Invalid ~s: name of application (~p) must match filename.", [File, AppName]).
+
+clean(_State, File) ->
     %% If the app file is a .app.src, delete the generated .app file
     case rebar_app_utils:is_app_src(File) of
         true ->
@@ -92,34 +80,48 @@ clean(_Config, File) ->
 %% Internal functions
 %% ===================================================================
 
-info(help, compile) ->
-    info_help("Validate .app file");
-info(help, clean) ->
-    info_help("Delete .app file if generated from .app.src").
+validate_app(State, App) ->
+    AppFile = rebar_app_info:app_file(App),
+    case rebar_app_utils:load_app_file(State, AppFile) of
+        {ok, State1, AppName, AppData} ->
+            case validate_name(AppName, AppFile) of
+                ok ->
+                    validate_app_modules(State1, App, AppData);
+                Error ->
+                    Error
+            end;
+        {error, Reason} ->
+            ?PRV_ERROR({file_read, AppFile, Reason})
+    end.
 
-info_help(Description) ->
-    ?CONSOLE(
-       "~s.~n"
-       "~n"
-       "Valid rebar.config options:~n"
-       "  ~p",
-       [
-        Description,
-        {validate_app_modules, true}
-       ]).
+validate_app_modules(State, App, AppData) ->
+    %% In general, the list of modules is an important thing to validate
+    %% for compliance with OTP guidelines and upgrade procedures.
+    %% However, some people prefer not to validate this list.
+    AppVsn = proplists:get_value(vsn, AppData),
+    case rebar_state:get(State, validate_app_modules, true) of
+        true ->
+            case rebar_app_discover:validate_application_info(App) of
+                true ->
+                    {ok, rebar_app_info:original_vsn(App, AppVsn)};
+                Error ->
+                    Error
+            end;
+        false ->
+            {ok, rebar_app_info:original_vsn(App, AppVsn)}
+    end.
 
-preprocess(Config, Dir, AppSrcFile) ->
-    case rebar_app_utils:load_app_file(Config, AppSrcFile) of
-        {ok, Config1, AppName, AppData} ->
+preprocess(State, Dir, AppSrcFile) ->
+    case rebar_app_utils:load_app_file(State, AppSrcFile) of
+        {ok, State1, AppName, AppData} ->
             %% Look for a configuration file with vars we want to
             %% substitute. Note that we include the list of modules available in
             %% ebin/ and update the app data accordingly.
-            AppVars = load_app_vars(Config1) ++ [{modules, ebin_modules(Dir)}],
+            AppVars = load_app_vars(State1) ++ [{modules, ebin_modules(Dir)}],
             A1 = apply_app_vars(AppVars, AppData),
 
-
             %% AppSrcFile may contain instructions for generating a vsn number
-            {Config2, Vsn} = rebar_app_utils:app_vsn(Config1, AppSrcFile),
+            {State2, Vsn} = rebar_app_utils:app_vsn(State1, AppSrcFile),
             A2 = lists:keystore(vsn, 1, A1, {vsn, Vsn}),
 
             %% systools:make_relup/4 fails with {missing_param, registered}
@@ -137,14 +139,13 @@ preprocess(Config, Dir, AppSrcFile) ->
             %% on the code path
             true = code:add_path(filename:absname(filename:dirname(AppFile))),
 
-            {Config2, AppFile};
+            {State2, AppFile};
         {error, Reason} ->
-            ?ABORT("Failed to read ~s for preprocessing: ~p",
-                   [AppSrcFile, Reason])
+            ?PRV_ERROR({file_read, AppSrcFile, Reason})
     end.
 
-load_app_vars(Config) ->
-    case rebar_state:get(Config, app_vars_file, undefined) of
+load_app_vars(State) ->
+    case rebar_state:get(State, app_vars_file, undefined) of
         undefined ->
             ?DEBUG("No app_vars_file defined.", []),
             [];
@@ -168,44 +169,7 @@ validate_name(AppName, File) ->
         true ->
             ok;
         false ->
-            ?ERROR("Invalid ~s: name of application (~p) "
-                   "must match filename.", [File, AppName]),
-            ?FAIL
-    end.
-
-validate_modules(_Dir, AppName, undefined) ->
-    ?ERROR("Missing modules declaration in ~p.app", [AppName]),
-    ?FAIL;
-
-validate_modules(Dir, AppName, Mods) ->
-    %% Construct two sets -- one for the actual .beam files in ebin/
-    %% and one for the modules
-    %% listed in the .app file
-    EbinSet = ordsets:from_list(ebin_modules(Dir)),
-    ModSet = ordsets:from_list(Mods),
-
-    %% Identify .beam files listed in the .app, but not present in ebin/
-    case ordsets:subtract(ModSet, EbinSet) of
-        [] ->
-            ok;
-        MissingBeams ->
-            Msg1 = lists:flatten([io_lib:format("\t* ~p", [M]) ||
-                                     M <- MissingBeams]),
-            ?ERROR("One or more modules listed in ~p.app are not "
-                   "present in ebin/*.beam:~n~s", [AppName, Msg1]),
-            ?FAIL
-    end,
-
-    %% Identify .beam files NOT list in the .app, but present in ebin/
-    case ordsets:subtract(EbinSet, ModSet) of
-        [] ->
-            ok;
-        MissingMods ->
-            Msg2 = lists:flatten([io_lib:format("\t* ~p\n", [M]) ||
-                                     M <- MissingMods]),
-            ?ERROR("One or more .beam files exist that are not "
-                   "listed in ~p.app:\n~s", [AppName, Msg2]),
-            ?FAIL
+            ?PRV_ERROR({invalid_name, File, AppName})
     end.
 
 ebin_modules(Dir) ->

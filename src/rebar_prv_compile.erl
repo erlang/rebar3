@@ -85,8 +85,13 @@ build_apps(State, Apps) ->
 build(State, AppInfo) ->
     ?INFO("Compiling ~s", [rebar_app_info:name(AppInfo)]),
     rebar_erlc_compiler:compile(State, ec_cnv:to_list(rebar_app_info:dir(AppInfo))),
-    {ok, AppInfo1} = rebar_otp_app:compile(State, AppInfo),
-    AppInfo1.
+    case rebar_otp_app:compile(State, AppInfo) of
+        {ok, AppInfo1} ->
+            AppInfo1;
+        Error ->
+            throw(Error)
+    end.
+
 
 %% ===================================================================
 %% Internal functions

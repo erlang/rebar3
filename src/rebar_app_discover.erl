@@ -1,11 +1,14 @@
 -module(rebar_app_discover).
 
 -export([do/2,
+         format_error/1,
          find_unbuilt_apps/1,
          find_apps/1,
          find_apps/2,
          find_app/2,
          validate_application_info/1]).
+
+-include_lib("providers/include/providers.hrl").
 
 do(State, LibDirs) ->
     BaseDir = rebar_state:dir(State),
@@ -16,6 +19,11 @@ do(State, LibDirs) ->
                         ProjectDeps1 = lists:delete(rebar_app_info:name(AppInfo), ProjectDeps),
                         rebar_state:project_apps(StateAcc, rebar_app_info:deps(AppInfo, ProjectDeps1))
             end, State, Apps).
+
+format_error({module_list, File}) ->
+    io_lib:format("Error reading module list from ~p~n", [File]);
+format_error({missing_module, Module}) ->
+    io_lib:format("Module defined in app file missing: ~p~n", [Module]).
 
 -spec all_app_dirs(list(file:name())) -> list(file:name()).
 all_app_dirs(LibDirs) ->
@@ -142,7 +150,7 @@ validate_application_info(AppInfo) ->
                 {ok, List} ->
                     has_all_beams(EbinDir, List);
                 _Error ->
-                    false
+                    ?PRV_ERROR({modules_list, AppFile})
             end
     end.
 
@@ -158,7 +166,7 @@ get_modules_list(AppFile, AppDetail) ->
             {ok, ModulesList}
     end.
 
--spec has_all_beams(file:filename_all(), list()) -> boolean().
+-spec has_all_beams(file:filename_all(), list()) -> true | providers:error().
 has_all_beams(EbinDir, [Module | ModuleList]) ->
     BeamFile = filename:join([EbinDir,
                               ec_cnv:to_list(Module) ++ ".beam"]),
@@ -166,7 +174,7 @@ has_all_beams(EbinDir, [Module | ModuleList]) ->
         true ->
             has_all_beams(EbinDir, ModuleList);
         false ->
-            false
+            ?PRV_ERROR({missing_module, Module})
     end;
 has_all_beams(_, []) ->
     true.
