@@ -224,7 +224,12 @@ state(#app_info_t{state=State}) ->
 
 -spec valid(t()) -> boolean().
 valid(AppInfo=#app_info_t{valid=undefined}) ->
-    rebar_app_discover:validate_application_info(AppInfo);
+    try
+        rebar_app_discover:validate_application_info(AppInfo)
+    catch
+        _:_ ->
+            false
+    end;
 valid(#app_info_t{valid=Valid}) ->
     Valid.
 
