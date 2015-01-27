@@ -101,7 +101,7 @@ validate_app_modules(State, App, AppData) ->
     AppVsn = proplists:get_value(vsn, AppData),
     case rebar_state:get(State, validate_app_modules, true) of
         true ->
-            case rebar_app_discover:validate_application_info(App) of
+            case rebar_app_discover:validate_application_info(App, AppData) of
                 true ->
                     {ok, rebar_app_info:original_vsn(App, AppVsn)};
                 Error ->
