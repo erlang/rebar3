@@ -150,7 +150,7 @@ validate_application_info(AppInfo) ->
                 {ok, List} ->
                     has_all_beams(EbinDir, List);
                 _Error ->
-                    ?PRV_ERROR({modules_list, AppFile})
+                    ?PRV_ERROR({module_list, AppFile})
             end
     end.
 
@@ -174,7 +174,7 @@ has_all_beams(EbinDir, [Module | ModuleList]) ->
         true ->
             has_all_beams(EbinDir, ModuleList);
         false ->
-            ?PRV_ERROR({missing_module, Module})
+            throw(?PRV_ERROR({missing_module, Module}))
     end;
 has_all_beams(_, []) ->
     true.
