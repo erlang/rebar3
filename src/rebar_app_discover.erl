@@ -6,7 +6,8 @@
          find_apps/1,
          find_apps/2,
          find_app/2,
-         validate_application_info/1]).
+         validate_application_info/1,
+         validate_application_info/2]).
 
 -include_lib("providers/include/providers.hrl").
 
@@ -140,12 +141,14 @@ create_app_info(AppDir, AppFile) ->
 
 -spec validate_application_info(rebar_app_info:t()) -> boolean().
 validate_application_info(AppInfo) ->
+    validate_application_info(AppInfo, rebar_app_info:app_details(AppInfo)).
+
+validate_application_info(AppInfo, AppDetail) ->
     EbinDir = rebar_app_info:ebin_dir(AppInfo),
     case rebar_app_info:app_file(AppInfo) of
         undefined ->
             false;
         AppFile ->
-            AppDetail = rebar_app_info:app_details(AppInfo),
             case get_modules_list(AppFile, AppDetail) of
                 {ok, List} ->
                     has_all_beams(EbinDir, List);
