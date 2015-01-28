@@ -47,7 +47,8 @@
          deprecated/4,
          erl_opts/1,
          indent/1,
-         cleanup_code_path/1]).
+         cleanup_code_path/1,
+         args_to_tasks/1]).
 
 %% for internal use only
 -export([otp_release/0]).
@@ -217,6 +218,12 @@ erl_opts(Config) ->
         false ->
             [debug_info|Opts]
     end.
+
+%% for use by `do` task
+
+%% note: this does not handle the case where you have an argument that
+%%  was enclosed in quotes and might have commas but should not be split.
+args_to_tasks(Args) -> new_task(Args, []).
 
 %% ====================================================================
 %% Internal functions
@@ -466,4 +473,50 @@ cleanup_code_path(OrigPath) ->
             true;
         _ ->
             code:set_path(OrigPath)
+    end.
+
+new_task([], Acc) -> lists:reverse(Acc);
+new_task([TaskList|Rest], Acc) ->
+    case re:split(TaskList, ",", [{return, list}, {parts, 2}]) of
+        %% `do` consumes all remaining args
+        ["do" = Task|RestArgs] ->
+            lists:reverse([{Task, RestArgs ++ Rest}|Acc]);
+        %% single task terminated by a comma
+        [Task, ""]    -> new_task(Rest, [{Task, []}|Acc]);
+        %% sequence of two or more tasks
+        [Task, More]  -> new_task([More|Rest], [{Task, []}|Acc]);
+        %% single task not terminated by a comma
+        [Task]        -> arg_or_flag(Rest, [{Task, []}|Acc])
+    end.
+
+arg_or_flag([], [{Task, Args}|Acc]) ->
+    lists:reverse([{Task, lists:reverse(Args)}|Acc]);
+%% case where you have `foo , bar`
+arg_or_flag([","|Rest], Acc) -> new_task(Rest, Acc);
+%% case where you have `foo ,bar`
+arg_or_flag(["," ++ Task|Rest], Acc) -> new_task([Task|Rest], Acc);
+%% a flag
+arg_or_flag(["-" ++ _ = Flag|Rest], [{Task, Args}|Acc]) ->
+    case maybe_ends_in_comma(Flag) of
+        false   -> arg_or_flag(Rest, [{Task, [Flag|Args]}|Acc]);
+        NewFlag -> new_task(Rest, [{Task,
+                                    lists:reverse([NewFlag|Args])}|Acc])
+    end;
+%% an argument or a sequence of arguments
+arg_or_flag([ArgList|Rest], [{Task, Args}|Acc]) ->
+    case re:split(ArgList, ",", [{return, list}, {parts, 2}]) of
+        %% single arg terminated by a comma
+        [Arg, ""]   -> new_task(Rest, [{Task,
+                                        lists:reverse([Arg|Args])}|Acc]);
+        %% sequence of two or more args/tasks
+        [Arg, More] -> new_task([More|Rest], [{Task,
+                                              lists:reverse([Arg|Args])}|Acc]);
+        %% single arg not terminated by a comma
+        [Arg] -> arg_or_flag(Rest, [{Task, [Arg|Args]}|Acc])
+    end.
+
+maybe_ends_in_comma(H) ->
+    case lists:reverse(H) of
+        "," ++ Flag -> lists:reverse(Flag);
+        _           -> false
     end.
