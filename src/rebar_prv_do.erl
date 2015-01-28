@@ -32,13 +32,12 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    Tasks = args_to_tasks(rebar_state:command_args(State)),
+    Tasks = rebar_utils:args_to_tasks(rebar_state:command_args(State)),
     do_tasks(Tasks, State).
 
 do_tasks([], State) ->
     {ok, State};
-do_tasks([TaskArgs | Tail], State) ->
-    [TaskStr | Args] = string:tokens(TaskArgs, " "),
+do_tasks([{TaskStr, Args}|Tail], State) ->
     Task = list_to_atom(TaskStr),
     State1 = rebar_state:set(State, task, Task),
     State2 = rebar_state:command_args(State1, Args),
@@ -52,6 +51,3 @@ do_tasks([TaskArgs | Tail], State) ->
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
-
-args_to_tasks(Args) ->
-    [string:strip(T) || T <- string:tokens(string:join(Args, " "), ",")].
