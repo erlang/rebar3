@@ -197,6 +197,7 @@ doterl_compile(Config, Dir, MoreSources, ErlOpts) ->
       fun(S, C) ->
               internal_erl_compile(C, Dir, S, OutDir1, ErlOpts, G)
       end),
+    ok = maybe_cover_compile(Config, OutDir1),
     true = code:set_path(CurrPath),
     ok.
 
@@ -621,3 +622,20 @@ log_files(Prefix, Files) ->
         _ ->
             ?DEBUG("~s:~n~p", [Prefix, Files])
     end.
+
+maybe_cover_compile(State, BeamDir) ->
+    case rebar_state:get(State, coverage, false) of
+        true  -> cover_compile(BeamDir);
+        false -> ok
+    end.
+
+cover_compile(BeamDir) ->
+    %% cover compile the modules we just compiled
+    CompileResult = cover:compile_beam_directory(BeamDir),
+    %% print any warnings about modules that failed to cover compile
+    lists:foreach(fun print_cover_warnings/1, CompileResult).
+
+print_cover_warnings({ok, _}) -> ok;
+print_cover_warnings({error, File}) ->
+    ?WARN("Cover compilation of ~p failed, module is not included in cover analysis.",
+          [File]).
