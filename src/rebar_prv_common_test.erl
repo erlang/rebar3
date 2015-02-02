@@ -287,8 +287,9 @@ ensure_dir([Dir|Rest]) ->
 test_state(State, InDirs, OutDir) ->
     ErlOpts = rebar_state:get(State, common_test_compile_opts, []) ++
               rebar_utils:erl_opts(State),
-    TestOpts = [{outdir, OutDir}] ++
+    ErlOpts1 = [{outdir, OutDir}] ++
                add_test_dir(ErlOpts, InDirs),
+    TestOpts = safe_define_test_macro(ErlOpts1),
     first_files(rebar_state:set(State, erl_opts, TestOpts)).
 
 add_test_dir(Opts, InDirs) ->
@@ -298,6 +299,19 @@ add_test_dir(Opts, InDirs) ->
         [] -> [{src_dirs, ["src", "test" | InDirs]} | Opts];
         _ -> [{src_dirs, ["test" | InDirs]} | Opts]
     end.
+
+safe_define_test_macro(Opts) ->
+    %% defining a compile macro twice results in an exception so
+    %% make sure 'TEST' is only defined once
+    case test_defined(Opts) of
+       true -> Opts;
+       false -> [{d, 'TEST'}] ++ Opts
+    end.
+
+test_defined([{d, 'TEST'}|_]) -> true;
+test_defined([{d, 'TEST', true}|_]) -> true;
+test_defined([_|Rest]) -> test_defined(Rest);
+test_defined([]) -> false.
 
 first_files(State) ->
     BaseFirst = rebar_state:get(State, erl_first_files, []),

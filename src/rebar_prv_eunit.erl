@@ -47,7 +47,7 @@ do(State) ->
                       %% combine `erl_first_files` and `eunit_first_files` and adjust
                       %% compile opts to include `eunit_compile_opts`, `{d, 'TEST'}`
                       %% and `{src_dirs, "test"}`
-                      TestState = first_files(test_state(S, OutDir)),
+                      TestState = test_state(S, OutDir),
                       ok = rebar_erlc_compiler:compile(TestState, AppDir)
                   end, TestApps),
     ok = maybe_compile_extra_tests(TestApps, State, OutDir),
@@ -56,6 +56,7 @@ do(State) ->
     EUnitOpts = resolve_eunit_opts(State, Opts),
     AppsToTest = [{application, erlang:binary_to_atom(rebar_app_info:name(App), unicode)}
                   || App <- TestApps],
+    ?DEBUG("Testing: ~p", [AppsToTest]),
     Result = eunit:test(AppsToTest, EUnitOpts),
     true = code:set_path(Path),
     case handle_results(Result) of
@@ -109,13 +110,13 @@ default_test_dir(State) ->
     ok = rebar_file_utils:reset_dir(OutDir),
     OutDir.
 
-test_state(State, TmpDir) ->
+test_state(State, OutDir) ->
     ErlOpts = rebar_state:get(State, eunit_compile_opts, []) ++
-        rebar_utils:erl_opts(State),
-    ErlOpts1 = [{outdir, TmpDir}] ++
-        add_test_dir(ErlOpts),
+              rebar_utils:erl_opts(State),
+    ErlOpts1 = [{outdir, OutDir}] ++
+               add_test_dir(ErlOpts),
     TestOpts = safe_define_test_macro(ErlOpts1),
-    rebar_state:set(State, erl_opts, TestOpts).
+    first_files(rebar_state:set(State, erl_opts, TestOpts)).
 
 add_test_dir(Opts) ->
     %% if no src_dirs are set we have to specify `src` or it won't

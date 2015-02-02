@@ -70,12 +70,13 @@ process_command(State, Command) ->
             end;
         CommandProvider ->
             case Command of
-                Command when Command =:= do, Namespace =:= undefined ->
+                Command when (Command =:= do orelse Command =:= cover),
+                             Namespace =:= undefined ->
                     %% We're definitely in the default namespace. 'do' doesn't
                     %% properly exist for non-default namespaces outside of
                     %% dynamic dispatch calls for namespaces.
                     do(TargetProviders, rebar_state:namespace(State, default));
-                Command when Command =:= do; Command =:= as ->
+                Command when Command =:= do; Command =:= as; Command =:= cover ->
                     do(TargetProviders, State);
                 _ ->
                     Profiles = providers:profiles(CommandProvider),
@@ -91,7 +92,6 @@ process_command(State, Command) ->
                     end
             end
     end.
-
 -spec do([{atom(), atom()}], rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do([], State) ->
     {ok, State};
