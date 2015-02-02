@@ -47,16 +47,18 @@ do(State) ->
                       %% combine `erl_first_files` and `eunit_first_files` and adjust
                       %% compile opts to include `eunit_compile_opts`, `{d, 'TEST'}`
                       %% and `{src_dirs, "test"}`
-                      TestState = first_files(test_state(S, OutDir)),
+                      TestState = test_state(S, OutDir),
                       ok = rebar_erlc_compiler:compile(TestState, AppDir)
                   end, TestApps),
     ok = maybe_compile_extra_tests(TestApps, State, OutDir),
+    ok = maybe_cover_compile(Opts, State, OutDir),
     Path = code:get_path(),
     true = code:add_patha(OutDir),
     EUnitOpts = resolve_eunit_opts(State, Opts),
     AppsToTest = [{application, erlang:binary_to_atom(rebar_app_info:name(App), unicode)}
                   || App <- TestApps],
     Result = eunit:test(AppsToTest, EUnitOpts),
+    ok = rebar_prv_cover:maybe_write_coverdata(State, ?PROVIDER),
     true = code:set_path(Path),
     case handle_results(Result) of
         {error, Reason} ->
@@ -72,9 +74,11 @@ format_error({error_running_tests, Reason}) ->
     io_lib:format("Error running tests: ~p", [Reason]).
 
 eunit_opts(_State) ->
-    [{outdir, $o, "outdir", string, help(outdir)},
+    [{cover, $c, "cover", boolean, help(cover)},
+     {outdir, $o, "outdir", string, help(outdir)},
      {verbose, $v, "verbose", boolean, help(verbose)}].
 
+help(cover) -> "Generate cover data";
 help(outdir) -> "Output directory for EUnit compiled modules";
 help(verbose) -> "Verbose output".
 
@@ -109,13 +113,13 @@ default_test_dir(State) ->
     ok = rebar_file_utils:reset_dir(OutDir),
     OutDir.
 
-test_state(State, TmpDir) ->
+test_state(State, OutDir) ->
     ErlOpts = rebar_state:get(State, eunit_compile_opts, []) ++
-        rebar_utils:erl_opts(State),
-    ErlOpts1 = [{outdir, TmpDir}] ++
-        add_test_dir(ErlOpts),
+              rebar_utils:erl_opts(State),
+    ErlOpts1 = [{outdir, OutDir}] ++
+               add_test_dir(ErlOpts),
     TestOpts = safe_define_test_macro(ErlOpts1),
-    rebar_state:set(State, erl_opts, TestOpts).
+    first_files(rebar_state:set(State, erl_opts, TestOpts)).
 
 add_test_dir(Opts) ->
     %% if no src_dirs are set we have to specify `src` or it won't
@@ -171,6 +175,13 @@ maybe_compile_extra_tests(TestApps, State, OutDir) ->
         %% already compiled `./test` so do nothing
         _ -> ok
     end.
+
+maybe_cover_compile(Opts, State, OutDir) ->
+    State1 = case proplists:get_value(cover, Opts, false) of
+        true  -> rebar_state:set(State, cover_enabled, true);
+        false -> State
+    end,
+    rebar_prv_cover:maybe_cover_compile(State1, OutDir).
 
 handle_results(ok) -> ok;
 handle_results(error) ->
