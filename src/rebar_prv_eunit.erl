@@ -40,8 +40,10 @@ do(State) ->
     EUnitOpts = resolve_eunit_opts(State, Opts),
     TestApps = filter_checkouts(rebar_state:project_apps(State)),
     ok = compile_tests(State, TestApps),
+    ok = maybe_cover_compile(State, Opts),
     AppsToTest = test_dirs(State, TestApps),
     Result = eunit:test(AppsToTest, EUnitOpts),
+    ok = rebar_prv_cover:maybe_write_coverdata(State, ?PROVIDER),
     case handle_results(Result) of
         {error, Reason} ->
             {error, {?MODULE, Reason}};
@@ -56,8 +58,10 @@ format_error({error_running_tests, Reason}) ->
     io_lib:format("Error running tests: ~p", [Reason]).
 
 eunit_opts(_State) ->
-    [{verbose, $v, "verbose", boolean, help(verbose)}].
+    [{cover, $c, "cover", boolean, help(cover)},
+     {verbose, $v, "verbose", boolean, help(verbose)}].
 
+help(cover) -> "Generate cover data";
 help(verbose) -> "Verbose output".
 
 filter_checkouts(Apps) -> filter_checkouts(Apps, []).
@@ -156,6 +160,13 @@ replace_src_dirs(State) ->
     ErlOpts = rebar_state:get(State, erl_opts, []),
     StrippedOpts = lists:keydelete(src_dirs, 1, ErlOpts),
     rebar_state:set(State, erl_opts, [{src_dirs, ["test"]}|StrippedOpts]).
+
+maybe_cover_compile(State, Opts) ->
+    State1 = case proplists:get_value(cover, Opts, false) of
+        true  -> rebar_state:set(State, cover_enabled, true);
+        false -> State
+    end,
+    rebar_prv_cover:maybe_cover_compile(State1).
 
 handle_results(ok) -> ok;
 handle_results(error) ->

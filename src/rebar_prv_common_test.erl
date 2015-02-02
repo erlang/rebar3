@@ -42,10 +42,12 @@ do(State) ->
     ok = create_dirs(Opts),
     InDirs = in_dirs(State, RawOpts),
     ok = compile_tests(State, TestApps, InDirs),
+    ok = maybe_cover_compile(State, RawOpts),
     CTOpts = resolve_ct_opts(State, Opts),
-    Verbose = proplists:get_value(verbose, Opts, false),
+    Verbose = proplists:get_value(verbose, RawOpts, false),
     TestDirs = test_dirs(State, TestApps),
     Result = run_test([{dir, TestDirs}|CTOpts], Verbose),
+    ok = rebar_prv_cover:maybe_write_coverdata(State, ?PROVIDER),
     case Result of
         {error, Reason} ->
             {error, {?MODULE, Reason}};
@@ -90,7 +92,8 @@ ct_opts(State) ->
      {silent_connections, undefined, "silent_connections", string,
       help(silent_connections)}, % all OR %% comma-seperated list
      {stylesheet, undefined, "stylesheet", string, help(stylesheet)}, %% file
-     {cover, undefined, "cover", string, help(cover)}, %% file
+     {cover, $c, "cover", boolean, help(cover)},
+     {cover_spec, undefined, "cover_spec", string, help(cover_spec)}, %% file
      {cover_stop, undefined, "cover_stop", boolean, help(cover_stop)}, %% Boolean
      {event_handler, undefined, "event_handler", string, help(event_handler)}, %% EH | [EH] WHERE EH atom() | {atom(), InitArgs} | {[atom()], InitArgs}
      {include, undefined, "include", string, help(include)}, % comma-seperated list
@@ -138,6 +141,8 @@ help(silent_connections) ->
 help(stylesheet) ->
     "Stylesheet to use for test results";
 help(cover) ->
+    "Generate cover data";
+help(cover_spec) ->
     "Cover file to use";
 help(cover_stop) ->
     ""; %% ??
@@ -174,8 +179,10 @@ transform_opts(Opts) ->
     transform_opts(Opts, []).
 
 transform_opts([], Acc) -> Acc;
-%% drop `outdir` so it's not passed to common_test
-transform_opts([{outdir, _}|Rest], Acc) ->
+%% drop `cover` and `verbose` so they're not passed as an option to common_test
+transform_opts([{cover, _}|Rest], Acc) ->
+    transform_opts(Rest, Acc);
+transform_opts([{verbose, _}|Rest], Acc) ->
     transform_opts(Rest, Acc);
 transform_opts([{ct_hooks, CtHooks}|Rest], Acc) ->
     transform_opts(Rest, [{ct_hooks, parse_term(CtHooks)}|Acc]);
@@ -343,6 +350,13 @@ replace_src_dirs(State, InDirs) ->
     ErlOpts = rebar_state:get(State, erl_opts, []),
     StrippedOpts = lists:keydelete(src_dirs, 1, ErlOpts),
     rebar_state:set(State, erl_opts, [{src_dirs, ["test"|InDirs]}|StrippedOpts]).
+
+maybe_cover_compile(State, Opts) ->
+    State1 = case proplists:get_value(cover, Opts, false) of
+        true  -> rebar_state:set(State, cover_enabled, true);
+        false -> State
+    end,
+    rebar_prv_cover:maybe_cover_compile(State1).
 
 handle_results([Result]) ->
     handle_results(Result);
