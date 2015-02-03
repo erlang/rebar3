@@ -37,17 +37,18 @@ process_command(State, Command) ->
     Providers = rebar_state:providers(State),
     Namespace = rebar_state:namespace(State),
     {TargetProviders, CommandProvider} =
-     case Namespace of
-        undefined ->
-            %% undefined namespace means 'default', but on the first run;
-            %% it is used as an implicit counter for the first vs. subsequent
-            %% runs.
-            {providers:get_target_providers(Command, Providers, default),
-             providers:get_provider(Command, Providers, default)};
-        _ ->
-            {providers:get_target_providers(Command, Providers, Namespace),
-             providers:get_provider(Command, Providers, Namespace)}
-    end,
+        case Namespace of
+            undefined ->
+                %% undefined namespace means 'default', but on the first run;
+                %% it is used as an implicit counter for the first vs. subsequent
+                %% runs.
+                {providers:get_target_providers(Command, Providers, default),
+                 providers:get_provider(Command, Providers, default)};
+            _ ->
+                {providers:get_target_providers(Command, Providers, Namespace),
+                 providers:get_provider(Command, Providers, Namespace)}
+        end,
+
     case CommandProvider of
         not_found ->
             case Namespace of
