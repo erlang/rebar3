@@ -278,8 +278,8 @@ add_provider(State=#state_t{providers=Providers}, Provider) ->
     State#state_t{providers=[Provider | Providers]}.
 
 create_logic_providers(ProviderModules, State0) ->
-    State1 = try
-                 lists:foldl(fun(ProviderMod, StateAcc) ->
+    try
+        State1 = lists:foldl(fun(ProviderMod, StateAcc) ->
                                      case providers:new(ProviderMod, StateAcc) of
                                          {error, Reason} ->
                                              ?ERROR(Reason++"~n", []),
@@ -287,13 +287,13 @@ create_logic_providers(ProviderModules, State0) ->
                                          {ok, StateAcc1} ->
                                              StateAcc1
                                      end
-                             end, State0, ProviderModules)
-             catch
-                 C:T ->
-                     ?DEBUG("~p: ~p ~p", [C, T, erlang:get_stacktrace()]),
-                     throw({error, "Failed creating providers. Run with DEBUG=1 for stacktrace."})
-             end,
-    apply_hooks(State1).
+                             end, State0, ProviderModules),
+        apply_hooks(State1)
+    catch
+        C:T ->
+            ?DEBUG("~p: ~p ~p", [C, T, erlang:get_stacktrace()]),
+            throw({error, "Failed creating providers. Run with DEBUG=1 for stacktrace."})
+    end.
 
 apply_hooks(State0) ->
     try
