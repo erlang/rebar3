@@ -34,4 +34,5 @@ build_and_clean_app(Config) ->
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name, valid}]}),
-    rebar_test_utils:run_and_check(Config, [{provider_hooks, [{post, [{compile, clean}]}]}], ["compile"], {ok, [{app, Name, invalid}]}).
+    rebar_test_utils:run_and_check(Config, [{provider_hooks, [{post, [{compile, clean}]}]}],
+                                  ["compile"], {ok, [{app, Name, invalid}]}).

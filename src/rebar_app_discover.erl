@@ -88,15 +88,15 @@ find_app(AppDir, Validate) ->
                     case validate_application_info(AppInfo2) of
                         true ->
                             {true, AppInfo2};
-                        false ->
+                        _ ->
                             false
                     end;
                 invalid ->
                     case validate_application_info(AppInfo2) of
-                        false ->
-                            {true, AppInfo2};
                         true ->
-                            false
+                            false;
+                        _ ->
+                            {true, AppInfo2}
                     end;
                 all ->
                     {true, AppInfo2}
@@ -177,7 +177,7 @@ has_all_beams(EbinDir, [Module | ModuleList]) ->
         true ->
             has_all_beams(EbinDir, ModuleList);
         false ->
-            throw(?PRV_ERROR({missing_module, Module}))
+            ?PRV_ERROR({missing_module, Module})
     end;
 has_all_beams(_, []) ->
     true.
