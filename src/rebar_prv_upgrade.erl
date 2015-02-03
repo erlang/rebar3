@@ -12,7 +12,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, upgrade).
--define(DEPS, [lock]).
+-define(DEPS, []).
 %% Also only upgrade top-level (0) deps. Transitive deps shouldn't be
 %% upgradable -- if the user wants this, they should declare it at the
 %% top level and then upgrade.
@@ -41,38 +41,38 @@ init(State) ->
 do(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     Name = ec_cnv:to_binary(proplists:get_value(package, Args)),
-    Locks = rebar_state:lock(State),
-    %% TODO: optimize by running the find + unlock in one sweep
-    case find_app(Name, Locks) of
-        {AppInfo, 0} ->
-            %% Unlock the app and all those with a lock level higher than
-            %% it has
-            NewLocks = unlock_higher_than(0, Locks -- [AppInfo]),
-            {ok, rebar_state:lock(State, NewLocks)};
-        {_AppInfo, Level} when Level > 0 ->
+    Locks = rebar_state:get(State, {locks, default}, []),
+    case lists:keyfind(Name, 1, Locks) of
+        {_, _, 0} = Lock ->
+            Deps = rebar_state:get(State, deps),
+            case lists:keyfind(binary_to_atom(Name, utf8), 1, Deps) of
+                false ->
+                    {error, unknown_dependency};
+                Dep ->
+                    Source = case Dep of
+                        {_, Src} -> Src;
+                        {_, _, Src} -> Src
+                    end,
+                    NewLocks = unlock_higher_than(0, Locks -- [Lock]),
+                    State1 = rebar_state:set(State, {deps, default}, [{Name, Source, 0} | NewLocks]),
+                    State2 = rebar_state:set(State1, {locks, default}, NewLocks),
+                    rebar_prv_install_deps:do(State2)
+            end;
+        {_, _, Level} when Level > 0 ->
             {error, transitive_dependency};
         false ->
-            {error, unknown_dependency}
+            ct:pal("deps: ~p", [{Name,Locks}]),
+            {error, unlocked_dependency}
     end.
 
-find_app(_Name, []) -> false;
-find_app(Name, [App|Apps]) ->
-    case rebar_app_info:name(App) of
-        Name -> {App, rebar_app_info:dep_level(App)};
-        _ -> find_app(Name, Apps)
-    end.
 
-%% Because we operate on a lock list, removing the app from the list
-%% unlocks it.
 unlock_higher_than(_, []) -> [];
-unlock_higher_than(Level, [App | Apps]) ->
-    case rebar_app_info:dep_level(App) of
-        N when N > Level ->
-            unlock_higher_than(Level, Apps);
-        N when N =< Level ->
-            [App | unlock_higher_than(Level, Apps)]
+unlock_higher_than(Level, [App = {_,_,AppLevel} | Apps]) ->
+    if AppLevel > Level  -> unlock_higher_than(Level, Apps);
+       AppLevel =< Level -> [App | unlock_higher_than(Level, Apps)]
     end.
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
+

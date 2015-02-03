@@ -254,10 +254,9 @@ update_src_deps(Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen, 
                                      {SeenAcc1, StateAcc1} = maybe_lock(Profile, AppInfo, SeenAcc, StateAcc, Level),
                                      {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2, LocksAcc1} =
                                          case Update of
-                                             {true, UpdateName, UpdateLevel} ->
+                                             true ->
+                                             %{true, UpdateName, UpdateLevel} ->
                                                  handle_update(AppInfo
-                                                              ,UpdateName
-                                                              ,UpdateLevel
                                                               ,SrcDepsAcc
                                                               ,PkgDepsAcc
                                                               ,SrcAppsAcc
@@ -285,14 +284,15 @@ update_src_deps(Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen, 
             update_src_deps(Profile, Level+1, NewSrcDeps, NewPkgDeps, NewSrcApps, State1, Update, Seen1, NewLocks)
     end.
 
-handle_update(AppInfo, UpdateName, UpdateLevel, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
+handle_update(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
     Name = rebar_app_info:name(AppInfo),
-    {_, _, DepLevel} = lists:keyfind(Name, 1, Locks),
-    case UpdateLevel < DepLevel
-        orelse Name =:= UpdateName of
-        true ->
+    ct:pal("update ~p", [Name]),
+    case lists:keyfind(Name, 1, Locks) of
+        false ->
+            ct:pal("in lock"),
             case maybe_fetch(AppInfo, true, []) of
                 true ->
+                    ct:pal("fetch!"),
                     handle_dep(AppInfo
                               ,SrcDeps
                               ,PkgDeps
@@ -302,9 +302,11 @@ handle_update(AppInfo, UpdateName, UpdateLevel, SrcDeps, PkgDeps, SrcApps, Level
                               ,Locks);
 
                 false ->
+                    ct:pal("nofetch"),
                     {SrcDeps, PkgDeps, SrcApps, State, Locks}
             end;
-        false ->
+        _StillLocked ->
+            ct:pal("stillocked"),
             {SrcDeps, PkgDeps, SrcApps, State, Locks}
     end.
 
