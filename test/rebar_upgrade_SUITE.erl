@@ -6,7 +6,10 @@
 all() -> [{group, git}].%, {group, pkg}].
 
 groups() ->
-    [{all, [], [top, pair, triplet, tree]},
+    [{all, [], [top_a, top_b, top_c, top_d1, top_d2, top_e,
+                pair_a, pair_b, pair_c,
+                triplet_a, triplet_b, triplet_c,
+                tree_a, tree_b, tree_c]},
      {git, [], [{group, all}]},
      {pkg, [], [{group, all}]}].
 
@@ -29,10 +32,12 @@ end_per_group(_, Config) ->
 
 init_per_testcase(Case, Config) ->
     DepsType = ?config(deps_type, Config),
-    {Deps, Unlocks} = upgrades(Case),
+    {Deps, UpDeps, ToUp, Expectations} = upgrades(Case),
     Expanded = expand_deps(DepsType, Deps),
-    [{unlocks, normalize_unlocks(Unlocks)},
-     {mock, fun() -> mock_deps(DepsType, Expanded, []) end}
+    UpExpanded = expand_deps(DepsType, UpDeps),
+    [{expected, normalize_unlocks(Expectations)},
+     {mock, fun() -> mock_deps(DepsType, Expanded, []) end},
+     {mock_update, fun() -> mock_deps(DepsType, UpExpanded, ToUp) end}
      | setup_project(Case, Config, Expanded)].
 
 end_per_testcase(_, Config) ->
@@ -52,49 +57,216 @@ setup_project(Case, Config0, Deps) ->
     [{rebarconfig, RebarConf} | Config].
 
 
-upgrades(top) ->
-    {[{"A", [{"B", [{"D", "1", []}]},
-             {"C", [{"D", "2", []}]}]}
+upgrades(top_a) ->
+     %% Original tree
+    {[{"A", "1", [{"B", [{"D", "1", []}]},
+                  {"C", [{"D", "2", []}]}]}
      ],
-     %% upgrade vs. locked after upgrade
-     [{"A", []},
-      {"B", {error, transitive_dependency}},
-      {"C", {error, transitive_dependency}},
-      {"D", "1", {error, transitive_dependency}},
-      {"D", "2", {error, unknown_dependency}}]};
-upgrades(pair) ->
-    {[{"A", [{"C", []}]},
-      {"B", [{"D", []}]}],
-     [{"A", ["B"]},
-      {"B", ["A"]},
-      {"C", {error, transitive_dependency}},
-      {"D", {error, transitive_dependency}}]};
-upgrades(triplet) ->
-    {[{"A", [{"D",[]},
-             {"E",[]}]},
-      {"B", [{"F",[]},
-             {"G",[]}]},
-      {"C", [{"H",[]},
-             {"I",[]}]}],
-     [{"A", ["B","C"]},
-      {"B", ["A","C"]},
-      {"C", ["A","B"]},
-      {"D", {error, transitive_dependency}},
-      %% ...
-      {"I", {error, transitive_dependency}}]};
-upgrades(tree) ->
-    {[{"A", [{"D",[{"J",[]}]},
-             {"E",[{"K",[]}]}]},
-      {"B", [{"F",[]},
-             {"G",[]}]},
-      {"C", [{"H",[]},
-             {"I",[]}]}],
-     [{"A", ["B","C"]},
-      {"B", ["A","C"]},
-      {"C", ["A","B"]},
-      {"D", {error, transitive_dependency}},
-      %% ...
-      {"K", {error, transitive_dependency}}]}.
+     %% Updated tree
+     [{"A", "1", [{"B", [{"D", "3", []}]},
+                  {"C", [{"D", "2", []}]}]}
+     ],
+     %% Modified apps, gobally
+     ["A","B","D"],
+     %% upgrade vs. new tree
+     {"A", [{"A","1"}, "B", "C", {"D","3"}]}};
+upgrades(top_b) ->
+     %% Original tree
+    {[{"A", "1", [{"B", [{"D", "1", []}]},
+                  {"C", [{"D", "2", []}]}]}
+     ],
+     %% Updated tree
+     [{"A", "1", [{"B", [{"D", "3", []}]},
+                  {"C", [{"D", "2", []}]}]}
+     ],
+     %% Modified apps, gobally
+     ["A","B","D"],
+     %% upgrade vs. new tree
+     {"B", {error, transitive_dependency}}};
+upgrades(top_c) ->
+     %% Original tree
+    {[{"A", "1", [{"B", [{"D", "1", []}]},
+                  {"C", [{"D", "2", []}]}]}
+     ],
+     %% Updated tree
+     [{"A", "1", [{"B", [{"D", "3", []}]},
+                  {"C", [{"D", "2", []}]}]}
+     ],
+     %% Modified apps, gobally
+     ["A","B","D"],
+     %% upgrade vs. new tree
+     {"C", {error, transitive_dependency}}};
+upgrades(top_d1) ->
+     %% Original tree
+    {[{"A", "1", [{"B", [{"D", "1", []}]},
+                  {"C", [{"D", "2", []}]}]}
+     ],
+     %% Updated tree
+     [{"A", "1", [{"B", [{"D", "3", []}]},
+                  {"C", [{"D", "2", []}]}]}
+     ],
+     %% Modified apps, gobally
+     ["A","B","D"],
+     %% upgrade vs. new tree
+     {"D", {error, transitive_dependency}}};
+upgrades(top_d2) ->
+     %% Original tree
+    {[{"A", "1", [{"B", [{"D", "1", []}]},
+                  {"C", [{"D", "2", []}]}]}
+     ],
+     %% Updated tree
+     [{"A", "1", [{"B", [{"D", "3", []}]},
+                  {"C", [{"D", "2", []}]}]}
+     ],
+     %% Modified apps, gobally
+     ["A","B","D"],
+     %% upgrade vs. new tree
+     {"D", {error, transitive_dependency}}};
+upgrades(top_e) ->
+     %% Original tree
+    {[{"A", "1", [{"B", [{"D", "1", []}]},
+                  {"C", [{"D", "2", []}]}]}
+     ],
+     %% Updated tree
+     [{"A", "1", [{"B", [{"D", "3", []}]},
+                  {"C", [{"D", "2", []}]}]}
+     ],
+     %% Modified apps, gobally
+     ["A","B","D"],
+     %% upgrade vs. new tree
+     {"E", {error, unknown_dependency}}};
+upgrades(pair_a) ->
+    {[{"A", "1", [{"C", "1", []}]},
+      {"B", "1", [{"D", "1", []}]}
+     ],
+     [{"A", "2", [{"C", "2", []}]},
+      {"B", "2", [{"D", "2", []}]}
+     ],
+     ["A","B","C","D"],
+     {"A", [{"A","2"},{"C","2"},{"B","1"},{"D","1"}]}};
+upgrades(pair_b) ->
+    {[{"A", "1", [{"C", "1", []}]},
+      {"B", "1", [{"D", "1", []}]}
+     ],
+     [{"A", "2", [{"C", "2", []}]},
+      {"B", "2", [{"D", "2", []}]}
+     ],
+     ["A","B","C","D"],
+     {"B", [{"A","1"},{"C","1"},{"B","2"},{"D","2"}]}};
+upgrades(pair_c) ->
+    {[{"A", "1", [{"C", "1", []}]},
+      {"B", "1", [{"D", "1", []}]}
+     ],
+     [{"A", "2", [{"C", "2", []}]},
+      {"B", "2", [{"D", "2", []}]}
+     ],
+     ["A","B","C","D"],
+     {"C", {error, transitive_dependency}}};
+upgrades(triplet_a) ->
+    {[{"A", "1", [{"D",[]},
+                  {"E","3",[]}]},
+      {"B", "1", [{"F","1",[]},
+                  {"G",[]}]},
+      {"C", "0", [{"H","3",[]},
+                  {"I",[]}]}],
+     [{"A", "1", [{"D",[]},
+                  {"E","2",[]}]},
+      {"B", "1", [{"F","1",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H","4",[]},
+                  {"I",[]}]}],
+     ["A","C","E","H"],
+     {"A", [{"A","1"}, "D", {"E","2"},
+            {"B","1"}, {"F","1"}, "G",
+            {"C","0"}, {"H","3"}, "I"]}};
+upgrades(triplet_b) ->
+    {[{"A", "1", [{"D",[]},
+                  {"E","3",[]}]},
+      {"B", "1", [{"F","1",[]},
+                  {"G",[]}]},
+      {"C", "0", [{"H","3",[]},
+                  {"I",[]}]}],
+     [{"A", "1", [{"D",[]},
+                  {"E","2",[]}]},
+      {"B", "1", [{"F","1",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H","4",[]},
+                  {"I",[]}]}],
+     ["A","C","E","H"],
+     {"B", [{"A","1"}, "D", {"E","3"},
+            {"B","1"}, {"F","1"}, "G",
+            {"C","0"}, {"H","3"}, "I"]}};
+upgrades(triplet_c) ->
+    {[{"A", "1", [{"D",[]},
+                  {"E","3",[]}]},
+      {"B", "1", [{"F","1",[]},
+                  {"G",[]}]},
+      {"C", "0", [{"H","3",[]},
+                  {"I",[]}]}],
+     [{"A", "1", [{"D",[]},
+                  {"E","2",[]}]},
+      {"B", "1", [{"F","1",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H","4",[]},
+                  {"I",[]}]}],
+     ["A","C","E","H"],
+     {"C", [{"A","1"}, "D", {"E","3"},
+            {"B","1"}, {"F","1"}, "G",
+            {"C","1"}, {"H","4"}, "I"]}};
+upgrades(tree_a) ->
+    {[{"A", "1", [{"D",[{"J",[]}]},
+                  {"E",[{"I","1",[]}]}]},
+      {"B", "1", [{"F",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H",[]},
+                  {"I","2",[]}]}
+     ],
+     [{"A", "1", [{"D",[{"J",[]}]},
+                  {"E",[{"I","1",[]}]}]},
+      {"B", "1", [{"F",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H",[]}]}
+     ],
+     ["C"],
+     {"A", [{"A","1"}, "D", "J", "E",
+            {"B","1"}, "F", "G",
+            {"C","1"}, "H", {"I","2"}]}};
+upgrades(tree_b) ->
+    {[{"A", "1", [{"D",[{"J",[]}]},
+                  {"E",[{"I","1",[]}]}]},
+      {"B", "1", [{"F",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H",[]},
+                  {"I","2",[]}]}
+     ],
+     [{"A", "1", [{"D",[{"J",[]}]},
+                  {"E",[{"I","1",[]}]}]},
+      {"B", "1", [{"F",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H",[]}]}
+     ],
+     ["C"],
+     {"B", [{"A","1"}, "D", "J", "E",
+            {"B","1"}, "F", "G",
+            {"C","1"}, "H", {"I","2"}]}};
+upgrades(tree_c) ->
+    {[{"A", "1", [{"D",[{"J",[]}]},
+                  {"E",[{"I","1",[]}]}]},
+      {"B", "1", [{"F",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H",[]},
+                  {"I","2",[]}]}
+     ],
+     [{"A", "1", [{"D",[{"J",[]}]},
+                  {"E",[{"I","1",[]}]}]},
+      {"B", "1", [{"F",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H",[]}]}
+     ],
+     ["C"],
+     {"C", [{"A","1"}, "D", "J", "E", {"I","1"},
+            {"B","1"}, "F", "G",
+            {"C","1"}, "H"]}}.
 
 %% TODO: add a test that verifies that unlocking files and then
 %% running the upgrade code is enough to properly upgrade things.
@@ -106,8 +278,10 @@ top_level_deps([{{pkg, Name, Vsn, _URL}, _} | Deps]) ->
     [{list_to_atom(Name), Vsn} | top_level_deps(Deps)].
 
 mock_deps(git, Deps, Upgrades) ->
+    catch mock_git_resource:unmock(),
     mock_git_resource:mock([{deps, flat_deps(Deps)}, {upgrade, Upgrades}]);
 mock_deps(pkg, Deps, Upgrades) ->
+    catch mock_pkg_resource:unmock(),
     mock_pkg_resource:mock([{pkgdeps, flat_pkgdeps(Deps)}, {upgrade, Upgrades}]).
 
 flat_deps([]) -> [];
@@ -143,43 +317,55 @@ expand_deps(pkg, [{Name, Vsn, Deps} | Rest]) ->
     Dep = {pkg, Name, Vsn, "https://example.org/user/"++Name++".tar.gz"},
     [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)].
 
-normalize_unlocks([]) -> [];
-normalize_unlocks([{App, Locks} | Rest]) ->
-    [{iolist_to_binary(App),
-      normalize_unlocks_expect(Locks)} | normalize_unlocks(Rest)];
-normalize_unlocks([{App, Vsn, Locks} | Rest]) ->
-    [{iolist_to_binary(App), iolist_to_binary(Vsn),
-      normalize_unlocks_expect(Locks)} | normalize_unlocks(Rest)].
+normalize_unlocks({App, Locks}) ->
+    {iolist_to_binary(App),
+     normalize_unlocks_expect(Locks)};
+normalize_unlocks({App, Vsn, Locks}) ->
+    {iolist_to_binary(App), iolist_to_binary(Vsn),
+     normalize_unlocks_expect(Locks)}.
 
 normalize_unlocks_expect({error, Reason}) ->
     {error, Reason};
 normalize_unlocks_expect([]) ->
     [];
 normalize_unlocks_expect([{App,Vsn} | Rest]) ->
-    [{iolist_to_binary(App), iolist_to_binary(Vsn)}
+    [{dep, App, Vsn}
      | normalize_unlocks_expect(Rest)];
 normalize_unlocks_expect([App | Rest]) ->
-    [iolist_to_binary(App) | normalize_unlocks_expect(Rest)].
+    [{dep, App} | normalize_unlocks_expect(Rest)].
 
-top(Config) -> run(Config).
-pair(Config) -> run(Config).
-triplet(Config) -> run(Config).
-tree(Config) -> run(Config).
+top_a(Config) -> run(Config).
+top_b(Config) -> run(Config).
+top_c(Config) -> run(Config).
+top_d1(Config) -> run(Config).
+top_d2(Config) -> run(Config).
+top_e(Config) -> run(Config).
+
+pair_a(Config) -> run(Config).
+pair_b(Config) -> run(Config).
+pair_c(Config) -> run(Config).
+
+triplet_a(Config) -> run(Config).
+triplet_b(Config) -> run(Config).
+triplet_c(Config) -> run(Config).
+
+tree_a(Config) -> run(Config).
+tree_b(Config) -> run(Config).
+tree_c(Config) -> run(Config).
 
 run(Config) ->
     apply(?config(mock, Config), []),
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
     %% Install dependencies before re-mocking for an upgrade
     rebar_test_utils:run_and_check(Config, RebarConfig, ["lock"], {ok, []}),
-    Unlocks = ?config(unlocks, Config),
-    [begin
-        ct:pal("Unlocks: ~p -> ~p", [App, Unlocked]),
-        Expectation = case Unlocked of
-            Tuple when is_tuple(Tuple) -> Tuple;
-            _ -> {unlocked, Unlocked}
-        end,
-        rebar_test_utils:run_and_check(
-            Config, RebarConfig, ["upgrade", App], Expectation
-        )
-     end || {App, Unlocked} <- Unlocks].
+    {App, Unlocks} = ?config(expected, Config),
+    ct:pal("Upgrades: ~p -> ~p", [App, Unlocks]),
+    Expectation = case Unlocks of
+        {error, Term} -> {error, Term};
+        _ -> {ok, Unlocks}
+    end,
+    apply(?config(mock_update, Config), []),
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["upgrade", App], Expectation
+    ).
 

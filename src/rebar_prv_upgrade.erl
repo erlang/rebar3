@@ -62,7 +62,7 @@ do(State) ->
             {error, transitive_dependency};
         false ->
             ct:pal("deps: ~p", [{Name,Locks}]),
-            {error, unlocked_dependency}
+            {error, unknown_dependency}
     end.
 
 

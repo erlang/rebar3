@@ -54,14 +54,6 @@ run_and_check(Config, RebarConfig, Command, Expect) ->
         {ok, Expected} ->
             {ok, _} = Res,
             check_results(AppDir, Expected);
-        {unlocked, Expected} ->
-            ct:pal("Expected: ~p", [Expected]),
-            {ok, ResState} = Res,
-            Locks = rebar_state:lock(ResState),
-            ct:pal("Locks: ~p", [Locks]),
-            ?assertEqual(lists:sort(Expected),
-                         lists:sort([rebar_app_info:name(Lock)
-                                     || Lock <- Locks]));
         return ->
             Res
     end.
