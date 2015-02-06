@@ -43,6 +43,7 @@ limit scope.
 | update     | Update package index |
 | upgrade    | Fetch latest version of dep |
 | version    | Print current version of Erlang/OTP and rebar |
+| xref       | Run cross reference analysis on the project |
 
 ### Commands still to do
 
