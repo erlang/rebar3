@@ -96,7 +96,8 @@ prepare(State) ->
                              rebar_state:get(State, xref_warnings, false)},
                             {verbose, rebar_log:is_verbose(State)}]),
 
-    {ok, _} = xref:add_directory(xref, "ebin"),
+    [{ok, _} = xref:add_directory(xref, rebar_app_info:ebin_dir(App))
+     || App <- rebar_state:project_apps(State)],
 
     %% Save the code path prior to doing any further code path
     %% manipulation
