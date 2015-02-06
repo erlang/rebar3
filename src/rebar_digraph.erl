@@ -40,15 +40,15 @@ add(Graph, {PkgName, Deps}) ->
     end,
 
     lists:foreach(fun(DepName) ->
-                          case DepName of
-                              {Name, _Vsn} ->
-                                  Name;
-                              Name ->
-                                  Name
-                          end,
-                          V3 = case digraph:vertex(Graph, Name) of
+                          Name1 = case DepName of
+                                      {Name, _Vsn} ->
+                                          ec_cnv:to_binary(Name);
+                                      Name ->
+                                          ec_cnv:to_binary(Name)
+                                  end,
+                          V3 = case digraph:vertex(Graph, Name1) of
                                    false ->
-                                       digraph:add_vertex(Graph, Name);
+                                       digraph:add_vertex(Graph, Name1);
                                    {V2, []} ->
                                        V2
                                end,
@@ -112,5 +112,5 @@ names_to_apps(Names, Apps) ->
 -spec find_app_by_name(atom(), [rebar_app_info:t()]) -> {ok, rebar_app_info:t()} | error.
 find_app_by_name(Name, Apps) ->
     ec_lists:find(fun(App) ->
-                          binary_to_atom(rebar_app_info:name(App), utf8) =:= binary_to_atom(Name, utf8)
+                          rebar_app_info:name(App) =:= Name
                   end, Apps).

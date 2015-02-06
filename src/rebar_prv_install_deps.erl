@@ -226,7 +226,7 @@ package_to_app(DepsDir, Packages, {Name, Vsn}) ->
         error ->
             {error, missing_package};
         {ok, P} ->
-            PkgDeps = [{atom_to_binary(PkgName,utf8), list_to_binary(PkgVsn)}
+            PkgDeps = [{PkgName, PkgVsn}
                        || {PkgName,PkgVsn} <- proplists:get_value(<<"deps">>, P, [])],
             Link = proplists:get_value(<<"link">>, P, ""),
             {ok, AppInfo} = rebar_app_info:new(Name, Vsn),
