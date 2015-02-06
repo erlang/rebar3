@@ -166,6 +166,8 @@
          {git, "git://github.com/rebar/rebar.git", {branch, "master"}}},
         {rebar, "1.0.0",
          {git, "git://github.com/rebar/rebar.git", {tag, "1.0.0"}}},
+        {rebar, ".*",
+         {git, "git://github.com/rebar/rebar.git", {ref, "7f73b8d3650b41ffd53a199f3eda20985eda84e3"}}},
         %% Dependencies can be marked as 'raw'. Rebar does not require
         %% such dependencies to have a standard Erlang/OTP layout
         %% which assumes the presence of either
