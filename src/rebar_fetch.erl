@@ -46,7 +46,12 @@ download_source(AppDir, Source) ->
                 code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
                 ec_file:remove(filename:absname(AppDir1), [recursive]),
                 ok = ec_file:copy(FromDir, filename:absname(AppDir1), [recursive]),
-                true = code:add_patha(filename:join(AppDir1, "ebin")),
+                case ec_file:exists(filename:join(AppDir1, "ebin")) of
+                    true ->
+                        true = code:add_patha(filename:join(AppDir1, "ebin"));
+                    false ->
+                        ok
+                end,
                 true
         end
     catch
