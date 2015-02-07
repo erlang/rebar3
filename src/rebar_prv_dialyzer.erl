@@ -381,7 +381,7 @@ format_warnings(Warnings) ->
     format_warnings(Warnings, [], []).
 
 format_warnings([Warning | Rest], Unknowns, Warnings) ->
-    case dialyzer:format_warning(Warning) of
+    case dialyzer:format_warning(Warning, fullpath) of
         ":0: " ++ Unknown ->
             format_warnings(Rest, [strip(Unknown) | Unknowns], Warnings);
         Warning2 ->
