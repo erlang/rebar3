@@ -127,6 +127,7 @@ app_vsn(Config, AppFile) ->
 %% Internal functions
 %% ===================================================================
 
+load_app_file(_State, undefined) -> {error, missing_app_file};
 load_app_file(State, Filename) ->
     AppFile = {app_file, Filename},
     case rebar_state:get(State, {appfile, AppFile}, undefined) of
