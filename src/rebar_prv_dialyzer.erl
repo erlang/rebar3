@@ -267,7 +267,7 @@ remove_plt(State, Plt, Files) ->
     run_plt(State, Plt, plt_remove, Files).
 
 check_plt(State, _Plt, []) ->
-    {o, State};
+    {0, State};
 check_plt(State, Plt, Files) ->
     ?INFO("Checking ~b files in ~p...", [length(Files), Plt]),
     run_plt(State, Plt, plt_check, Files).
