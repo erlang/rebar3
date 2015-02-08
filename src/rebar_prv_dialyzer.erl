@@ -202,6 +202,8 @@ ebin_to_info(EbinDir, AppName) ->
             Modules = proplists:get_value(modules, AppDetails, []),
             Files = modules_to_files(Modules, EbinDir),
             {IncApps ++ DepApps, Files};
+        {error, enoent} when AppName =:= erts ->
+            {[], ebin_files(EbinDir)};
         _ ->
             Error = io_lib:format("Could not parse ~p", [AppFile]),
             throw({dialyzer_error, Error})
@@ -221,6 +223,11 @@ module_to_file(Module, EbinDir, Ext) ->
             ?CONSOLE("Unknown module ~s", [Module]),
             false
     end.
+
+ebin_files(EbinDir) ->
+    Wildcard = "*" ++ code:objfile_extension(),
+    [filename:join(EbinDir, File) ||
+     File <- filelib:wildcard(Wildcard, EbinDir)].
 
 read_plt(_State, Plt) ->
     case dialyzer:plt_info(Plt) of
