@@ -29,6 +29,7 @@ limit scope.
 |----------- |------------ |
 | as         | Higher-order provider to run multiple tasks in sequence as certain profiles |
 | compile    | Build project |
+| cover      | Higher-order provider to generate code coverage analysis for multiple tasks |
 | clean      | Remove project apps beam files |
 | ct         | Run Common Test suites |
 | do         | Higher-order provider to run multiple tasks in sequence |
