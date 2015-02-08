@@ -38,13 +38,13 @@ init_per_testcase(Case, Config) ->
     [{expected, normalize_unlocks(Expectations)},
      {mock, fun() -> mock_deps(DepsType, Expanded, []) end},
      {mock_update, fun() -> mock_deps(DepsType, UpExpanded, ToUp) end}
-     | setup_project(Case, Config, Expanded)].
+     | setup_project(Case, Config, Expanded, UpExpanded)].
 
 end_per_testcase(_, Config) ->
     meck:unload(),
     Config.
 
-setup_project(Case, Config0, Deps) ->
+setup_project(Case, Config0, Deps, UpDeps) ->
     DepsType = ?config(deps_type, Config0),
     Config = rebar_test_utils:init_rebar_state(
             Config0,
@@ -54,7 +54,8 @@ setup_project(Case, Config0, Deps) ->
     rebar_test_utils:create_app(AppDir, "Root", "0.0.0", [kernel, stdlib]),
     TopDeps = top_level_deps(Deps),
     RebarConf = rebar_test_utils:create_config(AppDir, [{deps, TopDeps}]),
-    [{rebarconfig, RebarConf} | Config].
+    [{rebarconfig, RebarConf},
+     {next_top_deps, top_level_deps(UpDeps)} | Config].
 
 
 upgrades(top_a) ->
@@ -279,6 +280,7 @@ top_level_deps([{{pkg, Name, Vsn, _URL}, _} | Deps]) ->
 
 mock_deps(git, Deps, Upgrades) ->
     catch mock_git_resource:unmock(),
+    ct:pal("mocked: ~p", [flat_deps(Deps)]),
     mock_git_resource:mock([{deps, flat_deps(Deps)}, {upgrade, Upgrades}]);
 mock_deps(pkg, Deps, Upgrades) ->
     catch mock_pkg_resource:unmock(),
@@ -365,7 +367,10 @@ run(Config) ->
         _ -> {ok, Unlocks}
     end,
     apply(?config(mock_update, Config), []),
+    NewRebarConf = rebar_test_utils:create_config(?config(apps, Config),
+                                                  [{deps, ?config(next_top_deps, Config)}]),
+    {ok, NewRebarConfig} = file:consult(NewRebarConf),
     rebar_test_utils:run_and_check(
-        Config, RebarConfig, ["upgrade", App], Expectation
+        Config, NewRebarConfig, ["upgrade", App], Expectation
     ).
 

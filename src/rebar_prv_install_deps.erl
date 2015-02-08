@@ -44,6 +44,8 @@
 -define(PROVIDER, install_deps).
 -define(DEPS, [app_discovery]).
 
+-define(APP_NAME_INDEX, 2).
+
 -type src_dep() :: {atom(), {atom(), string(), string()}}
              | {atom(), string(), {atom(), string(), string()}}.
 -type pkg_dep() :: {atom(), binary()} | atom().
@@ -135,7 +137,8 @@ handle_deps(Profile, State, Deps) ->
 handle_deps(Profile, State, Deps, Update) when is_boolean(Update) ->
     handle_deps(Profile, State, Deps, Update, []);
 handle_deps(Profile, State, Deps, Locks) when is_list(Locks) ->
-    handle_deps(Profile, State, Deps, false, Locks).
+    Update = rebar_state:get(State, upgrade, false),
+    handle_deps(Profile, State, Deps, Update, Locks).
 
 -spec handle_deps(atom(), rebar_state:t(), list(), boolean() | {true, binary(), integer()}, list())
                  -> {ok, [rebar_app_info:t()], rebar_state:t()} | {error, string()}.
@@ -277,7 +280,7 @@ update_src_deps(Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen, 
                              end
                      end,
                      {[], PkgDeps, SrcApps, State, Seen, Locks},
-                     lists:sort(SrcDeps)) of
+                     sort_deps(SrcDeps)) of
         {[], NewPkgDeps, NewSrcApps, State1, Seen1, _NewLocks} ->
             {State1, NewSrcApps, NewPkgDeps, Seen1};
         {NewSrcDeps, NewPkgDeps, NewSrcApps, State1, Seen1, NewLocks} ->
@@ -286,13 +289,10 @@ update_src_deps(Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Update, Seen, 
 
 handle_update(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
     Name = rebar_app_info:name(AppInfo),
-    ct:pal("update ~p", [Name]),
     case lists:keyfind(Name, 1, Locks) of
         false ->
-            ct:pal("in lock"),
-            case maybe_fetch(AppInfo, true, []) of
+            case maybe_fetch(AppInfo, true, sets:new()) of
                 true ->
-                    ct:pal("fetch!"),
                     handle_dep(AppInfo
                               ,SrcDeps
                               ,PkgDeps
@@ -302,11 +302,9 @@ handle_update(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
                               ,Locks);
 
                 false ->
-                    ct:pal("nofetch"),
                     {SrcDeps, PkgDeps, SrcApps, State, Locks}
             end;
         _StillLocked ->
-            ct:pal("stillocked"),
             {SrcDeps, PkgDeps, SrcApps, State, Locks}
     end.
 
@@ -365,9 +363,9 @@ maybe_fetch(AppInfo, Update, Seen) ->
                              end
                      end,
 
-            case not Exists orelse Update of
+            case not Exists of% orelse Update of
                 true ->
-                    ?INFO("Fetching ~s", [rebar_app_info:name(AppInfo)]),
+                    ?INFO("Fetching ~s (~p)", [rebar_app_info:name(AppInfo), rebar_app_info:source(AppInfo)]),
                     Source = rebar_app_info:source(AppInfo),
                     case rebar_fetch:download_source(AppDir, Source) of
                         {error, Reason} ->
@@ -381,7 +379,7 @@ maybe_fetch(AppInfo, Update, Seen) ->
                             false;
                         false ->
                             Source = rebar_app_info:source(AppInfo),
-                            case rebar_fetch:needs_update(AppDir, Source) of
+                            case Update andalso rebar_fetch:needs_update(AppDir, Source) of
                                 true ->
                                     ?INFO("Updating ~s", [rebar_app_info:name(AppInfo)]),
                                     case rebar_fetch:download_source(AppDir, Source) of
@@ -461,6 +459,14 @@ new_dep(DepsDir, Name, Vsn, Source, State) ->
     Dep1 = rebar_app_info:state(Dep,
                                rebar_state:overrides(S, ParentOverrides++Overrides)),
     rebar_app_info:source(Dep1, Source).
+
+sort_deps(Deps) ->
+    %% We need a sort stable, based on the name. So that for multiple deps on
+    %% the same level with the same name, we keep the order the parents had.
+    %% `lists:keysort/2' is documented as stable in the stdlib.
+    %% The list of deps is revered when we get it. For the proper stable
+    %% result, re-reverse it.
+    lists:keysort(?APP_NAME_INDEX, lists:reverse(Deps)).
 
 -spec parse_goal(binary(), binary()) -> pkg_dep().
 parse_goal(Name, Constraint) ->

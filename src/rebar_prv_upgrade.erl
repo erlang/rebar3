@@ -56,12 +56,12 @@ do(State) ->
                     NewLocks = unlock_higher_than(0, Locks -- [Lock]),
                     State1 = rebar_state:set(State, {deps, default}, [{Name, Source, 0} | NewLocks]),
                     State2 = rebar_state:set(State1, {locks, default}, NewLocks),
-                    rebar_prv_install_deps:do(State2)
+                    State3 = rebar_state:set(State2, upgrade, true),
+                    rebar_prv_install_deps:do(State3)
             end;
         {_, _, Level} when Level > 0 ->
             {error, transitive_dependency};
         false ->
-            ct:pal("deps: ~p", [{Name,Locks}]),
             {error, unknown_dependency}
     end.
 
