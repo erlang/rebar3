@@ -31,11 +31,8 @@
          is_app_dir/0, is_app_dir/1,
          is_app_src/1,
          app_src_to_app/1,
-         app_name/2,
-         app_applications/2,
+         load_app_file/2,
          app_vsn/2]).
-
--export([load_app_file/2]). % TEMPORARY
 
 -include("rebar.hrl").
 
@@ -94,24 +91,6 @@ app_src_to_app(Filename) ->
     filelib:ensure_dir(AppFile),
     AppFile.
 
-app_name(Config, AppFile) ->
-    case load_app_file(Config, AppFile) of
-        {ok, NewConfig, AppName, _} ->
-            {NewConfig, AppName};
-        {error, Reason} ->
-            ?ABORT("Failed to extract name from ~s: ~p\n",
-                   [AppFile, Reason])
-    end.
-
-app_applications(Config, AppFile) ->
-    case load_app_file(Config, AppFile) of
-        {ok, NewConfig, _, AppInfo} ->
-            {NewConfig, get_value(applications, AppInfo, AppFile)};
-        {error, Reason} ->
-            ?ABORT("Failed to extract applications from ~s: ~p\n",
-                   [AppFile, Reason])
-    end.
-
 app_vsn(Config, AppFile) ->
     case load_app_file(Config, AppFile) of
         {ok, Config1, _, AppInfo} ->
@@ -122,10 +101,6 @@ app_vsn(Config, AppFile) ->
             ?ABORT("Failed to extract vsn from ~s: ~p\n",
                    [AppFile, Reason])
     end.
-
-%% ===================================================================
-%% Internal functions
-%% ===================================================================
 
 load_app_file(_State, undefined) -> {error, missing_app_file};
 load_app_file(State, Filename) ->
@@ -146,6 +121,10 @@ load_app_file(State, Filename) ->
         {AppName, AppData} ->
             {ok, State, AppName, AppData}
     end.
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
 
 %% In the case of *.app.src we want to give the user the ability to
 %% dynamically script the application resource file (think dynamic version
