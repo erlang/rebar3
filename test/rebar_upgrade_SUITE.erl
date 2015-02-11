@@ -9,7 +9,8 @@ groups() ->
     [{all, [], [top_a, top_b, top_c, top_d1, top_d2, top_e,
                 pair_a, pair_b, pair_ab, pair_c, pair_all,
                 triplet_a, triplet_b, triplet_c,
-                tree_a, tree_b, tree_c, tree_c2, tree_ac, tree_all]},
+                tree_a, tree_b, tree_c, tree_c2, tree_ac, tree_all,
+                delete_d]},
      {git, [], [{group, all}]},
      {pkg, [], [{group, all}]}].
 
@@ -83,7 +84,7 @@ upgrades(top_b) ->
      %% Modified apps, gobally
      ["A","B","D"],
      %% upgrade vs. new tree
-     {"B", {error, {transitive_dependency, <<"B">>}}}};
+     {"B", {error, {rebar_prv_upgrade, {transitive_dependency, <<"B">>}}}}};
 upgrades(top_c) ->
      %% Original tree
     {[{"A", "1", [{"B", [{"D", "1", []}]},
@@ -96,7 +97,7 @@ upgrades(top_c) ->
      %% Modified apps, gobally
      ["A","B","D"],
      %% upgrade vs. new tree
-     {"C", {error, {transitive_dependency, <<"C">>}}}};
+     {"C", {error, {rebar_prv_upgrade, {transitive_dependency, <<"C">>}}}}};
 upgrades(top_d1) ->
      %% Original tree
     {[{"A", "1", [{"B", [{"D", "1", []}]},
@@ -109,7 +110,7 @@ upgrades(top_d1) ->
      %% Modified apps, gobally
      ["A","B","D"],
      %% upgrade vs. new tree
-     {"D", {error, {transitive_dependency, <<"D">>}}}};
+     {"D", {error, {rebar_prv_upgrade, {transitive_dependency, <<"D">>}}}}};
 upgrades(top_d2) ->
      %% Original tree
     {[{"A", "1", [{"B", [{"D", "1", []}]},
@@ -122,7 +123,7 @@ upgrades(top_d2) ->
      %% Modified apps, gobally
      ["A","B","D"],
      %% upgrade vs. new tree
-     {"D", {error, {transitive_dependency, <<"D">>}}}};
+     {"D", {error, {rebar_prv_upgrade, {transitive_dependency, <<"D">>}}}}};
 upgrades(top_e) ->
      %% Original tree
     {[{"A", "1", [{"B", [{"D", "1", []}]},
@@ -135,7 +136,7 @@ upgrades(top_e) ->
      %% Modified apps, gobally
      ["A","B","D"],
      %% upgrade vs. new tree
-     {"E", {error, {unknown_dependency, <<"E">>}}}};
+     {"E", {error, {rebar_prv_upgrade, {unknown_dependency, <<"E">>}}}}};
 upgrades(pair_a) ->
     {[{"A", "1", [{"C", "1", []}]},
       {"B", "1", [{"D", "1", []}]}
@@ -171,7 +172,7 @@ upgrades(pair_c) ->
       {"B", "2", [{"D", "2", []}]}
      ],
      ["A","B","C","D"],
-     {"C", {error, {transitive_dependency, <<"C">>}}}};
+     {"C", {error, {rebar_prv_upgrade, {transitive_dependency, <<"C">>}}}}};
 upgrades(pair_all) ->
     {[{"A", "1", [{"C", "1", []}]},
       {"B", "1", [{"D", "1", []}]}
@@ -340,7 +341,17 @@ upgrades(tree_all) ->
      ["C","I"],
      {"", [{"A","1"}, "D", "J", "E", {"I","1"},
            {"B","1"}, "F", "G",
-           {"C","1"}, "H"]}}.
+           {"C","1"}, "H"]}};
+upgrades(delete_d) ->
+    {[{"A", "1", [{"B", [{"D", "1", []}]},
+                  {"C", [{"D", "2", []}]}]}
+     ],
+     [{"A", "2", [{"B", []},
+                  {"C", []}]}
+     ],
+     ["A","B", "C"],
+     %% upgrade vs. new tree
+     {"", [{"A","2"}, "B", "C"]}}.
 
 %% TODO: add a test that verifies that unlocking files and then
 %% running the upgrade code is enough to properly upgrade things.
@@ -353,7 +364,6 @@ top_level_deps([{{pkg, Name, Vsn, _URL}, _} | Deps]) ->
 
 mock_deps(git, Deps, Upgrades) ->
     catch mock_git_resource:unmock(),
-    ct:pal("mocked: ~p", [flat_deps(Deps)]),
     mock_git_resource:mock([{deps, flat_deps(Deps)}, {upgrade, Upgrades}]);
 mock_deps(pkg, Deps, Upgrades) ->
     catch mock_pkg_resource:unmock(),
@@ -435,6 +445,15 @@ tree_c2(Config) -> run(Config).
 tree_ac(Config) -> run(Config).
 tree_all(Config) -> run(Config).
 
+delete_d(Config) ->
+    meck:new(rebar_log, [no_link, passthrough]),
+    run(Config),
+    Infos = [{Str, Args}
+            || {_, {rebar_log, log, [info, Str, Args]}, _} <- meck:history(rebar_log)],
+    meck:unload(rebar_log),
+    ?assertNotEqual([],
+                    [1 || {"App ~ts is no longer needed and can be deleted.",
+                           [<<"D">>]} <- Infos]).
 run(Config) ->
     apply(?config(mock, Config), []),
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),

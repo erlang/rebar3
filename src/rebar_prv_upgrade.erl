@@ -29,11 +29,14 @@ init(State) ->
                                                    {module, ?MODULE},
                                                    {bare, false},
                                                    {deps, ?DEPS},
-                                                   {example, "rebar upgrade cowboy[,ranch]"},
-                                                   {short_desc, "Upgrade dependency."},
-                                                   {desc, ""},
+                                                   {example, "rebar3 upgrade [cowboy[,ranch]]"},
+                                                   {short_desc, "Upgrade dependencies."},
+                                                   {desc, "Upgrade project dependecies. Mentioning no application "
+                                                          "will upgrade all dependencies. To upgrade specific dependencies, "
+                                                          "their names can be listed in the command."},
                                                    {opts, [
-                                                          {package, undefined, undefined, string, "Packages to upgrade."}
+                                                          {package, undefined, undefined, string,
+                                                           "List of packages to upgrade. If not specified, all dependencies are upgraded."}
                                                           ]}])),
     {ok, State1}.
 
@@ -42,11 +45,11 @@ do(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     Locks = rebar_state:get(State, {locks, default}, []),
     Deps = rebar_state:get(State, deps),
-    Names = parse_names(ec_cnv:to_binary(proplists:get_value(package, Args)), Locks),
+    Names = parse_names(ec_cnv:to_binary(proplists:get_value(package, Args, <<"">>)), Locks),
     case prepare_locks(Names, Deps, Locks, []) of
         {error, Reason} ->
             {error, Reason};
-        {Locks0, _Unlocks0} -> % unlocks may be useful for deletions
+        {Locks0, _Unlocks0} ->
             Deps0 = top_level_deps(Deps, Locks),
             State1 = rebar_state:set(State, {deps, default}, Deps0),
             State2 = rebar_state:set(State1, {locks, default}, Locks0),
@@ -54,6 +57,10 @@ do(State) ->
             Res = rebar_prv_install_deps:do(State3),
             case Res of
                 {ok, State4} ->
+                    info_useless(
+                        [element(1,Lock) || Lock <- Locks],
+                        [rebar_app_info:name(App) || App <- rebar_state:lock(State4)]
+                    ),
                     rebar_prv_lock:do(State4);
                 _ ->
                     Res
@@ -61,6 +68,12 @@ do(State) ->
     end.
 
 -spec format_error(any()) -> iolist().
+format_error({unknown_dependency, Name}) ->
+    io_lib:format("Dependency ~ts not found", [Name]);
+format_error({transitive_dependency, Name}) ->
+    io_lib:format("Dependency ~ts is transient and cannot be safely upgraded. "
+                  "Promote it to your top-level rebar.config file to upgrade it.",
+                  [Name]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -82,7 +95,7 @@ prepare_locks([Name|Names], Deps, Locks, Unlocks) ->
             AtomName = binary_to_atom(Name, utf8),
             case lists:keyfind(AtomName, 1, Deps) of
                 false ->
-                    {error, {unknown_dependency, Name}};
+                    {error, {?MODULE, {unknown_dependency, Name}}};
                 Dep ->
                     Source = case Dep of
                         {_, Src} -> Src;
@@ -90,15 +103,14 @@ prepare_locks([Name|Names], Deps, Locks, Unlocks) ->
                     end,
                     {NewLocks, NewUnlocks} = unlock_higher_than(0, Locks -- [Lock]),
                     prepare_locks(Names,
-                                  %deps_like_locks(Deps, [{Name,Source,0} | NewLocks]),
                                   Deps,
                                   NewLocks,
                                   [{Name, Source, 0} | NewUnlocks ++ Unlocks])
             end;
         {_, _, Level} when Level > 0 ->
-            {error, {transitive_dependency,Name}};
+            {error, {?MODULE, {transitive_dependency,Name}}};
         false ->
-            {error, {unknown_dependency,Name}}
+            {error, {?MODULE, {unknown_dependency,Name}}}
     end.
 
 top_level_deps(Deps, Locks) ->
@@ -112,4 +124,10 @@ unlock_higher_than(Level, [App = {_,_,AppLevel} | Apps], Locks, Unlocks) ->
     if AppLevel > Level  -> unlock_higher_than(Level, Apps, Locks, [App | Unlocks]);
        AppLevel =< Level -> unlock_higher_than(Level, Apps, [App | Locks], Unlocks)
     end.
+
+info_useless(Old, New) ->
+    [?INFO("App ~ts is no longer needed and can be deleted.", [Name])
+     || Name <- Old,
+        not lists:member(Name, New)],
+    ok.
 
