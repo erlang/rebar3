@@ -7,9 +7,9 @@ all() -> [{group, git}].%, {group, pkg}].
 
 groups() ->
     [{all, [], [top_a, top_b, top_c, top_d1, top_d2, top_e,
-                pair_a, pair_b, pair_c,
+                pair_a, pair_b, pair_ab, pair_c,
                 triplet_a, triplet_b, triplet_c,
-                tree_a, tree_b, tree_c]},
+                tree_a, tree_b, tree_c, tree_c2, tree_ac]},
      {git, [], [{group, all}]},
      {pkg, [], [{group, all}]}].
 
@@ -83,7 +83,7 @@ upgrades(top_b) ->
      %% Modified apps, gobally
      ["A","B","D"],
      %% upgrade vs. new tree
-     {"B", {error, transitive_dependency}}};
+     {"B", {error, {transitive_dependency, <<"B">>}}}};
 upgrades(top_c) ->
      %% Original tree
     {[{"A", "1", [{"B", [{"D", "1", []}]},
@@ -96,7 +96,7 @@ upgrades(top_c) ->
      %% Modified apps, gobally
      ["A","B","D"],
      %% upgrade vs. new tree
-     {"C", {error, transitive_dependency}}};
+     {"C", {error, {transitive_dependency, <<"C">>}}}};
 upgrades(top_d1) ->
      %% Original tree
     {[{"A", "1", [{"B", [{"D", "1", []}]},
@@ -109,7 +109,7 @@ upgrades(top_d1) ->
      %% Modified apps, gobally
      ["A","B","D"],
      %% upgrade vs. new tree
-     {"D", {error, transitive_dependency}}};
+     {"D", {error, {transitive_dependency, <<"D">>}}}};
 upgrades(top_d2) ->
      %% Original tree
     {[{"A", "1", [{"B", [{"D", "1", []}]},
@@ -122,7 +122,7 @@ upgrades(top_d2) ->
      %% Modified apps, gobally
      ["A","B","D"],
      %% upgrade vs. new tree
-     {"D", {error, transitive_dependency}}};
+     {"D", {error, {transitive_dependency, <<"D">>}}}};
 upgrades(top_e) ->
      %% Original tree
     {[{"A", "1", [{"B", [{"D", "1", []}]},
@@ -135,7 +135,7 @@ upgrades(top_e) ->
      %% Modified apps, gobally
      ["A","B","D"],
      %% upgrade vs. new tree
-     {"E", {error, unknown_dependency}}};
+     {"E", {error, {unknown_dependency, <<"E">>}}}};
 upgrades(pair_a) ->
     {[{"A", "1", [{"C", "1", []}]},
       {"B", "1", [{"D", "1", []}]}
@@ -154,6 +154,15 @@ upgrades(pair_b) ->
      ],
      ["A","B","C","D"],
      {"B", [{"A","1"},{"C","1"},{"B","2"},{"D","2"}]}};
+upgrades(pair_ab) ->
+    {[{"A", "1", [{"C", "1", []}]},
+      {"B", "1", [{"D", "1", []}]}
+     ],
+     [{"A", "2", [{"C", "2", []}]},
+      {"B", "2", [{"D", "2", []}]}
+     ],
+     ["A","B","C","D"],
+     {"A,B", [{"A","2"},{"C","2"},{"B","2"},{"D","2"}]}};
 upgrades(pair_c) ->
     {[{"A", "1", [{"C", "1", []}]},
       {"B", "1", [{"D", "1", []}]}
@@ -162,7 +171,7 @@ upgrades(pair_c) ->
       {"B", "2", [{"D", "2", []}]}
      ],
      ["A","B","C","D"],
-     {"C", {error, transitive_dependency}}};
+     {"C", {error, {transitive_dependency, <<"C">>}}}};
 upgrades(triplet_a) ->
     {[{"A", "1", [{"D",[]},
                   {"E","3",[]}]},
@@ -264,10 +273,47 @@ upgrades(tree_c) ->
                   {"G",[]}]},
       {"C", "1", [{"H",[]}]}
      ],
-     ["C"],
+     ["C","I"],
      {"C", [{"A","1"}, "D", "J", "E", {"I","1"},
             {"B","1"}, "F", "G",
-            {"C","1"}, "H"]}}.
+            {"C","1"}, "H"]}};
+upgrades(tree_c2) ->
+    {[{"A", "1", [{"D",[{"J",[]}]},
+                  {"E",[{"I","1",[]}]}]},
+      {"B", "1", [{"F",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H",[]},
+                  {"I","2",[]}]}
+     ],
+     [{"A", "1", [{"D",[{"J",[]}]},
+                  {"E",[{"I","1",[]}]}]},
+      {"B", "1", [{"F",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H",[{"K",[]}]},
+                  {"I","2",[]}]}
+     ],
+     ["C", "H"],
+     {"C", [{"A","1"}, "D", "J", "E",
+            {"B","1"}, "F", "G",
+            {"C","1"}, "H", {"I", "2"}, "K"]}};
+upgrades(tree_ac) ->
+    {[{"A", "1", [{"D",[{"J",[]}]},
+                  {"E",[{"I","1",[]}]}]},
+      {"B", "1", [{"F",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H",[]},
+                  {"I","2",[]}]}
+     ],
+     [{"A", "1", [{"D",[{"J",[]}]},
+                  {"E",[{"I","1",[]}]}]},
+      {"B", "1", [{"F",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H",[]}]}
+     ],
+     ["C","I"],
+     {"C, A", [{"A","1"}, "D", "J", "E", {"I","1"},
+               {"B","1"}, "F", "G",
+               {"C","1"}, "H"]}}.
 
 %% TODO: add a test that verifies that unlocking files and then
 %% running the upgrade code is enough to properly upgrade things.
@@ -345,6 +391,7 @@ top_e(Config) -> run(Config).
 
 pair_a(Config) -> run(Config).
 pair_b(Config) -> run(Config).
+pair_ab(Config) -> run(Config).
 pair_c(Config) -> run(Config).
 
 triplet_a(Config) -> run(Config).
@@ -354,6 +401,8 @@ triplet_c(Config) -> run(Config).
 tree_a(Config) -> run(Config).
 tree_b(Config) -> run(Config).
 tree_c(Config) -> run(Config).
+tree_c2(Config) -> run(Config).
+tree_ac(Config) -> run(Config).
 
 run(Config) ->
     apply(?config(mock, Config), []),

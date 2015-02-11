@@ -60,7 +60,7 @@ mock_update(Opts) ->
         ?MOD, needs_update,
         fun(_Dir, {git, Url, _Ref}) ->
             App = app(Url),
-            ct:pal("Needed update? ~p -> ~p", [App, lists:member(App, ToUpdate)]),
+            ct:pal("Needed update? ~p (~p) -> ~p", [App, {Url,_Ref}, lists:member(App, ToUpdate)]),
             lists:member(App, ToUpdate)
         end).
 
@@ -108,7 +108,6 @@ mock_download(Opts) ->
             {git, Url, {_, Vsn}} = normalize_git(Git, Overrides, Default),
             App = app(Url),
             AppDeps = proplists:get_value({App,Vsn}, Deps, []),
-            ct:pal("creating app ~p", [{Dir, App, Vsn, AppDeps}]),
             rebar_test_utils:create_app(
                 Dir, App, Vsn,
                 [element(1,D) || D  <- AppDeps]

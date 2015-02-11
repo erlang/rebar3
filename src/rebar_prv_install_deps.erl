@@ -252,7 +252,22 @@ update_src_deps(Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen,
                                          true ->
                                              ok
                                      end,
-                                     {SrcDepsAcc, PkgDepsAcc, SrcAppsAcc, StateAcc, SeenAcc, LocksAcc};
+                                     %% scan for app children here if upgrading
+                                     case Upgrade of
+                                        false ->
+                                            {SrcDepsAcc, PkgDepsAcc, SrcAppsAcc, StateAcc, SeenAcc, LocksAcc};
+                                        true ->
+                                            {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2, LocksAcc1} =
+                                            handle_dep(AppInfo
+                                                       ,SrcDepsAcc
+                                                       ,PkgDepsAcc
+                                                       ,SrcAppsAcc
+                                                       ,Level
+                                                       ,StateAcc
+                                                       ,LocksAcc),
+
+                                    {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2, SeenAcc, LocksAcc1}
+                                     end;
                                  false ->
                                      {SeenAcc1, StateAcc1} = maybe_lock(Profile, AppInfo, SeenAcc, StateAcc, Level),
                                      {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2, LocksAcc1} =
@@ -302,10 +317,10 @@ handle_upgrade(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
                               ,Locks);
 
                 false ->
-                    {SrcDeps, PkgDeps, SrcApps, State, Locks}
+                    {[AppInfo|SrcDeps], PkgDeps, SrcApps, State, Locks}
             end;
         _StillLocked ->
-            {SrcDeps, PkgDeps, SrcApps, State, Locks}
+            {[AppInfo|SrcDeps], PkgDeps, SrcApps, State, Locks}
     end.
 
 handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
@@ -452,8 +467,9 @@ fetch_app(AppInfo, AppDir) ->
             Result
     end.
 
-maybe_upgrade(_AppInfo, _AppDir, false) ->
-    false;
+maybe_upgrade(AppInfo, AppDir, false) ->
+    Source = rebar_app_info:source(AppInfo),
+    rebar_fetch:needs_update(AppDir, Source);
 maybe_upgrade(AppInfo, AppDir, true) ->
     Source = rebar_app_info:source(AppInfo),
     case rebar_fetch:needs_update(AppDir, Source) of
