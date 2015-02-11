@@ -7,9 +7,9 @@ all() -> [{group, git}].%, {group, pkg}].
 
 groups() ->
     [{all, [], [top_a, top_b, top_c, top_d1, top_d2, top_e,
-                pair_a, pair_b, pair_ab, pair_c,
+                pair_a, pair_b, pair_ab, pair_c, pair_all,
                 triplet_a, triplet_b, triplet_c,
-                tree_a, tree_b, tree_c, tree_c2, tree_ac]},
+                tree_a, tree_b, tree_c, tree_c2, tree_ac, tree_all]},
      {git, [], [{group, all}]},
      {pkg, [], [{group, all}]}].
 
@@ -172,6 +172,15 @@ upgrades(pair_c) ->
      ],
      ["A","B","C","D"],
      {"C", {error, {transitive_dependency, <<"C">>}}}};
+upgrades(pair_all) ->
+    {[{"A", "1", [{"C", "1", []}]},
+      {"B", "1", [{"D", "1", []}]}
+     ],
+     [{"A", "2", [{"C", "2", []}]},
+      {"B", "2", [{"D", "2", []}]}
+     ],
+     ["A","B","C","D"],
+     {"", [{"A","2"},{"C","2"},{"B","2"},{"D","2"}]}};
 upgrades(triplet_a) ->
     {[{"A", "1", [{"D",[]},
                   {"E","3",[]}]},
@@ -313,7 +322,25 @@ upgrades(tree_ac) ->
      ["C","I"],
      {"C, A", [{"A","1"}, "D", "J", "E", {"I","1"},
                {"B","1"}, "F", "G",
-               {"C","1"}, "H"]}}.
+               {"C","1"}, "H"]}};
+upgrades(tree_all) ->
+    {[{"A", "1", [{"D",[{"J",[]}]},
+                  {"E",[{"I","1",[]}]}]},
+      {"B", "1", [{"F",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H",[]},
+                  {"I","2",[]}]}
+     ],
+     [{"A", "1", [{"D",[{"J",[]}]},
+                  {"E",[{"I","1",[]}]}]},
+      {"B", "1", [{"F",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H",[]}]}
+     ],
+     ["C","I"],
+     {"", [{"A","1"}, "D", "J", "E", {"I","1"},
+           {"B","1"}, "F", "G",
+           {"C","1"}, "H"]}}.
 
 %% TODO: add a test that verifies that unlocking files and then
 %% running the upgrade code is enough to properly upgrade things.
@@ -377,10 +404,12 @@ normalize_unlocks_expect({error, Reason}) ->
 normalize_unlocks_expect([]) ->
     [];
 normalize_unlocks_expect([{App,Vsn} | Rest]) ->
-    [{dep, App, Vsn}
+    [{dep, App, Vsn},
+     {lock, App, Vsn}
      | normalize_unlocks_expect(Rest)];
 normalize_unlocks_expect([App | Rest]) ->
-    [{dep, App} | normalize_unlocks_expect(Rest)].
+    [{dep, App},
+     {lock, App} | normalize_unlocks_expect(Rest)].
 
 top_a(Config) -> run(Config).
 top_b(Config) -> run(Config).
@@ -393,6 +422,7 @@ pair_a(Config) -> run(Config).
 pair_b(Config) -> run(Config).
 pair_ab(Config) -> run(Config).
 pair_c(Config) -> run(Config).
+pair_all(Config) -> run(Config).
 
 triplet_a(Config) -> run(Config).
 triplet_b(Config) -> run(Config).
@@ -403,6 +433,7 @@ tree_b(Config) -> run(Config).
 tree_c(Config) -> run(Config).
 tree_c2(Config) -> run(Config).
 tree_ac(Config) -> run(Config).
+tree_all(Config) -> run(Config).
 
 run(Config) ->
     apply(?config(mock, Config), []),

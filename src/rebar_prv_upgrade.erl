@@ -40,35 +40,39 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
-    Names = parse_names(ec_cnv:to_binary(proplists:get_value(package, Args))),
-    %% TODO: support many names. Only a subtree can be updated per app
-    %%       mentioned. When no app is named, unlock *everything*
     Locks = rebar_state:get(State, {locks, default}, []),
     Deps = rebar_state:get(State, deps),
+    Names = parse_names(ec_cnv:to_binary(proplists:get_value(package, Args)), Locks),
     case prepare_locks(Names, Deps, Locks, []) of
         {error, Reason} ->
             {error, Reason};
-        {Locks0, Unlocks0} ->
+        {Locks0, _Unlocks0} -> % unlocks may be useful for deletions
             Deps0 = top_level_deps(Deps, Locks),
             State1 = rebar_state:set(State, {deps, default}, Deps0),
             State2 = rebar_state:set(State1, {locks, default}, Locks0),
             State3 = rebar_state:set(State2, upgrade, true),
             Res = rebar_prv_install_deps:do(State3),
             case Res of
-                {ok, S} ->
-                    ct:pal("original locks ~p", [Locks]),
-                    ct:pal("new locks ~p", [Locks0]),
-                    ct:pal("old deps: ~p", [Deps]),
-                    ct:pal("new deps: ~p", [Deps0]),
-                    ct:pal("Unlocks: ~p", [Unlocks0]),
-                    %% TODO: replace new locks onto the old locks list
-                    rebar_prv_lock:do(S);
-                _ -> Res
+                {ok, State4} ->
+                    rebar_prv_lock:do(State4);
+                _ ->
+                    Res
             end
     end.
 
-parse_names(Bin) ->
-    lists:usort(re:split(Bin, <<" *, *">>, [trim])).
+-spec format_error(any()) -> iolist().
+format_error(Reason) ->
+    io_lib:format("~p", [Reason]).
+
+
+parse_names(Bin, Locks) ->
+    case lists:usort(re:split(Bin, <<" *, *">>, [trim])) of
+        %% Nothing submitted, use *all* apps
+        [<<"">>] -> [Name || {Name, _, 0} <- Locks];
+        [] -> [Name || {Name, _, 0} <- Locks];
+        %% Regular options
+        Other -> Other
+    end.
 
 prepare_locks([], _, Locks, Unlocks) ->
     {Locks, Unlocks};
@@ -108,8 +112,4 @@ unlock_higher_than(Level, [App = {_,_,AppLevel} | Apps], Locks, Unlocks) ->
     if AppLevel > Level  -> unlock_higher_than(Level, Apps, Locks, [App | Unlocks]);
        AppLevel =< Level -> unlock_higher_than(Level, Apps, [App | Locks], Unlocks)
     end.
-
--spec format_error(any()) -> iolist().
-format_error(Reason) ->
-    io_lib:format("~p", [Reason]).
 

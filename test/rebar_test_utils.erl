@@ -103,6 +103,8 @@ create_random_vsn() ->
 check_results(AppDir, Expected) ->
     BuildDir = filename:join([AppDir, "_build", "lib"]),
     CheckoutsDir = filename:join([AppDir, "_checkouts"]),
+    LockFile = filename:join([AppDir, "rebar.lock"]),
+    Locks = lists:flatten(rebar_config:consult_file(LockFile)),
     Apps = rebar_app_discover:find_apps([AppDir]),
     InvalidApps = rebar_app_discover:find_apps([AppDir], invalid),
     ValidApps = rebar_app_discover:find_apps([AppDir], valid),
@@ -152,6 +154,18 @@ check_results(AppDir, Expected) ->
                     {Name, App} ->
                         ?assertEqual(iolist_to_binary(Vsn),
                                      iolist_to_binary(rebar_app_info:original_vsn(App)))
+                end
+        ;  ({lock, Name}) ->
+                ct:pal("Name: ~p", [Name]),
+                ?assertNotEqual(false, lists:keyfind(iolist_to_binary(Name), 1, Locks))
+        ;  ({lock, Name, Vsn}) ->
+                ct:pal("Name: ~p, Vsn: ~p", [Name, Vsn]),
+                case lists:keyfind(iolist_to_binary(Name), 1, Locks) of
+                    false ->
+                        error({lock_not_found, Name});
+                    {_LockName, {_, _, {ref, LockVsn}}, _} ->
+                        ?assertEqual(iolist_to_binary(Vsn),
+                                     iolist_to_binary(LockVsn))
                 end
         end, Expected).
 
