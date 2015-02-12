@@ -24,7 +24,7 @@ init(State) ->
                                                                {module, ?MODULE},
                                                                {bare, false},
                                                                {deps, ?DEPS},
-                                                               {example, "rebar help <task>"},
+                                                               {example, "rebar3 help <task>"},
                                                                {short_desc, "Display a list of tasks or help for a given task or subtask."},
                                                                {desc, "Display a list of tasks or help for a given task or subtask."},
                                                                {opts, [
