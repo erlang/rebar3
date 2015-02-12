@@ -8,12 +8,13 @@
 -module(rebar_fetch).
 
 -export([lock_source/2,
-         download_source/2,
+         download_source/3,
          needs_update/2]).
 
 -export([format_error/1]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 %% map short versions of resources to module names
 -define(RESOURCES, [{git, rebar_git_resource}, {pkg, rebar_pkg_resource}]).
@@ -24,13 +25,14 @@ lock_source(AppDir, Source) ->
     Module = get_resource_type(Source),
     Module:lock(AppDir, Source).
 
--spec download_source(file:filename_all(), rebar_resource:resource()) -> true | {error, any()}.
-download_source(AppDir, Source) ->
+-spec download_source(file:filename_all(), rebar_resource:resource(), rebar_state:t()) ->
+                             true | {error, any()}.
+download_source(AppDir, Source, State) ->
     try
         Module = get_resource_type(Source),
         TmpDir = ec_file:insecure_mkdtemp(),
         AppDir1 = ec_cnv:to_list(AppDir),
-        case Module:download(TmpDir, Source) of
+        case Module:download(TmpDir, Source, State) of
             {ok, _} ->
                 ec_file:mkdir_p(AppDir1),
                 code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
@@ -38,20 +40,21 @@ download_source(AppDir, Source) ->
                 ok = ec_file:copy(TmpDir, filename:absname(AppDir1), [recursive]),
                 true;
             {tarball, File} ->
+                Contents = filename:join(TmpDir, "contents"),
                 ec_file:mkdir_p(AppDir1),
-                ok = erl_tar:extract(File, [{cwd, TmpDir}
-                                           ,compressed]),
-                BaseName = filename:basename(AppDir1),
-                [FromDir] = filelib:wildcard(filename:join(TmpDir, BaseName++"-*")),
+                ec_file:mkdir_p(Contents),
+                ok = erl_tar:extract(File, [{cwd, TmpDir}]),
+                ok = erl_tar:extract(filename:join(TmpDir, "contents.tar.gz"),
+                                    [{cwd, Contents}, compressed]),
                 code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
                 ec_file:remove(filename:absname(AppDir1), [recursive]),
-                ok = ec_file:copy(FromDir, filename:absname(AppDir1), [recursive]),
-                true = code:add_patha(filename:join(AppDir1, "ebin")),
+                ok = ec_file:copy(Contents, filename:absname(AppDir1), [recursive]),
                 true
         end
     catch
-        _:_ ->
-            {error, {rebar_fetch, {fetch_fail, Source}}}
+        C:T ->
+            ?DEBUG("rebar_fetch exception ~p ~p ~p", [C, T, erlang:get_stacktrace()]),
+            throw(?PRV_ERROR({fetch_fail, Source}))
     end.
 
 -spec needs_update(file:filename_all(), rebar_resource:resource()) -> boolean() | {error, string()}.

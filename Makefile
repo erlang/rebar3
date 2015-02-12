@@ -6,7 +6,7 @@ RETEST=$(PWD)/deps/retest/retest
 DEPS_PLT=$(CURDIR)/.depsolver_plt
 
 all:
-	./bootstrap/bootstrap
+	@rebar get-deps compile escriptize
 
 clean:
 	@rm -rf rebar3 ebin/*.beam inttest/rt.work rt.work .eunit

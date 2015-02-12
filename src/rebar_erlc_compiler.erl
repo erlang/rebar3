@@ -144,17 +144,13 @@ doterl_compile(Config, Dir, MoreSources, ErlOpts) ->
                                 filename:join(Dir, X)
                         end, rebar_dir:src_dirs(proplists:append_values(src_dirs, ErlOpts))),
     AllErlFiles = gather_src(SrcDirs, []) ++ MoreSources,
-    %% NOTE: If and when erl_first_files is not inherited anymore
-    %% (rebar_state:get instead of rebar_state:get_list), consider
-    %% logging a warning message for any file listed in erl_first_files which
-    %% wasn't found via gather_src.
-    
+
     %% Issue: rebar/rebar3#140 (fix matching based on same path + order of
     %% erl_first_files)
     ErlFirstFiles = get_erl_first_files(ErlFirstFilesConf, AllErlFiles),
     RestErls = [ File || File <- AllErlFiles,
                          not lists:member(File, ErlFirstFiles) ],
-   
+
     %% Make sure that ebin/ exists and is on the path
     ok = filelib:ensure_dir(filename:join([Dir, "ebin", "dummy.beam"])),
     CurrPath = code:get_path(),
@@ -634,5 +630,3 @@ log_files(Prefix, Files) ->
         _ ->
             ?DEBUG("~s:~n~p", [Prefix, Files])
     end.
-
-

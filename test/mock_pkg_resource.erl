@@ -21,7 +21,7 @@ mock() -> mock([]).
             | {not_in_index, [{App, Vsn}]}
             | {pkgdeps, [{{App,Vsn}, [Dep]}]},
     App :: string(),
-    Dep :: {App, string(), {pkg, App, Vsn, Url::string()}},
+    Dep :: {App, string(), {pkg, App, Vsn}},
     Vsn :: string().
 mock(Opts) ->
     meck:new(?MOD, [no_link]),
@@ -50,7 +50,7 @@ mock_update(Opts) ->
     ToUpdate = proplists:get_value(update, Opts, []),
     meck:expect(
         ?MOD, needs_update,
-        fun(_Dir, {pkg, App, _Vsn, _Url}) ->
+        fun(_Dir, {pkg, App, _Vsn}) ->
             lists:member(App, ToUpdate)
         end).
 
@@ -65,7 +65,7 @@ mock_vsn(_Opts) ->
 %% @doc For each app to download, create a dummy app on disk instead.
 %% The configuration for this one (passed in from `mock/1') includes:
 %%
-%% - Specify a version with `{pkg, _, Vsn, _}'
+%% - Specify a version with `{pkg, _, Vsn}'
 %% - Dependencies for each application must be passed of the form:
 %%   `{pkgdeps, [{"app1", [{app2, ".*", {pkg, ...}}]}]}' -- basically
 %%   the `pkgdeps' option takes a key/value list of terms to output directly
@@ -74,7 +74,7 @@ mock_download(Opts) ->
     Deps = proplists:get_value(pkgdeps, Opts, []),
     meck:expect(
         ?MOD, download,
-        fun (Dir, {pkg, AppBin, Vsn, _Url}) ->
+        fun (Dir, {pkg, AppBin, Vsn}, _) ->
             App = binary_to_list(AppBin),
             filelib:ensure_dir(Dir),
             AppDeps = proplists:get_value({App,Vsn}, Deps, []),
@@ -83,11 +83,15 @@ mock_download(Opts) ->
                 [element(1,D) || D  <- AppDeps]
             ),
             rebar_test_utils:create_config(Dir, [{deps, AppDeps}]),
-            Tarball = filename:join([Dir, "package.tar.gz"]),
+            Tarball = filename:join([Dir, App++"-"++binary_to_list(Vsn)++".tar"]),
+            Contents = filename:join([Dir, "contents.tar.gz"]),
             Files = all_files(rebar_app_info:dir(AppInfo)),
-            ok = erl_tar:create(Tarball,
+            ok = erl_tar:create(Contents,
                                 archive_names(Dir, App, Vsn, Files),
                                 [compressed]),
+            ok = erl_tar:create(Tarball,
+                                [{"contents.tar.gz", Contents}],
+                                []),
             [file:delete(F) || F <- Files],
             {tarball, Tarball}
         end).
@@ -117,8 +121,7 @@ all_files(Dir) ->
     filelib:wildcard(filename:join([Dir, "**"])).
 
 archive_names(Dir, App, Vsn, Files) ->
-    ArchName = App++"-"++binary_to_list(Vsn),
-    [{ArchName ++ (F -- Dir), F} || F <- Files].
+    [{(F -- Dir) -- "/", F} || F <- Files].
 
 find_parts(Apps, Skip) -> find_parts(Apps, Skip, dict:new()).
 
