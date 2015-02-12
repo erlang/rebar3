@@ -41,7 +41,7 @@ do(State) ->
                               ,rebar_app_info:dep_level(Dep)}
                       end, AllDeps),
     Dir = rebar_state:dir(State),
-    file:write_file(filename:join(Dir, "rebar.lock"), io_lib:format("~p.~n", [Locks])),
+    file:write_file(filename:join(Dir, ?LOCK_FILE), io_lib:format("~p.~n", [Locks])),
     {ok, State}.
 
 -spec format_error(any()) -> iolist().

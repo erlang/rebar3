@@ -1,4 +1,3 @@
-%%% TODO: check that warnings are appearing
 -module(rebar_deps_SUITE).
 -compile(export_all).
 -include_lib("common_test/include/ct.hrl").
