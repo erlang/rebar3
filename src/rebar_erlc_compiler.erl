@@ -148,11 +148,13 @@ doterl_compile(Config, Dir, MoreSources, ErlOpts) ->
     %% (rebar_state:get instead of rebar_state:get_list), consider
     %% logging a warning message for any file listed in erl_first_files which
     %% wasn't found via gather_src.
-    {ErlFirstFiles, RestErls} =
-        lists:partition(
-          fun(Source) ->
-                  lists:member(list_to_atom(filename:basename(Source, ".erl")), ErlFirstFilesConf)
-          end, AllErlFiles),
+    
+    %% Issue: rebar/rebar3#140 (fix matching based on same path + order of
+    %% erl_first_files)
+    ErlFirstFiles = get_erl_first_files(ErlFirstFilesConf, AllErlFiles),
+    RestErls = [ File || File <- AllErlFiles,
+                         not lists:member(File, ErlFirstFiles) ],
+   
     %% Make sure that ebin/ exists and is on the path
     ok = filelib:ensure_dir(filename:join([Dir, "ebin", "dummy.beam"])),
     CurrPath = code:get_path(),
@@ -205,6 +207,17 @@ doterl_compile(Config, Dir, MoreSources, ErlOpts) ->
 %%
 erls(Files) ->
     [Erl || Erl <- Files, filename:extension(Erl) =:= ".erl"].
+
+%%
+%% Return a list of erl_first_files in order as specified in rebar.config
+%% using the path from AllFiles.
+%%
+get_erl_first_files(FirstFiles, AllFiles) ->
+    BaseFirstFiles = [filename:basename(F) || F <- FirstFiles],
+    IndexedAllFiles = [{filename:basename(F), F} || F <- AllFiles ],
+    [ proplists:get_value(FileName, IndexedAllFiles) ||
+        FileName <- BaseFirstFiles,
+        proplists:is_defined(FileName, IndexedAllFiles) ].
 
 %%
 %% Return a list without duplicates while preserving order
@@ -621,3 +634,5 @@ log_files(Prefix, Files) ->
         _ ->
             ?DEBUG("~s:~n~p", [Prefix, Files])
     end.
+
+
