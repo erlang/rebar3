@@ -23,7 +23,7 @@ end_per_testcase(_, Config) ->
 
 mock_home_dir(Path) ->
     meck:new(rebar_dir, [passthrough]),
-    meck:expect(rebar_dir, home_dir, fun() -> Path end).
+    meck:expect(rebar_dir, template_dir, fun(_) -> Path end).
 
 mock_empty_escript_templates() ->
     %% Can't find escript templates unless we run

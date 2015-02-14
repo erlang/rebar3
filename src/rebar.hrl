@@ -22,7 +22,6 @@
 -define(DEFAULT_RELEASE_DIR, "rel").
 -define(DEFAULT_CONFIG_FILE, "rebar.config").
 -define(LOCK_FILE, "rebar.lock").
--define(CONFIG_DIR, ".rebar3").
 
 -ifdef(namespaced_types).
 -type rebar_dict() :: dict:dict().

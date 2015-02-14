@@ -59,7 +59,7 @@ format_error(package_index_write) ->
     "Failed to write package index.".
 
 write_registry(Dict, {digraph, Edges, Vertices, Neighbors, _}, State) ->
-    Dir = rebar_dir:global_config_dir(State),
+    Dir = rebar_dir:global_cache_dir(State),
     RegistryDir = filename:join(Dir, "packages"),
     filelib:ensure_dir(filename:join(RegistryDir, "dummy")),
     ets:tab2file(Edges, filename:join(RegistryDir, "edges")),

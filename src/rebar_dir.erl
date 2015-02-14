@@ -7,8 +7,13 @@
          lib_dirs/1,
          home_dir/0,
          global_config_dir/1,
+         global_config/1,
+         global_config/0,
+         global_cache_dir/1,
+         local_cache_dir/0,
          get_cwd/0,
-         ensure_dir/1,
+         template_globals/1,
+         template_dir/1,
          src_dirs/1,
          ebin_dir/0,
          processing_base_dir/1,
@@ -47,23 +52,31 @@ home_dir() ->
 
 global_config_dir(State) ->
     Home = home_dir(),
-    rebar_state:get(State, global_rebar_dir, filename:join(Home, ?CONFIG_DIR)).
+    rebar_state:get(State, global_rebar_dir, filename:join([Home, ".config", "rebar3"])).
+
+global_config(State) ->
+    filename:join(global_config_dir(State), "config").
+
+global_config() ->
+    Home = home_dir(),
+    filename:join([Home, ".config", "rebar3", "config"]).
+
+global_cache_dir(State) ->
+    Home = home_dir(),
+    rebar_state:get(State, global_rebar_dir, filename:join([Home, ".cache", "rebar3"])).
+
+local_cache_dir() ->
+    filename:join(get_cwd(), ".rebar3").
 
 get_cwd() ->
     {ok, Dir} = file:get_cwd(),
     Dir.
 
-%% TODO: filelib:ensure_dir/1 corrected in R13B04. Remove when we drop
-%% support for OTP releases older than R13B04.
-ensure_dir(Path) ->
-    case filelib:ensure_dir(Path) of
-        ok ->
-            ok;
-        {error,eexist} ->
-            ok;
-        Error ->
-            Error
-    end.
+template_globals(State) ->
+    filename:join([global_config_dir(State), "templates", "globals"]).
+
+template_dir(State) ->
+    filename:join([global_config_dir(State), "templates"]).
 
 -spec src_dirs([string()]) -> [file:filename(), ...].
 src_dirs([]) ->

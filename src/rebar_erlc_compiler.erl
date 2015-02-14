@@ -283,7 +283,7 @@ check_erlcinfo(Config, _) ->
            [erlcinfo_file(Config)]).
 
 erlcinfo_file(_Config) ->
-    filename:join([rebar_dir:get_cwd(), ?CONFIG_DIR, ?ERLCINFO_FILE]).
+    filename:join(rebar_dir:local_cache_dir(), ?ERLCINFO_FILE).
 
 init_erlcinfo(Config, Erls) ->
     G = restore_erlcinfo(Config),
@@ -464,8 +464,8 @@ internal_erl_compile(Config, Dir, Source, OutDir, ErlOpts, G) ->
 -spec compile_mib(file:filename(), file:filename(),
                   rebar_state:t()) -> 'ok'.
 compile_mib(Source, Target, Config) ->
-    ok = rebar_dir:ensure_dir(Target),
-    ok = rebar_dir:ensure_dir(filename:join("include", "dummy.hrl")),
+    ok = filelib:ensure_dir(Target),
+    ok = filelib:ensure_dir(filename:join("include", "dummy.hrl")),
     Opts = [{outdir, "priv/mibs"}, {i, ["priv/mibs"]}] ++
         rebar_state:get(Config, mib_opts, []),
     case snmpc:compile(Source, Opts) of
