@@ -34,5 +34,6 @@ get_packages(State) ->
                     {dict:new(), digraph:new()}
             end;
         false ->
+            ?ERROR("Bad packages index, try to fix with `rebar3 update`", []),
             {dict:new(), digraph:new()}
     end.
