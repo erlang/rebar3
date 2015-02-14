@@ -79,18 +79,60 @@ hex_to_graph(Filename) ->
               end, ok, T),
 
     Dict1 = ets:foldl(fun({{Pkg, PkgVsn}, [Deps | _]}, Dict) ->
-                              DepsList = lists:foldl(fun([Dep, DepVsn, _, _], DepsListAcc) ->
-                                                             case DepVsn of
-                                                                 <<"~> ", Vsn/binary>> ->
-                                                                     digraph:add_edge(Graph, {Pkg, PkgVsn}, {Dep, Vsn}),
-                                                                     [{Dep, DepVsn} | DepsListAcc];
-                                                                 Vsn ->
-                                                                     digraph:add_edge(Graph, {Pkg, PkgVsn}, {Dep, Vsn}),
-                                                                     [{Dep, Vsn} | DepsListAcc]
-                                                             end
-                                                     end, [], Deps),
+                              DepsList = update_graph(Pkg, PkgVsn, Deps, T, Graph),
                               dict:store({Pkg, PkgVsn}, DepsList, Dict);
                          (_, Dict) ->
                               Dict
                       end, dict:new(), T),
     {Dict1, Graph}.
+
+update_graph(Pkg, PkgVsn, Deps, HexRegistry, Graph) ->
+    lists:foldl(fun([Dep, DepVsn, _, _], DepsListAcc) ->
+                        case DepVsn of
+                            <<"~> ", Vsn/binary>> ->
+                                HighestDepVsn = find_highest_matching(Dep, Vsn, HexRegistry),
+                                digraph:add_edge(Graph, {Pkg, PkgVsn}, {Dep, HighestDepVsn}),
+                                [{Dep, DepVsn} | DepsListAcc];
+                            Vsn ->
+                                digraph:add_edge(Graph, {Pkg, PkgVsn}, {Dep, Vsn}),
+                                [{Dep, Vsn} | DepsListAcc]
+                        end
+                end, [], Deps).
+
+%% Hex supports use of ~> to specify the version required for a dependency.
+%% Since rebar3 requires exact versions to choose from we find the highest
+%% available version of the dep that passes the constraint.
+
+%% `~>` will never include pre-release versions of its upper bound.
+%% It can also be used to set an upper bound on only the major
+%% version part. See the table below for `~>` requirements and
+%% their corresponding translation.
+%% `~>` | Translation
+%% :------------- | :---------------------
+%% `~> 2.0.0` | `>= 2.0.0 and < 2.1.0`
+%% `~> 2.1.2` | `>= 2.1.2 and < 2.2.0`
+%% `~> 2.1.3-dev` | `>= 2.1.3-dev and < 2.2.0`
+%% `~> 2.0` | `>= 2.0.0 and < 3.0.0`
+%% `~> 2.1` | `>= 2.1.0 and < 3.0.0`
+find_highest_matching(Dep, Constraint, T) ->
+    case ets:lookup(T, Dep) of
+        [{Dep, [[Vsn]]}] ->
+            case ec_semver:pes(Vsn, Constraint) of
+                true ->
+                    Vsn;
+                false ->
+                    ?WARN("Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
+                         "Using anyway, but it is not guarenteed to work.", [Dep, Vsn, Constraint]),
+                    Vsn
+            end;
+        [{Dep, [[HeadVsn | VsnTail]]}] ->
+            lists:foldl(fun(Version, Highest) ->
+                                case ec_semver:pes(Version, Constraint) andalso
+                                    ec_semver:gt(Version, Highest) of
+                                    true ->
+                                        Version;
+                                    false ->
+                                        Highest
+                                end
+                        end, HeadVsn, VsnTail)
+    end.
