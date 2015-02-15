@@ -380,8 +380,7 @@ run_dialyzer(State, Opts) ->
     %% dialyzer may return callgraph warnings when get_warnings is false
     case proplists:get_bool(get_warnings, Opts) of
         true ->
-            WarningsList = rebar_state:get(State, dialyzer_warnings,
-                                           default_warnings()),
+            WarningsList = rebar_state:get(State, dialyzer_warnings, []),
             Opts2 = [{warnings, WarningsList} | Opts],
             {Unknowns, Warnings} = format_warnings(dialyzer:run(Opts2)),
             _ = [?CONSOLE("~s", [Unknown]) || Unknown <- Unknowns],
@@ -407,11 +406,6 @@ format_warnings([], Unknowns, Warnings) ->
 
 strip(Warning) ->
     string:strip(Warning, right, $\n).
-
-default_warnings() ->
-    [error_handling,
-     unmatched_returns,
-     underspecs].
 
 no_warnings() ->
     [no_return,
