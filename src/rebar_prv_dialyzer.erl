@@ -352,7 +352,7 @@ succ_typings(State, Plt, Apps) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     case proplists:get_value(succ_typings, Args) of
         false ->
-            {ok, State};
+            {0, State};
         _ ->
             do_succ_typings(State, Plt, Apps)
     end.
