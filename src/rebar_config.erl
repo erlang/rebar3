@@ -27,7 +27,9 @@
 -module(rebar_config).
 
 -export([consult/1
-        ,consult_file/1]).
+        ,consult_file/1
+
+        ,merge_locks/2]).
 
 -include("rebar.hrl").
 
@@ -58,6 +60,18 @@ consult_file(File) ->
             end
     end.
 
+merge_locks(Config, []) ->
+    Config;
+merge_locks(Config, [Locks]) ->
+    {deps, ConfigDeps} = lists:keyfind(deps, 1, Config),
+    %% We want the top level deps only from the lock file.
+    %% This ensures deterministic overrides for configs.
+    %% Then check if any new deps have been added to the config
+    %% since it was locked.
+    Deps = [X || X <- Locks, element(3, X) =:= 0],
+    NewDeps = find_newly_added(ConfigDeps, Locks),
+    [{{locks, default}, Locks}, {{deps, default}, NewDeps++Deps} | Config].
+
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
@@ -84,3 +98,24 @@ bs(Vars) ->
     lists:foldl(fun({K,V}, Bs) ->
                         erl_eval:add_binding(K, V, Bs)
                 end, erl_eval:new_bindings(), Vars).
+
+%% Find deps that have been added to the config after the lock was created
+find_newly_added(ConfigDeps, LockedDeps) ->
+    [Dep || Dep <- ConfigDeps,
+            begin
+                NewDep = ec_cnv:to_binary(element(1, Dep)),
+                case lists:keyfind(NewDep, 1, LockedDeps) of
+                    false ->
+                        true;
+                    Match ->
+                        case element(3, Match) of
+                            0 ->
+                                true;
+                            _ ->
+                                ?WARN("Newly added dep ~s is locked at a lower level. "
+                                     "If you really want to unlock it, use 'rebar3 upgrade ~s'",
+                                     [NewDep, NewDep]),
+                                false
+                        end
+                end
+            end].

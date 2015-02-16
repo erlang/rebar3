@@ -3,7 +3,7 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-all() -> [sub_app_deps, {group, git}, {group, pkg}].
+all() -> [sub_app_deps, newly_added_dep, {group, git}, {group, pkg}].
 
 groups() ->
     [{all, [], [flat, pick_highest_left, pick_highest_right,
@@ -29,6 +29,8 @@ init_per_group(_, Config) ->
 end_per_group(_, Config) ->
     Config.
 
+init_per_testcase(newly_added_dep, Config) ->
+    rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(sub_app_deps, Config) ->
     rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(Case, Config) ->
@@ -129,9 +131,9 @@ expand_deps(pkg, [{Name, Vsn, Deps} | Rest]) ->
 setup_project(Case, Config0, Deps) ->
     DepsType = ?config(deps_type, Config0),
     Config = rebar_test_utils:init_rebar_state(
-            Config0,
-            atom_to_list(Case)++"_"++atom_to_list(DepsType)++"_"
-    ),
+               Config0,
+               atom_to_list(Case)++"_"++atom_to_list(DepsType)++"_"
+              ),
     AppDir = ?config(apps, Config),
     rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
     TopDeps = top_level_deps(Deps),
@@ -217,6 +219,40 @@ sub_app_deps(Config) ->
     rebar_test_utils:run_and_check(
       Config, RebarConfig, ["compile"],
       {ok, [{app, Name}, {dep, "a"}, {dep, "b", "1.0.0"}]}).
+
+%% Newly added dependency after locking
+newly_added_dep(Config) ->
+    AppDir = ?config(apps, Config),
+    Deps = expand_deps(git, [{"a", "1.0.0", []}
+                            ,{"b", "1.0.0", [{"c", "1.0.0", []}]}
+                            ,{"c", "2.0.0", []}]),
+    mock_git_resource:mock([{deps, flat_deps(Deps)}]),
+
+    Name = rebar_test_utils:create_random_name("app_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+
+    SubAppsDir = filename:join([AppDir, Name]),
+    rebar_test_utils:create_app(SubAppsDir, Name, Vsn, [kernel, stdlib]),
+
+    TopDeps = top_level_deps(expand_deps(git, [{"b", "1.0.0", []}])),
+    {ok, RebarConfig} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, TopDeps}])),
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig, ["compile"],
+      {ok, [{app, Name}, {dep, "b", "1.0.0"}, {dep, "c", "1.0.0"}]}),
+
+    %% Add a and c to top level
+    TopDeps2 = top_level_deps(expand_deps(git, [{"a", "1.0.0", []}
+                                               ,{"c", "2.0.0", []}
+                                               ,{"b", "1.0.0", []}])),
+    {ok, RebarConfig2} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, TopDeps2}])),
+    LockFile = filename:join(AppDir, "rebar.lock"),
+    RebarConfig3 = rebar_config:merge_locks(RebarConfig2,
+                                           rebar_config:consult_file(LockFile)),
+
+    %% a should now be installed and c should not change
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig3, ["compile"],
+      {ok, [{app, Name}, {dep, "a"}, {dep, "b", "1.0.0"}, {dep, "c", "1.0.0"}]}).
 
 
 run(Config) ->
