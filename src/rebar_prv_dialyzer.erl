@@ -352,7 +352,7 @@ succ_typings(State, Plt, Apps) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     case proplists:get_value(succ_typings, Args) of
         false ->
-            {ok, State};
+            {0, State};
         _ ->
             do_succ_typings(State, Plt, Apps)
     end.
@@ -377,12 +377,20 @@ app_to_files(App) ->
     Files.
 
 run_dialyzer(State, Opts) ->
-    WarningsList = rebar_state:get(State, dialyzer_warnings, default_warnings()),
-    Opts2 = [{warnings, WarningsList} | Opts],
-    {Unknowns, Warnings} = format_warnings(dialyzer:run(Opts2)),
-    _ = [?CONSOLE("~s", [Unknown]) || Unknown <- Unknowns],
-    _ = [?CONSOLE("~s", [Warning]) || Warning <- Warnings],
-    {length(Warnings), State}.
+    %% dialyzer may return callgraph warnings when get_warnings is false
+    case proplists:get_bool(get_warnings, Opts) of
+        true ->
+            WarningsList = rebar_state:get(State, dialyzer_warnings,
+                                           default_warnings()),
+            Opts2 = [{warnings, WarningsList} | Opts],
+            {Unknowns, Warnings} = format_warnings(dialyzer:run(Opts2)),
+            _ = [?CONSOLE("~s", [Unknown]) || Unknown <- Unknowns],
+            _ = [?CONSOLE("~s", [Warning]) || Warning <- Warnings],
+            {length(Warnings), State};
+        false ->
+            _ = dialyzer:run([{warnings, no_warnings()} | Opts]),
+            {0, State}
+    end.
 
 format_warnings(Warnings) ->
     format_warnings(Warnings, [], []).
@@ -404,3 +412,15 @@ default_warnings() ->
     [error_handling,
      unmatched_returns,
      underspecs].
+
+no_warnings() ->
+    [no_return,
+     no_unused,
+     no_improper_lists,
+     no_fun_app,
+     no_match,
+     no_opaque,
+     no_fail_call,
+     no_contracts,
+     no_behaviours,
+     no_undefined_callbacks].
