@@ -37,18 +37,25 @@ needs_update(Dir, {git, Url, {branch, Branch}}) ->
 needs_update(Dir, {git, Url, "master"}) ->
     needs_update(Dir, {git, Url, {branch, "master"}});
 needs_update(Dir, {git, Url, Ref}) ->
-    case Ref of
-        {ref, Ref1} ->
-            Ref1;
-        Ref1 ->
-            Ref1
-    end,
-
     {ok, Current} = rebar_utils:sh(?FMT("git rev-parse -q HEAD", []),
                                    [{cd, Dir}]),
     Current1 = string:strip(string:strip(Current, both, $\n), both, $\r),
+
+    Ref2 = case Ref of
+               {ref, Ref1} ->
+                   Length = length(Current1),
+                   if
+                       Length >= 7 ->
+                           lists:sublist(Ref1, Length);
+                       true ->
+                           Ref1
+                   end;
+               Ref1 ->
+                   Ref1
+           end,
+
     ?DEBUG("Comparing git ref ~s with ~s", [Ref1, Current1]),
-    not ((Current1 =:= Ref1) andalso compare_url(Dir, Url)).
+    not ((Current1 =:= Ref2) andalso compare_url(Dir, Url)).
 
 compare_url(Dir, Url) ->
     {ok, CurrentUrl} = rebar_utils:sh(?FMT("git config --get remote.origin.url", []),
