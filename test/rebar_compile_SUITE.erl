@@ -8,7 +8,9 @@
          build_basic_app/1,
          build_release_apps/1,
          build_checkout_apps/1,
-         build_checkout_deps/1]).
+         build_checkout_deps/1,
+         recompile_when_opts_change/1,
+         dont_recompile_when_opts_dont_change/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -28,7 +30,8 @@ init_per_testcase(_, Config) ->
 
 all() ->
     [build_basic_app, build_release_apps,
-     build_checkout_apps, build_checkout_deps].
+     build_checkout_apps, build_checkout_deps,
+     recompile_when_opts_change, dont_recompile_when_opts_dont_change].
 
 build_basic_app(Config) ->
     AppDir = ?config(apps, Config),
@@ -88,3 +91,54 @@ build_checkout_deps(Config) ->
     ok = application:load(list_to_atom(Name2)),
     Loaded = application:loaded_applications(),
     {_, _, Vsn2} = lists:keyfind(list_to_atom(Name2), 1, Loaded).
+
+recompile_when_opts_change(Config) ->
+    AppDir = ?config(apps, Config),
+    EbinDir = filename:join([AppDir, "ebin"]),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    {ok, Files} = file:list_dir(EbinDir),
+    ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+               || F <- Files, filename:extension(F) == ".beam"],
+
+    timer:sleep(1000),
+
+    rebar_test_utils:create_config(AppDir, [{erl_opts, [{d, some_define}]}]),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    {ok, NewFiles} = file:list_dir(EbinDir),
+    NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+                  || F <- NewFiles, filename:extension(F) == ".beam"],
+
+    ?assert(ModTime =/= NewModTime).
+
+
+dont_recompile_when_opts_dont_change(Config) ->
+    AppDir = ?config(apps, Config),
+    EbinDir = filename:join([AppDir, "ebin"]),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    {ok, Files} = file:list_dir(EbinDir),
+    ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+               || F <- Files, filename:extension(F) == ".beam"],
+
+    timer:sleep(1000),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    {ok, NewFiles} = file:list_dir(EbinDir),
+    NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+                  || F <- NewFiles, filename:extension(F) == ".beam"], 
+
+    ?assert(ModTime == NewModTime).

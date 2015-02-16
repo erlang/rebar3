@@ -254,11 +254,26 @@ include_path(Source, Config) ->
                 ++ proplists:get_all_values(i, ErlOpts)).
 
 -spec needs_compile(file:filename(), file:filename(),
-                    [string()]) -> boolean().
-needs_compile(Source, Target, Parents) ->
+                    list(), [string()]) -> boolean().
+needs_compile(Source, Target, Opts, Parents) ->
     TargetLastMod = filelib:last_modified(Target),
-    lists:any(fun(I) -> TargetLastMod < filelib:last_modified(I) end,
-              [Source] ++ Parents).
+    F = fun(I) -> source_changed(TargetLastMod, I) end,
+    lists:any(F, [Source] ++ Parents) orelse opts_changed(Opts, Target).
+
+source_changed(TargetLastMod, I) -> TargetLastMod < filelib:last_modified(I).
+
+opts_changed(Opts, Target) ->
+    Basename = filename:basename(Target, ".beam"),
+    Dirname = filename:dirname(Target),
+    ObjectFile = filename:join([Dirname, Basename]),
+    case code:load_abs(ObjectFile) of
+        {module, Mod} ->
+            Compile = Mod:module_info(compile),
+            lists:sort(Opts) =/= lists:sort(proplists:get_value(options,
+                                                                Compile,
+                                                                undefined));
+        {error, nofile} -> true
+    end.
 
 check_erlcinfo(_Config, #erlcinfo{vsn=?ERLCINFO_VSN}) ->
     ok;
@@ -427,13 +442,15 @@ internal_erl_compile(Config, Dir, Source, OutDir, ErlOpts, G) ->
     Target = filename:join([OutDir | string:tokens(Module, ".")]) ++ ".beam",
     ok = filelib:ensure_dir(Target),
 
+    %% Construct the compile opts
+    Opts = [{outdir, filename:dirname(Target)}] ++
+        ErlOpts ++ [{i, filename:join(Dir, "include")}],
+
     %% If the file needs compilation, based on last mod date of includes or
     %% the target
-    case needs_compile(Source, Target, Parents) of
+    case needs_compile(Source, Target, Opts, Parents) of
         true ->
-            Opts = [{outdir, filename:dirname(Target)}] ++
-                ErlOpts ++ [{i, filename:join(Dir, "include")}, return],
-            case compile:file(Source, Opts) of
+            case compile:file(Source, Opts ++ [return]) of
                 {ok, _Mod} ->
                     ok;
                 {ok, _Mod, Ws} ->
@@ -489,7 +506,7 @@ compile_xrl_yrl(Config, Source, Target, Opts, Mod) ->
     Dir = rebar_state:dir(Config),
     Opts1 = [{includefile, filename:join(Dir, I)} || {includefile, I} <- Opts,
                                                      filename:pathtype(I) =:= relative],
-    case needs_compile(Source, Target, []) of
+    case needs_compile(Source, Target, Opts1, []) of
         true ->
             case Mod:file(Source, Opts1 ++ [{return, true}]) of
                 {ok, _} ->
