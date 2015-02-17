@@ -55,7 +55,8 @@ do(State) ->
     Path = code:get_path(),
     true = code:add_patha(OutDir),
     CTOpts = resolve_ct_opts(State, Opts, OutDir),
-    Result = handle_results(ct:run_test(CTOpts)),
+    Verbose = proplists:get_value(verbose, Opts, false),
+    Result = run_test(CTOpts, Verbose),
     true = code:set_path(Path),
     case Result of
         {error, Reason} ->
@@ -69,6 +70,19 @@ format_error({failures_running_tests, FailedCount}) ->
     io_lib:format("Failures occured running tests: ~p", [FailedCount]);
 format_error({error_running_tests, Reason}) ->
     io_lib:format("Error running tests: ~p", [Reason]).
+
+run_test(CTOpts, true) ->
+    handle_results(ct:run_test(CTOpts));
+run_test(CTOpts, false) ->
+    Pid = self(),
+    LogDir = proplists:get_value(logdir, CTOpts),
+    erlang:spawn(fun() ->
+        {ok, F} = file:open(filename:join([LogDir, "ct.latest.log"]),
+                             [write]),
+        true = group_leader(F, self()),
+        Pid ! ct:run_test(CTOpts)
+    end),
+    receive Result -> handle_quiet_results(CTOpts, Result) end.
 
 ct_opts(State) ->
     DefaultLogsDir = filename:join([rebar_state:dir(State), "logs"]),
@@ -104,7 +118,8 @@ ct_opts(State) ->
      {until, undefined, "until", string, help(until)}, %% format: YYMoMoDD[HHMMSS]
      {force_stop, undefined, "force_stop", string, help(force_stop)}, % enum: skip_rest, bool
      {basic_html, undefined, "basic_html", boolean, help(basic_html)}, %% Booloean
-     {ct_hooks, undefined, "ct_hooks", string, help(ct_hooks)} %% List: [CTHModule | {CTHModule, CTHInitArgs}] where CTHModule is atom CthInitArgs is term
+     {ct_hooks, undefined, "ct_hooks", string, help(ct_hooks)}, %% List: [CTHModule | {CTHModule, CTHInitArgs}] where CTHModule is atom CthInitArgs is term
+     {verbose, $v, "verbose", boolean, help(verbose)}
     ].
 
 help(outdir) ->
@@ -166,7 +181,9 @@ help(basic_html) ->
 help(ct_hooks) ->
     "";
 help(userconfig) ->
-    "".
+    "";
+help(verbose) ->
+    "Verbose output".
 
 split_ct_dirs(State, RawOpts) ->
     %% preserve the override nature of command line opts by only checking
@@ -339,9 +356,17 @@ handle_results([Result|Results]) when is_list(Results) ->
         Error ->
             Error
     end;
-handle_results({_, 0, _}) ->
-    ok;
-handle_results({_, FailedCount, _}) ->
-    {error, {failures_running_tests, FailedCount}};
 handle_results({error, Reason}) ->
-    {error, {error_running_tests, Reason}}.
+    {error, {error_running_tests, Reason}};
+handle_results(_) -> ok.
+
+handle_quiet_results(_, {Passed, 0, {0, 0}}) ->
+    io:format("  All ~p tests passed.~n", [Passed]);
+handle_quiet_results(_, {Passed, 0, {UserSkipped, AutoSkipped}}) ->
+    io:format("  All ~p tests passed. Skipped ~p tests.~n",
+              [Passed, UserSkipped + AutoSkipped]);
+handle_quiet_results(CTOpts, {_, Failed, _}) ->
+    LogDir = proplists:get_value(logdir, CTOpts),
+    Index = filename:join([LogDir, "index.html"]),
+    io:format("  ~p tests failed.~n  Results written to ~p.~n", [Failed, Index]);
+handle_quiet_results(_CTOpts, Result) -> handle_results(Result).
