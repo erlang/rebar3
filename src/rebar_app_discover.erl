@@ -16,15 +16,32 @@ do(State, LibDirs) ->
     Dirs = [filename:join(BaseDir, LibDir) || LibDir <- LibDirs],
     Apps = find_apps(Dirs, all),
     ProjectDeps = rebar_state:deps_names(State),
+
     lists:foldl(fun(AppInfo, StateAcc) ->
+                        StateAcc1 = merge_deps(AppInfo, StateAcc),
                         ProjectDeps1 = lists:delete(rebar_app_info:name(AppInfo), ProjectDeps),
-                        rebar_state:project_apps(StateAcc, rebar_app_info:deps(AppInfo, ProjectDeps1))
-            end, State, Apps).
+                        rebar_state:project_apps(StateAcc1
+                                                ,rebar_app_info:deps(AppInfo, ProjectDeps1))
+                end, State, Apps).
 
 format_error({module_list, File}) ->
     io_lib:format("Error reading module list from ~p~n", [File]);
 format_error({missing_module, Module}) ->
     io_lib:format("Module defined in app file missing: ~p~n", [Module]).
+
+merge_deps(AppInfo, State) ->
+    Profiles = rebar_state:current_profiles(State),
+    Name = rebar_app_info:name(AppInfo),
+    C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
+    AppState = rebar_state:apply_overrides(
+                 rebar_state:apply_profiles(
+                   rebar_state:new(State, C, rebar_app_info:dir(AppInfo)), Profiles), Name),
+    lists:foldl(fun(Profile, StateAcc) ->
+                        AppProfDeps = rebar_state:get(AppState, {deps, Profile}, []),
+                        TopLevelProfDeps = rebar_state:get(StateAcc, {deps, Profile}, []),
+                        ProfDeps2 = lists:keymerge(1, TopLevelProfDeps, AppProfDeps),
+                        rebar_state:set(StateAcc, {deps, Profile}, ProfDeps2)
+                end, State, lists:reverse(Profiles)).
 
 -spec all_app_dirs(list(file:name())) -> list(file:name()).
 all_app_dirs(LibDirs) ->

@@ -3,7 +3,7 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-all() -> [{group, git}, {group, pkg}].
+all() -> [sub_app_deps, {group, git}, {group, pkg}].
 
 groups() ->
     [{all, [], [flat, pick_highest_left, pick_highest_right,
@@ -29,6 +29,8 @@ init_per_group(_, Config) ->
 end_per_group(_, Config) ->
     Config.
 
+init_per_testcase(sub_app_deps, Config) ->
+    rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(Case, Config) ->
     {Deps, Warnings, Expect} = deps(Case),
     Expected = case Expect of
@@ -190,6 +192,32 @@ pick_smallest2(Config) -> run(Config).
 circular1(Config) -> run(Config).
 circular2(Config) -> run(Config).
 circular_skip(Config) -> run(Config).
+
+%% Test that the deps of project apps that have their own rebar.config
+%% are included, but that top level rebar.config deps take precedence
+sub_app_deps(Config) ->
+    AppDir = ?config(apps, Config),
+    Deps = expand_deps(git, [{"a", "1.0.0", []}
+                            ,{"b", "1.0.0", []}
+                            ,{"b", "2.0.0", []}]),
+    mock_git_resource:mock([{deps, flat_deps(Deps)}]),
+
+    Name = rebar_test_utils:create_random_name("sub_app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+
+    SubAppsDir = filename:join([AppDir, Name]),
+    SubDeps = top_level_deps(expand_deps(git, [{"a", "1.0.0", []}
+                                              ,{"b", "2.0.0", []}])),
+    rebar_test_utils:create_app(SubAppsDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_config(SubAppsDir, [{deps, SubDeps}]),
+
+    TopDeps = top_level_deps(expand_deps(git, [{"b", "1.0.0", []}])),
+    {ok, RebarConfig} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, TopDeps}])),
+
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig, ["compile"],
+      {ok, [{app, Name}, {dep, "a"}, {dep, "b", "1.0.0"}]}).
+
 
 run(Config) ->
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),

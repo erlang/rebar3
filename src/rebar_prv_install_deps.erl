@@ -267,7 +267,7 @@ update_src_deps(Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen,
                                                        ,StateAcc
                                                        ,LocksAcc),
 
-                                    {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2, SeenAcc, LocksAcc1}
+                                             {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2, SeenAcc, LocksAcc1}
                                      end;
                                  false ->
                                      {SeenAcc1, StateAcc1} = maybe_lock(Profile, AppInfo, SeenAcc, StateAcc, Level),
