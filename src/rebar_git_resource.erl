@@ -5,7 +5,7 @@
 -behaviour(rebar_resource).
 
 -export([lock/2
-        ,download/2
+        ,download/3
         ,needs_update/2
         ,make_vsn/1]).
 
@@ -75,28 +75,28 @@ parse_git_url("https://" ++ HostPath) ->
     [Host | Path] = string:tokens(HostPath, "/"),
     {Host, filename:rootname(filename:join(Path), ".git")}.
 
-download(Dir, {git, Url}) ->
+download(Dir, {git, Url}, State) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
-    download(Dir, {git, Url, {branch, "master"}});
-download(Dir, {git, Url, ""}) ->
+    download(Dir, {git, Url, {branch, "master"}}, State);
+download(Dir, {git, Url, ""}, State) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
-    download(Dir, {git, Url, {branch, "master"}});
-download(Dir, {git, Url, {branch, Branch}}) ->
+    download(Dir, {git, Url, {branch, "master"}}, State);
+download(Dir, {git, Url, {branch, Branch}}, _State) ->
     ok = filelib:ensure_dir(Dir),
     rebar_utils:sh(?FMT("git clone ~s ~s -b ~s --single-branch",
                        [Url, filename:basename(Dir), Branch]),
                    [{cd, filename:dirname(Dir)}]);
-download(Dir, {git, Url, {tag, Tag}}) ->
+download(Dir, {git, Url, {tag, Tag}}, _State) ->
     ok = filelib:ensure_dir(Dir),
     rebar_utils:sh(?FMT("git clone ~s ~s -b ~s --single-branch",
                         [Url, filename:basename(Dir), Tag]),
                    [{cd, filename:dirname(Dir)}]);
-download(Dir, {git, Url, {ref, Ref}}) ->
+download(Dir, {git, Url, {ref, Ref}}, _State) ->
     ok = filelib:ensure_dir(Dir),
     rebar_utils:sh(?FMT("git clone -n ~s ~s", [Url, filename:basename(Dir)]),
                    [{cd, filename:dirname(Dir)}]),
     rebar_utils:sh(?FMT("git checkout -q ~s", [Ref]), [{cd, Dir}]);
-download(Dir, {git, Url, Rev}) ->
+download(Dir, {git, Url, Rev}, _State) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
     ok = filelib:ensure_dir(Dir),
     rebar_utils:sh(?FMT("git clone -n ~s ~s", [Url, filename:basename(Dir)]),

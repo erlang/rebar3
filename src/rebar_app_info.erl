@@ -79,7 +79,7 @@ new(AppName, Vsn) ->
 new(AppName, Vsn, Dir) ->
     {ok, #app_info_t{name=ec_cnv:to_binary(AppName),
                      original_vsn=Vsn,
-                     dir=Dir}}.
+                     dir=ec_cnv:to_list(Dir)}}.
 
 %% @doc build a complete version of the app info with all fields set.
 -spec new(atom() | binary() | string(), binary() | string(), file:name(), list()) ->
@@ -87,7 +87,7 @@ new(AppName, Vsn, Dir) ->
 new(AppName, Vsn, Dir, Deps) ->
     {ok, #app_info_t{name=ec_cnv:to_binary(AppName),
                      original_vsn=Vsn,
-                     dir=Dir,
+                     dir=ec_cnv:to_list(Dir),
                      deps=Deps}}.
 
 %% @doc discover a complete version of the app info with all fields set.
@@ -200,7 +200,7 @@ dir(#app_info_t{dir=Dir}) ->
 
 -spec dir(t(), file:name()) -> t().
 dir(AppInfo=#app_info_t{}, Dir) ->
-    AppInfo#app_info_t{dir=Dir}.
+    AppInfo#app_info_t{dir=ec_cnv:to_list(Dir)}.
 
 -spec ebin_dir(t()) -> file:name().
 ebin_dir(#app_info_t{dir=Dir}) ->

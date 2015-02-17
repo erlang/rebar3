@@ -5,7 +5,7 @@
 -behaviour(rebar_resource).
 
 -export([lock/2
-        ,download/2
+        ,download/3
         ,needs_update/2
         ,make_vsn/1]).
 
@@ -23,9 +23,11 @@ needs_update(Dir, {pkg, _Name, Vsn, _Url}) ->
             true
     end.
 
-download(Dir, {pkg, _Name, _Vsn, Url}) ->
+download(Dir, {pkg, Name, Vsn}, State) ->
     TmpFile = filename:join(Dir, "package.tar.gz"),
-    {ok, saved_to_file} = httpc:request(get, {binary_to_list(Url), []}, [], [{stream, TmpFile}]),
+    CDN = rebar_state:get(State, rebar_packages_cdn, "https://s3.amazonaws.com/s3.hex.pm/tarballs"),
+    Url = string:join([CDN, binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>)], "/"),
+    {ok, saved_to_file} = httpc:request(get, {Url, []}, [], [{stream, TmpFile}]),
     {tarball, TmpFile}.
 
 make_vsn(_) ->

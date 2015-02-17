@@ -75,19 +75,19 @@ do(State) ->
         Profiles = rebar_state:current_profiles(State),
         ProjectApps = rebar_state:project_apps(State),
 
-        {SrcApps, State1} =
-            lists:foldl(fun(Profile, {SrcAppsAcc, StateAcc}) ->
+        {Apps, State1} =
+            lists:foldl(fun(Profile, {AppsAcc, StateAcc}) ->
                                 Locks = rebar_state:get(StateAcc, {locks, Profile}, []),
-                                {ok, NewSrcApps, NewState} =
+                                {ok, NewApps, NewState} =
                                     handle_deps(Profile
                                                ,StateAcc
                                                ,rebar_state:get(StateAcc, {deps, Profile}, [])
                                                ,Locks),
-                                {NewSrcApps++SrcAppsAcc, NewState}
+                                {NewApps++AppsAcc, NewState}
                         end, {[], State}, lists:reverse(Profiles)),
 
-        Source = ProjectApps ++ SrcApps,
-        case find_cycles(Source ++ rebar_state:all_deps(State1)) of
+        Source = ProjectApps ++ Apps,
+        case find_cycles(Source) of
             {cycles, Cycles} ->
                 ?PRV_ERROR({cycles, Cycles});
             {error, Error} ->
@@ -117,7 +117,9 @@ find_cycles(Apps) ->
 
 -spec format_error(any()) -> iolist().
 format_error({parse_dep, Dep}) ->
-    io_lib:format("Failed parsing dep ~p~n", [Dep]);
+    io_lib:format("Failed parsing dep ~p", [Dep]);
+format_error({missing_package, Package, Version}) ->
+    io_lib:format("Package not found in registry: ~s-~s", [Package, Version]);
 format_error({cycles, Cycles}) ->
     Prints = [["applications: ",
                [io_lib:format("~s ", [Dep]) || Dep <- Cycle],
@@ -178,7 +180,7 @@ handle_deps(Profile, State, Deps, Upgrade, Locks) ->
     %% Sort all apps to build order
     State3 = rebar_state:all_deps(State2, AllDeps),
 
-    {ok, SrcApps, State3}.
+    {ok, AllDeps, State3}.
 
 %% ===================================================================
 %% Internal functions
@@ -193,7 +195,7 @@ update_pkg_deps(Profile, Pkgs, Packages, Upgrade, Seen, State) ->
                                                       ,Packages
                                                       ,Pkg),
                               {SeenAcc1, StateAcc1} = maybe_lock(Profile, AppInfo, SeenAcc, StateAcc, 0),
-                              case maybe_fetch(AppInfo, Upgrade, SeenAcc1) of
+                              case maybe_fetch(AppInfo, Upgrade, SeenAcc1, State) of
                                   true ->
                                       {[AppInfo | Acc], SeenAcc1, StateAcc1};
                                   false ->
@@ -227,15 +229,14 @@ maybe_lock(Profile, AppInfo, Seen, State, Level) ->
 package_to_app(DepsDir, Packages, {Name, Vsn}) ->
     case dict:find({Name, Vsn}, Packages) of
         error ->
-            {error, missing_package};
+            throw(?PRV_ERROR({missing_package, Name, Vsn}));
         {ok, P} ->
             PkgDeps = [{PkgName, PkgVsn}
                        || {PkgName,PkgVsn} <- proplists:get_value(<<"deps">>, P, [])],
-            Link = proplists:get_value(<<"link">>, P, ""),
             {ok, AppInfo} = rebar_app_info:new(Name, Vsn),
             AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
             AppInfo2 = rebar_app_info:dir(AppInfo1, rebar_dir:deps_dir(DepsDir, Name)),
-            rebar_app_info:source(AppInfo2, {pkg, Name, Vsn, Link})
+            rebar_app_info:source(AppInfo2, {pkg, Name, Vsn})
     end.
 
 -spec update_src_deps(atom(), non_neg_integer(), list(), list(), list(), rebar_state:t(), boolean(), sets:set(binary()), list()) -> {rebar_state:t(), list(), list(), sets:set(binary())}.
@@ -282,7 +283,7 @@ update_src_deps(Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen,
                                                               ,StateAcc1
                                                               ,LocksAcc);
                                              _ ->
-                                                 maybe_fetch(AppInfo, false, SeenAcc),
+                                                 maybe_fetch(AppInfo, false, SeenAcc, StateAcc),
                                                  handle_dep(AppInfo
                                                            ,SrcDepsAcc
                                                            ,PkgDepsAcc
@@ -306,7 +307,7 @@ handle_upgrade(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
     Name = rebar_app_info:name(AppInfo),
     case lists:keyfind(Name, 1, Locks) of
         false ->
-            case maybe_fetch(AppInfo, true, sets:new()) of
+            case maybe_fetch(AppInfo, true, sets:new(), State) of
                 true ->
                     handle_dep(AppInfo
                               ,SrcDeps
@@ -357,8 +358,8 @@ handle_dep(State, DepsDir, AppInfo, Locks, Level) ->
     {AppInfo2, SrcDeps, PkgDeps, Locks++NewLocks}.
 
 -spec maybe_fetch(rebar_app_info:t(), boolean() | {true, binary(), integer()},
-                  sets:set(binary())) -> boolean().
-maybe_fetch(AppInfo, Upgrade, Seen) ->
+                  sets:set(binary()), rebar_state:t()) -> boolean().
+maybe_fetch(AppInfo, Upgrade, Seen, State) ->
     AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
     Apps = rebar_app_discover:find_apps(["_checkouts"], all),
     case rebar_app_utils:find(rebar_app_info:name(AppInfo), Apps) of
@@ -368,13 +369,13 @@ maybe_fetch(AppInfo, Upgrade, Seen) ->
         error ->
             case not app_exists(AppDir) of
                 true ->
-                    fetch_app(AppInfo, AppDir);
+                    fetch_app(AppInfo, AppDir, State);
                 false ->
                     case sets:is_element(rebar_app_info:name(AppInfo), Seen) of
                         true ->
                             false;
                         false ->
-                            maybe_upgrade(AppInfo, AppDir, Upgrade)
+                            maybe_upgrade(AppInfo, AppDir, Upgrade, State)
                     end
             end
     end.
@@ -457,25 +458,25 @@ app_exists(AppDir) ->
             end
     end.
 
-fetch_app(AppInfo, AppDir) ->
+fetch_app(AppInfo, AppDir, State) ->
     ?INFO("Fetching ~s (~p)", [rebar_app_info:name(AppInfo), rebar_app_info:source(AppInfo)]),
     Source = rebar_app_info:source(AppInfo),
-    case rebar_fetch:download_source(AppDir, Source) of
+    case rebar_fetch:download_source(AppDir, Source, State) of
         {error, Reason} ->
             throw(Reason);
         Result ->
             Result
     end.
 
-maybe_upgrade(AppInfo, AppDir, false) ->
+maybe_upgrade(AppInfo, AppDir, false, _State) ->
     Source = rebar_app_info:source(AppInfo),
     rebar_fetch:needs_update(AppDir, Source);
-maybe_upgrade(AppInfo, AppDir, true) ->
+maybe_upgrade(AppInfo, AppDir, true, State) ->
     Source = rebar_app_info:source(AppInfo),
     case rebar_fetch:needs_update(AppDir, Source) of
         true ->
             ?INFO("Updating ~s", [rebar_app_info:name(AppInfo)]),
-            case rebar_fetch:download_source(AppDir, Source) of
+            case rebar_fetch:download_source(AppDir, Source, State) of
                 {error, Reason} ->
                     throw(Reason);
                 Result ->

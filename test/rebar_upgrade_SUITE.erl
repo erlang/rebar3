@@ -359,7 +359,7 @@ upgrades(delete_d) ->
 top_level_deps([]) -> [];
 top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
     [{list_to_atom(Name), Vsn, Ref} | top_level_deps(Deps)];
-top_level_deps([{{pkg, Name, Vsn, _URL}, _} | Deps]) ->
+top_level_deps([{{pkg, Name, Vsn}, _} | Deps]) ->
     [{list_to_atom(Name), Vsn} | top_level_deps(Deps)].
 
 mock_deps(git, Deps, Upgrades) ->
@@ -381,7 +381,7 @@ vsn_from_ref({git, _, {_, Vsn}}) -> Vsn;
 vsn_from_ref({git, _, Vsn}) -> Vsn.
 
 flat_pkgdeps([]) -> [];
-flat_pkgdeps([{{pkg, Name, Vsn, _Url}, Deps} | Rest]) ->
+flat_pkgdeps([{{pkg, Name, Vsn}, Deps} | Rest]) ->
     [{{iolist_to_binary(Name),iolist_to_binary(Vsn)}, top_level_deps(Deps)}]
     ++
     flat_pkgdeps(Deps)
@@ -396,10 +396,10 @@ expand_deps(git, [{Name, Vsn, Deps} | Rest]) ->
     Dep = {Name, Vsn, {git, "https://example.org/user/"++Name++".git", {tag, Vsn}}},
     [{Dep, expand_deps(git, Deps)} | expand_deps(git, Rest)];
 expand_deps(pkg, [{Name, Deps} | Rest]) ->
-    Dep = {pkg, Name, "0.0.0", "https://example.org/user/"++Name++".tar.gz"},
+    Dep = {pkg, Name, "0.0.0"},
     [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)];
 expand_deps(pkg, [{Name, Vsn, Deps} | Rest]) ->
-    Dep = {pkg, Name, Vsn, "https://example.org/user/"++Name++".tar.gz"},
+    Dep = {pkg, Name, Vsn},
     [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)].
 
 normalize_unlocks({App, Locks}) ->
@@ -472,4 +472,3 @@ run(Config) ->
     rebar_test_utils:run_and_check(
         Config, NewRebarConfig, ["upgrade", App], Expectation
     ).
-

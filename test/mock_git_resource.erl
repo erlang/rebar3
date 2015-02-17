@@ -103,7 +103,7 @@ mock_download(Opts) ->
     Overrides = proplists:get_value(override_vsn, Opts, []),
     meck:expect(
         ?MOD, download,
-        fun (Dir, Git) ->
+        fun (Dir, Git, _) ->
             filelib:ensure_dir(Dir),
             {git, Url, {_, Vsn}} = normalize_git(Git, Overrides, Default),
             App = app(Url),
