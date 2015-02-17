@@ -56,19 +56,14 @@ do(State) ->
     true = code:add_patha(OutDir),
     CTOpts = resolve_ct_opts(State, Opts, OutDir),
     Verbose = proplists:get_value(verbose, Opts, false),
-    Result = run_test(CTOpts, Verbose),
+    run_test(CTOpts, Verbose),
     true = code:set_path(Path),
-    case Result of
-        {error, Reason} ->
-            {error, {?MODULE, Reason}};
-        ok ->
-            {ok, State}
-    end.
+    {ok, State}.
 
 -spec format_error(any()) -> iolist().
-format_error({failures_running_tests, FailedCount}) ->
-    io_lib:format("Failures occured running tests: ~p", [FailedCount]);
-format_error({error_running_tests, Reason}) ->
+format_error(error) ->
+    io_lib:format("Error running tests", []);
+format_error({error, Reason}) ->
     io_lib:format("Error running tests: ~p", [Reason]).
 
 run_test(CTOpts, true) ->
@@ -356,8 +351,10 @@ handle_results([Result|Results]) when is_list(Results) ->
         Error ->
             Error
     end;
+handle_results(error) ->
+    ?WARN("Error running tests", []);
 handle_results({error, Reason}) ->
-    {error, {error_running_tests, Reason}};
+    ?WARN("Error running tests: ~p", [Reason]);
 handle_results(_) -> ok.
 
 handle_quiet_results(_, {Passed, 0, {0, 0}}) ->
