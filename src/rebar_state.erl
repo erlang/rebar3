@@ -97,7 +97,9 @@ new(ParentState, Config, Dir) ->
                         D = proplists:get_value(deps, Config, []),
                         dict:from_list([{{deps, default}, D} | Config])
                 end,
-    NewOpts = dict:merge(fun(_Key, Value1, _Value2) ->
+    NewOpts = dict:merge(fun(erl_opts, _Value1, Value2) ->
+                                 Value2;
+                             (_Key, Value1, _Value2) ->
                                  Value1
                          end, LocalOpts, Opts),
     ParentState#state_t{dir=Dir
