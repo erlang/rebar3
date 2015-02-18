@@ -265,9 +265,11 @@ opts_changed(Opts, Target) ->
     case code:load_abs(ObjectFile) of
         {module, Mod} ->
             Compile = Mod:module_info(compile),
+            %% dialyzer and eunit have trouble without the next two lines
+            code:delete(Mod),
+            code:purge(Mod),
             lists:sort(Opts) =/= lists:sort(proplists:get_value(options,
-                                                                Compile,
-                                                                undefined));
+                                                                Compile));
         {error, nofile} -> true
     end.
 
