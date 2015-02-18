@@ -76,9 +76,9 @@ run_test(CTOpts, true) ->
 run_test(CTOpts, false) ->
     Pid = self(),
     LogDir = proplists:get_value(logdir, CTOpts),
-    erlang:spawn(fun() ->
+    erlang:spawn_monitor(fun() ->
         {ok, F} = file:open(filename:join([LogDir, "ct.latest.log"]),
-                             [write]),
+                            [write]),
         true = group_leader(F, self()),
         Pid ! ct:run_test(CTOpts)
     end),
@@ -369,4 +369,6 @@ handle_quiet_results(CTOpts, {_, Failed, _}) ->
     LogDir = proplists:get_value(logdir, CTOpts),
     Index = filename:join([LogDir, "index.html"]),
     io:format("  ~p tests failed.~n  Results written to ~p.~n", [Failed, Index]);
+handle_quiet_results(_CTOpts, {'DOWN', _, _, _, Reason}) ->
+    handle_results({error, Reason});
 handle_quiet_results(_CTOpts, Result) -> handle_results(Result).
