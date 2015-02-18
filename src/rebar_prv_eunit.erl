@@ -56,19 +56,14 @@ do(State) ->
     EUnitOpts = resolve_eunit_opts(State, Opts),
     AppsToTest = [{application, erlang:binary_to_atom(rebar_app_info:name(App), unicode)}
                   || App <- TestApps],
-    Result = eunit:test(AppsToTest, EUnitOpts),
+    handle_results(eunit:test(AppsToTest, EUnitOpts)),
     true = code:set_path(Path),
-    case handle_results(Result) of
-        {error, Reason} ->
-            {error, {?MODULE, Reason}};
-        ok ->
-            {ok, State}
-    end.
+    {ok, State}.
 
 -spec format_error(any()) -> iolist().
-format_error(unknown_error) ->
+format_error(error) ->
     io_lib:format("Error running tests", []);
-format_error({error_running_tests, Reason}) ->
+format_error({error, Reason}) ->
     io_lib:format("Error running tests: ~p", [Reason]).
 
 eunit_opts(_State) ->
@@ -172,8 +167,8 @@ maybe_compile_extra_tests(TestApps, State, OutDir) ->
         _ -> ok
     end.
 
-handle_results(ok) -> ok;
 handle_results(error) ->
-    {error, unknown_error};
+    ?WARN("Error running tests", []);
 handle_results({error, Reason}) ->
-    {error, {error_running_tests, Reason}}.
+    ?WARN("Error running tests: ~p", [Reason]);
+handle_results(_) -> ok.
