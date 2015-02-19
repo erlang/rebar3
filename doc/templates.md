@@ -17,7 +17,7 @@
 
 ## Global Variables
 
-Global variables can be set by editing the file at `$HOME/.rebar3/templates/globals`:
+Global variables can be set by editing the file at `$HOME/.config/rebar3/templates/globals`:
 
     {variables, [
         {author_name, "My Name Is A String"},
@@ -29,7 +29,7 @@ This will let you define variables for all templates.
 
 Variables left undefined will be ignored and revert to the default value.
 
-The override order for these variables will be: Defaults < $HOME/.rebar3/templates/globals < command line invocation.
+The override order for these variables will be: Defaults < $HOME/.config/rebar3/templates/globals < command line invocation.
 
 ## Batteries-Included Templates ##
 
@@ -77,7 +77,7 @@ Then go to the directory created for the project by rebar3.
 
 ## Custom Templates ##
 
-Custom templates can be added in `$HOME/.rebar3/templates/`. Each template is at least two files:
+Custom templates can be added in `$HOME/.config/rebar3/templates/`. Each template is at least two files:
 
 - `my_template.dtl`: There can be many of these files. They are regular Erlang files using the django template syntax for variable replacements.
 - `my_template.template`; Called the *template index*, there is one per template callable from `rebar3`. This one will be visible when calling `rebar3 new my_template`. This file regroups the different \*.dtl files into a more cohesive template.
@@ -112,7 +112,7 @@ Specifically:
 
 ### Example ###
 
-As an example, we'll create a template for Common Test test suites. Create the directory structure `~/.rebar/templates/` and then go in there.
+As an example, we'll create a template for Common Test test suites. Create the directory structure `~/.config/rebar/templates/` and then go in there.
 
 We'll start with an index for our template, called `ct_suite.template`:
 
@@ -173,7 +173,7 @@ Let's look at the details:
 
     → ./rebar3 new help ct_suite
     ct_suite:
-            custom template (/home/ferd/.rebar3/templates/ct_suite.template)
+            custom template (/home/ferd/.config/rebar3/templates/ct_suite.template)
             Description: A basic Common Test suite for an OTP application
             Variables:
                     name="suite" (Name of the suite, prepended to the standard _SUITE suffix)
