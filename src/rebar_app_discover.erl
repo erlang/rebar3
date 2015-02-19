@@ -17,12 +17,14 @@ do(State, LibDirs) ->
     Apps = find_apps(Dirs, all),
     ProjectDeps = rebar_state:deps_names(State),
 
+    %% Sort apps so we get the same merged deps config everytime
+    SortedApps = rebar_utils:sort_deps(Apps),
     lists:foldl(fun(AppInfo, StateAcc) ->
                         StateAcc1 = merge_deps(AppInfo, StateAcc),
                         ProjectDeps1 = lists:delete(rebar_app_info:name(AppInfo), ProjectDeps),
                         rebar_state:project_apps(StateAcc1
                                                 ,rebar_app_info:deps(AppInfo, ProjectDeps1))
-                end, State, Apps).
+                end, State, SortedApps).
 
 format_error({module_list, File}) ->
     io_lib:format("Error reading module list from ~p~n", [File]);
