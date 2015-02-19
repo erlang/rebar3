@@ -54,6 +54,7 @@ compile(State, App) ->
     validate_app(State2, App1).
 
 
+
 format_error({file_read, File, Reason}) ->
     io_lib:format("Failed to read ~s for processing: ~p", [File, Reason]);
 format_error({invalid_name, File, AppName}) ->
