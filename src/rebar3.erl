@@ -142,15 +142,7 @@ init_config() ->
                      rebar_config:consult_file(ConfigFile)
              end,
 
-    Config1 = case rebar_config:consult_file(?LOCK_FILE) of
-                  [D] ->
-                      %% We want the top level deps only from the lock file.
-                      %% This ensures deterministic overrides for configs.
-                      Deps = [X || X <- D, element(3, X) =:= 0],
-                      [{{locks, default}, D}, {{deps, default}, Deps} | Config];
-                  _ ->
-                      Config
-              end,
+    Config1 = rebar_config:merge_locks(Config, rebar_config:consult_file(?LOCK_FILE)),
 
     %% If $HOME/.rebar3/config exists load and use as global config
     Home = rebar_dir:home_dir(),
@@ -228,8 +220,6 @@ version() ->
     {ok, Vsn} = application:get_key(rebar, vsn),
     ?CONSOLE("rebar ~s on Erlang/OTP ~s Erts ~s",
              [Vsn, erlang:system_info(otp_release), erlang:system_info(version)]).
-
-
 
 %% TODO: Actually make it 'global'
 %%
