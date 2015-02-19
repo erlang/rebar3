@@ -357,10 +357,10 @@ upgrades(delete_d) ->
 %% running the upgrade code is enough to properly upgrade things.
 
 top_level_deps([]) -> [];
-top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
-    [{list_to_atom(Name), Vsn, Ref} | top_level_deps(Deps)];
 top_level_deps([{{pkg, Name, Vsn}, _} | Deps]) ->
-    [{list_to_atom(Name), Vsn} | top_level_deps(Deps)].
+    [{list_to_atom(Name), Vsn} | top_level_deps(Deps)];
+top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
+    [{list_to_atom(Name), Vsn, Ref} | top_level_deps(Deps)].
 
 mock_deps(git, Deps, Upgrades) ->
     catch mock_git_resource:unmock(),
