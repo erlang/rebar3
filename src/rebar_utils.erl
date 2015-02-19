@@ -26,7 +26,8 @@
 %% -------------------------------------------------------------------
 -module(rebar_utils).
 
--export([droplast/1,
+-export([sort_deps/1,
+         droplast/1,
          filtermap/2,
          is_arch/1,
          sh/2,
@@ -56,10 +57,19 @@
 -include("rebar.hrl").
 
 -define(ONE_LEVEL_INDENT, "     ").
+-define(APP_NAME_INDEX, 2).
 
 %% ====================================================================
 %% Public API
 %% ====================================================================
+
+sort_deps(Deps) ->
+    %% We need a sort stable, based on the name. So that for multiple deps on
+    %% the same level with the same name, we keep the order the parents had.
+    %% `lists:keysort/2' is documented as stable in the stdlib.
+    %% The list of deps is revered when we get it. For the proper stable
+    %% result, re-reverse it.
+    lists:keysort(?APP_NAME_INDEX, lists:reverse(Deps)).
 
 droplast(L) ->
     lists:reverse(tl(lists:reverse(L))).

@@ -44,8 +44,6 @@
 -define(PROVIDER, install_deps).
 -define(DEPS, [app_discovery]).
 
--define(APP_NAME_INDEX, 2).
-
 -type src_dep() :: {atom(), {atom(), string(), string()}}
              | {atom(), string(), {atom(), string(), string()}}.
 -type pkg_dep() :: {atom(), binary()} | atom().
@@ -267,7 +265,7 @@ update_src_deps(Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen,
                                                        ,StateAcc
                                                        ,LocksAcc),
 
-                                    {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2, SeenAcc, LocksAcc1}
+                                             {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2, SeenAcc, LocksAcc1}
                                      end;
                                  false ->
                                      {SeenAcc1, StateAcc1} = maybe_lock(Profile, AppInfo, SeenAcc, StateAcc, Level),
@@ -296,7 +294,7 @@ update_src_deps(Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen,
                              end
                      end,
                      {[], PkgDeps, SrcApps, State, Seen, Locks},
-                     sort_deps(SrcDeps)) of
+                     rebar_utils:sort_deps(SrcDeps)) of
         {[], NewPkgDeps, NewSrcApps, State1, Seen1, _NewLocks} ->
             {State1, NewSrcApps, NewPkgDeps, Seen1};
         {NewSrcDeps, NewPkgDeps, NewSrcApps, State1, Seen1, NewLocks} ->
@@ -485,14 +483,6 @@ maybe_upgrade(AppInfo, AppDir, true, State) ->
         false ->
             false
     end.
-
-sort_deps(Deps) ->
-    %% We need a sort stable, based on the name. So that for multiple deps on
-    %% the same level with the same name, we keep the order the parents had.
-    %% `lists:keysort/2' is documented as stable in the stdlib.
-    %% The list of deps is revered when we get it. For the proper stable
-    %% result, re-reverse it.
-    lists:keysort(?APP_NAME_INDEX, lists:reverse(Deps)).
 
 -spec parse_goal(binary(), binary()) -> pkg_dep().
 parse_goal(Name, Constraint) ->
