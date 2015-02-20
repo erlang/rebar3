@@ -1,0 +1,52 @@
+-module(rebar_release_SUITE).
+-compile(export_all).
+-include_lib("common_test/include/ct.hrl").
+-include_lib("eunit/include/eunit.hrl").
+
+all() -> [release, tar].
+
+init_per_testcase(Case, Config0) ->
+    Config = rebar_test_utils:init_rebar_state(Config0),
+    Name = rebar_test_utils:create_random_name(atom_to_list(Case)),
+    AppDir = ?config(apps, Config),
+    application:load(rebar),
+
+    ok = ec_file:mkdir_p(AppDir),
+    State = rebar_state:new([{base_dir, filename:join([AppDir, "_build"])}]),
+
+    rebar_test_utils:create_app(AppDir, Name, "1.0.0", [kernel, stdlib]),
+    [{name, Name}, {apps, AppDir}, {state, State} | Config].
+
+end_per_testcase(_, Config) ->
+    meck:unload(),
+    Config.
+
+release(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = ?config(name, Config),
+    Vsn = "1.0.0",
+    {ok, RebarConfig} =
+        file:consult(rebar_test_utils:create_config(AppDir,
+                                                    [{relx, [{release, {list_to_atom(Name), Vsn},
+                                                              [list_to_atom(Name)]},
+                                                             {lib_dirs, [AppDir]}]}])),
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig,
+      ["release"],
+      {ok, [{release, list_to_atom(Name), Vsn}]}
+     ).
+
+tar(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = ?config(name, Config),
+    Vsn = "1.0.0",
+    {ok, RebarConfig} =
+        file:consult(rebar_test_utils:create_config(AppDir,
+                                                    [{relx, [{release, {list_to_atom(Name), Vsn},
+                                                              [list_to_atom(Name)]},
+                                                             {lib_dirs, [AppDir]}]}])),
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig,
+      ["tar"],
+      {ok, [{release, list_to_atom(Name), Vsn}, {tar, Name, Vsn}]}
+     ).

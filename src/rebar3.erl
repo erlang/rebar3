@@ -76,7 +76,8 @@ main(Args) ->
 run(BaseState, Commands) ->
     _ = application:load(rebar),
     BaseState1 = rebar_state:set(BaseState, task, Commands),
-    run_aux(BaseState1, [], Commands).
+    BaseState2 = rebar_state:set(BaseState1, caller, api),
+    run_aux(BaseState2, [], Commands).
 
 %% ====================================================================
 %% Internal functions
@@ -84,7 +85,9 @@ run(BaseState, Commands) ->
 
 run(RawArgs) ->
     _ = application:load(rebar),
-    {GlobalPluginProviders, BaseConfig} = init_config(),
+
+    {GlobalPluginProviders, BaseState} = init_config(),
+    BaseState1 = rebar_state:set(BaseState, caller, command_line),
 
     case erlang:system_info(version) of
         "6.1" ->
@@ -94,8 +97,8 @@ run(RawArgs) ->
             ok
     end,
 
-    {BaseConfig1, _Args1} = set_options(BaseConfig, {[], []}),
-    run_aux(BaseConfig1, GlobalPluginProviders, RawArgs).
+    {BaseState2, _Args1} = set_options(BaseState1, {[], []}),
+    run_aux(BaseState2, GlobalPluginProviders, RawArgs).
 
 run_aux(State, GlobalPluginProviders, RawArgs) ->
     %% Make sure crypto is running

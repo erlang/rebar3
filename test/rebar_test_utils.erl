@@ -115,6 +115,7 @@ check_results(AppDir, Expected) ->
     DepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Deps],
     Checkouts = rebar_app_discover:find_apps([CheckoutsDir], all),
     CheckoutsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Checkouts],
+
     lists:foreach(
         fun({app, Name}) ->
                 ct:pal("Name: ~p", [Name]),
@@ -167,6 +168,29 @@ check_results(AppDir, Expected) ->
                         ?assertEqual(iolist_to_binary(Vsn),
                                      iolist_to_binary(LockVsn))
                 end
+        ;  ({release, Name, Vsn}) ->
+                ct:pal("Release: ~p-~s", [Name, Vsn]),
+                {ok, Cwd} = file:get_cwd(),
+                try
+                    file:set_cwd(AppDir),
+                    ReleaseDir = filename:join([AppDir, "_build", "rel"]),
+                    RelxState = rlx_state:new("", [], []),
+                    RelxState1 = rlx_state:base_output_dir(RelxState, ReleaseDir),
+                    {ok, RelxState2} = rlx_prv_app_discover:do(RelxState1),
+                    {ok, RelxState3} = rlx_prv_rel_discover:do(RelxState2),
+
+                    %% throws not_found if it doesn't exist
+                    rlx_state:get_realized_release(RelxState3, Name, Vsn)
+                catch
+                    _ ->
+                        ct:fail(release_not_found)
+                after
+                    file:set_cwd(Cwd)
+                end
+        ;  ({tar, Name, Vsn}) ->
+                ct:pal("Tarball: ~s-~s", [Name, Vsn]),
+                TarballWildcard = filename:join([AppDir, "**", Name++"-"++Vsn++".tar.gz"]),
+                ?assertNotEqual([], filelib:wildcard(TarballWildcard))
         end, Expected).
 
 write_src_file(Dir, Name) ->
