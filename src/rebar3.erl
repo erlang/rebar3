@@ -144,9 +144,8 @@ init_config() ->
 
     Config1 = rebar_config:merge_locks(Config, rebar_config:consult_file(?LOCK_FILE)),
 
-    %% If $HOME/.rebar3/config exists load and use as global config
-    Home = rebar_dir:home_dir(),
-    GlobalConfigFile = filename:join([Home, ?CONFIG_DIR, "config"]),
+    %% If $HOME/.config/rebar3/config exists load and use as global config
+    GlobalConfigFile = rebar_dir:global_config(),
     State = case filelib:is_regular(GlobalConfigFile) of
                 true ->
                     ?DEBUG("Load global config file ~p",

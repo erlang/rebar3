@@ -48,13 +48,13 @@ new(Template, Vars, Force, State) ->
     ?DEBUG("Looking for ~p~n", [Template]),
     case lists:keyfind(Template, 1, AvailTemplates) of
         false -> {not_found, Template};
-        TemplateTup -> create(TemplateTup, Files, Vars, Force)
+        TemplateTup -> create(TemplateTup, Files, Vars, Force, State)
     end.
 
 %% Give a list of templates with their expanded content
 list_templates(State) ->
     {AvailTemplates, Files} = find_templates(State),
-    [list_template(Files, Template) || Template <- AvailTemplates].
+    [list_template(Files, Template, State) || Template <- AvailTemplates].
 
 %% ===================================================================
 %% Rendering API / legacy?
@@ -89,11 +89,11 @@ render(Template, Context) ->
 %% ===================================================================
 
 %% Expand a single template's value
-list_template(Files, {Name, Type, File}) ->
+list_template(Files, {Name, Type, File}, State) ->
     TemplateTerms = consult(load_file(Files, Type, File)),
     {Name, Type, File,
      get_template_description(TemplateTerms),
-     get_template_vars(TemplateTerms)}.
+     get_template_vars(TemplateTerms, State)}.
 
 %% Load up the template description out from a list of attributes read in
 %% a .template file.
@@ -105,12 +105,12 @@ get_template_description(TemplateTerms) ->
 
 %% Load up the variables out from a list of attributes read in a .template file
 %% and return them merged with the globally-defined and default variables.
-get_template_vars(TemplateTerms) ->
+get_template_vars(TemplateTerms, State) ->
     Vars = case lists:keyfind(variables, 1, TemplateTerms) of
         {_, Value} -> Value;
         false -> []
     end,
-    override_vars(Vars, override_vars(global_variables(), default_variables())).
+    override_vars(Vars, override_vars(global_variables(State), default_variables())).
 
 %% Provide a way to merge a set of variables with another one. The left-hand
 %% set of variables takes precedence over the right-hand set.
@@ -142,9 +142,8 @@ default_variables() ->
 
 %% Load variable definitions from the 'Globals' file in the home template
 %% directory
-global_variables() ->
-    Home = rebar_dir:home_dir(),
-    GlobalFile = filename:join([Home, ?CONFIG_DIR, "templates", "globals"]),
+global_variables(State) ->
+    GlobalFile = rebar_dir:template_globals(State),
     case file:consult(GlobalFile) of
         {error, enoent} -> [];
         {ok, Data} -> proplists:get_value(variables, Data, [])
@@ -157,9 +156,9 @@ drop_var_docs([{K,V}|Rest]) -> [{K,V} | drop_var_docs(Rest)].
 
 %% Load the template index, resolve all variables, and then execute
 %% the template.
-create({Template, Type, File}, Files, UserVars, Force) ->
+create({Template, Type, File}, Files, UserVars, Force, State) ->
     TemplateTerms = consult(load_file(Files, Type, File)),
-    Vars = drop_var_docs(override_vars(UserVars, get_template_vars(TemplateTerms))),
+    Vars = drop_var_docs(override_vars(UserVars, get_template_vars(TemplateTerms, State))),
     TemplateCwd = filename:dirname(File),
     execute_template(TemplateTerms, Files, {Template, Type, TemplateCwd}, Vars, Force).
 
@@ -270,8 +269,7 @@ find_escript_templates(Files) ->
 %% Fetch template indexes that sit on disk in the user's HOME
 find_disk_templates(State) ->
     OtherTemplates = find_other_templates(State),
-    Home = rebar_dir:home_dir(),
-    HomeFiles = rebar_utils:find_files(filename:join([Home, ?CONFIG_DIR, "templates"]),
+    HomeFiles = rebar_utils:find_files(rebar_dir:template_dir(State),
                                        ?TEMPLATE_RE, true), % recursive
     [{file, F} || F <- OtherTemplates ++ HomeFiles].
 

@@ -12,7 +12,7 @@
 
 -spec get_packages(rebar_state:t()) -> {rebar_dict(), rebar_digraph()}.
 get_packages(State) ->
-    RebarDir = rebar_dir:global_config_dir(State),
+    RebarDir = rebar_dir:global_cache_dir(State),
     RegistryDir = filename:join(RebarDir, "packages"),
     DictFile = filename:join(RegistryDir, "dict"),
     Edges = filename:join(RegistryDir, "edges"),
