@@ -270,7 +270,7 @@ opts_changed(Opts, Target) ->
             code:purge(Mod),
             lists:sort(Opts) =/= lists:sort(proplists:get_value(options,
                                                                 Compile));
-        {error, nofile} -> true
+        {error, _} -> true
     end.
 
 check_erlcinfo(_Config, #erlcinfo{vsn=?ERLCINFO_VSN}) ->
