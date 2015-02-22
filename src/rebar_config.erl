@@ -60,7 +60,7 @@ consult_file(File) ->
             end
     end.
 
-merge_locks(Config, []) ->
+merge_locks(Config, [[]]) ->
     Config;
 merge_locks(Config, [Locks]) ->
     {deps, ConfigDeps} = lists:keyfind(deps, 1, Config),
