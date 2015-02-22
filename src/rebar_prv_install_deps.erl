@@ -306,8 +306,7 @@ update_unseen_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State,
             handle_upgrade(AppInfo, SrcDeps, PkgDeps, SrcApps,
                            Level, State1, Locks);
         _ ->
-            %% why do we use the old state there?
-            maybe_fetch(AppInfo, false, Seen, State),
+            maybe_fetch(AppInfo, false, Seen, State1),
             handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps,
                        Level, State1, Locks)
     end,
