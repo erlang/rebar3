@@ -189,8 +189,8 @@ check_results(AppDir, Expected) ->
                 end
         ;  ({tar, Name, Vsn}) ->
                 ct:pal("Tarball: ~s-~s", [Name, Vsn]),
-                TarballWildcard = filename:join([AppDir, "**", Name++"-"++Vsn++".tar.gz"]),
-                ?assertNotEqual([], filelib:wildcard(TarballWildcard))
+                Tarball = filename:join([AppDir, "_build", "rel", Name, Name++"-"++Vsn++".tar.gz"]),
+                ?assertNotEqual([], filelib:is_file(Tarball))
         end, Expected).
 
 write_src_file(Dir, Name) ->
