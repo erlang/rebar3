@@ -74,15 +74,7 @@ do(State) ->
         ProjectApps = rebar_state:project_apps(State),
 
         {Apps, State1} =
-            lists:foldl(fun(Profile, {AppsAcc, StateAcc}) ->
-                                Locks = rebar_state:get(StateAcc, {locks, Profile}, []),
-                                {ok, NewApps, NewState} =
-                                    handle_deps(Profile
-                                               ,StateAcc
-                                               ,rebar_state:get(StateAcc, {deps, Profile}, [])
-                                               ,Locks),
-                                {NewApps++AppsAcc, NewState}
-                        end, {[], State}, lists:reverse(Profiles)),
+            lists:foldl(fun deps_per_profile/2, {[], State}, lists:reverse(Profiles)),
 
         Source = ProjectApps ++ Apps,
         case find_cycles(Source) of
@@ -91,11 +83,9 @@ do(State) ->
             {error, Error} ->
                 {error, Error};
             no_cycle ->
-                case rebar_digraph:compile_order(Source) of
-                    {ok, Sort} ->
-                        {ok, rebar_state:deps_to_build(State1,
-                                                    lists:dropwhile(fun rebar_app_info:valid/1,
-                                                                    Sort -- ProjectApps))};
+                case compile_order(Source, ProjectApps) of
+                    {ok, ToCompile} ->
+                        {ok, rebar_state:deps_to_build(State1, ToCompile)};
                     {error, Error} ->
                         {error, Error}
                 end
@@ -104,13 +94,6 @@ do(State) ->
         %% maybe_fetch will maybe_throw an exception to break out of some loops
         _:{error, Reason} ->
             {error, Reason}
-    end.
-
-find_cycles(Apps) ->
-    case rebar_digraph:compile_order(Apps) of
-        {error, {cycles, Cycles}} -> {cycles, Cycles};
-        {error, Error} -> {error, Error};
-        {ok, _} -> no_cycle
     end.
 
 -spec format_error(any()) -> iolist().
@@ -155,22 +138,8 @@ handle_deps(Profile, State, Deps, Upgrade, Locks) ->
     {State1, SrcApps, PkgDeps1, Seen} =
         update_src_deps(Profile, 0, SrcDeps, PkgDeps, [], State, Upgrade, sets:new(), Locks),
 
-    {Solved, State2} = case PkgDeps1 of
-                           [] -> %% No pkg deps
-                               {[], State1};
-                           PkgDeps2 ->
-                               %% Find pkg deps needed
-                               S = case rebar_digraph:cull_deps(Graph, PkgDeps2) of
-                                       {ok, [], _} ->
-                                           throw({rebar_digraph, no_solution});
-                                       {ok, Solution, []} ->
-                                           Solution;
-                                       {ok, Solution, Discarded} ->
-                                           [warn_skip_pkg(Pkg) || Pkg <- Discarded],
-                                           Solution
-                                   end,
-                               update_pkg_deps(Profile, S, Packages, Upgrade, Seen, State1)
-                       end,
+    {Solved, State2} =
+        update_pkg_deps(Profile, Packages, PkgDeps1, Graph, Upgrade, Seen, State1),
 
     AllDeps = lists:ukeymerge(2
                              ,lists:ukeysort(2, SrcApps)
@@ -184,33 +153,74 @@ handle_deps(Profile, State, Deps, Upgrade, Locks) ->
 %% Internal functions
 %% ===================================================================
 
+deps_per_profile(Profile, {Apps, State}) ->
+    Locks = rebar_state:get(State, {locks, Profile}, []),
+    ProfileDeps = rebar_state:get(State, {deps, Profile}, []),
+    {ok, NewApps, NewState} = handle_deps(Profile, State, ProfileDeps, Locks),
+    {NewApps++Apps, NewState}.
+
+find_cycles(Apps) ->
+    case rebar_digraph:compile_order(Apps) of
+        {error, {cycles, Cycles}} -> {cycles, Cycles};
+        {error, Error} -> {error, Error};
+        {ok, _} -> no_cycle
+    end.
+
+compile_order(Source, ProjectApps) ->
+    case rebar_digraph:compile_order(Source) of
+        {ok, Sort} ->
+            %% Valid apps are compiled and good
+            {ok, lists:dropwhile(fun rebar_app_info:valid/1, Sort -- ProjectApps)};
+        {error, Error} ->
+            {error, Error}
+    end.
+
+update_pkg_deps(Profile, Packages, PkgDeps, Graph, Upgrade, Seen, State) ->
+    case PkgDeps of
+        [] -> %% No pkg deps
+            {[], State};
+        PkgDeps ->
+            %% Find pkg deps needed
+            S = case rebar_digraph:cull_deps(Graph, PkgDeps) of
+                {ok, [], _} ->
+                    throw({rebar_digraph, no_solution});
+                {ok, Solution, []} ->
+                    Solution;
+                {ok, Solution, Discarded} ->
+                    [warn_skip_pkg(Pkg) || Pkg <- Discarded],
+                    Solution
+            end,
+            update_pkg_deps(Profile, S, Packages, Upgrade, Seen, State)
+    end.
+
 update_pkg_deps(Profile, Pkgs, Packages, Upgrade, Seen, State) ->
     %% Create app_info record for each pkg dep
     DepsDir = rebar_dir:deps_dir(State),
     {Solved, _, State1}
         = lists:foldl(fun(Pkg, {Acc, SeenAcc, StateAcc}) ->
-                              AppInfo = package_to_app(DepsDir
-                                                      ,Packages
-                                                      ,Pkg),
-                              {SeenAcc1, StateAcc1} = maybe_lock(Profile, AppInfo, SeenAcc, StateAcc, 0),
-                              case maybe_fetch(AppInfo, Upgrade, SeenAcc1, State) of
-                                  true ->
-                                      {[AppInfo | Acc], SeenAcc1, StateAcc1};
-                                  false ->
-                                      {Acc, SeenAcc1, StateAcc1}
-                              end
+                        handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Acc, SeenAcc, StateAcc)
                       end, {[], Seen, State}, Pkgs),
     {Solved, State1}.
 
+handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Fetched, Seen, State) ->
+    AppInfo = package_to_app(DepsDir, Packages, Pkg),
+    {NewSeen, NewState} = maybe_lock(Profile, AppInfo, Seen, State, 0),
+    case maybe_fetch(AppInfo, Upgrade, NewSeen, NewState) of
+        true ->
+            {[AppInfo | Fetched], NewSeen, NewState};
+        false ->
+            {Fetched, NewSeen, NewState}
+    end.
+
+
 maybe_lock(Profile, AppInfo, Seen, State, Level) ->
-    Name = rebar_app_info:name(AppInfo),
     case Profile of
         default ->
+            Name = rebar_app_info:name(AppInfo),
             case sets:is_element(Name, Seen) of
                 false ->
-                    AppName = rebar_app_info:name(AppInfo),
                     Locks = rebar_state:lock(State),
-                    case lists:any(fun(App) -> rebar_app_info:name(App) =:= AppName end, Locks) of
+                    case lists:any(fun(App) -> rebar_app_info:name(App) =:= Name end, Locks) of
                         true ->
                             {sets:add_element(Name, Seen), State};
                         false ->
@@ -239,67 +249,69 @@ package_to_app(DepsDir, Packages, {Name, Vsn}) ->
 
 -spec update_src_deps(atom(), non_neg_integer(), list(), list(), list(), rebar_state:t(), boolean(), sets:set(binary()), list()) -> {rebar_state:t(), list(), list(), sets:set(binary())}.
 update_src_deps(Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, Locks) ->
-    case lists:foldl(fun(AppInfo, {SrcDepsAcc, PkgDepsAcc, SrcAppsAcc, StateAcc, SeenAcc, LocksAcc}) ->
-                             %% If not seen, add to list of locks to write out
-                             Name = rebar_app_info:name(AppInfo),
-                             case sets:is_element(Name, SeenAcc) of
-                                 true ->
-                                     %% If from lock file don't print warning about skipping
-                                     case lists:keymember(Name, 1, Locks) of
-                                         false ->
-                                             warn_skip_deps(AppInfo);
-                                         true ->
-                                             ok
-                                     end,
-                                     %% scan for app children here if upgrading
-                                     case Upgrade of
-                                        false ->
-                                            {SrcDepsAcc, PkgDepsAcc, SrcAppsAcc, StateAcc, SeenAcc, LocksAcc};
-                                        true ->
-                                            {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2, LocksAcc1} =
-                                            handle_dep(AppInfo
-                                                       ,SrcDepsAcc
-                                                       ,PkgDepsAcc
-                                                       ,SrcAppsAcc
-                                                       ,Level
-                                                       ,StateAcc
-                                                       ,LocksAcc),
-
-                                             {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2, SeenAcc, LocksAcc1}
-                                     end;
-                                 false ->
-                                     {SeenAcc1, StateAcc1} = maybe_lock(Profile, AppInfo, SeenAcc, StateAcc, Level),
-                                     {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2, LocksAcc1} =
-                                         case Upgrade of
-                                             true ->
-                                             %{true, UpgradeName, UpgradeLevel} ->
-                                                 handle_upgrade(AppInfo
-                                                              ,SrcDepsAcc
-                                                              ,PkgDepsAcc
-                                                              ,SrcAppsAcc
-                                                              ,Level
-                                                              ,StateAcc1
-                                                              ,LocksAcc);
-                                             _ ->
-                                                 maybe_fetch(AppInfo, false, SeenAcc, StateAcc),
-                                                 handle_dep(AppInfo
-                                                           ,SrcDepsAcc
-                                                           ,PkgDepsAcc
-                                                           ,SrcAppsAcc
-                                                           ,Level
-                                                           ,StateAcc1
-                                                           ,LocksAcc)
-                                         end,
-                                     {SrcDepsAcc1, PkgDepsAcc1, SrcAppsAcc1, StateAcc2, SeenAcc1, LocksAcc1}
-                             end
-                     end,
-                     {[], PkgDeps, SrcApps, State, Seen, Locks},
-                     rebar_utils:sort_deps(SrcDeps)) of
+    case lists:foldl(
+            fun(AppInfo, {SrcDepsAcc, PkgDepsAcc, SrcAppsAcc, StateAcc, SeenAcc, LocksAcc}) ->
+                    update_src_dep(AppInfo, Profile, Level,
+                                   SrcDepsAcc, PkgDepsAcc, SrcAppsAcc, StateAcc,
+                                   Upgrade, SeenAcc, Locks, LocksAcc)
+            end,
+            {[], PkgDeps, SrcApps, State, Seen, Locks},
+            rebar_utils:sort_deps(SrcDeps)) of
         {[], NewPkgDeps, NewSrcApps, State1, Seen1, _NewLocks} ->
             {State1, NewSrcApps, NewPkgDeps, Seen1};
         {NewSrcDeps, NewPkgDeps, NewSrcApps, State1, Seen1, NewLocks} ->
             update_src_deps(Profile, Level+1, NewSrcDeps, NewPkgDeps, NewSrcApps, State1, Upgrade, Seen1, NewLocks)
     end.
+
+update_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, BaseLocks, Locks) ->
+    %% If not seen, add to list of locks to write out
+    Name = rebar_app_info:name(AppInfo),
+    case sets:is_element(Name, Seen) of
+        true ->
+            update_seen_src_dep(AppInfo, Level,
+                                SrcDeps, PkgDeps, SrcApps,
+                                State, Upgrade, Seen, BaseLocks, Locks);
+        false ->
+            update_unseen_src_dep(AppInfo, Profile, Level,
+                                  SrcDeps, PkgDeps, SrcApps,
+                                  State, Upgrade, Seen, Locks)
+
+    end.
+
+update_seen_src_dep(AppInfo, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, BaseLocks, Locks) ->
+    Name = rebar_app_info:name(AppInfo),
+    %% If seen from lock file don't print warning about skipping
+    case lists:keymember(Name, 1, BaseLocks) of
+        false ->
+            warn_skip_deps(AppInfo);
+        true ->
+            ok
+    end,
+    %% scan for app children here if upgrading
+    case Upgrade of
+        false ->
+            {SrcDeps, PkgDeps, SrcApps, State, Seen, Locks};
+        true ->
+            {NewSrcDeps, NewPkgDeps, NewSrcApps, NewState, NewLocks}
+            = handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps,
+                         Level, State, Locks),
+            {NewSrcDeps, NewPkgDeps, NewSrcApps, NewState, Seen, NewLocks}
+    end.
+
+update_unseen_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, Locks) ->
+    {NewSeen, State1} = maybe_lock(Profile, AppInfo, Seen, State, Level),
+    {NewSrcDeps, NewPkgDeps, NewSrcApps, State2, NewLocks}
+    = case Upgrade of
+        true ->
+            handle_upgrade(AppInfo, SrcDeps, PkgDeps, SrcApps,
+                           Level, State1, Locks);
+        _ ->
+            %% why do we use the old state there?
+            maybe_fetch(AppInfo, false, Seen, State),
+            handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps,
+                       Level, State1, Locks)
+    end,
+    {NewSrcDeps, NewPkgDeps, NewSrcApps, State2, NewSeen, NewLocks}.
 
 handle_upgrade(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
     Name = rebar_app_info:name(AppInfo),
@@ -307,13 +319,8 @@ handle_upgrade(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
         false ->
             case maybe_fetch(AppInfo, true, sets:new(), State) of
                 true ->
-                    handle_dep(AppInfo
-                              ,SrcDeps
-                              ,PkgDeps
-                              ,SrcApps
-                              ,Level
-                              ,State
-                              ,Locks);
+                    handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps,
+                               Level, State, Locks);
 
                 false ->
                     {[AppInfo|SrcDeps], PkgDeps, SrcApps, State, Locks}
@@ -359,12 +366,11 @@ handle_dep(State, DepsDir, AppInfo, Locks, Level) ->
                   sets:set(binary()), rebar_state:t()) -> boolean().
 maybe_fetch(AppInfo, Upgrade, Seen, State) ->
     AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
-    Apps = rebar_app_discover:find_apps(["_checkouts"], all),
-    case rebar_app_utils:find(rebar_app_info:name(AppInfo), Apps) of
-        {ok, _} ->
-            %% Don't fetch dep if it exists in the _checkouts dir
+    %% Don't fetch dep if it exists in the _checkouts dir
+    case in_checkouts(AppInfo) of
+        true ->
             false;
-        error ->
+        false ->
             case not app_exists(AppDir) of
                 true ->
                     fetch_app(AppInfo, AppDir, State);
@@ -377,6 +383,14 @@ maybe_fetch(AppInfo, Upgrade, Seen, State) ->
                     end
             end
     end.
+
+in_checkouts(AppInfo) ->
+    Apps = rebar_app_discover:find_apps(["_checkouts"], all),
+    case rebar_app_utils:find(rebar_app_info:name(AppInfo), Apps) of
+        {ok, _} -> true;
+        error -> false
+    end.
+
 
 -spec parse_deps(binary(), list(), list(), list(), integer()) -> {[rebar_app_info:t()], [pkg_dep()]}.
 parse_deps(DepsDir, Deps, State, Locks, Level) ->
