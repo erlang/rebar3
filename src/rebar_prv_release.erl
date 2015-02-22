@@ -32,6 +32,7 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    Caller = rebar_state:get(State, caller, api),
     Options = rebar_state:command_args(State),
     DepsDir = rebar_dir:deps_dir(State),
     LibDirs = rebar_utils:filtermap(fun ec_file:exists/1,
@@ -42,11 +43,13 @@ do(State) ->
         case rebar_state:get(State, relx, []) of
             [] ->
                 relx:main([{lib_dirs, LibDirs}
-                          ,{output_dir, OutputDir}], AllOptions);
+                          ,{output_dir, OutputDir}
+                          ,{caller, Caller}], AllOptions);
             Config ->
                 relx:main([{lib_dirs, LibDirs}
                           ,{config, Config}
-                          ,{output_dir, OutputDir}], AllOptions)
+                          ,{output_dir, OutputDir}
+                          ,{caller, Caller}], AllOptions)
         end,
         {ok, State}
     catch
