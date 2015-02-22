@@ -27,8 +27,7 @@
 -module(rebar_otp_app).
 
 -export([compile/2,
-         format_error/1,
-         clean/2]).
+         format_error/1]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
@@ -42,40 +41,21 @@ compile(State, App) ->
     %% written out as a ebin/*.app file. That resulting file will then
     %% be validated as usual.
     Dir = ec_cnv:to_list(rebar_app_info:dir(App)),
-    {State2, App1} = case rebar_app_info:app_file_src(App) of
-                          undefined ->
-                              {State, App};
-                          AppFileSrc ->
-                              {State1, File} = preprocess(State, Dir, AppFileSrc),
-                              {State1, rebar_app_info:app_file(App, File)}
-                      end,
+    App1 = case rebar_app_info:app_file_src(App) of
+               undefined ->
+                   App;
+               AppFileSrc ->
+                   File = preprocess(State, Dir, AppFileSrc),
+                   rebar_app_info:app_file(App, File)
+           end,
 
     %% Load the app file and validate it.
-    validate_app(State2, App1).
-
-
+    validate_app(State, App1).
 
 format_error({file_read, File, Reason}) ->
     io_lib:format("Failed to read ~s for processing: ~p", [File, Reason]);
 format_error({invalid_name, File, AppName}) ->
     io_lib:format("Invalid ~s: name of application (~p) must match filename.", [File, AppName]).
-
-clean(_State, File) ->
-    %% If the app file is a .app.src, delete the generated .app file
-    case rebar_app_utils:is_app_src(File) of
-        true ->
-            case file:delete(rebar_app_utils:app_src_to_app(File)) of
-                ok ->
-                    ok;
-                {error, enoent} ->
-                    %% The file not existing is OK, we can ignore the error.
-                    ok;
-                Other ->
-                    Other
-            end;
-        false ->
-            ok
-    end.
 
 %% ===================================================================
 %% Internal functions
@@ -83,11 +63,11 @@ clean(_State, File) ->
 
 validate_app(State, App) ->
     AppFile = rebar_app_info:app_file(App),
-    case rebar_app_utils:load_app_file(State, AppFile) of
-        {ok, State1, AppName, AppData} ->
+    case consult_app_file(AppFile) of
+        {ok, [{application, AppName, AppData}]} ->
             case validate_name(AppName, AppFile) of
                 ok ->
-                    validate_app_modules(State1, App, AppData);
+                    validate_app_modules(State, App, AppData);
                 Error ->
                     Error
             end;
@@ -102,7 +82,7 @@ validate_app_modules(State, App, AppData) ->
     AppVsn = proplists:get_value(vsn, AppData),
     case rebar_state:get(State, validate_app_modules, true) of
         true ->
-            case rebar_app_discover:validate_application_info(App, AppData) of
+            case rebar_app_utils:validate_application_info(App, AppData) of
                 true ->
                     {ok, rebar_app_info:original_vsn(App, AppVsn)};
                 Error ->
@@ -113,16 +93,16 @@ validate_app_modules(State, App, AppData) ->
     end.
 
 preprocess(State, Dir, AppSrcFile) ->
-    case rebar_app_utils:load_app_file(State, AppSrcFile) of
-        {ok, State1, AppName, AppData} ->
+    case consult_app_file(AppSrcFile) of
+        {ok, [{application, AppName, AppData}]} ->
             %% Look for a configuration file with vars we want to
             %% substitute. Note that we include the list of modules available in
             %% ebin/ and update the app data accordingly.
-            AppVars = load_app_vars(State1) ++ [{modules, ebin_modules(Dir)}],
+            AppVars = load_app_vars(State) ++ [{modules, ebin_modules(Dir)}],
             A1 = apply_app_vars(AppVars, AppData),
 
             %% AppSrcFile may contain instructions for generating a vsn number
-            {State2, Vsn} = rebar_app_utils:app_vsn(State1, AppSrcFile),
+            Vsn = app_vsn(AppSrcFile),
             A2 = lists:keystore(vsn, 1, A1, {vsn, Vsn}),
 
             %% systools:make_relup/4 fails with {missing_param, registered}
@@ -140,7 +120,7 @@ preprocess(State, Dir, AppSrcFile) ->
             %% on the code path
             true = code:add_path(filename:absname(filename:dirname(AppFile))),
 
-            {State2, AppFile};
+            AppFile;
         {error, Reason} ->
             ?PRV_ERROR({file_read, AppSrcFile, Reason})
     end.
@@ -184,4 +164,34 @@ ensure_registered(AppData) ->
         {registered, _} ->
             %% We could further check whether the value is a list of atoms.
             AppData
+    end.
+
+%% In the case of *.app.src we want to give the user the ability to
+%% dynamically script the application resource file (think dynamic version
+%% string, etc.), in a way similar to what can be done with the rebar
+%% config. However, in the case of *.app, rebar should not manipulate
+%% that file. This enforces that dichotomy between app and app.src.
+consult_app_file(Filename) ->
+    case lists:suffix(".app.src", Filename) of
+        false ->
+            file:consult(Filename);
+        true ->
+            {ok, rebar_config:consult_file(Filename)}
+    end.
+
+app_vsn(AppFile) ->
+    case consult_app_file(AppFile) of
+        {ok, [{application, _AppName, AppData}]} ->
+            AppDir = filename:dirname(filename:dirname(AppFile)),
+            rebar_utils:vcs_vsn(get_value(vsn, AppData, AppFile), AppDir);
+        {error, Reason} ->
+            ?ABORT("Failed to consult app file ~s: ~p\n", [AppFile, Reason])
+    end.
+
+get_value(Key, AppInfo, AppFile) ->
+    case proplists:get_value(Key, AppInfo) of
+        undefined ->
+            ?ABORT("Failed to get app value '~p' from '~s'~n", [Key, AppFile]);
+        Value ->
+            Value
     end.

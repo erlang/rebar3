@@ -43,7 +43,7 @@
          beams/1,
          find_executable/1,
          expand_code_path/0,
-         vcs_vsn/3,
+         vcs_vsn/2,
          deprecated/3,
          deprecated/4,
          erl_opts/1,
@@ -178,19 +178,6 @@ expand_code_path() ->
                                    [filename:absname(Path) | Acc]
                            end, [], code:get_path()),
     code:set_path(lists:reverse(CodePath)).
-
-vcs_vsn(Config, Vsn, Dir) ->
-    Key = {Vsn, Dir},
-    Cache = rebar_state:get(Config, vsn_cache, dict:new()),
-    case dict:find(Key, Cache) of
-        error ->
-            VsnString = vcs_vsn_1(Vsn, Dir),
-            Cache1 = dict:store(Key, VsnString, Cache),
-            Config1 = rebar_state:set(Config, vsn_cache, Cache1),
-            {Config1, VsnString};
-        {ok, VsnString} ->
-            {Config, VsnString}
-    end.
 
 deprecated(Old, New, Opts, When) when is_list(Opts) ->
     case lists:member(Old, Opts) of
@@ -413,16 +400,16 @@ escript_foldl(Fun, Acc, File) ->
             Error
     end.
 
-vcs_vsn_1(Vcs, Dir) ->
+vcs_vsn(Vcs, Dir) ->
     case vcs_vsn_cmd(Vcs, Dir) of
         {plain, VsnString} ->
             VsnString;
         {cmd, CmdString} ->
             vcs_vsn_invoke(CmdString, Dir);
         unknown ->
-            ?ABORT("vcs_vsn: Unknown vsn format: ~p\n", [Vcs]);
+            ?ABORT("vcs_vsn: Unknown vsn format: ~p", [Vcs]);
         {error, Reason} ->
-            ?ABORT("vcs_vsn: ~s\n", [Reason])
+            ?ABORT("vcs_vsn: ~s", [Reason])
     end.
 
 %% Temp work around for repos like relx that use "semver"

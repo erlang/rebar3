@@ -370,10 +370,10 @@ maybe_fetch(AppInfo, Upgrade, Seen, State) ->
         true ->
             false;
         false ->
-            case not app_exists(AppDir) of
-                true ->
-                    fetch_app(AppInfo, AppDir, State);
+            case rebar_app_discover:find_app(AppDir, all) of
                 false ->
+                    fetch_app(AppInfo, AppDir, State);
+                {true, _} ->
                     case sets:is_element(rebar_app_info:name(AppInfo), Seen) of
                         true ->
                             false;
@@ -455,19 +455,6 @@ new_dep(DepsDir, Name, Vsn, Source, State) ->
     Dep1 = rebar_app_info:state(Dep,
                                rebar_state:overrides(S, ParentOverrides++Overrides)),
     rebar_app_info:source(Dep1, Source).
-
-app_exists(AppDir) ->
-    case rebar_app_utils:is_app_dir(filename:absname(AppDir)++"-*") of
-        {true, _} ->
-            true;
-        _ ->
-            case rebar_app_utils:is_app_dir(filename:absname(AppDir)) of
-                {true, _} ->
-                    true;
-                _ ->
-                    false
-            end
-    end.
 
 fetch_app(AppInfo, AppDir, State) ->
     ?INFO("Fetching ~s (~p)", [rebar_app_info:name(AppInfo), rebar_app_info:source(AppInfo)]),

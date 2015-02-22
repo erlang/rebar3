@@ -5,9 +5,7 @@
          find_unbuilt_apps/1,
          find_apps/1,
          find_apps/2,
-         find_app/2,
-         validate_application_info/1,
-         validate_application_info/2]).
+         find_app/2]).
 
 -include_lib("providers/include/providers.hrl").
 
@@ -104,14 +102,14 @@ find_app(AppDir, Validate) ->
                        end,
             case Validate of
                 valid ->
-                    case validate_application_info(AppInfo2) of
+                    case rebar_app_utils:validate_application_info(AppInfo2) of
                         true ->
                             {true, AppInfo2};
                         _ ->
                             false
                     end;
                 invalid ->
-                    case validate_application_info(AppInfo2) of
+                    case rebar_app_utils:validate_application_info(AppInfo2) of
                         true ->
                             false;
                         _ ->
@@ -157,46 +155,3 @@ create_app_info(AppDir, AppFile) ->
         _ ->
             error
     end.
-
--spec validate_application_info(rebar_app_info:t()) -> boolean().
-validate_application_info(AppInfo) ->
-    validate_application_info(AppInfo, rebar_app_info:app_details(AppInfo)).
-
-validate_application_info(AppInfo, AppDetail) ->
-    EbinDir = rebar_app_info:ebin_dir(AppInfo),
-    case rebar_app_info:app_file(AppInfo) of
-        undefined ->
-            false;
-        AppFile ->
-            case get_modules_list(AppFile, AppDetail) of
-                {ok, List} ->
-                    has_all_beams(EbinDir, List);
-                _Error ->
-                    ?PRV_ERROR({module_list, AppFile})
-            end
-    end.
-
--spec get_modules_list(file:filename_all(), proplists:proplist()) ->
-                              {ok, list()} |
-                              {warning, Reason::term()} |
-                              {error, Reason::term()}.
-get_modules_list(AppFile, AppDetail) ->
-    case proplists:get_value(modules, AppDetail) of
-        undefined ->
-            {warning, {invalid_app_file, AppFile}};
-        ModulesList ->
-            {ok, ModulesList}
-    end.
-
--spec has_all_beams(file:filename_all(), list()) -> true | providers:error().
-has_all_beams(EbinDir, [Module | ModuleList]) ->
-    BeamFile = filename:join([EbinDir,
-                              ec_cnv:to_list(Module) ++ ".beam"]),
-    case filelib:is_file(BeamFile) of
-        true ->
-            has_all_beams(EbinDir, ModuleList);
-        false ->
-            ?PRV_ERROR({missing_module, Module})
-    end;
-has_all_beams(_, []) ->
-    true.

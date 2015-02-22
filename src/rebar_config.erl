@@ -91,7 +91,7 @@ try_consult(File) ->
         {error, enoent} ->
             [];
         {error, Reason} ->
-            ?ABORT("Failed to read config file ~s: ~p", [File, Reason])
+            ?ABORT("Failed to read config file ~s:~n ~p", [File, Reason])
     end.
 
 bs(Vars) ->
