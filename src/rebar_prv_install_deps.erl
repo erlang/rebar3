@@ -293,23 +293,23 @@ update_seen_src_dep(AppInfo, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, S
             {SrcDeps, PkgDeps, SrcApps, State, Seen, Locks};
         true ->
             {NewSrcDeps, NewPkgDeps, NewSrcApps, NewState, NewLocks}
-            = handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps,
-                         Level, State, Locks),
+                = handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps,
+                             Level, State, Locks),
             {NewSrcDeps, NewPkgDeps, NewSrcApps, NewState, Seen, NewLocks}
     end.
 
 update_unseen_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, Locks) ->
     {NewSeen, State1} = maybe_lock(Profile, AppInfo, Seen, State, Level),
     {NewSrcDeps, NewPkgDeps, NewSrcApps, State2, NewLocks}
-    = case Upgrade of
-        true ->
-            handle_upgrade(AppInfo, SrcDeps, PkgDeps, SrcApps,
-                           Level, State1, Locks);
-        _ ->
-            maybe_fetch(AppInfo, false, Seen, State1),
-            handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps,
-                       Level, State1, Locks)
-    end,
+        = case Upgrade of
+            true ->
+                handle_upgrade(AppInfo, SrcDeps, PkgDeps, SrcApps,
+                               Level, State1, Locks);
+            _ ->
+                maybe_fetch(AppInfo, false, Seen, State1),
+                handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps,
+                           Level, State1, Locks)
+        end,
     {NewSrcDeps, NewPkgDeps, NewSrcApps, State2, NewSeen, NewLocks}.
 
 handle_upgrade(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
