@@ -72,29 +72,18 @@ validate_application_info(AppInfo, AppDetail) ->
         undefined ->
             false;
         AppFile ->
-            case get_modules_list(AppFile, AppDetail) of
-                {ok, List} ->
-                    has_all_beams(EbinDir, List);
-                _Error ->
-                    ?PRV_ERROR({module_list, AppFile})
+            case proplists:get_value(modules, AppDetail) of
+                undefined ->
+                    ?PRV_ERROR({module_list, AppFile});
+                List ->
+                    has_all_beams(EbinDir, List)
+
             end
     end.
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
-
--spec get_modules_list(file:filename_all(), proplists:proplist()) ->
-                              {ok, list()} |
-                              {warning, Reason::term()} |
-                              {error, Reason::term()}.
-get_modules_list(AppFile, AppDetail) ->
-    case proplists:get_value(modules, AppDetail) of
-        undefined ->
-            {warning, {invalid_app_file, AppFile}};
-        ModulesList ->
-            {ok, ModulesList}
-    end.
 
 -spec has_all_beams(file:filename_all(), list()) -> true | providers:error().
 has_all_beams(EbinDir, [Module | ModuleList]) ->
