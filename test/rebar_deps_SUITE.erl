@@ -43,7 +43,7 @@ init_per_testcase(Case, Config) ->
     mock_warnings(),
     [{expect, Expected},
      {warnings, Warnings}
-    | setup_project(Case, Config, expand_deps(DepsType, Deps))].
+    | setup_project(Case, Config, rebar_test_utils:expand_deps(DepsType, Deps))].
 
 end_per_testcase(_, Config) ->
     meck:unload(),
@@ -114,20 +114,6 @@ deps(circular_skip) ->
      [{"C","2"}],
      {ok, ["B", {"C","1"}, "D"]}}.
 
-expand_deps(_, []) -> [];
-expand_deps(git, [{Name, Deps} | Rest]) ->
-    Dep = {Name, ".*", {git, "https://example.org/user/"++Name++".git", "master"}},
-    [{Dep, expand_deps(git, Deps)} | expand_deps(git, Rest)];
-expand_deps(git, [{Name, Vsn, Deps} | Rest]) ->
-    Dep = {Name, Vsn, {git, "https://example.org/user/"++Name++".git", {tag, Vsn}}},
-    [{Dep, expand_deps(git, Deps)} | expand_deps(git, Rest)];
-expand_deps(pkg, [{Name, Deps} | Rest]) ->
-    Dep = {pkg, Name, "0.0.0"},
-    [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)];
-expand_deps(pkg, [{Name, Vsn, Deps} | Rest]) ->
-    Dep = {pkg, Name, Vsn},
-    [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)].
-
 setup_project(Case, Config0, Deps) ->
     DepsType = ?config(deps_type, Config0),
     Config = rebar_test_utils:init_rebar_state(
@@ -136,41 +122,23 @@ setup_project(Case, Config0, Deps) ->
               ),
     AppDir = ?config(apps, Config),
     rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
-    TopDeps = top_level_deps(Deps),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
     RebarConf = rebar_test_utils:create_config(AppDir, [{deps, TopDeps}]),
     case DepsType of
         git ->
-            mock_git_resource:mock([{deps, flat_deps(Deps)}]);
+            mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}]);
         pkg ->
             mock_pkg_resource:mock([{pkgdeps, flat_pkgdeps(Deps)}])
     end,
     [{rebarconfig, RebarConf} | Config].
 
-
-flat_deps([]) -> [];
-flat_deps([{{Name,_Vsn,Ref}, Deps} | Rest]) ->
-    [{{Name,vsn_from_ref(Ref)}, top_level_deps(Deps)}]
-    ++
-    flat_deps(Deps)
-    ++
-    flat_deps(Rest).
-
-vsn_from_ref({git, _, {_, Vsn}}) -> Vsn;
-vsn_from_ref({git, _, Vsn}) -> Vsn.
-
 flat_pkgdeps([]) -> [];
 flat_pkgdeps([{{pkg, Name, Vsn}, Deps} | Rest]) ->
-    [{{iolist_to_binary(Name),iolist_to_binary(Vsn)}, top_level_deps(Deps)}]
+    [{{iolist_to_binary(Name),iolist_to_binary(Vsn)}, rebar_test_utils:top_level_deps(Deps)}]
     ++
     flat_pkgdeps(Deps)
     ++
     flat_pkgdeps(Rest).
-
-top_level_deps([]) -> [];
-top_level_deps([{{pkg, Name, Vsn}, _} | Deps]) ->
-    [{list_to_atom(Name), Vsn} | top_level_deps(Deps)];
-top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
-    [{list_to_atom(Name), Vsn, Ref} | top_level_deps(Deps)].
 
 app_vsn([]) -> [];
 app_vsn([{Source, Deps} | Rest]) ->
@@ -199,21 +167,21 @@ circular_skip(Config) -> run(Config).
 %% are included, but that top level rebar.config deps take precedence
 sub_app_deps(Config) ->
     AppDir = ?config(apps, Config),
-    Deps = expand_deps(git, [{"a", "1.0.0", []}
-                            ,{"b", "1.0.0", []}
-                            ,{"b", "2.0.0", []}]),
-    mock_git_resource:mock([{deps, flat_deps(Deps)}]),
+    Deps = rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
+                                             ,{"b", "1.0.0", []}
+                                             ,{"b", "2.0.0", []}]),
+    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}]),
 
     Name = rebar_test_utils:create_random_name("sub_app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
 
     SubAppsDir = filename:join([AppDir, Name]),
-    SubDeps = top_level_deps(expand_deps(git, [{"a", "1.0.0", []}
+    SubDeps = rebar_test_utils:top_level_deps(rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
                                               ,{"b", "2.0.0", []}])),
     rebar_test_utils:create_app(SubAppsDir, Name, Vsn, [kernel, stdlib]),
     rebar_test_utils:create_config(SubAppsDir, [{deps, SubDeps}]),
 
-    TopDeps = top_level_deps(expand_deps(git, [{"b", "1.0.0", []}])),
+    TopDeps = rebar_test_utils:top_level_deps(rebar_test_utils:expand_deps(git, [{"b", "1.0.0", []}])),
     {ok, RebarConfig} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, TopDeps}])),
 
     rebar_test_utils:run_and_check(
@@ -223,10 +191,10 @@ sub_app_deps(Config) ->
 %% Newly added dependency after locking
 newly_added_dep(Config) ->
     AppDir = ?config(apps, Config),
-    Deps = expand_deps(git, [{"a", "1.0.0", []}
+    Deps = rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
                             ,{"b", "1.0.0", [{"c", "1.0.0", []}]}
                             ,{"c", "2.0.0", []}]),
-    mock_git_resource:mock([{deps, flat_deps(Deps)}]),
+    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}]),
 
     Name = rebar_test_utils:create_random_name("app_"),
     Vsn = rebar_test_utils:create_random_vsn(),
@@ -234,14 +202,14 @@ newly_added_dep(Config) ->
     SubAppsDir = filename:join([AppDir, Name]),
     rebar_test_utils:create_app(SubAppsDir, Name, Vsn, [kernel, stdlib]),
 
-    TopDeps = top_level_deps(expand_deps(git, [{"b", "1.0.0", []}])),
+    TopDeps = rebar_test_utils:top_level_deps(rebar_test_utils:expand_deps(git, [{"b", "1.0.0", []}])),
     {ok, RebarConfig} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, TopDeps}])),
     rebar_test_utils:run_and_check(
       Config, RebarConfig, ["compile"],
       {ok, [{app, Name}, {dep, "b", "1.0.0"}, {dep, "c", "1.0.0"}]}),
 
     %% Add a and c to top level
-    TopDeps2 = top_level_deps(expand_deps(git, [{"a", "1.0.0", []}
+    TopDeps2 = rebar_test_utils:top_level_deps(rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
                                                ,{"c", "2.0.0", []}
                                                ,{"b", "1.0.0", []}])),
     {ok, RebarConfig2} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, TopDeps2}])),
