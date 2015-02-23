@@ -314,7 +314,8 @@ expand_sh_flag(debug_and_abort_on_error) ->
 expand_sh_flag(use_stdout) ->
     {output_handler,
      fun(Line, Acc) ->
-             ?CONSOLE("~s", [Line]),
+             %% Line already has a newline so don't use ?CONSOLE which adds one
+             io:format("~s", [Line]),
              [Line | Acc]
      end};
 expand_sh_flag({use_stdout, false}) ->
