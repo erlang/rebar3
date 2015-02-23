@@ -34,8 +34,8 @@ end_per_group(_, Config) ->
 init_per_testcase(Case, Config) ->
     DepsType = ?config(deps_type, Config),
     {Deps, UpDeps, ToUp, Expectations} = upgrades(Case),
-    Expanded = expand_deps(DepsType, Deps),
-    UpExpanded = expand_deps(DepsType, UpDeps),
+    Expanded = rebar_test_utils:expand_deps(DepsType, Deps),
+    UpExpanded = rebar_test_utils:expand_deps(DepsType, UpDeps),
     [{expected, normalize_unlocks(Expectations)},
      {mock, fun() -> mock_deps(DepsType, Expanded, []) end},
      {mock_update, fun() -> mock_deps(DepsType, UpExpanded, ToUp) end}
@@ -53,10 +53,10 @@ setup_project(Case, Config0, Deps, UpDeps) ->
     ),
     AppDir = ?config(apps, Config),
     rebar_test_utils:create_app(AppDir, "Root", "0.0.0", [kernel, stdlib]),
-    TopDeps = top_level_deps(Deps),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
     RebarConf = rebar_test_utils:create_config(AppDir, [{deps, TopDeps}]),
     [{rebarconfig, RebarConf},
-     {next_top_deps, top_level_deps(UpDeps)} | Config].
+     {next_top_deps, rebar_test_utils:top_level_deps(UpDeps)} | Config].
 
 
 upgrades(top_a) ->
@@ -356,51 +356,12 @@ upgrades(delete_d) ->
 %% TODO: add a test that verifies that unlocking files and then
 %% running the upgrade code is enough to properly upgrade things.
 
-top_level_deps([]) -> [];
-top_level_deps([{{pkg, Name, Vsn}, _} | Deps]) ->
-    [{list_to_atom(Name), Vsn} | top_level_deps(Deps)];
-top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
-    [{list_to_atom(Name), Vsn, Ref} | top_level_deps(Deps)].
-
 mock_deps(git, Deps, Upgrades) ->
     catch mock_git_resource:unmock(),
-    mock_git_resource:mock([{deps, flat_deps(Deps)}, {upgrade, Upgrades}]);
+    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}, {upgrade, Upgrades}]);
 mock_deps(pkg, Deps, Upgrades) ->
     catch mock_pkg_resource:unmock(),
-    mock_pkg_resource:mock([{pkgdeps, flat_pkgdeps(Deps)}, {upgrade, Upgrades}]).
-
-flat_deps([]) -> [];
-flat_deps([{{Name,_Vsn,Ref}, Deps} | Rest]) ->
-    [{{Name,vsn_from_ref(Ref)}, top_level_deps(Deps)}]
-    ++
-    flat_deps(Deps)
-    ++
-    flat_deps(Rest).
-
-vsn_from_ref({git, _, {_, Vsn}}) -> Vsn;
-vsn_from_ref({git, _, Vsn}) -> Vsn.
-
-flat_pkgdeps([]) -> [];
-flat_pkgdeps([{{pkg, Name, Vsn}, Deps} | Rest]) ->
-    [{{iolist_to_binary(Name),iolist_to_binary(Vsn)}, top_level_deps(Deps)}]
-    ++
-    flat_pkgdeps(Deps)
-    ++
-    flat_pkgdeps(Rest).
-
-expand_deps(_, []) -> [];
-expand_deps(git, [{Name, Deps} | Rest]) ->
-    Dep = {Name, ".*", {git, "https://example.org/user/"++Name++".git", "master"}},
-    [{Dep, expand_deps(git, Deps)} | expand_deps(git, Rest)];
-expand_deps(git, [{Name, Vsn, Deps} | Rest]) ->
-    Dep = {Name, Vsn, {git, "https://example.org/user/"++Name++".git", {tag, Vsn}}},
-    [{Dep, expand_deps(git, Deps)} | expand_deps(git, Rest)];
-expand_deps(pkg, [{Name, Deps} | Rest]) ->
-    Dep = {pkg, Name, "0.0.0"},
-    [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)];
-expand_deps(pkg, [{Name, Vsn, Deps} | Rest]) ->
-    Dep = {pkg, Name, Vsn},
-    [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)].
+    mock_pkg_resource:mock([{pkgdeps, rebar_test_utils:flat_pkgdeps(Deps)}, {upgrade, Upgrades}]).
 
 normalize_unlocks({App, Locks}) ->
     {iolist_to_binary(App),

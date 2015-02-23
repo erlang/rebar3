@@ -48,7 +48,7 @@ do(State) ->
         ok
     catch
         E:C ->
-            io:format("E C ~p ~p~n", [E, C]),
+            io:format("E C ~p ~p~n~p~n", [E, C, erlang:get_stacktrace()]),
             throw({error, {?MODULE, package_index_write}})
     end,
 
