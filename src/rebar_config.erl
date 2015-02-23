@@ -60,8 +60,13 @@ consult_file(File) ->
             end
     end.
 
+%% no lockfile
+merge_locks(Config, []) ->
+    Config;
+%% empty lockfile
 merge_locks(Config, [[]]) ->
     Config;
+%% lockfile with entries
 merge_locks(Config, [Locks]) ->
     {deps, ConfigDeps} = lists:keyfind(deps, 1, Config),
     %% We want the top level deps only from the lock file.
