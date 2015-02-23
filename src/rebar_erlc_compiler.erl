@@ -265,13 +265,19 @@ opts_changed(Opts, Target) ->
     case code:load_abs(ObjectFile) of
         {module, Mod} ->
             Compile = Mod:module_info(compile),
-            %% dialyzer and eunit have trouble without the next two lines
-            code:delete(Mod),
-            code:purge(Mod),
+            _ = purge(Mod),
             lists:sort(Opts) =/= lists:sort(proplists:get_value(options,
                                                                 Compile));
-        {error, _} -> true
+        {error, nofile} -> false
     end.
+
+purge(Mod) ->
+    %% remove old code if necessary
+    _ = code:purge(Mod),
+    %% move current code to old
+    true = code:delete(Mod),
+    %% remove new old code
+    _ = code:purge(Mod).
 
 check_erlcinfo(_Config, #erlcinfo{vsn=?ERLCINFO_VSN}) ->
     ok;
