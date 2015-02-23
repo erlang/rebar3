@@ -22,4 +22,4 @@ apply_hook(Dir, Env, {Arch, Command, Hook}) ->
     end;
 apply_hook(Dir, Env, {Command, Hook}) ->
     Msg = lists:flatten(io_lib:format("Hook for ~p failed!~n", [Command])),
-    rebar_utils:sh(Hook, [{cd, Dir}, {env, Env}, {abort_on_error, Msg}]).
+    rebar_utils:sh(Hook, [use_stdout, {cd, Dir}, {env, Env}, {abort_on_error, Msg}]).
