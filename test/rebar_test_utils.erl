@@ -2,6 +2,7 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -export([init_rebar_state/1, init_rebar_state/2, run_and_check/4]).
+-export([expand_deps/2, flat_deps/1, top_level_deps/1]).
 -export([create_app/4, create_empty_app/4, create_config/2]).
 -export([create_random_name/1, create_random_vsn/0]).
 
@@ -96,6 +97,37 @@ create_random_vsn() ->
     lists:flatten([erlang:integer_to_list(random:uniform(100)),
                    ".", erlang:integer_to_list(random:uniform(100)),
                    ".", erlang:integer_to_list(random:uniform(100))]).
+
+expand_deps(_, []) -> [];
+expand_deps(git, [{Name, Deps} | Rest]) ->
+    Dep = {Name, ".*", {git, "https://example.org/user/"++Name++".git", "master"}},
+    [{Dep, expand_deps(git, Deps)} | expand_deps(git, Rest)];
+expand_deps(git, [{Name, Vsn, Deps} | Rest]) ->
+    Dep = {Name, Vsn, {git, "https://example.org/user/"++Name++".git", {tag, Vsn}}},
+    [{Dep, expand_deps(git, Deps)} | expand_deps(git, Rest)];
+expand_deps(pkg, [{Name, Deps} | Rest]) ->
+    Dep = {pkg, Name, "0.0.0"},
+    [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)];
+expand_deps(pkg, [{Name, Vsn, Deps} | Rest]) ->
+    Dep = {pkg, Name, Vsn},
+    [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)].
+
+flat_deps([]) -> [];
+flat_deps([{{Name,_Vsn,Ref}, Deps} | Rest]) ->
+    [{{Name,vsn_from_ref(Ref)}, top_level_deps(Deps)}]
+    ++
+    flat_deps(Deps)
+    ++
+    flat_deps(Rest).
+
+vsn_from_ref({git, _, {_, Vsn}}) -> Vsn;
+vsn_from_ref({git, _, Vsn}) -> Vsn.
+
+top_level_deps([]) -> [];
+top_level_deps([{{pkg, Name, Vsn}, _} | Deps]) ->
+    [{list_to_atom(Name), Vsn} | top_level_deps(Deps)];
+top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
+    [{list_to_atom(Name), Vsn, Ref} | top_level_deps(Deps)].
 
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
