@@ -10,7 +10,8 @@
          build_checkout_apps/1,
          build_checkout_deps/1,
          recompile_when_opts_change/1,
-         dont_recompile_when_opts_dont_change/1]).
+         dont_recompile_when_opts_dont_change/1,
+         dont_recompile_yrl_or_xrl/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -31,7 +32,8 @@ init_per_testcase(_, Config) ->
 all() ->
     [build_basic_app, build_release_apps,
      build_checkout_apps, build_checkout_deps,
-     recompile_when_opts_change, dont_recompile_when_opts_dont_change].
+     recompile_when_opts_change, dont_recompile_when_opts_dont_change,
+     dont_recompile_yrl_or_xrl].
 
 build_basic_app(Config) ->
     AppDir = ?config(apps, Config),
@@ -140,5 +142,44 @@ dont_recompile_when_opts_dont_change(Config) ->
     {ok, NewFiles} = file:list_dir(EbinDir),
     NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
                   || F <- NewFiles, filename:extension(F) == ".beam"], 
+
+    ?assert(ModTime == NewModTime).
+
+dont_recompile_yrl_or_xrl(Config) ->
+    AppDir = ?config(apps, Config),
+    
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    Xrl = filename:join([AppDir, "src", "not_a_real_xrl_" ++ Name ++ ".xrl"]),
+    ok = filelib:ensure_dir(Xrl),
+    XrlBody = 
+        "Definitions."
+        "\n\n"
+        "D = [0-9]"
+        "\n\n"
+        "Rules."
+        "\n\n"
+        "{D}+ :"
+        "  {token,{integer,TokenLine,list_to_integer(TokenChars)}}."
+        "\n\n"
+        "{D}+\\.{D}+((E|e)(\\+|\\-)?{D}+)? :"
+        "  {token,{float,TokenLine,list_to_float(TokenChars)}}."
+        "\n\n"
+        "Erlang code.",
+    ok = ec_file:write(Xrl, XrlBody),
+
+    XrlBeam = filename:join([AppDir, "ebin", filename:basename(Xrl, ".xrl") ++ ".beam"]),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    ModTime = filelib:last_modified(XrlBeam),
+
+    timer:sleep(1000),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    NewModTime = filelib:last_modified(XrlBeam),
 
     ?assert(ModTime == NewModTime).
