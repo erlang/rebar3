@@ -47,11 +47,11 @@ mock_lock(_) ->
 %% @doc The config passed to the `mock/2' function can specify which apps
 %% should be updated on a per-name basis: `{update, ["App1", "App3"]}'.
 mock_update(Opts) ->
-    ToUpdate = proplists:get_value(update, Opts, []),
+    ToUpdate = proplists:get_value(upgrade, Opts, []),
     meck:expect(
         ?MOD, needs_update,
         fun(_Dir, {pkg, App, _Vsn}) ->
-            lists:member(App, ToUpdate)
+            lists:member(binary_to_list(App), ToUpdate)
         end).
 
 %% @doc Replicated an unsupported call.

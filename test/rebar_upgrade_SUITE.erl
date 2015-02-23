@@ -3,7 +3,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -compile(export_all).
 
-all() -> [{group, git}].%, {group, pkg}].
+all() -> [{group, git}, {group, pkg}].
 
 groups() ->
     [{all, [], [top_a, top_b, top_c, top_d1, top_d2, top_e,
@@ -38,7 +38,7 @@ init_per_testcase(Case, Config) ->
     UpExpanded = rebar_test_utils:expand_deps(DepsType, UpDeps),
     [{expected, normalize_unlocks(Expectations)},
      {mock, fun() -> mock_deps(DepsType, Expanded, []) end},
-     {mock_update, fun() -> mock_deps(DepsType, UpExpanded, ToUp) end}
+     {mock_update, fun() -> mock_deps(DepsType, Expanded, UpExpanded, ToUp) end}
      | setup_project(Case, Config, Expanded, UpExpanded)].
 
 end_per_testcase(_, Config) ->
@@ -206,7 +206,7 @@ upgrades(triplet_b) ->
                   {"G",[]}]},
       {"C", "0", [{"H","3",[]},
                   {"I",[]}]}],
-     [{"A", "1", [{"D",[]},
+     [{"A", "2", [{"D",[]},
                   {"E","2",[]}]},
       {"B", "1", [{"F","1",[]},
                   {"G",[]}]},
@@ -223,7 +223,7 @@ upgrades(triplet_c) ->
                   {"G",[]}]},
       {"C", "0", [{"H","3",[]},
                   {"I",[]}]}],
-     [{"A", "1", [{"D",[]},
+     [{"A", "2", [{"D",[]},
                   {"E","2",[]}]},
       {"B", "1", [{"F","1",[]},
                   {"G",[]}]},
@@ -245,7 +245,7 @@ upgrades(tree_a) ->
                   {"E",[{"I","1",[]}]}]},
       {"B", "1", [{"F",[]},
                   {"G",[]}]},
-      {"C", "1", [{"H",[]}]}
+      {"C", "2", [{"H",[]}]}
      ],
      ["C"],
      {"A", [{"A","1"}, "D", "J", "E",
@@ -263,7 +263,7 @@ upgrades(tree_b) ->
                   {"E",[{"I","1",[]}]}]},
       {"B", "1", [{"F",[]},
                   {"G",[]}]},
-      {"C", "1", [{"H",[]}]}
+      {"C", "2", [{"H",[]}]}
      ],
      ["C"],
      {"B", [{"A","1"}, "D", "J", "E",
@@ -362,6 +362,15 @@ mock_deps(git, Deps, Upgrades) ->
 mock_deps(pkg, Deps, Upgrades) ->
     catch mock_pkg_resource:unmock(),
     mock_pkg_resource:mock([{pkgdeps, rebar_test_utils:flat_pkgdeps(Deps)}, {upgrade, Upgrades}]).
+
+mock_deps(git, _OldDeps, Deps, Upgrades) ->
+    catch mock_git_resource:unmock(),
+    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}, {upgrade, Upgrades}]);
+mock_deps(pkg, OldDeps, Deps, Upgrades) ->
+    Merged = Deps ++ [Dep || Dep <- OldDeps,
+                             not lists:keymember(element(1, Dep), 1, Deps)],
+    catch mock_pkg_resource:unmock(),
+    mock_pkg_resource:mock([{pkgdeps, rebar_test_utils:flat_pkgdeps(Merged)}, {upgrade, Upgrades}]).
 
 normalize_unlocks({App, Locks}) ->
     {iolist_to_binary(App),
