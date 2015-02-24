@@ -2,7 +2,7 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -export([init_rebar_state/1, init_rebar_state/2, run_and_check/4]).
--export([expand_deps/2, flat_deps/1, top_level_deps/1]).
+-export([expand_deps/2, flat_deps/1, flat_pkgdeps/1, top_level_deps/1]).
 -export([create_app/4, create_empty_app/4, create_config/2]).
 -export([create_random_name/1, create_random_vsn/0]).
 
@@ -120,6 +120,15 @@ flat_deps([{{Name,_Vsn,Ref}, Deps} | Rest]) ->
     ++
     flat_deps(Rest).
 
+flat_pkgdeps([]) -> [];
+flat_pkgdeps([{{pkg, Name, Vsn}, Deps} | Rest]) ->
+    [{{iolist_to_binary(Name),iolist_to_binary(Vsn)}, top_level_deps(Deps)}]
+    ++
+    flat_pkgdeps(Deps)
+    ++
+    flat_pkgdeps(Rest).
+
+
 vsn_from_ref({git, _, {_, Vsn}}) -> Vsn;
 vsn_from_ref({git, _, Vsn}) -> Vsn.
 
@@ -196,6 +205,9 @@ check_results(AppDir, Expected) ->
                 case lists:keyfind(iolist_to_binary(Name), 1, Locks) of
                     false ->
                         error({lock_not_found, Name});
+                    {_LockName, {pkg, _, LockVsn}, _} ->
+                        ?assertEqual(iolist_to_binary(Vsn),
+                                     iolist_to_binary(LockVsn));
                     {_LockName, {_, _, {ref, LockVsn}}, _} ->
                         ?assertEqual(iolist_to_binary(Vsn),
                                      iolist_to_binary(LockVsn))

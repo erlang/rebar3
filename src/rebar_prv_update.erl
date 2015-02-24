@@ -47,8 +47,7 @@ do(State) ->
         write_registry(Dict, Graph, State),
         ok
     catch
-        E:C ->
-            io:format("E C ~p ~p~n", [E, C]),
+        _E:_C ->
             throw({error, {?MODULE, package_index_write}})
     end,
 

@@ -71,29 +71,36 @@ restore_graph({Vs, Es}) ->
 cull_deps(Graph, Vertices) ->
     cull_deps(Graph,
               Vertices,
+              1,
+              lists:foldl(fun({Key, _}, Levels) -> dict:store(Key, 0, Levels) end,
+                          dict:new(), Vertices),
               lists:foldl(fun({Key, _}=N, Solution) -> dict:store(Key, N, Solution) end,
                           dict:new(), Vertices),
               []).
 
-cull_deps(_Graph, [], Solution, Discarded) ->
+cull_deps(_Graph, [], _Level, Levels, Solution, Discarded) ->
     {_, Vertices} = lists:unzip(dict:to_list(Solution)),
-    {ok, Vertices, Discarded};
-cull_deps(Graph, Vertices, Solution, Discarded) ->
-    {NV, NS, DS} =
-        lists:foldl(fun(V, {NewVertices, SolutionAcc, DiscardedAcc}) ->
-                        OutNeighbors = digraph:out_neighbours(Graph, V),
-                        lists:foldl(fun({Key, _}=N, {NewVertices1, SolutionAcc1, DiscardedAcc1}) ->
+    LvlVertices = [{App,Vsn,dict:fetch(App,Levels)} || {App,Vsn} <- Vertices],
+    {ok, LvlVertices, Discarded};
+cull_deps(Graph, Vertices, Level, Levels, Solution, Discarded) ->
+    {NV, NS, LS, DS} =
+        lists:foldl(fun(V, {NewVertices, SolutionAcc, LevelsAcc, DiscardedAcc}) ->
+                        OutNeighbors = lists:keysort(1, digraph:out_neighbours(Graph, V)),
+                        lists:foldl(fun({Key, _}=N, {NewVertices1, SolutionAcc1, LevelsAcc1, DiscardedAcc1}) ->
                                             case dict:find(Key, SolutionAcc1) of
                                                 {ok, N} -> % already seen
-                                                    {NewVertices1, SolutionAcc1, DiscardedAcc1};
+                                                    {NewVertices1, SolutionAcc1, LevelsAcc, DiscardedAcc1};
                                                 {ok, _} -> % conflict resolution!
-                                                    {NewVertices1, SolutionAcc1, [N|DiscardedAcc1]};
+                                                    {NewVertices1, SolutionAcc1, LevelsAcc, [N|DiscardedAcc1]};
                                                 error ->
-                                                    {[N | NewVertices1], dict:store(Key, N, SolutionAcc1), DiscardedAcc1}
+                                                    {[N | NewVertices1],
+                                                     dict:store(Key, N, SolutionAcc1),
+                                                     dict:store(Key, Level, LevelsAcc1),
+                                                     DiscardedAcc1}
                                             end
-                                    end, {NewVertices, SolutionAcc, DiscardedAcc}, OutNeighbors)
-                    end, {[], Solution, Discarded}, lists:sort(Vertices)),
-    cull_deps(Graph, NV, NS, DS).
+                                    end, {NewVertices, SolutionAcc, LevelsAcc, DiscardedAcc}, OutNeighbors)
+                    end, {[], Solution, Levels, Discarded}, lists:keysort(1, Vertices)),
+    cull_deps(Graph, NV, Level+1, LS, NS, DS).
 
 subgraph(Graph, Vertices) ->
     digraph_utils:subgraph(Graph, Vertices).

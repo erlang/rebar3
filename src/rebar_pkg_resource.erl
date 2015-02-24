@@ -14,7 +14,7 @@
 lock(_AppDir, Source) ->
     Source.
 
-needs_update(Dir, {pkg, _Name, Vsn, _Url}) ->
+needs_update(Dir, {pkg, _Name, Vsn}) ->
     [AppInfo] = rebar_app_discover:find_apps([Dir], all),
     case rebar_app_info:original_vsn(AppInfo) =:= ec_cnv:to_list(Vsn) of
         true ->

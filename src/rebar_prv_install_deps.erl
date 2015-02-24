@@ -204,8 +204,9 @@ update_pkg_deps(Profile, Pkgs, Packages, Upgrade, Seen, State) ->
 
 handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Fetched, Seen, State) ->
     AppInfo = package_to_app(DepsDir, Packages, Pkg),
-    {NewSeen, NewState} = maybe_lock(Profile, AppInfo, Seen, State, 0),
-    case maybe_fetch(AppInfo, Upgrade, NewSeen, NewState) of
+    Level = rebar_app_info:dep_level(AppInfo),
+    {NewSeen, NewState} = maybe_lock(Profile, AppInfo, Seen, State, Level),
+    case maybe_fetch(AppInfo, Upgrade, Seen, NewState) of
         true ->
             {[AppInfo | Fetched], NewSeen, NewState};
         false ->
@@ -234,7 +235,7 @@ maybe_lock(Profile, AppInfo, Seen, State, Level) ->
             {Seen, State}
     end.
 
-package_to_app(DepsDir, Packages, {Name, Vsn}) ->
+package_to_app(DepsDir, Packages, {Name, Vsn, Level}) ->
     case dict:find({Name, Vsn}, Packages) of
         error ->
             throw(?PRV_ERROR({missing_package, Name, Vsn}));
@@ -244,7 +245,8 @@ package_to_app(DepsDir, Packages, {Name, Vsn}) ->
             {ok, AppInfo} = rebar_app_info:new(Name, Vsn),
             AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
             AppInfo2 = rebar_app_info:dir(AppInfo1, rebar_dir:deps_dir(DepsDir, Name)),
-            rebar_app_info:source(AppInfo2, {pkg, Name, Vsn})
+            AppInfo3 = rebar_app_info:dep_level(AppInfo2, Level),
+            rebar_app_info:source(AppInfo3, {pkg, Name, Vsn})
     end.
 
 -spec update_src_deps(atom(), non_neg_integer(), list(), list(), list(), rebar_state:t(), boolean(), sets:set(binary()), list()) -> {rebar_state:t(), list(), list(), sets:set(binary())}.
@@ -432,6 +434,8 @@ parse_dep({Name, _Vsn, Source, Opts}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) 
     ?WARN("Dependency option list ~p in ~p is not supported and will be ignored", [Opts, Name]),
     Dep = new_dep(DepsDir, Name, [], Source, State),
     {[Dep | SrcDepsAcc], PkgDepsAcc};
+parse_dep({_Name, {pkg, Name, Vsn}, Level}, {SrcDepsAcc, PkgDepsAcc}, _, _) when is_integer(Level) ->
+    {SrcDepsAcc, [{Name, Vsn} | PkgDepsAcc]};
 parse_dep({Name, Source, Level}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_tuple(Source)
                                                                               , is_integer(Level) ->
     Dep = new_dep(DepsDir, Name, [], Source, State),
