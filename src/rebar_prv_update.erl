@@ -47,8 +47,7 @@ do(State) ->
         write_registry(Dict, Graph, State),
         ok
     catch
-        E:C ->
-            io:format("E C ~p ~p~n~p~n", [E, C, erlang:get_stacktrace()]),
+        _E:_C ->
             throw({error, {?MODULE, package_index_write}})
     end,
 
