@@ -207,9 +207,7 @@ merge_opts(Profile, NewOpts, OldOpts) ->
                                   true ->
                                       NewValue;
                                   false ->
-                                      lists:keymerge(1
-                                                    ,lists:keysort(1, OldValue)
-                                                    ,lists:keysort(1, NewValue))
+                                      OldValue ++ NewValue
                               end;
                          (_Key, NewValue, _OldValue) ->
                               NewValue
