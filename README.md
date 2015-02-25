@@ -33,6 +33,7 @@ limit scope.
 | ct         | Run Common Test suites |
 | do         | Higher-order provider to run multiple tasks in sequence |
 | dialyzer   | Run the Dialyzer analyzer on the project |
+| edoc       | Generate documentation using edoc |
 | eunit      | Run eunit tests |
 | help       | Print help for rebar or task |
 | new        | Create new rebar project from templates |
