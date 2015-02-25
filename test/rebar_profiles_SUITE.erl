@@ -6,14 +6,15 @@
          end_per_testcase/2,
          all/0,
          profile_new_key/1,
-         profile_merge_keys/1]).
+         profile_merge_keys/1,
+         profile_merges/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/file.hrl").
 
 all() ->
-    [profile_new_key, profile_merge_keys].
+    [profile_new_key, profile_merge_keys, profile_merges].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -80,3 +81,20 @@ profile_merge_keys(Config) ->
                                    ["as", "ct", "compile"], {ok, [{app, Name}
                                                                  ,{dep, "a", "1.0.0"}
                                                                  ,{dep, "b", "2.0.0"}]}).
+
+profile_merges(_Config) ->
+    RebarConfig = [{test1, [{key1, 1, 2}, key2]},
+                   {test2, "hello"},
+                   {profiles,
+                    [{profile1,
+                      [{test1, [{key3, 5}, key1]}]},
+                     {profile2, [{test2, "goodbye"}]}]}],
+    State = rebar_state:new(RebarConfig),
+    State1 = rebar_state:apply_profiles(State, [profile1, profile2]),
+
+    %% Combine lists
+    ?assertEqual(lists:sort([key1, key2, {key1, 1, 2}, {key3, 5}]),
+                 lists:sort(rebar_state:get(State1, test1))),
+
+    %% Use new value for strings
+    "goodbye" = rebar_state:get(State1, test2).
