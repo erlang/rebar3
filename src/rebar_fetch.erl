@@ -17,7 +17,8 @@
 -include_lib("providers/include/providers.hrl").
 
 %% map short versions of resources to module names
--define(RESOURCES, [{git, rebar_git_resource}, {pkg, rebar_pkg_resource}]).
+-define(RESOURCES, [{git, rebar_git_resource}, {pkg, rebar_pkg_resource},
+                    {hg, rebar_hg_resource}]).
 
 -spec lock_source(file:filename_all(), rebar_resource:resource()) ->
                          rebar_resource:resource() | {error, string()}.
