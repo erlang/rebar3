@@ -162,9 +162,9 @@ mod_to_filename(TaskDir, M) ->
 process(Coverage) -> process(Coverage, {0, 0}).
 
 process([], {0, 0}) ->
-    "0.0%";
+    "0%";
 process([], {Cov, Not}) ->
-    float_to_list((Cov / (Cov + Not)) * 100, [{decimals, 1}]) ++ "%";
+    integer_to_list(trunc((Cov / (Cov + Not)) * 100)) ++ "%";
 %% line 0 is a line added by eunit and never executed so ignore it
 process([{{_, 0}, _}|Rest], Acc) -> process(Rest, Acc);
 process([{_, {Cov, Not}}|Rest], {Covered, NotCovered}) ->
