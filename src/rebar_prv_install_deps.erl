@@ -61,8 +61,8 @@ init(State) ->
                                                                {bare, true},
                                                                {deps, ?DEPS},
                                                                {example, undefined},
-                                                               {short_desc, "Install dependencies"},
-                                                               {desc, info("Install dependencies")},
+                                                               {short_desc, ""},
+                                                               {desc, ""},
                                                                {opts, []}])),
     {ok, State1}.
 
@@ -498,39 +498,6 @@ parse_goal(Name, Constraint) ->
         nomatch ->
             fail
     end.
-
-info(Description) ->
-    io_lib:format("~s.~n"
-                 "~n"
-                 "Valid rebar.config options:~n"
-                 "  ~p~n"
-                 "  ~p~n",
-                 [
-                 Description,
-                 {deps_dir, "deps"},
-                 {deps,
-                  [app_name,
-                   {rebar, "1.0.*"},
-                   {rebar, ".*",
-                    {git, "git://github.com/rebar/rebar.git"}},
-                   {rebar, ".*",
-                    {git, "git://github.com/rebar/rebar.git", "Rev"}},
-                   {rebar, "1.0.*",
-                    {git, "git://github.com/rebar/rebar.git", {branch, "master"}}},
-                   {rebar, "1.0.0",
-                    {git, "git://github.com/rebar/rebar.git", {tag, "1.0.0"}}},
-                   {rebar, "",
-                    {git, "git://github.com/rebar/rebar.git", {branch, "master"}},
-                    [raw]},
-                   {app_name, ".*", {hg, "https://www.example.org/url"}},
-                   {app_name, ".*", {rsync, "Url"}},
-                   {app_name, ".*", {svn, "https://www.example.org/url"}},
-                   {app_name, ".*", {svn, "svn://svn.example.org/url"}},
-                   {app_name, ".*", {bzr, "https://www.example.org/url", "Rev"}},
-                   {app_name, ".*", {fossil, "https://www.example.org/url"}},
-                   {app_name, ".*", {fossil, "https://www.example.org/url", "Vsn"}},
-                   {app_name, ".*", {p4, "//depot/subdir/app_dir"}}]}
-                 ]).
 
 warn_skip_deps(AppInfo) ->
     ?WARN("Skipping ~s (from ~p) as an app of the same name "
