@@ -120,7 +120,7 @@ run_aux(State, GlobalPluginProviders, RawArgs) ->
              end,
 
     %% Process each command, resetting any state between each one
-    BaseDir = rebar_dir:base_dir(State2),
+    BaseDir = rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR),
     State3 = rebar_state:set(State2, base_dir,
                             filename:join(filename:absname(rebar_state:dir(State2)), BaseDir)),
 

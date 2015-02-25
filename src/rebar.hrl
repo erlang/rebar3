@@ -14,7 +14,6 @@
 -define(FMT(Str, Args), lists:flatten(io_lib:format(Str, Args))).
 
 -define(DEFAULT_BASE_DIR, "_build").
--define(DEFAULT_PROFILE_DIR, "default").
 -define(DEFAULT_PROJECT_APP_DIRS, ["_checkouts", "apps", "lib", "."]).
 -define(DEFAULT_DEPS_DIR, "lib").
 -define(DEFAULT_PLUGINS_DIR, "plugins").

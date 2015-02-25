@@ -23,7 +23,10 @@
 
 -spec base_dir(rebar_state:t()) -> file:filename_all().
 base_dir(State) ->
-    rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR).
+    Profiles = rebar_state:current_profiles(State),
+    ProfilesStrings = [ec_cnv:to_list(P) || P <- Profiles],
+    ProfilesDir = string:join(ProfilesStrings, "+"),
+    filename:join(rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR), ProfilesDir).
 
 -spec deps_dir(rebar_state:t()) -> file:filename_all().
 deps_dir(State) ->

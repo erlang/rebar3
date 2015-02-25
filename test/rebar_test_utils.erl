@@ -142,7 +142,7 @@ top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
 %%% Helpers %%%
 %%%%%%%%%%%%%%%
 check_results(AppDir, Expected) ->
-    BuildDir = filename:join([AppDir, "_build", "lib"]),
+    BuildDirs = filelib:wildcard(filename:join([AppDir, "_build", "*", "lib"])),
     CheckoutsDir = filename:join([AppDir, "_checkouts"]),
     LockFile = filename:join([AppDir, "rebar.lock"]),
     Locks = lists:flatten(rebar_config:consult_file(LockFile)),
@@ -152,7 +152,7 @@ check_results(AppDir, Expected) ->
     AppsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Apps],
     InvalidAppsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- InvalidApps],
     ValidAppsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- ValidApps],
-    Deps = rebar_app_discover:find_apps([BuildDir], all),
+    Deps = rebar_app_discover:find_apps(BuildDirs, all),
     DepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Deps],
     Checkouts = rebar_app_discover:find_apps([CheckoutsDir], all),
     CheckoutsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Checkouts],
@@ -217,7 +217,7 @@ check_results(AppDir, Expected) ->
                 {ok, Cwd} = file:get_cwd(),
                 try
                     file:set_cwd(AppDir),
-                    ReleaseDir = filename:join([AppDir, "_build", "rel"]),
+                    [ReleaseDir] = filelib:wildcard(filename:join([AppDir, "_build", "*", "rel"])),
                     RelxState = rlx_state:new("", [], []),
                     RelxState1 = rlx_state:base_output_dir(RelxState, ReleaseDir),
                     {ok, RelxState2} = rlx_prv_app_discover:do(RelxState1),
