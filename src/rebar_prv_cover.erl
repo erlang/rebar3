@@ -250,6 +250,9 @@ write_index_section(F, [{Section, DataFile, Mods}|Rest]) ->
     ok = file:write(F, "</table>\n"),
     write_index_section(F, Rest).
 
+%% fix for r15b which doesn't put the correct path in the `source` section
+%%  of `module_info(compile)`
+strip_coverdir([]) -> "";
 strip_coverdir(File) ->
     filename:join(lists:reverse(lists:sublist(lists:reverse(filename:split(File)),
                                               2))).
