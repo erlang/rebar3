@@ -165,9 +165,17 @@ analyze_to_file(Mod, State, Task) ->
     ok = filelib:ensure_dir(filename:join([TaskDir, "dummy.html"])),
     case code:ensure_loaded(Mod) of
         {module, _} ->
-            cover:analyze_to_file(Mod, mod_to_filename(TaskDir, Mod), [html]);
+            write_file(Mod, mod_to_filename(TaskDir, Mod));
         {error, _}  ->
             ?WARN("Can't load module ~ts.", [Mod]),
+            {ok, []}
+    end.
+
+write_file(Mod, FileName) ->
+    case cover:analyze_to_file(Mod, FileName, [html]) of
+        {ok, File} -> {ok, File};
+        {error, Reason} ->
+            ?WARN("Couldn't write annotated file for module ~p for reason ~p", [Mod, Reason]),
             {ok, []}
     end.
 
