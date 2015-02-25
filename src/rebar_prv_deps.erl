@@ -67,7 +67,7 @@ display_dep(_State, {Name, _Vsn, Source}) when is_tuple(Source), element(1, Sour
 display_dep(_State, {Name, _Vsn, Source, _Opts}) when is_tuple(Source), element(1, Source) =:= git ->
     ?CONSOLE("~s* (git soutce)", [ec_cnv:to_binary(Name)]);
 %% unknown source
-display_dep(_State, {Name, Source}) when is_tuple(Source), element(1, Source) ->
+display_dep(_State, {Name, Source}) when is_tuple(Source) ->
     ?CONSOLE("~s* (source ~p)", [ec_cnv:to_binary(Name), Source]);
 display_dep(_State, {Name, _Vsn, Source}) when is_tuple(Source) ->
     ?CONSOLE("~s* (source ~p)", [ec_cnv:to_binary(Name), Source]);
