@@ -29,6 +29,7 @@
                      rebar_prv_dialyzer,
                      rebar_prv_do,
                      rebar_prv_eunit,
+                     rebar_prv_edoc,
                      rebar_prv_lock,
                      rebar_prv_install_deps,
                      rebar_prv_packages,
