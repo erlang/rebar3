@@ -28,36 +28,20 @@ init(State) ->
                                  {short_desc, "Run EUnit Tests."},
                                  {desc, ""},
                                  {opts, eunit_opts(State)},
-                                 {profiles, [test]}]),
+                                 {profiles, [test, eunit]}]),
     State1 = rebar_state:add_provider(State, Provider),
-    {ok, State1}.
+    State2 = rebar_state:add_to_profile(State1, eunit, test_state(State1)),
+    {ok, State2}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     ?INFO("Performing EUnit tests...", []),
-    {RawOpts, _} = rebar_state:command_parsed_args(State),
-    Opts = transform_opts(RawOpts, State),
-    TestApps = filter_checkouts(rebar_state:project_apps(State)),
-    OutDir = proplists:get_value(outdir, Opts, default_test_dir(State)),
-    ?DEBUG("Compiling EUnit instrumented modules in: ~p", [OutDir]),
-    lists:foreach(fun(App) ->
-                      AppDir = rebar_app_info:dir(App),
-                      C = rebar_config:consult(AppDir),
-                      S = rebar_state:new(State, C, AppDir),
-                      %% combine `erl_first_files` and `eunit_first_files` and adjust
-                      %% compile opts to include `eunit_compile_opts`, `{d, 'TEST'}`
-                      %% and `{src_dirs, "test"}`
-                      TestState = first_files(test_state(S, OutDir)),
-                      ok = rebar_erlc_compiler:compile(TestState, AppDir)
-                  end, TestApps),
-    ok = maybe_compile_extra_tests(TestApps, State, OutDir),
-    Path = code:get_path(),
-    true = code:add_patha(OutDir),
+    {Opts, _} = rebar_state:command_parsed_args(State),
     EUnitOpts = resolve_eunit_opts(State, Opts),
-    AppsToTest = [{application, erlang:binary_to_atom(rebar_app_info:name(App), unicode)}
-                  || App <- TestApps],
+    TestApps = filter_checkouts(rebar_state:project_apps(State)),
+    ok = maybe_compile_extra_tests(TestApps, State),
+    AppsToTest = test_dirs(TestApps),
     Result = eunit:test(AppsToTest, EUnitOpts),
-    true = code:set_path(Path),
     case handle_results(Result) of
         {error, Reason} ->
             {error, {?MODULE, Reason}};
@@ -72,23 +56,9 @@ format_error({error_running_tests, Reason}) ->
     io_lib:format("Error running tests: ~p", [Reason]).
 
 eunit_opts(_State) ->
-    [{outdir, $o, "outdir", string, help(outdir)},
-     {verbose, $v, "verbose", boolean, help(verbose)}].
+    [{verbose, $v, "verbose", boolean, help(verbose)}].
 
-help(outdir) -> "Output directory for EUnit compiled modules";
 help(verbose) -> "Verbose output".
-
-transform_opts(Opts, State) -> transform_opts(Opts, State, []).
-
-transform_opts([], _State, Acc) -> Acc;
-transform_opts([{outdir, Path}|Rest], State, Acc) ->
-    NewAcc = case filename:pathtype(Path) of
-        absolute -> [{outdir, Path}] ++ Acc;
-        _ -> [{outdir, filename:join([rebar_state:dir(State), Path])}] ++ Acc
-    end,
-    transform_opts(Rest, State, NewAcc);
-transform_opts([{Key, Val}|Rest], State, Acc) ->
-    transform_opts(Rest, State, [{Key, Val}|Acc]).
 
 filter_checkouts(Apps) -> filter_checkouts(Apps, []).
 
@@ -101,21 +71,30 @@ filter_checkouts([App|Rest], Acc) ->
         false -> filter_checkouts(Rest, [App|Acc])
     end.
 
-default_test_dir(State) ->
-    Tmp = rebar_file_utils:system_tmpdir(),
-    Root = filename:join([rebar_state:dir(State), Tmp]),
-    Project = filename:basename(rebar_state:dir(State)),
-    OutDir = filename:join([Root, Project ++ "_rebar3_eunit"]),
-    ok = rebar_file_utils:reset_dir(OutDir),
-    OutDir.
+resolve_eunit_opts(State, Opts) ->
+    EUnitOpts = rebar_state:get(State, eunit_opts, []),
+    case proplists:get_value(verbose, Opts, false) of
+        true -> set_verbose(EUnitOpts);
+        false -> EUnitOpts
+    end.
 
-test_state(State, TmpDir) ->
-    ErlOpts = rebar_state:get(State, eunit_compile_opts, []) ++
-        rebar_utils:erl_opts(State),
-    ErlOpts1 = [{outdir, TmpDir}] ++
-        add_test_dir(ErlOpts),
+test_dirs(TestApps) ->
+    %% we need to add "./ebin" but only if it's not already due to be added
+    F = fun(App) -> rebar_app_info:dir(App) == rebar_dir:get_cwd() end,
+    case lists:any(F, TestApps) of
+        true  -> test_dirs(TestApps, []);
+        false -> [{dir, "ebin"}|test_dirs(TestApps, [])]
+    end.
+
+test_dirs([], Acc) -> lists:reverse(Acc);
+test_dirs([App|Rest], Acc) ->
+    test_dirs(Rest, [{dir, rebar_app_info:ebin_dir(App)}|Acc]).
+
+test_state(State) ->
+    ErlOpts = rebar_state:get(State, eunit_compile_opts, []),
+    ErlOpts1 = add_test_dir(ErlOpts),
     TestOpts = safe_define_test_macro(ErlOpts1),
-    rebar_state:set(State, erl_opts, TestOpts).
+    first_files(State) ++ [{erl_opts, TestOpts}].
 
 add_test_dir(Opts) ->
     %% if no src_dirs are set we have to specify `src` or it won't
@@ -139,37 +118,23 @@ test_defined([_|Rest]) -> test_defined(Rest);
 test_defined([]) -> false.
 
 first_files(State) ->
-    BaseFirst = rebar_state:get(State, erl_first_files, []),
     EUnitFirst = rebar_state:get(State, eunit_first_files, []),
-    rebar_state:set(State, erl_first_files, BaseFirst ++ EUnitFirst).
-
-resolve_eunit_opts(State, Opts) ->
-    EUnitOpts = rebar_state:get(State, eunit_opts, []),
-    case lists:member({verbose, true}, Opts) of
-        true -> set_verbose(EUnitOpts);
-        false -> EUnitOpts
-    end.
+    [{erl_first_files, EUnitFirst}].
 
 set_verbose(Opts) ->
+    %% if `verbose` is already set don't set it again
     case lists:member(verbose, Opts) of
         true -> Opts;
         false -> [verbose] ++ Opts
     end.
 
-maybe_compile_extra_tests(TestApps, State, OutDir) ->
+maybe_compile_extra_tests(TestApps, State) ->
     F = fun(App) -> rebar_app_info:dir(App) == rebar_dir:get_cwd() end,
     case lists:filter(F, TestApps) of
         %% compile just the `test` and extra test directories of the base dir
-        [] ->
-            ErlOpts = rebar_state:get(State, common_test_compile_opts, []) ++
-                      rebar_utils:erl_opts(State),
-            TestOpts = [{outdir, OutDir}] ++
-                       [{src_dirs, ["test"]}] ++
-                       safe_define_test_macro(lists:keydelete(src_dirs, 1, ErlOpts)),
-            TestState = first_files(rebar_state:set(State, erl_opts, TestOpts)),
-            rebar_erlc_compiler:compile(TestState, rebar_dir:get_cwd());
+        [] -> rebar_erlc_compiler:compile(State, rebar_dir:get_cwd());
         %% already compiled `./test` so do nothing
-        _ -> ok
+        _  -> ok
     end.
 
 handle_results(ok) -> ok;
