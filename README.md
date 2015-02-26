@@ -32,6 +32,7 @@ limit scope.
 | as         | Higher-order provider to run multiple tasks in sequence as certain profiles |
 | compile    | Build project |
 | clean      | Remove project apps beam files |
+| cover      | Generate coverage info from data compiled by `eunit --cover` or `ct --cover` |
 | ct         | Run Common Test suites |
 | do         | Higher-order provider to run multiple tasks in sequence |
 | dialyzer   | Run the Dialyzer analyzer on the project |
