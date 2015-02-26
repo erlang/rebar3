@@ -42,8 +42,8 @@ do_tasks([{TaskStr, Args}|Tail], State) ->
     State1 = rebar_state:set(State, task, Task),
     State2 = rebar_state:command_args(State1, Args),
     case rebar_core:process_command(State2, Task) of
-        {ok, State3} ->
-            do_tasks(Tail, State3);
+        {ok, _} ->
+            do_tasks(Tail, State);
         Error ->
             Error
     end.
