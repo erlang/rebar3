@@ -15,7 +15,7 @@
          command_args/1, command_args/2,
          command_parsed_args/1, command_parsed_args/2,
 
-         apply_profiles/2,
+         add_to_profile/3, apply_profiles/2,
 
          dir/1, dir/2,
          create_logic_providers/2,
@@ -186,6 +186,13 @@ apply_overrides(State=#state_t{overrides=Overrides}, AppName) ->
                    (_, StateAcc) ->
                         StateAcc
                 end, State2, Overrides).
+
+add_to_profile(State, Profile, KVs) when is_atom(Profile), is_list(KVs) ->
+    Profiles = rebar_state:get(State, profiles, []),
+    ProfileOpts = dict:from_list(proplists:get_value(Profile, Profiles, [])),
+    NewOpts = merge_opts(Profile, dict:from_list(KVs), ProfileOpts),
+    NewProfiles = [{Profile, dict:to_list(NewOpts)}|lists:keydelete(Profile, 1, Profiles)],
+    rebar_state:set(State, profiles, NewProfiles).
 
 apply_profiles(State, Profile) when not is_list(Profile) ->
     apply_profiles(State, [Profile]);

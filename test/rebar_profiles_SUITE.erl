@@ -7,14 +7,17 @@
          all/0,
          profile_new_key/1,
          profile_merge_keys/1,
-         profile_merges/1]).
+         profile_merges/1,
+         add_to_profile/1,
+         add_to_existing_profile/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/file.hrl").
 
 all() ->
-    [profile_new_key, profile_merge_keys, profile_merges].
+    [profile_new_key, profile_merge_keys, profile_merges,
+     add_to_profile, add_to_existing_profile].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -98,3 +101,23 @@ profile_merges(_Config) ->
 
     %% Use new value for strings
     "goodbye" = rebar_state:get(State1, test2).
+
+add_to_profile(_Config) ->
+    RebarConfig = [{foo, true}, {bar, false}],
+    State = rebar_state:new(RebarConfig),
+    State1 = rebar_state:add_to_profile(State, test, [{foo, false}]),
+    State2 = rebar_state:apply_profiles(State1, test),
+
+    Opts = rebar_state:opts(State2),
+    lists:map(fun(K) -> false = dict:fetch(K, Opts) end, [foo, bar]).
+
+add_to_existing_profile(_Config) ->
+    RebarConfig = [{foo, true}, {bar, false}, {profiles, [
+        {test, [{foo, false}]}
+    ]}],
+    State = rebar_state:new(RebarConfig),
+    State1 = rebar_state:add_to_profile(State, test, [{baz, false}]),
+    State2 = rebar_state:apply_profiles(State1, test),
+    
+    Opts = rebar_state:opts(State2),
+    lists:map(fun(K) -> false = dict:fetch(K, Opts) end, [foo, bar, baz]).
