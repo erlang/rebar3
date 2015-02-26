@@ -26,7 +26,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_erlc_compiler).
 
--export([compile/2,
+-export([compile/3,
          clean/2]).
 
 -include("rebar.hrl").
@@ -79,8 +79,8 @@
 %%                           'old_inets'}]}.
 %%
 
--spec compile(rebar_state:t(), file:name()) -> 'ok'.
-compile(Config, Dir) ->
+-spec compile(rebar_state:t(), file:name(), file:name()) -> 'ok'.
+compile(Config, Dir, OutDir) ->
     rebar_base_compiler:run(Config,
                             check_files(rebar_state:get(
                                           Config, xrl_first_files, [])),
@@ -96,7 +96,7 @@ compile(Config, Dir) ->
                                           Config, mib_first_files, [])),
                             filename:join(Dir, "mibs"), ".mib", filename:join([Dir, "priv", "mibs"]), ".bin",
                             fun compile_mib/3),
-    doterl_compile(Config, Dir).
+    doterl_compile(Config, Dir, OutDir).
 
 -spec clean(rebar_state:t(), file:filename()) -> 'ok'.
 clean(Config, AppDir) ->
@@ -128,21 +128,19 @@ clean(Config, AppDir) ->
 %% Internal functions
 %% ===================================================================
 
--spec doterl_compile(rebar_state:t(), file:filename()) -> ok.
-doterl_compile(State, Dir) ->
+-spec doterl_compile(rebar_state:t(), file:filename(), file:filename()) -> ok.
+doterl_compile(State, Dir, ODir) ->
     ErlOpts = rebar_utils:erl_opts(State),
-    doterl_compile(State, Dir, [], ErlOpts).
+    doterl_compile(State, Dir, ODir, [], ErlOpts).
 
-doterl_compile(Config, Dir, MoreSources, ErlOpts) ->
-    OutDir = filename:join(Dir, "ebin"),
+doterl_compile(Config, Dir, ODir, MoreSources, ErlOpts) ->
+    OutDir = filename:join(ODir, "ebin"),
     ErlFirstFilesConf = rebar_state:get(Config, erl_first_files, []),
     ?DEBUG("erl_opts ~p", [ErlOpts]),
     %% Support the src_dirs option allowing multiple directories to
     %% contain erlang source. This might be used, for example, should
     %% eunit tests be separated from the core application source.
-    SrcDirs = lists:map(fun(X) ->
-                                filename:join(Dir, X)
-                        end, rebar_dir:src_dirs(proplists:append_values(src_dirs, ErlOpts))),
+    SrcDirs = [filename:join(Dir, X) || X <- proplists:get_value(src_dirs, ErlOpts, ["src"])],
     AllErlFiles = gather_src(SrcDirs, []) ++ MoreSources,
 
     %% Issue: rebar/rebar3#140 (fix matching based on same path + order of
@@ -152,9 +150,9 @@ doterl_compile(Config, Dir, MoreSources, ErlOpts) ->
                          not lists:member(File, ErlFirstFiles) ],
 
     %% Make sure that ebin/ exists and is on the path
-    ok = filelib:ensure_dir(filename:join([Dir, "ebin", "dummy.beam"])),
+    ok = filelib:ensure_dir(filename:join(OutDir, "dummy.beam")),
     CurrPath = code:get_path(),
-    true = code:add_path(filename:absname(filename:join(Dir, "ebin"))),
+    true = code:add_path(filename:absname(OutDir)),
     OutDir1 = proplists:get_value(outdir, ErlOpts, OutDir),
     G = init_erlcinfo(Config, AllErlFiles),
     %% Split RestErls so that files which are depended on are treated

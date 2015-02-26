@@ -14,8 +14,6 @@
          get_cwd/0,
          template_globals/1,
          template_dir/1,
-         src_dirs/1,
-         ebin_dir/0,
          processing_base_dir/1,
          processing_base_dir/2]).
 
@@ -80,15 +78,6 @@ template_globals(State) ->
 
 template_dir(State) ->
     filename:join([global_config_dir(State), "templates"]).
-
--spec src_dirs([string()]) -> [file:filename(), ...].
-src_dirs([]) ->
-    ["src"];
-src_dirs(SrcDirs) ->
-    SrcDirs.
-
-ebin_dir() ->
-    filename:join(get_cwd(), "ebin").
 
 processing_base_dir(State) ->
     Cwd = get_cwd(),

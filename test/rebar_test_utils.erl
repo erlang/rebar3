@@ -146,12 +146,13 @@ check_results(AppDir, Expected) ->
     CheckoutsDir = filename:join([AppDir, "_checkouts"]),
     LockFile = filename:join([AppDir, "rebar.lock"]),
     Locks = lists:flatten(rebar_config:consult_file(LockFile)),
-    Apps = rebar_app_discover:find_apps([AppDir]),
-    InvalidApps = rebar_app_discover:find_apps([AppDir], invalid),
-    ValidApps = rebar_app_discover:find_apps([AppDir], valid),
-    AppsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Apps],
-    InvalidAppsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- InvalidApps],
-    ValidAppsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- ValidApps],
+
+    InvalidApps = rebar_app_discover:find_apps(BuildDirs, invalid),
+    ValidApps = rebar_app_discover:find_apps(BuildDirs, valid),
+
+    InvalidDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- InvalidApps],
+    ValidDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- ValidApps],
+
     Deps = rebar_app_discover:find_apps(BuildDirs, all),
     DepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Deps],
     Checkouts = rebar_app_discover:find_apps([CheckoutsDir], all),
@@ -160,7 +161,7 @@ check_results(AppDir, Expected) ->
     lists:foreach(
         fun({app, Name}) ->
                 ct:pal("Name: ~p", [Name]),
-                case lists:keyfind(Name, 1, AppsNames) of
+                case lists:keyfind(Name, 1, DepsNames) of
                     false ->
                         error({app_not_found, Name});
                     {Name, _App} ->
@@ -168,7 +169,7 @@ check_results(AppDir, Expected) ->
                 end
         ; ({app, Name, invalid}) ->
                 ct:pal("Name: ~p", [Name]),
-                case lists:keyfind(Name, 1, InvalidAppsNames) of
+                case lists:keyfind(Name, 1, InvalidDepsNames) of
                     false ->
                         error({app_not_found, Name});
                     {Name, _App} ->
@@ -176,7 +177,7 @@ check_results(AppDir, Expected) ->
                 end
         ; ({app, Name, valid}) ->
                 ct:pal("Name: ~p", [Name]),
-                case lists:keyfind(Name, 1, ValidAppsNames) of
+                case lists:keyfind(Name, 1, ValidDepsNames) of
                     false ->
                         error({app_not_found, Name});
                     {Name, _App} ->

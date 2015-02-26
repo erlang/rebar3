@@ -72,7 +72,7 @@ clean_apps(State, Apps) ->
                           ?INFO("Cleaning out ~s...", [rebar_app_info:name(AppInfo)]),
                           %% Legacy hook support
                           rebar_hooks:run_compile_hooks(AppDir, pre_hooks, clean, S),
-                          rebar_erlc_compiler:clean(State, ec_cnv:to_list(rebar_app_info:dir(AppInfo))),
+                          rebar_erlc_compiler:clean(State, rebar_app_info:out_dir(AppInfo)),
                           rebar_hooks:run_compile_hooks(AppDir, post_hooks, clean, S)
                   end, Apps).
 

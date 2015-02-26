@@ -102,7 +102,6 @@ prepare(State) ->
     %% Save the code path prior to doing any further code path
     %% manipulation
     OriginalPath = code:get_path(),
-    true = code:add_path(rebar_dir:ebin_dir()),
 
     %% Get list of xref checks we want to run
     ConfXrefChecks = rebar_state:get(State, xref_checks,

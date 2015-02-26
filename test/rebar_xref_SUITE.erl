@@ -57,8 +57,9 @@ end_per_testcase(_, Config) ->
     %% we are about to remove the directory and there may be
     %% subsequent test cases that error out when the code path tries
     %% to include one of these soon-to-be nonexistent directories.
-    code:del_path(AppDir ++ "/."),
-    true = code:del_path(rebar_dir:ebin_dir()),
+    Name = ?config(app_name, Config),
+    EbinDir = filename:join([AppDir, "_build", "default" "lib", Name, "ebin"]),
+    true = code:del_path(EbinDir),
     file:set_cwd(OrigDir),
     ec_file:remove(AppDir, [recursive]),
     ok.
