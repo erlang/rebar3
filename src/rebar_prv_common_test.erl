@@ -52,11 +52,13 @@ do(State) ->
                       ok = rebar_erlc_compiler:compile(TestState, AppDir)
                   end, TestApps),
     ok = maybe_compile_extra_tests(TestApps, State, InDirs, OutDir),
+    ok = maybe_cover_compile(RawOpts, State, OutDir),
     Path = code:get_path(),
     true = code:add_patha(OutDir),
     CTOpts = resolve_ct_opts(State, Opts, OutDir),
     Verbose = proplists:get_value(verbose, Opts, false),
     Result = run_test(CTOpts, Verbose),
+    ok = rebar_prv_cover:maybe_write_coverdata(State, ?PROVIDER),
     true = code:set_path(Path),
     case Result of
         {error, Reason} ->
@@ -103,7 +105,8 @@ ct_opts(State) ->
      {silent_connections, undefined, "silent_connections", string,
       help(silent_connections)}, % all OR %% comma-seperated list
      {stylesheet, undefined, "stylesheet", string, help(stylesheet)}, %% file
-     {cover, undefined, "cover", string, help(cover)}, %% file
+     {cover, $c, "cover", boolean, help(cover)},
+     {cover_spec, undefined, "cover_spec", string, help(cover_spec)}, %% file
      {cover_stop, undefined, "cover_stop", boolean, help(cover_stop)}, %% Boolean
      {event_handler, undefined, "event_handler", string, help(event_handler)}, %% EH | [EH] WHERE EH atom() | {atom(), InitArgs} | {[atom()], InitArgs}
      {include, undefined, "include", string, help(include)}, % comma-seperated list
@@ -153,6 +156,8 @@ help(silent_connections) ->
 help(stylesheet) ->
     "Stylesheet to use for test results";
 help(cover) ->
+    "Generate cover data";
+help(cover_spec) ->
     "Cover file to use";
 help(cover_stop) ->
     ""; %% ??
@@ -210,8 +215,10 @@ transform_opts(Opts) ->
     transform_opts(Opts, []).
 
 transform_opts([], Acc) -> Acc;
-%% drop `outdir` so it's not passed to common_test
+%% drop `outdir` and `cover` so they're not passed to common_test
 transform_opts([{outdir, _}|Rest], Acc) ->
+    transform_opts(Rest, Acc);
+transform_opts([{cover, _}|Rest], Acc) ->
     transform_opts(Rest, Acc);
 transform_opts([{ct_hooks, CtHooks}|Rest], Acc) ->
     transform_opts(Rest, [{ct_hooks, parse_term(CtHooks)}|Acc]);
@@ -346,6 +353,13 @@ maybe_compile_extra_tests(TestApps, State, InDirs, OutDir) ->
         %% already compiled `./test` so do nothing
         _ -> ok
     end.
+
+maybe_cover_compile(Opts, State, OutDir) ->
+    State1 = case proplists:get_value(cover, Opts, false) of
+        true  -> rebar_state:set(State, cover_enabled, true);
+        false -> State
+    end,
+    rebar_prv_cover:maybe_cover_compile(State1, OutDir).
 
 handle_results([Result]) ->
     handle_results(Result);
