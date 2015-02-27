@@ -16,6 +16,8 @@ locations (git, hg, etc).
 3.0 Pre-Alpha
 ====
 
+[DOCUMENTATION](http://www.rebar3.org/v3.0/docs)
+
 This is an experimental branch, considered to be pre-alpha, and still
 very unstable. Use at your own risk, and expect no support. See
 [the related announcement](http://lists.basho.com/pipermail/rebar_lists.basho.com/2014-November/002087.html).
