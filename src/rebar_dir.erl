@@ -15,7 +15,8 @@
          template_globals/1,
          template_dir/1,
          processing_base_dir/1,
-         processing_base_dir/2]).
+         processing_base_dir/2,
+         make_relative_path/2]).
 
 -include("rebar.hrl").
 
@@ -86,3 +87,12 @@ processing_base_dir(State) ->
 processing_base_dir(State, Dir) ->
     AbsDir = filename:absname(Dir),
     AbsDir =:= rebar_state:get(State, base_dir).
+
+make_relative_path(Source, Target) ->
+    do_make_relative_path(filename:split(Source), filename:split(Target)).
+
+do_make_relative_path([H|T1], [H|T2]) ->
+    do_make_relative_path(T1, T2);
+do_make_relative_path(Source, Target) ->
+    Base = lists:duplicate(max(length(Target) - 1, 0), ".."),
+    filename:join(Base ++ Source).

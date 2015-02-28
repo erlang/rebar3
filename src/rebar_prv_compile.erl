@@ -123,8 +123,12 @@ copy_app_dirs(AppName, OldAppDir, AppDir) ->
             end,
             filelib:ensure_dir(filename:join(AppDir, "dummy")),
             %% link to src to be adjacent to ebin is needed for R15 use of cover/xref
-            [file:make_symlink(filename:join(OldAppDir, Dir), filename:join(AppDir, Dir))
-            || Dir <- ["priv", "include", "src"]];
+            [symlink_or_copy(OldAppDir, AppDir, Dir) || Dir <- ["priv", "include", "src"]];
         false ->
             ok
     end.
+
+symlink_or_copy(OldAppDir, AppDir, Dir) ->
+    Source = filename:join(OldAppDir, Dir),
+    Target = filename:join(AppDir, Dir),
+    rebar_file_utils:symlink_or_copy(Source, Target).
