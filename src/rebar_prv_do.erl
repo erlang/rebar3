@@ -7,6 +7,7 @@
 
 -export([init/1,
          do/1,
+         do_tasks/2,
          format_error/1]).
 
 -include("rebar.hrl").

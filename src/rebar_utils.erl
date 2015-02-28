@@ -477,8 +477,8 @@ new_task([], Acc) -> lists:reverse(Acc);
 new_task([TaskList|Rest], Acc) ->
     case re:split(TaskList, ",", [{return, list}, {parts, 2}]) of
         %% `do` consumes all remaining args
-        ["do" = Task|RestArgs] ->
-            lists:reverse([{Task, RestArgs ++ Rest}|Acc]);
+        ["do" = Task] ->
+            lists:reverse([{Task, Rest}|Acc]);
         %% single task terminated by a comma
         [Task, ""]    -> new_task(Rest, [{Task, []}|Acc]);
         %% sequence of two or more tasks

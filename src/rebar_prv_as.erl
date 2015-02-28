@@ -32,21 +32,45 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    [Profile | Rest] = rebar_state:command_args(State),
-    Tasks = args_to_tasks(Rest),
-    Profiles = [list_to_atom(X) || X <- string:tokens(Profile, ",")],
-    State1 = rebar_state:apply_profiles(State, Profiles),
-    lists:foldl(fun(TaskArgs, {ok, StateAcc}) ->
-                        [TaskStr | Args] = string:tokens(TaskArgs, " "),
-                        Task = list_to_atom(TaskStr),
-                        StateAcc1 = rebar_state:set(StateAcc, task, Task),
-                        StateAcc2 = rebar_state:command_args(StateAcc1, Args),
-                        rebar_core:process_command(StateAcc2, Task)
-                end, {ok, State1}, Tasks).
+    {Profiles, Tasks} = args_to_profiles_and_tasks(rebar_state:command_args(State)),
+    case Profiles of
+        [] ->
+            {error, "At least one profile must be specified when using `as`"};
+        _  ->
+            State1 = rebar_state:apply_profiles(State, [list_to_atom(X) || X <- Profiles]),
+            rebar_prv_do:do_tasks(Tasks, State1)
+    end.
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
-args_to_tasks(Args) ->
-    [string:strip(T) || T <- string:tokens(string:join(Args, " "), ",")].
+args_to_profiles_and_tasks(Args) ->
+    first_profile(Args).
+
+first_profile([]) -> {[], []};
+first_profile([ProfileList|Rest]) ->
+    case re:split(ProfileList, ",", [{return, list}, {parts, 2}]) of
+        %% profile terminated by comma
+        [P, More]       -> profiles([More] ++ Rest, [P]);
+        %% profile not terminated by comma
+        [P]           -> comma_or_end(Rest, [P])
+    end.
+
+profiles([], Acc) -> {lists:reverse(Acc), rebar_utils:args_to_tasks([])};
+profiles([ProfileList|Rest], Acc) ->
+    case re:split(ProfileList, ",", [{return, list}, {parts, 2}]) of
+        %% profile terminated by comma
+        [P, More]  -> profiles([More] ++ Rest, [P|Acc]);
+        %% profile not terminated by comma
+        [P]      -> comma_or_end(Rest, [P|Acc])
+    end.
+
+%% `, foo...`
+comma_or_end([","|Rest], Acc) ->
+    profiles(Rest, Acc);
+%% `,foo...`
+comma_or_end(["," ++ Profile|Rest], Acc) ->
+    profiles([Profile|Rest], Acc);
+comma_or_end(Tasks, Acc) ->
+    {lists:reverse(Acc), rebar_utils:args_to_tasks(Tasks)}.
