@@ -380,7 +380,7 @@ maybe_fetch(AppInfo, Upgrade, Seen, State) ->
                         {true, FoundApp} ->
                             ?INFO("Linking ~s to ~s", [rebar_app_info:dir(FoundApp), AppDir]),
                             filelib:ensure_dir(AppDir),
-                            ok = file:make_symlink(rebar_app_info:dir(FoundApp), AppDir),
+                            rebar_file_utils:symlink_or_copy(rebar_app_info:dir(FoundApp), AppDir),
                             true
                     end;
                 {true, _} ->
