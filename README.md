@@ -36,6 +36,7 @@ limit scope.
 | do         | Higher-order provider to run multiple tasks in sequence |
 | dialyzer   | Run the Dialyzer analyzer on the project |
 | edoc       | Generate documentation using edoc |
+| escriptize | Generate escript of project |
 | eunit      | Run eunit tests |
 | help       | Print help for rebar or task |
 | new        | Create new rebar project from templates |
@@ -47,13 +48,6 @@ limit scope.
 | upgrade    | Fetch latest version of dep |
 | version    | Print current version of Erlang/OTP and rebar |
 | xref       | Run cross reference analysis on the project |
-
-### Commands still to do
-
-| Command    | Description |
-|----------- |------------ |
-| escriptize | Generate escript of project |
-
 
 ### Changes
 
