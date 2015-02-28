@@ -42,13 +42,14 @@ do(State) ->
     ?DEBUG("Compiling EUnit instrumented modules in: ~p", [OutDir]),
     lists:foreach(fun(App) ->
                       AppDir = rebar_app_info:dir(App),
+                      AppOutDir = rebar_app_info:out_dir(App),
                       C = rebar_config:consult(AppDir),
                       S = rebar_state:new(State, C, AppDir),
                       %% combine `erl_first_files` and `eunit_first_files` and adjust
                       %% compile opts to include `eunit_compile_opts`, `{d, 'TEST'}`
                       %% and `{src_dirs, "test"}`
                       TestState = first_files(test_state(S, OutDir)),
-                      ok = rebar_erlc_compiler:compile(TestState, AppDir)
+                      ok = rebar_erlc_compiler:compile(TestState, AppDir, AppOutDir)
                   end, TestApps),
     ok = maybe_compile_extra_tests(TestApps, State, OutDir),
     Path = code:get_path(),
@@ -167,7 +168,7 @@ maybe_compile_extra_tests(TestApps, State, OutDir) ->
                        [{src_dirs, ["test"]}] ++
                        safe_define_test_macro(lists:keydelete(src_dirs, 1, ErlOpts)),
             TestState = first_files(rebar_state:set(State, erl_opts, TestOpts)),
-            rebar_erlc_compiler:compile(TestState, rebar_dir:get_cwd());
+            rebar_erlc_compiler:compile(TestState, rebar_dir:get_cwd(), rebar_dir:get_cwd());
         %% already compiled `./test` so do nothing
         _ -> ok
     end.

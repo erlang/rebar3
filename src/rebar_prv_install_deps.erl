@@ -374,7 +374,15 @@ maybe_fetch(AppInfo, Upgrade, Seen, State) ->
         false ->
             case rebar_app_discover:find_app(AppDir, all) of
                 false ->
-                    fetch_app(AppInfo, AppDir, State);
+                    case in_default(AppInfo, State) of
+                        false ->
+                            fetch_app(AppInfo, AppDir, State);
+                        {true, FoundApp} ->
+                            ?INFO("Linking ~s to ~s", [rebar_app_info:dir(FoundApp), AppDir]),
+                            filelib:ensure_dir(AppDir),
+                            rebar_file_utils:symlink_or_copy(rebar_app_info:dir(FoundApp), AppDir),
+                            true
+                    end;
                 {true, _} ->
                     case sets:is_element(rebar_app_info:name(AppInfo), Seen) of
                         true ->
@@ -392,6 +400,10 @@ in_checkouts(AppInfo) ->
         error -> false
     end.
 
+in_default(AppInfo, State) ->
+    Name = ec_cnv:to_list(rebar_app_info:name(AppInfo)),
+    DefaultAppDir = filename:join([rebar_state:get(State, base_dir), "default", "lib", Name]),
+    rebar_app_discover:find_app(DefaultAppDir, all).
 
 -spec parse_deps(binary(), list(), list(), list(), integer()) -> {[rebar_app_info:t()], [pkg_dep()]}.
 parse_deps(DepsDir, Deps, State, Locks, Level) ->

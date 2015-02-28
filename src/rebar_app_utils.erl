@@ -29,9 +29,10 @@
 -export([find/2,
          find/3,
          is_app_src/1,
-         app_src_to_app/1,
+         app_src_to_app/2,
          validate_application_info/1,
-         validate_application_info/2]).
+         validate_application_info/2,
+         format_error/1]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
@@ -56,9 +57,8 @@ is_app_src(Filename) ->
     %% this is an .app.src file.
     Filename =/= filename:rootname(Filename, ".app.src").
 
-app_src_to_app(Filename) ->
-    Path = filename:join(rebar_utils:droplast(filename:split(filename:dirname(Filename)))),
-    AppFile = filename:join([Path, "ebin", filename:basename(Filename, ".app.src") ++ ".app"]),
+app_src_to_app(OutDir, Filename) ->
+    AppFile = filename:join([OutDir, "ebin", filename:basename(Filename, ".app.src") ++ ".app"]),
     filelib:ensure_dir(AppFile),
     AppFile.
 
@@ -80,6 +80,9 @@ validate_application_info(AppInfo, AppDetail) ->
 
             end
     end.
+
+format_error(Error) ->
+    io_lib:format("~p", [Error]).
 
 %% ===================================================================
 %% Internal functions

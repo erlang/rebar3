@@ -28,6 +28,8 @@
          dep_level/2,
          dir/1,
          dir/2,
+         out_dir/1,
+         out_dir/2,
          source/1,
          source/2,
          state/1,
@@ -48,6 +50,7 @@
                      profiles=[default] :: atom(),
                      dep_level=0 :: integer(),
                      dir :: file:name(),
+                     out_dir :: file:name(),
                      source :: string() | tuple() | undefined,
                      state :: rebar_state:t() | undefined,
                      valid :: boolean()}).
@@ -79,7 +82,8 @@ new(AppName, Vsn) ->
 new(AppName, Vsn, Dir) ->
     {ok, #app_info_t{name=ec_cnv:to_binary(AppName),
                      original_vsn=Vsn,
-                     dir=ec_cnv:to_list(Dir)}}.
+                     dir=ec_cnv:to_list(Dir),
+                     out_dir=ec_cnv:to_list(Dir)}}.
 
 %% @doc build a complete version of the app info with all fields set.
 -spec new(atom() | binary() | string(), binary() | string(), file:name(), list()) ->
@@ -88,6 +92,7 @@ new(AppName, Vsn, Dir, Deps) ->
     {ok, #app_info_t{name=ec_cnv:to_binary(AppName),
                      original_vsn=Vsn,
                      dir=ec_cnv:to_list(Dir),
+                     out_dir=ec_cnv:to_list(Dir),
                      deps=Deps}}.
 
 %% @doc discover a complete version of the app info with all fields set.
@@ -133,7 +138,7 @@ app_file_src(AppInfo=#app_info_t{}, AppFileSrc) ->
     AppInfo#app_info_t{app_file_src=ec_cnv:to_list(AppFileSrc)}.
 
 -spec app_file(t()) -> file:filename_all() | undefined.
-app_file(#app_info_t{app_file=undefined, dir=Dir, name=Name}) ->
+app_file(#app_info_t{app_file=undefined, out_dir=Dir, name=Name}) ->
     AppFile = filename:join([ec_cnv:to_list(Dir), "ebin", ec_cnv:to_list(Name)++".app"]),
     case filelib:is_file(AppFile) of
         true ->
@@ -199,12 +204,23 @@ dir(#app_info_t{dir=Dir}) ->
     Dir.
 
 -spec dir(t(), file:name()) -> t().
+dir(AppInfo=#app_info_t{out_dir=undefined}, Dir) ->
+    AppInfo#app_info_t{dir=ec_cnv:to_list(Dir),
+                       out_dir=ec_cnv:to_list(Dir)};
 dir(AppInfo=#app_info_t{}, Dir) ->
     AppInfo#app_info_t{dir=ec_cnv:to_list(Dir)}.
 
+-spec out_dir(t()) -> file:name().
+out_dir(#app_info_t{out_dir=OutDir}) ->
+    OutDir.
+
+-spec out_dir(t(), file:name()) -> t().
+out_dir(AppInfo=#app_info_t{}, OutDir) ->
+    AppInfo#app_info_t{out_dir=ec_cnv:to_list(OutDir)}.
+
 -spec ebin_dir(t()) -> file:name().
-ebin_dir(#app_info_t{dir=Dir}) ->
-    filename:join(Dir, "ebin").
+ebin_dir(#app_info_t{out_dir=OutDir}) ->
+    ec_cnv:to_list(filename:join(OutDir, "ebin")).
 
 -spec source(t(), string() | tuple()) -> t().
 source(AppInfo=#app_info_t{}, Source) ->

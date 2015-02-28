@@ -26,7 +26,8 @@
 %% -------------------------------------------------------------------
 -module(rebar_file_utils).
 
--export([rm_rf/1,
+-export([symlink_or_copy/2,
+         rm_rf/1,
          cp_r/2,
          mv/2,
          delete_each/1,
@@ -40,6 +41,22 @@
 %% ===================================================================
 %% Public API
 %% ===================================================================
+
+symlink_or_copy(Source, Target) ->
+    Link = case os:type() of
+               {win32, _} ->
+                   Source;
+               _ ->
+                   rebar_dir:make_relative_path(Source, Target)
+           end,
+    case file:make_symlink(Link, Target) of
+        ok ->
+            ok;
+        {error, eexist} ->
+            ok;
+        {error, _} ->
+            cp_r([Source], Target)
+    end.
 
 %% @doc Remove files and directories.
 %% Target is a single filename, directoryname or wildcard expression.
@@ -127,7 +144,7 @@ write_file_if_contents_differ(Filename, Bytes) ->
     end.
 
 %% returns an os appropriate tmpdir given a path
--spec system_tmpdir() -> file:filename(). 
+-spec system_tmpdir() -> file:filename().
 -spec system_tmpdir(PathComponents) -> file:filename() when
       PathComponents :: [file:name()].
 

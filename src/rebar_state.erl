@@ -97,6 +97,7 @@ new(ParentState, Config, Dir) ->
                         D = proplists:get_value(deps, Config, []),
                         dict:from_list([{{deps, default}, D} | Config])
                 end,
+
     NewOpts = dict:merge(fun(_Key, Value1, _Value2) ->
                                  Value1
                          end, LocalOpts, Opts),
@@ -193,13 +194,14 @@ apply_profiles(State, [default]) ->
     State;
 apply_profiles(State=#state_t{opts=Opts, current_profiles=CurrentProfiles}, Profiles) ->
     ConfigProfiles = rebar_state:get(State, profiles, []),
-    NewOpts = lists:foldl(fun(default, OptsAcc) ->
-                                  OptsAcc;
-                             (Profile, OptsAcc) ->
-                                  ProfileOpts = dict:from_list(proplists:get_value(Profile, ConfigProfiles, [])),
-                                  merge_opts(Profile, ProfileOpts, OptsAcc)
-                          end, Opts, Profiles),
-    State#state_t{current_profiles=CurrentProfiles++Profiles, opts=NewOpts}.
+    {Profiles1, NewOpts} =
+        lists:foldl(fun(default, {ProfilesAcc, OptsAcc}) ->
+                            {ProfilesAcc, OptsAcc};
+                       (Profile, {ProfilesAcc, OptsAcc}) ->
+                            ProfileOpts = dict:from_list(proplists:get_value(Profile, ConfigProfiles, [])),
+                            {[Profile]++ProfilesAcc, merge_opts(Profile, ProfileOpts, OptsAcc)}
+                    end, {[], Opts}, Profiles),
+    State#state_t{current_profiles=CurrentProfiles++Profiles1, opts=NewOpts}.
 
 merge_opts(Profile, NewOpts, OldOpts) ->
     Opts = dict:merge(fun(_Key, NewValue, OldValue) when is_list(NewValue) ->

@@ -43,13 +43,14 @@ do(State) ->
     ?DEBUG("Compiling Common Test suites in: ~p", [OutDir]),
     lists:foreach(fun(App) ->
                       AppDir = rebar_app_info:dir(App),
+                      AppOutDir = rebar_app_info:out_dir(App),
                       C = rebar_config:consult(AppDir),
                       S = rebar_state:new(State, C, AppDir),
                       %% combine `erl_first_files` and `common_test_first_files` and
                       %% adjust compile opts to include `common_test_compile_opts`
                       %% and `{src_dirs, "test"}`
                       TestState = test_state(S, InDirs, OutDir),
-                      ok = rebar_erlc_compiler:compile(TestState, AppDir)
+                      ok = rebar_erlc_compiler:compile(TestState, AppDir, AppOutDir)
                   end, TestApps),
     ok = maybe_compile_extra_tests(TestApps, State, InDirs, OutDir),
     Path = code:get_path(),

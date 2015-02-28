@@ -14,16 +14,18 @@
          get_cwd/0,
          template_globals/1,
          template_dir/1,
-         src_dirs/1,
-         ebin_dir/0,
          processing_base_dir/1,
-         processing_base_dir/2]).
+         processing_base_dir/2,
+         make_relative_path/2]).
 
 -include("rebar.hrl").
 
 -spec base_dir(rebar_state:t()) -> file:filename_all().
 base_dir(State) ->
-    rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR).
+    Profiles = rebar_state:current_profiles(State),
+    ProfilesStrings = [ec_cnv:to_list(P) || P <- Profiles],
+    ProfilesDir = string:join(ProfilesStrings, "+"),
+    filename:join(rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR), ProfilesDir).
 
 -spec deps_dir(rebar_state:t()) -> file:filename_all().
 deps_dir(State) ->
@@ -78,15 +80,6 @@ template_globals(State) ->
 template_dir(State) ->
     filename:join([global_config_dir(State), "templates"]).
 
--spec src_dirs([string()]) -> [file:filename(), ...].
-src_dirs([]) ->
-    ["src"];
-src_dirs(SrcDirs) ->
-    SrcDirs.
-
-ebin_dir() ->
-    filename:join(get_cwd(), "ebin").
-
 processing_base_dir(State) ->
     Cwd = get_cwd(),
     processing_base_dir(State, Cwd).
@@ -94,3 +87,12 @@ processing_base_dir(State) ->
 processing_base_dir(State, Dir) ->
     AbsDir = filename:absname(Dir),
     AbsDir =:= rebar_state:get(State, base_dir).
+
+make_relative_path(Source, Target) ->
+    do_make_relative_path(filename:split(Source), filename:split(Target)).
+
+do_make_relative_path([H|T1], [H|T2]) ->
+    do_make_relative_path(T1, T2);
+do_make_relative_path(Source, Target) ->
+    Base = lists:duplicate(max(length(Target) - 1, 0), ".."),
+    filename:join(Base ++ Source).
