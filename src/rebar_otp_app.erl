@@ -51,6 +51,8 @@ compile(State, App) ->
     %% Load the app file and validate it.
     validate_app(State, App1).
 
+format_error(invalid_app_file) ->
+    "Failed to read app file";
 format_error({file_read, File, Reason}) ->
     io_lib:format("Failed to read ~s for processing: ~p", [File, Reason]);
 format_error({invalid_name, File, AppName}) ->
@@ -174,11 +176,16 @@ ensure_registered(AppData) ->
 %% config. However, in the case of *.app, rebar should not manipulate
 %% that file. This enforces that dichotomy between app and app.src.
 consult_app_file(Filename) ->
-    case lists:suffix(".app.src", Filename) of
+    case filelib:is_file(Filename) of
         false ->
-            file:consult(Filename);
+            throw(?PRV_ERROR(invalid_app_file));
         true ->
-            {ok, rebar_config:consult_file(Filename)}
+            case lists:suffix(".app.src", Filename) of
+                false ->
+                    file:consult(Filename);
+                true ->
+                    {ok, rebar_config:consult_file(Filename)}
+            end
     end.
 
 app_vsn(AppFile) ->
