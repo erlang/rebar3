@@ -71,7 +71,8 @@ Example:
 -behaviour(rebar_provider).
 
 -export([init/1,
-         do/1]).
+         do/1,
+         format_error/1]).
 
 -define(PROVIDER, something).
 -define(DEPS, []).
@@ -96,6 +97,9 @@ init(State) ->
 do(State) ->
     %% Do something
     {ok, State}.
+
+format_error(Error) ->
+    io_lib:format("~p", [Error]);
 ```
 
 
