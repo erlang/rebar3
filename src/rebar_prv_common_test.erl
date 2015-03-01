@@ -343,7 +343,7 @@ maybe_compile_extra_tests(TestApps, State, InDirs, OutDir) ->
                        [{src_dirs, ["test"|InDirs]}] ++
                        lists:keydelete(src_dirs, 1, ErlOpts),
             TestState = first_files(rebar_state:set(State, erl_opts, TestOpts)),
-            rebar_erlc_compiler:compile(TestState, rebar_dir:get_cwd());
+            rebar_erlc_compiler:compile(TestState, rebar_dir:get_cwd(), rebar_dir:get_cwd());
         %% already compiled `./test` so do nothing
         _ -> ok
     end.
