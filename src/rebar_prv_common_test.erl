@@ -30,35 +30,22 @@ init(State) ->
                                  {opts, ct_opts(State)},
                                  {profiles, [test]}]),
     State1 = rebar_state:add_provider(State, Provider),
-    {ok, State1}.
+    State2 = rebar_state:add_to_profile(State1, test, test_state(State1)),
+    {ok, State2}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     ?INFO("Running Common Test suites...", []),
     {RawOpts, _} = rebar_state:command_parsed_args(State),
-    {InDirs, OutDir} = split_ct_dirs(State, RawOpts),
     Opts = transform_opts(RawOpts),
     TestApps = filter_checkouts(rebar_state:project_apps(State)),
     ok = create_dirs(Opts),
-    ?DEBUG("Compiling Common Test suites in: ~p", [OutDir]),
-    lists:foreach(fun(App) ->
-                      AppDir = rebar_app_info:dir(App),
-                      AppOutDir = rebar_app_info:out_dir(App),
-                      C = rebar_config:consult(AppDir),
-                      S = rebar_state:new(State, C, AppDir),
-                      %% combine `erl_first_files` and `common_test_first_files` and
-                      %% adjust compile opts to include `common_test_compile_opts`
-                      %% and `{src_dirs, "test"}`
-                      TestState = test_state(S, InDirs, OutDir),
-                      ok = rebar_erlc_compiler:compile(TestState, AppDir, AppOutDir)
-                  end, TestApps),
-    ok = maybe_compile_extra_tests(TestApps, State, InDirs, OutDir),
-    Path = code:get_path(),
-    true = code:add_patha(OutDir),
-    CTOpts = resolve_ct_opts(State, Opts, OutDir),
+    InDirs = in_dirs(State, RawOpts),
+    ok = compile_tests(State, TestApps, InDirs),
+    CTOpts = resolve_ct_opts(State, Opts),
     Verbose = proplists:get_value(verbose, Opts, false),
-    Result = run_test(CTOpts, Verbose),
-    true = code:set_path(Path),
+    TestDirs = test_dirs(State, TestApps),
+    Result = run_test([{dir, TestDirs}|CTOpts], Verbose),
     case Result of
         {error, Reason} ->
             {error, {?MODULE, Reason}};
@@ -86,9 +73,8 @@ run_test(CTOpts, false) ->
     receive Result -> handle_quiet_results(CTOpts, Result) end.
 
 ct_opts(State) ->
-    DefaultLogsDir = filename:join([rebar_state:dir(State), "logs"]),
+    DefaultLogsDir = filename:join([rebar_state:dir(State), "_logs"]),
     [{dir, undefined, "dir", string, help(dir)}, %% comma-seperated list
-     {outdir, undefined, "outdir", string, help(outdir)}, %% string
      {suite, undefined, "suite", string, help(suite)}, %% comma-seperated list
      {group, undefined, "group", string, help(group)}, %% comma-seperated list
      {testcase, undefined, "case", string, help(testcase)}, %% comma-seperated list
@@ -123,8 +109,6 @@ ct_opts(State) ->
      {verbose, $v, "verbose", boolean, help(verbose)}
     ].
 
-help(outdir) ->
-    "Output directory for compiled modules";
 help(dir) ->
     "List of additional directories containing test suites";
 help(suite) ->
@@ -185,27 +169,6 @@ help(userconfig) ->
     "";
 help(verbose) ->
     "Verbose output".
-
-split_ct_dirs(State, RawOpts) ->
-    %% preserve the override nature of command line opts by only checking
-    %% `rebar.config` defined additional test dirs if none are defined via
-    %% command line flag
-    InDirs = case proplists:get_value(dir, RawOpts) of
-        undefined ->
-            CTOpts = rebar_state:get(State, common_test_opts, []),
-            proplists:get_value(dir, CTOpts, []);
-        Dirs -> split_string(Dirs)
-    end,
-    OutDir = proplists:get_value(outdir, RawOpts, default_test_dir(State)),
-    {InDirs, OutDir}.
-
-default_test_dir(State) ->
-    Tmp = rebar_file_utils:system_tmpdir(),
-    Root = filename:join([rebar_state:dir(State), Tmp]),
-    Project = filename:basename(rebar_state:dir(State)),
-    OutDir = filename:join([Root, Project ++ "_rebar3_ct"]),
-    ok = rebar_file_utils:reset_dir(OutDir),
-    OutDir.
 
 transform_opts(Opts) ->
     transform_opts(Opts, []).
@@ -302,51 +265,84 @@ ensure_dir([Dir|Rest]) ->
     end,
     ensure_dir(Rest).
 
-test_state(State, InDirs, OutDir) ->
-    ErlOpts = rebar_state:get(State, common_test_compile_opts, []) ++
-              rebar_utils:erl_opts(State),
-    TestOpts = [{outdir, OutDir}] ++
-               add_test_dir(ErlOpts, InDirs),
-    first_files(rebar_state:set(State, erl_opts, TestOpts)).
-
-add_test_dir(Opts, InDirs) ->
-    %% if no src_dirs are set we have to specify `src` or it won't
-    %% be built
-    case proplists:append_values(src_dirs, Opts) of
-        [] -> [{src_dirs, ["src", "test" | InDirs]} | Opts];
-        _ -> [{src_dirs, ["test" | InDirs]} | Opts]
+in_dirs(State, Opts) ->
+    %% preserve the override nature of command line opts by only checking
+    %% `rebar.config` defined additional test dirs if none are defined via
+    %% command line flag
+    case proplists:get_value(dir, Opts) of
+        undefined ->
+            CTOpts = rebar_state:get(State, ct_opts, []),
+            proplists:get_value(dir, CTOpts, []);
+        Dirs -> split_string(Dirs)
     end.
 
-first_files(State) ->
-    BaseFirst = rebar_state:get(State, erl_first_files, []),
-    CTFirst = rebar_state:get(State, common_test_first_files, []),
-    rebar_state:set(State, erl_first_files, BaseFirst ++ CTFirst).
+test_dirs(State, TestApps) ->
+    %% we need to add "./ebin" if it exists but only if it's not already
+    %%  due to be added
+    F = fun(App) -> rebar_app_info:dir(App) =/= rebar_dir:get_cwd() end,
+    BareEbin = filename:join([rebar_dir:base_dir(State), "ebin"]),
+    case lists:any(F, TestApps) andalso filelib:is_dir(BareEbin) of
+        false -> application_dirs(TestApps, []);
+        true  -> [BareEbin|application_dirs(TestApps, [])]
+    end.
 
-resolve_ct_opts(State, CmdLineOpts, OutDir) ->
-    CTOpts = rebar_state:get(State, common_test_opts, []),
+application_dirs([], Acc) -> lists:reverse(Acc);
+application_dirs([App|Rest], Acc) ->
+    application_dirs(Rest, [rebar_app_info:ebin_dir(App)|Acc]).
+
+test_state(State) ->
+    TestOpts = case rebar_state:get(State, ct_compile_opts, []) of
+        []    -> [];
+        Opts  -> [{erl_opts, Opts}]
+    end, 
+    [first_files(State)|TestOpts].
+
+first_files(State) ->
+    CTFirst = rebar_state:get(State, ct_first_files, []),
+    {erl_first_files, CTFirst}.
+
+resolve_ct_opts(State, CmdLineOpts) ->
+    CTOpts = rebar_state:get(State, ct_opts, []),
     Opts = lists:ukeymerge(1,
                     lists:ukeysort(1, CmdLineOpts),
                     lists:ukeysort(1, CTOpts)),
-    %% rebar has seperate input and output directories whereas `common_test`
-    %% uses only a single directory so set `dir` to our precompiled `OutDir`
-    %% and disable `auto_compile`
-    [{auto_compile, false}, {dir, OutDir}] ++ lists:keydelete(dir, 1, Opts).
+    %% disable `auto_compile` and remove `dir` from the opts
+    [{auto_compile, false}|lists:keydelete(dir, 1, Opts)].
 
-maybe_compile_extra_tests(TestApps, State, InDirs, OutDir) ->
+compile_tests(State, TestApps, InDirs) ->
+    State1 = replace_src_dirs(State, InDirs),
+    F = fun(AppInfo) ->
+        AppDir = rebar_app_info:dir(AppInfo),
+        S = case rebar_app_info:state(AppInfo) of
+            undefined ->
+                C = rebar_config:consult(AppDir),
+                rebar_state:new(State1, C, AppDir);
+            AppState ->
+                AppState
+        end,
+        ok = rebar_erlc_compiler:compile(S,
+                                         ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
+                                         ec_cnv:to_list(rebar_app_info:out_dir(AppInfo)))
+    end,
+    lists:foreach(F, TestApps),
+    compile_bare_tests(State1, TestApps).
+
+compile_bare_tests(State, TestApps) ->
     F = fun(App) -> rebar_app_info:dir(App) == rebar_dir:get_cwd() end,
     case lists:filter(F, TestApps) of
-        %% compile just the `test` and extra test directories of the base dir
-        [] ->
-            ErlOpts = rebar_state:get(State, common_test_compile_opts, []) ++
-                      rebar_utils:erl_opts(State),
-            TestOpts = [{outdir, OutDir}] ++
-                       [{src_dirs, ["test"|InDirs]}] ++
-                       lists:keydelete(src_dirs, 1, ErlOpts),
-            TestState = first_files(rebar_state:set(State, erl_opts, TestOpts)),
-            rebar_erlc_compiler:compile(TestState, rebar_dir:get_cwd(), rebar_dir:get_cwd());
+        %% compile just the `test` directory of the base dir
+        [] -> rebar_erlc_compiler:compile(State,
+                                          rebar_dir:get_cwd(),
+                                          rebar_dir:base_dir(State));
         %% already compiled `./test` so do nothing
-        _ -> ok
+        _  -> ok
     end.
+
+replace_src_dirs(State, InDirs) ->
+    %% replace any `src_dirs` with just the `test` dir and any `InDirs`
+    ErlOpts = rebar_state:get(State, erl_opts, []),
+    StrippedOpts = lists:keydelete(src_dirs, 1, ErlOpts),
+    rebar_state:set(State, erl_opts, [{src_dirs, ["test"|InDirs]}|StrippedOpts]).
 
 handle_results([Result]) ->
     handle_results(Result);
