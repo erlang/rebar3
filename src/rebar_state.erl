@@ -204,6 +204,13 @@ apply_profiles(State=#state_t{opts=Opts, current_profiles=CurrentProfiles}, Prof
 merge_opts(Profile, NewOpts, OldOpts) ->
     Opts = dict:merge(fun(_Key, NewValue, OldValue) when is_list(NewValue) ->
                               case io_lib:printable_list(NewValue) of
+                                  true when NewValue =:= [] ->
+                                      case io_lib:printable_list(OldValue) of
+                                          true ->
+                                              NewValue;
+                                          false ->
+                                              OldValue
+                                      end;
                                   true ->
                                       NewValue;
                                   false ->

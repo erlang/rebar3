@@ -85,10 +85,14 @@ profile_merge_keys(Config) ->
 profile_merges(_Config) ->
     RebarConfig = [{test1, [{key1, 1, 2}, key2]},
                    {test2, "hello"},
+                   {test3, [key3]},
+                   {test4, "oldvalue"},
                    {profiles,
                     [{profile1,
                       [{test1, [{key3, 5}, key1]}]},
-                     {profile2, [{test2, "goodbye"}]}]}],
+                     {profile2, [{test2, "goodbye"},
+                                 {test3, []},
+                                 {test4, []}]}]}],
     State = rebar_state:new(RebarConfig),
     State1 = rebar_state:apply_profiles(State, [profile1, profile2]),
 
@@ -97,4 +101,8 @@ profile_merges(_Config) ->
                  lists:sort(rebar_state:get(State1, test1))),
 
     %% Use new value for strings
-    "goodbye" = rebar_state:get(State1, test2).
+    "goodbye" = rebar_state:get(State1, test2),
+
+    %% Check that a newvalue of []/"" doesn't override non-string oldvalues
+    [key3] = rebar_state:get(State1, test3),
+    [] = rebar_state:get(State1, test4).
