@@ -74,8 +74,8 @@ run_test(CTOpts, false) ->
     end),
     receive Result -> handle_quiet_results(CTOpts, Result) end.
 
-ct_opts(State) ->
-    DefaultLogsDir = filename:join([rebar_state:dir(State), "_logs"]),
+ct_opts(_State) ->
+    DefaultLogsDir = filename:join(["_build", "_logs"]),
     [{dir, undefined, "dir", string, help(dir)}, %% comma-seperated list
      {suite, undefined, "suite", string, help(suite)}, %% comma-seperated list
      {group, undefined, "group", string, help(group)}, %% comma-seperated list

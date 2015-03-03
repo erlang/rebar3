@@ -333,7 +333,7 @@ verbose(State) ->
     end.
 
 cover_dir(State) ->
-    rebar_state:get(State, cover_data_dir, "_cover").
+    rebar_state:get(State, cover_data_dir, filename:join(["_build", "_cover"])).
 
 cover_opts(_State) ->
     [{reset, $r, "reset", boolean, help(reset)},

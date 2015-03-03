@@ -47,7 +47,7 @@ flag_coverdata_written(Config) ->
                                    ["eunit", "--cover"],
                                    {ok, [{app, Name}]}),
 
-    true = filelib:is_file(filename:join(["_cover", "eunit.coverdata"])).
+    true = filelib:is_file(filename:join(["_build", "_cover", "eunit.coverdata"])).
 
 config_coverdata_written(Config) ->
     AppDir = ?config(apps, Config),
@@ -62,7 +62,7 @@ config_coverdata_written(Config) ->
                                    ["eunit"],
                                    {ok, [{app, Name}]}),
 
-    true = filelib:is_file(filename:join(["_cover", "eunit.coverdata"])).
+    true = filelib:is_file(filename:join(["_build", "_cover", "eunit.coverdata"])).
 
 index_written(Config) ->
     AppDir = ?config(apps, Config),
@@ -77,7 +77,7 @@ index_written(Config) ->
                                    ["do", "eunit", "--cover", ",", "cover"],
                                    {ok, [{app, Name}]}),
 
-    true = filelib:is_file(filename:join(["_cover", "index.html"])).
+    true = filelib:is_file(filename:join(["_build", "_cover", "index.html"])).
 
 config_alt_coverdir(Config) ->
     AppDir = ?config(apps, Config),
@@ -109,7 +109,7 @@ flag_verbose(Config) ->
                                    ["do", "eunit", "--cover", ",", "cover", "--verbose"],
                                    {ok, [{app, Name}]}),
 
-    true = filelib:is_file(filename:join(["_cover", "index.html"])).
+    true = filelib:is_file(filename:join(["_build", "_cover", "index.html"])).
 
 config_verbose(Config) ->
     AppDir = ?config(apps, Config),
@@ -124,4 +124,4 @@ config_verbose(Config) ->
                                    ["do", "eunit", "--cover", ",", "cover"],
                                    {ok, [{app, Name}]}),
 
-    true = filelib:is_file(filename:join(["_cover", "index.html"])).
+    true = filelib:is_file(filename:join(["_build", "_cover", "index.html"])).
