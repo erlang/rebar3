@@ -23,7 +23,12 @@
 -spec base_dir(rebar_state:t()) -> file:filename_all().
 base_dir(State) ->
     Profiles = rebar_state:current_profiles(State),
-    ProfilesStrings = [ec_cnv:to_list(P) || P <- Profiles],
+    ProfilesStrings = case [ec_cnv:to_list(P) || P <- Profiles] of
+        ["default"]      -> ["default"];
+        %% drop `default` from the profile dir if it's implicit and reverse order
+        %%  of profiles to match order passed to `as`
+        ["default"|Rest] -> lists:reverse(Rest)
+    end,
     ProfilesDir = string:join(ProfilesStrings, "+"),
     filename:join(rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR), ProfilesDir).
 
