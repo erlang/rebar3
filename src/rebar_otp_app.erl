@@ -167,17 +167,21 @@ ebin_modules(App, Dir) ->
 
 beam_src(Beam) ->
     try
+        Mod = list_to_atom(filename:basename(Beam, ".beam")),
+        _ = purge(Mod),
         {module, Mod} = code:load_abs(filename:rootname(Beam, ".beam")),
         Compile = Mod:module_info(compile),
-        %% completely purge module so any other attempts to load it succeed
-        _ = code:purge(Mod),
-        _ = code:delete(Mod),
-        _ = code:purge(Mod),
         proplists:get_value(source, Compile, [])
     catch
         error:undef -> [];
         error:nofile -> []
     end.
+
+purge(Mod) ->
+    %% remove old code if necessary
+    _ = code:purge(Mod),
+    %% move current code to old
+    _ = code:delete(Mod).
 
 ensure_registered(AppData) ->
     case lists:keyfind(registered, 1, AppData) of
