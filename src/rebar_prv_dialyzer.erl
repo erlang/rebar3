@@ -213,29 +213,12 @@ ebin_to_info(EbinDir, AppName) ->
             DepApps = proplists:get_value(applications, AppDetails, []),
             IncApps = proplists:get_value(included_applications, AppDetails,
                                           []),
-            Modules = proplists:get_value(modules, AppDetails, []),
-            Files = modules_to_files(Modules, EbinDir),
-            {IncApps ++ DepApps, Files};
+            {IncApps ++ DepApps, ebin_files(EbinDir)};
         {error, enoent} when AppName =:= erts ->
             {[], ebin_files(EbinDir)};
         _ ->
             Error = io_lib:format("Could not parse ~p", [AppFile]),
             throw({dialyzer_error, Error})
-    end.
-
-modules_to_files(Modules, EbinDir) ->
-    Ext = code:objfile_extension(),
-    Mod2File = fun(Module) -> module_to_file(Module, EbinDir, Ext) end,
-    rebar_utils:filtermap(Mod2File, Modules).
-
-module_to_file(Module, EbinDir, Ext) ->
-    File = filename:join(EbinDir, atom_to_list(Module) ++ Ext),
-    case filelib:is_file(File) of
-        true ->
-            {true, File};
-        false ->
-            ?CONSOLE("Unknown module ~s", [Module]),
-            false
     end.
 
 ebin_files(EbinDir) ->
