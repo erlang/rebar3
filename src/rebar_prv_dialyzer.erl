@@ -380,13 +380,18 @@ run_dialyzer(State, Opts) ->
     case proplists:get_bool(get_warnings, Opts) of
         true ->
             WarningsList = rebar_state:get(State, dialyzer_warnings, []),
-            Opts2 = [{warnings, WarningsList} | Opts],
+            Opts2 = [{warnings, WarningsList},
+                     {check_plt, false} |
+                     Opts],
             {Unknowns, Warnings} = format_warnings(dialyzer:run(Opts2)),
             _ = [?CONSOLE("~s", [Unknown]) || Unknown <- Unknowns],
             _ = [?CONSOLE("~s", [Warning]) || Warning <- Warnings],
             {length(Warnings), State};
         false ->
-            _ = dialyzer:run([{warnings, no_warnings()} | Opts]),
+            Opts2 = [{warnings, no_warnings()},
+                     {check_plt, false} |
+                     Opts],
+            _ = dialyzer:run(Opts2),
             {0, State}
     end.
 
