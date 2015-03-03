@@ -317,28 +317,27 @@ resolve_ct_opts(State, CmdLineOpts) ->
     [{auto_compile, false}|lists:keydelete(dir, 1, Opts)].
 
 compile_tests(State, TestApps, InDirs) ->
-    State1 = replace_src_dirs(State, InDirs),
     F = fun(AppInfo) ->
         AppDir = rebar_app_info:dir(AppInfo),
         S = case rebar_app_info:state(AppInfo) of
             undefined ->
                 C = rebar_config:consult(AppDir),
-                rebar_state:new(State1, C, AppDir);
+                rebar_state:new(State, C, AppDir);
             AppState ->
                 AppState
         end,
-        ok = rebar_erlc_compiler:compile(S,
+        ok = rebar_erlc_compiler:compile(replace_src_dirs(S, InDirs),
                                          ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
                                          ec_cnv:to_list(rebar_app_info:out_dir(AppInfo)))
     end,
     lists:foreach(F, TestApps),
-    compile_bare_tests(State1, TestApps).
+    compile_bare_tests(State, TestApps, InDirs).
 
-compile_bare_tests(State, TestApps) ->
+compile_bare_tests(State, TestApps, InDirs) ->
     F = fun(App) -> rebar_app_info:dir(App) == rebar_dir:get_cwd() end,
     case lists:filter(F, TestApps) of
         %% compile just the `test` directory of the base dir
-        [] -> rebar_erlc_compiler:compile(State,
+        [] -> rebar_erlc_compiler:compile(replace_src_dirs(State, InDirs),
                                           rebar_dir:get_cwd(),
                                           rebar_dir:base_dir(State));
         %% already compiled `./test` so do nothing
