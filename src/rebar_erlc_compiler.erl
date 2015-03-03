@@ -260,10 +260,10 @@ opts_changed(Opts, Target) ->
     Basename = filename:basename(Target, ".beam"),
     Dirname = filename:dirname(Target),
     ObjectFile = filename:join([Dirname, Basename]),
+    _ = purge(list_to_atom(Basename)),
     case code:load_abs(ObjectFile) of
         {module, Mod} ->
             Compile = Mod:module_info(compile),
-            _ = purge(Mod),
             lists:sort(Opts) =/= lists:sort(proplists:get_value(options,
                                                                 Compile));
         {error, nofile} -> false
@@ -273,9 +273,7 @@ purge(Mod) ->
     %% remove old code if necessary
     _ = code:purge(Mod),
     %% move current code to old
-    true = code:delete(Mod),
-    %% remove new old code
-    _ = code:purge(Mod).
+    _ = code:delete(Mod).
 
 check_erlcinfo(_Config, #erlcinfo{vsn=?ERLCINFO_VSN}) ->
     ok;
