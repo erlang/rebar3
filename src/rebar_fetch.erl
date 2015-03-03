@@ -38,7 +38,8 @@ download_source(AppDir, Source, State) ->
                 ec_file:mkdir_p(AppDir1),
                 code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
                 ec_file:remove(filename:absname(AppDir1), [recursive]),
-                ok = ec_file:copy(TmpDir, filename:absname(AppDir1), [recursive]),
+                ?DEBUG("Moving checkout ~p to ~p", [TmpDir, filename:absname(AppDir1)]),
+                ok = rebar_file_utils:mv(TmpDir, filename:absname(AppDir1)),
                 true;
             {tarball, File} ->
                 Contents = filename:join(TmpDir, "contents"),
@@ -49,7 +50,12 @@ download_source(AppDir, Source, State) ->
                                     [{cwd, Contents}, compressed]),
                 code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
                 ec_file:remove(filename:absname(AppDir1), [recursive]),
-                ok = ec_file:copy(Contents, filename:absname(AppDir1), [recursive]),
+
+                ?DEBUG("Moving contents ~p to ~p", [Contents, filename:absname(AppDir1)]),
+                ok = rebar_file_utils:mv(Contents, filename:absname(AppDir1)),
+
+                ?DEBUG("Removing tmp dir ~p", [TmpDir]),
+                ec_file:remove(TmpDir, [recursive]),
                 true
         end
     catch
