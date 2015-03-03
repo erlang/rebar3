@@ -40,18 +40,19 @@ compile(State, App) ->
     %% If we get an .app.src file, it needs to be pre-processed and
     %% written out as a ebin/*.app file. That resulting file will then
     %% be validated as usual.
-    Dir = ec_cnv:to_list(rebar_app_info:dir(App)),
     App1 = case rebar_app_info:app_file_src(App) of
                undefined ->
                    App;
                AppFileSrc ->
-                   File = preprocess(State, Dir, AppFileSrc),
+                   File = preprocess(State, App, AppFileSrc),
                    rebar_app_info:app_file(App, File)
            end,
 
     %% Load the app file and validate it.
     validate_app(State, App1).
 
+format_error(invalid_app_file) ->
+    "Failed to read app file";
 format_error({file_read, File, Reason}) ->
     io_lib:format("Failed to read ~s for processing: ~p", [File, Reason]);
 format_error({invalid_name, File, AppName}) ->
@@ -92,13 +93,14 @@ validate_app_modules(State, App, AppData) ->
             {ok, rebar_app_info:original_vsn(App, AppVsn)}
     end.
 
-preprocess(State, Dir, AppSrcFile) ->
+preprocess(State, AppInfo, AppSrcFile) ->
     case consult_app_file(AppSrcFile) of
         {ok, [{application, AppName, AppData}]} ->
             %% Look for a configuration file with vars we want to
             %% substitute. Note that we include the list of modules available in
             %% ebin/ and update the app data accordingly.
-            AppVars = load_app_vars(State) ++ [{modules, ebin_modules(Dir)}],
+            OutDir = rebar_app_info:out_dir(AppInfo),
+            AppVars = load_app_vars(State) ++ [{modules, ebin_modules(OutDir)}],
             A1 = apply_app_vars(AppVars, AppData),
 
             %% AppSrcFile may contain instructions for generating a vsn number
@@ -113,7 +115,9 @@ preprocess(State, Dir, AppSrcFile) ->
             Spec = io_lib:format("~p.\n", [{application, AppName, A3}]),
 
             %% Setup file .app filename and write new contents
-            AppFile = rebar_app_utils:app_src_to_app(AppSrcFile),
+            EbinDir = rebar_app_info:ebin_dir(AppInfo),
+            filelib:ensure_dir(filename:join(EbinDir, "dummy.beam")),
+            AppFile = rebar_app_utils:app_src_to_app(OutDir, AppSrcFile),
             ok = rebar_file_utils:write_file_if_contents_differ(AppFile, Spec),
 
             %% Make certain that the ebin/ directory is available
@@ -172,11 +176,16 @@ ensure_registered(AppData) ->
 %% config. However, in the case of *.app, rebar should not manipulate
 %% that file. This enforces that dichotomy between app and app.src.
 consult_app_file(Filename) ->
-    case lists:suffix(".app.src", Filename) of
+    case filelib:is_file(Filename) of
         false ->
-            file:consult(Filename);
+            throw(?PRV_ERROR(invalid_app_file));
         true ->
-            {ok, rebar_config:consult_file(Filename)}
+            case lists:suffix(".app.src", Filename) of
+                false ->
+                    file:consult(Filename);
+                true ->
+                    {ok, rebar_config:consult_file(Filename)}
+            end
     end.
 
 app_vsn(AppFile) ->

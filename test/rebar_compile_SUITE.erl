@@ -77,7 +77,7 @@ build_checkout_apps(Config) ->
 build_checkout_deps(Config) ->
     AppDir = ?config(apps, Config),
     CheckoutsDir = ?config(checkouts, Config),
-    DepsDir = filename:join([AppDir, "_build", "lib"]),
+    DepsDir = filename:join([AppDir, "_build", "default", "lib"]),
     Name1 = rebar_test_utils:create_random_name("checkapp1_"),
     Vsn1 = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(filename:join([AppDir,Name1]), Name1, Vsn1, [kernel, stdlib]),
@@ -96,7 +96,6 @@ build_checkout_deps(Config) ->
 
 recompile_when_opts_change(Config) ->
     AppDir = ?config(apps, Config),
-    EbinDir = filename:join([AppDir, "ebin"]),
 
     Name = rebar_test_utils:create_random_name("app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
@@ -104,6 +103,7 @@ recompile_when_opts_change(Config) ->
 
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
 
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
     {ok, Files} = file:list_dir(EbinDir),
     ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
                || F <- Files, filename:extension(F) == ".beam"],
@@ -123,7 +123,6 @@ recompile_when_opts_change(Config) ->
 
 dont_recompile_when_opts_dont_change(Config) ->
     AppDir = ?config(apps, Config),
-    EbinDir = filename:join([AppDir, "ebin"]),
 
     Name = rebar_test_utils:create_random_name("app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
@@ -131,6 +130,7 @@ dont_recompile_when_opts_dont_change(Config) ->
 
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
 
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
     {ok, Files} = file:list_dir(EbinDir),
     ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
                || F <- Files, filename:extension(F) == ".beam"],
@@ -141,20 +141,20 @@ dont_recompile_when_opts_dont_change(Config) ->
 
     {ok, NewFiles} = file:list_dir(EbinDir),
     NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
-                  || F <- NewFiles, filename:extension(F) == ".beam"], 
+                  || F <- NewFiles, filename:extension(F) == ".beam"],
 
     ?assert(ModTime == NewModTime).
 
 dont_recompile_yrl_or_xrl(Config) ->
     AppDir = ?config(apps, Config),
-    
+
     Name = rebar_test_utils:create_random_name("app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
     Xrl = filename:join([AppDir, "src", "not_a_real_xrl_" ++ Name ++ ".xrl"]),
     ok = filelib:ensure_dir(Xrl),
-    XrlBody = 
+    XrlBody =
         "Definitions."
         "\n\n"
         "D = [0-9]"
