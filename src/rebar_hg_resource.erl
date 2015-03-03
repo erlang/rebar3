@@ -61,7 +61,7 @@ download(Dir, {hg, Url, {branch, Branch}}, _State) ->
                    [{cd, filename:dirname(Dir)}]);
 download(Dir, {hg, Url, {tag, Tag}}, _State) ->
     ok = filelib:ensure_dir(Dir),
-    rebar_utils:sh(?FMT("hg clone -q -r ~s ~s ~s",
+    rebar_utils:sh(?FMT("hg clone -q -u ~s ~s ~s",
                         [Tag, Url, filename:basename(Dir)]),
                    [{cd, filename:dirname(Dir)}]);
 download(Dir, {hg, Url, {ref, Ref}}, _State) ->
@@ -115,7 +115,7 @@ get_tag_distance(Dir, Ref) ->
                       [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
     Log = string:strip(LogString,
                        both, $\n),
-    [Tag, Distance] = re:split(Log, "-([0-9]+)$", [{parts,0}]),
+    [Tag, Distance] = re:split(Log, "-([0-9]+)$", [{parts,0}, {return, list}]),
     {Tag, Distance}.
 
 get_branch_ref(Dir, Branch) ->
