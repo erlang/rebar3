@@ -22,10 +22,10 @@ init_per_suite(Config) -> Config.
 end_per_suite(_Config) -> ok.
 
 init_per_testcase(_, Config) ->
-    rebar_test_utils:init_rebar_state(Config, "do_as_").
+    rebar_test_utils:init_rebar_state(Config, "as_").
 
 all() -> [as_basic, as_multiple_profiles, as_multiple_tasks,
-          as_multiple_profiles_multiple_tasks].
+          as_multiple_profiles_multiple_tasks, as_comma_placement].
 
 as_basic(Config) ->
     AppDir = ?config(apps, Config),
@@ -78,7 +78,7 @@ as_multiple_profiles_multiple_tasks(Config) ->
 as_comma_placement(Config) ->
     AppDir = ?config(apps, Config),
 
-    Name = rebar_test_utils:create_random_name("do_as_crazy_"),
+    Name = rebar_test_utils:create_random_name("as_comma_placement_"),
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
@@ -86,3 +86,4 @@ as_comma_placement(Config) ->
                                    [],
                                    ["as", "foo,bar", ",", "baz", ",qux", "compile"],
                                    {ok, [{app, Name}]}).
+
