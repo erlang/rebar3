@@ -100,7 +100,7 @@ preprocess(State, AppInfo, AppSrcFile) ->
             %% substitute. Note that we include the list of modules available in
             %% ebin/ and update the app data accordingly.
             OutDir = rebar_app_info:out_dir(AppInfo),
-            AppVars = load_app_vars(State) ++ [{modules, ebin_modules(OutDir)}],
+            AppVars = load_app_vars(State) ++ [{modules, ebin_modules(AppInfo, OutDir)}],
             A1 = apply_app_vars(AppVars, AppData),
 
             %% AppSrcFile may contain instructions for generating a vsn number
@@ -157,9 +157,27 @@ validate_name(AppName, File) ->
             ?PRV_ERROR({invalid_name, File, AppName})
     end.
 
-ebin_modules(Dir) ->
-    lists:sort([rebar_utils:beam_to_mod(N) ||
-                   N <- rebar_utils:beams(filename:join(Dir, "ebin"))]).
+ebin_modules(App, Dir) ->
+    Beams = lists:sort(rebar_utils:beams(filename:join(Dir, "ebin"))),
+    F = fun(Beam) -> not lists:prefix(filename:join([rebar_app_info:dir(App), "test"]),
+                                      beam_src(Beam))
+    end,
+    Filtered = lists:filter(F, Beams),
+    [rebar_utils:beam_to_mod(N) || N <- Filtered].
+
+beam_src(Beam) ->
+    try
+        {module, Mod} = code:load_abs(filename:rootname(Beam, ".beam")),
+        Compile = Mod:module_info(compile),
+        %% completely purge module so any other attempts to load it succeed
+        _ = code:purge(Mod),
+        _ = code:delete(Mod),
+        _ = code:purge(Mod),
+        proplists:get_value(source, Compile, [])
+    catch
+        error:undef -> [];
+        error:nofile -> []
+    end.
 
 ensure_registered(AppData) ->
     case lists:keyfind(registered, 1, AppData) of
