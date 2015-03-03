@@ -14,9 +14,11 @@
 lock(AppDir, {git, Url, _}) ->
     lock(AppDir, {git, Url});
 lock(AppDir, {git, Url}) ->
-    Ref = string:strip(
-            os:cmd("git --git-dir='" ++ AppDir ++ "/.git' rev-parse --verify HEAD")
-            ,both, $\n),
+    AbortMsg = io_lib:format("Locking of git dependency failed in ~s", [AppDir]),
+    {ok, VsnString} =
+        rebar_utils:sh("git --git-dir='" ++ AppDir ++ "/.git' rev-parse --verify HEAD",
+                       [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
+    Ref = string:strip(VsnString, both, $\n),
     {git, Url, {ref, Ref}}.
 
 %% Return true if either the git url or tag/branch/ref is not the same as the currently
@@ -118,13 +120,21 @@ make_vsn(Dir) ->
 collect_default_refcount() ->
     %% Get the tag timestamp and minimal ref from the system. The
     %% timestamp is really important from an ordering perspective.
-    RawRef = os:cmd("git log -n 1 --pretty=format:'%h\n' "),
+    AbortMsg1 = "Gtting log of git dependency failed in " ++ rebar_dir:get_cwd(),
+    {ok, String} =
+        rebar_utils:sh("git log -n 1 --pretty=format:'%h\n' ",
+                       [{use_stdout, false},
+                        {debug_abort_on_error, AbortMsg1}]),
+    RawRef = string:strip(String, both, $\n),
 
     {Tag, TagVsn} = parse_tags(),
-    RawCount =
+    {ok, RawCount} =
         case Tag of
             undefined ->
-                os:cmd("git rev-list HEAD | wc -l");
+                AbortMsg2 = "Getting rev-list of git depedency failed in " ++ rebar_dir:get_cwd(),
+                rebar_utils:sh("git rev-list HEAD | wc -l",
+                               [{use_stdout, false},
+                                {debug_abort_on_error, AbortMsg2}]);
             _ ->
                 get_patch_count(Tag)
         end,
@@ -146,18 +156,25 @@ build_vsn_string(Vsn, RawRef, RawCount) ->
     end.
 
 get_patch_count(RawRef) ->
+    AbortMsg = "Getting rev-list of git dep failed in " ++ rebar_dir:get_cwd(),
     Ref = re:replace(RawRef, "\\s", "", [global]),
     Cmd = io_lib:format("git rev-list ~s..HEAD | wc -l",
                          [Ref]),
-    os:cmd(Cmd).
+    rebar_utils:sh(Cmd,
+                   [{use_stdout, false},
+                    {debug_abort_on_error, AbortMsg}]).
 
 parse_tags() ->
-    first_valid_tag(os:cmd("git log --oneline --decorate  | fgrep \"tag: \" -1000")).
-
-first_valid_tag(Line) ->
-    case re:run(Line, "(\\(|\\s)tag:\\s(v([^,\\)]+))", [{capture, [2, 3], list}]) of
-        {match,[Tag, Vsn]} ->
-            {Tag, Vsn};
-        nomatch ->
-            {undefined, "0.0.0"}
+    %% Don't abort on error, we want the bad return to be turned into 0.0.0
+    case rebar_utils:sh("git log --oneline --decorate  | fgrep \"tag: \" -1000",
+                        [{use_stdout, false}, return_on_error]) of
+        {error, _} ->
+            {undefined, "0.0.0"};
+        {ok, Line} ->
+            case re:run(Line, "(\\(|\\s)tag:\\s(v([^,\\)]+))", [{capture, [2, 3], list}]) of
+                {match,[Tag, Vsn]} ->
+                    {Tag, Vsn};
+                nomatch ->
+                    {undefined, "0.0.0"}
+            end
     end.

@@ -80,7 +80,12 @@ make_vsn(Dir) ->
     Ref = get_ref(Dir),
     Cmd = BaseHg ++ "log --template \"{latesttag}+build.{latesttagdistance}.rev.{node|short}\""
           " --rev " ++ Ref,
-    RawVsn = string:strip(os:cmd(Cmd), both, $\n),
+    AbortMsg = io_lib:format("Version resolution of hg dependency failed in ~s", [Dir]),
+    {ok, VsnString} =
+        rebar_utils:sh(Cmd,
+                       [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
+    RawVsn = string:strip(VsnString, both, $\n),
+
     Vsn = case RawVsn of
         "null+" ++ Rest -> "0.0.0+" ++ Rest;
         _ -> RawVsn
@@ -95,20 +100,30 @@ compare_url(Dir, Url) ->
     parse_hg_url(CurrentUrl1) =:= parse_hg_url(Url).
 
 get_ref(Dir) ->
-    string:strip(os:cmd("hg -R '" ++ Dir ++ "' --debug id -i"), both, $\n).
+    AbortMsg = io_lib:format("Get ref of hg dependency failed in ~s", [Dir]),
+    {ok, RefString} =
+        rebar_utils:sh("hg -R '" ++ Dir ++ "' --debug id -i",
+                       [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
+    string:strip(RefString, both, $\n).
 
 get_tag_distance(Dir, Ref) ->
-    Log = string:strip(os:cmd("hg -R '" ++ Dir ++ "' "
-                              "log --template \"{latesttag}-{latesttagdistance}\n\" "
-                              "--rev " ++ Ref),
+    AbortMsg = io_lib:format("Get tag distance of hg dependency failed in ~s", [Dir]),
+    {ok, LogString} =
+        rebar_utils:sh("hg -R '" ++ Dir ++ "' "
+                      "log --template \"{latesttag}-{latesttagdistance}\n\" "
+                      "--rev " ++ Ref,
+                      [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
+    Log = string:strip(LogString,
                        both, $\n),
     [Tag, Distance] = re:split(Log, "-([0-9]+)$", [{parts,0}]),
     {Tag, Distance}.
 
 get_branch_ref(Dir, Branch) ->
-    string:strip(
-        os:cmd("hg -R '" ++ Dir ++ "' log --template \"{node}\n\" --rev " ++ Branch),
-        both, $\n).
+    AbortMsg = io_lib:format("Get branch ref of hg dependency failed in ~s", [Dir]),
+    {ok, BranchRefString} =
+        rebar_utils:sh("hg -R '" ++ Dir ++ "' log --template \"{node}\n\" --rev " ++ Branch,
+                       [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
+    string:strip(BranchRefString, both, $\n).
 
 parse_hg_url("ssh://" ++ HostPath) ->
     [Host | Path] = string:tokens(HostPath, "/"),

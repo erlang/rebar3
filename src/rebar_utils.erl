@@ -308,6 +308,9 @@ expand_sh_flag(abort_on_error) ->
 expand_sh_flag({abort_on_error, Message}) ->
     {error_handler,
      log_msg_and_abort(Message)};
+expand_sh_flag({debug_abort_on_error, Message}) ->
+    {error_handler,
+     debug_log_msg_and_abort(Message)};
 expand_sh_flag(debug_and_abort_on_error) ->
     {error_handler,
      fun debug_and_abort/2};
@@ -332,6 +335,14 @@ expand_sh_flag({env, _EnvArg} = Env) ->
 -spec log_msg_and_abort(string()) -> err_handler().
 log_msg_and_abort(Message) ->
     fun(_Command, {_Rc, _Output}) ->
+            ?ABORT(Message, [])
+    end.
+
+debug_log_msg_and_abort(Message) ->
+    fun(Command, {Rc, Output}) ->
+            ?DEBUG("sh(~s)~n"
+                  "failed with return code ~w and the following output:~n"
+                  "~s", [Command, Rc, Output]),
             ?ABORT(Message, [])
     end.
 
