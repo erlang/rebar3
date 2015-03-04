@@ -9,7 +9,9 @@
          profile_merge_keys/1,
          profile_merges/1,
          add_to_profile/1,
-         add_to_existing_profile/1]).
+         add_to_existing_profile/1,
+         profiles_remain_applied_with_config_present/1,
+         profiles_applied_once_only/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -17,7 +19,9 @@
 
 all() ->
     [profile_new_key, profile_merge_keys, profile_merges,
-     add_to_profile, add_to_existing_profile].
+     add_to_profile, add_to_existing_profile,
+     profiles_remain_applied_with_config_present,
+     profiles_applied_once_only].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -27,7 +31,7 @@ end_per_suite(_Config) ->
     application:stop(meck).
 
 init_per_testcase(_, Config) ->
-    rebar_test_utils:init_rebar_state(Config).
+    rebar_test_utils:init_rebar_state(Config, "profiles_").
 
 end_per_testcase(_, Config) ->
     meck:unload(),
@@ -129,3 +133,37 @@ add_to_existing_profile(_Config) ->
 
     Opts = rebar_state:opts(State2),
     lists:map(fun(K) -> false = dict:fetch(K, Opts) end, [foo, bar, baz]).
+
+profiles_remain_applied_with_config_present(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("profiles_remain_applied_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{erl_opts, []}, {profiles, [
+        {not_ok, [{erl_opts, [{d, not_ok}]}]}
+    ]}],
+
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["as", "not_ok", "compile"], {ok, [{app, Name}]}),
+
+    Mod = list_to_atom("not_a_real_src_" ++ Name),
+
+    true = lists:member({d, not_ok}, proplists:get_value(options, Mod:module_info(compile), [])).
+
+profiles_applied_once_only(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("profiles_applied_once_only_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{erl_opts, []}, {profiles, [
+        {not_ok, [{erl_opts, [{d, not_ok}]}]}
+    ]}],
+
+    rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["as", "not_ok", "compile"], {ok, [{app, Name}]}).
