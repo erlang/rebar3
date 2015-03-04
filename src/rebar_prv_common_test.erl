@@ -42,11 +42,17 @@ do(State) ->
     ok = create_dirs(Opts),
     InDirs = in_dirs(State, RawOpts),
     ok = compile_tests(State, TestApps, InDirs),
+    case resolve_ct_opts(State, TestApps, Opts) of
+        {ok, CTOpts} ->
+            run_test(State, RawOpts, CTOpts);
+        {error, Reason} ->
+            {error, {?MODULE, Reason}}
+    end.
+
+run_test(State, RawOpts, CTOpts) ->
     ok = maybe_cover_compile(State, RawOpts),
-    CTOpts = resolve_ct_opts(State, Opts),
     Verbose = proplists:get_value(verbose, RawOpts, false),
-    TestDirs = test_dirs(State, TestApps),
-    Result = run_test([{dir, TestDirs}|CTOpts], Verbose),
+    Result = run_test(CTOpts, Verbose),
     ok = rebar_prv_cover:maybe_write_coverdata(State, ?PROVIDER),
     case Result of
         {error, Reason} ->
@@ -59,7 +65,9 @@ do(State) ->
 format_error({failures_running_tests, FailedCount}) ->
     io_lib:format("Failures occured running tests: ~p", [FailedCount]);
 format_error({error_running_tests, Reason}) ->
-    io_lib:format("Error running tests: ~p", [Reason]).
+    io_lib:format("Error running tests: ~p", [Reason]);
+format_error({error_processing_options, Reason}) ->
+    io_lib:format("Error processing options: ~p", [Reason]).
 
 run_test(CTOpts, true) ->
     handle_results(ct:run_test(CTOpts));
@@ -217,6 +225,8 @@ transform_opts([{testcase, Testcase}|Rest], Acc) ->
 transform_opts([{group, Group}|Rest], Acc) -> % @TODO handle ""
     % Input is a list or an atom. It can also be a nested list.
     transform_opts(Rest, [{group, parse_term(Group)}|Acc]);
+transform_opts([{suite, Suite}|Rest], Acc) ->
+    transform_opts(Rest, [{suite, split_string(Suite)}|Acc]);
 transform_opts([{Key, Val}|Rest], Acc) when is_list(Val) ->
     % Default to splitting a string on comma, that works fine for both flat
     % lists of which there are many and single-items.
@@ -308,13 +318,46 @@ first_files(State) ->
     CTFirst = rebar_state:get(State, ct_first_files, []),
     {erl_first_files, CTFirst}.
 
-resolve_ct_opts(State, CmdLineOpts) ->
+resolve_ct_opts(State, TestApps, CmdLineOpts) ->
     CTOpts = rebar_state:get(State, ct_opts, []),
     Opts = lists:ukeymerge(1,
                     lists:ukeysort(1, CmdLineOpts),
                     lists:ukeysort(1, CTOpts)),
-    %% disable `auto_compile` and remove `dir` from the opts
-    [{auto_compile, false}|lists:keydelete(dir, 1, Opts)].
+    TestDirs = test_dirs(State, TestApps),
+    try resolve_ct_opts(TestDirs, Opts) of
+        Opts2 ->
+            %% disable `auto_compile`
+            {ok, [{auto_compile, false} | Opts2]}
+    catch
+        throw:{error, Reason}->
+            {error, {error_processing_options, Reason}}
+    end.
+
+resolve_ct_opts(Dirs, Opts) ->
+    Opts2 = lists:keydelete(dir, 1, Opts),
+    case lists:keytake(suite, 1, Opts2) of
+        {value, {suite, Suites}, Opts3} ->
+            %% Find full path to suites so that test names are consistent with
+            %% names when testing all dirs.
+            Suites2 = [resolve_suite(Dirs, Suite) || Suite <- Suites],
+            [{suite, Suites2} | Opts3];
+        false ->
+            %% No suites, test all dirs.
+            [{dir, Dirs} | Opts2]
+    end.
+
+resolve_suite(Dirs, Suite) ->
+    File = Suite ++ code:objfile_extension(),
+    case [Path || Dir <- Dirs,
+                  Path <- [filename:join(Dir, File)],
+                  filelib:is_file(Path)] of
+        [Suite2] ->
+            Suite2;
+        [] ->
+            throw({error, {unknown_suite, File}});
+        Suites ->
+            throw({error, {duplicate_suites, Suites}})
+    end.
 
 compile_tests(State, TestApps, InDirs) ->
     F = fun(AppInfo) ->
