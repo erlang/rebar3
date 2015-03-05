@@ -160,6 +160,8 @@ get_plt_files([AppName | DepApps], Apps, PltApps, Files) ->
             get_plt_files(DepApps, Apps, PltApps, Files);
         false ->
             {DepApps2, Files2} = app_name_to_info(AppName),
+            ?DEBUG("~s dependencies: ~p", [AppName, DepApps2]),
+            ?DEBUG("~s files: ~p", [AppName, Files2]),
             DepApps3 = DepApps2 ++ DepApps,
             Files3 = Files2 ++ Files,
             get_plt_files(DepApps3, Apps, [AppName | PltApps], Files3)
@@ -208,6 +210,7 @@ search_ebin(AppName) ->
 
 ebin_to_info(EbinDir, AppName) ->
     AppFile = filename:join(EbinDir, atom_to_list(AppName) ++ ".app"),
+    ?DEBUG("Consulting app file ~p", [AppFile]),
     case file:consult(AppFile) of
         {ok, [{application, AppName, AppDetails}]} ->
             DepApps = proplists:get_value(applications, AppDetails, []),
@@ -264,7 +267,6 @@ check_plt(State, Plt, OldList, FilesList) ->
     {CheckWarnings, State2} = check_plt(State1, Plt, sets:to_list(Check)),
     Add = sets:subtract(Files, Old),
     {AddWarnings, State3} = add_plt(State2, Plt, sets:to_list(Add)),
-    ?DEBUG("~p", [[RemWarnings, CheckWarnings, AddWarnings]]),
     {RemWarnings + CheckWarnings + AddWarnings, State3}.
 
 remove_plt(State, _Plt, []) ->
@@ -383,6 +385,7 @@ run_dialyzer(State, Opts) ->
             Opts2 = [{warnings, WarningsList},
                      {check_plt, false} |
                      Opts],
+            ?DEBUG("Running dialyzer with options: ~p~n", [Opts2]),
             {Unknowns, Warnings} = format_warnings(dialyzer:run(Opts2)),
             _ = [?CONSOLE("~s", [Unknown]) || Unknown <- Unknowns],
             _ = [?CONSOLE("~s", [Warning]) || Warning <- Warnings],
@@ -391,6 +394,7 @@ run_dialyzer(State, Opts) ->
             Opts2 = [{warnings, no_warnings()},
                      {check_plt, false} |
                      Opts],
+            ?DEBUG("Running dialyzer with options: ~p~n", [Opts2]),
             _ = dialyzer:run(Opts2),
             {0, State}
     end.
