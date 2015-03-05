@@ -10,7 +10,8 @@
          profile_merges/1,
          add_to_profile/1,
          add_to_existing_profile/1,
-         profiles_remain_applied_with_config_present/1]).
+         profiles_remain_applied_with_config_present/1,
+         only_apply_profiles_once/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -19,7 +20,8 @@
 all() ->
     [profile_new_key, profile_merge_keys, profile_merges,
      add_to_profile, add_to_existing_profile,
-     profiles_remain_applied_with_config_present].
+     profiles_remain_applied_with_config_present,
+     only_apply_profiles_once].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -151,3 +153,21 @@ profiles_remain_applied_with_config_present(Config) ->
     Mod = list_to_atom("not_a_real_src_" ++ Name),
 
     true = lists:member({d, not_ok}, proplists:get_value(options, Mod:module_info(compile), [])).
+
+only_apply_profiles_once(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("apply_once_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{erl_opts, []}, {profiles, [
+        {only_once, [{erl_opts, [{d, some_define}]}]}
+    ]}],
+
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+
+    %% if both `as` and `app_discovery` apply profiles this will fail with `some_define`
+    %%  being declared twice
+    rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["as", "only_once", "compile"], {ok, [{app, Name}]}).
