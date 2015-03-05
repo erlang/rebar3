@@ -19,13 +19,13 @@ do(State, LibDirs) ->
     %% Sort apps so we get the same merged deps config everytime
     SortedApps = rebar_utils:sort_deps(Apps),
     lists:foldl(fun(AppInfo, StateAcc) ->
-                        StateAcc1 = merge_deps(AppInfo, StateAcc),
+                        {AppInfo1, StateAcc1} = merge_deps(AppInfo, StateAcc),
                         Name = rebar_app_info:name(AppInfo),
                         OutDir = filename:join(DepsDir, Name),
-                        AppInfo1 = rebar_app_info:out_dir(AppInfo, OutDir),
+                        AppInfo2 = rebar_app_info:out_dir(AppInfo1, OutDir),
                         ProjectDeps1 = lists:delete(Name, ProjectDeps),
                         rebar_state:project_apps(StateAcc1
-                                                ,rebar_app_info:deps(AppInfo1, ProjectDeps1))
+                                                ,rebar_app_info:deps(AppInfo2, ProjectDeps1))
                 end, State, SortedApps).
 
 format_error({module_list, File}) ->
@@ -37,15 +37,21 @@ merge_deps(AppInfo, State) ->
     Profiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo),
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
+
     AppState = rebar_state:apply_overrides(
                  rebar_state:apply_profiles(
                    rebar_state:new(State, C, rebar_app_info:dir(AppInfo)), Profiles), Name),
-    lists:foldl(fun(Profile, StateAcc) ->
-                        AppProfDeps = rebar_state:get(AppState, {deps, Profile}, []),
-                        TopLevelProfDeps = rebar_state:get(StateAcc, {deps, Profile}, []),
-                        ProfDeps2 = lists:keymerge(1, TopLevelProfDeps, AppProfDeps),
-                        rebar_state:set(StateAcc, {deps, Profile}, ProfDeps2)
-                end, State, lists:reverse(Profiles)).
+    AppInfo1 = rebar_app_info:state(AppInfo, AppState),
+
+    State1 = lists:foldl(fun(Profile, StateAcc) ->
+                                 AppProfDeps = rebar_state:get(AppState, {deps, Profile}, []),
+                                 TopLevelProfDeps = rebar_state:get(StateAcc, {deps, Profile}, []),
+                                 ProfDeps2 = lists:keymerge(1, TopLevelProfDeps, AppProfDeps),
+                                 rebar_state:set(StateAcc, {deps, Profile}, ProfDeps2)
+                         end, State, lists:reverse(Profiles)),
+
+
+    {AppInfo1, State1}.
 
 -spec all_app_dirs(list(file:name())) -> list(file:name()).
 all_app_dirs(LibDirs) ->
