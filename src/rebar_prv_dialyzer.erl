@@ -86,8 +86,8 @@ format_error(Reason) ->
 %% Internal functions
 
 get_plt_location(State) ->
-    BuildDir = rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR),
-    DefaultPlt = filename:join([BuildDir, default_plt()]),
+    BaseDir = rebar_dir:base_dir(State),
+    DefaultPlt = filename:join(BaseDir, default_plt()),
     rebar_state:get(State, dialyzer_plt, DefaultPlt).
 
 default_plt() ->
