@@ -86,29 +86,12 @@ format_error(Reason) ->
 %% Internal functions
 
 get_plt_location(State) ->
-    BuildDir = rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR),
-    DefaultPlt = filename:join([BuildDir, default_plt()]),
+    BaseDir = rebar_dir:base_dir(State),
+    DefaultPlt = filename:join(BaseDir, default_plt()),
     rebar_state:get(State, dialyzer_plt, DefaultPlt).
 
 default_plt() ->
-    ".rebar3.otp-" ++ otp_version() ++ ".plt".
-
-otp_version() ->
-    Release = erlang:system_info(otp_release),
-    try otp_version(Release) of
-        Vsn ->
-            Vsn
-    catch
-        error:_ ->
-            Release
-    end.
-
-otp_version(Release) ->
-    File = filename:join([code:root_dir(), "releases", Release, "OTP_VERSION"]),
-    {ok, Contents} = file:read_file(File),
-    [Vsn] = binary:split(Contents, [<<$\n>>], [global, trim]),
-    [_ | _] = unicode:characters_to_list(Vsn).
-
+    rebar_utils:otp_release() ++ ".plt".
 
 do(State, Plt, Apps) ->
     {PltWarnings, State1} = update_proj_plt(State, Plt, Apps),
