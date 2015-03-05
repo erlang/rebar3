@@ -166,22 +166,14 @@ ebin_modules(App, Dir) ->
     [rebar_utils:beam_to_mod(N) || N <- Filtered].
 
 beam_src(Beam) ->
-    try
-        Mod = list_to_atom(filename:basename(Beam, ".beam")),
-        _ = purge(Mod),
-        {module, Mod} = code:load_abs(filename:rootname(Beam, ".beam")),
-        Compile = Mod:module_info(compile),
-        proplists:get_value(source, Compile, [])
-    catch
-        error:undef -> [];
-        error:nofile -> []
+    case beam_lib:chunks(Beam, [compile_info]) of
+        {ok, {_mod, Chunks}} ->
+            CompileInfo = proplists:get_value(compile_info, Chunks, []),
+            proplists:get_value(source, CompileInfo, []);
+        {error, beam_lib, Reason} ->
+            ?WARN("Couldn't read debug info from ~p for reason: ~p", [Beam, Reason]),
+            []
     end.
-
-purge(Mod) ->
-    %% remove old code if necessary
-    _ = code:purge(Mod),
-    %% move current code to old
-    _ = code:delete(Mod).
 
 ensure_registered(AppData) ->
     case lists:keyfind(registered, 1, AppData) of

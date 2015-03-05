@@ -21,7 +21,7 @@ end_per_suite(_Config) ->
     ok.
 
 init_per_testcase(_, Config) ->
-    rebar_test_utils:init_rebar_state(Config).
+    rebar_test_utils:init_rebar_state(Config, "eunit_").
 
 all() ->
     [test_basic_app].
@@ -29,9 +29,9 @@ all() ->
 test_basic_app(Config) ->
     AppDir = ?config(apps, Config),
 
-    Name = rebar_test_utils:create_random_name("eunit_"),
+    Name = rebar_test_utils:create_random_name("basic_"),
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
-    
+
     RebarConfig = [{erl_opts, [{d, some_define}]}],
     rebar_test_utils:run_and_check(Config, RebarConfig, ["eunit"], {ok, [{app, Name}]}).

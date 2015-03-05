@@ -11,8 +11,7 @@
          build_checkout_deps/1,
          recompile_when_opts_change/1,
          dont_recompile_when_opts_dont_change/1,
-         dont_recompile_yrl_or_xrl/1,
-         purge_before_load/1]).
+         dont_recompile_yrl_or_xrl/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -34,7 +33,7 @@ all() ->
     [build_basic_app, build_release_apps,
      build_checkout_apps, build_checkout_deps,
      recompile_when_opts_change, dont_recompile_when_opts_dont_change,
-     dont_recompile_yrl_or_xrl, purge_before_load].
+     dont_recompile_yrl_or_xrl].
 
 build_basic_app(Config) ->
     AppDir = ?config(apps, Config),
@@ -185,12 +184,3 @@ dont_recompile_yrl_or_xrl(Config) ->
 
     ?assert(ModTime == NewModTime).
 
-purge_before_load(Config) ->
-    AppDir = ?config(apps, Config),
-
-    Name = rebar_test_utils:create_random_name("app1_"),
-    Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
-
-    Tasks = ["do", "compile,compile,compile"],
-    rebar_test_utils:run_and_check(Config, [], Tasks, {ok, [{app, Name}]}).

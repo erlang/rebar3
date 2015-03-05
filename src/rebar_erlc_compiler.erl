@@ -256,24 +256,21 @@ needs_compile(Source, Target, Opts, Parents) ->
 
 source_changed(TargetLastMod, I) -> TargetLastMod < filelib:last_modified(I).
 
-opts_changed(Opts, Target) ->
-    Basename = filename:basename(Target, ".beam"),
-    Dirname = filename:dirname(Target),
-    ObjectFile = filename:join([Dirname, Basename]),
-    _ = purge(list_to_atom(Basename)),
-    case code:load_abs(ObjectFile) of
-        {module, Mod} ->
-            Compile = Mod:module_info(compile),
-            lists:sort(Opts) =/= lists:sort(proplists:get_value(options,
-                                                                Compile));
-        {error, nofile} -> false
+opts_changed(NewOpts, Target) ->
+    case compile_info(Target) of
+        {ok, Opts} -> lists:sort(Opts) =/= lists:sort(NewOpts);
+        _          -> true
     end.
 
-purge(Mod) ->
-    %% remove old code if necessary
-    _ = code:purge(Mod),
-    %% move current code to old
-    _ = code:delete(Mod).
+compile_info(Target) ->
+    case beam_lib:chunks(Target, [compile_info]) of
+        {ok, {_mod, Chunks}} ->
+            CompileInfo = proplists:get_value(compile_info, Chunks, []),
+            {ok, proplists:get_value(options, CompileInfo, [])};
+        {error, beam_lib, Reason} ->
+            ?WARN("Couldn't read debug info from ~p for reason: ~p", [Target, Reason]),
+            {error, Reason}
+    end.
 
 check_erlcinfo(_Config, #erlcinfo{vsn=?ERLCINFO_VSN}) ->
     ok;
