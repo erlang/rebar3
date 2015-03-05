@@ -62,8 +62,8 @@ run_test(State, RawOpts, CTOpts) ->
     end.
 
 -spec format_error(any()) -> iolist().
-format_error({failures_running_tests, FailedCount}) ->
-    io_lib:format("Failures occured running tests: ~p", [FailedCount]);
+format_error({failures_running_tests, {Failed, AutoSkipped}}) ->
+    io_lib:format("Failures occured running tests: ~b", [Failed+AutoSkipped]);
 format_error({error_running_tests, Reason}) ->
     io_lib:format("Error running tests: ~p", [Reason]);
 format_error({error_processing_options, Reason}) ->
@@ -400,28 +400,56 @@ maybe_cover_compile(State, Opts) ->
     end,
     rebar_prv_cover:maybe_cover_compile(State1).
 
-handle_results([Result]) ->
+handle_results(Results) when is_list(Results) ->
+    Result = lists:foldl(fun sum_results/2, {0, 0, {0,0}}, Results),
     handle_results(Result);
-handle_results([Result|Results]) when is_list(Results) ->
-    case handle_results(Result) of
-        ok ->
-            handle_results(Results);
-        Error ->
-            Error
-    end;
+handle_results({_, Failed, {_, AutoSkipped}})
+  when Failed > 0 orelse AutoSkipped > 0 ->
+    {error, {failures_running_tests, {Failed, AutoSkipped}}};
 handle_results({error, Reason}) ->
     {error, {error_running_tests, Reason}};
-handle_results(_) -> ok.
+handle_results(_) ->
+    ok.
 
-handle_quiet_results(_, {Passed, 0, {0, 0}}) ->
-    io:format("  All ~p tests passed.~n", [Passed]);
-handle_quiet_results(_, {Passed, 0, {UserSkipped, AutoSkipped}}) ->
-    io:format("  All ~p tests passed. Skipped ~p tests.~n",
-              [Passed, UserSkipped + AutoSkipped]);
-handle_quiet_results(CTOpts, {_, Failed, _}) ->
-    LogDir = proplists:get_value(logdir, CTOpts),
-    Index = filename:join([LogDir, "index.html"]),
-    io:format("  ~p tests failed.~n  Results written to ~p.~n", [Failed, Index]);
-handle_quiet_results(_CTOpts, {'DOWN', _, _, _, Reason}) ->
+sum_results({Passed, Failed, {UserSkipped, AutoSkipped}},
+            {Passed2, Failed2, {UserSkipped2, AutoSkipped2}}) ->
+    {Passed+Passed2, Failed+Failed2,
+     {UserSkipped+UserSkipped2, AutoSkipped+AutoSkipped2}}.
+
+handle_quiet_results(_, {error, _} = Result) ->
+    handle_results(Result);
+handle_quiet_results(_, {'DOWN', _, _, _, Reason}) ->
     handle_results({error, Reason});
-handle_quiet_results(_CTOpts, Result) -> handle_results(Result).
+handle_quiet_results(CTOpts, Results) when is_list(Results) ->
+    _ = [format_result(Result) || Result <- Results],
+    case handle_results(Results) of
+        {error, {failures_running_tests, _}} = Error ->
+            LogDir = proplists:get_value(logdir, CTOpts),
+            Index = filename:join([LogDir, "index.html"]),
+            ?CONSOLE("Results written to ~p.", [Index]),
+            Error;
+        Other ->
+            Other
+    end;
+handle_quiet_results(CTOpts, Result) ->
+    handle_quiet_results(CTOpts, [Result]).
+
+format_result({Passed, 0, {0, 0}}) ->
+    ?CONSOLE("All ~p tests passed.", [Passed]);
+format_result({Passed, Failed, Skipped}) ->
+    Format = [format_failed(Failed), format_skipped(Skipped),
+              format_passed(Passed)],
+    ?CONSOLE("~s", [Format]).
+
+format_failed(0) ->
+    [];
+format_failed(Failed) ->
+    io_lib:format("Failed ~p tests. ", [Failed]).
+
+format_passed(Passed) ->
+    io_lib:format("Passed ~p tests. ", [Passed]).
+
+format_skipped({0, 0}) ->
+    [];
+format_skipped({User, Auto}) ->
+    io_lib:format("Skipped ~p (~p, ~p) tests. ", [User+Auto, User, Auto]).
