@@ -91,7 +91,7 @@ get_plt_location(State) ->
     rebar_state:get(State, dialyzer_plt, DefaultPlt).
 
 default_plt() ->
-    ".rebar3.otp-" ++ rebar_utils:otp_release() ++ ".plt".
+    rebar_utils:otp_release() ++ ".plt".
 
 do(State, Plt, Apps) ->
     {PltWarnings, State1} = update_proj_plt(State, Plt, Apps),
