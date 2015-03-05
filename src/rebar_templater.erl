@@ -132,13 +132,40 @@ override_vars([{Var, Default, Doc} | Rest], General) ->
 
 %% Default variables, generated dynamically.
 default_variables() ->
+    {DefaultAuthor, DefaultEmail} = default_author_and_email(),
     {{Y,M,D},{H,Min,S}} = calendar:universal_time(),
     [{date, lists:flatten(io_lib:format("~4..0w-~2..0w-~2..0w",[Y,M,D]))},
      {datetime, lists:flatten(io_lib:format("~4..0w-~2..0w-~2..0wT~2..0w:~2..0w:~2..0w+00:00",[Y,M,D,H,Min,S]))},
-     {author_name, "Anonymous"},
-     {author_email, "anonymous@example.org"},
+     {author_name, DefaultAuthor},
+     {author_email, DefaultEmail},
      {copyright_year, integer_to_list(Y)},
      {apps_dir, "apps", "Directory where applications will be created if needed"}].
+
+default_author_and_email() ->
+    %% See if we can get a git user and email to use as defaults
+    case rebar_utils:sh("git config --global user.name", []) of
+        {ok, Name} ->
+            case rebar_utils:sh("git config --global user.email", []) of
+                {ok, Email} ->
+                    {string:strip(Name, both, $\n), string:strip(Email, both, $\n)};
+                {error, _} ->
+                    %% Use neither if one doesn't exist
+                    {"Anonymous", "anonymous@example.org"}
+            end;
+        {error, _} ->
+            %% Ok, try mecurial
+            case rebar_utils:sh("hg showconfig ui.username", []) of
+                {ok, NameEmail} ->
+                    case re:run(NameEmail, [{capture, [1,2], list}]) of
+                        {match, [Name, Email]} ->
+                            {Name, Email};
+                        _ ->
+                            {"Anonymous", "anonymous@example.org"}
+                    end;
+                {error, _} ->
+                    {"Anonymous", "anonymous@example.org"}
+            end
+    end.
 
 %% Load variable definitions from the 'Globals' file in the home template
 %% directory

@@ -17,6 +17,9 @@ init_per_group(Name, Config) ->
     [{type, Name},
      {resource, {Name, "https://example.org/user/app", "vsn"}} | Config].
 
+end_per_group(_, _Config) ->
+    ok.
+
 %% Changing the resource type is seen as an upgrade
 init_per_testcase(change_type_upgrade, Config) ->
     Type = ?config(type, Config),
