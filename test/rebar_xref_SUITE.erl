@@ -31,7 +31,6 @@ end_per_suite(_Config) ->
 init_per_testcase(Case, Config) ->
     UpdConfig = rebar_test_utils:init_rebar_state(Config),
     AppDir = ?config(apps, UpdConfig),
-    {ok, OrigDir} = file:get_cwd(),
     file:set_cwd(AppDir),
     Name = rebar_test_utils:create_random_name("xrefapp_"),
     Vsn = rebar_test_utils:create_random_vsn(),
@@ -43,25 +42,9 @@ init_per_testcase(Case, Config) ->
                                   undefined_function_calls,undefined_functions,
                                   exports_not_used,locals_not_used]}],
     [{app_name, Name},
-     {rebar_config, RebarConfig},
-     {orig_dir, OrigDir} | UpdConfig].
+     {rebar_config, RebarConfig} | UpdConfig].
 
 end_per_testcase(_, Config) ->
-    ?debugMsg("End test case cleanup"),
-    AppDir = ?config(apps, Config),
-    OrigDir = ?config(orig_dir, Config),
-    %% Code path cleanup because we set the CWD to the `AppDir' prior
-    %% to launching rebar and these paths make it into the code path
-    %% before the xref module executes so they don't get cleaned up
-    %% automatically after the xref run. Only have to do this because
-    %% we are about to remove the directory and there may be
-    %% subsequent test cases that error out when the code path tries
-    %% to include one of these soon-to-be nonexistent directories.
-    Name = ?config(app_name, Config),
-    EbinDir = filename:join([AppDir, "_build", "default" "lib", Name, "ebin"]),
-    true = code:del_path(EbinDir),
-    file:set_cwd(OrigDir),
-    ec_file:remove(AppDir, [recursive]),
     ok.
 
 all() ->
