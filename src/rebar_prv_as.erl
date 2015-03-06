@@ -37,7 +37,10 @@ do(State) ->
         [] ->
             {error, "At least one profile must be specified when using `as`"};
         _  ->
-            State1 = rebar_state:apply_profiles(State, [list_to_atom(X) || X <- Profiles]),
+            CurrentProfiles = rebar_state:current_profiles(State),
+            NewProfiles = CurrentProfiles ++ [list_to_atom(X) || X <- Profiles],
+            ?DEBUG("Running tasks as: ~p", [NewProfiles]),
+            State1 = rebar_state:current_profiles(State, NewProfiles),
             rebar_prv_do:do_tasks(Tasks, State1)
     end.
 
