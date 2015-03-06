@@ -10,7 +10,10 @@
          profile_merges/1,
          add_to_profile/1,
          add_to_existing_profile/1,
-         profiles_remain_applied_with_config_present/1]).
+         profiles_remain_applied_with_config_present/1,
+         test_profile_applied_at_completion/1,
+         test_profile_applied_before_compile/1,
+         test_profile_applied_before_eunit/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -19,7 +22,10 @@
 all() ->
     [profile_new_key, profile_merge_keys, profile_merges,
      add_to_profile, add_to_existing_profile,
-     profiles_remain_applied_with_config_present].
+     profiles_remain_applied_with_config_present,
+     test_profile_applied_at_completion,
+     test_profile_applied_before_compile,
+     test_profile_applied_before_eunit].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -151,3 +157,43 @@ profiles_remain_applied_with_config_present(Config) ->
     Mod = list_to_atom("not_a_real_src_" ++ Name),
 
     true = lists:member({d, not_ok}, proplists:get_value(options, Mod:module_info(compile), [])).
+
+test_profile_applied_at_completion(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("test_profile_at_completion_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    {ok, State} = rebar_test_utils:run_and_check(Config,
+                                                 [],
+                                                 ["eunit"],
+                                                 return),
+
+    Opts = rebar_state:opts(State),
+    ErlOpts = dict:fetch(erl_opts, Opts),
+    true = lists:member({d, 'TEST'}, ErlOpts).
+
+test_profile_applied_before_compile(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("test_profile_before_compile_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    rebar_test_utils:run_and_check(Config, [], ["eunit"], {ok, [{app, Name}]}),
+
+    S = list_to_atom("not_a_real_src_" ++ Name),
+    true = lists:member({d, 'TEST'}, proplists:get_value(options, S:module_info(compile), [])).
+
+test_profile_applied_before_eunit(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("test_profile_before_eunit_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    rebar_test_utils:run_and_check(Config, [], ["eunit"], {ok, [{app, Name}]}),
+
+    T = list_to_atom("not_a_real_src_" ++ Name ++ "_tests"),
+    true = lists:member({d, 'TEST'}, proplists:get_value(options, T:module_info(compile), [])).
