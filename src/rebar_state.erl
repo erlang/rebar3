@@ -3,7 +3,7 @@
 -export([new/0, new/1, new/2, new/3,
          get/2, get/3, set/3,
 
-         opts/1,
+         opts/1, opts/2,
          default/1, default/2,
 
          escript_path/1, escript_path/2,
@@ -37,7 +37,6 @@
 -record(state_t, {dir                               :: file:name(),
                   opts                = dict:new()  :: rebar_dict(),
                   default             = dict:new()  :: rebar_dict(),
-
                   escript_path                      :: undefined | file:filename_all(),
 
                   lock                = [],
@@ -97,6 +96,7 @@ new(ParentState, Config, Dir) ->
                         D = proplists:get_value(deps, Config, []),
                         dict:from_list([{{deps, default}, D} | Config])
                 end,
+
     NewOpts = dict:merge(fun(_Key, Value1, _Value2) ->
                                  Value1
                          end, LocalOpts, Opts),
@@ -128,6 +128,9 @@ default(State, Opts) ->
 
 opts(#state_t{opts=Opts}) ->
     Opts.
+
+opts(State, Opts) ->
+    State#state_t{opts=Opts}.
 
 current_profiles(#state_t{current_profiles=Profiles}) ->
     Profiles.

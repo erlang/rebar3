@@ -34,13 +34,15 @@ format_error({missing_module, Module}) ->
     io_lib:format("Module defined in app file missing: ~p~n", [Module]).
 
 merge_deps(AppInfo, State) ->
-    Profiles = rebar_state:current_profiles(State),
+    Default = rebar_state:default(State),
+    CurrentProfiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo),
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
 
+    %% We reset the opts here to default so no profiles are applied multiple times
     AppState = rebar_state:apply_overrides(
                  rebar_state:apply_profiles(
-                   rebar_state:new(State, C, rebar_app_info:dir(AppInfo)), Profiles), Name),
+                   rebar_state:new(rebar_state:opts(State, Default), C, rebar_app_info:dir(AppInfo)), CurrentProfiles), Name),
     AppInfo1 = rebar_app_info:state(AppInfo, AppState),
 
     State1 = lists:foldl(fun(Profile, StateAcc) ->
@@ -48,8 +50,7 @@ merge_deps(AppInfo, State) ->
                                  TopLevelProfDeps = rebar_state:get(StateAcc, {deps, Profile}, []),
                                  ProfDeps2 = lists:keymerge(1, TopLevelProfDeps, AppProfDeps),
                                  rebar_state:set(StateAcc, {deps, Profile}, ProfDeps2)
-                         end, State, lists:reverse(Profiles)),
-
+                         end, State, lists:reverse(CurrentProfiles)),
 
     {AppInfo1, State1}.
 
