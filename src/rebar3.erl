@@ -115,8 +115,7 @@ run_aux(State, GlobalPluginProviders, RawArgs) ->
                  false ->
                      State;
                  Profile ->
-                     State1 = rebar_state:apply_profiles(State, [list_to_atom(Profile)]),
-                     rebar_state:default(State1, rebar_state:opts(State1))
+                     rebar_state:apply_profiles(State, [list_to_atom(Profile)])
              end,
 
     %% Process each command, resetting any state between each one
@@ -127,11 +126,15 @@ run_aux(State, GlobalPluginProviders, RawArgs) ->
     {ok, Providers} = application:get_env(rebar, providers),
     {ok, PluginProviders, State4} = rebar_plugins:install(State3),
     rebar_core:update_code_path(State4),
+
+    %% Providers can modify profiles stored in opts, so set default after initializing providers
     AllProviders = Providers++PluginProviders++GlobalPluginProviders,
     State5 = rebar_state:create_logic_providers(AllProviders, State4),
+    State6 = rebar_state:default(State5, rebar_state:opts(State5)),
+
     {Task, Args} = parse_args(RawArgs),
 
-    rebar_core:process_command(rebar_state:command_args(State5, Args), Task).
+    rebar_core:process_command(rebar_state:command_args(State6, Args), Task).
 
 init_config() ->
     %% Initialize logging system

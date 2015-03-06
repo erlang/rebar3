@@ -167,8 +167,11 @@ test_profile_applied_at_completion(Config) ->
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
+    RebarConfig = [{erl_opts, [{d, some_define}]}],
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+
     {ok, State} = rebar_test_utils:run_and_check(Config,
-                                                 [],
+                                                 RebarConfig,
                                                  ["eunit"],
                                                  return),
 
@@ -183,7 +186,10 @@ test_profile_applied_before_compile(Config) ->
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
-    rebar_test_utils:run_and_check(Config, [], ["eunit"], {ok, [{app, Name}]}),
+    RebarConfig = [{erl_opts, [{d, some_define}]}],
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["eunit"], {ok, [{app, Name}]}),
 
     S = list_to_atom("not_a_real_src_" ++ Name),
     true = lists:member({d, 'TEST'}, proplists:get_value(options, S:module_info(compile), [])).
@@ -195,7 +201,10 @@ test_profile_applied_before_eunit(Config) ->
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
-    rebar_test_utils:run_and_check(Config, [], ["eunit"], {ok, [{app, Name}]}),
+    RebarConfig = [{erl_opts, [{d, some_define}]}],
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["eunit"], {ok, [{app, Name}]}),
 
     T = list_to_atom("not_a_real_src_" ++ Name ++ "_tests"),
     true = lists:member({d, 'TEST'}, proplists:get_value(options, T:module_info(compile), [])).
@@ -207,8 +216,11 @@ test_profile_applied_to_apps(Config) ->
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
+    RebarConfig = [{erl_opts, [{d, some_define}]}],
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+
     {ok, State} = rebar_test_utils:run_and_check(Config,
-                                                 [],
+                                                 RebarConfig,
                                                  ["eunit"],
                                                  return),
 
