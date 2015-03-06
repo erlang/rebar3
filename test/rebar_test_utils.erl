@@ -271,14 +271,10 @@ erl_test_file(Name) ->
     BaseName = filename:basename(Name, ".erl"),
     io_lib:format("-module(~s_tests).\n"
                   "-compile(export_all).\n"
-                  "-ifndef(some_define).\n"
-                  "-define(some_define, false).\n"
-                  "-endif.\n"
-                  "-ifdef(TEST).\n"
                   "-include_lib(\"eunit/include/eunit.hrl\").\n"
                   "some_test_() -> ?_assertEqual(ok, ~s:main()).\n"
-                  "define_test_() -> ?_assertEqual(true, ?some_define).\n"
-                  "-endif.\n", [BaseName, BaseName]).
+                  "define_test_() -> ?_assertEqual(true, ?some_define).\n",
+                  [BaseName, BaseName]).
 
 get_app_metadata(Name, Vsn, Deps) ->
     {application, erlang:list_to_atom(Name),

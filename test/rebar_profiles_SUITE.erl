@@ -10,7 +10,8 @@
          profile_merges/1,
          add_to_profile/1,
          add_to_existing_profile/1,
-         profiles_remain_applied_with_config_present/1]).
+         profiles_remain_applied_with_config_present/1,
+         providers_profiles_applied/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -19,7 +20,8 @@
 all() ->
     [profile_new_key, profile_merge_keys, profile_merges,
      add_to_profile, add_to_existing_profile,
-     profiles_remain_applied_with_config_present].
+     profiles_remain_applied_with_config_present,
+     providers_profiles_applied].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -151,3 +153,18 @@ profiles_remain_applied_with_config_present(Config) ->
     Mod = list_to_atom("not_a_real_src_" ++ Name),
 
     true = lists:member({d, not_ok}, proplists:get_value(options, Mod:module_info(compile), [])).
+
+providers_profiles_applied(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("providers_profiles_applied_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{erl_opts, []}, {profiles, [
+        {test, [{erl_opts, [{d, some_define}]}]}
+    ]}],
+
+    %% if the `test` profile isn't applied as a result of running `eunit` the define
+    %%  will not be applied and compilation will fail
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["eunit"], {ok, [{app, Name}]}).
