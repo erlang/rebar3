@@ -35,6 +35,8 @@
 -include("rebar.hrl").
 
 -record(state_t, {dir                               :: file:name(),
+                  base_opts           = dict:new()  :: rebar_dict(),
+                  added_opts          = dict:new()  :: rebar_dict(),
                   opts                = dict:new()  :: rebar_dict(),
                   default             = dict:new()  :: rebar_dict(),
 
@@ -68,6 +70,7 @@ new(Config) when is_list(Config) ->
     Opts = dict:from_list([{{deps, default}, Deps} | Config]),
     #state_t { dir = rebar_dir:get_cwd(),
                default = Opts,
+               base_opts = Opts,
                opts = Opts }.
 
 -spec new(t() | atom(), list()) -> t().
@@ -78,6 +81,7 @@ new(Profile, Config) when is_atom(Profile)
     #state_t { dir = rebar_dir:get_cwd(),
                current_profiles = [Profile],
                default = Opts,
+               base_opts = Opts,
                opts = Opts };
 new(ParentState=#state_t{}, Config) ->
     %% Load terms from rebar.config, if it exists
@@ -86,7 +90,8 @@ new(ParentState=#state_t{}, Config) ->
 
 -spec new(t(), list(), file:name()) -> t().
 new(ParentState, Config, Dir) ->
-    Opts = ParentState#state_t.opts,
+    BaseOpts = ParentState#state_t.base_opts,
+    AddedOpts = ParentState#state_t.added_opts,
     LocalOpts = case rebar_config:consult_file(filename:join(Dir, ?LOCK_FILE)) of
                     [D] ->
                         %% We want the top level deps only from the lock file.
@@ -99,9 +104,14 @@ new(ParentState, Config, Dir) ->
                 end,
     NewOpts = dict:merge(fun(_Key, Value1, _Value2) ->
                                  Value1
-                         end, LocalOpts, Opts),
+                         end, LocalOpts, BaseOpts),
+    NewMerged = dict:merge(fun(_Key, Value1, _Value2) ->
+                                 Value1
+                           end, AddedOpts, NewOpts),
     ParentState#state_t{dir=Dir
-                       ,opts=NewOpts
+                       ,base_opts=NewOpts
+                       ,added_opts=AddedOpts
+                       ,opts=NewMerged
                        ,default=NewOpts}.
 
 get(State, Key) ->
@@ -117,8 +127,9 @@ get(State, Key, Default) ->
     end.
 
 -spec set(t(), any(), any()) -> t().
-set(State=#state_t{opts=Opts}, Key, Value) ->
-    State#state_t{ opts = dict:store(Key, Value, Opts) }.
+set(State=#state_t{opts=Opts, added_opts=AddedOpts}, Key, Value) ->
+    State#state_t{ opts = dict:store(Key, Value, Opts),
+                   added_opts = dict:store(Key, Value, AddedOpts) }.
 
 default(#state_t{default=Opts}) ->
     Opts.
@@ -198,7 +209,8 @@ apply_profiles(State, Profile) when not is_list(Profile) ->
     apply_profiles(State, [Profile]);
 apply_profiles(State, [default]) ->
     State;
-apply_profiles(State=#state_t{opts=Opts, current_profiles=CurrentProfiles}, Profiles) ->
+apply_profiles(State=#state_t{base_opts=Opts, added_opts=AddedOpts,
+                              current_profiles=CurrentProfiles}, Profiles) ->
     ConfigProfiles = rebar_state:get(State, profiles, []),
     {Profiles1, NewOpts} =
         lists:foldl(fun(default, {ProfilesAcc, OptsAcc}) ->
@@ -207,7 +219,10 @@ apply_profiles(State=#state_t{opts=Opts, current_profiles=CurrentProfiles}, Prof
                             ProfileOpts = dict:from_list(proplists:get_value(Profile, ConfigProfiles, [])),
                             {[Profile]++ProfilesAcc, merge_opts(Profile, ProfileOpts, OptsAcc)}
                     end, {[], Opts}, Profiles),
-    State#state_t{current_profiles=CurrentProfiles++Profiles1, opts=NewOpts}.
+    NewMerged = dict:merge(fun(_Key, Value1, _Value2) ->
+                                 Value1
+                           end, AddedOpts, NewOpts),
+    State#state_t{current_profiles=CurrentProfiles++Profiles1, opts=NewMerged}.
 
 merge_opts(Profile, NewOpts, OldOpts) ->
     Opts = dict:merge(fun(_Key, NewValue, OldValue) when is_list(NewValue) ->
