@@ -3,6 +3,8 @@
 -export([new/0, new/1, new/2, new/3,
          get/2, get/3, set/3,
 
+         base_state/1, base_state/2,
+
          opts/1,
          default/1, default/2,
 
@@ -37,7 +39,7 @@
 -record(state_t, {dir                               :: file:name(),
                   opts                = dict:new()  :: rebar_dict(),
                   default             = dict:new()  :: rebar_dict(),
-
+                  base_state          = undefined   :: t(),
                   escript_path                      :: undefined | file:filename_all(),
 
                   lock                = [],
@@ -119,6 +121,15 @@ get(State, Key, Default) ->
 -spec set(t(), any(), any()) -> t().
 set(State=#state_t{opts=Opts}, Key, Value) ->
     State#state_t{ opts = dict:store(Key, Value, Opts) }.
+
+%% This is the State before any profiles have been applied.
+%% We keep it around so project apps can apply profiles and
+%% overrides to the original top level state.
+base_state(#state_t{base_state=BaseState}) ->
+    BaseState.
+
+base_state(State, BaseState) ->
+    State#state_t{base_state=BaseState}.
 
 default(#state_t{default=Opts}) ->
     Opts.
