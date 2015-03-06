@@ -13,7 +13,8 @@
          profiles_remain_applied_with_config_present/1,
          test_profile_applied_at_completion/1,
          test_profile_applied_before_compile/1,
-         test_profile_applied_before_eunit/1]).
+         test_profile_applied_before_eunit/1,
+         test_profile_applied_to_apps/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -25,7 +26,8 @@ all() ->
      profiles_remain_applied_with_config_present,
      test_profile_applied_at_completion,
      test_profile_applied_before_compile,
-     test_profile_applied_before_eunit].
+     test_profile_applied_before_eunit,
+     test_profile_applied_to_apps].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -197,3 +199,23 @@ test_profile_applied_before_eunit(Config) ->
 
     T = list_to_atom("not_a_real_src_" ++ Name ++ "_tests"),
     true = lists:member({d, 'TEST'}, proplists:get_value(options, T:module_info(compile), [])).
+
+test_profile_applied_to_apps(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("test_profile_applied_to_apps_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    {ok, State} = rebar_test_utils:run_and_check(Config,
+                                                 [],
+                                                 ["eunit"],
+                                                 return),
+
+    Apps = rebar_state:project_apps(State),
+    lists:foreach(fun(App) ->
+        AppState = rebar_app_info:state(App),
+        Opts = rebar_state:opts(AppState),
+        ErlOpts = dict:fetch(erl_opts, Opts),
+        true = lists:member({d, 'TEST'}, ErlOpts)
+    end, Apps).
