@@ -125,7 +125,6 @@ run_aux(State, GlobalPluginProviders, RawArgs) ->
 
     {ok, Providers} = application:get_env(rebar, providers),
     {ok, PluginProviders, State4} = rebar_plugins:install(State3),
-    rebar_core:update_code_path(State4),
 
     %% Providers can modify profiles stored in opts, so set default after initializing providers
     AllProviders = Providers++PluginProviders++GlobalPluginProviders,

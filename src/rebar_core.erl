@@ -26,8 +26,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_core).
 
--export([process_command/2
-        ,update_code_path/1]).
+-export([process_command/2]).
 
 -include("rebar.hrl").
 
@@ -103,38 +102,3 @@ do([ProviderName | Rest], State) ->
         {error, Error} ->
             {error, Error}
     end.
-
-update_code_path(State) ->
-    true = rebar_utils:expand_code_path(),
-    LibDirs = rebar_dir:lib_dirs(State),
-    DepsDir = rebar_dir:deps_dir(State),
-    PluginsDir = rebar_dir:plugins_dir(State),
-    _UpdatedCodePaths = update_code_path_(lists:usort([DepsDir, PluginsDir | LibDirs])).
-
-%% ===================================================================
-%% Internal functions
-%% ===================================================================
-
-update_code_path_(Paths) ->
-    LibPaths = expand_lib_dirs(Paths, rebar_dir:get_cwd(), []),
-    ok = code:add_pathsa(LibPaths),
-    %% track just the paths we added, so we can remove them without
-    %% removing other paths added by this dep
-    {added, LibPaths}.
-
-expand_lib_dirs([], _Root, Acc) ->
-    Acc;
-expand_lib_dirs([Dir | Rest], Root, Acc) ->
-    %% The current dir should only have an ebin dir.
-    %% Other lib dirs contain app directories, so need the wildcard
-    Apps = case Dir of
-               "." ->
-                   [filename:join(Dir, "ebin")];
-               _ ->
-                   filelib:wildcard(filename:join([Dir, "*", "ebin"]))
-           end,
-    FqApps = case filename:pathtype(Dir) of
-                 absolute -> Apps;
-                 _        -> [filename:join([Root, A]) || A <- Apps]
-             end,
-    expand_lib_dirs(Rest, Root, Acc ++ FqApps).
