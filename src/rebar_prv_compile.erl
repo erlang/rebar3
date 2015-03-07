@@ -28,7 +28,7 @@ init(State) ->
                                                                {module, ?MODULE},
                                                                {bare, false},
                                                                {deps, ?DEPS},
-                                                               {example, "rebar compile"},
+                                                               {example, "rebar3 compile"},
                                                                {short_desc, "Compile apps .app.src and .erl files."},
                                                                {desc, ""},
                                                                {opts, [

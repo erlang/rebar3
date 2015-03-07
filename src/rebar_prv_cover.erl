@@ -26,7 +26,7 @@ init(State) ->
                                                                {module, ?MODULE},
                                                                {bare, false},
                                                                {deps, ?DEPS},
-                                                               {example, "rebar cover"},
+                                                               {example, "rebar3 cover"},
                                                                {short_desc, "Perform coverage analysis."},
                                                                {desc, ""},
                                                                {opts, cover_opts(State)}])),

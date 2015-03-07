@@ -49,7 +49,7 @@ init(State) ->
                                                                {module, ?MODULE},
                                                                {bare, false},
                                                                {deps, ?DEPS},
-                                                               {example, "rebar shell"},
+                                                               {example, "rebar3 shell"},
                                                                {short_desc, "Run shell with project apps and deps in path."},
                                                                {desc, info()},
                                                                {opts, []}])),

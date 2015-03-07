@@ -26,7 +26,7 @@ init(State) ->
                                                                {module, ?MODULE},
                                                                {bare, false},
                                                                {deps, ?DEPS},
-                                                               {example, "rebar dialyzer"},
+                                                               {example, "rebar3 dialyzer"},
                                                                {short_desc, short_desc()},
                                                                {desc, desc()},
                                                                {opts, Opts}])),

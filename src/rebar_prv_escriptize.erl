@@ -49,7 +49,7 @@ init(State) ->
                                 {module, ?MODULE},
                                 {bare, false},
                                 {deps, ?DEPS},
-                                {example, "rebar escriptize"},
+                                {example, "rebar3 escriptize"},
                                 {opts, []},
                                 {short_desc, "Generate escript archive"},
                                 {desc, desc()}

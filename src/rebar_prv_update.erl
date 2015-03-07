@@ -24,7 +24,7 @@ init(State) ->
                                                                {module, ?MODULE},
                                                                {bare, false},
                                                                {deps, ?DEPS},
-                                                               {example, "rebar update"},
+                                                               {example, "rebar3 update"},
                                                                {short_desc, "Update package index."},
                                                                {desc, ""},
                                                                {opts, []}])),

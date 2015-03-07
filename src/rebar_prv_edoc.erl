@@ -21,7 +21,7 @@ init(State) ->
                                                                {module, ?MODULE},
                                                                {bare, false},
                                                                {deps, ?DEPS},
-                                                               {example, "rebar edoc"},
+                                                               {example, "rebar3 edoc"},
                                                                {short_desc, "Generate documentation using edoc."},
                                                                {desc, ""},
                                                                {opts, []}])),

@@ -17,7 +17,7 @@ init(State) ->
                                                                {module, ?MODULE},
                                                                {bare, true},
                                                                {deps, ?DEPS},
-                                                               {example, "rebar deps"},
+                                                               {example, "rebar3 deps"},
                                                                {short_desc, "List dependencies"},
                                                                {desc, info("List dependencies")},
                                                                {opts, []}])),

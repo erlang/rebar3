@@ -24,7 +24,7 @@ init(State) ->
                                                                {module, ?MODULE},
                                                                {bare, false},
                                                                {deps, ?DEPS},
-                                                               {example, "rebar version"},
+                                                               {example, "rebar3 version"},
                                                                {short_desc, "Print version for rebar and current Erlang."},
                                                                {desc, ""},
                                                                {opts, []}])),

@@ -24,7 +24,7 @@ init(State) ->
                                  {module, ?MODULE},
                                  {deps, ?DEPS},
                                  {bare, false},
-                                 {example, "rebar eunit"},
+                                 {example, "rebar3 eunit"},
                                  {short_desc, "Run EUnit Tests."},
                                  {desc, ""},
                                  {opts, eunit_opts(State)},

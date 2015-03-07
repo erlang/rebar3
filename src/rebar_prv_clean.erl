@@ -24,7 +24,7 @@ init(State) ->
                                                                {module, ?MODULE},
                                                                {bare, false},
                                                                {deps, ?DEPS},
-                                                               {example, "rebar clean"},
+                                                               {example, "rebar3 clean"},
                                                                {short_desc, "Remove compiled beam files from apps."},
                                                                {desc, ""},
                                                                {opts, [{all, $a, "all", undefined, "Clean all apps include deps"}]}])),

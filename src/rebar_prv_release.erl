@@ -24,7 +24,7 @@ init(State) ->
                                                                {module, ?MODULE},
                                                                {bare, false},
                                                                {deps, ?DEPS},
-                                                               {example, "rebar release"},
+                                                               {example, "rebar3 release"},
                                                                {short_desc, "Build release of project."},
                                                                {desc, ""},
                                                                {opts, relx:opt_spec_list()}])),
