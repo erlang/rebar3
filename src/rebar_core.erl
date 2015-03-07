@@ -84,7 +84,7 @@ process_command(State, Command) ->
                     %% to have both $REBAR_PROFILE set and use 'as' in a command
                     case rebar_state:current_profiles(State) of
                         [default] ->
-                            do([{default, hd(TargetProviders)} | tl(TargetProviders)], State);
+                            do(TargetProviders, State);
                         _ ->
                             {error, "Namespace 'as' is forbidden"}
                     end;

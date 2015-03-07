@@ -100,13 +100,11 @@
          do/1,
          format_error/1]).
 
-%% for internal use only
--export([info/2]).
-
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 -define(PROVIDER, compile).
--define(DEPS, []).
+-define(DEPS, [{default, compile}]).
 
 %% ===================================================================
 %% Public API
@@ -125,27 +123,44 @@ init(State) ->
                                                                {opts, []}])),
     {ok, State1}.
 
-do(Config) ->
+do(State) ->
     ?INFO("Running erlydtl...", []),
-    MultiDtlOpts = erlydtl_opts(Config),
+    DtlOpts = proplists:unfold(rebar_state:get(State, erlydtl_opts, [])),
 
-    Result = lists:foldl(fun(DtlOpts, _) ->
-                                 file:make_dir(option(out_dir, DtlOpts)),
-                                 rebar_base_compiler:run(Config, [],
-                                                         option(doc_root, DtlOpts),
-                                                         option(source_ext, DtlOpts),
-                                                         option(out_dir, DtlOpts),
-                                                         option(module_ext, DtlOpts) ++ ".beam",
-                                                         fun(S, T, C) ->
-                                                                 compile_dtl(C, S, T, DtlOpts)
-                                                         end,
-                                                         [{check_last_mod, false},
-                                                          {recursive, option(recursive, DtlOpts)}])
-                         end, ok, MultiDtlOpts),
+    %% We need a project app to store the results under in _build
+    %% If there is more than 1 project app, check for an app config
+    %% if that doesn't exist, error out.
+    App1 = case rebar_state:project_apps(State) of
+               [App] ->
+                   App;
+               Apps ->
+                   case option(app, DtlOpts) of
+                       undefined ->
+                           ?PRV_ERROR(no_main_app);
+                       Name ->
+                           rebar_app_utils:find(Name, Apps)
+                   end
+           end,
 
-    {Result, Config}.
+    Dir = rebar_app_info:dir(App1),
+    OutDir = rebar_app_info:ebin_dir(App1),
+    rebar_base_compiler:run(State,
+                            [],
+                            filename:join(Dir, option(doc_root, DtlOpts)),
+                            option(source_ext, DtlOpts),
+                            OutDir,
+                            option(module_ext, DtlOpts) ++ ".beam",
+                            fun(S, T, C) ->
+                                    compile_dtl(C, S, T, DtlOpts, Dir, OutDir)
+                            end,
+                            [{check_last_mod, false},
+                             {recursive, option(recursive, DtlOpts)}]),
+
+    {ok, State}.
 
 -spec format_error(any()) ->  iolist().
+format_error(no_main_app) ->
+    "Erlydtl Error: Multiple project apps found and no {app, atom()} option found in erlydtl_opts.";
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -153,41 +168,11 @@ format_error(Reason) ->
 %% Internal functions
 %% ===================================================================
 
-info(help, compile) ->
-    ?CONSOLE(
-       "Build ErlyDtl (*.dtl) sources.~n"
-       "~n"
-       "Valid rebar.config options:~n"
-       "  ~p",
-       [
-        {erlydtl_opts, [{doc_root,   "templates"},
-                        {out_dir,    "ebin"},
-                        {source_ext, ".dtl"},
-                        {module_ext, "_dtl"},
-                        {recursive, true}]}
-       ]).
-
-erlydtl_opts(Config) ->
-    Opts = rebar_state:get(Config, erlydtl_opts, []),
-    Tuples = [{K,V} || {K,V} <- Opts],
-    case [L || L <- Opts, is_list(L), not io_lib:printable_list(L)] of
-        [] ->
-            [lists:keysort(1, Tuples)];
-        Lists ->
-            lists:map(
-              fun(L) ->
-                      lists:keysort(1,
-                                    lists:foldl(
-                                      fun({K,T}, Acc) ->
-                                              lists:keystore(K, 1, Acc, {K, T})
-                                      end, Tuples, L))
-              end, Lists)
-    end.
-
 option(Opt, DtlOpts) ->
     proplists:get_value(Opt, DtlOpts, default(Opt)).
 
-default(doc_root) -> "templates";
+default(app) -> undefined;
+default(doc_root) -> "priv/templates";
 default(out_dir)  -> "ebin";
 default(source_ext) -> ".dtl";
 default(module_ext) -> "_dtl";
@@ -195,62 +180,44 @@ default(custom_tags_dir) -> "";
 default(compiler_options) -> [return];
 default(recursive) -> true.
 
-compile_dtl(Config, Source, Target, DtlOpts) ->
-    case code:which(erlydtl) of
-        non_existing ->
-            ?ERROR("~n===============================================~n"
-                   " You need to install erlydtl to compile DTL templates~n"
-                   " Download the latest tarball release from github~n"
-                   "    https://github.com/erlydtl/erlydtl/releases~n"
-                   " and install it into your erlang library dir~n"
-                   "===============================================~n", []),
-            ?FAIL;
-        _ ->
-            case needs_compile(Source, Target, DtlOpts) of
-                true ->
-                    do_compile(Config, Source, Target, DtlOpts);
-                false ->
-                    skipped
-            end
+compile_dtl(State, Source, Target, DtlOpts, Dir, OutDir) ->
+    case needs_compile(Source, Target, DtlOpts) of
+        true ->
+            do_compile(State, Source, Target, DtlOpts, Dir, OutDir);
+        false ->
+            skipped
     end.
 
-do_compile(Config, Source, Target, DtlOpts) ->
-    %% TODO: Check last mod on target and referenced DTLs here..
-
-    %% erlydtl >= 0.8.1 does not use the extra indirection using the
-    %% compiler_options. Kept for backward compatibility with older
-    %% versions of erlydtl.
+do_compile(State, Source, Target, DtlOpts, Dir, OutDir) ->
     CompilerOptions = option(compiler_options, DtlOpts),
 
     Sorted = proplists:unfold(
                lists:sort(
-                 [{out_dir, option(out_dir, DtlOpts)},
-                  {doc_root, option(doc_root, DtlOpts)},
+                 [{out_dir, OutDir},
+                  {doc_root, filename:join(Dir, option(doc_root, DtlOpts))},
                   {custom_tags_dir, option(custom_tags_dir, DtlOpts)},
-                  {compiler_options, CompilerOptions}
-                  |CompilerOptions])),
+                  {compiler_options, CompilerOptions}])),
 
     %% ensure that doc_root and out_dir are defined,
     %% using defaults if necessary
     Opts = lists:ukeymerge(1, DtlOpts, Sorted),
-    ?INFO("Compiling \"~s\" -> \"~s\" with options:~n    ~s",
-        [Source, Target, io_lib:format("~p", [Opts])]),
+    ?DEBUG("Compiling \"~s\" -> \"~s\" with options:~n    ~s",
+          [Source, Target, io_lib:format("~p", [Opts])]),
     case erlydtl:compile_file(ec_cnv:to_list(Source),
-                         list_to_atom(module_name(Target)),
-                         Opts) of
+                              list_to_atom(module_name(Target)),
+                              Opts) of
         {ok, _Mod} ->
             ok;
         {ok, _Mod, Ws} ->
-            rebar_base_compiler:ok_tuple(Config, Source, Ws);
+            rebar_base_compiler:ok_tuple(State, Source, Ws);
         error ->
-            rebar_base_compiler:error_tuple(Config, Source, [], [], Opts);
+            rebar_base_compiler:error_tuple(State, Source, [], [], Opts);
         {error, Es, Ws} ->
-            rebar_base_compiler:error_tuple(Config, Source, Es, Ws, Opts)
+            rebar_base_compiler:error_tuple(State, Source, Es, Ws, Opts)
     end.
 
 module_name(Target) ->
-    F = filename:basename(Target),
-    string:substr(F, 1, length(F)-length(".beam")).
+    filename:rootname(filename:basename(Target), ".beam").
 
 needs_compile(Source, Target, DtlOpts) ->
     LM = filelib:last_modified(Target),
