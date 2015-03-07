@@ -22,7 +22,7 @@ init(State) ->
         {module, ?MODULE},
         {bare, false},
         {deps, ?DEPS},
-        {example, "rebar new <template>"},
+        {example, "rebar3 new <template>"},
         {short_desc, "Create new project from templates."},
         {desc, info()},
         {opts, [{force, $f, "force", undefined, "overwrite existing files"}]}

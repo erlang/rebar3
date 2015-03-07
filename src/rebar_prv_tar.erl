@@ -24,7 +24,7 @@ init(State) ->
                                                                {module, ?MODULE},
                                                                {bare, false},
                                                                {deps, ?DEPS},
-                                                               {example, "rebar tar"},
+                                                               {example, "rebar3 tar"},
                                                                {short_desc, "Tar archive of release built of project."},
                                                                {desc, ""},
                                                                {opts, relx:opt_spec_list()}])),

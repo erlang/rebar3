@@ -24,7 +24,7 @@ init(State) ->
                                  {module, ?MODULE},
                                  {deps, ?DEPS},
                                  {bare, false},
-                                 {example, "rebar ct"},
+                                 {example, "rebar3 ct"},
                                  {short_desc, "Run Common Tests."},
                                  {desc, ""},
                                  {opts, ct_opts(State)},
@@ -311,7 +311,7 @@ test_state(State) ->
     TestOpts = case rebar_state:get(State, ct_compile_opts, []) of
         []    -> [];
         Opts  -> [{erl_opts, Opts}]
-    end, 
+    end,
     [first_files(State)|TestOpts].
 
 first_files(State) ->

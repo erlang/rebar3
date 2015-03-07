@@ -17,7 +17,7 @@ init(State) ->
                                                                {module, ?MODULE},
                                                                {bare, false},
                                                                {deps, ?DEPS},
-                                                               {example, "rebar pkgs"},
+                                                               {example, "rebar3 pkgs"},
                                                                {short_desc, "List available packages."},
                                                                {desc, info("List available packages")},
                                                                {opts, []}])),
