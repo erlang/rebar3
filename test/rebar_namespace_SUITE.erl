@@ -5,7 +5,8 @@
 
 all() -> [implicit_compile, default_compile, do_compile,
           as_default_compile, as_do_compile,
-          notfound, do_notfound, default_notfound, ns_notfound].
+          notfound, do_notfound, default_notfound, ns_notfound, ns_found,
+          as_ns_invalid].
 
 init_per_testcase(Case, Config0) ->
     Config = rebar_test_utils:init_rebar_state(Config0),
@@ -77,6 +78,22 @@ ns_notfound(Config) ->
                             [fakecommand, ns])}
     ).
 
+ns_found(Config) ->
+    Command = ["ns", "fake_provider"],
+    rebar_test_utils:run_and_check(
+      add_fake_ns_provider(Config), [], Command,
+      {ok, []}
+    ).
+
+as_ns_invalid(Config) ->
+    %% The as namespace is not valid
+    Command = ["as", "profile", "as", "task"],
+    rebar_test_utils:run_and_check(
+      add_fake_ns_provider(Config), [], Command,
+      {error, "Namespace 'as' is forbidden"}
+    ).
+
+
 %%% Helpers %%%
 add_fake_ns_provider(Config) ->
     State = ?config(state, Config),
@@ -84,10 +101,13 @@ add_fake_ns_provider(Config) ->
       State,
       providers:create(
         [{name, fake_provider},
-         {module, fake_provider},
+         {module, ?MODULE},
          {namespace, ns},
          {deps, []},
          {opts, []}]
        )
      ),
     [{state, State1} | Config].
+
+%% callback for the test suite.
+do(State) -> {ok, State}.

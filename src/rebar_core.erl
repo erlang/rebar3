@@ -74,7 +74,21 @@ process_command(State, Command) ->
                     %% properly exist for non-default namespaces outside of
                     %% dynamic dispatch calls for namespaces.
                     do(TargetProviders, rebar_state:namespace(State, default));
-                Command when Command =:= do; Command =:= as ->
+                Command when Command =:= as, Namespace =:= undefined ->
+                    %% Because of the possible forms such as:
+                    %% 'rebar3 as profile task`, `rebar3 as profile do task`
+                    %% and `rebar3 as profile namespace task`, we can only know
+                    %% whether we're in the first 'as' or a namespace 'as' by
+                    %% looking at profiles (as makes them non-default).
+                    %% The namespace 'as' is banned. It also makes it impossible
+                    %% to have both $REBAR_PROFILE set and use 'as' in a command
+                    case rebar_state:current_profiles(State) of
+                        [default] ->
+                            do([{default, hd(TargetProviders)} | tl(TargetProviders)], State);
+                        _ ->
+                            {error, "Namespace 'as' is forbidden"}
+                    end;
+                Command when Command =:= do ->
                     do(TargetProviders, State);
                 _ ->
                     Profiles = providers:profiles(CommandProvider),
@@ -83,7 +97,12 @@ process_command(State, Command) ->
                     case getopt:parse(Opts, rebar_state:command_args(State1)) of
                         {ok, Args} ->
                             State2 = rebar_state:command_parsed_args(State1, Args),
-                            do(TargetProviders, State2);
+                            case Namespace of
+                                undefined -> % we're executing commands, set the default namespace
+                                    do(TargetProviders, rebar_state:namespace(State2, default));
+                                _ ->
+                                    do(TargetProviders, State2)
+                            end;
                         {error, {invalid_option, Option}} ->
                             {error, io_lib:format("Invalid option ~s on task ~p", [Option, Command])}
                     end
@@ -94,8 +113,19 @@ process_command(State, Command) ->
 do([], State) ->
     {ok, State};
 do([ProviderName | Rest], State) ->
-    Provider = providers:get_provider(ProviderName
-                                     ,rebar_state:providers(State)),
+    %% Special providers like 'as', 'do' or some hooks may be passed
+    %% as a tuple {Namespace, Name}, otherwise not. Handle them
+    %% on a per-need basis.
+    Provider = case ProviderName of
+        {Namespace, Name} ->
+            providers:get_provider(Name
+                                  ,rebar_state:providers(State)
+                                  ,Namespace);
+        _ ->
+            providers:get_provider(ProviderName
+                                  ,rebar_state:providers(State)
+                                  ,rebar_state:namespace(State))
+    end,
     case providers:do(Provider, State) of
         {ok, State1} ->
             do(Rest, State1);
