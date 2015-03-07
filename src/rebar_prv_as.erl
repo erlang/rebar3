@@ -51,19 +51,23 @@ args_to_profiles_and_tasks(Args) ->
 first_profile([]) -> {[], []};
 first_profile([ProfileList|Rest]) ->
     case re:split(ProfileList, ",", [{return, list}, {parts, 2}]) of
-        %% profile terminated by comma
-        [P, More]       -> profiles([More] ++ Rest, [P]);
-        %% profile not terminated by comma
-        [P]           -> comma_or_end(Rest, [P])
+        %% `foo, bar`
+        [P, ""]   -> profiles(Rest, [P]);
+        %% `foo,bar`
+        [P, More] -> profiles([More] ++ Rest, [P]);
+        %% `foo`
+        [P]       -> comma_or_end(Rest, [P])
     end.
 
 profiles([], Acc) -> {lists:reverse(Acc), rebar_utils:args_to_tasks([])};
 profiles([ProfileList|Rest], Acc) ->
     case re:split(ProfileList, ",", [{return, list}, {parts, 2}]) of
-        %% profile terminated by comma
-        [P, More]  -> profiles([More] ++ Rest, [P|Acc]);
-        %% profile not terminated by comma
-        [P]      -> comma_or_end(Rest, [P|Acc])
+        %% `foo, bar`
+        [P, ""]   -> profiles(Rest, [P|Acc]);
+        %% `foo,bar`
+        [P, More] -> profiles([More] ++ Rest, [P|Acc]);
+        %% `foo`
+        [P]       -> comma_or_end(Rest, [P|Acc])
     end.
 
 %% `, foo...`
