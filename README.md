@@ -13,14 +13,15 @@ configuration work. rebar also provides dependency management, enabling
 application writers to easily re-use common libraries from a variety of
 locations (git, hg, etc).
 
-3.0 Pre-Alpha
+3.0 Alpha
 ====
 
 [DOCUMENTATION](http://www.rebar3.org/v3.0/docs)
 
-This is an experimental branch, considered to be pre-alpha, and still
-very unstable. Use at your own risk, and expect no support. See
-[the related announcement](http://lists.basho.com/pipermail/rebar_lists.basho.com/2014-November/002087.html).
+This is a preliminary branch, considered to be alpha, and still
+very unstable. Use at your own risk, but please do report bugs
+and issues encountered and we'll try to resolve problems as
+soon as possible.
 
 Compatibility with rebar 2.0 has been broken, and features removed to
 limit scope.
