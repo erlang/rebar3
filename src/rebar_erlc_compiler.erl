@@ -140,7 +140,7 @@ doterl_compile(Config, Dir, ODir, MoreSources, ErlOpts) ->
     %% Support the src_dirs option allowing multiple directories to
     %% contain erlang source. This might be used, for example, should
     %% eunit tests be separated from the core application source.
-    SrcDirs = [filename:join(Dir, X) || X <- proplists:get_value(src_dirs, ErlOpts, ["src"])],
+    SrcDirs = [filename:join(Dir, X) || X <- rebar_state:get(Config, src_dirs, ["src"])],
     AllErlFiles = gather_src(SrcDirs, []) ++ MoreSources,
 
     %% Issue: rebar/rebar3#140 (fix matching based on same path + order of

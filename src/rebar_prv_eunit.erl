@@ -156,9 +156,7 @@ compile_bare_tests(State, TestApps) ->
 
 replace_src_dirs(State) ->
     %% replace any `src_dirs` with just the `test` dir
-    ErlOpts = rebar_state:get(State, erl_opts, []),
-    StrippedOpts = lists:keydelete(src_dirs, 1, ErlOpts),
-    rebar_state:set(State, erl_opts, [{src_dirs, ["test"]}|StrippedOpts]).
+    rebar_state:set(State, src_dirs, ["test"]).
 
 maybe_cover_compile(State, Opts) ->
     State1 = case proplists:get_value(cover, Opts, false) of

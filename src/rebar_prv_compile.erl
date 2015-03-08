@@ -71,7 +71,7 @@ build_app(State, AppInfo) ->
     AppDir = rebar_app_info:dir(AppInfo),
     OutDir = rebar_app_info:out_dir(AppInfo),
 
-    copy_app_dirs(AppDir, OutDir),
+    copy_app_dirs(State, AppDir, OutDir),
 
     S = case rebar_app_info:state(AppInfo) of
             undefined ->
@@ -108,7 +108,7 @@ handle_args(State) ->
     Jobs = proplists:get_value(jobs, Args, ?DEFAULT_JOBS),
     {ok, rebar_state:set(State, jobs, Jobs)}.
 
-copy_app_dirs(OldAppDir, AppDir) ->
+copy_app_dirs(State, OldAppDir, AppDir) ->
     case ec_cnv:to_binary(filename:absname(OldAppDir)) =/=
         ec_cnv:to_binary(filename:absname(AppDir)) of
         true ->
@@ -123,8 +123,9 @@ copy_app_dirs(OldAppDir, AppDir) ->
                     ok
             end,
             filelib:ensure_dir(filename:join(AppDir, "dummy")),
-            %% link to src to be adjacent to ebin is needed for R15 use of cover/xref
-            [symlink_or_copy(OldAppDir, AppDir, Dir) || Dir <- ["priv", "include", "src", "test"]];
+            %% link to src_dirs to be adjacent to ebin is needed for R15 use of cover/xref
+            SrcDirs = rebar_state:get(State, src_dirs, ["src"]),
+            [symlink_or_copy(OldAppDir, AppDir, Dir) || Dir <- ["priv", "include", "test"] ++ SrcDirs];
         false ->
             ok
     end.
