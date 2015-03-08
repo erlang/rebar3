@@ -61,6 +61,7 @@ desc() ->
         "the project's and its dependencies' BEAM files.".
 
 do(State) ->
+    ?INFO("Building escript...", []),
     escriptize(State).
 
 escriptize(State0) ->
