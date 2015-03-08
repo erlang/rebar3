@@ -3,19 +3,6 @@
 %% This is a sample rebar.conf file that shows examples of some of rebar's
 %% options.
 
-%% == Core ==
-
-%% Extend list of always recursive commands
-{recursive_cmds, []}.
-
-%% Check required ERTS or OTP release version
-{require_erts_vsn, ".*"}.
-{require_otp_vsn, ".*"}.
-{require_min_otp_vsn, ".*"}.
-
-%% Additional library directories to add to the code path
-{lib_dirs, []}.
-
 %% == Erlang Compiler ==
 
 %% Erlang files to compile before the rest. Rebar automatically compiles
@@ -55,34 +42,12 @@
 %% EDoc options
 {edoc_opts, []}.
 
-%% == Port Compiler ==
-
-%% Port compilation environment variables. See rebar_port_compiler.erl for
-%% more info. Default is `[]'
-{port_env, [{"CFLAGS", "$CFLAGS -Ifoo"},
-            {"freebsd", "LDFLAGS", "$LDFLAGS -lfoo"}]}.
-
-%% port_specs
-%% List of filenames or wildcards to be compiled. May also contain a tuple
-%% consisting of a regular expression to be applied against the system
-%% architecture as a filter.
-{port_specs, [{"priv/so_name.so", ["c_src/*.c"]},
-              {"linux", "priv/hello_linux", ["c_src/hello_linux.c"]},
-              {"linux", "priv/hello_linux", ["c_src/*.c"], [{env, []}]}]}.
-
 %% == escriptize ==
 {escript_name, "application"}.
 {escript_incl_apps, []}.
 {escript_shebang, "#!/usr/bin/env escript\n"}.
 {escript_comment, "%%\n"}.
 {escript_emu_args, "%%! -pa application/application/ebin\n"}.
-
-%% == LFE Compiler ==
-
-%% LFE files to compile before the rest
-{lfe_first_files, []}.
-
-%% Options for the LFE compiler: reuse {erl_opts, []}
 
 %% == ErlyDTL Compiler ==
 
@@ -125,37 +90,11 @@
 %% Option to use short names (i.e., -sname test) when starting ct
 {ct_use_short_names, true}.
 
-%% == QuickCheck ==
-
-%% If qc_mod is unspecified, rebar tries to detect Triq or EQC
-{qc_opts, [{qc_mod, module()}, Options]}.
-
-%% Additional compile options for qc. erl_opts is also used
-{qc_compile_opts, []}.
-
-%% Same as erl_first_files, but used only when running 'qc'
-{qc_first_files, []}.
-
-%% == Cleanup ==
-
-%% Which files to cleanup
-{clean_files, ["file", "file2"]}.
-
-%% == OTP Applications ==
-
-%% Enable validation of the OTP app module list. Default is 'true'
-{validate_app_modules, true}.
-
-%% == Dependencies ==
-
-%% Where to put any downloaded dependencies. Default is "deps"
-{deps_dir, "deps"}.
-
 %% What dependencies we have, dependencies can be of 3 forms, an application
 %% name as an atom, eg. mochiweb, a name and a version (from the .app file), or
 %% an application name, a version and the SCM details on how to fetch it (SCM
 %% type, location and revision).
-%% Rebar currently supports git, hg, bzr, svn, rsync, fossil, and p4.
+%% Rebar3 currently supports git and hg
 {deps, [app_name,
         {rebar, "1.0.*"},
         {rebar, ".*",
@@ -168,48 +107,7 @@
          {git, "git://github.com/rebar/rebar.git", {tag, "1.0.0"}}},
         {rebar, ".*",
          {git, "git://github.com/rebar/rebar.git", {ref, "7f73b8d3650b41ffd53a199f3eda20985eda84e3"}}},
-        %% Dependencies can be marked as 'raw'. Rebar does not require
-        %% such dependencies to have a standard Erlang/OTP layout
-        %% which assumes the presence of either
-        %% "src/dependency_name.app.src" or "ebin/dependency_name.app"
-        %% files.
-        %%
-        %% 'raw' dependencies can still contain 'rebar.config' and
-        %% even can have the proper OTP directory layout, but they
-        %% won't be compiled.
-        %%
-        %% Only a subset of rebar commands will be executed on the
-        %% 'raw' subdirectories: get-deps, update-deps, check-deps,
-        %% list-deps and delete-deps.
-        {rebar, "",
-         {git, "git://github.com/rebar/rebar.git", {branch, "master"}},
-         [raw]},
-        {app_name, ".*", {hg, "https://www.example.org/url"}},
-        {app_name, ".*", {rsync, "Url"}},
-        {app_name, ".*", {svn, "https://www.example.org/url"}},
-        {app_name, ".*", {svn, "svn://svn.example.org/url"}},
-        {app_name, ".*", {bzr, "https://www.example.org/url", "Rev"}},
-        {app_name, ".*", {fossil, "https://www.example.org/url"}},
-        {app_name, ".*", {fossil, "https://www.example.org/url", "Vsn"}},
-        {app_name, ".*", {p4, "//depot/subdir/app_dir"}}]}.
-
-%% == Subdirectories ==
-
-%% Subdirectories?
-{sub_dirs, ["dir1", "dir2"]}.
-
-%% == Plugins ==
-
-%% Plugins you wish to include.
-%% These can include any module on the code path, including deps.
-%% Alternatively, plugins can be placed as source files in the plugin_dir, in
-%% which case they will be compiled and loaded dynamically at runtime.
-{plugins, [plugin1, plugin2]}.
-
-%% Override the directory in which plugin sources can be found.
-%% Defaults to ./plugins
-{plugin_dir, "some_other_directory"}.
-
+        {app_name, ".*", {hg, "https://www.example.org/url"}}]}.
 
 %% == Pre/Post Command Hooks ==
 
