@@ -140,15 +140,22 @@ compile_tests(State, TestApps) ->
                                          ec_cnv:to_list(rebar_app_info:out_dir(AppInfo)))
     end,
     lists:foreach(F, TestApps),
-    compile_bare_tests(State, TestApps).
+    case filelib:is_dir(filename:join([rebar_dir:get_cwd(), "test"])) of
+        true  -> compile_bare_tests(State, TestApps);
+        false -> ok
+    end.
 
 compile_bare_tests(State, TestApps) ->
     F = fun(App) -> rebar_app_info:dir(App) == rebar_dir:get_cwd() end,
     case lists:filter(F, TestApps) of
-        %% compile just the `test` directory of the base dir
-        [] -> rebar_erlc_compiler:compile(replace_src_dirs(State),
-                                          rebar_dir:get_cwd(),
-                                          filename:join([rebar_dir:base_dir(State), "ebin"]));
+        %% compile and link just the `test` directory of the base dir
+        [] ->
+            Source = filename:join([rebar_dir:get_cwd(), "test"]),
+            Target = filename:join([rebar_dir:base_dir(State), "test"]),
+            ok = rebar_file_utils:symlink_or_copy(Source, Target),
+            rebar_erlc_compiler:compile(replace_src_dirs(State),
+                                        rebar_dir:base_dir(State),
+                                        filename:join([rebar_dir:base_dir(State), "ebin"]));
         %% already compiled `./test` so do nothing
         _  -> ok
     end.

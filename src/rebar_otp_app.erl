@@ -159,7 +159,7 @@ validate_name(AppName, File) ->
 
 ebin_modules(App, Dir) ->
     Beams = lists:sort(rebar_utils:beams(filename:join(Dir, "ebin"))),
-    F = fun(Beam) -> not lists:prefix(filename:join([rebar_app_info:dir(App), "test"]),
+    F = fun(Beam) -> not lists:prefix(filename:join([rebar_app_info:out_dir(App), "test"]),
                                       beam_src(Beam))
     end,
     Filtered = lists:filter(F, Beams),
