@@ -49,13 +49,18 @@ symlink_or_copy(Source, Target) ->
                _ ->
                    rebar_dir:make_relative_path(Source, Target)
            end,
-    case file:make_symlink(Link, Target) of
-        ok ->
-            ok;
-        {error, eexist} ->
-            ok;
-        {error, _} ->
-            cp_r([Source], Target)
+    case filelib:is_dir(Link) of
+        true ->
+            case file:make_symlink(Link, Target) of
+                ok ->
+                    ok;
+                {error, eexist} ->
+                    ok;
+                {error, _} ->
+                    cp_r([Source], Target)
+            end;
+        false ->
+            ok
     end.
 
 %% @doc Remove files and directories.
