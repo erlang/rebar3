@@ -382,8 +382,7 @@ erl_to_mod(Filename) ->
     list_to_atom(filename:rootname(filename:basename(Filename))).
 
 beams(Dir) ->
-    filelib:fold_files(Dir, ".*\.beam\$", true,
-                       fun(F, Acc) -> [F | Acc] end, []).
+    filelib:wildcard(filename:join(Dir, "*.beam")).
 
 -spec abort() -> no_return().
 abort() ->
