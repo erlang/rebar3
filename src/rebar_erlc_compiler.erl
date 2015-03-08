@@ -26,7 +26,8 @@
 %% -------------------------------------------------------------------
 -module(rebar_erlc_compiler).
 
--export([compile/3,
+-export([compile/2,
+         compile/3,
          clean/2]).
 
 -include("rebar.hrl").
@@ -78,6 +79,10 @@
 %%                          {platform_define, "R13",
 %%                           'old_inets'}]}.
 %%
+
+-spec compile(rebar_state:t(), file:name()) -> 'ok'.
+compile(Config, Dir) ->
+    compile(Config, Dir, filename:join([Dir, "ebin"])).
 
 -spec compile(rebar_state:t(), file:name(), file:name()) -> 'ok'.
 compile(Config, Dir, OutDir) ->
@@ -133,8 +138,7 @@ doterl_compile(State, Dir, ODir) ->
     ErlOpts = rebar_utils:erl_opts(State),
     doterl_compile(State, Dir, ODir, [], ErlOpts).
 
-doterl_compile(Config, Dir, ODir, MoreSources, ErlOpts) ->
-    OutDir = filename:join(ODir, "ebin"),
+doterl_compile(Config, Dir, OutDir, MoreSources, ErlOpts) ->
     ErlFirstFilesConf = rebar_state:get(Config, erl_first_files, []),
     ?DEBUG("erl_opts ~p", [ErlOpts]),
     %% Support the src_dirs option allowing multiple directories to

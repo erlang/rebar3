@@ -137,7 +137,6 @@ compile_tests(State, TestApps) ->
                 AppState
         end,
         ok = rebar_erlc_compiler:compile(replace_src_dirs(S),
-                                         ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
                                          ec_cnv:to_list(rebar_app_info:out_dir(AppInfo)))
     end,
     lists:foreach(F, TestApps),
@@ -149,7 +148,7 @@ compile_bare_tests(State, TestApps) ->
         %% compile just the `test` directory of the base dir
         [] -> rebar_erlc_compiler:compile(replace_src_dirs(State),
                                           rebar_dir:get_cwd(),
-                                          rebar_dir:base_dir(State));
+                                          filename:join([rebar_dir:base_dir(State), "ebin"]));
         %% already compiled `./test` so do nothing
         _  -> ok
     end.

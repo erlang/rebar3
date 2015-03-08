@@ -9,6 +9,7 @@
          build_release_apps/1,
          build_checkout_apps/1,
          build_checkout_deps/1,
+         build_all_srcdirs/1,
          recompile_when_opts_change/1,
          dont_recompile_when_opts_dont_change/1,
          dont_recompile_yrl_or_xrl/1]).
@@ -32,6 +33,7 @@ init_per_testcase(_, Config) ->
 all() ->
     [build_basic_app, build_release_apps,
      build_checkout_apps, build_checkout_deps,
+     build_all_srcdirs,
      recompile_when_opts_change, dont_recompile_when_opts_dont_change,
      dont_recompile_yrl_or_xrl].
 
@@ -93,6 +95,31 @@ build_checkout_deps(Config) ->
     ok = application:load(list_to_atom(Name2)),
     Loaded = application:loaded_applications(),
     {_, _, Vsn2} = lists:keyfind(list_to_atom(Name2), 1, Loaded).
+
+build_all_srcdirs(Config) ->
+    AppDir = ?config(apps, Config),
+
+    RebarConfig = [{erl_opts, [{src_dirs, ["src", "extra"]}]}],
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    ExtraSrc = <<"-module(extra_src).\n"
+        "-export([ok/0]).\n"
+        "ok() -> ok.\n">>,
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "extra", "dummy"])),
+    ok = file:write_file(filename:join([AppDir, "extra", "extra_src.erl"]), ExtraSrc),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
+
+    %% check a beam corresponding to the src in the extra src_dir exists in ebin
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    true = filelib:is_file(filename:join([EbinDir, "extra_src.beam"])),
+
+    %% check the extra src_dir was linked into the _build dir
+    true = filelib:is_dir(filename:join([AppDir, "_build", "default", "lib", Name, "extra"])).
 
 recompile_when_opts_change(Config) ->
     AppDir = ?config(apps, Config),
