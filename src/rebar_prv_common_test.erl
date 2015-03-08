@@ -369,28 +369,37 @@ compile_tests(State, TestApps, InDirs) ->
             AppState ->
                 AppState
         end,
-        ok = rebar_erlc_compiler:compile(replace_src_dirs(S, InDirs),
+        ok = rebar_erlc_compiler:compile(replace_src_dirs(S, ["test"]),
                                          ec_cnv:to_list(rebar_app_info:out_dir(AppInfo)))
     end,
     lists:foreach(F, TestApps),
-    compile_bare_tests(State, TestApps, InDirs).
+    compile_extra_tests(State, TestApps, InDirs).
 
-compile_bare_tests(State, TestApps, InDirs) ->
+%% extra directories containing tests can be passed to ct via the `dir` option
+compile_extra_tests(State, TestApps, InDirs) ->
     F = fun(App) -> rebar_app_info:dir(App) == rebar_dir:get_cwd() end,
-    case lists:filter(F, TestApps) of
-        %% compile just the `test` directory of the base dir
-        [] -> rebar_erlc_compiler:compile(replace_src_dirs(State, InDirs),
-                                          rebar_dir:get_cwd(),
-                                          filename:join([rebar_dir:base_dir(State), "ebin"]));
+    TestDirs = case lists:filter(F, TestApps) of
+        %% add `test` to indirs if it exists at the root of the project and
+        %%  it hasn't already been compiled
+        [] -> ["test"|InDirs];
         %% already compiled `./test` so do nothing
-        _  -> ok
-    end.
+        _  -> InDirs
+    end,
+    %% symlink each of the extra dirs
+    lists:foreach(fun(Dir) ->
+        Source = filename:join([rebar_dir:get_cwd(), Dir]),
+        Target = filename:join([rebar_dir:base_dir(State), Dir]),
+        ok = rebar_file_utils:symlink_or_copy(Source, Target)
+    end, TestDirs),
+    rebar_erlc_compiler:compile(replace_src_dirs(State, TestDirs),
+                                rebar_dir:base_dir(State),
+                                filename:join([rebar_dir:base_dir(State), "ebin"])).
 
-replace_src_dirs(State, InDirs) ->
-    %% replace any `src_dirs` with just the `test` dir and any `InDirs`
+replace_src_dirs(State, Dirs) ->
+    %% replace any `src_dirs` with the test dirs
     ErlOpts = rebar_state:get(State, erl_opts, []),
     StrippedOpts = lists:keydelete(src_dirs, 1, ErlOpts),
-    rebar_state:set(State, erl_opts, [{src_dirs, ["test"|InDirs]}|StrippedOpts]).
+    rebar_state:set(State, erl_opts, [{src_dirs, Dirs}|StrippedOpts]).
 
 maybe_cover_compile(State, Opts) ->
     State1 = case proplists:get_value(cover, Opts, false) of
