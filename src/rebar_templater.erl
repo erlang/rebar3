@@ -143,9 +143,9 @@ default_variables() ->
 
 default_author_and_email() ->
     %% See if we can get a git user and email to use as defaults
-    case rebar_utils:sh("git config --global user.name", []) of
+    case rebar_utils:sh("git config --global user.name", [return_on_error]) of
         {ok, Name} ->
-            case rebar_utils:sh("git config --global user.email", []) of
+            case rebar_utils:sh("git config --global user.email", [return_on_error]) of
                 {ok, Email} ->
                     {string:strip(Name, both, $\n), string:strip(Email, both, $\n)};
                 {error, _} ->
@@ -154,7 +154,7 @@ default_author_and_email() ->
             end;
         {error, _} ->
             %% Ok, try mecurial
-            case rebar_utils:sh("hg showconfig ui.username", []) of
+            case rebar_utils:sh("hg showconfig ui.username", [return_on_error]) of
                 {ok, NameEmail} ->
                     case re:run(NameEmail, [{capture, [1,2], list}]) of
                         {match, [Name, Email]} ->
