@@ -97,9 +97,8 @@ new(ParentState, Config, Dir) ->
                         dict:from_list([{{deps, default}, D} | Config])
                 end,
 
-    NewOpts = dict:merge(fun(_Key, Value1, _Value2) ->
-                                 Value1
-                         end, LocalOpts, Opts),
+    NewOpts = merge_opts(LocalOpts, Opts),
+
     ParentState#state_t{dir=Dir
                        ,opts=NewOpts
                        ,default=NewOpts}.
@@ -213,29 +212,39 @@ apply_profiles(State=#state_t{opts=Opts, current_profiles=CurrentProfiles}, Prof
     State#state_t{current_profiles=CurrentProfiles++Profiles1, opts=NewOpts}.
 
 merge_opts(Profile, NewOpts, OldOpts) ->
-    Opts = dict:merge(fun(_Key, NewValue, OldValue) when is_list(NewValue) ->
-                              case io_lib:printable_list(NewValue) of
-                                  true when NewValue =:= [] ->
-                                      case io_lib:printable_list(OldValue) of
-                                          true ->
-                                              NewValue;
-                                          false ->
-                                              OldValue
-                                      end;
-                                  true ->
-                                      NewValue;
-                                  false ->
-                                      OldValue ++ NewValue
-                              end;
-                         (_Key, NewValue, _OldValue) ->
-                              NewValue
-                      end, NewOpts, OldOpts),
+    Opts = merge_opts(NewOpts, OldOpts),
+
     case dict:find(deps, NewOpts) of
         {ok, Value} ->
             dict:store({deps, Profile}, Value, Opts);
         error ->
             Opts
     end.
+
+merge_opts(NewOpts, OldOpts) ->
+    dict:merge(fun(deps, NewValue, _OldValue) ->
+                       NewValue;
+                  ({deps, _}, NewValue, _OldValue) ->
+                       NewValue;
+                  (profiles, NewValue, OldValue) ->
+                       dict:to_list(merge_opts(dict:from_list(NewValue), dict:from_list(OldValue)));
+                  (_Key, NewValue, OldValue) when is_list(NewValue) ->
+                       case io_lib:printable_list(NewValue) of
+                           true when NewValue =:= [] ->
+                               case io_lib:printable_list(OldValue) of
+                                   true ->
+                                       NewValue;
+                                   false ->
+                                       OldValue
+                               end;
+                           true ->
+                               NewValue;
+                           false ->
+                               lists:umerge(lists:sort(NewValue), lists:sort(OldValue))
+                       end;
+                  (_Key, NewValue, _OldValue) ->
+                       NewValue
+               end, NewOpts, OldOpts).
 
 dir(#state_t{dir=Dir}) ->
     Dir.
