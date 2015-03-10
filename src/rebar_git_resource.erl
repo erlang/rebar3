@@ -120,7 +120,7 @@ make_vsn(Dir) ->
 collect_default_refcount() ->
     %% Get the tag timestamp and minimal ref from the system. The
     %% timestamp is really important from an ordering perspective.
-    AbortMsg1 = "Gtting log of git dependency failed in " ++ rebar_dir:get_cwd(),
+    AbortMsg1 = "Getting log of git dependency failed in " ++ rebar_dir:get_cwd(),
     {ok, String} =
         rebar_utils:sh("git log -n 1 --pretty=format:'%h\n' ",
                        [{use_stdout, false},
