@@ -328,7 +328,7 @@ prioritize_templates([{Name, Type, File} | Rest], Valid) ->
             prioritize_templates(Rest, Valid);
         {_, file, _} ->
             ?DEBUG("Skipping template ~p, due to presence of a custom "
-                   "template at ~s~n", [File]),
+                   "template at ~s~n", [Name, File]),
             prioritize_templates(Rest, Valid)
     end.
 
