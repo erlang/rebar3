@@ -8,6 +8,7 @@
 -export([init/1,
          do/1,
          maybe_cover_compile/1,
+         maybe_cover_compile/2,
          maybe_write_coverdata/2,
          format_error/1]).
 
@@ -43,8 +44,12 @@ do(State) ->
 
 -spec maybe_cover_compile(rebar_state:t()) -> ok.
 maybe_cover_compile(State) ->
+    maybe_cover_compile(State, []).
+
+-spec maybe_cover_compile(rebar_state:t(), [file:name()]) -> ok.
+maybe_cover_compile(State, ExtraDirs) ->
     case rebar_state:get(State, cover_enabled, false) of
-        true  -> cover_compile(State);
+        true  -> cover_compile(State, ExtraDirs);
         false -> ok
     end.
 
@@ -269,7 +274,7 @@ strip_coverdir(File) ->
     filename:join(lists:reverse(lists:sublist(lists:reverse(filename:split(File)),
                                               2))).
 
-cover_compile(State) ->
+cover_compile(State, ExtraDirs) ->
     %% start the cover server if necessary
     {ok, CoverPid} = start_cover(),
     %% redirect cover output
@@ -277,7 +282,7 @@ cover_compile(State) ->
     %% cover compile the modules we just compiled
     Apps = filter_checkouts(rebar_state:project_apps(State)),
     CompileResult = compile_beam_directories(Apps, []) ++
-                    compile_bare_test_directory(State),
+                    compile_extras(ExtraDirs, []),
     %% print any warnings about modules that failed to cover compile
     lists:foreach(fun print_cover_warnings/1, CompileResult).
 
@@ -298,13 +303,10 @@ compile_beam_directories([App|Rest], Acc) ->
                                                         "ebin"])),
     compile_beam_directories(Rest, Acc ++ Result).
 
-compile_bare_test_directory(State) ->
-    case cover:compile_beam_directory(filename:join([rebar_dir:base_dir(State),
-                                                     "ebin"])) of
-        %% if directory doesn't exist just return empty result set
-        {error, enoent} -> [];
-        Result     -> Result
-    end.
+compile_extras([], Acc) -> Acc;
+compile_extras([Dir|Rest], Acc) ->
+    Result = cover:compile_beam_directory(Dir),
+    compile_extras(Rest, Acc ++ Result).
 
 start_cover() ->
     case cover:start() of
