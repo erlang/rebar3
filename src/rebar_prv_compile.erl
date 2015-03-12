@@ -49,13 +49,12 @@ do(State) ->
     %% Need to allow global config vars used on deps
     %% Right now no way to differeniate and just give deps a new state
     EmptyState = rebar_state:new(),
-    EmptyState1 = rebar_state:set(EmptyState, jobs, Jobs),
-    build_apps(EmptyState1, Deps),
+    build_apps(EmptyState, Deps, Jobs),
 
     %% Use the project State for building project apps
     %% Set hooks to empty so top-level hooks aren't run for each project app
     State2 = rebar_state:set(rebar_state:set(State1, post_hooks, []), pre_hooks, []),
-    ProjectApps1 = build_apps(State2, ProjectApps),
+    ProjectApps1 = build_apps(State2, ProjectApps, Jobs),
     rebar_hooks:run_compile_hooks(Cwd, post_hooks, compile, State1),
 
     {ok, rebar_state:project_apps(State1, ProjectApps1)}.
@@ -64,10 +63,10 @@ do(State) ->
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
-build_apps(State, Apps) ->
-    [build_app(State, AppInfo) || AppInfo <- Apps].
+build_apps(State, Apps, Jobs) ->
+    [build_app(State, AppInfo, Jobs) || AppInfo <- Apps].
 
-build_app(State, AppInfo) ->
+build_app(State, AppInfo, Jobs) ->
     AppDir = rebar_app_info:dir(AppInfo),
     OutDir = rebar_app_info:out_dir(AppInfo),
 
@@ -81,10 +80,14 @@ build_app(State, AppInfo) ->
                 AppState
         end,
 
+    %% Set jobs in opts that was passed as an argument to the provider
+    %% This is in case the AppInfo had a state set and used it for S
+    S1 = rebar_state:set(S, jobs, Jobs),
+
     %% Legacy hook support
-    rebar_hooks:run_compile_hooks(AppDir, pre_hooks, compile, S),
-    AppInfo1 = compile(S, AppInfo),
-    rebar_hooks:run_compile_hooks(AppDir, post_hooks, compile, S),
+    rebar_hooks:run_compile_hooks(AppDir, pre_hooks, compile, S1),
+    AppInfo1 = compile(S1, AppInfo),
+    rebar_hooks:run_compile_hooks(AppDir, post_hooks, compile, S1),
 
     true = code:add_patha(rebar_app_info:ebin_dir(AppInfo1)),
     AppInfo1.
