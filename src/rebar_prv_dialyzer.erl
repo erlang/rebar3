@@ -296,8 +296,8 @@ build_proj_plt(State, Plt, Files) ->
     end.
 
 get_base_plt_location(State) ->
-    GlobalConfigDir = rebar_dir:global_config_dir(State),
-    BaseDir = rebar_state:get(State, dialyzer_base_plt_dir, GlobalConfigDir),
+    GlobalCacheDir = rebar_dir:global_cache_dir(State),
+    BaseDir = rebar_state:get(State, dialyzer_base_plt_dir, GlobalCacheDir),
     BasePlt = rebar_state:get(State, dialyzer_base_plt, default_plt()),
     filename:join(BaseDir, BasePlt).
 
