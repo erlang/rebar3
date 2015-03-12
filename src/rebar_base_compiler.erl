@@ -40,20 +40,7 @@
 
 run(Config, FirstFiles, RestFiles, CompileFn) ->
     %% Compile the first files in sequence
-    compile_each(FirstFiles, Config, CompileFn),
-
-    %% Spin up workers for the rest of the files
-    case RestFiles of
-        [] ->
-            ok;
-        _ ->
-            Self = self(),
-            F = fun() -> compile_worker(Self, Config, CompileFn) end,
-            Jobs = rebar_state:get(Config, jobs, 3),
-            ?DEBUG("Starting ~B compile worker(s)", [Jobs]),
-            Pids = [spawn_monitor(F) || _I <- lists:seq(1,Jobs)],
-            compile_queue(Config, Pids, RestFiles)
-    end.
+    compile_each(FirstFiles++RestFiles, Config, CompileFn).
 
 run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
     Compile3Fn) ->
@@ -145,71 +132,6 @@ compile_each([Source | Rest], Config, CompileFn) ->
             ?FAIL
     end,
     compile_each(Rest, Config, CompileFn).
-
-compile_queue(_Config, [], []) ->
-    ok;
-compile_queue(Config, Pids, Targets) ->
-    receive
-        {next, Worker} ->
-            case Targets of
-                [] ->
-                    Worker ! empty,
-                    compile_queue(Config, Pids, Targets);
-                [Source | Rest] ->
-                    Worker ! {compile, Source},
-                    compile_queue(Config, Pids, Rest)
-            end;
-
-        {fail, {_, {source, Source}}=Error} ->
-            ?ERROR("Compiling ~s failed:",
-                     [maybe_absname(Config, Source)]),
-            maybe_report(Error),
-            ?DEBUG("Worker compilation failed: ~p", [Error]),
-            ?FAIL;
-
-        {compiled, Source, Warnings} ->
-            report(Warnings),
-            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]),
-            compile_queue(Config, Pids, Targets);
-
-        {compiled, Source} ->
-            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]),
-            compile_queue(Config, Pids, Targets);
-        {skipped, Source} ->
-            ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), filename:basename(Source)]),
-            compile_queue(Config, Pids, Targets);
-        {'DOWN', Mref, _, Pid, normal} ->
-            ?DEBUG("Worker exited cleanly", []),
-            Pids2 = lists:delete({Pid, Mref}, Pids),
-            compile_queue(Config, Pids2, Targets);
-
-        {'DOWN', _Mref, _, _Pid, Info} ->
-            ?DEBUG("Worker failed: ~p", [Info]),
-            ?FAIL
-    end.
-
-compile_worker(QueuePid, Config, CompileFn) ->
-    QueuePid ! {next, self()},
-    receive
-        {compile, Source} ->
-            case catch(compile(Source, Config, CompileFn)) of
-                {ok, Ws} ->
-                    QueuePid ! {compiled, Source, Ws},
-                    compile_worker(QueuePid, Config, CompileFn);
-                ok ->
-                    QueuePid ! {compiled, Source},
-                    compile_worker(QueuePid, Config, CompileFn);
-                skipped ->
-                    QueuePid ! {skipped, Source},
-                    compile_worker(QueuePid, Config, CompileFn);
-                Error ->
-                    QueuePid ! {fail, {{error, Error}, {source, Source}}},
-                    ok
-            end;
-
-        empty ->
-            ok
-    end.
 
 format_errors(Config, Source, Errors) ->
     format_errors(Config, Source, "", Errors).
