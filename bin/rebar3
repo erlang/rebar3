@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+DIR=$(dirname $([ -L $0 ] && readlink -f $0 || echo $0))
+
+erl -noinput +sbtu +A0 -pa $DIR/../ebin -pa $DIR/../deps/*/ebin -run rebar3 main $@
