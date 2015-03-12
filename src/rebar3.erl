@@ -45,7 +45,7 @@
 main(Args) ->
     case catch(run(Args)) of
         {ok, _State} ->
-            ok;
+            erlang:halt(0);
         rebar_abort ->
             erlang:halt(1);
         {error, rebar_abort} ->
