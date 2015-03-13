@@ -26,69 +26,61 @@
 %% -------------------------------------------------------------------
 -module(rebar_core).
 
--export([process_command/2]).
+-export([init_command/2, process_namespace/2, process_command/2]).
 
 -include("rebar.hrl").
+
+init_command(State, do) ->
+    process_command(rebar_state:namespace(State, default), do);
+init_command(State, as) ->
+    process_command(rebar_state:namespace(State, default), as);
+init_command(State, Command) ->
+    case process_namespace(State, Command) of
+        {ok, State1, Command1} ->
+            process_command(State1, Command1);
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+process_namespace(_State, as) ->
+    {error, "Namespace 'as' is forbidden"};
+process_namespace(State, Command) ->
+    Providers = rebar_state:providers(State),
+    CommandProvider = providers:get_provider(Command, Providers, default),
+    case CommandProvider of
+        not_found ->
+            case providers:get_providers_by_namespace(Command, Providers) of
+                [] ->
+                    {error, io_lib:format("Command ~p not found", [Command])};
+                _ ->
+                    %% Replay 'do' as a command of that namespace
+                    {ok, rebar_state:namespace(State, Command), do}
+            end;
+        _ ->
+            {ok, rebar_state:namespace(State, default), Command}
+    end.
 
 -spec process_command(rebar_state:t(), atom()) -> {ok, rebar_state:t()} | {error, string()}.
 process_command(State, Command) ->
     %% ? rebar_prv_install_deps:setup_env(State),
     Providers = rebar_state:providers(State),
     Namespace = rebar_state:namespace(State),
-    {TargetProviders, CommandProvider} =
-        case Namespace of
-            undefined ->
-                %% undefined namespace means 'default', but on the first run;
-                %% it is used as an implicit counter for the first vs. subsequent
-                %% runs.
-                {providers:get_target_providers(Command, Providers, default),
-                 providers:get_provider(Command, Providers, default)};
-            _ ->
-                {providers:get_target_providers(Command, Providers, Namespace),
-                 providers:get_provider(Command, Providers, Namespace)}
-        end,
-
+    TargetProviders = providers:get_target_providers(Command, Providers, Namespace),
+    CommandProvider = providers:get_provider(Command, Providers, Namespace),
     case CommandProvider of
-        not_found ->
+        not_found when Command =/= do ->
             case Namespace of
-                undefined ->
-                    %% On the first run (Namespace = undefined), we use the
-                    %% unfound command name to be a namespace.
-                    case providers:get_providers_by_namespace(Command, Providers) of
-                        [] ->
-                            {error, io_lib:format("Command ~p not found", [Command])};
-                        _ ->
-                            do([{default, do} | TargetProviders],
-                               rebar_state:namespace(State, Command))
-                    end;
                 default ->
                     {error, io_lib:format("Command ~p not found", [Command])};
                 _ ->
                     {error, io_lib:format("Command ~p not found in namespace ~p",
                                           [Command, Namespace])}
             end;
+        not_found when Command =:= do, Namespace =/= default ->
+            do([{default, do} | TargetProviders], State);
         CommandProvider ->
             case Command of
-                Command when Command =:= do, Namespace =:= undefined ->
-                    %% We're definitely in the default namespace. 'do' doesn't
-                    %% properly exist for non-default namespaces outside of
-                    %% dynamic dispatch calls for namespaces.
-                    do(TargetProviders, rebar_state:namespace(State, default));
-                Command when Command =:= as, Namespace =:= undefined ->
-                    %% Because of the possible forms such as:
-                    %% 'rebar3 as profile task`, `rebar3 as profile do task`
-                    %% and `rebar3 as profile namespace task`, we can only know
-                    %% whether we're in the first 'as' or a namespace 'as' by
-                    %% looking at profiles (as makes them non-default).
-                    %% The namespace 'as' is banned. It also makes it impossible
-                    %% to have both $REBAR_PROFILE set and use 'as' in a command
-                    case rebar_state:current_profiles(State) of
-                        [default] ->
-                            do(TargetProviders, State);
-                        _ ->
-                            {error, "Namespace 'as' is forbidden"}
-                    end;
-                Command when Command =:= do ->
+                do ->
                     do(TargetProviders, State);
                 _ ->
                     Profiles = providers:profiles(CommandProvider),
@@ -97,12 +89,7 @@ process_command(State, Command) ->
                     case getopt:parse(Opts, rebar_state:command_args(State1)) of
                         {ok, Args} ->
                             State2 = rebar_state:command_parsed_args(State1, Args),
-                            case Namespace of
-                                undefined -> % we're executing commands, set the default namespace
-                                    do(TargetProviders, rebar_state:namespace(State2, default));
-                                _ ->
-                                    do(TargetProviders, State2)
-                            end;
+                            do(TargetProviders, State2);
                         {error, {invalid_option, Option}} ->
                             {error, io_lib:format("Invalid option ~s on task ~p", [Option, Command])}
                     end
