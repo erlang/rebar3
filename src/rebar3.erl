@@ -133,7 +133,7 @@ run_aux(State, GlobalPluginProviders, RawArgs) ->
 
     {Task, Args} = parse_args(RawArgs),
 
-    rebar_core:process_command(rebar_state:command_args(State6, Args), Task).
+    rebar_core:init_command(rebar_state:command_args(State6, Args), Task).
 
 init_config() ->
     %% Initialize logging system

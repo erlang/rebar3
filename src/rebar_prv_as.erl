@@ -38,7 +38,17 @@ do(State) ->
             {error, "At least one profile must be specified when using `as`"};
         _  ->
             State1 = rebar_state:apply_profiles(State, [list_to_atom(X) || X <- Profiles]),
-            rebar_prv_do:do_tasks(Tasks, State1)
+            {FirstTask, FirstTaskArgs} = hd(Tasks),
+            FirstTaskAtom = list_to_atom(FirstTask),
+            case rebar_core:process_namespace(State1, FirstTaskAtom) of
+                {ok, State2, NewTask} ->
+                    rebar_prv_do:do_tasks(
+                        [{atom_to_list(NewTask),FirstTaskArgs}|tl(Tasks)],
+                        State2
+                    );
+                {error, Reason} ->
+                    {error, Reason}
+            end
     end.
 
 -spec format_error(any()) -> iolist().
