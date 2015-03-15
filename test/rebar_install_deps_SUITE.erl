@@ -8,7 +8,8 @@ all() -> [{group, git}, {group, pkg}].
 groups() ->
     [{all, [], [flat, pick_highest_left, pick_highest_right,
                 pick_smallest1, pick_smallest2,
-                circular1, circular2, circular_skip]},
+                circular1, circular2, circular_skip,
+                fail_conflict]},
      {git, [], [{group, all}]},
      {pkg, [], [{group, all}]}].
 
@@ -33,7 +34,7 @@ init_per_testcase(Case, Config) ->
     {Deps, Warnings, Expect} = deps(Case),
     Expected = case Expect of
         {ok, List} -> {ok, format_expected_deps(List)};
-        {error, Reason} -> {error, Reason}
+        Other -> Other
     end,
     DepsType = ?config(deps_type, Config),
     mock_warnings(),
@@ -108,13 +109,36 @@ deps(circular_skip) ->
     {[{"B", [{"C", "2", [{"B", []}]}]},
       {"C", "1", [{"D",[]}]}],
      [{"C","2"}],
-     {ok, ["B", {"C","1"}, "D"]}}.
+     {ok, ["B", {"C","1"}, "D"]}};
+deps(fail_conflict) ->
+    {[{"B", [{"C", "2", []}]},
+      {"C", "1", []}],
+     [{"C","2"}],
+     rebar_abort}.
 
+setup_project(fail_conflict, Config0, Deps) ->
+    DepsType = ?config(deps_type, Config0),
+    Config = rebar_test_utils:init_rebar_state(
+            Config0,
+            "fail_conflict_"++atom_to_list(DepsType)++"_"
+    ),
+    AppDir = ?config(apps, Config),
+    rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+    RebarConf = rebar_test_utils:create_config(AppDir, [{deps, TopDeps},
+                                                        {deps_error_on_conflict, true}]),
+    case DepsType of
+        git ->
+            mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}]);
+        pkg ->
+            mock_pkg_resource:mock([{pkgdeps, rebar_test_utils:flat_pkgdeps(Deps)}])
+    end,
+    [{rebarconfig, RebarConf} | Config];
 setup_project(Case, Config0, Deps) ->
     DepsType = ?config(deps_type, Config0),
     Config = rebar_test_utils:init_rebar_state(
             Config0,
-            atom_to_list(Case)++"_"++atom_to_list(DepsType)++"_"
+            atom_to_list(Case)++"_installdeps_"++atom_to_list(DepsType)++"_"
     ),
     AppDir = ?config(apps, Config),
     rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
@@ -143,6 +167,13 @@ circular1(Config) -> run(Config).
 circular2(Config) -> run(Config).
 circular_skip(Config) -> run(Config).
 
+fail_conflict(Config) ->
+    {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["install_deps"], ?config(expect, Config)
+    ),
+    check_warnings(error_calls(), ?config(warnings, Config), ?config(deps_type, Config)).
+
 run(Config) ->
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
     rebar_test_utils:run_and_check(
@@ -153,6 +184,10 @@ run(Config) ->
 warning_calls() ->
     History = meck:history(rebar_log),
     [{Str, Args} || {_, {rebar_log, log, [warn, Str, Args]}, _} <- History].
+
+error_calls() ->
+    History = meck:history(rebar_log),
+    [{Str, Args} || {_, {rebar_log, log, [error, Str, Args]}, _} <- History].
 
 check_warnings(_, [], _) ->
     ok;
