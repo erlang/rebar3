@@ -10,6 +10,7 @@
          format_error/1]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 -define(PROVIDER, upgrade).
 -define(DEPS, []).
@@ -95,7 +96,7 @@ prepare_locks([Name|Names], Deps, Locks, Unlocks) ->
             AtomName = binary_to_atom(Name, utf8),
             case lists:keyfind(AtomName, 1, Deps) of
                 false ->
-                    {error, {?MODULE, {unknown_dependency, Name}}};
+                    ?PRV_ERROR({unknown_dependency, Name});
                 Dep ->
                     Source = case Dep of
                         {_, Src} -> Src;
@@ -108,9 +109,9 @@ prepare_locks([Name|Names], Deps, Locks, Unlocks) ->
                                   [{Name, Source, 0} | NewUnlocks ++ Unlocks])
             end;
         {_, _, Level} when Level > 0 ->
-            {error, {?MODULE, {transitive_dependency,Name}}};
+            ?PRV_ERROR({transitive_dependency, Name});
         false ->
-            {error, {?MODULE, {unknown_dependency,Name}}}
+            ?PRV_ERROR({unknown_dependency, Name})
     end.
 
 top_level_deps(Deps, Locks) ->

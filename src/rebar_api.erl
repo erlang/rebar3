@@ -2,6 +2,7 @@
 %%% that can be used by plugin builders.
 -module(rebar_api).
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 -export([abort/0, abort/2,
          console/2,
          debug/2, info/2, warn/2, error/2]).

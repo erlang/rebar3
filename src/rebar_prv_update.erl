@@ -10,6 +10,7 @@
          format_error/1]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 -define(PROVIDER, update).
 -define(DEPS, []).
@@ -48,7 +49,7 @@ do(State) ->
         ok
     catch
         _E:_C ->
-            throw({error, {?MODULE, package_index_write}})
+            ?PRV_ERROR(package_index_write)
     end,
 
     {ok, State}.

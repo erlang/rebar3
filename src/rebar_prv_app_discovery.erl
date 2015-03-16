@@ -10,6 +10,7 @@
          format_error/1]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 -define(PROVIDER, app_discovery).
 -define(DEPS, []).
@@ -38,7 +39,7 @@ do(State) ->
         {ok, State1}
     catch
         throw:{error, Error}->
-            {error, {?MODULE, Error}}
+            ?PRV_ERROR(Error)
     end.
 
 -spec format_error(any()) -> iolist().
