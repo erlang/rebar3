@@ -189,7 +189,7 @@ update_pkg_deps(Profile, Packages, PkgDeps, Graph, Upgrade, Seen, State) ->
                 {ok, Solution, []} ->
                     Solution;
                 {ok, Solution, Discarded} ->
-                    [warn_skip_pkg(Pkg) || Pkg <- Discarded],
+                    [warn_skip_pkg(Pkg, State) || Pkg <- Discarded],
                     Solution
             end,
             update_pkg_deps(Profile, S, Packages, Upgrade, Seen, State)
@@ -287,7 +287,7 @@ update_seen_src_dep(AppInfo, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, S
     %% If seen from lock file don't print warning about skipping
     case lists:keymember(Name, 1, BaseLocks) of
         false ->
-            warn_skip_deps(AppInfo);
+            warn_skip_deps(AppInfo, State);
         true ->
             ok
     end,
@@ -513,13 +513,21 @@ parse_goal(Name, Constraint) ->
             fail
     end.
 
-warn_skip_deps(AppInfo) ->
-    ?WARN("Skipping ~s (from ~p) as an app of the same name "
+warn_skip_deps(AppInfo, State) ->
+    Msg = "Skipping ~s (from ~p) as an app of the same name "
           "has already been fetched~n",
-          [rebar_app_info:name(AppInfo),
-           rebar_app_info:source(AppInfo)]).
+    Args = [rebar_app_info:name(AppInfo),
+            rebar_app_info:source(AppInfo)],
+    case rebar_state:get(State, deps_error_on_conflict, false) of
+        false -> ?WARN(Msg, Args);
+        true -> ?ERROR(Msg, Args), ?FAIL
+    end.
 
-warn_skip_pkg({Name, Source}) ->
-    ?WARN("Skipping ~s (version ~s from package index) as an app of the same "
+warn_skip_pkg({Name, Source}, State) ->
+    Msg = "Skipping ~s (version ~s from package index) as an app of the same "
           "name has already been fetched~n",
-          [Name, Source]).
+    Args = [Name, Source],
+    case rebar_state:get(State, deps_error_on_conflict, false) of
+        false -> ?WARN(Msg, Args);
+        true -> ?ERROR(Msg, Args), ?FAIL
+    end.

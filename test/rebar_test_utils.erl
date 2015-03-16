@@ -48,15 +48,19 @@ run_and_check(Config, RebarConfig, Command, Expect) ->
     %% Assumes init_rebar_state has run first
     AppDir = ?config(apps, Config),
     State = ?config(state, Config),
-    Res = rebar3:run(rebar_state:new(State, RebarConfig, AppDir), Command),
-    case Expect of
-        {error, Reason} ->
-            ?assertEqual({error, Reason}, Res);
-        {ok, Expected} ->
-            {ok, _} = Res,
-            check_results(AppDir, Expected);
-        return ->
-            Res
+    try
+        Res = rebar3:run(rebar_state:new(State, RebarConfig, AppDir), Command),
+        case Expect of
+            {error, Reason} ->
+                ?assertEqual({error, Reason}, Res);
+            {ok, Expected} ->
+                {ok, _} = Res,
+                check_results(AppDir, Expected);
+            return ->
+                Res
+        end
+    catch
+        rebar_abort when Expect =:= rebar_abort -> rebar_abort
     end.
 
 %% @doc Creates a dummy application including:

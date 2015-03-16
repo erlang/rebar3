@@ -48,7 +48,9 @@ merge_deps(AppInfo, State) ->
     State1 = lists:foldl(fun(Profile, StateAcc) ->
                                  AppProfDeps = rebar_state:get(AppState, {deps, Profile}, []),
                                  TopLevelProfDeps = rebar_state:get(StateAcc, {deps, Profile}, []),
-                                 ProfDeps2 = lists:keymerge(1, TopLevelProfDeps, AppProfDeps),
+                                 ProfDeps2 = dedup(lists:keymerge(1,
+                                                                  lists:keysort(1, TopLevelProfDeps),
+                                                                  lists:keysort(1, AppProfDeps))),
                                  rebar_state:set(StateAcc, {deps, Profile}, ProfDeps2)
                          end, State, lists:reverse(CurrentProfiles)),
 
@@ -166,3 +168,8 @@ create_app_info(AppDir, AppFile) ->
         _ ->
             error
     end.
+
+dedup([]) -> [];
+dedup([A]) -> [A];
+dedup([H,H|T]) -> dedup([H|T]);
+dedup([H|T]) -> [H|dedup(T)].
