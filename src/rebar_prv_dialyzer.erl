@@ -387,7 +387,9 @@ run_dialyzer(State, Opts) ->
 filter_warnings([], Warnings) ->
     Warnings;
 filter_warnings(Ignores, Warnings) ->
-    [Warning || Warning <- Warnings, Ignore <- Ignores, not match_warning(Ignore, Warning)].
+    lists:filter(fun(Warning) ->
+        not lists:any(fun (Ignore) -> match_warning(Ignore, Warning) end, Ignores)
+    end, Warnings).
 
 match_warning({MatchTag, {MatchPath, MatchLine}, MatchMsg}, {Tag, {Path, Line}, Msg}) when MatchPath =/= '_' ->
     lists:suffix(MatchPath, Path) andalso match_term([MatchTag, MatchLine, MatchMsg], [Tag, Line, Msg]);
