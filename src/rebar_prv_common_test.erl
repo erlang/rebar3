@@ -10,6 +10,7 @@
          format_error/1]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 -define(PROVIDER, ct).
 -define(DEPS, [compile]).
@@ -46,7 +47,7 @@ do(State) ->
         {ok, CTOpts} ->
             run_test(State, RawOpts, CTOpts);
         {error, Reason} ->
-            {error, {?MODULE, Reason}}
+            ?PRV_ERROR(Reason)
     end.
 
 run_test(State, RawOpts, CTOpts) ->

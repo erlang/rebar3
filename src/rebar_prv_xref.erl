@@ -10,6 +10,7 @@
          format_error/1]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 -define(PROVIDER, xref).
 -define(DEPS, [compile]).
@@ -51,7 +52,7 @@ do(State) ->
         true ->
             {ok, State};
         false ->
-            {error, {?MODULE, {xref_issues, XrefResults, QueryResults}}}
+            ?PRV_ERROR({xref_issues, XrefResults, QueryResults})
     end.
 
 -spec format_error(any()) -> iolist().

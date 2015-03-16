@@ -10,6 +10,7 @@
          format_error/1]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 -define(PROVIDER, eunit).
 -define(DEPS, [compile]).
@@ -46,7 +47,7 @@ do(State) ->
     ok = rebar_prv_cover:maybe_write_coverdata(State, ?PROVIDER),
     case handle_results(Result) of
         {error, Reason} ->
-            {error, {?MODULE, Reason}};
+            ?PRV_ERROR(Reason);
         ok ->
             {ok, State}
     end.

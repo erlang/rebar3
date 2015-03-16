@@ -10,6 +10,7 @@
          format_error/1]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 -define(PROVIDER, dialyzer).
 -define(DEPS, [compile]).
@@ -70,9 +71,9 @@ do(State) ->
         do(State, Plt, Apps)
     catch
         throw:{dialyzer_error, Error} ->
-            {error, {?MODULE, {error_processing_apps, Error}}};
+            ?PRV_ERROR({error_processing_apps, Error});
         throw:{dialyzer_warnings, Warnings} ->
-            {error, {?MODULE, {dialyzer_warnings, Warnings}}}
+            ?PRV_ERROR({dialyzer_warnings, Warnings})
     end.
 
 -spec format_error(any()) -> iolist().
