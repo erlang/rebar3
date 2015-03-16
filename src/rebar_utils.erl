@@ -116,7 +116,7 @@ sh_send(Command0, String, Options0) ->
     Options = [expand_sh_flag(V)
                || V <- proplists:compact(Options0 ++ DefaultOptions)],
 
-    Command = patch_on_windows(Command0, proplists:get_value(env, Options, [])),
+    Command = lists:flatten(patch_on_windows(Command0, proplists:get_value(env, Options, []))),
     PortSettings = proplists:get_all_values(port_settings, Options) ++
         [exit_status, {line, 16384}, use_stdio, stderr_to_stdout, hide],
     Port = open_port({spawn, Command}, PortSettings),
@@ -145,10 +145,10 @@ sh(Command0, Options0) ->
     ErrorHandler = proplists:get_value(error_handler, Options),
     OutputHandler = proplists:get_value(output_handler, Options),
 
-    Command = patch_on_windows(Command0, proplists:get_value(env, Options, [])),
+    Command = lists:flatten(patch_on_windows(Command0, proplists:get_value(env, Options, []))),
     PortSettings = proplists:get_all_values(port_settings, Options) ++
         [exit_status, {line, 16384}, use_stdio, stderr_to_stdout, hide],
-    ?DEBUG("Port Cmd: ~p\nPort Opts: ~p\n", [Command, PortSettings]),
+    ?DEBUG("Port Cmd: ~s\nPort Opts: ~p\n", [Command, PortSettings]),
     Port = open_port({spawn, Command}, PortSettings),
 
     case sh_loop(Port, OutputHandler, []) of
