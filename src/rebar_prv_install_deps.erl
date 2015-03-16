@@ -97,6 +97,8 @@ do(State) ->
     end.
 
 -spec format_error(any()) -> iolist().
+format_error({bad_constraint, Name, Constraint}) ->
+    io_lib:format("Unable to parse version for package ~s: ~s", [Name, Constraint]);
 format_error({parse_dep, Dep}) ->
     io_lib:format("Failed parsing dep ~p", [Dep]);
 format_error({missing_package, Package, Version}) ->
@@ -510,7 +512,7 @@ parse_goal(Name, Constraint) ->
         {match, [Op, Vsn]} ->
             {Name, Vsn, binary_to_atom(Op, utf8)};
         nomatch ->
-            fail
+            throw(?PRV_ERROR({bad_constraint, Name, Constraint}))
     end.
 
 warn_skip_deps(AppInfo, State) ->

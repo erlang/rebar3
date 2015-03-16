@@ -49,7 +49,7 @@ do(State) ->
         ok
     catch
         _E:_C ->
-            ?PRV_ERROR(package_index_write)
+            throw(?PRV_ERROR(package_index_write))
     end,
 
     {ok, State}.
