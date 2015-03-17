@@ -210,13 +210,8 @@ handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Fetched, Seen, State) -
     AppInfo = package_to_app(DepsDir, Packages, Pkg),
     Level = rebar_app_info:dep_level(AppInfo),
     {NewSeen, NewState} = maybe_lock(Profile, AppInfo, Seen, State, Level),
-    case maybe_fetch(AppInfo, Upgrade, Seen, NewState) of
-        true ->
-            {[AppInfo | Fetched], NewSeen, NewState};
-        false ->
-            {Fetched, NewSeen, NewState}
-    end.
-
+    maybe_fetch(AppInfo, Upgrade, Seen, NewState),
+    {[AppInfo | Fetched], NewSeen, NewState}.
 
 maybe_lock(Profile, AppInfo, Seen, State, Level) ->
     case Profile of
