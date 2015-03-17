@@ -5,7 +5,7 @@
          end_per_suite/1,
          init_per_testcase/2,
          all/0,
-         update_base_plt/1,
+         update_shared_plt/1,
          update_app_plt/1,
          build_release_plt/1]).
 
@@ -24,25 +24,25 @@ end_per_suite(_Config) ->
 
 init_per_testcase(Testcase, Config) ->
     PrivDir = ?config(priv_dir, Config),
-    Prefix = ec_cnv:to_list(Testcase),
-    Plt = filename:join(PrivDir,  Prefix ++ ".project.plt"),
-    BasePlt = Prefix ++ "base.plt",
-    RebarConfig = [{dialyzer_plt, Plt},
-                   {dialyzer_base_plt, BasePlt},
-                   {dialyzer_base_plt_dir, PrivDir},
-                   {dialyzer_base_plt_apps, [erts]}],
-    [{plt, Plt},
-     {base_plt, filename:join(PrivDir, BasePlt)},
+    TestDir = ec_cnv:to_list(Testcase),
+    PltDir = filename:join([PrivDir, TestDir, "local"]),
+    SharedPltDir = filename:join([PrivDir, TestDir, "shared"]),
+    RebarConfig = [{dialyzer_plt_location, PltDir},
+                   {dialyzer_shared_plt_location, SharedPltDir},
+                   {dialyzer_shared_plt_apps, [erts]}],
+    PltName = rebar_utils:otp_release() ++ ".plt",
+    [{plt, filename:join(PltDir, PltName)},
+     {shared_plt, filename:join(SharedPltDir, PltName)},
      {rebar_config, RebarConfig} |
      rebar_test_utils:init_rebar_state(Config)].
 
 all() ->
-    [update_base_plt, update_app_plt, build_release_plt].
+    [update_shared_plt, update_app_plt, build_release_plt].
 
-update_base_plt(Config) ->
+update_shared_plt(Config) ->
     AppDir = ?config(apps, Config),
     RebarConfig = ?config(rebar_config, Config),
-    BasePlt = ?config(base_plt, Config),
+    SharedPlt = ?config(shared_plt, Config),
     Plt = ?config(plt, Config),
 
     Name = rebar_test_utils:create_random_name("app1_"),
@@ -54,17 +54,17 @@ update_base_plt(Config) ->
 
     ErtsFiles = erts_files(),
 
-    {ok, BasePltFiles} = plt_files(BasePlt),
-    ?assertEqual(ErtsFiles, BasePltFiles),
+    {ok, SharedPltFiles} = plt_files(SharedPlt),
+    ?assertEqual(ErtsFiles, SharedPltFiles),
 
-    alter_plt(BasePlt),
+    alter_plt(SharedPlt),
     ok = file:delete(Plt),
 
     rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
                                    {ok, [{app, Name}]}),
 
-    {ok, BasePltFiles2} = plt_files(BasePlt),
-    ?assertEqual(ErtsFiles, BasePltFiles2),
+    {ok, SharedPltFiles2} = plt_files(SharedPlt),
+    ?assertEqual(ErtsFiles, SharedPltFiles2),
 
     {ok, PltFiles} = plt_files(Plt),
     ?assertEqual(ErtsFiles, PltFiles).
@@ -106,7 +106,7 @@ update_app_plt(Config) ->
 build_release_plt(Config) ->
     AppDir = ?config(apps, Config),
     RebarConfig = ?config(rebar_config, Config),
-    BasePlt = ?config(base_plt, Config),
+    SharedPlt = ?config(shared_plt, Config),
     Plt = ?config(plt, Config),
 
     Name1 = rebar_test_utils:create_random_name("relapp1_"),
@@ -123,8 +123,8 @@ build_release_plt(Config) ->
 
     ErtsFiles = erts_files(),
 
-    {ok, BasePltFiles} = plt_files(BasePlt),
-    ?assertEqual(ErtsFiles, BasePltFiles),
+    {ok, SharedPltFiles} = plt_files(SharedPlt),
+    ?assertEqual(ErtsFiles, SharedPltFiles),
 
     {ok, PltFiles} = plt_files(Plt),
     ?assertEqual(ErtsFiles, PltFiles).

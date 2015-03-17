@@ -41,22 +41,22 @@ desc() ->
     "\n"
     "The following (optional) configurations can be added to a rebar.config:\n"
     "`dialyzer_warnings` - a list of dialyzer warnings\n"
-    "`dialyzer_plt` - the PLT file to use\n"
-    "`dialyzer_plt_apps` - a list of applications to include in the PLT file*\n"
+    "`dialyzer_plt_location` - the directory of the PLT file\n"
+    "`dialyzer_plt_extra_apps` - a list of applications to include in the PLT file*\n"
     "`dialyzer_plt_warnings` - display warnings when updating a PLT file "
     "(boolean)\n"
-    "`dialyzer_base_plt` - the base PLT file to use**\n"
-    "`dialyzer_base_plt_dir` - the base PLT directory**\n"
-    "`dialyzer_base_plt_apps` - a list of applications to include in the base "
-    "PLT file**\n"
+    "`dialyzer_shared_plt_location` - the directory of the shared PLT**\n"
+    "`dialyzer_shared_plt_apps` - a list of applications to include in the "
+    "shared PLT file**\n"
     "\n"
-    "*The applications in `dialyzer_base_plt_apps` and any `applications` and "
-    "`included_applications` listed in their .app files will be added to the "
+    "*The applications in `dialyzer_shared_plt_apps` and any `applications` "
+    "and included_applications` listed in their .app files will be added to "
     "list.\n"
-    "**The base PLT is a PLT containing the core OTP applications often "
-    "required for a project's PLT. One base PLT is created per OTP version and "
-    "stored in `dialyzer_base_plt_dir` (defaults to $HOME/.rebar3/). A base "
-    "PLT is used to create a project's initial PLT.".
+    "**The shared PLT is a PLT containing the core OTP applications often "
+    "required for a project's PLT. One shared PLT is created per OTP version "
+    " and stored in `dialyzer_shared_plt_location` (defaults to "
+    "$HOME/.cache/rebar3/). A shared PLT is used to create a project's initial "
+    "PLT.".
 
 short_desc() ->
     "Run the Dialyzer analyzer on the project.".
@@ -86,11 +86,17 @@ format_error(Reason) ->
 %% Internal functions
 
 get_plt_location(State) ->
-    BaseDir = rebar_dir:base_dir(State),
-    DefaultPlt = filename:join(BaseDir, default_plt()),
-    rebar_state:get(State, dialyzer_plt, DefaultPlt).
+    case rebar_state:get(State, dialyzer_plt_location, local) of
+        local ->
+            BaseDir = rebar_dir:base_dir(State),
+            filename:join(BaseDir, plt_name());
+        shared ->
+            get_shared_plt_location(State);
+        PltDir ->
+            filename:join(PltDir, plt_name())
+    end.
 
-default_plt() ->
+plt_name() ->
     rebar_utils:otp_release() ++ ".plt".
 
 do(State, Plt) ->
@@ -125,12 +131,12 @@ do_update_proj_plt(State, Plt) ->
     {Warnings2 + Warnings3, State2}.
 
 proj_plt_files(State) ->
-    BasePltApps = rebar_state:get(State, dialyzer_base_plt_apps,
-                                  default_plt_apps()),
-    PltApps = rebar_state:get(State, dialyzer_plt_apps, []),
+    SharedPltApps = rebar_state:get(State, dialyzer_shared_plt_apps,
+                                    default_plt_apps()),
+    ExtraPltApps = rebar_state:get(State, dialyzer_plt_extra_apps, []),
     Apps = rebar_state:project_apps(State),
     DepApps = lists:flatmap(fun rebar_app_info:applications/1, Apps),
-    get_plt_files(BasePltApps ++ PltApps ++ DepApps, Apps).
+    get_plt_files(SharedPltApps ++ ExtraPltApps ++ DepApps, Apps).
 
 default_plt_apps() ->
     [erts,
@@ -290,42 +296,53 @@ run_plt(State, Plt, Analysis, Files) ->
     run_dialyzer(State, Opts).
 
 build_proj_plt(State, Plt, Files) ->
-    BasePlt = get_base_plt_location(State),
-    {BaseFiles, BaseWarnings} = base_plt_files(State),
-    BaseWarnings2 = format_warnings(BaseWarnings),
-    {BaseWarnings3, State1} = update_base_plt(State, BasePlt, BaseFiles),
-    ?INFO("Copying ~p to ~p...", [BasePlt, Plt]),
+    SharedPlt = get_shared_plt_location(State),
+    {SharedFiles, SharedWarnings} = shared_plt_files(State),
+    SharedWarnings2 = format_warnings(SharedWarnings),
+    {SharedWarnings3, State1} = update_shared_plt(State, SharedPlt,
+                                                  SharedFiles),
     _ = filelib:ensure_dir(Plt),
-    case file:copy(BasePlt, Plt) of
+    copy_plt(SharedPlt, Plt),
+    {CheckWarnings, State2} = check_plt(State1, Plt, SharedFiles,
+                                        Files),
+    {SharedWarnings2 + SharedWarnings3 + CheckWarnings, State2}.
+
+copy_plt(Source, Source) ->
+    ok;
+copy_plt(Source, Target) ->
+    ?INFO("Copying ~p to ~p...", [Source, Target]),
+    case file:copy(Source, Target) of
         {ok, _} ->
-            {CheckWarnings, State2} = check_plt(State1, Plt, BaseFiles, Files),
-            {BaseWarnings2 + BaseWarnings3 + CheckWarnings, State2};
+            ok;
         {error, Reason} ->
             Error = io_lib:format("Could not copy PLT from ~p to ~p: ~p",
-                                  [BasePlt, Plt, file:format_error(Reason)]),
+                                  [Source, Target, file:format_error(Reason)]),
             throw({dialyzer_error, Error})
     end.
 
-get_base_plt_location(State) ->
-    GlobalCacheDir = rebar_dir:global_cache_dir(State),
-    BaseDir = rebar_state:get(State, dialyzer_base_plt_dir, GlobalCacheDir),
-    BasePlt = rebar_state:get(State, dialyzer_base_plt, default_plt()),
-    filename:join(BaseDir, BasePlt).
+get_shared_plt_location(State) ->
+    case rebar_state:get(State, dialyzer_shared_plt_location, shared) of
+        shared ->
+            GlobalCacheDir = rebar_dir:global_cache_dir(State),
+            filename:join(GlobalCacheDir, plt_name());
+        SharedDir ->
+            filename:join(SharedDir, plt_name())
+    end.
 
-base_plt_files(State) ->
-    BasePltApps = rebar_state:get(State, dialyzer_base_plt_apps,
-                                  default_plt_apps()),
+shared_plt_files(State) ->
+    SharedPltApps = rebar_state:get(State, dialyzer_shared_plt_apps,
+                                    default_plt_apps()),
     Apps = rebar_state:project_apps(State),
-    get_plt_files(BasePltApps, Apps).
+    get_plt_files(SharedPltApps, Apps).
 
-update_base_plt(State, BasePlt, BaseFiles) ->
-    ?INFO("Updating base plt...", []),
-    case read_plt(State, BasePlt) of
-        {ok, OldBaseFiles} ->
-            check_plt(State, BasePlt, OldBaseFiles, BaseFiles);
+update_shared_plt(State, SharedPlt, SharedFiles) ->
+    ?INFO("Updating shared plt...", []),
+    case read_plt(State, SharedPlt) of
+        {ok, OldSharedFiles} ->
+            check_plt(State, SharedPlt, OldSharedFiles, SharedFiles);
         {error, no_such_file} ->
-            _ = filelib:ensure_dir(BasePlt),
-            build_plt(State, BasePlt, BaseFiles)
+            _ = filelib:ensure_dir(SharedPlt),
+            build_plt(State, SharedPlt, SharedFiles)
     end.
 
 build_plt(State, Plt, Files) ->
