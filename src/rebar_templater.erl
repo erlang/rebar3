@@ -156,7 +156,7 @@ default_author_and_email() ->
             %% Ok, try mecurial
             case rebar_utils:sh("hg showconfig ui.username", [return_on_error]) of
                 {ok, NameEmail} ->
-                    case re:run(NameEmail, [{capture, [1,2], list}]) of
+                    case re:run(NameEmail, "^(.*) <(.*)>$", [{capture, [1,2], list}]) of
                         {match, [Name, Email]} ->
                             {Name, Email};
                         _ ->
