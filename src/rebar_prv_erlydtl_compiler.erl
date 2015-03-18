@@ -173,7 +173,6 @@ option(Opt, DtlOpts) ->
 
 default(app) -> undefined;
 default(doc_root) -> "priv/templates";
-default(out_dir)  -> "ebin";
 default(source_ext) -> ".dtl";
 default(module_ext) -> "_dtl";
 default(custom_tags_dir) -> "";
