@@ -6,7 +6,7 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-all() -> [app, app_with_fallbacks].
+all() -> [app_git_user, app_hg_user, app_with_fallbacks].
 
 
 init_per_testcase(Case, Config0) ->
@@ -31,7 +31,7 @@ mock_empty_escript_templates() ->
     meck:new(rebar_utils, [passthrough]),
     meck:expect(rebar_utils, escript_foldl, fun(_,_,_) -> {ok, []} end).
 
-app(Config) ->
+app_git_user(Config) ->
     meck:expect(rebar_utils, sh, fun("git config --global user.name", _) -> {ok, "gitname"};
                                     ("git config --global user.email", _) -> {ok, "git@email.com"}
                                  end),
@@ -65,6 +65,28 @@ app_with_fallbacks(Config) ->
     validate_files(
       Config, Name,
       [{"LICENSE", ["Anonymous", "anonymous@example.org"]},
+       {"README.md", [Name]},
+       {".gitignore", []},
+       {"rebar.config", []},
+       {filename:join(["src", Name++".app.src"]), [Name]},
+       {filename:join(["src", Name++"_sup.erl"]), [Name]},
+       {filename:join(["src", Name++"_app.erl"]), [Name]}
+      ]).
+
+app_hg_user(Config) ->
+    meck:expect(rebar_utils, sh, fun("hg showconfig ui.username", _) -> {ok, "hgname <hg@email.com>"};
+                                    (_, _) -> {error, fallback}
+                                 end),
+
+    Name = ?config(name, Config),
+    rebar_test_utils:run_and_check(
+      Config, [],
+      ["new", "test_app", Name],
+      {ok, []}
+     ),
+    validate_files(
+      Config, Name,
+      [{"LICENSE", ["hgname", "hg@email.com"]},
        {"README.md", [Name]},
        {".gitignore", []},
        {"rebar.config", []},
