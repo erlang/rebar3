@@ -3,6 +3,8 @@
 -export([base_dir/1,
          deps_dir/1,
          deps_dir/2,
+         checkouts_dir/1,
+         checkouts_dir/2,
          plugins_dir/1,
          lib_dirs/1,
          home_dir/0,
@@ -39,6 +41,17 @@ deps_dir(State) ->
 -spec deps_dir(file:filename_all(), file:filename_all()) -> file:filename_all().
 deps_dir(DepsDir, App) ->
     filename:join(DepsDir, App).
+
+root_dir(State) ->
+    rebar_state:get(State, root_dir, ?DEFAULT_ROOT_DIR).
+
+-spec checkouts_dir(rebar_state:t()) -> file:filename_all().
+checkouts_dir(State) ->
+    filename:join(root_dir(State), rebar_state:get(State, checkouts_dir, ?DEFAULT_CHECKOUTS_DIR)).
+
+-spec checkouts_dir(rebar_state:t(), file:filename_all()) -> file:filename_all().
+checkouts_dir(State, App) ->
+    filename:join(checkouts_dir(State), App).
 
 -spec plugins_dir(rebar_state:t()) -> file:filename_all().
 plugins_dir(State) ->

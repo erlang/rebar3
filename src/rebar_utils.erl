@@ -387,6 +387,7 @@ beams(Dir) ->
 -spec abort() -> no_return().
 abort() ->
     throw(rebar_abort).
+
 -spec abort(string(), [term()]) -> no_return().
 abort(String, Args) ->
     ?ERROR(String, Args),

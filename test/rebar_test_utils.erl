@@ -25,7 +25,8 @@ init_rebar_state(Config, Name) ->
     ok = ec_file:mkdir_p(CheckoutsDir),
     Verbosity = rebar3:log_level(),
     rebar_log:init(command_line, Verbosity),
-    State = rebar_state:new([{base_dir, filename:join([AppsDir, "_build"])}]),
+    State = rebar_state:new([{base_dir, filename:join([AppsDir, "_build"])}
+                            ,{root_dir, AppsDir}]),
     [{apps, AppsDir}, {checkouts, CheckoutsDir}, {state, State} | Config].
 
 %% @doc Takes common test config, a rebar config ([] if empty), a command to

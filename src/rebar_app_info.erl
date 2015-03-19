@@ -34,6 +34,8 @@
          source/2,
          state/1,
          state/2,
+         is_checkout/1,
+         is_checkout/2,
          valid/1,
          valid/2]).
 
@@ -53,6 +55,7 @@
                      out_dir :: file:name(),
                      source :: string() | tuple() | undefined,
                      state :: rebar_state:t() | undefined,
+                     is_checkout=false :: boolean(),
                      valid :: boolean()}).
 
 %%============================================================================
@@ -237,6 +240,14 @@ state(AppInfo=#app_info_t{}, State) ->
 -spec state(t()) -> rebar_state:t() | undefined.
 state(#app_info_t{state=State}) ->
     State.
+
+-spec is_checkout(t(), boolean()) -> t().
+is_checkout(AppInfo=#app_info_t{}, IsCheckout) ->
+    AppInfo#app_info_t{is_checkout=IsCheckout}.
+
+-spec is_checkout(t()) -> boolean().
+is_checkout(#app_info_t{is_checkout=IsCheckout}) ->
+    IsCheckout.
 
 -spec valid(t()) -> boolean().
 valid(AppInfo=#app_info_t{valid=undefined}) ->

@@ -174,7 +174,7 @@ compile_order(Source, ProjectApps) ->
     case rebar_digraph:compile_order(Source) of
         {ok, Sort} ->
             %% Valid apps are compiled and good
-            {ok, lists:dropwhile(fun rebar_app_info:valid/1, Sort -- ProjectApps)};
+            {ok, lists:dropwhile(fun not_needs_compile/1, Sort -- ProjectApps)};
         {error, Error} ->
             {error, Error}
     end.
@@ -214,23 +214,28 @@ handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Fetched, Seen, State) -
     {[AppInfo | Fetched], NewSeen, NewState}.
 
 maybe_lock(Profile, AppInfo, Seen, State, Level) ->
-    case Profile of
-        default ->
-            Name = rebar_app_info:name(AppInfo),
-            case sets:is_element(Name, Seen) of
-                false ->
-                    Locks = rebar_state:lock(State),
-                    case lists:any(fun(App) -> rebar_app_info:name(App) =:= Name end, Locks) of
-                        true ->
-                            {sets:add_element(Name, Seen), State};
+    case rebar_app_info:is_checkout(AppInfo) of
+        false ->
+            case Profile of
+                default ->
+                    Name = rebar_app_info:name(AppInfo),
+                    case sets:is_element(Name, Seen) of
                         false ->
-                            {sets:add_element(Name, Seen),
-                             rebar_state:lock(State, rebar_app_info:dep_level(AppInfo, Level))}
+                            Locks = rebar_state:lock(State),
+                            case lists:any(fun(App) -> rebar_app_info:name(App) =:= Name end, Locks) of
+                                true ->
+                                    {sets:add_element(Name, Seen), State};
+                                false ->
+                                    {sets:add_element(Name, Seen),
+                                     rebar_state:lock(State, rebar_app_info:dep_level(AppInfo, Level))}
+                            end;
+                        true ->
+                            {Seen, State}
                     end;
-                true ->
+                _ ->
                     {Seen, State}
             end;
-        _ ->
+        true ->
             {Seen, State}
     end.
 
@@ -367,7 +372,7 @@ handle_dep(State, DepsDir, AppInfo, Locks, Level) ->
 maybe_fetch(AppInfo, Upgrade, Seen, State) ->
     AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
     %% Don't fetch dep if it exists in the _checkouts dir
-    case in_checkouts(AppInfo) of
+    case rebar_app_info:is_checkout(AppInfo) of
         true ->
             false;
         false ->
@@ -390,13 +395,6 @@ maybe_fetch(AppInfo, Upgrade, Seen, State) ->
                             maybe_upgrade(AppInfo, AppDir, Upgrade, State)
                     end
             end
-    end.
-
-in_checkouts(AppInfo) ->
-    Apps = rebar_app_discover:find_apps(["_checkouts"], all),
-    case rebar_app_utils:find(rebar_app_info:name(AppInfo), Apps) of
-        {ok, _} -> true;
-        error -> false
     end.
 
 in_default(AppInfo, State) ->
@@ -427,11 +425,25 @@ parse_deps(DepsDir, Deps, State, Locks, Level) ->
                         end
                 end, {[], []}, Deps).
 
-parse_dep({Name, Vsn}, {SrcDepsAcc, PkgDepsAcc}, _DepsDir, _State) when is_list(Vsn) ->
-    {SrcDepsAcc, [parse_goal(ec_cnv:to_binary(Name)
-                            ,ec_cnv:to_binary(Vsn)) | PkgDepsAcc]};
-parse_dep(Name, {SrcDepsAcc, PkgDepsAcc}, _DepsDir, _State) when is_atom(Name) ->
-    {SrcDepsAcc, [ec_cnv:to_binary(Name) | PkgDepsAcc]};
+parse_dep({Name, Vsn}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_list(Vsn) ->
+    CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
+    case rebar_app_info:discover(CheckoutsDir) of
+        {ok, _App} ->
+            Dep = new_dep(DepsDir, Name, [], [], State),
+            {[Dep | SrcDepsAcc], PkgDepsAcc};
+        not_found ->
+            {SrcDepsAcc, [parse_goal(ec_cnv:to_binary(Name)
+                                    ,ec_cnv:to_binary(Vsn)) | PkgDepsAcc]}
+    end;
+parse_dep(Name, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_atom(Name) ->
+    CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
+    case rebar_app_info:discover(CheckoutsDir) of
+        {ok, _App} ->
+            Dep = new_dep(DepsDir, Name, [], [], State),
+            {[Dep | SrcDepsAcc], PkgDepsAcc};
+        not_found ->
+            {SrcDepsAcc, [ec_cnv:to_binary(Name) | PkgDepsAcc]}
+    end;
 parse_dep({Name, Source}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_tuple(Source) ->
     Dep = new_dep(DepsDir, Name, [], Source, State),
     {[Dep | SrcDepsAcc], PkgDepsAcc};
@@ -445,8 +457,15 @@ parse_dep({Name, _Vsn, Source, Opts}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) 
     ?WARN("Dependency option list ~p in ~p is not supported and will be ignored", [Opts, Name]),
     Dep = new_dep(DepsDir, Name, [], Source, State),
     {[Dep | SrcDepsAcc], PkgDepsAcc};
-parse_dep({_Name, {pkg, Name, Vsn}, Level}, {SrcDepsAcc, PkgDepsAcc}, _, _) when is_integer(Level) ->
-    {SrcDepsAcc, [{Name, Vsn} | PkgDepsAcc]};
+parse_dep({_Name, {pkg, Name, Vsn}, Level}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_integer(Level) ->
+    CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
+    case rebar_app_info:discover(CheckoutsDir) of
+        {ok, _App} ->
+            Dep = new_dep(DepsDir, Name, [], [], State),
+            {[Dep | SrcDepsAcc], PkgDepsAcc};
+        not_found ->
+            {SrcDepsAcc, [{Name, Vsn} | PkgDepsAcc]}
+    end;
 parse_dep({Name, Source, Level}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_tuple(Source)
                                                                               , is_integer(Level) ->
     Dep = new_dep(DepsDir, Name, [], Source, State),
@@ -456,12 +475,19 @@ parse_dep(Dep, _, _, _) ->
 
 
 new_dep(DepsDir, Name, Vsn, Source, State) ->
-    Dir = ec_cnv:to_list(filename:join(DepsDir, Name)),
-    {ok, Dep} = case rebar_app_info:discover(Dir) of
+    CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
+    {ok, Dep} = case rebar_app_info:discover(CheckoutsDir) of
                     {ok, App} ->
-                        {ok, App};
+                        {ok, rebar_app_info:is_checkout(App, true)};
                     not_found ->
-                        rebar_app_info:new(Name, Vsn, ec_cnv:to_list(filename:join(DepsDir, Name)))
+                        Dir = ec_cnv:to_list(filename:join(DepsDir, Name)),
+                        case rebar_app_info:discover(Dir) of
+                            {ok, App} ->
+                                {ok, App};
+                            not_found ->
+                                rebar_app_info:new(Name, Vsn,
+                                                   ec_cnv:to_list(filename:join(DepsDir, Name)))
+                        end
                 end,
     C = rebar_config:consult(rebar_app_info:dir(Dep)),
     S = rebar_state:new(rebar_state:new(), C, rebar_app_info:dir(Dep)),
@@ -528,3 +554,7 @@ warn_skip_pkg({Name, Source}, State) ->
         false -> ?WARN(Msg, Args);
         true -> ?ERROR(Msg, Args), ?FAIL
     end.
+
+not_needs_compile(App) ->
+    not(rebar_app_info:is_checkout(App))
+        andalso rebar_app_info:valid(App).
