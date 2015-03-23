@@ -217,7 +217,7 @@ check_results(AppDir, Expected) ->
                         ?assertEqual(iolist_to_binary(Vsn),
                                      iolist_to_binary(LockVsn))
                 end
-        ;  ({release, Name, Vsn}) ->
+        ;  ({release, Name, Vsn, ExpectedDevMode}) ->
                 ct:pal("Release: ~p-~s", [Name, Vsn]),
                 {ok, Cwd} = file:get_cwd(),
                 try
@@ -227,6 +227,15 @@ check_results(AppDir, Expected) ->
                     RelxState1 = rlx_state:base_output_dir(RelxState, ReleaseDir),
                     {ok, RelxState2} = rlx_prv_app_discover:do(RelxState1),
                     {ok, RelxState3} = rlx_prv_rel_discover:do(RelxState2),
+
+                    LibDir = filename:join([ReleaseDir, Name, "lib"]),
+                    {ok, RelLibs} = file:list_dir(LibDir),
+                    IsSymLinkFun =
+                        fun(X) ->
+                                ec_file:is_symlink(filename:join(LibDir, X))
+                        end,
+                    DevMode = lists:all(IsSymLinkFun, RelLibs),
+                    ?assertEqual(ExpectedDevMode, DevMode),
 
                     %% throws not_found if it doesn't exist
                     rlx_state:get_realized_release(RelxState3, Name, Vsn)
