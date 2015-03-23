@@ -240,7 +240,7 @@ merge_opts(NewOpts, OldOpts) ->
                            true ->
                                NewValue;
                            false ->
-                               lists:umerge(lists:sort(NewValue), lists:sort(OldValue))
+                               tup_umerge(lists:sort(NewValue), lists:sort(OldValue))
                        end;
                   (_Key, NewValue, _OldValue) ->
                        NewValue
@@ -362,3 +362,59 @@ add_hook(pre, {PreHooks, PostHooks}, Hook) ->
     {[Hook | PreHooks], PostHooks};
 add_hook(post, {PreHooks, PostHooks}, Hook) ->
     {PreHooks, [Hook | PostHooks]}.
+
+%% Custom merge functions. The objective is to behave like lists:umerge/2,
+%% except that we also compare the merge elements based on the key if they're a
+%% tuple, such that `{key, val1}' is always prioritized over `{key, val0}' if
+%% the former is from the 'new' list.
+%%
+%% This lets us apply proper overrides to list of elements according to profile
+%% priority.
+tup_umerge([], Olds) ->
+    Olds;
+tup_umerge(News, Olds) ->
+    [ENew|ENews] = expand(News),
+    EOlds = expand(Olds),
+    unexpand(lists:reverse(umerge(ENews, EOlds, [], ENew))).
+
+%% Expand values, so they `key' is now `{key, key}', and so that
+%% `{key, val}' is now `{key, {key, val}'. This allows us to compare
+%% possibly only on the total key or the value itself.
+expand([]) -> [];
+expand([Tup|T]) when is_tuple(Tup) -> [{element(1, Tup), Tup} | expand(T)];
+expand([H|T]) -> [{H,H} | expand(T)].
+
+%% Go back to unexpanded form.
+unexpand(List) -> [element(2, X) || X <- List].
+
+%% This is equivalent to umerge2_2 in the stdlib, except we use the expanded
+%% value/key only to compare
+umerge(News, [{KOld,_}=Old|Olds], Merged, {KCmp, _} = Cmp) when KCmp =< KOld ->
+    umerge(News, Olds, [Cmp | Merged], Cmp, Old);
+umerge(News, [Old|Olds], Merged, Cmp) ->
+    umerge(News, Olds, [Old | Merged], Cmp);
+umerge(News, [], Merged, Cmp) ->
+    lists:reverse(News, [Cmp | Merged]).
+
+%% Similar to stdlib's umerge2_1 in the stdlib, except that when the expanded
+%% value/keys compare equal, we check if the element is a full dupe to clear it
+%% (like the stdlib function does) or otherwise keep the duplicate around in
+%% an order that prioritizes 'New' elements.
+umerge([{KNew,_}=New|News], Olds, Merged, _CmpMerged, {KCmp,_}=Cmp) when KNew =< KCmp ->
+    umerge(News, Olds, [New | Merged], New, Cmp);
+umerge([{KNew,_}=New|News], Olds, Merged, {KCmp,_}=CmpMerged, Cmp) when KNew == KCmp ->
+    if New == CmpMerged ->
+        umerge(News, Olds, Merged, New);
+       New =/= CmpMerged -> % this is where we depart from the stdlib!
+        umerge(News, Olds, [New | Merged], New, Cmp)
+    end;
+umerge([New|News], Olds, Merged, _CmpMerged, Cmp) -> % >
+    umerge(News, Olds, [Cmp | Merged], New);
+umerge([], Olds, Merged, {KCmpM,_}=CmpMerged, {KCmp,_}=Cmp) when KCmpM =:= KCmp ->
+    if CmpMerged == Cmp ->
+        lists:reverse(Olds, Merged);
+       CmpMerged =/= Cmp -> % We depart from stdlib here too!
+        lists:reverse(Olds, [Cmp | Merged])
+    end;
+umerge([], Olds, Merged, _CmpMerged, Cmp) ->
+    lists:reverse(Olds, [Cmp | Merged]).
