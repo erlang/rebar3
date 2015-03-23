@@ -3,7 +3,10 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-all() -> [release, tar].
+all() -> [release,
+          dev_mode_release,
+          profile_dev_mode_override_release,
+          tar].
 
 init_per_testcase(Case, Config0) ->
     Config = rebar_test_utils:init_rebar_state(Config0),
@@ -33,8 +36,45 @@ release(Config) ->
     rebar_test_utils:run_and_check(
       Config, RebarConfig,
       ["release"],
-      {ok, [{release, list_to_atom(Name), Vsn}]}
+      {ok, [{release, list_to_atom(Name), Vsn, false}]}
      ).
+
+dev_mode_release(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = ?config(name, Config),
+    Vsn = "1.0.0",
+    {ok, RebarConfig} =
+        file:consult(rebar_test_utils:create_config(AppDir,
+                                                    [{relx, [{release, {list_to_atom(Name), Vsn},
+                                                              [list_to_atom(Name)]},
+                                                             {lib_dirs, [AppDir]},
+                                                             {dev_mode, true}]}])),
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig,
+      ["release"],
+      {ok, [{release, list_to_atom(Name), Vsn, true}]}
+     ).
+
+
+profile_dev_mode_override_release(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = ?config(name, Config),
+    Vsn = "1.0.0",
+    {ok, RebarConfig} =
+        file:consult(rebar_test_utils:create_config(AppDir,
+                                                    [{relx, [{release, {list_to_atom(Name), Vsn},
+                                                              [list_to_atom(Name)]},
+                                                             {lib_dirs, [AppDir]},
+                                                             {dev_mode, true}]},
+                                                     {profiles,
+                                                      [{ct,
+                                                        [{relx, [{dev_mode, false}]}]}]}])),
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig,
+      ["as", "ct", "release"],
+      {ok, [{release, list_to_atom(Name), Vsn, false}]}
+     ).
+
 
 tar(Config) ->
     AppDir = ?config(apps, Config),
@@ -48,5 +88,5 @@ tar(Config) ->
     rebar_test_utils:run_and_check(
       Config, RebarConfig,
       ["tar"],
-      {ok, [{release, list_to_atom(Name), Vsn}, {tar, Name, Vsn}]}
+      {ok, [{release, list_to_atom(Name), Vsn, false}, {tar, Name, Vsn}]}
      ).
