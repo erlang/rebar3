@@ -82,6 +82,8 @@ process_command(State, Command) ->
             case Command of
                 do ->
                     do(TargetProviders, State);
+                as ->
+                    do(TargetProviders, State);
                 _ ->
                     Profiles = providers:profiles(CommandProvider),
                     State1 = rebar_state:apply_profiles(State, Profiles),
