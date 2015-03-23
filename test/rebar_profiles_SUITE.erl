@@ -100,12 +100,17 @@ profile_merges(_Config) ->
                    {test2, "hello"},
                    {test3, [key3]},
                    {test4, "oldvalue"},
+                   {test5, [{key5, true}]},
+                   {test6, [{key6, false}]},
                    {profiles,
                     [{profile1,
                       [{test1, [{key3, 5}, key1]}]},
                      {profile2, [{test2, "goodbye"},
                                  {test3, []},
-                                 {test4, []}]}]}],
+                                 {test4, []},
+                                 {test5, [{key5, false}]},
+                                 {test6, [{key6, true}]}
+                                ]}]}],
     State = rebar_state:new(RebarConfig),
     State1 = rebar_state:apply_profiles(State, [profile1, profile2]),
 
@@ -118,7 +123,9 @@ profile_merges(_Config) ->
 
     %% Check that a newvalue of []/"" doesn't override non-string oldvalues
     [key3] = rebar_state:get(State1, test3),
-    [] = rebar_state:get(State1, test4).
+    [] = rebar_state:get(State1, test4),
+    [{key5, false}, {key5, true}] = rebar_state:get(State1, test5),
+    [{key6, true}, {key6, false}] = rebar_state:get(State1, test6).
 
 add_to_profile(_Config) ->
     RebarConfig = [{foo, true}, {bar, false}],
