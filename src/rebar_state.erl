@@ -228,7 +228,7 @@ merge_opts(NewOpts, OldOpts) ->
                        NewValue;
                   (profiles, NewValue, OldValue) ->
                        dict:to_list(merge_opts(dict:from_list(NewValue), dict:from_list(OldValue)));
-                  (_Key, NewValue, OldValue) when is_list(NewValue) ->
+                  (Key, NewValue, OldValue) when is_list(NewValue) ->
                        case io_lib:printable_list(NewValue) of
                            true when NewValue =:= [] ->
                                case io_lib:printable_list(OldValue) of
@@ -240,11 +240,97 @@ merge_opts(NewOpts, OldOpts) ->
                            true ->
                                NewValue;
                            false ->
-                               lists:umerge(lists:sort(NewValue), lists:sort(OldValue))
+                               merge_list_value(Key, NewValue, OldValue)
                        end;
                   (_Key, NewValue, _OldValue) ->
                        NewValue
                end, NewOpts, OldOpts).
+
+%% This function handles the merging of configuration value lists The
+%% function clauses except for the last one handle special cases of
+%% list values where it is valid to have multiple tuple entries that
+%% share a common first element. A good example of this is the define
+%% tuple (e.g. {d, 'TEST'}) in erl_opts. The final function clause is
+%% the catch-all which performs a merge on any tuples whose first
+%% elements match.
+merge_list_value(erl_opts, NewValue, OldValue) ->
+    lists:umerge(lists:sort(NewValue), lists:sort(OldValue));
+merge_list_value(eunit_compile_opts, NewValue, OldValue) ->
+    lists:umerge(lists:sort(NewValue), lists:sort(OldValue));
+merge_list_value(_, NewValue, OldValue) ->
+    merge_list_value(lists:sort(NewValue), lists:sort(OldValue)).
+
+%% Merge the two value lists by separating tuples from non-tuples and
+%% merging each value type independently.
+merge_list_value(NewValue, OldValue) ->
+    {NewTuples, NewNonTuples} =
+        lists:partition(fun(X) -> is_tuple(X) end, NewValue),
+    {OldTuples, OldNonTuples} =
+        lists:partition(fun(X) -> is_tuple(X) end, OldValue),
+    %% Sort each list of non-tuple types and unique merge them
+    MergedNonTuples = lists:umerge(lists:sort(NewNonTuples),
+                                   lists:sort(OldNonTuples)),
+    %% Tuple value merging is more complex so handle it in a separate
+    %% function
+    MergedTuples = merge_tuples(lists:sort(NewTuples),
+                                lists:sort(OldTuples),
+                                []),
+    lists:sort(MergedNonTuples ++ MergedTuples).
+
+%% Merge lists of tuple values under a particular configuration key.
+%% A recursive merge is done for any pairs whose first elements match
+%% and whose second elements are lists. This is necessary so that any
+%% nested configuration information in tuples or lists within those
+%% second element lists can be properly merged without losing any
+%% configuration information.  This is only currently done for
+%% pairs. Other arity tuples are merged using the same strategy
+%% employed by `lists:ukeymerge', but handling can be added for
+%% triples or other tuple arities as required.
+merge_tuples([], [], Acc) ->
+    %% Both input lists exhausted, return the accumulator
+    Acc;
+merge_tuples(Tuples1, [], Acc) ->
+    %% The second input list is exhausted. Concat the accumulator to
+    %% the remainder of the first list as a return value.
+    Tuples1 ++ Acc;
+merge_tuples([], Tuples2, Acc) ->
+    %% The first input list is exhausted. Concat the accumulator to
+    %% the remainder of the second list as a return value.
+    Tuples2 ++ Acc;
+merge_tuples([{Key, Value1} | Rest1], [{Key, Value2} | Rest2], Acc)
+  when is_list(Value1), is_list(Value2) ->
+    %% The configuration keys are the same and both values are
+    %% lists. In this case we must descend into the list values and
+    %% merge so no configuration data is lost.
+    MergedListValue = merge_list_value(Key, Value1, Value2),
+    merge_tuples(Rest1, Rest2, [{Key, MergedListValue} | Acc]);
+merge_tuples([{Key, Value1} | Rest1], [{Key, _Value2} | Rest2], Acc) ->
+    %% The configuration keys are the same and at least one value is
+    %% not a list. In this case Value1 is selected. This yields the
+    %% same result of doing a unique key merge on a list of tuples.
+    merge_tuples(Rest1, Rest2, [{Key, Value1} | Acc]);
+merge_tuples([Head1 | Rest1]=Tuples1, [Head2 | Rest2]=Tuples2, Acc)
+  when is_tuple(Head1), is_tuple(Head2) ->
+    %% This clause handles non-recursive merging of tuple
+    %% values. If the first elements of each tuple match then the
+    %% value from the the first input is kept. This mirrors the
+    %% behavior of the unique merging functions in the `lists' modules
+    %% such as `umerge' and `ukeymerge'. If the first elements of each
+    %% tuple do not match no merging occurs and the tuple whose key
+    %% sorts less is added to the accumulator while the input list
+    %% containing the tuple whose key sorts greater is left intact in
+    %% case keys from the other input list match and require merging.
+    case element(1, Head1) =:= element(2, Head2) of
+        true ->
+            merge_tuples(Rest1, Rest2, [Head1 | Acc]);
+        false ->
+            case element(1, Head1) < element(2, Head2) of
+                true ->
+                    merge_tuples(Rest1, Tuples2, [Head1 | Acc]);
+                false ->
+                    merge_tuples(Tuples1, Rest2, [Head2 | Acc])
+            end
+    end.
 
 dir(#state_t{dir=Dir}) ->
     Dir.
