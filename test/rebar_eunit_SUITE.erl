@@ -219,6 +219,15 @@ test_single_app_flag(Config) ->
                                       Vsn2,
                                       [kernel, stdlib]),
 
+    BareSuite = io_lib:format("-module(all_tests).\n"
+                              "-compile(export_all).\n"
+                              "-include_lib(\"eunit/include/eunit.hrl\").\n"
+                              "some_test_() -> ?_assert(true).\n"
+                              "define_test_() -> ?_assertEqual(true, ?some_define).\n", []),
+    FileName = filename:join([AppDir, "test", "all_tests.erl"]),
+    ok = filelib:ensure_dir(FileName),
+    ok = ec_file:write(FileName, BareSuite),
+
     RebarConfig = [{erl_opts, [{d, some_define}]}],
     rebar_test_utils:run_and_check(Config,
                                    RebarConfig,
@@ -228,7 +237,8 @@ test_single_app_flag(Config) ->
     Suite1 = list_to_atom("not_a_real_src_" ++ Name1 ++ "_tests"),
     {module, Suite1} = code:ensure_loaded(Suite1),
     Suite2 = list_to_atom("not_a_real_src_" ++ Name2 ++ "_tests"),
-    {error, nofile} = code:ensure_loaded(Suite2).
+    {error, nofile} = code:ensure_loaded(Suite2),
+    {error, nofile} = code:ensure_loaded(all_tests).
 
 test_multiple_app_flag(Config) ->
     AppDir = ?config(apps, Config),
@@ -246,6 +256,15 @@ test_multiple_app_flag(Config) ->
                                       Vsn2,
                                       [kernel, stdlib]),
 
+    BareSuite = io_lib:format("-module(all_tests).\n"
+                              "-compile(export_all).\n"
+                              "-include_lib(\"eunit/include/eunit.hrl\").\n"
+                              "some_test_() -> ?_assert(true).\n"
+                              "define_test_() -> ?_assertEqual(true, ?some_define).\n", []),
+    FileName = filename:join([AppDir, "test", "all_tests.erl"]),
+    ok = filelib:ensure_dir(FileName),
+    ok = ec_file:write(FileName, BareSuite),
+
     RebarConfig = [{erl_opts, [{d, some_define}]}],
     rebar_test_utils:run_and_check(Config,
                                    RebarConfig,
@@ -255,7 +274,8 @@ test_multiple_app_flag(Config) ->
     Suite1 = list_to_atom("not_a_real_src_" ++ Name1 ++ "_tests"),
     {module, Suite1} = code:ensure_loaded(Suite1),
     Suite2 = list_to_atom("not_a_real_src_" ++ Name2 ++ "_tests"),
-    {module, Suite2} = code:ensure_loaded(Suite2).
+    {module, Suite2} = code:ensure_loaded(Suite2),
+    {error, nofile} = code:ensure_loaded(all_tests).
 
 test_nonexistent_app_flag(Config) ->
     AppDir = ?config(apps, Config),

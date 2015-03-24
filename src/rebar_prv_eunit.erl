@@ -142,10 +142,8 @@ filter_checkouts(Apps) -> filter_checkouts(Apps, []).
 
 filter_checkouts([], Acc) -> lists:reverse(Acc);
 filter_checkouts([App|Rest], Acc) ->
-    AppDir = filename:absname(rebar_app_info:dir(App)),
-    CheckoutsDir = filename:absname("_checkouts"),
-    case lists:prefix(CheckoutsDir, AppDir) of
-        true -> filter_checkouts(Rest, Acc);
+    case rebar_app_info:is_checkout(App) of
+        true  -> filter_checkouts(Rest, Acc);
         false -> filter_checkouts(Rest, [App|Acc])
     end.
 
