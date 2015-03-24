@@ -30,16 +30,16 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     AllDeps = rebar_state:lock(State),
-    Locks = lists:map(fun(Dep) ->
-                              Dir = rebar_app_info:dir(Dep),
-                              Source = rebar_app_info:source(Dep),
+    Locks = [begin
+                 Dir = rebar_app_info:dir(Dep),
+                 Source = rebar_app_info:source(Dep),
 
-                              %% If source is tuple it is a source dep
-                              %% e.g. {git, "git://github.com/ninenines/cowboy.git", "master"}
-                              {rebar_app_info:name(Dep)
-                              ,rebar_fetch:lock_source(Dir, Source)
-                              ,rebar_app_info:dep_level(Dep)}
-                      end, AllDeps),
+                 %% If source is tuple it is a source dep
+                 %% e.g. {git, "git://github.com/ninenines/cowboy.git", "master"}
+                 {rebar_app_info:name(Dep)
+                 ,rebar_fetch:lock_source(Dir, Source)
+                 ,rebar_app_info:dep_level(Dep)}
+             end || Dep <- AllDeps, not(rebar_app_info:is_checkout(Dep))],
     Dir = rebar_state:dir(State),
     file:write_file(filename:join(Dir, ?LOCK_FILE), io_lib:format("~p.~n", [Locks])),
     {ok, State}.

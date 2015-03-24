@@ -55,7 +55,7 @@ mock_lock(_) ->
 %% should be updated on a per-name basis: `{update, ["App1", "App3"]}'.
 mock_update(Opts) ->
     ToUpdate = proplists:get_value(upgrade, Opts, []),
-    ct:pal("TOUp: ~p", [ToUpdate]),
+%    ct:pal("TOUp: ~p", [ToUpdate]),
     meck:expect(
         ?MOD, needs_update,
         fun(_Dir, {git, Url, _Ref}) ->
@@ -110,7 +110,7 @@ mock_download(Opts) ->
             AppDeps = proplists:get_value({App,Vsn}, Deps, []),
             rebar_test_utils:create_app(
                 Dir, App, Vsn,
-                [element(1,D) || D  <- AppDeps]
+                [kernel, stdlib] ++ [element(1,D) || D  <- AppDeps]
             ),
             rebar_test_utils:create_config(Dir, [{deps, AppDeps}]),
             {ok, 'WHATEVER'}

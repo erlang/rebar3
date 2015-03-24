@@ -78,9 +78,9 @@ mock_download(Opts) ->
             App = binary_to_list(AppBin),
             filelib:ensure_dir(Dir),
             AppDeps = proplists:get_value({App,Vsn}, Deps, []),
-            {ok, AppInfo} = rebar_test_utils:create_empty_app(
-                Dir, App, Vsn,
-                [element(1,D) || D  <- AppDeps]
+            {ok, AppInfo} = rebar_test_utils:create_app(
+                Dir, App, binary_to_list(Vsn),
+                [kernel, stdlib] ++ [element(1,D) || D  <- AppDeps]
             ),
             rebar_test_utils:create_config(Dir, [{deps, AppDeps}]),
             Tarball = filename:join([Dir, App++"-"++binary_to_list(Vsn)++".tar"]),
