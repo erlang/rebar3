@@ -93,7 +93,11 @@ process_command(State, Command) ->
                             State2 = rebar_state:command_parsed_args(State1, Args),
                             do(TargetProviders, State2);
                         {error, {invalid_option, Option}} ->
-                            {error, io_lib:format("Invalid option ~s on task ~p", [Option, Command])}
+                            {error, io_lib:format("Invalid option ~s on task ~p", [Option, Command])};
+                        {error, {invalid_option_arg, {Option, Arg}}} ->
+                            {error, io_lib:format("Invalid argument ~s to option ~s", [Arg, Option])};
+                        {error, {missing_option_arg, Option}} ->
+                            {error, io_lib:format("Missing argument to option ~s", [Option])}
                     end
             end
     end.
