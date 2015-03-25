@@ -3,7 +3,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -export([init_rebar_state/1, init_rebar_state/2, run_and_check/4]).
 -export([expand_deps/2, flat_deps/1, flat_pkgdeps/1, top_level_deps/1]).
--export([create_app/4, create_empty_app/4, create_config/2]).
+-export([create_app/4, create_eunit_app/4, create_empty_app/4, create_config/2]).
 -export([create_random_name/1, create_random_vsn/0]).
 
 %%%%%%%%%%%%%%
@@ -70,7 +70,17 @@ run_and_check(Config, RebarConfig, Command, Expect) ->
 %% And returns a `rebar_app_info' object.
 create_app(AppDir, Name, Vsn, Deps) ->
     write_src_file(AppDir, Name),
-    write_test_file(AppDir, Name),
+    write_app_src_file(AppDir, Name, Vsn, Deps),
+    rebar_app_info:new(Name, Vsn, AppDir, Deps).
+
+%% @doc Creates a dummy application including:
+%% - src/<file>.erl
+%% - src/<file>.app.src
+%% - test/<file>_tests.erl
+%% And returns a `rebar_app_info' object.
+create_eunit_app(AppDir, Name, Vsn, Deps) ->
+    write_eunitized_src_file(AppDir, Name),
+    write_eunit_suite_file(AppDir, Name),
     write_app_src_file(AppDir, Name, Vsn, Deps),
     rebar_app_info:new(Name, Vsn, AppDir, Deps).
 
@@ -260,10 +270,15 @@ write_src_file(Dir, Name) ->
     ok = filelib:ensure_dir(Erl),
     ok = ec_file:write(Erl, erl_src_file("not_a_real_src_" ++ Name ++ ".erl")).
 
-write_test_file(Dir, Name) ->
+write_eunitized_src_file(Dir, Name) ->
+    Erl = filename:join([Dir, "src", "not_a_real_src_" ++ Name ++ ".erl"]),
+    ok = filelib:ensure_dir(Erl),
+    ok = ec_file:write(Erl, erl_eunitized_src_file("not_a_real_src_" ++ Name ++ ".erl")).
+
+write_eunit_suite_file(Dir, Name) ->
     Erl = filename:join([Dir, "test", "not_a_real_src_" ++ Name ++ "_tests.erl"]),
     ok = filelib:ensure_dir(Erl),
-    ok = ec_file:write(Erl, erl_test_file("not_a_real_src_" ++ Name ++ ".erl")).
+    ok = ec_file:write(Erl, erl_eunit_suite_file("not_a_real_src_" ++ Name ++ ".erl")).
 
 write_app_file(Dir, Name, Version, Deps) ->
     Filename = filename:join([Dir, "ebin", Name ++ ".app"]),
@@ -278,13 +293,18 @@ write_app_src_file(Dir, Name, Version, Deps) ->
 erl_src_file(Name) ->
     io_lib:format("-module(~s).\n"
                   "-export([main/0]).\n"
+                  "main() -> ok.\n", [filename:basename(Name, ".erl")]).
+
+erl_eunitized_src_file(Name) ->
+    io_lib:format("-module(~s).\n"
+                  "-export([main/0]).\n"
                   "main() -> ok.\n"
                   "-ifdef(TEST).\n"
                   "-include_lib(\"eunit/include/eunit.hrl\").\n"
                   "some_test_() -> ?_assertEqual(ok, main()).\n"
                   "-endif.\n", [filename:basename(Name, ".erl")]).
 
-erl_test_file(Name) ->
+erl_eunit_suite_file(Name) ->
     BaseName = filename:basename(Name, ".erl"),
     io_lib:format("-module(~s_tests).\n"
                   "-compile(export_all).\n"

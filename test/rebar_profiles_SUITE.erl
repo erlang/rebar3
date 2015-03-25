@@ -172,7 +172,7 @@ test_profile_applied_at_completion(Config) ->
 
     Name = rebar_test_utils:create_random_name("test_profile_at_completion_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
     RebarConfig = [{erl_opts, [{d, some_define}]}],
     rebar_test_utils:create_config(AppDir, RebarConfig),
@@ -191,7 +191,7 @@ test_profile_applied_before_compile(Config) ->
 
     Name = rebar_test_utils:create_random_name("test_profile_before_compile_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
     RebarConfig = [{erl_opts, [{d, some_define}]}],
     rebar_test_utils:create_config(AppDir, RebarConfig),
@@ -206,7 +206,7 @@ test_profile_applied_before_eunit(Config) ->
 
     Name = rebar_test_utils:create_random_name("test_profile_before_eunit_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
     RebarConfig = [{erl_opts, [{d, some_define}]}],
     rebar_test_utils:create_config(AppDir, RebarConfig),
@@ -221,7 +221,7 @@ test_profile_applied_to_apps(Config) ->
 
     Name = rebar_test_utils:create_random_name("test_profile_applied_to_apps_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
     RebarConfig = [{erl_opts, [{d, some_define}]}],
     rebar_test_utils:create_config(AppDir, RebarConfig),
