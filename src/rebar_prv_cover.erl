@@ -14,7 +14,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, cover).
--define(DEPS, []).
+-define(DEPS, [app_discovery]).
 
 %% ===================================================================
 %% Public API
@@ -136,14 +136,25 @@ import(CoverData) ->
     end.
 
 analysis(State, Task) ->
+    OldPath = code:get_path(),
+    ok = restore_cover_paths(State),
     Mods = cover:imported_modules(),
-    lists:map(
-        fun(Mod) ->
-            {ok, Answer} = cover:analyze(Mod, coverage, line),
-            {ok, File} = analyze_to_file(Mod, State, Task),
-            {Mod, process(Answer), File}
-        end,
-        Mods).
+    Analysis = lists:map(fun(Mod) ->
+                  {ok, Answer} = cover:analyze(Mod, coverage, line),
+                  {ok, File} = analyze_to_file(Mod, State, Task),
+                  {Mod, process(Answer), File}
+              end,
+              Mods),
+    true = code:set_path(OldPath),
+    Analysis.
+
+restore_cover_paths(State) ->
+    lists:foreach(fun(App) ->
+        AppDir = rebar_app_info:out_dir(App),
+        _ = code:add_path(filename:join([AppDir, "ebin"]))
+    end, rebar_state:project_apps(State)),
+    _ = code:add_path(filename:join([rebar_dir:base_dir(State), "ebin"])),
+    ok.
 
 analyze_to_file(Mod, State, Task) ->
     CoverDir = cover_dir(State),
@@ -320,8 +331,7 @@ write_coverdata(State, Task) ->
     ExportFile = filename:join([DataDir, atom_to_list(Task) ++ ".coverdata"]),
     case cover:export(ExportFile) of
         ok ->
-            ?DEBUG("Cover data written to ~p.", [ExportFile]),
-            ok;
+            ?DEBUG("Cover data written to ~p.", [ExportFile]);
         {error, Reason} ->
             ?WARN("Cover data export failed: ~p", [Reason])
     end.
