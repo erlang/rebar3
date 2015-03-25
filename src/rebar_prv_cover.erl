@@ -29,7 +29,8 @@ init(State) ->
                                                                {example, "rebar3 cover"},
                                                                {short_desc, "Perform coverage analysis."},
                                                                {desc, ""},
-                                                               {opts, cover_opts(State)}])),
+                                                               {opts, cover_opts(State)},
+                                                               {profiles, [test]}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
@@ -333,7 +334,8 @@ verbose(State) ->
     end.
 
 cover_dir(State) ->
-    rebar_state:get(State, cover_data_dir, filename:join(["_build", "cover"])).
+    rebar_state:get(State, cover_data_dir, filename:join([rebar_dir:base_dir(State),
+                                                          "cover"])).
 
 cover_opts(_State) ->
     [{reset, $r, "reset", boolean, help(reset)},
