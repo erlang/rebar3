@@ -207,15 +207,17 @@ replace_src_dirs(State) ->
     StrippedOpts = lists:keydelete(src_dirs, 1, ErlOpts),
     rebar_state:set(State, erl_opts, [{src_dirs, ["test"]}|StrippedOpts]).
 
-test_set(Apps, Suites) -> test_set(Apps, Suites, []).
+test_set(Apps, all) -> set_apps(Apps, []);
+test_set(_Apps, Suites) -> set_suites(Suites, []).
 
-test_set([], all, Acc) -> lists:reverse(Acc);
-test_set(_, [], Acc) -> lists:reverse(Acc);
-test_set([App|Rest], all, Acc) ->
+set_apps([], Acc) -> lists:reverse(Acc);
+set_apps([App|Rest], Acc) ->
     AppName = list_to_atom(binary_to_list(rebar_app_info:name(App))),
-    test_set(Rest, all, [{application, AppName}|Acc]);
-test_set(Apps, [Suite|Rest], Acc) ->
-    test_set(Apps, Rest, [{module, list_to_atom(Suite)}|Acc]).
+    set_apps(Rest, [{application, AppName}|Acc]).
+
+set_suites([], Acc) -> lists:reverse(Acc);
+set_suites([Suite|Rest], Acc) ->
+    set_suites(Rest, [{module, list_to_atom(Suite)}|Acc]).
 
 resolve_eunit_opts(State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
@@ -248,3 +250,4 @@ help(app)    -> "List of application test suites to run";
 help(cover)   -> "Generate cover data";
 help(suite)   -> "List of test suites to run";
 help(verbose) -> "Verbose output".
+
