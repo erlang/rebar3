@@ -33,15 +33,24 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     case rebar_state:command_args(State) of
+        ["help"] ->
+            ?CONSOLE("Call `rebar3 new help <template>` for a detailed description~n", []),
+            show_short_templates(rebar_templater:list_templates(State)),
+            {ok, State};
         ["help", TemplateName] ->
             case lists:keyfind(TemplateName, 1, rebar_templater:list_templates(State)) of
-                false -> io:format("template not found.~n");
+                false -> ?CONSOLE("template not found.", []);
                 Term -> show_template(Term)
             end,
             {ok, State};
         [TemplateName | Opts] ->
-            Force = is_forced(State),
-            ok = rebar_templater:new(TemplateName, parse_opts(Opts), Force, State),
+            case lists:keyfind(TemplateName, 1, rebar_templater:list_templates(State)) of
+                false ->
+                    ?CONSOLE("template not found.", []);
+                _ ->
+                    Force = is_forced(State),
+                    ok = rebar_templater:new(TemplateName, parse_opts(Opts), Force, State)
+            end,
             {ok, State};
         [] ->
             show_short_templates(rebar_templater:list_templates(State)),
