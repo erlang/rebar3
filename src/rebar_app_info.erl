@@ -49,7 +49,7 @@
                      app_details=[] :: list(),
                      applications=[] :: list(),
                      deps=[] :: list(),
-                     profiles=[default] :: atom(),
+                     profiles=[default] :: [atom()],
                      dep_level=0 :: integer(),
                      dir :: file:name(),
                      out_dir :: file:name(),

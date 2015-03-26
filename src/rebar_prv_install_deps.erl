@@ -346,7 +346,7 @@ handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
     ,NewLocks}.
 
 -spec handle_dep(rebar_state:t(), file:filename_all(), rebar_app_info:t(), list(), integer()) ->
-                        {rebar_app_info:t(), [rebar_app_info:t()], [pkg_dep()]}.
+                        {rebar_app_info:t(), [rebar_app_info:t()], [pkg_dep()], [integer()]}.
 handle_dep(State, DepsDir, AppInfo, Locks, Level) ->
     Profiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo),
@@ -402,7 +402,7 @@ in_default(AppInfo, State) ->
     DefaultAppDir = filename:join([rebar_state:get(State, base_dir), "default", "lib", Name]),
     rebar_app_discover:find_app(DefaultAppDir, all).
 
--spec parse_deps(binary(), list(), list(), list(), integer()) -> {[rebar_app_info:t()], [pkg_dep()]}.
+-spec parse_deps(binary(), list(), rebar_state:t(), list(), integer()) -> {[rebar_app_info:t()], [pkg_dep()]}.
 parse_deps(DepsDir, Deps, State, Locks, Level) ->
     lists:foldl(fun(Dep, Acc) ->
                         Name = case Dep of

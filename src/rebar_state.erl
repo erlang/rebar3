@@ -41,7 +41,7 @@
 
                   lock                = [],
                   current_profiles    = [default]     :: [atom()],
-                  namespace           = undefined     :: [atom()],
+                  namespace           = undefined     :: atom(),
 
                   command_args        = [],
                   command_parsed_args = [],

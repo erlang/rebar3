@@ -69,7 +69,7 @@ escriptize(State0) ->
                [App] ->
                    App;
                Apps ->
-                   case rebar_state:get(escript_main_app, State0, undefined) of
+                   case rebar_state:get(State0, escript_main_app, undefined) of
                        undefined ->
                            ?PRV_ERROR(no_main_app);
                        Name ->
