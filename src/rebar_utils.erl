@@ -49,7 +49,10 @@
          erl_opts/1,
          indent/1,
          cleanup_code_path/1,
-         args_to_tasks/1]).
+         args_to_tasks/1,
+         expand_env_variable/3,
+         get_arch/0,
+         wordsize/0]).
 
 %% for internal use only
 -export([otp_release/0]).
