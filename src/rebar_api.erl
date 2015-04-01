@@ -5,7 +5,11 @@
 -include_lib("providers/include/providers.hrl").
 -export([abort/0, abort/2,
          console/2,
-         debug/2, info/2, warn/2, error/2]).
+         debug/2, info/2, warn/2, error/2,
+         expand_env_variable/3,
+         get_arch/0,
+         wordsize/0]).
+
 -export_type([rebar_dict/0, rebar_digraph/0]).
 
 %%%%%%%%%%%%%%%%%%%%%%%
@@ -30,3 +34,17 @@ info(Str, Args) -> ?INFO(Str, Args).
 warn(Str, Args) -> ?WARN(Str, Args).
 %% @doc logs with severity `error'
 error(Str, Args) -> ?ERROR(Str, Args).
+
+%%
+%% Given env. variable FOO we want to expand all references to
+%% it in InStr. References can have two forms: $FOO and ${FOO}
+%% The end of form $FOO is delimited with whitespace or eol
+%%
+expand_env_variable(InStr, VarName, RawVarValue) ->
+    rebar_utils:expand_env_variable(InStr, VarName, RawVarValue).
+
+get_arch() ->
+    rebar_utils:get_arch().
+
+wordsize() ->
+    rebar_utils:wordsize().
