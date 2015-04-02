@@ -58,11 +58,11 @@ format_error(Reason) ->
 %% print help/usage string
 %%
 help(State) ->
-    ?CONSOLE("Rebar is a tool for working with Erlang projects.~n~n", []),
+    ?CONSOLE("Rebar3 is a tool for working with Erlang projects.~n~n", []),
     OptSpecList = rebar3:global_option_spec_list(),
     getopt:usage(OptSpecList, "rebar", "", []),
     ?CONSOLE("~nSeveral tasks are available:~n", []),
 
     providers:help(rebar_state:providers(State)),
 
-    ?CONSOLE("~nRun 'rebar help <TASK>' for details.~n~n", []).
+    ?CONSOLE("~nRun 'rebar3 help <TASK>' for details.~n~n", []).
