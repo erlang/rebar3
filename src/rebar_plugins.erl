@@ -61,13 +61,10 @@ validate_plugin(Plugin) ->
         {ok, Providers} ->
             {true, Providers};
         undefined ->
-            Exports = sets:from_list(Plugin:module_info(exports)),
-            Required = sets:from_list([{init,1},
-                                       {do,1},
-                                       {format_error,1}]),
-            case sets:is_subset(Required,  Exports) of
+            Exports = Plugin:module_info(exports),
+            case lists:member({init,1}, Exports) of
                 false ->
-                    ?WARN("Plugin ~p is not a provider. It will not be used.~n", [Plugin]),
+                    ?WARN("Plugin ~p does not export init/1. It will not be used.~n", [Plugin]),
                     false;
                 true ->
                     {true, Plugin}
