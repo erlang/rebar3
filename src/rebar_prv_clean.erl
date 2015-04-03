@@ -37,7 +37,7 @@ do(State) ->
 
     case All of
         true ->
-            DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
+            DepsDir = rebar_dir:deps_dir(State),
             DepApps = rebar_app_discover:find_apps([DepsDir], all);
         false ->
             DepApps = []
