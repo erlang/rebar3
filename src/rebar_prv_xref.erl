@@ -66,7 +66,7 @@ format_error(Reason) ->
 %% ===================================================================
 
 short_desc() ->
-    "Run cross reference analysis".
+    "Run cross reference analysis.".
 
 desc() ->
     io_lib:format(

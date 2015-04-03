@@ -26,8 +26,8 @@ init(State) ->
                                                                {bare, false},
                                                                {deps, ?DEPS},
                                                                {example, "rebar3 wtf \"<task>\""},
-                                                               {short_desc, "Provide a crash report to be sent to the rebar3 issues page"},
-                                                               {desc, "Provide a crash report to be sent to the rebar3 issues page"},
+                                                               {short_desc, "Provide a crash report to be sent to the rebar3 issues page."},
+                                                               {desc, "Provide a crash report to be sent to the rebar3 issues page."},
                                                                {opts, [
                                                                       {task, undefined, undefined, string, "Task to print details for."}
                                                                       ]}])),

@@ -51,7 +51,7 @@ init(State) ->
                                 {deps, ?DEPS},
                                 {example, "rebar3 escriptize"},
                                 {opts, []},
-                                {short_desc, "Generate escript archive"},
+                                {short_desc, "Generate escript archive."},
                                 {desc, desc()}
                                 ]),
     {ok, rebar_state:add_provider(State, Provider)}.

@@ -67,7 +67,7 @@ format_error(Reason) ->
 
 info() ->
     io_lib:format(
-      "Create rebar project based on template and vars.~n"
+      "Create rebar3 project based on template and vars.~n"
       "~n"
       "Valid command line options:~n"
       "  template= [var=foo,...]~n", []).
