@@ -42,13 +42,46 @@ do_tasks([{TaskStr, Args}|Tail], State) ->
     Task = list_to_atom(TaskStr),
     State1 = rebar_state:set(State, task, Task),
     State2 = rebar_state:command_args(State1, Args),
-    case rebar_core:process_command(State2, Task) of
-        {ok, _} ->
-            do_tasks(Tail, State);
-        Error ->
-            Error
+    Namespace = rebar_state:namespace(State2),
+    case Namespace of
+        default ->
+            %% The first task we hit might be a namespace!
+            case maybe_namespace(State2, Task, Args) of
+                {ok, _} ->
+                    do_tasks(Tail, State);
+                {error, Reason} ->
+                    {error, Reason}
+            end;
+        _ ->
+            %% We're already in a non-default namespace, check the
+            %% task directly.
+            case rebar_core:process_command(State2, Task) of
+                {ok, _} ->
+                    do_tasks(Tail, State);
+                {error, Reason} ->
+                    {error, Reason}
+            end
     end.
+
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
+
+maybe_namespace(State, Task, Args) ->
+    case rebar_core:process_namespace(State, Task) of
+        {ok, State2, Task} ->
+            %% The task exists after all.
+            rebar_core:process_command(State2, Task);
+        {ok, State2, do} when Args =/= [] ->
+            %% We are in 'do' so we can't apply it directly.
+            [NewTaskStr | NewArgs] = Args,
+            NewTask = list_to_atom(NewTaskStr),
+            State3 = rebar_state:command_args(State2, NewArgs),
+            rebar_core:process_command(State3, NewTask);
+        {ok, _, _} ->
+            %% No arguments to consider as a command. Woops.
+            {error, io_lib:format("Command ~p not found", [Task])};
+        {error, Reason} ->
+            {error, Reason}
+    end.

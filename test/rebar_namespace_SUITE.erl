@@ -6,7 +6,8 @@
 all() -> [implicit_compile, default_compile, do_compile,
           as_default_compile, as_do_compile,
           notfound, do_notfound, default_notfound, ns_notfound, ns_found,
-          as_ns_invalid].
+          as_ns_invalid,
+          do_ns_chain, do_ns_chain2, do_ns_noarg, do_ns_badcmd].
 
 init_per_testcase(Case, Config0) ->
     Config = rebar_test_utils:init_rebar_state(Config0),
@@ -93,6 +94,41 @@ as_ns_invalid(Config) ->
       {error, "Namespace 'as' is forbidden"}
     ).
 
+do_ns_chain(Config) ->
+    %% `do` is also able to resolve namespaces on
+    %% commands not found
+    Command = ["do", "deps,", "ns", "fake_provider,", "deps"],
+    rebar_test_utils:run_and_check(
+      add_fake_ns_provider(Config), [], Command,
+      {ok, []}
+    ).
+
+do_ns_chain2(Config) ->
+    %% `do` is also able to resolve namespaces on
+    %% commands not found
+    Command = ["do", "ns", "fake_provider,", "deps,", "ns", "fake_provider"],
+    rebar_test_utils:run_and_check(
+      add_fake_ns_provider(Config), [], Command,
+      {ok, []}
+    ).
+
+do_ns_noarg(Config) ->
+    %% `do` is also able to resolve namespaces on
+    %% commands not found
+    Command = ["do", "ns"],
+    rebar_test_utils:run_and_check(
+      add_fake_ns_provider(Config), [], Command,
+      {error, io_lib:format("Command ~p not found", [ns])}
+    ).
+
+do_ns_badcmd(Config) ->
+    %% `do` is also able to resolve namespaces on
+    %% commands not found
+    Command = ["do", "ns", "badcmd"],
+    rebar_test_utils:run_and_check(
+      add_fake_ns_provider(Config), [], Command,
+      {error, io_lib:format("Command ~p not found in namespace ~p", [badcmd, ns])}
+    ).
 
 %%% Helpers %%%
 add_fake_ns_provider(Config) ->
