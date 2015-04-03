@@ -39,7 +39,7 @@ flag_coverdata_written(Config) ->
 
     Name = rebar_test_utils:create_random_name("cover_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
     RebarConfig = [{erl_opts, [{d, some_define}]}],
     rebar_test_utils:run_and_check(Config,
@@ -47,14 +47,14 @@ flag_coverdata_written(Config) ->
                                    ["eunit", "--cover"],
                                    {ok, [{app, Name}]}),
 
-    true = filelib:is_file(filename:join(["_build", "cover", "eunit.coverdata"])).
+    true = filelib:is_file(filename:join([AppDir, "_build", "test", "cover", "eunit.coverdata"])).
 
 config_coverdata_written(Config) ->
     AppDir = ?config(apps, Config),
 
     Name = rebar_test_utils:create_random_name("cover_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
     RebarConfig = [{erl_opts, [{d, some_define}]}, {cover_enabled, true}],
     rebar_test_utils:run_and_check(Config,
@@ -62,14 +62,14 @@ config_coverdata_written(Config) ->
                                    ["eunit"],
                                    {ok, [{app, Name}]}),
 
-    true = filelib:is_file(filename:join(["_build", "cover", "eunit.coverdata"])).
+    true = filelib:is_file(filename:join([AppDir, "_build", "test", "cover", "eunit.coverdata"])).
 
 index_written(Config) ->
     AppDir = ?config(apps, Config),
 
     Name = rebar_test_utils:create_random_name("cover_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
     RebarConfig = [{erl_opts, [{d, some_define}]}],
     rebar_test_utils:run_and_check(Config,
@@ -77,14 +77,14 @@ index_written(Config) ->
                                    ["do", "eunit", "--cover", ",", "cover"],
                                    {ok, [{app, Name}]}),
 
-    true = filelib:is_file(filename:join(["_build", "cover", "index.html"])).
+    true = filelib:is_file(filename:join([AppDir, "_build", "test", "cover", "index.html"])).
 
 config_alt_coverdir(Config) ->
     AppDir = ?config(apps, Config),
 
     Name = rebar_test_utils:create_random_name("cover_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
     CoverDir = filename:join(["coverage", "goes", "here"]),
 
@@ -101,7 +101,7 @@ flag_verbose(Config) ->
 
     Name = rebar_test_utils:create_random_name("cover_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
     RebarConfig = [{erl_opts, [{d, some_define}]}],
     rebar_test_utils:run_and_check(Config,
@@ -109,14 +109,14 @@ flag_verbose(Config) ->
                                    ["do", "eunit", "--cover", ",", "cover", "--verbose"],
                                    {ok, [{app, Name}]}),
 
-    true = filelib:is_file(filename:join(["_build", "cover", "index.html"])).
+    true = filelib:is_file(filename:join([AppDir, "_build", "test", "cover", "index.html"])).
 
 config_verbose(Config) ->
     AppDir = ?config(apps, Config),
 
     Name = rebar_test_utils:create_random_name("cover_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
     RebarConfig = [{erl_opts, [{d, some_define}]}, {cover_print_enabled, true}],
     rebar_test_utils:run_and_check(Config,
@@ -124,4 +124,4 @@ config_verbose(Config) ->
                                    ["do", "eunit", "--cover", ",", "cover"],
                                    {ok, [{app, Name}]}),
 
-    true = filelib:is_file(filename:join(["_build", "cover", "index.html"])).
+    true = filelib:is_file(filename:join([AppDir, "_build", "test", "cover", "index.html"])).
