@@ -57,7 +57,7 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(Config) ->
-    shell(),
+    shell(Config),
     {ok, Config}.
 
 -spec format_error(any()) -> iolist().
@@ -71,7 +71,7 @@ format_error(Reason) ->
 %% it also lacks the ctrl-c interrupt handler that `erl` features. ctrl-c will
 %% immediately kill the script. ctrl-g, however, works fine
 
-shell() ->
+shell(State) ->
     %% scan all processes for any with references to the old user and save them to
     %% update later
     NeedsUpdate = [Pid || Pid <- erlang:processes(),
@@ -92,6 +92,8 @@ shell() ->
     %% times). removes at most the error_logger added by init and the
     %% error_logger added by the tty handler
     ok = remove_error_handler(3),
+    %% add test paths
+    ok = add_test_paths(State),
     %% this call never returns (until user quits shell)
     timer:sleep(infinity).
 
@@ -116,3 +118,13 @@ wait_until_user_started(Timeout) ->
         undefined -> timer:sleep(100), wait_until_user_started(Timeout - 100);
         _ -> ok
     end.
+
+add_test_paths(State) ->
+    lists:foreach(fun(App) ->
+        AppDir = rebar_app_info:out_dir(App),
+        %% ignore errors resulting from non-existent directories
+        _ = code:add_path(filename:join([AppDir, "ebin"])),
+        _ = code:add_path(filename:join([AppDir, "test"]))
+    end, rebar_state:project_apps(State)),
+    _ = code:add_path(filename:join([rebar_dir:base_dir(State), "test"])),
+    ok.

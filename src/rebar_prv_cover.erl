@@ -156,9 +156,10 @@ analysis(State, Task) ->
 restore_cover_paths(State) ->
     lists:foreach(fun(App) ->
         AppDir = rebar_app_info:out_dir(App),
-        _ = code:add_path(filename:join([AppDir, "ebin"]))
+        _ = code:add_path(filename:join([AppDir, "ebin"])),
+        _ = code:add_path(filename:join([AppDir, "test"]))
     end, rebar_state:project_apps(State)),
-    _ = code:add_path(filename:join([rebar_dir:base_dir(State), "ebin"])),
+    _ = code:add_path(filename:join([rebar_dir:base_dir(State), "test"])),
     ok.
 
 analyze_to_file(Mod, State, Task) ->
@@ -290,10 +291,8 @@ filter_checkouts(Apps) -> filter_checkouts(Apps, []).
 
 filter_checkouts([], Acc) -> lists:reverse(Acc);
 filter_checkouts([App|Rest], Acc) ->
-    AppDir = filename:absname(rebar_app_info:dir(App)),
-    CheckoutsDir = filename:absname("_checkouts"),
-    case lists:prefix(CheckoutsDir, AppDir) of
-        true -> filter_checkouts(Rest, Acc);
+    case rebar_app_info:is_checkout(App) of
+        true  -> filter_checkouts(Rest, Acc);
         false -> filter_checkouts(Rest, [App|Acc])
     end.
 
