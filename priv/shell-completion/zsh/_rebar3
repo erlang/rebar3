@@ -208,8 +208,8 @@ _rebar3_tasks() {
 (( $+functions[_rebar3_list_deps] )) ||
 _rebar3_list_deps() {
     local -a cmd packages deps_long
-    deps_long=($PWD/deps/*(/))
-    packages=( ${${deps_long#$PWD/deps/}%-*-*} )
+    deps_long=($PWD/_build/default/lib/*(/))
+    packages=( ${${deps_long#$PWD/_build/default/lib/}%-*-*} )
     compadd "$@" -a packages
 }
 
