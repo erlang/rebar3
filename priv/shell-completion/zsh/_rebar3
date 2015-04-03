@@ -1,0 +1,224 @@
+#compdef rebar3
+
+
+
+_rebar3 () {
+    typeset -A opt_args
+    local curcontext="$curcontext" state line
+
+    local ret=1
+
+    _arguments -C \
+        '1: :_rebar3_tasks' \
+        '*::arg:->args' \
+    && ret=0
+
+    case $state in
+        (args)
+            curcontext="${curcontext%:*:*}:rebar-task-$words[1]:"
+            case $line[1] in
+                (as)
+                    _arguments \
+                        '1:name' \
+                        '2: :_rebar3_tasks' \
+                    && ret=0
+                ;;
+                (clean)
+                    _arguments \
+                        '(-a --all)'{-a,--all}'[Clean all apps include deps.]' \
+                    && ret=0
+                ;;
+                (compile)
+                    _message 'no more arguments' && ret=0
+                ;;
+                (cover)
+                    _arguments \
+                        '(-r --reset)'{-r,--reset}'[Reset all coverdata.]' \
+                        '(-v --verbose)'{-v,--verbose}'[Print coverage analysis.]' \
+                    && ret=0
+                ;;
+                (ct)
+                    _arguments \
+                        '(--dir)--dir[List of additional directories containing test suites]:test directory:_files -/' \
+                        '(--suite)--suite[List of test suites to run]:suites' \
+                        '(--group)--group[List of test groups to run]:groups' \
+                        '(--case)--case[List of test cases to run]:cases' \
+                        '(--spec)--spec[List of test specs to run]:specs' \
+                        '(--join_specs)--join_specs' \
+                        '(--label)--label[Test label]:label' \
+                        '(--config)--config[List of config files]:config files:_files' \
+                        '(--userconfig)--userconfig' \
+                        '(--allow_user_terms)--allow_user_terms' \
+                        '(--logdir)--logdir[Log folder]:log folder:_files -/' \
+                        '(--logopts)--logopts' \
+                        '(--verbosity)--verbosity[Verbosity]:verbosity' \
+                        '(--silent_connections)--silent_connections' \
+                        '(--stylesheet)--stylesheet[Stylesheet to use for test results]:stylesheet:_files' \
+                        '(-c --cover)'{-c,--cover}'[Generate cover data]' \
+                        '(--cover_spec)--cover_spec[Cover file to use]:cover file:_files' \
+                        '(--cover_stop)--cover_stop' \
+                        '(--event_handler)--event_handler[Event handlers to attach to the runner]:event handlers' \
+                        '(--include)--include[Include folder]:include directory:_files -/' \
+                        '(--abort_if_missing_suites)--abort_if_missing_suites[Abort if suites are missing]:abort missing suites:(true false)' \
+                        '(--multiply_timetraps)--multiply_timetraps' \
+                        '(--scale_timetraps)--scale_timetraps' \
+                        '(--create_priv_dir)--create_priv_dir' \
+                        '(--repeat)--repeat[How often to repeat tests]:repeat test count' \
+                        '(--duration)--duration[Max runtime (format: HHMMSS)]:max run time' \
+                        '(--until)--until[Run until (format: HHMMSS)]:run until time' \
+                        '(--force_stop)--force_stop[Force stop after time]' \
+                        '(--basic_html)--basic_html[Show basic HTML]' \
+                        '(--ct_hooks)--ct_hooks:ct hooks' \
+                        '(-v --verbose)'{-v,--verbose}'[Print coverage analysis]' \
+                    && ret=0
+                ;;
+                (dialyzer)
+                    _arguments \
+                        '(-u --update-plt)'{-u, --update-plt}'[Enable updating the PLT.]' \
+                        '(-s --succ-typings)'{-s, --succ-typings}'[Enable success typing analysis.]' \
+                    && ret=0
+                ;;
+                (do)
+                    _message 'rebar do' && ret=0
+                ;;
+                (edoc)
+                    _message 'rebar edoc' && ret=0
+                ;;
+                (escriptize)
+                    _message 'rebar escriptize' && ret=0
+                ;;
+                (eunit)
+                    _arguments \
+                        '(--app)--app[List of application test suites to run]:suites' \
+                        '(--suite)--suite[List of test suites to run]:suites' \
+                        '(-c --cover)'{-c,--cover}'[Generate cover data]' \
+                        '(-v --verbose)'{-v,--verbose}'[Verbose output]' \
+                    && ret=0
+                ;;
+                (help)
+                    _arguments '1: :_rebar3_tasks' && ret=0
+                ;;
+                (new)
+                    _arguments \
+                        '1:type:(app lib release plugin)' \
+                        '2:name:' \
+                        '(-f --force)'{-f,--force}'[ overwrite existing files]' \
+                    && ret=0
+                ;;
+                (pkgs)
+                    _message 'List available packages.' && ret=0
+                ;;
+                (release)
+                    _arguments \
+                        '(-n --relname)'{-n,--relname}'[Specify the name for the release that will be generated.]:relname' \
+                        '(-v --relvsn)'{-n,--relname}'[Specify the  version for the release.]:relvsn' \
+                        '(-g --goal)'{-g,--goal}'[Specify a target constraint on the system. These are usually the OTP.]:goal' \
+                        '(-u --upfrom)'{-u,--upfrom}'[Only valid with relup target, specify the release to upgrade from.]:upfrom' \
+                        '(-o --output-dir)'{-o,--output-dir}'[The output directory for the release. This is ./ by default.]:out directory:_files -/' \
+                        '(-l --lib-dir)'{-l,--output-dir}'[Additional dir that should be searched for OTP Apps]:lib directory:_files -/' \
+                        '(-p --path)'{-p,--path}'[Additional dir to add to the code path]:path directory:_files -/' \
+                        '(--default-libs)--default-libs[Whether to use the default system added lib dirs]:default libs:(true false)' \
+                        '(-V --verbose)'{-V,--verbose}'[Verbosity level, maybe between 0 and 3 ,default: 2]:verbosity level:(0 1 2 3)' \
+                        '(-d --dev-mode)'{-d,--dev-mode}'[Symlink the applications and configuration into the release instead of copying]' \
+                        '(-i --include-erts)'{-i,--dev-mode}'[If true include a copy of erts used to build with, if a path include erts at that path. If false, do not include erts]' \
+                        '(-a --override)'{-a,--override}'[Provide an app name and a directory to override in the form <appname>:<app directory>]:override' \
+                        '(-c --config)'{-c,--config}'[The path to a config file]:config file:_files ' \
+                        '(--overlay_vars)--overlay_vars[Path to a file of overlay variables]:overlay variables file:_files' \
+                        '(--vm_args)--vm_args[Path to a file to use for vm.args]:vm args file:_files' \
+                        '(--sys_config)--sys_config[Path to a file to use for sys.config]:sys config file:_files' \
+                        '(--system_libs)--system_libs[Path to dir of Erlang system libs]:system libs:_files -/' \
+                        '(--version)--version[Print relx version]' \
+                        '(-r --root)'{-r,--root}'[The project root directory]:system libs:_files -/' \
+                    && ret=0
+                ;;
+                (shell)
+                    _message 'Start a shell with project and deps preloaded' && ret=0
+                ;;
+                (tar)
+                    _arguments \
+                        '(-n --relname)'{-n,--relname}'[Specify the name for the release that will be generated.]:relname' \
+                        '(-v --relvsn)'{-n,--relname}'[Specify the  version for the release.]:relvsn' \
+                        '(-g --goal)'{-g,--goal}'[Specify a target constraint on the system. These are usually the OTP.]:goal' \
+                        '(-u --upfrom)'{-u,--upfrom}'[Only valid with relup target, specify the release to upgrade from.]:upfrom' \
+                        '(-o --output-dir)'{-o,--output-dir}'[The output directory for the release. This is ./ by default.]:out directory:_files -/' \
+                        '(-l --lib-dir)'{-l,--output-dir}'[Additional dir that should be searched for OTP Apps]:lib directory:_files -/' \
+                        '(-p --path)'{-p,--path}'[Additional dir to add to the code path]:path directory:_files -/' \
+                        '(--default-libs)--default-libs[Whether to use the default system added lib dirs]:default libs:(true false)' \
+                        '(-V --verbose)'{-V,--verbose}'[Verbosity level, maybe between 0 and 3 ,default: 2]:verbosity level:(0 1 2 3)' \
+                        '(-d --dev-mode)'{-d,--dev-mode}'[Symlink the applications and configuration into the release instead of copying]' \
+                        '(-i --include-erts)'{-i,--dev-mode}'[If true include a copy of erts used to build with, if a path include erts at that path. If false, do not include erts]' \
+                        '(-a --override)'{-a,--override}'[Provide an app name and a directory to override in the form <appname>:<app directory>]:override' \
+                        '(-c --config)'{-c,--config}'[The path to a config file]:config file:_files ' \
+                        '(--overlay_vars)--overlay_vars[Path to a file of overlay variables]:overlay variables file:_files' \
+                        '(--vm_args)--vm_args[Path to a file to use for vm.args]:vm args file:_files' \
+                        '(--sys_config)--sys_config[Path to a file to use for sys.config]:sys config file:_files' \
+                        '(--system_libs)--system_libs[Path to dir of Erlang system libs]:system libs:_files -/' \
+                        '(--version)--version[Print relx version]' \
+                        '(-r --root)'{-r,--root}'[The project root directory]:system libs:_files -/' \
+                    && ret=0
+                ;;
+                (update)
+                    _message 'rebar update' && ret=0
+                ;;
+                (upgrade)
+                    _arguments \
+                        '*: :_rebar3_list_deps' \
+                    && ret=0
+                ;;
+                (version)
+                    _message 'rebar version' && ret=0
+                ;;
+                (wtf)
+                    _arguments '1: :_rebar3_tasks' && ret=0
+                ;;
+                (xref)
+                    _message 'rebar xref' && ret=0
+            esac
+    esac
+}
+
+(( $+functions[_rebar3_tasks] )) ||
+_rebar3_tasks() {
+    local tasks; tasks=(
+        'as:Higher order provider for running multiple tasks in a sequence as a certain profiles.'
+        'clean:Remove compiled beam files from apps.'
+        'compile:Compile apps .app.src and .erl files.'
+        'cover:Perform coverage analysis.'
+        'ct:Run Common Tests.'
+        'dialyzer:Run the Dialyzer analyzer on the project.'
+        'do:Higher order provider for running multiple tasks in a sequence.'
+        'edoc:Generate documentation using edoc.'
+        'escriptize:Generate escript archive.'
+        'eunit:Run EUnit Tests.'
+        'help:Display a list of tasks or help for a given task or subtask.'
+        'new:Create new project from templates.'
+        'pkgs:List available packages.'
+        'release:Build release of project.'
+        'shell:Run shell with project apps and deps in path.'
+        'tar:Tar archive of release built of project.'
+        'update:Update package index.'
+        'upgrade:Upgrade dependencies.'
+        'version:Print version for rebar and current Erlang.'
+        'wtf:Provide a crash report to be sent to the rebar3 issues page.'
+        'xref:Run cross reference analysis.'
+    )
+    _describe -t tasks 'rebar3 tasks' tasks "$@"
+}
+
+(( $+functions[_rebar3_list_deps] )) ||
+_rebar3_list_deps() {
+    local -a cmd packages deps_long
+    deps_long=($PWD/deps/*(/))
+    packages=( ${${deps_long#$PWD/deps/}%-*-*} )
+    compadd "$@" -a packages
+}
+
+_rebar3 "$@"
+
+# Local variables:
+# mode: shell-script
+# sh-basic-offset: 2
+# sh-indent-comment: t
+# indent-tabs-mode: nil
+# End:
+# ex: sw=2 ts=2 et filetype=sh
