@@ -510,12 +510,12 @@ fetch_app(AppInfo, AppDir, State) ->
             Result
     end.
 
-maybe_upgrade(AppInfo, AppDir, false, _State) ->
+maybe_upgrade(AppInfo, AppDir, false, State) ->
     Source = rebar_app_info:source(AppInfo),
-    rebar_fetch:needs_update(AppDir, Source);
+    rebar_fetch:needs_update(AppDir, Source, State);
 maybe_upgrade(AppInfo, AppDir, true, State) ->
     Source = rebar_app_info:source(AppInfo),
-    case rebar_fetch:needs_update(AppDir, Source) of
+    case rebar_fetch:needs_update(AppDir, Source, State) of
         true ->
             ?INFO("Updating ~s", [rebar_app_info:name(AppInfo)]),
             case rebar_fetch:download_source(AppDir, Source, State) of
