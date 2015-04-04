@@ -27,7 +27,7 @@ init(State) ->
                                                                {deps, ?DEPS},
                                                                {example, "rebar3 do <task1>, <task2>, ..."},
                                                                {short_desc, "Higher order provider for running multiple tasks in a sequence."},
-                                                               {desc, ""},
+                                                               {desc, "Higher order provider for running multiple tasks in a sequence."},
                                                                {opts, []}])),
     {ok, State1}.
 

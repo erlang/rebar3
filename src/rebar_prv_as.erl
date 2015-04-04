@@ -26,7 +26,7 @@ init(State) ->
                                                                {deps, ?DEPS},
                                                                {example, "rebar3 as <profile1>,<profile2>,... <task1>, <task2>, ..."},
                                                                {short_desc, "Higher order provider for running multiple tasks in a sequence as a certain profiles."},
-                                                               {desc, ""},
+                                                               {desc, "Higher order provider for running multiple tasks in a sequence as a certain profiles."},
                                                                {opts, [{profile, undefined, undefined, string, "Profiles to run as."}]}])),
     {ok, State1}.
 

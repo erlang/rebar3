@@ -26,7 +26,7 @@ init(State) ->
                                                                {deps, ?DEPS},
                                                                {example, "rebar3 tar"},
                                                                {short_desc, "Tar archive of release built of project."},
-                                                               {desc, ""},
+                                                               {desc, "Tar archive of release built of project."},
                                                                {opts, relx:opt_spec_list()}])),
     {ok, State1}.
 

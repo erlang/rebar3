@@ -29,7 +29,7 @@ init(State) ->
                                                                {deps, ?DEPS},
                                                                {example, "rebar3 cover"},
                                                                {short_desc, "Perform coverage analysis."},
-                                                               {desc, ""},
+                                                               {desc, "Perform coverage analysis."},
                                                                {opts, cover_opts(State)},
                                                                {profiles, [test]}])),
     {ok, State1}.

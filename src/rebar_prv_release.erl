@@ -26,7 +26,7 @@ init(State) ->
                                                                {deps, ?DEPS},
                                                                {example, "rebar3 release"},
                                                                {short_desc, "Build release of project."},
-                                                               {desc, ""},
+                                                               {desc, "Build release of project."},
                                                                {opts, relx:opt_spec_list()}])),
     {ok, State1}.
 

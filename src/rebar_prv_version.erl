@@ -26,7 +26,7 @@ init(State) ->
                                                                {deps, ?DEPS},
                                                                {example, "rebar3 version"},
                                                                {short_desc, "Print version for rebar and current Erlang."},
-                                                               {desc, ""},
+                                                               {desc, "Print version for rebar and current Erlang."},
                                                                {opts, []}])),
 
     {ok, State1}.
