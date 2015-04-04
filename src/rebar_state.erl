@@ -30,6 +30,7 @@
          overrides/1, overrides/2,
          apply_overrides/2,
 
+         resources/1, resources/2, add_resource/2,
          providers/1, providers/2, add_provider/2]).
 
 -include("rebar.hrl").
@@ -51,6 +52,7 @@
                   all_deps            = []          :: [rebar_app_info:t()],
 
                   overrides           = [],
+                  resources           = [],
                   providers           = []}).
 
 -export_type([t/0]).
@@ -296,6 +298,16 @@ namespace(#state_t{namespace=Namespace}) ->
 namespace(State=#state_t{}, Namespace) ->
     State#state_t{namespace=Namespace}.
 
+resources(#state_t{resources=Resources}) ->
+    Resources.
+
+resources(State, NewResources) ->
+    State#state_t{resources=NewResources}.
+
+-spec add_resource(t(), rebar_resource:resource()) -> t().
+add_resource(State=#state_t{resources=Resources}, Resource) ->
+    State#state_t{resources=[Resource | Resources]}.
+
 providers(#state_t{providers=Providers}) ->
     Providers.
 
@@ -425,4 +437,3 @@ umerge([], Olds, Merged, CmpMerged, Cmp) when CmpMerged == Cmp ->
     lists:reverse(Olds, Merged);
 umerge([], Olds, Merged, _CmpMerged, Cmp) ->
     lists:reverse(Olds, [Cmp | Merged]).
-

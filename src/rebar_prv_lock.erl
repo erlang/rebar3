@@ -37,7 +37,7 @@ do(State) ->
                  %% If source is tuple it is a source dep
                  %% e.g. {git, "git://github.com/ninenines/cowboy.git", "master"}
                  {rebar_app_info:name(Dep)
-                 ,rebar_fetch:lock_source(Dir, Source)
+                 ,rebar_fetch:lock_source(Dir, Source, State)
                  ,rebar_app_info:dep_level(Dep)}
              end || Dep <- AllDeps, not(rebar_app_info:is_checkout(Dep))],
     Dir = rebar_state:dir(State),
