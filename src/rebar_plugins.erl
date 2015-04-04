@@ -12,17 +12,28 @@
 %% ===================================================================
 
 install(State) ->
+    DepsDir = rebar_dir:deps_dir(State),
     %% Set deps_dir to a different dir for plugin so they don't collide
     OldDepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
     State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
-    DepsDir = rebar_dir:deps_dir(State1),
-    expand_plugins(DepsDir),
     Plugins = rebar_state:get(State1, plugins, []),
+
+    ProjectApps = rebar_state:project_apps(State),
+    DepApps = rebar_app_discover:find_apps([DepsDir], all),
+
+    OtherPlugins = lists:flatmap(fun(App) ->
+                                         AppDir = rebar_app_info:dir(App),
+                                         C = rebar_config:consult(AppDir),
+                                         S = rebar_state:new(rebar_state:new(), C, AppDir),
+                                         rebar_state:get(S, plugins, [])
+                                 end, ProjectApps++DepApps),
+
     PluginProviders = lists:flatten(rebar_utils:filtermap(fun(Plugin) ->
                                                                   handle_plugin(Plugin, State1)
-                                                          end, Plugins)),
+                                                          end, Plugins++OtherPlugins)),
 
     State2 = rebar_state:set(State1, deps_dir, OldDepsDir),
+
     {ok, PluginProviders, State2}.
 
 -spec handle_plugin(rebar_prv_install_deps:dep(), rebar_state:t()) -> {true, any()} | false.
@@ -37,7 +48,7 @@ handle_plugin(Plugin, State) ->
     catch
         C:T ->
             ?DEBUG("~p ~p", [C, T]),
-            ?WARN("Plugin ~p not available. It will not be used.~n", [Plugin]),
+            ?WARN("Plugin ~p not available. It will not be used.", [Plugin]),
             false
     end.
 
@@ -56,7 +67,7 @@ plugin_providers(Plugin) when is_atom(Plugin) ->
     validate_plugin(Plugin).
 
 validate_plugin(Plugin) ->
-    ok = application:load(Plugin),
+    _ = application:load(Plugin),
     case application:get_env(Plugin, providers) of
         {ok, Providers} ->
             {true, Providers};
@@ -64,13 +75,9 @@ validate_plugin(Plugin) ->
             Exports = Plugin:module_info(exports),
             case lists:member({init,1}, Exports) of
                 false ->
-                    ?WARN("Plugin ~p does not export init/1. It will not be used.~n", [Plugin]),
+                    ?WARN("Plugin ~p does not export init/1. It will not be used.", [Plugin]),
                     false;
                 true ->
                     {true, Plugin}
             end
     end.
-
-expand_plugins(Dir) ->
-    Apps = filelib:wildcard(filename:join([Dir, "*", "ebin"])),
-    ok = code:add_pathsa(Apps).

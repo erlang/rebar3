@@ -85,7 +85,10 @@ do(State) ->
             no_cycle ->
                 case compile_order(Source, ProjectApps) of
                     {ok, ToCompile} ->
-                        {ok, rebar_state:deps_to_build(State1, ToCompile)};
+                        %% Deps may have plugins to install. Find and intall here.
+                        {ok, PluginProviders, State2} = rebar_plugins:install(State1),
+                        State3 = rebar_state:create_logic_providers(PluginProviders, State2),
+                        {ok, rebar_state:deps_to_build(State3, ToCompile)};
                     {error, Error} ->
                         {error, Error}
                 end

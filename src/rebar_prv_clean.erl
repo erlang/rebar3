@@ -32,6 +32,7 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    Providers = rebar_state:providers(State),
     ProjectApps = rebar_state:project_apps(State),
     {all, All} = handle_args(State),
 
@@ -46,12 +47,12 @@ do(State) ->
     %% Need to allow global config vars used on deps
     %% Right now no way to differeniate and just give deps a new state
     EmptyState = rebar_state:new(),
-    clean_apps(EmptyState, DepApps),
+    clean_apps(EmptyState, Providers, DepApps),
 
     Cwd = rebar_dir:get_cwd(),
-    rebar_hooks:run_compile_hooks(Cwd, pre_hooks, clean, State),
-    clean_apps(State, ProjectApps),
-    rebar_hooks:run_compile_hooks(Cwd, post_hooks, clean, State),
+    rebar_hooks:run_all_hooks(Cwd, pre, clean, Providers, State),
+    clean_apps(State, Providers, ProjectApps),
+    rebar_hooks:run_all_hooks(Cwd, post, clean, Providers, State),
 
     {ok, State}.
 
@@ -63,7 +64,7 @@ format_error(Reason) ->
 %% Internal functions
 %% ===================================================================
 
-clean_apps(State, Apps) ->
+clean_apps(State, Providers, Apps) ->
     lists:foreach(fun(AppInfo) ->
                           AppDir = rebar_app_info:dir(AppInfo),
                           C = rebar_config:consult(AppDir),
@@ -71,9 +72,9 @@ clean_apps(State, Apps) ->
 
                           ?INFO("Cleaning out ~s...", [rebar_app_info:name(AppInfo)]),
                           %% Legacy hook support
-                          rebar_hooks:run_compile_hooks(AppDir, pre_hooks, clean, S),
+                          rebar_hooks:run_all_hooks(AppDir, pre, clean, Providers, S),
                           rebar_erlc_compiler:clean(State, rebar_app_info:out_dir(AppInfo)),
-                          rebar_hooks:run_compile_hooks(AppDir, post_hooks, clean, S)
+                          rebar_hooks:run_all_hooks(AppDir, post, clean, Providers, S)
                   end, Apps).
 
 handle_args(State) ->
