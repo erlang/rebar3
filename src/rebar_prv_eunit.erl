@@ -37,7 +37,7 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     ?INFO("Performing EUnit tests...", []),
-    %% Run ct provider prehooks
+    %% Run eunit provider prehooks
     Providers = rebar_state:providers(State),
     Cwd = rebar_dir:get_cwd(),
     rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
@@ -45,7 +45,7 @@ do(State) ->
     case prepare_tests(State) of
         {ok, Tests} ->
             {ok, State1} = do_tests(State, Tests),
-            %% Run ct provider posthooks
+            %% Run eunit provider posthooks
             rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State1),
             {ok, State1};
         Error ->
