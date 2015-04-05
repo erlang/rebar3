@@ -36,7 +36,7 @@ do(State) ->
     Deps = rebar_state:deps_to_build(State),
     Cwd = rebar_dir:get_cwd(),
 
-    rebar_hooks:run_all_hooks(Cwd, pre, compile, Providers, State),
+    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
     %% Need to allow global config vars used on deps
     %% Right now no way to differeniate and just give deps a new state
@@ -48,7 +48,7 @@ do(State) ->
     State2 = rebar_state:set(rebar_state:set(State, post_hooks, []), pre_hooks, []),
     ProjectApps1 = build_apps(State2, Providers, ProjectApps),
 
-    rebar_hooks:run_all_hooks(Cwd, post, compile, Providers, State),
+    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State),
 
     {ok, rebar_state:project_apps(State, ProjectApps1)}.
 
@@ -75,9 +75,9 @@ build_app(State, Providers, AppInfo) ->
 
     %% Legacy hook support
 
-    rebar_hooks:run_all_hooks(AppDir, pre, compile,  Providers, S),
+    rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, S),
     AppInfo1 = compile(S, AppInfo),
-    rebar_hooks:run_all_hooks(AppDir, post, compile, Providers, S),
+    rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, S),
 
     true = code:add_patha(rebar_app_info:ebin_dir(AppInfo1)),
     AppInfo1.

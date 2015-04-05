@@ -50,9 +50,9 @@ do(State) ->
     clean_apps(EmptyState, Providers, DepApps),
 
     Cwd = rebar_dir:get_cwd(),
-    rebar_hooks:run_all_hooks(Cwd, pre, clean, Providers, State),
+    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
     clean_apps(State, Providers, ProjectApps),
-    rebar_hooks:run_all_hooks(Cwd, post, clean, Providers, State),
+    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State),
 
     {ok, State}.
 
@@ -72,9 +72,9 @@ clean_apps(State, Providers, Apps) ->
 
                           ?INFO("Cleaning out ~s...", [rebar_app_info:name(AppInfo)]),
                           %% Legacy hook support
-                          rebar_hooks:run_all_hooks(AppDir, pre, clean, Providers, S),
+                          rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER, Providers, S),
                           rebar_erlc_compiler:clean(State, rebar_app_info:out_dir(AppInfo)),
-                          rebar_hooks:run_all_hooks(AppDir, post, clean, Providers, S)
+                          rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, S)
                   end, Apps).
 
 handle_args(State) ->
