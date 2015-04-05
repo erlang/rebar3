@@ -85,7 +85,10 @@ do(State) ->
             no_cycle ->
                 case compile_order(Source, ProjectApps) of
                     {ok, ToCompile} ->
-                        {ok, rebar_state:deps_to_build(State1, ToCompile)};
+                        %% Deps may have plugins to install. Find and intall here.
+                        {ok, PluginProviders, State2} = rebar_plugins:install(State1),
+                        State3 = rebar_state:create_logic_providers(PluginProviders, State2),
+                        {ok, rebar_state:deps_to_build(State3, ToCompile)};
                     {error, Error} ->
                         {error, Error}
                 end
@@ -507,12 +510,12 @@ fetch_app(AppInfo, AppDir, State) ->
             Result
     end.
 
-maybe_upgrade(AppInfo, AppDir, false, _State) ->
+maybe_upgrade(AppInfo, AppDir, false, State) ->
     Source = rebar_app_info:source(AppInfo),
-    rebar_fetch:needs_update(AppDir, Source);
+    rebar_fetch:needs_update(AppDir, Source, State);
 maybe_upgrade(AppInfo, AppDir, true, State) ->
     Source = rebar_app_info:source(AppInfo),
-    case rebar_fetch:needs_update(AppDir, Source) of
+    case rebar_fetch:needs_update(AppDir, Source, State) of
         true ->
             ?INFO("Updating ~s", [rebar_app_info:name(AppInfo)]),
             case rebar_fetch:download_source(AppDir, Source, State) of
