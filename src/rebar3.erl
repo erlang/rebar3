@@ -156,9 +156,8 @@ init_config() ->
                 true ->
                     ?DEBUG("Load global config file ~p",
                            [GlobalConfigFile]),
-                    GlobalConfig = rebar_state:new(global, rebar_config:consult_file(GlobalConfigFile)),
-                    GlobalConfig1 = rebar_plugins:install(GlobalConfig),
-                    rebar_state:new(GlobalConfig1, Config1);
+                    GlobalConfig = rebar_state:new(rebar_config:consult_file(GlobalConfigFile)),
+                    rebar_state:new(GlobalConfig, Config1);
                 false ->
                     rebar_state:new(Config1)
             end,
