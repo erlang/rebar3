@@ -320,61 +320,24 @@ add_provider(State=#state_t{providers=Providers}, Provider) ->
 
 create_logic_providers(ProviderModules, State0) ->
     try
-        State1 = lists:foldl(fun(ProviderMod, StateAcc) ->
-                                     case providers:new(ProviderMod, StateAcc) of
-                                         {error, Reason} ->
-                                             ?ERROR(Reason++"~n", []),
-                                             StateAcc;
-                                         {ok, StateAcc1} ->
-                                             StateAcc1
-                                     end
-                             end, State0, ProviderModules),
-        apply_hooks(State1)
+        lists:foldl(fun(ProviderMod, StateAcc) ->
+                            case providers:new(ProviderMod, StateAcc) of
+                                {error, Reason} ->
+                                    ?ERROR(Reason++"~n", []),
+                                    StateAcc;
+                                {ok, StateAcc1} ->
+                                    StateAcc1
+                            end
+                    end, State0, ProviderModules)
     catch
         C:T ->
             ?DEBUG("~p: ~p ~p", [C, T, erlang:get_stacktrace()]),
             throw({error, "Failed creating providers. Run with DEBUG=1 for stacktrace."})
     end.
 
-apply_hooks(State0) ->
-    try
-        Hooks = rebar_state:get(State0, provider_hooks, []),
-        PreHooks = proplists:get_value(pre, Hooks, []),
-        PostHooks = proplists:get_value(post, Hooks, []),
-        State1 = lists:foldl(fun({Target, Hook}, StateAcc) ->
-                                     prepend_hook(StateAcc, Target, Hook)
-                             end, State0, PreHooks),
-        lists:foldl(fun({Target, Hook}, StateAcc) ->
-                            append_hook(StateAcc, Target, Hook)
-                    end, State1, PostHooks)
-    catch
-        C:T ->
-            ?DEBUG("~p: ~p ~p", [C, T, erlang:get_stacktrace()]),
-            throw({error, "Failed parsing provider hooks. Run with DEBUG=1 for stacktrace."})
-    end.
-
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
-
-prepend_hook(State=#state_t{providers=Providers}, Target, Hook) ->
-    State#state_t{providers=add_hook(pre, Providers, Target, Hook)}.
-
-append_hook(State=#state_t{providers=Providers}, Target, Hook) ->
-    State#state_t{providers=add_hook(post, Providers, Target, Hook)}.
-
-add_hook(Which, Providers, Target, Hook) ->
-    Provider = providers:get_provider(Target, Providers),
-    Hooks = providers:hooks(Provider),
-    NewHooks = add_hook(Which, Hooks, Hook),
-    NewProvider = providers:hooks(Provider, NewHooks),
-    [NewProvider | lists:delete(Provider, Providers)].
-
-add_hook(pre, {PreHooks, PostHooks}, Hook) ->
-    {[Hook | PreHooks], PostHooks};
-add_hook(post, {PreHooks, PostHooks}, Hook) ->
-    {PreHooks, [Hook | PostHooks]}.
-
 
 %% Sort the list in proplist-order, meaning that `{a,b}' and `{a,c}'
 %% both compare as usual, and `a' and `b' do the same, but `a' and `{a,b}' will
