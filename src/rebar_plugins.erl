@@ -13,18 +13,16 @@
 
 -spec install(rebar_state:t()) -> rebar_state:t().
 install(State) ->
-    DepsDir = rebar_dir:deps_dir(State),
     Plugins = rebar_state:get(State, plugins, []),
 
     ProjectApps = rebar_state:project_apps(State),
-    DepApps = rebar_app_discover:find_apps([DepsDir], all),
 
     OtherPlugins = lists:flatmap(fun(App) ->
                                          AppDir = rebar_app_info:dir(App),
                                          C = rebar_config:consult(AppDir),
                                          S = rebar_state:new(rebar_state:new(), C, AppDir),
                                          rebar_state:get(S, plugins, [])
-                                 end, ProjectApps++DepApps),
+                                 end, ProjectApps),
 
     handle_plugins(Plugins++OtherPlugins, State).
 
