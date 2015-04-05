@@ -7,30 +7,28 @@
 %% -------------------------------------------------------------------
 -module(rebar_fetch).
 
--export([lock_source/2,
+-export([lock_source/3,
          download_source/3,
-         needs_update/2]).
+         needs_update/3]).
 
 -export([format_error/1]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
-%% map short versions of resources to module names
--define(RESOURCES, [{git, rebar_git_resource}, {pkg, rebar_pkg_resource},
-                    {hg, rebar_hg_resource}]).
-
--spec lock_source(file:filename_all(), rebar_resource:resource()) ->
+-spec lock_source(file:filename_all(), rebar_resource:resource(), rebar_state:t()) ->
                          rebar_resource:resource() | {error, string()}.
-lock_source(AppDir, Source) ->
-    Module = get_resource_type(Source),
+lock_source(AppDir, Source, State) ->
+    Resources = rebar_state:resources(State),
+    Module = get_resource_type(Source, Resources),
     Module:lock(AppDir, Source).
 
 -spec download_source(file:filename_all(), rebar_resource:resource(), rebar_state:t()) ->
                              true | {error, any()}.
 download_source(AppDir, Source, State) ->
     try
-        Module = get_resource_type(Source),
+        Resources = rebar_state:resources(State),
+        Module = get_resource_type(Source, Resources),
         TmpDir = ec_file:insecure_mkdtemp(),
         AppDir1 = ec_cnv:to_list(AppDir),
         case Module:download(TmpDir, Source, State) of
@@ -64,9 +62,10 @@ download_source(AppDir, Source, State) ->
             throw(?PRV_ERROR({fetch_fail, Source}))
     end.
 
--spec needs_update(file:filename_all(), rebar_resource:resource()) -> boolean() | {error, string()}.
-needs_update(AppDir, Source) ->
-    Module = get_resource_type(Source),
+-spec needs_update(file:filename_all(), rebar_resource:resource(), rebar_state:t()) -> boolean() | {error, string()}.
+needs_update(AppDir, Source, State) ->
+    Resources = rebar_state:resources(State),
+    Module = get_resource_type(Source, Resources),
     try
         Module:needs_update(AppDir, Source)
     catch
@@ -77,17 +76,17 @@ needs_update(AppDir, Source) ->
 format_error({fetch_fail, Source}) ->
     io_lib:format("Failed to fetch and copy dep: ~p", [Source]).
 
-get_resource_type({Type, Location}) ->
-    find_resource_module(Type, Location);
-get_resource_type({Type, Location, _}) ->
-    find_resource_module(Type, Location);
-get_resource_type({Type, _, _, Location}) ->
-    find_resource_module(Type, Location);
-get_resource_type(_) ->
+get_resource_type({Type, Location}, Resources) ->
+    find_resource_module(Type, Location, Resources);
+get_resource_type({Type, Location, _}, Resources) ->
+    find_resource_module(Type, Location, Resources);
+get_resource_type({Type, _, _, Location}, Resources) ->
+    find_resource_module(Type, Location, Resources);
+get_resource_type(_, _) ->
     rebar_pkg_resource.
 
-find_resource_module(Type, Location) ->
-    case lists:keyfind(Type, 1, ?RESOURCES) of
+find_resource_module(Type, Location, Resources) ->
+    case lists:keyfind(Type, 1, Resources) of
         false ->
             case code:which(Type) of
                 non_existing ->
