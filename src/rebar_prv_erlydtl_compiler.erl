@@ -119,7 +119,7 @@ init(State) ->
                                                                {deps, ?DEPS},
                                                                {example, "rebar3 erlydtl compile"},
                                                                {short_desc, "Compile erlydtl templates."},
-                                                               {desc, ""},
+                                                               {desc, "Compile erlydtl templates."},
                                                                {opts, []}])),
     {ok, State1}.
 

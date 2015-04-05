@@ -28,7 +28,7 @@ init(State) ->
                                  {bare, false},
                                  {example, "rebar3 ct"},
                                  {short_desc, "Run Common Tests."},
-                                 {desc, ""},
+                                 {desc, "Run Common Tests."},
                                  {opts, ct_opts(State)},
                                  {profiles, [test]}]),
     State1 = rebar_state:add_provider(State, Provider),

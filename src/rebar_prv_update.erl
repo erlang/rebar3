@@ -27,7 +27,7 @@ init(State) ->
                                                                {deps, ?DEPS},
                                                                {example, "rebar3 update"},
                                                                {short_desc, "Update package index."},
-                                                               {desc, ""},
+                                                               {desc, "Update package index."},
                                                                {opts, []}])),
     {ok, State1}.
 

@@ -23,7 +23,7 @@ init(State) ->
                                                                {deps, ?DEPS},
                                                                {example, "rebar3 edoc"},
                                                                {short_desc, "Generate documentation using edoc."},
-                                                               {desc, ""},
+                                                               {desc, "Generate documentation using edoc."},
                                                                {opts, []}])),
     {ok, State1}.
 

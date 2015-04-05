@@ -34,20 +34,14 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    {Args, _} = rebar_state:command_parsed_args(State),
-    case proplists:get_value(help_task, Args, undefined) of
-        undefined ->
+    case rebar_state:command_args(State) of
+        [] ->
             help(State),
             {ok, State};
-        Name ->
-            Providers = rebar_state:providers(State),
-            case providers:get_provider(list_to_atom(Name), Providers) of
-                not_found ->
-                    {error, io_lib:format("Unknown task ~s", [Name])};
-                Provider ->
-                    providers:help(Provider),
-                    {ok, State}
-            end
+        [Name] -> % default namespace
+            task_help(default, list_to_atom(Name), State);
+        [Namespace, Name] ->
+            task_help(list_to_atom(Namespace), list_to_atom(Name), State)
     end.
 
 -spec format_error(any()) -> iolist().
@@ -66,3 +60,13 @@ help(State) ->
     providers:help(rebar_state:providers(State)),
 
     ?CONSOLE("~nRun 'rebar3 help <TASK>' for details.~n~n", []).
+
+task_help(Namespace, Name, State) ->
+    Providers = rebar_state:providers(State),
+    case providers:get_provider(Name, Providers, Namespace) of
+        not_found ->
+            {error, io_lib:format("Unknown task ~p", [Name])};
+        Provider ->
+            providers:help(Provider),
+            {ok, State}
+    end.
