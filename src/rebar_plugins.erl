@@ -3,7 +3,7 @@
 
 -module(rebar_plugins).
 
--export([install/1]).
+-export([install/1, handle_plugins/2]).
 
 -include("rebar.hrl").
 
@@ -11,12 +11,10 @@
 %% Public API
 %% ===================================================================
 
+-spec install(rebar_state:t()) -> rebar_state:t().
 install(State) ->
     DepsDir = rebar_dir:deps_dir(State),
-    %% Set deps_dir to a different dir for plugin so they don't collide
-    OldDepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
-    State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
-    Plugins = rebar_state:get(State1, plugins, []),
+    Plugins = rebar_state:get(State, plugins, []),
 
     ProjectApps = rebar_state:project_apps(State),
     DepApps = rebar_app_discover:find_apps([DepsDir], all),
@@ -28,20 +26,22 @@ install(State) ->
                                          rebar_state:get(S, plugins, [])
                                  end, ProjectApps++DepApps),
 
-    PluginProviders = lists:flatten(rebar_utils:filtermap(fun(Plugin) ->
-                                                                  handle_plugin(Plugin, State1)
-                                                          end, Plugins++OtherPlugins)),
+    handle_plugins(Plugins++OtherPlugins, State).
 
-    State2 = rebar_state:set(State1, deps_dir, OldDepsDir),
+-spec handle_plugins([rebar_prv_install_deps:dep()], rebar_state:t()) -> rebar_state:t().
+handle_plugins(Plugins, State) ->
+    PluginProviders = lists:flatmap(fun(Plugin) ->
+                                            handle_plugin(Plugin, State)
+                                    end, Plugins),
+    rebar_state:create_logic_providers(PluginProviders, State).
 
-    {ok, PluginProviders, State2}.
-
--spec handle_plugin(rebar_prv_install_deps:dep(), rebar_state:t()) -> {true, any()} | false.
 handle_plugin(Plugin, State) ->
     try
-        {ok, _, State1} = rebar_prv_install_deps:handle_deps(default, State, [Plugin]),
+        %% Set deps dir to plugins dir so apps are installed there
+        State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
+        {ok, _, State2} = rebar_prv_install_deps:handle_deps(default, State1, [Plugin]),
 
-        Apps = rebar_state:all_deps(State1),
+        Apps = rebar_state:all_deps(State2),
         ToBuild = lists:dropwhile(fun rebar_app_info:valid/1, Apps),
         [build_plugin(AppInfo) || AppInfo <- ToBuild],
         plugin_providers(Plugin)
@@ -49,7 +49,7 @@ handle_plugin(Plugin, State) ->
         C:T ->
             ?DEBUG("~p ~p", [C, T]),
             ?WARN("Plugin ~p not available. It will not be used.", [Plugin]),
-            false
+            []
     end.
 
 build_plugin(AppInfo) ->
@@ -70,14 +70,14 @@ validate_plugin(Plugin) ->
     _ = application:load(Plugin),
     case application:get_env(Plugin, providers) of
         {ok, Providers} ->
-            {true, Providers};
+            Providers;
         undefined ->
             Exports = Plugin:module_info(exports),
             case lists:member({init,1}, Exports) of
                 false ->
                     ?WARN("Plugin ~p does not export init/1. It will not be used.", [Plugin]),
-                    false;
+                    [];
                 true ->
-                    {true, Plugin}
+                    [Plugin]
             end
     end.

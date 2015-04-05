@@ -77,7 +77,7 @@ run(BaseState, Commands) ->
     _ = application:load(rebar),
     BaseState1 = rebar_state:set(BaseState, task, Commands),
     BaseState2 = rebar_state:set(BaseState1, caller, api),
-    run_aux(BaseState2, [], Commands).
+    run_aux(BaseState2, Commands).
 
 %% ====================================================================
 %% Internal functions
@@ -86,7 +86,7 @@ run(BaseState, Commands) ->
 run(RawArgs) ->
     _ = application:load(rebar),
 
-    {GlobalPluginProviders, BaseState} = init_config(),
+    BaseState = init_config(),
     BaseState1 = rebar_state:set(BaseState, caller, command_line),
 
     case erlang:system_info(version) of
@@ -98,9 +98,9 @@ run(RawArgs) ->
     end,
 
     {BaseState2, _Args1} = set_options(BaseState1, {[], []}),
-    run_aux(BaseState2, GlobalPluginProviders, RawArgs).
+    run_aux(BaseState2, RawArgs).
 
-run_aux(State, GlobalPluginProviders, RawArgs) ->
+run_aux(State, RawArgs) ->
     %% Make sure crypto is running
     case crypto:start() of
         ok -> ok;
@@ -126,11 +126,10 @@ run_aux(State, GlobalPluginProviders, RawArgs) ->
     {ok, Providers} = application:get_env(rebar, providers),
     {ok, Resources} = application:get_env(rebar, resources),
     State4 = rebar_state:resources(State3, Resources),
-    {ok, PluginProviders, State5} = rebar_plugins:install(State4),
+    State5 = rebar_plugins:install(State4),
 
     %% Providers can modify profiles stored in opts, so set default after initializing providers
-    AllProviders = Providers++PluginProviders++GlobalPluginProviders,
-    State6 = rebar_state:create_logic_providers(AllProviders, State5),
+    State6 = rebar_state:create_logic_providers(Providers, State5),
     State7 = rebar_state:default(State6, rebar_state:opts(State6)),
 
     {Task, Args} = parse_args(RawArgs),
@@ -158,10 +157,9 @@ init_config() ->
                     ?DEBUG("Load global config file ~p",
                            [GlobalConfigFile]),
                     GlobalConfig = rebar_state:new(global, rebar_config:consult_file(GlobalConfigFile)),
-                    {ok, PluginProviders, GlobalConfig1} = rebar_plugins:install(GlobalConfig),
+                    GlobalConfig1 = rebar_plugins:install(GlobalConfig),
                     rebar_state:new(GlobalConfig1, Config1);
                 false ->
-                    PluginProviders = [],
                     rebar_state:new(Config1)
             end,
 
@@ -177,7 +175,7 @@ init_config() ->
 
     %% TODO: Do we need this still? I think it may still be used.
     %% Initialize vsn cache
-    {PluginProviders, rebar_state:set(State1, vsn_cache, dict:new())}.
+    rebar_state:set(State1, vsn_cache, dict:new()).
 
 parse_args([]) ->
     parse_args(["help"]);
