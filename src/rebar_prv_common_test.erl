@@ -38,6 +38,11 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     ?INFO("Running Common Test suites...", []),
+    %% Run ct provider prehooks
+    Providers = rebar_state:providers(State),
+    Cwd = rebar_dir:get_cwd(),
+    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
+
     try
         case setup_ct(State) of
             {error, {no_tests_specified, Opts}} ->
@@ -46,9 +51,14 @@ do(State) ->
             Opts ->
                 Opts1 = setup_logdir(State, Opts),
                 ?DEBUG("common test opts: ~p", [Opts1]),
-                run_test(State, Opts1)
+                {ok, State1} = run_test(State, Opts1),
+                %% Run ct provider posthooks
+                rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State1),
+                {ok, State1}
         end
-    catch error:Reason -> ?PRV_ERROR(Reason)
+    catch
+        error:Reason ->
+            ?PRV_ERROR(Reason)
     end.
 
 -spec format_error(any()) -> iolist().
@@ -251,7 +261,7 @@ join(undefined, Suites) -> Suites;
 join(Dir, Suites) when is_list(Dir), is_integer(hd(Dir)) ->
     lists:map(fun(S) -> filename:join([Dir, S]) end, Suites);
 %% multiple dirs or a bad dir argument, try to continue anyways
-join(_, Suites) -> Suites. 
+join(_, Suites) -> Suites.
 
 find_suite_dirs(Suites) ->
     AllDirs = lists:map(fun(S) -> filename:dirname(filename:absname(S)) end, Suites),

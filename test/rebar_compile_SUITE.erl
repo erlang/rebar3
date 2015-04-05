@@ -15,7 +15,8 @@
          dont_recompile_when_opts_dont_change/1,
          dont_recompile_yrl_or_xrl/1,
          deps_in_path/1,
-         checkout_priority/1]).
+         checkout_priority/1,
+         compile_plugins/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -41,7 +42,7 @@ all() ->
      build_checkout_apps, build_checkout_deps,
      build_all_srcdirs,
      recompile_when_opts_change, dont_recompile_when_opts_dont_change,
-     dont_recompile_yrl_or_xrl, deps_in_path, checkout_priority].
+     dont_recompile_yrl_or_xrl, deps_in_path, checkout_priority, compile_plugins].
 
 build_basic_app(Config) ->
     AppDir = ?config(apps, Config),
@@ -332,3 +333,34 @@ checkout_priority(Config) ->
 
     ?assertEqual(Vsn2, proplists:get_value(vsn, DepProps)),
     ?assertEqual(Vsn2, proplists:get_value(vsn, PkgProps)).
+
+%% Tests that compiling a project installs and compiles the plugins of deps
+compile_plugins(Config) ->
+    AppDir = ?config(apps, Config),
+    PluginsDir = filename:join([?config(base_dir, Config), "default", "plugins"]),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    DepName = rebar_test_utils:create_random_name("dep1_"),
+    PluginName = rebar_test_utils:create_random_name("plugin1_"),
+    mock_git_resource:mock([{config, [{plugins, [
+                                                {list_to_atom(PluginName), Vsn}
+                                                ]}]}]),
+    mock_pkg_resource:mock([
+                           {pkgdeps, [{{iolist_to_binary(PluginName), iolist_to_binary(Vsn)}, []}]}
+                           ]),
+
+    RConfFile =
+        rebar_test_utils:create_config(AppDir,
+                                      [{deps, [
+                                              {list_to_atom(DepName), {git, "http://site.com/user/"++DepName++".git", {tag, Vsn}}}
+                                              ]}]),
+    {ok, RConf} = file:consult(RConfFile),
+
+    %% Build with deps.
+    rebar_test_utils:run_and_check(
+        Config, RConf, ["compile"],
+        {ok, [{app, Name}, {plugin, PluginName}, {dep, DepName}]}
+    ).

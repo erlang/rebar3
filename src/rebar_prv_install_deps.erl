@@ -336,13 +336,13 @@ handle_upgrade(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
 
 handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
     DepsDir = rebar_dir:deps_dir(State),
-    {AppInfo1, NewSrcDeps, NewPkgDeps, NewLocks} =
+    {AppInfo1, NewSrcDeps, NewPkgDeps, NewLocks, State1} =
         handle_dep(State, DepsDir, AppInfo, Locks, Level),
     AppInfo2 = rebar_app_info:dep_level(AppInfo1, Level),
     {NewSrcDeps ++ SrcDeps
     ,NewPkgDeps++PkgDeps
     ,[AppInfo2 | SrcApps]
-    ,State
+    ,State1
     ,NewLocks}.
 
 -spec handle_dep(rebar_state:t(), file:filename_all(), rebar_app_info:t(), list(), integer()) ->
@@ -359,13 +359,16 @@ handle_dep(State, DepsDir, AppInfo, Locks, Level) ->
     S3 = rebar_state:apply_overrides(S2, Name),
     AppInfo1 = rebar_app_info:state(AppInfo, S3),
 
+    %% Dep may have plugins to install. Find and install here.
+    State1 = rebar_plugins:handle_plugins(rebar_state:get(S3, plugins, []), State),
+
     Deps = rebar_state:get(S3, deps, []),
     %% Upgrade lock level to be the level the dep will have in this dep tree
     NewLocks = [{DepName, Source, LockLevel+Level} ||
                    {DepName, Source, LockLevel} <- rebar_state:get(S3, {locks, default}, [])],
     AppInfo2 = rebar_app_info:deps(AppInfo1, rebar_state:deps_names(Deps)),
     {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, S3, Locks, Level),
-    {AppInfo2, SrcDeps, PkgDeps, Locks++NewLocks}.
+    {AppInfo2, SrcDeps, PkgDeps, Locks++NewLocks, State1}.
 
 -spec maybe_fetch(rebar_app_info:t(), boolean() | {true, binary(), integer()},
                   sets:set(binary()), rebar_state:t()) -> boolean().
@@ -507,12 +510,12 @@ fetch_app(AppInfo, AppDir, State) ->
             Result
     end.
 
-maybe_upgrade(AppInfo, AppDir, false, _State) ->
+maybe_upgrade(AppInfo, AppDir, false, State) ->
     Source = rebar_app_info:source(AppInfo),
-    rebar_fetch:needs_update(AppDir, Source);
+    rebar_fetch:needs_update(AppDir, Source, State);
 maybe_upgrade(AppInfo, AppDir, true, State) ->
     Source = rebar_app_info:source(AppInfo),
-    case rebar_fetch:needs_update(AppDir, Source) of
+    case rebar_fetch:needs_update(AppDir, Source, State) of
         true ->
             ?INFO("Updating ~s", [rebar_app_info:name(AppInfo)]),
             case rebar_fetch:download_source(AppDir, Source, State) of

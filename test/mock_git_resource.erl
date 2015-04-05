@@ -99,6 +99,7 @@ mock_vsn(Opts) ->
 %%   into a `rebar.config' file to describe dependencies.
 mock_download(Opts) ->
     Deps = proplists:get_value(deps, Opts, []),
+    Config = proplists:get_value(config, Opts, []),
     Default = proplists:get_value(default_vsn, Opts, "0.0.0"),
     Overrides = proplists:get_value(override_vsn, Opts, []),
     meck:expect(
@@ -112,7 +113,7 @@ mock_download(Opts) ->
                 Dir, App, Vsn,
                 [kernel, stdlib] ++ [element(1,D) || D  <- AppDeps]
             ),
-            rebar_test_utils:create_config(Dir, [{deps, AppDeps}]),
+            rebar_test_utils:create_config(Dir, [{deps, AppDeps}]++Config),
             {ok, 'WHATEVER'}
         end).
 
