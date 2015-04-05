@@ -53,8 +53,8 @@ do(State) ->
                 ?DEBUG("common test opts: ~p", [Opts1]),
                 {ok, State1} = run_test(State, Opts1),
                 %% Run ct provider posthooks
-                rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State),
-                {ok, State1};
+                rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State1),
+                {ok, State1}
         end
     catch
         error:Reason ->
