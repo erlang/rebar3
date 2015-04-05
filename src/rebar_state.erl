@@ -298,9 +298,11 @@ namespace(#state_t{namespace=Namespace}) ->
 namespace(State=#state_t{}, Namespace) ->
     State#state_t{namespace=Namespace}.
 
+-spec resources(t()) -> rebar_resource:resource().
 resources(#state_t{resources=Resources}) ->
     Resources.
 
+-spec resources(t(), [rebar_resource:resource()]) -> t().
 resources(State, NewResources) ->
     State#state_t{resources=NewResources}.
 
