@@ -12,7 +12,7 @@
          global_config/1,
          global_config/0,
          global_cache_dir/1,
-         local_cache_dir/0,
+         local_cache_dir/1,
          get_cwd/0,
          template_globals/1,
          template_dir/1,
@@ -85,8 +85,8 @@ global_cache_dir(State) ->
     Home = home_dir(),
     rebar_state:get(State, global_rebar_dir, filename:join([Home, ".cache", "rebar3"])).
 
-local_cache_dir() ->
-    filename:join(get_cwd(), ".rebar3").
+local_cache_dir(Dir) ->
+    filename:join(Dir, ".rebar3").
 
 get_cwd() ->
     {ok, Dir} = file:get_cwd(),

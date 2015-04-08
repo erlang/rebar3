@@ -16,6 +16,7 @@
          dont_recompile_when_opts_dont_change/1,
          dont_recompile_yrl_or_xrl/1,
          deps_in_path/1,
+         delete_beam_if_source_deleted/1,
          checkout_priority/1,
          compile_plugins/1]).
 
@@ -43,7 +44,8 @@ all() ->
      build_checkout_apps, build_checkout_deps,
      build_all_srcdirs, recompile_when_hrl_changes,
      recompile_when_opts_change, dont_recompile_when_opts_dont_change,
-     dont_recompile_yrl_or_xrl, deps_in_path, checkout_priority, compile_plugins].
+     dont_recompile_yrl_or_xrl, delete_beam_if_source_deleted,
+     deps_in_path, checkout_priority, compile_plugins].
 
 build_basic_app(Config) ->
     AppDir = ?config(apps, Config),
@@ -258,6 +260,24 @@ dont_recompile_yrl_or_xrl(Config) ->
 
     ?assert(ModTime == NewModTime).
 
+delete_beam_if_source_deleted(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    SrcDir = filename:join([AppDir, "_build", "default", "lib", Name, "src"]),
+    ?assert(filelib:is_regular(filename:join(EbinDir, "not_a_real_src_" ++ Name ++ ".beam"))),
+    file:delete(filename:join(SrcDir, "not_a_real_src_" ++ Name ++ ".erl")),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    ?assertNot(filelib:is_regular(filename:join(EbinDir, "not_a_real_src_" ++ Name ++ ".beam"))).
+
 deps_in_path(Config) ->
     AppDir = ?config(apps, Config),
     StartPaths = code:get_path(),
@@ -374,7 +394,6 @@ checkout_priority(Config) ->
 %% Tests that compiling a project installs and compiles the plugins of deps
 compile_plugins(Config) ->
     AppDir = ?config(apps, Config),
-    PluginsDir = filename:join([?config(base_dir, Config), "default", "plugins"]),
 
     Name = rebar_test_utils:create_random_name("app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
