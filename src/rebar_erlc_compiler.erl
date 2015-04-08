@@ -401,7 +401,7 @@ compile_xrl_yrl(Config, Source, Target, Opts, Mod) ->
     Dir = rebar_state:dir(Config),
     Opts1 = [{includefile, filename:join(Dir, I)} || {includefile, I} <- Opts,
                                                      filename:pathtype(I) =:= relative],
-    case filelib:last_modified(Source) > filelib:last_modified(Target) of
+    case needs_compile(Source, Target) of
         true ->
             case Mod:file(Source, Opts1 ++ [{return, true}]) of
                 {ok, _} ->
@@ -415,6 +415,9 @@ compile_xrl_yrl(Config, Source, Target, Opts, Mod) ->
         false ->
             skipped
     end.
+
+needs_compile(Source, Target) ->
+    filelib:last_modified(Source) > filelib:last_modified(Target).
 
 gather_src([], Srcs) ->
     Srcs;
