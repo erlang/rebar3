@@ -41,6 +41,7 @@ desc() ->
     "\n"
     "The following (optional) configurations can be added to a rebar.config:\n"
     "`dialyzer_warnings` - a list of dialyzer warnings\n"
+    "`dialyzer_ignored_warnings` - a list of patterns for ignoring warnings\n"
     "`dialyzer_plt` - the PLT file to use\n"
     "`dialyzer_plt_apps` - a list of applications to include in the PLT file*\n"
     "`dialyzer_plt_warnings` - display warnings when updating a PLT file "
@@ -366,11 +367,12 @@ run_dialyzer(State, Opts) ->
     case proplists:get_bool(get_warnings, Opts) of
         true ->
             WarningsList = rebar_state:get(State, dialyzer_warnings, []),
+            IgnoredWarningsList = rebar_state:get(State, dialyzer_ignored_warnings, []),
             Opts2 = [{warnings, WarningsList},
                      {check_plt, false} |
                      Opts],
             ?DEBUG("Running dialyzer with options: ~p~n", [Opts2]),
-            {Unknowns, Warnings} = format_warnings(dialyzer:run(Opts2)),
+            {Unknowns, Warnings} = format_warnings(filter_warnings(IgnoredWarningsList, dialyzer:run(Opts2))),
             _ = [?CONSOLE("~s", [Unknown]) || Unknown <- Unknowns],
             _ = [?CONSOLE("~s", [Warning]) || Warning <- Warnings],
             {length(Warnings), State};
@@ -382,6 +384,29 @@ run_dialyzer(State, Opts) ->
             _ = dialyzer:run(Opts2),
             {0, State}
     end.
+
+filter_warnings([], Warnings) ->
+    Warnings;
+filter_warnings(Ignores, Warnings) ->
+    lists:filter(fun(Warning) ->
+        not lists:any(fun (Ignore) -> match_warning(Ignore, Warning) end, Ignores)
+    end, Warnings).
+
+match_warning({MatchTag, {MatchPath, MatchLine}, MatchMsg}, {Tag, {Path, Line}, Msg}) when MatchPath =/= '_' ->
+    lists:suffix(MatchPath, Path) andalso match_term([MatchTag, MatchLine, MatchMsg], [Tag, Line, Msg]);
+match_warning({_, _, _} = Match, {_, {_, _}, _} = Warning) ->
+    match_term(Match, Warning).
+
+match_term(Term, Term) ->
+    true;
+match_term('_', _Term) ->
+    true;
+match_term(Term1, Term2) when is_list(Term1), is_list(Term2), length(Term1) =:= length(Term2) ->
+    lists:all(fun({T1, T2}) -> match_term(T1, T2) end, lists:zip(Term1, Term2));
+match_term(Term1, Term2) when is_tuple(Term1), is_tuple(Term2), tuple_size(Term1) =:= tuple_size(Term2) ->
+    lists:all(fun({T1, T2}) -> match_term(T1, T2) end, lists:zip(tuple_to_list(Term1), tuple_to_list(Term2)));
+match_term(_, _) ->
+    false.
 
 format_warnings(Warnings) ->
     format_warnings(Warnings, [], []).
