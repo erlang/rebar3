@@ -122,7 +122,7 @@ https://s3.amazonaws.com/rebar3/rebar3
 
 ```sh
 $ git clone https://github.com/rebar/rebar3
-$ cd rebar
+$ cd rebar3
 $ ./bootstrap/bootstrap
 ==> rebar (compile)
 Congratulations! You now have a self-contained script called "rebar3" in
