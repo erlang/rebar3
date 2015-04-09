@@ -234,7 +234,7 @@ update_erlcinfo(G, Dirs, Source) ->
                     digraph:del_vertex(G, Source),
                     modified;
                 LastModified when LastUpdated < LastModified ->
-                    modify_erlcinfo(G, Source, LastModified, Dirs);
+                    modify_erlcinfo(G, Source, LastModified, filename:dirname(Source), Dirs);
                 _ ->
                     Modified = lists:foldl(
                         update_erlcinfo_fun(G, Dirs),
@@ -246,7 +246,7 @@ update_erlcinfo(G, Dirs, Source) ->
                     end
             end;
         false ->
-            modify_erlcinfo(G, Source, filelib:last_modified(Source), Dirs)
+            modify_erlcinfo(G, Source, filelib:last_modified(Source), filename:dirname(Source), Dirs)
     end.
 
 update_erlcinfo_fun(G, Dirs) ->
@@ -264,9 +264,9 @@ update_max_modified_deps(G, Source) ->
     digraph:add_vertex(G, Source, MaxModified),
     MaxModified.
 
-modify_erlcinfo(G, Source, LastModified, Dirs) ->
+modify_erlcinfo(G, Source, LastModified, Dir, Dirs) ->
     {ok, Fd} = file:open(Source, [read]),
-    Incls = parse_attrs(Fd, []),
+    Incls = parse_attrs(Fd, [], Dir),
     AbsIncls = expand_file_names(Incls, Dirs),
     ok = file:close(Fd),
     digraph:add_vertex(G, Source, LastModified),
@@ -436,49 +436,49 @@ delete_dir(Dir, Subdirs) ->
     lists:foreach(fun(D) -> delete_dir(D, dirs(D)) end, Subdirs),
     file:del_dir(Dir).
 
-parse_attrs(Fd, Includes) ->
+parse_attrs(Fd, Includes, Dir) ->
     case io:parse_erl_form(Fd, "") of
         {ok, Form, _Line} ->
             case erl_syntax:type(Form) of
                 attribute ->
-                    NewIncludes = process_attr(Form, Includes),
-                    parse_attrs(Fd, NewIncludes);
+                    NewIncludes = process_attr(Form, Includes, Dir),
+                    parse_attrs(Fd, NewIncludes, Dir);
                 _ ->
-                    parse_attrs(Fd, Includes)
+                    parse_attrs(Fd, Includes, Dir)
             end;
         {eof, _} ->
             Includes;
         _Err ->
-            parse_attrs(Fd, Includes)
+            parse_attrs(Fd, Includes, Dir)
     end.
 
-process_attr(Form, Includes) ->
+process_attr(Form, Includes, Dir) ->
     AttrName = erl_syntax:atom_value(erl_syntax:attribute_name(Form)),
-    process_attr(AttrName, Form, Includes).
+    process_attr(AttrName, Form, Includes, Dir).
 
-process_attr(import, Form, Includes) ->
+process_attr(import, Form, Includes, _Dir) ->
     case erl_syntax_lib:analyze_import_attribute(Form) of
         {Mod, _Funs} ->
             [module_to_erl(Mod)|Includes];
         Mod ->
             [module_to_erl(Mod)|Includes]
     end;
-process_attr(file, Form, Includes) ->
+process_attr(file, Form, Includes, _Dir) ->
     {File, _} = erl_syntax_lib:analyze_file_attribute(Form),
     [File|Includes];
-process_attr(include, Form, Includes) ->
+process_attr(include, Form, Includes, _Dir) ->
     [FileNode] = erl_syntax:attribute_arguments(Form),
     File = erl_syntax:string_value(FileNode),
     [File|Includes];
-process_attr(include_lib, Form, Includes) ->
+process_attr(include_lib, Form, Includes, Dir) ->
     [FileNode] = erl_syntax:attribute_arguments(Form),
     RawFile = erl_syntax:string_value(FileNode),
-    maybe_expand_include_lib_path(RawFile) ++ Includes;
-process_attr(behaviour, Form, Includes) ->
+    maybe_expand_include_lib_path(RawFile, Dir) ++ Includes;
+process_attr(behaviour, Form, Includes, _Dir) ->
     [FileNode] = erl_syntax:attribute_arguments(Form),
     File = module_to_erl(erl_syntax:atom_value(FileNode)),
     [File|Includes];
-process_attr(compile, Form, Includes) ->
+process_attr(compile, Form, Includes, _Dir) ->
     [Arg] = erl_syntax:attribute_arguments(Form),
     case erl_syntax:concrete(Arg) of
         {parse_transform, Mod} ->
@@ -497,7 +497,7 @@ process_attr(compile, Form, Includes) ->
         _ ->
             Includes
     end;
-process_attr(_, _Form, Includes) ->
+process_attr(_, _Form, Includes, _Dir) ->
     Includes.
 
 module_to_erl(Mod) ->
@@ -507,10 +507,10 @@ module_to_erl(Mod) ->
 %% Given the filename from an include_lib attribute, if the path
 %% exists, return unmodified, or else get the absolute ERL_LIBS
 %% path.
-maybe_expand_include_lib_path(File) ->
-    case filelib:is_regular(File) of
+maybe_expand_include_lib_path(File, Dir) ->
+    case filelib:is_regular(filename:join(Dir, File)) of
         true ->
-            [File];
+            [filename:join(Dir, File)];
         false ->
             expand_include_lib_path(File)
     end.
