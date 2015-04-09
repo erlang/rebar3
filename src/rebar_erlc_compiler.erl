@@ -355,8 +355,7 @@ internal_erl_compile(Config, Dir, Module, OutDir, ErlOpts) ->
     end.
 
 target_base(OutDir, Source) ->
-    Module = filename:basename(Source, ".erl"),
-    filename:join([OutDir|string:tokens(Module, ".")]).
+    filename:join(OutDir, filename:basename(Source, ".erl")).
 
 -spec compile_mib(file:filename(), file:filename(),
                   rebar_state:t()) -> 'ok'.
