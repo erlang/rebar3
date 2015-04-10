@@ -170,7 +170,6 @@ doterl_compile(Config, Dir, OutDir, MoreSources, ErlOpts) ->
     ok.
 
 erl_first_files(Config, NeededErlFiles) ->
-    %% NOTE: rebar_config:get_local perhaps?
     ErlFirstFilesConf = rebar_state:get(Config, erl_first_files, []),
     %% NOTE: order of files in ErlFirstFiles is important!
     [File || File <- ErlFirstFilesConf, lists:member(File, NeededErlFiles)].
