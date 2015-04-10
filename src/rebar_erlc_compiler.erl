@@ -195,7 +195,7 @@ opts_changed(Opts, Target) ->
             Compile = Mod:module_info(compile),
             lists:sort(Opts) =/= lists:sort(proplists:get_value(options,
                                                                 Compile,
-                                                                undefined));
+                                                                []));
         {error, _} -> true
     end.
 
