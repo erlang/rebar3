@@ -11,6 +11,7 @@
          build_checkout_apps/1,
          build_checkout_deps/1,
          build_all_srcdirs/1,
+         recompile_when_hrl_changes/1,
          recompile_when_opts_change/1,
          dont_recompile_when_opts_dont_change/1,
          dont_recompile_yrl_or_xrl/1,
@@ -40,7 +41,7 @@ end_per_testcase(_, _Config) ->
 all() ->
     [build_basic_app, build_release_apps,
      build_checkout_apps, build_checkout_deps,
-     build_all_srcdirs,
+     build_all_srcdirs, recompile_when_hrl_changes,
      recompile_when_opts_change, dont_recompile_when_opts_dont_change,
      dont_recompile_yrl_or_xrl, deps_in_path, checkout_priority, compile_plugins].
 
@@ -131,6 +132,43 @@ build_all_srcdirs(Config) ->
     %% check the extra src_dir was linked into the _build dir
     true = filelib:is_dir(filename:join([AppDir, "_build", "default", "lib", Name, "extra"])).
 
+recompile_when_hrl_changes(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+
+    ExtraSrc = <<"-module(test_header_include).\n"
+                  "-export([main/0]).\n"
+                  "-include(\"test_header_include.hrl\").\n"
+                  "main() -> ?SOME_DEFINE.\n">>,
+
+    ExtraHeader = <<"-define(SOME_DEFINE, true).\n">>,
+    HeaderFile = filename:join([AppDir, "src", "test_header_include.hrl"]),
+    ok = file:write_file(filename:join([AppDir, "src", "test_header_include.erl"]), ExtraSrc),
+    ok = file:write_file(HeaderFile, ExtraHeader),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    {ok, Files} = file:list_dir(EbinDir),
+    ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+               || F <- Files, filename:extension(F) == ".beam"],
+
+    timer:sleep(1000),
+
+    os:cmd("touch " ++ HeaderFile),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    {ok, NewFiles} = file:list_dir(EbinDir),
+    NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+                  || F <- NewFiles, filename:extension(F) == ".beam"],
+
+    ?assert(ModTime =/= NewModTime).
+
 recompile_when_opts_change(Config) ->
     AppDir = ?config(apps, Config),
 
@@ -156,7 +194,6 @@ recompile_when_opts_change(Config) ->
                   || F <- NewFiles, filename:extension(F) == ".beam"],
 
     ?assert(ModTime =/= NewModTime).
-
 
 dont_recompile_when_opts_dont_change(Config) ->
     AppDir = ?config(apps, Config),
