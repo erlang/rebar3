@@ -178,17 +178,15 @@ erl_first_files(Config, NeededErlFiles) ->
 %% dependencies induced by given graph G.
 needed_files(G, ErlOpts, Dir, OutDir, SourceFiles) ->
     lists:filter(fun(Source) ->
-                         Target = target_base(OutDir, Source) ++ ".beam",
+                         TargetBase = target_base(OutDir, Source),
+                         Target = TargetBase ++ ".beam",
                          Opts = [{outdir, filename:dirname(Target)}
                                 ,{i, filename:join(Dir, "include")}] ++ ErlOpts,
                          digraph:vertex(G, Source) > {Source, filelib:last_modified(Target)}
-                              orelse opts_changed(Opts, Target)
+                              orelse opts_changed(Opts, TargetBase)
                  end, SourceFiles).
 
-opts_changed(Opts, Target) ->
-    Basename = filename:basename(Target, ".beam"),
-    Dirname = filename:dirname(Target),
-    ObjectFile = filename:join([Dirname, Basename]),
+opts_changed(Opts, ObjectFile) ->
     case code:load_abs(ObjectFile) of
         {module, Mod} ->
             Compile = Mod:module_info(compile),
