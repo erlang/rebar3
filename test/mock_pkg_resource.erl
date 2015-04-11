@@ -110,6 +110,8 @@ mock_pkg_index(Opts) ->
     GraphParts = to_graph_parts(Dict),
     Digraph = rebar_digraph:restore_graph(GraphParts),
     meck:new(rebar_packages, [passthrough, no_link]),
+    meck:expect(rebar_packages, registry,
+                fun(_State) -> {ok, to_registry(Deps)} end),
     meck:expect(rebar_packages, get_packages,
                 fun(_State) -> {Dict, Digraph} end).
 
@@ -117,10 +119,23 @@ mock_pkg_index(Opts) ->
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
 %%%%%%%%%%%%%%%
+
+to_registry(Deps) ->
+    Tid = ets:new(registry, []),
+    lists:foreach(fun({{Name, Vsn}, _}) ->
+                          case ets:lookup(Tid, Name) of
+                              [{_, [Vsns]}] ->
+                                  ets:insert(Tid, {Name, [[Vsn | Vsns]]});
+                              _ ->
+                                  ets:insert(Tid, {Name, [[Vsn]]})
+                          end
+                  end, Deps),
+    Tid.
+
 all_files(Dir) ->
     filelib:wildcard(filename:join([Dir, "**"])).
 
-archive_names(Dir, App, Vsn, Files) ->
+archive_names(Dir, _App, _Vsn, Files) ->
     [{(F -- Dir) -- "/", F} || F <- Files].
 
 find_parts(Apps, Skip) -> find_parts(Apps, Skip, dict:new()).

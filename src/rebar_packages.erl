@@ -43,7 +43,7 @@ get_packages(State) ->
 registry(State) ->
     Dir = rebar_dir:global_cache_dir(State),
     RegistryDir = filename:join(Dir, "packages"),
-    HexFile = filename:join(RegistryDir, "registry2"),
+    HexFile = filename:join(RegistryDir, "registry"),
     case ets:file2tab(HexFile) of
         {ok, T} ->
             {ok, T};
