@@ -519,31 +519,45 @@ process_attr(_, _Form, Includes, _Dir) ->
 module_to_erl(Mod) ->
     atom_to_list(Mod) ++ ".erl".
 
-
-%% Given the filename from an include_lib attribute, if the path
-%% exists, return unmodified, or else get the absolute ERL_LIBS
-%% path.
-maybe_expand_include_lib_path(File, Dir) ->
-    case filelib:is_regular(filename:join(Dir, File)) of
-        true ->
-            [filename:join(Dir, File)];
-        false ->
-            expand_include_lib_path(File)
-    end.
-
 %% Given a path like "stdlib/include/erl_compile.hrl", return
 %% "OTP_INSTALL_DIR/lib/erlang/lib/stdlib-x.y.z/include/erl_compile.hrl".
 %% Usually a simple [Lib, SubDir, File1] = filename:split(File) should
 %% work, but to not crash when an unusual include_lib path is used,
 %% utilize more elaborate logic.
-expand_include_lib_path(File) ->
+maybe_expand_include_lib_path(File, Dir) ->
     File1 = filename:basename(File),
-    Split = filename:split(filename:dirname(File)),
-    Lib = hd(Split),
-    SubDir = filename:join(tl(Split)),
-    case code:lib_dir(list_to_atom(Lib), list_to_atom(SubDir)) of
-        {error, bad_name} -> [];
-        Dir -> [filename:join(Dir, File1)]
+    case filename:split(filename:dirname(File)) of
+        [_] ->
+            warn_and_find_path(File, Dir);
+        [Lib | SubDir] ->
+            case code:lib_dir(list_to_atom(Lib), list_to_atom(filename:join(SubDir))) of
+                {error, bad_name} ->
+                    warn_and_find_path(File, Dir);
+                AppDir ->
+                    [filename:join(AppDir, File1)]
+            end
+    end.
+
+%% The use of -include_lib was probably incorrect by the user but lets try to make it work.
+%% We search in the outdir and outdir/../include to see if the header exists.
+warn_and_find_path(File, Dir) ->
+    ?WARN("Bad use of -include_lib(\"~s\")."
+         " First path component should be the name of an application."
+         " You probably meant -include(\"~s\").", [File, File]),
+    SrcHeader = filename:join(Dir, File),
+    case filelib:is_regular(SrcHeader) of
+        true ->
+            [SrcHeader];
+        false ->
+            IncludeDir = filename:join(filename:join(lists:droplast(filename:split(Dir))), "include"),
+            IncludeHeader = filename:join(IncludeDir, File),
+            case filelib:is_regular(IncludeHeader) of
+                true ->
+                    [filename:join(IncludeDir, File)];
+                false ->
+                    ?WARN("Could not find header for -include_lib(\"~s\").", [File]),
+                    []
+            end
     end.
 
 %%
