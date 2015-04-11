@@ -102,21 +102,10 @@ remove_common_path1([Part | RestFilename], [Part | RestPath]) ->
 remove_common_path1(FilenameParts, _) ->
     filename:join(FilenameParts).
 
-
-compile(Source, Config, CompileFn) ->
-    case CompileFn(Source, Config) of
-        ok ->
-            ok;
-        skipped ->
-            skipped;
-        Error ->
-            Error
-    end.
-
 compile_each([], _Config, _CompileFn) ->
     ok;
 compile_each([Source | Rest], Config, CompileFn) ->
-    case compile(Source, Config, CompileFn) of
+    case CompileFn(Source, Config) of
         ok ->
             ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]);
         {ok, Warnings} ->
