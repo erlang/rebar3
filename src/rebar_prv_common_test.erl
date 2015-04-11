@@ -70,6 +70,8 @@ format_error({failures_running_tests, {Failed, AutoSkipped}}) ->
     io_lib:format("Failures occured running tests: ~b", [Failed+AutoSkipped]);
 format_error({error_running_tests, Reason}) ->
     io_lib:format("Error running tests: ~p", [Reason]);
+format_error(suite_at_project_root) ->
+    io_lib:format("Test suites can't be located in project root", []);
 format_error({error, Reason}) ->
     io_lib:format("Unknown error: ~p", [Reason]).
 
@@ -269,6 +271,10 @@ find_suite_dirs(Suites) ->
     lists:usort(AllDirs).
 
 copy(State, Target) ->
+    case reduce_path(Target) == rebar_state:dir(State) of
+        true  -> erlang:error(suite_at_project_root);
+        false -> ok
+    end,
     case retarget_path(State, Target) of
         %% directory lies outside of our project's file structure so
         %%  don't copy it
