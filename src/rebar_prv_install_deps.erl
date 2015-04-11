@@ -134,7 +134,8 @@ handle_deps(_Profile, State, [], _, _) ->
 handle_deps(Profile, State0, Deps, Upgrade, Locks) ->
     %% Read in package index and dep graph
     {Packages, Graph} = rebar_state:packages(State0),
-    State = rebar_state:packages(State0, {Packages, Graph}),
+    Registry = rebar_packages:registry(State0),
+    State = rebar_state:packages(rebar_state:registry(State0, Registry), {Packages, Graph}),
     %% Split source deps from pkg deps, needed to keep backwards compatibility
     DepsDir = rebar_dir:deps_dir(State),
     {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, State, Locks, 0),
@@ -573,7 +574,7 @@ not_needs_compile(App) ->
         andalso rebar_app_info:valid(App).
 
 get_package(Dep, State) ->
-    case rebar_packages:registry(State) of
+    case rebar_state:registry(State) of
         {ok, T} ->
             HighestDepVsn = rebar_packages:find_highest_matching(Dep, "0", T),
             {Dep, HighestDepVsn};

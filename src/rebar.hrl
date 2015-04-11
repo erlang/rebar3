@@ -36,6 +36,12 @@
 -type rebar_digraph() :: digraph().
 -endif.
 
+-ifdef(namespaced_types).
+-type rebar_tid() :: ets:tid().
+-else.
+-type rebar_tid() :: tid().
+-endif.
+
 -define(GRAPH_VSN, 2).
 -type v() :: {digraph:vertex(), term()} | 'false'.
 -type e() :: {digraph:vertex(), digraph:vertex()}.
