@@ -28,10 +28,12 @@
 
 -export([consult/1
         ,consult_file/1
+        ,format_error/1
 
         ,merge_locks/2]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 %% ===================================================================
 %% Public API
@@ -77,6 +79,9 @@ merge_locks(Config, [Locks]) ->
     NewDeps = find_newly_added(ConfigDeps, Locks),
     [{{locks, default}, Locks}, {{deps, default}, NewDeps++Deps} | Config].
 
+format_error({bad_dep_name, Dep}) ->
+    io_lib:format("Dependency name must be an atom, instead found: ~p", [Dep]).
+
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
@@ -107,12 +112,12 @@ bs(Vars) ->
 %% Find deps that have been added to the config after the lock was created
 find_newly_added(ConfigDeps, LockedDeps) ->
     rebar_utils:filtermap(fun(Dep) when is_tuple(Dep) ->
-                                  check_dep(element(1, Dep), LockedDeps);
+                                  check_newly_added(element(1, Dep), LockedDeps);
                              (Dep) ->
-                                  check_dep(Dep, LockedDeps)
+                                  check_newly_added(Dep, LockedDeps)
                           end, ConfigDeps).
 
-check_dep(Dep, LockedDeps) ->
+check_newly_added(Dep, LockedDeps) when is_atom(Dep) ->
     NewDep = ec_cnv:to_binary(Dep),
     case lists:keyfind(NewDep, 1, LockedDeps) of
         false ->
@@ -127,4 +132,6 @@ check_dep(Dep, LockedDeps) ->
                          [NewDep, NewDep]),
                     false
             end
-    end.
+    end;
+check_newly_added(Dep, _) ->
+    throw(?PRV_ERROR({bad_dep_name, Dep})).
