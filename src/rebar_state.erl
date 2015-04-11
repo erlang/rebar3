@@ -55,7 +55,7 @@
                   all_deps            = []          :: [rebar_app_info:t()],
 
                   packages            = undefined   :: {rebar_dict(), rebar_digraph()} | undefined,
-                  registry            = undefined   :: {ok, rebar_tid()} | error | undefined,
+                  registry            = undefined   :: {ok, ets:tid()} | error | undefined,
                   overrides           = [],
                   resources           = [],
                   providers           = []}).

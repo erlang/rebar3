@@ -128,8 +128,8 @@ check_newly_added(Dep, LockedDeps) when is_atom(Dep) ->
                     true;
                 _ ->
                     ?WARN("Newly added dep ~s is locked at a lower level. "
-                         "If you really want to unlock it, use 'rebar3 upgrade ~s'",
-                         [NewDep, NewDep]),
+                          "If you really want to unlock it, use 'rebar3 upgrade ~s'",
+                          [NewDep, NewDep]),
                     false
             end
     end;

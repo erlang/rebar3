@@ -101,7 +101,7 @@ cull_deps(Graph, Vertices, Level, Levels, Solution, Discarded) ->
                                                      DiscardedAcc1}
                                             end
                                     end, {NewVertices, SolutionAcc, LevelsAcc, DiscardedAcc}, OutNeighbors)
-                    end, {[], Solution, Levels, Discarded}, lists:sort(Vertices)),
+                    end, {[], Solution, Levels, Discarded}, lists:keysort(1, Vertices)),
     cull_deps(Graph, NV, Level+1, LS, NS, DS).
 
 subgraph(Graph, Vertices) ->
