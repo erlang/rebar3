@@ -44,10 +44,14 @@ do(State) ->
 
     case prepare_tests(State) of
         {ok, Tests} ->
-            {ok, State1} = do_tests(State, Tests),
-            %% Run eunit provider posthooks
-            rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State1),
-            {ok, State1};
+            case do_tests(State, Tests) of
+                {ok, State1} ->
+                    %% Run eunit provider posthooks
+                    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State1),
+                    {ok, State1};
+                Error ->
+                    Error
+            end;
         Error ->
             Error
     end.

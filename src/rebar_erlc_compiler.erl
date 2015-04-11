@@ -118,7 +118,7 @@ clean(_Config, AppDir) ->
         || F <- YrlFiles ]),
 
     %% Delete the build graph, if any
-    rebar_file_utils:rm_rf(erlcinfo_file()),
+    rebar_file_utils:rm_rf(erlcinfo_file(AppDir)),
 
     %% Erlang compilation is recursive, so it's possible that we have a nested
     %% directory structure in ebin with .beam files within. As such, we want
@@ -152,7 +152,14 @@ doterl_compile(Config, Dir, OutDir, MoreSources, ErlOpts) ->
     true = code:add_path(filename:absname(OutDir)),
     OutDir1 = proplists:get_value(outdir, ErlOpts, OutDir),
 
-    G = init_erlcinfo(proplists:get_all_values(i, ErlOpts), AllErlFiles),
+    G = init_erlcinfo(proplists:get_all_values(i, ErlOpts), AllErlFiles, Dir),
+
+    %% A source file may have been renamed or deleted. Remove it from the graph
+    %% and remove any beam file for that source if it exists.
+    Vertices = digraph:vertices(G),
+    [maybe_rm_beam_and_edge(G, OutDir, File) || File <- lists:sort(Vertices) -- lists:sort(AllErlFiles),
+                                                filename:extension(File) =:= ".erl"],
+
     NeededErlFiles = needed_files(G, ErlOpts, Dir, OutDir1, AllErlFiles),
     ErlFirstFiles = erl_first_files(Config, NeededErlFiles),
     {DepErls, OtherErls} = lists:partition(
@@ -186,6 +193,19 @@ needed_files(G, ErlOpts, Dir, OutDir, SourceFiles) ->
                               orelse opts_changed(Opts, TargetBase)
                  end, SourceFiles).
 
+maybe_rm_beam_and_edge(G, OutDir, Source) ->
+    %% This is NOT a double check it is the only check that the source file is actually gone
+    case filelib:is_regular(Source) of
+        true ->
+            %% Actually exists, don't delete
+            ok;
+        false ->
+            Target = target_base(OutDir, Source) ++ ".beam",
+            ?DEBUG("Source ~s is gone, deleting previous beam file if it exists ~s", [Source, Target]),
+            file:delete(Target),
+            digraph:del_vertex(G, Source)
+    end.
+
 opts_changed(Opts, ObjectFile) ->
     case code:load_abs(ObjectFile) of
         {module, Mod} ->
@@ -196,24 +216,24 @@ opts_changed(Opts, ObjectFile) ->
         {error, _} -> true
     end.
 
-erlcinfo_file() ->
-    filename:join(rebar_dir:local_cache_dir(), ?ERLCINFO_FILE).
+erlcinfo_file(Dir) ->
+    filename:join(rebar_dir:local_cache_dir(Dir), ?ERLCINFO_FILE).
 
 %% Get dependency graph of given Erls files and their dependencies (header files,
 %% parse transforms, behaviours etc.) located in their directories or given
 %% InclDirs. Note that last modification times stored in vertices already respect
 %% dependencies induced by given graph G.
-init_erlcinfo(InclDirs, Erls) ->
+init_erlcinfo(InclDirs, Erls, Dir) ->
     G = digraph:new([acyclic]),
-    try restore_erlcinfo(G, InclDirs)
+    try restore_erlcinfo(G, InclDirs, Dir)
     catch
         _:_ ->
-            ?WARN("Failed to restore ~s file. Discarding it.~n", [erlcinfo_file()]),
-            file:delete(erlcinfo_file())
+            ?WARN("Failed to restore ~s file. Discarding it.~n", [erlcinfo_file(Dir)]),
+            file:delete(erlcinfo_file(Dir))
     end,
     Dirs = source_and_include_dirs(InclDirs, Erls),
     Modified = lists:foldl(update_erlcinfo_fun(G, Dirs), false, Erls),
-    if Modified -> store_erlcinfo(G, InclDirs); not Modified -> ok end,
+    if Modified -> store_erlcinfo(G, InclDirs, Dir); not Modified -> ok end,
     G.
 
 source_and_include_dirs(InclDirs, Erls) ->
@@ -275,8 +295,8 @@ modify_erlcinfo(G, Source, LastModified, Dir, Dirs) ->
       end, AbsIncls),
     modified.
 
-restore_erlcinfo(G, InclDirs) ->
-    case file:read_file(erlcinfo_file()) of
+restore_erlcinfo(G, InclDirs, Dir) ->
+    case file:read_file(erlcinfo_file(Dir)) of
         {ok, Data} ->
             % Since externally passed InclDirs can influence erlcinfo graph (see
             % modify_erlcinfo), we have to check here that they didn't change.
@@ -294,10 +314,10 @@ restore_erlcinfo(G, InclDirs) ->
             ok
     end.
 
-store_erlcinfo(G, InclDirs) ->
+store_erlcinfo(G, InclDirs, Dir) ->
     Vs = lists:map(fun(V) -> digraph:vertex(G, V) end, digraph:vertices(G)),
     Es = lists:map(fun(E) -> digraph:edge(G, E) end, digraph:edges(G)),
-    File = erlcinfo_file(),
+    File = erlcinfo_file(Dir),
     ok = filelib:ensure_dir(File),
     Data = term_to_binary(#erlcinfo{info={Vs, Es, InclDirs}}, [{compressed, 2}]),
     file:write_file(File, Data).
