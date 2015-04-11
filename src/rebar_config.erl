@@ -106,21 +106,25 @@ bs(Vars) ->
 
 %% Find deps that have been added to the config after the lock was created
 find_newly_added(ConfigDeps, LockedDeps) ->
-    [Dep || Dep <- ConfigDeps,
-            begin
-                NewDep = ec_cnv:to_binary(element(1, Dep)),
-                case lists:keyfind(NewDep, 1, LockedDeps) of
-                    false ->
-                        true;
-                    Match ->
-                        case element(3, Match) of
-                            0 ->
-                                true;
-                            _ ->
-                                ?WARN("Newly added dep ~s is locked at a lower level. "
-                                     "If you really want to unlock it, use 'rebar3 upgrade ~s'",
-                                     [NewDep, NewDep]),
-                                false
-                        end
-                end
-            end].
+    rebar_utils:filtermap(fun(Dep) when is_tuple(Dep) ->
+                                  check_dep(element(1, Dep), LockedDeps);
+                             (Dep) ->
+                                  check_dep(Dep, LockedDeps)
+                          end, ConfigDeps).
+
+check_dep(Dep, LockedDeps) ->
+    NewDep = ec_cnv:to_binary(Dep),
+    case lists:keyfind(NewDep, 1, LockedDeps) of
+        false ->
+            true;
+        Match ->
+            case element(3, Match) of
+                0 ->
+                    true;
+                _ ->
+                    ?WARN("Newly added dep ~s is locked at a lower level. "
+                         "If you really want to unlock it, use 'rebar3 upgrade ~s'",
+                         [NewDep, NewDep]),
+                    false
+            end
+    end.

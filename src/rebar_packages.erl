@@ -1,6 +1,8 @@
 -module(rebar_packages).
 
--export([get_packages/1]).
+-export([get_packages/1
+        ,registry/1
+        ,find_highest_matching/3]).
 
 -export_type([package/0]).
 
@@ -36,4 +38,55 @@ get_packages(State) ->
         false ->
             ?ERROR("Bad packages index, try to fix with `rebar3 update`", []),
             {dict:new(), digraph:new()}
+    end.
+
+registry(State) ->
+    Dir = rebar_dir:global_cache_dir(State),
+    RegistryDir = filename:join(Dir, "packages"),
+    HexFile = filename:join(RegistryDir, "registry2"),
+    case ets:file2tab(HexFile) of
+        {ok, T} ->
+            {ok, T};
+        {error, Reason} ->
+            ?DEBUG("Error loading registry: ~p", [Reason]),
+            error
+    end.
+
+
+%% Hex supports use of ~> to specify the version required for a dependency.
+%% Since rebar3 requires exact versions to choose from we find the highest
+%% available version of the dep that passes the constraint.
+
+%% `~>` will never include pre-release versions of its upper bound.
+%% It can also be used to set an upper bound on only the major
+%% version part. See the table below for `~>` requirements and
+%% their corresponding translation.
+%% `~>` | Translation
+%% :------------- | :---------------------
+%% `~> 2.0.0` | `>= 2.0.0 and < 2.1.0`
+%% `~> 2.1.2` | `>= 2.1.2 and < 2.2.0`
+%% `~> 2.1.3-dev` | `>= 2.1.3-dev and < 2.2.0`
+%% `~> 2.0` | `>= 2.0.0 and < 3.0.0`
+%% `~> 2.1` | `>= 2.1.0 and < 3.0.0`
+find_highest_matching(Dep, Constraint, T) ->
+    case ets:lookup(T, Dep) of
+        [{Dep, [[Vsn]]}] ->
+            case ec_semver:pes(Vsn, Constraint) of
+                true ->
+                    Vsn;
+                false ->
+                    ?WARN("Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
+                         "Using anyway, but it is not guarenteed to work.", [Dep, Vsn, Constraint]),
+                    Vsn
+            end;
+        [{Dep, [[HeadVsn | VsnTail]]}] ->
+            lists:foldl(fun(Version, Highest) ->
+                                case ec_semver:pes(Version, Constraint) andalso
+                                    ec_semver:gt(Version, Highest) of
+                                    true ->
+                                        Version;
+                                    false ->
+                                        Highest
+                                end
+                        end, HeadVsn, VsnTail)
     end.

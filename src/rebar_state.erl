@@ -30,6 +30,8 @@
          overrides/1, overrides/2,
          apply_overrides/2,
 
+         packages/1, packages/2,
+
          resources/1, resources/2, add_resource/2,
          providers/1, providers/2, add_provider/2]).
 
@@ -50,6 +52,8 @@
                   project_apps        = []          :: [rebar_app_info:t()],
                   deps_to_build       = []          :: [rebar_app_info:t()],
                   all_deps            = []          :: [rebar_app_info:t()],
+
+                  packages            = undefined   :: {rebar_dict(), rebar_digraph()} | undefined,
 
                   overrides           = [],
                   resources           = [],
@@ -242,7 +246,8 @@ merge_opts(NewOpts, OldOpts) ->
                            true ->
                                NewValue;
                            false ->
-                               tup_umerge(tup_sort(NewValue), tup_sort(OldValue))
+                               rebar_utils:tup_umerge(rebar_utils:tup_sort(NewValue)
+                                                     ,rebar_utils:tup_sort(OldValue))
                        end;
                   (_Key, NewValue, _OldValue) ->
                        NewValue
@@ -298,6 +303,14 @@ namespace(#state_t{namespace=Namespace}) ->
 namespace(State=#state_t{}, Namespace) ->
     State#state_t{namespace=Namespace}.
 
+packages(State=#state_t{packages=undefined}) ->
+    rebar_packages:get_packages(State);
+packages(#state_t{packages=Packages}) ->
+    Packages.
+
+packages(State, Packages) ->
+    State#state_t{packages=Packages}.
+
 -spec resources(t()) -> rebar_resource:resource().
 resources(#state_t{resources=Resources}) ->
     Resources.
@@ -340,65 +353,3 @@ create_logic_providers(ProviderModules, State0) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
-
-%% Sort the list in proplist-order, meaning that `{a,b}' and `{a,c}'
-%% both compare as usual, and `a' and `b' do the same, but `a' and `{a,b}' will
-%% compare based on the first element of the key, and in order. So the following
-%% list will sort as:
-%% - `[native, {native,o3}, check]' -> `[check, native, {native, o3}]'
-%% - `[native, {native,o3}, {native, o2}, check]' -> `[check,native,{native,o3},{native,o2}]'
-%% Meaning that:
-%% a) no deduplication takes place
-%% b) the key of a tuple is what counts in being sorted, but atoms are seen as {atom}
-%%    as far as comparison is concerned (departing from lists:ukeysort/2)
-%% c) order is preserved for similar keys and tuples no matter their size (sort is stable)
-%%
-%% These properties let us merge proplists fairly easily.
-tup_sort(List) ->
-    lists:sort(fun(A, B) when is_tuple(A), is_tuple(B) -> element(1, A) =< element(1, B)
-               ;  (A, B) when is_tuple(A) -> element(1, A) =< B
-               ;  (A, B) when is_tuple(B) -> A =< element(1, B)
-               ;  (A, B) -> A =< B
-               end, List).
-
-%% Custom merge functions. The objective is to behave like lists:umerge/2,
-%% except that we also compare the merge elements based on the key if they're a
-%% tuple, such that `{key, val1}' is always prioritized over `{key, val0}' if
-%% the former is from the 'new' list.
-%%
-%% This lets us apply proper overrides to list of elements according to profile
-%% priority. This function depends on a stable proplist sort.
-tup_umerge([], Olds) ->
-    Olds;
-tup_umerge([New|News], Olds) ->
-    lists:reverse(umerge(News, Olds, [], New)).
-
-%% This is equivalent to umerge2_2 in the stdlib, except we use the expanded
-%% value/key only to compare
-umerge(News, [Old|Olds], Merged, Cmp) when element(1, Cmp) == element(1, Old);
-                                           element(1, Cmp) == Old;
-                                           Cmp == element(1, Old);
-                                           Cmp =< Old ->
-    umerge(News, Olds, [Cmp | Merged], Cmp, Old);
-umerge(News, [Old|Olds], Merged, Cmp) ->
-    umerge(News, Olds, [Old | Merged], Cmp);
-umerge(News, [], Merged, Cmp) ->
-    lists:reverse(News, [Cmp | Merged]).
-
-%% Similar to stdlib's umerge2_1 in the stdlib, except that when the expanded
-%% value/keys compare equal, we check if the element is a full dupe to clear it
-%% (like the stdlib function does) or otherwise keep the duplicate around in
-%% an order that prioritizes 'New' elements.
-umerge([New|News], Olds, Merged, CmpMerged, Cmp) when CmpMerged == Cmp ->
-    umerge(News, Olds, Merged, New);
-umerge([New|News], Olds, Merged, _CmpMerged, Cmp) when element(1,New) == element(1, Cmp);
-                                                       element(1,New) == Cmp;
-                                                       New == element(1, Cmp);
-                                                       New =< Cmp ->
-    umerge(News, Olds, [New | Merged], New, Cmp);
-umerge([New|News], Olds, Merged, _CmpMerged, Cmp) -> % >
-    umerge(News, Olds, [Cmp | Merged], New);
-umerge([], Olds, Merged, CmpMerged, Cmp) when CmpMerged == Cmp ->
-    lists:reverse(Olds, Merged);
-umerge([], Olds, Merged, _CmpMerged, Cmp) ->
-    lists:reverse(Olds, [Cmp | Merged]).

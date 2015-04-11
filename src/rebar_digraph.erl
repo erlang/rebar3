@@ -72,10 +72,12 @@ cull_deps(Graph, Vertices) ->
     cull_deps(Graph,
               Vertices,
               1,
-              lists:foldl(fun({Key, _}, Levels) -> dict:store(Key, 0, Levels) end,
-                          dict:new(), Vertices),
-              lists:foldl(fun({Key, _}=N, Solution) -> dict:store(Key, N, Solution) end,
-                          dict:new(), Vertices),
+              lists:foldl(fun({Key, _}, Levels) ->
+                                  dict:store(Key, 0, Levels)
+                          end, dict:new(), Vertices),
+              lists:foldl(fun({Key, _}=N, Solution) ->
+                                  dict:store(Key, N, Solution)
+                          end, dict:new(), Vertices),
               []).
 
 cull_deps(_Graph, [], _Level, Levels, Solution, Discarded) ->
@@ -99,7 +101,7 @@ cull_deps(Graph, Vertices, Level, Levels, Solution, Discarded) ->
                                                      DiscardedAcc1}
                                             end
                                     end, {NewVertices, SolutionAcc, LevelsAcc, DiscardedAcc}, OutNeighbors)
-                    end, {[], Solution, Levels, Discarded}, lists:keysort(1, Vertices)),
+                    end, {[], Solution, Levels, Discarded}, lists:sort(Vertices)),
     cull_deps(Graph, NV, Level+1, LS, NS, DS).
 
 subgraph(Graph, Vertices) ->
