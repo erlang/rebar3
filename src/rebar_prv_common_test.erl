@@ -43,21 +43,15 @@ do(State) ->
     Cwd = rebar_dir:get_cwd(),
     rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
-    try
-        case setup_ct(State) of
-            {error, {no_tests_specified, Opts}} ->
-                ?WARN("No tests specified in opts: ~p", [Opts]),
-                {ok, State};
-            Opts ->
-                Opts1 = setup_logdir(State, Opts),
-                ?DEBUG("common test opts: ~p", [Opts1]),
-                {ok, State1} = run_test(State, Opts1),
-                %% Run ct provider posthooks
-                rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State1),
-                {ok, State1}
-        end
+    try run_test(State) of
+        {ok, State1} = Result ->
+            %% Run ct provider posthooks
+            rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State1),
+            Result;
+        ?PRV_ERROR(_) = Error ->
+            Error
     catch
-        error:Reason ->
+        throw:{error, Reason} ->
             ?PRV_ERROR(Reason)
     end.
 
@@ -79,10 +73,21 @@ format_error({error, Reason}) ->
 %% Internal functions
 %% ===================================================================
 
+run_test(State) ->
+    case setup_ct(State) of
+        {error, {no_tests_specified, Opts}} ->
+            ?WARN("No tests specified in opts: ~p", [Opts]),
+            {ok, State};
+        Opts ->
+            Opts1 = setup_logdir(State, Opts),
+            ?DEBUG("common test opts: ~p", [Opts1]),
+            run_test(State, Opts1)
+    end.
+
 run_test(State, Opts) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     Result = case proplists:get_value(verbose, RawOpts, false) of
-        true  -> run_test(Opts);
+        true  -> run_test_verbose(Opts);
         false -> run_test_quiet(Opts)
     end,
     ok = rebar_prv_cover:maybe_write_coverdata(State, ?PROVIDER),
@@ -91,7 +96,7 @@ run_test(State, Opts) ->
         Error -> Error
     end.
 
-run_test(Opts) -> handle_results(ct:run_test(Opts)).
+run_test_verbose(Opts) -> handle_results(ct:run_test(Opts)).
 
 run_test_quiet(Opts) ->
     Pid = self(),
@@ -212,7 +217,7 @@ discover_dirs_and_suites(State, Opts) ->
         {[Dir], Suites} when is_integer(hd(Dir)), is_list(Suites) ->
             [{dir, Dir}|lists:keydelete(dir, 1, Opts)];
         %% multiple dirs and suites, error now to simplify later steps
-        {_, _} -> erlang:error({multiple_dirs_and_suites, Opts})
+        {_, _} -> throw({error, {multiple_dirs_and_suites, Opts}})
     end.
 
 discover_testspec(_TestSpec, Opts) ->
@@ -272,7 +277,7 @@ find_suite_dirs(Suites) ->
 
 copy(State, Target) ->
     case reduce_path(Target) == rebar_state:dir(State) of
-        true  -> erlang:error(suite_at_project_root);
+        true  -> throw({error, suite_at_project_root});
         false -> ok
     end,
     case retarget_path(State, Target) of
