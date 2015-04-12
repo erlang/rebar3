@@ -391,11 +391,11 @@ maybe_fetch(AppInfo, Upgrade, Seen, State) ->
                         {true, FoundApp} ->
                             %% Preserve the state we created with overrides
                             AppState = rebar_app_info:state(AppInfo),
-                            FoundApp = rebar_app_info:state(FoundApp, AppState),
-                            ?INFO("Linking ~s to ~s", [rebar_app_info:dir(FoundApp), AppDir]),
+                            FoundApp1 = rebar_app_info:state(FoundApp, AppState),
+                            ?INFO("Linking ~s to ~s", [rebar_app_info:dir(FoundApp1), AppDir]),
                             filelib:ensure_dir(AppDir),
-                            rebar_file_utils:symlink_or_copy(rebar_app_info:dir(FoundApp), AppDir),
-                            {true, AppInfo}
+                            rebar_file_utils:symlink_or_copy(rebar_app_info:dir(FoundApp1), AppDir),
+                            {true, FoundApp1}
                     end;
                 {true, AppInfo1} ->
                     %% Preserve the state we created with overrides
