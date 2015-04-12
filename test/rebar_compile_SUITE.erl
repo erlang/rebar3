@@ -18,7 +18,8 @@
          deps_in_path/1,
          delete_beam_if_source_deleted/1,
          checkout_priority/1,
-         compile_plugins/1]).
+         compile_plugins/1,
+         highest_version_of_pkg_dep/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -45,7 +46,7 @@ all() ->
      build_all_srcdirs, recompile_when_hrl_changes,
      recompile_when_opts_change, dont_recompile_when_opts_dont_change,
      dont_recompile_yrl_or_xrl, delete_beam_if_source_deleted,
-     deps_in_path, checkout_priority, compile_plugins].
+     deps_in_path, checkout_priority, compile_plugins, highest_version_of_pkg_dep].
 
 build_basic_app(Config) ->
     AppDir = ?config(apps, Config),
@@ -419,4 +420,29 @@ compile_plugins(Config) ->
     rebar_test_utils:run_and_check(
         Config, RConf, ["compile"],
         {ok, [{app, Name}, {plugin, PluginName}, {dep, DepName}]}
+    ).
+
+highest_version_of_pkg_dep(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    PkgName = rebar_test_utils:create_random_name("pkg1_"),
+    mock_git_resource:mock([]),
+    mock_pkg_resource:mock([
+        {pkgdeps, [{{iolist_to_binary(PkgName), <<"0.1.0">>}, []},
+                   {{iolist_to_binary(PkgName), <<"0.0.1">>}, []},
+                   {{iolist_to_binary(PkgName), <<"0.1.3">>}, []},
+                   {{iolist_to_binary(PkgName), <<"0.1.1">>}, []}]}
+    ]),
+
+    RConfFile = rebar_test_utils:create_config(AppDir, [{deps, [list_to_atom(PkgName)]}]),
+    {ok, RConf} = file:consult(RConfFile),
+
+    %% Build with deps.
+    rebar_test_utils:run_and_check(
+        Config, RConf, ["compile"],
+        {ok, [{app, Name}, {dep, PkgName, <<"0.1.3">>}]}
     ).

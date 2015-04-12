@@ -35,10 +35,14 @@ init(State) ->
 do(State) ->
     ?INFO("Updating package index...", []),
     try
-        Url = rebar_state:get(State, rebar_packages_cdn, "https://s3.amazonaws.com/s3.hex.pm/registry.ets.gz"),
+        Dir = rebar_dir:global_cache_dir(State),
+        RegistryDir = filename:join(Dir, "packages"),
+        filelib:ensure_dir(filename:join(RegistryDir, "dummy")),
+        HexFile = filename:join(RegistryDir, "registry"),
         TmpDir = ec_file:insecure_mkdtemp(),
         TmpFile = filename:join(TmpDir, "packages.gz"),
-        HexFile = filename:join(TmpDir, "packages"),
+
+        Url = rebar_state:get(State, rebar_packages_cdn, "https://s3.amazonaws.com/s3.hex.pm/registry.ets.gz"),
         {ok, _RequestId} = httpc:request(get, {Url, []},
                                          [], [{stream, TmpFile}, {sync, true}]),
         {ok, Data} = file:read_file(TmpFile),
@@ -90,7 +94,7 @@ update_graph(Pkg, PkgVsn, Deps, HexRegistry, Graph) ->
     lists:foldl(fun([Dep, DepVsn, _, _], DepsListAcc) ->
                         case DepVsn of
                             <<"~> ", Vsn/binary>> ->
-                                HighestDepVsn = find_highest_matching(Dep, Vsn, HexRegistry),
+                                HighestDepVsn = rebar_packages:find_highest_matching(Dep, Vsn, HexRegistry),
                                 digraph:add_edge(Graph, {Pkg, PkgVsn}, {Dep, HighestDepVsn}),
                                 [{Dep, DepVsn} | DepsListAcc];
                             Vsn ->
@@ -98,41 +102,3 @@ update_graph(Pkg, PkgVsn, Deps, HexRegistry, Graph) ->
                                 [{Dep, Vsn} | DepsListAcc]
                         end
                 end, [], Deps).
-
-%% Hex supports use of ~> to specify the version required for a dependency.
-%% Since rebar3 requires exact versions to choose from we find the highest
-%% available version of the dep that passes the constraint.
-
-%% `~>` will never include pre-release versions of its upper bound.
-%% It can also be used to set an upper bound on only the major
-%% version part. See the table below for `~>` requirements and
-%% their corresponding translation.
-%% `~>` | Translation
-%% :------------- | :---------------------
-%% `~> 2.0.0` | `>= 2.0.0 and < 2.1.0`
-%% `~> 2.1.2` | `>= 2.1.2 and < 2.2.0`
-%% `~> 2.1.3-dev` | `>= 2.1.3-dev and < 2.2.0`
-%% `~> 2.0` | `>= 2.0.0 and < 3.0.0`
-%% `~> 2.1` | `>= 2.1.0 and < 3.0.0`
-find_highest_matching(Dep, Constraint, T) ->
-    case ets:lookup(T, Dep) of
-        [{Dep, [[Vsn]]}] ->
-            case ec_semver:pes(Vsn, Constraint) of
-                true ->
-                    Vsn;
-                false ->
-                    ?WARN("Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
-                         "Using anyway, but it is not guarenteed to work.", [Dep, Vsn, Constraint]),
-                    Vsn
-            end;
-        [{Dep, [[HeadVsn | VsnTail]]}] ->
-            lists:foldl(fun(Version, Highest) ->
-                                case ec_semver:pes(Version, Constraint) andalso
-                                    ec_semver:gt(Version, Highest) of
-                                    true ->
-                                        Version;
-                                    false ->
-                                        Highest
-                                end
-                        end, HeadVsn, VsnTail)
-    end.

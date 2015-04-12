@@ -48,9 +48,9 @@ merge_deps(AppInfo, State) ->
     State1 = lists:foldl(fun(Profile, StateAcc) ->
                                  AppProfDeps = rebar_state:get(AppState, {deps, Profile}, []),
                                  TopLevelProfDeps = rebar_state:get(StateAcc, {deps, Profile}, []),
-                                 ProfDeps2 = dedup(lists:keymerge(1,
-                                                                  lists:keysort(1, TopLevelProfDeps),
-                                                                  lists:keysort(1, AppProfDeps))),
+                                 ProfDeps2 = dedup(rebar_utils:tup_umerge(
+                                                     rebar_utils:tup_sort(TopLevelProfDeps)
+                                                     ,rebar_utils:tup_sort(AppProfDeps))),
                                  rebar_state:set(StateAcc, {deps, Profile}, ProfDeps2)
                          end, State, lists:reverse(CurrentProfiles)),
 
@@ -164,7 +164,8 @@ create_app_info(AppDir, AppFile) ->
             AppInfo1 = rebar_app_info:applications(
                          rebar_app_info:app_details(AppInfo, AppDetails),
                          IncludedApplications++Applications),
-            rebar_app_info:dir(AppInfo1, AppDir);
+            Valid = rebar_app_utils:validate_application_info(AppInfo1),
+            rebar_app_info:dir(rebar_app_info:valid(AppInfo1, Valid), AppDir);
         _ ->
             error
     end.

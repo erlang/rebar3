@@ -52,7 +52,9 @@
          args_to_tasks/1,
          expand_env_variable/3,
          get_arch/0,
-         wordsize/0]).
+         wordsize/0,
+         tup_umerge/2,
+         tup_sort/1]).
 
 %% for internal use only
 -export([otp_release/0]).
@@ -224,6 +226,68 @@ erl_opts(Config) ->
 %% note: this does not handle the case where you have an argument that
 %%  was enclosed in quotes and might have commas but should not be split.
 args_to_tasks(Args) -> new_task(Args, []).
+
+%% Sort the list in proplist-order, meaning that `{a,b}' and `{a,c}'
+%% both compare as usual, and `a' and `b' do the same, but `a' and `{a,b}' will
+%% compare based on the first element of the key, and in order. So the following
+%% list will sort as:
+%% - `[native, {native,o3}, check]' -> `[check, native, {native, o3}]'
+%% - `[native, {native,o3}, {native, o2}, check]' -> `[check,native,{native,o3},{native,o2}]'
+%% Meaning that:
+%% a) no deduplication takes place
+%% b) the key of a tuple is what counts in being sorted, but atoms are seen as {atom}
+%%    as far as comparison is concerned (departing from lists:ukeysort/2)
+%% c) order is preserved for similar keys and tuples no matter their size (sort is stable)
+%%
+%% These properties let us merge proplists fairly easily.
+tup_sort(List) ->
+    lists:sort(fun(A, B) when is_tuple(A), is_tuple(B) -> element(1, A) =< element(1, B)
+               ;  (A, B) when is_tuple(A) -> element(1, A) =< B
+               ;  (A, B) when is_tuple(B) -> A =< element(1, B)
+               ;  (A, B) -> A =< B
+               end, List).
+
+%% Custom merge functions. The objective is to behave like lists:umerge/2,
+%% except that we also compare the merge elements based on the key if they're a
+%% tuple, such that `{key, val1}' is always prioritized over `{key, val0}' if
+%% the former is from the 'new' list.
+%%
+%% This lets us apply proper overrides to list of elements according to profile
+%% priority. This function depends on a stable proplist sort.
+tup_umerge([], Olds) ->
+    Olds;
+tup_umerge([New|News], Olds) ->
+    lists:reverse(umerge(News, Olds, [], New)).
+
+%% This is equivalent to umerge2_2 in the stdlib, except we use the expanded
+%% value/key only to compare
+umerge(News, [Old|Olds], Merged, Cmp) when element(1, Cmp) == element(1, Old);
+                                           element(1, Cmp) == Old;
+                                           Cmp == element(1, Old);
+                                           Cmp =< Old ->
+    umerge(News, Olds, [Cmp | Merged], Cmp, Old);
+umerge(News, [Old|Olds], Merged, Cmp) ->
+    umerge(News, Olds, [Old | Merged], Cmp);
+umerge(News, [], Merged, Cmp) ->
+    lists:reverse(News, [Cmp | Merged]).
+
+%% Similar to stdlib's umerge2_1 in the stdlib, except that when the expanded
+%% value/keys compare equal, we check if the element is a full dupe to clear it
+%% (like the stdlib function does) or otherwise keep the duplicate around in
+%% an order that prioritizes 'New' elements.
+umerge([New|News], Olds, Merged, CmpMerged, Cmp) when CmpMerged == Cmp ->
+    umerge(News, Olds, Merged, New);
+umerge([New|News], Olds, Merged, _CmpMerged, Cmp) when element(1,New) == element(1, Cmp);
+                                                       element(1,New) == Cmp;
+                                                       New == element(1, Cmp);
+                                                       New =< Cmp ->
+    umerge(News, Olds, [New | Merged], New, Cmp);
+umerge([New|News], Olds, Merged, _CmpMerged, Cmp) -> % >
+    umerge(News, Olds, [Cmp | Merged], New);
+umerge([], Olds, Merged, CmpMerged, Cmp) when CmpMerged == Cmp ->
+    lists:reverse(Olds, Merged);
+umerge([], Olds, Merged, _CmpMerged, Cmp) ->
+    lists:reverse(Olds, [Cmp | Merged]).
 
 %% ====================================================================
 %% Internal functions

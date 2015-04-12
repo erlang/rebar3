@@ -97,6 +97,8 @@ do(State) ->
     end.
 
 -spec format_error(any()) -> iolist().
+format_error({load_registry_fail, Dep}) ->
+    io_lib:format("Error loading registry to resolve version of ~s. Try fixing by running 'rebar3 update'", [Dep]);
 format_error({bad_constraint, Name, Constraint}) ->
     io_lib:format("Unable to parse version for package ~s: ~s", [Name, Constraint]);
 format_error({parse_dep, Dep}) ->
@@ -129,9 +131,11 @@ handle_deps(Profile, State, Deps, Locks) when is_list(Locks) ->
                  -> {ok, [rebar_app_info:t()], rebar_state:t()} | {error, string()}.
 handle_deps(_Profile, State, [], _, _) ->
     {ok, [], State};
-handle_deps(Profile, State, Deps, Upgrade, Locks) ->
+handle_deps(Profile, State0, Deps, Upgrade, Locks) ->
     %% Read in package index and dep graph
-    {Packages, Graph} = rebar_packages:get_packages(State),
+    {Packages, Graph} = rebar_state:packages(State0),
+    Registry = rebar_packages:registry(State0),
+    State = rebar_state:packages(rebar_state:registry(State0, Registry), {Packages, Graph}),
     %% Split source deps from pkg deps, needed to keep backwards compatibility
     DepsDir = rebar_dir:deps_dir(State),
     {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, State, Locks, 0),
@@ -210,8 +214,8 @@ handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Fetched, Seen, State) -
     AppInfo = package_to_app(DepsDir, Packages, Pkg),
     Level = rebar_app_info:dep_level(AppInfo),
     {NewSeen, NewState} = maybe_lock(Profile, AppInfo, Seen, State, Level),
-    maybe_fetch(AppInfo, Upgrade, Seen, NewState),
-    {[AppInfo | Fetched], NewSeen, NewState}.
+    {_, AppInfo1} = maybe_fetch(AppInfo, Upgrade, Seen, NewState),
+    {[AppInfo1 | Fetched], NewSeen, NewState}.
 
 maybe_lock(Profile, AppInfo, Seen, State, Level) ->
     case rebar_app_info:is_checkout(AppInfo) of
@@ -312,8 +316,8 @@ update_unseen_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State,
                 handle_upgrade(AppInfo, SrcDeps, PkgDeps, SrcApps,
                                Level, State1, Locks);
             _ ->
-                maybe_fetch(AppInfo, false, Seen, State1),
-                handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps,
+                {_, AppInfo1} = maybe_fetch(AppInfo, false, Seen, State1),
+                handle_dep(AppInfo1, SrcDeps, PkgDeps, SrcApps,
                            Level, State1, Locks)
         end,
     {NewSrcDeps, NewPkgDeps, NewSrcApps, State2, NewSeen, NewLocks}.
@@ -323,12 +327,12 @@ handle_upgrade(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
     case lists:keyfind(Name, 1, Locks) of
         false ->
             case maybe_fetch(AppInfo, true, sets:new(), State) of
-                true ->
-                    handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps,
+                {true, AppInfo1} ->
+                    handle_dep(AppInfo1, SrcDeps, PkgDeps, SrcApps,
                                Level, State, Locks);
 
-                false ->
-                    {[AppInfo|SrcDeps], PkgDeps, SrcApps, State, Locks}
+                {false, AppInfo1} ->
+                    {[AppInfo1|SrcDeps], PkgDeps, SrcApps, State, Locks}
             end;
         _StillLocked ->
             {[AppInfo|SrcDeps], PkgDeps, SrcApps, State, Locks}
@@ -371,31 +375,37 @@ handle_dep(State, DepsDir, AppInfo, Locks, Level) ->
     {AppInfo2, SrcDeps, PkgDeps, Locks++NewLocks, State1}.
 
 -spec maybe_fetch(rebar_app_info:t(), boolean() | {true, binary(), integer()},
-                  sets:set(binary()), rebar_state:t()) -> boolean().
+                  sets:set(binary()), rebar_state:t()) -> {boolean(), rebar_app_info:t()}.
 maybe_fetch(AppInfo, Upgrade, Seen, State) ->
     AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
     %% Don't fetch dep if it exists in the _checkouts dir
     case rebar_app_info:is_checkout(AppInfo) of
         true ->
-            false;
+            {false, AppInfo};
         false ->
             case rebar_app_discover:find_app(AppDir, all) of
                 false ->
                     case in_default(AppInfo, State) of
                         false ->
-                            fetch_app(AppInfo, AppDir, State);
+                            {fetch_app(AppInfo, AppDir, State), AppInfo};
                         {true, FoundApp} ->
-                            ?INFO("Linking ~s to ~s", [rebar_app_info:dir(FoundApp), AppDir]),
+                            %% Preserve the state we created with overrides
+                            AppState = rebar_app_info:state(AppInfo),
+                            FoundApp1 = rebar_app_info:state(FoundApp, AppState),
+                            ?INFO("Linking ~s to ~s", [rebar_app_info:dir(FoundApp1), AppDir]),
                             filelib:ensure_dir(AppDir),
-                            rebar_file_utils:symlink_or_copy(rebar_app_info:dir(FoundApp), AppDir),
-                            true
+                            rebar_file_utils:symlink_or_copy(rebar_app_info:dir(FoundApp1), AppDir),
+                            {true, FoundApp1}
                     end;
-                {true, _} ->
+                {true, AppInfo1} ->
+                    %% Preserve the state we created with overrides
+                    AppState = rebar_app_info:state(AppInfo),
+                    AppInfo2 = rebar_app_info:state(AppInfo1, AppState),
                     case sets:is_element(rebar_app_info:name(AppInfo), Seen) of
                         true ->
-                            false;
+                            {false, AppInfo2};
                         false ->
-                            maybe_upgrade(AppInfo, AppDir, Upgrade, State)
+                            {maybe_upgrade(AppInfo, AppDir, Upgrade, State), AppInfo2}
                     end
             end
     end.
@@ -439,13 +449,14 @@ parse_dep({Name, Vsn}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_list(Vs
                                     ,ec_cnv:to_binary(Vsn)) | PkgDepsAcc]}
     end;
 parse_dep(Name, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_atom(Name) ->
+    {PkgName, PkgVsn} = get_package(ec_cnv:to_binary(Name), State),
     CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
     case rebar_app_info:discover(CheckoutsDir) of
         {ok, _App} ->
             Dep = new_dep(DepsDir, Name, [], [], State),
             {[Dep | SrcDepsAcc], PkgDepsAcc};
         not_found ->
-            {SrcDepsAcc, [ec_cnv:to_binary(Name) | PkgDepsAcc]}
+            {SrcDepsAcc, [{PkgName, PkgVsn} | PkgDepsAcc]}
     end;
 parse_dep({Name, Source}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_tuple(Source) ->
     Dep = new_dep(DepsDir, Name, [], Source, State),
@@ -561,3 +572,12 @@ warn_skip_pkg({Name, Source}, State) ->
 not_needs_compile(App) ->
     not(rebar_app_info:is_checkout(App))
         andalso rebar_app_info:valid(App).
+
+get_package(Dep, State) ->
+    case rebar_state:registry(State) of
+        {ok, T} ->
+            HighestDepVsn = rebar_packages:find_highest_matching(Dep, "0", T),
+            {Dep, HighestDepVsn};
+        error ->
+            throw(?PRV_ERROR({load_registry_fail, Dep}))
+    end.
