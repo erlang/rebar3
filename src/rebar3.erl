@@ -55,7 +55,7 @@ main(Args) ->
                 non_existing ->
                     ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace", []),
                     ?DEBUG("Uncaught error: ~p ~p", [Module, Reason]),
-                    ?INFO("When submitting a bug report, please include the output of `rebar3 wtf \"your command\"`", []);
+                    ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []);
                 _ ->
                     ?ERROR(Module:format_error(Reason), [])
             end,
@@ -68,7 +68,7 @@ main(Args) ->
             %% Dump this error to console
             ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace", []),
             ?DEBUG("Uncaught error: ~p", [Error]),
-            ?INFO("When submitting a bug report, please include the output of `rebar3 wtf \"your command\"`", []),
+            ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []),
             erlang:halt(1)
     end.
 
