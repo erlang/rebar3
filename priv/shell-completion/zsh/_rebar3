@@ -131,6 +131,9 @@ _rebar3 () {
                         '(-r --root)'{-r,--root}'[The project root directory]:system libs:_files -/' \
                     && ret=0
                 ;;
+                (report)
+                    _arguments '1: :_rebar3_tasks' && ret=0
+                ;;
                 (shell)
                     _message 'Start a shell with project and deps preloaded' && ret=0
                 ;;
@@ -168,9 +171,6 @@ _rebar3 () {
                 (version)
                     _message 'rebar version' && ret=0
                 ;;
-                (wtf)
-                    _arguments '1: :_rebar3_tasks' && ret=0
-                ;;
                 (xref)
                     _message 'rebar xref' && ret=0
             esac
@@ -194,12 +194,12 @@ _rebar3_tasks() {
         'new:Create new project from templates.'
         'pkgs:List available packages.'
         'release:Build release of project.'
+        'report:Provide a crash report to be sent to the rebar3 issues page.'
         'shell:Run shell with project apps and deps in path.'
         'tar:Tar archive of release built of project.'
         'update:Update package index.'
         'upgrade:Upgrade dependencies.'
         'version:Print version for rebar and current Erlang.'
-        'wtf:Provide a crash report to be sent to the rebar3 issues page.'
         'xref:Run cross reference analysis.'
     )
     _describe -t tasks 'rebar3 tasks' tasks "$@"

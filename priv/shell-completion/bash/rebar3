@@ -24,12 +24,12 @@ _rebar3()
             new \
             pkgs \
             release \
+            report \
             shell \
             tar \
             update \
             upgrade \
             version \
-            wtf \
             xref"
     elif [[ ${prev} == as ]] ; then
         :
@@ -115,6 +115,8 @@ _rebar3()
             --system_libs \
             --version \
             --root"
+    elif [[ ${prev} == report ]] ; then
+        :
     elif [[ ${prev} == shell ]] ; then
         :
     elif [[ ${prev} == tar ]] ; then
@@ -144,8 +146,6 @@ _rebar3()
     elif [[ ${prev} == upgrade ]] ; then
         :
     elif [[ ${prev} == version ]] ; then
-        :
-    elif [[ ${prev} == wtf ]] ; then
         :
     elif [[ ${prev} == xref ]] ; then
         :

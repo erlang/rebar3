@@ -1,7 +1,7 @@
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 
--module(rebar_prv_wtf).
+-module(rebar_prv_report).
 
 -behaviour(provider).
 
@@ -11,7 +11,7 @@
 
 -include("rebar.hrl").
 
--define(PROVIDER, wtf).
+-define(PROVIDER, report).
 -define(DEPS, []).
 -define(ISSUES_URL, "https://github.com/rebar/rebar3/issues").
 
@@ -25,7 +25,7 @@ init(State) ->
                                                                {module, ?MODULE},
                                                                {bare, false},
                                                                {deps, ?DEPS},
-                                                               {example, "rebar3 wtf \"<task>\""},
+                                                               {example, "rebar3 report \"<task>\""},
                                                                {short_desc, "Provide a crash report to be sent to the rebar3 issues page."},
                                                                {desc, "Provide a crash report to be sent to the rebar3 issues page."},
                                                                {opts, [
@@ -42,7 +42,11 @@ do(State) ->
     %% ...
     %% Show app versions (including rebar3)
     {ok, Vsn} = application:get_key(rebar, vsn),
-    Vsns = application:which_applications(),
+    {ok, Apps} = application:get_key(rebar, applications),
+    [application:ensure_started(App) || App <- Apps],
+    Vsns = [io_lib:format("~p: ~s~n", [App, AVsn])
+            || App <- lists:sort(Apps),
+               {ok, AVsn} <- [application:get_key(App, vsn)]],
     %% Show OS and versions
     OS = erlang:system_info(system_architecture),
     %% Erlang version (ERTS)
@@ -54,7 +58,7 @@ do(State) ->
     UTC = calendar:universal_time(),
     %%
     ?CONSOLE(
-        "Rebar3 wtf report~n"
+        "Rebar3 report~n"
         " version ~s~n"
         " generated at ~s~n"
         "=================~n"
@@ -71,7 +75,7 @@ do(State) ->
         "Library directory: ~ts~n"
         "-----------------~n"
         "Loaded Applications:~n"
-        "~p~n"
+        "~s~n"
         "-----------------~n"
         "Escript path: ~ts~n"
         "Providers:~n"
