@@ -164,7 +164,12 @@ create_app_info(AppDir, AppFile) ->
             AppInfo1 = rebar_app_info:applications(
                          rebar_app_info:app_details(AppInfo, AppDetails),
                          IncludedApplications++Applications),
-            Valid = rebar_app_utils:validate_application_info(AppInfo1),
+            Valid = case rebar_app_utils:validate_application_info(AppInfo1) of
+                        true ->
+                            true;
+                        _ ->
+                            false
+                    end,
             rebar_app_info:dir(rebar_app_info:valid(AppInfo1, Valid), AppDir);
         _ ->
             error

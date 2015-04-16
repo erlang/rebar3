@@ -13,7 +13,7 @@ compile_order(Apps) ->
     Graph = digraph:new(),
     lists:foreach(fun(App) ->
                           Name = rebar_app_info:name(App),
-                          Deps = rebar_app_info:deps(App),
+                          Deps = all_apps_deps(App),
                           add(Graph, {Name, Deps})
                   end, Apps),
     case digraph_utils:topsort(Graph) of
@@ -123,3 +123,7 @@ find_app_by_name(Name, Apps) ->
     ec_lists:find(fun(App) ->
                           rebar_app_info:name(App) =:= Name
                   end, Apps).
+
+all_apps_deps(App) ->
+    Applications = [atom_to_binary(X, utf8) || X <- rebar_app_info:applications(App)],
+    lists:usort(rebar_app_info:deps(App) ++ Applications).
