@@ -77,7 +77,6 @@ validate_application_info(AppInfo, AppDetail) ->
                     ?PRV_ERROR({module_list, AppFile});
                 List ->
                     has_all_beams(EbinDir, List)
-
             end
     end.
 

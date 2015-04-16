@@ -46,11 +46,12 @@ do(State) ->
     %% Use the project State for building project apps
     %% Set hooks to empty so top-level hooks aren't run for each project app
     State2 = rebar_state:set(rebar_state:set(State, post_hooks, []), pre_hooks, []),
-    ProjectApps1 = build_apps(State2, Providers, ProjectApps),
+    {ok, ProjectApps1} = rebar_digraph:compile_order(ProjectApps),
+    ProjectApps2 = build_apps(State2, Providers, ProjectApps1),
 
     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State),
 
-    {ok, rebar_state:project_apps(State, ProjectApps1)}.
+    {ok, rebar_state:project_apps(State, ProjectApps2)}.
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
