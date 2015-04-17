@@ -43,7 +43,7 @@ do(State) ->
     %% Show app versions (including rebar3)
     {ok, Vsn} = application:get_key(rebar, vsn),
     {ok, Apps} = application:get_key(rebar, applications),
-    [application:ensure_started(App) || App <- Apps],
+    [application:load(App) || App <- Apps],
     Vsns = [io_lib:format("~p: ~s~n", [App, AVsn])
             || App <- lists:sort(Apps),
                {ok, AVsn} <- [application:get_key(App, vsn)]],
@@ -101,4 +101,3 @@ time_to_string({{Y,M,D},{H,Min,S}}) ->
 
 parse_task(Str) ->
     hd(re:split(Str, " ")).
-
