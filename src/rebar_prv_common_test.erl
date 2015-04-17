@@ -242,7 +242,7 @@ copy_and_compile_test_suites(State, Opts) ->
             Dirs = find_suite_dirs(AllSuites),
             lists:foreach(fun(S) ->
                 NewPath = copy(State, S),
-                compile_dir(State, NewPath)
+                compile_dir(State, S, NewPath)
             end, Dirs),
             NewSuites = lists:map(fun(S) -> retarget_path(State, S) end, AllSuites),
             [{suite, NewSuites}|lists:keydelete(suite, 1, Opts)]
@@ -254,12 +254,12 @@ copy_and_compile_test_dirs(State, Opts) ->
         %% dir is a single directory
         Dir when is_list(Dir), is_integer(hd(Dir)) ->
             NewPath = copy(State, Dir),
-            [{dir, compile_dir(State, NewPath)}|lists:keydelete(dir, 1, Opts)];
+            [{dir, compile_dir(State, Dir, NewPath)}|lists:keydelete(dir, 1, Opts)];
         %% dir is a list of directories
         Dirs when is_list(Dirs) ->
             NewDirs = lists:map(fun(Dir) ->
                 NewPath = copy(State, Dir),
-                compile_dir(State, NewPath)
+                compile_dir(State, Dir, NewPath)
             end, Dirs),
             [{dir, NewDirs}|lists:keydelete(dir, 1, Opts)]
     end.
@@ -294,11 +294,11 @@ copy(State, Target) ->
             NewTarget
     end.
 
-compile_dir(State, Dir) ->
+compile_dir(State, Dir, OutDir) ->
     NewState = replace_src_dirs(State, [Dir]),
-    ok = rebar_erlc_compiler:compile(NewState, rebar_dir:base_dir(State), Dir),
+    ok = rebar_erlc_compiler:compile(NewState, rebar_dir:base_dir(State), OutDir),
     ok = maybe_cover_compile(State, Dir),
-    Dir.
+    OutDir.
 
 retarget_path(State, Path) ->
     ProjectApps = rebar_state:project_apps(State),

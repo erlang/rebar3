@@ -130,20 +130,23 @@ do(State) ->
     %% We need a project app to store the results under in _build
     %% If there is more than 1 project app, check for an app config
     %% if that doesn't exist, error out.
-    App1 = case rebar_state:project_apps(State) of
-               [App] ->
-                   App;
-               Apps ->
-                   case option(app, DtlOpts) of
-                       undefined ->
-                           ?PRV_ERROR(no_main_app);
-                       Name ->
-                           rebar_app_utils:find(Name, Apps)
-                   end
-           end,
+    case rebar_state:project_apps(State) of
+        [App] ->
+            run_erlydtl(App, DtlOpts, State),
+            {ok, State};
+        Apps ->
+            case option(app, DtlOpts) of
+                undefined ->
+                    ?PRV_ERROR(no_main_app);
+                Name ->
+                    run_erlydtl(rebar_app_utils:find(Name, Apps), DtlOpts, State),
+                    {ok, State}
+            end
+    end.
 
-    Dir = rebar_app_info:dir(App1),
-    OutDir = rebar_app_info:ebin_dir(App1),
+run_erlydtl(App, DtlOpts, State) ->
+    Dir = rebar_app_info:dir(App),
+    OutDir = rebar_app_info:ebin_dir(App),
     rebar_base_compiler:run(State,
                             [],
                             filename:join(Dir, option(doc_root, DtlOpts)),
@@ -154,9 +157,7 @@ do(State) ->
                                     compile_dtl(C, S, T, DtlOpts, Dir, OutDir)
                             end,
                             [{check_last_mod, false},
-                             {recursive, option(recursive, DtlOpts)}]),
-
-    {ok, State}.
+                             {recursive, option(recursive, DtlOpts)}]).
 
 -spec format_error(any()) ->  iolist().
 format_error(no_main_app) ->

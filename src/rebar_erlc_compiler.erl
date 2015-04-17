@@ -549,7 +549,7 @@ warn_and_find_path(File, Dir) ->
         true ->
             [SrcHeader];
         false ->
-            IncludeDir = filename:join(filename:join(lists:droplast(filename:split(Dir))), "include"),
+            IncludeDir = filename:join(filename:join(rebar_utils:droplast(filename:split(Dir))), "include"),
             IncludeHeader = filename:join(IncludeDir, File),
             case filelib:is_regular(IncludeHeader) of
                 true ->

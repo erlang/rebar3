@@ -62,22 +62,21 @@ desc() ->
 
 do(State) ->
     ?INFO("Building escript...", []),
-    escriptize(State).
+    case rebar_state:project_apps(State) of
+        [App] ->
+            escriptize(State, App);
+        Apps ->
+            case rebar_state:get(State, escript_main_app, undefined) of
+                undefined ->
+                    ?PRV_ERROR(no_main_app);
+                Name ->
+                    AppInfo = rebar_app_utils:find(Name, Apps),
+                    escriptize(State, AppInfo)
+            end
+    end.
 
-escriptize(State0) ->
-    App1 = case rebar_state:project_apps(State0) of
-               [App] ->
-                   App;
-               Apps ->
-                   case rebar_state:get(State0, escript_main_app, undefined) of
-                       undefined ->
-                           ?PRV_ERROR(no_main_app);
-                       Name ->
-                           rebar_app_utils:find(Name, Apps)
-                   end
-           end,
-
-    AppName = rebar_app_info:name(App1),
+escriptize(State0, App) ->
+    AppName = rebar_app_info:name(App),
     AppNameStr = ec_cnv:to_list(AppName),
 
     %% Get the output filename for the escript -- this may include dirs
@@ -152,7 +151,8 @@ get_app_beams([App | Rest], Acc) ->
         Path ->
             Prefix = filename:join(atom_to_list(App), "ebin"),
             Acc2 = load_files(Prefix, "*.beam", Path),
-            get_app_beams(Rest, Acc2 ++ Acc)
+            Acc3 = load_files(Prefix, "*.app", Path),
+            get_app_beams(Rest, Acc3 ++ Acc2 ++ Acc)
     end.
 
 get_extra(State) ->
