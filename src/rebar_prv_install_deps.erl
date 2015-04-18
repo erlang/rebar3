@@ -153,7 +153,7 @@ handle_deps(Profile, State0, Deps, Upgrade, Locks) ->
     %% Sort all apps to build order
     State3 = rebar_state:all_deps(State2, AllDeps),
     CodePaths = [rebar_app_info:ebin_dir(A) || A <- AllDeps],
-    ok = code:add_pathsa(CodePaths),
+    ok = code:add_pathsz(CodePaths),
 
     {ok, AllDeps, State3}.
 
