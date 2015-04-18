@@ -1,6 +1,7 @@
 -module(rebar_dir).
 
 -export([base_dir/1,
+         profile_dir/2,
          deps_dir/1,
          deps_dir/2,
          checkouts_dir/1,
@@ -24,7 +25,10 @@
 
 -spec base_dir(rebar_state:t()) -> file:filename_all().
 base_dir(State) ->
-    Profiles = rebar_state:current_profiles(State),
+    profile_dir(State, rebar_state:current_profiles(State)).
+
+-spec profile_dir(rebar_state:t(), [atom()]) -> file:filename_all().
+profile_dir(State, Profiles) ->
     ProfilesStrings = case [ec_cnv:to_list(P) || P <- Profiles] of
         ["default"]      -> ["default"];
         %% drop `default` from the profile dir if it's implicit and reverse order
@@ -33,6 +37,7 @@ base_dir(State) ->
     end,
     ProfilesDir = string:join(ProfilesStrings, "+"),
     filename:join(rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR), ProfilesDir).
+
 
 -spec deps_dir(rebar_state:t()) -> file:filename_all().
 deps_dir(State) ->
