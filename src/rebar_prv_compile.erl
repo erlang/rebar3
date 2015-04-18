@@ -32,7 +32,7 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     DepsPaths = rebar_state:code_paths(State, all_deps),
-    code:add_paths(DepsPaths),
+    code:add_pathsa(DepsPaths),
 
     ProjectApps = rebar_state:project_apps(State),
     Providers = rebar_state:providers(State),
@@ -83,7 +83,6 @@ build_app(State, Providers, AppInfo) ->
         end,
 
     %% Legacy hook support
-
     rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, S),
     AppInfo1 = compile(S, AppInfo),
     rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, S),

@@ -160,7 +160,7 @@ profiles_remain_applied_with_config_present(Config) ->
 
     rebar_test_utils:create_config(AppDir, RebarConfig),
 
-    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig,
+    rebar_test_utils:run_and_check(Config, RebarConfig,
                                    ["as", "not_ok", "compile"], {ok, [{app, Name}]}),
 
     Path = filename:join([AppDir, "_build", "not_ok", "lib", Name, "ebin"]),

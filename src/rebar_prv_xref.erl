@@ -36,7 +36,7 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    code:add_pathsa(rebar_state:code_paths(State, all_deps)),
     XrefChecks = prepare(State),
 
     %% Run xref checks

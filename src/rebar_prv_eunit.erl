@@ -37,7 +37,7 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     ?INFO("Performing EUnit tests...", []),
-    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    code:add_pathsa(rebar_state:code_paths(State, all_deps)),
     %% Run eunit provider prehooks
     Providers = rebar_state:providers(State),
     Cwd = rebar_dir:get_cwd(),

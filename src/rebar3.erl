@@ -27,6 +27,7 @@
 -module(rebar3).
 
 -export([main/1,
+         run/1,
          run/2,
          global_option_spec_list/0,
          init_config/0,

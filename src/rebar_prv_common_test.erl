@@ -39,7 +39,7 @@ init(State) ->
 do(State) ->
     ?INFO("Running Common Test suites...", []),
 
-    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    code:add_pathsa(rebar_state:code_paths(State, all_deps)),
 
     %% Run ct provider prehooks
     Providers = rebar_state:providers(State),

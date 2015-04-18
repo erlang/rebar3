@@ -148,7 +148,8 @@ doterl_compile(Config, Dir, OutDir, MoreSources, ErlOpts) ->
 
     %% Make sure that ebin/ exists and is on the path
     ok = filelib:ensure_dir(filename:join(OutDir, "dummy.beam")),
-    true = code:add_path(filename:absname(OutDir)),
+    true = code:add_patha(filename:absname(OutDir)),
+
     OutDir1 = proplists:get_value(outdir, ErlOpts, OutDir),
 
     G = init_erlcinfo(proplists:get_all_values(i, ErlOpts), AllErlFiles, Dir),
