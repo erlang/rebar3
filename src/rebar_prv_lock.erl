@@ -23,7 +23,7 @@ init(State) ->
                                                                {deps, ?DEPS},
                                                                {example, ""},
                                                                {short_desc, "Locks dependencies."},
-                                                               {desc, info("Locks dependencies")},
+                                                               {desc, "Locks dependencies"},
                                                                {opts, []}])),
     {ok, State1}.
 
@@ -39,9 +39,6 @@ do(State) ->
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
-info(_) ->
-    "".
-
 build_locks(State) ->
     AllDeps = rebar_state:lock(State),
     [begin
@@ -54,4 +51,3 @@ build_locks(State) ->
         ,rebar_fetch:lock_source(Dir, Source, State)
         ,rebar_app_info:dep_level(Dep)}
      end || Dep <- AllDeps, not(rebar_app_info:is_checkout(Dep))].
-
