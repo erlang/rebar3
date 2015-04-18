@@ -44,7 +44,7 @@ init_per_testcase(Case, Config) ->
     [{app_name, Name},
      {rebar_config, RebarConfig} | UpdConfig].
 
-end_per_testcase(_, Config) ->
+end_per_testcase(_, _Config) ->
     ok.
 
 all() ->
@@ -112,7 +112,7 @@ verify_test_results(xref_test, AppName, XrefResults, _QueryResults) ->
     ok;
 verify_test_results(xref_ignore_test, AppName, XrefResults, _QueryResults) ->
     AppModules = ["behaviour1", "behaviour2", "mymod", "othermod", "somemod"],
-    [Behaviour1Mod, Behaviour2Mod, MyMod, OtherMod, SomeMod] =
+    [_Behaviour1Mod, _Behaviour2Mod, _MyMod, _OtherMod, SomeMod] =
         [list_to_atom(AppName ++ "_" ++ Mod) || Mod <- AppModules],
     UndefFuns = proplists:get_value(undefined_functions, XrefResults),
     ?assertNot(lists:keymember(undefined_function_calls, 1, XrefResults)),
