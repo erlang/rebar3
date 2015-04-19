@@ -84,7 +84,7 @@ build_app(State, Providers, AppInfo) ->
     AppInfo1 = compile(S1, AppInfo),
     rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, S1),
 
-    true = code:add_pathz(rebar_app_info:ebin_dir(AppInfo1)),
+    true = code:add_patha(rebar_app_info:ebin_dir(AppInfo1)),
     AppInfo1.
 
 compile(State, AppInfo) ->
