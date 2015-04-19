@@ -62,17 +62,18 @@ desc() ->
 
 do(State) ->
     ?INFO("Building escript...", []),
-    case rebar_state:project_apps(State) of
-        [App] ->
-            escriptize(State, App);
-        Apps ->
-            case rebar_state:get(State, escript_main_app, undefined) of
-                undefined ->
-                    ?PRV_ERROR(no_main_app);
-                Name ->
-                    AppInfo = rebar_app_utils:find(Name, Apps),
-                    escriptize(State, AppInfo)
-            end
+    case rebar_state:get(State, escript_main_app, undefined) of
+        undefined ->
+            case rebar_state:project_apps(State) of
+                [App] ->
+                    escriptize(State, App);
+                _ ->
+                    ?PRV_ERROR(no_main_app)
+            end;
+        Name ->
+            AllApps = rebar_state:all_deps(State)++rebar_state:project_apps(State),
+            AppInfo = rebar_app_utils:find(Name, AllApps),
+            escriptize(State, AppInfo)
     end.
 
 escriptize(State0, App) ->
@@ -89,8 +90,9 @@ escriptize(State0, App) ->
     %% in the output file. We then use the .app files for each of these
     %% to pull in all the .beam files.
     InclApps = lists:usort(rebar_state:get(State, escript_incl_apps, [])
-                           ++ all_deps(State)),
-    InclBeams = get_app_beams(InclApps),
+                          ++ all_deps(State)),
+    AllApps = rebar_state:all_deps(State)++rebar_state:project_apps(State),
+    InclBeams = get_apps_beams(InclApps, AllApps),
 
     %% Look for a list of extra files to include in the output file.
     %% For internal rebar-private use only. Do not use outside rebar.
@@ -139,21 +141,31 @@ format_error(no_main_app) ->
 %% Internal functions
 %% ===================================================================
 
-get_app_beams(Apps) ->
-    get_app_beams(Apps, []).
+get_apps_beams(Apps, AllApps) ->
+    get_apps_beams(Apps, AllApps, []).
 
-get_app_beams([], Acc) ->
+get_apps_beams([], _, Acc) ->
     Acc;
-get_app_beams([App | Rest], Acc) ->
-    case code:lib_dir(App, ebin) of
-        {error, bad_name} ->
-            throw(?PRV_ERROR({bad_name, App}));
-        Path ->
-            Prefix = filename:join(atom_to_list(App), "ebin"),
-            Acc2 = load_files(Prefix, "*.beam", Path),
-            Acc3 = load_files(Prefix, "*.app", Path),
-            get_app_beams(Rest, Acc3 ++ Acc2 ++ Acc)
+get_apps_beams([App | Rest], AllApps, Acc) ->
+    case rebar_app_utils:find(ec_cnv:to_binary(App), AllApps) of
+        {ok, App1} ->
+            OutDir = filename:absname(rebar_app_info:ebin_dir(App1)),
+            Beams = get_app_beams(App, OutDir),
+            get_apps_beams(Rest, AllApps, Beams ++ Acc);
+        _->
+            case code:lib_dir(App, ebin) of
+                {error, bad_name} ->
+                    throw(?PRV_ERROR({bad_name, App}));
+                Path ->
+                    Beams = get_app_beams(App, Path),
+                    get_apps_beams(Rest, AllApps, Beams ++ Acc)
+            end
     end.
+
+get_app_beams(App, Path) ->
+    Prefix = filename:join(atom_to_list(App), "ebin"),
+    load_files(Prefix, "*.beam", Path) ++
+        load_files(Prefix, "*.app", Path).
 
 get_extra(State) ->
     Extra = rebar_state:get(State, escript_incl_extra, []),

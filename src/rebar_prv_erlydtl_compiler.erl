@@ -125,39 +125,48 @@ init(State) ->
 
 do(State) ->
     ?INFO("Running erlydtl...", []),
-    DtlOpts = proplists:unfold(rebar_state:get(State, erlydtl_opts, [])),
-
-    %% We need a project app to store the results under in _build
-    %% If there is more than 1 project app, check for an app config
-    %% if that doesn't exist, error out.
-    case rebar_state:project_apps(State) of
-        [App] ->
-            run_erlydtl(App, DtlOpts, State),
-            {ok, State};
-        Apps ->
-            case option(app, DtlOpts) of
-                undefined ->
-                    ?PRV_ERROR(no_main_app);
-                Name ->
-                    run_erlydtl(rebar_app_utils:find(Name, Apps), DtlOpts, State),
-                    {ok, State}
-            end
+    case rebar_state:get(State, escript_main_app, undefined) of
+        undefined ->
+            Dir = rebar_state:dir(State),
+            case rebar_app_discover:find_app(Dir, all) of
+                {true, AppInfo} ->
+                    AllApps = rebar_state:project_apps(State) ++ rebar_state:all_deps(State),
+                    case rebar_app_utils:find(rebar_app_info:name(AppInfo), AllApps) of
+                        {ok, AppInfo1} ->
+                            %% Use the existing app info instead of newly created one
+                            run_erlydtl(AppInfo1, State);
+                        _ ->
+                            run_erlydtl(AppInfo, State)
+                    end,
+                    {ok, State};
+                _ ->
+                    ?PRV_ERROR(no_main_app)
+            end;
+        Name ->
+            AllApps = rebar_state:project_apps(State) ++ rebar_state:all_deps(State),
+            {ok, App} = rebar_app_utils:find(Name, AllApps),
+            run_erlydtl(App, State),
+            {ok, State}
     end.
 
-run_erlydtl(App, DtlOpts, State) ->
-    Dir = rebar_app_info:dir(App),
+run_erlydtl(App, State) ->
+    Dir = rebar_state:dir(State),
+    DtlOpts = proplists:unfold(rebar_state:get(State, erlydtl_opts, [])),
+    TemplateDir = filename:join(Dir, option(doc_root, DtlOpts)),
+    DtlOpts2 = [{doc_root, TemplateDir} | proplists:delete(doc_root, DtlOpts)],
     OutDir = rebar_app_info:ebin_dir(App),
+    filelib:ensure_dir(filename:join(OutDir, "dummy.beam")),
     rebar_base_compiler:run(State,
                             [],
-                            filename:join(Dir, option(doc_root, DtlOpts)),
-                            option(source_ext, DtlOpts),
+                            TemplateDir,
+                            option(source_ext, DtlOpts2),
                             OutDir,
-                            option(module_ext, DtlOpts) ++ ".beam",
+                            option(module_ext, DtlOpts2) ++ ".beam",
                             fun(S, T, C) ->
-                                    compile_dtl(C, S, T, DtlOpts, Dir, OutDir)
+                                    compile_dtl(C, S, T, DtlOpts2, Dir, OutDir)
                             end,
                             [{check_last_mod, false},
-                             {recursive, option(recursive, DtlOpts)}]).
+                             {recursive, option(recursive, DtlOpts2)}]).
 
 -spec format_error(any()) ->  iolist().
 format_error(no_main_app) ->

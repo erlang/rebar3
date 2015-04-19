@@ -114,7 +114,7 @@ compile_each([Source | Rest], Config, CompileFn) ->
         skipped ->
             ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), filename:basename(Source)]);
         Error ->
-            ?INFO("Compiling ~s failed:",
+            ?ERROR("Compiling ~s failed",
                      [maybe_absname(Config, Source)]),
             maybe_report(Error),
             ?DEBUG("Compilation failed: ~p", [Error]),
