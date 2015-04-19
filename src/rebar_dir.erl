@@ -4,6 +4,7 @@
          profile_dir/2,
          deps_dir/1,
          deps_dir/2,
+         root_dir/1,
          checkouts_dir/1,
          checkouts_dir/2,
          plugins_dir/1,
@@ -48,7 +49,7 @@ deps_dir(DepsDir, App) ->
     filename:join(DepsDir, App).
 
 root_dir(State) ->
-    rebar_state:get(State, root_dir, ?DEFAULT_ROOT_DIR).
+    filename:absname(rebar_state:get(State, root_dir, ?DEFAULT_ROOT_DIR)).
 
 -spec checkouts_dir(rebar_state:t()) -> file:filename_all().
 checkouts_dir(State) ->
