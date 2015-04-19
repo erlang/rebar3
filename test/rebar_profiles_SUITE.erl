@@ -160,8 +160,11 @@ profiles_remain_applied_with_config_present(Config) ->
 
     rebar_test_utils:create_config(AppDir, RebarConfig),
 
-    rebar_test_utils:run_and_check(Config, RebarConfig,
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig,
                                    ["as", "not_ok", "compile"], {ok, [{app, Name}]}),
+
+    Path = filename:join([AppDir, "_build", "not_ok", "lib", Name, "ebin"]),
+    code:add_path(Path),
 
     Mod = list_to_atom("not_a_real_src_" ++ Name),
 
@@ -196,7 +199,8 @@ test_profile_applied_before_compile(Config) ->
     RebarConfig = [{erl_opts, [{d, some_define}]}],
     rebar_test_utils:create_config(AppDir, RebarConfig),
 
-    rebar_test_utils:run_and_check(Config, RebarConfig, ["eunit"], {ok, [{app, Name}]}),
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["eunit"], {ok, [{app, Name}]}),
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
 
     S = list_to_atom("not_a_real_src_" ++ Name),
     true = lists:member({d, 'TEST'}, proplists:get_value(options, S:module_info(compile), [])).
@@ -211,7 +215,8 @@ test_profile_applied_before_eunit(Config) ->
     RebarConfig = [{erl_opts, [{d, some_define}]}],
     rebar_test_utils:create_config(AppDir, RebarConfig),
 
-    rebar_test_utils:run_and_check(Config, RebarConfig, ["eunit"], {ok, [{app, Name}]}),
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["eunit"], {ok, [{app, Name}]}),
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
 
     T = list_to_atom("not_a_real_src_" ++ Name ++ "_tests"),
     true = lists:member({d, 'TEST'}, proplists:get_value(options, T:module_info(compile), [])).

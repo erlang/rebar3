@@ -102,10 +102,11 @@ build_checkout_deps(Config) ->
     Deps = [{list_to_atom(Name2), Vsn2, {git, "", ""}}],
     {ok, RebarConfig} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, Deps}])),
 
-    rebar_test_utils:run_and_check(
+    {ok, State} = rebar_test_utils:run_and_check(
         Config, RebarConfig, ["compile"],
         {ok, [{app, Name1}, {checkout, Name2}]}
     ),
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
     ok = application:load(list_to_atom(Name2)),
     Loaded = application:loaded_applications(),
     {_, _, Vsn2} = lists:keyfind(list_to_atom(Name2), 1, Loaded).
@@ -307,10 +308,11 @@ deps_in_path(Config) ->
     ?assertEqual([], [Path || Path <- code:get_path(),
                                  {match, _} <- [re:run(Path, PkgName)]]),
     %% Build things
-    rebar_test_utils:run_and_check(
+    {ok, State} = rebar_test_utils:run_and_check(
         Config, RConf, ["compile"],
         {ok, [{app, Name}, {dep, DepName}, {dep, PkgName}]}
     ),
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
     %% Find src name in there
     ?assertNotEqual([], [Path || Path <- code:get_path(),
                                  {match, _} <- [re:run(Path, DepName)]]),
@@ -326,11 +328,12 @@ deps_in_path(Config) ->
     ?assertEqual([], [Path || Path <- code:get_path(),
                                  {match, _} <- [re:run(Path, PkgName)]]),
     %% Rebuild
-    rebar_test_utils:run_and_check(
+    {ok, State1} = rebar_test_utils:run_and_check(
         Config, RConf, ["compile"],
         {ok, [{app, Name}, {dep, DepName}, {dep, PkgName}]}
     ),
     %% Find src name in there
+    code:add_paths(rebar_state:code_paths(State1, all_deps)),
     ?assertNotEqual([], [Path || Path <- code:get_path(),
                                  {match, _} <- [re:run(Path, DepName)]]),
     %% find pkg name in there
@@ -373,11 +376,11 @@ checkout_priority(Config) ->
 
     %% Rebuild and make sure the checkout apps are in path
     code:set_path(StartPaths),
-    rebar_test_utils:run_and_check(
+    {ok, State} = rebar_test_utils:run_and_check(
         Config, RConf, ["compile"],
         {ok, [{app, Name}, {checkout, DepName}, {checkout, PkgName}]}
     ),
-
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
     [DepPath] = [Path || Path <- code:get_path(),
                          {match, _} <- [re:run(Path, DepName)]],
     [PkgPath] = [Path || Path <- code:get_path(),

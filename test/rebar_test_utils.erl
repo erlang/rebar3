@@ -56,7 +56,8 @@ run_and_check(Config, RebarConfig, Command, Expect) ->
                 ?assertEqual({error, Reason}, Res);
             {ok, Expected} ->
                 {ok, _} = Res,
-                check_results(AppDir, Expected);
+                check_results(AppDir, Expected),
+                Res;
             return ->
                 Res
         end
