@@ -213,8 +213,12 @@ apply_profiles(State=#state_t{opts=Opts, current_profiles=CurrentProfiles}, Prof
         lists:foldl(fun(default, {ProfilesAcc, OptsAcc}) ->
                             {ProfilesAcc, OptsAcc};
                        (Profile, {ProfilesAcc, OptsAcc}) ->
+                            NewProfilesAcc = case lists:member(Profile, CurrentProfiles) of
+                                                false -> [Profile]++ProfilesAcc;
+                                                true -> ProfilesAcc
+                                             end,
                             ProfileOpts = dict:from_list(proplists:get_value(Profile, ConfigProfiles, [])),
-                            {[Profile]++ProfilesAcc, merge_opts(Profile, ProfileOpts, OptsAcc)}
+                            {NewProfilesAcc, merge_opts(Profile, ProfileOpts, OptsAcc)}
                     end, {[], Opts}, Profiles),
     State#state_t{current_profiles=CurrentProfiles++Profiles1, opts=NewOpts}.
 
