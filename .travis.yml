@@ -3,11 +3,11 @@ otp_release:
   - 17.0
   - R16B03-1
   - R15B03
-script: make travis
+script: "./rebar3 ct"
 branches:
   only:
     - master
-before_deploy: "rm -rf !(rebar3)"
+before_deploy: "cp _build/default/bin/rebar3 ./ && rm -rf !(rebar3)"
 deploy:
   on:
     branch: master

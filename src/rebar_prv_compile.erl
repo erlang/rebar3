@@ -76,11 +76,13 @@ build_app(State, Providers, AppInfo) ->
                 AppState
         end,
 
+    S1 = rebar_state:project_apps(S, [AppInfo]),
+
     %% Legacy hook support
 
-    rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, S),
-    AppInfo1 = compile(S, AppInfo),
-    rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, S),
+    rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, S1),
+    AppInfo1 = compile(S1, AppInfo),
+    rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, S1),
 
     true = code:add_patha(rebar_app_info:ebin_dir(AppInfo1)),
     AppInfo1.
