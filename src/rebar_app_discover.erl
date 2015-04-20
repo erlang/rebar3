@@ -37,12 +37,13 @@ merge_deps(AppInfo, State) ->
     Default = rebar_state:default(State),
     CurrentProfiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo),
-    C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
+    C = project_app_config(AppInfo, State),
 
     %% We reset the opts here to default so no profiles are applied multiple times
     AppState = rebar_state:apply_overrides(
                  rebar_state:apply_profiles(
-                   rebar_state:new(rebar_state:opts(State, Default), C, rebar_app_info:dir(AppInfo)), CurrentProfiles), Name),
+                   rebar_state:new(reset_hooks(rebar_state:opts(State, Default)), C,
+                                  rebar_app_info:dir(AppInfo)), CurrentProfiles), Name),
     AppInfo1 = rebar_app_info:state(AppInfo, AppState),
 
     State1 = lists:foldl(fun(Profile, StateAcc) ->
@@ -55,6 +56,27 @@ merge_deps(AppInfo, State) ->
                          end, State, lists:reverse(CurrentProfiles)),
 
     {AppInfo1, State1}.
+
+project_app_config(AppInfo, State) ->
+    C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
+    Dir = rebar_app_info:dir(AppInfo),
+    maybe_reset_hooks(C, Dir, State).
+
+%% Here we check if the app is at the root of the project.
+%% If it is, then drop the hooks from the config so they aren't run twice
+maybe_reset_hooks(C, Dir, State) ->
+    case filename:dirname(rebar_dir:root_dir(State)) of
+        Dir ->
+            C1 = proplists:delete(provider_hooks, C),
+            proplists:delete(hooks, C1);
+        _ ->
+            C
+    end.
+
+reset_hooks(State) ->
+    lists:foldl(fun(Key, StateAcc) ->
+                        rebar_state:set(StateAcc, Key, [])
+                end, State, [post_hooks, pre_hooks, provider_hooks]).
 
 -spec all_app_dirs(list(file:name())) -> list(file:name()).
 all_app_dirs(LibDirs) ->
