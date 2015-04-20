@@ -161,7 +161,7 @@ doterl_compile(Config, Dir, OutDir, MoreSources, ErlOpts) ->
                                                 filename:extension(File) =:= ".erl"],
 
     NeededErlFiles = needed_files(G, ErlOpts, Dir, OutDir1, AllErlFiles),
-    ErlFirstFiles = erl_first_files(Config, NeededErlFiles),
+    ErlFirstFiles = erl_first_files(Config, Dir, NeededErlFiles),
     {DepErls, OtherErls} = lists:partition(
                              fun(Source) -> digraph:in_degree(G, Source) > 0 end,
                              [File || File <- NeededErlFiles, not lists:member(File, ErlFirstFiles)]),
@@ -176,10 +176,11 @@ doterl_compile(Config, Dir, OutDir, MoreSources, ErlOpts) ->
     true = code:set_path(CurrPath),
     ok.
 
-erl_first_files(Config, NeededErlFiles) ->
+erl_first_files(Config, Dir, NeededErlFiles) ->
     ErlFirstFilesConf = rebar_state:get(Config, erl_first_files, []),
     %% NOTE: order of files in ErlFirstFiles is important!
-    [File || File <- ErlFirstFilesConf, lists:member(File, NeededErlFiles)].
+    [filename:join(Dir, File) || File <- ErlFirstFilesConf,
+                                 lists:member(filename:join(Dir, File), NeededErlFiles)].
 
 %% Get subset of SourceFiles which need to be recompiled, respecting
 %% dependencies induced by given graph G.
