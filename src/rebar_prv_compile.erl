@@ -36,14 +36,15 @@ do(State) ->
     Deps = rebar_state:deps_to_build(State),
     Cwd = rebar_dir:get_cwd(),
 
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
-
     %% Need to allow global config vars used on deps
     %% Right now no way to differeniate and just give deps a new state
     EmptyState = rebar_state:new(),
     build_apps(EmptyState, Providers, Deps),
 
     {ok, ProjectApps1} = rebar_digraph:compile_order(ProjectApps),
+
+    %% Run top level hooks *before* project apps compiled but *after* deps are
+    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
     ProjectApps2 = build_apps(State, Providers, ProjectApps1),
     State2 = rebar_state:project_apps(State, ProjectApps2),
