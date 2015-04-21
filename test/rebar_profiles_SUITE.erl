@@ -7,7 +7,10 @@
          all/0,
          profile_new_key/1,
          profile_merge_keys/1,
+         explicit_profile_deduplicate_deps/1,
+         implicit_profile_deduplicate_deps/1,
          profile_merges/1,
+         same_profile_deduplication/1,
          add_to_profile/1,
          add_to_existing_profile/1,
          profiles_remain_applied_with_config_present/1,
@@ -22,6 +25,7 @@
 
 all() ->
     [profile_new_key, profile_merge_keys, profile_merges,
+     explicit_profile_deduplicate_deps, implitit_profilededuplicate_deps,
      add_to_profile, add_to_existing_profile,
      profiles_remain_applied_with_config_present,
      test_profile_applied_at_completion,
@@ -94,6 +98,67 @@ profile_merge_keys(Config) ->
                                    ["as", "ct", "compile"], {ok, [{app, Name}
                                                                  ,{dep, "a", "1.0.0"}
                                                                  ,{dep, "b", "2.0.0"}]}).
+
+explicit_profile_deduplicate_deps(Config) ->
+    AppDir = ?config(apps, Config),
+
+    AllDeps = rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
+                                                ,{"a", "2.0.0", []}
+                                                ,{"b", "1.0.0", []}
+                                                ,{"b", "2.0.0", []}]),
+    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(AllDeps)}]),
+
+    Name = rebar_test_utils:create_random_name("explicit_profile_deduplicate_deps_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    FooDeps = rebar_test_utils:top_level_deps(
+                    rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []},
+                                                       {"b", "2.0.0", []}])),
+    BarDeps = rebar_test_utils:top_level_deps(
+                    rebar_test_utils:expand_deps(git, [{"b", "1.0.0", []}])),
+
+    RebarConfig = [{profiles,
+                    [{foo,
+                      [{deps, FooDeps}]},
+                     {bar,
+                      [{deps, BarDeps}]}]}],
+
+    rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["as", "bar,foo,bar", "compile"], {ok, [{app, Name}
+                                                                 ,{dep, "a", "1.0.0"}
+                                                                 ,{dep, "b", "1.0.0"}]}).
+
+implicit_profile_deduplicate_deps(Config) ->
+    AppDir = ?config(apps, Config),
+
+    AllDeps = rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
+                                                ,{"a", "2.0.0", []}
+                                                ,{"b", "1.0.0", []}
+                                                ,{"b", "2.0.0", []}]),
+    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(AllDeps)}]),
+
+    Name = rebar_test_utils:create_random_name("implicit_profile_deduplicate_deps_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    TestDeps = rebar_test_utils:top_level_deps(
+                    rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []},
+                                                       {"b", "2.0.0", []}])),
+    ProfileDeps = rebar_test_utils:top_level_deps(
+                    rebar_test_utils:expand_deps(git, [{"b", "1.0.0", []}])),
+
+    RebarConfig = [{profiles,
+                    [{test,
+                      [{deps, TestDeps}]},
+                     {bar,
+                      [{deps, ProfileDeps}]}]}],
+
+    rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["as", "test,bar", "eunit"], {ok, [{app, Name}
+                                                                 ,{dep, "a", "1.0.0"}
+                                                                 ,{dep, "b", "2.0.0"}]}).
+
 
 profile_merges(_Config) ->
     RebarConfig = [{test1, [{key1, 1, 2}, key2]},
