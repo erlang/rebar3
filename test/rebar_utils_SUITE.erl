@@ -21,7 +21,9 @@
          task_with_flag_with_trailing_comma/1,
          task_with_flag_with_commas/1,
          task_with_multiple_flags/1,
-         special_task_do/1]).
+         special_task_do/1,
+         trivial_umerge/1,
+         three_tuple_umerge/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -29,7 +31,10 @@
 
 
 all() ->
-    [{group, args_to_tasks}].
+    [{group, args_to_tasks},
+     trivial_umerge,
+     three_tuple_umerge
+    ].
 
 groups() ->
     [{args_to_tasks, [], [empty_arglist,
@@ -118,3 +123,18 @@ special_task_do(_Config) ->
                                                                         "do",
                                                                         "bar,",
                                                                         "baz"]).
+
+trivial_umerge(_Config) ->
+    New = [{key, foo}],
+    Old = [{key, bar}],
+    Result = rebar_utils:tup_umerge(New, Old),
+    ?assertEqual([{key, foo}], Result).
+
+three_tuple_umerge(_Config) ->
+    New = rebar_utils:tup_sort([{d, foo, true}, {d, bar, true}]),
+    Old = rebar_utils:tup_sort([{d, foo, false}, {d, bar, true}]),
+    Result = rebar_utils:tup_umerge(New, Old),
+    ?assertEqual(
+        rebar_utils:tup_sort([{do, foo, true}, {d, bar, true}]),
+        Result
+    ).
