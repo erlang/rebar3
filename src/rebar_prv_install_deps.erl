@@ -150,12 +150,12 @@ handle_deps(Profile, State0, Deps, Upgrade, Locks) ->
     AllDeps = lists:ukeymerge(2
                              ,lists:ukeysort(2, SrcApps)
                              ,lists:ukeysort(2, Solved)),
-    %% Sort all apps to build order
+
     State3 = rebar_state:all_deps(State2, AllDeps),
     CodePaths = [rebar_app_info:ebin_dir(A) || A <- AllDeps],
-    ok = code:add_pathsz(CodePaths),
+    State4 = rebar_state:code_paths(State3, all_deps, CodePaths),
 
-    {ok, AllDeps, State3}.
+    {ok, AllDeps, State4}.
 
 %% ===================================================================
 %% Internal functions

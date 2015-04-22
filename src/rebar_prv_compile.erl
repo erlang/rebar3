@@ -31,6 +31,9 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    DepsPaths = rebar_state:code_paths(State, all_deps),
+    code:add_paths(DepsPaths),
+
     ProjectApps = rebar_state:project_apps(State),
     Providers = rebar_state:providers(State),
     Deps = rebar_state:deps_to_build(State),
@@ -49,9 +52,14 @@ do(State) ->
     ProjectApps2 = build_apps(State, Providers, ProjectApps1),
     State2 = rebar_state:project_apps(State, ProjectApps2),
 
+    ProjAppsPaths = [filename:join(rebar_app_info:out_dir(X), "ebin") || X <- ProjectApps2],
+    State3 = rebar_state:code_paths(State2, all_deps, DepsPaths ++ ProjAppsPaths),
+
     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State2),
 
-    {ok, State2}.
+    rebar_utils:cleanup_code_path(rebar_state:code_paths(State3, default)),
+
+    {ok, State3}.
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
@@ -80,7 +88,6 @@ build_app(State, Providers, AppInfo) ->
     AppInfo1 = compile(S, AppInfo),
     rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, S),
 
-    true = code:add_patha(rebar_app_info:ebin_dir(AppInfo1)),
     AppInfo1.
 
 compile(State, AppInfo) ->

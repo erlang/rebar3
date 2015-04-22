@@ -92,7 +92,9 @@ shell(State) ->
     %% times). removes at most the error_logger added by init and the
     %% error_logger added by the tty handler
     ok = remove_error_handler(3),
-    %% add test paths
+    %% Add deps to path
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    %% add project app test paths
     ok = add_test_paths(State),
     %% this call never returns (until user quits shell)
     timer:sleep(infinity).
@@ -121,10 +123,9 @@ wait_until_user_started(Timeout) ->
 
 add_test_paths(State) ->
     lists:foreach(fun(App) ->
-        AppDir = rebar_app_info:out_dir(App),
-        %% ignore errors resulting from non-existent directories
-        _ = code:add_path(filename:join([AppDir, "ebin"])),
-        _ = code:add_path(filename:join([AppDir, "test"]))
-    end, rebar_state:project_apps(State)),
+                          AppDir = rebar_app_info:out_dir(App),
+                          %% ignore errors resulting from non-existent directories
+                          _ = code:add_path(filename:join([AppDir, "test"]))
+                  end, rebar_state:project_apps(State)),
     _ = code:add_path(filename:join([rebar_dir:base_dir(State), "test"])),
     ok.

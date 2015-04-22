@@ -134,7 +134,9 @@ run_aux(State, RawArgs) ->
 
     {Task, Args} = parse_args(RawArgs),
 
-    rebar_core:init_command(rebar_state:command_args(State7, Args), Task).
+    State8 = rebar_state:code_paths(State7, default, code:get_path()),
+
+    rebar_core:init_command(rebar_state:command_args(State8, Args), Task).
 
 init_config() ->
     %% Initialize logging system

@@ -37,6 +37,7 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     ?INFO("Performing EUnit tests...", []),
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
     %% Run eunit provider prehooks
     Providers = rebar_state:providers(State),
     Cwd = rebar_dir:get_cwd(),
@@ -48,11 +49,14 @@ do(State) ->
                 {ok, State1} ->
                     %% Run eunit provider posthooks
                     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State1),
+                    rebar_utils:cleanup_code_path(rebar_state:code_paths(State1, default)),
                     {ok, State1};
                 Error ->
+                    rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
                     Error
             end;
         Error ->
+            rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
             Error
     end.
 

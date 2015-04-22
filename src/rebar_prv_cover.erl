@@ -150,7 +150,7 @@ analysis(State, Task) ->
                   {Mod, process(Answer), File}
               end,
               Mods),
-    true = code:set_path(OldPath),
+    true = rebar_utils:cleanup_code_path(OldPath),
     Analysis.
 
 restore_cover_paths(State) ->

@@ -3,6 +3,8 @@
 -export([new/0, new/1, new/2, new/3,
          get/2, get/3, set/3,
 
+         code_paths/2, code_paths/3,
+
          opts/1, opts/2,
          default/1, default/2,
 
@@ -40,6 +42,7 @@
 
 -record(state_t, {dir                               :: file:name(),
                   opts                = dict:new()  :: rebar_dict(),
+                  code_paths          = dict:new()  :: rebar_dict(),
                   default             = dict:new()  :: rebar_dict(),
                   escript_path                      :: undefined | file:filename_all(),
 
@@ -131,6 +134,17 @@ default(#state_t{default=Opts}) ->
 
 default(State, Opts) ->
     State#state_t{default=Opts}.
+
+code_paths(#state_t{code_paths=CodePaths}, Key) ->
+    case dict:find(Key, CodePaths) of
+        {ok, CodePath} ->
+            CodePath;
+        _ ->
+            []
+    end.
+
+code_paths(State=#state_t{code_paths=CodePaths}, Key, CodePath) ->
+    State#state_t{code_paths=dict:store(Key, CodePath, CodePaths)}.
 
 opts(#state_t{opts=Opts}) ->
     Opts.
