@@ -207,7 +207,8 @@ apply_profiles(State, Profile) when not is_list(Profile) ->
     apply_profiles(State, [Profile]);
 apply_profiles(State, [default]) ->
     State;
-apply_profiles(State=#state_t{opts=Opts, current_profiles=CurrentProfiles}, Profiles) ->
+apply_profiles(State=#state_t{default = Defaults, current_profiles=CurrentProfiles}, Profiles) ->
+    AppliedProfiles = deduplicate(CurrentProfiles ++ Profiles),
     ConfigProfiles = rebar_state:get(State, profiles, []),
     NewOpts =
         lists:foldl(fun(default, OptsAcc) ->
@@ -215,8 +216,8 @@ apply_profiles(State=#state_t{opts=Opts, current_profiles=CurrentProfiles}, Prof
                        (Profile, OptsAcc) ->
                             ProfileOpts = dict:from_list(proplists:get_value(Profile, ConfigProfiles, [])),
                             merge_opts(Profile, ProfileOpts, OptsAcc)
-                    end, Opts, Profiles),
-    State#state_t{current_profiles = deduplicate(CurrentProfiles ++ Profiles), opts=NewOpts}.
+                    end, Defaults, AppliedProfiles),
+    State#state_t{current_profiles = AppliedProfiles, opts=NewOpts}.
 
 deduplicate(Profiles) ->
     do_deduplicate(lists:reverse(Profiles), []).
