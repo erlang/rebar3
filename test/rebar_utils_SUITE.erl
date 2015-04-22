@@ -29,8 +29,7 @@
 
 
 all() ->
-    [{group, args_to_tasks}
-    ].
+    [{group, args_to_tasks}].
 
 groups() ->
     [{args_to_tasks, [], [empty_arglist,

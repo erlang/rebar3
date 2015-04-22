@@ -257,7 +257,7 @@ tup_sort(List) ->
 tup_umerge([], Olds) ->
     Olds;
 tup_umerge([New|News], Olds) ->
-    lists:reverse( umerge(News, Olds, [], New) ).
+    lists:reverse(umerge(News, Olds, [], New)).
 
 %% This is equivalent to umerge2_2 in the stdlib, except we use the expanded
 %% value/key only to compare

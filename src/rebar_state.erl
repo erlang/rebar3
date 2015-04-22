@@ -232,6 +232,7 @@ do_deduplicate([Head | Rest], Acc) ->
 
 merge_opts(Profile, NewOpts, OldOpts) ->
     Opts = merge_opts(NewOpts, OldOpts),
+
     case dict:find(deps, NewOpts) of
         {ok, Value} ->
             dict:store({deps, Profile}, Value, Opts);
