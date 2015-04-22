@@ -218,6 +218,13 @@ default_profile(Config) ->
      || {dep, App} <- Apps],
     [?assertMatch({ok, #file_info{type=directory}}, % somehow symlinks return dirs
                   file:read_file_info(filename:join([BuildDir, "profile", "lib", App])))
+     || {dep, App} <- Apps],
+    %% A second run to another profile also links default to the right spot
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["as", "other", "install_deps"], Expect
+    ),
+    [?assertMatch({ok, #file_info{type=directory}}, % somehow symlinks return dirs
+                  file:read_file_info(filename:join([BuildDir, "other", "lib", App])))
      || {dep, App} <- Apps].
 
 nondefault_profile(Config) ->
@@ -234,6 +241,13 @@ nondefault_profile(Config) ->
      || {dep, App} <- Apps],
     [?assertMatch({ok, #file_info{type=directory}},
                   file:read_file_info(filename:join([BuildDir, "nondef", "lib", App])))
+     || {dep, App} <- Apps],
+    %% A second run to another profile doesn't link dependencies
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["as", "other", "install_deps"], Expect
+    ),
+    [?assertMatch({error, enoent},
+                  file:read_file_info(filename:join([BuildDir, "default", "lib", App])))
      || {dep, App} <- Apps].
 
 
