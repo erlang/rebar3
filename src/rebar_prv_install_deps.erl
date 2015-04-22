@@ -395,14 +395,8 @@ maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
                         false ->
                             case fetch_app(AppInfo, AppDir, State) of
                                 true ->
-                                    case needs_symlinking(State, Profile) of
-                                        true ->
-                                            SymDir = filename:join([rebar_dir:deps_dir(State), rebar_app_info:name(AppInfo)]),
-                                            symlink_dep(AppDir, SymDir),
-                                            {true, AppInfo};
-                                        false ->
-                                            {true, AppInfo}
-                                    end;
+                                    maybe_symlink_default(State, Profile, AppDir, AppInfo),
+                                    {true, AppInfo};
                                 Other ->
                                     {Other, AppInfo}
                             end;
@@ -417,6 +411,7 @@ maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
                     %% Preserve the state we created with overrides
                     AppState = rebar_app_info:state(AppInfo),
                     AppInfo2 = rebar_app_info:state(AppInfo1, AppState),
+                    maybe_symlink_default(State, Profile, AppDir, AppInfo2),
                     case sets:is_element(rebar_app_info:name(AppInfo), Seen) of
                         true ->
                             {false, AppInfo2};
@@ -444,6 +439,18 @@ needs_symlinking(State, Profile) ->
             %% File fetched to the right directory already
             false
     end.
+
+maybe_symlink_default(State, Profile, AppDir, AppInfo) ->
+    case needs_symlinking(State, Profile) of
+        true ->
+            SymDir = filename:join([rebar_dir:deps_dir(State),
+                                    rebar_app_info:name(AppInfo)]),
+            symlink_dep(AppDir, SymDir),
+            true;
+        false ->
+            false
+    end.
+
 
 symlink_dep(From, To) ->
     ?INFO("Linking ~s to ~s", [From, To]),
