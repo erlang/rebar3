@@ -257,7 +257,20 @@ tup_sort(List) ->
 tup_umerge([], Olds) ->
     Olds;
 tup_umerge([New|News], Olds) ->
-    lists:reverse(umerge(News, Olds, [], New)).
+    reverse_deduplicate( umerge(News, Olds, [], New) ).
+
+reverse_deduplicate(List) ->
+    lists:reverse( do_deduplicate(lists:reverse(List), []) ).
+
+do_deduplicate([], Acc) ->
+    Acc;
+do_deduplicate([Value | Rest], Acc) ->
+    case lists:member(Value, Acc) of
+        true ->
+            do_deduplicate(Rest, Acc);
+        false ->
+            do_deduplicate(Rest, [Value | Acc])
+    end.
 
 %% This is equivalent to umerge2_2 in the stdlib, except we use the expanded
 %% value/key only to compare

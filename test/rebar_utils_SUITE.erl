@@ -21,7 +21,8 @@
          task_with_flag_with_trailing_comma/1,
          task_with_flag_with_commas/1,
          task_with_multiple_flags/1,
-         special_task_do/1]).
+         special_task_do/1,
+         tup_umerge_deduplication/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -29,7 +30,9 @@
 
 
 all() ->
-    [{group, args_to_tasks}].
+    [{group, args_to_tasks},
+      tup_umerge_deduplication
+    ].
 
 groups() ->
     [{args_to_tasks, [], [empty_arglist,
@@ -118,3 +121,11 @@ special_task_do(_Config) ->
                                                                         "do",
                                                                         "bar,",
                                                                         "baz"]).
+
+tup_umerge_deduplication(_Config) ->
+    Old = [{key,c},{key,b},{key,a}],
+    New = [{key, a}],
+    ?assertEqual(
+        [{key, a}, {key, c}, {key, b}],
+        rebar_utils:tup_umerge(New, Old)
+    ).
