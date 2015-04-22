@@ -11,6 +11,7 @@
          implicit_profile_deduplicate_deps/1,
          profile_merges/1,
          same_profile_deduplication/1,
+         stack_deduplication/1,
          add_to_profile/1,
          add_to_existing_profile/1,
          profiles_remain_applied_with_config_present/1,
@@ -26,7 +27,7 @@
 all() ->
     [profile_new_key, profile_merge_keys, profile_merges,
      explicit_profile_deduplicate_deps, implicit_profile_deduplicate_deps,
-     same_profile_deduplication,
+     same_profile_deduplication, stack_deduplication,
      add_to_profile, add_to_existing_profile,
      profiles_remain_applied_with_config_present,
      test_profile_applied_at_completion,
@@ -199,7 +200,7 @@ same_profile_deduplication(_Config) ->
                    {test3, [key3]},
                    {profiles,
                     [{profile1,
-                      [{test1, [{key3, 5}, key1]},
+                      [{test1, [{key3, 5}, {key2, "hello"}]},
                        {test2, [bar]},
                        {test3, []}
                     ]}]
@@ -208,15 +209,56 @@ same_profile_deduplication(_Config) ->
     State1 = rebar_state:apply_profiles(State, [profile1, profile1, profile1]),
 
     ?assertEqual([default, profile1], rebar_state:current_profiles(State1)),
-    %% Combine lists
-    ?assertEqual(lists:sort([key1, key2, {key1, 1, 2}, {key3, 5}]),
-                 lists:sort(rebar_state:get(State1, test1))),
+    Test1 = rebar_state:get(State1, test1),
 
+    %% Combine lists
+    ?assertEqual(lists:sort([key2, {key1, 1, 2}, {key3, 5}, {key2, "hello"}]),
+                 lists:sort(Test1)),
+
+    %% Key2 from profile1 overrides key2 from default profile
+    ?assertEqual("hello", proplists:get_value(key2, Test1)),
 
     %% Check that a newvalue of []/"" doesn't override non-string oldvalues
     ?assertEqual([key3], rebar_state:get(State1, test3)),
-    ?assertEqual([foo, bar], rebar_state:get(State1, test2)).
+    ?assertEqual([bar, foo], rebar_state:get(State1, test2)).
 
+stack_deduplication(_Config) ->
+    RebarConfig = [
+        {test_key, default},
+        {test_list, [ {foo, default}  ]},
+        {profiles, [
+            {a, [
+                {test_key, a},
+                {test_list, [ {foo, a} ]}
+            ]},
+            {b, [
+                {test_key, b},
+                {test_list, [ {foo, b} ]}
+            ]},
+            {c, [
+                {test_key, c},
+                {test_list, [ {foo, c} ]}
+            ]},
+            {d, [
+                {test_key, d},
+                {test_list, [ {foo, d} ]}
+            ]},
+            {e, [
+                {test_key, e},
+                {test_list, [ {foo, e} ]}
+            ]}
+        ]}
+    ],
+    State = rebar_state:new(RebarConfig),
+    State1 = rebar_state:apply_profiles(State, [a, b, c, d, e, a, e, b]),
+    ?assertEqual(b, rebar_state:get(State1, test_key)),
+
+    TestList = rebar_state:get(State1, test_list),
+    ?assertEqual(
+        [{foo, b}, {foo, e}, {foo, a}, {foo, d}, {foo, c}, {foo, default} ],
+        TestList
+    ),
+    ?assertEqual(b, proplists:get_value(foo, TestList)).
 
 add_to_profile(_Config) ->
     RebarConfig = [{foo, true}, {bar, false}],
