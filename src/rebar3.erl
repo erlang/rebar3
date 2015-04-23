@@ -115,6 +115,8 @@ run_aux(State, RawArgs) ->
     State2 = case os:getenv("REBAR_PROFILE") of
                  false ->
                      State;
+                 "" ->
+                     State;
                  Profile ->
                      rebar_state:apply_profiles(State, [list_to_atom(Profile)])
              end,

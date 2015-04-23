@@ -121,7 +121,7 @@ all_deps_code_paths(Config) ->
                                    ["compile"], {ok, [{app, Name}
                                                      ,{dep, "a", "1.0.0"}
                                                      ,{dep, "b", "2.0.0"}]}),
-    os:unsetenv("REBAR_PROFILE"),
+    os:putenv("REBAR_PROFILE", ""),
 
     Paths = rebar_state:code_paths(State, all_deps),
     Path = lists:reverse(["_build", "all_deps_test", "lib", "b", "ebin"]),

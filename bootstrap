@@ -25,7 +25,7 @@ main(_Args) ->
     os:putenv("REBAR_PROFILE", "bootstrap"),
     {ok, State} = rebar3:run(["compile"]),
     reset_env(),
-    os:unsetenv("REBAR_PROFILE"),
+    os:putenv("REBAR_PROFILE", ""),
     %% Build erlydtl files (a hook on compile in the default profile) and escript file
     DepsPaths = rebar_state:code_paths(State, all_deps),
     code:add_pathsa(DepsPaths),
