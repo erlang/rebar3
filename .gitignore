@@ -1,8 +1,9 @@
+rebar3
+_build
 .depsolver_plt
 *.beam
 test/*_data
 logs
-rebar3
 /rebar
 *~
 *.orig
@@ -13,6 +14,5 @@ rebar3
 /.eunit
 /deps
 /.rebar
-rebar.lock
 priv/templates/*.dtl.erl
 ebin

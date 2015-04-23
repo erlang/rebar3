@@ -93,7 +93,7 @@ shell(State) ->
     %% error_logger added by the tty handler
     ok = remove_error_handler(3),
     %% Add deps to path
-    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    code:add_pathsa(rebar_state:code_paths(State, all_deps)),
     %% add project app test paths
     ok = add_test_paths(State),
     %% this call never returns (until user quits shell)

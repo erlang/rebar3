@@ -64,7 +64,7 @@ short_desc() ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     ?INFO("Dialyzer starting, this may take a while...", []),
-    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    code:add_pathsa(rebar_state:code_paths(State, all_deps)),
     Plt = get_plt_location(State),
     Apps = rebar_state:project_apps(State),
 

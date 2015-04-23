@@ -57,7 +57,6 @@ consult_file(File) ->
                     {ok, Terms} = consult_and_eval(File, Script),
                     Terms;
                 false ->
-                    ?DEBUG("Consult config file ~p", [File]),
                     try_consult(File)
             end
     end.

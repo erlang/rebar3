@@ -54,7 +54,7 @@ wordsize() ->
 
 %% Add deps to the code path
 add_deps_to_path(State) ->
-  code:add_paths(rebar_state:code_paths(State, all_deps)).
+  code:add_pathsa(rebar_state:code_paths(State, all_deps)).
 
 %% Revert to only having the beams necessary for running rebar3 and plugins in the path
 restore_code_path(State) ->

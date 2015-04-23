@@ -128,7 +128,6 @@ preprocess(State, AppInfo, AppSrcFile) ->
 load_app_vars(State) ->
     case rebar_state:get(State, app_vars_file, undefined) of
         undefined ->
-            ?DEBUG("No app_vars_file defined.", []),
             [];
         Filename ->
             ?INFO("Loading app vars from ~p", [Filename]),
