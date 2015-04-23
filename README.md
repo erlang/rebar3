@@ -123,12 +123,21 @@ You can download a pre-built binary version of rebar3 based on the last commit f
 
 https://s3.amazonaws.com/rebar3/rebar3
 
-#### Building rebar
+#### Bootstrapping rebar3
 
 ```sh
 $ git clone https://github.com/rebar/rebar3
 $ cd rebar3
 $ ./bootstrap
+```
+
+### Developing on rebar3
+
+When developing you can simply run `escriptize` to build your changes but the new escript is under `_build/default/bin/rebar3`
+
+```sh
+$ ./rebar3 escriptize
+$ _build/default/bin/rebar3
 ```
 
 
