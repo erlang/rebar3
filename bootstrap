@@ -90,8 +90,7 @@ compile(App, FirstFiles) ->
 
 bootstrap_rebar3() ->
     filelib:ensure_dir("_build/default/lib/rebar/ebin/dummy.beam"),
-    filelib:ensure_dir("_build/default/lib/rebar/src/dummy.erl"),
-    ec_file:copy("src", "_build/default/lib/rebar/src", [recursive]),
+    file:make_symlink(filename:absname("src"), filename:absname("_build/default/lib/rebar/src")),
     Sources = filelib:wildcard("src/*.erl"),
     [compile:file(X, [{outdir, "_build/default/lib/rebar/ebin/"}]) || X <- Sources],
     code:add_path(filename:absname("_build/default/lib/rebar/ebin")).
