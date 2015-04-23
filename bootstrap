@@ -84,16 +84,29 @@ compile(App, FirstFiles) ->
     code:add_path(filename:join(Dir, "ebin")),
     FirstFilesPaths = [filename:join([Dir, "src", Module]) || Module <- FirstFiles],
     Sources = FirstFilesPaths ++ filelib:wildcard(filename:join([Dir, "src", "*.erl"])),
-    [compile:file(X, [{i, filename:join(Dir, "include")}
+    [compile_file(X, [{i, filename:join(Dir, "include")}
                      ,{outdir,  filename:join(Dir, "ebin")}
                      ,return]) || X <- Sources].
+
+compile_file(File, Opts) ->
+    case compile:file(File, Opts) of
+        {ok, _Mod} ->
+            ok;
+        {ok, _Mod, []} ->
+            ok;
+        {ok, _Mod, Ws} ->
+            io:format("Warning: ~p~n", [format_warnings(File, Ws)]);
+        {error, Es, Ws} ->
+            io:format("~s ~s~n", [format_errors(File, Es), format_warnings(File, Ws)]),
+            halt(1)
+    end.
 
 bootstrap_rebar3() ->
     filelib:ensure_dir("_build/default/lib/rebar/ebin/dummy.beam"),
     file:make_symlink(filename:absname("src"), filename:absname("_build/default/lib/rebar/src")),
     Sources = filelib:wildcard("src/*.erl"),
     [compile:file(X, [{outdir, "_build/default/lib/rebar/ebin/"}]) || X <- Sources],
-    code:add_path(filename:absname("_build/default/lib/rebar/ebin")).
+    code:add_patha(filename:absname("_build/default/lib/rebar/ebin")).
 
 setup_env() ->
     %% We don't need or want erlydtl or relx providers loaded yet
@@ -126,3 +139,32 @@ get_deps() ->
             {ok, Config} = file:consult("rebar.config"),
             proplists:get_value(deps, Config)
     end.
+
+format_errors(Source, Errors) ->
+    format_errors(Source, "", Errors).
+
+format_warnings(Source, Warnings) ->
+    format_warnings(Source, Warnings, []).
+
+format_warnings(Source, Warnings, Opts) ->
+    Prefix = case lists:member(warnings_as_errors, Opts) of
+                 true -> "";
+                 false -> "Warning: "
+             end,
+    format_errors(Source, Prefix, Warnings).
+
+format_errors(_MainSource, Extra, Errors) ->
+    [begin
+         [format_error(Source, Extra, Desc) || Desc <- Descs]
+     end
+     || {Source, Descs} <- Errors].
+
+format_error(AbsSource, Extra, {{Line, Column}, Mod, Desc}) ->
+    ErrorDesc = Mod:format_error(Desc),
+    io_lib:format("~s:~w:~w: ~s~s~n", [AbsSource, Line, Column, Extra, ErrorDesc]);
+format_error(AbsSource, Extra, {Line, Mod, Desc}) ->
+    ErrorDesc = Mod:format_error(Desc),
+    io_lib:format("~s:~w: ~s~s~n", [AbsSource, Line, Extra, ErrorDesc]);
+format_error(AbsSource, Extra, {Mod, Desc}) ->
+    ErrorDesc = Mod:format_error(Desc),
+    io_lib:format("~s: ~s~s~n", [AbsSource, Extra, ErrorDesc]).
