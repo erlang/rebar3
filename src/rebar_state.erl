@@ -65,7 +65,7 @@
 
 -export_type([t/0]).
 
--type t() :: record(state_t).
+-type t() :: #state_t{}.
 
 -spec new() -> t().
 new() ->
