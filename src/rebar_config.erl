@@ -69,7 +69,7 @@ merge_locks(Config, [[]]) ->
     Config;
 %% lockfile with entries
 merge_locks(Config, [Locks]) ->
-    {deps, ConfigDeps} = lists:keyfind(deps, 1, Config),
+    ConfigDeps = proplists:get_value(deps, Config, []),
     %% We want the top level deps only from the lock file.
     %% This ensures deterministic overrides for configs.
     %% Then check if any new deps have been added to the config
