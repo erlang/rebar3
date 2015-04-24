@@ -541,9 +541,6 @@ maybe_expand_include_lib_path(File, Dir) ->
 %% The use of -include_lib was probably incorrect by the user but lets try to make it work.
 %% We search in the outdir and outdir/../include to see if the header exists.
 warn_and_find_path(File, Dir) ->
-    ?WARN("Bad use of -include_lib(\"~s\")."
-         " First path component should be the name of an application."
-         " You probably meant -include(\"~s\").", [File, File]),
     SrcHeader = filename:join(Dir, File),
     case filelib:is_regular(SrcHeader) of
         true ->
@@ -555,7 +552,6 @@ warn_and_find_path(File, Dir) ->
                 true ->
                     [filename:join(IncludeDir, File)];
                 false ->
-                    ?WARN("Could not find header for -include_lib(\"~s\").", [File]),
                     []
             end
     end.
