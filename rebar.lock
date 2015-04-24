@@ -12,7 +12,7 @@
   1},
  {<<"relx">>,
   {git,"https://github.com/erlware/relx.git",
-       {ref,"3f2462807fe4afb82bc52dd3ff8ff9244aad3bd3"}},
+       {ref,"f8af9f5cd9f70ff43a043fe274dda4e56be82a2d"}},
   0},
  {<<"providers">>,
   {git,"https://github.com/tsloughter/providers.git",
@@ -28,5 +28,5 @@
   0},
  {<<"erlware_commons">>,
   {git,"https://github.com/erlware/erlware_commons.git",
-       {ref,"05b956da26788f30b3cb793fa6ace02b75f481d0"}},
+       {ref,"ef0d252b11c863f9c228af2fe93a4e42fba2f7f3"}},
   0}].

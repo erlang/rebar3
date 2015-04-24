@@ -394,7 +394,7 @@ write_file(Output, Data, Force) ->
 -spec make_template_name(string(), term()) -> module().
 make_template_name(Base, Value) ->
     %% Seed so we get different values each time
-    random:seed(erlang:now()),
+    random:seed(os:timestamp()),
     Hash = erlang:phash2(Value),
     Ran = random:uniform(10000000),
     erlang:list_to_atom(Base ++ "_" ++

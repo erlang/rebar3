@@ -86,7 +86,7 @@ compile(App, FirstFiles) ->
     Sources = FirstFilesPaths ++ filelib:wildcard(filename:join([Dir, "src", "*.erl"])),
     [compile_file(X, [{i, filename:join(Dir, "include")}
                      ,{outdir,  filename:join(Dir, "ebin")}
-                     ,return]) || X <- Sources].
+                     ,return | additional_defines()]) || X <- Sources].
 
 compile_file(File, Opts) ->
     case compile:file(File, Opts) of
@@ -95,7 +95,8 @@ compile_file(File, Opts) ->
         {ok, _Mod, []} ->
             ok;
         {ok, _Mod, Ws} ->
-            io:format("Warning: ~p~n", [format_warnings(File, Ws)]);
+            io:format("~s~n", [format_warnings(File, Ws)]),
+            halt(1);
         {error, Es, Ws} ->
             io:format("~s ~s~n", [format_errors(File, Es), format_warnings(File, Ws)]),
             halt(1)
@@ -103,9 +104,11 @@ compile_file(File, Opts) ->
 
 bootstrap_rebar3() ->
     filelib:ensure_dir("_build/default/lib/rebar/ebin/dummy.beam"),
+    code:add_path("_build/default/lib/rebar/ebin/"),
     file:make_symlink(filename:absname("src"), filename:absname("_build/default/lib/rebar/src")),
-    Sources = filelib:wildcard("src/*.erl"),
-    [compile:file(X, [{outdir, "_build/default/lib/rebar/ebin/"}]) || X <- Sources],
+    Sources = ["src/rebar_resource.erl" | filelib:wildcard("src/*.erl")],
+    [compile_file(X, [{outdir, "_build/default/lib/rebar/ebin/"}
+                     ,return | additional_defines()]) || X <- Sources],
     code:add_patha(filename:absname("_build/default/lib/rebar/ebin")).
 
 setup_env() ->
@@ -168,3 +171,50 @@ format_error(AbsSource, Extra, {Line, Mod, Desc}) ->
 format_error(AbsSource, Extra, {Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
     io_lib:format("~s: ~s~s~n", [AbsSource, Extra, ErrorDesc]).
+
+additional_defines() ->
+    [{d, D} || {Re, D} <- [{"^[0-9]+", namespaced_types}, {"^R1[4|5]", deprecated_crypto}], is_otp_release(Re)].
+
+is_otp_release(ArchRegex) ->
+    case re:run(otp_release(), ArchRegex, [{capture, none}]) of
+        match ->
+            true;
+        nomatch ->
+            false
+    end.
+
+otp_release() ->
+    otp_release1(erlang:system_info(otp_release)).
+
+%% If OTP <= R16, otp_release is already what we want.
+otp_release1([$R,N|_]=Rel) when is_integer(N) ->
+    Rel;
+%% If OTP >= 17.x, erlang:system_info(otp_release) returns just the
+%% major version number, we have to read the full version from
+%% a file. See http://www.erlang.org/doc/system_principles/versions.html
+%% Read vsn string from the 'OTP_VERSION' file and return as list without
+%% the "\n".
+otp_release1(Rel) ->
+    File = filename:join([code:root_dir(), "releases", Rel, "OTP_VERSION"]),
+    {ok, Vsn} = file:read_file(File),
+
+    %% It's fine to rely on the binary module here because we can
+    %% be sure that it's available when the otp_release string does
+    %% not begin with $R.
+    Size = byte_size(Vsn),
+    %% The shortest vsn string consists of at least two digits
+    %% followed by "\n". Therefore, it's safe to assume Size >= 3.
+    case binary:part(Vsn, {Size, -3}) of
+        <<"**\n">> ->
+            %% The OTP documentation mentions that a system patched
+            %% using the otp_patch_apply tool available to licensed
+            %% customers will leave a '**' suffix in the version as a
+            %% flag saying the system consists of application versions
+            %% from multiple OTP versions. We ignore this flag and
+            %% drop the suffix, given for all intents and purposes, we
+            %% cannot obtain relevant information from it as far as
+            %% tooling is concerned.
+            binary:bin_to_list(Vsn, {0, Size - 3});
+        _ ->
+            binary:bin_to_list(Vsn, {0, Size - 1})
+    end.
