@@ -10,7 +10,7 @@ groups() ->
                 pair_a, pair_b, pair_ab, pair_c, pair_all,
                 triplet_a, triplet_b, triplet_c,
                 tree_a, tree_b, tree_c, tree_c2, tree_ac, tree_all,
-                delete_d]},
+                delete_d, promote]},
      {git, [], [{group, all}]},
      {pkg, [], [{group, all}]}].
 
@@ -351,7 +351,17 @@ upgrades(delete_d) ->
      ],
      ["A","B", "C"],
      %% upgrade vs. new tree
-     {"", [{"A","2"}, "B", "C"]}}.
+     {"", [{"A","2"}, "B", "C"]}};
+upgrades(promote) ->
+    {[{"A", "1", [{"C", "1", []}]},
+      {"B", "1", [{"D", "1", []}]}
+     ],
+     [{"A", "2", [{"C", "2", []}]},
+      {"B", "2", [{"D", "2", []}]},
+      {"C", "3", []}
+     ],
+     ["A","B","C","D"],
+     {"C", [{"A","1"},{"C","3"},{"B","1"},{"D","1"}]}}.
 
 %% TODO: add a test that verifies that unlocking files and then
 %% running the upgrade code is enough to properly upgrade things.
@@ -414,6 +424,7 @@ tree_c(Config) -> run(Config).
 tree_c2(Config) -> run(Config).
 tree_ac(Config) -> run(Config).
 tree_all(Config) -> run(Config).
+promote(Config) -> run(Config).
 
 delete_d(Config) ->
     meck:new(rebar_log, [no_link, passthrough]),

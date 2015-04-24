@@ -91,28 +91,37 @@ parse_names(Bin, Locks) ->
 prepare_locks([], _, Locks, Unlocks) ->
     {Locks, Unlocks};
 prepare_locks([Name|Names], Deps, Locks, Unlocks) ->
+    AtomName = binary_to_atom(Name, utf8),
     case lists:keyfind(Name, 1, Locks) of
         {_, _, 0} = Lock ->
-            AtomName = binary_to_atom(Name, utf8),
             case lists:keyfind(AtomName, 1, Deps) of
                 false ->
                     ?PRV_ERROR({unknown_dependency, Name});
                 Dep ->
-                    Source = case Dep of
-                        {_, Src} -> Src;
-                        {_, _, Src} -> Src
-                    end,
-                    {NewLocks, NewUnlocks} = unlock_higher_than(0, Locks -- [Lock]),
-                    prepare_locks(Names,
-                                  Deps,
-                                  NewLocks,
+                    {Source, NewLocks, NewUnlocks} = prepare_lock(Dep, Lock, Locks),
+                    prepare_locks(Names, Deps, NewLocks,
                                   [{Name, Source, 0} | NewUnlocks ++ Unlocks])
             end;
-        {_, _, Level} when Level > 0 ->
-            ?PRV_ERROR({transitive_dependency, Name});
+        {_, _, Level} = Lock when Level > 0 ->
+            case lists:keyfind(AtomName, 1, Deps) of
+                false ->
+                    ?PRV_ERROR({transitive_dependency, Name});
+                Dep -> % Dep has been promoted
+                    {Source, NewLocks, NewUnlocks} = prepare_lock(Dep, Lock, Locks),
+                    prepare_locks(Names, Deps, NewLocks,
+                                  [{Name, Source, 0} | NewUnlocks ++ Unlocks])
+            end;
         false ->
             ?PRV_ERROR({unknown_dependency, Name})
     end.
+
+prepare_lock(Dep, Lock, Locks) ->
+    Source = Source = case Dep of
+        {_, Src} -> Src;
+        {_, _, Src} -> Src
+    end,
+    {NewLocks, NewUnlocks} = unlock_higher_than(0, Locks -- [Lock]),
+    {Source, NewLocks, NewUnlocks}.
 
 top_level_deps(Deps, Locks) ->
     [Dep || Dep <- Deps, lists:keymember(0, 3, Locks)].
