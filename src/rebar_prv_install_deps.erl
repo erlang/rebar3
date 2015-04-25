@@ -82,13 +82,9 @@ do(State) ->
                 ?PRV_ERROR({cycles, Cycles});
             {error, Error} ->
                 {error, Error};
-            no_cycle ->
-                case compile_order(Source, ProjectApps) of
-                    {ok, ToCompile} ->
-                        {ok, rebar_state:deps_to_build(State1, ToCompile)};
-                    {error, Error} ->
-                        {error, Error}
-                end
+            {no_cycle, Sorted} ->
+                ToCompile = cull_compile(Sorted, ProjectApps),
+                {ok, rebar_state:deps_to_build(State1, ToCompile)}
         end
     catch
         %% maybe_fetch will maybe_throw an exception to break out of some loops
@@ -171,17 +167,11 @@ find_cycles(Apps) ->
     case rebar_digraph:compile_order(Apps) of
         {error, {cycles, Cycles}} -> {cycles, Cycles};
         {error, Error} -> {error, Error};
-        {ok, _} -> no_cycle
+        {ok, Sorted} -> {no_cycle, Sorted}
     end.
 
-compile_order(Source, ProjectApps) ->
-    case rebar_digraph:compile_order(Source) of
-        {ok, Sort} ->
-            %% Valid apps are compiled and good
-            {ok, lists:dropwhile(fun not_needs_compile/1, Sort -- ProjectApps)};
-        {error, Error} ->
-            {error, Error}
-    end.
+cull_compile(TopSortedDeps, ProjectApps) ->
+    lists:dropwhile(fun not_needs_compile/1, TopSortedDeps -- ProjectApps).
 
 update_pkg_deps(Profile, Packages, PkgDeps, Graph, Upgrade, Seen, State) ->
     case PkgDeps of
