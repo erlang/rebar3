@@ -386,7 +386,7 @@ maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
                             case fetch_app(AppInfo, AppDir, State) of
                                 true ->
                                     maybe_symlink_default(State, Profile, AppDir, AppInfo),
-                                    {true, AppInfo};
+                                    {true, update_app_info(AppInfo)};
                                 Other ->
                                     {Other, AppInfo}
                             end;
@@ -552,6 +552,15 @@ fetch_app(AppInfo, AppDir, State) ->
         Result ->
             Result
     end.
+
+update_app_info(AppInfo) ->
+    AppDetails = rebar_app_info:app_details(AppInfo),
+    Applications = proplists:get_value(applications, AppDetails, []),
+    IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
+    AppInfo1 = rebar_app_info:applications(
+                 rebar_app_info:app_details(AppInfo, AppDetails),
+                 IncludedApplications++Applications),
+    rebar_app_info:valid(AppInfo1, false).
 
 maybe_upgrade(AppInfo, AppDir, false, State) ->
     Source = rebar_app_info:source(AppInfo),
