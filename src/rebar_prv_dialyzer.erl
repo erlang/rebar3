@@ -73,7 +73,9 @@ do(State) ->
         throw:{dialyzer_error, Error} ->
             ?PRV_ERROR({error_processing_apps, Error});
         throw:{dialyzer_warnings, Warnings} ->
-            ?PRV_ERROR({dialyzer_warnings, Warnings})
+            ?PRV_ERROR({dialyzer_warnings, Warnings});
+        throw:{output_file_error, _, _} = Error ->
+            ?PRV_ERROR(Error)
     after
         rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default))
     end.
@@ -83,6 +85,9 @@ format_error({error_processing_apps, Error}) ->
     io_lib:format("Error in dialyzing apps: ~s", [Error]);
 format_error({dialyzer_warnings, Warnings}) ->
     io_lib:format("Warnings occured running dialyzer: ~b", [Warnings]);
+format_error({output_file_error, File, Error}) ->
+    Error1 = file:format_error(Error),
+    io_lib:format("Failed to write to ~s: ~s", [File, Error1]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -97,33 +102,50 @@ default_plt() ->
     rebar_utils:otp_release() ++ ".plt".
 
 do(State, Plt) ->
-    {PltWarnings, State1} = update_proj_plt(State, Plt),
-    {Warnings, State2} = succ_typings(State1, Plt),
+    Output = get_output_file(State),
+    {PltWarnings, State1} = update_proj_plt(State, Plt, Output),
+    {Warnings, State2} = succ_typings(State1, Plt, Output),
     case PltWarnings + Warnings of
         0 ->
             {ok, State2};
         TotalWarnings ->
+            ?INFO("Warnings written to ~s", [Output]),
             throw({dialyzer_warnings, TotalWarnings})
     end.
 
-update_proj_plt(State, Plt) ->
+get_output_file(State) ->
+    BaseDir = rebar_dir:base_dir(State),
+    Output = filename:join(BaseDir, default_output_file()),
+    case file:open(Output, [write]) of
+        {ok, File} ->
+            ok = file:close(File),
+            Output;
+        {error, Reason} ->
+            throw({output_file_error, Output, Reason})
+    end.
+
+default_output_file() ->
+    rebar_utils:otp_release() ++ ".dialyzer_warnings".
+
+update_proj_plt(State, Plt, Output) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     case proplists:get_value(update_plt, Args) of
         false ->
             {0, State};
         _ ->
-            do_update_proj_plt(State, Plt)
+            do_update_proj_plt(State, Plt, Output)
     end.
 
-do_update_proj_plt(State, Plt) ->
+do_update_proj_plt(State, Plt, Output) ->
     ?INFO("Updating plt...", []),
     {Files, Warnings} = proj_plt_files(State),
-    Warnings2 = format_warnings(Warnings),
+    Warnings2 = format_warnings(Output, Warnings),
     {Warnings3, State2} = case read_plt(State, Plt) of
                               {ok, OldFiles} ->
-                                  check_plt(State, Plt, OldFiles, Files);
+                                  check_plt(State, Plt, Output, OldFiles,
+                                            Files);
                               {error, no_such_file} ->
-                                  build_proj_plt(State, Plt, Files)
+                                  build_proj_plt(State, Plt, Output, Files)
                           end,
     {Warnings2 + Warnings3, State2}.
 
@@ -254,54 +276,57 @@ read_plt(_State, Plt) ->
             throw({dialyzer_error, Error})
     end.
 
-check_plt(State, Plt, OldList, FilesList) ->
+check_plt(State, Plt, Output, OldList, FilesList) ->
     Old = sets:from_list(OldList),
     Files = sets:from_list(FilesList),
-    Remove = sets:subtract(Old, Files),
-    {RemWarnings, State1} = remove_plt(State, Plt, sets:to_list(Remove)),
-    Check = sets:intersection(Files, Old),
-    {CheckWarnings, State2} = check_plt(State1, Plt, sets:to_list(Check)),
-    Add = sets:subtract(Files, Old),
-    {AddWarnings, State3} = add_plt(State2, Plt, sets:to_list(Add)),
+    Remove = sets:to_list(sets:subtract(Old, Files)),
+    {RemWarnings, State1} = remove_plt(State, Plt, Output, Remove),
+    Check = sets:to_list(sets:intersection(Files, Old)),
+    {CheckWarnings, State2} = check_plt(State1, Plt, Output, Check),
+    Add = sets:to_list(sets:subtract(Files, Old)),
+    {AddWarnings, State3} = add_plt(State2, Plt, Output, Add),
     {RemWarnings + CheckWarnings + AddWarnings, State3}.
 
-remove_plt(State, _Plt, []) ->
+remove_plt(State, _Plt, _Output, []) ->
     {0, State};
-remove_plt(State, Plt, Files) ->
+remove_plt(State, Plt, Output, Files) ->
     ?INFO("Removing ~b files from ~p...", [length(Files), Plt]),
-    run_plt(State, Plt, plt_remove, Files).
+    run_plt(State, Plt, Output, plt_remove, Files).
 
-check_plt(State, _Plt, []) ->
+check_plt(State, _Plt, _Output, []) ->
     {0, State};
-check_plt(State, Plt, Files) ->
+check_plt(State, Plt, Output, Files) ->
     ?INFO("Checking ~b files in ~p...", [length(Files), Plt]),
-    run_plt(State, Plt, plt_check, Files).
+    run_plt(State, Plt, Output, plt_check, Files).
 
-add_plt(State, _Plt, []) ->
+add_plt(State, _Plt, _Output, []) ->
     {0, State};
-add_plt(State, Plt, Files) ->
+add_plt(State, Plt, Output, Files) ->
     ?INFO("Adding ~b files to ~p...", [length(Files), Plt]),
-    run_plt(State, Plt, plt_add, Files).
+    run_plt(State, Plt, Output, plt_add, Files).
 
-run_plt(State, Plt, Analysis, Files) ->
+run_plt(State, Plt, Output, Analysis, Files) ->
     GetWarnings = rebar_state:get(State, dialyzer_plt_warnings, false),
     Opts = [{analysis_type, Analysis},
             {get_warnings, GetWarnings},
             {init_plt, Plt},
             {from, byte_code},
             {files, Files}],
-    run_dialyzer(State, Opts).
+    run_dialyzer(State, Opts, Output).
 
-build_proj_plt(State, Plt, Files) ->
+build_proj_plt(State, Plt, Output, Files) ->
     BasePlt = get_base_plt_location(State),
+    ?INFO("Updating base plt...", []),
     {BaseFiles, BaseWarnings} = base_plt_files(State),
-    BaseWarnings2 = format_warnings(BaseWarnings),
-    {BaseWarnings3, State1} = update_base_plt(State, BasePlt, BaseFiles),
+    BaseWarnings2 = format_warnings(Output, BaseWarnings),
+    {BaseWarnings3, State1} = update_base_plt(State, BasePlt, Output,
+                                              BaseFiles),
     ?INFO("Copying ~p to ~p...", [BasePlt, Plt]),
     _ = filelib:ensure_dir(Plt),
     case file:copy(BasePlt, Plt) of
         {ok, _} ->
-            {CheckWarnings, State2} = check_plt(State1, Plt, BaseFiles, Files),
+            {CheckWarnings, State2} = check_plt(State1, Plt, Output, BaseFiles,
+                                                Files),
             {BaseWarnings2 + BaseWarnings3 + CheckWarnings, State2};
         {error, Reason} ->
             Error = io_lib:format("Could not copy PLT from ~p to ~p: ~p",
@@ -321,46 +346,45 @@ base_plt_files(State) ->
     Apps = rebar_state:project_apps(State),
     get_plt_files(BasePltApps, Apps).
 
-update_base_plt(State, BasePlt, BaseFiles) ->
-    ?INFO("Updating base plt...", []),
+update_base_plt(State, BasePlt, Output, BaseFiles) ->
     case read_plt(State, BasePlt) of
         {ok, OldBaseFiles} ->
-            check_plt(State, BasePlt, OldBaseFiles, BaseFiles);
+            check_plt(State, BasePlt, Output, OldBaseFiles, BaseFiles);
         {error, no_such_file} ->
             _ = filelib:ensure_dir(BasePlt),
-            build_plt(State, BasePlt, BaseFiles)
+            build_plt(State, BasePlt, Output, BaseFiles)
     end.
 
-build_plt(State, Plt, Files) ->
+build_plt(State, Plt, Output, Files) ->
     ?INFO("Adding ~b files to ~p...", [length(Files), Plt]),
     GetWarnings = rebar_state:get(State, dialyzer_plt_warnings, false),
     Opts = [{analysis_type, plt_build},
             {get_warnings, GetWarnings},
             {output_plt, Plt},
             {files, Files}],
-    run_dialyzer(State, Opts).
+    run_dialyzer(State, Opts, Output).
 
-succ_typings(State, Plt) ->
+succ_typings(State, Plt, Output) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     case proplists:get_value(succ_typings, Args) of
         false ->
             {0, State};
         _ ->
             Apps = rebar_state:project_apps(State),
-            succ_typings(State, Plt, Apps)
+            succ_typings(State, Plt, Output, Apps)
     end.
 
-succ_typings(State, Plt, Apps) ->
+succ_typings(State, Plt, Output, Apps) ->
     ?INFO("Doing success typing analysis...", []),
     {Files, Warnings} = apps_to_files(Apps),
-    Warnings2 = format_warnings(Warnings),
+    Warnings2 = format_warnings(Output, Warnings),
     ?INFO("Analyzing ~b files with ~p...", [length(Files), Plt]),
     Opts = [{analysis_type, succ_typings},
             {get_warnings, true},
             {from, byte_code},
             {files, Files},
             {init_plt, Plt}],
-    {Warnings3, State2} = run_dialyzer(State, Opts),
+    {Warnings3, State2} = run_dialyzer(State, Opts, Output),
     {Warnings2 + Warnings3, State2}.
 
 apps_to_files(Apps) ->
@@ -377,7 +401,7 @@ app_to_files(App) ->
     {_, Files, Warnings} = app_name_to_info(AppName),
     {Files, Warnings}.
 
-run_dialyzer(State, Opts) ->
+run_dialyzer(State, Opts, Output) ->
     %% dialyzer may return callgraph warnings when get_warnings is false
     case proplists:get_bool(get_warnings, Opts) of
         true ->
@@ -386,7 +410,7 @@ run_dialyzer(State, Opts) ->
                      {check_plt, false} |
                      Opts],
             ?DEBUG("Running dialyzer with options: ~p~n", [Opts2]),
-            Warnings = format_warnings(dialyzer:run(Opts2)),
+            Warnings = format_warnings(Output, dialyzer:run(Opts2)),
             {Warnings, State};
         false ->
             Opts2 = [{warnings, no_warnings()},
@@ -397,25 +421,40 @@ run_dialyzer(State, Opts) ->
             {0, State}
     end.
 
-format_warnings(Warnings) ->
-    format_warnings(Warnings, 0).
+format_warnings(Output, Warnings) ->
+    Warnings1 = format_warnings(Warnings),
+    console_warnings(Warnings1),
+    file_warnings(Output, Warnings1),
+    length(Warnings1).
 
-format_warnings([Warning | Warnings], N) ->
-    format_warning(Warning),
-    format_warnings(Warnings, N + 1);
-format_warnings([], N) ->
-    N.
+format_warnings(Warnings) ->
+    [format_warning(Warning) || Warning <- Warnings].
 
 format_warning({unknown_application, _, [AppName]}) ->
-    ?CONSOLE("Unknown application: ~s", [AppName]);
+    io_lib:format("Unknown application: ~s", [AppName]);
 format_warning({unknown_module, _, [Module]}) ->
-    ?CONSOLE("Unknown module: ~s", [Module]);
+    io_lib:format("Unknown module: ~s", [Module]);
 format_warning(Warning) ->
     case strip(dialyzer:format_warning(Warning, fullpath)) of
         ":0: " ++ Unknown ->
-            ?CONSOLE("~s", [Unknown]);
-        Warning2 ->
-            ?CONSOLE("~s", [Warning2])
+            Unknown;
+        Warning1 ->
+            Warning1
+    end.
+
+console_warnings(Warnings) ->
+    _ = [?CONSOLE("~s", [Warning]) || Warning <- Warnings],
+    ok.
+
+file_warnings(_, []) ->
+    ok;
+file_warnings(Output, Warnings) ->
+    Warnings1 = [[Warning, $\n] || Warning <- Warnings],
+    case file:write_file(Output, Warnings1, [append]) of
+        ok ->
+            ok;
+        {error, Reason} ->
+            throw({output_file_error, Output, Reason})
     end.
 
 strip(Warning) ->
