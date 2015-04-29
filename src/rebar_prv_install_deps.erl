@@ -128,30 +128,39 @@ handle_deps(Profile, State, Deps, Locks) when is_list(Locks) ->
 handle_deps(_Profile, State, [], _, _) ->
     {ok, [], State};
 handle_deps(Profile, State0, Deps, Upgrade, Locks) ->
-    %% Read in package index and dep graph
-    {Packages, Graph} = rebar_state:packages(State0),
-    Registry = rebar_packages:registry(State0),
-    State = rebar_state:packages(rebar_state:registry(State0, Registry), {Packages, Graph}),
     %% Split source deps from pkg deps, needed to keep backwards compatibility
-    DepsDir = profile_dep_dir(State, Profile),
-    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, State, Locks, 0),
+    DepsDir = profile_dep_dir(State0, Profile),
+
+    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, State0, Locks, 0),
 
     %% Fetch transitive src deps
-    {State1, SrcApps, PkgDeps1, Seen} =
-        update_src_deps(Profile, 0, SrcDeps, PkgDeps, [], State, Upgrade, sets:new(), Locks),
+    {State1, SrcApps, PkgDeps1, Seen} = update_src_deps(Profile, 0, SrcDeps, PkgDeps, []
+                                                       ,State0, Upgrade, sets:new(), Locks),
 
-    {Solved, State2} =
-        update_pkg_deps(Profile, Packages, PkgDeps1, Graph, Upgrade, Seen, State1),
+    {Solved, State4} =
+        case PkgDeps1 of
+            [] ->
+                {[], State1};
+            _ ->
+                %% Read in package index and dep graph
+                {Packages, Graph} = rebar_state:packages(State1),
+                Registry = rebar_packages:registry(State1),
+                State2 = rebar_state:packages(rebar_state:registry(State1, Registry)
+                                            ,{Packages, Graph}),
+
+                update_pkg_deps(Profile, Packages, PkgDeps1
+                               ,Graph, Upgrade, Seen, State2)
+        end,
 
     AllDeps = lists:ukeymerge(2
                              ,lists:ukeysort(2, SrcApps)
                              ,lists:ukeysort(2, Solved)),
 
-    State3 = rebar_state:update_all_deps(State2, AllDeps),
+    State5 = rebar_state:update_all_deps(State4, AllDeps),
     CodePaths = [rebar_app_info:ebin_dir(A) || A <- AllDeps],
-    State4 = rebar_state:update_code_paths(State3, all_deps, CodePaths),
+    State6 = rebar_state:update_code_paths(State5, all_deps, CodePaths),
 
-    {ok, AllDeps, State4}.
+    {ok, AllDeps, State6}.
 
 %% ===================================================================
 %% Internal functions
