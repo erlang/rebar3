@@ -1,2 +1,2 @@
 {description, "Makefile for building C/C++ in c_src"}.
-{template, "Makefile.dtl", "c_src/Makefile"}.
+{template, "Makefile", "c_src/Makefile"}.

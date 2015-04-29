@@ -29,14 +29,10 @@
 -export([new/4,
          list_templates/1]).
 
-%% API for other utilities that need templating functionality
--export([resolve_variables/2,
-         render/2]).
 
 -include("rebar.hrl").
 
 -define(TEMPLATE_RE, "^[^._].*\\.template\$").
--define(ERLYDTL_COMPILE_OPTS, [report_warnings, return_errors, {auto_escape, false}, {out_dir, false}]).
 
 %% ===================================================================
 %% Public API
@@ -45,7 +41,7 @@
 %% Apply a template
 new(Template, Vars, Force, State) ->
     {AvailTemplates, Files} = find_templates(State),
-    ?DEBUG("Looking for ~p~n", [Template]),
+    ?DEBUG("Looking for ~p", [Template]),
     case lists:keyfind(Template, 1, AvailTemplates) of
         false -> {not_found, Template};
         TemplateTup -> create(TemplateTup, Files, Vars, Force, State)
@@ -55,34 +51,6 @@ new(Template, Vars, Force, State) ->
 list_templates(State) ->
     {AvailTemplates, Files} = find_templates(State),
     [list_template(Files, Template, State) || Template <- AvailTemplates].
-
-%% ===================================================================
-%% Rendering API / legacy?
-%% ===================================================================
-
-%% Given a list of key value pairs, for each string value attempt to
-%% render it using Dict as the context. Storing the result in Dict as Key.
-%%
-resolve_variables([], Dict) ->
-    Dict;
-resolve_variables([{Key, Value0} | Rest], Dict) when is_list(Value0) ->
-    Value = render(Value0, Dict),
-    resolve_variables(Rest, dict:store(Key, Value, Dict));
-resolve_variables([{Key, {list, Dicts}} | Rest], Dict) when is_list(Dicts) ->
-    %% just un-tag it so erlydtl can use it
-    resolve_variables(Rest, dict:store(Key, Dicts, Dict));
-resolve_variables([_Pair | Rest], Dict) ->
-    resolve_variables(Rest, Dict).
-
-%%
-%% Render a binary to a string, using erlydtl and the specified context
-%%
-render(Template, Context) when is_atom(Template) ->
-    Template:render(Context);
-render(Template, Context) ->
-    Module = list_to_atom(Template++"_dtl"),
-    Module:render(Context).
-
 
 %% ===================================================================
 %% Internal Functions
@@ -191,7 +159,7 @@ create({Template, Type, File}, Files, UserVars, Force, State) ->
 
 %% Run template instructions one at a time.
 execute_template([], _, {Template,_,_}, _, _) ->
-    ?DEBUG("Template ~s applied~n", [Template]),
+    ?DEBUG("Template ~s applied", [Template]),
     ok;
 %% We can't execute the description
 execute_template([{description, _} | Terms], Files, Template, Vars, Force) ->
@@ -201,13 +169,13 @@ execute_template([{variables, _} | Terms], Files, Template, Vars, Force) ->
     execute_template(Terms, Files, Template, Vars, Force);
 %% Create a directory
 execute_template([{dir, Path} | Terms], Files, Template, Vars, Force) ->
-    ?DEBUG("Creating directory ~p~n", [Path]),
+    ?DEBUG("Creating directory ~p", [Path]),
     case ec_file:mkdir_p(expand_path(Path, Vars)) of
         ok ->
             ok;
         {error, Reason} ->
             ?ABORT("Failed while processing template instruction "
-                   "{dir, ~p}: ~p~n", [Path, Reason])
+                   "{dir, ~p}: ~p", [Path, Reason])
     end,
     execute_template(Terms, Files, Template, Vars, Force);
 %% Change permissions on a file
@@ -218,29 +186,28 @@ execute_template([{chmod, File, Perm} | Terms], Files, Template, Vars, Force) ->
             execute_template(Terms, Files, Template, Vars, Force);
         {error, Reason} ->
             ?ABORT("Failed while processing template instruction "
-                   "{chmod, ~.8#, ~p}: ~p~n", [Perm, File, Reason])
+                   "{chmod, ~.8#, ~p}: ~p", [Perm, File, Reason])
     end;
 %% Create a raw untemplated file
 execute_template([{file, From, To} | Terms], Files, {Template, Type, Cwd}, Vars, Force) ->
-    ?DEBUG("Creating file ~p~n", [To]),
+    ?DEBUG("Creating file ~p", [To]),
     Data = load_file(Files, Type, filename:join(Cwd, From)),
     Out = expand_path(To,Vars),
     case write_file(Out, Data, Force) of
         ok -> ok;
-        {error, exists} -> ?INFO("File ~p already exists.~n", [Out])
+        {error, exists} -> ?INFO("File ~p already exists.", [Out])
     end,
     execute_template(Terms, Files, {Template, Type, Cwd}, Vars, Force);
 %% Operate on a django template
 execute_template([{template, From, To} | Terms], Files, {Template, Type, Cwd}, Vars, Force) ->
-    ?DEBUG("Executing template file ~p~n", [From]),
+    ?DEBUG("Executing template file ~p", [From]),
     Out = expand_path(To, Vars),
     Tpl = load_file(Files, Type, filename:join(Cwd, From)),
-    TplName = make_template_name("rebar_template", Out),
-    {ok, Mod} = erlydtl:compile_template(Tpl, TplName, ?ERLYDTL_COMPILE_OPTS),
-    {ok, Output} = Mod:render(Vars),
-    case write_file(Out, Output, Force) of
-        ok -> ok;
-        {error, exists} -> ?INFO("File ~p already exists~n", [Out])
+    case write_file(Out, render(Tpl, Vars), Force) of
+        ok ->
+            ok;
+        {error, exists} ->
+            ?INFO("File ~p already exists", [Out])
     end,
     execute_template(Terms, Files, {Template, Type, Cwd}, Vars, Force);
 %% Unknown
@@ -342,11 +309,11 @@ prioritize_templates([{Name, Type, File} | Rest], Valid) ->
             prioritize_templates(Rest, [{Name, Type, File} | Valid]);
         {_, escript, _} ->
             ?DEBUG("Skipping template ~p, due to presence of a built-in "
-                   "template with the same name~n", [Name]),
+                   "template with the same name", [Name]),
             prioritize_templates(Rest, Valid);
         {_, file, _} ->
             ?DEBUG("Skipping template ~p, due to presence of a custom "
-                   "template at ~s~n", [Name, File]),
+                   "template at ~s", [Name, File]),
             prioritize_templates(Rest, Valid)
     end.
 
@@ -409,12 +376,12 @@ write_file(Output, Data, Force) ->
             {error, exists}
     end.
 
--spec make_template_name(string(), term()) -> module().
-make_template_name(Base, Value) ->
-    %% Seed so we get different values each time
-    random:seed(os:timestamp()),
-    Hash = erlang:phash2(Value),
-    Ran = random:uniform(10000000),
-    erlang:list_to_atom(Base ++ "_" ++
-                            erlang:integer_to_list(Hash) ++
-                            "_" ++ erlang:integer_to_list(Ran)).
+%%
+%% Render a binary to a string, using mustache and the specified context
+%%
+render(Bin, Context) ->
+    %% Be sure to escape any double-quotes before rendering...
+    ReOpts = [global, {return, list}],
+    Str0 = re:replace(Bin, "\\\\", "\\\\\\", ReOpts),
+    Str1 = re:replace(Str0, "\"", "\\\\\"", ReOpts),
+    rebar_mustache:render(Str1, dict:from_list(Context)).

@@ -3,9 +3,9 @@
     {name, "mylib", "Name of the OTP library application"},
     {desc, "An OTP library", "Short description of the app"}
 ]}.
-{template, "mod.erl.dtl", "{{name}}/src/{{name}}.erl"}.
-{template, "otp_lib.app.src.dtl", "{{name}}/src/{{name}}.app.src"}.
-{template, "rebar.config.dtl", "{{name}}/rebar.config"}.
-{template, "gitignore.dtl", "{{name}}/.gitignore"}.
-{template, "LICENSE.dtl", "{{name}}/LICENSE"}.
-{template, "README.md.dtl", "{{name}}/README.md"}.
+{template, "mod.erl", "{{name}}/src/{{name}}.erl"}.
+{template, "otp_lib.app.src", "{{name}}/src/{{name}}.app.src"}.
+{template, "rebar.config", "{{name}}/rebar.config"}.
+{template, "gitignore", "{{name}}/.gitignore"}.
+{template, "LICENSE", "{{name}}/LICENSE"}.
+{template, "README.md", "{{name}}/README.md"}.
