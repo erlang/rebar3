@@ -2,6 +2,7 @@
 -compile(export_all).
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("kernel/include/file.hrl").
 
 all() -> [{group, git}, {group, pkg}].
 
@@ -9,7 +10,7 @@ groups() ->
     [{all, [], [flat, pick_highest_left, pick_highest_right,
                 pick_smallest1, pick_smallest2,
                 circular1, circular2, circular_skip,
-                fail_conflict]},
+                fail_conflict, default_profile, nondefault_profile]},
      {git, [], [{group, all}]},
      {pkg, [], [{group, all}]}].
 
@@ -114,7 +115,17 @@ deps(fail_conflict) ->
     {[{"B", [{"C", "2", []}]},
       {"C", "1", []}],
      [{"C","2"}],
-     rebar_abort}.
+     rebar_abort};
+deps(default_profile) ->
+    {[{"B", []},
+      {"C", []}],
+     [],
+     {ok, ["B", "C"]}};
+deps(nondefault_profile) ->
+    {[{"B", []},
+      {"C", []}],
+     [],
+     {ok, ["B", "C"]}}.
 
 setup_project(fail_conflict, Config0, Deps) ->
     DepsType = ?config(deps_type, Config0),
@@ -127,6 +138,25 @@ setup_project(fail_conflict, Config0, Deps) ->
     TopDeps = rebar_test_utils:top_level_deps(Deps),
     RebarConf = rebar_test_utils:create_config(AppDir, [{deps, TopDeps},
                                                         {deps_error_on_conflict, true}]),
+    case DepsType of
+        git ->
+            mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}]);
+        pkg ->
+            mock_pkg_resource:mock([{pkgdeps, rebar_test_utils:flat_pkgdeps(Deps)}])
+    end,
+    [{rebarconfig, RebarConf} | Config];
+setup_project(nondefault_profile, Config0, Deps) ->
+    DepsType = ?config(deps_type, Config0),
+    Config = rebar_test_utils:init_rebar_state(
+            Config0,
+            "nondefault_profile_"++atom_to_list(DepsType)++"_"
+    ),
+    AppDir = ?config(apps, Config),
+    rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+    RebarConf = rebar_test_utils:create_config(AppDir, [{profiles, [
+                                                            {nondef, [{deps, TopDeps}]}
+                                                       ]}]),
     case DepsType of
         git ->
             mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}]);
@@ -173,6 +203,53 @@ fail_conflict(Config) ->
         Config, RebarConfig, ["install_deps"], ?config(expect, Config)
     ),
     check_warnings(error_calls(), ?config(warnings, Config), ?config(deps_type, Config)).
+
+default_profile(Config) ->
+    {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
+    AppDir = ?config(apps, Config),
+    {ok, Apps} = Expect = ?config(expect, Config),
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["as", "profile", "install_deps"], Expect
+    ),
+    check_warnings(error_calls(), ?config(warnings, Config), ?config(deps_type, Config)),
+    BuildDir = filename:join([AppDir, "_build"]),
+    [?assertMatch({ok, #file_info{type=directory}},
+                  file:read_file_info(filename:join([BuildDir, "default", "lib", App])))
+     || {dep, App} <- Apps],
+    [?assertMatch({ok, #file_info{type=directory}}, % somehow symlinks return dirs
+                  file:read_file_info(filename:join([BuildDir, "profile", "lib", App])))
+     || {dep, App} <- Apps],
+    %% A second run to another profile also links default to the right spot
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["as", "other", "install_deps"], Expect
+    ),
+    [?assertMatch({ok, #file_info{type=directory}}, % somehow symlinks return dirs
+                  file:read_file_info(filename:join([BuildDir, "other", "lib", App])))
+     || {dep, App} <- Apps].
+
+nondefault_profile(Config) ->
+    {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
+    AppDir = ?config(apps, Config),
+    {ok, Apps} = Expect = ?config(expect, Config),
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["as", "nondef", "install_deps"], Expect
+    ),
+    check_warnings(error_calls(), ?config(warnings, Config), ?config(deps_type, Config)),
+    BuildDir = filename:join([AppDir, "_build"]),
+    [?assertMatch({error, enoent},
+                  file:read_file_info(filename:join([BuildDir, "default", "lib", App])))
+     || {dep, App} <- Apps],
+    [?assertMatch({ok, #file_info{type=directory}},
+                  file:read_file_info(filename:join([BuildDir, "nondef", "lib", App])))
+     || {dep, App} <- Apps],
+    %% A second run to another profile doesn't link dependencies
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["as", "other", "install_deps"], Expect
+    ),
+    [?assertMatch({error, enoent},
+                  file:read_file_info(filename:join([BuildDir, "default", "lib", App])))
+     || {dep, App} <- Apps].
+
 
 run(Config) ->
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),

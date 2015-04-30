@@ -36,7 +36,8 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    {OriginalPath, XrefChecks} = prepare(State),
+    code:add_pathsa(rebar_state:code_paths(State, all_deps)),
+    XrefChecks = prepare(State),
 
     %% Run xref checks
     ?INFO("Running cross reference analysis...", []),
@@ -45,9 +46,8 @@ do(State) ->
     %% Run custom queries
     QueryChecks = rebar_state:get(State, xref_queries, []),
     QueryResults = lists:foldl(fun check_query/2, [], QueryChecks),
-
-    ok = cleanup(OriginalPath),
-
+    stopped = xref:stop(xref),
+    rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
     case XrefResults =:= [] andalso QueryResults =:= [] of
         true ->
             {ok, State};
@@ -100,10 +100,6 @@ prepare(State) ->
     [{ok, _} = xref:add_directory(xref, rebar_app_info:ebin_dir(App))
      || App <- rebar_state:project_apps(State)],
 
-    %% Save the code path prior to doing any further code path
-    %% manipulation
-    OriginalPath = code:get_path(),
-
     %% Get list of xref checks we want to run
     ConfXrefChecks = rebar_state:get(State, xref_checks,
                                      [exports_not_used,
@@ -112,15 +108,7 @@ prepare(State) ->
     XrefChecks = sets:to_list(sets:intersection(
                                 sets:from_list(?SUPPORTED_XREFS),
                                 sets:from_list(ConfXrefChecks))),
-    {OriginalPath, XrefChecks}.
-
-cleanup(Path) ->
-    %% Restore the code path using the provided path
-    true = rebar_utils:cleanup_code_path(Path),
-
-    %% Stop xref
-    stopped = xref:stop(xref),
-    ok.
+    XrefChecks.
 
 xref_checks(XrefChecks) ->
     lists:foldl(fun run_xref_check/2, [], XrefChecks).

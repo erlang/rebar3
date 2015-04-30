@@ -164,8 +164,8 @@ test_basic_defines(Config) ->
     AppOpts = proplists:get_value(options, App:module_info(compile), []),
     SuiteOpts = proplists:get_value(options, Suite:module_info(compile), []),
     Expect = [{d, some_define}],
-    lists:foreach(fun(Expect) -> true = lists:member(Expect, AppOpts) end, Expect),
-    lists:foreach(fun(Expect) -> true = lists:member(Expect, SuiteOpts) end, Expect).
+    lists:foreach(fun(E) -> true = lists:member(E, AppOpts) end, Expect),
+    lists:foreach(fun(E) -> true = lists:member(E, SuiteOpts) end, Expect).
 
 test_multi_defines(Config) ->
     AppDir = ?config(apps, Config),
@@ -198,10 +198,10 @@ test_multi_defines(Config) ->
     AppOpts2 = proplists:get_value(options, App2:module_info(compile), []),
     SuiteOpts2 = proplists:get_value(options, Suite2:module_info(compile), []),
     Expect = [{d, some_define}],
-    lists:foreach(fun(Expect) -> true = lists:member(Expect, AppOpts1) end, Expect),
-    lists:foreach(fun(Expect) -> true = lists:member(Expect, SuiteOpts1) end, Expect),
-    lists:foreach(fun(Expect) -> true = lists:member(Expect, AppOpts2) end, Expect),
-    lists:foreach(fun(Expect) -> true = lists:member(Expect, SuiteOpts2) end, Expect).
+    lists:foreach(fun(E) -> true = lists:member(E, AppOpts1) end, Expect),
+    lists:foreach(fun(E) -> true = lists:member(E, SuiteOpts1) end, Expect),
+    lists:foreach(fun(E) -> true = lists:member(E, AppOpts2) end, Expect),
+    lists:foreach(fun(E) -> true = lists:member(E, SuiteOpts2) end, Expect).
 
 test_single_app_flag(Config) ->
     AppDir = ?config(apps, Config),

@@ -27,6 +27,7 @@
 -module(rebar3).
 
 -export([main/1,
+         run/1,
          run/2,
          global_option_spec_list/0,
          init_config/0,
@@ -114,6 +115,8 @@ run_aux(State, RawArgs) ->
     State2 = case os:getenv("REBAR_PROFILE") of
                  false ->
                      State;
+                 "" ->
+                     State;
                  Profile ->
                      rebar_state:apply_profiles(State, [list_to_atom(Profile)])
              end,
@@ -134,7 +137,9 @@ run_aux(State, RawArgs) ->
 
     {Task, Args} = parse_args(RawArgs),
 
-    rebar_core:init_command(rebar_state:command_args(State7, Args), Task).
+    State8 = rebar_state:code_paths(State7, default, code:get_path()),
+
+    rebar_core:init_command(rebar_state:command_args(State8, Args), Task).
 
 init_config() ->
     %% Initialize logging system

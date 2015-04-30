@@ -61,7 +61,7 @@
 %%============================================================================
 %% types
 %%============================================================================
--type t() :: record(app_info_t).
+-type t() :: #app_info_t{}.
 
 %%============================================================================
 %% API
@@ -157,6 +157,19 @@ app_file(AppInfo=#app_info_t{}, AppFile) ->
     AppInfo#app_info_t{app_file=AppFile}.
 
 -spec app_details(t()) -> list().
+app_details(AppInfo=#app_info_t{app_details=[]}) ->
+    AppFile = case app_file(AppInfo) of
+                  undefined ->
+                      app_file_src(AppInfo);
+                  File ->
+                      File
+              end,
+    case file:consult(AppFile) of
+        {ok, [{application, _, AppDetails}]} ->
+            AppDetails;
+        _ ->
+            []
+    end;
 app_details(#app_info_t{app_details=AppDetails}) ->
     AppDetails.
 

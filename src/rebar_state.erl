@@ -3,6 +3,8 @@
 -export([new/0, new/1, new/2, new/3,
          get/2, get/3, set/3,
 
+         code_paths/2, code_paths/3, update_code_paths/3,
+
          opts/1, opts/2,
          default/1, default/2,
 
@@ -22,7 +24,7 @@
 
          project_apps/1, project_apps/2,
          deps_to_build/1, deps_to_build/2,
-         all_deps/1, all_deps/2,
+         all_deps/1, all_deps/2, update_all_deps/2,
          namespace/1, namespace/2,
 
          deps_names/1,
@@ -40,6 +42,7 @@
 
 -record(state_t, {dir                               :: file:name(),
                   opts                = dict:new()  :: rebar_dict(),
+                  code_paths          = dict:new()  :: rebar_dict(),
                   default             = dict:new()  :: rebar_dict(),
                   escript_path                      :: undefined | file:filename_all(),
 
@@ -62,7 +65,7 @@
 
 -export_type([t/0]).
 
--type t() :: record(state_t).
+-type t() :: #state_t{}.
 
 -spec new() -> t().
 new() ->
@@ -131,6 +134,25 @@ default(#state_t{default=Opts}) ->
 
 default(State, Opts) ->
     State#state_t{default=Opts}.
+
+code_paths(#state_t{code_paths=CodePaths}, Key) ->
+    case dict:find(Key, CodePaths) of
+        {ok, CodePath} ->
+            CodePath;
+        _ ->
+            []
+    end.
+
+code_paths(State=#state_t{code_paths=CodePaths}, Key, CodePath) ->
+    State#state_t{code_paths=dict:store(Key, CodePath, CodePaths)}.
+
+update_code_paths(State=#state_t{code_paths=CodePaths}, Key, CodePath) ->
+    case dict:is_key(Key, CodePaths) of
+        true ->
+            State#state_t{code_paths=dict:append_list(Key, CodePath, CodePaths)};
+        false ->
+            State#state_t{code_paths=dict:store(Key, CodePath, CodePaths)}
+    end.
 
 opts(#state_t{opts=Opts}) ->
     Opts.
@@ -309,6 +331,9 @@ all_deps(#state_t{all_deps=Apps}) ->
 
 all_deps(State=#state_t{}, NewApps) ->
     State#state_t{all_deps=NewApps}.
+
+update_all_deps(State=#state_t{all_deps=Apps}, NewApps) ->
+    State#state_t{all_deps=Apps++NewApps}.
 
 namespace(#state_t{namespace=Namespace}) ->
     Namespace.

@@ -120,10 +120,6 @@ preprocess(State, AppInfo, AppSrcFile) ->
             AppFile = rebar_app_utils:app_src_to_app(OutDir, AppSrcFile),
             ok = rebar_file_utils:write_file_if_contents_differ(AppFile, Spec),
 
-            %% Make certain that the ebin/ directory is available
-            %% on the code path
-            true = code:add_path(filename:absname(filename:dirname(AppFile))),
-
             AppFile;
         {error, Reason} ->
             ?PRV_ERROR({file_read, AppSrcFile, Reason})
@@ -132,7 +128,6 @@ preprocess(State, AppInfo, AppSrcFile) ->
 load_app_vars(State) ->
     case rebar_state:get(State, app_vars_file, undefined) of
         undefined ->
-            ?DEBUG("No app_vars_file defined.", []),
             [];
         Filename ->
             ?INFO("Loading app vars from ~p", [Filename]),

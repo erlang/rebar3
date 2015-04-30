@@ -1,0 +1,220 @@
+#!/usr/bin/env escript
+%% -*- mode: erlang;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% ex: ft=erlang ts=4 sw=4 et
+
+main(_Args) ->
+    %% Fetch and build deps required to build rebar3
+    BaseDeps = [{providers, []}
+               ,{getopt, []}
+               ,{erlware_commons, ["ec_dictionary.erl", "ec_vsn.erl"]}],
+    Deps = get_deps(),
+    [fetch_and_compile(Dep, Deps) || Dep <- BaseDeps],
+
+    %% Build rebar3 modules with compile:file
+    bootstrap_rebar3(),
+
+    %% Build rebar.app from rebar.app.src
+    {ok, App} = rebar_app_info:new(rebar, "3.0.0", filename:absname("_build/default/lib/rebar/")),
+    rebar_otp_app:compile(rebar_state:new(), App),
+
+    %% Because we are compiling files that are loaded already we want to silence
+    %% not_purged errors in rebar_erlc_compiler:opts_changed/1
+    error_logger:tty(false),
+
+    setup_env(),
+    os:putenv("REBAR_PROFILE", "bootstrap"),
+    {ok, State} = rebar3:run(["compile"]),
+    reset_env(),
+    os:putenv("REBAR_PROFILE", ""),
+    %% Build erlydtl files (a hook on compile in the default profile) and escript file
+    DepsPaths = rebar_state:code_paths(State, all_deps),
+    code:add_pathsa(DepsPaths),
+
+    rebar3:run(["clean", "-a"]),
+    rebar3:run(["escriptize"]),
+
+    %% Done with compile, can turn back on error logger
+    error_logger:tty(true),
+
+    %% Finally, update executable perms for our script on *nix,
+    %%  or write out script files on win32.
+    ec_file:copy("_build/default/bin/rebar3", "./rebar3"),
+    case os:type() of
+        {unix,_} ->
+            [] = os:cmd("chmod u+x rebar3"),
+            ok;
+        {win32,_} ->
+            write_windows_scripts(),
+            ok;
+        _ ->
+            ok
+    end.
+
+fetch_and_compile({Name, ErlFirstFiles}, Deps) ->
+    {Name, _, Repo} = lists:keyfind(Name, 1, Deps),
+    ok = fetch(Repo, Name),
+    compile(Name, ErlFirstFiles).
+
+fetch({git, Url, Source}, App) ->
+    Dir = filename:join([filename:absname("_build/default/lib/"), App]),
+    case filelib:is_dir(Dir) of
+        true ->
+            true = code:add_path(filename:join(Dir, "ebin")),
+            ok;
+        false ->
+            fetch_source(Dir, Url, Source),
+            ok
+    end.
+
+fetch_source(Dir, Url, {ref, Ref}) ->
+    ok = filelib:ensure_dir(Dir),
+    os:cmd(io_lib:format("git clone ~s ~s", [Url, Dir])),
+    {ok, Cwd} = file:get_cwd(),
+    file:set_cwd(Dir),
+    os:cmd(io_lib:format("git checkout -q ~s", [Ref])),
+    file:set_cwd(Cwd);
+fetch_source(Dir, Url, {_, Branch}) ->
+    ok = filelib:ensure_dir(Dir),
+    os:cmd(io_lib:format("git clone ~s ~s -b ~s --single-branch",
+                         [Url, Dir, Branch])).
+
+compile(App, FirstFiles) ->
+    Dir = filename:join(filename:absname("_build/default/lib/"), App),
+    filelib:ensure_dir(filename:join([Dir, "ebin", "dummy.beam"])),
+    code:add_path(filename:join(Dir, "ebin")),
+    FirstFilesPaths = [filename:join([Dir, "src", Module]) || Module <- FirstFiles],
+    Sources = FirstFilesPaths ++ filelib:wildcard(filename:join([Dir, "src", "*.erl"])),
+    [compile_file(X, [{i, filename:join(Dir, "include")}
+                     ,{outdir,  filename:join(Dir, "ebin")}
+                     ,return | additional_defines()]) || X <- Sources].
+
+compile_file(File, Opts) ->
+    case compile:file(File, Opts) of
+        {ok, _Mod} ->
+            ok;
+        {ok, _Mod, []} ->
+            ok;
+        {ok, _Mod, Ws} ->
+            io:format("~s~n", [format_warnings(File, Ws)]),
+            halt(1);
+        {error, Es, Ws} ->
+            io:format("~s ~s~n", [format_errors(File, Es), format_warnings(File, Ws)]),
+            halt(1)
+    end.
+
+bootstrap_rebar3() ->
+    filelib:ensure_dir("_build/default/lib/rebar/ebin/dummy.beam"),
+    code:add_path("_build/default/lib/rebar/ebin/"),
+    file:make_symlink(filename:absname("src"), filename:absname("_build/default/lib/rebar/src")),
+    Sources = ["src/rebar_resource.erl" | filelib:wildcard("src/*.erl")],
+    [compile_file(X, [{outdir, "_build/default/lib/rebar/ebin/"}
+                     ,return | additional_defines()]) || X <- Sources],
+    code:add_patha(filename:absname("_build/default/lib/rebar/ebin")).
+
+setup_env() ->
+    %% We don't need or want erlydtl or relx providers loaded yet
+    application:load(rebar),
+    {ok, Providers} = application:get_env(rebar, providers),
+    Providers1 = Providers -- [rebar_prv_erlydtl_compiler,
+                               rebar_prv_release,
+                               rebar_prv_tar],
+    application:set_env(rebar, providers, Providers1).
+
+reset_env() ->
+    %% Reset the env so we get all providers and can build erlydtl files
+    application:unset_env(rebar, providers),
+    application:unload(rebar),
+    application:load(rebar).
+
+write_windows_scripts() ->
+    CmdScript=
+        "@echo off\r\n"
+        "setlocal\r\n"
+        "set rebarscript=%~f0\r\n"
+        "escript.exe \"%rebarscript:.cmd=%\" %*\r\n",
+    ok = file:write_file("rebar3.cmd", CmdScript).
+
+get_deps() ->
+    case file:consult("rebar.lock") of
+        {ok, [Deps]} ->
+            [{binary_to_atom(Name, utf8), "", Source} || {Name, Source, _Level} <- Deps];
+        _ ->
+            {ok, Config} = file:consult("rebar.config"),
+            proplists:get_value(deps, Config)
+    end.
+
+format_errors(Source, Errors) ->
+    format_errors(Source, "", Errors).
+
+format_warnings(Source, Warnings) ->
+    format_warnings(Source, Warnings, []).
+
+format_warnings(Source, Warnings, Opts) ->
+    Prefix = case lists:member(warnings_as_errors, Opts) of
+                 true -> "";
+                 false -> "Warning: "
+             end,
+    format_errors(Source, Prefix, Warnings).
+
+format_errors(_MainSource, Extra, Errors) ->
+    [begin
+         [format_error(Source, Extra, Desc) || Desc <- Descs]
+     end
+     || {Source, Descs} <- Errors].
+
+format_error(AbsSource, Extra, {{Line, Column}, Mod, Desc}) ->
+    ErrorDesc = Mod:format_error(Desc),
+    io_lib:format("~s:~w:~w: ~s~s~n", [AbsSource, Line, Column, Extra, ErrorDesc]);
+format_error(AbsSource, Extra, {Line, Mod, Desc}) ->
+    ErrorDesc = Mod:format_error(Desc),
+    io_lib:format("~s:~w: ~s~s~n", [AbsSource, Line, Extra, ErrorDesc]);
+format_error(AbsSource, Extra, {Mod, Desc}) ->
+    ErrorDesc = Mod:format_error(Desc),
+    io_lib:format("~s: ~s~s~n", [AbsSource, Extra, ErrorDesc]).
+
+additional_defines() ->
+    [{d, D} || {Re, D} <- [{"^[0-9]+", namespaced_types}, {"^R1[4|5]", deprecated_crypto}], is_otp_release(Re)].
+
+is_otp_release(ArchRegex) ->
+    case re:run(otp_release(), ArchRegex, [{capture, none}]) of
+        match ->
+            true;
+        nomatch ->
+            false
+    end.
+
+otp_release() ->
+    otp_release1(erlang:system_info(otp_release)).
+
+%% If OTP <= R16, otp_release is already what we want.
+otp_release1([$R,N|_]=Rel) when is_integer(N) ->
+    Rel;
+%% If OTP >= 17.x, erlang:system_info(otp_release) returns just the
+%% major version number, we have to read the full version from
+%% a file. See http://www.erlang.org/doc/system_principles/versions.html
+%% Read vsn string from the 'OTP_VERSION' file and return as list without
+%% the "\n".
+otp_release1(Rel) ->
+    File = filename:join([code:root_dir(), "releases", Rel, "OTP_VERSION"]),
+    {ok, Vsn} = file:read_file(File),
+
+    %% It's fine to rely on the binary module here because we can
+    %% be sure that it's available when the otp_release string does
+    %% not begin with $R.
+    Size = byte_size(Vsn),
+    %% The shortest vsn string consists of at least two digits
+    %% followed by "\n". Therefore, it's safe to assume Size >= 3.
+    case binary:part(Vsn, {Size, -3}) of
+        <<"**\n">> ->
+            %% The OTP documentation mentions that a system patched
+            %% using the otp_patch_apply tool available to licensed
+            %% customers will leave a '**' suffix in the version as a
+            %% flag saying the system consists of application versions
+            %% from multiple OTP versions. We ignore this flag and
+            %% drop the suffix, given for all intents and purposes, we
+            %% cannot obtain relevant information from it as far as
+            %% tooling is concerned.
+            binary:bin_to_list(Vsn, {0, Size - 3});
+        _ ->
+            binary:bin_to_list(Vsn, {0, Size - 1})
+    end.

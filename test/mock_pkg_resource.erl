@@ -152,7 +152,7 @@ find_parts([{AppName, Deps}|Rest], Skip, Acc) ->
     end.
 
 to_graph_parts(Dict) ->
-    LastUpdated = now(),
+    LastUpdated = os:timestamp(),
     dict:fold(fun(K,V,{Ks,Vs}) ->
             {_,Deps} = lists:keyfind(<<"deps">>, 1, V),
             {[{K,LastUpdated}|Ks],

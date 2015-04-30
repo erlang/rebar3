@@ -38,6 +38,8 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     ?INFO("Running Common Test suites...", []),
+    code:add_pathsa(rebar_state:code_paths(State, all_deps)),
+
     %% Run ct provider prehooks
     Providers = rebar_state:providers(State),
     Cwd = rebar_dir:get_cwd(),
@@ -47,11 +49,14 @@ do(State) ->
         {ok, State1} = Result ->
             %% Run ct provider posthooks
             rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State1),
+            rebar_utils:cleanup_code_path(rebar_state:code_paths(State1, default)),
             Result;
         ?PRV_ERROR(_) = Error ->
+            rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
             Error
     catch
         throw:{error, Reason} ->
+            rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
             ?PRV_ERROR(Reason)
     end.
 

@@ -9,6 +9,7 @@
          profile_merge_keys/1,
          explicit_profile_deduplicate_deps/1,
          implicit_profile_deduplicate_deps/1,
+         all_deps_code_paths/1,
          profile_merges/1,
          same_profile_deduplication/1,
          stack_deduplication/1,
@@ -25,7 +26,7 @@
 -include_lib("kernel/include/file.hrl").
 
 all() ->
-    [profile_new_key, profile_merge_keys, profile_merges,
+    [profile_new_key, profile_merge_keys, all_deps_code_paths, profile_merges,
      explicit_profile_deduplicate_deps, implicit_profile_deduplicate_deps,
      same_profile_deduplication, stack_deduplication,
      add_to_profile, add_to_existing_profile,
@@ -160,6 +161,39 @@ implicit_profile_deduplicate_deps(Config) ->
                                    ["as", "test,bar", "eunit"], {ok, [{app, Name}
                                                                  ,{dep, "a", "1.0.0"}
                                                                  ,{dep, "b", "2.0.0"}]}).
+
+all_deps_code_paths(Config) ->
+    AppDir = ?config(apps, Config),
+
+    AllDeps = rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
+                                                ,{"b", "2.0.0", []}]),
+    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(AllDeps)}]),
+
+    Name = rebar_test_utils:create_random_name("all_deps_code_paths"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    Deps = rebar_test_utils:top_level_deps(
+             rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}])),
+    ProfileDeps = rebar_test_utils:top_level_deps(
+                    rebar_test_utils:expand_deps(git, [{"b", "2.0.0", []}])),
+
+    RebarConfig = [{deps, Deps},
+                   {profiles,
+                    [{all_deps_test,
+                      [{deps, ProfileDeps}]}]}],
+    os:putenv("REBAR_PROFILE", "all_deps_test"),
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["compile"], {ok, [{app, Name}
+                                                     ,{dep, "a", "1.0.0"}
+                                                     ,{dep, "b", "2.0.0"}]}),
+    os:putenv("REBAR_PROFILE", ""),
+
+    Paths = rebar_state:code_paths(State, all_deps),
+    Path = lists:reverse(["_build", "all_deps_test", "lib", "b", "ebin"]),
+    ?assert(lists:any(fun(X) ->
+                              Path =:= lists:sublist(lists:reverse(filename:split(X)), 5)
+                      end, Paths)).
 
 
 profile_merges(_Config) ->
@@ -296,6 +330,9 @@ profiles_remain_applied_with_config_present(Config) ->
     rebar_test_utils:run_and_check(Config, RebarConfig,
                                    ["as", "not_ok", "compile"], {ok, [{app, Name}]}),
 
+    Path = filename:join([AppDir, "_build", "not_ok", "lib", Name, "ebin"]),
+    code:add_patha(Path),
+
     Mod = list_to_atom("not_a_real_src_" ++ Name),
 
     true = lists:member({d, not_ok}, proplists:get_value(options, Mod:module_info(compile), [])).
@@ -329,7 +366,8 @@ test_profile_applied_before_compile(Config) ->
     RebarConfig = [{erl_opts, [{d, some_define}]}],
     rebar_test_utils:create_config(AppDir, RebarConfig),
 
-    rebar_test_utils:run_and_check(Config, RebarConfig, ["eunit"], {ok, [{app, Name}]}),
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["eunit"], {ok, [{app, Name}]}),
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
 
     S = list_to_atom("not_a_real_src_" ++ Name),
     true = lists:member({d, 'TEST'}, proplists:get_value(options, S:module_info(compile), [])).
@@ -344,7 +382,8 @@ test_profile_applied_before_eunit(Config) ->
     RebarConfig = [{erl_opts, [{d, some_define}]}],
     rebar_test_utils:create_config(AppDir, RebarConfig),
 
-    rebar_test_utils:run_and_check(Config, RebarConfig, ["eunit"], {ok, [{app, Name}]}),
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["eunit"], {ok, [{app, Name}]}),
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
 
     T = list_to_atom("not_a_real_src_" ++ Name ++ "_tests"),
     true = lists:member({d, 'TEST'}, proplists:get_value(options, T:module_info(compile), [])).

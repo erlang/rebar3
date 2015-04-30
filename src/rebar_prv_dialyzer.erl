@@ -64,6 +64,7 @@ short_desc() ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     ?INFO("Dialyzer starting, this may take a while...", []),
+    code:add_pathsa(rebar_state:code_paths(State, all_deps)),
     Plt = get_plt_location(State),
     Apps = rebar_state:project_apps(State),
 
@@ -74,6 +75,8 @@ do(State) ->
             ?PRV_ERROR({error_processing_apps, Error});
         throw:{dialyzer_warnings, Warnings} ->
             ?PRV_ERROR({dialyzer_warnings, Warnings})
+    after
+        rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default))
     end.
 
 -spec format_error(any()) -> iolist().

@@ -148,8 +148,8 @@ doterl_compile(Config, Dir, OutDir, MoreSources, ErlOpts) ->
 
     %% Make sure that ebin/ exists and is on the path
     ok = filelib:ensure_dir(filename:join(OutDir, "dummy.beam")),
-    CurrPath = code:get_path(),
-    true = code:add_path(filename:absname(OutDir)),
+    true = code:add_patha(filename:absname(OutDir)),
+
     OutDir1 = proplists:get_value(outdir, ErlOpts, OutDir),
 
     G = init_erlcinfo(proplists:get_all_values(i, ErlOpts), AllErlFiles, Dir),
@@ -161,7 +161,7 @@ doterl_compile(Config, Dir, OutDir, MoreSources, ErlOpts) ->
                                                 filename:extension(File) =:= ".erl"],
 
     NeededErlFiles = needed_files(G, ErlOpts, Dir, OutDir1, AllErlFiles),
-    ErlFirstFiles = erl_first_files(Config, NeededErlFiles),
+    ErlFirstFiles = erl_first_files(Config, Dir, NeededErlFiles),
     {DepErls, OtherErls} = lists:partition(
                              fun(Source) -> digraph:in_degree(G, Source) > 0 end,
                              [File || File <- NeededErlFiles, not lists:member(File, ErlFirstFiles)]),
@@ -173,13 +173,13 @@ doterl_compile(Config, Dir, OutDir, MoreSources, ErlOpts) ->
       fun(S, C) ->
               internal_erl_compile(C, Dir, S, OutDir1, ErlOpts)
       end),
-    true = code:set_path(CurrPath),
     ok.
 
-erl_first_files(Config, NeededErlFiles) ->
+erl_first_files(Config, Dir, NeededErlFiles) ->
     ErlFirstFilesConf = rebar_state:get(Config, erl_first_files, []),
     %% NOTE: order of files in ErlFirstFiles is important!
-    [File || File <- ErlFirstFilesConf, lists:member(File, NeededErlFiles)].
+    [filename:join(Dir, File) || File <- ErlFirstFilesConf,
+                                 lists:member(filename:join(Dir, File), NeededErlFiles)].
 
 %% Get subset of SourceFiles which need to be recompiled, respecting
 %% dependencies induced by given graph G.
@@ -541,9 +541,6 @@ maybe_expand_include_lib_path(File, Dir) ->
 %% The use of -include_lib was probably incorrect by the user but lets try to make it work.
 %% We search in the outdir and outdir/../include to see if the header exists.
 warn_and_find_path(File, Dir) ->
-    ?WARN("Bad use of -include_lib(\"~s\")."
-         " First path component should be the name of an application."
-         " You probably meant -include(\"~s\").", [File, File]),
     SrcHeader = filename:join(Dir, File),
     case filelib:is_regular(SrcHeader) of
         true ->
@@ -555,7 +552,6 @@ warn_and_find_path(File, Dir) ->
                 true ->
                     [filename:join(IncludeDir, File)];
                 false ->
-                    ?WARN("Could not find header for -include_lib(\"~s\").", [File]),
                     []
             end
     end.

@@ -91,7 +91,7 @@ hex_to_graph(Filename) ->
     {Dict1, Graph}.
 
 update_graph(Pkg, PkgVsn, Deps, HexRegistry, Graph) ->
-    lists:foldl(fun([Dep, DepVsn, _, _], DepsListAcc) ->
+    lists:foldl(fun([Dep, DepVsn, false, _AppName | _], DepsListAcc) ->
                         case DepVsn of
                             <<"~> ", Vsn/binary>> ->
                                 HighestDepVsn = rebar_packages:find_highest_matching(Dep, Vsn, HexRegistry),
@@ -100,5 +100,7 @@ update_graph(Pkg, PkgVsn, Deps, HexRegistry, Graph) ->
                             Vsn ->
                                 digraph:add_edge(Graph, {Pkg, PkgVsn}, {Dep, Vsn}),
                                 [{Dep, Vsn} | DepsListAcc]
-                        end
+                        end;
+                   ([_Dep, _DepVsn, true, _AppName | _], DepsListAcc) ->
+                        DepsListAcc
                 end, [], Deps).

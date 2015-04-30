@@ -266,17 +266,29 @@ replace_var([H|T], Acc, Vars) ->
 
 %% Load a list of all the files in the escript and on disk
 find_templates(State) ->
-    %% Cache the files since we'll potentially need to walk it several times
-    %% over the course of a run.
-    Files = cache_escript_files(State),
-
-    %% Build a list of available templates
-    AvailTemplates = prioritize_templates(
-        tag_names(find_disk_templates(State)),
-        tag_names(find_escript_templates(Files))),
-
+    DiskTemplates = find_disk_templates(State),
+    {MainTemplates, Files} =
+        case rebar_state:escript_path(State) of
+            undefined ->
+                {find_priv_templates(State), []};
+            _ ->
+                %% Cache the files since we'll potentially need to walk it several times
+                %% over the course of a run.
+                F = cache_escript_files(State),
+                {find_escript_templates(F), F}
+        end,
+    AvailTemplates = find_available_templates(DiskTemplates,
+                                              MainTemplates),
     ?DEBUG("Available templates: ~p\n", [AvailTemplates]),
     {AvailTemplates, Files}.
+
+find_available_templates(TemplateList1, TemplateList2) ->
+    AvailTemplates = prioritize_templates(
+                       tag_names(TemplateList1),
+                       tag_names(TemplateList2)),
+
+    ?DEBUG("Available templates: ~p\n", [AvailTemplates]),
+    AvailTemplates.
 
 %% Scan the current escript for available files
 cache_escript_files(State) ->
@@ -292,6 +304,12 @@ find_escript_templates(Files) ->
     [{escript, Name}
      || {Name, _Bin} <- Files,
         re:run(Name, ?TEMPLATE_RE, [{capture, none}]) == match].
+
+find_priv_templates(State) ->
+    OtherTemplates = rebar_utils:find_files(code:priv_dir(rebar), ?TEMPLATE_RE),
+    HomeFiles = rebar_utils:find_files(rebar_dir:template_dir(State),
+                                       ?TEMPLATE_RE, true), % recursive
+    [{file, F} || F <- OtherTemplates ++ HomeFiles].
 
 %% Fetch template indexes that sit on disk in the user's HOME
 find_disk_templates(State) ->
@@ -394,7 +412,7 @@ write_file(Output, Data, Force) ->
 -spec make_template_name(string(), term()) -> module().
 make_template_name(Base, Value) ->
     %% Seed so we get different values each time
-    random:seed(erlang:now()),
+    random:seed(os:timestamp()),
     Hash = erlang:phash2(Value),
     Ran = random:uniform(10000000),
     erlang:list_to_atom(Base ++ "_" ++

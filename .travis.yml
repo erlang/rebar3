@@ -3,7 +3,8 @@ otp_release:
   - 17.0
   - R16B03-1
   - R15B03
-script: make travis
+before_script: "./bootstrap"
+script: "./rebar3 ct"
 branches:
   only:
     - master

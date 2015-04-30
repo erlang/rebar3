@@ -42,7 +42,6 @@
          erl_to_mod/1,
          beams/1,
          find_executable/1,
-         expand_code_path/0,
          vcs_vsn/2,
          deprecated/3,
          deprecated/4,
@@ -176,13 +175,6 @@ find_executable(Name) ->
         Path ->
             "\"" ++ filename:nativename(Path) ++ "\""
     end.
-
-%% Convert all the entries in the code path to absolute paths.
-expand_code_path() ->
-    CodePath = lists:foldl(fun(Path, Acc) ->
-                                   [filename:absname(Path) | Acc]
-                           end, [], code:get_path()),
-    code:set_path(lists:reverse(CodePath)).
 
 deprecated(Old, New, Opts, When) when is_list(Opts) ->
     case lists:member(Old, Opts) of

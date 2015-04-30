@@ -82,13 +82,9 @@ do(State) ->
                 ?PRV_ERROR({cycles, Cycles});
             {error, Error} ->
                 {error, Error};
-            no_cycle ->
-                case compile_order(Source, ProjectApps) of
-                    {ok, ToCompile} ->
-                        {ok, rebar_state:deps_to_build(State1, ToCompile)};
-                    {error, Error} ->
-                        {error, Error}
-                end
+            {no_cycle, Sorted} ->
+                ToCompile = cull_compile(Sorted, ProjectApps),
+                {ok, rebar_state:deps_to_build(State1, ToCompile)}
         end
     catch
         %% maybe_fetch will maybe_throw an exception to break out of some loops
@@ -132,30 +128,39 @@ handle_deps(Profile, State, Deps, Locks) when is_list(Locks) ->
 handle_deps(_Profile, State, [], _, _) ->
     {ok, [], State};
 handle_deps(Profile, State0, Deps, Upgrade, Locks) ->
-    %% Read in package index and dep graph
-    {Packages, Graph} = rebar_state:packages(State0),
-    Registry = rebar_packages:registry(State0),
-    State = rebar_state:packages(rebar_state:registry(State0, Registry), {Packages, Graph}),
     %% Split source deps from pkg deps, needed to keep backwards compatibility
-    DepsDir = rebar_dir:deps_dir(State),
-    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, State, Locks, 0),
+    DepsDir = profile_dep_dir(State0, Profile),
+
+    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, State0, Locks, 0),
 
     %% Fetch transitive src deps
-    {State1, SrcApps, PkgDeps1, Seen} =
-        update_src_deps(Profile, 0, SrcDeps, PkgDeps, [], State, Upgrade, sets:new(), Locks),
+    {State1, SrcApps, PkgDeps1, Seen} = update_src_deps(Profile, 0, SrcDeps, PkgDeps, []
+                                                       ,State0, Upgrade, sets:new(), Locks),
 
-    {Solved, State2} =
-        update_pkg_deps(Profile, Packages, PkgDeps1, Graph, Upgrade, Seen, State1),
+    {Solved, State4} =
+        case PkgDeps1 of
+            [] ->
+                {[], State1};
+            _ ->
+                %% Read in package index and dep graph
+                {Packages, Graph} = rebar_state:packages(State1),
+                Registry = rebar_packages:registry(State1),
+                State2 = rebar_state:packages(rebar_state:registry(State1, Registry)
+                                            ,{Packages, Graph}),
+
+                update_pkg_deps(Profile, Packages, PkgDeps1
+                               ,Graph, Upgrade, Seen, State2)
+        end,
 
     AllDeps = lists:ukeymerge(2
                              ,lists:ukeysort(2, SrcApps)
                              ,lists:ukeysort(2, Solved)),
-    %% Sort all apps to build order
-    State3 = rebar_state:all_deps(State2, AllDeps),
-    CodePaths = [rebar_app_info:ebin_dir(A) || A <- AllDeps],
-    ok = code:add_pathsa(CodePaths),
 
-    {ok, AllDeps, State3}.
+    State5 = rebar_state:update_all_deps(State4, AllDeps),
+    CodePaths = [rebar_app_info:ebin_dir(A) || A <- AllDeps],
+    State6 = rebar_state:update_code_paths(State5, all_deps, CodePaths),
+
+    {ok, AllDeps, State6}.
 
 %% ===================================================================
 %% Internal functions
@@ -171,17 +176,11 @@ find_cycles(Apps) ->
     case rebar_digraph:compile_order(Apps) of
         {error, {cycles, Cycles}} -> {cycles, Cycles};
         {error, Error} -> {error, Error};
-        {ok, _} -> no_cycle
+        {ok, Sorted} -> {no_cycle, Sorted}
     end.
 
-compile_order(Source, ProjectApps) ->
-    case rebar_digraph:compile_order(Source) of
-        {ok, Sort} ->
-            %% Valid apps are compiled and good
-            {ok, lists:dropwhile(fun not_needs_compile/1, Sort -- ProjectApps)};
-        {error, Error} ->
-            {error, Error}
-    end.
+cull_compile(TopSortedDeps, ProjectApps) ->
+    lists:dropwhile(fun not_needs_compile/1, TopSortedDeps -- ProjectApps).
 
 update_pkg_deps(Profile, Packages, PkgDeps, Graph, Upgrade, Seen, State) ->
     case PkgDeps of
@@ -203,7 +202,7 @@ update_pkg_deps(Profile, Packages, PkgDeps, Graph, Upgrade, Seen, State) ->
 
 update_pkg_deps(Profile, Pkgs, Packages, Upgrade, Seen, State) ->
     %% Create app_info record for each pkg dep
-    DepsDir = rebar_dir:deps_dir(State),
+    DepsDir = profile_dep_dir(State, Profile),
     {Solved, _, State1}
         = lists:foldl(fun(Pkg, {Acc, SeenAcc, StateAcc}) ->
                         handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Acc, SeenAcc, StateAcc)
@@ -214,7 +213,7 @@ handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Fetched, Seen, State) -
     AppInfo = package_to_app(DepsDir, Packages, Pkg),
     Level = rebar_app_info:dep_level(AppInfo),
     {NewSeen, NewState} = maybe_lock(Profile, AppInfo, Seen, State, Level),
-    {_, AppInfo1} = maybe_fetch(AppInfo, Upgrade, Seen, NewState),
+    {_, AppInfo1} = maybe_fetch(AppInfo, Profile, Upgrade, Seen, NewState),
     {[AppInfo1 | Fetched], NewSeen, NewState}.
 
 maybe_lock(Profile, AppInfo, Seen, State, Level) ->
@@ -252,7 +251,7 @@ package_to_app(DepsDir, Packages, {Name, Vsn, Level}) ->
                        || {PkgName,PkgVsn} <- proplists:get_value(<<"deps">>, P, [])],
             {ok, AppInfo} = rebar_app_info:new(Name, Vsn),
             AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
-            AppInfo2 = rebar_app_info:dir(AppInfo1, rebar_dir:deps_dir(DepsDir, Name)),
+            AppInfo2 = rebar_app_info:dir(AppInfo1, filename:join([DepsDir, Name])),
             AppInfo3 = rebar_app_info:dep_level(AppInfo2, Level),
             rebar_app_info:source(AppInfo3, {pkg, Name, Vsn})
     end.
@@ -278,7 +277,7 @@ update_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrad
     Name = rebar_app_info:name(AppInfo),
     case sets:is_element(Name, Seen) of
         true ->
-            update_seen_src_dep(AppInfo, Level,
+            update_seen_src_dep(AppInfo, Profile, Level,
                                 SrcDeps, PkgDeps, SrcApps,
                                 State, Upgrade, Seen, BaseLocks, Locks);
         false ->
@@ -288,7 +287,13 @@ update_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrad
 
     end.
 
-update_seen_src_dep(AppInfo, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, BaseLocks, Locks) ->
+profile_dep_dir(State, Profile) ->
+    case Profile of
+        default -> filename:join([rebar_dir:profile_dir(State, [default]), rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR)]);
+        _ -> rebar_dir:deps_dir(State)
+    end.
+
+update_seen_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, BaseLocks, Locks) ->
     Name = rebar_app_info:name(AppInfo),
     %% If seen from lock file don't print warning about skipping
     case lists:keymember(Name, 1, BaseLocks) of
@@ -303,7 +308,7 @@ update_seen_src_dep(AppInfo, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, S
             {SrcDeps, PkgDeps, SrcApps, State, Seen, Locks};
         true ->
             {NewSrcDeps, NewPkgDeps, NewSrcApps, NewState, NewLocks}
-                = handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps,
+                = handle_dep(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps,
                              Level, State, Locks),
             {NewSrcDeps, NewPkgDeps, NewSrcApps, NewState, Seen, NewLocks}
     end.
@@ -313,22 +318,22 @@ update_unseen_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State,
     {NewSrcDeps, NewPkgDeps, NewSrcApps, State2, NewLocks}
         = case Upgrade of
             true ->
-                handle_upgrade(AppInfo, SrcDeps, PkgDeps, SrcApps,
+                handle_upgrade(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps,
                                Level, State1, Locks);
             _ ->
-                {_, AppInfo1} = maybe_fetch(AppInfo, false, Seen, State1),
-                handle_dep(AppInfo1, SrcDeps, PkgDeps, SrcApps,
+                {_, AppInfo1} = maybe_fetch(AppInfo, Profile, false, Seen, State1),
+                handle_dep(AppInfo1, Profile, SrcDeps, PkgDeps, SrcApps,
                            Level, State1, Locks)
         end,
     {NewSrcDeps, NewPkgDeps, NewSrcApps, State2, NewSeen, NewLocks}.
 
-handle_upgrade(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
+handle_upgrade(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
     Name = rebar_app_info:name(AppInfo),
     case lists:keyfind(Name, 1, Locks) of
         false ->
-            case maybe_fetch(AppInfo, true, sets:new(), State) of
+            case maybe_fetch(AppInfo, Profile, true, sets:new(), State) of
                 {true, AppInfo1} ->
-                    handle_dep(AppInfo1, SrcDeps, PkgDeps, SrcApps,
+                    handle_dep(AppInfo1, Profile, SrcDeps, PkgDeps, SrcApps,
                                Level, State, Locks);
 
                 {false, AppInfo1} ->
@@ -338,8 +343,8 @@ handle_upgrade(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
             {[AppInfo|SrcDeps], PkgDeps, SrcApps, State, Locks}
     end.
 
-handle_dep(AppInfo, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
-    DepsDir = rebar_dir:deps_dir(State),
+handle_dep(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
+    DepsDir = profile_dep_dir(State, Profile),
     {AppInfo1, NewSrcDeps, NewPkgDeps, NewLocks, State1} =
         handle_dep(State, DepsDir, AppInfo, Locks, Level),
     AppInfo2 = rebar_app_info:dep_level(AppInfo1, Level),
@@ -374,9 +379,9 @@ handle_dep(State, DepsDir, AppInfo, Locks, Level) ->
     {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, S3, Locks, Level),
     {AppInfo2, SrcDeps, PkgDeps, Locks++NewLocks, State1}.
 
--spec maybe_fetch(rebar_app_info:t(), boolean() | {true, binary(), integer()},
+-spec maybe_fetch(rebar_app_info:t(), atom(), boolean() | {true, binary(), integer()},
                   sets:set(binary()), rebar_state:t()) -> {boolean(), rebar_app_info:t()}.
-maybe_fetch(AppInfo, Upgrade, Seen, State) ->
+maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
     AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
     %% Don't fetch dep if it exists in the _checkouts dir
     case rebar_app_info:is_checkout(AppInfo) of
@@ -385,22 +390,27 @@ maybe_fetch(AppInfo, Upgrade, Seen, State) ->
         false ->
             case rebar_app_discover:find_app(AppDir, all) of
                 false ->
-                    case in_default(AppInfo, State) of
+                    case already_in_default(AppInfo, State) of
                         false ->
-                            {fetch_app(AppInfo, AppDir, State), AppInfo};
+                            case fetch_app(AppInfo, AppDir, State) of
+                                true ->
+                                    maybe_symlink_default(State, Profile, AppDir, AppInfo),
+                                    {true, update_app_info(AppInfo)};
+                                Other ->
+                                    {Other, AppInfo}
+                            end;
                         {true, FoundApp} ->
                             %% Preserve the state we created with overrides
                             AppState = rebar_app_info:state(AppInfo),
                             FoundApp1 = rebar_app_info:state(FoundApp, AppState),
-                            ?INFO("Linking ~s to ~s", [rebar_app_info:dir(FoundApp1), AppDir]),
-                            filelib:ensure_dir(AppDir),
-                            rebar_file_utils:symlink_or_copy(rebar_app_info:dir(FoundApp1), AppDir),
+                            symlink_dep(rebar_app_info:dir(FoundApp1), AppDir),
                             {true, FoundApp1}
                     end;
                 {true, AppInfo1} ->
                     %% Preserve the state we created with overrides
                     AppState = rebar_app_info:state(AppInfo),
                     AppInfo2 = rebar_app_info:state(AppInfo1, AppState),
+                    maybe_symlink_default(State, Profile, AppDir, AppInfo2),
                     case sets:is_element(rebar_app_info:name(AppInfo), Seen) of
                         true ->
                             {false, AppInfo2};
@@ -410,10 +420,41 @@ maybe_fetch(AppInfo, Upgrade, Seen, State) ->
             end
     end.
 
-in_default(AppInfo, State) ->
+already_in_default(AppInfo, State) ->
     Name = ec_cnv:to_list(rebar_app_info:name(AppInfo)),
     DefaultAppDir = filename:join([rebar_state:get(State, base_dir), "default", "lib", Name]),
     rebar_app_discover:find_app(DefaultAppDir, all).
+
+needs_symlinking(State, Profile) ->
+    case {rebar_state:current_profiles(State), Profile} of
+        {[default], default} ->
+            %% file will be in default already -- this is the only run we have
+            false;
+        {_, default} ->
+            %% file fetched to default, needs to be linked to the current
+            %% run's directory.
+            true;
+        _ ->
+            %% File fetched to the right directory already
+            false
+    end.
+
+maybe_symlink_default(State, Profile, AppDir, AppInfo) ->
+    case needs_symlinking(State, Profile) of
+        true ->
+            SymDir = filename:join([rebar_dir:deps_dir(State),
+                                    rebar_app_info:name(AppInfo)]),
+            symlink_dep(AppDir, SymDir),
+            true;
+        false ->
+            false
+    end.
+
+
+symlink_dep(From, To) ->
+    ?INFO("Linking ~s to ~s", [From, To]),
+    filelib:ensure_dir(To),
+    rebar_file_utils:symlink_or_copy(From, To).
 
 -spec parse_deps(binary(), list(), rebar_state:t(), list(), integer()) -> {[rebar_app_info:t()], [pkg_dep()]}.
 parse_deps(DepsDir, Deps, State, Locks, Level) ->
@@ -520,6 +561,15 @@ fetch_app(AppInfo, AppDir, State) ->
         Result ->
             Result
     end.
+
+update_app_info(AppInfo) ->
+    AppDetails = rebar_app_info:app_details(AppInfo),
+    Applications = proplists:get_value(applications, AppDetails, []),
+    IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
+    AppInfo1 = rebar_app_info:applications(
+                 rebar_app_info:app_details(AppInfo, AppDetails),
+                 IncludedApplications++Applications),
+    rebar_app_info:valid(AppInfo1, false).
 
 maybe_upgrade(AppInfo, AppDir, false, State) ->
     Source = rebar_app_info:source(AppInfo),

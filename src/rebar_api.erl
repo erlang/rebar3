@@ -8,7 +8,9 @@
          debug/2, info/2, warn/2, error/2,
          expand_env_variable/3,
          get_arch/0,
-         wordsize/0]).
+         wordsize/0,
+         add_deps_to_path/1,
+         restore_code_path/1]).
 
 -export_type([rebar_dict/0, rebar_digraph/0]).
 
@@ -48,3 +50,12 @@ get_arch() ->
 
 wordsize() ->
     rebar_utils:wordsize().
+
+
+%% Add deps to the code path
+add_deps_to_path(State) ->
+  code:add_pathsa(rebar_state:code_paths(State, all_deps)).
+
+%% Revert to only having the beams necessary for running rebar3 and plugins in the path
+restore_code_path(State) ->
+  rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)).

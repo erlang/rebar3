@@ -73,7 +73,8 @@ Example:
 -behaviour(rebar_provider).
 
 -export([init/1,
-         do/1]).
+         do/1,
+         format_error/1]).
 
 -define(PROVIDER, something).
 -define(DEPS, []).
@@ -98,6 +99,10 @@ init(State) ->
 do(State) ->
     %% Do something
     {ok, State}.
+
+-spec format_error(any()) -> iolist().
+format_error(Reason) ->
+    io_lib:format("~p", [Reason]).
 ```
 
 
@@ -118,16 +123,21 @@ You can download a pre-built binary version of rebar3 based on the last commit f
 
 https://s3.amazonaws.com/rebar3/rebar3
 
-#### Building rebar
+#### Bootstrapping rebar3
 
 ```sh
 $ git clone https://github.com/rebar/rebar3
 $ cd rebar3
-$ ./bootstrap/bootstrap
-==> rebar (compile)
-Congratulations! You now have a self-contained script called "rebar3" in
-your current working directory. Place this script anywhere in your path
-and you can use rebar to build OTP-compliant apps.
+$ ./bootstrap
+```
+
+### Developing on rebar3
+
+When developing you can simply run `escriptize` to build your changes but the new escript is under `_build/default/bin/rebar3`
+
+```sh
+$ ./rebar3 escriptize
+$ _build/default/bin/rebar3
 ```
 
 

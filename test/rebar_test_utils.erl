@@ -56,7 +56,8 @@ run_and_check(Config, RebarConfig, Command, Expect) ->
                 ?assertEqual({error, Reason}, Res);
             {ok, Expected} ->
                 {ok, _} = Res,
-                check_results(AppDir, Expected);
+                check_results(AppDir, Expected),
+                Res;
             return ->
                 Res
         end
@@ -103,12 +104,12 @@ create_config(AppDir, Contents) ->
 
 %% @doc Util to create a random variation of a given name.
 create_random_name(Name) ->
-    random:seed(erlang:now()),
+    random:seed(os:timestamp()),
     Name ++ erlang:integer_to_list(random:uniform(1000000)).
 
 %% @doc Util to create a random variation of a given version.
 create_random_vsn() ->
-    random:seed(erlang:now()),
+    random:seed(os:timestamp()),
     lists:flatten([erlang:integer_to_list(random:uniform(100)),
                    ".", erlang:integer_to_list(random:uniform(100)),
                    ".", erlang:integer_to_list(random:uniform(100))]).

@@ -31,27 +31,33 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    DepsPaths = rebar_state:code_paths(State, all_deps),
+    code:add_pathsa(DepsPaths),
+
     ProjectApps = rebar_state:project_apps(State),
     Providers = rebar_state:providers(State),
     Deps = rebar_state:deps_to_build(State),
     Cwd = rebar_dir:get_cwd(),
-
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
     %% Need to allow global config vars used on deps
     %% Right now no way to differeniate and just give deps a new state
     EmptyState = rebar_state:new(),
     build_apps(EmptyState, Providers, Deps),
 
-    %% Use the project State for building project apps
-    %% Set hooks to empty so top-level hooks aren't run for each project app
-    State2 = rebar_state:set(rebar_state:set(State, post_hooks, []), pre_hooks, []),
     {ok, ProjectApps1} = rebar_digraph:compile_order(ProjectApps),
 
-    ProjectApps2 = build_apps(State2, Providers, ProjectApps1),
-    State3 = rebar_state:project_apps(State2, ProjectApps2),
+    %% Run top level hooks *before* project apps compiled but *after* deps are
+    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
-    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State3),
+    ProjectApps2 = build_apps(State, Providers, ProjectApps1),
+    State2 = rebar_state:project_apps(State, ProjectApps2),
+
+    ProjAppsPaths = [filename:join(rebar_app_info:out_dir(X), "ebin") || X <- ProjectApps2],
+    State3 = rebar_state:code_paths(State2, all_deps, DepsPaths ++ ProjAppsPaths),
+
+    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State2),
+
+    rebar_utils:cleanup_code_path(rebar_state:code_paths(State3, default)),
 
     {ok, State3}.
 
@@ -77,12 +83,10 @@ build_app(State, Providers, AppInfo) ->
         end,
 
     %% Legacy hook support
-
     rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, S),
     AppInfo1 = compile(S, AppInfo),
     rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, S),
 
-    true = code:add_patha(rebar_app_info:ebin_dir(AppInfo1)),
     AppInfo1.
 
 compile(State, AppInfo) ->
