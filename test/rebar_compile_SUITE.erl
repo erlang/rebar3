@@ -19,7 +19,8 @@
          delete_beam_if_source_deleted/1,
          checkout_priority/1,
          compile_plugins/1,
-         highest_version_of_pkg_dep/1]).
+         highest_version_of_pkg_dep/1,
+         parse_transform_test/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -46,7 +47,8 @@ all() ->
      build_all_srcdirs, recompile_when_hrl_changes,
      recompile_when_opts_change, dont_recompile_when_opts_dont_change,
      dont_recompile_yrl_or_xrl, delete_beam_if_source_deleted,
-     deps_in_path, checkout_priority, compile_plugins, highest_version_of_pkg_dep].
+     deps_in_path, checkout_priority, compile_plugins, highest_version_of_pkg_dep,
+     parse_transform_test].
 
 build_basic_app(Config) ->
     AppDir = ?config(apps, Config),
@@ -449,3 +451,24 @@ highest_version_of_pkg_dep(Config) ->
         Config, RConf, ["compile"],
         {ok, [{app, Name}, {dep, PkgName, <<"0.1.3">>}]}
     ).
+
+parse_transform_test(Config) ->
+    AppDir = ?config(apps, Config),
+
+    RebarConfig = [{erl_opts, [{parse_transform, pascal}]}],
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    ExtraSrc = <<"-module(pascal). "
+                 "-export([parse_transform/2]). "
+                 "parse_transform(Forms, _Options) -> "
+                 "Forms.">>,
+
+    ok = file:write_file(filename:join([AppDir, "src", "pascal.erl"]), ExtraSrc),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
+
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    true = filelib:is_file(filename:join([EbinDir, "pascal.beam"])).
