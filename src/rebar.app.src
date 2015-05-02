@@ -37,7 +37,6 @@
                      rebar_prv_dialyzer,
                      rebar_prv_do,
                      rebar_prv_edoc,
-                     rebar_prv_erlydtl_compiler,
                      rebar_prv_escriptize,
                      rebar_prv_eunit,
                      rebar_prv_help,

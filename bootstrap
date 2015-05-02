@@ -26,7 +26,7 @@ main(_Args) ->
     {ok, State} = rebar3:run(["compile"]),
     reset_env(),
     os:putenv("REBAR_PROFILE", ""),
-    %% Build erlydtl files (a hook on compile in the default profile) and escript file
+
     DepsPaths = rebar_state:code_paths(State, all_deps),
     code:add_pathsa(DepsPaths),
 
@@ -112,16 +112,15 @@ bootstrap_rebar3() ->
     code:add_patha(filename:absname("_build/default/lib/rebar/ebin")).
 
 setup_env() ->
-    %% We don't need or want erlydtl or relx providers loaded yet
+    %% We don't need or want relx providers loaded yet
     application:load(rebar),
     {ok, Providers} = application:get_env(rebar, providers),
-    Providers1 = Providers -- [rebar_prv_erlydtl_compiler,
-                               rebar_prv_release,
+    Providers1 = Providers -- [rebar_prv_release,
                                rebar_prv_tar],
     application:set_env(rebar, providers, Providers1).
 
 reset_env() ->
-    %% Reset the env so we get all providers and can build erlydtl files
+    %% Reset the env so we get all providers
     application:unset_env(rebar, providers),
     application:unload(rebar),
     application:load(rebar).
