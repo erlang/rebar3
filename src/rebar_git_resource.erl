@@ -32,7 +32,7 @@ needs_update(Dir, {git, Url, {tag, Tag}}) ->
     not ((Current1 =:= Tag) andalso compare_url(Dir, Url));
 needs_update(Dir, {git, Url, {branch, Branch}}) ->
     %% Fetch remote so we can check if the branch has changed
-    {ok, _} = rebar_utils:sh(?FMT("git fetch", []),
+    {ok, _} = rebar_utils:sh(?FMT("git fetch origin ~s", [Branch]),
                              [{cd, Dir}]),
     %% Check for new commits to origin/Branch
     {ok, Current} = rebar_utils:sh(?FMT("git log HEAD..origin/~s --oneline", [Branch]),
