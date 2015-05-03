@@ -140,4 +140,3 @@ info_useless(Old, New) ->
      || Name <- Old,
         not lists:member(Name, New)],
     ok.
-

@@ -31,11 +31,14 @@ needs_update(Dir, {git, Url, {tag, Tag}}) ->
     ?DEBUG("Comparing git tag ~s with ~s", [Tag, Current1]),
     not ((Current1 =:= Tag) andalso compare_url(Dir, Url));
 needs_update(Dir, {git, Url, {branch, Branch}}) ->
-    {ok, Current} = rebar_utils:sh(?FMT("git symbolic-ref -q --short HEAD", []),
+    %% Fetch remote so we can check if the branch has changed
+    {ok, _} = rebar_utils:sh(?FMT("git fetch origin ~s", [Branch]),
+                             [{cd, Dir}]),
+    %% Check for new commits to origin/Branch
+    {ok, Current} = rebar_utils:sh(?FMT("git log HEAD..origin/~s --oneline", [Branch]),
                                    [{cd, Dir}]),
-    Current1 = string:strip(string:strip(Current, both, $\n), both, $\r),
-    ?DEBUG("Comparing git branch ~s with ~s", [Branch, Current1]),
-    not ((Current1 =:= Branch) andalso compare_url(Dir, Url));
+    ?DEBUG("Checking git branch ~s for updates", [Branch]),
+    not ((Current =:= []) andalso compare_url(Dir, Url));
 needs_update(Dir, {git, Url, "master"}) ->
     needs_update(Dir, {git, Url, {branch, "master"}});
 needs_update(Dir, {git, Url, Ref}) ->
