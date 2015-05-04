@@ -73,14 +73,14 @@ find_highest_matching(Dep, Constraint, T) ->
         [{Dep, [[Vsn]]}] ->
             case ec_semver:pes(Vsn, Constraint) of
                 true ->
-                    Vsn;
+                    {ok, Vsn};
                 false ->
                     ?WARN("Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
                          "Using anyway, but it is not guarenteed to work.", [Dep, Vsn, Constraint]),
-                    Vsn
+                    {ok, Vsn}
             end;
         [{Dep, [[HeadVsn | VsnTail]]}] ->
-            lists:foldl(fun(Version, Highest) ->
+            {ok, lists:foldl(fun(Version, Highest) ->
                                 case ec_semver:pes(Version, Constraint) andalso
                                     ec_semver:gt(Version, Highest) of
                                     true ->
@@ -88,5 +88,8 @@ find_highest_matching(Dep, Constraint, T) ->
                                     false ->
                                         Highest
                                 end
-                        end, HeadVsn, VsnTail)
+                        end, HeadVsn, VsnTail)};
+        [] ->
+            ?WARN("Missing registry entry for package ~s", [Dep]),
+            none
     end.

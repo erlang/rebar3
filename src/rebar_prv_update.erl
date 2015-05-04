@@ -52,7 +52,8 @@ do(State) ->
         write_registry(Dict, Graph, State),
         ok
     catch
-        _E:_C ->
+        _E:C ->
+            ?DEBUG("Error creating package index: ~p ~p", [C, erlang:get_stacktrace()]),
             throw(?PRV_ERROR(package_index_write))
     end,
 
@@ -94,9 +95,13 @@ update_graph(Pkg, PkgVsn, Deps, HexRegistry, Graph) ->
     lists:foldl(fun([Dep, DepVsn, false, _AppName | _], DepsListAcc) ->
                         case DepVsn of
                             <<"~> ", Vsn/binary>> ->
-                                HighestDepVsn = rebar_packages:find_highest_matching(Dep, Vsn, HexRegistry),
-                                digraph:add_edge(Graph, {Pkg, PkgVsn}, {Dep, HighestDepVsn}),
-                                [{Dep, DepVsn} | DepsListAcc];
+                                case rebar_packages:find_highest_matching(Dep, Vsn, HexRegistry) of
+                                    {ok, HighestDepVsn} ->
+                                        digraph:add_edge(Graph, {Pkg, PkgVsn}, {Dep, HighestDepVsn}),
+                                        [{Dep, DepVsn} | DepsListAcc];
+                                    none ->
+                                        DepsListAcc
+                                end;
                             Vsn ->
                                 digraph:add_edge(Graph, {Pkg, PkgVsn}, {Dep, Vsn}),
                                 [{Dep, Vsn} | DepsListAcc]
