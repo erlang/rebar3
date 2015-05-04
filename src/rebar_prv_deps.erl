@@ -13,14 +13,18 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
-                                                               {module, ?MODULE},
-                                                               {bare, true},
-                                                               {deps, ?DEPS},
-                                                               {example, "rebar3 deps"},
-                                                               {short_desc, "List dependencies"},
-                                                               {desc, info("List dependencies")},
-                                                               {opts, []}])),
+    State1 = rebar_state:add_provider(
+            State,
+            providers:create([
+                    {name, ?PROVIDER},
+                    {module, ?MODULE},
+                    {bare, true},
+                    {deps, ?DEPS},
+                    {example, "rebar3 deps"},
+                    {short_desc, "List dependencies"},
+                    {desc, "List dependencies. Those not matching lock files "
+                           "are followed by an asterisk (*)."},
+                    {opts, []}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
@@ -44,12 +48,40 @@ display(State, Profile, Deps) ->
     display_deps(State, Deps),
     ?CONSOLE("", []).
 
-merge(Deps, Deps) ->
-    Deps;
 merge(Deps, SourceDeps) ->
+    merge1(dedup([normalize(Dep) || Dep <- Deps]),
+           [normalize(Dep) || Dep <- SourceDeps]).
+
+normalize(Name) when is_binary(Name) ->
+    Name;
+normalize(Name) when is_atom(Name) ->
+    ec_cnv:to_binary(Name);
+normalize(Dep) when is_tuple(Dep) ->
+    Name = element(1, Dep),
+    setelement(1, Dep, normalize(Name)).
+
+merge1(Deps, SourceDeps) ->
+    Names = [name(Dep) || Dep <- Deps],
     ToAdd = [Dep || Dep <- SourceDeps,
-                    not lists:keymember(ec_cnv:to_binary(element(1,Dep)), 1, Deps)],
+                    not lists:member(name(Dep), Names)],
     Deps ++ ToAdd.
+
+%% Keep the latter one as locks come after regular deps in the list.
+%% This is totally not safe as an assumption, but it's what we got.
+%% We do this by comparing the current element and looking if a
+%% similar named one happens later. If so, drop the current one.
+dedup(Deps) -> dedup(Deps, [name(Dep) || Dep <- Deps]).
+
+dedup([], []) -> [];
+dedup([Dep|Deps], [Name|DepNames]) ->
+    case lists:member(Name, DepNames) of
+        true -> dedup(Deps, DepNames);
+        false -> [Dep | dedup(Deps, DepNames)]
+    end.
+
+name(T) when is_tuple(T) -> element(1, T);
+name(B) when is_binary(B) -> B.
+
 
 display_deps(State, Deps) ->
     lists:foreach(fun(Dep) -> display_dep(State, Dep) end, Deps).
@@ -57,8 +89,8 @@ display_deps(State, Deps) ->
 %% packages
 display_dep(_State, {Name, Vsn}) when is_list(Vsn) ->
     ?CONSOLE("~s* (package ~s)", [ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)]);
-display_dep(_State, Name) when is_atom(Name) ->
-    ?CONSOLE("~s* (package)", [ec_cnv:to_binary(Name)]);
+display_dep(_State, Name) when is_binary(Name) ->
+    ?CONSOLE("~s* (package)", [Name]);
 %% git source
 display_dep(_State, {Name, Source}) when is_tuple(Source), element(1, Source) =:= git ->
     ?CONSOLE("~s* (git source)", [ec_cnv:to_binary(Name)]);
@@ -98,38 +130,3 @@ display_dep(State, {Name, Source, Level}) when is_tuple(Source), is_integer(Leve
         false -> ""
     end,
     ?CONSOLE("~s~s (locked ~p)", [Name, NeedsUpdate, Source]).
-
-info(Description) ->
-    io_lib:format("~s.~n"
-                 "~n"
-                 "Valid rebar.config options:~n"
-                 "  ~p~n"
-                 "  ~p~n"
-                 "Valid command line options:~n"
-                 "  deps_dir=\"deps\" (override default or rebar.config deps_dir)~n",
-                 [
-                 Description,
-                 {deps_dir, "deps"},
-                 {deps,
-                  [app_name,
-                   {rebar, "1.0.*"},
-                   {rebar, ".*",
-                    {git, "git://github.com/rebar/rebar.git"}},
-                   {rebar, ".*",
-                    {git, "git://github.com/rebar/rebar.git", "Rev"}},
-                   {rebar, "1.0.*",
-                    {git, "git://github.com/rebar/rebar.git", {branch, "master"}}},
-                   {rebar, "1.0.0",
-                    {git, "git://github.com/rebar/rebar.git", {tag, "1.0.0"}}},
-                   {rebar, "",
-                    {git, "git://github.com/rebar/rebar.git", {branch, "master"}},
-                    [raw]},
-                   {app_name, ".*", {hg, "https://www.example.org/url"}},
-                   {app_name, ".*", {rsync, "Url"}},
-                   {app_name, ".*", {svn, "https://www.example.org/url"}},
-                   {app_name, ".*", {svn, "svn://svn.example.org/url"}},
-                   {app_name, ".*", {bzr, "https://www.example.org/url", "Rev"}},
-                   {app_name, ".*", {fossil, "https://www.example.org/url"}},
-                   {app_name, ".*", {fossil, "https://www.example.org/url", "Vsn"}},
-                   {app_name, ".*", {p4, "//depot/subdir/app_dir"}}]}
-                 ]).
