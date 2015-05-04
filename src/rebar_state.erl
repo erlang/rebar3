@@ -69,25 +69,28 @@
 
 -spec new() -> t().
 new() ->
-    #state_t{dir = rebar_dir:get_cwd()}.
+    BaseState = base_state(),
+    BaseState#state_t{dir = rebar_dir:get_cwd()}.
 
 -spec new(list()) -> t().
 new(Config) when is_list(Config) ->
+    BaseState = base_state(),
     Deps = proplists:get_value(deps, Config, []),
     Opts = dict:from_list([{{deps, default}, Deps} | Config]),
-    #state_t { dir = rebar_dir:get_cwd(),
-               default = Opts,
-               opts = Opts }.
+    BaseState#state_t { dir = rebar_dir:get_cwd(),
+                        default = Opts,
+                        opts = Opts }.
 
 -spec new(t() | atom(), list()) -> t().
 new(Profile, Config) when is_atom(Profile)
                         , is_list(Config) ->
+    BaseState = base_state(),
     Deps = proplists:get_value(deps, Config, []),
     Opts = dict:from_list([{{deps, default}, Deps} | Config]),
-    #state_t { dir = rebar_dir:get_cwd(),
-               current_profiles = [Profile],
-               default = Opts,
-               opts = Opts };
+    BaseState#state_t { dir = rebar_dir:get_cwd(),
+                        current_profiles = [Profile],
+                        default = Opts,
+                        opts = Opts };
 new(ParentState=#state_t{}, Config) ->
     %% Load terms from rebar.config, if it exists
     Dir = rebar_dir:get_cwd(),
@@ -112,6 +115,10 @@ new(ParentState, Config, Dir) ->
     ParentState#state_t{dir=Dir
                        ,opts=NewOpts
                        ,default=NewOpts}.
+
+base_state() ->
+    {ok, Resources} = application:get_env(rebar, resources),
+    #state_t{resources=Resources}.
 
 get(State, Key) ->
     {ok, Value} = dict:find(Key, State#state_t.opts),
