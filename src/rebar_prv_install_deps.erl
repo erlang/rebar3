@@ -626,7 +626,7 @@ not_needs_compile(App) ->
 get_package(Dep, State) ->
     case rebar_state:registry(State) of
         {ok, T} ->
-            HighestDepVsn = rebar_packages:find_highest_matching(Dep, "0", T),
+            {ok, HighestDepVsn} = rebar_packages:find_highest_matching(Dep, "0", T),
             {Dep, HighestDepVsn};
         error ->
             throw(?PRV_ERROR({load_registry_fail, Dep}))
