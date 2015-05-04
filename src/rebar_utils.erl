@@ -42,7 +42,7 @@
          erl_to_mod/1,
          beams/1,
          find_executable/1,
-         vcs_vsn/2,
+         vcs_vsn/3,
          deprecated/3,
          deprecated/4,
          erl_opts/1,
@@ -471,8 +471,8 @@ escript_foldl(Fun, Acc, File) ->
             Error
     end.
 
-vcs_vsn(Vcs, Dir) ->
-    case vcs_vsn_cmd(Vcs, Dir) of
+vcs_vsn(Vcs, Dir, Resources) ->
+    case vcs_vsn_cmd(Vcs, Dir, Resources) of
         {plain, VsnString} ->
             VsnString;
         {cmd, CmdString} ->
@@ -484,22 +484,47 @@ vcs_vsn(Vcs, Dir) ->
     end.
 
 %% Temp work around for repos like relx that use "semver"
-vcs_vsn_cmd(VCS, Dir) when VCS =:= semver ; VCS =:= "semver" ->
-    rebar_git_resource:make_vsn(Dir);
-vcs_vsn_cmd(VCS, Dir) when VCS =:= git ; VCS =:= "git" ->
-    rebar_git_resource:make_vsn(Dir);
-vcs_vsn_cmd(VCS, Dir) when VCS =:= pkg ; VCS =:= "pkg" ->
-    rebar_pkg_resource:make_vsn(Dir);
-vcs_vsn_cmd({cmd, _Cmd}=Custom, _) ->
+vcs_vsn_cmd(VCS, Dir, Resources) when VCS =:= semver ; VCS =:= "semver" ->
+    vcs_vsn_cmd(git, Dir, Resources);
+vcs_vsn_cmd({cmd, _Cmd}=Custom, _, _) ->
     Custom;
-vcs_vsn_cmd(Version, _) when is_list(Version) ->
-    {plain, Version};
-vcs_vsn_cmd(_, _) ->
+vcs_vsn_cmd(VCS, Dir, Resources) when is_atom(VCS) ->
+    case find_resource_module(VCS, Resources) of
+        {ok, Module} ->
+            Module:make_vsn(Dir);
+        {error, _} ->
+            unknown
+    end;
+vcs_vsn_cmd(VCS, Dir, Resources) when is_list(VCS) ->
+    try list_to_existing_atom(VCS) of
+        AVCS ->
+            case vcs_vsn_cmd(AVCS, Dir, Resources) of
+                unknown -> {plain, VCS};
+                Other -> Other
+            end
+    catch
+        error:badarg ->
+            {plain, VCS}
+    end;
+vcs_vsn_cmd(_, _, _) ->
     unknown.
 
 vcs_vsn_invoke(Cmd, Dir) ->
     {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),
     string:strip(VsnString, right, $\n).
+
+find_resource_module(Type, Resources) ->
+    case lists:keyfind(Type, 1, Resources) of
+        false ->
+            case code:which(Type) of
+                non_existing ->
+                    {error, unknown};
+                _ ->
+                    {ok, Type}
+            end;
+        {Type, Module} ->
+            {ok, Module}
+    end.
 
 %%
 %% Filter a list of erl_opts platform_define options such that only
