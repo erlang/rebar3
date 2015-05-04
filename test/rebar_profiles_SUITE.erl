@@ -7,11 +7,16 @@
          all/0,
          profile_new_key/1,
          profile_merge_keys/1,
+         explicit_profile_deduplicate_deps/1,
+         implicit_profile_deduplicate_deps/1,
          all_deps_code_paths/1,
          profile_merges/1,
+         same_profile_deduplication/1,
+         stack_deduplication/1,
          add_to_profile/1,
          add_to_existing_profile/1,
          profiles_remain_applied_with_config_present/1,
+         deduplicated_paths/1,
          test_profile_applied_at_completion/1,
          test_profile_applied_before_compile/1,
          test_profile_applied_before_eunit/1,
@@ -23,8 +28,11 @@
 
 all() ->
     [profile_new_key, profile_merge_keys, all_deps_code_paths, profile_merges,
+     explicit_profile_deduplicate_deps, implicit_profile_deduplicate_deps,
+     same_profile_deduplication, stack_deduplication,
      add_to_profile, add_to_existing_profile,
      profiles_remain_applied_with_config_present,
+     deduplicated_paths,
      test_profile_applied_at_completion,
      test_profile_applied_before_compile,
      test_profile_applied_before_eunit,
@@ -96,6 +104,66 @@ profile_merge_keys(Config) ->
                                                                  ,{dep, "a", "1.0.0"}
                                                                  ,{dep, "b", "2.0.0"}]}).
 
+explicit_profile_deduplicate_deps(Config) ->
+    AppDir = ?config(apps, Config),
+
+    AllDeps = rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
+                                                ,{"a", "2.0.0", []}
+                                                ,{"b", "1.0.0", []}
+                                                ,{"b", "2.0.0", []}]),
+    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(AllDeps)}]),
+
+    Name = rebar_test_utils:create_random_name("explicit_profile_deduplicate_deps_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    FooDeps = rebar_test_utils:top_level_deps(
+                    rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []},
+                                                       {"b", "2.0.0", []}])),
+    BarDeps = rebar_test_utils:top_level_deps(
+                    rebar_test_utils:expand_deps(git, [{"b", "1.0.0", []}])),
+
+    RebarConfig = [{profiles,
+                    [{foo,
+                      [{deps, FooDeps}]},
+                     {bar,
+                      [{deps, BarDeps}]}]}],
+
+    rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["as", "bar,foo,bar", "compile"], {ok, [{app, Name}
+                                                                 ,{dep, "a", "1.0.0"}
+                                                                 ,{dep, "b", "1.0.0"}]}).
+
+implicit_profile_deduplicate_deps(Config) ->
+    AppDir = ?config(apps, Config),
+
+    AllDeps = rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
+                                                ,{"a", "2.0.0", []}
+                                                ,{"b", "1.0.0", []}
+                                                ,{"b", "2.0.0", []}]),
+    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(AllDeps)}]),
+
+    Name = rebar_test_utils:create_random_name("implicit_profile_deduplicate_deps_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    TestDeps = rebar_test_utils:top_level_deps(
+                    rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []},
+                                                       {"b", "2.0.0", []}])),
+    ProfileDeps = rebar_test_utils:top_level_deps(
+                    rebar_test_utils:expand_deps(git, [{"b", "1.0.0", []}])),
+
+    RebarConfig = [{profiles,
+                    [{test,
+                      [{deps, TestDeps}]},
+                     {bar,
+                      [{deps, ProfileDeps}]}]}],
+
+    rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["as", "test,bar", "eunit"], {ok, [{app, Name}
+                                                                 ,{dep, "a", "1.0.0"}
+                                                                 ,{dep, "b", "2.0.0"}]}).
+
 all_deps_code_paths(Config) ->
     AppDir = ?config(apps, Config),
 
@@ -162,6 +230,72 @@ profile_merges(_Config) ->
     [{key5, false}, {key5, true}] = rebar_state:get(State1, test5),
     [{key6, true}, {key6, false}] = rebar_state:get(State1, test6).
 
+same_profile_deduplication(_Config) ->
+    RebarConfig = [{test1, [{key1, 1, 2}, key2]},
+                   {test2, [foo]},
+                   {test3, [key3]},
+                   {profiles,
+                    [{profile1,
+                      [{test1, [{key3, 5}, {key2, "hello"}]},
+                       {test2, [bar]},
+                       {test3, []}
+                    ]}]
+                   }],
+    State = rebar_state:new(RebarConfig),
+    State1 = rebar_state:apply_profiles(State, [profile1, profile1, profile1]),
+
+    ?assertEqual([default, profile1], rebar_state:current_profiles(State1)),
+    Test1 = rebar_state:get(State1, test1),
+
+    %% Combine lists
+    ?assertEqual(lists:sort([key2, {key1, 1, 2}, {key3, 5}, {key2, "hello"}]),
+                 lists:sort(Test1)),
+
+    %% Key2 from profile1 overrides key2 from default profile
+    ?assertEqual("hello", proplists:get_value(key2, Test1)),
+
+    %% Check that a newvalue of []/"" doesn't override non-string oldvalues
+    ?assertEqual([key3], rebar_state:get(State1, test3)),
+    ?assertEqual([bar, foo], rebar_state:get(State1, test2)).
+
+stack_deduplication(_Config) ->
+    RebarConfig = [
+        {test_key, default},
+        {test_list, [ {foo, default}  ]},
+        {profiles, [
+            {a, [
+                {test_key, a},
+                {test_list, [ {foo, a} ]}
+            ]},
+            {b, [
+                {test_key, b},
+                {test_list, [ {foo, b} ]}
+            ]},
+            {c, [
+                {test_key, c},
+                {test_list, [ {foo, c} ]}
+            ]},
+            {d, [
+                {test_key, d},
+                {test_list, [ {foo, d} ]}
+            ]},
+            {e, [
+                {test_key, e},
+                {test_list, [ {foo, e} ]}
+            ]}
+        ]}
+    ],
+    State = rebar_state:new(RebarConfig),
+    State1 = rebar_state:apply_profiles(State, [a, b, c, d, e, a, e, b]),
+    ?assertEqual(b, rebar_state:get(State1, test_key)),
+
+    TestList = rebar_state:get(State1, test_list),
+    ?assertEqual(
+        [{foo, b}, {foo, e}, {foo, a}, {foo, d}, {foo, c}, {foo, default} ],
+        TestList
+    ),
+    ?assertEqual(b, proplists:get_value(foo, TestList)).
+
 add_to_profile(_Config) ->
     RebarConfig = [{foo, true}, {bar, false}],
     State = rebar_state:new(RebarConfig),
@@ -204,6 +338,22 @@ profiles_remain_applied_with_config_present(Config) ->
     Mod = list_to_atom("not_a_real_src_" ++ Name),
 
     true = lists:member({d, not_ok}, proplists:get_value(options, Mod:module_info(compile), [])).
+
+deduplicated_paths(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("deduplicated_paths_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [],
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+    rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["as", "a,b,c,d,e,a,e,b", "compile"],
+                                   {ok, [{app, Name}]}),
+
+    Path = filename:join([AppDir, "_build", "c+d+a+e+b", "lib", Name, "ebin"]),
+    ?assert(filelib:is_dir(Path)).
 
 test_profile_applied_at_completion(Config) ->
     AppDir = ?config(apps, Config),
