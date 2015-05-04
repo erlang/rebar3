@@ -16,6 +16,7 @@
          add_to_profile/1,
          add_to_existing_profile/1,
          profiles_remain_applied_with_config_present/1,
+         deduplicated_paths/1,
          test_profile_applied_at_completion/1,
          test_profile_applied_before_compile/1,
          test_profile_applied_before_eunit/1,
@@ -31,6 +32,7 @@ all() ->
      same_profile_deduplication, stack_deduplication,
      add_to_profile, add_to_existing_profile,
      profiles_remain_applied_with_config_present,
+     deduplicated_paths,
      test_profile_applied_at_completion,
      test_profile_applied_before_compile,
      test_profile_applied_before_eunit,
@@ -336,6 +338,22 @@ profiles_remain_applied_with_config_present(Config) ->
     Mod = list_to_atom("not_a_real_src_" ++ Name),
 
     true = lists:member({d, not_ok}, proplists:get_value(options, Mod:module_info(compile), [])).
+
+deduplicated_paths(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("deduplicated_paths_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [],
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+    rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["as", "a,b,c,d,e,a,e,b", "compile"],
+                                   {ok, [{app, Name}]}),
+
+    Path = filename:join([AppDir, "_build", "c+d+a+e+b", "lib", Name, "ebin"]),
+    ?assert(filelib:is_dir(Path)).
 
 test_profile_applied_at_completion(Config) ->
     AppDir = ?config(apps, Config),
