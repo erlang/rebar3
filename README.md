@@ -13,7 +13,7 @@ configuration work. rebar also provides dependency management, enabling
 application writers to easily re-use common libraries from a variety of
 locations (git, hg, etc).
 
-3.0 Alpha-4
+3.0 Alpha-5
 ====
 
 [DOCUMENTATION](http://www.rebar3.org/v3.0/docs)
@@ -44,6 +44,7 @@ limit scope.
 | new        | Create new rebar project from templates |
 | pkgs       | List available packages |
 | release    | Build release of project |
+| report     | Report on environment and versions for bug reports |
 | shell      | Run shell with project apps in path |
 | tar        | Package release into tarball |
 | update     | Update package index |
