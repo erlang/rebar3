@@ -127,19 +127,17 @@ run_aux(State, RawArgs) ->
                             filename:join(filename:absname(rebar_state:dir(State2)), BaseDir)),
 
     {ok, Providers} = application:get_env(rebar, providers),
-    {ok, Resources} = application:get_env(rebar, resources),
-    State4 = rebar_state:resources(State3, Resources),
-    State5 = rebar_plugins:install(State4),
+    State4 = rebar_plugins:install(State3),
 
     %% Providers can modify profiles stored in opts, so set default after initializing providers
-    State6 = rebar_state:create_logic_providers(Providers, State5),
-    State7 = rebar_state:default(State6, rebar_state:opts(State6)),
+    State5 = rebar_state:create_logic_providers(Providers, State4),
+    State6 = rebar_state:default(State5, rebar_state:opts(State5)),
 
     {Task, Args} = parse_args(RawArgs),
 
-    State8 = rebar_state:code_paths(State7, default, code:get_path()),
+    State7 = rebar_state:code_paths(State6, default, code:get_path()),
 
-    rebar_core:init_command(rebar_state:command_args(State8, Args), Task).
+    rebar_core:init_command(rebar_state:command_args(State7, Args), Task).
 
 init_config() ->
     %% Initialize logging system

@@ -91,20 +91,12 @@ display_dep(_State, {Name, Vsn}) when is_list(Vsn) ->
     ?CONSOLE("~s* (package ~s)", [ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)]);
 display_dep(_State, Name) when is_binary(Name) ->
     ?CONSOLE("~s* (package)", [Name]);
-%% git source
-display_dep(_State, {Name, Source}) when is_tuple(Source), element(1, Source) =:= git ->
-    ?CONSOLE("~s* (git source)", [ec_cnv:to_binary(Name)]);
-display_dep(_State, {Name, _Vsn, Source}) when is_tuple(Source), element(1, Source) =:= git ->
-    ?CONSOLE("~s* (git source)", [ec_cnv:to_binary(Name)]);
-display_dep(_State, {Name, _Vsn, Source, _Opts}) when is_tuple(Source), element(1, Source) =:= git ->
-    ?CONSOLE("~s* (git soutce)", [ec_cnv:to_binary(Name)]);
-%% unknown source
 display_dep(_State, {Name, Source}) when is_tuple(Source) ->
-    ?CONSOLE("~s* (source ~p)", [ec_cnv:to_binary(Name), Source]);
+    ?CONSOLE("~s* (~s source)", [ec_cnv:to_binary(Name), type(Source)]);
 display_dep(_State, {Name, _Vsn, Source}) when is_tuple(Source) ->
-    ?CONSOLE("~s* (source ~p)", [ec_cnv:to_binary(Name), Source]);
+    ?CONSOLE("~s* (~s source)", [ec_cnv:to_binary(Name), type(Source)]);
 display_dep(_State, {Name, _Vsn, Source, _Opts}) when is_tuple(Source) ->
-    ?CONSOLE("~s* (source ~p)", [ec_cnv:to_binary(Name), Source]);
+    ?CONSOLE("~s* (~s source)", [ec_cnv:to_binary(Name), type(Source)]);
 %% Locked
 display_dep(State, {Name, Source={pkg, _, Vsn}, Level}) when is_integer(Level) ->
     DepsDir = rebar_dir:deps_dir(State),
@@ -114,14 +106,6 @@ display_dep(State, {Name, Source={pkg, _, Vsn}, Level}) when is_integer(Level) -
         false -> ""
     end,
     ?CONSOLE("~s~s (locked package ~s)", [Name, NeedsUpdate, Vsn]);
-display_dep(State, {Name, Source, Level}) when is_tuple(Source), is_integer(Level), element(1, Source) =:= git ->
-    DepsDir = rebar_dir:deps_dir(State),
-    AppDir = filename:join([DepsDir, ec_cnv:to_binary(Name)]),
-    NeedsUpdate = case rebar_fetch:needs_update(AppDir, Source, State) of
-        true -> "*";
-        false -> ""
-    end,
-    ?CONSOLE("~s~s (locked git source)", [Name, NeedsUpdate]);
 display_dep(State, {Name, Source, Level}) when is_tuple(Source), is_integer(Level) ->
     DepsDir = rebar_dir:deps_dir(State),
     AppDir = filename:join([DepsDir, ec_cnv:to_binary(Name)]),
@@ -129,4 +113,6 @@ display_dep(State, {Name, Source, Level}) when is_tuple(Source), is_integer(Leve
         true -> "*";
         false -> ""
     end,
-    ?CONSOLE("~s~s (locked ~p)", [Name, NeedsUpdate, Source]).
+    ?CONSOLE("~s~s (locked ~s source)", [Name, NeedsUpdate, type(Source)]).
+
+type(Source) when is_tuple(Source) -> element(1, Source).
