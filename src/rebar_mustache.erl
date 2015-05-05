@@ -84,7 +84,7 @@ render(Mod, CompiledTemplate, Ctx) ->
 pre_compile(T, State) ->
   SectionRE = "\{\{\#([^\}]*)}}\s*(.+?){{\/\\1\}\}\s*",
   {ok, CompiledSectionRE} = re:compile(SectionRE, [dotall]),
-  TagRE = "\{\{(#|=|!|<|>|\{)?(.+?)\\1?\}\}+",
+  TagRE = "\{\{(#|=|!|<|>|\{)?(.+?)\\1?\}\}",
   {ok, CompiledTagRE} = re:compile(TagRE, [dotall]),
   State2 = State#mstate{section_re = CompiledSectionRE, tag_re = CompiledTagRE},
   "fun(Ctx) -> " ++
