@@ -117,7 +117,12 @@ new(ParentState, Config, Dir) ->
                        ,default=NewOpts}.
 
 base_state() ->
-    {ok, Resources} = application:get_env(rebar, resources),
+    case application:get_env(rebar, resources) of
+        undefined ->
+            Resources = [];
+        {ok, Resources} ->
+            Resources
+    end,
     #state_t{resources=Resources}.
 
 get(State, Key) ->
