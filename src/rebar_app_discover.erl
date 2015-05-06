@@ -159,7 +159,12 @@ find_app(AppDir, Validate) ->
                     case Validate of
                         V when V =:= invalid ; V =:= all ->
                             AppInfo = create_app_info(AppDir, File),
-                            {true, rebar_app_info:app_file_src(AppInfo, File)};
+                            case AppInfo of
+                              {error, Reason} ->
+                                  throw({error, {invalid_app_file, File, Reason}});
+                              _ ->
+                                  {true, rebar_app_info:app_file_src(AppInfo, File)}
+                            end;
                         valid ->
                             false
                     end;
@@ -175,7 +180,7 @@ find_app(AppDir, Validate) ->
 app_dir(AppFile) ->
     filename:join(rebar_utils:droplast(filename:split(filename:dirname(AppFile)))).
 
--spec create_app_info(file:name(), file:name()) -> rebar_app_info:t() | error.
+-spec create_app_info(file:name(), file:name()) -> rebar_app_info:t() | {error, term()}.
 create_app_info(AppDir, AppFile) ->
     case file:consult(AppFile) of
         {ok, [{application, AppName, AppDetails}]} ->
@@ -193,8 +198,8 @@ create_app_info(AppDir, AppFile) ->
                             false
                     end,
             rebar_app_info:dir(rebar_app_info:valid(AppInfo1, Valid), AppDir);
-        _ ->
-            error
+        {error, Reason} ->
+            {error, Reason}
     end.
 
 dedup([]) -> [];
