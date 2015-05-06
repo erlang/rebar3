@@ -266,7 +266,7 @@ remove_space_from_tail_impl(_, Size) ->
 %% @doc Number to binary
 -spec to_binary(number() | binary() | string()) -> binary() | string().
 to_binary(Integer) when is_integer(Integer) ->
-    integer_to_binary(Integer);
+    ec_cnv:to_binary(Integer);
 to_binary(Float) when is_float(Float) ->
     io_lib:format("~p", [Float]);
 to_binary(X) ->
