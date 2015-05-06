@@ -380,8 +380,4 @@ write_file(Output, Data, Force) ->
 %% Render a binary to a string, using mustache and the specified context
 %%
 render(Bin, Context) ->
-    %% Be sure to escape any double-quotes before rendering...
-    ReOpts = [global, {return, list}],
-    Str0 = re:replace(Bin, "\\\\", "\\\\\\", ReOpts),
-    Str1 = re:replace(Str0, "\"", "\\\\\"", ReOpts),
-    rebar_mustache:render(Str1, dict:from_list(Context)).
+    rebar_mustache:render(ec_cnv:to_binary(Bin), dict:from_list(Context)).
