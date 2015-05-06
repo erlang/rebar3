@@ -62,7 +62,11 @@
 -opaque template() :: #?MODULE{}.
 %% @see parse_binary/1
 %% @see parse_file/1
+-ifdef(namespaced_types).
 -type data()       :: #{string() => data() | iodata() | fun((data(), function()) -> iodata())}.
+-else.
+-type data()       :: dict().
+-endif.
 %% @see render/2
 %% @see compile/2
 -type partial()    :: {partial, {state(), EndTag :: binary(), LastTagSize :: non_neg_integer(), Rest :: binary(), [tag()]}}.
