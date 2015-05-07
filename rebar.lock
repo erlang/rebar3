@@ -4,7 +4,7 @@
   0},
  {<<"mustache">>,
   {git,"https://github.com/tsloughter/mustache.git",
-       {ref,"8ce571f671419ae6178eab8c96574ce0d566c186"}},
+       {ref,"fe99ec4fcc4cf3f169d4851b4d1b7b5780b8d464"}},
   0},
  {<<"getopt">>,
   {git,"https://github.com/jcomellas/getopt.git",
