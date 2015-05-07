@@ -16,7 +16,7 @@ lock(AppDir, {git, Url, _}) ->
 lock(AppDir, {git, Url}) ->
     AbortMsg = io_lib:format("Locking of git dependency failed in ~s", [AppDir]),
     {ok, VsnString} =
-        rebar_utils:sh("git --git-dir='" ++ AppDir ++ "/.git' rev-parse --verify HEAD",
+        rebar_utils:sh("git --git-dir=\"" ++ AppDir ++ "/.git\" rev-parse --verify HEAD",
                        [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
     Ref = string:strip(VsnString, both, $\n),
     {git, Url, {ref, Ref}}.
@@ -125,7 +125,7 @@ collect_default_refcount() ->
     %% timestamp is really important from an ordering perspective.
     AbortMsg1 = "Getting log of git dependency failed in " ++ rebar_dir:get_cwd(),
     {ok, String} =
-        rebar_utils:sh("git log -n 1 --pretty=format:'%h\n' ",
+        rebar_utils:sh("git log -n 1 --pretty=format:\"%h\n\" ",
                        [{use_stdout, false},
                         {debug_abort_on_error, AbortMsg1}]),
     RawRef = string:strip(String, both, $\n),
@@ -135,41 +135,43 @@ collect_default_refcount() ->
         case Tag of
             undefined ->
                 AbortMsg2 = "Getting rev-list of git depedency failed in " ++ rebar_dir:get_cwd(),
-                rebar_utils:sh("git rev-list HEAD | wc -l",
-                               [{use_stdout, false},
-                                {debug_abort_on_error, AbortMsg2}]);
+                {ok, PatchLines} = rebar_utils:sh("git rev-list HEAD",
+                                                  [{use_stdout, false},
+                                                   {debug_abort_on_error, AbortMsg2}]),
+                rebar_utils:line_count(PatchLines);
             _ ->
                 get_patch_count(Tag)
         end,
     {TagVsn, RawRef, RawCount}.
 
-build_vsn_string(Vsn, RawRef, RawCount) ->
+build_vsn_string(Vsn, RawRef, Count) ->
     %% Cleanup the tag and the Ref information. Basically leading 'v's and
     %% whitespace needs to go away.
     RefTag = [".ref", re:replace(RawRef, "\\s", "", [global])],
-    Count = erlang:iolist_to_binary(re:replace(RawCount, "\\s", "", [global])),
 
     %% Create the valid [semver](http://semver.org) version from the tag
     case Count of
-        <<"0">> ->
+        0 ->
             erlang:binary_to_list(erlang:iolist_to_binary(Vsn));
         _ ->
             erlang:binary_to_list(erlang:iolist_to_binary([Vsn, "+build.",
-                                                           Count, RefTag]))
+                                                           integer_to_list(Count), RefTag]))
     end.
 
 get_patch_count(RawRef) ->
     AbortMsg = "Getting rev-list of git dep failed in " ++ rebar_dir:get_cwd(),
     Ref = re:replace(RawRef, "\\s", "", [global]),
-    Cmd = io_lib:format("git rev-list ~s..HEAD | wc -l",
+    Cmd = io_lib:format("git rev-list ~s..HEAD",
                          [Ref]),
-    rebar_utils:sh(Cmd,
-                   [{use_stdout, false},
-                    {debug_abort_on_error, AbortMsg}]).
+    {ok, PatchLines} = rebar_utils:sh(Cmd,
+                                        [{use_stdout, false},
+                                         {debug_abort_on_error, AbortMsg}]),
+    rebar_utils:line_count(PatchLines).
+
 
 parse_tags() ->
     %% Don't abort on error, we want the bad return to be turned into 0.0.0
-    case rebar_utils:sh("git log --oneline --decorate  | fgrep \"tag: \" -1000",
+    case rebar_utils:sh("git log --oneline --no-walk --tags --decorate",
                         [{use_stdout, false}, return_on_error]) of
         {error, _} ->
             {undefined, "0.0.0"};

@@ -53,7 +53,8 @@
          get_arch/0,
          wordsize/0,
          tup_umerge/2,
-         tup_sort/1]).
+         tup_sort/1,
+         line_count/1]).
 
 %% for internal use only
 -export([otp_release/0]).
@@ -280,6 +281,11 @@ umerge([], Olds, Merged, CmpMerged, Cmp) when CmpMerged == Cmp ->
     lists:reverse(Olds, Merged);
 umerge([], Olds, Merged, _CmpMerged, Cmp) ->
     lists:reverse(Olds, [Cmp | Merged]).
+
+%% Implements wc -l functionality used to determine patchcount from git output
+line_count(PatchLines) ->
+    Tokenized = string:tokens(PatchLines, "\n"),
+    {ok, length(Tokenized)}.
 
 %% ====================================================================
 %% Internal functions
