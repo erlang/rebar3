@@ -122,7 +122,7 @@ symlink_or_copy(Source, Target) ->
                {win32, _} ->
                    Source;
                _ ->
-                   rebar_dir:make_relative_path(Source, Target)
+                   make_relative_path(Source, Target)
            end,
     case file:make_symlink(Link, Target) of
         ok ->
@@ -132,6 +132,15 @@ symlink_or_copy(Source, Target) ->
         {error, _} ->
             cp_r([Source], Target)
     end.
+
+make_relative_path(Source, Target) ->
+    do_make_relative_path(filename:split(Source), filename:split(Target)).
+
+do_make_relative_path([H|T1], [H|T2]) ->
+    do_make_relative_path(T1, T2);
+do_make_relative_path(Source, Target) ->
+    Base = lists:duplicate(max(length(Target) - 1, 0), ".."),
+    filename:join(Base ++ Source).
 
 cp_r([], _Dest) ->
     ok;
