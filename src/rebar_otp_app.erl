@@ -104,7 +104,7 @@ preprocess(State, AppInfo, AppSrcFile) ->
             A1 = apply_app_vars(AppVars, AppData),
 
             %% AppSrcFile may contain instructions for generating a vsn number
-            Vsn = app_vsn(AppSrcFile),
+            Vsn = app_vsn(AppSrcFile, State),
             A2 = lists:keystore(vsn, 1, A1, {vsn, Vsn}),
 
             %% systools:make_relup/4 fails with {missing_param, registered}
@@ -197,11 +197,12 @@ consult_app_file(Filename) ->
             end
     end.
 
-app_vsn(AppFile) ->
+app_vsn(AppFile, State) ->
     case consult_app_file(AppFile) of
         {ok, [{application, _AppName, AppData}]} ->
             AppDir = filename:dirname(filename:dirname(AppFile)),
-            rebar_utils:vcs_vsn(get_value(vsn, AppData, AppFile), AppDir);
+            Resources = rebar_state:resources(State),
+            rebar_utils:vcs_vsn(get_value(vsn, AppData, AppFile), AppDir, Resources);
         {error, Reason} ->
             ?ABORT("Failed to consult app file ~s: ~p\n", [AppFile, Reason])
     end.
