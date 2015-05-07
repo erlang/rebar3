@@ -52,7 +52,7 @@ init(State) ->
                                                                {example, "rebar3 shell"},
                                                                {short_desc, "Run shell with project apps and deps in path."},
                                                                {desc, info()},
-                                                               {opts, []}])),
+                                                               {opts, [{config, undefined, "config", string, "Path to the config file to use. Defaults to the sys_config defined for relx, if present."}]}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
@@ -96,6 +96,8 @@ shell(State) ->
     code:add_pathsa(rebar_state:code_paths(State, all_deps)),
     %% add project app test paths
     ok = add_test_paths(State),
+    %% try to read in sys.config file
+    ok = reread_config(State),
     %% this call never returns (until user quits shell)
     timer:sleep(infinity).
 
@@ -129,3 +131,61 @@ add_test_paths(State) ->
                   end, rebar_state:project_apps(State)),
     _ = code:add_path(filename:join([rebar_dir:base_dir(State), "test"])),
     ok.
+
+reread_config(State) ->
+    case find_config(State) of
+        no_config ->
+            ok;
+        {ok, ConfigList} ->
+            lists:foreach(fun ({Application, Items}) ->
+                                  lists:foreach(fun ({Key, Val}) ->
+                                                        application:set_env(Application, Key, Val)
+                                                end,
+                                                Items)
+                          end,
+                          ConfigList);
+        {error, Error} ->
+            ?ABORT("Error while attempting to read configuration file: ~p", [Error])
+    end.
+
+% First try the --config flag, then try the relx sys_config
+-spec find_config(rebar_state:t()) -> {ok, [tuple()]}|no_config|{error, tuple()}.
+find_config(State) ->
+    case find_config_option(State) of
+        no_config ->
+            find_config_relx(State);
+        Result ->
+            Result
+    end.
+
+-spec find_config_option(rebar_state:t()) -> {ok, [tuple()]}|no_config|{error, tuple()}.
+find_config_option(State) ->
+    {Opts, _} = rebar_state:command_parsed_args(State),
+    case proplists:get_value(config, Opts) of
+        undefined ->
+            no_config;
+        Filename ->
+            consult_config(State, Filename)
+    end.
+
+-spec find_config_relx(rebar_state:t()) -> {ok, [tuple()]}|no_config|{error, tuple()}.
+find_config_relx(State) ->
+    case proplists:get_value(sys_config, rebar_state:get(State, relx, [])) of
+        undefined ->
+            no_config;
+        Filename ->
+            consult_config(State, Filename)
+    end.
+
+-spec consult_config(rebar_state:t(), string()) -> {ok, [tuple()]}|{error, tuple()}.
+consult_config(State, Filename) ->
+    Fullpath = filename:join(rebar_dir:root_dir(State), Filename),
+    ?DEBUG("Loading configuration from ~p", [Fullpath]),
+    case file:consult(Fullpath) of
+        {ok, [Config]} ->
+            {ok, Config};
+        {ok, []} ->
+            {ok, []};
+        {error, Error} ->
+            {error, {Error, Fullpath}}
+    end.
