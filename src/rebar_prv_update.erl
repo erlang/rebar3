@@ -72,6 +72,10 @@ write_registry(Dict, {digraph, Edges, Vertices, Neighbors, _}, State) ->
     ets:tab2file(Neighbors, filename:join(RegistryDir, "neighbors")),
     file:write_file(filename:join(RegistryDir, "dict"), term_to_binary(Dict)).
 
+is_supported(<<"make">>) -> true;
+is_supported(<<"rebar">>) -> true;
+is_supported(_) -> false.
+
 hex_to_graph(Filename) ->
     {ok, T} = ets:file2tab(Filename),
     Graph = digraph:new(),
@@ -83,9 +87,14 @@ hex_to_graph(Filename) ->
                       ok
               end, ok, T),
 
-    Dict1 = ets:foldl(fun({{Pkg, PkgVsn}, [Deps | _]}, Dict) ->
-                              DepsList = update_graph(Pkg, PkgVsn, Deps, T, Graph),
-                              dict:store({Pkg, PkgVsn}, DepsList, Dict);
+    Dict1 = ets:foldl(fun({{Pkg, PkgVsn}, [Deps, _, BuildTools | _]}, Dict) when is_list(BuildTools) ->
+                              case lists:any(fun is_supported/1, BuildTools) of
+                                  true ->
+                                      DepsList = update_graph(Pkg, PkgVsn, Deps, T, Graph),
+                                      dict:store({Pkg, PkgVsn}, DepsList, Dict);
+                                  false ->
+                                      Dict
+                              end;
                          (_, Dict) ->
                               Dict
                       end, dict:new(), T),
