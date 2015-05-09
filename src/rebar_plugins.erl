@@ -42,6 +42,7 @@ handle_plugin(Plugin, State) ->
         Apps = rebar_state:all_deps(State2),
         ToBuild = lists:dropwhile(fun rebar_app_info:valid/1, Apps),
         [build_plugin(AppInfo) || AppInfo <- ToBuild],
+        [true = code:add_patha(filename:join(rebar_app_info:dir(AppInfo), "ebin")) || AppInfo <- Apps],
         plugin_providers(Plugin)
     catch
         C:T ->
@@ -54,8 +55,7 @@ build_plugin(AppInfo) ->
     AppDir = rebar_app_info:dir(AppInfo),
     C = rebar_config:consult(AppDir),
     S = rebar_state:new(rebar_state:new(), C, AppDir),
-    rebar_prv_compile:compile(S, AppInfo),
-    true = code:add_patha(filename:join(AppDir, "ebin")).
+    rebar_prv_compile:compile(S, AppInfo).
 
 plugin_providers({Plugin, _, _}) when is_atom(Plugin) ->
     validate_plugin(Plugin);
