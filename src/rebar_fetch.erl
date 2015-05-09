@@ -40,20 +40,15 @@ download_source(AppDir, Source, State) ->
                 ok = rebar_file_utils:mv(TmpDir, filename:absname(AppDir1)),
                 true;
             {tarball, File} ->
-                Contents = filename:join(TmpDir, "contents"),
                 ec_file:mkdir_p(AppDir1),
-                ec_file:mkdir_p(Contents),
-                ok = erl_tar:extract(File, [{cwd, TmpDir}]),
-                ok = erl_tar:extract(filename:join(TmpDir, "contents.tar.gz"),
-                                    [{cwd, Contents}, compressed]),
+                {ok, Files} = erl_tar:extract(File, [memory]),
+
                 code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
                 ec_file:remove(filename:absname(AppDir1), [recursive]),
 
-                ?DEBUG("Moving contents ~p to ~p", [Contents, filename:absname(AppDir1)]),
-                ok = rebar_file_utils:mv(Contents, filename:absname(AppDir1)),
-
-                ?DEBUG("Removing tmp dir ~p", [TmpDir]),
-                ec_file:remove(TmpDir, [recursive]),
+                {"contents.tar.gz", Binary} = lists:keyfind("contents.tar.gz", 1, Files),
+                ok = erl_tar:extract({binary, Binary},
+                                     [{cwd, filename:absname(AppDir1)}, compressed]),
                 true
         end
     catch
