@@ -16,7 +16,8 @@
          single_unmanaged_suite/1,
          multi_suite/1,
          all_suite/1,
-         single_dir_and_single_suite/1]).
+         single_dir_and_single_suite/1,
+         symlinked_dir_overwritten_fix/1]).
 
 -include_lib("common_test/include/ct.hrl").
 
@@ -36,7 +37,8 @@ groups() -> [{basic_app, [], [basic_app_default_dirs,
                                     single_unmanaged_suite,
                                     multi_suite,
                                     all_suite,
-                                    single_dir_and_single_suite]}].
+                                    single_dir_and_single_suite,
+                                    symlinked_dir_overwritten_fix]}].
 
 init_per_group(basic_app, Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_"),
@@ -512,6 +514,36 @@ single_dir_and_single_suite(Config) ->
     Suite = proplists:get_value(suite, Result),
 
     Expect = Suite.
+
+symlinked_dir_overwritten_fix(Config) ->
+    AppDir = ?config(apps, Config),
+    [Name1, _Name2] = ?config(appnames, Config),
+
+    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["as", "test", "compile"], return),
+
+    LibDirs = rebar_dir:lib_dirs(State),
+    State1 = rebar_app_discover:do(State, LibDirs),
+
+    Providers = rebar_state:providers(State1),
+    Namespace = rebar_state:namespace(State1),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+    {ok, GetOptResult} = getopt:parse(GetOptSpec,
+                                      ["--dir=" ++ filename:join([AppDir,
+                                                                  "apps",
+                                                                  Name1])]),
+
+    State2 = rebar_state:command_parsed_args(State1, GetOptResult),
+
+    Result = rebar_prv_common_test:setup_ct(State2),
+
+    Expect = filename:absname(filename:join([AppDir, "_build", "test", "lib", Name1])),
+    Dir = proplists:get_value(dir, Result),
+
+    Expect = Dir,
+
+    {ok, _} = rebar_test_utils:run_and_check(Config, [], ["as", "test", "compile"], return).
+
 
 test_suite(Name) ->
     io_lib:format("-module(~ts_SUITE).\n"
