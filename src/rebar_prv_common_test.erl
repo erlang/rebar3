@@ -280,23 +280,25 @@ find_suite_dirs(Suites) ->
     %% eliminate duplicates
     lists:usort(AllDirs).
 
-copy(State, Target) ->
-    case reduce_path(Target) == rebar_state:dir(State) of
+copy(State, Dir) ->
+    From = reduce_path(Dir),
+    case From == rebar_state:dir(State) of
         true  -> throw({error, suite_at_project_root});
         false -> ok
     end,
-    case retarget_path(State, Target) of
+    case retarget_path(State, From) of
         %% directory lies outside of our project's file structure so
         %%  don't copy it
-        Target    -> Target;
-        NewTarget ->
-            %% unlink the directory if it's a symlink
-            case ec_file:is_symlink(NewTarget) of
-                true  -> ok = ec_file:remove(NewTarget);
+        From   -> From;
+        Target ->
+            %% recursively delete any symlinks in the target directory
+            %%  if it exists so we don't smash files in the linked dirs
+            case ec_file:is_dir(Target) of
+                true  -> remove_links(Target);
                 false -> ok
             end,
-            ok = ec_file:copy(Target, NewTarget, [recursive]),
-            NewTarget
+            ok = ec_file:copy(From, Target, [recursive]),
+            Target
     end.
 
 compile_dir(State, Dir, OutDir) ->
@@ -342,6 +344,26 @@ reduce_path(Acc, ["."|Rest])       -> reduce_path(Acc, Rest);
 reduce_path([_|Acc], [".."|Rest])  -> reduce_path(Acc, Rest);
 reduce_path([], [".."|Rest])       -> reduce_path([], Rest);
 reduce_path(Acc, [Component|Rest]) -> reduce_path([Component|Acc], Rest).
+
+remove_links(Path) ->
+    case ec_file:is_dir(Path) of
+        false -> ok;
+        true  -> remove_links1(Path)
+    end.
+
+remove_links1(Path) ->
+    case ec_file:is_symlink(Path) of
+        true  ->
+            file:delete(Path);
+        false ->
+            lists:foreach(fun(ChildPath) ->
+                                  remove_links(ChildPath)
+                          end, sub_dirs(Path))
+    end.
+
+sub_dirs(Path) ->
+    {ok, SubDirs} = file:list_dir(Path),
+    [filename:join(Path, SubDir) || SubDir <- SubDirs].
 
 replace_src_dirs(State, Dirs) ->
     %% replace any `src_dirs` with the test dirs
