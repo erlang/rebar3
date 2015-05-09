@@ -2,6 +2,7 @@
 
 -export([get_packages/1
         ,registry/1
+        ,check_registry/3
         ,find_highest_matching/3]).
 
 -export_type([package/0]).
@@ -52,6 +53,18 @@ registry(State) ->
             error
     end.
 
+check_registry(Pkg, Vsn, State) ->
+    case rebar_state:registry(State) of
+        {ok, T} ->
+            case ets:lookup(T, Pkg) of
+                [{Pkg, [Vsns]}] ->
+                    lists:member(Vsn, Vsns);
+                _ ->
+                    false
+            end;
+        error ->
+            false
+    end.
 
 %% Hex supports use of ~> to specify the version required for a dependency.
 %% Since rebar3 requires exact versions to choose from we find the highest

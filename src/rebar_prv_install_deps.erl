@@ -99,6 +99,8 @@ format_error({bad_constraint, Name, Constraint}) ->
     io_lib:format("Unable to parse version for package ~s: ~s", [Name, Constraint]);
 format_error({parse_dep, Dep}) ->
     io_lib:format("Failed parsing dep ~p", [Dep]);
+format_error({not_rebar_package, Package, Version}) ->
+    io_lib:format("Package not buildable with rebar3: ~s-~s", [Package, Version]);
 format_error({missing_package, Package, Version}) ->
     io_lib:format("Package not found in registry: ~s-~s", [Package, Version]);
 format_error({cycles, Cycles}) ->
@@ -210,7 +212,7 @@ update_pkg_deps(Profile, Pkgs, Packages, Upgrade, Seen, State) ->
     {Solved, State1}.
 
 handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Fetched, Seen, State) ->
-    AppInfo = package_to_app(DepsDir, Packages, Pkg),
+    AppInfo = package_to_app(DepsDir, Packages, Pkg, State),
     Level = rebar_app_info:dep_level(AppInfo),
     {NewSeen, NewState} = maybe_lock(Profile, AppInfo, Seen, State, Level),
     {_, AppInfo1} = maybe_fetch(AppInfo, Profile, Upgrade, Seen, NewState),
@@ -242,10 +244,15 @@ maybe_lock(Profile, AppInfo, Seen, State, Level) ->
             {Seen, State}
     end.
 
-package_to_app(DepsDir, Packages, {Name, Vsn, Level}) ->
+package_to_app(DepsDir, Packages, {Name, Vsn, Level}, State) ->
     case dict:find({Name, Vsn}, Packages) of
         error ->
-            throw(?PRV_ERROR({missing_package, Name, Vsn}));
+            case rebar_packages:check_registry(Name, Vsn, State) of
+                true ->
+                    throw(?PRV_ERROR({not_rebar_package, Name, Vsn}));
+                false ->
+                    throw(?PRV_ERROR({missing_package, Name, Vsn}))
+            end;
         {ok, P} ->
             PkgDeps = [{PkgName, PkgVsn}
                        || {PkgName,PkgVsn} <- proplists:get_value(<<"deps">>, P, [])],
