@@ -10,7 +10,8 @@
          get_arch/0,
          wordsize/0,
          add_deps_to_path/1,
-         restore_code_path/1]).
+         restore_code_path/1,
+         processing_base_dir/1]).
 
 -export_type([rebar_dict/0, rebar_digraph/0]).
 
@@ -59,3 +60,6 @@ add_deps_to_path(State) ->
 %% Revert to only having the beams necessary for running rebar3 and plugins in the path
 restore_code_path(State) ->
   rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)).
+
+processing_base_dir(State) ->
+    rebar_dir:processing_base_dir(State).
