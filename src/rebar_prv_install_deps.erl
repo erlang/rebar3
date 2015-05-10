@@ -304,11 +304,10 @@ update_seen_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State, U
     Name = rebar_app_info:name(AppInfo),
     %% If seen from lock file or user requested an upgrade
     %% don't print warning about skipping
-    case lists:keymember(Name, 1, BaseLocks) orelse Upgrade of
-        false ->
-            warn_skip_deps(AppInfo, State);
-        true ->
-            ok
+    case lists:keymember(Name, 1, BaseLocks) of
+        false when Upgrade -> ok;
+        false when not Upgrade -> warn_skip_deps(AppInfo, State);
+        true -> ok
     end,
     %% scan for app children here if upgrading
     case Upgrade of
