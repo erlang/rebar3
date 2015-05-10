@@ -151,7 +151,7 @@ handle_deps(Profile, State0, Deps, Upgrade, Locks) ->
                                             ,{Packages, Graph}),
 
                 update_pkg_deps(Profile, Packages, PkgDeps1
-                               ,Graph, Upgrade, Seen, State2)
+                               ,Graph, Upgrade, Seen, State2, Locks)
         end,
 
     AllDeps = lists:ukeymerge(2
@@ -184,7 +184,7 @@ find_cycles(Apps) ->
 cull_compile(TopSortedDeps, ProjectApps) ->
     lists:dropwhile(fun not_needs_compile/1, TopSortedDeps -- ProjectApps).
 
-update_pkg_deps(Profile, Packages, PkgDeps, Graph, Upgrade, Seen, State) ->
+update_pkg_deps(Profile, Packages, PkgDeps, Graph, Upgrade, Seen, State, Locks) ->
     case PkgDeps of
         [] -> %% No pkg deps
             {[], State};
@@ -196,13 +196,16 @@ update_pkg_deps(Profile, Packages, PkgDeps, Graph, Upgrade, Seen, State) ->
                 {ok, Solution, []} ->
                     Solution;
                 {ok, Solution, Discarded} ->
-                    [warn_skip_pkg(Pkg, State) || Pkg <- Discarded],
+                    [warn_skip_pkg(Pkg, State) || Pkg <- Discarded, not(pkg_locked(Pkg, Locks))],
                     Solution
             end,
-            update_pkg_deps(Profile, S, Packages, Upgrade, Seen, State)
+            update_pkg_deps(Profile, S, Packages, Upgrade, Seen, State, Locks)
     end.
 
-update_pkg_deps(Profile, Pkgs, Packages, Upgrade, Seen, State) ->
+pkg_locked({Name, _}, Locks) ->
+    false =/= lists:keyfind(Name, 1, Locks).
+
+update_pkg_deps(Profile, Pkgs, Packages, Upgrade, Seen, State, _Locks) ->
     %% Create app_info record for each pkg dep
     DepsDir = profile_dep_dir(State, Profile),
     {Solved, _, State1}
@@ -610,7 +613,7 @@ parse_goal(Name, Constraint) ->
 
 warn_skip_deps(AppInfo, State) ->
     Msg = "Skipping ~s (from ~p) as an app of the same name "
-          "has already been fetched~n",
+          "has already been fetched",
     Args = [rebar_app_info:name(AppInfo),
             rebar_app_info:source(AppInfo)],
     case rebar_state:get(State, deps_error_on_conflict, false) of
@@ -620,7 +623,7 @@ warn_skip_deps(AppInfo, State) ->
 
 warn_skip_pkg({Name, Source}, State) ->
     Msg = "Skipping ~s (version ~s from package index) as an app of the same "
-          "name has already been fetched~n",
+          "name has already been fetched",
     Args = [Name, Source],
     case rebar_state:get(State, deps_error_on_conflict, false) of
         false -> ?WARN(Msg, Args);
