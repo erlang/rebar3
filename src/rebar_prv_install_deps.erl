@@ -302,8 +302,9 @@ profile_dep_dir(State, Profile) ->
 
 update_seen_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, BaseLocks, Locks) ->
     Name = rebar_app_info:name(AppInfo),
-    %% If seen from lock file don't print warning about skipping
-    case lists:keymember(Name, 1, BaseLocks) of
+    %% If seen from lock file or user requested an upgrade
+    %% don't print warning about skipping
+    case lists:keymember(Name, 1, BaseLocks) orelse Upgrade of
         false ->
             warn_skip_deps(AppInfo, State);
         true ->
@@ -585,7 +586,7 @@ maybe_upgrade(AppInfo, AppDir, true, State) ->
     Source = rebar_app_info:source(AppInfo),
     case rebar_fetch:needs_update(AppDir, Source, State) of
         true ->
-            ?INFO("Updating ~s", [rebar_app_info:name(AppInfo)]),
+            ?INFO("Upgrading ~s", [rebar_app_info:name(AppInfo)]),
             case rebar_fetch:download_source(AppDir, Source, State) of
                 {error, Reason} ->
                     throw(Reason);
@@ -593,6 +594,7 @@ maybe_upgrade(AppInfo, AppDir, true, State) ->
                     Result
             end;
         false ->
+            ?INFO("No upgrade needed for ~s", [rebar_app_info:name(AppInfo)]),
             false
     end.
 
