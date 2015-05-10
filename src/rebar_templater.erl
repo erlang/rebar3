@@ -29,7 +29,9 @@
 -export([new/4,
          list_templates/1]).
 
+-export([format_error/1]).
 
+-include_lib("providers/include/providers.hrl").
 -include("rebar.hrl").
 
 -define(TEMPLATE_RE, "^[^._].*\\.template\$").
@@ -51,6 +53,14 @@ new(Template, Vars, Force, State) ->
 list_templates(State) ->
     {AvailTemplates, Files} = find_templates(State),
     [list_template(Files, Template, State) || Template <- AvailTemplates].
+
+format_error({dir_fail, Path, Reason}) ->
+    io_lib:format("Failed while processing template instruction {dir, ~p}: ~p", [Path, Reason]);
+format_error({chmod_fail, Perm, File, Reason}) ->
+    io_lib:format("Failed while processing template instruction {chmod, ~.8#, ~p}: ~p", [Perm, File, Reason]);
+format_error({write_file, Output, Reason}) ->
+    io_lib:format("Failed to write output file ~p: ~p", [Output, Reason]).
+
 
 %% ===================================================================
 %% Internal Functions
@@ -174,8 +184,7 @@ execute_template([{dir, Path} | Terms], Files, Template, Vars, Force) ->
         ok ->
             ok;
         {error, Reason} ->
-            ?ABORT("Failed while processing template instruction "
-                   "{dir, ~p}: ~p", [Path, Reason])
+            throw({dir_fail, Path, Reason})
     end,
     execute_template(Terms, Files, Template, Vars, Force);
 %% Change permissions on a file
@@ -185,8 +194,7 @@ execute_template([{chmod, File, Perm} | Terms], Files, Template, Vars, Force) ->
         ok ->
             execute_template(Terms, Files, Template, Vars, Force);
         {error, Reason} ->
-            ?ABORT("Failed while processing template instruction "
-                   "{chmod, ~.8#, ~p}: ~p", [Perm, File, Reason])
+            throw({chmod_fail, Perm, File, Reason})
     end;
 %% Create a raw untemplated file
 execute_template([{file, From, To} | Terms], Files, {Template, Type, Cwd}, Vars, Force) ->
@@ -369,8 +377,7 @@ write_file(Output, Data, Force) ->
                 ok ->
                     ok;
                 {error, Reason} ->
-                    ?ABORT("Failed to write output file ~p: ~p\n",
-                           [Output, Reason])
+                    throw(?PRV_ERROR({write_file, Output, Reason}))
             end;
         false ->
             {error, exists}

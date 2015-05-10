@@ -36,11 +36,17 @@
          system_tmpdir/1,
          reset_dir/1]).
 
+-export([format_error/1]).
+
+-include_lib("providers/include/providers.hrl").
 -include("rebar.hrl").
 
 %% ===================================================================
 %% Public API
 %% ===================================================================
+
+format_error({delete_fail, File, Reason}) ->
+    io_lib:format("Failed to delete file ~s: ~p", [File, Reason]).
 
 symlink_or_copy(Source, Target) ->
     Link = case os:type() of
@@ -128,8 +134,7 @@ delete_each([File | Rest]) ->
         {error, enoent} ->
             delete_each(Rest);
         {error, Reason} ->
-            ?ERROR("Failed to delete file ~s: ~p\n", [File, Reason]),
-            ?FAIL
+            throw(?PRV_ERROR({delete_fail, File, Reason}))
     end.
 
 write_file_if_contents_differ(Filename, Bytes) ->

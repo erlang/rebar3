@@ -109,6 +109,8 @@ format_error({cycles, Cycles}) ->
                "depend on each other~n"]
               || Cycle <- Cycles],
     ["Dependency cycle(s) detected:~n", Prints];
+format_error({dep_conflict, Msg, Args}) ->
+    io_lib:format(Msg, Args);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -614,8 +616,10 @@ warn_skip_deps(AppInfo, State) ->
     Args = [rebar_app_info:name(AppInfo),
             rebar_app_info:source(AppInfo)],
     case rebar_state:get(State, deps_error_on_conflict, false) of
-        false -> ?WARN(Msg, Args);
-        true -> ?ERROR(Msg, Args), ?FAIL
+        false ->
+            ?WARN(Msg, Args);
+        true ->
+            throw(?PRV_ERROR({dep_conflict, Msg, Args}))
     end.
 
 warn_skip_pkg({Name, Source}, State) ->
@@ -623,8 +627,10 @@ warn_skip_pkg({Name, Source}, State) ->
           "name has already been fetched~n",
     Args = [Name, Source],
     case rebar_state:get(State, deps_error_on_conflict, false) of
-        false -> ?WARN(Msg, Args);
-        true -> ?ERROR(Msg, Args), ?FAIL
+        false ->
+            ?WARN(Msg, Args);
+        true ->
+            throw(?PRV_ERROR({dep_conflict, Msg, Args}))
     end.
 
 not_needs_compile(App) ->

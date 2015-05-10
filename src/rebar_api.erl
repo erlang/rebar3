@@ -3,8 +3,7 @@
 -module(rebar_api).
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
--export([abort/0, abort/2,
-         console/2,
+-export([console/2,
          debug/2, info/2, warn/2, error/2,
          expand_env_variable/3,
          get_arch/0,
@@ -18,13 +17,6 @@
 %%%%%%%%%%%%%%%%%%%%%%%
 %%% Error reporting %%%
 %%%%%%%%%%%%%%%%%%%%%%%
-
-%% @doc Interrupts program flow
-abort() -> ?FAIL.
-
-%% @doc like {@link error/2}, except it also raises an
-%% exception to interrupt program flow.
-abort(Str, Args) -> ?ABORT(Str, Args).
 
 %% @doc Prints to the console, including a newline
 console(Str, Args) -> ?CONSOLE(Str, Args).

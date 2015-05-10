@@ -79,7 +79,9 @@ merge_locks(Config, [Locks]) ->
     [{{locks, default}, Locks}, {{deps, default}, NewDeps++Deps} | Config].
 
 format_error({bad_dep_name, Dep}) ->
-    io_lib:format("Dependency name must be an atom, instead found: ~p", [Dep]).
+    io_lib:format("Dependency name must be an atom, instead found: ~p", [Dep]);
+format_error({config_file, File, Reason}) ->
+    io_lib:format("Failed to read config file ~s:~n ~p", [File, Reason]).
 
 %% ===================================================================
 %% Internal functions
@@ -100,7 +102,7 @@ try_consult(File) ->
         {error, enoent} ->
             [];
         {error, Reason} ->
-            ?ABORT("Failed to read config file ~s:~n ~p", [File, Reason])
+            throw(?PRV_ERROR({config_file, File, Reason}))
     end.
 
 bs(Vars) ->

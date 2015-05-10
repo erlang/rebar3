@@ -26,13 +26,16 @@
 %% -------------------------------------------------------------------
 -module(rebar_base_compiler).
 
--include("rebar.hrl").
-
 -export([run/4,
          run/7,
          run/8,
          ok_tuple/3,
          error_tuple/5]).
+
+-export([format_error/1]).
+
+-include_lib("providers/include/providers.hrl").
+-include("rebar.hrl").
 
 %% ===================================================================
 %% Public API
@@ -76,6 +79,10 @@ error_tuple(Config, Source, Es, Ws, Opts) ->
     {error, format_errors(Config, Source, Es),
      format_warnings(Config, Source, Ws, Opts)}.
 
+format_error({compile_file, File, Error}) ->
+    maybe_report(Error),
+    io_lib:format("Compiling ~s failed", [File]).
+
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
@@ -114,11 +121,7 @@ compile_each([Source | Rest], Config, CompileFn) ->
         skipped ->
             ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), filename:basename(Source)]);
         Error ->
-            ?ERROR("Compiling ~s failed",
-                     [maybe_absname(Config, Source)]),
-            maybe_report(Error),
-            ?DEBUG("Compilation failed: ~p", [Error]),
-            ?FAIL
+            throw(?PRV_ERROR({compile_file, Source, Error}))
     end,
     compile_each(Rest, Config, CompileFn).
 
@@ -148,10 +151,9 @@ maybe_report(_) ->
 report(Messages) ->
     lists:foreach(fun(Msg) -> io:format("~s~n", [Msg]) end, Messages).
 
-format_errors(Config, _MainSource, Extra, Errors) ->
+format_errors(_Config, _MainSource, Extra, Errors) ->
     [begin
-         AbsSource = maybe_absname(Config, Source),
-         [format_error(AbsSource, Extra, Desc) || Desc <- Descs]
+         [format_error(Source, Extra, Desc) || Desc <- Descs]
      end
      || {Source, Descs} <- Errors].
 
@@ -164,6 +166,3 @@ format_error(AbsSource, Extra, {Line, Mod, Desc}) ->
 format_error(AbsSource, Extra, {Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
     ?FMT("~s: ~s~s~n", [AbsSource, Extra, ErrorDesc]).
-
-maybe_absname(_Config, Filename) ->
-    Filename.
