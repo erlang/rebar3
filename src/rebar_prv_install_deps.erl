@@ -563,10 +563,10 @@ fetch_app(AppInfo, AppDir, State) ->
     ?INFO("Fetching ~s (~p)", [rebar_app_info:name(AppInfo), rebar_app_info:source(AppInfo)]),
     Source = rebar_app_info:source(AppInfo),
     case rebar_fetch:download_source(AppDir, Source, State) of
-        {error, Reason} ->
-            throw(Reason);
-        Result ->
-            Result
+        true ->
+            true;
+        Error ->
+            throw(Error)
     end.
 
 update_app_info(AppInfo) ->
@@ -587,10 +587,10 @@ maybe_upgrade(AppInfo, AppDir, true, State) ->
         true ->
             ?INFO("Upgrading ~s", [rebar_app_info:name(AppInfo)]),
             case rebar_fetch:download_source(AppDir, Source, State) of
-                {error, Reason} ->
-                    throw(Reason);
-                Result ->
-                    Result
+                true ->
+                    true;
+                Error ->
+                    throw(Error)
             end;
         false ->
             ?INFO("No upgrade needed for ~s", [rebar_app_info:name(AppInfo)]),

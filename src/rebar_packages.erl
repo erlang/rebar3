@@ -3,6 +3,7 @@
 -export([get_packages/1
         ,registry/1
         ,check_registry/3
+        ,registry_checksum/2
         ,find_highest_matching/3]).
 
 -export_type([package/0]).
@@ -64,6 +65,15 @@ check_registry(Pkg, Vsn, State) ->
             end;
         error ->
             false
+    end.
+
+registry_checksum({pkg, Name, Vsn}, State) ->
+    {ok, Registry} = registry(State),
+    case ets:lookup(Registry, {Name, Vsn}) of
+        [{{_, _}, [_, Checksum | _]}] ->
+            Checksum;
+        [] ->
+            none
     end.
 
 %% Hex supports use of ~> to specify the version required for a dependency.
