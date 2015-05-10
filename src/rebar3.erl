@@ -44,33 +44,14 @@
 
 %% escript Entry point
 main(Args) ->
-    case catch(run(Args)) of
+    try run(Args) of
         {ok, _State} ->
             erlang:halt(0);
-        rebar_abort ->
-            erlang:halt(1);
-        {error, rebar_abort} ->
-            erlang:halt(1);
-        {error, {Module, Reason}} ->
-            case code:which(Module) of
-                non_existing ->
-                    ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace", []),
-                    ?DEBUG("Uncaught error: ~p ~p", [Module, Reason]),
-                    ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []);
-                _ ->
-                    ?ERROR(Module:format_error(Reason), [])
-            end,
-            erlang:halt(1);
-        {error, Error} when is_list(Error) ->
-            ?ERROR(Error, []),
-            erlang:halt(1);
         Error ->
-            %% Nothing should percolate up from rebar_core;
-            %% Dump this error to console
-            ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace", []),
-            ?DEBUG("Uncaught error: ~p", [Error]),
-            ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []),
-            erlang:halt(1)
+            handle_error(Error)
+    catch
+        _:Error ->
+            handle_error(Error)
     end.
 
 %% Erlang-API entry point
@@ -251,3 +232,28 @@ global_option_spec_list() ->
     %{config,   $C, "config",   string,    "Rebar config file to use."},
     {task,     undefined, undefined, string, "Task to run."}
     ].
+
+handle_error(rebar_abort) ->
+    erlang:halt(1);
+handle_error({error, rebar_abort}) ->
+    erlang:halt(1);
+handle_error({error, {Module, Reason}}) ->
+    case code:which(Module) of
+        non_existing ->
+            ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace", []),
+            ?DEBUG("Uncaught error: ~p ~p", [Module, Reason]),
+            ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []);
+        _ ->
+            ?ERROR(Module:format_error(Reason), [])
+    end,
+    erlang:halt(1);
+handle_error({error, Error}) when is_list(Error) ->
+    ?ERROR(Error, []),
+    erlang:halt(1);
+handle_error(Error) ->
+    %% Nothing should percolate up from rebar_core;
+    %% Dump this error to console
+    ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace", []),
+    ?DEBUG("Uncaught error: ~p", [Error]),
+    ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []),
+    erlang:halt(1).
