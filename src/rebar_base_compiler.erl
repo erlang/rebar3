@@ -69,12 +69,12 @@ run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
                 simple_compile_wrapper(S, Target, Compile3Fn, C, CheckLastMod)
         end).
 
-ok_tuple(Config, Source, Ws) ->
-    {ok, format_warnings(Config, Source, Ws)}.
+ok_tuple(_Config, Source, Ws) ->
+    {ok, format_warnings(Source, Ws)}.
 
-error_tuple(Config, Source, Es, Ws, Opts) ->
-    {error, format_errors(Config, Source, Es),
-     format_warnings(Config, Source, Ws, Opts)}.
+error_tuple(_Config, Source, Es, Ws, Opts) ->
+    {error, format_errors(Source, Es),
+     format_warnings(Source, Ws, Opts)}.
 
 %% ===================================================================
 %% Internal functions
@@ -114,26 +114,25 @@ compile_each([Source | Rest], Config, CompileFn) ->
         skipped ->
             ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), filename:basename(Source)]);
         Error ->
-            ?ERROR("Compiling ~s failed",
-                     [maybe_absname(Config, Source)]),
+            ?ERROR("Compiling ~s failed", [Source]),
             maybe_report(Error),
             ?DEBUG("Compilation failed: ~p", [Error]),
             ?FAIL
     end,
     compile_each(Rest, Config, CompileFn).
 
-format_errors(Config, Source, Errors) ->
-    format_errors(Config, Source, "", Errors).
+format_errors(Source, Errors) ->
+    format_errors(Source, "", Errors).
 
-format_warnings(Config, Source, Warnings) ->
-    format_warnings(Config, Source, Warnings, []).
+format_warnings(Source, Warnings) ->
+    format_warnings(Source, Warnings, []).
 
-format_warnings(Config, Source, Warnings, Opts) ->
+format_warnings(Source, Warnings, Opts) ->
     Prefix = case lists:member(warnings_as_errors, Opts) of
                  true -> "";
                  false -> "Warning: "
              end,
-    format_errors(Config, Source, Prefix, Warnings).
+    format_errors(Source, Prefix, Warnings).
 
 maybe_report({{error, {error, _Es, _Ws}=ErrorsAndWarnings}, {source, _}}) ->
     maybe_report(ErrorsAndWarnings);
@@ -148,10 +147,9 @@ maybe_report(_) ->
 report(Messages) ->
     lists:foreach(fun(Msg) -> io:format("~s~n", [Msg]) end, Messages).
 
-format_errors(Config, _MainSource, Extra, Errors) ->
+format_errors(_MainSource, Extra, Errors) ->
     [begin
-         AbsSource = maybe_absname(Config, Source),
-         [format_error(AbsSource, Extra, Desc) || Desc <- Descs]
+         [format_error(Source, Extra, Desc) || Desc <- Descs]
      end
      || {Source, Descs} <- Errors].
 
@@ -164,6 +162,3 @@ format_error(AbsSource, Extra, {Line, Mod, Desc}) ->
 format_error(AbsSource, Extra, {Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
     ?FMT("~s: ~s~s~n", [AbsSource, Extra, ErrorDesc]).
-
-maybe_absname(_Config, Filename) ->
-    Filename.

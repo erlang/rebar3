@@ -248,11 +248,11 @@ format_mfa_source(MFA) ->
 %% Extract an element from a tuple, or undefined if N > tuple size
 %%
 safe_element(N, Tuple) ->
-    case catch(element(N, Tuple)) of
-        {'EXIT', {badarg, _}} ->
-            undefined;
-        Value ->
-            Value
+    try
+        element(N, Tuple)
+    catch
+        error:badarg ->
+            undefined
     end.
 
 %%
