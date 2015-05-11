@@ -62,8 +62,19 @@
 %% Additional compile options for eunit. erl_opts is also used
 {eunit_compile_opts, []}.
 
-%% Same as erl_first_files, but used only when running 'eunit'
+%% Files to compile first when compiling eunit test suites
 {eunit_first_files, []}.
+
+%% == Common Test ==
+
+%% Options to pass to ct:run_test/1
+{ct_opts, [{logdir, "logs"}, {dir, "test"}]}.
+
+%% Additional compile options for ct. erl_opts is also used
+{ct_compile_opts, []}.
+
+%% Files to compile first when compiling ct test suites
+{ct_first_files, []}.
 
 %% == Cover ==
 
@@ -73,22 +84,8 @@
 %% Whether to print coverage report to console. Default is `false'
 {cover_print_enabled, false}.
 
-%% Whether to export coverage report to file. Default is `false'
-{cover_export_enabled, false}.
-
-%% == Common Test ==
-
-%% Override the default "test" directory in which SUITEs are located
-{ct_dir, "itest"}.
-
-%% Override the default "logs" directory in which SUITEs are logged
-{ct_log_dir, "test/logs"}.
-
-%% Option to pass extra parameters when launching Common Test
-{ct_extra_params, "-boot start_sasl -s myapp"}.
-
-%% Option to use short names (i.e., -sname test) when starting ct
-{ct_use_short_names, true}.
+%% Directory to store collected cover data
+{cover_data_dir, "cover"}.
 
 %% What dependencies we have, dependencies can be of 3 forms, an application
 %% name as an atom, eg. mochiweb, a name and a version (from the .app file), or
