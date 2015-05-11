@@ -30,6 +30,9 @@
          compile/3,
          clean/2]).
 
+-export([format_error/1]).
+
+-include_lib("providers/include/providers.hrl").
 -include("rebar.hrl").
 -include_lib("stdlib/include/erl_compile.hrl").
 
@@ -128,6 +131,9 @@ clean(_Config, AppDir) ->
     rebar_file_utils:delete_each(BeamFiles),
     lists:foreach(fun(Dir) -> delete_dir(Dir, dirs(Dir)) end, dirs(filename:join(AppDir, "ebin"))),
     ok.
+
+format_error({missing_file, File}) ->
+    io_lib:format("File ~p is missing, aborting.", [File]).
 
 %% ===================================================================
 %% Internal functions
@@ -417,7 +423,7 @@ compile_mib(Source, Target, Config) ->
             rebar_file_utils:mv(Hrl_filename, "include"),
             ok;
         {error, compilation_failed} ->
-            ?FAIL
+            throw({error, compilation_failed})
     end.
 
 -spec compile_xrl(file:filename(), file:filename(),
@@ -586,6 +592,8 @@ check_files(FileList) ->
 
 check_file(File) ->
     case filelib:is_regular(File) of
-        false -> ?ABORT("File ~p is missing, aborting\n", [File]);
-        true -> File
+        false ->
+            throw(?PRV_ERROR({missing_file, File}));
+        true ->
+            File
     end.

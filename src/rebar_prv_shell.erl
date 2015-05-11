@@ -34,6 +34,7 @@
          do/1,
          format_error/1]).
 
+-include_lib("providers/include/providers.hrl").
 -include("rebar.hrl").
 
 -define(PROVIDER, shell).
@@ -61,6 +62,8 @@ do(Config) ->
     {ok, Config}.
 
 -spec format_error(any()) -> iolist().
+format_error({config_file, Error}) ->
+    io_lib:format("Error while attempting to read configuration file: ~p", [Error]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -114,12 +117,13 @@ remove_error_handler(N) ->
 
 %% Timeout is a period to wait before giving up
 wait_until_user_started(0) ->
-    ?ABORT("Timeout exceeded waiting for `user` to register itself", []),
+    ?ERROR("Timeout exceeded waiting for `user` to register itself", []),
     erlang:error(timeout);
 wait_until_user_started(Timeout) ->
     case whereis(user) of
         %% if user is not yet registered wait a tenth of a second and try again
-        undefined -> timer:sleep(100), wait_until_user_started(Timeout - 100);
+        undefined ->
+            timer:sleep(100), wait_until_user_started(Timeout - 100);
         _ -> ok
     end.
 
@@ -145,7 +149,7 @@ reread_config(State) ->
                           end,
                           ConfigList);
         {error, Error} ->
-            ?ABORT("Error while attempting to read configuration file: ~p", [Error])
+            throw(?PRV_ERROR({config_file, Error}))
     end.
 
 % First try the --config flag, then try the relx sys_config

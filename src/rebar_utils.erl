@@ -32,8 +32,6 @@
          is_arch/1,
          sh/2,
          sh_send/3,
-         abort/0,
-         abort/2,
          escript_foldl/3,
          find_files/2,
          find_files/3,
@@ -56,9 +54,12 @@
          tup_sort/1,
          line_count/1]).
 
+-export([format_error/1]).
+
 %% for internal use only
 -export([otp_release/0]).
 
+-include_lib("providers/include/providers.hrl").
 -include("rebar.hrl").
 
 -define(ONE_LEVEL_INDENT, "     ").
@@ -67,6 +68,9 @@
 %% ====================================================================
 %% Public API
 %% ====================================================================
+
+format_error(Error) ->
+    Error.
 
 sort_deps(Deps) ->
     %% We need a sort stable, based on the name. So that for multiple deps on
@@ -403,7 +407,7 @@ expand_sh_flag({env, _EnvArg} = Env) ->
 -spec log_msg_and_abort(string()) -> err_handler().
 log_msg_and_abort(Message) ->
     fun(_Command, {_Rc, _Output}) ->
-            ?ABORT(Message, [])
+            throw(?PRV_ERROR(Message))
     end.
 
 debug_log_msg_and_abort(Message) ->
@@ -411,14 +415,14 @@ debug_log_msg_and_abort(Message) ->
             ?DEBUG("sh(~s)~n"
                   "failed with return code ~w and the following output:~n"
                   "~s", [Command, Rc, Output]),
-            ?ABORT(Message, [])
+            throw(?PRV_ERROR(Message))
     end.
 
 -spec log_and_abort(string(), {integer(), string()}) -> no_return().
 log_and_abort(Command, {Rc, Output}) ->
-    ?ABORT("sh(~s)~n"
-          "failed with return code ~w and the following output:~n"
-          "~s", [Command, Rc, Output]).
+    throw(?PRV_ERROR(?FMT("sh(~s)~n"
+                         "failed with return code ~w and the following output:~n"
+                         "~s", [Command, Rc, Output]))).
 
 -spec debug_and_abort(string(), {integer(), string()}) -> no_return().
 debug_and_abort(Command, {Rc, Output}) ->
@@ -452,15 +456,6 @@ erl_to_mod(Filename) ->
 beams(Dir) ->
     filelib:wildcard(filename:join(Dir, "*.beam")).
 
--spec abort() -> no_return().
-abort() ->
-    throw(rebar_abort).
-
--spec abort(string(), [term()]) -> no_return().
-abort(String, Args) ->
-    ?ERROR(String, Args),
-    abort().
-
 escript_foldl(Fun, Acc, File) ->
     case escript:extract(File, [compile_source]) of
         {ok, [_Shebang, _Comment, _EmuArgs, Body]} ->
@@ -487,9 +482,9 @@ vcs_vsn(Vcs, Dir, Resources) ->
         {cmd, CmdString} ->
             vcs_vsn_invoke(CmdString, Dir);
         unknown ->
-            ?ABORT("vcs_vsn: Unknown vsn format: ~p", [Vcs]);
+            throw(?PRV_ERROR(?FMT("vcs_vsn: Unknown vsn format: ~p", [Vcs])));
         {error, Reason} ->
-            ?ABORT("vcs_vsn: ~s", [Reason])
+            throw(?PRV_ERROR(?FMT("vcs_vsn: ~s", [Reason])))
     end.
 
 %% Temp work around for repos like relx that use "semver"

@@ -56,7 +56,11 @@ format_error(invalid_app_file) ->
 format_error({file_read, File, Reason}) ->
     io_lib:format("Failed to read ~s for processing: ~p", [File, Reason]);
 format_error({invalid_name, File, AppName}) ->
-    io_lib:format("Invalid ~s: name of application (~p) must match filename.", [File, AppName]).
+    io_lib:format("Invalid ~s: name of application (~p) must match filename.", [File, AppName]);
+format_error({app_file_consult, AppFile, Reason}) ->
+    io_lib:format("Failed to consult app file ~s: ~p\n", [AppFile, Reason]);
+format_error({app_value, Key, AppFile}) ->
+    io_lib:format("Failed to get app value '~p' from '~s'~n", [Key, AppFile]).
 
 %% ===================================================================
 %% Internal functions
@@ -204,13 +208,13 @@ app_vsn(AppFile, State) ->
             Resources = rebar_state:resources(State),
             rebar_utils:vcs_vsn(get_value(vsn, AppData, AppFile), AppDir, Resources);
         {error, Reason} ->
-            ?ABORT("Failed to consult app file ~s: ~p\n", [AppFile, Reason])
+            throw(?PRV_ERROR({app_file_consult, AppFile, Reason}))
     end.
 
 get_value(Key, AppInfo, AppFile) ->
     case proplists:get_value(Key, AppInfo) of
         undefined ->
-            ?ABORT("Failed to get app value '~p' from '~s'~n", [Key, AppFile]);
+            throw(?PRV_ERROR({app_value, Key, AppFile}));
         Value ->
             Value
     end.
