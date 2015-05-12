@@ -31,20 +31,14 @@ download_source(AppDir, Source, State) ->
         Module = get_resource_type(Source, Resources),
         TmpDir = ec_file:insecure_mkdtemp(),
         AppDir1 = ec_cnv:to_list(AppDir),
-        case Module:download(TmpDir, Source, State) of
-            {ok, _} ->
-                ec_file:mkdir_p(AppDir1),
-                code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
-                ec_file:remove(filename:absname(AppDir1), [recursive]),
-                ?DEBUG("Moving checkout ~p to ~p", [TmpDir, filename:absname(AppDir1)]),
-                ok = rebar_file_utils:mv(TmpDir, filename:absname(AppDir1)),
-                true;
-            {tarball, File} ->
-                verify_and_extract(File, Source, AppDir1, State)
-        end
+        {ok, _} = Module:download(TmpDir, Source, State),
+        ec_file:mkdir_p(AppDir1),
+        code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
+        ec_file:remove(filename:absname(AppDir1), [recursive]),
+        ?DEBUG("Moving checkout ~p to ~p", [TmpDir, filename:absname(AppDir1)]),
+        ok = rebar_file_utils:mv(TmpDir, filename:absname(AppDir1)),
+        true
     catch
-        _:bad_etag ->
-            throw(?PRV_ERROR({bad_etag, Source}));
         C:T ->
             ?DEBUG("rebar_fetch exception ~p ~p ~p", [C, T, erlang:get_stacktrace()]),
             throw(?PRV_ERROR({fetch_fail, Source}))
@@ -92,34 +86,3 @@ find_resource_module(Type, Location, Resources) ->
         {Type, Module} ->
             Module
     end.
-
-verify_and_extract(File, Source, AppDir, State) ->
-    ec_file:mkdir_p(AppDir),
-    {ok, Files} = erl_tar:extract(File, [memory]),
-
-    code:del_path(filename:absname(filename:join(AppDir, "ebin"))),
-    ec_file:remove(filename:absname(AppDir), [recursive]),
-
-    {"contents.tar.gz", Contents} = lists:keyfind("contents.tar.gz", 1, Files),
-    {"VERSION", Version} = lists:keyfind("VERSION", 1, Files),
-    {"metadata.config", Meta} = lists:keyfind("metadata.config", 1, Files),
-
-    Checksum = checksum(Contents, Version, Meta),
-    RegistryChecksum = rebar_packages:registry_checksum(Source, State),
-    {"CHECKSUM", TarChecksum} = lists:keyfind("CHECKSUM", 1, Files),
-
-    if
-        Checksum =/= TarChecksum ->
-            ?PRV_ERROR({bad_checksum, File});
-        Checksum =/= RegistryChecksum ->
-            ?PRV_ERROR({bad_registry_checksum, File});
-        true ->
-            ok = erl_tar:extract({binary, Contents},
-                                 [{cwd, filename:absname(AppDir)}, compressed]),
-            true
-    end.
-
-checksum(Contents, Version, Meta) ->
-    Blob = <<Version/binary, Meta/binary, Contents/binary>>,
-    <<X:256/big-unsigned-integer>> = crypto:hash(sha256, Blob),
-    list_to_binary(string:to_upper(lists:flatten(io_lib:format("~64.16.0b", [X])))).
