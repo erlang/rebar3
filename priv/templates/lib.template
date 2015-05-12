@@ -1,4 +1,4 @@
-{description, "OTP Library application (no processes)"}.
+{description, "Complete OTP Library application (no processes) structure"}.
 {variables, [
     {name, "mylib", "Name of the OTP library application"},
     {desc, "An OTP library", "Short description of the app"}

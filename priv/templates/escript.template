@@ -1,4 +1,4 @@
-{description, "Escriptized application"}.
+{description, "Complete escriptized application structure"}.
 {variables, [
     {name, "mylib", "Name of the OTP application to be escriptized"},
     {desc, "An escript", "Short description of the project"}

@@ -1,4 +1,4 @@
-{description, "Rebar3 plugin"}.
+{description, "Rebar3 plugin project structure"}.
 {variables, [
     {name, "myplugin", "Name of the plugin"},
     {desc, "A rebar plugin", "Short description of the plugin's purpose"}
