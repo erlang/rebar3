@@ -16,3 +16,4 @@ logs
 /.rebar
 priv/templates/*.dtl.erl
 ebin
+.edts
