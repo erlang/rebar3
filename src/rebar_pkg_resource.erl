@@ -37,9 +37,17 @@ download(_Dir, {pkg, Name, Vsn}, State) ->
     case request(Url, etag(Path)) of
         {ok, cached} ->
             {tarball, Path};
-        {ok, Binary} ->
+        {ok, Binary, EtagHeader} ->
             file:write_file(Path, Binary),
-            {tarball, Path};
+            Etag = etag(Path),
+            case EtagHeader =:= Etag of
+                true ->
+                    {tarball, Path};
+                false ->
+                    ?DEBUG("Bad md5sum for ~s of ~s comparing to ~s sent by server",
+                           [Path, Etag, EtagHeader]),
+                    throw(bad_etag)
+            end;
         error ->
             case filelib:is_regular(Path) of
                 true ->
@@ -68,9 +76,10 @@ request(Url, ETag) ->
     case httpc:request(get, {Url, [{"if-none-match", ETag} || ETag =/= false]},
                       [{relaxed, true}],
                       [{body_format, binary}]) of
-        {ok, {{_Version, 200, _Reason}, _Headers, Body}} ->
+        {ok, {{_Version, 200, _Reason}, Headers, Body}} ->
+            {"etag", ETag1} = lists:keyfind("etag", 1, Headers),
             ?DEBUG("Successfully downloaded ~s", [Url]),
-            {ok, Body};
+            {ok, Body, string:strip(ETag1, both, $")};
         {ok, {{_Version, 304, _Reason}, _Headers, _Body}} ->
             ?DEBUG("Cached copy of ~s still valid", [Url]),
             {ok, cached};

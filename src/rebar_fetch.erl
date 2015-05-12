@@ -43,6 +43,8 @@ download_source(AppDir, Source, State) ->
                 verify_and_extract(File, Source, AppDir1, State)
         end
     catch
+        _:bad_etag ->
+            throw(?PRV_ERROR({bad_etag, Source}));
         C:T ->
             ?DEBUG("rebar_fetch exception ~p ~p ~p", [C, T, erlang:get_stacktrace()]),
             throw(?PRV_ERROR({fetch_fail, Source}))
@@ -59,6 +61,8 @@ needs_update(AppDir, Source, State) ->
             true
     end.
 
+format_error({bad_etag, Source}) ->
+    io_lib:format("MD5 Checksum comparison failed for: ~p", [Source]);
 format_error({fetch_fail, Source}) ->
     io_lib:format("Failed to fetch and copy dep: ~p", [Source]);
 format_error({bad_checksum, File}) ->
