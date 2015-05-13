@@ -1,4 +1,4 @@
--module({{name}}).
+-module('{{name}}').
 
 %% API exports
 -export([main/1]).
