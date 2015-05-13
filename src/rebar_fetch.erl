@@ -65,6 +65,8 @@ needs_update(AppDir, Source, State) ->
             true
     end.
 
+format_error({bad_download, CachePath}) ->
+    io_lib:format("Download of package does not match md5sum from server: ~s", [CachePath]);
 format_error({failed_extract, CachePath}) ->
     io_lib:format("Failed to extract package: ~s", [CachePath]);
 format_error({bad_etag, Source}) ->

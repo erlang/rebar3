@@ -67,7 +67,7 @@ serve_from_download(TmpDir, CachePath, Package, ETag, Binary, State) ->
         ETag ->
             serve_from_cache(TmpDir, CachePath, Package, State);
         FileETag ->
-            ?DEBUG("Download ETag ~s doesn't match cached ETag ~s", [ETag, FileETag]),
+            ?DEBUG("Download ETag ~s doesn't match returned ETag ~s", [ETag, FileETag]),
             {bad_download, CachePath}
     end.
 
