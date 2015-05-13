@@ -26,22 +26,32 @@ lock_source(AppDir, Source, State) ->
 -spec download_source(file:filename_all(), rebar_resource:resource(), rebar_state:t()) ->
                              true | {error, any()}.
 download_source(AppDir, Source, State) ->
-    try
-        Resources = rebar_state:resources(State),
-        Module = get_resource_type(Source, Resources),
-        TmpDir = ec_file:insecure_mkdtemp(),
-        AppDir1 = ec_cnv:to_list(AppDir),
-        {ok, _} = Module:download(TmpDir, Source, State),
-        ec_file:mkdir_p(AppDir1),
-        code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
-        ec_file:remove(filename:absname(AppDir1), [recursive]),
-        ?DEBUG("Moving checkout ~p to ~p", [TmpDir, filename:absname(AppDir1)]),
-        ok = rebar_file_utils:mv(TmpDir, filename:absname(AppDir1)),
-        true
+    try download_source_(AppDir, Source, State) of
+        true ->
+            true;
+        Error ->
+            throw(Error)
     catch
         C:T ->
             ?DEBUG("rebar_fetch exception ~p ~p ~p", [C, T, erlang:get_stacktrace()]),
             throw(?PRV_ERROR({fetch_fail, Source}))
+    end.
+
+download_source_(AppDir, Source, State) ->
+    Resources = rebar_state:resources(State),
+    Module = get_resource_type(Source, Resources),
+    TmpDir = ec_file:insecure_mkdtemp(),
+    AppDir1 = ec_cnv:to_list(AppDir),
+    case Module:download(TmpDir, Source, State) of
+        {ok, _} ->
+            ec_file:mkdir_p(AppDir1),
+            code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
+            ec_file:remove(filename:absname(AppDir1), [recursive]),
+            ?DEBUG("Moving checkout ~p to ~p", [TmpDir, filename:absname(AppDir1)]),
+            ok = rebar_file_utils:mv(TmpDir, filename:absname(AppDir1)),
+            true;
+        Error ->
+            Error
     end.
 
 -spec needs_update(file:filename_all(), rebar_resource:resource(), rebar_state:t()) -> boolean() | {error, string()}.
