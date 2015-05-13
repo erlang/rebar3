@@ -9,7 +9,6 @@
         ,needs_update/2
         ,make_vsn/1]).
 
--include_lib("providers/include/providers.hrl").
 -include("rebar.hrl").
 
 -define(DEFAULT_CDN, "https://s3.amazonaws.com/s3.hex.pm/tarballs").
@@ -44,7 +43,7 @@ cached_download(TmpDir, CachePath, Pkg, Url, ETag, State) ->
             ?DEBUG("Download ~s error, using ~s from cache", [Url, CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg, State);
         error ->
-            throw(request_failed)
+            request_failed
     end.
 
 serve_from_cache(TmpDir, CachePath, Pkg, State) ->
@@ -54,11 +53,11 @@ serve_from_cache(TmpDir, CachePath, Pkg, State) ->
             ok = erl_tar:extract({binary, Contents}, [{cwd, TmpDir}, compressed]),
             {ok, true};
         {_Bin, Chk, Chk} ->
-            ?PRV_ERROR({failed_extract, CachePath});
+            {failed_extract, CachePath};
         {Chk, _Reg, Chk} ->
-            ?PRV_ERROR({bad_registry_checksum, CachePath});
+            {bad_registry_checksum, CachePath};
         {_Bin, _Reg, _Tar} ->
-            ?PRV_ERROR({bad_checksum, CachePath})
+            {bad_checksum, CachePath}
     end.
 
 serve_from_download(TmpDir, CachePath, Package, ETag, Binary, State) ->
@@ -69,7 +68,7 @@ serve_from_download(TmpDir, CachePath, Package, ETag, Binary, State) ->
             serve_from_cache(TmpDir, CachePath, Package, State);
         FileETag ->
             ?DEBUG("Download ETag ~s doesn't match cached ETag ~s", [ETag, FileETag]),
-            ?PRV_ERROR({bad_download, CachePath})
+            {bad_download, CachePath}
     end.
 
 
