@@ -11,8 +11,6 @@
 
 -include("rebar.hrl").
 
--define(DEFAULT_CDN, "https://s3.amazonaws.com/s3.hex.pm/tarballs").
-
 lock(_AppDir, Source) ->
     Source.
 
@@ -27,7 +25,7 @@ needs_update(Dir, {pkg, _Name, Vsn}) ->
 
 download(TmpDir, Pkg={pkg, Name, Vsn}, State) ->
     CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
-    PackageDir = hex_package_dir(CDN, State),
+    PackageDir = rebar_packages:package_dir(State),
     Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
     CachePath = filename:join(PackageDir, Package),
     Url = string:join([CDN, Package], "/"),
@@ -53,10 +51,13 @@ serve_from_cache(TmpDir, CachePath, Pkg, State) ->
             ok = erl_tar:extract({binary, Contents}, [{cwd, TmpDir}, compressed]),
             {ok, true};
         {_Bin, Chk, Chk} ->
+            ?DEBUG("Checksums: registry: ~p, pkg: ~p", [Chk, _Bin]),
             {failed_extract, CachePath};
         {Chk, _Reg, Chk} ->
+            ?DEBUG("Checksums: registry: ~p, pkg: ~p", [_Reg, Chk]),
             {bad_registry_checksum, CachePath};
         {_Bin, _Reg, _Tar} ->
+            ?DEBUG("Checksums: registry: ~p, pkg: ~p, meta: ~p", [_Reg, _Bin, _Tar]),
             {bad_checksum, CachePath}
     end.
 
@@ -67,7 +68,7 @@ serve_from_download(TmpDir, CachePath, Package, ETag, Binary, State) ->
         ETag ->
             serve_from_cache(TmpDir, CachePath, Package, State);
         FileETag ->
-            ?DEBUG("Download ETag ~s doesn't match returned ETag ~s", [ETag, FileETag]),
+            ?DEBUG("Downloaded file ~s ETag ~s doesn't match returned ETag ~s", [CachePath, ETag, FileETag]),
             {bad_download, CachePath}
     end.
 
@@ -84,28 +85,17 @@ checksums(Pkg, Files, Contents, Version, Meta, State) ->
     Blob = <<Version/binary, Meta/binary, Contents/binary>>,
     <<X:256/big-unsigned>> = crypto:hash(sha256, Blob),
     BinChecksum = list_to_binary(string:to_upper(lists:flatten(io_lib:format("~64.16.0b", [X])))),
-    RegistryChecksum = rebar_packages:registry_sum(Pkg, State),
+    RegistryChecksum = rebar_packages:registry_checksum(Pkg, State),
     {"CHECKSUM", TarChecksum} = lists:keyfind("CHECKSUM", 1, Files),
     {BinChecksum, RegistryChecksum, TarChecksum}.
 
 make_vsn(_) ->
     {error, "Replacing version of type pkg not supported."}.
 
-%% Use the shared hex package directory unless a non-default package repo is used
-hex_package_dir(?DEFAULT_CDN, _) ->
-    filename:join([rebar_dir:home_dir(), ".hex", "packages"]);
-hex_package_dir(CDN, State) ->
-    CacheDir = rebar_dir:global_cache_dir(State),
-    {ok, {_, _, Host, _, _, _}} = http_uri:parse(CDN),
-    CDNPath = filename:join(lists:reverse(string:tokens(Host, "."))),
-    PackageDir = filename:join([CacheDir, "hex", CDNPath, "packages"]),
-    ok = filelib:ensure_dir(filename:join(PackageDir, "placeholder")),
-    PackageDir.
-
 request(Url, ETag) ->
     case httpc:request(get, {Url, [{"if-none-match", ETag} || ETag =/= false]},
-                      [{relaxed, true}],
-                      [{body_format, binary}]) of
+                       [{relaxed, true}],
+                       [{body_format, binary}]) of
         {ok, {{_Version, 200, _Reason}, Headers, Body}} ->
             ?DEBUG("Successfully downloaded ~s", [Url]),
             {"etag", ETag1} = lists:keyfind("etag", 1, Headers),

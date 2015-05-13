@@ -2,6 +2,7 @@
 
 -export([get_packages/1
         ,registry/1
+        ,package_dir/1
         ,check_registry/3
         ,registry_checksum/2
         ,find_highest_matching/3]).
@@ -16,8 +17,7 @@
 
 -spec get_packages(rebar_state:t()) -> {rebar_dict(), rebar_digraph()}.
 get_packages(State) ->
-    RebarDir = rebar_dir:global_cache_dir(State),
-    RegistryDir = filename:join(RebarDir, "packages"),
+    RegistryDir = package_dir(State),
     DictFile = filename:join(RegistryDir, "dict"),
     Edges = filename:join(RegistryDir, "edges"),
     Vertices = filename:join(RegistryDir, "vertices"),
@@ -43,8 +43,7 @@ get_packages(State) ->
     end.
 
 registry(State) ->
-    Dir = rebar_dir:global_cache_dir(State),
-    RegistryDir = filename:join(Dir, "packages"),
+    RegistryDir = package_dir(State),
     HexFile = filename:join(RegistryDir, "registry"),
     case ets:file2tab(HexFile) of
         {ok, T} ->
@@ -53,6 +52,17 @@ registry(State) ->
             ?DEBUG("Error loading registry: ~p", [Reason]),
             error
     end.
+
+package_dir(State) ->
+    CacheDir = rebar_dir:global_cache_dir(State),
+    CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
+    {ok, {_, _, Host, _, Path, _}} = http_uri:parse(CDN),
+    CDNHostPath = lists:reverse(string:tokens(Host, ".")),
+    CDNPath = tl(filename:split(Path)),
+    PackageDir = filename:join([CacheDir, "hex"] ++ CDNHostPath ++ CDNPath ++ ["packages"]),
+    ok = filelib:ensure_dir(filename:join(PackageDir, "placeholder")),
+    PackageDir.
+
 
 check_registry(Pkg, Vsn, State) ->
     case rebar_state:registry(State) of
