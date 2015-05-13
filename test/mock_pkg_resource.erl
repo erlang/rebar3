@@ -16,6 +16,7 @@ mock() -> mock([]).
 -spec mock(Opts) -> ok when
     Opts :: [Option],
     Option :: {update, [App]}
+            | {cache_dir, string()}
             | {default_vsn, Vsn}
             | {override_vsn, [{App, Vsn}]}
             | {not_in_index, [{App, Vsn}]}
@@ -83,7 +84,8 @@ mock_download(Opts) ->
                 [kernel, stdlib] ++ [element(1,D) || D  <- AppDeps]
             ),
             rebar_test_utils:create_config(Dir, [{deps, AppDeps}]),
-            Tarball = filename:join([Dir, App++"-"++binary_to_list(Vsn)++".tar"]),
+            TarApp = App++"-"++binary_to_list(Vsn)++".tar",
+            Tarball = filename:join([Dir, TarApp]),
             Contents = filename:join([Dir, "contents.tar.gz"]),
             Files = all_files(rebar_app_info:dir(AppInfo)),
             ok = erl_tar:create(Contents,
@@ -92,8 +94,11 @@ mock_download(Opts) ->
             ok = erl_tar:create(Tarball,
                                 [{"contents.tar.gz", Contents}],
                                 []),
-            [file:delete(F) || F <- Files],
-            {tarball, Tarball}
+            Cache = proplists:get_value(cache_dir, Opts, filename:join(Dir,"cache")),
+            Cached = filename:join([Cache, TarApp]),
+            filelib:ensure_dir(Cached),
+            rebar_file_utils:mv(Tarball, Cached),
+            {ok, true}
         end).
 
 %% @doc On top of the pkg resource mocking, we need to mock the package
