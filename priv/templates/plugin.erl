@@ -1,9 +1,9 @@
--module({{name}}).
+-module('{{name}}').
 -behaviour(provider).
 
 -export([init/1, do/1, format_error/1]).
 
--define(PROVIDER, {{name}}).
+-define(PROVIDER, '{{name}}').
 -define(DEPS, [app_discovery]).
 
 %% ===================================================================
