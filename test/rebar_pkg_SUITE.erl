@@ -94,12 +94,9 @@ good_cached(Config) ->
     Cache = ?config(cache_dir, Config),
     CachedFile = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>),
     ?assert(filelib:is_regular(CachedFile)),
-    FInfo = file:read_file_info(CachedFile),
     {ok, Content} = file:read_file(CachedFile),
     ?assertEqual({ok, true},
                  rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn}, State)),
-    ?assertEqual(FInfo,
-                 file:read_file_info(CachedFile)),
     {ok, Content} = file:read_file(CachedFile).
 
 badindexchk(Config) ->
@@ -142,12 +139,9 @@ good_disconnect(Config) ->
     Cache = ?config(cache_dir, Config),
     CachedFile = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>),
     ?assert(filelib:is_regular(CachedFile)),
-    FInfo = file:read_file_info(CachedFile),
     {ok, Content} = file:read_file(CachedFile),
     ?assertEqual({ok, true},
                  rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn}, State)),
-    ?assertEqual(FInfo,
-                 file:read_file_info(CachedFile)),
     {ok, Content} = file:read_file(CachedFile).
 
 bad_disconnect(Config) ->
