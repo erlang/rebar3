@@ -31,7 +31,7 @@ init(State) ->
                                  "their name can be listed in the command."},
                           {opts, [
                             {package, undefined, undefined, string,
-                             "List of packages to upgrade. If not specified, all dependencies are upgraded."}
+                             "List of packages to unlock. If not specified, all dependencies are unlocked."}
                           ]}
                          ])
     ),
