@@ -388,7 +388,7 @@ handle_dep(State, DepsDir, AppInfo, Locks, Level) ->
     {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, S3, Locks, Level),
     {AppInfo2, SrcDeps, PkgDeps, Locks++NewLocks, State1}.
 
--spec maybe_fetch(rebar_app_info:t(), atom(), boolean() | {true, binary(), integer()},
+-spec maybe_fetch(rebar_app_info:t(), atom(), boolean(),
                   sets:set(binary()), rebar_state:t()) -> {boolean(), rebar_app_info:t()}.
 maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
     AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
@@ -580,10 +580,7 @@ update_app_info(AppInfo) ->
                  IncludedApplications++Applications),
     rebar_app_info:valid(AppInfo1, false).
 
-maybe_upgrade(AppInfo, AppDir, false, State) ->
-    Source = rebar_app_info:source(AppInfo),
-    rebar_fetch:needs_update(AppDir, Source, State);
-maybe_upgrade(AppInfo, AppDir, true, State) ->
+maybe_upgrade(AppInfo, AppDir, Upgrade, State) ->
     Source = rebar_app_info:source(AppInfo),
     case rebar_fetch:needs_update(AppDir, Source, State) of
         true ->
@@ -595,8 +592,13 @@ maybe_upgrade(AppInfo, AppDir, true, State) ->
                     throw(Error)
             end;
         false ->
-            ?INFO("No upgrade needed for ~s", [rebar_app_info:name(AppInfo)]),
-            false
+            case Upgrade of
+                true ->
+                    ?INFO("No upgrade needed for ~s", [rebar_app_info:name(AppInfo)]),
+                    false;
+                false ->
+                    false
+            end
     end.
 
 -spec parse_goal(binary(), binary()) -> pkg_dep().
