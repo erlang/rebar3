@@ -192,11 +192,10 @@ resolve_ct_opts(State) ->
                              lists:ukeysort(1, CmdOpts),
                              lists:ukeysort(1, CfgOpts)),
     %% make sure `dir` and/or `suite` from command line go in as
-    %%  a pair overriding both `dir` and `suite` from config if
-    %%  they exist
+    %%  a pair overriding only `suite` from config if they exist
     case {proplists:get_value(suite, CmdOpts), proplists:get_value(dir, CmdOpts)} of
         {undefined, undefined} -> Merged;
-        {_Suite, undefined}    -> lists:keydelete(dir, 1, Merged);
+        {_Suite, undefined}    -> Merged;
         {undefined, _Dir}      -> lists:keydelete(suite, 1, Merged);
         {_Suite, _Dir}         -> Merged
     end.
