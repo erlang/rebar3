@@ -120,16 +120,21 @@ resolve_apps(State, RawOpts) ->
     end.
 
 resolve_suites(State, Apps, RawOpts) ->
-    case proplists:get_value(suite, RawOpts) of
-        undefined  -> compile_tests(State, Apps, all, RawOpts);
-        Suites     -> SuiteNames = string:tokens(Suites, [$,]),
-                      case filter_suites_by_apps(SuiteNames, Apps) of
-                          {ok, S} -> compile_tests(State, Apps, S, RawOpts);
-                          Error   -> Error
-                      end
+    %% It is necessary to generate the ".app" for test before called "filter_suites_by_apps"
+    ok = compile_tests(State, Apps, RawOpts),
+
+    Result = case proplists:get_value(suite, RawOpts) of
+                 undefined -> {ok, all};
+                 Suites0   ->
+                     SuiteNames = string:tokens(Suites0, [$,]),
+                     filter_suites_by_apps(SuiteNames, Apps)
+             end,
+    case Result of
+        {ok, Suites} -> {ok, test_set(Apps, Suites)};
+        Error        -> Error
     end.
 
-compile_tests(State, TestApps, Suites, RawOpts) ->
+compile_tests(State, TestApps, RawOpts) ->
     F = fun(AppInfo) ->
         AppDir = rebar_app_info:dir(AppInfo),
         S = case rebar_app_info:state(AppInfo) of
@@ -140,11 +145,14 @@ compile_tests(State, TestApps, Suites, RawOpts) ->
                 AppState
         end,
         ok = rebar_erlc_compiler:compile(replace_src_dirs(S),
-                                         ec_cnv:to_list(rebar_app_info:out_dir(AppInfo)))
+                                         ec_cnv:to_list(rebar_app_info:out_dir(AppInfo))),
+        case rebar_otp_app:compile(State, AppInfo) of
+            {ok, _AppInfo} -> ok;
+            Error          -> throw(Error)
+        end
     end,
     lists:foreach(F, TestApps),
-    ok = maybe_cover_compile(State, RawOpts),
-    {ok, test_set(TestApps, Suites)}.
+    maybe_cover_compile(State, RawOpts).
 
 maybe_cover_compile(State, Opts) ->
     State1 = case proplists:get_value(cover, Opts, false) of
