@@ -9,7 +9,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, edoc).
--define(DEPS, [app_discovery]).
+-define(DEPS, [compile]).
 
 %% ===================================================================
 %% Public API
@@ -29,6 +29,7 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    code:add_pathsa(rebar_state:code_paths(State, all_deps)),
     ProjectApps = rebar_state:project_apps(State),
     EDocOpts = rebar_state:get(State, edoc_opts, []),
     lists:foreach(fun(AppInfo) ->
@@ -37,6 +38,7 @@ do(State) ->
                           AppDir = rebar_app_info:dir(AppInfo),
                           ok = edoc:application(list_to_atom(AppName), AppDir, EDocOpts)
                   end, ProjectApps),
+    rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
