@@ -100,7 +100,7 @@ preprocess(State, AppInfo, AppSrcFile) ->
             %% substitute. Note that we include the list of modules available in
             %% ebin/ and update the app data accordingly.
             OutDir = rebar_app_info:out_dir(AppInfo),
-            AppVars = load_app_vars(State) ++ [{modules, ebin_modules(AppInfo, OutDir)}],
+            AppVars = load_app_vars(State) ++ [{modules, ebin_modules(OutDir)}],
             A1 = apply_app_vars(AppVars, AppData),
 
             %% AppSrcFile may contain instructions for generating a vsn number
@@ -152,23 +152,9 @@ validate_name(AppName, File) ->
             ?PRV_ERROR({invalid_name, File, AppName})
     end.
 
-ebin_modules(App, Dir) ->
+ebin_modules(Dir) ->
     Beams = lists:sort(rebar_utils:beams(filename:join(Dir, "ebin"))),
-    F = fun(Beam) -> not lists:prefix(filename:join([rebar_app_info:out_dir(App), "test"]),
-                                      beam_src(Beam))
-    end,
-    Filtered = lists:filter(F, Beams),
-    [rebar_utils:beam_to_mod(N) || N <- Filtered].
-
-beam_src(Beam) ->
-    case beam_lib:chunks(Beam, [compile_info]) of
-        {ok, {_mod, Chunks}} ->
-            CompileInfo = proplists:get_value(compile_info, Chunks, []),
-            proplists:get_value(source, CompileInfo, []);
-        {error, beam_lib, Reason} ->
-            ?WARN("Couldn't read debug info from ~p for reason: ~p", [Beam, Reason]),
-            []
-    end.
+    [rebar_utils:beam_to_mod(N) || N <- Beams].
 
 ensure_registered(AppData) ->
     case lists:keyfind(registered, 1, AppData) of
