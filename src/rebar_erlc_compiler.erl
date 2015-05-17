@@ -227,14 +227,20 @@ maybe_rm_beam_and_edge(G, OutDir, Source) ->
             digraph:del_vertex(G, Source)
     end.
 
-opts_changed(Opts, ObjectFile) ->
-    case code:load_abs(ObjectFile) of
-        {module, Mod} ->
-            Compile = Mod:module_info(compile),
-            lists:sort(Opts) =/= lists:sort(proplists:get_value(options,
-                                                                Compile,
-                                                                []));
-        {error, _} -> true
+opts_changed(NewOpts, Target) ->
+    case compile_info(Target) of
+        {ok, Opts} -> lists:sort(Opts) =/= lists:sort(NewOpts);
+        _          -> true
+    end.
+
+compile_info(Target) ->
+    case beam_lib:chunks(Target, [compile_info]) of
+        {ok, {_mod, Chunks}} ->
+            CompileInfo = proplists:get_value(compile_info, Chunks, []),
+            {ok, proplists:get_value(options, CompileInfo, [])};
+        {error, beam_lib, Reason} ->
+            ?WARN("Couldn't read debug info from ~p for reason: ~p", [Target, Reason]),
+            {error, Reason}
     end.
 
 erlcinfo_file(Dir) ->
