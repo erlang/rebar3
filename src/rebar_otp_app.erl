@@ -100,7 +100,7 @@ preprocess(State, AppInfo, AppSrcFile) ->
             %% substitute. Note that we include the list of modules available in
             %% ebin/ and update the app data accordingly.
             OutDir = rebar_app_info:out_dir(AppInfo),
-            AppVars = load_app_vars(State) ++ [{modules, ebin_modules(AppInfo, OutDir)}],
+            AppVars = load_app_vars(State) ++ [{modules, ebin_modules(State, AppInfo, OutDir)}],
             A1 = apply_app_vars(AppVars, AppData),
 
             %% AppSrcFile may contain instructions for generating a vsn number
@@ -152,13 +152,24 @@ validate_name(AppName, File) ->
             ?PRV_ERROR({invalid_name, File, AppName})
     end.
 
-ebin_modules(App, Dir) ->
+ebin_modules(State, App, Dir) ->
     Beams = lists:sort(rebar_utils:beams(filename:join(Dir, "ebin"))),
-    F = fun(Beam) -> not lists:prefix(filename:join([rebar_app_info:out_dir(App), "test"]),
-                                      beam_src(Beam))
-    end,
+    ExtraDirs = extra_dirs(State),
+    F = fun(Beam) -> not in_extra_dir(App, Beam, ExtraDirs) end,
     Filtered = lists:filter(F, Beams),
     [rebar_utils:beam_to_mod(N) || N <- Filtered].
+
+extra_dirs(State) ->
+    ErlOpts = rebar_utils:erl_opts(State),
+    Extras = proplists:get_value(extra_src_dirs, ErlOpts, []),
+    SrcDirs = proplists:get_value(src_dirs, ErlOpts, ["src"]),
+    %% remove any dirs that are defined in `src_dirs` from `extra_src_dirs`
+    Extras -- SrcDirs.
+
+in_extra_dir(App, Beam, Dirs) ->
+    lists:any(fun(Dir) -> lists:prefix(filename:join([rebar_app_info:out_dir(App), Dir]),
+                                       beam_src(Beam)) end,
+              Dirs).
 
 beam_src(Beam) ->
     case beam_lib:chunks(Beam, [compile_info]) of
