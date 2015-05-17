@@ -1,3 +1,4 @@
+.rebar3
 rebar3
 _build
 .depsolver_plt
