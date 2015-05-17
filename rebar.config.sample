@@ -13,7 +13,12 @@
 %% Erlang compiler options
 {erl_opts, [no_debug_info,
             {i, "myinclude"},
+            %% directories containing source files
             {src_dirs, ["src", "src2", "src3"]},
+            %% extra_src_dirs are directories containing
+            %%   source files that are NOT part of the
+            %%   application itself
+            {extra_src_dirs, ["eunit", "ct"]},
             {platform_define,
              "(linux|solaris|freebsd|darwin)", 'HAVE_SENDFILE'},
             {platform_define, "(linux|freebsd)", 'BACKLOG', 128},
