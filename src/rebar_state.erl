@@ -12,7 +12,7 @@
 
          lock/1, lock/2,
 
-         current_profiles/1,
+         current_profiles/1, current_profiles/2,
 
          command_args/1, command_args/2,
          command_parsed_args/1, command_parsed_args/2,
@@ -174,6 +174,9 @@ opts(State, Opts) ->
 
 current_profiles(#state_t{current_profiles=Profiles}) ->
     Profiles.
+
+current_profiles(State, Profiles) ->
+    State#state_t{current_profiles=Profiles}.
 
 lock(#state_t{lock=Lock}) ->
     Lock.

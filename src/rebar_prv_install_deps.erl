@@ -380,7 +380,6 @@ handle_dep(State, DepsDir, AppInfo, Locks, Level) ->
 
     %% Dep may have plugins to install. Find and install here.
     State1 = rebar_plugins:handle_plugins(rebar_state:get(S3, plugins, []), State),
-
     Deps = rebar_state:get(S3, deps, []),
     %% Upgrade lock level to be the level the dep will have in this dep tree
     NewLocks = [{DepName, Source, LockLevel+Level} ||
@@ -432,7 +431,7 @@ maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
 
 already_in_default(AppInfo, State) ->
     Name = ec_cnv:to_list(rebar_app_info:name(AppInfo)),
-    DefaultAppDir = filename:join([rebar_state:get(State, base_dir), "default", "lib", Name]),
+    DefaultAppDir = filename:join([rebar_state:get(State, base_dir, []), "default", "lib", Name]),
     rebar_app_discover:find_app(DefaultAppDir, all).
 
 needs_symlinking(State, Profile) ->

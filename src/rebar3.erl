@@ -141,7 +141,16 @@ init_config() ->
                     ?DEBUG("Load global config file ~p",
                            [GlobalConfigFile]),
                     GlobalConfig = rebar_state:new(rebar_config:consult_file(GlobalConfigFile)),
-                    rebar_state:new(GlobalConfig, Config1);
+
+                    %% We don't want to worry about global plugin install state effecting later
+                    %% usage. So we throw away the global profile state used for plugin install.
+                    GlobalConfigThrowAway = rebar_state:current_profiles(GlobalConfig, ["global"]),
+                    rebar_plugins:handle_plugins(global,
+                                                 rebar_state:get(GlobalConfigThrowAway, plugins, []),
+                                                 GlobalConfigThrowAway),
+
+                    GlobalConfig2 = rebar_state:set(GlobalConfig, plugins, []),
+                    rebar_state:new(GlobalConfig2, Config1);
                 false ->
                     rebar_state:new(Config1)
             end,

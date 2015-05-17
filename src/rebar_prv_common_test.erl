@@ -303,7 +303,7 @@ copy(State, Dir) ->
 
 compile_dir(State, Dir, OutDir) ->
     NewState = replace_src_dirs(State, [Dir]),
-    ok = rebar_erlc_compiler:compile(NewState, rebar_state:dir(State), OutDir),
+    ok = rebar_erlc_compiler:compile(NewState, rebar_dir:base_dir(State), OutDir),
     ok = maybe_cover_compile(State, Dir),
     OutDir.
 
