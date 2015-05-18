@@ -84,7 +84,8 @@ format_error({error_running_tests, Reason}) ->
 test_state(State) ->
     ErlOpts = rebar_state:get(State, eunit_compile_opts, []),
     TestOpts = safe_define_test_macro(ErlOpts),
-    first_files(State) ++ [{erl_opts, TestOpts}].
+    TestDir = [{extra_src_dirs, ["test"]}],
+    first_files(State) ++ [{erl_opts, TestOpts ++ TestDir}].
 
 safe_define_test_macro(Opts) ->
     %% defining a compile macro twice results in an exception so
@@ -105,46 +106,9 @@ first_files(State) ->
 
 prepare_tests(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
-    resolve_apps(State, RawOpts).
-
-resolve_apps(State, RawOpts) ->
-    case proplists:get_value(app, RawOpts) of
-        undefined -> resolve_suites(State, project_apps(State), RawOpts);
-        %% convert app name strings to `rebar_app_info` objects
-        Apps      -> AppNames = string:tokens(Apps, [$,]),
-                     ProjectApps = project_apps(State),
-                     case filter_apps_by_name(AppNames, ProjectApps) of
-                         {ok, TestApps} -> resolve_suites(State, TestApps, RawOpts);
-                         Error          -> Error
-                     end
-    end.
-
-resolve_suites(State, Apps, RawOpts) ->
-    case proplists:get_value(suite, RawOpts) of
-        undefined  -> compile_tests(State, Apps, all, RawOpts);
-        Suites     -> SuiteNames = string:tokens(Suites, [$,]),
-                      case filter_suites_by_apps(SuiteNames, Apps) of
-                          {ok, S} -> compile_tests(State, Apps, S, RawOpts);
-                          Error   -> Error
-                      end
-    end.
-
-compile_tests(State, TestApps, Suites, RawOpts) ->
-    F = fun(AppInfo) ->
-        AppDir = rebar_app_info:dir(AppInfo),
-        S = case rebar_app_info:state(AppInfo) of
-            undefined ->
-                C = rebar_config:consult(AppDir),
-                rebar_state:new(State, C, AppDir);
-            AppState ->
-                AppState
-        end,
-        ok = rebar_erlc_compiler:compile(replace_src_dirs(S),
-                                         ec_cnv:to_list(rebar_app_info:out_dir(AppInfo)))
-    end,
-    lists:foreach(F, TestApps),
     ok = maybe_cover_compile(State, RawOpts),
-    {ok, test_set(TestApps, Suites)}.
+    ProjectApps = project_apps(State),
+    resolve_apps(ProjectApps, RawOpts).
 
 maybe_cover_compile(State, Opts) ->
     State1 = case proplists:get_value(cover, Opts, false) of
@@ -152,6 +116,27 @@ maybe_cover_compile(State, Opts) ->
         false -> State
     end,
     rebar_prv_cover:maybe_cover_compile(State1).
+
+resolve_apps(ProjectApps, RawOpts) ->
+    case proplists:get_value(app, RawOpts) of
+        undefined -> resolve_suites(ProjectApps, RawOpts);
+        %% convert app name strings to `rebar_app_info` objects
+        Apps      -> AppNames = string:tokens(Apps, [$,]),
+                     case filter_apps_by_name(AppNames, ProjectApps) of
+                         {ok, TestApps} -> resolve_suites(TestApps, RawOpts);
+                         Error          -> Error
+                     end
+    end.
+
+resolve_suites(Apps, RawOpts) ->
+    case proplists:get_value(suite, RawOpts) of
+        undefined  -> test_set(Apps, all);
+        Suites     -> SuiteNames = string:tokens(Suites, [$,]),
+                      case filter_suites_by_apps(SuiteNames, Apps) of
+                          {ok, S} -> test_set(Apps, S);
+                          Error   -> Error
+                      end
+    end.
 
 project_apps(State) ->
     filter_checkouts(rebar_state:project_apps(State)).
@@ -219,14 +204,8 @@ app_modules([App|Rest], Acc) ->
             app_modules(Rest, NewAcc)
     end.
 
-replace_src_dirs(State) ->
-    %% replace any `src_dirs` with just the `test` dir
-    ErlOpts = rebar_state:get(State, erl_opts, []),
-    StrippedOpts = lists:keydelete(src_dirs, 1, ErlOpts),
-    rebar_state:set(State, erl_opts, [{src_dirs, ["test"]}|StrippedOpts]).
-
-test_set(Apps, all) -> set_apps(Apps, []);
-test_set(_Apps, Suites) -> set_suites(Suites, []).
+test_set(Apps, all) -> {ok, set_apps(Apps, [])};
+test_set(_Apps, Suites) -> {ok, set_suites(Suites, [])}.
 
 set_apps([], Acc) -> lists:reverse(Acc);
 set_apps([App|Rest], Acc) ->
