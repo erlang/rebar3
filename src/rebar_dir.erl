@@ -30,14 +30,15 @@ base_dir(State) ->
 
 -spec profile_dir(rebar_state:t(), [atom()]) -> file:filename_all().
 profile_dir(State, Profiles) ->
-    ProfilesStrings = case [ec_cnv:to_list(P) || P <- Profiles] of
-        ["default"]      -> ["default"];
+    {BaseDir, ProfilesStrings} = case [ec_cnv:to_list(P) || P <- Profiles] of
+        ["global"] -> {?MODULE:global_cache_dir(State), [""]};
+        ["default"] -> {rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR), ["default"]};
         %% drop `default` from the profile dir if it's implicit and reverse order
         %%  of profiles to match order passed to `as`
-        ["default"|Rest] -> Rest
+        ["default"|Rest] -> {rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR), Rest}
     end,
     ProfilesDir = string:join(ProfilesStrings, "+"),
-    filename:join(rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR), ProfilesDir).
+    filename:join(BaseDir, ProfilesDir).
 
 
 -spec deps_dir(rebar_state:t()) -> file:filename_all().
@@ -81,11 +82,11 @@ global_config_dir(State) ->
     rebar_state:get(State, global_rebar_dir, filename:join([Home, ".config", "rebar3"])).
 
 global_config(State) ->
-    filename:join(global_config_dir(State), "config").
+    filename:join(global_config_dir(State), "rebar.config").
 
 global_config() ->
     Home = home_dir(),
-    filename:join([Home, ".config", "rebar3", "config"]).
+    filename:join([Home, ".config", "rebar3", "rebar.config"]).
 
 global_cache_dir(State) ->
     Home = home_dir(),

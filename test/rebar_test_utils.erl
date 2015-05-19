@@ -160,6 +160,7 @@ top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
 check_results(AppDir, Expected) ->
     BuildDirs = filelib:wildcard(filename:join([AppDir, "_build", "*", "lib"])),
     PluginDirs = filelib:wildcard(filename:join([AppDir, "_build", "*", "plugins"])),
+    GlobalPluginDirs = filelib:wildcard(filename:join([AppDir, "global", "plugins"])),
     CheckoutsDir = filename:join([AppDir, "_checkouts"]),
     LockFile = filename:join([AppDir, "rebar.lock"]),
     Locks = lists:flatten(rebar_config:consult_file(LockFile)),
@@ -176,6 +177,8 @@ check_results(AppDir, Expected) ->
     CheckoutsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Checkouts],
     Plugins = rebar_app_discover:find_apps(PluginDirs, all),
     PluginsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Plugins],
+    GlobalPlugins = rebar_app_discover:find_apps(GlobalPluginDirs, all),
+    GlobalPluginsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- GlobalPlugins],
 
     lists:foreach(
         fun({app, Name}) ->
@@ -224,7 +227,19 @@ check_results(AppDir, Expected) ->
                 ct:pal("Name: ~p, Vsn: ~p", [Name, Vsn]),
                 case lists:keyfind(Name, 1, PluginsNames) of
                     false ->
-                        error({dep_not_found, Name});
+                        error({plugin_not_found, Name});
+                    {Name, App} ->
+                        ?assertEqual(iolist_to_binary(Vsn),
+                                     iolist_to_binary(rebar_app_info:original_vsn(App)))
+                end
+        ;  ({global_plugin, Name}) ->
+                ct:pal("Name: ~p", [Name]),
+                ?assertNotEqual(false, lists:keyfind(Name, 1, GlobalPluginsNames))
+        ;  ({global_plugin, Name, Vsn}) ->
+                ct:pal("Name: ~p, Vsn: ~p", [Name, Vsn]),
+                case lists:keyfind(Name, 1, GlobalPluginsNames) of
+                    false ->
+                        error({global_plugin_not_found, Name});
                     {Name, App} ->
                         ?assertEqual(iolist_to_binary(Vsn),
                                      iolist_to_binary(rebar_app_info:original_vsn(App)))
