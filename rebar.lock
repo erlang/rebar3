@@ -1,6 +1,6 @@
 [{<<"relx">>,
   {git,"https://github.com/erlware/relx.git",
-       {ref,"2e59b1c95575b3c104cc191e954c82baadc43c6c"}},
+       {ref,"74fec3455ba6dbb7d9e369137c1b15ab10804993"}},
   0},
  {<<"providers">>,
   {git,"https://github.com/tsloughter/providers.git",
