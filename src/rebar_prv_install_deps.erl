@@ -385,7 +385,7 @@ handle_dep(State, DepsDir, AppInfo, Locks, Level) ->
     NewLocks = [{DepName, Source, LockLevel+Level} ||
                    {DepName, Source, LockLevel} <- rebar_state:get(S3, {locks, default}, [])],
     AppInfo2 = rebar_app_info:deps(AppInfo1, rebar_state:deps_names(Deps)),
-    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, S3, Locks, Level),
+    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, S3, Locks, Level+1),
     {AppInfo2, SrcDeps, PkgDeps, Locks++NewLocks, State1}.
 
 -spec maybe_fetch(rebar_app_info:t(), atom(), boolean(),
