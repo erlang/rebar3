@@ -72,7 +72,7 @@ format_error({failed_extract, CachePath}) ->
 format_error({bad_etag, Source}) ->
     io_lib:format("MD5 Checksum comparison failed for: ~s", [Source]);
 format_error({fetch_fail, Source}) ->
-    io_lib:format("Failed to fetch and copy dep: ~s", [Source]);
+    io_lib:format("Failed to fetch and copy dep: ~p", [Source]);
 format_error({bad_checksum, File}) ->
     io_lib:format("Checksum mismatch against tarball in ~s", [File]);
 format_error({bad_registry_checksum, File}) ->
