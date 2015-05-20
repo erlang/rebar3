@@ -51,7 +51,7 @@
                   namespace           = undefined     :: atom(),
 
                   command_args        = [],
-                  command_parsed_args = [],
+                  command_parsed_args = {[], []},
 
                   project_apps        = []          :: [rebar_app_info:t()],
                   deps_to_build       = []          :: [rebar_app_info:t()],
