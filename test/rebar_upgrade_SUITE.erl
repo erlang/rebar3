@@ -369,7 +369,7 @@ upgrades(stable_lock) ->
      [{"A", "2", [{"C", "2", []}]},
       {"B", "2", [{"D", "2", []}]}
      ],
-     ["A","B","C","D"],
+     [],
      %% Run a regular lock and no app should be upgraded
      {"any", [{"A","1"},{"C","1"},{"B","1"},{"D","1"}]}};
 upgrades(fwd_lock) ->

@@ -182,7 +182,7 @@ check_results(AppDir, Expected) ->
 
     lists:foreach(
         fun({app, Name}) ->
-                ct:pal("Name: ~p", [Name]),
+                ct:pal("App Name: ~p", [Name]),
                 case lists:keyfind(Name, 1, DepsNames) of
                     false ->
                         error({app_not_found, Name});
@@ -190,7 +190,7 @@ check_results(AppDir, Expected) ->
                         ok
                 end
         ; ({app, Name, invalid}) ->
-                ct:pal("Name: ~p", [Name]),
+                ct:pal("Invalid Name: ~p", [Name]),
                 case lists:keyfind(Name, 1, InvalidDepsNames) of
                     false ->
                         error({app_not_found, Name});
@@ -198,7 +198,7 @@ check_results(AppDir, Expected) ->
                         ok
                 end
         ; ({app, Name, valid}) ->
-                ct:pal("Name: ~p", [Name]),
+                ct:pal("Valid Name: ~p", [Name]),
                 case lists:keyfind(Name, 1, ValidDepsNames) of
                     false ->
                         error({app_not_found, Name});
@@ -206,13 +206,13 @@ check_results(AppDir, Expected) ->
                         ok
                 end
         ;  ({checkout, Name}) ->
-                ct:pal("Name: ~p", [Name]),
+                ct:pal("Checkout Name: ~p", [Name]),
                 ?assertNotEqual(false, lists:keyfind(Name, 1, CheckoutsNames))
         ;  ({dep, Name}) ->
-                ct:pal("Name: ~p", [Name]),
+                ct:pal("Dep Name: ~p", [Name]),
                 ?assertNotEqual(false, lists:keyfind(Name, 1, DepsNames))
         ;  ({dep, Name, Vsn}) ->
-                ct:pal("Name: ~p, Vsn: ~p", [Name, Vsn]),
+                ct:pal("Dep Name: ~p, Vsn: ~p", [Name, Vsn]),
                 case lists:keyfind(Name, 1, DepsNames) of
                     false ->
                         error({dep_not_found, Name});
@@ -221,10 +221,10 @@ check_results(AppDir, Expected) ->
                                      iolist_to_binary(rebar_app_info:original_vsn(App)))
                 end
         ;  ({plugin, Name}) ->
-                ct:pal("Name: ~p", [Name]),
+                ct:pal("Plugin Name: ~p", [Name]),
                 ?assertNotEqual(false, lists:keyfind(Name, 1, PluginsNames))
         ;  ({plugin, Name, Vsn}) ->
-                ct:pal("Name: ~p, Vsn: ~p", [Name, Vsn]),
+                ct:pal("Plugin Name: ~p, Vsn: ~p", [Name, Vsn]),
                 case lists:keyfind(Name, 1, PluginsNames) of
                     false ->
                         error({plugin_not_found, Name});
@@ -233,10 +233,10 @@ check_results(AppDir, Expected) ->
                                      iolist_to_binary(rebar_app_info:original_vsn(App)))
                 end
         ;  ({global_plugin, Name}) ->
-                ct:pal("Name: ~p", [Name]),
+                ct:pal("Global Plugin Name: ~p", [Name]),
                 ?assertNotEqual(false, lists:keyfind(Name, 1, GlobalPluginsNames))
         ;  ({global_plugin, Name, Vsn}) ->
-                ct:pal("Name: ~p, Vsn: ~p", [Name, Vsn]),
+                ct:pal("Global Plugin Name: ~p, Vsn: ~p", [Name, Vsn]),
                 case lists:keyfind(Name, 1, GlobalPluginsNames) of
                     false ->
                         error({global_plugin_not_found, Name});
@@ -245,10 +245,10 @@ check_results(AppDir, Expected) ->
                                      iolist_to_binary(rebar_app_info:original_vsn(App)))
                 end
         ;  ({lock, Name}) ->
-                ct:pal("Name: ~p", [Name]),
+                ct:pal("Lock Name: ~p", [Name]),
                 ?assertNotEqual(false, lists:keyfind(iolist_to_binary(Name), 1, Locks))
         ;  ({lock, Name, Vsn}) ->
-                ct:pal("Name: ~p, Vsn: ~p", [Name, Vsn]),
+                ct:pal("Lock Name: ~p, Vsn: ~p", [Name, Vsn]),
                 case lists:keyfind(iolist_to_binary(Name), 1, Locks) of
                     false ->
                         error({lock_not_found, Name});
