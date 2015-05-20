@@ -47,6 +47,7 @@
          deprecated/4,
          erl_opts/1,
          indent/1,
+         update_code/1,
          cleanup_code_path/1,
          args_to_tasks/1,
          expand_env_variable/3,
@@ -562,6 +563,23 @@ filter_defines([Opt | Rest], Acc) ->
 -spec indent(non_neg_integer()) -> iolist().
 indent(Amount) when erlang:is_integer(Amount) ->
     [?ONE_LEVEL_INDENT || _ <- lists:seq(1, Amount)].
+
+%% Replace code paths with new paths for existing apps and
+%% purge code of the old modules from those apps.
+update_code(Paths) ->
+    lists:foreach(fun(Path) ->
+                          Name = filename:basename(Path, "/ebin"),
+                          App = list_to_atom(Name),
+                          application:load(App),
+                          case application:get_key(App, modules) of
+                              undefined ->
+                                  code:add_patha(Path),
+                                  ok;
+                              {ok, Modules} ->
+                                  code:replace_path(Name, Path),
+                                  [begin code:purge(M), code:delete(M) end || M <- Modules]
+                          end
+                  end, Paths).
 
 cleanup_code_path(OrigPath) ->
     CurrentPath = code:get_path(),
