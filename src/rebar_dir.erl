@@ -20,7 +20,10 @@
          template_dir/1,
          processing_base_dir/1,
          processing_base_dir/2,
-         make_relative_path/2]).
+         make_relative_path/2,
+         src_dirs/1, src_dirs/2,
+         extra_src_dirs/1, extra_src_dirs/2,
+         all_src_dirs/1, all_src_dirs/3]).
 
 -include("rebar.hrl").
 
@@ -121,3 +124,35 @@ do_make_relative_path([H|T1], [H|T2]) ->
 do_make_relative_path(Source, Target) ->
     Base = lists:duplicate(max(length(Target) - 1, 0), ".."),
     filename:join(Base ++ Source).
+
+-spec src_dirs(rebar_state:t()) -> list(file:filename_all()).
+src_dirs(State) -> src_dirs(State, []).
+
+-spec src_dirs(rebar_state:t(), list(file:filename_all())) -> list(file:filename_all()).
+src_dirs(State, Default) ->
+    ErlOpts = rebar_utils:erl_opts(State),
+    Vs = proplists:get_all_values(src_dirs, ErlOpts),
+    case lists:append(Vs) of
+        []   -> Default;
+        Dirs -> Dirs
+    end.
+
+-spec extra_src_dirs(rebar_state:t()) -> list(file:filename_all()).
+extra_src_dirs(State) -> extra_src_dirs(State, []).
+
+-spec extra_src_dirs(rebar_state:t(), list(file:filename_all())) -> list(file:filename_all()).
+extra_src_dirs(State, Default) ->
+    ErlOpts = rebar_utils:erl_opts(State),
+    Vs = proplists:get_all_values(extra_src_dirs, ErlOpts),
+    case lists:append(Vs) of
+        []   -> Default;
+        Dirs -> Dirs
+    end.
+
+-spec all_src_dirs(rebar_state:t()) -> list(file:filename_all()).
+all_src_dirs(State) -> all_src_dirs(State, [], []).
+
+-spec all_src_dirs(rebar_state:t(), list(file:filename_all()), list(file:filename_all())) ->
+    list(file:filename_all()).
+all_src_dirs(State, SrcDefault, ExtraDefault) ->
+    src_dirs(State, SrcDefault) ++ extra_src_dirs(State, ExtraDefault).
