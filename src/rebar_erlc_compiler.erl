@@ -88,6 +88,11 @@ compile(Config, Dir) ->
 compile(Config, Dir, OutDir) ->
     rebar_base_compiler:run(Config,
                             check_files(rebar_state:get(
+                                          Config, peg_first_files, [])),
+                            filename:join(Dir, "src"), ".peg", filename:join(Dir, "src"), ".erl",
+                            fun compile_peg/3),
+    rebar_base_compiler:run(Config,
+                            check_files(rebar_state:get(
                                           Config, xrl_first_files, [])),
                             filename:join(Dir, "src"), ".xrl", filename:join(Dir, "src"), ".erl",
                             fun compile_xrl/3),
@@ -425,6 +430,22 @@ compile_mib(Source, Target, Config) ->
             ok;
         {error, compilation_failed} ->
             ?FAIL
+    end.
+
+-spec compile_peg(file:filename(), file:filename(),
+                  rebar_state:t()) -> 'ok'.
+compile_peg(Source, Target, Config) ->
+    Opts = rebar_state:get(Config, peg_opts, []),
+    case needs_compile(Source, Target) of
+        true ->
+            try
+                neotoma:file(Source, Opts)
+            catch
+                exit:Error ->
+                    {error, Error}
+            end;
+        false ->
+            skipped
     end.
 
 -spec compile_xrl(file:filename(), file:filename(),
