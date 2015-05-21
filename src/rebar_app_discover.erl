@@ -7,6 +7,7 @@
          find_apps/2,
          find_app/2]).
 
+-include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
 do(State, LibDirs) ->
@@ -19,13 +20,19 @@ do(State, LibDirs) ->
     %% Sort apps so we get the same merged deps config everytime
     SortedApps = rebar_utils:sort_deps(Apps),
     lists:foldl(fun(AppInfo, StateAcc) ->
-                        {AppInfo1, StateAcc1} = merge_deps(AppInfo, StateAcc),
-                        Name = rebar_app_info:name(AppInfo),
-                        OutDir = filename:join(DepsDir, Name),
-                        AppInfo2 = rebar_app_info:out_dir(AppInfo1, OutDir),
-                        ProjectDeps1 = lists:delete(Name, ProjectDeps),
-                        rebar_state:project_apps(StateAcc1
-                                                ,rebar_app_info:deps(AppInfo2, ProjectDeps1))
+			Name = rebar_app_info:name(AppInfo),
+			case enable(State, AppInfo) of
+			    true ->
+				{AppInfo1, StateAcc1} = merge_deps(AppInfo, StateAcc),
+				OutDir = filename:join(DepsDir, Name),
+				AppInfo2 = rebar_app_info:out_dir(AppInfo1, OutDir),
+				ProjectDeps1 = lists:delete(Name, ProjectDeps),
+				rebar_state:project_apps(StateAcc1
+		 					,rebar_app_info:deps(AppInfo2, ProjectDeps1));
+			    false ->
+				?INFO("Ignoring ~s", [Name]),
+				StateAcc
+			end
                 end, State, SortedApps).
 
 format_error({module_list, File}) ->
@@ -206,3 +213,7 @@ dedup([]) -> [];
 dedup([A]) -> [A];
 dedup([H,H|T]) -> dedup([H|T]);
 dedup([H|T]) -> [H|dedup(T)].
+
+enable(State, AppInfo) ->
+    not lists:member(rebar_app_info:name(AppInfo), 
+		     rebar_state:get(excluded_apps, State, [])).
