@@ -202,20 +202,25 @@ update_pkg_deps(Profile, Packages, PkgDeps, Graph, Upgrade, Seen, State, Locks) 
             update_pkg_deps(Profile, S, Packages, Upgrade, Seen, State, Locks)
     end.
 
+pkg_locked({Name, _, _}, Locks) ->
+    pkg_locked(Name, Locks);
 pkg_locked({Name, _}, Locks) ->
+    pkg_locked(Name, Locks);
+pkg_locked(Name, Locks) ->
     false =/= lists:keyfind(Name, 1, Locks).
 
-update_pkg_deps(Profile, Pkgs, Packages, Upgrade, Seen, State, _Locks) ->
+update_pkg_deps(Profile, Pkgs, Packages, Upgrade, Seen, State, Locks) ->
     %% Create app_info record for each pkg dep
     DepsDir = profile_dep_dir(State, Profile),
     {Solved, _, State1}
         = lists:foldl(fun(Pkg, {Acc, SeenAcc, StateAcc}) ->
-                        handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Acc, SeenAcc, StateAcc)
+                        handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Acc, SeenAcc, Locks, StateAcc)
                       end, {[], Seen, State}, Pkgs),
     {Solved, State1}.
 
-handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Fetched, Seen, State) ->
-    AppInfo = package_to_app(DepsDir, Packages, Pkg, State),
+handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Fetched, Seen, Locks, State) ->
+    IsLock = pkg_locked(Pkg, Locks),
+    AppInfo = package_to_app(DepsDir, Packages, Pkg, IsLock, State),
     Level = rebar_app_info:dep_level(AppInfo),
     {NewSeen, NewState} = maybe_lock(Profile, AppInfo, Seen, State, Level),
     {_, AppInfo1} = maybe_fetch(AppInfo, Profile, Upgrade, Seen, NewState),
@@ -247,7 +252,7 @@ maybe_lock(Profile, AppInfo, Seen, State, Level) ->
             {Seen, State}
     end.
 
-package_to_app(DepsDir, Packages, {Name, Vsn, Level}, State) ->
+package_to_app(DepsDir, Packages, {Name, Vsn, Level}, IsLock, State) ->
     case dict:find({Name, Vsn}, Packages) of
         error ->
             case rebar_packages:check_registry(Name, Vsn, State) of
@@ -263,7 +268,8 @@ package_to_app(DepsDir, Packages, {Name, Vsn, Level}, State) ->
             AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
             AppInfo2 = rebar_app_info:dir(AppInfo1, filename:join([DepsDir, Name])),
             AppInfo3 = rebar_app_info:dep_level(AppInfo2, Level),
-            rebar_app_info:source(AppInfo3, {pkg, Name, Vsn})
+            AppInfo4 = rebar_app_info:is_lock(AppInfo3, IsLock),
+            rebar_app_info:source(AppInfo4, {pkg, Name, Vsn})
     end.
 
 -spec update_src_deps(atom(), non_neg_integer(), list(), list(), list(), rebar_state:t(), boolean(), sets:set(binary()), list()) -> {rebar_state:t(), list(), list(), sets:set(binary())}.
@@ -476,69 +482,69 @@ parse_deps(DepsDir, Deps, State, Locks, Level) ->
                                end,
                         case lists:keyfind(ec_cnv:to_binary(Name), 1, Locks) of
                             false ->
-                                parse_dep(Dep, Acc, DepsDir, State);
+                                parse_dep(Dep, Acc, DepsDir, false, State);
                             LockedDep ->
                                 LockedLevel = element(3, LockedDep),
                                 case LockedLevel > Level of
                                     true ->
-                                        parse_dep(Dep, Acc, DepsDir, State);
+                                        parse_dep(Dep, Acc, DepsDir, false, State);
                                     false ->
-                                        parse_dep(LockedDep, Acc, DepsDir, State)
+                                        parse_dep(LockedDep, Acc, DepsDir, true, State)
                                 end
                         end
                 end, {[], []}, Deps).
 
-parse_dep({Name, Vsn}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_list(Vsn) ->
+parse_dep({Name, Vsn}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is_list(Vsn) ->
     CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
     case rebar_app_info:discover(CheckoutsDir) of
         {ok, _App} ->
-            Dep = new_dep(DepsDir, Name, [], [], State),
+            Dep = new_dep(DepsDir, Name, [], [], IsLock, State),
             {[Dep | SrcDepsAcc], PkgDepsAcc};
         not_found ->
             {SrcDepsAcc, [parse_goal(ec_cnv:to_binary(Name)
                                     ,ec_cnv:to_binary(Vsn)) | PkgDepsAcc]}
     end;
-parse_dep(Name, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_atom(Name) ->
+parse_dep(Name, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is_atom(Name) ->
     {PkgName, PkgVsn} = get_package(ec_cnv:to_binary(Name), State),
     CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
     case rebar_app_info:discover(CheckoutsDir) of
         {ok, _App} ->
-            Dep = new_dep(DepsDir, Name, [], [], State),
+            Dep = new_dep(DepsDir, Name, [], [], IsLock, State),
             {[Dep | SrcDepsAcc], PkgDepsAcc};
         not_found ->
             {SrcDepsAcc, [{PkgName, PkgVsn} | PkgDepsAcc]}
     end;
-parse_dep({Name, Source}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_tuple(Source) ->
-    Dep = new_dep(DepsDir, Name, [], Source, State),
+parse_dep({Name, Source}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is_tuple(Source) ->
+    Dep = new_dep(DepsDir, Name, [], Source, IsLock, State),
     {[Dep | SrcDepsAcc], PkgDepsAcc};
-parse_dep({Name, Source}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_tuple(Source) ->
-    Dep = new_dep(DepsDir, Name, [], Source, State),
+parse_dep({Name, Source}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is_tuple(Source) ->
+    Dep = new_dep(DepsDir, Name, [], Source, IsLock, State),
     {[Dep | SrcDepsAcc], PkgDepsAcc};
-parse_dep({Name, _Vsn, Source}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_tuple(Source) ->
-    Dep = new_dep(DepsDir, Name, [], Source, State),
+parse_dep({Name, _Vsn, Source}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is_tuple(Source) ->
+    Dep = new_dep(DepsDir, Name, [], Source, IsLock, State),
     {[Dep | SrcDepsAcc], PkgDepsAcc};
-parse_dep({Name, _Vsn, Source, Opts}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_tuple(Source) ->
+parse_dep({Name, _Vsn, Source, Opts}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is_tuple(Source) ->
     ?WARN("Dependency option list ~p in ~p is not supported and will be ignored", [Opts, Name]),
-    Dep = new_dep(DepsDir, Name, [], Source, State),
+    Dep = new_dep(DepsDir, Name, [], Source, IsLock, State),
     {[Dep | SrcDepsAcc], PkgDepsAcc};
-parse_dep({_Name, {pkg, Name, Vsn}, Level}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_integer(Level) ->
+parse_dep({_Name, {pkg, Name, Vsn}, Level}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is_integer(Level) ->
     CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
     case rebar_app_info:discover(CheckoutsDir) of
         {ok, _App} ->
-            Dep = new_dep(DepsDir, Name, [], [], State),
+            Dep = new_dep(DepsDir, Name, [], [], IsLock, State),
             {[Dep | SrcDepsAcc], PkgDepsAcc};
         not_found ->
             {SrcDepsAcc, [{Name, Vsn} | PkgDepsAcc]}
     end;
-parse_dep({Name, Source, Level}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, State) when is_tuple(Source)
+parse_dep({Name, Source, Level}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is_tuple(Source)
                                                                               , is_integer(Level) ->
-    Dep = new_dep(DepsDir, Name, [], Source, State),
+    Dep = new_dep(DepsDir, Name, [], Source, IsLock, State),
     {[Dep | SrcDepsAcc], PkgDepsAcc};
-parse_dep(Dep, _, _, _) ->
+parse_dep(Dep, _, _, _, _) ->
     throw(?PRV_ERROR({parse_dep, Dep})).
 
 
-new_dep(DepsDir, Name, Vsn, Source, State) ->
+new_dep(DepsDir, Name, Vsn, Source, IsLock, State) ->
     CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
     {ok, Dep} = case rebar_app_info:discover(CheckoutsDir) of
                     {ok, App} ->
@@ -559,7 +565,7 @@ new_dep(DepsDir, Name, Vsn, Source, State) ->
     ParentOverrides = rebar_state:overrides(State),
     Dep1 = rebar_app_info:state(Dep,
                                rebar_state:overrides(S, ParentOverrides++Overrides)),
-    rebar_app_info:source(Dep1, Source).
+    rebar_app_info:is_lock(rebar_app_info:source(Dep1, Source), IsLock).
 
 fetch_app(AppInfo, AppDir, State) ->
     ?INFO("Fetching ~s (~p)", [rebar_app_info:name(AppInfo), rebar_app_info:source(AppInfo)]),
@@ -582,23 +588,28 @@ update_app_info(AppInfo) ->
 
 maybe_upgrade(AppInfo, AppDir, Upgrade, State) ->
     Source = rebar_app_info:source(AppInfo),
-    case rebar_fetch:needs_update(AppDir, Source, State) of
+    case Upgrade orelse rebar_app_info:is_lock(AppInfo) of
         true ->
-            ?INFO("Upgrading ~s", [rebar_app_info:name(AppInfo)]),
-            case rebar_fetch:download_source(AppDir, Source, State) of
+            case rebar_fetch:needs_update(AppDir, Source, State) of
                 true ->
-                    true;
-                Error ->
-                    throw(Error)
+                    ?INFO("Upgrading ~s", [rebar_app_info:name(AppInfo)]),
+                    case rebar_fetch:download_source(AppDir, Source, State) of
+                        true ->
+                            true;
+                        Error ->
+                            throw(Error)
+                    end;
+                false ->
+                    case Upgrade of
+                        true ->
+                            ?INFO("No upgrade needed for ~s", [rebar_app_info:name(AppInfo)]),
+                            false;
+                        false ->
+                            false
+                    end
             end;
         false ->
-            case Upgrade of
-                true ->
-                    ?INFO("No upgrade needed for ~s", [rebar_app_info:name(AppInfo)]),
-                    false;
-                false ->
-                    false
-            end
+            false
     end.
 
 -spec parse_goal(binary(), binary()) -> pkg_dep().
