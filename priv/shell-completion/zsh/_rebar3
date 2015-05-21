@@ -72,6 +72,9 @@ _rebar3 () {
                         '(-v --verbose)'{-v,--verbose}'[Print coverage analysis]' \
                     && ret=0
                 ;;
+                (deps)
+                    _message 'no more arguments' && ret=0
+                ;;
                 (dialyzer)
                     _arguments \
                         '(-u --update-plt)'{-u, --update-plt}'[Enable updating the PLT.]' \
@@ -100,7 +103,7 @@ _rebar3 () {
                 ;;
                 (new)
                     _arguments \
-                        '1:type:(app lib release plugin)' \
+                        '1:type:(app cmake escript lib plugin release)' \
                         '2:name:' \
                         '(-f --force)'{-f,--force}'[ overwrite existing files]' \
                     && ret=0
@@ -160,6 +163,11 @@ _rebar3 () {
                         '(-r --root)'{-r,--root}'[The project root directory]:system libs:_files -/' \
                     && ret=0
                 ;;
+                (unlock)
+                    _arguments \
+                        '*: :_rebar3_list_deps' \
+                    && ret=0
+                ;;
                 (update)
                     _message 'rebar update' && ret=0
                 ;;
@@ -185,6 +193,7 @@ _rebar3_tasks() {
         'compile:Compile apps .app.src and .erl files.'
         'cover:Perform coverage analysis.'
         'ct:Run Common Tests.'
+        'deps:List dependencies.'
         'dialyzer:Run the Dialyzer analyzer on the project.'
         'do:Higher order provider for running multiple tasks in a sequence.'
         'edoc:Generate documentation using edoc.'
@@ -197,6 +206,7 @@ _rebar3_tasks() {
         'report:Provide a crash report to be sent to the rebar3 issues page.'
         'shell:Run shell with project apps and deps in path.'
         'tar:Tar archive of release built of project.'
+        'unlock:Unlock dependencies..'
         'update:Update package index.'
         'upgrade:Upgrade dependencies.'
         'version:Print version for rebar and current Erlang.'

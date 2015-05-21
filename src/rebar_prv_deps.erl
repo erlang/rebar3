@@ -18,7 +18,7 @@ init(State) ->
             providers:create([
                     {name, ?PROVIDER},
                     {module, ?MODULE},
-                    {bare, true},
+                    {bare, false},
                     {deps, ?DEPS},
                     {example, "rebar3 deps"},
                     {short_desc, "List dependencies"},
