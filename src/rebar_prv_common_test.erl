@@ -368,8 +368,11 @@ sub_dirs(Path) ->
 replace_src_dirs(State, Dirs) ->
     %% replace any `src_dirs` with the test dirs
     ErlOpts = rebar_state:get(State, erl_opts, []),
-    StrippedOpts = lists:keydelete(src_dirs, 1, ErlOpts),
-    rebar_state:set(State, erl_opts, [{src_dirs, Dirs}|StrippedOpts]).
+    StrippedOpts = filter_src_dirs(ErlOpts),
+    rebar_state:set(State, erl_opts, [{extra_src_dirs, Dirs}|StrippedOpts]).
+
+filter_src_dirs(ErlOpts) ->
+    lists:filter(fun({src_dirs, _}) -> false; ({extra_src_dirs, _}) -> false; (_) -> true end, ErlOpts).
 
 test_dirs(State, Opts) ->
     BareTest = filename:join([rebar_state:dir(State), "test"]),
