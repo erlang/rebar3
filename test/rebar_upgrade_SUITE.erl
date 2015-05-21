@@ -10,7 +10,7 @@ groups() ->
                 pair_a, pair_b, pair_ab, pair_c, pair_all,
                 triplet_a, triplet_b, triplet_c,
                 tree_a, tree_b, tree_c, tree_c2, tree_ac, tree_all,
-                delete_d, promote]},
+                delete_d, promote, stable_lock, fwd_lock]},
      {git, [], [{group, all}]},
      {pkg, [], [{group, all}]}].
 
@@ -361,7 +361,30 @@ upgrades(promote) ->
       {"C", "3", []}
      ],
      ["A","B","C","D"],
-     {"C", [{"A","1"},{"C","3"},{"B","1"},{"D","1"}]}}.
+     {"C", [{"A","1"},{"C","3"},{"B","1"},{"D","1"}]}};
+upgrades(stable_lock) ->
+    {[{"A", "1", [{"C", "1", []}]},
+      {"B", "1", [{"D", "1", []}]}
+     ], % lock after this
+     [{"A", "2", [{"C", "2", []}]},
+      {"B", "2", [{"D", "2", []}]}
+     ],
+     [],
+     %% Run a regular lock and no app should be upgraded
+     {"any", [{"A","1"},{"C","1"},{"B","1"},{"D","1"}]}};
+upgrades(fwd_lock) ->
+    {[{"A", "1", [{"C", "1", []}]},
+      {"B", "1", [{"D", "1", []}]}
+     ],
+     [{"A", "2", [{"C", "2", []}]},
+      {"B", "2", [{"D", "2", []}]}
+     ],
+     ["A","B","C","D"],
+     %% For this one, we should build, rewrite the lock
+     %% file to include the result post-upgrade, and then
+     %% run a regular lock to see that the lock file is respected
+     %% in deps.
+     {"any", [{"A","2"},{"C","2"},{"B","2"},{"D","2"}]}}.
 
 %% TODO: add a test that verifies that unlocking files and then
 %% running the upgrade code is enough to properly upgrade things.
@@ -435,6 +458,46 @@ delete_d(Config) ->
     ?assertNotEqual([],
                     [1 || {"App ~ts is no longer needed and can be deleted.",
                            [<<"D">>]} <- Infos]).
+
+stable_lock(Config) ->
+    apply(?config(mock, Config), []),
+    {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
+    %% Install dependencies before re-mocking for an upgrade
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["lock"], {ok, []}),
+    {App, Unlocks} = ?config(expected, Config),
+    ct:pal("Upgrades: ~p -> ~p", [App, Unlocks]),
+    Expectation = case Unlocks of
+        {error, Term} -> {error, Term};
+        _ -> {ok, Unlocks}
+    end,
+    apply(?config(mock_update, Config), []),
+    NewRebarConf = rebar_test_utils:create_config(?config(apps, Config),
+                                                  [{deps, ?config(next_top_deps, Config)}]),
+    {ok, NewRebarConfig} = file:consult(NewRebarConf),
+    rebar_test_utils:run_and_check(
+        Config, NewRebarConfig, ["lock", App], Expectation
+    ).
+
+fwd_lock(Config) ->
+    apply(?config(mock, Config), []),
+    {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
+    %% Install dependencies before re-mocking for an upgrade
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["lock"], {ok, []}),
+    {App, Unlocks} = ?config(expected, Config),
+    ct:pal("Upgrades: ~p -> ~p", [App, Unlocks]),
+    Expectation = case Unlocks of
+        {error, Term} -> {error, Term};
+        _ -> {ok, Unlocks}
+    end,
+    rewrite_locks(Expectation, Config),
+    apply(?config(mock_update, Config), []),
+    NewRebarConf = rebar_test_utils:create_config(?config(apps, Config),
+                                                  [{deps, ?config(next_top_deps, Config)}]),
+    {ok, NewRebarConfig} = file:consult(NewRebarConf),
+    rebar_test_utils:run_and_check(
+        Config, NewRebarConfig, ["lock", App], Expectation
+    ).
+
 run(Config) ->
     apply(?config(mock, Config), []),
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
@@ -453,3 +516,20 @@ run(Config) ->
     rebar_test_utils:run_and_check(
         Config, NewRebarConfig, ["upgrade", App], Expectation
     ).
+
+rewrite_locks({ok, Expectations}, Config) ->
+    AppDir = ?config(apps, Config),
+    LockFile = filename:join([AppDir, "rebar.lock"]),
+    {ok, [Locks]} = file:consult(LockFile),
+    ExpLocks = [{list_to_binary(Name), Vsn}
+               || {lock, Name, Vsn} <- Expectations],
+    NewLocks = lists:foldl(
+        fun({App, {pkg, Name, _}, Lvl}, Acc) ->
+                Vsn = list_to_binary(proplists:get_value(App,ExpLocks)),
+                [{App, {pkg, Name, Vsn}, Lvl} | Acc]
+        ;  ({App, {git, URL, {ref, _}}, Lvl}, Acc) ->
+                Vsn = proplists:get_value(App,ExpLocks),
+                [{App, {git, URL, {ref, Vsn}}, Lvl} | Acc]
+        end, [], Locks),
+    ct:pal("rewriting locks from ~p to~n~p", [Locks, NewLocks]),
+    file:write_file(LockFile, io_lib:format("~p.~n", [NewLocks])).

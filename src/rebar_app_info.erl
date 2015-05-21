@@ -34,6 +34,8 @@
          source/2,
          state/1,
          state/2,
+         is_lock/1,
+         is_lock/2,
          is_checkout/1,
          is_checkout/2,
          valid/1,
@@ -41,22 +43,23 @@
 
 -export_type([t/0]).
 
--record(app_info_t, {name :: binary(),
-                     app_file_src :: file:filename_all() | undefined,
-                     app_file :: file:filename_all() | undefined,
-                     config :: rebar_state:t() | undefined,
-                     original_vsn :: binary() | string() | undefined,
-                     app_details=[] :: list(),
-                     applications=[] :: list(),
-                     deps=[] :: list(),
+-record(app_info_t, {name               :: binary(),
+                     app_file_src       :: file:filename_all() | undefined,
+                     app_file           :: file:filename_all() | undefined,
+                     config             :: rebar_state:t() | undefined,
+                     original_vsn       :: binary() | string() | undefined,
+                     app_details=[]     :: list(),
+                     applications=[]    :: list(),
+                     deps=[]            :: list(),
                      profiles=[default] :: [atom()],
-                     dep_level=0 :: integer(),
-                     dir :: file:name(),
-                     out_dir :: file:name(),
-                     source :: string() | tuple() | undefined,
-                     state :: rebar_state:t() | undefined,
-                     is_checkout=false :: boolean(),
-                     valid :: boolean()}).
+                     dep_level=0        :: integer(),
+                     dir                :: file:name(),
+                     out_dir            :: file:name(),
+                     source             :: string() | tuple() | undefined,
+                     state              :: rebar_state:t() | undefined,
+                     is_lock=false      :: boolean(),
+                     is_checkout=false  :: boolean(),
+                     valid              :: boolean()}).
 
 %%============================================================================
 %% types
@@ -253,6 +256,14 @@ state(AppInfo=#app_info_t{}, State) ->
 -spec state(t()) -> rebar_state:t() | undefined.
 state(#app_info_t{state=State}) ->
     State.
+
+-spec is_lock(t(), boolean()) -> t().
+is_lock(AppInfo=#app_info_t{}, IsLock) ->
+    AppInfo#app_info_t{is_lock=IsLock}.
+
+-spec is_lock(t()) -> boolean().
+is_lock(#app_info_t{is_lock=IsLock}) ->
+    IsLock.
 
 -spec is_checkout(t(), boolean()) -> t().
 is_checkout(AppInfo=#app_info_t{}, IsCheckout) ->
