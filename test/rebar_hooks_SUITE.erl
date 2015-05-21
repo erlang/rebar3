@@ -5,7 +5,8 @@
          end_per_suite/1,
          init_per_testcase/2,
          all/0,
-         build_and_clean_app/1]).
+         build_and_clean_app/1,
+         run_hooks_once/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -24,7 +25,7 @@ init_per_testcase(_, Config) ->
     rebar_test_utils:init_rebar_state(Config).
 
 all() ->
-    [build_and_clean_app].
+    [build_and_clean_app, run_hooks_once].
 
 %% Test post provider hook cleans compiled project app, leaving it invalid
 build_and_clean_app(Config) ->
@@ -36,3 +37,13 @@ build_and_clean_app(Config) ->
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name, valid}]}),
     rebar_test_utils:run_and_check(Config, [{provider_hooks, [{post, [{compile, clean}]}]}],
                                   ["compile"], {ok, [{app, Name, invalid}]}).
+
+run_hooks_once(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    RebarConfig = [{pre_hooks, [{compile, "mkdir blah"}]}],
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name, valid}]}).

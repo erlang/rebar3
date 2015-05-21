@@ -65,10 +65,10 @@ project_app_config(AppInfo, State) ->
 %% Here we check if the app is at the root of the project.
 %% If it is, then drop the hooks from the config so they aren't run twice
 maybe_reset_hooks(C, Dir, State) ->
-    case filename:dirname(rebar_dir:root_dir(State)) of
+    case ec_file:real_dir_path(rebar_dir:root_dir(State)) of
         Dir ->
             C1 = proplists:delete(provider_hooks, C),
-            proplists:delete(hooks, C1);
+            proplists:delete(post_hooks, proplists:delete(pre_hooks, C1));
         _ ->
             C
     end.

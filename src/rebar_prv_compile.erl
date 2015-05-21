@@ -37,7 +37,7 @@ do(State) ->
     ProjectApps = rebar_state:project_apps(State),
     Providers = rebar_state:providers(State),
     Deps = rebar_state:deps_to_build(State),
-    Cwd = rebar_dir:get_cwd(),
+    Cwd = rebar_state:dir(State),
 
     %% Need to allow global config vars used on deps
     %% Right now no way to differeniate and just give deps a new state
