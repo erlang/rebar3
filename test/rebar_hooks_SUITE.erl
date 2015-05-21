@@ -4,9 +4,11 @@
          init_per_suite/1,
          end_per_suite/1,
          init_per_testcase/2,
+         end_per_testcase/2,
          all/0,
          build_and_clean_app/1,
          run_hooks_once/1,
+         run_hooks_for_plugins/1,
          deps_hook_namespace/1]).
 
 -include_lib("common_test/include/ct.hrl").
@@ -25,9 +27,12 @@ end_per_suite(_Config) ->
 init_per_testcase(_, Config) ->
     rebar_test_utils:init_rebar_state(Config).
 
+end_per_testcase(_, _Config) ->
+    catch meck:unload().
+
 all() ->
     [build_and_clean_app, run_hooks_once,
-    deps_hook_namespace].
+     run_hooks_for_plugins, deps_hook_namespace].
 
 %% Test post provider hook cleans compiled project app, leaving it invalid
 build_and_clean_app(Config) ->
@@ -71,3 +76,26 @@ deps_hook_namespace(Config) ->
         Config, RebarConfig, ["compile"],
         {ok, [{dep, "some_dep"}]}
     ).
+
+run_hooks_for_plugins(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    PluginName = rebar_test_utils:create_random_name("plugin1_"),
+    mock_git_resource:mock([{config, [{pre_hooks, [{compile, "touch randomfile"}]}]}]),
+
+    RConfFile = rebar_test_utils:create_config(AppDir,
+                                               [{plugins, [
+                                                          {list_to_atom(PluginName),
+                                                          {git, "http://site.com/user/"++PluginName++".git",
+                                                          {tag, Vsn}}}
+                                                          ]}]),
+    {ok, RConf} = file:consult(RConfFile),
+
+    rebar_test_utils:run_and_check(Config, RConf, ["compile"], {ok, [{app, Name, valid},
+                                                                     {plugin, PluginName},
+                                                                     {file, filename:join([AppDir, "_build", "default", "plugins", PluginName, "randomfile"])}]}).
