@@ -27,6 +27,7 @@ _rebar3()
             report \
             shell \
             tar \
+            unlock \
             update \
             upgrade \
             version \
