@@ -56,7 +56,7 @@ main(Args) ->
 
 %% Erlang-API entry point
 run(BaseState, Commands) ->
-    _ = application:load(rebar),
+    start_and_load_apps(),
     BaseState1 = rebar_state:set(BaseState, task, Commands),
     BaseState2 = rebar_state:set(BaseState1, caller, api),
     run_aux(BaseState2, Commands).
@@ -66,7 +66,7 @@ run(BaseState, Commands) ->
 %% ====================================================================
 
 run(RawArgs) ->
-    _ = application:load(rebar),
+    start_and_load_apps(),
 
     BaseState = init_config(),
     BaseState1 = rebar_state:set(BaseState, caller, command_line),
@@ -83,16 +83,6 @@ run(RawArgs) ->
     run_aux(BaseState2, RawArgs).
 
 run_aux(State, RawArgs) ->
-    %% Make sure crypto is running
-    case crypto:start() of
-        ok -> ok;
-        {error,{already_started,crypto}} -> ok
-    end,
-    application:start(asn1),
-    application:start(public_key),
-    application:start(ssl),
-    inets:start(),
-
     State2 = case os:getenv("REBAR_PROFILE") of
                  false ->
                      State;
@@ -266,3 +256,15 @@ handle_error(Error) ->
     ?DEBUG("Uncaught error: ~p", [Error]),
     ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []),
     erlang:halt(1).
+
+start_and_load_apps() ->
+    _ = application:load(rebar),
+    %% Make sure crypto is running
+    case crypto:start() of
+        ok -> ok;
+        {error,{already_started,crypto}} -> ok
+    end,
+    application:start(asn1),
+    application:start(public_key),
+    application:start(ssl),
+    inets:start().
