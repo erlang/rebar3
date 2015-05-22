@@ -167,12 +167,7 @@ app_details(AppInfo=#app_info_t{app_details=[]}) ->
                   File ->
                       File
               end,
-    case file:consult(AppFile) of
-        {ok, [{application, _, AppDetails}]} ->
-            AppDetails;
-        _ ->
-            []
-    end;
+    rebar_file_utils:try_consult(AppFile);
 app_details(#app_info_t{app_details=AppDetails}) ->
     AppDetails.
 

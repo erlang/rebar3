@@ -136,20 +136,18 @@ reread_config(State) ->
     case find_config(State) of
         no_config ->
             ok;
-        {ok, ConfigList} ->
+        ConfigList ->
             lists:foreach(fun ({Application, Items}) ->
                                   lists:foreach(fun ({Key, Val}) ->
                                                         application:set_env(Application, Key, Val)
                                                 end,
                                                 Items)
                           end,
-                          ConfigList);
-        {error, Error} ->
-            ?ABORT("Error while attempting to read configuration file: ~p", [Error])
+                          ConfigList)
     end.
 
 % First try the --config flag, then try the relx sys_config
--spec find_config(rebar_state:t()) -> {ok, [tuple()]}|no_config|{error, tuple()}.
+-spec find_config(rebar_state:t()) -> [tuple()] | no_config.
 find_config(State) ->
     case find_config_option(State) of
         no_config ->
@@ -158,7 +156,7 @@ find_config(State) ->
             Result
     end.
 
--spec find_config_option(rebar_state:t()) -> {ok, [tuple()]}|no_config|{error, tuple()}.
+-spec find_config_option(rebar_state:t()) -> [tuple()] | no_config.
 find_config_option(State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
     case proplists:get_value(config, Opts) of
@@ -168,7 +166,7 @@ find_config_option(State) ->
             consult_config(State, Filename)
     end.
 
--spec find_config_relx(rebar_state:t()) -> {ok, [tuple()]}|no_config|{error, tuple()}.
+-spec find_config_relx(rebar_state:t()) -> [tuple()] | no_config.
 find_config_relx(State) ->
     case proplists:get_value(sys_config, rebar_state:get(State, relx, [])) of
         undefined ->
@@ -181,11 +179,4 @@ find_config_relx(State) ->
 consult_config(State, Filename) ->
     Fullpath = filename:join(rebar_dir:root_dir(State), Filename),
     ?DEBUG("Loading configuration from ~p", [Fullpath]),
-    case file:consult(Fullpath) of
-        {ok, [Config]} ->
-            {ok, Config};
-        {ok, []} ->
-            {ok, []};
-        {error, Error} ->
-            {error, {Error, Fullpath}}
-    end.
+    rebar_file_utils:try_consult(Fullpath).

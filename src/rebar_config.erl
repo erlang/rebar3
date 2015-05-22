@@ -57,7 +57,7 @@ consult_file(File) ->
                     {ok, Terms} = consult_and_eval(File, Script),
                     Terms;
                 false ->
-                    try_consult(File)
+                    rebar_file_utils:try_consult(File)
             end
     end.
 
@@ -87,21 +87,11 @@ format_error({bad_dep_name, Dep}) ->
 
 consult_and_eval(File, Script) ->
     ?DEBUG("Evaluating config script ~p", [Script]),
-    StateData = try_consult(File),
+    StateData = rebar_file_utils:try_consult(File),
     file:script(Script, bs([{'CONFIG', StateData}, {'SCRIPT', Script}])).
 
 remove_script_ext(F) ->
     filename:rootname(F, ".script").
-
-try_consult(File) ->
-    case file:consult(File) of
-        {ok, Terms} ->
-            Terms;
-        {error, enoent} ->
-            [];
-        {error, Reason} ->
-            ?ABORT("Failed to read config file ~s:~n ~p", [File, Reason])
-    end.
 
 bs(Vars) ->
     lists:foldl(fun({K,V}, Bs) ->

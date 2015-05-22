@@ -26,7 +26,9 @@
 %% -------------------------------------------------------------------
 -module(rebar_file_utils).
 
--export([symlink_or_copy/2,
+-export([try_consult/1,
+         format_error/1,
+         symlink_or_copy/2,
          rm_rf/1,
          cp_r/2,
          mv/2,
@@ -37,10 +39,24 @@
          reset_dir/1]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 %% ===================================================================
 %% Public API
 %% ===================================================================
+
+try_consult(File) ->
+    case file:consult(File) of
+        {ok, Terms} ->
+            Terms;
+        {error, enoent} ->
+            [];
+        {error, Reason} ->
+            throw(?PRV_ERROR({bad_term_file, File, Reason}))
+    end.
+
+format_error({bad_term_file, AppFile, Reason}) ->
+    io_lib:format("Error reading file ~s: ~s", [AppFile, file:format_error(Reason)]).
 
 symlink_or_copy(Source, Target) ->
     Link = case os:type() of
