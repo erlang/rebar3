@@ -99,7 +99,7 @@ new(ParentState=#state_t{}, Config) ->
 -spec new(t(), list(), file:name()) -> t().
 new(ParentState, Config, Dir) ->
     Opts = ParentState#state_t.opts,
-    LocalOpts = case rebar_config:consult_file(filename:join(Dir, ?LOCK_FILE)) of
+    LocalOpts = case rebar_config:consult_file(filename:join(Dir, ?LOCK_FILE), [raw]) of
                     [D] ->
                         %% We want the top level deps only from the lock file.
                         %% This ensures deterministic overrides for configs.
@@ -110,7 +110,7 @@ new(ParentState, Config, Dir) ->
                         dict:from_list([{{deps, default}, D} | Config])
                 end,
 
-    NewOpts = merge_opts(LocalOpts, Opts),
+    NewOpts = rebar_config:merge_opts(LocalOpts, Opts),
 
     ParentState#state_t{dir=Dir
                        ,opts=NewOpts
@@ -268,7 +268,7 @@ do_deduplicate([Head | Rest], Acc) ->
     end.
 
 merge_opts(Profile, NewOpts, OldOpts) ->
-    Opts = merge_opts(NewOpts, OldOpts),
+    Opts = rebar_config:merge_opts(NewOpts, OldOpts),
 
     case dict:find(deps, NewOpts) of
         {ok, Value} ->
@@ -276,32 +276,6 @@ merge_opts(Profile, NewOpts, OldOpts) ->
         error ->
             Opts
     end.
-
-merge_opts(NewOpts, OldOpts) ->
-    dict:merge(fun(deps, NewValue, _OldValue) ->
-                       NewValue;
-                  ({deps, _}, NewValue, _OldValue) ->
-                       NewValue;
-                  (profiles, NewValue, OldValue) ->
-                       dict:to_list(merge_opts(dict:from_list(NewValue), dict:from_list(OldValue)));
-                  (_Key, NewValue, OldValue) when is_list(NewValue) ->
-                       case io_lib:printable_list(NewValue) of
-                           true when NewValue =:= [] ->
-                               case io_lib:printable_list(OldValue) of
-                                   true ->
-                                       NewValue;
-                                   false ->
-                                       OldValue
-                               end;
-                           true ->
-                               NewValue;
-                           false ->
-                               rebar_utils:tup_umerge(rebar_utils:tup_sort(NewValue)
-                                                     ,rebar_utils:tup_sort(OldValue))
-                       end;
-                  (_Key, NewValue, _OldValue) ->
-                       NewValue
-               end, NewOpts, OldOpts).
 
 dir(#state_t{dir=Dir}) ->
     Dir.

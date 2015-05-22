@@ -203,7 +203,7 @@ consult_app_file(Filename) ->
                 false ->
                     file:consult(Filename);
                 true ->
-                    {ok, rebar_config:consult_file(Filename)}
+                    {ok, rebar_config:consult_file(Filename, [raw])}
             end
     end.
 

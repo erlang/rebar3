@@ -27,10 +27,17 @@
 -module(rebar_config).
 
 -export([consult/1
+        ,consult/2
         ,consult_file/1
+        ,consult_file/2
         ,format_error/1
 
-        ,merge_locks/2]).
+        ,merge_locks/2
+        ,merge_opts/2]).
+
+-export_type([
+    consult_opt/0
+]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
@@ -39,26 +46,44 @@
 %% Public API
 %% ===================================================================
 
+-type consult_opt()     :: raw.
+-type consult_opts()    :: [ consult_opt() ].
+
 -spec consult(file:name()) -> [any()].
 consult(Dir) ->
-    consult_file(filename:join(Dir, ?DEFAULT_CONFIG_FILE)).
+    consult(Dir, []).
+
+-spec consult(file:name(), consult_opts()) -> [any()].
+consult(Dir, Options) ->
+    consult_file(filename:join(Dir, ?DEFAULT_CONFIG_FILE), Options).
 
 -spec consult_file(file:name()) -> [any()].
-consult_file(File) when is_binary(File) ->
-    consult_file(binary_to_list(File));
 consult_file(File) ->
-    case filename:extension(File) of
-        ".script" ->
-            consult_and_eval(remove_script_ext(File), File);
-        _ ->
-            Script = File ++ ".script",
-            case filelib:is_regular(Script) of
-                true ->
-                    {ok, Terms} = consult_and_eval(File, Script),
-                    Terms;
-                false ->
-                    try_consult(File)
-            end
+    consult_file(File, []).
+
+-spec consult_file(file:name(), consult_opts()) -> [any()].
+consult_file(File, Opts) when is_binary(File) ->
+    consult_file(binary_to_list(File), Opts);
+consult_file(File, Opts) ->
+    ResultTerms =
+        case filename:extension(File) of
+            ".script" ->
+                consult_and_eval(remove_script_ext(File), File);
+            _ ->
+                Script = File ++ ".script",
+                case filelib:is_regular(Script) of
+                    true ->
+                        {ok, Terms} = consult_and_eval(File, Script),
+                        Terms;
+                    false ->
+                        try_consult(File)
+                end
+        end,
+    case proplists:get_bool(raw, Opts) of
+        true ->
+            ResultTerms;
+        false ->
+            process_config(ResultTerms, filename:dirname(File))
     end.
 
 %% no lockfile
@@ -77,6 +102,32 @@ merge_locks(Config, [Locks]) ->
     Deps = [X || X <- Locks, element(3, X) =:= 0],
     NewDeps = find_newly_added(ConfigDeps, Locks),
     [{{locks, default}, Locks}, {{deps, default}, NewDeps++Deps} | Config].
+
+merge_opts(NewOpts, OldOpts) ->
+    dict:merge(fun(deps, NewValue, _OldValue) ->
+        NewValue;
+        ({deps, _}, NewValue, _OldValue) ->
+            NewValue;
+        (profiles, NewValue, OldValue) ->
+            dict:to_list(merge_opts(dict:from_list(NewValue), dict:from_list(OldValue)));
+        (_Key, NewValue, OldValue) when is_list(NewValue) ->
+            case io_lib:printable_list(NewValue) of
+                true when NewValue =:= [] ->
+                    case io_lib:printable_list(OldValue) of
+                        true ->
+                            NewValue;
+                        false ->
+                            OldValue
+                    end;
+                true ->
+                    NewValue;
+                false ->
+                    rebar_utils:tup_umerge(rebar_utils:tup_sort(NewValue)
+                        ,rebar_utils:tup_sort(OldValue))
+            end;
+        (_Key, NewValue, _OldValue) ->
+            NewValue
+    end, NewOpts, OldOpts).
 
 format_error({bad_dep_name, Dep}) ->
     io_lib:format("Dependency name must be an atom, instead found: ~p", [Dep]).
@@ -102,6 +153,22 @@ try_consult(File) ->
         {error, Reason} ->
             ?ABORT("Failed to read config file ~s:~n ~p", [File, Reason])
     end.
+
+process_config(Terms, BaseDir) ->
+    do_process(Terms, dict:new(), BaseDir).
+
+do_process([], Acc, _BaseDir) ->
+    dict:to_list(Acc);
+do_process([{include_config, Path} | Rest], Acc, BaseDir) ->
+    FullPath = filename:absname_join(BaseDir, Path),
+    SubconfigTerms = consult_file(FullPath),
+    Tmp = merge_opts(dict:from_list(SubconfigTerms), Acc),
+    do_process(Rest, Tmp, BaseDir);
+
+do_process([Something | Rest], Acc, BaseDir) ->
+    Tmp = merge_opts(dict:from_list([Something]), Acc),
+    do_process(Rest, Tmp, BaseDir).
+
 
 bs(Vars) ->
     lists:foldl(fun({K,V}, Bs) ->

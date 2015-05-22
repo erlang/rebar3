@@ -163,7 +163,7 @@ check_results(AppDir, Expected) ->
     GlobalPluginDirs = filelib:wildcard(filename:join([AppDir, "global", "plugins"])),
     CheckoutsDir = filename:join([AppDir, "_checkouts"]),
     LockFile = filename:join([AppDir, "rebar.lock"]),
-    Locks = lists:flatten(rebar_config:consult_file(LockFile)),
+    Locks = lists:flatten(rebar_config:consult_file(LockFile,[raw])),
 
     InvalidApps = rebar_app_discover:find_apps(BuildDirs, invalid),
     ValidApps = rebar_app_discover:find_apps(BuildDirs, valid),
