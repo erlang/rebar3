@@ -237,8 +237,8 @@ ebin_to_info(EbinDir, AppName) ->
             {IncApps ++ DepApps, Files, Warnings};
         {error, enoent} when AppName =:= erts ->
             {[], ebin_files(EbinDir), []};
-        _ ->
-            Error = io_lib:format("Could not parse ~p", [AppFile]),
+        {error, Reason} ->
+            Error = io_lib:format("Could not parse ~s: ~p", [AppFile, file:format_error(Reason)]),
             throw({dialyzer_error, Error})
     end.
 

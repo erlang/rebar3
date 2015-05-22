@@ -41,6 +41,8 @@
          valid/1,
          valid/2]).
 
+-include("rebar.hrl").
+
 -export_type([t/0]).
 
 -record(app_info_t, {name               :: binary(),
@@ -161,17 +163,18 @@ app_file(AppInfo=#app_info_t{}, AppFile) ->
 
 -spec app_details(t()) -> list().
 app_details(AppInfo=#app_info_t{app_details=[]}) ->
-    AppFile = case app_file(AppInfo) of
-                  undefined ->
-                      app_file_src(AppInfo);
-                  File ->
-                      File
-              end,
-    case file:consult(AppFile) of
-        {ok, [{application, _, AppDetails}]} ->
-            AppDetails;
-        _ ->
-            []
+    case app_file(AppInfo) of
+        undefined ->
+            rebar_file_utils:try_consult(app_file_src(AppInfo));
+        AppFile ->
+            try
+                rebar_file_utils:try_consult(AppFile)
+            catch
+                throw:{error, {Module, Reason}} ->
+                    ?DEBUG("Warning, falling back to .app.src because of: ~s",
+                          [Module:format_error(Reason)]),
+                    rebar_file_utils:try_consult(app_file_src(AppInfo))
+            end
     end;
 app_details(#app_info_t{app_details=AppDetails}) ->
     AppDetails.

@@ -182,25 +182,21 @@ app_dir(AppFile) ->
 
 -spec create_app_info(file:name(), file:name()) -> rebar_app_info:t() | {error, term()}.
 create_app_info(AppDir, AppFile) ->
-    case file:consult(AppFile) of
-        {ok, [{application, AppName, AppDetails}]} ->
-            AppVsn = proplists:get_value(vsn, AppDetails),
-            Applications = proplists:get_value(applications, AppDetails, []),
-            IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
-            {ok, AppInfo} = rebar_app_info:new(AppName, AppVsn, AppDir, []),
-            AppInfo1 = rebar_app_info:applications(
-                         rebar_app_info:app_details(AppInfo, AppDetails),
-                         IncludedApplications++Applications),
-            Valid = case rebar_app_utils:validate_application_info(AppInfo1) of
-                        true ->
-                            true;
-                        _ ->
-                            false
-                    end,
-            rebar_app_info:dir(rebar_app_info:valid(AppInfo1, Valid), AppDir);
-        {error, Reason} ->
-            {error, Reason}
-    end.
+    [{application, AppName, AppDetails}] = rebar_file_utils:try_consult(AppFile),
+    AppVsn = proplists:get_value(vsn, AppDetails),
+    Applications = proplists:get_value(applications, AppDetails, []),
+    IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
+    {ok, AppInfo} = rebar_app_info:new(AppName, AppVsn, AppDir, []),
+    AppInfo1 = rebar_app_info:applications(
+                 rebar_app_info:app_details(AppInfo, AppDetails),
+                 IncludedApplications++Applications),
+    Valid = case rebar_app_utils:validate_application_info(AppInfo1) of
+                true ->
+                    true;
+                _ ->
+                    false
+            end,
+    rebar_app_info:dir(rebar_app_info:valid(AppInfo1, Valid), AppDir).
 
 dedup([]) -> [];
 dedup([A]) -> [A];
