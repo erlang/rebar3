@@ -261,9 +261,7 @@ package_to_app(DepsDir, Packages, {Name, Vsn, Level}, IsLock, State) ->
                 false ->
                     throw(?PRV_ERROR({missing_package, Name, Vsn}))
             end;
-        {ok, P} ->
-            PkgDeps = [{PkgName, PkgVsn}
-                       || {PkgName,PkgVsn} <- proplists:get_value(<<"deps">>, P, [])],
+        {ok, PkgDeps} ->
             {ok, AppInfo} = rebar_app_info:new(Name, Vsn),
             AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
             AppInfo2 = rebar_app_info:dir(AppInfo1, filename:join([DepsDir, Name])),
@@ -578,7 +576,7 @@ fetch_app(AppInfo, AppDir, State) ->
     end.
 
 update_app_info(AppDir, AppInfo) ->
-    {true, Found} = rebar_app_discover:find_app(AppDir, all),
+    {ok, Found} = rebar_app_info:discover(AppDir),
     AppDetails = rebar_app_info:app_details(Found),
     Applications = proplists:get_value(applications, AppDetails, []),
     IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
