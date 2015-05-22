@@ -254,6 +254,11 @@ handle_error(Error) ->
     %% Dump this error to console
     ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace", []),
     ?DEBUG("Uncaught error: ~p", [Error]),
+    case erlang:get_stacktrace() of
+        [] -> ok;
+        Trace ->
+            ?DEBUG("Stack trace to the error location: ~p", [Trace])
+    end,
     ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []),
     erlang:halt(1).
 
