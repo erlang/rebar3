@@ -7,6 +7,7 @@
          find_apps/2,
          find_app/2]).
 
+-include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
 do(State, LibDirs) ->
@@ -123,59 +124,7 @@ find_apps(LibDirs, Validate) ->
 find_app(AppDir, Validate) ->
     AppFile = filelib:wildcard(filename:join([AppDir, "ebin", "*.app"])),
     AppSrcFile = filelib:wildcard(filename:join([AppDir, "src", "*.app.src"])),
-    case AppFile of
-        [File] ->
-            AppInfo = create_app_info(AppDir, File),
-            AppInfo1 = rebar_app_info:app_file(AppInfo, File),
-            AppInfo2 = case AppSrcFile of
-                           [F] ->
-                               rebar_app_info:app_file_src(AppInfo1, F);
-                           [] ->
-                               AppInfo1;
-                           Other when is_list(Other) ->
-                               throw({error, {multiple_app_files, Other}})
-                       end,
-            case Validate of
-                valid ->
-                    case rebar_app_utils:validate_application_info(AppInfo2) of
-                        true ->
-                            {true, AppInfo2};
-                        _ ->
-                            false
-                    end;
-                invalid ->
-                    case rebar_app_utils:validate_application_info(AppInfo2) of
-                        true ->
-                            false;
-                        _ ->
-                            {true, AppInfo2}
-                    end;
-                all ->
-                    {true, AppInfo2}
-            end;
-        [] ->
-            case AppSrcFile of
-                [File] ->
-                    case Validate of
-                        V when V =:= invalid ; V =:= all ->
-                            AppInfo = create_app_info(AppDir, File),
-                            case AppInfo of
-                              {error, Reason} ->
-                                  throw({error, {invalid_app_file, File, Reason}});
-                              _ ->
-                                  {true, rebar_app_info:app_file_src(AppInfo, File)}
-                            end;
-                        valid ->
-                            false
-                    end;
-                [] ->
-                    false;
-                Other when is_list(Other) ->
-                    throw({error, {multiple_app_files, Other}})
-            end;
-        Other when is_list(Other) ->
-            throw({error, {multiple_app_files, Other}})
-    end.
+    try_handle_app_file(AppFile, AppDir, AppSrcFile, Validate).
 
 app_dir(AppFile) ->
     filename:join(rebar_utils:droplast(filename:split(filename:dirname(AppFile)))).
@@ -202,3 +151,59 @@ dedup([]) -> [];
 dedup([A]) -> [A];
 dedup([H,H|T]) -> dedup([H|T]);
 dedup([H|T]) -> [H|dedup(T)].
+
+try_handle_app_file([], AppDir, AppSrcFile, Validate) ->
+    try_handle_app_src_file([], AppDir, AppSrcFile, Validate);
+try_handle_app_file([File], AppDir, AppSrcFile, Validate) ->
+    try create_app_info(AppDir, File) of
+        AppInfo ->
+            AppInfo1 = rebar_app_info:app_file(AppInfo, File),
+            AppInfo2 = case AppSrcFile of
+                           [F] ->
+                               rebar_app_info:app_file_src(AppInfo1, F);
+                           [] ->
+                               AppInfo1;
+                           Other when is_list(Other) ->
+                               throw({error, {multiple_app_files, Other}})
+                       end,
+            case Validate of
+                valid ->
+                    case rebar_app_utils:validate_application_info(AppInfo2) of
+                        true ->
+                            {true, AppInfo2};
+                        _ ->
+                            false
+                    end;
+                invalid ->
+                    case rebar_app_utils:validate_application_info(AppInfo2) of
+                        true ->
+                            false;
+                        _ ->
+                            {true, AppInfo2}
+                    end;
+                all ->
+                    {true, AppInfo2}
+            end
+    catch
+        throw:{error, {Module, Reason}} ->
+            ?DEBUG("Falling back to app.src file because .app failed: ~s", [Module:format_error(Reason)]),
+            try_handle_app_src_file(File, AppDir, AppSrcFile, Validate)
+    end;
+try_handle_app_file(Other, _AppDir, _AppSrcFile, _Validate) ->
+    throw({error, {multiple_app_files, Other}}).
+
+try_handle_app_src_file(_, _AppDir, [], _Validate) ->
+    false;
+try_handle_app_src_file(_, _AppDir, _AppSrcFile, valid) ->
+    false;
+try_handle_app_src_file(_, AppDir, [File], Validate) when Validate =:= invalid
+                                                           ; Validate =:= all ->
+    AppInfo = create_app_info(AppDir, File),
+    case AppInfo of
+        {error, Reason} ->
+            throw({error, {invalid_app_file, File, Reason}});
+        _ ->
+            {true, rebar_app_info:app_file_src(AppInfo, File)}
+    end;
+try_handle_app_src_file(_, _AppDir, Other, _Validate) ->
+    throw({error, {multiple_app_files, Other}}).
