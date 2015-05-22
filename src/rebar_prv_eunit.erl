@@ -134,14 +134,7 @@ resolve_suites(State, Apps, RawOpts) ->
 
 compile_tests(State, TestApps, Suites, RawOpts) ->
     F = fun(AppInfo) ->
-        AppDir = rebar_app_info:dir(AppInfo),
-        S = case rebar_app_info:state(AppInfo) of
-            undefined ->
-                C = rebar_config:consult(AppDir),
-                rebar_state:new(State, C, AppDir);
-            AppState ->
-                AppState
-        end,
+        S = rebar_app_info:state_or_new(State, AppInfo),
         ok = rebar_erlc_compiler:compile(replace_src_dirs(S),
                                          ec_cnv:to_list(rebar_app_info:out_dir(AppInfo)))
     end,
