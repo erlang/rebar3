@@ -51,10 +51,10 @@ compile(State, App) ->
     %% Load the app file and validate it.
     validate_app(State, App1).
 
-format_error(invalid_app_file) ->
-    "Failed to read app file";
+format_error({missing_app_file, Filename}) ->
+    io_lib:format("App file is missing: ~s", [Filename]);
 format_error({file_read, File, Reason}) ->
-    io_lib:format("Failed to read ~s for processing: ~p", [File, Reason]);
+    io_lib:format("Failed to read app file ~s for processing: ~p", [File, Reason]);
 format_error({invalid_name, File, AppName}) ->
     io_lib:format("Invalid ~s: name of application (~p) must match filename.", [File, AppName]).
 
@@ -197,7 +197,7 @@ ensure_registered(AppData) ->
 consult_app_file(Filename) ->
     case filelib:is_file(Filename) of
         false ->
-            throw(?PRV_ERROR(invalid_app_file));
+            {error, enoent};
         true ->
             case lists:suffix(".app.src", Filename) of
                 false ->
@@ -214,7 +214,7 @@ app_vsn(AppFile, State) ->
             Resources = rebar_state:resources(State),
             rebar_utils:vcs_vsn(get_value(vsn, AppData, AppFile), AppDir, Resources);
         {error, Reason} ->
-            ?ABORT("Failed to consult app file ~s: ~p\n", [AppFile, Reason])
+            throw(?PRV_ERROR({file_read, AppFile, Reason}))
     end.
 
 get_value(Key, AppInfo, AppFile) ->
