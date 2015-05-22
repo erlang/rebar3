@@ -124,7 +124,8 @@ find_apps(LibDirs, Validate) ->
 find_app(AppDir, Validate) ->
     AppFile = filelib:wildcard(filename:join([AppDir, "ebin", "*.app"])),
     AppSrcFile = filelib:wildcard(filename:join([AppDir, "src", "*.app.src"])),
-    try_handle_app_file(AppFile, AppDir, AppSrcFile, Validate).
+    AppInfo = try_handle_app_file(AppFile, AppDir, AppSrcFile, Validate),
+    AppInfo.
 
 app_dir(AppFile) ->
     filename:join(rebar_utils:droplast(filename:split(filename:dirname(AppFile)))).
@@ -165,7 +166,7 @@ try_handle_app_file([File], AppDir, AppSrcFile, Validate) ->
                                AppInfo1;
                            Other when is_list(Other) ->
                                throw({error, {multiple_app_files, Other}})
-                       end,
+                      end,
             case Validate of
                 valid ->
                     case rebar_app_utils:validate_application_info(AppInfo2) of
@@ -197,7 +198,7 @@ try_handle_app_src_file(_, _AppDir, [], _Validate) ->
 try_handle_app_src_file(_, _AppDir, _AppSrcFile, valid) ->
     false;
 try_handle_app_src_file(_, AppDir, [File], Validate) when Validate =:= invalid
-                                                           ; Validate =:= all ->
+                                                        ; Validate =:= all ->
     AppInfo = create_app_info(AppDir, File),
     case AppInfo of
         {error, Reason} ->

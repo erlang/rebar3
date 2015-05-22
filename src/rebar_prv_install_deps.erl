@@ -410,7 +410,7 @@ maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
                             case fetch_app(AppInfo, AppDir, State) of
                                 true ->
                                     maybe_symlink_default(State, Profile, AppDir, AppInfo),
-                                    {true, update_app_info(AppInfo)};
+                                    {true, update_app_info(AppDir, AppInfo)};
                                 Other ->
                                     {Other, AppInfo}
                             end;
@@ -577,8 +577,9 @@ fetch_app(AppInfo, AppDir, State) ->
             throw(Error)
     end.
 
-update_app_info(AppInfo) ->
-    AppDetails = rebar_app_info:app_details(AppInfo),
+update_app_info(AppDir, AppInfo) ->
+    {true, Found} = rebar_app_discover:find_app(AppDir, all),
+    AppDetails = rebar_app_info:app_details(Found),
     Applications = proplists:get_value(applications, AppDetails, []),
     IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
     AppInfo1 = rebar_app_info:applications(
