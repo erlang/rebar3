@@ -54,7 +54,7 @@ compile(State, App) ->
 format_error({missing_app_file, Filename}) ->
     io_lib:format("App file is missing: ~s", [Filename]);
 format_error({file_read, File, Reason}) ->
-    io_lib:format("Failed to read app file ~s for processing: ~p", [File, Reason]);
+    io_lib:format("Failed to read app file ~s for processing: ~p", [File, file:format_error(Reason)]);
 format_error({invalid_name, File, AppName}) ->
     io_lib:format("Invalid ~s: name of application (~p) must match filename.", [File, AppName]).
 
