@@ -151,15 +151,14 @@ find_parts([{AppName, Deps}|Rest], Skip, Acc) ->
         true -> find_parts(Rest, Skip, Acc);
         false ->
             AccNew = dict:store(AppName,
-                                [{<<"deps">>,Deps}, {<<"link">>,<<"undef">>}],
+                                Deps,
                                 Acc),
             find_parts(Rest, Skip, AccNew)
     end.
 
 to_graph_parts(Dict) ->
     LastUpdated = os:timestamp(),
-    dict:fold(fun(K,V,{Ks,Vs}) ->
-            {_,Deps} = lists:keyfind(<<"deps">>, 1, V),
+    dict:fold(fun(K,Deps,{Ks,Vs}) ->
             {[{K,LastUpdated}|Ks],
              [{K,{list_to_binary(atom_to_list(DK)), list_to_binary(DV)}}
              || {DK,DV} <- Deps]  ++ Vs}

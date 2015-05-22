@@ -261,9 +261,7 @@ package_to_app(DepsDir, Packages, {Name, Vsn, Level}, IsLock, State) ->
                 false ->
                     throw(?PRV_ERROR({missing_package, Name, Vsn}))
             end;
-        {ok, P} ->
-            PkgDeps = [{PkgName, PkgVsn}
-                       || {PkgName,PkgVsn} <- proplists:get_value(<<"deps">>, P, [])],
+        {ok, PkgDeps} ->
             {ok, AppInfo} = rebar_app_info:new(Name, Vsn),
             AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
             AppInfo2 = rebar_app_info:dir(AppInfo1, filename:join([DepsDir, Name])),
@@ -410,7 +408,7 @@ maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
                             case fetch_app(AppInfo, AppDir, State) of
                                 true ->
                                     maybe_symlink_default(State, Profile, AppDir, AppInfo),
-                                    {true, update_app_info(AppInfo)};
+                                    {true, update_app_info(AppDir, AppInfo)};
                                 Other ->
                                     {Other, AppInfo}
                             end;
@@ -577,8 +575,12 @@ fetch_app(AppInfo, AppDir, State) ->
             throw(Error)
     end.
 
-update_app_info(AppInfo) ->
-    AppDetails = rebar_app_info:app_details(AppInfo),
+%% This is called after the dep has been downloaded and unpacked, if it hadn't been already.
+%% So this is the first time for newly downloaded apps that its .app/.app.src data can
+%% be read in an parsed.
+update_app_info(AppDir, AppInfo) ->
+    {ok, Found} = rebar_app_info:discover(AppDir),
+    AppDetails = rebar_app_info:app_details(Found),
     Applications = proplists:get_value(applications, AppDetails, []),
     IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
     AppInfo1 = rebar_app_info:applications(

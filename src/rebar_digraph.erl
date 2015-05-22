@@ -124,6 +124,10 @@ find_app_by_name(Name, Apps) ->
                           rebar_app_info:name(App) =:= Name
                   end, Apps).
 
+%% The union of all entries in the applications list for an app and
+%% the deps listed in its rebar.config is all deps that may be needed
+%% for building the app.
 all_apps_deps(App) ->
-    Applications = [atom_to_binary(X, utf8) || X <- rebar_app_info:applications(App)],
-    lists:usort(rebar_app_info:deps(App) ++ Applications).
+    Applications = lists:usort([atom_to_binary(X, utf8) || X <- rebar_app_info:applications(App)]),
+    Deps = lists:usort(lists:map(fun({Name, _}) -> Name; (Name) -> Name end, rebar_app_info:deps(App))),
+    lists:umerge(Deps, Applications).
