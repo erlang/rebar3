@@ -153,6 +153,8 @@ dedup([A]) -> [A];
 dedup([H,H|T]) -> dedup([H|T]);
 dedup([H|T]) -> [H|dedup(T)].
 
+%% Read in and parse the .app file if it is availabe. Do the same for
+%% the .app.src file if it exists.
 try_handle_app_file([], AppDir, AppSrcFile, Validate) ->
     try_handle_app_src_file([], AppDir, AppSrcFile, Validate);
 try_handle_app_file([File], AppDir, AppSrcFile, Validate) ->
@@ -193,6 +195,7 @@ try_handle_app_file([File], AppDir, AppSrcFile, Validate) ->
 try_handle_app_file(Other, _AppDir, _AppSrcFile, _Validate) ->
     throw({error, {multiple_app_files, Other}}).
 
+%% Read in the .app.src file if we aren't looking for a valid (already built) app
 try_handle_app_src_file(_, _AppDir, [], _Validate) ->
     false;
 try_handle_app_src_file(_, _AppDir, _AppSrcFile, valid) ->

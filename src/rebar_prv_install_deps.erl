@@ -575,6 +575,9 @@ fetch_app(AppInfo, AppDir, State) ->
             throw(Error)
     end.
 
+%% This is called after the dep has been downloaded and unpacked, if it hadn't been already.
+%% So this is the first time for newly downloaded apps that its .app/.app.src data can
+%% be read in an parsed.
 update_app_info(AppDir, AppInfo) ->
     {ok, Found} = rebar_app_info:discover(AppDir),
     AppDetails = rebar_app_info:app_details(Found),
