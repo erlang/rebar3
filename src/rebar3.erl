@@ -132,7 +132,7 @@ init_config() ->
                      rebar_config:consult_file(ConfigFile)
              end,
 
-    Config1 = rebar_config:merge_locks(Config, rebar_config:consult_file(?LOCK_FILE)),
+    Config1 = rebar_config:merge_locks(Config, rebar_config:consult_file(?LOCK_FILE, [raw])),
 
     %% If $HOME/.config/rebar3/config exists load and use as global config
     GlobalConfigFile = rebar_dir:global_config(),

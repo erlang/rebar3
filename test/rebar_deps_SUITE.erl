@@ -215,7 +215,7 @@ newly_added_dep(Config) ->
     {ok, RebarConfig2} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, TopDeps2}])),
     LockFile = filename:join(AppDir, "rebar.lock"),
     RebarConfig3 = rebar_config:merge_locks(RebarConfig2,
-                                           rebar_config:consult_file(LockFile)),
+                                           rebar_config:consult_file(LockFile, [raw])),
 
     %% a should now be installed and c should not change
     rebar_test_utils:run_and_check(
