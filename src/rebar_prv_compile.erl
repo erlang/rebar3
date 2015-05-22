@@ -6,7 +6,7 @@
          do/1,
          format_error/1]).
 
--export([compile/2]).
+-export([compile/3]).
 
 -include("rebar.hrl").
 
@@ -82,18 +82,17 @@ build_app(State, Providers, AppInfo) ->
                 AppState
         end,
 
-    %% Legacy hook support
-    rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, S),
-    AppInfo1 = compile(S, AppInfo),
-    rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, S),
+    compile(S, Providers, AppInfo).
 
-    AppInfo1.
-
-compile(State, AppInfo) ->
+compile(State, Providers, AppInfo) ->
     ?INFO("Compiling ~s", [rebar_app_info:name(AppInfo)]),
+    AppDir = rebar_app_info:dir(AppInfo),
+    rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, State),
+
     rebar_erlc_compiler:compile(State, ec_cnv:to_list(rebar_app_info:out_dir(AppInfo))),
     case rebar_otp_app:compile(State, AppInfo) of
         {ok, AppInfo1} ->
+            rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, State),
             AppInfo1;
         Error ->
             throw(Error)

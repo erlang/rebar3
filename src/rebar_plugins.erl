@@ -63,7 +63,7 @@ build_plugin(AppInfo) ->
     AppDir = rebar_app_info:dir(AppInfo),
     C = rebar_config:consult(AppDir),
     S = rebar_state:new(rebar_state:new(), C, AppDir),
-    rebar_prv_compile:compile(S, AppInfo).
+    rebar_prv_compile:compile(S, [], AppInfo).
 
 plugin_providers({Plugin, _, _}) when is_atom(Plugin) ->
     validate_plugin(Plugin);
