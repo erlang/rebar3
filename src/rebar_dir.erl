@@ -34,7 +34,7 @@ base_dir(State) ->
 -spec profile_dir(rebar_state:t(), [atom()]) -> file:filename_all().
 profile_dir(State, Profiles) ->
     {BaseDir, ProfilesStrings} = case [ec_cnv:to_list(P) || P <- Profiles] of
-        ["global"] -> {?MODULE:global_cache_dir(State), [""]};
+        ["global" | _] -> {?MODULE:global_cache_dir(State), [""]};
         ["default"] -> {rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR), ["default"]};
         %% drop `default` from the profile dir if it's implicit and reverse order
         %%  of profiles to match order passed to `as`
