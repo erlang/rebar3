@@ -34,6 +34,7 @@
          source/2,
          state/1,
          state/2,
+         state_or_new/2,
          is_lock/1,
          is_lock/2,
          is_checkout/1,
@@ -258,6 +259,14 @@ state(AppInfo=#app_info_t{}, State) ->
 
 -spec state(t()) -> rebar_state:t() | undefined.
 state(#app_info_t{state=State}) ->
+    State.
+
+-spec state_or_new(rebar_state:t(), t()) -> rebar_state:t().
+state_or_new(State, AppInfo=#app_info_t{state=undefined}) ->
+    AppDir = dir(AppInfo),
+    C = rebar_config:consult(AppDir),
+    rebar_state:new(State, C, AppDir);
+state_or_new(_State, #app_info_t{state=State}) ->
     State.
 
 -spec is_lock(t(), boolean()) -> t().

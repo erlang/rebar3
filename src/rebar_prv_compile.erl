@@ -71,17 +71,9 @@ build_apps(State, Providers, Apps) ->
 build_app(State, Providers, AppInfo) ->
     AppDir = rebar_app_info:dir(AppInfo),
     OutDir = rebar_app_info:out_dir(AppInfo),
-
     copy_app_dirs(State, AppDir, OutDir),
 
-    S = case rebar_app_info:state(AppInfo) of
-            undefined ->
-                C = rebar_config:consult(AppDir),
-                rebar_state:new(State, C, AppDir);
-            AppState ->
-                AppState
-        end,
-
+    S = rebar_app_info:state_or_new(State, AppInfo),
     compile(S, Providers, AppInfo).
 
 compile(State, Providers, AppInfo) ->
