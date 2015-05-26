@@ -82,6 +82,7 @@ shell(State) ->
     setup_paths(State),
     ok = reread_config(State),
     maybe_boot_apps(State),
+    rebar_agent:start_link(State),
     setup_shell(),
     %% try to read in sys.config file
     %% this call never returns (until user quits shell)
@@ -134,17 +135,20 @@ maybe_boot_apps(State) ->
         undefined ->
             ok;
         Apps ->
-            ?WARN("The rebar3 shell is a development tool; to deploy "
-                  "applications in production, consider using releases "
-                  "(http://www.rebar3.org/v3.0/docs/releases)", []),
-            Res = [application:ensure_all_started(App) || App <- Apps],
-            _ = [?INFO("Booted ~p", [App])
-                 || {ok, Booted} <- Res,
-                    App <- Booted],
-            _ = [?ERROR("Failed to boot ~p for reason ~p", [App, Reason])
-                 || {error, {App, Reason}} <- Res],
-            ok
+            boot_apps(Apps)
     end.
+
+boot_apps(Apps) ->
+    ?WARN("The rebar3 shell is a development tool; to deploy "
+            "applications in production, consider using releases "
+            "(http://www.rebar3.org/v3.0/docs/releases)", []),
+    Res = [application:ensure_all_started(App) || App <- Apps],
+    _ = [?INFO("Booted ~p", [App])
+            || {ok, Booted} <- Res,
+            App <- Booted],
+    _ = [?ERROR("Failed to boot ~p for reason ~p", [App, Reason])
+            || {error, {App, Reason}} <- Res],
+    ok.
 
 remove_error_handler(0) ->
     ?WARN("Unable to remove simple error_logger handler", []);
