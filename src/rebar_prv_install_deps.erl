@@ -37,7 +37,10 @@
 
 -export([handle_deps/3,
          handle_deps/4,
-         handle_deps/5]).
+         handle_deps/5,
+
+         find_cycles/1,
+         cull_compile/2]).
 
 -export_type([dep/0]).
 
@@ -76,6 +79,10 @@ do(State) ->
         {Apps, State1} =
             lists:foldl(fun deps_per_profile/2, {[], State}, lists:reverse(Profiles)),
 
+        State2 = rebar_state:update_all_deps(State1, Apps),
+        CodePaths = [rebar_app_info:ebin_dir(A) || A <- Apps],
+        State3 = rebar_state:update_code_paths(State2, all_deps, CodePaths),
+
         Source = ProjectApps ++ Apps,
         case find_cycles(Source) of
             {cycles, Cycles} ->
@@ -84,7 +91,7 @@ do(State) ->
                 {error, Error};
             {no_cycle, Sorted} ->
                 ToCompile = cull_compile(Sorted, ProjectApps),
-                {ok, rebar_state:deps_to_build(State1, ToCompile)}
+                {ok, rebar_state:deps_to_build(State3, ToCompile)}
         end
     catch
         %% maybe_fetch will maybe_throw an exception to break out of some loops
@@ -158,11 +165,7 @@ handle_deps(Profile, State0, Deps, Upgrade, Locks) ->
                              ,lists:ukeysort(2, SrcApps)
                              ,lists:ukeysort(2, Solved)),
 
-    State5 = rebar_state:update_all_deps(State4, AllDeps),
-    CodePaths = [rebar_app_info:ebin_dir(A) || A <- AllDeps],
-    State6 = rebar_state:update_code_paths(State5, all_deps, CodePaths),
-
-    {ok, AllDeps, State6}.
+    {ok, AllDeps, State4}.
 
 %% ===================================================================
 %% Internal functions

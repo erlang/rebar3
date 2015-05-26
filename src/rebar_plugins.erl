@@ -32,31 +32,49 @@ handle_plugins(Plugins, State) ->
 
 handle_plugins(Profile, Plugins, State) ->
     %% Set deps dir to plugins dir so apps are installed there
+    Locks = rebar_state:lock(State),
+    DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
     State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
 
-    PluginProviders = lists:flatmap(fun(Plugin) ->
-                                            handle_plugin(Profile, Plugin, State1)
-                                    end, Plugins),
+    {PluginProviders, State2} =
+        lists:foldl(fun(Plugin, {PluginAcc, StateAcc}) ->
+                            {NewPlugins, NewState} = handle_plugin(Profile, Plugin, StateAcc),
+                            {PluginAcc++NewPlugins, NewState}
+                      end, {[], State1}, Plugins),
 
     %% reset deps dir
-    State2 = rebar_state:set(State1, deps_dir, ?DEFAULT_DEPS_DIR),
+    State3 = rebar_state:set(State2, deps_dir, DepsDir),
+    State4 = rebar_state:lock(State3, Locks),
 
-    rebar_state:create_logic_providers(PluginProviders, State2).
+    rebar_state:create_logic_providers(PluginProviders, State4).
 
 handle_plugin(Profile, Plugin, State) ->
     try
-        {ok, _, State2} = rebar_prv_install_deps:handle_deps(Profile, State, [Plugin]),
+        {ok, Apps, State2} = rebar_prv_install_deps:handle_deps(Profile, State, [Plugin]),
+        {no_cycle, Sorted} = rebar_prv_install_deps:find_cycles(Apps),
+        ToBuild = rebar_prv_install_deps:cull_compile(Sorted, []),
 
-        Apps = rebar_state:all_deps(State2),
-        ToBuild = lists:dropwhile(fun rebar_app_info:valid/1, Apps),
+        %% Add already built plugin deps to the code path
+        CodePaths = [rebar_app_info:ebin_dir(A) || A <- Apps -- ToBuild],
+        code:add_pathsa(CodePaths),
+
+        %% Build plugin and its deps
         [build_plugin(AppInfo) || AppInfo <- ToBuild],
-        [true = code:add_patha(filename:join(rebar_app_info:dir(AppInfo), "ebin")) || AppInfo <- Apps],
-        plugin_providers(Plugin)
+
+        %% Add newly built deps and plugin to code path
+        State3 = rebar_state:update_all_plugin_deps(State2, Apps),
+        NewCodePaths = [rebar_app_info:ebin_dir(A) || A <- ToBuild],
+        code:add_pathsa(CodePaths),
+
+        %% Store plugin code paths so we can remove them when compiling project apps
+        State4 = rebar_state:update_code_paths(State3, all_plugin_deps, CodePaths++NewCodePaths),
+
+        {plugin_providers(Plugin), State4}
     catch
         C:T ->
             ?DEBUG("~p ~p ~p", [C, T, erlang:get_stacktrace()]),
             ?WARN("Plugin ~p not available. It will not be used.", [Plugin]),
-            []
+            {[], State}
     end.
 
 build_plugin(AppInfo) ->
@@ -65,6 +83,8 @@ build_plugin(AppInfo) ->
     S = rebar_state:new(rebar_state:new(), C, AppDir),
     rebar_prv_compile:compile(S, [], AppInfo).
 
+plugin_providers({Plugin, _, _, _}) when is_atom(Plugin) ->
+    validate_plugin(Plugin);
 plugin_providers({Plugin, _, _}) when is_atom(Plugin) ->
     validate_plugin(Plugin);
 plugin_providers({Plugin, _}) when is_atom(Plugin) ->
