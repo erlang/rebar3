@@ -410,17 +410,19 @@ compile_plugins(Config) ->
     DepName = rebar_test_utils:create_random_name("dep1_"),
     PluginName = rebar_test_utils:create_random_name("plugin1_"),
 
-    mock_git_resource:mock([{config, [{plugins, [
-                                                {list_to_atom(PluginName), Vsn}
-                                                ]}]}]),
-    mock_pkg_resource:mock([
-                           {pkgdeps, [{{iolist_to_binary(PluginName), iolist_to_binary(Vsn)}, []}]}
-                           ]),
+    Plugins = rebar_test_utils:expand_deps(git, [{PluginName, Vsn, []}]),
+    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Plugins)}]),
+
+    mock_pkg_resource:mock([{pkgdeps, [{{list_to_binary(DepName), list_to_binary(Vsn)}, []}]},
+                            {config, [{plugins, [
+                                                {list_to_atom(PluginName),
+                                                 {git, "http://site.com/user/"++PluginName++".git",
+                                                 {tag, Vsn}}}]}]}]),
 
     RConfFile =
         rebar_test_utils:create_config(AppDir,
                                       [{deps, [
-                                              {list_to_atom(DepName), {git, "http://site.com/user/"++DepName++".git", {tag, Vsn}}}
+                                              list_to_atom(DepName)
                                               ]}]),
     {ok, RConf} = file:consult(RConfFile),
 
@@ -498,16 +500,10 @@ complex_plugins(Config) ->
     DepName3 = rebar_test_utils:create_random_name("dep3_"),
     PluginName = rebar_test_utils:create_random_name("plugin1_"),
 
-    Plugin = {{PluginName, Vsn2}, [{list_to_atom(DepName2),
-                                    {git, "http://site.com/user/"++DepName2++".git", {tag, Vsn}}}]},
-    Dep2 = {{DepName2, Vsn},
-           [{list_to_atom(DepName3),
-             {git, "http://site.com/user/"++DepName3++".git", {tag, Vsn}}}]},
-    mock_git_resource:mock([{deps, [Plugin,
-                                    Dep2,
-                                    {{iolist_to_binary(DepName), iolist_to_binary(Vsn)}, []},
-                                    {{iolist_to_binary(DepName3), iolist_to_binary(Vsn)}, []}]}]),
-
+    Deps = rebar_test_utils:expand_deps(git, [{PluginName, Vsn2, [{DepName2, Vsn,
+                                                                  [{DepName3, Vsn, []}]}]}
+                                             ,{DepName, Vsn, []}]),
+    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}]),
 
     RConfFile =
         rebar_test_utils:create_config(AppDir,

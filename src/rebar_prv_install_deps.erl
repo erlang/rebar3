@@ -227,7 +227,22 @@ handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Fetched, Seen, Locks, S
     Level = rebar_app_info:dep_level(AppInfo),
     {NewSeen, NewState} = maybe_lock(Profile, AppInfo, Seen, State, Level),
     {_, AppInfo1} = maybe_fetch(AppInfo, Profile, Upgrade, Seen, NewState),
-    {[AppInfo1 | Fetched], NewSeen, NewState}.
+
+    Profiles = rebar_state:current_profiles(State),
+    Name = rebar_app_info:name(AppInfo1),
+    C = rebar_config:consult(rebar_app_info:dir(AppInfo1)),
+    BaseDir = rebar_state:get(State, base_dir, []),
+    S1 = rebar_state:new(rebar_state:set(rebar_state:new(), base_dir, BaseDir),
+                        C, rebar_app_info:dir(AppInfo1)),
+    S2 = rebar_state:apply_profiles(S1, Profiles),
+    S3 = rebar_state:apply_overrides(S2, Name),
+    AppInfo2 = rebar_app_info:state(AppInfo1, S3),
+
+    %% Dep may have plugins to install. Find and install here.
+    S4 = rebar_plugins:handle_plugins(rebar_state:get(S3, plugins, []), S3),
+    AppInfo3 = rebar_app_info:state(AppInfo2, S4),
+
+    {[AppInfo3 | Fetched], NewSeen, NewState}.
 
 maybe_lock(Profile, AppInfo, Seen, State, Level) ->
     case rebar_app_info:is_checkout(AppInfo) of
@@ -386,14 +401,16 @@ handle_dep(State, DepsDir, AppInfo, Locks, Level) ->
     AppInfo1 = rebar_app_info:state(AppInfo, S3),
 
     %% Dep may have plugins to install. Find and install here.
-    State1 = rebar_plugins:handle_plugins(rebar_state:get(S3, plugins, []), State),
-    Deps = rebar_state:get(S3, deps, []),
+    S4 = rebar_plugins:handle_plugins(rebar_state:get(S3, plugins, []), S3),
+    AppInfo2 = rebar_app_info:state(AppInfo1, S4),
+
     %% Upgrade lock level to be the level the dep will have in this dep tree
+    Deps = rebar_state:get(S4, deps, []),
     NewLocks = [{DepName, Source, LockLevel+Level} ||
-                   {DepName, Source, LockLevel} <- rebar_state:get(S3, {locks, default}, [])],
-    AppInfo2 = rebar_app_info:deps(AppInfo1, rebar_state:deps_names(Deps)),
-    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, S3, Locks, Level+1),
-    {AppInfo2, SrcDeps, PkgDeps, Locks++NewLocks, State1}.
+                   {DepName, Source, LockLevel} <- rebar_state:get(S4, {locks, default}, [])],
+    AppInfo3 = rebar_app_info:deps(AppInfo2, rebar_state:deps_names(Deps)),
+    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, S4, Locks, Level+1),
+    {AppInfo3, SrcDeps, PkgDeps, Locks++NewLocks, State}.
 
 -spec maybe_fetch(rebar_app_info:t(), atom(), boolean(),
                   sets:set(binary()), rebar_state:t()) -> {boolean(), rebar_app_info:t()}.

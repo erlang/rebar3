@@ -36,7 +36,6 @@ do(State) ->
     rebar_utils:remove_from_code_path(PluginDepsPaths),
     code:add_pathsa(DepsPaths),
 
-
     ProjectApps = rebar_state:project_apps(State),
     Providers = rebar_state:providers(State),
     Deps = rebar_state:deps_to_build(State),

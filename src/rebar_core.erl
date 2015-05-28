@@ -119,6 +119,7 @@ do([ProviderName | Rest], State) ->
                                   ,rebar_state:providers(State)
                                   ,rebar_state:namespace(State))
     end,
+
     case providers:do(Provider, State) of
         {ok, State1} ->
             do(Rest, State1);
