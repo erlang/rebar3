@@ -15,7 +15,7 @@ mock() -> mock([]).
 %% Specific config options are explained in each of the private functions.
 -spec mock(Opts) -> ok when
     Opts :: [Option],
-    Option :: {update, [App]}
+    Option :: {upgrade, [App]}
             | {cache_dir, string()}
             | {default_vsn, Vsn}
             | {override_vsn, [{App, Vsn}]}
@@ -119,7 +119,6 @@ mock_pkg_index(Opts) ->
                 fun(_State) -> {ok, to_registry(Deps)} end),
     meck:expect(rebar_packages, get_packages,
                 fun(_State) -> {Dict, Digraph} end).
-
 
 %%%%%%%%%%%%%%%
 %%% Helpers %%%

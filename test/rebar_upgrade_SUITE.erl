@@ -3,7 +3,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -compile(export_all).
 
-all() -> [{group, git}, {group, pkg}].
+all() -> [{group, git}, {group, pkg}, novsn_pkg].
 
 groups() ->
     [{all, [], [top_a, top_b, top_c, top_d1, top_d2, top_e,
@@ -31,6 +31,26 @@ init_per_group(_, Config) ->
 end_per_group(_, Config) ->
     Config.
 
+init_per_testcase(novsn_pkg, Config0) ->
+    Config = rebar_test_utils:init_rebar_state(Config0, "novsn_pkg_"),
+    AppDir = ?config(apps, Config),
+    RebarConf = rebar_test_utils:create_config(AppDir, [{deps, [fakeapp]}]),
+
+    Deps = [{{<<"fakeapp">>, <<"1.0.0">>}, []}],
+    UpDeps = [{{<<"fakeapp">>, <<"1.1.0">>}, []}],
+    Upgrades = ["fakeapp"],
+
+    [{rebarconfig, RebarConf},
+     {mock, fun() ->
+        catch mock_pkg_resource:unmock(),
+        mock_pkg_resource:mock([{pkgdeps, Deps}, {upgrade, []}])
+      end},
+     {mock_update, fun() ->
+        catch mock_pkg_resource:unmock(),
+        mock_pkg_resource:mock([{pkgdeps, UpDeps}, {upgrade, Upgrades}])
+      end},
+     {expected, {ok, [{dep, "fakeapp", "1.1.0"}, {lock, "fakeapp", "1.1.0"}]}}
+     | Config];
 init_per_testcase(Case, Config) ->
     DepsType = ?config(deps_type, Config),
     {Deps, UpDeps, ToUp, Expectations} = upgrades(Case),
@@ -516,6 +536,18 @@ run(Config) ->
     rebar_test_utils:run_and_check(
         Config, NewRebarConfig, ["upgrade", App], Expectation
     ).
+
+novsn_pkg(Config) ->
+    apply(?config(mock, Config), []),
+    {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
+    %% Install dependencies before re-mocking for an upgrade
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["lock"], {ok, []}),
+    Expectation = ?config(expected, Config),
+    apply(?config(mock_update, Config), []),
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["upgrade"], Expectation
+    ),
+    ok.
 
 rewrite_locks({ok, Expectations}, Config) ->
     AppDir = ?config(apps, Config),

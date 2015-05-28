@@ -94,10 +94,15 @@ prepare_locks([Name|Names], Deps, Locks, Unlocks) ->
     AtomName = binary_to_atom(Name, utf8),
     case lists:keyfind(Name, 1, Locks) of
         {_, _, 0} = Lock ->
-            case lists:keyfind(AtomName, 1, Deps) of
-                false ->
+            case {lists:keyfind(AtomName, 1, Deps), lists:member(AtomName, Deps)} of
+                {false, false} ->
                     ?PRV_ERROR({unknown_dependency, Name});
-                Dep ->
+                {Dep, false} ->
+                    {Source, NewLocks, NewUnlocks} = prepare_lock(Dep, Lock, Locks),
+                    prepare_locks(Names, Deps, NewLocks,
+                                  [{Name, Source, 0} | NewUnlocks ++ Unlocks]);
+                {false, true} -> % package as a single atom
+                    Dep = AtomName,
                     {Source, NewLocks, NewUnlocks} = prepare_lock(Dep, Lock, Locks),
                     prepare_locks(Names, Deps, NewLocks,
                                   [{Name, Source, 0} | NewUnlocks ++ Unlocks])
@@ -116,9 +121,13 @@ prepare_locks([Name|Names], Deps, Locks, Unlocks) ->
     end.
 
 prepare_lock(Dep, Lock, Locks) ->
-    Source = Source = case Dep of
-        {_, Src} -> Src;
-        {_, _, Src} -> Src
+    Source = case Dep of
+        {_, SrcOrVsn} -> SrcOrVsn;
+        {_, _, Src} -> Src;
+        _ when is_atom(Dep) ->
+            %% version-free package. Must unlock whatever matches in locks
+            {_, Vsn, _} = lists:keyfind(ec_cnv:to_binary(Dep), 1, Locks),
+            Vsn
     end,
     {NewLocks, NewUnlocks} = unlock_higher_than(0, Locks -- [Lock]),
     {Source, NewLocks, NewUnlocks}.
