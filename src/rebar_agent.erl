@@ -4,6 +4,8 @@
          handle_call/3, handle_cast/2, handle_info/2,
          code_change/3, terminate/2]).
 
+-include("rebar.hrl").
+
 -record(state, {state,
                 cwd}).
 
@@ -16,39 +18,16 @@ do(Command) when is_atom(Command) ->
 do(Namespace, Command) when is_atom(Namespace), is_atom(Command) ->
     gen_server:call(?MODULE, {cmd, Namespace, Command}, infinity).
 
-init(State0) ->
-    Cwd = file:get_cwd(),
-    State = rebar_state:update_code_paths(State0, default, code:get_path()),
+init(State) ->
+    {ok, Cwd} = file:get_cwd(),
     {ok, #state{state=State, cwd=Cwd}}.
 
 handle_call({cmd, Command}, _From, State=#state{state=RState, cwd=Cwd}) ->
-    Res = try
-        case file:get_cwd() of
-            Cwd ->
-                case rebar_core:process_command(RState, Command) of
-                    {ok, _} ->
-                        refresh(RState),
-                        ok;
-                    {error, Err} when is_list(Err) ->
-                        refresh(RState),
-                        {error, lists:flatten(Err)};
-                    {error, Err} ->
-                        refresh(RState),
-                        {error, Err}
-                end;
-            _ ->
-                {error, cwd_changed}
-        end
-    catch
-        Type:Reason ->
-            {error, {Type, Reason}}
-    end,
-    {reply, Res, State};
-handle_call({cmd, Namespace, Command}, From, State = #state{state=RState}) ->
-    {reply, Res, _} = handle_call({cmd, Command}, From, State#state{
-        state = rebar_state:namespace(RState, Namespace)
-    }),
-    {reply, Res, State};
+    {Res, NewRState} = run(default, Command, RState, Cwd),
+    {reply, Res, State#state{state=NewRState}};
+handle_call({cmd, Namespace, Command}, _From, State = #state{state=RState, cwd=Cwd}) ->
+    {Res, NewRState} = run(Namespace, Command, RState, Cwd),
+    {reply, Res, State#state{state=NewRState}};
 handle_call(_Call, _From, State) ->
     {noreply, State}.
 
@@ -64,8 +43,62 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(_Reason, _State) ->
     ok.
 
-refresh(RState) ->
-    ToRefresh = rebar_state:code_paths(RState, all_deps)
+run(Namespace, Command, RState, Cwd) ->
+    try
+        case file:get_cwd() of
+            {ok, Cwd} ->
+                Args = [atom_to_list(Namespace), atom_to_list(Command)],
+                CmdState0 = refresh_state(RState, Cwd),
+                CmdState1 = rebar_state:set(CmdState0, task, atom_to_list(Command)),
+                CmdState = rebar_state:set(CmdState1, caller, api),
+                case rebar3:run(CmdState, Args) of
+                    {ok, TmpState} ->
+                        refresh_paths(TmpState),
+                        {ok, CmdState};
+                    {error, Err} when is_list(Err) ->
+                        refresh_paths(CmdState),
+                        {{error, lists:flatten(Err)}, CmdState};
+                    {error, Err} ->
+                        refresh_paths(CmdState),
+                        {{error, Err}, CmdState}
+                end;
+            _ ->
+                {{error, cwd_changed}, RState}
+        end
+    catch
+        Type:Reason ->
+            ?DEBUG("Agent Stacktrace: ~p", [erlang:get_stacktrace()]),
+            {{error, {Type, Reason}}, RState}
+    end.
+
+refresh_paths(RState) ->
+    ToRefresh = (rebar_state:code_paths(RState, all_deps)
+                 %% TODO: add plugin paths here when the other change is merged
+                 ++ [filename:join([rebar_app_info:out_dir(App), "test"])
+                     || App <- rebar_state:project_apps(RState)]
                 %% make sure to never reload self; halt()s the VM
-                -- [filename:dirname(code:which(?MODULE))],
-    rebar_utils:update_code(ToRefresh).
+                ) -- [filename:dirname(code:which(?MODULE))],
+    %% Similar to rebar_utils:update_code/1, but also forces a reload
+    %% of used modules.
+    lists:foreach(fun(Path) ->
+            Name = filename:basename(Path, "/ebin"),
+            App = list_to_atom(Name),
+            application:load(App),
+            case application:get_key(App, modules) of
+                undefined ->
+                    code:add_patha(Path),
+                    ok;
+                {ok, Modules} ->
+                    ?DEBUG("reloading ~p from ~s", [Modules, Path]),
+                    code:replace_path(Name, Path),
+                    [begin code:purge(M), code:delete(M), code:load_file(M) end
+                    || M <- Modules]
+            end
+        end, ToRefresh).
+
+refresh_state(RState, _Dir) ->
+    lists:foldl(
+        fun(F, State) -> F(State) end,
+        rebar3:init_config(),
+        [fun(S) -> rebar_state:current_profiles(S, rebar_state:current_profiles(RState)) end]
+    ).

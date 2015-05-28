@@ -82,8 +82,8 @@ shell(State) ->
     setup_paths(State),
     ok = reread_config(State),
     maybe_boot_apps(State),
-    rebar_agent:start_link(State),
     setup_shell(),
+    rebar_agent:start_link(State),
     %% try to read in sys.config file
     %% this call never returns (until user quits shell)
     timer:sleep(infinity).
