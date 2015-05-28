@@ -70,7 +70,8 @@ run_and_check(Config, RebarConfig, Command, Expect) ->
 %% - src/<file>.app.src
 %% And returns a `rebar_app_info' object.
 create_app(AppDir, Name, Vsn, Deps) ->
-    write_src_file(AppDir, Name),
+    write_src_file(AppDir, Name ++ ".erl"),
+    write_src_file(AppDir, "not_a_real_src_" ++ Name ++ ".erl"),
     write_app_src_file(AppDir, Name, Vsn, Deps),
     rebar_app_info:new(Name, Vsn, AppDir, Deps).
 
@@ -297,9 +298,9 @@ check_results(AppDir, Expected) ->
         end, Expected).
 
 write_src_file(Dir, Name) ->
-    Erl = filename:join([Dir, "src", "not_a_real_src_" ++ Name ++ ".erl"]),
+    Erl = filename:join([Dir, "src", Name]),
     ok = filelib:ensure_dir(Erl),
-    ok = ec_file:write(Erl, erl_src_file("not_a_real_src_" ++ Name ++ ".erl")).
+    ok = ec_file:write(Erl, erl_src_file(Name)).
 
 write_eunitized_src_file(Dir, Name) ->
     Erl = filename:join([Dir, "src", "not_a_real_src_" ++ Name ++ ".erl"]),
