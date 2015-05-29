@@ -129,7 +129,7 @@ reread_config(State) ->
     end.
 
 maybe_boot_apps(State) ->
-    case rebar_state:get(State, shell_apps, undefined) of
+    case find_apps_to_boot(State) of
         undefined ->
             %% try to read in sys.config file
             ok = reread_config(State);
@@ -138,6 +138,19 @@ maybe_boot_apps(State) ->
             load_apps(Apps),
             ok = reread_config(State),
             boot_apps(Apps)
+    end.
+
+find_apps_to_boot(State) ->
+    %% Try the shell_apps option
+    case rebar_state:get(State, shell_apps, undefined) of
+        undefined ->
+            %% Get to the relx tuple instead
+            case lists:keyfind(release, 1, rebar_state:get(State, relx, [])) of
+                {_, _, Apps} -> Apps;
+                false -> undefined
+            end;
+        Apps ->
+            Apps
     end.
 
 load_apps(Apps) ->
