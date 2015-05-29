@@ -80,11 +80,9 @@ format_error(Reason) ->
 
 shell(State) ->
     setup_paths(State),
-    ok = reread_config(State),
     maybe_boot_apps(State),
     setup_shell(),
     rebar_agent:start_link(State),
-    %% try to read in sys.config file
     %% this call never returns (until user quits shell)
     timer:sleep(infinity).
 
@@ -133,10 +131,25 @@ reread_config(State) ->
 maybe_boot_apps(State) ->
     case rebar_state:get(State, shell_apps, undefined) of
         undefined ->
-            ok;
+            %% try to read in sys.config file
+            ok = reread_config(State);
         Apps ->
+            %% load apps, then check config, then boot them.
+            load_apps(Apps),
+            ok = reread_config(State),
             boot_apps(Apps)
     end.
+
+load_apps(Apps) ->
+    [case application:load(App) of
+        ok ->
+             {ok, Ks} = application:get_all_key(App),
+             load_apps(proplists:get_value(applications, Ks));
+        _ ->
+            error % will be caught when starting the app
+     end || App <- Apps,
+            not lists:keymember(App, 1, application:loaded_applications())],
+    ok.
 
 boot_apps(Apps) ->
     ?WARN("The rebar3 shell is a development tool; to deploy "
