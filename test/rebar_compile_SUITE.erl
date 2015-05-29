@@ -20,6 +20,7 @@
          checkout_priority/1,
          compile_plugins/1,
          compile_global_plugins/1,
+         complex_plugins/1,
          highest_version_of_pkg_dep/1,
          parse_transform_test/1]).
 
@@ -49,7 +50,7 @@ all() ->
      recompile_when_opts_change, dont_recompile_when_opts_dont_change,
      dont_recompile_yrl_or_xrl, delete_beam_if_source_deleted,
      deps_in_path, checkout_priority, compile_plugins, compile_global_plugins,
-     highest_version_of_pkg_dep, parse_transform_test].
+     complex_plugins, highest_version_of_pkg_dep, parse_transform_test].
 
 build_basic_app(Config) ->
     AppDir = ?config(apps, Config),
@@ -408,17 +409,20 @@ compile_plugins(Config) ->
 
     DepName = rebar_test_utils:create_random_name("dep1_"),
     PluginName = rebar_test_utils:create_random_name("plugin1_"),
-    mock_git_resource:mock([{config, [{plugins, [
-                                                {list_to_atom(PluginName), Vsn}
-                                                ]}]}]),
-    mock_pkg_resource:mock([
-                           {pkgdeps, [{{iolist_to_binary(PluginName), iolist_to_binary(Vsn)}, []}]}
-                           ]),
+
+    Plugins = rebar_test_utils:expand_deps(git, [{PluginName, Vsn, []}]),
+    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Plugins)}]),
+
+    mock_pkg_resource:mock([{pkgdeps, [{{list_to_binary(DepName), list_to_binary(Vsn)}, []}]},
+                            {config, [{plugins, [
+                                                {list_to_atom(PluginName),
+                                                 {git, "http://site.com/user/"++PluginName++".git",
+                                                 {tag, Vsn}}}]}]}]),
 
     RConfFile =
         rebar_test_utils:create_config(AppDir,
                                       [{deps, [
-                                              {list_to_atom(DepName), {git, "http://site.com/user/"++DepName++".git", {tag, Vsn}}}
+                                              list_to_atom(DepName)
                                               ]}]),
     {ok, RConf} = file:consult(RConfFile),
 
@@ -476,6 +480,49 @@ compile_global_plugins(Config) ->
              {global_plugin, PluginName, Vsn},
              {plugin, PluginName, Vsn2},
              {dep, DepName}]}
+     ),
+
+    meck:unload(rebar_dir).
+
+%% Tests installing of plugin with transitive deps
+complex_plugins(Config) ->
+    AppDir = ?config(apps, Config),
+
+    meck:new(rebar_dir, [passthrough]),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    Vsn2 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    DepName = rebar_test_utils:create_random_name("dep1_"),
+    DepName2 = rebar_test_utils:create_random_name("dep2_"),
+    DepName3 = rebar_test_utils:create_random_name("dep3_"),
+    PluginName = rebar_test_utils:create_random_name("plugin1_"),
+
+    Deps = rebar_test_utils:expand_deps(git, [{PluginName, Vsn2, [{DepName2, Vsn,
+                                                                  [{DepName3, Vsn, []}]}]}
+                                             ,{DepName, Vsn, []}]),
+    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}]),
+
+    RConfFile =
+        rebar_test_utils:create_config(AppDir,
+                                       [{deps, [
+                                               {list_to_atom(DepName), {git, "http://site.com/user/"++DepName++".git", {tag, Vsn}}}
+                                               ]},
+                                       {plugins, [
+                                                 {list_to_atom(PluginName), {git, "http://site.com/user/"++PluginName++".git", {tag, Vsn2}}}
+                                                 ]}]),
+    {ok, RConf} = file:consult(RConfFile),
+
+    %% Build with deps.
+    rebar_test_utils:run_and_check(
+        Config, RConf, ["compile"],
+        {ok, [{app, Name},
+              {plugin, PluginName, Vsn2},
+              {plugin, DepName2},
+              {plugin, DepName3},
+              {dep, DepName}]}
      ),
 
     meck:unload(rebar_dir).

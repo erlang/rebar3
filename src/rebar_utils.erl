@@ -48,6 +48,7 @@
          erl_opts/1,
          indent/1,
          update_code/1,
+         remove_from_code_path/1,
          cleanup_code_path/1,
          args_to_tasks/1,
          expand_env_variable/3,
@@ -579,6 +580,22 @@ update_code(Paths) ->
                                   code:replace_path(Name, Path),
                                   [begin code:purge(M), code:delete(M) end || M <- Modules]
                           end
+                  end, Paths).
+
+remove_from_code_path(Paths) ->
+    lists:foreach(fun(Path) ->
+                          Name = filename:basename(Path, "/ebin"),
+                          App = list_to_atom(Name),
+                          application:load(App),
+                          case application:get_key(App, modules) of
+                              undefined ->
+                                  application:unload(App),
+                                  ok;
+                              {ok, Modules} ->
+                                  application:unload(App),
+                                  [begin code:purge(M), code:delete(M) end || M <- Modules]
+                          end,
+                          code:del_path(Path)
                   end, Paths).
 
 cleanup_code_path(OrigPath) ->

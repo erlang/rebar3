@@ -10,11 +10,17 @@ run_all_hooks(Dir, Type, Command, Providers, State) ->
     run_hooks(Dir, Type, Command, State).
 
 run_provider_hooks(Dir, Type, Command, Providers, State) ->
-    State1 = rebar_state:providers(rebar_state:dir(State, Dir), Providers),
+    PluginDepsPaths = rebar_state:code_paths(State, all_plugin_deps),
+    code:add_pathsa(PluginDepsPaths),
+    Providers1 = rebar_state:providers(State),
+    State1 = rebar_state:providers(rebar_state:dir(State, Dir), Providers++Providers1),
     AllHooks = rebar_state:get(State1, provider_hooks, []),
     TypeHooks = proplists:get_value(Type, AllHooks, []),
     HookProviders = proplists:get_all_values(Command, TypeHooks),
-    rebar_core:do(HookProviders, State1).
+
+    State2 = rebar_core:do(HookProviders, State1),
+    rebar_utils:remove_from_code_path(PluginDepsPaths),
+    State2.
 
 run_hooks(Dir, Type, Command, State) ->
     Hooks = case Type of

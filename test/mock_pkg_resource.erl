@@ -73,6 +73,7 @@ mock_vsn(_Opts) ->
 %%   into a `rebar.config' file to describe dependencies.
 mock_download(Opts) ->
     Deps = proplists:get_value(pkgdeps, Opts, []),
+    Config = proplists:get_value(config, Opts, []),
     meck:expect(
         ?MOD, download,
         fun (Dir, {pkg, AppBin, Vsn}, _) ->
@@ -83,7 +84,7 @@ mock_download(Opts) ->
                 Dir, App, binary_to_list(Vsn),
                 [kernel, stdlib] ++ [element(1,D) || D  <- AppDeps]
             ),
-            rebar_test_utils:create_config(Dir, [{deps, AppDeps}]),
+            rebar_test_utils:create_config(Dir, [{deps, AppDeps}]++Config),
             TarApp = App++"-"++binary_to_list(Vsn)++".tar",
             Tarball = filename:join([Dir, TarApp]),
             Contents = filename:join([Dir, "contents.tar.gz"]),
