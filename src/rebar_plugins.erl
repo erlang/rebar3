@@ -36,6 +36,7 @@ handle_plugins(Profile, Plugins, State) ->
     DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
     State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
 
+    %% Install each plugin individually so if one fails to install it doesn't effect the others
     {PluginProviders, State2} =
         lists:foldl(fun(Plugin, {PluginAcc, StateAcc}) ->
                             {NewPlugins, NewState} = handle_plugin(Profile, Plugin, StateAcc),
