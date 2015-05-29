@@ -7,7 +7,8 @@
 -include("rebar.hrl").
 
 -record(state, {state,
-                cwd}).
+                cwd,
+                show_warning=true}).
 
 start_link(State) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, State, []).
@@ -23,11 +24,13 @@ init(State) ->
     {ok, #state{state=State, cwd=Cwd}}.
 
 handle_call({cmd, Command}, _From, State=#state{state=RState, cwd=Cwd}) ->
+    MidState = maybe_show_warning(State),
     {Res, NewRState} = run(default, Command, RState, Cwd),
-    {reply, Res, State#state{state=NewRState}};
+    {reply, Res, MidState#state{state=NewRState}};
 handle_call({cmd, Namespace, Command}, _From, State = #state{state=RState, cwd=Cwd}) ->
+    MidState = maybe_show_warning(State),
     {Res, NewRState} = run(Namespace, Command, RState, Cwd),
-    {reply, Res, State#state{state=NewRState}};
+    {reply, Res, MidState#state{state=NewRState}};
 handle_call(_Call, _From, State) ->
     {noreply, State}.
 
@@ -71,9 +74,14 @@ run(Namespace, Command, RState, Cwd) ->
             {{error, {Type, Reason}}, RState}
     end.
 
+maybe_show_warning(S=#state{show_warning=true}) ->
+    ?WARN("This feature is experimental and may be modified or removed at any time.", []),
+    S#state{show_warning=false};
+maybe_show_warning(State) ->
+    State.
+
 refresh_paths(RState) ->
     ToRefresh = (rebar_state:code_paths(RState, all_deps)
-                 %% TODO: add plugin paths here when the other change is merged
                  ++ [filename:join([rebar_app_info:out_dir(App), "test"])
                      || App <- rebar_state:project_apps(RState)]
                 %% make sure to never reload self; halt()s the VM
