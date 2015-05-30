@@ -47,6 +47,8 @@ do_tasks([{TaskStr, Args}|Tail], State) ->
         default ->
             %% The first task we hit might be a namespace!
             case maybe_namespace(State2, Task, Args) of
+                {ok, FinalState} when Tail =:= [] ->
+                    {ok, FinalState};
                 {ok, _} ->
                     do_tasks(Tail, State);
                 {error, Reason} ->
@@ -56,6 +58,8 @@ do_tasks([{TaskStr, Args}|Tail], State) ->
             %% We're already in a non-default namespace, check the
             %% task directly.
             case rebar_core:process_command(State2, Task) of
+                {ok, FinalState} when Tail =:= [] ->
+                    {ok, FinalState};
                 {ok, _} ->
                     do_tasks(Tail, State);
                 {error, Reason} ->

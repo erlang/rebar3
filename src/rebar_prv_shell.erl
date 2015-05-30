@@ -45,14 +45,25 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
-                                                               {module, ?MODULE},
-                                                               {bare, false},
-                                                               {deps, ?DEPS},
-                                                               {example, "rebar3 shell"},
-                                                               {short_desc, "Run shell with project apps and deps in path."},
-                                                               {desc, info()},
-                                                               {opts, [{config, undefined, "config", string, "Path to the config file to use. Defaults to the sys_config defined for relx, if present."}]}])),
+    State1 = rebar_state:add_provider(
+            State,
+            providers:create([
+                {name, ?PROVIDER},
+                {module, ?MODULE},
+                {bare, false},
+                {deps, ?DEPS},
+                {example, "rebar3 shell"},
+                {short_desc, "Run shell with project apps and deps in path."},
+                {desc, info()},
+                {opts, [{config, undefined, "config", string,
+                         "Path to the config file to use. Defaults to the "
+                         "sys_config defined for relx, if present."},
+                        {name, undefined, "name", atom,
+                         "Gives a long name to the node."},
+                        {sname, undefined, "sname", atom,
+                         "Gives a short name to the node."}]}
+            ])
+    ),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
@@ -72,6 +83,18 @@ format_error(Reason) ->
 %% immediately kill the script. ctrl-g, however, works fine
 
 shell(State) ->
+    setup_name(State),
+    setup_paths(State),
+    maybe_boot_apps(State),
+    setup_shell(),
+    rebar_agent:start_link(State),
+    %% this call never returns (until user quits shell)
+    timer:sleep(infinity).
+
+info() ->
+    "Start a shell with project and deps preloaded similar to~n'erl -pa ebin -pa deps/*/ebin'.~n".
+
+setup_shell() ->
     %% scan all processes for any with references to the old user and save them to
     %% update later
     NeedsUpdate = [Pid || Pid <- erlang:processes(),
@@ -91,18 +114,85 @@ shell(State) ->
     %% disable the simple error_logger (which may have been added multiple
     %% times). removes at most the error_logger added by init and the
     %% error_logger added by the tty handler
-    ok = remove_error_handler(3),
+    ok = remove_error_handler(3).
+
+setup_paths(State) ->
     %% Add deps to path
     code:add_pathsa(rebar_state:code_paths(State, all_deps)),
     %% add project app test paths
-    ok = add_test_paths(State),
-    %% try to read in sys.config file
-    ok = reread_config(State),
-    %% this call never returns (until user quits shell)
-    timer:sleep(infinity).
+    ok = add_test_paths(State).
 
-info() ->
-    "Start a shell with project and deps preloaded similar to~n'erl -pa ebin -pa deps/*/ebin'.~n".
+maybe_boot_apps(State) ->
+    case find_apps_to_boot(State) of
+        undefined ->
+            %% try to read in sys.config file
+            ok = reread_config(State);
+        Apps ->
+            %% load apps, then check config, then boot them.
+            load_apps(Apps),
+            ok = reread_config(State),
+            boot_apps(Apps)
+    end.
+
+setup_name(State) ->
+    {Opts, _} = rebar_state:command_parsed_args(State),
+    case {proplists:get_value(name, Opts), proplists:get_value(sname, Opts)} of
+        {undefined, undefined} ->
+            ok;
+        {Name, undefined} ->
+            net_kernel:start([Name, longnames]);
+        {undefined, SName} ->
+            net_kernel:start([SName, shortnames]);
+        {_, _} ->
+            ?ABORT("Cannot have both short and long node names defined", [])
+    end.
+
+find_apps_to_boot(State) ->
+    %% Try the shell_apps option
+    case rebar_state:get(State, shell_apps, undefined) of
+        undefined ->
+            %% Get to the relx tuple instead
+            case lists:keyfind(release, 1, rebar_state:get(State, relx, [])) of
+                {_, _, Apps} -> Apps;
+                false -> undefined
+            end;
+        Apps ->
+            Apps
+    end.
+
+load_apps(Apps) ->
+    [case application:load(App) of
+        ok ->
+             {ok, Ks} = application:get_all_key(App),
+             load_apps(proplists:get_value(applications, Ks));
+        _ ->
+            error % will be caught when starting the app
+     end || App <- Apps,
+            not lists:keymember(App, 1, application:loaded_applications())],
+    ok.
+
+reread_config(State) ->
+    case find_config(State) of
+        no_config ->
+            ok;
+        ConfigList ->
+            _ = [application:set_env(Application, Key, Val)
+                  || {Application, Items} <- ConfigList,
+                     {Key, Val} <- Items],
+            ok
+    end.
+
+boot_apps(Apps) ->
+    ?WARN("The rebar3 shell is a development tool; to deploy "
+            "applications in production, consider using releases "
+            "(http://www.rebar3.org/v3.0/docs/releases)", []),
+    Res = [application:ensure_all_started(App) || App <- Apps],
+    _ = [?INFO("Booted ~p", [App])
+            || {ok, Booted} <- Res,
+            App <- Booted],
+    _ = [?ERROR("Failed to boot ~p for reason ~p", [App, Reason])
+            || {error, {App, Reason}} <- Res],
+    ok.
 
 remove_error_handler(0) ->
     ?WARN("Unable to remove simple error_logger handler", []);
@@ -124,27 +214,13 @@ wait_until_user_started(Timeout) ->
     end.
 
 add_test_paths(State) ->
-    lists:foreach(fun(App) ->
-                          AppDir = rebar_app_info:out_dir(App),
-                          %% ignore errors resulting from non-existent directories
-                          _ = code:add_path(filename:join([AppDir, "test"]))
-                  end, rebar_state:project_apps(State)),
+    _ = [begin
+            AppDir = rebar_app_info:out_dir(App),
+            %% ignore errors resulting from non-existent directories
+            _ = code:add_path(filename:join([AppDir, "test"]))
+         end || App <- rebar_state:project_apps(State)],
     _ = code:add_path(filename:join([rebar_dir:base_dir(State), "test"])),
     ok.
-
-reread_config(State) ->
-    case find_config(State) of
-        no_config ->
-            ok;
-        ConfigList ->
-            lists:foreach(fun ({Application, Items}) ->
-                                  lists:foreach(fun ({Key, Val}) ->
-                                                        application:set_env(Application, Key, Val)
-                                                end,
-                                                Items)
-                          end,
-                          ConfigList)
-    end.
 
 % First try the --config flag, then try the relx sys_config
 -spec find_config(rebar_state:t()) -> [tuple()] | no_config.
@@ -179,4 +255,7 @@ find_config_relx(State) ->
 consult_config(State, Filename) ->
     Fullpath = filename:join(rebar_dir:root_dir(State), Filename),
     ?DEBUG("Loading configuration from ~p", [Fullpath]),
-    rebar_file_utils:try_consult(Fullpath).
+    case rebar_file_utils:try_consult(Fullpath) of
+        [T] -> T;
+        [] -> []
+    end.
