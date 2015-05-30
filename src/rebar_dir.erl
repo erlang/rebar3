@@ -132,7 +132,7 @@ src_dirs(State) -> src_dirs(State, []).
 src_dirs(State, Default) ->
     ErlOpts = rebar_utils:erl_opts(State),
     Vs = proplists:get_all_values(src_dirs, ErlOpts),
-    case lists:append(Vs) of
+    case lists:append([rebar_state:get(State, src_dirs, []) | Vs]) of
         []   -> Default;
         Dirs -> Dirs
     end.
@@ -144,7 +144,7 @@ extra_src_dirs(State) -> extra_src_dirs(State, []).
 extra_src_dirs(State, Default) ->
     ErlOpts = rebar_utils:erl_opts(State),
     Vs = proplists:get_all_values(extra_src_dirs, ErlOpts),
-    case lists:append(Vs) of
+    case lists:append([rebar_state:get(State, extra_src_dirs, []) | Vs]) of
         []   -> Default;
         Dirs -> Dirs
     end.

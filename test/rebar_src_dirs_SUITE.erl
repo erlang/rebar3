@@ -1,4 +1,4 @@
--module(rebar_extra_src_dirs_SUITE).
+-module(rebar_src_dirs_SUITE).
 
 -export([suite/0,
          init_per_suite/1,
@@ -6,9 +6,15 @@
          init_per_testcase/2,
          end_per_testcase/2,
          all/0,
+         src_dirs_at_root/1,
+         extra_src_dirs_at_root/1,
+         src_dirs_in_erl_opts/1,
+         extra_src_dirs_in_erl_opts/1,
+         src_dirs_at_root_and_in_erl_opts/1,
+         extra_src_dirs_at_root_and_in_erl_opts/1,
          build_basic_app/1,
          build_multi_apps/1,
-         src_dir_takes_precedence/1]).
+         src_dir_takes_precedence_over_extra/1]).
 
 -include_lib("common_test/include/ct.hrl").
 
@@ -27,7 +33,88 @@ init_per_testcase(_, Config) ->
 end_per_testcase(_, _Config) -> ok.
 
 all() ->
-    [build_basic_app, build_multi_apps, src_dir_takes_precedence].
+    [src_dirs_at_root, extra_src_dirs_at_root,
+     src_dirs_in_erl_opts, extra_src_dirs_in_erl_opts,
+     src_dirs_at_root_and_in_erl_opts, extra_src_dirs_at_root_and_in_erl_opts,
+     build_basic_app, build_multi_apps, src_dir_takes_precedence_over_extra].
+
+src_dirs_at_root(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{src_dirs, ["foo", "bar", "baz"]}],
+
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+
+    ["foo", "bar", "baz"] = rebar_dir:src_dirs(State, []).
+
+extra_src_dirs_at_root(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{extra_src_dirs, ["foo", "bar", "baz"]}],
+
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+
+    ["foo", "bar", "baz"] = rebar_dir:extra_src_dirs(State, []).
+
+src_dirs_in_erl_opts(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{erl_opts, [{src_dirs, ["foo", "bar", "baz"]}]}],
+
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+
+    ["foo", "bar", "baz"] = rebar_dir:src_dirs(State, []).
+
+extra_src_dirs_in_erl_opts(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{erl_opts, [{extra_src_dirs, ["foo", "bar", "baz"]}]}],
+
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+
+    ["foo", "bar", "baz"] = rebar_dir:extra_src_dirs(State, []).
+
+src_dirs_at_root_and_in_erl_opts(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{erl_opts, [{src_dirs, ["foo", "bar"]}]}, {src_dirs, ["baz", "qux"]}],
+
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+
+    ["baz", "qux", "foo", "bar"] = rebar_dir:src_dirs(State, []).
+
+extra_src_dirs_at_root_and_in_erl_opts(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{erl_opts, [{extra_src_dirs, ["foo", "bar"]}]}, {extra_src_dirs, ["baz", "qux"]}],
+
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+
+    ["baz", "qux", "foo", "bar"] = rebar_dir:extra_src_dirs(State, []).
 
 build_basic_app(Config) ->
     AppDir = ?config(apps, Config),
@@ -118,7 +205,7 @@ build_multi_apps(Config) ->
     Mods2 = proplists:get_value(modules, KVs2),
     false = lists:member(extra2, Mods2).
 
-src_dir_takes_precedence(Config) ->
+src_dir_takes_precedence_over_extra(Config) ->
     AppDir = ?config(apps, Config),
 
     Name = rebar_test_utils:create_random_name("app1_"),
