@@ -57,7 +57,11 @@ init(State) ->
                 {desc, info()},
                 {opts, [{config, undefined, "config", string,
                          "Path to the config file to use. Defaults to the "
-                         "sys_config defined for relx, if present."}]}
+                         "sys_config defined for relx, if present."},
+                        {name, undefined, "name", atom,
+                         "Gives a long name to the node."},
+                        {sname, undefined, "sname", atom,
+                         "Gives a short name to the node."}]}
             ])
     ),
     {ok, State1}.
@@ -79,6 +83,7 @@ format_error(Reason) ->
 %% immediately kill the script. ctrl-g, however, works fine
 
 shell(State) ->
+    setup_name(State),
     setup_paths(State),
     maybe_boot_apps(State),
     setup_shell(),
@@ -117,17 +122,6 @@ setup_paths(State) ->
     %% add project app test paths
     ok = add_test_paths(State).
 
-reread_config(State) ->
-    case find_config(State) of
-        no_config ->
-            ok;
-        ConfigList ->
-            _ = [application:set_env(Application, Key, Val)
-                  || {Application, Items} <- ConfigList,
-                     {Key, Val} <- Items],
-            ok
-    end.
-
 maybe_boot_apps(State) ->
     case find_apps_to_boot(State) of
         undefined ->
@@ -138,6 +132,19 @@ maybe_boot_apps(State) ->
             load_apps(Apps),
             ok = reread_config(State),
             boot_apps(Apps)
+    end.
+
+setup_name(State) ->
+    {Opts, _} = rebar_state:command_parsed_args(State),
+    case {proplists:get_value(name, Opts), proplists:get_value(sname, Opts)} of
+        {undefined, undefined} ->
+            ok;
+        {Name, undefined} ->
+            net_kernel:start([Name, longnames]);
+        {undefined, SName} ->
+            net_kernel:start([SName, shortnames]);
+        {_, _} ->
+            ?ABORT("Cannot have both short and long node names defined", [])
     end.
 
 find_apps_to_boot(State) ->
@@ -163,6 +170,17 @@ load_apps(Apps) ->
      end || App <- Apps,
             not lists:keymember(App, 1, application:loaded_applications())],
     ok.
+
+reread_config(State) ->
+    case find_config(State) of
+        no_config ->
+            ok;
+        ConfigList ->
+            _ = [application:set_env(Application, Key, Val)
+                  || {Application, Items} <- ConfigList,
+                     {Key, Val} <- Items],
+            ok
+    end.
 
 boot_apps(Apps) ->
     ?WARN("The rebar3 shell is a development tool; to deploy "
