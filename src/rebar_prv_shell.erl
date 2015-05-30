@@ -107,8 +107,10 @@ setup_shell() ->
     %% wait until user_drv and user have been registered (max 3 seconds)
     ok = wait_until_user_started(3000),
     %% set any process that had a reference to the old user's group leader to the
-    %% new user process
-    _ = [erlang:group_leader(whereis(user), Pid) || Pid <- NeedsUpdate],
+    %% new user process. Catch the race condition when the Pid exited after the
+    %% liveness check.
+    _ = [catch erlang:group_leader(whereis(user), Pid) || Pid <- NeedsUpdate,
+                                                          is_process_alive(Pid)],
     %% enable error_logger's tty output
     ok = error_logger:swap_handler(tty),
     %% disable the simple error_logger (which may have been added multiple
