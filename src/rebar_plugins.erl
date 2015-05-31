@@ -60,7 +60,7 @@ handle_plugin(Profile, Plugin, State) ->
         code:add_pathsa(CodePaths),
 
         %% Build plugin and its deps
-        [build_plugin(AppInfo) || AppInfo <- ToBuild],
+        [build_plugin(AppInfo, Apps, State) || AppInfo <- ToBuild],
 
         %% Add newly built deps and plugin to code path
         State3 = rebar_state:update_all_plugin_deps(State2, Apps),
@@ -78,11 +78,12 @@ handle_plugin(Profile, Plugin, State) ->
             {[], State}
     end.
 
-build_plugin(AppInfo) ->
+build_plugin(AppInfo, Apps, State) ->
+    Providers = rebar_state:providers(State),
     AppDir = rebar_app_info:dir(AppInfo),
     C = rebar_config:consult(AppDir),
-    S = rebar_state:new(rebar_state:new(), C, AppDir),
-    rebar_prv_compile:compile(S, [], AppInfo).
+    S = rebar_state:new(rebar_state:all_deps(rebar_state:new(), Apps), C, AppDir),
+    rebar_prv_compile:compile(S, Providers, AppInfo).
 
 plugin_providers({Plugin, _, _, _}) when is_atom(Plugin) ->
     validate_plugin(Plugin);

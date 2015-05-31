@@ -98,10 +98,9 @@ run_aux(State, RawArgs) ->
                             filename:join(filename:absname(rebar_state:dir(State2)), BaseDir)),
 
     {ok, Providers} = application:get_env(rebar, providers),
-    State4 = rebar_plugins:install(State3),
-
     %% Providers can modify profiles stored in opts, so set default after initializing providers
-    State5 = rebar_state:create_logic_providers(Providers, State4),
+    State4 = rebar_state:create_logic_providers(Providers, State3),
+    State5 = rebar_plugins:install(State4),
     State6 = rebar_state:default(State5, rebar_state:opts(State5)),
 
     {Task, Args} = parse_args(RawArgs),
