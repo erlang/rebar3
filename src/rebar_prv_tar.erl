@@ -40,6 +40,9 @@ do(State) ->
                                    [?DEFAULT_CHECKOUTS_DIR, DepsDir | ProjectAppDirs]),
     OutputDir = filename:join(rebar_dir:base_dir(State), ?DEFAULT_RELEASE_DIR),
     AllOptions = string:join(["release", "tar" | Options], " "),
+    Cwd = rebar_state:dir(State),
+    Providers = rebar_state:providers(State),
+    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
     case rebar_state:get(State, relx, []) of
         [] ->
             relx:main([{lib_dirs, LibDirs}
@@ -51,6 +54,7 @@ do(State) ->
                       ,{output_dir, OutputDir}
                       ,{caller, Caller}], AllOptions)
     end,
+    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State),
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
