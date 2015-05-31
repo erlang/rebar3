@@ -72,7 +72,7 @@ do(State) ->
             end;
         Name ->
             AllApps = rebar_state:all_deps(State)++rebar_state:project_apps(State),
-            AppInfo = rebar_app_utils:find(Name, AllApps),
+            {ok, AppInfo} = rebar_app_utils:find(ec_cnv:to_binary(Name), AllApps),
             escriptize(State, AppInfo)
     end.
 
@@ -83,6 +83,7 @@ escriptize(State0, App) ->
     %% Get the output filename for the escript -- this may include dirs
     Filename = filename:join([rebar_dir:base_dir(State0), "bin",
                               rebar_state:get(State0, escript_name, AppName)]),
+    ?DEBUG("Creating escript file ~s", [Filename]),
     ok = filelib:ensure_dir(Filename),
     State = rebar_state:escript_path(State0, Filename),
 
