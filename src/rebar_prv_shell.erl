@@ -50,7 +50,7 @@ init(State) ->
             providers:create([
                 {name, ?PROVIDER},
                 {module, ?MODULE},
-                {bare, false},
+                {bare, true},
                 {deps, ?DEPS},
                 {example, "rebar3 shell"},
                 {short_desc, "Run shell with project apps and deps in path."},

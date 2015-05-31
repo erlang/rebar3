@@ -22,7 +22,7 @@
 init(State) ->
     State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
                                                                {module, ?MODULE},
-                                                               {bare, false},
+                                                               {bare, true},
                                                                {deps, ?DEPS},
                                                                {example, "rebar3 help <task>"},
                                                                {short_desc, "Display a list of tasks or help for a given task or subtask."},

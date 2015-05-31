@@ -47,7 +47,7 @@ init(State) ->
     Provider = providers:create([
                                 {name, ?PROVIDER},
                                 {module, ?MODULE},
-                                {bare, false},
+                                {bare, true},
                                 {deps, ?DEPS},
                                 {example, "rebar3 escriptize"},
                                 {opts, []},

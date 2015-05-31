@@ -61,7 +61,7 @@
 init(State) ->
     State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
                                                                {module, ?MODULE},
-                                                               {bare, true},
+                                                               {bare, false},
                                                                {deps, ?DEPS},
                                                                {example, undefined},
                                                                {short_desc, ""},
