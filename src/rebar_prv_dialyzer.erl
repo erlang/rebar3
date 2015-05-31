@@ -25,7 +25,7 @@ init(State) ->
             {succ_typings, $s, "succ-typings", boolean, "Enable success typing analysis. Default: true"}],
     State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
                                                                {module, ?MODULE},
-                                                               {bare, false},
+                                                               {bare, true},
                                                                {deps, ?DEPS},
                                                                {example, "rebar3 dialyzer"},
                                                                {short_desc, short_desc()},

@@ -4,7 +4,7 @@
   0},
  {<<"providers">>,
   {git,"https://github.com/tsloughter/providers.git",
-       {ref,"7563ba7e916d5a35972b25b3aa1945ffe0a8e7a5"}},
+       {ref,"adc0af0a3f5de2049419a753777686b94f4e2c90"}},
   0},
  {<<"mustache">>,
   {git,"https://github.com/soranoba/mustache.git",

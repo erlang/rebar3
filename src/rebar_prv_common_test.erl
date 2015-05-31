@@ -25,7 +25,7 @@ init(State) ->
     Provider = providers:create([{name, ?PROVIDER},
                                  {module, ?MODULE},
                                  {deps, ?DEPS},
-                                 {bare, false},
+                                 {bare, true},
                                  {example, "rebar3 ct"},
                                  {short_desc, "Run Common Tests."},
                                  {desc, "Run Common Tests."},

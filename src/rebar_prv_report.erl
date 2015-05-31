@@ -23,7 +23,7 @@
 init(State) ->
     State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
                                                                {module, ?MODULE},
-                                                               {bare, false},
+                                                               {bare, true},
                                                                {deps, ?DEPS},
                                                                {example, "rebar3 report \"<task>\""},
                                                                {short_desc, "Provide a crash report to be sent to the rebar3 issues page."},

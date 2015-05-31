@@ -28,7 +28,7 @@ init(State) ->
         rebar_state:add_provider(State,
                                  providers:create([{name, ?PROVIDER},
                                                    {module, ?MODULE},
-                                                   {bare, false},
+                                                   {bare, true},
                                                    {deps, ?DEPS},
                                                    {example, "rebar3 upgrade [cowboy[,ranch]]"},
                                                    {short_desc, "Upgrade dependencies."},
