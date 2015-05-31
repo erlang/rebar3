@@ -13,7 +13,7 @@ configuration work. rebar also provides dependency management, enabling
 application writers to easily re-use common libraries from a variety of
 locations (git, hg, etc).
 
-3.0 Alpha-5
+3.0 Alpha-6
 ====
 
 [DOCUMENTATION](http://www.rebar3.org/v3.0/docs)
