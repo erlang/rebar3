@@ -345,21 +345,26 @@ reduce_path([_|Acc], [".."|Rest])  -> reduce_path(Acc, Rest);
 reduce_path([], [".."|Rest])       -> reduce_path([], Rest);
 reduce_path(Acc, [Component|Rest]) -> reduce_path([Component|Acc], Rest).
 
-remove_links(Path) ->
-    case ec_file:is_dir(Path) of
-        false -> ok;
-        true  -> remove_links1(Path)
-    end.
 
-remove_links1(Path) ->
+remove_links(Path) ->
+	IsDir = ec_file:is_dir(Path),
     case ec_file:is_symlink(Path) of
-        true  ->
+        true when IsDir ->
+            delete_dir_link(Path);
+        true ->
             file:delete(Path);
         false ->
-            lists:foreach(fun(ChildPath) ->
-                                  remove_links(ChildPath)
-                          end, sub_dirs(Path))
+            ec_file:is_dir(Path) andalso
+                lists:foreach(fun(ChildPath) ->
+                                      remove_links(ChildPath)
+                              end, sub_dirs(Path))
     end.
+
+delete_dir_link(Path) ->
+	case os:type() of
+		{unix, _} -> file:delete(Path);
+		{win32, _} -> file:del_dir(Path)
+	end.
 
 sub_dirs(Path) ->
     {ok, SubDirs} = file:list_dir(Path),

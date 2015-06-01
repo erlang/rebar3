@@ -120,20 +120,23 @@ mv(Source, Dest) ->
                                       [{use_stdout, false}, abort_on_error]),
             ok;
         {win32, _} ->
-            {ok, R} = rebar_utils:sh(
-                        ?FMT("move /y \"~s\" \"~s\" 1> nul",
+            Res = rebar_utils:sh(
+                        ?FMT("robocopy /move /e \"~s\" \"~s\" 1> nul",
                              [filename:nativename(Source),
                               filename:nativename(Dest)]),
                         [{use_stdout, false}, return_on_error]),
-            case R of
-                [] ->
-                    ok;
-                _ ->
+            case win32_robocopy_ok(Res) of
+                true -> ok;
+                false ->
                     {error, lists:flatten(
                               io_lib:format("Failed to move ~s to ~s~n",
                                             [Source, Dest]))}
             end
     end.
+
+win32_robocopy_ok({ok, _}) -> true;
+win32_robocopy_ok({error, {Rc, _}}) when Rc<9, Rc==16 -> true;
+win32_robocopy_ok(_) -> false.
 
 delete_each([]) ->
     ok;
