@@ -36,10 +36,14 @@
          write_file_if_contents_differ/2,
          system_tmpdir/0,
          system_tmpdir/1,
-         reset_dir/1]).
+         reset_dir/1,
+         touch/1]).
 
 -include("rebar.hrl").
+
 -include_lib("providers/include/providers.hrl").
+-include_lib("kernel/include/file.hrl").
+
 
 %% ===================================================================
 %% Public API
@@ -71,13 +75,14 @@ symlink_or_copy(Source, Target) ->
         {error, eexist} ->
             ok;
         {error, _} ->
+            rm_rf(Target),
             cp_r([Source], Target)
     end.
 
 %% @doc Remove files and directories.
 %% Target is a single filename, directoryname or wildcard expression.
 -spec rm_rf(string()) -> 'ok'.
-rm_rf(Target) ->
+rm_rf(Target) when is_list(Target) ->
     case os:type() of
         {unix, _} ->
             EscTarget = escape_path(Target),
@@ -91,7 +96,9 @@ rm_rf(Target) ->
             ok = delete_each(Files),
             ok = delete_each_dir_win32(Dirs),
             ok
-    end.
+    end;
+rm_rf(Target) when is_binary(Target) ->
+    rm_rf(binary_to_list(Target)).
 
 -spec cp_r(list(string()), file:filename()) -> 'ok'.
 cp_r([], _Dest) ->
@@ -186,6 +193,17 @@ reset_dir(Path) ->
     %% recreate the directory
     filelib:ensure_dir(filename:join([Path, "dummy.beam"])).
 
+
+%% Linux touch but using erlang functions to work in bot *nix os and
+%% windows
+-spec touch(Path) -> ok | {error, Reason} when
+      Path :: file:name(),
+      Reason :: file:posix().
+touch(Path) ->
+    {ok, A} = file:read_file_info(Path),
+    ok = file:write_file_info(Path, A#file_info{mtime = calendar:local_time(),
+                                                atime = calendar:local_time()}).
+
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
@@ -198,8 +216,10 @@ delete_each_dir_win32([Dir | Rest]) ->
     delete_each_dir_win32(Rest).
 
 xcopy_win32(Source,Dest)->
+    %% "xcopy \"~s\" \"~s\" /q /y /e 2> nul", Chanegd to robocopy to
+    %% handle long names. May have issues with older windows.
     {ok, R} = rebar_utils:sh(
-                ?FMT("xcopy \"~s\" \"~s\" /q /y /e 2> nul",
+                ?FMT("robocopy \"~s\" \"~s\" /e /is 2> nul",
                      [filename:nativename(Source), filename:nativename(Dest)]),
                 [{use_stdout, false}, return_on_error]),
     case length(R) > 0 of
@@ -214,12 +234,11 @@ xcopy_win32(Source,Dest)->
 
 cp_r_win32({true, SourceDir}, {true, DestDir}) ->
     %% from directory to directory
-    SourceBase = filename:basename(SourceDir),
-    ok = case file:make_dir(filename:join(DestDir, SourceBase)) of
+     ok = case file:make_dir(DestDir) of
              {error, eexist} -> ok;
              Other -> Other
          end,
-    ok = xcopy_win32(SourceDir, filename:join(DestDir, SourceBase));
+    ok = xcopy_win32(SourceDir, DestDir);
 cp_r_win32({false, Source} = S,{true, DestDir}) ->
     %% from file to directory
     cp_r_win32(S, {false, filename:join(DestDir, filename:basename(Source))});
