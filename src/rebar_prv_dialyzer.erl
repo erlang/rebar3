@@ -72,6 +72,7 @@ short_desc() ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    maybe_fix_env(),
     ?INFO("Dialyzer starting, this may take a while...", []),
     code:add_pathsa(rebar_state:code_paths(State, all_deps)),
     Plt = get_plt(State),
@@ -90,6 +91,14 @@ do(State) ->
     after
         rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default))
     end.
+
+%% This is used to workaround dialyzer quirk discussed here
+%% https://github.com/rebar/rebar3/pull/489#issuecomment-107953541
+%% Dialyzer gets default plt location wrong way by peeking HOME environment
+%% variable which usually is not defined on Windows.
+maybe_fix_env() ->
+    {ok, [[HomePath]]} = init:get_argument(home),
+    os:putenv("DIALYZER_PLT", filename:join(HomePath, ".dialyzer_plt")).
 
 -spec format_error(any()) -> iolist().
 format_error({error_processing_apps, Error}) ->
