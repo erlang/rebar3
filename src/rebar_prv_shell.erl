@@ -111,12 +111,18 @@ setup_shell() ->
     %% liveness check.
     _ = [catch erlang:group_leader(whereis(user), Pid) || Pid <- NeedsUpdate,
                                                           is_process_alive(Pid)],
-    %% enable error_logger's tty output
-    ok = error_logger:swap_handler(tty),
-    %% disable the simple error_logger (which may have been added multiple
-    %% times). removes at most the error_logger added by init and the
-    %% error_logger added by the tty handler
-    ok = remove_error_handler(3).
+    try
+        %% enable error_logger's tty output
+        error_logger:swap_handler(tty),
+        %% disable the simple error_logger (which may have been added multiple
+        %% times). removes at most the error_logger added by init and the
+        %% error_logger added by the tty handler
+        remove_error_handler(3)
+    catch
+        E:R -> % may fail with custom loggers
+            ?DEBUG("Logger changes failed for ~p:~p (~p)", [E,R,erlang:get_stacktrace()]),
+            hope_for_best
+    end.
 
 setup_paths(State) ->
     %% Add deps to path
