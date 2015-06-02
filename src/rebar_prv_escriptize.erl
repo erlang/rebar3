@@ -90,8 +90,8 @@ escriptize(State0, App) ->
     %% Look for a list of other applications (dependencies) to include
     %% in the output file. We then use the .app files for each of these
     %% to pull in all the .beam files.
-    InclApps = lists:usort(rebar_state:get(State, escript_incl_apps, [])
-                          ++ all_deps(State)),
+    InclApps = lists:usort([ec_cnv:to_atom(AppName) | rebar_state:get(State, escript_incl_apps, [])
+                           ++ all_deps(State)]),
     AllApps = rebar_state:all_deps(State)++rebar_state:project_apps(State),
     InclBeams = get_apps_beams(InclApps, AllApps),
 
@@ -135,7 +135,7 @@ format_error({bad_name, App}) ->
     io_lib:format("Failed to get ebin/ directory for "
                    "escript_incl_app: ~p", [App]);
 format_error(no_main_app) ->
-    io_lib:format("Multiple project apps and {rebar_escript_plugin, [{main_app, atom()}]}."
+    io_lib:format("Multiple project apps and {escript_main_app, atom()}."
                  " not set in rebar.config", []).
 
 %% ===================================================================
