@@ -286,8 +286,9 @@ is_checkout(#app_info_t{is_checkout=IsCheckout}) ->
     IsCheckout.
 
 -spec valid(t()) -> boolean().
-valid(AppInfo=#app_info_t{valid=undefined}) ->
-    case rebar_app_utils:validate_application_info(AppInfo) of
+valid(AppInfo=#app_info_t{valid=undefined, state=State}) ->
+    case rebar_app_utils:validate_application_info(AppInfo)
+        andalso rebar_state:has_all_artifacts(State) =:= true of
         true ->
             true;
         _ ->
