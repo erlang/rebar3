@@ -3,6 +3,8 @@
 -export([new/0, new/1, new/2, new/3,
          get/2, get/3, set/3,
 
+         has_all_artifacts/1,
+
          code_paths/2, code_paths/3, update_code_paths/3,
 
          opts/1, opts/2,
@@ -148,6 +150,23 @@ default(#state_t{default=Opts}) ->
 
 default(State, Opts) ->
     State#state_t{default=Opts}.
+
+-spec has_all_artifacts(rebar_app_info:t()) -> true | providers:error().
+has_all_artifacts(State) ->
+    Artifacts = rebar_state:get(State, artifacts, []),
+    Dir = rebar_dir:base_dir(State),
+    all(Dir, Artifacts).
+
+all(_, []) ->
+    true;
+all(Dir, [File|Artifacts]) ->
+    case filelib:is_regular(filename:join(Dir, File)) of
+        false ->
+            ?DEBUG("Missing artifact ~s", [filename:join(Dir, File)]),
+            {false, File};
+        true ->
+            all(Dir, Artifacts)
+    end.
 
 code_paths(#state_t{code_paths=CodePaths}, Key) ->
     case dict:find(Key, CodePaths) of

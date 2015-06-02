@@ -666,7 +666,8 @@ warn_skip_pkg({Name, Source}, State) ->
 
 not_needs_compile(App) ->
     not(rebar_app_info:is_checkout(App))
-        andalso rebar_app_info:valid(App).
+        andalso rebar_app_info:valid(App)
+          andalso rebar_state:has_all_artifacts(rebar_app_info:state(App)) =:= true.
 
 get_package(Dep, State) ->
     case rebar_state:registry(State) of

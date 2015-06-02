@@ -20,19 +20,19 @@ do(State, LibDirs) ->
     %% Sort apps so we get the same merged deps config everytime
     SortedApps = rebar_utils:sort_deps(Apps),
     lists:foldl(fun(AppInfo, StateAcc) ->
-			Name = rebar_app_info:name(AppInfo),
-			case enable(State, AppInfo) of
-			    true ->
-				{AppInfo1, StateAcc1} = merge_deps(AppInfo, StateAcc),
-				OutDir = filename:join(DepsDir, Name),
-				AppInfo2 = rebar_app_info:out_dir(AppInfo1, OutDir),
-				ProjectDeps1 = lists:delete(Name, ProjectDeps),
-				rebar_state:project_apps(StateAcc1
-		 					,rebar_app_info:deps(AppInfo2, ProjectDeps1));
-			    false ->
-				?INFO("Ignoring ~s", [Name]),
-				StateAcc
-			end
+                        Name = rebar_app_info:name(AppInfo),
+                        case enable(State, AppInfo) of
+                            true ->
+                                {AppInfo1, StateAcc1} = merge_deps(AppInfo, StateAcc),
+                                OutDir = filename:join(DepsDir, Name),
+                                AppInfo2 = rebar_app_info:out_dir(AppInfo1, OutDir),
+                                ProjectDeps1 = lists:delete(Name, ProjectDeps),
+                                rebar_state:project_apps(StateAcc1
+                                                        ,rebar_app_info:deps(AppInfo2, ProjectDeps1));
+                            false ->
+                                ?INFO("Ignoring ~s", [Name]),
+                                StateAcc
+                        end
                 end, State, SortedApps).
 
 format_error({module_list, File}) ->
@@ -51,7 +51,8 @@ merge_deps(AppInfo, State) ->
                  rebar_state:apply_profiles(
                    rebar_state:new(reset_hooks(rebar_state:opts(State, Default)), C,
                                   rebar_app_info:dir(AppInfo)), CurrentProfiles), Name),
-    AppInfo1 = rebar_app_info:state(AppInfo, AppState),
+    AppState1 = rebar_state:set(AppState, artifacts, []),
+    AppInfo1 = rebar_app_info:state(AppInfo, AppState1),
 
     State1 = lists:foldl(fun(Profile, StateAcc) ->
                                  AppProfDeps = rebar_state:get(AppState, {deps, Profile}, []),
@@ -219,8 +220,8 @@ try_handle_app_src_file(_, _AppDir, Other, _Validate) ->
     throw({error, {multiple_app_files, Other}}).
 
 enable(State, AppInfo) ->
-    not lists:member(to_atom(rebar_app_info:name(AppInfo)), 
-		     rebar_state:get(State, excluded_apps, [])).
+    not lists:member(to_atom(rebar_app_info:name(AppInfo)),
+             rebar_state:get(State, excluded_apps, [])).
 
 to_atom(Bin) ->
     list_to_atom(binary_to_list(Bin)).

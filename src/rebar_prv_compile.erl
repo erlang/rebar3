@@ -8,6 +8,7 @@
 
 -export([compile/3]).
 
+-include_lib("providers/include/providers.hrl").
 -include("rebar.hrl").
 
 -define(PROVIDER, compile).
@@ -60,12 +61,15 @@ do(State) ->
     State3 = rebar_state:code_paths(State2, all_deps, DepsPaths ++ ProjAppsPaths),
 
     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State2),
+    has_all_artifacts(State3),
 
     rebar_utils:cleanup_code_path(rebar_state:code_paths(State3, default)),
 
     {ok, State3}.
 
 -spec format_error(any()) -> iolist().
+format_error({missing_artifact, File}) ->
+    io_lib:format("Missing artifact ~s", [File]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -90,6 +94,7 @@ compile(State, Providers, AppInfo) ->
     case rebar_otp_app:compile(State, AppInfo) of
         {ok, AppInfo1} ->
             rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, State),
+            has_all_artifacts(State),
             AppInfo1;
         Error ->
             throw(Error)
@@ -98,6 +103,14 @@ compile(State, Providers, AppInfo) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+has_all_artifacts(State) ->
+    case rebar_state:has_all_artifacts(State) of
+        {false, File} ->
+            throw(?PRV_ERROR({missing_artifact, File}));
+        true ->
+            true
+    end.
 
 copy_app_dirs(State, OldAppDir, AppDir) ->
     case ec_cnv:to_binary(filename:absname(OldAppDir)) =/=
