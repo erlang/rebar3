@@ -7,6 +7,7 @@
          end_per_testcase/2,
          all/0,
          build_and_clean_app/1,
+         escriptize_artifacts/1,
          run_hooks_once/1,
          run_hooks_for_plugins/1,
          deps_hook_namespace/1]).
@@ -31,7 +32,7 @@ end_per_testcase(_, _Config) ->
     catch meck:unload().
 
 all() ->
-    [build_and_clean_app, run_hooks_once,
+    [build_and_clean_app, run_hooks_once, escriptize_artifacts,
      run_hooks_for_plugins, deps_hook_namespace].
 
 %% Test post provider hook cleans compiled project app, leaving it invalid
@@ -44,6 +45,33 @@ build_and_clean_app(Config) ->
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name, valid}]}),
     rebar_test_utils:run_and_check(Config, [{provider_hooks, [{post, [{compile, clean}]}]}],
                                   ["compile"], {ok, [{app, Name, invalid}]}).
+
+escriptize_artifacts(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    Artifact = "bin/"++Name,
+    RConfFile =
+        rebar_test_utils:create_config(AppDir,
+                                       [
+                                       {escript_name, list_to_atom(Name)}
+                                       ,{artifacts, [Artifact]}
+                                       ]),
+    {ok, RConf} = file:consult(RConfFile),
+
+    try rebar_test_utils:run_and_check(Config, RConf, ["compile"], [])
+    catch
+        {error,
+         {rebar_prv_compile,
+          {missing_artifact, Artifact}}} ->
+            ok
+    end,
+    rebar_test_utils:run_and_check(Config, RConf++[{provider_hooks, [{post, [{compile, escriptize}]}]}],
+                                  ["compile"], {ok, [{app, Name, valid}
+                                                    ,{file, filename:join([AppDir, "_build/default/", Artifact])}]}).
 
 run_hooks_once(Config) ->
     AppDir = ?config(apps, Config),
