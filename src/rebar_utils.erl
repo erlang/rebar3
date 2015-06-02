@@ -56,7 +56,9 @@
          wordsize/0,
          tup_umerge/2,
          tup_sort/1,
-         line_count/1]).
+         line_count/1,
+         check_min_otp_version/1,
+         check_blacklisted_otp_versions/1]).
 
 %% for internal use only
 -export([otp_release/0]).
@@ -289,9 +291,51 @@ line_count(PatchLines) ->
     Tokenized = string:tokens(PatchLines, "\n"),
     {ok, length(Tokenized)}.
 
+check_min_otp_version(undefined) ->
+    ok;
+check_min_otp_version(MinOtpVersion) ->
+    %% Fully-qualify with ?MODULE so the function can be meck'd in rebar_utils_SUITE
+    OtpRelease = ?MODULE:otp_release(),
+    {MinMajor, MinMinor} = split_version(MinOtpVersion),
+    {OtpMajor, OtpMinor} = split_version(OtpRelease),
+
+    case {OtpMajor, OtpMinor} >= {MinMajor, MinMinor} of
+        true ->
+            ?DEBUG("~s satisfies the requirement for minimum OTP version ~s",
+                [OtpRelease, MinOtpVersion]);
+        false ->
+            ?ABORT("OTP release ~s or later is required. Verion in use: ~s",
+                [MinOtpVersion, OtpRelease])
+    end.
+
+check_blacklisted_otp_versions(undefined) ->
+    ok;
+check_blacklisted_otp_versions(BlacklistedRegexes) ->
+    %% Fully-qualify with ?MODULE so the function can be meck'd in rebar_utils_SUITE
+    OtpRelease = ?MODULE:otp_release(),
+    lists:foreach(
+        fun(BlacklistedRegex) -> abort_if_blacklisted(BlacklistedRegex, OtpRelease) end,
+        BlacklistedRegexes).
+
+abort_if_blacklisted(BlacklistedRegex, OtpRelease) ->
+    case re:run(OtpRelease, BlacklistedRegex, [{capture, none}]) of
+        match ->
+            ?ABORT("OTP release ~s matches blacklisted version ~s",
+                [OtpRelease, BlacklistedRegex]);
+            nomatch ->
+                ?DEBUG("~s does not match blacklisted OTP version ~s",
+                [OtpRelease, BlacklistedRegex])
+    end.
+
+
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
+
+split_version(Version) ->
+    list_to_tuple(lists:map(
+        fun(S) -> list_to_integer(S) end,
+        string:tokens(Version, "."))).
 
 otp_release() ->
     otp_release1(erlang:system_info(otp_release)).
