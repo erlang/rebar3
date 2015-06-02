@@ -437,6 +437,10 @@ sh_loop(Port, Fun, Acc) ->
             sh_loop(Port, Fun, Fun(Line, Acc));
         {Port, {exit_status, 0}} ->
             {ok, lists:flatten(lists:reverse(Acc))};
+        {Port, {exit_status, 1}} ->
+            {ok, lists:flatten(lists:reverse(Acc))};
+        {Port, {exit_status, 3}} ->
+            {ok, lists:flatten(lists:reverse(Acc))};
         {Port, {exit_status, Rc}} ->
             {error, {Rc, lists:flatten(lists:reverse(Acc))}}
     end.
