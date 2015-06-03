@@ -105,12 +105,12 @@ create_config(AppDir, Contents) ->
 
 %% @doc Util to create a random variation of a given name.
 create_random_name(Name) ->
-    random:seed(os:timestamp()),
+    random:seed(erlang:now()),
     Name ++ erlang:integer_to_list(random:uniform(1000000)).
 
 %% @doc Util to create a random variation of a given version.
 create_random_vsn() ->
-    random:seed(os:timestamp()),
+    random:seed(erlang:now()),
     lists:flatten([erlang:integer_to_list(random:uniform(100)),
                    ".", erlang:integer_to_list(random:uniform(100)),
                    ".", erlang:integer_to_list(random:uniform(100))]).
