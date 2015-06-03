@@ -109,7 +109,7 @@ download(Dir, {git, Url, Rev}, _State) ->
     rebar_utils:sh(?FMT("git checkout -q ~s", [Rev]), [{cd, Dir}]).
 
 make_vsn(Dir) ->
-    {ok, Cwd} = file:get_cwd(),
+    Cwd = rebar_dir:get_cwd(),
     try
         ok = file:set_cwd(Dir),
         {Vsn, RawRef, RawCount} = collect_default_refcount(),
