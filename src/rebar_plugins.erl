@@ -3,7 +3,10 @@
 
 -module(rebar_plugins).
 
--export([install/1, handle_plugins/2, handle_plugins/3]).
+-export([project_apps_install/1
+        ,install/1
+        ,handle_plugins/3
+        ,handle_plugins/4]).
 
 -include("rebar.hrl").
 
@@ -11,26 +14,35 @@
 %% Public API
 %% ===================================================================
 
--spec install(rebar_state:t()) -> rebar_state:t().
-install(State) ->
-    Plugins = rebar_state:get(State, plugins, []),
-
+-spec project_apps_install(rebar_state:t()) -> rebar_state:t().
+project_apps_install(State) ->
+    Profiles = rebar_state:current_profiles(State),
     ProjectApps = rebar_state:project_apps(State),
 
-    OtherPlugins = lists:flatmap(fun(App) ->
-                                         AppDir = rebar_app_info:dir(App),
-                                         C = rebar_config:consult(AppDir),
-                                         S = rebar_state:new(rebar_state:new(), C, AppDir),
-                                         rebar_state:get(S, plugins, [])
-                                 end, ProjectApps),
+    lists:foldl(fun(Profile, StateAcc) ->
+                        Plugins = rebar_state:get(State, {plugins, Profile}, []),
+                        handle_plugins(Profile, Plugins, StateAcc),
+                        lists:foldl(fun(App, StateAcc1) ->
+                                              AppDir = rebar_app_info:dir(App),
+                                              C = rebar_config:consult(AppDir),
+                                              S = rebar_state:new(rebar_state:new(), C, AppDir),
+                                              Plugins2 = rebar_state:get(S, {plugins, Profile}, []),
+                                              handle_plugins(Profile, Plugins2, StateAcc1)
+                                      end, StateAcc, ProjectApps)
+                end, State, Profiles).
 
-    handle_plugins(Plugins++OtherPlugins, State).
-
--spec handle_plugins([rebar_prv_install_deps:dep()], rebar_state:t()) -> rebar_state:t().
-handle_plugins(Plugins, State) ->
-    handle_plugins(default, Plugins, State).
+-spec install(rebar_state:t()) -> rebar_state:t().
+install(State) ->
+    Profiles = rebar_state:current_profiles(State),
+    lists:foldl(fun(Profile, StateAcc) ->
+                        Plugins = rebar_state:get(State, {plugins, Profile}, []),
+                        handle_plugins(Profile, Plugins, StateAcc)
+                end, State, Profiles).
 
 handle_plugins(Profile, Plugins, State) ->
+    handle_plugins(Profile, Plugins, State, false).
+
+handle_plugins(Profile, Plugins, State, Upgrade) ->
     %% Set deps dir to plugins dir so apps are installed there
     Locks = rebar_state:lock(State),
     DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
@@ -39,7 +51,7 @@ handle_plugins(Profile, Plugins, State) ->
     %% Install each plugin individually so if one fails to install it doesn't effect the others
     {PluginProviders, State2} =
         lists:foldl(fun(Plugin, {PluginAcc, StateAcc}) ->
-                            {NewPlugins, NewState} = handle_plugin(Profile, Plugin, StateAcc),
+                            {NewPlugins, NewState} = handle_plugin(Profile, Plugin, StateAcc, Upgrade),
                             {PluginAcc++NewPlugins, NewState}
                       end, {[], State1}, Plugins),
 
@@ -49,9 +61,9 @@ handle_plugins(Profile, Plugins, State) ->
 
     rebar_state:create_logic_providers(PluginProviders, State4).
 
-handle_plugin(Profile, Plugin, State) ->
+handle_plugin(Profile, Plugin, State, Upgrade) ->
     try
-        {ok, Apps, State2} = rebar_prv_install_deps:handle_deps(Profile, State, [Plugin]),
+        {ok, Apps, State2} = rebar_prv_install_deps:handle_deps(Profile, State, [Plugin], Upgrade),
         {no_cycle, Sorted} = rebar_prv_install_deps:find_cycles(Apps),
         ToBuild = rebar_prv_install_deps:cull_compile(Sorted, []),
 

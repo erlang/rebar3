@@ -35,6 +35,7 @@ base_dir(State) ->
 profile_dir(State, Profiles) ->
     {BaseDir, ProfilesStrings} = case [ec_cnv:to_list(P) || P <- Profiles] of
         ["global" | _] -> {?MODULE:global_cache_dir(State), [""]};
+        ["bootstrap", "default"] -> {rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR), ["default"]};
         ["default"] -> {rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR), ["default"]};
         %% drop `default` from the profile dir if it's implicit and reverse order
         %%  of profiles to match order passed to `as`
@@ -42,7 +43,6 @@ profile_dir(State, Profiles) ->
     end,
     ProfilesDir = string:join(ProfilesStrings, "+"),
     filename:join(BaseDir, ProfilesDir).
-
 
 -spec deps_dir(rebar_state:t()) -> file:filename_all().
 deps_dir(State) ->
