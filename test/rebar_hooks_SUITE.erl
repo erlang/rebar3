@@ -114,7 +114,7 @@ run_hooks_for_plugins(Config) ->
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
     PluginName = rebar_test_utils:create_random_name("plugin1_"),
-    mock_git_resource:mock([{config, [{pre_hooks, [{compile, "touch randomfile"}]}]}]),
+    mock_git_resource:mock([{config, [{pre_hooks, [{compile, "echo whatsup > randomfile"}]}]}]),
 
     RConfFile = rebar_test_utils:create_config(AppDir,
                                                [{plugins, [
