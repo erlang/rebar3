@@ -14,6 +14,7 @@
 
 -define(PROVIDER, dialyzer).
 -define(DEPS, [compile]).
+-define(PLT_PREFIX, "rebar3").
 
 %% ===================================================================
 %% Public API
@@ -39,24 +40,32 @@ desc() ->
     "This command will build, and keep up-to-date, a suitable PLT and will use "
     "it to carry out success typing analysis on the current project.\n"
     "\n"
-    "The following (optional) configurations can be added to a rebar.config:\n"
-    "`dialyzer_warnings` - a list of dialyzer warnings\n"
-    "`dialyzer_plt` - the PLT file to use\n"
-    "`dialyzer_plt_apps` - a list of applications to include in the PLT file*\n"
-    "`dialyzer_plt_warnings` - display warnings when updating a PLT file "
-    "(boolean)\n"
-    "`dialyzer_base_plt` - the base PLT file to use**\n"
-    "`dialyzer_base_plt_dir` - the base PLT directory**\n"
-    "`dialyzer_base_plt_apps` - a list of applications to include in the base "
-    "PLT file**\n"
+    "The following (optional) configurations can be added to a `proplist` of "
+    "options `dialyzer` in rebar.config:\n"
+    "`warnings` - a list of dialyzer warnings\n"
+    "`get_warnings` - display warnings when altering a PLT file (boolean)\n"
+    "`plt_extra_apps` - a list of applications to include in the PLT file*\n"
+    "`plt_location` - the location of the PLT file, `local` to store in the "
+    "profile's base directory (default) or a custom directory.\n"
+    "`plt_prefix` - the prefix to the PLT file, defaults to \"rebar3\"**\n"
+    "`base_plt_apps` - a list of applications to include in the base "
+    "PLT file***\n"
+    "`base_plt_location` - the location of base PLT file, `global` to store in "
+    "$HOME/.cache/rebar3 (default) or  a custom directory***\n"
+    "`base_plt_prefix` - the prefix to the base PLT file, defaults to "
+    "\"rebar3\"** ***\n"
+    "\n"
+    "For example, to warn on unmatched returns: \n"
+    "{dialyzer, [{warnings, [unmatched_returns]}]}.\n"
     "\n"
     "*The applications in `dialyzer_base_plt_apps` and any `applications` and "
     "`included_applications` listed in their .app files will be added to the "
     "list.\n"
-    "**The base PLT is a PLT containing the core OTP applications often "
-    "required for a project's PLT. One base PLT is created per OTP version and "
-    "stored in `dialyzer_base_plt_dir` (defaults to $HOME/.rebar3/). A base "
-    "PLT is used to create a project's initial PLT.".
+    "**PLT files are named \"<prefix>_<otp_release>_plt\".\n"
+    "***The base PLT is a PLT containing the core applications often required "
+    "for a project's PLT. One base PLT is created per OTP version and "
+    "stored in `base_plt_location`. A base PLT is used to build project PLTs."
+    "\n".
 
 short_desc() ->
     "Run the Dialyzer analyzer on the project.".
@@ -65,7 +74,7 @@ short_desc() ->
 do(State) ->
     ?INFO("Dialyzer starting, this may take a while...", []),
     code:add_pathsa(rebar_state:code_paths(State, all_deps)),
-    Plt = get_plt_location(State),
+    Plt = get_plt(State),
 
     try
         do(State, Plt)
@@ -97,13 +106,19 @@ format_error(Reason) ->
 
 %% Internal functions
 
-get_plt_location(State) ->
-    BaseDir = rebar_dir:base_dir(State),
-    DefaultPlt = filename:join(BaseDir, default_plt()),
-    rebar_state:get(State, dialyzer_plt, DefaultPlt).
+get_plt(State) ->
+    Prefix = get_config(State, plt_prefix, ?PLT_PREFIX),
+    Name = plt_name(Prefix),
+    case get_config(State, plt_location, local) of
+        local ->
+            BaseDir = rebar_dir:base_dir(State),
+            filename:join(BaseDir, Name);
+        Dir ->
+            filename:join(Dir, Name)
+    end.
 
-default_plt() ->
-    rebar_utils:otp_release() ++ ".plt".
+plt_name(Prefix) ->
+    Prefix ++ "_" ++ rebar_utils:otp_release() ++ "_plt".
 
 do(State, Plt) ->
     Output = get_output_file(State),
@@ -151,9 +166,8 @@ do_update_proj_plt(State, Plt, Output) ->
     end.
 
 proj_plt_files(State) ->
-    BasePltApps = rebar_state:get(State, dialyzer_base_plt_apps,
-                                  default_plt_apps()),
-    PltApps = rebar_state:get(State, dialyzer_plt_apps, []),
+    BasePltApps = get_config(State, base_plt_apps, default_plt_apps()),
+    PltApps = get_config(State, plt_extra_apps, []),
     Apps = rebar_state:project_apps(State),
     DepApps = lists:flatmap(fun rebar_app_info:applications/1, Apps),
     get_plt_files(BasePltApps ++ PltApps ++ DepApps, Apps).
@@ -259,16 +273,17 @@ add_plt(State, Plt, Output, Files) ->
     run_plt(State, Plt, Output, plt_add, Files).
 
 run_plt(State, Plt, Output, Analysis, Files) ->
-    GetWarnings = rebar_state:get(State, dialyzer_plt_warnings, false),
+    GetWarnings = get_config(State, get_warnings, false),
     Opts = [{analysis_type, Analysis},
             {get_warnings, GetWarnings},
             {init_plt, Plt},
+            {output_plt, Plt},
             {from, byte_code},
             {files, Files}],
     run_dialyzer(State, Opts, Output).
 
 build_proj_plt(State, Plt, Output, Files) ->
-    BasePlt = get_base_plt_location(State),
+    BasePlt = get_base_plt(State),
     ?INFO("Updating base plt...", []),
     BaseFiles = base_plt_files(State),
     {BaseWarnings, State1} = update_base_plt(State, BasePlt, Output, BaseFiles),
@@ -285,15 +300,19 @@ build_proj_plt(State, Plt, Output, Files) ->
             throw({dialyzer_error, Error})
     end.
 
-get_base_plt_location(State) ->
-    GlobalCacheDir = rebar_dir:global_cache_dir(State),
-    BaseDir = rebar_state:get(State, dialyzer_base_plt_dir, GlobalCacheDir),
-    BasePlt = rebar_state:get(State, dialyzer_base_plt, default_plt()),
-    filename:join(BaseDir, BasePlt).
+get_base_plt(State) ->
+    Prefix = get_config(State, base_plt_prefix, ?PLT_PREFIX),
+    Name = plt_name(Prefix),
+    case get_config(State, base_plt_location, global) of
+        global ->
+            GlobalCacheDir = rebar_dir:global_cache_dir(State),
+            filename:join(GlobalCacheDir, Name);
+        Dir ->
+            filename:join(Dir, Name)
+    end.
 
 base_plt_files(State) ->
-    BasePltApps = rebar_state:get(State, dialyzer_base_plt_apps,
-                                  default_plt_apps()),
+    BasePltApps = get_config(State, base_plt_apps, default_plt_apps()),
     Apps = rebar_state:project_apps(State),
     get_plt_files(BasePltApps, Apps).
 
@@ -308,7 +327,7 @@ update_base_plt(State, BasePlt, Output, BaseFiles) ->
 
 build_plt(State, Plt, Output, Files) ->
     ?INFO("Adding ~b files to ~p...", [length(Files), Plt]),
-    GetWarnings = rebar_state:get(State, dialyzer_plt_warnings, false),
+    GetWarnings = get_config(State, get_warnings, false),
     Opts = [{analysis_type, plt_build},
             {get_warnings, GetWarnings},
             {output_plt, Plt},
@@ -349,7 +368,7 @@ run_dialyzer(State, Opts, Output) ->
     %% dialyzer may return callgraph warnings when get_warnings is false
     case proplists:get_bool(get_warnings, Opts) of
         true ->
-            WarningsList = rebar_state:get(State, dialyzer_warnings, []),
+            WarningsList = get_config(State, warnings, []),
             Opts2 = [{warnings, WarningsList},
                      {check_plt, false} |
                      Opts],
@@ -411,3 +430,7 @@ no_warnings() ->
      no_contracts,
      no_behaviours,
      no_undefined_callbacks].
+
+get_config(State, Key, Default) ->
+    Config = rebar_state:get(State, dialyzer, []),
+    proplists:get_value(Key, Config, Default).
