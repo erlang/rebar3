@@ -25,15 +25,16 @@ end_per_suite(_Config) ->
 init_per_testcase(Testcase, Config) ->
     PrivDir = ?config(priv_dir, Config),
     Prefix = ec_cnv:to_list(Testcase),
-    Plt = filename:join(PrivDir,  Prefix ++ ".project.plt"),
-    BasePlt = Prefix ++ "base.plt",
-    RebarConfig = [{dialyzer_plt, Plt},
-                   {dialyzer_base_plt, BasePlt},
-                   {dialyzer_base_plt_dir, PrivDir},
-                   {dialyzer_base_plt_apps, [erts]}],
-    [{plt, Plt},
-     {base_plt, filename:join(PrivDir, BasePlt)},
-     {rebar_config, RebarConfig} |
+    BasePrefix = Prefix ++ "_base",
+    Opts = [{plt_prefix, Prefix},
+            {plt_location, PrivDir},
+            {base_plt_prefix, BasePrefix},
+            {base_plt_location, PrivDir},
+            {base_plt_apps, [erts]}],
+    Suffix = "_" ++ rebar_utils:otp_release() ++ "_plt",
+    [{plt, filename:join(PrivDir, Prefix ++ Suffix)},
+     {base_plt, filename:join(PrivDir, BasePrefix ++ Suffix)},
+     {rebar_config, [{dialyzer, Opts}]} |
      rebar_test_utils:init_rebar_state(Config)].
 
 all() ->
