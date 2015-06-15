@@ -85,8 +85,11 @@ format_error(Reason) ->
 shell(State) ->
     setup_name(State),
     setup_paths(State),
-    maybe_boot_apps(State),
     setup_shell(),
+    %% apps must be started after the change in shell because otherwise
+    %% their application masters never gets the new group leader (held in
+    %% their internal state)
+    maybe_boot_apps(State),
     rebar_agent:start_link(State),
     %% this call never returns (until user quits shell)
     timer:sleep(infinity).
