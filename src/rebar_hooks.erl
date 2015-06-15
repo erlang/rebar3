@@ -22,6 +22,29 @@ run_provider_hooks(Dir, Type, Command, Providers, State) ->
     rebar_utils:remove_from_code_path(PluginDepsPaths),
     State2.
 
+%% @doc The following environment variables are exported when running
+%% a hook (absolute paths):
+%% 
+%% REBAR_DEPS_DIR          = rebar_dir:deps_dir/1
+%% REBAR_BUILD_DIR         = rebar_dir:base_dir/1
+%% REBAR_ROOT_DIR          = rebar_dir:root_dir/1
+%% REBAR_CHECKOUTS_DIR     = rebar_dir:checkouts_dir/1
+%% REBAR_PLUGINS_DIR       = rebar_dir:plugins_dir/1
+%% REBAR_GLOBAL_CONFIG_DIR = rebar_dir:global_config_dir/1
+%% REBAR_GLOBAL_CACHE_DIR  = rebar_dir:global_cache_dir/1
+%% REBAR_TEMPLATE_DIR      = rebar_dir:template_dir/1
+%% REBAR_APP_DIRS          = rebar_dir:lib_dirs/1
+%% REBAR_SRC_DIRS          = rebar_dir:src_dirs/1
+%%
+%% autoconf compatible variables 
+%% (see: http://www.gnu.org/software/autoconf/manual/autoconf.html#Erlang-Libraries):
+%% ERLANG_ERTS_VER              = erlang:system_info(version)
+%% ERLANG_ROOT_DIR              = code:root_dir/0
+%% ERLANG_LIB_DIR_erl_interface = code:lib_dir(erl_interface)
+%% ERLANG_LIB_VER_erl_interface = version part of path returned by code:lib_dir(erl_interface)
+%% ERL                          = ERLANG_ROOT_DIR/bin/erl
+%% ERLC                         = ERLANG_ROOT_DIR/bin/erl
+%%
 run_hooks(Dir, Type, Command, State) ->
     Hooks = case Type of
                 pre ->
@@ -31,7 +54,7 @@ run_hooks(Dir, Type, Command, State) ->
                 _ ->
                     []
             end,
-    Env = [{"REBAR_DEPS_DIR", filename:absname(rebar_dir:deps_dir(State))}],
+    Env = create_env(State),
     lists:foreach(fun({_, C, _}=Hook) when C =:= Command ->
                           apply_hook(Dir, Env, Hook);
                      ({C, _}=Hook) when C =:= Command ->
@@ -50,3 +73,35 @@ apply_hook(Dir, Env, {Arch, Command, Hook}) ->
 apply_hook(Dir, Env, {Command, Hook}) ->
     Msg = lists:flatten(io_lib:format("Hook for ~p failed!~n", [Command])),
     rebar_utils:sh(Hook, [use_stdout, {cd, Dir}, {env, Env}, {abort_on_error, Msg}]).
+
+create_env(State) ->
+    BaseDir = rebar_state:dir(State),
+    [
+     {"REBAR_DEPS_DIR",          filename:absname(rebar_dir:deps_dir(State))},
+     {"REBAR_BUILD_DIR",         filename:absname(rebar_dir:base_dir(State))},
+     {"REBAR_ROOT_DIR",          filename:absname(rebar_dir:root_dir(State))},
+     {"REBAR_CHECKOUTS_DIR",     filename:absname(rebar_dir:checkouts_dir(State))},
+     {"REBAR_PLUGINS_DIR",       filename:absname(rebar_dir:plugins_dir(State))},
+     {"REBAR_GLOBAL_CONFIG_DIR", filename:absname(rebar_dir:global_config_dir(State))},
+     {"REBAR_GLOBAL_CACHE_DIR",  filename:absname(rebar_dir:global_cache_dir(State))},
+     {"REBAR_TEMPLATE_DIR",      filename:absname(rebar_dir:template_dir(State))},
+     {"REBAR_APP_DIRS",          join_dirs(BaseDir, rebar_dir:lib_dirs(State))},
+     {"REBAR_SRC_DIRS",          join_dirs(BaseDir, rebar_dir:all_src_dirs(State))},
+     {"ERLANG_ERTS_VER",         erlang:system_info(version)},
+     {"ERLANG_ROOT_DIR",         code:root_dir()},
+     {"ERLANG_LIB_DIR_erl_interface", code:lib_dir(erl_interface)},
+     {"ERLANG_LIB_VER_erl_interface", re_version(code:lib_dir(erl_interface))},
+     {"ERL",                     filename:join([code:root_dir(), "bin", "erl"])},
+     {"ERLC",                    filename:join([code:root_dir(), "bin", "erlc"])}
+    ].
+
+join_dirs(BaseDir, Dirs) ->
+    string:join([ filename:join(BaseDir, Dir) || Dir <- Dirs ], ":").
+
+re_version(Path) ->
+    case re:run(Path, "^.*-(?<VER>[^/-]*)$", [{capture, [1], list}]) of
+	nomatch -> "";
+	{match, [Ver]} -> Ver
+    end.
+
+    
