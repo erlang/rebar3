@@ -75,13 +75,39 @@ symlink_or_copy(Source, Target) ->
         {error, eexist} ->
             ok;
         {error, _} ->
-            Target2 = case is_binary(Target) of
-                          true -> unicode:characters_to_list(Target);
-                          false -> Target
-                      end,
-            rm_rf(Target2),
-            cp_r([Source], Target)
+            case os:type() of
+                {win32, _} ->
+                    S = unicode:characters_to_list(Source),
+                    T = unicode:characters_to_list(Target),
+                    case filelib:is_dir(S) of
+                        true ->
+                            win32_symlink(S, T);
+                        false ->
+                            ok
+                    end;
+                _ ->
+                    case filelib:is_dir(Target) of
+                        true ->
+                            ok;
+                        false ->
+                            cp_r([Source], Target)
+                    end
+            end
     end.
+
+win32_symlink(Source, Target) ->
+    Res = rebar_utils:sh(
+            ?FMT("cmd /c mklink /j \"~s\" \"~s\"",
+                 [filename:nativename(Target), filename:nativename(Source)]),
+            [{use_stdout, false}, return_on_error]),
+    case win32_ok(Res) of
+        true -> ok;
+        false ->
+            {error, lists:flatten(
+                      io_lib:format("Failed to sumlink ~s to ~s~n",
+                                    [Source, Target]))}
+    end.
+
 
 %% @doc Remove files and directories.
 %% Target is a single filename, directoryname or wildcard expression.
@@ -130,11 +156,11 @@ mv(Source, Dest) ->
             ok;
         {win32, _} ->
             Res = rebar_utils:sh(
-                        ?FMT("robocopy /move /e \"~s\" \"~s\" 1> nul",
+                        ?FMT("robocopy /move /s \"~s\" \"~s\" 1> nul",
                              [filename:nativename(Source),
                               filename:nativename(Dest)]),
                         [{use_stdout, false}, return_on_error]),
-            case win32_robocopy_ok(Res) of
+            case win32_ok(Res) of
                 true -> ok;
                 false ->
                     {error, lists:flatten(
@@ -143,9 +169,9 @@ mv(Source, Dest) ->
             end
     end.
 
-win32_robocopy_ok({ok, _}) -> true;
-win32_robocopy_ok({error, {Rc, _}}) when Rc<9; Rc=:=16 -> true;
-win32_robocopy_ok(_) -> false.
+win32_ok({ok, _}) -> true;
+win32_ok({error, {Rc, _}}) when Rc<9; Rc=:=16 -> true;
+win32_ok(_) -> false.
 
 delete_each([]) ->
     ok;
@@ -224,10 +250,10 @@ xcopy_win32(Source,Dest)->
     %% "xcopy \"~s\" \"~s\" /q /y /e 2> nul", Chanegd to robocopy to
     %% handle long names. May have issues with older windows.
     Res = rebar_utils:sh(
-                ?FMT("robocopy \"~s\" \"~s\" /e /is 2> nul",
+                ?FMT("robocopy \"~s\" \"~s\" /e /is /purge 2> nul",
                      [filename:nativename(Source), filename:nativename(Dest)]),
                 [{use_stdout, false}, return_on_error]),
-    case win32_robocopy_ok(Res) of
+    case win32_ok(Res) of
                 true -> ok;
                 false ->
                     {error, lists:flatten(
