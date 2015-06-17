@@ -26,9 +26,10 @@
 %% -------------------------------------------------------------------
 -module(rebar_core).
 
--export([init_command/2, process_namespace/2, process_command/2, do/2]).
+-export([init_command/2, process_namespace/2, process_command/2, do/2, format_error/1]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 init_command(State, do) ->
     process_command(rebar_state:namespace(State, default), do);
@@ -120,9 +121,19 @@ do([ProviderName | Rest], State) ->
                                   ,rebar_state:namespace(State))
     end,
 
-    case providers:do(Provider, State) of
+    try providers:do(Provider, State) of
         {ok, State1} ->
             do(Rest, State1);
         {error, Error} ->
             {error, Error}
+    catch
+        error:undef ->
+            %% This should really only happen if a plugin provider doesn't export do/1
+            ?DEBUG("Undefined call to provider's do function:~n~p", [erlang:get_stacktrace()]),
+            ?PRV_ERROR({bad_provider_namespace, ProviderName})
     end.
+
+format_error({bad_provider_namespace, {Namespace, Name}}) ->
+    io_lib:format("Undefined command ~s in namespace ~s", [Name, Namespace]);
+format_error({bad_provider_namespace, Name}) ->
+    io_lib:format("Undefined command ~s", [Name]).
