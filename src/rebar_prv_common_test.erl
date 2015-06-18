@@ -247,7 +247,7 @@ copy_and_compile_test_suites(State, Opts) ->
             Dirs = find_suite_dirs(AllSuites),
             lists:foreach(fun(S) ->
                 NewPath = copy(State, S),
-                compile_dir(State, S, NewPath)
+                compile_dir(State, NewPath)
             end, Dirs),
             NewSuites = lists:map(fun(S) -> retarget_path(State, S) end, AllSuites),
             [{suite, NewSuites}|lists:keydelete(suite, 1, Opts)]
@@ -259,12 +259,12 @@ copy_and_compile_test_dirs(State, Opts) ->
         %% dir is a single directory
         Dir when is_list(Dir), is_integer(hd(Dir)) ->
             NewPath = copy(State, Dir),
-            [{dir, compile_dir(State, Dir, NewPath)}|lists:keydelete(dir, 1, Opts)];
+            [{dir, compile_dir(State, NewPath)}|lists:keydelete(dir, 1, Opts)];
         %% dir is a list of directories
         Dirs when is_list(Dirs) ->
             NewDirs = lists:map(fun(Dir) ->
                 NewPath = copy(State, Dir),
-                compile_dir(State, Dir, NewPath)
+                compile_dir(State, NewPath)
             end, Dirs),
             [{dir, NewDirs}|lists:keydelete(dir, 1, Opts)]
     end.
@@ -301,11 +301,11 @@ copy(State, Dir) ->
             Target
     end.
 
-compile_dir(State, Dir, OutDir) ->
-    NewState = replace_src_dirs(State, [Dir]),
-    ok = rebar_erlc_compiler:compile(NewState, rebar_dir:base_dir(State), OutDir),
+compile_dir(State, Dir) ->
+    NewState = replace_src_dirs(State, [filename:absname(Dir)]),
+    ok = rebar_erlc_compiler:compile(NewState, rebar_dir:base_dir(State), Dir),
     ok = maybe_cover_compile(State, Dir),
-    OutDir.
+    Dir.
 
 retarget_path(State, Path) ->
     ProjectApps = rebar_state:project_apps(State),
@@ -368,8 +368,10 @@ sub_dirs(Path) ->
 replace_src_dirs(State, Dirs) ->
     %% replace any `src_dirs` with the test dirs
     ErlOpts = rebar_state:get(State, erl_opts, []),
-    StrippedOpts = filter_src_dirs(ErlOpts),
-    rebar_state:set(State, erl_opts, [{extra_src_dirs, Dirs}|StrippedOpts]).
+    StrippedErlOpts = filter_src_dirs(ErlOpts),
+    State1 = rebar_state:set(State, erl_opts, StrippedErlOpts),
+    State2 = rebar_state:set(State1, src_dirs, []),
+    rebar_state:set(State2, extra_src_dirs, Dirs).
 
 filter_src_dirs(ErlOpts) ->
     lists:filter(fun({src_dirs, _}) -> false; ({extra_src_dirs, _}) -> false; (_) -> true end, ErlOpts).
