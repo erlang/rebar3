@@ -82,7 +82,8 @@ new() ->
 new(Config) when is_list(Config) ->
     BaseState = base_state(),
     Deps = proplists:get_value(deps, Config, []),
-    Terms = [{{deps, default}, Deps} | Config],
+    Plugins = proplists:get_value(plugins, Config, []),
+    Terms = [{{deps, default}, Deps}, {{plugins, default}, Plugins} | Config],
     true = rebar_config:verify_config_format(Terms),
     Opts = dict:from_list(Terms),
     BaseState#state_t { dir = rebar_dir:get_cwd(),
@@ -95,7 +96,8 @@ new(Profile, Config) when is_atom(Profile)
     BaseState = base_state(),
     Deps = proplists:get_value(deps, Config, []),
 
-    Terms = [{{deps, default}, Deps} | Config],
+    Plugins = proplists:get_value(plugins, Config, []),
+    Terms = [{{deps, default}, Deps}, {{plugins, default}, Plugins} | Config],
     true = rebar_config:verify_config_format(Terms),
     Opts = dict:from_list(Terms),
     BaseState#state_t { dir = rebar_dir:get_cwd(),
@@ -112,18 +114,19 @@ new(ParentState, Config, Dir) ->
     Opts = ParentState#state_t.opts,
     LocalOpts = case rebar_config:consult_lock_file(filename:join(Dir, ?LOCK_FILE)) of
                     [D] ->
-                    %% We want the top level deps only from the lock file.
-                    %% This ensures deterministic overrides for configs.
-                    Deps = [X || X <- D, element(3, X) =:= 0],
-
-                    Terms = [{{locks, default}, D}, {{deps, default}, Deps} | Config],
-                    true = rebar_config:verify_config_format(Terms),
-                    dict:from_list(Terms);
+                        %% We want the top level deps only from the lock file.
+                        %% This ensures deterministic overrides for configs.
+                        Deps = [X || X <- D, element(3, X) =:= 0],
+                        Plugins = proplists:get_value(plugins, Config, []),
+                        Terms = [{{locks, default}, D}, {{deps, default}, Deps}, {{plugins, default}, Plugins} | Config],
+                        true = rebar_config:verify_config_format(Terms),
+                        dict:from_list(Terms);
                     _ ->
-                    D = proplists:get_value(deps, Config, []),
-                    Terms = [{{deps, default}, D} | Config],
-                    true = rebar_config:verify_config_format(Terms),
-                    dict:from_list(Terms)
+                        D = proplists:get_value(deps, Config, []),
+                        Plugins = proplists:get_value(plugins, Config, []),
+                        Terms = [{{deps, default}, D}, {{plugins, default}, Plugins} | Config],
+                        true = rebar_config:verify_config_format(Terms),
+                        dict:from_list(Terms)
                 end,
 
     NewOpts = merge_opts(LocalOpts, Opts),
@@ -257,14 +260,17 @@ apply_overrides(State=#state_t{overrides=Overrides}, AppName) ->
                                  StateAcc
                          end, State1, Overrides),
 
-    lists:foldl(fun({add, N, O}, StateAcc) when N =:= Name ->
+    State3 = lists:foldl(fun({add, N, O}, StateAcc) when N =:= Name ->
                         lists:foldl(fun({Key, Value}, StateAcc1) ->
                                             OldValue = rebar_state:get(StateAcc1, Key, []),
                                             rebar_state:set(StateAcc1, Key, Value++OldValue)
                                     end, StateAcc, O);
                    (_, StateAcc) ->
                         StateAcc
-                end, State2, Overrides).
+                end, State2, Overrides),
+
+    Opts = opts(State3),
+    State3#state_t{default=Opts}.
 
 add_to_profile(State, Profile, KVs) when is_atom(Profile), is_list(KVs) ->
     Profiles = rebar_state:get(State, profiles, []),
@@ -280,6 +286,7 @@ apply_profiles(State, [default]) ->
 apply_profiles(State=#state_t{default = Defaults, current_profiles=CurrentProfiles}, Profiles) ->
     AppliedProfiles = deduplicate(CurrentProfiles ++ Profiles),
     ConfigProfiles = rebar_state:get(State, profiles, []),
+
     NewOpts =
         lists:foldl(fun(default, OptsAcc) ->
                             OptsAcc;
@@ -303,17 +310,28 @@ do_deduplicate([Head | Rest], Acc) ->
 merge_opts(Profile, NewOpts, OldOpts) ->
     Opts = merge_opts(NewOpts, OldOpts),
 
-    case dict:find(deps, NewOpts) of
+    Opts2 = case dict:find(plugins, NewOpts) of
         {ok, Value} ->
-            dict:store({deps, Profile}, Value, Opts);
+            dict:store({plugins, Profile}, Value, Opts);
         error ->
             Opts
+    end,
+
+    case dict:find(deps, NewOpts) of
+        {ok, Value2} ->
+            dict:store({deps, Profile}, Value2, Opts2);
+        error ->
+            Opts2
     end.
 
 merge_opts(NewOpts, OldOpts) ->
     dict:merge(fun(deps, NewValue, _OldValue) ->
                        NewValue;
                   ({deps, _}, NewValue, _OldValue) ->
+                       NewValue;
+                  (plugins, NewValue, _OldValue) ->
+                       NewValue;
+                  ({plugins, _}, NewValue, _OldValue) ->
                        NewValue;
                   (profiles, NewValue, OldValue) ->
                        dict:to_list(merge_opts(dict:from_list(NewValue), dict:from_list(OldValue)));

@@ -95,12 +95,12 @@ run_aux(State, RawArgs) ->
     %% Process each command, resetting any state between each one
     BaseDir = rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR),
     State3 = rebar_state:set(State2, base_dir,
-                            filename:join(filename:absname(rebar_state:dir(State2)), BaseDir)),
+                             filename:join(filename:absname(rebar_state:dir(State2)), BaseDir)),
 
     {ok, Providers} = application:get_env(rebar, providers),
     %% Providers can modify profiles stored in opts, so set default after initializing providers
     State4 = rebar_state:create_logic_providers(Providers, State3),
-    State5 = rebar_plugins:install(State4),
+    State5 = rebar_plugins:project_apps_install(State4),
     State6 = rebar_state:default(State5, rebar_state:opts(State5)),
 
     {Task, Args} = parse_args(RawArgs),
@@ -133,13 +133,14 @@ init_config() ->
 
                     %% We don't want to worry about global plugin install state effecting later
                     %% usage. So we throw away the global profile state used for plugin install.
-                    GlobalConfigThrowAway = rebar_state:current_profiles(GlobalConfig, ["global"]),
+                    GlobalConfigThrowAway = rebar_state:current_profiles(GlobalConfig, [global]),
                     GlobalState = rebar_plugins:handle_plugins(global,
                                                  rebar_state:get(GlobalConfigThrowAway, plugins, []),
                                                  GlobalConfigThrowAway),
                     GlobalPlugins = rebar_state:providers(GlobalState),
                     GlobalConfig2 = rebar_state:set(GlobalConfig, plugins, []),
-                    rebar_state:providers(rebar_state:new(GlobalConfig2, Config1), GlobalPlugins);
+                    GlobalConfig3 = rebar_state:set(GlobalConfig2, {plugins, global}, rebar_state:get(GlobalConfigThrowAway, plugins, [])),
+                    rebar_state:providers(rebar_state:new(GlobalConfig3, Config1), GlobalPlugins);
                 false ->
                     rebar_state:new(Config1)
             end,

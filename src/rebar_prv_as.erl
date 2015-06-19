@@ -38,13 +38,14 @@ do(State) ->
             {error, "At least one profile must be specified when using `as`"};
         _  ->
             State1 = rebar_state:apply_profiles(State, [list_to_atom(X) || X <- Profiles]),
+            State2 = rebar_plugins:project_apps_install(State1),
             {FirstTask, FirstTaskArgs} = hd(Tasks),
             FirstTaskAtom = list_to_atom(FirstTask),
-            case rebar_core:process_namespace(State1, FirstTaskAtom) of
-                {ok, State2, NewTask} ->
+            case rebar_core:process_namespace(State2, FirstTaskAtom) of
+                {ok, State3, NewTask} ->
                     rebar_prv_do:do_tasks(
                         [{atom_to_list(NewTask),FirstTaskArgs}|tl(Tasks)],
-                        State2
+                        State3
                     );
                 {error, Reason} ->
                     {error, Reason}

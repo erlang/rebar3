@@ -234,22 +234,26 @@ handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Fetched, Seen, Locks, S
     BaseDir = rebar_state:get(State, base_dir, []),
     S1 = rebar_state:new(rebar_state:set(rebar_state:new(), base_dir, BaseDir),
                         C, rebar_app_info:dir(AppInfo1)),
-    S2 = rebar_state:apply_profiles(S1, Profiles),
-    S3 = rebar_state:apply_overrides(S2, Name),
-    AppInfo2 = rebar_app_info:state(AppInfo1, S3),
+    S2 = rebar_state:apply_overrides(S1, Name),
+
+    Plugins = rebar_state:get(S2, plugins, []),
+    S3 = rebar_state:set(S2, {plugins, Profile}, Plugins),
+
+    S4 = rebar_state:apply_profiles(S3, Profiles),
+    AppInfo2 = rebar_app_info:state(AppInfo1, S4),
 
     %% Dep may have plugins to install. Find and install here.
-    S4 = rebar_plugins:handle_plugins(rebar_state:get(S3, plugins, []), S3),
-    AppInfo3 = rebar_app_info:state(AppInfo2, S4),
+    S5 = rebar_plugins:install(S4),
+    AppInfo3 = rebar_app_info:state(AppInfo2, S5),
 
     {[AppInfo3 | Fetched], NewSeen, NewState}.
 
 maybe_lock(Profile, AppInfo, Seen, State, Level) ->
+    Name = rebar_app_info:name(AppInfo),
     case rebar_app_info:is_checkout(AppInfo) of
         false ->
             case Profile of
                 default ->
-                    Name = rebar_app_info:name(AppInfo),
                     case sets:is_element(Name, Seen) of
                         false ->
                             Locks = rebar_state:lock(State),
@@ -264,10 +268,10 @@ maybe_lock(Profile, AppInfo, Seen, State, Level) ->
                             {Seen, State}
                     end;
                 _ ->
-                    {Seen, State}
+                    {sets:add_element(Name, Seen), State}
             end;
         true ->
-            {Seen, State}
+            {sets:add_element(Name, Seen), State}
     end.
 
 package_to_app(DepsDir, Packages, {Name, Vsn, Level}, IsLock, State) ->
@@ -367,7 +371,6 @@ handle_upgrade(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps, Level, State, Locks)
                 {true, AppInfo1} ->
                     handle_dep(AppInfo1, Profile, SrcDeps, PkgDeps, SrcApps,
                                Level, State, Locks);
-
                 {false, AppInfo1} ->
                     {[AppInfo1|SrcDeps], PkgDeps, SrcApps, State, Locks}
             end;
@@ -378,7 +381,7 @@ handle_upgrade(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps, Level, State, Locks)
 handle_dep(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
     DepsDir = profile_dep_dir(State, Profile),
     {AppInfo1, NewSrcDeps, NewPkgDeps, NewLocks, State1} =
-        handle_dep(State, DepsDir, AppInfo, Locks, Level),
+        handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level),
     AppInfo2 = rebar_app_info:dep_level(AppInfo1, Level),
     {NewSrcDeps ++ SrcDeps
     ,NewPkgDeps++PkgDeps
@@ -386,9 +389,9 @@ handle_dep(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
     ,State1
     ,NewLocks}.
 
--spec handle_dep(rebar_state:t(), file:filename_all(), rebar_app_info:t(), list(), integer()) ->
+-spec handle_dep(rebar_state:t(), atom(), file:filename_all(), rebar_app_info:t(), list(), integer()) ->
                         {rebar_app_info:t(), [rebar_app_info:t()], [pkg_dep()], [integer()]}.
-handle_dep(State, DepsDir, AppInfo, Locks, Level) ->
+handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     Profiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo),
 
@@ -396,20 +399,24 @@ handle_dep(State, DepsDir, AppInfo, Locks, Level) ->
 
     S = rebar_app_info:state(AppInfo),
     S1 = rebar_state:new(S, C, rebar_app_info:dir(AppInfo)),
-    S2 = rebar_state:apply_profiles(S1, Profiles),
-    S3 = rebar_state:apply_overrides(S2, Name),
-    AppInfo1 = rebar_app_info:state(AppInfo, S3),
+    S2 = rebar_state:apply_overrides(S1, Name),
+
+    Plugins = rebar_state:get(S2, plugins, []),
+    S3 = rebar_state:set(S2, {plugins, Profile}, Plugins),
+
+    S4 = rebar_state:apply_profiles(S3, Profiles),
+    AppInfo1 = rebar_app_info:state(AppInfo, S4),
 
     %% Dep may have plugins to install. Find and install here.
-    S4 = rebar_plugins:handle_plugins(rebar_state:get(S3, plugins, []), S3),
-    AppInfo2 = rebar_app_info:state(AppInfo1, S4),
+    S5 = rebar_plugins:install(S4),
+    AppInfo2 = rebar_app_info:state(AppInfo1, S5),
 
     %% Upgrade lock level to be the level the dep will have in this dep tree
-    Deps = rebar_state:get(S4, deps, []),
+    Deps = rebar_state:get(S5, deps, []),
     NewLocks = [{DepName, Source, LockLevel+Level} ||
-                   {DepName, Source, LockLevel} <- rebar_state:get(S4, {locks, default}, [])],
+                   {DepName, Source, LockLevel} <- rebar_state:get(S5, {locks, default}, [])],
     AppInfo3 = rebar_app_info:deps(AppInfo2, rebar_state:deps_names(Deps)),
-    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, S4, Locks, Level+1),
+    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, S5, Locks, Level+1),
     {AppInfo3, SrcDeps, PkgDeps, Locks++NewLocks, State}.
 
 -spec maybe_fetch(rebar_app_info:t(), atom(), boolean(),
