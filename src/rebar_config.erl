@@ -27,7 +27,10 @@
 -module(rebar_config).
 
 -export([consult/1
+        ,consult_app_file/1
         ,consult_file/1
+        ,consult_lock_file/1
+        ,verify_config_format/1
         ,format_error/1
 
         ,merge_locks/2]).
@@ -43,10 +46,21 @@
 consult(Dir) ->
     consult_file(filename:join(Dir, ?DEFAULT_CONFIG_FILE)).
 
--spec consult_file(file:name()) -> [any()].
-consult_file(File) when is_binary(File) ->
-    consult_file(binary_to_list(File));
+consult_app_file(File) ->
+    consult_file_(File).
+
+consult_lock_file(File) ->
+    consult_file_(File).
+
 consult_file(File) ->
+    Terms = consult_file_(File),
+    true = verify_config_format(Terms),
+    Terms.
+
+-spec consult_file_(file:name()) -> [any()].
+consult_file_(File) when is_binary(File) ->
+    consult_file_(binary_to_list(File));
+consult_file_(File) ->
     case filename:extension(File) of
         ".script" ->
             consult_and_eval(remove_script_ext(File), File);
@@ -60,6 +74,13 @@ consult_file(File) ->
                     rebar_file_utils:try_consult(File)
             end
     end.
+
+verify_config_format([]) ->
+    true;
+verify_config_format([{_Key, _Value} | T]) ->
+    verify_config_format(T);
+verify_config_format([Term | _]) ->
+    throw(?PRV_ERROR({bad_config_format, Term})).
 
 %% no lockfile
 merge_locks(Config, []) ->
@@ -78,6 +99,8 @@ merge_locks(Config, [Locks]) ->
     NewDeps = find_newly_added(ConfigDeps, Locks),
     [{{locks, default}, Locks}, {{deps, default}, NewDeps++Deps} | Config].
 
+format_error({bad_config_format, Term}) ->
+    io_lib:format("Unable to parse config. Term is not in {Key, Value} format:~n~p", [Term]);
 format_error({bad_dep_name, Dep}) ->
     io_lib:format("Dependency name must be an atom, instead found: ~p", [Dep]).
 

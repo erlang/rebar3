@@ -120,8 +120,7 @@ init_config() ->
                  ConfigFile ->
                      rebar_config:consult_file(ConfigFile)
              end,
-
-    Config1 = rebar_config:merge_locks(Config, rebar_config:consult_file(?LOCK_FILE)),
+    Config1 = rebar_config:merge_locks(Config, rebar_config:consult_lock_file(?LOCK_FILE)),
 
     %% If $HOME/.config/rebar3/config exists load and use as global config
     GlobalConfigFile = rebar_dir:global_config(),
@@ -129,7 +128,8 @@ init_config() ->
                 true ->
                     ?DEBUG("Load global config file ~p",
                            [GlobalConfigFile]),
-                    GlobalConfig = rebar_state:new(rebar_config:consult_file(GlobalConfigFile)),
+                    GlobalConfigTerms = rebar_config:consult_file(GlobalConfigFile),
+                    GlobalConfig = rebar_state:new(GlobalConfigTerms),
 
                     %% We don't want to worry about global plugin install state effecting later
                     %% usage. So we throw away the global profile state used for plugin install.

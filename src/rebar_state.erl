@@ -1,6 +1,7 @@
 -module(rebar_state).
 
 -export([new/0, new/1, new/2, new/3,
+
          get/2, get/3, set/3,
 
          has_all_artifacts/1,
@@ -42,6 +43,7 @@
          providers/1, providers/2, add_provider/2]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 -record(state_t, {dir                               :: file:name(),
                   opts                = dict:new()  :: rebar_dict(),
@@ -80,7 +82,9 @@ new() ->
 new(Config) when is_list(Config) ->
     BaseState = base_state(),
     Deps = proplists:get_value(deps, Config, []),
-    Opts = dict:from_list([{{deps, default}, Deps} | Config]),
+    Terms = [{{deps, default}, Deps} | Config],
+    true = rebar_config:verify_config_format(Terms),
+    Opts = dict:from_list(Terms),
     BaseState#state_t { dir = rebar_dir:get_cwd(),
                         default = Opts,
                         opts = Opts }.
@@ -90,7 +94,10 @@ new(Profile, Config) when is_atom(Profile)
                         , is_list(Config) ->
     BaseState = base_state(),
     Deps = proplists:get_value(deps, Config, []),
-    Opts = dict:from_list([{{deps, default}, Deps} | Config]),
+
+    Terms = [{{deps, default}, Deps} | Config],
+    true = rebar_config:verify_config_format(Terms),
+    Opts = dict:from_list(Terms),
     BaseState#state_t { dir = rebar_dir:get_cwd(),
                         current_profiles = [Profile],
                         default = Opts,
@@ -103,15 +110,20 @@ new(ParentState=#state_t{}, Config) ->
 -spec new(t(), list(), file:name()) -> t().
 new(ParentState, Config, Dir) ->
     Opts = ParentState#state_t.opts,
-    LocalOpts = case rebar_config:consult_file(filename:join(Dir, ?LOCK_FILE)) of
+    LocalOpts = case rebar_config:consult_lock_file(filename:join(Dir, ?LOCK_FILE)) of
                     [D] ->
-                        %% We want the top level deps only from the lock file.
-                        %% This ensures deterministic overrides for configs.
-                        Deps = [X || X <- D, element(3, X) =:= 0],
-                        dict:from_list([{{locks, default}, D}, {{deps, default}, Deps} | Config]);
+                    %% We want the top level deps only from the lock file.
+                    %% This ensures deterministic overrides for configs.
+                    Deps = [X || X <- D, element(3, X) =:= 0],
+
+                    Terms = [{{locks, default}, D}, {{deps, default}, Deps} | Config],
+                    true = rebar_config:verify_config_format(Terms),
+                    dict:from_list(Terms);
                     _ ->
-                        D = proplists:get_value(deps, Config, []),
-                        dict:from_list([{{deps, default}, D} | Config])
+                    D = proplists:get_value(deps, Config, []),
+                    Terms = [{{deps, default}, D} | Config],
+                    true = rebar_config:verify_config_format(Terms),
+                    dict:from_list(Terms)
                 end,
 
     NewOpts = merge_opts(LocalOpts, Opts),
