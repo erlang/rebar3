@@ -130,7 +130,9 @@ do([ProviderName | Rest], State) ->
         error:undef ->
             %% This should really only happen if a plugin provider doesn't export do/1
             ?DEBUG("Undefined call to provider's do function:~n~p", [erlang:get_stacktrace()]),
-            ?PRV_ERROR({bad_provider_namespace, ProviderName})
+            ?PRV_ERROR({bad_provider_namespace, ProviderName});
+        error:{badrecord,provider} ->
+            {error, ProviderName}
     end.
 
 format_error({bad_provider_namespace, {Namespace, Name}}) ->

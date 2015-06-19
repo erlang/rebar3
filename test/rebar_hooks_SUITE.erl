@@ -62,7 +62,7 @@ escriptize_artifacts(Config) ->
                                        ]),
     {ok, RConf} = file:consult(RConfFile),
 
-    try rebar_test_utils:run_and_check(Config, RConf, ["compile"], [])
+    try rebar_test_utils:run_and_check(Config, RConf, ["compile"], return)
     catch
         {error,
          {rebar_prv_compile,

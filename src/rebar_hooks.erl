@@ -1,6 +1,9 @@
 -module(rebar_hooks).
 
--export([run_all_hooks/5]).
+-export([run_all_hooks/5
+        ,format_error/1]).
+
+-include_lib("providers/include/providers.hrl").
 
 -spec run_all_hooks(file:filename_all(), pre | post,
                    atom() | {atom(), atom()} | string(),
@@ -18,13 +21,21 @@ run_provider_hooks(Dir, Type, Command, Providers, State) ->
     TypeHooks = proplists:get_value(Type, AllHooks, []),
     HookProviders = proplists:get_all_values(Command, TypeHooks),
 
-    State2 = rebar_core:do(HookProviders, State1),
-    rebar_utils:remove_from_code_path(PluginDepsPaths),
-    State2.
+    case rebar_core:do(HookProviders, State1) of
+        {error, ProviderName} ->
+            throw(?PRV_ERROR({bad_provider, Type, Command, ProviderName}));
+        {ok, _} ->
+            rebar_utils:remove_from_code_path(PluginDepsPaths)
+    end.
+
+format_error({bad_provider, Type, Command, {Name, Namespace}}) ->
+    io_lib:format("Unable to run ~s hooks for '~p', command '~p' in namespace '~p' not found.", [Type, Command, Namespace, Name]);
+format_error({bad_provider, Type, Command, Name}) ->
+    io_lib:format("Unable to run ~s hooks for '~p', command '~p' not found.", [Type, Command, Name]).
 
 %% @doc The following environment variables are exported when running
 %% a hook (absolute paths):
-%% 
+%%
 %% REBAR_DEPS_DIR          = rebar_dir:deps_dir/1
 %% REBAR_BUILD_DIR         = rebar_dir:base_dir/1
 %% REBAR_ROOT_DIR          = rebar_dir:root_dir/1
@@ -36,7 +47,7 @@ run_provider_hooks(Dir, Type, Command, Providers, State) ->
 %% REBAR_APP_DIRS          = rebar_dir:lib_dirs/1
 %% REBAR_SRC_DIRS          = rebar_dir:src_dirs/1
 %%
-%% autoconf compatible variables 
+%% autoconf compatible variables
 %% (see: http://www.gnu.org/software/autoconf/manual/autoconf.html#Erlang-Libraries):
 %% ERLANG_ERTS_VER              = erlang:system_info(version)
 %% ERLANG_ROOT_DIR              = code:root_dir/0
@@ -100,8 +111,6 @@ join_dirs(BaseDir, Dirs) ->
 
 re_version(Path) ->
     case re:run(Path, "^.*-(?<VER>[^/-]*)$", [{capture, [1], list}]) of
-	nomatch -> "";
-	{match, [Ver]} -> Ver
+        nomatch -> "";
+        {match, [Ver]} -> Ver
     end.
-
-    
