@@ -3,6 +3,7 @@
 -export([run_all_hooks/5
         ,format_error/1]).
 
+-include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
 -spec run_all_hooks(file:filename_all(), pre | post,
@@ -23,6 +24,7 @@ run_provider_hooks(Dir, Type, Command, Providers, State) ->
 
     case rebar_core:do(HookProviders, State1) of
         {error, ProviderName} ->
+            ?DEBUG(format_error({bad_provider, Type, Command, ProviderName}), []),
             throw(?PRV_ERROR({bad_provider, Type, Command, ProviderName}));
         {ok, _} ->
             rebar_utils:remove_from_code_path(PluginDepsPaths)
