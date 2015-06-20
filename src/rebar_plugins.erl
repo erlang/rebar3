@@ -50,17 +50,16 @@ handle_plugins(Profile, Plugins, State, Upgrade) ->
     State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
 
     %% Install each plugin individually so if one fails to install it doesn't effect the others
-    {PluginProviders, State2} =
+    {_PluginProviders, State2} =
         lists:foldl(fun(Plugin, {PluginAcc, StateAcc}) ->
                             {NewPlugins, NewState} = handle_plugin(Profile, Plugin, StateAcc, Upgrade),
-                            {PluginAcc++NewPlugins, NewState}
+                            NewState1 = rebar_state:create_logic_providers(NewPlugins, NewState),
+                            {PluginAcc++NewPlugins, NewState1}
                       end, {[], State1}, Plugins),
 
     %% reset deps dir
     State3 = rebar_state:set(State2, deps_dir, DepsDir),
-    State4 = rebar_state:lock(State3, Locks),
-
-    rebar_state:create_logic_providers(PluginProviders, State4).
+    rebar_state:lock(State3, Locks).
 
 handle_plugin(Profile, Plugin, State, Upgrade) ->
     try
@@ -73,7 +72,7 @@ handle_plugin(Profile, Plugin, State, Upgrade) ->
         code:add_pathsa(CodePaths),
 
         %% Build plugin and its deps
-        [build_plugin(AppInfo, Apps, State) || AppInfo <- ToBuild],
+        [build_plugin(AppInfo, Apps, State2) || AppInfo <- ToBuild],
 
         %% Add newly built deps and plugin to code path
         State3 = rebar_state:update_all_plugin_deps(State2, Apps),
@@ -93,10 +92,11 @@ handle_plugin(Profile, Plugin, State, Upgrade) ->
 
 build_plugin(AppInfo, Apps, State) ->
     Providers = rebar_state:providers(State),
+    Providers1 = rebar_state:providers(rebar_app_info:state(AppInfo)),
     AppDir = rebar_app_info:dir(AppInfo),
     C = rebar_config:consult(AppDir),
     S = rebar_state:new(rebar_state:all_deps(rebar_state:new(), Apps), C, AppDir),
-    rebar_prv_compile:compile(S, Providers, AppInfo).
+    rebar_prv_compile:compile(S, Providers++Providers1, AppInfo).
 
 plugin_providers({Plugin, _, _, _}) when is_atom(Plugin) ->
     validate_plugin(Plugin);
