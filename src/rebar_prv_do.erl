@@ -33,8 +33,16 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    Tasks = rebar_utils:args_to_tasks(rebar_state:command_args(State)),
-    do_tasks(Tasks, State).
+    case rebar_utils:args_to_tasks(rebar_state:command_args(State)) of
+        [] ->
+            AllProviders = rebar_state:providers(State),
+            Namespace = rebar_state:namespace(State),
+            Providers = providers:get_providers_by_namespace(Namespace, AllProviders),
+            providers:help(Providers),
+            {ok, State};
+        Tasks ->
+            do_tasks(Tasks, State)
+    end.
 
 do_tasks([], State) ->
     {ok, State};

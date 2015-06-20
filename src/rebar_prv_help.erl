@@ -65,7 +65,13 @@ task_help(Namespace, Name, State) ->
     Providers = rebar_state:providers(State),
     case providers:get_provider(Name, Providers, Namespace) of
         not_found ->
-            {error, io_lib:format("Unknown task ~p", [Name])};
+            case providers:get_providers_by_namespace(Name, Providers) of
+                [] ->
+                    {error, io_lib:format("Unknown task ~p", [Name])};
+                NSProviders ->
+                    providers:help(NSProviders),
+                    {ok, State}
+            end;
         Provider ->
             providers:help(Provider),
             {ok, State}
