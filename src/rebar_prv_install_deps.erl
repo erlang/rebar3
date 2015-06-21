@@ -230,10 +230,8 @@ handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Fetched, Seen, Locks, S
 
     Profiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo1),
-    C = rebar_config:consult(rebar_app_info:dir(AppInfo1)),
-    BaseDir = rebar_state:get(State, base_dir, []),
-    S1 = rebar_state:new(rebar_state:set(rebar_state:new(), base_dir, BaseDir),
-                        C, rebar_app_info:dir(AppInfo1)),
+
+    S1 = rebar_app_info:state(AppInfo1),
     S2 = rebar_state:apply_overrides(S1, Name),
 
     Plugins = rebar_state:get(S2, plugins, []),
@@ -289,7 +287,16 @@ package_to_app(DepsDir, Packages, {Name, Vsn, Level}, IsLock, State) ->
             AppInfo2 = rebar_app_info:dir(AppInfo1, filename:join([DepsDir, Name])),
             AppInfo3 = rebar_app_info:dep_level(AppInfo2, Level),
             AppInfo4 = rebar_app_info:is_lock(AppInfo3, IsLock),
-            rebar_app_info:source(AppInfo4, {pkg, Name, Vsn})
+
+            C = rebar_config:consult(rebar_app_info:dir(AppInfo1)),
+            BaseDir = rebar_state:get(State, base_dir, []),
+            Overrides = rebar_state:get(State, overrides, []),
+            S = rebar_state:new(rebar_state:set(rebar_state:new(), base_dir, BaseDir),
+                                 C, rebar_app_info:dir(AppInfo1)),
+            ParentOverrides = rebar_state:overrides(State),
+            AppInfo5 = rebar_app_info:state(AppInfo4,
+                                            rebar_state:overrides(S, ParentOverrides++Overrides)),
+            rebar_app_info:source(AppInfo5, {pkg, Name, Vsn})
     end.
 
 -spec update_src_deps(atom(), non_neg_integer(), list(), list(), list(), rebar_state:t(), boolean(), sets:set(binary()), list()) -> {rebar_state:t(), list(), list(), sets:set(binary())}.
