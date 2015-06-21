@@ -111,6 +111,11 @@ _rebar3 () {
                 (pkgs)
                     _message 'List available packages.' && ret=0
                 ;;
+                (plugins)
+                    _arguments \
+                        '1:type:(list upgrade)' \
+                    && ret=0
+                ;;
                 (release)
                     _arguments \
                         '(-n --relname)'{-n,--relname}'[Specify the name for the release that will be generated.]:relname' \
@@ -202,11 +207,12 @@ _rebar3_tasks() {
         'help:Display a list of tasks or help for a given task or subtask.'
         'new:Create new project from templates.'
         'pkgs:List available packages.'
+        'plugins:List or upgrade plugins.'
         'release:Build release of project.'
         'report:Provide a crash report to be sent to the rebar3 issues page.'
         'shell:Run shell with project apps and deps in path.'
         'tar:Tar archive of release built of project.'
-        'unlock:Unlock dependencies..'
+        'unlock:Unlock dependencies.'
         'update:Update package index.'
         'upgrade:Upgrade dependencies.'
         'version:Print version for rebar and current Erlang.'
