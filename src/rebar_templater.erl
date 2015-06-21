@@ -380,4 +380,4 @@ write_file(Output, Data, Force) ->
 %% Render a binary to a string, using mustache and the specified context
 %%
 render(Bin, Context) ->
-    mustache:render(ec_cnv:to_binary(Bin), Context, [{key_type, atom}]).
+    bbmustache:render(ec_cnv:to_binary(Bin), Context, [{key_type, atom}]).

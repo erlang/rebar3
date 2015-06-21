@@ -1,4 +1,5 @@
-[{<<"relx">>,
+[{<<"bbmustache">>,{pkg,<<"bbmustache">>,<<"1.0.0">>},0},
+ {<<"relx">>,
   {git,"https://github.com/erlware/relx.git",
        {ref,"74fec3455ba6dbb7d9e369137c1b15ab10804993"}},
   0},

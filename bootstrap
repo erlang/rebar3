@@ -86,6 +86,7 @@ compile(App, FirstFiles) ->
     FirstFilesPaths = [filename:join([Dir, "src", Module]) || Module <- FirstFiles],
     Sources = FirstFilesPaths ++ filelib:wildcard(filename:join([Dir, "src", "*.erl"])),
     [compile_file(X, [{i, filename:join(Dir, "include")}
+                     ,debug_info
                      ,{outdir,  filename:join(Dir, "ebin")}
                      ,return | additional_defines()]) || X <- Sources].
 

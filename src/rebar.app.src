@@ -17,6 +17,7 @@
                   common_test,
                   erlware_commons,
                   providers,
+                  bbmustache,
                   relx,
                   inets]},
   {env, [
