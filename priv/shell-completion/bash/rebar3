@@ -23,6 +23,7 @@ _rebar3()
             help \
             new \
             pkgs \
+            plugins \
             release \
             report \
             shell \
@@ -93,6 +94,8 @@ _rebar3()
         sopts="-f"
         lopts="--force"
     elif [[ ${prev} == pkgs ]] ; then
+        :
+    elif [[ ${prev} == plugins ]] ; then
         :
     elif [[ ${prev} == release ]] ; then
         sopts="-n -v -g -u -o -h -l -p -V -d -i -a -c -r"

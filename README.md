@@ -38,15 +38,17 @@ limit scope.
 | do         | Higher-order provider to run multiple tasks in sequence |
 | dialyzer   | Run the Dialyzer analyzer on the project |
 | edoc       | Generate documentation using edoc |
-| eunit      | Run eunit tests |
 | escriptize | Generate escript of project |
+| eunit      | Run eunit tests |
 | help       | Print help for rebar or task |
 | new        | Create new rebar project from templates |
 | pkgs       | List available packages |
+| plugins    | List or upgrade plugins |
 | release    | Build release of project |
 | report     | Report on environment and versions for bug reports |
 | shell      | Run shell with project apps in path |
 | tar        | Package release into tarball |
+| unlock     | Unlock dependencies |
 | update     | Update package index |
 | upgrade    | Fetch latest version of dep |
 | version    | Print current version of Erlang/OTP and rebar |
