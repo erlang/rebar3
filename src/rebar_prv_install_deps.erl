@@ -224,28 +224,13 @@ update_pkg_deps(Profile, Pkgs, Packages, Upgrade, Seen, State, Locks) ->
 handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Fetched, Seen, Locks, State) ->
     IsLock = pkg_locked(Pkg, Locks),
     AppInfo = package_to_app(DepsDir, Packages, Pkg, IsLock, State),
+    Deps = rebar_app_info:deps(AppInfo),
     Level = rebar_app_info:dep_level(AppInfo),
     {NewSeen, NewState} = maybe_lock(Profile, AppInfo, Seen, State, Level),
     {_, AppInfo1} = maybe_fetch(AppInfo, Profile, Upgrade, Seen, NewState),
-
-    Profiles = rebar_state:current_profiles(State),
-    Name = rebar_app_info:name(AppInfo1),
-    C = rebar_config:consult(rebar_app_info:dir(AppInfo1)),
-    BaseDir = rebar_state:get(State, base_dir, []),
-    S1 = rebar_state:new(rebar_state:set(rebar_state:new(), base_dir, BaseDir),
-                        C, rebar_app_info:dir(AppInfo1)),
-    S2 = rebar_state:apply_overrides(S1, Name),
-
-    Plugins = rebar_state:get(S2, plugins, []),
-    S3 = rebar_state:set(S2, {plugins, Profile}, Plugins),
-
-    S4 = rebar_state:apply_profiles(S3, Profiles),
-    AppInfo2 = rebar_app_info:state(AppInfo1, S4),
-
-    %% Dep may have plugins to install. Find and install here.
-    S5 = rebar_plugins:install(S4),
-    AppInfo3 = rebar_app_info:state(AppInfo2, S5),
-
+    {AppInfo2, _, _, _, _} =
+        handle_dep(NewState, Profile, DepsDir, AppInfo1, Locks, Level),
+    AppInfo3 = rebar_app_info:deps(AppInfo2, Deps),
     {[AppInfo3 | Fetched], NewSeen, NewState}.
 
 maybe_lock(Profile, AppInfo, Seen, State, Level) ->
@@ -284,12 +269,12 @@ package_to_app(DepsDir, Packages, {Name, Vsn, Level}, IsLock, State) ->
                     throw(?PRV_ERROR({missing_package, Name, Vsn}))
             end;
         {ok, PkgDeps} ->
-            {ok, AppInfo} = rebar_app_info:new(Name, Vsn),
-            AppInfo1 = rebar_app_info:deps(AppInfo, PkgDeps),
-            AppInfo2 = rebar_app_info:dir(AppInfo1, filename:join([DepsDir, Name])),
-            AppInfo3 = rebar_app_info:dep_level(AppInfo2, Level),
-            AppInfo4 = rebar_app_info:is_lock(AppInfo3, IsLock),
-            rebar_app_info:source(AppInfo4, {pkg, Name, Vsn})
+            Source = {pkg, Name, Vsn},
+            AppInfo = new_dep(DepsDir, Name, Vsn, Source, IsLock, State),
+            AppInfo1 = rebar_app_info:dep_level(rebar_app_info:deps(AppInfo, PkgDeps), Level),
+            BaseDir = rebar_state:get(State, base_dir, []),
+            AppState1 = rebar_state:set(rebar_app_info:state(AppInfo1), base_dir, BaseDir),
+            rebar_app_info:state(AppInfo1, AppState1)
     end.
 
 -spec update_src_deps(atom(), non_neg_integer(), list(), list(), list(), rebar_state:t(), boolean(), sets:set(binary()), list()) -> {rebar_state:t(), list(), list(), sets:set(binary())}.

@@ -4,6 +4,12 @@
 
 
 main(_Args) ->
+    application:start(crypto),
+    application:start(asn1),
+    application:start(public_key),
+    application:start(ssl),
+    inets:start(),
+
     %% Fetch and build deps required to build rebar3
     BaseDeps = [{providers, []}
                ,{getopt, []}
@@ -24,6 +30,7 @@ main(_Args) ->
 
     setup_env(),
     os:putenv("REBAR_PROFILE", "bootstrap"),
+    rebar3:run(["update"]),
     {ok, State} = rebar3:run(["compile"]),
     reset_env(),
     os:putenv("REBAR_PROFILE", ""),
@@ -56,28 +63,33 @@ fetch_and_compile({Name, ErlFirstFiles}, Deps) ->
     ok = fetch(Repo, Name),
     compile(Name, ErlFirstFiles).
 
-fetch({git, Url, Source}, App) ->
+fetch({pkg, Name, Vsn}, App) ->
     Dir = filename:join([filename:absname("_build/default/lib/"), App]),
-    case filelib:is_dir(Dir) of
-        true ->
-            true = code:add_path(filename:join(Dir, "ebin")),
-            ok;
-        false ->
-            fetch_source(Dir, Url, Source),
-            ok
+    CDN = "https://s3.amazonaws.com/s3.hex.pm/tarballs",
+    Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
+    Url = string:join([CDN, Package], "/"),
+    case request(Url) of
+        {ok, Binary} ->
+            {ok, Contents} = extract(Binary),
+            ok = erl_tar:extract({binary, Contents}, [{cwd, Dir}, compressed]);
+        _ ->
+            io:format("Error: Unable to fetch package ~p ~p~n", [Name, Vsn])
     end.
 
-fetch_source(Dir, Url, {ref, Ref}) ->
-    ok = filelib:ensure_dir(Dir),
-    os:cmd(io_lib:format("git clone ~s ~s", [Url, Dir])),
-    {ok, Cwd} = file:get_cwd(),
-    file:set_cwd(Dir),
-    os:cmd(io_lib:format("git checkout -q ~s", [Ref])),
-    file:set_cwd(Cwd);
-fetch_source(Dir, Url, {_, Branch}) ->
-    ok = filelib:ensure_dir(Dir),
-    os:cmd(io_lib:format("git clone ~s ~s -b ~s --single-branch",
-                         [Url, Dir, Branch])).
+extract(Binary) ->
+    {ok, Files} = erl_tar:extract({binary, Binary}, [memory]),
+    {"contents.tar.gz", Contents} = lists:keyfind("contents.tar.gz", 1, Files),
+    {ok, Contents}.
+
+request(Url) ->
+    case httpc:request(get, {Url, []},
+                       [{relaxed, true}],
+                       [{body_format, binary}]) of
+        {ok, {{_Version, 200, _Reason}, _Headers, Body}} ->
+            {ok, Body};
+        Error ->
+            Error
+    end.
 
 compile(App, FirstFiles) ->
     Dir = filename:join(filename:absname("_build/default/lib/"), App),
@@ -86,6 +98,7 @@ compile(App, FirstFiles) ->
     FirstFilesPaths = [filename:join([Dir, "src", Module]) || Module <- FirstFiles],
     Sources = FirstFilesPaths ++ filelib:wildcard(filename:join([Dir, "src", "*.erl"])),
     [compile_file(X, [{i, filename:join(Dir, "include")}
+                     ,debug_info
                      ,{outdir,  filename:join(Dir, "ebin")}
                      ,return | additional_defines()]) || X <- Sources].
 
