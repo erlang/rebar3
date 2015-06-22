@@ -27,9 +27,9 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    case rebar_packages:registry(State) of
-        {ok, Registry} ->
-            print_packages(Registry),
+    case rebar_packages:get_packages(State) of
+        {Dict, _} ->
+            print_packages(Dict),
             {ok, State};
         error ->
             ?PRV_ERROR(load_registry_fail)
@@ -39,13 +39,16 @@ do(State) ->
 format_error(load_registry_fail) ->
     "Failed to load package regsitry. Try running 'rebar3 update' to fix".
 
-print_packages(Table) ->
-    MS = ets:fun2ms(fun({Key, [Value]}) when is_binary(Key) -> {Key, Value} end),
-    Pkgs = ets:select(Table, MS),
-    lists:foreach(fun({Name, Vsns}) ->
-                          VsnStr = join(Vsns, <<", ">>),
-                          io:format("~s:~n    Versions: ~s~n~n", [Name, VsnStr])
-                  end, Pkgs).
+print_packages(Dict) ->
+    Pkgs = lists:keysort(1, dict:fetch_keys(Dict)),
+    SortedPkgs = lists:foldl(fun({Pkg, Vsn}, Acc) ->
+                                       orddict:append_list(Pkg, [Vsn], Acc)
+                               end, orddict:new(), Pkgs),
+
+    orddict:map(fun(Name, Vsns) ->
+                        VsnStr = join(Vsns, <<", ">>),
+                        io:format("~s:~n    Versions: ~s~n~n", [Name, VsnStr])
+                end, SortedPkgs).
 
 -spec join([binary()], binary()) -> binary().
 join([Bin], _Sep) ->
