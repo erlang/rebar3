@@ -4,10 +4,7 @@
 
 
 main(_Args) ->
-    case crypto:start() of
-        ok -> ok;
-        {error,{already_started,crypto}} -> ok
-    end,
+    application:start(crypto),
     application:start(asn1),
     application:start(public_key),
     application:start(ssl),
