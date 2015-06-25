@@ -93,9 +93,7 @@ handle_plugin(Profile, Plugin, State, Upgrade) ->
 build_plugin(AppInfo, Apps, State) ->
     Providers = rebar_state:providers(State),
     Providers1 = rebar_state:providers(rebar_app_info:state(AppInfo)),
-    AppDir = rebar_app_info:dir(AppInfo),
-    C = rebar_config:consult(AppDir),
-    S = rebar_state:new(rebar_state:all_deps(rebar_state:new(), Apps), C, AppDir),
+    S = rebar_state:all_deps(rebar_app_info:state_or_new(State, AppInfo), Apps),
     rebar_prv_compile:compile(S, Providers++Providers1, AppInfo).
 
 plugin_providers({Plugin, _, _, _}) when is_atom(Plugin) ->
