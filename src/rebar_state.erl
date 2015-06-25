@@ -4,6 +4,8 @@
 
          get/2, get/3, set/3,
 
+         format_error/1,
+
          has_all_artifacts/1,
 
          code_paths/2, code_paths/3, update_code_paths/3,
@@ -166,6 +168,9 @@ default(#state_t{default=Opts}) ->
 default(State, Opts) ->
     State#state_t{default=Opts}.
 
+format_error({profile_not_list, Profile, Other}) ->
+    io_lib:format("Profile config must be a list but for profile '~p' config given as:~n~p", [Profile, Other]).
+
 -spec has_all_artifacts(rebar_app_info:t()) -> true | providers:error().
 has_all_artifacts(State) ->
     Artifacts = rebar_state:get(State, artifacts, []),
@@ -291,8 +296,13 @@ apply_profiles(State=#state_t{default = Defaults, current_profiles=CurrentProfil
         lists:foldl(fun(default, OptsAcc) ->
                             OptsAcc;
                        (Profile, OptsAcc) ->
-                            ProfileOpts = dict:from_list(proplists:get_value(Profile, ConfigProfiles, [])),
-                            merge_opts(Profile, ProfileOpts, OptsAcc)
+                            case proplists:get_value(Profile, ConfigProfiles, []) of
+                                OptsList when is_list(OptsList) ->
+                                    ProfileOpts = dict:from_list(OptsList),
+                                    merge_opts(Profile, ProfileOpts, OptsAcc);
+                                Other ->
+                                    throw(?PRV_ERROR({profile_not_list, Profile, Other}))
+                            end
                     end, Defaults, AppliedProfiles),
     State#state_t{current_profiles = AppliedProfiles, opts=NewOpts}.
 
