@@ -48,10 +48,10 @@ end_per_testcase(_, Config) ->
     Config.
 
 format_expected_deps(Deps) ->
-    [case Dep of
-        {N,V} -> {dep, N, V};
-        N -> {dep, N}
-     end || Dep <- Deps].
+    lists:append([case Dep of
+        {N,V} -> [{dep, N, V}, {lock, N, V}];
+        N -> [{dep, N}, {lock, N}]
+    end || Dep <- Deps]).
 
 %% format:
 %% {Spec,
@@ -200,7 +200,7 @@ circular_skip(Config) -> run(Config).
 fail_conflict(Config) ->
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
     rebar_test_utils:run_and_check(
-        Config, RebarConfig, ["install_deps"], ?config(expect, Config)
+        Config, RebarConfig, ["lock"], ?config(expect, Config)
     ),
     check_warnings(error_calls(), ?config(warnings, Config), ?config(deps_type, Config)).
 
@@ -209,7 +209,7 @@ default_profile(Config) ->
     AppDir = ?config(apps, Config),
     {ok, Apps} = Expect = ?config(expect, Config),
     rebar_test_utils:run_and_check(
-        Config, RebarConfig, ["as", "profile", "install_deps"], Expect
+        Config, RebarConfig, ["as", "profile", "lock"], Expect
     ),
     check_warnings(error_calls(), ?config(warnings, Config), ?config(deps_type, Config)),
     BuildDir = filename:join([AppDir, "_build"]),
@@ -221,18 +221,30 @@ default_profile(Config) ->
      || {dep, App} <- Apps],
     %% A second run to another profile also links default to the right spot
     rebar_test_utils:run_and_check(
-        Config, RebarConfig, ["as", "other", "install_deps"], Expect
+        Config, RebarConfig, ["as", "other", "lock"], Expect
     ),
     [?assertMatch({ok, #file_info{type=directory}}, % somehow symlinks return dirs
                   file:read_file_info(filename:join([BuildDir, "other", "lib", App])))
      || {dep, App} <- Apps].
 
 nondefault_profile(Config) ->
+    %% The dependencies here are saved directly to the 
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
     AppDir = ?config(apps, Config),
-    {ok, Apps} = Expect = ?config(expect, Config),
+    {ok, AppLocks} = ?config(expect, Config),
+    try
+        rebar_test_utils:run_and_check(
+            Config, RebarConfig, ["as", "nondef", "lock"], {ok, AppLocks}
+        ),
+        error(generated_locks)
+    catch
+        error:generated_locks -> error(generated_locks);
+        _:{assertNotEqual, _} -> ok
+    end,
+    Apps = [App || App = {dep, _} <- AppLocks],
+    Expect = {ok, Apps},
     rebar_test_utils:run_and_check(
-        Config, RebarConfig, ["as", "nondef", "install_deps"], Expect
+        Config, RebarConfig, ["as", "nondef", "lock"], Expect
     ),
     check_warnings(error_calls(), ?config(warnings, Config), ?config(deps_type, Config)),
     BuildDir = filename:join([AppDir, "_build"]),
@@ -244,7 +256,7 @@ nondefault_profile(Config) ->
      || {dep, App} <- Apps],
     %% A second run to another profile doesn't link dependencies
     rebar_test_utils:run_and_check(
-        Config, RebarConfig, ["as", "other", "install_deps"], Expect
+        Config, RebarConfig, ["as", "other", "lock"], Expect
     ),
     [?assertMatch({error, enoent},
                   file:read_file_info(filename:join([BuildDir, "default", "lib", App])))
@@ -254,7 +266,7 @@ nondefault_profile(Config) ->
 run(Config) ->
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
     rebar_test_utils:run_and_check(
-        Config, RebarConfig, ["install_deps"], ?config(expect, Config)
+        Config, RebarConfig, ["lock"], ?config(expect, Config)
     ),
     check_warnings(warning_calls(), ?config(warnings, Config), ?config(deps_type, Config)).
 
