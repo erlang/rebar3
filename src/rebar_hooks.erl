@@ -67,6 +67,7 @@ run_hooks(Dir, Type, Command, State) ->
                 _ ->
                     []
             end,
+
     Env = create_env(State),
     lists:foreach(fun({_, C, _}=Hook) when C =:= Command ->
                           apply_hook(Dir, Env, Hook);
