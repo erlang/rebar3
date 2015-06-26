@@ -25,6 +25,7 @@ _rebar3()
             pkgs \
             plugins \
             release \
+            relup \
             report \
             shell \
             tar \
@@ -98,6 +99,28 @@ _rebar3()
     elif [[ ${prev} == plugins ]] ; then
         :
     elif [[ ${prev} == release ]] ; then
+        sopts="-n -v -g -u -o -h -l -p -V -d -i -a -c -r"
+        lopts="--relname \
+            --relvsn \
+            --goal \
+            --upfrom \
+            --output-dir \
+            --help \
+            --lib-dir \
+            --path \
+            --default-libs \
+            --verbose \
+            --dev-mode \
+            --include-erts \
+            --override \
+            --config \
+            --overlay_vars \
+            --vm_args \
+            --sys_config \
+            --system_libs \
+            --version \
+            --root"
+    elif [[ ${prev} == relup ]] ; then
         sopts="-n -v -g -u -o -h -l -p -V -d -i -a -c -r"
         lopts="--relname \
             --relvsn \

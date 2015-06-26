@@ -45,6 +45,7 @@ limit scope.
 | pkgs       | List available packages |
 | plugins    | List or upgrade plugins |
 | release    | Build release of project |
+| relup      | Creates relup from 2 releases |
 | report     | Report on environment and versions for bug reports |
 | shell      | Run shell with project apps in path |
 | tar        | Package release into tarball |
