@@ -83,7 +83,7 @@ symlink_or_copy(Source, Target) ->
                         true ->
                             win32_symlink(S, T);
                         false ->
-                            ok
+                            cp_r([S], T)
                     end;
                 _ ->
                     case filelib:is_dir(Target) of
@@ -104,7 +104,7 @@ win32_symlink(Source, Target) ->
         true -> ok;
         false ->
             {error, lists:flatten(
-                      io_lib:format("Failed to sumlink ~s to ~s~n",
+                      io_lib:format("Failed to symlink ~s to ~s~n",
                                     [Source, Target]))}
     end.
 
