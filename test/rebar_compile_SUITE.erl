@@ -19,7 +19,8 @@
          delete_beam_if_source_deleted/1,
          checkout_priority/1,
          highest_version_of_pkg_dep/1,
-         parse_transform_test/1]).
+         parse_transform_test/1,
+         erl_first_files_test/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -46,7 +47,8 @@ all() ->
      build_all_srcdirs, recompile_when_hrl_changes,
      recompile_when_opts_change, dont_recompile_when_opts_dont_change,
      dont_recompile_yrl_or_xrl, delete_beam_if_source_deleted,
-     deps_in_path, checkout_priority, highest_version_of_pkg_dep, parse_transform_test].
+     deps_in_path, checkout_priority, highest_version_of_pkg_dep,
+     parse_transform_test, erl_first_files_test].
 
 build_basic_app(Config) ->
     AppDir = ?config(apps, Config),
@@ -441,3 +443,43 @@ parse_transform_test(Config) ->
 
     EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
     true = filelib:is_file(filename:join([EbinDir, "pascal.beam"])).
+
+erl_first_files_test(Config) ->
+    AppDir = ?config(apps, Config),
+    RebarConfig = [{erl_opts, [{parse_transform, mark_time}]},
+                   {erl_first_files, ["src/mark_time.erl",
+                                      "src/b.erl",
+                                      "src/d.erl",
+                                      "src/a.erl"]}],
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:write_src_file(AppDir, "a.erl"),
+    rebar_test_utils:write_src_file(AppDir, "b.erl"),
+    rebar_test_utils:write_src_file(AppDir, "d.erl"),
+    rebar_test_utils:write_src_file(AppDir, "e.erl"),
+
+    ExtraSrc = <<"-module(mark_time). "
+                 "-export([parse_transform/2]). "
+                 "parse_transform([Form={attribute,_,module,Mod}|Forms], Options) -> "
+                 "    [Form, {attribute,1,number, os:timestamp()} | Forms];"
+                 "parse_transform([Form|Forms], Options) -> "
+                 "    [Form | parse_transform(Forms, Options)].">>,
+
+    ok = file:write_file(filename:join([AppDir, "src", "mark_time.erl"]), ExtraSrc),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
+
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    true = filelib:is_file(filename:join([EbinDir, "mark_time.beam"])),
+
+    code:load_abs(filename:join([EbinDir, "a"])),
+    code:load_abs(filename:join([EbinDir, "b"])),
+    code:load_abs(filename:join([EbinDir, "d"])),
+    code:load_abs(filename:join([EbinDir, "e"])),
+    A = proplists:get_value(number, a:module_info(attributes)),
+    B = proplists:get_value(number, b:module_info(attributes)),
+    D = proplists:get_value(number, d:module_info(attributes)),
+    E = proplists:get_value(number, e:module_info(attributes)),
+    ?assertEqual([B,D,A,E], lists:sort([A,B,D,E])).

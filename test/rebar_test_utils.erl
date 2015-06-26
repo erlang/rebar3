@@ -4,7 +4,7 @@
 -export([init_rebar_state/1, init_rebar_state/2, run_and_check/4]).
 -export([expand_deps/2, flat_deps/1, flat_pkgdeps/1, top_level_deps/1]).
 -export([create_app/4, create_eunit_app/4, create_empty_app/4, create_config/2]).
--export([create_random_name/1, create_random_vsn/0]).
+-export([create_random_name/1, create_random_vsn/0, write_src_file/2]).
 
 %%%%%%%%%%%%%%
 %%% Public %%%
