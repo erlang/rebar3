@@ -215,7 +215,6 @@ check_results(AppDir, Expected) ->
                 ?assertNotEqual(false, lists:keyfind(Name, 1, DepsNames))
         ;  ({dep, Name, Vsn}) ->
                 ct:pal("Dep Name: ~p, Vsn: ~p", [Name, Vsn]),
-		ct:pal("DepNames: ~p~n", [DepsNames]),
                 case lists:keyfind(Name, 1, DepsNames) of
                     false ->
                         error({dep_not_found, Name});
@@ -275,28 +274,11 @@ check_results(AppDir, Expected) ->
 
                     LibDir = filename:join([ReleaseDir, Name, "lib"]),
                     {ok, RelLibs} = file:list_dir(LibDir),
-		    ct:pal("RelLibs: ~p~n", [RelLibs]),
                     IsSymLinkFun =
                         fun(X) ->
                                 ec_file:is_symlink(filename:join(LibDir, X))
                         end,
-		    IsDirFun =
-			fun(X) ->
-				filelib:is_dir(filename:join([LibDir, X]))
-			end,
-                    DevMode =
-			case os:type() of
-			    {unix, _} ->
-				lists:all(IsSymLinkFun, RelLibs);
-			    {win32, _} ->
-				Bool = lists:all(IsDirFun, RelLibs),
-				case ExpectedDevMode of
-				    true ->
-					Bool;
-				    false ->
-					not Bool
-				end
-			end,
+                    DevMode = lists:all(IsSymLinkFun, RelLibs),
                     ?assertEqual(ExpectedDevMode, DevMode),
 
                     %% throws not_found if it doesn't exist
