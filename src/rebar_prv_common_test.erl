@@ -105,14 +105,18 @@ run_test_verbose(Opts) -> handle_results(ct:run_test(Opts)).
 
 run_test_quiet(Opts) ->
     Pid = self(),
+    Ref = erlang:make_ref(),
     LogDir = proplists:get_value(logdir, Opts),
-    erlang:spawn_monitor(fun() ->
+    {_, Monitor} = erlang:spawn_monitor(fun() ->
         {ok, F} = file:open(filename:join([LogDir, "ct.latest.log"]),
                             [write]),
         true = group_leader(F, self()),
-        Pid ! ct:run_test(Opts)
+        Pid ! {Ref, ct:run_test(Opts)}
     end),
-    receive Result -> handle_quiet_results(Opts, Result) end.
+    receive
+        {Ref, Result} -> handle_quiet_results(Opts, Result);
+        {'DOWN', Monitor, _, _, Reason} -> handle_results(?PRV_ERROR(Reason))
+    end.
 
 handle_results(Results) when is_list(Results) ->
     Result = lists:foldl(fun sum_results/2, {0, 0, {0,0}}, Results),
@@ -132,8 +136,6 @@ sum_results({Passed, Failed, {UserSkipped, AutoSkipped}},
 
 handle_quiet_results(_, {error, _} = Result) ->
     handle_results(Result);
-handle_quiet_results(_, {'DOWN', _, _, _, Reason}) ->
-    handle_results(?PRV_ERROR(Reason));
 handle_quiet_results(CTOpts, Results) when is_list(Results) ->
     _ = [format_result(Result) || Result <- Results],
     case handle_results(Results) of
