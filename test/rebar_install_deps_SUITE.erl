@@ -239,7 +239,7 @@ nondefault_profile(Config) ->
         error(generated_locks)
     catch
         error:generated_locks -> error(generated_locks);
-        _:{assertNotEqual, _} -> ok
+        _:_ -> ok
     end,
     Apps = [App || App = {dep, _} <- AppLocks],
     Expect = {ok, Apps},
