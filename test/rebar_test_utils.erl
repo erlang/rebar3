@@ -105,7 +105,8 @@ create_config(AppDir, Contents) ->
 
 %% @doc Util to create a random variation of a given name.
 create_random_name(Name) ->
-    random:seed(erlang:now()),
+    <<A:32, B:32, C:32>> = crypto:rand_bytes(12),
+    random:seed({A,B,C}),
     Name ++ erlang:integer_to_list(random:uniform(1000000)).
 
 %% @doc Util to create a random variation of a given version.

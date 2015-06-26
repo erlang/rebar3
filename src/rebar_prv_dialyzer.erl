@@ -97,8 +97,7 @@ do(State) ->
 %% Dialyzer gets default plt location wrong way by peeking HOME environment
 %% variable which usually is not defined on Windows.
 maybe_fix_env() ->
-    {ok, [[HomePath]]} = init:get_argument(home),
-    os:putenv("DIALYZER_PLT", filename:join(HomePath, ".dialyzer_plt")).
+    os:putenv("DIALYZER_PLT", filename:join(rebar_dir:home_dir(), ".dialyzer_plt")).
 
 -spec format_error(any()) -> iolist().
 format_error({error_processing_apps, Error}) ->

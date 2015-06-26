@@ -22,7 +22,7 @@
          task_with_flag_with_commas/1,
          task_with_multiple_flags/1,
          special_task_do/1,
-         sh_don_not_miss_messages/1]).
+         sh_does_not_miss_messages/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -31,7 +31,7 @@
 
 all() ->
     [{group, args_to_tasks},
-     sh_don_not_miss_messages].
+     sh_does_not_miss_messages].
 
 groups() ->
     [{args_to_tasks, [], [empty_arglist,
@@ -120,7 +120,7 @@ special_task_do(_Config) ->
                                                                         "do",
                                                                         "bar,",
                                                                         "baz"]).
-sh_don_not_miss_messages(_Config) ->
+sh_does_not_miss_messages(_Config) ->
     Source = "~nmain(_) ->~n io:format(\"donotmissme\").~n",
     file:write_file("do_not_miss_messages", io_lib:format(Source,[])),
     {ok, "donotmissme"} = rebar_utils:sh("escript do_not_miss_messages", []),
