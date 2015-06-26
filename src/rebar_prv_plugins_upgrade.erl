@@ -50,15 +50,12 @@ format_error(Reason) ->
 
 upgrade(Plugin, State) ->
     Profiles = rebar_state:current_profiles(State),
-    Dep = ec_lists:search(fun(Profile) ->
-                                  Plugins = rebar_state:get(State, {plugins, Profile}, []),
-                                  case find(list_to_atom(Plugin), Plugins) of
-                                      false ->
-                                          not_found;
-                                      P ->
-                                          {ok, P}
-                                  end
-                          end, Profiles),
+    case find_plugin(Plugin, Profiles, State) of
+        not_found ->
+            Dep = find_plugin(Plugin, [global], State);
+        Dep ->
+            Dep
+    end,
 
     case Dep of
         not_found ->
@@ -81,6 +78,17 @@ upgrade(Plugin, State) ->
             [build_plugin(AppInfo, Apps, State) || AppInfo <- ToBuild],
             {ok, State}
     end.
+
+find_plugin(Plugin, Profiles, State) ->
+    ec_lists:search(fun(Profile) ->
+                            Plugins = rebar_state:get(State, {plugins, Profile}, []),
+                            case find(list_to_atom(Plugin), Plugins) of
+                                false ->
+                                    not_found;
+                                P ->
+                                    {ok, P}
+                            end
+                    end, Profiles).
 
 find(_Plugin, []) ->
     false;
