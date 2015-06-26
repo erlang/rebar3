@@ -48,6 +48,7 @@
                      rebar_prv_plugins,
                      rebar_prv_plugins_upgrade,
                      rebar_prv_release,
+                     rebar_prv_relup,
                      rebar_prv_report,
                      rebar_prv_shell,
                      rebar_prv_tar,

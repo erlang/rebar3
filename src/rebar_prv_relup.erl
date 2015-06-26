@@ -1,7 +1,7 @@
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 
--module(rebar_prv_release).
+-module(rebar_prv_relup).
 
 -behaviour(provider).
 
@@ -11,8 +11,8 @@
 
 -include("rebar.hrl").
 
--define(PROVIDER, release).
--define(DEPS, [compile]).
+-define(PROVIDER, relup).
+-define(DEPS, [release]).
 
 %% ===================================================================
 %% Public API
@@ -20,14 +20,15 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
-                                                               {module, ?MODULE},
-                                                               {bare, true},
-                                                               {deps, ?DEPS},
-                                                               {example, "rebar3 release"},
-                                                               {short_desc, "Build release of project."},
-                                                               {desc, "Build release of project."},
-                                                               {opts, relx:opt_spec_list()}])),
+    Provider = providers:create([{name, ?PROVIDER},
+                                 {module, ?MODULE},
+                                 {bare, true},
+                                 {deps, ?DEPS},
+                                 {example, "rebar3 relup"},
+                                 {short_desc, "Create relup of releases."},
+                                 {desc, "Create relup of releases."},
+                                 {opts, relx:opt_spec_list()}]),
+    State1 = rebar_state:add_provider(State, Provider),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
@@ -38,7 +39,7 @@ do(State) ->
     LibDirs = rebar_utils:filtermap(fun ec_file:exists/1,
                                    [?DEFAULT_CHECKOUTS_DIR, DepsDir | ProjectAppDirs]),
     OutputDir = filename:join(rebar_dir:base_dir(State), ?DEFAULT_RELEASE_DIR),
-    AllOptions = string:join(["release" | Options], " "),
+    AllOptions = string:join(["relup" | Options], " "),
     Cwd = rebar_state:dir(State),
     Providers = rebar_state:providers(State),
     rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
