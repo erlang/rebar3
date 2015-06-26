@@ -386,10 +386,9 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     S1 = rebar_state:new(S, C, rebar_app_info:dir(AppInfo)),
     S2 = rebar_state:apply_overrides(S1, Name),
 
-    Plugins = rebar_state:get(S2, plugins, []),
-    S3 = rebar_state:set(S2, {plugins, Profile}, Plugins),
-
-    S4 = rebar_state:apply_profiles(S3, Profiles),
+    S3 = rebar_state:apply_profiles(S2, Profiles),
+    Plugins = rebar_state:get(S3, plugins, []),
+    S4 = rebar_state:set(S3, {plugins, Profile}, Plugins),
     AppInfo1 = rebar_app_info:state(AppInfo, S4),
 
     %% Dep may have plugins to install. Find and install here.
