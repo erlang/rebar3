@@ -389,7 +389,7 @@ run_dialyzer(State, Opts, Output) ->
                      {check_plt, false} |
                      Opts],
             ?DEBUG("Running dialyzer with options: ~p~n", [Opts2]),
-            _ = dialyzer:run(Opts2),
+            dialyzer:run(Opts2),
             {0, State}
     end.
 
