@@ -139,6 +139,29 @@ _rebar3 () {
                         '(-r --root)'{-r,--root}'[The project root directory]:system libs:_files -/' \
                     && ret=0
                 ;;
+                (relup)
+                    _arguments \
+                        '(-n --relname)'{-n,--relname}'[Specify the name for the release that will be generated.]:relname' \
+                        '(-v --relvsn)'{-n,--relname}'[Specify the  version for the release.]:relvsn' \
+                        '(-g --goal)'{-g,--goal}'[Specify a target constraint on the system. These are usually the OTP.]:goal' \
+                        '(-u --upfrom)'{-u,--upfrom}'[Only valid with relup target, specify the release to upgrade from.]:upfrom' \
+                        '(-o --output-dir)'{-o,--output-dir}'[The output directory for the release. This is ./ by default.]:out directory:_files -/' \
+                        '(-l --lib-dir)'{-l,--output-dir}'[Additional dir that should be searched for OTP Apps]:lib directory:_files -/' \
+                        '(-p --path)'{-p,--path}'[Additional dir to add to the code path]:path directory:_files -/' \
+                        '(--default-libs)--default-libs[Whether to use the default system added lib dirs]:default libs:(true false)' \
+                        '(-V --verbose)'{-V,--verbose}'[Verbosity level, maybe between 0 and 3 ,default: 2]:verbosity level:(0 1 2 3)' \
+                        '(-d --dev-mode)'{-d,--dev-mode}'[Symlink the applications and configuration into the release instead of copying]' \
+                        '(-i --include-erts)'{-i,--dev-mode}'[If true include a copy of erts used to build with, if a path include erts at that path. If false, do not include erts]' \
+                        '(-a --override)'{-a,--override}'[Provide an app name and a directory to override in the form <appname>:<app directory>]:override' \
+                        '(-c --config)'{-c,--config}'[The path to a config file]:config file:_files ' \
+                        '(--overlay_vars)--overlay_vars[Path to a file of overlay variables]:overlay variables file:_files' \
+                        '(--vm_args)--vm_args[Path to a file to use for vm.args]:vm args file:_files' \
+                        '(--sys_config)--sys_config[Path to a file to use for sys.config]:sys config file:_files' \
+                        '(--system_libs)--system_libs[Path to dir of Erlang system libs]:system libs:_files -/' \
+                        '(--version)--version[Print relx version]' \
+                        '(-r --root)'{-r,--root}'[The project root directory]:system libs:_files -/' \
+                    && ret=0
+                ;;
                 (report)
                     _arguments '1: :_rebar3_tasks' && ret=0
                 ;;
@@ -209,6 +232,7 @@ _rebar3_tasks() {
         'pkgs:List available packages.'
         'plugins:List or upgrade plugins.'
         'release:Build release of project.'
+        'relup:Create relup from 2 releases.'
         'report:Provide a crash report to be sent to the rebar3 issues page.'
         'shell:Run shell with project apps and deps in path.'
         'tar:Tar archive of release built of project.'
