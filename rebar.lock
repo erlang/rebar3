@@ -1,5 +1,5 @@
 [{<<"bbmustache">>,{pkg,<<"bbmustache">>,<<"1.0.1">>},0},
  {<<"providers">>,{pkg,<<"providers">>,<<"1.4.1">>},0},
  {<<"erlware_commons">>,{pkg,<<"erlware_commons">>,<<"0.12.0">>},0},
- {<<"relx">>,{pkg,<<"relx">>,<<"2.1.0">>},0},
+ {<<"relx">>,{pkg,<<"relx">>,<<"3.0.0">>},0},
  {<<"getopt">>,{pkg,<<"getopt">>,<<"0.8.2">>},0}].

@@ -232,6 +232,7 @@ setup_env() ->
     application:load(rebar),
     {ok, Providers} = application:get_env(rebar, providers),
     Providers1 = Providers -- [rebar_prv_release,
+                               rebar_prv_relup,
                                rebar_prv_tar],
     application:set_env(rebar, providers, Providers1).
 
