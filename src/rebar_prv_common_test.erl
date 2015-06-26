@@ -354,7 +354,7 @@ remove_links(Path) ->
         true ->
             file:delete(Path);
         false ->
-            ec_file:is_dir(Path) andalso
+            IsDir andalso
                 lists:foreach(fun(ChildPath) ->
                                       remove_links(ChildPath)
                               end, sub_dirs(Path))
