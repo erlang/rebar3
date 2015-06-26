@@ -347,17 +347,15 @@ reduce_path(Acc, [Component|Rest]) -> reduce_path([Component|Acc], Rest).
 
 
 remove_links(Path) ->
-	IsDir = ec_file:is_dir(Path),
+    IsDir = ec_file:is_dir(Path),
     case ec_file:is_symlink(Path) of
         true when IsDir ->
             delete_dir_link(Path);
-        true ->
-            file:delete(Path);
-        false ->
-            ec_file:is_dir(Path) andalso
+        false when IsDir ->
                 lists:foreach(fun(ChildPath) ->
                                       remove_links(ChildPath)
-                              end, sub_dirs(Path))
+                              end, dir_entries(Path));
+        _ -> file:delete(Path)
     end.
 
 delete_dir_link(Path) ->
@@ -366,7 +364,7 @@ delete_dir_link(Path) ->
 		{win32, _} -> file:del_dir(Path)
 	end.
 
-sub_dirs(Path) ->
+dir_entries(Path) ->
     {ok, SubDirs} = file:list_dir(Path),
     [filename:join(Path, SubDir) || SubDir <- SubDirs].
 
