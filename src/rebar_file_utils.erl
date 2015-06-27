@@ -36,10 +36,14 @@
          write_file_if_contents_differ/2,
          system_tmpdir/0,
          system_tmpdir/1,
-         reset_dir/1]).
+         reset_dir/1,
+         touch/1]).
 
 -include("rebar.hrl").
+
 -include_lib("providers/include/providers.hrl").
+-include_lib("kernel/include/file.hrl").
+
 
 %% ===================================================================
 %% Public API
@@ -71,8 +75,39 @@ symlink_or_copy(Source, Target) ->
         {error, eexist} ->
             ok;
         {error, _} ->
-            cp_r([Source], Target)
+            case os:type() of
+                {win32, _} ->
+                    S = unicode:characters_to_list(Source),
+                    T = unicode:characters_to_list(Target),
+                    case filelib:is_dir(S) of
+                        true ->
+                            win32_symlink(S, T);
+                        false ->
+                            cp_r([S], T)
+                    end;
+                _ ->
+                    case filelib:is_dir(Target) of
+                        true ->
+                            ok;
+                        false ->
+                            cp_r([Source], Target)
+                    end
+            end
     end.
+
+win32_symlink(Source, Target) ->
+    Res = rebar_utils:sh(
+            ?FMT("cmd /c mklink /j \"~s\" \"~s\"",
+                 [filename:nativename(Target), filename:nativename(Source)]),
+            [{use_stdout, false}, return_on_error]),
+    case win32_ok(Res) of
+        true -> ok;
+        false ->
+            {error, lists:flatten(
+                      io_lib:format("Failed to symlink ~s to ~s~n",
+                                    [Source, Target]))}
+    end.
+
 
 %% @doc Remove files and directories.
 %% Target is a single filename, directoryname or wildcard expression.
@@ -120,20 +155,23 @@ mv(Source, Dest) ->
                                       [{use_stdout, false}, abort_on_error]),
             ok;
         {win32, _} ->
-            {ok, R} = rebar_utils:sh(
-                        ?FMT("move /y \"~s\" \"~s\" 1> nul",
+            Res = rebar_utils:sh(
+                        ?FMT("robocopy /move /s \"~s\" \"~s\" 1> nul",
                              [filename:nativename(Source),
                               filename:nativename(Dest)]),
                         [{use_stdout, false}, return_on_error]),
-            case R of
-                [] ->
-                    ok;
-                _ ->
+            case win32_ok(Res) of
+                true -> ok;
+                false ->
                     {error, lists:flatten(
                               io_lib:format("Failed to move ~s to ~s~n",
                                             [Source, Dest]))}
             end
     end.
+
+win32_ok({ok, _}) -> true;
+win32_ok({error, {Rc, _}}) when Rc<9; Rc=:=16 -> true;
+win32_ok(_) -> false.
 
 delete_each([]) ->
     ok;
@@ -186,6 +224,17 @@ reset_dir(Path) ->
     %% recreate the directory
     filelib:ensure_dir(filename:join([Path, "dummy.beam"])).
 
+
+%% Linux touch but using erlang functions to work in bot *nix os and
+%% windows
+-spec touch(Path) -> ok | {error, Reason} when
+      Path :: file:name(),
+      Reason :: file:posix().
+touch(Path) ->
+    {ok, A} = file:read_file_info(Path),
+    ok = file:write_file_info(Path, A#file_info{mtime = calendar:local_time(),
+                                                atime = calendar:local_time()}).
+
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
@@ -198,28 +247,27 @@ delete_each_dir_win32([Dir | Rest]) ->
     delete_each_dir_win32(Rest).
 
 xcopy_win32(Source,Dest)->
-    {ok, R} = rebar_utils:sh(
-                ?FMT("xcopy \"~s\" \"~s\" /q /y /e 2> nul",
+    %% "xcopy \"~s\" \"~s\" /q /y /e 2> nul", Chanegd to robocopy to
+    %% handle long names. May have issues with older windows.
+    Res = rebar_utils:sh(
+                ?FMT("robocopy \"~s\" \"~s\" /e /is /purge 2> nul",
                      [filename:nativename(Source), filename:nativename(Dest)]),
                 [{use_stdout, false}, return_on_error]),
-    case length(R) > 0 of
-        %% when xcopy fails, stdout is empty and and error message is printed
-        %% to stderr (which is redirected to nul)
-        true -> ok;
-        false ->
-            {error, lists:flatten(
-                      io_lib:format("Failed to xcopy from ~s to ~s~n",
-                                    [Source, Dest]))}
+    case win32_ok(Res) of
+                true -> ok;
+                false ->
+                    {error, lists:flatten(
+                              io_lib:format("Failed to copy ~s to ~s~n",
+                                            [Source, Dest]))}
     end.
 
 cp_r_win32({true, SourceDir}, {true, DestDir}) ->
     %% from directory to directory
-    SourceBase = filename:basename(SourceDir),
-    ok = case file:make_dir(filename:join(DestDir, SourceBase)) of
+     ok = case file:make_dir(DestDir) of
              {error, eexist} -> ok;
              Other -> Other
          end,
-    ok = xcopy_win32(SourceDir, filename:join(DestDir, SourceBase));
+    ok = xcopy_win32(SourceDir, DestDir);
 cp_r_win32({false, Source} = S,{true, DestDir}) ->
     %% from file to directory
     cp_r_win32(S, {false, filename:join(DestDir, filename:basename(Source))});

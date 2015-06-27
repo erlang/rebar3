@@ -20,7 +20,7 @@ do(Namespace, Command) when is_atom(Namespace), is_atom(Command) ->
     gen_server:call(?MODULE, {cmd, Namespace, Command}, infinity).
 
 init(State) ->
-    {ok, Cwd} = file:get_cwd(),
+    Cwd = rebar_dir:get_cwd(),
     {ok, #state{state=State, cwd=Cwd}}.
 
 handle_call({cmd, Command}, _From, State=#state{state=RState, cwd=Cwd}) ->
@@ -48,8 +48,8 @@ terminate(_Reason, _State) ->
 
 run(Namespace, Command, RState, Cwd) ->
     try
-        case file:get_cwd() of
-            {ok, Cwd} ->
+        case rebar_dir:get_cwd() of
+            Cwd ->
                 Args = [atom_to_list(Namespace), atom_to_list(Command)],
                 CmdState0 = refresh_state(RState, Cwd),
                 CmdState1 = rebar_state:set(CmdState0, task, atom_to_list(Command)),

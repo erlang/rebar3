@@ -154,7 +154,7 @@ sh(Command0, Options0) ->
 
     Command = lists:flatten(patch_on_windows(Command0, proplists:get_value(env, Options, []))),
     PortSettings = proplists:get_all_values(port_settings, Options) ++
-        [exit_status, {line, 16384}, use_stdio, stderr_to_stdout, hide],
+        [exit_status, {line, 16384}, use_stdio, stderr_to_stdout, hide, eof],
     ?DEBUG("Port Cmd: ~s\nPort Opts: ~p\n", [Command, PortSettings]),
     Port = open_port({spawn, Command}, PortSettings),
 
@@ -435,10 +435,14 @@ sh_loop(Port, Fun, Acc) ->
             sh_loop(Port, Fun, Fun(Line ++ "\n", Acc));
         {Port, {data, {noeol, Line}}} ->
             sh_loop(Port, Fun, Fun(Line, Acc));
-        {Port, {exit_status, 0}} ->
-            {ok, lists:flatten(lists:reverse(Acc))};
-        {Port, {exit_status, Rc}} ->
-            {error, {Rc, lists:flatten(lists:reverse(Acc))}}
+        {Port, eof} ->
+            Data = lists:flatten(lists:reverse(Acc)),
+            receive
+                {Port, {exit_status, 0}} ->
+                    {ok, Data};
+                {Port, {exit_status, Rc}} ->
+                    {error, {Rc, Data}}
+            end
     end.
 
 beam_to_mod(Dir, Filename) ->
