@@ -211,11 +211,9 @@ discover_tests(State, Opts) ->
 
 discover_dirs_and_suites(State, Opts) ->
     case {proplists:get_value(dir, Opts), proplists:get_value(suite, Opts)} of
-        %% no dirs or suites defined, try using `$APP/test` and `$ROOT/test`
+        %% no dirs defined, try using `$APP/test` and `$ROOT/test`
         %%  as suites
-        {undefined, undefined} -> test_dirs(State, Opts);
-        %% no dirs defined
-        {undefined, _} -> Opts;
+        {undefined, _} -> test_dirs(State, Opts);
         %% no suites defined
         {_, undefined} -> Opts;
         %% a single dir defined, this is ok
