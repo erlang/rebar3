@@ -6,7 +6,8 @@
 all() -> [release,
           dev_mode_release,
           profile_dev_mode_override_release,
-          tar].
+          tar,
+          extend_release].
 
 init_per_testcase(Case, Config0) ->
     Config = rebar_test_utils:init_rebar_state(Config0),
@@ -89,4 +90,22 @@ tar(Config) ->
       Config, RebarConfig,
       ["tar"],
       {ok, [{release, list_to_atom(Name), Vsn, false}, {tar, Name, Vsn}]}
+     ).
+
+%% Test that the order of release config args is not lost. If it is extend would fail.
+extend_release(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = ?config(name, Config),
+    Vsn = "1.0.0",
+    {ok, RebarConfig} =
+        file:consult(rebar_test_utils:create_config(AppDir,
+                                                    [{relx, [{release, {list_to_atom(Name), Vsn},
+                                                              [list_to_atom(Name)]},
+                                                             {release, {extended, Vsn, {extend, list_to_atom(Name)}},
+                                                              []},
+                                                             {lib_dirs, [AppDir]}]}])),
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig,
+      ["release", "-n", "extended"],
+      {ok, [{release, extended, Vsn, false}]}
      ).

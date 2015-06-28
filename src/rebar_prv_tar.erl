@@ -32,29 +32,7 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    Options = rebar_state:command_args(State),
-    DepsDir = rebar_dir:deps_dir(State),
-    ProjectAppDirs = lists:delete(".", ?DEFAULT_PROJECT_APP_DIRS),
-    LibDirs = rebar_utils:filtermap(fun ec_file:exists/1,
-                                   [?DEFAULT_CHECKOUTS_DIR, DepsDir | ProjectAppDirs]),
-    OutputDir = filename:join(rebar_dir:base_dir(State), ?DEFAULT_RELEASE_DIR),
-    AllOptions = string:join(["tar" | Options], " "),
-    Cwd = rebar_state:dir(State),
-    Providers = rebar_state:providers(State),
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
-    case rebar_state:get(State, relx, []) of
-        [] ->
-            relx:main([{lib_dirs, LibDirs}
-                      ,{output_dir, OutputDir}
-                      ,{caller, api}], AllOptions);
-        Config ->
-            relx:main([{lib_dirs, LibDirs}
-                      ,{config, lists:reverse(Config)}
-                      ,{output_dir, OutputDir}
-                      ,{caller, api}], AllOptions)
-    end,
-    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State),
-    {ok, State}.
+    rebar_relx:do(rlx_prv_release, "tar", ?PROVIDER, State).
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
