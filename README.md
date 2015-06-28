@@ -11,20 +11,12 @@ embed directly in a project. Where possible, rebar uses standard Erlang/OTP
 conventions for project structures, thus minimizing the amount of build
 configuration work. rebar also provides dependency management, enabling
 application writers to easily re-use common libraries from a variety of
-locations (git, hg, etc).
+locations ([hex.pm](http://hex.pm), git, hg, etc).
 
-3.0 Alpha-6
+3.0 Beta-1
 ====
 
 [DOCUMENTATION](http://www.rebar3.org/v3.0/docs)
-
-This is a preliminary branch, considered to be alpha, and still
-very unstable. Use at your own risk, but please do report bugs
-and issues encountered and we'll try to resolve problems as
-soon as possible.
-
-Compatibility with rebar 2.0 has been broken, and features removed to
-limit scope.
 
 ### Commands
 
@@ -143,7 +135,6 @@ When developing you can simply run `escriptize` to build your changes but the ne
 $ ./rebar3 escriptize
 $ _build/default/bin/rebar3
 ```
-
 
 Contributing to rebar
 =====================
