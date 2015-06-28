@@ -50,7 +50,7 @@ do(State) ->
                           ,{caller, api}], AllOptions);
             Config ->
                 relx:main([{lib_dirs, LibDirs}
-                          ,{config, lists:reverse(Config)}
+                          ,{config, Config}
                           ,{output_dir, OutputDir}
                           ,{caller, api}], AllOptions)
         end,
