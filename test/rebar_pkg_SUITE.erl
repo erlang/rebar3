@@ -61,7 +61,7 @@ init_per_testcase(good_disconnect=Name, Config0) ->
     copy_to_cache(Pkg, Config),
     meck:unload(httpc),
     meck:new(httpc, [passthrough, unsticky]),
-    meck:expect(httpc, request, fun(_, _, _, _) -> {error, econnrefused} end),
+    meck:expect(httpc, request, fun(_, _, _, _, _) -> {error, econnrefused} end),
     Config;
 init_per_testcase(bad_disconnect=Name, Config0) ->
     Pkg = {<<"goodpkg">>, <<"1.0.0">>},
@@ -71,7 +71,7 @@ init_per_testcase(bad_disconnect=Name, Config0) ->
     Config = mock_config(Name, Config1),
     meck:unload(httpc),
     meck:new(httpc, [passthrough, unsticky]),
-    meck:expect(httpc, request, fun(_, _, _, _) -> {error, econnrefused} end),
+    meck:expect(httpc, request, fun(_, _, _, _, _) -> {error, econnrefused} end),
     Config.
 
 end_per_testcase(_, Config) ->
@@ -186,9 +186,9 @@ mock_config(Name, Config) ->
     {ok, PkgContents} = file:read_file(filename:join(?config(data_dir, Config), PkgFile)),
     meck:new(httpc, [passthrough, unsticky]),
     meck:expect(httpc, request,
-            fun(get, {_Url, _Opts}, _, _) when GoodCache ->
+            fun(get, {_Url, _Opts}, _, _, _) when GoodCache ->
                 {ok, {{Vsn, 304, <<"Not Modified">>}, [{"etag", ?good_etag}], <<>>}};
-               (get, {_Url, _Opts}, _, _) ->
+               (get, {_Url, _Opts}, _, _, _) ->
                 {ok, {{Vsn, 200, <<"OK">>}, [{"etag", ?good_etag}], PkgContents}}
             end),
     [{cache_root, CacheRoot},
