@@ -11,7 +11,7 @@ embed directly in a project. Where possible, rebar uses standard Erlang/OTP
 conventions for project structures, thus minimizing the amount of build
 configuration work. rebar also provides dependency management, enabling
 application writers to easily re-use common libraries from a variety of
-locations ([hex.pm](http://hex.pm), git, hg, etc).
+locations ([hex.pm](http://hex.pm), git, hg, and so on).
 
 3.0 Beta-1
 ====
@@ -27,6 +27,7 @@ locations ([hex.pm](http://hex.pm), git, hg, etc).
 | clean      | Remove project apps beam files |
 | cover      | Generate coverage info from data compiled by `eunit --cover` or `ct --cover` |
 | ct         | Run Common Test suites |
+| deps       | Lists dependencies currently in use |
 | do         | Higher-order provider to run multiple tasks in sequence |
 | dialyzer   | Run the Dialyzer analyzer on the project |
 | edoc       | Generate documentation using edoc |
@@ -47,15 +48,26 @@ locations ([hex.pm](http://hex.pm), git, hg, etc).
 | version    | Print current version of Erlang/OTP and rebar |
 | xref       | Run cross reference analysis on the project |
 
+A more complete list can be found on the [docs page](http://www.rebar3.org/v3.0/docs/commands)
+
 ### Changes
+
+#### Since Rebar 2.x
 
 * Fetches and builds deps if missing when running any command that relies on them
 * Automatically recognizes `apps` and `lib` directory structure
-* Relx for releases
+* Relx for releases and relups
+* deterministic builds and conflict resolution
+* New plugin handling mechanism
+* New hook mechanism
+* Support for packages
+* A ton more
 
 ### Gone
 
 * Reltool integeration
+* Quickcheck integration (moved to [a plugin](http://www.rebar3.org/v3.0/docs/using-available-plugins#quickcheck))
+* C code compiling (moved to [a plugin](http://www.rebar3.org/v3.0/docs/using-available-plugins#port-compiler) or hooks)
 
 ### Providers
 
@@ -165,3 +177,4 @@ General rebar community resources and links:
 - #rebar on [irc.freenode.net](http://freenode.net/)
 - [wiki](https://github.com/rebar/rebar/wiki)
 - [issues](https://github.com/rebar/rebar/issues)
+- [Documentation](http://www.rebar3.org/v3.0/docs)
