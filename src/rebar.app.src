@@ -3,7 +3,7 @@
 
 {application, rebar,
  [{description, "Rebar: Erlang Build Tool"},
-  {vsn, "3.0.0-alpha-6"},
+  {vsn, "3.0.0-beta-1"},
   {modules, []},
   {registered, []},
   {applications, [kernel,
