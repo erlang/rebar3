@@ -123,7 +123,11 @@ escriptize(State0, App) ->
 
     %% Finally, update executable perms for our script
     {ok, #file_info{mode = Mode}} = file:read_file_info(Filename),
-    ok = file:change_mode(Filename, Mode bor 8#00111),
+    case file:change_mode(Filename, Mode bor 8#00111) of
+        {error, Reason} ->
+            rebar_api:warn("Failed to chmod file ~p: ~p",[Filename, Reason]);
+        _ -> ok
+    end,
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
