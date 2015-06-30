@@ -63,6 +63,14 @@ format_error({bad_term_file, AppFile, Reason}) ->
     io_lib:format("Error reading file ~s: ~s", [AppFile, file:format_error(Reason)]).
 
 symlink_or_copy(Source, Target) ->
+    case ec_file:exists(Source) of
+        true ->
+            do_symlink_or_copy(Source, Target);
+        false ->
+            ok
+    end.
+
+do_symlink_or_copy(Source, Target) ->
     Link = case os:type() of
                {win32, _} ->
                    Source;
@@ -231,9 +239,8 @@ reset_dir(Path) ->
       Path :: file:name(),
       Reason :: file:posix().
 touch(Path) ->
-    {ok, A} = file:read_file_info(Path),
-    ok = file:write_file_info(Path, A#file_info{mtime = calendar:local_time(),
-                                                atime = calendar:local_time()}).
+    file:change_time(Path, calendar:local_time(), calendar:local_time()).
+
 
 %% ===================================================================
 %% Internal functions
