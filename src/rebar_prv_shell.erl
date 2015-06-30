@@ -86,6 +86,7 @@ shell(State) ->
     setup_name(State),
     setup_paths(State),
     setup_shell(),
+    eval_dot_erlang(),
     %% apps must be started after the change in shell because otherwise
     %% their application masters never gets the new group leader (held in
     %% their internal state)
@@ -126,6 +127,9 @@ setup_shell() ->
             ?DEBUG("Logger changes failed for ~p:~p (~p)", [E,R,erlang:get_stacktrace()]),
             hope_for_best
     end.
+
+eval_dot_erlang() ->
+    catch c:erlangrc().
 
 setup_paths(State) ->
     %% Add deps to path
