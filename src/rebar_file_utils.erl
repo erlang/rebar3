@@ -151,7 +151,7 @@ mv(Source, Dest) ->
         {unix, _} ->
             EscSource = escape_path(Source),
             EscDest = escape_path(Dest),
-            {ok, []} = rebar_utils:sh(?FMT("mv ~s ~s", [EscSource, EscDest]),
+            {ok, _} = rebar_utils:sh(?FMT("mv ~s ~s", [EscSource, EscDest]),
                                       [{use_stdout, false}, abort_on_error]),
             ok;
         {win32, _} ->
