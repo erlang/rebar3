@@ -139,7 +139,7 @@ app_dir(AppFile) ->
 
 -spec create_app_info(file:name(), file:name()) -> rebar_app_info:t() | {error, term()}.
 create_app_info(AppDir, AppFile) ->
-    [{application, AppName, AppDetails}] = rebar_file_utils:try_consult(AppFile),
+    [{application, AppName, AppDetails}] = rebar_config:consult_app_file(AppFile),
     AppVsn = proplists:get_value(vsn, AppDetails),
     Applications = proplists:get_value(applications, AppDetails, []),
     IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
