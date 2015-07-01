@@ -155,10 +155,18 @@ mv(Source, Dest) ->
                                       [{use_stdout, false}, abort_on_error]),
             ok;
         {win32, _} ->
-            Res = rebar_utils:sh(
-                        ?FMT("robocopy \"~s\" \"~s\" /move /s 1> nul",
+            case filelib:is_dir(Source) of
+                true ->
+                    Cmd = ?FMT("robocopy /move /s \"~s\" \"~s\" 1> nul",
                              [filename:nativename(Source),
-                              filename:nativename(Dest)]),
+                              filename:nativename(Dest)]);
+                false ->
+                    Cmd = ?FMT("robocopy /move /s \"~s\" \"~s\" \"~s\" 1> nul",
+                             [filename:nativename(filename:dirname(Source)),
+                              filename:nativename(Dest),
+                              filename:basename(Source)])
+            end,
+            Res = rebar_utils:sh(Cmd,
                         [{use_stdout, false}, return_on_error]),
             case win32_ok(Res) of
                 true -> ok;
@@ -249,14 +257,18 @@ delete_each_dir_win32([Dir | Rest]) ->
 xcopy_win32(Source,Dest)->
     %% "xcopy \"~s\" \"~s\" /q /y /e 2> nul", Chanegd to robocopy to
     %% handle long names. May have issues with older windows.
-    Res = rebar_utils:sh(
-                ?FMT("robocopy \"~s\" \"~s\" \"~s\" /e /is /purge 2> nul",
-                             [filename:nativename(filename:dirname(Source)),
-                              filename:nativename(Dest),
-                              filename:basename(Source)]),
-
-                % ?FMT("robocopy \"~s\" \"~s\" /e /is /purge 2> nul",
-                %      [filename:nativename(Source), filename:nativename(Dest)]),
+    case filelib:is_dir(Source) of
+        true ->
+            Cmd = ?FMT("robocopy \"~s\" \"~s\" /e /is 1> nul",
+                     [filename:nativename(Source),
+                      filename:nativename(Dest)]);
+        false ->
+            Cmd = ?FMT("robocopy \"~s\" \"~s\" \"~s\" /e /is 1> nul",
+                     [filename:nativename(filename:dirname(Source)),
+                      filename:nativename(Dest),
+                      filename:basename(Source)])
+    end,
+    Res = rebar_utils:sh(Cmd,
                 [{use_stdout, false}, return_on_error]),
     case win32_ok(Res) of
                 true -> ok;
