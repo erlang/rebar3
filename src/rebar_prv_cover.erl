@@ -337,16 +337,24 @@ write_coverdata(State, Task) ->
             ?WARN("Cover data export failed: ~p", [Reason])
     end.
 
-verbose(State) ->
+command_line_opts(State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
-    case proplists:get_value(verbose, Opts, missing) of
-        missing -> rebar_state:get(State, cover_print_enabled, false);
-        Else -> Else
+    Opts.
+
+config_opts(State) ->
+    rebar_state:get(State, cover_opts, []).
+
+verbose(State) ->
+    Command = proplists:get_value(verbose, command_line_opts(State), undefined),
+    Config = proplists:get_value(verbose, config_opts(State), undefined),
+    case {Command, Config} of
+        {undefined, undefined} -> false;
+        {undefined, Verbose}   -> Verbose;
+        {Verbose, _}           -> Verbose
     end.
 
 cover_dir(State) ->
-    rebar_state:get(State, cover_data_dir, filename:join([rebar_dir:base_dir(State),
-                                                          "cover"])).
+    filename:join([rebar_dir:base_dir(State), "cover"]).
 
 cover_opts(_State) ->
     [{reset, $r, "reset", boolean, help(reset)},
