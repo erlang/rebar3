@@ -123,8 +123,6 @@ setHttpcOptions() ->
             Opts2 = Opts1
     end,
 
-    io:format("Opts: ~p~n", [Opts2]),
-
     case Opts2 of
         [] ->
             ok;
