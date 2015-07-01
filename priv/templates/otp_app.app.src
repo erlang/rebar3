@@ -8,5 +8,9 @@
     stdlib
    ]},
   {env,[]},
-  {modules, []}
+  {modules, []},
+
+  {contributors, []},
+  {licenses, []},
+  {links, []}
  ]}.
