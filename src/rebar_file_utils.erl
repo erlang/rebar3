@@ -156,7 +156,7 @@ mv(Source, Dest) ->
             ok;
         {win32, _} ->
             Res = rebar_utils:sh(
-                        ?FMT("robocopy /move /s \"~s\" \"~s\" 1> nul",
+                        ?FMT("robocopy \"~s\" \"~s\" /move /s 1> nul",
                              [filename:nativename(Source),
                               filename:nativename(Dest)]),
                         [{use_stdout, false}, return_on_error]),
@@ -250,8 +250,13 @@ xcopy_win32(Source,Dest)->
     %% "xcopy \"~s\" \"~s\" /q /y /e 2> nul", Chanegd to robocopy to
     %% handle long names. May have issues with older windows.
     Res = rebar_utils:sh(
-                ?FMT("robocopy \"~s\" \"~s\" /e /is /purge 2> nul",
-                     [filename:nativename(Source), filename:nativename(Dest)]),
+                ?FMT("robocopy \"~s\" \"~s\" \"~s\" /e /is /purge 2> nul",
+                             [filename:nativename(filename:dirname(Source)),
+                              filename:nativename(Dest),
+                              filename:basename(Source)]),
+
+                % ?FMT("robocopy \"~s\" \"~s\" /e /is /purge 2> nul",
+                %      [filename:nativename(Source), filename:nativename(Dest)]),
                 [{use_stdout, false}, return_on_error]),
     case win32_ok(Res) of
                 true -> ok;
