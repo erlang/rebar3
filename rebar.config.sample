@@ -83,14 +83,14 @@
 
 %% == Cover ==
 
-%% Whether to enable coverage reporting. Default is `false'
+%% Whether to enable coverage reporting where commands support cover. Default
+%% is `false'
 {cover_enabled, false}.
 
-%% Whether to print coverage report to console. Default is `false'
-{cover_print_enabled, false}.
+%% Options to pass to cover provider
+{cover_opts, [verbose]}.
 
-%% Directory to store collected cover data
-{cover_data_dir, "cover"}.
+%% == Dependencies ==
 
 %% What dependencies we have, dependencies can be of 3 forms, an application
 %% name as an atom, eg. mochiweb, a name and a version (from the .app file), or

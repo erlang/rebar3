@@ -8,7 +8,6 @@
          flag_coverdata_written/1,
          config_coverdata_written/1,
          index_written/1,
-         config_alt_coverdir/1,
          flag_verbose/1,
          config_verbose/1]).
 
@@ -31,7 +30,6 @@ init_per_testcase(_, Config) ->
 all() ->
     [flag_coverdata_written, config_coverdata_written,
      index_written,
-     config_alt_coverdir,
      flag_verbose, config_verbose].
 
 flag_coverdata_written(Config) ->
@@ -79,23 +77,6 @@ index_written(Config) ->
 
     true = filelib:is_file(filename:join([AppDir, "_build", "test", "cover", "index.html"])).
 
-config_alt_coverdir(Config) ->
-    AppDir = ?config(apps, Config),
-
-    Name = rebar_test_utils:create_random_name("cover_"),
-    Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
-
-    CoverDir = filename:join(["coverage", "goes", "here"]),
-
-    RebarConfig = [{erl_opts, [{d, some_define}]}, {cover_data_dir, CoverDir}],
-    rebar_test_utils:run_and_check(Config,
-                                   RebarConfig,
-                                   ["do", "eunit", "--cover", ",", "cover"],
-                                   {ok, [{app, Name}]}),
-
-    true = filelib:is_file(filename:join([CoverDir, "index.html"])).
-
 flag_verbose(Config) ->
     AppDir = ?config(apps, Config),
 
@@ -118,7 +99,7 @@ config_verbose(Config) ->
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
-    RebarConfig = [{erl_opts, [{d, some_define}]}, {cover_print_enabled, true}],
+    RebarConfig = [{erl_opts, [{d, some_define}]}, {cover_opts, [verbose]}],
     rebar_test_utils:run_and_check(Config,
                                    RebarConfig,
                                    ["do", "eunit", "--cover", ",", "cover"],
