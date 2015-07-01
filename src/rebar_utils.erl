@@ -663,53 +663,26 @@ maybe_ends_in_comma(H) ->
         _           -> false
     end.
 
-set_httpc_options() ->
-    %% Get http_proxy and https_proxy environment variables
-    case os:getenv("http_proxy") of
-        false ->
-            Http = "";
-        Http ->
-            Http
-    end,
-    case os:getenv("https_proxy") of
-        false ->
-            Https = "";
-        Https ->
-            Https
-    end,
-
-    %% Parse the variables to extract host and port
-    Opts = [],
-    case http_uri:parse(Http) of
-        {ok,{_, [], Host, Port, _, []}} ->
-            Opts1 = Opts ++ [{proxy, {{Host, Port}, []}}];
-        {error, _} ->
-            Opts1 = Opts
-    end,
-
-    case http_uri:parse(Https) of
-        {ok,{_, [], Host2, Port2, _, []}} ->
-            Opts2 = Opts1 ++ [{https_proxy, {{Host2, Port2}, []}}];
-        {error, _} ->
-            Opts2 = Opts1
-    end,
-
-    case Opts2 of
-        [] ->
-            Opts3 = [
-                {max_sessions, 4},
-                {max_keep_alive_length, 4},
-                {keep_alive_timeout, 120000},
-                {max_pipeline_length, 4},
-                {pipeline_timeout, 60000}
-            ];
+get_http_var() ->
+    {ok, [[Home]]} = init:get_argument(home),
+    ConfDir = filename:join(Home, ".config/rebar3"),
+    case file:consult(filename:join(ConfDir, "rebar.config")) of
+        {ok, Config} ->
+            Config;
         _ ->
-            Opts3 = Opts2 ++ [
-                {max_sessions, 4},
-                {max_keep_alive_length, 4},
-                {keep_alive_timeout, 120000},
-                {max_pipeline_length, 4},
-                {pipeline_timeout, 60000}
-            ]
-    end,
-    httpc:set_options(Opts3).
+            []
+    end.
+
+get_http(Scheme) ->
+    proplists:get_value(Scheme, get_http_var(), "").
+
+set_httpc_options() ->
+    set_httpc_options(https_proxy, get_http(https_proxy)),
+    set_httpc_options(proxy, get_http(http_proxy)).
+
+set_httpc_options(_, []) ->
+    ok;
+
+set_httpc_options(Scheme, Proxy) ->
+    {ok, {_, _, Host, Port, _, _}} = http_uri:parse(Proxy),
+    httpc:set_options([{Scheme, {{Host, Port}, []}}]).
