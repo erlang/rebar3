@@ -87,16 +87,22 @@ refresh_paths(RState) ->
                 %% make sure to never reload self; halt()s the VM
                 ) -- [filename:dirname(code:which(?MODULE))],
     %% Similar to rebar_utils:update_code/1, but also forces a reload
-    %% of used modules.
+    %% of used modules. Also forces to reload all of ebin/ instead
+    %% of just the modules in the .app file, because 'extra_src_dirs'
+    %% allows to load and compile files that are not to be kept
+    %% in the app file.
     lists:foreach(fun(Path) ->
             Name = filename:basename(Path, "/ebin"),
+            Files = filelib:wildcard(filename:join([Path, "*.beam"])),
+            Modules = [list_to_atom(filename:basename(F, ".beam"))
+                       || F <- Files],
             App = list_to_atom(Name),
             application:load(App),
             case application:get_key(App, modules) of
                 undefined ->
                     code:add_patha(Path),
                     ok;
-                {ok, Modules} ->
+                {ok, _} ->
                     ?DEBUG("reloading ~p from ~s", [Modules, Path]),
                     code:replace_path(Name, Path),
                     [begin code:purge(M), code:delete(M), code:load_file(M) end
@@ -108,5 +114,5 @@ refresh_state(RState, _Dir) ->
     lists:foldl(
         fun(F, State) -> F(State) end,
         rebar3:init_config(),
-        [fun(S) -> rebar_state:current_profiles(S, rebar_state:current_profiles(RState)) end]
+        [fun(S) -> rebar_state:apply_profiles(S, rebar_state:current_profiles(RState)) end]
     ).
