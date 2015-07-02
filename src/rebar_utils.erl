@@ -663,18 +663,10 @@ maybe_ends_in_comma(H) ->
         _           -> false
     end.
 
-get_http_var() ->
-    {ok, [[Home]]} = init:get_argument(home),
-    ConfDir = filename:join(Home, ".config/rebar3"),
-    case file:consult(filename:join(ConfDir, "rebar.config")) of
-        {ok, Config} ->
-            Config;
-        _ ->
-            []
-    end.
-
-get_http(Scheme) ->
-    proplists:get_value(Scheme, get_http_var(), []).
+get_http_vars(Scheme) ->
+    GlobalConfigFile = rebar_dir:global_config(),
+    Config = rebar_config:consult_file(GlobalConfigFile),
+    proplists:get_value(Scheme, Config, []).
 
 set_httpc_options() ->
     set_httpc_options(https_proxy, get_http_vars(https_proxy)),
