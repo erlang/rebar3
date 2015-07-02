@@ -35,7 +35,7 @@
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
--export([handle_profile_deps/4,
+-export([handle_deps_as_profile/4,
          find_cycles/1,
          cull_compile/2]).
 
@@ -117,45 +117,57 @@ format_error({cycles, Cycles}) ->
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
-%% ===================================================================
-%% Internal functions
-%% ===================================================================
-
-handle_profile_deps(Profile, State, Deps, Upgrade) ->
+%% Allows other providers to install deps in a given profile
+%% manually, outside of what is provided by rebar3's deps tuple.
+handle_deps_as_profile(Profile, State, Deps, Upgrade) ->
     Locks = [],
     Level = 0,
     DepsDir = profile_dep_dir(State, Profile),
 
     {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, State, Locks, Level),
-    AllProfileDeps = [{Profile, SrcDeps, Locks, Level}],
-    {AllApps, PkgDeps1, Seen, State1} = handle_profile_level(AllProfileDeps, [{Profile, Locks, PkgDeps}], Locks, sets:new(), Upgrade, State),
+    AllSrcProfileDeps = [{Profile, SrcDeps, Locks, Level}],
+    AllPkgProfileDeps = [{Profile, Locks, PkgDeps}],
+    {AllApps, PkgDeps1, Seen, State1} = handle_profile_level(AllSrcProfileDeps, AllPkgProfileDeps, Locks, sets:new(), Upgrade, State),
 
     handle_profile_pkg_level(PkgDeps1, AllApps, Seen, Upgrade, State1).
 
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
+
+%% finds all the deps in `{deps, ...}` for each profile provided.
 deps_per_profile(Profiles, Upgrade, State) ->
     Level = 0,
-    {AllProfileDeps, PkgDeps} = lists:foldl(fun(Profile, {ProfileDepsAcc, PkgDepsAcc}) ->
-                                DepsDir = profile_dep_dir(State, Profile),
-                                Locks = rebar_state:get(State, {locks, Profile}, []),
-                                Deps = rebar_state:get(State, {deps, Profile}, []),
-                                {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, State, Locks, Level),
-                                {[{Profile, SrcDeps, Locks, Level} | ProfileDepsAcc]
-                                 ,[{Profile, Locks, PkgDeps} | PkgDepsAcc]}
-                        end, {[],[]}, Profiles),
+    {AllProfileDeps, PkgDeps} = lists:foldl(fun(Profile, {SrcAcc, PkgAcc}) ->
+                                                {Src, Pkg} = parse_profile_deps(State, Profile, Level),
+                                                {[Src | SrcAcc], [Pkg | PkgAcc]}
+                                            end, {[], []}, Profiles),
     {AllApps, PkgDeps1, Seen, State1} = handle_profile_level(AllProfileDeps, PkgDeps, [], sets:new(), Upgrade, State),
 
     handle_profile_pkg_level(PkgDeps1, AllApps, Seen, Upgrade, State1).
 
+parse_profile_deps(State, Profile, Level) ->
+    DepsDir = profile_dep_dir(State, Profile),
+    Locks = rebar_state:get(State, {locks, Profile}, []),
+    Deps = rebar_state:get(State, {deps, Profile}, []),
+    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, State, Locks, Level),
+    {{Profile, SrcDeps, Locks, Level}, {Profile, Locks, PkgDeps}}.
+
+%% Level-order traversal of all dependencies, across profiles.
+%% If profiles x,y,z are present, then the traversal will go:
+%% x0, y0, z0, x1, y1, z1, ..., xN, yN, zN.
 handle_profile_level([], PkgDeps, SrcApps, Seen, _Upgrade, State) ->
     {SrcApps, PkgDeps, Seen, State};
 handle_profile_level([{Profile, SrcDeps, Locks, Level} | Rest], PkgDeps, SrcApps, Seen, Upgrade, State) ->
-    case update_src_deps(Profile, Level, SrcDeps, [], SrcApps
-                        ,State, Upgrade, Seen, Locks) of
-        {[], PkgDeps1, SrcApps1, State1, Seen1, Locks1} ->
-            handle_profile_level(Rest, [{Profile, Locks1, PkgDeps1} | PkgDeps], SrcApps1++SrcApps, sets:union(Seen, Seen1), Upgrade, State1);
-        {SrcDeps1, PkgDeps1, SrcApps1, State1, Seen1, Locks1} ->
-            handle_profile_level(Rest++[{Profile, SrcDeps1, Locks1, Level+1}], [{Profile, Locks1, PkgDeps1} | PkgDeps], SrcApps1++SrcApps, sets:union(Seen, Seen1), Upgrade, State1)
-    end.
+    {SrcDeps1, PkgDeps1, SrcApps1, State1, Seen1, Locks1} =
+        update_src_deps(Profile, Level, SrcDeps, [], SrcApps
+                        ,State, Upgrade, Seen, Locks),
+    SrcDeps2 = case SrcDeps1 of
+        [] -> Rest;
+        _ -> Rest ++ [{Profile, SrcDeps1, Locks1, Level+1}]
+    end,
+    handle_profile_level(SrcDeps2, [{Profile, Locks1, PkgDeps1} | PkgDeps], SrcApps1++SrcApps, sets:union(Seen, Seen1), Upgrade, State1).
 
 handle_profile_pkg_level(PkgDeps, AllApps, Seen, Upgrade, State) ->
     %% Read in package index and dep graph
@@ -486,6 +498,7 @@ parse_deps(DepsDir, Deps, State, Locks, Level) ->
                 end, {[], []}, Deps).
 
 parse_dep({Name, Vsn}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is_list(Vsn) ->
+    %% Versioned Package dependency
     CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
     case rebar_app_info:discover(CheckoutsDir) of
         {ok, _App} ->
@@ -496,6 +509,7 @@ parse_dep({Name, Vsn}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is
                                     ,ec_cnv:to_binary(Vsn)) | PkgDepsAcc]}
     end;
 parse_dep(Name, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is_atom(Name) ->
+    %% Unversioned package dependency
     {PkgName, PkgVsn} = get_package(ec_cnv:to_binary(Name), State),
     CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
     case rebar_app_info:discover(CheckoutsDir) of
