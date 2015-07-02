@@ -674,7 +674,7 @@ get_http_var() ->
     end.
 
 get_http(Scheme) ->
-    proplists:get_value(Scheme, get_http_var(), "").
+    proplists:get_value(Scheme, get_http_var(), []).
 
 set_httpc_options() ->
     set_httpc_options(https_proxy, get_http(https_proxy)),
