@@ -56,7 +56,11 @@ run_and_check(Config, RebarConfig, Command, Expect) ->
                 ?assertEqual({error, Reason}, Res);
             {ok, Expected} ->
                 {ok, _} = Res,
-                check_results(AppDir, Expected),
+                check_results(AppDir, Expected, "*"),
+                Res;
+            {ok, Expected, ProfileRun} ->
+                {ok, _} = Res,
+                check_results(AppDir, Expected, ProfileRun),
                 Res;
             return ->
                 Res
@@ -164,9 +168,9 @@ top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
 %%%%%%%%%%%%%%%
-check_results(AppDir, Expected) ->
-    BuildDirs = filelib:wildcard(filename:join([AppDir, "_build", "*", "lib"])),
-    PluginDirs = filelib:wildcard(filename:join([AppDir, "_build", "*", "plugins"])),
+check_results(AppDir, Expected, ProfileRun) ->
+    BuildDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib"])),
+    PluginDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "plugins"])),
     GlobalPluginDirs = filelib:wildcard(filename:join([AppDir, "global", "plugins"])),
     CheckoutsDir = filename:join([AppDir, "_checkouts"]),
     LockFile = filename:join([AppDir, "rebar.lock"]),

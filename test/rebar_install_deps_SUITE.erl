@@ -10,7 +10,8 @@ groups() ->
     [{all, [], [flat, pick_highest_left, pick_highest_right,
                 pick_smallest1, pick_smallest2,
                 circular1, circular2, circular_skip,
-                fail_conflict, default_profile, nondefault_profile]},
+                fail_conflict, default_profile, nondefault_profile,
+                nondefault_pick_highest]},
      {git, [], [{group, all}]},
      {pkg, [], [{group, all}]}].
 
@@ -125,7 +126,10 @@ deps(nondefault_profile) ->
     {[{"B", []},
       {"C", []}],
      [],
-     {ok, ["B", "C"]}}.
+     {ok, ["B", "C"]}};
+deps(nondefault_pick_highest) ->
+    %% This is all handled in setup_project
+    {[],[],{ok,[]}}.
 
 setup_project(fail_conflict, Config0, Deps) ->
     DepsType = ?config(deps_type, Config0),
@@ -162,6 +166,34 @@ setup_project(nondefault_profile, Config0, Deps) ->
             mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}]);
         pkg ->
             mock_pkg_resource:mock([{pkgdeps, rebar_test_utils:flat_pkgdeps(Deps)}])
+    end,
+    [{rebarconfig, RebarConf} | Config];
+setup_project(nondefault_pick_highest, Config0, _) ->
+    DepsType = ?config(deps_type, Config0),
+    Config = rebar_test_utils:init_rebar_state(
+            Config0,
+            "nondefault_pick_highest_"++atom_to_list(DepsType)++"_"
+    ),
+    AppDir = ?config(apps, Config),
+    rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
+    DefaultDeps = rebar_test_utils:expand_deps(DepsType, [{"B", [{"C", "1", []}]}]),
+    ProfileDeps = rebar_test_utils:expand_deps(DepsType, [{"C", "2", []}]),
+    DefaultTop = rebar_test_utils:top_level_deps(DefaultDeps),
+    ProfileTop = rebar_test_utils:top_level_deps(ProfileDeps),
+    RebarConf = rebar_test_utils:create_config(
+            AppDir,
+            [{deps, DefaultTop},
+             {profiles, [{nondef, [{deps, ProfileTop}]}]}]
+    ),
+    case DepsType of
+        git ->
+            mock_git_resource:mock(
+                [{deps, rebar_test_utils:flat_deps(DefaultDeps ++ ProfileDeps)}]
+            );
+        pkg ->
+            mock_pkg_resource:mock(
+                [{pkgdeps, rebar_test_utils:flat_pkgdeps(DefaultDeps ++ ProfileDeps)}]
+            )
     end,
     [{rebarconfig, RebarConf} | Config];
 setup_project(Case, Config0, Deps) ->
@@ -228,7 +260,7 @@ default_profile(Config) ->
      || {dep, App} <- Apps].
 
 nondefault_profile(Config) ->
-    %% The dependencies here are saved directly to the 
+    %% The dependencies here are saved directly to the
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
     AppDir = ?config(apps, Config),
     {ok, AppLocks} = ?config(expect, Config),
@@ -262,6 +294,21 @@ nondefault_profile(Config) ->
                   file:read_file_info(filename:join([BuildDir, "default", "lib", App])))
      || {dep, App} <- Apps].
 
+nondefault_pick_highest(Config) ->
+    {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
+    %AppDir = ?config(apps, Config),
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["as", "nondef", "lock"],
+        {ok, [{dep, "B"}, {lock, "B"}, {dep, "C", "2"}], "nondef"}
+    ),
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["lock"],
+        {ok, [{dep, "B"}, {lock, "B"}, {dep, "C", "1"}, {lock, "C", "1"}], "default"}
+    ),
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["as", "nondef", "lock"],
+        {ok, [{dep, "B"}, {lock, "B"}, {dep, "C", "2"}], "nondef"}
+    ).
 
 run(Config) ->
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
@@ -294,4 +341,3 @@ in_warnings(pkg, Warns, NameRaw, VsnRaw) ->
     Vsn = iolist_to_binary(VsnRaw),
     1 =< length([1 || {_, [AppName, AppVsn]} <- Warns,
                       AppName =:= Name, AppVsn =:= Vsn]).
-
