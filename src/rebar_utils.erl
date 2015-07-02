@@ -685,4 +685,4 @@ set_httpc_options(_, []) ->
 
 set_httpc_options(Scheme, Proxy) ->
     {ok, {_, _, Host, Port, _, _}} = http_uri:parse(Proxy),
-    httpc:set_options([{Scheme, {{Host, Port}, []}}]).
+    httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar).

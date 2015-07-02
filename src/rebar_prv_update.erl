@@ -43,7 +43,8 @@ do(State) ->
 
         Url = rebar_state:get(State, rebar_packages_cdn, "https://s3.amazonaws.com/s3.hex.pm/registry.ets.gz"),
         {ok, _RequestId} = httpc:request(get, {Url, []},
-                                         [], [{stream, TmpFile}, {sync, true}]),
+                                         [], [{stream, TmpFile}, {sync, true}],
+                                         rebar),
         {ok, Data} = file:read_file(TmpFile),
         Unzipped = zlib:gunzip(Data),
         ok = file:write_file(HexFile, Unzipped),

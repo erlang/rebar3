@@ -273,5 +273,6 @@ start_and_load_apps() ->
     application:start(public_key),
     application:start(ssl),
     inets:start(),
-    inets:start(httpc),
+    inets:start(httpc, [{profile, rebar}]),
     rebar_utils:set_httpc_options().
+
