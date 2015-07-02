@@ -94,7 +94,7 @@ request(Url) ->
             Error
     end.
 
-get_http_var() ->
+get_rebar_config() ->
     {ok, [[Home]]} = init:get_argument(home),
     ConfDir = filename:join(Home, ".config/rebar3"),
     case file:consult(filename:join(ConfDir, "rebar.config")) of
@@ -104,12 +104,12 @@ get_http_var() ->
             []
     end.
 
-get_http(Scheme) ->
-    proplists:get_value(Scheme, get_http_var(), []).
+get_http_vars(Scheme) ->
+    proplists:get_value(Scheme, get_rebar_config(), []).
 
 set_httpc_options() ->
-    set_httpc_options(https_proxy, get_http(https_proxy)),
-    set_httpc_options(proxy, get_http(http_proxy)).
+    set_httpc_options(https_proxy, get_http_vars(https_proxy)),
+    set_httpc_options(proxy, get_http_vars(http_proxy)).
 
 set_httpc_options(_, []) ->
     ok;
