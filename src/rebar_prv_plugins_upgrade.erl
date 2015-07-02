@@ -62,10 +62,7 @@ upgrade(Plugin, State) ->
             ?PRV_ERROR({not_found, Plugin});
         {ok, P, Profile} ->
             State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
-            {ok, Apps, _State2} = rebar_prv_install_deps:handle_deps(Profile
-                                                                    ,State1
-                                                                    ,[P]
-                                                                    ,true),
+            {Apps, _State2} = rebar_prv_install_deps:handle_deps_as_profile(Profile, State1, [P], true),
 
             {no_cycle, Sorted} = rebar_prv_install_deps:find_cycles(Apps),
             ToBuild = rebar_prv_install_deps:cull_compile(Sorted, []),

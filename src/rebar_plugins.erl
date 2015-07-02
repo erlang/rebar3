@@ -63,7 +63,7 @@ handle_plugins(Profile, Plugins, State, Upgrade) ->
 
 handle_plugin(Profile, Plugin, State, Upgrade) ->
     try
-        {ok, Apps, State2} = rebar_prv_install_deps:handle_deps(Profile, State, [Plugin], Upgrade),
+        {Apps, State2} = rebar_prv_install_deps:handle_deps_as_profile(Profile, State, [Plugin], Upgrade),
         {no_cycle, Sorted} = rebar_prv_install_deps:find_cycles(Apps),
         ToBuild = rebar_prv_install_deps:cull_compile(Sorted, []),
 
