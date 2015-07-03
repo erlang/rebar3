@@ -34,9 +34,43 @@ init_per_testcase(newly_added_dep, Config) ->
 init_per_testcase(sub_app_deps, Config) ->
     rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(http_proxy_settings, Config) ->
+    %% Create private rebar.config
+    Priv = ?config(priv_dir, Config),
+    GlobalDir = filename:join(Priv, "global"),
+    GlobalConfigDir = filename:join([GlobalDir, ".config", "rebar3"]),
+    GlobalConfig = filename:join([GlobalDir, ".config", "rebar3", "rebar.config"]),
+
+    meck:new(rebar_dir, [passthrough]),
+    meck:expect(rebar_dir, global_config, fun() -> GlobalConfig end),
+    meck:expect(rebar_dir, global_cache_dir, fun(_) -> GlobalDir end),
+
+    %% Insert proxy variables into config
+    rebar_test_utils:create_config(GlobalConfigDir,
+                                   [{http_proxy, "http://localhost:1234"}
+    ]),
     rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(https_proxy_settings, Config) ->
-    rebar_test_utils:init_rebar_state(Config);
+    {OTPVersion, _} = string:to_integer(erlang:system_info(otp_release)),
+    case OTPVersion of
+        Vsn when Vsn =< 15 ->
+            {skip, https_proxy_unsupported_before_R16};
+        _ ->
+            %% Create private rebar.config
+            Priv = ?config(priv_dir, Config),
+            GlobalDir = filename:join(Priv, "global"),
+            GlobalConfigDir = filename:join([GlobalDir, ".config", "rebar3"]),
+            GlobalConfig = filename:join([GlobalDir, ".config", "rebar3", "rebar.config"]),
+
+            meck:new(rebar_dir, [passthrough]),
+            meck:expect(rebar_dir, global_config, fun() -> GlobalConfig end),
+            meck:expect(rebar_dir, global_cache_dir, fun(_) -> GlobalDir end),
+
+            %% Insert proxy variables into config
+            rebar_test_utils:create_config(GlobalConfigDir,
+                                           [{https_proxy, "http://localhost:1234"}
+            ]),
+            rebar_test_utils:init_rebar_state(Config)
+    end;
 init_per_testcase(Case, Config) ->
     {Deps, Warnings, Expect} = deps(Case),
     Expected = case Expect of
@@ -49,6 +83,12 @@ init_per_testcase(Case, Config) ->
      {warnings, Warnings}
     | setup_project(Case, Config, rebar_test_utils:expand_deps(DepsType, Deps))].
 
+end_per_testcase(https_proxy_settings, Config) ->
+    meck:unload(rebar_dir),
+    Config;
+end_per_testcase(http_proxy_settings, Config) ->
+    meck:unload(rebar_dir),
+    Config;
 end_per_testcase(_, Config) ->
     meck:unload(),
     Config.
@@ -227,57 +267,23 @@ newly_added_dep(Config) ->
       {ok, [{app, Name}, {dep, "a"}, {dep, "b", "1.0.0"}, {dep, "c", "1.0.0"}]}).
 
 
-http_proxy_settings(Config) ->
-    %% Create private rebar.config
-    Priv = ?config(priv_dir, Config),
-    GlobalDir = filename:join(Priv, "global"),
-    GlobalConfigDir = filename:join([GlobalDir, ".config", "rebar3"]),
-    GlobalConfig = filename:join([GlobalDir, ".config", "rebar3", "rebar.config"]),
-
-    meck:new(rebar_dir, [passthrough]),
-    meck:expect(rebar_dir, global_config, fun() -> GlobalConfig end),
-    meck:expect(rebar_dir, global_cache_dir, fun(_) -> GlobalDir end),
-
-    %% Insert proxy variables into config
-    rebar_test_utils:create_config(GlobalConfigDir,
-                                   [{http_proxy, "http://localhost:1234"}
-    ]),
-
+http_proxy_settings(_Config) ->
     %% Load config
     rebar_utils:set_httpc_options(),
     rebar3:init_config(),
 
     %% Assert variable is right
     ?assertEqual({ok,{{"localhost", 1234}, []}},
-                 httpc:get_option(proxy, rebar)),
+                 httpc:get_option(proxy, rebar)).
 
-    meck:unload(rebar_dir).
-
-https_proxy_settings(Config) ->
-    %% Create private rebar.config
-    Priv = ?config(priv_dir, Config),
-    GlobalDir = filename:join(Priv, "global"),
-    GlobalConfigDir = filename:join([GlobalDir, ".config", "rebar3"]),
-    GlobalConfig = filename:join([GlobalDir, ".config", "rebar3", "rebar.config"]),
-
-    meck:new(rebar_dir, [passthrough]),
-    meck:expect(rebar_dir, global_config, fun() -> GlobalConfig end),
-    meck:expect(rebar_dir, global_cache_dir, fun(_) -> GlobalDir end),
-
-    %% Insert proxy variables into config
-    rebar_test_utils:create_config(GlobalConfigDir,
-                                   [{https_proxy, "http://localhost:1234"}
-    ]),
-
+https_proxy_settings(_Config) ->
     %% Load config
     rebar_utils:set_httpc_options(),
     rebar3:init_config(),
 
     %% Assert variable is right
     ?assertEqual({ok,{{"localhost", 1234}, []}},
-                 httpc:get_option(https_proxy, rebar)),
-
-    meck:unload(rebar_dir).
+                 httpc:get_option(https_proxy, rebar)).
 
 
 run(Config) ->
