@@ -90,9 +90,10 @@ shell(State) ->
     %% their application masters never gets the new group leader (held in
     %% their internal state)
     maybe_boot_apps(State),
-    rebar_agent:start_link(State),
-    %% this call never returns (until user quits shell)
-    timer:sleep(infinity).
+    simulate_proc_lib(),
+    true = register(rebar_agent, self()),
+    {ok, GenState} = rebar_agent:init(State),
+    gen_server:enter_loop(rebar_agent, [], GenState, {local, rebar_agent}, hibernate).
 
 info() ->
     "Start a shell with project and deps preloaded similar to~n'erl -pa ebin -pa deps/*/ebin'.~n".
@@ -144,6 +145,11 @@ maybe_boot_apps(State) ->
             ok = reread_config(State),
             boot_apps(Apps)
     end.
+
+simulate_proc_lib() ->
+    FakeParent = spawn_link(fun() -> timer:sleep(infinity) end),
+    put('$ancestors', [FakeParent]),
+    put('$initial_call', {rebar_agent, init, 1}).
 
 setup_name(State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),

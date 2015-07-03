@@ -26,11 +26,11 @@ init(State) ->
 handle_call({cmd, Command}, _From, State=#state{state=RState, cwd=Cwd}) ->
     MidState = maybe_show_warning(State),
     {Res, NewRState} = run(default, Command, RState, Cwd),
-    {reply, Res, MidState#state{state=NewRState}};
+    {reply, Res, MidState#state{state=NewRState}, hibernate};
 handle_call({cmd, Namespace, Command}, _From, State = #state{state=RState, cwd=Cwd}) ->
     MidState = maybe_show_warning(State),
     {Res, NewRState} = run(Namespace, Command, RState, Cwd),
-    {reply, Res, MidState#state{state=NewRState}};
+    {reply, Res, MidState#state{state=NewRState}, hibernate};
 handle_call(_Call, _From, State) ->
     {noreply, State}.
 
