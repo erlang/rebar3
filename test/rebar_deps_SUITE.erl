@@ -50,11 +50,14 @@ init_per_testcase(http_proxy_settings, Config) ->
     ]),
     rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(https_proxy_settings, Config) ->
-    {OTPVersion, _} = string:to_integer(erlang:system_info(otp_release)),
-    case OTPVersion of
-        Vsn when Vsn =< 15 ->
+    SupportsHttpsProxy = case erlang:system_info(otp_release) of
+        "R16"++_ -> true;
+        "R"++_ -> false;
+        _ -> true % 17 and up don't have a "R" in the version
+    end,
+    if not SupportsHttpsProxy ->
             {skip, https_proxy_unsupported_before_R16};
-        _ ->
+       SupportsHttpsProxy ->
             %% Create private rebar.config
             Priv = ?config(priv_dir, Config),
             GlobalDir = filename:join(Priv, "global"),
