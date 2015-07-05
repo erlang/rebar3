@@ -96,7 +96,7 @@ request(Url, ETag) ->
     case httpc:request(get, {Url, [{"if-none-match", ETag} || ETag =/= false]},
                        [{relaxed, true}],
                        [{body_format, binary}],
-                       hex) of
+                       rebar) of
         {ok, {{_Version, 200, _Reason}, Headers, Body}} ->
             ?DEBUG("Successfully downloaded ~s", [Url]),
             {"etag", ETag1} = lists:keyfind("etag", 1, Headers),

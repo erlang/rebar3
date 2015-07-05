@@ -9,6 +9,8 @@ main(_Args) ->
     application:start(public_key),
     application:start(ssl),
     inets:start(),
+    inets:start(httpc, [{profile, rebar}]),
+    set_httpc_options(),
 
     %% Fetch and build deps required to build rebar3
     BaseDeps = [{providers, []}
@@ -84,12 +86,37 @@ extract(Binary) ->
 request(Url) ->
     case httpc:request(get, {Url, []},
                        [{relaxed, true}],
-                       [{body_format, binary}]) of
+                       [{body_format, binary}],
+                       rebar) of
         {ok, {{_Version, 200, _Reason}, _Headers, Body}} ->
             {ok, Body};
         Error ->
             Error
     end.
+
+get_rebar_config() ->
+    {ok, [[Home]]} = init:get_argument(home),
+    ConfDir = filename:join(Home, ".config/rebar3"),
+    case file:consult(filename:join(ConfDir, "rebar.config")) of
+        {ok, Config} ->
+            Config;
+        _ ->
+            []
+    end.
+
+get_http_vars(Scheme) ->
+    proplists:get_value(Scheme, get_rebar_config(), []).
+
+set_httpc_options() ->
+    set_httpc_options(https_proxy, get_http_vars(https_proxy)),
+    set_httpc_options(proxy, get_http_vars(http_proxy)).
+
+set_httpc_options(_, []) ->
+    ok;
+
+set_httpc_options(Scheme, Proxy) ->
+    {ok, {_, _, Host, Port, _, _}} = http_uri:parse(Proxy),
+    httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar).
 
 compile(App, FirstFiles) ->
     Dir = filename:join(filename:absname("_build/default/lib/"), App),

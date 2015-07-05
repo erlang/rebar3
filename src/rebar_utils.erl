@@ -56,7 +56,8 @@
          wordsize/0,
          tup_umerge/2,
          tup_sort/1,
-         line_count/1]).
+         line_count/1,
+         set_httpc_options/0]).
 
 %% for internal use only
 -export([otp_release/0]).
@@ -661,3 +662,19 @@ maybe_ends_in_comma(H) ->
         "," ++ Flag -> lists:reverse(Flag);
         _           -> false
     end.
+
+get_http_vars(Scheme) ->
+    GlobalConfigFile = rebar_dir:global_config(),
+    Config = rebar_config:consult_file(GlobalConfigFile),
+    proplists:get_value(Scheme, Config, []).
+
+set_httpc_options() ->
+    set_httpc_options(https_proxy, get_http_vars(https_proxy)),
+    set_httpc_options(proxy, get_http_vars(http_proxy)).
+
+set_httpc_options(_, []) ->
+    ok;
+
+set_httpc_options(Scheme, Proxy) ->
+    {ok, {_, _, Host, Port, _, _}} = http_uri:parse(Proxy),
+    httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar).

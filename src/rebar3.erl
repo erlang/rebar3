@@ -273,13 +273,6 @@ start_and_load_apps() ->
     application:start(public_key),
     application:start(ssl),
     inets:start(),
-    inets:start(httpc, [{profile, hex}]),
-    http_opts().
+    inets:start(httpc, [{profile, rebar}]),
+    rebar_utils:set_httpc_options().
 
-http_opts() ->
-    Opts = [{max_sessions, 4},
-            {max_keep_alive_length, 4},
-            {keep_alive_timeout, 120000},
-            {max_pipeline_length, 4},
-            {pipeline_timeout, 60000}],
-    httpc:set_options(Opts, hex).
