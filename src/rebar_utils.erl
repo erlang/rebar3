@@ -128,11 +128,13 @@ sh_send(Command0, String, Options0) ->
     PortSettings = proplists:get_all_values(port_settings, Options) ++
         [exit_status, {line, 16384}, use_stdio, stderr_to_stdout, hide],
     Port = open_port({spawn, Command}, PortSettings),
-
-    %% allow us to send some data to the shell command's STDIN
-    %% Erlang doesn't let us get any reply after sending an EOF, though...
-    Port ! {self(), {command, String}},
-    port_close(Port).
+    try
+        %% allow us to send some data to the shell command's STDIN
+        %% Erlang doesn't let us get any reply after sending an EOF, though...
+        Port ! {self(), {command, String}}
+    after
+        port_close(Port)
+    end.
 
 %%
 %% Options = [Option] -- defaults to [use_stdout, abort_on_error]
@@ -159,11 +161,15 @@ sh(Command0, Options0) ->
     ?DEBUG("Port Cmd: ~s\nPort Opts: ~p\n", [Command, PortSettings]),
     Port = open_port({spawn, Command}, PortSettings),
 
-    case sh_loop(Port, OutputHandler, []) of
-        {ok, _Output} = Ok ->
-            Ok;
-        {error, {_Rc, _Output}=Err} ->
-            ErrorHandler(Command, Err)
+    try
+        case sh_loop(Port, OutputHandler, []) of
+            {ok, _Output} = Ok ->
+                Ok;
+            {error, {_Rc, _Output}=Err} ->
+                ErrorHandler(Command, Err)
+        end
+    after
+        port_close(Port)
     end.
 
 find_files(Dir, Regex) ->
