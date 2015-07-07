@@ -68,12 +68,16 @@ compare_url(Dir, Url) ->
     CurrentUrl1 = string:strip(string:strip(CurrentUrl, both, $\n), both, $\r),
     ParsedUrl = parse_git_url(Url),
     ParsedCurrentUrl = parse_git_url(CurrentUrl1),
+    ?DEBUG("Comparing git url ~p with ~p", [ParsedUrl, ParsedCurrentUrl]),
     ParsedCurrentUrl =:= ParsedUrl.
 
 parse_git_url("git@" ++ HostPath) ->
     [Host, Path] = string:tokens(HostPath, ":"),
     {Host, filename:rootname(Path, ".git")};
 parse_git_url("git://" ++ HostPath) ->
+    [Host | Path] = string:tokens(HostPath, "/"),
+    {Host, filename:rootname(filename:join(Path), ".git")};
+parse_git_url("http://" ++ HostPath) ->
     [Host | Path] = string:tokens(HostPath, "/"),
     {Host, filename:rootname(filename:join(Path), ".git")};
 parse_git_url("https://" ++ HostPath) ->
