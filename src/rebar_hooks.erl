@@ -14,12 +14,21 @@ run_all_hooks(Dir, Type, Command, Providers, State) ->
     run_hooks(Dir, Type, Command, State).
 
 run_provider_hooks(Dir, Type, Command, Providers, State) ->
+    case rebar_state:get(State, provider_hooks, []) of
+        [] ->
+            ok;
+        AllHooks ->
+            TypeHooks = proplists:get_value(Type, AllHooks, []),
+            run_provider_hooks(Dir, Type, Command, Providers, TypeHooks, State)
+    end.
+
+run_provider_hooks(_Dir, _Type, _Command, _Providers, [], _State) ->
+    ok;
+run_provider_hooks(Dir, Type, Command, Providers, TypeHooks, State) ->
     PluginDepsPaths = rebar_state:code_paths(State, all_plugin_deps),
     code:add_pathsa(PluginDepsPaths),
     Providers1 = rebar_state:providers(State),
     State1 = rebar_state:providers(rebar_state:dir(State, Dir), Providers++Providers1),
-    AllHooks = rebar_state:get(State1, provider_hooks, []),
-    TypeHooks = proplists:get_value(Type, AllHooks, []),
     HookProviders = proplists:get_all_values(Command, TypeHooks),
 
     case rebar_core:do(HookProviders, State1) of
@@ -58,24 +67,24 @@ format_error({bad_provider, Type, Command, Name}) ->
 %% ERL                          = ERLANG_ROOT_DIR/bin/erl
 %% ERLC                         = ERLANG_ROOT_DIR/bin/erl
 %%
+run_hooks(Dir, pre, Command, State) ->
+    run_hooks(Dir, pre_hooks, Command, State);
+run_hooks(Dir, post, Command, State) ->
+    run_hooks(Dir, post_hooks, Command, State);
 run_hooks(Dir, Type, Command, State) ->
-    Hooks = case Type of
-                pre ->
-                    rebar_state:get(State, pre_hooks, []);
-                post ->
-                    rebar_state:get(State, post_hooks, []);
-                _ ->
-                    []
-            end,
-
-    Env = create_env(State),
-    lists:foreach(fun({_, C, _}=Hook) when C =:= Command ->
-                          apply_hook(Dir, Env, Hook);
-                     ({C, _}=Hook) when C =:= Command ->
-                          apply_hook(Dir, Env, Hook);
-                     (_) ->
-                          continue
-                  end, Hooks).
+    case rebar_state:get(State, Type, []) of
+        [] ->
+            ok;
+        Hooks ->
+            Env = create_env(State),
+            lists:foreach(fun({_, C, _}=Hook) when C =:= Command ->
+                                  apply_hook(Dir, Env, Hook);
+                             ({C, _}=Hook) when C =:= Command ->
+                                  apply_hook(Dir, Env, Hook);
+                             (_) ->
+                                  continue
+                          end, Hooks)
+    end.
 
 apply_hook(Dir, Env, {Arch, Command, Hook}) ->
     case rebar_utils:is_arch(Arch) of
