@@ -20,7 +20,8 @@
          checkout_priority/1,
          highest_version_of_pkg_dep/1,
          parse_transform_test/1,
-         erl_first_files_test/1]).
+         erl_first_files_test/1,
+         mib_test/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -48,7 +49,7 @@ all() ->
      recompile_when_opts_change, dont_recompile_when_opts_dont_change,
      dont_recompile_yrl_or_xrl, delete_beam_if_source_deleted,
      deps_in_path, checkout_priority, highest_version_of_pkg_dep,
-     parse_transform_test, erl_first_files_test].
+     parse_transform_test, erl_first_files_test, mib_test].
 
 build_basic_app(Config) ->
     AppDir = ?config(apps, Config),
@@ -308,7 +309,7 @@ deps_in_path(Config) ->
     ?assertEqual([], [Path || Path <- code:get_path(),
                               {match, _} <- [re:run(Path, DepName)]]),
     %% Hope not to find pkg name in there
-  
+
     ?assertEqual([], [Path || Path <- code:get_path(),
                                  {match, _} <- [re:run(Path, PkgName)]]),
     %% Build things
@@ -485,3 +486,48 @@ erl_first_files_test(Config) ->
     D = proplists:get_value(number, d:module_info(attributes)),
     E = proplists:get_value(number, e:module_info(attributes)),
     ?assertEqual([B,D,A,E], lists:sort([A,B,D,E])).
+
+mib_test(Config) ->
+    AppDir = ?config(apps, Config),
+
+    RebarConfig = [],
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    MibsSrc = <<"-- SIMPLE-MIB.\n"
+"-- This is just a simple MIB used for testing!\n"
+"--\n"
+"SIMPLE-MIB DEFINITIONS ::= BEGIN\n"
+"IMPORTS\n"
+"    MODULE-IDENTITY, enterprises\n"
+"        FROM SNMPv2-SMI;\n"
+"\n"
+"ericsson MODULE-IDENTITY\n"
+"    LAST-UPDATED\n"
+"        \"201403060000Z\"\n"
+"    ORGANIZATION\n"
+"        \"rebar\"\n"
+"    CONTACT-INFO\n"
+"        \"rebar <rebar@example.com>\n"
+"    or\n"
+"    whoever is currently responsible for the SIMPLE\n"
+"    enterprise MIB tree branch (enterprises.999).\"\n"
+"    DESCRIPTION\n"
+"        \"This very small module is made available\n"
+"	for mib-compilation testing.\"\n"
+"    ::= { enterprises 999 }\n"
+"END\n">>,
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "mibs", "dummy"])),
+    ok = file:write_file(filename:join([AppDir, "mibs", "SIMPLE-MIB.mib"]), MibsSrc),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
+
+    %% check a beam corresponding to the src in the extra src_dir exists in ebin
+    PrivMibsDir = filename:join([AppDir, "_build", "default", "lib", Name, "priv", "mibs"]),
+    true = filelib:is_file(filename:join([PrivMibsDir, "SIMPLE-MIB.bin"])),
+
+    %% check the extra src_dir was linked into the _build dir
+    true = filelib:is_dir(filename:join([AppDir, "_build", "default", "lib", Name, "mibs"])).

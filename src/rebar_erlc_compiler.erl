@@ -404,10 +404,13 @@ target_base(OutDir, Source) ->
 -spec compile_mib(file:filename(), file:filename(),
                   rebar_state:t()) -> 'ok'.
 compile_mib(Source, Target, Config) ->
+    Dir = rebar_state:dir(Config),
     ok = filelib:ensure_dir(Target),
-    ok = filelib:ensure_dir(filename:join("include", "dummy.hrl")),
-    Opts = [{outdir, "priv/mibs"}, {i, ["priv/mibs"]}] ++
+    ok = filelib:ensure_dir(filename:join([Dir, "include", "dummy.hrl"])),
+    Opts = [{outdir, filename:join([Dir, "priv", "mibs"])}
+           ,{i, [filename:join([Dir, "priv", "mibs"])]}] ++
         rebar_state:get(Config, mib_opts, []),
+
     case snmpc:compile(Source, Opts) of
         {ok, _} ->
             Mib = filename:rootname(Target),
