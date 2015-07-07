@@ -126,7 +126,20 @@ copy_app_dirs(State, OldAppDir, AppDir) ->
                 false ->
                     ok
             end,
+
             filelib:ensure_dir(filename:join(AppDir, "dummy")),
+
+            %% link or copy mibs if it exists
+            case filelib:is_dir(filename:join(OldAppDir, "mibs")) of
+                true ->
+                    %% If mibs exist it means we must ensure priv exists.
+                    %% mibs files are compiled to priv/mibs/
+                    filelib:ensure_dir(filename:join([OldAppDir, "priv", "dummy"])),
+                    symlink_or_copy(OldAppDir, AppDir, "mibs");
+                false ->
+                    ok
+            end,
+
             %% link to src_dirs to be adjacent to ebin is needed for R15 use of cover/xref
             SrcDirs = rebar_dir:all_src_dirs(State, ["src"], ["test"]),
             [symlink_or_copy(OldAppDir, AppDir, Dir) || Dir <- ["priv", "include"] ++ SrcDirs];
