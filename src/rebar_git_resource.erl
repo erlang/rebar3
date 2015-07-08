@@ -113,28 +113,23 @@ download(Dir, {git, Url, Rev}, _State) ->
     rebar_utils:sh(?FMT("git checkout -q ~s", [Rev]), [{cd, Dir}]).
 
 make_vsn(Dir) ->
-    Cwd = rebar_dir:get_cwd(),
-    try
-        ok = file:set_cwd(Dir),
-        {Vsn, RawRef, RawCount} = collect_default_refcount(),
-        {plain, build_vsn_string(Vsn, RawRef, RawCount)}
-    after
-        file:set_cwd(Cwd)
-    end.
+    {Vsn, RawRef, RawCount} = collect_default_refcount(Dir),
+    {plain, build_vsn_string(Vsn, RawRef, RawCount)}.
 
 %% Internal functions
 
-collect_default_refcount() ->
+collect_default_refcount(Dir) ->
     %% Get the tag timestamp and minimal ref from the system. The
     %% timestamp is really important from an ordering perspective.
     AbortMsg1 = "Getting log of git dependency failed in " ++ rebar_dir:get_cwd(),
     {ok, String} =
         rebar_utils:sh("git log -n 1 --pretty=format:\"%h\n\" ",
                        [{use_stdout, false},
+                        {cd, Dir},
                         {debug_abort_on_error, AbortMsg1}]),
     RawRef = string:strip(String, both, $\n),
 
-    {Tag, TagVsn} = parse_tags(),
+    {Tag, TagVsn} = parse_tags(Dir),
     {ok, RawCount} =
         case Tag of
             undefined ->
@@ -144,7 +139,7 @@ collect_default_refcount() ->
                                                    {debug_abort_on_error, AbortMsg2}]),
                 rebar_utils:line_count(PatchLines);
             _ ->
-                get_patch_count(Tag)
+                get_patch_count(Dir, Tag)
         end,
     {TagVsn, RawRef, RawCount}.
 
@@ -162,8 +157,8 @@ build_vsn_string(Vsn, RawRef, Count) ->
                                                            integer_to_list(Count), RefTag]))
     end.
 
-get_patch_count(RawRef) ->
-    AbortMsg = "Getting rev-list of git dep failed in " ++ rebar_dir:get_cwd(),
+get_patch_count(Dir, RawRef) ->
+    AbortMsg = "Getting rev-list of git dep failed in " ++ Dir,
     Ref = re:replace(RawRef, "\\s", "", [global]),
     Cmd = io_lib:format("git rev-list ~s..HEAD",
                          [Ref]),
@@ -173,10 +168,10 @@ get_patch_count(RawRef) ->
     rebar_utils:line_count(PatchLines).
 
 
-parse_tags() ->
+parse_tags(Dir) ->
     %% Don't abort on error, we want the bad return to be turned into 0.0.0
     case rebar_utils:sh("git log --oneline --no-walk --tags --decorate",
-                        [{use_stdout, false}, return_on_error]) of
+                        [{use_stdout, false}, return_on_error, {cd, Dir}]) of
         {error, _} ->
             {undefined, "0.0.0"};
         {ok, Line} ->
