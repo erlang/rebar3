@@ -91,9 +91,9 @@ cull_deps(Graph, Vertices, Level, Levels, Solution, Discarded) ->
                         lists:foldl(fun({Key, _}=N, {NewVertices1, SolutionAcc1, LevelsAcc1, DiscardedAcc1}) ->
                                             case dict:find(Key, SolutionAcc1) of
                                                 {ok, N} -> % already seen
-                                                    {NewVertices1, SolutionAcc1, LevelsAcc, DiscardedAcc1};
+                                                    {NewVertices1, SolutionAcc1, LevelsAcc1, DiscardedAcc1};
                                                 {ok, _} -> % conflict resolution!
-                                                    {NewVertices1, SolutionAcc1, LevelsAcc, [N|DiscardedAcc1]};
+                                                    {NewVertices1, SolutionAcc1, LevelsAcc1, [N|DiscardedAcc1]};
                                                 error ->
                                                     {[N | NewVertices1],
                                                      dict:store(Key, N, SolutionAcc1),
