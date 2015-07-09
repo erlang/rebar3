@@ -128,9 +128,15 @@ do([ProviderName | Rest], State) ->
             {error, Error}
     catch
         error:undef ->
-            %% This should really only happen if a plugin provider doesn't export do/1
-            ?DEBUG("Undefined call to provider's do function:~n~p", [erlang:get_stacktrace()]),
-            ?PRV_ERROR({bad_provider_namespace, ProviderName});
+            Stack = erlang:get_stacktrace(),
+            case Stack of
+                [{ProviderName, do, [_], _}|_] ->
+                    %% This should really only happen if a plugin provider doesn't export do/1
+                    ?DEBUG("Undefined call to provider's do/1 function:~n~p", [Stack]),
+                    ?PRV_ERROR({bad_provider_namespace, ProviderName});
+                _ -> % re-raise
+                    erlang:raise(error, undef, Stack)
+            end;
         error:{badrecord,provider} ->
             {error, ProviderName}
     end.
