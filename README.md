@@ -165,16 +165,15 @@ The main place to go for questions is the [rebar mailing
 list](http://lists.basho.com/pipermail/rebar_lists.basho.com/). If you need
 quick feedback, you can try the #rebar channel on
 [irc.freenode.net](http://freenode.net). Be sure to check the
-[wiki](https://github.com/rebar/rebar/wiki) first, just to be sure you're not
+[documentation](http://www.rebar3.org/v3.0/docs) first, just to be sure you're not
 asking about things with well known answers.
 
 For bug reports, roadmaps, and issues, visit the [github issues
-page](https://github.com/rebar/rebar/issues).
+page](https://github.com/rebar/rebar3/issues).
 
 General rebar community resources and links:
 
 - [Rebar Mailing List](http://lists.basho.com/pipermail/rebar_lists.basho.com/)
 - #rebar on [irc.freenode.net](http://freenode.net/)
-- [wiki](https://github.com/rebar/rebar/wiki)
-- [issues](https://github.com/rebar/rebar/issues)
+- [issues](https://github.com/rebar/rebar3/issues)
 - [Documentation](http://www.rebar3.org/v3.0/docs)
