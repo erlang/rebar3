@@ -1,6 +1,8 @@
+sudo: false
 language: erlang
 otp_release:
-  - 17.0
+  - 18.0
+  - 17.5
   - R16B03-1
   - R15B03
 before_script: "./bootstrap"
@@ -8,6 +10,9 @@ script: "./rebar3 ct"
 branches:
   only:
     - master
+cache:
+  directories:
+  - $HOME/.cache/rebar3/hex/com/amazonaws/s3/s3.hex.pm/tarballs/packages/
 before_deploy: "rm -rf !(rebar3)"
 deploy:
   on:
