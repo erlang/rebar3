@@ -18,3 +18,4 @@ logs
 priv/templates/*.dtl.erl
 ebin
 .edts
+env
