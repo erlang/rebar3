@@ -75,7 +75,6 @@ do(State) ->
 
         Upgrade = rebar_state:get(State, upgrade, false),
         {Apps, State1} = deps_per_profile(Profiles, Upgrade, State),
-            %lists:foldl(fun deps_per_profile/2, {[], State}, lists:reverse(Profiles)),
 
         State2 = rebar_state:update_all_deps(State1, Apps),
         CodePaths = [rebar_app_info:ebin_dir(A) || A <- Apps],
@@ -322,7 +321,7 @@ profile_dep_dir(State, Profile) ->
         _ -> rebar_dir:deps_dir(State)
     end.
 
-update_seen_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, BaseLocks, Locks) ->
+update_seen_src_dep(AppInfo, _Profile, _Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, BaseLocks, Locks) ->
     Name = rebar_app_info:name(AppInfo),
     %% If seen from lock file or user requested an upgrade
     %% don't print warning about skipping
@@ -331,44 +330,32 @@ update_seen_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State, U
         false when not Upgrade -> warn_skip_deps(AppInfo, State);
         true -> ok
     end,
-    %% scan for app children here if upgrading
-    case Upgrade of
-        false ->
-            {SrcDeps, PkgDeps, SrcApps, State, Seen, Locks};
-        true ->
-            {NewSrcDeps, NewPkgDeps, NewSrcApps, NewState, NewLocks}
-                = handle_dep(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps,
-                             Level, State, Locks),
-            {NewSrcDeps, NewPkgDeps, NewSrcApps, NewState, Seen, NewLocks}
-    end.
+    {SrcDeps, PkgDeps, SrcApps, State, Seen, Locks}.
 
 update_unseen_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, Locks) ->
     {NewSeen, State1} = maybe_lock(Profile, AppInfo, Seen, State, Level),
     {NewSrcDeps, NewPkgDeps, NewSrcApps, State2, NewLocks}
         = case Upgrade of
-            true ->
-                handle_upgrade(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps,
-                               Level, State1, Locks);
-            _ ->
-                {_, AppInfo1} = maybe_fetch(AppInfo, Profile, false, Seen, State1),
-                handle_dep(AppInfo1, Profile, SrcDeps, PkgDeps, SrcApps,
-                           Level, State1, Locks)
-        end,
+              true ->
+                  handle_upgrade(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps,
+                                 Level, State1, Seen, Locks);
+              _ ->
+                  {_, AppInfo1} = maybe_fetch(AppInfo, Profile, false, Seen, State1),
+                  handle_dep(AppInfo1, Profile, SrcDeps, PkgDeps, SrcApps,
+                             Level, State1, Locks)
+          end,
     {NewSrcDeps, NewPkgDeps, NewSrcApps, State2, NewSeen, NewLocks}.
 
-handle_upgrade(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
+handle_upgrade(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps, Level, State, Seen, Locks) ->
     Name = rebar_app_info:name(AppInfo),
     case lists:keyfind(Name, 1, Locks) of
         false ->
-            case maybe_fetch(AppInfo, Profile, true, sets:new(), State) of
-                {true, AppInfo1} ->
-                    handle_dep(AppInfo1, Profile, SrcDeps, PkgDeps, SrcApps,
-                               Level, State, Locks);
-                {false, AppInfo1} ->
-                    {[AppInfo1|SrcDeps], PkgDeps, SrcApps, State, Locks}
-            end;
+            {_, AppInfo1} = maybe_fetch(AppInfo, Profile, true, Seen, State),
+            handle_dep(AppInfo1, Profile, SrcDeps, PkgDeps, SrcApps,
+                       Level, State, Locks);
         _StillLocked ->
-            {[AppInfo|SrcDeps], PkgDeps, SrcApps, State, Locks}
+            handle_dep(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps,
+                       Level, State, Locks)
     end.
 
 handle_dep(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->

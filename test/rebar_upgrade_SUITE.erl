@@ -10,7 +10,8 @@ groups() ->
                 pair_a, pair_b, pair_ab, pair_c, pair_all,
                 triplet_a, triplet_b, triplet_c,
                 tree_a, tree_b, tree_c, tree_c2, tree_ac, tree_all,
-                delete_d, promote, stable_lock, fwd_lock]},
+                delete_d, promote, stable_lock, fwd_lock,
+                compile_upgrade_parity]},
      {git, [], [{group, all}]},
      {pkg, [], [{group, all}]}].
 
@@ -404,7 +405,20 @@ upgrades(fwd_lock) ->
      %% file to include the result post-upgrade, and then
      %% run a regular lock to see that the lock file is respected
      %% in deps.
-     {"any", [{"A","2"},{"C","2"},{"B","2"},{"D","2"}]}}.
+     {"any", [{"A","2"},{"C","2"},{"B","2"},{"D","2"}]}};
+upgrades(compile_upgrade_parity) ->
+    {[{"A", "1", [{"D",[{"J",[]}]},
+                  {"E",[{"I","1",[]}]}]},
+      {"B", "1", [{"F",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H",[]},
+                  {"I","2",[]}]}
+     ],
+     [],
+     [],
+     {"", [{"A","1"}, "D", "J", "E", {"I","1"},
+           {"B","1"}, "F", "G",
+           {"C","1"}, "H"]}}.
 
 %% TODO: add a test that verifies that unlocking files and then
 %% running the upgrade code is enough to properly upgrade things.
@@ -517,6 +531,22 @@ fwd_lock(Config) ->
     rebar_test_utils:run_and_check(
         Config, NewRebarConfig, ["lock", App], Expectation
     ).
+
+compile_upgrade_parity(Config) ->
+    AppDir = ?config(apps, Config),
+    apply(?config(mock, Config), []),
+    {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
+    %% compiling and upgrading should generate the same lockfiles when
+    %% deps are identical
+    Lockfile = filename:join([AppDir, "rebar.lock"]),
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, []}),
+    {ok, CompileLockData1} = file:read_file(Lockfile),
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["upgrade"], {ok, []}),
+    {ok, UpgradeLockData} = file:read_file(Lockfile),
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, []}),
+    {ok, CompileLockData2} = file:read_file(Lockfile),
+    ?assertEqual(CompileLockData1, CompileLockData2),
+    ?assertEqual(CompileLockData1, UpgradeLockData).
 
 run(Config) ->
     apply(?config(mock, Config), []),

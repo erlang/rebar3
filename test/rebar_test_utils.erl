@@ -333,12 +333,12 @@ write_app_src_file(Dir, Name, Version, Deps) ->
     ok = ec_file:write_term(Filename, get_app_metadata(ec_cnv:to_list(Name), Version, Deps)).
 
 erl_src_file(Name) ->
-    io_lib:format("-module(~s).\n"
+    io_lib:format("-module('~s').\n"
                   "-export([main/0]).\n"
                   "main() -> ok.\n", [filename:basename(Name, ".erl")]).
 
 erl_eunitized_src_file(Name) ->
-    io_lib:format("-module(~s).\n"
+    io_lib:format("-module('~s').\n"
                   "-export([main/0]).\n"
                   "main() -> ok.\n"
                   "-ifdef(TEST).\n"
@@ -348,7 +348,7 @@ erl_eunitized_src_file(Name) ->
 
 erl_eunit_suite_file(Name) ->
     BaseName = filename:basename(Name, ".erl"),
-    io_lib:format("-module(~s_tests).\n"
+    io_lib:format("-module('~s_tests').\n"
                   "-compile(export_all).\n"
                   "-ifndef(some_define).\n"
                   "-define(some_define, false).\n"
