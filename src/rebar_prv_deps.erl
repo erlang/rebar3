@@ -24,16 +24,25 @@ init(State) ->
                     {short_desc, "List dependencies"},
                     {desc, "List dependencies. Those not matching lock files "
                            "are followed by an asterisk (*)."},
-                    {opts, []}])),
+                    {opts, [{tree, $t, "tree", undefined, "Display dependencies in tree format."}]}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    Profiles = rebar_state:current_profiles(State),
-    List = [{Profile, rebar_state:get(State, {deps, Profile}, [])}
-            || Profile <- Profiles],
-    [display(State, Profile, Deps) || {Profile, Deps} <- List],
-    {ok, State}.
+    case display_tree(State) of
+        true ->
+            {_Packages, Graph} = rebar_state:packages(State),
+            List = merge_deps_per_profile(State),
+            {_SrcDeps, PkgDeps} = rebar_prv_install_deps:parse_deps("", List, State, [], 0),
+            rebar_digraph:print_solution(Graph, PkgDeps),
+            {ok, State};
+        false ->
+            Profiles = rebar_state:current_profiles(State),
+            List = [{Profile, rebar_state:get(State, {deps, Profile}, [])}
+                   || Profile <- Profiles],
+            [display(State, Profile, Deps) || {Profile, Deps} <- List],
+            {ok, State}
+    end.
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
@@ -116,3 +125,17 @@ display_dep(State, {Name, Source, Level}) when is_tuple(Source), is_integer(Leve
     ?CONSOLE("~s~s (locked ~s source)", [Name, NeedsUpdate, type(Source)]).
 
 type(Source) when is_tuple(Source) -> element(1, Source).
+
+display_tree(State) ->
+    {Args, _} = rebar_state:command_parsed_args(State),
+    proplists:get_value(tree, Args, false).
+
+merge_deps_per_profile(State) ->
+    Profiles = rebar_state:current_profiles(State),
+    lists:foldl(fun(Profile, Deps) ->
+                        D = rebar_utils:deps_to_binary(rebar_state:get(State, {deps, Profile}, [])),
+                        D1 = rebar_utils:tup_sort(D),
+                        rebar_utils:tup_dedup(
+                          rebar_utils:tup_umerge(D1
+                                                ,Deps))
+                end, [], Profiles).

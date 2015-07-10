@@ -61,7 +61,7 @@ merge_deps(AppInfo, State) ->
     State1 = lists:foldl(fun(Profile, StateAcc) ->
                                  AppProfDeps = rebar_state:get(AppState, {deps, Profile}, []),
                                  TopLevelProfDeps = rebar_state:get(StateAcc, {deps, Profile}, []),
-                                 ProfDeps2 = dedup(rebar_utils:tup_umerge(
+                                 ProfDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_umerge(
                                                      rebar_utils:tup_sort(TopLevelProfDeps)
                                                      ,rebar_utils:tup_sort(AppProfDeps))),
                                  rebar_state:set(StateAcc, {deps, Profile}, ProfDeps2)
@@ -155,11 +155,6 @@ create_app_info(AppDir, AppFile) ->
                     false
             end,
     rebar_app_info:dir(rebar_app_info:valid(AppInfo1, Valid), AppDir).
-
-dedup([]) -> [];
-dedup([A]) -> [A];
-dedup([H,H|T]) -> dedup([H|T]);
-dedup([H|T]) -> [H|dedup(T)].
 
 %% Read in and parse the .app file if it is availabe. Do the same for
 %% the .app.src file if it exists.
