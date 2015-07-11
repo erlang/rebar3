@@ -289,7 +289,13 @@ apply_profiles(State, Profile) when not is_list(Profile) ->
 apply_profiles(State, [default]) ->
     State;
 apply_profiles(State=#state_t{default = Defaults, current_profiles=CurrentProfiles}, Profiles) ->
-    AppliedProfiles = deduplicate(CurrentProfiles ++ Profiles),
+    AppliedProfiles = case Profiles of
+                          [global | _] ->
+                              Profiles;
+                          _ ->
+                              deduplicate(CurrentProfiles ++ Profiles)
+                      end,
+
     ConfigProfiles = rebar_state:get(State, profiles, []),
 
     NewOpts =
