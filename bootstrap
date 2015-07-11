@@ -285,6 +285,7 @@ get_deps() ->
     case file:consult("rebar.lock") of
         {ok, [[]]} ->
             %% Something went wrong in a previous build, lock file shouldn't be empty
+            io:format("Empty list in lock file, deleting rebar.lock~n"),
             ok = file:delete("rebar.lock"),
             {ok, Config} = file:consult("rebar.config"),
             proplists:get_value(deps, Config);
