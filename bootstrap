@@ -61,8 +61,12 @@ main(_Args) ->
     end.
 
 fetch_and_compile({Name, ErlFirstFiles}, Deps) ->
-    {Name, _, Repo} = lists:keyfind(Name, 1, Deps),
-    ok = fetch(Repo, Name),
+    case lists:keyfind(Name, 1, Deps) of
+        {Name, Vsn} ->
+            ok = fetch({pkg, atom_to_binary(Name, utf8), list_to_binary(Vsn)}, Name);
+        {Name, _, Source} ->
+            ok = fetch(Source, Name)
+    end,
     compile(Name, ErlFirstFiles).
 
 fetch({pkg, Name, Vsn}, App) ->
@@ -279,6 +283,11 @@ write_windows_scripts() ->
 
 get_deps() ->
     case file:consult("rebar.lock") of
+        {ok, [[]]} ->
+            %% Something went wrong in a previous build, lock file shouldn't be empty
+            ok = file:delete("rebar.lock"),
+            {ok, Config} = file:consult("rebar.config"),
+            proplists:get_value(deps, Config);
         {ok, [Deps]} ->
             [{binary_to_atom(Name, utf8), "", Source} || {Name, Source, _Level} <- Deps];
         _ ->
