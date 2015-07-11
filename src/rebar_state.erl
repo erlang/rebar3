@@ -289,7 +289,16 @@ apply_profiles(State, Profile) when not is_list(Profile) ->
 apply_profiles(State, [default]) ->
     State;
 apply_profiles(State=#state_t{default = Defaults, current_profiles=CurrentProfiles}, Profiles) ->
-    AppliedProfiles = deduplicate(CurrentProfiles ++ Profiles),
+    AppliedProfiles = case Profiles of
+                          %% Head of list global profile is special, only for use by rebar3
+                          %% It does not clash if a user does `rebar3 as global...` but when
+                          %% it is the head we must make sure not to prepend `default`
+                          [global | _] ->
+                              Profiles;
+                          _ ->
+                              deduplicate(CurrentProfiles ++ Profiles)
+                      end,
+
     ConfigProfiles = rebar_state:get(State, profiles, []),
 
     NewOpts =
