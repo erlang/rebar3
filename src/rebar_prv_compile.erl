@@ -63,7 +63,8 @@ do(State) ->
     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State2),
     has_all_artifacts(State3),
 
-    rebar_utils:cleanup_code_path(rebar_state:code_paths(State3, default)),
+    rebar_utils:cleanup_code_path(rebar_state:code_paths(State3, default)
+                                 ++ rebar_state:code_paths(State, all_plugin_deps)),
 
     {ok, State3}.
 
