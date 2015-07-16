@@ -117,7 +117,7 @@ format_error(Reason) ->
 Building
 --------
 
-Recommended installation of [Erlang/OTP](http://www.erlang.org) is source built using [erln8](http://metadave.github.io/erln8/) or [kerl](https://github.com/yrashk/kerl). For binary packages use those provided by [Erlang Solutions](https://www.erlang-solutions.com/downloads/download-erlang-otp), but be sure to choose the "Standard" download option or you'll have issues building projects.
+Recommended installation of [Erlang/OTP](http://www.erlang.org) is source built using [erln8](http://erln8.github.io/erln8/) or [kerl](https://github.com/yrashk/kerl). For binary packages use those provided by [Erlang Solutions](https://www.erlang-solutions.com/downloads/download-erlang-otp), but be sure to choose the "Standard" download option or you'll have issues building projects.
 
 ### Dependencies
 
