@@ -153,17 +153,17 @@ build_multi_apps(Config) ->
 
     Name1 = rebar_test_utils:create_random_name("app1_"),
     Vsn1 = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(filename:join([AppDir,Name1]), Name1, Vsn1, [kernel, stdlib]),
+    rebar_test_utils:create_app(filename:join([AppDir,"apps",Name1]), Name1, Vsn1, [kernel, stdlib]),
     Name2 = rebar_test_utils:create_random_name("app2_"),
     Vsn2 = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(filename:join([AppDir,Name2]), Name2, Vsn2, [kernel, stdlib]),
+    rebar_test_utils:create_app(filename:join([AppDir,"apps",Name2]), Name2, Vsn2, [kernel, stdlib]),
 
-    Extra1 = filename:join([AppDir, Name1, "extra", "extra1.erl"]),
+    Extra1 = filename:join([AppDir, "apps", Name1, "extra", "extra1.erl"]),
     ok = filelib:ensure_dir(Extra1),
     Src1 = io_lib:format("-module(extra1).~n-export([x/0]).~nx() -> ok.", []),
     ok = ec_file:write(Extra1, Src1),
 
-    Extra2 = filename:join([AppDir, Name2, "extra", "extra2.erl"]),
+    Extra2 = filename:join([AppDir, "apps", Name2, "extra", "extra2.erl"]),
     ok = filelib:ensure_dir(Extra2),
     Src2 = io_lib:format("-module(extra2).~n-export([x/0]).~nx() -> ok.", []),
     ok = ec_file:write(Extra2, Src2),
@@ -178,7 +178,7 @@ build_multi_apps(Config) ->
     %% check that `extraX.erl` was compiled to the `ebin` dir
     Ebin1 = filename:join([AppDir, "_build", "default", "lib", Name1, "ebin"]),
     true = filelib:is_file(filename:join([Ebin1, "extra1.beam"])),
-    
+
     Ebin2 = filename:join([AppDir, "_build", "default", "lib", Name2, "ebin"]),
     true = filelib:is_file(filename:join([Ebin2, "extra2.beam"])),
 

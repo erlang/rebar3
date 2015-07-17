@@ -94,25 +94,17 @@ all_app_dirs(LibDirs) ->
 
 app_dirs(LibDir) ->
     Path1 = filename:join([LibDir,
-                           "*",
-                           "src",
-                           "*.app.src"]),
-    Path2 = filename:join([LibDir,
                            "src",
                            "*.app.src"]),
 
-    Path3 = filename:join([LibDir,
-                           "*",
-                           "ebin",
-                           "*.app"]),
-    Path4 = filename:join([LibDir,
+    Path2 = filename:join([LibDir,
                            "ebin",
                            "*.app"]),
 
     lists:usort(lists:foldl(fun(Path, Acc) ->
                                     Files = filelib:wildcard(ec_cnv:to_list(Path)),
                                     [app_dir(File) || File <- Files] ++ Acc
-                            end, [], [Path1, Path2, Path3, Path4])).
+                            end, [], [Path1, Path2])).
 
 find_unbuilt_apps(LibDirs) ->
     find_apps(LibDirs, invalid).

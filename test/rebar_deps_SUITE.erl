@@ -222,7 +222,7 @@ sub_app_deps(Config) ->
     Name = rebar_test_utils:create_random_name("sub_app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
 
-    SubAppsDir = filename:join([AppDir, Name]),
+    SubAppsDir = filename:join([AppDir, "apps", Name]),
     SubDeps = rebar_test_utils:top_level_deps(rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
                                               ,{"b", "2.0.0", []}])),
     rebar_test_utils:create_app(SubAppsDir, Name, Vsn, [kernel, stdlib]),
@@ -246,7 +246,7 @@ newly_added_dep(Config) ->
     Name = rebar_test_utils:create_random_name("app_"),
     Vsn = rebar_test_utils:create_random_vsn(),
 
-    SubAppsDir = filename:join([AppDir, Name]),
+    SubAppsDir = filename:join([AppDir, "apps", Name]),
     rebar_test_utils:create_app(SubAppsDir, Name, Vsn, [kernel, stdlib]),
 
     TopDeps = rebar_test_utils:top_level_deps(rebar_test_utils:expand_deps(git, [{"b", "1.0.0", []}])),

@@ -112,11 +112,11 @@ build_release_plt(Config) ->
 
     Name1 = rebar_test_utils:create_random_name("relapp1_"),
     Vsn1 = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(filename:join([AppDir,Name1]), Name1, Vsn1,
+    rebar_test_utils:create_app(filename:join([AppDir,"apps",Name1]), Name1, Vsn1,
                                 [erts]),
     Name2 = rebar_test_utils:create_random_name("relapp2_"),
     Vsn2 = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(filename:join([AppDir,Name2]), Name2, Vsn2,
+    rebar_test_utils:create_app(filename:join([AppDir,"apps",Name2]), Name2, Vsn2,
                                 [erts, ec_cnv:to_atom(Name1)]),
 
     rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
