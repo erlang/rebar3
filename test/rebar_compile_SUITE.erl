@@ -65,10 +65,10 @@ build_release_apps(Config) ->
 
     Name1 = rebar_test_utils:create_random_name("relapp1_"),
     Vsn1 = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(filename:join([AppDir,Name1]), Name1, Vsn1, [kernel, stdlib]),
+    rebar_test_utils:create_app(filename:join([AppDir,"apps",Name1]), Name1, Vsn1, [kernel, stdlib]),
     Name2 = rebar_test_utils:create_random_name("relapp2_"),
     Vsn2 = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(filename:join([AppDir,Name2]), Name2, Vsn2, [kernel, stdlib]),
+    rebar_test_utils:create_app(filename:join([AppDir,"apps",Name2]), Name2, Vsn2, [kernel, stdlib]),
 
     rebar_test_utils:run_and_check(
         Config, [], ["compile"],
@@ -80,7 +80,7 @@ build_checkout_apps(Config) ->
     CheckoutsDir = ?config(checkouts, Config),
     Name1 = rebar_test_utils:create_random_name("checkapp1_"),
     Vsn1 = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(filename:join([AppDir,Name1]), Name1, Vsn1, [kernel, stdlib]),
+    rebar_test_utils:create_app(AppDir, Name1, Vsn1, [kernel, stdlib]),
     Name2 = rebar_test_utils:create_random_name("checkapp2_"),
     Vsn2 = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(filename:join([CheckoutsDir,Name2]), Name2, Vsn2, [kernel, stdlib]),
@@ -96,7 +96,7 @@ build_checkout_deps(Config) ->
     DepsDir = filename:join([AppDir, "_build", "default", "lib"]),
     Name1 = rebar_test_utils:create_random_name("checkapp1_"),
     Vsn1 = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(filename:join([AppDir,Name1]), Name1, Vsn1, [kernel, stdlib]),
+    rebar_test_utils:create_app(AppDir, Name1, Vsn1, [kernel, stdlib]),
     Name2 = rebar_test_utils:create_random_name("checkapp2_"),
     Vsn2 = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(filename:join([CheckoutsDir,Name2]), Name2, Vsn2, [kernel, stdlib]),

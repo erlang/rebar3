@@ -169,10 +169,10 @@ top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
 %%% Helpers %%%
 %%%%%%%%%%%%%%%
 check_results(AppDir, Expected, ProfileRun) ->
-    BuildDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib"])),
-    PluginDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "plugins"])),
-    GlobalPluginDirs = filelib:wildcard(filename:join([AppDir, "global", "plugins"])),
-    CheckoutsDir = filename:join([AppDir, "_checkouts"]),
+    BuildDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib", "*"])),
+    PluginDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "plugins", "*"])),
+    GlobalPluginDirs = filelib:wildcard(filename:join([AppDir, "global", "plugins", "*"])),
+    CheckoutsDir = filename:join([AppDir, "_checkouts", "*"]),
     LockFile = filename:join([AppDir, "rebar.lock"]),
     Locks = lists:flatten(rebar_config:consult_lock_file(LockFile)),
 
