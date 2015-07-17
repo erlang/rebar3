@@ -57,7 +57,10 @@
          tup_umerge/2,
          tup_sort/1,
          line_count/1,
-         set_httpc_options/0]).
+         set_httpc_options/0,
+         escape_chars/1,
+         escape_double_quotes/1,
+         escape_double_quotes_weak/1]).
 
 %% for internal use only
 -export([otp_release/0]).
@@ -684,3 +687,15 @@ set_httpc_options(_, []) ->
 set_httpc_options(Scheme, Proxy) ->
     {ok, {_, _, Host, Port, _, _}} = http_uri:parse(Proxy),
     httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar).
+
+%% escape\ as\ a\ shell\?
+escape_chars(Str) ->
+    re:replace(Str, "([ ()?`!$])", "\\\\&", [global, {return, list}]).
+
+%% "escape inside these"
+escape_double_quotes(Str) ->
+    re:replace(Str, "([\"\\\\`!$*])", "\\\\&", [global, {return, list}]).
+
+%% "escape inside these" but allow *
+escape_double_quotes_weak(Str) ->
+    re:replace(Str, "([\"\\\\`!$])", "\\\\&", [global, {return, list}]).

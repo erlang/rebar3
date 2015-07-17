@@ -57,26 +57,34 @@ download(Dir, {hg, Url, ""}, State) ->
 download(Dir, {hg, Url, {branch, Branch}}, _State) ->
     ok = filelib:ensure_dir(Dir),
     rebar_utils:sh(?FMT("hg clone -q -b ~s ~s ~s",
-                       [Branch, Url, filename:basename(Dir)]),
+                       [rebar_utils:escape_chars(Branch),
+                        rebar_utils:escape_chars(Url),
+                        rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]);
 download(Dir, {hg, Url, {tag, Tag}}, _State) ->
     ok = filelib:ensure_dir(Dir),
     rebar_utils:sh(?FMT("hg clone -q -u ~s ~s ~s",
-                        [Tag, Url, filename:basename(Dir)]),
+                        [rebar_utils:escape_chars(Tag),
+                         rebar_utils:escape_chars(Url),
+                         rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]);
 download(Dir, {hg, Url, {ref, Ref}}, _State) ->
     ok = filelib:ensure_dir(Dir),
     rebar_utils:sh(?FMT("hg clone -q -r ~s ~s ~s",
-                        [Ref, Url, filename:basename(Dir)]),
+                        [rebar_utils:escape_chars(Ref),
+                         rebar_utils:escape_chars(Url),
+                         rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]);
 download(Dir, {hg, Url, Rev}, _State) ->
     ok = filelib:ensure_dir(Dir),
     rebar_utils:sh(?FMT("hg clone -q -r ~s ~s ~s",
-                        [Rev, Url, filename:basename(Dir)]),
+                        [rebar_utils:escape_chars(Rev),
+                         rebar_utils:escape_chars(Url),
+                         rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]).
 
 make_vsn(Dir) ->
-    BaseHg = "hg -R '" ++ Dir ++ "' ",
+    BaseHg = "hg -R \"" ++ rebar_utils:escape_double_quotes(Dir) ++ "\" ",
     Ref = get_ref(Dir),
     Cmd = BaseHg ++ "log --template \"{latesttag}+build.{latesttagdistance}.rev.{node|short}\""
           " --rev " ++ Ref,
@@ -95,23 +103,23 @@ make_vsn(Dir) ->
 %%% Internal functions
 
 compare_url(Dir, Url) ->
-    CurrentUrl = string:strip(os:cmd("hg -R '" ++ Dir ++"' paths default"), both, $\n),
+    CurrentUrl = string:strip(os:cmd("hg -R \"" ++ rebar_utils:escape_double_quotes(Dir) ++"\" paths default"), both, $\n),
     CurrentUrl1 = string:strip(CurrentUrl, both, $\r),
     parse_hg_url(CurrentUrl1) =:= parse_hg_url(Url).
 
 get_ref(Dir) ->
     AbortMsg = io_lib:format("Get ref of hg dependency failed in ~s", [Dir]),
     {ok, RefString} =
-        rebar_utils:sh("hg -R '" ++ Dir ++ "' --debug id -i",
+        rebar_utils:sh("hg -R \"" ++ rebar_utils:escape_double_quotes(Dir) ++ "\" --debug id -i",
                        [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
     string:strip(RefString, both, $\n).
 
 get_tag_distance(Dir, Ref) ->
     AbortMsg = io_lib:format("Get tag distance of hg dependency failed in ~s", [Dir]),
     {ok, LogString} =
-        rebar_utils:sh("hg -R '" ++ Dir ++ "' "
+        rebar_utils:sh("hg -R \"" ++ rebar_utils:escape_double_quotes(Dir) ++ "\" "
                       "log --template \"{latesttag}-{latesttagdistance}\n\" "
-                      "--rev " ++ Ref,
+                      "--rev " ++ rebar_utils:escape_chars(Ref),
                       [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
     Log = string:strip(LogString,
                        both, $\n),
@@ -121,7 +129,8 @@ get_tag_distance(Dir, Ref) ->
 get_branch_ref(Dir, Branch) ->
     AbortMsg = io_lib:format("Get branch ref of hg dependency failed in ~s", [Dir]),
     {ok, BranchRefString} =
-        rebar_utils:sh("hg -R '" ++ Dir ++ "' log --template \"{node}\n\" --rev " ++ Branch,
+        rebar_utils:sh("hg -R \"" ++ rebar_utils:escape_double_quotes(Dir) ++
+                       "\" log --template \"{node}\n\" --rev " ++ rebar_utils:escape_chars(Branch),
                        [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
     string:strip(BranchRefString, both, $\n).
 
