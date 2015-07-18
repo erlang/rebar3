@@ -98,7 +98,8 @@ symlink_or_copy(Source, Target) ->
 win32_symlink(Source, Target) ->
     Res = rebar_utils:sh(
             ?FMT("cmd /c mklink /j \"~s\" \"~s\"",
-                 [filename:nativename(Target), filename:nativename(Source)]),
+                 [rebar_utils:escape_double_quotes(filename:nativename(Target)),
+                  rebar_utils:escape_double_quotes(filename:nativename(Source))]),
             [{use_stdout, false}, return_on_error]),
     case win32_ok(Res) of
         true -> ok;
@@ -115,7 +116,7 @@ win32_symlink(Source, Target) ->
 rm_rf(Target) ->
     case os:type() of
         {unix, _} ->
-            EscTarget = escape_path(Target),
+            EscTarget = rebar_utils:escape_chars(Target),
             {ok, []} = rebar_utils:sh(?FMT("rm -rf ~s", [EscTarget]),
                                       [{use_stdout, false}, abort_on_error]),
             ok;
@@ -134,10 +135,10 @@ cp_r([], _Dest) ->
 cp_r(Sources, Dest) ->
     case os:type() of
         {unix, _} ->
-            EscSources = [escape_path(Src) || Src <- Sources],
+            EscSources = [rebar_utils:escape_chars(Src) || Src <- Sources],
             SourceStr = string:join(EscSources, " "),
             {ok, []} = rebar_utils:sh(?FMT("cp -R ~s \"~s\"",
-                                           [SourceStr, Dest]),
+                                           [SourceStr, rebar_utils:escape_double_quotes(Dest)]),
                                       [{use_stdout, false}, abort_on_error]),
             ok;
         {win32, _} ->
@@ -149,8 +150,8 @@ cp_r(Sources, Dest) ->
 mv(Source, Dest) ->
     case os:type() of
         {unix, _} ->
-            EscSource = escape_path(Source),
-            EscDest = escape_path(Dest),
+            EscSource = rebar_utils:escape_chars(Source),
+            EscDest = rebar_utils:escape_chars(Dest),
             {ok, []} = rebar_utils:sh(?FMT("mv ~s ~s", [EscSource, EscDest]),
                                       [{use_stdout, false}, abort_on_error]),
             ok;
@@ -158,13 +159,13 @@ mv(Source, Dest) ->
             Cmd = case filelib:is_dir(Source) of
                       true ->
                           ?FMT("robocopy /move /s \"~s\" \"~s\" 1> nul",
-                               [filename:nativename(Source),
-                                filename:nativename(Dest)]);
+                               [rebar_utils:escape_double_quotes(filename:nativename(Source)),
+                                rebar_utils:escape_double_quotes(filename:nativename(Dest))]);
                       false ->
                           ?FMT("robocopy /move /s \"~s\" \"~s\" \"~s\" 1> nul",
-                               [filename:nativename(filename:dirname(Source)),
-                                filename:nativename(Dest),
-                                filename:basename(Source)])
+                               [rebar_utils:escape_double_quotes(filename:nativename(filename:dirname(Source))),
+                                rebar_utils:escape_double_quotes(filename:nativename(Dest)),
+                                rebar_utils:escape_double_quotes(filename:basename(Source))])
                   end,
             Res = rebar_utils:sh(Cmd,
                         [{use_stdout, false}, return_on_error]),
@@ -250,7 +251,7 @@ touch(Path) ->
 delete_each_dir_win32([]) -> ok;
 delete_each_dir_win32([Dir | Rest]) ->
     {ok, []} = rebar_utils:sh(?FMT("rd /q /s \"~s\"",
-                                   [filename:nativename(Dir)]),
+                                   [rebar_utils:escape_double_quotes(filename:nativename(Dir))]),
                               [{use_stdout, false}, return_on_error]),
     delete_each_dir_win32(Rest).
 
@@ -260,13 +261,13 @@ xcopy_win32(Source,Dest)->
     Cmd = case filelib:is_dir(Source) of
               true ->
                   ?FMT("robocopy \"~s\" \"~s\" /e /is 1> nul",
-                       [filename:nativename(Source),
-                        filename:nativename(Dest)]);
+                       [rebar_utils:escape_double_quotes(filename:nativename(Source)),
+                        rebar_utils:escape_double_quotes(filename:nativename(Dest))]);
               false ->
                   ?FMT("robocopy \"~s\" \"~s\" \"~s\" /e /is 1> nul",
-                       [filename:nativename(filename:dirname(Source)),
-                        filename:nativename(Dest),
-                        filename:basename(Source)])
+                       [rebar_utils:escape_double_quotes(filename:nativename(filename:dirname(Source))),
+                        rebar_utils:escape_double_quotes(filename:nativename(Dest)),
+                        rebar_utils:escape_double_quotes(filename:basename(Source))])
           end,
     Res = rebar_utils:sh(Cmd,
                 [{use_stdout, false}, return_on_error]),
@@ -318,5 +319,3 @@ cp_r_win32(Source,Dest) ->
                   end, filelib:wildcard(Source)),
     ok.
 
-escape_path(Str) ->
-    re:replace(Str, "([ ()?])", "\\\\&", [global, {return, list}]).

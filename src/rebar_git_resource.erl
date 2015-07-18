@@ -16,7 +16,7 @@ lock(AppDir, {git, Url, _}) ->
 lock(AppDir, {git, Url}) ->
     AbortMsg = io_lib:format("Locking of git dependency failed in ~s", [AppDir]),
     {ok, VsnString} =
-        rebar_utils:sh("git --git-dir=\"" ++ AppDir ++ "/.git\" rev-parse --verify HEAD",
+        rebar_utils:sh("git --git-dir=\"" ++ rebar_utils:escape_double_quotes(AppDir) ++ "/.git\" rev-parse --verify HEAD",
                        [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
     Ref = string:strip(VsnString, both, $\n),
     {git, Url, {ref, Ref}}.
@@ -32,10 +32,11 @@ needs_update(Dir, {git, Url, {tag, Tag}}) ->
     not ((Current1 =:= Tag) andalso compare_url(Dir, Url));
 needs_update(Dir, {git, Url, {branch, Branch}}) ->
     %% Fetch remote so we can check if the branch has changed
-    {ok, _} = rebar_utils:sh(?FMT("git fetch origin ~s", [Branch]),
+    SafeBranch = rebar_utils:escape_chars(Branch),
+    {ok, _} = rebar_utils:sh(?FMT("git fetch origin ~s", [SafeBranch]),
                              [{cd, Dir}]),
     %% Check for new commits to origin/Branch
-    {ok, Current} = rebar_utils:sh(?FMT("git log HEAD..origin/~s --oneline", [Branch]),
+    {ok, Current} = rebar_utils:sh(?FMT("git log HEAD..origin/~s --oneline", [SafeBranch]),
                                    [{cd, Dir}]),
     ?DEBUG("Checking git branch ~s for updates", [Branch]),
     not ((Current =:= []) andalso compare_url(Dir, Url));
@@ -93,24 +94,33 @@ download(Dir, {git, Url, ""}, State) ->
 download(Dir, {git, Url, {branch, Branch}}, _State) ->
     ok = filelib:ensure_dir(Dir),
     rebar_utils:sh(?FMT("git clone ~s ~s -b ~s --single-branch",
-                       [Url, filename:basename(Dir), Branch]),
+                       [rebar_utils:escape_chars(Url),
+                        rebar_utils:escape_chars(filename:basename(Dir)),
+                        rebar_utils:escape_chars(Branch)]),
                    [{cd, filename:dirname(Dir)}]);
 download(Dir, {git, Url, {tag, Tag}}, _State) ->
     ok = filelib:ensure_dir(Dir),
     rebar_utils:sh(?FMT("git clone ~s ~s -b ~s --single-branch",
-                        [Url, filename:basename(Dir), Tag]),
+                       [rebar_utils:escape_chars(Url),
+                        rebar_utils:escape_chars(filename:basename(Dir)),
+                        rebar_utils:escape_chars(Tag)]),
                    [{cd, filename:dirname(Dir)}]);
 download(Dir, {git, Url, {ref, Ref}}, _State) ->
     ok = filelib:ensure_dir(Dir),
-    rebar_utils:sh(?FMT("git clone -n ~s ~s", [Url, filename:basename(Dir)]),
+    rebar_utils:sh(?FMT("git clone -n ~s ~s",
+                        [rebar_utils:escape_chars(Url),
+                         rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]),
     rebar_utils:sh(?FMT("git checkout -q ~s", [Ref]), [{cd, Dir}]);
 download(Dir, {git, Url, Rev}, _State) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
     ok = filelib:ensure_dir(Dir),
-    rebar_utils:sh(?FMT("git clone -n ~s ~s", [Url, filename:basename(Dir)]),
+    rebar_utils:sh(?FMT("git clone -n ~s ~s",
+                        [rebar_utils:escape_chars(Url),
+                         rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]),
-    rebar_utils:sh(?FMT("git checkout -q ~s", [Rev]), [{cd, Dir}]).
+    rebar_utils:sh(?FMT("git checkout -q ~s", [rebar_utils:escape_chars(Rev)]),
+                   [{cd, Dir}]).
 
 make_vsn(Dir) ->
     {Vsn, RawRef, RawCount} = collect_default_refcount(Dir),
@@ -162,7 +172,7 @@ get_patch_count(Dir, RawRef) ->
     AbortMsg = "Getting rev-list of git dep failed in " ++ Dir,
     Ref = re:replace(RawRef, "\\s", "", [global]),
     Cmd = io_lib:format("git rev-list ~s..HEAD",
-                         [Ref]),
+                        [rebar_utils:escape_chars(Ref)]),
     {ok, PatchLines} = rebar_utils:sh(Cmd,
                                         [{use_stdout, false},
                                          {cd, Dir},
