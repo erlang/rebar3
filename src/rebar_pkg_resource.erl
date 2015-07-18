@@ -9,6 +9,8 @@
         ,needs_update/2
         ,make_vsn/1]).
 
+-export([ssl_opts/1]).
+
 -include("rebar.hrl").
 -include_lib("public_key/include/OTP-PUB-KEY.hrl").
 

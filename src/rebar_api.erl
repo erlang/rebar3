@@ -11,7 +11,8 @@
          wordsize/0,
          add_deps_to_path/1,
          restore_code_path/1,
-         processing_base_dir/1]).
+         processing_base_dir/1,
+         ssl_opts/1]).
 
 -export_type([rebar_dict/0, rebar_digraph/0]).
 
@@ -63,3 +64,6 @@ restore_code_path(State) ->
 
 processing_base_dir(State) ->
     rebar_dir:processing_base_dir(State).
+
+ssl_opts(Url) ->
+    rebar_pkg_resource:ssl_opts(Url).
