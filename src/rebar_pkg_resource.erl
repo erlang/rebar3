@@ -97,7 +97,7 @@ make_vsn(_) ->
 
 request(Url, ETag) ->
     case httpc:request(get, {Url, [{"if-none-match", ETag} || ETag =/= false]},
-                       [{ssl, [ssl_opts(Url)]}, {relaxed, true}],
+                       [{ssl, ssl_opts(Url)}, {relaxed, true}],
                        [{body_format, binary}],
                        rebar) of
         {ok, {{_Version, 200, _Reason}, Headers, Body}} ->
