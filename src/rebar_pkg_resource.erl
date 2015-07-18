@@ -10,6 +10,7 @@
         ,make_vsn/1]).
 
 -include("rebar.hrl").
+-include_lib("public_key/include/OTP-PUB-KEY.hrl").
 
 lock(_AppDir, Source) ->
     Source.
@@ -94,7 +95,7 @@ make_vsn(_) ->
 
 request(Url, ETag) ->
     case httpc:request(get, {Url, [{"if-none-match", ETag} || ETag =/= false]},
-                       [{relaxed, true}],
+                       [{ssl, [ssl_opts(Url)]}, {relaxed, true}],
                        [{body_format, binary}],
                        rebar) of
         {ok, {{_Version, 200, _Reason}, Headers, Body}} ->
@@ -120,3 +121,62 @@ etag(Path) ->
         {error, _} ->
             false
     end.
+
+ssl_opts(Url) ->
+    case check_ssl_version() of
+        true ->
+            {ok, {_, _, Hostname, _, _, _}} = http_uri:parse(ec_cnv:to_list(Url)),
+            VerifyFun = {fun ssl_verify_hostname:verify_fun/3, [{check_hostname, Hostname}]},
+            CACerts = cacerts(),
+            [{verify, verify_peer}, {depth, 2}, {cacerts, CACerts}
+            ,{partial_chain, fun partial_chain/1}, {verify_fun, VerifyFun}];
+        false ->
+            ?WARN("Insecure HTTPS request (peer verification disabled), please update to OTP 17.4 or later", []),
+            [{verify, verify_none}]
+    end.
+
+partial_chain(Certs) ->
+    Certs1 = [{Cert, public_key:pkix_decode_cert(Cert, otp)} || Cert <- Certs],
+    CACerts = cacerts(),
+    CACerts1 = [public_key:pkix_decode_cert(Cert, otp) || Cert <- CACerts],
+
+    case ec_lists:find(fun({_, Cert}) ->
+                              check_cert(CACerts1, Cert)
+                       end, Certs1) of
+        {ok, Trusted} ->
+            {trusted_ca, element(1, Trusted)};
+        _ ->
+            unknown_ca
+    end.
+
+extract_public_key_info(Cert) ->
+    ((Cert#'OTPCertificate'.tbsCertificate)#'OTPTBSCertificate'.subjectPublicKeyInfo).
+
+cacerts() ->
+    Pems = public_key:pem_decode(rebar_cacerts:cacerts()),
+    [Der || {'Certificate', Der, _} <- Pems].
+
+check_cert(CACerts, Cert) ->
+    lists:any(fun(CACert) ->
+                      extract_public_key_info(CACert) == extract_public_key_info(Cert)
+              end, CACerts).
+
+check_ssl_version() ->
+    case application:get_key(ssl, vsn) of
+        {ok, Vsn} ->
+            parse_vsn(Vsn) >= {5, 3, 6};
+        _ ->
+            false
+    end.
+
+parse_vsn(Vsn) ->
+    version_pad(string:tokens(Vsn, ".")).
+
+version_pad([Major]) ->
+    {list_to_integer(Major), 0, 0};
+version_pad([Major, Minor]) ->
+    {list_to_integer(Major), list_to_integer(Minor), 0};
+version_pad([Major, Minor, Patch]) ->
+    {list_to_integer(Major), list_to_integer(Minor), list_to_integer(Patch)};
+version_pad([Major, Minor, Patch | _]) ->
+    {list_to_integer(Major), list_to_integer(Minor), list_to_integer(Patch)}.

@@ -18,6 +18,7 @@
                   erlware_commons,
                   providers,
                   bbmustache,
+		  ssl_verify_hostname,
                   relx,
                   inets]},
   {env, [
