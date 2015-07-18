@@ -21,7 +21,8 @@
          highest_version_of_pkg_dep/1,
          parse_transform_test/1,
          erl_first_files_test/1,
-         mib_test/1]).
+         mib_test/1,
+         only_default_transitive_deps/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -49,7 +50,7 @@ all() ->
      recompile_when_opts_change, dont_recompile_when_opts_dont_change,
      dont_recompile_yrl_or_xrl, delete_beam_if_source_deleted,
      deps_in_path, checkout_priority, highest_version_of_pkg_dep,
-     parse_transform_test, erl_first_files_test, mib_test].
+     parse_transform_test, erl_first_files_test, mib_test, only_default_transitive_deps].
 
 build_basic_app(Config) ->
     AppDir = ?config(apps, Config),
@@ -531,3 +532,27 @@ mib_test(Config) ->
 
     %% check the extra src_dir was linked into the _build dir
     true = filelib:is_dir(filename:join([AppDir, "_build", "default", "lib", Name, "mibs"])).
+
+only_default_transitive_deps(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    GitDeps = rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}]),
+    PkgName = rebar_test_utils:create_random_name("pkg1_"),
+    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(GitDeps)},
+                            {config, [{profiles, [{test, [{deps, [list_to_atom(PkgName)]}]}]}]}]),
+
+    mock_pkg_resource:mock([{pkgdeps, [{{iolist_to_binary(PkgName), <<"0.1.0">>}, []}]}]),
+
+    Deps = rebar_test_utils:top_level_deps(GitDeps),
+    RConfFile = rebar_test_utils:create_config(AppDir, [{deps, Deps}]),
+    {ok, RConf} = file:consult(RConfFile),
+
+    %% Build with deps.
+    rebar_test_utils:run_and_check(
+        Config, RConf, ["as", "test", "compile"],
+        {ok, [{app, Name}, {dep, "a", <<"1.0.0">>}, {dep_not_exist, PkgName}]}
+    ).

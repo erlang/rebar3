@@ -391,7 +391,7 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     AppInfo2 = rebar_app_info:state(AppInfo1, S5),
 
     %% Upgrade lock level to be the level the dep will have in this dep tree
-    Deps = rebar_state:get(S5, deps, []),
+    Deps = rebar_state:get(S5, {deps, default}, []),
     NewLocks = [{DepName, Source, LockLevel+Level} ||
                    {DepName, Source, LockLevel} <- rebar_state:get(S5, {locks, default}, [])],
     AppInfo3 = rebar_app_info:deps(AppInfo2, rebar_state:deps_names(Deps)),
