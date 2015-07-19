@@ -59,6 +59,10 @@ run(BaseState, Commands) ->
     start_and_load_apps(),
     BaseState1 = rebar_state:set(BaseState, task, Commands),
     BaseState2 = rebar_state:set(BaseState1, caller, api),
+
+    Verbosity = log_level(),
+    ok = rebar_log:init(api, Verbosity),
+
     run_aux(BaseState2, Commands).
 
 %% ====================================================================
@@ -122,25 +126,17 @@ init_config() ->
              end,
     Config1 = rebar_config:merge_locks(Config, rebar_config:consult_lock_file(?LOCK_FILE)),
 
-    %% If $HOME/.config/rebar3/config exists load and use as global config
+    %% If $HOME/.config/rebar3/rebar.config exists load and use as global config
     GlobalConfigFile = rebar_dir:global_config(),
     State = case filelib:is_regular(GlobalConfigFile) of
                 true ->
-                    ?DEBUG("Load global config file ~p",
-                           [GlobalConfigFile]),
-                    GlobalConfigTerms = rebar_config:consult_file(GlobalConfigFile),
-                    GlobalConfig = rebar_state:new(GlobalConfigTerms),
-
-                    %% We don't want to worry about global plugin install state effecting later
-                    %% usage. So we throw away the global profile state used for plugin install.
-                    GlobalConfigThrowAway = rebar_state:current_profiles(GlobalConfig, [global]),
-                    GlobalState = rebar_plugins:handle_plugins(global,
-                                                 rebar_state:get(GlobalConfigThrowAway, plugins, []),
-                                                 GlobalConfigThrowAway),
-                    GlobalPlugins = rebar_state:providers(GlobalState),
-                    GlobalConfig2 = rebar_state:set(GlobalConfig, plugins, []),
-                    GlobalConfig3 = rebar_state:set(GlobalConfig2, {plugins, global}, rebar_state:get(GlobalConfigThrowAway, plugins, [])),
-                    rebar_state:providers(rebar_state:new(GlobalConfig3, Config1), GlobalPlugins);
+                    ?DEBUG("Load global config file ~s", [GlobalConfigFile]),
+                    try state_from_global_config(Config1, GlobalConfigFile)
+                    catch
+                        _:_ ->
+                            ?WARN("Global config ~s exists but can not be read. Ignoring global config values.", [GlobalConfigFile]),
+                            rebar_state:new(Config1)
+                    end;
                 false ->
                     rebar_state:new(Config1)
             end,
@@ -273,6 +269,20 @@ start_and_load_apps() ->
     application:start(public_key),
     application:start(ssl),
     inets:start(),
-    inets:start(httpc, [{profile, rebar}]),
-    rebar_utils:set_httpc_options().
+    inets:start(httpc, [{profile, rebar}]).
 
+state_from_global_config(Config, GlobalConfigFile) ->
+    rebar_utils:set_httpc_options(),
+    GlobalConfigTerms = rebar_config:consult_file(GlobalConfigFile),
+    GlobalConfig = rebar_state:new(GlobalConfigTerms),
+
+    %% We don't want to worry about global plugin install state effecting later
+    %% usage. So we throw away the global profile state used for plugin install.
+    GlobalConfigThrowAway = rebar_state:current_profiles(GlobalConfig, [global]),
+    GlobalState = rebar_plugins:handle_plugins(global,
+                                               rebar_state:get(GlobalConfigThrowAway, plugins, []),
+                                               GlobalConfigThrowAway),
+    GlobalPlugins = rebar_state:providers(GlobalState),
+    GlobalConfig2 = rebar_state:set(GlobalConfig, plugins, []),
+    GlobalConfig3 = rebar_state:set(GlobalConfig2, {plugins, global}, rebar_state:get(GlobalConfigThrowAway, plugins, [])),
+    rebar_state:providers(rebar_state:new(GlobalConfig3, Config), GlobalPlugins).
