@@ -129,6 +129,8 @@ setup_shell() ->
     end.
 
 setup_paths(State) ->
+    %% Change working directory for the project root
+    file:set_cwd(rebar_state:dir(State)),
     %% Add deps to path
     code:add_pathsa(rebar_state:code_paths(State, all_deps)),
     %% add project app test paths
