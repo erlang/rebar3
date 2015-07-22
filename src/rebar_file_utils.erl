@@ -73,7 +73,7 @@ symlink_or_copy(Source, Target) ->
         ok ->
             ok;
         {error, eexist} ->
-            ok;
+            exists;
         {error, _} ->
             case os:type() of
                 {win32, _} ->

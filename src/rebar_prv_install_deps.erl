@@ -449,17 +449,29 @@ maybe_symlink_default(State, Profile, AppDir, AppInfo) ->
         true ->
             SymDir = filename:join([rebar_dir:deps_dir(State),
                                     rebar_app_info:name(AppInfo)]),
-            symlink_dep(AppDir, SymDir),
+            symlink_dep(State, AppDir, SymDir),
             true;
         false ->
             false
     end.
 
-
-symlink_dep(From, To) ->
-    ?INFO("Linking ~s to ~s", [From, To]),
+symlink_dep(State, From, To) ->
     filelib:ensure_dir(To),
-    rebar_file_utils:symlink_or_copy(From, To).
+    case rebar_file_utils:symlink_or_copy(From, To) of
+        ok ->
+            RelativeFrom = make_relative_to_root(State, From),
+            RelativeTo = make_relative_to_root(State, To),
+            ?INFO("Linking ~s to ~s", [RelativeFrom, RelativeTo]),
+            ok;
+        exists ->
+            ok
+    end.
+
+make_relative_to_root(State, Path) when is_binary(Path) ->
+    make_relative_to_root(State, binary_to_list(Path));
+make_relative_to_root(State, Path) when is_list(Path) ->
+    Root = rebar_dir:root_dir(State),
+    rebar_dir:make_relative_path(Path, Root).
 
 -spec parse_deps(binary(), list(), rebar_state:t(), list(), integer()) -> {[rebar_app_info:t()], [pkg_dep()]}.
 parse_deps(DepsDir, Deps, State, Locks, Level) ->
