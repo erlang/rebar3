@@ -689,6 +689,8 @@ set_httpc_options(Scheme, Proxy) ->
     httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar).
 
 %% escape\ as\ a\ shell\?
+escape_chars(Str) when is_atom(Str) ->
+    escape_chars(atom_to_list(Str));
 escape_chars(Str) ->
     re:replace(Str, "([ ()?`!$])", "\\\\&", [global, {return, list}]).
 
