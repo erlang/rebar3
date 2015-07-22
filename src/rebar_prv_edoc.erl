@@ -24,7 +24,8 @@ init(State) ->
                                                                {example, "rebar3 edoc"},
                                                                {short_desc, "Generate documentation using edoc."},
                                                                {desc, "Generate documentation using edoc."},
-                                                               {opts, []}])),
+                                                               {opts, []},
+                                                               {profiles, [docs]}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
