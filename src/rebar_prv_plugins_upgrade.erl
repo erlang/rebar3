@@ -97,7 +97,10 @@ find(Plugin, [Plugin1 | Plugins]) when is_tuple(Plugin1) ->
             Plugin1;
         false ->
             find(Plugin, Plugins)
-    end.
+    end;
+find(Plugin, [_Plugin | Plugins]) ->
+    find(Plugin, Plugins).
+
 
 build_plugin(AppInfo, Apps, State) ->
     Providers = rebar_state:providers(State),
