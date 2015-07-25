@@ -306,8 +306,8 @@ check_min_otp_version(undefined) ->
 check_min_otp_version(MinOtpVersion) ->
     %% Fully-qualify with ?MODULE so the function can be meck'd in rebar_utils_SUITE
     OtpRelease = ?MODULE:otp_release(),
-    {MinMajor, MinMinor} = split_version(MinOtpVersion),
-    {OtpMajor, OtpMinor} = split_version(OtpRelease),
+    {MinMajor, MinMinor} = version_tuple(MinOtpVersion),
+    {OtpMajor, OtpMinor} = version_tuple(OtpRelease),
 
     case {OtpMajor, OtpMinor} >= {MinMajor, MinMinor} of
         true ->
@@ -341,11 +341,16 @@ abort_if_blacklisted(BlacklistedRegex, OtpRelease) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
-
-split_version(Version) ->
-    list_to_tuple(lists:map(
-        fun(S) -> list_to_integer(S) end,
-        string:tokens(Version, "."))).
+version_tuple(OtpRelease) ->
+    case re:run(OtpRelease, "R?(\\d+)B?-?(\\d+)?", [{capture, all, list}]) of
+        {match, [_Full, Maj, Min]} ->
+            {list_to_integer(Maj), list_to_integer(Min)};
+        {match, [_Full, Maj]} ->
+            {list_to_integer(Maj), 0};
+        nomatch ->
+            ?WARN("", []),
+            {0,0}
+    end.
 
 otp_release() ->
     otp_release1(erlang:system_info(otp_release)).

@@ -25,6 +25,7 @@
          task_with_multiple_flags/1,
          special_task_do/1,
          valid_otp_version/1,
+         valid_old_format_otp_version/1,
          valid_otp_version_equal/1,
          invalid_otp_version/1,
          nonblacklisted_otp_version/1,
@@ -65,6 +66,7 @@ groups() ->
                           task_with_multiple_flags,
                           special_task_do,
                           valid_otp_version,
+                          valid_old_format_otp_version,
                           valid_otp_version_equal,
                           invalid_otp_version,
                           nonblacklisted_otp_version,
@@ -143,6 +145,12 @@ valid_otp_version(_Config) ->
     meck:new(rebar_utils, [passthrough]),
     meck:expect(rebar_utils, otp_release, fun() -> "42.4" end),
     rebar_utils:check_min_otp_version("42.3"),
+    meck:unload(rebar_utils).
+
+valid_old_format_otp_version(_Config) ->
+    meck:new(rebar_utils, [passthrough]),
+    meck:expect(rebar_utils, otp_release, fun() -> "R15B03-1" end),
+    rebar_utils:check_min_otp_version("R15"),
     meck:unload(rebar_utils).
 
 valid_otp_version_equal(_Config) ->
