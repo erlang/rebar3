@@ -386,6 +386,9 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     S4 = rebar_state:set(S3, {plugins, Profile}, Plugins),
     AppInfo1 = rebar_app_info:state(AppInfo, S4),
 
+    rebar_utils:check_min_otp_version(rebar_state:get(S4, minimum_otp_vsn, undefined)),
+    rebar_utils:check_blacklisted_otp_versions(rebar_state:get(S4, blacklisted_otp_vsns, [])),
+
     %% Dep may have plugins to install. Find and install here.
     S5 = rebar_plugins:install(S4),
     AppInfo2 = rebar_app_info:state(AppInfo1, S5),

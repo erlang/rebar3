@@ -51,6 +51,10 @@ merge_deps(AppInfo, State) ->
                  rebar_state:apply_profiles(
                    rebar_state:new(reset_hooks(rebar_state:opts(State, Default)), C,
                                   rebar_app_info:dir(AppInfo)), CurrentProfiles), Name),
+
+    rebar_utils:check_min_otp_version(rebar_state:get(AppState, minimum_otp_vsn, undefined)),
+    rebar_utils:check_blacklisted_otp_versions(rebar_state:get(AppState, blacklisted_otp_vsns, [])),
+
     AppState1 = rebar_state:set(AppState, artifacts, []),
     AppInfo1 = rebar_app_info:state(AppInfo, AppState1),
 

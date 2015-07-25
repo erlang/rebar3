@@ -306,16 +306,16 @@ check_min_otp_version(undefined) ->
 check_min_otp_version(MinOtpVersion) ->
     %% Fully-qualify with ?MODULE so the function can be meck'd in rebar_utils_SUITE
     OtpRelease = ?MODULE:otp_release(),
-    {MinMajor, MinMinor} = version_tuple(MinOtpVersion),
-    {OtpMajor, OtpMinor} = version_tuple(OtpRelease),
+    ParsedMin = version_tuple(MinOtpVersion),
+    ParsedVsn = version_tuple(OtpRelease),
 
-    case {OtpMajor, OtpMinor} >= {MinMajor, MinMinor} of
+    case ParsedVsn >= ParsedMin of
         true ->
             ?DEBUG("~s satisfies the requirement for minimum OTP version ~s",
-                [OtpRelease, MinOtpVersion]);
+                   [OtpRelease, MinOtpVersion]);
         false ->
-            ?ABORT("OTP release ~s or later is required. Verion in use: ~s",
-                [MinOtpVersion, OtpRelease])
+            ?ABORT("OTP release ~s or later is required. Version in use: ~s",
+                   [MinOtpVersion, OtpRelease])
     end.
 
 check_blacklisted_otp_versions(undefined) ->
@@ -331,10 +331,10 @@ abort_if_blacklisted(BlacklistedRegex, OtpRelease) ->
     case re:run(OtpRelease, BlacklistedRegex, [{capture, none}]) of
         match ->
             ?ABORT("OTP release ~s matches blacklisted version ~s",
-                [OtpRelease, BlacklistedRegex]);
-            nomatch ->
-                ?DEBUG("~s does not match blacklisted OTP version ~s",
-                [OtpRelease, BlacklistedRegex])
+                   [OtpRelease, BlacklistedRegex]);
+        nomatch ->
+            ?DEBUG("~s does not match blacklisted OTP version ~s",
+                   [OtpRelease, BlacklistedRegex])
     end.
 
 
@@ -342,14 +342,15 @@ abort_if_blacklisted(BlacklistedRegex, OtpRelease) ->
 %% Internal functions
 %% ====================================================================
 version_tuple(OtpRelease) ->
-    case re:run(OtpRelease, "R?(\\d+)B?-?(\\d+)?", [{capture, all, list}]) of
+    case re:run(OtpRelease, "R?(\\d+)B?.?-?(\\d+)?.?-?(\\d+)?", [{capture, all, list}]) of
+        {match, [_Full, Maj, Min, Patch]} ->
+            {list_to_integer(Maj), list_to_integer(Min), list_to_integer(Patch)};
         {match, [_Full, Maj, Min]} ->
-            {list_to_integer(Maj), list_to_integer(Min)};
+            {list_to_integer(Maj), list_to_integer(Min), 0};
         {match, [_Full, Maj]} ->
-            {list_to_integer(Maj), 0};
+            {list_to_integer(Maj), 0, 0};
         nomatch ->
-            ?WARN("", []),
-            {0,0}
+            ?ABORT("Minimum OTP release unable to be parsed: ~s", [OtpRelease])
     end.
 
 otp_release() ->

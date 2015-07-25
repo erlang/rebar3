@@ -150,7 +150,17 @@ valid_otp_version(_Config) ->
 valid_old_format_otp_version(_Config) ->
     meck:new(rebar_utils, [passthrough]),
     meck:expect(rebar_utils, otp_release, fun() -> "R15B03-1" end),
-    rebar_utils:check_min_otp_version("R15"),
+    rebar_utils:check_min_otp_version("14"),
+
+    meck:expect(rebar_utils, otp_release, fun() -> "R16B03" end),
+    rebar_utils:check_min_otp_version("16.0"),
+
+    meck:expect(rebar_utils, otp_release, fun() -> "18.0.1" end),
+    rebar_utils:check_min_otp_version("17.5.4"),
+
+    meck:expect(rebar_utils, otp_release, fun() -> "18.0-rc1" end),
+    ?assertException(throw, rebar_abort, rebar_utils:check_min_otp_version("19")),
+
     meck:unload(rebar_utils).
 
 valid_otp_version_equal(_Config) ->
