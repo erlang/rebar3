@@ -11,6 +11,8 @@
          config/2,
          app_file_src/1,
          app_file_src/2,
+         app_file_src_script/1,
+         app_file_src_script/2,
          app_file/1,
          app_file/2,
          app_details/1,
@@ -48,6 +50,7 @@
 
 -record(app_info_t, {name               :: binary(),
                      app_file_src       :: file:filename_all() | undefined,
+                     app_file_src_script:: file:filename_all() | undefined,
                      app_file           :: file:filename_all() | undefined,
                      config             :: rebar_state:t() | undefined,
                      original_vsn       :: binary() | string() | undefined,
@@ -145,6 +148,22 @@ app_file_src(#app_info_t{app_file_src=AppFileSrc}) ->
 -spec app_file_src(t(), file:filename_all()) -> t().
 app_file_src(AppInfo=#app_info_t{}, AppFileSrc) ->
     AppInfo#app_info_t{app_file_src=ec_cnv:to_list(AppFileSrc)}.
+
+-spec app_file_src_script(t()) -> file:filename_all() | undefined.
+app_file_src_script(#app_info_t{app_file_src_script=undefined, dir=Dir, name=Name}) ->
+    AppFileSrcScript = filename:join([ec_cnv:to_list(Dir), "src", ec_cnv:to_list(Name)++".app.src.script"]),
+    case filelib:is_file(AppFileSrcScript) of
+        true ->
+            AppFileSrcScript;
+        false ->
+            undefined
+    end;
+app_file_src_script(#app_info_t{app_file_src_script=AppFileSrcScript}) ->
+    ec_cnv:to_list(AppFileSrcScript).
+
+-spec app_file_src_script(t(), file:filename_all()) -> t().
+app_file_src_script(AppInfo=#app_info_t{}, AppFileSrcScript) ->
+    AppInfo#app_info_t{app_file_src_script=ec_cnv:to_list(AppFileSrcScript)}.
 
 -spec app_file(t()) -> file:filename_all() | undefined.
 app_file(#app_info_t{app_file=undefined, out_dir=Dir, name=Name}) ->

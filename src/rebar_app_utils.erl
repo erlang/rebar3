@@ -58,7 +58,14 @@ is_app_src(Filename) ->
     Filename =/= filename:rootname(Filename, ".app.src").
 
 app_src_to_app(OutDir, Filename) ->
-    AppFile = filename:join([OutDir, "ebin", filename:basename(Filename, ".app.src") ++ ".app"]),
+    AppFile =
+        case lists:suffix(".app.src", Filename) of
+            true ->
+                filename:join([OutDir, "ebin", filename:basename(Filename, ".app.src") ++ ".app"]);
+            false ->
+                filename:join([OutDir, "ebin", filename:basename(Filename,
+                                                                 ".app.src.script") ++ ".app"])
+        end,
     filelib:ensure_dir(AppFile),
     AppFile.
 
