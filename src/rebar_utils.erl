@@ -56,6 +56,7 @@
          wordsize/0,
          tup_umerge/2,
          tup_sort/1,
+         tup_find/2,
          line_count/1,
          set_httpc_options/0,
          escape_chars/1,
@@ -265,6 +266,20 @@ tup_umerge([], Olds) ->
     Olds;
 tup_umerge([New|News], Olds) ->
     lists:reverse(umerge(News, Olds, [], New)).
+
+tup_find(_Elem, []) ->
+    false;
+tup_find(Elem, [Elem | _Elems]) ->
+    Elem;
+tup_find(Elem, [Elem1 | Elems]) when is_tuple(Elem1) ->
+    case element(1, Elem1) =:= Elem of
+        true ->
+            Elem1;
+        false ->
+            tup_find(Elem, Elems)
+    end;
+tup_find(Elem, [_Elem | Elems]) ->
+    tup_find(Elem, Elems).
 
 %% This is equivalent to umerge2_2 in the stdlib, except we use the expanded
 %% value/key only to compare

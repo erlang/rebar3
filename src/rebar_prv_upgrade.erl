@@ -94,21 +94,16 @@ prepare_locks([Name|Names], Deps, Locks, Unlocks) ->
     AtomName = binary_to_atom(Name, utf8),
     case lists:keyfind(Name, 1, Locks) of
         {_, _, 0} = Lock ->
-            case {lists:keyfind(AtomName, 1, Deps), lists:member(AtomName, Deps)} of
-                {false, false} ->
+            case rebar_utils:tup_find(AtomName, Deps) of
+                false ->
                     ?PRV_ERROR({unknown_dependency, Name});
-                {Dep, false} ->
-                    {Source, NewLocks, NewUnlocks} = prepare_lock(Dep, Lock, Locks),
-                    prepare_locks(Names, Deps, NewLocks,
-                                  [{Name, Source, 0} | NewUnlocks ++ Unlocks]);
-                {false, true} -> % package as a single atom
-                    Dep = AtomName,
+                Dep ->
                     {Source, NewLocks, NewUnlocks} = prepare_lock(Dep, Lock, Locks),
                     prepare_locks(Names, Deps, NewLocks,
                                   [{Name, Source, 0} | NewUnlocks ++ Unlocks])
             end;
         {_, _, Level} = Lock when Level > 0 ->
-            case lists:keyfind(AtomName, 1, Deps) of
+            case rebar_utils:tup_find(AtomName, Deps) of
                 false ->
                     ?PRV_ERROR({transitive_dependency, Name});
                 Dep -> % Dep has been promoted
