@@ -1,6 +1,8 @@
 -module(rebar_utils_SUITE).
 
 -export([all/0,
+         init_per_testcase/2,
+         end_per_testcase/2,
          groups/0,
          init_per_group/2,
          end_per_group/2,
@@ -22,12 +24,23 @@
          task_with_flag_with_commas/1,
          task_with_multiple_flags/1,
          special_task_do/1,
+         valid_otp_version/1,
+         valid_old_format_otp_version/1,
+         valid_otp_version_equal/1,
+         invalid_otp_version/1,
+         nonblacklisted_otp_version/1,
+         blacklisted_otp_version/1,
          sh_does_not_miss_messages/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/file.hrl").
 
+init_per_testcase(_, Config) ->
+    rebar_test_utils:init_rebar_state(Config).
+
+end_per_testcase(_, _Config) ->
+    catch meck:unload().
 
 all() ->
     [{group, args_to_tasks},
@@ -51,7 +64,14 @@ groups() ->
                           task_with_flag_with_trailing_comma,
                           task_with_flag_with_commas,
                           task_with_multiple_flags,
-                          special_task_do]}].
+                          special_task_do,
+                          valid_otp_version,
+                          valid_old_format_otp_version,
+                          valid_otp_version_equal,
+                          invalid_otp_version,
+                          nonblacklisted_otp_version,
+                          blacklisted_otp_version
+    ]}].
 
 init_per_group(_, Config) -> Config.
 end_per_group(_, Config) -> Config.
@@ -120,6 +140,53 @@ special_task_do(_Config) ->
                                                                         "do",
                                                                         "bar,",
                                                                         "baz"]).
+
+valid_otp_version(_Config) ->
+    meck:new(rebar_utils, [passthrough]),
+    meck:expect(rebar_utils, otp_release, fun() -> "42.4" end),
+    rebar_utils:check_min_otp_version("42.3"),
+    meck:unload(rebar_utils).
+
+valid_old_format_otp_version(_Config) ->
+    meck:new(rebar_utils, [passthrough]),
+    meck:expect(rebar_utils, otp_release, fun() -> "R15B03-1" end),
+    rebar_utils:check_min_otp_version("14"),
+
+    meck:expect(rebar_utils, otp_release, fun() -> "R16B03" end),
+    rebar_utils:check_min_otp_version("16.0"),
+
+    meck:expect(rebar_utils, otp_release, fun() -> "18.0.1" end),
+    rebar_utils:check_min_otp_version("17.5.4"),
+
+    meck:expect(rebar_utils, otp_release, fun() -> "18.0-rc1" end),
+    ?assertException(throw, rebar_abort, rebar_utils:check_min_otp_version("19")),
+
+    meck:unload(rebar_utils).
+
+valid_otp_version_equal(_Config) ->
+    meck:new(rebar_utils, [passthrough]),
+    meck:expect(rebar_utils, otp_release, fun() -> "42.3" end),
+    rebar_utils:check_min_otp_version("42.3"),
+    meck:unload(rebar_utils).
+
+invalid_otp_version(_Config) ->
+    meck:new(rebar_utils, [passthrough]),
+    meck:expect(rebar_utils, otp_release, fun() -> "17.4" end),
+    ?assertException(throw, rebar_abort, rebar_utils:check_min_otp_version("42.3")),
+    meck:unload(rebar_utils).
+
+nonblacklisted_otp_version(_Config) ->
+    meck:new(rebar_utils, [passthrough]),
+    meck:expect(rebar_utils, otp_release, fun() -> "42.4" end),
+    rebar_utils:check_blacklisted_otp_versions(["1\\.2", "42\\.3"]),
+    meck:unload(rebar_utils).
+
+blacklisted_otp_version(_Config) ->
+    meck:new(rebar_utils, [passthrough]),
+    meck:expect(rebar_utils, otp_release, fun() -> "42.4" end),
+    ?assertException(throw, rebar_abort, rebar_utils:check_blacklisted_otp_versions(["1\\.2", "42\\.[1-4]"])),
+    meck:unload(rebar_utils).
+
 sh_does_not_miss_messages(_Config) ->
     Source = "~nmain(_) ->~n io:format(\"donotmissme\").~n",
     file:write_file("do_not_miss_messages", io_lib:format(Source,[])),

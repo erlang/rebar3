@@ -60,7 +60,9 @@
          set_httpc_options/0,
          escape_chars/1,
          escape_double_quotes/1,
-         escape_double_quotes_weak/1]).
+         escape_double_quotes_weak/1,
+         check_min_otp_version/1,
+         check_blacklisted_otp_versions/1]).
 
 %% for internal use only
 -export([otp_release/0]).
@@ -299,9 +301,57 @@ line_count(PatchLines) ->
     Tokenized = string:tokens(PatchLines, "\n"),
     {ok, length(Tokenized)}.
 
+check_min_otp_version(undefined) ->
+    ok;
+check_min_otp_version(MinOtpVersion) ->
+    %% Fully-qualify with ?MODULE so the function can be meck'd in rebar_utils_SUITE
+    OtpRelease = ?MODULE:otp_release(),
+    ParsedMin = version_tuple(MinOtpVersion),
+    ParsedVsn = version_tuple(OtpRelease),
+
+    case ParsedVsn >= ParsedMin of
+        true ->
+            ?DEBUG("~s satisfies the requirement for minimum OTP version ~s",
+                   [OtpRelease, MinOtpVersion]);
+        false ->
+            ?ABORT("OTP release ~s or later is required. Version in use: ~s",
+                   [MinOtpVersion, OtpRelease])
+    end.
+
+check_blacklisted_otp_versions(undefined) ->
+    ok;
+check_blacklisted_otp_versions(BlacklistedRegexes) ->
+    %% Fully-qualify with ?MODULE so the function can be meck'd in rebar_utils_SUITE
+    OtpRelease = ?MODULE:otp_release(),
+    lists:foreach(
+        fun(BlacklistedRegex) -> abort_if_blacklisted(BlacklistedRegex, OtpRelease) end,
+        BlacklistedRegexes).
+
+abort_if_blacklisted(BlacklistedRegex, OtpRelease) ->
+    case re:run(OtpRelease, BlacklistedRegex, [{capture, none}]) of
+        match ->
+            ?ABORT("OTP release ~s matches blacklisted version ~s",
+                   [OtpRelease, BlacklistedRegex]);
+        nomatch ->
+            ?DEBUG("~s does not match blacklisted OTP version ~s",
+                   [OtpRelease, BlacklistedRegex])
+    end.
+
+
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
+version_tuple(OtpRelease) ->
+    case re:run(OtpRelease, "R?(\\d+)B?.?-?(\\d+)?.?-?(\\d+)?", [{capture, all, list}]) of
+        {match, [_Full, Maj, Min, Patch]} ->
+            {list_to_integer(Maj), list_to_integer(Min), list_to_integer(Patch)};
+        {match, [_Full, Maj, Min]} ->
+            {list_to_integer(Maj), list_to_integer(Min), 0};
+        {match, [_Full, Maj]} ->
+            {list_to_integer(Maj), 0, 0};
+        nomatch ->
+            ?ABORT("Minimum OTP release unable to be parsed: ~s", [OtpRelease])
+    end.
 
 otp_release() ->
     otp_release1(erlang:system_info(otp_release)).
