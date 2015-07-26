@@ -79,28 +79,13 @@ upgrade(Plugin, State) ->
 find_plugin(Plugin, Profiles, State) ->
     ec_lists:search(fun(Profile) ->
                             Plugins = rebar_state:get(State, {plugins, Profile}, []),
-                            case find(list_to_atom(Plugin), Plugins) of
+                            case rebar_utils:tup_find(list_to_atom(Plugin), Plugins) of
                                 false ->
                                     not_found;
                                 P ->
                                     {ok, P}
                             end
                     end, Profiles).
-
-find(_Plugin, []) ->
-    false;
-find(Plugin, [Plugin | _Plugins]) ->
-    Plugin;
-find(Plugin, [Plugin1 | Plugins]) when is_tuple(Plugin1) ->
-    case element(1, Plugin1) =:= Plugin of
-        true ->
-            Plugin1;
-        false ->
-            find(Plugin, Plugins)
-    end;
-find(Plugin, [_Plugin | Plugins]) ->
-    find(Plugin, Plugins).
-
 
 build_plugin(AppInfo, Apps, State) ->
     Providers = rebar_state:providers(State),
