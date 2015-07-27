@@ -131,7 +131,8 @@ find_apps(LibDirs, Validate) ->
 find_app(AppDir, Validate) ->
     AppFile = filelib:wildcard(filename:join([AppDir, "ebin", "*.app"])),
     AppSrcFile = filelib:wildcard(filename:join([AppDir, "src", "*.app.src"])),
-    AppInfo = try_handle_app_file(AppFile, AppDir, AppSrcFile, Validate),
+    AppSrcScriptFile = filelib:wildcard(filename:join([AppDir, "src", "*.app.src.script"])),
+    AppInfo = try_handle_app_file(AppFile, AppDir, AppSrcFile, AppSrcScriptFile, Validate),
     AppInfo.
 
 app_dir(AppFile) ->
@@ -162,9 +163,11 @@ dedup([H|T]) -> [H|dedup(T)].
 
 %% Read in and parse the .app file if it is availabe. Do the same for
 %% the .app.src file if it exists.
-try_handle_app_file([], AppDir, AppSrcFile, Validate) ->
+try_handle_app_file([], AppDir, [], AppSrcScriptFile, Validate) ->
+    try_handle_app_src_file([], AppDir, AppSrcScriptFile, Validate);
+try_handle_app_file([], AppDir, AppSrcFile, _, Validate) ->
     try_handle_app_src_file([], AppDir, AppSrcFile, Validate);
-try_handle_app_file([File], AppDir, AppSrcFile, Validate) ->
+try_handle_app_file([File], AppDir, AppSrcFile, _, Validate) ->
     try create_app_info(AppDir, File) of
         AppInfo ->
             AppInfo1 = rebar_app_info:app_file(AppInfo, File),
@@ -199,7 +202,7 @@ try_handle_app_file([File], AppDir, AppSrcFile, Validate) ->
             ?DEBUG("Falling back to app.src file because .app failed: ~s", [Module:format_error(Reason)]),
             try_handle_app_src_file(File, AppDir, AppSrcFile, Validate)
     end;
-try_handle_app_file(Other, _AppDir, _AppSrcFile, _Validate) ->
+try_handle_app_file(Other, _AppDir, _AppSrcFile, _, _Validate) ->
     throw({error, {multiple_app_files, Other}}).
 
 %% Read in the .app.src file if we aren't looking for a valid (already built) app
@@ -214,7 +217,12 @@ try_handle_app_src_file(_, AppDir, [File], Validate) when Validate =:= invalid
         {error, Reason} ->
             throw({error, {invalid_app_file, File, Reason}});
         _ ->
-            {true, rebar_app_info:app_file_src(AppInfo, File)}
+            case filename:extension(File) of
+                ".script" ->
+                    {true, rebar_app_info:app_file_src_script(AppInfo, File)};
+                _ ->
+                    {true, rebar_app_info:app_file_src(AppInfo, File)}
+            end
     end;
 try_handle_app_src_file(_, _AppDir, Other, _Validate) ->
     throw({error, {multiple_app_files, Other}}).

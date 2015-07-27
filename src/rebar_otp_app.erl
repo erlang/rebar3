@@ -40,11 +40,17 @@ compile(State, App) ->
     %% If we get an .app.src file, it needs to be pre-processed and
     %% written out as a ebin/*.app file. That resulting file will then
     %% be validated as usual.
-    App1 = case rebar_app_info:app_file_src(App) of
+    App1 = case rebar_app_info:app_file_src_script(App) of
                undefined ->
-                   App;
-               AppFileSrc ->
-                   File = preprocess(State, App, AppFileSrc),
+                   case rebar_app_info:app_file_src(App) of
+                       undefined ->
+                           App;
+                       AppFileSrc ->
+                           File = preprocess(State, App, AppFileSrc),
+                           rebar_app_info:app_file(App, File)
+                   end;
+               AppFileSrcScript ->
+                   File = preprocess(State, App, AppFileSrcScript),
                    rebar_app_info:app_file(App, File)
            end,
 
@@ -199,7 +205,8 @@ consult_app_file(Filename) ->
         false ->
             {error, enoent};
         true ->
-            case lists:suffix(".app.src", Filename) of
+            case lists:suffix(".app.src", Filename)
+                orelse lists:suffix(".app.src.script", Filename) of
                 false ->
                     file:consult(Filename);
                 true ->
