@@ -524,9 +524,6 @@ parse_dep(Name, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is_atom(N
 parse_dep({Name, Source}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is_tuple(Source) ->
     Dep = new_dep(DepsDir, Name, [], Source, IsLock, State),
     {[Dep | SrcDepsAcc], PkgDepsAcc};
-parse_dep({Name, Source}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is_tuple(Source) ->
-    Dep = new_dep(DepsDir, Name, [], Source, IsLock, State),
-    {[Dep | SrcDepsAcc], PkgDepsAcc};
 parse_dep({Name, _Vsn, Source}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is_tuple(Source) ->
     Dep = new_dep(DepsDir, Name, [], Source, IsLock, State),
     {[Dep | SrcDepsAcc], PkgDepsAcc};
