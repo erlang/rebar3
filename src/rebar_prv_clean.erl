@@ -50,11 +50,9 @@ do(State) ->
     clean_apps(EmptyState, Providers, DepApps),
 
     Cwd = rebar_dir:get_cwd(),
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
-    clean_apps(State, Providers, ProjectApps),
-    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State),
-
-    {ok, State}.
+    {ok, State1} = rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
+    clean_apps(State1, Providers, ProjectApps),
+    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State1).
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
@@ -70,9 +68,10 @@ clean_apps(State, Providers, Apps) ->
                           S = rebar_app_info:state_or_new(State, AppInfo),
 
                           ?INFO("Cleaning out ~s...", [rebar_app_info:name(AppInfo)]),
-                          rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER, Providers, S),
-                          rebar_erlc_compiler:clean(State, rebar_app_info:out_dir(AppInfo)),
-                          rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, S)
+                          {ok, S1} = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER, Providers, S),
+                          rebar_erlc_compiler:clean(S1, rebar_app_info:out_dir(AppInfo)),
+                          rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, S1),
+                          ok
                   end, Apps).
 
 handle_args(State) ->

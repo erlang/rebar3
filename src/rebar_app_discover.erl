@@ -75,12 +75,12 @@ merge_deps(AppInfo, State) ->
     Default = rebar_state:default(State),
     CurrentProfiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo),
-    C = project_app_config(AppInfo, State),
+    {C, State1} = project_app_config(AppInfo, State),
 
     %% We reset the opts here to default so no profiles are applied multiple times
     AppState = rebar_state:apply_overrides(
                  rebar_state:apply_profiles(
-                   rebar_state:new(reset_hooks(rebar_state:opts(State, Default)), C,
+                   rebar_state:new(reset_hooks(rebar_state:opts(State1, Default)), C,
                                   rebar_app_info:dir(AppInfo)), CurrentProfiles), Name),
     AppState1 = rebar_state:overrides(AppState, rebar_state:get(AppState, overrides, [])),
 
@@ -94,7 +94,7 @@ merge_deps(AppInfo, State) ->
                                  handle_profile(Profile, Name, AppState1, StateAcc)
                          end, State, lists:reverse(CurrentProfiles)),
 
-    {AppInfo1, State1}.
+    {AppInfo1, State2}.
 
 handle_profile(Profile, Name, AppState, State) ->
     TopParsedDeps = rebar_state:get(State, {parsed_deps, Profile}, {[], []}),
@@ -126,17 +126,16 @@ parse_profile_deps(Profile, Name, Deps, AppState, State) ->
 project_app_config(AppInfo, State) ->
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
     Dir = rebar_app_info:dir(AppInfo),
-    maybe_reset_hooks(C, Dir, State).
+    {C, maybe_reset_hooks(Dir, State)}.
 
 %% Here we check if the app is at the root of the project.
 %% If it is, then drop the hooks from the config so they aren't run twice
-maybe_reset_hooks(C, Dir, State) ->
+maybe_reset_hooks(Dir, State) ->
     case ec_file:real_dir_path(rebar_dir:root_dir(State)) of
         Dir ->
-            C1 = proplists:delete(provider_hooks, C),
-            proplists:delete(post_hooks, proplists:delete(pre_hooks, C1));
+            reset_hooks(State);
         _ ->
-            C
+            State
     end.
 
 reset_hooks(State) ->

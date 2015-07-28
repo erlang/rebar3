@@ -43,20 +43,20 @@ do(State) ->
     %% Run ct provider prehooks
     Providers = rebar_state:providers(State),
     Cwd = rebar_dir:get_cwd(),
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
+    {ok, State1} = rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
-    try run_test(State) of
-        {ok, State1} = Result ->
+    try run_test(State1) of
+        {ok, State2} = Result ->
             %% Run ct provider posthooks
-            rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State1),
-            rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+            {ok, State3} = rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State2),
+            rebar_utils:cleanup_code_path(rebar_state:code_paths(State3, default)),
             Result;
         ?PRV_ERROR(_) = Error ->
-            rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+            rebar_utils:cleanup_code_path(rebar_state:code_paths(State1, default)),
             Error
     catch
         throw:{error, Reason} ->
-            rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+            rebar_utils:cleanup_code_path(rebar_state:code_paths(State1, default)),
             ?PRV_ERROR(Reason)
     end.
 
