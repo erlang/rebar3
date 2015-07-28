@@ -52,21 +52,31 @@ do(State) ->
     {ok, ProjectApps1} = rebar_digraph:compile_order(ProjectApps),
 
     %% Run top level hooks *before* project apps compiled but *after* deps are
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
+    io:format("Opts[0]: ~p~n", [rebar_state:get(State, erl_opts)]),
+    {ok, State1} = rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
-    ProjectApps2 = build_apps(State, Providers, ProjectApps1),
-    State2 = rebar_state:project_apps(State, ProjectApps2),
+    io:format("Opts[1]: ~p~n", [rebar_state:get(State1, erl_opts)]),
+    io:format("Cwd: ~p~n", [Cwd]),
+
+    ProjectApps2 = build_apps(State1, Providers, ProjectApps1),
+    State2 = rebar_state:project_apps(State1, ProjectApps2),
+    io:format("Opts[2]: ~p~n", [rebar_state:get(State2, erl_opts)]),
 
     ProjAppsPaths = [filename:join(rebar_app_info:out_dir(X), "ebin") || X <- ProjectApps2],
     State3 = rebar_state:code_paths(State2, all_deps, DepsPaths ++ ProjAppsPaths),
 
-    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State2),
-    has_all_artifacts(State3),
+    io:format("Opts[3]: ~p~n", [rebar_state:get(State3, erl_opts)]),
 
-    rebar_utils:cleanup_code_path(rebar_state:code_paths(State3, default)
-                                 ++ rebar_state:code_paths(State, all_plugin_deps)),
 
-    {ok, State3}.
+    {ok, State4} = rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State3),
+    io:format("Opts[4]: ~p~n", [rebar_state:get(State4, erl_opts)]),
+
+    has_all_artifacts(State4),
+
+    rebar_utils:cleanup_code_path(rebar_state:code_paths(State4, default)
+                                 ++ rebar_state:code_paths(State4, all_plugin_deps)),
+
+    {ok, State4}.
 
 -spec format_error(any()) -> iolist().
 format_error({missing_artifact, File}) ->
@@ -81,21 +91,27 @@ build_app(State, Providers, AppInfo) ->
     AppDir = rebar_app_info:dir(AppInfo),
     OutDir = rebar_app_info:out_dir(AppInfo),
     copy_app_dirs(State, AppDir, OutDir),
+    io:format("Opts[b:0]: ~p~n", [rebar_state:get(State, erl_opts)]),
 
-    S = rebar_app_info:state_or_new(State, AppInfo),
+    %% S = rebar_app_info:state_or_new(State, AppInfo),
+    S = State,
+    io:format("Opts[b:1]: ~p~n", [rebar_state:get(S, erl_opts)]),
     S1 = rebar_state:all_deps(S, rebar_state:all_deps(State)),
+    io:format("Opts[b:2]: ~p~n", [rebar_state:get(S1, erl_opts)]),
     compile(S1, Providers, AppInfo).
 
 compile(State, Providers, AppInfo) ->
     ?INFO("Compiling ~s", [rebar_app_info:name(AppInfo)]),
     AppDir = rebar_app_info:dir(AppInfo),
-    rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, State),
-
-    rebar_erlc_compiler:compile(State, ec_cnv:to_list(rebar_app_info:out_dir(AppInfo))),
-    case rebar_otp_app:compile(State, AppInfo) of
+    io:format("Opts[c:0]: ~p~n", [rebar_state:get(State, erl_opts)]),
+    io:format("AppDir: ~p~n", [AppDir]),
+    {ok, State1} = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER, Providers, State),
+    io:format("Opts[c:1]: ~p~n", [rebar_state:get(State1, erl_opts)]),
+    rebar_erlc_compiler:compile(State1, ec_cnv:to_list(rebar_app_info:out_dir(AppInfo))),
+    case rebar_otp_app:compile(State1, AppInfo) of
         {ok, AppInfo1} ->
-            rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, State),
-            has_all_artifacts(State),
+            {ok, State2} = rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, State1),
+            has_all_artifacts(State2),
             AppInfo1;
         Error ->
             throw(Error)

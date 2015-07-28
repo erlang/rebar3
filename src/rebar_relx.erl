@@ -23,9 +23,9 @@ do(Module, Command, Provider, State) ->
     AllOptions = string:join([Command | Options], " "),
     Cwd = rebar_state:dir(State),
     Providers = rebar_state:providers(State),
-    rebar_hooks:run_all_hooks(Cwd, pre, Provider, Providers, State),
+    {ok, State1} = rebar_hooks:run_all_hooks(Cwd, pre, Provider, Providers, State),
     try
-        case rebar_state:get(State, relx, []) of
+        case rebar_state:get(State1, relx, []) of
             [] ->
                 relx:main([{lib_dirs, LibDirs}
                           ,{output_dir, OutputDir}
@@ -37,8 +37,7 @@ do(Module, Command, Provider, State) ->
                           ,{output_dir, OutputDir}
                           ,{caller, api}], AllOptions)
         end,
-        rebar_hooks:run_all_hooks(Cwd, post, Provider, Providers, State),
-        {ok, State}
+        rebar_hooks:run_all_hooks(Cwd, post, Provider, Providers, State1)
     catch
         throw:T ->
             {error, {Module, T}}
