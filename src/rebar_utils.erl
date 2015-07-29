@@ -742,12 +742,12 @@ set_httpc_options(Scheme, Proxy) ->
 escape_chars(Str) when is_atom(Str) ->
     escape_chars(atom_to_list(Str));
 escape_chars(Str) ->
-    re:replace(Str, "([ ()?`!$&])", "\\\\&", [global, {return, list}]).
+    re:replace(Str, "([ ()?`!$&;])", "\\\\&", [global, {return, list}]).
 
 %% "escape inside these"
 escape_double_quotes(Str) ->
-    re:replace(Str, "([\"\\\\`!$&*])", "\\\\&", [global, {return, list}]).
+    re:replace(Str, "([\"\\\\`!$&*;])", "\\\\&", [global, {return, list}]).
 
 %% "escape inside these" but allow *
 escape_double_quotes_weak(Str) ->
-    re:replace(Str, "([\"\\\\`!$&])", "\\\\&", [global, {return, list}]).
+    re:replace(Str, "([\"\\\\`!$&;])", "\\\\&", [global, {return, list}]).
