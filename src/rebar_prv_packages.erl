@@ -46,7 +46,11 @@ print_packages(Dict) ->
                                end, orddict:new(), Pkgs),
 
     orddict:map(fun(Name, Vsns) ->
-                        VsnStr = join(Vsns, <<", ">>),
+                        SortedVsns = lists:sort(fun(A, B) ->
+                                                        ec_semver:lte(ec_semver:parse(A)
+                                                                     ,ec_semver:parse(B))
+                                                end, Vsns),
+                        VsnStr = join(SortedVsns, <<", ">>),
                         io:format("~s:~n    Versions: ~s~n~n", [Name, VsnStr])
                 end, SortedPkgs).
 
