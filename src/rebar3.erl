@@ -199,9 +199,14 @@ log_level() ->
 %% show version information and halt
 %%
 version() ->
-    {ok, Vsn} = application:get_key(rebar, vsn),
-    ?CONSOLE("rebar ~s on Erlang/OTP ~s Erts ~s",
-             [Vsn, erlang:system_info(otp_release), erlang:system_info(version)]).
+    {ok, RebarVsn} = application:get_key(rebar, vsn),
+    {ok, RelxVsn}  = application:get_key(relx, vsn),
+    ?CONSOLE("rebar ~s with relx ~s on Erlang/OTP ~s Erts ~s", [
+             RebarVsn,
+             RelxVsn,
+             erlang:system_info(otp_release),
+             erlang:system_info(version)
+    ]).
 
 %% TODO: Actually make it 'global'
 %%
@@ -260,6 +265,7 @@ handle_error(Error) ->
 
 start_and_load_apps() ->
     _ = application:load(rebar),
+    _ = application:load(relx),
     %% Make sure crypto is running
     case crypto:start() of
         ok -> ok;
