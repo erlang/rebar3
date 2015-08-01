@@ -22,7 +22,8 @@
          parse_transform_test/1,
          erl_first_files_test/1,
          mib_test/1,
-         only_default_transitive_deps/1]).
+         only_default_transitive_deps/1,
+         clean_all/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -50,7 +51,8 @@ all() ->
      recompile_when_opts_change, dont_recompile_when_opts_dont_change,
      dont_recompile_yrl_or_xrl, delete_beam_if_source_deleted,
      deps_in_path, checkout_priority, highest_version_of_pkg_dep,
-     parse_transform_test, erl_first_files_test, mib_test, only_default_transitive_deps].
+     parse_transform_test, erl_first_files_test, mib_test, only_default_transitive_deps,
+     clean_all].
 
 build_basic_app(Config) ->
     AppDir = ?config(apps, Config),
@@ -555,4 +557,36 @@ only_default_transitive_deps(Config) ->
     rebar_test_utils:run_and_check(
         Config, RConf, ["as", "test", "compile"],
         {ok, [{app, Name}, {dep, "a", <<"1.0.0">>}, {dep_not_exist, PkgName}]}
+    ).
+
+clean_all(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    DepName = rebar_test_utils:create_random_name("dep1_"),
+    PkgName = rebar_test_utils:create_random_name("pkg1_"),
+    mock_git_resource:mock([]),
+    mock_pkg_resource:mock([
+        {pkgdeps, [{{iolist_to_binary(PkgName), iolist_to_binary(Vsn)}, []}]}
+    ]),
+
+    RConfFile = rebar_test_utils:create_config(AppDir, [{deps, [
+        {list_to_atom(DepName), {git, "http://site.com/user/"++DepName++".git", {tag, Vsn}}},
+        {list_to_atom(PkgName), Vsn}
+    ]}]),
+    {ok, RConf} = file:consult(RConfFile),
+
+    %% Build things
+    rebar_test_utils:run_and_check(
+        Config, RConf, ["compile"],
+        {ok, [{app, Name}, {app, DepName}, {app, PkgName}]}
+    ),
+
+    %% Clean all
+    rebar_test_utils:run_and_check(
+        Config, RConf, ["clean", "--all"],
+        {ok, [{app, Name, invalid}, {app, DepName, invalid}, {app, PkgName, invalid}]}
     ).

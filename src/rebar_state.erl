@@ -344,8 +344,8 @@ merge_opts(Profile, NewOpts, OldOpts) ->
     end.
 
 merge_opts(NewOpts, OldOpts) ->
-    dict:merge(fun(deps, NewValue, _OldValue) ->
-                       NewValue;
+    dict:merge(fun(deps, _NewValue, OldValue) ->
+                       OldValue;
                   ({deps, _}, NewValue, _OldValue) ->
                        NewValue;
                   (plugins, NewValue, _OldValue) ->

@@ -45,7 +45,7 @@ init(State) ->
 do(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     Locks = rebar_state:get(State, {locks, default}, []),
-    Deps = rebar_state:get(State, deps),
+    Deps = rebar_state:get(State, deps, []),
     Names = parse_names(ec_cnv:to_binary(proplists:get_value(package, Args, <<"">>)), Locks),
     case prepare_locks(Names, Deps, Locks, []) of
         {error, Reason} ->
