@@ -125,7 +125,7 @@ handle_deps_as_profile(Profile, State, Deps, Upgrade) ->
 
     {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, State, Locks, Level),
     AllSrcProfileDeps = [{Profile, SrcDeps, Locks, Level}],
-    AllPkgProfileDeps = [{Profile, Locks, PkgDeps}],
+    AllPkgProfileDeps = [{Profile, Locks, PkgDeps, Level}],
     {AllApps, PkgDeps1, Seen, State1} = handle_profile_level(AllSrcProfileDeps, AllPkgProfileDeps, Locks, sets:new(), Upgrade, State),
 
     handle_profile_pkg_level(PkgDeps1, AllApps, Seen, Upgrade, State1).
@@ -151,7 +151,7 @@ parse_profile_deps(State, Profile, Level) ->
     Locks = rebar_state:get(State, {locks, Profile}, []),
     Deps = rebar_state:get(State, {deps, Profile}, []),
     {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, State, Locks, Level),
-    {{Profile, SrcDeps, Locks, Level}, {Profile, Locks, PkgDeps}}.
+    {{Profile, SrcDeps, Locks, Level}, {Profile, Locks, PkgDeps, Level}}.
 
 %% Level-order traversal of all dependencies, across profiles.
 %% If profiles x,y,z are present, then the traversal will go:
@@ -166,7 +166,7 @@ handle_profile_level([{Profile, SrcDeps, Locks, Level} | Rest], PkgDeps, SrcApps
         [] -> Rest;
         _ -> Rest ++ [{Profile, SrcDeps1, Locks1, Level+1}]
     end,
-    handle_profile_level(SrcDeps2, [{Profile, Locks1, PkgDeps1} | PkgDeps], SrcApps1++SrcApps, sets:union(Seen, Seen1), Upgrade, State1).
+    handle_profile_level(SrcDeps2, [{Profile, Locks1, PkgDeps1, Level+1} | PkgDeps], SrcApps1++SrcApps, sets:union(Seen, Seen1), Upgrade, State1).
 
 handle_profile_pkg_level(PkgDeps, AllApps, Seen, Upgrade, State) ->
     %% Read in package index and dep graph
@@ -175,11 +175,12 @@ handle_profile_pkg_level(PkgDeps, AllApps, Seen, Upgrade, State) ->
     State1 = rebar_state:packages(rebar_state:registry(State, Registry)
                                  ,{Packages, Graph}),
 
-    lists:foldl(fun({_Profile, _, []}, {AllAcc, StateAcc}) ->
+    lists:foldl(fun({_Profile, _, [], _}, {AllAcc, StateAcc}) ->
                         {AllAcc, StateAcc};
-                   ({Profile1, Locks, PkgDeps2}, {AllAcc, StateAcc}) ->
+                   ({Profile1, Locks, PkgDeps2, Level}, {AllAcc, StateAcc}) ->
                         {Solved, StateAcc2} = update_pkg_deps(Profile1, Packages, PkgDeps2
-                                                             ,Graph, Upgrade, Seen, StateAcc, Locks),
+                                                             ,Graph, Upgrade, Seen, StateAcc, Locks
+                                                             ,Level),
 
                         AllDeps = lists:ukeymerge(2
                                                  ,lists:ukeysort(2, AllAcc)
@@ -198,13 +199,13 @@ find_cycles(Apps) ->
 cull_compile(TopSortedDeps, ProjectApps) ->
     lists:dropwhile(fun not_needs_compile/1, TopSortedDeps -- ProjectApps).
 
-update_pkg_deps(Profile, Packages, PkgDeps, Graph, Upgrade, Seen, State, Locks) ->
+update_pkg_deps(Profile, Packages, PkgDeps, Graph, Upgrade, Seen, State, Locks, Level) ->
     case PkgDeps of
         [] -> %% No pkg deps
             {[], State};
         PkgDeps ->
             %% Find pkg deps needed
-            S = case rebar_digraph:cull_deps(Graph, PkgDeps) of
+            S = case rebar_digraph:cull_deps(Graph, PkgDeps, Level) of
                 {ok, [], _} ->
                     throw({rebar_digraph, no_solution});
                 {ok, Solution, []} ->
