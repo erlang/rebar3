@@ -2,7 +2,7 @@
 
 -export([compile_order/1
         ,restore_graph/1
-        ,cull_deps/2
+        ,cull_deps/3
         ,subgraph/2
         ,format_error/1]).
 
@@ -68,12 +68,12 @@ restore_graph({Vs, Es}) ->
 %% Pick packages to fullfill dependencies
 %% The first dep while traversing the graph is chosen and any conflicting
 %% dep encountered later on is ignored.
-cull_deps(Graph, Vertices) ->
+cull_deps(Graph, Vertices, Level) ->
     cull_deps(Graph,
               Vertices,
-              1,
+              Level+1,
               lists:foldl(fun({Key, _}, Levels) ->
-                                  dict:store(Key, 0, Levels)
+                                  dict:store(Key, Level, Levels)
                           end, dict:new(), Vertices),
               lists:foldl(fun({Key, _}=N, Solution) ->
                                   dict:store(Key, N, Solution)
