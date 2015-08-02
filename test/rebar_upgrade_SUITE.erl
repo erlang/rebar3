@@ -48,7 +48,7 @@ init_per_testcase(novsn_pkg, Config0) ->
       end},
      {mock_update, fun() ->
         catch mock_pkg_resource:unmock(),
-        mock_pkg_resource:mock([{pkgdeps, UpDeps}, {upgrade, Upgrades}])
+        mock_pkg_resource:mock([{pkgdeps, UpDeps++Deps}, {upgrade, Upgrades}])
       end},
      {expected, {ok, [{dep, "fakeapp", "1.1.0"}, {lock, "fakeapp", "1.1.0"}]}}
      | Config];
@@ -430,14 +430,12 @@ mock_deps(pkg, Deps, Upgrades) ->
     catch mock_pkg_resource:unmock(),
     mock_pkg_resource:mock([{pkgdeps, rebar_test_utils:flat_pkgdeps(Deps)}, {upgrade, Upgrades}]).
 
-mock_deps(git, _OldDeps, Deps, Upgrades) ->
+mock_deps(git, OldDeps, Deps, Upgrades) ->
     catch mock_git_resource:unmock(),
-    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}, {upgrade, Upgrades}]);
+    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps++OldDeps)}, {upgrade, Upgrades}]);
 mock_deps(pkg, OldDeps, Deps, Upgrades) ->
-    Merged = Deps ++ [Dep || Dep <- OldDeps,
-                             not lists:keymember(element(1, Dep), 1, Deps)],
     catch mock_pkg_resource:unmock(),
-    mock_pkg_resource:mock([{pkgdeps, rebar_test_utils:flat_pkgdeps(Merged)}, {upgrade, Upgrades}]).
+    mock_pkg_resource:mock([{pkgdeps, rebar_test_utils:flat_pkgdeps(Deps++OldDeps)}, {upgrade, Upgrades}]).
 
 normalize_unlocks({App, Locks}) ->
     {iolist_to_binary(App),

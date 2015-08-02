@@ -63,7 +63,8 @@
          escape_double_quotes/1,
          escape_double_quotes_weak/1,
          check_min_otp_version/1,
-         check_blacklisted_otp_versions/1]).
+         check_blacklisted_otp_versions/1,
+         info_useless/2]).
 
 %% for internal use only
 -export([otp_release/0]).
@@ -766,3 +767,9 @@ escape_double_quotes(Str) ->
 %% "escape inside these" but allow *
 escape_double_quotes_weak(Str) ->
     re:replace(Str, "([\"\\\\`!$&;])", "\\\\&", [global, {return, list}]).
+
+info_useless(Old, New) ->
+    [?INFO("App ~ts is no longer needed and can be deleted.", [Name])
+     || Name <- Old,
+        not lists:member(Name, New)],
+    ok.
