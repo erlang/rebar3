@@ -70,7 +70,7 @@ info() ->
       "Create rebar3 project based on template and vars.~n"
       "~n"
       "Valid command line options:~n"
-      "  template= [var=foo,...]~n", []).
+      "  <template> [var=foo,...]~n", []).
 
 is_forced(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
