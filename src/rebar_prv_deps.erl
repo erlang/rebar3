@@ -24,7 +24,7 @@ init(State) ->
                     {short_desc, "List dependencies"},
                     {desc, "List dependencies. Those not matching lock files "
                            "are followed by an asterisk (*)."},
-                    {opts, [{tree, $t, "tree", undefined, "Display dependencies in tree format."}]}])),
+                    {opts, [{tree, $t, "tree", undefined, "Display package dependencies in tree format (git and hg deps not supported)."}]}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
