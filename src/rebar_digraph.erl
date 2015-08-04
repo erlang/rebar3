@@ -3,7 +3,9 @@
 -export([compile_order/1
         ,restore_graph/1
         ,cull_deps/3
+        ,cull_deps/4
         ,subgraph/2
+        ,print_solution/2
         ,format_error/1]).
 
 -include("rebar.hrl").
@@ -68,7 +70,12 @@ restore_graph({Vs, Es}) ->
 %% Pick packages to fullfill dependencies
 %% The first dep while traversing the graph is chosen and any conflicting
 %% dep encountered later on is ignored.
+
 cull_deps(Graph, Vertices, Level) ->
+    {ok, LvlVertices, Discarded, _} = cull_deps(Graph, Vertices, Level, none),
+    {ok, LvlVertices, Discarded}.
+
+cull_deps(Graph, Vertices, Level, SolutionGraph) ->
     cull_deps(Graph,
               Vertices,
               Level+1,
@@ -78,13 +85,14 @@ cull_deps(Graph, Vertices, Level) ->
               lists:foldl(fun({Key, _}=N, Solution) ->
                                   dict:store(Key, N, Solution)
                           end, dict:new(), Vertices),
-              []).
+              [],
+              SolutionGraph).
 
-cull_deps(_Graph, [], _Level, Levels, Solution, Discarded) ->
+cull_deps(_Graph, [], _Level, Levels, Solution, Discarded, SolutionGraph) ->
     {_, Vertices} = lists:unzip(dict:to_list(Solution)),
     LvlVertices = [{App,Vsn,dict:fetch(App,Levels)} || {App,Vsn} <- Vertices],
-    {ok, LvlVertices, Discarded};
-cull_deps(Graph, Vertices, Level, Levels, Solution, Discarded) ->
+    {ok, LvlVertices, Discarded, SolutionGraph};
+cull_deps(Graph, Vertices, Level, Levels, Solution, Discarded, SolutionGraph) ->
     {NV, NS, LS, DS} =
         lists:foldl(fun(V, {NewVertices, SolutionAcc, LevelsAcc, DiscardedAcc}) ->
                         OutNeighbors = lists:keysort(1, digraph:out_neighbours(Graph, V)),
@@ -95,6 +103,7 @@ cull_deps(Graph, Vertices, Level, Levels, Solution, Discarded) ->
                                                 {ok, _} -> % conflict resolution!
                                                     {NewVertices1, SolutionAcc1, LevelsAcc1, [N|DiscardedAcc1]};
                                                 error ->
+                                                    add_to_solution_graph(N, V, SolutionGraph),
                                                     {[N | NewVertices1],
                                                      dict:store(Key, N, SolutionAcc1),
                                                      dict:store(Key, Level, LevelsAcc1),
@@ -102,10 +111,35 @@ cull_deps(Graph, Vertices, Level, Levels, Solution, Discarded) ->
                                             end
                                     end, {NewVertices, SolutionAcc, LevelsAcc, DiscardedAcc}, OutNeighbors)
                     end, {[], Solution, Levels, Discarded}, lists:keysort(1, Vertices)),
-    cull_deps(Graph, NV, Level+1, LS, NS, DS).
+    cull_deps(Graph, NV, Level+1, LS, NS, DS, SolutionGraph).
 
 subgraph(Graph, Vertices) ->
     digraph_utils:subgraph(Graph, Vertices).
+
+add_to_solution_graph(_, _, none) ->
+    ok;
+add_to_solution_graph(N, V, SolutionGraph) ->
+    NewV = digraph:add_vertex(SolutionGraph, N),
+    digraph:add_edge(SolutionGraph, V, NewV).
+
+print_solution(Graph, Deps) ->
+    SolutionGraph = digraph:new(),
+    [digraph:add_vertex(SolutionGraph, V) || V <- Deps],
+    cull_deps(Graph, Deps, 0, SolutionGraph),
+    print_solution(SolutionGraph, Deps, 0).
+
+print_solution(_, [], _) ->
+    ok;
+print_solution(SolutionGraph, [{N, V} | Vertices], 0) ->
+    ?CONSOLE("~s-~s", [N, V]),
+    OutNeighbors = lists:keysort(1, digraph:out_neighbours(SolutionGraph, {N,V})),
+    print_solution(SolutionGraph, OutNeighbors, 4),
+    print_solution(SolutionGraph, Vertices, 0);
+print_solution(SolutionGraph, [{N, V} | Vertices], Indent) ->
+    ?CONSOLE("~s~s-~s", [[" " || _ <- lists:seq(0, Indent)], N, V]),
+    OutNeighbors = lists:keysort(1, digraph:out_neighbours(SolutionGraph, {N,V})),
+    print_solution(SolutionGraph, OutNeighbors, Indent+4),
+    print_solution(SolutionGraph, Vertices, Indent).
 
 format_error(no_solution) ->
     io_lib:format("No solution for packages found.", []).

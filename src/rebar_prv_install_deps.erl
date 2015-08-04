@@ -36,6 +36,7 @@
 -include_lib("providers/include/providers.hrl").
 
 -export([handle_deps_as_profile/4,
+         parse_deps/5,
          find_cycles/1,
          cull_compile/2]).
 
@@ -122,7 +123,6 @@ handle_deps_as_profile(Profile, State, Deps, Upgrade) ->
     Locks = [],
     Level = 0,
     DepsDir = profile_dep_dir(State, Profile),
-
     {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, State, Locks, Level),
     AllSrcProfileDeps = [{Profile, SrcDeps, Locks, Level}],
     AllPkgProfileDeps = [{Profile, Locks, PkgDeps, Level}],
@@ -511,7 +511,7 @@ parse_dep({Name, Vsn}, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is
             {SrcDepsAcc, [parse_goal(ec_cnv:to_binary(Name)
                                     ,ec_cnv:to_binary(Vsn)) | PkgDepsAcc]}
     end;
-parse_dep(Name, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is_atom(Name) ->
+parse_dep(Name, {SrcDepsAcc, PkgDepsAcc}, DepsDir, IsLock, State) when is_atom(Name); is_binary(Name) ->
     %% Unversioned package dependency
     {PkgName, PkgVsn} = get_package(ec_cnv:to_binary(Name), State),
     CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),

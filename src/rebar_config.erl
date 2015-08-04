@@ -124,27 +124,37 @@ bs(Vars) ->
 
 %% Find deps that have been added to the config after the lock was created
 find_newly_added(ConfigDeps, LockedDeps) ->
-    rebar_utils:filtermap(fun(Dep) when is_tuple(Dep) ->
-                                  check_newly_added(element(1, Dep), LockedDeps);
-                             (Dep) ->
-                                  check_newly_added(Dep, LockedDeps)
-                          end, ConfigDeps).
+    [D || {true, D} <- [check_newly_added(Dep, LockedDeps) || Dep <- ConfigDeps]].
 
-check_newly_added(Dep, LockedDeps) when is_atom(Dep) ->
-    NewDep = ec_cnv:to_binary(Dep),
-    case lists:keyfind(NewDep, 1, LockedDeps) of
+check_newly_added({_, _}=Dep, LockedDeps) ->
+    check_newly_added_(Dep, LockedDeps);
+check_newly_added({Name, _, Source}, LockedDeps) ->
+    check_newly_added_({Name, Source}, LockedDeps);
+check_newly_added(Dep, LockedDeps) ->
+    check_newly_added_(Dep, LockedDeps).
+
+check_newly_added_({Name, Source}, LockedDeps) ->
+    case check_newly_added_(Name, LockedDeps) of
+        {true, Name1} ->
+            {true, {Name1, Source}};
         false ->
-            true;
+            false
+    end;
+check_newly_added_(Dep, LockedDeps) when is_atom(Dep) ->
+    Name = ec_cnv:to_binary(Dep),
+    case lists:keyfind(Name, 1, LockedDeps) of
+        false ->
+            {true, Name};
         Match ->
             case element(3, Match) of
                 0 ->
-                    true;
+                    {true, Name};
                 _ ->
                     ?WARN("Newly added dep ~s is locked at a lower level. "
                           "If you really want to unlock it, use 'rebar3 upgrade ~s'",
-                          [NewDep, NewDep]),
+                          [Name, Name]),
                     false
             end
     end;
-check_newly_added(Dep, _) ->
+check_newly_added_(Dep, _) ->
     throw(?PRV_ERROR({bad_dep_name, Dep})).
