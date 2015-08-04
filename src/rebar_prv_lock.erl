@@ -19,11 +19,11 @@
 init(State) ->
     State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
                                                                {module, ?MODULE},
-                                                               {bare, false},
+                                                               {bare, true},
                                                                {deps, ?DEPS},
-                                                               {example, ""},
-                                                               {short_desc, "Locks dependencies."},
-                                                               {desc, "Locks dependencies"},
+                                                               {example, "rebar3 lock"},
+                                                               {short_desc, "Fetch and locks dependencies."},
+                                                               {desc, "Fetch and locks dependencies"},
                                                                {opts, []}])),
     {ok, State1}.
 
