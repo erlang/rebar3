@@ -157,12 +157,18 @@ setup_name(State) ->
         {undefined, undefined} ->
             ok;
         {Name, undefined} ->
-            net_kernel:start([Name, longnames]);
+            check_epmd(net_kernel:start([Name, longnames]));
         {undefined, SName} ->
-            net_kernel:start([SName, shortnames]);
+            check_epmd(net_kernel:start([SName, shortnames]));
         {_, _} ->
             ?ABORT("Cannot have both short and long node names defined", [])
     end.
+
+check_epmd({error,{{shutdown, {_,net_kernel,{'EXIT',nodistribution}}},_}}) ->
+    ?ERROR("Erlang Distribution failed, falling back to nonode@nohost. "
+           "Verify that epmd is running and try again.",[]);
+check_epmd(_) ->
+    ok.
 
 find_apps_to_boot(State) ->
     %% Try the shell_apps option
