@@ -54,6 +54,8 @@
          expand_env_variable/3,
          get_arch/0,
          wordsize/0,
+         deps_to_binary/1,
+         tup_dedup/1,
          tup_umerge/2,
          tup_sort/1,
          tup_find/2,
@@ -63,7 +65,8 @@
          escape_double_quotes/1,
          escape_double_quotes_weak/1,
          check_min_otp_version/1,
-         check_blacklisted_otp_versions/1]).
+         check_blacklisted_otp_versions/1,
+         info_useless/2]).
 
 %% for internal use only
 -export([otp_release/0]).
@@ -234,6 +237,30 @@ erl_opts(Config) ->
 %% note: this does not handle the case where you have an argument that
 %%  was enclosed in quotes and might have commas but should not be split.
 args_to_tasks(Args) -> new_task(Args, []).
+
+deps_to_binary([]) ->
+    [];
+deps_to_binary([{Name, _, Source} | T]) ->
+    [{ec_cnv:to_binary(Name), Source} | deps_to_binary(T)];
+deps_to_binary([{Name, Source} | T]) ->
+    [{ec_cnv:to_binary(Name), Source} | deps_to_binary(T)];
+deps_to_binary([Name | T]) ->
+    [ec_cnv:to_binary(Name) | deps_to_binary(T)].
+
+tup_dedup([]) ->
+    [];
+tup_dedup([A]) ->
+    [A];
+tup_dedup([A,B|T]) when element(1, A) =:= element(1, B) ->
+    tup_dedup([A | T]);
+tup_dedup([A,B|T]) when element(1, A) =:= B ->
+    tup_dedup([A | T]);
+tup_dedup([A,B|T]) when A =:= element(1, B) ->
+    tup_dedup([A | T]);
+tup_dedup([A,A|T]) ->
+    [A|tup_dedup(T)];
+tup_dedup([A|T]) ->
+    [A|tup_dedup(T)].
 
 %% Sort the list in proplist-order, meaning that `{a,b}' and `{a,c}'
 %% both compare as usual, and `a' and `b' do the same, but `a' and `{a,b}' will
@@ -766,3 +793,9 @@ escape_double_quotes(Str) ->
 %% "escape inside these" but allow *
 escape_double_quotes_weak(Str) ->
     re:replace(Str, "([\"\\\\`!$&;])", "\\\\&", [global, {return, list}]).
+
+info_useless(Old, New) ->
+    [?INFO("App ~ts is no longer needed and can be deleted.", [Name])
+     || Name <- Old,
+        not lists:member(Name, New)],
+    ok.

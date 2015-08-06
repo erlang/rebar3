@@ -13,7 +13,7 @@
 -include_lib("providers/include/providers.hrl").
 
 -define(PROVIDER, upgrade).
--define(DEPS, []).
+-define(DEPS, [lock]).
 %% Also only upgrade top-level (0) deps. Transitive deps shouldn't be
 %% upgradable -- if the user wants this, they should declare it at the
 %% top level and then upgrade.
@@ -55,13 +55,15 @@ do(State) ->
             State1 = rebar_state:set(State, {deps, default}, Deps0),
             State2 = rebar_state:set(State1, {locks, default}, Locks0),
             State3 = rebar_state:set(State2, upgrade, true),
-            Res = rebar_prv_install_deps:do(State3),
+            UpdatedLocks = [L || L <- rebar_state:lock(State3),
+                                 lists:keymember(rebar_app_info:name(L), 1, Locks0)],
+            Res = rebar_prv_install_deps:do(rebar_state:lock(State3, UpdatedLocks)),
             case Res of
                 {ok, State4} ->
-                    info_useless(
-                        [element(1,Lock) || Lock <- Locks],
-                        [rebar_app_info:name(App) || App <- rebar_state:lock(State4)]
-                    ),
+                    rebar_utils:info_useless(
+                      [element(1,Lock) || Lock <- Locks],
+                      [rebar_app_info:name(App) || App <- rebar_state:lock(State4)]
+                     ),
                     rebar_prv_lock:do(State4);
                 _ ->
                     Res
@@ -73,8 +75,8 @@ format_error({unknown_dependency, Name}) ->
     io_lib:format("Dependency ~ts not found", [Name]);
 format_error({transitive_dependency, Name}) ->
     io_lib:format("Dependency ~ts is transient and cannot be safely upgraded. "
-                  "Promote it to your top-level rebar.config file to upgrade it.",
-                  [Name]);
+                 "Promote it to your top-level rebar.config file to upgrade it.",
+                 [Name]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -138,9 +140,3 @@ unlock_higher_than(Level, [App = {_,_,AppLevel} | Apps], Locks, Unlocks) ->
     if AppLevel > Level  -> unlock_higher_than(Level, Apps, Locks, [App | Unlocks]);
        AppLevel =< Level -> unlock_higher_than(Level, Apps, [App | Locks], Unlocks)
     end.
-
-info_useless(Old, New) ->
-    [?INFO("App ~ts is no longer needed and can be deleted.", [Name])
-     || Name <- Old,
-        not lists:member(Name, New)],
-    ok.
