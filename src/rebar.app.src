@@ -58,5 +58,7 @@
                      rebar_prv_upgrade,
                      rebar_prv_version,
                      rebar_prv_xref]}
-        ]}
+        ]},
+
+        {config_loader, rebar_config_default}
  ]}.

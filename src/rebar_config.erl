@@ -35,8 +35,13 @@
 
         ,merge_locks/2]).
 
--include("rebar.hrl").
--include_lib("providers/include/providers.hrl").
+-callback consult(file:name()) -> [any()].
+-callback consult_app_file(file:name()) -> [any()].
+-callback consult_file(file:name()) -> [any()].
+-callback consult_lock_file(file:name()) -> [any()].
+-callback verify_config_format([any()]) -> true.
+-callback format_error(term()) -> ok.
+-callback merge_locks([proplists:property()], [term()]) -> [proplists:property()].
 
 %% ===================================================================
 %% Public API
@@ -44,117 +49,33 @@
 
 -spec consult(file:name()) -> [any()].
 consult(Dir) ->
-    consult_file(filename:join(Dir, ?DEFAULT_CONFIG_FILE)).
+    impl(consult, [Dir]).
 
 consult_app_file(File) ->
-    consult_file_(File).
+    impl(consult_app_file, [File]).
 
 consult_lock_file(File) ->
-    consult_file_(File).
+    impl(consult_lock_file, [File]).
 
 consult_file(File) ->
-    Terms = consult_file_(File),
-    true = verify_config_format(Terms),
-    Terms.
+    impl(consult_file, [File]).
 
--spec consult_file_(file:name()) -> [any()].
-consult_file_(File) when is_binary(File) ->
-    consult_file_(binary_to_list(File));
-consult_file_(File) ->
-    case filename:extension(File) of
-        ".script" ->
-            {ok, Terms} = consult_and_eval(remove_script_ext(File), File),
-            [Terms];
-        _ ->
-            Script = File ++ ".script",
-            case filelib:is_regular(Script) of
-                true ->
-                    {ok, Terms} = consult_and_eval(File, Script),
-                    Terms;
-                false ->
-                    rebar_file_utils:try_consult(File)
-            end
+verify_config_format(Config) ->
+    impl(verify_config_format, [Config]).
+
+merge_locks(Config, Locks) ->
+    impl(merge_locks, [Config, Locks]).
+
+format_error(Err) ->
+    impl(format_error, [Err]).
+
+%%%
+%%% Priv
+%%%
+impl(FunName, Args) ->
+    Mod = application:get_env(rebar, config_loader, rebar_config_default),
+    try erlang:apply(Mod, FunName, Args)
+    catch
+        error:undef ->
+            throw({bad_config_loader, Mod})
     end.
-
-verify_config_format([]) ->
-    true;
-verify_config_format([{_Key, _Value} | T]) ->
-    verify_config_format(T);
-verify_config_format([Term | _]) ->
-    throw(?PRV_ERROR({bad_config_format, Term})).
-
-%% no lockfile
-merge_locks(Config, []) ->
-    Config;
-%% empty lockfile
-merge_locks(Config, [[]]) ->
-    Config;
-%% lockfile with entries
-merge_locks(Config, [Locks]) ->
-    ConfigDeps = proplists:get_value(deps, Config, []),
-    %% We want the top level deps only from the lock file.
-    %% This ensures deterministic overrides for configs.
-    %% Then check if any new deps have been added to the config
-    %% since it was locked.
-    Deps = [X || X <- Locks, element(3, X) =:= 0],
-    NewDeps = find_newly_added(ConfigDeps, Locks),
-    [{{locks, default}, Locks}, {{deps, default}, NewDeps++Deps} | Config].
-
-format_error({bad_config_format, Term}) ->
-    io_lib:format("Unable to parse config. Term is not in {Key, Value} format:~n~p", [Term]);
-format_error({bad_dep_name, Dep}) ->
-    io_lib:format("Dependency name must be an atom, instead found: ~p", [Dep]).
-
-%% ===================================================================
-%% Internal functions
-%% ===================================================================
-
-consult_and_eval(File, Script) ->
-    ?DEBUG("Evaluating config script ~p", [Script]),
-    StateData = rebar_file_utils:try_consult(File),
-    file:script(Script, bs([{'CONFIG', StateData}, {'SCRIPT', Script}])).
-
-remove_script_ext(F) ->
-    filename:rootname(F, ".script").
-
-bs(Vars) ->
-    lists:foldl(fun({K,V}, Bs) ->
-                        erl_eval:add_binding(K, V, Bs)
-                end, erl_eval:new_bindings(), Vars).
-
-%% Find deps that have been added to the config after the lock was created
-find_newly_added(ConfigDeps, LockedDeps) ->
-    [D || {true, D} <- [check_newly_added(Dep, LockedDeps) || Dep <- ConfigDeps]].
-
-check_newly_added({_, _}=Dep, LockedDeps) ->
-    check_newly_added_(Dep, LockedDeps);
-check_newly_added({Name, _, Source}, LockedDeps) ->
-    check_newly_added_({Name, Source}, LockedDeps);
-check_newly_added(Dep, LockedDeps) ->
-    check_newly_added_(Dep, LockedDeps).
-
-check_newly_added_({Name, Source}, LockedDeps) ->
-    case check_newly_added_(Name, LockedDeps) of
-        {true, Name1} ->
-            {true, {Name1, Source}};
-        false ->
-            false
-    end;
-check_newly_added_(Dep, LockedDeps) when is_atom(Dep) ->
-    Name = ec_cnv:to_binary(Dep),
-    case lists:keyfind(Name, 1, LockedDeps) of
-        false ->
-            {true, Name};
-        Match ->
-            case element(3, Match) of
-                0 ->
-                    {true, Name};
-                _ ->
-                    ?WARN("Newly added dep ~s is locked at a lower level. "
-                          "If you really want to unlock it, use 'rebar3 upgrade ~s'",
-                          [Name, Name]),
-                    false
-            end
-    end;
-check_newly_added_(Dep, _) ->
-    throw(?PRV_ERROR({bad_dep_name, Dep})).
