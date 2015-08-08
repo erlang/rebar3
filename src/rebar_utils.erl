@@ -683,7 +683,7 @@ update_code(Paths) ->
                                   code:add_patha(Path),
                                   ok;
                               {ok, Modules} ->
-                                  code:replace_path(Name, Path),
+                                  code:replace_path(App, Path),
                                   [begin code:purge(M), code:delete(M) end || M <- Modules]
                           end
                   end, Paths).

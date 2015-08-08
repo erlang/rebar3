@@ -88,7 +88,7 @@ desc() ->
           " - (\"mod\":\".*foo\"/\"4\"))",[]}]}
       ]).
 
--spec prepare(rebar_state:t()) -> {[file:filename()], [atom()]}.
+-spec prepare(rebar_state:t()) -> [atom()].
 prepare(State) ->
     {ok, _} = xref:start(xref),
     ok = xref:set_library_path(xref, code_path(State)),

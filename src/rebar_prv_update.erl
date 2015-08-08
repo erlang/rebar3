@@ -15,6 +15,10 @@
 -define(PROVIDER, update).
 -define(DEPS, []).
 
+%% Ignore warning of digraph opqaque type when running dialyzer
+-dialyzer({no_opaque, do/1}).
+-dialyzer({no_opaque, write_registry/3}).
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -63,6 +67,7 @@ do(State) ->
 format_error(package_index_write) ->
     "Failed to write package index.".
 
+-spec write_registry(rebar_dict(), {digraph, ets:tid(), ets:tid(), ets:tid(), any()}, rebar_state:t()) -> ok | {error, atom()}.
 write_registry(Dict, {digraph, Edges, Vertices, Neighbors, _}, State) ->
     RegistryDir = rebar_packages:package_dir(State),
     filelib:ensure_dir(filename:join(RegistryDir, "dummy")),

@@ -61,7 +61,7 @@ process_namespace(State, Command) ->
             {ok, rebar_state:namespace(State, default), Command}
     end.
 
--spec process_command(rebar_state:t(), atom()) -> {ok, rebar_state:t()} | {error, string()}.
+-spec process_command(rebar_state:t(), atom()) -> {ok, rebar_state:t()} | {error, string()} | {error, {module(), any()}}.
 process_command(State, Command) ->
     %% ? rebar_prv_install_deps:setup_env(State),
     Providers = rebar_state:providers(State),
@@ -103,7 +103,7 @@ process_command(State, Command) ->
             end
     end.
 
--spec do([{atom(), atom()}], rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
+-spec do([{atom(), atom()}], rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()} | {error, {module(), any()}}.
 do([], State) ->
     {ok, State};
 do([ProviderName | Rest], State) ->

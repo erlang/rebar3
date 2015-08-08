@@ -138,7 +138,7 @@ find_app(AppDir, Validate) ->
 app_dir(AppFile) ->
     filename:join(rebar_utils:droplast(filename:split(filename:dirname(AppFile)))).
 
--spec create_app_info(file:name(), file:name()) -> rebar_app_info:t() | {error, term()}.
+-spec create_app_info(file:name(), file:name()) -> rebar_app_info:t().
 create_app_info(AppDir, AppFile) ->
     [{application, AppName, AppDetails}] = rebar_config:consult_app_file(AppFile),
     AppVsn = proplists:get_value(vsn, AppDetails),
@@ -208,16 +208,11 @@ try_handle_app_src_file(_, _AppDir, _AppSrcFile, valid) ->
 try_handle_app_src_file(_, AppDir, [File], Validate) when Validate =:= invalid
                                                         ; Validate =:= all ->
     AppInfo = create_app_info(AppDir, File),
-    case AppInfo of
-        {error, Reason} ->
-            throw({error, {invalid_app_file, File, Reason}});
+    case filename:extension(File) of
+        ".script" ->
+            {true, rebar_app_info:app_file_src_script(AppInfo, File)};
         _ ->
-            case filename:extension(File) of
-                ".script" ->
-                    {true, rebar_app_info:app_file_src_script(AppInfo, File)};
-                _ ->
-                    {true, rebar_app_info:app_file_src(AppInfo, File)}
-            end
+            {true, rebar_app_info:app_file_src(AppInfo, File)}
     end;
 try_handle_app_src_file(_, _AppDir, Other, _Validate) ->
     throw({error, {multiple_app_files, Other}}).

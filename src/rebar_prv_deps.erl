@@ -33,7 +33,7 @@ do(State) ->
         true ->
             {_Packages, Graph} = rebar_state:packages(State),
             List = merge_deps_per_profile(State),
-            {_SrcDeps, PkgDeps} = rebar_prv_install_deps:parse_deps("", List, State, [], 0),
+            {_SrcDeps, PkgDeps} = rebar_prv_install_deps:parse_deps(<<"">>, List, State, [], 0),
             rebar_digraph:print_solution(Graph, PkgDeps),
             {ok, State};
         false ->

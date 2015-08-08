@@ -171,7 +171,7 @@ default(State, Opts) ->
 format_error({profile_not_list, Profile, Other}) ->
     io_lib:format("Profile config must be a list but for profile '~p' config given as:~n~p", [Profile, Other]).
 
--spec has_all_artifacts(rebar_app_info:t()) -> true | providers:error().
+-spec has_all_artifacts(#state_t{}) -> true | {false, file:filename()}.
 has_all_artifacts(State) ->
     Artifacts = rebar_state:get(State, artifacts, []),
     Dir = rebar_dir:base_dir(State),
@@ -188,6 +188,7 @@ all(Dir, [File|Artifacts]) ->
             all(Dir, Artifacts)
     end.
 
+-spec code_paths(#state_t{}, atom()) -> [file:filename()].
 code_paths(#state_t{code_paths=CodePaths}, Key) ->
     case dict:find(Key, CodePaths) of
         {ok, CodePath} ->
@@ -196,9 +197,11 @@ code_paths(#state_t{code_paths=CodePaths}, Key) ->
             []
     end.
 
+-spec code_paths(#state_t{}, atom(), [file:filename()]) -> #state_t{}.
 code_paths(State=#state_t{code_paths=CodePaths}, Key, CodePath) ->
     State#state_t{code_paths=dict:store(Key, CodePath, CodePaths)}.
 
+-spec update_code_paths(#state_t{}, atom(), [file:filename()]) -> #state_t{}.
 update_code_paths(State=#state_t{code_paths=CodePaths}, Key, CodePath) ->
     case dict:is_key(Key, CodePaths) of
         true ->
@@ -451,15 +454,15 @@ registry(#state_t{registry=Registry}) ->
 registry(State, Registry) ->
     State#state_t{registry=Registry}.
 
--spec resources(t()) -> rebar_resource:resource().
+-spec resources(t()) -> [{rebar_resource:type(), module()}].
 resources(#state_t{resources=Resources}) ->
     Resources.
 
--spec resources(t(), [rebar_resource:resource()]) -> t().
+-spec resources(t(), [{rebar_resource:type(), module()}]) -> t().
 resources(State, NewResources) ->
     State#state_t{resources=NewResources}.
 
--spec add_resource(t(), rebar_resource:resource()) -> t().
+-spec add_resource(t(), {rebar_resource:type(), module()}) -> t().
 add_resource(State=#state_t{resources=Resources}, Resource) ->
     State#state_t{resources=[Resource | Resources]}.
 
