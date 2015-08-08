@@ -510,6 +510,7 @@ log_msg_and_abort(Message) ->
             ?ABORT(Message, [])
     end.
 
+-spec debug_log_msg_and_abort(string()) -> err_handler().
 debug_log_msg_and_abort(Message) ->
     fun(Command, {Rc, Output}) ->
             ?DEBUG("sh(~s)~n"

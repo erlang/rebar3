@@ -15,9 +15,14 @@
 -define(PROVIDER, update).
 -define(DEPS, []).
 
-%% Ignore warning of digraph opqaque type when running dialyzer
+%% Ignore warning of digraph opaque type when running dialyzer
 -dialyzer({no_opaque, do/1}).
 -dialyzer({no_opaque, write_registry/3}).
+
+%% Ignoring the opaque type warning won't stop dialyzer from warning of
+%% no return for functions that had the opaque type warnings
+-dialyzer({no_return, do/1}).
+-dialyzer({no_return, write_registry/3}).
 
 %% ===================================================================
 %% Public API
