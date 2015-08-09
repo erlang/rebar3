@@ -382,7 +382,7 @@ expand_file_names(Files, Dirs) ->
       end, Files).
 
 
--spec internal_erl_compile(rebar_config:config(), file:filename(), file:filename(),
+-spec internal_erl_compile(rebar_state:t(), file:filename(), file:filename(),
     file:filename(), list()) -> ok | {ok, any()} | {error, any(), any()}.
 internal_erl_compile(Config, Dir, Module, OutDir, ErlOpts) ->
     Target = target_base(OutDir, Module) ++ ".beam",
