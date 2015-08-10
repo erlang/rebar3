@@ -11,6 +11,9 @@
 
 -include("rebar.hrl").
 
+%% Regex used for parsing scp style remote url
+-define(SCP_PATTERN, "\\A(?<username>[^@]+)@(?<host>[^:]+):(?<path>.+)\\z").
+
 lock(AppDir, {git, Url, _}) ->
     lock(AppDir, {git, Url});
 lock(AppDir, {git, Url}) ->
@@ -67,23 +70,27 @@ compare_url(Dir, Url) ->
     {ok, CurrentUrl} = rebar_utils:sh(?FMT("git config --get remote.origin.url", []),
                                       [{cd, Dir}]),
     CurrentUrl1 = string:strip(string:strip(CurrentUrl, both, $\n), both, $\r),
-    ParsedUrl = parse_git_url(Url),
-    ParsedCurrentUrl = parse_git_url(CurrentUrl1),
+    {ok, ParsedUrl} = parse_git_url(Url),
+    {ok, ParsedCurrentUrl} = parse_git_url(CurrentUrl1),
     ?DEBUG("Comparing git url ~p with ~p", [ParsedUrl, ParsedCurrentUrl]),
     ParsedCurrentUrl =:= ParsedUrl.
 
-parse_git_url("git@" ++ HostPath) ->
-    [Host, Path] = string:tokens(HostPath, ":"),
-    {Host, filename:rootname(Path, ".git")};
-parse_git_url("git://" ++ HostPath) ->
-    [Host | Path] = string:tokens(HostPath, "/"),
-    {Host, filename:rootname(filename:join(Path), ".git")};
-parse_git_url("http://" ++ HostPath) ->
-    [Host | Path] = string:tokens(HostPath, "/"),
-    {Host, filename:rootname(filename:join(Path), ".git")};
-parse_git_url("https://" ++ HostPath) ->
-    [Host | Path] = string:tokens(HostPath, "/"),
-    {Host, filename:rootname(filename:join(Path), ".git")}.
+parse_git_url(Url) ->
+    %% Checks for standard scp style git remote
+    case re:run(Url, ?SCP_PATTERN, [{capture, [host, path], list}]) of
+        {match, [Host, Path]} ->
+            {ok, {Host, filename:rootname(Path, ".git")}};
+        nomatch ->
+            parse_git_url(not_scp, Url)
+    end.
+parse_git_url(not_scp, Url) ->
+    UriOpts = [{scheme_defaults, [{git, 9418} | http_uri:scheme_defaults()]}],
+    case http_uri:parse(Url, UriOpts) of
+        {ok, {_Scheme, _User, Host, _Port, Path, _Query}} ->
+            {ok, {Host, filename:rootname(Path, ".git")}};
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
 download(Dir, {git, Url}, State) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
