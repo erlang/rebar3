@@ -94,7 +94,8 @@ format_error(Error) ->
 %% Internal functions
 %% ===================================================================
 
--spec has_all_beams(file:filename_all(), list()) -> true | providers:error().
+-spec has_all_beams(file:filename_all(), [module()]) ->
+    true | ?PRV_ERROR({missing_module, module()}).
 has_all_beams(EbinDir, [Module | ModuleList]) ->
     BeamFile = filename:join([EbinDir,
                               ec_cnv:to_list(Module) ++ ".beam"]),
