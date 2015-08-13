@@ -30,7 +30,7 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     OldLocks = rebar_state:get(State, {locks, default}, []),
-    Locks = build_locks(State),
+    Locks = lists:keysort(1, build_locks(State)),
     Dir = rebar_state:dir(State),
     file:write_file(filename:join(Dir, ?LOCK_FILE),
                     io_lib:format("~p.~n", [Locks])),
