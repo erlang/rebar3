@@ -29,18 +29,24 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    OldLocks = rebar_state:get(State, {locks, default}, []),
-    Locks = lists:keysort(1, build_locks(State)),
-    Dir = rebar_state:dir(State),
-    file:write_file(filename:join(Dir, ?LOCK_FILE),
-                    io_lib:format("~p.~n", [Locks])),
-    State1 = rebar_state:set(State, {locks, default}, Locks),
+    %% Only lock default profile run
+    case rebar_state:current_profiles(State) of
+        [default] ->
+            OldLocks = rebar_state:get(State, {locks, default}, []),
+            Locks = lists:keysort(1, build_locks(State)),
+            Dir = rebar_state:dir(State),
+            file:write_file(filename:join(Dir, ?LOCK_FILE),
+                            io_lib:format("~p.~n", [Locks])),
+            State1 = rebar_state:set(State, {locks, default}, Locks),
 
-    OldLockNames = [element(1,L) || L <- OldLocks],
-    NewLockNames = [element(1,L) || L <- Locks],
-    rebar_utils:info_useless(OldLockNames, NewLockNames),
+            OldLockNames = [element(1,L) || L <- OldLocks],
+            NewLockNames = [element(1,L) || L <- Locks],
+            rebar_utils:info_useless(OldLockNames, NewLockNames),
 
-    {ok, State1}.
+            {ok, State1};
+        _ ->
+            {ok, State}
+    end.
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
