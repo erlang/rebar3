@@ -289,7 +289,7 @@ package_to_app(DepsDir, Packages, {Name, Vsn, Level}, IsLock, State) ->
             rebar_app_info:state(AppInfo1, AppState1)
     end.
 
--spec update_src_deps(atom(), non_neg_integer(), list(), list(), list(), rebar_state:t(), boolean(), sets:set(binary()), list()) -> {rebar_state:t(), list(), list(), sets:set(binary())}.
+-spec update_src_deps(atom(), non_neg_integer(), list(), list(), list(), rebar_state:t(), boolean(), sets:set(binary()), list()) -> {list(), list(), list(), rebar_state:t(), sets:set(binary()), list()}.
 update_src_deps(Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, Locks) ->
     lists:foldl(
       fun(AppInfo, {SrcDepsAcc, PkgDepsAcc, SrcAppsAcc, StateAcc, SeenAcc, LocksAcc}) ->
@@ -371,7 +371,7 @@ handle_dep(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
     ,NewLocks}.
 
 -spec handle_dep(rebar_state:t(), atom(), file:filename_all(), rebar_app_info:t(), list(), integer()) ->
-                        {rebar_app_info:t(), [rebar_app_info:t()], [pkg_dep()], [integer()]}.
+                        {rebar_app_info:t(), [rebar_app_info:t()], [pkg_dep()], [integer()], rebar_state:t()}.
 handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     Profiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo),
@@ -413,13 +413,9 @@ maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
         false ->
             case rebar_app_discover:find_app(AppDir, all) of
                 false ->
-                    case fetch_app(AppInfo, AppDir, State) of
-                        true ->
-                            maybe_symlink_default(State, Profile, AppDir, AppInfo),
-                            {true, update_app_info(AppDir, AppInfo)};
-                        Other ->
-                            {Other, AppInfo}
-                    end;
+                    true = fetch_app(AppInfo, AppDir, State),
+                    maybe_symlink_default(State, Profile, AppDir, AppInfo),
+                    {true, update_app_info(AppDir, AppInfo)};
                 {true, AppInfo1} ->
                     %% Preserve the state we created with overrides
                     AppState = rebar_app_info:state(AppInfo),
@@ -477,7 +473,7 @@ make_relative_to_root(State, Path) when is_list(Path) ->
     Root = rebar_dir:root_dir(State),
     rebar_dir:make_relative_path(Path, Root).
 
--spec parse_deps(binary(), list(), rebar_state:t(), list(), integer()) -> {[rebar_app_info:t()], [pkg_dep()]}.
+-spec parse_deps(binary(), list(), rebar_state:t(), list(), integer()) -> {[rebar_app_info:t()], [tuple()]}.
 parse_deps(DepsDir, Deps, State, Locks, Level) ->
     lists:foldl(fun(Dep, Acc) ->
                         Name = case Dep of
@@ -575,12 +571,7 @@ new_dep(DepsDir, Name, Vsn, Source, IsLock, State) ->
 fetch_app(AppInfo, AppDir, State) ->
     ?INFO("Fetching ~s (~p)", [rebar_app_info:name(AppInfo), rebar_app_info:source(AppInfo)]),
     Source = rebar_app_info:source(AppInfo),
-    case rebar_fetch:download_source(AppDir, Source, State) of
-        true ->
-            true;
-        Error ->
-            throw(Error)
-    end.
+    true = rebar_fetch:download_source(AppDir, Source, State).
 
 %% This is called after the dep has been downloaded and unpacked, if it hadn't been already.
 %% So this is the first time for newly downloaded apps that its .app/.app.src data can
@@ -602,12 +593,7 @@ maybe_upgrade(AppInfo, AppDir, Upgrade, State) ->
             case rebar_fetch:needs_update(AppDir, Source, State) of
                 true ->
                     ?INFO("Upgrading ~s", [rebar_app_info:name(AppInfo)]),
-                    case rebar_fetch:download_source(AppDir, Source, State) of
-                        true ->
-                            true;
-                        Error ->
-                            throw(Error)
-                    end;
+                    true = rebar_fetch:download_source(AppDir, Source, State);
                 false ->
                     case Upgrade of
                         true ->
@@ -621,7 +607,7 @@ maybe_upgrade(AppInfo, AppDir, Upgrade, State) ->
             false
     end.
 
--spec parse_goal(binary(), binary()) -> pkg_dep().
+-spec parse_goal(binary(), binary()) -> {binary(), binary()} | {binary(), binary(), binary()}.
 parse_goal(Name, Constraint) ->
     case re:run(Constraint, "([^\\d]*)(\\d.*)", [{capture, [1,2], binary}]) of
         {match, [<<>>, Vsn]} ->

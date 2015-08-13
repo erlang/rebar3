@@ -21,10 +21,12 @@
 %%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Interrupts program flow
+-spec abort() -> no_return().
 abort() -> ?FAIL.
 
 %% @doc like {@link error/2}, except it also raises an
 %% exception to interrupt program flow.
+-spec abort(string(), list()) -> no_return().
 abort(Str, Args) -> ?ABORT(Str, Args).
 
 %% @doc Prints to the console, including a newline
