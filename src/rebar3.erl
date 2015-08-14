@@ -43,6 +43,7 @@
 %% ====================================================================
 
 %% escript Entry point
+-spec main(list()) -> no_return().
 main(Args) ->
     try run(Args) of
         {ok, _State} ->

@@ -104,7 +104,7 @@ refresh_paths(RState) ->
                     ok;
                 {ok, _} ->
                     ?DEBUG("reloading ~p from ~s", [Modules, Path]),
-                    code:replace_path(Name, Path),
+                    code:replace_path(App, Path),
                     [begin code:purge(M), code:delete(M), code:load_file(M) end
                     || M <- Modules]
             end

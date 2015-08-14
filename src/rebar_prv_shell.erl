@@ -274,7 +274,7 @@ find_config_relx(State) ->
             consult_config(State, Filename)
     end.
 
--spec consult_config(rebar_state:t(), string()) -> {ok, [tuple()]}|{error, tuple()}.
+-spec consult_config(rebar_state:t(), string()) -> [tuple()].
 consult_config(State, Filename) ->
     Fullpath = filename:join(rebar_dir:root_dir(State), Filename),
     ?DEBUG("Loading configuration from ~p", [Fullpath]),

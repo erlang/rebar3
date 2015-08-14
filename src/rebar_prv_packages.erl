@@ -27,13 +27,9 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    case rebar_packages:get_packages(State) of
-        {Dict, _} ->
-            print_packages(Dict),
-            {ok, State};
-        error ->
-            ?PRV_ERROR(load_registry_fail)
-    end.
+    {Dict, _} = rebar_packages:get_packages(State),
+    print_packages(Dict),
+    {ok, State}.
 
 -spec format_error(any()) -> iolist().
 format_error(load_registry_fail) ->

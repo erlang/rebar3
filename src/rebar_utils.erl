@@ -510,6 +510,7 @@ log_msg_and_abort(Message) ->
             ?ABORT(Message, [])
     end.
 
+-spec debug_log_msg_and_abort(string()) -> err_handler().
 debug_log_msg_and_abort(Message) ->
     fun(Command, {Rc, Output}) ->
             ?DEBUG("sh(~s)~n"
@@ -683,7 +684,7 @@ update_code(Paths) ->
                                   code:add_patha(Path),
                                   ok;
                               {ok, Modules} ->
-                                  code:replace_path(Name, Path),
+                                  code:replace_path(App, Path),
                                   [begin code:purge(M), code:delete(M) end || M <- Modules]
                           end
                   end, Paths).
