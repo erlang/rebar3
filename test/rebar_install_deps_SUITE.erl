@@ -241,6 +241,9 @@ default_profile(Config) ->
     AppDir = ?config(apps, Config),
     {ok, Apps} = Expect = ?config(expect, Config),
     rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["lock"], Expect
+    ),
+    rebar_test_utils:run_and_check(
         Config, RebarConfig, ["as", "profile", "lock"], Expect
     ),
     check_warnings(error_calls(), ?config(warnings, Config), ?config(deps_type, Config)),
@@ -252,6 +255,9 @@ default_profile(Config) ->
                   file:read_file_info(filename:join([BuildDir, "profile", "lib", App])))
      || {dep, App} <- Apps],
     %% A second run to another profile also links default to the right spot
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["lock"], Expect
+    ),
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["as", "other", "lock"], Expect
     ),
@@ -296,10 +302,13 @@ nondefault_profile(Config) ->
 
 nondefault_pick_highest(Config) ->
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
-    %AppDir = ?config(apps, Config),
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["lock"],
+        {ok, [{dep, "B"}, {lock, "B"}, {lock, "C", "1"}, {dep, "C", "1"}], "default"}
+    ),
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["as", "nondef", "lock"],
-        {ok, [{dep, "B"}, {lock, "B"}, {dep, "C", "2"}], "nondef"}
+        {ok, [{dep, "B"}, {lock, "B"}, {lock, "C", "1"}, {dep, "C", "2"}], "nondef"}
     ),
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["lock"],
@@ -307,7 +316,7 @@ nondefault_pick_highest(Config) ->
     ),
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["as", "nondef", "lock"],
-        {ok, [{dep, "B"}, {lock, "B"}, {dep, "C", "2"}], "nondef"}
+        {ok, [{dep, "B"}, {lock, "B"}, {lock, "C", "1"}, {dep, "C", "2"}], "nondef"}
     ).
 
 run(Config) ->
