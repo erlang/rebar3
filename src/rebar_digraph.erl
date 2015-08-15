@@ -3,9 +3,7 @@
 -export([compile_order/1
         ,restore_graph/1
         ,cull_deps/2
-        ,cull_deps/3
         ,subgraph/2
-        ,print_solution/2
         ,format_error/1]).
 
 -include("rebar.hrl").
@@ -71,14 +69,8 @@ restore_graph({Vs, Es}) ->
 %% The first dep while traversing the graph is chosen and any conflicting
 %% dep encountered later on is ignored.
 cull_deps(Graph, Vertices) ->
-    {ok, LvlVertices, Discarded, _} = cull_deps(Graph, Vertices, none),
-    {ok, LvlVertices, Discarded}.
-
-print_solution(Graph, PkgDeps=[{_, _, Deps} | _]) ->
-    SolutionGraph = digraph:new(),
-    [digraph:add_vertex(SolutionGraph, V) || V <- Deps],
-    cull_deps(Graph, PkgDeps, SolutionGraph),
-    print_solution(SolutionGraph, Deps, 0).
+    {Solution, Levels} = build_initial_dicts(Vertices),
+    cull_deps(Graph, Vertices, Levels, Solution, []).
 
 format_error(no_solution) ->
     io_lib:format("No solution for packages found.", []).
@@ -87,39 +79,30 @@ format_error(no_solution) ->
 %% Internal Functions
 %%====================================================================
 
-cull_deps(Graph, Vertices, SolutionGraph) ->
-    {Solution, Levels} = build_initial_dicts(Vertices),
-    cull_deps(Graph,
-              Vertices,
-              Levels,
-              Solution,
-              [],
-              SolutionGraph).
-
-cull_deps(_Graph, [], Levels, Solution, Discarded, SolutionGraph) ->
+cull_deps(_Graph, [], Levels, Solution, Discarded) ->
     {_, Vertices} = lists:unzip(dict:to_list(Solution)),
-    LvlVertices = [{Profile, {App,Vsn,dict:fetch(App,Levels)}} || {Profile, {App,Vsn}} <- Vertices],
-    {ok, LvlVertices, Discarded, SolutionGraph};
-cull_deps(Graph, [{Profile, Level, Vs} | Vertices], Levels, Solution, Discarded, SolutionGraph) ->
+    LvlVertices = [{Profile, {Parent,App,Vsn,dict:fetch(App,Levels)}} || {Profile, {Parent,App,Vsn}} <- Vertices],
+    {ok, LvlVertices, Discarded};
+cull_deps(Graph, [{Profile, Level, Vs} | Vertices], Levels, Solution, Discarded) ->
     {NV, NS, LS, DS} =
-        lists:foldl(fun(V, {Acc, SolutionAcc, LevelsAcc, DiscardedAcc}) ->
-                            OutNeighbors = lists:keysort(1, digraph:out_neighbours(Graph, V)),
-                            handle_neighbors(Profile, Level, V
+        lists:foldl(fun({_, Name, Vsn}, {Acc, SolutionAcc, LevelsAcc, DiscardedAcc}) ->
+                            OutNeighbors = lists:keysort(1, digraph:out_neighbours(Graph, {Name,Vsn})),
+                            handle_neighbors(Profile, Level, Name
                                             ,OutNeighbors, Acc, SolutionAcc
-                                            ,LevelsAcc, DiscardedAcc, SolutionGraph)
+                                            ,LevelsAcc, DiscardedAcc)
 
-                    end, {[], Solution, Levels, Discarded}, lists:keysort(1, Vs)),
+                    end, {[], Solution, Levels, Discarded}, lists:keysort(2, Vs)),
 
-    cull_deps(Graph, Vertices++NV, LS, NS, DS, SolutionGraph).
+    cull_deps(Graph, Vertices++NV, LS, NS, DS).
 
 %% For each outgoing edge of a dep check if it should be added to the solution
 %% and add it to the list of vertices to do the same for
-handle_neighbors(Profile, Level, Vertex, OutNeighbors, Vertices
-                ,Solution, Levels, Discarded, SolutionGraph) ->
-        case lists:foldl(fun({Key, _}=N, {NewVertices, Solution1, Levels1, Discarded1}) ->
-                            maybe_add_to_solution(Profile, Level, Vertex, Key, N
+handle_neighbors(Profile, Level, Parent, OutNeighbors, Vertices
+                ,Solution, Levels, Discarded) ->
+        case lists:foldl(fun({Name, _}=N, {NewVertices, Solution1, Levels1, Discarded1}) ->
+                            maybe_add_to_solution(Profile, Level, Name, N, Parent
                                                  ,NewVertices, Solution1
-                                                 ,Levels1, Discarded1, SolutionGraph)
+                                                 ,Levels1, Discarded1)
                     end, {[], Solution, Levels, Discarded}, OutNeighbors) of
             {[], SolutionAcc2, LevelsAcc2, DiscardedAcc2} ->
                 {Vertices, SolutionAcc2, LevelsAcc2, DiscardedAcc2};
@@ -128,10 +111,10 @@ handle_neighbors(Profile, Level, Vertex, OutNeighbors, Vertices
                 ,SolutionAcc2, LevelsAcc2, DiscardedAcc2}
         end.
 
-maybe_add_to_solution(Profile, Level, Vertex, Key, Value, Vertices
-                     ,Solution, Levels, Discarded, SolutionGraph) ->
+maybe_add_to_solution(Profile, Level, Key, {Name, Vsn}=Value, Parent
+                     ,Vertices ,Solution, Levels, Discarded) ->
     case dict:find(Key, Solution) of
-        {ok, Value} -> % already seen
+        {ok, {Profile, {Parent, Name, Vsn}}} -> % already seen
             {Vertices,
              Solution,
              Levels,
@@ -142,9 +125,8 @@ maybe_add_to_solution(Profile, Level, Vertex, Key, Value, Vertices
              Levels,
              [Value|Discarded]};
         error ->
-            add_to_solution_graph(Value, Vertex, SolutionGraph),
-            {[Value | Vertices],
-             dict:store(Key, {Profile, Value}, Solution),
+            {[{Parent, Name, Vsn} | Vertices],
+             dict:store(Key, {Profile, {Parent, Name, Vsn}}, Solution),
              dict:store(Key, Level+1, Levels),
              Discarded}
     end.
@@ -164,30 +146,11 @@ maybe_add_to_dict(Key, Value, Dict) ->
 %% and the level it is from (for the lock file)
 build_initial_dicts(Vertices) ->
     lists:foldl(fun({Profile, Level, Vs}, {Solution, Levels}) ->
-                        lists:foldl(fun({Key, Vsn}, {SAcc, LAcc}) ->
-                                            {maybe_add_to_dict(Key, {Profile, {Key,Vsn}}, SAcc),
+                        lists:foldl(fun({Parent, Key, Vsn}, {SAcc, LAcc}) ->
+                                            {maybe_add_to_dict(Key, {Profile, {Parent,Key,Vsn}}, SAcc),
                                              maybe_add_to_dict(Key, Level, LAcc)}
                                     end, {Solution, Levels}, Vs)
                 end, {dict:new(), dict:new()}, Vertices).
-
-add_to_solution_graph(_, _, none) ->
-    ok;
-add_to_solution_graph(N, V, SolutionGraph) ->
-    NewV = digraph:add_vertex(SolutionGraph, N),
-    digraph:add_edge(SolutionGraph, V, NewV).
-
-print_solution(_, [], _) ->
-    ok;
-print_solution(SolutionGraph, [{N, V} | Vertices], 0) ->
-    ?CONSOLE("~s-~s", [N, V]),
-    OutNeighbors = lists:keysort(1, digraph:out_neighbours(SolutionGraph, {N,V})),
-    print_solution(SolutionGraph, OutNeighbors, 4),
-    print_solution(SolutionGraph, Vertices, 0);
-print_solution(SolutionGraph, [{N, V} | Vertices], Indent) ->
-    ?CONSOLE("~s~s-~s", [[" " || _ <- lists:seq(0, Indent)], N, V]),
-    OutNeighbors = lists:keysort(1, digraph:out_neighbours(SolutionGraph, {N,V})),
-    print_solution(SolutionGraph, OutNeighbors, Indent+4),
-    print_solution(SolutionGraph, Vertices, Indent).
 
 -spec names_to_apps([atom()], [rebar_app_info:t()]) -> [rebar_app_info:t()].
 names_to_apps(Names, Apps) ->

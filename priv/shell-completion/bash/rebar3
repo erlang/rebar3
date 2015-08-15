@@ -15,6 +15,7 @@ _rebar3()
             compile \
             cover \
             ct \
+            deps \
             dialyzer \
             do \
             edoc \
@@ -29,6 +30,7 @@ _rebar3()
             report \
             shell \
             tar \
+            tree \
             unlock \
             update \
             upgrade \
@@ -77,6 +79,8 @@ _rebar3()
             --basic_html \
             --ct_hooks \
             --verbose"
+    elif [[ ${prev} == deps ]] ; then
+        :
     elif [[ ${prev} == dialyzer ]] ; then
         sopts="-u -s"
         lopts="--update-plt --succ-typings"
@@ -168,6 +172,9 @@ _rebar3()
             --system_libs \
             --version \
             --root"
+    elif [[ ${prev} == tree ]] ; then
+        sopts="-v"
+        lopts="--verbose"
     elif [[ ${prev} == update ]] ; then
         :
     elif [[ ${prev} == upgrade ]] ; then

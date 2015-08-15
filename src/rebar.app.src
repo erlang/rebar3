@@ -18,7 +18,7 @@
                   erlware_commons,
                   providers,
                   bbmustache,
-		  ssl_verify_hostname,
+          ssl_verify_hostname,
                   relx,
                   inets]},
   {env, [
@@ -36,6 +36,7 @@
                      rebar_prv_compile,
                      rebar_prv_cover,
                      rebar_prv_deps,
+                     rebar_prv_deps_tree,
                      rebar_prv_dialyzer,
                      rebar_prv_do,
                      rebar_prv_edoc,

@@ -191,6 +191,11 @@ _rebar3 () {
                         '(-r --root)'{-r,--root}'[The project root directory]:system libs:_files -/' \
                     && ret=0
                 ;;
+                (tree)
+                    _arguments \
+                        '(-v --verbose)'{-v,--verbose}'[Print repo and branch/tag/ref for git and hg deps]' \
+                    && ret=0
+                ;;
                 (unlock)
                     _arguments \
                         '*: :_rebar3_list_deps' \
@@ -236,6 +241,7 @@ _rebar3_tasks() {
         'report:Provide a crash report to be sent to the rebar3 issues page.'
         'shell:Run shell with project apps and deps in path.'
         'tar:Tar archive of release built of project.'
+        'tree:Print dependency tree.'
         'unlock:Unlock dependencies.'
         'update:Update package index.'
         'upgrade:Upgrade dependencies.'

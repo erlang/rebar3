@@ -17,6 +17,8 @@
          app_file/2,
          app_details/1,
          app_details/2,
+         parent/1,
+         parent/2,
          original_vsn/1,
          original_vsn/2,
          ebin_dir/1,
@@ -54,6 +56,7 @@
                      app_file           :: file:filename_all() | undefined,
                      config             :: rebar_state:t() | undefined,
                      original_vsn       :: binary() | string() | undefined,
+                     parent             :: binary() | root,
                      app_details=[]     :: list(),
                      applications=[]    :: list(),
                      deps=[]            :: list(),
@@ -202,6 +205,13 @@ app_details(#app_info_t{app_details=AppDetails}) ->
 -spec app_details(t(), list()) -> t().
 app_details(AppInfo=#app_info_t{}, AppDetails) ->
     AppInfo#app_info_t{app_details=AppDetails}.
+
+parent(#app_info_t{parent=Parent}) ->
+    Parent.
+
+-spec parent(t(), binary() | root) -> t().
+parent(AppInfo=#app_info_t{}, Parent) ->
+    AppInfo#app_info_t{parent=Parent}.
 
 -spec original_vsn(t()) -> string().
 original_vsn(#app_info_t{original_vsn=Vsn}) ->
