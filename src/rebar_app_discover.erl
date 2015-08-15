@@ -16,7 +16,31 @@ do(State, LibDirs) ->
     Apps = find_apps(Dirs, all),
     ProjectDeps = rebar_state:deps_names(State),
     DepsDir = rebar_dir:deps_dir(State),
+    CurrentProfiles = rebar_state:current_profiles(State),
 
+    %% There may be a top level src which is an app and there may not
+    %% Find it here if there is, otherwise define the deps parent as root
+    TopLevelApp = case ec_lists:find(fun(X) ->
+                                             ec_file:real_dir_path(rebar_app_info:dir(X)) =:=
+                                                 ec_file:real_dir_path(rebar_dir:root_dir(State))
+                                     end, Apps) of
+                      {ok, App} ->
+                          rebar_app_info:name(App);
+                      error ->
+                          root
+                  end,
+
+    %% Handle top level deps
+    State1 = lists:foldl(fun(Profile, StateAcc) ->
+                                 ProfileDeps = rebar_state:get(StateAcc, {deps, Profile}, []),
+                                 ParsedDeps = parse_profile_deps(Profile
+                                                                ,TopLevelApp
+                                                                ,ProfileDeps
+                                                                ,StateAcc),
+                                 rebar_state:set(StateAcc, {parsed_deps, Profile}, ParsedDeps)
+                         end, State, lists:reverse(CurrentProfiles)),
+
+    %% Handle sub project apps deps
     %% Sort apps so we get the same merged deps config everytime
     SortedApps = rebar_utils:sort_deps(Apps),
     lists:foldl(fun(AppInfo, StateAcc) ->
@@ -33,7 +57,7 @@ do(State, LibDirs) ->
                                 ?INFO("Ignoring ~s", [Name]),
                                 StateAcc
                         end
-                end, State, SortedApps).
+                end, State1, SortedApps).
 
 format_error({module_list, File}) ->
     io_lib:format("Error reading module list from ~p~n", [File]);
@@ -51,23 +75,44 @@ merge_deps(AppInfo, State) ->
                  rebar_state:apply_profiles(
                    rebar_state:new(reset_hooks(rebar_state:opts(State, Default)), C,
                                   rebar_app_info:dir(AppInfo)), CurrentProfiles), Name),
+    AppState1 = rebar_state:overrides(AppState, rebar_state:get(AppState, overrides, [])),
 
-    rebar_utils:check_min_otp_version(rebar_state:get(AppState, minimum_otp_vsn, undefined)),
-    rebar_utils:check_blacklisted_otp_versions(rebar_state:get(AppState, blacklisted_otp_vsns, [])),
+    rebar_utils:check_min_otp_version(rebar_state:get(AppState1, minimum_otp_vsn, undefined)),
+    rebar_utils:check_blacklisted_otp_versions(rebar_state:get(AppState1, blacklisted_otp_vsns, [])),
 
-    AppState1 = rebar_state:set(AppState, artifacts, []),
-    AppInfo1 = rebar_app_info:state(AppInfo, AppState1),
+    AppState2 = rebar_state:set(AppState1, artifacts, []),
+    AppInfo1 = rebar_app_info:state(AppInfo, AppState2),
 
     State1 = lists:foldl(fun(Profile, StateAcc) ->
-                                 AppProfDeps = rebar_state:get(AppState, {deps, Profile}, []),
-                                 TopLevelProfDeps = rebar_state:get(StateAcc, {deps, Profile}, []),
-                                 ProfDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_umerge(
-                                                     rebar_utils:tup_sort(TopLevelProfDeps)
-                                                     ,rebar_utils:tup_sort(AppProfDeps))),
-                                 rebar_state:set(StateAcc, {deps, Profile}, ProfDeps2)
+                                 handle_profile(Profile, Name, AppState1, StateAcc)
                          end, State, lists:reverse(CurrentProfiles)),
 
     {AppInfo1, State1}.
+
+handle_profile(Profile, Name, AppState, State) ->
+    {TopSrc, TopPkg} = rebar_state:get(State, {parsed_deps, Profile}, {[], []}),
+    TopLevelProfileDeps = rebar_state:get(State, {deps, Profile}, []),
+    AppProfileDeps = rebar_state:get(AppState, {deps, Profile}, []),
+    ProfileDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_umerge(
+                                           rebar_utils:tup_sort(TopLevelProfileDeps)
+                                           ,rebar_utils:tup_sort(AppProfileDeps))),
+    State1 = rebar_state:set(State, {deps, Profile}, ProfileDeps2),
+
+    %% Only deps not also specified in the top level config need
+    %% to be included in the parsed deps
+    NewDeps = ProfileDeps2 -- TopLevelProfileDeps,
+    {ParsedSrc, ParsedPkg} = parse_profile_deps(Profile, Name, NewDeps, State1),
+    rebar_state:set(State1, {parsed_deps, Profile}, {TopSrc++ParsedSrc, TopPkg++ParsedPkg}).
+
+parse_profile_deps(Profile, Name, Deps, State) ->
+    DepsDir = rebar_prv_install_deps:profile_dep_dir(State, Profile),
+    Locks = rebar_state:get(State, {locks, Profile}, []),
+    rebar_prv_install_deps:parse_deps(Name
+                                     ,DepsDir
+                                     ,Deps
+                                     ,State
+                                     ,Locks
+                                     ,1).
 
 project_app_config(AppInfo, State) ->
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
