@@ -50,6 +50,7 @@ end
 ## report            Provide a crash report to be sent to the rebar3 issues page.
 ## shell             Run shell with project apps and deps in path.
 ## tar               Tar archive of release built of project.
+## tree              Print dependency tree.
 ## unlock            Unlock dependencies.
 ## update            Update package index.
 ## upgrade           Upgrade dependencies.
@@ -149,6 +150,10 @@ complete -f -c 'rebar3' -n '__fish_rebar3_using_command tar' -l system_libs     
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command tar' -l version            -d "Print relx version"
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command tar' -s r -l root          -d "The project root directory"
 
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a tree -d "Print depdency tree."
+
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command tree' -s v -l verbose  -d "Print repo and branch/tag/ref for git and hg deps."
+
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a unlock -d "Unlock dependencies."
 
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a update -d "Update package index."
@@ -158,4 +163,3 @@ complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a upgrade -d "Upgrade 
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a version -d "Print version for rebar and current Erlang."
 
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a xref -d "Run cross reference analysis."
-
