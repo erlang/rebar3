@@ -239,8 +239,8 @@ sub_app_deps(Config) ->
 newly_added_dep(Config) ->
     AppDir = ?config(apps, Config),
     Deps = rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
-                            ,{"b", "1.0.0", [{"c", "1.0.0", []}]}
-                            ,{"c", "2.0.0", []}]),
+                                             ,{"b", "1.0.0", [{"c", "1.0.0", []}]}
+                                             ,{"c", "2.0.0", []}]),
     mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}]),
 
     Name = rebar_test_utils:create_random_name("app_"),
