@@ -57,7 +57,8 @@ profile_new_key(Config) ->
 
     AllDeps = rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
                                                 ,{"b", "1.0.0", []}]),
-    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(AllDeps)}]),
+    {SrcDeps, []} = rebar_test_utils:flat_deps(AllDeps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
 
     Name = rebar_test_utils:create_random_name("profile_new_key_"),
     Vsn = rebar_test_utils:create_random_vsn(),
@@ -82,7 +83,8 @@ profile_merge_keys(Config) ->
     AllDeps = rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
                                                 ,{"b", "1.0.0", []}
                                                 ,{"b", "2.0.0", []}]),
-    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(AllDeps)}]),
+    {SrcDeps, []} = rebar_test_utils:flat_deps(AllDeps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
 
     Name = rebar_test_utils:create_random_name("profile_new_key_"),
     Vsn = rebar_test_utils:create_random_vsn(),
@@ -111,7 +113,8 @@ explicit_profile_deduplicate_deps(Config) ->
                                                 ,{"a", "2.0.0", []}
                                                 ,{"b", "1.0.0", []}
                                                 ,{"b", "2.0.0", []}]),
-    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(AllDeps)}]),
+    {SrcDeps, []} = rebar_test_utils:flat_deps(AllDeps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
 
     Name = rebar_test_utils:create_random_name("explicit_profile_deduplicate_deps_"),
     Vsn = rebar_test_utils:create_random_vsn(),
@@ -141,7 +144,8 @@ implicit_profile_deduplicate_deps(Config) ->
                                                 ,{"a", "2.0.0", []}
                                                 ,{"b", "1.0.0", []}
                                                 ,{"b", "2.0.0", []}]),
-    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(AllDeps)}]),
+    {SrcDeps, []} = rebar_test_utils:flat_deps(AllDeps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
 
     Name = rebar_test_utils:create_random_name("implicit_profile_deduplicate_deps_"),
     Vsn = rebar_test_utils:create_random_vsn(),
@@ -169,7 +173,8 @@ all_deps_code_paths(Config) ->
 
     AllDeps = rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
                                                 ,{"b", "2.0.0", []}]),
-    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(AllDeps)}]),
+    {SrcDeps, []} = rebar_test_utils:flat_deps(AllDeps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
 
     Name = rebar_test_utils:create_random_name("all_deps_code_paths"),
     Vsn = rebar_test_utils:create_random_vsn(),
