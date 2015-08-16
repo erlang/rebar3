@@ -45,7 +45,8 @@ compile_plugins(Config) ->
     PluginName = rebar_test_utils:create_random_name("plugin1_"),
 
     Plugins = rebar_test_utils:expand_deps(git, [{PluginName, Vsn, []}]),
-    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Plugins)}]),
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Plugins),
+    mock_git_resource:mock([{deps, SrcDeps}]),
 
     mock_pkg_resource:mock([{pkgdeps, [{{list_to_binary(DepName), list_to_binary(Vsn)}, []}]},
                             {config, [{plugins, [
@@ -137,7 +138,8 @@ complex_plugins(Config) ->
     Deps = rebar_test_utils:expand_deps(git, [{PluginName, Vsn2, [{DepName2, Vsn,
                                                                   [{DepName3, Vsn, []}]}]}
                                              ,{DepName, Vsn, []}]),
-    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}]),
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
 
     RConfFile =
         rebar_test_utils:create_config(AppDir,

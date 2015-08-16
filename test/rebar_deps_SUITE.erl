@@ -171,29 +171,10 @@ setup_project(Case, Config0, Deps) ->
     rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
     TopDeps = rebar_test_utils:top_level_deps(Deps),
     RebarConf = rebar_test_utils:create_config(AppDir, [{deps, TopDeps}]),
-    case DepsType of
-        git ->
-            mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}]);
-        pkg ->
-            mock_pkg_resource:mock([{pkgdeps, flat_pkgdeps(Deps)}])
-    end,
+    {SrcDeps, PkgDeps} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
+    mock_pkg_resource:mock([{pkgdeps, PkgDeps}]),
     [{rebarconfig, RebarConf} | Config].
-
-flat_pkgdeps([]) -> [];
-flat_pkgdeps([{{pkg, Name, Vsn}, Deps} | Rest]) ->
-    [{{iolist_to_binary(Name),iolist_to_binary(Vsn)}, rebar_test_utils:top_level_deps(Deps)}]
-    ++
-    flat_pkgdeps(Deps)
-    ++
-    flat_pkgdeps(Rest).
-
-app_vsn([]) -> [];
-app_vsn([{Source, Deps} | Rest]) ->
-    {Name, Vsn} = case Source of
-        {pkg, N, V} -> {N,V};
-        {N,V,_Ref} -> {N,V}
-    end,
-    [{Name, Vsn}] ++ app_vsn(Deps) ++ app_vsn(Rest).
 
 mock_warnings() ->
     %% just let it do its thing, we check warnings through
@@ -217,7 +198,8 @@ sub_app_deps(Config) ->
     Deps = rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
                                              ,{"b", "1.0.0", []}
                                              ,{"b", "2.0.0", []}]),
-    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}]),
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
 
     Name = rebar_test_utils:create_random_name("sub_app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
@@ -241,7 +223,8 @@ newly_added_dep(Config) ->
     Deps = rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
                                              ,{"b", "1.0.0", [{"c", "1.0.0", []}]}
                                              ,{"c", "2.0.0", []}]),
-    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}]),
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
 
     Name = rebar_test_utils:create_random_name("app_"),
     Vsn = rebar_test_utils:create_random_vsn(),
