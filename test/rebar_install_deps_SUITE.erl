@@ -470,7 +470,7 @@ m_pkg_src_override(Config) ->
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["lock"],
         {error, {rebar_prv_install_deps,
-                 {source_dep_in_pkg, [<<"C">>,<<"b">>]}}}
+                 {package_dep_override, <<"b">>}}}
     ).
 
 run(Config) ->
