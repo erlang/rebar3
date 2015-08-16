@@ -269,8 +269,8 @@ eunit_opts(_State) ->
      {suite, undefined, "suite", string, help(suite)},
      {verbose, $v, "verbose", boolean, help(verbose)}].
 
-help(app)     -> "Comma seperated list of application test suites to run";
-help(cover)   -> "Generate cover data";
-help(file)    -> "Comma seperated list of modules to run";
-help(suite)   -> "Comma seperated list of test suites to run";
-help(verbose) -> "Verbose output".
+help(app)     -> "Comma seperated list of application test suites to run. Equivalent to `[{application, App}]`.";
+help(cover)   -> "Generate cover data. Defaults to false.";
+help(file)    -> "Comma seperated list of files to run. Equivalent to `[{file, File}]`.";
+help(suite)   -> "Comma seperated list of test suites to run. Equivalent to `[{module, Suite}]`.";
+help(verbose) -> "Verbose output. Defaults to false.".
