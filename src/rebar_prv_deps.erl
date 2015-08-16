@@ -34,7 +34,8 @@ do(State) ->
             {_Packages, Graph} = rebar_state:packages(State),
             List = merge_deps_per_profile(State),
             {_SrcDeps, PkgDeps} = rebar_prv_install_deps:parse_deps(<<"">>, List, State, [], 0),
-            rebar_digraph:print_solution(Graph, PkgDeps),
+            PkgDeps1 = [{default, 0, PkgDeps}],
+            rebar_digraph:print_solution(Graph, PkgDeps1),
             {ok, State};
         false ->
             Profiles = rebar_state:current_profiles(State),
