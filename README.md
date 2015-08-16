@@ -42,6 +42,7 @@ locations ([hex.pm](http://hex.pm), git, hg, and so on).
 | report     | Report on environment and versions for bug reports |
 | shell      | Run shell with project apps in path |
 | tar        | Package release into tarball |
+| tree       | Print dependency tree |
 | unlock     | Unlock dependencies |
 | update     | Update package index |
 | upgrade    | Fetch latest version of dep |
