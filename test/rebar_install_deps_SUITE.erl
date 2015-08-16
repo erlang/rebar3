@@ -218,10 +218,11 @@ mdeps(m_pick_source2) ->
      ["d"],
      {ok, ["b", "C", "D"]}};
 mdeps(m_pick_source3) ->
+    %% The order of declaration is important.
     {[{"b", []},
       {"B", []}],
-     ["b"],
-     {ok, ["B"]}};
+     ["B"],
+     {ok, ["b"]}};
 mdeps(m_pick_source4) ->
     {[{"B", []},
       {"b", []}],
