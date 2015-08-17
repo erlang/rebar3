@@ -16,20 +16,23 @@ compile_order(Apps) ->
                           Deps = all_apps_deps(App),
                           add(Graph, {Name, Deps})
                   end, Apps),
-    case digraph_utils:topsort(Graph) of
-        false ->
-            case digraph_utils:is_acyclic(Graph) of
-                true ->
-                    {error, no_sort};
-                false ->
-                    Cycles = lists:sort(
-                        [lists:sort(Comp) || Comp <- digraph_utils:strong_components(Graph),
-                                             length(Comp)>1]),
-                    {error, {cycles, Cycles}}
-            end;
-        V ->
-            {ok, names_to_apps(lists:reverse(V), Apps)}
-    end.
+    Order =
+        case digraph_utils:topsort(Graph) of
+            false ->
+                case digraph_utils:is_acyclic(Graph) of
+                    true ->
+                        {error, no_sort};
+                    false ->
+                        Cycles = lists:sort(
+                                   [lists:sort(Comp) || Comp <- digraph_utils:strong_components(Graph),
+                                                        length(Comp)>1]),
+                        {error, {cycles, Cycles}}
+                end;
+            V ->
+                {ok, names_to_apps(lists:reverse(V), Apps)}
+        end,
+    true = digraph:delete(Graph),
+    Order.
 
 add(Graph, {PkgName, Deps}) ->
     case digraph:vertex(Graph, PkgName) of
