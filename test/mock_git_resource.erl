@@ -20,7 +20,8 @@ mock() -> mock([]).
             | {override_vsn, [{App, Vsn}]}
             | {deps, [{App, [Dep]}]},
     App :: string(),
-    Dep :: {App, string(), {git, string()} | {git, string(), term()}},
+    Dep :: {App, string(), {git, string()} | {git, string(), term()}}
+         | {pkg, App, term()},
     Vsn :: string().
 mock(Opts) ->
     meck:new(?MOD, [no_link]),
@@ -46,8 +47,8 @@ mock_lock(_) ->
             case Git of
                 {git, Url, {tag, Ref}} -> {git, Url, {ref, Ref}};
                 {git, Url, {ref, Ref}} -> {git, Url, {ref, Ref}};
-                {git, Url} -> {git, Url, {ref, "fake-ref"}};
-                {git, Url, _} -> {git, Url, {ref, "fake-ref"}}
+                {git, Url} -> {git, Url, {ref, "0.0.0"}};
+                {git, Url, _} -> {git, Url, {ref, "0.0.0"}}
             end
         end).
 

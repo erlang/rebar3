@@ -544,7 +544,8 @@ only_default_transitive_deps(Config) ->
 
     GitDeps = rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}]),
     PkgName = rebar_test_utils:create_random_name("pkg1_"),
-    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(GitDeps)},
+    {SrcDeps, _} = rebar_test_utils:flat_deps(GitDeps),
+    mock_git_resource:mock([{deps, SrcDeps},
                             {config, [{profiles, [{test, [{deps, [list_to_atom(PkgName)]}]}]}]}]),
 
     mock_pkg_resource:mock([{pkgdeps, [{{iolist_to_binary(PkgName), <<"0.1.0">>}, []}]}]),

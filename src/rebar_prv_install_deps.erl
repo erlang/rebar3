@@ -37,6 +37,8 @@
 
 -export([handle_deps_as_profile/4,
          parse_deps/5,
+         parse_deps/6,
+         profile_dep_dir/2,
          find_cycles/1,
          cull_compile/2]).
 
@@ -155,10 +157,8 @@ deps_per_profile(Profiles, Upgrade, State) ->
     handle_profile_pkg_level(PkgDeps1, AllApps, Seen, Upgrade, Locks, State1).
 
 parse_profile_deps(State, Profile, Level) ->
-    DepsDir = profile_dep_dir(State, Profile),
     Locks = rebar_state:get(State, {locks, Profile}, []),
-    Deps = rebar_state:get(State, {deps, Profile}, []),
-    {SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, State, Locks, Level),
+    {SrcDeps, PkgDeps} = rebar_state:get(State, {parsed_deps, Profile}, {[], []}),
     {{Profile, SrcDeps, Locks, Level}, {Profile, Level, PkgDeps}}.
 
 %% Level-order traversal of all dependencies, across profiles.
@@ -190,9 +190,12 @@ handle_profile_pkg_level(PkgDeps, AllApps, Seen, Upgrade, Locks, State) ->
     State1 = rebar_state:packages(rebar_state:registry(State, Registry)
                                  ,{Packages, Graph}),
 
-    S = case rebar_digraph:cull_deps(Graph, lists:keysort(2, PkgDeps)) of
-            {ok, [], _} ->
+    S = case rebar_digraph:cull_deps(Graph, lists:keysort(2, PkgDeps), Seen) of
+            {ok, [], []} ->
                 throw({rebar_digraph, no_solution});
+            {ok, [], Discarded} ->
+                [warn_skip_pkg(Pkg, State) || Pkg <- Discarded, not(pkg_locked(Pkg, Locks))],
+                [];
             {ok, Solution, []} ->
                 Solution;
             {ok, Solution, Discarded} ->
@@ -376,9 +379,9 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     Profiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo),
 
-    C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
-
+    %% Deps may be under a sub project app, find it and use its state if so
     S = rebar_app_info:state(AppInfo),
+    C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
     S1 = rebar_state:new(S, C, rebar_app_info:dir(AppInfo)),
     S2 = rebar_state:apply_overrides(S1, Name),
 

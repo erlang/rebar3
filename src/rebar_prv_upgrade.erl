@@ -53,18 +53,21 @@ do(State) ->
         {Locks0, _Unlocks0} ->
             Deps0 = top_level_deps(Deps, Locks),
             State1 = rebar_state:set(State, {deps, default}, Deps0),
-            State2 = rebar_state:set(State1, {locks, default}, Locks0),
-            State3 = rebar_state:set(State2, upgrade, true),
-            UpdatedLocks = [L || L <- rebar_state:lock(State3),
+            DepsDir = rebar_prv_install_deps:profile_dep_dir(State, default),
+            D = rebar_prv_install_deps:parse_deps(root, DepsDir, Deps0, State1, Locks0, 0),
+            State2 = rebar_state:set(State1, {parsed_deps, default}, D),
+            State3 = rebar_state:set(State2, {locks, default}, Locks0),
+            State4 = rebar_state:set(State3, upgrade, true),
+            UpdatedLocks = [L || L <- rebar_state:lock(State4),
                                  lists:keymember(rebar_app_info:name(L), 1, Locks0)],
-            Res = rebar_prv_install_deps:do(rebar_state:lock(State3, UpdatedLocks)),
+            Res = rebar_prv_install_deps:do(rebar_state:lock(State4, UpdatedLocks)),
             case Res of
-                {ok, State4} ->
+                {ok, State5} ->
                     rebar_utils:info_useless(
                       [element(1,Lock) || Lock <- Locks],
-                      [rebar_app_info:name(App) || App <- rebar_state:lock(State4)]
+                      [rebar_app_info:name(App) || App <- rebar_state:lock(State5)]
                      ),
-                    rebar_prv_lock:do(State4);
+                    rebar_prv_lock:do(State5);
                 _ ->
                     Res
             end

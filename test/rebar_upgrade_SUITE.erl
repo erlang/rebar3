@@ -425,17 +425,21 @@ upgrades(compile_upgrade_parity) ->
 
 mock_deps(git, Deps, Upgrades) ->
     catch mock_git_resource:unmock(),
-    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps)}, {upgrade, Upgrades}]);
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}, {upgrade, Upgrades}]);
 mock_deps(pkg, Deps, Upgrades) ->
     catch mock_pkg_resource:unmock(),
-    mock_pkg_resource:mock([{pkgdeps, rebar_test_utils:flat_pkgdeps(Deps)}, {upgrade, Upgrades}]).
+    {_, PkgDeps} = rebar_test_utils:flat_deps(Deps),
+    mock_pkg_resource:mock([{pkgdeps, PkgDeps}, {upgrade, Upgrades}]).
 
 mock_deps(git, OldDeps, Deps, Upgrades) ->
     catch mock_git_resource:unmock(),
-    mock_git_resource:mock([{deps, rebar_test_utils:flat_deps(Deps++OldDeps)}, {upgrade, Upgrades}]);
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps++OldDeps),
+    mock_git_resource:mock([{deps, SrcDeps}, {upgrade, Upgrades}]);
 mock_deps(pkg, OldDeps, Deps, Upgrades) ->
     catch mock_pkg_resource:unmock(),
-    mock_pkg_resource:mock([{pkgdeps, rebar_test_utils:flat_pkgdeps(Deps++OldDeps)}, {upgrade, Upgrades}]).
+    {_, PkgDeps} = rebar_test_utils:flat_deps(Deps++OldDeps),
+    mock_pkg_resource:mock([{pkgdeps, PkgDeps}, {upgrade, Upgrades}]).
 
 normalize_unlocks({App, Locks}) ->
     {iolist_to_binary(App),
