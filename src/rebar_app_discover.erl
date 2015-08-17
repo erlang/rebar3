@@ -20,15 +20,7 @@ do(State, LibDirs) ->
 
     %% There may be a top level src which is an app and there may not
     %% Find it here if there is, otherwise define the deps parent as root
-    TopLevelApp = case ec_lists:find(fun(X) ->
-                                             ec_file:real_dir_path(rebar_app_info:dir(X)) =:=
-                                                 ec_file:real_dir_path(rebar_dir:root_dir(State))
-                                     end, Apps) of
-                      {ok, App} ->
-                          rebar_app_info:name(App);
-                      error ->
-                          root
-                  end,
+    TopLevelApp = define_root_app(Apps, State),
 
     %% Handle top level deps
     State1 = lists:foldl(fun(Profile, StateAcc) ->
@@ -60,6 +52,18 @@ do(State, LibDirs) ->
                                 StateAcc
                         end
                 end, State1, SortedApps).
+
+define_root_app(Apps, State) ->
+    RootDir = rebar_dir:root_dir(State),
+    case ec_lists:find(fun(X) ->
+                               ec_file:real_dir_path(rebar_app_info:dir(X)) =:=
+                                   ec_file:real_dir_path(RootDir)
+                       end, Apps) of
+        {ok, App} ->
+            rebar_app_info:name(App);
+        error ->
+            root
+    end.
 
 format_error({module_list, File}) ->
     io_lib:format("Error reading module list from ~p~n", [File]);

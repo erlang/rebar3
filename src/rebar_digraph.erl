@@ -108,12 +108,9 @@ cull_deps(Graph, [{Profile, Level, Vs} | Vertices], Levels, Solution, Seen, Disc
 %% Combine lists of deps that have the same profile and level
 combine_profile_levels(Vertices, NewVertices) ->
     V = lists:foldl(fun({Profile, Level, Vs}, Acc) ->
-                        case ec_lists:find(fun({P, L, _}) when P =:= Profile
-                                                             , L =:= Level ->
-                                                   true;
-                                              (_) ->
-                                                   false
-                                           end, Acc) of
+                            case ec_lists:find(fun({P, L, _}) ->
+                                                       P =:= Profile andalso L =:= Level
+                                               end, Acc) of
                             {ok, {_, _, OldVs}=Old} ->
                                 lists:delete(Old, Acc)++[{Profile, Level, lists:keysort(1, OldVs++Vs)}];
                             error ->
