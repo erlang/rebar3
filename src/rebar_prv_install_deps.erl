@@ -157,10 +157,7 @@ deps_per_profile(Profiles, Upgrade, State) ->
     handle_profile_pkg_level(PkgDeps1, AllApps, Seen, Upgrade, Locks, State1).
 
 parse_profile_deps(State, Profile, Level) ->
-    %DepsDir = profile_dep_dir(State, Profile),
     Locks = rebar_state:get(State, {locks, Profile}, []),
-    %Deps = rebar_state:get(State, {deps, Profile}, []),
-    %{SrcDeps, PkgDeps} = parse_deps(DepsDir, Deps, State, Locks, Level),
     {SrcDeps, PkgDeps} = rebar_state:get(State, {parsed_deps, Profile}, {[], []}),
     {{Profile, SrcDeps, Locks, Level}, {Profile, Level, PkgDeps}}.
 
