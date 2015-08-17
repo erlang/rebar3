@@ -18,8 +18,7 @@ groups() ->
         m_flat1, m_flat2, m_circular1, m_circular2, m_circular3,
         m_pick_source1, m_pick_source2, m_pick_source3,
         m_pick_source4, m_pick_source5, m_source_to_pkg,
-        m_pkg_level1, m_pkg_level2,
-        m_pkg_src_override
+        m_pkg_level1, m_pkg_level2, m_pkg_level3, m_pkg_level3_alpha_order
      ]}
     ].
 
@@ -221,12 +220,12 @@ mdeps(m_pick_source3) ->
     %% The order of declaration is important.
     {[{"b", []},
       {"B", []}],
-     ["B"],
+     [],
      {ok, ["b"]}};
 mdeps(m_pick_source4) ->
     {[{"B", []},
       {"b", []}],
-     ["b"],
+     [],
      {ok, ["B"]}};
 mdeps(m_pick_source5) ->
     {[{"B", [{"d", []}]},
@@ -247,10 +246,16 @@ mdeps(m_pkg_level2) ->
       {"C", [{"D", [{"e", "2", []}]}]}],
      [{"e","2"}],
      {ok, ["B","C","D",{"e","1"}]}};
-mdeps(m_pkg_src_override) ->
-    %% This is all handled in setup_project
-    {[],[],{ok,[]}}.
-
+mdeps(m_pkg_level3_alpha_order) ->
+    {[{"B", [{"d", [{"f", "1", []}]}]},
+      {"C", [{"E", [{"f", "2", []}]}]}],
+     [{"f","2"}],
+     {ok, ["B","C","d","E",{"f","1"}]}};
+mdeps(m_pkg_level3) ->
+    {[{"B", [{"d", [{"f", "1", []}]}]},
+      {"C", [{"E", [{"G", [{"f", "2", []}]}]}]}],
+     [{"f","2"}],
+     {ok, ["B","C","d","E","G",{"f","1"}]}}.
 
 setup_project(fail_conflict, Config0, Deps) ->
     DepsType = ?config(deps_type, Config0),
@@ -308,23 +313,6 @@ setup_project(nondefault_pick_highest, Config0, _) ->
             {_, PkgDeps} = rebar_test_utils:flat_deps(DefaultDeps++ProfileDeps),
             mock_pkg_resource:mock([{pkgdeps, PkgDeps}])
     end,
-    [{rebarconfig, RebarConf} | Config];
-setup_project(m_pkg_src_override, Config0, _) ->
-    Config = rebar_test_utils:init_rebar_state(Config0, "m_pkg_src_override_mixed_"),
-    AppDir = ?config(apps, Config),
-    rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
-    DefaultDeps = rebar_test_utils:expand_deps(mixed, [{"b", [{"c", []}]}]),
-    OverrideDeps = rebar_test_utils:expand_deps(mixed, [{"C", []}]),
-    DefaultTop = rebar_test_utils:top_level_deps(DefaultDeps),
-    OverrideTop = rebar_test_utils:top_level_deps(OverrideDeps),
-    RebarConf = rebar_test_utils:create_config(
-            AppDir,
-            [{deps, DefaultTop},
-             {overrides, [{override, b, [{deps, OverrideTop}]}]}]
-    ),
-    {SrcDeps,PkgDeps} = rebar_test_utils:flat_deps(DefaultDeps++OverrideDeps),
-    mock_git_resource:mock([{deps, SrcDeps}]),
-    mock_pkg_resource:mock([{pkgdeps, PkgDeps}]),
     [{rebarconfig, RebarConf} | Config];
 setup_project(Case, Config0, Deps) ->
     DepsType = ?config(deps_type, Config0),
@@ -459,19 +447,8 @@ m_pick_source5(Config) -> run(Config).
 m_source_to_pkg(Config) -> run(Config).
 m_pkg_level1(Config) -> run(Config).
 m_pkg_level2(Config) -> run(Config).
-
-
-m_pkg_src_override(Config) ->
-    %% Detect the invalid override where a package dep's are overriden
-    %% with source dependencies. We only test with overrides because
-    %% we trust the package index to be correct there and not introduce
-    %% that kind of error.
-    {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
-    rebar_test_utils:run_and_check(
-        Config, RebarConfig, ["lock"],
-        {error, {rebar_prv_install_deps,
-                 {package_dep_override, <<"b">>}}}
-    ).
+m_pkg_level3(Config) -> run(Config).
+m_pkg_level3_alpha_order(Config) -> run(Config).
 
 run(Config) ->
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),

@@ -33,9 +33,10 @@ do(State, LibDirs) ->
     %% Handle top level deps
     State1 = lists:foldl(fun(Profile, StateAcc) ->
                                  ProfileDeps = rebar_state:get(StateAcc, {deps, Profile}, []),
+                                 ProfileDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_sort(ProfileDeps)),
                                  ParsedDeps = parse_profile_deps(Profile
                                                                 ,TopLevelApp
-                                                                ,ProfileDeps
+                                                                ,ProfileDeps2
                                                                 ,StateAcc),
                                  rebar_state:set(StateAcc, {parsed_deps, Profile}, ParsedDeps)
                          end, State, lists:reverse(CurrentProfiles)),
@@ -93,9 +94,10 @@ handle_profile(Profile, Name, AppState, State) ->
     {TopSrc, TopPkg} = rebar_state:get(State, {parsed_deps, Profile}, {[], []}),
     TopLevelProfileDeps = rebar_state:get(State, {deps, Profile}, []),
     AppProfileDeps = rebar_state:get(AppState, {deps, Profile}, []),
+    AppProfileDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_sort(AppProfileDeps)),
     ProfileDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_umerge(
                                            rebar_utils:tup_sort(TopLevelProfileDeps)
-                                           ,rebar_utils:tup_sort(AppProfileDeps))),
+                                           ,rebar_utils:tup_sort(AppProfileDeps2))),
     State1 = rebar_state:set(State, {deps, Profile}, ProfileDeps2),
 
     %% Only deps not also specified in the top level config need

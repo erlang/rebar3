@@ -193,9 +193,12 @@ handle_profile_pkg_level(PkgDeps, AllApps, Seen, Upgrade, Locks, State) ->
     State1 = rebar_state:packages(rebar_state:registry(State, Registry)
                                  ,{Packages, Graph}),
 
-    S = case rebar_digraph:cull_deps(Graph, lists:keysort(2, PkgDeps)) of
-            {ok, [], _} ->
+    S = case rebar_digraph:cull_deps(Graph, lists:keysort(2, PkgDeps), Seen) of
+            {ok, [], []} ->
                 throw({rebar_digraph, no_solution});
+            {ok, [], Discarded} ->
+                [warn_skip_pkg(Pkg, State) || Pkg <- Discarded, not(pkg_locked(Pkg, Locks))],
+                [];
             {ok, Solution, []} ->
                 Solution;
             {ok, Solution, Discarded} ->
