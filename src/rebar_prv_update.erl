@@ -59,6 +59,7 @@ do(State) ->
         ok = file:write_file(HexFile, Unzipped),
         {Dict, Graph} = hex_to_graph(HexFile),
         write_registry(Dict, Graph, State),
+        true = digraph:delete(Graph),
         ok
     catch
         _E:C ->
