@@ -379,20 +379,11 @@ handle_dep(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
 -spec handle_dep(rebar_state:t(), atom(), file:filename_all(), rebar_app_info:t(), list(), integer()) ->
                         {rebar_app_info:t(), [rebar_app_info:t()], [pkg_dep()], [integer()], rebar_state:t()}.
 handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
-    Parent = rebar_app_info:parent(AppInfo),
     Profiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo),
 
     %% Deps may be under a sub project app, find it and use its state if so
-    S = case ec_lists:find(fun(X) ->
-                                   Parent =:= rebar_app_info:name(X)
-                           end, rebar_state:project_apps(State)) of
-            {ok, ParentApp} ->
-                rebar_app_info:state(ParentApp);
-            error ->
-                rebar_app_info:state(AppInfo)
-        end,
-
+    S = rebar_app_info:state(AppInfo),
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
     S1 = rebar_state:new(S, C, rebar_app_info:dir(AppInfo)),
     S2 = rebar_state:apply_overrides(S1, Name),

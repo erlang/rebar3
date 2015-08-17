@@ -37,6 +37,7 @@ do(State, LibDirs) ->
                                  ParsedDeps = parse_profile_deps(Profile
                                                                 ,TopLevelApp
                                                                 ,ProfileDeps2
+                                                                ,StateAcc
                                                                 ,StateAcc),
                                  rebar_state:set(StateAcc, {parsed_deps, Profile}, ParsedDeps)
                          end, State, lists:reverse(CurrentProfiles)),
@@ -103,16 +104,16 @@ handle_profile(Profile, Name, AppState, State) ->
     %% Only deps not also specified in the top level config need
     %% to be included in the parsed deps
     NewDeps = ProfileDeps2 -- TopLevelProfileDeps,
-    {ParsedSrc, ParsedPkg} = parse_profile_deps(Profile, Name, NewDeps, State1),
+    {ParsedSrc, ParsedPkg} = parse_profile_deps(Profile, Name, NewDeps, AppState, State1),
     rebar_state:set(State1, {parsed_deps, Profile}, {TopSrc++ParsedSrc, TopPkg++ParsedPkg}).
 
-parse_profile_deps(Profile, Name, Deps, State) ->
+parse_profile_deps(Profile, Name, Deps, AppState, State) ->
     DepsDir = rebar_prv_install_deps:profile_dep_dir(State, Profile),
     Locks = rebar_state:get(State, {locks, Profile}, []),
     rebar_prv_install_deps:parse_deps(Name
                                      ,DepsDir
                                      ,Deps
-                                     ,State
+                                     ,AppState
                                      ,Locks
                                      ,1).
 
