@@ -77,7 +77,7 @@ cull_deps(Graph, Vertices) ->
 
 cull_deps(Graph, Vertices, Seen) ->
     Vertices1 = lists:keysort(2, Vertices),
-    {Solution, Levels, Discarded} = {dict:new(), dict:new(), []},
+    {Solution, Levels, Discarded} = {dict:new(), dict:new(), sets:new()},
     cull_deps(Graph, Vertices1, Levels, Solution, Seen, Discarded).
 
 format_error(no_solution) ->
@@ -91,7 +91,7 @@ cull_deps(_Graph, [], Levels, Solution, _, Discarded) ->
     {_, Vertices} = lists:unzip(dict:to_list(Solution)),
     LvlVertices = [{Profile, {Parent, App, Vsn, dict:fetch(App, Levels)}}
                   || {Profile, {Parent,App,Vsn}} <- Vertices],
-    {ok, LvlVertices, Discarded};
+    {ok, LvlVertices,  sets:to_list(Discarded)};
 cull_deps(Graph, [{Profile, Level, Vs} | Vertices], Levels, Solution, Seen, Discarded) ->
     {NV, NS, LS, DS} =
         lists:foldl(fun({Parent, Name, Vsn}, {Acc, SolutionAcc, LevelsAcc, DiscardedAcc}) ->
@@ -134,7 +134,7 @@ handle_neighbors(Profile, Level, Parent, OutNeighbors, Vertices
                                  {ok, _} -> % conflict resolution!
                                      %% Warn on different version
                                      {NewVertices,
-                                      [Value|Discarded1]};
+                                      sets:add_element(Value, Discarded1)};
                                  error ->
                                      %% We check Seen separately because we don't care
                                      %% to warn if the exact same version of a package
@@ -143,7 +143,7 @@ handle_neighbors(Profile, Level, Parent, OutNeighbors, Vertices
                                      case sets:is_element(Name, Seen) of
                                          true ->
                                              {NewVertices,
-                                              [Value|Discarded1]};
+                                              sets:add_element(Value, Discarded1)};
                                          false ->
                                              {[{Parent, Name, Vsn} | NewVertices],
                                               Discarded1}
@@ -167,7 +167,7 @@ maybe_add_to_solution(Profile, Level, Key, {Name, Vsn}=Value, Parent
             %% Warn on different version
             {Solution,
              Levels,
-             [Value|Discarded]};
+             sets:add_element(Value, Discarded)};
         error ->
             %% We check Seen separately because we don't care to warn if the exact
             %% same version of a package was already part of the solution but we do
@@ -176,7 +176,7 @@ maybe_add_to_solution(Profile, Level, Key, {Name, Vsn}=Value, Parent
                 true ->
                     {Solution,
                      Levels,
-                     [Value|Discarded]};
+                     sets:add_element(Value, Discarded)};
                 false ->
                     {dict:store(Key, {Profile, {Parent, Name, Vsn}}, Solution),
                      dict:store(Key, Level, Levels),
