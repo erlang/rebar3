@@ -361,10 +361,10 @@ remove_links(Path) ->
     end.
 
 delete_dir_link(Path) ->
-	case os:type() of
-		{unix, _} -> file:delete(Path);
-		{win32, _} -> file:del_dir(Path)
-	end.
+    case os:type() of
+        {unix, _} -> file:delete(Path);
+        {win32, _} -> file:del_dir(Path)
+    end.
 
 dir_entries(Path) ->
     {ok, SubDirs} = file:list_dir(Path),

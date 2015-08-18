@@ -2,7 +2,7 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -export([init_rebar_state/1, init_rebar_state/2, run_and_check/4]).
--export([expand_deps/2, flat_deps/1, flat_pkgdeps/1, top_level_deps/1]).
+-export([expand_deps/2, flat_deps/1, top_level_deps/1]).
 -export([create_app/4, create_eunit_app/4, create_empty_app/4, create_config/2]).
 -export([create_random_name/1, create_random_vsn/0, write_src_file/2]).
 
@@ -137,24 +137,43 @@ expand_deps(pkg, [{Name, Deps} | Rest]) ->
     [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)];
 expand_deps(pkg, [{Name, Vsn, Deps} | Rest]) ->
     Dep = {pkg, Name, Vsn},
-    [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)].
+    [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)];
+expand_deps(mixed, [{Name, Deps} | Rest]) ->
+    Dep = if hd(Name) >= $a, hd(Name) =< $z ->
+            {pkg, string:to_upper(Name), "0.0.0"}
+           ; hd(Name) >= $A, hd(Name) =< $Z ->
+            {Name, ".*", {git, "https://example.org/user/"++Name++".git", "master"}}
+    end,
+    [{Dep, expand_deps(mixed, Deps)} | expand_deps(mixed, Rest)];
+expand_deps(mixed, [{Name, Vsn, Deps} | Rest]) ->
+    Dep = if hd(Name) >= $a, hd(Name) =< $z ->
+            {pkg, string:to_upper(Name), Vsn}
+           ; hd(Name) >= $A, hd(Name) =< $Z ->
+            {Name, Vsn, {git, "https://example.org/user/"++Name++".git", {tag, Vsn}}}
+    end,
+    [{Dep, expand_deps(mixed, Deps)} | expand_deps(mixed, Rest)].
 
-flat_deps([]) -> [];
-flat_deps([{{Name,_Vsn,Ref}, Deps} | Rest]) ->
-    [{{Name,vsn_from_ref(Ref)}, top_level_deps(Deps)}]
-    ++
-    flat_deps(Deps)
-    ++
-    flat_deps(Rest).
+%% Source deps can depend on both source and package dependencies;
+%% package deps can only depend on package deps.
+%% For things to work we have to go down the dep tree and find all
+%% lineages of pkg deps and return them, whereas the source deps
+%% can be left as is.
+flat_deps(Deps) -> flat_deps(Deps, [], []).
 
-flat_pkgdeps([]) -> [];
-flat_pkgdeps([{{pkg, Name, Vsn}, Deps} | Rest]) ->
-    [{{iolist_to_binary(Name),iolist_to_binary(Vsn)}, top_level_deps(Deps)}]
-    ++
-    flat_pkgdeps(Deps)
-    ++
-    flat_pkgdeps(Rest).
-
+flat_deps([], Src, Pkg) -> {Src, Pkg};
+flat_deps([{{pkg, Name, Vsn}, PkgDeps} | Rest], Src, Pkg) ->
+    Current = {{iolist_to_binary(Name), iolist_to_binary(Vsn)},
+               top_level_deps(PkgDeps)},
+    {[], FlatPkgDeps} = flat_deps(PkgDeps),
+    flat_deps(Rest,
+              Src,
+              Pkg ++ [Current | FlatPkgDeps]);
+flat_deps([{{Name,_Vsn,Ref}, Deps} | Rest], Src, Pkg) ->
+    Current = {{Name,vsn_from_ref(Ref)}, top_level_deps(Deps)},
+    {FlatDeps, FlatPkgDeps} = flat_deps(Deps),
+    flat_deps(Rest,
+              Src ++ [Current | FlatDeps],
+              Pkg ++ FlatPkgDeps).
 
 vsn_from_ref({git, _, {_, Vsn}}) -> Vsn;
 vsn_from_ref({git, _, Vsn}) -> Vsn.
@@ -274,6 +293,28 @@ check_results(AppDir, Expected, ProfileRun) ->
                     {_LockName, {pkg, _, LockVsn}, _} ->
                         ?assertEqual(iolist_to_binary(Vsn),
                                      iolist_to_binary(LockVsn));
+                    {_LockName, {_, _, {ref, LockVsn}}, _} ->
+                        ?assertEqual(iolist_to_binary(Vsn),
+                                     iolist_to_binary(LockVsn))
+                end
+        ;  ({lock, pkg, Name, Vsn}) ->
+                ct:pal("Pkg Lock Name: ~p, Vsn: ~p", [Name, Vsn]),
+                case lists:keyfind(iolist_to_binary(Name), 1, Locks) of
+                    false ->
+                        error({lock_not_found, Name});
+                    {_LockName, {pkg, _, LockVsn}, _} ->
+                        ?assertEqual(iolist_to_binary(Vsn),
+                                     iolist_to_binary(LockVsn));
+                    {_LockName, {_, _, {ref, LockVsn}}, _} ->
+                        error({source_lock, {Name, LockVsn}})
+                end
+        ;  ({lock, src, Name, Vsn}) ->
+                ct:pal("Src Lock Name: ~p, Vsn: ~p", [Name, Vsn]),
+                case lists:keyfind(iolist_to_binary(Name), 1, Locks) of
+                    false ->
+                        error({lock_not_found, Name});
+                    {_LockName, {pkg, _, LockVsn}, _} ->
+                        error({pkg_lock, {Name, LockVsn}});
                     {_LockName, {_, _, {ref, LockVsn}}, _} ->
                         ?assertEqual(iolist_to_binary(Vsn),
                                      iolist_to_binary(LockVsn))

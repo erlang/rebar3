@@ -29,7 +29,7 @@ init(State) ->
 do(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     Verbose = proplists:get_value(verbose, Args, false),
-    print_deps_tree(rebar_state:all_deps(State), Verbose),
+    print_deps_tree(rebar_state:all_deps(State), Verbose, State),
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
@@ -38,7 +38,7 @@ format_error(Reason) ->
 
 %% Internal functions
 
-print_deps_tree(SrcDeps, Verbose) ->
+print_deps_tree(SrcDeps, Verbose, State) ->
     D = lists:foldl(fun(App, Dict) ->
                             Name = rebar_app_info:name(App),
                             Vsn = rebar_app_info:original_vsn(App),
@@ -46,11 +46,14 @@ print_deps_tree(SrcDeps, Verbose) ->
                             Parent = rebar_app_info:parent(App),
                             dict:append_list(Parent, [{Name, Vsn, Source}], Dict)
                     end, dict:new(), SrcDeps),
+    ProjectAppNames = [{rebar_app_info:name(App)
+                       ,rebar_app_info:original_vsn(App)
+                       ,project} || App <- rebar_state:project_apps(State)],
     case dict:find(root, D) of
         {ok, Children} ->
-            print_children(-1, lists:keysort(1, Children), D, Verbose);
+            print_children(-1, lists:keysort(1, Children++ProjectAppNames), D, Verbose);
         error ->
-            none
+            print_children(-1, lists:keysort(1, ProjectAppNames), D, Verbose)
     end.
 
 print_children(_, [], _, _) ->
@@ -68,6 +71,8 @@ print_children(Indent, [{Name, Vsn, Source} | Rest], Dict, Verbose) ->
             print_children(Indent, Rest, Dict, Verbose)
     end.
 
+type(project, _) ->
+    "project app";
 type(Source, Verbose) when is_tuple(Source) ->
     case {element(1, Source), Verbose} of
         {pkg, _} ->
