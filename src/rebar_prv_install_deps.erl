@@ -243,7 +243,7 @@ handle_pkg_dep(Profile, Pkg, Packages, Upgrade, DepsDir, Fetched, Seen, Locks, S
             {NewSeen, NewState} = maybe_lock(Profile, AppInfo, Seen, State, Level),
             {_, AppInfo1} = maybe_fetch(AppInfo, Profile, Upgrade, Seen, NewState),
             {AppInfo2, _, _, _, _} =
-                handle_dep(NewState, Profile, DepsDir, AppInfo1, Locks, Level),
+                handle_dep(NewState, Profile, DepsDir, AppInfo1, Locks, Level, Upgrade),
             AppInfo3 = rebar_app_info:deps(AppInfo2, Deps),
             {[AppInfo3 | Fetched], NewSeen, NewState}
     end.
@@ -346,7 +346,7 @@ update_unseen_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State,
               _ ->
                   {_, AppInfo1} = maybe_fetch(AppInfo, Profile, false, Seen, State1),
                   handle_dep(AppInfo1, Profile, SrcDeps, PkgDeps, SrcApps,
-                             Level, State1, Locks)
+                             Level, State1, Locks, false)
           end,
     {NewSrcDeps, NewPkgDeps, NewSrcApps, State2, NewSeen, NewLocks}.
 
@@ -356,16 +356,16 @@ handle_upgrade(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps, Level, State, Seen, 
         false ->
             {_, AppInfo1} = maybe_fetch(AppInfo, Profile, true, Seen, State),
             handle_dep(AppInfo1, Profile, SrcDeps, PkgDeps, SrcApps,
-                       Level, State, Locks);
+                       Level, State, Locks, true);
         _StillLocked ->
             handle_dep(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps,
-                       Level, State, Locks)
+                       Level, State, Locks, true)
     end.
 
-handle_dep(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
+handle_dep(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps, Level, State, Locks, Upgrade) ->
     DepsDir = profile_dep_dir(State, Profile),
     {AppInfo1, NewSrcDeps, NewPkgDeps, NewLocks, State1} =
-        handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level),
+        handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level, Upgrade),
     AppInfo2 = rebar_app_info:dep_level(AppInfo1, Level),
     {NewSrcDeps ++ SrcDeps
     ,NewPkgDeps++PkgDeps
@@ -373,9 +373,9 @@ handle_dep(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
     ,State1
     ,NewLocks}.
 
--spec handle_dep(rebar_state:t(), atom(), file:filename_all(), rebar_app_info:t(), list(), integer()) ->
+-spec handle_dep(rebar_state:t(), atom(), file:filename_all(), rebar_app_info:t(), list(), integer(), boolean()) ->
                         {rebar_app_info:t(), [rebar_app_info:t()], [pkg_dep()], [integer()], rebar_state:t()}.
-handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
+handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level, Upgrade) ->
     Profiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo),
 
@@ -397,10 +397,16 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     S5 = rebar_plugins:install(S4),
     AppInfo2 = rebar_app_info:state(AppInfo1, S5),
 
-    %% Upgrade lock level to be the level the dep will have in this dep tree
+    %% Ignore locks for a dep if we are upgrading
+    NewLocks = case Upgrade of
+                   true ->
+                       [];
+                   _ ->
+                       %% Upgrade lock level to be the level the dep will have in this dep tree
+                       [{DepName, Source, LockLevel+Level} ||
+                           {DepName, Source, LockLevel} <- rebar_state:get(S5, {locks, default}, [])]
+               end,
     Deps = rebar_state:get(S5, {deps, default}, []),
-    NewLocks = [{DepName, Source, LockLevel+Level} ||
-                   {DepName, Source, LockLevel} <- rebar_state:get(S5, {locks, default}, [])],
     AppInfo3 = rebar_app_info:deps(AppInfo2, rebar_state:deps_names(Deps)),
     {SrcDeps, PkgDeps} = parse_deps(rebar_app_info:name(AppInfo3), DepsDir, Deps, S5, Locks, Level+1),
     {AppInfo3, SrcDeps, PkgDeps, Locks++NewLocks, State}.
