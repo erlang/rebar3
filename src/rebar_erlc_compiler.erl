@@ -169,17 +169,20 @@ doterl_compile(Config, Dir, OutDir, MoreSources, ErlOpts) ->
     DepErlsOrdered = digraph_utils:topsort(SubGraph),
     FirstErls = ErlFirstFiles ++ lists:reverse(DepErlsOrdered),
     ?DEBUG("Files to compile first: ~p", [FirstErls]),
-    rebar_base_compiler:run(
-      Config, FirstErls, OtherErls,
-      fun(S, C) ->
-              ErlOpts1 = case lists:member(S, ErlFirstFiles) of
-                             true -> ErlOptsFirst;
-                             false -> ErlOpts
-                         end,
-              internal_erl_compile(C, Dir, S, OutDir1, ErlOpts1)
-      end),
-    true = digraph:delete(SubGraph),
-    true = digraph:delete(G),
+    try
+        rebar_base_compiler:run(
+          Config, FirstErls, OtherErls,
+          fun(S, C) ->
+                  ErlOpts1 = case lists:member(S, ErlFirstFiles) of
+                                 true -> ErlOptsFirst;
+                                 false -> ErlOpts
+                             end,
+                  internal_erl_compile(C, Dir, S, OutDir1, ErlOpts1)
+          end)
+    after
+        true = digraph:delete(SubGraph),
+        true = digraph:delete(G)
+    end,
     ok.
 
 %% Get files which need to be compiled first, i.e. those specified in erl_first_files
