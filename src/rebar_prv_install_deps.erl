@@ -133,7 +133,7 @@ handle_deps_as_profile(Profile, State, Deps, Upgrade) ->
                             _ ->
                                 [{Profile, Level, PkgDeps}]
                         end,
-    {AllApps, PkgDeps1, Seen, State1} = handle_profile_level(AllSrcProfileDeps, AllPkgProfileDeps, Locks, sets:new(), Upgrade, State),
+    {AllApps, PkgDeps1, Seen, State1} = handle_profile_level(AllSrcProfileDeps, AllPkgProfileDeps, Locks, sets:new(), Upgrade, [], State),
 
     handle_profile_pkg_level(PkgDeps1, AllApps, Seen, Upgrade, [], State1).
 
@@ -152,7 +152,8 @@ deps_per_profile(Profiles, Upgrade, State) ->
                                                         {[Src | SrcAcc], [Pkg | PkgAcc]}
                                                 end
                                             end, {[], []}, Profiles),
-    {AllApps, PkgDeps1, Seen, State1} = handle_profile_level(AllProfileDeps, PkgDeps, [], sets:new(), Upgrade, State),
+    TopPkgDeps = [PkgName || {_, PkgName, _} <- lists:flatten([Pkgs || {_, _, Pkgs} <- PkgDeps])],
+    {AllApps, PkgDeps1, Seen, State1} = handle_profile_level(AllProfileDeps, PkgDeps, [], sets:new(), Upgrade, TopPkgDeps, State),
     Locks = rebar_state:get(State, {locks, default}, []),
     handle_profile_pkg_level(PkgDeps1, AllApps, Seen, Upgrade, Locks, State1).
 
@@ -164,12 +165,12 @@ parse_profile_deps(State, Profile, Level) ->
 %% Level-order traversal of all dependencies, across profiles.
 %% If profiles x,y,z are present, then the traversal will go:
 %% x0, y0, z0, x1, y1, z1, ..., xN, yN, zN.
-handle_profile_level([], PkgDeps, SrcApps, Seen, _Upgrade, State) ->
+handle_profile_level([], PkgDeps, SrcApps, Seen, _Upgrade, _, State) ->
     {SrcApps, PkgDeps, Seen, State};
-handle_profile_level([{Profile, SrcDeps, Locks, Level} | Rest], PkgDeps, SrcApps, Seen, Upgrade, State) ->
+handle_profile_level([{Profile, SrcDeps, Locks, Level} | Rest], PkgDeps, SrcApps, Seen, Upgrade, TopPkgDeps, State) ->
     {SrcDeps1, PkgDeps1, SrcApps1, State1, Seen1, Locks1} =
         update_src_deps(Profile, Level, SrcDeps, [], SrcApps
-                        ,State, Upgrade, Seen, Locks),
+                        ,State, Upgrade, Seen, TopPkgDeps, Locks),
     SrcDeps2 = case SrcDeps1 of
         [] -> Rest;
         _ -> Rest ++ [{Profile, SrcDeps1, Locks1, Level+1}]
@@ -179,7 +180,7 @@ handle_profile_level([{Profile, SrcDeps, Locks, Level} | Rest], PkgDeps, SrcApps
                                            PkgDeps;
                                        _ ->
                                            [{Profile, Level+1, PkgDeps1} | PkgDeps]
-                                   end, SrcApps1, sets:union(Seen, Seen1), Upgrade, State1).
+                                   end, SrcApps1, sets:union(Seen, Seen1), Upgrade, TopPkgDeps, State1).
 
 handle_profile_pkg_level([], AllApps, _Seen, _Upgrade, _Locks, State) ->
     {AllApps, State};
@@ -296,19 +297,19 @@ package_to_app(DepsDir, Packages, {Parent, Name, Vsn, Level}, IsLock, State) ->
             rebar_app_info:parent(rebar_app_info:state(AppInfo1, AppState1), Parent)
     end.
 
--spec update_src_deps(atom(), non_neg_integer(), list(), list(), list(), rebar_state:t(), boolean(), sets:set(binary()), list()) -> {list(), list(), list(), rebar_state:t(), sets:set(binary()), list()}.
-update_src_deps(Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, Locks) ->
+-spec update_src_deps(atom(), non_neg_integer(), list(), list(), list(), rebar_state:t(), boolean(), sets:set(binary()), [binary()], list()) -> {list(), list(), list(), rebar_state:t(), sets:set(binary()), list()}.
+update_src_deps(Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, TopPkgDeps, Locks) ->
     lists:foldl(
       fun(AppInfo, {SrcDepsAcc, PkgDepsAcc, SrcAppsAcc, StateAcc, SeenAcc, LocksAcc}) ->
               update_src_dep(AppInfo, Profile, Level,
                              SrcDepsAcc, PkgDepsAcc, SrcAppsAcc, StateAcc,
-                             Upgrade, SeenAcc, Locks, LocksAcc)
+                             Upgrade, SeenAcc, Locks, TopPkgDeps, LocksAcc)
       end,
       {[], PkgDeps, SrcApps, State, Seen, Locks},
       rebar_utils:sort_deps(SrcDeps)).
 
 
-update_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, BaseLocks, Locks) ->
+update_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, BaseLocks, TopPkgDeps, Locks) ->
     %% If not seen, add to list of locks to write out
     Name = rebar_app_info:name(AppInfo),
     case sets:is_element(Name, Seen) of
@@ -319,7 +320,7 @@ update_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrad
         false ->
             update_unseen_src_dep(AppInfo, Profile, Level,
                                   SrcDeps, PkgDeps, SrcApps,
-                                  State, Upgrade, Seen, Locks)
+                                  State, Upgrade, Seen, TopPkgDeps, Locks)
 
     end.
 
@@ -340,13 +341,25 @@ update_seen_src_dep(AppInfo, _Profile, _Level, SrcDeps, PkgDeps, SrcApps, State,
     end,
     {SrcDeps, PkgDeps, SrcApps, State, Seen, Locks}.
 
-update_unseen_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, Locks) ->
-    {NewSeen, State1} = maybe_lock(Profile, AppInfo, Seen, State, Level),
-    {_, AppInfo1} = maybe_fetch(AppInfo, Profile, Upgrade, Seen, State1),
-    {NewSrcDeps, NewPkgDeps, NewSrcApps, State2, NewLocks} =
-        handle_dep(AppInfo1, Profile, SrcDeps, PkgDeps, SrcApps,
-                   Level, State1, Locks),
-    {NewSrcDeps, NewPkgDeps, NewSrcApps, State2, NewSeen, NewLocks}.
+update_unseen_src_dep(AppInfo, Profile, Level, SrcDeps, PkgDeps, SrcApps, State, Upgrade, Seen, TopPkgDeps, Locks) ->
+    Name = rebar_app_info:name(AppInfo),
+    case lists:member(Name, TopPkgDeps) of
+        true ->
+            %% src dep overridden by top level pkg dep
+            %% warn if it isn't already locked as well
+            case lists:keymember(Name, 1, Locks) of
+                false -> warn_skip_deps(AppInfo, State);
+                true -> ok
+            end,
+            {SrcDeps, PkgDeps, SrcApps, State, Seen, Locks};
+        false ->
+            {NewSeen, State1} = maybe_lock(Profile, AppInfo, Seen, State, Level),
+            {_, AppInfo1} = maybe_fetch(AppInfo, Profile, Upgrade, Seen, State1),
+            {NewSrcDeps, NewPkgDeps, NewSrcApps, State2, NewLocks} =
+                handle_dep(AppInfo1, Profile, SrcDeps, PkgDeps, SrcApps,
+                           Level, State1, Locks),
+            {NewSrcDeps, NewPkgDeps, NewSrcApps, State2, NewSeen, NewLocks}
+    end.
 
 handle_dep(AppInfo, Profile, SrcDeps, PkgDeps, SrcApps, Level, State, Locks) ->
     DepsDir = profile_dep_dir(State, Profile),
