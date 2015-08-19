@@ -18,7 +18,8 @@ groups() ->
         m_flat1, m_flat2, m_circular1, m_circular2, m_circular3,
         m_pick_source1, m_pick_source2, m_pick_source3,
         m_pick_source4, m_pick_source5, m_source_to_pkg,
-        m_pkg_level1, m_pkg_level2, m_pkg_level3, m_pkg_level3_alpha_order
+        m_pkg_level1, m_pkg_level2, m_pkg_level3, m_pkg_level3_alpha_order,
+        m_pick_pkg_over_transitive_source
      ]}
     ].
 
@@ -96,9 +97,9 @@ format_expected_mdeps(Deps) ->
 format_expected_mixed_warnings(Warnings) ->
     [case W of
         {N, Vsn} when hd(N) >= $a, hd(N) =< $z -> {pkg, string:to_upper(N), Vsn};
-        {N, Vsn} when hd(N) >= $A, hd(N) =< $Z -> {src, N, Vsn};
+        {N, Vsn} when hd(N) >= $A, hd(N) =< $Z -> {git, N, Vsn};
         N when hd(N) >= $a, hd(N) =< $z -> {pkg, string:to_upper(N), "0.0.0"};
-        N when hd(N) >= $A, hd(N) =< $Z -> {src, N, "0.0.0"}
+        N when hd(N) >= $A, hd(N) =< $Z -> {git, N, "0.0.0"}
      end || W <- Warnings].
 
 %% format:
@@ -201,9 +202,9 @@ mdeps(m_circular2) ->
      {error, {rebar_prv_install_deps, {cycles, [[<<"B">>,<<"C">>]]}}}};
 mdeps(m_circular3) ->
     %% Spot the circular dep due to being to low in the deps tree
-    %% but as a source dep, taking precedence over packages
+    %% but as a source dep, taking precedence over packages at the same level
     {[{"B", [{"C", "2", [{"B", []}]}]},
-      {"c", "1", [{"d",[]}]}],
+      {"D", [{"c", "1", [{"d",[]}]}]}],
      [],
      {error, {rebar_prv_install_deps, {cycles, [[<<"B">>,<<"C">>]]}}}};
 mdeps(m_pick_source1) ->
@@ -255,7 +256,12 @@ mdeps(m_pkg_level3) ->
     {[{"B", [{"d", [{"f", "1", []}]}]},
       {"C", [{"E", [{"G", [{"f", "2", []}]}]}]}],
      [{"f","2"}],
-     {ok, ["B","C","d","E","G",{"f","1"}]}}.
+     {ok, ["B","C","d","E","G",{"f","1"}]}};
+mdeps(m_pick_pkg_over_transitive_source) ->
+    {[{"B", [{"C", "1", []}]},
+      {"c", []}],
+     [{"C", "1"}],
+     {ok, ["B", "c"]}}.
 
 setup_project(fail_conflict, Config0, Deps) ->
     DepsType = ?config(deps_type, Config0),
@@ -449,6 +455,7 @@ m_pkg_level1(Config) -> run(Config).
 m_pkg_level2(Config) -> run(Config).
 m_pkg_level3(Config) -> run(Config).
 m_pkg_level3_alpha_order(Config) -> run(Config).
+m_pick_pkg_over_transitive_source(Config) -> run(Config).
 
 run(Config) ->
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
