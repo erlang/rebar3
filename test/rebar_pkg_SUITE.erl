@@ -171,7 +171,7 @@ mock_config(Name, Config) ->
     %% The state returns us a fake registry
     meck:new(rebar_state, [passthrough]),
     meck:expect(rebar_state, registry,
-                fun(_State) -> {ok, fake_registry} end),
+                fun(_State) -> {ok, T} end),
     meck:expect(rebar_state, get,
                 fun(_State, rebar_packages_cdn, _Default) ->
                     "http://test.com/"

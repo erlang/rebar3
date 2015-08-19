@@ -35,7 +35,7 @@ mock(Opts) ->
 
 unmock() ->
     meck:unload(?MOD),
-    meck:unload(rebar_packages).
+    meck:unload(rebar_state).
 
 %%%%%%%%%%%%%%%
 %%% Private %%%
@@ -115,10 +115,10 @@ mock_pkg_index(Opts) ->
     Dict = find_parts(Deps, Skip),
     GraphParts = to_graph_parts(Dict),
     Digraph = rebar_digraph:restore_graph(GraphParts),
-    meck:new(rebar_packages, [passthrough, no_link]),
-    meck:expect(rebar_packages, registry,
+    meck:new(rebar_state, [passthrough, no_link]),
+    meck:expect(rebar_state, registry,
                 fun(_State) -> {ok, to_registry(Deps)} end),
-    meck:expect(rebar_packages, get_packages,
+    meck:expect(rebar_state, packages,
                 fun(_State) -> {Dict, Digraph} end).
 
 %%%%%%%%%%%%%%%
