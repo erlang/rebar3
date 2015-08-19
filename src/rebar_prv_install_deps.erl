@@ -186,7 +186,7 @@ handle_profile_pkg_level([], AllApps, _Seen, _Upgrade, _Locks, State) ->
 handle_profile_pkg_level(PkgDeps, AllApps, Seen, Upgrade, Locks, State) ->
     %% Read in package index and dep graph
     {Packages, Graph} = rebar_state:packages(State),
-    Registry = rebar_packages:registry(State),
+    Registry = rebar_state:registry(State),
     State1 = rebar_state:packages(rebar_state:registry(State, Registry)
                                  ,{Packages, Graph}),
 
@@ -366,7 +366,8 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     Name = rebar_app_info:name(AppInfo),
 
     %% Deps may be under a sub project app, find it and use its state if so
-    S = rebar_app_info:state(AppInfo),
+    S0 = rebar_app_info:state(AppInfo),
+    S = rebar_state:registry(S0, rebar_state:registry(State)),
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
     S1 = rebar_state:new(S, C, rebar_app_info:dir(AppInfo)),
     S2 = rebar_state:apply_overrides(S1, Name),

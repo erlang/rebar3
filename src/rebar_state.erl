@@ -88,9 +88,16 @@ new(Config) when is_list(Config) ->
     Terms = [{{deps, default}, Deps}, {{plugins, default}, Plugins} | Config],
     true = rebar_config:verify_config_format(Terms),
     Opts = dict:from_list(Terms),
-    BaseState#state_t { dir = rebar_dir:get_cwd(),
-                        default = Opts,
-                        opts = Opts }.
+    load_package_registry(
+      BaseState#state_t { dir = rebar_dir:get_cwd(),
+                          default = Opts,
+                          opts = Opts }).
+
+load_package_registry(Config0) ->
+    Registry = rebar_packages:registry(Config0),
+    Packages = rebar_packages:packages(Config0),
+    Config0#state_t{registry = Registry,
+                    packages = Packages}.
 
 -spec new(t() | atom(), list()) -> t().
 new(Profile, Config) when is_atom(Profile)
@@ -102,10 +109,11 @@ new(Profile, Config) when is_atom(Profile)
     Terms = [{{deps, default}, Deps}, {{plugins, default}, Plugins} | Config],
     true = rebar_config:verify_config_format(Terms),
     Opts = dict:from_list(Terms),
-    BaseState#state_t { dir = rebar_dir:get_cwd(),
-                        current_profiles = [Profile],
-                        default = Opts,
-                        opts = Opts };
+    load_package_registry(
+      BaseState#state_t { dir = rebar_dir:get_cwd(),
+                          current_profiles = [Profile],
+                          default = Opts,
+                          opts = Opts });
 new(ParentState=#state_t{}, Config) ->
     %% Load terms from rebar.config, if it exists
     Dir = rebar_dir:get_cwd(),
@@ -438,16 +446,16 @@ namespace(#state_t{namespace=Namespace}) ->
 namespace(State=#state_t{}, Namespace) ->
     State#state_t{namespace=Namespace}.
 
-packages(State=#state_t{packages=undefined}) ->
-    rebar_packages:get_packages(State);
+packages(#state_t{packages=undefined}) ->
+    throw(packages_usage_error);
 packages(#state_t{packages=Packages}) ->
     Packages.
 
 packages(State, Packages) ->
     State#state_t{packages=Packages}.
 
-registry(State=#state_t{registry=undefined}) ->
-    rebar_packages:registry(State);
+registry(#state_t{registry=undefined}) ->
+    throw(registry_usage_error);
 registry(#state_t{registry=Registry}) ->
     Registry.
 

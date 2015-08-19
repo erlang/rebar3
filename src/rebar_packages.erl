@@ -1,6 +1,6 @@
 -module(rebar_packages).
 
--export([get_packages/1
+-export([packages/1
         ,registry/1
         ,package_dir/1
         ,check_registry/3
@@ -15,8 +15,9 @@
 -type vsn() :: binary().
 -type package() :: pkg_name() | {pkg_name(), vsn()}.
 
--spec get_packages(rebar_state:t()) -> {rebar_dict(), rebar_digraph()}.
-get_packages(State) ->
+-spec packages(rebar_state:t()) -> {rebar_dict(), rebar_digraph()}.
+%% DON'T USE IT! Use rebar_state:packages(State) instead.
+packages(State) ->
     RegistryDir = package_dir(State),
     DictFile = filename:join(RegistryDir, "dict"),
     Edges = filename:join(RegistryDir, "edges"),
@@ -42,6 +43,8 @@ get_packages(State) ->
             {dict:new(), digraph:new()}
     end.
 
+-spec registry(rebar_state:t()) -> {ok, ets:tid()} | {error, any()}.
+%% DON'T USE IT! Use rebar_state:registry(State) instead.
 registry(State) ->
     RegistryDir = package_dir(State),
     HexFile = filename:join(RegistryDir, "registry"),
@@ -78,7 +81,7 @@ check_registry(Pkg, Vsn, State) ->
     end.
 
 registry_checksum({pkg, Name, Vsn}, State) ->
-    {ok, Registry} = registry(State),
+    {ok, Registry} = rebar_state:registry(State),
     case ets:lookup(Registry, {Name, Vsn}) of
         [{{_, _}, [_, Checksum | _]}] ->
             Checksum;
