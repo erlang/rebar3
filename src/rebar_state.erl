@@ -38,7 +38,8 @@
          overrides/1, overrides/2,
          apply_overrides/2,
 
-         packages/1, packages/2,
+         packages_graph/1, packages_graph/2,
+         packages/1,
          registry/1, registry/2,
 
          resources/1, resources/2, add_resource/2,
@@ -65,7 +66,8 @@
                   all_plugin_deps     = []          :: [rebar_app_info:t()],
                   all_deps            = []          :: [rebar_app_info:t()],
 
-                  packages            = undefined   :: {rebar_dict(), rebar_digraph()} | undefined,
+                  packages            = undefined   :: rebar_dict(),
+                  packages_graph      = undefined   :: rebar_digraph() | undefined,
                   registry            = undefined   :: {ok, ets:tid()} | error | undefined,
                   overrides           = [],
                   resources           = [],
@@ -96,7 +98,9 @@ new(Config) when is_list(Config) ->
 load_package_registry(Config0) ->
     Registry = rebar_packages:registry(Config0),
     Packages = rebar_packages:packages(Config0),
+    PackagesGraph = rebar_packages:packages_graph(Config0),
     Config0#state_t{registry = Registry,
+                    packages_graph = PackagesGraph,
                     packages = Packages}.
 
 -spec new(t() | atom(), list()) -> t().
@@ -451,8 +455,13 @@ packages(#state_t{packages=undefined}) ->
 packages(#state_t{packages=Packages}) ->
     Packages.
 
-packages(State, Packages) ->
-    State#state_t{packages=Packages}.
+packages_graph(#state_t{packages_graph=undefined}) ->
+    throw(packages_usage_error);
+packages_graph(#state_t{packages_graph=PackagesGraph}) ->
+    PackagesGraph.
+
+packages_graph(State, PackagesGraph) ->
+    State#state_t{packages_graph=PackagesGraph}.
 
 registry(#state_t{registry=undefined}) ->
     throw(registry_usage_error);

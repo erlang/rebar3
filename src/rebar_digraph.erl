@@ -2,8 +2,6 @@
 
 -export([compile_order/1
         ,restore_graph/1
-        ,cull_deps/2
-        ,cull_deps/3
         ,subgraph/2
         ,format_error/1]).
 
@@ -69,120 +67,12 @@ restore_graph({Vs, Es}) ->
                   end, Es),
     Graph.
 
-%% Pick packages to fullfill dependencies
-%% The first dep while traversing the graph is chosen and any conflicting
-%% dep encountered later on is ignored.
-cull_deps(Graph, Vertices) ->
-    cull_deps(Graph, Vertices, sets:new()).
-
-cull_deps(Graph, Vertices, Seen) ->
-    Vertices1 = lists:keysort(2, Vertices),
-    {Solution, Levels, Discarded} = {dict:new(), dict:new(), sets:new()},
-    cull_deps(Graph, Vertices1, Levels, Solution, Seen, Discarded).
-
 format_error(no_solution) ->
     io_lib:format("No solution for packages found.", []).
 
 %%====================================================================
 %% Internal Functions
 %%====================================================================
-
-cull_deps(_Graph, [], Levels, Solution, _, Discarded) ->
-    {_, Vertices} = lists:unzip(dict:to_list(Solution)),
-    LvlVertices = [{Profile, {Parent, App, Vsn, dict:fetch(App, Levels)}}
-                  || {Profile, {Parent,App,Vsn}} <- Vertices],
-    {ok, LvlVertices,  sets:to_list(Discarded)};
-cull_deps(Graph, [{Profile, Level, Vs} | Vertices], Levels, Solution, Seen, Discarded) ->
-    {NV, NS, LS, DS} =
-        lists:foldl(fun({Parent, Name, Vsn}, {Acc, SolutionAcc, LevelsAcc, DiscardedAcc}) ->
-                            {SolutionAcc1, LevelsAcc1, DiscardedAcc1} =
-                                maybe_add_to_solution(Profile, Level, Name, {Name, Vsn}, Parent
-                                                     ,SolutionAcc
-                                                     ,LevelsAcc, Seen, DiscardedAcc),
-                            OutNeighbors = digraph:out_neighbours(Graph, {Name,Vsn}),
-                            {NewVertices, DiscardedAcc2} = handle_neighbors(Profile, Level, Name
-                                                          ,OutNeighbors, Acc, SolutionAcc1
-                                                                           ,Seen, DiscardedAcc1),
-                            {NewVertices, SolutionAcc1, LevelsAcc1, DiscardedAcc2}
-                    end, {[], Solution, Levels, Discarded}, Vs),
-    NewVertices = combine_profile_levels(Vertices, NV),
-    cull_deps(Graph, NewVertices, LS, NS, Seen, DS).
-
-%% Combine lists of deps that have the same profile and level
-combine_profile_levels(Vertices, NewVertices) ->
-    V = lists:foldl(fun({Profile, Level, Vs}, Acc) ->
-                            case ec_lists:find(fun({P, L, _}) ->
-                                                       P =:= Profile andalso L =:= Level
-                                               end, Acc) of
-                            {ok, {_, _, OldVs}=Old} ->
-                                lists:delete(Old, Acc)++[{Profile, Level, lists:keysort(1, OldVs++Vs)}];
-                            error ->
-                                Acc++[{Profile, Level, Vs}]
-                        end
-                end, Vertices, NewVertices),
-    lists:keysort(2, V).
-
-%% For each outgoing edge of a dep check if it should be added to the solution
-%% and add it to the list of vertices to do the same for
-handle_neighbors(Profile, Level, Parent, OutNeighbors, Vertices
-                ,Solution, Seen, Discarded) ->
-    case lists:foldl(fun({Name, Vsn}=Value, {NewVertices, Discarded1}) ->
-                             case dict:find(Name, Solution) of
-                                 {ok, {Profile, {Parent, Name, Vsn}}} -> % already seen
-                                     {NewVertices,
-                                      Discarded1};
-                                 {ok, _} -> % conflict resolution!
-                                     %% Warn on different version
-                                     {NewVertices,
-                                      sets:add_element(Value, Discarded1)};
-                                 error ->
-                                     %% We check Seen separately because we don't care
-                                     %% to warn if the exact same version of a package
-                                     %% was already part of the solution but we do
-                                     %% if it was simply seen in source deps
-                                     case sets:is_element(Name, Seen) of
-                                         true ->
-                                             {NewVertices,
-                                              sets:add_element(Value, Discarded1)};
-                                         false ->
-                                             {[{Parent, Name, Vsn} | NewVertices],
-                                              Discarded1}
-                                     end
-                             end
-                    end, {[], Discarded}, OutNeighbors) of
-            {[], DiscardedAcc2} ->
-                {Vertices, DiscardedAcc2};
-            {NewVertices1, DiscardedAcc2} ->
-                {Vertices++[{Profile, Level+1, NewVertices1}] ,DiscardedAcc2}
-        end.
-
-maybe_add_to_solution(Profile, Level, Key, {Name, Vsn}=Value, Parent
-                     ,Solution, Levels, Seen, Discarded) ->
-    case dict:find(Key, Solution) of
-        {ok, {Profile, {Parent, Name, Vsn}}} -> % already seen
-            {Solution,
-             Levels,
-             Discarded};
-        {ok, _} -> % conflict resolution!
-            %% Warn on different version
-            {Solution,
-             Levels,
-             sets:add_element(Value, Discarded)};
-        error ->
-            %% We check Seen separately because we don't care to warn if the exact
-            %% same version of a package was already part of the solution but we do
-            %% if it was simply seen in source deps
-            case sets:is_element(Name, Seen) of
-                true ->
-                    {Solution,
-                     Levels,
-                     sets:add_element(Value, Discarded)};
-                false ->
-                    {dict:store(Key, {Profile, {Parent, Name, Vsn}}, Solution),
-                     dict:store(Key, Level, Levels),
-                     Discarded}
-            end
-    end.
 
 subgraph(Graph, Vertices) ->
     digraph_utils:subgraph(Graph, Vertices).

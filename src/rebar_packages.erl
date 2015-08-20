@@ -1,6 +1,7 @@
 -module(rebar_packages).
 
 -export([packages/1
+        ,packages_graph/1
         ,registry/1
         ,package_dir/1
         ,check_registry/3
@@ -15,32 +16,43 @@
 -type vsn() :: binary().
 -type package() :: pkg_name() | {pkg_name(), vsn()}.
 
--spec packages(rebar_state:t()) -> {rebar_dict(), rebar_digraph()}.
+-spec packages(rebar_state:t()) -> rebar_dict().
 %% DON'T USE IT! Use rebar_state:packages(State) instead.
 packages(State) ->
     RegistryDir = package_dir(State),
     DictFile = filename:join(RegistryDir, "dict"),
+
+    try
+        {ok, DictBinary} = file:read_file(DictFile),
+        binary_to_term(DictBinary)
+    catch
+        _:_ ->
+            ?ERROR("Bad packages index, try to fix with `rebar3 update`", []),
+            dict:new()
+    end.
+
+-spec packages_graph(rebar_state:t()) -> rebar_digraph().
+packages_graph(State) ->
+    RegistryDir = package_dir(State),
     Edges = filename:join(RegistryDir, "edges"),
     Vertices = filename:join(RegistryDir, "vertices"),
     Neighbors = filename:join(RegistryDir, "neighbors"),
 
-    case lists:all(fun(X) -> filelib:is_file(X) end, [DictFile, Edges, Vertices, Neighbors]) of
+    case lists:all(fun(X) -> filelib:is_file(X) end, [Edges, Vertices, Neighbors]) of
         true ->
             try
-                {ok, DictBinary} = file:read_file(DictFile),
-                Dict = binary_to_term(DictBinary),
                 {ok, EdgesTab} = ets:file2tab(Edges),
                 {ok, VerticesTab} = ets:file2tab(Vertices),
                 {ok, NeighborsTab} = ets:file2tab(Neighbors),
-                {Dict, {digraph, EdgesTab, VerticesTab, NeighborsTab, true}}
+                {digraph, EdgesTab, VerticesTab, NeighborsTab, true}
             catch
                 _:_ ->
                     ?ERROR("Bad packages index, try to fix with `rebar3 update`", []),
-                    {dict:new(), digraph:new()}
+                    digraph:new()
             end;
         false ->
             ?ERROR("Bad packages index, try to fix with `rebar3 update`", []),
-            {dict:new(), digraph:new()}
+            digraph:new()
     end.
 
 -spec registry(rebar_state:t()) -> {ok, ets:tid()} | {error, any()}.

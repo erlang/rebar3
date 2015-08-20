@@ -119,7 +119,9 @@ mock_pkg_index(Opts) ->
     meck:expect(rebar_state, registry,
                 fun(_State) -> {ok, to_registry(Deps)} end),
     meck:expect(rebar_state, packages,
-                fun(_State) -> {Dict, Digraph} end).
+                fun(_State) -> Dict end),
+    meck:expect(rebar_state, packages_graph,
+                fun(_State) -> Digraph end).
 
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
