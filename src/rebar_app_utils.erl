@@ -212,13 +212,8 @@ parse_goal(Name, Constraint) ->
     end.
 
 get_package(Dep, State) ->
-    case rebar_state:registry(State) of
-        {ok, T} ->
-            {ok, HighestDepVsn} = rebar_packages:find_highest_matching(Dep, "0", T),
-            {Dep, HighestDepVsn};
-        error ->
-            throw(?PRV_ERROR({load_registry_fail, Dep}))
-    end.
+    {ok, HighestDepVsn} = rebar_packages:find_highest_matching(Dep, "0", ?PACKAGE_TABLE, State),
+    {Dep, HighestDepVsn}.
 
 -spec has_all_beams(file:filename_all(), [module()]) ->
     true | ?PRV_ERROR({missing_module, module()}).

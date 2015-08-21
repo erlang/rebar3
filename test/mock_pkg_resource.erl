@@ -35,7 +35,7 @@ mock(Opts) ->
 
 unmock() ->
     meck:unload(?MOD),
-    meck:unload(rebar_state).
+    meck:unload(rebar_packages).
 
 %%%%%%%%%%%%%%%
 %%% Private %%%
@@ -111,33 +111,18 @@ mock_pkg_index(Opts) ->
     Deps = proplists:get_value(pkgdeps, Opts, []),
     Skip = proplists:get_value(not_in_index, Opts, []),
     %% Dict: {App, Vsn}: [{<<"link">>, <<>>}, {<<"deps">>, []}]
-    %% Digraph: all apps and deps in the index
+    %% Index: all apps and deps in the index
+
     Dict = find_parts(Deps, Skip),
-    GraphParts = to_graph_parts(Dict),
-    Digraph = rebar_digraph:restore_graph(GraphParts),
-    meck:new(rebar_state, [passthrough, no_link]),
-    meck:expect(rebar_state, registry,
-                fun(_State) -> {ok, to_registry(Deps)} end),
-    meck:expect(rebar_state, packages,
-                fun(_State) -> Dict end),
-    meck:expect(rebar_state, packages_graph,
-                fun(_State) -> Digraph end).
+    meck:new(rebar_packages, [passthrough, no_link]),
+    meck:expect(rebar_packages, packages,
+                fun(_State) -> to_index(Deps, Dict) end),
+    meck:expect(rebar_packages, load_and_verify_version,
+                fun(_State) -> to_index(Deps, Dict), true end).
 
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
 %%%%%%%%%%%%%%%
-
-to_registry(Deps) ->
-    Tid = ets:new(registry, []),
-    lists:foreach(fun({{Name, Vsn}, _}) ->
-                          case ets:lookup(Tid, Name) of
-                              [{_, [Vsns]}] ->
-                                  ets:insert(Tid, {Name, [[Vsn | Vsns]]});
-                              _ ->
-                                  ets:insert(Tid, {Name, [[Vsn]]})
-                          end
-                  end, Deps),
-    Tid.
 
 all_files(Dir) ->
     filelib:wildcard(filename:join([Dir, "**"])).
@@ -158,10 +143,20 @@ find_parts([{AppName, Deps}|Rest], Skip, Acc) ->
             find_parts(Rest, Skip, AccNew)
     end.
 
-to_graph_parts(Dict) ->
-    LastUpdated = os:timestamp(),
-    dict:fold(fun(K,Deps,{Ks,Vs}) ->
-            {[{K,LastUpdated}|Ks],
-             [{K,{list_to_binary(atom_to_list(DK)), list_to_binary(DV)}}
-             || {DK,DV} <- Deps]  ++ Vs}
-        end, {[],[]}, Dict).
+to_index(AllDeps, Dict) ->
+    catch ets:delete(package_index),
+    ets:new(package_index, [named_table, public]),
+    dict:fold(
+      fun(K, Deps, _) ->
+              DepsList = [{ec_cnv:to_binary(DK), ec_cnv:to_binary(DV)} || {DK, DV} <- Deps],
+              ets:insert(package_index, {K, DepsList, <<"checksum">>})
+      end, ok, Dict),
+    ets:insert(package_index, {package_index_version, 3}),
+    lists:foreach(fun({{Name, Vsn}, _}) ->
+                          case ets:lookup(package_index,  ec_cnv:to_binary(Name)) of
+                              [{_, Vsns}] ->
+                                  ets:insert(package_index, {ec_cnv:to_binary(Name), [ec_cnv:to_binary(Vsn) | Vsns]});
+                              _ ->
+                                  ets:insert(package_index, {ec_cnv:to_binary(Name), [ec_cnv:to_binary(Vsn)]})
+                          end
+                  end, AllDeps).

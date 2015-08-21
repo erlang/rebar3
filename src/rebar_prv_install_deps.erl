@@ -125,10 +125,7 @@ handle_deps_as_profile(Profile, State, Deps, Upgrade) ->
     DepsDir = profile_dep_dir(State, Profile),
     Deps1 = rebar_app_utils:parse_deps(DepsDir, Deps, State, Locks, Level),
     ProfileLevelDeps = [{Profile, Deps1, Level}],
-    Graph = rebar_state:packages_graph(State),
-    Registry = rebar_packages:registry(State),
-    State1 = rebar_state:packages_graph(rebar_state:registry(State, Registry), Graph),
-    handle_profile_level(ProfileLevelDeps, [], sets:new(), Upgrade, Locks, State1, Graph).
+    handle_profile_level(ProfileLevelDeps, [], sets:new(), Upgrade, Locks, State).
 
 %% ===================================================================
 %% Internal functions
@@ -141,10 +138,7 @@ deps_per_profile(Profiles, Upgrade, State) ->
     Deps = lists:foldl(fun(Profile, DepAcc) ->
                                [parsed_profile_deps(State, Profile, Level) | DepAcc]
                        end, [], Profiles),
-    Graph = rebar_state:packages_graph(State),
-    Registry = rebar_packages:registry(State),
-    State1 = rebar_state:packages_graph(rebar_state:registry(State, Registry), Graph),
-    handle_profile_level(Deps, [], sets:new(), Upgrade, Locks, State1, Graph).
+    handle_profile_level(Deps, [], sets:new(), Upgrade, Locks, State).
 
 parsed_profile_deps(State, Profile, Level) ->
     ParsedDeps = rebar_state:get(State, {parsed_deps, Profile}, []),
@@ -153,17 +147,17 @@ parsed_profile_deps(State, Profile, Level) ->
 %% Level-order traversal of all dependencies, across profiles.
 %% If profiles x,y,z are present, then the traversal will go:
 %% x0, y0, z0, x1, y1, z1, ..., xN, yN, zN.
-handle_profile_level([], Apps, _Seen, _Upgrade, _Locks, State, _Graph) ->
+handle_profile_level([], Apps, _Seen, _Upgrade, _Locks, State) ->
     {Apps, State};
-handle_profile_level([{Profile, Deps, Level} | Rest], Apps, Seen, Upgrade, Locks, State, Graph) ->
+handle_profile_level([{Profile, Deps, Level} | Rest], Apps, Seen, Upgrade, Locks, State) ->
     {Deps1, Apps1, State1, Seen1} =
         update_deps(Profile, Level, Deps, Apps
-                   ,State, Upgrade, Seen, Locks, Graph),
+                   ,State, Upgrade, Seen, Locks),
     Deps2 = case Deps1 of
         [] -> Rest;
         _ -> Rest ++ [{Profile, Deps1, Level+1}]
     end,
-    handle_profile_level(Deps2, Apps1, sets:union(Seen, Seen1), Upgrade, Locks, State1, Graph).
+    handle_profile_level(Deps2, Apps1, sets:union(Seen, Seen1), Upgrade, Locks, State1).
 
 find_cycles(Apps) ->
     case rebar_digraph:compile_order(Apps) of
@@ -201,17 +195,17 @@ maybe_lock(Profile, AppInfo, Seen, State, Level) ->
             {sets:add_element(Name, Seen), State}
     end.
 
-update_deps(Profile, Level, Deps, Apps, State, Upgrade, Seen, Locks, Graph) ->
+update_deps(Profile, Level, Deps, Apps, State, Upgrade, Seen, Locks) ->
     lists:foldl(
       fun(AppInfo, {DepsAcc, AppsAcc, StateAcc, SeenAcc}) ->
               update_dep(AppInfo, Profile, Level,
                          DepsAcc, AppsAcc, StateAcc,
-                         Upgrade, SeenAcc, Locks, Graph)
+                         Upgrade, SeenAcc, Locks)
       end,
       {[], Apps, State, Seen},
       rebar_utils:sort_deps(Deps)).
 
-update_dep(AppInfo, Profile, Level, Deps, Apps, State, Upgrade, Seen, Locks, Graph) ->
+update_dep(AppInfo, Profile, Level, Deps, Apps, State, Upgrade, Seen, Locks) ->
     %% If not seen, add to list of locks to write out
     Name = rebar_app_info:name(AppInfo),
     case sets:is_element(Name, Seen) of
@@ -222,7 +216,7 @@ update_dep(AppInfo, Profile, Level, Deps, Apps, State, Upgrade, Seen, Locks, Gra
         false ->
             update_unseen_dep(AppInfo, Profile, Level,
                               Deps, Apps,
-                              State, Upgrade, Seen, Locks, Graph)
+                              State, Upgrade, Seen, Locks)
     end.
 
 profile_dep_dir(State, Profile) ->
@@ -242,24 +236,23 @@ update_seen_dep(AppInfo, _Profile, _Level, Deps, Apps, State, Upgrade, Seen, Loc
     end,
     {Deps, Apps, State, Seen}.
 
-update_unseen_dep(AppInfo, Profile, Level, Deps, Apps, State, Upgrade, Seen, Locks, Graph) ->
+update_unseen_dep(AppInfo, Profile, Level, Deps, Apps, State, Upgrade, Seen, Locks) ->
     {NewSeen, State1} = maybe_lock(Profile, AppInfo, Seen, State, Level),
     {_, AppInfo1} = maybe_fetch(AppInfo, Profile, Upgrade, Seen, State1),
     DepsDir = profile_dep_dir(State, Profile),
     {AppInfo2, NewDeps, State2} =
-        handle_dep(State1, Profile, DepsDir, AppInfo1, Locks, Level, Graph),
+        handle_dep(State1, Profile, DepsDir, AppInfo1, Locks, Level),
     AppInfo3 = rebar_app_info:dep_level(AppInfo2, Level),
     {NewDeps ++ Deps, [AppInfo3 | Apps], State2, NewSeen}.
 
--spec handle_dep(rebar_state:t(), atom(), file:filename_all(), rebar_app_info:t(), list(), integer(), rebar_dict()) -> {rebar_app_info:t(), [rebar_app_info:t()], [pkg_dep()], [integer()], rebar_state:t()}.
-handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level, Graph) ->
+-spec handle_dep(rebar_state:t(), atom(), file:filename_all(), rebar_app_info:t(), list(), integer()) -> {rebar_app_info:t(), [rebar_app_info:t()], [pkg_dep()], [integer()], rebar_state:t()}.
+handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     Profiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo),
     Vsn = rebar_app_info:original_vsn(AppInfo),
 
     %% Deps may be under a sub project app, find it and use its state if so
-    S0 = rebar_app_info:state(AppInfo),
-    S = rebar_state:registry(S0, rebar_state:registry(State)),
+    S = rebar_app_info:state(AppInfo),
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
     S1 = rebar_state:new(S, C, rebar_app_info:dir(AppInfo)),
     S2 = rebar_state:apply_overrides(S1, Name),
@@ -278,7 +271,7 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level, Graph) ->
     %% Upgrade lock level to be the level the dep will have in this dep tree
     case rebar_app_info:resource_type(AppInfo1) of
         pkg ->
-            NewDeps = digraph:out_neighbours(Graph, {ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)}),
+            NewDeps = rebar_packages:deps(Name, Vsn, S5),
             NewDeps1 = rebar_app_utils:parse_deps(Name, DepsDir, NewDeps, S5, Locks, Level+1),
             {rebar_app_info:deps(AppInfo1, NewDeps), NewDeps1, State};
         _ ->

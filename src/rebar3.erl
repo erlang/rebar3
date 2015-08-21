@@ -105,6 +105,7 @@ run_aux(State, RawArgs) ->
     {ok, Providers} = application:get_env(rebar, providers),
     %% Providers can modify profiles stored in opts, so set default after initializing providers
     State4 = rebar_state:create_logic_providers(Providers, State3),
+    rebar_packages:packages(State4),
     State5 = rebar_plugins:project_apps_install(State4),
     State6 = rebar_state:default(State5, rebar_state:opts(State5)),
 
@@ -280,9 +281,15 @@ state_from_global_config(Config, GlobalConfigFile) ->
     %% We don't want to worry about global plugin install state effecting later
     %% usage. So we throw away the global profile state used for plugin install.
     GlobalConfigThrowAway = rebar_state:current_profiles(GlobalConfig, [global]),
-    GlobalState = rebar_plugins:handle_plugins(global,
-                                               rebar_state:get(GlobalConfigThrowAway, plugins, []),
-                                               GlobalConfigThrowAway),
+    GlobalState = case rebar_state:get(GlobalConfigThrowAway, plugins, []) of
+                      [] ->
+                          GlobalConfigThrowAway;
+                      GlobalPluginsToInstall ->
+                          rebar_packages:packages(GlobalConfigThrowAway),
+                          rebar_plugins:handle_plugins(global,
+                                                       GlobalPluginsToInstall,
+                                                       GlobalConfigThrowAway)
+                  end,
     GlobalPlugins = rebar_state:providers(GlobalState),
     GlobalConfig2 = rebar_state:set(GlobalConfig, plugins, []),
     GlobalConfig3 = rebar_state:set(GlobalConfig2, {plugins, global}, rebar_state:get(GlobalConfigThrowAway, plugins, [])),

@@ -159,25 +159,33 @@ mock_config(Name, Config) ->
     Priv = ?config(priv_dir, Config),
     CacheRoot = filename:join([Priv, "cache", atom_to_list(Name)]),
     TmpDir = filename:join([Priv, "tmp", atom_to_list(Name)]),
-    T = ets:new(fake_registry, [public]),
-    ets:insert_new(T, [
-        {{<<"badindexchk">>,<<"1.0.0">>}, [[], ?bad_checksum]},
-        {{<<"goodpkg">>,<<"1.0.0">>}, [[], ?good_checksum]},
-        {{<<"badpkg">>,<<"1.0.0">>}, [[], ?good_checksum]}
+    Tid = ets:new(registry_table, [public]),
+    ets:insert_new(Tid, [
+        {<<"badindexchk">>,[[<<"1.0.0">>]]},
+        {<<"goodpkg">>,[[<<"1.0.0">>]]},
+        {<<"badpkg">>,[[<<"1.0.0">>]]},
+        {{<<"badindexchk">>,<<"1.0.0">>}, [[], ?bad_checksum, [<<"rebar3">>]]},
+        {{<<"goodpkg">>,<<"1.0.0">>}, [[], ?good_checksum, [<<"rebar3">>]]},
+        {{<<"badpkg">>,<<"1.0.0">>}, [[], ?good_checksum, [<<"rebar3">>]]}
     ]),
     CacheDir = filename:join([CacheRoot, "hex", "com", "test", "packages"]),
     filelib:ensure_dir(filename:join([CacheDir, "registry"])),
-    ok = ets:tab2file(T, filename:join([CacheDir, "registry"])),
+    ok = ets:tab2file(Tid, filename:join([CacheDir, "registry"])),
+
     %% The state returns us a fake registry
     meck:new(rebar_state, [passthrough]),
-    meck:expect(rebar_state, registry,
-                fun(_State) -> {ok, T} end),
     meck:expect(rebar_state, get,
                 fun(_State, rebar_packages_cdn, _Default) ->
                     "http://test.com/"
                 end),
+
     meck:new(rebar_dir, [passthrough]),
     meck:expect(rebar_dir, global_cache_dir, fun(_) -> CacheRoot end),
+
+    meck:new(rebar_packages, [passthrough]),
+    meck:expect(rebar_packages, package_dir, fun(_) -> CacheDir end),
+    rebar_prv_update:hex_to_index(rebar_state:new()),
+
     %% Cache fetches are mocked -- we assume the server and clients are
     %% correctly used.
     GoodCache = ?config(good_cache, Config),
@@ -194,7 +202,7 @@ mock_config(Name, Config) ->
     [{cache_root, CacheRoot},
      {cache_dir, CacheDir},
      {tmp_dir, TmpDir},
-     {mock_table, T} | Config].
+     {mock_table, Tid} | Config].
 
 unmock_config(Config) ->
     meck:unload(),

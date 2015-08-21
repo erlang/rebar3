@@ -27,19 +27,17 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    Dict = rebar_packages:packages(State),
-    print_packages(Dict),
+    print_packages(),
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
 format_error(load_registry_fail) ->
     "Failed to load package regsitry. Try running 'rebar3 update' to fix".
 
-print_packages(Dict) ->
-    Pkgs = lists:keysort(1, dict:fetch_keys(Dict)),
-    SortedPkgs = lists:foldl(fun({Pkg, Vsn}, Acc) ->
-                                       orddict:append_list(Pkg, [Vsn], Acc)
-                               end, orddict:new(), Pkgs),
+print_packages() ->
+    SortedPkgs = ets:foldl(fun({{Pkg, Vsn}, _}, Acc) ->
+                                   orddict:append_list(Pkg, [Vsn], Acc)
+                           end, orddict:new(), ?PACKAGE_TABLE),
 
     orddict:map(fun(Name, Vsns) ->
                         SortedVsns = lists:sort(fun(A, B) ->
