@@ -25,7 +25,9 @@ init_rebar_state(Config, Name) ->
     ok = ec_file:mkdir_p(CheckoutsDir),
     Verbosity = rebar3:log_level(),
     rebar_log:init(command_line, Verbosity),
+    GlobalDir = filename:join([DataDir, "cache"]),
     State = rebar_state:new([{base_dir, filename:join([AppsDir, "_build"])}
+                            ,{global_rebar_dir, GlobalDir}
                             ,{root_dir, AppsDir}]),
     [{apps, AppsDir}, {checkouts, CheckoutsDir}, {state, State} | Config].
 

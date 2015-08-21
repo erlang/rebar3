@@ -27,7 +27,7 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    {Dict, _} = rebar_packages:get_packages(State),
+    {Dict, _} = rebar_state:packages(State),
     print_packages(Dict),
     {ok, State}.
 
