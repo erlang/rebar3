@@ -84,6 +84,7 @@ write_registry(Dict, {digraph, Edges, Vertices, Neighbors, _}, State) ->
 
 is_supported(<<"make">>) -> true;
 is_supported(<<"rebar">>) -> true;
+is_supported(<<"rebar3">>) -> true;
 is_supported(_) -> false.
 
 hex_to_graph(Filename) ->
