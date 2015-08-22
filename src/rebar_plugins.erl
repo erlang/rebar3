@@ -16,27 +16,21 @@
 
 -spec project_apps_install(rebar_state:t()) -> rebar_state:t().
 project_apps_install(State) ->
-    rebar_packages:packages(State),
-
     Profiles = rebar_state:current_profiles(State),
     ProjectApps = rebar_state:project_apps(State),
 
-    State1 = lists:foldl(fun(Profile, StateAcc) ->
+    lists:foldl(fun(Profile, StateAcc) ->
                         Plugins = rebar_state:get(State, {plugins, Profile}, []),
                         StateAcc1 = handle_plugins(Profile, Plugins, StateAcc),
 
                         lists:foldl(fun(App, StateAcc2) ->
-                                              AppDir = rebar_app_info:dir(App),
-                                              C = rebar_config:consult(AppDir),
-                                              S = rebar_state:new(rebar_state:new(), C, AppDir),
-                                              Plugins2 = rebar_state:get(S, {plugins, Profile}, []),
-                                              handle_plugins(Profile, Plugins2, StateAcc2)
-                                      end, StateAcc1, ProjectApps)
-                end, State, Profiles),
-
-    rebar_packages:close_packages(),
-
-    State1.
+                                            AppDir = rebar_app_info:dir(App),
+                                            C = rebar_config:consult(AppDir),
+                                            S = rebar_state:new(rebar_state:new(), C, AppDir),
+                                            Plugins2 = rebar_state:get(S, {plugins, Profile}, []),
+                                            handle_plugins(Profile, Plugins2, StateAcc2)
+                                    end, StateAcc1, ProjectApps)
+                end, State, Profiles).
 
 -spec install(rebar_state:t()) -> rebar_state:t().
 install(State) ->
