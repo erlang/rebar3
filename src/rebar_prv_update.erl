@@ -9,20 +9,13 @@
          do/1,
          format_error/1]).
 
+-export([hex_to_index/1]).
+
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
 -define(PROVIDER, update).
 -define(DEPS, []).
-
-%% Ignore warning of digraph opaque type when running dialyzer
--dialyzer({no_opaque, do/1}).
--dialyzer({no_opaque, write_registry/3}).
-
-%% Ignoring the opaque type warning won't stop dialyzer from warning of
-%% no return for functions that had the opaque type warnings
--dialyzer({no_return, do/1}).
--dialyzer({no_return, write_registry/3}).
 
 %% ===================================================================
 %% Public API
@@ -50,16 +43,15 @@ do(State) ->
         TmpDir = ec_file:insecure_mkdtemp(),
         TmpFile = filename:join(TmpDir, "packages.gz"),
 
-        Url = rebar_state:get(State, rebar_packages_cdn, "https://s3.amazonaws.com/s3.hex.pm/registry.ets.gz"),
+        Url = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_HEX_REGISTRY),
         {ok, _RequestId} = httpc:request(get, {Url, []},
                                          [], [{stream, TmpFile}, {sync, true}],
                                          rebar),
         {ok, Data} = file:read_file(TmpFile),
         Unzipped = zlib:gunzip(Data),
         ok = file:write_file(HexFile, Unzipped),
-        {Dict, Graph} = hex_to_graph(HexFile),
-        write_registry(Dict, Graph, State),
-        true = digraph:delete(Graph),
+
+        hex_to_index(State),
         ok
     catch
         _E:C ->
@@ -73,56 +65,58 @@ do(State) ->
 format_error(package_index_write) ->
     "Failed to write package index.".
 
--spec write_registry(rebar_dict(), {digraph, ets:tid(), ets:tid(), ets:tid(), any()}, rebar_state:t()) -> ok | {error, atom()}.
-write_registry(Dict, {digraph, Edges, Vertices, Neighbors, _}, State) ->
-    RegistryDir = rebar_packages:package_dir(State),
-    filelib:ensure_dir(filename:join(RegistryDir, "dummy")),
-    ets:tab2file(Edges, filename:join(RegistryDir, "edges")),
-    ets:tab2file(Vertices, filename:join(RegistryDir, "vertices")),
-    ets:tab2file(Neighbors, filename:join(RegistryDir, "neighbors")),
-    file:write_file(filename:join(RegistryDir, "dict"), term_to_binary(Dict)).
-
 is_supported(<<"make">>) -> true;
 is_supported(<<"rebar">>) -> true;
+is_supported(<<"rebar3">>) -> true;
 is_supported(_) -> false.
 
-hex_to_graph(Filename) ->
-    {ok, T} = ets:file2tab(Filename),
-    Graph = digraph:new(),
-    ets:foldl(fun({Pkg, [Versions]}, ok) when is_binary(Pkg), is_list(Versions) ->
-                      lists:foreach(fun(Version) ->
-                                            digraph:add_vertex(Graph, {Pkg, Version}, 1)
-                                    end, Versions);
-                 (_, ok) ->
-                      ok
-              end, ok, T),
+hex_to_index(State) ->
+    RegistryDir = rebar_packages:package_dir(State),
+    HexFile = filename:join(RegistryDir, "registry"),
+    try ets:file2tab(HexFile) of
+        {ok, Registry} ->
+            try
+                (catch ets:delete(?PACKAGE_TABLE)),
+                ets:new(?PACKAGE_TABLE, [named_table, public]),
+                ets:foldl(fun({{Pkg, PkgVsn}, [Deps, Checksum, BuildTools | _]}, _) when is_list(BuildTools) ->
+                                  case lists:any(fun is_supported/1, BuildTools) of
+                                      true ->
+                                          DepsList = update_deps_list(Deps, Registry, State),
+                                          ets:insert(?PACKAGE_TABLE, {{Pkg, PkgVsn}, DepsList, Checksum});
+                                      false ->
+                                          true
+                                  end;
+                             ({Pkg, [Vsns]}, _) when is_binary(Pkg) ->
+                                  ets:insert(?PACKAGE_TABLE, {Pkg, Vsns});
+                             (_, _) ->
+                                  true
+                          end, true, Registry),
 
-    Dict1 = ets:foldl(fun({{Pkg, PkgVsn}, [Deps, _, BuildTools | _]}, Dict) when is_list(BuildTools) ->
-                              case lists:any(fun is_supported/1, BuildTools) of
-                                  true ->
-                                      DepsList = update_graph(Pkg, PkgVsn, Deps, T, Graph),
-                                      dict:store({Pkg, PkgVsn}, DepsList, Dict);
-                                  false ->
-                                      Dict
-                              end;
-                         (_, Dict) ->
-                              Dict
-                      end, dict:new(), T),
-    {Dict1, Graph}.
+                ets:insert(?PACKAGE_TABLE, {package_index_version, ?PACKAGE_INDEX_VERSION}),
+                ets:tab2file(?PACKAGE_TABLE, filename:join(RegistryDir, "packages.idx")),
+                true
+            after
+                catch ets:delete(Registry)
+            end;
+        {error, Reason} ->
+            ?DEBUG("Error loading package registry: ~p", [Reason]),
+            false
+    catch
+        _:_ ->
+            fail
+    end.
 
-update_graph(Pkg, PkgVsn, Deps, HexRegistry, Graph) ->
+update_deps_list(Deps, HexRegistry, State) ->
     lists:foldl(fun([Dep, DepVsn, false, _AppName | _], DepsListAcc) ->
                         case DepVsn of
                             <<"~> ", Vsn/binary>> ->
-                                case rebar_packages:find_highest_matching(Dep, Vsn, HexRegistry) of
+                                case rebar_packages:find_highest_matching(Dep, Vsn, HexRegistry, State) of
                                     {ok, HighestDepVsn} ->
-                                        digraph:add_edge(Graph, {Pkg, PkgVsn}, {Dep, HighestDepVsn}),
-                                        [{Dep, DepVsn} | DepsListAcc];
+                                        [{Dep, HighestDepVsn} | DepsListAcc];
                                     none ->
                                         DepsListAcc
                                 end;
                             Vsn ->
-                                digraph:add_edge(Graph, {Pkg, PkgVsn}, {Dep, Vsn}),
                                 [{Dep, Vsn} | DepsListAcc]
                         end;
                    ([_Dep, _DepVsn, true, _AppName | _], DepsListAcc) ->

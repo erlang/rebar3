@@ -38,9 +38,6 @@
          overrides/1, overrides/2,
          apply_overrides/2,
 
-         packages/1, packages/2,
-         registry/1, registry/2,
-
          resources/1, resources/2, add_resource/2,
          providers/1, providers/2, add_provider/2]).
 
@@ -65,8 +62,6 @@
                   all_plugin_deps     = []          :: [rebar_app_info:t()],
                   all_deps            = []          :: [rebar_app_info:t()],
 
-                  packages            = undefined   :: {rebar_dict(), rebar_digraph()} | undefined,
-                  registry            = undefined   :: {ok, ets:tid()} | error | undefined,
                   overrides           = [],
                   resources           = [],
                   providers           = []}).
@@ -88,16 +83,9 @@ new(Config) when is_list(Config) ->
     Terms = [{{deps, default}, Deps}, {{plugins, default}, Plugins} | Config],
     true = rebar_config:verify_config_format(Terms),
     Opts = dict:from_list(Terms),
-    load_package_registry(
-      BaseState#state_t { dir = rebar_dir:get_cwd(),
-                          default = Opts,
-                          opts = Opts }).
-
-load_package_registry(Config0) ->
-    Registry = rebar_packages:registry(Config0),
-    Packages = rebar_packages:packages(Config0),
-    Config0#state_t{registry = Registry,
-                    packages = Packages}.
+    BaseState#state_t { dir = rebar_dir:get_cwd(),
+                        default = Opts,
+                        opts = Opts }.
 
 -spec new(t() | atom(), list()) -> t().
 new(Profile, Config) when is_atom(Profile)
@@ -109,11 +97,10 @@ new(Profile, Config) when is_atom(Profile)
     Terms = [{{deps, default}, Deps}, {{plugins, default}, Plugins} | Config],
     true = rebar_config:verify_config_format(Terms),
     Opts = dict:from_list(Terms),
-    load_package_registry(
-      BaseState#state_t { dir = rebar_dir:get_cwd(),
-                          current_profiles = [Profile],
-                          default = Opts,
-                          opts = Opts });
+    BaseState#state_t { dir = rebar_dir:get_cwd(),
+                        current_profiles = [Profile],
+                        default = Opts,
+                        opts = Opts };
 new(ParentState=#state_t{}, Config) ->
     %% Load terms from rebar.config, if it exists
     Dir = rebar_dir:get_cwd(),
@@ -445,22 +432,6 @@ namespace(#state_t{namespace=Namespace}) ->
 
 namespace(State=#state_t{}, Namespace) ->
     State#state_t{namespace=Namespace}.
-
-packages(#state_t{packages=undefined}) ->
-    throw(packages_usage_error);
-packages(#state_t{packages=Packages}) ->
-    Packages.
-
-packages(State, Packages) ->
-    State#state_t{packages=Packages}.
-
-registry(#state_t{registry=undefined}) ->
-    throw(registry_usage_error);
-registry(#state_t{registry=Registry}) ->
-    Registry.
-
-registry(State, Registry) ->
-    State#state_t{registry=Registry}.
 
 -spec resources(t()) -> [{rebar_resource:type(), module()}].
 resources(#state_t{resources=Resources}) ->

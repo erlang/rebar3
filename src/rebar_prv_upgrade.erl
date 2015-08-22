@@ -54,7 +54,7 @@ do(State) ->
             Deps0 = top_level_deps(Deps, Locks),
             State1 = rebar_state:set(State, {deps, default}, Deps0),
             DepsDir = rebar_prv_install_deps:profile_dep_dir(State, default),
-            D = rebar_prv_install_deps:parse_deps(root, DepsDir, Deps0, State1, Locks0, 0),
+            D = rebar_app_utils:parse_deps(root, DepsDir, Deps0, State1, Locks0, 0),
             State2 = rebar_state:set(State1, {parsed_deps, default}, D),
             State3 = rebar_state:set(State2, {locks, default}, Locks0),
             State4 = rebar_state:set(State3, upgrade, true),
@@ -82,7 +82,6 @@ format_error({transitive_dependency, Name}) ->
                  [Name]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
-
 
 parse_names(Bin, Locks) ->
     case lists:usort(re:split(Bin, <<" *, *">>, [trim])) of

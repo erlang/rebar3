@@ -23,7 +23,13 @@
 -define(DEFAULT_RELEASE_DIR, "rel").
 -define(DEFAULT_CONFIG_FILE, "rebar.config").
 -define(DEFAULT_CDN, "https://s3.amazonaws.com/s3.hex.pm/tarballs").
+-define(DEFAULT_HEX_REGISTRY, "https://s3.amazonaws.com/s3.hex.pm/registry.ets.gz").
 -define(LOCK_FILE, "rebar.lock").
+
+-define(PACKAGE_INDEX_VERSION, 3).
+-define(PACKAGE_TABLE, package_index).
+-define(INDEX_FILE, "packages.idx").
+-define(REGISTRY_FILE, "registry").
 
 -ifdef(namespaced_types).
 -type rebar_dict() :: dict:dict().
