@@ -152,13 +152,7 @@ doterl_compile(Config, Dir, OutDir, MoreSources, ErlOpts) ->
 
     OutDir1 = proplists:get_value(outdir, ErlOpts, OutDir),
 
-    G = init_erlcinfo(proplists:get_all_values(i, ErlOpts), AllErlFiles, Dir),
-
-    %% A source file may have been renamed or deleted. Remove it from the graph
-    %% and remove any beam file for that source if it exists.
-    Vertices = digraph:vertices(G),
-    [maybe_rm_beam_and_edge(G, OutDir, File) || File <- lists:sort(Vertices) -- lists:sort(AllErlFiles),
-                                                filename:extension(File) =:= ".erl"],
+    G = init_erlcinfo(proplists:get_all_values(i, ErlOpts), AllErlFiles, Dir, OutDir),
 
     NeededErlFiles = needed_files(G, ErlOpts, Dir, OutDir1, AllErlFiles),
     {ErlFirstFiles, ErlOptsFirst} = erl_first_files(Config, ErlOpts, Dir, NeededErlFiles),
@@ -225,12 +219,13 @@ maybe_rm_beam_and_edge(G, OutDir, Source) ->
     case filelib:is_regular(Source) of
         true ->
             %% Actually exists, don't delete
-            ok;
+            false;
         false ->
             Target = target_base(OutDir, Source) ++ ".beam",
             ?DEBUG("Source ~s is gone, deleting previous beam file if it exists ~s", [Source, Target]),
             file:delete(Target),
-            digraph:del_vertex(G, Source)
+            digraph:del_vertex(G, Source),
+            true
     end.
 
 opts_changed(NewOpts, Target) ->
@@ -256,7 +251,7 @@ erlcinfo_file(Dir) ->
 %% parse transforms, behaviours etc.) located in their directories or given
 %% InclDirs. Note that last modification times stored in vertices already respect
 %% dependencies induced by given graph G.
-init_erlcinfo(InclDirs, Erls, Dir) ->
+init_erlcinfo(InclDirs, Erls, Dir, OutDir) ->
     G = digraph:new([acyclic]),
     try restore_erlcinfo(G, InclDirs, Dir)
     catch
@@ -265,9 +260,28 @@ init_erlcinfo(InclDirs, Erls, Dir) ->
             file:delete(erlcinfo_file(Dir))
     end,
     Dirs = source_and_include_dirs(InclDirs, Erls),
-    Modified = lists:foldl(update_erlcinfo_fun(G, Dirs), false, Erls),
-    if Modified -> store_erlcinfo(G, InclDirs, Dir); not Modified -> ok end,
+    %% A source file may have been renamed or deleted. Remove it from the graph
+    %% and remove any beam file for that source if it exists.
+    Modified = maybe_rm_beams_and_edges(G, OutDir, Erls),
+    Modified1 = lists:foldl(update_erlcinfo_fun(G, Dirs), Modified, Erls),
+    if Modified1 -> store_erlcinfo(G, InclDirs, Dir); not Modified1 -> ok end,
     G.
+
+maybe_rm_beams_and_edges(G, Dir, Files) ->
+    Vertices = digraph:vertices(G),
+    case lists:filter(fun(File) ->
+                              case filename:extension(File) =:= ".erl" of
+                                  true ->
+                                      maybe_rm_beam_and_edge(G, Dir, File);
+                                  false ->
+                                      false
+                              end
+                      end, lists:sort(Vertices) -- lists:sort(Files)) of
+        [] ->
+            false;
+        _ ->
+            true
+    end.
 
 source_and_include_dirs(InclDirs, Erls) ->
     SourceDirs = lists:map(fun filename:dirname/1, Erls),
