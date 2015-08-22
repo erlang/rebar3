@@ -28,14 +28,12 @@ do(Module, Command, Provider, State) ->
         case rebar_state:get(State, relx, []) of
             [] ->
                 relx:main([{lib_dirs, LibDirs}
-                          ,{output_dir, OutputDir}
-                          ,{caller, api}], AllOptions);
+                          ,{caller, api} | output_dir(OutputDir, Options)], AllOptions);
             Config ->
                 Config1 = update_config(Config),
                 relx:main([{lib_dirs, LibDirs}
                           ,{config, Config1}
-                          ,{output_dir, OutputDir}
-                          ,{caller, api}], AllOptions)
+                          ,{caller, api} | output_dir(OutputDir, Options)], AllOptions)
         end,
         rebar_hooks:run_all_hooks(Cwd, post, Provider, Providers, State),
         {ok, State}
@@ -67,3 +65,8 @@ update_config(Config) ->
                             end
                     end, {[], []}, Config),
     lists:reverse(Special) ++ Other.
+
+%% Don't override output_dir if the user passed one on the command line
+output_dir(OutputDir, Options) ->
+    [{output_dir, OutputDir} || not(lists:member("-o", Options))
+                                    andalso not(lists:member("--output-dir", Options))].
