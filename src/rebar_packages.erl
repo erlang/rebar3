@@ -1,56 +1,60 @@
 -module(rebar_packages).
 
--export([get_packages/1
-        ,registry/1
+-export([packages/1
+        ,close_packages/0
+        ,load_and_verify_version/1
+        ,deps/3
         ,package_dir/1
-        ,check_registry/3
         ,registry_checksum/2
-        ,find_highest_matching/3]).
+        ,find_highest_matching/4
+        ,format_error/1]).
 
 -export_type([package/0]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 -type pkg_name() :: binary() | atom().
 -type vsn() :: binary().
 -type package() :: pkg_name() | {pkg_name(), vsn()}.
 
--spec get_packages(rebar_state:t()) -> {rebar_dict(), rebar_digraph()}.
-get_packages(State) ->
-    RegistryDir = package_dir(State),
-    DictFile = filename:join(RegistryDir, "dict"),
-    Edges = filename:join(RegistryDir, "edges"),
-    Vertices = filename:join(RegistryDir, "vertices"),
-    Neighbors = filename:join(RegistryDir, "neighbors"),
-
-    case lists:all(fun(X) -> filelib:is_file(X) end, [DictFile, Edges, Vertices, Neighbors]) of
+-spec packages(rebar_state:t()) -> ets:tid().
+packages(State) ->
+    catch ets:delete(?PACKAGE_TABLE),
+    case load_and_verify_version(State) of
         true ->
-            try
-                {ok, DictBinary} = file:read_file(DictFile),
-                Dict = binary_to_term(DictBinary),
-                {ok, EdgesTab} = ets:file2tab(Edges),
-                {ok, VerticesTab} = ets:file2tab(Vertices),
-                {ok, NeighborsTab} = ets:file2tab(Neighbors),
-                {Dict, {digraph, EdgesTab, VerticesTab, NeighborsTab, true}}
-            catch
-                _:_ ->
-                    ?ERROR("Bad packages index, try to fix with `rebar3 update`", []),
-                    {dict:new(), digraph:new()}
-            end;
+            ok;
         false ->
+            ?DEBUG("Error loading package index.", []),
             ?ERROR("Bad packages index, try to fix with `rebar3 update`", []),
-            {dict:new(), digraph:new()}
+            ets:new(?PACKAGE_TABLE, [named_table, public])
     end.
 
-registry(State) ->
+close_packages() ->
+    catch ets:delete(?PACKAGE_TABLE).
+
+load_and_verify_version(State) ->
     RegistryDir = package_dir(State),
-    HexFile = filename:join(RegistryDir, "registry"),
-    case ets:file2tab(HexFile) of
-        {ok, T} ->
-            {ok, T};
-        {error, Reason} ->
-            ?DEBUG("Error loading registry: ~p", [Reason]),
-            error
+    case ets:file2tab(filename:join(RegistryDir, ?INDEX_FILE)) of
+        {ok, _} ->
+            case ets:lookup_element(?PACKAGE_TABLE, package_index_version, 2) of
+                ?PACKAGE_INDEX_VERSION ->
+                    true;
+                _ ->
+                    (catch ets:delete(?PACKAGE_TABLE)),
+                    rebar_prv_update:hex_to_index(State)
+            end;
+        _ ->
+            rebar_prv_update:hex_to_index(State)
+    end.
+
+deps(Name, Vsn, State) ->
+    try
+        verify_table(State),
+        ets:lookup_element(?PACKAGE_TABLE, {ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)}, 2)
+    catch
+        _:_ ->
+            throw(?PRV_ERROR({missing_package, ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)}))
     end.
 
 package_dir(State) ->
@@ -63,27 +67,13 @@ package_dir(State) ->
     ok = filelib:ensure_dir(filename:join(PackageDir, "placeholder")),
     PackageDir.
 
-
-check_registry(Pkg, Vsn, State) ->
-    case rebar_state:registry(State) of
-        {ok, T} ->
-            case ets:lookup(T, Pkg) of
-                [{Pkg, [Vsns]}] ->
-                    lists:member(Vsn, Vsns);
-                _ ->
-                    false
-            end;
-        error ->
-            false
-    end.
-
 registry_checksum({pkg, Name, Vsn}, State) ->
-    {ok, Registry} = registry(State),
-    case ets:lookup(Registry, {Name, Vsn}) of
-        [{{_, _}, [_, Checksum | _]}] ->
-            Checksum;
-        [] ->
-            none
+    try
+        verify_table(State),
+        ets:lookup_element(?PACKAGE_TABLE, {Name, Vsn}, 3)
+    catch
+        _:_ ->
+            throw(?PRV_ERROR({missing_package, ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)}))
     end.
 
 %% Hex supports use of ~> to specify the version required for a dependency.
@@ -101,28 +91,45 @@ registry_checksum({pkg, Name, Vsn}, State) ->
 %% `~> 2.1.3-dev` | `>= 2.1.3-dev and < 2.2.0`
 %% `~> 2.0` | `>= 2.0.0 and < 3.0.0`
 %% `~> 2.1` | `>= 2.1.0 and < 3.0.0`
-find_highest_matching(Dep, Constraint, T) ->
-    case ets:lookup(T, Dep) of
-        [{Dep, [[Vsn]]}] ->
-            case ec_semver:pes(Vsn, Constraint) of
-                true ->
-                    {ok, Vsn};
-                false ->
-                    ?WARN("Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
-                         "Using anyway, but it is not guarenteed to work.", [Dep, Vsn, Constraint]),
-                    {ok, Vsn}
-            end;
-        [{Dep, [[HeadVsn | VsnTail]]}] ->
-            {ok, lists:foldl(fun(Version, Highest) ->
-                                case ec_semver:pes(Version, Constraint) andalso
-                                    ec_semver:gt(Version, Highest) of
-                                    true ->
-                                        Version;
-                                    false ->
-                                        Highest
-                                end
-                        end, HeadVsn, VsnTail)};
+find_highest_matching(Dep, Constraint, Table, State) ->
+    verify_table(State),
+    case ets:lookup_element(Table, Dep, 2) of
+        [[HeadVsn | VsnTail]] ->
+            {ok, handle_vsns(Constraint, HeadVsn, VsnTail)};
+        [[Vsn]] ->
+            handle_single_vsn(Dep, Vsn, Constraint);
+        [Vsn] ->
+            handle_single_vsn(Dep, Vsn, Constraint);
+        [HeadVsn | VsnTail] ->
+            {ok, handle_vsns(Constraint, HeadVsn, VsnTail)};
         [] ->
-            ?WARN("Missing registry entry for package ~s", [Dep]),
+            ?WARN("Missing registry entry for package ~s. Try to fix with `rebar3 update`", [Dep]),
             none
     end.
+
+handle_vsns(Constraint, HeadVsn, VsnTail) ->
+    lists:foldl(fun(Version, Highest) ->
+                        case ec_semver:pes(Version, Constraint) andalso
+                            ec_semver:gt(Version, Highest) of
+                            true ->
+                                Version;
+                            false ->
+                                Highest
+                        end
+                end, HeadVsn, VsnTail).
+
+handle_single_vsn(Dep, Vsn, Constraint) ->
+    case ec_semver:pes(Vsn, Constraint) of
+        true ->
+            {ok, Vsn};
+        false ->
+            ?WARN("Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
+                 "Using anyway, but it is not guarenteed to work.", [Dep, Vsn, Constraint]),
+            {ok, Vsn}
+    end.
+
+format_error({missing_package, Package, Version}) ->
+    io_lib:format("Package not found in registry: ~s-~s. Try to fix with `rebar3 update`", [Package, Version]).
+
+verify_table(State) ->
+    ets:info(?PACKAGE_TABLE, named_table) =:= true orelse ?MODULE:load_and_verify_version(State).

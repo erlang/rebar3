@@ -34,6 +34,8 @@
          dir/2,
          out_dir/1,
          out_dir/2,
+         resource_type/1,
+         resource_type/2,
          source/1,
          source/2,
          state/1,
@@ -64,6 +66,7 @@
                      dep_level=0        :: integer(),
                      dir                :: file:name(),
                      out_dir            :: file:name(),
+                     resource_type      :: pkg | src,
                      source             :: string() | tuple() | undefined,
                      state              :: rebar_state:t() | undefined,
                      is_lock=false      :: boolean(),
@@ -274,6 +277,14 @@ out_dir(AppInfo=#app_info_t{}, OutDir) ->
 ebin_dir(#app_info_t{out_dir=OutDir}) ->
     ec_cnv:to_list(filename:join(OutDir, "ebin")).
 
+-spec resource_type(t(), pkg | src) -> t().
+resource_type(AppInfo=#app_info_t{}, Type) ->
+    AppInfo#app_info_t{resource_type=Type}.
+
+-spec resource_type(t()) -> pkg | src.
+resource_type(#app_info_t{resource_type=ResourceType}) ->
+    ResourceType.
+
 -spec source(t(), string() | tuple()) -> t().
 source(AppInfo=#app_info_t{}, Source) ->
     AppInfo#app_info_t{source=Source}.
@@ -316,7 +327,7 @@ is_checkout(#app_info_t{is_checkout=IsCheckout}) ->
 
 -spec valid(t()) -> boolean().
 valid(AppInfo=#app_info_t{valid=undefined, state=State}) ->
-    case rebar_app_utils:validate_application_info(AppInfo)
+    case rebar_app_utils:validate_application_info(AppInfo) =:= true
         andalso rebar_state:has_all_artifacts(State) =:= true of
         true ->
             true;

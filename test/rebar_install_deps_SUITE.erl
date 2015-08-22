@@ -15,7 +15,7 @@ groups() ->
      {git, [], [{group, unique}]},
      {pkg, [], [{group, unique}]},
      {mixed, [], [
-        m_flat1, m_flat2, m_circular1, m_circular2, m_circular3,
+        m_flat1, m_flat2, m_circular1, m_circular2,
         m_pick_source1, m_pick_source2, m_pick_source3,
         m_pick_source4, m_pick_source5, m_source_to_pkg,
         m_pkg_level1, m_pkg_level2, m_pkg_level3, m_pkg_level3_alpha_order
@@ -96,9 +96,9 @@ format_expected_mdeps(Deps) ->
 format_expected_mixed_warnings(Warnings) ->
     [case W of
         {N, Vsn} when hd(N) >= $a, hd(N) =< $z -> {pkg, string:to_upper(N), Vsn};
-        {N, Vsn} when hd(N) >= $A, hd(N) =< $Z -> {src, N, Vsn};
+        {N, Vsn} when hd(N) >= $A, hd(N) =< $Z -> {git, N, Vsn};
         N when hd(N) >= $a, hd(N) =< $z -> {pkg, string:to_upper(N), "0.0.0"};
-        N when hd(N) >= $A, hd(N) =< $Z -> {src, N, "0.0.0"}
+        N when hd(N) >= $A, hd(N) =< $Z -> {git, N, "0.0.0"}
      end || W <- Warnings].
 
 %% format:
@@ -199,39 +199,32 @@ mdeps(m_circular2) ->
     {[{"B", [{"c", [{"b", []}]}]}],
      [],
      {error, {rebar_prv_install_deps, {cycles, [[<<"B">>,<<"C">>]]}}}};
-mdeps(m_circular3) ->
-    %% Spot the circular dep due to being to low in the deps tree
-    %% but as a source dep, taking precedence over packages
-    {[{"B", [{"C", "2", [{"B", []}]}]},
-      {"c", "1", [{"d",[]}]}],
-     [],
-     {error, {rebar_prv_install_deps, {cycles, [[<<"B">>,<<"C">>]]}}}};
 mdeps(m_pick_source1) ->
     {[{"B", [{"D", []}]},
       {"c", [{"d", []}]}],
      ["d"],
      {ok, ["B", "c", "D"]}};
 mdeps(m_pick_source2) ->
-    {[{"b", [{"d", []}]},
-      {"C", [{"D", []}]}],
-     ["d"],
-     {ok, ["b", "C", "D"]}};
-mdeps(m_pick_source3) ->
     %% The order of declaration is important.
     {[{"b", []},
       {"B", []}],
      [],
      {ok, ["b"]}};
-mdeps(m_pick_source4) ->
+mdeps(m_pick_source3) ->
     {[{"B", []},
       {"b", []}],
      [],
      {ok, ["B"]}};
+mdeps(m_pick_source4) ->
+    {[{"b", [{"d", "1", []}]},
+      {"C", [{"D", "1", []}]}],
+     [{"D", "1"}],
+     {ok, ["b", "C", {"d", "1"}]}};
 mdeps(m_pick_source5) ->
-    {[{"B", [{"d", []}]},
-      {"C", [{"D", []}]}],
-     ["d"],
-     {ok, ["B", "C", "D"]}};
+    {[{"B", [{"d", "1", []}]},
+      {"C", [{"D", "1", []}]}],
+     [{"D", "1"}],
+     {ok, ["B", "C", {"d", "1"}]}};
 mdeps(m_source_to_pkg) ->
     {[{"B", [{"c",[{"d", []}]}]}],
      [],
@@ -438,7 +431,6 @@ m_flat1(Config) -> run(Config).
 m_flat2(Config) -> run(Config).
 m_circular1(Config) -> run(Config).
 m_circular2(Config) -> run(Config).
-m_circular3(Config) -> run(Config).
 m_pick_source1(Config) -> run(Config).
 m_pick_source2(Config) -> run(Config).
 m_pick_source3(Config) -> run(Config).
@@ -483,5 +475,5 @@ in_warnings(git, Warns, NameRaw, VsnRaw) ->
 in_warnings(pkg, Warns, NameRaw, VsnRaw) ->
     Name = iolist_to_binary(NameRaw),
     Vsn = iolist_to_binary(VsnRaw),
-    1 =< length([1 || {_, [AppName, AppVsn]} <- Warns,
+    1 =< length([1 || {_, [AppName, {pkg, _, AppVsn}]} <- Warns,
                       AppName =:= Name, AppVsn =:= Vsn]).

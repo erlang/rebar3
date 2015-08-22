@@ -38,9 +38,6 @@
          overrides/1, overrides/2,
          apply_overrides/2,
 
-         packages/1, packages/2,
-         registry/1, registry/2,
-
          resources/1, resources/2, add_resource/2,
          providers/1, providers/2, add_provider/2]).
 
@@ -65,8 +62,6 @@
                   all_plugin_deps     = []          :: [rebar_app_info:t()],
                   all_deps            = []          :: [rebar_app_info:t()],
 
-                  packages            = undefined   :: {rebar_dict(), rebar_digraph()} | undefined,
-                  registry            = undefined   :: {ok, ets:tid()} | error | undefined,
                   overrides           = [],
                   resources           = [],
                   providers           = []}).
@@ -437,22 +432,6 @@ namespace(#state_t{namespace=Namespace}) ->
 
 namespace(State=#state_t{}, Namespace) ->
     State#state_t{namespace=Namespace}.
-
-packages(State=#state_t{packages=undefined}) ->
-    rebar_packages:get_packages(State);
-packages(#state_t{packages=Packages}) ->
-    Packages.
-
-packages(State, Packages) ->
-    State#state_t{packages=Packages}.
-
-registry(State=#state_t{registry=undefined}) ->
-    rebar_packages:registry(State);
-registry(#state_t{registry=Registry}) ->
-    Registry.
-
-registry(State, Registry) ->
-    State#state_t{registry=Registry}.
 
 -spec resources(t()) -> [{rebar_resource:type(), module()}].
 resources(#state_t{resources=Resources}) ->
