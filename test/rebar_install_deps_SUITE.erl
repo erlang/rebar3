@@ -17,7 +17,7 @@ groups() ->
      {mixed, [], [
         m_flat1, m_flat2, m_circular1, m_circular2,
         m_pick_source1, m_pick_source2, m_pick_source3,
-        m_source_to_pkg,
+        m_pick_source4, m_pick_source5, m_source_to_pkg,
         m_pkg_level1, m_pkg_level2, m_pkg_level3, m_pkg_level3_alpha_order
      ]}
     ].
@@ -96,9 +96,9 @@ format_expected_mdeps(Deps) ->
 format_expected_mixed_warnings(Warnings) ->
     [case W of
         {N, Vsn} when hd(N) >= $a, hd(N) =< $z -> {pkg, string:to_upper(N), Vsn};
-        {N, Vsn} when hd(N) >= $A, hd(N) =< $Z -> {src, N, Vsn};
+        {N, Vsn} when hd(N) >= $A, hd(N) =< $Z -> {git, N, Vsn};
         N when hd(N) >= $a, hd(N) =< $z -> {pkg, string:to_upper(N), "0.0.0"};
-        N when hd(N) >= $A, hd(N) =< $Z -> {src, N, "0.0.0"}
+        N when hd(N) >= $A, hd(N) =< $Z -> {git, N, "0.0.0"}
      end || W <- Warnings].
 
 %% format:
@@ -215,6 +215,16 @@ mdeps(m_pick_source3) ->
       {"b", []}],
      [],
      {ok, ["B"]}};
+mdeps(m_pick_source4) ->
+    {[{"b", [{"d", "1", []}]},
+      {"C", [{"D", "1", []}]}],
+     [{"D", "1"}],
+     {ok, ["b", "C", {"d", "1"}]}};
+mdeps(m_pick_source5) ->
+    {[{"B", [{"d", "1", []}]},
+      {"C", [{"D", "1", []}]}],
+     [{"D", "1"}],
+     {ok, ["B", "C", {"d", "1"}]}};
 mdeps(m_source_to_pkg) ->
     {[{"B", [{"c",[{"d", []}]}]}],
      [],
@@ -424,6 +434,8 @@ m_circular2(Config) -> run(Config).
 m_pick_source1(Config) -> run(Config).
 m_pick_source2(Config) -> run(Config).
 m_pick_source3(Config) -> run(Config).
+m_pick_source4(Config) -> run(Config).
+m_pick_source5(Config) -> run(Config).
 m_source_to_pkg(Config) -> run(Config).
 m_pkg_level1(Config) -> run(Config).
 m_pkg_level2(Config) -> run(Config).
