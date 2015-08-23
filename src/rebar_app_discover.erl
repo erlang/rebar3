@@ -26,12 +26,13 @@ do(State, LibDirs) ->
     State1 = lists:foldl(fun(Profile, StateAcc) ->
                                  ProfileDeps = rebar_state:get(StateAcc, {deps, Profile}, []),
                                  ProfileDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_sort(ProfileDeps)),
+                                 StateAcc1 = rebar_state:set(StateAcc, {deps, Profile}, ProfileDeps2),
                                  ParsedDeps = parse_profile_deps(Profile
                                                                 ,TopLevelApp
                                                                 ,ProfileDeps2
-                                                                ,StateAcc
-                                                                ,StateAcc),
-                                 rebar_state:set(StateAcc, {parsed_deps, Profile}, ParsedDeps)
+                                                                ,StateAcc1
+                                                                ,StateAcc1),
+                                 rebar_state:set(StateAcc1, {parsed_deps, Profile}, ParsedDeps)
                          end, State, lists:reverse(CurrentProfiles)),
 
     %% Handle sub project apps deps
@@ -109,7 +110,8 @@ handle_profile(Profile, Name, AppState, State) ->
     %% to be included in the parsed deps
     NewDeps = ProfileDeps2 -- TopLevelProfileDeps,
     ParsedDeps = parse_profile_deps(Profile, Name, NewDeps, AppState, State1),
-    rebar_state:set(State1, {parsed_deps, Profile}, TopParsedDeps++ParsedDeps).
+    State2 = rebar_state:set(State1, {deps, Profile}, ProfileDeps2),
+    rebar_state:set(State2, {parsed_deps, Profile}, TopParsedDeps++ParsedDeps).
 
 parse_profile_deps(Profile, Name, Deps, AppState, State) ->
     DepsDir = rebar_prv_install_deps:profile_dep_dir(State, Profile),
