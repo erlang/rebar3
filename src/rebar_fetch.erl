@@ -71,6 +71,8 @@ format_error({failed_extract, CachePath}) ->
     io_lib:format("Failed to extract package: ~s", [CachePath]);
 format_error({bad_etag, Source}) ->
     io_lib:format("MD5 Checksum comparison failed for: ~s", [Source]);
+format_error({fetch_fail, Name, Vsn}) ->
+    io_lib:format("Failed to fetch and copy dep: ~s-~s", [Name, Vsn]);
 format_error({fetch_fail, Source}) ->
     io_lib:format("Failed to fetch and copy dep: ~p", [Source]);
 format_error({bad_checksum, File}) ->

@@ -126,6 +126,8 @@ parse_dep(Parent, {Name, Vsn}, DepsDir, IsLock, State) when is_list(Vsn); is_bin
         not_found ->
             {PkgName, PkgVsn} = parse_goal(ec_cnv:to_binary(Name)
                                           ,ec_cnv:to_binary(Vsn)),
+            %% Verify package actually exists. This will throw a missing_package exception
+            rebar_packages:deps(PkgName, PkgVsn, State),
             Source = {pkg, PkgName, PkgVsn},
             rebar_app_info:resource_type(dep_to_app(Parent, DepsDir, PkgName, PkgVsn, Source, IsLock, State), pkg)
     end;
@@ -137,6 +139,8 @@ parse_dep(Parent, Name, DepsDir, IsLock, State) when is_atom(Name); is_binary(Na
         {ok, _App} ->
             dep_to_app(root, DepsDir, Name, [], [], IsLock, State);
         not_found ->
+            %% Verify package actually exists. This will throw a missing_package exception
+            rebar_packages:deps(PkgName, PkgVsn, State),
             Source = {pkg, PkgName, PkgVsn},
             rebar_app_info:resource_type(dep_to_app(Parent, DepsDir, PkgName, PkgVsn, Source, IsLock, State), pkg)
     end;
@@ -153,6 +157,8 @@ parse_dep(Parent, {_Name, {pkg, Name, Vsn}, Level}, DepsDir, IsLock, State) when
         {ok, _App} ->
             dep_to_app(root, DepsDir, Name, [], [], IsLock, State);
         not_found ->
+            %% Verify package actually exists. This will throw a missing_package exception
+            rebar_packages:deps(Name, Vsn, State),
             Source = {pkg, Name, Vsn},
             rebar_app_info:resource_type(dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State), pkg)
     end;
@@ -193,6 +199,10 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
                    end,
     rebar_app_info:resource_type(rebar_app_info:parent(AppInfo, Parent), ResourceType).
 
+format_error({missing_package, Package}) ->
+    io_lib:format("Package not found in registry: ~s", [Package]);
+format_error({parse_dep, Dep}) ->
+    io_lib:format("Failed parsing dep ~p", [Dep]);
 format_error(Error) ->
     io_lib:format("~p", [Error]).
 
@@ -212,8 +222,12 @@ parse_goal(Name, Constraint) ->
     end.
 
 get_package(Dep, State) ->
-    {ok, HighestDepVsn} = rebar_packages:find_highest_matching(Dep, "0", ?PACKAGE_TABLE, State),
-    {Dep, HighestDepVsn}.
+    case rebar_packages:find_highest_matching(Dep, "0", ?PACKAGE_TABLE, State) of
+        {ok, HighestDepVsn} ->
+            {Dep, HighestDepVsn};
+        none ->
+            throw(?PRV_ERROR({missing_package, ec_cnv:to_binary(Dep)}))
+    end.
 
 -spec has_all_beams(file:filename_all(), [module()]) ->
     true | ?PRV_ERROR({missing_module, module()}).

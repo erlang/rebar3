@@ -38,6 +38,10 @@ do(State) ->
         State1 = rebar_app_discover:do(State, LibDirs),
         {ok, State1}
     catch
+        throw:{error, {rebar_packages, Error}} ->
+            {error, {rebar_packages, Error}};
+        throw:{error, {rebar_app_utils, Error}} ->
+            {error, {rebar_app_utils, Error}};
         throw:{error, Error} ->
             ?PRV_ERROR(Error)
     end.
