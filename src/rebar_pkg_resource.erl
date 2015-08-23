@@ -34,7 +34,7 @@ download(TmpDir, Pkg={pkg, Name, Vsn}, State) ->
     Url = string:join([CDN, Package], "/"),
     cached_download(TmpDir, CachePath, Pkg, Url, etag(CachePath), State).
 
-cached_download(TmpDir, CachePath, Pkg, Url, ETag, State) ->
+cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn}, Url, ETag, State) ->
     case request(Url, ETag) of
         {ok, cached} ->
             serve_from_cache(TmpDir, CachePath, Pkg, State);
@@ -44,7 +44,7 @@ cached_download(TmpDir, CachePath, Pkg, Url, ETag, State) ->
             ?DEBUG("Download ~s error, using ~s from cache", [Url, CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg, State);
         error ->
-            request_failed
+            {fetch_fail, Name, Vsn}
     end.
 
 serve_from_cache(TmpDir, CachePath, Pkg, State) ->

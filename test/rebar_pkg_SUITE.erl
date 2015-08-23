@@ -148,7 +148,7 @@ bad_disconnect(Config) ->
     Tmp = ?config(tmp_dir, Config),
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
-    ?assertEqual(request_failed,
+    ?assertEqual({fetch_fail, Pkg, Vsn},
                  rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn}, State)).
 
 

@@ -114,6 +114,7 @@ update_deps_list(Deps, HexRegistry, State) ->
                                     {ok, HighestDepVsn} ->
                                         [{Dep, HighestDepVsn} | DepsListAcc];
                                     none ->
+                                        ?WARN("Missing registry entry for package ~s. Try to fix with `rebar3 update`", [Dep]),
                                         DepsListAcc
                                 end;
                             Vsn ->

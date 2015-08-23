@@ -108,6 +108,8 @@ format_error({not_rebar_package, Package, Version}) ->
     io_lib:format("Package not buildable with rebar3: ~s-~s", [Package, Version]);
 format_error({missing_package, Package, Version}) ->
     io_lib:format("Package not found in registry: ~s-~s", [Package, Version]);
+format_error({missing_package, Package}) ->
+    io_lib:format("Package not found in registry: ~s", [Package]);
 format_error({cycles, Cycles}) ->
     Prints = [["applications: ",
                [io_lib:format("~s ", [Dep]) || Dep <- Cycle],

@@ -93,7 +93,7 @@ registry_checksum({pkg, Name, Vsn}, State) ->
 %% `~> 2.1` | `>= 2.1.0 and < 3.0.0`
 find_highest_matching(Dep, Constraint, Table, State) ->
     verify_table(State),
-    case ets:lookup_element(Table, Dep, 2) of
+    try ets:lookup_element(Table, Dep, 2) of
         [[HeadVsn | VsnTail]] ->
             {ok, handle_vsns(Constraint, HeadVsn, VsnTail)};
         [[Vsn]] ->
@@ -101,9 +101,9 @@ find_highest_matching(Dep, Constraint, Table, State) ->
         [Vsn] ->
             handle_single_vsn(Dep, Vsn, Constraint);
         [HeadVsn | VsnTail] ->
-            {ok, handle_vsns(Constraint, HeadVsn, VsnTail)};
-        [] ->
-            ?WARN("Missing registry entry for package ~s. Try to fix with `rebar3 update`", [Dep]),
+            {ok, handle_vsns(Constraint, HeadVsn, VsnTail)}
+    catch
+        error:badarg ->
             none
     end.
 
