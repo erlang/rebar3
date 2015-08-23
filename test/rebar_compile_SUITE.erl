@@ -23,7 +23,9 @@
          erl_first_files_test/1,
          mib_test/1,
          only_default_transitive_deps/1,
-         clean_all/1]).
+         clean_all/1,
+         override_deps/1,
+         profile_override_deps/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -52,7 +54,7 @@ all() ->
      dont_recompile_yrl_or_xrl, delete_beam_if_source_deleted,
      deps_in_path, checkout_priority, highest_version_of_pkg_dep,
      parse_transform_test, erl_first_files_test, mib_test, only_default_transitive_deps,
-     clean_all].
+     clean_all, override_deps, profile_override_deps].
 
 build_basic_app(Config) ->
     AppDir = ?config(apps, Config),
@@ -590,4 +592,42 @@ clean_all(Config) ->
     rebar_test_utils:run_and_check(
         Config, RConf, ["clean", "--all"],
         {ok, [{app, Name, invalid}, {app, DepName, invalid}, {app, PkgName, invalid}]}
+    ).
+
+override_deps(Config) ->
+    mock_git_resource:mock([{deps, [{some_dep, "0.0.1"},{other_dep, "0.0.1"}]}]),
+    Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+
+    RebarConfig = [
+        {deps, TopDeps},
+        {overrides, [
+            {override, some_dep, [
+                                 {deps, []}
+                                 ]}
+                    ]}
+        ],
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["compile"],
+        {ok, [{dep, "some_dep"},{dep_not_exist, "other_dep"}]}
+    ).
+
+profile_override_deps(Config) ->
+    mock_git_resource:mock([{deps, [{some_dep, "0.0.1"},{other_dep, "0.0.1"}]}]),
+    Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+
+    RebarConfig = [
+        {deps, TopDeps},
+        {profiles, [{a,
+                    [{overrides, [
+                                {override, some_dep, [
+                                                     {deps, []}
+                                                     ]}
+                                ]}
+                    ]}
+        ]}],
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["as", "a", "compile"],
+        {ok, [{dep, "some_dep"},{dep_not_exist, "other_dep"}]}
     ).

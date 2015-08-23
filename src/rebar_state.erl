@@ -242,7 +242,9 @@ apply_overrides(State=#state_t{overrides=Overrides}, AppName) ->
 
     %% Inefficient. We want the order we get here though.
     State1 = lists:foldl(fun({override, O}, StateAcc) ->
-                                 lists:foldl(fun({Key, Value}, StateAcc1) ->
+                                 lists:foldl(fun({deps, Value}, StateAcc1) ->
+                                                     rebar_state:set(StateAcc1, {deps,default}, Value);
+                                                ({Key, Value}, StateAcc1) ->
                                                      rebar_state:set(StateAcc1, Key, Value)
                                              end, StateAcc, O);
                             (_, StateAcc) ->
@@ -250,7 +252,9 @@ apply_overrides(State=#state_t{overrides=Overrides}, AppName) ->
                          end, State, Overrides),
 
     State2 = lists:foldl(fun({override, N, O}, StateAcc) when N =:= Name ->
-                                 lists:foldl(fun({Key, Value}, StateAcc1) ->
+                                 lists:foldl(fun({deps, Value}, StateAcc1) ->
+                                                     rebar_state:set(StateAcc1, {deps,default}, Value);
+                                                ({Key, Value}, StateAcc1) ->
                                                      rebar_state:set(StateAcc1, Key, Value)
                                              end, StateAcc, O);
                             (_, StateAcc) ->
@@ -258,7 +262,10 @@ apply_overrides(State=#state_t{overrides=Overrides}, AppName) ->
                          end, State1, Overrides),
 
     State3 = lists:foldl(fun({add, N, O}, StateAcc) when N =:= Name ->
-                        lists:foldl(fun({Key, Value}, StateAcc1) ->
+                        lists:foldl(fun({deps, Value}, StateAcc1) ->
+                                            OldValue = rebar_state:get(StateAcc1, {deps,default}, []),
+                                            rebar_state:set(StateAcc1, {deps,default}, Value++OldValue);
+                                       ({Key, Value}, StateAcc1) ->
                                             OldValue = rebar_state:get(StateAcc1, Key, []),
                                             rebar_state:set(StateAcc1, Key, Value++OldValue)
                                     end, StateAcc, O);
