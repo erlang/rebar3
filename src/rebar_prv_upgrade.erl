@@ -100,7 +100,8 @@ prepare_locks([Name|Names], Deps, Locks, Unlocks) ->
         {_, _, 0} = Lock ->
             case rebar_utils:tup_find(AtomName, Deps) of
                 false ->
-                    ?PRV_ERROR({unknown_dependency, Name});
+                    ?WARN("Dependency ~s has been removed and will not be upgraded", [Name]),
+                    prepare_locks(Names, Deps, Locks, Unlocks);
                 Dep ->
                     {Source, NewLocks, NewUnlocks} = prepare_lock(Dep, Lock, Locks),
                     prepare_locks(Names, Deps, NewLocks,
