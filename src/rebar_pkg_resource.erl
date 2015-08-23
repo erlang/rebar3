@@ -44,7 +44,7 @@ cached_download(TmpDir, CachePath, Pkg, Url, ETag, State) ->
             ?DEBUG("Download ~s error, using ~s from cache", [Url, CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg, State);
         error ->
-            request_failed
+            {fetch_fail, Pkg}
     end.
 
 serve_from_cache(TmpDir, CachePath, Pkg, State) ->
