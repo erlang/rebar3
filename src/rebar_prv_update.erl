@@ -35,11 +35,11 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    ?INFO("Updating package index...", []),
     try
-        RegistryDir = rebar_packages:package_dir(State),
+        RegistryDir = rebar_packages:registry_dir(State),
         filelib:ensure_dir(filename:join(RegistryDir, "dummy")),
         HexFile = filename:join(RegistryDir, "registry"),
+        ?INFO("Updating package registry...", []),
         TmpDir = ec_file:insecure_mkdtemp(),
         TmpFile = filename:join(TmpDir, "packages.gz"),
 
@@ -50,7 +50,7 @@ do(State) ->
         {ok, Data} = file:read_file(TmpFile),
         Unzipped = zlib:gunzip(Data),
         ok = file:write_file(HexFile, Unzipped),
-
+        ?INFO("Writing registry to ~s", [rebar_file_utils:replace_home_dir(HexFile)]),
         hex_to_index(State),
         ok
     catch
@@ -71,11 +71,13 @@ is_supported(<<"rebar3">>) -> true;
 is_supported(_) -> false.
 
 hex_to_index(State) ->
-    RegistryDir = rebar_packages:package_dir(State),
+    RegistryDir = rebar_packages:registry_dir(State),
     HexFile = filename:join(RegistryDir, "registry"),
     try ets:file2tab(HexFile) of
         {ok, Registry} ->
             try
+                PackageIndex = filename:join(RegistryDir, "packages.idx"),
+                ?INFO("Generating package index...", []),
                 (catch ets:delete(?PACKAGE_TABLE)),
                 ets:new(?PACKAGE_TABLE, [named_table, public]),
                 ets:foldl(fun({{Pkg, PkgVsn}, [Deps, Checksum, BuildTools | _]}, _) when is_list(BuildTools) ->
@@ -93,7 +95,8 @@ hex_to_index(State) ->
                           end, true, Registry),
 
                 ets:insert(?PACKAGE_TABLE, {package_index_version, ?PACKAGE_INDEX_VERSION}),
-                ets:tab2file(?PACKAGE_TABLE, filename:join(RegistryDir, "packages.idx")),
+                ?INFO("Writing index to ~s", [rebar_file_utils:replace_home_dir(PackageIndex)]),
+                ets:tab2file(?PACKAGE_TABLE, PackageIndex),
                 true
             after
                 catch ets:delete(Registry)
