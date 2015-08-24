@@ -4,6 +4,7 @@
         ,close_packages/0
         ,load_and_verify_version/1
         ,deps/3
+        ,registry_dir/1
         ,package_dir/1
         ,registry_checksum/2
         ,find_highest_matching/4
@@ -34,7 +35,7 @@ close_packages() ->
     catch ets:delete(?PACKAGE_TABLE).
 
 load_and_verify_version(State) ->
-    RegistryDir = package_dir(State),
+    RegistryDir = registry_dir(State),
     case ets:file2tab(filename:join(RegistryDir, ?INDEX_FILE)) of
         {ok, _} ->
             case ets:lookup_element(?PACKAGE_TABLE, package_index_version, 2) of
@@ -57,13 +58,25 @@ deps(Name, Vsn, State) ->
             throw(?PRV_ERROR({missing_package, ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)}))
     end.
 
-package_dir(State) ->
+registry_dir(State) ->
     CacheDir = rebar_dir:global_cache_dir(State),
-    CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
-    {ok, {_, _, Host, _, Path, _}} = http_uri:parse(CDN),
-    CDNHostPath = lists:reverse(string:tokens(Host, ".")),
-    CDNPath = tl(filename:split(Path)),
-    PackageDir = filename:join([CacheDir, "hex"] ++ CDNHostPath ++ CDNPath ++ ["packages"]),
+    case rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN) of
+        ?DEFAULT_CDN ->
+            RegistryDir = filename:join([CacheDir, "hex", "default"]),
+            ok = filelib:ensure_dir(filename:join(RegistryDir, "placeholder")),
+            RegistryDir;
+        CDN ->
+            {ok, {_, _, Host, _, Path, _}} = http_uri:parse(CDN),
+            CDNHostPath = lists:reverse(string:tokens(Host, ".")),
+            CDNPath = tl(filename:split(Path)),
+            RegistryDir = filename:join([CacheDir, "hex"] ++ CDNHostPath ++ CDNPath),
+            ok = filelib:ensure_dir(filename:join(RegistryDir, "placeholder")),
+            RegistryDir
+    end.
+
+package_dir(State) ->
+    RegistryDir = registry_dir(State),
+    PackageDir = filename:join([RegistryDir, "packages"]),
     ok = filelib:ensure_dir(filename:join(PackageDir, "placeholder")),
     PackageDir.
 
@@ -93,7 +106,7 @@ registry_checksum({pkg, Name, Vsn}, State) ->
 %% `~> 2.1` | `>= 2.1.0 and < 3.0.0`
 find_highest_matching(Dep, Constraint, Table, State) ->
     verify_table(State),
-    case ets:lookup_element(Table, Dep, 2) of
+    try ets:lookup_element(Table, Dep, 2) of
         [[HeadVsn | VsnTail]] ->
             {ok, handle_vsns(Constraint, HeadVsn, VsnTail)};
         [[Vsn]] ->
@@ -101,9 +114,9 @@ find_highest_matching(Dep, Constraint, Table, State) ->
         [Vsn] ->
             handle_single_vsn(Dep, Vsn, Constraint);
         [HeadVsn | VsnTail] ->
-            {ok, handle_vsns(Constraint, HeadVsn, VsnTail)};
-        [] ->
-            ?WARN("Missing registry entry for package ~s. Try to fix with `rebar3 update`", [Dep]),
+            {ok, handle_vsns(Constraint, HeadVsn, VsnTail)}
+    catch
+        error:badarg ->
             none
     end.
 

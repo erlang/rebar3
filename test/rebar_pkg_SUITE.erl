@@ -148,7 +148,7 @@ bad_disconnect(Config) ->
     Tmp = ?config(tmp_dir, Config),
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
-    ?assertEqual(request_failed,
+    ?assertEqual({fetch_fail, Pkg, Vsn},
                  rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn}, State)).
 
 
@@ -183,6 +183,7 @@ mock_config(Name, Config) ->
     meck:expect(rebar_dir, global_cache_dir, fun(_) -> CacheRoot end),
 
     meck:new(rebar_packages, [passthrough]),
+    meck:expect(rebar_packages, registry_dir, fun(_) -> CacheDir end),
     meck:expect(rebar_packages, package_dir, fun(_) -> CacheDir end),
     rebar_prv_update:hex_to_index(rebar_state:new()),
 

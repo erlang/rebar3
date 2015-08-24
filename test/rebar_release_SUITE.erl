@@ -4,10 +4,11 @@
 -include_lib("eunit/include/eunit.hrl").
 
 all() -> [release,
-          dev_mode_release,
-          profile_dev_mode_override_release,
-          tar,
-          extend_release].
+         dev_mode_release,
+         profile_dev_mode_override_release,
+         tar,
+         extend_release,
+         user_output_dir].
 
 init_per_testcase(Case, Config0) ->
     Config = rebar_test_utils:init_rebar_state(Config0),
@@ -109,3 +110,27 @@ extend_release(Config) ->
       ["release", "-n", "extended"],
       {ok, [{release, extended, Vsn, false}]}
      ).
+
+user_output_dir(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = ?config(name, Config),
+    ReleaseDir = filename:join(AppDir, "./_rel"),
+    Vsn = "1.0.0",
+
+    {ok, RebarConfig} =
+        file:consult(rebar_test_utils:create_config(AppDir,
+                                                    [{relx, [{release, {list_to_atom(Name), Vsn},
+                                                              [list_to_atom(Name)]},
+                                                             {lib_dirs, [AppDir]},
+                                                             {dev_mode, true}]}])),
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig,
+      ["release", "-o", ReleaseDir],
+      {ok, []}
+     ),
+
+    RelxState = rlx_state:new("", [], []),
+    RelxState1 = rlx_state:base_output_dir(RelxState, ReleaseDir),
+    {ok, RelxState2} = rlx_prv_app_discover:do(RelxState1),
+    {ok, RelxState3} = rlx_prv_rel_discover:do(RelxState2),
+    rlx_state:get_realized_release(RelxState3, list_to_atom(Name), Vsn).

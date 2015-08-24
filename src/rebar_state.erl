@@ -78,11 +78,7 @@ new() ->
 -spec new(list()) -> t().
 new(Config) when is_list(Config) ->
     BaseState = base_state(),
-    Deps = proplists:get_value(deps, Config, []),
-    Plugins = proplists:get_value(plugins, Config, []),
-    Terms = [{{deps, default}, Deps}, {{plugins, default}, Plugins} | Config],
-    true = rebar_config:verify_config_format(Terms),
-    Opts = dict:from_list(Terms),
+    Opts = base_opts(Config),
     BaseState#state_t { dir = rebar_dir:get_cwd(),
                         default = Opts,
                         opts = Opts }.
@@ -91,12 +87,7 @@ new(Config) when is_list(Config) ->
 new(Profile, Config) when is_atom(Profile)
                         , is_list(Config) ->
     BaseState = base_state(),
-    Deps = proplists:get_value(deps, Config, []),
-
-    Plugins = proplists:get_value(plugins, Config, []),
-    Terms = [{{deps, default}, Deps}, {{plugins, default}, Plugins} | Config],
-    true = rebar_config:verify_config_format(Terms),
-    Opts = dict:from_list(Terms),
+    Opts = base_opts(Config),
     BaseState#state_t { dir = rebar_dir:get_cwd(),
                         current_profiles = [Profile],
                         default = Opts,
@@ -119,11 +110,7 @@ new(ParentState, Config, Dir) ->
                         true = rebar_config:verify_config_format(Terms),
                         dict:from_list(Terms);
                     _ ->
-                        D = proplists:get_value(deps, Config, []),
-                        Plugins = proplists:get_value(plugins, Config, []),
-                        Terms = [{{deps, default}, D}, {{plugins, default}, Plugins} | Config],
-                        true = rebar_config:verify_config_format(Terms),
-                        dict:from_list(Terms)
+                       base_opts(Config)
                 end,
 
     NewOpts = merge_opts(LocalOpts, Opts),
@@ -140,6 +127,13 @@ base_state() ->
             Resources
     end,
     #state_t{resources=Resources}.
+
+base_opts(Config) ->
+    Deps = proplists:get_value(deps, Config, []),
+    Plugins = proplists:get_value(plugins, Config, []),
+    Terms = [{{deps, default}, Deps}, {{plugins, default}, Plugins} | Config],
+    true = rebar_config:verify_config_format(Terms),
+    dict:from_list(Terms).
 
 get(State, Key) ->
     {ok, Value} = dict:find(Key, State#state_t.opts),
@@ -248,7 +242,9 @@ apply_overrides(State=#state_t{overrides=Overrides}, AppName) ->
 
     %% Inefficient. We want the order we get here though.
     State1 = lists:foldl(fun({override, O}, StateAcc) ->
-                                 lists:foldl(fun({Key, Value}, StateAcc1) ->
+                                 lists:foldl(fun({deps, Value}, StateAcc1) ->
+                                                     rebar_state:set(StateAcc1, {deps,default}, Value);
+                                                ({Key, Value}, StateAcc1) ->
                                                      rebar_state:set(StateAcc1, Key, Value)
                                              end, StateAcc, O);
                             (_, StateAcc) ->
@@ -256,7 +252,9 @@ apply_overrides(State=#state_t{overrides=Overrides}, AppName) ->
                          end, State, Overrides),
 
     State2 = lists:foldl(fun({override, N, O}, StateAcc) when N =:= Name ->
-                                 lists:foldl(fun({Key, Value}, StateAcc1) ->
+                                 lists:foldl(fun({deps, Value}, StateAcc1) ->
+                                                     rebar_state:set(StateAcc1, {deps,default}, Value);
+                                                ({Key, Value}, StateAcc1) ->
                                                      rebar_state:set(StateAcc1, Key, Value)
                                              end, StateAcc, O);
                             (_, StateAcc) ->
@@ -264,7 +262,10 @@ apply_overrides(State=#state_t{overrides=Overrides}, AppName) ->
                          end, State1, Overrides),
 
     State3 = lists:foldl(fun({add, N, O}, StateAcc) when N =:= Name ->
-                        lists:foldl(fun({Key, Value}, StateAcc1) ->
+                        lists:foldl(fun({deps, Value}, StateAcc1) ->
+                                            OldValue = rebar_state:get(StateAcc1, {deps,default}, []),
+                                            rebar_state:set(StateAcc1, {deps,default}, Value++OldValue);
+                                       ({Key, Value}, StateAcc1) ->
                                             OldValue = rebar_state:get(StateAcc1, Key, []),
                                             rebar_state:set(StateAcc1, Key, Value++OldValue)
                                     end, StateAcc, O);
