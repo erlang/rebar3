@@ -251,7 +251,6 @@ update_unseen_dep(AppInfo, Profile, Level, Deps, Apps, State, Upgrade, Seen, Loc
 handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     Profiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo),
-    Vsn = rebar_app_info:original_vsn(AppInfo),
 
     %% Deps may be under a sub project app, find it and use its state if so
     S = rebar_app_info:state(AppInfo),
@@ -273,7 +272,8 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     %% Upgrade lock level to be the level the dep will have in this dep tree
     case rebar_app_info:resource_type(AppInfo1) of
         pkg ->
-            NewDeps = rebar_packages:deps(Name, Vsn, S5),
+            {pkg, PkgName, PkgVsn} = rebar_app_info:source(AppInfo1),
+            NewDeps = rebar_packages:deps(PkgName, PkgVsn, S5),
             NewDeps1 = rebar_app_utils:parse_deps(Name, DepsDir, NewDeps, S5, Locks, Level+1),
             {rebar_app_info:deps(AppInfo1, NewDeps), NewDeps1, State};
         _ ->

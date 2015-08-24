@@ -117,6 +117,33 @@ parse_dep(Dep, Parent, DepsDir, State, Locks, Level) ->
             end
     end.
 
+parse_dep(Parent, {Name, Vsn, {pkg, PkgName}}, DepsDir, IsLock, State) ->
+    %% Versioned Package dependency with different package name from app name
+    CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, PkgName)),
+    case rebar_app_info:discover(CheckoutsDir) of
+        {ok, _App} ->
+            dep_to_app(root, DepsDir, Name, [], [], IsLock, State);
+        not_found ->
+            {PkgName1, PkgVsn} = parse_goal(ec_cnv:to_binary(PkgName)
+                                           ,ec_cnv:to_binary(Vsn)),
+            %% Verify package actually exists. This will throw a missing_package exception
+            rebar_packages:deps(PkgName1, PkgVsn, State),
+            Source = {pkg, PkgName1, PkgVsn},
+            rebar_app_info:resource_type(dep_to_app(Parent, DepsDir, Name, PkgVsn, Source, IsLock, State), pkg)
+    end;
+parse_dep(Parent, {Name, {pkg, PkgName}}, DepsDir, IsLock, State) ->
+    %% Package dependency with different package name from app name
+    {PkgName1, PkgVsn} = get_package(ec_cnv:to_binary(PkgName), State),
+    CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, PkgName1)),
+    case rebar_app_info:discover(CheckoutsDir) of
+        {ok, _App} ->
+            dep_to_app(root, DepsDir, Name, [], [], IsLock, State);
+        not_found ->
+            %% Verify package actually exists. This will throw a missing_package exception
+            rebar_packages:deps(PkgName1, PkgVsn, State),
+            Source = {pkg, PkgName1, PkgVsn},
+            rebar_app_info:resource_type(dep_to_app(Parent, DepsDir, Name, PkgVsn, Source, IsLock, State), pkg)
+    end;
 parse_dep(Parent, {Name, Vsn}, DepsDir, IsLock, State) when is_list(Vsn); is_binary(Vsn) ->
     %% Versioned Package dependency
     CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
@@ -151,15 +178,15 @@ parse_dep(Parent, {Name, _Vsn, Source}, DepsDir, IsLock, State) when is_tuple(So
 parse_dep(Parent, {Name, _Vsn, Source, Opts}, DepsDir, IsLock, State) when is_tuple(Source) ->
     ?WARN("Dependency option list ~p in ~p is not supported and will be ignored", [Opts, Name]),
     dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, State);
-parse_dep(Parent, {_Name, {pkg, Name, Vsn}, Level}, DepsDir, IsLock, State) when is_integer(Level) ->
-    CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
+parse_dep(Parent, {Name, {pkg, PkgName, Vsn}, Level}, DepsDir, IsLock, State) when is_integer(Level) ->
+    CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, PkgName)),
     case rebar_app_info:discover(CheckoutsDir) of
         {ok, _App} ->
             dep_to_app(root, DepsDir, Name, [], [], IsLock, State);
         not_found ->
             %% Verify package actually exists. This will throw a missing_package exception
-            rebar_packages:deps(Name, Vsn, State),
-            Source = {pkg, Name, Vsn},
+            rebar_packages:deps(PkgName, Vsn, State),
+            Source = {pkg, PkgName, Vsn},
             rebar_app_info:resource_type(dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State), pkg)
     end;
 parse_dep(Parent, {Name, Source, Level}, DepsDir, IsLock, State) when is_tuple(Source)
