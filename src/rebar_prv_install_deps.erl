@@ -98,6 +98,8 @@ do(State) ->
     end.
 
 -spec format_error(any()) -> iolist().
+format_error({dep_app_not_found, AppDir, AppName}) ->
+    io_lib:format("Dependency failure: Application ~s not found at the top level of directory ~s", [AppName, AppDir]);
 format_error({load_registry_fail, Dep}) ->
     io_lib:format("Error loading registry to resolve version of ~s. Try fixing by running 'rebar3 update'", [Dep]);
 format_error({bad_constraint, Name, Constraint}) ->
@@ -366,16 +368,20 @@ fetch_app(AppInfo, AppDir, State) ->
 %% So this is the first time for newly downloaded apps that its .app/.app.src data can
 %% be read in an parsed.
 update_app_info(AppDir, AppInfo) ->
-    {ok, Found} = rebar_app_info:discover(AppDir),
-    AppDetails = rebar_app_info:app_details(Found),
-    Vsn = rebar_app_info:original_vsn(Found),
-    Applications = proplists:get_value(applications, AppDetails, []),
-    IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
-    AppInfo1 = rebar_app_info:original_vsn(rebar_app_info:applications(
-                 rebar_app_info:app_details(AppInfo, AppDetails),
-                 IncludedApplications++Applications), Vsn),
-    AppInfo2 = copy_app_info(AppInfo, AppInfo1),
-    rebar_app_info:valid(AppInfo2, undefined).
+    case rebar_app_info:discover(AppDir) of
+        {ok, Found} ->
+            AppDetails = rebar_app_info:app_details(Found),
+            Vsn = rebar_app_info:original_vsn(Found),
+            Applications = proplists:get_value(applications, AppDetails, []),
+            IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
+            AppInfo1 = rebar_app_info:original_vsn(rebar_app_info:applications(
+                                                     rebar_app_info:app_details(AppInfo, AppDetails),
+                                                     IncludedApplications++Applications), Vsn),
+            AppInfo2 = copy_app_info(AppInfo, AppInfo1),
+            rebar_app_info:valid(AppInfo2, undefined);
+        not_found ->
+            throw(?PRV_ERROR({dep_app_not_found, AppDir, rebar_app_info:name(AppInfo)}))
+    end.
 
 copy_app_info(OldAppInfo, NewAppInfo) ->
     ResourceType = rebar_app_info:resource_type(OldAppInfo),
