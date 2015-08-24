@@ -255,7 +255,7 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     %% Deps may be under a sub project app, find it and use its state if so
     S = rebar_app_info:state(AppInfo),
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
-    S1 = rebar_state:new(S, C, rebar_app_info:dir(AppInfo)),
+    S1 = rebar_state:new(S, C, AppInfo),
     S2 = rebar_state:apply_overrides(S1, Name),
 
     S3 = rebar_state:apply_profiles(S2, Profiles),
@@ -270,18 +270,10 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     AppInfo1 = rebar_app_info:state(AppInfo, S5),
 
     %% Upgrade lock level to be the level the dep will have in this dep tree
-    case rebar_app_info:resource_type(AppInfo1) of
-        pkg ->
-            {pkg, PkgName, PkgVsn} = rebar_app_info:source(AppInfo1),
-            NewDeps = rebar_packages:deps(PkgName, PkgVsn, S5),
-            NewDeps1 = rebar_app_utils:parse_deps(Name, DepsDir, NewDeps, S5, Locks, Level+1),
-            {rebar_app_info:deps(AppInfo1, NewDeps), NewDeps1, State};
-        _ ->
-            Deps = rebar_state:get(S5, {deps, default}, []),
-            AppInfo2 = rebar_app_info:deps(AppInfo1, rebar_state:deps_names(Deps)),
-            Deps1 = rebar_app_utils:parse_deps(Name, DepsDir, Deps, S5, Locks, Level+1),
-            {AppInfo2, Deps1, State}
-    end.
+    Deps = rebar_state:get(S5, {deps, default}, []),
+    AppInfo2 = rebar_app_info:deps(AppInfo1, rebar_state:deps_names(Deps)),
+    Deps1 = rebar_app_utils:parse_deps(Name, DepsDir, Deps, S5, Locks, Level+1),
+    {AppInfo2, Deps1, State}.
 
 -spec maybe_fetch(rebar_app_info:t(), atom(), boolean(),
                   sets:set(binary()), rebar_state:t()) -> {boolean(), rebar_app_info:t()}.
@@ -378,13 +370,15 @@ update_app_info(AppDir, AppInfo) ->
     rebar_app_info:valid(AppInfo2, undefined).
 
 copy_app_info(OldAppInfo, NewAppInfo) ->
+    Deps = rebar_app_info:deps(OldAppInfo),
     ResourceType = rebar_app_info:resource_type(OldAppInfo),
     Parent = rebar_app_info:parent(OldAppInfo),
     Source = rebar_app_info:source(OldAppInfo),
 
-    rebar_app_info:resource_type(
-      rebar_app_info:source(
-        rebar_app_info:parent(NewAppInfo, Parent), Source), ResourceType).
+    rebar_app_info:deps(
+      rebar_app_info:resource_type(
+        rebar_app_info:source(
+          rebar_app_info:parent(NewAppInfo, Parent), Source), ResourceType), Deps).
 
 maybe_upgrade(AppInfo, AppDir, Upgrade, State) ->
     Source = rebar_app_info:source(AppInfo),

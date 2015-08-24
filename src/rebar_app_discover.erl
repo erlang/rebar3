@@ -198,7 +198,7 @@ create_app_info(AppDir, AppFile) ->
     AppVsn = proplists:get_value(vsn, AppDetails),
     Applications = proplists:get_value(applications, AppDetails, []),
     IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
-    {ok, AppInfo} = rebar_app_info:new(AppName, AppVsn, AppDir, []),
+    {ok, AppInfo} = rebar_app_info:new(AppName, AppVsn, AppDir),
     AppInfo1 = rebar_app_info:applications(
                  rebar_app_info:app_details(AppInfo, AppDetails),
                  IncludedApplications++Applications),
