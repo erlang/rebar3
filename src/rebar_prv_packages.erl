@@ -35,8 +35,12 @@ format_error(load_registry_fail) ->
     "Failed to load package regsitry. Try running 'rebar3 update' to fix".
 
 print_packages() ->
-    SortedPkgs = ets:foldl(fun({{Pkg, Vsn}, _}, Acc) ->
-                                   orddict:append_list(Pkg, [Vsn], Acc)
+    SortedPkgs = ets:foldl(fun({package_index_version, _}, Acc) ->
+                                   Acc;
+                              ({Pkg, Vsns}, Acc) ->
+                                   orddict:store(Pkg, Vsns, Acc);
+                              (_, Acc) ->
+                                   Acc
                            end, orddict:new(), ?PACKAGE_TABLE),
 
     orddict:map(fun(Name, Vsns) ->
@@ -45,7 +49,7 @@ print_packages() ->
                                                                      ,ec_semver:parse(B))
                                                 end, Vsns),
                         VsnStr = join(SortedVsns, <<", ">>),
-                        io:format("~s:~n    Versions: ~s~n~n", [Name, VsnStr])
+                        ?CONSOLE("~s:~n    Versions: ~s~n", [Name, VsnStr])
                 end, SortedPkgs).
 
 -spec join([binary()], binary()) -> binary().
