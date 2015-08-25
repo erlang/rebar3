@@ -11,7 +11,7 @@
 -define(good_checksum, <<"1C6CE379D191FBAB41B7905075E0BF87CBBE23C77CECE775C5A0B786B2244C35">>).
 
 all() -> [good_uncached, good_cached, badindexchk, badpkg,
-          bad_to_good, good_disconnect, bad_disconnect].
+          bad_to_good, good_disconnect, bad_disconnect, pkgs_provider].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -20,6 +20,8 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     application:stop(meck).
 
+init_per_testcase(pkgs_provider, Config) ->
+    Config;
 init_per_testcase(good_uncached=Name, Config0) ->
     Config = [{good_cache, false},
               {pkg, {<<"goodpkg">>, <<"1.0.0">>}}
@@ -74,6 +76,8 @@ init_per_testcase(bad_disconnect=Name, Config0) ->
     meck:expect(httpc, request, fun(_, _, _, _, _) -> {error, econnrefused} end),
     Config.
 
+end_per_testcase(pkgs_provider, Config) ->
+    Config;
 end_per_testcase(_, Config) ->
     unmock_config(Config),
     Config.
@@ -151,6 +155,12 @@ bad_disconnect(Config) ->
     ?assertEqual({fetch_fail, Pkg, Vsn},
                  rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn}, State)).
 
+pkgs_provider(Config) ->
+    Config1 = rebar_test_utils:init_rebar_state(Config),
+    rebar_test_utils:run_and_check(
+      Config1, [], ["pkgs"],
+        {ok, []}
+    ).
 
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
