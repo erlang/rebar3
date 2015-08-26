@@ -3,7 +3,8 @@
 -include_lib("eunit/include/eunit.hrl").
 -export([init_rebar_state/1, init_rebar_state/2, run_and_check/4]).
 -export([expand_deps/2, flat_deps/1, top_level_deps/1]).
--export([create_app/4, create_eunit_app/4, create_empty_app/4, create_config/2]).
+-export([create_app/4, create_eunit_app/4, create_empty_app/4, create_config/2,
+         package_app/3]).
 -export([create_random_name/1, create_random_vsn/0, write_src_file/2]).
 
 %%%%%%%%%%%%%%
@@ -418,3 +419,25 @@ get_app_metadata(Name, Vsn, Deps) ->
       {included_applications, []},
       {registered, []},
       {applications, Deps}]}.
+
+package_app(AppDir, DestDir, PkgName) ->
+    Name = PkgName++".tar",
+    {ok, Fs} = file:list_dir(AppDir),
+    ok = erl_tar:create(filename:join(DestDir, "contents.tar.gz"),
+                        lists:zip(Fs, [filename:join(AppDir,F) || F <- Fs]),
+                        [compressed]),
+    ok = file:write_file(filename:join(DestDir, "metadata.config"), "who cares"),
+    ok = file:write_file(filename:join(DestDir, "VERSION"), "3"),
+    {ok, Contents} = file:read_file(filename:join(DestDir, "contents.tar.gz")),
+    Blob = <<"3who cares", Contents/binary>>,
+    <<X:256/big-unsigned>> = crypto:hash(sha256, Blob),
+    BinChecksum = list_to_binary(string:to_upper(lists:flatten(io_lib:format("~64.16.0b", [X])))),
+    ok = file:write_file(filename:join(DestDir, "CHECKSUM"), BinChecksum),
+    PkgFiles = ["contents.tar.gz", "VERSION", "metadata.config", "CHECKSUM"],
+    Archive = filename:join(DestDir, Name),
+    ok = erl_tar:create(Archive,
+                        lists:zip(PkgFiles, [filename:join(DestDir,F) || F <- PkgFiles])),
+    {ok, BinFull} = file:read_file(Archive),
+    <<E:128/big-unsigned-integer>> = crypto:hash(md5, BinFull),
+    Etag = string:to_lower(lists:flatten(io_lib:format("~32.16.0b", [E]))),
+    {BinChecksum, Etag}.

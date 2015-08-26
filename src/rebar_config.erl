@@ -128,11 +128,20 @@ find_newly_added(ConfigDeps, LockedDeps) ->
 
 check_newly_added({_, _}=Dep, LockedDeps) ->
     check_newly_added_(Dep, LockedDeps);
+check_newly_added({_, _, {pkg, _}}=Dep, LockedDeps) ->
+    check_newly_added_(Dep, LockedDeps);
 check_newly_added({Name, _, Source}, LockedDeps) ->
     check_newly_added_({Name, Source}, LockedDeps);
 check_newly_added(Dep, LockedDeps) ->
     check_newly_added_(Dep, LockedDeps).
 
+check_newly_added_({Name, Vsn, Source}, LockedDeps) ->
+    case check_newly_added_(Name, LockedDeps) of
+        {true, Name1} ->
+            {true, {Name1, Vsn, Source}};
+        false ->
+            false
+    end;
 check_newly_added_({Name, Source}, LockedDeps) ->
     case check_newly_added_(Name, LockedDeps) of
         {true, Name1} ->
