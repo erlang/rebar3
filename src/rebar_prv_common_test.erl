@@ -299,8 +299,10 @@ copy(State, Dir) ->
                 true  -> remove_links(Target);
                 false -> ok
             end,
-            ok = ec_file:copy(From, Target, [recursive]),
-            Target
+            case rebar_file_utils:symlink_or_copy(From, Target) of
+               exists -> Target;
+               ok     -> Target
+            end
     end.
 
 compile_dir(State, Dir) ->
