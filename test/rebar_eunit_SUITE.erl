@@ -18,7 +18,10 @@
          test_single_suite_flag/1,
          test_suite_in_app_flag/1,
          test_suite_in_wrong_app_flag/1,
-         test_nonexistent_suite_flag/1]).
+         test_nonexistent_suite_flag/1,
+         test_single_file_flag/1,
+         test_multiple_file_flag/1,
+         test_nonexistent_file_flag/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -42,7 +45,8 @@ all() ->
      test_basic_defines, test_multi_defines,
      test_single_app_flag, test_multiple_app_flag, test_nonexistent_app_flag,
      test_single_suite_flag, test_suite_in_app_flag,
-     test_suite_in_wrong_app_flag, test_nonexistent_suite_flag].
+     test_suite_in_wrong_app_flag, test_nonexistent_suite_flag,
+     test_single_file_flag, test_multiple_file_flag, test_nonexistent_file_flag].
 
 test_basic_app(Config) ->
     AppDir = ?config(apps, Config),
@@ -406,3 +410,55 @@ test_nonexistent_suite_flag(Config) ->
                                                          return),
 
     Error = {error_running_tests, "Module `not_a_real_module' not found in applications."}.
+
+test_single_file_flag(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("single_file_flag_app_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{erl_opts, [{d, some_define}]}],
+    rebar_test_utils:run_and_check(Config,
+                                   RebarConfig,
+                                   ["eunit", "--file=not_a_real_src_" ++ Name ++ "_tests.beam"],
+                                   {ok, [{app, Name}]}),
+
+    File = list_to_atom("not_a_real_src_" ++ Name ++ "_tests"),
+    {module, File} = code:ensure_loaded(File).
+
+test_multiple_file_flag(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("multiple_file_flag_app_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{erl_opts, [{d, some_define}]}],
+    rebar_test_utils:run_and_check(Config,
+                                   RebarConfig,
+                                   ["eunit", "--file=not_a_real_src_" ++ Name ++ "_tests.beam,not_a_real_src_" ++ Name ++ ".beam"],
+                                   {ok, [{app, Name}]}),
+
+    File1 = list_to_atom("not_a_real_src_" ++ Name ++ "_tests"),
+    {module, File1} = code:ensure_loaded(File1),
+
+    File2 = list_to_atom("not_a_real_src_" ++ Name),
+    {module, File2} = code:ensure_loaded(File2).
+
+test_nonexistent_file_flag(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("nonexistent_file_flag_app_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_eunit_app(AppDir,
+                                      Name,
+                                      Vsn,
+                                      [kernel, stdlib]),
+
+    RebarConfig = [{erl_opts, [{d, some_define}]}],
+    {error, {rebar_prv_eunit, _Error}} = rebar_test_utils:run_and_check(Config,
+                                                         RebarConfig,
+                                                         ["eunit", "--file=" ++ filename:join(["some_path", "not_a_real_file.erl"])],
+                                                         return).
+

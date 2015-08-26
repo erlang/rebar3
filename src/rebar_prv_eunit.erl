@@ -109,7 +109,7 @@ prepare_tests(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     ok = maybe_cover_compile(State, RawOpts),
     ProjectApps = project_apps(State),
-    resolve_apps(ProjectApps, RawOpts).
+    resolve_tests(ProjectApps, RawOpts).
 
 maybe_cover_compile(State, Opts) ->
     State1 = case proplists:get_value(cover, Opts, false) of
@@ -117,6 +117,26 @@ maybe_cover_compile(State, Opts) ->
         false -> State
     end,
     rebar_prv_cover:maybe_cover_compile(State1).
+
+resolve_tests(ProjectApps, RawOpts) ->
+    case proplists:get_value(file, RawOpts) of
+        undefined -> resolve_apps(ProjectApps, RawOpts);
+        Files     -> resolve_files(ProjectApps, Files, RawOpts)
+    end.
+
+resolve_files(ProjectApps, Files, RawOpts) ->
+    case {proplists:get_value(app, RawOpts), proplists:get_value(suite, RawOpts)} of
+        {undefined, undefined} -> resolve_files(Files, []);
+        _                      ->
+        case resolve_apps(ProjectApps, RawOpts) of
+            {ok, TestSet} -> resolve_files(Files, TestSet);
+            Error         -> Error
+        end
+    end.
+
+resolve_files(Files, TestSet) ->
+    FileNames = string:tokens(Files, [$,]),
+    {ok, TestSet ++ set_files(FileNames, [])}.
 
 resolve_apps(ProjectApps, RawOpts) ->
     case proplists:get_value(app, RawOpts) of
@@ -217,6 +237,10 @@ set_suites([], Acc) -> lists:reverse(Acc);
 set_suites([Suite|Rest], Acc) ->
     set_suites(Rest, [{module, list_to_atom(Suite)}|Acc]).
 
+set_files([], Acc) -> lists:reverse(Acc);
+set_files([File|Rest], Acc) ->
+    set_files(Rest, [{file, File}|Acc]).
+
 resolve_eunit_opts(State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
     EUnitOpts = rebar_state:get(State, eunit_opts, []),
@@ -241,10 +265,12 @@ handle_results({error, Reason}) ->
 eunit_opts(_State) ->
     [{app, undefined, "app", string, help(app)},
      {cover, $c, "cover", boolean, help(cover)},
+     {file, $f, "file", string, help(file)},
      {suite, undefined, "suite", string, help(suite)},
      {verbose, $v, "verbose", boolean, help(verbose)}].
 
-help(app)    -> "List of application test suites to run";
-help(cover)   -> "Generate cover data";
-help(suite)   -> "List of test suites to run";
-help(verbose) -> "Verbose output".
+help(app)     -> "Comma seperated list of application test suites to run. Equivalent to `[{application, App}]`.";
+help(cover)   -> "Generate cover data. Defaults to false.";
+help(file)    -> "Comma seperated list of files to run. Equivalent to `[{file, File}]`.";
+help(suite)   -> "Comma seperated list of test suites to run. Equivalent to `[{module, Suite}]`.";
+help(verbose) -> "Verbose output. Defaults to false.".
