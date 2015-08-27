@@ -27,7 +27,6 @@
 -module(rebar_file_utils).
 
 -export([try_consult/1,
-         replace_home_dir/1,
          format_error/1,
          symlink_or_copy/2,
          rm_rf/1,
@@ -59,10 +58,6 @@ try_consult(File) ->
         {error, Reason} ->
             throw(?PRV_ERROR({bad_term_file, File, Reason}))
     end.
-
-replace_home_dir(Dir) ->
-    HomeDir = rebar_dir:home_dir(),
-    re:replace(Dir, [$^ | HomeDir], "~", [{return, list}]).
 
 format_error({bad_term_file, AppFile, Reason}) ->
     io_lib:format("Error reading file ~s: ~s", [AppFile, file:format_error(Reason)]).
