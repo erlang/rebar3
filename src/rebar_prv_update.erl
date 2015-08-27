@@ -50,7 +50,7 @@ do(State) ->
         {ok, Data} = file:read_file(TmpFile),
         Unzipped = zlib:gunzip(Data),
         ok = file:write_file(HexFile, Unzipped),
-        ?INFO("Writing registry to ~s", [rebar_file_utils:replace_home_dir(HexFile)]),
+        ?INFO("Writing registry to ~s", [HexFile]),
         hex_to_index(State),
         ok
     catch
@@ -95,7 +95,7 @@ hex_to_index(State) ->
                           end, true, Registry),
 
                 ets:insert(?PACKAGE_TABLE, {package_index_version, ?PACKAGE_INDEX_VERSION}),
-                ?INFO("Writing index to ~s", [rebar_file_utils:replace_home_dir(PackageIndex)]),
+                ?INFO("Writing index to ~s", [PackageIndex]),
                 ets:tab2file(?PACKAGE_TABLE, PackageIndex),
                 true
             after

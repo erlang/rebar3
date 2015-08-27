@@ -4,6 +4,7 @@
          new/2,
          new/3,
          new/4,
+         new/5,
          discover/1,
          name/1,
          name/2,
@@ -58,7 +59,7 @@
                      app_file           :: file:filename_all() | undefined,
                      config             :: rebar_state:t() | undefined,
                      original_vsn       :: binary() | string() | undefined,
-                     parent             :: binary() | root,
+                     parent=root        :: binary() | root,
                      app_details=[]     :: list(),
                      applications=[]    :: list(),
                      deps=[]            :: list(),
@@ -108,6 +109,17 @@ new(AppName, Vsn, Dir) ->
                  {ok, t()}.
 new(AppName, Vsn, Dir, Deps) ->
     {ok, #app_info_t{name=ec_cnv:to_binary(AppName),
+                     original_vsn=Vsn,
+                     dir=ec_cnv:to_list(Dir),
+                     out_dir=ec_cnv:to_list(Dir),
+                     deps=Deps}}.
+
+%% @doc build a complete version of the app info with all fields set.
+-spec new(atom() | binary(), atom() | binary() | string(), binary() | string(), file:name(), list()) ->
+                 {ok, t()}.
+new(Parent, AppName, Vsn, Dir, Deps) ->
+    {ok, #app_info_t{name=ec_cnv:to_binary(AppName),
+                     parent=Parent,
                      original_vsn=Vsn,
                      dir=ec_cnv:to_list(Dir),
                      out_dir=ec_cnv:to_list(Dir),
@@ -305,7 +317,7 @@ state(#app_info_t{state=State}) ->
 state_or_new(State, AppInfo=#app_info_t{state=undefined}) ->
     AppDir = dir(AppInfo),
     C = rebar_config:consult(AppDir),
-    rebar_state:new(State, C, AppDir);
+    rebar_state:new(State, C, AppInfo);
 state_or_new(_State, #app_info_t{state=State}) ->
     State.
 
