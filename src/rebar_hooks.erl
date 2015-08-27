@@ -1,30 +1,34 @@
 -module(rebar_hooks).
 
 -export([run_all_hooks/5
+        ,run_all_hooks/6
         ,format_error/1]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
+run_all_hooks(Dir, Type, Command, Providers, State) ->
+    run_all_hooks(Dir, Type, Command, Providers,  element(2,rebar_app_info:new(noen)), State).
+
 -spec run_all_hooks(file:filename_all(), pre | post,
                    atom() | {atom(), atom()} | string(),
-                   [providers:t()], rebar_state:t()) -> ok.
-run_all_hooks(Dir, Type, Command, Providers, State) ->
-    run_provider_hooks(Dir, Type, Command, Providers, State),
-    run_hooks(Dir, Type, Command, State).
+                   [providers:t()], rebar_app_info:t(), rebar_state:t()) -> ok.
+run_all_hooks(Dir, Type, Command, Providers, AppInfo, State) ->
+    run_provider_hooks(Dir, Type, Command, Providers, AppInfo, State),
+    run_hooks(Dir, Type, Command, AppInfo, State).
 
-run_provider_hooks(Dir, Type, Command, Providers, State) ->
-    case rebar_state:get(State, provider_hooks, []) of
+run_provider_hooks(Dir, Type, Command, Providers, AppInfo, State) ->
+    case rebar_app_info:get(AppInfo, provider_hooks, [])++rebar_state:get(State, provider_hooks, []) of
         [] ->
             ok;
         AllHooks ->
             TypeHooks = proplists:get_value(Type, AllHooks, []),
-            run_provider_hooks(Dir, Type, Command, Providers, TypeHooks, State)
+            run_provider_hooks(Dir, Type, Command, Providers, TypeHooks, AppInfo, State)
     end.
 
-run_provider_hooks(_Dir, _Type, _Command, _Providers, [], _State) ->
+run_provider_hooks(_Dir, _Type, _Command, _Providers, [], _AppInfo, _State) ->
     ok;
-run_provider_hooks(Dir, Type, Command, Providers, TypeHooks, State) ->
+run_provider_hooks(Dir, Type, Command, Providers, TypeHooks, _AppInfo, State) ->
     PluginDepsPaths = rebar_state:code_paths(State, all_plugin_deps),
     code:add_pathsa(PluginDepsPaths),
     Providers1 = rebar_state:providers(State),
@@ -67,16 +71,16 @@ format_error({bad_provider, Type, Command, Name}) ->
 %% ERL                          = ERLANG_ROOT_DIR/bin/erl
 %% ERLC                         = ERLANG_ROOT_DIR/bin/erl
 %%
-run_hooks(Dir, pre, Command, State) ->
-    run_hooks(Dir, pre_hooks, Command, State);
-run_hooks(Dir, post, Command, State) ->
-    run_hooks(Dir, post_hooks, Command, State);
-run_hooks(Dir, Type, Command, State) ->
-    case rebar_state:get(State, Type, []) of
+run_hooks(Dir, pre, Command, AppInfo, State) ->
+    run_hooks(Dir, pre_hooks, Command, AppInfo, State);
+run_hooks(Dir, post, Command, AppInfo, State) ->
+    run_hooks(Dir, post_hooks, Command, AppInfo, State);
+run_hooks(Dir, Type, Command, AppInfo, State) ->
+    case rebar_app_info:get(AppInfo, Type, []) of
         [] ->
             ok;
         Hooks ->
-            Env = create_env(State),
+            Env = create_env(State, AppInfo),
             lists:foreach(fun({_, C, _}=Hook) when C =:= Command ->
                                   apply_hook(Dir, Env, Hook);
                              ({C, _}=Hook) when C =:= Command ->
@@ -97,8 +101,9 @@ apply_hook(Dir, Env, {Command, Hook}) ->
     Msg = lists:flatten(io_lib:format("Hook for ~p failed!~n", [Command])),
     rebar_utils:sh(Hook, [use_stdout, {cd, Dir}, {env, Env}, {abort_on_error, Msg}]).
 
-create_env(State) ->
-    BaseDir = rebar_state:dir(State),
+create_env(State, AppInfo) ->
+    Opts = rebar_app_info:opts(AppInfo),
+    BaseDir = rebar_dir:base_dir(State),
     [
      {"REBAR_DEPS_DIR",          filename:absname(rebar_dir:deps_dir(State))},
      {"REBAR_BUILD_DIR",         filename:absname(rebar_dir:base_dir(State))},
@@ -109,7 +114,7 @@ create_env(State) ->
      {"REBAR_GLOBAL_CACHE_DIR",  filename:absname(rebar_dir:global_cache_dir(State))},
      {"REBAR_TEMPLATE_DIR",      filename:absname(rebar_dir:template_dir(State))},
      {"REBAR_APP_DIRS",          join_dirs(BaseDir, rebar_dir:lib_dirs(State))},
-     {"REBAR_SRC_DIRS",          join_dirs(BaseDir, rebar_dir:all_src_dirs(State))},
+     {"REBAR_SRC_DIRS",          join_dirs(BaseDir, rebar_dir:all_src_dirs(Opts))},
      {"ERLANG_ERTS_VER",         erlang:system_info(version)},
      {"ERLANG_ROOT_DIR",         code:root_dir()},
      {"ERLANG_LIB_DIR_erl_interface", code:lib_dir(erl_interface)},

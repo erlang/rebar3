@@ -26,7 +26,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_erlc_compiler).
 
--export([compile/2,
+-export([compile/1,
          compile/3,
          clean/2]).
 
@@ -80,31 +80,32 @@
 %%                           'old_inets'}]}.
 %%
 
--spec compile(rebar_state:t(), file:name()) -> 'ok'.
-compile(Config, Dir) ->
-    compile(Config, Dir, filename:join([Dir, "ebin"])).
+-spec compile(rebar_app_info:t()) -> 'ok'.
+compile(AppInfo) ->
+    Dir = ec_cnv:to_list(rebar_app_info:out_dir(AppInfo)),
+    compile(rebar_app_info:opts(AppInfo), Dir, filename:join([Dir, "ebin"])).
 
--spec compile(rebar_state:t(), file:name(), file:name()) -> 'ok'.
-compile(Config, Dir, OutDir) ->
-    rebar_base_compiler:run(Config,
-                            check_files(rebar_state:get(
-                                          Config, xrl_first_files, [])),
+-spec compile(rebar_app_info:t(), file:name(), file:name()) -> 'ok'.
+compile(AppInfo, Dir, OutDir) ->
+    rebar_base_compiler:run(AppInfo,
+                            check_files(rebar_utils:get(
+                                          AppInfo, xrl_first_files, [])),
                             filename:join(Dir, "src"), ".xrl", filename:join(Dir, "src"), ".erl",
                             fun compile_xrl/3),
-    rebar_base_compiler:run(Config,
-                            check_files(rebar_state:get(
-                                          Config, yrl_first_files, [])),
+    rebar_base_compiler:run(AppInfo,
+                            check_files(rebar_utils:get(
+                                          AppInfo, yrl_first_files, [])),
                             filename:join(Dir, "src"), ".yrl", filename:join(Dir, "src"), ".erl",
                             fun compile_yrl/3),
-    rebar_base_compiler:run(Config,
-                            check_files(rebar_state:get(
-                                          Config, mib_first_files, [])),
+    rebar_base_compiler:run(AppInfo,
+                            check_files(rebar_utils:get(
+                                          AppInfo, mib_first_files, [])),
                             filename:join(Dir, "mibs"), ".mib", filename:join([Dir, "priv", "mibs"]), ".bin",
                             fun compile_mib/3),
-    doterl_compile(Config, Dir, OutDir).
+    doterl_compile(AppInfo, Dir, OutDir).
 
--spec clean(rebar_state:t(), file:filename()) -> 'ok'.
-clean(_Config, AppDir) ->
+-spec clean(rebar_app_info:t(), file:filename()) -> 'ok'.
+clean(_AppInfo, AppDir) ->
     MibFiles = rebar_utils:find_files(filename:join(AppDir, "mibs"), ?RE_PREFIX".*\\.mib\$"),
     MIBs = [filename:rootname(filename:basename(MIB)) || MIB <- MibFiles],
     rebar_file_utils:delete_each(
@@ -133,17 +134,17 @@ clean(_Config, AppDir) ->
 %% Internal functions
 %% ===================================================================
 
--spec doterl_compile(rebar_state:t(), file:filename(), file:filename()) -> ok.
+-spec doterl_compile(rebar_app_info:t(), file:filename(), file:filename()) -> ok.
 doterl_compile(State, Dir, ODir) ->
     ErlOpts = rebar_utils:erl_opts(State),
     doterl_compile(State, Dir, ODir, [], ErlOpts).
 
-doterl_compile(Config, Dir, OutDir, MoreSources, ErlOpts) ->
+doterl_compile(AppInfo, Dir, OutDir, MoreSources, ErlOpts) ->
     ?DEBUG("erl_opts ~p", [ErlOpts]),
     %% Support the src_dirs option allowing multiple directories to
     %% contain erlang source. This might be used, for example, should
     %% eunit tests be separated from the core application source.
-    SrcDirs = [filename:join(Dir, X) || X <- rebar_dir:all_src_dirs(Config, ["src"], [])],
+    SrcDirs = [filename:join(Dir, X) || X <- rebar_dir:all_src_dirs(AppInfo, ["src"], [])],
     AllErlFiles = gather_src(SrcDirs, []) ++ MoreSources,
 
     %% Make sure that ebin/ exists and is on the path
@@ -155,7 +156,7 @@ doterl_compile(Config, Dir, OutDir, MoreSources, ErlOpts) ->
     G = init_erlcinfo(proplists:get_all_values(i, ErlOpts), AllErlFiles, Dir, OutDir),
 
     NeededErlFiles = needed_files(G, ErlOpts, Dir, OutDir1, AllErlFiles),
-    {ErlFirstFiles, ErlOptsFirst} = erl_first_files(Config, ErlOpts, Dir, NeededErlFiles),
+    {ErlFirstFiles, ErlOptsFirst} = erl_first_files(AppInfo, ErlOpts, Dir, NeededErlFiles),
     {DepErls, OtherErls} = lists:partition(
                              fun(Source) -> digraph:in_degree(G, Source) > 0 end,
                              [File || File <- NeededErlFiles, not lists:member(File, ErlFirstFiles)]),
@@ -165,7 +166,7 @@ doterl_compile(Config, Dir, OutDir, MoreSources, ErlOpts) ->
     ?DEBUG("Files to compile first: ~p", [FirstErls]),
     try
         rebar_base_compiler:run(
-          Config, FirstErls, OtherErls,
+          AppInfo, FirstErls, OtherErls,
           fun(S, C) ->
                   ErlOpts1 = case lists:member(S, ErlFirstFiles) of
                                  true -> ErlOptsFirst;
@@ -182,8 +183,8 @@ doterl_compile(Config, Dir, OutDir, MoreSources, ErlOpts) ->
 %% Get files which need to be compiled first, i.e. those specified in erl_first_files
 %% and parse_transform options.  Also produce specific erl_opts for these first
 %% files, so that yet to be compiled parse transformations are excluded from it.
-erl_first_files(Config, ErlOpts, Dir, NeededErlFiles) ->
-    ErlFirstFilesConf = rebar_state:get(Config, erl_first_files, []),
+erl_first_files(AppInfo, ErlOpts, Dir, NeededErlFiles) ->
+    ErlFirstFilesConf = rebar_utils:get(AppInfo, erl_first_files, []),
     NeededSrcDirs = lists:usort(lists:map(fun filename:dirname/1, NeededErlFiles)),
     %% NOTE: order of files here is important!
     ErlFirstFiles =
@@ -402,9 +403,9 @@ expand_file_names(Files, Dirs) ->
       end, Files).
 
 
--spec internal_erl_compile(rebar_state:t(), file:filename(), file:filename(),
+-spec internal_erl_compile(rebar_app_info:t(), file:filename(), file:filename(),
     file:filename(), list()) -> ok | {ok, any()} | {error, any(), any()}.
-internal_erl_compile(Config, Dir, Module, OutDir, ErlOpts) ->
+internal_erl_compile(AppInfo, Dir, Module, OutDir, ErlOpts) ->
     Target = target_base(OutDir, Module) ++ ".beam",
     ok = filelib:ensure_dir(Target),
     Opts = [{outdir, filename:dirname(Target)}] ++ ErlOpts ++
@@ -413,23 +414,23 @@ internal_erl_compile(Config, Dir, Module, OutDir, ErlOpts) ->
         {ok, _Mod} ->
             ok;
         {ok, _Mod, Ws} ->
-            rebar_base_compiler:ok_tuple(Config, Module, Ws);
+            rebar_base_compiler:ok_tuple(AppInfo, Module, Ws);
         {error, Es, Ws} ->
-            rebar_base_compiler:error_tuple(Config, Module, Es, Ws, Opts)
+            rebar_base_compiler:error_tuple(AppInfo, Module, Es, Ws, Opts)
     end.
 
 target_base(OutDir, Source) ->
     filename:join(OutDir, filename:basename(Source, ".erl")).
 
 -spec compile_mib(file:filename(), file:filename(),
-                  rebar_state:t()) -> 'ok'.
-compile_mib(Source, Target, Config) ->
-    Dir = rebar_state:dir(Config),
+                  rebar_app_info:t()) -> 'ok'.
+compile_mib(Source, Target, AppInfo) ->
+    Dir = filename:dirname(Target),
     ok = filelib:ensure_dir(Target),
     ok = filelib:ensure_dir(filename:join([Dir, "include", "dummy.hrl"])),
-    Opts = [{outdir, filename:join([Dir, "priv", "mibs"])}
-           ,{i, [filename:join([Dir, "priv", "mibs"])]}] ++
-        rebar_state:get(Config, mib_opts, []),
+    Opts = [{outdir, Dir}
+           ,{i, [Dir]}] ++
+        rebar_utils:get(AppInfo, mib_opts, []),
 
     case snmpc:compile(Source, Opts) of
         {ok, _} ->
@@ -450,21 +451,21 @@ compile_mib(Source, Target, Config) ->
     end.
 
 -spec compile_xrl(file:filename(), file:filename(),
-                  rebar_state:t()) -> 'ok'.
-compile_xrl(Source, Target, Config) ->
-    Opts = [{scannerfile, Target} | rebar_state:get(Config, xrl_opts, [])],
-    compile_xrl_yrl(Config, Source, Target, Opts, leex).
+                  rebar_app_info:t()) -> 'ok'.
+compile_xrl(Source, Target, AppInfo) ->
+    Opts = [{scannerfile, Target} | rebar_utils:get(AppInfo, xrl_opts, [])],
+    compile_xrl_yrl(AppInfo, Source, Target, Opts, leex).
 
 -spec compile_yrl(file:filename(), file:filename(),
-                  rebar_state:t()) -> 'ok'.
-compile_yrl(Source, Target, Config) ->
-    Opts = [{parserfile, Target} | rebar_state:get(Config, yrl_opts, [])],
-    compile_xrl_yrl(Config, Source, Target, Opts, yecc).
+                  rebar_app_info:t()) -> 'ok'.
+compile_yrl(Source, Target, AppInfo) ->
+    Opts = [{parserfile, Target} | rebar_utils:get(AppInfo, yrl_opts, [])],
+    compile_xrl_yrl(AppInfo, Source, Target, Opts, yecc).
 
--spec compile_xrl_yrl(rebar_state:t(), file:filename(),
+-spec compile_xrl_yrl(rebar_app_info:t(), file:filename(),
                       file:filename(), list(), module()) -> 'ok'.
-compile_xrl_yrl(Config, Source, Target, Opts, Mod) ->
-    Dir = rebar_state:dir(Config),
+compile_xrl_yrl(AppInfo, Source, Target, Opts, Mod) ->
+    Dir = filename:dirname(Target),
     Opts1 = [{includefile, filename:join(Dir, I)} || {includefile, I} <- Opts,
                                                      filename:pathtype(I) =:= relative],
     case needs_compile(Source, Target) of
@@ -473,9 +474,9 @@ compile_xrl_yrl(Config, Source, Target, Opts, Mod) ->
                 {ok, _} ->
                     ok;
                 {ok, _Mod, Ws} ->
-                    rebar_base_compiler:ok_tuple(Config, Source, Ws);
+                    rebar_base_compiler:ok_tuple(AppInfo, Source, Ws);
                 {error, Es, Ws} ->
-                    rebar_base_compiler:error_tuple(Config, Source,
+                    rebar_base_compiler:error_tuple(AppInfo, Source,
                                                     Es, Ws, Opts1)
             end;
         false ->

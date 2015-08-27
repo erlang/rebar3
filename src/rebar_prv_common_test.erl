@@ -43,12 +43,12 @@ do(State) ->
     %% Run ct provider prehooks
     Providers = rebar_state:providers(State),
     Cwd = rebar_dir:get_cwd(),
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
+    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, element(2,rebar_app_info:new(noen)), State),
 
     try run_test(State) of
         {ok, State1} = Result ->
             %% Run ct provider posthooks
-            rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State1),
+            rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, element(2,rebar_app_info:new(noen)), State1),
             rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
             Result;
         ?PRV_ERROR(_) = Error ->
@@ -307,7 +307,7 @@ copy(State, Dir) ->
 
 compile_dir(State, Dir) ->
     NewState = replace_src_dirs(State, [filename:absname(Dir)]),
-    ok = rebar_erlc_compiler:compile(NewState, rebar_dir:base_dir(State), Dir),
+    ok = rebar_erlc_compiler:compile(rebar_state:opts(NewState), rebar_dir:base_dir(State), Dir),
     ok = maybe_cover_compile(State, Dir),
     Dir.
 

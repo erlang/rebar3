@@ -26,7 +26,10 @@
 %% -------------------------------------------------------------------
 -module(rebar_utils).
 
--export([sort_deps/1,
+-export([get/2,
+         get/3,
+         set/3,
+         sort_deps/1,
          droplast/1,
          filtermap/2,
          is_arch/1,
@@ -79,6 +82,21 @@
 %% ====================================================================
 %% Public API
 %% ====================================================================
+
+get(Opts, Key) ->
+    {ok, Value} = dict:find(Key, Opts),
+    Value.
+
+get(Opts, Key, Default) ->
+    case dict:find(Key, Opts) of
+        {ok, Value} ->
+            Value;
+        error ->
+            Default
+    end.
+
+set(Opts, Key, Value) ->
+    dict:store(Key, Value, Opts).
 
 sort_deps(Deps) ->
     %% We need a sort stable, based on the name. So that for multiple deps on
@@ -219,11 +237,11 @@ deprecated(Old, New, When) ->
       [Old, Old, New, Old, When]).
 
 %% @doc Return list of erl_opts
--spec erl_opts(rebar_state:t()) -> list().
-erl_opts(Config) ->
-    RawErlOpts = filter_defines(rebar_state:get(Config, erl_opts, []), []),
+-spec erl_opts(rebar_app_info:t()) -> list().
+erl_opts(AppInfo) ->
+    RawErlOpts = filter_defines(rebar_utils:get(AppInfo, erl_opts, []), []),
     Defines = [{d, list_to_atom(D)} ||
-                  D <- rebar_state:get(Config, defines, [])],
+                  D <- rebar_utils:get(AppInfo, defines, [])],
     Opts = Defines ++ RawErlOpts,
     case proplists:is_defined(no_debug_info, Opts) of
         true ->

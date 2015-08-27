@@ -254,28 +254,29 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     Profiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo),
 
-    %% Deps may be under a sub project app, find it and use its state if so
-    S = rebar_app_info:state(AppInfo),
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
-    S1 = rebar_state:new(S, C, AppInfo),
-    S2 = rebar_state:apply_overrides(S1, Name),
+    AppInfo0 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
+    AppInfo1 = rebar_app_info:apply_overrides(AppInfo0, Name),
 
-    S3 = rebar_state:apply_profiles(S2, Profiles),
-    Plugins = rebar_state:get(S3, plugins, []),
-    S4 = rebar_state:set(S3, {plugins, Profile}, Plugins),
+    AppInfo2 = rebar_app_info:apply_profiles(AppInfo1, Profiles),
+    Plugins = rebar_app_info:get(AppInfo2, plugins, []),
+    AppInfo3 = rebar_app_info:set(AppInfo2, {plugins, Profile}, Plugins),
 
-    rebar_utils:check_min_otp_version(rebar_state:get(S4, minimum_otp_vsn, undefined)),
-    rebar_utils:check_blacklisted_otp_versions(rebar_state:get(S4, blacklisted_otp_vsns, [])),
+    rebar_utils:check_min_otp_version(rebar_app_info:get(AppInfo3, minimum_otp_vsn, undefined)),
+    rebar_utils:check_blacklisted_otp_versions(rebar_app_info:get(AppInfo3, blacklisted_otp_vsns, [])),
 
     %% Dep may have plugins to install. Find and install here.
-    S5 = rebar_plugins:install(S4),
-    AppInfo1 = rebar_app_info:state(AppInfo, S5),
+    _S = rebar_plugins:install(State, AppInfo3),
+    %% TODO: Plugin Providers??
+
+    %AppInfo1 = rebar_app_info:state(AppInfo, S5),
+    %AppInfo2 = rebar_app_info:opts(AppInfo1, rebar_state:opts(S5)),
 
     %% Upgrade lock level to be the level the dep will have in this dep tree
-    Deps = rebar_state:get(S5, {deps, default}, []),
-    AppInfo2 = rebar_app_info:deps(AppInfo1, rebar_state:deps_names(Deps)),
-    Deps1 = rebar_app_utils:parse_deps(Name, DepsDir, Deps, S5, Locks, Level+1),
-    {AppInfo2, Deps1, State}.
+    Deps = rebar_app_info:get(AppInfo3, {deps, default}, []),
+    AppInfo4 = rebar_app_info:deps(AppInfo3, rebar_state:deps_names(Deps)),
+    Deps1 = rebar_app_utils:parse_deps(Name, DepsDir, Deps, State, Locks, Level+1),
+    {AppInfo4, Deps1, State}.
 
 -spec maybe_fetch(rebar_app_info:t(), atom(), boolean(),
                   sets:set(binary()), rebar_state:t()) -> {boolean(), rebar_app_info:t()}.
@@ -420,4 +421,4 @@ warn_skip_deps(AppInfo, State) ->
 not_needs_compile(App) ->
     not(rebar_app_info:is_checkout(App))
         andalso rebar_app_info:valid(App)
-          andalso rebar_state:has_all_artifacts(rebar_app_info:state(App)) =:= true.
+          andalso rebar_app_info:has_all_artifacts(App) =:= true.

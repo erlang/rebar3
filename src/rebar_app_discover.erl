@@ -89,12 +89,13 @@ merge_deps(AppInfo, State) ->
 
     AppState2 = rebar_state:set(AppState1, artifacts, []),
     AppInfo1 = rebar_app_info:state(AppInfo, AppState2),
+    AppInfo2 = rebar_app_info:opts(AppInfo1, rebar_state:opts(AppState2)),
 
     State1 = lists:foldl(fun(Profile, StateAcc) ->
                                  handle_profile(Profile, Name, AppState1, StateAcc)
                          end, State, lists:reverse(CurrentProfiles)),
 
-    {AppInfo1, State1}.
+    {AppInfo2, State1}.
 
 handle_profile(Profile, Name, AppState, State) ->
     TopParsedDeps = rebar_state:get(State, {parsed_deps, Profile}, {[], []}),

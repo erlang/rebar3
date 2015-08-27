@@ -52,7 +52,7 @@ do(State) ->
     {ok, ProjectApps1} = rebar_digraph:compile_order(ProjectApps),
 
     %% Run top level hooks *before* project apps compiled but *after* deps are
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
+    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, element(2,rebar_app_info:new(noen)), State),
 
     ProjectApps2 = build_apps(State, Providers, ProjectApps1),
     State2 = rebar_state:project_apps(State, ProjectApps2),
@@ -60,7 +60,7 @@ do(State) ->
     ProjAppsPaths = [filename:join(rebar_app_info:out_dir(X), "ebin") || X <- ProjectApps2],
     State3 = rebar_state:code_paths(State2, all_deps, DepsPaths ++ ProjAppsPaths),
 
-    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State2),
+    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, element(2,rebar_app_info:new(noen)), State2),
     has_all_artifacts(State3),
 
     rebar_utils:cleanup_code_path(rebar_state:code_paths(State3, default)
@@ -80,7 +80,7 @@ build_apps(State, Providers, Apps) ->
 build_app(State, Providers, AppInfo) ->
     AppDir = rebar_app_info:dir(AppInfo),
     OutDir = rebar_app_info:out_dir(AppInfo),
-    copy_app_dirs(State, AppDir, OutDir),
+    copy_app_dirs(AppInfo, AppDir, OutDir),
 
     S = rebar_app_info:state_or_new(State, AppInfo),
     S1 = rebar_state:all_deps(S, rebar_state:all_deps(State)),
@@ -89,12 +89,12 @@ build_app(State, Providers, AppInfo) ->
 compile(State, Providers, AppInfo) ->
     ?INFO("Compiling ~s", [rebar_app_info:name(AppInfo)]),
     AppDir = rebar_app_info:dir(AppInfo),
-    rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, State),
+    rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, AppInfo, State),
 
-    rebar_erlc_compiler:compile(State, ec_cnv:to_list(rebar_app_info:out_dir(AppInfo))),
+    rebar_erlc_compiler:compile(AppInfo),
     case rebar_otp_app:compile(State, AppInfo) of
         {ok, AppInfo1} ->
-            rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, State),
+            rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo, State),
             has_all_artifacts(State),
             AppInfo1;
         Error ->
@@ -113,7 +113,7 @@ has_all_artifacts(State) ->
             true
     end.
 
-copy_app_dirs(State, OldAppDir, AppDir) ->
+copy_app_dirs(AppInfo, OldAppDir, AppDir) ->
     case ec_cnv:to_binary(filename:absname(OldAppDir)) =/=
         ec_cnv:to_binary(filename:absname(AppDir)) of
         true ->
@@ -142,7 +142,7 @@ copy_app_dirs(State, OldAppDir, AppDir) ->
             end,
 
             %% link to src_dirs to be adjacent to ebin is needed for R15 use of cover/xref
-            SrcDirs = rebar_dir:all_src_dirs(State, ["src"], []),
+            SrcDirs = rebar_dir:all_src_dirs(rebar_app_info:opts(AppInfo), ["src"], []),
             [symlink_or_copy(OldAppDir, AppDir, Dir) || Dir <- ["priv", "include"] ++ SrcDirs];
         false ->
             ok
