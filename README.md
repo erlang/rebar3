@@ -13,7 +13,7 @@ configuration work. rebar also provides dependency management, enabling
 application writers to easily re-use common libraries from a variety of
 locations ([hex.pm](http://hex.pm), git, hg, and so on).
 
-3.0 Beta-1
+3.0 Beta-2
 ====
 
 [DOCUMENTATION](http://www.rebar3.org/v3.0/docs)
