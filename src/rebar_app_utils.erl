@@ -165,7 +165,7 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
                         Dir = ec_cnv:to_list(filename:join(DepsDir, Name)),
                         case rebar_app_info:discover(Dir) of
                             {ok, App} ->
-                                {ok, App};
+                                {ok, rebar_app_info:parent(App, Parent)};
                             not_found ->
                                 rebar_app_info:new(Parent, Name, Vsn, Dir, [])
                         end
