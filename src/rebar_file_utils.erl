@@ -201,9 +201,9 @@ write_file_if_contents_differ(Filename, Bytes) ->
         {ok, ToWrite} ->
             ok;
         {ok,  _} ->
-            file:write_file(Filename, ToWrite);
+            file:write_file(Filename, ToWrite, [raw]);
         {error,  _} ->
-            file:write_file(Filename, ToWrite)
+            file:write_file(Filename, ToWrite, [raw])
     end.
 
 %% returns an os appropriate tmpdir given a path
