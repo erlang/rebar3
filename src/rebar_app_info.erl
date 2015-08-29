@@ -9,8 +9,6 @@
          discover/1,
          name/1,
          name/2,
-         config/1,
-         config/2,
          app_file_src/1,
          app_file_src/2,
          app_file_src_script/1,
@@ -47,9 +45,6 @@
          resource_type/2,
          source/1,
          source/2,
-         state/1,
-         state/2,
-         state_or_new/2,
          is_lock/1,
          is_lock/2,
          is_checkout/1,
@@ -76,7 +71,6 @@
                      app_file_src       :: file:filename_all() | undefined,
                      app_file_src_script:: file:filename_all() | undefined,
                      app_file           :: file:filename_all() | undefined,
-                     config             :: rebar_state:t() | undefined,
                      original_vsn       :: binary() | string() | undefined,
                      parent=root        :: binary() | root,
                      app_details=[]     :: list(),
@@ -90,7 +84,6 @@
                      out_dir            :: file:name(),
                      resource_type      :: pkg | src,
                      source             :: string() | tuple() | undefined,
-                     state              :: rebar_state:t() | undefined,
                      is_lock=false      :: boolean(),
                      is_checkout=false  :: boolean(),
                      valid              :: boolean()}).
@@ -193,14 +186,6 @@ name(#app_info_t{name=Name}) ->
 -spec name(t(), atom() | binary() | string()) -> t().
 name(AppInfo=#app_info_t{}, AppName) ->
     AppInfo#app_info_t{name=ec_cnv:to_binary(AppName)}.
-
--spec config(t()) -> rebar_state:t().
-config(#app_info_t{config=Config}) ->
-    Config.
-
--spec config(t(), rebar_state:t()) -> t().
-config(AppInfo=#app_info_t{}, Config) ->
-    AppInfo#app_info_t{config=Config}.
 
 opts(#app_info_t{opts=Opts}) ->
     Opts.
@@ -383,22 +368,6 @@ source(AppInfo=#app_info_t{}, Source) ->
 -spec source(t()) -> string() | tuple().
 source(#app_info_t{source=Source}) ->
     Source.
-
--spec state(t(), rebar_state:t() | undefined) -> t().
-state(AppInfo=#app_info_t{}, State) ->
-    AppInfo#app_info_t{state=State}.
-
--spec state(t()) -> rebar_state:t() | undefined.
-state(#app_info_t{state=State}) ->
-    State.
-
--spec state_or_new(rebar_state:t(), t()) -> rebar_state:t().
-state_or_new(State, AppInfo=#app_info_t{state=undefined}) ->
-    AppDir = dir(AppInfo),
-    C = rebar_config:consult(AppDir),
-    rebar_state:new(State, C, AppInfo);
-state_or_new(_State, #app_info_t{state=State}) ->
-    State.
 
 -spec is_lock(t(), boolean()) -> t().
 is_lock(AppInfo=#app_info_t{}, IsLock) ->

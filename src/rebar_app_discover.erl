@@ -88,8 +88,7 @@ merge_deps(AppInfo, State) ->
     rebar_utils:check_blacklisted_otp_versions(rebar_state:get(AppState1, blacklisted_otp_vsns, [])),
 
     AppState2 = rebar_state:set(AppState1, artifacts, []),
-    AppInfo1 = rebar_app_info:state(AppInfo, AppState2),
-    AppInfo2 = rebar_app_info:opts(AppInfo1, rebar_state:opts(AppState2)),
+    AppInfo2 = rebar_app_info:opts(AppInfo, rebar_state:opts(AppState2)),
 
     State1 = lists:foldl(fun(Profile, StateAcc) ->
                                  handle_profile(Profile, Name, AppState1, StateAcc)

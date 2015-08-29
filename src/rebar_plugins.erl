@@ -92,7 +92,8 @@ handle_plugin(Profile, Plugin, State, Upgrade) ->
 build_plugin(AppInfo, Apps, State) ->
     Providers = rebar_state:providers(State),
     %Providers1 = rebar_state:providers(rebar_app_info:state(AppInfo)),
-    S = rebar_state:all_deps(rebar_app_info:state_or_new(State, AppInfo), Apps),
+    %rebar_app_info:state_or_new(State, AppInfo)
+    S = rebar_state:all_deps(State, Apps),
     S1 = rebar_state:set(S, deps_dir, ?DEFAULT_PLUGINS_DIR),
     rebar_prv_compile:compile(S1, Providers, AppInfo).
 

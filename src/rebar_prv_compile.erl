@@ -82,8 +82,8 @@ build_app(State, Providers, AppInfo) ->
     OutDir = rebar_app_info:out_dir(AppInfo),
     copy_app_dirs(AppInfo, AppDir, OutDir),
 
-    S = rebar_app_info:state_or_new(State, AppInfo),
-    S1 = rebar_state:all_deps(S, rebar_state:all_deps(State)),
+    %S = rebar_app_info:state_or_new(State, AppInfo),
+    S1 = rebar_state:all_deps(State, rebar_state:all_deps(State)),
     compile(S1, Providers, AppInfo).
 
 compile(State, Providers, AppInfo) ->

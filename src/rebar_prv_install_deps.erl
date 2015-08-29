@@ -294,9 +294,9 @@ maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
                     {true, rebar_app_info:valid(update_app_info(AppDir, AppInfo), false)};
                 {true, AppInfo1} ->
                     %% Preserve the state we created with overrides
-                    AppInfo2 = copy_app_info(AppInfo, AppInfo1),
-                    AppState = rebar_app_info:state(AppInfo),
-                    AppInfo3 = rebar_app_info:state(AppInfo2, AppState),
+                    AppInfo3 = copy_app_info(AppInfo, AppInfo1),
+                    %% AppState = rebar_app_info:state(AppInfo),
+                    %% AppInfo3 = rebar_app_info:state(AppInfo2, AppState),
                     case sets:is_element(rebar_app_info:name(AppInfo3), Seen) of
                         true ->
                             {false, AppInfo3};

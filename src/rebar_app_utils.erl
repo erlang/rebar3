@@ -176,7 +176,6 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
     Overrides = rebar_state:get(State, overrides, []),
     ParentOverrides = rebar_state:overrides(State),
     S1 = rebar_state:set(rebar_state:overrides(State, ParentOverrides++Overrides), base_dir, BaseDir),
-    %AppInfo2 = rebar_app_info:state(AppInfo1, S1),
     AppInfo3 = rebar_app_info:opts(AppInfo1, rebar_state:opts(S1)),
     rebar_app_info:is_lock(rebar_app_info:source(AppInfo3, Source), IsLock).
 

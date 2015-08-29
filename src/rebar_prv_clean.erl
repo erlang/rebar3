@@ -67,12 +67,12 @@ format_error(Reason) ->
 clean_apps(State, Providers, Apps) ->
     lists:foreach(fun(AppInfo) ->
                           AppDir = rebar_app_info:dir(AppInfo),
-                          S = rebar_app_info:state_or_new(State, AppInfo),
+                          %S = rebar_app_info:state_or_new(State, AppInfo),
 
                           ?INFO("Cleaning out ~s...", [rebar_app_info:name(AppInfo)]),
-                          rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER, Providers, AppInfo, S),
+                          rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER, Providers, AppInfo, State),
                           rebar_erlc_compiler:clean(State, rebar_app_info:out_dir(AppInfo)),
-                          rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo, S)
+                          rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo, State)
                   end, Apps).
 
 handle_args(State) ->
