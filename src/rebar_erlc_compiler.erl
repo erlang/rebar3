@@ -85,27 +85,27 @@ compile(AppInfo) ->
     Dir = ec_cnv:to_list(rebar_app_info:out_dir(AppInfo)),
     compile(rebar_app_info:opts(AppInfo), Dir, filename:join([Dir, "ebin"])).
 
--spec compile(rebar_app_info:t(), file:name(), file:name()) -> 'ok'.
-compile(AppInfo, Dir, OutDir) ->
-    rebar_base_compiler:run(AppInfo,
+-spec compile(rebar_dict(), file:name(), file:name()) -> 'ok'.
+compile(Opts, Dir, OutDir) ->
+    rebar_base_compiler:run(Opts,
                             check_files(rebar_utils:get(
-                                          AppInfo, xrl_first_files, [])),
+                                          Opts, xrl_first_files, [])),
                             filename:join(Dir, "src"), ".xrl", filename:join(Dir, "src"), ".erl",
                             fun compile_xrl/3),
-    rebar_base_compiler:run(AppInfo,
+    rebar_base_compiler:run(Opts,
                             check_files(rebar_utils:get(
-                                          AppInfo, yrl_first_files, [])),
+                                          Opts, yrl_first_files, [])),
                             filename:join(Dir, "src"), ".yrl", filename:join(Dir, "src"), ".erl",
                             fun compile_yrl/3),
-    rebar_base_compiler:run(AppInfo,
+    rebar_base_compiler:run(Opts,
                             check_files(rebar_utils:get(
-                                          AppInfo, mib_first_files, [])),
+                                          Opts, mib_first_files, [])),
                             filename:join(Dir, "mibs"), ".mib", filename:join([Dir, "priv", "mibs"]), ".bin",
                             fun compile_mib/3),
-    doterl_compile(AppInfo, Dir, OutDir).
+    doterl_compile(Opts, Dir, OutDir).
 
--spec clean(rebar_app_info:t(), file:filename()) -> 'ok'.
-clean(_AppInfo, AppDir) ->
+-spec clean(rebar_dict(), file:filename()) -> 'ok'.
+clean(_Opts, AppDir) ->
     MibFiles = rebar_utils:find_files(filename:join(AppDir, "mibs"), ?RE_PREFIX".*\\.mib\$"),
     MIBs = [filename:rootname(filename:basename(MIB)) || MIB <- MibFiles],
     rebar_file_utils:delete_each(
@@ -134,17 +134,17 @@ clean(_AppInfo, AppDir) ->
 %% Internal functions
 %% ===================================================================
 
--spec doterl_compile(rebar_app_info:t(), file:filename(), file:filename()) -> ok.
-doterl_compile(State, Dir, ODir) ->
-    ErlOpts = rebar_utils:erl_opts(State),
-    doterl_compile(State, Dir, ODir, [], ErlOpts).
+-spec doterl_compile(rebar_dict(), file:filename(), file:filename()) -> ok.
+doterl_compile(Opts, Dir, ODir) ->
+    ErlOpts = rebar_utils:erl_opts(Opts),
+    doterl_compile(Opts, Dir, ODir, [], ErlOpts).
 
-doterl_compile(AppInfo, Dir, OutDir, MoreSources, ErlOpts) ->
+doterl_compile(Opts, Dir, OutDir, MoreSources, ErlOpts) ->
     ?DEBUG("erl_opts ~p", [ErlOpts]),
     %% Support the src_dirs option allowing multiple directories to
     %% contain erlang source. This might be used, for example, should
     %% eunit tests be separated from the core application source.
-    SrcDirs = [filename:join(Dir, X) || X <- rebar_dir:all_src_dirs(AppInfo, ["src"], [])],
+    SrcDirs = [filename:join(Dir, X) || X <- rebar_dir:all_src_dirs(Opts, ["src"], [])],
     AllErlFiles = gather_src(SrcDirs, []) ++ MoreSources,
 
     %% Make sure that ebin/ exists and is on the path
@@ -156,7 +156,7 @@ doterl_compile(AppInfo, Dir, OutDir, MoreSources, ErlOpts) ->
     G = init_erlcinfo(proplists:get_all_values(i, ErlOpts), AllErlFiles, Dir, OutDir),
 
     NeededErlFiles = needed_files(G, ErlOpts, Dir, OutDir1, AllErlFiles),
-    {ErlFirstFiles, ErlOptsFirst} = erl_first_files(AppInfo, ErlOpts, Dir, NeededErlFiles),
+    {ErlFirstFiles, ErlOptsFirst} = erl_first_files(Opts, ErlOpts, Dir, NeededErlFiles),
     {DepErls, OtherErls} = lists:partition(
                              fun(Source) -> digraph:in_degree(G, Source) > 0 end,
                              [File || File <- NeededErlFiles, not lists:member(File, ErlFirstFiles)]),
@@ -166,7 +166,7 @@ doterl_compile(AppInfo, Dir, OutDir, MoreSources, ErlOpts) ->
     ?DEBUG("Files to compile first: ~p", [FirstErls]),
     try
         rebar_base_compiler:run(
-          AppInfo, FirstErls, OtherErls,
+          Opts, FirstErls, OtherErls,
           fun(S, C) ->
                   ErlOpts1 = case lists:member(S, ErlFirstFiles) of
                                  true -> ErlOptsFirst;
@@ -183,8 +183,8 @@ doterl_compile(AppInfo, Dir, OutDir, MoreSources, ErlOpts) ->
 %% Get files which need to be compiled first, i.e. those specified in erl_first_files
 %% and parse_transform options.  Also produce specific erl_opts for these first
 %% files, so that yet to be compiled parse transformations are excluded from it.
-erl_first_files(AppInfo, ErlOpts, Dir, NeededErlFiles) ->
-    ErlFirstFilesConf = rebar_utils:get(AppInfo, erl_first_files, []),
+erl_first_files(Opts, ErlOpts, Dir, NeededErlFiles) ->
+    ErlFirstFilesConf = rebar_utils:get(Opts, erl_first_files, []),
     NeededSrcDirs = lists:usort(lists:map(fun filename:dirname/1, NeededErlFiles)),
     %% NOTE: order of files here is important!
     ErlFirstFiles =
@@ -209,10 +209,10 @@ needed_files(G, ErlOpts, Dir, OutDir, SourceFiles) ->
     lists:filter(fun(Source) ->
                          TargetBase = target_base(OutDir, Source),
                          Target = TargetBase ++ ".beam",
-                         Opts = [{outdir, filename:dirname(Target)}
+                         AllOpts = [{outdir, filename:dirname(Target)}
                                 ,{i, filename:join(Dir, "include")}] ++ ErlOpts,
                          digraph:vertex(G, Source) > {Source, filelib:last_modified(Target)}
-                              orelse opts_changed(Opts, TargetBase)
+                              orelse opts_changed(AllOpts, TargetBase)
                  end, SourceFiles).
 
 maybe_rm_beam_and_edge(G, OutDir, Source) ->
@@ -403,40 +403,40 @@ expand_file_names(Files, Dirs) ->
       end, Files).
 
 
--spec internal_erl_compile(rebar_app_info:t(), file:filename(), file:filename(),
+-spec internal_erl_compile(rebar_dict(), file:filename(), file:filename(),
     file:filename(), list()) -> ok | {ok, any()} | {error, any(), any()}.
-internal_erl_compile(AppInfo, Dir, Module, OutDir, ErlOpts) ->
+internal_erl_compile(Opts, Dir, Module, OutDir, ErlOpts) ->
     Target = target_base(OutDir, Module) ++ ".beam",
     ok = filelib:ensure_dir(Target),
-    Opts = [{outdir, filename:dirname(Target)}] ++ ErlOpts ++
+    AllOpts = [{outdir, filename:dirname(Target)}] ++ ErlOpts ++
         [{i, filename:join(Dir, "include")}, return],
-    case compile:file(Module, Opts) of
+    case compile:file(Module, AllOpts) of
         {ok, _Mod} ->
             ok;
         {ok, _Mod, Ws} ->
-            rebar_base_compiler:ok_tuple(AppInfo, Module, Ws);
+            rebar_base_compiler:ok_tuple(Opts, Module, Ws);
         {error, Es, Ws} ->
-            rebar_base_compiler:error_tuple(AppInfo, Module, Es, Ws, Opts)
+            rebar_base_compiler:error_tuple(Opts, Module, Es, Ws, Opts)
     end.
 
 target_base(OutDir, Source) ->
     filename:join(OutDir, filename:basename(Source, ".erl")).
 
 -spec compile_mib(file:filename(), file:filename(),
-                  rebar_app_info:t()) -> 'ok'.
-compile_mib(Source, Target, AppInfo) ->
+                  rebar_dict()) -> 'ok'.
+compile_mib(Source, Target, Opts) ->
     Dir = filename:dirname(Target),
     ok = filelib:ensure_dir(Target),
     ok = filelib:ensure_dir(filename:join([Dir, "include", "dummy.hrl"])),
-    Opts = [{outdir, Dir}
-           ,{i, [Dir]}] ++
-        rebar_utils:get(AppInfo, mib_opts, []),
+    AllOpts = [{outdir, Dir}
+              ,{i, [Dir]}] ++
+        rebar_utils:get(Opts, mib_opts, []),
 
-    case snmpc:compile(Source, Opts) of
+    case snmpc:compile(Source, AllOpts) of
         {ok, _} ->
             Mib = filename:rootname(Target),
             MibToHrlOpts =
-                case proplists:get_value(verbosity, Opts, undefined) of
+                case proplists:get_value(verbosity, AllOpts, undefined) of
                     undefined ->
                         #options{specific = []};
                     Verbosity ->
@@ -451,33 +451,33 @@ compile_mib(Source, Target, AppInfo) ->
     end.
 
 -spec compile_xrl(file:filename(), file:filename(),
-                  rebar_app_info:t()) -> 'ok'.
-compile_xrl(Source, Target, AppInfo) ->
-    Opts = [{scannerfile, Target} | rebar_utils:get(AppInfo, xrl_opts, [])],
-    compile_xrl_yrl(AppInfo, Source, Target, Opts, leex).
+                  rebar_dict()) -> 'ok'.
+compile_xrl(Source, Target, Opts) ->
+    AllOpts = [{scannerfile, Target} | rebar_utils:get(Opts, xrl_opts, [])],
+    compile_xrl_yrl(Opts, Source, Target, AllOpts, leex).
 
 -spec compile_yrl(file:filename(), file:filename(),
-                  rebar_app_info:t()) -> 'ok'.
-compile_yrl(Source, Target, AppInfo) ->
-    Opts = [{parserfile, Target} | rebar_utils:get(AppInfo, yrl_opts, [])],
-    compile_xrl_yrl(AppInfo, Source, Target, Opts, yecc).
+                  rebar_dict()) -> 'ok'.
+compile_yrl(Source, Target, Opts) ->
+    AllOpts = [{parserfile, Target} | rebar_utils:get(Opts, yrl_opts, [])],
+    compile_xrl_yrl(Opts, Source, Target, AllOpts, yecc).
 
--spec compile_xrl_yrl(rebar_app_info:t(), file:filename(),
+-spec compile_xrl_yrl(rebar_dict(), file:filename(),
                       file:filename(), list(), module()) -> 'ok'.
-compile_xrl_yrl(AppInfo, Source, Target, Opts, Mod) ->
+compile_xrl_yrl(Opts, Source, Target, AllOpts, Mod) ->
     Dir = filename:dirname(Target),
-    Opts1 = [{includefile, filename:join(Dir, I)} || {includefile, I} <- Opts,
-                                                     filename:pathtype(I) =:= relative],
+    AllOpts1 = [{includefile, filename:join(Dir, I)} || {includefile, I} <- AllOpts,
+                                                        filename:pathtype(I) =:= relative],
     case needs_compile(Source, Target) of
         true ->
-            case Mod:file(Source, Opts1 ++ [{return, true}]) of
+            case Mod:file(Source, AllOpts1 ++ [{return, true}]) of
                 {ok, _} ->
                     ok;
                 {ok, _Mod, Ws} ->
-                    rebar_base_compiler:ok_tuple(AppInfo, Source, Ws);
+                    rebar_base_compiler:ok_tuple(Opts, Source, Ws);
                 {error, Es, Ws} ->
-                    rebar_base_compiler:error_tuple(AppInfo, Source,
-                                                    Es, Ws, Opts1)
+                    rebar_base_compiler:error_tuple(Opts, Source,
+                                                    Es, Ws, AllOpts1)
             end;
         false ->
             skipped

@@ -129,34 +129,34 @@ do_make_relative_path(Source, Target) ->
     Base = lists:duplicate(max(length(Target) - 1, 0), ".."),
     filename:join(Base ++ Source).
 
--spec src_dirs(rebar_app_info:t()) -> list(file:filename_all()).
-src_dirs(State) -> src_dirs(State, []).
+-spec src_dirs(rebar_dict()) -> list(file:filename_all()).
+src_dirs(Opts) -> src_dirs(Opts, []).
 
--spec src_dirs(rebar_app_info:t(), list(file:filename_all())) -> list(file:filename_all()).
-src_dirs(AppInfo, Default) ->
-    ErlOpts = rebar_utils:erl_opts(AppInfo),
+-spec src_dirs(rebar_dict(), list(file:filename_all())) -> list(file:filename_all()).
+src_dirs(Opts, Default) ->
+    ErlOpts = rebar_utils:erl_opts(Opts),
     Vs = proplists:get_all_values(src_dirs, ErlOpts),
-    case lists:append([rebar_utils:get(AppInfo, src_dirs, []) | Vs]) of
+    case lists:append([rebar_utils:get(Opts, src_dirs, []) | Vs]) of
         []   -> Default;
         Dirs -> Dirs
     end.
 
--spec extra_src_dirs(rebar_app_info:t()) -> list(file:filename_all()).
-extra_src_dirs(AppInfo) -> extra_src_dirs(AppInfo, []).
+-spec extra_src_dirs(rebar_dict()) -> list(file:filename_all()).
+extra_src_dirs(Opts) -> extra_src_dirs(Opts, []).
 
--spec extra_src_dirs(rebar_app_info:t(), list(file:filename_all())) -> list(file:filename_all()).
-extra_src_dirs(AppInfo, Default) ->
-    ErlOpts = rebar_utils:erl_opts(AppInfo),
+-spec extra_src_dirs(rebar_dict(), list(file:filename_all())) -> list(file:filename_all()).
+extra_src_dirs(Opts, Default) ->
+    ErlOpts = rebar_utils:erl_opts(Opts),
     Vs = proplists:get_all_values(extra_src_dirs, ErlOpts),
-    case lists:append([rebar_utils:get(AppInfo, extra_src_dirs, []) | Vs]) of
+    case lists:append([rebar_utils:get(Opts, extra_src_dirs, []) | Vs]) of
         []   -> Default;
         Dirs -> Dirs
     end.
 
--spec all_src_dirs(rebar_app_info:t()) -> list(file:filename_all()).
-all_src_dirs(AppInfo) -> all_src_dirs(AppInfo, [], []).
+-spec all_src_dirs(rebar_dict()) -> list(file:filename_all()).
+all_src_dirs(Opts) -> all_src_dirs(Opts, [], []).
 
--spec all_src_dirs(rebar_app_info:t(), list(file:filename_all()), list(file:filename_all())) ->
+-spec all_src_dirs(rebar_dict(), list(file:filename_all()), list(file:filename_all())) ->
     list(file:filename_all()).
-all_src_dirs(AppInfo, SrcDefault, ExtraDefault) ->
-    src_dirs(AppInfo, SrcDefault) ++ extra_src_dirs(AppInfo, ExtraDefault).
+all_src_dirs(Opts, SrcDefault, ExtraDefault) ->
+    src_dirs(Opts, SrcDefault) ++ extra_src_dirs(Opts, ExtraDefault).

@@ -1,6 +1,7 @@
 -module(rebar_app_info).
 
--export([new/1,
+-export([new/0,
+         new/1,
          new/2,
          new/3,
          new/4,
@@ -98,6 +99,10 @@
 %% ============================================================================
 %% @doc Build a new, empty, app info value. This is not of a lot of use and you
 %% probably wont be doing this much.
+-spec new() -> t().
+new() ->
+    #app_info_t{}.
+
 -spec new(atom() | binary() | string()) ->
                  {ok, t()}.
 new(AppName) ->

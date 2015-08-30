@@ -5,7 +5,8 @@
          find_unbuilt_apps/1,
          find_apps/1,
          find_apps/2,
-         find_app/2]).
+         find_app/2,
+         find_app/3]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
@@ -183,41 +184,46 @@ find_apps(LibDirs, Validate) ->
 
 -spec find_app(file:filename_all(), valid | invalid | all) -> {true, rebar_app_info:t()} | false.
 find_app(AppDir, Validate) ->
+    find_app(rebar_app_info:new(), AppDir, Validate).
+
+find_app(AppInfo, AppDir, Validate) ->
     AppFile = filelib:wildcard(filename:join([AppDir, "ebin", "*.app"])),
     AppSrcFile = filelib:wildcard(filename:join([AppDir, "src", "*.app.src"])),
     AppSrcScriptFile = filelib:wildcard(filename:join([AppDir, "src", "*.app.src.script"])),
-    AppInfo = try_handle_app_file(AppFile, AppDir, AppSrcFile, AppSrcScriptFile, Validate),
-    AppInfo.
+    try_handle_app_file(AppInfo, AppFile, AppDir, AppSrcFile, AppSrcScriptFile, Validate).
 
 app_dir(AppFile) ->
     filename:join(rebar_utils:droplast(filename:split(filename:dirname(AppFile)))).
 
--spec create_app_info(file:name(), file:name()) -> rebar_app_info:t().
-create_app_info(AppDir, AppFile) ->
+-spec create_app_info(rebar_app_info:t(), file:name(), file:name()) -> rebar_app_info:t().
+create_app_info(AppInfo, AppDir, AppFile) ->
     [{application, AppName, AppDetails}] = rebar_config:consult_app_file(AppFile),
     AppVsn = proplists:get_value(vsn, AppDetails),
     Applications = proplists:get_value(applications, AppDetails, []),
     IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
-    {ok, AppInfo} = rebar_app_info:new(AppName, AppVsn, AppDir),
-    AppInfo1 = rebar_app_info:applications(
-                 rebar_app_info:app_details(AppInfo, AppDetails),
+    AppInfo1 = rebar_app_info:name(
+                 rebar_app_info:original_vsn(
+                   rebar_app_info:dir(AppInfo, AppDir), AppVsn), AppName),
+    AppInfo2 = rebar_app_info:applications(
+                 rebar_app_info:app_details(AppInfo1, AppDetails),
                  IncludedApplications++Applications),
-    Valid = case rebar_app_utils:validate_application_info(AppInfo1) of
+    Valid = case rebar_app_utils:validate_application_info(AppInfo2) =:= true
+                andalso rebar_app_info:has_all_artifacts(AppInfo2) =:= true of
                 true ->
                     true;
                 _ ->
                     false
             end,
-    rebar_app_info:dir(rebar_app_info:valid(AppInfo1, Valid), AppDir).
+    rebar_app_info:dir(rebar_app_info:valid(AppInfo2, Valid), AppDir).
 
 %% Read in and parse the .app file if it is availabe. Do the same for
 %% the .app.src file if it exists.
-try_handle_app_file([], AppDir, [], AppSrcScriptFile, Validate) ->
-    try_handle_app_src_file([], AppDir, AppSrcScriptFile, Validate);
-try_handle_app_file([], AppDir, AppSrcFile, _, Validate) ->
-    try_handle_app_src_file([], AppDir, AppSrcFile, Validate);
-try_handle_app_file([File], AppDir, AppSrcFile, _, Validate) ->
-    try create_app_info(AppDir, File) of
+try_handle_app_file(AppInfo, [], AppDir, [], AppSrcScriptFile, Validate) ->
+    try_handle_app_src_file(AppInfo, [], AppDir, AppSrcScriptFile, Validate);
+try_handle_app_file(AppInfo, [], AppDir, AppSrcFile, _, Validate) ->
+    try_handle_app_src_file(AppInfo, [], AppDir, AppSrcFile, Validate);
+try_handle_app_file(AppInfo0, [File], AppDir, AppSrcFile, _, Validate) ->
+    try create_app_info(AppInfo0, AppDir, File) of
         AppInfo ->
             AppInfo1 = rebar_app_info:app_file(AppInfo, File),
             AppInfo2 = case AppSrcFile of
@@ -249,26 +255,26 @@ try_handle_app_file([File], AppDir, AppSrcFile, _, Validate) ->
     catch
         throw:{error, {Module, Reason}} ->
             ?DEBUG("Falling back to app.src file because .app failed: ~s", [Module:format_error(Reason)]),
-            try_handle_app_src_file(File, AppDir, AppSrcFile, Validate)
+            try_handle_app_src_file(AppInfo0, File, AppDir, AppSrcFile, Validate)
     end;
-try_handle_app_file(Other, _AppDir, _AppSrcFile, _, _Validate) ->
+try_handle_app_file(_AppInfo, Other, _AppDir, _AppSrcFile, _, _Validate) ->
     throw({error, {multiple_app_files, Other}}).
 
 %% Read in the .app.src file if we aren't looking for a valid (already built) app
-try_handle_app_src_file(_, _AppDir, [], _Validate) ->
+try_handle_app_src_file(_AppInfo, _, _AppDir, [], _Validate) ->
     false;
-try_handle_app_src_file(_, _AppDir, _AppSrcFile, valid) ->
+try_handle_app_src_file(_AppInfo, _, _AppDir, _AppSrcFile, valid) ->
     false;
-try_handle_app_src_file(_, AppDir, [File], Validate) when Validate =:= invalid
-                                                        ; Validate =:= all ->
-    AppInfo = create_app_info(AppDir, File),
+try_handle_app_src_file(AppInfo, _, AppDir, [File], Validate) when Validate =:= invalid
+                                                                 ; Validate =:= all ->
+    AppInfo1 = create_app_info(AppInfo, AppDir, File),
     case filename:extension(File) of
         ".script" ->
-            {true, rebar_app_info:app_file_src_script(AppInfo, File)};
+            {true, rebar_app_info:app_file_src_script(AppInfo1, File)};
         _ ->
-            {true, rebar_app_info:app_file_src(AppInfo, File)}
+            {true, rebar_app_info:app_file_src(AppInfo1, File)}
     end;
-try_handle_app_src_file(_, _AppDir, Other, _Validate) ->
+try_handle_app_src_file(_AppInfo, _, _AppDir, Other, _Validate) ->
     throw({error, {multiple_app_files, Other}}).
 
 enable(State, AppInfo) ->

@@ -237,17 +237,17 @@ deprecated(Old, New, When) ->
       [Old, Old, New, Old, When]).
 
 %% @doc Return list of erl_opts
--spec erl_opts(rebar_app_info:t()) -> list().
-erl_opts(AppInfo) ->
-    RawErlOpts = filter_defines(rebar_utils:get(AppInfo, erl_opts, []), []),
+-spec erl_opts(rebar_dict()) -> list().
+erl_opts(Opts) ->
+    RawErlOpts = filter_defines(rebar_utils:get(Opts, erl_opts, []), []),
     Defines = [{d, list_to_atom(D)} ||
-                  D <- rebar_utils:get(AppInfo, defines, [])],
-    Opts = Defines ++ RawErlOpts,
-    case proplists:is_defined(no_debug_info, Opts) of
+                  D <- rebar_utils:get(Opts, defines, [])],
+    AllOpts = Defines ++ RawErlOpts,
+    case proplists:is_defined(no_debug_info, AllOpts) of
         true ->
-            [O || O <- Opts, O =/= no_debug_info];
+            [O || O <- AllOpts, O =/= no_debug_info];
         false ->
-            [debug_info|Opts]
+            [debug_info|AllOpts]
     end.
 
 %% for use by `do` task

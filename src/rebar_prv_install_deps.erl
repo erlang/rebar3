@@ -287,24 +287,20 @@ maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
         true ->
             {false, AppInfo};
         false ->
-            case rebar_app_discover:find_app(AppDir, all) of
+            case rebar_app_discover:find_app(AppInfo, AppDir, all) of
                 false ->
                     true = fetch_app(AppInfo, AppDir, State),
                     maybe_symlink_default(State, Profile, AppDir, AppInfo),
                     {true, rebar_app_info:valid(update_app_info(AppDir, AppInfo), false)};
                 {true, AppInfo1} ->
-                    %% Preserve the state we created with overrides
-                    AppInfo3 = copy_app_info(AppInfo, AppInfo1),
-                    %% AppState = rebar_app_info:state(AppInfo),
-                    %% AppInfo3 = rebar_app_info:state(AppInfo2, AppState),
-                    case sets:is_element(rebar_app_info:name(AppInfo3), Seen) of
+                    case sets:is_element(rebar_app_info:name(AppInfo1), Seen) of
                         true ->
-                            {false, AppInfo3};
+                            {false, AppInfo1};
                         false ->
-                            maybe_symlink_default(State, Profile, AppDir, AppInfo3),
+                            maybe_symlink_default(State, Profile, AppDir, AppInfo1),
                             MaybeUpgrade = maybe_upgrade(AppInfo, AppDir, Upgrade, State),
-                            AppInfo4 = update_app_info(AppDir, AppInfo3),
-                            {MaybeUpgrade, AppInfo4}
+                            AppInfo2 = update_app_info(AppDir, AppInfo1),
+                            {MaybeUpgrade, AppInfo2}
                     end
             end
     end.
@@ -361,31 +357,12 @@ fetch_app(AppInfo, AppDir, State) ->
 %% So this is the first time for newly downloaded apps that its .app/.app.src data can
 %% be read in an parsed.
 update_app_info(AppDir, AppInfo) ->
-    case rebar_app_info:discover(AppDir) of
-        {ok, Found} ->
-            AppDetails = rebar_app_info:app_details(Found),
-            Vsn = rebar_app_info:original_vsn(Found),
-            Applications = proplists:get_value(applications, AppDetails, []),
-            IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
-            AppInfo1 = rebar_app_info:original_vsn(rebar_app_info:applications(
-                                                     rebar_app_info:app_details(AppInfo, AppDetails),
-                                                     IncludedApplications++Applications), Vsn),
-            AppInfo2 = copy_app_info(AppInfo, AppInfo1),
-            rebar_app_info:valid(AppInfo2, undefined);
-        not_found ->
+    case rebar_app_discover:find_app(AppInfo, AppDir, all) of
+        {true, AppInfo1} ->
+            AppInfo1;
+        false ->
             throw(?PRV_ERROR({dep_app_not_found, AppDir, rebar_app_info:name(AppInfo)}))
     end.
-
-copy_app_info(OldAppInfo, NewAppInfo) ->
-    Deps = rebar_app_info:deps(OldAppInfo),
-    ResourceType = rebar_app_info:resource_type(OldAppInfo),
-    Parent = rebar_app_info:parent(OldAppInfo),
-    Source = rebar_app_info:source(OldAppInfo),
-
-    rebar_app_info:deps(
-      rebar_app_info:resource_type(
-        rebar_app_info:source(
-          rebar_app_info:parent(NewAppInfo, Parent), Source), ResourceType), Deps).
 
 maybe_upgrade(AppInfo, AppDir, Upgrade, State) ->
     Source = rebar_app_info:source(AppInfo),
