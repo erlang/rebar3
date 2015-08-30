@@ -37,11 +37,13 @@ download(TmpDir, Pkg={pkg, Name, Vsn}, State) ->
 cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn}, Url, ETag, State) ->
     case request(Url, ETag) of
         {ok, cached} ->
+            ?INFO("Version cached at ~s is up to date, reusing it", [CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg, State);
         {ok, Body, NewETag} ->
+            ?INFO("Downloaded package, caching at ~s", [CachePath]),
             serve_from_download(TmpDir, CachePath, Pkg, NewETag, Body, State);
         error when ETag =/= false ->
-            ?DEBUG("Download ~s error, using ~s from cache", [Url, CachePath]),
+            ?INFO("Download error, using cached file at ~s", [CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg, State);
         error ->
             {fetch_fail, Name, Vsn}
