@@ -59,9 +59,7 @@
          add_to_profile/3,
          apply_profiles/2,
          deduplicate/1,
-         do_deduplicate/2,
-         merge_opts/3,
-         merge_opts/2]).
+         do_deduplicate/2]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
@@ -158,7 +156,7 @@ update_opts(AppInfo, Opts, Config) ->
     true = rebar_config:verify_config_format(Terms),
     LocalOpts = dict:from_list(Terms),
 
-    NewOpts = merge_opts(LocalOpts, Opts),
+    NewOpts = rebar_utils:merge_opts(LocalOpts, Opts),
 
     AppInfo#app_info_t{opts=NewOpts
                       ,default=NewOpts}.
@@ -425,52 +423,14 @@ all(Dir, [File|Artifacts]) ->
 
 %%%%%
 
-apply_overrides(AppInfo, Name) ->
-    Overrides = rebar_app_info:get(AppInfo, overrides, []),
-    %Name = binary_to_atom(AppName, utf8),
-
-    %% Inefficient. We want the order we get here though.
-    AppInfo1 = lists:foldl(fun({override, O}, AppInfoAcc) ->
-                                 lists:foldl(fun({deps, Value}, AppInfoAcc1) ->
-                                                     rebar_app_info:set(AppInfoAcc1, {deps,default}, Value);
-                                                ({Key, Value}, AppInfoAcc1) ->
-                                                     rebar_app_info:set(AppInfoAcc1, Key, Value)
-                                             end, AppInfoAcc, O);
-                            (_, AppInfoAcc) ->
-                                 AppInfoAcc
-                         end, AppInfo, Overrides),
-
-    AppInfo2 = lists:foldl(fun({override, N, O}, AppInfoAcc) when N =:= Name ->
-                                 lists:foldl(fun({deps, Value}, AppInfoAcc1) ->
-                                                     rebar_app_info:set(AppInfoAcc1, {deps,default}, Value);
-                                                ({Key, Value}, AppInfoAcc1) ->
-                                                     rebar_app_info:set(AppInfoAcc1, Key, Value)
-                                             end, AppInfoAcc, O);
-                            (_, AppInfoAcc) ->
-                                 AppInfoAcc
-                         end, AppInfo1, Overrides),
-
-    AppInfo3 = lists:foldl(fun({add, N, O}, AppInfoAcc) when N =:= Name ->
-                        lists:foldl(fun({deps, Value}, AppInfoAcc1) ->
-                                            OldValue = rebar_app_info:get(AppInfoAcc1, {deps,default}, []),
-                                            rebar_app_info:set(AppInfoAcc1, {deps,default}, Value++OldValue);
-                                       ({Key, Value}, AppInfoAcc1) ->
-                                            OldValue = rebar_app_info:get(AppInfoAcc1, Key, []),
-                                            rebar_app_info:set(AppInfoAcc1, Key, Value++OldValue)
-                                    end, AppInfoAcc, O);
-                   (_, AppInfoAcc) ->
-                        AppInfoAcc
-                end, AppInfo2, Overrides),
-
-    Opts = opts(AppInfo3),
-    AppInfo3#app_info_t{default=Opts}.
+apply_overrides(Overrides, AppInfo) ->
+    Name = binary_to_atom(rebar_app_info:name(AppInfo), utf8),
+    Opts = rebar_utils:apply_overrides(opts(AppInfo), Name, Overrides),
+    AppInfo#app_info_t{default=Opts, opts=Opts}.
 
 add_to_profile(AppInfo, Profile, KVs) when is_atom(Profile), is_list(KVs) ->
-    Profiles = rebar_app_info:get(AppInfo, profiles, []),
-    ProfileOpts = dict:from_list(proplists:get_value(Profile, Profiles, [])),
-    NewOpts = merge_opts(Profile, dict:from_list(KVs), ProfileOpts),
-    NewProfiles = [{Profile, dict:to_list(NewOpts)}|lists:keydelete(Profile, 1, Profiles)],
-    rebar_app_info:set(AppInfo, profiles, NewProfiles).
+    Opts = rebar_utils:add_to_profile(opts(AppInfo), Profile, KVs),
+    AppInfo#app_info_t{opts=Opts}.
 
 apply_profiles(AppInfo, Profile) when not is_list(Profile) ->
     apply_profiles(AppInfo, [Profile]);
@@ -496,7 +456,7 @@ apply_profiles(AppInfo=#app_info_t{default = Defaults, profiles=CurrentProfiles}
                             case proplists:get_value(Profile, ConfigProfiles, []) of
                                 OptsList when is_list(OptsList) ->
                                     ProfileOpts = dict:from_list(OptsList),
-                                    merge_opts(Profile, ProfileOpts, OptsAcc);
+                                    rebar_utils:merge_opts(Profile, ProfileOpts, OptsAcc);
                                 Other ->
                                     throw(?PRV_ERROR({profile_not_list, Profile, Other}))
                             end
@@ -513,50 +473,3 @@ do_deduplicate([Head | Rest], Acc) ->
         true -> do_deduplicate(Rest, Acc);
         false -> do_deduplicate(Rest, [Head | Acc])
     end.
-
-merge_opts(Profile, NewOpts, OldOpts) ->
-    Opts = merge_opts(NewOpts, OldOpts),
-
-    Opts2 = case dict:find(plugins, NewOpts) of
-        {ok, Value} ->
-            dict:store({plugins, Profile}, Value, Opts);
-        error ->
-            Opts
-    end,
-
-    case dict:find(deps, NewOpts) of
-        {ok, Value2} ->
-            dict:store({deps, Profile}, Value2, Opts2);
-        error ->
-            Opts2
-    end.
-
-merge_opts(NewOpts, OldOpts) ->
-    dict:merge(fun(deps, _NewValue, OldValue) ->
-                       OldValue;
-                  ({deps, _}, NewValue, _OldValue) ->
-                       NewValue;
-                  (plugins, NewValue, _OldValue) ->
-                       NewValue;
-                  ({plugins, _}, NewValue, _OldValue) ->
-                       NewValue;
-                  (profiles, NewValue, OldValue) ->
-                       dict:to_list(merge_opts(dict:from_list(NewValue), dict:from_list(OldValue)));
-                  (_Key, NewValue, OldValue) when is_list(NewValue) ->
-                       case io_lib:printable_list(NewValue) of
-                           true when NewValue =:= [] ->
-                               case io_lib:printable_list(OldValue) of
-                                   true ->
-                                       NewValue;
-                                   false ->
-                                       OldValue
-                               end;
-                           true ->
-                               NewValue;
-                           false ->
-                               rebar_utils:tup_umerge(rebar_utils:tup_sort(NewValue)
-                                                     ,rebar_utils:tup_sort(OldValue))
-                       end;
-                  (_Key, NewValue, _OldValue) ->
-                       NewValue
-               end, NewOpts, OldOpts).

@@ -45,14 +45,14 @@ do(State) ->
     %% Need to allow global config vars used on deps.
     %% Right now no way to differeniate and just give deps a new state.
     %% But need an account of "all deps" for some hooks to use.
-    EmptyState = rebar_state:new(),
-    build_apps(rebar_state:all_deps(EmptyState,
-                                   rebar_state:all_deps(State)), Providers, Deps),
-
+    %% EmptyState = rebar_state:new(),
+    %% build_apps(rebar_state:all_deps(EmptyState,
+    %%                                rebar_state:all_deps(State)), Providers, Deps),
+    build_apps(State, Providers, Deps),
     {ok, ProjectApps1} = rebar_digraph:compile_order(ProjectApps),
 
     %% Run top level hooks *before* project apps compiled but *after* deps are
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, element(2,rebar_app_info:new(noen)), State),
+    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
     ProjectApps2 = build_apps(State, Providers, ProjectApps1),
     State2 = rebar_state:project_apps(State, ProjectApps2),
@@ -60,9 +60,13 @@ do(State) ->
     ProjAppsPaths = [filename:join(rebar_app_info:out_dir(X), "ebin") || X <- ProjectApps2],
     State3 = rebar_state:code_paths(State2, all_deps, DepsPaths ++ ProjAppsPaths),
 
-    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, element(2,rebar_app_info:new(noen)), State2),
-    has_all_artifacts(State3),
-
+    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State2),
+    case rebar_state:has_all_artifacts(State3) of
+        {false, File} ->
+            throw(?PRV_ERROR({missing_artifact, File}));
+        true ->
+            true
+    end,
     rebar_utils:cleanup_code_path(rebar_state:code_paths(State3, default)
                                  ++ rebar_state:code_paths(State, all_plugin_deps)),
 
@@ -83,8 +87,8 @@ build_app(State, Providers, AppInfo) ->
     copy_app_dirs(AppInfo, AppDir, OutDir),
 
     %S = rebar_app_info:state_or_new(State, AppInfo),
-    S1 = rebar_state:all_deps(State, rebar_state:all_deps(State)),
-    compile(S1, Providers, AppInfo).
+    %S1 = rebar_state:all_deps(State, rebar_state:all_deps(State)),
+    compile(State, Providers, AppInfo).
 
 compile(State, Providers, AppInfo) ->
     ?INFO("Compiling ~s", [rebar_app_info:name(AppInfo)]),
@@ -95,7 +99,7 @@ compile(State, Providers, AppInfo) ->
     case rebar_otp_app:compile(State, AppInfo) of
         {ok, AppInfo1} ->
             rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo, State),
-            has_all_artifacts(State),
+            has_all_artifacts(AppInfo1),
             AppInfo1;
         Error ->
             throw(Error)
@@ -105,8 +109,8 @@ compile(State, Providers, AppInfo) ->
 %% Internal functions
 %% ===================================================================
 
-has_all_artifacts(State) ->
-    case rebar_state:has_all_artifacts(State) of
+has_all_artifacts(AppInfo1) ->
+    case rebar_app_info:has_all_artifacts(AppInfo1) of
         {false, File} ->
             throw(?PRV_ERROR({missing_artifact, File}));
         true ->

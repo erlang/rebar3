@@ -7,28 +7,29 @@
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
-run_all_hooks(Dir, Type, Command, Providers, State) ->
-    run_all_hooks(Dir, Type, Command, Providers,  element(2,rebar_app_info:new(noen)), State).
-
 -spec run_all_hooks(file:filename_all(), pre | post,
                    atom() | {atom(), atom()} | string(),
                    [providers:t()], rebar_app_info:t(), rebar_state:t()) -> ok.
 run_all_hooks(Dir, Type, Command, Providers, AppInfo, State) ->
-    run_provider_hooks(Dir, Type, Command, Providers, AppInfo, State),
-    run_hooks(Dir, Type, Command, AppInfo, State).
+    run_provider_hooks(Dir, Type, Command, Providers, rebar_app_info:opts(AppInfo), State),
+    run_hooks(Dir, Type, Command, rebar_app_info:opts(AppInfo), State).
 
-run_provider_hooks(Dir, Type, Command, Providers, AppInfo, State) ->
-    case rebar_app_info:get(AppInfo, provider_hooks, [])++rebar_state:get(State, provider_hooks, []) of
+run_all_hooks(Dir, Type, Command, Providers, State) ->
+    run_provider_hooks(Dir, Type, Command, Providers, rebar_state:opts(State), State),
+    run_hooks(Dir, Type, Command, rebar_state:opts(State), State).
+
+run_provider_hooks(Dir, Type, Command, Providers, Opts, State) ->
+    case rebar_utils:get(Opts, provider_hooks, []) of
         [] ->
             ok;
         AllHooks ->
             TypeHooks = proplists:get_value(Type, AllHooks, []),
-            run_provider_hooks(Dir, Type, Command, Providers, TypeHooks, AppInfo, State)
+            run_provider_hooks_(Dir, Type, Command, Providers, TypeHooks, rebar_state:opts(State, Opts))
     end.
 
-run_provider_hooks(_Dir, _Type, _Command, _Providers, [], _AppInfo, _State) ->
+run_provider_hooks_(_Dir, _Type, _Command, _Providers, [], _State) ->
     ok;
-run_provider_hooks(Dir, Type, Command, Providers, TypeHooks, _AppInfo, State) ->
+run_provider_hooks_(Dir, Type, Command, Providers, TypeHooks, State) ->
     PluginDepsPaths = rebar_state:code_paths(State, all_plugin_deps),
     code:add_pathsa(PluginDepsPaths),
     Providers1 = rebar_state:providers(State),
@@ -71,16 +72,16 @@ format_error({bad_provider, Type, Command, Name}) ->
 %% ERL                          = ERLANG_ROOT_DIR/bin/erl
 %% ERLC                         = ERLANG_ROOT_DIR/bin/erl
 %%
-run_hooks(Dir, pre, Command, AppInfo, State) ->
-    run_hooks(Dir, pre_hooks, Command, AppInfo, State);
-run_hooks(Dir, post, Command, AppInfo, State) ->
-    run_hooks(Dir, post_hooks, Command, AppInfo, State);
-run_hooks(Dir, Type, Command, AppInfo, State) ->
-    case rebar_app_info:get(AppInfo, Type, []) of
+run_hooks(Dir, pre, Command, Opts, State) ->
+    run_hooks(Dir, pre_hooks, Command, Opts, State);
+run_hooks(Dir, post, Command, Opts, State) ->
+    run_hooks(Dir, post_hooks, Command, Opts, State);
+run_hooks(Dir, Type, Command, Opts, State) ->
+    case rebar_utils:get(Opts, Type, []) of
         [] ->
             ok;
         Hooks ->
-            Env = create_env(State, AppInfo),
+            Env = create_env(State, Opts),
             lists:foreach(fun({_, C, _}=Hook) when C =:= Command ->
                                   apply_hook(Dir, Env, Hook);
                              ({C, _}=Hook) when C =:= Command ->
@@ -101,8 +102,7 @@ apply_hook(Dir, Env, {Command, Hook}) ->
     Msg = lists:flatten(io_lib:format("Hook for ~p failed!~n", [Command])),
     rebar_utils:sh(Hook, [use_stdout, {cd, Dir}, {env, Env}, {abort_on_error, Msg}]).
 
-create_env(State, AppInfo) ->
-    Opts = rebar_app_info:opts(AppInfo),
+create_env(State, Opts) ->
     BaseDir = rebar_dir:base_dir(State),
     [
      {"REBAR_DEPS_DIR",          filename:absname(rebar_dir:deps_dir(State))},

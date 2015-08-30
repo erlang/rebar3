@@ -256,7 +256,7 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
 
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
     AppInfo0 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
-    AppInfo1 = rebar_app_info:apply_overrides(AppInfo0, Name),
+    AppInfo1 = rebar_app_info:apply_overrides(rebar_state:overrides(State), AppInfo0),
 
     AppInfo2 = rebar_app_info:apply_profiles(AppInfo1, Profiles),
     Plugins = rebar_app_info:get(AppInfo2, plugins, []),
@@ -266,7 +266,7 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     rebar_utils:check_blacklisted_otp_versions(rebar_app_info:get(AppInfo3, blacklisted_otp_vsns, [])),
 
     %% Dep may have plugins to install. Find and install here.
-    _S = rebar_plugins:install(State, AppInfo3),
+    State1 = rebar_plugins:install(State, AppInfo3),
     %% TODO: Plugin Providers??
 
     %AppInfo1 = rebar_app_info:state(AppInfo, S5),
@@ -276,7 +276,7 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     Deps = rebar_app_info:get(AppInfo3, {deps, default}, []),
     AppInfo4 = rebar_app_info:deps(AppInfo3, rebar_state:deps_names(Deps)),
     Deps1 = rebar_app_utils:parse_deps(Name, DepsDir, Deps, State, Locks, Level+1),
-    {AppInfo4, Deps1, State}.
+    {AppInfo4, Deps1, State1}.
 
 -spec maybe_fetch(rebar_app_info:t(), atom(), boolean(),
                   sets:set(binary()), rebar_state:t()) -> {boolean(), rebar_app_info:t()}.

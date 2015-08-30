@@ -69,7 +69,11 @@
          escape_double_quotes_weak/1,
          check_min_otp_version/1,
          check_blacklisted_otp_versions/1,
-         info_useless/2]).
+         info_useless/2,
+         apply_overrides/3,
+         add_to_profile/3,
+         merge_opts/2,
+         merge_opts/3]).
 
 %% for internal use only
 -export([otp_release/0]).
@@ -397,6 +401,93 @@ abort_if_blacklisted(BlacklistedRegex, OtpRelease) ->
                    [OtpRelease, BlacklistedRegex])
     end.
 
+apply_overrides(Opts, Name, Overrides) ->
+    %% Inefficient. We want the order we get here though.
+    Opts1 = lists:foldl(fun({override, O}, OptsAcc) ->
+                                 lists:foldl(fun({deps, Value}, OptsAcc1) ->
+                                                     rebar_utils:set(OptsAcc1, {deps,default}, Value);
+                                                ({Key, Value}, OptsAcc1) ->
+                                                     rebar_utils:set(OptsAcc1, Key, Value)
+                                             end, OptsAcc, O);
+                            (_, OptsAcc) ->
+                                 OptsAcc
+                         end, Opts, Overrides),
+
+    Opts2 = lists:foldl(fun({override, N, O}, OptsAcc) when N =:= Name ->
+                                 lists:foldl(fun({deps, Value}, OptsAcc1) ->
+                                                     rebar_utils:set(OptsAcc1, {deps,default}, Value);
+                                                ({Key, Value}, OptsAcc1) ->
+                                                     rebar_utils:set(OptsAcc1, Key, Value)
+                                             end, OptsAcc, O);
+                            (_, OptsAcc) ->
+                                 OptsAcc
+                         end, Opts1, Overrides),
+
+    lists:foldl(fun({add, N, O}, OptsAcc) when N =:= Name ->
+                        lists:foldl(fun({deps, Value}, OptsAcc1) ->
+                                            OldValue = rebar_utils:get(OptsAcc1, {deps,default}, []),
+                                            rebar_utils:set(OptsAcc1, {deps,default}, Value++OldValue);
+                                       ({Key, Value}, OptsAcc1) ->
+                                            OldValue = rebar_utils:get(OptsAcc1, Key, []),
+                                            rebar_utils:set(OptsAcc1, Key, Value++OldValue)
+                                    end, OptsAcc, O);
+                   (_, OptsAcc) ->
+                        OptsAcc
+                end, Opts2, Overrides).
+
+add_to_profile(Opts, Profile, KVs) when is_atom(Profile), is_list(KVs) ->
+    Profiles = rebar_utils:get(Opts, profiles, []),
+    ProfileOpts = dict:from_list(proplists:get_value(Profile, Profiles, [])),
+    NewOpts = rebar_utils:merge_opts(Profile, dict:from_list(KVs), ProfileOpts),
+    NewProfiles = [{Profile, dict:to_list(NewOpts)}|lists:keydelete(Profile, 1, Profiles)],
+    rebar_utils:set(Opts, profiles, NewProfiles).
+
+merge_opts(Profile, NewOpts, OldOpts) ->
+    Opts = merge_opts(NewOpts, OldOpts),
+
+    Opts2 = case dict:find(plugins, NewOpts) of
+        {ok, Value} ->
+            dict:store({plugins, Profile}, Value, Opts);
+        error ->
+            Opts
+    end,
+
+    case dict:find(deps, NewOpts) of
+        {ok, Value2} ->
+            dict:store({deps, Profile}, Value2, Opts2);
+        error ->
+            Opts2
+    end.
+
+merge_opts(NewOpts, OldOpts) ->
+    dict:merge(fun(deps, _NewValue, OldValue) ->
+                       OldValue;
+                  ({deps, _}, NewValue, _OldValue) ->
+                       NewValue;
+                  (plugins, NewValue, _OldValue) ->
+                       NewValue;
+                  ({plugins, _}, NewValue, _OldValue) ->
+                       NewValue;
+                  (profiles, NewValue, OldValue) ->
+                       dict:to_list(merge_opts(dict:from_list(NewValue), dict:from_list(OldValue)));
+                  (_Key, NewValue, OldValue) when is_list(NewValue) ->
+                       case io_lib:printable_list(NewValue) of
+                           true when NewValue =:= [] ->
+                               case io_lib:printable_list(OldValue) of
+                                   true ->
+                                       NewValue;
+                                   false ->
+                                       OldValue
+                               end;
+                           true ->
+                               NewValue;
+                           false ->
+                               rebar_utils:tup_umerge(rebar_utils:tup_sort(NewValue)
+                                                     ,rebar_utils:tup_sort(OldValue))
+                       end;
+                  (_Key, NewValue, _OldValue) ->
+                       NewValue
+               end, NewOpts, OldOpts).
 
 %% ====================================================================
 %% Internal functions

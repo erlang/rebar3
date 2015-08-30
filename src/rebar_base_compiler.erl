@@ -31,8 +31,8 @@
 -export([run/4,
          run/7,
          run/8,
-         ok_tuple/3,
-         error_tuple/5]).
+         ok_tuple/2,
+         error_tuple/4]).
 
 %% ===================================================================
 %% Public API
@@ -69,10 +69,10 @@ run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
                 simple_compile_wrapper(S, Target, Compile3Fn, C, CheckLastMod)
         end).
 
-ok_tuple(_Config, Source, Ws) ->
+ok_tuple(Source, Ws) ->
     {ok, format_warnings(Source, Ws)}.
 
-error_tuple(_Config, Source, Es, Ws, Opts) ->
+error_tuple(Source, Es, Ws, Opts) ->
     {error, format_errors(Source, Es),
      format_warnings(Source, Ws, Opts)}.
 

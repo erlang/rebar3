@@ -118,7 +118,7 @@ new(ParentState, Config, Deps, Dir) ->
     true = rebar_config:verify_config_format(Terms),
     LocalOpts = dict:from_list(Terms),
 
-    NewOpts = merge_opts(LocalOpts, Opts),
+    NewOpts = rebar_utils:merge_opts(LocalOpts, Opts),
 
     ParentState#state_t{dir=Dir
                        ,opts=NewOpts
@@ -255,49 +255,12 @@ command_parsed_args(State, CmdArgs) ->
 
 apply_overrides(State=#state_t{overrides=Overrides}, AppName) ->
     Name = binary_to_atom(AppName, utf8),
-
-    %% Inefficient. We want the order we get here though.
-    State1 = lists:foldl(fun({override, O}, StateAcc) ->
-                                 lists:foldl(fun({deps, Value}, StateAcc1) ->
-                                                     rebar_state:set(StateAcc1, {deps,default}, Value);
-                                                ({Key, Value}, StateAcc1) ->
-                                                     rebar_state:set(StateAcc1, Key, Value)
-                                             end, StateAcc, O);
-                            (_, StateAcc) ->
-                                 StateAcc
-                         end, State, Overrides),
-
-    State2 = lists:foldl(fun({override, N, O}, StateAcc) when N =:= Name ->
-                                 lists:foldl(fun({deps, Value}, StateAcc1) ->
-                                                     rebar_state:set(StateAcc1, {deps,default}, Value);
-                                                ({Key, Value}, StateAcc1) ->
-                                                     rebar_state:set(StateAcc1, Key, Value)
-                                             end, StateAcc, O);
-                            (_, StateAcc) ->
-                                 StateAcc
-                         end, State1, Overrides),
-
-    State3 = lists:foldl(fun({add, N, O}, StateAcc) when N =:= Name ->
-                        lists:foldl(fun({deps, Value}, StateAcc1) ->
-                                            OldValue = rebar_state:get(StateAcc1, {deps,default}, []),
-                                            rebar_state:set(StateAcc1, {deps,default}, Value++OldValue);
-                                       ({Key, Value}, StateAcc1) ->
-                                            OldValue = rebar_state:get(StateAcc1, Key, []),
-                                            rebar_state:set(StateAcc1, Key, Value++OldValue)
-                                    end, StateAcc, O);
-                   (_, StateAcc) ->
-                        StateAcc
-                end, State2, Overrides),
-
-    Opts = opts(State3),
-    State3#state_t{default=Opts}.
+    Opts = rebar_utils:apply_overrides(opts(State), Name, Overrides),
+    State#state_t{default=Opts, opts=Opts}.
 
 add_to_profile(State, Profile, KVs) when is_atom(Profile), is_list(KVs) ->
-    Profiles = rebar_state:get(State, profiles, []),
-    ProfileOpts = dict:from_list(proplists:get_value(Profile, Profiles, [])),
-    NewOpts = merge_opts(Profile, dict:from_list(KVs), ProfileOpts),
-    NewProfiles = [{Profile, dict:to_list(NewOpts)}|lists:keydelete(Profile, 1, Profiles)],
-    rebar_state:set(State, profiles, NewProfiles).
+    Opts = rebar_utils:add_to_profile(opts(State), Profile, KVs),
+    State#state_t{opts=Opts}.
 
 apply_profiles(State, Profile) when not is_list(Profile) ->
     apply_profiles(State, [Profile]);
@@ -323,7 +286,7 @@ apply_profiles(State=#state_t{default = Defaults, current_profiles=CurrentProfil
                             case proplists:get_value(Profile, ConfigProfiles, []) of
                                 OptsList when is_list(OptsList) ->
                                     ProfileOpts = dict:from_list(OptsList),
-                                    merge_opts(Profile, ProfileOpts, OptsAcc);
+                                    rebar_utils:merge_opts(Profile, ProfileOpts, OptsAcc);
                                 Other ->
                                     throw(?PRV_ERROR({profile_not_list, Profile, Other}))
                             end
@@ -340,53 +303,6 @@ do_deduplicate([Head | Rest], Acc) ->
         true -> do_deduplicate(Rest, Acc);
         false -> do_deduplicate(Rest, [Head | Acc])
     end.
-
-merge_opts(Profile, NewOpts, OldOpts) ->
-    Opts = merge_opts(NewOpts, OldOpts),
-
-    Opts2 = case dict:find(plugins, NewOpts) of
-        {ok, Value} ->
-            dict:store({plugins, Profile}, Value, Opts);
-        error ->
-            Opts
-    end,
-
-    case dict:find(deps, NewOpts) of
-        {ok, Value2} ->
-            dict:store({deps, Profile}, Value2, Opts2);
-        error ->
-            Opts2
-    end.
-
-merge_opts(NewOpts, OldOpts) ->
-    dict:merge(fun(deps, _NewValue, OldValue) ->
-                       OldValue;
-                  ({deps, _}, NewValue, _OldValue) ->
-                       NewValue;
-                  (plugins, NewValue, _OldValue) ->
-                       NewValue;
-                  ({plugins, _}, NewValue, _OldValue) ->
-                       NewValue;
-                  (profiles, NewValue, OldValue) ->
-                       dict:to_list(merge_opts(dict:from_list(NewValue), dict:from_list(OldValue)));
-                  (_Key, NewValue, OldValue) when is_list(NewValue) ->
-                       case io_lib:printable_list(NewValue) of
-                           true when NewValue =:= [] ->
-                               case io_lib:printable_list(OldValue) of
-                                   true ->
-                                       NewValue;
-                                   false ->
-                                       OldValue
-                               end;
-                           true ->
-                               NewValue;
-                           false ->
-                               rebar_utils:tup_umerge(rebar_utils:tup_sort(NewValue)
-                                                     ,rebar_utils:tup_sort(OldValue))
-                       end;
-                  (_Key, NewValue, _OldValue) ->
-                       NewValue
-               end, NewOpts, OldOpts).
 
 dir(#state_t{dir=Dir}) ->
     Dir.

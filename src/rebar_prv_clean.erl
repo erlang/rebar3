@@ -50,9 +50,9 @@ do(State) ->
     clean_apps(EmptyState, Providers, DepApps),
 
     Cwd = rebar_dir:get_cwd(),
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, element(2,rebar_app_info:new(noen)), State),
+    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
     clean_apps(State, Providers, ProjectApps),
-    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, element(2,rebar_app_info:new(noen)), State),
+    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State),
 
     {ok, State}.
 

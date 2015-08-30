@@ -210,7 +210,7 @@ needed_files(G, ErlOpts, Dir, OutDir, SourceFiles) ->
                          TargetBase = target_base(OutDir, Source),
                          Target = TargetBase ++ ".beam",
                          AllOpts = [{outdir, filename:dirname(Target)}
-                                ,{i, filename:join(Dir, "include")}] ++ ErlOpts,
+                                   ,{i, filename:join(Dir, "include")}] ++ ErlOpts,
                          digraph:vertex(G, Source) > {Source, filelib:last_modified(Target)}
                               orelse opts_changed(AllOpts, TargetBase)
                  end, SourceFiles).
@@ -405,7 +405,7 @@ expand_file_names(Files, Dirs) ->
 
 -spec internal_erl_compile(rebar_dict(), file:filename(), file:filename(),
     file:filename(), list()) -> ok | {ok, any()} | {error, any(), any()}.
-internal_erl_compile(Opts, Dir, Module, OutDir, ErlOpts) ->
+internal_erl_compile(_Opts, Dir, Module, OutDir, ErlOpts) ->
     Target = target_base(OutDir, Module) ++ ".beam",
     ok = filelib:ensure_dir(Target),
     AllOpts = [{outdir, filename:dirname(Target)}] ++ ErlOpts ++
@@ -414,9 +414,9 @@ internal_erl_compile(Opts, Dir, Module, OutDir, ErlOpts) ->
         {ok, _Mod} ->
             ok;
         {ok, _Mod, Ws} ->
-            rebar_base_compiler:ok_tuple(Opts, Module, Ws);
+            rebar_base_compiler:ok_tuple(Module, Ws);
         {error, Es, Ws} ->
-            rebar_base_compiler:error_tuple(Opts, Module, Es, Ws, Opts)
+            rebar_base_compiler:error_tuple(Module, Es, Ws, AllOpts)
     end.
 
 target_base(OutDir, Source) ->
@@ -464,8 +464,9 @@ compile_yrl(Source, Target, Opts) ->
 
 -spec compile_xrl_yrl(rebar_dict(), file:filename(),
                       file:filename(), list(), module()) -> 'ok'.
-compile_xrl_yrl(Opts, Source, Target, AllOpts, Mod) ->
-    Dir = filename:dirname(Target),
+compile_xrl_yrl(_Opts, Source, Target, AllOpts, Mod) ->
+    %% FIX ME: should be the outdir or something
+    Dir = filename:dirname(filename:dirname(Target)),
     AllOpts1 = [{includefile, filename:join(Dir, I)} || {includefile, I} <- AllOpts,
                                                         filename:pathtype(I) =:= relative],
     case needs_compile(Source, Target) of
@@ -474,9 +475,9 @@ compile_xrl_yrl(Opts, Source, Target, AllOpts, Mod) ->
                 {ok, _} ->
                     ok;
                 {ok, _Mod, Ws} ->
-                    rebar_base_compiler:ok_tuple(Opts, Source, Ws);
+                    rebar_base_compiler:ok_tuple(Source, Ws);
                 {error, Es, Ws} ->
-                    rebar_base_compiler:error_tuple(Opts, Source,
+                    rebar_base_compiler:error_tuple(Source,
                                                     Es, Ws, AllOpts1)
             end;
         false ->
