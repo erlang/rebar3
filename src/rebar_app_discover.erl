@@ -77,7 +77,6 @@ merge_deps(AppInfo, State) ->
     CurrentProfiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo),
     C = project_app_config(AppInfo, State),
-
     %% We reset the opts here to default so no profiles are applied multiple times
     AppState = rebar_state:apply_overrides(
                  rebar_state:apply_profiles(

@@ -171,8 +171,10 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
                     end,
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
     AppInfo0 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
-    AppInfo1 = rebar_app_info:apply_overrides(rebar_state:get(State, overrides, []), AppInfo0),
-    rebar_app_info:is_lock(rebar_app_info:source(AppInfo1, Source), IsLock).
+    Overrides = rebar_state:get(State, overrides, []),
+    AppInfo1 = rebar_app_info:set(AppInfo0, overrides, rebar_app_info:get(AppInfo, overrides, [])++Overrides),
+    AppInfo2 = rebar_app_info:apply_overrides(rebar_app_info:get(AppInfo1, overrides, []), AppInfo1),
+    rebar_app_info:is_lock(rebar_app_info:source(AppInfo2, Source), IsLock).
 
 format_error({missing_package, Package}) ->
     io_lib:format("Package not found in registry: ~s", [Package]);
