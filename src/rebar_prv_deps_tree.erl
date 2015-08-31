@@ -49,26 +49,32 @@ print_deps_tree(SrcDeps, Verbose, State) ->
     ProjectAppNames = [{rebar_app_info:name(App)
                        ,rebar_app_info:original_vsn(App)
                        ,project} || App <- rebar_state:project_apps(State)],
+    io:setopts([{encoding, unicode}]),
     case dict:find(root, D) of
         {ok, Children} ->
-            print_children(-1, lists:keysort(1, Children++ProjectAppNames), D, Verbose);
+            print_children("", lists:keysort(1, Children++ProjectAppNames), D, Verbose);
         error ->
-            print_children(-1, lists:keysort(1, ProjectAppNames), D, Verbose)
+            print_children("", lists:keysort(1, ProjectAppNames), D, Verbose)
     end.
 
 print_children(_, [], _, _) ->
     ok;
-print_children(Indent, [{Name, Vsn, Source} | Rest], Dict, Verbose) ->
-
-    [io:format("|  ") || _ <- lists:seq(0, Indent, 2)],
-    io:format("|- "),
-    io:format("~s-~s (~s)~n", [Name, Vsn, type(Source, Verbose)]),
+print_children(Prefix, [{Name, Vsn, Source} | Rest], Dict, Verbose) ->
+    Prefix1 = case Rest of
+                  [] ->
+                      io:format("~s└─ ", [Prefix]),
+                      [Prefix, "   "];
+                  _ ->
+                      io:format("~s├─ ", [Prefix]),
+                      [Prefix, "│  "]
+              end,
+    io:format("~s─~s (~s)~n", [Name, Vsn, type(Source, Verbose)]),
     case dict:find(Name, Dict) of
         {ok, Children} ->
-            print_children(Indent+2, lists:keysort(1, Children), Dict, Verbose),
-            print_children(Indent, Rest, Dict, Verbose);
+            print_children(Prefix1, lists:keysort(1, Children), Dict, Verbose),
+            print_children(Prefix, Rest, Dict, Verbose);
         error ->
-            print_children(Indent, Rest, Dict, Verbose)
+            print_children(Prefix, Rest, Dict, Verbose)
     end.
 
 type(project, _) ->
