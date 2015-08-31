@@ -49,6 +49,7 @@ print_deps_tree(SrcDeps, Verbose, State) ->
     ProjectAppNames = [{rebar_app_info:name(App)
                        ,rebar_app_info:original_vsn(App)
                        ,project} || App <- rebar_state:project_apps(State)],
+    io:setopts([{encoding, unicode}]),
     case dict:find(root, D) of
         {ok, Children} ->
             print_children("", lists:keysort(1, Children++ProjectAppNames), D, Verbose);
@@ -60,14 +61,14 @@ print_children(_, [], _, _) ->
     ok;
 print_children(Prefix, [{Name, Vsn, Source} | Rest], Dict, Verbose) ->
     Prefix1 = case Rest of
-        [] ->
-            io:format("~s`- ", [Prefix]),
-            [Prefix, "   "];
-        _ ->
-            io:format("~s|- ", [Prefix]),
-            [Prefix, "|  "]
-    end,
-    io:format("~s-~s (~s)~n", [Name, Vsn, type(Source, Verbose)]),
+                  [] ->
+                      io:format("~s└─ ", [Prefix]),
+                      [Prefix, "   "];
+                  _ ->
+                      io:format("~s├─ ", [Prefix]),
+                      [Prefix, "│  "]
+              end,
+    io:format("~s─~s (~s)~n", [Name, Vsn, type(Source, Verbose)]),
     case dict:find(Name, Dict) of
         {ok, Children} ->
             print_children(Prefix1, lists:keysort(1, Children), Dict, Verbose),
