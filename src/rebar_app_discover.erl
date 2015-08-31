@@ -31,7 +31,7 @@ do(State, LibDirs) ->
                                  ParsedDeps = parse_profile_deps(Profile
                                                                 ,TopLevelApp
                                                                 ,ProfileDeps2
-                                                                ,StateAcc1
+                                                                ,rebar_state:opts(StateAcc1)
                                                                 ,StateAcc1),
                                  rebar_state:set(StateAcc1, {parsed_deps, Profile}, ParsedDeps)
                          end, State, lists:reverse(CurrentProfiles)),
@@ -74,32 +74,29 @@ format_error({missing_module, Module}) ->
 
 merge_deps(AppInfo, State) ->
     Default = rebar_state:default(State),
-    CurrentProfiles = rebar_state:current_profiles(State),
-    Name = rebar_app_info:name(AppInfo),
     C = project_app_config(AppInfo, State),
+    AppInfo0 = rebar_app_info:update_opts(AppInfo, Default, C),
+
+    CurrentProfiles = rebar_state:current_profiles(State),
+    Name = rebar_app_info:name(AppInfo0),
+
     %% We reset the opts here to default so no profiles are applied multiple times
-    AppState = rebar_state:apply_overrides(
-                 rebar_state:apply_profiles(
-                   rebar_state:new(reset_hooks(rebar_state:opts(State, Default)), C,
-                                  rebar_app_info:dir(AppInfo)), CurrentProfiles), Name),
-    AppState1 = rebar_state:overrides(AppState, rebar_state:get(AppState, overrides, [])),
+    AppInfo1 = rebar_app_info:apply_overrides(rebar_state:overrides(State), AppInfo0),
+    AppInfo2 = rebar_app_info:apply_profiles(AppInfo1, CurrentProfiles),
 
-    rebar_utils:check_min_otp_version(rebar_state:get(AppState1, minimum_otp_vsn, undefined)),
-    rebar_utils:check_blacklisted_otp_versions(rebar_state:get(AppState1, blacklisted_otp_vsns, [])),
-
-    AppState2 = rebar_state:set(AppState1, artifacts, []),
-    AppInfo2 = rebar_app_info:opts(AppInfo, rebar_state:opts(AppState2)),
+    rebar_utils:check_min_otp_version(rebar_app_info:get(AppInfo2, minimum_otp_vsn, undefined)),
+    rebar_utils:check_blacklisted_otp_versions(rebar_app_info:get(AppInfo2, blacklisted_otp_vsns, [])),
 
     State1 = lists:foldl(fun(Profile, StateAcc) ->
-                                 handle_profile(Profile, Name, AppState1, StateAcc)
+                                 handle_profile(Profile, Name, AppInfo2, StateAcc)
                          end, State, lists:reverse(CurrentProfiles)),
 
     {AppInfo2, State1}.
 
-handle_profile(Profile, Name, AppState, State) ->
+handle_profile(Profile, Name, AppInfo, State) ->
     TopParsedDeps = rebar_state:get(State, {parsed_deps, Profile}, {[], []}),
     TopLevelProfileDeps = rebar_state:get(State, {deps, Profile}, []),
-    AppProfileDeps = rebar_state:get(AppState, {deps, Profile}, []),
+    AppProfileDeps = rebar_app_info:get(AppInfo, {deps, Profile}, []),
     AppProfileDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_sort(AppProfileDeps)),
     ProfileDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_umerge(
                                            rebar_utils:tup_sort(TopLevelProfileDeps)
@@ -109,17 +106,17 @@ handle_profile(Profile, Name, AppState, State) ->
     %% Only deps not also specified in the top level config need
     %% to be included in the parsed deps
     NewDeps = ProfileDeps2 -- TopLevelProfileDeps,
-    ParsedDeps = parse_profile_deps(Profile, Name, NewDeps, AppState, State1),
+    ParsedDeps = parse_profile_deps(Profile, Name, NewDeps, rebar_app_info:opts(AppInfo), State1),
     State2 = rebar_state:set(State1, {deps, Profile}, ProfileDeps2),
     rebar_state:set(State2, {parsed_deps, Profile}, TopParsedDeps++ParsedDeps).
 
-parse_profile_deps(Profile, Name, Deps, AppState, State) ->
+parse_profile_deps(Profile, Name, Deps, Opts, State) ->
     DepsDir = rebar_prv_install_deps:profile_dep_dir(State, Profile),
     Locks = rebar_state:get(State, {locks, Profile}, []),
     rebar_app_utils:parse_deps(Name
                               ,DepsDir
                               ,Deps
-                              ,AppState
+                              ,rebar_state:opts(State, Opts)
                               ,Locks
                               ,1).
 
@@ -139,10 +136,10 @@ maybe_reset_hooks(C, Dir, State) ->
             C
     end.
 
-reset_hooks(State) ->
-    lists:foldl(fun(Key, StateAcc) ->
-                        rebar_state:set(StateAcc, Key, [])
-                end, State, [post_hooks, pre_hooks, provider_hooks]).
+%% reset_hooks(Opts) ->
+%%     lists:foldl(fun(Key, OptsAcc) ->
+%%                         rebar_utils:set(OptsAcc, Key, [])
+%%                 end, Opts, [post_hooks, pre_hooks, provider_hooks]).
 
 -spec all_app_dirs(list(file:name())) -> list(file:name()).
 all_app_dirs(LibDirs) ->
