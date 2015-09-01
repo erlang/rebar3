@@ -55,20 +55,21 @@ print_deps_tree(SrcDeps, Verbose, State) ->
             print_children("", lists:keysort(1, Children++ProjectAppNames), D, Verbose);
         error ->
             print_children("", lists:keysort(1, ProjectAppNames), D, Verbose)
-    end.
+    end,
+    io:setopts([{encoding, latin1}]).
 
 print_children(_, [], _, _) ->
     ok;
 print_children(Prefix, [{Name, Vsn, Source} | Rest], Dict, Verbose) ->
     Prefix1 = case Rest of
                   [] ->
-                      io:format("~s└─ ", [Prefix]),
+                      io:format("~ts└─ ", [Prefix]),
                       [Prefix, "   "];
                   _ ->
-                      io:format("~s├─ ", [Prefix]),
+                      io:format("~ts├─ ", [Prefix]),
                       [Prefix, "│  "]
               end,
-    io:format("~s─~s (~s)~n", [Name, Vsn, type(Source, Verbose)]),
+    io:format("~ts─~ts (~ts)~n", [Name, Vsn, type(Source, Verbose)]),
     case dict:find(Name, Dict) of
         {ok, Children} ->
             print_children(Prefix1, lists:keysort(1, Children), Dict, Verbose),
