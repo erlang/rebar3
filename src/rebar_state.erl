@@ -105,7 +105,7 @@ new(ParentState, Config, Deps, Dir) ->
     true = rebar_config:verify_config_format(Terms),
     LocalOpts = dict:from_list(Terms),
 
-    NewOpts = rebar_utils:merge_opts(LocalOpts, Opts),
+    NewOpts = rebar_opts:merge_opts(LocalOpts, Opts),
 
     ParentState#state_t{dir=Dir
                        ,opts=NewOpts
@@ -241,7 +241,7 @@ command_parsed_args(State, CmdArgs) ->
     State#state_t{command_parsed_args=CmdArgs}.
 
 add_to_profile(State, Profile, KVs) when is_atom(Profile), is_list(KVs) ->
-    Opts = rebar_utils:add_to_profile(opts(State), Profile, KVs),
+    Opts = rebar_opts:add_to_profile(opts(State), Profile, KVs),
     State#state_t{opts=Opts}.
 
 apply_profiles(State, Profile) when not is_list(Profile) ->
@@ -268,7 +268,7 @@ apply_profiles(State=#state_t{default = Defaults, current_profiles=CurrentProfil
                             case proplists:get_value(Profile, ConfigProfiles, []) of
                                 OptsList when is_list(OptsList) ->
                                     ProfileOpts = dict:from_list(OptsList),
-                                    rebar_utils:merge_opts(Profile, ProfileOpts, OptsAcc);
+                                    rebar_opts:merge_opts(Profile, ProfileOpts, OptsAcc);
                                 Other ->
                                     throw(?PRV_ERROR({profile_not_list, Profile, Other}))
                             end

@@ -19,7 +19,7 @@ run_all_hooks(Dir, Type, Command, Providers, State) ->
     run_hooks(Dir, Type, Command, rebar_state:opts(State), State).
 
 run_provider_hooks(Dir, Type, Command, Providers, Opts, State) ->
-    case rebar_utils:get(Opts, provider_hooks, []) of
+    case rebar_opts:get(Opts, provider_hooks, []) of
         [] ->
             ok;
         AllHooks ->
@@ -76,7 +76,7 @@ run_hooks(Dir, pre, Command, Opts, State) ->
 run_hooks(Dir, post, Command, Opts, State) ->
     run_hooks(Dir, post_hooks, Command, Opts, State);
 run_hooks(Dir, Type, Command, Opts, State) ->
-    case rebar_utils:get(Opts, Type, []) of
+    case rebar_opts:get(Opts, Type, []) of
         [] ->
             ok;
         Hooks ->

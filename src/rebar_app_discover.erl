@@ -138,7 +138,7 @@ maybe_reset_hooks(C, Dir, State) ->
 
 reset_hooks(Opts) ->
     lists:foldl(fun(Key, OptsAcc) ->
-                        rebar_utils:set(OptsAcc, Key, [])
+                        rebar_opts:set(OptsAcc, Key, [])
                 end, Opts, [post_hooks, pre_hooks, provider_hooks, artifacts]).
 
 -spec all_app_dirs(list(file:name())) -> list(file:name()).

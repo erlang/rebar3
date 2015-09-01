@@ -88,17 +88,17 @@ compile(AppInfo) ->
 -spec compile(rebar_dict(), file:name(), file:name()) -> 'ok'.
 compile(Opts, Dir, OutDir) ->
     rebar_base_compiler:run(Opts,
-                            check_files(rebar_utils:get(
+                            check_files(rebar_opts:get(
                                           Opts, xrl_first_files, [])),
                             filename:join(Dir, "src"), ".xrl", filename:join(Dir, "src"), ".erl",
                             fun compile_xrl/3),
     rebar_base_compiler:run(Opts,
-                            check_files(rebar_utils:get(
+                            check_files(rebar_opts:get(
                                           Opts, yrl_first_files, [])),
                             filename:join(Dir, "src"), ".yrl", filename:join(Dir, "src"), ".erl",
                             fun compile_yrl/3),
     rebar_base_compiler:run(Opts,
-                            check_files(rebar_utils:get(
+                            check_files(rebar_opts:get(
                                           Opts, mib_first_files, [])),
                             filename:join(Dir, "mibs"), ".mib", filename:join([Dir, "priv", "mibs"]), ".bin",
                             fun compile_mib/3),
@@ -136,7 +136,7 @@ clean(_Opts, AppDir) ->
 
 -spec doterl_compile(rebar_dict(), file:filename(), file:filename()) -> ok.
 doterl_compile(Opts, Dir, ODir) ->
-    ErlOpts = rebar_utils:erl_opts(Opts),
+    ErlOpts = rebar_opts:erl_opts(Opts),
     doterl_compile(Opts, Dir, ODir, [], ErlOpts).
 
 doterl_compile(Opts, Dir, OutDir, MoreSources, ErlOpts) ->
@@ -184,7 +184,7 @@ doterl_compile(Opts, Dir, OutDir, MoreSources, ErlOpts) ->
 %% and parse_transform options.  Also produce specific erl_opts for these first
 %% files, so that yet to be compiled parse transformations are excluded from it.
 erl_first_files(Opts, ErlOpts, Dir, NeededErlFiles) ->
-    ErlFirstFilesConf = rebar_utils:get(Opts, erl_first_files, []),
+    ErlFirstFilesConf = rebar_opts:get(Opts, erl_first_files, []),
     NeededSrcDirs = lists:usort(lists:map(fun filename:dirname/1, NeededErlFiles)),
     %% NOTE: order of files here is important!
     ErlFirstFiles =
@@ -430,7 +430,7 @@ compile_mib(Source, Target, Opts) ->
     ok = filelib:ensure_dir(filename:join([Dir, "include", "dummy.hrl"])),
     AllOpts = [{outdir, Dir}
               ,{i, [Dir]}] ++
-        rebar_utils:get(Opts, mib_opts, []),
+        rebar_opts:get(Opts, mib_opts, []),
 
     case snmpc:compile(Source, AllOpts) of
         {ok, _} ->
@@ -453,13 +453,13 @@ compile_mib(Source, Target, Opts) ->
 -spec compile_xrl(file:filename(), file:filename(),
                   rebar_dict()) -> 'ok'.
 compile_xrl(Source, Target, Opts) ->
-    AllOpts = [{scannerfile, Target} | rebar_utils:get(Opts, xrl_opts, [])],
+    AllOpts = [{scannerfile, Target} | rebar_opts:get(Opts, xrl_opts, [])],
     compile_xrl_yrl(Opts, Source, Target, AllOpts, leex).
 
 -spec compile_yrl(file:filename(), file:filename(),
                   rebar_dict()) -> 'ok'.
 compile_yrl(Source, Target, Opts) ->
-    AllOpts = [{parserfile, Target} | rebar_utils:get(Opts, yrl_opts, [])],
+    AllOpts = [{parserfile, Target} | rebar_opts:get(Opts, yrl_opts, [])],
     compile_xrl_yrl(Opts, Source, Target, AllOpts, yecc).
 
 -spec compile_xrl_yrl(rebar_dict(), file:filename(),

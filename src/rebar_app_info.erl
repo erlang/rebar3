@@ -156,7 +156,7 @@ update_opts(AppInfo, Opts, Config) ->
     true = rebar_config:verify_config_format(Terms),
     LocalOpts = dict:from_list(Terms),
 
-    NewOpts = rebar_utils:merge_opts(LocalOpts, Opts),
+    NewOpts = rebar_opts:merge_opts(LocalOpts, Opts),
 
     AppInfo#app_info_t{opts=NewOpts
                       ,default=NewOpts}.
@@ -425,11 +425,11 @@ all(Dir, [File|Artifacts]) ->
 
 apply_overrides(Overrides, AppInfo) ->
     Name = binary_to_atom(rebar_app_info:name(AppInfo), utf8),
-    Opts = rebar_utils:apply_overrides(opts(AppInfo), Name, Overrides),
+    Opts = rebar_opts:apply_overrides(opts(AppInfo), Name, Overrides),
     AppInfo#app_info_t{default=Opts, opts=Opts}.
 
 add_to_profile(AppInfo, Profile, KVs) when is_atom(Profile), is_list(KVs) ->
-    Opts = rebar_utils:add_to_profile(opts(AppInfo), Profile, KVs),
+    Opts = rebar_opts:add_to_profile(opts(AppInfo), Profile, KVs),
     AppInfo#app_info_t{opts=Opts}.
 
 apply_profiles(AppInfo, Profile) when not is_list(Profile) ->
@@ -456,7 +456,7 @@ apply_profiles(AppInfo=#app_info_t{default = Defaults, profiles=CurrentProfiles}
                             case proplists:get_value(Profile, ConfigProfiles, []) of
                                 OptsList when is_list(OptsList) ->
                                     ProfileOpts = dict:from_list(OptsList),
-                                    rebar_utils:merge_opts(Profile, ProfileOpts, OptsAcc);
+                                    rebar_opts:merge_opts(Profile, ProfileOpts, OptsAcc);
                                 Other ->
                                     throw(?PRV_ERROR({profile_not_list, Profile, Other}))
                             end
