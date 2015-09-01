@@ -81,7 +81,7 @@ merge_deps(AppInfo, State) ->
     Name = rebar_app_info:name(AppInfo0),
 
     %% We reset the opts here to default so no profiles are applied multiple times
-    AppInfo1 = rebar_app_info:apply_overrides(rebar_state:overrides(State), AppInfo0),
+    AppInfo1 = rebar_app_info:apply_overrides(rebar_state:get(State, overrides, []), AppInfo0),
     AppInfo2 = rebar_app_info:apply_profiles(AppInfo1, CurrentProfiles),
 
     rebar_utils:check_min_otp_version(rebar_app_info:get(AppInfo2, minimum_otp_vsn, undefined)),

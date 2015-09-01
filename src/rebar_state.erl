@@ -35,8 +35,6 @@
 
          deps_names/1,
 
-         overrides/1, overrides/2,
-         apply_overrides/2,
 
          resources/1, resources/2, add_resource/2,
          providers/1, providers/2, add_provider/2]).
@@ -62,7 +60,6 @@
                   all_plugin_deps     = []          :: [rebar_app_info:t()],
                   all_deps            = []          :: [rebar_app_info:t()],
 
-                  overrides           = [],
                   resources           = [],
                   providers           = []}).
 
@@ -243,11 +240,6 @@ command_parsed_args(#state_t{command_parsed_args=CmdArgs}) ->
 command_parsed_args(State, CmdArgs) ->
     State#state_t{command_parsed_args=CmdArgs}.
 
-apply_overrides(State=#state_t{overrides=Overrides}, AppName) ->
-    Name = binary_to_atom(AppName, utf8),
-    Opts = rebar_utils:apply_overrides(opts(State), Name, Overrides),
-    State#state_t{default=Opts, opts=Opts}.
-
 add_to_profile(State, Profile, KVs) when is_atom(Profile), is_list(KVs) ->
     Opts = rebar_utils:add_to_profile(opts(State), Profile, KVs),
     State#state_t{opts=Opts}.
@@ -309,12 +301,6 @@ deps_names(Deps) when is_list(Deps) ->
 deps_names(State) ->
     Deps = rebar_state:get(State, deps, []),
     deps_names(Deps).
-
-overrides(#state_t{overrides=Overrides}) ->
-    Overrides.
-
-overrides(State=#state_t{}, Overrides) ->
-    State#state_t{overrides=Overrides}.
 
 project_apps(#state_t{project_apps=Apps}) ->
     Apps.

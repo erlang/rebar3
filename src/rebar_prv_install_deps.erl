@@ -273,8 +273,8 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     AppInfo4 = rebar_app_info:deps(AppInfo3, rebar_state:deps_names(Deps)),
 
     %% Keep all overrides from the global config and this dep when parsing its deps
-    Overrides = rebar_state:overrides(State) ++ rebar_app_info:get(AppInfo0, overrides, []),
-    Deps1 = rebar_app_utils:parse_deps(Name, DepsDir, Deps, rebar_state:overrides(State, Overrides)
+    Overrides = rebar_app_info:get(AppInfo0, overrides, []),
+    Deps1 = rebar_app_utils:parse_deps(Name, DepsDir, Deps, rebar_state:set(State, overrides, Overrides)
                                       ,Locks, Level+1),
     {AppInfo4, Deps1, State1}.
 
