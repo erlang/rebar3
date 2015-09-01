@@ -36,10 +36,10 @@ do(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     %% retrieve apps to filter by for other args
     Apps = filter_apps(RawOpts, State),
-    %% remove apps opt from options
-    Paths = lists:filter(fun({app, _}) -> false; (_) -> true end, RawOpts),
+    %% remove apps and seperator opts from options
+    Paths = lists:filter(fun({app, _}) -> false; ({seperator, _}) -> false; (_) -> true end, RawOpts),
     %% if no paths requested in opts print the base_dir instead
-    P = case Paths of [] -> [{base, true}]; _ -> Paths end,
+    P = case Paths of [] -> [{ebin, true}]; _ -> Paths end,
     case paths(P, Apps, State, []) of
         ok             -> {ok, State};
         {error, Error} -> {error, Error}
@@ -61,7 +61,7 @@ filter_apps(RawOpts, State) ->
     end.
 
 
-paths([], _, _, Acc) -> print_paths_if_exist(lists:reverse(Acc));
+paths([], _, State, Acc) -> print_paths_if_exist(lists:reverse(Acc), State);
 paths([{base, true}|Rest], Apps, State, Acc) ->
     paths(Rest, Apps, State, [base_dir(State)|Acc]);
 paths([{bin, true}|Rest], Apps, State, Acc) ->
@@ -89,9 +89,11 @@ priv_dirs(Apps, State) ->
 src_dirs(Apps, State) ->
     lists:map(fun(App) -> io_lib:format("~s/lib/~s/src", [rebar_dir:base_dir(State), App]) end, Apps).
 
-print_paths_if_exist(Paths) ->
+print_paths_if_exist(Paths, State) ->
+    {RawOpts, _} = rebar_state:command_parsed_args(State),
+    Sep = proplists:get_value(seperator, RawOpts, " "),
     RealPaths = lists:filter(fun(P) -> ec_file:is_dir(P) end, Paths),
-    io:format("~s", [string:join(RealPaths, ",")]).
+    io:format("~s", [string:join(RealPaths, Sep)]).
 
 project_deps(State) ->
     Profiles = rebar_state:current_profiles(State),
@@ -110,14 +112,16 @@ eunit_opts(_State) ->
      {ebin, undefined, "ebin", boolean, help(ebin)},
      {lib, undefined, "lib", boolean, help(lib)},
      {priv, undefined, "priv", boolean, help(priv)},
+     {seperator, $s, "seperator", string, help(seperator)},
      {src, undefined, "src", boolean, help(src)},
      {rel, undefined, "rel", boolean, help(rel)}].
 
-help(app)  -> "Comma seperated list of applications to return paths for.";
-help(base) -> "Return the `base' path of the current profile.";
-help(bin)  -> "Return the `bin' path of the current profile.";
-help(ebin) -> "Return all `ebin' paths of the current profile's applications.";
-help(lib)  -> "Return the `lib' path of the current profile.";
-help(priv) -> "Return the `priv' path of the current profile's applications.";
-help(src)  -> "Return the `src' path of the current profile's applications.";
-help(rel)  -> "Return the `rel' path of the current profile.".
+help(app)       -> "Comma seperated list of applications to return paths for.";
+help(base)      -> "Return the `base' path of the current profile.";
+help(bin)       -> "Return the `bin' path of the current profile.";
+help(ebin)      -> "Return all `ebin' paths of the current profile's applications.";
+help(lib)       -> "Return the `lib' path of the current profile.";
+help(priv)      -> "Return the `priv' path of the current profile's applications.";
+help(seperator) -> "In case of multiple return paths, the seperator character to use to join them.";
+help(src)       -> "Return the `src' path of the current profile's applications.";
+help(rel)       -> "Return the `rel' path of the current profile.".
