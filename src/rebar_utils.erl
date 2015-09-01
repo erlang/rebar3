@@ -269,20 +269,23 @@ deps_to_binary([{Name, Source} | T]) ->
 deps_to_binary([Name | T]) ->
     [ec_cnv:to_binary(Name) | deps_to_binary(T)].
 
-tup_dedup([]) ->
+tup_dedup(List) ->
+    tup_dedup_(tup_sort(List)).
+
+tup_dedup_([]) ->
     [];
-tup_dedup([A]) ->
+tup_dedup_([A]) ->
     [A];
-tup_dedup([A,B|T]) when element(1, A) =:= element(1, B) ->
-    tup_dedup([A | T]);
-tup_dedup([A,B|T]) when element(1, A) =:= B ->
-    tup_dedup([A | T]);
-tup_dedup([A,B|T]) when A =:= element(1, B) ->
-    tup_dedup([A | T]);
-tup_dedup([A,A|T]) ->
-    [A|tup_dedup(T)];
-tup_dedup([A|T]) ->
-    [A|tup_dedup(T)].
+tup_dedup_([A,B|T]) when element(1, A) =:= element(1, B) ->
+    tup_dedup_([A | T]);
+tup_dedup_([A,B|T]) when element(1, A) =:= B ->
+    tup_dedup_([A | T]);
+tup_dedup_([A,B|T]) when A =:= element(1, B) ->
+    tup_dedup_([A | T]);
+tup_dedup_([A,A|T]) ->
+    [A|tup_dedup_(T)];
+tup_dedup_([A|T]) ->
+    [A|tup_dedup_(T)].
 
 %% Sort the list in proplist-order, meaning that `{a,b}' and `{a,c}'
 %% both compare as usual, and `a' and `b' do the same, but `a' and `{a,b}' will
@@ -311,9 +314,12 @@ tup_sort(List) ->
 %%
 %% This lets us apply proper overrides to list of elements according to profile
 %% priority. This function depends on a stable proplist sort.
-tup_umerge([], Olds) ->
+tup_umerge(NewList, OldList) ->
+    tup_umerge_(tup_sort(NewList), tup_sort(OldList)).
+
+tup_umerge_([], Olds) ->
     Olds;
-tup_umerge([New|News], Olds) ->
+tup_umerge_([New|News], Olds) ->
     lists:reverse(umerge(News, Olds, [], New)).
 
 tup_find(_Elem, []) ->

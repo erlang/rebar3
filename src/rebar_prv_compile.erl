@@ -42,12 +42,6 @@ do(State) ->
     Deps = rebar_state:deps_to_build(State),
     Cwd = rebar_state:dir(State),
 
-    %% Need to allow global config vars used on deps.
-    %% Right now no way to differeniate and just give deps a new state.
-    %% But need an account of "all deps" for some hooks to use.
-    %% EmptyState = rebar_state:new(),
-    %% build_apps(rebar_state:all_deps(EmptyState,
-    %%                                rebar_state:all_deps(State)), Providers, Deps),
     build_apps(State, Providers, Deps),
     {ok, ProjectApps1} = rebar_digraph:compile_order(ProjectApps),
 
@@ -85,9 +79,6 @@ build_app(State, Providers, AppInfo) ->
     AppDir = rebar_app_info:dir(AppInfo),
     OutDir = rebar_app_info:out_dir(AppInfo),
     copy_app_dirs(AppInfo, AppDir, OutDir),
-
-    %S = rebar_app_info:state_or_new(State, AppInfo),
-    %S1 = rebar_state:all_deps(State, rebar_state:all_deps(State)),
     compile(State, Providers, AppInfo).
 
 compile(State, Providers, AppInfo) ->

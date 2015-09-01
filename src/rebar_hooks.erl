@@ -35,7 +35,6 @@ run_provider_hooks_(Dir, Type, Command, Providers, TypeHooks, State) ->
     Providers1 = rebar_state:providers(State),
     State1 = rebar_state:providers(rebar_state:dir(State, Dir), Providers++Providers1),
     HookProviders = proplists:get_all_values(Command, TypeHooks),
-
     case rebar_core:do(HookProviders, State1) of
         {error, ProviderName} ->
             ?DEBUG(format_error({bad_provider, Type, Command, ProviderName}), []),

@@ -97,19 +97,9 @@ new(ParentState=#state_t{}, Config) ->
     Dir = rebar_dir:get_cwd(),
     new(ParentState, Config, Dir).
 
--spec new(t(), list(), rebar_app_info:t() | file:filename_all()) -> t().
-new(ParentState, Config, Dir) when is_list(Dir) ->
-    new(ParentState, Config, deps_from_config(Dir, Config), Dir);
-new(ParentState, Config, AppInfo) ->
-    Dir = rebar_app_info:dir(AppInfo),
-    DepLocks = case rebar_app_info:resource_type(AppInfo) of
-                   pkg ->
-                       Deps = rebar_app_info:deps(AppInfo),
-                       [{{locks, default}, Deps}, {{deps, default}, Deps}];
-                   _ ->
-                       deps_from_config(Dir, Config)
-               end,
-    new(ParentState, Config, DepLocks, Dir).
+-spec new(t(), list(), file:filename_all()) -> t().
+new(ParentState, Config, Dir) ->
+    new(ParentState, Config, deps_from_config(Dir, Config), Dir).
 
 new(ParentState, Config, Deps, Dir) ->
     Opts = ParentState#state_t.opts,

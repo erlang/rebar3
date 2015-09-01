@@ -26,7 +26,7 @@ do(State, LibDirs) ->
     %% Handle top level deps
     State1 = lists:foldl(fun(Profile, StateAcc) ->
                                  ProfileDeps = rebar_state:get(StateAcc, {deps, Profile}, []),
-                                 ProfileDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_sort(ProfileDeps)),
+                                 ProfileDeps2 = rebar_utils:tup_dedup(ProfileDeps),
                                  StateAcc1 = rebar_state:set(StateAcc, {deps, Profile}, ProfileDeps2),
                                  ParsedDeps = parse_profile_deps(Profile
                                                                 ,TopLevelApp
@@ -73,7 +73,7 @@ format_error({missing_module, Module}) ->
     io_lib:format("Module defined in app file missing: ~p~n", [Module]).
 
 merge_deps(AppInfo, State) ->
-    Default = rebar_state:default(State),
+    Default = reset_hooks(rebar_state:default(State)),
     C = project_app_config(AppInfo, State),
     AppInfo0 = rebar_app_info:update_opts(AppInfo, Default, C),
 
@@ -97,10 +97,9 @@ handle_profile(Profile, Name, AppInfo, State) ->
     TopParsedDeps = rebar_state:get(State, {parsed_deps, Profile}, {[], []}),
     TopLevelProfileDeps = rebar_state:get(State, {deps, Profile}, []),
     AppProfileDeps = rebar_app_info:get(AppInfo, {deps, Profile}, []),
-    AppProfileDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_sort(AppProfileDeps)),
-    ProfileDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_umerge(
-                                           rebar_utils:tup_sort(TopLevelProfileDeps)
-                                           ,rebar_utils:tup_sort(AppProfileDeps2))),
+    AppProfileDeps2 = rebar_utils:tup_dedup(AppProfileDeps),
+    ProfileDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_umerge(TopLevelProfileDeps
+                                                               ,AppProfileDeps2)),
     State1 = rebar_state:set(State, {deps, Profile}, ProfileDeps2),
 
     %% Only deps not also specified in the top level config need
@@ -131,15 +130,16 @@ maybe_reset_hooks(C, Dir, State) ->
     case ec_file:real_dir_path(rebar_dir:root_dir(State)) of
         Dir ->
             C1 = proplists:delete(provider_hooks, C),
-            proplists:delete(post_hooks, proplists:delete(pre_hooks, C1));
+            C2 = proplists:delete(artifacts, C1),
+            proplists:delete(post_hooks, proplists:delete(pre_hooks, C2));
         _ ->
             C
     end.
 
-%% reset_hooks(Opts) ->
-%%     lists:foldl(fun(Key, OptsAcc) ->
-%%                         rebar_utils:set(OptsAcc, Key, [])
-%%                 end, Opts, [post_hooks, pre_hooks, provider_hooks]).
+reset_hooks(Opts) ->
+    lists:foldl(fun(Key, OptsAcc) ->
+                        rebar_utils:set(OptsAcc, Key, [])
+                end, Opts, [post_hooks, pre_hooks, provider_hooks, artifacts]).
 
 -spec all_app_dirs(list(file:name())) -> list(file:name()).
 all_app_dirs(LibDirs) ->
