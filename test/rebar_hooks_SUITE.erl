@@ -43,7 +43,13 @@ build_and_clean_app(Config) ->
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name, valid}]}),
-    rebar_test_utils:run_and_check(Config, [{provider_hooks, [{post, [{compile, clean}]}]}],
+
+    RConfFile = rebar_test_utils:create_config(AppDir,
+                                               [{provider_hooks, [{post, [{compile, clean}]}]}]
+                                              ),
+    {ok, RConf} = file:consult(RConfFile),
+
+    rebar_test_utils:run_and_check(Config, RConf,
                                   ["compile"], {ok, [{app, Name, invalid}]}).
 
 escriptize_artifacts(Config) ->
@@ -69,7 +75,17 @@ escriptize_artifacts(Config) ->
           {missing_artifact, Artifact}}} ->
             ok
     end,
-    rebar_test_utils:run_and_check(Config, RConf++[{provider_hooks, [{post, [{compile, escriptize}]}]}],
+
+    RConfFile2 =
+        rebar_test_utils:create_config(AppDir,
+                                       [
+                                       {escript_name, list_to_atom(Name)}
+                                       ,{artifacts, [Artifact]}
+                                       ,{provider_hooks, [{post, [{compile, escriptize}]}]}
+                                       ]),
+    {ok, RConf2} = file:consult(RConfFile2),
+
+    rebar_test_utils:run_and_check(Config, RConf2,
                                   ["compile"], {ok, [{app, Name, valid}
                                                     ,{file, filename:join([AppDir, "_build/default/", Artifact])}]}).
 
