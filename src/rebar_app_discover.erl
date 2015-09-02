@@ -84,8 +84,8 @@ merge_deps(AppInfo, State) ->
     AppInfo1 = rebar_app_info:apply_overrides(rebar_state:get(State, overrides, []), AppInfo0),
     AppInfo2 = rebar_app_info:apply_profiles(AppInfo1, CurrentProfiles),
 
-    rebar_utils:check_min_otp_version(rebar_app_info:get(AppInfo2, minimum_otp_vsn, undefined)),
-    rebar_utils:check_blacklisted_otp_versions(rebar_app_info:get(AppInfo2, blacklisted_otp_vsns, [])),
+    %% Will throw an exception if checks fail
+    rebar_app_info:verify_otp_vsn(AppInfo2),
 
     State1 = lists:foldl(fun(Profile, StateAcc) ->
                                  handle_profile(Profile, Name, AppInfo2, StateAcc)

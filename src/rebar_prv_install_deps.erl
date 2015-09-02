@@ -262,8 +262,8 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     Plugins = rebar_app_info:get(AppInfo2, plugins, []),
     AppInfo3 = rebar_app_info:set(AppInfo2, {plugins, Profile}, Plugins),
 
-    rebar_utils:check_min_otp_version(rebar_app_info:get(AppInfo3, minimum_otp_vsn, undefined)),
-    rebar_utils:check_blacklisted_otp_versions(rebar_app_info:get(AppInfo3, blacklisted_otp_vsns, [])),
+    %% Will throw an exception if checks fail
+    rebar_app_info:verify_otp_vsn(AppInfo3),
 
     %% Dep may have plugins to install. Find and install here.
     State1 = rebar_plugins:install(State, AppInfo3),

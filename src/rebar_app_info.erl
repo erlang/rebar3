@@ -53,6 +53,7 @@
          valid/1,
          valid/2,
 
+         verify_otp_vsn/1,
          has_all_artifacts/1,
 
          apply_overrides/2,
@@ -403,6 +404,10 @@ valid(#app_info_t{valid=Valid}) ->
 -spec valid(t(), boolean()) -> t().
 valid(AppInfo=#app_info_t{}, Valid) ->
     AppInfo#app_info_t{valid=Valid}.
+
+verify_otp_vsn(AppInfo) ->
+    rebar_utils:check_min_otp_version(rebar_app_info:get(AppInfo, minimum_otp_vsn, undefined)),
+    rebar_utils:check_blacklisted_otp_versions(rebar_app_info:get(AppInfo, blacklisted_otp_vsns, [])).
 
 -spec has_all_artifacts(#app_info_t{}) -> true | {false, file:filename()}.
 has_all_artifacts(AppInfo) ->
