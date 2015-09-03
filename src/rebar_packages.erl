@@ -8,7 +8,6 @@
         ,package_dir/1
         ,registry_checksum/2
         ,find_highest_matching/4
-        ,verify_table/1
         ,format_error/1]).
 
 -export_type([package/0]).
@@ -52,7 +51,7 @@ load_and_verify_version(State) ->
 
 deps(Name, Vsn, State) ->
     try
-        ?MODULE:verify_table(State),
+        verify_table(State),
         ets:lookup_element(?PACKAGE_TABLE, {ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)}, 2)
     catch
         _:_ ->
@@ -83,7 +82,7 @@ package_dir(State) ->
 
 registry_checksum({pkg, Name, Vsn}, State) ->
     try
-        ?MODULE:verify_table(State),
+        verify_table(State),
         ets:lookup_element(?PACKAGE_TABLE, {Name, Vsn}, 3)
     catch
         _:_ ->
@@ -106,7 +105,7 @@ registry_checksum({pkg, Name, Vsn}, State) ->
 %% `~> 2.0` | `>= 2.0.0 and < 3.0.0`
 %% `~> 2.1` | `>= 2.1.0 and < 3.0.0`
 find_highest_matching(Dep, Constraint, Table, State) ->
-    ?MODULE:verify_table(State),
+    verify_table(State),
     try ets:lookup_element(Table, Dep, 2) of
         [[HeadVsn | VsnTail]] ->
             {ok, handle_vsns(Constraint, HeadVsn, VsnTail)};
@@ -146,4 +145,4 @@ format_error({missing_package, Package, Version}) ->
     io_lib:format("Package not found in registry: ~s-~s. Try to fix with `rebar3 update`", [Package, Version]).
 
 verify_table(State) ->
-    ets:info(?PACKAGE_TABLE, named_table) =:= true orelse load_and_verify_version(State).
+    ets:info(?PACKAGE_TABLE, named_table) =:= true orelse ?MODULE:load_and_verify_version(State).
