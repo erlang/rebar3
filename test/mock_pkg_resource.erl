@@ -117,7 +117,7 @@ mock_pkg_index(Opts) ->
     meck:new(rebar_packages, [passthrough, no_link]),
     meck:expect(rebar_packages, packages,
                 fun(_State) -> to_index(Deps, Dict) end),
-    meck:expect(rebar_packages, load_and_verify_version,
+    meck:expect(rebar_packages, verify_table,
                 fun(_State) -> to_index(Deps, Dict), true end).
 
 %%%%%%%%%%%%%%%
