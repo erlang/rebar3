@@ -684,7 +684,12 @@ update_code(Paths) ->
                                   code:add_patha(Path),
                                   ok;
                               {ok, Modules} ->
-                                  code:replace_path(App, Path),
+                                  %% replace_path causes problems when running
+                                  %% tests in projects like erlware_commons that rebar3
+                                  %% also includes
+                                  %code:replace_path(App, Path),
+                                  code:del_path(App),
+                                  code:add_patha(Path),
                                   [begin code:purge(M), code:delete(M) end || M <- Modules]
                           end
                   end, Paths).
