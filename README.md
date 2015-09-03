@@ -35,6 +35,7 @@ locations ([hex.pm](http://hex.pm), git, hg, and so on).
 | eunit      | Run eunit tests |
 | help       | Print help for rebar or task |
 | new        | Create new rebar project from templates |
+| path       | Print paths to build dirs in current profile |
 | pkgs       | List available packages |
 | plugins    | List or upgrade plugins |
 | release    | Build release of project |

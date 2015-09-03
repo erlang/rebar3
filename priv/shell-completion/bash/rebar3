@@ -23,6 +23,7 @@ _rebar3()
             eunit \
             help \
             new \
+            path \
             pkgs \
             plugins \
             release \
@@ -98,6 +99,17 @@ _rebar3()
     elif [[ ${prev} == new ]] ; then
         sopts="-f"
         lopts="--force"
+    elif [[ ${prev} == path ]] ; then
+        sopts="-s"
+        lopts="--app \
+            --base \
+            --bin \
+            --ebin \
+            --lib \
+            --priv \
+            --separator \
+            --src \
+            --rel"
     elif [[ ${prev} == pkgs ]] ; then
         :
     elif [[ ${prev} == plugins ]] ; then

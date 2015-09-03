@@ -36,8 +36,8 @@ do(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     %% retrieve apps to filter by for other args
     Apps = filter_apps(RawOpts, State),
-    %% remove apps and seperator opts from options
-    Paths = lists:filter(fun({app, _}) -> false; ({seperator, _}) -> false; (_) -> true end, RawOpts),
+    %% remove apps and separator opts from options
+    Paths = lists:filter(fun({app, _}) -> false; ({separator, _}) -> false; (_) -> true end, RawOpts),
     %% if no paths requested in opts print the base_dir instead
     P = case Paths of [] -> [{ebin, true}]; _ -> Paths end,
     case paths(P, Apps, State, []) of
@@ -91,7 +91,7 @@ src_dirs(Apps, State) ->
 
 print_paths_if_exist(Paths, State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
-    Sep = proplists:get_value(seperator, RawOpts, " "),
+    Sep = proplists:get_value(separator, RawOpts, " "),
     RealPaths = lists:filter(fun(P) -> ec_file:is_dir(P) end, Paths),
     io:format("~s", [string:join(RealPaths, Sep)]).
 
@@ -112,7 +112,7 @@ eunit_opts(_State) ->
      {ebin, undefined, "ebin", boolean, help(ebin)},
      {lib, undefined, "lib", boolean, help(lib)},
      {priv, undefined, "priv", boolean, help(priv)},
-     {seperator, $s, "seperator", string, help(seperator)},
+     {separator, $s, "separator", string, help(separator)},
      {src, undefined, "src", boolean, help(src)},
      {rel, undefined, "rel", boolean, help(rel)}].
 
@@ -122,6 +122,6 @@ help(bin)       -> "Return the `bin' path of the current profile.";
 help(ebin)      -> "Return all `ebin' paths of the current profile's applications.";
 help(lib)       -> "Return the `lib' path of the current profile.";
 help(priv)      -> "Return the `priv' path of the current profile's applications.";
-help(seperator) -> "In case of multiple return paths, the seperator character to use to join them.";
+help(separator) -> "In case of multiple return paths, the separator character to use to join them.";
 help(src)       -> "Return the `src' path of the current profile's applications.";
 help(rel)       -> "Return the `rel' path of the current profile.".
