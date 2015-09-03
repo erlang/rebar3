@@ -533,6 +533,8 @@ transform_opts([], Acc) -> Acc;
 %% drop `cover` and `verbose` so they're not passed as an option to common_test
 transform_opts([{cover, _}|Rest], Acc) ->
     transform_opts(Rest, Acc);
+transform_opts([{cover_spec, CoverSpec}|Rest], Acc) ->
+    transform_opts(Rest, [{cover, CoverSpec}|Acc]);
 transform_opts([{verbose, _}|Rest], Acc) ->
     transform_opts(Rest, Acc);
 transform_opts([{ct_hooks, CtHooks}|Rest], Acc) ->
