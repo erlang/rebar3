@@ -18,7 +18,7 @@
     rebar_resource:resource().
 -callback download(file:filename_all(), tuple(), rebar_state:t()) ->
     {tarball, file:filename_all()} | {ok, any()} | {error, any()}.
--callback needs_update(file:filename_all(), tuple()) ->
+-callback needs_update(file:filename_all(), tuple(), rebar_state:t()) ->
     boolean().
 -callback make_vsn(file:filename_all()) ->
     {plain, string()} | {error, string()}.

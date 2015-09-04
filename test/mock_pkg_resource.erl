@@ -51,7 +51,7 @@ mock_update(Opts) ->
     ToUpdate = proplists:get_value(upgrade, Opts, []),
     meck:expect(
         ?MOD, needs_update,
-        fun(_Dir, {pkg, App, _Vsn}) ->
+        fun(_Dir, {pkg, App, _Vsn}, _) ->
             lists:member(binary_to_list(App), ToUpdate)
         end).
 

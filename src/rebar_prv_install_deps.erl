@@ -38,7 +38,7 @@
 -export([handle_deps_as_profile/4,
          profile_dep_dir/2,
          find_cycles/1,
-         cull_compile/2]).
+         cull_compile/3]).
 
 -export_type([dep/0]).
 
@@ -88,7 +88,7 @@ do(State) ->
             {error, Error} ->
                 {error, Error};
             {no_cycle, Sorted} ->
-                ToCompile = cull_compile(Sorted, ProjectApps),
+                ToCompile = cull_compile(Sorted, ProjectApps, State3),
                 {ok, rebar_state:deps_to_build(State3, ToCompile)}
         end
     catch
@@ -170,8 +170,8 @@ find_cycles(Apps) ->
         {ok, Sorted} -> {no_cycle, Sorted}
     end.
 
-cull_compile(TopSortedDeps, ProjectApps) ->
-    lists:dropwhile(fun not_needs_compile/1, TopSortedDeps -- ProjectApps).
+cull_compile(TopSortedDeps, ProjectApps, State) ->
+    lists:dropwhile(fun(App) -> not_needs_compile(App, State) end, TopSortedDeps -- ProjectApps).
 
 maybe_lock(Profile, AppInfo, Seen, State, Level) ->
     Name = rebar_app_info:name(AppInfo),
@@ -287,11 +287,11 @@ maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
         true ->
             {false, AppInfo};
         false ->
-            case rebar_app_discover:find_app(AppInfo, AppDir, all) of
+            case rebar_app_discover:find_app(AppInfo, AppDir, all, State) of
                 false ->
                     true = fetch_app(AppInfo, AppDir, State),
                     maybe_symlink_default(State, Profile, AppDir, AppInfo),
-                    {true, rebar_app_info:valid(update_app_info(AppDir, AppInfo), false)};
+                    {true, rebar_app_info:valid(update_app_info(AppDir, AppInfo, State), false)};
                 {true, AppInfo1} ->
                     case sets:is_element(rebar_app_info:name(AppInfo1), Seen) of
                         true ->
@@ -299,7 +299,7 @@ maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
                         false ->
                             maybe_symlink_default(State, Profile, AppDir, AppInfo1),
                             MaybeUpgrade = maybe_upgrade(AppInfo, AppDir, Upgrade, State),
-                            AppInfo2 = update_app_info(AppDir, AppInfo1),
+                            AppInfo2 = update_app_info(AppDir, AppInfo1, State),
                             {MaybeUpgrade, AppInfo2}
                     end
             end
@@ -356,8 +356,8 @@ fetch_app(AppInfo, AppDir, State) ->
 %% This is called after the dep has been downloaded and unpacked, if it hadn't been already.
 %% So this is the first time for newly downloaded apps that its .app/.app.src data can
 %% be read in an parsed.
-update_app_info(AppDir, AppInfo) ->
-    case rebar_app_discover:find_app(AppInfo, AppDir, all) of
+update_app_info(AppDir, AppInfo, State) ->
+    case rebar_app_discover:find_app(AppInfo, AppDir, all, State) of
         {true, AppInfo1} ->
             AppInfo1;
         false ->
@@ -395,7 +395,7 @@ warn_skip_deps(AppInfo, State) ->
         true -> ?ERROR(Msg, Args), ?FAIL
     end.
 
-not_needs_compile(App) ->
+not_needs_compile(App, State) ->
     not(rebar_app_info:is_checkout(App))
-        andalso rebar_app_info:valid(App)
-          andalso rebar_app_info:has_all_artifacts(App) =:= true.
+        andalso rebar_app_info:valid(App, State)
+          andalso rebar_app_info:has_all_artifacts(App, State) =:= true.

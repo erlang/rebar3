@@ -191,6 +191,7 @@ top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
 %%% Helpers %%%
 %%%%%%%%%%%%%%%
 check_results(AppDir, Expected, ProfileRun) ->
+    State = rebar_state:new(),
     BuildDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib", "*"])),
     PluginDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "plugins", "*"])),
     GlobalPluginDirs = filelib:wildcard(filename:join([AppDir, "global", "plugins", "*"])),
@@ -198,19 +199,19 @@ check_results(AppDir, Expected, ProfileRun) ->
     LockFile = filename:join([AppDir, "rebar.lock"]),
     Locks = lists:flatten(rebar_config:consult_lock_file(LockFile)),
 
-    InvalidApps = rebar_app_discover:find_apps(BuildDirs, invalid),
-    ValidApps = rebar_app_discover:find_apps(BuildDirs, valid),
+    InvalidApps = rebar_app_discover:find_apps(BuildDirs, invalid, State),
+    ValidApps = rebar_app_discover:find_apps(BuildDirs, valid, State),
 
     InvalidDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- InvalidApps],
     ValidDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- ValidApps],
 
-    Deps = rebar_app_discover:find_apps(BuildDirs, all),
+    Deps = rebar_app_discover:find_apps(BuildDirs, all, State),
     DepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Deps],
-    Checkouts = rebar_app_discover:find_apps([CheckoutsDir], all),
+    Checkouts = rebar_app_discover:find_apps([CheckoutsDir], all, State),
     CheckoutsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Checkouts],
-    Plugins = rebar_app_discover:find_apps(PluginDirs, all),
+    Plugins = rebar_app_discover:find_apps(PluginDirs, all, State),
     PluginsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Plugins],
-    GlobalPlugins = rebar_app_discover:find_apps(GlobalPluginDirs, all),
+    GlobalPlugins = rebar_app_discover:find_apps(GlobalPluginDirs, all, State),
     GlobalPluginsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- GlobalPlugins],
 
     lists:foreach(

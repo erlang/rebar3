@@ -7,7 +7,7 @@
          new/4,
          new/5,
          update_opts/3,
-         discover/1,
+         discover/2,
          name/1,
          name/2,
          app_file_src/1,
@@ -50,11 +50,10 @@
          is_lock/2,
          is_checkout/1,
          is_checkout/2,
-         valid/1,
          valid/2,
 
          verify_otp_vsn/1,
-         has_all_artifacts/1,
+         has_all_artifacts/2,
 
          apply_overrides/2,
          add_to_profile/3,
@@ -174,9 +173,9 @@ deps_from_config(Dir, Config) ->
     end.
 
 %% @doc discover a complete version of the app info with all fields set.
--spec discover(file:filename_all()) -> {ok, t()} | not_found.
-discover(Dir) ->
-    case rebar_app_discover:find_app(Dir, all) of
+-spec discover(file:filename_all(), rebar_state:t()) -> {ok, t()} | not_found.
+discover(Dir, State) ->
+    case rebar_app_discover:find_app(Dir, all, State) of
         {true, AppInfo} ->
             {ok, AppInfo};
         false ->
@@ -389,30 +388,29 @@ is_checkout(AppInfo=#app_info_t{}, IsCheckout) ->
 is_checkout(#app_info_t{is_checkout=IsCheckout}) ->
     IsCheckout.
 
--spec valid(t()) -> boolean().
-valid(AppInfo=#app_info_t{valid=undefined}) ->
+-spec valid(t(), boolean() | rebar_state:t()) -> t() | boolean().
+valid(AppInfo=#app_info_t{}, Valid) when is_boolean(Valid) ->
+    AppInfo#app_info_t{valid=Valid};
+valid(AppInfo=#app_info_t{valid=undefined}, State) ->
     case rebar_app_utils:validate_application_info(AppInfo) =:= true
-        andalso has_all_artifacts(AppInfo) =:= true of
+        andalso has_all_artifacts(AppInfo, State) =:= true of
         true ->
             true;
         _ ->
             false
     end;
-valid(#app_info_t{valid=Valid}) ->
+valid(#app_info_t{valid=Valid}, _State) ->
     Valid.
 
--spec valid(t(), boolean()) -> t().
-valid(AppInfo=#app_info_t{}, Valid) ->
-    AppInfo#app_info_t{valid=Valid}.
 
 verify_otp_vsn(AppInfo) ->
     rebar_utils:check_min_otp_version(rebar_app_info:get(AppInfo, minimum_otp_vsn, undefined)),
     rebar_utils:check_blacklisted_otp_versions(rebar_app_info:get(AppInfo, blacklisted_otp_vsns, [])).
 
--spec has_all_artifacts(#app_info_t{}) -> true | {false, file:filename()}.
-has_all_artifacts(AppInfo) ->
+-spec has_all_artifacts(#app_info_t{}, rebar_state:t()) -> true | {false, file:filename()}.
+has_all_artifacts(AppInfo, State) ->
     Artifacts = rebar_app_info:get(AppInfo, artifacts, []),
-    Dir = dir(AppInfo),
+    Dir = rebar_dir:base_dir(State),
     all(Dir, Artifacts).
 
 all(_, []) ->
