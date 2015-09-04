@@ -253,29 +253,30 @@ update_unseen_dep(AppInfo, Profile, Level, Deps, Apps, State, Upgrade, Seen, Loc
 handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     Profiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo),
-
-    %% Deps may be under a sub project app, find it and use its state if so
-    S = rebar_app_info:state(AppInfo),
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
-    S1 = rebar_state:new(S, C, AppInfo),
-    S2 = rebar_state:apply_overrides(S1, Name),
 
-    S3 = rebar_state:apply_profiles(S2, Profiles),
-    Plugins = rebar_state:get(S3, plugins, []),
-    S4 = rebar_state:set(S3, {plugins, Profile}, Plugins),
+    AppInfo0 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
+    AppInfo1 = rebar_app_info:apply_overrides(rebar_app_info:get(AppInfo, overrides, []), AppInfo0),
+    AppInfo2 = rebar_app_info:apply_profiles(AppInfo1, Profiles),
 
-    rebar_utils:check_min_otp_version(rebar_state:get(S4, minimum_otp_vsn, undefined)),
-    rebar_utils:check_blacklisted_otp_versions(rebar_state:get(S4, blacklisted_otp_vsns, [])),
+    Plugins = rebar_app_info:get(AppInfo2, plugins, []),
+    AppInfo3 = rebar_app_info:set(AppInfo2, {plugins, Profile}, Plugins),
+
+    %% Will throw an exception if checks fail
+    rebar_app_info:verify_otp_vsn(AppInfo3),
 
     %% Dep may have plugins to install. Find and install here.
-    S5 = rebar_plugins:install(S4),
-    AppInfo1 = rebar_app_info:state(AppInfo, S5),
+    State1 = rebar_plugins:install(State, AppInfo3),
 
     %% Upgrade lock level to be the level the dep will have in this dep tree
-    Deps = rebar_state:get(S5, {deps, default}, []),
-    AppInfo2 = rebar_app_info:deps(AppInfo1, rebar_state:deps_names(Deps)),
-    Deps1 = rebar_app_utils:parse_deps(Name, DepsDir, Deps, S5, Locks, Level+1),
-    {AppInfo2, Deps1, State}.
+    Deps = rebar_app_info:get(AppInfo3, {deps, default}, []),
+    AppInfo4 = rebar_app_info:deps(AppInfo3, rebar_state:deps_names(Deps)),
+
+    %% Keep all overrides from the global config and this dep when parsing its deps
+    Overrides = rebar_app_info:get(AppInfo0, overrides, []),
+    Deps1 = rebar_app_utils:parse_deps(Name, DepsDir, Deps, rebar_state:set(State, overrides, Overrides)
+                                      ,Locks, Level+1),
+    {AppInfo4, Deps1, State1}.
 
 -spec maybe_fetch(rebar_app_info:t(), atom(), boolean(),
                   sets:set(binary()), rebar_state:t()) -> {boolean(), rebar_app_info:t()}.
@@ -286,24 +287,20 @@ maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
         true ->
             {false, AppInfo};
         false ->
-            case rebar_app_discover:find_app(AppDir, all) of
+            case rebar_app_discover:find_app(AppInfo, AppDir, all) of
                 false ->
                     true = fetch_app(AppInfo, AppDir, State),
                     maybe_symlink_default(State, Profile, AppDir, AppInfo),
                     {true, rebar_app_info:valid(update_app_info(AppDir, AppInfo), false)};
                 {true, AppInfo1} ->
-                    %% Preserve the state we created with overrides
-                    AppInfo2 = copy_app_info(AppInfo, AppInfo1),
-                    AppState = rebar_app_info:state(AppInfo),
-                    AppInfo3 = rebar_app_info:state(AppInfo2, AppState),
-                    case sets:is_element(rebar_app_info:name(AppInfo3), Seen) of
+                    case sets:is_element(rebar_app_info:name(AppInfo1), Seen) of
                         true ->
-                            {false, AppInfo3};
+                            {false, AppInfo1};
                         false ->
-                            maybe_symlink_default(State, Profile, AppDir, AppInfo3),
+                            maybe_symlink_default(State, Profile, AppDir, AppInfo1),
                             MaybeUpgrade = maybe_upgrade(AppInfo, AppDir, Upgrade, State),
-                            AppInfo4 = update_app_info(AppDir, AppInfo3),
-                            {MaybeUpgrade, AppInfo4}
+                            AppInfo2 = update_app_info(AppDir, AppInfo1),
+                            {MaybeUpgrade, AppInfo2}
                     end
             end
     end.
@@ -360,31 +357,12 @@ fetch_app(AppInfo, AppDir, State) ->
 %% So this is the first time for newly downloaded apps that its .app/.app.src data can
 %% be read in an parsed.
 update_app_info(AppDir, AppInfo) ->
-    case rebar_app_info:discover(AppDir) of
-        {ok, Found} ->
-            AppDetails = rebar_app_info:app_details(Found),
-            Vsn = rebar_app_info:original_vsn(Found),
-            Applications = proplists:get_value(applications, AppDetails, []),
-            IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
-            AppInfo1 = rebar_app_info:original_vsn(rebar_app_info:applications(
-                                                     rebar_app_info:app_details(AppInfo, AppDetails),
-                                                     IncludedApplications++Applications), Vsn),
-            AppInfo2 = copy_app_info(AppInfo, AppInfo1),
-            rebar_app_info:valid(AppInfo2, undefined);
-        not_found ->
+    case rebar_app_discover:find_app(AppInfo, AppDir, all) of
+        {true, AppInfo1} ->
+            AppInfo1;
+        false ->
             throw(?PRV_ERROR({dep_app_not_found, AppDir, rebar_app_info:name(AppInfo)}))
     end.
-
-copy_app_info(OldAppInfo, NewAppInfo) ->
-    Deps = rebar_app_info:deps(OldAppInfo),
-    ResourceType = rebar_app_info:resource_type(OldAppInfo),
-    Parent = rebar_app_info:parent(OldAppInfo),
-    Source = rebar_app_info:source(OldAppInfo),
-
-    rebar_app_info:deps(
-      rebar_app_info:resource_type(
-        rebar_app_info:source(
-          rebar_app_info:parent(NewAppInfo, Parent), Source), ResourceType), Deps).
 
 maybe_upgrade(AppInfo, AppDir, Upgrade, State) ->
     Source = rebar_app_info:source(AppInfo),
@@ -420,4 +398,4 @@ warn_skip_deps(AppInfo, State) ->
 not_needs_compile(App) ->
     not(rebar_app_info:is_checkout(App))
         andalso rebar_app_info:valid(App)
-          andalso rebar_state:has_all_artifacts(rebar_app_info:state(App)) =:= true.
+          andalso rebar_app_info:has_all_artifacts(App) =:= true.

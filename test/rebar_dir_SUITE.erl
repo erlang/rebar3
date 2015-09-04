@@ -28,39 +28,39 @@ end_per_testcase(_, _Config) -> ok.
 
 default_src_dirs(Config) ->
     {ok, State} = rebar_test_utils:run_and_check(Config, [], ["compile"], return),
-    
-    [] = rebar_dir:src_dirs(State),
-    ["src"] = rebar_dir:src_dirs(State, ["src"]).
+
+    [] = rebar_dir:src_dirs(rebar_state:opts(State)),
+    ["src"] = rebar_dir:src_dirs(rebar_state:opts(State), ["src"]).
 
 default_extra_src_dirs(Config) ->
     {ok, State} = rebar_test_utils:run_and_check(Config, [], ["compile"], return),
-  
-    [] = rebar_dir:extra_src_dirs(State),
-    ["src"] = rebar_dir:extra_src_dirs(State, ["src"]).
+
+    [] = rebar_dir:extra_src_dirs(rebar_state:opts(State)),
+    ["src"] = rebar_dir:extra_src_dirs(rebar_state:opts(State), ["src"]).
 
 default_all_src_dirs(Config) ->
     {ok, State} = rebar_test_utils:run_and_check(Config, [], ["compile"], return),
-  
-    [] = rebar_dir:all_src_dirs(State),
-    ["src", "test"] = rebar_dir:all_src_dirs(State, ["src"], ["test"]).
+
+    [] = rebar_dir:all_src_dirs(rebar_state:opts(State)),
+    ["src", "test"] = rebar_dir:all_src_dirs(rebar_state:opts(State), ["src"], ["test"]).
 
 src_dirs(Config) ->
     RebarConfig = [{erl_opts, [{src_dirs, ["foo", "bar", "baz"]}]}],
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
-    
-    ["foo", "bar", "baz"] = rebar_dir:src_dirs(State).
+
+    ["foo", "bar", "baz"] = rebar_dir:src_dirs(rebar_state:opts(State)).
 
 extra_src_dirs(Config) ->
     RebarConfig = [{erl_opts, [{extra_src_dirs, ["foo", "bar", "baz"]}]}],
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
-    
-    ["foo", "bar", "baz"] = rebar_dir:extra_src_dirs(State).
+
+    ["foo", "bar", "baz"] = rebar_dir:extra_src_dirs(rebar_state:opts(State)).
 
 all_src_dirs(Config) ->
     RebarConfig = [{erl_opts, [{src_dirs, ["foo", "bar"]}, {extra_src_dirs, ["baz", "qux"]}]}],
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
-    
-    ["foo", "bar", "baz", "qux"] = rebar_dir:all_src_dirs(State).
+
+    ["foo", "bar", "baz", "qux"] = rebar_dir:all_src_dirs(rebar_state:opts(State)).
 
 profile_src_dirs(Config) ->
     RebarConfig = [
@@ -70,9 +70,9 @@ profile_src_dirs(Config) ->
         ]}
     ],
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["as", "more", "compile"], return),
-    
+
     R = lists:sort(["foo", "bar", "baz", "qux"]),
-    R = lists:sort(rebar_dir:src_dirs(State)).
+    R = lists:sort(rebar_dir:src_dirs(rebar_state:opts(State))).
 
 profile_extra_src_dirs(Config) ->
     RebarConfig = [
@@ -82,9 +82,9 @@ profile_extra_src_dirs(Config) ->
         ]}
     ],
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["as", "more", "compile"], return),
-    
+
     R = lists:sort(["foo", "bar", "baz", "qux"]),
-    R = lists:sort(rebar_dir:extra_src_dirs(State)).
+    R = lists:sort(rebar_dir:extra_src_dirs(rebar_state:opts(State))).
 
 profile_all_src_dirs(Config) ->
     RebarConfig = [
@@ -94,6 +94,6 @@ profile_all_src_dirs(Config) ->
         ]}
     ],
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["as", "more", "compile"], return),
-    
+
     R = lists:sort(["foo", "bar", "baz", "qux"]),
-    R = lists:sort(rebar_dir:all_src_dirs(State)).
+    R = lists:sort(rebar_dir:all_src_dirs(rebar_state:opts(State))).

@@ -157,26 +157,24 @@ pkg_to_app(Parent, DepsDir, AppName, PkgName, PkgVsn, IsLock, State) ->
 
 dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
     CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
-    BaseDir = rebar_state:get(State, base_dir, []),
-    {ok, App1} = case rebar_app_info:discover(CheckoutsDir) of
-                    {ok, App} ->
-                        {ok, rebar_app_info:is_checkout(App, true)};
-                    not_found ->
-                        Dir = ec_cnv:to_list(filename:join(DepsDir, Name)),
-                        case rebar_app_info:discover(Dir) of
-                            {ok, App} ->
-                                {ok, rebar_app_info:parent(App, Parent)};
-                            not_found ->
-                                rebar_app_info:new(Parent, Name, Vsn, Dir, [])
-                        end
-                end,
-    C = rebar_config:consult(rebar_app_info:dir(App1)),
-    S = rebar_state:new(rebar_state:new(), C, App1),
+    {ok, AppInfo} = case rebar_app_info:discover(CheckoutsDir) of
+                        {ok, App} ->
+                            {ok, rebar_app_info:is_checkout(App, true)};
+                        not_found ->
+                            Dir = ec_cnv:to_list(filename:join(DepsDir, Name)),
+                            case rebar_app_info:discover(Dir) of
+                                {ok, App} ->
+                                    {ok, rebar_app_info:parent(App, Parent)};
+                                not_found ->
+                                    rebar_app_info:new(Parent, Name, Vsn, Dir, [])
+                            end
+                    end,
+    C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
+    AppInfo0 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
     Overrides = rebar_state:get(State, overrides, []),
-    ParentOverrides = rebar_state:overrides(State),
-    S1 = rebar_state:set(rebar_state:overrides(S, ParentOverrides++Overrides), base_dir, BaseDir),
-    App2 = rebar_app_info:state(App1, S1),
-    rebar_app_info:is_lock(rebar_app_info:source(App2, Source), IsLock).
+    AppInfo1 = rebar_app_info:set(AppInfo0, overrides, rebar_app_info:get(AppInfo, overrides, [])++Overrides),
+    AppInfo2 = rebar_app_info:apply_overrides(rebar_app_info:get(AppInfo1, overrides, []), AppInfo1),
+    rebar_app_info:is_lock(rebar_app_info:source(AppInfo2, Source), IsLock).
 
 format_error({missing_package, Package}) ->
     io_lib:format("Package not found in registry: ~s", [Package]);

@@ -49,7 +49,7 @@ src_dirs_at_root(Config) ->
 
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
 
-    ["foo", "bar", "baz"] = rebar_dir:src_dirs(State, []).
+    ["foo", "bar", "baz"] = rebar_dir:src_dirs(rebar_state:opts(State), []).
 
 extra_src_dirs_at_root(Config) ->
     AppDir = ?config(apps, Config),
@@ -62,7 +62,7 @@ extra_src_dirs_at_root(Config) ->
 
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
 
-    ["foo", "bar", "baz"] = rebar_dir:extra_src_dirs(State, []).
+    ["foo", "bar", "baz"] = rebar_dir:extra_src_dirs(rebar_state:opts(State), []).
 
 src_dirs_in_erl_opts(Config) ->
     AppDir = ?config(apps, Config),
@@ -75,7 +75,7 @@ src_dirs_in_erl_opts(Config) ->
 
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
 
-    ["foo", "bar", "baz"] = rebar_dir:src_dirs(State, []).
+    ["foo", "bar", "baz"] = rebar_dir:src_dirs(rebar_state:opts(State), []).
 
 extra_src_dirs_in_erl_opts(Config) ->
     AppDir = ?config(apps, Config),
@@ -88,7 +88,7 @@ extra_src_dirs_in_erl_opts(Config) ->
 
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
 
-    ["foo", "bar", "baz"] = rebar_dir:extra_src_dirs(State, []).
+    ["foo", "bar", "baz"] = rebar_dir:extra_src_dirs(rebar_state:opts(State), []).
 
 src_dirs_at_root_and_in_erl_opts(Config) ->
     AppDir = ?config(apps, Config),
@@ -101,7 +101,7 @@ src_dirs_at_root_and_in_erl_opts(Config) ->
 
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
 
-    ["baz", "qux", "foo", "bar"] = rebar_dir:src_dirs(State, []).
+    ["baz", "qux", "foo", "bar"] = rebar_dir:src_dirs(rebar_state:opts(State), []).
 
 extra_src_dirs_at_root_and_in_erl_opts(Config) ->
     AppDir = ?config(apps, Config),
@@ -114,7 +114,7 @@ extra_src_dirs_at_root_and_in_erl_opts(Config) ->
 
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
 
-    ["baz", "qux", "foo", "bar"] = rebar_dir:extra_src_dirs(State, []).
+    ["baz", "qux", "foo", "bar"] = rebar_dir:extra_src_dirs(rebar_state:opts(State), []).
 
 build_basic_app(Config) ->
     AppDir = ?config(apps, Config),

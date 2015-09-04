@@ -4,7 +4,7 @@
 -module(rebar_plugins).
 
 -export([project_apps_install/1
-        ,install/1
+        ,install/2
         ,handle_plugins/3
         ,handle_plugins/4]).
 
@@ -23,20 +23,19 @@ project_apps_install(State) ->
                         Plugins = rebar_state:get(State, {plugins, Profile}, []),
                         StateAcc1 = handle_plugins(Profile, Plugins, StateAcc),
 
-                        lists:foldl(fun(App, StateAcc2) ->
-                                            AppDir = rebar_app_info:dir(App),
-                                            C = rebar_config:consult(AppDir),
-                                            S = rebar_state:new(rebar_state:new(), C, AppDir),
-                                            Plugins2 = rebar_state:get(S, {plugins, Profile}, []),
+                        lists:foldl(fun(AppInfo, StateAcc2) ->
+                                            C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
+                                            AppInfo0 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
+                                            Plugins2 = rebar_state:get(AppInfo0, {plugins, Profile}, []),
                                             handle_plugins(Profile, Plugins2, StateAcc2)
                                     end, StateAcc1, ProjectApps)
                 end, State, Profiles).
 
--spec install(rebar_state:t()) -> rebar_state:t().
-install(State) ->
+-spec install(rebar_state:t(), rebar_app_info:t()) -> rebar_state:t().
+install(State, AppInfo) ->
     Profiles = rebar_state:current_profiles(State),
     lists:foldl(fun(Profile, StateAcc) ->
-                        Plugins = rebar_state:get(State, {plugins, Profile}, []),
+                        Plugins = rebar_app_info:get(AppInfo, {plugins, Profile}, []),
                         handle_plugins(Profile, Plugins, StateAcc)
                 end, State, Profiles).
 
@@ -92,10 +91,11 @@ handle_plugin(Profile, Plugin, State, Upgrade) ->
 
 build_plugin(AppInfo, Apps, State) ->
     Providers = rebar_state:providers(State),
-    Providers1 = rebar_state:providers(rebar_app_info:state(AppInfo)),
-    S = rebar_state:all_deps(rebar_app_info:state_or_new(State, AppInfo), Apps),
+    %Providers1 = rebar_state:providers(rebar_app_info:state(AppInfo)),
+    %rebar_app_info:state_or_new(State, AppInfo)
+    S = rebar_state:all_deps(State, Apps),
     S1 = rebar_state:set(S, deps_dir, ?DEFAULT_PLUGINS_DIR),
-    rebar_prv_compile:compile(S1, Providers++Providers1, AppInfo).
+    rebar_prv_compile:compile(S1, Providers, AppInfo).
 
 plugin_providers({Plugin, _, _, _}) when is_atom(Plugin) ->
     validate_plugin(Plugin);

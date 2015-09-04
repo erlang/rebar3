@@ -42,13 +42,7 @@ do(State) ->
     Deps = rebar_state:deps_to_build(State),
     Cwd = rebar_state:dir(State),
 
-    %% Need to allow global config vars used on deps.
-    %% Right now no way to differeniate and just give deps a new state.
-    %% But need an account of "all deps" for some hooks to use.
-    EmptyState = rebar_state:new(),
-    build_apps(rebar_state:all_deps(EmptyState,
-                                   rebar_state:all_deps(State)), Providers, Deps),
-
+    build_apps(State, Providers, Deps),
     {ok, ProjectApps1} = rebar_digraph:compile_order(ProjectApps),
 
     %% Run top level hooks *before* project apps compiled but *after* deps are
@@ -61,8 +55,12 @@ do(State) ->
     State3 = rebar_state:code_paths(State2, all_deps, DepsPaths ++ ProjAppsPaths),
 
     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State2),
-    has_all_artifacts(State3),
-
+    case rebar_state:has_all_artifacts(State3) of
+        {false, File} ->
+            throw(?PRV_ERROR({missing_artifact, File}));
+        true ->
+            true
+    end,
     rebar_utils:cleanup_code_path(rebar_state:code_paths(State3, default)
                                  ++ rebar_state:code_paths(State, all_plugin_deps)),
 
@@ -80,22 +78,19 @@ build_apps(State, Providers, Apps) ->
 build_app(State, Providers, AppInfo) ->
     AppDir = rebar_app_info:dir(AppInfo),
     OutDir = rebar_app_info:out_dir(AppInfo),
-    copy_app_dirs(State, AppDir, OutDir),
-
-    S = rebar_app_info:state_or_new(State, AppInfo),
-    S1 = rebar_state:all_deps(S, rebar_state:all_deps(State)),
-    compile(S1, Providers, AppInfo).
+    copy_app_dirs(AppInfo, AppDir, OutDir),
+    compile(State, Providers, AppInfo).
 
 compile(State, Providers, AppInfo) ->
     ?INFO("Compiling ~s", [rebar_app_info:name(AppInfo)]),
     AppDir = rebar_app_info:dir(AppInfo),
-    rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, State),
+    rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, AppInfo, State),
 
-    rebar_erlc_compiler:compile(State, ec_cnv:to_list(rebar_app_info:out_dir(AppInfo))),
+    rebar_erlc_compiler:compile(AppInfo),
     case rebar_otp_app:compile(State, AppInfo) of
         {ok, AppInfo1} ->
-            rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, State),
-            has_all_artifacts(State),
+            rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo, State),
+            has_all_artifacts(AppInfo1),
             AppInfo1;
         Error ->
             throw(Error)
@@ -105,15 +100,15 @@ compile(State, Providers, AppInfo) ->
 %% Internal functions
 %% ===================================================================
 
-has_all_artifacts(State) ->
-    case rebar_state:has_all_artifacts(State) of
+has_all_artifacts(AppInfo1) ->
+    case rebar_app_info:has_all_artifacts(AppInfo1) of
         {false, File} ->
             throw(?PRV_ERROR({missing_artifact, File}));
         true ->
             true
     end.
 
-copy_app_dirs(State, OldAppDir, AppDir) ->
+copy_app_dirs(AppInfo, OldAppDir, AppDir) ->
     case ec_cnv:to_binary(filename:absname(OldAppDir)) =/=
         ec_cnv:to_binary(filename:absname(AppDir)) of
         true ->
@@ -142,7 +137,7 @@ copy_app_dirs(State, OldAppDir, AppDir) ->
             end,
 
             %% link to src_dirs to be adjacent to ebin is needed for R15 use of cover/xref
-            SrcDirs = rebar_dir:all_src_dirs(State, ["src"], []),
+            SrcDirs = rebar_dir:all_src_dirs(rebar_app_info:opts(AppInfo), ["src"], []),
             [symlink_or_copy(OldAppDir, AppDir, Dir) || Dir <- ["priv", "include"] ++ SrcDirs];
         false ->
             ok

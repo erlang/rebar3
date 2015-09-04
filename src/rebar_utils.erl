@@ -45,7 +45,6 @@
          vcs_vsn/3,
          deprecated/3,
          deprecated/4,
-         erl_opts/1,
          indent/1,
          update_code/1,
          remove_from_code_path/1,
@@ -218,20 +217,6 @@ deprecated(Old, New, When) ->
         "'~p' will be removed ~s.~n">>,
       [Old, Old, New, Old, When]).
 
-%% @doc Return list of erl_opts
--spec erl_opts(rebar_state:t()) -> list().
-erl_opts(Config) ->
-    RawErlOpts = filter_defines(rebar_state:get(Config, erl_opts, []), []),
-    Defines = [{d, list_to_atom(D)} ||
-                  D <- rebar_state:get(Config, defines, [])],
-    Opts = Defines ++ RawErlOpts,
-    case proplists:is_defined(no_debug_info, Opts) of
-        true ->
-            [O || O <- Opts, O =/= no_debug_info];
-        false ->
-            [debug_info|Opts]
-    end.
-
 %% for use by `do` task
 
 %% note: this does not handle the case where you have an argument that
@@ -247,20 +232,23 @@ deps_to_binary([{Name, Source} | T]) ->
 deps_to_binary([Name | T]) ->
     [ec_cnv:to_binary(Name) | deps_to_binary(T)].
 
-tup_dedup([]) ->
+tup_dedup(List) ->
+    tup_dedup_(tup_sort(List)).
+
+tup_dedup_([]) ->
     [];
-tup_dedup([A]) ->
+tup_dedup_([A]) ->
     [A];
-tup_dedup([A,B|T]) when element(1, A) =:= element(1, B) ->
-    tup_dedup([A | T]);
-tup_dedup([A,B|T]) when element(1, A) =:= B ->
-    tup_dedup([A | T]);
-tup_dedup([A,B|T]) when A =:= element(1, B) ->
-    tup_dedup([A | T]);
-tup_dedup([A,A|T]) ->
-    [A|tup_dedup(T)];
-tup_dedup([A|T]) ->
-    [A|tup_dedup(T)].
+tup_dedup_([A,B|T]) when element(1, A) =:= element(1, B) ->
+    tup_dedup_([A | T]);
+tup_dedup_([A,B|T]) when element(1, A) =:= B ->
+    tup_dedup_([A | T]);
+tup_dedup_([A,B|T]) when A =:= element(1, B) ->
+    tup_dedup_([A | T]);
+tup_dedup_([A,A|T]) ->
+    [A|tup_dedup_(T)];
+tup_dedup_([A|T]) ->
+    [A|tup_dedup_(T)].
 
 %% Sort the list in proplist-order, meaning that `{a,b}' and `{a,c}'
 %% both compare as usual, and `a' and `b' do the same, but `a' and `{a,b}' will
@@ -289,9 +277,12 @@ tup_sort(List) ->
 %%
 %% This lets us apply proper overrides to list of elements according to profile
 %% priority. This function depends on a stable proplist sort.
-tup_umerge([], Olds) ->
+tup_umerge(NewList, OldList) ->
+    tup_umerge_(tup_sort(NewList), tup_sort(OldList)).
+
+tup_umerge_([], Olds) ->
     Olds;
-tup_umerge([New|News], Olds) ->
+tup_umerge_([New|News], Olds) ->
     lists:reverse(umerge(News, Olds, [], New)).
 
 tup_find(_Elem, []) ->
@@ -378,7 +369,6 @@ abort_if_blacklisted(BlacklistedRegex, OtpRelease) ->
             ?DEBUG("~s does not match blacklisted OTP version ~s",
                    [OtpRelease, BlacklistedRegex])
     end.
-
 
 %% ====================================================================
 %% Internal functions
@@ -643,29 +633,6 @@ find_resource_module(Type, Resources) ->
         {Type, Module} ->
             {ok, Module}
     end.
-
-%%
-%% Filter a list of erl_opts platform_define options such that only
-%% those which match the provided architecture regex are returned.
-%%
-filter_defines([], Acc) ->
-    lists:reverse(Acc);
-filter_defines([{platform_define, ArchRegex, Key} | Rest], Acc) ->
-    case rebar_utils:is_arch(ArchRegex) of
-        true ->
-            filter_defines(Rest, [{d, Key} | Acc]);
-        false ->
-            filter_defines(Rest, Acc)
-    end;
-filter_defines([{platform_define, ArchRegex, Key, Value} | Rest], Acc) ->
-    case rebar_utils:is_arch(ArchRegex) of
-        true ->
-            filter_defines(Rest, [{d, Key, Value} | Acc]);
-        false ->
-            filter_defines(Rest, Acc)
-    end;
-filter_defines([Opt | Rest], Acc) ->
-    filter_defines(Rest, [Opt | Acc]).
 
 %% @doc ident to the level specified
 -spec indent(non_neg_integer()) -> iolist().

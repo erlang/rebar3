@@ -5,7 +5,8 @@
          find_unbuilt_apps/1,
          find_apps/1,
          find_apps/2,
-         find_app/2]).
+         find_app/2,
+         find_app/3]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
@@ -25,12 +26,12 @@ do(State, LibDirs) ->
     %% Handle top level deps
     State1 = lists:foldl(fun(Profile, StateAcc) ->
                                  ProfileDeps = rebar_state:get(StateAcc, {deps, Profile}, []),
-                                 ProfileDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_sort(ProfileDeps)),
+                                 ProfileDeps2 = rebar_utils:tup_dedup(ProfileDeps),
                                  StateAcc1 = rebar_state:set(StateAcc, {deps, Profile}, ProfileDeps2),
                                  ParsedDeps = parse_profile_deps(Profile
                                                                 ,TopLevelApp
                                                                 ,ProfileDeps2
-                                                                ,StateAcc1
+                                                                ,rebar_state:opts(StateAcc1)
                                                                 ,StateAcc1),
                                  rebar_state:set(StateAcc1, {parsed_deps, Profile}, ParsedDeps)
                          end, State, lists:reverse(CurrentProfiles)),
@@ -72,54 +73,49 @@ format_error({missing_module, Module}) ->
     io_lib:format("Module defined in app file missing: ~p~n", [Module]).
 
 merge_deps(AppInfo, State) ->
-    Default = rebar_state:default(State),
-    CurrentProfiles = rebar_state:current_profiles(State),
-    Name = rebar_app_info:name(AppInfo),
+    Default = reset_hooks(rebar_state:default(State)),
     C = project_app_config(AppInfo, State),
+    AppInfo0 = rebar_app_info:update_opts(AppInfo, Default, C),
+
+    CurrentProfiles = rebar_state:current_profiles(State),
+    Name = rebar_app_info:name(AppInfo0),
 
     %% We reset the opts here to default so no profiles are applied multiple times
-    AppState = rebar_state:apply_overrides(
-                 rebar_state:apply_profiles(
-                   rebar_state:new(reset_hooks(rebar_state:opts(State, Default)), C,
-                                  rebar_app_info:dir(AppInfo)), CurrentProfiles), Name),
-    AppState1 = rebar_state:overrides(AppState, rebar_state:get(AppState, overrides, [])),
+    AppInfo1 = rebar_app_info:apply_overrides(rebar_state:get(State, overrides, []), AppInfo0),
+    AppInfo2 = rebar_app_info:apply_profiles(AppInfo1, CurrentProfiles),
 
-    rebar_utils:check_min_otp_version(rebar_state:get(AppState1, minimum_otp_vsn, undefined)),
-    rebar_utils:check_blacklisted_otp_versions(rebar_state:get(AppState1, blacklisted_otp_vsns, [])),
-
-    AppState2 = rebar_state:set(AppState1, artifacts, []),
-    AppInfo1 = rebar_app_info:state(AppInfo, AppState2),
+    %% Will throw an exception if checks fail
+    rebar_app_info:verify_otp_vsn(AppInfo2),
 
     State1 = lists:foldl(fun(Profile, StateAcc) ->
-                                 handle_profile(Profile, Name, AppState1, StateAcc)
+                                 handle_profile(Profile, Name, AppInfo2, StateAcc)
                          end, State, lists:reverse(CurrentProfiles)),
 
-    {AppInfo1, State1}.
+    {AppInfo2, State1}.
 
-handle_profile(Profile, Name, AppState, State) ->
+handle_profile(Profile, Name, AppInfo, State) ->
     TopParsedDeps = rebar_state:get(State, {parsed_deps, Profile}, {[], []}),
     TopLevelProfileDeps = rebar_state:get(State, {deps, Profile}, []),
-    AppProfileDeps = rebar_state:get(AppState, {deps, Profile}, []),
-    AppProfileDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_sort(AppProfileDeps)),
-    ProfileDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_umerge(
-                                           rebar_utils:tup_sort(TopLevelProfileDeps)
-                                           ,rebar_utils:tup_sort(AppProfileDeps2))),
+    AppProfileDeps = rebar_app_info:get(AppInfo, {deps, Profile}, []),
+    AppProfileDeps2 = rebar_utils:tup_dedup(AppProfileDeps),
+    ProfileDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_umerge(TopLevelProfileDeps
+                                                               ,AppProfileDeps2)),
     State1 = rebar_state:set(State, {deps, Profile}, ProfileDeps2),
 
     %% Only deps not also specified in the top level config need
     %% to be included in the parsed deps
     NewDeps = ProfileDeps2 -- TopLevelProfileDeps,
-    ParsedDeps = parse_profile_deps(Profile, Name, NewDeps, AppState, State1),
+    ParsedDeps = parse_profile_deps(Profile, Name, NewDeps, rebar_app_info:opts(AppInfo), State1),
     State2 = rebar_state:set(State1, {deps, Profile}, ProfileDeps2),
     rebar_state:set(State2, {parsed_deps, Profile}, TopParsedDeps++ParsedDeps).
 
-parse_profile_deps(Profile, Name, Deps, AppState, State) ->
+parse_profile_deps(Profile, Name, Deps, Opts, State) ->
     DepsDir = rebar_prv_install_deps:profile_dep_dir(State, Profile),
     Locks = rebar_state:get(State, {locks, Profile}, []),
     rebar_app_utils:parse_deps(Name
                               ,DepsDir
                               ,Deps
-                              ,AppState
+                              ,rebar_state:opts(State, Opts)
                               ,Locks
                               ,1).
 
@@ -134,15 +130,16 @@ maybe_reset_hooks(C, Dir, State) ->
     case ec_file:real_dir_path(rebar_dir:root_dir(State)) of
         Dir ->
             C1 = proplists:delete(provider_hooks, C),
-            proplists:delete(post_hooks, proplists:delete(pre_hooks, C1));
+            C2 = proplists:delete(artifacts, C1),
+            proplists:delete(post_hooks, proplists:delete(pre_hooks, C2));
         _ ->
             C
     end.
 
-reset_hooks(State) ->
-    lists:foldl(fun(Key, StateAcc) ->
-                        rebar_state:set(StateAcc, Key, [])
-                end, State, [post_hooks, pre_hooks, provider_hooks]).
+reset_hooks(Opts) ->
+    lists:foldl(fun(Key, OptsAcc) ->
+                        rebar_opts:set(OptsAcc, Key, [])
+                end, Opts, [post_hooks, pre_hooks, provider_hooks, artifacts]).
 
 -spec all_app_dirs(list(file:name())) -> list(file:name()).
 all_app_dirs(LibDirs) ->
@@ -183,41 +180,46 @@ find_apps(LibDirs, Validate) ->
 
 -spec find_app(file:filename_all(), valid | invalid | all) -> {true, rebar_app_info:t()} | false.
 find_app(AppDir, Validate) ->
+    find_app(rebar_app_info:new(), AppDir, Validate).
+
+find_app(AppInfo, AppDir, Validate) ->
     AppFile = filelib:wildcard(filename:join([AppDir, "ebin", "*.app"])),
     AppSrcFile = filelib:wildcard(filename:join([AppDir, "src", "*.app.src"])),
     AppSrcScriptFile = filelib:wildcard(filename:join([AppDir, "src", "*.app.src.script"])),
-    AppInfo = try_handle_app_file(AppFile, AppDir, AppSrcFile, AppSrcScriptFile, Validate),
-    AppInfo.
+    try_handle_app_file(AppInfo, AppFile, AppDir, AppSrcFile, AppSrcScriptFile, Validate).
 
 app_dir(AppFile) ->
     filename:join(rebar_utils:droplast(filename:split(filename:dirname(AppFile)))).
 
--spec create_app_info(file:name(), file:name()) -> rebar_app_info:t().
-create_app_info(AppDir, AppFile) ->
+-spec create_app_info(rebar_app_info:t(), file:name(), file:name()) -> rebar_app_info:t().
+create_app_info(AppInfo, AppDir, AppFile) ->
     [{application, AppName, AppDetails}] = rebar_config:consult_app_file(AppFile),
     AppVsn = proplists:get_value(vsn, AppDetails),
     Applications = proplists:get_value(applications, AppDetails, []),
     IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
-    {ok, AppInfo} = rebar_app_info:new(AppName, AppVsn, AppDir),
-    AppInfo1 = rebar_app_info:applications(
-                 rebar_app_info:app_details(AppInfo, AppDetails),
+    AppInfo1 = rebar_app_info:name(
+                 rebar_app_info:original_vsn(
+                   rebar_app_info:dir(AppInfo, AppDir), AppVsn), AppName),
+    AppInfo2 = rebar_app_info:applications(
+                 rebar_app_info:app_details(AppInfo1, AppDetails),
                  IncludedApplications++Applications),
-    Valid = case rebar_app_utils:validate_application_info(AppInfo1) of
+    Valid = case rebar_app_utils:validate_application_info(AppInfo2) =:= true
+                andalso rebar_app_info:has_all_artifacts(AppInfo2) =:= true of
                 true ->
                     true;
                 _ ->
                     false
             end,
-    rebar_app_info:dir(rebar_app_info:valid(AppInfo1, Valid), AppDir).
+    rebar_app_info:dir(rebar_app_info:valid(AppInfo2, Valid), AppDir).
 
 %% Read in and parse the .app file if it is availabe. Do the same for
 %% the .app.src file if it exists.
-try_handle_app_file([], AppDir, [], AppSrcScriptFile, Validate) ->
-    try_handle_app_src_file([], AppDir, AppSrcScriptFile, Validate);
-try_handle_app_file([], AppDir, AppSrcFile, _, Validate) ->
-    try_handle_app_src_file([], AppDir, AppSrcFile, Validate);
-try_handle_app_file([File], AppDir, AppSrcFile, _, Validate) ->
-    try create_app_info(AppDir, File) of
+try_handle_app_file(AppInfo, [], AppDir, [], AppSrcScriptFile, Validate) ->
+    try_handle_app_src_file(AppInfo, [], AppDir, AppSrcScriptFile, Validate);
+try_handle_app_file(AppInfo, [], AppDir, AppSrcFile, _, Validate) ->
+    try_handle_app_src_file(AppInfo, [], AppDir, AppSrcFile, Validate);
+try_handle_app_file(AppInfo0, [File], AppDir, AppSrcFile, _, Validate) ->
+    try create_app_info(AppInfo0, AppDir, File) of
         AppInfo ->
             AppInfo1 = rebar_app_info:app_file(AppInfo, File),
             AppInfo2 = case AppSrcFile of
@@ -249,26 +251,26 @@ try_handle_app_file([File], AppDir, AppSrcFile, _, Validate) ->
     catch
         throw:{error, {Module, Reason}} ->
             ?DEBUG("Falling back to app.src file because .app failed: ~s", [Module:format_error(Reason)]),
-            try_handle_app_src_file(File, AppDir, AppSrcFile, Validate)
+            try_handle_app_src_file(AppInfo0, File, AppDir, AppSrcFile, Validate)
     end;
-try_handle_app_file(Other, _AppDir, _AppSrcFile, _, _Validate) ->
+try_handle_app_file(_AppInfo, Other, _AppDir, _AppSrcFile, _, _Validate) ->
     throw({error, {multiple_app_files, Other}}).
 
 %% Read in the .app.src file if we aren't looking for a valid (already built) app
-try_handle_app_src_file(_, _AppDir, [], _Validate) ->
+try_handle_app_src_file(_AppInfo, _, _AppDir, [], _Validate) ->
     false;
-try_handle_app_src_file(_, _AppDir, _AppSrcFile, valid) ->
+try_handle_app_src_file(_AppInfo, _, _AppDir, _AppSrcFile, valid) ->
     false;
-try_handle_app_src_file(_, AppDir, [File], Validate) when Validate =:= invalid
-                                                        ; Validate =:= all ->
-    AppInfo = create_app_info(AppDir, File),
+try_handle_app_src_file(AppInfo, _, AppDir, [File], Validate) when Validate =:= invalid
+                                                                 ; Validate =:= all ->
+    AppInfo1 = create_app_info(AppInfo, AppDir, File),
     case filename:extension(File) of
         ".script" ->
-            {true, rebar_app_info:app_file_src_script(AppInfo, File)};
+            {true, rebar_app_info:app_file_src_script(AppInfo1, File)};
         _ ->
-            {true, rebar_app_info:app_file_src(AppInfo, File)}
+            {true, rebar_app_info:app_file_src(AppInfo1, File)}
     end;
-try_handle_app_src_file(_, _AppDir, Other, _Validate) ->
+try_handle_app_src_file(_AppInfo, _, _AppDir, Other, _Validate) ->
     throw({error, {multiple_app_files, Other}}).
 
 enable(State, AppInfo) ->

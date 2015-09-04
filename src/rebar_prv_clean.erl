@@ -44,10 +44,7 @@ do(State) ->
             DepApps = []
     end,
 
-    %% Need to allow global config vars used on deps
-    %% Right now no way to differeniate and just give deps a new state
-    EmptyState = rebar_state:new(),
-    clean_apps(EmptyState, Providers, DepApps),
+    clean_apps(State, Providers, DepApps),
 
     Cwd = rebar_dir:get_cwd(),
     rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
@@ -66,13 +63,11 @@ format_error(Reason) ->
 
 clean_apps(State, Providers, Apps) ->
     lists:foreach(fun(AppInfo) ->
-                          AppDir = rebar_app_info:dir(AppInfo),
-                          S = rebar_app_info:state_or_new(State, AppInfo),
-
                           ?INFO("Cleaning out ~s...", [rebar_app_info:name(AppInfo)]),
-                          rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER, Providers, S),
+                          AppDir = rebar_app_info:dir(AppInfo),
+                          rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER, Providers, AppInfo, State),
                           rebar_erlc_compiler:clean(State, rebar_app_info:out_dir(AppInfo)),
-                          rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, S)
+                          rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo, State)
                   end, Apps).
 
 handle_args(State) ->

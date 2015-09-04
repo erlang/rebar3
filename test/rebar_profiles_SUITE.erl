@@ -428,8 +428,7 @@ test_profile_applied_to_apps(Config) ->
 
     Apps = rebar_state:project_apps(State),
     lists:foreach(fun(App) ->
-        AppState = rebar_app_info:state(App),
-        Opts = rebar_state:opts(AppState),
+        Opts = rebar_app_info:opts(App),
         ErlOpts = dict:fetch(erl_opts, Opts),
         true = lists:member({d, 'TEST'}, ErlOpts)
     end, Apps).
