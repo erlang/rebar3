@@ -119,19 +119,17 @@ parse_dep(Dep, Parent, DepsDir, State, Locks, Level) ->
 
 parse_dep(Parent, {Name, Vsn, {pkg, PkgName}}, DepsDir, IsLock, State) ->
     {PkgName1, PkgVsn} = parse_goal(ec_cnv:to_binary(PkgName), ec_cnv:to_binary(Vsn)),
-    pkg_to_app(Parent, DepsDir, Name, PkgName1, PkgVsn, IsLock, State);
+    dep_to_app(Parent, DepsDir, Name, PkgVsn, {pkg, PkgName1, PkgVsn}, IsLock, State);
 parse_dep(Parent, {Name, {pkg, PkgName}}, DepsDir, IsLock, State) ->
     %% Package dependency with different package name from app name
-    {PkgName1, PkgVsn} = get_package(ec_cnv:to_binary(PkgName), State),
-    pkg_to_app(Parent, DepsDir, Name, PkgName1, PkgVsn, IsLock, State);
+    dep_to_app(Parent, DepsDir, Name, undefined, {pkg, ec_cnv:to_binary(PkgName), undefined}, IsLock, State);
 parse_dep(Parent, {Name, Vsn}, DepsDir, IsLock, State) when is_list(Vsn); is_binary(Vsn) ->
     %% Versioned Package dependency
     {PkgName, PkgVsn} = parse_goal(ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)),
-    pkg_to_app(Parent, DepsDir, PkgName, PkgName, PkgVsn, IsLock, State);
+    dep_to_app(Parent, DepsDir, PkgName, PkgVsn, {pkg, PkgName, PkgVsn}, IsLock, State);
 parse_dep(Parent, Name, DepsDir, IsLock, State) when is_atom(Name); is_binary(Name) ->
     %% Unversioned package dependency
-    {PkgName, PkgVsn} = get_package(ec_cnv:to_binary(Name), State),
-    pkg_to_app(Parent, DepsDir, PkgName, PkgName, PkgVsn, IsLock, State);
+    dep_to_app(Parent, DepsDir, ec_cnv:to_binary(Name), undefined, {pkg, ec_cnv:to_binary(Name), undefined}, IsLock, State);
 parse_dep(Parent, {Name, Source}, DepsDir, IsLock, State) when is_tuple(Source) ->
     dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, State);
 parse_dep(Parent, {Name, _Vsn, Source}, DepsDir, IsLock, State) when is_tuple(Source) ->
@@ -140,41 +138,54 @@ parse_dep(Parent, {Name, _Vsn, Source, Opts}, DepsDir, IsLock, State) when is_tu
     ?WARN("Dependency option list ~p in ~p is not supported and will be ignored", [Opts, Name]),
     dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, State);
 parse_dep(Parent, {Name, {pkg, PkgName, Vsn}, Level}, DepsDir, IsLock, State) when is_integer(Level) ->
-    pkg_to_app(Parent, DepsDir, Name, PkgName, Vsn, IsLock, State);
+    dep_to_app(Parent, DepsDir, Name, Vsn, {pkg, PkgName, Vsn}, IsLock, State);
 parse_dep(Parent, {Name, Source, Level}, DepsDir, IsLock, State) when is_tuple(Source)
                                                                     , is_integer(Level) ->
     dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, State);
 parse_dep(_, Dep, _, _, _) ->
     throw(?PRV_ERROR({parse_dep, Dep})).
 
-%% Verify package exists and create the AppInfo record
-pkg_to_app(Parent, DepsDir, AppName, PkgName, PkgVsn, IsLock, State) ->
-    %% Verify package actually exists. This will throw a missing_package exception
-    Deps = rebar_packages:deps(PkgName, PkgVsn, State),
-    Source = {pkg, PkgName, PkgVsn},
-    AppInfo = dep_to_app(Parent, DepsDir, AppName, PkgVsn, Source, IsLock, State),
-    rebar_app_info:resource_type(rebar_app_info:deps(AppInfo, Deps), pkg).
-
 dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
     CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
-    {ok, AppInfo} = case rebar_app_info:discover(CheckoutsDir) of
+    AppInfo = case rebar_app_info:discover(CheckoutsDir) of
                         {ok, App} ->
-                            {ok, rebar_app_info:is_checkout(App, true)};
+                            rebar_app_info:is_checkout(App, true);
                         not_found ->
                             Dir = ec_cnv:to_list(filename:join(DepsDir, Name)),
-                            case rebar_app_info:discover(Dir) of
-                                {ok, App} ->
-                                    {ok, rebar_app_info:parent(App, Parent)};
-                                not_found ->
-                                    rebar_app_info:new(Parent, Name, Vsn, Dir, [])
-                            end
+                            {ok, AppInfo0} =
+                                case rebar_app_info:discover(Dir) of
+                                    {ok, App} ->
+                                        {ok, rebar_app_info:parent(App, Parent)};
+                                    not_found ->
+                                        rebar_app_info:new(Parent, Name, Vsn, Dir, [])
+                                end,
+                            update_source(AppInfo0, Source, State)
                     end,
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
-    AppInfo0 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
+    AppInfo1 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
     Overrides = rebar_state:get(State, overrides, []),
-    AppInfo1 = rebar_app_info:set(AppInfo0, overrides, rebar_app_info:get(AppInfo, overrides, [])++Overrides),
-    AppInfo2 = rebar_app_info:apply_overrides(rebar_app_info:get(AppInfo1, overrides, []), AppInfo1),
-    rebar_app_info:is_lock(rebar_app_info:source(AppInfo2, Source), IsLock).
+    AppInfo2 = rebar_app_info:set(AppInfo1, overrides, rebar_app_info:get(AppInfo, overrides, [])++Overrides),
+    AppInfo3 = rebar_app_info:apply_overrides(rebar_app_info:get(AppInfo2, overrides, []), AppInfo2),
+    rebar_app_info:is_lock(AppInfo3, IsLock).
+
+update_source(AppInfo, {pkg, PkgName, undefined}, State) ->
+    {PkgName1, PkgVsn1} = get_package(PkgName, State),
+    AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName1, PkgVsn1}),
+    Deps = rebar_packages:deps(PkgName1
+                              ,PkgVsn1
+                              ,State),
+    AppInfo2 = rebar_app_info:resource_type(rebar_app_info:deps(AppInfo1, Deps), pkg),
+    rebar_app_info:original_vsn(AppInfo2, PkgVsn1);
+update_source(AppInfo, {pkg, PkgName, PkgVsn}, State) ->
+    AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName, PkgVsn}),
+    Deps = rebar_packages:deps(PkgName
+                              ,PkgVsn
+                              ,State),
+    AppInfo2 = rebar_app_info:resource_type(rebar_app_info:deps(AppInfo1, Deps), pkg),
+    rebar_app_info:original_vsn(AppInfo2, PkgVsn);
+update_source(AppInfo, Source, _State) ->
+    rebar_app_info:source(AppInfo, Source).
+
 
 format_error({missing_package, Package}) ->
     io_lib:format("Package not found in registry: ~s", [Package]);
