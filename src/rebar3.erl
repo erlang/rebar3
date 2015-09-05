@@ -225,7 +225,6 @@ global_option_spec_list() ->
     %% {Name, ShortOpt, LongOpt, ArgSpec, HelpMsg}
     {help,     $h, "help",     undefined, "Print this help."},
     {version,  $v, "version",  undefined, "Show version information."},
-    %{config,   $C, "config",   string,    "Rebar config file to use."},
     {task,     undefined, undefined, string, "Task to run."}
     ].
 

@@ -11,8 +11,9 @@
                    atom() | {atom(), atom()} | string(),
                    [providers:t()], rebar_app_info:t(), rebar_state:t()) -> ok.
 run_all_hooks(Dir, Type, Command, Providers, AppInfo, State) ->
-    run_provider_hooks(Dir, Type, Command, Providers, rebar_app_info:opts(AppInfo), State),
-    run_hooks(Dir, Type, Command, rebar_app_info:opts(AppInfo), State).
+    State1 = rebar_state:current_app(State, AppInfo),
+    run_provider_hooks(Dir, Type, Command, Providers, rebar_app_info:opts(AppInfo), State1),
+    run_hooks(Dir, Type, Command, rebar_app_info:opts(AppInfo), State1).
 
 run_all_hooks(Dir, Type, Command, Providers, State) ->
     run_provider_hooks(Dir, Type, Command, Providers, rebar_state:opts(State), State),
