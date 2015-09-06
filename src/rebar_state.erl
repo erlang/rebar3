@@ -27,6 +27,7 @@
          dir/1, dir/2,
          create_logic_providers/2,
 
+         current_app/1, current_app/2,
          project_apps/1, project_apps/2,
          deps_to_build/1, deps_to_build/2,
          all_plugin_deps/1, all_plugin_deps/2, update_all_plugin_deps/2,
@@ -49,12 +50,13 @@
                   escript_path                      :: undefined | file:filename_all(),
 
                   lock                = [],
-                  current_profiles    = [default]     :: [atom()],
-                  namespace           = default       :: atom(),
+                  current_profiles    = [default]   :: [atom()],
+                  namespace           = default     :: atom(),
 
                   command_args        = [],
                   command_parsed_args = {[], []},
 
+                  current_app                       :: rebar_app_info:t(),
                   project_apps        = []          :: [rebar_app_info:t()],
                   deps_to_build       = []          :: [rebar_app_info:t()],
                   all_plugin_deps     = []          :: [rebar_app_info:t()],
@@ -301,6 +303,12 @@ deps_names(Deps) when is_list(Deps) ->
 deps_names(State) ->
     Deps = rebar_state:get(State, deps, []),
     deps_names(Deps).
+
+current_app(#state_t{current_app=CurrentApp}) ->
+    CurrentApp.
+
+current_app(State=#state_t{}, CurrentApp) ->
+    State#state_t{current_app=CurrentApp}.
 
 project_apps(#state_t{project_apps=Apps}) ->
     Apps.
