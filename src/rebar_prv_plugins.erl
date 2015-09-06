@@ -34,7 +34,7 @@ do(State) ->
     GlobalConfigFile = rebar_dir:global_config(),
     GlobalConfig = rebar_state:new(rebar_config:consult_file(GlobalConfigFile)),
     GlobalPlugins = rebar_state:get(GlobalConfig, plugins, []),
-    GlobalPluginsDir = filename:join(rebar_dir:global_cache_dir(State), "plugins"),
+    GlobalPluginsDir = filename:join(rebar_dir:global_cache_dir(rebar_state:opts(State)), "plugins"),
     display_plugins("Global plugins", GlobalPluginsDir, GlobalPlugins),
 
     Plugins = rebar_state:get(State, plugins, []),
