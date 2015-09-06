@@ -225,7 +225,7 @@ update_dep(AppInfo, Profile, Level, Deps, Apps, State, Upgrade, Seen, Locks) ->
 
 profile_dep_dir(State, Profile) ->
     case Profile of
-        default -> filename:join([rebar_dir:profile_dir(State, [default]), rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR)]);
+        default -> filename:join([rebar_dir:profile_dir(rebar_state:opts(State), [default]), rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR)]);
         _ -> rebar_dir:deps_dir(State)
     end.
 

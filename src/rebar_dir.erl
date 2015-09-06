@@ -29,17 +29,17 @@
 
 -spec base_dir(rebar_state:t()) -> file:filename_all().
 base_dir(State) ->
-    profile_dir(State, rebar_state:current_profiles(State)).
+    profile_dir(rebar_state:opts(State), rebar_state:current_profiles(State)).
 
--spec profile_dir(rebar_state:t(), [atom()]) -> file:filename_all().
-profile_dir(State, Profiles) ->
+-spec profile_dir(rebar_dict(), [atom()]) -> file:filename_all().
+profile_dir(Opts, Profiles) ->
     {BaseDir, ProfilesStrings} = case [ec_cnv:to_list(P) || P <- Profiles] of
-        ["global" | _] -> {?MODULE:global_cache_dir(State), [""]};
-        ["bootstrap", "default"] -> {rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR), ["default"]};
-        ["default"] -> {rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR), ["default"]};
+        ["global" | _] -> {?MODULE:global_cache_dir(Opts), [""]};
+        ["bootstrap", "default"] -> {rebar_opts:get(Opts, base_dir, ?DEFAULT_BASE_DIR), ["default"]};
+        ["default"] -> {rebar_opts:get(Opts, base_dir, ?DEFAULT_BASE_DIR), ["default"]};
         %% drop `default` from the profile dir if it's implicit and reverse order
         %%  of profiles to match order passed to `as`
-        ["default"|Rest] -> {rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR), Rest}
+        ["default"|Rest] -> {rebar_opts:get(Opts, base_dir, ?DEFAULT_BASE_DIR), Rest}
     end,
     ProfilesDir = string:join(ProfilesStrings, "+"),
     filename:join(BaseDir, ProfilesDir).
@@ -91,9 +91,9 @@ global_config() ->
     Home = home_dir(),
     filename:join([Home, ".config", "rebar3", "rebar.config"]).
 
-global_cache_dir(State) ->
+global_cache_dir(Opts) ->
     Home = home_dir(),
-    rebar_state:get(State, global_rebar_dir, filename:join([Home, ".cache", "rebar3"])).
+    rebar_opts:get(Opts, global_rebar_dir, filename:join([Home, ".cache", "rebar3"])).
 
 local_cache_dir(Dir) ->
     filename:join(Dir, ".rebar3").

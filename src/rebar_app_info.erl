@@ -412,18 +412,22 @@ verify_otp_vsn(AppInfo) ->
 -spec has_all_artifacts(#app_info_t{}) -> true | {false, file:filename()}.
 has_all_artifacts(AppInfo) ->
     Artifacts = rebar_app_info:get(AppInfo, artifacts, []),
-    Dir = dir(AppInfo),
-    all(Dir, Artifacts).
+    OutDir = out_dir(AppInfo),
+    Context = [{base_dir, rebar_app_info:get(AppInfo, base_dir, ?DEFAULT_BASE_DIR)}
+              ,{profile_dir, rebar_dir:profile_dir(opts(AppInfo), profiles(AppInfo))}
+              ,{out_dir, OutDir}],
+    all(OutDir, Context, Artifacts).
 
-all(_, []) ->
+all(_, _, []) ->
     true;
-all(Dir, [File|Artifacts]) ->
-    case filelib:is_regular(filename:join(Dir, File)) of
+all(Dir, Context, [File|Artifacts]) ->
+    FilePath = filename:join(Dir, rebar_templater:render(File, Context)),
+    case filelib:is_regular(FilePath) of
         false ->
-            ?DEBUG("Missing artifact ~s", [filename:join(Dir, File)]),
+            ?DEBUG("Missing artifact ~s", [FilePath]),
             {false, File};
         true ->
-            all(Dir, Artifacts)
+            all(Dir, Context, Artifacts)
     end.
 
 %%%%%
