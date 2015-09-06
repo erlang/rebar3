@@ -35,30 +35,30 @@ do(State) ->
     GlobalConfig = rebar_state:new(rebar_config:consult_file(GlobalConfigFile)),
     GlobalPlugins = rebar_state:get(GlobalConfig, plugins, []),
     GlobalPluginsDir = filename:join(rebar_dir:global_cache_dir(State), "plugins"),
-    display_plugins("Global plugins", GlobalPluginsDir, GlobalPlugins),
+    display_plugins("Global plugins", GlobalPluginsDir, GlobalPlugins, State),
 
     Plugins = rebar_state:get(State, plugins, []),
     PluginsDir =rebar_dir:plugins_dir(State),
-    display_plugins("Local plugins", PluginsDir, Plugins),
+    display_plugins("Local plugins", PluginsDir, Plugins, State),
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
-display_plugins(_Header, _Dir, []) ->
+display_plugins(_Header, _Dir, [], _State) ->
     ok;
-display_plugins(Header, Dir, Plugins) ->
+display_plugins(Header, Dir, Plugins, State) ->
     ?CONSOLE("--- ~s ---", [Header]),
-    display_plugins(Dir, Plugins),
+    display_plugins(Dir, Plugins, State),
     ?CONSOLE("", []).
 
-display_plugins(Dir, Plugins) ->
+display_plugins(Dir, Plugins, State) ->
     lists:foreach(fun(Plugin) ->
                           Name = if is_atom(Plugin) -> Plugin;
                                     is_tuple(Plugin) -> element(1, Plugin)
                                  end,
-                          case rebar_app_info:discover(filename:join(Dir, Name)) of
+                          case rebar_app_info:discover(filename:join(Dir, Name), State) of
                               {ok, _App} ->
                                   ?CONSOLE("~s", [Name]);
                               not_found ->

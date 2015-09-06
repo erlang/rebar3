@@ -6,7 +6,7 @@
 
 -export([lock/2
         ,download/3
-        ,needs_update/2
+        ,needs_update/3
         ,make_vsn/1]).
 
 -export([ssl_opts/1]).
@@ -17,8 +17,8 @@
 lock(_AppDir, Source) ->
     Source.
 
-needs_update(Dir, {pkg, _Name, Vsn}) ->
-    [AppInfo] = rebar_app_discover:find_apps([Dir], all),
+needs_update(Dir, {pkg, _Name, Vsn}, State) ->
+    [AppInfo] = rebar_app_discover:find_apps([Dir], all, State),
     case rebar_app_info:original_vsn(AppInfo) =:= ec_cnv:to_list(Vsn) of
         true ->
             false;

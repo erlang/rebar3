@@ -62,10 +62,10 @@ upgrade(Plugin, State) ->
             ?PRV_ERROR({not_found, Plugin});
         {ok, P, Profile} ->
             State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
-            {Apps, _State2} = rebar_prv_install_deps:handle_deps_as_profile(Profile, State1, [P], true),
+            {Apps, State2} = rebar_prv_install_deps:handle_deps_as_profile(Profile, State1, [P], true),
 
             {no_cycle, Sorted} = rebar_prv_install_deps:find_cycles(Apps),
-            ToBuild = rebar_prv_install_deps:cull_compile(Sorted, []),
+            ToBuild = rebar_prv_install_deps:cull_compile(Sorted, [], State2),
 
             %% Add already built plugin deps to the code path
             CodePaths = [rebar_app_info:ebin_dir(A) || A <- Apps -- ToBuild],

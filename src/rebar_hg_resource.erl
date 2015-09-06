@@ -6,7 +6,7 @@
 
 -export([lock/2
         ,download/3
-        ,needs_update/2
+        ,needs_update/3
         ,make_vsn/1]).
 
 -include("rebar.hrl").
@@ -19,22 +19,22 @@ lock(AppDir, {hg, Url}) ->
 
 %% Return `true' if either the hg url or tag/branch/ref is not the same as
 %% the currently checked out repo for the dep
-needs_update(Dir, {hg, Url, {tag, Tag}}) ->
+needs_update(Dir, {hg, Url, {tag, Tag}}, _State) ->
     Ref = get_ref(Dir),
     {ClosestTag, Distance} = get_tag_distance(Dir, Ref),
     ?DEBUG("Comparing hg tag ~s with ref ~s (closest tag is ~s at distance ~s)",
            [Tag, Ref, ClosestTag, Distance]),
     not ((Distance =:= "0") andalso (Tag =:= ClosestTag)
          andalso compare_url(Dir, Url));
-needs_update(Dir, {hg, Url, {branch, Branch}}) ->
+needs_update(Dir, {hg, Url, {branch, Branch}}, _State) ->
     Ref = get_ref(Dir),
     BRef = get_branch_ref(Dir, Branch),
     not ((Ref =:= BRef) andalso compare_url(Dir, Url));
-needs_update(Dir, {hg, Url, "default"}) ->
+needs_update(Dir, {hg, Url, "default"}, _State) ->
     Ref = get_ref(Dir),
     BRef = get_branch_ref(Dir, "default"),
     not ((Ref =:= BRef) andalso compare_url(Dir, Url));
-needs_update(Dir, {hg, Url, Ref}) ->
+needs_update(Dir, {hg, Url, Ref}, _State) ->
     LocalRef = get_ref(Dir),
     TargetRef = case Ref of
         {ref, Ref1} ->

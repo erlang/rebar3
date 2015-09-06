@@ -59,7 +59,7 @@ mock_update(Opts) ->
 %    ct:pal("TOUp: ~p", [ToUpdate]),
     meck:expect(
         ?MOD, needs_update,
-        fun(_Dir, {git, Url, _Ref}) ->
+        fun(_Dir, {git, Url, _Ref}, _) ->
             App = app(Url),
 %            ct:pal("Needed update? ~p (~p) -> ~p", [App, {Url,_Ref}, lists:member(App, ToUpdate)]),
             lists:member(App, ToUpdate)

@@ -39,7 +39,7 @@ do(State) ->
     case All of
         true ->
             DepsDir = rebar_dir:deps_dir(State),
-            DepApps = rebar_app_discover:find_apps([filename:join(DepsDir, "*")], all);
+            DepApps = rebar_app_discover:find_apps([filename:join(DepsDir, "*")], all, State);
         false ->
             DepApps = []
     end,

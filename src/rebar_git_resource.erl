@@ -6,7 +6,7 @@
 
 -export([lock/2
         ,download/3
-        ,needs_update/2
+        ,needs_update/3
         ,make_vsn/1]).
 
 -include("rebar.hrl").
@@ -26,14 +26,14 @@ lock(AppDir, {git, Url}) ->
 
 %% Return true if either the git url or tag/branch/ref is not the same as the currently
 %% checked out git repo for the dep
-needs_update(Dir, {git, Url, {tag, Tag}}) ->
+needs_update(Dir, {git, Url, {tag, Tag}}, _State) ->
     {ok, Current} = rebar_utils:sh(?FMT("git describe --tags --exact-match", []),
                                    [{cd, Dir}]),
     Current1 = string:strip(string:strip(Current, both, $\n), both, $\r),
 
     ?DEBUG("Comparing git tag ~s with ~s", [Tag, Current1]),
     not ((Current1 =:= Tag) andalso compare_url(Dir, Url));
-needs_update(Dir, {git, Url, {branch, Branch}}) ->
+needs_update(Dir, {git, Url, {branch, Branch}}, _State) ->
     %% Fetch remote so we can check if the branch has changed
     SafeBranch = rebar_utils:escape_chars(Branch),
     {ok, _} = rebar_utils:sh(?FMT("git fetch origin ~s", [SafeBranch]),
@@ -43,9 +43,9 @@ needs_update(Dir, {git, Url, {branch, Branch}}) ->
                                    [{cd, Dir}]),
     ?DEBUG("Checking git branch ~s for updates", [Branch]),
     not ((Current =:= []) andalso compare_url(Dir, Url));
-needs_update(Dir, {git, Url, "master"}) ->
-    needs_update(Dir, {git, Url, {branch, "master"}});
-needs_update(Dir, {git, Url, Ref}) ->
+needs_update(Dir, {git, Url, "master"}, State) ->
+    needs_update(Dir, {git, Url, {branch, "master"}}, State);
+needs_update(Dir, {git, Url, Ref}, _State) ->
     {ok, Current} = rebar_utils:sh(?FMT("git rev-parse -q HEAD", []),
                                    [{cd, Dir}]),
     Current1 = string:strip(string:strip(Current, both, $\n), both, $\r),

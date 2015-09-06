@@ -59,7 +59,7 @@ needs_update(AppDir, Source, State) ->
     Resources = rebar_state:resources(State),
     Module = get_resource_type(Source, Resources),
     try
-        Module:needs_update(AppDir, Source)
+        Module:needs_update(AppDir, Source, State)
     catch
         _:_ ->
             true

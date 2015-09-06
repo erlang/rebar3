@@ -90,7 +90,7 @@ compile(State, Providers, AppInfo) ->
     case rebar_otp_app:compile(State, AppInfo) of
         {ok, AppInfo1} ->
             rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo, State),
-            has_all_artifacts(AppInfo1),
+            has_all_artifacts(AppInfo1, State),
             AppInfo1;
         Error ->
             throw(Error)
@@ -100,8 +100,8 @@ compile(State, Providers, AppInfo) ->
 %% Internal functions
 %% ===================================================================
 
-has_all_artifacts(AppInfo1) ->
-    case rebar_app_info:has_all_artifacts(AppInfo1) of
+has_all_artifacts(AppInfo1, State) ->
+    case rebar_app_info:has_all_artifacts(AppInfo1, State) of
         {false, File} ->
             throw(?PRV_ERROR({missing_artifact, File}));
         true ->
