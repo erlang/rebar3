@@ -111,7 +111,7 @@ create_env(State, Opts) ->
      {"REBAR_CHECKOUTS_DIR",     filename:absname(rebar_dir:checkouts_dir(State))},
      {"REBAR_PLUGINS_DIR",       filename:absname(rebar_dir:plugins_dir(State))},
      {"REBAR_GLOBAL_CONFIG_DIR", filename:absname(rebar_dir:global_config_dir(State))},
-     {"REBAR_GLOBAL_CACHE_DIR",  filename:absname(rebar_dir:global_cache_dir(State))},
+     {"REBAR_GLOBAL_CACHE_DIR",  filename:absname(rebar_dir:global_cache_dir(Opts))},
      {"REBAR_TEMPLATE_DIR",      filename:absname(rebar_dir:template_dir(State))},
      {"REBAR_APP_DIRS",          join_dirs(BaseDir, rebar_dir:lib_dirs(State))},
      {"REBAR_SRC_DIRS",          join_dirs(BaseDir, rebar_dir:all_src_dirs(Opts))},

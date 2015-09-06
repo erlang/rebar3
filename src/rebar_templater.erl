@@ -27,7 +27,8 @@
 -module(rebar_templater).
 
 -export([new/4,
-         list_templates/1]).
+         list_templates/1,
+         render/2]).
 
 
 -include("rebar.hrl").

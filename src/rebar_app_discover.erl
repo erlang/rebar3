@@ -73,25 +73,29 @@ format_error({missing_module, Module}) ->
     io_lib:format("Module defined in app file missing: ~p~n", [Module]).
 
 merge_deps(AppInfo, State) ->
+    %% These steps make sure that hooks and artifacts are run in the context of
+    %% the application they are defined at. If an umbrella structure is used and
+    %% they are deifned at the top level they will instead run in the context of
+    %% the State and at the top level, not as part of an application.
     Default = reset_hooks(rebar_state:default(State)),
-    C = project_app_config(AppInfo, State),
+    {C, State1} = project_app_config(AppInfo, State),
     AppInfo0 = rebar_app_info:update_opts(AppInfo, Default, C),
 
-    CurrentProfiles = rebar_state:current_profiles(State),
+    CurrentProfiles = rebar_state:current_profiles(State1),
     Name = rebar_app_info:name(AppInfo0),
 
     %% We reset the opts here to default so no profiles are applied multiple times
-    AppInfo1 = rebar_app_info:apply_overrides(rebar_state:get(State, overrides, []), AppInfo0),
+    AppInfo1 = rebar_app_info:apply_overrides(rebar_state:get(State1, overrides, []), AppInfo0),
     AppInfo2 = rebar_app_info:apply_profiles(AppInfo1, CurrentProfiles),
 
     %% Will throw an exception if checks fail
     rebar_app_info:verify_otp_vsn(AppInfo2),
 
-    State1 = lists:foldl(fun(Profile, StateAcc) ->
+    State2 = lists:foldl(fun(Profile, StateAcc) ->
                                  handle_profile(Profile, Name, AppInfo2, StateAcc)
-                         end, State, lists:reverse(CurrentProfiles)),
+                         end, State1, lists:reverse(CurrentProfiles)),
 
-    {AppInfo2, State1}.
+    {AppInfo2, State2}.
 
 handle_profile(Profile, Name, AppInfo, State) ->
     TopParsedDeps = rebar_state:get(State, {parsed_deps, Profile}, {[], []}),
@@ -122,18 +126,17 @@ parse_profile_deps(Profile, Name, Deps, Opts, State) ->
 project_app_config(AppInfo, State) ->
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
     Dir = rebar_app_info:dir(AppInfo),
-    maybe_reset_hooks(C, Dir, State).
+    Opts = maybe_reset_hooks(Dir, rebar_state:opts(State), State),
+    {C, rebar_state:opts(State, Opts)}.
 
 %% Here we check if the app is at the root of the project.
 %% If it is, then drop the hooks from the config so they aren't run twice
-maybe_reset_hooks(C, Dir, State) ->
+maybe_reset_hooks(Dir, Opts, State) ->
     case ec_file:real_dir_path(rebar_dir:root_dir(State)) of
         Dir ->
-            C1 = proplists:delete(provider_hooks, C),
-            C2 = proplists:delete(artifacts, C1),
-            proplists:delete(post_hooks, proplists:delete(pre_hooks, C2));
+            reset_hooks(Opts);
         _ ->
-            C
+            Opts
     end.
 
 reset_hooks(Opts) ->

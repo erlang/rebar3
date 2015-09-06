@@ -60,7 +60,7 @@ deps(Name, Vsn, State) ->
     end.
 
 registry_dir(State) ->
-    CacheDir = rebar_dir:global_cache_dir(State),
+    CacheDir = rebar_dir:global_cache_dir(rebar_state:opts(State)),
     case rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN) of
         ?DEFAULT_CDN ->
             RegistryDir = filename:join([CacheDir, "hex", "default"]),
