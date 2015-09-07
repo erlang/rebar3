@@ -44,6 +44,7 @@ end
 ## eunit             Run EUnit Tests.
 ## help              Display a list of tasks or help for a given task or subtask.
 ## new               Create new project from templates.
+## path              Print paths to build dirs in current profile.
 ## pkgs              List available packages.
 ## release           Build release of project.
 ## relup             Create relup of releases.
@@ -117,6 +118,17 @@ complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a help -d "Display a l
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a new -d "Create new project from templates."
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command new' -s f -l force -d "Overwrite existing files"
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command new' -a help -d "Display all variables and arguments for each template"
+
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a paths -d "Print paths to build dirs in current profile."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l app -d "Comma seperated list of applications to return paths for."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l base -d "Return the `base' path of the current profile."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l bin -d Return the `bin' path of the current profile."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l ebin -d "Return all `ebin' paths of the current profile's applications."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l lib -d "Return the `lib' path of the current profile."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l priv -d "Return the `priv' path of the current profile's applications."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -s s -l separator -d "In case of multiple return paths, the separator character to use to join them."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l src -d "Return the `src' path of the current profile's applications."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l rel -d "Return the `rel' path of the current profile."
 
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a pkgs -d "List available packages."
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a release -d "Build release of project."
