@@ -84,14 +84,14 @@ build_app(State, Providers, AppInfo) ->
 compile(State, Providers, AppInfo) ->
     ?INFO("Compiling ~s", [rebar_app_info:name(AppInfo)]),
     AppDir = rebar_app_info:dir(AppInfo),
-    rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, AppInfo, State),
+    AppInfo1 = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, AppInfo, State),
 
-    rebar_erlc_compiler:compile(AppInfo),
-    case rebar_otp_app:compile(State, AppInfo) of
-        {ok, AppInfo1} ->
-            rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo, State),
-            has_all_artifacts(AppInfo1),
-            AppInfo1;
+    rebar_erlc_compiler:compile(AppInfo1),
+    case rebar_otp_app:compile(State, AppInfo1) of
+        {ok, AppInfo2} ->
+            AppInfo3 = rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo2, State),
+            has_all_artifacts(AppInfo3),
+            AppInfo3;
         Error ->
             throw(Error)
     end.

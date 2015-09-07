@@ -9,6 +9,7 @@
          compile_plugins/1,
          compile_global_plugins/1,
          complex_plugins/1,
+         list/1,
          upgrade/1]).
 
 -include_lib("common_test/include/ct.hrl").
@@ -31,7 +32,7 @@ end_per_testcase(_, _Config) ->
     catch meck:unload().
 
 all() ->
-    [compile_plugins, compile_global_plugins, complex_plugins, upgrade].
+    [compile_plugins, compile_global_plugins, complex_plugins, list, upgrade].
 
 %% Tests that compiling a project installs and compiles the plugins of deps
 compile_plugins(Config) ->
@@ -162,6 +163,12 @@ complex_plugins(Config) ->
      ),
 
     meck:unload(rebar_dir).
+
+list(Config) ->
+    rebar_test_utils:run_and_check(
+        Config, [], ["plugins", "list"],
+        {ok, []}
+     ).
 
 upgrade(Config) ->
     AppDir = ?config(apps, Config),

@@ -9,11 +9,12 @@
 
 -spec run_all_hooks(file:filename_all(), pre | post,
                    atom() | {atom(), atom()} | string(),
-                   [providers:t()], rebar_app_info:t(), rebar_state:t()) -> ok.
+                   [providers:t()], rebar_app_info:t(), rebar_state:t()) -> rebar_app_info:t().
 run_all_hooks(Dir, Type, Command, Providers, AppInfo, State) ->
     State1 = rebar_state:current_app(State, AppInfo),
-    run_provider_hooks(Dir, Type, Command, Providers, rebar_app_info:opts(AppInfo), State1),
-    run_hooks(Dir, Type, Command, rebar_app_info:opts(AppInfo), State1).
+    State2 = run_provider_hooks(Dir, Type, Command, Providers, rebar_app_info:opts(AppInfo), State1),
+    run_hooks(Dir, Type, Command, rebar_app_info:opts(AppInfo), State1),
+    rebar_state:current_app(State2).
 
 run_all_hooks(Dir, Type, Command, Providers, State) ->
     run_provider_hooks(Dir, Type, Command, Providers, rebar_state:opts(State), State),
@@ -22,14 +23,14 @@ run_all_hooks(Dir, Type, Command, Providers, State) ->
 run_provider_hooks(Dir, Type, Command, Providers, Opts, State) ->
     case rebar_opts:get(Opts, provider_hooks, []) of
         [] ->
-            ok;
+            State;
         AllHooks ->
             TypeHooks = proplists:get_value(Type, AllHooks, []),
             run_provider_hooks_(Dir, Type, Command, Providers, TypeHooks, rebar_state:opts(State, Opts))
     end.
 
-run_provider_hooks_(_Dir, _Type, _Command, _Providers, [], _State) ->
-    ok;
+run_provider_hooks_(_Dir, _Type, _Command, _Providers, [], State) ->
+    State;
 run_provider_hooks_(Dir, Type, Command, Providers, TypeHooks, State) ->
     PluginDepsPaths = rebar_state:code_paths(State, all_plugin_deps),
     code:add_pathsa(PluginDepsPaths),
@@ -40,8 +41,9 @@ run_provider_hooks_(Dir, Type, Command, Providers, TypeHooks, State) ->
         {error, ProviderName} ->
             ?DEBUG(format_error({bad_provider, Type, Command, ProviderName}), []),
             throw(?PRV_ERROR({bad_provider, Type, Command, ProviderName}));
-        {ok, _} ->
-            rebar_utils:remove_from_code_path(PluginDepsPaths)
+        {ok, State2} ->
+            rebar_utils:remove_from_code_path(PluginDepsPaths),
+            State2
     end.
 
 format_error({bad_provider, Type, Command, {Name, Namespace}}) ->
