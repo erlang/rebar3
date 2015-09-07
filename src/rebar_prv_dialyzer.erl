@@ -45,6 +45,9 @@ desc() ->
     "`warnings` - a list of dialyzer warnings\n"
     "`get_warnings` - display warnings when altering a PLT file (boolean)\n"
     "`plt_extra_apps` - a list of applications to include in the PLT file*\n"
+    "`plt_include_all_deps` - in addition to the first level dependencies, "
+    "include all nested dependent applications in the PLT file (boolean), "
+    "default to `false`\n"
     "`plt_location` - the location of the PLT file, `local` to store in the "
     "profile's base directory (default) or a custom directory.\n"
     "`plt_prefix` - the prefix to the PLT file, defaults to \"rebar3\"**\n"
@@ -178,7 +181,12 @@ proj_plt_files(State) ->
     PltApps = get_config(State, plt_extra_apps, []),
     Apps = rebar_state:project_apps(State),
     DepApps = lists:flatmap(fun rebar_app_info:applications/1, Apps),
-    get_plt_files(BasePltApps ++ PltApps ++ DepApps, Apps).
+    DepApps1 =
+        case get_config(State, plt_include_all_deps, false) of
+            false -> DepApps;
+            true -> collect_nested_dependent_apps(DepApps)
+        end,
+    get_plt_files(BasePltApps ++ PltApps ++ DepApps1, Apps).
 
 default_plt_apps() ->
     [erts,
@@ -442,3 +450,30 @@ no_warnings() ->
 get_config(State, Key, Default) ->
     Config = rebar_state:get(State, dialyzer, []),
     proplists:get_value(Key, Config, Default).
+
+-spec collect_nested_dependent_apps([atom()]) -> [atom()].
+collect_nested_dependent_apps(RootApps) ->
+    Deps = lists:foldl(fun collect_nested_dependent_apps/2, sets:new(), RootApps),
+    sets:to_list(Deps).
+
+-spec collect_nested_dependent_apps(atom(), rebar_set()) -> rebar_set().
+collect_nested_dependent_apps(App, Seen) ->
+    case sets:is_element(App, Seen) of
+        true ->
+            Seen;
+        false ->
+            Seen1 = sets:add_element(App, Seen),
+            case code:lib_dir(App) of
+                {error, _} ->
+                    Seen1;
+                AppDir ->
+                    case rebar_app_discover:find_app(AppDir, all) of
+                        false ->
+                            Seen1;
+                        {true, AppInfo}  ->
+                            lists:foldl(fun collect_nested_dependent_apps/2,
+                                        Seen1,
+                                        rebar_app_info:applications(AppInfo))
+                    end
+            end
+    end.
