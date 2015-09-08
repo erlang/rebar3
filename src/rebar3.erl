@@ -26,7 +26,8 @@
 %% -------------------------------------------------------------------
 -module(rebar3).
 
--export([main/1,
+-export([main/0,
+         main/1,
          run/1,
          run/2,
          global_option_spec_list/0,
@@ -41,6 +42,12 @@
 %% ====================================================================
 %% Public API
 %% ====================================================================
+
+%% For running with:
+%% erl +sbtu +A0 -noinput -mode minimal -boot start_clean -s rebar3 main -extra "$@"
+main() ->
+    List = init:get_plain_arguments(),
+    main(List).
 
 %% escript Entry point
 -spec main(list()) -> no_return().
@@ -146,7 +153,14 @@ init_config() ->
     %% resources out of the escript
     State1 = try
                  ScriptName = filename:absname(escript:script_name()),
-                 rebar_state:escript_path(State, ScriptName)
+                 %% Running with 'erl -s rebar3 main' still sets a name for some reason
+                 %% so verify it is a real file
+                 case filelib:is_regular(ScriptName) of
+                     true ->
+                         rebar_state:escript_path(State, ScriptName);
+                     false ->
+                         State
+                 end
              catch
                  _:_ ->
                      State
