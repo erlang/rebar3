@@ -36,6 +36,7 @@
 
         {providers, [rebar_prv_app_discovery,
                      rebar_prv_as,
+                     rebar_prv_bare_compile,
                      rebar_prv_clean,
                      rebar_prv_common_test,
                      rebar_prv_compile,

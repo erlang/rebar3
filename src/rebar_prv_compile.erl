@@ -6,7 +6,8 @@
          do/1,
          format_error/1]).
 
--export([compile/3]).
+-export([compile/2,
+         compile/3]).
 
 -include_lib("providers/include/providers.hrl").
 -include("rebar.hrl").
@@ -80,6 +81,9 @@ build_app(State, Providers, AppInfo) ->
     OutDir = rebar_app_info:out_dir(AppInfo),
     copy_app_dirs(AppInfo, AppDir, OutDir),
     compile(State, Providers, AppInfo).
+
+compile(State, AppInfo) ->
+    compile(State, rebar_state:providers(State), AppInfo).
 
 compile(State, Providers, AppInfo) ->
     ?INFO("Compiling ~s", [rebar_app_info:name(AppInfo)]),
