@@ -40,10 +40,8 @@ do(State) ->
     Paths = lists:filter(fun({app, _}) -> false; ({separator, _}) -> false; (_) -> true end, RawOpts),
     %% if no paths requested in opts print the base_dir instead
     P = case Paths of [] -> [{ebin, true}]; _ -> Paths end,
-    case paths(P, Apps, State, []) of
-        ok             -> {ok, State};
-        {error, Error} -> {error, Error}
-    end.
+    paths(P, Apps, State, []),
+    {ok, State}.
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->

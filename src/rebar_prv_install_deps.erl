@@ -249,7 +249,7 @@ update_unseen_dep(AppInfo, Profile, Level, Deps, Apps, State, Upgrade, Seen, Loc
     AppInfo3 = rebar_app_info:dep_level(AppInfo2, Level),
     {NewDeps ++ Deps, [AppInfo3 | Apps], State2, NewSeen}.
 
--spec handle_dep(rebar_state:t(), atom(), file:filename_all(), rebar_app_info:t(), list(), integer()) -> {rebar_app_info:t(), [rebar_app_info:t()], [pkg_dep()], [integer()], rebar_state:t()}.
+-spec handle_dep(rebar_state:t(), atom(), file:filename_all(), rebar_app_info:t(), list(), integer()) -> {rebar_app_info:t(), [rebar_app_info:t()], rebar_state:t()}.
 handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     Profiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo),

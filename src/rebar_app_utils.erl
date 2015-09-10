@@ -90,7 +90,7 @@ validate_application_info(AppInfo, AppDetail) ->
             end
     end.
 
--spec parse_deps(binary(), list(), rebar_state:t(), list(), integer()) -> {[rebar_app_info:t()], [tuple()]}.
+-spec parse_deps(binary(), list(), rebar_state:t(), list(), integer()) -> [rebar_app_info:t()].
 parse_deps(DepsDir, Deps, State, Locks, Level) ->
     parse_deps(root, DepsDir, Deps, State, Locks, Level).
 

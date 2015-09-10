@@ -313,7 +313,7 @@ get_base_plt(State) ->
     Name = plt_name(Prefix),
     case get_config(State, base_plt_location, global) of
         global ->
-            GlobalCacheDir = rebar_dir:global_cache_dir(State),
+            GlobalCacheDir = rebar_dir:global_cache_dir(rebar_state:opts(State)),
             filename:join(GlobalCacheDir, Name);
         Dir ->
             filename:join(Dir, Name)
