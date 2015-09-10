@@ -133,7 +133,7 @@ ssl_opts(Url) ->
         true ->
             {ok, {_, _, Hostname, _, _, _}} = http_uri:parse(ec_cnv:to_list(Url)),
             VerifyFun = {fun ssl_verify_hostname:verify_fun/3, [{check_hostname, Hostname}]},
-            CACerts = cacerts(),
+            CACerts = certifi:cacerts(),
             [{verify, verify_peer}, {depth, 2}, {cacerts, CACerts}
             ,{partial_chain, fun partial_chain/1}, {verify_fun, VerifyFun}];
         false ->
@@ -143,7 +143,7 @@ ssl_opts(Url) ->
 
 partial_chain(Certs) ->
     Certs1 = [{Cert, public_key:pkix_decode_cert(Cert, otp)} || Cert <- Certs],
-    CACerts = cacerts(),
+    CACerts = certifi:cacerts(),
     CACerts1 = [public_key:pkix_decode_cert(Cert, otp) || Cert <- CACerts],
 
     case ec_lists:find(fun({_, Cert}) ->
@@ -157,10 +157,6 @@ partial_chain(Certs) ->
 
 extract_public_key_info(Cert) ->
     ((Cert#'OTPCertificate'.tbsCertificate)#'OTPTBSCertificate'.subjectPublicKeyInfo).
-
-cacerts() ->
-    Pems = public_key:pem_decode(rebar_cacerts:cacerts()),
-    [Der || {'Certificate', Der, _} <- Pems].
 
 check_cert(CACerts, Cert) ->
     lists:any(fun(CACert) ->
