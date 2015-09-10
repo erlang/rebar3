@@ -26,7 +26,7 @@ project_apps_install(State) ->
                         lists:foldl(fun(AppInfo, StateAcc2) ->
                                             C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
                                             AppInfo0 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
-                                            Plugins2 = rebar_state:get(AppInfo0, {plugins, Profile}, []),
+                                            Plugins2 = rebar_app_info:get(AppInfo0, {plugins, Profile}, []),
                                             handle_plugins(Profile, Plugins2, StateAcc2)
                                     end, StateAcc1, ProjectApps)
                 end, State, Profiles).

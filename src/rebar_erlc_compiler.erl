@@ -28,7 +28,7 @@
 
 -export([compile/1,
          compile/3,
-         clean/2]).
+         clean/1]).
 
 -include("rebar.hrl").
 -include_lib("stdlib/include/erl_compile.hrl").
@@ -104,8 +104,8 @@ compile(Opts, Dir, OutDir) ->
                             fun compile_mib/3),
     doterl_compile(Opts, Dir, OutDir).
 
--spec clean(rebar_dict(), file:filename()) -> 'ok'.
-clean(_Opts, AppDir) ->
+-spec clean(file:filename()) -> 'ok'.
+clean(AppDir) ->
     MibFiles = rebar_utils:find_files(filename:join(AppDir, "mibs"), ?RE_PREFIX".*\\.mib\$"),
     MIBs = [filename:rootname(filename:basename(MIB)) || MIB <- MibFiles],
     rebar_file_utils:delete_each(
