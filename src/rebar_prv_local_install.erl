@@ -31,7 +31,7 @@ init(State) ->
                                                   {bare, true},
                                                   {namespace, ?NAMESPACE},
                                                   {deps, ?DEPS},
-                                                  {example, "rebar3 local install"},
+                                                  {example, "rebar3 unstable install"},
                                                   {short_desc, "Extract libs from rebar3 escript along with a run script."},
                                                   {desc, ""},
                                                   {opts, []}])),

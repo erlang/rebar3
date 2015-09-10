@@ -53,6 +53,7 @@ end
 ## tar               Tar archive of release built of project.
 ## tree              Print dependency tree.
 ## unlock            Unlock dependencies.
+## unstable          Namespace providing commands that are still in flux.
 ## update            Update package index.
 ## upgrade           Upgrade dependencies.
 ## version           Print version for rebar and current Erlang.
@@ -101,7 +102,7 @@ complete -f -c 'rebar3' -n '__fish_rebar3_using_command dialyzer' -s u -l update
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command dialyzer' -s s -l succ-typings -d "Enable success typing analysis. Default: true"
 
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a do -d "Higher order provider for running multiple tasks in a sequence."
-complete -f -c 'rebar3' -n '__fish_rebar3_using_command do' -a 'compile, clean, ct, cover, deps, dialyzer, edoc, eunit, help, new, pkgs, release, relup, report, shell, tar, unlock, update, upgrade, version, xref,'
+complete -f -c 'rebar3' -n '__fish_rebar3_using_command do' -a 'compile, clean, ct, cover, deps, dialyzer, edoc, eunit, help, new, pkgs, release, relup, report, shell, tar, unlock, unstable, update, upgrade, version, xref,'
 ## TODO: do should understand plugins, but now it does not.
 
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a edoc -d "Generate documentation using edoc."
@@ -121,14 +122,14 @@ complete -f -c 'rebar3' -n '__fish_rebar3_using_command new' -a help -d "Display
 
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a paths -d "Print paths to build dirs in current profile."
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l app -d "Comma seperated list of applications to return paths for."
-complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l base -d "Return the `base' path of the current profile."
-complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l bin -d Return the `bin' path of the current profile."
-complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l ebin -d "Return all `ebin' paths of the current profile's applications."
-complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l lib -d "Return the `lib' path of the current profile."
-complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l priv -d "Return the `priv' path of the current profile's applications."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l base -d "Return the `base` path of the current profile."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l bin -d "Return the `bin` path of the current profile."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l ebin -d "Return all `ebin` paths of the current profile`s applications."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l lib -d "Return the `lib` path of the current profile."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l priv -d "Return the `priv` path of the current profile`s applications."
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -s s -l separator -d "In case of multiple return paths, the separator character to use to join them."
-complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l src -d "Return the `src' path of the current profile's applications."
-complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l rel -d "Return the `rel' path of the current profile."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l src -d "Return the `src` path of the current profile`s applications."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l rel -d "Return the `rel` path of the current profile."
 
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a pkgs -d "List available packages."
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a release -d "Build release of project."
@@ -137,8 +138,8 @@ complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a report -d "Provide a
 
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a shell -d "Run shell with project apps and deps in path."
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command shell' -l config -d "Allows to load a config file, if any. Defaults to the sys_config entry defined for relx if present."
-complete -f -c 'rebar3' -n '__fish_rebar3_using_command shell' -l name -d "equivalent to erlang's -name"
-complete -f -c 'rebar3' -n '__fish_rebar3_using_command shell' -l sname -d "equivalent to erlang's -sname"
+complete -f -c 'rebar3' -n '__fish_rebar3_using_command shell' -l name -d "equivalent to erlang`s -name"
+complete -f -c 'rebar3' -n '__fish_rebar3_using_command shell' -l sname -d "equivalent to erlang`s -sname"
 
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a tar -d "Tar archive of release built of project."
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command tar' -s n -l relname -d "Specify the name for the release that will be generated"
@@ -167,6 +168,10 @@ complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a tree -d "Print depde
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command tree' -s v -l verbose  -d "Print repo and branch/tag/ref for git and hg deps."
 
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a unlock -d "Unlock dependencies."
+
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a unstable -d "Namespace providing commands that are still in flux."
+
+complete -f -c 'rebar3' -n '__fish_rebar3_using_command unstable' -a 'install upgrade'
 
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a update -d "Update package index."
 

@@ -111,11 +111,11 @@ _rebar3 () {
                 (path)
                     _arguments \
                         '(--app)--app[Comma seperated list of applications to return paths for.]:apps' \
-                        '(--base)--base[Return the `base' path of the current profile.]' \
-                        '(--bin)--bin[Return the `bin' path of the current profile.]' \
-                        '(--ebin)--ebin[Return all `ebin' paths of the current profile's applications.]' \
-                        '(--lib)--lib[Return the `lib' path of the current profile.]' \
-                        '(--priv)--priv[Return the `priv' path of the current profile's applications.]' \
+                        '(--base)--base[Return the `base` path of the current profile.]' \
+                        '(--bin)--bin[Return the `bin` path of the current profile.]' \
+                        '(--ebin)--ebin[Return all `ebin` paths of the current profile`s applications.]' \
+                        '(--lib)--lib[Return the `lib` path of the current profile.]' \
+                        '(--priv)--priv[Return the `priv` path of the current profile`s applications.]' \
                         '(-s --separator)--separator[In case of multiple return paths, the separator character to use to join them.]' \
                     && ret=0
                 ;;
@@ -212,6 +212,11 @@ _rebar3 () {
                         '*: :_rebar3_list_deps' \
                     && ret=0
                 ;;
+                (unstable)
+                    _arguments \
+                        '*: :(install upgrade)' \
+                    && ret=0
+                ;;
                 (update)
                     _message 'rebar update' && ret=0
                 ;;
@@ -254,6 +259,7 @@ _rebar3_tasks() {
         'tar:Tar archive of release built of project.'
         'tree:Print dependency tree.'
         'unlock:Unlock dependencies.'
+        'unstable:Namespace providing commands that are still in flux.'
         'update:Update package index.'
         'upgrade:Upgrade dependencies.'
         'version:Print version for rebar and current Erlang.'

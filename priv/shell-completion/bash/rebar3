@@ -33,6 +33,7 @@ _rebar3()
             tar \
             tree \
             unlock \
+            unstable \
             update \
             upgrade \
             version \
@@ -187,6 +188,8 @@ _rebar3()
     elif [[ ${prev} == tree ]] ; then
         sopts="-v"
         lopts="--verbose"
+    elif [[ ${prev} == unstable ]] ; then
+        :
     elif [[ ${prev} == update ]] ; then
         :
     elif [[ ${prev} == upgrade ]] ; then

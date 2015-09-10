@@ -29,7 +29,7 @@ init(State) ->
                                                   {bare, true},
                                                   {namespace, ?NAMESPACE},
                                                   {deps, ?DEPS},
-                                                  {example, "rebar3 local upgrade"},
+                                                  {example, "rebar3 unstable upgrade"},
                                                   {short_desc, "Download latest rebar3 escript and extract."},
                                                   {desc, ""},
                                                   {opts, []}])),
