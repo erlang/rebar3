@@ -72,7 +72,7 @@ get_md5(Rebar3Path) ->
 maybe_fetch_rebar3(Rebar3Md5) ->
     TmpDir = ec_file:insecure_mkdtemp(),
     TmpFile = filename:join(TmpDir, "rebar3"),
-    case rebar_pkg_resource:request("https://s3.amazonaws.com/rebar3/rebar4", Rebar3Md5) of
+    case rebar_pkg_resource:request("https://s3.amazonaws.com/rebar3/rebar3", Rebar3Md5) of
         {ok, Binary, _ETag} ->
             file:write_file(TmpFile, Binary),
             {saved, TmpFile};
