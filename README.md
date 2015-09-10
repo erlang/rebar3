@@ -45,6 +45,7 @@ locations ([hex.pm](http://hex.pm), git, hg, and so on).
 | tar        | Package release into tarball |
 | tree       | Print dependency tree |
 | unlock     | Unlock dependencies |
+| unstable   | Namespace providing commands that are still in flux |
 | update     | Update package index |
 | upgrade    | Fetch latest version of dep |
 | version    | Print current version of Erlang/OTP and rebar |
