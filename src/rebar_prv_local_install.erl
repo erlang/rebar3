@@ -15,7 +15,7 @@
 -include_lib("kernel/include/file.hrl").
 
 -define(PROVIDER, install).
--define(NAMESPACE, local).
+-define(NAMESPACE, unstable).
 -define(DEPS, []).
 
 %% ===================================================================
@@ -39,12 +39,18 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    case rebar_state:escript_path(State) of
-        undefined ->
-            ?INFO("Already running from an unpacked rebar3. Nothing to do...", []),
+    case os:type() of
+        {win32, _} ->
+            ?ERROR("Sorry, this feature is not yet available on Windows.", []),
             {ok, State};
-        ScriptPath ->
-            extract_escript(State, ScriptPath)
+        _ ->
+            case rebar_state:escript_path(State) of
+                undefined ->
+                    ?INFO("Already running from an unpacked rebar3. Nothing to do...", []),
+                    {ok, State};
+                ScriptPath ->
+                    extract_escript(State, ScriptPath)
+            end
     end.
 
 -spec format_error(any()) -> iolist().

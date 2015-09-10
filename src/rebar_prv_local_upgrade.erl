@@ -13,7 +13,7 @@
 -include_lib("kernel/include/file.hrl").
 
 -define(PROVIDER, upgrade).
--define(NAMESPACE, local).
+-define(NAMESPACE, unstable).
 -define(DEPS, []).
 
 %% ===================================================================
@@ -37,19 +37,24 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    Md5 = case rebar_state:escript_path(State) of
-              undefined ->
-                  false;
-              ScriptPath ->
-                  get_md5(ScriptPath)
-          end,
-
-    case maybe_fetch_rebar3(Md5) of
-        up_to_date ->
-            ?CONSOLE("No upgrade available", []),
+    case os:type() of
+        {win32, _} ->
+            ?ERROR("Sorry, this feature is not yet available on Windows.", []),
             {ok, State};
-        {saved, TmpRebar3} ->
-            rebar_prv_local_install:extract_escript(State, TmpRebar3)
+        _ ->
+            Md5 = case rebar_state:escript_path(State) of
+                      undefined ->
+                          false;
+                      ScriptPath ->
+                          get_md5(ScriptPath)
+                  end,
+
+            case maybe_fetch_rebar3(Md5) of
+                {saved, TmpRebar3} ->
+                    rebar_prv_local_install:extract_escript(State, TmpRebar3);
+                _ ->
+                    {ok, State}
+            end
     end.
 
 -spec format_error(any()) -> iolist().
@@ -67,10 +72,13 @@ get_md5(Rebar3Path) ->
 maybe_fetch_rebar3(Rebar3Md5) ->
     TmpDir = ec_file:insecure_mkdtemp(),
     TmpFile = filename:join(TmpDir, "rebar3"),
-    case rebar_pkg_resource:request("https://s3.amazonaws.com/rebar3/rebar3", Rebar3Md5) of
+    case rebar_pkg_resource:request("https://s3.amazonaws.com/rebar3/rebar4", Rebar3Md5) of
         {ok, Binary, _ETag} ->
             file:write_file(TmpFile, Binary),
             {saved, TmpFile};
+        error ->
+            ?ERROR("Unable to fetch latest rebar3 escript. Please try again later.", []);
         _ ->
+            ?CONSOLE("No upgrade available", []),
             up_to_date
     end.
