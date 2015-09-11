@@ -64,7 +64,7 @@ consult_file_(File) ->
     case filename:extension(File) of
         ".script" ->
             {ok, Terms} = consult_and_eval(remove_script_ext(File), File),
-            [Terms];
+            Terms;
         _ ->
             Script = File ++ ".script",
             case filelib:is_regular(Script) of
