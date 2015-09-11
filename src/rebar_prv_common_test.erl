@@ -91,6 +91,7 @@ run_test(State) ->
 
 run_test(State, Opts) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
+    ok = rebar_prv_cover:maybe_cover_compile(State, apps),
     Result = case proplists:get_value(verbose, RawOpts, false) of
         true  -> run_test_verbose(Opts);
         false -> run_test_quiet(Opts)

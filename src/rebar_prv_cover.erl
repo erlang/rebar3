@@ -44,12 +44,12 @@ do(State) ->
 
 -spec maybe_cover_compile(rebar_state:t()) -> ok.
 maybe_cover_compile(State) ->
-    maybe_cover_compile(State, []).
+    maybe_cover_compile(State, apps).
 
--spec maybe_cover_compile(rebar_state:t(), [file:name()]) -> ok.
-maybe_cover_compile(State, ExtraDirs) ->
+-spec maybe_cover_compile(rebar_state:t(), [file:name()] | apps) -> ok.
+maybe_cover_compile(State, Dirs) ->
     case rebar_state:get(State, cover_enabled, false) of
-        true  -> cover_compile(State, ExtraDirs);
+        true  -> cover_compile(State, Dirs);
         false -> ok
     end.
 
@@ -275,17 +275,23 @@ strip_coverdir(File) ->
     filename:join(lists:reverse(lists:sublist(lists:reverse(filename:split(File)),
                                               2))).
 
-cover_compile(State, ExtraDirs) ->
+cover_compile(State, apps) ->
+    Apps = filter_checkouts(rebar_state:project_apps(State)),
+    AppDirs = app_ebin_dirs(Apps, []),
+    cover_compile(State, AppDirs);
+cover_compile(State, Dirs) ->
     %% start the cover server if necessary
     {ok, CoverPid} = start_cover(),
     %% redirect cover output
     true = redirect_cover_output(State, CoverPid),
-    %% cover compile the modules we just compiled
-    Apps = filter_checkouts(rebar_state:project_apps(State)),
-    CompileResult = compile_beam_directories(Apps, []) ++
-                    compile_extras(ExtraDirs, []),
+    CompileResult = compile(Dirs, []),
     %% print any warnings about modules that failed to cover compile
-    lists:foreach(fun print_cover_warnings/1, CompileResult).
+    lists:foreach(fun print_cover_warnings/1, lists:flatten(CompileResult)).
+
+compile([], Acc) -> lists:reverse(Acc);
+compile([Dir|Rest], Acc) ->
+    Result = cover:compile_beam_directory(Dir),
+    compile(Rest, [Result|Acc]).
 
 filter_checkouts(Apps) -> filter_checkouts(Apps, []).
 
@@ -296,16 +302,9 @@ filter_checkouts([App|Rest], Acc) ->
         false -> filter_checkouts(Rest, [App|Acc])
     end.
 
-compile_beam_directories([], Acc) -> Acc;
-compile_beam_directories([App|Rest], Acc) ->
-    Result = cover:compile_beam_directory(filename:join([rebar_app_info:out_dir(App),
-                                                        "ebin"])),
-    compile_beam_directories(Rest, Acc ++ Result).
-
-compile_extras([], Acc) -> Acc;
-compile_extras([Dir|Rest], Acc) ->
-    Result = cover:compile_beam_directory(Dir),
-    compile_extras(Rest, Acc ++ Result).
+app_ebin_dirs([], Acc) -> Acc;
+app_ebin_dirs([App|Rest], Acc) ->
+    app_ebin_dirs(Rest, [rebar_app_info:ebin_dir(App)|Acc]).
 
 start_cover() ->
     case cover:start() of
