@@ -10,6 +10,7 @@
         ,make_vsn/1]).
 
 -export([request/2
+        ,etag/1
         ,ssl_opts/1]).
 
 -include("rebar.hrl").

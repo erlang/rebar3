@@ -10,6 +10,7 @@
          format_error/1]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 -include_lib("kernel/include/file.hrl").
 
 -define(PROVIDER, upgrade).
@@ -52,12 +53,16 @@ do(State) ->
             case maybe_fetch_rebar3(Md5) of
                 {saved, TmpRebar3} ->
                     rebar_prv_local_install:extract_escript(State, TmpRebar3);
-                _ ->
-                    {ok, State}
+                up_to_date ->
+                    {ok, State};
+                Error ->
+                    Error
             end
     end.
 
 -spec format_error(any()) -> iolist().
+format_error(bad_checksum) ->
+    "Not updating rebar3, the checksum of download did not match the one provided by s3.";
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -73,9 +78,14 @@ maybe_fetch_rebar3(Rebar3Md5) ->
     TmpDir = ec_file:insecure_mkdtemp(),
     TmpFile = filename:join(TmpDir, "rebar3"),
     case rebar_pkg_resource:request("https://s3.amazonaws.com/rebar3/rebar3", Rebar3Md5) of
-        {ok, Binary, _ETag} ->
+        {ok, Binary, ETag} ->
             file:write_file(TmpFile, Binary),
-            {saved, TmpFile};
+            case rebar_pkg_resource:etag(TmpFile) of
+                ETag ->
+                    {saved, TmpFile};
+                _ ->
+                    ?PRV_ERROR(bad_checksum)
+            end;
         error ->
             ?ERROR("Unable to fetch latest rebar3 escript. Please try again later.", []);
         _ ->
