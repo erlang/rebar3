@@ -149,7 +149,7 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
     CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
     AppInfo = case rebar_app_info:discover(CheckoutsDir) of
                         {ok, App} ->
-                            rebar_app_info:is_checkout(App, true);
+                            rebar_app_info:source(rebar_app_info:is_checkout(App, true), checkout);
                         not_found ->
                             Dir = ec_cnv:to_list(filename:join(DepsDir, Name)),
                             {ok, AppInfo0} =
