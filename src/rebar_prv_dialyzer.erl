@@ -465,11 +465,11 @@ collect_nested_dependent_apps(App, Seen) ->
             Seen1 = sets:add_element(App, Seen),
             case code:lib_dir(App) of
                 {error, _} ->
-                    Seen1;
+                    throw({unknown_application, App});
                 AppDir ->
                     case rebar_app_discover:find_app(AppDir, all) of
                         false ->
-                            Seen1;
+                            throw({unknown_application, App});
                         {true, AppInfo}  ->
                             lists:foldl(fun collect_nested_dependent_apps/2,
                                         Seen1,
