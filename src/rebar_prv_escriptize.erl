@@ -107,7 +107,7 @@ escriptize(State0, App) ->
     ExtraFiles = usort(InclBeams ++ InclExtra),
     Files = get_nonempty(EbinFiles ++ ExtraFiles),
 
-    DefaultEmuArgs = ?FMT("%%! -escript main ~s -pa ~s/~s/ebin\n",
+    DefaultEmuArgs = ?FMT("%%! -escript main ~s -pz ~s/~s/ebin\n",
                           [AppNameStr, AppNameStr, AppNameStr]),
     EscriptSections =
         [ {shebang,
