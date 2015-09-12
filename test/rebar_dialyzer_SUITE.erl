@@ -8,7 +8,7 @@
          update_base_plt/1,
          update_app_plt/1,
          build_release_plt/1,
-         plt_include_all_deps_option/1]).
+         plt_apps_option/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -39,7 +39,7 @@ init_per_testcase(Testcase, Config) ->
      rebar_test_utils:init_rebar_state(Config)].
 
 all() ->
-    [update_base_plt, update_app_plt, build_release_plt, plt_include_all_deps_option].
+    [update_base_plt, update_app_plt, build_release_plt, plt_apps_option].
 
 update_base_plt(Config) ->
     AppDir = ?config(apps, Config),
@@ -131,7 +131,7 @@ build_release_plt(Config) ->
     {ok, PltFiles} = plt_files(Plt),
     ?assertEqual(ErtsFiles, PltFiles).
 
-plt_include_all_deps_option(Config) ->
+plt_apps_option(Config) ->
     AppDir = ?config(apps, Config),
     RebarConfig = ?config(rebar_config, Config),
     Plt = ?config(plt, Config),
@@ -166,14 +166,14 @@ plt_include_all_deps_option(Config) ->
                        ]}],
                      RebarConfig),
 
-    %% Dialyzer: plt_include_all_deps = false (default)
+    %% Dialyzer: plt_apps = top_level_deps (default)
     rebar_test_utils:run_and_check(Config1, RebarConfig1, ["dialyzer"],
                                    {ok, [{app, Name3}]}),
     {ok, PltFiles1} = plt_files(Plt),
     ?assertEqual([App2, erts], get_apps_from_beam_files(PltFiles1)),
 
-    %% Dialyzer: plt_include_all_deps = true
-    RebarConfig2 = merge_config([{dialyzer, [{plt_include_all_deps, true}]}],
+    %% Dialyzer: plt_apps = all_deps
+    RebarConfig2 = merge_config([{dialyzer, [{plt_apps, all_deps}]}],
                                 RebarConfig1),
     rebar_test_utils:run_and_check(Config1, RebarConfig2, ["dialyzer"],
                                    {ok, [{app, Name3}]}),

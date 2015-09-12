@@ -44,28 +44,29 @@ desc() ->
     "options `dialyzer` in rebar.config:\n"
     "`warnings` - a list of dialyzer warnings\n"
     "`get_warnings` - display warnings when altering a PLT file (boolean)\n"
-    "`plt_extra_apps` - a list of applications to include in the PLT file*\n"
-    "`plt_include_all_deps` - in addition to the first level dependencies, "
-    "include all nested dependent applications in the PLT file (boolean), "
-    "default to `false`\n"
+    "`plt_apps` - the strategy for determining the applications which included "
+    "in the PLT file, `top_level_deps` to include just the direct dependencies "
+    "or `all_deps` to include all nested dependencies*\n"
+    "`plt_extra_apps` - a list of applications to include in the PLT file**\n"
     "`plt_location` - the location of the PLT file, `local` to store in the "
     "profile's base directory (default) or a custom directory.\n"
-    "`plt_prefix` - the prefix to the PLT file, defaults to \"rebar3\"**\n"
+    "`plt_prefix` - the prefix to the PLT file, defaults to \"rebar3\"***\n"
     "`base_plt_apps` - a list of applications to include in the base "
-    "PLT file***\n"
+    "PLT file****\n"
     "`base_plt_location` - the location of base PLT file, `global` to store in "
-    "$HOME/.cache/rebar3 (default) or  a custom directory***\n"
+    "$HOME/.cache/rebar3 (default) or  a custom directory****\n"
     "`base_plt_prefix` - the prefix to the base PLT file, defaults to "
-    "\"rebar3\"** ***\n"
+    "\"rebar3\"*** ****\n"
     "\n"
     "For example, to warn on unmatched returns: \n"
     "{dialyzer, [{warnings, [unmatched_returns]}]}.\n"
     "\n"
-    "*The applications in `dialyzer_base_plt_apps` and any `applications` and "
-    "`included_applications` listed in their .app files will be added to the "
-    "list.\n"
-    "**PLT files are named \"<prefix>_<otp_release>_plt\".\n"
-    "***The base PLT is a PLT containing the core applications often required "
+    "*The direct dependent applications are listed in `applications` and "
+    "`included_applications` of their .app files.\n"
+    "**The applications in `base_plt_apps` will be added to the "
+    "list. \n"
+    "***PLT files are named \"<prefix>_<otp_release>_plt\".\n"
+    "****The base PLT is a PLT containing the core applications often required "
     "for a project's PLT. One base PLT is created per OTP version and "
     "stored in `base_plt_location`. A base PLT is used to build project PLTs."
     "\n".
@@ -182,9 +183,9 @@ proj_plt_files(State) ->
     Apps = rebar_state:project_apps(State),
     DepApps = lists:flatmap(fun rebar_app_info:applications/1, Apps),
     DepApps1 =
-        case get_config(State, plt_include_all_deps, false) of
-            false -> DepApps;
-            true -> collect_nested_dependent_apps(DepApps)
+        case get_config(State, plt_apps, top_level_deps) of
+            top_level_deps -> DepApps;
+            all_deps       -> collect_nested_dependent_apps(DepApps)
         end,
     get_plt_files(BasePltApps ++ PltApps ++ DepApps1, Apps).
 
