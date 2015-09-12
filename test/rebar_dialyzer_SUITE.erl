@@ -141,19 +141,19 @@ plt_apps_option(Config) ->
     Name1 = rebar_test_utils:create_random_name("app1_"),
     Vsn1 = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(filename:join([AppDir,"deps",Name1]), Name1, Vsn1,
-                                [erts]),
+                                []),
     App1 = ec_cnv:to_atom(Name1),
 
     Name2 = rebar_test_utils:create_random_name("app2_"),
     Vsn2 = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(filename:join([AppDir,"deps",Name2]), Name2, Vsn2,
-                                [erts, App1]), % App2 depends on App1
+                                [App1]), % App2 depends on App1
     App2 = ec_cnv:to_atom(Name2),
 
     Name3 = rebar_test_utils:create_random_name("app3_"), % the project application
     Vsn3 = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name3, Vsn3,
-                                [erts, App2]), % App3 depends on App2
+                                [App2]), % App3 depends on App2
 
     %% Dependencies settings
     State1 = rebar_state:add_resource(State, {localfs, rebar_localfs_resource}),
@@ -169,6 +169,8 @@ plt_apps_option(Config) ->
     %% Dialyzer: plt_apps = top_level_deps (default)
     rebar_test_utils:run_and_check(Config1, RebarConfig1, ["dialyzer"],
                                    {ok, [{app, Name3}]}),
+
+    %% NOTE: `erts` is included in `base_plt_apps`
     {ok, PltFiles1} = plt_files(Plt),
     ?assertEqual([App2, erts], get_apps_from_beam_files(PltFiles1)),
 
