@@ -58,8 +58,7 @@ format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
 bin_contents(OutputDir) ->
-    <<"
-#!/usr/bin/env sh
+    <<"#!/usr/bin/env sh
 
 erl -pa ", (ec_cnv:to_binary(OutputDir))/binary,"/*/ebin +sbtu +A0  -noshell -boot start_clean -s rebar3 main -extra \"$@\"
 ">>.
