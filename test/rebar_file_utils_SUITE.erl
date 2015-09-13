@@ -10,7 +10,9 @@
          multi_tmpdir/1,
          reset_nonexistent_dir/1,
          reset_empty_dir/1,
-         reset_dir/1]).
+         reset_dir/1,
+         relative_path/1,
+         reduce_path/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -19,7 +21,8 @@
 
 all() ->
     [{group, tmpdir},
-     {group, reset_dir}].
+     {group, reset_dir},
+     relative_path, reduce_path].
 
 groups() ->
     [{tmpdir, [], [raw_tmpdir, empty_tmpdir, simple_tmpdir, multi_tmpdir]},
@@ -84,3 +87,20 @@ reset_dir(Config) ->
     ok = rebar_file_utils:reset_dir(TmpDir),
     ?assert(filelib:is_dir(TmpDir)),
     {ok, []} = file:list_dir(TmpDir).
+
+relative_path(_Config) ->
+    ?assertEqual({ok, "foo/bar/baz"}, rebar_file_utils:relative_path("/foo/bar/baz", "/")),
+    ?assertEqual({ok, "bar/baz"}, rebar_file_utils:relative_path("/foo/bar/baz", "/foo")),
+    ?assertEqual({ok, "bar"}, rebar_file_utils:relative_path("foo/bar", "foo")),
+    ?assertEqual({ok, "bar"}, rebar_file_utils:relative_path("foo/bar/", "foo/")),
+    ?assertEqual({error, not_relative}, rebar_file_utils:relative_path("/foo/bar/baz", "/qux")),
+    ?assertEqual({error, not_relative}, rebar_file_utils:relative_path("/foo/bar/baz", "/foo/bar/baz/qux")).
+
+reduce_path(_Config) ->
+    ?assertEqual("/", rebar_file_utils:reduce_path("/")),
+    ?assertEqual("/", rebar_file_utils:reduce_path("/../../..")),
+    ?assertEqual("/foo", rebar_file_utils:reduce_path("/foo/bar/..")),
+    ?assertEqual("/foo", rebar_file_utils:reduce_path("/foo/../foo")),
+    ?assertEqual("/foo", rebar_file_utils:reduce_path("/foo/.")),
+    ?assertEqual("/foo", rebar_file_utils:reduce_path("/foo/./.")),
+    ?assertEqual("/foo/bar", rebar_file_utils:reduce_path("/foo/./bar")).

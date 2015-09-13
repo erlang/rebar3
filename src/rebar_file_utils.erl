@@ -37,7 +37,9 @@
          system_tmpdir/0,
          system_tmpdir/1,
          reset_dir/1,
-         touch/1]).
+         touch/1,
+         relative_path/2,
+         reduce_path/1]).
 
 -include("rebar.hrl").
 
@@ -243,6 +245,31 @@ touch(Path) ->
     {ok, A} = file:read_file_info(Path),
     ok = file:write_file_info(Path, A#file_info{mtime = calendar:local_time(),
                                                 atime = calendar:local_time()}).
+
+%% for a given path return the path relative to a base directory
+-spec relative_path(string(), string()) -> {ok, string()} | {error, not_relative}.
+
+relative_path(Target, To) ->
+    relative_path1(filename:split(reduce_path(Target)),
+                   filename:split(reduce_path(To))).
+
+relative_path1([Part|Target], [Part|To]) -> relative_path1(Target, To);
+relative_path1([], [])                   -> {ok, ""};
+relative_path1(Target, [])               -> {ok, filename:join(Target)};
+relative_path1(_, _)                     -> {error, not_relative}.
+
+
+%% reduce a filepath by removing all incidences of `.' and `..'
+-spec reduce_path(string()) -> string().
+
+reduce_path(Dir) -> reduce_path([], filename:split(filename:absname(Dir))).
+
+reduce_path([], [])                -> filename:nativename("/");
+reduce_path(Acc, [])               -> filename:join(lists:reverse(Acc));
+reduce_path(Acc, ["."|Rest])       -> reduce_path(Acc, Rest);
+reduce_path([_|Acc], [".."|Rest])  -> reduce_path(Acc, Rest);
+reduce_path([], [".."|Rest])       -> reduce_path([], Rest);
+reduce_path(Acc, [Component|Rest]) -> reduce_path([Component|Acc], Rest).
 
 %% ===================================================================
 %% Internal functions

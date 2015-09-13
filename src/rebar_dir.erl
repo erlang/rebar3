@@ -23,7 +23,8 @@
          make_relative_path/2,
          src_dirs/1, src_dirs/2,
          extra_src_dirs/1, extra_src_dirs/2,
-         all_src_dirs/1, all_src_dirs/3]).
+         all_src_dirs/1, all_src_dirs/3,
+         retarget_path/2]).
 
 -include("rebar.hrl").
 
@@ -160,3 +161,29 @@ all_src_dirs(Opts) -> all_src_dirs(Opts, [], []).
     list(file:filename_all()).
 all_src_dirs(Opts, SrcDefault, ExtraDefault) ->
     src_dirs(Opts, SrcDefault) ++ extra_src_dirs(Opts, ExtraDefault).
+
+%% given a path if that path is an ancestor of an app dir return the path relative to that
+%% apps outdir. if the path is not an ancestor to any app dirs but is an ancestor of the
+%% project root return the path relative to the project base_dir. if it is not an ancestor
+%% of either return it unmodified
+-spec retarget_path(rebar_state:t(), string()) -> string().
+
+retarget_path(State, Path) ->
+    ProjectApps = rebar_state:project_apps(State),
+    retarget_path(State, Path, ProjectApps).
+
+%% not relative to any apps in project, check to see it's relative to
+%% project root
+retarget_path(State, Path, []) ->
+    case rebar_file_utils:relative_path(rebar_file_utils:reduce_path(Path), rebar_state:dir(State)) of
+        {ok, NewPath}         -> filename:join([base_dir(State), NewPath]);
+        %% not relative to project root, don't modify
+        {error, not_relative} -> Path
+    end;
+%% relative to current app, retarget to the same dir relative to
+%% the app's out_dir
+retarget_path(State, Path, [App|Rest]) ->
+    case rebar_file_utils:relative_path(rebar_file_utils:reduce_path(Path), rebar_app_info:dir(App)) of
+        {ok, NewPath}         -> filename:join([rebar_app_info:out_dir(App), NewPath]);
+        {error, not_relative} -> retarget_path(State, Path, Rest)
+    end.
