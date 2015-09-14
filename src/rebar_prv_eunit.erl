@@ -79,6 +79,9 @@ format_error(unknown_error) ->
     io_lib:format("Error running tests", []);
 format_error({error_running_tests, Reason}) ->
     io_lib:format("Error running tests: ~p", [Reason]);
+format_error({eunit_test_errors, Errors}) ->
+    io_lib:format(lists:concat(["Error Running EUnit Tests:"] ++
+                               lists:map(fun(Error) -> "~n  " ++ Error end, Errors)), []);
 format_error({error, Error}) ->
     format_error({error_running_tests, Error}).
 
@@ -141,22 +144,39 @@ select_tests(ProjectApps, [], []) -> default_tests(ProjectApps);
 select_tests(_ProjectApps, A, B)  -> A ++ B.
 
 validate_tests(State, ProjectApps, Tests) ->
-    {ok, lists:filter(fun(Elem) -> validate(State, ProjectApps, Elem) end, Tests)}.
+    gather_tests(fun(Elem) -> validate(State, ProjectApps, Elem) end, Tests, []).
 
-validate(_State, ProjectApps, {application, App}) ->
-    validate_app(App, ProjectApps);
+gather_tests(_F, [], Acc) -> {ok, lists:reverse(Acc)};
+gather_tests(F, [Test|Rest], Acc) ->
+    case F(Test) of
+        true  -> gather_tests(F, Rest, [Test|Acc]);
+        false -> gather_tests(F, Rest, Acc);
+        %% failure mode, switch to gathering errors
+        Error -> gather_errors(F, Rest, [Error])
+    end.
+
+gather_errors(_F, [], Acc) -> ?PRV_ERROR({eunit_test_errors, lists:reverse(Acc)});
+gather_errors(F, [Test|Rest], Acc) ->
+    case F(Test) of
+        true  -> gather_errors(F, Rest, Acc);
+        false -> gather_errors(F, Rest, Acc);
+        Error -> gather_errors(F, Rest, [Error|Acc])
+    end.
+
+validate(State, ProjectApps, {application, App}) ->
+    validate_app(State, ProjectApps, App);
 validate(State, _ProjectApps, {dir, Dir}) ->
     ok = maybe_compile_dir(State, Dir),
-    validate_dir(Dir);
+    validate_dir(State, Dir);
 validate(State, _ProjectApps, {file, File}) ->
     ok = maybe_compile_file(State, File),
-    validate_file(File);
-validate(_State, ProjectApps, {module, Module}) ->
-    validate_module(Module, ProjectApps);
-validate(_State, ProjectApps, {suite, Module}) ->
-    validate_module(Module, ProjectApps);
-validate(_State, ProjectApps, Module) when is_atom(Module) ->
-    validate_module(Module, ProjectApps);
+    validate_file(State, File);
+validate(State, ProjectApps, {module, Module}) ->
+    validate_module(State, ProjectApps, Module);
+validate(State, ProjectApps, {suite, Module}) ->
+    validate_module(State, ProjectApps, Module);
+validate(State, ProjectApps, Module) when is_atom(Module) ->
+    validate_module(State, ProjectApps, Module);
 validate(State, ProjectApps, Path) when is_list(Path) ->
     case ec_file:is_dir(Path) of
         true  -> validate(State, ProjectApps, {dir, Path});
@@ -167,32 +187,39 @@ validate(State, ProjectApps, Path) when is_list(Path) ->
 %% unvalidatable
 validate(_State, _ProjectApps, _Test) -> true.
 
-validate_app(AppName, []) ->
-    ?WARN(lists:concat(["Application `", AppName, "' not found in project."]), []),
-    false;
-validate_app(AppName, [App|Rest]) ->
+validate_app(State, [], AppName) ->
+    warn_or_error(State, lists:concat(["Application `", AppName, "' not found in project."]));
+validate_app(State, [App|Rest], AppName) ->
     case AppName == binary_to_atom(rebar_app_info:name(App), unicode) of
         true  -> true;
-        false -> validate_app(AppName, Rest)
+        false -> validate_app(State, Rest, AppName)
     end.
 
-validate_dir(Dir) ->
+validate_dir(State, Dir) ->
     case ec_file:is_dir(Dir) of
         true  -> true;
-        false -> ?WARN(lists:concat(["Directory `", Dir, "' not found."]), []), false
+        false -> warn_or_error(State, lists:concat(["Directory `", Dir, "' not found."]))
     end.
 
-validate_file(File) ->
+validate_file(State, File) ->
     case ec_file:exists(File) of
         true  -> true;
-        false -> ?WARN(lists:concat(["File `", File, "' not found."]), []), false
+        false -> warn_or_error(State, lists:concat(["File `", File, "' not found."]))
     end.
 
-validate_module(Module, Apps) ->
+validate_module(State, Apps, Module) ->
     AppModules = app_modules([binary_to_atom(rebar_app_info:name(A), unicode) || A <- Apps], []),
     case lists:member(Module, AppModules) of
         true  -> true;
-        false -> ?WARN(lists:concat(["Module `", Module, "' not found in applications."]), []), false
+        false -> warn_or_error(State, lists:concat(["Module `", Module, "' not found in applications."]))
+    end.
+
+warn_or_error(State, Msg) ->
+    {RawOpts, _} = rebar_state:command_parsed_args(State),
+    Error = proplists:get_value(error_on_warning, RawOpts, false),
+    case Error of
+        true  -> Msg;
+        false -> ?WARN(Msg, []), false
     end.
 
 project_apps(State) ->
@@ -267,6 +294,7 @@ eunit_opts(_State) ->
     [{app, undefined, "app", string, help(app)},
      {cover, $c, "cover", boolean, help(cover)},
      {dir, undefined, "dir", string, help(dir)},
+     {error_on_warning, $e, "error_on_warning", boolean, help(error)},
      {file, undefined, "file", string, help(file)},
      {module, undefined, "module", string, help(module)},
      {suite, undefined, "suite", string, help(suite)},
@@ -275,6 +303,7 @@ eunit_opts(_State) ->
 help(app)     -> "Comma separated list of application test suites to run. Equivalent to `[{application, App}]`.";
 help(cover)   -> "Generate cover data. Defaults to false.";
 help(dir)     -> "Comma separated list of dirs to load tests from. Equivalent to `[{dir, Dir}]`.";
+help(error)   -> "Error on invalid test specifications instead of warning.";
 help(file)    -> "Comma separated list of files to load tests from. Equivalent to `[{file, File}]`.";
 help(module)  -> "Comma separated list of modules to load tests from. Equivalent to `[{module, Module}]`.";
 help(suite)   -> "Comma separated list of test suites to run. Equivalent to `[{module, Suite}]`.";
