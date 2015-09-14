@@ -175,15 +175,15 @@ retarget_path(State, Path) ->
 %% not relative to any apps in project, check to see it's relative to
 %% project root
 retarget_path(State, Path, []) ->
-    case rebar_file_utils:relative_path(rebar_file_utils:reduce_path(Path), rebar_state:dir(State)) of
-        {ok, NewPath}         -> filename:join([base_dir(State), NewPath]);
+    case rebar_file_utils:path_from_ancestor(rebar_file_utils:canonical_path(Path), rebar_state:dir(State)) of
+        {ok, NewPath}      -> filename:join([base_dir(State), NewPath]);
         %% not relative to project root, don't modify
-        {error, not_relative} -> Path
+        {error, badparent} -> Path
     end;
 %% relative to current app, retarget to the same dir relative to
 %% the app's out_dir
 retarget_path(State, Path, [App|Rest]) ->
-    case rebar_file_utils:relative_path(rebar_file_utils:reduce_path(Path), rebar_app_info:dir(App)) of
-        {ok, NewPath}         -> filename:join([rebar_app_info:out_dir(App), NewPath]);
-        {error, not_relative} -> retarget_path(State, Path, Rest)
+    case rebar_file_utils:path_from_ancestor(rebar_file_utils:canonical_path(Path), rebar_app_info:dir(App)) of
+        {ok, NewPath}      -> filename:join([rebar_app_info:out_dir(App), NewPath]);
+        {error, badparent} -> retarget_path(State, Path, Rest)
     end.

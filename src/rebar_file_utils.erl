@@ -38,8 +38,8 @@
          system_tmpdir/1,
          reset_dir/1,
          touch/1,
-         relative_path/2,
-         reduce_path/1]).
+         path_from_ancestor/2,
+         canonical_path/1]).
 
 -include("rebar.hrl").
 
@@ -247,29 +247,29 @@ touch(Path) ->
                                                 atime = calendar:local_time()}).
 
 %% for a given path return the path relative to a base directory
--spec relative_path(string(), string()) -> {ok, string()} | {error, not_relative}.
+-spec path_from_ancestor(string(), string()) -> {ok, string()} | {error, badparent}.
 
-relative_path(Target, To) ->
-    relative_path1(filename:split(reduce_path(Target)),
-                   filename:split(reduce_path(To))).
+path_from_ancestor(Target, To) ->
+    path_from_ancestor_(filename:split(canonical_path(Target)),
+                        filename:split(canonical_path(To))).
 
-relative_path1([Part|Target], [Part|To]) -> relative_path1(Target, To);
-relative_path1([], [])                   -> {ok, ""};
-relative_path1(Target, [])               -> {ok, filename:join(Target)};
-relative_path1(_, _)                     -> {error, not_relative}.
+path_from_ancestor_([Part|Target], [Part|To]) -> path_from_ancestor_(Target, To);
+path_from_ancestor_([], [])                   -> {ok, ""};
+path_from_ancestor_(Target, [])               -> {ok, filename:join(Target)};
+path_from_ancestor_(_, _)                     -> {error, badparent}.
 
 
 %% reduce a filepath by removing all incidences of `.' and `..'
--spec reduce_path(string()) -> string().
+-spec canonical_path(string()) -> string().
 
-reduce_path(Dir) -> reduce_path([], filename:split(filename:absname(Dir))).
+canonical_path(Dir) -> canonical_path([], filename:split(filename:absname(Dir))).
 
-reduce_path([], [])                -> filename:nativename("/");
-reduce_path(Acc, [])               -> filename:join(lists:reverse(Acc));
-reduce_path(Acc, ["."|Rest])       -> reduce_path(Acc, Rest);
-reduce_path([_|Acc], [".."|Rest])  -> reduce_path(Acc, Rest);
-reduce_path([], [".."|Rest])       -> reduce_path([], Rest);
-reduce_path(Acc, [Component|Rest]) -> reduce_path([Component|Acc], Rest).
+canonical_path([], [])                -> filename:nativename("/");
+canonical_path(Acc, [])               -> filename:join(lists:reverse(Acc));
+canonical_path(Acc, ["."|Rest])       -> canonical_path(Acc, Rest);
+canonical_path([_|Acc], [".."|Rest])  -> canonical_path(Acc, Rest);
+canonical_path([], [".."|Rest])       -> canonical_path([], Rest);
+canonical_path(Acc, [Component|Rest]) -> canonical_path([Component|Acc], Rest).
 
 %% ===================================================================
 %% Internal functions
