@@ -31,7 +31,7 @@ init(State) ->
                                  {opts, eunit_opts(State)},
                                  {profiles, [test]}]),
     State1 = rebar_state:add_provider(State, Provider),
-    State2 = rebar_state:add_to_profile(State1, test, test_state(State1)),
+    State2 = rebar_state:add_to_profile(State1, test, test_state()),
     {ok, State2}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
@@ -89,28 +89,7 @@ format_error({error, Error}) ->
 %% Internal functions
 %% ===================================================================
 
-test_state(State) ->
-    ErlOpts = rebar_state:get(State, eunit_compile_opts, []),
-    TestOpts = safe_define_test_macro(ErlOpts),
-    TestDir = [{extra_src_dirs, ["test"]}],
-    first_files(State) ++ [{erl_opts, TestOpts ++ TestDir}].
-
-safe_define_test_macro(Opts) ->
-    %% defining a compile macro twice results in an exception so
-    %% make sure 'TEST' is only defined once
-    case test_defined(Opts) of
-       true -> Opts;
-       false -> [{d, 'TEST'}] ++ Opts
-    end.
-
-test_defined([{d, 'TEST'}|_]) -> true;
-test_defined([{d, 'TEST', true}|_]) -> true;
-test_defined([_|Rest]) -> test_defined(Rest);
-test_defined([]) -> false.
-
-first_files(State) ->
-    EUnitFirst = rebar_state:get(State, eunit_first_files, []),
-    [{erl_first_files, EUnitFirst}].
+test_state() -> [{extra_src_dirs, ["test"]}, {erl_opts, [{d, 'TEST'}]}].
 
 prepare_tests(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
