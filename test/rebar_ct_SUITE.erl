@@ -17,13 +17,15 @@
          multi_suite/1,
          all_suite/1,
          single_dir_and_single_suite/1,
-         symlinked_dir_overwritten_fix/1]).
+         symlinked_dir_overwritten_fix/1,
+         data_dir_correct/1]).
 
 -include_lib("common_test/include/ct.hrl").
 
 all() -> [{group, basic_app},
           {group, multi_app},
-          {group, dirs_and_suites}].
+          {group, dirs_and_suites},
+          {group, data_dirs}].
 
 groups() -> [{basic_app, [], [basic_app_default_dirs,
                               basic_app_default_beams]},
@@ -38,7 +40,8 @@ groups() -> [{basic_app, [], [basic_app_default_dirs,
                                     multi_suite,
                                     all_suite,
                                     single_dir_and_single_suite,
-                                    symlinked_dir_overwritten_fix]}].
+                                    symlinked_dir_overwritten_fix]},
+             {data_dirs, [], [data_dir_correct]}].
 
 init_per_group(basic_app, Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_"),
@@ -139,7 +142,8 @@ init_per_group(dirs_and_suites, Config) ->
     ok = filelib:ensure_dir(Suite3),
     ok = file:write_file(Suite3, test_suite("extras")),
 
-    [{appnames, [Name1, Name2]}|C].
+    [{appnames, [Name1, Name2]}|C];
+init_per_group(_, Config) -> Config.
 
 end_per_group(_Group, _Config) -> ok.
 
@@ -544,7 +548,13 @@ symlinked_dir_overwritten_fix(Config) ->
 
     {ok, _} = rebar_test_utils:run_and_check(Config, [], ["as", "test", "compile"], return).
 
+data_dir_correct(Config) ->
+    DataDir = ?config(data_dir, Config),
+    Parts = filename:split(DataDir),
+    ["rebar_ct_SUITE_data","test","rebar","lib","test","_build"|_] = lists:reverse(Parts).
 
+
+%% helper for generating test data
 test_suite(Name) ->
     io_lib:format("-module(~ts_SUITE).\n"
                   "-compile(export_all).\n"
