@@ -122,12 +122,13 @@ prepare_tests(State) ->
     validate_tests(State, ProjectApps, Tests).
 
 resolve_tests(RawOpts) ->
-    Apps    = resolve(app, application, RawOpts),
-    Dirs    = resolve(dir, RawOpts),
-    Files   = resolve(file, RawOpts),
-    Modules = resolve(module, RawOpts),
-    Suites  = resolve(suite, module, RawOpts),
-    Apps ++ Dirs ++ Files ++ Modules ++ Suites.
+    Apps         = resolve(app, application, RawOpts),
+    Applications = resolve(application, RawOpts),
+    Dirs         = resolve(dir, RawOpts),
+    Files        = resolve(file, RawOpts),
+    Modules      = resolve(module, RawOpts),
+    Suites       = resolve(suite, module, RawOpts),
+    Apps ++ Applications ++ Dirs ++ Files ++ Modules ++ Suites.
 
 resolve(Flag, RawOpts) -> resolve(Flag, Flag, RawOpts).
 
@@ -292,12 +293,13 @@ handle_results({error, Reason}) ->
 
 eunit_opts(_State) ->
     [{app, undefined, "app", string, help(app)},
+     {application, undefined, "application", string, help(app)},
      {cover, $c, "cover", boolean, help(cover)},
      {dir, undefined, "dir", string, help(dir)},
      {error_on_warning, $e, "error_on_warning", boolean, help(error)},
      {file, undefined, "file", string, help(file)},
      {module, undefined, "module", string, help(module)},
-     {suite, undefined, "suite", string, help(suite)},
+     {suite, undefined, "suite", string, help(module)},
      {verbose, $v, "verbose", boolean, help(verbose)}].
 
 help(app)     -> "Comma separated list of application test suites to run. Equivalent to `[{application, App}]`.";
@@ -306,5 +308,4 @@ help(dir)     -> "Comma separated list of dirs to load tests from. Equivalent to
 help(error)   -> "Error on invalid test specifications instead of warning.";
 help(file)    -> "Comma separated list of files to load tests from. Equivalent to `[{file, File}]`.";
 help(module)  -> "Comma separated list of modules to load tests from. Equivalent to `[{module, Module}]`.";
-help(suite)   -> "Comma separated list of test suites to run. Equivalent to `[{module, Suite}]`.";
 help(verbose) -> "Verbose output. Defaults to false.".
