@@ -548,6 +548,7 @@ symlinked_dir_overwritten_fix(Config) ->
 
     {ok, _} = rebar_test_utils:run_and_check(Config, [], ["as", "test", "compile"], return).
 
+%% this test probably only fails when this suite is run via rebar3 with the --cover flag
 data_dir_correct(Config) ->
     DataDir = ?config(data_dir, Config),
     Parts = filename:split(DataDir),
