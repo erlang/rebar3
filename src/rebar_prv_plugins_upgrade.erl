@@ -24,7 +24,7 @@ init(State) ->
                     {bare, true},
                     {deps, ?DEPS},
                     {example, "rebar3 plugins upgrade <plugin>"},
-                    {short_desc, "Uprade plugins"},
+                    {short_desc, "Upgrade plugins"},
                     {desc, "List or upgrade plugins"},
                     {opts, [{plugin, undefined, undefined, string,
                              "Plugin to upgrade"}]}])),
