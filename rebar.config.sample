@@ -99,6 +99,7 @@
 {dialyzer, [
     {warnings, [underspecs, no_return]},
     {get_warnings, true},
+    {plt_apps, top_level_deps}, % top_level_deps | all_deps
     {plt_extra_apps, []},
     {plt_location, local}, % local | "/my/file/name"
     {plt_prefix, "rebar3"},
