@@ -81,6 +81,19 @@ get_template_vars(TemplateTerms, State) ->
     end,
     override_vars(Vars, override_vars(global_variables(State), default_variables())).
 
+%% merges variables passed on the command line with variables from file if
+%% specified.
+get_user_vars(UserVars) ->
+    case lists:keytake(template_vars, 1, UserVars) of
+        {value, {template_vars, Filename}, NewUserVars} ->
+            ?DEBUG("Merging template vars from ~p", [Filename]),
+            FileVars = file_variables(Filename),
+            override_vars(NewUserVars, FileVars);
+        false -> UserVars
+    end.
+
+
+
 %% Provide a way to merge a set of variables with another one. The left-hand
 %% set of variables takes precedence over the right-hand set.
 %% In the case where left-hand variable description contains overriden defaults, but
@@ -145,6 +158,15 @@ global_variables(State) ->
         {ok, Data} -> proplists:get_value(variables, Data, [])
     end.
 
+file_variables(Filename) ->
+    case file:consult(Filename) of
+        {error, enoent} ->
+            ?ABORT("~p set as template_vars doesn't exist\n", [Filename]);
+        {error, Error} ->
+            ?ABORT("Error parsing file: ~p, Error: ~p", [Filename, Error]);
+        {ok, Data} -> proplists:get_value(variables, Data, [])
+    end.
+
 %% drop the documentation for variables when present
 drop_var_docs([]) -> [];
 drop_var_docs([{K,V,_}|Rest]) -> [{K,V} | drop_var_docs(Rest)];
@@ -154,7 +176,8 @@ drop_var_docs([{K,V}|Rest]) -> [{K,V} | drop_var_docs(Rest)].
 %% the template.
 create({Template, Type, File}, Files, UserVars, Force, State) ->
     TemplateTerms = consult(load_file(Files, Type, File)),
-    Vars = drop_var_docs(override_vars(UserVars, get_template_vars(TemplateTerms, State))),
+    MergedUserVars = get_user_vars(UserVars),
+    Vars = drop_var_docs(override_vars(MergedUserVars, get_template_vars(TemplateTerms, State))),
     TemplateCwd = filename:dirname(File),
     execute_template(TemplateTerms, Files, {Template, Type, TemplateCwd}, Vars, Force).
 
