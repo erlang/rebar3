@@ -176,7 +176,7 @@ check_ssl_version() ->
     end.
 
 parse_vsn(Vsn) ->
-    version_pad(string:tokens(Vsn, ".")).
+    version_pad(string:tokens(Vsn, ".-")).
 
 version_pad([Major]) ->
     {list_to_integer(Major), 0, 0};
