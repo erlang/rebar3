@@ -194,16 +194,10 @@ parse_tags(Dir) ->
         {error, _} ->
             {undefined, "0.0.0"};
         {ok, Line} ->
-            case re:run(Line, "(\\(|\\s)(HEAD,\\s)tag:\\s(v?([^,\\)]+))", [{capture, [3, 4], list}]) of
+            case re:run(Line, "(\\(|\\s)tag:\\s(v([^,\\)]+))", [{capture, [2, 3], list}]) of
                 {match,[Tag, Vsn]} ->
                     {Tag, Vsn};
                 nomatch ->
-                    case rebar_utils:sh("git describe --tags",
-                            [{use_stdout, false}, return_on_error, {cd, Dir}]) of
-                        {error, _} ->
-                            {undefined, "0.0.0"};
-                        {ok, LatestVsn} ->
-                            {undefined, string:strip(LatestVsn, both, $\n)}
-                    end
+                    {undefined, "0.0.0"}
             end
     end.
