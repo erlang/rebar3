@@ -15,7 +15,8 @@ main(_Args) ->
     %% Fetch and build deps required to build rebar3
     BaseDeps = [{providers, []}
                ,{getopt, []}
-               ,{erlware_commons, ["ec_dictionary.erl", "ec_vsn.erl"]}],
+               ,{erlware_commons, ["ec_dictionary.erl", "ec_vsn.erl"]}
+               ,{certifi, []}],
     Deps = get_deps(),
     [fetch_and_compile(Dep, Deps) || Dep <- BaseDeps],
 
