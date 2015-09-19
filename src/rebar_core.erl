@@ -68,6 +68,7 @@ process_command(State, Command) ->
     Namespace = rebar_state:namespace(State),
     TargetProviders = providers:get_target_providers(Command, Providers, Namespace),
     CommandProvider = providers:get_provider(Command, Providers, Namespace),
+    ?DEBUG("Expanded command sequence to be run: ~p", [TargetProviders]),
     case CommandProvider of
         not_found when Command =/= do ->
             case Namespace of
