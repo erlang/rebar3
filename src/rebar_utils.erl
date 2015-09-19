@@ -592,6 +592,8 @@ vcs_vsn(Vcs, Dir, Resources) ->
     end.
 
 %% Temp work around for repos like relx that use "semver"
+vcs_vsn_cmd(Vsn, _, _) when is_binary(Vsn) ->
+    {plain, Vsn};
 vcs_vsn_cmd(VCS, Dir, Resources) when VCS =:= semver ; VCS =:= "semver" ->
     vcs_vsn_cmd(git, Dir, Resources);
 vcs_vsn_cmd({cmd, _Cmd}=Custom, _, _) ->
