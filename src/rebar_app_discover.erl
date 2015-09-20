@@ -229,7 +229,8 @@ try_handle_app_file(AppInfo0, [File], AppDir, AppSrcFile, _, Validate) ->
                            [F] ->
                                rebar_app_info:app_file_src(AppInfo1, F);
                            [] ->
-                               AppInfo1;
+                               %% Set to undefined in case AppInfo previous had a .app.src
+                               rebar_app_info:app_file_src(AppInfo1, undefined);
                            Other when is_list(Other) ->
                                throw({error, {multiple_app_files, Other}})
                       end,
