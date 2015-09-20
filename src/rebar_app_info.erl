@@ -232,6 +232,8 @@ app_file_src(#app_info_t{app_file_src=AppFileSrc}) ->
     ec_cnv:to_list(AppFileSrc).
 
 -spec app_file_src(t(), file:filename_all()) -> t().
+app_file_src(AppInfo=#app_info_t{}, undefined) ->
+    AppInfo#app_info_t{app_file_src=undefined};
 app_file_src(AppInfo=#app_info_t{}, AppFileSrc) ->
     AppInfo#app_info_t{app_file_src=ec_cnv:to_list(AppFileSrc)}.
 
@@ -248,6 +250,8 @@ app_file_src_script(#app_info_t{app_file_src_script=AppFileSrcScript}) ->
     ec_cnv:to_list(AppFileSrcScript).
 
 -spec app_file_src_script(t(), file:filename_all()) -> t().
+app_file_src_script(AppInfo=#app_info_t{}, undefined) ->
+    AppInfo#app_info_t{app_file_src_script=undefined};
 app_file_src_script(AppInfo=#app_info_t{}, AppFileSrcScript) ->
     AppInfo#app_info_t{app_file_src_script=ec_cnv:to_list(AppFileSrcScript)}.
 

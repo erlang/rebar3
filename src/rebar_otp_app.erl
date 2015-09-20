@@ -60,7 +60,7 @@ compile(State, App) ->
 format_error({missing_app_file, Filename}) ->
     io_lib:format("App file is missing: ~s", [Filename]);
 format_error({file_read, File, Reason}) ->
-    io_lib:format("Failed to read app file ~s for processing: ~p", [File, file:format_error(Reason)]);
+    io_lib:format("Failed to read required file ~s for processing: ~s", [File, file:format_error(Reason)]);
 format_error({invalid_name, File, AppName}) ->
     io_lib:format("Invalid ~s: name of application (~p) must match filename.", [File, AppName]).
 
@@ -110,7 +110,7 @@ preprocess(State, AppInfo, AppSrcFile) ->
             A1 = apply_app_vars(AppVars, AppData),
 
             %% AppSrcFile may contain instructions for generating a vsn number
-            Vsn = app_vsn(AppSrcFile, State),
+            Vsn = app_vsn(AppData, AppSrcFile, State),
             A2 = lists:keystore(vsn, 1, A1, {vsn, Vsn}),
 
             %% systools:make_relup/4 fails with {missing_param, registered}
@@ -128,7 +128,7 @@ preprocess(State, AppInfo, AppSrcFile) ->
 
             AppFile;
         {error, Reason} ->
-            ?PRV_ERROR({file_read, AppSrcFile, Reason})
+            throw(?PRV_ERROR({file_read, AppSrcFile, Reason}))
     end.
 
 load_app_vars(State) ->
@@ -214,15 +214,10 @@ consult_app_file(Filename) ->
             end
     end.
 
-app_vsn(AppFile, State) ->
-    case consult_app_file(AppFile) of
-        {ok, [{application, _AppName, AppData}]} ->
-            AppDir = filename:dirname(filename:dirname(AppFile)),
-            Resources = rebar_state:resources(State),
-            rebar_utils:vcs_vsn(get_value(vsn, AppData, AppFile), AppDir, Resources);
-        {error, Reason} ->
-            throw(?PRV_ERROR({file_read, AppFile, Reason}))
-    end.
+app_vsn(AppData, AppFile, State) ->
+    AppDir = filename:dirname(filename:dirname(AppFile)),
+    Resources = rebar_state:resources(State),
+    rebar_utils:vcs_vsn(get_value(vsn, AppData, AppFile), AppDir, Resources).
 
 get_value(Key, AppInfo, AppFile) ->
     case proplists:get_value(Key, AppInfo) of
