@@ -63,14 +63,14 @@ consult_file_(File) when is_binary(File) ->
 consult_file_(File) ->
     case filename:extension(File) of
         ".script" ->
-            {ok, Term} = consult_and_eval(remove_script_ext(File), File),
-            [Term];
+            {ok, Terms} = consult_and_eval(remove_script_ext(File), File),
+            Terms;
         _ ->
             Script = File ++ ".script",
             case filelib:is_regular(Script) of
                 true ->
-                    {ok, Term} = consult_and_eval(File, Script),
-                    [Term];
+                    {ok, Terms} = consult_and_eval(File, Script),
+                    Terms;
                 false ->
                     rebar_file_utils:try_consult(File)
             end
