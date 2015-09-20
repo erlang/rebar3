@@ -69,7 +69,7 @@ consult_file_(File) ->
             Script = File ++ ".script",
             case filelib:is_regular(Script) of
                 true ->
-                    {ok, [Term]} = consult_and_eval(File, Script),
+                    {ok, Term} = consult_and_eval(File, Script),
                     [Term];
                 false ->
                     rebar_file_utils:try_consult(File)
