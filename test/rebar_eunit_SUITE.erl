@@ -5,25 +5,25 @@
          end_per_suite/1,
          init_per_testcase/2,
          all/0]).
--export([test_basic_app/1,
-         test_multi_app/1,
-         test_profile/1,
-         test_basic_exports/1,
-         test_multi_exports/1,
-         test_basic_defines/1,
-         test_multi_defines/1,
-         test_single_app_flag/1,
-         test_multiple_app_flag/1,
-         test_single_module_flag/1,
-         test_nonexistent_module_flag/1,
-         test_single_file_flag/1,
-         test_multiple_file_flag/1,
-         test_nonexistent_file_flag/1,
-         test_single_dir_flag/1,
-         test_multiple_dir_flag/1,
-         test_nonexistent_dir_flag/1,
-         test_config_tests/1,
-         test_nonexistent_tests/1,
+-export([basic_app/1,
+         multi_app/1,
+         profile/1,
+         basic_exports/1,
+         multi_exports/1,
+         basic_defines/1,
+         multi_defines/1,
+         single_app_flag/1,
+         multiple_app_flag/1,
+         single_module_flag/1,
+         nonexistent_module_flag/1,
+         single_file_flag/1,
+         multiple_file_flag/1,
+         nonexistent_file_flag/1,
+         single_dir_flag/1,
+         multiple_dir_flag/1,
+         nonexistent_dir_flag/1,
+         config_tests/1,
+         nonexistent_tests/1,
          eunit_compile_opts/1,
          eunit_first_files/1]).
 
@@ -44,17 +44,17 @@ init_per_testcase(_, Config) ->
     rebar_test_utils:init_rebar_state(Config, "eunit_").
 
 all() ->
-    [test_basic_app, test_multi_app, test_profile,
-     test_basic_exports, test_multi_exports,
-     test_basic_defines, test_multi_defines,
-     test_single_app_flag, test_multiple_app_flag,
-     test_single_module_flag, test_nonexistent_module_flag,
-     test_single_file_flag, test_multiple_file_flag, test_nonexistent_file_flag,
-     test_single_dir_flag, test_multiple_dir_flag, test_nonexistent_dir_flag,
-     test_config_tests, test_nonexistent_tests,
+    [basic_app, multi_app, profile,
+     basic_exports, multi_exports,
+     basic_defines, multi_defines,
+     single_app_flag, multiple_app_flag,
+     single_module_flag, nonexistent_module_flag,
+     single_file_flag, multiple_file_flag, nonexistent_file_flag,
+     single_dir_flag, multiple_dir_flag, nonexistent_dir_flag,
+     config_tests, nonexistent_tests,
      eunit_compile_opts, eunit_first_files].
 
-test_basic_app(Config) ->
+basic_app(Config) ->
     AppDir = ?config(apps, Config),
 
     Name = rebar_test_utils:create_random_name("basic_"),
@@ -64,7 +64,7 @@ test_basic_app(Config) ->
     RebarConfig = [{erl_opts, [{d, some_define}]}],
     rebar_test_utils:run_and_check(Config, RebarConfig, ["eunit"], {ok, [{app, Name}]}).
 
-test_multi_app(Config) ->
+multi_app(Config) ->
     AppDir = ?config(apps, Config),
 
     Name1 = rebar_test_utils:create_random_name("multi_app1_"),
@@ -86,7 +86,7 @@ test_multi_app(Config) ->
                                    ["eunit"],
                                    {ok, [{app, Name1}, {app, Name2}]}).
 
-test_profile(Config) ->
+profile(Config) ->
     AppDir = ?config(apps, Config),
 
     Name = rebar_test_utils:create_random_name("profile_"),
@@ -100,7 +100,7 @@ test_profile(Config) ->
                                    ["as", "test", "eunit"],
                                    {ok, [{app, Name}]}).
 
-test_basic_exports(Config) ->
+basic_exports(Config) ->
     AppDir = ?config(apps, Config),
 
     Name = rebar_test_utils:create_random_name("basic_exports_"),
@@ -122,7 +122,7 @@ test_basic_exports(Config) ->
     lists:foreach(fun(Expect) -> true = lists:member(Expect, AppExports) end, AppExpect),
     lists:foreach(fun(Expect) -> true = lists:member(Expect, SuiteExports) end, SuiteExpect).
 
-test_multi_exports(Config) ->
+multi_exports(Config) ->
     AppDir = ?config(apps, Config),
 
     Name1 = rebar_test_utils:create_random_name("multi_exports_app1_"),
@@ -159,7 +159,7 @@ test_multi_exports(Config) ->
     lists:foreach(fun(Expect) -> true = lists:member(Expect, AppExports2) end, AppExpect),
     lists:foreach(fun(Expect) -> true = lists:member(Expect, SuiteExports2) end, SuiteExpect).
 
-test_basic_defines(Config) ->
+basic_defines(Config) ->
     AppDir = ?config(apps, Config),
 
     Name = rebar_test_utils:create_random_name("basic_"),
@@ -177,7 +177,7 @@ test_basic_defines(Config) ->
     lists:foreach(fun(E) -> true = lists:member(E, AppOpts) end, Expect),
     lists:foreach(fun(E) -> true = lists:member(E, SuiteOpts) end, Expect).
 
-test_multi_defines(Config) ->
+multi_defines(Config) ->
     AppDir = ?config(apps, Config),
 
     Name1 = rebar_test_utils:create_random_name("multi_app1_"),
@@ -213,7 +213,7 @@ test_multi_defines(Config) ->
     lists:foreach(fun(E) -> true = lists:member(E, AppOpts2) end, Expect),
     lists:foreach(fun(E) -> true = lists:member(E, SuiteOpts2) end, Expect).
 
-test_single_app_flag(Config) ->
+single_app_flag(Config) ->
     AppDir = ?config(apps, Config),
 
     Name1 = rebar_test_utils:create_random_name("multi_exports_app1_"),
@@ -250,7 +250,7 @@ test_single_app_flag(Config) ->
     {error, nofile} = code:ensure_loaded(Suite2),
     {error, nofile} = code:ensure_loaded(all_tests).
 
-test_multiple_app_flag(Config) ->
+multiple_app_flag(Config) ->
     AppDir = ?config(apps, Config),
 
     Name1 = rebar_test_utils:create_random_name("multi_exports_app1_"),
@@ -287,7 +287,7 @@ test_multiple_app_flag(Config) ->
     {module, Suite2} = code:ensure_loaded(Suite2),
     {error, nofile} = code:ensure_loaded(all_tests).
 
-test_single_module_flag(Config) ->
+single_module_flag(Config) ->
     AppDir = ?config(apps, Config),
 
     Name1 = rebar_test_utils:create_random_name("multi_exports_app1_"),
@@ -312,7 +312,7 @@ test_single_module_flag(Config) ->
     Suite1 = list_to_atom("not_a_real_src_" ++ Name1 ++ "_tests"),
     {module, Suite1} = code:ensure_loaded(Suite1).
 
-test_nonexistent_module_flag(Config) ->
+nonexistent_module_flag(Config) ->
     AppDir = ?config(apps, Config),
 
     Name1 = rebar_test_utils:create_random_name("multi_exports_app1_"),
@@ -336,7 +336,7 @@ test_nonexistent_module_flag(Config) ->
 
     Error = {eunit_test_errors, ["Module `not_a_real_module' not found in applications."]}.
 
-test_single_file_flag(Config) ->
+single_file_flag(Config) ->
     AppDir = ?config(apps, Config),
 
     Name = rebar_test_utils:create_random_name("single_file_flag_app_"),
@@ -354,7 +354,7 @@ test_single_file_flag(Config) ->
     Mod = list_to_atom("not_a_real_src_" ++ Name ++ "_tests"),
     {module, Mod} = code:ensure_loaded(Mod).
 
-test_multiple_file_flag(Config) ->
+multiple_file_flag(Config) ->
     AppDir = ?config(apps, Config),
 
     Name = rebar_test_utils:create_random_name("multiple_file_flag_app_"),
@@ -377,7 +377,7 @@ test_multiple_file_flag(Config) ->
     Mod2 = list_to_atom("not_a_real_src_" ++ Name),
     {module, Mod2} = code:ensure_loaded(Mod2).
 
-test_nonexistent_file_flag(Config) ->
+nonexistent_file_flag(Config) ->
     AppDir = ?config(apps, Config),
 
     Name = rebar_test_utils:create_random_name("nonexistent_file_flag_app_"),
@@ -395,7 +395,7 @@ test_nonexistent_file_flag(Config) ->
 
     Error = {eunit_test_errors, ["File `not_a_real_file.beam' not found."]}.
 
-test_single_dir_flag(Config) ->
+single_dir_flag(Config) ->
     AppDir = ?config(apps, Config),
 
     Name = rebar_test_utils:create_random_name("single_file_flag_app_"),
@@ -413,7 +413,7 @@ test_single_dir_flag(Config) ->
     Mod = list_to_atom("not_a_real_src_" ++ Name ++ "_tests"),
     {module, Mod} = code:ensure_loaded(Mod).
 
-test_multiple_dir_flag(Config) ->
+multiple_dir_flag(Config) ->
     AppDir = ?config(apps, Config),
 
     Name = rebar_test_utils:create_random_name("multiple_file_flag_app_"),
@@ -436,7 +436,7 @@ test_multiple_dir_flag(Config) ->
     Mod2 = list_to_atom("not_a_real_src_" ++ Name),
     {module, Mod2} = code:ensure_loaded(Mod2).
 
-test_nonexistent_dir_flag(Config) ->
+nonexistent_dir_flag(Config) ->
     AppDir = ?config(apps, Config),
 
     Name = rebar_test_utils:create_random_name("nonexistent_file_flag_app_"),
@@ -454,7 +454,7 @@ test_nonexistent_dir_flag(Config) ->
 
     Error = {eunit_test_errors, ["Directory `not_a_real_dir' not found."]}.
 
-test_config_tests(Config) ->
+config_tests(Config) ->
     AppDir = ?config(apps, Config),
 
     Name1 = rebar_test_utils:create_random_name("config_tests_app1_"),
@@ -491,7 +491,7 @@ test_config_tests(Config) ->
     {error, nofile} = code:ensure_loaded(Suite2),
     {error, nofile} = code:ensure_loaded(all_tests).
 
-test_nonexistent_tests(Config) ->
+nonexistent_tests(Config) ->
     AppDir = ?config(apps, Config),
 
     Name1 = rebar_test_utils:create_random_name("multi_exports_app1_"),
