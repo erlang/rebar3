@@ -72,7 +72,8 @@ format_warning({_Tag, {File, Line}, Msg}, FOpt) when is_list(File),
 %%----- Warnings for general discrepancies ----------------
 message_to_string({apply, [Args, ArgNs, FailReason,
                            SigArgs, SigRet, Contract]}) ->
-    format("Fun application with arguments ~s ", [Args]) ++
+    format(?BW"Fun application with arguments "?R"~s ",
+           [bad_arg(ArgNs, Args)]) ++
         call_or_apply_to_string(ArgNs, FailReason, SigArgs, SigRet, Contract);
 message_to_string({app_call, [M, F, Args, Culprit, ExpectedType, FoundType]}) ->
     format(?BW "The call" ?R " ~s:~s~s " ?BW "requires that"
@@ -80,37 +81,42 @@ message_to_string({app_call, [M, F, Args, Culprit, ExpectedType, FoundType]}) ->
            ?R "\n",
            [M, F, Args, Culprit, ExpectedType, FoundType]);
 message_to_string({bin_construction, [Culprit, Size, Seg, Type]}) ->
-    format("Binary construction will fail since the ~s field ~s in"
-           " segment ~s has type ~s\n", [Culprit, Size, Seg, Type]);
+    format(?BW "Binary construction will fail since the"?NB" ~s "?BW"field"?R
+           " ~s"?BW" in segment"?R" ~s"?BW" has type"?R" ~s\n",
+           [Culprit, Size, Seg, Type]);
 message_to_string({call, [M, F, Args, ArgNs, FailReason,
                           SigArgs, SigRet, Contract]}) ->
     format(?BW "The call" ?R " ~w:~w~s ", [M, F, bad_arg(ArgNs, Args)]) ++
         call_or_apply_to_string(ArgNs, FailReason, SigArgs, SigRet, Contract);
 message_to_string({call_to_missing, [M, F, A]}) ->
-    format("Call to missing or unexported function ~w:~w/~w\n", [M, F, A]);
+    format(?BW"Call to missing or unexported function "?R"~w:~w/~w\n",
+           [M, F, A]);
 message_to_string({exact_eq, [Type1, Op, Type2]}) ->
-    format("The test ~s ~s ~s can never evaluate to 'true'\n",
+    format(?BW"The test "?R"~s ~s ~s"?BW" can never evaluate to 'true'\n",
            [Type1, Op, Type2]);
 message_to_string({fun_app_args, [Args, Type]}) ->
-    format("Fun application with arguments ~s will fail"
-           " since the function has type ~s\n", [Args, Type]);
+    format(?BW"Fun application with arguments "?R"~s"?BW" will fail"
+           " since the function has type "?R"~s\n", [Args, Type]);
 message_to_string({fun_app_no_fun, [Op, Type, Arity]}) ->
-    format("Fun application will fail since ~s :: ~s"
-           " is not a function of arity ~w\n", [Op, Type, Arity]);
+    format(?BW"Fun application will fail since "?R"~s "?BW"::"?R" ~s"
+           " is not a function of arity "?R"~w\n", [Op, Type, Arity]);
 message_to_string({guard_fail, []}) ->
     ?BW "Clause guard cannot succeed.\n" ?R;
 message_to_string({guard_fail, [Arg1, Infix, Arg2]}) ->
-    format(?BW "Guard test "?R"~s ~s ~s"?BW" can never succeed\n", [Arg1, Infix, Arg2]);
+    format(?BW "Guard test "?R"~s ~s ~s"?BW" can never succeed\n",
+           [Arg1, Infix, Arg2]);
 message_to_string({neg_guard_fail, [Arg1, Infix, Arg2]}) ->
-    format("Guard test not(~s ~s ~s) can never succeed\n",
+    format(?BW "Guard test not("?R"~s ~s ~s"?BW") can never succeed\n",
            [Arg1, Infix, Arg2]);
 message_to_string({guard_fail, [Guard, Args]}) ->
-    format("Guard test ~w~s can never succeed\n", [Guard, Args]);
+    format(?BW "Guard test "?R"~w~s"?BW" can never succeed\n",
+           [Guard, Args]);
 message_to_string({neg_guard_fail, [Guard, Args]}) ->
-    format("Guard test not(~w~s) can never succeed\n", [Guard, Args]);
+    format(?BW"Guard test not("?R"~w~s"?BW") can never succeed\n",
+           [Guard, Args]);
 message_to_string({guard_fail_pat, [Pat, Type]}) ->
-    format("Clause guard cannot succeed. The ~s was matched"
-           " against the type ~s\n", [Pat, Type]);
+    format(?BW"Clause guard cannot succeed. The "?R"~s"?BW" was matched"
+           " against the type "?R"~s\n", [Pat, Type]);
 message_to_string({improper_list_constr, [TlType]}) ->
     format(?BW "Cons will produce an improper list"
            " since its "?NB"2"?R"nd"?BW" argument is"?R" ~s\n", [TlType]);
@@ -127,17 +133,18 @@ message_to_string({no_return, [Type|Name]}) ->
         both -> NameString ++ ?BW "has no local return\n" ?R
     end;
 message_to_string({record_constr, [RecConstr, FieldDiffs]}) ->
-    format("Record construction ~s violates the"
-           " declared type of field ~s\n", [RecConstr, FieldDiffs]);
+    format(?BW"Record construction "?R"~s"?BW" violates the"
+           " declared type of field "?R"~s\n", [RecConstr, FieldDiffs]);
 message_to_string({record_constr, [Name, Field, Type]}) ->
-    format("Record construction violates the declared type for #~w{}"
-           " since ~s cannot be of type ~s\n", [Name, Field, Type]);
+    format(?BW"Record construction violates the declared type for "?R"#~w{}" ?BW
+           " since "?R"~s"?BW" cannot be of type "?R"~s\n",
+           [Name, Field, Type]);
 message_to_string({record_matching, [String, Name]}) ->
-    format("The ~s violates the"
-           " declared type for #~w{}\n", [String, Name]);
+    format(?BW"The "?R"~s"?BW" violates the"
+           " declared type for "?R"#~w{}\n", [String, Name]);
 message_to_string({record_match, [Pat, Type]}) ->
-    format("Matching of ~s tagged with a record name violates the declared"
-           " type of ~s\n", [Pat, Type]);
+    format(?BW"Matching of "?R"~s"?BW" tagged with a record name violates the"
+           " declared type of "?R"~s\n", [Pat, Type]);
 message_to_string({pattern_match, [Pat, Type]}) ->
     format(?BW"The ~s"?BW" can never match the type "?NG"~s\n",
            [bad_pat(Pat), Type]);
@@ -146,78 +153,79 @@ message_to_string({pattern_match_cov, [Pat, Type]}) ->
            " clauses completely covered the type "?NG"~s\n",
            [bad_pat(Pat), Type]);
 message_to_string({unmatched_return, [Type]}) ->
-    format("Expression produces a value of type ~s,"
+    format(?BW "Expression produces a value of type "?R"~s"?BW","
            " but this value is unmatched\n", [Type]);
 message_to_string({unused_fun, [F, A]}) ->
     format(?BW "Function "?NR"~w/~w"?BW" will never be called\n", [F, A]);
 %%----- Warnings for specs and contracts -------------------
 message_to_string({contract_diff, [M, F, _A, Contract, Sig]}) ->
-    format("Type specification ~w:~w~s"
-           " is not equal to the success typing: ~w:~w~s\n",
+    format(?BW"Type specification "?R"~w:~w~s"?BW
+           " is not equal to the success typing: "?R"~w:~w~s\n",
            [M, F, Contract, M, F, Sig]);
 message_to_string({contract_subtype, [M, F, _A, Contract, Sig]}) ->
-    format("Type specification ~w:~w~s"
-           " is a subtype of the success typing: ~w:~w~s\n",
+    format(?BW"Type specification "?R"~w:~w~s"?BW
+           " is a subtype of the success typing: "?R"~w:~w~s\n",
            [M, F, Contract, M, F, Sig]);
 message_to_string({contract_supertype, [M, F, _A, Contract, Sig]}) ->
-    format("Type specification ~w:~w~s"
-           " is a supertype of the success typing: ~w:~w~s\n",
+    format(?BW"Type specification "?R"~w:~w~s"?BW
+           " is a supertype of the success typing: "?R"~w:~w~s\n",
            [M, F, Contract, M, F, Sig]);
 message_to_string({contract_range, [Contract, M, F, ArgStrings, Line, CRet]}) ->
-    format("The contract ~w:~w~s cannot be right because the inferred"
-           " return for ~w~s on line ~w is ~s\n",
+    format(?BW"The contract "?R"~w:~w~s"?BW" cannot be right because the"
+           " inferred return for "?R"~w~s"?BW" on line "?R"~w"?BW" is "?R"~s\n",
            [M, F, Contract, F, ArgStrings, Line, CRet]);
 message_to_string({invalid_contract, [M, F, A, Sig]}) ->
     format(?BW "Invalid type specification for function" ?R " ~w:~w/~w."
            ?BW " The success typing is" ?R " ~s\n", [M, F, A, Sig]);
 message_to_string({extra_range, [M, F, A, ExtraRanges, SigRange]}) ->
-    format("The specification for ~w:~w/~w states that the function"
-           " might also return ~s but the inferred return is ~s\n",
+    format(?BW"The specification for "?R"~w:~w/~w"?BW" states that the function"
+           " might also return "?R"~s"?BW" but the inferred return is "?R"~s\n",
            [M, F, A, ExtraRanges, SigRange]);
 message_to_string({overlapping_contract, [M, F, A]}) ->
-    format("Overloaded contract for ~w:~w/~w has overlapping domains;"
-           " such contracts are currently unsupported and are simply ignored\n",
-           [M, F, A]);
+    format(?BW"Overloaded contract for "?R"~w:~w/~w"?BW" has overlapping"
+           " domains; such contracts are currently unsupported and are simply "
+           "ignored\n", [M, F, A]);
 message_to_string({spec_missing_fun, [M, F, A]}) ->
-    format("Contract for function that does not exist: ~w:~w/~w\n",
+    format(?BW"Contract for function that does not exist: "?R"~w:~w/~w\n",
            [M, F, A]);
 %%----- Warnings for opaque type violations -------------------
 message_to_string({call_with_opaque, [M, F, Args, ArgNs, ExpArgs]}) ->
-    format("The call ~w:~w~s contains ~s when ~s\n",
+    format(?BW"The call "?R"~w:~w~s"?BW" contains "?R"~s"?BW" when "?R"~s\n",
            [M, F, Args, form_positions(ArgNs), form_expected(ExpArgs)]);
 message_to_string({call_without_opaque, [M, F, Args, [{N,_,_}|_] = ExpectedTriples]}) ->
     format([?BW, "The call", ?R, " ~w:~w~s ", ?BW, "does not have" ?R " ~s\n"],
            [M, F, bad_arg(N, Args), form_expected_without_opaque(ExpectedTriples)]);
 message_to_string({opaque_eq, [Type, _Op, OpaqueType]}) ->
-    format("Attempt to test for equality between a term of type ~s"
-           " and a term of opaque type ~s\n", [Type, OpaqueType]);
+    format(?BW"Attempt to test for equality between a term of type "?R"~s"?BW
+           " and a term of opaque type "?R"~s\n", [Type, OpaqueType]);
 message_to_string({opaque_guard, [Arg1, Infix, Arg2, ArgNs]}) ->
-    format("Guard test ~s ~s ~s contains ~s\n",
+    format(?BW"Guard test "?R"~s ~s ~s"?BW" contains "?R"~s\n",
            [Arg1, Infix, Arg2, form_positions(ArgNs)]);
 message_to_string({opaque_guard, [Guard, Args]}) ->
-    format("Guard test ~w~s breaks the opaqueness of its argument\n",
-           [Guard, Args]);
+    format(?BW"Guard test "?R"~w~s"?BW" breaks the opaqueness of its"
+           " argument\n", [Guard, Args]);
 message_to_string({opaque_match, [Pat, OpaqueType, OpaqueTerm]}) ->
     Term = if OpaqueType =:= OpaqueTerm -> "the term";
               true -> OpaqueTerm
            end,
-    format("The attempt to match a term of type ~s against the ~s"
-           " breaks the opaqueness of ~s\n", [OpaqueType, Pat, Term]);
+    format(?BW"The attempt to match a term of type "?R"~s"?BW" against the"
+           ?R" ~s"?BW" breaks the opaqueness of "?R"~s\n",
+           [OpaqueType, Pat, Term]);
 message_to_string({opaque_neq, [Type, _Op, OpaqueType]}) ->
-    format("Attempt to test for inequality between a term of type ~s"
-           " and a term of opaque type ~s\n", [Type, OpaqueType]);
+    format(?BW"Attempt to test for inequality between a term of type "?R"~s"
+           ?BW" and a term of opaque type "?R"~s\n", [Type, OpaqueType]);
 message_to_string({opaque_type_test, [Fun, Args, Arg, ArgType]}) ->
-    format("The type test ~s~s breaks the opaqueness of the term ~s~s\n",
-           [Fun, Args, Arg, ArgType]);
+    format(?BW"The type test "?R"~s~s"?BW" breaks the opaqueness of the term "
+           ?R"~s~s\n", [Fun, Args, Arg, ArgType]);
 message_to_string({opaque_size, [SizeType, Size]}) ->
-    format("The size ~s breaks the opaqueness of ~s\n",
+    format(?BW"The size "?R"~s"?BW" breaks the opaqueness of "?R"~s\n",
            [SizeType, Size]);
 message_to_string({opaque_call, [M, F, Args, Culprit, OpaqueType]}) ->
-    format("The call ~s:~s~s breaks the opaqueness of the term ~s :: ~s\n",
-           [M, F, Args, Culprit, OpaqueType]);
+    format(?BW"The call "?R"~s:~s~s"?BW" breaks the opaqueness of the term"?R
+           " ~s :: ~s\n", [M, F, Args, Culprit, OpaqueType]);
 %%----- Warnings for concurrency errors --------------------
 message_to_string({race_condition, [M, F, Args, Reason]}) ->
-    format("The call ~w:~w~s ~s\n", [M, F, Args, Reason]);
+    format(?BW"The call "?R"~w:~w~s ~s\n", [M, F, Args, Reason]);
 %%----- Warnings for behaviour errors --------------------
 message_to_string({callback_type_mismatch, [B, F, A, ST, CT]}) ->
     format(?BW"The inferred return type of"?R" ~w/~w (~s) "?BW
@@ -231,27 +239,28 @@ message_to_string({callback_arg_type_mismatch, [B, F, A, N, ST, CT]}) ->
            ?BW"behaviour\n",
            [ordinal(N), F, A, ST, CT, B]);
 message_to_string({callback_spec_type_mismatch, [B, F, A, ST, CT]}) ->
-    format("The return type ~s in the specification of ~w/~w is not a"
-           " subtype of ~s, which is the expected return type for the"
-           " callback of ~w behaviour\n", [ST, F, A, CT, B]);
+    format(?BW"The return type "?R"~s"?BW" in the specification of "?R
+           "~w/~w"?BW" is not a subtype of "?R"~s"?BW", which is the expected"
+           " return type for the callback of "?R"~w"?BW" behaviour\n",
+           [ST, F, A, CT, B]);
 message_to_string({callback_spec_arg_type_mismatch, [B, F, A, N, ST, CT]}) ->
-    format("The specified type for the ~s argument of ~w/~w (~s) is"
-           " not a supertype of ~s, which is expected type for this"
-           " argument in the callback of the ~w behaviour\n",
-           [ordinal(N), F, A, ST, CT, B]);
+    format(?BW"The specified type for the "?R"~s"?BW" argument of "?R
+           "~w/~w (~s)"?BW" is not a supertype of "?R"~s"?BW", which is"
+           " expected type for this argument in the callback of the "?R"~w"
+           ?BW" behaviour\n", [ordinal(N), F, A, ST, CT, B]);
 message_to_string({callback_missing, [B, F, A]}) ->
-    format("Undefined callback function ~w/~w (behaviour '~w')\n",
-           [F, A, B]);
+    format(?BW"Undefined callback function "?R"~w/~w"?BW" (behaviour " ?R
+           "'~w'"?BW")\n",[F, A, B]);
 message_to_string({callback_info_missing, [B]}) ->
     format(?BW "Callback info about the " ?NR "~w" ?BW
            " behaviour is not available\n" ?R, [B]);
 %%----- Warnings for unknown functions, types, and behaviours -------------
 message_to_string({unknown_type, {M, F, A}}) ->
-    format("Unknown type ~w:~w/~w", [M, F, A]);
+    format(?BW"Unknown type "?NR"~w:~w/~w", [M, F, A]);
 message_to_string({unknown_function, {M, F, A}}) ->
-    format("Unknown function ~w:~w/~w", [M, F, A]);
+    format(?BW"Unknown function "?NR"~w:~w/~w", [M, F, A]);
 message_to_string({unknown_behaviour, B}) ->
-    format("Unknown behaviour ~w", [B]).
+    format(?BW"Unknown behaviour "?NR"~w", [B]).
 
 %%-----------------------------------------------------------------------------
 %% Auxiliary functions below
