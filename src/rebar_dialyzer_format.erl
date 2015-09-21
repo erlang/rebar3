@@ -75,14 +75,16 @@ message_to_string({apply, [Args, ArgNs, FailReason,
     format("Fun application with arguments ~s ", [Args]) ++
         call_or_apply_to_string(ArgNs, FailReason, SigArgs, SigRet, Contract);
 message_to_string({app_call, [M, F, Args, Culprit, ExpectedType, FoundType]}) ->
-    format("The call ~s:~s~s requires that ~s is of type ~s not ~s\n",
+    format(?BW "The call" ?R " ~s:~s~s " ?BW "requires that"
+           ?R " ~s " ?BW "is of type " ?NG "~s" ?BW " not " ?NR "~s"
+           ?R "\n",
            [M, F, Args, Culprit, ExpectedType, FoundType]);
 message_to_string({bin_construction, [Culprit, Size, Seg, Type]}) ->
     format("Binary construction will fail since the ~s field ~s in"
            " segment ~s has type ~s\n", [Culprit, Size, Seg, Type]);
 message_to_string({call, [M, F, Args, ArgNs, FailReason,
                           SigArgs, SigRet, Contract]}) ->
-    format("The call ~w:~w~s ", [M, F, Args]) ++
+    format(?BW "The call" ?R " ~w:~w~s ", [M, F, bad_arg(ArgNs, Args)]) ++
         call_or_apply_to_string(ArgNs, FailReason, SigArgs, SigRet, Contract);
 message_to_string({call_to_missing, [M, F, A]}) ->
     format("Call to missing or unexported function ~w:~w/~w\n", [M, F, A]);
@@ -259,12 +261,13 @@ call_or_apply_to_string(ArgNs, FailReason, SigArgs, SigRet,
             case ArgNs =:= [] of
                 true ->
                     %% We do not know which argument(s) caused the failure
-                    format("will never return since the success typing arguments"
-                           " are ~s\n", [SigArgs]);
+                    format(?BW "will never return since the success typing arguments"
+                            " are " ?R "~s\n", [SigArgs]);
                 false ->
-                    format("will never return since it differs in the ~s argument"
-                           " from the success typing arguments: ~s\n",
-                           [PositionString, SigArgs])
+                    format(?BW "will never return since it differs in the" ?R
+                           " ~s " ?BW "argument from the success typing"
+                           " arguments:" ?R " ~s\n",
+                           [PositionString, good_arg(ArgNs, SigArgs)])
             end;
         only_contract ->
             case (ArgNs =:= []) orelse IsOverloaded of
@@ -332,36 +335,60 @@ ordinal(N) when is_integer(N) -> format(?BB ++ "~w" ++ ?R ++ "th", [N]).
 
 
 bad_arg(N, Args) ->
+    color_arg(N, ?NR, Args).
+
+good_arg(N, Args) ->
+    color_arg(N, ?NG, Args).
+color_arg(N, C, Args) when is_integer(N) ->
+    color_arg([N], C, Args);
+color_arg(Ns, C, Args) ->
     Args1 = seperate_args(Args),
-    Args2 = highlight(N, Args1),
+    Args2 = highlight(Ns, 1, C, Args1),
     join_args(Args2).
 
 
-highlight(1, [Arg | Rest]) ->
-    [[?NR, Arg, ?R] | Rest];
+highlight([], _N, _C, Rest) ->
+    Rest;
 
-highlight(N, [Arg | Rest]) ->
-    [Arg | highlight(N - 1, Rest)].
+highlight([N | Nr], N, C, [Arg | Rest]) ->
+    [[C, Arg, ?R] | highlight(Nr, N+1, C, Rest)];
+
+highlight(Ns, N, C, [Arg | Rest]) ->
+    [Arg | highlight(Ns, N + 1, C, Rest)].
 
 seperate_args([$( | S]) ->
     seperate_args([], S, "", []).
 
-seperate_args([], [$,, Next | R], Arg, Args) ->
-    seperate_args([], R, [Next], [lists:reverse(Arg) | Args]);
+%% We strip this space since dialyzer is inconsistant in adding or not adding 
+%% it ....
+seperate_args([], [$,, $\s | R], Arg, Args) ->
+    seperate_args([], R, [], [lists:reverse(Arg) | Args]);
+
+seperate_args([], [$, | R], Arg, Args) ->
+    seperate_args([], R, [], [lists:reverse(Arg) | Args]);
+
 seperate_args([], [$)], Arg, Args) ->
     lists:reverse([lists:reverse(Arg) | Args]);
 seperate_args([C | D], [C | R], Arg, Args) ->
     seperate_args(D, R, [C | Arg], Args);
+%% Brackets
 seperate_args(D, [${ | R], Arg, Args) ->
     seperate_args([$}|D], R, [${ | Arg], Args);
+
+seperate_args(D, [$( | R], Arg, Args) ->
+    seperate_args([$)|D], R, [$( | Arg], Args);
+
+seperate_args(D, [$[ | R], Arg, Args) ->
+    seperate_args([$]|D], R, [$[ | Arg], Args);
+
+seperate_args(D, [$< | R], Arg, Args) ->
+    seperate_args([$>|D], R, [$< | Arg], Args);
+%% 'strings'
 seperate_args(D, [$' | R], Arg, Args) ->
     seperate_args([$'|D], R, [$' | Arg], Args);
 seperate_args(D, [$" | R], Arg, Args) ->
     seperate_args([$"|D], R, [$" | Arg], Args);
-seperate_args(D, [$( | R], Arg, Args) ->
-    seperate_args([$)|D], R, [$( | Arg], Args);
-seperate_args(D, [$< | R], Arg, Args) ->
-    seperate_args([$>|D], R, [$< | Arg], Args);
+
 seperate_args(D, [C | R], Arg, Args) ->
     seperate_args(D, R, [C | Arg], Args).
 
