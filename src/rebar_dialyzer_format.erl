@@ -29,12 +29,14 @@ format(Warning) ->
 strip(Warning) ->
     string:strip(Warning, right, $\n).
 
-%%format(Fmt, Args) ->
-%%    Args2 = [format("~s\033[1;37m", [A]) || A <- Args],
-%%    format(Fmt, Args2).
+%%fmt(Fmt, Args) ->
+%%    Args2 = [fmt("~s\033[1;37m", [A]) || A <- Args],
+%%    fmt(Fmt, Args2).
 
-format(Fmt, Args) ->
-    io_lib:format(lists:flatten(Fmt ++ ?R), Args).
+fmt(Fmt) ->
+    fmt(Fmt, []).
+fmt(Fmt, Args) ->
+    io_lib:format(cfmt(Fmt), Args).
 
 
 %% Mostrly from: https://github.com/erlware/erlware_commons/blob/49bc69e35a282bde4a0a6a8f211b5f77d8585256/src/ec_cmd_log.erl#L220
@@ -42,9 +44,9 @@ format(Fmt, Args) ->
 %%    colorize(Color, false, Msg).
 
 %% colorize(Color, false, Msg) when is_integer(Color) ->
-%%     lists:flatten(format("\033[~B;~Bm~s\033[0m", [0, Color, Msg]));
+%%     lists:flatten(fmt("\033[~B;~Bm~s\033[0m", [0, Color, Msg]));
 %% colorize(Color, true, Msg) when is_integer(Color) ->
-%%     lists:flatten(format("\033[~B;~Bm~s\033[0m", [1, Color, Msg])).
+%%     lists:flatten(fmt("\033[~B;~Bm~s\033[0m", [1, Color, Msg])).
 
 
 %%bw(M) ->
@@ -61,8 +63,42 @@ format_warning({_Tag, {File, Line}, Msg}, FOpt) when is_list(File),
             basename -> filename:basename(File)
         end,
     String = lists:flatten(message_to_string(Msg)),
-    lists:flatten(format("~s:~w~n~s", [F, Line, String])).
+    lists:flatten(fmt("~s:~w~n~s", [F, Line, String])).
 
+
+
+cfmt(S) ->
+    lists:flatten(cfmt_(S)) ++ ?R.
+
+cfmt_([$~,$!,$! | S]) ->
+    [?R | cfmt(S)];
+
+cfmt_([$~,$!,$r | S]) ->
+    [?NR | cfmt(S)];
+cfmt_([$~,$!,$R | S]) ->
+    [?BR | cfmt(S)];
+
+cfmt_([$~,$!,$g | S]) ->
+    [?NG | cfmt(S)];
+cfmt_([$~,$!,$G | S]) ->
+    [?BG | cfmt(S)];
+
+cfmt_([$~,$!,$b | S]) ->
+    [?NB | cfmt(S)];
+cfmt_([$~,$!,$B | S]) ->
+    [?BB | cfmt(S)];
+
+cfmt_([$~,$!,$w | S]) ->
+    [?NW | cfmt(S)];
+cfmt_([$~,$!,$W | S]) ->
+    [?BW | cfmt(S)];
+
+cfmt_([$~,$~ | S]) ->
+    [$~,$~ | cfmt(S)];
+cfmt_([C | S]) ->
+    [C | cfmt(S)];
+cfmt_([]) ->
+    [].
 
 %%-----------------------------------------------------------------------------
 %% Message classification and pretty-printing below. Messages appear in
@@ -72,195 +108,195 @@ format_warning({_Tag, {File, Line}, Msg}, FOpt) when is_list(File),
 %%----- Warnings for general discrepancies ----------------
 message_to_string({apply, [Args, ArgNs, FailReason,
                            SigArgs, SigRet, Contract]}) ->
-    format(?BW"Fun application with arguments "?R"~s ",
+    fmt("~!WFun application with arguments ~!!~s ",
            [bad_arg(ArgNs, Args)]) ++
         call_or_apply_to_string(ArgNs, FailReason, SigArgs, SigRet, Contract);
 message_to_string({app_call, [M, F, Args, Culprit, ExpectedType, FoundType]}) ->
-    format(?BW "The call" ?R " ~s:~s~s " ?BW "requires that"
-           ?R " ~s " ?BW "is of type " ?NG "~s" ?BW " not " ?NR "~s"
-           ?R "\n",
+    fmt("~!WThe call~!! ~s:~s~s ~!Wrequires that"
+           "~!! ~s ~!Wis of type ~!g~s~!W not ~!r~s"
+           "~!!\n",
            [M, F, Args, Culprit, ExpectedType, FoundType]);
 message_to_string({bin_construction, [Culprit, Size, Seg, Type]}) ->
-    format(?BW "Binary construction will fail since the"?NB" ~s "?BW"field"?R
-           " ~s"?BW" in segment"?R" ~s"?BW" has type"?R" ~s\n",
+    fmt("~!WBinary construction will fail since the ~!b~s~!W field~!!"
+           " ~s~!W in segment~!! ~s~!W has type~!! ~s\n",
            [Culprit, Size, Seg, Type]);
 message_to_string({call, [M, F, Args, ArgNs, FailReason,
                           SigArgs, SigRet, Contract]}) ->
-    format(?BW "The call" ?R " ~w:~w~s ", [M, F, bad_arg(ArgNs, Args)]) ++
+    fmt("~!WThe call~!! ~w:~w~s ", [M, F, bad_arg(ArgNs, Args)]) ++
         call_or_apply_to_string(ArgNs, FailReason, SigArgs, SigRet, Contract);
 message_to_string({call_to_missing, [M, F, A]}) ->
-    format(?BW"Call to missing or unexported function "?R"~w:~w/~w\n",
+    fmt("~!WCall to missing or unexported function ~!!~w:~w/~w\n",
            [M, F, A]);
 message_to_string({exact_eq, [Type1, Op, Type2]}) ->
-    format(?BW"The test "?R"~s ~s ~s"?BW" can never evaluate to 'true'\n",
+    fmt("~!WThe test ~!!~s ~s ~s~!W can never evaluate to 'true'\n",
            [Type1, Op, Type2]);
 message_to_string({fun_app_args, [Args, Type]}) ->
-    format(?BW"Fun application with arguments "?R"~s"?BW" will fail"
-           " since the function has type "?R"~s\n", [Args, Type]);
+    fmt("~!WFun application with arguments ~!!~s~!W will fail"
+           " since the function has type ~!!~s\n", [Args, Type]);
 message_to_string({fun_app_no_fun, [Op, Type, Arity]}) ->
-    format(?BW"Fun application will fail since "?R"~s "?BW"::"?R" ~s"
-           " is not a function of arity "?R"~w\n", [Op, Type, Arity]);
+    fmt("~!WFun application will fail since ~!!~s ~!W::~!! ~s"
+           " is not a function of arity ~!!~w\n", [Op, Type, Arity]);
 message_to_string({guard_fail, []}) ->
-    ?BW "Clause guard cannot succeed.\n" ?R;
+    "~!WClause guard cannot succeed.\n~!!";
 message_to_string({guard_fail, [Arg1, Infix, Arg2]}) ->
-    format(?BW "Guard test "?R"~s ~s ~s"?BW" can never succeed\n",
+    fmt("~!WGuard test ~!!~s ~s ~s~!W can never succeed\n",
            [Arg1, Infix, Arg2]);
 message_to_string({neg_guard_fail, [Arg1, Infix, Arg2]}) ->
-    format(?BW "Guard test not("?R"~s ~s ~s"?BW") can never succeed\n",
+    fmt("~!WGuard test not(~!!~s ~s ~s~!W) can never succeed\n",
            [Arg1, Infix, Arg2]);
 message_to_string({guard_fail, [Guard, Args]}) ->
-    format(?BW "Guard test "?R"~w~s"?BW" can never succeed\n",
+    fmt("~!WGuard test ~!!~w~s~!W can never succeed\n",
            [Guard, Args]);
 message_to_string({neg_guard_fail, [Guard, Args]}) ->
-    format(?BW"Guard test not("?R"~w~s"?BW") can never succeed\n",
+    fmt("~!WGuard test not(~!!~w~s~!W) can never succeed\n",
            [Guard, Args]);
 message_to_string({guard_fail_pat, [Pat, Type]}) ->
-    format(?BW"Clause guard cannot succeed. The "?R"~s"?BW" was matched"
-           " against the type "?R"~s\n", [Pat, Type]);
+    fmt("~!WClause guard cannot succeed. The ~!!~s~!W was matched"
+           " against the type ~!!~s\n", [Pat, Type]);
 message_to_string({improper_list_constr, [TlType]}) ->
-    format(?BW "Cons will produce an improper list"
-           " since its "?NB"2"?R"nd"?BW" argument is"?R" ~s\n", [TlType]);
+    fmt("~!WCons will produce an improper list"
+           " since its ~!b2~!!nd~!W argument is~!! ~s\n", [TlType]);
 message_to_string({no_return, [Type|Name]}) ->
     NameString =
         case Name of
-            [] -> ?BW "The created fun ";
-            [F, A] -> format(?BW "Function " ?NR "~w/~w ", [F, A])
+            [] -> "~!WThe created fun ";
+            [F, A] -> fmt("~!WFunction ~!r~w/~w ", [F, A])
         end,
     case Type of
-        no_match -> NameString ++ ?BW "has no clauses that will ever match\n" ?R;
-        only_explicit -> NameString ++ ?BW "only terminates with explicit exception\n" ?R;
-        only_normal -> NameString ++ ?BW "has no local return\n" ?R;
-        both -> NameString ++ ?BW "has no local return\n" ?R
+        no_match -> fmt("~s~!Whas no clauses that will ever match\n",[NameString]);
+        only_explicit -> fmt("~s~!Wonly terminates with explicit exception\n", [NameString]);
+        only_normal -> fmt("~s~!W~!Whas no local return\n", [NameString]);
+        both -> fmt("~s~!W~!Whas no local return\n", [NameString])
     end;
 message_to_string({record_constr, [RecConstr, FieldDiffs]}) ->
-    format(?BW"Record construction "?R"~s"?BW" violates the"
-           " declared type of field "?R"~s\n", [RecConstr, FieldDiffs]);
+    fmt("~!WRecord construction ~!!~s~!W violates the"
+           " declared type of field ~!!~s\n", [RecConstr, FieldDiffs]);
 message_to_string({record_constr, [Name, Field, Type]}) ->
-    format(?BW"Record construction violates the declared type for "?R"#~w{}" ?BW
-           " since "?R"~s"?BW" cannot be of type "?R"~s\n",
+    fmt("~!WRecord construction violates the declared type for ~!!#~w{}~!W"
+           " since ~!!~s~!W cannot be of type ~!!~s\n",
            [Name, Field, Type]);
 message_to_string({record_matching, [String, Name]}) ->
-    format(?BW"The "?R"~s"?BW" violates the"
-           " declared type for "?R"#~w{}\n", [String, Name]);
+    fmt("~!WThe ~!!~s~!W violates the"
+           " declared type for ~!!#~w{}\n", [String, Name]);
 message_to_string({record_match, [Pat, Type]}) ->
-    format(?BW"Matching of "?R"~s"?BW" tagged with a record name violates the"
-           " declared type of "?R"~s\n", [Pat, Type]);
+    fmt("~!WMatching of ~!!~s~!W tagged with a record name violates the"
+           " declared type of ~!!~s\n", [Pat, Type]);
 message_to_string({pattern_match, [Pat, Type]}) ->
-    format(?BW"The ~s"?BW" can never match the type "?NG"~s\n",
+    fmt("~!WThe ~s~!W can never match the type ~!g~s\n",
            [bad_pat(Pat), Type]);
 message_to_string({pattern_match_cov, [Pat, Type]}) ->
-    format(?BW "The ~s"?BW" can never match since previous"
-           " clauses completely covered the type "?NG"~s\n",
+    fmt("~!WThe ~s~!W can never match since previous"
+           " clauses completely covered the type ~!g~s\n",
            [bad_pat(Pat), Type]);
 message_to_string({unmatched_return, [Type]}) ->
-    format(?BW "Expression produces a value of type "?R"~s"?BW","
+    fmt("~!WExpression produces a value of type ~!!~s~!W,"
            " but this value is unmatched\n", [Type]);
 message_to_string({unused_fun, [F, A]}) ->
-    format(?BW "Function "?NR"~w/~w"?BW" will never be called\n", [F, A]);
+    fmt("~!WFunction ~!r~w/~w~!W will never be called\n", [F, A]);
 %%----- Warnings for specs and contracts -------------------
 message_to_string({contract_diff, [M, F, _A, Contract, Sig]}) ->
-    format(?BW"Type specification "?R"~w:~w~s"?BW
-           " is not equal to the success typing: "?R"~w:~w~s\n",
+    fmt("~!WType specification ~!!~w:~w~s~!W"
+           " is not equal to the success typing: ~!!~w:~w~s\n",
            [M, F, Contract, M, F, Sig]);
 message_to_string({contract_subtype, [M, F, _A, Contract, Sig]}) ->
-    format(?BW"Type specification "?R"~w:~w~s"?BW
-           " is a subtype of the success typing: "?R"~w:~w~s\n",
+    fmt("~!WType specification ~!!~w:~w~s~!W"
+           " is a subtype of the success typing: ~!!~w:~w~s\n",
            [M, F, Contract, M, F, Sig]);
 message_to_string({contract_supertype, [M, F, _A, Contract, Sig]}) ->
-    format(?BW"Type specification "?R"~w:~w~s"?BW
-           " is a supertype of the success typing: "?R"~w:~w~s\n",
+    fmt("~!WType specification ~!!~w:~w~s~!W"
+           " is a supertype of the success typing: ~!!~w:~w~s\n",
            [M, F, Contract, M, F, Sig]);
 message_to_string({contract_range, [Contract, M, F, ArgStrings, Line, CRet]}) ->
-    format(?BW"The contract "?R"~w:~w~s"?BW" cannot be right because the"
-           " inferred return for "?R"~w~s"?BW" on line "?R"~w"?BW" is "?R"~s\n",
+    fmt("~!WThe contract ~!!~w:~w~s~!W cannot be right because the"
+           " inferred return for ~!!~w~s~!W on line ~!!~w~!W is ~!!~s\n",
            [M, F, Contract, F, ArgStrings, Line, CRet]);
 message_to_string({invalid_contract, [M, F, A, Sig]}) ->
-    format(?BW "Invalid type specification for function" ?R " ~w:~w/~w."
-           ?BW " The success typing is" ?R " ~s\n", [M, F, A, Sig]);
+    fmt("~!WInvalid type specification for function~!! ~w:~w/~w."
+           "~!W The success typing is~!! ~s\n", [M, F, A, Sig]);
 message_to_string({extra_range, [M, F, A, ExtraRanges, SigRange]}) ->
-    format(?BW"The specification for "?R"~w:~w/~w"?BW" states that the function"
-           " might also return "?R"~s"?BW" but the inferred return is "?R"~s\n",
+    fmt("~!WThe specification for ~!!~w:~w/~w~!W states that the function"
+           " might also return ~!!~s~!W but the inferred return is ~!!~s\n",
            [M, F, A, ExtraRanges, SigRange]);
 message_to_string({overlapping_contract, [M, F, A]}) ->
-    format(?BW"Overloaded contract for "?R"~w:~w/~w"?BW" has overlapping"
+    fmt("~!WOverloaded contract for ~!!~w:~w/~w~!W has overlapping"
            " domains; such contracts are currently unsupported and are simply "
            "ignored\n", [M, F, A]);
 message_to_string({spec_missing_fun, [M, F, A]}) ->
-    format(?BW"Contract for function that does not exist: "?R"~w:~w/~w\n",
+    fmt("~!WContract for function that does not exist: ~!!~w:~w/~w\n",
            [M, F, A]);
 %%----- Warnings for opaque type violations -------------------
 message_to_string({call_with_opaque, [M, F, Args, ArgNs, ExpArgs]}) ->
-    format(?BW"The call "?R"~w:~w~s"?BW" contains "?R"~s"?BW" when "?R"~s\n",
+    fmt("~!WThe call ~!!~w:~w~s~!W contains ~!!~s~!W when ~!!~s\n",
            [M, F, Args, form_positions(ArgNs), form_expected(ExpArgs)]);
 message_to_string({call_without_opaque, [M, F, Args, [{N,_,_}|_] = ExpectedTriples]}) ->
-    format([?BW, "The call", ?R, " ~w:~w~s ", ?BW, "does not have" ?R " ~s\n"],
-           [M, F, bad_arg(N, Args), form_expected_without_opaque(ExpectedTriples)]);
+    fmt("~!WThe call ~!!~w:~w~s ~!Wdoes not have~!! ~s\n",
+        [M, F, bad_arg(N, Args), form_expected_without_opaque(ExpectedTriples)]);
 message_to_string({opaque_eq, [Type, _Op, OpaqueType]}) ->
-    format(?BW"Attempt to test for equality between a term of type "?R"~s"?BW
-           " and a term of opaque type "?R"~s\n", [Type, OpaqueType]);
+    fmt("~!WAttempt to test for equality between a term of type ~!!~s~!W"
+           " and a term of opaque type ~!!~s\n", [Type, OpaqueType]);
 message_to_string({opaque_guard, [Arg1, Infix, Arg2, ArgNs]}) ->
-    format(?BW"Guard test "?R"~s ~s ~s"?BW" contains "?R"~s\n",
+    fmt("~!WGuard test ~!!~s ~s ~s~!W contains ~!!~s\n",
            [Arg1, Infix, Arg2, form_positions(ArgNs)]);
 message_to_string({opaque_guard, [Guard, Args]}) ->
-    format(?BW"Guard test "?R"~w~s"?BW" breaks the opaqueness of its"
+    fmt("~!WGuard test ~!!~w~s~!W breaks the opaqueness of its"
            " argument\n", [Guard, Args]);
 message_to_string({opaque_match, [Pat, OpaqueType, OpaqueTerm]}) ->
     Term = if OpaqueType =:= OpaqueTerm -> "the term";
               true -> OpaqueTerm
            end,
-    format(?BW"The attempt to match a term of type "?R"~s"?BW" against the"
-           ?R" ~s"?BW" breaks the opaqueness of "?R"~s\n",
+    fmt("~!WThe attempt to match a term of type ~!!~s~!W against the"
+           "~!! ~s~!W breaks the opaqueness of ~!!~s\n",
            [OpaqueType, Pat, Term]);
 message_to_string({opaque_neq, [Type, _Op, OpaqueType]}) ->
-    format(?BW"Attempt to test for inequality between a term of type "?R"~s"
-           ?BW" and a term of opaque type "?R"~s\n", [Type, OpaqueType]);
+    fmt("~!WAttempt to test for inequality between a term of type ~!!~s"
+           "~!W and a term of opaque type ~!!~s\n", [Type, OpaqueType]);
 message_to_string({opaque_type_test, [Fun, Args, Arg, ArgType]}) ->
-    format(?BW"The type test "?R"~s~s"?BW" breaks the opaqueness of the term "
-           ?R"~s~s\n", [Fun, Args, Arg, ArgType]);
+    fmt("~!WThe type test ~!!~s~s~!W breaks the opaqueness of the term "
+           "~!!~s~s\n", [Fun, Args, Arg, ArgType]);
 message_to_string({opaque_size, [SizeType, Size]}) ->
-    format(?BW"The size "?R"~s"?BW" breaks the opaqueness of "?R"~s\n",
+    fmt("~!WThe size ~!!~s~!W breaks the opaqueness of ~!!~s\n",
            [SizeType, Size]);
 message_to_string({opaque_call, [M, F, Args, Culprit, OpaqueType]}) ->
-    format(?BW"The call "?R"~s:~s~s"?BW" breaks the opaqueness of the term"?R
+    fmt("~!WThe call ~!!~s:~s~s~!W breaks the opaqueness of the term~!!"
            " ~s :: ~s\n", [M, F, Args, Culprit, OpaqueType]);
 %%----- Warnings for concurrency errors --------------------
 message_to_string({race_condition, [M, F, Args, Reason]}) ->
-    format(?BW"The call "?R"~w:~w~s ~s\n", [M, F, Args, Reason]);
+    fmt("~!WThe call ~!!~w:~w~s ~s\n", [M, F, Args, Reason]);
 %%----- Warnings for behaviour errors --------------------
 message_to_string({callback_type_mismatch, [B, F, A, ST, CT]}) ->
-    format(?BW"The inferred return type of"?R" ~w/~w (~s) "?BW
-           "has nothing in common with"?R" ~s, "?BW"which is the expected"
-           " return type for the callback of"?R" ~w "?BW"behaviour\n",
+    fmt("~!WThe inferred return type of~!! ~w/~w (~s) ~!W"
+           "has nothing in common with~!! ~s, ~!Wwhich is the expected"
+           " return type for the callback of~!! ~w ~!Wbehaviour\n",
            [F, A, ST, CT, B]);
 message_to_string({callback_arg_type_mismatch, [B, F, A, N, ST, CT]}) ->
-    format(?BW"The inferred type for the"?R" ~s "?BW"argument of"?R
-           " ~w/~w (~s) "?BW"is not a supertype of"?R" ~s"?BW", which is"
-           "expected type for this argument in the callback of the"?R" ~w "
-           ?BW"behaviour\n",
+    fmt("~!WThe inferred type for the~!! ~s ~!Wargument of~!!"
+           " ~w/~w (~s) ~!Wis not a supertype of~!! ~s~!W, which is"
+           "expected type for this argument in the callback of the~!! ~w "
+           "~!Wbehaviour\n",
            [ordinal(N), F, A, ST, CT, B]);
 message_to_string({callback_spec_type_mismatch, [B, F, A, ST, CT]}) ->
-    format(?BW"The return type "?R"~s"?BW" in the specification of "?R
-           "~w/~w"?BW" is not a subtype of "?R"~s"?BW", which is the expected"
-           " return type for the callback of "?R"~w"?BW" behaviour\n",
+    fmt("~!WThe return type ~!!~s~!W in the specification of ~!!"
+           "~w/~w~!W is not a subtype of ~!!~s~!W, which is the expected"
+           " return type for the callback of ~!!~w~!W behaviour\n",
            [ST, F, A, CT, B]);
 message_to_string({callback_spec_arg_type_mismatch, [B, F, A, N, ST, CT]}) ->
-    format(?BW"The specified type for the "?R"~s"?BW" argument of "?R
-           "~w/~w (~s)"?BW" is not a supertype of "?R"~s"?BW", which is"
-           " expected type for this argument in the callback of the "?R"~w"
-           ?BW" behaviour\n", [ordinal(N), F, A, ST, CT, B]);
+    fmt("~!WThe specified type for the ~!!~s~!W argument of ~!!"
+           "~w/~w (~s)~!W is not a supertype of ~!!~s~!W, which is"
+           " expected type for this argument in the callback of the ~!!~w"
+           "~!W behaviour\n", [ordinal(N), F, A, ST, CT, B]);
 message_to_string({callback_missing, [B, F, A]}) ->
-    format(?BW"Undefined callback function "?R"~w/~w"?BW" (behaviour " ?R
-           "'~w'"?BW")\n",[F, A, B]);
+    fmt("~!WUndefined callback function ~!!~w/~w~!W (behaviour ~!!"
+           "'~w'~!W)\n",[F, A, B]);
 message_to_string({callback_info_missing, [B]}) ->
-    format(?BW "Callback info about the " ?NR "~w" ?BW
-           " behaviour is not available\n" ?R, [B]);
+    fmt("~!WCallback info about the ~!r~w~!W"
+           " behaviour is not available\n", [B]);
 %%----- Warnings for unknown functions, types, and behaviours -------------
 message_to_string({unknown_type, {M, F, A}}) ->
-    format(?BW"Unknown type "?NR"~w:~w/~w", [M, F, A]);
+    fmt("~!WUnknown type ~!r~w:~w/~w", [M, F, A]);
 message_to_string({unknown_function, {M, F, A}}) ->
-    format(?BW"Unknown function "?NR"~w:~w/~w", [M, F, A]);
+    fmt("~!WUnknown function ~!r~w:~w/~w", [M, F, A]);
 message_to_string({unknown_behaviour, B}) ->
-    format(?BW"Unknown behaviour "?NR"~w", [B]).
+    fmt("~!WUnknown behaviour ~!r~w", [B]).
 
 %%-----------------------------------------------------------------------------
 %% Auxiliary functions below
@@ -274,27 +310,27 @@ call_or_apply_to_string(ArgNs, FailReason, SigArgs, SigRet,
             case ArgNs =:= [] of
                 true ->
                     %% We do not know which argument(s) caused the failure
-                    format(?BW "will never return since the success typing arguments"
-                            " are " ?R "~s\n", [SigArgs]);
+                    fmt("~!Wwill never return since the success typing arguments"
+                        " are ~!!~s\n", [SigArgs]);
                 false ->
-                    format(?BW "will never return since it differs in the" ?R
-                           " ~s " ?BW "argument from the success typing"
-                           " arguments:" ?R " ~s\n",
+                    fmt("~!Wwill never return since it differs in the~!!"
+                           " ~s ~!Wargument from the success typing"
+                           " arguments:~!! ~s\n",
                            [PositionString, good_arg(ArgNs, SigArgs)])
             end;
         only_contract ->
             case (ArgNs =:= []) orelse IsOverloaded of
                 true ->
                     %% We do not know which arguments caused the failure
-                    format(?BW "breaks the contract"?R" ~s\n", [Contract]);
+                    fmt("~!Wbreaks the contract~!! ~s\n", [Contract]);
                 false ->
-                    format(?BW "breaks the contract"?R" ~s "?BW"in the"?R
-                           " ~s "?BW"argument\n",
+                    fmt("~!Wbreaks the contract~!! ~s ~!Win the~!!"
+                           " ~s ~!Wargument\n",
                            [good_arg(ArgNs, Contract), PositionString])
             end;
         both ->
-            format(?BW "will never return since the success typing is "
-                   ?R"~s "?BW"->"?R" ~s " ?BW"and the contract is "?R"~s\n",
+            fmt("~!Wwill never return since the success typing is "
+                   "~!!~s ~!W->~!! ~s ~!Wand the contract is ~!!~s\n",
                    [good_arg(ArgNs, SigArgs), SigRet,
                     good_arg(ArgNs, Contract)])
     end.
@@ -312,12 +348,14 @@ form_positions(ArgNs) ->
 %% We know which positions N are to blame;
 %% the list of triples will never be empty.
 form_expected_without_opaque([{N, T, TStr}]) ->
-    case erl_types:t_is_opaque(T) of
-        true  ->
-            format([?BW, "an opaque term of type", ?NG, " ~s ", ?BW, "as "], [TStr]);
-        false ->
-            format([?BW, "a term of type ", ?NG, "~s ", ?BW, "(with opaque subterms) as "], [TStr])
-    end ++ form_position_string([N]) ++ ?BW ++ " argument" ++ ?R;
+    FStr = case erl_types:t_is_opaque(T) of
+               true  ->
+                   "~!Wan opaque term of type~!g ~s ~!Was ";
+               false ->
+                   "~!Wa term of type ~!g~s ~!W(with opaque subterms) as "
+           end ++ form_position_string([N]) ++ "~!W argument",
+    fmt(FStr, [TStr]);
+
 form_expected_without_opaque(ExpectedTriples) -> %% TODO: can do much better here
     {ArgNs, _Ts, _TStrs} = lists:unzip3(ExpectedTriples),
     "opaque terms as " ++ form_position_string(ArgNs) ++ " arguments".
@@ -327,10 +365,13 @@ form_expected(ExpectedArgs) ->
         [T] ->
             TS = erl_types:t_to_string(T),
             case erl_types:t_is_opaque(T) of
-                true  -> format("an opaque term of type ~s is expected", [TS]);
-                false -> format("a structured term of type ~s is expected", [TS])
+                true  -> fmt("~!Wan opaque term of type ~!!~s~!W is"
+                                " expected", [TS]);
+                false -> fmt("~!Wa structured term of type ~!!~s~!W is"
+                                " expected", [TS])
             end;
-        [_,_|_] -> "terms of different types are expected in these positions"
+        [_,_|_] -> fmt("~!Wterms of different types are expected in these"
+                          " positions", [])
     end.
 
 form_position_string(ArgNs) ->
@@ -339,30 +380,30 @@ form_position_string(ArgNs) ->
         [N1] -> ordinal(N1);
         [_,_|_] ->
             [Last|Prevs] = lists:reverse(ArgNs),
-            ", " ++ Head = lists:flatten([format(", ~s",[ordinal(N)]) ||
+            ", " ++ Head = lists:flatten([fmt(", ~s",[ordinal(N)]) ||
                                              N <- lists:reverse(Prevs)]),
             Head ++ " and " ++ ordinal(Last)
     end.
 
-ordinal(1) -> ?BB ++ "1" ++ ?R ++ "st";
-ordinal(2) -> ?BB ++ "2" ++ ?R ++ "nd";
-ordinal(3) -> ?BB ++ "3" ++ ?R ++ "rd";
-ordinal(N) when is_integer(N) -> format(?BB ++ "~w" ++ ?R ++ "th", [N]).
+ordinal(1) -> fmt("~!B1~!!st");
+ordinal(2) -> fmt("~!B2~!!nd");
+ordinal(3) -> fmt("~!B3~!!rd");
+ordinal(N) when is_integer(N) -> fmt("~!B~w~!!th", [N]).
 
 
 bad_pat("pattern " ++ P) ->
-    "pattern " ?NR ++ P ++ ?R;
+    fmt("pattern ~!r~s",[P]);
 bad_pat("variable " ++ P) ->
-    "variable " ?NR ++ P ++ ?R;
+    fmt("variable ~!r~s",[P]);
 bad_pat(P) ->
-    "pattern " ?NR ++ P ++ ?R.
+    fmt("~!r~s",[P]).
 
 
 bad_arg(N, Args) ->
-    color_arg(N, ?NR, Args).
+    color_arg(N, g, Args).
 
 good_arg(N, Args) ->
-    color_arg(N, ?NG, Args).
+    color_arg(N, r, Args).
 color_arg(N, C, Args) when is_integer(N) ->
     color_arg([N], C, Args);
 color_arg(Ns, C, Args) ->
@@ -374,27 +415,21 @@ color_arg(Ns, C, Args) ->
 highlight([], _N, _C, Rest) ->
     Rest;
 
-highlight([N | Nr], N, C, [Arg | Rest]) ->
-    [[C, Arg, ?R] | highlight(Nr, N+1, C, Rest)];
+highlight([N | Nr], N, g, [Arg | Rest]) ->
+    [fmt("~!g~s", [Arg]) | highlight(Nr, N+1, g, Rest)];
+
+highlight([N | Nr], N, r, [Arg | Rest]) ->
+    [fmt("~!r~s", [Arg]) | highlight(Nr, N+1, r, Rest)];
 
 highlight(Ns, N, C, [Arg | Rest]) ->
     [Arg | highlight(Ns, N + 1, C, Rest)].
-
-%% highlight([], _N, _C, Rest) ->
-%%     [[?NG, A, ?R] || A <- Rest];
-
-%% highlight([N | Nr], N, C, [Arg | Rest]) ->
-%%     [[?NR, Arg, ?R] | highlight(Nr, N+1, C, Rest)];
-
-%% highlight(Ns, N, C, [Arg | Rest]) ->
-%%     [[?NG, Arg, ?R] | highlight(Ns, N + 1, C, Rest)].
 
 seperate_args([$( | S]) ->
     seperate_args([], S, "", []).
 
 
 
-%% We strip this space since dialyzer is inconsistant in adding or not adding 
+%% We strip this space since dialyzer is inconsistant in adding or not adding
 %% it ....
 seperate_args([], [$,, $\s | R], Arg, Args) ->
     seperate_args([], R, [], [lists:reverse(Arg) | Args]);
