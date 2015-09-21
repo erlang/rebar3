@@ -4,11 +4,17 @@
 
 -define(NR, "\033[0;31m").
 -define(NG, "\033[0;32m").
+-define(NY, "\033[0;33m").
 -define(NB, "\033[0;34m").
+-define(NM, "\033[0;35m").
+-define(NC, "\033[0;36m").
 -define(NW, "\033[0;37m").
 -define(BR, "\033[1;31m").
 -define(BG, "\033[1;32m").
+-define(NY, "\033[1;33m").
 -define(BB, "\033[1;34m").
+-define(BM, "\033[1;35m").
+-define(BC, "\033[1;36m").
 -define(BW, "\033[1;37m").
 -define(R,  "\033[0m").
 
@@ -83,10 +89,25 @@ cfmt_([$~,$!,$g | S]) ->
 cfmt_([$~,$!,$G | S]) ->
     [?BG | cfmt(S)];
 
+cfmt_([$~,$!,$y | S]) ->
+    [?NY | cfmt(S)];
+cfmt_([$~,$!,$Y | S]) ->
+    [?BY | cfmt(S)];
+
 cfmt_([$~,$!,$b | S]) ->
     [?NB | cfmt(S)];
 cfmt_([$~,$!,$B | S]) ->
     [?BB | cfmt(S)];
+
+cfmt_([$~,$!,$m | S]) ->
+    [?NM | cfmt(S)];
+cfmt_([$~,$!,$M | S]) ->
+    [?BM | cfmt(S)];
+
+cfmt_([$~,$!,$c | S]) ->
+    [?NC | cfmt(S)];
+cfmt_([$~,$!,$C | S]) ->
+    [?BC | cfmt(S)];
 
 cfmt_([$~,$!,$w | S]) ->
     [?NW | cfmt(S)];
