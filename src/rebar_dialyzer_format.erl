@@ -149,7 +149,7 @@ message_to_string({unmatched_return, [Type]}) ->
     format("Expression produces a value of type ~s,"
            " but this value is unmatched\n", [Type]);
 message_to_string({unused_fun, [F, A]}) ->
-    format("Function ~w/~w will never be called\n", [F, A]);
+    format(?BW "Function "?NR"~w/~w"?BW" will never be called\n", [F, A]);
 %%----- Warnings for specs and contracts -------------------
 message_to_string({contract_diff, [M, F, _A, Contract, Sig]}) ->
     format("Type specification ~w:~w~s"
