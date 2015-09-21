@@ -34,7 +34,7 @@ strip(Warning) ->
 %%    format(Fmt, Args2).
 
 format(Fmt, Args) ->
-    io_lib:format(lists:flatten(Fmt), Args).
+    io_lib:format(lists:flatten(Fmt ++ ?R), Args).
 
 
 %% Mostrly from: https://github.com/erlware/erlware_commons/blob/49bc69e35a282bde4a0a6a8f211b5f77d8585256/src/ec_cmd_log.erl#L220
@@ -61,7 +61,7 @@ format_warning({_Tag, {File, Line}, Msg}, FOpt) when is_list(File),
             basename -> filename:basename(File)
         end,
     String = lists:flatten(message_to_string(Msg)),
-    lists:flatten(format("~s:~w: ~s", [F, Line, String])).
+    lists:flatten(format("~s:~w~n~s", [F, Line, String])).
 
 
 %%-----------------------------------------------------------------------------
@@ -98,7 +98,7 @@ message_to_string({fun_app_no_fun, [Op, Type, Arity]}) ->
     format("Fun application will fail since ~s :: ~s"
            " is not a function of arity ~w\n", [Op, Type, Arity]);
 message_to_string({guard_fail, []}) ->
-    "Clause guard cannot succeed.\n";
+    ?BW "Clause guard cannot succeed.\n" ?R;
 message_to_string({guard_fail, [Arg1, Infix, Arg2]}) ->
     format("Guard test ~s ~s ~s can never succeed\n", [Arg1, Infix, Arg2]);
 message_to_string({neg_guard_fail, [Arg1, Infix, Arg2]}) ->
@@ -117,14 +117,14 @@ message_to_string({improper_list_constr, [TlType]}) ->
 message_to_string({no_return, [Type|Name]}) ->
     NameString =
         case Name of
-            [] -> "The created fun ";
-            [F, A] -> format("Function ~w/~w ", [F, A])
+            [] -> ?BW "The created fun ";
+            [F, A] -> format(?BW "Function " ?NR "~w/~w ", [F, A])
         end,
     case Type of
-        no_match -> NameString ++ "has no clauses that will ever match\n";
-        only_explicit -> NameString ++ "only terminates with explicit exception\n";
-        only_normal -> NameString ++ "has no local return\n";
-        both -> NameString ++ "has no local return\n"
+        no_match -> NameString ++ ?BW "has no clauses that will ever match\n" ?R;
+        only_explicit -> NameString ++ ?BW "only terminates with explicit exception\n" ?R;
+        only_normal -> NameString ++ ?BW "has no local return\n" ?R;
+        both -> NameString ++ ?BW "has no local return\n" ?R
     end;
 message_to_string({record_constr, [RecConstr, FieldDiffs]}) ->
     format("Record construction ~s violates the"
@@ -139,11 +139,12 @@ message_to_string({record_match, [Pat, Type]}) ->
     format("Matching of ~s tagged with a record name violates the declared"
            " type of ~s\n", [Pat, Type]);
 message_to_string({pattern_match, [Pat, Type]}) ->
-    format("The ~s can never match the type ~s\n", [Pat, Type]);
+    format(?BW"The ~s"?BW" can never match the type "?NG"~s\n",
+           [bad_pat(Pat), Type]);
 message_to_string({pattern_match_cov, [Pat, Type]}) ->
-    format("The ~s can never match since previous"
-           " clauses completely covered the type ~s\n",
-           [Pat, Type]);
+    format(?BW "The ~s"?BW" can never match since previous"
+           " clauses completely covered the type "?NG"~s\n",
+           [bad_pat(Pat), Type]);
 message_to_string({unmatched_return, [Type]}) ->
     format("Expression produces a value of type ~s,"
            " but this value is unmatched\n", [Type]);
@@ -167,8 +168,8 @@ message_to_string({contract_range, [Contract, M, F, ArgStrings, Line, CRet]}) ->
            " return for ~w~s on line ~w is ~s\n",
            [M, F, Contract, F, ArgStrings, Line, CRet]);
 message_to_string({invalid_contract, [M, F, A, Sig]}) ->
-    format("Invalid type specification for function ~w:~w/~w."
-           " The success typing is ~s\n", [M, F, A, Sig]);
+    format(?BW "Invalid type specification for function" ?R " ~w:~w/~w."
+           ?BW " The success typing is" ?R " ~s\n", [M, F, A, Sig]);
 message_to_string({extra_range, [M, F, A, ExtraRanges, SigRange]}) ->
     format("The specification for ~w:~w/~w states that the function"
            " might also return ~s but the inferred return is ~s\n",
@@ -219,13 +220,15 @@ message_to_string({race_condition, [M, F, Args, Reason]}) ->
     format("The call ~w:~w~s ~s\n", [M, F, Args, Reason]);
 %%----- Warnings for behaviour errors --------------------
 message_to_string({callback_type_mismatch, [B, F, A, ST, CT]}) ->
-    format("The inferred return type of ~w/~w (~s) has nothing in common"
-           " with ~s, which is the expected return type for the callback of"
-           " ~w behaviour\n", [F, A, ST, CT, B]);
+    format(?BW"The inferred return type of"?R" ~w/~w (~s) "?BW
+           "has nothing in common with"?R" ~s, "?BW"which is the expected"
+           " return type for the callback of"?R" ~w "?BW"behaviour\n",
+           [F, A, ST, CT, B]);
 message_to_string({callback_arg_type_mismatch, [B, F, A, N, ST, CT]}) ->
-    format("The inferred type for the ~s argument of ~w/~w (~s) is"
-           " not a supertype of ~s, which is expected type for this"
-           " argument in the callback of the ~w behaviour\n",
+    format(?BW"The inferred type for the"?R" ~s "?BW"argument of"?R
+           " ~w/~w (~s) "?BW"is not a supertype of"?R" ~s"?BW", which is"
+           "expected type for this argument in the callback of the"?R" ~w "
+           ?BW"behaviour\n",
            [ordinal(N), F, A, ST, CT, B]);
 message_to_string({callback_spec_type_mismatch, [B, F, A, ST, CT]}) ->
     format("The return type ~s in the specification of ~w/~w is not a"
@@ -240,7 +243,8 @@ message_to_string({callback_missing, [B, F, A]}) ->
     format("Undefined callback function ~w/~w (behaviour '~w')\n",
            [F, A, B]);
 message_to_string({callback_info_missing, [B]}) ->
-    format("Callback info about the ~w behaviour is not available\n", [B]);
+    format(?BW "Callback info about the " ?NR "~w" ?BW
+           " behaviour is not available\n" ?R, [B]);
 %%----- Warnings for unknown functions, types, and behaviours -------------
 message_to_string({unknown_type, {M, F, A}}) ->
     format("Unknown type ~w:~w/~w", [M, F, A]);
@@ -273,14 +277,17 @@ call_or_apply_to_string(ArgNs, FailReason, SigArgs, SigRet,
             case (ArgNs =:= []) orelse IsOverloaded of
                 true ->
                     %% We do not know which arguments caused the failure
-                    format("breaks the contract ~s\n", [Contract]);
+                    format(?BW "breaks the contract"?R" ~s\n", [Contract]);
                 false ->
-                    format("breaks the contract ~s in the ~s argument\n",
-                           [Contract, PositionString])
+                    format(?BW "breaks the contract"?R" ~s "?BW"in the"?R
+                           " ~s "?BW"argument\n",
+                           [good_arg(ArgNs, Contract), PositionString])
             end;
         both ->
-            format("will never return since the success typing is ~s -> ~s"
-                   " and the contract is ~s\n", [SigArgs, SigRet, Contract])
+            format(?BW "will never return since the success typing is "
+                   ?R"~s "?BW"->"?R" ~s " ?BW"and the contract is "?R"~s\n",
+                   [good_arg(ArgNs, SigArgs), SigRet,
+                    good_arg(ArgNs, Contract)])
     end.
 
 form_positions(ArgNs) ->
@@ -332,6 +339,14 @@ ordinal(1) -> ?BB ++ "1" ++ ?R ++ "st";
 ordinal(2) -> ?BB ++ "2" ++ ?R ++ "nd";
 ordinal(3) -> ?BB ++ "3" ++ ?R ++ "rd";
 ordinal(N) when is_integer(N) -> format(?BB ++ "~w" ++ ?R ++ "th", [N]).
+
+
+bad_pat("pattern " ++ P) ->
+    "pattern " ?NR ++ P ++ ?R;
+bad_pat("variable " ++ P) ->
+    "variable " ?NR ++ P ++ ?R;
+bad_pat(P) ->
+    "pattern " ?NR ++ P ++ ?R.
 
 
 bad_arg(N, Args) ->
@@ -394,3 +409,4 @@ seperate_args(D, [C | R], Arg, Args) ->
 
 join_args(Args) ->
     [$(, string:join(Args, ", "), $)].
+
