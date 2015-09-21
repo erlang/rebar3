@@ -198,6 +198,12 @@ parse_tags(Dir) ->
                 {match,[Tag, Vsn]} ->
                     {Tag, Vsn};
                 nomatch ->
-                    {undefined, "0.0.0"}
+                    case rebar_utils:sh("git describe --tags --abbrev=0",
+                            [{use_stdout, false}, return_on_error, {cd, Dir}]) of
+                        {error, _} ->
+                            {undefined, "0.0.0"};
+                        {ok, LatestVsn} ->
+                            {undefined, string:strip(LatestVsn, both, $\n)}
+                    end
             end
     end.
