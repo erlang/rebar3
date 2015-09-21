@@ -100,7 +100,7 @@ message_to_string({fun_app_no_fun, [Op, Type, Arity]}) ->
 message_to_string({guard_fail, []}) ->
     ?BW "Clause guard cannot succeed.\n" ?R;
 message_to_string({guard_fail, [Arg1, Infix, Arg2]}) ->
-    format("Guard test ~s ~s ~s can never succeed\n", [Arg1, Infix, Arg2]);
+    format(?BW "Guard test "?R"~s ~s ~s"?BW" can never succeed\n", [Arg1, Infix, Arg2]);
 message_to_string({neg_guard_fail, [Arg1, Infix, Arg2]}) ->
     format("Guard test not(~s ~s ~s) can never succeed\n",
            [Arg1, Infix, Arg2]);
@@ -112,8 +112,8 @@ message_to_string({guard_fail_pat, [Pat, Type]}) ->
     format("Clause guard cannot succeed. The ~s was matched"
            " against the type ~s\n", [Pat, Type]);
 message_to_string({improper_list_constr, [TlType]}) ->
-    format("Cons will produce an improper list"
-           " since its 2nd argument is ~s\n", [TlType]);
+    format(?BW "Cons will produce an improper list"
+           " since its "?NB"2"?R"nd"?BW" argument is"?R" ~s\n", [TlType]);
 message_to_string({no_return, [Type|Name]}) ->
     NameString =
         case Name of
