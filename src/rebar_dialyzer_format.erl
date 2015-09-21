@@ -431,10 +431,11 @@ bad_pat(P) ->
 
 
 bad_arg(N, Args) ->
-    color_arg(N, g, Args).
+    color_arg(N, r, Args).
 
 good_arg(N, Args) ->
-    color_arg(N, r, Args).
+    color_arg(N, g, Args).
+
 color_arg(N, C, Args) when is_integer(N) ->
     color_arg([N], C, Args);
 color_arg(Ns, C, Args) ->
