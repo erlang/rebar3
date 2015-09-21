@@ -13,7 +13,8 @@
 -include_lib("providers/include/providers.hrl").
 
 -define(PROVIDER, eunit).
--define(DEPS, [compile]).
+%% we need to modify app_info state before compile
+-define(DEPS, [lock]).
 
 %% ===================================================================
 %% Public API
@@ -36,10 +37,21 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    %% inject the `TEST` macro, `eunit_first_files` and `eunit_compile_opts`
+    %% into the applications to be compiled
+    NewState = inject_eunit_state(State),
+
+    case rebar_prv_compile:do(NewState) of
+        {ok, S} -> do_tests(S);
+        %% this should look like a compiler error, not an eunit error
+        Error   -> Error
+    end.
+
+do_tests(State) ->
     ?INFO("Performing EUnit tests...", []),
     rebar_utils:update_code(rebar_state:code_paths(State, all_deps)),
 
-    %% Run eunit provider prehooks
+    %% Run compile provider prehooks
     Providers = rebar_state:providers(State),
     Cwd = rebar_dir:get_cwd(),
     rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
@@ -89,11 +101,28 @@ format_error({error, Error}) ->
 %% Internal functions
 %% ===================================================================
 
-test_state(State) ->
-    ErlOpts = rebar_state:get(State, eunit_compile_opts, []),
-    TestOpts = safe_define_test_macro(ErlOpts),
-    TestDir = [{extra_src_dirs, ["test"]}],
-    first_files(State) ++ [{erl_opts, TestOpts ++ TestDir}].
+%% currently only add the `extra_drc_dirs` on provider init
+test_state(_State) -> [{extra_src_dirs, ["test"]}].
+
+inject_eunit_state(State) ->
+    Apps = project_apps(State),
+    ModdedApps = lists:map(fun(App) -> inject(State, App) end, Apps),
+    rebar_state:project_apps(State, ModdedApps).
+
+inject(State, App) ->
+    %% append `eunit_compile_opts` to app defined `erl_opts` and define
+    %% the `TEST` macro if not already compiled
+    ErlOpts = rebar_app_info:get(App, erl_opts, []),
+    EUnitOpts = rebar_state:get(State, eunit_compile_opts, []),
+    NewOpts = safe_define_test_macro(EUnitOpts ++ ErlOpts),
+    %% append `eunit_first_files` to app defined `erl_first_files`
+    FirstFiles = rebar_app_info:get(App, erl_first_files, []),
+    EUnitFirstFiles = rebar_state:get(State, eunit_first_files, []),
+    NewFirstFiles = EUnitFirstFiles ++ FirstFiles,
+    %% insert the new keys into the app
+    lists:foldl(fun({K, V}, NewApp) -> rebar_app_info:set(NewApp, K, V) end,
+                App,
+                [{erl_opts, NewOpts}, {erl_first_files, NewFirstFiles}]).
 
 safe_define_test_macro(Opts) ->
     %% defining a compile macro twice results in an exception so
@@ -107,10 +136,6 @@ test_defined([{d, 'TEST'}|_]) -> true;
 test_defined([{d, 'TEST', true}|_]) -> true;
 test_defined([_|Rest]) -> test_defined(Rest);
 test_defined([]) -> false.
-
-first_files(State) ->
-    EUnitFirst = rebar_state:get(State, eunit_first_files, []),
-    [{erl_first_files, EUnitFirst}].
 
 prepare_tests(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),

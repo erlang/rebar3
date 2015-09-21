@@ -375,8 +375,8 @@ test_profile_applied_at_completion(Config) ->
                                                  ["eunit"],
                                                  return),
 
-    Opts = rebar_state:opts(State),
-    ErlOpts = dict:fetch(erl_opts, Opts),
+    [App] = rebar_state:project_apps(State),
+    ErlOpts = rebar_app_info:get(App, erl_opts),
     true = lists:member({d, 'TEST'}, ErlOpts).
 
 test_profile_applied_before_compile(Config) ->
