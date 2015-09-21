@@ -57,7 +57,7 @@ format_warning({Tag, {File, Line, _MFA}, Msg}, FOpt) ->
 format_warning({_Tag, {File, Line}, Msg}, FOpt) when is_list(File),
                                                      is_integer(Line) ->
     F = case FOpt of
-            fullpath -> File;
+            fullpath -> re:replace(File, "^.*/_build/", "_build/");
             basename -> filename:basename(File)
         end,
     String = lists:flatten(message_to_string(Msg)),
@@ -371,8 +371,19 @@ highlight([N | Nr], N, C, [Arg | Rest]) ->
 highlight(Ns, N, C, [Arg | Rest]) ->
     [Arg | highlight(Ns, N + 1, C, Rest)].
 
+%% highlight([], _N, _C, Rest) ->
+%%     [[?NG, A, ?R] || A <- Rest];
+
+%% highlight([N | Nr], N, C, [Arg | Rest]) ->
+%%     [[?NR, Arg, ?R] | highlight(Nr, N+1, C, Rest)];
+
+%% highlight(Ns, N, C, [Arg | Rest]) ->
+%%     [[?NG, Arg, ?R] | highlight(Ns, N + 1, C, Rest)].
+
 seperate_args([$( | S]) ->
     seperate_args([], S, "", []).
+
+
 
 %% We strip this space since dialyzer is inconsistant in adding or not adding 
 %% it ....
