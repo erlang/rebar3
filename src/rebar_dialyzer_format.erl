@@ -4,21 +4,7 @@
 
 -export([format/1]).
 
--define(NR, "\033[0;31m").
--define(NG, "\033[0;32m").
--define(NY, "\033[0;33m").
--define(NB, "\033[0;34m").
--define(NM, "\033[0;35m").
--define(NC, "\033[0;36m").
--define(NW, "\033[0;37m").
--define(BR, "\033[1;31m").
--define(BG, "\033[1;32m").
--define(BY, "\033[1;33m").
--define(BB, "\033[1;34m").
--define(BM, "\033[1;35m").
--define(BC, "\033[1;36m").
--define(BW, "\033[1;37m").
--define(R,  "\033[0m").
+
 
 format(Warning) ->
     Str = try
@@ -39,15 +25,10 @@ format(Warning) ->
 strip(Warning) ->
     string:strip(Warning, right, $\n).
 
-%%fmt(Fmt, Args) ->
-%%    Args2 = [fmt("~s\033[1;37m", [A]) || A <- Args],
-%%    fmt(Fmt, Args2).
-
 fmt(Fmt) ->
-    fmt(Fmt, []).
+    rebar_colour:format(Fmt, []).
 fmt(Fmt, Args) ->
-    io_lib:format(cfmt(Fmt), Args).
-
+    rebar_colour:format(Fmt, Args).
 
 format_warning({Tag, {File, Line, _MFA}, Msg}, FOpt) ->
     format_warning({Tag, {File, Line}, Msg}, FOpt);
@@ -59,80 +40,6 @@ format_warning({_Tag, {File, Line}, Msg}, FOpt) when is_list(File),
         end,
     String = lists:flatten(message_to_string(Msg)),
     lists:flatten(fmt("~s:~w~n~s", [F, Line, String])).
-
-
-%% FROM https://github.com/erlware/erlware_commons/blob/49bc69e35a282bde4a0a6a8f211b5f77d8585256/src/ec_cmd_log.erl
-%% @doc Query the term enviroment
-%% For reasons of simplicity, we don't parse terminal capabilities yet, although
-%% a later version could do so. Rather, we provide a simple match-list of terminal
-%% capabilities.
-%% @end
--spec query_term_env() -> full | dumb.
-query_term_env() ->
-    term_capabilities(os:getenv("TERM")).
-
--spec term_capabilities(string()) -> full | dumb.
-term_capabilities("xterm") -> full;
-term_capabilities("dumb") -> dumb;
-term_capabilities(_) -> full. %% Default to the backwards compatible version.
-
-
-cfmt(S) ->
-    cfmt(S, query_term_env() =:= full).
-cfmt(S, true) ->
-    lists:flatten(cfmt_(S, true)) ++ ?R;
-cfmt(S, false) ->
-    lists:flatten(cfmt_(S, false)).
-
-cfmt_([$~,$!,_C | S], false) ->
-    cfmt_(S, false);
-
-cfmt_([$~,$!,$! | S], Enabled) ->
-    [?R | cfmt_(S, Enabled)];
-
-cfmt_([$~,$!,$r | S], Enabled) ->
-    [?NR | cfmt_(S, Enabled)];
-cfmt_([$~,$!,$R | S], Enabled) ->
-    [?BR | cfmt_(S, Enabled)];
-
-cfmt_([$~,$!,$g | S], Enabled) ->
-    [?NG | cfmt_(S, Enabled)];
-cfmt_([$~,$!,$G | S], Enabled) ->
-    [?BG | cfmt_(S, Enabled)];
-
-cfmt_([$~,$!,$y | S], Enabled) ->
-    [?NY | cfmt_(S, Enabled)];
-cfmt_([$~,$!,$Y | S], Enabled) ->
-    [?BY | cfmt_(S, Enabled)];
-
-cfmt_([$~,$!,$b | S], Enabled) ->
-    [?NB | cfmt_(S, Enabled)];
-cfmt_([$~,$!,$B | S], Enabled) ->
-    [?BB | cfmt_(S, Enabled)];
-
-cfmt_([$~,$!,$m | S], Enabled) ->
-    [?NM | cfmt_(S, Enabled)];
-cfmt_([$~,$!,$M | S], Enabled) ->
-    [?BM | cfmt_(S, Enabled)];
-
-cfmt_([$~,$!,$c | S], Enabled) ->
-    [?NC | cfmt_(S, Enabled)];
-cfmt_([$~,$!,$C | S], Enabled) ->
-    [?BC | cfmt_(S, Enabled)];
-
-cfmt_([$~,$!,$w | S], Enabled) ->
-    [?NW | cfmt_(S, Enabled)];
-cfmt_([$~,$!,$W | S], Enabled) ->
-    [?BW | cfmt_(S, Enabled)];
-
-cfmt_([$~,$~ | S], Enabled) ->
-    [$~,$~ | cfmt_(S, Enabled)];
-
-cfmt_([C | S], Enabled) ->
-    [C | cfmt_(S, Enabled)];
-
-cfmt_([], _Enabled) ->
-    [].
 
 %%-----------------------------------------------------------------------------
 %% Message classification and pretty-printing below. Messages appear in
