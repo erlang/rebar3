@@ -1,6 +1,7 @@
 -module(rebar_dialyzer_format).
 
--export([format/1, bad_arg/2]).
+-export([format/1]).
+
 
 -define(NR, "\033[0;31m").
 -define(NG, "\033[0;32m").
@@ -11,7 +12,7 @@
 -define(NW, "\033[0;37m").
 -define(BR, "\033[1;31m").
 -define(BG, "\033[1;32m").
--define(NY, "\033[1;33m").
+-define(BY, "\033[1;33m").
 -define(BB, "\033[1;34m").
 -define(BM, "\033[1;35m").
 -define(BC, "\033[1;36m").
@@ -19,6 +20,7 @@
 -define(R,  "\033[0m").
 
 format(Warning) ->
+    format_warning(Warning, fullpath),
     Str = try
               format_warning(Warning, fullpath)
           catch
@@ -72,53 +74,61 @@ format_warning({_Tag, {File, Line}, Msg}, FOpt) when is_list(File),
     lists:flatten(fmt("~s:~w~n~s", [F, Line, String])).
 
 
-
 cfmt(S) ->
-    lists:flatten(cfmt_(S)) ++ ?R.
+    cfmt(S, true).
+cfmt(S, true) ->
+    lists:flatten(cfmt_(S, true)) ++ ?R;
+cfmt(S, false) ->
+    lists:flatten(cfmt_(S, false)).
 
-cfmt_([$~,$!,$! | S]) ->
-    [?R | cfmt(S)];
+cfmt_([$~,$!,_C | S], false) ->
+    cfmt_(S, false);
 
-cfmt_([$~,$!,$r | S]) ->
-    [?NR | cfmt(S)];
-cfmt_([$~,$!,$R | S]) ->
-    [?BR | cfmt(S)];
+cfmt_([$~,$!,$! | S], Enabled) ->
+    [?R | cfmt_(S, Enabled)];
 
-cfmt_([$~,$!,$g | S]) ->
-    [?NG | cfmt(S)];
-cfmt_([$~,$!,$G | S]) ->
-    [?BG | cfmt(S)];
+cfmt_([$~,$!,$r | S], Enabled) ->
+    [?NR | cfmt_(S, Enabled)];
+cfmt_([$~,$!,$R | S], Enabled) ->
+    [?BR | cfmt_(S, Enabled)];
 
-cfmt_([$~,$!,$y | S]) ->
-    [?NY | cfmt(S)];
-cfmt_([$~,$!,$Y | S]) ->
-    [?BY | cfmt(S)];
+cfmt_([$~,$!,$g | S], Enabled) ->
+    [?NG | cfmt_(S, Enabled)];
+cfmt_([$~,$!,$G | S], Enabled) ->
+    [?BG | cfmt_(S, Enabled)];
 
-cfmt_([$~,$!,$b | S]) ->
-    [?NB | cfmt(S)];
-cfmt_([$~,$!,$B | S]) ->
-    [?BB | cfmt(S)];
+cfmt_([$~,$!,$y | S], Enabled) ->
+    [?NY | cfmt_(S, Enabled)];
+cfmt_([$~,$!,$Y | S], Enabled) ->
+    [?BY | cfmt_(S, Enabled)];
 
-cfmt_([$~,$!,$m | S]) ->
-    [?NM | cfmt(S)];
-cfmt_([$~,$!,$M | S]) ->
-    [?BM | cfmt(S)];
+cfmt_([$~,$!,$b | S], Enabled) ->
+    [?NB | cfmt_(S, Enabled)];
+cfmt_([$~,$!,$B | S], Enabled) ->
+    [?BB | cfmt_(S, Enabled)];
 
-cfmt_([$~,$!,$c | S]) ->
-    [?NC | cfmt(S)];
-cfmt_([$~,$!,$C | S]) ->
-    [?BC | cfmt(S)];
+cfmt_([$~,$!,$m | S], Enabled) ->
+    [?NM | cfmt_(S, Enabled)];
+cfmt_([$~,$!,$M | S], Enabled) ->
+    [?BM | cfmt_(S, Enabled)];
 
-cfmt_([$~,$!,$w | S]) ->
-    [?NW | cfmt(S)];
-cfmt_([$~,$!,$W | S]) ->
-    [?BW | cfmt(S)];
+cfmt_([$~,$!,$c | S], Enabled) ->
+    [?NC | cfmt_(S, Enabled)];
+cfmt_([$~,$!,$C | S], Enabled) ->
+    [?BC | cfmt_(S, Enabled)];
 
-cfmt_([$~,$~ | S]) ->
-    [$~,$~ | cfmt(S)];
-cfmt_([C | S]) ->
-    [C | cfmt(S)];
-cfmt_([]) ->
+cfmt_([$~,$!,$w | S], Enabled) ->
+    [?NW | cfmt_(S, Enabled)];
+cfmt_([$~,$!,$W | S], Enabled) ->
+    [?BW | cfmt_(S, Enabled)];
+
+cfmt_([$~,$~ | S], Enabled) ->
+    [$~,$~ | cfmt_(S, Enabled)];
+
+cfmt_([C | S], Enabled) ->
+    [C | cfmt_(S, Enabled)];
+
+cfmt_([], _Enabled) ->
     [].
 
 %%-----------------------------------------------------------------------------
