@@ -20,7 +20,6 @@
 -define(R,  "\033[0m").
 
 format(Warning) ->
-    format_warning(Warning, fullpath),
     Str = try
               format_warning(Warning, fullpath)
           catch
