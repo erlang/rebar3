@@ -47,21 +47,6 @@ fmt(Fmt, Args) ->
     io_lib:format(cfmt(Fmt), Args).
 
 
-%% Mostrly from: https://github.com/erlware/erlware_commons/blob/49bc69e35a282bde4a0a6a8f211b5f77d8585256/src/ec_cmd_log.erl#L220
-%%colorize(Color, Msg) when is_integer(Color) ->
-%%    colorize(Color, false, Msg).
-
-%% colorize(Color, false, Msg) when is_integer(Color) ->
-%%     lists:flatten(fmt("\033[~B;~Bm~s\033[0m", [0, Color, Msg]));
-%% colorize(Color, true, Msg) when is_integer(Color) ->
-%%     lists:flatten(fmt("\033[~B;~Bm~s\033[0m", [1, Color, Msg])).
-
-
-%%bw(M) ->
-%%    colorize(37, true, M).
-
-%% Based on: https://github.com/erlang/otp/blob/a2670f0822fc6729df956c8ec8c381340ff0a5fb/lib/dialyzer/src/dialyzer.erl#L290
-
 format_warning({Tag, {File, Line, _MFA}, Msg}, FOpt) ->
     format_warning({Tag, {File, Line}, Msg}, FOpt);
 format_warning({_Tag, {File, Line}, Msg}, FOpt) when is_list(File),
@@ -74,8 +59,24 @@ format_warning({_Tag, {File, Line}, Msg}, FOpt) when is_list(File),
     lists:flatten(fmt("~s:~w~n~s", [F, Line, String])).
 
 
+%% FROM https://github.com/erlware/erlware_commons/blob/49bc69e35a282bde4a0a6a8f211b5f77d8585256/src/ec_cmd_log.erl
+%% @doc Query the term enviroment
+%% For reasons of simplicity, we don't parse terminal capabilities yet, although
+%% a later version could do so. Rather, we provide a simple match-list of terminal
+%% capabilities.
+%% @end
+-spec query_term_env() -> full | dumb.
+query_term_env() ->
+    term_capabilities(os:getenv("TERM")).
+
+-spec term_capabilities(string()) -> full | dumb.
+term_capabilities("xterm") -> full;
+term_capabilities("dumb") -> dumb;
+term_capabilities(_) -> full. %% Default to the backwards compatible version.
+
+
 cfmt(S) ->
-    cfmt(S, true).
+    cfmt(S, query_term_env() =:= full).
 cfmt(S, true) ->
     lists:flatten(cfmt_(S, true)) ++ ?R;
 cfmt(S, false) ->
