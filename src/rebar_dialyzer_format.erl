@@ -1,7 +1,6 @@
 -module(rebar_dialyzer_format).
 
--export([format/1]).
-
+-export([format/1, bad_arg/2, seperate_args/1]).
 
 -define(NR, "\033[0;31m").
 -define(NG, "\033[0;32m").
@@ -353,11 +352,11 @@ call_or_apply_to_string(ArgNs, FailReason, SigArgs, SigRet,
             case (ArgNs =:= []) orelse IsOverloaded of
                 true ->
                     %% We do not know which arguments caused the failure
-                    fmt("~!Wbreaks the contract~!! ~s\n", [Contract]);
+                    fmt("~!Wbreaks the contract~!! ~s\n", [good_arg(ArgNs, Contract)]);
                 false ->
                     fmt("~!Wbreaks the contract~!! ~s ~!Win the~!!"
                            " ~s ~!Wargument\n",
-                           [good_arg(ArgNs, Contract), PositionString])
+                        [good_arg(ArgNs, Contract), PositionString])
             end;
         both ->
             fmt("~!Wwill never return since the success typing is "
@@ -439,10 +438,9 @@ good_arg(N, Args) ->
 color_arg(N, C, Args) when is_integer(N) ->
     color_arg([N], C, Args);
 color_arg(Ns, C, Args) ->
-    Args1 = seperate_args(Args),
+    {Args1, Rest} =seperate_args(Args),
     Args2 = highlight(Ns, 1, C, Args1),
-    join_args(Args2).
-
+    join_args(Args2) ++ Rest.
 
 highlight([], _N, _C, Rest) ->
     Rest;
@@ -469,8 +467,8 @@ seperate_args([], [$,, $\s | R], Arg, Args) ->
 seperate_args([], [$, | R], Arg, Args) ->
     seperate_args([], R, [], [lists:reverse(Arg) | Args]);
 
-seperate_args([], [$)], Arg, Args) ->
-    lists:reverse([lists:reverse(Arg) | Args]);
+seperate_args([], [$) | Rest], Arg, Args) ->
+    {lists:reverse([lists:reverse(Arg) | Args]), Rest};
 seperate_args([C | D], [C | R], Arg, Args) ->
     seperate_args(D, R, [C | Arg], Args);
 %% Brackets
