@@ -100,14 +100,14 @@ message_to_string({improper_list_constr, [TlType]}) ->
 message_to_string({no_return, [Type|Name]}) ->
     NameString =
         case Name of
-            [] -> "~!WThe created fun ";
+            [] -> fmt("~!WThe created fun ");
             [F, A] -> fmt("~!WFunction ~!r~w/~w ", [F, A])
         end,
     case Type of
         no_match -> fmt("~s~!Whas no clauses that will ever match\n",[NameString]);
         only_explicit -> fmt("~s~!Wonly terminates with explicit exception\n", [NameString]);
-        only_normal -> fmt("~s~!W~!Whas no local return\n", [NameString]);
-        both -> fmt("~s~!W~!Whas no local return\n", [NameString])
+        only_normal -> fmt("~s~!Whas no local return\n", [NameString]);
+        both -> fmt("~s~!Whas no local return\n", [NameString])
     end;
 message_to_string({record_constr, [RecConstr, FieldDiffs]}) ->
     fmt("~!WRecord construction ~!!~s~!W violates the"
