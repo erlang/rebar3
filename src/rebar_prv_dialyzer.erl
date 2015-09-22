@@ -402,14 +402,10 @@ run_dialyzer(State, Opts, Output) ->
     end.
 
 format_warnings(Output, Warnings) ->
-    Warnings1 = format_warnings(Warnings),
+    Warnings1 = rebar_dialyzer_format:format_warnings(Warnings),
     console_warnings(Warnings1),
     file_warnings(Output, Warnings),
     length(Warnings1).
-
-format_warnings(Warnings) ->
-    [rebar_dialyzer_format:format(Warning) || Warning <- Warnings].
-
 
 console_warnings(Warnings) ->
     _ = [?CONSOLE("~s", [Warning]) || Warning <- Warnings],
