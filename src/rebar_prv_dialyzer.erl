@@ -404,7 +404,7 @@ run_dialyzer(State, Opts, Output) ->
 format_warnings(Output, Warnings) ->
     Warnings1 = format_warnings(Warnings),
     console_warnings(Warnings1),
-    file_warnings(Output, Warnings1),
+    file_warnings(Output, Warnings),
     length(Warnings1).
 
 format_warnings(Warnings) ->
@@ -418,7 +418,7 @@ console_warnings(Warnings) ->
 file_warnings(_, []) ->
     ok;
 file_warnings(Output, Warnings) ->
-    Warnings1 = [[Warning, $\n] || Warning <- Warnings],
+    Warnings1 = [[dialyzer:format_warning(Warning, fullpath), $\n] || Warning <- Warnings],
     case file:write_file(Output, Warnings1, [append]) of
         ok ->
             ok;
