@@ -405,7 +405,7 @@ format_warnings(Output, Warnings) ->
     Warnings1 = rebar_dialyzer_format:format_warnings(Warnings),
     console_warnings(Warnings1),
     file_warnings(Output, Warnings),
-    length(Warnings1).
+    length(Warnings).
 
 console_warnings(Warnings) ->
     _ = [?CONSOLE("~s", [Warning]) || Warning <- Warnings],
