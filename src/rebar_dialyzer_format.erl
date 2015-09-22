@@ -56,8 +56,7 @@ message_to_string({apply, [Args, ArgNs, FailReason,
         call_or_apply_to_string(ArgNs, FailReason, SigArgs, SigRet, Contract);
 message_to_string({app_call, [M, F, Args, Culprit, ExpectedType, FoundType]}) ->
     fmt("~!^The call~!! ~s:~s~s ~!^requires that"
-        "~!! ~s ~!^is of type ~!g~s~!^ not ~!r~s"
-        "~!!",
+        "~!! ~s ~!^is of type ~!g~s~!^ not ~!r~s",
         [M, F, Args, Culprit, ExpectedType, FoundType]);
 message_to_string({bin_construction, [Culprit, Size, Seg, Type]}) ->
     fmt("~!^Binary construction will fail since the ~!b~s~!^ field~!!"
@@ -135,7 +134,7 @@ message_to_string({unmatched_return, [Type]}) ->
     fmt("~!^Expression produces a value of type ~!!~s~!^,"
         " but this value is unmatched", [Type]);
 message_to_string({unused_fun, [F, A]}) ->
-    fmt("~!^Function ~!r~w/~w~!^ will never be called", [F, A]);
+    fmt("~!^Function ~!r~w/~w~!!~!^ will never be called", [F, A]);
 %%----- Warnings for specs and contracts -------------------
 message_to_string({contract_diff, [M, F, _A, Contract, Sig]}) ->
     fmt("~!^Type specification ~!!~w:~w~s~!^"
@@ -231,7 +230,7 @@ message_to_string({callback_missing, [B, F, A]}) ->
     fmt("~!^Undefined callback function ~!!~w/~w~!^ (behaviour ~!!"
         "'~w'~!^)",[F, A, B]);
 message_to_string({callback_info_missing, [B]}) ->
-    fmt("~!^Callback info about the ~!r~w~!^"
+    fmt("~!^Callback info about the ~!r~w~!!~!^"
         " behaviour is not available", [B]);
 %%----- Warnings for unknown functions, types, and behaviours -------------
 message_to_string({unknown_type, {M, F, A}}) ->
