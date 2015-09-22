@@ -109,10 +109,24 @@ format_error({bad_dep_name, Dep}) ->
 %% Internal functions
 %% ===================================================================
 
+-spec consult_and_eval(File::file:name_all(), Script::file:name_all()) ->
+                              {ok, Terms::[term()]} |
+                              {error, Reason::term()}.
 consult_and_eval(File, Script) ->
     ?DEBUG("Evaluating config script ~p", [Script]),
     StateData = rebar_file_utils:try_consult(File),
-    file:script(Script, bs([{'CONFIG', StateData}, {'SCRIPT', Script}])).
+    %% file:consult/1 always returns the terms as a list, however file:script
+    %% can (and will) return any kind of term(), to make consult_and_eval
+    %% work the same way as eval we ensure that when no list is returned we
+    %% convert it in a list.
+    case file:script(Script, bs([{'CONFIG', StateData}, {'SCRIPT', Script}])) of
+        {ok, Terms} when is_list(Terms) ->
+            {ok, Terms};
+        {ok, Term} ->
+            {ok, [Term]};
+        Error ->
+            Error
+    end.
 
 remove_script_ext(F) ->
     filename:rootname(F, ".script").
