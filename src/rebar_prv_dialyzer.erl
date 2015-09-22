@@ -408,15 +408,8 @@ format_warnings(Output, Warnings) ->
     length(Warnings1).
 
 format_warnings(Warnings) ->
-    [format_warning(Warning) || Warning <- Warnings].
+    [rebar_dialyzer_format:format(Warning) || Warning <- Warnings].
 
-format_warning(Warning) ->
-    case strip(dialyzer:format_warning(Warning, fullpath)) of
-        ":0: " ++ Unknown ->
-            Unknown;
-        Warning1 ->
-            Warning1
-    end.
 
 console_warnings(Warnings) ->
     _ = [?CONSOLE("~s", [Warning]) || Warning <- Warnings],
@@ -432,9 +425,6 @@ file_warnings(Output, Warnings) ->
         {error, Reason} ->
             throw({output_file_error, Output, Reason})
     end.
-
-strip(Warning) ->
-    string:strip(Warning, right, $\n).
 
 no_warnings() ->
     [no_return,
