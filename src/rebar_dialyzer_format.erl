@@ -5,7 +5,6 @@
 -export([format/1]).
 
 
-
 format(Warning) ->
     Str = try
               format_warning(Warning, fullpath)
@@ -26,9 +25,9 @@ strip(Warning) ->
     string:strip(Warning, right, $\n).
 
 fmt(Fmt) ->
-    rebar_colour:format(Fmt, []).
+    cf:format(Fmt, []).
 fmt(Fmt, Args) ->
-    rebar_colour:format(Fmt, Args).
+    cf:format(Fmt, Args).
 
 format_warning({Tag, {File, Line, _MFA}, Msg}, FOpt) ->
     format_warning({Tag, {File, Line}, Msg}, FOpt);
