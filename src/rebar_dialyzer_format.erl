@@ -278,14 +278,11 @@ call_or_apply_to_string(ArgNs, FailReason, SigArgs, SigRet,
     end.
 
 form_positions(ArgNs) ->
+    ArgS = form_position_string(ArgNs),
     case ArgNs of
-        [_] -> "an opaque term as ";
-        [_,_|_] -> "opaque terms as "
-    end ++ form_position_string(ArgNs) ++
-        case ArgNs of
-            [_] -> " argument";
-            [_,_|_] -> " arguments"
-        end.
+        [_] ->     fmt("~!^an opaque term as ~!!~s~!^ argument", [ArgS]);
+        [_,_|_] -> fmt("~!^opaque terms as ~!!~s~!^ arguments", [ArgS])
+    end.
 
 %% We know which positions N are to blame;
 %% the list of triples will never be empty.
