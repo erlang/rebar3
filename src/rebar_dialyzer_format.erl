@@ -169,7 +169,7 @@ message_to_string({spec_missing_fun, [M, F, A]}) ->
 %%----- Warnings for opaque type violations -------------------
 message_to_string({call_with_opaque, [M, F, Args, ArgNs, ExpArgs]}) ->
     fmt("~!^The call ~!!~w:~w~s~!^ contains ~!!~s~!^ when ~!!~s",
-        [M, F, Args, form_positions(ArgNs), form_expected(ExpArgs)]);
+        [M, F, bad_arg(ArgNs, Args), form_positions(ArgNs), form_expected(ExpArgs)]);
 message_to_string({call_without_opaque, [M, F, Args, [{N,_,_}|_] = ExpectedTriples]}) ->
     fmt("~!^The call ~!!~w:~w~s ~!^does not have~!! ~s",
         [M, F, bad_arg(N, Args), form_expected_without_opaque(ExpectedTriples)]);
