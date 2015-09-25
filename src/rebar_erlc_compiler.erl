@@ -28,6 +28,7 @@
 
 -export([compile/1,
          compile/3,
+         compile/4,
          clean/1]).
 
 -include("rebar.hrl").
@@ -103,6 +104,11 @@ compile(Opts, Dir, OutDir) ->
                             filename:join(Dir, "mibs"), ".mib", filename:join([Dir, "priv", "mibs"]), ".bin",
                             fun compile_mib/3),
     doterl_compile(Opts, Dir, OutDir).
+
+-spec compile(rebar_dict(), file:filename(), file:filename(), [file:filename()]) -> 'ok'.
+compile(Opts, Dir, OutDir, More) ->
+    ErlOpts = rebar_opts:erl_opts(Opts),
+    doterl_compile(Opts, Dir, OutDir, More, ErlOpts).
 
 -spec clean(file:filename()) -> 'ok'.
 clean(AppDir) ->
@@ -488,6 +494,7 @@ needs_compile(Source, Target) ->
     filelib:last_modified(Source) > filelib:last_modified(Target).
 
 gather_src([], Srcs) ->
+    ?DEBUG("src_files ~p", [Srcs]),
     Srcs;
 gather_src([Dir|Rest], Srcs) ->
     gather_src(
