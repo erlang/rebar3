@@ -3,7 +3,7 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-all() -> [sub_app_deps, newly_added_dep, http_proxy_settings, https_proxy_settings, {group, git}, {group, pkg}].
+all() -> [sub_app_deps, newly_added_dep, newly_added_after_empty_lock, http_proxy_settings, https_proxy_settings, {group, git}, {group, pkg}].
 
 groups() ->
     [{all, [], [flat, pick_highest_left, pick_highest_right,
@@ -29,6 +29,8 @@ init_per_group(_, Config) ->
 end_per_group(_, Config) ->
     Config.
 
+init_per_testcase(newly_added_after_empty_lock, Config) ->
+    rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(newly_added_dep, Config) ->
     rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(sub_app_deps, Config) ->
@@ -251,6 +253,36 @@ newly_added_dep(Config) ->
     rebar_test_utils:run_and_check(
       Config, RebarConfig3, ["compile"],
       {ok, [{app, Name}, {dep, "a"}, {dep, "b", "1.0.0"}, {dep, "c", "1.0.0"}]}).
+
+newly_added_after_empty_lock(Config) ->
+    AppDir = ?config(apps, Config),
+    Deps = rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}]),
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
+
+    Name = rebar_test_utils:create_random_name("app_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+
+    SubAppsDir = filename:join([AppDir, "apps", Name]),
+    rebar_test_utils:create_app(SubAppsDir, Name, Vsn, [kernel, stdlib]),
+
+    TopDeps = rebar_test_utils:top_level_deps(rebar_test_utils:expand_deps(git, [])),
+    {ok, RebarConfig} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, TopDeps}])),
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig, ["compile"],
+      {ok, []}),
+
+    %% Add a and c to top level
+    TopDeps2 = rebar_test_utils:top_level_deps(rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}])),
+    {ok, RebarConfig2} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, TopDeps2}])),
+    LockFile = filename:join(AppDir, "rebar.lock"),
+    RebarConfig3 = rebar_config:merge_locks(RebarConfig2,
+                                           rebar_config:consult_lock_file(LockFile)),
+
+    %% a should now be installed and c should not change
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig3, ["compile"],
+      {ok, [{app, Name}, {dep, "a", "1.0.0"}]}).
 
 
 http_proxy_settings(_Config) ->

@@ -86,9 +86,6 @@ verify_config_format([Term | _]) ->
 %% no lockfile
 merge_locks(Config, []) ->
     Config;
-%% empty lockfile
-merge_locks(Config, [[]]) ->
-    Config;
 %% lockfile with entries
 merge_locks(Config, [Locks]) ->
     ConfigDeps = proplists:get_value(deps, Config, []),
