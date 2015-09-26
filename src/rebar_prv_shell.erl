@@ -190,7 +190,7 @@ load_apps(Apps) ->
              load_apps(proplists:get_value(applications, Ks));
         _ ->
             error % will be caught when starting the app
-     end || App <- Apps,
+     end || App <- normalize_load_apps(Apps),
             not lists:keymember(App, 1, application:loaded_applications())],
     ok.
 
@@ -209,13 +209,26 @@ boot_apps(Apps) ->
     ?WARN("The rebar3 shell is a development tool; to deploy "
             "applications in production, consider using releases "
             "(http://www.rebar3.org/v3.0/docs/releases)", []),
-    Res = [application:ensure_all_started(App) || App <- Apps],
+    Normalized = normalize_boot_apps(Apps),
+    Res = [application:ensure_all_started(App) || App <- Normalized],
     _ = [?INFO("Booted ~p", [App])
             || {ok, Booted} <- Res,
             App <- Booted],
     _ = [?ERROR("Failed to boot ~p for reason ~p", [App, Reason])
             || {error, {App, Reason}} <- Res],
     ok.
+
+normalize_load_apps([]) -> [];
+normalize_load_apps([{App, _} | T]) -> [App | normalize_load_apps(T)];
+normalize_load_apps([{App, _Vsn, load} | T]) -> [App | normalize_load_apps(T)];
+normalize_load_apps([App | T]) when is_atom(App) -> [App | normalize_load_apps(T)].
+
+normalize_boot_apps([]) -> [];
+normalize_boot_apps([{_App, load} | T]) -> normalize_boot_apps(T);
+normalize_boot_apps([{_App, _Vsn, load} | T]) -> normalize_boot_apps(T);
+normalize_boot_apps([{App, _Vsn} | T]) -> [App | normalize_boot_apps(T)];
+normalize_boot_apps([App | T]) when is_atom(App) -> [App | normalize_boot_apps(T)].
+
 
 remove_error_handler(0) ->
     ?WARN("Unable to remove simple error_logger handler", []);
