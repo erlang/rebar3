@@ -47,7 +47,8 @@ do(State) ->
     Locks = rebar_state:get(State, {locks, default}, []),
     Deps = rebar_state:get(State, deps, []),
     Names = parse_names(ec_cnv:to_binary(proplists:get_value(package, Args, <<"">>)), Locks),
-    case prepare_locks(Names, Deps, Locks, []) of
+    DepsDict = deps_dict(rebar_state:all_deps(State)),
+    case prepare_locks(Names, Deps, Locks, [], DepsDict) of
         {error, Reason} ->
             {error, Reason};
         {Locks0, _Unlocks0} ->
@@ -92,54 +93,77 @@ parse_names(Bin, Locks) ->
         Other -> Other
     end.
 
-prepare_locks([], _, Locks, Unlocks) ->
+prepare_locks([], _, Locks, Unlocks, _Dict) ->
     {Locks, Unlocks};
-prepare_locks([Name|Names], Deps, Locks, Unlocks) ->
+prepare_locks([Name|Names], Deps, Locks, Unlocks, Dict) ->
     AtomName = binary_to_atom(Name, utf8),
     case lists:keyfind(Name, 1, Locks) of
         {_, _, 0} = Lock ->
             case rebar_utils:tup_find(AtomName, Deps) of
                 false ->
                     ?WARN("Dependency ~s has been removed and will not be upgraded", [Name]),
-                    prepare_locks(Names, Deps, Locks, Unlocks);
+                    prepare_locks(Names, Deps, Locks, Unlocks, Dict);
                 Dep ->
-                    {Source, NewLocks, NewUnlocks} = prepare_lock(Dep, Lock, Locks),
+                    {Source, NewLocks, NewUnlocks} = prepare_lock(Dep, Lock, Locks, Dict),
                     prepare_locks(Names, Deps, NewLocks,
-                                  [{Name, Source, 0} | NewUnlocks ++ Unlocks])
+                                  [{Name, Source, 0} | NewUnlocks ++ Unlocks], Dict)
             end;
         {_, _, Level} = Lock when Level > 0 ->
             case rebar_utils:tup_find(AtomName, Deps) of
                 false ->
                     ?PRV_ERROR({transitive_dependency, Name});
                 Dep -> % Dep has been promoted
-                    {Source, NewLocks, NewUnlocks} = prepare_lock(Dep, Lock, Locks),
+                    {Source, NewLocks, NewUnlocks} = prepare_lock(Dep, Lock, Locks, Dict),
                     prepare_locks(Names, Deps, NewLocks,
-                                  [{Name, Source, 0} | NewUnlocks ++ Unlocks])
+                                  [{Name, Source, 0} | NewUnlocks ++ Unlocks], Dict)
             end;
         false ->
             ?PRV_ERROR({unknown_dependency, Name})
     end.
 
-prepare_lock(Dep, Lock, Locks) ->
-    Source = case Dep of
-        {_, SrcOrVsn} -> SrcOrVsn;
-        {_, _, Src} -> Src;
+prepare_lock(Dep, Lock, Locks, Dict) ->
+    {Name1, Source} = case Dep of
+        {Name, SrcOrVsn} -> {Name, SrcOrVsn};
+        {Name, _, Src} -> {Name, Src};
         _ when is_atom(Dep) ->
             %% version-free package. Must unlock whatever matches in locks
             {_, Vsn, _} = lists:keyfind(ec_cnv:to_binary(Dep), 1, Locks),
-            Vsn
+            {Dep, Vsn}
     end,
-    {NewLocks, NewUnlocks} = unlock_higher_than(0, Locks -- [Lock]),
+    Children = all_children(Name1, Dict),
+    {NewLocks, NewUnlocks} = unlock_children(Children, Locks -- [Lock]),
     {Source, NewLocks, NewUnlocks}.
 
 top_level_deps(Deps, Locks) ->
     [Dep || Dep <- Deps, lists:keymember(0, 3, Locks)].
 
-unlock_higher_than(Level, Locks) -> unlock_higher_than(Level, Locks, [], []).
+unlock_children(Children, Locks) ->
+    unlock_children(Children, Locks, [], []).
 
-unlock_higher_than(_, [], Locks, Unlocks) ->
+unlock_children(_, [], Locks, Unlocks) ->
     {Locks, Unlocks};
-unlock_higher_than(Level, [App = {_,_,AppLevel} | Apps], Locks, Unlocks) ->
-    if AppLevel > Level  -> unlock_higher_than(Level, Apps, Locks, [App | Unlocks]);
-       AppLevel =< Level -> unlock_higher_than(Level, Apps, [App | Locks], Unlocks)
+unlock_children(Children, [App = {Name,_,_} | Apps], Locks, Unlocks) ->
+    case lists:member(ec_cnv:to_binary(Name), Children) of
+        true ->
+            unlock_children(Children, Apps, Locks, [App | Unlocks]);
+        false ->
+            unlock_children(Children, Apps, [App | Locks], Unlocks)
+    end.
+
+deps_dict(Deps) ->
+    lists:foldl(fun(App, Dict) ->
+                        Name = rebar_app_info:name(App),
+                        Parent = rebar_app_info:parent(App),
+                        dict:append_list(Parent, [Name], Dict)
+                end, dict:new(), Deps).
+
+all_children(Name, Dict) ->
+    lists:flatten(all_children_(Name, Dict)).
+
+all_children_(Name, Dict) ->
+    case dict:find(ec_cnv:to_binary(Name), Dict) of
+        {ok, Children} ->
+            Children ++ [all_children_(Child, Dict) || Child <- Children];
+        error ->
+            []
     end.

@@ -561,13 +561,19 @@ run(Config) ->
         {error, Term} -> {error, Term};
         _ -> {ok, Unlocks}
     end,
-    apply(?config(mock_update, Config), []),
+
+    meck:new(rebar_prv_upgrade, [passthrough]),
+    meck:expect(rebar_prv_upgrade, do, fun(S) ->
+                                               apply(?config(mock_update, Config), []),
+                                               meck:passthrough([S])
+                                       end),
     NewRebarConf = rebar_test_utils:create_config(?config(apps, Config),
                                                   [{deps, ?config(next_top_deps, Config)}]),
     {ok, NewRebarConfig} = file:consult(NewRebarConf),
     rebar_test_utils:run_and_check(
         Config, NewRebarConfig, ["upgrade", App], Expectation
-    ).
+     ),
+    meck:unload(rebar_prv_upgrade).
 
 novsn_pkg(Config) ->
     apply(?config(mock, Config), []),
