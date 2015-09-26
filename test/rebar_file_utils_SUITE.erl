@@ -97,8 +97,8 @@ path_from_ancestor(_Config) ->
     ?assertEqual({error, badparent}, rebar_file_utils:path_from_ancestor("/foo/bar/baz", "/foo/bar/baz/qux")).
 
 canonical_path(_Config) ->
-    ?assertEqual("/", rebar_file_utils:canonical_path("/")),
-    ?assertEqual("/", rebar_file_utils:canonical_path("/../../..")),
+    ?assertEqual(filename:nativename("/"), rebar_file_utils:canonical_path("/")),
+    ?assertEqual(filename:nativename("/"), rebar_file_utils:canonical_path("/../../..")),
     ?assertEqual("/foo", rebar_file_utils:canonical_path("/foo/bar/..")),
     ?assertEqual("/foo", rebar_file_utils:canonical_path("/foo/../foo")),
     ?assertEqual("/foo", rebar_file_utils:canonical_path("/foo/.")),
