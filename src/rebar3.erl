@@ -64,7 +64,7 @@ main(Args) ->
 
 %% Erlang-API entry point
 run(BaseState, Commands) ->
-    start_and_load_apps(),
+    start_and_load_apps(api),
     BaseState1 = rebar_state:set(BaseState, task, Commands),
     BaseState2 = rebar_state:set(BaseState1, caller, api),
 
@@ -78,7 +78,7 @@ run(BaseState, Commands) ->
 %% ====================================================================
 
 run(RawArgs) ->
-    start_and_load_apps(),
+    start_and_load_apps(command_line),
 
     BaseState = init_config(),
     BaseState1 = rebar_state:set(BaseState, caller, command_line),
@@ -272,18 +272,31 @@ handle_error(Error) ->
     ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []),
     erlang:halt(1).
 
-start_and_load_apps() ->
+start_and_load_apps(Caller) ->
     _ = application:load(rebar),
     %% Make sure crypto is running
-    case crypto:start() of
-        ok -> ok;
-        {error,{already_started,crypto}} -> ok
-    end,
-    application:start(asn1),
-    application:start(public_key),
-    application:start(ssl),
+    ensure_running(crypto, Caller),
+    ensure_running(asn1, Caller),
+    ensure_running(public_key, Caller),
+    ensure_running(ssl, Caller),
     inets:start(),
     inets:start(httpc, [{profile, rebar}]).
+
+ensure_running(App, Caller) ->
+    case application:start(App) of
+        ok -> ok;
+        {error, {already_started, App}} -> ok;
+        {error, Reason} ->
+            %% These errors keep rebar3's own configuration to be loaded,
+            %% which disables the log level and causes a failure without
+            %% showing the error message. Bypass this entirely by overriding
+            %% the default value (which allows logging to take place)
+            %% and shut things down manually.
+            Log = ec_cmd_log:new(warn, Caller),
+            ec_cmd_log:error(Log, "Rebar dependency ~p could not be loaded "
+                                  "for reason ~p~n", [App, Reason]),
+            throw(rebar_abort)
+    end.
 
 state_from_global_config(Config, GlobalConfigFile) ->
     rebar_utils:set_httpc_options(),
