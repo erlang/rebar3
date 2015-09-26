@@ -163,7 +163,7 @@ all_children(Name, Dict) ->
 all_children_(Name, Dict) ->
     case dict:find(ec_cnv:to_binary(Name), Dict) of
         {ok, Children} ->
-            Children ++ [all_children_(Child, Dict) || Child <- Children];
+            [Children | [all_children_(Child, Dict) || Child <- Children]];
         error ->
             []
     end.
