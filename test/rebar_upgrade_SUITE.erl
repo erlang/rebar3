@@ -9,7 +9,7 @@ groups() ->
     [{all, [], [top_a, top_b, top_c, top_d1, top_d2, top_e,
                 pair_a, pair_b, pair_ab, pair_c, pair_all,
                 triplet_a, triplet_b, triplet_c,
-                tree_a, tree_b, tree_c, tree_c2, tree_ac, tree_all,
+                tree_a, tree_b, tree_c, tree_c2, tree_cj, tree_ac, tree_all,
                 delete_d, promote, stable_lock, fwd_lock,
                 compile_upgrade_parity]},
      {git, [], [{group, all}]},
@@ -327,6 +327,25 @@ upgrades(tree_c2) ->
      {"C", [{"A","1"}, "D", "J", "E",
             {"B","1"}, "F", "G",
             {"C","1"}, "H", {"I", "2"}, "K"]}};
+upgrades(tree_cj) ->
+    {[{"A", "1", [{"D",[{"J", "1",[]}]},
+                  {"E",[{"I","1",[]}]}]},
+      {"B", "1", [{"F",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H",[]},
+                  {"I","1",[]}]}
+     ],
+     [{"A", "1", [{"D",[{"J", "2", []}]},
+                  {"E",[{"I","1",[]}]}]},
+      {"B", "1", [{"F",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H",[]},
+                  {"I","1",[]}]}
+     ],
+     ["C","J"],
+     {"C", [{"A","1"}, "D", {"J", "1"}, "E", {"I","1"},
+            {"B","1"}, "F", "G",
+            {"C","1"}, "H"]}};
 upgrades(tree_ac) ->
     {[{"A", "1", [{"D",[{"J",[]}]},
                   {"E",[{"I","1",[]}]}]},
@@ -481,6 +500,7 @@ tree_a(Config) -> run(Config).
 tree_b(Config) -> run(Config).
 tree_c(Config) -> run(Config).
 tree_c2(Config) -> run(Config).
+tree_cj(Config) -> run(Config).
 tree_ac(Config) -> run(Config).
 tree_all(Config) -> run(Config).
 promote(Config) -> run(Config).
@@ -561,13 +581,19 @@ run(Config) ->
         {error, Term} -> {error, Term};
         _ -> {ok, Unlocks}
     end,
-    apply(?config(mock_update, Config), []),
+
+    meck:new(rebar_prv_upgrade, [passthrough]),
+    meck:expect(rebar_prv_upgrade, do, fun(S) ->
+                                               apply(?config(mock_update, Config), []),
+                                               meck:passthrough([S])
+                                       end),
     NewRebarConf = rebar_test_utils:create_config(?config(apps, Config),
                                                   [{deps, ?config(next_top_deps, Config)}]),
     {ok, NewRebarConfig} = file:consult(NewRebarConf),
     rebar_test_utils:run_and_check(
         Config, NewRebarConfig, ["upgrade", App], Expectation
-    ).
+     ),
+    meck:unload(rebar_prv_upgrade).
 
 novsn_pkg(Config) ->
     apply(?config(mock, Config), []),
