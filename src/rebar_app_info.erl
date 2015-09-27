@@ -83,7 +83,7 @@
                      dir                :: file:name(),
                      out_dir            :: file:name(),
                      resource_type      :: pkg | src,
-                     source             :: string() | tuple() | undefined,
+                     source             :: string() | tuple() | checkout | undefined,
                      is_lock=false      :: boolean(),
                      is_checkout=false  :: boolean(),
                      valid              :: boolean()}).
@@ -231,7 +231,7 @@ app_file_src(#app_info_t{app_file_src=undefined, dir=Dir, name=Name}) ->
 app_file_src(#app_info_t{app_file_src=AppFileSrc}) ->
     ec_cnv:to_list(AppFileSrc).
 
--spec app_file_src(t(), file:filename_all()) -> t().
+-spec app_file_src(t(), file:filename_all() | undefined) -> t().
 app_file_src(AppInfo=#app_info_t{}, undefined) ->
     AppInfo#app_info_t{app_file_src=undefined};
 app_file_src(AppInfo=#app_info_t{}, AppFileSrc) ->
@@ -369,7 +369,7 @@ resource_type(AppInfo=#app_info_t{}, Type) ->
 resource_type(#app_info_t{resource_type=ResourceType}) ->
     ResourceType.
 
--spec source(t(), string() | tuple()) -> t().
+-spec source(t(), string() | tuple() | checkout) -> t().
 source(AppInfo=#app_info_t{}, Source) ->
     AppInfo#app_info_t{source=Source}.
 

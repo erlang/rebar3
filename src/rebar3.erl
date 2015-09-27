@@ -45,6 +45,7 @@
 
 %% For running with:
 %% erl +sbtu +A0 -noinput -mode minimal -boot start_clean -s rebar3 main -extra "$@"
+-spec main() -> no_return().
 main() ->
     List = init:get_plain_arguments(),
     main(List).
