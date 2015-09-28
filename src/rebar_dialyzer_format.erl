@@ -1,14 +1,32 @@
+%%%
+%%% General colour conventions mostly follow the same schema
+%%% that git uses:
+%%%
+%%% * cyan:  files/lines or locations in general
+%%% * bold:  important text i.e. the human parts of warnings
+%%%          this allows quickly 'scanning' over a warning fading
+%%%          out the cody bits
+%%% * red:   things that went bad, i.e. the wrong argument in a
+%%%          call. It allows to quickly catching where in the code
+%%%          ane error is.
+%%% * green: the 'good' stuff, i.e. what was expected as an argument
+%%%          the 'red vs green' resambles the diff view 'remove vs add'
+%%% * blue:  argument positions.
 -module(rebar_dialyzer_format).
 
 -include("rebar.hrl").
 
 -export([format_warnings/1]).
 
+%% Formats a list of warnings in a nice per file way. Note that we reverse
+%% the list at the end to 'undo' the reversal by foldl
 format_warnings(Warnings) ->
     {_, Res} = lists:foldl(fun format_warning_/2, {undefined, []}, Warnings),
     lists:reverse(Res).
 
 
+%% If the last seen file is and the file of this warning are the same
+%% we skip the file header
 format_warning_(Warning = {_Tag, {File, Line}, Msg}, {File, Acc}) ->
     try
         String = message_to_string(Msg),
@@ -20,6 +38,7 @@ format_warning_(Warning = {_Tag, {File, Line}, Msg}, {File, Acc}) ->
             {File, [dialyzer:format_warning(Warning, fullpath) | Acc]}
     end;
 
+%% With a new file detencted we also write a file header.
 format_warning_(Warning = {_Tag, {File, Line}, Msg}, {_LastFile, Acc}) ->
     try
         Base = filename:basename(File),
@@ -329,7 +348,7 @@ ordinal(2) -> fmt("~!B2~!!nd");
 ordinal(3) -> fmt("~!B3~!!rd");
 ordinal(N) when is_integer(N) -> fmt("~!B~w~!!th", [N]).
 
-
+%% Format a pattern ad highlight errorous part in red.
 bad_pat("pattern " ++ P) ->
     fmt("pattern ~!r~s",[P]);
 bad_pat("variable " ++ P) ->
@@ -339,14 +358,16 @@ bad_pat(P) ->
 
 
 bad_arg(N, Args) ->
-    color_arg(N, r, Args).
+    colour_arg(N, r, Args).
 
 good_arg(N, Args) ->
-    color_arg(N, g, Args).
+    colour_arg(N, g, Args).
 
-color_arg(N, C, Args) when is_integer(N) ->
-    color_arg([N], C, Args);
-color_arg(Ns, C, Args) ->
+%% colour one or more arg of an argument list, this unparses the args
+%% highlights one or more of them and puts them back together.
+colour_arg(N, C, Args) when is_integer(N) ->
+    colour_arg([N], C, Args);
+colour_arg(Ns, C, Args) ->
     {Args1, Rest} =seperate_args(Args),
     Args2 = highlight(Ns, 1, C, Args1),
     join_args(Args2) ++ Rest.
@@ -363,10 +384,12 @@ highlight([N | Nr], N, r, [Arg | Rest]) ->
 highlight(Ns, N, C, [Arg | Rest]) ->
     [Arg | highlight(Ns, N + 1, C, Rest)].
 
+%% Arugments to functions and constraints are passed as
+%% strings not as data, this function pulls them apart
+%% to allow interacting with them seperately and not
+%% as one bug chunk of data.
 seperate_args([$( | S]) ->
     seperate_args([], S, "", []).
-
-
 
 %% We strip this space since dialyzer is inconsistant in adding or not adding
 %% it ....
