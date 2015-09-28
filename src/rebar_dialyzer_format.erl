@@ -31,12 +31,9 @@ fmt(Fmt, Args) ->
 
 format_warning({Tag, {File, Line, _MFA}, Msg}, FOpt) ->
     format_warning({Tag, {File, Line}, Msg}, FOpt);
-format_warning({_Tag, {File, Line}, Msg}, FOpt) when is_list(File),
-                                                     is_integer(Line) ->
-    F = case FOpt of
-            fullpath -> re:replace(File, "^.*/_build/", "_build/");
-            basename -> filename:basename(File)
-        end,
+format_warning({_Tag, {File, Line}, Msg}, fullpath) when is_list(File),
+                                                       is_integer(Line) ->
+    F = re:replace(File, "^.*/_build/", "_build/"),
     String = lists:flatten(message_to_string(Msg)),
     lists:flatten(fmt("~s:~w~n~s", [F, Line, String])).
 

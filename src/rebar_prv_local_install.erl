@@ -82,7 +82,7 @@ extract_escript(State, ScriptPath) ->
 
     {ok, #file_info{mode = _,
                     uid = Uid,
-                    gid = Gid}} = file:read_file_info(ScriptPath, [mode, uid, gid]),
+                    gid = Gid}} = file:read_file_info(ScriptPath),
 
     ?INFO("Writing rebar3 run script ~s...", [BinFile]),
     file:write_file(BinFile, bin_contents(OutputDir)),
