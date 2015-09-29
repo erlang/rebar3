@@ -78,7 +78,7 @@ do_tests(State, Tests) ->
     ?DEBUG("eunit_tests ~p", [Tests]),
     ?DEBUG("eunit_opts  ~p", [EUnitOpts]),
     Result = eunit:test(Tests, EUnitOpts),
-    ok = rebar_prv_cover:maybe_write_coverdata(State, ?PROVIDER),
+    ok = maybe_write_coverdata(State),
     case handle_results(Result) of
         {error, Reason} ->
             ?PRV_ERROR(Reason);
@@ -121,8 +121,8 @@ compile(State) ->
     case rebar_prv_compile:do(NewState) of
         %% successfully compiled apps
         {ok, S} ->
-            _ = maybe_cover_compile(S),
-            _ = maybe_compile_bare_testdir(S),
+            ok = maybe_cover_compile(S),
+            ok = maybe_compile_bare_testdir(S),
             {ok, S};
         %% this should look like a compiler error, not an eunit error
         Error   -> Error
@@ -303,14 +303,34 @@ set_verbose(Opts) ->
     end.
 
 maybe_cover_compile(State) ->
-    State1 = case rebar_state:get(State, cover, false) of
+    {RawOpts, _} = rebar_state:command_parsed_args(State),
+    State1 = case proplists:get_value(cover, RawOpts, false) of
         true  -> rebar_state:set(State, cover_enabled, true);
         false -> State
     end,
     rebar_prv_cover:maybe_cover_compile(State1).
 
+maybe_cover_compile(State, Dir) ->
+    {RawOpts, _} = rebar_state:command_parsed_args(State),
+    State1 = case proplists:get_value(cover, RawOpts, false) of
+        true  -> rebar_state:set(State, cover_enabled, true);
+        false -> State
+    end,
+    rebar_prv_cover:maybe_cover_compile(State1, [Dir]).
+
+maybe_write_coverdata(State) ->
+    {RawOpts, _} = rebar_state:command_parsed_args(State),
+    State1 = case proplists:get_value(cover, RawOpts, false) of
+        true  -> rebar_state:set(State, cover_enabled, true);
+        false -> State
+    end,
+    rebar_prv_cover:maybe_write_coverdata(State1, ?PROVIDER).
+
 maybe_compile_bare_testdir(State) ->
-    case ec_file:is_dir(filename:join([rebar_state:dir(State), "test"])) of
+    Apps = project_apps(State),
+    BareTest = filename:join([rebar_state:dir(State), "test"]),
+    F = fun(App) -> rebar_app_info:dir(App) == rebar_state:dir(State) end,
+    case ec_file:is_dir(BareTest) andalso not lists:any(F, Apps) of
         true ->
             ErlOpts = rebar_state:get(State, erl_opts, []),
             EUnitOpts = rebar_state:get(State, eunit_compile_opts, []),
@@ -325,7 +345,8 @@ maybe_compile_bare_testdir(State) ->
                                   [{erl_opts, NewErlOpts}, {erl_first_files, NewFirstFiles}, {src_dirs, ["test"]}]),
             OutDir = filename:join([rebar_dir:base_dir(State), "test"]),
             filelib:ensure_dir(filename:join([OutDir, "dummy.beam"])),
-            rebar_erlc_compiler:compile(NewOpts, rebar_state:dir(State), OutDir);
+            rebar_erlc_compiler:compile(NewOpts, rebar_state:dir(State), OutDir),
+            maybe_cover_compile(State, [OutDir]);
         false -> ok
     end.
 
