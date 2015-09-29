@@ -1,6 +1,7 @@
 [{<<"bbmustache">>,{pkg,<<"bbmustache">>,<<"1.0.4">>},0},
  {<<"certifi">>,{pkg,<<"certifi">>,<<"0.1.1">>},0},
  {<<"cf">>,{pkg,<<"cf">>,<<"0.1.2">>},0},
+ {<<"erlware_commons">>,{pkg,<<"erlware_commons">>,<<"0.16.0">>},0},
  {<<"getopt">>,{pkg,<<"getopt">>,<<"0.8.2">>},0},
  {<<"providers">>,{pkg,<<"providers">>,<<"1.5.0">>},0},
  {<<"relx">>,{pkg,<<"relx">>,<<"3.7.1">>},0},
