@@ -93,8 +93,8 @@ _rebar3()
     elif [[ ${prev} == escriptize ]] ; then
         :
     elif [[ ${prev} == eunit ]] ; then
-        sopts="-c -v"
-        lopts="--app --cover --suite --verbose"
+        sopts="-c -e -v"
+        lopts="--app --application --cover --dir --error_on_warning --file --module --suite --verbose"
     elif [[ ${prev} == help ]] ; then
         :
     elif [[ ${prev} == new ]] ; then

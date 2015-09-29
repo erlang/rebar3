@@ -47,7 +47,7 @@
 {ct_compile_opts, []}.
 %% {erl_first_files, ...} but for CT runs
 {ct_first_files, []}.
-%% Same options as for ct:run_test(...)
+%% Same options as for ct:run_test(Opts)
 {ct_opts, []}.
 
 
@@ -153,12 +153,14 @@
 
 %% == EUnit ==
 
-%% Options for eunit:test(Tests, ...)
-{eunit_opts, []}.
+%% eunit:test(Tests)
+{eunit_tests, [{application, rebar3}]}
+%% Options for eunit:test(Tests, Opts)
+{eunit_opts, [verbose]}.
 %% Additional compile options for eunit. erl_opts is also used
-{eunit_compile_opts, []}.
+{eunit_compile_opts, [{d, some_define}]}.
 %% {erl_first_files, ...} but for Eunit
-{eunit_first_files, []}.
+{eunit_first_files, ["test/test_behaviour.erl"]}.
 
 
 %% == Overrides ==

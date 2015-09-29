@@ -92,9 +92,14 @@ _rebar3 () {
                 ;;
                 (eunit)
                     _arguments \
-                        '(--app)--app[List of application test suites to run]:suites' \
-                        '(--suite)--suite[List of test suites to run]:suites' \
+                        '(--app)--app[Comma separated list of application test suites to run]:suites' \
+                        '(--application)--application[Comma separated list of application test suites to run]:applications' \
                         '(-c --cover)'{-c,--cover}'[Generate cover data]' \
+                        '(--dir)--dir[Comma separated list of dirs to load tests from]:dirs' \
+                        '(-e --error_on_warning)'{-e,--error_on_warning}'[Error on invalid test specifications instead of warning]' \
+                        '(--file)--file[Comma separated list of files to load tests from]:files' \
+                        '(--module)--module[Comma separated list of modules to load tests from]:modules' \
+                        '(--suite)--suite[Comma separated list of modules to load tests from]:modules' \
                         '(-v --verbose)'{-v,--verbose}'[Verbose output]' \
                     && ret=0
                 ;;

@@ -1,0 +1,15 @@
+#!/usr/bin/env escript
+
+main(["basic_app"]) ->
+  case filelib:is_dir("basic_app") of
+    true  -> zip:create("basic_app.zip", ["basic_app"]), halt(0);
+    false -> io:format("unable to locate basic_app directory~n", []), halt(1)
+  end;
+main(["multi_app"]) ->
+  case filelib:is_dir("multi_app") of
+    true  -> zip:create("multi_app.zip", ["multi_app"]), halt(0);
+    false -> io:format("unable to locate multi_app directory~n", []), halt(1)
+  end,
+  halt(0);
+main(_) ->
+  io:format("usage: deflate basic_app | multi_app~n", []), halt(1).

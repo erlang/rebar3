@@ -109,9 +109,16 @@ complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a edoc -d "Generate do
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a escriptize -d "Generate escript archive."
 
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a eunit -d "Run EUnit Tests."
+complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunit' -l app -d "Comma separated list of application test suites to run. Equivalent to `[{application, App}]`"
+complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunit' -l application -d "Comma separated list of application test suites to run. Equivalent to `[{application, App}]`"
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunit' -s c -l cover -d "Generate cover data"
+complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunit' -l dir -d "Comma separated list of dirs to load tests from. Equivalent to `[{dir, Dir}]`"
+complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunut' -s e -l error_on_warning -d "Error on invalid test specifications instead of warning"
+complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunit' -l file -d "Comma separated list of files to load tests from. Equivalent to `[{file, File}]`"
+complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunit' -l module -d "Comma separated list of modules to load tests from. Equivalent to `[{module, Module}]`"
+complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunit' -l suite -d "Comma separated list of modules to load tests from. Equivalent to `[{module, Module}]`"
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunit' -s v -l verbose -d "Verbose output"
-complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunit' -l app -d "List of applications to run tests for"
+
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunit' -l suite -d "Lists of test suites to run"
 
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a help -d "Display a list of tasks or help for a given task or subtask."
