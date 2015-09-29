@@ -1,0 +1,15 @@
+#!/usr/bin/env escript
+
+main(["basic_app"]) ->
+  case filelib:is_file("basic_app.zip") of
+    true  -> zip:unzip("basic_app.zip"), halt(0);
+    false -> io:format("unable to locate basic_app.zip~n", []), halt(1)
+  end;
+main(["multi_app"]) ->
+  case filelib:is_file("multi_app.zip") of
+    true  -> zip:unzip("multi_app.zip"), halt(0);
+    false -> io:format("unable to locate multi_app.zip~n", []), halt(1)
+  end,
+  halt(0);
+main(_) ->
+  io:format("usage: inflate basic_app | multi_app~n", []), halt(1).

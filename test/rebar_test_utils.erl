@@ -1,7 +1,7 @@
 -module(rebar_test_utils).
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
--export([init_rebar_state/1, init_rebar_state/2, run_and_check/4]).
+-export([init_rebar_state/1, init_rebar_state/2, run_and_check/4, check_results/3]).
 -export([expand_deps/2, flat_deps/1, top_level_deps/1]).
 -export([create_app/4, create_eunit_app/4, create_empty_app/4, create_config/2,
          package_app/3]).
