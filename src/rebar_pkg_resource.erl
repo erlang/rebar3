@@ -129,6 +129,14 @@ etag(Path) ->
     end.
 
 ssl_opts(Url) ->
+    case get_ssl_config() of
+        ssl_verify_enabled ->
+            ssl_opts(ssl_verify_enabled, Url);
+        ssl_verify_disabled ->
+            [{verify, verify_none}]
+    end.
+
+ssl_opts(ssl_verify_enabled, Url) ->
     case check_ssl_version() of
         true ->
             {ok, {_, _, Hostname, _, _, _}} = http_uri:parse(ec_cnv:to_list(Url)),
@@ -173,6 +181,16 @@ check_ssl_version() ->
             parse_vsn(Vsn) >= {5, 3, 6};
         _ ->
             false
+    end.
+
+get_ssl_config() ->
+    GlobalConfigFile = rebar_dir:global_config(),
+    Config = rebar_config:consult_file(GlobalConfigFile),
+    case proplists:get_value(ssl_verify, Config, []) of
+        false ->
+            ssl_verify_disabled;
+        _ ->
+            ssl_verify_enabled
     end.
 
 parse_vsn(Vsn) ->
