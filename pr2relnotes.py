@@ -53,7 +53,7 @@ def get_formatted_issue(repo, issue, title, url):
     """
     # Newline support writelines() call which doesn't add newlines
     # on its own
-    return("* {}/{}: [{}]({})\n".format(repo, issue, title, url))
+    return("* {}/{}: [{}]({})\n".format(repo, issue, title.encode('utf-8'), url))
 
 def gh_get_issue_output(org, repo, issuenum):
     """
