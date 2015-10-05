@@ -122,7 +122,10 @@ create_env(State, Opts) ->
      {"ERLANG_LIB_DIR_erl_interface", code:lib_dir(erl_interface)},
      {"ERLANG_LIB_VER_erl_interface", re_version(code:lib_dir(erl_interface))},
      {"ERL",                     filename:join([code:root_dir(), "bin", "erl"])},
-     {"ERLC",                    filename:join([code:root_dir(), "bin", "erlc"])}
+     {"ERLC",                    filename:join([code:root_dir(), "bin", "erlc"])},
+     {"ERLANG_ARCH"  ,           rebar_api:wordsize()},
+     {"ERLANG_TARGET",           rebar_api:get_arch()}
+
     ].
 
 join_dirs(BaseDir, Dirs) ->
