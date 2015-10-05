@@ -37,6 +37,7 @@ do(State) ->
         [] ->
             {error, "At least one profile must be specified when using `as`"};
         _  ->
+            warn_on_empty_profile(Profiles, State),
             State1 = rebar_state:apply_profiles(State, [list_to_atom(X) || X <- Profiles]),
             State2 = rebar_plugins:project_apps_install(State1),
             {FirstTask, FirstTaskArgs} = hd(Tasks),
@@ -89,3 +90,14 @@ comma_or_end(["," ++ Profile|Rest], Acc) ->
     profiles([Profile|Rest], Acc);
 comma_or_end(Tasks, Acc) ->
     {lists:reverse(Acc), rebar_utils:args_to_tasks(Tasks)}.
+
+%% If a profile is used by 'as' but has no entry under `profile` within
+%% the top level rebar.config or any project app's rebar.config print a warning.
+%% This is just to help developers, in case they forgot to define a profile but
+%% thought it was being used.
+warn_on_empty_profile(Profiles, State) ->
+    ProjectApps = rebar_state:project_apps(State),
+    DefinedProfiles = rebar_state:get(State, profiles, []) ++
+        lists:flatten([rebar_app_info:get(AppInfo, profiles, []) || AppInfo <- ProjectApps]),
+    [?WARN("No entry for profile ~s in config.", [Profile]) ||
+        Profile <- Profiles, not(lists:keymember(list_to_atom(Profile), 1, DefinedProfiles))].
