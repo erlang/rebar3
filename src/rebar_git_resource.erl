@@ -130,36 +130,43 @@ download(Dir, {git, Url, Rev}, _State) ->
                    [{cd, Dir}]).
 
 make_vsn(Dir) ->
-    {Vsn, RawRef, RawCount} = collect_default_refcount(Dir),
-    {plain, build_vsn_string(Vsn, RawRef, RawCount)}.
+    case collect_default_refcount(Dir) of
+        Vsn={plain, _} ->
+            Vsn;
+        {Vsn, RawRef, RawCount} ->
+            {plain, build_vsn_string(Vsn, RawRef, RawCount)}
+    end.
 
 %% Internal functions
 
 collect_default_refcount(Dir) ->
     %% Get the tag timestamp and minimal ref from the system. The
     %% timestamp is really important from an ordering perspective.
-    AbortMsg1 = "Getting log of git dependency failed in " ++ rebar_dir:get_cwd(),
-    {ok, String} =
-        rebar_utils:sh("git log -n 1 --pretty=format:\"%h\n\" ",
+    case rebar_utils:sh("git log -n 1 --pretty=format:\"%h\n\" ",
                        [{use_stdout, false},
-                        {cd, Dir},
-                        {debug_abort_on_error, AbortMsg1}]),
-    RawRef = string:strip(String, both, $\n),
+                        return_on_error,
+                        {cd, Dir}]) of
+        {error, _} ->
+            ?WARN("Getting log of git dependency failed in ~s. Falling back to version 0.0.0", [rebar_dir:get_cwd()]),
+            {plain, "0.0.0"};
+        {ok, String} ->
+            RawRef = string:strip(String, both, $\n),
 
-    {Tag, TagVsn} = parse_tags(Dir),
-    {ok, RawCount} =
-        case Tag of
-            undefined ->
-                AbortMsg2 = "Getting rev-list of git depedency failed in " ++ Dir,
-                {ok, PatchLines} = rebar_utils:sh("git rev-list HEAD",
-                                                  [{use_stdout, false},
-                                                   {cd, Dir},
-                                                   {debug_abort_on_error, AbortMsg2}]),
-                rebar_utils:line_count(PatchLines);
-            _ ->
-                get_patch_count(Dir, Tag)
-        end,
-    {TagVsn, RawRef, RawCount}.
+            {Tag, TagVsn} = parse_tags(Dir),
+            {ok, RawCount} =
+                case Tag of
+                    undefined ->
+                        AbortMsg2 = "Getting rev-list of git depedency failed in " ++ Dir,
+                        {ok, PatchLines} = rebar_utils:sh("git rev-list HEAD",
+                                                          [{use_stdout, false},
+                                                           {cd, Dir},
+                                                           {debug_abort_on_error, AbortMsg2}]),
+                        rebar_utils:line_count(PatchLines);
+                    _ ->
+                        get_patch_count(Dir, Tag)
+                end,
+            {TagVsn, RawRef, RawCount}
+    end.
 
 build_vsn_string(Vsn, RawRef, Count) ->
     %% Cleanup the tag and the Ref information. Basically leading 'v's and

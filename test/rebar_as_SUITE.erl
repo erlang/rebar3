@@ -12,7 +12,8 @@
          as_comma_placement/1,
          as_comma_then_space/1,
          as_dir_name/1,
-         as_with_task_args/1]).
+         as_with_task_args/1,
+         warn_on_empty_profile/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -30,7 +31,8 @@ init_per_testcase(_, Config) ->
 all() -> [as_basic, as_multiple_profiles, as_multiple_tasks,
           as_multiple_profiles_multiple_tasks,
           as_comma_placement, as_comma_then_space,
-          as_dir_name, as_with_task_args].
+          as_dir_name, as_with_task_args,
+          warn_on_empty_profile].
 
 as_basic(Config) ->
     AppDir = ?config(apps, Config),
@@ -136,3 +138,31 @@ as_with_task_args(Config) ->
                                    [],
                                    ["as", "default", "clean", "-a"],
                                    {ok, [{app, Name, invalid}]}).
+
+
+warn_on_empty_profile(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("as_warn_empty_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    meck:new(rebar_log, [passthrough]),
+    rebar_test_utils:run_and_check(Config,
+                                   [],
+                                   ["as", "fake1,fake2", "compile"],
+                                   {ok, [{app, Name}]}),
+    History = meck:history(rebar_log),
+    ?assert(warn_match("fake1", History)),
+    ?assert(warn_match("fake2", History)),
+    meck:unload(rebar_log),
+    ok.
+
+warn_match(App, History) ->
+    lists:any(
+        fun({_, {rebar_log,log, [warn, "No entry for profile ~s in config.",
+            [ArgApp]]}, _}) -> ArgApp =:= App
+        ;  (_) ->
+            false
+        end,
+     History).
