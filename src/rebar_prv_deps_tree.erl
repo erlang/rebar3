@@ -59,7 +59,7 @@ print_deps_tree(SrcDeps, Verbose, State) ->
         error ->
             print_children("", lists:keysort(1, ProjectAppNames), D, Verbose)
     end,
-    io:setopts([{encoding, latin1}]).
+    io:setopts([{encoding, unicode}]).
 
 print_children(_, [], _, _) ->
     ok;
