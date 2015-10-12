@@ -89,18 +89,18 @@ compile(AppInfo) ->
 -spec compile(rebar_dict(), file:name(), file:name()) -> 'ok'.
 compile(Opts, Dir, OutDir) ->
     rebar_base_compiler:run(Opts,
-                            check_files(rebar_opts:get(
-                                          Opts, xrl_first_files, [])),
+                            check_files([filename:join(Dir, File)
+                                         || File <- rebar_opts:get(Opts, xrl_first_files, [])]),
                             filename:join(Dir, "src"), ".xrl", filename:join(Dir, "src"), ".erl",
                             fun compile_xrl/3),
     rebar_base_compiler:run(Opts,
-                            check_files(rebar_opts:get(
-                                          Opts, yrl_first_files, [])),
+                            check_files([filename:join(Dir, File)
+                                         || File <- rebar_opts:get(Opts, yrl_first_files, [])]),
                             filename:join(Dir, "src"), ".yrl", filename:join(Dir, "src"), ".erl",
                             fun compile_yrl/3),
     rebar_base_compiler:run(Opts,
-                            check_files(rebar_opts:get(
-                                          Opts, mib_first_files, [])),
+                            check_files([filename:join(Dir, File)
+                                         || File <- rebar_opts:get(Opts, mib_first_files, [])]),
                             filename:join(Dir, "mibs"), ".mib", filename:join([Dir, "priv", "mibs"]), ".bin",
                             fun compile_mib/3),
     doterl_compile(Opts, Dir, OutDir).
