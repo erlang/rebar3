@@ -31,6 +31,7 @@
 -export([init/1,
          do/1,
          format_error/1]).
+-export([maybe_fetch/5]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
@@ -200,6 +201,10 @@ maybe_lock(Profile, AppInfo, Seen, State, Level) ->
     end.
 
 update_deps(Profile, Level, Deps, Apps, State, Upgrade, Seen, Locks) ->
+    rpc:pmap(
+        {rebar_prv_install_deps, maybe_fetch},
+        [Profile, Upgrade, Seen, State],
+        Deps),
     lists:foldl(
       fun(AppInfo, {DepsAcc, AppsAcc, StateAcc, SeenAcc}) ->
               update_dep(AppInfo, Profile, Level,
