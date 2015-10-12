@@ -66,13 +66,13 @@ print_children(_, [], _, _) ->
 print_children(Prefix, [{Name, Vsn, Source} | Rest], Dict, Verbose) ->
     Prefix1 = case Rest of
                   [] ->
-                      io:format("~ts└─ ", [Prefix]),
+                      io:format("~ts~ts", [Prefix, <<"└─ "/utf8>>]),
                       [Prefix, "   "];
                   _ ->
-                      io:format("~ts├─ ", [Prefix]),
+                      io:format("~ts~ts", [Prefix, <<"├─ "/utf8>>]),
                       [Prefix, "│  "]
               end,
-    io:format("~ts─~ts (~ts)~n", [Name, Vsn, type(Source, Verbose)]),
+    io:format("~ts~ts~ts (~ts)~n", [Name, <<"─"/utf8>>, Vsn, type(Source, Verbose)]),
     case dict:find(Name, Dict) of
         {ok, Children} ->
             print_children(Prefix1, lists:keysort(1, Children), Dict, Verbose),
