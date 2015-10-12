@@ -22,6 +22,7 @@
          parse_transform_test/1,
          erl_first_files_test/1,
          mib_test/1,
+         umbrella_mib_first_test/1,
          only_default_transitive_deps/1,
          clean_all/1,
          override_deps/1,
@@ -54,7 +55,8 @@ all() ->
      recompile_when_opts_change, dont_recompile_when_opts_dont_change,
      dont_recompile_yrl_or_xrl, delete_beam_if_source_deleted,
      deps_in_path, checkout_priority, highest_version_of_pkg_dep,
-     parse_transform_test, erl_first_files_test, mib_test, only_default_transitive_deps,
+     parse_transform_test, erl_first_files_test, mib_test,
+     umbrella_mib_first_test, only_default_transitive_deps,
      clean_all, override_deps, profile_override_deps, build_more_sources].
 
 build_basic_app(Config) ->
@@ -496,7 +498,7 @@ erl_first_files_test(Config) ->
 mib_test(Config) ->
     AppDir = ?config(apps, Config),
 
-    RebarConfig = [],
+    RebarConfig = [{mib_first_files, ["mibs/SIMPLE-MIB.mib"]}],
 
     Name = rebar_test_utils:create_random_name("app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
@@ -537,6 +539,53 @@ mib_test(Config) ->
 
     %% check the extra src_dir was linked into the _build dir
     true = filelib:is_dir(filename:join([AppDir, "_build", "default", "lib", Name, "mibs"])).
+
+umbrella_mib_first_test(Config) ->
+    AppsDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    AppDir = filename:join([AppsDir, "apps", Name]),
+
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    MibsSrc = <<"-- SIMPLE-MIB.\n"
+"-- This is just a simple MIB used for testing!\n"
+"--\n"
+"SIMPLE-MIB DEFINITIONS ::= BEGIN\n"
+"IMPORTS\n"
+"    MODULE-IDENTITY, enterprises\n"
+"        FROM SNMPv2-SMI;\n"
+"\n"
+"ericsson MODULE-IDENTITY\n"
+"    LAST-UPDATED\n"
+"        \"201403060000Z\"\n"
+"    ORGANIZATION\n"
+"        \"rebar\"\n"
+"    CONTACT-INFO\n"
+"        \"rebar <rebar@example.com>\n"
+"    or\n"
+"    whoever is currently responsible for the SIMPLE\n"
+"    enterprise MIB tree branch (enterprises.999).\"\n"
+"    DESCRIPTION\n"
+"        \"This very small module is made available\n"
+"	for mib-compilation testing.\"\n"
+"    ::= { enterprises 999 }\n"
+"END\n">>,
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "mibs", "dummy"])),
+    ok = file:write_file(filename:join([AppDir, "mibs", "SIMPLE-MIB.mib"]), MibsSrc),
+
+    RebarConfig = [{mib_first_files, ["mibs/SIMPLE-MIB.mib"]}],
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
+
+    %% check a beam corresponding to the src in the extra src_dir exists in ebin
+    PrivMibsDir = filename:join([AppsDir, "_build", "default", "lib", Name, "priv", "mibs"]),
+    true = filelib:is_file(filename:join([PrivMibsDir, "SIMPLE-MIB.bin"])),
+
+    %% check the extra src_dir was linked into the _build dir
+    true = filelib:is_dir(filename:join([AppsDir, "_build", "default", "lib", Name, "mibs"])).
 
 only_default_transitive_deps(Config) ->
     AppDir = ?config(apps, Config),
