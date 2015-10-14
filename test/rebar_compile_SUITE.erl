@@ -571,6 +571,10 @@ mib_test(Config) ->
     PrivMibsDir = filename:join([ProjectDir, "_build", "default", "lib", Name, "priv", "mibs"]),
     true = filelib:is_file(filename:join([PrivMibsDir, "SIMPLE-MIB.bin"])),
 
+    %% check mib header
+    IncludeDir = filename:join([ProjectDir, "_build", "default", "lib", Name, "include"]),
+    true = filelib:is_file(filename:join([IncludeDir, "SIMPLE-MIB.hrl"])),
+
     %% check the extra src_dir was linked into the _build dir
     true = filelib:is_dir(filename:join([ProjectDir, "_build", "default", "lib", Name, "mibs"])).
 
