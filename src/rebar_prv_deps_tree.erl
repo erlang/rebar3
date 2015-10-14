@@ -66,13 +66,13 @@ print_children(_, [], _, _) ->
 print_children(Prefix, [{Name, Vsn, Source} | Rest], Dict, Verbose) ->
     Prefix1 = case Rest of
                   [] ->
-                      io:format("~ts~ts", [Prefix, <<226,148,148,226,148,128,32>>]),
+                      io:format("~ts~ts", [Prefix, <<226,148,148,226,148,128,32>>]), %Binary for └─ utf8%
                       [Prefix, "   "];
                   _ ->
-                      io:format("~ts~ts", [Prefix, <<226,148,156,226,148,128,32>>]),
+                      io:format("~ts~ts", [Prefix, <<226,148,156,226,148,128,32>>]), %Binary for ├─ utf8%
                       [Prefix, "│  "]
               end,
-    io:format("~ts~ts~ts (~ts)~n", [Name, <<226,148,128>>, Vsn, type(Source, Verbose)]),
+    io:format("~ts~ts~ts (~ts)~n", [Name, <<226,148,128>>, Vsn, type(Source, Verbose)]), %Binary for ─ utf8%
     case dict:find(Name, Dict) of
         {ok, Children} ->
             print_children(Prefix1, lists:keysort(1, Children), Dict, Verbose),
