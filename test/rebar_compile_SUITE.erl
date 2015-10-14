@@ -3,9 +3,12 @@
 -export([suite/0,
          init_per_suite/1,
          end_per_suite/1,
+         init_per_group/2,
+         end_per_group/2,
          init_per_testcase/2,
          end_per_testcase/2,
          all/0,
+         groups/0,
          build_basic_app/1,
          build_release_apps/1,
          build_checkout_apps/1,
@@ -22,7 +25,7 @@
          parse_transform_test/1,
          erl_first_files_test/1,
          mib_test/1,
-         umbrella_mib_first_test/1,
+         mib_first_test/1,
          only_default_transitive_deps/1,
          clean_all/1,
          override_deps/1,
@@ -42,6 +45,25 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     ok.
 
+%%
+%% Some cases in this suite can be run directly as an application and as an umbrella
+%% project containing the application in an "apps" directory.  In other words, the same
+%% test case can be run twice but with different config.  The "subject_dir" config
+%% item indicates where an application should be created.  For as-application tests
+%% "subject_dir" and "apps" will be the same directory.  For as-umbrella tests
+%% "subject_dir" will be a random subdirectory of apps/
+%%
+
+init_per_group(as_application, Config) ->
+    [ {subject_relative_dir, "."} | Config ];
+
+init_per_group(as_umbrella, Config) ->
+    SubjectRelativeDir = filename:join(["apps", rebar_test_utils:create_random_name("subject1_")]),
+    [ {subject_relative_dir, SubjectRelativeDir} | Config ].
+
+end_per_group(_, _Config) ->
+    ok.
+
 init_per_testcase(_, Config) ->
     rebar_test_utils:init_rebar_state(Config).
 
@@ -49,15 +71,23 @@ end_per_testcase(_, _Config) ->
     catch meck:unload().
 
 all() ->
-    [build_basic_app, build_release_apps,
-     build_checkout_apps, build_checkout_deps,
-     build_all_srcdirs, recompile_when_hrl_changes,
-     recompile_when_opts_change, dont_recompile_when_opts_dont_change,
-     dont_recompile_yrl_or_xrl, delete_beam_if_source_deleted,
-     deps_in_path, checkout_priority, highest_version_of_pkg_dep,
-     parse_transform_test, erl_first_files_test, mib_test,
-     umbrella_mib_first_test, only_default_transitive_deps,
-     clean_all, override_deps, profile_override_deps, build_more_sources].
+    [{group, as_application},
+     {group, as_umbrella}].
+
+groups() ->
+    [{as_application, [],
+      [ build_basic_app, build_release_apps,
+        build_checkout_apps, build_checkout_deps,
+        build_all_srcdirs, recompile_when_hrl_changes,
+        recompile_when_opts_change, dont_recompile_when_opts_dont_change,
+        dont_recompile_yrl_or_xrl, delete_beam_if_source_deleted,
+        deps_in_path, checkout_priority, highest_version_of_pkg_dep,
+        parse_transform_test, erl_first_files_test, mib_test,
+        mib_first_test, only_default_transitive_deps,
+        clean_all, override_deps, profile_override_deps, build_more_sources ]},
+
+     {as_umbrella, [],
+      [ erl_first_files_test, mib_test, mib_first_test ]}].
 
 build_basic_app(Config) ->
     AppDir = ?config(apps, Config),
@@ -455,8 +485,11 @@ parse_transform_test(Config) ->
     EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
     true = filelib:is_file(filename:join([EbinDir, "pascal.beam"])).
 
+
 erl_first_files_test(Config) ->
-    AppDir = ?config(apps, Config),
+    ProjectDir = ?config(apps, Config),
+    SubjectDir = ?config(subject_dir, Config),
+
     RebarConfig = [{erl_opts, [{parse_transform, mark_time}]},
                    {erl_first_files, ["src/mark_time.erl",
                                       "src/b.erl",
@@ -465,11 +498,11 @@ erl_first_files_test(Config) ->
 
     Name = rebar_test_utils:create_random_name("app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
-    rebar_test_utils:write_src_file(AppDir, "a.erl"),
-    rebar_test_utils:write_src_file(AppDir, "b.erl"),
-    rebar_test_utils:write_src_file(AppDir, "d.erl"),
-    rebar_test_utils:write_src_file(AppDir, "e.erl"),
+    rebar_test_utils:create_app(SubjectDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:write_src_file(SubjectDir, "a.erl"),
+    rebar_test_utils:write_src_file(SubjectDir, "b.erl"),
+    rebar_test_utils:write_src_file(SubjectDir, "d.erl"),
+    rebar_test_utils:write_src_file(SubjectDir, "e.erl"),
 
     ExtraSrc = <<"-module(mark_time). "
                  "-export([parse_transform/2]). "
@@ -478,11 +511,11 @@ erl_first_files_test(Config) ->
                  "parse_transform([Form|Forms], Options) -> "
                  "    [Form | parse_transform(Forms, Options)].">>,
 
-    ok = file:write_file(filename:join([AppDir, "src", "mark_time.erl"]), ExtraSrc),
+    ok = file:write_file(filename:join([SubjectDir, "src", "mark_time.erl"]), ExtraSrc),
 
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
 
-    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    EbinDir = filename:join([ProjectDir, "_build", "default", "lib", Name, "ebin"]),
     true = filelib:is_file(filename:join([EbinDir, "mark_time.beam"])),
 
     code:load_abs(filename:join([EbinDir, "a"])),
@@ -496,13 +529,14 @@ erl_first_files_test(Config) ->
     ?assertEqual([B,D,A,E], lists:sort([A,B,D,E])).
 
 mib_test(Config) ->
-    AppDir = ?config(apps, Config),
+    ProjectDir = ?config(apps, Config),
+    SubjectDir = ?config(subject_dir, Config),
 
     RebarConfig = [{mib_first_files, ["mibs/SIMPLE-MIB.mib"]}],
 
     Name = rebar_test_utils:create_random_name("app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_app(SubjectDir, Name, Vsn, [kernel, stdlib]),
 
     MibsSrc = <<"-- SIMPLE-MIB.\n"
 "-- This is just a simple MIB used for testing!\n"
@@ -528,26 +562,26 @@ mib_test(Config) ->
 "    ::= { enterprises 999 }\n"
 "END\n">>,
 
-    ok = filelib:ensure_dir(filename:join([AppDir, "mibs", "dummy"])),
-    ok = file:write_file(filename:join([AppDir, "mibs", "SIMPLE-MIB.mib"]), MibsSrc),
+    ok = filelib:ensure_dir(filename:join([SubjectDir, "mibs", "dummy"])),
+    ok = file:write_file(filename:join([SubjectDir, "mibs", "SIMPLE-MIB.mib"]), MibsSrc),
 
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
 
-    %% check a beam corresponding to the src in the extra src_dir exists in ebin
-    PrivMibsDir = filename:join([AppDir, "_build", "default", "lib", Name, "priv", "mibs"]),
+    %% check mib binary
+    PrivMibsDir = filename:join([ProjectDir, "_build", "default", "lib", Name, "priv", "mibs"]),
     true = filelib:is_file(filename:join([PrivMibsDir, "SIMPLE-MIB.bin"])),
 
     %% check the extra src_dir was linked into the _build dir
-    true = filelib:is_dir(filename:join([AppDir, "_build", "default", "lib", Name, "mibs"])).
+    true = filelib:is_dir(filename:join([ProjectDir, "_build", "default", "lib", Name, "mibs"])).
 
-umbrella_mib_first_test(Config) ->
-    AppsDir = ?config(apps, Config),
+mib_first_test(Config) ->
+    ProjectDir = ?config(apps, Config),
+    SubjectDir = ?config(subject_dir, Config),
 
     Name = rebar_test_utils:create_random_name("app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    AppDir = filename:join([AppsDir, "apps", Name]),
 
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_app(SubjectDir, Name, Vsn, [kernel, stdlib]),
 
     MibsSrc = <<"-- SIMPLE-MIB.\n"
 "-- This is just a simple MIB used for testing!\n"
@@ -573,19 +607,19 @@ umbrella_mib_first_test(Config) ->
 "    ::= { enterprises 999 }\n"
 "END\n">>,
 
-    ok = filelib:ensure_dir(filename:join([AppDir, "mibs", "dummy"])),
-    ok = file:write_file(filename:join([AppDir, "mibs", "SIMPLE-MIB.mib"]), MibsSrc),
+    ok = filelib:ensure_dir(filename:join([SubjectDir, "mibs", "dummy"])),
+    ok = file:write_file(filename:join([SubjectDir, "mibs", "SIMPLE-MIB.mib"]), MibsSrc),
 
     RebarConfig = [{mib_first_files, ["mibs/SIMPLE-MIB.mib"]}],
 
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
 
     %% check a beam corresponding to the src in the extra src_dir exists in ebin
-    PrivMibsDir = filename:join([AppsDir, "_build", "default", "lib", Name, "priv", "mibs"]),
+    PrivMibsDir = filename:join([ProjectDir, "_build", "default", "lib", Name, "priv", "mibs"]),
     true = filelib:is_file(filename:join([PrivMibsDir, "SIMPLE-MIB.bin"])),
 
     %% check the extra src_dir was linked into the _build dir
-    true = filelib:is_dir(filename:join([AppsDir, "_build", "default", "lib", Name, "mibs"])).
+    true = filelib:is_dir(filename:join([ProjectDir, "_build", "default", "lib", Name, "mibs"])).
 
 only_default_transitive_deps(Config) ->
     AppDir = ?config(apps, Config),
