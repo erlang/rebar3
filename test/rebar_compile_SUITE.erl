@@ -26,8 +26,7 @@
          only_default_transitive_deps/1,
          clean_all/1,
          override_deps/1,
-         profile_override_deps/1,
-         build_more_sources/1]).
+         profile_override_deps/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -681,31 +680,3 @@ profile_override_deps(Config) ->
         Config, RebarConfig, ["as", "a", "compile"],
         {ok, [{dep, "some_dep"},{dep_not_exist, "other_dep"}]}
     ).
-
-build_more_sources(Config) ->
-    AppDir = ?config(apps, Config),
-
-    ASrc = <<"-module(a_src).\n-export([ok/0]).\nok() -> ok.\n">>,
-    BSrc = <<"-module(b_src).\n-export([ok/0]).\nok() -> ok.\n">>,
-    CSrc = <<"-module(c_src).\n-export([ok/0]).\nok() -> ok.\n">>,
-
-    ok = filelib:ensure_dir(filename:join([AppDir, "more", "dummy"])),
-    ok = filelib:ensure_dir(filename:join([AppDir, "ebin", "dummy"])),
-    ok = file:write_file(filename:join([AppDir, "more", "a_src.erl"]), ASrc),
-    ok = file:write_file(filename:join([AppDir, "more", "b_src.erl"]), BSrc),
-    ok = file:write_file(filename:join([AppDir, "more", "c_src.erl"]), CSrc),
-
-    Opts = dict:new(),
-
-    rebar_erlc_compiler:compile(Opts,
-                                filename:join([AppDir, "more"]),
-                                filename:join([AppDir, "ebin"]),
-                                [filename:join([AppDir, "more", "a_src.erl"]),
-                                 filename:join([AppDir, "more", "b_src.erl"]),
-                                 filename:join([AppDir, "more", "c_src.erl"])]),
-
-    EbinDir = filename:join([AppDir, "ebin"]),
-    true = filelib:is_file(filename:join([EbinDir, "a_src.beam"])),
-    true = filelib:is_file(filename:join([EbinDir, "b_src.beam"])),
-    true = filelib:is_file(filename:join([EbinDir, "c_src.beam"])).
-
