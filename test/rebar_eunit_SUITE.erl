@@ -125,7 +125,9 @@ basic_app_files(Config) ->
     AppDir = ?config(apps, Config),
 
     lists:foreach(fun(F) -> true = ec_file:exists(filename:join([AppDir, "_build", "test", "lib", "basic_app", "ebin", F])) end,
-                  ["basic_app.app", "basic_app.beam", "basic_app_tests.beam", "basic_app_tests_helper.beam"]).
+                  ["basic_app.app", "basic_app.beam"]),
+    lists:foreach(fun(F) -> true = ec_file:exists(filename:join([AppDir, "_build", "test", "lib", "basic_app", "test", F])) end,
+                  ["basic_app_tests.beam", "basic_app_tests_helper.beam"]).
 
 %% check that the correct tests are exported from modules for project
 %% note that this implies `TEST` is set correctly
@@ -171,10 +173,14 @@ multi_app_files(Config) ->
     AppDir = ?config(apps, Config),
 
     lists:foreach(fun(F) -> true = ec_file:exists(filename:join([AppDir, "_build", "test", "lib", "multi_app_bar", "ebin", F])) end,
-                  ["multi_app_bar.app", "multi_app_bar.beam", "multi_app_bar_tests.beam", "multi_app_bar_tests_helper.beam"]),
+                  ["multi_app_bar.app", "multi_app_bar.beam"]),
     lists:foreach(fun(F) -> true = ec_file:exists(filename:join([AppDir, "_build", "test", "lib", "multi_app_baz", "ebin", F])) end,
-                  ["multi_app_baz.app", "multi_app_baz.beam", "multi_app_baz_tests.beam", "multi_app_baz_tests_helper.beam"]),
-    lists:foreach(fun(F) -> true = ec_file:exists(filename:join([AppDir, "_build", "test", "test", F])) end,
+                  ["multi_app_baz.app", "multi_app_baz.beam"]),
+    lists:foreach(fun(F) -> true = ec_file:exists(filename:join([AppDir, "_build", "test", "lib", "multi_app_bar", "test", F])) end,
+                  ["multi_app_bar_tests.beam", "multi_app_bar_tests_helper.beam"]),
+    lists:foreach(fun(F) -> true = ec_file:exists(filename:join([AppDir, "_build", "test", "lib", "multi_app_baz", "test", F])) end,
+                  ["multi_app_baz_tests.beam", "multi_app_baz_tests_helper.beam"]),
+    lists:foreach(fun(F) -> true = ec_file:exists(filename:join([AppDir, "_build", "test", "extras", "test", F])) end,
                   ["multi_app_tests.beam", "multi_app_tests_helper.beam"]).
 
 %% check that the correct tests are exported from modules for project
@@ -202,7 +208,9 @@ multi_app_testset(Config) ->
     AppDir = ?config(apps, Config),
     Result = ?config(result, Config),
 
-    Set = {ok, [{application, multi_app_bar}, {application, multi_app_baz}, {dir, filename:join([AppDir, "_build", "test", "test"])}]},
+    Set = {ok, [{application, multi_app_bar},
+                {application, multi_app_baz},
+                {dir, filename:join([AppDir, "test"])}]},
     Set = rebar_prv_eunit:prepare_tests(Result).
 
 

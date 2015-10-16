@@ -52,8 +52,10 @@ do(State) ->
     ProjectApps2 = build_apps(State, Providers, ProjectApps1),
     State2 = rebar_state:project_apps(State, ProjectApps2),
 
-    ProjAppsPaths = [filename:join(rebar_app_info:out_dir(X), "ebin") || X <- ProjectApps2],
-    State3 = rebar_state:code_paths(State2, all_deps, DepsPaths ++ ProjAppsPaths),
+    %% projects with structures like /apps/foo,/apps/bar,/test
+    build_extra_dirs(State, ProjectApps2),
+
+    State3 = update_code_paths(State2, ProjectApps2, DepsPaths),
 
     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State2),
     case rebar_state:has_all_artifacts(State3) of
@@ -82,6 +84,30 @@ build_app(State, Providers, AppInfo) ->
     copy_app_dirs(AppInfo, AppDir, OutDir),
     compile(State, Providers, AppInfo).
 
+build_extra_dirs(State, Apps) ->
+    BaseDir = rebar_state:dir(State),
+    F = fun(App) -> rebar_app_info:dir(App) == BaseDir end,
+    %% check that this app hasn't already been dealt with
+    case lists:any(F, Apps) of
+        false ->
+            ProjOpts = rebar_state:opts(State),
+            Extras = rebar_dir:extra_src_dirs(ProjOpts, []),
+            [build_extra_dir(State, Dir) || Dir <- Extras];
+        true  -> ok
+    end.
+
+build_extra_dir(_State, []) -> ok;
+build_extra_dir(State, Dir) ->
+    case ec_file:is_dir(filename:join([rebar_state:dir(State), Dir])) of
+        true ->
+            BaseDir = filename:join([rebar_dir:base_dir(State), "extras"]),
+            OutDir = filename:join([BaseDir, Dir]),
+            filelib:ensure_dir(filename:join([OutDir, "dummy.beam"])),
+            copy(rebar_state:dir(State), BaseDir, Dir),
+            rebar_erlc_compiler:compile_dir(State, BaseDir, OutDir);
+        false -> ok
+    end.
+
 compile(State, AppInfo) ->
     compile(State, rebar_state:providers(State), AppInfo).
 
@@ -104,6 +130,33 @@ compile(State, Providers, AppInfo) ->
 %% Internal functions
 %% ===================================================================
 
+update_code_paths(State, ProjectApps, DepsPaths) ->
+    ProjAppsPaths = paths_for_apps(ProjectApps),
+    ExtrasPaths = paths_for_extras(State, ProjectApps),
+    rebar_state:code_paths(State, all_deps, DepsPaths ++ ProjAppsPaths ++ ExtrasPaths).
+
+paths_for_apps(Apps) -> paths_for_apps(Apps, []).
+
+paths_for_apps([], Acc) -> Acc;
+paths_for_apps([App|Rest], Acc) ->
+    {_SrcDirs, ExtraDirs} = resolve_src_dirs(rebar_app_info:opts(App)),
+    Paths = [filename:join([rebar_app_info:out_dir(App), Dir]) || Dir <- ["ebin"|ExtraDirs]],
+    FilteredPaths = lists:filter(fun ec_file:is_dir/1, Paths),
+    paths_for_apps(Rest, Acc ++ FilteredPaths).
+    
+paths_for_extras(State, Apps) ->
+    F = fun(App) -> rebar_app_info:dir(App) == rebar_state:dir(State) end,
+    %% check that this app hasn't already been dealt with
+    case lists:any(F, Apps) of
+        false -> paths_for_extras(State);
+        true  -> []
+    end.
+
+paths_for_extras(State) ->
+    {_SrcDirs, ExtraDirs} = resolve_src_dirs(rebar_state:opts(State)),
+    Paths = [filename:join([rebar_dir:base_dir(State), "extras", Dir]) || Dir <- ExtraDirs],
+    lists:filter(fun ec_file:is_dir/1, Paths).
+
 has_all_artifacts(AppInfo1) ->
     case rebar_app_info:has_all_artifacts(AppInfo1) of
         {false, File} ->
@@ -120,17 +173,17 @@ copy_app_dirs(AppInfo, OldAppDir, AppDir) ->
             %% copy all files from ebin if it exists
             case filelib:is_dir(EbinDir) of
                 true ->
-                    OutEbin = filename:join(AppDir, "ebin"),
-                    filelib:ensure_dir(filename:join(OutEbin, "dummy.beam")),
-                    rebar_file_utils:cp_r(filelib:wildcard(filename:join(EbinDir, "*")), OutEbin);
+                    OutEbin = filename:join([AppDir, "ebin"]),
+                    filelib:ensure_dir(filename:join([OutEbin, "dummy.beam"])),
+                    rebar_file_utils:cp_r(filelib:wildcard(filename:join([EbinDir, "*"])), OutEbin);
                 false ->
                     ok
             end,
 
-            filelib:ensure_dir(filename:join(AppDir, "dummy")),
+            filelib:ensure_dir(filename:join([AppDir, "dummy"])),
 
             %% link or copy mibs if it exists
-            case filelib:is_dir(filename:join(OldAppDir, "mibs")) of
+            case filelib:is_dir(filename:join([OldAppDir, "mibs"])) of
                 true ->
                     %% If mibs exist it means we must ensure priv exists.
                     %% mibs files are compiled to priv/mibs/
@@ -139,15 +192,57 @@ copy_app_dirs(AppInfo, OldAppDir, AppDir) ->
                 false ->
                     ok
             end,
-
+            {SrcDirs, ExtraDirs} = resolve_src_dirs(rebar_app_info:opts(AppInfo)),
             %% link to src_dirs to be adjacent to ebin is needed for R15 use of cover/xref
-            SrcDirs = rebar_dir:all_src_dirs(rebar_app_info:opts(AppInfo), ["src"], []),
-            [symlink_or_copy(OldAppDir, AppDir, Dir) || Dir <- ["priv", "include"] ++ SrcDirs];
+            [symlink_or_copy(OldAppDir, AppDir, Dir) || Dir <- ["priv", "include"] ++ SrcDirs],
+            %% copy all extra_src_dirs as they build into themselves and linking means they
+            %% are shared across profiles
+            [copy(OldAppDir, AppDir, Dir) || Dir <- ExtraDirs];
         false ->
             ok
     end.
 
 symlink_or_copy(OldAppDir, AppDir, Dir) ->
-    Source = filename:join(OldAppDir, Dir),
-    Target = filename:join(AppDir, Dir),
+    Source = filename:join([OldAppDir, Dir]),
+    Target = filename:join([AppDir, Dir]),
     rebar_file_utils:symlink_or_copy(Source, Target).
+
+copy(OldAppDir, AppDir, Dir) ->
+    Source = filename:join([OldAppDir, Dir]),
+    Target = filename:join([AppDir, Dir]),
+    case ec_file:is_dir(Source) of
+        true  -> copy(Source, Target);
+        false -> ok
+    end.
+
+%% TODO: use ec_file:copy/2 to do this, it preserves timestamps and
+%% may prevent recompilation of files in extra dirs
+copy(Source, Target) ->
+    %% important to do this so no files are copied onto themselves
+    %% which truncates them to zero length on some platforms
+    ok = delete_if_symlink(Target),
+    ok = filelib:ensure_dir(filename:join([Target, "dummy.beam"])),
+    {ok, Files} = rebar_utils:list_dir(Source),
+    case [filename:join([Source, F]) || F <- Files] of
+        []    -> ok;
+        Paths -> rebar_file_utils:cp_r(Paths, Target)
+    end.
+
+delete_if_symlink(Path) ->
+    case ec_file:is_symlink(Path) of
+        true  -> file:delete(Path);
+        false -> ok
+    end.
+
+resolve_src_dirs(Opts) ->
+    SrcDirs = rebar_dir:src_dirs(Opts, ["src"]),
+    ExtraDirs = rebar_dir:extra_src_dirs(Opts, []),
+    normalize_src_dirs(SrcDirs, ExtraDirs).
+
+%% remove duplicates and make sure no directories that exist
+%% in src_dirs also exist in extra_src_dirs
+normalize_src_dirs(SrcDirs, ExtraDirs) ->
+    S = lists:usort(SrcDirs),
+    E = lists:usort(ExtraDirs),
+    {S, lists:subtract(E, S)}.
+

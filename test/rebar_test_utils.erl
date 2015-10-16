@@ -334,7 +334,7 @@ check_results(AppDir, Expected, ProfileRun) ->
                     {ok, RelxState3} = rlx_prv_rel_discover:do(RelxState2),
 
                     LibDir = filename:join([ReleaseDir, Name, "lib"]),
-                    {ok, RelLibs} = file:list_dir(LibDir),
+                    {ok, RelLibs} = rebar_utils:list_dir(LibDir),
                     IsSymLinkFun =
                         fun(X) ->
                                 ec_file:is_symlink(filename:join(LibDir, X))
@@ -357,6 +357,9 @@ check_results(AppDir, Expected, ProfileRun) ->
         ;  ({file, Filename}) ->
                 ct:pal("Filename: ~s", [Filename]),
                 ?assert(filelib:is_file(Filename))
+        ;  ({dir, Dirname}) ->
+                ct:pal("Directory: ~s", [Dirname]),
+                ?assert(filelib:is_dir(Dirname))
         end, Expected).
 
 write_src_file(Dir, Name) ->
@@ -422,7 +425,7 @@ get_app_metadata(Name, Vsn, Deps) ->
 
 package_app(AppDir, DestDir, PkgName) ->
     Name = PkgName++".tar",
-    {ok, Fs} = file:list_dir(AppDir),
+    {ok, Fs} = rebar_utils:list_dir(AppDir),
     ok = erl_tar:create(filename:join(DestDir, "contents.tar.gz"),
                         lists:zip(Fs, [filename:join(AppDir,F) || F <- Fs]),
                         [compressed]),

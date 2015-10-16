@@ -5,12 +5,23 @@
          end_per_suite/1,
          init_per_testcase/2,
          end_per_testcase/2,
+         init_per_group/2,
+         end_per_group/2,
          all/0,
-         build_basic_app/1,
-         build_release_apps/1,
-         build_checkout_apps/1,
-         build_checkout_deps/1,
-         build_all_srcdirs/1,
+         groups/0,
+         build_basic_app/1, paths_basic_app/1, clean_basic_app/1,
+         build_release_apps/1, paths_release_apps/1, clean_release_apps/1,
+         build_checkout_apps/1, paths_checkout_apps/1,
+         build_checkout_deps/1, paths_checkout_deps/1,
+         build_basic_srcdirs/1, paths_basic_srcdirs/1,
+         build_release_srcdirs/1, paths_release_srcdirs/1,
+         build_unbalanced_srcdirs/1, paths_unbalanced_srcdirs/1,
+         build_basic_extra_dirs/1, paths_basic_extra_dirs/1, clean_basic_extra_dirs/1,
+         build_release_extra_dirs/1, paths_release_extra_dirs/1, clean_release_extra_dirs/1,
+         build_unbalanced_extra_dirs/1, paths_unbalanced_extra_dirs/1,
+         build_extra_dirs_in_project_root/1,
+         paths_extra_dirs_in_project_root/1,
+         clean_extra_dirs_in_project_root/1,
          recompile_when_hrl_changes/1,
          recompile_when_opts_change/1,
          dont_recompile_when_opts_dont_change/1,
@@ -35,6 +46,186 @@
 suite() ->
     [].
 
+all() ->
+    [{group, basic_app}, {group, release_apps},
+     {group, checkout_apps}, {group, checkout_deps},
+     {group, basic_srcdirs}, {group, release_srcdirs}, {group, unbalanced_srcdirs},
+     {group, basic_extras}, {group, release_extras}, {group, unbalanced_extras},
+     {group, root_extras},
+     recompile_when_hrl_changes, recompile_when_opts_change,
+     dont_recompile_when_opts_dont_change, dont_recompile_yrl_or_xrl,
+     delete_beam_if_source_deleted,
+     deps_in_path, checkout_priority, highest_version_of_pkg_dep,
+     parse_transform_test, erl_first_files_test, mib_test,
+     umbrella_mib_first_test, only_default_transitive_deps,
+     clean_all, override_deps, profile_override_deps].
+
+groups() ->
+    [{basic_app, [], [build_basic_app, paths_basic_app, clean_basic_app]},
+     {release_apps, [], [build_release_apps, paths_release_apps, clean_release_apps]},
+     {checkout_apps, [], [build_checkout_apps, paths_checkout_apps]},
+     {checkout_deps, [], [build_checkout_deps, paths_checkout_deps]},
+     {basic_srcdirs, [], [build_basic_srcdirs, paths_basic_srcdirs]},
+     {release_srcdirs, [], [build_release_srcdirs,
+                            paths_release_srcdirs]},
+     {unbalanced_srcdirs, [], [build_unbalanced_srcdirs,
+                               paths_unbalanced_srcdirs]},
+     {basic_extras, [], [build_basic_extra_dirs,
+                         paths_basic_extra_dirs,
+                         clean_basic_extra_dirs]},
+     {release_extras, [], [build_release_extra_dirs,
+                           paths_release_extra_dirs,
+                           clean_release_extra_dirs]},
+     {unbalanced_extras, [], [build_unbalanced_extra_dirs,
+                              paths_unbalanced_extra_dirs]},
+     {root_extras, [], [build_extra_dirs_in_project_root,
+                        paths_extra_dirs_in_project_root,
+                        clean_extra_dirs_in_project_root]}].
+
+init_per_group(basic_app, Config) ->
+    NewConfig = rebar_test_utils:init_rebar_state(Config, "basic_app_"),
+    AppDir = ?config(apps, NewConfig),
+
+    Name = rebar_test_utils:create_random_name("app1"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    
+    [{app_names, [Name]}, {vsns, [Vsn]}|NewConfig];
+
+init_per_group(release_apps, Config) ->
+    NewConfig = rebar_test_utils:init_rebar_state(Config, "release_apps_"),
+    AppDir = ?config(apps, NewConfig),
+
+    Name1 = rebar_test_utils:create_random_name("relapp1_"),
+    Vsn1 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([AppDir,"apps",Name1]), Name1, Vsn1, [kernel, stdlib]),
+
+    Name2 = rebar_test_utils:create_random_name("relapp2_"),
+    Vsn2 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([AppDir,"apps",Name2]), Name2, Vsn2, [kernel, stdlib]),
+    
+    [{app_names, [Name1, Name2]}, {vsns, [Vsn1, Vsn2]}|NewConfig];
+
+init_per_group(checkout_apps, Config) ->
+    NewConfig = rebar_test_utils:init_rebar_state(Config, "checkout_apps_"),
+    AppDir = ?config(apps, NewConfig),
+    CheckoutsDir = ?config(checkouts, NewConfig),
+
+    Name1 = rebar_test_utils:create_random_name("checkapp1_"),
+    Vsn1 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name1, Vsn1, [kernel, stdlib]),
+
+    Name2 = rebar_test_utils:create_random_name("checkapp2_"),
+    Vsn2 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([CheckoutsDir,Name2]), Name2, Vsn2, [kernel, stdlib]),
+
+    [{app_names, [Name1, Name2]}, {vsns, [Vsn1, Vsn2]}|NewConfig];
+
+init_per_group(checkout_deps, Config) ->
+    NewConfig = rebar_test_utils:init_rebar_state(Config, "checkout_deps_"),
+    AppDir = ?config(apps, NewConfig),
+    CheckoutsDir = ?config(checkouts, NewConfig),
+    DepsDir = filename:join([AppDir, "_build", "default", "lib"]),
+
+    Name1 = rebar_test_utils:create_random_name("checkapp1_"),
+    Vsn1 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name1, Vsn1, [kernel, stdlib]),
+
+    Name2 = rebar_test_utils:create_random_name("checkapp2_"),
+    Vsn2 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([CheckoutsDir,Name2]), Name2, Vsn2, [kernel, stdlib]),
+
+    rebar_test_utils:create_app(filename:join([DepsDir,Name2]), Name2, Vsn1, [kernel, stdlib]),
+
+    [{app_names, [Name1, Name2]}, {vsns, [Vsn1, Vsn2]}|NewConfig];
+
+init_per_group(Group, Config) when Group == basic_srcdirs; Group == basic_extras ->
+    NewConfig = rebar_test_utils:init_rebar_state(Config, "basic_srcdirs_"),
+    AppDir = ?config(apps, NewConfig),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    ExtraSrc = io_lib:format("-module(~ts_extra).\n-export([ok/0]).\nok() -> ok.\n", [Name]),
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "extra", "dummy"])),
+    ok = file:write_file(filename:join([AppDir, "extra", io_lib:format("~ts_extra.erl", [Name])]),
+                         ExtraSrc),
+
+    [{app_names, [Name]}, {vsns, [Vsn]}|NewConfig];
+
+init_per_group(Group, Config) when Group == release_srcdirs; Group == release_extras ->
+    NewConfig = rebar_test_utils:init_rebar_state(Config, "release_srcdirs_"),
+    AppDir = ?config(apps, NewConfig),
+
+    Name1 = rebar_test_utils:create_random_name("relapp1_"),
+    Vsn1 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([AppDir, "apps", Name1]), Name1, Vsn1, [kernel, stdlib]),
+
+    Name2 = rebar_test_utils:create_random_name("relapp2_"),
+    Vsn2 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([AppDir, "apps", Name2]), Name2, Vsn2, [kernel, stdlib]),
+
+    ExtraOne = io_lib:format("-module(~ts_extra).\n-export([ok/0]).\nok() -> ok.\n", [Name1]),
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "apps", Name1, "extra", "dummy"])),
+    ok = file:write_file(filename:join([AppDir, "apps", Name1, "extra",
+                                        io_lib:format("~ts_extra.erl", [Name1])]),
+                         ExtraOne),
+
+    ExtraTwo = io_lib:format("-module(~ts_extra).\n-export([ok/0]).\nok() -> ok.\n", [Name2]),
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "apps", Name2, "extra", "dummy"])),
+    ok = file:write_file(filename:join([AppDir, "apps", Name2, "extra",
+                                        io_lib:format("~ts_extra.erl", [Name2])]),
+                         ExtraTwo),
+
+    [{app_names, [Name1, Name2]}, {vsns, [Vsn1, Vsn2]}|NewConfig];
+
+init_per_group(Group, Config) when Group == unbalanced_srcdirs; Group == unbalanced_extras ->
+    NewConfig = rebar_test_utils:init_rebar_state(Config, "unbalanced_srcdirs_"),
+    AppDir = ?config(apps, NewConfig),
+
+    Name1 = rebar_test_utils:create_random_name("relapp1_"),
+    Vsn1 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([AppDir, "apps", Name1]), Name1, Vsn1, [kernel, stdlib]),
+
+    Name2 = rebar_test_utils:create_random_name("relapp2_"),
+    Vsn2 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([AppDir, "apps", Name2]), Name2, Vsn2, [kernel, stdlib]),
+
+    ExtraOne = io_lib:format("-module(~ts_extra).\n-export([ok/0]).\nok() -> ok.\n", [Name1]),
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "apps", Name1, "extra", "dummy"])),
+    ok = file:write_file(filename:join([AppDir, "apps", Name1, "extra",
+                                        io_lib:format("~ts_extra.erl", [Name1])]),
+                         ExtraOne),
+
+    [{app_names, [Name1, Name2]}, {vsns, [Vsn1, Vsn2]}|NewConfig];
+
+init_per_group(root_extras, Config) ->
+    NewConfig = rebar_test_utils:init_rebar_state(Config, "root_extras_"),
+    AppDir = ?config(apps, NewConfig),
+
+    Name1 = rebar_test_utils:create_random_name("relapp1_"),
+    Vsn1 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([AppDir, "apps", Name1]), Name1, Vsn1, [kernel, stdlib]),
+
+    Name2 = rebar_test_utils:create_random_name("relapp2_"),
+    Vsn2 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([AppDir, "apps", Name2]), Name2, Vsn2, [kernel, stdlib]),
+
+    Extra = <<"-module(extra).\n-export([ok/0]).\nok() -> ok.\n">>,
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "extra", "dummy"])),
+    ok = file:write_file(filename:join([AppDir, "extra", "extra.erl"]), Extra),
+
+    [{app_names, [Name1, Name2]}, {vsns, [Vsn1, Vsn2]}|NewConfig].
+
+end_per_group(_Group, _Config) ->
+    ok.
+
 init_per_suite(Config) ->
     Config.
 
@@ -42,56 +233,31 @@ end_per_suite(_Config) ->
     ok.
 
 init_per_testcase(_, Config) ->
-    rebar_test_utils:init_rebar_state(Config).
+    case ?config(apps, Config) of
+        undefined -> rebar_test_utils:init_rebar_state(Config);
+        _         -> Config
+    end.
 
 end_per_testcase(_, _Config) ->
     catch meck:unload().
 
-all() ->
-    [build_basic_app, build_release_apps,
-     build_checkout_apps, build_checkout_deps,
-     build_all_srcdirs, recompile_when_hrl_changes,
-     recompile_when_opts_change, dont_recompile_when_opts_dont_change,
-     dont_recompile_yrl_or_xrl, delete_beam_if_source_deleted,
-     deps_in_path, checkout_priority, highest_version_of_pkg_dep,
-     parse_transform_test, erl_first_files_test, mib_test,
-     umbrella_mib_first_test, only_default_transitive_deps,
-     clean_all, override_deps, profile_override_deps, build_more_sources].
+
+
+%% test cases
 
 build_basic_app(Config) ->
-    AppDir = ?config(apps, Config),
-
-    Name = rebar_test_utils:create_random_name("app1_"),
-    Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
-
+    [Name] = ?config(app_names, Config),
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}).
 
 build_release_apps(Config) ->
-    AppDir = ?config(apps, Config),
-
-    Name1 = rebar_test_utils:create_random_name("relapp1_"),
-    Vsn1 = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(filename:join([AppDir,"apps",Name1]), Name1, Vsn1, [kernel, stdlib]),
-    Name2 = rebar_test_utils:create_random_name("relapp2_"),
-    Vsn2 = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(filename:join([AppDir,"apps",Name2]), Name2, Vsn2, [kernel, stdlib]),
-
+    [Name1, Name2] = ?config(app_names, Config),
     rebar_test_utils:run_and_check(
         Config, [], ["compile"],
         {ok, [{app, Name1}, {app, Name2}]}
     ).
 
 build_checkout_apps(Config) ->
-    AppDir = ?config(apps, Config),
-    CheckoutsDir = ?config(checkouts, Config),
-    Name1 = rebar_test_utils:create_random_name("checkapp1_"),
-    Vsn1 = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name1, Vsn1, [kernel, stdlib]),
-    Name2 = rebar_test_utils:create_random_name("checkapp2_"),
-    Vsn2 = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(filename:join([CheckoutsDir,Name2]), Name2, Vsn2, [kernel, stdlib]),
-
+    [Name1, Name2] = ?config(app_names, Config),
     rebar_test_utils:run_and_check(
         Config, [], ["compile"],
         {ok, [{app, Name1}, {checkout, Name2}]}
@@ -99,52 +265,371 @@ build_checkout_apps(Config) ->
 
 build_checkout_deps(Config) ->
     AppDir = ?config(apps, Config),
-    CheckoutsDir = ?config(checkouts, Config),
-    DepsDir = filename:join([AppDir, "_build", "default", "lib"]),
-    Name1 = rebar_test_utils:create_random_name("checkapp1_"),
-    Vsn1 = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name1, Vsn1, [kernel, stdlib]),
-    Name2 = rebar_test_utils:create_random_name("checkapp2_"),
-    Vsn2 = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(filename:join([CheckoutsDir,Name2]), Name2, Vsn2, [kernel, stdlib]),
-    rebar_test_utils:create_app(filename:join([DepsDir,Name2]), Name2, Vsn1, [kernel, stdlib]),
+    [Name1, Name2] = ?config(app_names, Config),
+    [_, Vsn2] = ?config(vsns, Config),
 
     Deps = [{list_to_atom(Name2), Vsn2, {git, "", ""}}],
     {ok, RebarConfig} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, Deps}])),
 
-    {ok, State} = rebar_test_utils:run_and_check(
+    rebar_test_utils:run_and_check(
         Config, RebarConfig, ["compile"],
         {ok, [{app, Name1}, {checkout, Name2}]}
+    ).
+
+build_basic_srcdirs(Config) ->
+    AppDir = ?config(apps, Config),
+    [Name] = ?config(app_names, Config),
+
+    RebarConfig = [{erl_opts, [{src_dirs, ["src", "extra"]}]}],
+
+    %% check a beam corresponding to the src in the extra src_dir exists
+    ExtraBeam = filename:join([AppDir, "_build", "default", "lib", Name, "ebin",
+                               io_lib:format("~ts_extra.beam", [Name])]),
+    %% check the extra src_dir was copied/linked into the _build dir
+    ExtraDir = filename:join([AppDir, "_build", "default", "lib", Name, "extra"]),
+
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["compile"],
+        {ok, [{app, Name}, {file, ExtraBeam}, {dir, ExtraDir}]}
+    ).
+
+build_release_srcdirs(Config) ->
+    AppDir = ?config(apps, Config),
+    [Name1, Name2] = ?config(app_names, Config),
+
+    RebarConfig = [{erl_opts, [{src_dirs, ["src", "extra"]}]}],
+
+    %% check a beam corresponding to the src in the extra src_dir exists
+    Extra1Beam = filename:join([AppDir, "_build", "default", "lib", Name1, "ebin",
+                                io_lib:format("~ts_extra.beam", [Name1])]),
+    Extra2Beam = filename:join([AppDir, "_build", "default", "lib", Name2, "ebin",
+                                io_lib:format("~ts_extra.beam", [Name2])]),
+
+    %% check the extra src_dir was copied/linked into the _build dir
+    Extra1Dir = filename:join([AppDir, "_build", "default", "lib", Name1, "extra"]),
+    Extra2Dir = filename:join([AppDir, "_build", "default", "lib", Name2, "extra"]),
+
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["compile"],
+        {ok, [{app, Name1}, {app, Name2},
+              {file, Extra1Beam}, {file, Extra2Beam},
+              {dir, Extra1Dir}, {dir, Extra2Dir}]}
+    ).
+
+build_unbalanced_srcdirs(Config) ->
+    AppDir = ?config(apps, Config),
+    [Name1, Name2] = ?config(app_names, Config),
+
+    RebarConfig = [{erl_opts, [{src_dirs, ["src", "extra"]}]}],
+
+    %% check a beam corresponding to the src in the extra src_dir exists
+    Extra1Beam = filename:join([AppDir, "_build", "default", "lib", Name1, "ebin",
+                                io_lib:format("~ts_extra.beam", [Name1])]),
+
+    %% check the extra src_dir was copied/linked into the _build dir
+    Extra1Dir = filename:join([AppDir, "_build", "default", "lib", Name1, "extra"]),
+
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["compile"],
+        {ok, [{app, Name1}, {app, Name2}, {file, Extra1Beam}, {dir, Extra1Dir}]}
     ),
+
+    %% check no extra src_dir were copied/linked into the _build dir
+    Extra2Dir = filename:join([AppDir, "_build", "default", "lib", Name2, "extra"]),
+    false = filelib:is_dir(Extra2Dir),
+    %% check only expected beams are in the ebin dir
+    {ok, Files} = rebar_utils:list_dir(filename:join([AppDir, "_build", "default", "lib", Name2, "ebin"])),
+    lists:all(fun(Beam) -> lists:member(Beam, [Name2 ++ ".app", "not_a_real_src_" ++ Name2 ++ ".beam"]) end,
+              Files).
+
+build_basic_extra_dirs(Config) ->
+    AppDir = ?config(apps, Config),
+    [Name] = ?config(app_names, Config),
+
+    RebarConfig = [{erl_opts, [{extra_src_dirs, ["extra"]}]}],
+
+    %% check a beam corresponding to the src in the extra src_dir exists
+    ExtraBeam = filename:join([AppDir, "_build", "default", "lib", Name, "extra",
+                               io_lib:format("~ts_extra.beam", [Name])]),
+
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["compile"],
+        {ok, [{app, Name}, {file, ExtraBeam}]}
+    ).
+
+build_release_extra_dirs(Config) ->
+    AppDir = ?config(apps, Config),
+    [Name1, Name2] = ?config(app_names, Config),
+
+    RebarConfig = [{erl_opts, [{extra_src_dirs, ["extra"]}]}],
+
+    %% check a beam corresponding to the src in the extra src_dir exists
+    Extra1Beam = filename:join([AppDir, "_build", "default", "lib", Name1, "extra",
+                                io_lib:format("~ts_extra.beam", [Name1])]),
+    Extra2Beam = filename:join([AppDir, "_build", "default", "lib", Name2, "extra",
+                                io_lib:format("~ts_extra.beam", [Name2])]),
+
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["compile"],
+        {ok, [{app, Name1}, {app, Name2}, {file, Extra1Beam}, {file, Extra2Beam}]}
+    ).
+
+build_unbalanced_extra_dirs(Config) ->
+    AppDir = ?config(apps, Config),
+    [Name1, Name2] = ?config(app_names, Config),
+
+    RebarConfig = [{erl_opts, [{extra_src_dirs, ["extra"]}]}],
+
+    %% check a beam corresponding to the src in the extra src_dir exists
+    Extra1Beam = filename:join([AppDir, "_build", "default", "lib", Name1, "extra",
+                                io_lib:format("~ts_extra.beam", [Name1])]),
+
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["compile"],
+        {ok, [{app, Name1}, {app, Name2}, {file, Extra1Beam}]}
+    ),
+
+    %% check no extra src_dir were copied/linked into the _build dir
+    false = filelib:is_dir(filename:join([AppDir, "_build", "default", "lib", Name2, "extra"])),
+    %% check only expected beams are in the ebin dir
+    {ok, Files} = rebar_utils:list_dir(filename:join([AppDir, "_build", "default", "lib", Name2, "ebin"])),
+    lists:all(fun(Beam) -> lists:member(Beam, [Name2 ++ ".app", "not_a_real_src_" ++ Name2 ++ ".beam"]) end,
+              Files).
+
+build_extra_dirs_in_project_root(Config) ->
+    AppDir = ?config(apps, Config),
+    [Name1, Name2] = ?config(app_names, Config),
+
+    RebarConfig = [{erl_opts, [{extra_src_dirs, ["extra"]}]}],
+
+    %% check a beam corresponding to the src in the extra src_dir exists
+    ExtraBeam = filename:join([AppDir, "_build", "default", "extras", "extra", "extra.beam"]),
+
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["compile"],
+        {ok, [{app, Name1}, {app, Name2}, {file, ExtraBeam}]}
+    ).
+
+paths_basic_app(Config) ->
+    [Name] = ?config(app_names, Config),
+    [Vsn] = ?config(vsns, Config),
+
+    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["compile"], return),
+    
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    ok = application:load(list_to_atom(Name)),
+    Loaded = application:loaded_applications(),
+    {_, _, Vsn} = lists:keyfind(list_to_atom(Name), 1, Loaded).
+
+paths_release_apps(Config) ->
+    [Name1, Name2] = ?config(app_names, Config),
+    [Vsn1, Vsn2] = ?config(vsns, Config),
+
+    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["compile"], return),
+
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    ok = application:load(list_to_atom(Name1)),
+    ok = application:load(list_to_atom(Name2)),
+    Loaded = application:loaded_applications(),
+    {_, _, Vsn1} = lists:keyfind(list_to_atom(Name1), 1, Loaded),
+    {_, _, Vsn2} = lists:keyfind(list_to_atom(Name2), 1, Loaded).
+
+paths_checkout_apps(Config) ->
+    [Name1, _Name2] = ?config(app_names, Config),
+    [Vsn1, _Vsn2] = ?config(vsns, Config),
+
+    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["compile"], return),
+
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    ok = application:load(list_to_atom(Name1)),
+    Loaded = application:loaded_applications(),
+    {_, _, Vsn1} = lists:keyfind(list_to_atom(Name1), 1, Loaded).
+
+paths_checkout_deps(Config) ->
+    AppDir = ?config(apps, Config),
+    [_Name1, Name2] = ?config(app_names, Config),
+    [_Vsn1, Vsn2] = ?config(vsns, Config),
+
+    %% rebar_test_utils:init_rebar_state/1,2 uses rebar_state:new/3 which
+    %% maybe incorrectly sets deps to [] (based on `rebar.lock`) instead of
+    %% to the checkapps
+    %% until that is sorted out the lock file has to be removed before
+    %% this test will pass
+    file:delete(filename:join([AppDir, "rebar.lock"])),
+
+    {ok, RebarConfig} = file:consult(filename:join([AppDir, "rebar.config"])),
+
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+
     code:add_paths(rebar_state:code_paths(State, all_deps)),
     ok = application:load(list_to_atom(Name2)),
     Loaded = application:loaded_applications(),
     {_, _, Vsn2} = lists:keyfind(list_to_atom(Name2), 1, Loaded).
 
-build_all_srcdirs(Config) ->
+paths_basic_srcdirs(Config) ->
     AppDir = ?config(apps, Config),
+    [Name] = ?config(app_names, Config),
 
     RebarConfig = [{erl_opts, [{src_dirs, ["src", "extra"]}]}],
 
-    Name = rebar_test_utils:create_random_name("app1_"),
-    Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
 
-    ExtraSrc = <<"-module(extra_src).\n"
-        "-export([ok/0]).\n"
-        "ok() -> ok.\n">>,
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    Mod = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name]))),
+    {module, Mod} = code:ensure_loaded(Mod),
 
-    ok = filelib:ensure_dir(filename:join([AppDir, "extra", "dummy"])),
-    ok = file:write_file(filename:join([AppDir, "extra", "extra_src.erl"]), ExtraSrc),
+    Expect = filename:join([AppDir, "_build", "default", "lib", Name, "ebin",
+                            io_lib:format("~ts_extra.beam", [Name])]),
+    Expect = code:which(Mod).
 
-    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
+paths_release_srcdirs(Config) ->
+    AppDir = ?config(apps, Config),
+    [Name1, Name2] = ?config(app_names, Config),
 
-    %% check a beam corresponding to the src in the extra src_dir exists in ebin
-    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
-    true = filelib:is_file(filename:join([EbinDir, "extra_src.beam"])),
+    RebarConfig = [{erl_opts, [{src_dirs, ["src", "extra"]}]}],
 
-    %% check the extra src_dir was linked into the _build dir
-    true = filelib:is_dir(filename:join([AppDir, "_build", "default", "lib", Name, "extra"])).
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    Mod1 = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name1]))),
+    {module, Mod1} = code:ensure_loaded(Mod1),
+    Mod2 = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name2]))),
+    {module, Mod2} = code:ensure_loaded(Mod2),
+
+    ExpectOne = filename:join([AppDir, "_build", "default", "lib", Name1, "ebin",
+                               io_lib:format("~ts_extra.beam", [Name1])]),
+    ExpectOne = code:which(Mod1),
+    ExpectTwo = filename:join([AppDir, "_build", "default", "lib", Name2, "ebin",
+                               io_lib:format("~ts_extra.beam", [Name2])]),
+    ExpectTwo = code:which(Mod2).
+
+paths_unbalanced_srcdirs(Config) ->
+    AppDir = ?config(apps, Config),
+    [Name1, Name2] = ?config(app_names, Config),
+
+    RebarConfig = [{erl_opts, [{src_dirs, ["src", "extra"]}]}],
+
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    Mod1 = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name1]))),
+    {module, Mod1} = code:ensure_loaded(Mod1),
+    Mod2 = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name2]))),
+    {error, nofile} = code:ensure_loaded(Mod2),
+
+    ExpectOne = filename:join([AppDir, "_build", "default", "lib", Name1, "ebin",
+                               io_lib:format("~ts_extra.beam", [Name1])]),
+    ExpectOne = code:which(Mod1).
+
+paths_basic_extra_dirs(Config) ->
+    AppDir = ?config(apps, Config),
+    [Name] = ?config(app_names, Config),
+
+    RebarConfig = [{erl_opts, [{extra_src_dirs, ["extra"]}]}],
+
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    Mod = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name]))),
+    {module, Mod} = code:ensure_loaded(Mod),
+
+    Expect = filename:join([AppDir, "_build", "default", "lib", Name, "extra",
+                            io_lib:format("~ts_extra.beam", [Name])]),
+    Expect = code:which(Mod).
+
+paths_release_extra_dirs(Config) ->
+    AppDir = ?config(apps, Config),
+    [Name1, Name2] = ?config(app_names, Config),
+
+    RebarConfig = [{erl_opts, [{extra_src_dirs, ["extra"]}]}],
+
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    Mod1 = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name1]))),
+    {module, Mod1} = code:ensure_loaded(Mod1),
+    Mod2 = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name2]))),
+    {module, Mod2} = code:ensure_loaded(Mod2),
+
+    ExpectOne = filename:join([AppDir, "_build", "default", "lib", Name1, "extra",
+                               io_lib:format("~ts_extra.beam", [Name1])]),
+    ExpectOne = code:which(Mod1),
+    ExpectTwo = filename:join([AppDir, "_build", "default", "lib", Name2, "extra",
+                               io_lib:format("~ts_extra.beam", [Name2])]),
+    ExpectTwo = code:which(Mod2).
+
+
+paths_unbalanced_extra_dirs(Config) ->
+    AppDir = ?config(apps, Config),
+    [Name1, Name2] = ?config(app_names, Config),
+
+    RebarConfig = [{erl_opts, [{extra_src_dirs, ["extra"]}]}],
+
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    Mod1 = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name1]))),
+    {module, Mod1} = code:ensure_loaded(Mod1),
+    Mod2 = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name2]))),
+    {error, nofile} = code:ensure_loaded(Mod2),
+
+    ExpectOne = filename:join([AppDir, "_build", "default", "lib", Name1, "extra",
+                               io_lib:format("~ts_extra.beam", [Name1])]),
+    ExpectOne = code:which(Mod1).
+
+paths_extra_dirs_in_project_root(Config) ->
+    AppDir = ?config(apps, Config),
+
+    RebarConfig = [{erl_opts, [{extra_src_dirs, ["extra"]}]}],
+
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    {module, extra} = code:ensure_loaded(extra),
+
+    Expect = filename:join([AppDir, "_build", "default", "extras", "extra", "extra.beam"]),
+    Expect = code:which(extra).
+
+clean_basic_app(Config) ->
+    [Name] = ?config(app_names, Config),
+
+    rebar_test_utils:run_and_check(Config, [], ["clean"], {ok, [{app, Name, invalid}]}).
+
+clean_release_apps(Config) ->
+    [Name1, Name2] = ?config(app_names, Config),
+
+    rebar_test_utils:run_and_check(Config, [], ["clean"],
+                                   {ok, [{app, Name1, invalid}, {app, Name2, invalid}]}).
+
+clean_basic_extra_dirs(Config) ->
+    AppDir = ?config(apps, Config),
+    [Name] = ?config(app_names, Config),
+
+    rebar_test_utils:run_and_check(Config, [], ["clean"], {ok, [{app, Name, invalid}]}),
+
+    Beam = lists:flatten(io_lib:format("~ts_extra", [Name])),
+    false = ec_file:exists(filename:join([AppDir, "_build", "default", "lib", Name, "extras", Beam])).
+
+clean_release_extra_dirs(Config) ->
+    AppDir = ?config(apps, Config),
+    [Name1, Name2] = ?config(app_names, Config),
+
+    rebar_test_utils:run_and_check(Config, [], ["clean"],
+                                   {ok, [{app, Name1, invalid}, {app, Name2, invalid}]}),
+
+    Beam1 = lists:flatten(io_lib:format("~ts_extra", [Name1])),
+    false = ec_file:exists(filename:join([AppDir, "_build", "default", "lib", Name1, "extras", Beam1])),
+    Beam2 = lists:flatten(io_lib:format("~ts_extra", [Name2])),
+    false = ec_file:exists(filename:join([AppDir, "_build", "default", "lib", Name2, "extras", Beam2])).
+
+clean_extra_dirs_in_project_root(Config) ->
+    AppDir = ?config(apps, Config),
+    [Name1, Name2] = ?config(app_names, Config),
+
+    rebar_test_utils:run_and_check(Config, [], ["clean"],
+                                   {ok, [{app, Name1, invalid}, {app, Name2, invalid}]}),
+
+    false = ec_file:exists(filename:join([AppDir, "_build", "default", "extras"])).
 
 recompile_when_hrl_changes(Config) ->
     AppDir = ?config(apps, Config),
@@ -167,7 +652,7 @@ recompile_when_hrl_changes(Config) ->
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
 
     EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
-    {ok, Files} = file:list_dir(EbinDir),
+    {ok, Files} = rebar_utils:list_dir(EbinDir),
     ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
                || F <- Files, filename:extension(F) == ".beam"],
 
@@ -178,7 +663,7 @@ recompile_when_hrl_changes(Config) ->
 
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
 
-    {ok, NewFiles} = file:list_dir(EbinDir),
+    {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
     NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
                   || F <- NewFiles, filename:extension(F) == ".beam"],
 
@@ -194,7 +679,7 @@ recompile_when_opts_change(Config) ->
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
 
     EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
-    {ok, Files} = file:list_dir(EbinDir),
+    {ok, Files} = rebar_utils:list_dir(EbinDir),
     ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
                || F <- Files, filename:extension(F) == ".beam"],
 
@@ -204,7 +689,7 @@ recompile_when_opts_change(Config) ->
 
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
 
-    {ok, NewFiles} = file:list_dir(EbinDir),
+    {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
     NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
                   || F <- NewFiles, filename:extension(F) == ".beam"],
 
@@ -220,7 +705,7 @@ dont_recompile_when_opts_dont_change(Config) ->
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
 
     EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
-    {ok, Files} = file:list_dir(EbinDir),
+    {ok, Files} = rebar_utils:list_dir(EbinDir),
     ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
                || F <- Files, filename:extension(F) == ".beam"],
 
@@ -228,7 +713,7 @@ dont_recompile_when_opts_dont_change(Config) ->
 
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
 
-    {ok, NewFiles} = file:list_dir(EbinDir),
+    {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
     NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
                   || F <- NewFiles, filename:extension(F) == ".beam"],
 
@@ -331,7 +816,8 @@ deps_in_path(Config) ->
     %% find pkg name in there
     ?assertNotEqual([], [Path || Path <- code:get_path(),
                                  {match, _} <- [re:run(Path, PkgName)]]),
-    code:set_path(StartPaths),
+
+    true = code:set_path(lists:filter(fun(P) -> ec_file:exists(P) end, StartPaths)),
     %% Make sure apps we look for are not visible again
     %% Hope not to find src name
     ?assertEqual([], [Path || Path <- code:get_path(),
@@ -638,10 +1124,10 @@ clean_all(Config) ->
     ),
 
     %% Clean all
-    rebar_test_utils:run_and_check(
-        Config, RConf, ["clean", "--all"],
-        {ok, [{app, Name, invalid}, {app, DepName, invalid}, {app, PkgName, invalid}]}
-    ).
+    rebar_test_utils:run_and_check(Config, [], ["clean", "--all"],
+                                   {ok, [{app, Name, invalid},
+                                         {app, DepName, invalid},
+                                         {app, PkgName, invalid}]}).
 
 override_deps(Config) ->
     mock_git_resource:mock([{deps, [{some_dep, "0.0.1"},{other_dep, "0.0.1"}]}]),
@@ -680,3 +1166,4 @@ profile_override_deps(Config) ->
         Config, RebarConfig, ["as", "a", "compile"],
         {ok, [{dep, "some_dep"},{dep_not_exist, "other_dep"}]}
     ).
+

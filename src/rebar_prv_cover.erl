@@ -103,7 +103,7 @@ analyze(State) ->
 
 get_all_coverdata(CoverDir) ->
     ok = filelib:ensure_dir(filename:join([CoverDir, "dummy.log"])),
-    {ok, Files} = file:list_dir(CoverDir),
+    {ok, Files} = rebar_utils:list_dir(CoverDir),
     rebar_utils:filtermap(fun(FileName) ->
         case filename:extension(FileName) == ".coverdata" of
             true  -> {true, filename:join([CoverDir, FileName])};
@@ -277,8 +277,9 @@ strip_coverdir(File) ->
 
 cover_compile(State, apps) ->
     Apps = filter_checkouts(rebar_state:project_apps(State)),
-    AppDirs = app_ebin_dirs(Apps, []),
-    cover_compile(State, AppDirs);
+    AppDirs = app_dirs(Apps),
+    ExtraDirs = extra_src_dirs(State, Apps),
+    cover_compile(State, AppDirs ++ ExtraDirs);
 cover_compile(State, Dirs) ->
     %% start the cover server if necessary
     {ok, CoverPid} = start_cover(),
@@ -290,8 +291,29 @@ cover_compile(State, Dirs) ->
 
 compile([], Acc) -> lists:reverse(Acc);
 compile([Dir|Rest], Acc) ->
+    ?INFO("covering ~p", [Dir]),
     Result = cover:compile_beam_directory(Dir),
     compile(Rest, [Result|Acc]).
+
+app_dirs(Apps) ->
+    lists:foldl(fun app_ebin_dirs/2, [], Apps).
+
+app_ebin_dirs(App, Acc) ->
+    AppDir = rebar_app_info:ebin_dir(App),
+    ExtraDirs = rebar_dir:extra_src_dirs(rebar_app_info:opts(App), []),
+    OutDir = rebar_app_info:out_dir(App),
+    [filename:join([OutDir, D]) || D <- [AppDir|ExtraDirs]] ++ Acc.
+
+extra_src_dirs(State, Apps) ->
+    BaseDir = rebar_state:dir(State),
+    F = fun(App) -> rebar_app_info:dir(App) == BaseDir end,
+    %% check that this app hasn't already been dealt with
+    Extras = case lists:any(F, Apps) of
+        false -> rebar_dir:extra_src_dirs(rebar_state:opts(State), []);
+        true  -> []
+    end,
+    OutDir = rebar_dir:base_dir(State),
+    [filename:join([OutDir, "extras", D]) || D <- Extras].
 
 filter_checkouts(Apps) -> filter_checkouts(Apps, []).
 
@@ -301,10 +323,6 @@ filter_checkouts([App|Rest], Acc) ->
         true  -> filter_checkouts(Rest, Acc);
         false -> filter_checkouts(Rest, [App|Acc])
     end.
-
-app_ebin_dirs([], Acc) -> Acc;
-app_ebin_dirs([App|Rest], Acc) ->
-    app_ebin_dirs(Rest, [rebar_app_info:ebin_dir(App)|Acc]).
 
 start_cover() ->
     case cover:start() of
