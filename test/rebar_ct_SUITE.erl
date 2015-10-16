@@ -17,7 +17,6 @@
          multi_suite/1,
          all_suite/1,
          single_dir_and_single_suite/1,
-         symlinked_dir_overwritten_fix/1,
          data_dir_correct/1]).
 
 -include_lib("common_test/include/ct.hrl").
@@ -39,8 +38,7 @@ groups() -> [{basic_app, [], [basic_app_default_dirs,
                                     single_unmanaged_suite,
                                     multi_suite,
                                     all_suite,
-                                    single_dir_and_single_suite,
-                                    symlinked_dir_overwritten_fix]},
+                                    single_dir_and_single_suite]},
              {data_dirs, [], [data_dir_correct]}].
 
 init_per_group(basic_app, Config) ->
@@ -56,22 +54,14 @@ init_per_group(basic_app, Config) ->
     ok = filelib:ensure_dir(Suite),
     ok = file:write_file(Suite, test_suite(Name)),
 
-    {ok, State} = rebar_test_utils:run_and_check(C, [], ["as", "test", "compile"], return),
+    {ok, State} = rebar_test_utils:run_and_check(C, [], ["as", "test", "lock"], return),
 
-    LibDirs = rebar_dir:lib_dirs(State),
-    State1 = rebar_app_discover:do(State, LibDirs),
+    Tests = rebar_prv_common_test:prepare_tests(State),
+    {ok, NewState} = rebar_prv_common_test:compile(State, Tests),
+    {ok, T} = Tests,
+    Opts = rebar_prv_common_test:translate_paths(NewState, T),
 
-    Providers = rebar_state:providers(State1),
-    Namespace = rebar_state:namespace(State1),
-    CommandProvider = providers:get_provider(ct, Providers, Namespace),
-    GetOptSpec = providers:opts(CommandProvider),
-    {ok, GetOptResult} = getopt:parse(GetOptSpec, []),
-
-    State2 = rebar_state:command_parsed_args(State1, GetOptResult),
-
-    Result = rebar_prv_common_test:setup_ct(State2),
-
-    [{result, Result}, {appnames, [Name]}|C];
+    [{result, Opts}, {appnames, [Name]}|C];
 init_per_group(multi_app, Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_"),
 
@@ -99,22 +89,14 @@ init_per_group(multi_app, Config) ->
     ok = filelib:ensure_dir(Suite3),
     ok = file:write_file(Suite3, test_suite("extras")),
 
-    {ok, State} = rebar_test_utils:run_and_check(C, [], ["as", "test", "compile"], return),
+    {ok, State} = rebar_test_utils:run_and_check(C, [], ["as", "test", "lock"], return),
 
-    LibDirs = rebar_dir:lib_dirs(State),
-    State1 = rebar_app_discover:do(State, LibDirs),
+    Tests = rebar_prv_common_test:prepare_tests(State),
+    {ok, NewState} = rebar_prv_common_test:compile(State, Tests),
+    {ok, T} = Tests,
+    Opts = rebar_prv_common_test:translate_paths(NewState, T),
 
-    Providers = rebar_state:providers(State1),
-    Namespace = rebar_state:namespace(State1),
-    CommandProvider = providers:get_provider(ct, Providers, Namespace),
-    GetOptSpec = providers:opts(CommandProvider),
-    {ok, GetOptResult} = getopt:parse(GetOptSpec, []),
-
-    State2 = rebar_state:command_parsed_args(State1, GetOptResult),
-
-    Result = rebar_prv_common_test:setup_ct(State2),
-
-    [{result, Result}, {appnames, [Name1, Name2]}|C];
+    [{result, Opts}, {appnames, [Name1, Name2]}|C];
 init_per_group(dirs_and_suites, Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_"),
 
@@ -142,7 +124,9 @@ init_per_group(dirs_and_suites, Config) ->
     ok = filelib:ensure_dir(Suite3),
     ok = file:write_file(Suite3, test_suite("extras")),
 
-    [{appnames, [Name1, Name2]}|C];
+    {ok, State} = rebar_test_utils:run_and_check(C, [], ["as", "test", "lock"], return),
+
+    [{s, State}, {appnames, [Name1, Name2]}|C];
 init_per_group(_, Config) -> Config.
 
 end_per_group(_Group, _Config) -> ok.
@@ -152,10 +136,10 @@ basic_app_default_dirs(Config) ->
     [Name] = ?config(appnames, Config),
     Result = ?config(result, Config),
 
-    Expect = filename:absname(filename:join([AppDir, "_build", "test", "lib", Name, "test"])),
+    Expect = filename:join([AppDir, "_build", "test", "lib", Name, "test"]),
     Dir = proplists:get_value(dir, Result),
 
-    Expect = Dir.
+    [Expect] = Dir.
 
 basic_app_default_beams(Config) ->
     AppDir = ?config(apps, Config),
@@ -178,7 +162,7 @@ multi_app_default_dirs(Config) ->
 
     Expect1 = filename:absname(filename:join([AppDir, "_build", "test", "lib", Name1, "test"])),
     Expect2 = filename:absname(filename:join([AppDir, "_build", "test", "lib", Name2, "test"])),
-    Expect3 = filename:absname(filename:join([AppDir, "_build", "test", "test"])),
+    Expect3 = filename:absname(filename:join([AppDir, "_build", "test", "extras", "test"])),
     Dirs = proplists:get_value(dir, Result),
 
     true = (lists:sort([Expect1, Expect2, Expect3]) == lists:sort(Dirs)).
@@ -215,8 +199,7 @@ multi_app_default_beams(Config) ->
 single_app_dir(Config) ->
     AppDir = ?config(apps, Config),
     [Name1, _Name2] = ?config(appnames, Config),
-
-    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["as", "test", "compile"], return),
+    State = ?config(s, Config),
 
     LibDirs = rebar_dir:lib_dirs(State),
     State1 = rebar_app_discover:do(State, LibDirs),
@@ -233,17 +216,19 @@ single_app_dir(Config) ->
 
     State2 = rebar_state:command_parsed_args(State1, GetOptResult),
 
-    Result = rebar_prv_common_test:setup_ct(State2),
+    Tests = rebar_prv_common_test:prepare_tests(State2),
+    {ok, NewState} = rebar_prv_common_test:compile(State2, Tests),
+    {ok, T} = Tests,
+    Opts = rebar_prv_common_test:translate_paths(NewState, T),
 
-    Expect = filename:absname(filename:join([AppDir, "_build", "test", "lib", Name1, "test"])),
-    Dir = proplists:get_value(dir, Result),
+    Expect = filename:join([AppDir, "_build", "test", "lib", Name1, "test"]),
+    Dir = proplists:get_value(dir, Opts),
 
-    Expect = Dir.
+    [Expect] = Dir.
 
 single_extra_dir(Config) ->
     AppDir = ?config(apps, Config),
-
-    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["as", "test", "compile"], return),
+    State = ?config(s, Config),
 
     LibDirs = rebar_dir:lib_dirs(State),
     State1 = rebar_app_discover:do(State, LibDirs),
@@ -257,21 +242,23 @@ single_extra_dir(Config) ->
 
     State2 = rebar_state:command_parsed_args(State1, GetOptResult),
 
-    Result = rebar_prv_common_test:setup_ct(State2),
+    Tests = rebar_prv_common_test:prepare_tests(State2),
+    {ok, NewState} = rebar_prv_common_test:compile(State2, Tests),
+    {ok, T} = Tests,
+    Opts = rebar_prv_common_test:translate_paths(NewState, T),
 
-    Expect = filename:absname(filename:join([AppDir, "_build", "test", "test"])),
-    Dir = proplists:get_value(dir, Result),
+    Expect = filename:join([AppDir, "_build", "test", "extras", "test"]),
+    Dir = proplists:get_value(dir, Opts),
 
-    Expect = Dir.
+    [Expect] = Dir.
 
 single_unmanaged_dir(Config) ->
     PrivDir = ?config(priv_dir, Config),
+    State = ?config(s, Config),
 
     Suite = filename:join([PrivDir, "unmanaged_dir", "unmanaged_dir_SUITE.erl"]),
     ok = filelib:ensure_dir(Suite),
     ok = file:write_file(Suite, test_suite("unmanaged_dir")),
-
-    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["as", "test", "compile"], return),
 
     LibDirs = rebar_dir:lib_dirs(State),
     State1 = rebar_app_discover:do(State, LibDirs),
@@ -285,18 +272,20 @@ single_unmanaged_dir(Config) ->
 
     State2 = rebar_state:command_parsed_args(State1, GetOptResult),
 
-    Result = rebar_prv_common_test:setup_ct(State2),
+    Tests = rebar_prv_common_test:prepare_tests(State2),
+    {ok, NewState} = rebar_prv_common_test:compile(State2, Tests),
+    {ok, T} = Tests,
+    Opts = rebar_prv_common_test:translate_paths(NewState, T),
 
-    Expect = filename:absname(filename:join([PrivDir, "unmanaged_dir"])),
-    Dir = proplists:get_value(dir, Result),
+    Expect = filename:join([PrivDir, "unmanaged_dir"]),
+    Dir = proplists:get_value(dir, Opts),
 
-    Expect = Dir.
+    [Expect] = Dir.
 
 single_suite(Config) ->
     AppDir = ?config(apps, Config),
     [Name1, _Name2] = ?config(appnames, Config),
-
-    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["as", "test", "compile"], return),
+    State = ?config(s, Config),
 
     LibDirs = rebar_dir:lib_dirs(State),
     State1 = rebar_app_discover:do(State, LibDirs),
@@ -314,24 +303,26 @@ single_suite(Config) ->
 
     State2 = rebar_state:command_parsed_args(State1, GetOptResult),
 
-    Result = rebar_prv_common_test:setup_ct(State2),
+    Tests = rebar_prv_common_test:prepare_tests(State2),
+    {ok, NewState} = rebar_prv_common_test:compile(State2, Tests),
+    {ok, T} = Tests,
+    Opts = rebar_prv_common_test:translate_paths(NewState, T),
 
-    Expect = [filename:absname(filename:join([AppDir,
-                                              "_build",
-                                              "test",
-                                              "lib",
-                                              Name1,
-                                              "test",
-                                              Name1 ++ "_SUITE"]))],
-    Suite = proplists:get_value(suite, Result),
+    Expect = filename:join([AppDir,
+                            "_build",
+                            "test",
+                            "lib",
+                            Name1,
+                            "test",
+                            Name1 ++ "_SUITE"]),
+    Suite = proplists:get_value(suite, Opts),
 
-    Expect = Suite.
+    [Expect] = Suite.
 
 single_extra_suite(Config) ->
     AppDir = ?config(apps, Config),
     [_Name1, _Name2] = ?config(appnames, Config),
-
-    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["as", "test", "compile"], return),
+    State = ?config(s, Config),
 
     LibDirs = rebar_dir:lib_dirs(State),
     State1 = rebar_app_discover:do(State, LibDirs),
@@ -347,26 +338,29 @@ single_extra_suite(Config) ->
 
     State2 = rebar_state:command_parsed_args(State1, GetOptResult),
 
-    Result = rebar_prv_common_test:setup_ct(State2),
+    Tests = rebar_prv_common_test:prepare_tests(State2),
+    {ok, NewState} = rebar_prv_common_test:compile(State2, Tests),
+    {ok, T} = Tests,
+    Opts = rebar_prv_common_test:translate_paths(NewState, T),
 
-    Expect = [filename:absname(filename:join([AppDir,
-                                              "_build",
-                                              "test",
-                                              "test",
-                                              "extra_SUITE"]))],
-    Suite = proplists:get_value(suite, Result),
+    Expect = filename:join([AppDir,
+                            "_build",
+                            "test",
+                            "extras",
+                            "test",
+                            "extra_SUITE"]),
+    Suite = proplists:get_value(suite, Opts),
 
-    Expect = Suite.
+    [Expect] = Suite.
 
 single_unmanaged_suite(Config) ->
     PrivDir = ?config(priv_dir, Config),
     [_Name1, _Name2] = ?config(appnames, Config),
+    State = ?config(s, Config),
 
     Suite = filename:join([PrivDir, "unmanaged", "unmanaged_SUITE.erl"]),
     ok = filelib:ensure_dir(Suite),
     ok = file:write_file(Suite, test_suite("unmanaged")),
-
-    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["as", "test", "compile"], return),
 
     LibDirs = rebar_dir:lib_dirs(State),
     State1 = rebar_app_discover:do(State, LibDirs),
@@ -382,20 +376,22 @@ single_unmanaged_suite(Config) ->
 
     State2 = rebar_state:command_parsed_args(State1, GetOptResult),
 
-    Result = rebar_prv_common_test:setup_ct(State2),
+    Tests = rebar_prv_common_test:prepare_tests(State2),
+    {ok, NewState} = rebar_prv_common_test:compile(State2, Tests),
+    {ok, T} = Tests,
+    Opts = rebar_prv_common_test:translate_paths(NewState, T),
 
-    Expect = [filename:absname(filename:join([PrivDir,
-                                              "unmanaged",
-                                              "unmanaged_SUITE"]))],
-    SuitePath = proplists:get_value(suite, Result),
+    Expect = filename:join([PrivDir,
+                            "unmanaged",
+                            "unmanaged_SUITE"]),
+    SuitePath = proplists:get_value(suite, Opts),
 
-    Expect = SuitePath.
+    [Expect] = SuitePath.
 
 multi_suite(Config) ->
     AppDir = ?config(apps, Config),
     [Name1, Name2] = ?config(appnames, Config),
-
-    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["as", "test", "compile"], return),
+    State = ?config(s, Config),
 
     LibDirs = rebar_dir:lib_dirs(State),
     State1 = rebar_app_discover:do(State, LibDirs),
@@ -417,31 +413,33 @@ multi_suite(Config) ->
 
     State2 = rebar_state:command_parsed_args(State1, GetOptResult),
 
-    Result = rebar_prv_common_test:setup_ct(State2),
+    Tests = rebar_prv_common_test:prepare_tests(State2),
+    {ok, NewState} = rebar_prv_common_test:compile(State2, Tests),
+    {ok, T} = Tests,
+    Opts = rebar_prv_common_test:translate_paths(NewState, T),
 
-    Expect1 = filename:absname(filename:join([AppDir,
-                                              "_build",
-                                              "test",
-                                              "lib",
-                                              Name1,
-                                              "test",
-                                              Name1 ++ "_SUITE"])),
-    Expect2 = filename:absname(filename:join([AppDir,
-                                              "_build",
-                                              "test",
-                                              "lib",
-                                              Name2,
-                                              "test",
-                                              Name2 ++ "_SUITE"])),
-    Suites = proplists:get_value(suite, Result),
+    Expect1 = filename:join([AppDir,
+                             "_build",
+                             "test",
+                             "lib",
+                             Name1,
+                             "test",
+                             Name1 ++ "_SUITE"]),
+    Expect2 = filename:join([AppDir,
+                             "_build",
+                             "test",
+                             "lib",
+                             Name2,
+                             "test",
+                             Name2 ++ "_SUITE"]),
+    Suites = proplists:get_value(suite, Opts),
 
     true = (lists:sort([Expect1, Expect2]) == lists:sort(Suites)).
 
 all_suite(Config) ->
     AppDir = ?config(apps, Config),
     [Name1, Name2] = ?config(appnames, Config),
-
-    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["as", "test", "compile"], return),
+    State = ?config(s, Config),
 
     LibDirs = rebar_dir:lib_dirs(State),
     State1 = rebar_app_discover:do(State, LibDirs),
@@ -465,36 +463,39 @@ all_suite(Config) ->
 
     State2 = rebar_state:command_parsed_args(State1, GetOptResult),
 
-    Result = rebar_prv_common_test:setup_ct(State2),
+    Tests = rebar_prv_common_test:prepare_tests(State2),
+    {ok, NewState} = rebar_prv_common_test:compile(State2, Tests),
+    {ok, T} = Tests,
+    Opts = rebar_prv_common_test:translate_paths(NewState, T),
 
-    Expect1 = filename:absname(filename:join([AppDir,
-                                              "_build",
-                                              "test",
-                                              "lib",
-                                              Name1,
-                                              "test",
-                                              Name1 ++ "_SUITE"])),
-    Expect2 = filename:absname(filename:join([AppDir,
-                                              "_build",
-                                              "test",
-                                              "lib",
-                                              Name2,
-                                              "test",
-                                              Name2 ++ "_SUITE"])),
-    Expect3 = filename:absname(filename:join([AppDir,
-                                              "_build",
-                                              "test",
-                                              "test",
-                                              "extra_SUITE"])),
-    Suites = proplists:get_value(suite, Result),
+    Expect1 = filename:join([AppDir,
+                             "_build",
+                             "test",
+                             "lib",
+                             Name1,
+                             "test",
+                             Name1 ++ "_SUITE"]),
+    Expect2 = filename:join([AppDir,
+                             "_build",
+                             "test",
+                             "lib",
+                             Name2,
+                             "test",
+                             Name2 ++ "_SUITE"]),
+    Expect3 = filename:join([AppDir,
+                             "_build",
+                             "test",
+                             "extras",
+                             "test",
+                             "extra_SUITE"]),
+    Suites = proplists:get_value(suite, Opts),
 
     true = (lists:sort([Expect1, Expect2, Expect3]) == lists:sort(Suites)).
 
 single_dir_and_single_suite(Config) ->
     AppDir = ?config(apps, Config),
     [_Name1, _Name2] = ?config(appnames, Config),
-
-    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["as", "test", "compile"], return),
+    State = ?config(s, Config),
 
     LibDirs = rebar_dir:lib_dirs(State),
     State1 = rebar_app_discover:do(State, LibDirs),
@@ -509,45 +510,21 @@ single_dir_and_single_suite(Config) ->
 
     State2 = rebar_state:command_parsed_args(State1, GetOptResult),
 
-    Result = rebar_prv_common_test:setup_ct(State2),
+    Tests = rebar_prv_common_test:prepare_tests(State2),
+    {ok, NewState} = rebar_prv_common_test:compile(State2, Tests),
+    {ok, T} = Tests,
+    Opts = rebar_prv_common_test:translate_paths(NewState, T),
 
-    Expect = [filename:absname(filename:join([AppDir,
-                                              "_build",
-                                              "test",
-                                              "test",
-                                              "extra_SUITE"]))],
-    Suite = proplists:get_value(suite, Result),
+    Expect = filename:join([AppDir,
+                            "_build",
+                            "test",
+                            "extras",
+                            "test"]),
+    Dir = proplists:get_value(dir, Opts),
+    [Expect] = Dir,
 
-    Expect = Suite.
-
-symlinked_dir_overwritten_fix(Config) ->
-    AppDir = ?config(apps, Config),
-    [Name1, _Name2] = ?config(appnames, Config),
-
-    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["as", "test", "compile"], return),
-
-    LibDirs = rebar_dir:lib_dirs(State),
-    State1 = rebar_app_discover:do(State, LibDirs),
-
-    Providers = rebar_state:providers(State1),
-    Namespace = rebar_state:namespace(State1),
-    CommandProvider = providers:get_provider(ct, Providers, Namespace),
-    GetOptSpec = providers:opts(CommandProvider),
-    {ok, GetOptResult} = getopt:parse(GetOptSpec,
-                                      ["--dir=" ++ filename:join([AppDir,
-                                                                  "apps",
-                                                                  Name1])]),
-
-    State2 = rebar_state:command_parsed_args(State1, GetOptResult),
-
-    Result = rebar_prv_common_test:setup_ct(State2),
-
-    Expect = filename:absname(filename:join([AppDir, "_build", "test", "lib", Name1])),
-    Dir = proplists:get_value(dir, Result),
-
-    Expect = Dir,
-
-    {ok, _} = rebar_test_utils:run_and_check(Config, [], ["as", "test", "compile"], return).
+    Suite = proplists:get_value(suite, Opts),
+    ["extra_SUITE"] = Suite.
 
 %% this test probably only fails when this suite is run via rebar3 with the --cover flag
 data_dir_correct(Config) ->
