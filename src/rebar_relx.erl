@@ -18,7 +18,7 @@ do(Module, Command, Provider, State) ->
     DepsDir = rebar_dir:deps_dir(State),
     ProjectAppDirs = lists:delete(".", ?DEFAULT_PROJECT_APP_DIRS),
     LibDirs = rebar_utils:filtermap(fun ec_file:exists/1,
-                                   [?DEFAULT_CHECKOUTS_DIR, DepsDir | ProjectAppDirs]),
+                                   [rebar_dir:checkouts_dir(State), DepsDir | ProjectAppDirs]),
     OutputDir = filename:join(rebar_dir:base_dir(State), ?DEFAULT_RELEASE_DIR),
     AllOptions = string:join([Command | Options], " "),
     Cwd = rebar_state:dir(State),
