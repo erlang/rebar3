@@ -21,6 +21,7 @@ init_rebar_state(Config, Name) ->
     application:load(rebar),
     DataDir = ?config(priv_dir, Config),
     AppsDir = filename:join([DataDir, create_random_name(Name)]),
+    SubjectDir = filename:join([AppsDir, proplists:get_value(subject_relative_dir, Config, ".")]),
     CheckoutsDir = filename:join([AppsDir, "_checkouts"]),
     ok = ec_file:mkdir_p(AppsDir),
     ok = ec_file:mkdir_p(CheckoutsDir),
@@ -30,7 +31,7 @@ init_rebar_state(Config, Name) ->
     State = rebar_state:new([{base_dir, filename:join([AppsDir, "_build"])}
                             ,{global_rebar_dir, GlobalDir}
                             ,{root_dir, AppsDir}]),
-    [{apps, AppsDir}, {checkouts, CheckoutsDir}, {state, State} | Config].
+    [{apps, AppsDir}, {checkouts, CheckoutsDir}, {state, State}, {subject_dir, SubjectDir} | Config].
 
 %% @doc Takes common test config, a rebar config ([] if empty), a command to
 %% run ("install_deps", "compile", etc.), and a list of expected applications
