@@ -92,13 +92,13 @@
 %% @equiv compile(AppInfo, []).
 
 -spec compile(rebar_app_info:t()) -> ok.
-compile(AppInfo) when is_tuple(AppInfo), element(1, AppInfo) == app_info_t ->
+compile(AppInfo) when element(1, AppInfo) == app_info_t ->
     compile(AppInfo, []).
 
 %% @doc compile an individual application.
 
 -spec compile(rebar_app_info:t(), compile_opts()) -> ok.
-compile(AppInfo, CompileOpts) when is_tuple(AppInfo), element(1, AppInfo) == app_info_t ->
+compile(AppInfo, CompileOpts) when element(1, AppInfo) == app_info_t ->
     Dir = ec_cnv:to_list(rebar_app_info:out_dir(AppInfo)),
     RebarOpts = rebar_app_info:opts(AppInfo),
 
@@ -139,7 +139,7 @@ compile(AppInfo, CompileOpts) when is_tuple(AppInfo), element(1, AppInfo) == app
 %% directory of those src_dirs
 
 -spec compile(rebar_dict() | rebar_state:t(), file:name(), file:name()) -> ok.
-compile(State, BaseDir, OutDir) when is_tuple(State), element(1, State) == state_t ->
+compile(State, BaseDir, OutDir) when element(1, State) == state_t ->
     compile(rebar_state:opts(State), BaseDir, OutDir, [{recursive, false}]);
 compile(RebarOpts, BaseDir, OutDir) ->
     compile(RebarOpts, BaseDir, OutDir, [{recursive, false}]).
@@ -147,7 +147,7 @@ compile(RebarOpts, BaseDir, OutDir) ->
 %% @hidden
 
 -spec compile(rebar_dict() | rebar_state:t(), file:name(), file:name(), compile_opts()) -> ok.
-compile(State, BaseDir, OutDir, CompileOpts) when is_tuple(State), element(1, State) == state_t ->
+compile(State, BaseDir, OutDir, CompileOpts) when element(1, State) == state_t ->
     compile(rebar_state:opts(State), BaseDir, OutDir, CompileOpts);
 compile(RebarOpts, BaseDir, OutDir, CompileOpts) ->
     SrcDirs = lists:map(fun(SrcDir) -> filename:join(BaseDir, SrcDir) end,
@@ -166,7 +166,7 @@ compile(RebarOpts, BaseDir, OutDir, CompileOpts) ->
 %% @equiv compile_dirs(Context, BaseDir, [Dir], Dir, [{recursive, false}]).
 
 -spec compile_dir(rebar_dict() | rebar_state:t(), file:name(), file:name()) -> ok.
-compile_dir(State, BaseDir, Dir) when is_tuple(State), element(1, State) == state_t ->
+compile_dir(State, BaseDir, Dir) when element(1, State) == state_t ->
     compile_dir(rebar_state:opts(State), BaseDir, Dir, [{recursive, false}]);
 compile_dir(RebarOpts, BaseDir, Dir) ->
     compile_dir(RebarOpts, BaseDir, Dir, [{recursive, false}]).
@@ -174,7 +174,7 @@ compile_dir(RebarOpts, BaseDir, Dir) ->
 %% @equiv compile_dirs(Context, BaseDir, [Dir], Dir, Opts).
 
 -spec compile_dir(rebar_dict() | rebar_state:t(), file:name(), file:name(), compile_opts()) -> ok.
-compile_dir(State, BaseDir, Dir, Opts) when is_tuple(State), element(1, State) == state_t ->
+compile_dir(State, BaseDir, Dir, Opts) when element(1, State) == state_t ->
     compile_dirs(rebar_state:opts(State), BaseDir, [Dir], Dir, Opts);
 compile_dir(RebarOpts, BaseDir, Dir, Opts) ->
     compile_dirs(RebarOpts, BaseDir, [Dir], Dir, Opts).
@@ -186,14 +186,16 @@ compile_dir(RebarOpts, BaseDir, Dir, Opts) ->
                    [file:filename()],
                    file:filename(),
                    compile_opts()) -> ok.
-compile_dirs(State, BaseDir, Dirs, OutDir, CompileOpts) when is_tuple(State), element(1, State) == state_t ->
+compile_dirs(State, BaseDir, Dirs, OutDir, CompileOpts) when element(1, State) == state_t ->
     compile_dirs(rebar_state:opts(State), BaseDir, Dirs, OutDir, CompileOpts);
 compile_dirs(RebarOpts, BaseDir, SrcDirs, OutDir, Opts) ->
     CompileOpts = parse_opts(Opts),
   
     ErlOpts = rebar_opts:erl_opts(RebarOpts),
+    ?DEBUG("erlopts ~p", [ErlOpts]),
     Recursive = CompileOpts#compile_opts.recursive,
     AllErlFiles = gather_src(SrcDirs, Recursive),
+    ?DEBUG("files to compile ~p", [AllErlFiles]),
 
     %% Make sure that outdir is on the path
     ok = filelib:ensure_dir(filename:join(OutDir, "dummy.beam")),

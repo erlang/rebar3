@@ -77,8 +77,8 @@ do(State, Tests) ->
 run_tests(State, Tests) ->
     T = translate_paths(State, Tests),
     EUnitOpts = resolve_eunit_opts(State),
-    ?INFO("eunit_tests ~p", [T]),
-    ?INFO("eunit_opts  ~p", [EUnitOpts]),
+    ?DEBUG("eunit_tests ~p", [T]),
+    ?DEBUG("eunit_opts  ~p", [EUnitOpts]),
     Result = eunit:test(T, EUnitOpts),
     ok = maybe_write_coverdata(State),
     case handle_results(Result) of
