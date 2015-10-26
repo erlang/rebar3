@@ -44,24 +44,28 @@ do(State) ->
         TmpFile = filename:join(TmpDir, "packages.gz"),
 
         Url = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_HEX_REGISTRY),
-        {ok, _RequestId} = httpc:request(get, {Url, []},
-                                         [], [{stream, TmpFile}, {sync, true}],
-                                         rebar),
-        {ok, Data} = file:read_file(TmpFile),
-        Unzipped = zlib:gunzip(Data),
-        ok = file:write_file(HexFile, Unzipped),
-        ?INFO("Writing registry to ~s", [HexFile]),
-        hex_to_index(State),
-        ok
+        case httpc:request(get, {Url, []},
+                           [], [{stream, TmpFile}, {sync, true}],
+                           rebar) of
+            {ok, saved_to_file} ->
+                {ok, Data} = file:read_file(TmpFile),
+                Unzipped = zlib:gunzip(Data),
+                ok = file:write_file(HexFile, Unzipped),
+                ?INFO("Writing registry to ~s", [HexFile]),
+                hex_to_index(State),
+                {ok, State};
+            _ ->
+                ?PRV_ERROR(package_index_download)
+        end
     catch
         _E:C ->
             ?DEBUG("Error creating package index: ~p ~p", [C, erlang:get_stacktrace()]),
             throw(?PRV_ERROR(package_index_write))
-    end,
-
-    {ok, State}.
+    end.
 
 -spec format_error(any()) -> iolist().
+format_error(package_index_download) ->
+    "Failed to download package index.";
 format_error(package_index_write) ->
     "Failed to write package index.".
 
