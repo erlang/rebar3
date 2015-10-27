@@ -133,7 +133,7 @@ compile(State, {ok, Tests}) ->
 compile(_State, Error) -> Error.
 
 inject_eunit_state(State, Tests) ->
-    Apps = project_apps(State),
+    Apps = rebar_state:project_apps(State),
     ModdedApps = lists:map(fun(App) ->
         NewOpts = inject(rebar_app_info:opts(App), State),
         rebar_app_info:opts(App, NewOpts)
@@ -200,7 +200,7 @@ prepare_tests(State) ->
     %% parse and translate command line tests
     CmdTests = resolve_tests(State),
     CfgTests = rebar_state:get(State, eunit_tests, []),
-    ProjectApps = project_apps(State),
+    ProjectApps = rebar_state:project_apps(State),
     %% prioritize tests to run first trying any command line specified
     %% tests falling back to tests specified in the config file finally
     %% running a default set if no other tests are present
@@ -230,18 +230,6 @@ resolve(Flag, EUnitKey, RawOpts) ->
 
 normalize(Key, Value) when Key == dir; Key == file -> {Key, Value};
 normalize(Key, Value) -> {Key, list_to_atom(Value)}.
-
-project_apps(State) ->
-    filter_checkouts(rebar_state:project_apps(State)).
-
-filter_checkouts(Apps) -> filter_checkouts(Apps, []).
-
-filter_checkouts([], Acc) -> lists:reverse(Acc);
-filter_checkouts([App|Rest], Acc) ->
-    case rebar_app_info:is_checkout(App) of
-        true  -> filter_checkouts(Rest, Acc);
-        false -> filter_checkouts(Rest, [App|Acc])
-    end.
 
 select_tests(State, ProjectApps, [], []) -> default_tests(State, ProjectApps);
 select_tests(_State, _ProjectApps, [], Tests)  -> Tests;
@@ -350,11 +338,11 @@ translate_paths(State, Tests) -> translate_paths(State, Tests, []).
 
 translate_paths(_State, [], Acc) -> lists:reverse(Acc);
 translate_paths(State, [{dir, Dir}|Rest], Acc) ->
-    Apps = project_apps(State),
+    Apps = rebar_state:project_apps(State),
     translate_paths(State, Rest, [translate(State, Apps, Dir)|Acc]);
 translate_paths(State, [{file, File}|Rest], Acc) ->
     Dir = filename:dirname(File),
-    Apps = project_apps(State),
+    Apps = rebar_state:project_apps(State),
     translate_paths(State, Rest, [translate(State, Apps, Dir)|Acc]);
 translate_paths(State, [Test|Rest], Acc) ->
     translate_paths(State, Rest, [Test|Acc]).
