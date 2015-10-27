@@ -132,9 +132,9 @@ build_basic_app(Config) ->
 
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
 
-    %% check that `extra.erl` was compiled to the `ebin` dir
-    Ebin = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
-    true = filelib:is_file(filename:join([Ebin, "extra.beam"])),
+    %% check that `extra.erl` was compiled to the `extra` dir
+    ExtraOut = filename:join([AppDir, "_build", "default", "lib", Name, "extra"]),
+    true = filelib:is_file(filename:join([ExtraOut, "extra.beam"])),
 
     %% check that `extra.erl` is not in the `modules` key of the app
     {ok, App} = file:consult(filename:join([AppDir,
@@ -176,11 +176,11 @@ build_multi_apps(Config) ->
     ),
 
     %% check that `extraX.erl` was compiled to the `ebin` dir
-    Ebin1 = filename:join([AppDir, "_build", "default", "lib", Name1, "ebin"]),
-    true = filelib:is_file(filename:join([Ebin1, "extra1.beam"])),
+    ExtraOut1 = filename:join([AppDir, "_build", "default", "lib", Name1, "extra"]),
+    true = filelib:is_file(filename:join([ExtraOut1, "extra1.beam"])),
 
-    Ebin2 = filename:join([AppDir, "_build", "default", "lib", Name2, "ebin"]),
-    true = filelib:is_file(filename:join([Ebin2, "extra2.beam"])),
+    ExtraOut2 = filename:join([AppDir, "_build", "default", "lib", Name2, "extra"]),
+    true = filelib:is_file(filename:join([ExtraOut2, "extra2.beam"])),
 
     %% check that `extraX.erl` is not in the `modules` key of the app
     {ok, App1} = file:consult(filename:join([AppDir,
@@ -221,10 +221,9 @@ src_dir_takes_precedence_over_extra(Config) ->
 
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
 
-    %% check that `extra.erl` was compiled to the `ebin` dir
-    %% check that `extraX.erl` was compiled to the `ebin` dir
-    Ebin = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
-    true = filelib:is_file(filename:join([Ebin, "extra.beam"])),
+    %% check that `extra.erl` was compiled to the `extra` dir
+    ExtraOut = filename:join([AppDir, "_build", "default", "lib", Name, "extra"]),
+    true = filelib:is_file(filename:join([ExtraOut, "extra.beam"])),
 
     %% check that `extra.erl` is in the `modules` key of the app
     {ok, App} = file:consult(filename:join([AppDir,

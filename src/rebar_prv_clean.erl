@@ -49,6 +49,7 @@ do(State) ->
     Cwd = rebar_dir:get_cwd(),
     rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
     clean_apps(State, Providers, ProjectApps),
+    clean_extras(State),
     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State),
 
     {ok, State}.
@@ -66,9 +67,13 @@ clean_apps(State, Providers, Apps) ->
          ?INFO("Cleaning out ~s...", [rebar_app_info:name(AppInfo)]),
          AppDir = rebar_app_info:dir(AppInfo),
          AppInfo1 = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER, Providers, AppInfo, State),
-         rebar_erlc_compiler:clean(rebar_app_info:out_dir(AppInfo1)),
+         rebar_erlc_compiler:clean(AppInfo1),
          rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo1, State)
      end || AppInfo <- Apps].
+
+clean_extras(State) ->
+    BaseDir = rebar_dir:base_dir(State),
+    rebar_file_utils:rm_rf(filename:join([BaseDir, "extras"])).
 
 handle_args(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),

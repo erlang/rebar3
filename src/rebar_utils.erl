@@ -65,7 +65,8 @@
          escape_double_quotes_weak/1,
          check_min_otp_version/1,
          check_blacklisted_otp_versions/1,
-         info_useless/2]).
+         info_useless/2,
+         list_dir/1]).
 
 %% for internal use only
 -export([otp_release/0]).
@@ -774,3 +775,9 @@ info_useless(Old, New) ->
      || Name <- Old,
         not lists:member(Name, New)],
     ok.
+
+-ifdef(no_list_dir_all).
+list_dir(Dir) -> file:list_dir(Dir).
+-else.
+list_dir(Dir) -> file:list_dir_all(Dir).
+-endif.

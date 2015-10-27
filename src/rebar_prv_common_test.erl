@@ -285,26 +285,7 @@ find_suite_dirs(Suites) ->
 
 copy(State, Dir) ->
     From = reduce_path(Dir),
-    case From == rebar_state:dir(State) of
-        true  -> throw({error, suite_at_project_root});
-        false -> ok
-    end,
-    case retarget_path(State, From) of
-        %% directory lies outside of our project's file structure so
-        %%  don't copy it
-        From   -> From;
-        Target ->
-            %% recursively delete any symlinks in the target directory
-            %%  if it exists so we don't smash files in the linked dirs
-            case ec_file:is_dir(Target) of
-                true  -> remove_links(Target);
-                false -> ok
-            end,
-            case rebar_file_utils:symlink_or_copy(From, Target) of
-               exists -> Target;
-               ok     -> Target
-            end
-    end.
+    retarget_path(State, From).
 
 compile_dir(State, Dir) ->
     NewState = replace_src_dirs(State, [filename:absname(Dir)]),
@@ -349,29 +330,6 @@ reduce_path(Acc, ["."|Rest])       -> reduce_path(Acc, Rest);
 reduce_path([_|Acc], [".."|Rest])  -> reduce_path(Acc, Rest);
 reduce_path([], [".."|Rest])       -> reduce_path([], Rest);
 reduce_path(Acc, [Component|Rest]) -> reduce_path([Component|Acc], Rest).
-
-
-remove_links(Path) ->
-    IsDir = ec_file:is_dir(Path),
-    case ec_file:is_symlink(Path) of
-        true when IsDir ->
-            delete_dir_link(Path);
-        false when IsDir ->
-                lists:foreach(fun(ChildPath) ->
-                                      remove_links(ChildPath)
-                              end, dir_entries(Path));
-        _ -> file:delete(Path)
-    end.
-
-delete_dir_link(Path) ->
-    case os:type() of
-        {unix, _} -> file:delete(Path);
-        {win32, _} -> file:del_dir(Path)
-    end.
-
-dir_entries(Path) ->
-    {ok, SubDirs} = file:list_dir(Path),
-    [filename:join(Path, SubDir) || SubDir <- SubDirs].
 
 replace_src_dirs(State, Dirs) ->
     %% replace any `src_dirs` with the test dirs

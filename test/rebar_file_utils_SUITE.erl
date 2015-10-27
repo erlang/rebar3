@@ -64,7 +64,7 @@ reset_nonexistent_dir(Config) ->
     ?assertNot(filelib:is_dir(TmpDir)),
     ok = rebar_file_utils:reset_dir(TmpDir),
     ?assert(filelib:is_dir(TmpDir)),
-    {ok, []} = file:list_dir(TmpDir).
+    {ok, []} = rebar_utils:list_dir(TmpDir).
 
 reset_empty_dir(Config) ->
     TmpDir = ?config(tmpdir, Config),
@@ -73,7 +73,7 @@ reset_empty_dir(Config) ->
     ?assert(filelib:is_dir(TmpDir)),
     ok = rebar_file_utils:reset_dir(TmpDir),
     ?assert(filelib:is_dir(TmpDir)),
-    {ok, []} = file:list_dir(TmpDir).
+    {ok, []} = rebar_utils:list_dir(TmpDir).
 
 reset_dir(Config) ->
     TmpDir = ?config(tmpdir, Config),
@@ -86,7 +86,7 @@ reset_dir(Config) ->
                   ["a", "b", "c"]),
     ok = rebar_file_utils:reset_dir(TmpDir),
     ?assert(filelib:is_dir(TmpDir)),
-    {ok, []} = file:list_dir(TmpDir).
+    {ok, []} = rebar_utils:list_dir(TmpDir).
 
 path_from_ancestor(_Config) ->
     ?assertEqual({ok, "foo/bar/baz"}, rebar_file_utils:path_from_ancestor("/foo/bar/baz", "/")),

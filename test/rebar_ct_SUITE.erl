@@ -204,6 +204,7 @@ multi_app_default_beams(Config) ->
     File3 = filename:join([AppDir,
                            "_build",
                            "test",
+                           "extras",
                            "test",
                            "extras_SUITE.beam"]),
 

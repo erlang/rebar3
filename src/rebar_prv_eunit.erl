@@ -9,7 +9,7 @@
          do/1,
          format_error/1]).
 %% exported solely for tests
--export([compile/1, prepare_tests/1, eunit_opts/1]).
+-export([compile/2, prepare_tests/1, eunit_opts/1]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
@@ -39,14 +39,15 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    case compile(State) of
+    Tests = prepare_tests(State),
+    case compile(State, Tests) of
         %% successfully compiled apps
-        {ok, S} -> do_tests(S);
+        {ok, S} -> do(S, Tests);
         %% this should look like a compiler error, not an eunit error
         Error   -> Error
     end.
 
-do_tests(State) ->
+do(State, Tests) ->
     ?INFO("Performing EUnit tests...", []),
 
     rebar_utils:update_code(rebar_state:code_paths(State, all_deps)),
@@ -56,9 +57,9 @@ do_tests(State) ->
     Cwd = rebar_dir:get_cwd(),
     rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
-    case prepare_tests(State) of
-        {ok, Tests} ->
-            case do_tests(State, Tests) of
+    case Tests of
+        {ok, T} ->
+            case run_tests(State, T) of
                 {ok, State1} ->
                     %% Run eunit provider posthooks
                     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State1),
@@ -73,11 +74,12 @@ do_tests(State) ->
             Error
     end.
 
-do_tests(State, Tests) ->
+run_tests(State, Tests) ->
+    T = translate_paths(State, Tests),
     EUnitOpts = resolve_eunit_opts(State),
-    ?DEBUG("eunit_tests ~p", [Tests]),
+    ?DEBUG("eunit_tests ~p", [T]),
     ?DEBUG("eunit_opts  ~p", [EUnitOpts]),
-    Result = eunit:test(Tests, EUnitOpts),
+    Result = eunit:test(T, EUnitOpts),
     ok = maybe_write_coverdata(State),
     case handle_results(Result) of
         {error, Reason} ->
@@ -114,38 +116,80 @@ safe_define_test_macro(Opts) ->
        false -> [{d, 'TEST'}] ++ Opts
     end.
 
-compile(State) ->
-    %% inject `eunit_first_files` and `eunit_compile_opts` into the applications to be compiled
-    NewState = inject_eunit_state(State),
+compile(State, {ok, Tests}) ->
+    %% inject `eunit_first_files`, `eunit_compile_opts` and any
+    %% directories required by tests into the applications
+    NewState = inject_eunit_state(State, Tests),
 
     case rebar_prv_compile:do(NewState) of
         %% successfully compiled apps
         {ok, S} ->
             ok = maybe_cover_compile(S),
-            ok = maybe_compile_bare_testdir(S),
             {ok, S};
         %% this should look like a compiler error, not an eunit error
         Error   -> Error
-    end.
+    end;
+%% maybe compile even in the face of errors?
+compile(_State, Error) -> Error.
 
-inject_eunit_state(State) ->
-    Apps = project_apps(State),
-    ModdedApps = lists:map(fun(App) -> inject(State, App) end, Apps),
-    rebar_state:project_apps(State, ModdedApps).
+inject_eunit_state(State, Tests) ->
+    Apps = rebar_state:project_apps(State),
+    ModdedApps = lists:map(fun(App) ->
+        NewOpts = inject(rebar_app_info:opts(App), State),
+        rebar_app_info:opts(App, NewOpts)
+    end, Apps),
+    NewOpts = inject(rebar_state:opts(State), State),
+    NewState = rebar_state:opts(State, NewOpts),
+    test_dirs(NewState, ModdedApps, Tests).
 
-inject(State, App) ->
+inject(Opts, State) ->
     %% append `eunit_compile_opts` to app defined `erl_opts`
-    ErlOpts = rebar_app_info:get(App, erl_opts, []),
+    ErlOpts = rebar_opts:get(Opts, erl_opts, []),
     EUnitOpts = rebar_state:get(State, eunit_compile_opts, []),
-    NewOpts = EUnitOpts ++ ErlOpts,
+    NewErlOpts = EUnitOpts ++ ErlOpts,
     %% append `eunit_first_files` to app defined `erl_first_files`
-    FirstFiles = rebar_app_info:get(App, erl_first_files, []),
+    FirstFiles = rebar_opts:get(Opts, erl_first_files, []),
     EUnitFirstFiles = rebar_state:get(State, eunit_first_files, []),
     NewFirstFiles = EUnitFirstFiles ++ FirstFiles,
-    %% insert the new keys into the app
-    lists:foldl(fun({K, V}, NewApp) -> rebar_app_info:set(NewApp, K, V) end,
-                App,
-                [{erl_opts, NewOpts}, {erl_first_files, NewFirstFiles}]).
+    %% insert the new keys into the opts
+    lists:foldl(fun({K, V}, NewOpts) -> rebar_opts:set(NewOpts, K, V) end,
+                Opts,
+                [{erl_opts, NewErlOpts}, {erl_first_files, NewFirstFiles}]).
+
+test_dirs(State, Apps, []) -> rebar_state:project_apps(State, Apps);
+test_dirs(State, Apps, [{dir, Dir}|Rest]) ->
+    %% insert `Dir` into an app if relative, or the base state if not
+    %% app relative but relative to the root or not at all if outside
+    %% project scope
+    {NewState, NewApps} = maybe_inject_test_dir(State, [], Apps, Dir),
+    test_dirs(NewState, NewApps, Rest);
+test_dirs(State, Apps, [{file, File}|Rest]) ->
+    Dir = filename:dirname(File),
+    {NewState, NewApps} = maybe_inject_test_dir(State, [], Apps, Dir),
+    test_dirs(NewState, NewApps, Rest);
+test_dirs(State, Apps, [_|Rest]) -> test_dirs(State, Apps, Rest).
+
+maybe_inject_test_dir(State, AppAcc, [App|Rest], Dir) ->
+    case rebar_file_utils:path_from_ancestor(Dir, rebar_app_info:dir(App)) of
+        {ok, Path} ->
+            Opts = inject_test_dir(rebar_app_info:opts(App), Path),
+            {State, AppAcc ++ [rebar_app_info:opts(App, Opts)] ++ Rest};
+        {error, badparent} ->
+            maybe_inject_test_dir(State, AppAcc ++ [App], Rest, Dir)
+    end;
+maybe_inject_test_dir(State, AppAcc, [], Dir) ->
+    case rebar_file_utils:path_from_ancestor(Dir, rebar_state:dir(State)) of
+        {ok, Path} ->
+            Opts = inject_test_dir(rebar_state:opts(State), Path),
+            {rebar_state:opts(State, Opts), AppAcc};
+        {error, badparent} ->
+            {State, AppAcc}
+    end.
+
+inject_test_dir(Opts, Dir) ->
+    %% append specified test targets to app defined `extra_src_dirs`
+    ExtraSrcDirs = rebar_opts:get(Opts, extra_src_dirs, []),
+    rebar_opts:set(Opts, extra_src_dirs, ExtraSrcDirs ++ [Dir]).
 
 test_defined([{d, 'TEST'}|_]) -> true;
 test_defined([{d, 'TEST', true}|_]) -> true;
@@ -156,7 +200,7 @@ prepare_tests(State) ->
     %% parse and translate command line tests
     CmdTests = resolve_tests(State),
     CfgTests = rebar_state:get(State, eunit_tests, []),
-    ProjectApps = project_apps(State),
+    ProjectApps = rebar_state:project_apps(State),
     %% prioritize tests to run first trying any command line specified
     %% tests falling back to tests specified in the config file finally
     %% running a default set if no other tests are present
@@ -187,18 +231,6 @@ resolve(Flag, EUnitKey, RawOpts) ->
 normalize(Key, Value) when Key == dir; Key == file -> {Key, Value};
 normalize(Key, Value) -> {Key, list_to_atom(Value)}.
 
-project_apps(State) ->
-    filter_checkouts(rebar_state:project_apps(State)).
-
-filter_checkouts(Apps) -> filter_checkouts(Apps, []).
-
-filter_checkouts([], Acc) -> lists:reverse(Acc);
-filter_checkouts([App|Rest], Acc) ->
-    case rebar_app_info:is_checkout(App) of
-        true  -> filter_checkouts(Rest, Acc);
-        false -> filter_checkouts(Rest, [App|Acc])
-    end.
-
 select_tests(State, ProjectApps, [], []) -> default_tests(State, ProjectApps);
 select_tests(_State, _ProjectApps, [], Tests)  -> Tests;
 select_tests(_State, _ProjectApps, Tests, _) -> Tests.
@@ -212,7 +244,7 @@ default_tests(State, Apps) ->
         %%  included or `test` does not exist
         false -> lists:reverse(Tests);
         %% need to add `test` dir at root to dirs to be included
-        true  -> lists:reverse([{dir, filename:join([rebar_dir:base_dir(State), "test"])}|Tests])
+        true  -> lists:reverse([{dir, BareTest}|Tests])
     end.
 
 set_apps([], Acc) -> Acc;
@@ -268,14 +300,14 @@ validate_app(State, [App|Rest], AppName) ->
         false -> validate_app(State, Rest, AppName)
     end.
 
-validate_dir(_State, Dir) ->
-    case ec_file:is_dir(Dir) of
+validate_dir(State, Dir) ->
+    case ec_file:is_dir(filename:join([rebar_state:dir(State), Dir])) of
         true  -> ok;
         false -> {error, lists:concat(["Directory `", Dir, "' not found."])}
     end.
 
-validate_file(_State, File) ->
-    case ec_file:exists(File) of
+validate_file(State, File) ->
+    case ec_file:exists(filename:join([rebar_state:dir(State), File])) of
         true  -> ok;
         false -> {error, lists:concat(["File `", File, "' not found."])}
     end.
@@ -302,6 +334,31 @@ set_verbose(Opts) ->
         false -> [verbose] ++ Opts
     end.
 
+translate_paths(State, Tests) -> translate_paths(State, Tests, []).
+
+translate_paths(_State, [], Acc) -> lists:reverse(Acc);
+translate_paths(State, [{dir, Dir}|Rest], Acc) ->
+    Apps = rebar_state:project_apps(State),
+    translate_paths(State, Rest, [translate(State, Apps, Dir)|Acc]);
+translate_paths(State, [{file, File}|Rest], Acc) ->
+    Dir = filename:dirname(File),
+    Apps = rebar_state:project_apps(State),
+    translate_paths(State, Rest, [translate(State, Apps, Dir)|Acc]);
+translate_paths(State, [Test|Rest], Acc) ->
+    translate_paths(State, Rest, [Test|Acc]).
+
+translate(State, [App|Rest], Dir) ->
+    case rebar_file_utils:path_from_ancestor(Dir, rebar_app_info:dir(App)) of
+        {ok, Path}         -> {dir, filename:join([rebar_app_info:out_dir(App), Path])};
+        {error, badparent} -> translate(State, Rest, Dir)
+    end;
+translate(State, [], Dir) ->
+    case rebar_file_utils:path_from_ancestor(Dir, rebar_state:dir(State)) of
+        {ok, Path}         -> {dir, filename:join([rebar_dir:base_dir(State), "extras", Path])};
+        %% not relative, leave as is
+        {error, badparent} -> {dir, Dir}
+    end.
+
 maybe_cover_compile(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     State1 = case proplists:get_value(cover, RawOpts, false) of
@@ -310,14 +367,6 @@ maybe_cover_compile(State) ->
     end,
     rebar_prv_cover:maybe_cover_compile(State1).
 
-maybe_cover_compile(State, Dir) ->
-    {RawOpts, _} = rebar_state:command_parsed_args(State),
-    State1 = case proplists:get_value(cover, RawOpts, false) of
-        true  -> rebar_state:set(State, cover_enabled, true);
-        false -> State
-    end,
-    rebar_prv_cover:maybe_cover_compile(State1, [Dir]).
-
 maybe_write_coverdata(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     State1 = case proplists:get_value(cover, RawOpts, false) of
@@ -325,30 +374,6 @@ maybe_write_coverdata(State) ->
         false -> State
     end,
     rebar_prv_cover:maybe_write_coverdata(State1, ?PROVIDER).
-
-maybe_compile_bare_testdir(State) ->
-    Apps = project_apps(State),
-    BareTest = filename:join([rebar_state:dir(State), "test"]),
-    F = fun(App) -> rebar_app_info:dir(App) == rebar_state:dir(State) end,
-    case ec_file:is_dir(BareTest) andalso not lists:any(F, Apps) of
-        true ->
-            ErlOpts = rebar_state:get(State, erl_opts, []),
-            EUnitOpts = rebar_state:get(State, eunit_compile_opts, []),
-            NewErlOpts = safe_define_test_macro(EUnitOpts ++ ErlOpts),
-            %% append `eunit_first_files` to app defined `erl_first_files`
-            FirstFiles = rebar_state:get(State, erl_first_files, []),
-            EUnitFirstFiles = rebar_state:get(State, eunit_first_files, []),
-            NewFirstFiles = EUnitFirstFiles ++ FirstFiles,
-            Opts = rebar_state:opts(State),
-            NewOpts = lists:foldl(fun({K, V}, Dict) -> rebar_opts:set(Dict, K, V) end,
-                                  Opts,
-                                  [{erl_opts, NewErlOpts}, {erl_first_files, NewFirstFiles}, {src_dirs, ["test"]}]),
-            OutDir = filename:join([rebar_dir:base_dir(State), "test"]),
-            filelib:ensure_dir(filename:join([OutDir, "dummy.beam"])),
-            rebar_erlc_compiler:compile(NewOpts, rebar_state:dir(State), OutDir),
-            maybe_cover_compile(State, [OutDir]);
-        false -> ok
-    end.
 
 handle_results(ok) -> ok;
 handle_results(error) ->
