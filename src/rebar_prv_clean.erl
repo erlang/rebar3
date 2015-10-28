@@ -33,23 +33,23 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     Providers = rebar_state:providers(State),
-    ProjectApps = rebar_state:project_apps(State),
     {all, All} = handle_args(State),
+
+    Cwd = rebar_dir:get_cwd(),
+    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
     case All of
         true ->
             DepsDir = rebar_dir:deps_dir(State),
-            DepApps = rebar_app_discover:find_apps([filename:join(DepsDir, "*")], all);
+            AllApps = rebar_app_discover:find_apps([filename:join(DepsDir, "*")], all),
+            clean_apps(State, Providers, AllApps);
         false ->
-            DepApps = []
+            ProjectApps = rebar_state:project_apps(State),
+            clean_apps(State, Providers, ProjectApps)
     end,
 
-    clean_apps(State, Providers, DepApps),
-
-    Cwd = rebar_dir:get_cwd(),
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
-    clean_apps(State, Providers, ProjectApps),
     clean_extras(State),
+
     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State),
 
     {ok, State}.
