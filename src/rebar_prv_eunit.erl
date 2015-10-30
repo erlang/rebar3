@@ -9,7 +9,7 @@
          do/1,
          format_error/1]).
 %% exported solely for tests
--export([compile/2, prepare_tests/1, eunit_opts/1]).
+-export([compile/2, prepare_tests/1, eunit_opts/1, validate_tests/2]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
@@ -57,7 +57,7 @@ do(State, Tests) ->
     Cwd = rebar_dir:get_cwd(),
     rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
-    case Tests of
+    case validate_tests(State, Tests) of
         {ok, T} ->
             case run_tests(State, T) of
                 {ok, State1} ->
@@ -204,11 +204,7 @@ prepare_tests(State) ->
     %% prioritize tests to run first trying any command line specified
     %% tests falling back to tests specified in the config file finally
     %% running a default set if no other tests are present
-    Tests = select_tests(State, ProjectApps, CmdTests, CfgTests),
-    %% check applications for existence in project, modules for existence
-    %% in applications, files and dirs for existence on disk and allow
-    %% any unrecognized tests through for eunit to handle
-    validate_tests(State, ProjectApps, Tests).
+    select_tests(State, ProjectApps, CmdTests, CfgTests).
 
 resolve_tests(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
@@ -231,9 +227,9 @@ resolve(Flag, EUnitKey, RawOpts) ->
 normalize(Key, Value) when Key == dir; Key == file -> {Key, Value};
 normalize(Key, Value) -> {Key, list_to_atom(Value)}.
 
-select_tests(State, ProjectApps, [], []) -> default_tests(State, ProjectApps);
-select_tests(_State, _ProjectApps, [], Tests)  -> Tests;
-select_tests(_State, _ProjectApps, Tests, _) -> Tests.
+select_tests(State, ProjectApps, [], []) -> {ok, default_tests(State, ProjectApps)};
+select_tests(_State, _ProjectApps, [], Tests)  -> {ok, Tests};
+select_tests(_State, _ProjectApps, Tests, _) -> {ok, Tests}.
 
 default_tests(State, Apps) ->
     Tests = set_apps(Apps, []),
@@ -252,8 +248,9 @@ set_apps([App|Rest], Acc) ->
     AppName = list_to_atom(binary_to_list(rebar_app_info:name(App))),
     set_apps(Rest, [{application, AppName}|Acc]).
 
-validate_tests(State, ProjectApps, Tests) ->
-    gather_tests(fun(Elem) -> validate(State, ProjectApps, Elem) end, Tests, []).
+validate_tests(State, {ok, Tests}) ->
+    gather_tests(fun(Elem) -> validate(State, Elem) end, Tests, []);
+validate_tests(_State, Error) -> Error.
 
 gather_tests(_F, [], Acc) -> {ok, lists:reverse(Acc)};
 gather_tests(F, [Test|Rest], Acc) ->
@@ -270,27 +267,31 @@ gather_errors(F, [Test|Rest], Acc) ->
         {error, Error} -> gather_errors(F, Rest, [Error|Acc])
     end.
 
-validate(State, ProjectApps, {application, App}) ->
-    validate_app(State, ProjectApps, App);
-validate(State, _ProjectApps, {dir, Dir}) ->
+validate(State, {application, App}) ->
+    validate_app(State, App);
+validate(State, {dir, Dir}) ->
     validate_dir(State, Dir);
-validate(State, _ProjectApps, {file, File}) ->
+validate(State, {file, File}) ->
     validate_file(State, File);
-validate(State, _ProjectApps, {module, Module}) ->
+validate(State, {module, Module}) ->
     validate_module(State, Module);
-validate(State, _ProjectApps, {suite, Module}) ->
+validate(State, {suite, Module}) ->
     validate_module(State, Module);
-validate(State, _ProjectApps, Module) when is_atom(Module) ->
+validate(State, Module) when is_atom(Module) ->
     validate_module(State, Module);
-validate(State, ProjectApps, Path) when is_list(Path) ->
+validate(State, Path) when is_list(Path) ->
     case ec_file:is_dir(Path) of
-        true  -> validate(State, ProjectApps, {dir, Path});
-        false -> validate(State, ProjectApps, {file, Path})
+        true  -> validate(State, {dir, Path});
+        false -> validate(State, {file, Path})
     end;
 %% unrecognized tests should be included. if they're invalid eunit will error
 %% and rebar.config may contain arbitrarily complex tests that are effectively
 %% unvalidatable
-validate(_State, _ProjectApps, _Test) -> ok.
+validate(_State, _Test) -> ok.
+
+validate_app(State, AppName) ->
+    ProjectApps = rebar_state:project_apps(State),
+    validate_app(State, ProjectApps, AppName).
 
 validate_app(_State, [], AppName) ->
     {error, lists:concat(["Application `", AppName, "' not found in project."])};
