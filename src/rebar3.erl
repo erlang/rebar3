@@ -96,7 +96,7 @@ run(RawArgs) ->
     run_aux(BaseState2, RawArgs).
 
 run_aux(State, RawArgs) ->
-    State2 = case os:getenv("REBAR_PROFILE") of
+    State1 = case os:getenv("REBAR_PROFILE") of
                  false ->
                      State;
                  "" ->
@@ -104,6 +104,9 @@ run_aux(State, RawArgs) ->
                  Profile ->
                      rebar_state:apply_profiles(State, [list_to_atom(Profile)])
              end,
+
+    %% bootstrap test profile
+    State2 = rebar_state:add_to_profile(State1, test, test_state(State1)),
 
     %% Process each command, resetting any state between each one
     BaseDir = rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR),
@@ -319,3 +322,21 @@ state_from_global_config(Config, GlobalConfigFile) ->
     GlobalConfig2 = rebar_state:set(GlobalConfig, plugins, []),
     GlobalConfig3 = rebar_state:set(GlobalConfig2, {plugins, global}, rebar_state:get(GlobalConfigThrowAway, plugins, [])),
     rebar_state:providers(rebar_state:new(GlobalConfig3, Config), GlobalPlugins).
+
+test_state(State) ->
+    ErlOpts = rebar_state:get(State, erl_opts, []),
+    TestOpts = safe_define_test_macro(ErlOpts),
+    [{extra_src_dirs, ["test"]}, {erl_opts, TestOpts}].
+
+safe_define_test_macro(Opts) ->
+    %% defining a compile macro twice results in an exception so
+    %% make sure 'TEST' is only defined once
+    case test_defined(Opts) of
+       true  -> [];
+       false -> [{d, 'TEST'}]
+    end.
+
+test_defined([{d, 'TEST'}|_]) -> true;
+test_defined([{d, 'TEST', true}|_]) -> true;
+test_defined([_|Rest]) -> test_defined(Rest);
+test_defined([]) -> false.

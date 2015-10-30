@@ -34,8 +34,7 @@ init(State) ->
                                  {opts, eunit_opts(State)},
                                  {profiles, [test]}]),
     State1 = rebar_state:add_provider(State, Provider),
-    State2 = rebar_state:add_to_profile(State1, test, test_state(State1)),
-    {ok, State2}.
+    {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
@@ -102,19 +101,6 @@ format_error({error, Error}) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
-
-test_state(State) ->
-    ErlOpts = rebar_state:get(State, erl_opts, []),
-    TestOpts = safe_define_test_macro(ErlOpts),
-    [{extra_src_dirs, ["test"]}, {erl_opts, TestOpts}].
-
-safe_define_test_macro(Opts) ->
-    %% defining a compile macro twice results in an exception so
-    %% make sure 'TEST' is only defined once
-    case test_defined(Opts) of
-       true -> Opts;
-       false -> [{d, 'TEST'}] ++ Opts
-    end.
 
 compile(State, {ok, Tests}) ->
     %% inject `eunit_first_files`, `eunit_compile_opts` and any
@@ -190,11 +176,6 @@ inject_test_dir(Opts, Dir) ->
     %% append specified test targets to app defined `extra_src_dirs`
     ExtraSrcDirs = rebar_opts:get(Opts, extra_src_dirs, []),
     rebar_opts:set(Opts, extra_src_dirs, ExtraSrcDirs ++ [Dir]).
-
-test_defined([{d, 'TEST'}|_]) -> true;
-test_defined([{d, 'TEST', true}|_]) -> true;
-test_defined([_|Rest]) -> test_defined(Rest);
-test_defined([]) -> false.
 
 prepare_tests(State) ->
     %% parse and translate command line tests
