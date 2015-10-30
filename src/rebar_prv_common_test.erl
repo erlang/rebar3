@@ -74,14 +74,12 @@ do(State, Tests) ->
 run_tests(State, Opts) ->
     T = translate_paths(State, Opts),
     Opts1 = setup_logdir(State, T),
-    %% strip test spec if present
-    Opts2 = strip_test_spec(Opts1),
-    ?DEBUG("ct_opts ~p", [Opts2]),
+    ?DEBUG("ct_opts ~p", [Opts1]),
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     ok = maybe_write_coverdata(State),
     case proplists:get_value(verbose, RawOpts, false) of
-        true  -> run_test_verbose(Opts2);
-        false -> run_test_quiet(Opts2)
+        true  -> run_test_verbose(Opts1);
+        false -> run_test_quiet(Opts1)
     end.
 
 -spec format_error(any()) -> iolist().
@@ -101,16 +99,16 @@ format_error({multiple_errors, Errors}) ->
 
 prepare_tests(State) ->
     %% command line test options
-    CmdOpts = opts(State),
+    CmdOpts = cmdopts(State),
     %% rebar.config test options
-    CfgOpts = rebar_state:get(State, ct_tests, []),
+    CfgOpts = cfgopts(State),
     ProjectApps = rebar_state:project_apps(State),
     %% prioritize tests to run first trying any command line specified
     %% tests falling back to tests specified in the config file finally
     %% running a default set if no other tests are present
     select_tests(State, ProjectApps, CmdOpts, CfgOpts).
 
-opts(State) ->
+cmdopts(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     %% filter out opts common_test doesn't know about and convert
     %% to ct acceptable forms
@@ -147,6 +145,23 @@ transform_opts([Opt|Rest], Acc) ->
 
 split_string(String) ->
     string:tokens(String, [$,]).
+
+cfgopts(State) ->
+    Opts = rebar_state:get(State, ct_tests, []),
+    rebar_utils:filtermap(fun filter_opts/1, Opts).
+
+filter_opts({test_spec, _}) ->
+    ?WARN("Test specs not supported", []),
+    false;
+filter_opts({suite, Suite}) when is_integer(hd(Suite)) -> true;
+filter_opts({suite, Suite}) when is_atom(Suite) ->
+    {true, {suite, atom_to_list(Suite)}};
+filter_opts({suite, Suites}) ->
+    {true, {suite, lists:map(fun(S) when is_atom(S) -> atom_to_list(S);
+                                (S) when is_list(S) -> S
+                             end,
+                             Suites)}};
+filter_opts(_) -> true.
 
 select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
     Merged = lists:ukeymerge(1,
@@ -240,10 +255,15 @@ test_dirs(State, Apps, Opts) ->
     case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
         {Suites, undefined} -> set_compile_dirs(State, Apps, {suite, Suites});
         {undefined, Dirs}   -> set_compile_dirs(State, Apps, {dir, Dirs});
-        {Suites, [Dir]}     -> set_compile_dirs(State, Apps, join(Suites, Dir));
+        {Suites, Dir} when is_integer(hd(Dir)) ->
+            set_compile_dirs(State, Apps, join(Suites, Dir));
+        {Suites, [Dir]} when is_integer(hd(Dir)) ->
+            set_compile_dirs(State, Apps, join(Suites, Dir));          
         {_Suites, _Dirs}    -> {error, "Only a single directory may be specified when specifying suites"}
     end.
 
+join(Suite, Dir) when is_integer(hd(Suite)) ->
+    {suite, [filename:join([Dir, Suite])]};
 join(Suites, Dir) ->
     {suite, lists:map(fun(S) -> filename:join([Dir, S]) end, Suites)}.
 
@@ -349,14 +369,6 @@ setup_logdir(State, Opts) ->
     end,
     filelib:ensure_dir(filename:join([Logdir, "dummy.beam"])),
     [{logdir, Logdir}|lists:keydelete(logdir, 1, Opts)].
-
-strip_test_spec(Opts) ->
-    case proplists:get_value(test_spec, Opts) of
-        undefined -> Opts;
-        _         ->
-            ?WARN("Test specs not supported", []),
-            lists:keydelete(test_spec, 1, Opts)
-    end.
 
 run_test_verbose(Opts) -> handle_results(ct:run_test(Opts)).
 
