@@ -139,7 +139,7 @@ src_dirs(Opts, Default) ->
     Vs = proplists:get_all_values(src_dirs, ErlOpts),
     case lists:append([rebar_opts:get(Opts, src_dirs, []) | Vs]) of
         []   -> Default;
-        Dirs -> Dirs
+        Dirs -> lists:usort(Dirs)
     end.
 
 -spec extra_src_dirs(rebar_dict()) -> list(file:filename_all()).
@@ -151,7 +151,7 @@ extra_src_dirs(Opts, Default) ->
     Vs = proplists:get_all_values(extra_src_dirs, ErlOpts),
     case lists:append([rebar_opts:get(Opts, extra_src_dirs, []) | Vs]) of
         []   -> Default;
-        Dirs -> Dirs
+        Dirs -> lists:usort(Dirs)
     end.
 
 -spec all_src_dirs(rebar_dict()) -> list(file:filename_all()).
@@ -160,7 +160,7 @@ all_src_dirs(Opts) -> all_src_dirs(Opts, [], []).
 -spec all_src_dirs(rebar_dict(), list(file:filename_all()), list(file:filename_all())) ->
     list(file:filename_all()).
 all_src_dirs(Opts, SrcDefault, ExtraDefault) ->
-    src_dirs(Opts, SrcDefault) ++ extra_src_dirs(Opts, ExtraDefault).
+    lists:usort(src_dirs(Opts, SrcDefault) ++ extra_src_dirs(Opts, ExtraDefault)).
 
 %% given a path if that path is an ancestor of an app dir return the path relative to that
 %% apps outdir. if the path is not an ancestor to any app dirs but is an ancestor of the
