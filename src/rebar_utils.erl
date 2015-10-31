@@ -654,13 +654,19 @@ update_code(Paths) ->
                                   code:add_patha(Path),
                                   ok;
                               {ok, Modules} ->
+                                  %% stick rebar ebin dir before purging to prevent
+                                  %% inadvertent termination
+                                  RebarBin = code:lib_dir(rebar, ebin),
+                                  ok = code:stick_dir(RebarBin),
                                   %% replace_path causes problems when running
                                   %% tests in projects like erlware_commons that rebar3
                                   %% also includes
                                   %code:replace_path(App, Path),
                                   code:del_path(App),
                                   code:add_patha(Path),
-                                  [begin code:purge(M), code:delete(M) end || M <- Modules]
+                                  [begin code:purge(M), code:delete(M) end || M <- Modules],
+                                  %% unstick rebar dir
+                                  ok = code:unstick_dir(RebarBin)
                           end
                   end, Paths).
 
