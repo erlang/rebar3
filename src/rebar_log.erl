@@ -49,12 +49,15 @@ init(Caller, Verbosity) ->
                 ?INFO_LEVEL  -> info;
                 ?DEBUG_LEVEL -> debug
             end,
-    Log = ec_cmd_log:new(Level, Caller),
+    Log = ec_cmd_log:new(Level, Caller, low),
     application:set_env(rebar, log, Log).
 
 set_level(Level) ->
     ok = application:set_env(rebar, log_level, Level).
 
+log(Level = error, Str, Args) ->
+    {ok, LogState} = application:get_env(rebar, log),
+    ec_cmd_log:Level(LogState, cf:format("~!^~s~n", [Str]), Args);
 log(Level, Str, Args) ->
     {ok, LogState} = application:get_env(rebar, log),
     ec_cmd_log:Level(LogState, Str++"~n", Args).
