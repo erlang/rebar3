@@ -268,7 +268,7 @@ missing_application_arg(Config) ->
     State = rebar_state:command_parsed_args(S, Args),
 
     Error = {error, {rebar_prv_eunit, {eunit_test_errors, ["Application `missing_app' not found in project."]}}},
-    Error = rebar_prv_eunit:prepare_tests(State).
+    Error = rebar_prv_eunit:validate_tests(State, rebar_prv_eunit:prepare_tests(State)).
 
 %% check that the --module cmd line opt generates the correct test set
 single_module_arg(Config) ->
@@ -311,8 +311,11 @@ missing_module_arg(Config) ->
     {ok, Args} = getopt:parse(rebar_prv_eunit:eunit_opts(S), ["--module=missing_app"]),
     State = rebar_state:command_parsed_args(S, Args),
 
+    T = rebar_prv_eunit:prepare_tests(State),
+    Tests = rebar_prv_eunit:validate_tests(S, T),
+
     Error = {error, {rebar_prv_eunit, {eunit_test_errors, ["Module `missing_app' not found in project."]}}},
-    Error = rebar_prv_eunit:prepare_tests(State).
+    Error = Tests.
 
 %% check that the --suite cmd line opt generates the correct test set
 single_suite_arg(Config) ->
@@ -356,7 +359,7 @@ missing_suite_arg(Config) ->
     State = rebar_state:command_parsed_args(S, Args),
 
     Error = {error, {rebar_prv_eunit, {eunit_test_errors, ["Module `missing_app' not found in project."]}}},
-    Error = rebar_prv_eunit:prepare_tests(State).
+    Error = rebar_prv_eunit:validate_tests(State, rebar_prv_eunit:prepare_tests(State)).
 
 %% check that the --file cmd line opt generates the correct test set
 single_file_arg(Config) ->
@@ -390,7 +393,7 @@ missing_file_arg(Config) ->
     State = rebar_state:command_parsed_args(S, Args),
 
     Error = {error, {rebar_prv_eunit, {eunit_test_errors, ["File `" ++ Path ++"' not found."]}}},
-    Error = rebar_prv_eunit:prepare_tests(State).
+    Error = rebar_prv_eunit:validate_tests(State, rebar_prv_eunit:prepare_tests(State)).
 
 %% check that the --dir cmd line opt generates the correct test set
 single_dir_arg(Config) ->
@@ -424,7 +427,7 @@ missing_dir_arg(Config) ->
     State = rebar_state:command_parsed_args(S, Args),
 
     Error = {error, {rebar_prv_eunit, {eunit_test_errors, ["Directory `" ++ Path ++"' not found."]}}},
-    Error = rebar_prv_eunit:prepare_tests(State).
+    Error = rebar_prv_eunit:validate_tests(State, rebar_prv_eunit:prepare_tests(State)).
 
 %% check that multiple args are composed
 multiple_arg_composition(Config) ->
@@ -470,11 +473,14 @@ multiple_arg_errors(Config) ->
                                                               "--dir=" ++ DirPath]),
     State = rebar_state:command_parsed_args(S, Args),
 
+    T = rebar_prv_eunit:prepare_tests(State),
+    Tests = rebar_prv_eunit:validate_tests(S, T),
+
     Expect = ["Application `missing_app' not found in project.",
               "Directory `" ++ DirPath ++ "' not found.",
               "File `" ++ FilePath ++ "' not found.",
               "Module `missing_app' not found in project.",
               "Module `missing_app' not found in project."],
 
-    {error, {rebar_prv_eunit, {eunit_test_errors, Expect}}} = rebar_prv_eunit:prepare_tests(State).
+    {error, {rebar_prv_eunit, {eunit_test_errors, Expect}}} = Tests.
 
