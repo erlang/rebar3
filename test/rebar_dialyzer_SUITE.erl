@@ -69,7 +69,16 @@ update_base_plt(Config) ->
     ?assertEqual(ErtsFiles, BasePltFiles2),
 
     {ok, PltFiles} = plt_files(Plt),
-    ?assertEqual(ErtsFiles, PltFiles).
+    ?assertEqual(ErtsFiles, PltFiles),
+
+    add_missing_file(BasePlt),
+    ok = file:delete(Plt),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
+                                   {ok, [{app, Name}]}),
+
+    {ok, BasePltFiles3} = plt_files(BasePlt),
+    ?assertEqual(ErtsFiles, BasePltFiles3).
 
 
 update_app_plt(Config) ->
@@ -103,7 +112,15 @@ update_app_plt(Config) ->
                                    {ok, [{app, Name}]}),
 
     {ok, PltFiles3} = plt_files(Plt),
-    ?assertEqual(ErtsFiles, PltFiles3).
+    ?assertEqual(ErtsFiles, PltFiles3),
+
+    add_missing_file(Plt),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
+                                   {ok, [{app, Name}]}),
+
+    {ok, PltFiles4} = plt_files(Plt),
+    ?assertEqual(ErtsFiles, PltFiles4).
 
 build_release_plt(Config) ->
     AppDir = ?config(apps, Config),
@@ -209,6 +226,19 @@ alter_plt(Plt) ->
     _ = dialyzer:run([{analysis_type, plt_add},
                       {init_plt, Plt},
                       {files, [code:which(dialyzer)]}]),
+    ok.
+
+add_missing_file(Plt) ->
+    Source = code:which(dialyzer),
+    Dest = filename:join(filename:dirname(Plt), "dialyzer.beam"),
+    {ok, _} = file:copy(Source, Dest),
+    _ = try
+            dialyzer:run([{analysis_type, plt_add},
+                          {init_plt, Plt},
+                          {files, [Dest]}])
+        after
+            ok = file:delete(Dest)
+        end,
     ok.
 
 -spec merge_config(Config, Config) -> Config when

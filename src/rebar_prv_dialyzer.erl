@@ -173,7 +173,7 @@ do_update_proj_plt(State, Plt, Output) ->
     case read_plt(State, Plt) of
         {ok, OldFiles} ->
             check_plt(State, Plt, Output, OldFiles, Files);
-        {error, no_such_file} ->
+        error ->
             build_proj_plt(State, Plt, Output, Files)
     end.
 
@@ -252,12 +252,23 @@ read_plt(_State, Plt) ->
     case dialyzer:plt_info(Plt) of
         {ok, Info} ->
             Files = proplists:get_value(files, Info, []),
-            {ok, Files};
-        {error, no_such_file} = Error ->
-            Error;
+            read_plt_files(Plt, Files);
+        {error, no_such_file} ->
+            error;
         {error, read_error} ->
             Error = io_lib:format("Could not read the PLT file ~p", [Plt]),
             throw({dialyzer_error, Error})
+    end.
+
+%% If any file no longer exists dialyzer will fail when updating the PLT.
+read_plt_files(Plt, Files) ->
+    case [File || File <- Files, not filelib:is_file(File)] of
+        [] ->
+            {ok, Files};
+        Missing ->
+            ?INFO("Could not find ~p files in ~p...", [length(Missing), Plt]),
+            ?DEBUG("Could not find files: ~p", [Missing]),
+            error
     end.
 
 check_plt(State, Plt, Output, OldList, FilesList) ->
@@ -337,7 +348,7 @@ update_base_plt(State, BasePlt, Output, BaseFiles) ->
     case read_plt(State, BasePlt) of
         {ok, OldBaseFiles} ->
             check_plt(State, BasePlt, Output, OldBaseFiles, BaseFiles);
-        {error, no_such_file} ->
+        error ->
             _ = filelib:ensure_dir(BasePlt),
             build_plt(State, BasePlt, Output, BaseFiles)
     end.
