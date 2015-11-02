@@ -125,14 +125,16 @@ transform_opts([{testcase, Cases}|Rest], Acc) ->
     transform_opts(Rest, [{testcase, split_string(Cases)}|Acc]);
 transform_opts([{config, Configs}|Rest], Acc) ->
     transform_opts(Rest, [{config, split_string(Configs)}|Acc]);
-transform_opts([{include, Includes}|Rest], Acc) ->
-    transform_opts(Rest, [{include, split_string(Includes)}|Acc]);
+transform_opts([{logopts, LogOpts}|Rest], Acc) ->
+    transform_opts(Rest, [{logopts, lists:map(fun(P) -> list_to_atom(P) end, split_string(LogOpts))}|Acc]);
 transform_opts([{force_stop, "true"}|Rest], Acc) ->
     transform_opts(Rest, [{force_stop, true}|Acc]);
 transform_opts([{force_stop, "false"}|Rest], Acc) ->
     transform_opts(Rest, [{force_stop, false}|Acc]);
 transform_opts([{force_stop, "skip_rest"}|Rest], Acc) ->
     transform_opts(Rest, [{force_stop, skip_rest}|Acc]);
+transform_opts([{create_priv_dir, CreatePrivDir}|Rest], Acc) ->
+    transform_opts(Rest, [{create_priv_dir, list_to_atom(CreatePrivDir)}|Acc]);
 %% drop cover from opts, ct doesn't care about it
 transform_opts([{cover, _}|Rest], Acc) ->
     transform_opts(Rest, Acc);
@@ -147,7 +149,7 @@ split_string(String) ->
     string:tokens(String, [$,]).
 
 cfgopts(State) ->
-    Opts = rebar_state:get(State, ct_tests, []),
+    Opts = rebar_state:get(State, ct_opts, []),
     rebar_utils:filtermap(fun filter_opts/1, Opts).
 
 filter_opts({test_spec, _}) ->
@@ -164,9 +166,10 @@ filter_opts({suite, Suites}) ->
 filter_opts(_) -> true.
 
 select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
+    FixedOpts = lists:filter(fun({_, _}) -> true; (V) -> ?WARN("`~p` is not a valid option for `ct_opts`", [V]) end, CfgOpts),
     Merged = lists:ukeymerge(1,
                              lists:ukeysort(1, CmdOpts),
-                             lists:ukeysort(1, CfgOpts)),
+                             lists:ukeysort(1, FixedOpts)),
     %% make sure `dir` and/or `suite` from command line go in as
     %% a pair overriding both `dir` and `suite` from config if
     %% they exist
@@ -464,13 +467,21 @@ ct_opts(_State) ->
      {config, undefined, "config", string, help(config)}, %% comma-seperated list
      {allow_user_terms, undefined, "allow_user_terms", boolean, help(allow_user_terms)}, %% Bool
      {logdir, undefined, "logdir", string, help(logdir)}, %% dir
+     {logopts, undefined, "logopts", string, help(logopts)}, %% comma seperated list
      {verbosity, undefined, "verbosity", integer, help(verbosity)}, %% Integer
      {cover, $c, "cover", {boolean, false}, help(cover)},
-     {include, undefined, "include", string, help(include)}, % comma-seperated list
      {repeat, undefined, "repeat", integer, help(repeat)}, %% integer
      {duration, undefined, "duration", string, help(duration)}, % format: HHMMSS
      {until, undefined, "until", string, help(until)}, %% format: YYMoMoDD[HHMMSS]
-     {basic_html, undefined, "basic_html", boolean, help(basic_html)}, %% Booloean
+     {force_stop, undefined, "force_stop", string, help(force_stop)}, %% String
+     {basic_html, undefined, "basic_html", boolean, help(basic_html)}, %% Boolean
+     {stylesheet, undefined, "stylesheet", string, help(stylesheet)}, %% String
+     {decrypt_key, undefined, "decrypt_key", string, help(decrypt_key)}, %% String
+     {decrypt_file, undefined, "decrypt_file", string, help(decrypt_file)}, %% String
+     {abort_if_missing_suites, undefined, "abort_if_missing_suites", {boolean, true}, help(abort_if_missing_suites)}, %% Boolean
+     {multiply_timetraps, undefined, "multiply_timetraps", integer, help(multiple_timetraps)}, %% Integer
+     {scale_timetraps, undefined, "scale_timetraps", boolean, help(scale_timetraps)},
+     {create_priv_dir, undefined, "create_priv_dir", string, help(create_priv_dir)},
      {verbose, $v, "verbose", boolean, help(verbose)}
     ].
 
@@ -490,20 +501,36 @@ help(allow_user_terms) ->
     "Allow user defined config values in config files";
 help(logdir) ->
     "Log folder";
+help(logopts) ->
+    "Options for common test logging";
 help(verbosity) ->
     "Verbosity";
 help(cover) ->
     "Generate cover data";
-help(include) ->
-    "Include folders";
 help(repeat) ->
     "How often to repeat tests";
 help(duration) ->
     "Max runtime (format: HHMMSS)";
 help(until) ->
     "Run until (format: HHMMSS)";
+help(force_stop) ->
+    "Force stop on test timeout (true | false | skip_rest)";
 help(basic_html) ->
     "Show basic HTML";
+help(stylesheet) ->
+    "CSS stylesheet to apply to html output";
+help(decrypt_key) ->
+    "Path to key for decrypting config";
+help(decrypt_file) ->
+    "Path to file containing key for decrypting config";
+help(abort_if_missing_suites) ->
+    "Abort if suites are missing";
+help(multiply_timetraps) ->
+    "Multiply timetraps";
+help(scale_timetraps) ->
+    "Scale timetraps";
+help(create_priv_dir) ->
+    "Create priv dir (auto_per_run | auto_per_tc | manual_per_tc)";
 help(verbose) ->
     "Verbose output";
 help(_) ->
