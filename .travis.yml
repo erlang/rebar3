@@ -13,7 +13,7 @@ branches:
     - master
 cache:
   directories:
-  - $HOME/.cache/rebar3/hex/com/amazonaws/s3/s3.hex.pm/tarballs/packages/
+  - $HOME/.cache/rebar3/hex/default
 before_deploy: "rm -rf !(rebar3)"
 deploy:
   on:

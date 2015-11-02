@@ -34,34 +34,37 @@ do(State) ->
     GlobalConfigFile = rebar_dir:global_config(),
     GlobalConfig = rebar_state:new(rebar_config:consult_file(GlobalConfigFile)),
     GlobalPlugins = rebar_state:get(GlobalConfig, plugins, []),
-    GlobalPluginsDir = filename:join(rebar_dir:global_cache_dir(rebar_state:opts(State)), "plugins"),
-    display_plugins("Global plugins", GlobalPluginsDir, GlobalPlugins),
+    GlobalPluginsDir = filename:join([rebar_dir:global_cache_dir(rebar_state:opts(State)), "plugins", "*"]),
+    GlobalApps = rebar_app_discover:find_apps([GlobalPluginsDir], all),
+    display_plugins("Global plugins", GlobalApps, GlobalPlugins),
 
     Plugins = rebar_state:get(State, plugins, []),
-    PluginsDir =rebar_dir:plugins_dir(State),
-    display_plugins("Local plugins", PluginsDir, Plugins),
+    PluginsDir = filename:join(rebar_dir:plugins_dir(State), "*"),
+    CheckoutsDir = filename:join(rebar_dir:checkouts_dir(State), "*"),
+    Apps = rebar_app_discover:find_apps([CheckoutsDir, PluginsDir], all),
+    display_plugins("Local plugins", Apps, Plugins),
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
-display_plugins(_Header, _Dir, []) ->
+display_plugins(_Header, _Apps, []) ->
     ok;
-display_plugins(Header, Dir, Plugins) ->
+display_plugins(Header, Apps, Plugins) ->
     ?CONSOLE("--- ~s ---", [Header]),
-    display_plugins(Dir, Plugins),
+    display_plugins(Apps, Plugins),
     ?CONSOLE("", []).
 
-display_plugins(Dir, Plugins) ->
+display_plugins(Apps, Plugins) ->
     lists:foreach(fun(Plugin) ->
-                          Name = if is_atom(Plugin) -> Plugin;
-                                    is_tuple(Plugin) -> element(1, Plugin)
+                          Name = if is_atom(Plugin) -> ec_cnv:to_binary(Plugin);
+                                    is_tuple(Plugin) -> ec_cnv:to_binary(element(1, Plugin))
                                  end,
-                          case rebar_app_info:discover(filename:join(Dir, Name)) of
+                          case rebar_app_utils:find(Name, Apps) of
                               {ok, _App} ->
                                   ?CONSOLE("~s", [Name]);
-                              not_found ->
+                              error ->
                                   ?DEBUG("Unable to find plugin ~s", [Name])
                           end
                   end, Plugins).
