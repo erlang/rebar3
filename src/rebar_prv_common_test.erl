@@ -74,12 +74,13 @@ do(State, Tests) ->
 run_tests(State, Opts) ->
     T = translate_paths(State, Opts),
     Opts1 = setup_logdir(State, T),
-    ?DEBUG("ct_opts ~p", [Opts1]),
+    Opts2 = turn_off_auto_compile(Opts1),
+    ?DEBUG("ct_opts ~p", [Opts2]),
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     ok = maybe_write_coverdata(State),
     case proplists:get_value(verbose, RawOpts, false) of
-        true  -> run_test_verbose(Opts1);
-        false -> run_test_quiet(Opts1)
+        true  -> run_test_verbose(Opts2);
+        false -> run_test_quiet(Opts2)
     end.
 
 -spec format_error(any()) -> iolist().
@@ -154,6 +155,9 @@ cfgopts(State) ->
 
 filter_opts({test_spec, _}) ->
     ?WARN("Test specs not supported", []),
+    false;
+filter_opts({auto_compile, _}) ->
+    ?WARN("Auto compile not supported", []),
     false;
 filter_opts({suite, Suite}) when is_integer(hd(Suite)) -> true;
 filter_opts({suite, Suite}) when is_atom(Suite) ->
@@ -372,6 +376,9 @@ setup_logdir(State, Opts) ->
     end,
     filelib:ensure_dir(filename:join([Logdir, "dummy.beam"])),
     [{logdir, Logdir}|lists:keydelete(logdir, 1, Opts)].
+
+turn_off_auto_compile(Opts) ->
+    [{auto_compile, false}|lists:keydelete(auto_compile, 1, Opts)].
 
 run_test_verbose(Opts) -> handle_results(ct:run_test(Opts)).
 
