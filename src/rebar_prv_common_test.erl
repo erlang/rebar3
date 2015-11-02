@@ -38,7 +38,7 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     ?INFO("Running Common Test suites...", []),
-    rebar_utils:update_code(rebar_state:code_paths(State, all_deps)),
+    rebar_utils:update_code(rebar_state:code_paths(State, all_deps), [soft_purge]),
 
     %% Run ct provider prehooks
     Providers = rebar_state:providers(State),

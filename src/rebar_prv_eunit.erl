@@ -49,7 +49,7 @@ do(State) ->
 do(State, Tests) ->
     ?INFO("Performing EUnit tests...", []),
 
-    rebar_utils:update_code(rebar_state:code_paths(State, all_deps)),
+    rebar_utils:update_code(rebar_state:code_paths(State, all_deps), [soft_purge]),
 
     %% Run eunit provider prehooks
     Providers = rebar_state:providers(State),

@@ -47,6 +47,7 @@
          deprecated/4,
          indent/1,
          update_code/1,
+         update_code/2,
          remove_from_code_path/1,
          cleanup_code_path/1,
          args_to_tasks/1,
@@ -644,7 +645,9 @@ indent(Amount) when erlang:is_integer(Amount) ->
 
 %% Replace code paths with new paths for existing apps and
 %% purge code of the old modules from those apps.
-update_code(Paths) ->
+update_code(Paths) -> update_code(Paths, []).
+
+update_code(Paths, Opts) ->
     lists:foreach(fun(Path) ->
                           Name = filename:basename(Path, "/ebin"),
                           App = list_to_atom(Name),
@@ -654,19 +657,18 @@ update_code(Paths) ->
                                   code:add_patha(Path),
                                   ok;
                               {ok, Modules} ->
-                                  %% stick rebar ebin dir before purging to prevent
-                                  %% inadvertent termination
-                                  RebarBin = code:lib_dir(rebar, ebin),
-                                  ok = code:stick_dir(RebarBin),
                                   %% replace_path causes problems when running
                                   %% tests in projects like erlware_commons that rebar3
                                   %% also includes
                                   %code:replace_path(App, Path),
                                   code:del_path(App),
                                   code:add_patha(Path),
-                                  [begin code:purge(M), code:delete(M) end || M <- Modules],
-                                  %% unstick rebar dir
-                                  ok = code:unstick_dir(RebarBin)
+                                  case lists:member(soft_purge, Opts) of
+                                      true  ->
+                                          [begin code:soft_purge(M), code:delete(M) end || M <- Modules];
+                                      false ->
+                                          [begin code:purge(M), code:delete(M) end || M <- Modules]
+                                  end
                           end
                   end, Paths).
 
