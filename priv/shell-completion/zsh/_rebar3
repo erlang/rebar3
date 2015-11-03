@@ -43,33 +43,27 @@ _rebar3 () {
                         '(--suite)--suite[List of test suites to run]:suites' \
                         '(--group)--group[List of test groups to run]:groups' \
                         '(--case)--case[List of test cases to run]:cases' \
-                        '(--spec)--spec[List of test specs to run]:specs' \
-                        '(--join_specs)--join_specs' \
                         '(--label)--label[Test label]:label' \
                         '(--config)--config[List of config files]:config files:_files' \
-                        '(--userconfig)--userconfig' \
                         '(--allow_user_terms)--allow_user_terms' \
                         '(--logdir)--logdir[Log folder]:log folder:_files -/' \
                         '(--logopts)--logopts' \
                         '(--verbosity)--verbosity[Verbosity]:verbosity' \
-                        '(--silent_connections)--silent_connections' \
-                        '(--stylesheet)--stylesheet[Stylesheet to use for test results]:stylesheet:_files' \
                         '(-c --cover)'{-c,--cover}'[Generate cover data]' \
-                        '(--cover_spec)--cover_spec[Cover file to use]:cover file:_files' \
-                        '(--cover_stop)--cover_stop' \
-                        '(--event_handler)--event_handler[Event handlers to attach to the runner]:event handlers' \
-                        '(--include)--include[Include folder]:include directory:_files -/' \
+                        '(--repeat)--repeat[How often to repeat tests]:repeat test count' \
+                        '(--duration)--duration[Max runtime (format: HHMMSS)]:max run time' \
+                        '(--until)--until[Run until (format: HHMMSS)]:run until time' \
+                        '(--force_stop)--force_stop[Force stop on test timeout]:skip_rest' \
+                        '(--basic_html)--basic_html[Show basic HTML]' \
+                        '(--stylesheet)--stylesheet[Stylesheet to use for test results]:stylesheet:_files' \
+                        '(--decrypt_key)--decrypt_key[Path to key for decrypting config]:decrypt key:_files' \
+                        '(--decrypt_file)--decrypt_file[Path to file containing key for decrypting config]:decrypt file:_files' \
                         '(--abort_if_missing_suites)--abort_if_missing_suites[Abort if suites are missing]:abort missing suites:(true false)' \
                         '(--multiply_timetraps)--multiply_timetraps' \
                         '(--scale_timetraps)--scale_timetraps' \
                         '(--create_priv_dir)--create_priv_dir' \
-                        '(--repeat)--repeat[How often to repeat tests]:repeat test count' \
-                        '(--duration)--duration[Max runtime (format: HHMMSS)]:max run time' \
-                        '(--until)--until[Run until (format: HHMMSS)]:run until time' \
-                        '(--force_stop)--force_stop[Force stop after time]' \
-                        '(--basic_html)--basic_html[Show basic HTML]' \
-                        '(--ct_hooks)--ct_hooks:ct hooks' \
                         '(-v --verbose)'{-v,--verbose}'[Print coverage analysis]' \
+                        '(--auto_compile)--auto_compile' \
                     && ret=0
                 ;;
                 (deps)
