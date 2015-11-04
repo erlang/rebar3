@@ -72,7 +72,7 @@ basic_extra_src_dirs(Config) ->
 
     Name = rebar_test_utils:create_random_name("cover_extra_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
     ExtraSrc = io_lib:format("-module(~ts_extra).\n-export([ok/0]).\nok() -> ok.\n", [Name]),
 
@@ -86,8 +86,11 @@ basic_extra_src_dirs(Config) ->
                                    ["eunit", "--cover"],
                                    {ok, [{app, Name}]}),
 
-    Mod = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name]))),
-    {file, _} = cover:is_compiled(Mod).
+    Mod = list_to_atom(Name),
+    {file, _} = cover:is_compiled(Mod),
+
+    ExtraMod = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name]))),
+    {file, _} = cover:is_compiled(ExtraMod).
 
 release_extra_src_dirs(Config) ->
     AppDir = ?config(apps, Config),
@@ -120,10 +123,15 @@ release_extra_src_dirs(Config) ->
                                    ["eunit", "--cover"],
                                    {ok, [{app, Name1}, {app, Name2}]}),
 
-    Mod1 = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name1]))),
+    Mod1 = list_to_atom(Name1),
     {file, _} = cover:is_compiled(Mod1),
-    Mod2 = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name2]))),
-    {file, _} = cover:is_compiled(Mod2).
+    Mod2 = list_to_atom(Name2),
+    {file, _} = cover:is_compiled(Mod2),
+
+    ExtraMod1 = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name1]))),
+    {file, _} = cover:is_compiled(ExtraMod1),
+    ExtraMod2 = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name2]))),
+    {file, _} = cover:is_compiled(ExtraMod2).
 
 root_extra_src_dirs(Config) ->
     AppDir = ?config(apps, Config),
@@ -146,6 +154,11 @@ root_extra_src_dirs(Config) ->
                                    RebarConfig,
                                    ["eunit", "--cover"],
                                    {ok, [{app, Name1}, {app, Name2}]}),
+
+    Mod1 = list_to_atom(Name1),
+    {file, _} = cover:is_compiled(Mod1),
+    Mod2 = list_to_atom(Name2),
+    {file, _} = cover:is_compiled(Mod2),
 
     {file, _} = cover:is_compiled(extra).
 
