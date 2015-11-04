@@ -37,6 +37,7 @@
 -define(WARN_LEVEL,  1).
 -define(INFO_LEVEL,  2).
 -define(DEBUG_LEVEL, 3).
+-define(DFLT_INTENSITY, low).
 
 %% ===================================================================
 %% Public API
@@ -49,7 +50,15 @@ init(Caller, Verbosity) ->
                 ?INFO_LEVEL  -> info;
                 ?DEBUG_LEVEL -> debug
             end,
-    Log = ec_cmd_log:new(Level, Caller, low),
+    Intensity = case os:getenv("REBAR_COLOR") of
+                    "high" ->
+                        high;
+                    "low" ->
+                        low;
+                    _ ->
+                        ?DFLT_INTENSITY
+                end,
+    Log = ec_cmd_log:new(Level, Caller, Intensity),
     application:set_env(rebar, log, Log).
 
 set_level(Level) ->
