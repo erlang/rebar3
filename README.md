@@ -53,6 +53,14 @@ locations ([hex.pm](http://hex.pm), git, hg, and so on).
 
 A more complete list can be found on the [docs page](http://www.rebar3.org/v3.0/docs/commands)
 
+
+### Configuration
+
+Rebar3 uses the following environment variables to adjust behaviour:
+
+* `REBAR_COLOR` - set to `low` or `high` changes the color of the output to be more or less intense
+* `TERM` - used to detect if logs should be plain text or term colored, uses termcap to determin capabilities. If set to `dumb` colors are supressed.
+
 ### Changes
 
 #### Since Rebar 2.x
