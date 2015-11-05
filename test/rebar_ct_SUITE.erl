@@ -39,7 +39,8 @@
          cfg_opts/1,
          cfg_arbitrary_opts/1,
          cfg_test_spec_filtered/1,
-         cfg_atom_suites/1]).
+         cfg_atom_suites/1,
+         cover_compiled/1]).
 
 -include_lib("common_test/include/ct.hrl").
 
@@ -48,6 +49,7 @@ all() -> [{group, basic_app},
           {group, dirs_and_suites},
           {group, data_dirs},
           {group, ct_opts},
+          {group, cover},
           cfg_opts, cfg_arbitrary_opts,
           cfg_test_spec_filtered,
           cfg_atom_suites].
@@ -83,7 +85,8 @@ groups() -> [{basic_app, [], [basic_app_default_dirs,
                             cmd_abort_if_missing_suites,
                             cmd_multiply_timetraps,
                             cmd_scale_timetraps,
-                            cmd_create_priv_dir]}].
+                            cmd_create_priv_dir]},
+             {cover, [], [cover_compiled]}].
 
 init_per_group(basic_app, Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_"),
@@ -183,6 +186,18 @@ init_per_group(ct_opts, Config) ->
     {ok, State} = rebar_test_utils:run_and_check(C, [], ["as", "test", "lock"], return),
 
     [{result, State}|C];
+init_per_group(cover, Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "ct_opts"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name("ct_opts_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    {ok, State} = rebar_test_utils:run_and_check(C, [], ["as", "test", "lock"], return),
+
+    [{result, State}, {name, Name}|C];
 init_per_group(_, Config) -> Config.
 
 end_per_group(_Group, _Config) -> ok.
@@ -929,6 +944,25 @@ cfg_atom_suites(Config) ->
     {ok, TestOpts} = rebar_prv_common_test:prepare_tests(State),
 
     true = lists:member({suite, ["foo", "bar", "baz"]}, TestOpts).
+
+cover_compiled(Config) ->
+    State = ?config(result, Config),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+    {ok, GetOptResult} = getopt:parse(GetOptSpec, ["--cover"]),
+
+    NewState = rebar_state:command_parsed_args(State, GetOptResult),
+
+    Tests = rebar_prv_common_test:prepare_tests(NewState),
+    {ok, _} = rebar_prv_common_test:compile(NewState, Tests),
+
+    Name = ?config(name, Config),
+    Mod = list_to_atom(Name),
+    {file, _} = cover:is_compiled(Mod).
+    
 
 %% helper for generating test data
 test_suite(Name) ->
