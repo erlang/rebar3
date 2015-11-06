@@ -77,11 +77,12 @@ run_tests(State, Opts) ->
     Opts2 = turn_off_auto_compile(Opts1),
     ?DEBUG("ct_opts ~p", [Opts2]),
     {RawOpts, _} = rebar_state:command_parsed_args(State),
-    ok = maybe_write_coverdata(State),
-    case proplists:get_value(verbose, RawOpts, false) of
+    Result = case proplists:get_value(verbose, RawOpts, false) of
         true  -> run_test_verbose(Opts2);
         false -> run_test_quiet(Opts2)
-    end.
+    end,
+    ok = maybe_write_coverdata(State),
+    Result.
 
 -spec format_error(any()) -> iolist().
 format_error({error, Reason}) ->
