@@ -111,6 +111,10 @@ merge_opts(NewOpts, OldOpts) ->
                        NewValue;
                   (profiles, NewValue, OldValue) ->
                        dict:to_list(merge_opts(dict:from_list(NewValue), dict:from_list(OldValue)));
+                  (mib_first_files, Value, Value) ->
+                       Value;
+                  (mib_first_files, NewValue, OldValue) ->
+                       OldValue ++ NewValue;
                   (_Key, NewValue, OldValue) when is_list(NewValue) ->
                        case io_lib:printable_list(NewValue) of
                            true when NewValue =:= [] ->
