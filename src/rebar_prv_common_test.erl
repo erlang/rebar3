@@ -152,7 +152,7 @@ split_string(String) ->
 
 cfgopts(State) ->
     Opts = rebar_state:get(State, ct_opts, []),
-    rebar_utils:filtermap(fun filter_opts/1, Opts).
+    add_hooks(rebar_utils:filtermap(fun filter_opts/1, Opts)).
 
 filter_opts({test_spec, _}) ->
     ?WARN("Test specs not supported", []),
@@ -169,6 +169,18 @@ filter_opts({suite, Suites}) ->
                              end,
                              Suites)}};
 filter_opts(_) -> true.
+
+add_hooks(Opts) ->
+    %% cth_readable hooks
+    case lists:keyfind(ct_hooks, 1, Opts) of
+        false ->
+            [{ct_hooks, [cth_readable_failonly, cth_readable_shell]} | Opts];
+        {ct_hooks, Hooks} ->
+            %% Make sure hooks are there once only.
+            ReadableHooks = [cth_readable_failonly, cth_readable_shell],
+            NewHooks =  (Hooks -- ReadableHooks) ++ ReadableHooks,
+            lists:keyreplace(ct_hooks, 1, Opts, {ct_hooks, NewHooks})
+    end.
 
 select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
     FixedOpts = lists:filter(fun({_, _}) -> true; (V) -> ?WARN("`~p` is not a valid option for `ct_opts`", [V]) end, CfgOpts),
@@ -249,7 +261,7 @@ inject(Opts, State) ->
     %% append `ct_compile_opts` to app defined `erl_opts`
     ErlOpts = rebar_opts:get(Opts, erl_opts, []),
     CTOpts = rebar_state:get(State, ct_compile_opts, []),
-    NewErlOpts = CTOpts ++ ErlOpts,
+    NewErlOpts = add_transforms(CTOpts) ++ ErlOpts,
     %% append `ct_first_files` to app defined `erl_first_files`
     FirstFiles = rebar_opts:get(Opts, erl_first_files, []),
     CTFirstFiles = rebar_state:get(State, ct_first_files, []),
@@ -258,6 +270,11 @@ inject(Opts, State) ->
     lists:foldl(fun({K, V}, NewOpts) -> rebar_opts:set(NewOpts, K, V) end,
                 Opts,
                 [{erl_opts, NewErlOpts}, {erl_first_files, NewFirstFiles}]).
+
+add_transforms(CTOpts) ->
+    ReadableTransform = [{parse_transform, cth_readable_transform}],
+    (CTOpts -- ReadableTransform) ++ ReadableTransform.
+
 
 test_dirs(State, Apps, Opts) ->
     case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
