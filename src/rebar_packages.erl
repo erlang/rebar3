@@ -138,7 +138,7 @@ handle_single_vsn(Dep, Vsn, Constraint) ->
             {ok, Vsn};
         false ->
             ?WARN("Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
-                 "Using anyway, but it is not guarenteed to work.", [Dep, Vsn, Constraint]),
+                 "Using anyway, but it is not guaranteed to work.", [Dep, Vsn, Constraint]),
             {ok, Vsn}
     end.
 
