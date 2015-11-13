@@ -25,6 +25,7 @@
                   bbmustache,
                   ssl_verify_hostname,
                   certifi,
+                  cth_readable,
                   relx,
                   inets]},
   {env, [
