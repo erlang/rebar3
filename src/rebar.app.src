@@ -27,7 +27,8 @@
                   certifi,
                   cth_readable,
                   relx,
-                  inets]},
+                  inets,
+                  eunit_formatters]},
   {env, [
         %% Default log level
         {log_level, warn},

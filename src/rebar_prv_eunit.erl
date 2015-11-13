@@ -304,9 +304,20 @@ validate_module(_State, Module) ->
 resolve_eunit_opts(State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
     EUnitOpts = rebar_state:get(State, eunit_opts, []),
-    case proplists:get_value(verbose, Opts, false) of
-        true  -> set_verbose(EUnitOpts);
-        false -> EUnitOpts
+    EUnitOpts1 = case proplists:get_value(verbose, Opts, false) of
+                    true  -> set_verbose(EUnitOpts);
+                    false -> EUnitOpts
+                 end,
+    case proplists:get_value(eunit_formatters, Opts, true) of
+        true  -> custom_eunit_formatters(EUnitOpts1);
+        false -> EUnitOpts1
+    end.
+
+custom_eunit_formatters(Opts) ->
+    %% If `report` is already set then treat that like `eunit_formatters` is false
+    case lists:keymember(report, 1, Opts) of
+        true -> Opts;
+        false -> [no_tty, {report, {eunit_progress, [colored, profile]}} | Opts]
     end.
 
 set_verbose(Opts) ->

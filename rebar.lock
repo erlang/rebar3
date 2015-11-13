@@ -3,6 +3,7 @@
  {<<"cf">>,{pkg,<<"cf">>,<<"0.1.3">>},0},
  {<<"cth_readable">>,{pkg,<<"cth_readable">>,<<"1.0.1">>},0},
  {<<"erlware_commons">>,{pkg,<<"erlware_commons">>,<<"0.16.0">>},0},
+ {<<"eunit_formatters">>,{pkg,<<"eunit_formatters">>,<<"0.2.0">>},0},
  {<<"getopt">>,{pkg,<<"getopt">>,<<"0.8.2">>},0},
  {<<"providers">>,{pkg,<<"providers">>,<<"1.5.0">>},0},
  {<<"relx">>,{pkg,<<"relx">>,<<"3.8.0">>},0},
