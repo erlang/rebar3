@@ -152,7 +152,7 @@ split_string(String) ->
 
 cfgopts(State) ->
     Opts = rebar_state:get(State, ct_opts, []),
-    add_hooks(rebar_utils:filtermap(fun filter_opts/1, Opts)).
+    add_hooks(rebar_utils:filtermap(fun filter_opts/1, Opts), State).
 
 filter_opts({test_spec, _}) ->
     ?WARN("Test specs not supported", []),
@@ -170,12 +170,13 @@ filter_opts({suite, Suites}) ->
                              Suites)}};
 filter_opts(_) -> true.
 
-add_hooks(Opts) ->
-    %% cth_readable hooks
-    case lists:keyfind(ct_hooks, 1, Opts) of
-        false ->
+add_hooks(Opts, State) ->
+    case {readable(State), lists:keyfind(ct_hooks, 1, Opts)} of
+        {false, _} ->
+            Opts;
+        {true, false} ->
             [{ct_hooks, [cth_readable_failonly, cth_readable_shell]} | Opts];
-        {ct_hooks, Hooks} ->
+        {true, {ct_hooks, Hooks}} ->
             %% Make sure hooks are there once only.
             ReadableHooks = [cth_readable_failonly, cth_readable_shell],
             NewHooks =  (Hooks -- ReadableHooks) ++ ReadableHooks,
@@ -261,7 +262,7 @@ inject(Opts, State) ->
     %% append `ct_compile_opts` to app defined `erl_opts`
     ErlOpts = rebar_opts:get(Opts, erl_opts, []),
     CTOpts = rebar_state:get(State, ct_compile_opts, []),
-    NewErlOpts = add_transforms(CTOpts) ++ ErlOpts,
+    NewErlOpts = add_transforms(CTOpts, State) ++ ErlOpts,
     %% append `ct_first_files` to app defined `erl_first_files`
     FirstFiles = rebar_opts:get(Opts, erl_first_files, []),
     CTFirstFiles = rebar_state:get(State, ct_first_files, []),
@@ -271,10 +272,22 @@ inject(Opts, State) ->
                 Opts,
                 [{erl_opts, NewErlOpts}, {erl_first_files, NewFirstFiles}]).
 
-add_transforms(CTOpts) ->
-    ReadableTransform = [{parse_transform, cth_readable_transform}],
-    (CTOpts -- ReadableTransform) ++ ReadableTransform.
+add_transforms(CTOpts, State) ->
+    case readable(State) of
+        true ->
+            ReadableTransform = [{parse_transform, cth_readable_transform}],
+            (CTOpts -- ReadableTransform) ++ ReadableTransform;
+        false ->
+            CTOpts
+    end.
 
+readable(State) ->
+    {RawOpts, _} = rebar_state:command_parsed_args(State),
+    case proplists:get_value(readable, RawOpts) of
+        true  -> true;
+        false -> false;
+        undefined -> rebar_state:get(State, ct_readable, true)
+    end.
 
 test_dirs(State, Apps, Opts) ->
     case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
@@ -507,6 +520,7 @@ ct_opts(_State) ->
      {multiply_timetraps, undefined, "multiply_timetraps", integer, help(multiple_timetraps)}, %% Integer
      {scale_timetraps, undefined, "scale_timetraps", boolean, help(scale_timetraps)},
      {create_priv_dir, undefined, "create_priv_dir", string, help(create_priv_dir)},
+     {readable, undefined, "readable", boolean, help(readable)},
      {verbose, $v, "verbose", boolean, help(verbose)}
     ].
 
@@ -556,6 +570,8 @@ help(scale_timetraps) ->
     "Scale timetraps";
 help(create_priv_dir) ->
     "Create priv dir (auto_per_run | auto_per_tc | manual_per_tc)";
+help(readable) ->
+    "Shows test case names and only displays logs to shell on failures";
 help(verbose) ->
     "Verbose output";
 help(_) ->
