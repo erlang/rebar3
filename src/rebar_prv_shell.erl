@@ -113,20 +113,34 @@ info() ->
 setup_shell() ->
     %% scan all processes for any with references to the old user and save them to
     %% update later
-    NeedsUpdate = [Pid || Pid <- erlang:processes(),
-        proplists:get_value(group_leader, erlang:process_info(Pid)) == whereis(user)
-    ],
+    OldUser = whereis(user),
     %% terminate the current user
     ok = supervisor:terminate_child(kernel_sup, user),
     %% start a new shell (this also starts a new user under the correct group)
     _ = user_drv:start(),
     %% wait until user_drv and user have been registered (max 3 seconds)
     ok = wait_until_user_started(3000),
+    NewUser = whereis(user),
     %% set any process that had a reference to the old user's group leader to the
     %% new user process. Catch the race condition when the Pid exited after the
     %% liveness check.
-    _ = [catch erlang:group_leader(whereis(user), Pid) || Pid <- NeedsUpdate,
-                                                          is_process_alive(Pid)],
+    _ = [catch erlang:group_leader(NewUser, Pid)
+         || Pid <- erlang:processes(),
+            proplists:get_value(group_leader, erlang:process_info(Pid)) == OldUser,
+            is_process_alive(Pid)],
+    %% Application masters have the same problem, but they hold the old group
+    %% leader in their state and hold on to it. Re-point the processes whose
+    %% leaders are application masters. This can mess up a few things around
+    %% shutdown time, but is nicer than the current lock-up.
+    OldMasters = [Pid
+         || Pid <- erlang:processes(),
+            Pid < NewUser, % only change old masters
+            {_,Dict} <- [erlang:process_info(Pid, dictionary)],
+            {application_master,init,4} == proplists:get_value('$initial_call', Dict)],
+    _ = [catch erlang:group_leader(NewUser, Pid)
+         || Pid <- erlang:processes(),
+            lists:member(proplists:get_value(group_leader, erlang:process_info(Pid)),
+                         OldMasters)],
     try
         %% enable error_logger's tty output
         error_logger:swap_handler(tty),
