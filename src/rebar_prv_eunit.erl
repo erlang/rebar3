@@ -121,21 +121,29 @@ compile(_State, Error) -> Error.
 inject_eunit_state(State, Tests) ->
     Apps = rebar_state:project_apps(State),
     ModdedApps = lists:map(fun(App) ->
-        NewOpts = inject(rebar_app_info:opts(App), State),
+        NewOpts = inject(rebar_app_info:opts(App)),
         rebar_app_info:opts(App, NewOpts)
     end, Apps),
-    NewOpts = inject(rebar_state:opts(State), State),
+    NewOpts = inject(rebar_state:opts(State)),
     NewState = rebar_state:opts(State, NewOpts),
     test_dirs(NewState, ModdedApps, Tests).
 
-inject(Opts, State) ->
+opts(Opts, Key, Default) ->
+    case rebar_opts:get(Opts, Key, Default) of
+        Vs when is_list(Vs) -> Vs;
+        Wrong ->
+            ?WARN("Value ~p of option `~p' is not a list, trying to adjust and continue", [Wrong, Key]),
+            [Wrong]
+    end.
+
+inject(Opts) ->
     %% append `eunit_compile_opts` to app defined `erl_opts`
-    ErlOpts = rebar_opts:get(Opts, erl_opts, []),
-    EUnitOpts = rebar_state:get(State, eunit_compile_opts, []),
+    ErlOpts = opts(Opts, erl_opts, []),
+    EUnitOpts = opts(Opts, eunit_compile_opts, []),
     NewErlOpts = EUnitOpts ++ ErlOpts,
     %% append `eunit_first_files` to app defined `erl_first_files`
-    FirstFiles = rebar_opts:get(Opts, erl_first_files, []),
-    EUnitFirstFiles = rebar_state:get(State, eunit_first_files, []),
+    FirstFiles = opts(Opts, erl_first_files, []),
+    EUnitFirstFiles = opts(Opts, eunit_first_files, []),
     NewFirstFiles = EUnitFirstFiles ++ FirstFiles,
     %% insert the new keys into the opts
     lists:foldl(fun({K, V}, NewOpts) -> rebar_opts:set(NewOpts, K, V) end,
@@ -180,12 +188,22 @@ inject_test_dir(Opts, Dir) ->
 prepare_tests(State) ->
     %% parse and translate command line tests
     CmdTests = resolve_tests(State),
-    CfgTests = rebar_state:get(State, eunit_tests, []),
+    CfgTests = cfg_tests(State),
     ProjectApps = rebar_state:project_apps(State),
     %% prioritize tests to run first trying any command line specified
     %% tests falling back to tests specified in the config file finally
     %% running a default set if no other tests are present
     select_tests(State, ProjectApps, CmdTests, CfgTests).
+
+cfg_tests(State) ->
+    case rebar_state:get(State, eunit_tests, []) of
+        Tests when is_list(Tests) -> Tests;
+        Wrong ->
+            %% probably a single non list term, try wrapping it in a list and
+            %% continuing
+            ?WARN("Value `~p' of option `eunit_tests' is not a list, trying to adjust and continue", [Wrong]),
+            [Wrong]
+    end.
 
 resolve_tests(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),

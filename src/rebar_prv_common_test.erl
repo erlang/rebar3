@@ -151,8 +151,15 @@ split_string(String) ->
     string:tokens(String, [$,]).
 
 cfgopts(State) ->
-    Opts = rebar_state:get(State, ct_opts, []),
-    add_hooks(rebar_utils:filtermap(fun filter_opts/1, Opts), State).
+    case rebar_state:get(State, ct_opts, []) of
+        Opts when is_list(Opts) ->
+            add_hooks(rebar_utils:filtermap(fun filter_opts/1, Opts), State);
+        Wrong ->
+            %% probably a single non list term, try wrapping it in a list and
+            %% continuing
+            ?WARN("Value `~p' of option `ct_opts' is not a list, trying to adjust and continue", [Wrong]),
+            add_hooks(rebar_utils:filtermap(fun filter_opts/1, [Wrong]), State)
+    end.
 
 filter_opts({test_spec, _}) ->
     ?WARN("Test specs not supported", []),
@@ -258,14 +265,22 @@ inject_ct_state(State, Tests) ->
     NewState = rebar_state:opts(State, NewOpts),
     test_dirs(NewState, ModdedApps, Tests).
 
+opts(Opts, Key, Default) ->
+    case rebar_opts:get(Opts, Key, Default) of
+        Vs when is_list(Vs) -> Vs;
+        Wrong ->
+            ?WARN("Value `~p' of option `~p' is not a list, trying to adjust and continue", [Wrong, Key]),
+            [Wrong]
+    end.
+
 inject(Opts, State) ->
     %% append `ct_compile_opts` to app defined `erl_opts`
-    ErlOpts = rebar_opts:get(Opts, erl_opts, []),
-    CTOpts = rebar_state:get(State, ct_compile_opts, []),
+    ErlOpts = opts(Opts, erl_opts, []),
+    CTOpts = opts(Opts, ct_compile_opts, []),
     NewErlOpts = add_transforms(CTOpts, State) ++ ErlOpts,
     %% append `ct_first_files` to app defined `erl_first_files`
-    FirstFiles = rebar_opts:get(Opts, erl_first_files, []),
-    CTFirstFiles = rebar_state:get(State, ct_first_files, []),
+    FirstFiles = opts(Opts, erl_first_files, []),
+    CTFirstFiles = opts(Opts, ct_first_files, []),
     NewFirstFiles = CTFirstFiles ++ FirstFiles,
     %% insert the new keys into the opts
     lists:foldl(fun({K, V}, NewOpts) -> rebar_opts:set(NewOpts, K, V) end,
