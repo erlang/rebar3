@@ -38,9 +38,12 @@
          cmd_create_priv_dir/1,
          cfg_opts/1,
          cfg_arbitrary_opts/1,
-         cfg_test_spec_filtered/1,
+         cfg_test_spec/1,
          cfg_atom_suites/1,
-         cover_compiled/1]).
+         cover_compiled/1,
+         misspecified_ct_opts/1,
+         misspecified_ct_compile_opts/1,
+         misspecified_ct_first_files/1]).
 
 -include_lib("common_test/include/ct.hrl").
 
@@ -51,8 +54,11 @@ all() -> [{group, basic_app},
           {group, ct_opts},
           {group, cover},
           cfg_opts, cfg_arbitrary_opts,
-          cfg_test_spec_filtered,
-          cfg_atom_suites].
+          cfg_test_spec,
+          cfg_atom_suites,
+          misspecified_ct_opts,
+          misspecified_ct_compile_opts,
+          misspecified_ct_first_files].
 
 groups() -> [{basic_app, [], [basic_app_default_dirs,
                               basic_app_default_beams]},
@@ -911,12 +917,12 @@ cfg_arbitrary_opts(Config) ->
     true = lists:member({bar, 2}, TestOpts),
     true = lists:member({baz, 3}, TestOpts).
 
-cfg_test_spec_filtered(Config) ->
-    C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_test_spec_filtered_opts_"),
+cfg_test_spec(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_test_spec_opts_"),
 
     AppDir = ?config(apps, C),
 
-    Name = rebar_test_utils:create_random_name("ct_cfg_test_spec_filtered_opts_"),
+    Name = rebar_test_utils:create_random_name("ct_cfg_test_spec_opts_"),
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
@@ -924,9 +930,9 @@ cfg_test_spec_filtered(Config) ->
 
     {ok, State} = rebar_test_utils:run_and_check(C, RebarConfig, ["as", "test", "lock"], return),
 
-    {ok, TestOpts} = rebar_prv_common_test:prepare_tests(State),
+    {error, {rebar_prv_common_test, Error}} = rebar_prv_common_test:prepare_tests(State),
 
-    false = lists:keysearch(test_spec, 1, TestOpts).
+    {badconfig, "Test specs not supported"} = Error.
 
 cfg_atom_suites(Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_atom_suites_"),
@@ -962,7 +968,59 @@ cover_compiled(Config) ->
     Name = ?config(name, Config),
     Mod = list_to_atom(Name),
     {file, _} = cover:is_compiled(Mod).
-    
+
+misspecified_ct_opts(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_atom_suites_"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name("ct_cfg_atom_suites_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{ct_opts, {basic_html, false}}],
+
+    {ok, State} = rebar_test_utils:run_and_check(C, RebarConfig, ["as", "test", "lock"], return),
+
+    {error, {rebar_prv_common_test, Error}} = rebar_prv_common_test:prepare_tests(State),
+
+    {badconfig, {"Value `~p' of option `~p' must be a list", {{basic_html, false}, ct_opts}}} = Error.
+
+misspecified_ct_compile_opts(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_atom_suites_"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name("ct_cfg_atom_suites_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{ct_compile_opts, {d, whatever}}],
+
+    {ok, State} = rebar_test_utils:run_and_check(C, RebarConfig, ["as", "test", "lock"], return),
+
+    Tests = rebar_prv_common_test:prepare_tests(State),
+    {error, {rebar_prv_common_test, Error}} = rebar_prv_common_test:compile(State, Tests),
+
+    {badconfig, {"Value `~p' of option `~p' must be a list", {{d, whatever}, ct_compile_opts}}} = Error.
+
+misspecified_ct_first_files(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_atom_suites_"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name("ct_cfg_atom_suites_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{ct_first_files, some_file}],
+
+    {ok, State} = rebar_test_utils:run_and_check(C, RebarConfig, ["as", "test", "lock"], return),
+
+    Tests = rebar_prv_common_test:prepare_tests(State),
+    {error, {rebar_prv_common_test, Error}} = rebar_prv_common_test:compile(State, Tests),
+
+    {badconfig, {"Value `~p' of option `~p' must be a list", {some_file, ct_first_files}}} = Error.
 
 %% helper for generating test data
 test_suite(Name) ->

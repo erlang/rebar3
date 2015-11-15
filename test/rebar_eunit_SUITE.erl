@@ -11,13 +11,19 @@
 -export([single_file_arg/1, multi_file_arg/1, missing_file_arg/1]).
 -export([single_dir_arg/1, multi_dir_arg/1, missing_dir_arg/1]).
 -export([multiple_arg_composition/1, multiple_arg_errors/1]).
+-export([misspecified_eunit_tests/1]).
+-export([misspecified_eunit_compile_opts/1]).
+-export([misspecified_eunit_first_files/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/file.hrl").
 
 all() ->
-    [{group, basic_app}, {group, multi_app}, {group, cmd_line_args}].
+    [{group, basic_app}, {group, multi_app}, {group, cmd_line_args},
+     misspecified_eunit_tests,
+     misspecified_eunit_compile_opts,
+     misspecified_eunit_first_files].
 
 groups() ->
     [{basic_app, [sequence], [basic_app_compiles, {group, basic_app_results}]},
@@ -484,3 +490,60 @@ multiple_arg_errors(Config) ->
 
     {error, {rebar_prv_eunit, {eunit_test_errors, Expect}}} = Tests.
 
+misspecified_eunit_tests(Config) ->
+    State = rebar_test_utils:init_rebar_state(Config, "basic_app_"),
+
+    AppDir = ?config(apps, State),
+    PrivDir = ?config(priv_dir, State),
+
+    AppDirs = ["src", "include", "test"],
+
+    lists:foreach(fun(F) -> ec_file:copy(filename:join([PrivDir, "basic_app", F]),
+                                         filename:join([AppDir, F]),
+                                         [recursive]) end, AppDirs),
+
+    BaseConfig = [{erl_opts, [{d, config_define}]}, {eunit_compile_opts, [{d, eunit_compile_define}]}],
+
+    RebarConfig = [{eunit_tests, {dir, "test"}}|BaseConfig],
+
+    {error, {rebar_prv_eunit, Error}} = rebar_test_utils:run_and_check(State, RebarConfig, ["eunit"], return),
+
+    {badconfig, {"Value `~p' of option `~p' must be a list", {{dir, "test"}, eunit_tests}}} = Error.
+
+misspecified_eunit_compile_opts(Config) ->
+    State = rebar_test_utils:init_rebar_state(Config, "basic_app_"),
+
+    AppDir = ?config(apps, State),
+    PrivDir = ?config(priv_dir, State),
+
+    AppDirs = ["src", "include", "test"],
+
+    lists:foreach(fun(F) -> ec_file:copy(filename:join([PrivDir, "basic_app", F]),
+                                         filename:join([AppDir, F]),
+                                         [recursive]) end, AppDirs),
+
+    RebarConfig = [{erl_opts, [{d, config_define}]}, {eunit_compile_opts, {d, eunit_compile_define}}],
+
+    {error, {rebar_prv_eunit, Error}} = rebar_test_utils:run_and_check(State, RebarConfig, ["eunit"], return),
+
+    {badconfig, {"Value `~p' of option `~p' must be a list", {{d, eunit_compile_define}, eunit_compile_opts}}} = Error.
+
+misspecified_eunit_first_files(Config) ->
+    State = rebar_test_utils:init_rebar_state(Config, "basic_app_"),
+
+    AppDir = ?config(apps, State),
+    PrivDir = ?config(priv_dir, State),
+
+    AppDirs = ["src", "include", "test"],
+
+    lists:foreach(fun(F) -> ec_file:copy(filename:join([PrivDir, "basic_app", F]),
+                                         filename:join([AppDir, F]),
+                                         [recursive]) end, AppDirs),
+
+    BaseConfig = [{erl_opts, [{d, config_define}]}, {eunit_compile_opts, [{d, eunit_compile_define}]}],
+
+    RebarConfig = [{eunit_first_files, some_file}|BaseConfig],
+
+    {error, {rebar_prv_eunit, Error}} = rebar_test_utils:run_and_check(State, RebarConfig, ["eunit"], return),
+
+    {badconfig, {"Value `~p' of option `~p' must be a list", {some_file, eunit_first_files}}} = Error.
