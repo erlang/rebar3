@@ -91,6 +91,10 @@ format_error({error_running_tests, Reason}) ->
     format_error({error, Reason});
 format_error({failures_running_tests, {Failed, AutoSkipped}}) ->
     io_lib:format("Failures occured running tests: ~b", [Failed+AutoSkipped]);
+format_error({badconfig, {Msg, {Value, Key}}}) ->
+    io_lib:format(Msg, [Value, Key]);
+format_error({badconfig, Msg}) ->
+    io_lib:format(Msg, []);
 format_error({multiple_errors, Errors}) ->
     io_lib:format(lists:concat(["Error running tests:"] ++
                                lists:map(fun(Error) -> "~n  " ++ Error end, Errors)), []).
@@ -151,24 +155,33 @@ split_string(String) ->
     string:tokens(String, [$,]).
 
 cfgopts(State) ->
-    Opts = rebar_state:get(State, ct_opts, []),
-    add_hooks(rebar_utils:filtermap(fun filter_opts/1, Opts), State).
+    case rebar_state:get(State, ct_opts, []) of
+        Opts when is_list(Opts) ->
+            ensure_opts(add_hooks(Opts, State), []);
+        Wrong ->
+            %% probably a single non list term
+            ?PRV_ERROR({badconfig, {"Value `~p' of option `~p' must be a list", {Wrong, ct_opts}}})
+    end.
 
-filter_opts({test_spec, _}) ->
-    ?WARN("Test specs not supported", []),
-    false;
-filter_opts({auto_compile, _}) ->
-    ?WARN("Auto compile not supported", []),
-    false;
-filter_opts({suite, Suite}) when is_integer(hd(Suite)) -> true;
-filter_opts({suite, Suite}) when is_atom(Suite) ->
-    {true, {suite, atom_to_list(Suite)}};
-filter_opts({suite, Suites}) ->
-    {true, {suite, lists:map(fun(S) when is_atom(S) -> atom_to_list(S);
-                                (S) when is_list(S) -> S
-                             end,
-                             Suites)}};
-filter_opts(_) -> true.
+ensure_opts([], Acc) -> lists:reverse(Acc);
+ensure_opts([{test_spec, _}|_Rest], _Acc) ->
+    ?PRV_ERROR({badconfig, "Test specs not supported"});
+ensure_opts([{auto_compile, _}|_Rest], _Acc) ->
+    ?PRV_ERROR({badconfig, "Auto compile not supported"});
+ensure_opts([{suite, Suite}|Rest], Acc) when is_integer(hd(Suite)) ->
+    ensure_opts(Rest, [{suite, Suite}|Acc]);
+ensure_opts([{suite, Suite}|Rest], Acc) when is_atom(Suite) ->
+    ensure_opts(Rest, [{suite, atom_to_list(Suite)}|Acc]);
+ensure_opts([{suite, Suites}|Rest], Acc) ->
+    NewSuites = {suite, lists:map(fun(S) when is_atom(S) -> atom_to_list(S);
+                                     (S) when is_list(S) -> S
+                                  end,
+                                  Suites)},
+    ensure_opts(Rest, [NewSuites|Acc]);
+ensure_opts([{K, V}|Rest], Acc) ->
+    ensure_opts(Rest, [{K, V}|Acc]);
+ensure_opts([V|_Rest], _Acc) ->
+    ?PRV_ERROR({badconfig, {"Member `~p' of option `~p' must be a 2-tuple", {V, ct_opts}}}).
 
 add_hooks(Opts, State) ->
     case {readable(State), lists:keyfind(ct_hooks, 1, Opts)} of
@@ -183,11 +196,12 @@ add_hooks(Opts, State) ->
             lists:keyreplace(ct_hooks, 1, Opts, {ct_hooks, NewHooks})
     end.
 
+select_tests(_, _, {error, _} = Error, _) -> Error;
+select_tests(_, _, _, {error, _} = Error) -> Error;
 select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
-    FixedOpts = lists:filter(fun({_, _}) -> true; (V) -> ?WARN("`~p` is not a valid option for `ct_opts`", [V]) end, CfgOpts),
     Merged = lists:ukeymerge(1,
                              lists:ukeysort(1, CmdOpts),
-                             lists:ukeysort(1, FixedOpts)),
+                             lists:ukeysort(1, CfgOpts)),
     %% make sure `dir` and/or `suite` from command line go in as
     %% a pair overriding both `dir` and `suite` from config if
     %% they exist
@@ -228,7 +242,7 @@ application_dirs([App|Rest], Acc) ->
         false -> application_dirs(Rest, Acc)
     end.
 
-compile(State, {ok, Tests}) ->
+compile(State, {ok, _} = Tests) ->
     %% inject `ct_first_files` and `ct_compile_opts` into the applications
     %% to be compiled
     case inject_ct_state(State, Tests) of
@@ -248,38 +262,68 @@ do_compile(State) ->
         Error   -> Error
     end.
 
-inject_ct_state(State, Tests) ->
+inject_ct_state(State, {ok, Tests}) ->
     Apps = rebar_state:project_apps(State),
-    ModdedApps = lists:map(fun(App) ->
-        NewOpts = inject(rebar_app_info:opts(App), State),
-        rebar_app_info:opts(App, NewOpts)
-    end, Apps),
-    NewOpts = inject(rebar_state:opts(State), State),
-    NewState = rebar_state:opts(State, NewOpts),
-    test_dirs(NewState, ModdedApps, Tests).
+    case inject_ct_state(State, Apps, []) of
+        {ok, {NewState, ModdedApps}} ->
+            test_dirs(NewState, ModdedApps, Tests);
+        {error, _} = Error           -> Error
+    end;
+inject_ct_state(_State, Error) -> Error.
 
-inject(Opts, State) ->
+inject_ct_state(State, [App|Rest], Acc) ->
+    case inject(rebar_app_info:opts(App), State) of
+        {error, _} = Error -> Error;
+        NewOpts            ->
+            NewApp = rebar_app_info:opts(App, NewOpts),
+            inject_ct_state(State, Rest, [NewApp|Acc])
+    end;
+inject_ct_state(State, [], Acc) ->
+    case inject(rebar_state:opts(State), State) of
+        {error, _} = Error -> Error;
+        NewOpts            -> {ok, {rebar_state:opts(State, NewOpts), lists:reverse(Acc)}}
+    end.
+
+opts(Opts, Key, Default) ->
+    case rebar_opts:get(Opts, Key, Default) of
+        Vs when is_list(Vs) -> Vs;
+        Wrong ->
+            ?PRV_ERROR({badconfig, {"Value `~p' of option `~p' must be a list", {Wrong, Key}}})
+    end.
+
+inject(Opts, State) -> erl_opts(Opts, State).
+
+erl_opts(Opts, State) ->
     %% append `ct_compile_opts` to app defined `erl_opts`
-    ErlOpts = rebar_opts:get(Opts, erl_opts, []),
-    CTOpts = rebar_state:get(State, ct_compile_opts, []),
-    NewErlOpts = add_transforms(CTOpts, State) ++ ErlOpts,
-    %% append `ct_first_files` to app defined `erl_first_files`
-    FirstFiles = rebar_opts:get(Opts, erl_first_files, []),
-    CTFirstFiles = rebar_state:get(State, ct_first_files, []),
-    NewFirstFiles = CTFirstFiles ++ FirstFiles,
-    %% insert the new keys into the opts
-    lists:foldl(fun({K, V}, NewOpts) -> rebar_opts:set(NewOpts, K, V) end,
-                Opts,
-                [{erl_opts, NewErlOpts}, {erl_first_files, NewFirstFiles}]).
+    ErlOpts = opts(Opts, erl_opts, []),
+    CTOpts = opts(Opts, ct_compile_opts, []),
+    case add_transforms(append(CTOpts, ErlOpts), State) of
+        {error, Error} -> {error, Error};
+        NewErlOpts     -> first_files(rebar_opts:set(Opts, erl_opts, NewErlOpts))
+    end.
 
-add_transforms(CTOpts, State) ->
+first_files(Opts) ->
+    %% append `ct_first_files` to app defined `erl_first_files`
+    FirstFiles = opts(Opts, erl_first_files, []),
+    CTFirstFiles = opts(Opts, ct_first_files, []),
+    case append(CTFirstFiles, FirstFiles) of
+        {error, _} = Error -> Error;
+        NewFirstFiles  -> rebar_opts:set(Opts, erl_first_files, NewFirstFiles)
+    end.
+
+append({error, _} = Error, _) -> Error;
+append(_, {error, _} = Error) -> Error;
+append(A, B) -> A ++ B.
+
+add_transforms(CTOpts, State) when is_list(CTOpts) ->
     case readable(State) of
         true ->
             ReadableTransform = [{parse_transform, cth_readable_transform}],
             (CTOpts -- ReadableTransform) ++ ReadableTransform;
         false ->
             CTOpts
-    end.
+    end;
+add_transforms({error, _} = Error, _State) -> Error.
 
 readable(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
