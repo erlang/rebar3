@@ -105,25 +105,32 @@ run_aux(State, RawArgs) ->
                      rebar_state:apply_profiles(State, [list_to_atom(Profile)])
              end,
 
+    State2 = case os:getenv("HEX_CDN") of
+                 false ->
+                     State1;
+                 CDN ->
+                     rebar_state:set(State1, rebar_packages_cdn, CDN)
+             end,
+
     %% bootstrap test profile
-    State2 = rebar_state:add_to_profile(State1, test, test_state(State1)),
+    State3 = rebar_state:add_to_profile(State2, test, test_state(State1)),
 
     %% Process each command, resetting any state between each one
     BaseDir = rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR),
-    State3 = rebar_state:set(State2, base_dir,
-                             filename:join(filename:absname(rebar_state:dir(State2)), BaseDir)),
+    State4 = rebar_state:set(State3, base_dir,
+                             filename:join(filename:absname(rebar_state:dir(State3)), BaseDir)),
 
     {ok, Providers} = application:get_env(rebar, providers),
     %% Providers can modify profiles stored in opts, so set default after initializing providers
-    State4 = rebar_state:create_logic_providers(Providers, State3),
-    State5 = rebar_plugins:project_apps_install(State4),
-    State6 = rebar_state:default(State5, rebar_state:opts(State5)),
+    State5 = rebar_state:create_logic_providers(Providers, State4),
+    State6 = rebar_plugins:project_apps_install(State5),
+    State7 = rebar_state:default(State6, rebar_state:opts(State6)),
 
     {Task, Args} = parse_args(RawArgs),
 
-    State7 = rebar_state:code_paths(State6, default, code:get_path()),
+    State8 = rebar_state:code_paths(State7, default, code:get_path()),
 
-    rebar_core:init_command(rebar_state:command_args(State7, Args), Task).
+    rebar_core:init_command(rebar_state:command_args(State8, Args), Task).
 
 init_config() ->
     %% Initialize logging system

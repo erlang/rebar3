@@ -61,6 +61,7 @@
          tup_find/2,
          line_count/1,
          set_httpc_options/0,
+         url_append_path/2,
          escape_chars/1,
          escape_double_quotes/1,
          escape_double_quotes_weak/1,
@@ -797,6 +798,15 @@ set_httpc_options(_, []) ->
 set_httpc_options(Scheme, Proxy) ->
     {ok, {_, _, Host, Port, _, _}} = http_uri:parse(Proxy),
     httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar).
+
+url_append_path(Url, ExtraPath) ->
+     case http_uri:parse(Url) of
+         {ok, {Scheme, UserInfo, Host, Port, Path, Query}} ->
+             {ok, lists:append([atom_to_list(Scheme), "://", UserInfo, Host, ":", integer_to_list(Port),
+                                filename:join(Path, ExtraPath), "?", Query])};
+         _ ->
+             error
+     end.
 
 %% escape\ as\ a\ shell\?
 escape_chars(Str) when is_atom(Str) ->

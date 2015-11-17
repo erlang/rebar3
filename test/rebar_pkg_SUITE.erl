@@ -30,8 +30,8 @@ init_per_testcase(pkgs_provider=Name, Config) ->
     filelib:ensure_dir(filename:join([CacheDir, "registry"])),
     ok = ets:tab2file(Tid, filename:join([CacheDir, "registry"])),
     meck:new(rebar_packages, [passthrough]),
-    meck:expect(rebar_packages, registry_dir, fun(_) -> CacheDir end),
-    meck:expect(rebar_packages, package_dir, fun(_) -> CacheDir end),
+    meck:expect(rebar_packages, registry_dir, fun(_) -> {ok, CacheDir} end),
+    meck:expect(rebar_packages, package_dir, fun(_) -> {ok, CacheDir} end),
     rebar_prv_update:hex_to_index(rebar_state:new()),
     Config;
 init_per_testcase(good_uncached=Name, Config0) ->
@@ -203,8 +203,8 @@ mock_config(Name, Config) ->
     meck:expect(rebar_dir, global_cache_dir, fun(_) -> CacheRoot end),
 
     meck:new(rebar_packages, [passthrough]),
-    meck:expect(rebar_packages, registry_dir, fun(_) -> CacheDir end),
-    meck:expect(rebar_packages, package_dir, fun(_) -> CacheDir end),
+    meck:expect(rebar_packages, registry_dir, fun(_) -> {ok, CacheDir} end),
+    meck:expect(rebar_packages, package_dir, fun(_) -> {ok, CacheDir} end),
     rebar_prv_update:hex_to_index(rebar_state:new()),
 
     %% Cache fetches are mocked -- we assume the server and clients are

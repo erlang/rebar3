@@ -46,7 +46,7 @@ close_packages() ->
     catch ets:delete(?PACKAGE_TABLE).
 
 load_and_verify_version(State) ->
-    RegistryDir = registry_dir(State),
+    {ok, RegistryDir} = registry_dir(State),
     case ets:file2tab(filename:join(RegistryDir, ?INDEX_FILE)) of
         {ok, _} ->
             case ets:lookup_element(?PACKAGE_TABLE, package_index_version, 2) of
@@ -89,21 +89,30 @@ registry_dir(State) ->
         ?DEFAULT_CDN ->
             RegistryDir = filename:join([CacheDir, "hex", "default"]),
             ok = filelib:ensure_dir(filename:join(RegistryDir, "placeholder")),
-            RegistryDir;
+            {ok, RegistryDir};
         CDN ->
-            {ok, {_, _, Host, _, Path, _}} = http_uri:parse(CDN),
-            CDNHostPath = lists:reverse(string:tokens(Host, ".")),
-            CDNPath = tl(filename:split(Path)),
-            RegistryDir = filename:join([CacheDir, "hex"] ++ CDNHostPath ++ CDNPath),
-            ok = filelib:ensure_dir(filename:join(RegistryDir, "placeholder")),
-            RegistryDir
+            case rebar_utils:url_append_path(CDN, ?REMOTE_PACKAGE_DIR) of
+                {ok, Parsed} ->
+                    {ok, {_, _, Host, _, Path, _}} = http_uri:parse(Parsed),
+                    CDNHostPath = lists:reverse(string:tokens(Host, ".")),
+                    CDNPath = tl(filename:split(Path)),
+                    RegistryDir = filename:join([CacheDir, "hex"] ++ CDNHostPath ++ CDNPath),
+                    ok = filelib:ensure_dir(filename:join(RegistryDir, "placeholder")),
+                    {ok, RegistryDir};
+                _ ->
+                    {uri_parse_error, CDN}
+            end
     end.
 
 package_dir(State) ->
-    RegistryDir = registry_dir(State),
-    PackageDir = filename:join([RegistryDir, "packages"]),
-    ok = filelib:ensure_dir(filename:join(PackageDir, "placeholder")),
-    PackageDir.
+    case registry_dir(State) of
+        {ok, RegistryDir} ->
+            PackageDir = filename:join([RegistryDir, "packages"]),
+            ok = filelib:ensure_dir(filename:join(PackageDir, "placeholder")),
+            {ok, PackageDir};
+        Error ->
+            Error
+    end.
 
 registry_checksum({pkg, Name, Vsn}, State) ->
     try
