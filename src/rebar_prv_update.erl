@@ -92,12 +92,24 @@ hex_to_index(State) ->
                                       false ->
                                           true
                                   end;
-                             ({Pkg, [Vsns]}, _) when is_binary(Pkg) ->
-                                  ets:insert(?PACKAGE_TABLE, {Pkg, Vsns});
                              (_, _) ->
                                   true
                           end, true, Registry),
 
+                ets:foldl(fun({Pkg, [[]]}, _) when is_binary(Pkg) ->
+                                  true;
+                             ({Pkg, [Vsns=[Vsn | _Rest]]}, _) when is_binary(Pkg) ->
+                                  %% Verify the package is of the right build tool by checking if the first
+                                  %% version exists in the table from the foldl above
+                                  case ets:member(?PACKAGE_TABLE, {Pkg, Vsn}) of
+                                      true ->
+                                          ets:insert(?PACKAGE_TABLE, {Pkg, Vsns});
+                                      false ->
+                                          true
+                                  end;
+                             (_, _) ->
+                                  true
+                          end, true, Registry),
                 ets:insert(?PACKAGE_TABLE, {package_index_version, ?PACKAGE_INDEX_VERSION}),
                 ?INFO("Writing index to ~s", [PackageIndex]),
                 ets:tab2file(?PACKAGE_TABLE, PackageIndex),
