@@ -32,7 +32,7 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    case rebar_state:command_args(State) of
+    case strip_flags(rebar_state:command_args(State)) of
         ["help"] ->
             ?CONSOLE("Call `rebar3 new help <template>` for a detailed description~n", []),
             show_short_templates(rebar_templater:list_templates(State)),
@@ -71,6 +71,10 @@ info() ->
       "~n"
       "Valid command line options:~n"
       "  <template> [var=foo,...]~n", []).
+
+strip_flags([]) -> [];
+strip_flags(["-"++_|Opts]) -> strip_flags(Opts);
+strip_flags([Opt | Opts]) -> [Opt | strip_flags(Opts)].
 
 is_forced(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
