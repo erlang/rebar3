@@ -15,6 +15,7 @@ main(_Args) ->
     %% Fetch and build deps required to build rebar3
     BaseDeps = [{providers, []}
                ,{getopt, []}
+               ,{cf, []}
                ,{erlware_commons, ["ec_dictionary.erl", "ec_vsn.erl"]}
                ,{certifi, []}],
     Deps = get_deps(),
@@ -68,6 +69,12 @@ fetch_and_compile({Name, ErlFirstFiles}, Deps) ->
         {Name, _, Source} ->
             ok = fetch(Source, Name)
     end,
+
+    %% Hack: erlware_commons depends on a .script file to check if it is being built with
+    %% rebar2 or rebar3. But since rebar3 isn't built yet it can't get the vsn with get_key.
+    %% So we simply make sure that file is deleted before compiling
+    file:delete("_build/default/lib/erlware_commons/rebar.config.script"),
+
     compile(Name, ErlFirstFiles).
 
 fetch({pkg, Name, Vsn}, App) ->

@@ -27,6 +27,7 @@
                   certifi,
                   cth_readable,
                   relx,
+                  cf,
                   inets,
                   eunit_formatters]},
   {env, [
