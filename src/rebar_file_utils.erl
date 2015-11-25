@@ -139,7 +139,7 @@ cp_r(Sources, Dest) ->
         {unix, _} ->
             EscSources = [rebar_utils:escape_chars(Src) || Src <- Sources],
             SourceStr = string:join(EscSources, " "),
-            {ok, []} = rebar_utils:sh(?FMT("cp -R ~s \"~s\"",
+            {ok, []} = rebar_utils:sh(?FMT("cp -Rp ~s \"~s\"",
                                            [SourceStr, rebar_utils:escape_double_quotes(Dest)]),
                                       [{use_stdout, false}, abort_on_error]),
             ok;
