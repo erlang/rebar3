@@ -115,6 +115,8 @@ merge_opts(NewOpts, OldOpts) ->
                        Value;
                   (mib_first_files, NewValue, OldValue) ->
                        OldValue ++ NewValue;
+                  (relx, NewValue, OldValue) ->
+                       rebar_utils:tup_umerge(OldValue, NewValue);
                   (_Key, NewValue, OldValue) when is_list(NewValue) ->
                        case io_lib:printable_list(NewValue) of
                            true when NewValue =:= [] ->
