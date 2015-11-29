@@ -20,7 +20,19 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     application:stop(meck).
 
-init_per_testcase(pkgs_provider, Config) ->
+init_per_testcase(pkgs_provider=Name, Config) ->
+    %% Need to mock out a registry for this test now because it will try to update it automatically
+    Priv = ?config(priv_dir, Config),
+    Tid = ets:new(registry_table, [public]),
+    ets:insert_new(Tid, []),
+    CacheRoot = filename:join([Priv, "cache", atom_to_list(Name)]),
+    CacheDir = filename:join([CacheRoot, "hex", "com", "test", "packages"]),
+    filelib:ensure_dir(filename:join([CacheDir, "registry"])),
+    ok = ets:tab2file(Tid, filename:join([CacheDir, "registry"])),
+    meck:new(rebar_packages, [passthrough]),
+    meck:expect(rebar_packages, registry_dir, fun(_) -> CacheDir end),
+    meck:expect(rebar_packages, package_dir, fun(_) -> CacheDir end),
+    rebar_prv_update:hex_to_index(rebar_state:new()),
     Config;
 init_per_testcase(good_uncached=Name, Config0) ->
     Config = [{good_cache, false},
@@ -76,8 +88,6 @@ init_per_testcase(bad_disconnect=Name, Config0) ->
     meck:expect(httpc, request, fun(_, _, _, _, _) -> {error, econnrefused} end),
     Config.
 
-end_per_testcase(pkgs_provider, Config) ->
-    Config;
 end_per_testcase(_, Config) ->
     unmock_config(Config),
     Config.
