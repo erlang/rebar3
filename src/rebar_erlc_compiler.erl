@@ -520,15 +520,20 @@ target_base(OutDir, Source) ->
                   rebar_dict()) -> 'ok'.
 compile_mib(Source, Target, Opts) ->
     Dir = filename:dirname(Target),
+    IncludeDir = filename:join(Dir, "include"),
+
+    Mib = filename:rootname(Target),
+    HrlFilename = Mib ++ ".hrl",
+
     ok = filelib:ensure_dir(Target),
-    ok = filelib:ensure_dir(filename:join([Dir, "include", "dummy.hrl"])),
+    ok = filelib:ensure_dir(filename:join([IncludeDir, HrlFilename])),
+
     AllOpts = [{outdir, Dir}
               ,{i, [Dir]}] ++
         rebar_opts:get(Opts, mib_opts, []),
 
     case snmpc:compile(Source, AllOpts) of
         {ok, _} ->
-            Mib = filename:rootname(Target),
             MibToHrlOpts =
                 case proplists:get_value(verbosity, AllOpts, undefined) of
                     undefined ->
@@ -537,8 +542,7 @@ compile_mib(Source, Target, Opts) ->
                         #options{specific = [{verbosity, Verbosity}]}
                 end,
             ok = snmpc:mib_to_hrl(Mib, Mib, MibToHrlOpts),
-            Hrl_filename = Mib ++ ".hrl",
-            rebar_file_utils:mv(Hrl_filename, "include"),
+            rebar_file_utils:mv(HrlFilename, IncludeDir),
             ok;
         {error, compilation_failed} ->
             ?FAIL
