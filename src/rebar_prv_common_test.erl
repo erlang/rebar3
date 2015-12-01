@@ -32,7 +32,7 @@ init(State) ->
                                  {short_desc, "Run Common Tests."},
                                  {desc, "Run Common Tests."},
                                  {opts, ct_opts(State)},
-                                 {profiles, [test]}]),
+                                 {profiles, [test, ct]}]),
     {ok, rebar_state:add_provider(State, Provider)}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
@@ -340,7 +340,7 @@ test_dirs(State, Apps, Opts) ->
         {Suites, Dir} when is_integer(hd(Dir)) ->
             set_compile_dirs(State, Apps, join(Suites, Dir));
         {Suites, [Dir]} when is_integer(hd(Dir)) ->
-            set_compile_dirs(State, Apps, join(Suites, Dir));          
+            set_compile_dirs(State, Apps, join(Suites, Dir));
         {_Suites, _Dirs}    -> {error, "Only a single directory may be specified when specifying suites"}
     end.
 
@@ -620,4 +620,3 @@ help(verbose) ->
     "Verbose output";
 help(_) ->
     "".
-
