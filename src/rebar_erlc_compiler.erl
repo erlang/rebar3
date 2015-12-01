@@ -526,7 +526,7 @@ compile_mib(Source, Target, Opts) ->
     HrlFilename = Mib ++ ".hrl",
 
     ok = filelib:ensure_dir(Target),
-    ok = filelib:ensure_dir(filename:join([IncludeDir, HrlFilename])),
+    ok = filelib:ensure_dir(filename:join([IncludeDir, "dummy.hrl"])),
 
     AllOpts = [{outdir, Dir}
               ,{i, [Dir]}] ++
