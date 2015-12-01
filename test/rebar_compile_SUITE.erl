@@ -1022,6 +1022,10 @@ mib_test(Config) ->
     PrivMibsDir = filename:join([AppDir, "_build", "default", "lib", Name, "priv", "mibs"]),
     true = filelib:is_file(filename:join([PrivMibsDir, "SIMPLE-MIB.bin"])),
 
+    %% check mib header
+    IncludeDir = filename:join([AppDir, "_build", "default", "lib", Name, "include"]),
+    true = filelib:is_file(filename:join([IncludeDir, "SIMPLE-MIB.hrl"])),
+
     %% check the extra src_dir was linked into the _build dir
     true = filelib:is_dir(filename:join([AppDir, "_build", "default", "lib", Name, "mibs"])).
 
@@ -1068,6 +1072,10 @@ umbrella_mib_first_test(Config) ->
     %% check a beam corresponding to the src in the extra src_dir exists in ebin
     PrivMibsDir = filename:join([AppsDir, "_build", "default", "lib", Name, "priv", "mibs"]),
     true = filelib:is_file(filename:join([PrivMibsDir, "SIMPLE-MIB.bin"])),
+
+    %% check mib header
+    IncludeDir = filename:join([AppsDir, "_build", "default", "lib", Name, "include"]),
+    true = filelib:is_file(filename:join([IncludeDir, "SIMPLE-MIB.hrl"])),
 
     %% check the extra src_dir was linked into the _build dir
     true = filelib:is_dir(filename:join([AppsDir, "_build", "default", "lib", Name, "mibs"])).
