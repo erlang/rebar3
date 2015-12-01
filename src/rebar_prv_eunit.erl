@@ -346,7 +346,8 @@ resolve_eunit_opts(State) ->
                     true  -> set_verbose(EUnitOpts);
                     false -> EUnitOpts
                  end,
-    case proplists:get_value(eunit_formatters, EUnitOpts1, true) of
+    IsVerbose = lists:member(verbose, EUnitOpts1),
+    case proplists:get_value(eunit_formatters, EUnitOpts1, not IsVerbose) of
         true  -> custom_eunit_formatters(EUnitOpts1);
         false -> EUnitOpts1
     end.
