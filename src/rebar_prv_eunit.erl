@@ -38,20 +38,26 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    %% save the current path so we can preload from it later
+    OldPath = code:get_path(),
+
     Tests = prepare_tests(State),
     %% inject `eunit_first_files`, `eunit_compile_opts` and any
     %% directories required by tests into the applications
     NewState = inject_eunit_state(State, Tests),
     case compile(NewState) of
         %% successfully compiled apps
-        {ok, S} -> do(S, Tests);
+        {ok, S} -> do(S, Tests, OldPath);
         Error   -> Error
     end.
 
-do(State, Tests) ->
+do(State, Tests, OldPath) ->
     ?INFO("Performing EUnit tests...", []),
-
     rebar_utils:update_code(rebar_state:code_paths(State, all_deps), [soft_purge]),
+
+    %% preload eunit modules in case  eunit tests are in a
+    %% directory called `eunit' (which is pretty reasonable)
+    true = rebar_utils:preload_apps([eunit], OldPath),
 
     %% Run eunit provider prehooks
     Providers = rebar_state:providers(State),

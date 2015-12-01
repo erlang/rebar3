@@ -37,17 +37,24 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    %% save the current path so we can preload from it later
+    OldPath = code:get_path(),
+
     Tests = prepare_tests(State),
     case compile(State, Tests) of
         %% successfully compiled apps
-        {ok, S} -> do(S, Tests);
+        {ok, S} -> do(S, Tests, OldPath);
         %% this should look like a compiler error, not a ct error
         Error   -> Error
     end.
 
-do(State, Tests) ->
+do(State, Tests, OldPath) ->
     ?INFO("Running Common Test suites...", []),
     rebar_utils:update_code(rebar_state:code_paths(State, all_deps), [soft_purge]),
+
+    %% preload eunit modules in case ct tests are in a
+    %% directory called `ct' (which is pretty reasonable)
+    true = rebar_utils:preload_apps([common_test], OldPath),
 
     %% Run ct provider prehooks
     Providers = rebar_state:providers(State),
