@@ -346,7 +346,7 @@ resolve_eunit_opts(State) ->
                     true  -> set_verbose(EUnitOpts);
                     false -> EUnitOpts
                  end,
-    case proplists:get_value(eunit_formatters, Opts, true) of
+    case proplists:get_value(eunit_formatters, EUnitOpts1, true) of
         true  -> custom_eunit_formatters(EUnitOpts1);
         false -> EUnitOpts1
     end.
