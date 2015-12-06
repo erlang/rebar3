@@ -30,7 +30,8 @@
          invalid_otp_version/1,
          nonblacklisted_otp_version/1,
          blacklisted_otp_version/1,
-         sh_does_not_miss_messages/1]).
+         sh_does_not_miss_messages/1,
+         tup_merge/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -44,7 +45,8 @@ end_per_testcase(_, _Config) ->
 
 all() ->
     [{group, args_to_tasks},
-     sh_does_not_miss_messages].
+     sh_does_not_miss_messages,
+     tup_merge].
 
 groups() ->
     [{args_to_tasks, [], [empty_arglist,
@@ -198,3 +200,68 @@ sh_does_not_miss_messages(_Config) ->
             false
         end,
     AnyMessageRemained = false.
+
+tup_merge(_Config) ->
+    ?assertEqual(
+       [a,{a,a},{a,a,a},{a,b},{a,b,b},b,{b,a},{b,a,a},{b,b},{b,b,b},z,{z,a},{z,a,a},{z,b},{z,b,b}],
+       rebar_utils:tup_umerge(
+        rebar_utils:tup_sort([a,{a,a},{a,a,a},b,{b,a},{b,a,a},z,{z,a},{z,a,a}]),
+        rebar_utils:tup_sort([a,{a,b},{a,b,b},b,{b,b},{b,b,b},z,{z,b},{z,b,b}])
+       )
+    ),
+    ?assertEqual(
+       [a,{a,b},{a,b,b},{a,a},{a,a,a},b,{b,b},{b,b,b},{b,a},{b,a,a},z,{z,b},{z,b,b},{z,a},{z,a,a}],
+       rebar_utils:tup_umerge(
+         rebar_utils:tup_sort([a,{a,b},{a,b,b},b,{b,b},{b,b,b},z,{z,b},{z,b,b}]),
+         rebar_utils:tup_sort([a,{a,a},{a,a,a},b,{b,a},{b,a,a},z,{z,a},{z,a,a}])
+       )
+    ),
+    ?assertEqual(
+       [a,{a,b},{a,b,b},{a,a},{a,a,a},b,{b,b},{b,b,b},{b,a},{b,a,a},z,{z,b},{z,b,b},{z,a},{z,a,a}],
+       rebar_utils:tup_umerge(
+         rebar_utils:tup_sort([a,b,z,{a,b},{b,b},{z,b},{a,b,b},{b,b,b},{z,b,b}]),
+         rebar_utils:tup_sort([a,{a,a},{a,a,a},b,{b,a},{b,a,a},z,{z,a},{z,a,a}])
+       )
+    ),
+    ?assertEqual(
+       [{a,b},a,{a,b,b},{a,a},{a,a,a},{b,b},b,{b,b,b},{b,a},{b,a,a},{z,b},z,{z,b,b},{z,a},{z,a,a}],
+       rebar_utils:tup_umerge(
+         rebar_utils:tup_sort([{a,b},{b,b},{z,b},a,b,z,{a,b,b},{b,b,b},{z,b,b}]),
+         rebar_utils:tup_sort([a,{a,a},{a,a,a},b,{b,a},{b,a,a},z,{z,a},{z,a,a}])
+       )
+    ),
+    ?assertEqual(
+       [a,{a,b},{a,b,b},{a,a},{a,a,a},b,{b,b},{b,b,b},{b,a},{b,a,a},z,{z,b},{z,b,b},{z,a},{z,a,a}],
+       rebar_utils:tup_umerge(
+         rebar_utils:tup_sort([a,{a,b},{a,b,b},b,{b,b},{b,b,b},z,{z,b},{z,b,b}]),
+         rebar_utils:tup_sort([{a,a},a,{a,a,a},{b,a},b,{b,a,a},{z,a},z,{z,a,a}])
+       )
+    ),
+    ?assertEqual(
+       [{a,b},a,{a,b,b},{a,a},{a,a,a},{b,b},b,{b,b,b},{b,a},{b,a,a},{z,b},z,{z,b,b},{z,a},{z,a,a}],
+       rebar_utils:tup_umerge(
+         rebar_utils:tup_sort([{a,b},{b,b},{z,b},a,b,z,{a,b,b},{b,b,b},{z,b,b}]),
+         rebar_utils:tup_sort([{a,a},a,{a,a,a},{b,a},b,{b,a,a},{z,a},z,{z,a,a}])
+       )
+    ),
+    ?assertEqual(
+       [{a,b},{a,b,b},a,{a,a},{a,a,a},{b,b},{b,b,b},b,{b,a},{b,a,a},{z,b},{z,b,b},z,{z,a},{z,a,a}],
+       rebar_utils:tup_umerge(
+         rebar_utils:tup_sort([{a,b},{a,b,b},{b,b},{b,b,b},{z,b},{z,b,b},a,b,z]),
+         rebar_utils:tup_sort([{a,a},{a,a,a},a,{b,a},{b,a,a},b,{z,a},{z,a,a},z])
+       )
+    ),
+    ?assertEqual(
+       [{a,b},{a,b,b},a,{a,a},{a,a,a},{b,b},{b,b,b},b,{b,a},{b,a,a},{z,b},{z,b,b},z,{z,a},{z,a,a}],
+       rebar_utils:tup_umerge(
+         rebar_utils:tup_sort([{a,b},{a,b,b},{b,b},{b,b,b},{z,b},{z,b,b},a,b,z]),
+         rebar_utils:tup_sort([{a,a},{a,b},{a,a,a},{a,b,b},a,{b,a},{b,a,a},b,{z,a},{z,a,a},z])
+       )
+    ),
+    ?assertEqual(
+       [{a,b,b},{a,b},a,{a,a},{a,a,a},{b,b},{b,b,b},b,{b,a,a},{b,a},{z,b},{z,b,b},z,{z,a},{z,a,a}],
+       rebar_utils:tup_umerge(
+         rebar_utils:tup_sort([{a,b,b},{b,b},{a,b},{b,b,b},{z,b},{z,b,b},a,b,z]),
+         rebar_utils:tup_sort([{a,a},{a,a,a},a,{b,a,a},b,{z,a},{z,a,a},{b,a},z])
+       )
+    ).
