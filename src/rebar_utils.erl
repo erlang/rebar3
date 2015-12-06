@@ -285,7 +285,18 @@ tup_umerge(NewList, OldList) ->
 tup_umerge_([], Olds) ->
     Olds;
 tup_umerge_([New|News], Olds) ->
-    lists:reverse(umerge(News, Olds, [], New)).
+    tup_umerge_dedup_(umerge(News, Olds, [], New), []).
+
+%% removes 100% identical duplicate elements so that
+%% `[a,{a,b},a,{a,c},a]' returns `[a,{a,b},{a,c}]'.
+%% Operates on a reverted list that gets reversed as part of this pass
+tup_umerge_dedup_([], Acc) ->
+    Acc;
+tup_umerge_dedup_([H|T], Acc) ->
+    case lists:member(H,T) of
+        true -> tup_umerge_dedup_(T, Acc);
+        false -> tup_umerge_dedup_(T, [H|Acc])
+    end.
 
 tup_find(_Elem, []) ->
     false;
@@ -304,9 +315,9 @@ tup_find(Elem, [_Elem | Elems]) ->
 %% This is equivalent to umerge2_2 in the stdlib, except we use the expanded
 %% value/key only to compare
 umerge(News, [Old|Olds], Merged, Cmp) when element(1, Cmp) == element(1, Old);
-                                           element(1, Cmp) == Old;
-                                           Cmp == element(1, Old);
-                                           Cmp =< Old ->
+                                           element(1, Cmp) == Old andalso not is_tuple(Old);
+                                           Cmp == element(1, Old) andalso not is_tuple(Cmp);
+                                           Cmp =< Old andalso not is_tuple(Cmp) andalso not is_tuple(Old) ->
     umerge(News, Olds, [Cmp | Merged], Cmp, Old);
 umerge(News, [Old|Olds], Merged, Cmp) ->
     umerge(News, Olds, [Old | Merged], Cmp);
@@ -320,9 +331,9 @@ umerge(News, [], Merged, Cmp) ->
 umerge([New|News], Olds, Merged, CmpMerged, Cmp) when CmpMerged == Cmp ->
     umerge(News, Olds, Merged, New);
 umerge([New|News], Olds, Merged, _CmpMerged, Cmp) when element(1,New) == element(1, Cmp);
-                                                       element(1,New) == Cmp;
-                                                       New == element(1, Cmp);
-                                                       New =< Cmp ->
+                                                       element(1,New) == Cmp andalso not is_tuple(Cmp);
+                                                       New == element(1, Cmp) andalso not is_tuple(New);
+                                                       New =< Cmp andalso not is_tuple(New) andalso not is_tuple(Cmp) ->
     umerge(News, Olds, [New | Merged], New, Cmp);
 umerge([New|News], Olds, Merged, _CmpMerged, Cmp) -> % >
     umerge(News, Olds, [Cmp | Merged], New);
