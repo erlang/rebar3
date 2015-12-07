@@ -259,6 +259,13 @@ tup_merge(_Config) ->
        )
     ),
     ?assertEqual(
+       [{l, a}, {r, a, b}, {s, a}, {s, b}],
+       rebar_utils:tup_umerge(
+         rebar_utils:tup_sort([{r, a, b}, {s, a}, {l, a}]),
+         rebar_utils:tup_sort([{s, b}])
+       )
+    ),
+    ?assertEqual(
        [{a,b,b},{a,b},a,{a,a},{a,a,a},{b,b},{b,b,b},b,{b,a,a},{b,a},{z,b},{z,b,b},z,{z,a},{z,a,a}],
        rebar_utils:tup_umerge(
          rebar_utils:tup_sort([{a,b,b},{b,b},{a,b},{b,b,b},{z,b},{z,b,b},a,b,z]),
