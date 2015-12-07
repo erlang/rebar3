@@ -1,5 +1,5 @@
 [{<<"bbmustache">>,{pkg,<<"bbmustache">>,<<"1.0.4">>},0},
- {<<"certifi">>,{pkg,<<"certifi">>,<<"0.1.1">>},0},
+ {<<"certifi">>,{pkg,<<"certifi">>,<<"0.3.0">>},0},
  {<<"cf">>,{pkg,<<"cf">>,<<"0.2.1">>},0},
  {<<"cth_readable">>,{pkg,<<"cth_readable">>,<<"1.1.0">>},0},
  {<<"erlware_commons">>,{pkg,<<"erlware_commons">>,<<"0.18.0">>},0},
