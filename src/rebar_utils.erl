@@ -67,7 +67,8 @@
          check_min_otp_version/1,
          check_blacklisted_otp_versions/1,
          info_useless/2,
-         list_dir/1]).
+         list_dir/1,
+         preload_apps/2]).
 
 %% for internal use only
 -export([otp_release/0]).
@@ -404,6 +405,29 @@ abort_if_blacklisted(BlacklistedRegex, OtpRelease) ->
         nomatch ->
             ?DEBUG("~s does not match blacklisted OTP version ~s",
                    [OtpRelease, BlacklistedRegex])
+    end.
+
+preload_apps(Apps, Path) ->
+    lists:all(fun(true) -> true; (_) -> false end, [ load_all_mods(App, Path) || App <- Apps ]).
+
+load_all_mods(App, Path) ->
+    %% save the current path for restoration
+    CurrPath = code:get_path(),
+    %% this should ensure the app is reloaded from the right location
+    %% before compilation takes place
+    _ = code:set_path(Path),
+    case application:load(App) of
+        ok                           -> noop;
+        {error, {already_loaded, _}} -> noop
+    end,
+    {ok, Mods} = application:get_key(App, modules),
+    true = lists:all(fun({module, _}) -> true; (_) -> false end, [ maybe_load_module(M) || M <- Mods ]),
+    code:set_path(CurrPath).
+
+maybe_load_module(M) ->
+    case code:is_loaded(M) of
+        false -> code:load_file(M);
+        _     -> {module, M}
     end.
 
 %% ====================================================================
