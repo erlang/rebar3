@@ -116,7 +116,7 @@ compile(AppInfo, CompileOpts) when element(1, AppInfo) == app_info_t ->
                             check_files([filename:join(Dir, File)
                                          || File <- rebar_opts:get(RebarOpts, mib_first_files, [])]),
                             filename:join(Dir, "mibs"), ".mib", filename:join([Dir, "priv", "mibs"]), ".bin",
-                            fun compile_mib/3),
+                            compile_mib(AppInfo)),
 
     SrcDirs = lists:map(fun(SrcDir) -> filename:join(Dir, SrcDir) end,
                         rebar_dir:src_dirs(RebarOpts, ["src"])),
@@ -516,36 +516,44 @@ internal_erl_compile(_Opts, Dir, Module, OutDir, ErlOpts) ->
 target_base(OutDir, Source) ->
     filename:join(OutDir, filename:basename(Source, ".erl")).
 
--spec compile_mib(file:filename(), file:filename(),
-                  rebar_dict()) -> 'ok'.
-compile_mib(Source, Target, Opts) ->
-    Dir = filename:dirname(Target),
-    IncludeDir = filename:join(Dir, "include"),
+-spec compile_mib(rebar_app_info:t()) ->
+    fun((file:filename(), file:filename(), rebar_dict()) -> 'ok').
+compile_mib(AppInfo) ->
+    fun(Source, Target, Opts) ->
+        Dir = filename:dirname(Target),
+        IncludeDir = filename:join(Dir, "include"),
 
-    Mib = filename:rootname(Target),
-    HrlFilename = Mib ++ ".hrl",
+        Mib = filename:rootname(Target),
+        HrlFilename = Mib ++ ".hrl",
+        Hrl = filename:basename(HrlFilename),
 
-    ok = filelib:ensure_dir(Target),
-    ok = filelib:ensure_dir(filename:join([IncludeDir, "dummy.hrl"])),
+        AppInclude = filename:join([rebar_app_info:dir(AppInfo), "include"]),
 
-    AllOpts = [{outdir, Dir}
-              ,{i, [Dir]}] ++
-        rebar_opts:get(Opts, mib_opts, []),
+        ok = filelib:ensure_dir(Target),
+        ok = filelib:ensure_dir(filename:join([IncludeDir, "dummy.hrl"])),
+        ok = filelib:ensure_dir(filename:join([AppInclude, "dummy.hrl"])),
 
-    case snmpc:compile(Source, AllOpts) of
-        {ok, _} ->
-            MibToHrlOpts =
-                case proplists:get_value(verbosity, AllOpts, undefined) of
-                    undefined ->
-                        #options{specific = []};
-                    Verbosity ->
-                        #options{specific = [{verbosity, Verbosity}]}
-                end,
-            ok = snmpc:mib_to_hrl(Mib, Mib, MibToHrlOpts),
-            rebar_file_utils:mv(HrlFilename, IncludeDir),
-            ok;
-        {error, compilation_failed} ->
-            ?FAIL
+        AllOpts = [{outdir, Dir}
+                  ,{i, [Dir]}] ++
+            rebar_opts:get(Opts, mib_opts, []),
+
+        case snmpc:compile(Source, AllOpts) of
+            {ok, _} ->
+                MibToHrlOpts =
+                    case proplists:get_value(verbosity, AllOpts, undefined) of
+                        undefined ->
+                            #options{specific = []};
+                        Verbosity ->
+                            #options{specific = [{verbosity, Verbosity}]}
+                    end,
+                ok = snmpc:mib_to_hrl(Mib, Mib, MibToHrlOpts),
+                rebar_file_utils:mv(HrlFilename, IncludeDir),
+                rebar_file_utils:symlink_or_copy(filename:join([IncludeDir, Hrl]),
+                                                 filename:join([AppInclude, Hrl])),
+                ok;
+            {error, compilation_failed} ->
+                ?FAIL
+        end
     end.
 
 -spec compile_xrl(file:filename(), file:filename(),

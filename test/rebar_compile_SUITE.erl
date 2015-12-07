@@ -1025,6 +1025,9 @@ mib_test(Config) ->
     %% check a hrl corresponding to the mib in the mibs dir exists in priv/mibs/include
     true = filelib:is_file(filename:join([PrivMibsDir, "include", "SIMPLE-MIB.hrl"])),
 
+    %% check a hrl corresponding to the mib in the mibs dir exists in include
+    true = filelib:is_file(filename:join([AppDir, "include", "SIMPLE-MIB.hrl"])),
+
     %% check the mibs dir was linked into the _build dir
     true = filelib:is_dir(filename:join([AppDir, "_build", "default", "lib", Name, "mibs"])).
 
@@ -1074,6 +1077,9 @@ umbrella_mib_first_test(Config) ->
 
     %% check a hrl corresponding to the mib in the mibs dir exists in priv/mibs/include
     true = filelib:is_file(filename:join([PrivMibsDir, "include", "SIMPLE-MIB.hrl"])),
+
+    %% check a hrl corresponding to the mib in the mibs dir exists in include
+    true = filelib:is_file(filename:join([AppDir, "include", "SIMPLE-MIB.hrl"])),
 
     %% check the mibs dir was linked into the _build dir
     true = filelib:is_dir(filename:join([AppsDir, "_build", "default", "lib", Name, "mibs"])).
