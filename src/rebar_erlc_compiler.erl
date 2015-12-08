@@ -521,16 +521,12 @@ target_base(OutDir, Source) ->
 compile_mib(AppInfo) ->
     fun(Source, Target, Opts) ->
         Dir = filename:dirname(Target),
-        IncludeDir = filename:join(Dir, "include"),
-
         Mib = filename:rootname(Target),
         HrlFilename = Mib ++ ".hrl",
-        Hrl = filename:basename(HrlFilename),
 
         AppInclude = filename:join([rebar_app_info:dir(AppInfo), "include"]),
 
         ok = filelib:ensure_dir(Target),
-        ok = filelib:ensure_dir(filename:join([IncludeDir, "dummy.hrl"])),
         ok = filelib:ensure_dir(filename:join([AppInclude, "dummy.hrl"])),
 
         AllOpts = [{outdir, Dir}
@@ -547,9 +543,7 @@ compile_mib(AppInfo) ->
                             #options{specific = [{verbosity, Verbosity}]}
                     end,
                 ok = snmpc:mib_to_hrl(Mib, Mib, MibToHrlOpts),
-                rebar_file_utils:mv(HrlFilename, IncludeDir),
-                rebar_file_utils:symlink_or_copy(filename:join([IncludeDir, Hrl]),
-                                                 filename:join([AppInclude, Hrl])),
+                rebar_file_utils:mv(HrlFilename, AppInclude),
                 ok;
             {error, compilation_failed} ->
                 ?FAIL
