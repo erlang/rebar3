@@ -73,24 +73,33 @@ do(State) ->
         ?INFO("Verifying dependencies...", []),
         Profiles = rebar_state:current_profiles(State),
         ProjectApps = rebar_state:project_apps(State),
+	%% If true, the user will be asked for permision before any download happen
+	Permision = try rebar_state:get(State, download_confirmation)
+                    catch
+                        _:_ -> false
+                    end, 
 
         Upgrade = rebar_state:get(State, upgrade, false),
-        {Apps, State1} = deps_per_profile(Profiles, Upgrade, State),
 
-        State2 = rebar_state:update_all_deps(State1, Apps),
-        CodePaths = [rebar_app_info:ebin_dir(A) || A <- Apps],
-        State3 = rebar_state:update_code_paths(State2, all_deps, CodePaths),
-
-        Source = ProjectApps ++ Apps,
-        case find_cycles(Source) of
-            {cycles, Cycles} ->
-                ?PRV_ERROR({cycles, Cycles});
-            {error, Error} ->
-                {error, Error};
-            {no_cycle, Sorted} ->
-                ToCompile = cull_compile(Sorted, ProjectApps),
-                {ok, rebar_state:deps_to_build(State3, ToCompile)}
-        end
+	case deps_per_profile(Profiles, Upgrade, Permision, State) of
+		{error, permission_denied} -> 
+			{error, permission_denied};
+		{Apps, State1} ->
+		        State2 = rebar_state:update_all_deps(State1, Apps),
+		        CodePaths = [rebar_app_info:ebin_dir(A) || A <- Apps],
+		        State3 = rebar_state:update_code_paths(State2, all_deps, CodePaths),
+		
+		        Source = ProjectApps ++ Apps,
+		        case find_cycles(Source) of
+		            {cycles, Cycles} ->
+		                ?PRV_ERROR({cycles, Cycles});
+		            {error, Error} ->
+		                {error, Error};
+		            {no_cycle, Sorted} ->
+		                ToCompile = cull_compile(Sorted, ProjectApps),
+		                {ok, rebar_state:deps_to_build(State3, ToCompile)}
+		        end
+		end
     catch
         %% maybe_fetch will maybe_throw an exception to break out of some loops
         _:{error, Reason} ->
@@ -129,39 +138,68 @@ handle_deps_as_profile(Profile, State, Deps, Upgrade) ->
     DepsDir = profile_dep_dir(State, Profile),
     Deps1 = rebar_app_utils:parse_deps(DepsDir, Deps, State, Locks, Level),
     ProfileLevelDeps = [{Profile, Deps1, Level}],
-    handle_profile_level(ProfileLevelDeps, [], sets:new(), Upgrade, Locks, State).
+	
+    %% If true, the user will be asked for permision before any download happen
+    Permision = try rebar_state:get(State, download_confirmation)
+                catch
+                    _:_ -> false
+                 end, 
+    init_profile_level(ProfileLevelDeps, [], [], sets:new(), Upgrade, Permision, Locks, State).
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
 %% finds all the deps in `{deps, ...}` for each profile provided.
-deps_per_profile(Profiles, Upgrade, State) ->
+deps_per_profile(Profiles, Upgrade, Permision, State) ->
     Level = 0,
     Locks = rebar_state:get(State, {locks, default}, []),
     Deps = lists:foldl(fun(Profile, DepAcc) ->
                                [parsed_profile_deps(State, Profile, Level) | DepAcc]
                        end, [], Profiles),
-    handle_profile_level(Deps, [], sets:new(), Upgrade, Locks, State).
+	
+    init_profile_level(Deps, [], [], sets:new(), Upgrade, Permision, Locks, State).
+    
 
 parsed_profile_deps(State, Profile, Level) ->
     ParsedDeps = rebar_state:get(State, {parsed_deps, Profile}, []),
     {Profile, ParsedDeps, Level}.
 
+
 %% Level-order traversal of all dependencies, across profiles.
 %% If profiles x,y,z are present, then the traversal will go:
-%% x0, y0, z0, x1, y1, z1, ..., xN, yN, zN.
-handle_profile_level([], Apps, _Seen, _Upgrade, _Locks, State) ->
-    {Apps, State};
-handle_profile_level([{Profile, Deps, Level} | Rest], Apps, Seen, Upgrade, Locks, State) ->
+%% x0, y0, z0, x1, y1, z1, ..., xN, yN, zN. This function will 
+%% initialize the download of all dependencies at a particular level.
+init_profile_level(Deps, NextLevDeps, Apps, Seen, Upgrade, Permision, Locks, State) ->
+    case Permision of 
+	true -> 
+		case ask_user_permision(Deps) of
+			ok ->
+			   	handle_profile_level(Deps, NextLevDeps, Apps, Seen, Upgrade, Permision, Locks, State);
+			permission_denied ->
+				?INFO("~s", ["Aborting..."]),
+				{error, permission_denied}
+			end;
+	false ->
+    		handle_profile_level(Deps, NextLevDeps, Apps, Seen, Upgrade, Permision, Locks, State)
+    end.
+
+handle_profile_level([], NextLevDeps, Apps, Seen, Upgrade, Permision, Locks, State) ->
+    case NextLevDeps of
+	[] -> {Apps, State};
+	_ ->
+	      init_profile_level(NextLevDeps, [], Apps, Seen, Upgrade, Permision, Locks, State)
+    end;
+
+handle_profile_level([{Profile, Deps, Level} | Rest], NextLevDeps, Apps, Seen, Upgrade, Permision, Locks, State) ->
     {Deps1, Apps1, State1, Seen1} =
         update_deps(Profile, Level, Deps, Apps
                    ,State, Upgrade, Seen, Locks),
-    Deps2 = case Deps1 of
-        [] -> Rest;
-        _ -> Rest ++ [{Profile, Deps1, Level+1}]
-    end,
-    handle_profile_level(Deps2, Apps1, sets:union(Seen, Seen1), Upgrade, Locks, State1).
+    NextLevDeps2 = case Deps1 of
+			[] -> NextLevDeps;
+         		_ -> NextLevDeps ++ [{Profile, Deps1, Level+1}]
+     		   end,   
+    handle_profile_level(Rest, NextLevDeps2, Apps1, sets:union(Seen, Seen1), Upgrade, Permision, Locks, State1).
 
 find_cycles(Apps) ->
     case rebar_digraph:compile_order(Apps) of
@@ -399,3 +437,25 @@ not_needs_compile(App) ->
     not(rebar_app_info:is_checkout(App))
         andalso rebar_app_info:valid(App)
           andalso rebar_app_info:has_all_artifacts(App) =:= true.
+
+ask_user_permision(AppstoFetch) ->
+    io:format("The following Packages will be downloaded:~n"),
+    Deps = dep_accumulator(AppstoFetch, []),
+    [?INFO("-----~s-~s", [App, Ver]) || {App, Ver} <- Deps],
+    case io:get_chars("Do you want to continue? (y/n)", 2) of
+	"y\n" -> ok;
+	"Y\n" -> ok;
+	"n\n" -> permission_denied;
+	"N\n" -> permission_denied
+    end.
+
+dep_accumulator([], Acc) -> Acc;
+dep_accumulator([{_, Deps, _} | Rest], Acc)->
+    MoreAcc = lists:foldl(
+      fun(AppInfo, AccAcc) ->
+              [{binary_to_list(rebar_app_info:name(AppInfo)), 
+				binary_to_list(rebar_app_info:original_vsn(AppInfo))} | AccAcc]
+      end,
+      Acc,
+      Deps),
+      dep_accumulator(Rest, MoreAcc).
