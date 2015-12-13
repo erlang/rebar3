@@ -54,11 +54,7 @@ _rebar3()
             --suite \
             --group \
             --case \
-            --spec \
-            --join_specs \
-            --label \
             --config \
-            --userconfig \
             --allow_user_terms \
             --logdir \
             --logopts \
@@ -66,21 +62,20 @@ _rebar3()
             --silent_connections \
             --stylesheet \
             --cover \
-            --cover_spec \
-            --cover_stop \
-            --event_handler \
-            --include \
-            --abort_if_missing_suites \
-            --multiply_timetraps \
-            --scale_timetraps \
-            --create_priv_dir \
             --repeat \
             --duration \
             --until \
             --force_stop \
             --basic_html \
-            --ct_hooks \
-            --verbose"
+            --stylesheet \
+            --decrypt_key \
+            --decrypt_file \
+            --abort_if_missing_suites \
+            --multiply_timetraps \
+            --scale_timetraps \
+            --create_priv_dir \
+            --verbose" \
+            --auto_compile
     elif [[ ${prev} == deps ]] ; then
         :
     elif [[ ${prev} == dialyzer ]] ; then

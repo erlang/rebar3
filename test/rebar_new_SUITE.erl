@@ -6,7 +6,8 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-all() -> [app_git_user, app_hg_user, app_with_fallbacks].
+all() -> [app_git_user, app_hg_user, app_with_fallbacks,
+          app_with_flags1, app_with_flags2].
 
 
 init_per_testcase(Case, Config0) ->
@@ -88,6 +89,42 @@ app_hg_user(Config) ->
       Config, Name,
       [{"LICENSE", ["hgname", "hg@email.com"]},
        {"README.md", [Name]},
+       {".gitignore", []},
+       {"rebar.config", []},
+       {filename:join(["src", Name++".app.src"]), [Name]},
+       {filename:join(["src", Name++"_sup.erl"]), [Name]},
+       {filename:join(["src", Name++"_app.erl"]), [Name]}
+      ]).
+
+app_with_flags1(Config) ->
+    Name = ?config(name, Config),
+    rebar_test_utils:run_and_check(
+      Config, [],
+      ["new", "test_app", "-f", Name],
+      {ok, []}
+     ),
+    validate_files(
+      Config, Name,
+      [{"LICENSE", []},
+       {"README.md", []},
+       {".gitignore", []},
+       {"rebar.config", []},
+       {filename:join(["src", Name++".app.src"]), [Name]},
+       {filename:join(["src", Name++"_sup.erl"]), [Name]},
+       {filename:join(["src", Name++"_app.erl"]), [Name]}
+      ]).
+
+app_with_flags2(Config) ->
+    Name = ?config(name, Config),
+    rebar_test_utils:run_and_check(
+      Config, [],
+      ["new", "-f", "test_app", Name],
+      {ok, []}
+     ),
+    validate_files(
+      Config, Name,
+      [{"LICENSE", []},
+       {"README.md", []},
        {".gitignore", []},
        {"rebar.config", []},
        {filename:join(["src", Name++".app.src"]), [Name]},

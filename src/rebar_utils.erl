@@ -285,7 +285,18 @@ tup_umerge(NewList, OldList) ->
 tup_umerge_([], Olds) ->
     Olds;
 tup_umerge_([New|News], Olds) ->
-    lists:reverse(umerge(News, Olds, [], New)).
+    tup_umerge_dedup_(umerge(new, News, Olds, [], New), []).
+
+%% removes 100% identical duplicate elements so that
+%% `[a,{a,b},a,{a,c},a]' returns `[a,{a,b},{a,c}]'.
+%% Operates on a reverted list that gets reversed as part of this pass
+tup_umerge_dedup_([], Acc) ->
+    Acc;
+tup_umerge_dedup_([H|T], Acc) ->
+    case lists:member(H,T) of
+        true -> tup_umerge_dedup_(T, Acc);
+        false -> tup_umerge_dedup_(T, [H|Acc])
+    end.
 
 tup_find(_Elem, []) ->
     false;
@@ -301,35 +312,58 @@ tup_find(Elem, [Elem1 | Elems]) when is_tuple(Elem1) ->
 tup_find(Elem, [_Elem | Elems]) ->
     tup_find(Elem, Elems).
 
-%% This is equivalent to umerge2_2 in the stdlib, except we use the expanded
-%% value/key only to compare
-umerge(News, [Old|Olds], Merged, Cmp) when element(1, Cmp) == element(1, Old);
-                                           element(1, Cmp) == Old;
-                                           Cmp == element(1, Old);
-                                           Cmp =< Old ->
-    umerge(News, Olds, [Cmp | Merged], Cmp, Old);
-umerge(News, [Old|Olds], Merged, Cmp) ->
-    umerge(News, Olds, [Old | Merged], Cmp);
-umerge(News, [], Merged, Cmp) ->
-    lists:reverse(News, [Cmp | Merged]).
+-spec umerge(new|old, News, Olds, Acc, Current) -> Merged when
+      News :: [term()],
+      Olds :: [term()],
+      Acc  :: [term()],
+      Current :: term(),
+      Merged :: [term()].
+umerge(_, [], [], Acc, Current) ->
+    [Current | Acc];
+umerge(new, News, [], Acc, Current) ->
+    %% only news left
+    lists:reverse(News, [Current|Acc]);
+umerge(old, [], Olds, Acc, Current) ->
+    %% only olds left
+    lists:reverse(Olds, [Current|Acc]);
+umerge(new, News, [Old|Olds], Acc, Current) ->
+    {Dir, Merged, NewCurrent} = compare({new, Current}, {old, Old}),
+    umerge(Dir, News, Olds, [Merged|Acc], NewCurrent);
+umerge(old, [New|News], Olds, Acc, Current) ->
+    {Dir, Merged, NewCurrent} = compare({new, New}, {old, Current}),
+    umerge(Dir, News, Olds, [Merged|Acc], NewCurrent).
 
-%% Similar to stdlib's umerge2_1 in the stdlib, except that when the expanded
-%% value/keys compare equal, we check if the element is a full dupe to clear it
-%% (like the stdlib function does) or otherwise keep the duplicate around in
-%% an order that prioritizes 'New' elements.
-umerge([New|News], Olds, Merged, CmpMerged, Cmp) when CmpMerged == Cmp ->
-    umerge(News, Olds, Merged, New);
-umerge([New|News], Olds, Merged, _CmpMerged, Cmp) when element(1,New) == element(1, Cmp);
-                                                       element(1,New) == Cmp;
-                                                       New == element(1, Cmp);
-                                                       New =< Cmp ->
-    umerge(News, Olds, [New | Merged], New, Cmp);
-umerge([New|News], Olds, Merged, _CmpMerged, Cmp) -> % >
-    umerge(News, Olds, [Cmp | Merged], New);
-umerge([], Olds, Merged, CmpMerged, Cmp) when CmpMerged == Cmp ->
-    lists:reverse(Olds, Merged);
-umerge([], Olds, Merged, _CmpMerged, Cmp) ->
-    lists:reverse(Olds, [Cmp | Merged]).
+-spec compare({Priority, term()}, {Secondary, term()}) ->
+    {NextPriority, Merged, Larger} when
+      Priority :: new | old,
+      Secondary :: new | old,
+      NextPriority :: new | old,
+      Merged :: term(),
+      Larger :: term().
+compare({Priority, A}, {Secondary, B}) when is_tuple(A), is_tuple(B) ->
+    KA = element(1,A),
+    KB = element(1,B),
+    if KA == KB -> {Secondary, A, B};
+       KA  < KB -> {Secondary, A, B};
+       KA  > KB -> {Priority, B, A}
+    end;
+compare({Priority, A}, {Secondary, B}) when not is_tuple(A), not is_tuple(B) ->
+    if A == B -> {Secondary, A, B};
+       A  < B -> {Secondary, A, B};
+       A  > B -> {Priority, B, A}
+    end;
+compare({Priority, A}, {Secondary, B}) when is_tuple(A), not is_tuple(B) ->
+    KA = element(1,A),
+    if KA == B -> {Secondary, A, B};
+       KA  < B -> {Secondary, A, B};
+       KA  > B -> {Priority, B, A}
+    end;
+compare({Priority, A}, {Secondary, B}) when not is_tuple(A), is_tuple(B) ->
+    KB = element(1,B),
+    if A == KB -> {Secondary, A, B};
+       A  < KB -> {Secondary, A, B};
+       A  > KB -> {Priority, B, A}
+    end.
 
 %% Implements wc -l functionality used to determine patchcount from git output
 line_count(PatchLines) ->

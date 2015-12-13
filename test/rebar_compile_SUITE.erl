@@ -1018,11 +1018,14 @@ mib_test(Config) ->
 
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
 
-    %% check a beam corresponding to the src in the extra src_dir exists in ebin
+    %% check a bin corresponding to the mib in the mibs dir exists in priv/mibs
     PrivMibsDir = filename:join([AppDir, "_build", "default", "lib", Name, "priv", "mibs"]),
     true = filelib:is_file(filename:join([PrivMibsDir, "SIMPLE-MIB.bin"])),
 
-    %% check the extra src_dir was linked into the _build dir
+    %% check a hrl corresponding to the mib in the mibs dir exists in include
+    true = filelib:is_file(filename:join([AppDir, "include", "SIMPLE-MIB.hrl"])),
+
+    %% check the mibs dir was linked into the _build dir
     true = filelib:is_dir(filename:join([AppDir, "_build", "default", "lib", Name, "mibs"])).
 
 umbrella_mib_first_test(Config) ->
@@ -1065,11 +1068,14 @@ umbrella_mib_first_test(Config) ->
 
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
 
-    %% check a beam corresponding to the src in the extra src_dir exists in ebin
+    %% check a bin corresponding to the mib in the mibs dir exists in priv/mibs
     PrivMibsDir = filename:join([AppsDir, "_build", "default", "lib", Name, "priv", "mibs"]),
     true = filelib:is_file(filename:join([PrivMibsDir, "SIMPLE-MIB.bin"])),
 
-    %% check the extra src_dir was linked into the _build dir
+    %% check a hrl corresponding to the mib in the mibs dir exists in include
+    true = filelib:is_file(filename:join([AppDir, "include", "SIMPLE-MIB.hrl"])),
+
+    %% check the mibs dir was linked into the _build dir
     true = filelib:is_dir(filename:join([AppsDir, "_build", "default", "lib", Name, "mibs"])).
 
 only_default_transitive_deps(Config) ->

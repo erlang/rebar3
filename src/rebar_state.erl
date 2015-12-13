@@ -370,7 +370,24 @@ providers(State, NewProviders) ->
 
 -spec add_provider(t(), providers:t()) -> t().
 add_provider(State=#state_t{providers=Providers}, Provider) ->
-    State#state_t{providers=[Provider | Providers]}.
+    Name = providers:impl(Provider),
+    Namespace = providers:namespace(Provider),
+    Module = providers:module(Provider),
+    case lists:any(fun(P) ->
+                           case {providers:impl(P), providers:namespace(P)} of
+                               {Name, Namespace} ->
+                                   ?DEBUG("Not adding provider ~p ~p from module ~p because it already exists from module ~p",
+                                          [Namespace, Name, providers:module(P), Module]),
+                                   true;
+                               _ ->
+                                   false
+                           end
+                   end, Providers) of
+        true ->
+            State;
+        false ->
+            State#state_t{providers=[Provider | Providers]}
+    end.
 
 create_logic_providers(ProviderModules, State0) ->
     try
