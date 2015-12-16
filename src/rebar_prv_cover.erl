@@ -238,6 +238,8 @@ seperator(Width) ->
 
 format(String, Width) -> io_lib:format("~*.ts", [Width, String]).
 
+calculate_total(Stats) when length(Stats) =:= 0 ->
+    "0%";
 calculate_total(Stats) ->
     TotalStats = length(Stats),
     TotalCovInt = round(lists:foldl(
