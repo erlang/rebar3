@@ -247,10 +247,11 @@ set_global_flag(State, Options, Flag) ->
 %%
 global_option_spec_list() ->
     [
-    %% {Name, ShortOpt, LongOpt, ArgSpec, HelpMsg}
-    {help,     $h, "help",     undefined, "Print this help."},
-    {version,  $v, "version",  undefined, "Show version information."},
-    {task,     undefined, undefined, string, "Task to run."}
+    %% {Name,  ShortOpt,  LongOpt,    ArgSpec,   HelpMsg}
+    {help,     $h,        "help",     undefined, "Print this help."},
+    {version,  $v,        "version",  undefined, "Show version information."},
+    {task,     undefined, undefined,  string,    "Task to run."},
+    {state,    undefined, "state",    undefined, "Display configuration state"}
     ].
 
 handle_error(rebar_abort) ->

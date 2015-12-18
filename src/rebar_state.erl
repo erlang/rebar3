@@ -36,6 +36,7 @@
 
          deps_names/1,
 
+         to_list/1,
 
          resources/1, resources/2, add_resource/2,
          providers/1, providers/2, add_provider/2]).
@@ -405,6 +406,15 @@ create_logic_providers(ProviderModules, State0) ->
             ?DEBUG("~p: ~p ~p", [C, T, erlang:get_stacktrace()]),
             throw({error, "Failed creating providers. Run with DEBUG=1 for stacktrace."})
     end.
+
+to_list(#state_t{opts=O, code_paths=CP, default=D} = State) ->
+    O1     = dict:to_list(O),
+    CP1    = dict:to_list(CP),
+    D1     = dict:to_list(D),
+    State1 = State#state_t{opts=O1, code_paths=CP1, default=D1},
+    Fields = record_info(fields, state_t),
+    Values = tl(tuple_to_list(State1)),
+    lists:zip(Fields, Values).
 
 %% ===================================================================
 %% Internal functions
