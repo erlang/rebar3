@@ -411,17 +411,16 @@ to_list(#state_t{} = State) ->
     Fields = record_info(fields, state_t),
     Values = tl(tuple_to_list(State)),
     DictSz = tuple_size(dict:new()),
-    Fun    = fun
-                F({K,V}) when is_list(V) ->
-                    {K, [F(I) || I <- V]};
-                F(V) when is_tuple(V), element(1,V) =:= dict, tuple_size(V) =:= DictSz ->
-                    [F(I) || I <- dict:to_list(V)];
-                F({K,V}) when is_tuple(V), element(1,V) =:= dict, tuple_size(V) =:= DictSz ->
-                    {K, [F(I) || I <- dict:to_list(V)]};
-                F(Other) ->
-                    Other
-             end,
-    lists:zip(Fields, [Fun(I) || I <- Values]).
+    lists:zip(Fields, [reformat(I, DictSz) || I <- Values]).
+
+reformat({K,V}, DSz) when is_list(V) ->
+    {K, [reformat(I, DSz) || I <- V]};
+reformat(V, DSz) when is_tuple(V), element(1,V) =:= dict, tuple_size(V) =:= DSz ->
+    [reformat(I, DSz) || I <- dict:to_list(V)];
+reformat({K,V}, DSz) when is_tuple(V), element(1,V) =:= dict, tuple_size(V) =:= DSz ->
+    {K, [reformat(I, DSz) || I <- dict:to_list(V)]};
+reformat(Other, _DSz) ->
+    Other.
 
 %% ===================================================================
 %% Internal functions
