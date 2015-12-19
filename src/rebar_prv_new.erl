@@ -7,6 +7,7 @@
          format_error/1]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 -define(PROVIDER, new).
 -define(DEPS, []).
@@ -35,16 +36,16 @@ do(State) ->
     case strip_flags(rebar_state:command_args(State)) of
         ["help"] ->
             ?CONSOLE("Call `rebar3 new help <template>` for a detailed description~n", []),
-            show_short_templates(rebar_templater:list_templates(State)),
+            show_short_templates(list_templates(State)),
             {ok, State};
         ["help", TemplateName] ->
-            case lists:keyfind(TemplateName, 1, rebar_templater:list_templates(State)) of
+            case lists:keyfind(TemplateName, 1, list_templates(State)) of
                 false -> ?CONSOLE("template not found.", []);
                 Term -> show_template(Term)
             end,
             {ok, State};
         [TemplateName | Opts] ->
-            case lists:keyfind(TemplateName, 1, rebar_templater:list_templates(State)) of
+            case lists:keyfind(TemplateName, 1, list_templates(State)) of
                 false ->
                     ?CONSOLE("template not found.", []);
                 _ ->
@@ -53,17 +54,28 @@ do(State) ->
             end,
             {ok, State};
         [] ->
-            show_short_templates(rebar_templater:list_templates(State)),
+            show_short_templates(list_templates(State)),
             {ok, State}
     end.
 
 -spec format_error(any()) -> iolist().
+format_error({consult, File, Reason}) ->
+    io_lib:format("Error consulting file at ~s for reason ~p", [File, Reason]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+list_templates(State) ->
+    lists:foldl(fun({error, {consult, File, Reason}}, Acc) ->
+                    ?WARN("Error consulting template file ~s for reason ~p",
+                          [File, Reason]),
+                    Acc
+                ;  (Tpl, Acc) ->
+                    [Tpl|Acc]
+                end, [], lists:reverse(rebar_templater:list_templates(State))).
 
 info() ->
     io_lib:format(

@@ -59,10 +59,14 @@ list_templates(State) ->
 
 %% Expand a single template's value
 list_template(Files, {Name, Type, File}, State) ->
-    TemplateTerms = consult(load_file(Files, Type, File)),
-    {Name, Type, File,
-     get_template_description(TemplateTerms),
-     get_template_vars(TemplateTerms, State)}.
+    case consult(load_file(Files, Type, File)) of
+        {error, Reason} ->
+            {error, {consult, File, Reason}};
+        TemplateTerms ->
+            {Name, Type, File,
+             get_template_description(TemplateTerms),
+             get_template_vars(TemplateTerms, State)}
+    end.
 
 %% Load up the template description out from a list of attributes read in
 %% a .template file.
@@ -338,8 +342,10 @@ consult(Cont, Str, Acc) ->
         {done, Result, Remaining} ->
             case Result of
                 {ok, Tokens, _} ->
-                    {ok, Term} = erl_parse:parse_term(Tokens),
-                    consult([], Remaining, [Term | Acc]);
+                    case erl_parse:parse_term(Tokens) of
+                        {ok, Term} -> consult([], Remaining, [Term | Acc]);
+                        {error, Reason} -> {error, Reason}
+                    end;
                 {eof, _Other} ->
                     lists:reverse(Acc);
                 {error, Info, _} ->
