@@ -35,8 +35,8 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     L = rebar_state:to_list(State),
-    io:put_chars("State:\n"),
-    [?CONSOLE("  ~w: ~p\n", [K, V]) || {K,V} <- L],
+    ?CONSOLE("State:", []),
+    [?CONSOLE("  ~w: ~p", [K, V]) || {K,V} <- L],
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
