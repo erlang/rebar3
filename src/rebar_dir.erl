@@ -121,8 +121,37 @@ processing_base_dir(State, Dir) ->
     AbsDir = filename:absname(Dir),
     AbsDir =:= rebar_state:get(State, base_dir).
 
+make_absolute_path(Path) ->
+    case filename:pathtype(Path) of
+        absolute ->
+            Path;
+        relative ->
+            {ok, Dir} = file:get_cwd(),
+            filename:join([Dir, Path]);
+        volumerelative ->
+            Volume = hd(filename:split(Path)),
+            {ok, Dir} = file:get_cwd(Volume),
+            filename:join([Dir, Path])
+    end.
+
+make_normalized_path(Path) ->
+    AbsPath = make_absolute_path(Path),
+    Components = filename:split(AbsPath),
+    make_normalized_path(Components, []).
+
+make_normalized_path([], NormalizedPath) ->
+    filename:join(lists:reverse(NormalizedPath));
+make_normalized_path([H|T], NormalizedPath) ->
+    case H of
+        "."  -> make_normalized_path(T, NormalizedPath);
+        ".." -> make_normalized_path(T, tl(NormalizedPath));
+        _    -> make_normalized_path(T, [H|NormalizedPath])
+    end.
+
 make_relative_path(Source, Target) ->
-    do_make_relative_path(filename:split(Source), filename:split(Target)).
+    AbsSource = make_normalized_path(Source),
+    AbsTarget = make_normalized_path(Target),
+    do_make_relative_path(filename:split(AbsSource), filename:split(AbsTarget)).
 
 do_make_relative_path([H|T1], [H|T2]) ->
     do_make_relative_path(T1, T2);
