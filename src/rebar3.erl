@@ -250,8 +250,7 @@ global_option_spec_list() ->
     %% {Name,  ShortOpt,  LongOpt,    ArgSpec,   HelpMsg}
     {help,     $h,        "help",     undefined, "Print this help."},
     {version,  $v,        "version",  undefined, "Show version information."},
-    {task,     undefined, undefined,  string,    "Task to run."},
-    {state,    undefined, "state",    undefined, "Display configuration state"}
+    {task,     undefined, undefined,  string,    "Task to run."}
     ].
 
 handle_error(rebar_abort) ->
