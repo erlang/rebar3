@@ -207,12 +207,16 @@ format_table(Stats, CoverFiles) ->
     MaxLength = max(lists:foldl(fun max_length/2, 0, Stats), 20),
     Header = header(MaxLength),
     Seperator = seperator(MaxLength),
+    TotalLabel = format("total", MaxLength),
+    TotalCov = format(calculate_total(Stats), 8),
     [io_lib:format("~ts~n~ts~n~ts~n", [Seperator, Header, Seperator]),
         lists:map(fun({Mod, Coverage}) ->
             Name = format(Mod, MaxLength),
             Cov = format(Coverage, 8),
             io_lib:format("  |  ~ts  |  ~ts  |~n", [Name, Cov])
         end, Stats),
+        io_lib:format("~ts~n", [Seperator]),
+        io_lib:format("  |  ~ts  |  ~ts  |~n", [TotalLabel, TotalCov]),
         io_lib:format("~ts~n", [Seperator]),
         io_lib:format("  coverage calculated from:~n", []),
         lists:map(fun(File) ->
@@ -233,6 +237,18 @@ seperator(Width) ->
     ["  |--", io_lib:format("~*c", [Width, $-]), "--|------------|"].
 
 format(String, Width) -> io_lib:format("~*.ts", [Width, String]).
+
+calculate_total(Stats) when length(Stats) =:= 0 ->
+    "0%";
+calculate_total(Stats) ->
+    TotalStats = length(Stats),
+    TotalCovInt = round(lists:foldl(
+                        fun({_Mod, Coverage, _File}, Acc) ->
+                            Acc + (list_to_integer(string:strip(Coverage, right, $%)) / TotalStats);
+                        ({_Mod, Coverage}, Acc) ->
+                            Acc + (list_to_integer(string:strip(Coverage, right, $%)) / TotalStats)
+    end, 0, Stats)),
+    integer_to_list(TotalCovInt) ++ "%".
 
 write_index(State, Coverage) ->
     CoverDir = cover_dir(State),
@@ -265,6 +281,8 @@ write_index_section(F, [{Section, DataFile, Mods}|Rest]) ->
                      [strip_coverdir(Report), Mod, Cov])
         end,
     lists:foreach(fun(M) -> ok = file:write(F, FmtLink(M)) end, Mods),
+    ok = file:write(F, ?FMT("<tr><td><strong>Total</strong></td><td>~ts</td>\n",
+                     [calculate_total(Mods)])),
     ok = file:write(F, "</table>\n"),
     write_index_section(F, Rest).
 
