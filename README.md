@@ -42,7 +42,7 @@ locations ([hex.pm](http://hex.pm), git, hg, and so on).
 | relup      | Creates relup from 2 releases |
 | report     | Report on environment and versions for bug reports |
 | shell      | Run shell with project apps in path |
-| state      | Display configuration state |
+| state      | Display configuration state for debugging purposes |
 | tar        | Package release into tarball |
 | tree       | Print dependency tree |
 | unlock     | Unlock dependencies |
