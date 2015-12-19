@@ -407,14 +407,21 @@ create_logic_providers(ProviderModules, State0) ->
             throw({error, "Failed creating providers. Run with DEBUG=1 for stacktrace."})
     end.
 
-to_list(#state_t{opts=O, code_paths=CP, default=D} = State) ->
-    O1     = dict:to_list(O),
-    CP1    = dict:to_list(CP),
-    D1     = dict:to_list(D),
-    State1 = State#state_t{opts=O1, code_paths=CP1, default=D1},
+to_list(#state_t{} = State) ->
     Fields = record_info(fields, state_t),
-    Values = tl(tuple_to_list(State1)),
-    lists:zip(Fields, Values).
+    Values = tl(tuple_to_list(State)),
+    DictSz = tuple_size(dict:new()),
+    Fun    = fun
+                F({K,V}) when is_list(V) ->
+                    {K, [F(I) || I <- V]};
+                F(V) when is_tuple(V), element(1,V) =:= dict, tuple_size(V) =:= DictSz ->
+                    [F(I) || I <- dict:to_list(V)];
+                F({K,V}) when is_tuple(V), element(1,V) =:= dict, tuple_size(V) =:= DictSz ->
+                    {K, [F(I) || I <- dict:to_list(V)]};
+                F(Other) ->
+                    Other
+             end,
+    lists:zip(Fields, [Fun(I) || I <- Values]).
 
 %% ===================================================================
 %% Internal functions
