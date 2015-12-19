@@ -7,9 +7,25 @@
 -include_lib("eunit/include/eunit.hrl").
 
 all() -> [app_git_user, app_hg_user, app_with_fallbacks,
-          app_with_flags1, app_with_flags2].
+          app_with_flags1, app_with_flags2, plugin_tpl].
 
 
+init_per_testcase(plugin_tpl, Config) ->
+    application:load(rebar),
+    DataDir = ?config(data_dir, Config),
+    PrivDir = ?config(priv_dir, Config),
+    Name = rebar_test_utils:create_random_name("plugin_tpl"),
+    AppsDir = filename:join([PrivDir, rebar_test_utils:create_random_name(Name)]),
+    ec_file:copy(filename:join([DataDir, "plugin_tpl"]), AppsDir, [recursive]),
+    Verbosity = rebar3:log_level(),
+    rebar_log:init(command_line, Verbosity),
+    GlobalDir = filename:join([DataDir, "cache"]),
+    State = rebar_state:new([{base_dir, filename:join([AppsDir, "_build"])}
+                            ,{global_rebar_dir, GlobalDir}
+                            ,{root_dir, AppsDir}]),
+    mock_home_dir(DataDir),
+    mock_empty_escript_templates(),
+    [{apps, AppsDir}, {state, State}, {name, Name} | Config];
 init_per_testcase(Case, Config0) ->
     Config = rebar_test_utils:init_rebar_state(Config0),
     Name = rebar_test_utils:create_random_name(atom_to_list(Case)),
@@ -132,11 +148,24 @@ app_with_flags2(Config) ->
        {filename:join(["src", Name++"_app.erl"]), [Name]}
       ]).
 
+plugin_tpl(Config) ->
+    Name = ?config(name, Config),
+    rebar_test_utils:run_and_check(
+      Config, [],
+      ["new", "-f", "tpl", Name],
+      {ok, []}
+     ),
+    Result = filename:join(["src", Name++".erl"]), % In CWD
+    {ok, Bin} = file:read_file(Result),
+    {match, _} = re:run(Bin, Name, [multiline,global]).
+
 validate_files(_Config, Name, Checks) ->
     [begin
         Path = filename:join([Name, File]),
+        ct:pal("validating ~s for content", [Path]),
         {ok, Bin} = file:read_file(Path),
         [{match, _} = re:run(Bin, Pattern, [multiline,global])
          || Pattern <- Patterns]
      end || {File, Patterns} <- Checks],
     ok.
+
