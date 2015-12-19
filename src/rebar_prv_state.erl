@@ -36,7 +36,7 @@ init(State) ->
 do(State) ->
     L = rebar_state:to_list(State),
     io:put_chars("State:\n"),
-    [io:format("  ~w: ~p\n", [K, V]) || {K,V} <- L],
+    [?CONSOLE("  ~w: ~p\n", [K, V]) || {K,V} <- L],
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
