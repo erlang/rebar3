@@ -340,7 +340,7 @@ test_dirs(State, Apps, Opts) ->
         {Suites, Dir} when is_integer(hd(Dir)) ->
             set_compile_dirs(State, Apps, join(Suites, Dir));
         {Suites, [Dir]} when is_integer(hd(Dir)) ->
-            set_compile_dirs(State, Apps, join(Suites, Dir));          
+            set_compile_dirs(State, Apps, join(Suites, Dir));
         {_Suites, _Dirs}    -> {error, "Only a single directory may be specified when specifying suites"}
     end.
 
