@@ -239,6 +239,7 @@ replace_var([H|T], Acc, Vars) ->
 %% Load a list of all the files in the escript and on disk
 find_templates(State) ->
     DiskTemplates = find_disk_templates(State),
+    PluginTemplates = find_plugin_templates(State),
     {MainTemplates, Files} =
         case rebar_state:escript_path(State) of
             undefined ->
@@ -249,18 +250,22 @@ find_templates(State) ->
                 F = cache_escript_files(State),
                 {find_escript_templates(F), F}
         end,
-    AvailTemplates = find_available_templates(DiskTemplates,
-                                              MainTemplates),
+    AvailTemplates = find_available_templates([MainTemplates,
+                                               PluginTemplates,
+                                               DiskTemplates]),
     ?DEBUG("Available templates: ~p\n", [AvailTemplates]),
     {AvailTemplates, Files}.
 
-find_available_templates(TemplateList1, TemplateList2) ->
-    AvailTemplates = prioritize_templates(
-                       tag_names(TemplateList1),
-                       tag_names(TemplateList2)),
-
+find_available_templates(TemplateListList) ->
+    AvailTemplates = prioritize_templates(TemplateListList),
     ?DEBUG("Available templates: ~p\n", [AvailTemplates]),
     AvailTemplates.
+
+prioritize_templates([TemplateList]) ->
+    tag_names(TemplateList);
+prioritize_templates([TemplateList | TemplateListList]) ->
+    prioritize_templates(tag_names(TemplateList),
+                         prioritize_templates(TemplateListList)).
 
 %% Scan the current escript for available files
 cache_escript_files(State) ->
@@ -299,6 +304,14 @@ find_other_templates(State) ->
             rebar_utils:find_files(TemplateDir, ?TEMPLATE_RE)
     end.
 
+%% Fetch template indexes that sit on disk in plugins
+find_plugin_templates(State) ->
+    [{plugin, File}
+     || App <- rebar_state:all_plugin_deps(State),
+        Priv <- [rebar_app_info:priv_dir(App)],
+        Priv =/= undefined,
+        File <- rebar_utils:find_files(Priv, ?TEMPLATE_RE)].
+
 %% Take an existing list of templates and tag them by name the way
 %% the user would enter it from the CLI
 tag_names(List) ->
@@ -316,6 +329,10 @@ prioritize_templates([{Name, Type, File} | Rest], Valid) ->
             ?DEBUG("Skipping template ~p, due to presence of a built-in "
                    "template with the same name", [Name]),
             prioritize_templates(Rest, Valid);
+        {_, plugin, _} ->
+            ?DEBUG("Skipping template ~p, due to presence of a plugin "
+                   "template with the same name", [Name]),
+            prioritize_templates(Rest, Valid);
         {_, file, _} ->
             ?DEBUG("Skipping template ~p, due to presence of a custom "
                    "template at ~s", [Name, File]),
@@ -326,6 +343,9 @@ prioritize_templates([{Name, Type, File} | Rest], Valid) ->
 %% Read the contents of a file from the appropriate source
 load_file(Files, escript, Name) ->
     {Name, Bin} = lists:keyfind(Name, 1, Files),
+    Bin;
+load_file(_Files, plugin, Name) ->
+    {ok, Bin} = file:read_file(Name),
     Bin;
 load_file(_Files, file, Name) ->
     {ok, Bin} = file:read_file(Name),
