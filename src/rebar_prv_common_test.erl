@@ -381,7 +381,8 @@ maybe_inject_test_dir(State, AppAcc, [App|Rest], Dir) ->
             %% the current compiler tries to compile all subdirs including priv
             %% instead copy only files ending in `.erl' and directories
             %% ending in `_SUITE_data' into the `_build/PROFILE/extras' dir
-            ExtrasDir = filename:join([rebar_dir:base_dir(State), "extras"]),
+            {ok, RelAppDir} = rebar_file_utils:path_from_ancestor(rebar_app_info:dir(App), rebar_state:dir(State)),
+            ExtrasDir = filename:join([rebar_dir:base_dir(State), "extras", RelAppDir]),
             ok = copy_bare_suites(Dir, ExtrasDir),
             Opts = inject_test_dir(rebar_state:opts(State), ExtrasDir),
             {rebar_state:opts(State, Opts), AppAcc};
