@@ -375,6 +375,16 @@ find_suite_dirs(Suites) ->
 
 maybe_inject_test_dir(State, AppAcc, [App|Rest], Dir) ->
     case rebar_file_utils:path_from_ancestor(Dir, rebar_app_info:dir(App)) of
+        {ok, []}   ->
+            %% normal operation involves copying the entire directory a
+            %% suite exists in but if the suite is in the app root directory
+            %% the current compiler tries to compile all subdirs including priv
+            %% instead copy only files ending in `.erl' and directories
+            %% ending in `_SUITE_data' into the `_build/PROFILE/extras' dir
+            ExtrasDir = filename:join([rebar_dir:base_dir(State), "extras"]),
+            ok = copy_bare_suites(Dir, ExtrasDir),
+            Opts = inject_test_dir(rebar_state:opts(State), ExtrasDir),
+            {rebar_state:opts(State, Opts), AppAcc};
         {ok, Path} ->
             Opts = inject_test_dir(rebar_app_info:opts(App), Path),
             {State, AppAcc ++ [rebar_app_info:opts(App, Opts)] ++ Rest};
@@ -384,14 +394,29 @@ maybe_inject_test_dir(State, AppAcc, [App|Rest], Dir) ->
 maybe_inject_test_dir(State, AppAcc, [], Dir) ->
     case rebar_file_utils:path_from_ancestor(Dir, rebar_state:dir(State)) of
         {ok, []}   ->
-            ?WARN("Can't have suites in root of project dir, dropping from tests", []),
-            {State, AppAcc};
+            %% normal operation involves copying the entire directory a
+            %% suite exists in but if the suite is in the root directory
+            %% that results in a loop as we copy `_build' into itself
+            %% instead copy only files ending in `.erl' and directories
+            %% ending in `_SUITE_data' in the `_build/PROFILE/extras' dir
+            ExtrasDir = filename:join([rebar_dir:base_dir(State), "extras"]),
+            ok = copy_bare_suites(Dir, ExtrasDir),
+            Opts = inject_test_dir(rebar_state:opts(State), ExtrasDir),
+            {rebar_state:opts(State, Opts), AppAcc};
         {ok, Path} ->
             Opts = inject_test_dir(rebar_state:opts(State), Path),
             {rebar_state:opts(State, Opts), AppAcc};
         {error, badparent} ->
             {State, AppAcc}
     end.
+
+copy_bare_suites(From, To) ->
+    filelib:ensure_dir(filename:join([To, "dummy.txt"])),
+    SrcFiles = rebar_utils:find_files(From, ".*\\.[e|h]rl\$", false),
+    DataDirs = lists:filter(fun filelib:is_dir/1,
+                            filelib:wildcard(filename:join([From, "*_SUITE_data"]))),
+    ok = rebar_file_utils:cp_r(SrcFiles, To),
+    rebar_file_utils:cp_r(DataDirs, To).
 
 inject_test_dir(Opts, Dir) ->
     %% append specified test targets to app defined `extra_src_dirs`
