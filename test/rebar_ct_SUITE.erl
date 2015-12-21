@@ -654,7 +654,10 @@ suite_at_root(Config) ->
     true = filelib:is_file(TestBeam),
 
     DataDir = filename:join([AppDir, "_build", "test", "extras", "root_SUITE_data"]),
-    true = filelib:is_dir(DataDir).
+    true = filelib:is_dir(DataDir),
+
+    DataFile = filename:join([AppDir, "_build", "test", "extras", "root_SUITE_data", "some_data.txt"]),
+    true = filelib:is_file(DataFile).
 
 suite_at_app_root(Config) ->
     AppDir = ?config(apps, Config),
@@ -688,7 +691,10 @@ suite_at_app_root(Config) ->
     true = filelib:is_file(TestBeam),
 
     DataDir = filename:join([AppDir, "_build", "test", "extras", "apps", Name2, "app_root_SUITE_data"]),
-    true = filelib:is_dir(DataDir).
+    true = filelib:is_dir(DataDir),
+
+    DataFile = filename:join([AppDir, "_build", "test", "extras", "root_SUITE_data", "some_data.txt"]),
+    true = filelib:is_file(DataFile).
 
 %% this test probably only fails when this suite is run via rebar3 with the --cover flag
 data_dir_correct(Config) ->
