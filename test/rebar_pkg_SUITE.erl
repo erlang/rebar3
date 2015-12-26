@@ -11,7 +11,8 @@
 -define(good_checksum, <<"1C6CE379D191FBAB41B7905075E0BF87CBBE23C77CECE775C5A0B786B2244C35">>).
 
 all() -> [good_uncached, good_cached, badindexchk, badpkg,
-          bad_to_good, good_disconnect, bad_disconnect, pkgs_provider].
+          bad_to_good, good_disconnect, bad_disconnect, pkgs_provider,
+          find_highest_matching].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -86,7 +87,12 @@ init_per_testcase(bad_disconnect=Name, Config0) ->
     meck:unload(httpc),
     meck:new(httpc, [passthrough, unsticky]),
     meck:expect(httpc, request, fun(_, _, _, _, _) -> {error, econnrefused} end),
-    Config.
+    Config;
+init_per_testcase(Name, Config0) ->
+    Config = [{good_cache, false},
+              {pkg, {<<"goodpkg">>, <<"1.0.0">>}}
+              | Config0],
+    mock_config(Name, Config).
 
 end_per_testcase(_, Config) ->
     unmock_config(Config),
@@ -172,6 +178,16 @@ pkgs_provider(Config) ->
         {ok, []}
     ).
 
+find_highest_matching(_Config) ->
+    State = rebar_state:new(),
+    {ok, Vsn} = rebar_packages:find_highest_matching(<<"goodpkg">>, <<"1.0.0">>, package_index, State),
+    ?assertEqual(<<"1.0.1">>, Vsn),
+    {ok, Vsn1} = rebar_packages:find_highest_matching(<<"goodpkg">>, <<"1.0">>, package_index, State),
+    ?assertEqual(<<"1.1.1">>, Vsn1),
+    {ok, Vsn2} = rebar_packages:find_highest_matching(<<"goodpkg">>, <<"2.0">>, package_index, State),
+    ?assertEqual(<<"2.0.0">>, Vsn2).
+
+
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
 %%%%%%%%%%%%%%%
@@ -182,10 +198,13 @@ mock_config(Name, Config) ->
     Tid = ets:new(registry_table, [public]),
     ets:insert_new(Tid, [
         {<<"badindexchk">>,[[<<"1.0.0">>]]},
-        {<<"goodpkg">>,[[<<"1.0.0">>]]},
+        {<<"goodpkg">>,[[<<"1.0.0">>, <<"1.0.1">>, <<"1.1.1">>, <<"2.0.0">>]]},
         {<<"badpkg">>,[[<<"1.0.0">>]]},
         {{<<"badindexchk">>,<<"1.0.0">>}, [[], ?bad_checksum, [<<"rebar3">>]]},
         {{<<"goodpkg">>,<<"1.0.0">>}, [[], ?good_checksum, [<<"rebar3">>]]},
+        {{<<"goodpkg">>,<<"1.0.1">>}, [[], ?good_checksum, [<<"rebar3">>]]},
+        {{<<"goodpkg">>,<<"1.1.1">>}, [[], ?good_checksum, [<<"rebar3">>]]},
+        {{<<"goodpkg">>,<<"2.0.0">>}, [[], ?good_checksum, [<<"rebar3">>]]},
         {{<<"badpkg">>,<<"1.0.0">>}, [[], ?good_checksum, [<<"rebar3">>]]}
     ]),
     CacheDir = filename:join([CacheRoot, "hex", "com", "test", "packages"]),
