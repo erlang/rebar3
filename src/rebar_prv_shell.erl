@@ -27,6 +27,7 @@
 
 -module(rebar_prv_shell).
 -author("Kresten Krab Thorup <krab@trifork.com>").
+-author("Fred Hebert <mononcqc@ferd.ca>").
 
 -behaviour(provider).
 
@@ -111,6 +112,12 @@ info() ->
     "Start a shell with project and deps preloaded similar to~n'erl -pa ebin -pa deps/*/ebin'.~n".
 
 setup_shell() ->
+    case process_info(whereis(user), current_function) of
+        {_,{user,_,_}} -> setup_old_shell();
+        _ -> setup_new_shell()
+    end.
+
+setup_new_shell() ->
     %% scan all processes for any with references to the old user and save them to
     %% update later
     OldUser = whereis(user),
@@ -121,6 +128,22 @@ setup_shell() ->
     %% wait until user_drv and user have been registered (max 3 seconds)
     ok = wait_until_user_started(3000),
     NewUser = whereis(user),
+    rewrite_leaders(OldUser, NewUser).
+
+setup_old_shell() ->
+    %% scan all processes for any with references to the old user and save them to
+    %% update later
+    OldUser = whereis(user),
+    %% terminate the current user's port, in a way that makes it shut down,
+    %% but without taking down the supervision tree so that the escript doesn't
+    %% fully die
+    [P] = [P || P <- element(2,process_info(whereis(user), links)), is_port(P)],
+    user ! {'EXIT', P, normal}, % pretend the port died, then the port can die!
+    NewUser = rebar_user:start(), % hikack IO stuff with fake user
+    NewUser = whereis(user),
+    rewrite_leaders(OldUser, NewUser).
+
+rewrite_leaders(OldUser, NewUser) ->
     %% set any process that had a reference to the old user's group leader to the
     %% new user process. Catch the race condition when the Pid exited after the
     %% liveness check.
@@ -153,6 +176,7 @@ setup_shell() ->
             ?DEBUG("Logger changes failed for ~p:~p (~p)", [E,R,erlang:get_stacktrace()]),
             hope_for_best
     end.
+
 
 setup_paths(State) ->
     %% Add deps to path
