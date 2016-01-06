@@ -217,6 +217,10 @@ copy(OldAppDir, AppDir, Dir) ->
 
 %% TODO: use ec_file:copy/2 to do this, it preserves timestamps and
 %% may prevent recompilation of files in extra dirs
+copy(Source, Source) ->
+    %% allow users to specify a directory in _build as a directory
+    %% containing additional source/tests
+    ok;
 copy(Source, Target) ->
     %% important to do this so no files are copied onto themselves
     %% which truncates them to zero length on some platforms
