@@ -9,7 +9,7 @@
   {env,[]},
   {modules, []},
 
-  {contributors, []},
+  {maintainers, []},
   {licenses, []},
   {links, []}
  ]}.
