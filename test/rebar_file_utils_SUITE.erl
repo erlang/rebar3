@@ -97,10 +97,17 @@ path_from_ancestor(_Config) ->
     ?assertEqual({error, badparent}, rebar_file_utils:path_from_ancestor("/foo/bar/baz", "/foo/bar/baz/qux")).
 
 canonical_path(_Config) ->
-    ?assertEqual(filename:nativename("/"), rebar_file_utils:canonical_path("/")),
-    ?assertEqual(filename:nativename("/"), rebar_file_utils:canonical_path("/../../..")),
-    ?assertEqual("/foo", rebar_file_utils:canonical_path("/foo/bar/..")),
-    ?assertEqual("/foo", rebar_file_utils:canonical_path("/foo/../foo")),
-    ?assertEqual("/foo", rebar_file_utils:canonical_path("/foo/.")),
-    ?assertEqual("/foo", rebar_file_utils:canonical_path("/foo/./.")),
-    ?assertEqual("/foo/bar", rebar_file_utils:canonical_path("/foo/./bar")).
+    %% We find the root so that the name works both on unix-likes and
+    %% with Windows.
+    Root = case os:type() of
+               {win32, _} -> filename:nativename(filename:absname("/")); % C:\, with proper drive
+               _ -> "/"
+           end,
+    ?assertEqual(filename:nativename(Root), rebar_file_utils:canonical_path("/")),
+    ?assertEqual(filename:nativename(Root), rebar_file_utils:canonical_path("/../../..")),
+    ?assertEqual(Root ++ "foo", rebar_file_utils:canonical_path("/foo/bar/..")),
+    ?assertEqual(Root ++ "foo", rebar_file_utils:canonical_path("/foo/../foo")),
+    ?assertEqual(Root ++ "foo", rebar_file_utils:canonical_path("/foo/.")),
+    ?assertEqual(Root ++ "foo", rebar_file_utils:canonical_path("/foo/./.")),
+    ?assertEqual(filename:nativename(Root ++ "foo/bar"),
+                 rebar_file_utils:canonical_path("/foo/./bar")).
