@@ -45,7 +45,7 @@ needs_update(Dir, {git, Url, {branch, Branch}}) ->
     not ((Current =:= []) andalso compare_url(Dir, Url));
 needs_update(Dir, {git, Url, "master"}) ->
     needs_update(Dir, {git, Url, {branch, "master"}});
-needs_update(Dir, {git, Url, Ref}) ->
+needs_update(Dir, {git, _, Ref}) ->
     {ok, Current} = rebar_utils:sh(?FMT("git rev-parse -q HEAD", []),
                                    [{cd, Dir}]),
     Current1 = string:strip(string:strip(Current, both, $\n), both, $\r),
@@ -64,7 +64,7 @@ needs_update(Dir, {git, Url, Ref}) ->
            end,
 
     ?DEBUG("Comparing git ref ~s with ~s", [Ref1, Current1]),
-    not ((Current1 =:= Ref2) andalso compare_url(Dir, Url)).
+    (Current1 =/= Ref2).
 
 compare_url(Dir, Url) ->
     {ok, CurrentUrl} = rebar_utils:sh(?FMT("git config --get remote.origin.url", []),
