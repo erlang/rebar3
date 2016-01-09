@@ -37,7 +37,8 @@
          only_default_transitive_deps/1,
          clean_all/1,
          override_deps/1,
-         profile_override_deps/1]).
+         profile_override_deps/1,
+         deps_build_in_prod/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -58,7 +59,7 @@ all() ->
      deps_in_path, checkout_priority, highest_version_of_pkg_dep,
      parse_transform_test, erl_first_files_test, mib_test,
      umbrella_mib_first_test, only_default_transitive_deps,
-     clean_all, override_deps, profile_override_deps].
+     clean_all, override_deps, profile_override_deps, deps_build_in_prod].
 
 groups() ->
     [{basic_app, [], [build_basic_app, paths_basic_app, clean_basic_app]},
@@ -89,7 +90,7 @@ init_per_group(basic_app, Config) ->
     Name = rebar_test_utils:create_random_name("app1"),
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
-    
+
     [{app_names, [Name]}, {vsns, [Vsn]}|NewConfig];
 
 init_per_group(release_apps, Config) ->
@@ -103,7 +104,7 @@ init_per_group(release_apps, Config) ->
     Name2 = rebar_test_utils:create_random_name("relapp2_"),
     Vsn2 = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(filename:join([AppDir,"apps",Name2]), Name2, Vsn2, [kernel, stdlib]),
-    
+
     [{app_names, [Name1, Name2]}, {vsns, [Vsn1, Vsn2]}|NewConfig];
 
 init_per_group(checkout_apps, Config) ->
@@ -415,7 +416,7 @@ paths_basic_app(Config) ->
     [Vsn] = ?config(vsns, Config),
 
     {ok, State} = rebar_test_utils:run_and_check(Config, [], ["compile"], return),
-    
+
     code:add_paths(rebar_state:code_paths(State, all_deps)),
     ok = application:load(list_to_atom(Name)),
     Loaded = application:loaded_applications(),
@@ -1173,3 +1174,32 @@ profile_override_deps(Config) ->
         {ok, [{dep, "some_dep"},{dep_not_exist, "other_dep"}]}
     ).
 
+%% verify a deps prod profile is used
+%% tested by checking prod hooks run and outputs to default profile dir for dep
+%% and prod deps are installed for dep
+deps_build_in_prod(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    GitDeps = rebar_test_utils:expand_deps(git, [{"asdf", "1.0.0", []}]),
+    PkgName = rebar_test_utils:create_random_name("pkg1_"),
+    {SrcDeps, _} = rebar_test_utils:flat_deps(GitDeps),
+    mock_git_resource:mock([{deps, SrcDeps},
+                            {config, [{profiles, [{prod, [{pre_hooks, [{compile, "echo whatsup > randomfile"}]},
+                                                          {deps, [list_to_atom(PkgName)]}]}]}]}]),
+
+    mock_pkg_resource:mock([{pkgdeps, [{{iolist_to_binary(PkgName), <<"0.1.0">>}, []}]}]),
+
+    Deps = rebar_test_utils:top_level_deps(GitDeps),
+    RConfFile = rebar_test_utils:create_config(AppDir, [{deps, Deps}]),
+    {ok, RConf} = file:consult(RConfFile),
+
+    %% Build with deps.
+    rebar_test_utils:run_and_check(
+        Config, RConf, ["compile"],
+        {ok, [{app, Name}, {dep, "asdf", <<"1.0.0">>}, {dep, PkgName},
+              {file, filename:join([AppDir, "_build", "default", "lib", "asdf", "randomfile"])}]}
+    ).

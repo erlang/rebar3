@@ -166,7 +166,9 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
     Overrides = rebar_state:get(State, overrides, []),
     AppInfo2 = rebar_app_info:set(AppInfo1, overrides, rebar_app_info:get(AppInfo, overrides, [])++Overrides),
     AppInfo3 = rebar_app_info:apply_overrides(rebar_app_info:get(AppInfo2, overrides, []), AppInfo2),
-    rebar_app_info:is_lock(AppInfo3, IsLock).
+    AppInfo4 = rebar_app_info:apply_profiles(AppInfo3, [default, prod]),
+    AppInfo5 = rebar_app_info:profiles(AppInfo4, [default]),
+    rebar_app_info:is_lock(AppInfo5, IsLock).
 
 update_source(AppInfo, {pkg, PkgName, PkgVsn}, State) ->
     {PkgName1, PkgVsn1} = case PkgVsn of
