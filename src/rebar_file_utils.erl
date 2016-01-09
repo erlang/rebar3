@@ -262,9 +262,11 @@ path_from_ancestor_(_, _)                     -> {error, badparent}.
 %% reduce a filepath by removing all incidences of `.' and `..'
 -spec canonical_path(string()) -> string().
 
-canonical_path(Dir) -> canonical_path([], filename:split(filename:absname(Dir))).
+canonical_path(Dir) ->
+    Canon = canonical_path([], filename:split(filename:absname(Dir))),
+    filename:nativename(Canon).
 
-canonical_path([], [])                -> filename:nativename("/");
+canonical_path([], [])                -> filename:absname("/");
 canonical_path(Acc, [])               -> filename:join(lists:reverse(Acc));
 canonical_path(Acc, ["."|Rest])       -> canonical_path(Acc, Rest);
 canonical_path([_|Acc], [".."|Rest])  -> canonical_path(Acc, Rest);
@@ -283,13 +285,19 @@ delete_each_dir_win32([Dir | Rest]) ->
     delete_each_dir_win32(Rest).
 
 xcopy_win32(Source,Dest)->
-    %% "xcopy \"~s\" \"~s\" /q /y /e 2> nul", Chanegd to robocopy to
+    %% "xcopy \"~s\" \"~s\" /q /y /e 2> nul", Changed to robocopy to
     %% handle long names. May have issues with older windows.
     Cmd = case filelib:is_dir(Source) of
               true ->
+                  %% For robocopy, copying /a/b/c/ to /d/e/f/ recursively does not
+                  %% create /d/e/f/c/*, but rather copies all files to /d/e/f/*.
+                  %% The usage we make here expects the former, not the later, so we
+                  %% must manually add the last fragment of a directory to the `Dest`
+                  %% in order to properly replicate POSIX platforms
+                  NewDest = filename:join([Dest, filename:basename(Source)]),
                   ?FMT("robocopy \"~s\" \"~s\" /e /is 1> nul",
                        [rebar_utils:escape_double_quotes(filename:nativename(Source)),
-                        rebar_utils:escape_double_quotes(filename:nativename(Dest))]);
+                        rebar_utils:escape_double_quotes(filename:nativename(NewDest))]);
               false ->
                   ?FMT("robocopy \"~s\" \"~s\" \"~s\" /e /is 1> nul",
                        [rebar_utils:escape_double_quotes(filename:nativename(filename:dirname(Source))),

@@ -42,13 +42,10 @@ groups() ->
 init_per_suite(Config) ->
     PrivDir = ?config(priv_dir, Config),
     DataDir = ?config(data_dir, Config),
-    {ok, Cwd} = file:get_cwd(),
-    file:set_cwd(PrivDir),
     ok = ec_file:copy(filename:join([DataDir, "basic_app.zip"]), filename:join([PrivDir, "basic_app.zip"])),
-    {ok, _} = zip:extract(filename:join([PrivDir, "basic_app.zip"])),
+    {ok, _} = zip:extract(filename:join([PrivDir, "basic_app.zip"]), [{cwd, PrivDir}]),
     ok = ec_file:copy(filename:join([DataDir, "multi_app.zip"]), filename:join([PrivDir, "multi_app.zip"])),
-    {ok, _} = zip:extract(filename:join([PrivDir, "multi_app.zip"])),
-    file:set_cwd(Cwd),
+    {ok, _} = zip:extract(filename:join([PrivDir, "multi_app.zip"]), [{cwd, PrivDir}]),
     Config.
 
 init_per_group(basic_app, Config) ->
