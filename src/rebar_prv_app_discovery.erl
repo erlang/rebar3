@@ -36,7 +36,8 @@ do(State) ->
     LibDirs = rebar_dir:lib_dirs(State),
     try
         State1 = rebar_app_discover:do(State, LibDirs),
-        {ok, State1}
+        State2 = rebar_plugins:project_apps_install(State1),
+        {ok, State2}
     catch
         throw:{error, {rebar_packages, Error}} ->
             {error, {rebar_packages, Error}};

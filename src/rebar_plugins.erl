@@ -3,7 +3,8 @@
 
 -module(rebar_plugins).
 
--export([project_apps_install/1
+-export([top_level_install/1
+        ,project_apps_install/1
         ,install/2
         ,handle_plugins/3
         ,handle_plugins/4]).
@@ -14,11 +15,18 @@
 %% Public API
 %% ===================================================================
 
+-spec top_level_install(rebar_state:t()) -> rebar_state:t().
+top_level_install(State) ->
+    Profiles = rebar_state:current_profiles(State),
+    lists:foldl(fun(Profile, StateAcc) ->
+                        Plugins = rebar_state:get(State, {plugins, Profile}, []),
+                        handle_plugins(Profile, Plugins, StateAcc)
+                end, State, Profiles).
+
 -spec project_apps_install(rebar_state:t()) -> rebar_state:t().
 project_apps_install(State) ->
     Profiles = rebar_state:current_profiles(State),
     ProjectApps = rebar_state:project_apps(State),
-
     lists:foldl(fun(Profile, StateAcc) ->
                         Plugins = rebar_state:get(State, {plugins, Profile}, []),
                         StateAcc1 = handle_plugins(Profile, Plugins, StateAcc),

@@ -123,7 +123,7 @@ run_aux(State, RawArgs) ->
     {ok, Providers} = application:get_env(rebar, providers),
     %% Providers can modify profiles stored in opts, so set default after initializing providers
     State5 = rebar_state:create_logic_providers(Providers, State4),
-    State6 = rebar_plugins:project_apps_install(State5),
+    State6 = rebar_plugins:top_level_install(State5),
     State7 = rebar_state:default(State6, rebar_state:opts(State6)),
 
     {Task, Args} = parse_args(RawArgs),
