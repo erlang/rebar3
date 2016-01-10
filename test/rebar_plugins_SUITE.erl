@@ -10,7 +10,8 @@
          compile_global_plugins/1,
          complex_plugins/1,
          list/1,
-         upgrade/1]).
+         upgrade/1,
+         sub_app_plugins/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -32,7 +33,7 @@ end_per_testcase(_, _Config) ->
     catch meck:unload().
 
 all() ->
-    [compile_plugins, compile_global_plugins, complex_plugins, list, upgrade].
+    [compile_plugins, compile_global_plugins, complex_plugins, list, upgrade, sub_app_plugins].
 
 %% Tests that compiling a project installs and compiles the plugins of deps
 compile_plugins(Config) ->
@@ -207,4 +208,35 @@ upgrade(Config) ->
     rebar_test_utils:run_and_check(
         Config, RConf, ["plugins", "upgrade", PkgName],
         {ok, [{app, Name}, {plugin, PkgName, <<"0.1.3">>}]}
+     ).
+
+sub_app_plugins(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("sub_app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+
+    DepName = rebar_test_utils:create_random_name("dep1_"),
+    PluginName = rebar_test_utils:create_random_name("plugin1_"),
+
+    mock_pkg_resource:mock([{pkgdeps, [{{list_to_binary(DepName), list_to_binary(Vsn)}, []},
+                                       {{list_to_binary(PluginName), list_to_binary(Vsn)}, []}]}]),
+
+    SubAppsDir = filename:join([AppDir, "apps", Name]),
+
+    rebar_test_utils:create_app(SubAppsDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_config(SubAppsDir, [{deps, [{list_to_binary(DepName), list_to_binary(Vsn)}]},
+                                                {plugins, [list_to_atom(PluginName)]}]),
+
+    RConfFile =
+        rebar_test_utils:create_config(AppDir,
+                                       [{deps, [
+                                               list_to_atom(DepName)
+                                               ]}]),
+    {ok, RConf} = file:consult(RConfFile),
+
+    %% Build with deps.
+    rebar_test_utils:run_and_check(
+      Config, RConf, ["compile"],
+      {ok, [{app, Name}, {dep, DepName}, {plugin, PluginName}]}
      ).
