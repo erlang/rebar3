@@ -10,7 +10,7 @@ all() -> [release,
           profile_ordering_sys_config_extend,
           profile_ordering_sys_config_extend_3_tuple_merge,
           extend_release,
-          user_output_dir].
+          user_output_dir, profile_overlays].
 
 init_per_testcase(Case, Config0) ->
     Config = rebar_test_utils:init_rebar_state(Config0),
@@ -193,3 +193,25 @@ user_output_dir(Config) ->
     {ok, RelxState2} = rlx_prv_app_discover:do(RelxState1),
     {ok, RelxState3} = rlx_prv_rel_discover:do(RelxState2),
     rlx_state:get_realized_release(RelxState3, list_to_atom(Name), Vsn).
+
+profile_overlays(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = ?config(name, Config),
+    Vsn = "1.0.0",
+    {ok, RebarConfig} =
+        file:consult(rebar_test_utils:create_config(AppDir,
+                                                    [{relx, [{release, {list_to_atom(Name), Vsn},
+                                                              [list_to_atom(Name)]},
+                                                             {overlay, [{mkdir, "randomdir"}]},
+                                                             {lib_dirs, [AppDir]}]},
+                                                    {profiles, [{prod, [{relx, [{overlay, [{mkdir, "otherrandomdir"}]}]}]}]}])),
+
+    ReleaseDir = filename:join([AppDir, "./_build/prod/rel/", Name]),
+
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig,
+      ["as", "prod", "release"],
+      {ok, [{release, list_to_atom(Name), Vsn, false},
+            {dir, filename:join(ReleaseDir, "otherrandomdir")},
+            {dir, filename:join(ReleaseDir, "randomdir")}]}
+     ).
