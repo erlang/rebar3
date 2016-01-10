@@ -11,9 +11,5 @@ ebin
 log
 erl_crash.dump
 .rebar
-_rel
-_deps
-_plugins
-_tdeps
 logs
 _build

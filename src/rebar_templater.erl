@@ -159,8 +159,33 @@ drop_var_docs([{K,V}|Rest]) -> [{K,V} | drop_var_docs(Rest)].
 create({Template, Type, File}, Files, UserVars, Force, State) ->
     TemplateTerms = consult(load_file(Files, Type, File)),
     Vars = drop_var_docs(override_vars(UserVars, get_template_vars(TemplateTerms, State))),
+    maybe_warn_about_name(Vars),
     TemplateCwd = filename:dirname(File),
     execute_template(TemplateTerms, Files, {Template, Type, TemplateCwd}, Vars, Force).
+
+maybe_warn_about_name(Vars) ->
+    Name = proplists:get_value(name, Vars, "valid"),
+    case validate_atom(Name) of
+        invalid ->
+           ?WARN("The 'name' variable is often associated with Erlang "
+                 "module names and/or file names. The value submitted "
+                 "(~s) isn't an unquoted Erlang atom. Templates "
+                 "generated may contain errors.",
+                 [Name]);
+        valid ->
+            ok
+    end.
+
+validate_atom(Str) ->
+    case io_lib:fread("~a", unicode:characters_to_list(Str)) of
+        {ok, [Atom], ""} ->
+            case io_lib:write_atom(Atom) of
+                "'" ++ _ -> invalid; % quoted
+                _ -> valid % unquoted
+            end;
+        _ ->
+            invalid
+    end.
 
 %% Run template instructions one at a time.
 execute_template([], _, {Template,_,_}, _, _) ->
