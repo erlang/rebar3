@@ -30,8 +30,9 @@ do(Module, Command, Provider, State) ->
                 relx:main([{lib_dirs, LibDirs}
                           ,{caller, api} | output_dir(OutputDir, Options)], AllOptions);
             Config ->
+                Config1 = merge_overlays(Config),
                 relx:main([{lib_dirs, LibDirs}
-                          ,{config, Config}
+                          ,{config, Config1}
                           ,{caller, api} | output_dir(OutputDir, Options)], AllOptions)
         end,
         rebar_hooks:run_all_hooks(Cwd, post, Provider, Providers, State),
@@ -49,3 +50,12 @@ format_error(Reason) ->
 output_dir(OutputDir, Options) ->
     [{output_dir, OutputDir} || not(lists:member("-o", Options))
                                     andalso not(lists:member("--output-dir", Options))].
+
+merge_overlays(Config) ->
+    {Overlays, Others} =
+        lists:partition(fun(C) when element(1, C) =:= overlay -> true;
+                           (_) -> false
+                        end, Config),
+    %% Have profile overlay entries come before others to match how profiles work elsewhere
+    NewOverlay = lists:reverse(lists:flatmap(fun({overlay, Overlay}) -> Overlay end, Overlays)),
+    [{overlay, NewOverlay} | Others].
