@@ -369,26 +369,37 @@ set_verbose(Opts) ->
 translate_paths(State, Tests) -> translate_paths(State, Tests, []).
 
 translate_paths(_State, [], Acc) -> lists:reverse(Acc);
-translate_paths(State, [{dir, Dir}|Rest], Acc) ->
+translate_paths(State, [{K, _} = Path|Rest], Acc) when K == file; K == dir ->
     Apps = rebar_state:project_apps(State),
-    translate_paths(State, Rest, [translate(State, Apps, Dir)|Acc]);
-translate_paths(State, [{file, File}|Rest], Acc) ->
-    Dir = filename:dirname(File),
-    Apps = rebar_state:project_apps(State),
-    translate_paths(State, Rest, [translate(State, Apps, Dir)|Acc]);
+    translate_paths(State, Rest, [translate(State, Apps, Path)|Acc]);
 translate_paths(State, [Test|Rest], Acc) ->
     translate_paths(State, Rest, [Test|Acc]).
 
-translate(State, [App|Rest], Dir) ->
+translate(State, [App|Rest], {dir, Dir}) ->
     case rebar_file_utils:path_from_ancestor(Dir, rebar_app_info:dir(App)) of
         {ok, Path}         -> {dir, filename:join([rebar_app_info:out_dir(App), Path])};
-        {error, badparent} -> translate(State, Rest, Dir)
+        {error, badparent} -> translate(State, Rest, {dir, Dir})
     end;
-translate(State, [], Dir) ->
+translate(State, [App|Rest], {file, FilePath}) ->
+    Dir = filename:dirname(FilePath),
+    File = filename:basename(FilePath),
+    case rebar_file_utils:path_from_ancestor(Dir, rebar_app_info:dir(App)) of
+        {ok, Path}         -> {file, filename:join([rebar_app_info:out_dir(App), Path, File])};
+        {error, badparent} -> translate(State, Rest, {file, FilePath})
+    end;
+translate(State, [], {dir, Dir}) ->
     case rebar_file_utils:path_from_ancestor(Dir, rebar_state:dir(State)) of
         {ok, Path}         -> {dir, filename:join([rebar_dir:base_dir(State), "extras", Path])};
         %% not relative, leave as is
         {error, badparent} -> {dir, Dir}
+    end;
+translate(State, [], {file, FilePath}) ->
+    Dir = filename:dirname(FilePath),
+    File = filename:basename(FilePath),
+    case rebar_file_utils:path_from_ancestor(Dir, rebar_app_info:dir(State)) of
+        {ok, Path}         -> {file, filename:join([rebar_dir:base_dir(State), "extras", Path, File])};
+        %% not relative, leave as is
+        {error, badparent} -> {file, FilePath}
     end.
 
 maybe_cover_compile(State) ->
