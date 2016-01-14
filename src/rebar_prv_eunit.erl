@@ -333,10 +333,9 @@ validate_file(State, File) ->
     end.
 
 validate_module(_State, Module) ->
-    Path = code:which(Module),
-    case beam_lib:chunks(Path, [exports]) of
-        {ok, _}              -> ok;
-        {error, beam_lib, _} -> {error, lists:concat(["Module `", Module, "' not found in project."])}
+    case code:which(Module) of
+        non_existing -> {error, lists:concat(["Module `", Module, "' not found in project."])};
+        _            -> ok
     end.
 
 resolve_eunit_opts(State) ->
