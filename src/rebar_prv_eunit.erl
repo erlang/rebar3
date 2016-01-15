@@ -139,7 +139,8 @@ normalize(Key, Value) -> {Key, list_to_atom(Value)}.
 
 cfg_tests(State) ->
     case rebar_state:get(State, eunit_tests, []) of
-        Tests when is_list(Tests) -> Tests;
+        Tests when is_list(Tests) ->
+            lists:map(fun({app, App}) -> {application, App}; (T) -> T end, Tests);
         Wrong ->
             %% probably a single non list term
             ?PRV_ERROR({badconfig, {"Value `~p' of option `~p' must be a list", {Wrong, eunit_tests}}})
