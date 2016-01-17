@@ -828,8 +828,11 @@ info_useless(Old, New) ->
         not lists:member(Name, New)],
     ok.
 
--ifdef(no_list_dir_all).
-list_dir(Dir) -> file:list_dir(Dir).
--else.
-list_dir(Dir) -> file:list_dir_all(Dir).
--endif.
+list_dir(Dir) ->
+    %% `list_dir_all` returns raw files which are unsupported
+    %% prior to R16 so just fall back to `list_dir` if running
+    %% on an earlier vm
+    case erlang:function_exported(file, list_dir_all, 1) of
+        true  -> file:list_dir_all(Dir);
+        false -> file:list_dir(Dir)
+    end.
