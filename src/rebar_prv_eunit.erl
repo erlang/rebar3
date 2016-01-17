@@ -153,21 +153,50 @@ select_tests(_State, _ProjectApps, [], Tests)  -> {ok, Tests};
 select_tests(_State, _ProjectApps, Tests, _) -> {ok, Tests}.
 
 default_tests(State, Apps) ->
-    Tests = set_apps(Apps, []),
-    BareTest = filename:join([rebar_state:dir(State), "test"]),
-    F = fun(App) -> rebar_app_info:dir(App) == rebar_state:dir(State) end,
-    case filelib:is_dir(BareTest) andalso not lists:any(F, Apps) of
-        %% `test` dir at root of project is already scheduled to be
-        %%  included or `test` does not exist
-        false -> lists:reverse(Tests);
-        %% need to add `test` dir at root to dirs to be included
-        true  -> lists:reverse([{dir, BareTest}|Tests])
-    end.
+    %% use `{application, App}` for each app in project
+    AppTests = set_apps(Apps),
+    %% additional test modules in `test` dir of each app
+    ModTests = set_modules(Apps, State),
+    AppTests ++ ModTests.
+
+set_apps(Apps) -> set_apps(Apps, []).
 
 set_apps([], Acc) -> Acc;
 set_apps([App|Rest], Acc) ->
     AppName = list_to_atom(binary_to_list(rebar_app_info:name(App))),
     set_apps(Rest, [{application, AppName}|Acc]).
+
+set_modules(Apps, State) -> set_modules(Apps, State, {[], []}).
+
+set_modules([], State, {AppAcc, TestAcc}) ->
+    TestSrc = gather_src([filename:join([rebar_state:dir(State), "test"])]),
+    dedupe_tests({AppAcc, TestAcc ++ TestSrc});
+set_modules([App|Rest], State, {AppAcc, TestAcc}) ->
+    F = fun(Dir) -> filename:join([rebar_app_info:dir(App), Dir]) end,
+    AppDirs = lists:map(F, rebar_dir:src_dirs(rebar_app_info:opts(App), ["src"])),
+    AppSrc = gather_src(AppDirs),
+    TestDirs = [filename:join([rebar_app_info:dir(App), "test"])],
+    TestSrc = gather_src(TestDirs),
+    set_modules(Rest, State, {AppSrc ++ AppAcc, TestSrc ++ TestAcc}).
+
+gather_src(Dirs) -> gather_src(Dirs, []).
+
+gather_src([], Srcs) -> Srcs;
+gather_src([Dir|Rest], Srcs) ->
+    gather_src(Rest, Srcs ++ rebar_utils:find_files(Dir, "^[^._].*\\.erl\$", true)).
+
+dedupe_tests({AppMods, TestMods}) ->
+    %% for each modules in TestMods create a test if there is not a module
+    %% in AppMods that will trigger it
+    F = fun(Mod) ->
+        M = filename:basename(Mod, ".erl"),
+        MatchesTest = fun(Dir) -> filename:basename(Dir, ".erl") ++ "_tests" == M end, 
+        case lists:any(MatchesTest, AppMods) of
+            false -> {true, {module, list_to_atom(M)}};
+            true  -> false
+        end
+    end,
+    lists:usort(rebar_utils:filtermap(F, TestMods)).
 
 inject_eunit_state(State, {ok, Tests}) ->
     Apps = rebar_state:project_apps(State),
