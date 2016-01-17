@@ -325,9 +325,14 @@ reread_config(State) ->
         no_config ->
             ok;
         ConfigList ->
-            _ = [application:set_env(Application, Key, Val)
+            try
+                [application:set_env(Application, Key, Val)
                   || {Application, Items} <- ConfigList,
-                     {Key, Val} <- Items],
+                     {Key, Val} <- Items]
+            catch _:_ ->
+                ?ERROR("The configuration file submitted could not be read "
+                       "and will be ignored.", [])
+            end,
             ok
     end.
 
