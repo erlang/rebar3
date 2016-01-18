@@ -71,6 +71,18 @@ $ ./bootstrap
 
 Stable versions can be obtained from the [releases page](https://github.com/rebar/rebar3/releases).
 
+The rebar3 escript can also extract itself with a run script under the user's home directory:
+
+```bash
+$ ./rebar3 unstable install
+===> Extracting rebar3 libs to ~/.cache/rebar3/lib...
+===> Writing rebar3 run script ~/.cache/rebar3/bin/rebar3...
+===> Add to $PATH for use: export PATH=$PATH:~/.cache/rebar3/bin
+```
+
+To keep it up to date after you've installed rebar3 this way you can use `rebar3 unstable upgrade` which
+fetches the latest nightly and extracts to the same place as above.
+
 Rebar3 may also be available on various OS-specific package managers such as
 FreeBSD Ports. Those are maintained by the community and Rebar3 maintainers
 themselves are generally not involved in that process.
