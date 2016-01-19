@@ -170,16 +170,15 @@ get_app_beams(App, Path) ->
 
 get_extra(State) ->
     Extra = rebar_state:get(State, escript_incl_extra, []),
-    lists:foldl(fun({Wildcard, Dir}, Files) ->
-                        load_files(Wildcard, Dir) ++ Files
-                end, [], Extra).
-
-load_files(Wildcard, Dir) ->
-    load_files("", Wildcard, Dir).
+    lists:foldl(
+        fun
+            ({Prefix, Wildcard, Dir}, Files) ->
+                load_files(Prefix, Wildcard, Dir) ++ Files
+        end, [], Extra).
 
 load_files(Prefix, Wildcard, Dir) ->
     [read_file(Prefix, Filename, Dir)
-     || Filename <- filelib:wildcard(Wildcard, Dir)].
+     || Filename <- filelib:wildcard(Wildcard, Dir) ].
 
 read_file(Prefix, Filename, Dir) ->
     Filename1 = case Prefix of
