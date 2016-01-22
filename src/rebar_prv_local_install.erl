@@ -15,7 +15,7 @@
 -include_lib("kernel/include/file.hrl").
 
 -define(PROVIDER, install).
--define(NAMESPACE, unstable).
+-define(NAMESPACE, local).
 -define(DEPS, []).
 
 %% ===================================================================
