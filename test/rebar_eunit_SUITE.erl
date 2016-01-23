@@ -156,7 +156,9 @@ basic_app_exports(_Config) ->
 basic_app_testset(Config) ->
     Result = ?config(result, Config),
 
-    {ok, [{application, basic_app}]} = rebar_prv_eunit:prepare_tests(Result).
+    Set = {ok, [{application, basic_app},
+                {module, basic_app_tests_helper}]},
+    Set = rebar_prv_eunit:prepare_tests(Result).
 
 
 
@@ -208,12 +210,14 @@ multi_app_exports(_Config) ->
 
 %% check that the correct tests are schedule to run for project
 multi_app_testset(Config) ->
-    AppDir = ?config(apps, Config),
     Result = ?config(result, Config),
 
-    Set = {ok, [{application, multi_app_bar},
-                {application, multi_app_baz},
-                {dir, filename:join([AppDir, "test"])}]},
+    Set = {ok, [{application, multi_app_baz},
+                {application, multi_app_bar},
+                {module, multi_app_bar_tests_helper},
+                {module, multi_app_baz_tests_helper}, 
+                {module, multi_app_tests},
+                {module, multi_app_tests_helper}]},
     Set = rebar_prv_eunit:prepare_tests(Result).
 
 
