@@ -74,8 +74,8 @@ _rebar3()
             --multiply_timetraps \
             --scale_timetraps \
             --create_priv_dir \
-            --verbose" \
-            --auto_compile
+            --verbose \
+            --auto_compile"
     elif [[ ${prev} == deps ]] ; then
         :
     elif [[ ${prev} == dialyzer ]] ; then
