@@ -304,7 +304,8 @@ needed_files(G, ErlOpts, Dir, OutDir, SourceFiles) ->
                          TargetBase = target_base(OutDir, Source),
                          Target = TargetBase ++ ".beam",
                          AllOpts = [{outdir, filename:dirname(Target)}
-                                   ,{i, filename:join(Dir, "include")}] ++ ErlOpts,
+                                   ,{i, filename:join(Dir, "include")}
+                                   ,{i, Dir}] ++ ErlOpts,
                          digraph:vertex(G, Source) > {Source, filelib:last_modified(Target)}
                               orelse opts_changed(AllOpts, TargetBase)
                  end, SourceFiles).
@@ -503,7 +504,7 @@ internal_erl_compile(_Opts, Dir, Module, OutDir, ErlOpts) ->
     Target = target_base(OutDir, Module) ++ ".beam",
     ok = filelib:ensure_dir(Target),
     AllOpts = [{outdir, filename:dirname(Target)}] ++ ErlOpts ++
-        [{i, filename:join(Dir, "include")}, return],
+        [{i, filename:join(Dir, "include")}, {i, Dir}, return],
     case compile:file(Module, AllOpts) of
         {ok, _Mod} ->
             ok;
