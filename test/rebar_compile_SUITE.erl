@@ -38,7 +38,9 @@
          clean_all/1,
          override_deps/1,
          profile_override_deps/1,
-         deps_build_in_prod/1]).
+         deps_build_in_prod/1,
+         include_file_relative_to_working_directory/1,
+         include_file_in_src/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -59,7 +61,8 @@ all() ->
      deps_in_path, checkout_priority, highest_version_of_pkg_dep,
      parse_transform_test, erl_first_files_test, mib_test,
      umbrella_mib_first_test, only_default_transitive_deps,
-     clean_all, override_deps, profile_override_deps, deps_build_in_prod].
+     clean_all, override_deps, profile_override_deps, deps_build_in_prod,
+     include_file_relative_to_working_directory, include_file_in_src].
 
 groups() ->
     [{basic_app, [], [build_basic_app, paths_basic_app, clean_basic_app]},
@@ -1203,3 +1206,62 @@ deps_build_in_prod(Config) ->
         {ok, [{app, Name}, {dep, "asdf", <<"1.0.0">>}, {dep, PkgName},
               {file, filename:join([AppDir, "_build", "default", "lib", "asdf", "randomfile"])}]}
     ).
+
+%% verify that the proper include path is defined
+%% according the erlang doc which states:
+%%      If the filename File is absolute (possibly after variable substitution),
+%%      the include file with that name is included. Otherwise, the specified file
+%%      is searched for in the following directories, and in this order:
+%%          * The current working directory
+%%          * The directory where the module is being compiled
+%%          * The directories given by the include option
+include_file_relative_to_working_directory(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    Src = <<"-module(test).\n"
+"\n"
+"-include(\"include/test.hrl\").\n"
+"\n"
+"test() -> ?TEST_MACRO.\n"
+"\n">>,
+    Include = <<"-define(TEST_MACRO, test).\n">>,
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "src", "dummy"])),
+    ok = file:write_file(filename:join([AppDir, "src", "test.erl"]), Src),
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "include", "dummy"])),
+    ok = file:write_file(filename:join([AppDir, "include", "test.hrl"]), Include),
+
+    RebarConfig = [],
+    rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["compile"],
+                                   {ok, [{app, Name}]}).
+
+include_file_in_src(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    Src = <<"-module(test).\n"
+"\n"
+"-include(\"test.hrl\").\n"
+"\n"
+"test() -> ?TEST_MACRO.\n"
+"\n">>,
+    Include = <<"-define(TEST_MACRO, test).\n">>,
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "src", "dummy"])),
+    ok = file:write_file(filename:join([AppDir, "src", "test.erl"]), Src),
+
+    ok = file:write_file(filename:join([AppDir, "src", "test.hrl"]), Include),
+
+    RebarConfig = [],
+    rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["compile"],
+                                   {ok, [{app, Name}]}).
