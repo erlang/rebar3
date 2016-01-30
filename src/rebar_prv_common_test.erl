@@ -281,7 +281,8 @@ inject_ct_state(State, [App|Rest], Acc) ->
 inject_ct_state(State, [], Acc) ->
     case inject(rebar_state:opts(State), State) of
         {error, _} = Error -> Error;
-        NewOpts            -> {ok, {rebar_state:opts(State, NewOpts), lists:reverse(Acc)}}
+        NewOpts            ->
+          {ok, {rebar_state:opts(State, NewOpts), lists:reverse(Acc)}}
     end.
 
 opts(Opts, Key, Default) ->
@@ -385,7 +386,7 @@ maybe_inject_test_dir(State, AppAcc, [App|Rest], Dir) ->
             ExtrasDir = filename:join([rebar_dir:base_dir(State), "extras", RelAppDir]),
             ok = copy_bare_suites(Dir, ExtrasDir),
             Opts = inject_test_dir(rebar_state:opts(State), ExtrasDir),
-            {rebar_state:opts(State, Opts), AppAcc};
+            {rebar_state:opts(State, Opts), AppAcc ++ [App]};
         {ok, Path} ->
             Opts = inject_test_dir(rebar_app_info:opts(App), Path),
             {State, AppAcc ++ [rebar_app_info:opts(App, Opts)] ++ Rest};
