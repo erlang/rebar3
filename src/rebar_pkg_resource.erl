@@ -104,7 +104,7 @@ make_vsn(_) ->
     {error, "Replacing version of type pkg not supported."}.
 
 request(Url, ETag) ->
-    case httpc:request(get, {Url, [{"if-none-match", ETag} || ETag =/= false]},
+    case httpc:request(get, {Url, [{"if-none-match", ETag} || ETag =/= false]++[{"User-Agent", rebar_utils:user_agent()}]},
                        [{ssl, ssl_opts(Url)}, {relaxed, true}],
                        [{body_format, binary}],
                        rebar) of
