@@ -42,10 +42,20 @@ project_apps_install(State) ->
 -spec install(rebar_state:t(), rebar_app_info:t()) -> rebar_state:t().
 install(State, AppInfo) ->
     Profiles = rebar_state:current_profiles(State),
-    lists:foldl(fun(Profile, StateAcc) ->
-                        Plugins = rebar_app_info:get(AppInfo, {plugins, Profile}, []),
-                        handle_plugins(Profile, Plugins, StateAcc)
-                end, State, Profiles).
+
+    %% don't lose the overrides of the dep we are processing plugins for
+    Overrides = rebar_app_info:get(AppInfo, overrides, []),
+    StateOverrides = rebar_state:get(State, overrides, []),
+    AllOverrides = Overrides ++ StateOverrides,
+    State1 = rebar_state:set(State, overrides, AllOverrides),
+
+    State2 = lists:foldl(fun(Profile, StateAcc) ->
+                             Plugins = rebar_app_info:get(AppInfo, {plugins, Profile}, []),
+                             handle_plugins(Profile, Plugins, StateAcc)
+                         end, State1, Profiles),
+
+    %% Reset the overrides after processing the dep
+    rebar_state:set(State2, overrides, StateOverrides).
 
 handle_plugins(Profile, Plugins, State) ->
     handle_plugins(Profile, Plugins, State, false).
