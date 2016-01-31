@@ -681,25 +681,26 @@ suite_at_app_root(Config) ->
     Opts = rebar_prv_common_test:translate_paths(NewState, T),
 
     Suite = proplists:get_value(suite, Opts),
-    Expected = filename:join([AppDir, "_build", "test", "extras", "apps", Name2, "app_root_SUITE"]),
+    Expected = filename:join([AppDir, "_build", "test", "lib", Name2, "app_root_SUITE"]),
     [Expected] = Suite,
 
-    TestHrl = filename:join([AppDir, "_build", "test", "extras", "apps", Name2, "app_root_SUITE.hrl"]),
+    TestHrl = filename:join([AppDir, "_build", "test", "lib", Name2, "app_root_SUITE.hrl"]),
     true = filelib:is_file(TestHrl),
 
-    TestBeam = filename:join([AppDir, "_build", "test", "extras", "apps", Name2, "app_root_SUITE.beam"]),
+    TestBeam = filename:join([AppDir, "_build", "test", "lib", Name2, "app_root_SUITE.beam"]),
     true = filelib:is_file(TestBeam),
 
-    DataDir = filename:join([AppDir, "_build", "test", "extras", "apps", Name2, "app_root_SUITE_data"]),
+    DataDir = filename:join([AppDir, "_build", "test", "lib", Name2, "app_root_SUITE_data"]),
     true = filelib:is_dir(DataDir),
 
-    DataFile = filename:join([AppDir, "_build", "test", "extras", "root_SUITE_data", "some_data.txt"]),
+    DataFile = filename:join([AppDir, "_build", "test", "lib", Name2, "app_root_SUITE_data", "some_data.txt"]),
     true = filelib:is_file(DataFile).
 
 %% this test probably only fails when this suite is run via rebar3 with the --cover flag
 data_dir_correct(Config) ->
     DataDir = ?config(data_dir, Config),
     Parts = filename:split(DataDir),
+    ct:pal(Parts),
     ["rebar_ct_SUITE_data","test","rebar","lib","test","_build"|_] = lists:reverse(Parts).
 
 cmd_label(Config) ->
