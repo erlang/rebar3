@@ -281,7 +281,8 @@ inject_ct_state(State, [App|Rest], Acc) ->
 inject_ct_state(State, [], Acc) ->
     case inject(rebar_state:opts(State), State) of
         {error, _} = Error -> Error;
-        NewOpts            -> {ok, {rebar_state:opts(State, NewOpts), lists:reverse(Acc)}}
+        NewOpts            ->
+          {ok, {rebar_state:opts(State, NewOpts), lists:reverse(Acc)}}
     end.
 
 opts(Opts, Key, Default) ->
@@ -380,12 +381,10 @@ maybe_inject_test_dir(State, AppAcc, [App|Rest], Dir) ->
             %% suite exists in but if the suite is in the app root directory
             %% the current compiler tries to compile all subdirs including priv
             %% instead copy only files ending in `.erl' and directories
-            %% ending in `_SUITE_data' into the `_build/PROFILE/extras' dir
-            {ok, RelAppDir} = rebar_file_utils:path_from_ancestor(rebar_app_info:dir(App), rebar_state:dir(State)),
-            ExtrasDir = filename:join([rebar_dir:base_dir(State), "extras", RelAppDir]),
-            ok = copy_bare_suites(Dir, ExtrasDir),
-            Opts = inject_test_dir(rebar_state:opts(State), ExtrasDir),
-            {rebar_state:opts(State, Opts), AppAcc};
+            %% ending in `_SUITE_data' into the `_build/PROFILE/lib/APP' dir
+            ok = copy_bare_suites(Dir, rebar_app_info:out_dir(App)),
+            Opts = inject_test_dir(rebar_state:opts(State), rebar_app_info:out_dir(App)),
+            {rebar_state:opts(State, Opts), AppAcc ++ [App]};
         {ok, Path} ->
             Opts = inject_test_dir(rebar_app_info:opts(App), Path),
             {State, AppAcc ++ [rebar_app_info:opts(App, Opts)] ++ Rest};
@@ -449,14 +448,22 @@ translate_suites(_State, [], Acc) -> lists:reverse(Acc);
 translate_suites(State, [{suite, Suite}|Rest], Acc) when is_integer(hd(Suite)) ->
     %% single suite
     Apps = rebar_state:project_apps(State),
-    translate_suites(State, Rest, [{suite, translate(State, Apps, Suite)}|Acc]);
+    translate_suites(State, Rest, [{suite, translate_suite(State, Apps, Suite)}|Acc]);
 translate_suites(State, [{suite, Suites}|Rest], Acc) ->
     %% multiple suites
     Apps = rebar_state:project_apps(State),
-    NewSuites = {suite, lists:map(fun(Suite) -> translate(State, Apps, Suite) end, Suites)},
+    NewSuites = {suite, lists:map(fun(Suite) -> translate_suite(State, Apps, Suite) end, Suites)},
     translate_suites(State, Rest, [NewSuites|Acc]);
 translate_suites(State, [Test|Rest], Acc) ->
     translate_suites(State, Rest, [Test|Acc]).
+
+translate_suite(State, Apps, Suite) ->
+    Dirname = filename:dirname(Suite),
+    Basename = filename:basename(Suite),
+    case Dirname of
+        "." -> Suite;
+        _   -> filename:join([translate(State, Apps, Dirname), Basename])
+    end.
 
 translate(State, [App|Rest], Path) ->
     case rebar_file_utils:path_from_ancestor(Path, rebar_app_info:dir(App)) of
