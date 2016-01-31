@@ -10,7 +10,8 @@ _rebar3()
     if [[ ${prev} == rebar3 ]] ; then
         sopts="-h -v"
         lopts="--help --version"
-        cmdsnvars="as \
+        cmdsnvars=" \
+            as \
             clean \
             compile \
             cover \
@@ -37,7 +38,8 @@ _rebar3()
             update \
             upgrade \
             version \
-            xref"
+            xref \
+            "
     elif [[ ${prev} == as ]] ; then
         :
     elif [[ ${prev} == clean ]] ; then
@@ -50,7 +52,8 @@ _rebar3()
         lopts="--reset --verbose"
     elif [[ ${prev} == ct ]] ; then
         sopts="-c -v"
-        lopts="--dir \
+        lopts=" \
+            --dir \
             --suite \
             --group \
             --case \
@@ -74,8 +77,9 @@ _rebar3()
             --multiply_timetraps \
             --scale_timetraps \
             --create_priv_dir \
-            --verbose" \
-            --auto_compile
+            --verbose \
+            --auto_compile \
+            "
     elif [[ ${prev} == deps ]] ; then
         :
     elif [[ ${prev} == dialyzer ]] ; then
@@ -97,7 +101,8 @@ _rebar3()
         lopts="--force"
     elif [[ ${prev} == path ]] ; then
         sopts="-s"
-        lopts="--app \
+        lopts=" \
+            --app \
             --base \
             --bin \
             --ebin \
@@ -105,14 +110,16 @@ _rebar3()
             --priv \
             --separator \
             --src \
-            --rel"
+            --rel \
+            "
     elif [[ ${prev} == pkgs ]] ; then
         :
     elif [[ ${prev} == plugins ]] ; then
         :
     elif [[ ${prev} == release ]] ; then
         sopts="-n -v -g -u -o -h -l -p -V -d -i -a -c -r"
-        lopts="--relname \
+        lopts=" \
+            --relname \
             --relvsn \
             --goal \
             --upfrom \
@@ -131,10 +138,12 @@ _rebar3()
             --sys_config \
             --system_libs \
             --version \
-            --root"
+            --root \
+            "
     elif [[ ${prev} == relup ]] ; then
         sopts="-n -v -g -u -o -h -l -p -V -d -i -a -c -r"
-        lopts="--relname \
+        lopts=" \
+            --relname \
             --relvsn \
             --goal \
             --upfrom \
@@ -153,14 +162,16 @@ _rebar3()
             --sys_config \
             --system_libs \
             --version \
-            --root"
+            --root \
+            "
     elif [[ ${prev} == report ]] ; then
         :
     elif [[ ${prev} == shell ]] ; then
         :
     elif [[ ${prev} == tar ]] ; then
         sopts="-n -v -g -u -o -h -l -p -V -d -i -a -c -r"
-        lopts="--relname \
+        lopts=" \
+            --relname \
             --relvsn \
             --goal \
             --upfrom \
@@ -179,7 +190,8 @@ _rebar3()
             --sys_config \
             --system_libs \
             --version \
-            --root"
+            --root \
+            "
     elif [[ ${prev} == tree ]] ; then
         sopts="-v"
         lopts="--verbose"
