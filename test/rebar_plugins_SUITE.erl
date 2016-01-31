@@ -11,7 +11,8 @@
          complex_plugins/1,
          list/1,
          upgrade/1,
-         sub_app_plugins/1]).
+         sub_app_plugins/1,
+         sub_app_plugin_overrides/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -33,7 +34,7 @@ end_per_testcase(_, _Config) ->
     catch meck:unload().
 
 all() ->
-    [compile_plugins, compile_global_plugins, complex_plugins, list, upgrade, sub_app_plugins].
+    [compile_plugins, compile_global_plugins, complex_plugins, list, upgrade, sub_app_plugins, sub_app_plugin_overrides].
 
 %% Tests that compiling a project installs and compiles the plugins of deps
 compile_plugins(Config) ->
@@ -239,4 +240,44 @@ sub_app_plugins(Config) ->
     rebar_test_utils:run_and_check(
       Config, RConf, ["compile"],
       {ok, [{app, Name}, {dep, DepName}, {plugin, PluginName}]}
+     ).
+
+%% Tests that overrides in a dep that includes a plugin are applied to plugin fetching
+sub_app_plugin_overrides(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("sub_app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    Dep2Name = rebar_test_utils:create_random_name("dep2_"),
+
+    DepName = rebar_test_utils:create_random_name("dep1_"),
+    PluginName = rebar_test_utils:create_random_name("plugin1_"),
+    Vsn2 = rebar_test_utils:create_random_vsn(),
+
+    Deps = rebar_test_utils:expand_deps(git, [{PluginName, Vsn, [{DepName, Vsn, []}]},
+                                              {DepName, Vsn, []}]),
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
+
+    mock_pkg_resource:mock([{pkgdeps, [{{list_to_binary(Dep2Name), list_to_binary(Vsn)}, []}]},
+                            {config, [{plugins, [{list_to_atom(PluginName),
+                                                 {git, "http://site.com/user/"++PluginName++".git",
+                                                  {tag, Vsn}}}]},
+                                      %% Dep2 overrides the plugin's deps to have vsn2 of dep1
+                                      {overrides, [{override, list_to_atom(PluginName),
+                                                    [{deps, [{list_to_atom(DepName),
+                                                              {git, "http://site.com/user/"++DepName++".git",
+                                                               {tag, Vsn2}}}]}]}]}]}]),
+
+    SubAppsDir = filename:join([AppDir, "apps", Name]),
+
+    rebar_test_utils:create_app(SubAppsDir, Name, Vsn, [kernel, stdlib]),
+
+    RConfFile = rebar_test_utils:create_config(AppDir, [{deps, [{list_to_binary(Dep2Name), list_to_binary(Vsn)}]}]),
+    {ok, RConf} = file:consult(RConfFile),
+
+    %% Build with deps.
+    rebar_test_utils:run_and_check(
+      Config, RConf, ["compile"],
+      {ok, [{app, Name}, {dep, Dep2Name, Vsn}, {plugin, DepName, Vsn2}, {plugin, PluginName}]}
      ).
