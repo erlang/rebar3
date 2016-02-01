@@ -48,7 +48,7 @@ do(State) ->
                 case rebar_utils:url_append_path(CDN, ?REMOTE_REGISTRY_FILE) of
                     {ok, Url} ->
                         ?DEBUG("Fetching registry from ~p", [Url]),
-                        case httpc:request(get, {Url, []},
+                        case httpc:request(get, {Url, [{"User-Agent", rebar_utils:user_agent()}]},
                                            [], [{stream, TmpFile}, {sync, true}],
                                            rebar) of
                             {ok, saved_to_file} ->

@@ -68,7 +68,8 @@
          check_min_otp_version/1,
          check_blacklisted_otp_versions/1,
          info_useless/2,
-         list_dir/1]).
+         list_dir/1,
+         user_agent/0]).
 
 %% for internal use only
 -export([otp_release/0]).
@@ -406,6 +407,10 @@ abort_if_blacklisted(BlacklistedRegex, OtpRelease) ->
             ?DEBUG("~s does not match blacklisted OTP version ~s",
                    [OtpRelease, BlacklistedRegex])
     end.
+
+user_agent() ->
+    {ok, Vsn} = application:get_key(rebar, vsn),
+    ?FMT("Rebar/~s (OTP/~s)", [Vsn, otp_release()]).
 
 %% ====================================================================
 %% Internal functions
