@@ -13,6 +13,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, compile).
+-define(ERLC_HOOK, erlc_compile).
 -define(DEPS, [lock]).
 
 %% ===================================================================
@@ -116,12 +117,15 @@ compile(State, Providers, AppInfo) ->
     AppDir = rebar_app_info:dir(AppInfo),
     AppInfo1 = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, AppInfo, State),
 
-    rebar_erlc_compiler:compile(AppInfo1),
-    case rebar_otp_app:compile(State, AppInfo1) of
-        {ok, AppInfo2} ->
-            AppInfo3 = rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo2, State),
-            has_all_artifacts(AppInfo3),
-            AppInfo3;
+    AppInfo2 = rebar_hooks:run_all_hooks(AppDir, pre, ?ERLC_HOOK, Providers, AppInfo1, State),
+    rebar_erlc_compiler:compile(AppInfo2),
+    AppInfo3 = rebar_hooks:run_all_hooks(AppDir, post, ?ERLC_HOOK, Providers, AppInfo2, State),
+
+    case rebar_otp_app:compile(State, AppInfo3) of
+        {ok, AppInfo4} ->
+            AppInfo5 = rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo4, State),
+            has_all_artifacts(AppInfo5),
+            AppInfo5;
         Error ->
             throw(Error)
     end.
@@ -143,7 +147,7 @@ paths_for_apps([App|Rest], Acc) ->
     Paths = [filename:join([rebar_app_info:out_dir(App), Dir]) || Dir <- ["ebin"|ExtraDirs]],
     FilteredPaths = lists:filter(fun ec_file:is_dir/1, Paths),
     paths_for_apps(Rest, Acc ++ FilteredPaths).
-    
+
 paths_for_extras(State, Apps) ->
     F = fun(App) -> rebar_app_info:dir(App) == rebar_state:dir(State) end,
     %% check that this app hasn't already been dealt with
