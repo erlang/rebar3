@@ -105,6 +105,9 @@ run_aux(State, RawArgs) ->
                      rebar_state:apply_profiles(State, [list_to_atom(Profile)])
              end,
 
+    rebar_utils:check_min_otp_version(rebar_state:get(State1, minimum_otp_vsn, undefined)),
+    rebar_utils:check_blacklisted_otp_versions(rebar_state:get(State1, blacklisted_otp_vsns, undefined)),
+
     State2 = case os:getenv("HEX_CDN") of
                  false ->
                      State1;
