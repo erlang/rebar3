@@ -34,7 +34,6 @@ do(State) ->
     Providers = rebar_state:providers(State),
     Cwd = rebar_state:dir(State),
 
-    ?INFO("Deps: ~p", [Deps]),
 
     build_app_files(State, Providers, Deps),
     {ok, ProjectApps1} = rebar_digraph:compile_order(ProjectApps),
@@ -44,7 +43,6 @@ do(State) ->
     ProjectApps2 = build_app_files(State, Providers, ProjectApps1),
     State2 = rebar_state:project_apps(State, ProjectApps2),
 
-    ?INFO("ProjectApps: ~p", [ProjectApps2]),
 
     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State2),
 
@@ -72,7 +70,7 @@ build_app_file(State, AppInfo) ->
     build_app_file(State, rebar_state:providers(State), AppInfo).
 
 build_app_file(State, Providers, AppInfo) ->
-    ?INFO("Packaging ~p", [rebar_app_info:name(AppInfo)]),
+    ?INFO("Packaging ~s", [rebar_app_info:name(AppInfo)]),
     AppDir = rebar_app_info:dir(AppInfo),
     AppInfo1 = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER, Providers, AppInfo, State),
     case rebar_otp_app:compile(State, AppInfo1) of
