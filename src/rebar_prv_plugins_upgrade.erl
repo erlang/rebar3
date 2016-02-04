@@ -93,4 +93,5 @@ build_plugin(AppInfo, Apps, State) ->
     C = rebar_config:consult(AppDir),
     S = rebar_state:new(rebar_state:all_deps(rebar_state:new(), Apps), C, AppDir),
     AppInfo1 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
-    rebar_prv_compile:compile(S, Providers, AppInfo1).
+    AppInfo2 = rebar_prv_compile:compile(S, Providers, AppInfo1),
+    rebar_prv_app_builder:build_app_file(S, Providers, AppInfo2).
