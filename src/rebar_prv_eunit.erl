@@ -190,7 +190,7 @@ dedupe_tests({AppMods, TestMods}) ->
     %% in AppMods that will trigger it
     F = fun(Mod) ->
         M = filename:basename(Mod, ".erl"),
-        MatchesTest = fun(Dir) -> filename:basename(Dir, ".erl") ++ "_tests" == M end, 
+        MatchesTest = fun(Dir) -> filename:basename(Dir, ".erl") ++ "_tests" == M end,
         case lists:any(MatchesTest, AppMods) of
             false -> {true, {module, list_to_atom(M)}};
             true  -> false
@@ -291,8 +291,13 @@ compile(State) ->
     case rebar_prv_compile:do(State) of
         %% successfully compiled apps
         {ok, S} ->
-            ok = maybe_cover_compile(S),
-            {ok, S};
+            case rebar_prv_app_builder:do(S) of
+                {ok, S1} ->
+                    ok = maybe_cover_compile(S1),
+                    {ok, S1};
+                Error ->
+                    Error
+            end;
         %% this should look like a compiler error, not an eunit error
         Error   -> Error
     end.

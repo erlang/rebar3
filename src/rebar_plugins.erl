@@ -113,7 +113,8 @@ build_plugin(AppInfo, Apps, State) ->
     %rebar_app_info:state_or_new(State, AppInfo)
     S = rebar_state:all_deps(State, Apps),
     S1 = rebar_state:set(S, deps_dir, ?DEFAULT_PLUGINS_DIR),
-    rebar_prv_compile:compile(S1, Providers, AppInfo).
+    AppInfo1 = rebar_prv_compile:compile(S1, Providers, AppInfo),
+    rebar_prv_app_builder:build_app_file(S1, Providers, AppInfo1).
 
 plugin_providers({Plugin, _, _, _}) when is_atom(Plugin) ->
     validate_plugin(Plugin);
