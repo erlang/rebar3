@@ -397,7 +397,7 @@ run_dialyzer(State, Opts, Output) ->
     case proplists:get_bool(get_warnings, Opts) of
         true ->
             WarningsList = get_config(State, warnings, []),
-            Opts2 = [{warnings, WarningsList},
+            Opts2 = [{warnings, legacy_warnings(WarningsList)},
                      {check_plt, false} |
                      Opts],
             ?DEBUG("Running dialyzer with options: ~p~n", [Opts2]),
@@ -410,6 +410,14 @@ run_dialyzer(State, Opts, Output) ->
             ?DEBUG("Running dialyzer with options: ~p~n", [Opts2]),
             dialyzer:run(Opts2),
             {0, State}
+    end.
+
+legacy_warnings(Warnings) ->
+    case dialyzer_version() of
+       TupleVsn when TupleVsn < {2, 8, 0} ->
+            [Warning || Warning <- Warnings, Warning =/= unknown];
+        _ ->
+            Warnings
     end.
 
 format_warnings(Output, Warnings) ->
@@ -475,3 +483,16 @@ collect_nested_dependent_apps(App, Seen) ->
                     end
             end
     end.
+
+dialyzer_version() ->
+    _ = application:load(dialyzer),
+    {ok, Vsn} = application:get_key(dialyzer, vsn),
+    case string:tokens(Vsn, ".") of
+        [Major, Minor] ->
+            version_tuple(Major, Minor, "0");
+        [Major, Minor, Patch | _] ->
+            version_tuple(Major, Minor, Patch)
+    end.
+
+version_tuple(Major, Minor, Patch) ->
+    {list_to_integer(Major), list_to_integer(Minor), list_to_integer(Patch)}.
