@@ -3,8 +3,8 @@
 -include_lib("eunit/include/eunit.hrl").
 -export([init_rebar_state/1, init_rebar_state/2, run_and_check/4, check_results/3]).
 -export([expand_deps/2, flat_deps/1, top_level_deps/1]).
--export([create_app/4, create_eunit_app/4, create_empty_app/4, create_config/2,
-         package_app/3]).
+-export([create_app/4, create_eunit_app/4, create_empty_app/4,
+         create_config/2, create_config/3, package_app/3]).
 -export([create_random_name/1, create_random_vsn/0, write_src_file/2]).
 
 %%%%%%%%%%%%%%
@@ -104,11 +104,14 @@ create_empty_app(AppDir, Name, Vsn, Deps) ->
 %% each of which will be dumped as a consult file. For example, the list
 %% `[a, b, c]' will return the consult file `a. b. c.'.
 create_config(AppDir, Contents) ->
-    Conf = filename:join([AppDir, "rebar.config"]),
-    ok = filelib:ensure_dir(Conf),
+    ConfFilename = filename:join([AppDir, "rebar.config"]),
+    create_config(AppDir, ConfFilename, Contents).
+
+create_config(_AppDir, ConfFilename, Contents) ->
+    ok = filelib:ensure_dir(ConfFilename),
     Config = lists:flatten([io_lib:fwrite("~p.~n", [Term]) || Term <- Contents]),
-    ok = ec_file:write(Conf, Config),
-    Conf.
+    ok = ec_file:write(ConfFilename, Config),
+    ConfFilename.
 
 %% @doc Util to create a random variation of a given name.
 create_random_name(Name) ->

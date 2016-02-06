@@ -10,7 +10,8 @@ all() -> [release,
           profile_ordering_sys_config_extend,
           profile_ordering_sys_config_extend_3_tuple_merge,
           extend_release,
-          user_output_dir, profile_overlays].
+          user_output_dir, profile_overlays,
+          overlay_vars].
 
 init_per_testcase(Case, Config0) ->
     Config = rebar_test_utils:init_rebar_state(Config0),
@@ -215,3 +216,57 @@ profile_overlays(Config) ->
             {dir, filename:join(ReleaseDir, "otherrandomdir")},
             {dir, filename:join(ReleaseDir, "randomdir")}]}
      ).
+
+overlay_vars(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = ?config(name, Config),
+    Vsn = "1.0.0",
+    {ok, RebarConfig} =
+        file:consult(rebar_test_utils:create_config(AppDir,
+                                                    [{relx, [{release, {list_to_atom(Name), Vsn},
+                                                              [list_to_atom(Name)]},
+                                                             {overlay, [
+                                                                {template, filename:join([AppDir, "config/app.config"]),
+                                                                  "releases/{{release_version}}/sys.config"}
+                                                              ]},
+                                                             {overlay_vars, filename:join([AppDir, "config/vars.config"])},
+                                                             {lib_dirs, [AppDir]}]}
+                                                    ])),
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "config", "dummy"])),
+
+    OverlayVars = [{var_int, 1},
+                   {var_string, "\"test\""},
+                   {var_bin_string, "<<\"test\">>"},
+                   {var_tuple, "{t, ['atom']}"},
+                   {var_list, "[a, b, c, 'd']"},
+                   {var_bin, "<<23, 24, 25>>"}],
+    rebar_test_utils:create_config(AppDir,
+                                   filename:join([AppDir, "config", "vars.config"]),
+                                   OverlayVars),
+
+    AppConfig = [[{var_int, {{var_int}}},
+                  {var_string, {{{var_string}}}},
+                  {var_bin_string, {{{var_bin_string}}}},
+                  {var_tuple, {{{var_tuple}}}},
+                  {var_list, {{{var_list}}}},
+                  {var_bin, {{{var_bin}}}}]],
+    rebar_test_utils:create_config(AppDir,
+                                   filename:join([AppDir, "config", "app.config"]),
+                                   AppConfig),
+
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig,
+      ["release"],
+      {ok, [{release, list_to_atom(Name), Vsn, false}]}),
+
+    %% now consult the sys.config file to make sure that is has the expected
+    %% format
+    ExpectedSysconfig = [{var_int, 1},
+                         {var_string, "test"},
+                         {var_bin_string, <<"test">>},
+                         {var_tuple, {t, ['atom']}},
+                         {var_list, [a, b, c, 'd']},
+                         {var_bin, <<23, 24, 25>>}],
+    {ok, [ExpectedSysconfig]} = file:consult(filename:join([AppDir, "_build/default/rel",
+                                                          Name, "releases", Vsn, "sys.config"])).
