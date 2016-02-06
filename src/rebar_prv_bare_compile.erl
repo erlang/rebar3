@@ -44,7 +44,8 @@ do(State) ->
 
     [AppInfo] = rebar_state:project_apps(State),
     AppInfo1 = rebar_app_info:out_dir(AppInfo, rebar_dir:get_cwd()),
-    rebar_prv_compile:compile(State, AppInfo1),
+    AppInfo2 = rebar_prv_compile:compile(State, AppInfo1),
+    rebar_prv_app_builder:build_app_file(State, AppInfo2),
 
     rebar_utils:cleanup_code_path(OrigPath),
 

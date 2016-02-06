@@ -256,8 +256,13 @@ do_compile(State) ->
     case rebar_prv_compile:do(State) of
         %% successfully compiled apps
         {ok, S} ->
-            ok = maybe_cover_compile(S),
-            {ok, S};
+            case rebar_prv_app_builder:do(S) of
+                {ok, S1} ->
+                    ok = maybe_cover_compile(S1),
+                    {ok, S1};
+                Error ->
+                    Error
+            end;
         %% this should look like a compiler error, not an eunit error
         Error   -> Error
     end.

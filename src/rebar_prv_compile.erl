@@ -12,7 +12,7 @@
 -include_lib("providers/include/providers.hrl").
 -include("rebar.hrl").
 
--define(PROVIDER, compile).
+-define(PROVIDER, erlc_compile).
 -define(DEPS, [lock]).
 
 %% ===================================================================
@@ -23,11 +23,8 @@
 init(State) ->
     State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
                                                                {module, ?MODULE},
-                                                               {bare, true},
+                                                               {bare, false},
                                                                {deps, ?DEPS},
-                                                               {example, "rebar3 compile"},
-                                                               {short_desc, "Compile apps .app.src and .erl files."},
-                                                               {desc, "Compile apps .app.src and .erl files."},
                                                                {opts, []}])),
     {ok, State1}.
 
@@ -58,20 +55,10 @@ do(State) ->
     State3 = update_code_paths(State2, ProjectApps2, DepsPaths),
 
     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State2),
-    case rebar_state:has_all_artifacts(State3) of
-        {false, File} ->
-            throw(?PRV_ERROR({missing_artifact, File}));
-        true ->
-            true
-    end,
-    rebar_utils:cleanup_code_path(rebar_state:code_paths(State3, default)
-                                 ++ rebar_state:code_paths(State, all_plugin_deps)),
 
     {ok, State3}.
 
 -spec format_error(any()) -> iolist().
-format_error({missing_artifact, File}) ->
-    io_lib:format("Missing artifact ~s", [File]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -114,17 +101,12 @@ compile(State, AppInfo) ->
 compile(State, Providers, AppInfo) ->
     ?INFO("Compiling ~s", [rebar_app_info:name(AppInfo)]),
     AppDir = rebar_app_info:dir(AppInfo),
-    AppInfo1 = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, AppInfo, State),
 
+    AppInfo1 = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, AppInfo, State),
     rebar_erlc_compiler:compile(AppInfo1),
-    case rebar_otp_app:compile(State, AppInfo1) of
-        {ok, AppInfo2} ->
-            AppInfo3 = rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo2, State),
-            has_all_artifacts(AppInfo3),
-            AppInfo3;
-        Error ->
-            throw(Error)
-    end.
+    AppInfo2 = rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo1, State),
+
+    AppInfo2.
 
 %% ===================================================================
 %% Internal functions
@@ -143,7 +125,7 @@ paths_for_apps([App|Rest], Acc) ->
     Paths = [filename:join([rebar_app_info:out_dir(App), Dir]) || Dir <- ["ebin"|ExtraDirs]],
     FilteredPaths = lists:filter(fun ec_file:is_dir/1, Paths),
     paths_for_apps(Rest, Acc ++ FilteredPaths).
-    
+
 paths_for_extras(State, Apps) ->
     F = fun(App) -> rebar_app_info:dir(App) == rebar_state:dir(State) end,
     %% check that this app hasn't already been dealt with
@@ -157,13 +139,6 @@ paths_for_extras(State) ->
     Paths = [filename:join([rebar_dir:base_dir(State), "extras", Dir]) || Dir <- ExtraDirs],
     lists:filter(fun ec_file:is_dir/1, Paths).
 
-has_all_artifacts(AppInfo1) ->
-    case rebar_app_info:has_all_artifacts(AppInfo1) of
-        {false, File} ->
-            throw(?PRV_ERROR({missing_artifact, File}));
-        true ->
-            true
-    end.
 
 copy_app_dirs(AppInfo, OldAppDir, AppDir) ->
     case ec_cnv:to_binary(filename:absname(OldAppDir)) =/=

@@ -70,7 +70,7 @@ escriptize_artifacts(Config) ->
     try rebar_test_utils:run_and_check(Config, RConf, ["compile"], return)
     catch
         {error,
-         {rebar_prv_compile,
+         {rebar_prv_app_builder,
           {missing_artifact, Artifact}}} ->
             ok
     end,
