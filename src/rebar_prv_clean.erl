@@ -27,32 +27,35 @@ init(State) ->
                                                                {example, "rebar3 clean"},
                                                                {short_desc, "Remove compiled beam files from apps."},
                                                                {desc, "Remove compiled beam files from apps."},
-                                                               {opts, [{all, $a, "all", undefined, "Clean all apps include deps"}]}])),
+                                                               {opts, [{all, $a, "all", undefined, "Clean all apps include deps"},
+                                                                       {profile, $p, "profile", string, "Clean under profile. Equivalent to `rebar3 as <profile> clean`"}]}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     Providers = rebar_state:providers(State),
-    {all, All} = handle_args(State),
+    {All, Profiles} = handle_args(State),
+
+    State1 = rebar_state:apply_profiles(State, [list_to_atom(X) || X <- Profiles]),
 
     Cwd = rebar_dir:get_cwd(),
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
+    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State1),
 
     case All of
         true ->
-            DepsDir = rebar_dir:deps_dir(State),
+            DepsDir = rebar_dir:deps_dir(State1),
             AllApps = rebar_app_discover:find_apps([filename:join(DepsDir, "*")], all),
-            clean_apps(State, Providers, AllApps);
+            clean_apps(State1, Providers, AllApps);
         false ->
-            ProjectApps = rebar_state:project_apps(State),
-            clean_apps(State, Providers, ProjectApps)
+            ProjectApps = rebar_state:project_apps(State1),
+            clean_apps(State1, Providers, ProjectApps)
     end,
 
-    clean_extras(State),
+    clean_extras(State1),
 
-    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State),
+    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State1),
 
-    {ok, State}.
+    {ok, State1}.
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
@@ -78,4 +81,5 @@ clean_extras(State) ->
 handle_args(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     All = proplists:get_value(all, Args, false),
-    {all, All}.
+    Profiles = proplists:get_all_values(profile, Args),
+    {All, Profiles}.

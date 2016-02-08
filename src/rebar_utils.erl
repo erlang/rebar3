@@ -47,6 +47,7 @@
          deprecated/4,
          indent/1,
          update_code/1,
+         update_code/2,
          remove_from_code_path/1,
          cleanup_code_path/1,
          args_to_tasks/1,
@@ -60,13 +61,15 @@
          tup_find/2,
          line_count/1,
          set_httpc_options/0,
+         url_append_path/2,
          escape_chars/1,
          escape_double_quotes/1,
          escape_double_quotes_weak/1,
          check_min_otp_version/1,
          check_blacklisted_otp_versions/1,
          info_useless/2,
-         list_dir/1]).
+         list_dir/1,
+         user_agent/0]).
 
 %% for internal use only
 -export([otp_release/0]).
@@ -284,7 +287,18 @@ tup_umerge(NewList, OldList) ->
 tup_umerge_([], Olds) ->
     Olds;
 tup_umerge_([New|News], Olds) ->
-    lists:reverse(umerge(News, Olds, [], New)).
+    tup_umerge_dedup_(umerge(new, News, Olds, [], New), []).
+
+%% removes 100% identical duplicate elements so that
+%% `[a,{a,b},a,{a,c},a]' returns `[a,{a,b},{a,c}]'.
+%% Operates on a reverted list that gets reversed as part of this pass
+tup_umerge_dedup_([], Acc) ->
+    Acc;
+tup_umerge_dedup_([H|T], Acc) ->
+    case lists:member(H,T) of
+        true -> tup_umerge_dedup_(T, Acc);
+        false -> tup_umerge_dedup_(T, [H|Acc])
+    end.
 
 tup_find(_Elem, []) ->
     false;
@@ -300,35 +314,58 @@ tup_find(Elem, [Elem1 | Elems]) when is_tuple(Elem1) ->
 tup_find(Elem, [_Elem | Elems]) ->
     tup_find(Elem, Elems).
 
-%% This is equivalent to umerge2_2 in the stdlib, except we use the expanded
-%% value/key only to compare
-umerge(News, [Old|Olds], Merged, Cmp) when element(1, Cmp) == element(1, Old);
-                                           element(1, Cmp) == Old;
-                                           Cmp == element(1, Old);
-                                           Cmp =< Old ->
-    umerge(News, Olds, [Cmp | Merged], Cmp, Old);
-umerge(News, [Old|Olds], Merged, Cmp) ->
-    umerge(News, Olds, [Old | Merged], Cmp);
-umerge(News, [], Merged, Cmp) ->
-    lists:reverse(News, [Cmp | Merged]).
+-spec umerge(new|old, News, Olds, Acc, Current) -> Merged when
+      News :: [term()],
+      Olds :: [term()],
+      Acc  :: [term()],
+      Current :: term(),
+      Merged :: [term()].
+umerge(_, [], [], Acc, Current) ->
+    [Current | Acc];
+umerge(new, News, [], Acc, Current) ->
+    %% only news left
+    lists:reverse(News, [Current|Acc]);
+umerge(old, [], Olds, Acc, Current) ->
+    %% only olds left
+    lists:reverse(Olds, [Current|Acc]);
+umerge(new, News, [Old|Olds], Acc, Current) ->
+    {Dir, Merged, NewCurrent} = compare({new, Current}, {old, Old}),
+    umerge(Dir, News, Olds, [Merged|Acc], NewCurrent);
+umerge(old, [New|News], Olds, Acc, Current) ->
+    {Dir, Merged, NewCurrent} = compare({new, New}, {old, Current}),
+    umerge(Dir, News, Olds, [Merged|Acc], NewCurrent).
 
-%% Similar to stdlib's umerge2_1 in the stdlib, except that when the expanded
-%% value/keys compare equal, we check if the element is a full dupe to clear it
-%% (like the stdlib function does) or otherwise keep the duplicate around in
-%% an order that prioritizes 'New' elements.
-umerge([New|News], Olds, Merged, CmpMerged, Cmp) when CmpMerged == Cmp ->
-    umerge(News, Olds, Merged, New);
-umerge([New|News], Olds, Merged, _CmpMerged, Cmp) when element(1,New) == element(1, Cmp);
-                                                       element(1,New) == Cmp;
-                                                       New == element(1, Cmp);
-                                                       New =< Cmp ->
-    umerge(News, Olds, [New | Merged], New, Cmp);
-umerge([New|News], Olds, Merged, _CmpMerged, Cmp) -> % >
-    umerge(News, Olds, [Cmp | Merged], New);
-umerge([], Olds, Merged, CmpMerged, Cmp) when CmpMerged == Cmp ->
-    lists:reverse(Olds, Merged);
-umerge([], Olds, Merged, _CmpMerged, Cmp) ->
-    lists:reverse(Olds, [Cmp | Merged]).
+-spec compare({Priority, term()}, {Secondary, term()}) ->
+    {NextPriority, Merged, Larger} when
+      Priority :: new | old,
+      Secondary :: new | old,
+      NextPriority :: new | old,
+      Merged :: term(),
+      Larger :: term().
+compare({Priority, A}, {Secondary, B}) when is_tuple(A), is_tuple(B) ->
+    KA = element(1,A),
+    KB = element(1,B),
+    if KA == KB -> {Secondary, A, B};
+       KA  < KB -> {Secondary, A, B};
+       KA  > KB -> {Priority, B, A}
+    end;
+compare({Priority, A}, {Secondary, B}) when not is_tuple(A), not is_tuple(B) ->
+    if A == B -> {Secondary, A, B};
+       A  < B -> {Secondary, A, B};
+       A  > B -> {Priority, B, A}
+    end;
+compare({Priority, A}, {Secondary, B}) when is_tuple(A), not is_tuple(B) ->
+    KA = element(1,A),
+    if KA == B -> {Secondary, A, B};
+       KA  < B -> {Secondary, A, B};
+       KA  > B -> {Priority, B, A}
+    end;
+compare({Priority, A}, {Secondary, B}) when not is_tuple(A), is_tuple(B) ->
+    KB = element(1,B),
+    if A == KB -> {Secondary, A, B};
+       A  < KB -> {Secondary, A, B};
+       A  > KB -> {Priority, B, A}
+    end.
 
 %% Implements wc -l functionality used to determine patchcount from git output
 line_count(PatchLines) ->
@@ -370,6 +407,10 @@ abort_if_blacklisted(BlacklistedRegex, OtpRelease) ->
             ?DEBUG("~s does not match blacklisted OTP version ~s",
                    [OtpRelease, BlacklistedRegex])
     end.
+
+user_agent() ->
+    {ok, Vsn} = application:get_key(rebar, vsn),
+    ?FMT("Rebar/~s (OTP/~s)", [Vsn, otp_release()]).
 
 %% ====================================================================
 %% Internal functions
@@ -644,7 +685,9 @@ indent(Amount) when erlang:is_integer(Amount) ->
 
 %% Replace code paths with new paths for existing apps and
 %% purge code of the old modules from those apps.
-update_code(Paths) ->
+update_code(Paths) -> update_code(Paths, []).
+
+update_code(Paths, Opts) ->
     lists:foreach(fun(Path) ->
                           Name = filename:basename(Path, "/ebin"),
                           App = list_to_atom(Name),
@@ -654,19 +697,18 @@ update_code(Paths) ->
                                   code:add_patha(Path),
                                   ok;
                               {ok, Modules} ->
-                                  %% stick rebar ebin dir before purging to prevent
-                                  %% inadvertent termination
-                                  RebarBin = code:lib_dir(rebar, ebin),
-                                  ok = code:stick_dir(RebarBin),
                                   %% replace_path causes problems when running
                                   %% tests in projects like erlware_commons that rebar3
                                   %% also includes
                                   %code:replace_path(App, Path),
                                   code:del_path(App),
                                   code:add_patha(Path),
-                                  [begin code:purge(M), code:delete(M) end || M <- Modules],
-                                  %% unstick rebar dir
-                                  ok = code:unstick_dir(RebarBin)
+                                  case lists:member(soft_purge, Opts) of
+                                      true  ->
+                                          [begin code:soft_purge(M), code:delete(M) end || M <- Modules];
+                                      false ->
+                                          [begin code:purge(M), code:delete(M) end || M <- Modules]
+                                  end
                           end
                   end, Paths).
 
@@ -762,6 +804,15 @@ set_httpc_options(Scheme, Proxy) ->
     {ok, {_, _, Host, Port, _, _}} = http_uri:parse(Proxy),
     httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar).
 
+url_append_path(Url, ExtraPath) ->
+     case http_uri:parse(Url) of
+         {ok, {Scheme, UserInfo, Host, Port, Path, Query}} ->
+             {ok, lists:append([atom_to_list(Scheme), "://", UserInfo, Host, ":", integer_to_list(Port),
+                                filename:join(Path, ExtraPath), "?", Query])};
+         _ ->
+             error
+     end.
+
 %% escape\ as\ a\ shell\?
 escape_chars(Str) when is_atom(Str) ->
     escape_chars(atom_to_list(Str));
@@ -782,8 +833,11 @@ info_useless(Old, New) ->
         not lists:member(Name, New)],
     ok.
 
--ifdef(no_list_dir_all).
-list_dir(Dir) -> file:list_dir(Dir).
--else.
-list_dir(Dir) -> file:list_dir_all(Dir).
--endif.
+list_dir(Dir) ->
+    %% `list_dir_all` returns raw files which are unsupported
+    %% prior to R16 so just fall back to `list_dir` if running
+    %% on an earlier vm
+    case erlang:function_exported(file, list_dir_all, 1) of
+        true  -> file:list_dir_all(Dir);
+        false -> file:list_dir(Dir)
+    end.

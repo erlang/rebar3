@@ -15,7 +15,7 @@
 -include_lib("kernel/include/file.hrl").
 
 -define(PROVIDER, install).
--define(NAMESPACE, unstable).
+-define(NAMESPACE, local).
 -define(DEPS, []).
 
 %% ===================================================================
@@ -60,7 +60,7 @@ format_error(Reason) ->
 bin_contents(OutputDir) ->
     <<"#!/usr/bin/env sh
 
-erl -pz ", (ec_cnv:to_binary(OutputDir))/binary,"/*/ebin +sbtu +A0  -noshell -boot start_clean -s rebar3 main -extra \"$@\"
+erl -pz ", (ec_cnv:to_binary(OutputDir))/binary,"/*/ebin +sbtu +A0 -noshell -boot start_clean -s rebar3 main $REBAR3_ERL_ARGS -extra \"$@\"
 ">>.
 
 extract_escript(State, ScriptPath) ->

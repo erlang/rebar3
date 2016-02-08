@@ -1,0 +1,13 @@
+{description, "OTP Application"}.
+{variables, [
+    {name, "mylib", "Name of the OTP application"},
+    {desc, "An OTP application", "Short description of the app"}
+]}.
+bad_term,
+{template, "app.erl.dtl", "{{name}}/src/{{name}}_app.erl"}.
+{template, "sup.erl.dtl", "{{name}}/src/{{name}}_sup.erl"}.
+{template, "otp_app.app.src.dtl", "{{name}}/src/{{name}}.app.src"}.
+{template, "rebar.config.dtl", "{{name}}/rebar.config"}.
+{template, "gitignore.dtl", "{{name}}/.gitignore"}.
+{template, "LICENSE.dtl", "{{name}}/LICENSE"}.
+{template, "README.md.dtl", "{{name}}/README.md"}.

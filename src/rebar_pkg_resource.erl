@@ -30,11 +30,15 @@ needs_update(Dir, {pkg, _Name, Vsn}) ->
 
 download(TmpDir, Pkg={pkg, Name, Vsn}, State) ->
     CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
-    PackageDir = rebar_packages:package_dir(State),
+    {ok, PackageDir} = rebar_packages:package_dir(State),
     Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
     CachePath = filename:join(PackageDir, Package),
-    Url = string:join([CDN, Package], "/"),
-    cached_download(TmpDir, CachePath, Pkg, Url, etag(CachePath), State).
+    case rebar_utils:url_append_path(CDN, filename:join(?REMOTE_PACKAGE_DIR, Package)) of
+        {ok, Url} ->
+            cached_download(TmpDir, CachePath, Pkg, Url, etag(CachePath), State);
+        _ ->
+            {fetch_fail, Name, Vsn}
+    end.
 
 cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn}, Url, ETag, State) ->
     case request(Url, ETag) of
@@ -100,7 +104,7 @@ make_vsn(_) ->
     {error, "Replacing version of type pkg not supported."}.
 
 request(Url, ETag) ->
-    case httpc:request(get, {Url, [{"if-none-match", ETag} || ETag =/= false]},
+    case httpc:request(get, {Url, [{"if-none-match", ETag} || ETag =/= false]++[{"User-Agent", rebar_utils:user_agent()}]},
                        [{ssl, ssl_opts(Url)}, {relaxed, true}],
                        [{body_format, binary}],
                        rebar) of

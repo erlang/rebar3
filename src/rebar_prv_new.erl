@@ -7,6 +7,7 @@
          format_error/1]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 -define(PROVIDER, new).
 -define(DEPS, []).
@@ -32,19 +33,19 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    case rebar_state:command_args(State) of
+    case strip_flags(rebar_state:command_args(State)) of
         ["help"] ->
             ?CONSOLE("Call `rebar3 new help <template>` for a detailed description~n", []),
-            show_short_templates(rebar_templater:list_templates(State)),
+            show_short_templates(list_templates(State)),
             {ok, State};
         ["help", TemplateName] ->
-            case lists:keyfind(TemplateName, 1, rebar_templater:list_templates(State)) of
+            case lists:keyfind(TemplateName, 1, list_templates(State)) of
                 false -> ?CONSOLE("template not found.", []);
                 Term -> show_template(Term)
             end,
             {ok, State};
         [TemplateName | Opts] ->
-            case lists:keyfind(TemplateName, 1, rebar_templater:list_templates(State)) of
+            case lists:keyfind(TemplateName, 1, list_templates(State)) of
                 false ->
                     ?CONSOLE("template not found.", []);
                 _ ->
@@ -53,11 +54,13 @@ do(State) ->
             end,
             {ok, State};
         [] ->
-            show_short_templates(rebar_templater:list_templates(State)),
+            show_short_templates(list_templates(State)),
             {ok, State}
     end.
 
 -spec format_error(any()) -> iolist().
+format_error({consult, File, Reason}) ->
+    io_lib:format("Error consulting file at ~s for reason ~p", [File, Reason]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -65,12 +68,25 @@ format_error(Reason) ->
 %% Internal functions
 %% ===================================================================
 
+list_templates(State) ->
+    lists:foldl(fun({error, {consult, File, Reason}}, Acc) ->
+                    ?WARN("Error consulting template file ~s for reason ~p",
+                          [File, Reason]),
+                    Acc
+                ;  (Tpl, Acc) ->
+                    [Tpl|Acc]
+                end, [], lists:reverse(rebar_templater:list_templates(State))).
+
 info() ->
     io_lib:format(
       "Create rebar3 project based on template and vars.~n"
       "~n"
       "Valid command line options:~n"
       "  <template> [var=foo,...]~n", []).
+
+strip_flags([]) -> [];
+strip_flags(["-"++_|Opts]) -> strip_flags(Opts);
+strip_flags([Opt | Opts]) -> [Opt | strip_flags(Opts)].
 
 is_forced(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
@@ -116,10 +132,13 @@ show_template({Name, Type, Location, Description, Vars}) ->
                format_vars(Vars)]).
 
 format_type(escript) -> "built-in";
+format_type(plugin) -> "plugin";
 format_type(file) -> "custom".
 
 format_type(escript, _) ->
     "built-in template";
+format_type(plugin, Loc) ->
+    io_lib:format("plugin template (~s)", [Loc]);
 format_type(file, Loc) ->
     io_lib:format("custom template (~s)", [Loc]).
 

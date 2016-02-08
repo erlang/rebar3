@@ -1,4 +1,4 @@
-{application, '{{name}}',
+{application, {{name}},
  [{description, "{{desc}}"},
   {vsn, "0.1.0"},
   {registered, []},
@@ -9,7 +9,7 @@
   {env,[]},
   {modules, []},
 
-  {contributors, []},
+  {maintainers, []},
   {licenses, []},
   {links, []}
  ]}.

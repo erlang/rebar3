@@ -1,8 +1,8 @@
--module('{{name}}_prv').
+-module({{name}}_prv).
 
 -export([init/1, do/1, format_error/1]).
 
--define(PROVIDER, '{{name}}').
+-define(PROVIDER, {{name}}).
 -define(DEPS, [app_discovery]).
 
 %% ===================================================================

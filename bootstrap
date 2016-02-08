@@ -2,8 +2,7 @@
 %% -*- mode: erlang;erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ft=erlang ts=4 sw=4 et
 
-
-main(_Args) ->
+main(_) ->
     application:start(crypto),
     application:start(asn1),
     application:start(public_key),
@@ -34,7 +33,14 @@ main(_Args) ->
 
     setup_env(),
     os:putenv("REBAR_PROFILE", "bootstrap"),
-    rebar3:run(["update"]),
+    RegistryFile = default_registry_file(),
+    case filelib:is_file(RegistryFile) of
+        true ->
+            ok;
+        false ->
+            rebar3:run(["update"])
+    end,
+
     {ok, State} = rebar3:run(["compile"]),
     reset_env(),
     os:putenv("REBAR_PROFILE", ""),
@@ -62,6 +68,11 @@ main(_Args) ->
             ok
     end.
 
+default_registry_file() ->
+    {ok, [[Home]]} = init:get_argument(home),
+    CacheDir = filename:join([Home, ".cache", "rebar3"]),
+    filename:join([CacheDir, "hex", "default", "registry"]).
+
 fetch_and_compile({Name, ErlFirstFiles}, Deps) ->
     case lists:keyfind(Name, 1, Deps) of
         {Name, Vsn} ->
@@ -69,19 +80,30 @@ fetch_and_compile({Name, ErlFirstFiles}, Deps) ->
         {Name, _, Source} ->
             ok = fetch(Source, Name)
     end,
+
+    %% Hack: erlware_commons depends on a .script file to check if it is being built with
+    %% rebar2 or rebar3. But since rebar3 isn't built yet it can't get the vsn with get_key.
+    %% So we simply make sure that file is deleted before compiling
+    file:delete("_build/default/lib/erlware_commons/rebar.config.script"),
+
     compile(Name, ErlFirstFiles).
 
 fetch({pkg, Name, Vsn}, App) ->
     Dir = filename:join([filename:absname("_build/default/lib/"), App]),
-    CDN = "https://s3.amazonaws.com/s3.hex.pm/tarballs",
-    Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
-    Url = string:join([CDN, Package], "/"),
-    case request(Url) of
-        {ok, Binary} ->
-            {ok, Contents} = extract(Binary),
-            ok = erl_tar:extract({binary, Contents}, [{cwd, Dir}, compressed]);
-        _ ->
-            io:format("Error: Unable to fetch package ~p ~p~n", [Name, Vsn])
+    case filelib:is_dir(Dir) of
+        false ->
+            CDN = "https://s3.amazonaws.com/s3.hex.pm/tarballs",
+            Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
+            Url = string:join([CDN, Package], "/"),
+            case request(Url) of
+                {ok, Binary} ->
+                    {ok, Contents} = extract(Binary),
+                    ok = erl_tar:extract({binary, Contents}, [{cwd, Dir}, compressed]);
+                _ ->
+                    io:format("Error: Unable to fetch package ~p ~p~n", [Name, Vsn])
+            end;
+        true ->
+            io:format("Dependency ~s already exists~n", [Name])
     end.
 
 extract(Binary) ->

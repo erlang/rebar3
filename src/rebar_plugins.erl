@@ -3,7 +3,8 @@
 
 -module(rebar_plugins).
 
--export([project_apps_install/1
+-export([top_level_install/1
+        ,project_apps_install/1
         ,install/2
         ,handle_plugins/3
         ,handle_plugins/4]).
@@ -14,11 +15,18 @@
 %% Public API
 %% ===================================================================
 
+-spec top_level_install(rebar_state:t()) -> rebar_state:t().
+top_level_install(State) ->
+    Profiles = rebar_state:current_profiles(State),
+    lists:foldl(fun(Profile, StateAcc) ->
+                        Plugins = rebar_state:get(State, {plugins, Profile}, []),
+                        handle_plugins(Profile, Plugins, StateAcc)
+                end, State, Profiles).
+
 -spec project_apps_install(rebar_state:t()) -> rebar_state:t().
 project_apps_install(State) ->
     Profiles = rebar_state:current_profiles(State),
     ProjectApps = rebar_state:project_apps(State),
-
     lists:foldl(fun(Profile, StateAcc) ->
                         Plugins = rebar_state:get(State, {plugins, Profile}, []),
                         StateAcc1 = handle_plugins(Profile, Plugins, StateAcc),
@@ -34,10 +42,20 @@ project_apps_install(State) ->
 -spec install(rebar_state:t(), rebar_app_info:t()) -> rebar_state:t().
 install(State, AppInfo) ->
     Profiles = rebar_state:current_profiles(State),
-    lists:foldl(fun(Profile, StateAcc) ->
-                        Plugins = rebar_app_info:get(AppInfo, {plugins, Profile}, []),
-                        handle_plugins(Profile, Plugins, StateAcc)
-                end, State, Profiles).
+
+    %% don't lose the overrides of the dep we are processing plugins for
+    Overrides = rebar_app_info:get(AppInfo, overrides, []),
+    StateOverrides = rebar_state:get(State, overrides, []),
+    AllOverrides = Overrides ++ StateOverrides,
+    State1 = rebar_state:set(State, overrides, AllOverrides),
+
+    State2 = lists:foldl(fun(Profile, StateAcc) ->
+                             Plugins = rebar_app_info:get(AppInfo, {plugins, Profile}, []),
+                             handle_plugins(Profile, Plugins, StateAcc)
+                         end, State1, Profiles),
+
+    %% Reset the overrides after processing the dep
+    rebar_state:set(State2, overrides, StateOverrides).
 
 handle_plugins(Profile, Plugins, State) ->
     handle_plugins(Profile, Plugins, State, false).

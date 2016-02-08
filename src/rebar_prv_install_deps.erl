@@ -251,13 +251,12 @@ update_unseen_dep(AppInfo, Profile, Level, Deps, Apps, State, Upgrade, Seen, Loc
 
 -spec handle_dep(rebar_state:t(), atom(), file:filename_all(), rebar_app_info:t(), list(), integer()) -> {rebar_app_info:t(), [rebar_app_info:t()], rebar_state:t()}.
 handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
-    Profiles = rebar_state:current_profiles(State),
     Name = rebar_app_info:name(AppInfo),
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
 
     AppInfo0 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
     AppInfo1 = rebar_app_info:apply_overrides(rebar_app_info:get(AppInfo, overrides, []), AppInfo0),
-    AppInfo2 = rebar_app_info:apply_profiles(AppInfo1, Profiles),
+    AppInfo2 = rebar_app_info:apply_profiles(AppInfo1, [default, prod]),
 
     Plugins = rebar_app_info:get(AppInfo2, plugins, []),
     AppInfo3 = rebar_app_info:set(AppInfo2, {plugins, Profile}, Plugins),
@@ -269,7 +268,7 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     State1 = rebar_plugins:install(State, AppInfo3),
 
     %% Upgrade lock level to be the level the dep will have in this dep tree
-    Deps = rebar_app_info:get(AppInfo3, {deps, default}, []),
+    Deps = rebar_app_info:get(AppInfo3, {deps, default}, []) ++ rebar_app_info:get(AppInfo3, {deps, prod}, []),
     AppInfo4 = rebar_app_info:deps(AppInfo3, rebar_state:deps_names(Deps)),
 
     %% Keep all overrides from the global config and this dep when parsing its deps

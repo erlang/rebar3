@@ -13,7 +13,8 @@
          as_comma_then_space/1,
          as_dir_name/1,
          as_with_task_args/1,
-         warn_on_empty_profile/1]).
+         warn_on_empty_profile/1,
+         clean_as_profile/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -32,7 +33,7 @@ all() -> [as_basic, as_multiple_profiles, as_multiple_tasks,
           as_multiple_profiles_multiple_tasks,
           as_comma_placement, as_comma_then_space,
           as_dir_name, as_with_task_args,
-          warn_on_empty_profile].
+          warn_on_empty_profile, clean_as_profile].
 
 as_basic(Config) ->
     AppDir = ?config(apps, Config),
@@ -166,3 +167,20 @@ warn_match(App, History) ->
             false
         end,
      History).
+
+clean_as_profile(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("clean_as_profile_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    rebar_test_utils:run_and_check(Config,
+                                   [],
+                                   ["as", "foo", "compile"],
+                                   {ok, [{app, Name, valid}]}),
+
+    rebar_test_utils:run_and_check(Config,
+                                   [],
+                                   ["clean", "-a", "-p", "foo"],
+                                   {ok, [{app, Name, invalid}]}).

@@ -23,6 +23,7 @@
          original_vsn/1,
          original_vsn/2,
          ebin_dir/1,
+         priv_dir/1,
          applications/1,
          applications/2,
          profiles/1,
@@ -360,6 +361,10 @@ out_dir(AppInfo=#app_info_t{}, OutDir) ->
 -spec ebin_dir(t()) -> file:name().
 ebin_dir(#app_info_t{out_dir=OutDir}) ->
     ec_cnv:to_list(filename:join(OutDir, "ebin")).
+
+-spec priv_dir(t()) -> file:name().
+priv_dir(#app_info_t{out_dir=OutDir}) ->
+    ec_cnv:to_list(filename:join(OutDir, "priv")).
 
 -spec resource_type(t(), pkg | src) -> t().
 resource_type(AppInfo=#app_info_t{}, Type) ->

@@ -217,6 +217,10 @@ copy(OldAppDir, AppDir, Dir) ->
 
 %% TODO: use ec_file:copy/2 to do this, it preserves timestamps and
 %% may prevent recompilation of files in extra dirs
+copy(Source, Source) ->
+    %% allow users to specify a directory in _build as a directory
+    %% containing additional source/tests
+    ok;
 copy(Source, Target) ->
     %% important to do this so no files are copied onto themselves
     %% which truncates them to zero length on some platforms
@@ -243,6 +247,21 @@ resolve_src_dirs(Opts) ->
 %% in src_dirs also exist in extra_src_dirs
 normalize_src_dirs(SrcDirs, ExtraDirs) ->
     S = lists:usort(SrcDirs),
-    E = lists:usort(ExtraDirs),
-    {S, lists:subtract(E, S)}.
+    E = lists:subtract(lists:usort(ExtraDirs), S),
+    ok = warn_on_problematic_directories(S ++ E),
+    {S, E}.
+
+%% warn when directories called `eunit' and `ct' are added to compile dirs
+warn_on_problematic_directories(AllDirs) ->
+    F = fun(Dir) ->
+        case is_a_problem(Dir) of
+            true  -> ?WARN("Possible name clash with directory ~p.", [Dir]);
+            false -> ok
+        end
+    end,
+    lists:foreach(F, AllDirs).
+
+is_a_problem("eunit") -> true;
+is_a_problem("common_test") -> true;
+is_a_problem(_) -> false.
 

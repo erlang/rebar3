@@ -9,7 +9,7 @@
          do/1,
          format_error/1]).
 %% exported solely for tests
--export([compile/2, prepare_tests/1, eunit_opts/1]).
+-export([prepare_tests/1, eunit_opts/1, validate_tests/2]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
@@ -39,24 +39,26 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     Tests = prepare_tests(State),
-    case compile(State, Tests) of
+    %% inject `eunit_first_files`, `eunit_compile_opts` and any
+    %% directories required by tests into the applications
+    NewState = inject_eunit_state(State, Tests),
+    case compile(NewState) of
         %% successfully compiled apps
         {ok, S} -> do(S, Tests);
-        %% this should look like a compiler error, not an eunit error
         Error   -> Error
     end.
 
 do(State, Tests) ->
     ?INFO("Performing EUnit tests...", []),
 
-    rebar_utils:update_code(rebar_state:code_paths(State, all_deps)),
+    rebar_utils:update_code(rebar_state:code_paths(State, all_deps), [soft_purge]),
 
     %% Run eunit provider prehooks
     Providers = rebar_state:providers(State),
     Cwd = rebar_dir:get_cwd(),
     rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
-    case Tests of
+    case validate_tests(State, Tests) of
         {ok, T} ->
             case run_tests(State, T) of
                 {ok, State1} ->
@@ -95,6 +97,8 @@ format_error({error_running_tests, Reason}) ->
 format_error({eunit_test_errors, Errors}) ->
     io_lib:format(lists:concat(["Error Running EUnit Tests:"] ++
                                lists:map(fun(Error) -> "~n  " ++ Error end, Errors)), []);
+format_error({badconfig, {Msg, {Value, Key}}}) ->
+    io_lib:format(Msg, [Value, Key]);
 format_error({error, Error}) ->
     format_error({error_running_tests, Error}).
 
@@ -102,45 +106,150 @@ format_error({error, Error}) ->
 %% Internal functions
 %% ===================================================================
 
-compile(State, {ok, Tests}) ->
-    %% inject `eunit_first_files`, `eunit_compile_opts` and any
-    %% directories required by tests into the applications
-    NewState = inject_eunit_state(State, Tests),
+prepare_tests(State) ->
+    %% parse and translate command line tests
+    CmdTests = resolve_tests(State),
+    CfgTests = cfg_tests(State),
+    ProjectApps = rebar_state:project_apps(State),
+    %% prioritize tests to run first trying any command line specified
+    %% tests falling back to tests specified in the config file finally
+    %% running a default set if no other tests are present
+    select_tests(State, ProjectApps, CmdTests, CfgTests).
 
-    case rebar_prv_compile:do(NewState) of
-        %% successfully compiled apps
-        {ok, S} ->
-            ok = maybe_cover_compile(S),
-            {ok, S};
-        %% this should look like a compiler error, not an eunit error
-        Error   -> Error
-    end;
-%% maybe compile even in the face of errors?
-compile(_State, Error) -> Error.
+resolve_tests(State) ->
+    {RawOpts, _} = rebar_state:command_parsed_args(State),
+    Apps         = resolve(app, application, RawOpts),
+    Applications = resolve(application, RawOpts),
+    Dirs         = resolve(dir, RawOpts),
+    Files        = resolve(file, RawOpts),
+    Modules      = resolve(module, RawOpts),
+    Suites       = resolve(suite, module, RawOpts),
+    Apps ++ Applications ++ Dirs ++ Files ++ Modules ++ Suites.
 
-inject_eunit_state(State, Tests) ->
+resolve(Flag, RawOpts) -> resolve(Flag, Flag, RawOpts).
+
+resolve(Flag, EUnitKey, RawOpts) ->
+    case proplists:get_value(Flag, RawOpts) of
+        undefined -> [];
+        Args      -> lists:map(fun(Arg) -> normalize(EUnitKey, Arg) end, string:tokens(Args, [$,]))
+    end.
+
+normalize(Key, Value) when Key == dir; Key == file -> {Key, Value};
+normalize(Key, Value) -> {Key, list_to_atom(Value)}.
+
+cfg_tests(State) ->
+    case rebar_state:get(State, eunit_tests, []) of
+        Tests when is_list(Tests) ->
+            lists:map(fun({app, App}) -> {application, App}; (T) -> T end, Tests);
+        Wrong ->
+            %% probably a single non list term
+            ?PRV_ERROR({badconfig, {"Value `~p' of option `~p' must be a list", {Wrong, eunit_tests}}})
+    end.
+
+select_tests(_State, _ProjectApps, {error, _} = Error, _) -> Error;
+select_tests(_State, _ProjectApps, _, {error, _} = Error) -> Error;
+select_tests(State, ProjectApps, [], []) -> {ok, default_tests(State, ProjectApps)};
+select_tests(_State, _ProjectApps, [], Tests)  -> {ok, Tests};
+select_tests(_State, _ProjectApps, Tests, _) -> {ok, Tests}.
+
+default_tests(State, Apps) ->
+    %% use `{application, App}` for each app in project
+    AppTests = set_apps(Apps),
+    %% additional test modules in `test` dir of each app
+    ModTests = set_modules(Apps, State),
+    AppTests ++ ModTests.
+
+set_apps(Apps) -> set_apps(Apps, []).
+
+set_apps([], Acc) -> Acc;
+set_apps([App|Rest], Acc) ->
+    AppName = list_to_atom(binary_to_list(rebar_app_info:name(App))),
+    set_apps(Rest, [{application, AppName}|Acc]).
+
+set_modules(Apps, State) -> set_modules(Apps, State, {[], []}).
+
+set_modules([], State, {AppAcc, TestAcc}) ->
+    TestSrc = gather_src([filename:join([rebar_state:dir(State), "test"])]),
+    dedupe_tests({AppAcc, TestAcc ++ TestSrc});
+set_modules([App|Rest], State, {AppAcc, TestAcc}) ->
+    F = fun(Dir) -> filename:join([rebar_app_info:dir(App), Dir]) end,
+    AppDirs = lists:map(F, rebar_dir:src_dirs(rebar_app_info:opts(App), ["src"])),
+    AppSrc = gather_src(AppDirs),
+    TestDirs = [filename:join([rebar_app_info:dir(App), "test"])],
+    TestSrc = gather_src(TestDirs),
+    set_modules(Rest, State, {AppSrc ++ AppAcc, TestSrc ++ TestAcc}).
+
+gather_src(Dirs) -> gather_src(Dirs, []).
+
+gather_src([], Srcs) -> Srcs;
+gather_src([Dir|Rest], Srcs) ->
+    gather_src(Rest, Srcs ++ rebar_utils:find_files(Dir, "^[^._].*\\.erl\$", true)).
+
+dedupe_tests({AppMods, TestMods}) ->
+    %% for each modules in TestMods create a test if there is not a module
+    %% in AppMods that will trigger it
+    F = fun(Mod) ->
+        M = filename:basename(Mod, ".erl"),
+        MatchesTest = fun(Dir) -> filename:basename(Dir, ".erl") ++ "_tests" == M end, 
+        case lists:any(MatchesTest, AppMods) of
+            false -> {true, {module, list_to_atom(M)}};
+            true  -> false
+        end
+    end,
+    lists:usort(rebar_utils:filtermap(F, TestMods)).
+
+inject_eunit_state(State, {ok, Tests}) ->
     Apps = rebar_state:project_apps(State),
-    ModdedApps = lists:map(fun(App) ->
-        NewOpts = inject(rebar_app_info:opts(App), State),
-        rebar_app_info:opts(App, NewOpts)
-    end, Apps),
-    NewOpts = inject(rebar_state:opts(State), State),
-    NewState = rebar_state:opts(State, NewOpts),
-    test_dirs(NewState, ModdedApps, Tests).
+    case inject_eunit_state(State, Apps, []) of
+        {ok, {NewState, ModdedApps}} ->
+            test_dirs(NewState, ModdedApps, Tests);
+        {error, _} = Error           -> Error
+    end;
+inject_eunit_state(_State, Error) -> Error.
 
-inject(Opts, State) ->
+inject_eunit_state(State, [App|Rest], Acc) ->
+    case inject(rebar_app_info:opts(App)) of
+        {error, _} = Error -> Error;
+        NewOpts            ->
+            NewApp = rebar_app_info:opts(App, NewOpts),
+            inject_eunit_state(State, Rest, [NewApp|Acc])
+    end;
+inject_eunit_state(State, [], Acc) ->
+    case inject(rebar_state:opts(State)) of
+        {error, _} = Error -> Error;
+        NewOpts            -> {ok, {rebar_state:opts(State, NewOpts), lists:reverse(Acc)}}
+    end.
+
+opts(Opts, Key, Default) ->
+    case rebar_opts:get(Opts, Key, Default) of
+        Vs when is_list(Vs) -> Vs;
+        Wrong ->
+            ?PRV_ERROR({badconfig, {"Value `~p' of option `~p' must be a list", {Wrong, Key}}})
+    end.
+
+inject(Opts) -> erl_opts(Opts).
+
+erl_opts(Opts) ->
     %% append `eunit_compile_opts` to app defined `erl_opts`
-    ErlOpts = rebar_opts:get(Opts, erl_opts, []),
-    EUnitOpts = rebar_state:get(State, eunit_compile_opts, []),
-    NewErlOpts = EUnitOpts ++ ErlOpts,
+    ErlOpts = opts(Opts, erl_opts, []),
+    EUnitOpts = opts(Opts, eunit_compile_opts, []),
+    case append(EUnitOpts, ErlOpts) of
+        {error, _} = Error -> Error;
+        NewErlOpts         -> first_files(rebar_opts:set(Opts, erl_opts, NewErlOpts))
+    end.
+
+first_files(Opts) ->
     %% append `eunit_first_files` to app defined `erl_first_files`
-    FirstFiles = rebar_opts:get(Opts, erl_first_files, []),
-    EUnitFirstFiles = rebar_state:get(State, eunit_first_files, []),
-    NewFirstFiles = EUnitFirstFiles ++ FirstFiles,
-    %% insert the new keys into the opts
-    lists:foldl(fun({K, V}, NewOpts) -> rebar_opts:set(NewOpts, K, V) end,
-                Opts,
-                [{erl_opts, NewErlOpts}, {erl_first_files, NewFirstFiles}]).
+    FirstFiles = opts(Opts, erl_first_files, []),
+    EUnitFirstFiles = opts(Opts, eunit_first_files, []),
+    case append(EUnitFirstFiles, FirstFiles) of
+        {error, _} = Error -> Error;
+        NewFirstFiles  -> rebar_opts:set(Opts, erl_first_files, NewFirstFiles)
+    end.
+
+append({error, _} = Error, _) -> Error;
+append(_, {error, _} = Error) -> Error;
+append(A, B) -> A ++ B.
 
 test_dirs(State, Apps, []) -> rebar_state:project_apps(State, Apps);
 test_dirs(State, Apps, [{dir, Dir}|Rest]) ->
@@ -174,67 +283,23 @@ maybe_inject_test_dir(State, AppAcc, [], Dir) ->
 
 inject_test_dir(Opts, Dir) ->
     %% append specified test targets to app defined `extra_src_dirs`
-    ExtraSrcDirs = rebar_opts:get(Opts, extra_src_dirs, []),
+    ExtraSrcDirs = rebar_dir:extra_src_dirs(Opts),
     rebar_opts:set(Opts, extra_src_dirs, ExtraSrcDirs ++ [Dir]).
 
-prepare_tests(State) ->
-    %% parse and translate command line tests
-    CmdTests = resolve_tests(State),
-    CfgTests = rebar_state:get(State, eunit_tests, []),
-    ProjectApps = rebar_state:project_apps(State),
-    %% prioritize tests to run first trying any command line specified
-    %% tests falling back to tests specified in the config file finally
-    %% running a default set if no other tests are present
-    Tests = select_tests(State, ProjectApps, CmdTests, CfgTests),
-    %% check applications for existence in project, modules for existence
-    %% in applications, files and dirs for existence on disk and allow
-    %% any unrecognized tests through for eunit to handle
-    validate_tests(State, ProjectApps, Tests).
-
-resolve_tests(State) ->
-    {RawOpts, _} = rebar_state:command_parsed_args(State),
-    Apps         = resolve(app, application, RawOpts),
-    Applications = resolve(application, RawOpts),
-    Dirs         = resolve(dir, RawOpts),
-    Files        = resolve(file, RawOpts),
-    Modules      = resolve(module, RawOpts),
-    Suites       = resolve(suite, module, RawOpts),
-    Apps ++ Applications ++ Dirs ++ Files ++ Modules ++ Suites.
-
-resolve(Flag, RawOpts) -> resolve(Flag, Flag, RawOpts).
-
-resolve(Flag, EUnitKey, RawOpts) ->
-    case proplists:get_value(Flag, RawOpts) of
-        undefined -> [];
-        Args      -> lists:map(fun(Arg) -> normalize(EUnitKey, Arg) end, string:tokens(Args, [$,]))
+compile({error, _} = Error) -> Error;
+compile(State) ->
+    case rebar_prv_compile:do(State) of
+        %% successfully compiled apps
+        {ok, S} ->
+            ok = maybe_cover_compile(S),
+            {ok, S};
+        %% this should look like a compiler error, not an eunit error
+        Error   -> Error
     end.
 
-normalize(Key, Value) when Key == dir; Key == file -> {Key, Value};
-normalize(Key, Value) -> {Key, list_to_atom(Value)}.
-
-select_tests(State, ProjectApps, [], []) -> default_tests(State, ProjectApps);
-select_tests(_State, _ProjectApps, [], Tests)  -> Tests;
-select_tests(_State, _ProjectApps, Tests, _) -> Tests.
-
-default_tests(State, Apps) ->
-    Tests = set_apps(Apps, []),
-    BareTest = filename:join([rebar_state:dir(State), "test"]),
-    F = fun(App) -> rebar_app_info:dir(App) == rebar_state:dir(State) end,
-    case filelib:is_dir(BareTest) andalso not lists:any(F, Apps) of
-        %% `test` dir at root of project is already scheduled to be
-        %%  included or `test` does not exist
-        false -> lists:reverse(Tests);
-        %% need to add `test` dir at root to dirs to be included
-        true  -> lists:reverse([{dir, BareTest}|Tests])
-    end.
-
-set_apps([], Acc) -> Acc;
-set_apps([App|Rest], Acc) ->
-    AppName = list_to_atom(binary_to_list(rebar_app_info:name(App))),
-    set_apps(Rest, [{application, AppName}|Acc]).
-
-validate_tests(State, ProjectApps, Tests) ->
-    gather_tests(fun(Elem) -> validate(State, ProjectApps, Elem) end, Tests, []).
+validate_tests(State, {ok, Tests}) ->
+    gather_tests(fun(Elem) -> validate(State, Elem) end, Tests, []);
+validate_tests(_State, Error) -> Error.
 
 gather_tests(_F, [], Acc) -> {ok, lists:reverse(Acc)};
 gather_tests(F, [Test|Rest], Acc) ->
@@ -251,27 +316,31 @@ gather_errors(F, [Test|Rest], Acc) ->
         {error, Error} -> gather_errors(F, Rest, [Error|Acc])
     end.
 
-validate(State, ProjectApps, {application, App}) ->
-    validate_app(State, ProjectApps, App);
-validate(State, _ProjectApps, {dir, Dir}) ->
+validate(State, {application, App}) ->
+    validate_app(State, App);
+validate(State, {dir, Dir}) ->
     validate_dir(State, Dir);
-validate(State, _ProjectApps, {file, File}) ->
+validate(State, {file, File}) ->
     validate_file(State, File);
-validate(State, _ProjectApps, {module, Module}) ->
+validate(State, {module, Module}) ->
     validate_module(State, Module);
-validate(State, _ProjectApps, {suite, Module}) ->
+validate(State, {suite, Module}) ->
     validate_module(State, Module);
-validate(State, _ProjectApps, Module) when is_atom(Module) ->
+validate(State, Module) when is_atom(Module) ->
     validate_module(State, Module);
-validate(State, ProjectApps, Path) when is_list(Path) ->
+validate(State, Path) when is_list(Path) ->
     case ec_file:is_dir(Path) of
-        true  -> validate(State, ProjectApps, {dir, Path});
-        false -> validate(State, ProjectApps, {file, Path})
+        true  -> validate(State, {dir, Path});
+        false -> validate(State, {file, Path})
     end;
 %% unrecognized tests should be included. if they're invalid eunit will error
 %% and rebar.config may contain arbitrarily complex tests that are effectively
 %% unvalidatable
-validate(_State, _ProjectApps, _Test) -> ok.
+validate(_State, _Test) -> ok.
+
+validate_app(State, AppName) ->
+    ProjectApps = rebar_state:project_apps(State),
+    validate_app(State, ProjectApps, AppName).
 
 validate_app(_State, [], AppName) ->
     {error, lists:concat(["Application `", AppName, "' not found in project."])};
@@ -294,18 +363,29 @@ validate_file(State, File) ->
     end.
 
 validate_module(_State, Module) ->
-    Path = code:which(Module),
-    case beam_lib:chunks(Path, [exports]) of
-        {ok, _}              -> ok;
-        {error, beam_lib, _} -> {error, lists:concat(["Module `", Module, "' not found in project."])}
+    case code:which(Module) of
+        non_existing -> {error, lists:concat(["Module `", Module, "' not found in project."])};
+        _            -> ok
     end.
 
 resolve_eunit_opts(State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
     EUnitOpts = rebar_state:get(State, eunit_opts, []),
-    case proplists:get_value(verbose, Opts, false) of
-        true  -> set_verbose(EUnitOpts);
-        false -> EUnitOpts
+    EUnitOpts1 = case proplists:get_value(verbose, Opts, false) of
+                    true  -> set_verbose(EUnitOpts);
+                    false -> EUnitOpts
+                 end,
+    IsVerbose = lists:member(verbose, EUnitOpts1),
+    case proplists:get_value(eunit_formatters, EUnitOpts1, not IsVerbose) of
+        true  -> custom_eunit_formatters(EUnitOpts1);
+        false -> EUnitOpts1
+    end.
+
+custom_eunit_formatters(Opts) ->
+    %% If `report` is already set then treat that like `eunit_formatters` is false
+    case lists:keymember(report, 1, Opts) of
+        true -> Opts;
+        false -> [no_tty, {report, {eunit_progress, [colored, profile]}} | Opts]
     end.
 
 set_verbose(Opts) ->
@@ -318,26 +398,37 @@ set_verbose(Opts) ->
 translate_paths(State, Tests) -> translate_paths(State, Tests, []).
 
 translate_paths(_State, [], Acc) -> lists:reverse(Acc);
-translate_paths(State, [{dir, Dir}|Rest], Acc) ->
+translate_paths(State, [{K, _} = Path|Rest], Acc) when K == file; K == dir ->
     Apps = rebar_state:project_apps(State),
-    translate_paths(State, Rest, [translate(State, Apps, Dir)|Acc]);
-translate_paths(State, [{file, File}|Rest], Acc) ->
-    Dir = filename:dirname(File),
-    Apps = rebar_state:project_apps(State),
-    translate_paths(State, Rest, [translate(State, Apps, Dir)|Acc]);
+    translate_paths(State, Rest, [translate(State, Apps, Path)|Acc]);
 translate_paths(State, [Test|Rest], Acc) ->
     translate_paths(State, Rest, [Test|Acc]).
 
-translate(State, [App|Rest], Dir) ->
+translate(State, [App|Rest], {dir, Dir}) ->
     case rebar_file_utils:path_from_ancestor(Dir, rebar_app_info:dir(App)) of
         {ok, Path}         -> {dir, filename:join([rebar_app_info:out_dir(App), Path])};
-        {error, badparent} -> translate(State, Rest, Dir)
+        {error, badparent} -> translate(State, Rest, {dir, Dir})
     end;
-translate(State, [], Dir) ->
+translate(State, [App|Rest], {file, FilePath}) ->
+    Dir = filename:dirname(FilePath),
+    File = filename:basename(FilePath),
+    case rebar_file_utils:path_from_ancestor(Dir, rebar_app_info:dir(App)) of
+        {ok, Path}         -> {file, filename:join([rebar_app_info:out_dir(App), Path, File])};
+        {error, badparent} -> translate(State, Rest, {file, FilePath})
+    end;
+translate(State, [], {dir, Dir}) ->
     case rebar_file_utils:path_from_ancestor(Dir, rebar_state:dir(State)) of
         {ok, Path}         -> {dir, filename:join([rebar_dir:base_dir(State), "extras", Path])};
         %% not relative, leave as is
         {error, badparent} -> {dir, Dir}
+    end;
+translate(State, [], {file, FilePath}) ->
+    Dir = filename:dirname(FilePath),
+    File = filename:basename(FilePath),
+    case rebar_file_utils:path_from_ancestor(Dir, rebar_app_info:dir(State)) of
+        {ok, Path}         -> {file, filename:join([rebar_dir:base_dir(State), "extras", Path, File])};
+        %% not relative, leave as is
+        {error, badparent} -> {file, FilePath}
     end.
 
 maybe_cover_compile(State) ->

@@ -30,7 +30,7 @@ do(Module, Command, Provider, State) ->
                 relx:main([{lib_dirs, LibDirs}
                           ,{caller, api} | output_dir(OutputDir, Options)], AllOptions);
             Config ->
-                Config1 = update_config(Config),
+                Config1 = merge_overlays(Config),
                 relx:main([{lib_dirs, LibDirs}
                           ,{config, Config1}
                           ,{caller, api} | output_dir(OutputDir, Options)], AllOptions)
@@ -46,27 +46,16 @@ do(Module, Command, Provider, State) ->
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
-%% To handle profiles rebar3 expects the provider to use the first entry
-%% in a configuration key-value list as the value of a key if dups exist.
-%% This does not work with relx. Some config options must not lose their
-%% order (release which has an extends option is one). So here we pull out
-%% options that are special so we can reverse the rest so what we expect
-%% from a rebar3 profile is what we get on the relx side.
--define(SPECIAL_KEYS, [release, vm_args, sys_config, overlay_vars, lib_dirs]).
-
-update_config(Config) ->
-    {Special, Other} =
-        lists:foldl(fun(Tuple, {SpecialAcc, OtherAcc}) when is_tuple(Tuple) ->
-                            case lists:member(element(1, Tuple), ?SPECIAL_KEYS) of
-                                true ->
-                                    {[Tuple | SpecialAcc], OtherAcc};
-                                false ->
-                                    {SpecialAcc, [Tuple | OtherAcc]}
-                            end
-                    end, {[], []}, Config),
-    lists:reverse(Special) ++ Other.
-
 %% Don't override output_dir if the user passed one on the command line
 output_dir(OutputDir, Options) ->
     [{output_dir, OutputDir} || not(lists:member("-o", Options))
                                     andalso not(lists:member("--output-dir", Options))].
+
+merge_overlays(Config) ->
+    {Overlays, Others} =
+        lists:partition(fun(C) when element(1, C) =:= overlay -> true;
+                           (_) -> false
+                        end, Config),
+    %% Have profile overlay entries come before others to match how profiles work elsewhere
+    NewOverlay = lists:reverse(lists:flatmap(fun({overlay, Overlay}) -> Overlay end, Overlays)),
+    [{overlay, NewOverlay} | Others].

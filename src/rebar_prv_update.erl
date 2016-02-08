@@ -36,26 +36,36 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     try
-        RegistryDir = rebar_packages:registry_dir(State),
-        filelib:ensure_dir(filename:join(RegistryDir, "dummy")),
-        HexFile = filename:join(RegistryDir, "registry"),
-        ?INFO("Updating package registry...", []),
-        TmpDir = ec_file:insecure_mkdtemp(),
-        TmpFile = filename:join(TmpDir, "packages.gz"),
+        case rebar_packages:registry_dir(State) of
+            {ok, RegistryDir} ->
+                filelib:ensure_dir(filename:join(RegistryDir, "dummy")),
+                HexFile = filename:join(RegistryDir, "registry"),
+                ?INFO("Updating package registry...", []),
+                TmpDir = ec_file:insecure_mkdtemp(),
+                TmpFile = filename:join(TmpDir, "packages.gz"),
 
-        Url = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_HEX_REGISTRY),
-        case httpc:request(get, {Url, []},
-                           [], [{stream, TmpFile}, {sync, true}],
-                           rebar) of
-            {ok, saved_to_file} ->
-                {ok, Data} = file:read_file(TmpFile),
-                Unzipped = zlib:gunzip(Data),
-                ok = file:write_file(HexFile, Unzipped),
-                ?INFO("Writing registry to ~s", [HexFile]),
-                hex_to_index(State),
-                {ok, State};
-            _ ->
-                ?PRV_ERROR(package_index_download)
+                CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
+                case rebar_utils:url_append_path(CDN, ?REMOTE_REGISTRY_FILE) of
+                    {ok, Url} ->
+                        ?DEBUG("Fetching registry from ~p", [Url]),
+                        case httpc:request(get, {Url, [{"User-Agent", rebar_utils:user_agent()}]},
+                                           [], [{stream, TmpFile}, {sync, true}],
+                                           rebar) of
+                            {ok, saved_to_file} ->
+                                {ok, Data} = file:read_file(TmpFile),
+                                Unzipped = zlib:gunzip(Data),
+                                ok = file:write_file(HexFile, Unzipped),
+                                ?INFO("Writing registry to ~s", [HexFile]),
+                                hex_to_index(State),
+                                {ok, State};
+                            _ ->
+                                ?PRV_ERROR(package_index_download)
+                        end;
+                    _ ->
+                        ?PRV_ERROR({package_parse_cdn, CDN})
+                end;
+            {uri_parse_error, CDN} ->
+                ?PRV_ERROR({package_parse_cdn, CDN})
         end
     catch
         _E:C ->
@@ -64,6 +74,8 @@ do(State) ->
     end.
 
 -spec format_error(any()) -> iolist().
+format_error({package_parse_cdn, Uri}) ->
+    io_lib:format("Failed to parse CDN url: ~p", [Uri]);
 format_error(package_index_download) ->
     "Failed to download package index.";
 format_error(package_index_write) ->
@@ -75,7 +87,7 @@ is_supported(<<"rebar3">>) -> true;
 is_supported(_) -> false.
 
 hex_to_index(State) ->
-    RegistryDir = rebar_packages:registry_dir(State),
+    {ok, RegistryDir} = rebar_packages:registry_dir(State),
     HexFile = filename:join(RegistryDir, "registry"),
     try ets:file2tab(HexFile) of
         {ok, Registry} ->
@@ -92,12 +104,24 @@ hex_to_index(State) ->
                                       false ->
                                           true
                                   end;
-                             ({Pkg, [Vsns]}, _) when is_binary(Pkg) ->
-                                  ets:insert(?PACKAGE_TABLE, {Pkg, Vsns});
                              (_, _) ->
                                   true
                           end, true, Registry),
 
+                ets:foldl(fun({Pkg, [[]]}, _) when is_binary(Pkg) ->
+                                  true;
+                             ({Pkg, [Vsns=[Vsn | _Rest]]}, _) when is_binary(Pkg) ->
+                                  %% Verify the package is of the right build tool by checking if the first
+                                  %% version exists in the table from the foldl above
+                                  case ets:member(?PACKAGE_TABLE, {Pkg, Vsn}) of
+                                      true ->
+                                          ets:insert(?PACKAGE_TABLE, {Pkg, Vsns});
+                                      false ->
+                                          true
+                                  end;
+                             (_, _) ->
+                                  true
+                          end, true, Registry),
                 ets:insert(?PACKAGE_TABLE, {package_index_version, ?PACKAGE_INDEX_VERSION}),
                 ?INFO("Writing index to ~s", [PackageIndex]),
                 ets:tab2file(?PACKAGE_TABLE, PackageIndex),

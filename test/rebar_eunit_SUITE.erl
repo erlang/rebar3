@@ -11,13 +11,19 @@
 -export([single_file_arg/1, multi_file_arg/1, missing_file_arg/1]).
 -export([single_dir_arg/1, multi_dir_arg/1, missing_dir_arg/1]).
 -export([multiple_arg_composition/1, multiple_arg_errors/1]).
+-export([misspecified_eunit_tests/1]).
+-export([misspecified_eunit_compile_opts/1]).
+-export([misspecified_eunit_first_files/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/file.hrl").
 
 all() ->
-    [{group, basic_app}, {group, multi_app}, {group, cmd_line_args}].
+    [{group, basic_app}, {group, multi_app}, {group, cmd_line_args},
+     misspecified_eunit_tests,
+     misspecified_eunit_compile_opts,
+     misspecified_eunit_first_files].
 
 groups() ->
     [{basic_app, [sequence], [basic_app_compiles, {group, basic_app_results}]},
@@ -36,13 +42,10 @@ groups() ->
 init_per_suite(Config) ->
     PrivDir = ?config(priv_dir, Config),
     DataDir = ?config(data_dir, Config),
-    {ok, Cwd} = file:get_cwd(),
-    file:set_cwd(PrivDir),
     ok = ec_file:copy(filename:join([DataDir, "basic_app.zip"]), filename:join([PrivDir, "basic_app.zip"])),
-    {ok, _} = zip:extract(filename:join([PrivDir, "basic_app.zip"])),
+    {ok, _} = zip:extract(filename:join([PrivDir, "basic_app.zip"]), [{cwd, PrivDir}]),
     ok = ec_file:copy(filename:join([DataDir, "multi_app.zip"]), filename:join([PrivDir, "multi_app.zip"])),
-    {ok, _} = zip:extract(filename:join([PrivDir, "multi_app.zip"])),
-    file:set_cwd(Cwd),
+    {ok, _} = zip:extract(filename:join([PrivDir, "multi_app.zip"]), [{cwd, PrivDir}]),
     Config.
 
 init_per_group(basic_app, Config) ->
@@ -153,7 +156,9 @@ basic_app_exports(_Config) ->
 basic_app_testset(Config) ->
     Result = ?config(result, Config),
 
-    {ok, [{application, basic_app}]} = rebar_prv_eunit:prepare_tests(Result).
+    Set = {ok, [{application, basic_app},
+                {module, basic_app_tests_helper}]},
+    Set = rebar_prv_eunit:prepare_tests(Result).
 
 
 
@@ -205,12 +210,14 @@ multi_app_exports(_Config) ->
 
 %% check that the correct tests are schedule to run for project
 multi_app_testset(Config) ->
-    AppDir = ?config(apps, Config),
     Result = ?config(result, Config),
 
-    Set = {ok, [{application, multi_app_bar},
-                {application, multi_app_baz},
-                {dir, filename:join([AppDir, "test"])}]},
+    Set = {ok, [{application, multi_app_baz},
+                {application, multi_app_bar},
+                {module, multi_app_bar_tests_helper},
+                {module, multi_app_baz_tests_helper}, 
+                {module, multi_app_tests},
+                {module, multi_app_tests_helper}]},
     Set = rebar_prv_eunit:prepare_tests(Result).
 
 
@@ -268,7 +275,7 @@ missing_application_arg(Config) ->
     State = rebar_state:command_parsed_args(S, Args),
 
     Error = {error, {rebar_prv_eunit, {eunit_test_errors, ["Application `missing_app' not found in project."]}}},
-    Error = rebar_prv_eunit:prepare_tests(State).
+    Error = rebar_prv_eunit:validate_tests(State, rebar_prv_eunit:prepare_tests(State)).
 
 %% check that the --module cmd line opt generates the correct test set
 single_module_arg(Config) ->
@@ -311,8 +318,11 @@ missing_module_arg(Config) ->
     {ok, Args} = getopt:parse(rebar_prv_eunit:eunit_opts(S), ["--module=missing_app"]),
     State = rebar_state:command_parsed_args(S, Args),
 
+    T = rebar_prv_eunit:prepare_tests(State),
+    Tests = rebar_prv_eunit:validate_tests(S, T),
+
     Error = {error, {rebar_prv_eunit, {eunit_test_errors, ["Module `missing_app' not found in project."]}}},
-    Error = rebar_prv_eunit:prepare_tests(State).
+    Error = Tests.
 
 %% check that the --suite cmd line opt generates the correct test set
 single_suite_arg(Config) ->
@@ -356,7 +366,7 @@ missing_suite_arg(Config) ->
     State = rebar_state:command_parsed_args(S, Args),
 
     Error = {error, {rebar_prv_eunit, {eunit_test_errors, ["Module `missing_app' not found in project."]}}},
-    Error = rebar_prv_eunit:prepare_tests(State).
+    Error = rebar_prv_eunit:validate_tests(State, rebar_prv_eunit:prepare_tests(State)).
 
 %% check that the --file cmd line opt generates the correct test set
 single_file_arg(Config) ->
@@ -390,7 +400,7 @@ missing_file_arg(Config) ->
     State = rebar_state:command_parsed_args(S, Args),
 
     Error = {error, {rebar_prv_eunit, {eunit_test_errors, ["File `" ++ Path ++"' not found."]}}},
-    Error = rebar_prv_eunit:prepare_tests(State).
+    Error = rebar_prv_eunit:validate_tests(State, rebar_prv_eunit:prepare_tests(State)).
 
 %% check that the --dir cmd line opt generates the correct test set
 single_dir_arg(Config) ->
@@ -424,7 +434,7 @@ missing_dir_arg(Config) ->
     State = rebar_state:command_parsed_args(S, Args),
 
     Error = {error, {rebar_prv_eunit, {eunit_test_errors, ["Directory `" ++ Path ++"' not found."]}}},
-    Error = rebar_prv_eunit:prepare_tests(State).
+    Error = rebar_prv_eunit:validate_tests(State, rebar_prv_eunit:prepare_tests(State)).
 
 %% check that multiple args are composed
 multiple_arg_composition(Config) ->
@@ -470,11 +480,71 @@ multiple_arg_errors(Config) ->
                                                               "--dir=" ++ DirPath]),
     State = rebar_state:command_parsed_args(S, Args),
 
+    T = rebar_prv_eunit:prepare_tests(State),
+    Tests = rebar_prv_eunit:validate_tests(S, T),
+
     Expect = ["Application `missing_app' not found in project.",
               "Directory `" ++ DirPath ++ "' not found.",
               "File `" ++ FilePath ++ "' not found.",
               "Module `missing_app' not found in project.",
               "Module `missing_app' not found in project."],
 
-    {error, {rebar_prv_eunit, {eunit_test_errors, Expect}}} = rebar_prv_eunit:prepare_tests(State).
+    {error, {rebar_prv_eunit, {eunit_test_errors, Expect}}} = Tests.
 
+misspecified_eunit_tests(Config) ->
+    State = rebar_test_utils:init_rebar_state(Config, "basic_app_"),
+
+    AppDir = ?config(apps, State),
+    PrivDir = ?config(priv_dir, State),
+
+    AppDirs = ["src", "include", "test"],
+
+    lists:foreach(fun(F) -> ec_file:copy(filename:join([PrivDir, "basic_app", F]),
+                                         filename:join([AppDir, F]),
+                                         [recursive]) end, AppDirs),
+
+    BaseConfig = [{erl_opts, [{d, config_define}]}, {eunit_compile_opts, [{d, eunit_compile_define}]}],
+
+    RebarConfig = [{eunit_tests, {dir, "test"}}|BaseConfig],
+
+    {error, {rebar_prv_eunit, Error}} = rebar_test_utils:run_and_check(State, RebarConfig, ["eunit"], return),
+
+    {badconfig, {"Value `~p' of option `~p' must be a list", {{dir, "test"}, eunit_tests}}} = Error.
+
+misspecified_eunit_compile_opts(Config) ->
+    State = rebar_test_utils:init_rebar_state(Config, "basic_app_"),
+
+    AppDir = ?config(apps, State),
+    PrivDir = ?config(priv_dir, State),
+
+    AppDirs = ["src", "include", "test"],
+
+    lists:foreach(fun(F) -> ec_file:copy(filename:join([PrivDir, "basic_app", F]),
+                                         filename:join([AppDir, F]),
+                                         [recursive]) end, AppDirs),
+
+    RebarConfig = [{erl_opts, [{d, config_define}]}, {eunit_compile_opts, {d, eunit_compile_define}}],
+
+    {error, {rebar_prv_eunit, Error}} = rebar_test_utils:run_and_check(State, RebarConfig, ["eunit"], return),
+
+    {badconfig, {"Value `~p' of option `~p' must be a list", {{d, eunit_compile_define}, eunit_compile_opts}}} = Error.
+
+misspecified_eunit_first_files(Config) ->
+    State = rebar_test_utils:init_rebar_state(Config, "basic_app_"),
+
+    AppDir = ?config(apps, State),
+    PrivDir = ?config(priv_dir, State),
+
+    AppDirs = ["src", "include", "test"],
+
+    lists:foreach(fun(F) -> ec_file:copy(filename:join([PrivDir, "basic_app", F]),
+                                         filename:join([AppDir, F]),
+                                         [recursive]) end, AppDirs),
+
+    BaseConfig = [{erl_opts, [{d, config_define}]}, {eunit_compile_opts, [{d, eunit_compile_define}]}],
+
+    RebarConfig = [{eunit_first_files, some_file}|BaseConfig],
+
+    {error, {rebar_prv_eunit, Error}} = rebar_test_utils:run_and_check(State, RebarConfig, ["eunit"], return),
+
+    {badconfig, {"Value `~p' of option `~p' must be a list", {some_file, eunit_first_files}}} = Error.

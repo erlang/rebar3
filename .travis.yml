@@ -13,15 +13,13 @@ branches:
     - master
 cache:
   directories:
-  - $HOME/.cache/rebar3/hex/com/amazonaws/s3/s3.hex.pm/tarballs/packages/
+  - $HOME/.cache/rebar3/hex/default
 before_deploy: "rm -rf !(rebar3)"
 deploy:
   on:
     branch: master
     condition: $TRAVIS_OTP_RELEASE = R16B03-1
   provider: s3
-  edge:
-    branch: s3-backward-compat
   access_key_id: AKIAJAPYAQEFYCYSNL7Q
   secret_access_key:
     secure: "BUv2KQABv0Q4e8DAVNBRTc/lXHWt27yCN46Fdgo1IrcSSIiP+hq2yXzQcXLbPwkEu6pxUZQtL3mvKbt6l7uw3wFrcRfFAi1PGTITAW8MTmxtwcZIBcHSk3XOzDbkK+fYYcaddszmt7hDzzEFPtmYXiNgnaMIVeynhQLgcCcIRRQ="

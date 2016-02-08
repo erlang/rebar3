@@ -28,7 +28,17 @@ packages(State) ->
             ok;
         false ->
             ?DEBUG("Error loading package index.", []),
-            ?ERROR("Bad packages index, try to fix with `rebar3 update`", []),
+            handle_bad_index(State)
+    end.
+
+handle_bad_index(State) ->
+    ?ERROR("Bad packages index. Trying to fix by updating the registry.", []),
+    {ok, State1} = rebar_prv_update:do(State),
+    case load_and_verify_version(State1) of
+        true ->
+            ok;
+        false ->
+            %% Still unable to load after an update, create an empty registry
             ets:new(?PACKAGE_TABLE, [named_table, public])
     end.
 
@@ -36,7 +46,7 @@ close_packages() ->
     catch ets:delete(?PACKAGE_TABLE).
 
 load_and_verify_version(State) ->
-    RegistryDir = registry_dir(State),
+    {ok, RegistryDir} = registry_dir(State),
     case ets:file2tab(filename:join(RegistryDir, ?INDEX_FILE)) of
         {ok, _} ->
             case ets:lookup_element(?PACKAGE_TABLE, package_index_version, 2) of
@@ -52,10 +62,24 @@ load_and_verify_version(State) ->
 
 deps(Name, Vsn, State) ->
     try
-        ?MODULE:verify_table(State),
-        ets:lookup_element(?PACKAGE_TABLE, {ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)}, 2)
+        deps_(Name, Vsn, State)
     catch
         _:_ ->
+            handle_missing_package(Name, Vsn, State)
+    end.
+
+deps_(Name, Vsn, State) ->
+    ?MODULE:verify_table(State),
+    ets:lookup_element(?PACKAGE_TABLE, {ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)}, 2).
+
+handle_missing_package(Name, Vsn, State) ->
+    ?INFO("Package ~s-~s not found. Fetching registry updates and trying again...", [Name, Vsn]),
+    {ok, State1} = rebar_prv_update:do(State),
+    try
+        deps_(Name, Vsn, State1)
+    catch
+        _:_ ->
+            %% Even after an update the package is still missing, time to error out
             throw(?PRV_ERROR({missing_package, ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)}))
     end.
 
@@ -65,21 +89,30 @@ registry_dir(State) ->
         ?DEFAULT_CDN ->
             RegistryDir = filename:join([CacheDir, "hex", "default"]),
             ok = filelib:ensure_dir(filename:join(RegistryDir, "placeholder")),
-            RegistryDir;
+            {ok, RegistryDir};
         CDN ->
-            {ok, {_, _, Host, _, Path, _}} = http_uri:parse(CDN),
-            CDNHostPath = lists:reverse(string:tokens(Host, ".")),
-            CDNPath = tl(filename:split(Path)),
-            RegistryDir = filename:join([CacheDir, "hex"] ++ CDNHostPath ++ CDNPath),
-            ok = filelib:ensure_dir(filename:join(RegistryDir, "placeholder")),
-            RegistryDir
+            case rebar_utils:url_append_path(CDN, ?REMOTE_PACKAGE_DIR) of
+                {ok, Parsed} ->
+                    {ok, {_, _, Host, _, Path, _}} = http_uri:parse(Parsed),
+                    CDNHostPath = lists:reverse(string:tokens(Host, ".")),
+                    CDNPath = tl(filename:split(Path)),
+                    RegistryDir = filename:join([CacheDir, "hex"] ++ CDNHostPath ++ CDNPath),
+                    ok = filelib:ensure_dir(filename:join(RegistryDir, "placeholder")),
+                    {ok, RegistryDir};
+                _ ->
+                    {uri_parse_error, CDN}
+            end
     end.
 
 package_dir(State) ->
-    RegistryDir = registry_dir(State),
-    PackageDir = filename:join([RegistryDir, "packages"]),
-    ok = filelib:ensure_dir(filename:join(PackageDir, "placeholder")),
-    PackageDir.
+    case registry_dir(State) of
+        {ok, RegistryDir} ->
+            PackageDir = filename:join([RegistryDir, "packages"]),
+            ok = filelib:ensure_dir(filename:join(PackageDir, "placeholder")),
+            {ok, PackageDir};
+        Error ->
+            Error
+    end.
 
 registry_checksum({pkg, Name, Vsn}, State) ->
     try
@@ -138,12 +171,12 @@ handle_single_vsn(Dep, Vsn, Constraint) ->
             {ok, Vsn};
         false ->
             ?WARN("Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
-                 "Using anyway, but it is not guarenteed to work.", [Dep, Vsn, Constraint]),
+                 "Using anyway, but it is not guaranteed to work.", [Dep, Vsn, Constraint]),
             {ok, Vsn}
     end.
 
 format_error({missing_package, Package, Version}) ->
-    io_lib:format("Package not found in registry: ~s-~s. Try to fix with `rebar3 update`", [Package, Version]).
+    io_lib:format("Package not found in registry: ~s-~s.", [Package, Version]).
 
 verify_table(State) ->
     ets:info(?PACKAGE_TABLE, named_table) =:= true orelse load_and_verify_version(State).

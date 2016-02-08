@@ -207,12 +207,16 @@ format_table(Stats, CoverFiles) ->
     MaxLength = max(lists:foldl(fun max_length/2, 0, Stats), 20),
     Header = header(MaxLength),
     Seperator = seperator(MaxLength),
+    TotalLabel = format("total", MaxLength),
+    TotalCov = format(calculate_total(Stats), 8),
     [io_lib:format("~ts~n~ts~n~ts~n", [Seperator, Header, Seperator]),
         lists:map(fun({Mod, Coverage}) ->
             Name = format(Mod, MaxLength),
             Cov = format(Coverage, 8),
             io_lib:format("  |  ~ts  |  ~ts  |~n", [Name, Cov])
         end, Stats),
+        io_lib:format("~ts~n", [Seperator]),
+        io_lib:format("  |  ~ts  |  ~ts  |~n", [TotalLabel, TotalCov]),
         io_lib:format("~ts~n", [Seperator]),
         io_lib:format("  coverage calculated from:~n", []),
         lists:map(fun(File) ->
@@ -233,6 +237,18 @@ seperator(Width) ->
     ["  |--", io_lib:format("~*c", [Width, $-]), "--|------------|"].
 
 format(String, Width) -> io_lib:format("~*.ts", [Width, String]).
+
+calculate_total(Stats) when length(Stats) =:= 0 ->
+    "0%";
+calculate_total(Stats) ->
+    TotalStats = length(Stats),
+    TotalCovInt = round(lists:foldl(
+                        fun({_Mod, Coverage, _File}, Acc) ->
+                            Acc + (list_to_integer(string:strip(Coverage, right, $%)) / TotalStats);
+                        ({_Mod, Coverage}, Acc) ->
+                            Acc + (list_to_integer(string:strip(Coverage, right, $%)) / TotalStats)
+    end, 0, Stats)),
+    integer_to_list(TotalCovInt) ++ "%".
 
 write_index(State, Coverage) ->
     CoverDir = cover_dir(State),
@@ -265,6 +281,8 @@ write_index_section(F, [{Section, DataFile, Mods}|Rest]) ->
                      [strip_coverdir(Report), Mod, Cov])
         end,
     lists:foreach(fun(M) -> ok = file:write(F, FmtLink(M)) end, Mods),
+    ok = file:write(F, ?FMT("<tr><td><strong>Total</strong></td><td>~ts</td>\n",
+                     [calculate_total(Mods)])),
     ok = file:write(F, "</table>\n"),
     write_index_section(F, Rest).
 
@@ -279,21 +297,26 @@ cover_compile(State, apps) ->
     Apps = filter_checkouts(rebar_state:project_apps(State)),
     AppDirs = app_dirs(Apps),
     ExtraDirs = extra_src_dirs(State, Apps),
-    cover_compile(State, AppDirs ++ ExtraDirs);
+    cover_compile(State, lists:filter(fun(D) -> ec_file:is_dir(D) end, AppDirs ++ ExtraDirs));
 cover_compile(State, Dirs) ->
     %% start the cover server if necessary
     {ok, CoverPid} = start_cover(),
     %% redirect cover output
     true = redirect_cover_output(State, CoverPid),
-    CompileResult = compile(Dirs, []),
-    %% print any warnings about modules that failed to cover compile
-    lists:foreach(fun print_cover_warnings/1, lists:flatten(CompileResult)).
-
-compile([], Acc) -> lists:reverse(Acc);
-compile([Dir|Rest], Acc) ->
-    ?INFO("covering ~p", [Dir]),
-    Result = cover:compile_beam_directory(Dir),
-    compile(Rest, [Result|Acc]).
+    lists:foreach(fun(Dir) ->
+        ?DEBUG("cover compiling ~p", [Dir]),
+        case catch(cover:compile_beam_directory(Dir)) of
+            {error, eacces} ->
+                ?WARN("Directory ~p not readable, modules will not be included in coverage", [Dir]);
+            {error, enoent} ->
+                ?WARN("Directory ~p not found", [Dir]);
+            {'EXIT', {Reason, _}} ->
+                ?WARN("Cover compilation for directory ~p failed: ~p", [Dir, Reason]);
+            Results ->
+                %% print any warnings about modules that failed to cover compile
+                lists:foreach(fun print_cover_warnings/1, lists:flatten(Results))
+        end
+    end, Dirs).
 
 app_dirs(Apps) ->
     lists:foldl(fun app_ebin_dirs/2, [], Apps).
@@ -302,7 +325,7 @@ app_ebin_dirs(App, Acc) ->
     AppDir = rebar_app_info:ebin_dir(App),
     ExtraDirs = rebar_dir:extra_src_dirs(rebar_app_info:opts(App), []),
     OutDir = rebar_app_info:out_dir(App),
-    [filename:join([OutDir, D]) || D <- [AppDir|ExtraDirs]] ++ Acc.
+    [AppDir] ++ [filename:join([OutDir, D]) || D <- ExtraDirs] ++ Acc.
 
 extra_src_dirs(State, Apps) ->
     BaseDir = rebar_state:dir(State),
@@ -339,9 +362,8 @@ redirect_cover_output(State, CoverPid) ->
     group_leader(F, CoverPid).
 
 print_cover_warnings({ok, _}) -> ok;
-print_cover_warnings({error, File}) ->
-    ?WARN("Cover compilation of ~p failed, module is not included in cover data.",
-          [File]).
+print_cover_warnings({error, Error}) ->
+    ?WARN("Cover compilation failed: ~p", [Error]).
 
 write_coverdata(State, Task) ->
     DataDir = cover_dir(State),

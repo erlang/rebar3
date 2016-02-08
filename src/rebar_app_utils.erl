@@ -118,14 +118,14 @@ parse_dep(Dep, Parent, DepsDir, State, Locks, Level) ->
     end.
 
 parse_dep(Parent, {Name, Vsn, {pkg, PkgName}}, DepsDir, IsLock, State) ->
-    {PkgName1, PkgVsn} = parse_goal(ec_cnv:to_binary(PkgName), ec_cnv:to_binary(Vsn)),
+    {PkgName1, PkgVsn} = {ec_cnv:to_binary(PkgName), ec_cnv:to_binary(Vsn)},
     dep_to_app(Parent, DepsDir, Name, PkgVsn, {pkg, PkgName1, PkgVsn}, IsLock, State);
 parse_dep(Parent, {Name, {pkg, PkgName}}, DepsDir, IsLock, State) ->
     %% Package dependency with different package name from app name
     dep_to_app(Parent, DepsDir, Name, undefined, {pkg, ec_cnv:to_binary(PkgName), undefined}, IsLock, State);
 parse_dep(Parent, {Name, Vsn}, DepsDir, IsLock, State) when is_list(Vsn); is_binary(Vsn) ->
     %% Versioned Package dependency
-    {PkgName, PkgVsn} = parse_goal(ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)),
+    {PkgName, PkgVsn} = {ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)},
     dep_to_app(Parent, DepsDir, PkgName, PkgVsn, {pkg, PkgName, PkgVsn}, IsLock, State);
 parse_dep(Parent, Name, DepsDir, IsLock, State) when is_atom(Name); is_binary(Name) ->
     %% Unversioned package dependency
@@ -166,23 +166,26 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
     Overrides = rebar_state:get(State, overrides, []),
     AppInfo2 = rebar_app_info:set(AppInfo1, overrides, rebar_app_info:get(AppInfo, overrides, [])++Overrides),
     AppInfo3 = rebar_app_info:apply_overrides(rebar_app_info:get(AppInfo2, overrides, []), AppInfo2),
-    rebar_app_info:is_lock(AppInfo3, IsLock).
+    AppInfo4 = rebar_app_info:apply_profiles(AppInfo3, [default, prod]),
+    AppInfo5 = rebar_app_info:profiles(AppInfo4, [default]),
+    rebar_app_info:is_lock(AppInfo5, IsLock).
 
-update_source(AppInfo, {pkg, PkgName, undefined}, State) ->
-    {PkgName1, PkgVsn1} = get_package(PkgName, State),
+update_source(AppInfo, {pkg, PkgName, PkgVsn}, State) ->
+    {PkgName1, PkgVsn1} = case PkgVsn of
+                              undefined ->
+                                  get_package(PkgName, "0", State);
+                              <<"~>", Vsn/binary>> ->
+                                  [Vsn1] = binary:split(Vsn, [<<" ">>], [trim_all, global]),
+                                  get_package(PkgName, Vsn1, State);
+                              _ ->
+                                  {PkgName, PkgVsn}
+                          end,
     AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName1, PkgVsn1}),
     Deps = rebar_packages:deps(PkgName1
                               ,PkgVsn1
                               ,State),
     AppInfo2 = rebar_app_info:resource_type(rebar_app_info:deps(AppInfo1, Deps), pkg),
     rebar_app_info:original_vsn(AppInfo2, PkgVsn1);
-update_source(AppInfo, {pkg, PkgName, PkgVsn}, State) ->
-    AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName, PkgVsn}),
-    Deps = rebar_packages:deps(PkgName
-                              ,PkgVsn
-                              ,State),
-    AppInfo2 = rebar_app_info:resource_type(rebar_app_info:deps(AppInfo1, Deps), pkg),
-    rebar_app_info:original_vsn(AppInfo2, PkgVsn);
 update_source(AppInfo, Source, _State) ->
     rebar_app_info:source(AppInfo, Source).
 
@@ -198,19 +201,8 @@ format_error(Error) ->
 %% Internal functions
 %% ===================================================================
 
--spec parse_goal(binary(), binary()) -> {binary(), binary()} | {binary(), binary(), binary()}.
-parse_goal(Name, Constraint) ->
-    case re:run(Constraint, "([^\\d]*)(\\d.*)", [{capture, [1,2], binary}]) of
-        {match, [<<>>, Vsn]} ->
-            {Name, Vsn};
-        {match, [Op, Vsn]} ->
-            {Name, Vsn, binary_to_atom(Op, utf8)};
-        nomatch ->
-            throw(?PRV_ERROR({bad_constraint, Name, Constraint}))
-    end.
-
-get_package(Dep, State) ->
-    case rebar_packages:find_highest_matching(Dep, "0", ?PACKAGE_TABLE, State) of
+get_package(Dep, Vsn, State) ->
+    case rebar_packages:find_highest_matching(Dep, Vsn, ?PACKAGE_TABLE, State) of
         {ok, HighestDepVsn} ->
             {Dep, HighestDepVsn};
         none ->
