@@ -43,6 +43,16 @@
 %% Public API
 %% ===================================================================
 
+intensity() ->
+    case os:getenv("REBAR_COLOR") of
+        "high" ->
+            high;
+        "low" ->
+            low;
+        _ ->
+            ?DFLT_INTENSITY
+    end.
+
 init(Caller, Verbosity) ->
     Level = case valid_level(Verbosity) of
                 ?ERROR_LEVEL -> error;
@@ -50,14 +60,7 @@ init(Caller, Verbosity) ->
                 ?INFO_LEVEL  -> info;
                 ?DEBUG_LEVEL -> debug
             end,
-    Intensity = case os:getenv("REBAR_COLOR") of
-                    "high" ->
-                        high;
-                    "low" ->
-                        low;
-                    _ ->
-                        ?DFLT_INTENSITY
-                end,
+    Intensity = intensity(),
     Log = ec_cmd_log:new(Level, Caller, Intensity),
     application:set_env(rebar, log, Log).
 
