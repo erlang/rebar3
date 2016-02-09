@@ -23,7 +23,7 @@ init(State) ->
     Provider = providers:create(
         [{name, ?PROVIDER},
          {module, ?MODULE},
-         {bare, true},
+         {bare, false},
          {deps, ?DEPS},
          {example, "rebar3 state"},
          {short_desc, "Print current configuration state"},
