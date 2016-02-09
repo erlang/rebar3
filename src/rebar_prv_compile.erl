@@ -14,6 +14,7 @@
 
 -define(PROVIDER, compile).
 -define(ERLC_HOOK, erlc_compile).
+-define(APP_HOOK, app_compile).
 -define(DEPS, [lock]).
 
 %% ===================================================================
@@ -121,11 +122,13 @@ compile(State, Providers, AppInfo) ->
     rebar_erlc_compiler:compile(AppInfo2),
     AppInfo3 = rebar_hooks:run_all_hooks(AppDir, post, ?ERLC_HOOK, Providers, AppInfo2, State),
 
-    case rebar_otp_app:compile(State, AppInfo3) of
-        {ok, AppInfo4} ->
-            AppInfo5 = rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo4, State),
+    AppInfo4 = rebar_hooks:run_all_hooks(AppDir, pre, ?APP_HOOK, Providers, AppInfo3, State),
+    case rebar_otp_app:compile(State, AppInfo4) of
+        {ok, AppInfo5} ->
+            AppInfo6 = rebar_hooks:run_all_hooks(AppDir, post, ?APP_HOOK, Providers, AppInfo5, State),
+            AppInfo7 = rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo6, State),
             has_all_artifacts(AppInfo5),
-            AppInfo5;
+            AppInfo7;
         Error ->
             throw(Error)
     end.
