@@ -30,6 +30,7 @@
          set_level/1,
          error_level/0,
          default_level/0,
+         intensity/0,
          log/3,
          is_verbose/1]).
 
@@ -43,14 +44,23 @@
 %% Public API
 %% ===================================================================
 
+%% @doc Returns the color intensity, we first check the application envorinment
+%% if that is not set we check the environment variable REBAR_COLOR.
 intensity() ->
-    case os:getenv("REBAR_COLOR") of
-        "high" ->
-            high;
-        "low" ->
-            low;
-        _ ->
-            ?DFLT_INTENSITY
+    case application:get_env(rebar, color_intensity) of
+        undefined ->
+            R = case os:getenv("REBAR_COLOR") of
+                    "high" ->
+                        high;
+                    "low" ->
+                        low;
+                    _ ->
+                        ?DFLT_INTENSITY
+                end,
+            application:set_env(rebar, color_intensity, R),
+            R;
+        {ok, Mode} ->
+            Mode
     end.
 
 init(Caller, Verbosity) ->
