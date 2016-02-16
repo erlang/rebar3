@@ -30,6 +30,7 @@
          set_level/1,
          error_level/0,
          default_level/0,
+         intensity/0,
          log/3,
          is_verbose/1]).
 
@@ -37,10 +38,30 @@
 -define(WARN_LEVEL,  1).
 -define(INFO_LEVEL,  2).
 -define(DEBUG_LEVEL, 3).
+-define(DFLT_INTENSITY, low).
 
 %% ===================================================================
 %% Public API
 %% ===================================================================
+
+%% @doc Returns the color intensity, we first check the application envorinment
+%% if that is not set we check the environment variable REBAR_COLOR.
+intensity() ->
+    case application:get_env(rebar, color_intensity) of
+        undefined ->
+            R = case os:getenv("REBAR_COLOR") of
+                    "high" ->
+                        high;
+                    "low" ->
+                        low;
+                    _ ->
+                        ?DFLT_INTENSITY
+                end,
+            application:set_env(rebar, color_intensity, R),
+            R;
+        {ok, Mode} ->
+            Mode
+    end.
 
 init(Caller, Verbosity) ->
     Level = case valid_level(Verbosity) of
@@ -49,12 +70,16 @@ init(Caller, Verbosity) ->
                 ?INFO_LEVEL  -> info;
                 ?DEBUG_LEVEL -> debug
             end,
-    Log = ec_cmd_log:new(Level, Caller),
+    Intensity = intensity(),
+    Log = ec_cmd_log:new(Level, Caller, Intensity),
     application:set_env(rebar, log, Log).
 
 set_level(Level) ->
     ok = application:set_env(rebar, log_level, Level).
 
+log(Level = error, Str, Args) ->
+    {ok, LogState} = application:get_env(rebar, log),
+    ec_cmd_log:Level(LogState, lists:flatten(cf:format("~!^~s~n", [Str])), Args);
 log(Level, Str, Args) ->
     {ok, LogState} = application:get_env(rebar, log),
     ec_cmd_log:Level(LogState, Str++"~n", Args).
