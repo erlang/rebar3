@@ -35,8 +35,7 @@ do(State) ->
             OldLocks = rebar_state:get(State, {locks, default}, []),
             Locks = lists:keysort(1, build_locks(State)),
             Dir = rebar_state:dir(State),
-            file:write_file(filename:join(Dir, ?LOCK_FILE),
-                            io_lib:format("~p.~n", [Locks])),
+            rebar_config:write_lock_file(filename:join(Dir, ?LOCK_FILE), Locks),
             State1 = rebar_state:set(State, {locks, default}, Locks),
 
             OldLockNames = [element(1,L) || L <- OldLocks],
