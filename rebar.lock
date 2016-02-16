@@ -6,5 +6,5 @@
  {<<"eunit_formatters">>,{pkg,<<"eunit_formatters">>,<<"0.3.1">>},0},
  {<<"getopt">>,{pkg,<<"getopt">>,<<"0.8.2">>},0},
  {<<"providers">>,{pkg,<<"providers">>,<<"1.6.0">>},0},
- {<<"relx">>,{pkg,<<"relx">>,<<"3.15.0">>},0},
+ {<<"relx">>,{pkg,<<"relx">>,<<"3.16.0">>},0},
  {<<"ssl_verify_hostname">>,{pkg,<<"ssl_verify_hostname">>,<<"1.0.5">>},0}].
