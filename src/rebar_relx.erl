@@ -14,6 +14,8 @@
 
 -spec do(atom(), string(), atom(), rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(Module, Command, Provider, State) ->
+    %% We set the color mode for relx as a application env
+    application:set_env(relx, color_intensity, rebar_log:intensity()),
     Options = rebar_state:command_args(State),
     DepsDir = rebar_dir:deps_dir(State),
     ProjectAppDirs = lists:delete(".", ?DEFAULT_PROJECT_APP_DIRS),
