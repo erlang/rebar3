@@ -7,7 +7,9 @@
         ,registry_dir/1
         ,package_dir/1
         ,registry_checksum/2
+        ,find_highest_matching/6
         ,find_highest_matching/4
+        ,find_all/3
         ,verify_table/1
         ,format_error/1]).
 
@@ -139,16 +141,26 @@ registry_checksum({pkg, Name, Vsn}, State) ->
 %% `~> 2.0` | `>= 2.0.0 and < 3.0.0`
 %% `~> 2.1` | `>= 2.1.0 and < 3.0.0`
 find_highest_matching(Dep, Constraint, Table, State) ->
+    find_highest_matching(undefined, undefined, Dep, Constraint, Table, State).
+
+find_highest_matching(Pkg, PkgVsn, Dep, Constraint, Table, State) ->
+    try find_all(Dep, Table, State) of
+        {ok, [Vsn]} ->
+            handle_single_vsn(Pkg, PkgVsn, Dep, Vsn, Constraint);
+        {ok, [HeadVsn | VsnTail]} ->
+                            {ok, handle_vsns(Constraint, HeadVsn, VsnTail)}
+    catch
+        error:badarg ->
+            none
+    end.
+
+find_all(Dep, Table, State) ->
     ?MODULE:verify_table(State),
     try ets:lookup_element(Table, Dep, 2) of
-        [[HeadVsn | VsnTail]] ->
-            {ok, handle_vsns(Constraint, HeadVsn, VsnTail)};
-        [[Vsn]] ->
-            handle_single_vsn(Dep, Vsn, Constraint);
-        [Vsn] ->
-            handle_single_vsn(Dep, Vsn, Constraint);
-        [HeadVsn | VsnTail] ->
-            {ok, handle_vsns(Constraint, HeadVsn, VsnTail)}
+        [Vsns] when is_list(Vsns)->
+            {ok, Vsns};
+        Vsns ->
+            {ok, Vsns}
     catch
         error:badarg ->
             none
@@ -165,13 +177,19 @@ handle_vsns(Constraint, HeadVsn, VsnTail) ->
                         end
                 end, HeadVsn, VsnTail).
 
-handle_single_vsn(Dep, Vsn, Constraint) ->
+handle_single_vsn(Pkg, PkgVsn, Dep, Vsn, Constraint) ->
     case ec_semver:pes(Vsn, Constraint) of
         true ->
             {ok, Vsn};
         false ->
-            ?WARN("Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
-                 "Using anyway, but it is not guaranteed to work.", [Dep, Vsn, Constraint]),
+            case {Pkg, PkgVsn} of
+                {undefined, undefined} ->
+                    ?WARN("Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
+                          "Using anyway, but it is not guaranteed to work.", [Dep, Vsn, Constraint]);
+                _ ->
+                    ?WARN("[~s:~s] Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
+                          "Using anyway, but it is not guaranteed to work.", [Pkg, PkgVsn, Dep, Vsn, Constraint])
+            end,
             {ok, Vsn}
     end.
 
