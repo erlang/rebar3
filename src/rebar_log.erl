@@ -38,7 +38,7 @@
 -define(WARN_LEVEL,  1).
 -define(INFO_LEVEL,  2).
 -define(DEBUG_LEVEL, 3).
--define(DFLT_INTENSITY, low).
+-define(DFLT_INTENSITY, high).
 
 %% ===================================================================
 %% Public API
