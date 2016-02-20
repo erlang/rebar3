@@ -49,8 +49,8 @@ print_packages() ->
                                                         ec_semver:lte(ec_semver:parse(A)
                                                                      ,ec_semver:parse(B))
                                                 end, Vsns),
-                        VsnStr = join(SortedVsns, <<", ">>),
-                        ?CONSOLE("~s:~n    Versions: ~s~n", [Name, VsnStr])
+                        VsnStr = join(SortedVsns, <<" ">>),
+                        ?CONSOLE("~s ~s~n", [Name, VsnStr])
                 end, SortedPkgs).
 
 -spec join([binary()], binary()) -> binary().
