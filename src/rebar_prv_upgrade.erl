@@ -61,7 +61,7 @@ do(State) ->
             State4 = rebar_state:set(State3, upgrade, true),
             UpdatedLocks = [L || L <- rebar_state:lock(State4),
                                  lists:keymember(rebar_app_info:name(L), 1, Locks0)],
-            Res = rebar_prv_install_deps:do(rebar_state:lock(State4, UpdatedLocks)),
+            Res = rebar_prv_install_deps:do_(rebar_state:lock(State4, UpdatedLocks)),
             case Res of
                 {ok, State5} ->
                     rebar_utils:info_useless(

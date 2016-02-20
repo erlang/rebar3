@@ -35,7 +35,8 @@
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
--export([handle_deps_as_profile/4,
+-export([do_/1,
+         handle_deps_as_profile/4,
          profile_dep_dir/2,
          find_cycles/1,
          cull_compile/2]).
@@ -69,8 +70,11 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    ?INFO("Verifying dependencies...", []),
+    do_(State).
+
+do_(State) ->
     try
-        ?INFO("Verifying dependencies...", []),
         Profiles = rebar_state:current_profiles(State),
         ProjectApps = rebar_state:project_apps(State),
 
