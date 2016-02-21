@@ -64,6 +64,8 @@ init(State) ->
                          "Gives a long name to the node."},
                         {sname, undefined, "sname", atom,
                          "Gives a short name to the node."},
+                        {setcookie, undefined, "setcookie", atom,
+                         "Sets the cookie if the node is distributed."},
                         {script_file, undefined, "script", string,
                          "Path to an escript file to run before "
                          "starting the project apps. Defaults to "
@@ -258,9 +260,11 @@ setup_name(State) ->
         {undefined, undefined} ->
             ok;
         {Name, undefined} ->
-            check_epmd(net_kernel:start([Name, longnames]));
+            check_epmd(net_kernel:start([Name, longnames])),
+            setup_cookie(Opts);
         {undefined, SName} ->
-            check_epmd(net_kernel:start([SName, shortnames]));
+            check_epmd(net_kernel:start([SName, shortnames])),
+            setup_cookie(Opts);
         {_, _} ->
             ?ABORT("Cannot have both short and long node names defined", [])
     end.
@@ -270,6 +274,14 @@ check_epmd({error,{{shutdown, {_,net_kernel,{'EXIT',nodistribution}}},_}}) ->
            "Verify that epmd is running and try again.",[]);
 check_epmd(_) ->
     ok.
+
+setup_cookie(Opts) ->
+    case {node(), proplists:get_value(setcookie, Opts, nocookie)} of
+        {'nonode@nohost', _} -> nocookie;
+        {_, nocookie} -> nocookie;
+        {Node, Name} -> erlang:set_cookie(Node, Name)
+    end.
+
 
 find_apps_to_boot(State) ->
     %% Try the shell_apps option
