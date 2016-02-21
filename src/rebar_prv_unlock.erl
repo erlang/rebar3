@@ -46,15 +46,14 @@ do(State) ->
             {ok, State};
         {error, Reason} ->
             ?PRV_ERROR({file,Reason});
-        {ok, [Locks]} ->
+        {ok, _} ->
+            Locks = rebar_config:consult_lock_file(LockFile),
             case handle_unlocks(State, Locks, LockFile) of
                 ok ->
                     {ok, State};
                 {error, Reason} ->
                     ?PRV_ERROR({file,Reason})
-            end;
-        {ok, _Other} ->
-            ?PRV_ERROR(unknown_lock_format)
+            end
     end.
 
 -spec format_error(any()) -> iolist().
@@ -74,7 +73,7 @@ handle_unlocks(State, Locks, LockFile) ->
         _ when Names =:= [] -> % implicitly all locks
             file:delete(LockFile);
         NewLocks ->
-            file:write_file(LockFile, io_lib:format("~p.~n", [NewLocks]))
+            rebar_config:write_lock_file(LockFile, NewLocks)
     end.
 
 parse_names(Bin) ->

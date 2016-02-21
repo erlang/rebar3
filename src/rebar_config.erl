@@ -30,6 +30,7 @@
         ,consult_app_file/1
         ,consult_file/1
         ,consult_lock_file/1
+        ,write_lock_file/2
         ,verify_config_format/1
         ,format_error/1
 
@@ -50,7 +51,40 @@ consult_app_file(File) ->
     consult_file_(File).
 
 consult_lock_file(File) ->
-    consult_file_(File).
+    Terms = consult_file_(File),
+    case Terms of
+        [] ->
+            [];
+        [Locks] when is_list(Locks) -> % beta lock file
+            Locks;
+        [{Vsn, Locks}|Attrs] when is_list(Locks) -> % versioned lock file
+            %% Make sure the warning above is to be shown whenever a version
+            %% newer than the current one is being used, as we can't parse
+            %% all the contents of the lock file properly.
+            ?WARN("Rebar3 detected a lock file from a newer version. "
+                  "It will be loaded in compatibility mode, but important "
+                  "information may be missing or lost. It is recommended to "
+                  "upgrade Rebar3.", []),
+            read_attrs(Vsn, Locks, Attrs)
+    end.
+
+write_lock_file(LockFile, Locks) ->
+    NewLocks = write_attrs(Locks),
+    %% Write locks in the beta format, at least until it's been long
+    %% enough we can start modifying the lock format.
+    file:write_file(LockFile, io_lib:format("~p.~n", [NewLocks])).
+
+read_attrs(_Vsn, Locks, _Attrs) ->
+    %% Beta copy does not know how to expand attributes, but
+    %% is ready to support it.
+    Locks.
+
+write_attrs(Locks) ->
+    %% No attribute known that needs to be taken out of the structure,
+    %% just return terms as is.
+    Locks.
+
+
 
 consult_file(File) ->
     Terms = consult_file_(File),
@@ -87,7 +121,7 @@ verify_config_format([Term | _]) ->
 merge_locks(Config, []) ->
     Config;
 %% lockfile with entries
-merge_locks(Config, [Locks]) ->
+merge_locks(Config, Locks) ->
     ConfigDeps = proplists:get_value(deps, Config, []),
     %% We want the top level deps only from the lock file.
     %% This ensures deterministic overrides for configs.
