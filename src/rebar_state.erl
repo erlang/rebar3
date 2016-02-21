@@ -103,7 +103,8 @@ new(ParentState, Config, Dir) ->
 new(ParentState, Config, Deps, Dir) ->
     Opts = ParentState#state_t.opts,
     Plugins = proplists:get_value(plugins, Config, []),
-    Terms = Deps++[{{plugins, default}, Plugins} | Config],
+    ProjectPlugins = proplists:get_value(project_plugins, Config, []),
+    Terms = Deps++[{{project_plugins, default}, ProjectPlugins}, {{plugins, default}, Plugins} | Config],
     true = rebar_config:verify_config_format(Terms),
     LocalOpts = dict:from_list(Terms),
 
@@ -136,7 +137,8 @@ base_state() ->
 base_opts(Config) ->
     Deps = proplists:get_value(deps, Config, []),
     Plugins = proplists:get_value(plugins, Config, []),
-    Terms = [{{deps, default}, Deps}, {{plugins, default}, Plugins} | Config],
+    ProjectPlugins = proplists:get_value(project_plugins, Config, []),
+    Terms = [{{deps, default}, Deps}, {{plugins, default}, Plugins}, {{project_plugins, default}, ProjectPlugins} | Config],
     true = rebar_config:verify_config_format(Terms),
     dict:from_list(Terms).
 

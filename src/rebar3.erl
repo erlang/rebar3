@@ -124,16 +124,18 @@ run_aux(State, RawArgs) ->
                              filename:join(filename:absname(rebar_state:dir(State3)), BaseDir)),
 
     {ok, Providers} = application:get_env(rebar, providers),
+    %% Initializing project_plugins before providers allows top level plugins to take precedence
+    State5 = rebar_plugins:project_plugins_install(State4),
     %% Providers can modify profiles stored in opts, so set default after initializing providers
-    State5 = rebar_state:create_logic_providers(Providers, State4),
-    State6 = rebar_plugins:top_level_install(State5),
-    State7 = rebar_state:default(State6, rebar_state:opts(State6)),
+    State6 = rebar_state:create_logic_providers(Providers, State5),
+    State7 = rebar_plugins:top_level_install(State6),
+    State8 = rebar_state:default(State7, rebar_state:opts(State7)),
 
     {Task, Args} = parse_args(RawArgs),
 
-    State8 = rebar_state:code_paths(State7, default, code:get_path()),
+    State9 = rebar_state:code_paths(State8, default, code:get_path()),
 
-    rebar_core:init_command(rebar_state:command_args(State8, Args), Task).
+    rebar_core:init_command(rebar_state:command_args(State9, Args), Task).
 
 init_config() ->
     %% Initialize logging system
