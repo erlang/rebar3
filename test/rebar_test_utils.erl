@@ -3,7 +3,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -export([init_rebar_state/1, init_rebar_state/2, run_and_check/4, check_results/3]).
 -export([expand_deps/2, flat_deps/1, top_level_deps/1]).
--export([create_app/4, create_eunit_app/4, create_empty_app/4,
+-export([create_app/4, create_plugin/4, create_eunit_app/4, create_empty_app/4,
          create_config/2, create_config/3, package_app/3]).
 -export([create_random_name/1, create_random_vsn/0, write_src_file/2]).
 
@@ -78,6 +78,16 @@ run_and_check(Config, RebarConfig, Command, Expect) ->
 %% And returns a `rebar_app_info' object.
 create_app(AppDir, Name, Vsn, Deps) ->
     write_src_file(AppDir, Name ++ ".erl"),
+    write_src_file(AppDir, "not_a_real_src_" ++ Name ++ ".erl"),
+    write_app_src_file(AppDir, Name, Vsn, Deps),
+    rebar_app_info:new(Name, Vsn, AppDir, Deps).
+
+%% @doc Creates a dummy plugin including:
+%% - src/<file>.erl
+%% - src/<file>.app.src
+%% And returns a `rebar_app_info' object.
+create_plugin(AppDir, Name, Vsn, Deps) ->
+    write_plugin_file(AppDir, Name ++ ".erl"),
     write_src_file(AppDir, "not_a_real_src_" ++ Name ++ ".erl"),
     write_app_src_file(AppDir, Name, Vsn, Deps),
     rebar_app_info:new(Name, Vsn, AppDir, Deps).
@@ -365,6 +375,11 @@ check_results(AppDir, Expected, ProfileRun) ->
                 ?assert(filelib:is_dir(Dirname))
         end, Expected).
 
+write_plugin_file(Dir, Name) ->
+    Erl = filename:join([Dir, "src", Name]),
+    ok = filelib:ensure_dir(Erl),
+    ok = ec_file:write(Erl, plugin_src_file(Name)).
+
 write_src_file(Dir, Name) ->
     Erl = filename:join([Dir, "src", Name]),
     ok = filelib:ensure_dir(Erl),
@@ -394,6 +409,18 @@ erl_src_file(Name) ->
     io_lib:format("-module('~s').\n"
                   "-export([main/0]).\n"
                   "main() -> ok.\n", [filename:basename(Name, ".erl")]).
+
+plugin_src_file(Name) ->
+    io_lib:format("-module('~s').\n"
+                 "-export([init/1]).\n"
+                 "init(State) -> \n"
+                 "Provider = providers:create([\n"
+                 "{name, '~s'},\n"
+                 "{module, '~s'}\n"
+                 "]),\n"
+                 "{ok, rebar_state:add_provider(State, Provider)}.\n", [filename:basename(Name, ".erl"),
+                                                                        filename:basename(Name, ".erl"),
+                                                                        filename:basename(Name, ".erl")]).
 
 erl_eunitized_src_file(Name) ->
     io_lib:format("-module('~s').\n"
