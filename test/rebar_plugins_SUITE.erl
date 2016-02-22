@@ -12,7 +12,8 @@
          list/1,
          upgrade/1,
          sub_app_plugins/1,
-         sub_app_plugin_overrides/1]).
+         sub_app_plugin_overrides/1,
+         project_plugins/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -34,7 +35,7 @@ end_per_testcase(_, _Config) ->
     catch meck:unload().
 
 all() ->
-    [compile_plugins, compile_global_plugins, complex_plugins, list, upgrade, sub_app_plugins, sub_app_plugin_overrides].
+    [compile_plugins, compile_global_plugins, complex_plugins, list, upgrade, sub_app_plugins, sub_app_plugin_overrides, project_plugins].
 
 %% Tests that compiling a project installs and compiles the plugins of deps
 compile_plugins(Config) ->
@@ -281,3 +282,50 @@ sub_app_plugin_overrides(Config) ->
       Config, RConf, ["compile"],
       {ok, [{app, Name}, {dep, Dep2Name, Vsn}, {plugin, DepName, Vsn2}, {plugin, PluginName}]}
      ).
+
+%% Check that project plugins are first in providers even if they override defaults but that
+%% normal plugins do not
+project_plugins(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    DepName = rebar_test_utils:create_random_name("dep1_"),
+    PluginName = "compile",
+    PluginName2 = "release",
+
+    Plugins = rebar_test_utils:expand_deps(git, [{PluginName, Vsn, []}, {PluginName2, Vsn, []}]),
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Plugins),
+    mock_git_resource:mock([{deps, SrcDeps}], create_plugin),
+
+    mock_pkg_resource:mock([{pkgdeps, [{{list_to_binary(DepName), list_to_binary(Vsn)}, []}]},
+                            {config, [{plugins, [
+                                                {list_to_atom(PluginName),
+                                                 {git, "http://site.com/user/"++PluginName++".git",
+                                                 {tag, Vsn}}}]}]}]),
+
+    RConfFile =
+        rebar_test_utils:create_config(AppDir,
+                                      [{deps, [
+                                              list_to_atom(DepName)
+                                              ]},
+                                      {project_plugins, [
+                                                        {list_to_atom(PluginName2),
+                                                         {git, "http://site.com/user/"++PluginName2++".git",
+                                                          {tag, Vsn}}}]}]),
+    {ok, RConf} = file:consult(RConfFile),
+
+    %% Build with deps.
+    {ok, State} = rebar_test_utils:run_and_check(
+                    Config, RConf, ["compile"],
+                    {ok, [{app, Name}, {plugin, PluginName}, {plugin, PluginName2}, {dep, DepName}]}
+                   ),
+
+    %% Should have 2 release providers but only 1 compile provider
+    Release = [P || P <- rebar_state:providers(State), providers:impl(P) =:= release, providers:namespace(P) =:= default],
+    Compile = [P || P <- rebar_state:providers(State), providers:impl(P) =:= compile, providers:namespace(P) =:= default],
+
+    ?assertEqual(length(Release), 2),
+    ?assertEqual(length(Compile), 1).

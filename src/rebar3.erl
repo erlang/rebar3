@@ -124,10 +124,10 @@ run_aux(State, RawArgs) ->
                              filename:join(filename:absname(rebar_state:dir(State3)), BaseDir)),
 
     {ok, Providers} = application:get_env(rebar, providers),
-    %% Initializing project_plugins before providers allows top level plugins to take precedence
-    State5 = rebar_plugins:project_plugins_install(State4),
     %% Providers can modify profiles stored in opts, so set default after initializing providers
-    State6 = rebar_state:create_logic_providers(Providers, State5),
+    State5 = rebar_state:create_logic_providers(Providers, State4),
+    %% Initializing project_plugins which can override default providers
+    State6 = rebar_plugins:project_plugins_install(State5),
     State7 = rebar_plugins:top_level_install(State6),
     State8 = rebar_state:default(State7, rebar_state:opts(State7)),
 

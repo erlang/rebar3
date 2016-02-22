@@ -1,6 +1,6 @@
 %%% Mock a git resource and create an app magically for each URL submitted.
 -module(mock_git_resource).
--export([mock/0, mock/1, unmock/0]).
+-export([mock/0, mock/1, mock/2, unmock/0]).
 -define(MOD, rebar_git_resource).
 
 %%%%%%%%%%%%%%%%%
@@ -24,11 +24,14 @@ mock() -> mock([]).
          | {pkg, App, term()},
     Vsn :: string().
 mock(Opts) ->
+    mock(Opts, create_app).
+
+mock(Opts, CreateType) ->
     meck:new(?MOD, [no_link]),
     mock_lock(Opts),
     mock_update(Opts),
     mock_vsn(Opts),
-    mock_download(Opts),
+    mock_download(Opts, CreateType),
     ok.
 
 unmock() ->
@@ -98,7 +101,7 @@ mock_vsn(Opts) ->
 %%   `{deps, [{"app1", [{app2, ".*", {git, ...}}]}]}' -- basically
 %%   the `deps' option takes a key/value list of terms to output directly
 %%   into a `rebar.config' file to describe dependencies.
-mock_download(Opts) ->
+mock_download(Opts, CreateType) ->
     Deps = proplists:get_value(deps, Opts, []),
     Config = proplists:get_value(config, Opts, []),
     Default = proplists:get_value(default_vsn, Opts, "0.0.0"),
@@ -110,7 +113,7 @@ mock_download(Opts) ->
             {git, Url, {_, Vsn}} = normalize_git(Git, Overrides, Default),
             App = app(Url),
             AppDeps = proplists:get_value({App,Vsn}, Deps, []),
-            rebar_test_utils:create_app(
+            rebar_test_utils:CreateType(
                 Dir, App, Vsn,
                 [kernel, stdlib] ++ [element(1,D) || D  <- AppDeps]
             ),
