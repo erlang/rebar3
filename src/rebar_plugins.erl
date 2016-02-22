@@ -19,10 +19,12 @@
 -spec project_plugins_install(rebar_state:t()) -> rebar_state:t().
 project_plugins_install(State) ->
     Profiles = rebar_state:current_profiles(State),
-    lists:foldl(fun(Profile, StateAcc) ->
-                        Plugins = rebar_state:get(State, {project_plugins, Profile}, []),
-                        handle_plugins(Profile, Plugins, StateAcc)
-                end, State, Profiles).
+    State1 = rebar_state:allow_provider_overrides(State, true),
+    State2 = lists:foldl(fun(Profile, StateAcc) ->
+                             Plugins = rebar_state:get(State, {project_plugins, Profile}, []),
+                             handle_plugins(Profile, Plugins, StateAcc)
+                         end, State1, Profiles),
+    rebar_state:allow_provider_overrides(State2, false).
 
 -spec top_level_install(rebar_state:t()) -> rebar_state:t().
 top_level_install(State) ->

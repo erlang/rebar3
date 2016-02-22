@@ -36,9 +36,10 @@
 
          deps_names/1,
 
-
          resources/1, resources/2, add_resource/2,
-         providers/1, providers/2, add_provider/2]).
+         providers/1, providers/2, add_provider/2,
+         allow_provider_overrides/1, allow_provider_overrides/2
+        ]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
@@ -63,7 +64,8 @@
                   all_deps            = []          :: [rebar_app_info:t()],
 
                   resources           = [],
-                  providers           = []}).
+                  providers           = [],
+                  allow_provider_overrides = false  :: boolean()}).
 
 -export_type([t/0]).
 
@@ -370,8 +372,16 @@ providers(#state_t{providers=Providers}) ->
 providers(State, NewProviders) ->
     State#state_t{providers=NewProviders}.
 
+allow_provider_overrides(#state_t{allow_provider_overrides=Allow}) ->
+    Allow.
+
+allow_provider_overrides(State, Allow) ->
+    State#state_t{allow_provider_overrides=Allow}.
+
 -spec add_provider(t(), providers:t()) -> t().
-add_provider(State=#state_t{providers=Providers}, Provider) ->
+add_provider(State=#state_t{providers=Providers, allow_provider_overrides=true}, Provider) ->
+    State#state_t{providers=[Provider | Providers]};
+add_provider(State=#state_t{providers=Providers, allow_provider_overrides=false}, Provider) ->
     Name = providers:impl(Provider),
     Namespace = providers:namespace(Provider),
     Module = providers:module(Provider),
