@@ -180,11 +180,14 @@ pkgs_provider(Config) ->
 
 find_highest_matching(_Config) ->
     State = rebar_state:new(),
-    {ok, Vsn} = rebar_packages:find_highest_matching(<<"goodpkg">>, <<"1.0.0">>, package_index, State),
+    {ok, Vsn} = rebar_packages:find_highest_matching(
+                  <<"test">>, <<"1.0.0">>, <<"goodpkg">>, <<"1.0.0">>, package_index, State),
     ?assertEqual(<<"1.0.1">>, Vsn),
-    {ok, Vsn1} = rebar_packages:find_highest_matching(<<"goodpkg">>, <<"1.0">>, package_index, State),
+    {ok, Vsn1} = rebar_packages:find_highest_matching(
+                   <<"test">>, <<"1.0.0">>, <<"goodpkg">>, <<"1.0">>, package_index, State),
     ?assertEqual(<<"1.1.1">>, Vsn1),
-    {ok, Vsn2} = rebar_packages:find_highest_matching(<<"goodpkg">>, <<"2.0">>, package_index, State),
+    {ok, Vsn2} = rebar_packages:find_highest_matching(
+                   <<"test">>, <<"1.0.0">>, <<"goodpkg">>, <<"2.0">>, package_index, State),
     ?assertEqual(<<"2.0.0">>, Vsn2).
 
 

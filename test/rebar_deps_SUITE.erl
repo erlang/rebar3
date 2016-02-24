@@ -3,7 +3,7 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-all() -> [sub_app_deps, newly_added_dep, newly_added_after_empty_lock, http_proxy_settings, https_proxy_settings, {group, git}, {group, pkg}].
+all() -> [sub_app_deps, newly_added_dep, newly_added_after_empty_lock, http_proxy_settings, https_proxy_settings, semver_matching_lt, semver_matching_lte, semver_matching_gt, valid_version, {group, git}, {group, pkg}].
 
 groups() ->
     [{all, [], [flat, pick_highest_left, pick_highest_right,
@@ -29,6 +29,14 @@ init_per_group(_, Config) ->
 end_per_group(_, Config) ->
     Config.
 
+init_per_testcase(valid_version, Config) ->
+    rebar_test_utils:init_rebar_state(Config);
+init_per_testcase(semver_matching_lt, Config) ->
+    rebar_test_utils:init_rebar_state(Config);
+init_per_testcase(semver_matching_lte, Config) ->
+    rebar_test_utils:init_rebar_state(Config);
+init_per_testcase(semver_matching_gt, Config) ->
+    rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(newly_added_after_empty_lock, Config) ->
     rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(newly_added_dep, Config) ->
@@ -49,14 +57,14 @@ init_per_testcase(http_proxy_settings, Config) ->
     %% Insert proxy variables into config
     rebar_test_utils:create_config(GlobalConfigDir,
                                    [{http_proxy, "http://localhost:1234"}
-    ]),
+                                   ]),
     rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(https_proxy_settings, Config) ->
     SupportsHttpsProxy = case erlang:system_info(otp_release) of
-        "R16"++_ -> true;
-        "R"++_ -> false;
-        _ -> true % 17 and up don't have a "R" in the version
-    end,
+                             "R16"++_ -> true;
+                             "R"++_ -> false;
+                             _ -> true % 17 and up don't have a "R" in the version
+                         end,
     if not SupportsHttpsProxy ->
             {skip, https_proxy_unsupported_before_R16};
        SupportsHttpsProxy ->
@@ -73,20 +81,20 @@ init_per_testcase(https_proxy_settings, Config) ->
             %% Insert proxy variables into config
             rebar_test_utils:create_config(GlobalConfigDir,
                                            [{https_proxy, "http://localhost:1234"}
-            ]),
+                                           ]),
             rebar_test_utils:init_rebar_state(Config)
     end;
 init_per_testcase(Case, Config) ->
     {Deps, Warnings, Expect} = deps(Case),
     Expected = case Expect of
-        {ok, List} -> {ok, format_expected_deps(List)};
-        {error, Reason} -> {error, Reason}
-    end,
+                   {ok, List} -> {ok, format_expected_deps(List)};
+                   {error, Reason} -> {error, Reason}
+               end,
     DepsType = ?config(deps_type, Config),
     mock_warnings(),
     [{expect, Expected},
      {warnings, Warnings}
-    | setup_project(Case, Config, rebar_test_utils:expand_deps(DepsType, Deps))].
+     | setup_project(Case, Config, rebar_test_utils:expand_deps(DepsType, Deps))].
 
 end_per_testcase(https_proxy_settings, Config) ->
     meck:unload(rebar_dir),
@@ -100,8 +108,8 @@ end_per_testcase(_, Config) ->
 
 format_expected_deps(Deps) ->
     [case Dep of
-        {N,V} -> {dep, N, V};
-        N -> {dep, N}
+         {N,V} -> {dep, N, V};
+         N -> {dep, N}
      end || Dep <- Deps].
 
 %% format:
@@ -208,7 +216,7 @@ sub_app_deps(Config) ->
 
     SubAppsDir = filename:join([AppDir, "apps", Name]),
     SubDeps = rebar_test_utils:top_level_deps(rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
-                                              ,{"b", "2.0.0", []}])),
+                                                                                ,{"b", "2.0.0", []}])),
     rebar_test_utils:create_app(SubAppsDir, Name, Vsn, [kernel, stdlib]),
     rebar_test_utils:create_config(SubAppsDir, [{deps, SubDeps}]),
 
@@ -242,12 +250,12 @@ newly_added_dep(Config) ->
 
     %% Add a and c to top level
     TopDeps2 = rebar_test_utils:top_level_deps(rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
-                                               ,{"c", "2.0.0", []}
-                                               ,{"b", "1.0.0", []}])),
+                                                                                 ,{"c", "2.0.0", []}
+                                                                                 ,{"b", "1.0.0", []}])),
     {ok, RebarConfig2} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, TopDeps2}])),
     LockFile = filename:join(AppDir, "rebar.lock"),
     RebarConfig3 = rebar_config:merge_locks(RebarConfig2,
-                                           rebar_config:consult_lock_file(LockFile)),
+                                            rebar_config:consult_lock_file(LockFile)),
 
     %% a should now be installed and c should not change
     rebar_test_utils:run_and_check(
@@ -277,7 +285,7 @@ newly_added_after_empty_lock(Config) ->
     {ok, RebarConfig2} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, TopDeps2}])),
     LockFile = filename:join(AppDir, "rebar.lock"),
     RebarConfig3 = rebar_config:merge_locks(RebarConfig2,
-                                           rebar_config:consult_lock_file(LockFile)),
+                                            rebar_config:consult_lock_file(LockFile)),
 
     %% a should now be installed and c should not change
     rebar_test_utils:run_and_check(
@@ -302,6 +310,74 @@ https_proxy_settings(_Config) ->
     %% Assert variable is right
     ?assertEqual({ok,{{"localhost", 1234}, []}},
                  httpc:get_option(https_proxy, rebar)).
+
+
+semver_matching_lt(_Config) ->
+    Dep = <<"test">>,
+    Dep1 = {Dep, <<"1.0.0">>, Dep},
+    MaxVsn = <<"0.2.0">>,
+    Vsns = [<<"0.1.7">>, <<"0.1.9">>, <<"0.1.8">>, <<"0.2.0">>, <<"0.2.1">>],
+    ?assertEqual([{Dep, <<"0.1.9">>}],
+                 rebar_prv_update:cmpl_(undefined, MaxVsn, Vsns, [], Dep1,
+                                        fun ec_semver:lt/2)).
+
+semver_matching_lte(_Config) ->
+    Dep = <<"test">>,
+    Dep1 = {Dep, <<"1.0.0">>, Dep},
+    MaxVsn = <<"0.2.0">>,
+    Vsns = [<<"0.1.7">>, <<"0.1.9">>, <<"0.1.8">>, <<"0.2.0">>, <<"0.2.1">>],
+    ?assertEqual([{Dep, <<"0.2.0">>}],
+                 rebar_prv_update:cmpl_(undefined, MaxVsn, Vsns, [], Dep1,
+                                        fun ec_semver:lte/2)).
+
+semver_matching_gt(_Config) ->
+    Dep = <<"test">>,
+    Dep1 = {Dep, <<"1.0.0">>, Dep},
+    MaxVsn = <<"0.2.0">>,
+    Vsns = [<<"0.1.7">>, <<"0.1.9">>, <<"0.1.8">>, <<"0.2.0">>, <<"0.2.1">>],
+    ?assertEqual([{Dep, <<"0.2.1">>}],
+                 rebar_prv_update:cmp_(undefined, MaxVsn, Vsns, [], Dep1,
+                                       fun ec_semver:gt/2)).
+semver_matching_gte(_Config) ->
+    Dep = <<"test">>,
+    Dep1 = {Dep, <<"1.0.0">>, Dep},
+    MaxVsn = <<"0.2.0">>,
+    Vsns = [<<"0.1.7">>, <<"0.1.9">>, <<"0.1.8">>, <<"0.2.0">>],
+    ?assertEqual([{Dep, <<"0.2.0">>}],
+                 rebar_prv_update:cmp_(undefined, MaxVsn, Vsns, [], Dep1,
+                                       fun ec_semver:gt/2)).
+
+valid_version(_Config) ->
+    ?assert(rebar_prv_update:valid_vsn(<<"0.1">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<" 0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"  0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"<0.1">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"<0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"< 0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"<  0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<">0.1">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<">0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"> 0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<">  0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"<=0.1">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"<=0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"<= 0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"<=  0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<">=0.1">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<">=0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<">= 0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<">=  0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"==0.1">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"==0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"== 0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"==  0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"~>0.1">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"~>0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"~> 0.1.0">>)),
+    ?assert(rebar_prv_update:valid_vsn(<<"~>  0.1.0">>)),
+    ?assertNot(rebar_prv_update:valid_vsn(<<"> 0.1.0 and < 0.2.0">>)),
+    ok.
 
 
 run(Config) ->
