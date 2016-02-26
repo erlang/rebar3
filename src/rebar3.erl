@@ -265,8 +265,8 @@ handle_error({error, rebar_abort}) ->
 handle_error({error, {Module, Reason}}) ->
     case code:which(Module) of
         non_existing ->
-            file:write_file("rebar3.crashdump", io_lib:fwrite("~p: ~p~n~p~n~n", [Module, Reason, erlang:get_stacktrace()])),
-            ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace rebar3.crashdump", []),
+            ?CRASHDUMP("~p: ~p~n~p~n~n", [Module, Reason, erlang:get_stacktrace()]),
+            ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to stacktrace or consult rebar3.crashdump", []),
             ?DEBUG("Uncaught error: ~p ~p", [Module, Reason]),
             ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []);
         _ ->
@@ -279,7 +279,7 @@ handle_error({error, Error}) when is_list(Error) ->
 handle_error(Error) ->
     %% Nothing should percolate up from rebar_core;
     %% Dump this error to console
-    file:write_file("rebar3.crashdump", io_lib:fwrite("Error: ~p~n~p~n~n", [Error, erlang:get_stacktrace()])),
+    ?CRASHDUMP("Error: ~p~n~p~n~n", [Error, erlang:get_stacktrace()]),
     ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace or consult rebar3.crashdump", []),
     ?DEBUG("Uncaught error: ~p", [Error]),
     case erlang:get_stacktrace() of
