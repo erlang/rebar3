@@ -10,6 +10,7 @@
          escriptize_artifacts/1,
          run_hooks_once/1,
          run_hooks_for_plugins/1,
+         eunit_app_hooks/1,
          deps_hook_namespace/1]).
 
 -include_lib("common_test/include/ct.hrl").
@@ -33,7 +34,7 @@ end_per_testcase(_, _Config) ->
 
 all() ->
     [build_and_clean_app, run_hooks_once, escriptize_artifacts,
-     run_hooks_for_plugins, deps_hook_namespace].
+     run_hooks_for_plugins, deps_hook_namespace, eunit_app_hooks].
 
 %% Test post provider hook cleans compiled project app, leaving it invalid
 build_and_clean_app(Config) ->
@@ -118,6 +119,25 @@ deps_hook_namespace(Config) ->
         Config, RebarConfig, ["compile"],
         {ok, [{dep, "some_dep"}]}
     ).
+
+%% Checks that a hook that is defined on an app (not a top level hook of a project with subapps) is run
+eunit_app_hooks(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RConfFile =
+        rebar_test_utils:create_config(AppDir,
+                                       [
+                                       {escript_name, list_to_atom(Name)}
+                                       ,{provider_hooks, [{post, [{eunit, escriptize}]}]}
+                                       ]),
+    {ok, RConf} = file:consult(RConfFile),
+
+    rebar_test_utils:run_and_check(Config, RConf,
+                                  ["eunit"], {ok, [{app, Name, valid}
+                                               ,{file, filename:join([AppDir, "_build/test/bin", Name])}]}).
 
 run_hooks_for_plugins(Config) ->
     AppDir = ?config(apps, Config),
