@@ -67,22 +67,28 @@ deps(Name, Vsn, State) ->
         deps_(Name, Vsn, State)
     catch
         _:_ ->
-            handle_missing_package(Name, Vsn, State)
+            handle_missing_package({Name, Vsn}, State, fun(State1) -> deps_(Name, Vsn, State1) end)
     end.
 
 deps_(Name, Vsn, State) ->
     ?MODULE:verify_table(State),
     ets:lookup_element(?PACKAGE_TABLE, {ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)}, 2).
 
-handle_missing_package(Name, Vsn, State) ->
-    ?INFO("Package ~s-~s not found. Fetching registry updates and trying again...", [Name, Vsn]),
+handle_missing_package(Dep, State, Fun) ->
+    case Dep of
+        {Name, Vsn} ->
+            ?INFO("Package ~s-~s not found. Fetching registry updates and trying again...", [Name, Vsn]);
+        _ ->
+            ?INFO("Package ~p not found. Fetching registry updates and trying again...", [Dep])
+    end,
+
     {ok, State1} = rebar_prv_update:do(State),
     try
-        deps_(Name, Vsn, State1)
+        Fun(State1)
     catch
         _:_ ->
             %% Even after an update the package is still missing, time to error out
-            throw(?PRV_ERROR({missing_package, ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)}))
+            throw(?PRV_ERROR({missing_package, Dep}))
     end.
 
 registry_dir(State) ->
@@ -144,6 +150,23 @@ find_highest_matching(Dep, Constraint, Table, State) ->
     find_highest_matching(undefined, undefined, Dep, Constraint, Table, State).
 
 find_highest_matching(Pkg, PkgVsn, Dep, Constraint, Table, State) ->
+    try find_highest_matching_(Pkg, PkgVsn, Dep, Constraint, Table, State) of
+        none ->
+            handle_missing_package(Dep, State,
+                                   fun(State1) ->
+                                       find_highest_matching_(Pkg, PkgVsn, Dep, Constraint, Table, State1)
+                                   end);
+        Result ->
+            Result
+    catch
+        _:_ ->
+            handle_missing_package(Dep, State,
+                                   fun(State1) ->
+                                       find_highest_matching_(Pkg, PkgVsn, Dep, Constraint, Table, State1)
+                                   end)
+    end.
+
+find_highest_matching_(Pkg, PkgVsn, Dep, Constraint, Table, State) ->
     try find_all(Dep, Table, State) of
         {ok, [Vsn]} ->
             handle_single_vsn(Pkg, PkgVsn, Dep, Vsn, Constraint);
@@ -193,8 +216,10 @@ handle_single_vsn(Pkg, PkgVsn, Dep, Vsn, Constraint) ->
             {ok, Vsn}
     end.
 
-format_error({missing_package, Package, Version}) ->
-    io_lib:format("Package not found in registry: ~s-~s.", [Package, Version]).
+format_error({missing_package, {Name, Vsn}}) ->
+    io_lib:format("Package not found in registry: ~s-~s.", [ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)]);
+format_error({missing_package, Dep}) ->
+    io_lib:format("Package not found in registry: ~p.", [Dep]).
 
 verify_table(State) ->
     ets:info(?PACKAGE_TABLE, named_table) =:= true orelse load_and_verify_version(State).
