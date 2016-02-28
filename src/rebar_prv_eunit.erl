@@ -457,10 +457,10 @@ eunit_opts(_State) ->
     [{app, undefined, "app", string, help(app)},
      {application, undefined, "application", string, help(app)},
      {cover, $c, "cover", boolean, help(cover)},
-     {dir, undefined, "dir", string, help(dir)},
-     {file, undefined, "file", string, help(file)},
-     {module, undefined, "module", string, help(module)},
-     {suite, undefined, "suite", string, help(module)},
+     {dir, $d, "dir", string, help(dir)},
+     {file, $f, "file", string, help(file)},
+     {module, $m, "module", string, help(module)},
+     {suite, $s, "suite", string, help(module)},
      {verbose, $v, "verbose", boolean, help(verbose)}].
 
 help(app)     -> "Comma separated list of application test suites to run. Equivalent to `[{application, App}]`.";
