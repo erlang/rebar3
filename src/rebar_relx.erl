@@ -25,7 +25,7 @@ do(Module, Command, Provider, State) ->
     AllOptions = string:join([Command | Options], " "),
     Cwd = rebar_state:dir(State),
     Providers = rebar_state:providers(State),
-    rebar_hooks:run_all_hooks(Cwd, pre, Provider, Providers, State),
+    rebar_hooks:run_project_and_app_hooks(Cwd, pre, Provider, Providers, State),
     try
         case rebar_state:get(State, relx, []) of
             [] ->
@@ -37,7 +37,7 @@ do(Module, Command, Provider, State) ->
                           ,{config, Config1}
                           ,{caller, api} | output_dir(OutputDir, Options)], AllOptions)
         end,
-        rebar_hooks:run_all_hooks(Cwd, post, Provider, Providers, State),
+        rebar_hooks:run_project_and_app_hooks(Cwd, post, Provider, Providers, State),
         {ok, State}
     catch
         throw:T ->

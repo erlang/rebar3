@@ -52,14 +52,16 @@ do(State, Tests) ->
     %% Run ct provider prehooks
     Providers = rebar_state:providers(State),
     Cwd = rebar_dir:get_cwd(),
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
+
+    %% Run ct provider pre hooks for all project apps and top level project hooks
+    rebar_hooks:run_project_and_app_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
     case Tests of
         {ok, T} ->
             case run_tests(State, T) of
                 ok    ->
-                    %% Run ct provider posthooks
-                    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State),
+                    %% Run ct provider post hooks for all project apps and top level project hooks
+                    rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State),
                     rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
                     {ok, State};
                 Error ->
@@ -653,4 +655,3 @@ help(verbose) ->
     "Verbose output";
 help(_) ->
     "".
-
