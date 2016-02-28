@@ -56,14 +56,14 @@ do(State, Tests) ->
     %% Run eunit provider prehooks
     Providers = rebar_state:providers(State),
     Cwd = rebar_dir:get_cwd(),
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
+    rebar_hooks:run_project_and_app_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
     case validate_tests(State, Tests) of
         {ok, T} ->
             case run_tests(State, T) of
                 {ok, State1} ->
                     %% Run eunit provider posthooks
-                    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State1),
+                    rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State1),
                     rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
                     {ok, State1};
                 Error ->
@@ -190,7 +190,7 @@ dedupe_tests({AppMods, TestMods}) ->
     %% in AppMods that will trigger it
     F = fun(Mod) ->
         M = filename:basename(Mod, ".erl"),
-        MatchesTest = fun(Dir) -> filename:basename(Dir, ".erl") ++ "_tests" == M end, 
+        MatchesTest = fun(Dir) -> filename:basename(Dir, ".erl") ++ "_tests" == M end,
         case lists:any(MatchesTest, AppMods) of
             false -> {true, {module, list_to_atom(M)}};
             true  -> false

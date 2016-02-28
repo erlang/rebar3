@@ -2,6 +2,7 @@
 
 -export([run_all_hooks/5
         ,run_all_hooks/6
+        ,run_project_and_app_hooks/5
         ,format_error/1]).
 
 -include("rebar.hrl").
@@ -19,6 +20,11 @@ run_all_hooks(Dir, Type, Command, Providers, AppInfo, State) ->
 run_all_hooks(Dir, Type, Command, Providers, State) ->
     run_provider_hooks(Dir, Type, Command, Providers, rebar_state:opts(State), State),
     run_hooks(Dir, Type, Command, rebar_state:opts(State), State).
+
+run_project_and_app_hooks(Dir, Type, Command, Providers, State) ->
+    ProjectApps = rebar_state:project_apps(State),
+    [rebar_hooks:run_all_hooks(Dir, Type, Command, Providers, AppInfo, State) || AppInfo <- ProjectApps],
+    run_all_hooks(Dir, Type, Command, Providers, State).
 
 run_provider_hooks(Dir, Type, Command, Providers, Opts, State) ->
     case rebar_opts:get(Opts, provider_hooks, []) of
