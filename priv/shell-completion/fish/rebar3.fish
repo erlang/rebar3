@@ -110,6 +110,7 @@ complete -f -c 'rebar3' -n '__fish_rebar3_using_command ct' -l abort_if_missing_
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command ct' -l multiply_timetraps -d "Multiply timetraps."
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command ct' -l scale_timetraps -d "Scale timetraps."
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command ct' -l create_priv_dir -d "Create priv dir (auto_per_run | auto_per_tc | manual_per_tc)."
+complete -f -c 'rebar3' -n '__fish_rebar3_using_command ct' -l include -d "Directories containing additional include files."
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command ct' -s v -l verbose -d "Enable verbose output. Default: false."
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command ct' -l auto_compile -d "Let common test compile test suites instead of rebar3."
 

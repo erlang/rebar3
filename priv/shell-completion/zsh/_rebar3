@@ -62,6 +62,7 @@ _rebar3 () {
                         '(--multiply_timetraps)--multiply_timetraps' \
                         '(--scale_timetraps)--scale_timetraps' \
                         '(--create_priv_dir)--create_priv_dir' \
+                        `(--include)--include[Directories containing additional include files]:includes' \
                         '(-v --verbose)'{-v,--verbose}'[Print coverage analysis]' \
                         '(--auto_compile)--auto_compile' \
                     && ret=0

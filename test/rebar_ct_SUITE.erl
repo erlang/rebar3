@@ -38,6 +38,7 @@
          cmd_multiply_timetraps/1,
          cmd_scale_timetraps/1,
          cmd_create_priv_dir/1,
+         cmd_include_dir/1,
          cfg_opts/1,
          cfg_arbitrary_opts/1,
          cfg_test_spec/1,
@@ -96,7 +97,8 @@ groups() -> [{basic_app, [], [basic_app_default_dirs,
                             cmd_abort_if_missing_suites,
                             cmd_multiply_timetraps,
                             cmd_scale_timetraps,
-                            cmd_create_priv_dir]},
+                            cmd_create_priv_dir,
+                            cmd_include_dir]},
              {cover, [], [cover_compiled]}].
 
 init_per_group(basic_app, Config) ->
@@ -212,7 +214,7 @@ init_per_group(ct_opts, Config) ->
 
     {ok, State} = rebar_test_utils:run_and_check(C, [], ["as", "test", "lock"], return),
 
-    [{result, State}|C];
+    [{result, State}, {name, Name}|C];
 init_per_group(cover, Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_opts"),
 
@@ -701,7 +703,6 @@ suite_at_app_root(Config) ->
 data_dir_correct(Config) ->
     DataDir = ?config(data_dir, Config),
     Parts = filename:split(DataDir),
-    ct:pal(Parts),
     ["rebar_ct_SUITE_data","test","rebar","lib","test","_build"|_] = lists:reverse(Parts).
 
 cmd_label(Config) ->
@@ -974,6 +975,29 @@ cmd_create_priv_dir(Config) ->
 
     true = lists:member({create_priv_dir, manual_per_tc}, TestOpts).
 
+cmd_include_dir(Config) ->
+    State = ?config(result, Config),
+    AppDir = ?config(apps, Config),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+    {ok, GetOptResult} = getopt:parse(GetOptSpec, ["--include=foo/bar/baz,qux"]),
+
+    NewState = rebar_state:command_parsed_args(State, GetOptResult),
+
+    Tests = rebar_prv_common_test:prepare_tests(NewState),
+    {ok, _} = rebar_prv_common_test:compile(NewState, Tests),
+
+    Name = ?config(name, Config),
+    Beam = filename:join([AppDir, "_build", "test", "lib", Name, "ebin", Name ++ ".beam"]),
+
+    {ok, {_, [{compile_info, Info}]}} = beam_lib:chunks(Beam, [compile_info]),
+    CompileOpts = proplists:get_value(options, Info),
+    true = lists:member({i, "foo/bar/baz"}, CompileOpts),
+    true = lists:member({i, "qux"}, CompileOpts).
+    
 cfg_opts(Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_opts_"),
 
