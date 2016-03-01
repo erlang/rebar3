@@ -87,6 +87,7 @@ run_hooks(Dir, post, Command, Opts, State) ->
 run_hooks(Dir, Type, Command, Opts, State) ->
     case rebar_opts:get(Opts, Type, []) of
         [] ->
+            ?DEBUG("run_hooks(~p, ~p, ~p) -> no hooks defined\n", [Dir, Type, Command]),
             ok;
         Hooks ->
             Env = create_env(State, Opts),
