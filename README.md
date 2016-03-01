@@ -169,3 +169,4 @@ General rebar community resources and links:
 - [Documentation](http://www.rebar3.org/v3.0/docs)
 
 To contribute to rebar3, please refer to [CONTRIBUTING](CONTRIBUTING.md).
+

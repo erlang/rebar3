@@ -36,6 +36,8 @@
 
          deps_names/1,
 
+         to_list/1,
+
          resources/1, resources/2, add_resource/2,
          providers/1, providers/2, add_provider/2,
          allow_provider_overrides/1, allow_provider_overrides/2
@@ -417,6 +419,21 @@ create_logic_providers(ProviderModules, State0) ->
             ?DEBUG("~p: ~p ~p", [C, T, erlang:get_stacktrace()]),
             throw({error, "Failed creating providers. Run with DEBUG=1 for stacktrace."})
     end.
+
+to_list(#state_t{} = State) ->
+    Fields = record_info(fields, state_t),
+    Values = tl(tuple_to_list(State)),
+    DictSz = tuple_size(dict:new()),
+    lists:zip(Fields, [reformat(I, DictSz) || I <- Values]).
+
+reformat({K,V}, DSz) when is_list(V) ->
+    {K, [reformat(I, DSz) || I <- V]};
+reformat(V, DSz) when is_tuple(V), element(1,V) =:= dict, tuple_size(V) =:= DSz ->
+    [reformat(I, DSz) || I <- dict:to_list(V)];
+reformat({K,V}, DSz) when is_tuple(V), element(1,V) =:= dict, tuple_size(V) =:= DSz ->
+    {K, [reformat(I, DSz) || I <- dict:to_list(V)]};
+reformat(Other, _DSz) ->
+    Other.
 
 %% ===================================================================
 %% Internal functions
