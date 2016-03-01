@@ -1027,7 +1027,7 @@ cfg_test_spec(Config) ->
 
     {error, {rebar_prv_common_test, Error}} = rebar_prv_common_test:prepare_tests(State),
 
-    {badconfig, "Test specs not supported"} = Error.
+    {badconfig, "Test specs not supported. See http://www.rebar3.org/docs/running-tests#common-test"} = Error.
 
 cfg_cover_spec(Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_cover_spec_opts_"),
@@ -1044,7 +1044,7 @@ cfg_cover_spec(Config) ->
 
     {error, {rebar_prv_common_test, Error}} = rebar_prv_common_test:prepare_tests(State),
 
-    {badconfig, "Cover specs not supported"} = Error.
+    {badconfig, "Cover specs not supported. See http://www.rebar3.org/docs/running-tests#common-test"} = Error.
 
 cfg_atom_suites(Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_atom_suites_"),
