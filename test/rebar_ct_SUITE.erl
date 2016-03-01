@@ -41,6 +41,7 @@
          cfg_opts/1,
          cfg_arbitrary_opts/1,
          cfg_test_spec/1,
+         cfg_cover_spec/1,
          cfg_atom_suites/1,
          cover_compiled/1,
          misspecified_ct_opts/1,
@@ -56,7 +57,7 @@ all() -> [{group, basic_app},
           {group, ct_opts},
           {group, cover},
           cfg_opts, cfg_arbitrary_opts,
-          cfg_test_spec,
+          cfg_test_spec, cfg_cover_spec,
           cfg_atom_suites,
           misspecified_ct_opts,
           misspecified_ct_compile_opts,
@@ -1027,6 +1028,23 @@ cfg_test_spec(Config) ->
     {error, {rebar_prv_common_test, Error}} = rebar_prv_common_test:prepare_tests(State),
 
     {badconfig, "Test specs not supported"} = Error.
+
+cfg_cover_spec(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_cover_spec_opts_"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name("ct_cfg_cover_spec_opts_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{ct_opts, [{cover, "spec/foo.spec"}]}],
+
+    {ok, State} = rebar_test_utils:run_and_check(C, RebarConfig, ["as", "test", "lock"], return),
+
+    {error, {rebar_prv_common_test, Error}} = rebar_prv_common_test:prepare_tests(State),
+
+    {badconfig, "Cover specs not supported"} = Error.
 
 cfg_atom_suites(Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_atom_suites_"),
