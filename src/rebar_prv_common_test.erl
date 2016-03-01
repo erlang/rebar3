@@ -131,6 +131,8 @@ transform_opts([{testcase, Cases}|Rest], Acc) ->
     transform_opts(Rest, [{testcase, split_string(Cases)}|Acc]);
 transform_opts([{config, Configs}|Rest], Acc) ->
     transform_opts(Rest, [{config, split_string(Configs)}|Acc]);
+transform_opts([{include, Includes}|Rest], Acc) ->
+    transform_opts(Rest, [{include, split_string(Includes)}|Acc]);
 transform_opts([{logopts, LogOpts}|Rest], Acc) ->
     transform_opts(Rest, [{logopts, lists:map(fun(P) -> list_to_atom(P) end, split_string(LogOpts))}|Acc]);
 transform_opts([{force_stop, "true"}|Rest], Acc) ->
@@ -243,8 +245,8 @@ application_dirs([App|Rest], Acc) ->
     end.
 
 compile(State, {ok, _} = Tests) ->
-    %% inject `ct_first_files` and `ct_compile_opts` into the applications
-    %% to be compiled
+    %% inject `ct_first_files`, `ct_compile_opts` and `include` (from `ct_opts`
+    %% and command line options) into the applications to be compiled
     case inject_ct_state(State, Tests) of
         {ok, NewState} -> do_compile(NewState);
         Error          -> Error
@@ -264,22 +266,22 @@ do_compile(State) ->
 
 inject_ct_state(State, {ok, Tests}) ->
     Apps = rebar_state:project_apps(State),
-    case inject_ct_state(State, Apps, []) of
+    case inject_ct_state(State, Tests, Apps, []) of
         {ok, {NewState, ModdedApps}} ->
             test_dirs(NewState, ModdedApps, Tests);
         {error, _} = Error           -> Error
     end;
 inject_ct_state(_State, Error) -> Error.
 
-inject_ct_state(State, [App|Rest], Acc) ->
-    case inject(rebar_app_info:opts(App), State) of
+inject_ct_state(State, Tests, [App|Rest], Acc) ->
+    case inject(rebar_app_info:opts(App), State, Tests) of
         {error, _} = Error -> Error;
         NewOpts            ->
             NewApp = rebar_app_info:opts(App, NewOpts),
-            inject_ct_state(State, Rest, [NewApp|Acc])
+            inject_ct_state(State, Tests, Rest, [NewApp|Acc])
     end;
-inject_ct_state(State, [], Acc) ->
-    case inject(rebar_state:opts(State), State) of
+inject_ct_state(State, Tests, [], Acc) ->
+    case inject(rebar_state:opts(State), State, Tests) of
         {error, _} = Error -> Error;
         NewOpts            ->
           {ok, {rebar_state:opts(State, NewOpts), lists:reverse(Acc)}}
@@ -292,24 +294,35 @@ opts(Opts, Key, Default) ->
             ?PRV_ERROR({badconfig, {"Value `~p' of option `~p' must be a list", {Wrong, Key}}})
     end.
 
-inject(Opts, State) -> erl_opts(Opts, State).
+inject(Opts, State, Tests) -> erl_opts(Opts, State, Tests).
 
-erl_opts(Opts, State) ->
+erl_opts(Opts, State, Tests) ->
     %% append `ct_compile_opts` to app defined `erl_opts`
     ErlOpts = opts(Opts, erl_opts, []),
     CTOpts = opts(Opts, ct_compile_opts, []),
     case add_transforms(append(CTOpts, ErlOpts), State) of
-        {error, Error} -> {error, Error};
-        NewErlOpts     -> first_files(rebar_opts:set(Opts, erl_opts, NewErlOpts))
+        {error, _} = Error -> Error;
+        NewErlOpts         -> first_files(rebar_opts:set(Opts, erl_opts, NewErlOpts), Tests)
     end.
 
-first_files(Opts) ->
+first_files(Opts, Tests) ->
     %% append `ct_first_files` to app defined `erl_first_files`
     FirstFiles = opts(Opts, erl_first_files, []),
     CTFirstFiles = opts(Opts, ct_first_files, []),
     case append(CTFirstFiles, FirstFiles) of
         {error, _} = Error -> Error;
-        NewFirstFiles  -> rebar_opts:set(Opts, erl_first_files, NewFirstFiles)
+        NewFirstFiles      -> include_files(rebar_opts:set(Opts, erl_first_files, NewFirstFiles), Tests)
+    end.
+
+include_files(Opts, Tests) ->
+    %% append include dirs from command line and `ct_opts` to app defined
+    %% `erl_opts`
+    ErlOpts = opts(Opts, erl_opts, []),
+    Includes = proplists:get_value(include, Tests, []),
+    Is = lists:map(fun(I) -> {i, I} end, Includes),
+    case append(Is, ErlOpts) of
+        {error, _} = Error -> Error;
+        NewIncludes        -> rebar_opts:set(Opts, erl_opts, NewIncludes)
     end.
 
 append({error, _} = Error, _) -> Error;
@@ -597,6 +610,7 @@ ct_opts(_State) ->
      {multiply_timetraps, undefined, "multiply_timetraps", integer, help(multiple_timetraps)}, %% Integer
      {scale_timetraps, undefined, "scale_timetraps", boolean, help(scale_timetraps)},
      {create_priv_dir, undefined, "create_priv_dir", string, help(create_priv_dir)},
+     {include, undefined, "include", string, help(include)},
      {readable, undefined, "readable", boolean, help(readable)},
      {verbose, $v, "verbose", boolean, help(verbose)}
     ].
@@ -647,6 +661,8 @@ help(scale_timetraps) ->
     "Scale timetraps";
 help(create_priv_dir) ->
     "Create priv dir (auto_per_run | auto_per_tc | manual_per_tc)";
+help(include) ->
+    "Directories containing additional include files";
 help(readable) ->
     "Shows test case names and only displays logs to shell on failures";
 help(verbose) ->
