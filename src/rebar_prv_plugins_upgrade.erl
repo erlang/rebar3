@@ -78,13 +78,14 @@ upgrade(Plugin, State) ->
 
 find_plugin(Plugin, Profiles, State) ->
     ec_lists:search(fun(Profile) ->
-                            Plugins = rebar_state:get(State, {plugins, Profile}, []),
-                            case rebar_utils:tup_find(list_to_atom(Plugin), Plugins) of
-                                false ->
-                                    not_found;
-                                P ->
-                                    {ok, P}
-                            end
+                        Plugins = rebar_state:get(State, {plugins, Profile}, []) ++
+                            rebar_state:get(State, {project_plugins, Profile}, []),
+                        case rebar_utils:tup_find(list_to_atom(Plugin), Plugins) of
+                            false ->
+                                not_found;
+                            P ->
+                                {ok, P}
+                        end
                     end, Profiles).
 
 build_plugin(AppInfo, Apps, State) ->
