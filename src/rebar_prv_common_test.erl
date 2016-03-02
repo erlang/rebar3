@@ -168,12 +168,15 @@ cfgopts(State) ->
     end.
 
 ensure_opts([], Acc) -> lists:reverse(Acc);
-ensure_opts([{test_spec, _}|_Rest], _Acc) ->
-    ?PRV_ERROR({badconfig, "Test specs not supported. See http://www.rebar3.org/docs/running-tests#common-test"});
-ensure_opts([{cover, _}|_Rest], _Acc) ->
-    ?PRV_ERROR({badconfig, "Cover specs not supported. See http://www.rebar3.org/docs/running-tests#common-test"});
-ensure_opts([{auto_compile, _}|_Rest], _Acc) ->
-    ?PRV_ERROR({badconfig, "Auto compile not supported"});
+ensure_opts([{test_spec, _}|Rest], Acc) ->
+    ?WARN("Test specs not supported. See http://www.rebar3.org/docs/running-tests#common-test", []),
+    ensure_opts(Rest, Acc);
+ensure_opts([{cover, _}|Rest], Acc) ->
+    ?WARN("Cover specs not supported. See http://www.rebar3.org/docs/running-tests#common-test", []),
+    ensure_opts(Rest, Acc);
+ensure_opts([{auto_compile, _}|Rest], Acc) ->
+    ?WARN("Auto compile not supported", []),
+    ensure_opts(Rest, Acc);
 ensure_opts([{suite, Suite}|Rest], Acc) when is_integer(hd(Suite)) ->
     ensure_opts(Rest, [{suite, Suite}|Acc]);
 ensure_opts([{suite, Suite}|Rest], Acc) when is_atom(Suite) ->
