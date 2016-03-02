@@ -11,6 +11,7 @@
          complex_plugins/1,
          list/1,
          upgrade/1,
+         upgrade_project_plugin/1,
          sub_app_plugins/1,
          sub_app_plugin_overrides/1,
          project_plugins/1]).
@@ -35,7 +36,8 @@ end_per_testcase(_, _Config) ->
     catch meck:unload().
 
 all() ->
-    [compile_plugins, compile_global_plugins, complex_plugins, list, upgrade, sub_app_plugins, sub_app_plugin_overrides, project_plugins].
+    [compile_plugins, compile_global_plugins, complex_plugins, list, upgrade, upgrade_project_plugin,
+     sub_app_plugins, sub_app_plugin_overrides, project_plugins].
 
 %% Tests that compiling a project installs and compiles the plugins of deps
 compile_plugins(Config) ->
@@ -189,6 +191,45 @@ upgrade(Config) ->
     ]),
 
     RConfFile = rebar_test_utils:create_config(AppDir, [{plugins, [list_to_atom(PkgName)]}]),
+    {ok, RConf} = file:consult(RConfFile),
+
+    %% Build with deps.
+    rebar_test_utils:run_and_check(
+        Config, RConf, ["compile"],
+        {ok, [{app, Name}, {plugin, PkgName, <<"0.1.1">>}]}
+     ),
+
+    catch mock_pkg_resource:unmock(),
+    mock_pkg_resource:mock([
+        {pkgdeps, [{{iolist_to_binary(PkgName), <<"0.1.0">>}, []},
+                   {{iolist_to_binary(PkgName), <<"0.0.1">>}, []},
+                   {{iolist_to_binary(PkgName), <<"0.1.3">>}, []},
+                   {{iolist_to_binary(PkgName), <<"0.1.1">>}, []}]},
+        {upgrade, [PkgName]}
+    ]),
+
+    %% Build with deps.
+    rebar_test_utils:run_and_check(
+        Config, RConf, ["plugins", "upgrade", PkgName],
+        {ok, [{app, Name}, {plugin, PkgName, <<"0.1.3">>}]}
+     ).
+
+upgrade_project_plugin(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    PkgName = rebar_test_utils:create_random_name("pkg1_"),
+    mock_git_resource:mock([]),
+    mock_pkg_resource:mock([
+        {pkgdeps, [{{iolist_to_binary(PkgName), <<"0.1.0">>}, []},
+                   {{iolist_to_binary(PkgName), <<"0.0.1">>}, []},
+                   {{iolist_to_binary(PkgName), <<"0.1.1">>}, []}]}
+    ]),
+
+    RConfFile = rebar_test_utils:create_config(AppDir, [{project_plugins, [list_to_atom(PkgName)]}]),
     {ok, RConf} = file:consult(RConfFile),
 
     %% Build with deps.
