@@ -337,19 +337,18 @@ state_from_global_config(Config, GlobalConfigFile) ->
 
 test_state(State) ->
     ErlOpts = rebar_state:get(State, erl_opts, []),
-    TestOpts = safe_define_test_macro(ErlOpts, 'TEST'),
-    MoreTestOpts = safe_define_test_macro(ErlOpts, 'EUNIT'),
-    [{extra_src_dirs, ["test"]}, {erl_opts, TestOpts ++ MoreTestOpts}].
+    TestOpts = safe_define_test_macro(ErlOpts),
+    [{extra_src_dirs, ["test"]}, {erl_opts, TestOpts}].
 
-safe_define_test_macro(Opts, Macro) ->
+safe_define_test_macro(Opts) ->
     %% defining a compile macro twice results in an exception so
-    %% make sure 'TEST' or 'EUNIT' is only defined once
-    case test_defined(Opts, Macro) of
+    %% make sure 'TEST' is only defined once
+    case test_defined(Opts) of
        true  -> [];
-       false -> [{d, Macro}]
+       false -> [{d, 'TEST'}]
     end.
 
-test_defined([{d, Macro}|_], Macro) -> true;
-test_defined([{d, Macro, true}|_], Macro) -> true;
-test_defined([_|Rest], Macro) -> test_defined(Rest, Macro);
-test_defined([], _) -> false.
+test_defined([{d, 'TEST'}|_]) -> true;
+test_defined([{d, 'TEST', true}|_]) -> true;
+test_defined([_|Rest]) -> test_defined(Rest);
+test_defined([]) -> false.
