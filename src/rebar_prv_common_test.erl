@@ -329,8 +329,26 @@ include_files(Opts, Tests) ->
     Is = lists:map(fun(I) -> {i, I} end, Includes),
     case append(Is, ErlOpts) of
         {error, _} = Error -> Error;
-        NewIncludes        -> rebar_opts:set(Opts, erl_opts, NewIncludes)
+        NewIncludes        -> ct_macro(rebar_opts:set(Opts, erl_opts, NewIncludes))
     end.
+
+ct_macro(Opts) ->
+    ErlOpts = opts(Opts, erl_opts, []),
+    NewOpts = safe_define_ct_macro(ErlOpts),
+    rebar_opts:set(Opts, erl_opts, NewOpts).
+
+safe_define_ct_macro(Opts) ->
+    %% defining a compile macro twice results in an exception so
+    %% make sure 'COMMON_TEST' is only defined once
+    case test_defined(Opts) of
+       true  -> Opts;
+       false -> [{d, 'COMMON_TEST'}|Opts]
+    end.
+
+test_defined([{d, 'COMMON_TEST'}|_]) -> true;
+test_defined([{d, 'COMMON_TEST', true}|_]) -> true;
+test_defined([_|Rest]) -> test_defined(Rest);
+test_defined([]) -> false.
 
 append({error, _} = Error, _) -> Error;
 append(_, {error, _} = Error) -> Error;

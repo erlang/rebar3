@@ -6,8 +6,10 @@
          end_per_group/2]).
 -export([basic_app_default_dirs/1,
          basic_app_default_beams/1,
+         basic_app_ct_macro/1,
          multi_app_default_dirs/1,
          multi_app_default_beams/1,
+         multi_app_ct_macro/1,
          single_app_dir/1,
          single_extra_dir/1,
          single_unmanaged_dir/1,
@@ -65,9 +67,11 @@ all() -> [{group, basic_app},
           misspecified_ct_first_files].
 
 groups() -> [{basic_app, [], [basic_app_default_dirs,
-                              basic_app_default_beams]},
+                              basic_app_default_beams,
+                              basic_app_ct_macro]},
              {multi_app, [], [multi_app_default_dirs,
-                              multi_app_default_beams]},
+                              multi_app_default_beams,
+                              multi_app_ct_macro]},
              {dirs_and_suites, [], [single_app_dir,
                                     single_extra_dir,
                                     single_unmanaged_dir,
@@ -121,7 +125,7 @@ init_per_group(basic_app, Config) ->
     {ok, T} = Tests,
     Opts = rebar_prv_common_test:translate_paths(NewState, T),
 
-    [{result, Opts}, {appnames, [Name]}|C];
+    [{result, Opts}, {appnames, [Name]}, {compile_state, NewState}|C];
 init_per_group(multi_app, Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_"),
 
@@ -156,7 +160,7 @@ init_per_group(multi_app, Config) ->
     {ok, T} = Tests,
     Opts = rebar_prv_common_test:translate_paths(NewState, T),
 
-    [{result, Opts}, {appnames, [Name1, Name2]}|C];
+    [{result, Opts}, {appnames, [Name1, Name2]}, {compile_state, NewState}|C];
 init_per_group(dirs_and_suites, Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_"),
 
@@ -255,6 +259,15 @@ basic_app_default_beams(Config) ->
 
     true = filelib:is_file(File).
 
+basic_app_ct_macro(Config) ->
+    State = ?config(compile_state, Config),
+
+    [App] = rebar_state:project_apps(State),
+    Opts = rebar_app_info:opts(App),
+    ErlOpts = dict:fetch(erl_opts, Opts),
+    true = lists:member({d, 'COMMON_TEST'}, ErlOpts).
+
+
 multi_app_default_dirs(Config) ->
     AppDir = ?config(apps, Config),
     [Name1, Name2] = ?config(appnames, Config),
@@ -295,6 +308,16 @@ multi_app_default_beams(Config) ->
     true = filelib:is_file(File1),
     true = filelib:is_file(File2),
     true = filelib:is_file(File3).
+
+multi_app_ct_macro(Config) ->
+    State = ?config(compile_state, Config),
+
+    Apps = rebar_state:project_apps(State),
+    lists:foreach(fun(App) ->
+        Opts = rebar_app_info:opts(App),
+        ErlOpts = dict:fetch(erl_opts, Opts),
+        true = lists:member({d, 'COMMON_TEST'}, ErlOpts)
+    end, Apps).
 
 single_app_dir(Config) ->
     AppDir = ?config(apps, Config),
@@ -1157,6 +1180,7 @@ misspecified_ct_first_files(Config) ->
     {error, {rebar_prv_common_test, Error}} = rebar_prv_common_test:compile(State, Tests),
 
     {badconfig, {"Value `~p' of option `~p' must be a list", {some_file, ct_first_files}}} = Error.
+
 
 %% helper for generating test data
 test_suite(Name) ->
