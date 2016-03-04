@@ -2,8 +2,12 @@
 
 -export([all/0, groups/0]).
 -export([init_per_suite/1, init_per_group/2, end_per_group/2]).
--export([basic_app_compiles/1, basic_app_files/1, basic_app_exports/1, basic_app_testset/1]).
--export([multi_app_compiles/1, multi_app_files/1, multi_app_exports/1, multi_app_testset/1]).
+-export([basic_app_compiles/1, basic_app_files/1]).
+-export([basic_app_exports/1, basic_app_testset/1]).
+-export([basic_app_eunit_macro/1]).
+-export([multi_app_compiles/1, multi_app_files/1]).
+-export([multi_app_exports/1, multi_app_testset/1]).
+-export([multi_app_eunit_macro/1]).
 -export([eunit_tests/1, eunit_opts/1, eunit_first_files/1]).
 -export([single_application_arg/1, multi_application_arg/1, missing_application_arg/1]).
 -export([single_module_arg/1, multi_module_arg/1, missing_module_arg/1]).
@@ -27,9 +31,15 @@ all() ->
 
 groups() ->
     [{basic_app, [sequence], [basic_app_compiles, {group, basic_app_results}]},
-     {basic_app_results, [], [basic_app_files, basic_app_exports, basic_app_testset]},
+     {basic_app_results, [], [basic_app_files,
+                              basic_app_exports,
+                              basic_app_testset,
+                              basic_app_eunit_macro]},
      {multi_app, [sequence], [multi_app_compiles, {group, multi_app_results}]},
-     {multi_app_results, [], [multi_app_files, multi_app_exports, multi_app_testset]},
+     {multi_app_results, [], [multi_app_files,
+                              multi_app_exports,
+                              multi_app_testset,
+                              multi_app_eunit_macro]},
      {cmd_line_args, [], [eunit_tests, eunit_opts, eunit_first_files,
                           single_application_arg, multi_application_arg, missing_application_arg,
                           single_module_arg, multi_module_arg, missing_module_arg,
@@ -160,7 +170,16 @@ basic_app_testset(Config) ->
                 {module, basic_app_tests_helper}]},
     Set = rebar_prv_eunit:prepare_tests(Result).
 
-
+basic_app_eunit_macro(_Config) ->
+    Macro = fun(Mod) ->
+        begin
+            Path = code:which(Mod),
+            {ok, {Mod, [{compile_info, CompileInfo}]}} = beam_lib:chunks(Path, [compile_info]),
+            Opts = proplists:get_value(options, CompileInfo, []),
+            true = lists:member({d, 'EUNIT'}, Opts)
+        end
+    end,
+    lists:foreach(Macro, [basic_app, basic_app_tests, basic_app_tests_helper]).
 
 %% === tests for multiple applications in the `apps' directory of a project ===
 
@@ -220,7 +239,19 @@ multi_app_testset(Config) ->
                 {module, multi_app_tests_helper}]},
     Set = rebar_prv_eunit:prepare_tests(Result).
 
-
+multi_app_eunit_macro(_Config) ->
+    Macro = fun(Mod) ->
+        begin
+            Path = code:which(Mod),
+            {ok, {Mod, [{compile_info, CompileInfo}]}} = beam_lib:chunks(Path, [compile_info]),
+            Opts = proplists:get_value(options, CompileInfo, []),
+            true = lists:member({d, 'EUNIT'}, Opts)
+        end
+    end,
+    lists:foreach(Macro, [multi_app_bar, multi_app_bar_tests,
+                          multi_app_baz, multi_app_baz_tests,
+                          multi_app_tests, multi_app_tests_helper,
+                          multi_app_bar_tests_helper, multi_app_baz_tests_helper]).
 
 %% === tests for command line arguments ===
 

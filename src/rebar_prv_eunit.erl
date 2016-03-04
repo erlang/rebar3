@@ -244,8 +244,26 @@ first_files(Opts) ->
     EUnitFirstFiles = opts(Opts, eunit_first_files, []),
     case append(EUnitFirstFiles, FirstFiles) of
         {error, _} = Error -> Error;
-        NewFirstFiles  -> rebar_opts:set(Opts, erl_first_files, NewFirstFiles)
+        NewFirstFiles  -> eunit_macro(rebar_opts:set(Opts, erl_first_files, NewFirstFiles))
     end.
+
+eunit_macro(Opts) ->
+    ErlOpts = opts(Opts, erl_opts, []),
+    NewOpts = safe_define_eunit_macro(ErlOpts),
+    rebar_opts:set(Opts, erl_opts, NewOpts).
+
+safe_define_eunit_macro(Opts) ->
+    %% defining a compile macro twice results in an exception so
+    %% make sure 'EUNIT' is only defined once
+    case test_defined(Opts) of
+       true  -> Opts;
+       false -> [{d, 'EUNIT'}|Opts]
+    end.
+
+test_defined([{d, 'EUNIT'}|_]) -> true;
+test_defined([{d, 'EUNIT', true}|_]) -> true;
+test_defined([_|Rest]) -> test_defined(Rest);
+test_defined([]) -> false.
 
 append({error, _} = Error, _) -> Error;
 append(_, {error, _} = Error) -> Error;

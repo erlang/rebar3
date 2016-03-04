@@ -377,8 +377,7 @@ test_profile_applied_at_completion(Config) ->
 
     [App] = rebar_state:project_apps(State),
     ErlOpts = rebar_app_info:get(App, erl_opts),
-    true = lists:member({d, 'TEST'}, ErlOpts),
-    true = lists:member({d, 'EUNIT'}, ErlOpts).
+    true = lists:member({d, 'TEST'}, ErlOpts).
 
 test_profile_applied_before_compile(Config) ->
     AppDir = ?config(apps, Config),
@@ -394,9 +393,7 @@ test_profile_applied_before_compile(Config) ->
     code:add_paths(rebar_state:code_paths(State, all_deps)),
 
     S = list_to_atom("not_a_real_src_" ++ Name),
-    Opts = proplists:get_value(options, S:module_info(compile), []),
-    true = lists:member({d, 'TEST'}, Opts),
-    true = lists:member({d, 'EUNIT'}, Opts).
+    true = lists:member({d, 'TEST'}, proplists:get_value(options, S:module_info(compile), [])).
 
 test_profile_applied_before_eunit(Config) ->
     AppDir = ?config(apps, Config),
@@ -412,9 +409,7 @@ test_profile_applied_before_eunit(Config) ->
     code:add_paths(rebar_state:code_paths(State, all_deps)),
 
     T = list_to_atom("not_a_real_src_" ++ Name ++ "_tests"),
-    Opts = proplists:get_value(options, T:module_info(compile), []),
-    true = lists:member({d, 'TEST'}, Opts),
-    true = lists:member({d, 'EUNIT'}, Opts).
+    true = lists:member({d, 'TEST'}, proplists:get_value(options, T:module_info(compile), [])).
 
 test_profile_applied_to_apps(Config) ->
     AppDir = ?config(apps, Config),
@@ -435,6 +430,5 @@ test_profile_applied_to_apps(Config) ->
     lists:foreach(fun(App) ->
         Opts = rebar_app_info:opts(App),
         ErlOpts = dict:fetch(erl_opts, Opts),
-        true = lists:member({d, 'TEST'}, ErlOpts),
-        true = lists:member({d, 'EUNIT'}, ErlOpts)
+        true = lists:member({d, 'TEST'}, ErlOpts)
     end, Apps).
