@@ -28,11 +28,13 @@
 
 -export([init/2,
          set_level/1,
+         get_level/0,
          error_level/0,
          default_level/0,
          intensity/0,
          log/3,
-         is_verbose/1]).
+         is_verbose/1,
+         valid_level/1]).
 
 -define(ERROR_LEVEL, 0).
 -define(WARN_LEVEL,  1).
@@ -72,10 +74,19 @@ init(Caller, Verbosity) ->
             end,
     Intensity = intensity(),
     Log = ec_cmd_log:new(Level, Caller, Intensity),
+    set_level(valid_level(Verbosity)),
     application:set_env(rebar, log, Log).
 
 set_level(Level) ->
     ok = application:set_env(rebar, log_level, Level).
+
+get_level() ->
+    case application:get_env(rebar, log_level) of
+        undefined ->
+            default_level();
+        {ok, Level} ->
+            Level
+    end.
 
 log(Level = error, Str, Args) ->
     {ok, LogState} = application:get_env(rebar, log),
@@ -90,9 +101,9 @@ default_level() -> ?INFO_LEVEL.
 is_verbose(State) ->
     rebar_state:get(State, is_verbose, false).
 
+valid_level(Level) ->
+    erlang:max(?ERROR_LEVEL, erlang:min(Level, ?DEBUG_LEVEL)).
+
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
-
-valid_level(Level) ->
-    erlang:max(?ERROR_LEVEL, erlang:min(Level, ?DEBUG_LEVEL)).

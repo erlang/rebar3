@@ -16,6 +16,7 @@
 do(Module, Command, Provider, State) ->
     %% We set the color mode for relx as a application env
     application:set_env(relx, color_intensity, rebar_log:intensity()),
+    LogLevel = rebar_log:get_level(),
     Options = rebar_state:command_args(State),
     DepsDir = rebar_dir:deps_dir(State),
     ProjectAppDirs = lists:delete(".", ?DEFAULT_PROJECT_APP_DIRS),
@@ -30,12 +31,14 @@ do(Module, Command, Provider, State) ->
         case rebar_state:get(State, relx, []) of
             [] ->
                 relx:main([{lib_dirs, LibDirs}
-                          ,{caller, api} | output_dir(OutputDir, Options)], AllOptions);
+                          ,{caller, api}
+                          ,{log_level, LogLevel} | output_dir(OutputDir, Options)], AllOptions);
             Config ->
                 Config1 = merge_overlays(Config),
                 relx:main([{lib_dirs, LibDirs}
                           ,{config, Config1}
-                          ,{caller, api} | output_dir(OutputDir, Options)], AllOptions)
+                          ,{caller, api}
+                          ,{log_level, LogLevel} | output_dir(OutputDir, Options)], AllOptions)
         end,
         rebar_hooks:run_project_and_app_hooks(Cwd, post, Provider, Providers, State),
         {ok, State}
