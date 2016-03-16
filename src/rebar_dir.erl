@@ -93,8 +93,14 @@ global_config() ->
     filename:join([Home, ".config", "rebar3", "rebar.config"]).
 
 global_cache_dir(Opts) ->
-    Home = home_dir(),
-    rebar_opts:get(Opts, global_rebar_dir, filename:join([Home, ".cache", "rebar3"])).
+    RebarCacheDir = case os:getenv("REBAR_CACHE_DIR") of
+        false ->
+            Home = home_dir(),
+            filename:join([Home, ".cache", "rebar3"]);
+        ConfigFile ->
+            ConfigFile
+    end,
+    rebar_opts:get(Opts, global_rebar_dir, RebarCacheDir).
 
 local_cache_dir(Dir) ->
     filename:join(Dir, ".rebar3").
