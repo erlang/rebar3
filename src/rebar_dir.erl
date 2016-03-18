@@ -92,6 +92,7 @@ global_config() ->
     Home = home_dir(),
     filename:join([Home, ".config", "rebar3", "rebar.config"]).
 
+-spec global_cache_dir(rebar_dict()) -> file:filename_all().
 global_cache_dir(Opts) ->
     RebarCacheDir = case os:getenv("REBAR_CACHE_DIR") of
         false ->
