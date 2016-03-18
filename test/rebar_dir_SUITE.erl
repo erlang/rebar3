@@ -189,8 +189,8 @@ default_global_cache_dir(Config) ->
     ?assertEqual(Expected, rebar_dir:global_cache_dir(rebar_state:opts(State))).
 
 overwrite_default_global_cache_dir(Config) ->
-    os:putenv("REBAR_CACHE_DIR", "/tmp/"),
+    os:putenv("REBAR_CACHE_DIR", ?config(priv_dir, Config)),
     RebarConfig = [{erl_opts, []}],
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
-    Expected = "/tmp/",
+    Expected = ?config(priv_dir, Config),
     ?assertEqual(Expected, rebar_dir:global_cache_dir(rebar_state:opts(State))).
