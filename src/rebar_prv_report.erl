@@ -13,7 +13,7 @@
 
 -define(PROVIDER, report).
 -define(DEPS, []).
--define(ISSUES_URL, "https://github.com/rebar/rebar3/issues").
+-define(ISSUES_URL, "https://github.com/erlang/rebar3/issues").
 
 %% ===================================================================
 %% Public API

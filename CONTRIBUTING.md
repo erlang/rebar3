@@ -23,7 +23,7 @@ All files without specific headers can safely be assumed to be under Apache
 
 ## Submitting a Bug
 
-Bugs can be submitted to the [Github issue page](https://github.com/rebar/rebar3/issues).
+Bugs can be submitted to the [Github issue page](https://github.com/erlang/rebar3/issues).
 
 Rebar3 is not perfect software and will be buggy. When submitting a bug, be
 careful to know the following:
@@ -58,7 +58,7 @@ Before requesting or implementing a new feature, please do the following:
 
 - Take a look at our [list of plugins](http://www.rebar3.org/docs/using-available-plugins)
   to know if the feature isn't already supported by the community.
-- Verify in existing [tickets](https://github.com/rebar/rebar3/issues) whether
+- Verify in existing [tickets](https://github.com/erlang/rebar3/issues) whether
   the feature might already is in the works, has been moved to a plugin, or
   has already been rejected.
 

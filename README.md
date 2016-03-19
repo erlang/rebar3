@@ -64,12 +64,12 @@ $ wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
 From Source (assuming you have a full Erlang install):
 
 ```bash
-$ git clone https://github.com/rebar/rebar3.git
+$ git clone https://github.com/erlang/rebar3.git
 $ cd rebar3
 $ ./bootstrap
 ```
 
-Stable versions can be obtained from the [releases page](https://github.com/rebar/rebar3/releases).
+Stable versions can be obtained from the [releases page](https://github.com/erlang/rebar3/releases).
 
 The rebar3 escript can also extract itself with a run script under the user's home directory:
 
@@ -159,13 +159,13 @@ quick feedback, you can try the #rebar channel on
 asking about things with well known answers.
 
 For bug reports, roadmaps, and issues, visit the [github issues
-page](https://github.com/rebar/rebar3/issues).
+page](https://github.com/erlang/rebar3/issues).
 
 General rebar community resources and links:
 
 - [Rebar Mailing List](http://lists.basho.com/pipermail/rebar_lists.basho.com/)
 - #rebar on [irc.freenode.net](http://freenode.net/)
-- [issues](https://github.com/rebar/rebar3/issues)
+- [issues](https://github.com/erlang/rebar3/issues)
 - [Documentation](http://www.rebar3.org/v3.0/docs)
 
 To contribute to rebar3, please refer to [CONTRIBUTING](CONTRIBUTING.md).
