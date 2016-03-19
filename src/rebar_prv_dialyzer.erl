@@ -97,7 +97,7 @@ do(State) ->
     end.
 
 %% This is used to workaround dialyzer quirk discussed here
-%% https://github.com/rebar/rebar3/pull/489#issuecomment-107953541
+%% https://github.com/erlang/rebar3/pull/489#issuecomment-107953541
 %% Dialyzer gets default plt location wrong way by peeking HOME environment
 %% variable which usually is not defined on Windows.
 maybe_fix_env() ->
