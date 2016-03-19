@@ -133,11 +133,25 @@ kill_old_user() ->
     %% fully die
     [P] = [P || P <- element(2,process_info(whereis(user), links)), is_port(P)],
     user ! {'EXIT', P, normal}, % pretend the port died, then the port can die!
+    exit(P, kill),
+    wait_for_port_death(1000, P),
     OldUser.
 
+wait_for_port_death(N, _) when N < 0 ->
+    %% This risks displaying a warning!
+    whatever;
+wait_for_port_death(N, P) ->
+    case erlang:port_info(P) of
+        undefined ->
+            ok;
+        _ ->
+            timer:sleep(10),
+            wait_for_port_death(N-10, P)
+    end.
+
 setup_new_shell() ->
-    %% terminate the current user supervision structure
-    ok = supervisor:terminate_child(kernel_sup, user),
+    %% terminate the current user supervision structure, if any
+    _ = supervisor:terminate_child(kernel_sup, user),
     %% start a new shell (this also starts a new user under the correct group)
     _ = user_drv:start(),
     %% wait until user_drv and user have been registered (max 3 seconds)
