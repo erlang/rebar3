@@ -95,9 +95,13 @@ print_paths_if_exist(Paths, State) ->
 
 project_deps(State) ->
     Profiles = rebar_state:current_profiles(State),
-    List = lists:foldl(fun(Profile, Acc) -> rebar_state:get(State, {deps, Profile}, []) ++ Acc end, [], Profiles),
-    Deps = [normalize(Name) || {Name, _} <- List],
+    DepList = lists:foldl(fun(Profile, Acc) -> rebar_state:get(State, {deps, Profile}, []) ++ Acc end, [], Profiles),
+    LockList = lists:foldl(fun(Profile, Acc) -> rebar_state:get(State, {locks, Profile}, []) ++ Acc end, [], Profiles),
+    Deps = [normalize(name(Dep)) || Dep <- DepList++LockList],
     lists:usort(Deps).
+
+name(App) when is_tuple(App) -> element(1, App);
+name(Name) when is_binary(Name); is_list(Name); is_atom(Name) -> Name.
 
 normalize(AppName) when is_list(AppName) -> AppName;
 normalize(AppName) when is_atom(AppName) -> atom_to_list(AppName);
