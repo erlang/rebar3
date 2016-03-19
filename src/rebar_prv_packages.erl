@@ -28,22 +28,19 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     rebar_packages:packages(State),
-    print_packages(),
+    case rebar_state:command_args(State) of
+        [Name] ->
+            print_packages(get_packages(iolist_to_binary(Name)));
+        _ ->
+            print_packages(sort_packages())
+    end,
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
 format_error(load_registry_fail) ->
     "Failed to load package regsitry. Try running 'rebar3 update' to fix".
 
-print_packages() ->
-    SortedPkgs = ets:foldl(fun({package_index_version, _}, Acc) ->
-                                   Acc;
-                              ({Pkg, Vsns}, Acc) ->
-                                   orddict:store(Pkg, Vsns, Acc);
-                              (_, Acc) ->
-                                   Acc
-                           end, orddict:new(), ?PACKAGE_TABLE),
-
+print_packages(Pkgs) ->
     orddict:map(fun(Name, Vsns) ->
                         SortedVsns = lists:sort(fun(A, B) ->
                                                         ec_semver:lte(ec_semver:parse(A)
@@ -51,7 +48,20 @@ print_packages() ->
                                                 end, Vsns),
                         VsnStr = join(SortedVsns, <<", ">>),
                         ?CONSOLE("~s:~n    Versions: ~s~n", [Name, VsnStr])
-                end, SortedPkgs).
+                end, Pkgs).
+
+sort_packages() ->
+    ets:foldl(fun({package_index_version, _}, Acc) ->
+                      Acc;
+                 ({Pkg, Vsns}, Acc) ->
+                      orddict:store(Pkg, Vsns, Acc);
+                 (_, Acc) ->
+                      Acc
+              end, orddict:new(), ?PACKAGE_TABLE).
+
+get_packages(Name) ->
+    ets:lookup(?PACKAGE_TABLE, Name).
+
 
 -spec join([binary()], binary()) -> binary().
 join([Bin], _Sep) ->
