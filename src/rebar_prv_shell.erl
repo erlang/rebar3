@@ -269,33 +269,8 @@ simulate_proc_lib() ->
     put('$initial_call', {rebar_agent, init, 1}).
 
 setup_name(State) ->
-    {Opts, _} = rebar_state:command_parsed_args(State),
-    case {proplists:get_value(name, Opts), proplists:get_value(sname, Opts)} of
-        {undefined, undefined} ->
-            ok;
-        {Name, undefined} ->
-            check_epmd(net_kernel:start([Name, longnames])),
-            setup_cookie(Opts);
-        {undefined, SName} ->
-            check_epmd(net_kernel:start([SName, shortnames])),
-            setup_cookie(Opts);
-        {_, _} ->
-            ?ABORT("Cannot have both short and long node names defined", [])
-    end.
-
-check_epmd({error,{{shutdown, {_,net_kernel,{'EXIT',nodistribution}}},_}}) ->
-    ?ERROR("Erlang Distribution failed, falling back to nonode@nohost. "
-           "Verify that epmd is running and try again.",[]);
-check_epmd(_) ->
-    ok.
-
-setup_cookie(Opts) ->
-    case {node(), proplists:get_value(setcookie, Opts, nocookie)} of
-        {'nonode@nohost', _} -> nocookie;
-        {_, nocookie} -> nocookie;
-        {Node, Name} -> erlang:set_cookie(Node, Name)
-    end.
-
+    {Long, Short, Opts} = rebar_dist_utils:find_options(State),
+    rebar_dist_utils:either(Long, Short, Opts).
 
 find_apps_to_boot(State) ->
     %% Try the shell_apps option
