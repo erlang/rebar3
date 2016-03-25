@@ -201,7 +201,7 @@ parse_tags(Dir) ->
         {error, _} ->
             {undefined, "0.0.0"};
         {ok, Line} ->
-            case re:run(Line, "(\\(|\\s)(HEAD,\\s)tag:\\s(v?([^,\\)]+))", [{capture, [3, 4], list}]) of
+            case re:run(Line, "(\\(|\\s)(HEAD[^,]*,\\s)tag:\\s(v?([^,\\)]+))", [{capture, [3, 4], list}]) of
                 {match,[Tag, Vsn]} ->
                     {Tag, Vsn};
                 nomatch ->
