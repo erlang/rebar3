@@ -17,7 +17,7 @@ cache:
 before_deploy: "rm -rf !(rebar3)"
 deploy:
   on:
-    branch: master
+    tags: true
     condition: $TRAVIS_OTP_RELEASE = R16B03-1
   provider: s3
   access_key_id: AKIAJAPYAQEFYCYSNL7Q
