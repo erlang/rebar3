@@ -20,12 +20,12 @@ end_per_testcase(_, _) ->
     ok.
 
 from_config(Config) ->
-    ShortConfig = [{dist, [{sname, 'a@localhost'}, {setcookie, abc}]}],
-    LongConfig = [{dist, [{name, 'a@localhost.x'}, {setcookie, abc}]}],
-    BothConfig = [{dist, [{sname, 'a@localhost'}, {name, 'a@localhost.x'}, {setcookie,abc}]}],
+    ShortConfig = [{dist_node, [{sname, 'a@localhost'}, {setcookie, abc}]}],
+    LongConfig = [{dist_node, [{name, 'a@localhost.x'}, {setcookie, abc}]}],
+    BothConfig = [{dist_node, [{sname, 'a@localhost'}, {name, 'a@localhost.x'}, {setcookie,abc}]}],
     NoConfig = [],
-    CookieConfig = [{dist, [{setcookie, def}]}],
-    NoCookie = [{dist, [{sname, 'a@localhost'}]}],
+    CookieConfig = [{dist_node, [{setcookie, def}]}],
+    NoCookie = [{dist_node, [{sname, 'a@localhost'}]}],
     {ok, State0} = rebar_test_utils:run_and_check(Config, ShortConfig, ["version"], return),
     {undefined, 'a@localhost', [{setcookie, abc}]} = rebar_dist_utils:find_options(State0),
     {ok, State1} = rebar_test_utils:run_and_check(Config, LongConfig, ["version"], return),
@@ -59,7 +59,7 @@ from_cli(Config) ->
 overlap(Config) ->
     %% Make sure that CLI config takes over rebar config without clash for names, though
     %% cookies can pass through
-    RebarConfig = [{dist, [{sname, 'a@localhost'}, {setcookie, abc}]}],
+    RebarConfig = [{dist_node, [{sname, 'a@localhost'}, {setcookie, abc}]}],
     {ok, State0} = rebar_test_utils:run_and_check(Config, RebarConfig, ["version"], return),
     State1 = rebar_state:command_parsed_args(State0, {[{name, 'b@localhost.x'}], []}),
     {'b@localhost.x', undefined, [{setcookie, abc}]} = rebar_dist_utils:find_options(State1),
@@ -67,8 +67,8 @@ overlap(Config) ->
 
 from_config_profile(Config) ->
     %% running as a profile does not create name clashes
-    RebarConfig = [{dist, [{sname, 'a@localhost'}, {setcookie, abc}]},
-                   {profiles, [ {fake, [{dist, [{name, 'a@localhost.x'}]}]} ]}],
+    RebarConfig = [{dist_node, [{sname, 'a@localhost'}, {setcookie, abc}]},
+                   {profiles, [ {fake, [{dist_node, [{name, 'a@localhost.x'}]}]} ]}],
     {ok, State0} = rebar_test_utils:run_and_check(Config, RebarConfig, ["as","fake","version"], return),
     {'a@localhost.x', undefined, [{setcookie, abc}]} = rebar_dist_utils:find_options(State0),
     ok.

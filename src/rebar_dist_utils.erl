@@ -64,7 +64,7 @@ find_name_options(State) ->
     case {proplists:get_value(name, Opts), proplists:get_value(sname, Opts)} of
         {undefined, undefined} ->
             %% Else try the config file
-            DistOpts = rebar_state:get(State, dist, []),
+            DistOpts = rebar_state:get(State, dist_node, []),
             %% Pick the first one seen to support profile merges
             find_first_name(DistOpts);
         Res ->
@@ -82,7 +82,7 @@ find_cookie_option(State) ->
     case proplists:get_value(setcookie, Opts) of
         undefined ->
             %% Else try the config file
-            DistOpts = rebar_state:get(State, dist, []),
+            DistOpts = rebar_state:get(State, dist_node, []),
             proplists:get_value(setcookie, DistOpts, nocookie);
         Res ->
             Res
