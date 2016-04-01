@@ -189,8 +189,10 @@ ensure_opts([{suite, Suites}|Rest], Acc) ->
     ensure_opts(Rest, [NewSuites|Acc]);
 ensure_opts([{K, V}|Rest], Acc) ->
     ensure_opts(Rest, [{K, V}|Acc]);
-ensure_opts([V|_Rest], _Acc) ->
-    ?PRV_ERROR({badconfig, {"Member `~p' of option `~p' must be a 2-tuple", {V, ct_opts}}}).
+%% pass through other options, in case of things like config terms
+%% in `ct_opts`
+ensure_opts([V|Rest], Acc) ->
+    ensure_opts(Rest, [V|Acc]).
 
 add_hooks(Opts, State) ->
     case {readable(State), lists:keyfind(ct_hooks, 1, Opts)} of
