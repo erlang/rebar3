@@ -86,6 +86,8 @@ refresh_paths(RState) ->
                      || App <- rebar_state:project_apps(RState)]
                 %% make sure to never reload self; halt()s the VM
                 ) -- [filename:dirname(code:which(?MODULE))],
+    %% Modules from apps we can't reload without breaking functionality
+    Blacklist = [ec_cmd_log, providers, cf, cth_readable],
     %% Similar to rebar_utils:update_code/1, but also forces a reload
     %% of used modules. Also forces to reload all of ebin/ instead
     %% of just the modules in the .app file, because 'extra_src_dirs'
@@ -102,11 +104,16 @@ refresh_paths(RState) ->
                 undefined ->
                     code:add_patha(Path),
                     ok;
-                {ok, _} ->
-                    ?DEBUG("reloading ~p from ~s", [Modules, Path]),
-                    code:replace_path(App, Path),
-                    [begin code:purge(M), code:delete(M), code:load_file(M) end
-                    || M <- Modules]
+                {ok, Mods} ->
+                    case {length(Mods), length(Mods -- Blacklist)} of
+                        {X,X} ->
+                            ?DEBUG("reloading ~p from ~s", [Modules, Path]),
+                            code:replace_path(App, Path),
+                            [begin code:purge(M), code:delete(M), code:load_file(M) end
+                             || M <- Modules];
+                        {_,_} ->
+                            ?DEBUG("skipping app ~p, stable copy required", [App])
+                    end
             end
         end, ToRefresh).
 
