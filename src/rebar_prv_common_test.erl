@@ -37,6 +37,7 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    setup_name(State),
     Tests = prepare_tests(State),
     case compile(State, Tests) of
         %% successfully compiled apps
@@ -104,6 +105,10 @@ format_error({multiple_errors, Errors}) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+setup_name(State) ->
+    {Long, Short, Opts} = rebar_dist_utils:find_options(State),
+    rebar_dist_utils:either(Long, Short, Opts).
 
 prepare_tests(State) ->
     %% command line test options

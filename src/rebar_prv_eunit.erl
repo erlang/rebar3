@@ -51,6 +51,7 @@ do(State) ->
 do(State, Tests) ->
     ?INFO("Performing EUnit tests...", []),
 
+    setup_name(State),
     rebar_utils:update_code(rebar_state:code_paths(State, all_deps), [soft_purge]),
 
     %% Run eunit provider prehooks
@@ -105,6 +106,10 @@ format_error({error, Error}) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+setup_name(State) ->
+    {Long, Short, Opts} = rebar_dist_utils:find_options(State),
+    rebar_dist_utils:either(Long, Short, Opts).
 
 prepare_tests(State) ->
     %% parse and translate command line tests
