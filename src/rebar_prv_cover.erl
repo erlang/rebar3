@@ -299,6 +299,7 @@ cover_compile(State, apps) ->
     ExtraDirs = extra_src_dirs(State, Apps),
     cover_compile(State, lists:filter(fun(D) -> ec_file:is_dir(D) end, AppDirs ++ ExtraDirs));
 cover_compile(State, Dirs) ->
+    rebar_utils:update_code(rebar_state:code_paths(State, all_deps), [soft_purge]),
     %% start the cover server if necessary
     {ok, CoverPid} = start_cover(),
     %% redirect cover output
