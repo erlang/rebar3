@@ -484,11 +484,17 @@ eunit_opts(_State) ->
      {file, $f, "file", string, help(file)},
      {module, $m, "module", string, help(module)},
      {suite, $s, "suite", string, help(module)},
-     {verbose, $v, "verbose", boolean, help(verbose)}].
+     {verbose, $v, "verbose", boolean, help(verbose)},
+     {name, undefined, "name", atom, help(name)},
+     {sname, undefined, "sname", atom, help(sname)},
+     {setcookie, undefined, "setcookie", atom, help(setcookie)}].
 
-help(app)     -> "Comma separated list of application test suites to run. Equivalent to `[{application, App}]`.";
-help(cover)   -> "Generate cover data. Defaults to false.";
-help(dir)     -> "Comma separated list of dirs to load tests from. Equivalent to `[{dir, Dir}]`.";
-help(file)    -> "Comma separated list of files to load tests from. Equivalent to `[{file, File}]`.";
-help(module)  -> "Comma separated list of modules to load tests from. Equivalent to `[{module, Module}]`.";
-help(verbose) -> "Verbose output. Defaults to false.".
+help(app)       -> "Comma separated list of application test suites to run. Equivalent to `[{application, App}]`.";
+help(cover)     -> "Generate cover data. Defaults to false.";
+help(dir)       -> "Comma separated list of dirs to load tests from. Equivalent to `[{dir, Dir}]`.";
+help(file)      -> "Comma separated list of files to load tests from. Equivalent to `[{file, File}]`.";
+help(module)    -> "Comma separated list of modules to load tests from. Equivalent to `[{module, Module}]`.";
+help(verbose)   -> "Verbose output. Defaults to false.";
+help(name)      -> "Gives a long name to the node";
+help(sname)     -> "Gives a short name to the node";
+help(setcookie) -> "Sets the cookie if the node is distributed".

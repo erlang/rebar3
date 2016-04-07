@@ -644,7 +644,10 @@ ct_opts(_State) ->
      {create_priv_dir, undefined, "create_priv_dir", string, help(create_priv_dir)},
      {include, undefined, "include", string, help(include)},
      {readable, undefined, "readable", boolean, help(readable)},
-     {verbose, $v, "verbose", boolean, help(verbose)}
+     {verbose, $v, "verbose", boolean, help(verbose)},
+     {name, undefined, "name", atom, help(name)},
+     {sname, undefined, "sname", atom, help(sname)},
+     {setcookie, undefined, "setcookie", atom, help(setcookie)}
     ].
 
 help(dir) ->
@@ -699,5 +702,11 @@ help(readable) ->
     "Shows test case names and only displays logs to shell on failures";
 help(verbose) ->
     "Verbose output";
+help(name) ->
+    "Gives a long name to the node";
+help(sname) ->
+    "Gives a short name to the node";
+help(setcookie) ->
+    "Sets the cookie if the node is distributed";
 help(_) ->
     "".
