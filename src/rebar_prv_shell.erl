@@ -328,7 +328,8 @@ reread_config(State) ->
         ConfigList ->
             try
                 [application:set_env(Application, Key, Val)
-                  || {Application, Items} <- ConfigList,
+                  || Config <- ConfigList,
+                     {Application, Items} <- Config,
                      {Key, Val} <- Items]
             catch _:_ ->
                 ?ERROR("The configuration file submitted could not be read "
@@ -391,7 +392,7 @@ add_test_paths(State) ->
     ok.
 
 % First try the --config flag, then try the relx sys_config
--spec find_config(rebar_state:t()) -> [tuple()] | no_config.
+-spec find_config(rebar_state:t()) -> [[tuple()]] | no_config.
 find_config(State) ->
     case first_value([fun find_config_option/1,
                       fun find_config_rebar/1,
@@ -439,11 +440,17 @@ find_config_relx(State) ->
     debug_get_value(sys_config, rebar_state:get(State, relx, []), no_value,
                     "Found config from relx.").
 
--spec consult_config(rebar_state:t(), string()) -> [tuple()].
+-spec consult_config(rebar_state:t(), string()) -> [[tuple()]].
 consult_config(State, Filename) ->
     Fullpath = filename:join(rebar_dir:root_dir(State), Filename),
     ?DEBUG("Loading configuration from ~p", [Fullpath]),
-    case rebar_file_utils:try_consult(Fullpath) of
+    Config = case rebar_file_utils:try_consult(Fullpath) of
         [T] -> T;
         [] -> []
-    end.
+    end,
+    SubConfigs = [consult_config(State, Entry ++ ".config") ||
+                  Entry <- Config, is_list(Entry)
+                 ],
+
+    [Config | lists:merge(SubConfigs)].
+
