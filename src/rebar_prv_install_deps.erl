@@ -206,9 +206,13 @@ maybe_lock(Profile, AppInfo, Seen, State, Level) ->
 update_deps(Profile, Level, Deps, Apps, State, Upgrade, Seen, Locks) ->
     lists:foldl(
       fun(AppInfo, {DepsAcc, AppsAcc, StateAcc, SeenAcc}) ->
-              update_dep(AppInfo, Profile, Level,
-                         DepsAcc, AppsAcc, StateAcc,
-                         Upgrade, SeenAcc, Locks)
+              try update_dep(AppInfo, Profile, Level,
+                             DepsAcc, AppsAcc, StateAcc,
+                             Upgrade, SeenAcc, Locks)
+              catch
+                  throw:{error, {rebar_packages, {missing_package, Package}}} ->
+                      throw({error, {rebar_packages, {missing_package, Package, [rebar_app_info:name(AppInfo)]}}})
+              end
       end,
       {[], Apps, State, Seen},
       rebar_utils:sort_deps(Deps)).

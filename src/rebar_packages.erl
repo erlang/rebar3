@@ -216,10 +216,23 @@ handle_single_vsn(Pkg, PkgVsn, Dep, Vsn, Constraint) ->
             {ok, Vsn}
     end.
 
-format_error({missing_package, {Name, Vsn}}) ->
-    io_lib:format("Package not found in registry: ~s-~s.", [ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)]);
+format_dep({Name, Vsn}) ->
+    io_lib:format("~s-~s", [ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)]);
+format_dep(Dep) when is_binary(Dep) ->
+    io_lib:format("~s", [Dep]);
+format_dep(Dep) ->
+    io_lib:format("~p", [Dep]).
+
 format_error({missing_package, Dep}) ->
-    io_lib:format("Package not found in registry: ~p.", [Dep]).
+    format_error({missing_package, Dep, []});
+format_error({missing_package, Dep, Parents}) ->
+    Msg = io_lib:format("Package not found in registry: ~s", [format_dep(Dep)]),
+    ParentsMsg = lists:map(fun
+                               (PDep) -> io_lib:format(" requred by ~s", [format_dep(PDep)])
+                           end,
+                           Parents),
+    [Msg, ParentsMsg].
+
 
 verify_table(State) ->
     ets:info(?PACKAGE_TABLE, named_table) =:= true orelse load_and_verify_version(State).
