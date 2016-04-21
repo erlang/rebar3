@@ -92,7 +92,7 @@ fetch({pkg, Name, Vsn}, App) ->
     Dir = filename:join([filename:absname("_build/default/lib/"), App]),
     case filelib:is_dir(Dir) of
         false ->
-            CDN = "https://s3.amazonaws.com/s3.hex.pm/tarballs",
+            CDN = "https://repo.hex.pm/tarballs",
             Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
             Url = string:join([CDN, Package], "/"),
             case request(Url) of
