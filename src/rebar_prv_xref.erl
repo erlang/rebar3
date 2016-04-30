@@ -38,10 +38,10 @@ init(State) ->
 do(State) ->
     code:add_pathsa(rebar_state:code_paths(State, all_deps)),
     XrefChecks = prepare(State),
-
+    XrefIgnores = rebar_state:get(State, xref_ignores, []),
     %% Run xref checks
     ?INFO("Running cross reference analysis...", []),
-    XrefResults = xref_checks(XrefChecks),
+    XrefResults = xref_checks(XrefChecks, XrefIgnores),
 
     %% Run custom queries
     QueryChecks = rebar_state:get(State, xref_queries, []),
@@ -110,16 +110,18 @@ prepare(State) ->
                                 sets:from_list(ConfXrefChecks))),
     XrefChecks.
 
-xref_checks(XrefChecks) ->
-    lists:foldl(fun run_xref_check/2, [], XrefChecks).
+xref_checks(XrefChecks, XrefIgnores) ->
+    run_xref_checks(XrefChecks, XrefIgnores, []).
 
-run_xref_check(XrefCheck, Acc) ->
+run_xref_checks([], _XrefIgnores, Acc) ->
+    Acc;
+run_xref_checks([XrefCheck | T], XrefIgnores, Acc) ->
     {ok, Results} = xref:analyze(xref, XrefCheck),
-    case filter_xref_results(XrefCheck, Results) of
+    case filter_xref_results(XrefCheck, XrefIgnores, Results) of
         [] ->
-            Acc;
+            run_xref_checks(T, XrefIgnores, Acc);
         FilterResult ->
-            [{XrefCheck, FilterResult} | Acc]
+            run_xref_checks(T, XrefIgnores, [{XrefCheck, FilterResult} | Acc])
     end.
 
 check_query({Query, Value}, Acc) ->
@@ -170,7 +172,7 @@ get_behaviour_callbacks(_XrefCheck, _Attributes) ->
 parse_xref_result({_, MFAt}) -> MFAt;
 parse_xref_result(MFAt) -> MFAt.
 
-filter_xref_results(XrefCheck, XrefResults) ->
+filter_xref_results(XrefCheck, XrefIgnores, XrefResults) ->
     SearchModules = lists:usort(
                       lists:map(
                         fun({Mt,_Ft,_At}) -> Mt;
@@ -178,7 +180,7 @@ filter_xref_results(XrefCheck, XrefResults) ->
                            (_) -> undefined
                         end, XrefResults)),
 
-    Ignores = lists:flatmap(fun(Module) ->
+    Ignores = XrefIgnores ++ lists:flatmap(fun(Module) ->
                                     get_xref_ignorelist(Module, XrefCheck)
                             end, SearchModules),
 
