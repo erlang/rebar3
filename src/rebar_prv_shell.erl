@@ -192,7 +192,9 @@ rewrite_leaders(OldUser, NewUser) ->
         %% disable the simple error_logger (which may have been added multiple
         %% times). removes at most the error_logger added by init and the
         %% error_logger added by the tty handler
-        remove_error_handler(3)
+        remove_error_handler(3),
+        %% reset the tty handler once more for remote shells
+        error_logger:swap_handler(tty)
     catch
         E:R -> % may fail with custom loggers
             ?DEBUG("Logger changes failed for ~p:~p (~p)", [E,R,erlang:get_stacktrace()]),
