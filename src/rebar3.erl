@@ -129,13 +129,20 @@ run_aux(State, RawArgs) ->
     %% Initializing project_plugins which can override default providers
     State6 = rebar_plugins:project_plugins_install(State5),
     State7 = rebar_plugins:top_level_install(State6),
-    State8 = rebar_state:default(State7, rebar_state:opts(State7)),
+    State8 = case os:getenv("REBAR_CACHE_DIR") of
+                false ->
+                    State7;
+                ConfigFile ->
+                    rebar_state:set(State7, global_rebar_dir, ConfigFile)
+            end,
+
+    State9 = rebar_state:default(State8, rebar_state:opts(State8)),
 
     {Task, Args} = parse_args(RawArgs),
 
-    State9 = rebar_state:code_paths(State8, default, code:get_path()),
+    State10 = rebar_state:code_paths(State9, default, code:get_path()),
 
-    rebar_core:init_command(rebar_state:command_args(State9, Args), Task).
+    rebar_core:init_command(rebar_state:command_args(State10, Args), Task).
 
 init_config() ->
     %% Initialize logging system

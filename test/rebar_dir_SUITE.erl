@@ -6,6 +6,7 @@
 -export([src_dirs/1, extra_src_dirs/1, all_src_dirs/1]).
 -export([profile_src_dirs/1, profile_extra_src_dirs/1, profile_all_src_dirs/1]).
 -export([retarget_path/1, alt_base_dir_abs/1, alt_base_dir_rel/1]).
+-export([global_cache_dir/1, default_global_cache_dir/1, overwrite_default_global_cache_dir/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -15,8 +16,20 @@
 all() -> [default_src_dirs, default_extra_src_dirs, default_all_src_dirs,
           src_dirs, extra_src_dirs, all_src_dirs,
           profile_src_dirs, profile_extra_src_dirs, profile_all_src_dirs,
-          retarget_path, alt_base_dir_abs, alt_base_dir_rel].
+          retarget_path, alt_base_dir_abs, alt_base_dir_rel, global_cache_dir,
+          default_global_cache_dir, overwrite_default_global_cache_dir].
 
+init_per_testcase(default_global_cache_dir, Config) ->
+    [{apps, AppsDir}, {checkouts, CheckoutsDir}, {state, _State} | Config] = rebar_test_utils:init_rebar_state(Config),
+    NewState = rebar_state:new([{base_dir, filename:join([AppsDir, "_build"])}
+                            ,{root_dir, AppsDir}]),
+    [{apps, AppsDir}, {checkouts, CheckoutsDir}, {state, NewState} | Config];
+init_per_testcase(overwrite_default_global_cache_dir, Config) ->
+    os:putenv("REBAR_CACHE_DIR", ?config(priv_dir, Config)),
+    [{apps, AppsDir}, {checkouts, CheckoutsDir}, {state, _State} | Config] = rebar_test_utils:init_rebar_state(Config),
+    NewState = rebar_state:new([{base_dir, filename:join([AppsDir, "_build"])}
+                            ,{root_dir, AppsDir}]),
+    [{apps, AppsDir}, {checkouts, CheckoutsDir}, {state, NewState} | Config];
 init_per_testcase(_, Config) ->
     C = rebar_test_utils:init_rebar_state(Config),
     AppDir = ?config(apps, C),
@@ -162,3 +175,22 @@ alt_base_dir_rel(Config) ->
     ?assert(filelib:is_dir(filename:join([BaseDir, "lib", Name2, "ebin"]))),
     ?assert(filelib:is_file(filename:join([BaseDir, "lib", Name2, "ebin", Name2++".app"]))),
     ?assert(filelib:is_file(filename:join([BaseDir, "lib", Name2, "ebin", Name2++".beam"]))).
+
+global_cache_dir(Config) ->
+    RebarConfig = [{erl_opts, []}],
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+    DataDir = ?config(priv_dir, Config),
+    Expected = filename:join([DataDir, "cache"]),
+    ?assertEqual(Expected, rebar_dir:global_cache_dir(rebar_state:opts(State))).
+
+default_global_cache_dir(Config) ->
+    RebarConfig = [{erl_opts, []}],
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+    Expected = filename:join([rebar_dir:home_dir(), ".cache", "rebar3"]),
+    ?assertEqual(Expected, rebar_dir:global_cache_dir(rebar_state:opts(State))).
+
+overwrite_default_global_cache_dir(Config) ->
+    RebarConfig = [{erl_opts, []}],
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+    Expected = ?config(priv_dir, Config),
+    ?assertEqual(Expected, rebar_dir:global_cache_dir(rebar_state:opts(State))).
