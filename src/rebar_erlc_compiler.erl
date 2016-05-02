@@ -54,6 +54,8 @@
 -define(DEFAULT_OUTDIR, "ebin").
 -define(RE_PREFIX, "^[^._]").
 
+-type compiler_source_format() :: absolute | relative | unchanged.
+-define(DEFAULT_COMPILER_SOURCE_FORMAT, unchanged).
 
 %% ===================================================================
 %% Public API
@@ -500,7 +502,7 @@ expand_file_names(Files, Dirs) ->
 
 -spec internal_erl_compile(rebar_dict(), file:filename(), file:filename(),
     file:filename(), list()) -> ok | {ok, any()} | {error, any(), any()}.
-internal_erl_compile(_Opts, Dir, Module, OutDir, ErlOpts) ->
+internal_erl_compile(Opts, Dir, Module, OutDir, ErlOpts) ->
     Target = target_base(OutDir, Module) ++ ".beam",
     ok = filelib:ensure_dir(Target),
     AllOpts = [{outdir, filename:dirname(Target)}] ++ ErlOpts ++
@@ -511,8 +513,41 @@ internal_erl_compile(_Opts, Dir, Module, OutDir, ErlOpts) ->
         {ok, _Mod, Ws} ->
             rebar_base_compiler:ok_tuple(Module, Ws);
         {error, Es, Ws} ->
-            rebar_base_compiler:error_tuple(Module, Es, Ws, AllOpts)
+            error_tuple(Module, Es, Ws, AllOpts, source_format(Opts))
     end.
+
+-spec source_format(rebar_dict()) -> compiler_source_format().
+source_format(Opts) ->
+    case rebar_opts:get(Opts, compiler_source_format,
+                        ?DEFAULT_COMPILER_SOURCE_FORMAT) of
+        V when V == absolute;
+               V == relative;
+               V == unchanged -> V;
+        Other ->
+            ?WARN("Invalid argument ~p for compiler_source_format - "
+                  "assuming ~s~n", [Other, ?DEFAULT_COMPILER_SOURCE_FORMAT]),
+            ?DEFAULT_COMPILER_SOURCE_FORMAT
+    end.
+
+error_tuple(Module, Es, Ws, Opts, SourceFormat) ->
+    Cwd = rebar_dir:get_cwd(),
+    FormattedEs = format_error_sources(Es, SourceFormat, Cwd),
+    FormattedWs = format_error_sources(Ws, SourceFormat, Cwd),
+    rebar_base_compiler:error_tuple(Module, FormattedEs, FormattedWs, Opts).
+
+format_error_sources(Es, Format, Cwd) ->
+    [{format_error_source(Src, Format, Cwd), Desc} || {Src, Desc} <- Es].
+
+format_error_source(Src, absolute, _Cwd) ->
+    resolve_linked_source(Src);
+format_error_source(Src, relative, Cwd) ->
+    rebar_dir:make_relative_path(resolve_linked_source(Src), Cwd);
+format_error_source(Src, unchanged, _Cwd) ->
+    Src.
+
+resolve_linked_source(Src) ->
+    {Dir, Base} = rebar_file_utils:split_dirname(Src),
+    filename:join(rebar_file_utils:resolve_link(Dir), Base).
 
 target_base(OutDir, Source) ->
     filename:join(OutDir, filename:basename(Source, ".erl")).

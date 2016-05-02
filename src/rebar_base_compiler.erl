@@ -153,12 +153,12 @@ format_errors(_MainSource, Extra, Errors) ->
      end
      || {Source, Descs} <- Errors].
 
-format_error(AbsSource, Extra, {{Line, Column}, Mod, Desc}) ->
+format_error(Source, Extra, {{Line, Column}, Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
-    ?FMT("~s:~w:~w: ~s~s~n", [AbsSource, Line, Column, Extra, ErrorDesc]);
-format_error(AbsSource, Extra, {Line, Mod, Desc}) ->
+    ?FMT("~s:~w:~w: ~s~s~n", [Source, Line, Column, Extra, ErrorDesc]);
+format_error(Source, Extra, {Line, Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
-    ?FMT("~s:~w: ~s~s~n", [AbsSource, Line, Extra, ErrorDesc]);
-format_error(AbsSource, Extra, {Mod, Desc}) ->
+    ?FMT("~s:~w: ~s~s~n", [Source, Line, Extra, ErrorDesc]);
+format_error(Source, Extra, {Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
-    ?FMT("~s: ~s~s~n", [AbsSource, Extra, ErrorDesc]).
+    ?FMT("~s: ~s~s~n", [Source, Extra, ErrorDesc]).

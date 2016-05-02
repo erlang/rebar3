@@ -12,7 +12,9 @@
          reset_empty_dir/1,
          reset_dir/1,
          path_from_ancestor/1,
-         canonical_path/1]).
+         canonical_path/1,
+         resolve_link/1,
+         split_dirname/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -22,7 +24,9 @@
 all() ->
     [{group, tmpdir},
      {group, reset_dir},
-     path_from_ancestor, canonical_path].
+     canonical_path,
+     resolve_link,
+     split_dirname].
 
 groups() ->
     [{tmpdir, [], [raw_tmpdir, empty_tmpdir, simple_tmpdir, multi_tmpdir]},
@@ -111,3 +115,22 @@ canonical_path(_Config) ->
     ?assertEqual(Root ++ "foo", rebar_file_utils:canonical_path("/foo/./.")),
     ?assertEqual(filename:nativename(Root ++ "foo/bar"),
                  rebar_file_utils:canonical_path("/foo/./bar")).
+
+resolve_link(_Config) ->
+    TmpDir = rebar_file_utils:system_tmpdir(
+            ["rebar_file_utils_SUITE", "resolve_link"]),
+    Link = filename:join(TmpDir, "link"),
+    Target = filename:join(TmpDir, "link-target"),
+    ec_file:remove(TmpDir, [recursive]),
+    ok = filelib:ensure_dir(Target),
+    ok = file:write_file(Target, <<>>),
+    ok = file:make_symlink(Target, Link),
+    ?assertEqual(Target, rebar_file_utils:resolve_link(Link)).
+
+split_dirname(_Config) ->
+    ?assertEqual({".", ""}, rebar_file_utils:split_dirname("")),
+    ?assertEqual({"/", ""}, rebar_file_utils:split_dirname("/")),
+    ?assertEqual({"/", "foo"}, rebar_file_utils:split_dirname("/foo")),
+    ?assertEqual({".", "foo"}, rebar_file_utils:split_dirname("foo")),
+    ?assertEqual({"/foo", "bar"}, rebar_file_utils:split_dirname("/foo/bar")),
+    ?assertEqual({"foo", "bar"}, rebar_file_utils:split_dirname("foo/bar")).
