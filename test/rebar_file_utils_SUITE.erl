@@ -24,6 +24,7 @@
 all() ->
     [{group, tmpdir},
      {group, reset_dir},
+     path_from_ancestor,
      canonical_path,
      resolve_link,
      split_dirname].
