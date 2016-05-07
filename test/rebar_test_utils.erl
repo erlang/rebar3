@@ -149,21 +149,21 @@ expand_deps(git, [{Name, Vsn, Deps} | Rest]) ->
     Dep = {Name, Vsn, {git, "https://example.org/user/"++Name++".git", {tag, Vsn}}},
     [{Dep, expand_deps(git, Deps)} | expand_deps(git, Rest)];
 expand_deps(pkg, [{Name, Deps} | Rest]) ->
-    Dep = {pkg, Name, "0.0.0"},
+    Dep = {pkg, Name, "0.0.0", undefined},
     [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)];
 expand_deps(pkg, [{Name, Vsn, Deps} | Rest]) ->
-    Dep = {pkg, Name, Vsn},
+    Dep = {pkg, Name, Vsn, undefined},
     [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)];
 expand_deps(mixed, [{Name, Deps} | Rest]) ->
     Dep = if hd(Name) >= $a, hd(Name) =< $z ->
-            {pkg, string:to_upper(Name), "0.0.0"}
+            {pkg, string:to_upper(Name), "0.0.0", undefined}
            ; hd(Name) >= $A, hd(Name) =< $Z ->
             {Name, ".*", {git, "https://example.org/user/"++Name++".git", "master"}}
     end,
     [{Dep, expand_deps(mixed, Deps)} | expand_deps(mixed, Rest)];
 expand_deps(mixed, [{Name, Vsn, Deps} | Rest]) ->
     Dep = if hd(Name) >= $a, hd(Name) =< $z ->
-            {pkg, string:to_upper(Name), Vsn}
+            {pkg, string:to_upper(Name), Vsn, undefined}
            ; hd(Name) >= $A, hd(Name) =< $Z ->
             {Name, Vsn, {git, "https://example.org/user/"++Name++".git", {tag, Vsn}}}
     end,
@@ -177,7 +177,7 @@ expand_deps(mixed, [{Name, Vsn, Deps} | Rest]) ->
 flat_deps(Deps) -> flat_deps(Deps, [], []).
 
 flat_deps([], Src, Pkg) -> {Src, Pkg};
-flat_deps([{{pkg, Name, Vsn}, PkgDeps} | Rest], Src, Pkg) ->
+flat_deps([{{pkg, Name, Vsn, undefined}, PkgDeps} | Rest], Src, Pkg) ->
     Current = {{iolist_to_binary(Name), iolist_to_binary(Vsn)},
                top_level_deps(PkgDeps)},
     {[], FlatPkgDeps} = flat_deps(PkgDeps),
@@ -195,7 +195,7 @@ vsn_from_ref({git, _, {_, Vsn}}) -> Vsn;
 vsn_from_ref({git, _, Vsn}) -> Vsn.
 
 top_level_deps([]) -> [];
-top_level_deps([{{pkg, Name, Vsn}, _} | Deps]) ->
+top_level_deps([{{pkg, Name, Vsn, undefined}, _} | Deps]) ->
     [{list_to_atom(Name), Vsn} | top_level_deps(Deps)];
 top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
     [{list_to_atom(Name), Vsn, Ref} | top_level_deps(Deps)].
@@ -306,7 +306,7 @@ check_results(AppDir, Expected, ProfileRun) ->
                 case lists:keyfind(iolist_to_binary(Name), 1, Locks) of
                     false ->
                         error({lock_not_found, Name});
-                    {_LockName, {pkg, _, LockVsn}, _} ->
+                    {_LockName, {pkg, _, LockVsn, _}, _} ->
                         ?assertEqual(iolist_to_binary(Vsn),
                                      iolist_to_binary(LockVsn));
                     {_LockName, {_, _, {ref, LockVsn}}, _} ->
@@ -318,7 +318,7 @@ check_results(AppDir, Expected, ProfileRun) ->
                 case lists:keyfind(iolist_to_binary(Name), 1, Locks) of
                     false ->
                         error({lock_not_found, Name});
-                    {_LockName, {pkg, _, LockVsn}, _} ->
+                    {_LockName, {pkg, _, LockVsn, _}, _} ->
                         ?assertEqual(iolist_to_binary(Vsn),
                                      iolist_to_binary(LockVsn));
                     {_LockName, {_, _, {ref, LockVsn}}, _} ->
@@ -329,7 +329,7 @@ check_results(AppDir, Expected, ProfileRun) ->
                 case lists:keyfind(iolist_to_binary(Name), 1, Locks) of
                     false ->
                         error({lock_not_found, Name});
-                    {_LockName, {pkg, _, LockVsn}, _} ->
+                    {_LockName, {pkg, _, LockVsn, _}, _} ->
                         error({pkg_lock, {Name, LockVsn}});
                     {_LockName, {_, _, {ref, LockVsn}}, _} ->
                         ?assertEqual(iolist_to_binary(Vsn),

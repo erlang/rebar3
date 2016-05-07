@@ -103,7 +103,7 @@ good_uncached(Config) ->
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
     ?assertEqual({ok, true},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn}, State)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, undefined}, State)),
     Cache = ?config(cache_dir, Config),
     ?assert(filelib:is_regular(filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>))).
 
@@ -116,7 +116,7 @@ good_cached(Config) ->
     ?assert(filelib:is_regular(CachedFile)),
     {ok, Content} = file:read_file(CachedFile),
     ?assertEqual({ok, true},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn}, State)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, undefined}, State)),
     {ok, Content} = file:read_file(CachedFile).
 
 badindexchk(Config) ->
@@ -124,7 +124,7 @@ badindexchk(Config) ->
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
     ?assertMatch({bad_registry_checksum, _Path},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn}, State)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, undefined}, State)),
     %% The cached file is there for forensic purposes
     Cache = ?config(cache_dir, Config),
     ?assert(filelib:is_regular(filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>))).
@@ -134,7 +134,7 @@ badpkg(Config) ->
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
     ?assertMatch({bad_download, _Path},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn}, State)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, undefined}, State)),
     %% The cached file is there for forensic purposes
     Cache = ?config(cache_dir, Config),
     ?assert(filelib:is_regular(filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>))).
@@ -148,7 +148,7 @@ bad_to_good(Config) ->
     ?assert(filelib:is_regular(CachedFile)),
     {ok, Contents} = file:read_file(CachedFile),
     ?assertEqual({ok, true},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn}, State)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, undefined}, State)),
     %% Cache has refreshed
     ?assert({ok, Contents} =/= file:read_file(CachedFile)).
 
@@ -161,7 +161,7 @@ good_disconnect(Config) ->
     ?assert(filelib:is_regular(CachedFile)),
     {ok, Content} = file:read_file(CachedFile),
     ?assertEqual({ok, true},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn}, State)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, undefined}, State)),
     {ok, Content} = file:read_file(CachedFile).
 
 bad_disconnect(Config) ->
@@ -169,7 +169,7 @@ bad_disconnect(Config) ->
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
     ?assertEqual({fetch_fail, Pkg, Vsn},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn}, State)).
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, undefined}, State)).
 
 pkgs_provider(Config) ->
     Config1 = rebar_test_utils:init_rebar_state(Config),

@@ -56,35 +56,73 @@ consult_lock_file(File) ->
         [] ->
             [];
         [Locks] when is_list(Locks) -> % beta lock file
-            Locks;
+            read_attrs(beta, Locks, []);
         [{Vsn, Locks}|Attrs] when is_list(Locks) -> % versioned lock file
-            %% Make sure the warning above is to be shown whenever a version
-            %% newer than the current one is being used, as we can't parse
-            %% all the contents of the lock file properly.
-            ?WARN("Rebar3 detected a lock file from a newer version. "
-                  "It will be loaded in compatibility mode, but important "
-                  "information may be missing or lost. It is recommended to "
-                  "upgrade Rebar3.", []),
+            case Vsn of
+                ?CONFIG_VERSION ->
+                    ok;
+                _ ->
+                    %% Make sure the warning below is to be shown whenever a version
+                    %% newer than the current one is being used, as we can't parse
+                    %% all the contents of the lock file properly.
+                    ?WARN("Rebar3 detected a lock file from a newer version. "
+                          "It will be loaded in compatibility mode, but important "
+                          "information may be missing or lost. It is recommended to "
+                          "upgrade Rebar3.", [])
+            end,
             read_attrs(Vsn, Locks, Attrs)
     end.
 
 write_lock_file(LockFile, Locks) ->
-    NewLocks = write_attrs(Locks),
+    {NewLocks, Attrs} = write_attrs(Locks),
     %% Write locks in the beta format, at least until it's been long
     %% enough we can start modifying the lock format.
-    file:write_file(LockFile, io_lib:format("~p.~n", [NewLocks])).
+    case Attrs of
+        [] -> % write the old beta copy to avoid changes
+            file:write_file(LockFile, io_lib:format("~p.~n", [NewLocks]));
+        _ ->
+            file:write_file(LockFile,
+                            io_lib:format("{~p,~p}.~n~p.~n",
+                                          [?CONFIG_VERSION, NewLocks, Attrs]))
+    end.
 
-read_attrs(_Vsn, Locks, _Attrs) ->
+read_attrs(_Vsn, Locks, Attrs) ->
     %% Beta copy does not know how to expand attributes, but
     %% is ready to support it.
-    Locks.
+    expand_locks(Locks, extract_pkg_hashes(Attrs)).
+
+extract_pkg_hashes(Attrs) ->
+    Props = case Attrs of
+                [First|_] -> First;
+                [] -> []
+            end,
+    proplists:get_value(pkg_hash, Props, []).
+
+expand_locks([], _Hashes) ->
+    [];
+expand_locks([{Name, {pkg,PkgName,Vsn}, Lvl} | Locks], Hashes) ->
+    Hash = proplists:get_value(Name, Hashes),
+    [{Name, {pkg,PkgName,Vsn,Hash}, Lvl} | expand_locks(Locks, Hashes)];
+expand_locks([Lock|Locks], Hashes) ->
+    [Lock | expand_locks(Locks, Hashes)].
 
 write_attrs(Locks) ->
     %% No attribute known that needs to be taken out of the structure,
     %% just return terms as is.
-    Locks.
+    {NewLocks, Hashes} = split_locks(Locks, [], []),
+    case Hashes of
+        [] -> {NewLocks, []};
+        _ -> {NewLocks, [{pkg_hash, lists:sort(Hashes)}]}
+    end.
 
-
+split_locks([], Locks, Hashes) ->
+    {lists:reverse(Locks), Hashes};
+split_locks([{Name, {pkg,PkgName,Vsn,undefined}, Lvl} | Locks], LAcc, HAcc) ->
+    split_locks(Locks, [{Name,{pkg,PkgName,Vsn},Lvl}|LAcc], HAcc);
+split_locks([{Name, {pkg,PkgName,Vsn,Hash}, Lvl} | Locks], LAcc, HAcc) ->
+    split_locks(Locks, [{Name,{pkg,PkgName,Vsn},Lvl}|LAcc], [{Name, Hash}|HAcc]);
+split_locks([Lock|Locks], LAcc, HAcc) ->
+    split_locks(Locks, [Lock|LAcc], HAcc).
 
 consult_file(File) ->
     Terms = consult_file_(File),

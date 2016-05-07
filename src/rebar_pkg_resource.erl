@@ -19,7 +19,7 @@
 lock(_AppDir, Source) ->
     Source.
 
-needs_update(Dir, {pkg, _Name, Vsn}) ->
+needs_update(Dir, {pkg, _Name, Vsn, _Hash}) ->
     [AppInfo] = rebar_app_discover:find_apps([Dir], all),
     case rebar_app_info:original_vsn(AppInfo) =:= ec_cnv:to_list(Vsn) of
         true ->
@@ -28,7 +28,7 @@ needs_update(Dir, {pkg, _Name, Vsn}) ->
             true
     end.
 
-download(TmpDir, Pkg={pkg, Name, Vsn}, State) ->
+download(TmpDir, Pkg={pkg, Name, Vsn, _Hash}, State) ->
     CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
     {ok, PackageDir} = rebar_packages:package_dir(State),
     Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
@@ -40,7 +40,7 @@ download(TmpDir, Pkg={pkg, Name, Vsn}, State) ->
             {fetch_fail, Name, Vsn}
     end.
 
-cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn}, Url, ETag, State) ->
+cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash}, Url, ETag, State) ->
     case request(Url, ETag) of
         {ok, cached} ->
             ?INFO("Version cached at ~s is up to date, reusing it", [CachePath]),
