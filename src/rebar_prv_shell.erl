@@ -108,6 +108,10 @@ shell(State) ->
     simulate_proc_lib(),
     true = register(rebar_agent, self()),
     {ok, GenState} = rebar_agent:init(State),
+    %% Hack to fool the init process into thinking we have stopped and the normal
+    %% node start process can go on. Without it, init:get_status() always return
+    %% '{starting, started}' instead of '{started, started}'
+    init ! {'EXIT', self(), normal},    
     gen_server:enter_loop(rebar_agent, [], GenState, {local, rebar_agent}, hibernate).
 
 info() ->
