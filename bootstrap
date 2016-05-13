@@ -350,7 +350,7 @@ format_error(AbsSource, Extra, {Mod, Desc}) ->
     io_lib:format("~s: ~s~s~n", [AbsSource, Extra, ErrorDesc]).
 
 additional_defines() ->
-    [{d, D} || {Re, D} <- [{"^[0-9]+", namespaced_types}, {"^R1[4|5]", deprecated_crypto}], is_otp_release(Re)].
+    [{d, D} || {Re, D} <- [{"^[0-9]+", namespaced_types}, {"^R1[4|5]", deprecated_crypto}, {"^((1[8|9])|2)", rand_module}], is_otp_release(Re)].
 
 is_otp_release(ArchRegex) ->
     case re:run(otp_release(), ArchRegex, [{capture, none}]) of
