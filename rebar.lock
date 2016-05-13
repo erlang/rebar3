@@ -2,7 +2,7 @@
  {<<"certifi">>,{pkg,<<"certifi">>,<<"0.4.0">>},0},
  {<<"cf">>,{pkg,<<"cf">>,<<"0.2.1">>},0},
  {<<"cth_readable">>,{pkg,<<"cth_readable">>,<<"1.2.2">>},0},
- {<<"erlware_commons">>,{pkg,<<"erlware_commons">>,<<"0.20.0">>},0},
+ {<<"erlware_commons">>,{pkg,<<"erlware_commons">>,<<"0.21.0">>},0},
  {<<"eunit_formatters">>,{pkg,<<"eunit_formatters">>,<<"0.3.1">>},0},
  {<<"getopt">>,{pkg,<<"getopt">>,<<"0.8.2">>},0},
  {<<"providers">>,{pkg,<<"providers">>,<<"1.6.0">>},0},
