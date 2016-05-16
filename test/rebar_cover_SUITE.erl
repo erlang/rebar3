@@ -90,7 +90,7 @@ basic_extra_src_dirs(Config) ->
     {file, _} = cover:is_compiled(Mod),
 
     ExtraMod = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name]))),
-    {file, _} = cover:is_compiled(ExtraMod).
+    false = cover:is_compiled(ExtraMod).
 
 release_extra_src_dirs(Config) ->
     AppDir = ?config(apps, Config),
@@ -129,9 +129,9 @@ release_extra_src_dirs(Config) ->
     {file, _} = cover:is_compiled(Mod2),
 
     ExtraMod1 = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name1]))),
-    {file, _} = cover:is_compiled(ExtraMod1),
+    false = cover:is_compiled(ExtraMod1),
     ExtraMod2 = list_to_atom(lists:flatten(io_lib:format("~ts_extra", [Name2]))),
-    {file, _} = cover:is_compiled(ExtraMod2).
+    false = cover:is_compiled(ExtraMod2).
 
 root_extra_src_dirs(Config) ->
     AppDir = ?config(apps, Config),
@@ -160,7 +160,7 @@ root_extra_src_dirs(Config) ->
     Mod2 = list_to_atom(Name2),
     {file, _} = cover:is_compiled(Mod2),
 
-    {file, _} = cover:is_compiled(extra).
+    false = cover:is_compiled(extra).
 
 index_written(Config) ->
     AppDir = ?config(apps, Config),

@@ -296,8 +296,7 @@ strip_coverdir(File) ->
 cover_compile(State, apps) ->
     Apps = filter_checkouts(rebar_state:project_apps(State)),
     AppDirs = app_dirs(Apps),
-    ExtraDirs = extra_src_dirs(State, Apps),
-    cover_compile(State, lists:filter(fun(D) -> ec_file:is_dir(D) end, AppDirs ++ ExtraDirs));
+    cover_compile(State, lists:filter(fun(D) -> ec_file:is_dir(D) end, AppDirs));
 cover_compile(State, Dirs) ->
     %% start the cover server if necessary
     {ok, CoverPid} = start_cover(),
@@ -322,21 +321,7 @@ app_dirs(Apps) ->
     lists:foldl(fun app_ebin_dirs/2, [], Apps).
 
 app_ebin_dirs(App, Acc) ->
-    AppDir = rebar_app_info:ebin_dir(App),
-    ExtraDirs = rebar_dir:extra_src_dirs(rebar_app_info:opts(App), []),
-    OutDir = rebar_app_info:out_dir(App),
-    [AppDir] ++ [filename:join([OutDir, D]) || D <- ExtraDirs] ++ Acc.
-
-extra_src_dirs(State, Apps) ->
-    BaseDir = rebar_state:dir(State),
-    F = fun(App) -> rebar_app_info:dir(App) == BaseDir end,
-    %% check that this app hasn't already been dealt with
-    Extras = case lists:any(F, Apps) of
-        false -> rebar_dir:extra_src_dirs(rebar_state:opts(State), []);
-        true  -> []
-    end,
-    OutDir = rebar_dir:base_dir(State),
-    [filename:join([OutDir, "extras", D]) || D <- Extras].
+    [rebar_app_info:ebin_dir(App)|Acc].
 
 filter_checkouts(Apps) -> filter_checkouts(Apps, []).
 
