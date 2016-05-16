@@ -38,18 +38,22 @@ run_provider_hooks(Dir, Type, Command, Providers, Opts, State) ->
 run_provider_hooks_(_Dir, _Type, _Command, _Providers, [], State) ->
     State;
 run_provider_hooks_(Dir, Type, Command, Providers, TypeHooks, State) ->
-    PluginDepsPaths = rebar_state:code_paths(State, all_plugin_deps),
-    code:add_pathsa(PluginDepsPaths),
-    Providers1 = rebar_state:providers(State),
-    State1 = rebar_state:providers(rebar_state:dir(State, Dir), Providers++Providers1),
-    HookProviders = proplists:get_all_values(Command, TypeHooks),
-    case rebar_core:do(HookProviders, State1) of
-        {error, ProviderName} ->
-            ?DEBUG(format_error({bad_provider, Type, Command, ProviderName}), []),
-            throw(?PRV_ERROR({bad_provider, Type, Command, ProviderName}));
-        {ok, State2} ->
-            rebar_utils:remove_from_code_path(PluginDepsPaths),
-            State2
+    case proplists:get_all_values(Command, TypeHooks) of
+        [] ->
+            State;
+        HookProviders ->
+            PluginDepsPaths = lists:usort(rebar_state:code_paths(State, all_plugin_deps)),
+            code:add_pathsa(PluginDepsPaths),
+            Providers1 = rebar_state:providers(State),
+            State1 = rebar_state:providers(rebar_state:dir(State, Dir), Providers++Providers1),
+            case rebar_core:do(HookProviders, State1) of
+                {error, ProviderName} ->
+                    ?DEBUG(format_error({bad_provider, Type, Command, ProviderName}), []),
+                    throw(?PRV_ERROR({bad_provider, Type, Command, ProviderName}));
+                {ok, State2} ->
+                    rebar_utils:remove_from_code_path(PluginDepsPaths),
+                    State2
+            end
     end.
 
 format_error({bad_provider, Type, Command, {Name, Namespace}}) ->
