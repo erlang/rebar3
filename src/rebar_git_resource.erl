@@ -18,9 +18,16 @@ lock(AppDir, {git, Url, _}) ->
     lock(AppDir, {git, Url});
 lock(AppDir, {git, Url}) ->
     AbortMsg = io_lib:format("Locking of git dependency failed in ~s", [AppDir]),
+    Dir = rebar_utils:escape_double_quotes(AppDir),
     {ok, VsnString} =
-        rebar_utils:sh("git --git-dir=\"" ++ rebar_utils:escape_double_quotes(AppDir) ++ "/.git\" rev-parse --verify HEAD",
-                       [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
+        case os:type() of
+            {win32, _} ->
+                rebar_utils:sh("git rev-parse --git-dir=\"" ++ Dir ++ "/.git\" --work-tree=\"" ++ Dir ++ "\" --verify HEAD",
+                    [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]);
+            _ ->
+                rebar_utils:sh("git --git-dir=\"" ++ Dir ++ "/.git\" rev-parse --verify HEAD",
+                    [{use_stdout, false}, {debug_abort_on_error, AbortMsg}])
+        end,
     Ref = string:strip(VsnString, both, $\n),
     {git, Url, {ref, Ref}}.
 
