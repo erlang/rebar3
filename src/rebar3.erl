@@ -345,7 +345,13 @@ start_and_load_apps(Caller) ->
     ensure_running(public_key, Caller),
     ensure_running(ssl, Caller),
     inets:start(),
-    inets:start(httpc, [{profile, rebar}]).
+    inets:start(httpc, [{profile, rebar}]),
+    case ets:info(?REPOS_TABLE) of
+        undefined ->
+            ets:new(?REPOS_TABLE, [named_table, public]);
+        _ ->
+            ok
+    end.
 
 %% @doc Make sure a required app is running, or display an error message
 %% and abort if there's a problem.
@@ -369,7 +375,8 @@ ensure_running(App, Caller) ->
 -spec state_from_global_config([term()], file:filename()) -> rebar_state:t().
 state_from_global_config(Config, GlobalConfigFile) ->
     GlobalConfigTerms = rebar_config:consult_file(GlobalConfigFile),
-    GlobalConfig = rebar_state:new(GlobalConfigTerms),
+    Registries = proplists:get_value(hex_registries, GlobalConfigTerms, [?DEFAULT_REGISTRY]),
+    GlobalConfig = rebar_state:repos(rebar_state:new(GlobalConfigTerms), Registries),
 
     %% We don't want to worry about global plugin install state effecting later
     %% usage. So we throw away the global profile state used for plugin install.
@@ -386,6 +393,7 @@ state_from_global_config(Config, GlobalConfigFile) ->
     GlobalConfig2 = rebar_state:set(GlobalConfig, plugins, []),
     GlobalConfig3 = rebar_state:set(GlobalConfig2, {plugins, global}, rebar_state:get(GlobalConfigThrowAway, plugins, [])),
     rebar_state:providers(rebar_state:new(GlobalConfig3, Config), GlobalPlugins).
+
 
 test_state(State) ->
     ErlOpts = rebar_state:get(State, erl_opts, []),

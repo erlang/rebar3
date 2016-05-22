@@ -24,13 +24,14 @@
 -define(DEFAULT_RELEASE_DIR, "rel").
 -define(CONFIG_VERSION, "1.1.0").
 -define(DEFAULT_CDN, "https://repo.hex.pm/").
+-define(DEFAULT_REGISTRY, "https://repo.hex.pm/").
+-define(REPOS_TABLE, repos_table).
 -define(REMOTE_PACKAGE_DIR, "tarballs").
 -define(REMOTE_REGISTRY_FILE, "registry.ets.gz").
 -define(LOCK_FILE, "rebar.lock").
 
 -define(PACKAGE_INDEX_VERSION, 3).
--define(PACKAGE_TABLE, package_index).
--define(INDEX_FILE, "packages.idx").
+-define(INDEX_FILE, "registry"). %"packages.idx").
 -define(REGISTRY_FILE, "registry").
 
 -ifdef(namespaced_types).

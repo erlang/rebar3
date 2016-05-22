@@ -77,7 +77,7 @@ mock_download(Opts) ->
     Config = proplists:get_value(config, Opts, []),
     meck:expect(
         ?MOD, download,
-        fun (Dir, {pkg, AppBin, Vsn, _}, _) ->
+        fun (Dir, {{pkg, AppBin, Vsn, _}, _}, _) ->
             App = binary_to_list(AppBin),
             filelib:ensure_dir(Dir),
             AppDeps = proplists:get_value({App,Vsn}, Deps, []),
@@ -117,9 +117,9 @@ mock_pkg_index(Opts) ->
     Dict = find_parts(Deps, Skip),
     meck:new(rebar_packages, [passthrough, no_link]),
     meck:expect(rebar_packages, packages,
-                fun(_State) -> to_index(Deps, Dict) end),
+                fun(_, _State) -> to_index(Deps, Dict) end),
     meck:expect(rebar_packages, verify_table,
-                fun(_State) -> to_index(Deps, Dict), true end).
+                fun(_, _State) -> to_index(Deps, Dict) end).
 
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
@@ -145,22 +145,23 @@ find_parts([{AppName, Deps}|Rest], Skip, Acc) ->
     end.
 
 to_index(AllDeps, Dict) ->
-    catch ets:delete(package_index),
-    ets:new(package_index, [named_table, public]),
+    Tid = ets:new(package_index, [public]),
+    ets:insert(repos_table, {"https://repo.hex.pm/", Tid}),
     dict:fold(
       fun(K, Deps, _) ->
               DepsList = [{DKB, {pkg, DKB, DVB, undefined}}
                           || {DK, DV} <- Deps,
                              DKB <- [ec_cnv:to_binary(DK)],
                              DVB <- [ec_cnv:to_binary(DV)]],
-              ets:insert(package_index, {K, DepsList, <<"checksum">>})
+              ets:insert(Tid, {K, DepsList, <<"checksum">>})
       end, ok, Dict),
-    ets:insert(package_index, {package_index_version, 3}),
+    ets:insert(Tid, {package_index_version, 3}),
     lists:foreach(fun({{Name, Vsn}, _}) ->
-                          case ets:lookup(package_index,  ec_cnv:to_binary(Name)) of
+                          case ets:lookup(Tid,  ec_cnv:to_binary(Name)) of
                               [{_, Vsns}] ->
-                                  ets:insert(package_index, {ec_cnv:to_binary(Name), [ec_cnv:to_binary(Vsn) | Vsns]});
+                                  ets:insert(Tid, {ec_cnv:to_binary(Name), [ec_cnv:to_binary(Vsn) | Vsns]});
                               _ ->
-                                  ets:insert(package_index, {ec_cnv:to_binary(Name), [ec_cnv:to_binary(Vsn)]})
+                                  ets:insert(Tid, {ec_cnv:to_binary(Name), [ec_cnv:to_binary(Vsn)]})
                           end
-                  end, AllDeps).
+                  end, AllDeps),
+    {ok, Tid}.

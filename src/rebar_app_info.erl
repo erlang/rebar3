@@ -28,6 +28,8 @@
          applications/2,
          profiles/1,
          profiles/2,
+         registry/1,
+         registry/2,
          deps/1,
          deps/2,
          dep_level/1,
@@ -76,6 +78,7 @@
                      parent=root        :: binary() | root,
                      app_details=[]     :: list(),
                      applications=[]    :: list(),
+                     registry           :: string(),
                      deps=[]            :: list(),
                      profiles=[default] :: [atom()],
                      default=dict:new() :: rebar_dict(),
@@ -376,6 +379,14 @@ profiles(AppInfo=#app_info_t{}, Profiles) ->
     AppInfo#app_info_t{profiles=Profiles}.
 
 %% @doc returns the list of dependencies
+-spec registry(t()) -> string().
+registry(#app_info_t{registry=Registry}) ->
+    Registry.
+
+-spec registry(t(), string()) -> t().
+registry(AppInfo=#app_info_t{}, Registry) ->
+    AppInfo#app_info_t{registry=Registry}.
+
 -spec deps(t()) -> list().
 deps(#app_info_t{deps=Deps}) ->
     Deps.

@@ -845,11 +845,14 @@ set_httpc_options(Scheme, Proxy) ->
     set_proxy_auth(UserInfo).
 
 url_append_path(Url, ExtraPath) ->
-     case http_uri:parse(Url) of
+     try http_uri:parse(Url) of
          {ok, {Scheme, UserInfo, Host, Port, Path, Query}} ->
              {ok, lists:append([atom_to_list(Scheme), "://", UserInfo, Host, ":", integer_to_list(Port),
                                 filename:join(Path, ExtraPath), "?", Query])};
          _ ->
+             error
+     catch
+         _:_ ->
              error
      end.
 

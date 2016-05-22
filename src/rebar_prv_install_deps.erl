@@ -362,7 +362,8 @@ fetch_app(AppInfo, AppDir, State) ->
     ?INFO("Fetching ~s (~p)", [rebar_app_info:name(AppInfo),
                                format_source(rebar_app_info:source(AppInfo))]),
     Source = rebar_app_info:source(AppInfo),
-    true = rebar_fetch:download_source(AppDir, Source, State).
+    Registry = rebar_app_info:registry(AppInfo),
+    true = rebar_fetch:download_source(AppDir, {Source, Registry}, State).
 
 format_source({pkg, Name, Vsn, _Hash}) -> {pkg, Name, Vsn};
 format_source(Source) -> Source.
@@ -380,12 +381,13 @@ update_app_info(AppDir, AppInfo) ->
 
 maybe_upgrade(AppInfo, AppDir, Upgrade, State) ->
     Source = rebar_app_info:source(AppInfo),
+    Registry = rebar_app_info:registry(AppInfo),
     case Upgrade orelse rebar_app_info:is_lock(AppInfo) of
         true ->
             case rebar_fetch:needs_update(AppDir, Source, State) of
                 true ->
                     ?INFO("Upgrading ~s (~p)", [rebar_app_info:name(AppInfo), rebar_app_info:source(AppInfo)]),
-                    true = rebar_fetch:download_source(AppDir, Source, State);
+                    true = rebar_fetch:download_source(AppDir, {Source, Registry}, State);
                 false ->
                     case Upgrade of
                         true ->

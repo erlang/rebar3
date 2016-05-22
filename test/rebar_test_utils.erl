@@ -37,7 +37,8 @@ init_rebar_state(Config, Name) ->
     State = rebar_state:new([{base_dir, filename:join([AppsDir, "_build"])}
                             ,{global_rebar_dir, GlobalDir}
                             ,{root_dir, AppsDir}]),
-    [{apps, AppsDir}, {checkouts, CheckoutsDir}, {state, State} | Config].
+    State1 = rebar_state:repos(State, ["http://test.com/"]),
+    [{apps, AppsDir}, {checkouts, CheckoutsDir}, {state, State1} | Config].
 
 %% @doc Takes common test config, a rebar config ([] if empty), a command to
 %% run ("install_deps", "compile", etc.), and a list of expected applications

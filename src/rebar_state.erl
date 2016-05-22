@@ -38,6 +38,8 @@
 
          to_list/1,
 
+         repos/1, repos/2,
+
          resources/1, resources/2, add_resource/2,
          providers/1, providers/2, add_provider/2,
          allow_provider_overrides/1, allow_provider_overrides/2
@@ -64,6 +66,8 @@
                   deps_to_build       = []          :: [rebar_app_info:t()],
                   all_plugin_deps     = []          :: [rebar_app_info:t()],
                   all_deps            = []          :: [rebar_app_info:t()],
+
+                  repos                             :: [string()],
 
                   resources           = [],
                   providers           = [],
@@ -301,7 +305,9 @@ dir(State=#state_t{}, Dir) ->
     State#state_t{dir=filename:absname(Dir)}.
 
 deps_names(Deps) when is_list(Deps) ->
-    lists:map(fun(Dep) when is_tuple(Dep) ->
+    lists:map(fun([Dep, _Vsn, _Required, _App]) ->
+                  Dep;
+                 (Dep) when is_tuple(Dep) ->
                       ec_cnv:to_binary(element(1, Dep));
                  (Dep) when is_atom(Dep) ->
                       ec_cnv:to_binary(Dep)
@@ -355,6 +361,12 @@ namespace(#state_t{namespace=Namespace}) ->
 
 namespace(State=#state_t{}, Namespace) ->
     State#state_t{namespace=Namespace}.
+
+repos(#state_t{repos=Repos}) ->
+    Repos.
+
+repos(State, Repos) ->
+    State#state_t{repos=Repos}.
 
 -spec resources(t()) -> [{rebar_resource:type(), module()}].
 resources(#state_t{resources=Resources}) ->

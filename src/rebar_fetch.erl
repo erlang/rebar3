@@ -25,6 +25,8 @@ lock_source(AppDir, Source, State) ->
 
 -spec download_source(file:filename_all(), rebar_resource:resource(), rebar_state:t()) ->
                              true | {error, any()}.
+download_source(AppDir, {Source, undefined}, State) when is_tuple(Source) ->
+    download_source(AppDir, Source, State);
 download_source(AppDir, Source, State) ->
     try download_source_(AppDir, Source, State) of
         true ->
@@ -86,6 +88,8 @@ format_error({bad_checksum, File}) ->
 format_error({bad_registry_checksum, File}) ->
     io_lib:format("Checksum mismatch against registry in ~s", [File]).
 
+get_resource_type({{pkg, _, _, _}, _}, _) ->
+    rebar_pkg_resource;
 get_resource_type({Type, Location}, Resources) ->
     find_resource_module(Type, Location, Resources);
 get_resource_type({Type, Location, _}, Resources) ->

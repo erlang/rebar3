@@ -140,6 +140,8 @@ parse_deps(Parent, DepsDir, Deps, State, Locks, Level) ->
       Level :: non_neg_integer().
 parse_dep(Dep, Parent, DepsDir, State, Locks, Level) ->
     Name = case Dep of
+               [PkgName, _Vsn, _Required, _App] ->
+                   PkgName;
                Dep when is_tuple(Dep) ->
                    element(1, Dep);
                Dep ->
@@ -242,48 +244,50 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
     rebar_app_info:t() when
       Source :: tuple() | atom() | binary(). % TODO: meta to source()
 update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
-    {PkgName1, PkgVsn1} = case PkgVsn of
+    {PkgName1, PkgVsn1, Registry} = case PkgVsn of
                               undefined ->
-                                  get_package(PkgName, "0", State);
+                                  get_package(PkgName, PkgVsn, State);
                               <<"~>", Vsn/binary>> ->
                                   [Vsn1] = [X || X <- binary:split(Vsn, [<<" ">>], [global]), X =/= <<>>],
                                   get_package(PkgName, Vsn1, State);
                               _ ->
-                                  {PkgName, PkgVsn}
+                                  get_package(PkgName, PkgVsn, State)
                           end,
     %% store the expected hash for the dependency
     Hash1 = case Hash of
         undefined -> % unknown, define the hash since we know the dep
-            fetch_checksum(PkgName1, PkgVsn1, Hash, State);
+            fetch_checksum(PkgName1, PkgVsn1, Hash, Registry, State);
         _ -> % keep as is
             Hash
     end,
     AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName1, PkgVsn1, Hash1}),
-    Deps = rebar_packages:deps(PkgName1
-                              ,PkgVsn1
-                              ,State),
-    AppInfo2 = rebar_app_info:resource_type(rebar_app_info:deps(AppInfo1, Deps), pkg),
-    rebar_app_info:original_vsn(AppInfo2, PkgVsn1);
+    AppInfo2 = rebar_app_info:registry(AppInfo1, Registry),
+    {ok, Deps} = rebar_packages:deps_(PkgName1
+                                     ,PkgVsn1
+                                     ,Registry
+                                     ,State),
+    AppInfo3 = rebar_app_info:resource_type(rebar_app_info:deps(AppInfo2, Deps), pkg),
+    rebar_app_info:original_vsn(AppInfo3, PkgVsn1);
 update_source(AppInfo, Source, _State) ->
     rebar_app_info:source(AppInfo, Source).
 
 %% @doc grab the checksum for a given package
--spec fetch_checksum(atom(), string(), iodata() | undefined, rebar_state:t()) ->
+-spec fetch_checksum(atom(), string(), iodata() | undefined, string(), rebar_state:t()) ->
     iodata() | no_return().
-fetch_checksum(PkgName, PkgVsn, Hash, State) ->
+fetch_checksum(PkgName, PkgVsn, Hash, Registry, State) ->
     try
-        rebar_packages:registry_checksum({pkg, PkgName, PkgVsn, Hash}, State)
+        rebar_packages:registry_checksum({{pkg, PkgName, PkgVsn, Hash}, Registry}, State)
     catch
         _:_ ->
             ?INFO("Package ~s-~s not found. Fetching registry updates and trying again...", [PkgName, PkgVsn]),
             {ok, _} = rebar_prv_update:do(State),
-            rebar_packages:registry_checksum({pkg, PkgName, PkgVsn, Hash}, State)
+            rebar_packages:registry_checksum({{pkg, PkgName, PkgVsn, Hash}, Registry}, State)
     end.
 
 %% @doc convert a given exception's payload into an io description.
 -spec format_error(any()) -> iolist().
 format_error({missing_package, Package}) ->
-    io_lib:format("Package not found in registry: ~s", [Package]);
+    io_lib:format("Package not found in any available registry: ~s", [Package]);
 format_error({parse_dep, Dep}) ->
     io_lib:format("Failed parsing dep ~p", [Dep]);
 format_error(Error) ->
@@ -296,11 +300,24 @@ format_error(Error) ->
 %% @private find the correct version of a package based on the version
 %% and name passed in.
 -spec get_package(binary(), binary() | string(), rebar_state:t()) ->
-    term() | no_return().
+                         term() | no_return().
+get_package(Dep, undefined, State) ->
+    get_highest_matching_package(Dep, "0", State);
+get_package(Dep, <<"~>", Vsn/binary>>, State) ->
+    [Vsn1] = binary:split(Vsn, [<<" ">>], [trim_all, global]),
+    get_highest_matching_package(Dep, Vsn1, State);
 get_package(Dep, Vsn, State) ->
-    case rebar_packages:find_highest_matching(Dep, Vsn, ?PACKAGE_TABLE, State) of
-        {ok, HighestDepVsn} ->
-            {Dep, HighestDepVsn};
+    case rebar_packages:find_package_registry(Dep, Vsn, State) of
+        {ok, Registry} ->
+            {Dep, Vsn, Registry};
+        none ->
+            throw(?PRV_ERROR({missing_package, ec_cnv:to_binary(Dep)}))
+    end.
+
+get_highest_matching_package(Dep, Vsn, State) ->
+    case rebar_packages:find_highest_matching(Dep, Vsn, State) of
+        {ok, HighestDepVsn, Registry} ->
+            {Dep, HighestDepVsn, Registry};
         none ->
             throw(?PRV_ERROR({missing_package, ec_cnv:to_binary(Dep)}))
     end.
