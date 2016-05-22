@@ -1,27 +1,24 @@
 sudo: false
 language: erlang
-install: "true"
+install: 'true'
 otp_release:
-  - 18.0
-  - 17.5
-  - R16B03-1
-  - R15B03
+- 18.0
+- 17.5
+- R16B03-1
+- R15B03
 before_script: "./bootstrap"
 script: "./rebar3 ct"
 branches:
   only:
-    - master
+  - master
 cache:
   directories:
-  - $HOME/.cache/rebar3/hex/default
-before_deploy: "rm -rf !(rebar3)"
+  - "$HOME/.cache/rebar3/hex/default"
 deploy:
+  provider: releases
+  api_key:
+    secure: MjloYuaQF3cd3Oab57zqwPDLPqt5MDgBIrRLpXOQwNovr2tnkKd4aJK3QJ3pTxvZievjgl+qIYI1IZyjuRV37nkjAfMw14iig959wi0k8XTJoMdylVxE5X7hk4SiWhX/ycnJx3C28PPw1OitGTF76HAJDMgEelNdoNt+hvjvDEo=
+  file: rebar3
   on:
+    repo: erlang/rebar3
     tags: true
-    condition: $TRAVIS_OTP_RELEASE = R16B03-1
-  provider: s3
-  access_key_id: AKIAJAPYAQEFYCYSNL7Q
-  secret_access_key:
-    secure: "BUv2KQABv0Q4e8DAVNBRTc/lXHWt27yCN46Fdgo1IrcSSIiP+hq2yXzQcXLbPwkEu6pxUZQtL3mvKbt6l7uw3wFrcRfFAi1PGTITAW8MTmxtwcZIBcHSk3XOzDbkK+fYYcaddszmt7hDzzEFPtmYXiNgnaMIVeynhQLgcCcIRRQ="
-  bucket: "rebar3"
-  skip_cleanup: true
