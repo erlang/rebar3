@@ -114,14 +114,14 @@ hex_to_index(State) ->
 
                 ets:foldl(fun({Pkg, [[]]}, _) when is_binary(Pkg) ->
                                   true;
-                             ({Pkg, [Vsns=[Vsn | _Rest]]}, _) when is_binary(Pkg) ->
+                             ({Pkg, [Vsns=[_Vsn | _Rest]]}, _) when is_binary(Pkg) ->
                                   %% Verify the package is of the right build tool by checking if the first
                                   %% version exists in the table from the foldl above
-                                  case ets:member(?PACKAGE_TABLE, {Pkg, Vsn}) of
-                                      true ->
-                                          ets:insert(?PACKAGE_TABLE, {Pkg, Vsns});
-                                      false ->
-                                          true
+                                  case [V || V <- Vsns, ets:member(?PACKAGE_TABLE, {Pkg, V})] of
+                                      [] ->
+                                          true;
+                                      Vsns1 ->
+                                          ets:insert(?PACKAGE_TABLE, {Pkg, Vsns1})
                                   end;
                              (_, _) ->
                                   true
