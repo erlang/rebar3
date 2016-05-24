@@ -726,7 +726,7 @@ suite_at_app_root(Config) ->
 data_dir_correct(Config) ->
     DataDir = ?config(data_dir, Config),
     Parts = filename:split(DataDir),
-    ["rebar_ct_SUITE_data","test","rebar","lib","test","_build"|_] = lists:reverse(Parts).
+    ["rebar_ct_SUITE_data","test","rebar","lib",_,"_build"|_] = lists:reverse(Parts).
 
 cmd_label(Config) ->
     State = ?config(result, Config),
