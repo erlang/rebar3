@@ -22,13 +22,14 @@ lock(AppDir, {git, Url}) ->
     {ok, VsnString} =
         case os:type() of
             {win32, _} ->
-                rebar_utils:sh("git rev-parse --git-dir=\"" ++ Dir ++ "/.git\" --work-tree=\"" ++ Dir ++ "\" --verify HEAD",
+                rebar_utils:sh("cd " ++ Dir ++ " & git rev-parse --verify HEAD",
                     [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]);
             _ ->
                 rebar_utils:sh("git --git-dir=\"" ++ Dir ++ "/.git\" rev-parse --verify HEAD",
                     [{use_stdout, false}, {debug_abort_on_error, AbortMsg}])
         end,
-    Ref = string:strip(VsnString, both, $\n),
+    %on windows result will be like {ref,"--git-dir=path/to/proj/.git\n--work-tree=path/to/proj/.git\nrevision"}},
+    Ref = re:replace(string:strip(VsnString, both, $\n), "[\n]+", " ", [global, {return, list}]),
     {git, Url, {ref, Ref}}.
 
 %% Return true if either the git url or tag/branch/ref is not the same as the currently
@@ -125,7 +126,14 @@ download(Dir, {git, Url, {ref, Ref}}, _State) ->
                         [rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]),
-    rebar_utils:sh(?FMT("git checkout -q ~s", [Ref]), [{cd, Dir}]);
+
+    case os:type() of
+        {win32, _} ->
+            rebar_utils:sh(?FMT("cd ~s & git checkout -q ~s", [Dir, Ref]), [{cd, Dir}]);
+        _ ->
+            rebar_utils:sh(?FMT("git checkout -q ~s", [Ref]), [{cd, Dir}])
+    end;   
+
 download(Dir, {git, Url, Rev}, _State) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
     ok = filelib:ensure_dir(Dir),
@@ -133,8 +141,14 @@ download(Dir, {git, Url, Rev}, _State) ->
                         [rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]),
-    rebar_utils:sh(?FMT("git checkout -q ~s", [rebar_utils:escape_chars(Rev)]),
-                   [{cd, Dir}]).
+
+    case os:type() of
+        {win32, _} ->
+            rebar_utils:sh(?FMT("cd ~s & git checkout -q ~s", [Dir, Rev]), [{cd, Dir}]);
+        _ ->
+            rebar_utils:sh(?FMT("git checkout -q ~s", [rebar_utils:escape_chars(Rev)]), [{cd, Dir}])
+    end.
+
 
 make_vsn(Dir) ->
     case collect_default_refcount(Dir) of
