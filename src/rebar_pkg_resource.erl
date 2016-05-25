@@ -58,17 +58,20 @@ cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash}, Url, ETag, State
 serve_from_cache(TmpDir, CachePath, Pkg, State) ->
     {Files, Contents, Version, Meta} = extract(TmpDir, CachePath),
     case checksums(Pkg, Files, Contents, Version, Meta, State) of
-        {Chk, Chk, Chk} ->
+        {Chk, Chk, Chk, Chk} ->
             ok = erl_tar:extract({binary, Contents}, [{cwd, TmpDir}, compressed]),
             {ok, true};
-        {_Bin, Chk, Chk} ->
+        {_Hash, Chk, Chk, Chk} ->
+            ?DEBUG("Expected hash ~p does not match checksums ~p", [_Hash, Chk]),
+            {unexpected_hash, CachePath, _Hash, Chk};
+        {Chk, _Bin, Chk, Chk} ->
             ?DEBUG("Checksums: registry: ~p, pkg: ~p", [Chk, _Bin]),
             {failed_extract, CachePath};
-        {Chk, _Reg, Chk} ->
+        {Chk, Chk, _Reg, Chk} ->
             ?DEBUG("Checksums: registry: ~p, pkg: ~p", [_Reg, Chk]),
             {bad_registry_checksum, CachePath};
-        {_Bin, _Reg, _Tar} ->
-            ?DEBUG("Checksums: registry: ~p, pkg: ~p, meta: ~p", [_Reg, _Bin, _Tar]),
+        {_Hash, _Bin, _Reg, _Tar} ->
+            ?DEBUG("Checksums: expected: ~p, registry: ~p, pkg: ~p, meta: ~p", [_Hash, _Reg, _Bin, _Tar]),
             {bad_checksum, CachePath}
     end.
 
@@ -92,13 +95,13 @@ extract(TmpDir, CachePath) ->
     {"metadata.config", Meta} = lists:keyfind("metadata.config", 1, Files),
     {Files, Contents, Version, Meta}.
 
-checksums(Pkg, Files, Contents, Version, Meta, State) ->
+checksums(Pkg={pkg, _Name, _Vsn, Hash}, Files, Contents, Version, Meta, State) ->
     Blob = <<Version/binary, Meta/binary, Contents/binary>>,
     <<X:256/big-unsigned>> = crypto:hash(sha256, Blob),
     BinChecksum = list_to_binary(string:to_upper(lists:flatten(io_lib:format("~64.16.0b", [X])))),
     RegistryChecksum = rebar_packages:registry_checksum(Pkg, State),
     {"CHECKSUM", TarChecksum} = lists:keyfind("CHECKSUM", 1, Files),
-    {BinChecksum, RegistryChecksum, TarChecksum}.
+    {Hash, BinChecksum, RegistryChecksum, TarChecksum}.
 
 make_vsn(_) ->
     {error, "Replacing version of type pkg not supported."}.
