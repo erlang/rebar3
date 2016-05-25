@@ -610,7 +610,14 @@ novsn_pkg(Config) ->
 rewrite_locks({ok, Expectations}, Config) ->
     AppDir = ?config(apps, Config),
     LockFile = filename:join([AppDir, "rebar.lock"]),
-    {ok, [Locks]} = file:consult(LockFile),
+    Locks = case ?config(deps_type, Config) of
+                git ->
+                    {ok, [LockData]} = file:consult(LockFile),
+                    LockData;
+                pkg ->
+                    {ok, [{_Vsn, LockData}|_]} = file:consult(LockFile),
+                    LockData
+            end,
     ExpLocks = [{list_to_binary(Name), Vsn}
                || {lock, Name, Vsn} <- Expectations],
     NewLocks = lists:foldl(
