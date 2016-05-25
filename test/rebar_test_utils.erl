@@ -317,9 +317,10 @@ check_results(AppDir, Expected, ProfileRun) ->
                 case lists:keyfind(iolist_to_binary(Name), 1, Locks) of
                     false ->
                         error({lock_not_found, Name});
-                    {_LockName, {pkg, _, LockVsn, _}, _} ->
+                    {_LockName, {pkg, _, LockVsn, Hash}, _} ->
                         ?assertEqual(iolist_to_binary(Vsn),
-                                     iolist_to_binary(LockVsn));
+                                     iolist_to_binary(LockVsn)),
+                        ?assertNotEqual(undefined, Hash);
                     {_LockName, {_, _, {ref, LockVsn}}, _} ->
                         ?assertEqual(iolist_to_binary(Vsn),
                                      iolist_to_binary(LockVsn))
@@ -329,9 +330,10 @@ check_results(AppDir, Expected, ProfileRun) ->
                 case lists:keyfind(iolist_to_binary(Name), 1, Locks) of
                     false ->
                         error({lock_not_found, Name});
-                    {_LockName, {pkg, _, LockVsn, _}, _} ->
+                    {_LockName, {pkg, _, LockVsn, Hash}, _} ->
                         ?assertEqual(iolist_to_binary(Vsn),
-                                     iolist_to_binary(LockVsn));
+                                     iolist_to_binary(LockVsn)),
+                        ?assertNotEqual(undefined, Hash);
                     {_LockName, {_, _, {ref, LockVsn}}, _} ->
                         error({source_lock, {Name, LockVsn}})
                 end
