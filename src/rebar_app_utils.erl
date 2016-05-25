@@ -182,7 +182,14 @@ update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
                               _ ->
                                   {PkgName, PkgVsn}
                           end,
-    AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName1, PkgVsn1, Hash}),
+    %% store the expected hash for the dependency
+    Hash1 = case Hash of
+        undefined -> % unknown, define the hash since we know the dep
+            rebar_packages:registry_checksum({pkg, PkgName1, PkgVsn1, Hash}, State);
+        _ -> % keep as is
+            Hash
+    end,
+    AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName1, PkgVsn1, Hash1}),
     Deps = rebar_packages:deps(PkgName1
                               ,PkgVsn1
                               ,State),
