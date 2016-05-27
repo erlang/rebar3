@@ -107,14 +107,14 @@ download(Dir, {git, Url, ""}, State) ->
     download(Dir, {git, Url, {branch, "master"}}, State);
 download(Dir, {git, Url, {branch, Branch}}, _State) ->
     ok = filelib:ensure_dir(Dir),
-    rebar_utils:sh(?FMT("git clone ~s ~s -b ~s ",
+    rebar_utils:sh(?FMT("git clone ~s ~s -b ~s --single-branch",
                        [rebar_utils:escape_chars(Url),
                         rebar_utils:escape_chars(filename:basename(Dir)),
                         rebar_utils:escape_chars(Branch)]),
                    [{cd, filename:dirname(Dir)}]);
 download(Dir, {git, Url, {tag, Tag}}, _State) ->
     ok = filelib:ensure_dir(Dir),
-    rebar_utils:sh(?FMT("git clone ~s ~s -b ~s ",
+    rebar_utils:sh(?FMT("git clone ~s ~s -b ~s --single-branch",
                        [rebar_utils:escape_chars(Url),
                         rebar_utils:escape_chars(filename:basename(Dir)),
                         rebar_utils:escape_chars(Tag)]),
