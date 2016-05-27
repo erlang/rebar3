@@ -180,6 +180,24 @@ check_newly_added({Name, _, Source}, LockedDeps) ->
 check_newly_added(Dep, LockedDeps) ->
     check_newly_added_(Dep, LockedDeps).
 
+%% get [raw] deps out of the way
+check_newly_added_({Name, Source, Opts}, LockedDeps) when is_tuple(Source),
+                                                          is_list(Opts) ->
+    case check_newly_added_(Name, LockedDeps) of
+        {true, Name1} ->
+            {true, {Name1, Source}};
+        false ->
+            false
+    end;
+check_newly_added_({Name,_Vsn,Source,Opts}, LockedDeps) when is_tuple(Source),
+                                                             is_list(Opts) ->
+    case check_newly_added_(Name, LockedDeps) of
+        {true, Name1} ->
+            {true, {Name1, Source}};
+        false ->
+            false
+    end;
+%% and on to regular deps
 check_newly_added_({Name, Vsn, Source}, LockedDeps) ->
     case check_newly_added_(Name, LockedDeps) of
         {true, Name1} ->
