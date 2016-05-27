@@ -17,7 +17,7 @@
 lock(AppDir, {git, Url, _}) ->
     lock(AppDir, {git, Url});
 lock(AppDir, {git, Url}) ->
-    AbortMsg = io_lib:format("Locking of git dependency failed in ~s", [AppDir]),
+    AbortMsg = lists:flatten(io_lib:format("Locking of git dependency failed in ~s", [AppDir])),
     Dir = rebar_utils:escape_double_quotes(AppDir),
     {ok, VsnString} =
         case os:type() of
