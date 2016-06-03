@@ -134,7 +134,12 @@ parse_dep(Parent, {Name, Source}, DepsDir, IsLock, State) when is_tuple(Source) 
     dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, State);
 parse_dep(Parent, {Name, _Vsn, Source}, DepsDir, IsLock, State) when is_tuple(Source) ->
     dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, State);
-parse_dep(Parent, {Name, _Vsn, Source, Opts}, DepsDir, IsLock, State) when is_tuple(Source) ->
+parse_dep(Parent, {Name, _Vsn, Source, Opts}, DepsDir, IsLock, State) when is_tuple(Source),
+                                                                           is_list(Opts) ->
+    ?WARN("Dependency option list ~p in ~p is not supported and will be ignored", [Opts, Name]),
+    dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, State);
+parse_dep(Parent, {Name, Source, Opts}, DepsDir, IsLock, State) when is_tuple(Source),
+                                                                     is_list(Opts) ->
     ?WARN("Dependency option list ~p in ~p is not supported and will be ignored", [Opts, Name]),
     dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, State);
 parse_dep(Parent, {Name, {pkg, PkgName, Vsn}, Level}, DepsDir, IsLock, State) when is_integer(Level) ->
