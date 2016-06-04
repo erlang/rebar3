@@ -45,7 +45,13 @@ init(State) ->
 do(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     Locks = rebar_state:get(State, {locks, default}, []),
-    Deps = rebar_state:get(State, deps, []),
+    %% grab the parsed deps, and then add in the deps found in each of the
+    %% umbrella apps' configs (which are in {deps, default} when added by
+    %% `rebar_app_discover'). This later set however includes locks, so
+    %% we remove them to get a full picture.
+    TopDeps = rebar_state:get(State, deps, []),
+    ProfileDeps = rebar_state:get(State, {deps, default}, []),
+    Deps = TopDeps ++ ((ProfileDeps -- TopDeps) -- Locks), % top deps > profile deps
     Names = parse_names(ec_cnv:to_binary(proplists:get_value(package, Args, <<"">>)), Locks),
     DepsDict = deps_dict(rebar_state:all_deps(State)),
     case prepare_locks(Names, Deps, Locks, [], DepsDict) of
