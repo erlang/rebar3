@@ -45,13 +45,29 @@ init(State) ->
 do(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     Locks = rebar_state:get(State, {locks, default}, []),
-    %% grab the parsed deps, and then add in the deps found in each of the
-    %% umbrella apps' configs (which are in {deps, default} when added by
-    %% `rebar_app_discover'). This later set however includes locks, so
-    %% we remove them to get a full picture.
+    %% We have 3 sources of dependencies to upgrade from:
+    %% 1. the top-level rebar.config (in `deps', dep name is an atom)
+    %% 2. the app-level rebar.config in umbrella apps (in `{deps, default}',
+    %%    where the dep name is an atom)
+    %% 3. the formatted sources for all after app-parsing (in `{deps, default}',
+    %%    where the reprocessed app name is a binary)
+    %%
+    %% The gotcha with these is that the selection of dependencies with a
+    %% binary name (those that are stable and usable internally) is done with
+    %% in the profile deps only, but while accounting for locks.
+    %% Because our job here is to unlock those that have changed, we must
+    %% instead use the atom-based names, both in `deps' and `{deps, default}',
+    %% as those are the dependencies that may have changed but have been
+    %% disregarded by locks.
+    %%
+    %% As such, the working set of dependencies is the addition of
+    %% `deps' and `{deps, default}' entries with an atom name, as those
+    %% disregard locks and parsed values post-selection altogether.
+    %% Packages without versions can of course be a single atom.
     TopDeps = rebar_state:get(State, deps, []),
     ProfileDeps = rebar_state:get(State, {deps, default}, []),
-    Deps = TopDeps ++ ((ProfileDeps -- TopDeps) -- Locks), % top deps > profile deps
+    Deps = [Dep || Dep <- TopDeps ++ ProfileDeps, % TopDeps > ProfileDeps
+                   is_atom(Dep) orelse is_atom(element(1, Dep))],
     Names = parse_names(ec_cnv:to_binary(proplists:get_value(package, Args, <<"">>)), Locks),
     DepsDict = deps_dict(rebar_state:all_deps(State)),
     case prepare_locks(Names, Deps, Locks, [], DepsDict) of
