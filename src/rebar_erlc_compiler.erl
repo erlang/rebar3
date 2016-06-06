@@ -54,8 +54,8 @@
 -define(DEFAULT_OUTDIR, "ebin").
 -define(RE_PREFIX, "^[^._]").
 
--type compiler_source_format() :: absolute | relative | unchanged.
--define(DEFAULT_COMPILER_SOURCE_FORMAT, unchanged).
+-type compiler_source_format() :: absolute | relative | build.
+-define(DEFAULT_COMPILER_SOURCE_FORMAT, build).
 
 %% ===================================================================
 %% Public API
@@ -522,7 +522,7 @@ source_format(Opts) ->
                         ?DEFAULT_COMPILER_SOURCE_FORMAT) of
         V when V == absolute;
                V == relative;
-               V == unchanged -> V;
+               V == build -> V;
         Other ->
             ?WARN("Invalid argument ~p for compiler_source_format - "
                   "assuming ~s~n", [Other, ?DEFAULT_COMPILER_SOURCE_FORMAT]),
@@ -542,7 +542,7 @@ format_error_source(Src, absolute, _Cwd) ->
     resolve_linked_source(Src);
 format_error_source(Src, relative, Cwd) ->
     rebar_dir:make_relative_path(resolve_linked_source(Src), Cwd);
-format_error_source(Src, unchanged, _Cwd) ->
+format_error_source(Src, build, _Cwd) ->
     Src.
 
 resolve_linked_source(Src) ->
