@@ -276,11 +276,11 @@ handle_error({error, {Module, Reason}}) ->
             ?DEBUG("Uncaught error: ~p ~p", [Module, Reason]),
             ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []);
         _ ->
-            ?ERROR(Module:format_error(Reason), [])
+            ?ERROR("~s", [Module:format_error(Reason)])
     end,
     erlang:halt(1);
 handle_error({error, Error}) when is_list(Error) ->
-    ?ERROR(Error, []),
+    ?ERROR("~s", [Error]),
     erlang:halt(1);
 handle_error(Error) ->
     %% Nothing should percolate up from rebar_core;
