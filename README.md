@@ -53,7 +53,7 @@ best experience you can get.
 
 ## Getting Started
 
-A [getting started guide is maintained on the offcial documentation website](http://www.rebar3.org/docs/getting-started),
+A [getting started guide is maintained on the official documentation website](http://www.rebar3.org/docs/getting-started),
 but installing rebar3 can be done by any of the ways described below
 
 Nightly compiled version:
