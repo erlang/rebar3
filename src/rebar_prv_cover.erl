@@ -298,6 +298,7 @@ cover_compile(State, apps) ->
     AppDirs = app_dirs(Apps),
     cover_compile(State, lists:filter(fun(D) -> ec_file:is_dir(D) end, AppDirs));
 cover_compile(State, Dirs) ->
+    rebar_utils:update_code(rebar_state:code_paths(State, all_deps), [soft_purge]),
     %% start the cover server if necessary
     {ok, CoverPid} = start_cover(),
     %% redirect cover output
@@ -315,7 +316,9 @@ cover_compile(State, Dirs) ->
                 %% print any warnings about modules that failed to cover compile
                 lists:foreach(fun print_cover_warnings/1, lists:flatten(Results))
         end
-    end, Dirs).
+    end, Dirs),
+    rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+    ok.
 
 app_dirs(Apps) ->
     lists:foldl(fun app_ebin_dirs/2, [], Apps).
