@@ -58,6 +58,9 @@ consult_lock_file(File) ->
         [Locks] when is_list(Locks) -> % beta lock file
             read_attrs(beta, Locks, []);
         [{Vsn, Locks}|Attrs] when is_list(Locks) -> % versioned lock file
+            %% Because this is the first version of rebar3 to introduce a lock
+            %% file, all versionned lock files with a different versions have
+            %% to be newer.
             case Vsn of
                 ?CONFIG_VERSION ->
                     ok;
@@ -65,13 +68,23 @@ consult_lock_file(File) ->
                     %% Make sure the warning below is to be shown whenever a version
                     %% newer than the current one is being used, as we can't parse
                     %% all the contents of the lock file properly.
-                    ?WARN("Rebar3 detected a lock file from a newer version. "
-                          "It will be loaded in compatibility mode, but important "
-                          "information may be missing or lost. It is recommended to "
-                          "upgrade Rebar3.", [])
+                    warn_vsn_once()
             end,
             read_attrs(Vsn, Locks, Attrs)
     end.
+
+warn_vsn_once() ->
+    Warn = application:get_env(rebar, warn_config_vsn) =/= {ok, false},
+    application:set_env(rebar, warn_config_vsn, false),
+    case Warn of
+        false -> ok;
+        true ->
+            ?WARN("Rebar3 detected a lock file from a newer version. "
+                  "It will be loaded in compatibility mode, but important "
+                  "information may be missing or lost. It is recommended to "
+                  "upgrade Rebar3.", [])
+    end.
+
 
 write_lock_file(LockFile, Locks) ->
     {NewLocks, Attrs} = write_attrs(Locks),
