@@ -32,7 +32,11 @@
          run/7,
          run/8,
          ok_tuple/2,
-         error_tuple/4]).
+         error_tuple/4,
+         format_error_source/2]).
+
+-define(DEFAULT_COMPILER_SOURCE_FORMAT, relative).
+
 
 %% ===================================================================
 %% Public API
@@ -76,6 +80,28 @@ error_tuple(Source, Es, Ws, Opts) ->
     {error, format_errors(Source, Es),
      format_warnings(Source, Ws, Opts)}.
 
+format_error_source(Path, Opts) ->
+    Type = case rebar_opts:get(Opts, compiler_source_format,
+                               ?DEFAULT_COMPILER_SOURCE_FORMAT) of
+        V when V == absolute; V == relative; V == build ->
+            V;
+        Other ->
+            ?WARN("Invalid argument ~p for compiler_source_format - "
+                  "assuming ~s~n", [Other, ?DEFAULT_COMPILER_SOURCE_FORMAT]),
+            ?DEFAULT_COMPILER_SOURCE_FORMAT
+    end,
+    case Type of
+        absolute -> resolve_linked_source(Path);
+        build -> Path;
+        relative ->
+            Cwd = rebar_dir:get_cwd(),
+            rebar_dir:make_relative_path(resolve_linked_source(Path), Cwd)
+    end.
+
+resolve_linked_source(Src) ->
+    {Dir, Base} = rebar_file_utils:split_dirname(Src),
+    filename:join(rebar_file_utils:resolve_link(Dir), Base).
+
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
@@ -114,7 +140,8 @@ compile_each([Source | Rest], Config, CompileFn) ->
         skipped ->
             ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), filename:basename(Source)]);
         Error ->
-            ?ERROR("Compiling ~s failed", [Source]),
+            NewSource = format_error_source(Source, Config),
+            ?ERROR("Compiling ~s failed", [NewSource]),
             maybe_report(Error),
             ?DEBUG("Compilation failed: ~p", [Error]),
             ?FAIL
