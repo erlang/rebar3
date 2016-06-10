@@ -82,9 +82,28 @@ write_lock_file(LockFile, Locks) ->
             file:write_file(LockFile, io_lib:format("~p.~n", [NewLocks]));
         _ ->
             file:write_file(LockFile,
-                            io_lib:format("{~p,~p}.~n~p.~n",
-                                          [?CONFIG_VERSION, NewLocks, Attrs]))
+                            io_lib:format("{~p,~n~p}.~n[~n~s~n].~n",
+                                          [?CONFIG_VERSION, NewLocks,
+                                           format_attrs(Attrs)]))
     end.
+
+%% Attributes have a special formatting to ensure there's only one per
+%% line in terms of pkg_hash, so we disturb source diffing as little
+%% as possible.
+format_attrs([]) -> [];
+format_attrs([{pkg_hash, Vals}|T]) ->
+    [io_lib:format("{pkg_hash,[~n",[]), format_hashes(Vals), "]}",
+     maybe_comma(T) | format_attrs(T)];
+format_attrs([H|T]) ->
+    [io_lib:format("~p~s", [H, maybe_comma(T)]) | format_attrs(T)].
+
+format_hashes([]) -> [];
+format_hashes([{Pkg,Hash}|T]) ->
+    [" {", io_lib:format("~p",[Pkg]), ", ", io_lib:format("~p", [Hash]), "}",
+     maybe_comma(T) | format_hashes(T)].
+
+maybe_comma([]) -> "";
+maybe_comma([_|_]) -> io_lib:format(",~n", []).
 
 read_attrs(_Vsn, Locks, Attrs) ->
     %% Beta copy does not know how to expand attributes, but
