@@ -3,7 +3,11 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-all() -> [sub_app_deps, newly_added_dep, newly_added_after_empty_lock, http_proxy_settings, https_proxy_settings, semver_matching_lt, semver_matching_lte, semver_matching_gt, valid_version, {group, git}, {group, pkg}].
+all() -> [sub_app_deps, newly_added_dep, newly_added_after_empty_lock,
+          http_proxy_settings, https_proxy_settings,
+          http_os_proxy_settings, https_os_proxy_settings,
+          semver_matching_lt, semver_matching_lte, semver_matching_gt,
+          valid_version, {group, git}, {group, pkg}].
 
 groups() ->
     [{all, [], [flat, pick_highest_left, pick_highest_right,
@@ -82,6 +86,47 @@ init_per_testcase(https_proxy_settings, Config) ->
             rebar_test_utils:create_config(GlobalConfigDir,
                                            [{https_proxy, "http://localhost:1234"}
                                            ]),
+            %% Add a bad value by default to show config overtakes default
+            os:putenv("https_proxy", "unparseable-garbage"),
+            rebar_test_utils:init_rebar_state(Config)
+    end;
+init_per_testcase(http_os_proxy_settings, Config) ->
+    %% Create private rebar.config
+    Priv = ?config(priv_dir, Config),
+    GlobalDir = filename:join(Priv, "global"),
+    GlobalConfigDir = filename:join([GlobalDir, ".config", "rebar3"]),
+    GlobalConfig = filename:join([GlobalDir, ".config", "rebar3", "rebar.config"]),
+
+    meck:new(rebar_dir, [passthrough]),
+    meck:expect(rebar_dir, global_config, fun() -> GlobalConfig end),
+    meck:expect(rebar_dir, global_cache_dir, fun(_) -> GlobalDir end),
+
+    %% Insert proxy variables into os env, but not config
+    os:putenv("http_proxy", "http://localhost:1234"),
+    rebar_test_utils:create_config(GlobalConfigDir, []),
+    rebar_test_utils:init_rebar_state(Config);
+init_per_testcase(https_os_proxy_settings, Config) ->
+    SupportsHttpsProxy = case erlang:system_info(otp_release) of
+                             "R16"++_ -> true;
+                             "R"++_ -> false;
+                             _ -> true % 17 and up don't have a "R" in the version
+                         end,
+    if not SupportsHttpsProxy ->
+            {skip, https_proxy_unsupported_before_R16};
+       SupportsHttpsProxy ->
+            %% Create private rebar.config
+            Priv = ?config(priv_dir, Config),
+            GlobalDir = filename:join(Priv, "global"),
+            GlobalConfigDir = filename:join([GlobalDir, ".config", "rebar3"]),
+            GlobalConfig = filename:join([GlobalDir, ".config", "rebar3", "rebar.config"]),
+
+            meck:new(rebar_dir, [passthrough]),
+            meck:expect(rebar_dir, global_config, fun() -> GlobalConfig end),
+            meck:expect(rebar_dir, global_cache_dir, fun(_) -> GlobalDir end),
+
+            %% Insert proxy variables into os env, not in config
+            os:putenv("https_proxy", "http://localhost:1234"),
+            rebar_test_utils:create_config(GlobalConfigDir, []),
             rebar_test_utils:init_rebar_state(Config)
     end;
 init_per_testcase(Case, Config) ->
@@ -97,9 +142,18 @@ init_per_testcase(Case, Config) ->
      | setup_project(Case, Config, rebar_test_utils:expand_deps(DepsType, Deps))].
 
 end_per_testcase(https_proxy_settings, Config) ->
+    os:putenv("https_proxy", ""),
     meck:unload(rebar_dir),
     Config;
 end_per_testcase(http_proxy_settings, Config) ->
+    meck:unload(rebar_dir),
+    Config;
+end_per_testcase(http_os_proxy_settings, Config) ->
+    os:putenv("http_proxy", ""),
+    meck:unload(rebar_dir),
+    Config;
+end_per_testcase(https_os_proxy_settings, Config) ->
+    os:putenv("https_proxy", ""),
     meck:unload(rebar_dir),
     Config;
 end_per_testcase(_, Config) ->
@@ -311,6 +365,23 @@ https_proxy_settings(_Config) ->
     ?assertEqual({ok,{{"localhost", 1234}, []}},
                  httpc:get_option(https_proxy, rebar)).
 
+http_os_proxy_settings(_Config) ->
+    %% Load config
+    rebar_utils:set_httpc_options(),
+    rebar3:init_config(),
+
+    %% Assert variable is right
+    ?assertEqual({ok,{{"localhost", 1234}, []}},
+                 httpc:get_option(proxy, rebar)).
+
+https_os_proxy_settings(_Config) ->
+    %% Load config
+    rebar_utils:set_httpc_options(),
+    rebar3:init_config(),
+
+    %% Assert variable is right
+    ?assertEqual({ok,{{"localhost", 1234}, []}},
+                 httpc:get_option(https_proxy, rebar)).
 
 semver_matching_lt(_Config) ->
     Dep = <<"test">>,
