@@ -63,8 +63,11 @@ all() ->
      parse_transform_test, erl_first_files_test, mib_test,
      umbrella_mib_first_test, only_default_transitive_deps,
      clean_all, override_deps, profile_override_deps, deps_build_in_prod,
-     include_file_relative_to_working_directory, include_file_in_src,
-     always_recompile_when_erl_compiler_options_set].
+     include_file_relative_to_working_directory, include_file_in_src] ++
+     case erlang:function_exported(os, unsetenv, 1) of
+         true  -> [always_recompile_when_erl_compiler_options_set];
+         false -> []
+     end.
 
 groups() ->
     [{basic_app, [], [build_basic_app, paths_basic_app, clean_basic_app]},
