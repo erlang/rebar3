@@ -207,6 +207,8 @@ rewrite_leaders(OldUser, NewUser) ->
 
 
 setup_paths(State) ->
+    %% Change working directory for the project root
+    file:set_cwd(rebar_state:dir(State)),
     %% Add deps to path
     code:add_pathsa(rebar_state:code_paths(State, all_deps)),
     %% add project app test paths
@@ -448,7 +450,7 @@ find_config_relx(State) ->
 
 -spec consult_config(rebar_state:t(), string()) -> [[tuple()]].
 consult_config(State, Filename) ->
-    Fullpath = filename:join(rebar_dir:root_dir(State), Filename),
+    Fullpath = filename:join(rebar_state:dir(State), Filename),
     ?DEBUG("Loading configuration from ~p", [Fullpath]),
     Config = case rebar_file_utils:try_consult(Fullpath) of
         [T] -> T;
