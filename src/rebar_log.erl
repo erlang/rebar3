@@ -27,6 +27,7 @@
 -module(rebar_log).
 
 -export([init/2,
+         crashdump/2,
          set_level/1,
          get_level/0,
          error_level/0,
@@ -73,6 +74,7 @@ init(Caller, Verbosity) ->
                 ?DEBUG_LEVEL -> debug
             end,
     Intensity = intensity(),
+    application:set_env(rebar, log_caller, Caller),
     Log = ec_cmd_log:new(Level, Caller, Intensity),
     set_level(valid_level(Verbosity)),
     application:set_env(rebar, log, Log).
@@ -94,6 +96,16 @@ log(Level = error, Str, Args) ->
 log(Level, Str, Args) ->
     {ok, LogState} = application:get_env(rebar, log),
     ec_cmd_log:Level(LogState, Str++"~n", Args).
+
+crashdump(Str, Args) ->
+    crashdump("rebar3.crashdump", Str, Args).
+crashdump(File, Str, Args) ->
+    case application:get_env(rebar, log_caller) of
+        {ok, api} ->
+            ok;
+        _ ->
+            file:write_file(File, io_lib:fwrite(Str, Args))
+    end.
 
 error_level() -> ?ERROR_LEVEL.
 default_level() -> ?INFO_LEVEL.
