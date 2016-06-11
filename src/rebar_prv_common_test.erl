@@ -32,7 +32,7 @@ init(State) ->
                                  {short_desc, "Run Common Tests."},
                                  {desc, "Run Common Tests."},
                                  {opts, ct_opts(State)},
-                                 {profiles, [test]}]),
+                                 {profiles, [test, ct]}]),
     {ok, rebar_state:add_provider(State, Provider)}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.

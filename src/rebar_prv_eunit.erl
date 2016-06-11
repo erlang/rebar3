@@ -32,7 +32,7 @@ init(State) ->
                                  {short_desc, "Run EUnit Tests."},
                                  {desc, "Run EUnit Tests."},
                                  {opts, eunit_opts(State)},
-                                 {profiles, [test]}]),
+                                 {profiles, [test, eunit]}]),
     State1 = rebar_state:add_provider(State, Provider),
     {ok, State1}.
 
