@@ -54,7 +54,6 @@
 -define(DEFAULT_OUTDIR, "ebin").
 -define(RE_PREFIX, "^[^._]").
 
-
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -500,7 +499,7 @@ expand_file_names(Files, Dirs) ->
 
 -spec internal_erl_compile(rebar_dict(), file:filename(), file:filename(),
     file:filename(), list()) -> ok | {ok, any()} | {error, any(), any()}.
-internal_erl_compile(_Opts, Dir, Module, OutDir, ErlOpts) ->
+internal_erl_compile(Opts, Dir, Module, OutDir, ErlOpts) ->
     Target = target_base(OutDir, Module) ++ ".beam",
     ok = filelib:ensure_dir(Target),
     AllOpts = [{outdir, filename:dirname(Target)}] ++ ErlOpts ++
@@ -509,10 +508,20 @@ internal_erl_compile(_Opts, Dir, Module, OutDir, ErlOpts) ->
         {ok, _Mod} ->
             ok;
         {ok, _Mod, Ws} ->
-            rebar_base_compiler:ok_tuple(Module, Ws);
+            FormattedWs = format_error_sources(Ws, Opts),
+            rebar_base_compiler:ok_tuple(Module, FormattedWs);
         {error, Es, Ws} ->
-            rebar_base_compiler:error_tuple(Module, Es, Ws, AllOpts)
+            error_tuple(Module, Es, Ws, AllOpts, Opts)
     end.
+
+error_tuple(Module, Es, Ws, AllOpts, Opts) ->
+    FormattedEs = format_error_sources(Es, Opts),
+    FormattedWs = format_error_sources(Ws, Opts),
+    rebar_base_compiler:error_tuple(Module, FormattedEs, FormattedWs, AllOpts).
+
+format_error_sources(Es, Opts) ->
+    [{rebar_base_compiler:format_error_source(Src, Opts), Desc}
+     || {Src, Desc} <- Es].
 
 target_base(OutDir, Source) ->
     filename:join(OutDir, filename:basename(Source, ".erl")).

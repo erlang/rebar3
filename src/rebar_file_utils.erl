@@ -40,7 +40,9 @@
          reset_dir/1,
          touch/1,
          path_from_ancestor/2,
-         canonical_path/1]).
+         canonical_path/1,
+         resolve_link/1,
+         split_dirname/1]).
 
 -include("rebar.hrl").
 
@@ -287,6 +289,22 @@ canonical_path(Acc, ["."|Rest])       -> canonical_path(Acc, Rest);
 canonical_path([_|Acc], [".."|Rest])  -> canonical_path(Acc, Rest);
 canonical_path([], [".."|Rest])       -> canonical_path([], Rest);
 canonical_path(Acc, [Component|Rest]) -> canonical_path([Component|Acc], Rest).
+
+%% returns canonical target of path if path is a link, otherwise returns path
+-spec resolve_link(string()) -> string().
+
+resolve_link(Path) ->
+    case file:read_link(Path) of
+        {ok, Target} ->
+            canonical_path(filename:absname(Target, filename:dirname(Path)));
+        {error, _} -> Path
+    end.
+
+%% splits a path into dirname and basename
+-spec split_dirname(string()) -> {string(), string()}.
+
+split_dirname(Path) ->
+    {filename:dirname(Path), filename:basename(Path)}.
 
 %% ===================================================================
 %% Internal functions
