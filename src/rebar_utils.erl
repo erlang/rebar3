@@ -789,9 +789,13 @@ maybe_ends_in_comma(H) ->
     end.
 
 get_http_vars(Scheme) ->
+    OS = case os:getenv(atom_to_list(Scheme)) of
+        Str when is_list(Str) -> Str;
+        _ -> []
+    end,
     GlobalConfigFile = rebar_dir:global_config(),
     Config = rebar_config:consult_file(GlobalConfigFile),
-    proplists:get_value(Scheme, Config, []).
+    proplists:get_value(Scheme, Config, OS).
 
 set_httpc_options() ->
     set_httpc_options(https_proxy, get_http_vars(https_proxy)),
