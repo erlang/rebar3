@@ -40,7 +40,8 @@
          profile_override_deps/1,
          deps_build_in_prod/1,
          include_file_relative_to_working_directory/1,
-         include_file_in_src/1]).
+         include_file_in_src/1,
+         always_recompile_when_erl_compiler_options_set/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -62,7 +63,8 @@ all() ->
      parse_transform_test, erl_first_files_test, mib_test,
      umbrella_mib_first_test, only_default_transitive_deps,
      clean_all, override_deps, profile_override_deps, deps_build_in_prod,
-     include_file_relative_to_working_directory, include_file_in_src].
+     include_file_relative_to_working_directory, include_file_in_src,
+     always_recompile_when_erl_compiler_options_set].
 
 groups() ->
     [{basic_app, [], [build_basic_app, paths_basic_app, clean_basic_app]},
@@ -1265,3 +1267,44 @@ include_file_in_src(Config) ->
     rebar_test_utils:run_and_check(Config, RebarConfig,
                                    ["compile"],
                                    {ok, [{app, Name}]}).
+
+always_recompile_when_erl_compiler_options_set(Config) ->
+    %% save existing env to restore after test
+    ExistingEnv = os:getenv("ERL_COMPILER_OPTIONS"),
+
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("erl_compiler_options_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    true = os:unsetenv("ERL_COMPILER_OPTIONS"),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+
+    {ok, Files} = rebar_utils:list_dir(EbinDir),
+    ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+               || F <- Files, filename:extension(F) == ".beam"],
+
+    timer:sleep(1000),
+
+    true = os:putenv("ERL_COMPILER_OPTIONS", "[{d, some_macro}]"),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
+    NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+                  || F <- NewFiles, filename:extension(F) == ".beam"],
+
+    ?assert(ModTime =/= NewModTime),
+
+    %% restore existing env
+    case ExistingEnv of
+        false -> ok;
+        _     -> os:putenv("ERL_COMPILER_OPTIONS", ExistingEnv)
+    end.
+
+
+

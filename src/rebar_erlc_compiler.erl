@@ -308,6 +308,7 @@ needed_files(G, ErlOpts, Dir, OutDir, SourceFiles) ->
                                    ,{i, Dir}] ++ ErlOpts,
                          digraph:vertex(G, Source) > {Source, filelib:last_modified(Target)}
                               orelse opts_changed(AllOpts, TargetBase)
+                              orelse erl_compiler_opts_set()
                  end, SourceFiles).
 
 maybe_rm_beam_and_edge(G, OutDir, Source) ->
@@ -338,6 +339,12 @@ compile_info(Target) ->
         {error, beam_lib, Reason} ->
             ?WARN("Couldn't read debug info from ~p for reason: ~p", [Target, Reason]),
             {error, Reason}
+    end.
+
+erl_compiler_opts_set() ->
+    case os:getenv("ERL_COMPILER_OPTIONS") of
+        false -> false;
+        _     -> true
     end.
 
 erlcinfo_file(Dir) ->
