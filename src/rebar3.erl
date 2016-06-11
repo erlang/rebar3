@@ -155,8 +155,8 @@ init_config() ->
                  ConfigFile ->
                      rebar_config:consult_file(ConfigFile)
              end,
+	
     Config1 = rebar_config:merge_locks(Config, rebar_config:consult_lock_file(?LOCK_FILE)),
-
     %% If $HOME/.config/rebar3/rebar.config exists load and use as global config
     GlobalConfigFile = rebar_dir:global_config(),
     State = case filelib:is_regular(GlobalConfigFile) of
@@ -268,6 +268,8 @@ global_option_spec_list() ->
 handle_error(rebar_abort) ->
     erlang:halt(1);
 handle_error({error, rebar_abort}) ->
+    erlang:halt(1);
+handle_error({error, permission_denied}) ->
     erlang:halt(1);
 handle_error({error, {Module, Reason}}) ->
     case code:which(Module) of
