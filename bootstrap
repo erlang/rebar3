@@ -133,7 +133,11 @@ get_rebar_config() ->
     end.
 
 get_http_vars(Scheme) ->
-    proplists:get_value(Scheme, get_rebar_config(), []).
+    OS = case os:getenv(atom_to_list(Scheme)) of
+        Str when is_list(Str) -> Str;
+        _ -> []
+    end,
+    proplists:get_value(Scheme, get_rebar_config(), OS).
 
 set_httpc_options() ->
     set_httpc_options(https_proxy, get_http_vars(https_proxy)),
