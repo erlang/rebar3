@@ -41,6 +41,7 @@
          cmd_scale_timetraps/1,
          cmd_create_priv_dir/1,
          cmd_include_dir/1,
+         cmd_sys_config/1,
          cfg_opts/1,
          cfg_arbitrary_opts/1,
          cfg_test_spec/1,
@@ -51,6 +52,7 @@
          misspecified_ct_compile_opts/1,
          misspecified_ct_first_files/1]).
 
+-include_lib("eunit/include/eunit.hrl").
 -include_lib("common_test/include/ct.hrl").
 
 all() -> [{group, basic_app},
@@ -102,7 +104,8 @@ groups() -> [{basic_app, [], [basic_app_default_dirs,
                             cmd_multiply_timetraps,
                             cmd_scale_timetraps,
                             cmd_create_priv_dir,
-                            cmd_include_dir]},
+                            cmd_include_dir,
+                            cmd_sys_config]},
              {cover, [], [cover_compiled]}].
 
 init_per_group(basic_app, Config) ->
@@ -1020,7 +1023,41 @@ cmd_include_dir(Config) ->
     CompileOpts = proplists:get_value(options, Info),
     true = lists:member({i, "foo/bar/baz"}, CompileOpts),
     true = lists:member({i, "qux"}, CompileOpts).
-    
+
+cmd_sys_config(Config) ->
+    State = ?config(result, Config),
+    AppDir = ?config(apps, Config),
+    Name = ?config(name, Config),
+    AppName = list_to_atom(Name),
+
+    {ok, _} = rebar_prv_common_test:prepare_tests(State),
+    ?assertEqual(undefined, application:get_env(AppName, key)),
+
+    CfgFile = filename:join([AppDir, "config", "cfg_sys.config"]),
+    ok = filelib:ensure_dir(CfgFile),
+    ok = file:write_file(CfgFile, cfg_sys_config_file(AppName)),
+    RebarConfig = [{ct_opts, [{sys_config, CfgFile}]}],
+    {ok, State1} = rebar_test_utils:run_and_check(Config, RebarConfig, ["as", "test", "lock"], return),
+
+    {ok, _} = rebar_prv_common_test:prepare_tests(State1),
+    ?assertEqual({ok, cfg_value}, application:get_env(AppName, key)),
+
+    Providers = rebar_state:providers(State1),
+    Namespace = rebar_state:namespace(State1),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+
+    CmdFile = filename:join([AppDir, "config", "cmd_sys.config"]),
+    ok = filelib:ensure_dir(CmdFile),
+    ok = file:write_file(CmdFile, cmd_sys_config_file(AppName)),
+    {ok, GetOptResult} = getopt:parse(GetOptSpec, ["--sys_config="++CmdFile]),
+    State2 = rebar_state:command_parsed_args(State1, GetOptResult),
+
+    {ok, _} = rebar_prv_common_test:prepare_tests(State2),
+
+    ?assertEqual({ok ,cmd_value}, application:get_env(AppName, key)).
+
+
 cfg_opts(Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_opts_"),
 
@@ -1181,10 +1218,15 @@ misspecified_ct_first_files(Config) ->
 
     {badconfig, {"Value `~p' of option `~p' must be a list", {some_file, ct_first_files}}} = Error.
 
-
 %% helper for generating test data
 test_suite(Name) ->
     io_lib:format("-module(~ts_SUITE).\n"
                   "-compile(export_all).\n"
                   "all() -> [some_test].\n"
                   "some_test(_) -> ok.\n", [Name]).
+
+cmd_sys_config_file(AppName) ->
+    io_lib:format("[{~s, [{key, cmd_value}]}].", [AppName]).
+
+cfg_sys_config_file(AppName) ->
+    io_lib:format("[{~s, [{key, cfg_value}]}].", [AppName]).

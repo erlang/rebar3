@@ -69,7 +69,8 @@
          check_blacklisted_otp_versions/1,
          info_useless/2,
          list_dir/1,
-         user_agent/0]).
+         user_agent/0,
+         reread_config/1]).
 
 %% for internal use only
 -export([otp_release/0]).
@@ -411,6 +412,17 @@ abort_if_blacklisted(BlacklistedRegex, OtpRelease) ->
 user_agent() ->
     {ok, Vsn} = application:get_key(rebar, vsn),
     ?FMT("Rebar/~s (OTP/~s)", [Vsn, otp_release()]).
+
+reread_config(ConfigList) ->
+    try
+        [application:set_env(Application, Key, Val)
+        || Config <- ConfigList,
+           {Application, Items} <- Config,
+           {Key, Val} <- Items]
+    catch _:_ ->
+            ?ERROR("The configuration file submitted could not be read "
+                  "and will be ignored.", [])
+    end.
 
 %% ====================================================================
 %% Internal functions

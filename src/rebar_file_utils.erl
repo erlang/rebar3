@@ -27,6 +27,7 @@
 -module(rebar_file_utils).
 
 -export([try_consult/1,
+         consult_config/2,
          format_error/1,
          symlink_or_copy/2,
          rm_rf/1,
@@ -60,6 +61,20 @@ try_consult(File) ->
         {error, Reason} ->
             throw(?PRV_ERROR({bad_term_file, File, Reason}))
     end.
+
+-spec consult_config(rebar_state:t(), string()) -> [[tuple()]].
+consult_config(State, Filename) ->
+    Fullpath = filename:join(rebar_dir:root_dir(State), Filename),
+    ?DEBUG("Loading configuration from ~p", [Fullpath]),
+    Config = case try_consult(Fullpath) of
+        [T] -> T;
+        [] -> []
+    end,
+    SubConfigs = [consult_config(State, Entry ++ ".config") ||
+                  Entry <- Config, is_list(Entry)
+                 ],
+
+    [Config | lists:merge(SubConfigs)].
 
 format_error({bad_term_file, AppFile, Reason}) ->
     io_lib:format("Error reading file ~s: ~s", [AppFile, file:format_error(Reason)]).
