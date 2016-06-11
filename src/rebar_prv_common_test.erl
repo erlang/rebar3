@@ -116,6 +116,7 @@ prepare_tests(State) ->
     %% rebar.config test options
     CfgOpts = cfgopts(State),
     ProjectApps = rebar_state:project_apps(State),
+
     %% prioritize tests to run first trying any command line specified
     %% tests falling back to tests specified in the config file finally
     %% running a default set if no other tests are present
@@ -215,6 +216,14 @@ add_hooks(Opts, State) ->
 select_tests(_, _, {error, _} = Error, _) -> Error;
 select_tests(_, _, _, {error, _} = Error) -> Error;
 select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
+    %% set application env if sys_config argument is provided
+    SysConfigs = sys_config_list(CmdOpts, CfgOpts),
+    Configs = lists:flatmap(fun(Filename) ->
+                                rebar_file_utils:consult_config(State, Filename)
+                            end, SysConfigs),
+    [application:load(Application) || Config <- SysConfigs, {Application, _} <- Config],
+    rebar_utils:reread_config(Configs),
+
     Merged = lists:ukeymerge(1,
                              lists:ukeysort(1, CmdOpts),
                              lists:ukeysort(1, CfgOpts)),
@@ -228,6 +237,17 @@ select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
         {_Suite, _Dir}         -> Merged
     end,
     discover_tests(State, ProjectApps, Opts).
+
+sys_config_list(CmdOpts, CfgOpts) ->
+    CmdSysConfigs = split_string(proplists:get_value(sys_config, CmdOpts, "")),
+    case proplists:get_value(sys_config, CfgOpts, []) of
+        [H | _]=Configs when is_list(H) ->
+            Configs ++ CmdSysConfigs;
+        [] ->
+            CmdSysConfigs;
+        Configs ->
+            [Configs | CmdSysConfigs]
+    end.
 
 discover_tests(State, ProjectApps, Opts) ->
     case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
@@ -647,7 +667,8 @@ ct_opts(_State) ->
      {verbose, $v, "verbose", boolean, help(verbose)},
      {name, undefined, "name", atom, help(name)},
      {sname, undefined, "sname", atom, help(sname)},
-     {setcookie, undefined, "setcookie", atom, help(setcookie)}
+     {setcookie, undefined, "setcookie", atom, help(setcookie)},
+     {sys_config, undefined, "sys_config", string, help(sys_config)} %% comma-seperated list
     ].
 
 help(dir) ->
@@ -662,6 +683,8 @@ help(label) ->
     "Test label";
 help(config) ->
     "List of config files";
+help(sys_config) ->
+    "List of application config files";
 help(allow_user_terms) ->
     "Allow user defined config values in config files";
 help(logdir) ->

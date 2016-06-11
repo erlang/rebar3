@@ -111,7 +111,7 @@ shell(State) ->
     %% Hack to fool the init process into thinking we have stopped and the normal
     %% node start process can go on. Without it, init:get_status() always return
     %% '{starting, started}' instead of '{started, started}'
-    init ! {'EXIT', self(), normal},    
+    init ! {'EXIT', self(), normal},
     gen_server:enter_loop(rebar_agent, [], GenState, {local, rebar_agent}, hibernate).
 
 info() ->
@@ -332,16 +332,7 @@ reread_config(State) ->
         no_config ->
             ok;
         ConfigList ->
-            try
-                [application:set_env(Application, Key, Val)
-                  || Config <- ConfigList,
-                     {Application, Items} <- Config,
-                     {Key, Val} <- Items]
-            catch _:_ ->
-                ?ERROR("The configuration file submitted could not be read "
-                       "and will be ignored.", [])
-            end,
-            ok
+            rebar_utils:reread_config(ConfigList)
     end.
 
 boot_apps(Apps) ->
@@ -406,7 +397,7 @@ find_config(State) ->
         no_value ->
             no_config;
         Filename when is_list(Filename) ->
-            consult_config(State, Filename)
+            rebar_file_utils:consult_config(State, Filename)
     end.
 
 -spec first_value([Fun], State) -> no_value | Value when
@@ -414,7 +405,7 @@ find_config(State) ->
       State :: rebar_state:t(),
       Fun :: fun ((State) -> no_value | Value).
 first_value([], _) -> no_value;
-first_value([Fun | Rest], State) -> 
+first_value([Fun | Rest], State) ->
     case Fun(State) of
         no_value ->
             first_value(Rest, State);
@@ -445,18 +436,3 @@ find_config_rebar(State) ->
 find_config_relx(State) ->
     debug_get_value(sys_config, rebar_state:get(State, relx, []), no_value,
                     "Found config from relx.").
-
--spec consult_config(rebar_state:t(), string()) -> [[tuple()]].
-consult_config(State, Filename) ->
-    Fullpath = filename:join(rebar_dir:root_dir(State), Filename),
-    ?DEBUG("Loading configuration from ~p", [Fullpath]),
-    Config = case rebar_file_utils:try_consult(Fullpath) of
-        [T] -> T;
-        [] -> []
-    end,
-    SubConfigs = [consult_config(State, Entry ++ ".config") ||
-                  Entry <- Config, is_list(Entry)
-                 ],
-
-    [Config | lists:merge(SubConfigs)].
-
