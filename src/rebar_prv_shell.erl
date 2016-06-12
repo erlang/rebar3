@@ -332,7 +332,8 @@ reread_config(State) ->
         no_config ->
             ok;
         ConfigList ->
-            rebar_utils:reread_config(ConfigList)
+            _ = rebar_utils:reread_config(ConfigList),
+            ok
     end.
 
 boot_apps(Apps) ->
