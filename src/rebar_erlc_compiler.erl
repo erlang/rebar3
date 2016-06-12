@@ -200,7 +200,7 @@ compile_dirs(RebarOpts, BaseDir, SrcDirs, OutDir, Opts) ->
     ok = filelib:ensure_dir(filename:join(OutDir, "dummy.beam")),
     true = code:add_patha(filename:absname(OutDir)),
 
-    G = init_erlcinfo(proplists:get_all_values(i, ErlOpts), AllErlFiles, BaseDir, OutDir),
+    G = init_erlcinfo(include_abs_dirs(ErlOpts, BaseDir), AllErlFiles, BaseDir, OutDir),
 
     NeededErlFiles = needed_files(G, ErlOpts, BaseDir, OutDir, AllErlFiles),
     {ErlFirstFiles, ErlOptsFirst} = erl_first_files(RebarOpts, ErlOpts, BaseDir, NeededErlFiles),
@@ -387,7 +387,7 @@ maybe_rm_beams_and_edges(G, Dir, Files) ->
 
 source_and_include_dirs(InclDirs, Erls) ->
     SourceDirs = lists:map(fun filename:dirname/1, Erls),
-    lists:usort(["include" | InclDirs ++ SourceDirs]).
+    lists:usort(InclDirs ++ SourceDirs).
 
 update_erlcinfo(G, Dirs, Source) ->
     case digraph:vertex(G, Source) of
@@ -502,7 +502,6 @@ expand_file_names(Files, Dirs) ->
                         end, Dirs)
               end
       end, Files).
-
 
 -spec internal_erl_compile(rebar_dict(), file:filename(), file:filename(),
     file:filename(), list()) -> ok | {ok, any()} | {error, any(), any()}.
@@ -737,6 +736,10 @@ check_file(File) ->
 outdir(RebarOpts) ->
     ErlOpts = rebar_opts:erl_opts(RebarOpts),
     proplists:get_value(outdir, ErlOpts, ?DEFAULT_OUTDIR).
+
+include_abs_dirs(ErlOpts, BaseDir) ->
+    InclDirs = ["include"|proplists:get_all_values(i, ErlOpts)],
+    lists:map(fun(Incl) -> filename:join([BaseDir, Incl]) end, InclDirs).
 
 parse_opts(Opts) -> parse_opts(Opts, #compile_opts{}).
 
