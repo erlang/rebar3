@@ -57,6 +57,9 @@
 %% is `false'
 {cover_enabled, false}.
 
+%% Modules to exclude from cover
+{cover_excl_mods, []}.
+
 %% Options to pass to cover provider
 {cover_opts, [verbose]}.
 
