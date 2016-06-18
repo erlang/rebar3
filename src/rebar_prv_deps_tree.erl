@@ -70,7 +70,7 @@ print_children(Prefix, [{Name, Vsn, Source} | Rest], Dict, Verbose) ->
                       [Prefix, "   "];
                   _ ->
                       io:format("~ts~ts", [Prefix, <<226,148,156,226,148,128,32>>]), %Binary for ├─ utf8%
-                      [Prefix, "│  "]
+                      [Prefix, <<226,148,130,32,32>>] %Binary for │  utf8%
               end,
     io:format("~ts~ts~ts (~ts)~n", [Name, <<226,148,128>>, Vsn, type(Source, Verbose)]), %Binary for ─ utf8%
     case dict:find(Name, Dict) of
