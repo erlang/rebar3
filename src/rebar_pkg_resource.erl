@@ -19,7 +19,7 @@
 lock(_AppDir, Source) ->
     Source.
 
-needs_update(Dir, {pkg, _Name, Vsn}) ->
+needs_update(Dir, {pkg, _Name, Vsn, _Hash}) ->
     [AppInfo] = rebar_app_discover:find_apps([Dir], all),
     case rebar_app_info:original_vsn(AppInfo) =:= ec_cnv:to_list(Vsn) of
         true ->
@@ -28,7 +28,7 @@ needs_update(Dir, {pkg, _Name, Vsn}) ->
             true
     end.
 
-download(TmpDir, Pkg={pkg, Name, Vsn}, State) ->
+download(TmpDir, Pkg={pkg, Name, Vsn, _Hash}, State) ->
     CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
     {ok, PackageDir} = rebar_packages:package_dir(State),
     Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
@@ -40,7 +40,7 @@ download(TmpDir, Pkg={pkg, Name, Vsn}, State) ->
             {fetch_fail, Name, Vsn}
     end.
 
-cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn}, Url, ETag, State) ->
+cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash}, Url, ETag, State) ->
     case request(Url, ETag) of
         {ok, cached} ->
             ?INFO("Version cached at ~s is up to date, reusing it", [CachePath]),
@@ -58,17 +58,20 @@ cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn}, Url, ETag, State) ->
 serve_from_cache(TmpDir, CachePath, Pkg, State) ->
     {Files, Contents, Version, Meta} = extract(TmpDir, CachePath),
     case checksums(Pkg, Files, Contents, Version, Meta, State) of
-        {Chk, Chk, Chk} ->
+        {Chk, Chk, Chk, Chk} ->
             ok = erl_tar:extract({binary, Contents}, [{cwd, TmpDir}, compressed]),
             {ok, true};
-        {_Bin, Chk, Chk} ->
+        {_Hash, Chk, Chk, Chk} ->
+            ?DEBUG("Expected hash ~p does not match checksums ~p", [_Hash, Chk]),
+            {unexpected_hash, CachePath, _Hash, Chk};
+        {Chk, _Bin, Chk, Chk} ->
             ?DEBUG("Checksums: registry: ~p, pkg: ~p", [Chk, _Bin]),
             {failed_extract, CachePath};
-        {Chk, _Reg, Chk} ->
+        {Chk, Chk, _Reg, Chk} ->
             ?DEBUG("Checksums: registry: ~p, pkg: ~p", [_Reg, Chk]),
             {bad_registry_checksum, CachePath};
-        {_Bin, _Reg, _Tar} ->
-            ?DEBUG("Checksums: registry: ~p, pkg: ~p, meta: ~p", [_Reg, _Bin, _Tar]),
+        {_Hash, _Bin, _Reg, _Tar} ->
+            ?DEBUG("Checksums: expected: ~p, registry: ~p, pkg: ~p, meta: ~p", [_Hash, _Reg, _Bin, _Tar]),
             {bad_checksum, CachePath}
     end.
 
@@ -92,13 +95,13 @@ extract(TmpDir, CachePath) ->
     {"metadata.config", Meta} = lists:keyfind("metadata.config", 1, Files),
     {Files, Contents, Version, Meta}.
 
-checksums(Pkg, Files, Contents, Version, Meta, State) ->
+checksums(Pkg={pkg, _Name, _Vsn, Hash}, Files, Contents, Version, Meta, State) ->
     Blob = <<Version/binary, Meta/binary, Contents/binary>>,
     <<X:256/big-unsigned>> = crypto:hash(sha256, Blob),
     BinChecksum = list_to_binary(string:to_upper(lists:flatten(io_lib:format("~64.16.0b", [X])))),
     RegistryChecksum = rebar_packages:registry_checksum(Pkg, State),
     {"CHECKSUM", TarChecksum} = lists:keyfind("CHECKSUM", 1, Files),
-    {BinChecksum, RegistryChecksum, TarChecksum}.
+    {Hash, BinChecksum, RegistryChecksum, TarChecksum}.
 
 make_vsn(_) ->
     {error, "Replacing version of type pkg not supported."}.
