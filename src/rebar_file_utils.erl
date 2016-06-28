@@ -177,11 +177,11 @@ mv(Source, Dest) ->
         {win32, _} ->
             Cmd = case filelib:is_dir(Source) of
                       true ->
-                          ?FMT("robocopy /move /s \"~s\" \"~s\" 1> nul",
+                          ?FMT("robocopy /move /e \"~s\" \"~s\" 1> nul",
                                [rebar_utils:escape_double_quotes(filename:nativename(Source)),
                                 rebar_utils:escape_double_quotes(filename:nativename(Dest))]);
                       false ->
-                          ?FMT("robocopy /move /s \"~s\" \"~s\" \"~s\" 1> nul",
+                          ?FMT("robocopy /move /e \"~s\" \"~s\" \"~s\" 1> nul",
                                [rebar_utils:escape_double_quotes(filename:nativename(filename:dirname(Source))),
                                 rebar_utils:escape_double_quotes(filename:nativename(Dest)),
                                 rebar_utils:escape_double_quotes(filename:basename(Source))])
