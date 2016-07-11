@@ -3,8 +3,13 @@
 -export([suite/0,
          init_per_suite/1,
          end_per_suite/1,
+         init_per_group/2,
+         end_per_group/2,
          init_per_testcase/2,
          all/0,
+         groups/0,
+         empty_base_plt/1,
+         empty_app_plt/1,
          update_base_plt/1,
          update_app_plt/1,
          build_release_plt/1,
@@ -23,6 +28,14 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     ok.
 
+init_per_group(empty, Config) ->
+    [{base_plt_apps, []} | Config];
+init_per_group(_Group, Config) ->
+    [{base_plt_apps, [erts]} | Config].
+
+end_per_group(_Group, _Config) ->
+    ok.
+
 init_per_testcase(Testcase, Config) ->
     PrivDir = ?config(priv_dir, Config),
     Prefix = ec_cnv:to_list(Testcase),
@@ -31,7 +44,7 @@ init_per_testcase(Testcase, Config) ->
             {plt_location, PrivDir},
             {base_plt_prefix, BasePrefix},
             {base_plt_location, PrivDir},
-            {base_plt_apps, [erts]}],
+            {base_plt_apps, ?config(base_plt_apps, Config)}],
     Suffix = "_" ++ rebar_utils:otp_release() ++ "_plt",
     [{plt, filename:join(PrivDir, Prefix ++ Suffix)},
      {base_plt, filename:join(PrivDir, BasePrefix ++ Suffix)},
@@ -39,7 +52,55 @@ init_per_testcase(Testcase, Config) ->
      rebar_test_utils:init_rebar_state(Config)].
 
 all() ->
-    [update_base_plt, update_app_plt, build_release_plt, plt_apps_option].
+    [{group, empty}, {group, build_and_check}, {group, update}].
+
+groups() ->
+    [{empty, [empty_base_plt, empty_app_plt]},
+     {build_and_check, [build_release_plt, plt_apps_option]},
+     {update, [update_base_plt, update_app_plt]}].
+
+empty_base_plt(Config) ->
+    AppDir = ?config(apps, Config),
+    RebarConfig = ?config(rebar_config, Config),
+    BasePlt = ?config(base_plt, Config),
+    Plt = ?config(plt, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [erts]),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
+                                   {ok, [{app, Name}]}),
+
+    {ok, BasePltFiles} = plt_files(BasePlt),
+    ?assertEqual([], BasePltFiles),
+
+    ErtsFiles = erts_files(),
+    {ok, PltFiles} = plt_files(Plt),
+    ?assertEqual(ErtsFiles, PltFiles),
+
+    ok.
+
+empty_app_plt(Config) ->
+    AppDir = ?config(apps, Config),
+    RebarConfig = ?config(rebar_config, Config),
+    BasePlt = ?config(base_plt, Config),
+    Plt = ?config(plt, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, []),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
+                                   {ok, [{app, Name}]}),
+
+    {ok, BasePltFiles} = plt_files(BasePlt),
+    ?assertEqual([], BasePltFiles),
+
+    {ok, PltFiles} = plt_files(Plt),
+    ?assertEqual([], PltFiles),
+
+    ok.
 
 update_base_plt(Config) ->
     AppDir = ?config(apps, Config),
