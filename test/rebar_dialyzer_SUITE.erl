@@ -10,6 +10,7 @@
          groups/0,
          empty_base_plt/1,
          empty_app_plt/1,
+         empty_app_succ_typings/1,
          update_base_plt/1,
          update_app_plt/1,
          build_release_plt/1,
@@ -55,7 +56,7 @@ all() ->
     [{group, empty}, {group, build_and_check}, {group, update}].
 
 groups() ->
-    [{empty, [empty_base_plt, empty_app_plt]},
+    [{empty, [empty_base_plt, empty_app_plt, empty_app_succ_typings]},
      {build_and_check, [build_release_plt, plt_apps_option]},
      {update, [update_base_plt, update_app_plt]}].
 
@@ -99,6 +100,19 @@ empty_app_plt(Config) ->
 
     {ok, PltFiles} = plt_files(Plt),
     ?assertEqual([], PltFiles),
+
+    ok.
+
+empty_app_succ_typings(Config) ->
+    AppDir = ?config(apps, Config),
+    RebarConfig = ?config(rebar_config, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_empty_app(AppDir, Name, Vsn, []),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
+                                   {ok, [{app, Name}]}),
 
     ok.
 

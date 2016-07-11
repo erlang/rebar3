@@ -380,12 +380,15 @@ succ_typings(State, Plt, Output) ->
             {0, State};
         _ ->
             Apps = rebar_state:project_apps(State),
-            succ_typings(State, Plt, Output, Apps)
+            ?INFO("Doing success typing analysis...", []),
+            Files = apps_to_files(Apps),
+            succ_typings(State, Plt, Output, Files)
     end.
 
-succ_typings(State, Plt, Output, Apps) ->
-    ?INFO("Doing success typing analysis...", []),
-    Files = apps_to_files(Apps),
+succ_typings(State, Plt, _, []) ->
+    ?INFO("Analyzing no files with ~p...", [Plt]),
+    {0, State};
+succ_typings(State, Plt, Output, Files) ->
     ?INFO("Analyzing ~b files with ~p...", [length(Files), Plt]),
     Opts = [{analysis_type, succ_typings},
             {get_warnings, true},
