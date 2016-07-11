@@ -249,15 +249,28 @@ ebin_files(EbinDir) ->
      File <- filelib:wildcard(Wildcard, EbinDir)].
 
 read_plt(_State, Plt) ->
-    case dialyzer:plt_info(Plt) of
-        {ok, Info} ->
-            Files = proplists:get_value(files, Info, []),
+    Vsn = dialyzer_version(),
+    case plt_files(Plt) of
+        {ok, Files} when Vsn < {2, 9, 0} ->
+            % Before dialyzer-2.9 (OTP 18.3) removing a beam file from the PLT
+            % that no longer exists would crash. Therefore force a rebuild of
+            % PLT if any files no longer exist.
             read_plt_files(Plt, Files);
+        {ok, _} = Result when Vsn >= {2, 9, 0} ->
+            Result;
         {error, no_such_file} ->
             error;
         {error, read_error} ->
             Error = io_lib:format("Could not read the PLT file ~p", [Plt]),
             throw({dialyzer_error, Error})
+    end.
+
+plt_files(Plt) ->
+    case dialyzer:plt_info(Plt) of
+        {ok, Info} ->
+            {ok, proplists:get_value(files, Info, [])};
+        {error, _} = Error ->
+            Error
     end.
 
 %% If any file no longer exists dialyzer will fail when updating the PLT.
