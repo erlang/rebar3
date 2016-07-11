@@ -353,8 +353,19 @@ update_base_plt(State, BasePlt, Output, BaseFiles) ->
             build_plt(State, BasePlt, Output, BaseFiles)
     end.
 
+build_plt(State, Plt, _, []) ->
+    ?INFO("Building with no files in ~p...", [Plt]),
+    Opts = [{get_warnings, false},
+            {output_plt, Plt},
+            {apps, [erts]}],
+    % Create a PLT with erts files and then remove erts files to be left with an
+    % empty PLT. Dialyzer will crash when trying to build a PLT with an empty
+    % file list.
+    _ = dialyzer:run([{analysis_type, plt_build} | Opts]),
+    _ = dialyzer:run([{analysis_type, plt_remove}, {init_plt, Plt} | Opts]),
+    {0, State};
 build_plt(State, Plt, Output, Files) ->
-    ?INFO("Adding ~b files to ~p...", [length(Files), Plt]),
+    ?INFO("Building with ~b files in ~p...", [length(Files), Plt]),
     GetWarnings = get_config(State, get_warnings, false),
     Opts = [{analysis_type, plt_build},
             {get_warnings, GetWarnings},
@@ -369,12 +380,15 @@ succ_typings(State, Plt, Output) ->
             {0, State};
         _ ->
             Apps = rebar_state:project_apps(State),
-            succ_typings(State, Plt, Output, Apps)
+            ?INFO("Doing success typing analysis...", []),
+            Files = apps_to_files(Apps),
+            succ_typings(State, Plt, Output, Files)
     end.
 
-succ_typings(State, Plt, Output, Apps) ->
-    ?INFO("Doing success typing analysis...", []),
-    Files = apps_to_files(Apps),
+succ_typings(State, Plt, _, []) ->
+    ?INFO("Analyzing no files with ~p...", [Plt]),
+    {0, State};
+succ_typings(State, Plt, Output, Files) ->
     ?INFO("Analyzing ~b files with ~p...", [length(Files), Plt]),
     Opts = [{analysis_type, succ_typings},
             {get_warnings, true},
