@@ -155,7 +155,13 @@ format_warnings(Source, Warnings) ->
     format_warnings(Source, Warnings, []).
 
 format_warnings(Source, Warnings, Opts) ->
-    Prefix = case lists:member(warnings_as_errors, Opts) of
+    %% `Opts' can be passed in both as a list or a dictionary depending
+    %% on whether the first call to rebar_erlc_compiler was done with
+    %% the type `rebar_dict()' or `rebar_state:t()'.
+    LookupFn = if is_list(Opts) -> fun lists:member/2
+                ; true          -> fun dict:is_key/2
+               end,
+    Prefix = case LookupFn(warnings_as_errors, Opts) of
                  true -> "";
                  false -> "Warning: "
              end,
