@@ -128,7 +128,8 @@
 %% Paths to miscellaneous Erlang files to compile for an app
 %% without including them in its modules list
 {extra_src_dirs, []}.
-
+%% Path where custom rebar3 templates could be found
+{template_dir, []}.
 
 %% == EDoc ==
 
