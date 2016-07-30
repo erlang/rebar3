@@ -261,8 +261,7 @@ read_plt(_State, Plt) ->
         {error, no_such_file} ->
             error;
         {error, not_valid} ->
-            Error = io_lib:format("Could not read the PLT file ~p", [Plt]),
-            throw({dialyzer_error, Error});
+            error;
         {error, read_error} ->
             Error = io_lib:format("Could not read the PLT file ~p", [Plt]),
             throw({dialyzer_error, Error})
