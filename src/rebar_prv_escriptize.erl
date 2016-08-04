@@ -72,8 +72,12 @@ do(State) ->
             end;
         Name ->
             AllApps = rebar_state:all_deps(State)++rebar_state:project_apps(State),
-            {ok, AppInfo} = rebar_app_utils:find(ec_cnv:to_binary(Name), AllApps),
-            escriptize(State, AppInfo)
+            case rebar_app_utils:find(ec_cnv:to_binary(Name), AllApps) of
+                {ok, AppInfo} ->
+                    escriptize(State, AppInfo);
+                _ ->
+                    ?PRV_ERROR({bad_name, Name})
+            end
     end.
 
 escriptize(State0, App) ->
