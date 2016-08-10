@@ -221,7 +221,7 @@ select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
     Configs = lists:flatmap(fun(Filename) ->
                                 rebar_file_utils:consult_config(State, Filename)
                             end, SysConfigs),
-    [application:load(Application) || Config <- SysConfigs, {Application, _} <- Config],
+    [application:load(Application) || Config <- Configs, {Application, _} <- Config],
     rebar_utils:reread_config(Configs),
 
     Merged = lists:ukeymerge(1,
