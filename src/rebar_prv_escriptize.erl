@@ -232,7 +232,9 @@ find_deps_of_deps([Name|Names], Apps, Acc) ->
     DepNames = proplists:get_value(applications, rebar_app_info:app_details(App), []),
     BinDepNames = [ec_cnv:to_binary(Dep) || Dep <- DepNames,
                    %% ignore system libs; shouldn't include them.
-                   not lists:prefix(code:root_dir(), code:lib_dir(Dep))]
+                   DepDir <- [code:lib_dir(Dep)],
+                   DepDir =:= {error, bad_name} orelse % those are all local
+                   not lists:prefix(code:root_dir(), DepDir)]
                 -- ([Name|Names]++Acc), % avoid already seen deps
     ?DEBUG("new deps of ~p found to be ~p", [Name, BinDepNames]),
     find_deps_of_deps(BinDepNames ++ Names, Apps, BinDepNames ++ Acc).
