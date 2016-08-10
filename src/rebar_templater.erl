@@ -326,7 +326,7 @@ find_other_templates(State) ->
         undefined ->
             [];
         TemplateDir ->
-            rebar_utils:find_files(TemplateDir, ?TEMPLATE_RE)
+            rebar_utils:find_files(TemplateDir, ?TEMPLATE_RE, true) % recursive
     end.
 
 %% Fetch template indexes that sit on disk in plugins
