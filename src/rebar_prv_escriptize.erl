@@ -61,8 +61,11 @@ desc() ->
         "the project's and its dependencies' BEAM files.".
 
 do(State) ->
+    Providers = rebar_state:providers(State),
+    Cwd = rebar_state:dir(State),
+    rebar_hooks:run_project_and_app_hooks(Cwd, pre, ?PROVIDER, Providers, State),
     ?INFO("Building escript...", []),
-    case rebar_state:get(State, escript_main_app, undefined) of
+    Res = case rebar_state:get(State, escript_main_app, undefined) of
         undefined ->
             case rebar_state:project_apps(State) of
                 [App] ->
@@ -78,7 +81,9 @@ do(State) ->
                 _ ->
                     ?PRV_ERROR({bad_name, Name})
             end
-    end.
+    end,
+    rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State),
+    Res.
 
 escriptize(State0, App) ->
     AppName = rebar_app_info:name(App),
