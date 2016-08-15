@@ -41,7 +41,10 @@ do(State) ->
         [Name] -> % default namespace
             task_help(default, list_to_atom(Name), State);
         [Namespace, Name] ->
-            task_help(list_to_atom(Namespace), list_to_atom(Name), State)
+            task_help(list_to_atom(Namespace), list_to_atom(Name), State);
+        _ ->
+            {error, "Too many arguments given. " ++
+                 "Usage: rebar3 help [<namespace>] <task>"}
     end.
 
 -spec format_error(any()) -> iolist().
