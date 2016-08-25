@@ -33,17 +33,25 @@ do(State) ->
     code:add_pathsa(rebar_state:code_paths(State, all_deps)),
     ProjectApps = rebar_state:project_apps(State),
     Providers = rebar_state:providers(State),
-    EDocOpts = rebar_state:get(State, edoc_opts, []),
+    EdocOpts = rebar_state:get(State, edoc_opts, []),
+    ShouldAccPaths = not has_configured_paths(EdocOpts),
     Cwd = rebar_state:dir(State),
     rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
-    lists:foreach(fun(AppInfo) ->
-                          rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, AppInfo, State),
-                          AppName = ec_cnv:to_list(rebar_app_info:name(AppInfo)),
-                          ?INFO("Running edoc for ~s", [AppName]),
-                          AppDir = rebar_app_info:dir(AppInfo),
-                          ok = edoc:application(list_to_atom(AppName), AppDir, EDocOpts),
-                          rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, AppInfo, State)
-                  end, ProjectApps),
+    lists:foldl(fun(AppInfo, EdocOptsAcc) ->
+                    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, AppInfo, State),
+                    AppName = ec_cnv:to_list(rebar_app_info:name(AppInfo)),
+                    ?INFO("Running edoc for ~s", [AppName]),
+                    AppDir = rebar_app_info:dir(AppInfo),
+                    ok = edoc:application(list_to_atom(AppName), AppDir, EdocOptsAcc),
+                    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, AppInfo, State),
+                    case ShouldAccPaths of
+                        true ->
+                            %% edoc wants / on all OSes
+                            add_to_paths(EdocOptsAcc, AppDir++"/doc");
+                        false ->
+                            EdocOptsAcc
+                    end
+                end, EdocOpts, ProjectApps),
     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State),
     rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
     {ok, State}.
@@ -55,3 +63,12 @@ format_error(Reason) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+has_configured_paths(EdocOpts) ->
+    proplists:get_value(dir, EdocOpts) =/= undefined.
+
+add_to_paths([], Path) ->
+    [{doc_path, [Path]}];
+add_to_paths([{doc_path, Paths}|T], Path) ->
+    [{doc_path, [Path | Paths]} | T];
+add_to_paths([H|T], Path) ->
+    [H | add_to_paths(Path, T)].
