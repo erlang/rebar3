@@ -1,0 +1,17 @@
+{application, foo,
+ [{description, "An OTP application"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, { foo_app, []}},
+  {applications,
+   [kernel,
+    stdlib,
+    bar1, bar2
+   ]},
+  {env,[]},
+  {modules, []},
+
+  {maintainers, []},
+  {licenses, []},
+  {links, []}
+ ]}.
