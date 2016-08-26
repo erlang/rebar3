@@ -182,7 +182,7 @@ update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
                               undefined ->
                                   get_package(PkgName, "0", State);
                               <<"~>", Vsn/binary>> ->
-                                  [Vsn1] = binary:split(Vsn, [<<" ">>], [trim_all, global]),
+                                  [Vsn1] = [X || X <- binary:split(Vsn, [<<" ">>], [global]), X =/= <<>>],
                                   get_package(PkgName, Vsn1, State);
                               _ ->
                                   {PkgName, PkgVsn}
