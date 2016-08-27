@@ -109,8 +109,7 @@ refresh_paths(RState) ->
                         {X,X} ->
                             ?DEBUG("reloading ~p from ~s", [Modules, Path]),
                             code:replace_path(App, Path),
-                            [begin code:purge(M), code:delete(M), code:load_file(M) end
-                             || M <- Modules];
+                            reload_modules(Modules);
                         {_,_} ->
                             ?DEBUG("skipping app ~p, stable copy required", [App])
                     end
@@ -123,3 +122,22 @@ refresh_state(RState, _Dir) ->
         rebar3:init_config(),
         [fun(S) -> rebar_state:apply_profiles(S, rebar_state:current_profiles(RState)) end]
     ).
+
+reload_modules([]) -> noop;
+reload_modules(Modules) ->
+    case erlang:function_exported(code, prepare_loading, 1) of
+        true ->
+            %% OTP 19 and later -- use atomic loading and ignore unloadable mods
+            case code:prepare_loading(Modules) of
+                {ok, Prepared} ->
+                    [code:purge(M) || M <- Modules],
+                    code:finish_loading(Prepared);
+                {error, ModRsns} ->
+                    reload_modules(Modules -- [Mod || {Mod,_Rsn} <- ModRsns])
+            end;
+        false ->
+            %% Older versions, use a more ad-hoc mechanism. Specifically has
+            %% a harder time dealing with NIFs.
+            [begin code:purge(M), code:delete(M), code:load_file(M) end
+             || M <- Modules]
+    end.
