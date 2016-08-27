@@ -303,22 +303,43 @@ cover_compile(State, Dirs) ->
     {ok, CoverPid} = start_cover(),
     %% redirect cover output
     true = redirect_cover_output(State, CoverPid),
+    ExclMods = rebar_state:get(State, cover_excl_mods, []),
+
     lists:foreach(fun(Dir) ->
-        ?DEBUG("cover compiling ~p", [Dir]),
-        case catch(cover:compile_beam_directory(Dir)) of
+        case file:list_dir(Dir) of
+            {ok, Files} ->
+                ?DEBUG("cover compiling ~p", [Dir]),
+                [cover_compile_file(filename:join(Dir, File))
+                 || File <- Files,
+                    filename:extension(File) == ".beam",
+                    not is_ignored(Dir, File, ExclMods)],
+                ok;
             {error, eacces} ->
                 ?WARN("Directory ~p not readable, modules will not be included in coverage", [Dir]);
             {error, enoent} ->
                 ?WARN("Directory ~p not found", [Dir]);
-            {'EXIT', {Reason, _}} ->
-                ?WARN("Cover compilation for directory ~p failed: ~p", [Dir, Reason]);
-            Results ->
-                %% print any warnings about modules that failed to cover compile
-                lists:foreach(fun print_cover_warnings/1, lists:flatten(Results))
+            {error, Reason} ->
+                ?WARN("Directory ~p error ~p", [Dir, Reason])
         end
     end, Dirs),
     rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
     ok.
+
+is_ignored(Dir, File, ExclMods) ->
+    Ignored = lists:any(fun(Excl) ->
+                             File =:= atom_to_list(Excl) ++ ".beam"
+                        end,
+                        ExclMods),
+    Ignored andalso ?DEBUG("cover ignoring ~p ~p", [Dir, File]),
+    Ignored.
+
+cover_compile_file(FileName) ->
+    case catch(cover:compile_beam(FileName)) of
+        {error, Reason} ->
+            ?WARN("Cover compilation failed: ~p", [Reason]);
+        {ok, _} ->
+            ok
+    end.
 
 app_dirs(Apps) ->
     lists:foldl(fun app_ebin_dirs/2, [], Apps).
@@ -348,10 +369,6 @@ redirect_cover_output(State, CoverPid) ->
     {ok, F} = file:open(filename:join([DataDir, "cover.log"]),
                         [append]),
     group_leader(F, CoverPid).
-
-print_cover_warnings({ok, _}) -> ok;
-print_cover_warnings({error, Error}) ->
-    ?WARN("Cover compilation failed: ~p", [Error]).
 
 write_coverdata(State, Task) ->
     DataDir = cover_dir(State),
