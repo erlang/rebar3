@@ -247,5 +247,6 @@ coverdata_is_reset_on_write(Config) ->
                                    ["eunit"],
                                    {ok, [{app, Name}]}),
 
-    {result, Ok, []} = cover:analyse(cover:modules()),
+    Res = lists:map(fun(M) -> cover:analyse(M) end, cover:modules()),
+    Ok = lists:foldl(fun({ok, R}, Acc) -> R ++ Acc end, [], Res),
     [] = lists:filter(fun({_, {0,_}}) -> false; (_) -> true end, Ok).
