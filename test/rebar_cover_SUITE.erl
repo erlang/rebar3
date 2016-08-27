@@ -12,7 +12,8 @@
          root_extra_src_dirs/1,
          index_written/1,
          flag_verbose/1,
-         config_verbose/1]).
+         config_verbose/1,
+         excl_mods/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -35,7 +36,8 @@ all() ->
      basic_extra_src_dirs, release_extra_src_dirs,
      root_extra_src_dirs,
      index_written,
-     flag_verbose, config_verbose].
+     flag_verbose, config_verbose,
+     excl_mods].
 
 flag_coverdata_written(Config) ->
     AppDir = ?config(apps, Config),
@@ -206,3 +208,27 @@ config_verbose(Config) ->
                                    {ok, [{app, Name}]}),
 
     true = filelib:is_file(filename:join([AppDir, "_build", "test", "cover", "index.html"])).
+
+excl_mods(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name1 = rebar_test_utils:create_random_name("relapp1_"),
+    Vsn1 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([AppDir, "apps", Name1]), Name1, Vsn1, [kernel, stdlib]),
+
+    Name2 = rebar_test_utils:create_random_name("relapp2_"),
+    Vsn2 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([AppDir, "apps", Name2]), Name2, Vsn2, [kernel, stdlib]),
+
+    Mod1 = list_to_atom(Name1),
+    Mod2 = list_to_atom(Name2),
+    RebarConfig = [{erl_opts, [{d, some_define}]},
+                   {cover_excl_mods, [Mod2]}],
+
+    rebar_test_utils:run_and_check(Config,
+                                   RebarConfig,
+                                   ["eunit", "--cover"],
+                                   {ok, [{app, Name1}, {app, Name2}]}),
+
+    {file, _} = cover:is_compiled(Mod1),
+    false = cover:is_compiled(Mod2).
