@@ -308,29 +308,38 @@ cover_compile(State, Dirs) ->
     lists:foreach(fun(Dir) ->
         case file:list_dir(Dir) of
             {ok, Files} ->
-                Files2 = [F || F <- Files, filename:extension(F) == ".beam"],
-                lists:foreach(fun(File) ->
-                    case lists:any(fun (Excl) ->
-                        File =:= (atom_to_list(Excl) ++ ".beam")
-                    end, ExclMods) of
-                        true ->
-                            ?DEBUG("cover ignoring ~p ~p", [Dir, File]);
-                        _ ->
-                            ?DEBUG("cover compiling ~p ~p", [Dir, File]),
-                            case catch(cover:compile_beam(filename:join(Dir, File))) of
-                                {error, Reason} ->
-                                    ?WARN("Cover compilation failed: ~p", [Reason]);
-                                {ok, _} ->
-                                    ok
-                            end
-                    end
-                end, Files2);
+                ?DEBUG("cover compiling ~p", [Dir]),
+                [cover_compile_file(filename:join(Dir, File))
+                 || File <- Files,
+                    filename:extension(File) == ".beam",
+                    not is_ignored(Dir, File, ExclMods)],
+                ok;
+            {error, eacces} ->
+                ?WARN("Directory ~p not readable, modules will not be included in coverage", [Dir]);
+            {error, enoent} ->
+                ?WARN("Directory ~p not found", [Dir]);
             {error, Reason} ->
                 ?WARN("Directory ~p error ~p", [Dir, Reason])
         end
     end, Dirs),
     rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
     ok.
+
+is_ignored(Dir, File, ExclMods) ->
+    Ignored = lists:any(fun(Excl) ->
+                             File =:= atom_to_list(Excl) ++ ".beam"
+                        end,
+                        ExclMods),
+    Ignored andalso ?DEBUG("cover ignoring ~p ~p", [Dir, File]),
+    Ignored.
+
+cover_compile_file(FileName) ->
+    case catch(cover:compile_beam(FileName)) of
+        {error, Reason} ->
+            ?WARN("Cover compilation failed: ~p", [Reason]);
+        {ok, _} ->
+            ok
+    end.
 
 app_dirs(Apps) ->
     lists:foldl(fun app_ebin_dirs/2, [], Apps).
