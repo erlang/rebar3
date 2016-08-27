@@ -13,7 +13,8 @@
          index_written/1,
          flag_verbose/1,
          config_verbose/1,
-         excl_mods/1]).
+         excl_mods/1,
+         coverdata_is_reset_on_write/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -37,7 +38,7 @@ all() ->
      root_extra_src_dirs,
      index_written,
      flag_verbose, config_verbose,
-     excl_mods].
+     excl_mods, coverdata_is_reset_on_write].
 
 flag_coverdata_written(Config) ->
     AppDir = ?config(apps, Config),
@@ -232,3 +233,20 @@ excl_mods(Config) ->
 
     {file, _} = cover:is_compiled(Mod1),
     false = cover:is_compiled(Mod2).
+
+coverdata_is_reset_on_write(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("coverdata_is_reset_on_write_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{erl_opts, [{d, some_define}]}, {cover_enabled, true}],
+    rebar_test_utils:run_and_check(Config,
+                                   RebarConfig,
+                                   ["eunit"],
+                                   {ok, [{app, Name}]}),
+
+    Res = lists:map(fun(M) -> cover:analyse(M) end, cover:modules()),
+    Ok = lists:foldl(fun({ok, R}, Acc) -> R ++ Acc end, [], Res),
+    [] = lists:filter(fun({_, {0,_}}) -> false; (_) -> true end, Ok).

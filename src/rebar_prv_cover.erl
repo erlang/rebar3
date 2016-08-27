@@ -376,6 +376,8 @@ write_coverdata(State, Task) ->
     ExportFile = filename:join([DataDir, atom_to_list(Task) ++ ".coverdata"]),
     case cover:export(ExportFile) of
         ok ->
+            %% dump accumulated coverdata after writing
+            ok = cover:reset(),
             ?DEBUG("Cover data written to ~p.", [ExportFile]);
         {error, Reason} ->
             ?WARN("Cover data export failed: ~p", [Reason])
