@@ -190,7 +190,7 @@ update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
     %% store the expected hash for the dependency
     Hash1 = case Hash of
         undefined -> % unknown, define the hash since we know the dep
-            rebar_packages:registry_checksum({pkg, PkgName1, PkgVsn1, Hash}, State);
+            fetch_checksum(PkgName1, PkgVsn1, Hash, State);
         _ -> % keep as is
             Hash
     end,
@@ -203,6 +203,15 @@ update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
 update_source(AppInfo, Source, _State) ->
     rebar_app_info:source(AppInfo, Source).
 
+fetch_checksum(PkgName, PkgVsn, Hash, State) ->
+    try
+        rebar_packages:registry_checksum({pkg, PkgName, PkgVsn, Hash}, State)
+    catch
+        _:_ ->
+            ?INFO("Package ~s-~s not found. Fetching registry updates and trying again...", [PkgName, PkgVsn]),
+            {ok, _} = rebar_prv_update:do(State),
+            rebar_packages:registry_checksum({pkg, PkgName, PkgVsn, Hash}, State)
+    end.
 
 format_error({missing_package, Package}) ->
     io_lib:format("Package not found in registry: ~s", [Package]);
