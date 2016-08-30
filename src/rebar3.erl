@@ -292,7 +292,7 @@ handle_error(Error) ->
     case erlang:get_stacktrace() of
         [] -> ok;
         Trace ->
-            ?DEBUG("Stack trace to the error location: ~p", [Trace])
+            ?DEBUG("Stack trace to the error location:~n~p", [Trace])
     end,
     ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []),
     erlang:halt(1).
