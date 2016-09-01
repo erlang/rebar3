@@ -125,7 +125,7 @@ refresh_state(RState, _Dir) ->
 
 reload_modules([]) -> noop;
 reload_modules(Modules) -> 
-         reload_modules(Modules, erlang:function_exported(code, prepare_loading, 1)).
+        reload_modules(Modules, erlang:function_exported(code, prepare_loading, 1)).
 
 %% OTP 19 and later -- use atomic loading and ignore unloadable mods
 reload_modules(Modules, true) ->
@@ -137,16 +137,15 @@ reload_modules(Modules, true) ->
         {error, ModRsns} ->
             Blacklist = 
             (fun Error([], Acc) -> Acc;
-                 Error([ {ModNif, on_load_not_allowed} |T], Acc) -> 
+                 Error([ {ModNif, on_load_not_allowed} |T], Acc) ->
                     reload_modules([ModNif], false),
                     Error(T, [ModNif|Acc]);
-                 Error([ {ModError, _} |T], Acc) -> 
+                 Error([ {ModError, _} |T], Acc) ->
                     Error(T, [ModError|Acc])
             end)(ModRsns, []),
             reload_modules(Modules -- Blacklist, true)
     end;
 
-%% Older versions, use a more ad-hoc mechanism. Specifically has
-%% a harder time dealing with NIFs.
+%% Older versions, use a more ad-hoc mechanism.
 reload_modules(Modules, false) ->
     [begin code:purge(M), code:load_file(M) end || M <- Modules].
