@@ -136,13 +136,17 @@ reload_modules(Modules, true) ->
 
         {error, ModRsns} ->
             Blacklist = 
-            (fun Error([], Acc) -> Acc;
-                 Error([ {ModNif, on_load_not_allowed} |T], Acc) ->
-                    reload_modules([ModNif], false),
-                    Error(T, [ModNif|Acc]);
-                 Error([ {ModError, _} |T], Acc) ->
-                    Error(T, [ModError|Acc])
-            end)(ModRsns, []),
+                lists:foldr(fun({ModError, Error}, Acc) ->
+                    case Error of
+                        %perhaps cover other cases of failure?
+                        on_load_not_allowed ->
+                            reload_modules([ModError], false),
+                            [ModError|Acc];
+                        _ -> [ModError|Acc]
+                    end
+                end,
+                [], ModRsns
+            ),
             reload_modules(Modules -- Blacklist, true)
     end;
 
