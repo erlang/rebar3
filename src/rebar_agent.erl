@@ -109,7 +109,7 @@ refresh_paths(RState) ->
                         {X,X} ->
                             ?DEBUG("reloading ~p from ~s", [Modules, Path]),
                             code:replace_path(App, Path),
-                            [begin code:purge(M), code:delete(M), code:load_file(M) end
+                            [begin code:purge(M), code:load_file(M) end
                              || M <- Modules];
                         {_,_} ->
                             ?DEBUG("skipping app ~p, stable copy required", [App])
