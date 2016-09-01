@@ -137,9 +137,9 @@ reload_modules(Modules, true) ->
         {error, ModRsns} ->
             Blacklist = 
             (fun Error([], Acc) -> Acc;
-                 Error([ {ModError, on_load_not_allowed} |T], Acc) -> 
-                    reload_modules([ModError], false),
-                    Error(T, Acc);
+                 Error([ {ModNif, on_load_not_allowed} |T], Acc) -> 
+                    reload_modules([ModNif], false),
+                    Error(T, [ModNif|Acc]);
                  Error([ {ModError, _} |T], Acc) -> 
                     Error(T, [ModError|Acc])
             end)(ModRsns, []),
