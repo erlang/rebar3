@@ -138,6 +138,6 @@ reload_modules(Modules) ->
         false ->
             %% Older versions, use a more ad-hoc mechanism. Specifically has
             %% a harder time dealing with NIFs.
-            [begin code:purge(M), code:delete(M), code:load_file(M) end
+            [begin code:purge(M), code:load_file(M) end
              || M <- Modules]
     end.
