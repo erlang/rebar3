@@ -152,4 +152,4 @@ reload_modules(Modules, true) ->
 
 %% Older versions, use a more ad-hoc mechanism.
 reload_modules(Modules, false) ->
-    [begin code:purge(M), code:load_file(M) end || M <- Modules].
+    [begin code:delete(M), code:purge(M), code:load_file(M) end || M <- Modules].
