@@ -109,8 +109,7 @@ refresh_paths(RState) ->
                         {X,X} ->
                             ?DEBUG("reloading ~p from ~s", [Modules, Path]),
                             code:replace_path(App, Path),
-                            [begin code:purge(M), code:delete(M), code:load_file(M) end
-                             || M <- Modules];
+                            reload_modules(Modules);
                         {_,_} ->
                             ?DEBUG("skipping app ~p, stable copy required", [App])
                     end
@@ -123,3 +122,34 @@ refresh_state(RState, _Dir) ->
         rebar3:init_config(),
         [fun(S) -> rebar_state:apply_profiles(S, rebar_state:current_profiles(RState)) end]
     ).
+
+reload_modules([]) -> noop;
+reload_modules(Modules) -> 
+        reload_modules(Modules, erlang:function_exported(code, prepare_loading, 1)).
+
+%% OTP 19 and later -- use atomic loading and ignore unloadable mods
+reload_modules(Modules, true) ->
+    case code:prepare_loading(Modules) of
+        {ok, Prepared} ->
+            [code:purge(M) || M <- Modules],
+            code:finish_loading(Prepared);
+
+        {error, ModRsns} ->
+            Blacklist = 
+                lists:foldr(fun({ModError, Error}, Acc) ->
+                    case Error of
+                        %perhaps cover other cases of failure?
+                        on_load_not_allowed ->
+                            reload_modules([ModError], false),
+                            [ModError|Acc];
+                        _ -> [ModError|Acc]
+                    end
+                end,
+                [], ModRsns
+            ),
+            reload_modules(Modules -- Blacklist, true)
+    end;
+
+%% Older versions, use a more ad-hoc mechanism.
+reload_modules(Modules, false) ->
+    [begin code:delete(M), code:purge(M), code:load_file(M) end || M <- Modules].
