@@ -143,7 +143,7 @@ reload_modules(Modules, true) ->
                             reload_modules([ModError], false),
                             [ModError|Acc];
                         _ -> 
-                            ?ERROR("Module ~p failed to atomic load because ~p", [ModError, Error]),
+                            ?DEBUG("Module ~p failed to atomic load because ~p", [ModError, Error]),
                             [ModError|Acc]
                     end
                 end,
@@ -160,7 +160,7 @@ reload_modules(Modules, false) ->
             case code:load_file(M) of
                 {module, M} -> ok;
                 {error, Error} ->
-                    ?ERROR("Module ~p failed to load because ~p", [M, Error])
+                    ?DEBUG("Module ~p failed to load because ~p", [M, Error])
             end
         end, Modules
     ).
