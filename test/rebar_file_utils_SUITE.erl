@@ -14,7 +14,8 @@
          path_from_ancestor/1,
          canonical_path/1,
          resolve_link/1,
-         split_dirname/1]).
+         split_dirname/1,
+         mv_warning_is_ignored/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -27,7 +28,8 @@ all() ->
      path_from_ancestor,
      canonical_path,
      resolve_link,
-     split_dirname].
+     split_dirname,
+     mv_warning_is_ignored].
 
 groups() ->
     [{tmpdir, [], [raw_tmpdir, empty_tmpdir, simple_tmpdir, multi_tmpdir]},
@@ -135,3 +137,9 @@ split_dirname(_Config) ->
     ?assertEqual({".", "foo"}, rebar_file_utils:split_dirname("foo")),
     ?assertEqual({"/foo", "bar"}, rebar_file_utils:split_dirname("/foo/bar")),
     ?assertEqual({"foo", "bar"}, rebar_file_utils:split_dirname("foo/bar")).
+
+mv_warning_is_ignored(_Config) ->
+    meck:new(rebar_utils, [passthrough]),
+    meck:expect(rebar_utils, sh, fun("mv ding dong", _) -> {ok, "Warning"}  end),
+    ok = rebar_file_utils:mv("ding", "dong"),
+    meck:unload(rebar_utils).
