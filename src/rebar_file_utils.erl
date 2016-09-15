@@ -171,9 +171,14 @@ mv(Source, Dest) ->
         {unix, _} ->
             EscSource = rebar_utils:escape_chars(Source),
             EscDest = rebar_utils:escape_chars(Dest),
-            {ok, []} = rebar_utils:sh(?FMT("mv ~s ~s", [EscSource, EscDest]),
-                                      [{use_stdout, false}, abort_on_error]),
-            ok;
+            case rebar_utils:sh(?FMT("mv ~s ~s", [EscSource, EscDest]),
+                                      [{use_stdout, false}, abort_on_error]) of
+                {ok, []} ->
+                    ok;
+                {ok, Warning} ->
+                    ?WARN("mv: ~p", [Warning]),
+                    ok
+            end;
         {win32, _} ->
             Cmd = case filelib:is_dir(Source) of
                       true ->
