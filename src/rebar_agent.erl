@@ -142,7 +142,9 @@ reload_modules(Modules, true) ->
                         on_load_not_allowed ->
                             reload_modules([ModError], false),
                             [ModError|Acc];
-                        _ -> [ModError|Acc]
+                        _ -> 
+                            ?DEBUG("Module ~p failed to atomic load because ~p", [ModError, Error]),
+                            [ModError|Acc]
                     end
                 end,
                 [], ModRsns
@@ -152,4 +154,13 @@ reload_modules(Modules, true) ->
 
 %% Older versions, use a more ad-hoc mechanism.
 reload_modules(Modules, false) ->
-    [begin code:delete(M), code:purge(M), code:load_file(M) end || M <- Modules].
+    lists:foreach(fun(M) ->
+            code:delete(M), 
+            code:purge(M), 
+            case code:load_file(M) of
+                {module, M} -> ok;
+                {error, Error} ->
+                    ?DEBUG("Module ~p failed to load because ~p", [M, Error])
+            end
+        end, Modules
+    ).
