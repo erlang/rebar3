@@ -15,7 +15,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, cover).
--define(DEPS, [app_discovery]).
+-define(DEPS, [lock]).
 
 %% ===================================================================
 %% Public API
@@ -84,6 +84,20 @@ reset(State) ->
     {ok, State}.
 
 analyze(State) ->
+    %% modules have to be compiled and then cover compiled
+    %% in order for cover data to be reloaded
+    %% this maybe breaks if modules have been deleted
+    %% since code coverage was collected?
+    case rebar_prv_compile:do(State) of
+        %% successfully compiled apps
+        {ok, S} ->
+            ok = cover_compile(S, apps),
+            do_analyze(State);
+        %% this should look like a compiler error, not a cover error
+        Error   -> Error
+    end.
+
+do_analyze(State) ->
     ?INFO("Performing cover analysis...", []),
     %% figure out what coverdata we have
     CoverDir = cover_dir(State),
