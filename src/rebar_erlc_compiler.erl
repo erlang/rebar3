@@ -202,7 +202,13 @@ compile_dirs(RebarOpts, BaseDir, SrcDirs, OutDir, Opts) ->
 
     G = init_erlcinfo(include_abs_dirs(ErlOpts, BaseDir), AllErlFiles, BaseDir, OutDir),
 
-    NeededErlFiles = needed_files(G, ErlOpts, BaseDir, OutDir, AllErlFiles),
+    {ParseTransforms, Rest} = split_source_files(AllErlFiles, ErlOpts),
+    NeededErlFiles = case needed_files(G, ErlOpts, BaseDir, OutDir, ParseTransforms) of
+        [] -> needed_files(G, ErlOpts, BaseDir, OutDir, Rest);
+        %% at least one parse transform in the opts needs updating, so recompile all
+        _  -> AllErlFiles
+    end,
+
     {ErlFirstFiles, ErlOptsFirst} = erl_first_files(RebarOpts, ErlOpts, BaseDir, NeededErlFiles),
     {DepErls, OtherErls} = lists:partition(
                              fun(Source) -> digraph:in_degree(G, Source) > 0 end,
@@ -295,6 +301,14 @@ erl_first_files(Opts, ErlOpts, Dir, NeededErlFiles) ->
                                         true
                                end, ErlOpts),
     {ErlFirstFiles ++ ParseTransformsErls, ErlOptsFirst}.
+
+split_source_files(SourceFiles, ErlOpts) ->
+    ParseTransforms = proplists:get_all_values(parse_transform, ErlOpts),
+    lists:partition(fun(Source) ->
+                            lists:member(filename_to_atom(Source), ParseTransforms)
+                    end, SourceFiles).
+
+filename_to_atom(F) -> list_to_atom(filename:rootname(filename:basename(F))).
 
 %% Get subset of SourceFiles which need to be recompiled, respecting
 %% dependencies induced by given graph G.
