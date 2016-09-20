@@ -717,7 +717,10 @@ update_code(Paths, Opts) ->
                                   code:add_patha(Path),
                                   case lists:member(soft_purge, Opts) of
                                       true  ->
-                                          [begin code:soft_purge(M), code:delete(M) end || M <- Modules];
+                                            %% only soft purge modules that were not
+                                            %% cover compiled, otherwise coverage is lost
+                                          [begin code:soft_purge(M), code:delete(M) end ||
+                                                M <- Modules, cover:is_compiled(M) =:= false];
                                       false ->
                                           [begin code:purge(M), code:delete(M) end || M <- Modules]
                                   end

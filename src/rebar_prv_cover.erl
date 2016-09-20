@@ -349,6 +349,8 @@ is_ignored(Dir, File, ExclMods) ->
 
 cover_compile_file(FileName) ->
     case catch(cover:compile_beam(FileName)) of
+        {'EXIT', Reason} ->
+            ?WARN("Cover compilation crashed: ~p", [Reason]);
         {error, Reason} ->
             ?WARN("Cover compilation failed: ~p", [Reason]);
         {ok, _} ->
