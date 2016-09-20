@@ -42,7 +42,9 @@
          deps_build_in_prod/1,
          include_file_relative_to_working_directory/1,
          include_file_in_src/1,
-         always_recompile_when_erl_compiler_options_set/1]).
+         always_recompile_when_erl_compiler_options_set/1,
+         recompile_when_parse_transform_inline_changes/1,
+         recompile_when_parse_transform_as_opt_changes/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -65,7 +67,9 @@ all() ->
      parse_transform_test, erl_first_files_test, mib_test,
      umbrella_mib_first_test, only_default_transitive_deps,
      clean_all, override_deps, profile_override_deps, deps_build_in_prod,
-     include_file_relative_to_working_directory, include_file_in_src] ++
+     include_file_relative_to_working_directory, include_file_in_src,
+     recompile_when_parse_transform_as_opt_changes,
+     recompile_when_parse_transform_inline_changes] ++
      case erlang:function_exported(os, unsetenv, 1) of
          true  -> [always_recompile_when_erl_compiler_options_set];
          false -> []
@@ -1348,5 +1352,102 @@ always_recompile_when_erl_compiler_options_set(Config) ->
         _     -> os:putenv("ERL_COMPILER_OPTIONS", ExistingEnv)
     end.
 
+recompile_when_parse_transform_inline_changes(Config) ->
+    AppDir = ?config(apps, Config),
 
+    Name = rebar_test_utils:create_random_name("parse_transform_inline_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "src", "dummy"])),
+
+    ModSrc = <<"-module(example).\n"
+               "-export([foo/2]).\n"
+               "-compile([{parse_transform, example_parse_transform}]).\n"
+               "foo(_, _) -> ok.">>,
+
+    ok = file:write_file(filename:join([AppDir, "src", "example.erl"]),
+                         ModSrc),
+
+    ParseTransform = <<"-module(example_parse_transform).\n"
+                       "-export([parse_transform/2]).\n"
+                       "parse_transform(AST, _) -> AST.\n">>,
+
+    ok = file:write_file(filename:join([AppDir, "src", "example_parse_transform.erl"]),
+                         ParseTransform),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    {ok, Files} = rebar_utils:list_dir(EbinDir),
+    ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+               || F <- Files, filename:basename(F, ".beam") == "example"],
+
+    timer:sleep(1000),
+
+    NewParseTransform = <<"-module(example_parse_transform).\n"
+                          "-export([parse_transform/2]).\n"
+                          "parse_transform(AST, _) -> identity(AST).\n"
+                          "identity(AST) -> AST.\n">>,
+
+    ok = file:write_file(filename:join([AppDir, "src", "example_parse_transform.erl"]),
+                         NewParseTransform),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
+    NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+                  || F <- NewFiles, filename:basename(F, ".beam") == "example"],
+
+    ?assert(ModTime =/= NewModTime).
+
+recompile_when_parse_transform_as_opt_changes(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("parse_transform_opt_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "src", "dummy"])),
+
+    ModSrc = <<"-module(example).\n"
+               "-export([foo/2]).\n"
+               "foo(_, _) -> ok.">>,
+
+    ok = file:write_file(filename:join([AppDir, "src", "example.erl"]),
+                         ModSrc),
+
+    ParseTransform = <<"-module(example_parse_transform).\n"
+                       "-export([parse_transform/2]).\n"
+                       "parse_transform(AST, _) -> AST.">>,
+
+    ok = file:write_file(filename:join([AppDir, "src", "example_parse_transform.erl"]),
+                         ParseTransform),
+
+    RebarConfig = [{erl_opts, [{parse_transform, example_parse_transform}]}],
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
+
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    {ok, Files} = rebar_utils:list_dir(EbinDir),
+    ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+               || F <- Files, filename:basename(F, ".beam") == "example"],
+
+    timer:sleep(1000),
+
+    NewParseTransform = <<"-module(example_parse_transform).\n"
+                          "-export([parse_transform/2]).\n"
+                          "parse_transform(AST, _) -> identity(AST).\n"
+                          "identity(AST) -> AST.">>,
+
+    ok = file:write_file(filename:join([AppDir, "src", "example_parse_transform.erl"]),
+                         NewParseTransform),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
+
+    {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
+    NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+                  || F <- NewFiles, filename:basename(F, ".beam") == "example"],
+
+    ?assert(ModTime =/= NewModTime).
 
