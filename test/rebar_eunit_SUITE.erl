@@ -18,6 +18,7 @@
 -export([misspecified_eunit_tests/1]).
 -export([misspecified_eunit_compile_opts/1]).
 -export([misspecified_eunit_first_files/1]).
+-export([alternate_test_regex/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -27,7 +28,8 @@ all() ->
     [{group, basic_app}, {group, multi_app}, {group, cmd_line_args},
      misspecified_eunit_tests,
      misspecified_eunit_compile_opts,
-     misspecified_eunit_first_files].
+     misspecified_eunit_first_files,
+     alternate_test_regex].
 
 groups() ->
     [{basic_app, [sequence], [basic_app_compiles, {group, basic_app_results}]},
@@ -579,3 +581,25 @@ misspecified_eunit_first_files(Config) ->
     {error, {rebar_prv_eunit, Error}} = rebar_test_utils:run_and_check(State, RebarConfig, ["eunit"], return),
 
     {badconfig, {"Value `~p' of option `~p' must be a list", {some_file, eunit_first_files}}} = Error.
+
+alternate_test_regex(Config) ->
+    State = rebar_test_utils:init_rebar_state(Config, "alternate_test_regex_"),
+
+    AppDir = ?config(apps, State),
+    PrivDir = ?config(priv_dir, State),
+
+    AppDirs = ["src", "include", "test"],
+
+    lists:foreach(fun(F) -> ec_file:copy(filename:join([PrivDir, "basic_app", F]),
+                                         filename:join([AppDir, F]),
+                                         [recursive]) end, AppDirs),
+
+    BaseConfig = [{erl_opts, [{d, config_define}]}, {eunit_compile_opts, [{d, eunit_compile_define}]}],
+
+    RebarConfig = [{eunit_test_regex, "basic_app_tests.erl"}|BaseConfig],
+
+    {ok, S} = rebar_test_utils:run_and_check(State, RebarConfig, ["as", "test", "lock"], return),
+
+    Set = {ok, [{application, basic_app},
+                {module, basic_app_tests}]},
+    Set = rebar_prv_eunit:prepare_tests(S).

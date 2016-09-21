@@ -18,6 +18,8 @@
 %% we need to modify app_info state before compile
 -define(DEPS, [lock]).
 
+-define(DEFAULT_TEST_REGEX, "^[^._].*\\.erl\$").
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -174,21 +176,24 @@ set_apps([App|Rest], Acc) ->
 set_modules(Apps, State) -> set_modules(Apps, State, {[], []}).
 
 set_modules([], State, {AppAcc, TestAcc}) ->
-    TestSrc = gather_src([filename:join([rebar_state:dir(State), "test"])]),
+    Regex = rebar_state:get(State, eunit_test_regex, ?DEFAULT_TEST_REGEX),
+    BareTestDir = [filename:join([rebar_state:dir(State), "test"])],
+    TestSrc = gather_src(BareTestDir, Regex),
     dedupe_tests({AppAcc, TestAcc ++ TestSrc});
 set_modules([App|Rest], State, {AppAcc, TestAcc}) ->
     F = fun(Dir) -> filename:join([rebar_app_info:dir(App), Dir]) end,
     AppDirs = lists:map(F, rebar_dir:src_dirs(rebar_app_info:opts(App), ["src"])),
-    AppSrc = gather_src(AppDirs),
+    Regex = rebar_state:get(State, eunit_test_regex, ?DEFAULT_TEST_REGEX),
+    AppSrc = gather_src(AppDirs, Regex),
     TestDirs = [filename:join([rebar_app_info:dir(App), "test"])],
-    TestSrc = gather_src(TestDirs),
+    TestSrc = gather_src(TestDirs, Regex),
     set_modules(Rest, State, {AppSrc ++ AppAcc, TestSrc ++ TestAcc}).
 
-gather_src(Dirs) -> gather_src(Dirs, []).
+gather_src(Dirs, Regex) -> gather_src(Dirs, Regex, []).
 
-gather_src([], Srcs) -> Srcs;
-gather_src([Dir|Rest], Srcs) ->
-    gather_src(Rest, Srcs ++ rebar_utils:find_files(Dir, "^[^._].*\\.erl\$", true)).
+gather_src([], _Regex, Srcs) -> Srcs;
+gather_src([Dir|Rest], Regex, Srcs) ->
+    gather_src(Rest, Regex, Srcs ++ rebar_utils:find_files(Dir, Regex, true)).
 
 dedupe_tests({AppMods, TestMods}) ->
     %% for each modules in TestMods create a test if there is not a module
