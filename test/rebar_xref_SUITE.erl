@@ -150,7 +150,7 @@ get_module_body(mymod, AppName, IgnoreXref) ->
      ["-ignore_xref([{other2,1},{localfunc2,0},{fdeprecated,0}]).\n"
       || X <- [IgnoreXref], X =:= true],
      "-behaviour(", AppName, "_behaviour1).\n",     % 2 behaviours
-     "-behaviour(", AppName, "_behaviour2).\n",
+     "-behavior(", AppName, "_behaviour2).\n",
      "-deprecated({fdeprecated,0}).\n",      % deprecated function
      "bh1_a(A) -> localfunc1(bh1_a, A).\n", % behaviour functions
      "bh1_b(A) -> localfunc1(bh1_b, A).\n",
