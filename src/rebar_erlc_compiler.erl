@@ -668,6 +668,8 @@ process_attr(include_lib, Form, Includes, Dir) ->
     [FileNode] = erl_syntax:attribute_arguments(Form),
     RawFile = erl_syntax:string_value(FileNode),
     maybe_expand_include_lib_path(RawFile, Dir) ++ Includes;
+process_attr(behavior, Form, Includes, _Dir) ->
+    process_attr(behaviour, Form, Includes, _Dir);
 process_attr(behaviour, Form, Includes, _Dir) ->
     [FileNode] = erl_syntax:attribute_arguments(Form),
     File = module_to_erl(erl_syntax:atom_value(FileNode)),
