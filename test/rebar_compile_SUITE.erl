@@ -42,6 +42,8 @@
          deps_build_in_prod/1,
          include_file_relative_to_working_directory/1,
          include_file_in_src/1,
+         include_file_relative_to_working_directory_test/1,
+         include_file_in_src_test/1,
          always_recompile_when_erl_compiler_options_set/1,
          recompile_when_parse_transform_inline_changes/1,
          recompile_when_parse_transform_as_opt_changes/1]).
@@ -68,6 +70,7 @@ all() ->
      umbrella_mib_first_test, only_default_transitive_deps,
      clean_all, override_deps, profile_override_deps, deps_build_in_prod,
      include_file_relative_to_working_directory, include_file_in_src,
+     include_file_relative_to_working_directory_test, include_file_in_src_test,
      recompile_when_parse_transform_as_opt_changes,
      recompile_when_parse_transform_inline_changes] ++
      case erlang:function_exported(os, unsetenv, 1) of
@@ -769,7 +772,7 @@ dont_recompile_when_opts_dont_change(Config) ->
     NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
                   || F <- NewFiles, filename:extension(F) == ".beam"],
 
-    ?assert(ModTime == NewModTime).
+    ?assertEqual(ModTime, NewModTime).
 
 dont_recompile_yrl_or_xrl(Config) ->
     AppDir = ?config(apps, Config),
@@ -1312,6 +1315,72 @@ include_file_in_src(Config) ->
     RebarConfig = [],
     rebar_test_utils:run_and_check(Config, RebarConfig,
                                    ["compile"],
+                                   {ok, [{app, Name}]}).
+
+%% verify that the proper include path is defined
+%% according the erlang doc which states:
+%%      If the filename File is absolute (possibly after variable substitution),
+%%      the include file with that name is included. Otherwise, the specified file
+%%      is searched for in the following directories, and in this order:
+%%          * The current working directory
+%%          * The directory where the module is being compiled
+%%          * The directories given by the include option
+%%
+%% This test ensures that things keep working when additional directories
+%% are used for apps, such as the test/ directory within the test profile.
+include_file_relative_to_working_directory_test(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    Src = <<"-module(test).\n"
+"\n"
+"-include(\"include/test.hrl\").\n"
+"\n"
+"test() -> ?TEST_MACRO.\n"
+"\n">>,
+    Include = <<"-define(TEST_MACRO, test).\n">>,
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "src", "dummy"])),
+    ok = filelib:ensure_dir(filename:join([AppDir, "test", "dummy"])),
+    ok = file:write_file(filename:join([AppDir, "test", "test.erl"]), Src),
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "include", "dummy"])),
+    ok = file:write_file(filename:join([AppDir, "include", "test.hrl"]), Include),
+
+    RebarConfig = [],
+    rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["as", "test", "compile"],
+                                   {ok, [{app, Name}]}).
+
+%% Same as `include_file_in_src/1' but using the `test/' directory
+%% within the test profile.
+include_file_in_src_test(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    Src = <<"-module(test).\n"
+"\n"
+"-include(\"test.hrl\").\n"
+"\n"
+"test() -> ?TEST_MACRO.\n"
+"\n">>,
+    Include = <<"-define(TEST_MACRO, test).\n">>,
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "src", "dummy"])),
+    ok = filelib:ensure_dir(filename:join([AppDir, "test", "dummy"])),
+    ok = file:write_file(filename:join([AppDir, "test", "test.erl"]), Src),
+
+    ok = file:write_file(filename:join([AppDir, "src", "test.hrl"]), Include),
+
+    RebarConfig = [],
+    rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["as", "test", "compile"],
                                    {ok, [{app, Name}]}).
 
 always_recompile_when_erl_compiler_options_set(Config) ->
