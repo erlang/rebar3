@@ -317,7 +317,7 @@ needed_files(G, ErlOpts, RebarOpts, Dir, OutDir, SourceFiles) ->
                          TargetBase = target_base(OutDir, Source),
                          Target = TargetBase ++ ".beam",
                          PrivIncludes = [{i, filename:join(Dir, Src)}
-                                         || Src <- rebar_dir:src_dirs(RebarOpts, ["src"])],
+                                         || Src <- rebar_dir:all_src_dirs(RebarOpts, ["src"], [])],
                          AllOpts = [{outdir, filename:dirname(Target)}
                                    ,{i, filename:join(Dir, "include")}
                                    ,{i, Dir}] ++ PrivIncludes ++ ErlOpts,
@@ -526,7 +526,7 @@ internal_erl_compile(Opts, Dir, Module, OutDir, ErlOpts, RebarOpts) ->
     Target = target_base(OutDir, Module) ++ ".beam",
     ok = filelib:ensure_dir(Target),
     PrivIncludes = [{i, filename:join(Dir, Src)}
-                    || Src <- rebar_dir:src_dirs(RebarOpts, ["src"])],
+                    || Src <- rebar_dir:all_src_dirs(RebarOpts, ["src"], [])],
     AllOpts = [{outdir, filename:dirname(Target)}] ++ ErlOpts ++ PrivIncludes ++
               [{i, filename:join(Dir, "include")}, {i, Dir}, return],
     case compile:file(Module, AllOpts) of
