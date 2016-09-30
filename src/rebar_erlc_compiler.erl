@@ -203,8 +203,8 @@ compile_dirs(RebarOpts, BaseDir, SrcDirs, OutDir, Opts) ->
     G = init_erlcinfo(include_abs_dirs(ErlOpts, BaseDir), AllErlFiles, BaseDir, OutDir),
 
     {ParseTransforms, Rest} = split_source_files(AllErlFiles, ErlOpts),
-    NeededErlFiles = case needed_files(G, ErlOpts, BaseDir, OutDir, ParseTransforms) of
-        [] -> needed_files(G, ErlOpts, BaseDir, OutDir, Rest);
+    NeededErlFiles = case needed_files(G, ErlOpts, RebarOpts, BaseDir, OutDir, ParseTransforms) of
+        [] -> needed_files(G, ErlOpts, RebarOpts, BaseDir, OutDir, Rest);
         %% at least one parse transform in the opts needs updating, so recompile all
         _  -> AllErlFiles
     end,
@@ -224,7 +224,7 @@ compile_dirs(RebarOpts, BaseDir, SrcDirs, OutDir, Opts) ->
                                    true -> ErlOptsFirst;
                                    false -> ErlOpts
                                end,
-                    internal_erl_compile(C, BaseDir, S, OutDir, ErlOpts1)
+                    internal_erl_compile(C, BaseDir, S, OutDir, ErlOpts1, RebarOpts)
             end)
     after
         true = digraph:delete(SubGraph),
@@ -312,13 +312,15 @@ filename_to_atom(F) -> list_to_atom(filename:rootname(filename:basename(F))).
 
 %% Get subset of SourceFiles which need to be recompiled, respecting
 %% dependencies induced by given graph G.
-needed_files(G, ErlOpts, Dir, OutDir, SourceFiles) ->
+needed_files(G, ErlOpts, RebarOpts, Dir, OutDir, SourceFiles) ->
     lists:filter(fun(Source) ->
                          TargetBase = target_base(OutDir, Source),
                          Target = TargetBase ++ ".beam",
+                         PrivIncludes = [{i, filename:join(Dir, Src)}
+                                         || Src <- rebar_dir:all_src_dirs(RebarOpts, ["src"], [])],
                          AllOpts = [{outdir, filename:dirname(Target)}
                                    ,{i, filename:join(Dir, "include")}
-                                   ,{i, Dir}] ++ ErlOpts,
+                                   ,{i, Dir}] ++ PrivIncludes ++ ErlOpts,
                          digraph:vertex(G, Source) > {Source, filelib:last_modified(Target)}
                               orelse opts_changed(AllOpts, TargetBase)
                               orelse erl_compiler_opts_set()
@@ -518,12 +520,15 @@ expand_file_names(Files, Dirs) ->
       end, Files).
 
 -spec internal_erl_compile(rebar_dict(), file:filename(), file:filename(),
-    file:filename(), list()) -> ok | {ok, any()} | {error, any(), any()}.
-internal_erl_compile(Opts, Dir, Module, OutDir, ErlOpts) ->
+                           file:filename(), list(), rebar_dict()) ->
+      ok | {ok, any()} | {error, any(), any()}.
+internal_erl_compile(Opts, Dir, Module, OutDir, ErlOpts, RebarOpts) ->
     Target = target_base(OutDir, Module) ++ ".beam",
     ok = filelib:ensure_dir(Target),
-    AllOpts = [{outdir, filename:dirname(Target)}] ++ ErlOpts ++
-        [{i, filename:join(Dir, "include")}, {i, Dir}, return],
+    PrivIncludes = [{i, filename:join(Dir, Src)}
+                    || Src <- rebar_dir:all_src_dirs(RebarOpts, ["src"], [])],
+    AllOpts = [{outdir, filename:dirname(Target)}] ++ ErlOpts ++ PrivIncludes ++
+              [{i, filename:join(Dir, "include")}, {i, Dir}, return],
     case compile:file(Module, AllOpts) of
         {ok, _Mod} ->
             ok;
