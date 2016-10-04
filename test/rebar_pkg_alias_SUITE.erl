@@ -4,7 +4,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/file.hrl").
 
-all() -> [same_alias, diff_alias, diff_alias_vsn].
+all() -> [same_alias, diff_alias, diff_alias_vsn, transitive_alias].
 
 %% {uuid, {pkg, uuid}} = uuid
 %% {uuid, {pkg, alias}} = uuid on disk
@@ -32,6 +32,12 @@ init_per_testcase(diff_alias_vsn, Config0) ->
     AppDir = ?config(apps, Config),
     rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
     RebarConf = rebar_test_utils:create_config(AppDir, [{deps, [{fakelib, "1.0.0", {pkg, goodpkg}}]}]),
+    [{rebarconfig, RebarConf} | Config];
+init_per_testcase(transitive_alias, Config0) ->
+    Config = rebar_test_utils:init_rebar_state(Config0,"transitive_alias_vsn_"),
+    AppDir = ?config(apps, Config),
+    rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
+    RebarConf = rebar_test_utils:create_config(AppDir, [{deps, [{topdep, "1.0.0", {pkg, topdep}}]}]),
     [{rebarconfig, RebarConf} | Config].
 
 end_per_testcase(_, Config) ->
@@ -73,23 +79,73 @@ diff_alias(Config) ->
 
 diff_alias_vsn(Config) -> diff_alias(Config).
 
+transitive_alias(Config) ->
+    %% ensure that the apps fetched under transitive aliases are
+    %% locked properly, but also that they are stored in the right
+    %% directory in the build dir to avoid breaking includes and
+    %% static analysis tools that rely on the location to work
+    AppDir = ?config(apps, Config),
+    Lockfile = filename:join([AppDir, "rebar.lock"]),
+    {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["lock"],
+        {ok, [{lock, "topdep"},{dep, "topdep"},
+              {lock,"transitive_app"},{dep,"transitive_app"}]}
+    ),
+    {ok, [{_Vsn, LockData}|_]} = file:consult(Lockfile),
+    ?assert(lists:any(fun({<<"transitive_app">>,{pkg,<<"transitive">>,_},_}) -> true
+                      ;  (_) -> false end, LockData)),
+    AppDir = ?config(apps, Config),
+    AliasedName = filename:join([AppDir, "_build", "default", "lib", "transitive_app"]),
+    PkgName = filename:join([AppDir, "_build", "default", "lib", "transitive"]),
+    ?assert(filelib:is_dir(AliasedName)),
+    ?assertNot(filelib:is_dir(PkgName)),
+    %% An second run yields the same
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["lock"],
+        {ok, [{lock, "topdep"},{dep, "topdep"},
+              {lock,"transitive_app"},{dep,"transitive_app"}]}
+    ),
+    {ok, [{_Vsn, LockData}|_]} = file:consult(Lockfile),
+    ?assert(filelib:is_dir(AliasedName)),
+    ?assertNot(filelib:is_dir(PkgName)),
+    %% So does an upgrade
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["upgrade"],
+        {ok, [{lock, "topdep"},{dep, "topdep"},
+              {lock,"transitive_app"},{dep,"transitive_app"}]}
+    ),
+    {ok, [{_Vsn, LockData}|_]} = file:consult(Lockfile),
+    ?assert(filelib:is_dir(AliasedName)),
+    ?assertNot(filelib:is_dir(PkgName)),
+    ok.
+
 mock_config(Name, Config) ->
+    {ChkFake, Etag} = create_lib(Name, Config, "fakelib"),
+    {ChkTop, _} = create_lib(Name, Config, "topdep"),
+    {ChkTrans, _} = create_lib(Name, Config, "transitive_app", "transitive"),
     Priv = ?config(priv_dir, Config),
+    TmpDir = filename:join([Priv, "tmp", atom_to_list(Name)]),
+    %% Add an alias for goodpkg -> fakelib by hand
     AppDir = filename:join([Priv, "fakelib"]),
     CacheRoot = filename:join([Priv, "cache", atom_to_list(Name)]),
-    TmpDir = filename:join([Priv, "tmp", atom_to_list(Name)]),
     CacheDir = filename:join([CacheRoot, "hex", "com", "test", "packages"]),
-    filelib:ensure_dir(filename:join([CacheDir, "registry"])),
     rebar_test_utils:create_app(AppDir, "fakelib", "1.0.0", [kernel, stdlib]),
-    {Chk,Etag} = rebar_test_utils:package_app(AppDir, CacheDir, "fakelib-1.0.0"),
-    {Chk,Etag} = rebar_test_utils:package_app(AppDir, CacheDir, "goodpkg-1.0.0"),
+    {ChkFake, Etag} = rebar_test_utils:package_app(AppDir, CacheDir, "goodpkg-1.0.0"),
 
     Tid = ets:new(registry_table, [public]),
     ets:insert_new(Tid, [
         {<<"fakelib">>,[[<<"1.0.0">>]]},
         {<<"goodpkg">>,[[<<"1.0.0">>]]},
-        {{<<"fakelib">>,<<"1.0.0">>}, [[], Chk, [<<"rebar3">>]]},
-        {{<<"goodpkg">>,<<"1.0.0">>}, [[], Chk, [<<"rebar3">>]]}
+        {<<"topdep">>,[[<<"1.0.0">>]]},
+        {<<"transitive">>, [[<<"1.0.0">>]]},
+        {{<<"fakelib">>,<<"1.0.0">>}, [[], ChkFake, [<<"rebar3">>]]},
+        {{<<"goodpkg">>,<<"1.0.0">>}, [[], ChkFake, [<<"rebar3">>]]},
+        {{<<"topdep">>,<<"1.0.0">>},
+         [[
+           [<<"transitive">>, <<"1.0.0">>, false, <<"transitive_app">>]
+          ], ChkTop, [<<"rebar3">>]]},
+        {{<<"transitive">>,<<"1.0.0">>}, [[], ChkTrans, [<<"rebar3">>]]}
     ]),
     ok = ets:tab2file(Tid, filename:join([CacheDir, "registry"])),
     ets:delete(Tid),
@@ -119,3 +175,15 @@ mock_config(Name, Config) ->
 unmock_config(Config) ->
     meck:unload(),
     Config.
+
+create_lib(Name, Config, PkgName) ->
+    create_lib(Name, Config, PkgName, PkgName).
+
+create_lib(Name, Config, AppName, PkgName) ->
+    Priv = ?config(priv_dir, Config),
+    AppDir = filename:join([Priv, PkgName]),
+    CacheRoot = filename:join([Priv, "cache", atom_to_list(Name)]),
+    CacheDir = filename:join([CacheRoot, "hex", "com", "test", "packages"]),
+    filelib:ensure_dir(filename:join([CacheDir, "registry"])),
+    rebar_test_utils:create_app(AppDir, AppName, "1.0.0", [kernel, stdlib]),
+    rebar_test_utils:package_app(AppDir, CacheDir, PkgName++"-1.0.0").
