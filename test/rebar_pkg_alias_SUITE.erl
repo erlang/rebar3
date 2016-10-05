@@ -4,7 +4,8 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/file.hrl").
 
-all() -> [same_alias, diff_alias, diff_alias_vsn, transitive_alias].
+all() -> [same_alias, diff_alias, diff_alias_vsn, transitive_alias,
+          transitive_hash_mismatch].
 
 %% {uuid, {pkg, uuid}} = uuid
 %% {uuid, {pkg, alias}} = uuid on disk
@@ -34,6 +35,12 @@ init_per_testcase(diff_alias_vsn, Config0) ->
     RebarConf = rebar_test_utils:create_config(AppDir, [{deps, [{fakelib, "1.0.0", {pkg, goodpkg}}]}]),
     [{rebarconfig, RebarConf} | Config];
 init_per_testcase(transitive_alias, Config0) ->
+    Config = rebar_test_utils:init_rebar_state(Config0,"transitive_alias_vsn_"),
+    AppDir = ?config(apps, Config),
+    rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
+    RebarConf = rebar_test_utils:create_config(AppDir, [{deps, [{topdep, "1.0.0", {pkg, topdep}}]}]),
+    [{rebarconfig, RebarConf} | Config];
+init_per_testcase(transitive_hash_mismatch, Config0) ->
     Config = rebar_test_utils:init_rebar_state(Config0,"transitive_alias_vsn_"),
     AppDir = ?config(apps, Config),
     rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
@@ -118,6 +125,41 @@ transitive_alias(Config) ->
     {ok, [{_Vsn, LockData}|_]} = file:consult(Lockfile),
     ?assert(filelib:is_dir(AliasedName)),
     ?assertNot(filelib:is_dir(PkgName)),
+    ok.
+
+transitive_hash_mismatch(Config) ->
+    %% ensure that the apps fetched under transitive aliases are
+    %% locked properly, but also that they are stored in the right
+    %% directory in the build dir to avoid breaking includes and
+    %% static analysis tools that rely on the location to work
+    AppDir = ?config(apps, Config),
+    Lockfile = filename:join([AppDir, "rebar.lock"]),
+    {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["lock"],
+        {ok, [{lock, "topdep"},{dep, "topdep"},
+              {lock,"transitive_app"},{dep,"transitive_app"}]}
+    ),
+    {ok, [LockData|Attrs]} = file:consult(Lockfile),
+    %% Change Lock hash data to cause a failure next time, but on transitive
+    %% deps only
+    NewLock = [LockData|lists:map(
+        fun([{pkg_hash, Hashes}|Rest]) ->
+                [{pkg_hash, [{<<"transitive_app">>, <<"fakehash">>}
+                             | lists:keydelete(<<"transitive_app">>, 1, Hashes)]}
+                 | Rest]
+        ;  (Attr) ->
+                Attr
+        end, Attrs)],
+    {ok, Io} = file:open(Lockfile, [write]),
+    [io:format(Io, "~p.~n", [Attr]) || Attr <- NewLock],
+    file:close(Io),
+    ct:pal("lock: ~p", [file:consult(Lockfile)]),
+    ec_file:remove(filename:join([AppDir, "_build"]), [recursive]),
+    ?assertMatch(
+       {error, {rebar_fetch, {unexpected_hash, _, _, _}}},
+       rebar_test_utils:run_and_check(Config, RebarConfig, ["lock"], return)
+    ),
     ok.
 
 mock_config(Name, Config) ->

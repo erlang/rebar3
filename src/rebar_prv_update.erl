@@ -104,7 +104,8 @@ hex_to_index(State) ->
                                   case lists:any(fun is_supported/1, BuildTools) of
                                       true ->
                                           DepsList = update_deps_list(Pkg, PkgVsn, Deps, Registry, State),
-                                          ets:insert(?PACKAGE_TABLE, {{Pkg, PkgVsn}, DepsList, Checksum});
+                                          HashedDeps = update_deps_hashes(DepsList),
+                                          ets:insert(?PACKAGE_TABLE, {{Pkg, PkgVsn}, HashedDeps, Checksum});
                                       false ->
                                           true
                                   end;
@@ -175,6 +176,21 @@ update_deps_list(Pkg, PkgVsn, Deps, HexRegistry, State) ->
                    ([_Dep, _DepVsn, true, _AppName | _], DepsListAcc) ->
                         DepsListAcc
                 end, [], Deps).
+
+update_deps_hashes(List) ->
+    [{Name, {pkg, PkgName, Vsn, lookup_hash(PkgName, Vsn, Hash)}}
+     || {Name, {pkg, PkgName, Vsn, Hash}} <- List].
+
+lookup_hash(Name, Vsn, undefined) ->
+    try
+        ets:lookup_element(?PACKAGE_TABLE, {Name, Vsn}, 3)
+    catch
+        _:_ ->
+            undefined
+    end;
+lookup_hash(_, _, Hash) ->
+    Hash.
+
 
 rm_ws(<<" ", R/binary>>) ->
     rm_ws(R);
