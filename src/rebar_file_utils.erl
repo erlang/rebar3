@@ -72,14 +72,16 @@ consult_config(State, Filename) ->
         [T] -> T;
         [] -> []
     end,
-    lists:flatmap(
-      fun (SubConfig) when is_list(SubConfig) ->
-        case consult_config(State, SubConfig) of
-          [] -> consult_config(State, SubConfig ++ ".config");
-          X -> X
-        end;
-          (Entry) -> [Entry]
-      end, Config).
+    JoinedConfig = lists:flatmap(
+        fun (SubConfig) when is_list(SubConfig) ->
+            case lists:suffix(".config", SubConfig) of
+                false -> consult_config(State, SubConfig ++ ".config");
+                true -> consult_config(State, SubConfig)
+            end;
+            (Entry) -> [Entry]
+      end, Config),
+    %% Backwards compatibility
+    [JoinedConfig].
 
 format_error({bad_term_file, AppFile, Reason}) ->
     io_lib:format("Error reading file ~s: ~s", [AppFile, file:format_error(Reason)]).

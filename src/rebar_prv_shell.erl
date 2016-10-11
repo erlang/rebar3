@@ -331,8 +331,8 @@ reread_config(State) ->
     case find_config(State) of
         no_config ->
             ok;
-        Config ->
-            _ = rebar_utils:reread_config([Config]),
+        ConfigList ->
+            _ = rebar_utils:reread_config(ConfigList),
             ok
     end.
 
