@@ -414,8 +414,14 @@ user_agent() ->
     ?FMT("Rebar/~s (OTP/~s)", [Vsn, otp_release()]).
 
 reread_config(ConfigList) ->
+    SetEnv = case version_tuple(?MODULE:otp_release()) of
+        {X, _, _} when X =< 17 ->
+            fun application:set_env/3;
+        _ ->
+            fun (App, Key, Val) -> application:set_env(App, Key, Val, [{persistent, true}]) end
+    end,
     try
-        [application:set_env(Application, Key, Val)
+        [SetEnv(Application, Key, Val)
         || Config <- ConfigList,
            {Application, Items} <- Config,
            {Key, Val} <- Items]
