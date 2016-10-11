@@ -72,11 +72,14 @@ consult_config(State, Filename) ->
         [T] -> T;
         [] -> []
     end,
-    SubConfigs = [consult_config(State, Entry ++ ".config") ||
-                  Entry <- Config, is_list(Entry)
-                 ],
-
-    [Config | lists:merge(SubConfigs)].
+    lists:flatmap(
+      fun (SubConfig) when is_list(SubConfig) ->
+        case consult_config(State, SubConfig) of
+          [] -> consult_config(State, SubConfig ++ ".config");
+          X -> X
+        end;
+          (Entry) -> [Entry]
+      end, Config).
 
 format_error({bad_term_file, AppFile, Reason}) ->
     io_lib:format("Error reading file ~s: ~s", [AppFile, file:format_error(Reason)]).
