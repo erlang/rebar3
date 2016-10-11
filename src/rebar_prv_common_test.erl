@@ -221,6 +221,7 @@ select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
     Configs = lists:flatmap(fun(Filename) ->
                                 rebar_file_utils:consult_config(State, Filename)
                             end, SysConfigs),
+    code:add_pathsa(rebar_state:code_paths(State, all_deps)),
     [application:load(Application) || Config <- Configs, {Application, _} <- Config],
     rebar_utils:reread_config(Configs),
 
