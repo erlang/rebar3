@@ -414,6 +414,8 @@ user_agent() ->
     ?FMT("Rebar/~s (OTP/~s)", [Vsn, otp_release()]).
 
 reread_config(ConfigList) ->
+    %% NB: we attempt to mimic -config here, which survives app reload,
+    %% hence {persistent, true}.
     SetEnv = case version_tuple(?MODULE:otp_release()) of
         {X, _, _} when X =< 17 ->
             fun application:set_env/3;
