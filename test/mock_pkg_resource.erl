@@ -149,7 +149,10 @@ to_index(AllDeps, Dict) ->
     ets:new(package_index, [named_table, public]),
     dict:fold(
       fun(K, Deps, _) ->
-              DepsList = [{ec_cnv:to_binary(DK), ec_cnv:to_binary(DV)} || {DK, DV} <- Deps],
+              DepsList = [{DKB, {pkg, DKB, DVB, undefined}}
+                          || {DK, DV} <- Deps,
+                             DKB <- [ec_cnv:to_binary(DK)],
+                             DVB <- [ec_cnv:to_binary(DV)]],
               ets:insert(package_index, {K, DepsList, <<"checksum">>})
       end, ok, Dict),
     ets:insert(package_index, {package_index_version, 3}),

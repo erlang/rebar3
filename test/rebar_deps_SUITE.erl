@@ -385,36 +385,36 @@ https_os_proxy_settings(_Config) ->
 
 semver_matching_lt(_Config) ->
     Dep = <<"test">>,
-    Dep1 = {Dep, <<"1.0.0">>, Dep},
+    Dep1 = {Dep, <<"1.0.0">>, Dep, Dep},
     MaxVsn = <<"0.2.0">>,
     Vsns = [<<"0.1.7">>, <<"0.1.9">>, <<"0.1.8">>, <<"0.2.0">>, <<"0.2.1">>],
-    ?assertEqual([{Dep, <<"0.1.9">>}],
+    ?assertEqual([{Dep, {pkg, Dep, <<"0.1.9">>, undefined}}],
                  rebar_prv_update:cmpl_(undefined, MaxVsn, Vsns, [], Dep1,
                                         fun ec_semver:lt/2)).
 
 semver_matching_lte(_Config) ->
     Dep = <<"test">>,
-    Dep1 = {Dep, <<"1.0.0">>, Dep},
+    Dep1 = {Dep, <<"1.0.0">>, Dep, Dep},
     MaxVsn = <<"0.2.0">>,
     Vsns = [<<"0.1.7">>, <<"0.1.9">>, <<"0.1.8">>, <<"0.2.0">>, <<"0.2.1">>],
-    ?assertEqual([{Dep, <<"0.2.0">>}],
+    ?assertEqual([{Dep, {pkg, Dep, <<"0.2.0">>, undefined}}],
                  rebar_prv_update:cmpl_(undefined, MaxVsn, Vsns, [], Dep1,
                                         fun ec_semver:lte/2)).
 
 semver_matching_gt(_Config) ->
     Dep = <<"test">>,
-    Dep1 = {Dep, <<"1.0.0">>, Dep},
+    Dep1 = {Dep, <<"1.0.0">>, Dep, Dep},
     MaxVsn = <<"0.2.0">>,
     Vsns = [<<"0.1.7">>, <<"0.1.9">>, <<"0.1.8">>, <<"0.2.0">>, <<"0.2.1">>],
-    ?assertEqual([{Dep, <<"0.2.1">>}],
+    ?assertEqual([{Dep, {pkg, Dep, <<"0.2.1">>, undefined}}],
                  rebar_prv_update:cmp_(undefined, MaxVsn, Vsns, [], Dep1,
                                        fun ec_semver:gt/2)).
 semver_matching_gte(_Config) ->
     Dep = <<"test">>,
-    Dep1 = {Dep, <<"1.0.0">>, Dep},
+    Dep1 = {Dep, <<"1.0.0">>, Dep, Dep},
     MaxVsn = <<"0.2.0">>,
     Vsns = [<<"0.1.7">>, <<"0.1.9">>, <<"0.1.8">>, <<"0.2.0">>],
-    ?assertEqual([{Dep, <<"0.2.0">>}],
+    ?assertEqual([{Dep, {pkg, Dep, <<"0.2.0">>, undefined}}],
                  rebar_prv_update:cmp_(undefined, MaxVsn, Vsns, [], Dep1,
                                        fun ec_semver:gt/2)).
 
