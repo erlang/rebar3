@@ -286,10 +286,11 @@ handle_error({error, Error}) when is_list(Error) ->
 handle_error(Error) ->
     %% Nothing should percolate up from rebar_core;
     %% Dump this error to console
-    ?CRASHDUMP("Error: ~p~n~p~n~n", [Error, erlang:get_stacktrace()]),
+    StackTrace = erlang:get_stacktrace(),
+    ?CRASHDUMP("Error: ~p~n~p~n~n", [Error, StackTrace]),
     ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace or consult rebar3.crashdump", []),
     ?DEBUG("Uncaught error: ~p", [Error]),
-    case erlang:get_stacktrace() of
+    case StackTrace of
         [] -> ok;
         Trace ->
             ?DEBUG("Stack trace to the error location:~n~p", [Trace])
