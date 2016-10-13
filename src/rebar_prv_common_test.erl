@@ -221,8 +221,13 @@ select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
     Configs = lists:flatmap(fun(Filename) ->
                                 rebar_file_utils:consult_config(State, Filename)
                             end, SysConfigs),
+    %% NB: load the applications (from user directories too) to support OTP < 17
+    %% to our best ability.
+    OldPath = code:get_path(),
+    code:add_pathsa(rebar_state:code_paths(State, all_deps)),
     [application:load(Application) || Config <- Configs, {Application, _} <- Config],
     rebar_utils:reread_config(Configs),
+    code:set_path(OldPath),
 
     Merged = lists:ukeymerge(1,
                              lists:ukeysort(1, CmdOpts),
