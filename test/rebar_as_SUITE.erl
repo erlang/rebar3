@@ -14,6 +14,7 @@
          as_dir_name/1,
          as_with_task_args/1,
          warn_on_empty_profile/1,
+         error_on_empty_tasks/1,
          clean_as_profile/1]).
 
 -include_lib("common_test/include/ct.hrl").
@@ -33,7 +34,7 @@ all() -> [as_basic, as_multiple_profiles, as_multiple_tasks,
           as_multiple_profiles_multiple_tasks,
           as_comma_placement, as_comma_then_space,
           as_dir_name, as_with_task_args,
-          warn_on_empty_profile, clean_as_profile].
+          warn_on_empty_profile, error_on_empty_tasks, clean_as_profile].
 
 as_basic(Config) ->
     AppDir = ?config(apps, Config),
@@ -157,6 +158,20 @@ warn_on_empty_profile(Config) ->
     ?assert(warn_match("fake1", History)),
     ?assert(warn_match("fake2", History)),
     meck:unload(rebar_log),
+    ok.
+
+error_on_empty_tasks(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("as_error_empty_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    meck:new(rebar_log, [passthrough]),
+    rebar_test_utils:run_and_check(Config,
+                                   [],
+                                   ["as", "default"],
+                                   {error, "At least one task must be specified when using `as`"}),
     ok.
 
 warn_match(App, History) ->
