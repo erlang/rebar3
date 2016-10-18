@@ -139,6 +139,8 @@ transform_opts([{testcase, Cases}|Rest], Acc) ->
     transform_opts(Rest, [{testcase, split_string(Cases)}|Acc]);
 transform_opts([{config, Configs}|Rest], Acc) ->
     transform_opts(Rest, [{config, split_string(Configs)}|Acc]);
+transform_opts([{spec, Specs}|Rest], Acc) ->
+    transform_opts(Rest, [{spec, split_string(Specs)}|Acc]);
 transform_opts([{include, Includes}|Rest], Acc) ->
     transform_opts(Rest, [{include, split_string(Includes)}|Acc]);
 transform_opts([{logopts, LogOpts}|Rest], Acc) ->
@@ -174,9 +176,6 @@ cfgopts(State) ->
     end.
 
 ensure_opts([], Acc) -> lists:reverse(Acc);
-ensure_opts([{test_spec, _}|Rest], Acc) ->
-    ?WARN("Test specs not supported. See http://www.rebar3.org/docs/running-tests#common-test", []),
-    ensure_opts(Rest, Acc);
 ensure_opts([{cover, _}|Rest], Acc) ->
     ?WARN("Cover specs not supported. See http://www.rebar3.org/docs/running-tests#common-test", []),
     ensure_opts(Rest, Acc);
@@ -650,6 +649,8 @@ ct_opts(_State) ->
      {testcase, undefined, "case", string, help(testcase)}, %% comma-seperated list
      {label, undefined, "label", string, help(label)}, %% String
      {config, undefined, "config", string, help(config)}, %% comma-seperated list
+     {spec, undefined, "spec", string, help(spec)}, %% common-seperated list
+     {join_specs, undefined, "join_specs", boolean, help(join_specs)},
      {allow_user_terms, undefined, "allow_user_terms", boolean, help(allow_user_terms)}, %% Bool
      {logdir, undefined, "logdir", string, help(logdir)}, %% dir
      {logopts, undefined, "logopts", string, help(logopts)}, %% comma seperated list
@@ -688,6 +689,10 @@ help(label) ->
     "Test label";
 help(config) ->
     "List of config files";
+help(spec) ->
+    "List of test specifications";
+help(join_specs) ->
+    "Merge all test specifications and perform a single test run";
 help(sys_config) ->
     "List of application config files";
 help(allow_user_terms) ->

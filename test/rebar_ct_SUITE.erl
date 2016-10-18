@@ -24,6 +24,8 @@
          data_dir_correct/1,
          cmd_label/1,
          cmd_config/1,
+         cmd_spec/1,
+         cmd_join_specs/1,
          cmd_allow_user_terms/1,
          cmd_logdir/1,
          cmd_logopts/1,
@@ -44,7 +46,6 @@
          cmd_sys_config/1,
          cfg_opts/1,
          cfg_arbitrary_opts/1,
-         cfg_test_spec/1,
          cfg_cover_spec/1,
          cfg_atom_suites/1,
          cover_compiled/1,
@@ -62,7 +63,7 @@ all() -> [{group, basic_app},
           {group, ct_opts},
           {group, cover},
           cfg_opts, cfg_arbitrary_opts,
-          cfg_test_spec, cfg_cover_spec,
+          cfg_cover_spec,
           cfg_atom_suites,
           misspecified_ct_opts,
           misspecified_ct_compile_opts,
@@ -88,6 +89,8 @@ groups() -> [{basic_app, [], [basic_app_default_dirs,
              {data_dirs, [], [data_dir_correct]},
              {ct_opts, [], [cmd_label,
                             cmd_config,
+                            cmd_spec,
+                            cmd_join_specs,
                             cmd_allow_user_terms,
                             cmd_logdir,
                             cmd_logopts,
@@ -761,6 +764,36 @@ cmd_config(Config) ->
 
     true = lists:member({config, ["config/foo", "config/bar", "config/baz"]}, TestOpts).
 
+cmd_spec(Config) ->
+    State = ?config(result, Config),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+    {ok, GetOptResult} = getopt:parse(GetOptSpec, ["--spec=foo.spec,bar.spec,baz.spec"]),
+
+    NewState = rebar_state:command_parsed_args(State, GetOptResult),
+
+    {ok, TestOpts} = rebar_prv_common_test:prepare_tests(NewState),
+
+    true = lists:member({spec, ["foo.spec", "bar.spec", "baz.spec"]}, TestOpts).
+
+cmd_join_specs(Config) ->
+    State = ?config(result, Config),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+    {ok, GetOptResult} = getopt:parse(GetOptSpec, ["--join_specs=true"]),
+
+    NewState = rebar_state:command_parsed_args(State, GetOptResult),
+
+    {ok, TestOpts} = rebar_prv_common_test:prepare_tests(NewState),
+
+    true = lists:member({join_specs, true}, TestOpts).
+
 cmd_allow_user_terms(Config) ->
     State = ?config(result, Config),
 
@@ -1095,23 +1128,6 @@ cfg_arbitrary_opts(Config) ->
     true = lists:member({foo, 1}, TestOpts),
     true = lists:member({bar, 2}, TestOpts),
     true = lists:member({baz, 3}, TestOpts).
-
-cfg_test_spec(Config) ->
-    C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_test_spec_opts_"),
-
-    AppDir = ?config(apps, C),
-
-    Name = rebar_test_utils:create_random_name("ct_cfg_test_spec_opts_"),
-    Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
-
-    RebarConfig = [{ct_opts, [Opt = {test_spec, "spec/foo.spec"}]}],
-
-    {ok, State} = rebar_test_utils:run_and_check(C, RebarConfig, ["as", "test", "lock"], return),
-
-    {ok, TestOpts} = rebar_prv_common_test:prepare_tests(State),
-
-    false = lists:member(Opt, TestOpts).
 
 cfg_cover_spec(Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_cover_spec_opts_"),
