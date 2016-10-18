@@ -649,7 +649,7 @@ ct_opts(_State) ->
      {testcase, undefined, "case", string, help(testcase)}, %% comma-seperated list
      {label, undefined, "label", string, help(label)}, %% String
      {config, undefined, "config", string, help(config)}, %% comma-seperated list
-     {spec, undefined, "spec", string, help(spec)}, %% common-seperated list
+     {spec, undefined, "spec", string, help(spec)}, %% comma-seperated list
      {join_specs, undefined, "join_specs", boolean, help(join_specs)},
      {allow_user_terms, undefined, "allow_user_terms", boolean, help(allow_user_terms)}, %% Bool
      {logdir, undefined, "logdir", string, help(logdir)}, %% dir
