@@ -31,8 +31,23 @@ main(_) ->
     %% not_purged errors in rebar_erlc_compiler:opts_changed/1
     error_logger:tty(false),
 
+    %% To check whether a build was triggered by cron, examine the TRAVIS_EVENT_TYPE
+    %% environment variable to see if it has the value cron.
+    %% https://docs.travis-ci.com/user/cron-jobs/
+    Profile = case os:getenv("TRAVIS_EVENT_TYPE") of
+                    "cron" ->
+                        %% each Travis cron job can have an env variable
+                        %% specifying the profile to be built, if none defined
+                        %% fallback on default bootstrap profile
+                        case os:getenv("TRAVIS_CRON_PROFILE") of
+                            false -> "bootstrap";
+                            P -> P
+                        end;
+                    _ -> "bootstrap"
+              end,
+
     setup_env(),
-    os:putenv("REBAR_PROFILE", "bootstrap"),
+    os:putenv("REBAR_PROFILE", Profile),
     RegistryFile = default_registry_file(),
     case filelib:is_file(RegistryFile) of
         true ->
@@ -49,14 +64,14 @@ main(_) ->
     code:add_pathsa(DepsPaths),
 
     rebar3:run(["clean", "-a"]),
-    rebar3:run(["escriptize"]),
+    rebar3:run(["as", Profile, "escriptize"]),
 
     %% Done with compile, can turn back on error logger
     error_logger:tty(true),
 
     %% Finally, update executable perms for our script on *nix,
     %%  or write out script files on win32.
-    ec_file:copy("_build/default/bin/rebar3", "./rebar3"),
+    ec_file:copy(filename:join(["_build", Profile, "bin", "rebar3"]), "./rebar3"),
     case os:type() of
         {unix,_} ->
             [] = os:cmd("chmod u+x rebar3"),
