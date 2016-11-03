@@ -47,26 +47,33 @@ desc() ->
     "`plt_apps` - the strategy for determining the applications which included "
     "in the PLT file, `top_level_deps` to include just the direct dependencies "
     "or `all_deps` to include all nested dependencies*\n"
-    "`plt_extra_apps` - a list of applications to include in the PLT file**\n"
+    "`plt_extra_apps` - a list of extra applications to include in the PLT "
+    "file\n"
+    "`plt_extra_mods` - a list of extra modules to includes in the PLT file\n"
     "`plt_location` - the location of the PLT file, `local` to store in the "
     "profile's base directory (default) or a custom directory.\n"
-    "`plt_prefix` - the prefix to the PLT file, defaults to \"rebar3\"***\n"
+    "`plt_prefix` - the prefix to the PLT file, defaults to \"rebar3\"**\n"
     "`base_plt_apps` - a list of applications to include in the base "
-    "PLT file****\n"
+    "PLT file***\n"
+    "`base_plt_mods` - a list of modules to include in the base "
+    "PLT file***\n"
     "`base_plt_location` - the location of base PLT file, `global` to store in "
-    "$HOME/.cache/rebar3 (default) or  a custom directory****\n"
+    "$HOME/.cache/rebar3 (default) or  a custom directory***\n"
     "`base_plt_prefix` - the prefix to the base PLT file, defaults to "
-    "\"rebar3\"*** ****\n"
+    "\"rebar3\"** ***\n"
+    "`exclude_apps` - a list of applications to exclude from PLT files and "
+    "success typing analysis, `plt_extra_mods` and `base_plt_mods` can add "
+    "modules from excluded applications\n"
+    "`exclude_mods` - a list of modules to exclude from PLT files and "
+    "success typing analysis\n"
     "\n"
     "For example, to warn on unmatched returns: \n"
     "{dialyzer, [{warnings, [unmatched_returns]}]}.\n"
     "\n"
     "*The direct dependent applications are listed in `applications` and "
     "`included_applications` of their .app files.\n"
-    "**The applications in `base_plt_apps` will be added to the "
-    "list. \n"
-    "***PLT files are named \"<prefix>_<otp_release>_plt\".\n"
-    "****The base PLT is a PLT containing the core applications often required "
+    "**PLT files are named \"<prefix>_<otp_release>_plt\".\n"
+    "***The base PLT is a PLT containing the core applications often required "
     "for a project's PLT. One base PLT is created per OTP version and "
     "stored in `base_plt_location`. A base PLT is used to build project PLTs."
     "\n".
@@ -90,6 +97,10 @@ do(State) ->
             ?PRV_ERROR({dialyzer_warnings, Warnings});
         throw:{unknown_application, _} = Error ->
             ?PRV_ERROR(Error);
+        throw:{unknown_module, _} = Error ->
+            ?PRV_ERROR(Error);
+        throw:{duplicate_module, _, _, _} = Error ->
+            ?PRV_ERROR(Error);
         throw:{output_file_error, _, _} = Error ->
             ?PRV_ERROR(Error)
     after
@@ -110,6 +121,10 @@ format_error({dialyzer_warnings, Warnings}) ->
     io_lib:format("Warnings occured running dialyzer: ~b", [Warnings]);
 format_error({unknown_application, App}) ->
     io_lib:format("Could not find application: ~s", [App]);
+format_error({unknown_module, Mod}) ->
+    io_lib:format("Could not find module: ~s", [Mod]);
+format_error({duplicate_module, Mod, File1, File2}) ->
+    io_lib:format("Duplicates of module ~s: ~s ~s", [Mod, File1, File2]);
 format_error({output_file_error, File, Error}) ->
     Error1 = file:format_error(Error),
     io_lib:format("Failed to write to ~s: ~s", [File, Error1]);
@@ -178,45 +193,45 @@ do_update_proj_plt(State, Plt, Output) ->
     end.
 
 proj_plt_files(State) ->
-    BasePltApps = get_config(State, base_plt_apps, default_plt_apps()),
-    PltApps = get_config(State, plt_extra_apps, []),
+    BasePltApps = base_plt_apps(State),
+    PltApps = get_config(State, plt_extra_apps, []) ++ BasePltApps,
+    BasePltMods = get_config(State, base_plt_mods, []),
+    PltMods = get_config(State, plt_extra_mods, []) ++ BasePltMods,
+    Apps = proj_apps(State),
+    DepApps = proj_deps(State),
+    get_files(State, DepApps ++ PltApps, Apps -- PltApps, PltMods, []).
+
+proj_apps(State) ->
+    [ec_cnv:to_atom(rebar_app_info:name(App)) ||
+     App <- rebar_state:project_apps(State)].
+
+proj_deps(State) ->
     Apps = rebar_state:project_apps(State),
     DepApps = lists:flatmap(fun rebar_app_info:applications/1, Apps),
-    DepApps1 =
-        case get_config(State, plt_apps, top_level_deps) of
-            top_level_deps -> DepApps;
-            all_deps       -> collect_nested_dependent_apps(DepApps)
-        end,
-    get_plt_files(BasePltApps ++ PltApps ++ DepApps1, Apps).
-
-default_plt_apps() ->
-    [erts,
-     crypto,
-     kernel,
-     stdlib].
-
-get_plt_files(DepApps, Apps) ->
-    ?INFO("Resolving files...", []),
-    get_plt_files(DepApps, Apps, [], []).
-
-get_plt_files([], _, _, Files) ->
-    Files;
-get_plt_files([AppName | DepApps], Apps, PltApps, Files) ->
-    case lists:member(AppName, PltApps) orelse app_member(AppName, Apps) of
-        true ->
-            get_plt_files(DepApps, Apps, PltApps, Files);
-        false ->
-            Files2 = app_files(AppName),
-            ?DEBUG("~s files: ~p", [AppName, Files2]),
-            get_plt_files(DepApps, Apps, [AppName | PltApps], Files2 ++ Files)
+    case get_config(State, plt_apps, top_level_deps) of
+        top_level_deps -> DepApps;
+        all_deps       -> collect_nested_dependent_apps(DepApps)
     end.
 
-app_member(AppName, Apps) ->
-    case rebar_app_utils:find(ec_cnv:to_binary(AppName), Apps) of
-        {ok, _App} ->
-            true;
-        error ->
-            false
+get_files(State, Apps, SkipApps, Mods, SkipMods) ->
+    ?INFO("Resolving files...", []),
+    ExcludeApps = get_config(State, exclude_apps, []),
+    Files = apps_files(Apps, ExcludeApps ++ SkipApps, dict:new()),
+    ExcludeMods = get_config(State, exclude_mods, []),
+    Files2 = mods_files(Mods, ExcludeMods ++ SkipMods, Files),
+    dict:fold(fun(_, File, Acc) -> [File | Acc] end, [], Files2).
+
+apps_files([], _, Files) ->
+    Files;
+apps_files([AppName | DepApps], SkipApps, Files) ->
+    case lists:member(AppName, SkipApps) of
+        true ->
+            apps_files(DepApps, SkipApps, Files);
+        false ->
+            AppFiles = app_files(AppName),
+            ?DEBUG("~s modules: ~p", [AppName, dict:fetch_keys(AppFiles)]),
+            Files2 = merge_files(Files, AppFiles),
+            apps_files(DepApps, [AppName | SkipApps], Files2)
     end.
 
 app_files(AppName) ->
@@ -244,9 +259,41 @@ check_ebin(EbinDir) ->
     end.
 
 ebin_files(EbinDir) ->
-    Wildcard = "*" ++ code:objfile_extension(),
-    [filename:join(EbinDir, File) ||
-     File <- filelib:wildcard(Wildcard, EbinDir)].
+    Ext = code:objfile_extension(),
+    Wildcard = "*" ++ Ext,
+    Files = filelib:wildcard(Wildcard, EbinDir),
+    Store = fun(File, Mods) ->
+                    Mod = list_to_atom(filename:basename(File, Ext)),
+                    Absname = filename:join(EbinDir, File),
+                    dict:store(Mod, Absname, Mods)
+            end,
+    lists:foldl(Store, dict:new(), Files).
+
+merge_files(Files1, Files2) ->
+    Duplicate = fun(Mod, File1, File2) ->
+                        throw({duplicate_module, Mod, File1, File2})
+               end,
+    dict:merge(Duplicate, Files1, Files2).
+
+mods_files(Mods, SkipMods, Files) ->
+    Keep = fun(File) -> File end,
+    Ensure = fun(Mod, Acc) ->
+                     case lists:member(Mod, SkipMods) of
+                         true ->
+                             Acc;
+                         false ->
+                             dict:update(Mod, Keep, mod_file(Mod), Acc)
+                     end
+          end,
+    Files2 = lists:foldl(Ensure, Files, Mods),
+    lists:foldl(fun dict:erase/2, Files2, SkipMods).
+
+mod_file(Mod) ->
+    File = atom_to_list(Mod) ++ code:objfile_extension(),
+    case code:where_is_file(File) of
+        non_existing -> throw({unknown_module, Mod});
+        Absname      -> Absname
+    end.
 
 read_plt(_State, Plt) ->
     Vsn = dialyzer_version(),
@@ -355,9 +402,12 @@ get_base_plt(State) ->
     end.
 
 base_plt_files(State) ->
-    BasePltApps = get_config(State, base_plt_apps, default_plt_apps()),
-    Apps = rebar_state:project_apps(State),
-    get_plt_files(BasePltApps, Apps).
+    BasePltApps = base_plt_apps(State),
+    BasePltMods = get_config(State, base_plt_mods, []),
+    get_files(State, BasePltApps, [], BasePltMods, []).
+
+base_plt_apps(State) ->
+    get_config(State, base_plt_apps, [erts, crypto, kernel, stdlib]).
 
 update_base_plt(State, BasePlt, Output, BaseFiles) ->
     case read_plt(State, BasePlt) of
@@ -394,9 +444,8 @@ succ_typings(State, Plt, Output) ->
         false ->
             {0, State};
         _ ->
-            Apps = rebar_state:project_apps(State),
             ?INFO("Doing success typing analysis...", []),
-            Files = apps_to_files(Apps),
+            Files = proj_files(State),
             succ_typings(State, Plt, Output, Files)
     end.
 
@@ -412,14 +461,13 @@ succ_typings(State, Plt, Output, Files) ->
             {init_plt, Plt}],
     run_dialyzer(State, Opts, Output).
 
-apps_to_files(Apps) ->
-    ?INFO("Resolving files...", []),
-    [File || App <- Apps,
-             File <- app_to_files(App)].
-
-app_to_files(App) ->
-    AppName = ec_cnv:to_atom(rebar_app_info:name(App)),
-    app_files(AppName).
+proj_files(State) ->
+    Apps = proj_apps(State),
+    BasePltApps = get_config(State, base_plt_apps, []),
+    PltApps = get_config(State, plt_extra_apps, []) ++ BasePltApps,
+    BasePltMods = get_config(State, base_plt_mods, []),
+    PltMods = get_config(State, plt_extra_mods, []) ++ BasePltMods,
+    get_files(State, Apps, PltApps, [], PltMods).
 
 run_dialyzer(State, Opts, Output) ->
     %% dialyzer may return callgraph warnings when get_warnings is false
