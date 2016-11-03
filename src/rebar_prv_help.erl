@@ -57,7 +57,7 @@ format_error(Reason) ->
 help(State) ->
     ?CONSOLE("Rebar3 is a tool for working with Erlang projects.~n~n", []),
     OptSpecList = rebar3:global_option_spec_list(),
-    getopt:usage(OptSpecList, "rebar", "", []),
+    getopt:usage(OptSpecList, "rebar3", "", []),
     ?CONSOLE("~nSeveral tasks are available:~n", []),
 
     providers:help(rebar_state:providers(State)),
