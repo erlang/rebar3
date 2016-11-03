@@ -288,7 +288,8 @@ read_plt_files(Plt, Files) ->
 
 check_plt(State, Plt, Output, OldList, FilesList) ->
     Old = sets:from_list(OldList),
-    Files = sets:from_list(FilesList),
+    Extras = only_plt(State),
+    Files = sets:from_list(Extras ++ FilesList),
     Remove = sets:to_list(sets:subtract(Old, Files)),
     {RemWarnings, State1} = remove_plt(State, Plt, Output, Remove),
     Check = sets:to_list(sets:intersection(Files, Old)),
@@ -296,6 +297,18 @@ check_plt(State, Plt, Output, OldList, FilesList) ->
     Add = sets:to_list(sets:subtract(Files, Old)),
     {AddWarnings, State3} = add_plt(State2, Plt, Output, Add),
     {RemWarnings + CheckWarnings + AddWarnings, State3}.
+
+only_plt(State) ->
+    Apps = rebar_state:project_apps(State),
+    AllFiles = apps_to_files(Apps),
+    Only = get_config(State, only_in_plt, []),
+    Files =
+        case Only of
+            [] -> AllFiles;
+            Patterns ->
+                filter_files(Patterns, AllFiles)
+        end,
+    AllFiles -- Files.
 
 remove_plt(State, _Plt, _Output, []) ->
     {0, State};
@@ -396,9 +409,60 @@ succ_typings(State, Plt, Output) ->
         _ ->
             Apps = rebar_state:project_apps(State),
             ?INFO("Doing success typing analysis...", []),
-            Files = apps_to_files(Apps),
+            AllFiles = apps_to_files(Apps),
+            Rem = get_config(State, remove_files, []),
+            Only = get_config(State, only_in_plt, []),
+            Files =
+                case Rem ++ Only of
+                    [] -> AllFiles;
+                    Patterns ->
+                        filter_files(Patterns, AllFiles)
+                end,
             succ_typings(State, Plt, Output, Files)
     end.
+
+filter_files([], Files) ->
+    Files;
+filter_files([Pat|Rest], Files) ->
+    filter_files(Rest, filter(Pat, Files)).
+
+filter({file, AppName, FileName}, Files) ->
+    lists:filter(
+      fun(File) ->
+              {App, Base} = decompose(File),
+              not (App == AppName andalso Base == FileName)
+      end,
+      Files);
+filter({Pat, AppName, FilePattern}, Files) when Pat =:= pattern orelse
+                                                Pat =:= antipattern ->
+    {ok, Comp} = re:compile(FilePattern),
+    lists:filter(
+      fun(File) ->
+              {App, Base} = decompose(File),
+              ?DEBUG("a ~p b ~p ", [App, Base]),
+              AppMatch = (App == AppName),
+              Match = (nomatch /= re:run(Base, Comp)),
+              Bool =
+                  case Pat of
+                      pattern -> AppMatch andalso Match;
+                      antipattern -> AppMatch andalso not Match
+                  end,
+              ?DEBUG("verdict: ~p", [not Bool]),
+              not Bool
+      end,
+      Files).
+
+decompose(Path) ->
+    Sep =
+        case os:type() of
+            {unix, _} ->
+                "/.";
+            {win32, _} ->
+                "\\."
+        end,
+    [_Ext, Base, _Ebin, App | _] =
+        lists:reverse(string:tokens(Path, Sep)),
+    {App, Base}.
 
 succ_typings(State, Plt, _, []) ->
     ?INFO("Analyzing no files with ~p...", [Plt]),
