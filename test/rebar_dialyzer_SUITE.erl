@@ -12,7 +12,7 @@
          empty_app_plt/1,
          empty_app_succ_typings/1,
          update_base_plt/1,
-         update_app_plt/1,
+         update_app_plt_native/1,
          build_release_plt/1,
          plt_apps_option/1,
          exclude_and_extra/1]).
@@ -42,14 +42,18 @@ init_per_testcase(Testcase, Config) ->
     PrivDir = ?config(priv_dir, Config),
     Prefix = ec_cnv:to_list(Testcase),
     BasePrefix = Prefix ++ "_base",
-    Opts = [{plt_prefix, Prefix},
+    Opts = [{native, false},
+            {native_location, PrivDir},
+            {plt_prefix, Prefix},
             {plt_location, PrivDir},
             {base_plt_prefix, BasePrefix},
             {base_plt_location, PrivDir},
             {base_plt_apps, ?config(base_plt_apps, Config)}],
     Suffix = "_" ++ rebar_utils:otp_release() ++ "_plt",
+    Cache = rebar_utils:otp_release() ++ ".dialyzer_modules",
     [{plt, filename:join(PrivDir, Prefix ++ Suffix)},
      {base_plt, filename:join(PrivDir, BasePrefix ++ Suffix)},
+     {native_cache, filename:join(PrivDir, Cache)},
      {rebar_config, [{dialyzer, Opts}]} |
      rebar_test_utils:init_rebar_state(Config)].
 
@@ -59,7 +63,7 @@ all() ->
 groups() ->
     [{empty, [empty_base_plt, empty_app_plt, empty_app_succ_typings]},
      {build_and_check, [build_release_plt, plt_apps_option, exclude_and_extra]},
-     {update, [update_base_plt, update_app_plt]}].
+     {update, [update_base_plt, update_app_plt_native]}].
 
 empty_base_plt(Config) ->
     AppDir = ?config(apps, Config),
@@ -122,6 +126,7 @@ update_base_plt(Config) ->
     RebarConfig = ?config(rebar_config, Config),
     BasePlt = ?config(base_plt, Config),
     Plt = ?config(plt, Config),
+    NativeCache = ?config(native_cache, Config),
 
     Name = rebar_test_utils:create_random_name("app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
@@ -134,6 +139,8 @@ update_base_plt(Config) ->
 
     {ok, BasePltFiles} = plt_files(BasePlt),
     ?assertEqual(ErtsFiles, BasePltFiles),
+
+    ?assertNot(filelib:is_regular(NativeCache)),
 
     alter_plt(BasePlt),
     ok = file:delete(Plt),
@@ -154,19 +161,28 @@ update_base_plt(Config) ->
                                    {ok, [{app, Name}]}),
 
     {ok, BasePltFiles3} = plt_files(BasePlt),
-    ?assertEqual(ErtsFiles, BasePltFiles3).
+    ?assertEqual(ErtsFiles, BasePltFiles3),
 
+    ?assertNot(filelib:is_regular(NativeCache)).
 
-update_app_plt(Config) ->
+update_app_plt_native(Config) ->
     AppDir = ?config(apps, Config),
     RebarConfig = ?config(rebar_config, Config),
     Plt = ?config(plt, Config),
+    NativeCache = ?config(native_cache, Config),
+
+    {value, {dialyzer, Opts}, Rest} = lists:keytake(dialyzer, 1, RebarConfig),
+    RebarConfig2 = [{dialyzer, [{native, true} | Opts]} | Rest],
+
 
     Name = rebar_test_utils:create_random_name("app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [erts]),
 
-    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
+    ListsBeam = code:where_is_file("lists.beam"),
+    DialyzerBeam = code:where_is_file("dialyzer.beam"),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig2, ["dialyzer"],
                                    {ok, [{app, Name}]}),
 
     ErtsFiles = erts_files(),
@@ -174,29 +190,46 @@ update_app_plt(Config) ->
     {ok, PltFiles} = plt_files(Plt),
     ?assertEqual(ErtsFiles, PltFiles),
 
+    ?assertEqual(ListsBeam, code:which(lists)),
+    ?assertEqual(DialyzerBeam, code:which(dialyzer)),
+
+    ?assert(filelib:is_regular(NativeCache)),
+    LastMod = filelib:last_modified(NativeCache),
+
     alter_plt(Plt),
 
-    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
+    rebar_test_utils:run_and_check(Config, RebarConfig2, ["dialyzer"],
                                    {ok, [{app, Name}]}),
 
     {ok, PltFiles2} = plt_files(Plt),
     ?assertEqual(ErtsFiles, PltFiles2),
 
+    ?assertEqual(ListsBeam, code:which(lists)),
+    ?assertEqual(DialyzerBeam, code:which(dialyzer)),
+
     ok = file:delete(Plt),
 
-    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
+    rebar_test_utils:run_and_check(Config, RebarConfig2, ["dialyzer"],
                                    {ok, [{app, Name}]}),
 
     {ok, PltFiles3} = plt_files(Plt),
     ?assertEqual(ErtsFiles, PltFiles3),
 
+    ?assertEqual(ListsBeam, code:which(lists)),
+    ?assertEqual(DialyzerBeam, code:which(dialyzer)),
+
     add_missing_file(Plt),
 
-    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
+    rebar_test_utils:run_and_check(Config, RebarConfig2, ["dialyzer"],
                                    {ok, [{app, Name}]}),
 
     {ok, PltFiles4} = plt_files(Plt),
-    ?assertEqual(ErtsFiles, PltFiles4).
+    ?assertEqual(ErtsFiles, PltFiles4),
+
+    ?assertEqual(ListsBeam, code:which(lists)),
+    ?assertEqual(DialyzerBeam, code:which(dialyzer)),
+
+    ?assertEqual(LastMod, filelib:last_modified(NativeCache)).
 
 build_release_plt(Config) ->
     AppDir = ?config(apps, Config),
