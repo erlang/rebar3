@@ -22,6 +22,7 @@
          processing_base_dir/2,
          make_relative_path/2,
          src_dirs/1, src_dirs/2,
+         src_dir_opts/2, recursive/2,
          extra_src_dirs/1, extra_src_dirs/2,
          all_src_dirs/1, all_src_dirs/3,
          retarget_path/2]).
@@ -160,28 +161,43 @@ do_make_relative_path(Source, Target) ->
     Base = lists:duplicate(max(length(Target) - 1, 0), ".."),
     filename:join(Base ++ Source).
 
+%%%-----------------------------------------------------------------
+%%% 'src_dirs' and 'extra_src_dirs' can be configured with options
+%%% like this:
+%%%
+%%% {src_dirs,[{"foo",[{recursive,false}]}]}
+%%% {extra_src_dirs,[{"bar",[recursive]}]} (equivalent to {recursive,true})
+%%%
+%%% src_dirs/1,2 and extra_src_dirs/1,2 return only the list of
+%%% directories for the 'src_dirs' and 'extra_src_dirs' options
+%%% respectively, while src_dirs_opts/2 return the options list for
+%%% the given directory, no matter if it is configured as 'src_dirs' or
+%%% 'extra_src_dirs'.
+%%%
 -spec src_dirs(rebar_dict()) -> list(file:filename_all()).
 src_dirs(Opts) -> src_dirs(Opts, []).
 
 -spec src_dirs(rebar_dict(), list(file:filename_all())) -> list(file:filename_all()).
 src_dirs(Opts, Default) ->
-    ErlOpts = rebar_opts:erl_opts(Opts),
-    Vs = proplists:get_all_values(src_dirs, ErlOpts),
-    case lists:append([rebar_opts:get(Opts, src_dirs, []) | Vs]) of
-        []   -> Default;
-        Dirs -> lists:usort(Dirs)
-    end.
+    src_dirs(src_dirs, Opts, Default).
 
 -spec extra_src_dirs(rebar_dict()) -> list(file:filename_all()).
 extra_src_dirs(Opts) -> extra_src_dirs(Opts, []).
 
 -spec extra_src_dirs(rebar_dict(), list(file:filename_all())) -> list(file:filename_all()).
 extra_src_dirs(Opts, Default) ->
+    src_dirs(extra_src_dirs, Opts, Default).
+
+src_dirs(Type, Opts, Default) ->
+    lists:usort([case D0 of {D,_} -> D; _ -> D0 end ||
+                    D0 <- raw_src_dirs(Type,Opts,Default)]).
+
+raw_src_dirs(Type, Opts, Default) ->
     ErlOpts = rebar_opts:erl_opts(Opts),
-    Vs = proplists:get_all_values(extra_src_dirs, ErlOpts),
-    case lists:append([rebar_opts:get(Opts, extra_src_dirs, []) | Vs]) of
+    Vs = proplists:get_all_values(Type, ErlOpts),
+    case lists:append([rebar_opts:get(Opts, Type, []) | Vs]) of
         []   -> Default;
-        Dirs -> lists:usort(Dirs)
+        Dirs -> Dirs
     end.
 
 -spec all_src_dirs(rebar_dict()) -> list(file:filename_all()).
@@ -191,6 +207,32 @@ all_src_dirs(Opts) -> all_src_dirs(Opts, [], []).
     list(file:filename_all()).
 all_src_dirs(Opts, SrcDefault, ExtraDefault) ->
     lists:usort(src_dirs(Opts, SrcDefault) ++ extra_src_dirs(Opts, ExtraDefault)).
+
+%%%-----------------------------------------------------------------
+%%% Return the list of options for the given src directory
+%%% If the same option is given multiple times for a directory in the
+%%% config, the priority order is: first occurence of 'src_dirs'
+%%% followed by first occurence of 'extra_src_dirs'.
+-spec src_dir_opts(rebar_dict(), file:filename_all()) -> [{atom(),term()}].
+src_dir_opts(Opts, Dir) ->
+    RawSrcDirs = raw_src_dirs(src_dirs, Opts, []),
+    RawExtraSrcDirs = raw_src_dirs(extra_src_dirs, Opts, []),
+    AllOpts = [Opt || {D,Opt} <- RawSrcDirs++RawExtraSrcDirs,
+                      D==Dir],
+    lists:ukeysort(1,proplists:unfold(lists:append(AllOpts))).
+
+%%%-----------------------------------------------------------------
+%%% Return the value of the 'recursive' option for the given directory.
+%%% If not given, the value of 'recursive' in the 'erlc_compiler'
+%%% options is used, and finally the default is 'true'.
+-spec recursive(rebar_dict(), file:filename_all()) -> boolean().
+recursive(Opts, Dir) ->
+    DirOpts = src_dir_opts(Opts, Dir),
+    Default = proplists:get_value(recursive,
+                                  rebar_opts:get(Opts, erlc_compiler, []),
+                                  true),
+    R = proplists:get_value(recursive, DirOpts, Default),
+    R.
 
 %% given a path if that path is an ancestor of an app dir return the path relative to that
 %% apps outdir. if the path is not an ancestor to any app dirs but is an ancestor of the
