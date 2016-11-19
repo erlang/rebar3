@@ -153,7 +153,6 @@ cfg_tests(State) ->
             ?PRV_ERROR({badconfig, {"Value `~p' of option `~p' must be a list", {Wrong, eunit_tests}}})
     end.
 
-select_tests(_State, _ProjectApps, {error, _} = Error, _) -> Error;
 select_tests(_State, _ProjectApps, _, {error, _} = Error) -> Error;
 select_tests(State, ProjectApps, [], []) -> {ok, default_tests(State, ProjectApps)};
 select_tests(_State, _ProjectApps, [], Tests)  -> {ok, Tests};
@@ -316,14 +315,9 @@ inject_test_dir(Opts, Dir) ->
 
 compile({error, _} = Error) -> Error;
 compile(State) ->
-    case rebar_prv_compile:do(State) of
-        %% successfully compiled apps
-        {ok, S} ->
-            ok = maybe_cover_compile(S),
-            {ok, S};
-        %% this should look like a compiler error, not an eunit error
-        Error   -> Error
-    end.
+    {ok, S} = rebar_prv_compile:do(State),
+    ok = maybe_cover_compile(S),
+    {ok, S}.
 
 validate_tests(State, {ok, Tests}) ->
     gather_tests(fun(Elem) -> validate(State, Elem) end, Tests, []);
@@ -453,7 +447,7 @@ translate(State, [], {dir, Dir}) ->
 translate(State, [], {file, FilePath}) ->
     Dir = filename:dirname(FilePath),
     File = filename:basename(FilePath),
-    case rebar_file_utils:path_from_ancestor(Dir, rebar_app_info:dir(State)) of
+    case rebar_file_utils:path_from_ancestor(Dir, rebar_state:dir(State)) of
         {ok, Path}         -> {file, filename:join([rebar_dir:base_dir(State), "extras", Path, File])};
         %% not relative, leave as is
         {error, badparent} -> {file, FilePath}

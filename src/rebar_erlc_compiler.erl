@@ -573,9 +573,11 @@ compile_mib(AppInfo) ->
                 MibToHrlOpts =
                     case proplists:get_value(verbosity, AllOpts, undefined) of
                         undefined ->
-                            #options{specific = []};
+                            #options{specific = [],
+                                     cwd = rebar_dir:get_cwd()};
                         Verbosity ->
-                            #options{specific = [{verbosity, Verbosity}]}
+                            #options{specific = [{verbosity, Verbosity}],
+                                     cwd = rebar_dir:get_cwd()}
                     end,
                 ok = snmpc:mib_to_hrl(Mib, Mib, MibToHrlOpts),
                 rebar_file_utils:mv(HrlFilename, AppInclude),

@@ -212,7 +212,6 @@ add_hooks(Opts, State) ->
             lists:keyreplace(ct_hooks, 1, Opts, {ct_hooks, NewHooks})
     end.
 
-select_tests(_, _, {error, _} = Error, _) -> Error;
 select_tests(_, _, _, {error, _} = Error) -> Error;
 select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
     %% set application env if sys_config argument is provided
@@ -293,14 +292,9 @@ compile(State, {ok, _} = Tests) ->
 compile(_State, Error) -> Error.
 
 do_compile(State) ->
-    case rebar_prv_compile:do(State) of
-        %% successfully compiled apps
-        {ok, S} ->
-            ok = maybe_cover_compile(S),
-            {ok, S};
-        %% this should look like a compiler error, not an eunit error
-        Error   -> Error
-    end.
+    {ok, S} = rebar_prv_compile:do(State),
+    ok = maybe_cover_compile(S),
+    {ok, S}.
 
 inject_ct_state(State, {ok, Tests}) ->
     Apps = rebar_state:project_apps(State),
@@ -308,8 +302,7 @@ inject_ct_state(State, {ok, Tests}) ->
         {ok, {NewState, ModdedApps}} ->
             test_dirs(NewState, ModdedApps, Tests);
         {error, _} = Error           -> Error
-    end;
-inject_ct_state(_State, Error) -> Error.
+    end.
 
 inject_ct_state(State, Tests, [App|Rest], Acc) ->
     case inject(rebar_app_info:opts(App), State, Tests) of
