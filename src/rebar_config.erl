@@ -106,9 +106,7 @@ write_lock_file(LockFile, Locks) ->
 format_attrs([]) -> [];
 format_attrs([{pkg_hash, Vals}|T]) ->
     [io_lib:format("{pkg_hash,[~n",[]), format_hashes(Vals), "]}",
-     maybe_comma(T) | format_attrs(T)];
-format_attrs([H|T]) ->
-    [io_lib:format("~p~s", [H, maybe_comma(T)]) | format_attrs(T)].
+     maybe_comma(T) | format_attrs(T)].
 
 format_hashes([]) -> [];
 format_hashes([{Pkg,Hash}|T]) ->

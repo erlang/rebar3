@@ -88,14 +88,9 @@ analyze(State) ->
     %% in order for cover data to be reloaded
     %% this maybe breaks if modules have been deleted
     %% since code coverage was collected?
-    case rebar_prv_compile:do(State) of
-        %% successfully compiled apps
-        {ok, S} ->
-            ok = cover_compile(S, apps),
-            do_analyze(State);
-        %% this should look like a compiler error, not a cover error
-        Error   -> Error
-    end.
+    {ok, S} = rebar_prv_compile:do(State),
+    ok = cover_compile(S, apps),
+    do_analyze(State).
 
 do_analyze(State) ->
     ?INFO("Performing cover analysis...", []),

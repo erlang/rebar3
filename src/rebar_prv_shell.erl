@@ -120,7 +120,7 @@ info() ->
 setup_shell() ->
     OldUser = kill_old_user(),
     %% Test for support here
-    NewUser = try erlang:open_port({spawn,'tty_sl -c -e'}, []) of
+    NewUser = try erlang:open_port({spawn,"tty_sl -c -e"}, []) of
         Port when is_port(Port) ->
             true = port_close(Port),
             setup_new_shell()

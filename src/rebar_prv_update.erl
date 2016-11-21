@@ -236,7 +236,7 @@ cmp_(BestMatch, MinVsn, [Vsn | R], DepsListAcc, Dep, CmpFun) ->
 
 %% We need to treat this differently since we want a version that is LOWER but
 %% the higest possible one.
-cmpl({_Pkg, _PkgVsn, Dep} = Dep1, Vsn, HexRegistry, State, DepsListAcc, CmpFun) ->
+cmpl({_Pkg, _PkgVsn, Dep, _App} = Dep1, Vsn, HexRegistry, State, DepsListAcc, CmpFun) ->
     {ok, Vsns}  = rebar_packages:find_all(Dep, HexRegistry, State),
     cmpl_(undefined, Vsn, Vsns, DepsListAcc, Dep1, CmpFun).
 

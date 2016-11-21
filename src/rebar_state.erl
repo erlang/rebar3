@@ -59,7 +59,7 @@
                   command_args        = [],
                   command_parsed_args = {[], []},
 
-                  current_app                       :: rebar_app_info:t(),
+                  current_app                       :: undefined | rebar_app_info:t(),
                   project_apps        = []          :: [rebar_app_info:t()],
                   deps_to_build       = []          :: [rebar_app_info:t()],
                   all_plugin_deps     = []          :: [rebar_app_info:t()],
@@ -424,17 +424,24 @@ create_logic_providers(ProviderModules, State0) ->
 to_list(#state_t{} = State) ->
     Fields = record_info(fields, state_t),
     Values = tl(tuple_to_list(State)),
-    DictSz = tuple_size(dict:new()),
-    lists:zip(Fields, [reformat(I, DictSz) || I <- Values]).
+    lists:zip(Fields, [reformat(I) || I <- Values]).
 
-reformat({K,V}, DSz) when is_list(V) ->
-    {K, [reformat(I, DSz) || I <- V]};
-reformat(V, DSz) when is_tuple(V), element(1,V) =:= dict, tuple_size(V) =:= DSz ->
-    [reformat(I, DSz) || I <- dict:to_list(V)];
-reformat({K,V}, DSz) when is_tuple(V), element(1,V) =:= dict, tuple_size(V) =:= DSz ->
-    {K, [reformat(I, DSz) || I <- dict:to_list(V)]};
-reformat(Other, _DSz) ->
-    Other.
+reformat({K,V}) when is_list(V) ->
+    {K, [reformat(I) || I <- V]};
+reformat({K,V}) ->
+    try
+        {K, [reformat(I) || I <- dict:to_list(V)]}
+    catch
+        error:{badrecord,dict} ->
+            {K,V}
+    end;
+reformat(V) ->
+    try
+        [reformat(I) || I <- dict:to_list(V)]
+    catch
+        error:{badrecord,dict} ->
+            V
+    end.
 
 %% ===================================================================
 %% Internal functions

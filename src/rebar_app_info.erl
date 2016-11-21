@@ -68,7 +68,7 @@
 
 -export_type([t/0]).
 
--record(app_info_t, {name               :: binary(),
+-record(app_info_t, {name               :: binary() | undefined,
                      app_file_src       :: file:filename_all() | undefined,
                      app_file_src_script:: file:filename_all() | undefined,
                      app_file           :: file:filename_all() | undefined,
@@ -83,11 +83,11 @@
                      dep_level=0        :: integer(),
                      dir                :: file:name(),
                      out_dir            :: file:name(),
-                     resource_type      :: pkg | src,
+                     resource_type      :: pkg | src | undefined,
                      source             :: string() | tuple() | checkout | undefined,
                      is_lock=false      :: boolean(),
                      is_checkout=false  :: boolean(),
-                     valid              :: boolean()}).
+                     valid              :: boolean() | undefined}).
 
 %%============================================================================
 %% types
