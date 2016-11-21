@@ -88,14 +88,12 @@
 %%                           'old_inets'}]}.
 %%
 
-%% @equiv compile(AppInfo, []).
-
+%% @equiv compile(AppInfo, [])
 -spec compile(rebar_app_info:t()) -> ok.
 compile(AppInfo) when element(1, AppInfo) == app_info_t ->
     compile(AppInfo, []).
 
 %% @doc compile an individual application.
-
 -spec compile(rebar_app_info:t(), compile_opts()) -> ok.
 compile(AppInfo, CompileOpts) when element(1, AppInfo) == app_info_t ->
     Dir = ec_cnv:to_list(rebar_app_info:out_dir(AppInfo)),
@@ -162,16 +160,14 @@ compile(RebarOpts, BaseDir, OutDir, CompileOpts) ->
     end,
     lists:foreach(F, lists:map(fun(SrcDir) -> filename:join(BaseDir, SrcDir) end, ExtraDirs)).
 
-%% @equiv compile_dirs(Context, BaseDir, [Dir], Dir, [{recursive, false}]).
-
+%% @equiv compile_dirs(Context, BaseDir, [Dir], Dir, [{recursive, false}])
 -spec compile_dir(rebar_dict() | rebar_state:t(), file:name(), file:name()) -> ok.
 compile_dir(State, BaseDir, Dir) when element(1, State) == state_t ->
     compile_dir(rebar_state:opts(State), BaseDir, Dir, [{recursive, false}]);
 compile_dir(RebarOpts, BaseDir, Dir) ->
     compile_dir(RebarOpts, BaseDir, Dir, [{recursive, false}]).
 
-%% @equiv compile_dirs(Context, BaseDir, [Dir], Dir, Opts).
-
+%% @equiv compile_dirs(Context, BaseDir, [Dir], Dir, Opts)
 -spec compile_dir(rebar_dict() | rebar_state:t(), file:name(), file:name(), compile_opts()) -> ok.
 compile_dir(State, BaseDir, Dir, Opts) when element(1, State) == state_t ->
     compile_dirs(rebar_state:opts(State), BaseDir, [Dir], Dir, Opts);
@@ -179,7 +175,6 @@ compile_dir(RebarOpts, BaseDir, Dir, Opts) ->
     compile_dirs(RebarOpts, BaseDir, [Dir], Dir, Opts).
 
 %% @doc compile a list of directories with the given opts.
-
 -spec compile_dirs(rebar_dict() | rebar_state:t(),
                    file:filename(),
                    [file:filename()],
@@ -233,7 +228,6 @@ compile_dirs(RebarOpts, BaseDir, SrcDirs, OutDir, Opts) ->
     ok.
 
 %% @doc remove compiled artifacts from an AppDir.
-
 -spec clean(rebar_app_info:t()) -> 'ok'.
 clean(AppInfo) ->
     AppDir = rebar_app_info:out_dir(AppInfo),

@@ -237,10 +237,10 @@ write_file_if_contents_differ(Filename, Bytes) ->
 
 %% returns an os appropriate tmpdir given a path
 -spec system_tmpdir() -> file:filename().
+system_tmpdir() -> system_tmpdir([]).
+
 -spec system_tmpdir(PathComponents) -> file:filename() when
       PathComponents :: [file:name()].
-
-system_tmpdir() -> system_tmpdir([]).
 system_tmpdir(PathComponents) ->
     Tmp = case erlang:system_info(system_architecture) of
         "win32" ->
