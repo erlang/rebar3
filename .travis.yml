@@ -25,7 +25,6 @@ deploy:
       tags: true
 
   - provider: s3
-    region: us-west-2
     access_key_id: AKIAJAPYAQEFYCYSNL7Q
     secret_access_key:
       secure: "BUv2KQABv0Q4e8DAVNBRTc/lXHWt27yCN46Fdgo1IrcSSIiP+hq2yXzQcXLbPwkEu6pxUZQtL3mvKbt6l7uw3wFrcRfFAi1PGTITAW8MTmxtwcZIBcHSk3XOzDbkK+fYYcaddszmt7hDzzEFPtmYXiNgnaMIVeynhQLgcCcIRRQ="
