@@ -22,7 +22,6 @@
 -define(DEFAULT_PLUGINS_DIR, "plugins").
 -define(DEFAULT_TEST_DEPS_DIR, "test/lib").
 -define(DEFAULT_RELEASE_DIR, "rel").
--define(DEFAULT_CONFIG_FILE, "rebar.config").
 -define(CONFIG_VERSION, "1.1.0").
 -define(DEFAULT_CDN, "https://repo.hex.pm/").
 -define(REMOTE_PACKAGE_DIR, "tarballs").

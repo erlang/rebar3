@@ -26,7 +26,8 @@
 %% -------------------------------------------------------------------
 -module(rebar_config).
 
--export([consult/1
+-export([consult/0
+        ,consult/1
         ,consult_app_file/1
         ,consult_file/1
         ,consult_lock_file/1
@@ -39,13 +40,19 @@
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
+-define(DEFAULT_CONFIG_FILE, "rebar.config").
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
 
+-spec consult() -> [any()].
+consult() ->
+    consult_file(config_file()).
+
 -spec consult(file:name()) -> [any()].
 consult(Dir) ->
-    consult_file(filename:join(Dir, ?DEFAULT_CONFIG_FILE)).
+    consult_file(filename:join(Dir, config_file())).
 
 consult_app_file(File) ->
     consult_file_(File).
@@ -298,3 +305,11 @@ check_newly_added_(Dep, LockedDeps) when is_atom(Dep) ->
     end;
 check_newly_added_(Dep, _) ->
     throw(?PRV_ERROR({bad_dep_name, Dep})).
+
+config_file() ->
+    case os:getenv("REBAR_CONFIG") of
+        false ->
+            ?DEFAULT_CONFIG_FILE;
+        ConfigFile ->
+            ConfigFile
+    end.
