@@ -216,7 +216,7 @@ handle_single_vsn(Pkg, PkgVsn, Dep, Vsn, Constraint) ->
             {ok, Vsn}
     end.
 
-format_error({missing_package, {Name, Vsn}}) ->
+format_error({missing_package, Name, Vsn}) ->
     io_lib:format("Package not found in registry: ~s-~s.", [ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)]);
 format_error({missing_package, Dep}) ->
     io_lib:format("Package not found in registry: ~p.", [Dep]).
