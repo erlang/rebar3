@@ -47,10 +47,6 @@
 -type compile_opts() :: [compile_opt()].
 -type compile_opt() :: {recursive, boolean()}.
 
--record(compile_opts, {
-    recursive = true
-}).
-
 -define(DEFAULT_OUTDIR, "ebin").
 -define(RE_PREFIX, "^[^._]").
 
@@ -99,21 +95,25 @@ compile(AppInfo, CompileOpts) when element(1, AppInfo) == app_info_t ->
     Dir = ec_cnv:to_list(rebar_app_info:out_dir(AppInfo)),
     RebarOpts = rebar_app_info:opts(AppInfo),
 
+    SrcOpts = [check_last_mod,
+               {recursive, dir_recursive(RebarOpts, "src", CompileOpts)}],
+    MibsOpts = [check_last_mod,
+                {recursive, dir_recursive(RebarOpts, "mibs", CompileOpts)}],
     rebar_base_compiler:run(RebarOpts,
                             check_files([filename:join(Dir, File)
                                          || File <- rebar_opts:get(RebarOpts, xrl_first_files, [])]),
                             filename:join(Dir, "src"), ".xrl", filename:join(Dir, "src"), ".erl",
-                            fun compile_xrl/3),
+                            fun compile_xrl/3, SrcOpts),
     rebar_base_compiler:run(RebarOpts,
                             check_files([filename:join(Dir, File)
                                          || File <- rebar_opts:get(RebarOpts, yrl_first_files, [])]),
                             filename:join(Dir, "src"), ".yrl", filename:join(Dir, "src"), ".erl",
-                            fun compile_yrl/3),
+                            fun compile_yrl/3, SrcOpts),
     rebar_base_compiler:run(RebarOpts,
                             check_files([filename:join(Dir, File)
                                          || File <- rebar_opts:get(RebarOpts, mib_first_files, [])]),
                             filename:join(Dir, "mibs"), ".mib", filename:join([Dir, "priv", "mibs"]), ".bin",
-                            compile_mib(AppInfo)),
+                            compile_mib(AppInfo), MibsOpts),
 
     SrcDirs = lists:map(fun(SrcDir) -> filename:join(Dir, SrcDir) end,
                         rebar_dir:src_dirs(RebarOpts, ["src"])),
@@ -182,13 +182,10 @@ compile_dir(RebarOpts, BaseDir, Dir, Opts) ->
                    compile_opts()) -> ok.
 compile_dirs(State, BaseDir, Dirs, OutDir, CompileOpts) when element(1, State) == state_t ->
     compile_dirs(rebar_state:opts(State), BaseDir, Dirs, OutDir, CompileOpts);
-compile_dirs(RebarOpts, BaseDir, SrcDirs, OutDir, Opts) ->
-    CompileOpts = parse_opts(Opts),
-  
+compile_dirs(RebarOpts, BaseDir, SrcDirs, OutDir, CompileOpts) ->
     ErlOpts = rebar_opts:erl_opts(RebarOpts),
     ?DEBUG("erlopts ~p", [ErlOpts]),
-    Recursive = CompileOpts#compile_opts.recursive,
-    AllErlFiles = gather_src(SrcDirs, Recursive),
+    AllErlFiles = gather_src(RebarOpts, BaseDir, SrcDirs, CompileOpts),
     ?DEBUG("files to compile ~p", [AllErlFiles]),
 
     %% Make sure that outdir is on the path
@@ -266,12 +263,22 @@ clean_dirs(AppDir, [Dir|Rest]) ->
 %% Internal functions
 %% ===================================================================
 
-gather_src(Dirs, Recursive) ->
-    gather_src(Dirs, [], Recursive).
+gather_src(Opts, BaseDir, Dirs, CompileOpts) ->
+    gather_src(Opts, filename:split(BaseDir), Dirs, [], CompileOpts).
 
-gather_src([], Srcs, _Recursive) -> Srcs;
-gather_src([Dir|Rest], Srcs, Recursive) ->
-    gather_src(Rest, Srcs ++ rebar_utils:find_files(Dir, ?RE_PREFIX".*\\.erl\$", Recursive), Recursive).
+gather_src(_Opts, _BaseDirParts, [], Srcs, _CompileOpts) -> Srcs;
+gather_src(Opts, BaseDirParts, [Dir|Rest], Srcs, CompileOpts) ->
+    DirParts = filename:split(Dir),
+    RelDir = case lists:prefix(BaseDirParts,DirParts) of
+                 true ->
+                     case lists:nthtail(length(BaseDirParts),DirParts) of
+                         [] -> ".";
+                         RestParts -> filename:join(RestParts)
+                     end;
+                 false -> Dir
+             end,
+    DirRecursive = dir_recursive(Opts, RelDir, CompileOpts),
+    gather_src(Opts, BaseDirParts, Rest, Srcs ++ rebar_utils:find_files(Dir, ?RE_PREFIX".*\\.erl\$", DirRecursive), CompileOpts).
     
 %% Get files which need to be compiled first, i.e. those specified in erl_first_files
 %% and parse_transform options.  Also produce specific erl_opts for these first
@@ -758,8 +765,8 @@ include_abs_dirs(ErlOpts, BaseDir) ->
     InclDirs = ["include"|proplists:get_all_values(i, ErlOpts)],
     lists:map(fun(Incl) -> filename:join([BaseDir, Incl]) end, InclDirs).
 
-parse_opts(Opts) -> parse_opts(Opts, #compile_opts{}).
-
-parse_opts([], CompileOpts) -> CompileOpts;
-parse_opts([{recursive, Recursive}|Rest], CompileOpts) when Recursive == true; Recursive == false ->
-    parse_opts(Rest, CompileOpts#compile_opts{recursive = Recursive}).
+dir_recursive(Opts, Dir, CompileOpts) when is_list(CompileOpts) ->
+    case proplists:get_value(recursive,CompileOpts) of
+        undefined -> rebar_dir:recursive(Opts, Dir);
+        Recursive -> Recursive
+    end.

@@ -3,8 +3,10 @@
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
 
 -export([default_src_dirs/1, default_extra_src_dirs/1, default_all_src_dirs/1]).
--export([src_dirs/1, extra_src_dirs/1, all_src_dirs/1]).
+-export([src_dirs/1, src_dirs_with_opts/1, extra_src_dirs/1, all_src_dirs/1]).
+-export([src_dir_opts/1, recursive/1]).
 -export([profile_src_dirs/1, profile_extra_src_dirs/1, profile_all_src_dirs/1]).
+-export([profile_src_dir_opts/1]).
 -export([retarget_path/1, alt_base_dir_abs/1, alt_base_dir_rel/1]).
 -export([global_cache_dir/1, default_global_cache_dir/1, overwrite_default_global_cache_dir/1]).
 
@@ -14,8 +16,9 @@
 
 
 all() -> [default_src_dirs, default_extra_src_dirs, default_all_src_dirs,
-          src_dirs, extra_src_dirs, all_src_dirs,
+          src_dirs, extra_src_dirs, all_src_dirs, src_dir_opts, recursive,
           profile_src_dirs, profile_extra_src_dirs, profile_all_src_dirs,
+          profile_src_dir_opts,
           retarget_path, alt_base_dir_abs, alt_base_dir_rel, global_cache_dir,
           default_global_cache_dir, overwrite_default_global_cache_dir].
 
@@ -70,6 +73,13 @@ src_dirs(Config) ->
 
     ["bar", "baz", "foo"] = rebar_dir:src_dirs(rebar_state:opts(State)).
 
+src_dirs_with_opts(Config) ->
+    RebarConfig = [{erl_opts, [{src_dirs, ["foo", "bar", "baz"]},
+                               {src_dirs, [{"foo",[{recursive,false}]}, "qux"]}]}],
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+
+    ["bar", "baz", "foo", "qux"] = rebar_dir:src_dirs(rebar_state:opts(State)).
+
 extra_src_dirs(Config) ->
     RebarConfig = [{erl_opts, [{extra_src_dirs, ["foo", "bar", "baz"]}]}],
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
@@ -77,10 +87,40 @@ extra_src_dirs(Config) ->
     ["bar", "baz", "foo"] = rebar_dir:extra_src_dirs(rebar_state:opts(State)).
 
 all_src_dirs(Config) ->
-    RebarConfig = [{erl_opts, [{src_dirs, ["foo", "bar"]}, {extra_src_dirs, ["baz", "qux"]}]}],
+    RebarConfig = [{erl_opts, [{src_dirs, ["foo", "bar"]}, {extra_src_dirs, ["baz", "qux"]}, {src_dirs, [{"foo", [{recursive,false}]}]}]}],
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
 
     ["bar", "baz", "foo", "qux"] = rebar_dir:all_src_dirs(rebar_state:opts(State)).
+
+src_dir_opts(Config) ->
+    RebarConfig =
+        [{erl_opts, [{src_dirs, [{"foo",[{recursive,true}]}, "bar"]},
+                     {extra_src_dirs, ["baz", {"foo", [{recursive,false}]}]},
+                     {src_dirs, [{"foo", [{recursive,false}]}]}]}],
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig,
+                                                 ["compile"], return),
+    [{recursive,true}] = rebar_dir:src_dir_opts(rebar_state:opts(State), "foo"),
+    [] = rebar_dir:src_dir_opts(rebar_state:opts(State), "bar"),
+    [] = rebar_dir:src_dir_opts(rebar_state:opts(State), "nonexisting").
+
+recursive(Config) ->
+    RebarConfig1 =
+        [{erl_opts, [{src_dirs, ["foo", "bar"]},
+                     {extra_src_dirs, ["baz", {"foo", [{recursive,true}]}]},
+                     {src_dirs, [{"foo", [{recursive,false}]}]}]}],
+    {ok, State1} = rebar_test_utils:run_and_check(Config, RebarConfig1,
+                                                 ["compile"], return),
+    false = rebar_dir:recursive(rebar_state:opts(State1), "foo"),
+    true = rebar_dir:recursive(rebar_state:opts(State1), "bar"),
+
+    RebarConfig2 = [{erlc_compiler,[{recursive,false}]},
+                    {erl_opts,[{src_dirs,["foo",{"bar",[{recursive,true}]}]}]}],
+    {ok, State2} = rebar_test_utils:run_and_check(Config, RebarConfig2,
+                                                 ["compile"], return),
+    false = rebar_dir:recursive(rebar_state:opts(State2), "foo"),
+    true = rebar_dir:recursive(rebar_state:opts(State2), "bar"),
+
+    ok.
 
 profile_src_dirs(Config) ->
     RebarConfig = [
@@ -117,6 +157,26 @@ profile_all_src_dirs(Config) ->
 
     R = lists:sort(["foo", "bar", "baz", "qux"]),
     R = rebar_dir:all_src_dirs(rebar_state:opts(State)).
+
+profile_src_dir_opts(Config) ->
+    RebarConfig = [
+        {erl_opts, [{src_dirs, ["foo"]},
+                    {extra_src_dirs, [{"bar",[recursive]}]}]},
+        {profiles, [
+            {more, [{erl_opts, [{src_dirs, [{"bar",[{recursive,false}]}]},
+                                {extra_src_dirs, ["qux"]}]}]}
+        ]}
+    ],
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig,
+                                                 ["as", "more", "compile"],
+                                                 return),
+
+    [{recursive,false}] = rebar_dir:src_dir_opts(rebar_state:opts(State),"bar"),
+
+    {ok, State1} = rebar_test_utils:run_and_check(Config, RebarConfig,
+                                                 ["compile"], return),
+
+    [{recursive,true}] = rebar_dir:src_dir_opts(rebar_state:opts(State1),"bar").
 
 retarget_path(Config) ->
     {ok, State} = rebar_test_utils:run_and_check(Config, [], ["compile"], return),

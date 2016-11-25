@@ -310,7 +310,7 @@ maybe_inject_test_dir(State, AppAcc, [], Dir) ->
 
 inject_test_dir(Opts, Dir) ->
     %% append specified test targets to app defined `extra_src_dirs`
-    ExtraSrcDirs = rebar_dir:extra_src_dirs(Opts),
+    ExtraSrcDirs = rebar_opts:get(Opts, extra_src_dirs, []),
     rebar_opts:set(Opts, extra_src_dirs, ExtraSrcDirs ++ [Dir]).
 
 compile({error, _} = Error) -> Error;

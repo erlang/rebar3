@@ -46,7 +46,8 @@
          include_file_in_src_test/1,
          always_recompile_when_erl_compiler_options_set/1,
          recompile_when_parse_transform_inline_changes/1,
-         recompile_when_parse_transform_as_opt_changes/1]).
+         recompile_when_parse_transform_as_opt_changes/1,
+         recursive/1,no_recursive/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -72,7 +73,8 @@ all() ->
      include_file_relative_to_working_directory, include_file_in_src,
      include_file_relative_to_working_directory_test, include_file_in_src_test,
      recompile_when_parse_transform_as_opt_changes,
-     recompile_when_parse_transform_inline_changes] ++
+     recompile_when_parse_transform_inline_changes,
+     recursive, no_recursive] ++
      case erlang:function_exported(os, unsetenv, 1) of
          true  -> [always_recompile_when_erl_compiler_options_set];
          false -> []
@@ -1520,3 +1522,39 @@ recompile_when_parse_transform_as_opt_changes(Config) ->
 
     ?assert(ModTime =/= NewModTime).
 
+recursive(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:write_src_file(filename:join(AppDir,src),"rec.erl"),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    {ok, Files} = rebar_utils:list_dir(EbinDir),
+    ?assert(lists:member("rec.beam",Files)).
+
+no_recursive(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:write_src_file(filename:join(AppDir,src),"rec.erl"),
+
+    RebarConfig1 = [{erlc_compiler,[{recursive,false}]}],
+    rebar_test_utils:run_and_check(Config, RebarConfig1, ["compile"],
+                                   {ok, [{app, Name}]}),
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    {ok, Files1} = rebar_utils:list_dir(EbinDir),
+    ?assert(false==lists:member("rec.beam",Files1)),
+
+    RebarConfig2 = [{src_dirs,[{"src",[{recursive,false}]}]}],
+    rebar_test_utils:run_and_check(Config, RebarConfig2, ["compile"],
+                                   {ok, [{app, Name}]}),
+    {ok, Files2} = rebar_utils:list_dir(EbinDir),
+    ?assert(false==lists:member("rec.beam",Files2)),
+
+    ok.
