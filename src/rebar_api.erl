@@ -1,4 +1,4 @@
-%%% Packages rebar.hrl features and macros into a more generic API
+%%% @doc Packages rebar.hrl features and macros into a more generic API
 %%% that can be used by plugin builders.
 -module(rebar_api).
 -include("rebar.hrl").
@@ -30,42 +30,62 @@ abort() -> ?FAIL.
 abort(Str, Args) -> ?ABORT(Str, Args).
 
 %% @doc Prints to the console, including a newline
+-spec console(string(), list()) -> ok.
 console(Str, Args) -> ?CONSOLE(Str, Args).
 
 %% @doc logs with severity `debug'
+-spec debug(string(), list()) -> ok.
 debug(Str, Args) -> ?DEBUG(Str, Args).
+
 %% @doc logs with severity `info'
+-spec info(string(), list()) -> ok.
 info(Str, Args) -> ?INFO(Str, Args).
+
 %% @doc logs with severity `warn'
+-spec warn(string(), list()) -> ok.
 warn(Str, Args) -> ?WARN(Str, Args).
+
 %% @doc logs with severity `error'
+-spec error(string(), list()) -> ok.
 error(Str, Args) -> ?ERROR(Str, Args).
 
-%%
-%% Given env. variable FOO we want to expand all references to
-%% it in InStr. References can have two forms: $FOO and ${FOO}
-%% The end of form $FOO is delimited with whitespace or eol
-%%
+%% @doc Given env. variable `FOO' we want to expand all references to
+%% it in `InStr'. References can have two forms: `$FOO' and `${FOO}'
+%% The end of form `$FOO' is delimited with whitespace or EOL
+-spec expand_env_variable(string(), string(), term()) -> string().
 expand_env_variable(InStr, VarName, RawVarValue) ->
     rebar_utils:expand_env_variable(InStr, VarName, RawVarValue).
 
+%% @doc returns the sytem architecture, in strings like
+%% `"19.0.4-x86_64-unknown-linux-gnu-64"'.
+-spec get_arch() -> string().
 get_arch() ->
     rebar_utils:get_arch().
 
+%% @doc returns the size of a word on the system, as a string
+-spec wordsize() -> string().
 wordsize() ->
     rebar_utils:wordsize().
 
-
-%% Add deps to the code path
+%% @doc Add deps to the code path
+-spec add_deps_to_path(rebar_state:t()) -> ok.
 add_deps_to_path(State) ->
   code:add_pathsa(rebar_state:code_paths(State, all_deps)).
 
-%% Revert to only having the beams necessary for running rebar3 and plugins in the path
+%% @doc Revert to only having the beams necessary for running rebar3 and
+%% plugins in the path
+-spec restore_code_path(rebar_state:t()) -> true | {error, term()}.
 restore_code_path(State) ->
   rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)).
 
+%% @doc checks if the current working directory is the base directory
+%% for the project.
+-spec processing_base_dir(rebar_state:t()) -> boolean().
 processing_base_dir(State) ->
     rebar_dir:processing_base_dir(State).
 
+%% @doc returns the SSL options adequate for the project based on
+%% its configuration, including for validation of certs.
+-spec ssl_opts(string()) -> [term()].
 ssl_opts(Url) ->
     rebar_pkg_resource:ssl_opts(Url).

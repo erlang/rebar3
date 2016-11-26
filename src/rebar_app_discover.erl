@@ -1,3 +1,5 @@
+%%% @doc utility functions to do the basic discovery of apps
+%%% and layout for the project.
 -module(rebar_app_discover).
 
 -export([do/2,
@@ -11,6 +13,8 @@
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
+%% @doc from the base directory, 
+-spec do(rebar_state:t(), [file:filename()]) -> rebar_state:t().
 do(State, LibDirs) ->
     BaseDir = rebar_state:dir(State),
     Dirs = [filename:join(BaseDir, LibDir) || LibDir <- LibDirs],
@@ -55,6 +59,10 @@ do(State, LibDirs) ->
                         end
                 end, State1, SortedApps).
 
+%% @doc checks whether there is an app at the top level (and returns its
+%% name) or the 'root' atom in case we're in an umbrella project.
+-spec define_root_app([rebar_app_info:t()], rebar_state:t()) ->
+    root | binary().
 define_root_app(Apps, State) ->
     RootDir = rebar_dir:root_dir(State),
     case ec_lists:find(fun(X) ->
@@ -67,11 +75,17 @@ define_root_app(Apps, State) ->
             root
     end.
 
+%% @doc formatting errors from the module.
+-spec format_error(term()) -> iodata().
 format_error({module_list, File}) ->
     io_lib:format("Error reading module list from ~p~n", [File]);
 format_error({missing_module, Module}) ->
     io_lib:format("Module defined in app file missing: ~p~n", [Module]).
 
+%% @doc handles the merging and application of profiles and overrides
+%% for a given application, within its own context.
+-spec merge_deps(rebar_app_info:t(), rebar_state:t()) ->
+    {rebar_app_info:t(), rebar_state:t()}.
 merge_deps(AppInfo, State) ->
     %% These steps make sure that hooks and artifacts are run in the context of
     %% the application they are defined at. If an umbrella structure is used and
@@ -97,6 +111,10 @@ merge_deps(AppInfo, State) ->
 
     {AppInfo2, State2}.
 
+%% @doc Applies a given profile for an app, ensuring the deps
+%% match the context it will require.
+-spec handle_profile(atom(), binary(), rebar_app_info:t(), rebar_state:t()) ->
+    rebar_state:t().
 handle_profile(Profile, Name, AppInfo, State) ->
     TopParsedDeps = rebar_state:get(State, {parsed_deps, Profile}, {[], []}),
     TopLevelProfileDeps = rebar_state:get(State, {deps, Profile}, []),
@@ -113,6 +131,12 @@ handle_profile(Profile, Name, AppInfo, State) ->
     State2 = rebar_state:set(State1, {deps, Profile}, ProfileDeps2),
     rebar_state:set(State2, {parsed_deps, Profile}, TopParsedDeps++ParsedDeps).
 
+%% @doc parses all the known dependencies for a given profile
+-spec parse_profile_deps(Profile, Name, Deps, Opts, rebar_state:t()) -> [rebar_app_info:t()] when
+      Profile :: atom(),
+      Name :: binary(),
+      Deps :: [term()], % TODO: refine types
+      Opts :: term(). % TODO: refine types
 parse_profile_deps(Profile, Name, Deps, Opts, State) ->
     DepsDir = rebar_prv_install_deps:profile_dep_dir(State, Profile),
     Locks = rebar_state:get(State, {locks, Profile}, []),
@@ -123,14 +147,21 @@ parse_profile_deps(Profile, Name, Deps, Opts, State) ->
                               ,Locks
                               ,1).
 
+%% @doc Find the app-level config and return the state updated
+%% with the relevant app-level data.
+-spec project_app_config(rebar_app_info:t(), rebar_state:t()) ->
+    {Config, rebar_state:t()} when
+      Config :: [any()].
 project_app_config(AppInfo, State) ->
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
     Dir = rebar_app_info:dir(AppInfo),
     Opts = maybe_reset_hooks(Dir, rebar_state:opts(State), State),
     {C, rebar_state:opts(State, Opts)}.
 
-%% Here we check if the app is at the root of the project.
+%% @doc Here we check if the app is at the root of the project.
 %% If it is, then drop the hooks from the config so they aren't run twice
+-spec maybe_reset_hooks(file:filename(), Opts, rebar_state:t()) -> Opts when
+      Opts :: rebar_dict().
 maybe_reset_hooks(Dir, Opts, State) ->
     case ec_file:real_dir_path(rebar_dir:root_dir(State)) of
         Dir ->
@@ -139,17 +170,22 @@ maybe_reset_hooks(Dir, Opts, State) ->
             Opts
     end.
 
+%% @doc make the hooks empty for a given set of options
+-spec reset_hooks(Opts) -> Opts when Opts :: rebar_dict().
 reset_hooks(Opts) ->
     lists:foldl(fun(Key, OptsAcc) ->
                         rebar_opts:set(OptsAcc, Key, [])
                 end, Opts, [post_hooks, pre_hooks, provider_hooks, artifacts]).
 
--spec all_app_dirs(list(file:name())) -> list(file:name()).
+%% @doc find the directories for all apps
+-spec all_app_dirs([file:name()]) -> [file:name()].
 all_app_dirs(LibDirs) ->
     lists:flatmap(fun(LibDir) ->
                           app_dirs(LibDir)
                   end, LibDirs).
 
+%% @doc find the directories based on the library directories
+-spec app_dirs([file:name()]) -> [file:name()].
 app_dirs(LibDir) ->
     Path1 = filename:join([LibDir,
                            "src",
@@ -168,32 +204,51 @@ app_dirs(LibDir) ->
                                     [app_dir(File) || File <- Files] ++ Acc
                             end, [], [Path1, Path2, Path3])).
 
+%% @doc find all apps that haven't been built in a list of directories
+-spec find_unbuilt_apps([file:filename_all()]) -> [rebar_app_info:t()].
 find_unbuilt_apps(LibDirs) ->
     find_apps(LibDirs, invalid).
 
+%% @doc for each directory passed, find all apps that are valid.
+%% Returns all the related app info records.
 -spec find_apps([file:filename_all()]) -> [rebar_app_info:t()].
 find_apps(LibDirs) ->
     find_apps(LibDirs, valid).
 
+%% @doc for each directory passed, find all apps according
+%% to the validity rule passed in. Returns all the related
+%% app info records.
 -spec find_apps([file:filename_all()], valid | invalid | all) -> [rebar_app_info:t()].
 find_apps(LibDirs, Validate) ->
     rebar_utils:filtermap(fun(AppDir) ->
                                   find_app(AppDir, Validate)
                           end, all_app_dirs(LibDirs)).
 
+%% @doc check that a given app in a directory is there, and whether it's
+%% valid or not based on the second argument. Returns the related
+%% app info record.
 -spec find_app(file:filename_all(), valid | invalid | all) -> {true, rebar_app_info:t()} | false.
 find_app(AppDir, Validate) ->
     find_app(rebar_app_info:new(), AppDir, Validate).
 
+%% @doc check that a given app in a directory is there, and whether it's
+%% valid or not based on the second argument. Returns the related
+%% app info record.
+-spec find_app(rebar_app_info:t(), file:filename_all(), valid | invalid | all) ->
+    {true, rebar_app_info:t()} | false.
 find_app(AppInfo, AppDir, Validate) ->
     AppFile = filelib:wildcard(filename:join([AppDir, "ebin", "*.app"])),
     AppSrcFile = filelib:wildcard(filename:join([AppDir, "src", "*.app.src"])),
     AppSrcScriptFile = filelib:wildcard(filename:join([AppDir, "src", "*.app.src.script"])),
     try_handle_app_file(AppInfo, AppFile, AppDir, AppSrcFile, AppSrcScriptFile, Validate).
 
+%% @doc find the directory that an appfile has
+-spec app_dir(file:filename()) -> file:filename().
 app_dir(AppFile) ->
     filename:join(rebar_utils:droplast(filename:split(filename:dirname(AppFile)))).
 
+%% @doc populates an app info record based on an app directory and its
+%% app file.
 -spec create_app_info(rebar_app_info:t(), file:name(), file:name()) -> rebar_app_info:t().
 create_app_info(AppInfo, AppDir, AppFile) ->
     [{application, AppName, AppDetails}] = rebar_config:consult_app_file(AppFile),
@@ -215,8 +270,15 @@ create_app_info(AppInfo, AppDir, AppFile) ->
             end,
     rebar_app_info:dir(rebar_app_info:valid(AppInfo2, Valid), AppDir).
 
-%% Read in and parse the .app file if it is availabe. Do the same for
+%% @doc Read in and parse the .app file if it is availabe. Do the same for
 %% the .app.src file if it exists.
+-spec try_handle_app_file(AppInfo, AppFile, AppDir, AppSrcFile, AppSrcScriptFile, valid | invalid | all) ->
+    {true, AppInfo} | false when
+      AppInfo :: rebar_app_info:t(),
+      AppFile :: file:filename(),
+      AppDir :: file:filename(),
+      AppSrcFile :: file:filename(),
+      AppSrcScriptFile :: file:filename().
 try_handle_app_file(AppInfo, [], AppDir, [], AppSrcScriptFile, Validate) ->
     try_handle_app_src_file(AppInfo, [], AppDir, AppSrcScriptFile, Validate);
 try_handle_app_file(AppInfo, [], AppDir, AppSrcFile, _, Validate) ->
@@ -260,7 +322,14 @@ try_handle_app_file(AppInfo0, [File], AppDir, AppSrcFile, _, Validate) ->
 try_handle_app_file(_AppInfo, Other, _AppDir, _AppSrcFile, _, _Validate) ->
     throw({error, {multiple_app_files, Other}}).
 
-%% Read in the .app.src file if we aren't looking for a valid (already built) app
+%% @doc Read in the .app.src file if we aren't looking for a valid (already
+%% built) app.
+-spec try_handle_app_src_file(AppInfo, AppFile, AppDir, AppSrcFile, valid | invalid | all) ->
+    {true, AppInfo} | false when
+      AppInfo :: rebar_app_info:t(),
+      AppFile :: file:filename(),
+      AppDir :: file:filename(),
+      AppSrcFile :: file:filename().
 try_handle_app_src_file(_AppInfo, _, _AppDir, [], _Validate) ->
     false;
 try_handle_app_src_file(_AppInfo, _, _AppDir, _AppSrcFile, valid) ->
@@ -277,9 +346,13 @@ try_handle_app_src_file(AppInfo, _, AppDir, [File], Validate) when Validate =:= 
 try_handle_app_src_file(_AppInfo, _, _AppDir, Other, _Validate) ->
     throw({error, {multiple_app_files, Other}}).
 
+%% @doc checks whether the given app is not blacklisted in the config.
+-spec enable(rebar_state:t(), rebar_app_info:t()) -> boolean().
 enable(State, AppInfo) ->
     not lists:member(to_atom(rebar_app_info:name(AppInfo)),
              rebar_state:get(State, excluded_apps, [])).
 
+%% @private convert a binary to an atom.
+-spec to_atom(binary()) -> atom().
 to_atom(Bin) ->
     list_to_atom(binary_to_list(Bin)).

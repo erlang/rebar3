@@ -1,3 +1,5 @@
+%%% @doc Runs a process that holds a rebar3 state and can be used
+%%% to statefully maintain loaded project state into a running VM.
 -module(rebar_agent).
 -export([start_link/1, do/1, do/2]).
 -export([init/1,
@@ -10,19 +12,34 @@
                 cwd,
                 show_warning=true}).
 
+%% @doc boots an agent server; requires a full rebar3 state already.
+%% By default (within rebar3), this isn't called; `rebar_prv_shell'
+%% enters and transforms into this module
+-spec start_link(rebar_state:t()) -> {ok, pid()}.
 start_link(State) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, State, []).
 
+%% @doc runs a given command in the agent's context.
+-spec do(atom()) -> ok | {error, term()}.
 do(Command) when is_atom(Command) ->
     gen_server:call(?MODULE, {cmd, Command}, infinity).
 
+%% @doc runs a given command in the agent's context, under a given
+%% namespace.
+-spec do(atom(), atom()) -> ok | {error, term()}.
 do(Namespace, Command) when is_atom(Namespace), is_atom(Command) ->
     gen_server:call(?MODULE, {cmd, Namespace, Command}, infinity).
 
+%%%%%%%%%%%%%%%%%
+%%% CALLBACKS %%%
+%%%%%%%%%%%%%%%%%
+
+%% @private
 init(State) ->
     Cwd = rebar_dir:get_cwd(),
     {ok, #state{state=State, cwd=Cwd}}.
 
+%% @private
 handle_call({cmd, Command}, _From, State=#state{state=RState, cwd=Cwd}) ->
     MidState = maybe_show_warning(State),
     {Res, NewRState} = run(default, Command, RState, Cwd),
@@ -34,18 +51,29 @@ handle_call({cmd, Namespace, Command}, _From, State = #state{state=RState, cwd=C
 handle_call(_Call, _From, State) ->
     {noreply, State}.
 
+%% @private
 handle_cast(_Cast, State) ->
     {noreply, State}.
 
+%% @private
 handle_info(_Info, State) ->
     {noreply, State}.
 
+%% @private
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+%% @private
 terminate(_Reason, _State) ->
     ok.
 
+%%%%%%%%%%%%%%%
+%%% PRIVATE %%%
+%%%%%%%%%%%%%%%
+
+%% @private runs the actual command and maintains the state changes
+-spec run(atom(), atom(), rebar_state:t(), file:filename()) ->
+    {ok, rebar_state:t()} | {{error, term()}, rebar_state:t()}.
 run(Namespace, Command, RState, Cwd) ->
     try
         case rebar_dir:get_cwd() of
@@ -74,12 +102,17 @@ run(Namespace, Command, RState, Cwd) ->
             {{error, {Type, Reason}}, RState}
     end.
 
+%% @private function to display a warning for the feature only once
+-spec maybe_show_warning(#state{}) -> #state{}.
 maybe_show_warning(S=#state{show_warning=true}) ->
     ?WARN("This feature is experimental and may be modified or removed at any time.", []),
     S#state{show_warning=false};
 maybe_show_warning(State) ->
     State.
 
+%% @private based on a rebar3 state term, reload paths in a way
+%% that makes sense.
+-spec refresh_paths(rebar_state:t()) -> ok.
 refresh_paths(RState) ->
     ToRefresh = (rebar_state:code_paths(RState, all_deps)
                  ++ [filename:join([rebar_app_info:out_dir(App), "test"])
@@ -116,6 +149,9 @@ refresh_paths(RState) ->
             end
         end, ToRefresh).
 
+%% @private from a disk config, reload and reapply with the current
+%% profiles; used to find changes in the config from a prior run.
+-spec refresh_state(rebar_state:t(), file:filename()) -> rebar_state:t().
 refresh_state(RState, _Dir) ->
     lists:foldl(
         fun(F, State) -> F(State) end,
@@ -123,26 +159,28 @@ refresh_state(RState, _Dir) ->
         [fun(S) -> rebar_state:apply_profiles(S, rebar_state:current_profiles(RState)) end]
     ).
 
+%% @private takes a list of modules and reloads them
+-spec reload_modules([module()]) -> term().
 reload_modules([]) -> noop;
-reload_modules(Modules) -> 
+reload_modules(Modules) ->
         reload_modules(Modules, erlang:function_exported(code, prepare_loading, 1)).
 
-%% OTP 19 and later -- use atomic loading and ignore unloadable mods
+%% @private reloading modules, when there are modules to actually reload
 reload_modules(Modules, true) ->
+    %% OTP 19 and later -- use atomic loading and ignore unloadable mods
     case code:prepare_loading(Modules) of
         {ok, Prepared} ->
             [code:purge(M) || M <- Modules],
             code:finish_loading(Prepared);
-
         {error, ModRsns} ->
-            Blacklist = 
+            Blacklist =
                 lists:foldr(fun({ModError, Error}, Acc) ->
                     case Error of
-                        %perhaps cover other cases of failure?
+                        % perhaps cover other cases of failure?
                         on_load_not_allowed ->
                             reload_modules([ModError], false),
                             [ModError|Acc];
-                        _ -> 
+                        _ ->
                             ?DEBUG("Module ~p failed to atomic load because ~p", [ModError, Error]),
                             [ModError|Acc]
                     end
@@ -151,12 +189,11 @@ reload_modules(Modules, true) ->
             ),
             reload_modules(Modules -- Blacklist, true)
     end;
-
-%% Older versions, use a more ad-hoc mechanism.
 reload_modules(Modules, false) ->
+    %% Older versions, use a more ad-hoc mechanism.
     lists:foreach(fun(M) ->
-            code:delete(M), 
-            code:purge(M), 
+            code:delete(M),
+            code:purge(M),
             case code:load_file(M) of
                 {module, M} -> ok;
                 {error, Error} ->

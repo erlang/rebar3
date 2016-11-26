@@ -24,6 +24,16 @@
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
+%%
+%% @doc Main module for rebar3. Supports two interfaces; one for escripts,
+%% and one for usage as a library (although rebar3 makes a lot of
+%% assumptions about its environment, making it a bit tricky to use as
+%% a lib).
+%%
+%% This module's job is mostly to set up the root environment for rebar3
+%% and handle global options (mostly all from the ENV) and make them
+%% accessible to the rest of the run.
+%% @end
 -module(rebar3).
 
 -export([main/0,
@@ -43,14 +53,14 @@
 %% Public API
 %% ====================================================================
 
-%% For running with:
+%% @doc For running with:
 %% erl +sbtu +A0 -noinput -mode minimal -boot start_clean -s rebar3 main -extra "$@"
 -spec main() -> no_return().
 main() ->
     List = init:get_plain_arguments(),
     main(List).
 
-%% escript Entry point
+%% @doc escript Entry point
 -spec main(list()) -> no_return().
 main(Args) ->
     try run(Args) of
@@ -63,7 +73,8 @@ main(Args) ->
             handle_error(Error)
     end.
 
-%% Erlang-API entry point
+%% @doc Erlang-API entry point
+-spec run(rebar_state:t(), [string()]) -> {ok, rebar_state:t()} | {error, term()}.
 run(BaseState, Commands) ->
     start_and_load_apps(api),
     BaseState1 = rebar_state:set(BaseState, task, Commands),
@@ -78,6 +89,10 @@ run(BaseState, Commands) ->
 %% Internal functions
 %% ====================================================================
 
+%% @private sets up the rebar3 environment based on the command line
+%% arguments passed, if they have any relevance; used to translate
+%% from the escript call-site into a common one with the library
+%% usage.
 run(RawArgs) ->
     start_and_load_apps(command_line),
 
@@ -95,7 +110,13 @@ run(RawArgs) ->
     {BaseState2, _Args1} = set_options(BaseState1, {[], []}),
     run_aux(BaseState2, RawArgs).
 
+%% @private Junction point between the CLI and library entry points.
+%% From here on the module's role is a shared path here to finish
+%% up setting the environment for the run.
+-spec run_aux(rebar_state:t(), [string()]) ->
+    {ok, rebar_state:t()} | {error, term()}.
 run_aux(State, RawArgs) ->
+    %% Profile override; can only support one profile
     State1 = case os:getenv("REBAR_PROFILE") of
                  false ->
                      State;
@@ -108,6 +129,7 @@ run_aux(State, RawArgs) ->
     rebar_utils:check_min_otp_version(rebar_state:get(State1, minimum_otp_vsn, undefined)),
     rebar_utils:check_blacklisted_otp_versions(rebar_state:get(State1, blacklisted_otp_vsns, undefined)),
 
+    %% Change the default hex CDN
     State2 = case os:getenv("HEX_CDN") of
                  false ->
                      State1;
@@ -144,6 +166,9 @@ run_aux(State, RawArgs) ->
 
     rebar_core:init_command(rebar_state:command_args(State10, Args), Task).
 
+%% @doc set up base configuration having to do with verbosity, where
+%% to find config files, and so on, and return an internal rebar3 state term.
+-spec init_config() -> rebar_state:t().
 init_config() ->
     %% Initialize logging system
     Verbosity = log_level(),
@@ -188,6 +213,17 @@ init_config() ->
     %% Initialize vsn cache
     rebar_state:set(State1, vsn_cache, dict:new()).
 
+%% @doc Parse basic rebar3 arguments to find the top-level task
+%% to be run; this parsing is only partial from the point of view that
+%% runs done with arguments like `as $PROFILE do $TASK' will just
+%% return `as', which is then in charge of doing a more dynamic
+%% dispatch.
+%% If no arguments are given, the `help' task is returned.
+%% If special arguments like `-h' or `-v' are translated to `help'
+%% and `version' tasks.
+%% The unparsed parts of arguments are returned in:
+%% `{Task, Rest}'.
+-spec parse_args([string()]) -> {atom(), [string()]}.
 parse_args([]) ->
     parse_args(["help"]);
 parse_args([H | Rest]) when H =:= "-h"
@@ -199,6 +235,7 @@ parse_args([H | Rest]) when H =:= "-v"
 parse_args([Task | RawRest]) ->
     {list_to_atom(Task), RawRest}.
 
+%% @private actually not too sure what this does anymore.
 set_options(State, {Options, NonOptArgs}) ->
     GlobalDefines = proplists:get_all_values(defines, Options),
 
@@ -211,9 +248,8 @@ set_options(State, {Options, NonOptArgs}) ->
 
     {rebar_state:set(State2, task, Task), NonOptArgs}.
 
-%%
-%% get log level based on getopt option
-%%
+%% @doc get log level based on getopt options and ENV
+-spec log_level() -> integer().
 log_level() ->
     case os:getenv("QUIET") of
         Q when Q == false; Q == "" ->
@@ -228,18 +264,16 @@ log_level() ->
             rebar_log:error_level()
     end.
 
-%%
-%% show version information and halt
-%%
+%% @doc show version information
+-spec version() -> ok.
 version() ->
     {ok, Vsn} = application:get_key(rebar, vsn),
     ?CONSOLE("rebar ~s on Erlang/OTP ~s Erts ~s",
              [Vsn, erlang:system_info(otp_release), erlang:system_info(version)]).
 
+%% @private set global flag based on getopt option boolean value
 %% TODO: Actually make it 'global'
-%%
-%% set global flag based on getopt option boolean value
-%%
+-spec set_global_flag(rebar_state:t(), list(), term()) -> rebar_state:t().
 set_global_flag(State, Options, Flag) ->
     Value = case proplists:get_bool(Flag, Options) of
                 true ->
@@ -249,9 +283,9 @@ set_global_flag(State, Options, Flag) ->
             end,
     rebar_state:set(State, Flag, Value).
 
-%%
-%% options accepted via getopt
-%%
+
+%% @doc options accepted via getopt
+-spec global_option_spec_list() -> [{atom(), char(), string(), atom(), string()}, ...].
 global_option_spec_list() ->
     [
     %% {Name,  ShortOpt,  LongOpt,    ArgSpec,   HelpMsg}
@@ -260,6 +294,9 @@ global_option_spec_list() ->
     {task,     undefined, undefined,  string,    "Task to run."}
     ].
 
+%% @private translate unhandled errors and internal return codes into proper
+%% erroneous program exits.
+-spec handle_error(term()) -> no_return().
 handle_error(rebar_abort) ->
     erlang:halt(1);
 handle_error({error, rebar_abort}) ->
@@ -293,6 +330,11 @@ handle_error(Error) ->
     ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []),
     erlang:halt(1).
 
+%% @private Boot Erlang dependencies; problem is that escripts don't auto-boot
+%% stuff the way releases do and we have to do it by hand.
+%% This also lets us detect and show nicer errors when a critical lib is
+%% not supported
+-spec start_and_load_apps(command_line|api) -> term().
 start_and_load_apps(Caller) ->
     _ = application:load(rebar),
     %% Make sure crypto is running
@@ -303,6 +345,9 @@ start_and_load_apps(Caller) ->
     inets:start(),
     inets:start(httpc, [{profile, rebar}]).
 
+%% @doc Make sure a required app is running, or display an error message
+%% and abort if there's a problem.
+-spec ensure_running(atom(), command_line|api) -> ok | no_return().
 ensure_running(App, Caller) ->
     case application:start(App) of
         ok -> ok;
@@ -319,6 +364,7 @@ ensure_running(App, Caller) ->
             throw(rebar_abort)
     end.
 
+-spec state_from_global_config([term()], file:filename()) -> rebar_state:t().
 state_from_global_config(Config, GlobalConfigFile) ->
     rebar_utils:set_httpc_options(),
     GlobalConfigTerms = rebar_config:consult_file(GlobalConfigFile),

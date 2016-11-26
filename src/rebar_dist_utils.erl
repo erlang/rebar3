@@ -25,7 +25,7 @@ short(Name, Opts) ->
 long(Name, Opts) ->
     start(Name, longnames, Opts).
 
--spec find_options(rebar_state:state()) -> {Long, Short, Opts} when
+-spec find_options(rebar_state:t()) -> {Long, Short, Opts} when
       Long :: atom(),
       Short :: atom(),
       Opts :: [{setcookie,term()}].
