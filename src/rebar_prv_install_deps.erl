@@ -119,9 +119,9 @@ format_error({missing_package, Package}) ->
 format_error({cycles, Cycles}) ->
     Prints = [["applications: ",
                [io_lib:format("~s ", [Dep]) || Dep <- Cycle],
-               "depend on each other~n"]
+               "depend on each other\n"]
               || Cycle <- Cycles],
-    ["Dependency cycle(s) detected:~n", Prints];
+    ["Dependency cycle(s) detected:\n", Prints];
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
