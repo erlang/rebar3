@@ -227,19 +227,41 @@ select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
     rebar_utils:reread_config(Configs),
     code:set_path(OldPath),
 
-    Merged = lists:ukeymerge(1,
-                             lists:ukeysort(1, CmdOpts),
-                             lists:ukeysort(1, CfgOpts)),
-    %% make sure `dir` and/or `suite` from command line go in as
-    %% a pair overriding both `dir` and `suite` from config if
-    %% they exist
-    Opts = case {proplists:get_value(suite, CmdOpts), proplists:get_value(dir, CmdOpts)} of
-        {undefined, undefined} -> Merged;
-        {_Suite, undefined}    -> lists:keydelete(dir, 1, Merged);
-        {undefined, _Dir}      -> lists:keydelete(suite, 1, Merged);
-        {_Suite, _Dir}         -> Merged
-    end,
+    Opts = merge_opts(CmdOpts,CfgOpts),
     discover_tests(State, ProjectApps, Opts).
+
+%% Merge the option lists from command line and rebar.config:
+%%
+%% - Options set on the command line will replace the same options if
+%%   set in rebar.config.
+%%
+%% - Special care is taken with options that select which tests to
+%%   run - ANY such option on the command line will replace ALL such
+%%   options in the config.
+%%
+%%   Note that if 'spec' is given, common_test will ignore all 'dir',
+%%   'suite', 'group' and 'case', so there is no need to explicitly
+%%   remove any options from the command line.
+%%
+%%   All faulty combinations of options are also handled by
+%%   common_test and are not taken into account here.
+merge_opts(CmdOpts0, CfgOpts0) ->
+    TestSelectOpts = [spec,dir,suite,group,testcase],
+    CmdOpts = lists:ukeysort(1, CmdOpts0),
+    CfgOpts1 = lists:ukeysort(1, CfgOpts0),
+    CfgOpts = case is_any_defined(TestSelectOpts,CmdOpts) of
+                  false ->
+                      CfgOpts1;
+                  true ->
+                       [Opt || Opt={K,_} <- CfgOpts1,
+                               not lists:member(K,TestSelectOpts)]
+              end,
+    lists:ukeymerge(1, CmdOpts, CfgOpts).
+
+is_any_defined([Key|Keys],Opts) ->
+    proplists:is_defined(Key,Opts) orelse is_any_defined(Keys,Opts);
+is_any_defined([],_Opts) ->
+    false.
 
 sys_config_list(CmdOpts, CfgOpts) ->
     CmdSysConfigs = split_string(proplists:get_value(sys_config, CmdOpts, "")),
@@ -253,11 +275,10 @@ sys_config_list(CmdOpts, CfgOpts) ->
     end.
 
 discover_tests(State, ProjectApps, Opts) ->
-    case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
-        %% no dirs or suites defined, try using `$APP/test` and `$ROOT/test`
-        %%  as suites
-        {undefined, undefined} -> {ok, [default_tests(State, ProjectApps)|Opts]};
-        {_, _}                 -> {ok, Opts}
+    case is_any_defined([spec,dir,suite],Opts) of
+        %% no tests defined, try using `$APP/test` and `$ROOT/test` as dirs
+        false -> {ok, [default_tests(State, ProjectApps)|Opts]};
+        true  -> {ok, Opts}
     end.
 
 default_tests(State, ProjectApps) ->
@@ -397,14 +418,20 @@ readable(State) ->
     end.
 
 test_dirs(State, Apps, Opts) ->
-    case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
-        {Suites, undefined} -> set_compile_dirs(State, Apps, {suite, Suites});
-        {undefined, Dirs}   -> set_compile_dirs(State, Apps, {dir, Dirs});
-        {Suites, Dir} when is_integer(hd(Dir)) ->
-            set_compile_dirs(State, Apps, join(Suites, Dir));
-        {Suites, [Dir]} when is_integer(hd(Dir)) ->
-            set_compile_dirs(State, Apps, join(Suites, Dir));
-        {_Suites, _Dirs}    -> {error, "Only a single directory may be specified when specifying suites"}
+    case proplists:get_value(spec, Opts) of
+        undefined ->
+            case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
+                {Suites, undefined} -> set_compile_dirs(State, Apps, {suite, Suites});
+                {undefined, Dirs}   -> set_compile_dirs(State, Apps, {dir, Dirs});
+                {Suites, Dir} when is_integer(hd(Dir)) ->
+                    set_compile_dirs(State, Apps, join(Suites, Dir));
+                {Suites, [Dir]} when is_integer(hd(Dir)) ->
+                    set_compile_dirs(State, Apps, join(Suites, Dir));
+                {_Suites, _Dirs}    -> {error, "Only a single directory may be specified when specifying suites"}
+            end;
+        _Specs ->
+            %% Currently not adding any directories from the spec files.
+            {ok, rebar_state:project_apps(State, Apps)}
     end.
 
 join(Suite, Dir) when is_integer(hd(Suite)) ->

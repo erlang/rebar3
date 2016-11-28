@@ -51,7 +51,9 @@
          cover_compiled/1,
          misspecified_ct_opts/1,
          misspecified_ct_compile_opts/1,
-         misspecified_ct_first_files/1]).
+         misspecified_ct_first_files/1,
+         testspec/1,
+         cmd_vs_cfg_opts/1]).
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("common_test/include/ct.hrl").
@@ -67,7 +69,9 @@ all() -> [{group, basic_app},
           cfg_atom_suites,
           misspecified_ct_opts,
           misspecified_ct_compile_opts,
-          misspecified_ct_first_files].
+          misspecified_ct_first_files,
+          testspec,
+          cmd_vs_cfg_opts].
 
 groups() -> [{basic_app, [], [basic_app_default_dirs,
                               basic_app_default_beams,
@@ -1233,6 +1237,84 @@ misspecified_ct_first_files(Config) ->
     {error, {rebar_prv_common_test, Error}} = rebar_prv_common_test:compile(State, Tests),
 
     {badconfig, {"Value `~p' of option `~p' must be a list", {some_file, ct_first_files}}} = Error.
+
+testspec(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "ct_testspec_"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name("ct_testspec_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    Spec = filename:join([AppDir, "test", "some.spec"]),
+    ok = filelib:ensure_dir(Spec),
+    ok = file:write_file(Spec, "[].\n"),
+
+    {ok, State} = rebar_test_utils:run_and_check(C,
+                                                 [],
+                                                 ["as", "test", "lock"],
+                                                 return),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+
+    {ok, GetOptResult1} = getopt:parse(GetOptSpec, ["--spec","test/some.spec"]),
+    State1 = rebar_state:command_parsed_args(State, GetOptResult1),
+    Tests1 = rebar_prv_common_test:prepare_tests(State1),
+    {ok, _} = rebar_prv_common_test:compile(State1, Tests1),
+
+    ok.
+
+cmd_vs_cfg_opts(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "ct_cmd_vs_cfg_opts_"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name("ct_cmd_vs_cfg_opts_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{ct_opts, [{spec,"mytest.spec"},
+                              {dir,"test"},
+                              {suite,"some_SUITE"},
+                              {group,"some_group"},
+                              {testcase,"some_test"}]}],
+
+    {ok, State} = rebar_test_utils:run_and_check(C, RebarConfig, ["as", "test", "lock"], return),
+
+    {ok, TestOpts} = rebar_prv_common_test:prepare_tests(State),
+    true = lists:member({spec, "mytest.spec"}, TestOpts),
+    true = lists:member({dir, "test"}, TestOpts),
+    true = lists:member({suite, "some_SUITE"}, TestOpts),
+    true = lists:member({group, "some_group"}, TestOpts),
+    true = lists:member({testcase, "some_test"}, TestOpts),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+
+    {ok, GetOptResult1} = getopt:parse(GetOptSpec, ["--spec","test/some.spec"]),
+    State1 = rebar_state:command_parsed_args(State, GetOptResult1),
+    {ok, TestOpts1} = rebar_prv_common_test:prepare_tests(State1),
+    true = lists:member({spec, ["test/some.spec"]}, TestOpts1),
+    false = lists:keymember(dir, 1, TestOpts1),
+    false = lists:keymember(suite, 1, TestOpts1),
+    false = lists:keymember(group, 1, TestOpts1),
+    false = lists:keymember(testcase, 1, TestOpts1),
+
+    {ok, GetOptResult2} = getopt:parse(GetOptSpec, ["--suite","test/some_SUITE"]),
+    State2 = rebar_state:command_parsed_args(State, GetOptResult2),
+    {ok, TestOpts2} = rebar_prv_common_test:prepare_tests(State2),
+    true = lists:member({suite, ["test/some_SUITE"]}, TestOpts2),
+    false = lists:keymember(spec, 1, TestOpts2),
+    false = lists:keymember(dir, 1, TestOpts2),
+    false = lists:keymember(group, 1, TestOpts2),
+    false = lists:keymember(testcase, 1, TestOpts2),
+
+    ok.
 
 %% helper for generating test data
 test_suite(Name) ->
