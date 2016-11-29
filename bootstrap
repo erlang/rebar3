@@ -99,8 +99,9 @@ fetch({pkg, Name, Vsn}, App) ->
                 {ok, Binary} ->
                     {ok, Contents} = extract(Binary),
                     ok = erl_tar:extract({binary, Contents}, [{cwd, Dir}, compressed]);
-                _ ->
-                    io:format("Error: Unable to fetch package ~p ~p~n", [Name, Vsn])
+                {error, {Reason, _}} ->
+                    ReasonText = re:replace(atom_to_list(Reason), "_", " ", [global,{return,list}]),
+                    io:format("Error: Unable to fetch package ~s ~s: ~s~n", [Name, Vsn, ReasonText])
             end;
         true ->
             io:format("Dependency ~s already exists~n", [Name])
@@ -112,8 +113,10 @@ extract(Binary) ->
     {ok, Contents}.
 
 request(Url) ->
+    HttpOptions = [{relaxed, true} | get_proxy_auth()],
+
     case httpc:request(get, {Url, []},
-                       [{relaxed, true}],
+                       HttpOptions,
                        [{body_format, binary}],
                        rebar) of
         {ok, {{_Version, 200, _Reason}, _Headers, Body}} ->
@@ -402,3 +405,23 @@ otp_release1(Rel) ->
                     binary:bin_to_list(Vsn, {0, Size - 1})
             end
     end.
+
+%% extracts username and password from HTTPS_PROXY and returns them as tuple
+get_proxy_auth() ->
+    get_proxy_auth(get_http_vars(https_proxy)).
+
+get_proxy_auth([]) ->
+    [];
+get_proxy_auth(HttpsProxy) ->
+    {ok, {_, UserInfo, _, _, _, _}} = http_uri:parse(HttpsProxy),
+    parse_user_info(UserInfo).
+
+parse_user_info([]) ->
+    [];
+parse_user_info(UserInfo) ->    
+    Idx = string:chr(UserInfo, $:), 
+    Username = string:sub_string(UserInfo, 1, Idx-1),
+    Password = string:sub_string(UserInfo, Idx+1),
+    %% password may contain url encoded characters, need to decode them first
+    [{proxy_auth, {Username, http_uri:decode(Password)}}].
+
