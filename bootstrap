@@ -150,8 +150,9 @@ set_httpc_options(_, []) ->
     ok;
 
 set_httpc_options(Scheme, Proxy) ->
-    {ok, {_, _, Host, Port, _, _}} = http_uri:parse(Proxy),
-    httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar).
+    {ok, {_, UserInfo, Host, Port, _, _}} = http_uri:parse(Proxy),
+    httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar),
+    set_proxy_auth(UserInfo).
 
 compile(App, FirstFiles) ->
     Dir = filename:join(filename:absname("_build/default/lib/"), App),
@@ -406,22 +407,18 @@ otp_release1(Rel) ->
             end
     end.
 
-%% extracts username and password from HTTPS_PROXY and returns them as tuple
-get_proxy_auth() ->
-    get_proxy_auth(get_http_vars(https_proxy)).
-
-get_proxy_auth([]) ->
-    [];
-get_proxy_auth(HttpsProxy) ->
-    {ok, {_, UserInfo, _, _, _, _}} = http_uri:parse(HttpsProxy),
-    parse_user_info(UserInfo).
-
-parse_user_info([]) ->
-    [];
-parse_user_info(UserInfo) ->    
+set_proxy_auth([]) ->
+    ok;
+set_proxy_auth(UserInfo) ->
     Idx = string:chr(UserInfo, $:), 
     Username = string:sub_string(UserInfo, 1, Idx-1),
     Password = string:sub_string(UserInfo, Idx+1),
     %% password may contain url encoded characters, need to decode them first
-    [{proxy_auth, {Username, http_uri:decode(Password)}}].
+    put(proxy_auth, [{proxy_auth, {Username, http_uri:decode(Password)}}]).
+
+get_proxy_auth() ->
+    case get(proxy_auth) of
+        undefined -> [];
+        ProxyAuth -> ProxyAuth
+    end.
 

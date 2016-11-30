@@ -31,7 +31,8 @@
          nonblacklisted_otp_version/1,
          blacklisted_otp_version/1,
          sh_does_not_miss_messages/1,
-         tup_merge/1]).
+         tup_merge/1,
+         proxy_auth/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -46,7 +47,8 @@ end_per_testcase(_, _Config) ->
 all() ->
     [{group, args_to_tasks},
      sh_does_not_miss_messages,
-     tup_merge].
+     tup_merge,
+     proxy_auth].
 
 groups() ->
     [{args_to_tasks, [], [empty_arglist,
@@ -272,3 +274,15 @@ tup_merge(_Config) ->
          rebar_utils:tup_sort([{a,a},{a,a,a},a,{b,a,a},b,{z,a},{z,a,a},{b,a},z])
        )
     ).
+
+proxy_auth(_Config) ->
+	%% proxy auth with regular username/password
+	rebar_utils:set_proxy_auth("Username", "Password"),
+	?assertEqual([{proxy_auth, {"Username", "Password"}}],
+				 rebar_utils:get_proxy_auth()),
+	%% proxy auth with username missing and url encoded password
+	rebar_utils:set_proxy_auth("", "?!abc#$"),
+	?assertEqual([{proxy_auth, {"", "%3F!abc%23%24"}}],
+				 rebar_utils:get_proxy_auth()).
+	
+	

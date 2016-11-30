@@ -107,8 +107,10 @@ make_vsn(_) ->
     {error, "Replacing version of type pkg not supported."}.
 
 request(Url, ETag) ->
+    HttpOptions = [{ssl, ssl_opts(Url)}, {relaxed, true} | rebar_utils:get_proxy_auth()],
+
     case httpc:request(get, {Url, [{"if-none-match", ETag} || ETag =/= false]++[{"User-Agent", rebar_utils:user_agent()}]},
-                       [{ssl, ssl_opts(Url)}, {relaxed, true}],
+                       HttpOptions,
                        [{body_format, binary}],
                        rebar) of
         {ok, {{_Version, 200, _Reason}, Headers, Body}} ->
