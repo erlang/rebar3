@@ -281,8 +281,8 @@ proxy_auth(_Config) ->
 	?assertEqual([{proxy_auth, {"Username", "Password"}}],
 				 rebar_utils:get_proxy_auth()),
 	%% proxy auth with username missing and url encoded password
-	rebar_utils:set_proxy_auth(":?!abc#$"),
-	?assertEqual([{proxy_auth, {"", "%3F!abc%23%24"}}],
+	rebar_utils:set_proxy_auth(":%3F!abc%23%24"),
+	?assertEqual([{proxy_auth, {"", "?!abc#$"}}],
 				 rebar_utils:get_proxy_auth()).
 	
 	
