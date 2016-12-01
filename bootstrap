@@ -99,8 +99,9 @@ fetch({pkg, Name, Vsn}, App) ->
                 {ok, Binary} ->
                     {ok, Contents} = extract(Binary),
                     ok = erl_tar:extract({binary, Contents}, [{cwd, Dir}, compressed]);
-                _ ->
-                    io:format("Error: Unable to fetch package ~p ~p~n", [Name, Vsn])
+                {error, {Reason, _}} ->
+                    ReasonText = re:replace(atom_to_list(Reason), "_", " ", [global,{return,list}]),
+                    io:format("Error: Unable to fetch package ~s ~s: ~s~n", [Name, Vsn, ReasonText])
             end;
         true ->
             io:format("Dependency ~s already exists~n", [Name])
@@ -112,8 +113,10 @@ extract(Binary) ->
     {ok, Contents}.
 
 request(Url) ->
+    HttpOptions = [{relaxed, true} | get_proxy_auth()],
+
     case httpc:request(get, {Url, []},
-                       [{relaxed, true}],
+                       HttpOptions,
                        [{body_format, binary}],
                        rebar) of
         {ok, {{_Version, 200, _Reason}, _Headers, Body}} ->
@@ -147,8 +150,9 @@ set_httpc_options(_, []) ->
     ok;
 
 set_httpc_options(Scheme, Proxy) ->
-    {ok, {_, _, Host, Port, _, _}} = http_uri:parse(Proxy),
-    httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar).
+    {ok, {_, UserInfo, Host, Port, _, _}} = http_uri:parse(Proxy),
+    httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar),
+    set_proxy_auth(UserInfo).
 
 compile(App, FirstFiles) ->
     Dir = filename:join(filename:absname("_build/default/lib/"), App),
@@ -402,3 +406,19 @@ otp_release1(Rel) ->
                     binary:bin_to_list(Vsn, {0, Size - 1})
             end
     end.
+
+set_proxy_auth([]) ->
+    ok;
+set_proxy_auth(UserInfo) ->
+    Idx = string:chr(UserInfo, $:), 
+    Username = string:sub_string(UserInfo, 1, Idx-1),
+    Password = string:sub_string(UserInfo, Idx+1),
+    %% password may contain url encoded characters, need to decode them first
+    put(proxy_auth, [{proxy_auth, {Username, http_uri:decode(Password)}}]).
+
+get_proxy_auth() ->
+    case get(proxy_auth) of
+        undefined -> [];
+        ProxyAuth -> ProxyAuth
+    end.
+

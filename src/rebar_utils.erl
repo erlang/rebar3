@@ -70,7 +70,9 @@
          info_useless/2,
          list_dir/1,
          user_agent/0,
-         reread_config/1]).
+         reread_config/1,
+         get_proxy_auth/0]).
+
 
 %% for internal use only
 -export([otp_release/0]).
@@ -825,8 +827,9 @@ set_httpc_options(_, []) ->
     ok;
 
 set_httpc_options(Scheme, Proxy) ->
-    {ok, {_, _, Host, Port, _, _}} = http_uri:parse(Proxy),
-    httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar).
+    {ok, {_, UserInfo, Host, Port, _, _}} = http_uri:parse(Proxy),
+    httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar),
+    set_proxy_auth(UserInfo).
 
 url_append_path(Url, ExtraPath) ->
      case http_uri:parse(Url) of
@@ -864,4 +867,19 @@ list_dir(Dir) ->
     case erlang:function_exported(file, list_dir_all, 1) of
         true  -> file:list_dir_all(Dir);
         false -> file:list_dir(Dir)
+    end.
+
+set_proxy_auth([]) ->
+    ok;
+set_proxy_auth(UserInfo) ->
+    Idx = string:chr(UserInfo, $:), 
+    Username = string:sub_string(UserInfo, 1, Idx-1),
+    Password = string:sub_string(UserInfo, Idx+1),
+    %% password may contain url encoded characters, need to decode them first
+    application:set_env(rebar, proxy_auth, [{proxy_auth, {Username, http_uri:decode(Password)}}]).
+
+get_proxy_auth() ->
+    case application:get_env(rebar, proxy_auth) of
+        undefined -> [];
+        {ok, ProxyAuth} -> ProxyAuth
     end.

@@ -145,6 +145,8 @@ run_aux(State, RawArgs) ->
     rebar_core:init_command(rebar_state:command_args(State10, Args), Task).
 
 init_config() ->
+    rebar_utils:set_httpc_options(),
+
     %% Initialize logging system
     Verbosity = log_level(),
     ok = rebar_log:init(command_line, Verbosity),
@@ -320,7 +322,6 @@ ensure_running(App, Caller) ->
     end.
 
 state_from_global_config(Config, GlobalConfigFile) ->
-    rebar_utils:set_httpc_options(),
     GlobalConfigTerms = rebar_config:consult_file(GlobalConfigFile),
     GlobalConfig = rebar_state:new(GlobalConfigTerms),
 
