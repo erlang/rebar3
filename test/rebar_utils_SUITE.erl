@@ -303,9 +303,9 @@ proxy_auth(_Config, ProxyEnvKey) ->
 				 rebar_utils:get_proxy_auth()),
 
 	%% restore original proxy specification if any
-	restore_proxy_env(OldProxySpec).
+	restore_proxy_env(ProxyEnvKey, OldProxySpec).
 
-restore_proxy_env(false) ->
+restore_proxy_env(_, false) ->
 	ok;
-restore_proxy_env(ProxySpec) ->
-	os:putenv("http_proxy", ProxySpec).	
+restore_proxy_env(ProxyEnvKey, ProxySpec) ->
+	os:putenv(ProxyEnvKey, ProxySpec).	
