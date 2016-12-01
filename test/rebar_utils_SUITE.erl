@@ -276,6 +276,9 @@ tup_merge(_Config) ->
     ).
 
 proxy_auth(_Config) ->
+	application:unset_env(rebar, proxy_auth),
+	%% proxy auth not set
+	?assertEqual([], rebar_utils:get_proxy_auth()),
 	%% proxy auth with regular username/password
 	rebar_utils:set_proxy_auth("Username:Password"),
 	?assertEqual([{proxy_auth, {"Username", "Password"}}],
