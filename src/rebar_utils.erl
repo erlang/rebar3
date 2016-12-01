@@ -71,8 +71,8 @@
          list_dir/1,
          user_agent/0,
          reread_config/1,
-         get_proxy_auth/0,
-         set_proxy_auth/1]).
+         get_proxy_auth/0]).
+
 
 %% for internal use only
 -export([otp_release/0]).

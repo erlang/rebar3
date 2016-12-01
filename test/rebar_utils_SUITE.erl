@@ -276,15 +276,20 @@ tup_merge(_Config) ->
     ).
 
 proxy_auth(_Config) ->
+	Host = "host:",
+	Port = "1234",
+
 	application:unset_env(rebar, proxy_auth),
 	%% proxy auth not set
 	?assertEqual([], rebar_utils:get_proxy_auth()),
 	%% proxy auth with regular username/password
-	rebar_utils:set_proxy_auth("Username:Password"),
+	os:putenv("http_proxy", "http://Username:Password@" ++ Host ++ Port),
+	rebar_utils:set_httpc_options(),
 	?assertEqual([{proxy_auth, {"Username", "Password"}}],
 				 rebar_utils:get_proxy_auth()),
 	%% proxy auth with username missing and url encoded password
-	rebar_utils:set_proxy_auth(":%3F!abc%23%24"),
+	os:putenv("http_proxy", "http://:%3F!abc%23%24@" ++ Host ++ Port),
+	rebar_utils:set_httpc_options(),
 	?assertEqual([{proxy_auth, {"", "?!abc#$"}}],
 				 rebar_utils:get_proxy_auth()).
 	
