@@ -276,13 +276,13 @@ tup_merge(_Config) ->
     ).
 
 proxy_auth(_Config) ->
-	Host = "host:",
-	Port = "1234",
-	
 	proxy_auth(_Config, "http_proxy"),
 	proxy_auth(_Config, "https_proxy").
 
 proxy_auth(_Config, ProxyEnvKey) ->
+	Host = "host:",
+	Port = "1234",
+
 	%% remember current proxy specification
 	OldProxySpec = os:getenv(ProxyEnvKey),
 
