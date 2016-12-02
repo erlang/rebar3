@@ -107,34 +107,80 @@ download(Dir, {git, Url, ""}, State) ->
     download(Dir, {git, Url, {branch, "master"}}, State);
 download(Dir, {git, Url, {branch, Branch}}, _State) ->
     ok = filelib:ensure_dir(Dir),
-    rebar_utils:sh(?FMT("git clone ~s ~s -b ~s --single-branch",
-                       [rebar_utils:escape_chars(Url),
-                        rebar_utils:escape_chars(filename:basename(Dir)),
-                        rebar_utils:escape_chars(Branch)]),
-                   [{cd, filename:dirname(Dir)}]);
+    git_clone(branch, git_vsn(), Url, Dir, Branch);
 download(Dir, {git, Url, {tag, Tag}}, _State) ->
     ok = filelib:ensure_dir(Dir),
-    rebar_utils:sh(?FMT("git clone ~s ~s -b ~s --single-branch",
-                       [rebar_utils:escape_chars(Url),
-                        rebar_utils:escape_chars(filename:basename(Dir)),
-                        rebar_utils:escape_chars(Tag)]),
-                   [{cd, filename:dirname(Dir)}]);
+    git_clone(tag, git_vsn(), Url, Dir, Tag);
 download(Dir, {git, Url, {ref, Ref}}, _State) ->
     ok = filelib:ensure_dir(Dir),
+    git_clone(ref, git_vsn(), Url, Dir, Ref);
+download(Dir, {git, Url, Rev}, _State) ->
+    ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
+    ok = filelib:ensure_dir(Dir),
+    git_clone(rev, git_vsn(), Url, Dir, Rev).
+
+%% Use different git clone commands depending on git --version
+git_clone(branch,Vsn,Url,Dir,Branch) when Vsn >= {1,7,10}; Vsn =:= undefined ->
+    rebar_utils:sh(?FMT("git clone ~s ~s -b ~s --single-branch",
+                        [rebar_utils:escape_chars(Url),
+                         rebar_utils:escape_chars(filename:basename(Dir)),
+                         rebar_utils:escape_chars(Branch)]),
+                   [{cd, filename:dirname(Dir)}]);
+git_clone(branch,_Vsn,Url,Dir,Branch) ->
+    rebar_utils:sh(?FMT("git clone ~s ~s -b ~s",
+                        [rebar_utils:escape_chars(Url),
+                         rebar_utils:escape_chars(filename:basename(Dir)),
+                         rebar_utils:escape_chars(Branch)]),
+                   [{cd, filename:dirname(Dir)}]);
+git_clone(tag,Vsn,Url,Dir,Tag) when Vsn >= {1,7,10}; Vsn =:= undefined ->
+    rebar_utils:sh(?FMT("git clone ~s ~s -b ~s --single-branch",
+                        [rebar_utils:escape_chars(Url),
+                         rebar_utils:escape_chars(filename:basename(Dir)),
+                         rebar_utils:escape_chars(Tag)]),
+                   [{cd, filename:dirname(Dir)}]);
+git_clone(tag,_Vsn,Url,Dir,Tag) ->
+    rebar_utils:sh(?FMT("git clone ~s ~s -b ~s",
+                        [rebar_utils:escape_chars(Url),
+                         rebar_utils:escape_chars(filename:basename(Dir)),
+                         rebar_utils:escape_chars(Tag)]),
+                   [{cd, filename:dirname(Dir)}]);
+git_clone(ref,_Vsn,Url,Dir,Ref) ->
     rebar_utils:sh(?FMT("git clone -n ~s ~s",
                         [rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]),
     rebar_utils:sh(?FMT("git checkout -q ~s", [Ref]), [{cd, Dir}]);
-download(Dir, {git, Url, Rev}, _State) ->
-    ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
-    ok = filelib:ensure_dir(Dir),
+git_clone(rev,_Vsn,Url,Dir,Rev) ->
     rebar_utils:sh(?FMT("git clone -n ~s ~s",
                         [rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]),
     rebar_utils:sh(?FMT("git checkout -q ~s", [rebar_utils:escape_chars(Rev)]),
                    [{cd, Dir}]).
+
+git_vsn() ->
+    case application:get_env(rebar, git_vsn) of
+        {ok, Vsn} -> Vsn;
+        undefined ->
+            Vsn = git_vsn_fetch(),
+            application:set_env(rebar, git_vsn, Vsn),
+            Vsn
+    end.
+
+git_vsn_fetch() ->
+    case rebar_utils:sh("git --version",[]) of
+        {ok, VsnStr} ->
+            case re:run(VsnStr, "git version\\h+(\\d)\\.(\\d)\\.(\\d).*",[{capture,[1,2,3],list}]) of
+                {match,[Maj,Min,Patch]} ->
+                    {list_to_integer(Maj),
+                     list_to_integer(Min),
+                     list_to_integer(Patch)};
+                nomatch ->
+                    undefined
+            end;
+        {error, _} ->
+            undefined
+    end.
 
 make_vsn(Dir) ->
     case collect_default_refcount(Dir) of
