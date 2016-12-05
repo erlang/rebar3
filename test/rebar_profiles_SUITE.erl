@@ -20,7 +20,12 @@
          test_profile_applied_at_completion/1,
          test_profile_applied_before_compile/1,
          test_profile_applied_before_eunit/1,
-         test_profile_applied_to_apps/1]).
+         test_profile_applied_to_apps/1,
+         test_profile_erl_opts_order_1/1,
+         test_profile_erl_opts_order_2/1,
+         test_profile_erl_opts_order_3/1,
+         test_profile_erl_opts_order_4/1,
+         test_profile_erl_opts_order_5/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -36,7 +41,12 @@ all() ->
      test_profile_applied_at_completion,
      test_profile_applied_before_compile,
      test_profile_applied_before_eunit,
-     test_profile_applied_to_apps].
+     test_profile_applied_to_apps,
+     test_profile_erl_opts_order_1,
+     test_profile_erl_opts_order_2,
+     test_profile_erl_opts_order_3,
+     test_profile_erl_opts_order_4,
+     test_profile_erl_opts_order_5].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -432,3 +442,93 @@ test_profile_applied_to_apps(Config) ->
         ErlOpts = dict:fetch(erl_opts, Opts),
         true = lists:member({d, 'TEST'}, ErlOpts)
     end, Apps).
+
+test_profile_erl_opts_order_1(Config) ->
+    Opts = get_compiled_profile_erl_opts([default], Config),
+    Opt = last_erl_opt(Opts, [warn_export_all, nowarn_export_all], undefined),
+    undefined = Opt.
+
+test_profile_erl_opts_order_2(Config) ->
+    Opts = get_compiled_profile_erl_opts([strict], Config),
+    Opt = last_erl_opt(Opts, [warn_export_all, nowarn_export_all], undefined),
+    warn_export_all = Opt.
+
+test_profile_erl_opts_order_3(Config) ->
+    Opts = get_compiled_profile_erl_opts([loose], Config),
+    Opt = last_erl_opt(Opts, [warn_export_all, nowarn_export_all], undefined),
+    nowarn_export_all = Opt.
+
+test_profile_erl_opts_order_4(Config) ->
+    Opts = get_compiled_profile_erl_opts([strict, loose], Config),
+    Opt = last_erl_opt(Opts, [warn_export_all, nowarn_export_all], undefined),
+    nowarn_export_all = Opt.
+
+test_profile_erl_opts_order_5(Config) ->
+    Opts = get_compiled_profile_erl_opts([loose, strict], Config),
+    Opt = last_erl_opt(Opts, [warn_export_all, nowarn_export_all], undefined),
+    warn_export_all = Opt.
+
+get_compiled_profile_erl_opts(Profiles, Config) ->
+    AppDir = ?config(apps, Config),
+    PStrs = [atom_to_list(P) || P <- Profiles],
+
+    Name = rebar_test_utils:create_random_name(
+        lists:flatten(["erl_opts_order_" | [[S, $_] || S <- PStrs]])),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [
+        {erl_opts, [warnings_as_errors, {d, profile_default}]},
+        {profiles, [
+            {strict, [{erl_opts, [warn_export_all, {d, profile_strict}]}]},
+            {loose, [{erl_opts, [nowarn_export_all, {d, profile_loose}]}]} ]}],
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+
+    Command = case Profiles of
+        [] ->
+            ["compile"];
+        [default] ->
+            ["compile"];
+        _ ->
+            ["as", string:join(PStrs, ","), "compile"]
+    end,
+    {ok, State} = rebar_test_utils:run_and_check(
+        Config, RebarConfig, Command, {ok, [{app, Name}]}),
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    Mod = list_to_atom(Name),
+    proplists:get_value(options, Mod:module_info(compile), []).
+
+% macro definitions get special handling
+last_erl_opt([{d, Macro} = Opt | Opts], Targets, Last) ->
+    case lists:any(erl_opt_macro_match_fun(Macro), Targets) of
+        true ->
+            last_erl_opt(Opts, Targets, Opt);
+        _ ->
+            last_erl_opt(Opts, Targets, Last)
+    end;
+last_erl_opt([{d, Macro, _} = Opt | Opts], Targets, Last) ->
+    case lists:any(erl_opt_macro_match_fun(Macro), Targets) of
+        true ->
+            last_erl_opt(Opts, Targets, Opt);
+        _ ->
+            last_erl_opt(Opts, Targets, Last)
+    end;
+last_erl_opt([Opt | Opts], Targets, Last) ->
+    case lists:member(Opt, Targets) of
+        true ->
+            last_erl_opt(Opts, Targets, Opt);
+        _ ->
+            last_erl_opt(Opts, Targets, Last)
+    end;
+last_erl_opt([], _, Last) ->
+    Last.
+
+erl_opt_macro_match_fun(Macro) ->
+    fun({d, M}) ->
+            M == Macro;
+        ({d, M, _}) ->
+            M == Macro;
+        (_) ->
+            false
+    end.
+
