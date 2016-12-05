@@ -101,41 +101,68 @@ merge_opts(Profile, NewOpts, OldOpts) ->
     end.
 
 merge_opts(NewOpts, OldOpts) ->
-    dict:merge(fun(deps, _NewValue, OldValue) ->
-                       OldValue;
-                  ({deps, _}, NewValue, _OldValue) ->
-                       NewValue;
-                  (plugins, NewValue, _OldValue) ->
-                       NewValue;
-                  ({plugins, _}, NewValue, _OldValue) ->
-                       NewValue;
-                  (profiles, NewValue, OldValue) ->
-                       dict:to_list(merge_opts(dict:from_list(NewValue), dict:from_list(OldValue)));
-                  (mib_first_files, Value, Value) ->
-                       Value;
-                  (mib_first_files, NewValue, OldValue) ->
-                       OldValue ++ NewValue;
-                  (relx, NewValue, OldValue) ->
-                       rebar_utils:tup_umerge(OldValue, NewValue);
-                  (_Key, NewValue, OldValue) when is_list(NewValue) ->
-                       case io_lib:printable_list(NewValue) of
-                           true when NewValue =:= [] ->
-                               case io_lib:printable_list(OldValue) of
-                                   true ->
-                                       NewValue;
-                                   false ->
-                                       OldValue
-                               end;
-                           true ->
-                               NewValue;
-                           false ->
-                               rebar_utils:tup_umerge(NewValue, OldValue)
-                       end;
-                  (_Key, NewValue, _OldValue) ->
-                       NewValue
-               end, NewOpts, OldOpts).
+    dict:merge(fun merge_opt/3, NewOpts, OldOpts).
 
 %% Internal functions
+
+%%
+%% Function for dict:merge/3 (in merge_opts/2) to merge options by priority.
+%%
+merge_opt(deps, _NewValue, OldValue) ->
+    OldValue;
+merge_opt({deps, _}, NewValue, _OldValue) ->
+    NewValue;
+merge_opt(plugins, NewValue, _OldValue) ->
+    NewValue;
+merge_opt({plugins, _}, NewValue, _OldValue) ->
+    NewValue;
+merge_opt(profiles, NewValue, OldValue) ->
+    dict:to_list(merge_opts(dict:from_list(NewValue), dict:from_list(OldValue)));
+merge_opt(mib_first_files, Value, Value) ->
+    Value;
+merge_opt(mib_first_files, NewValue, OldValue) ->
+    OldValue ++ NewValue;
+merge_opt(relx, NewValue, OldValue) ->
+    rebar_utils:tup_umerge(OldValue, NewValue);
+merge_opt(Key, NewValue, OldValue)
+    when Key == erl_opts; Key == eunit_compile_opts; Key == ct_compile_opts ->
+    merge_erl_opts(lists:reverse(OldValue), NewValue);
+merge_opt(_Key, NewValue, OldValue) when is_list(NewValue) ->
+    case io_lib:printable_list(NewValue) of
+        true when NewValue =:= [] ->
+            case io_lib:printable_list(OldValue) of
+                true ->
+                    NewValue;
+                false ->
+                    OldValue
+            end;
+        true ->
+            NewValue;
+        false ->
+            rebar_utils:tup_umerge(NewValue, OldValue)
+    end;
+merge_opt(_Key, NewValue, _OldValue) ->
+    NewValue.
+
+%%
+%% Merge Erlang compiler options such that the result
+%%  a)  Doesn't contain duplicates.
+%%  b)  Resulting options are ordered by increasing precedence as expected by
+%%      the compiler.
+%% The first parameter is the lower precedence options, in reverse order, to
+%% be merged with the higher-precedence options in the second parameter.
+%%
+merge_erl_opts([Opt | Opts], []) ->
+    merge_erl_opts(Opts, [Opt]);
+merge_erl_opts([Opt | Opts], Merged) ->
+    case lists:member(Opt, Merged) of
+        true ->
+            merge_erl_opts(Opts, Merged);
+        _ ->
+            merge_erl_opts(Opts, [Opt | Merged])
+    end;
+merge_erl_opts([], Merged) ->
+    Merged.
 
 %%
 %% Filter a list of erl_opts platform_define options such that only
