@@ -48,7 +48,7 @@
 -type compile_opt() :: {recursive, boolean()}.
 
 -define(DEFAULT_OUTDIR, "ebin").
--define(RE_PREFIX, "^[^._]").
+-define(RE_PREFIX, "^(?!._)").
 
 %% ===================================================================
 %% Public API
