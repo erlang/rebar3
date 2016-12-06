@@ -54,7 +54,7 @@ run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
 run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
     Compile3Fn, Opts) ->
     %% Convert simple extension to proper regex
-    SourceExtRe = "^[^._].*\\" ++ SourceExt ++ [$$],
+    SourceExtRe = "^(?!._).*\\" ++ SourceExt ++ [$$],
 
     Recursive = proplists:get_value(recursive, Opts, true),
     %% Find all possible source files

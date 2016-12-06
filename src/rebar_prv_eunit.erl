@@ -18,7 +18,7 @@
 %% we need to modify app_info state before compile
 -define(DEPS, [lock]).
 
--define(DEFAULT_TEST_REGEX, "^[^._].*\\.erl\$").
+-define(DEFAULT_TEST_REGEX, "^(?!._).*\\.erl\$").
 
 %% ===================================================================
 %% Public API
