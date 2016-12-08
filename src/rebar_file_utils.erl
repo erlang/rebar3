@@ -74,10 +74,13 @@ consult_config(State, Filename) ->
     end,
     JoinedConfig = lists:flatmap(
         fun (SubConfig) when is_list(SubConfig) ->
-            case lists:suffix(".config", SubConfig) of
+            %% Backwards compatibility :(
+            [Entries] = case lists:suffix(".config", SubConfig) of
                 false -> consult_config(State, SubConfig ++ ".config");
                 true -> consult_config(State, SubConfig)
-            end;
+            end,
+            Entries;
+
             (Entry) -> [Entry]
       end, Config),
     %% Backwards compatibility
