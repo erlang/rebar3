@@ -429,9 +429,9 @@ test_dirs(State, Apps, Opts) ->
                     set_compile_dirs(State, Apps, join(Suites, Dir));
                 {_Suites, _Dirs}    -> {error, "Only a single directory may be specified when specifying suites"}
             end;
-        _Specs ->
-            %% Currently not adding any directories from the spec files.
-            {ok, rebar_state:project_apps(State, Apps)}
+        Specs ->
+            set_compile_dirs(State, Apps, {spec, Specs})
+
     end.
 
 join(Suite, Dir) when is_integer(hd(Suite)) ->
@@ -451,15 +451,15 @@ set_compile_dirs(State, Apps, {dir, Dirs}) ->
     F = fun(Dir, {S, A}) -> maybe_inject_test_dir(S, [], A, Dir) end,
     {NewState, NewApps} = lists:foldl(F, {State, Apps}, Dirs),
     {ok, rebar_state:project_apps(NewState, NewApps)};
-set_compile_dirs(State, Apps, {suite, Suites}) ->
-    %% suites with dir component
-    Dirs = find_suite_dirs(Suites),
+set_compile_dirs(State, Apps, {Type, Files}) when Type==spec; Type==suite ->
+    %% specs or suites with dir component
+    Dirs = find_file_dirs(Files),
     F = fun(Dir, {S, A}) -> maybe_inject_test_dir(S, [], A, Dir) end,
     {NewState, NewApps} = lists:foldl(F, {State, Apps}, Dirs),
     {ok, rebar_state:project_apps(NewState, NewApps)}.
 
-find_suite_dirs(Suites) ->
-    AllDirs = lists:map(fun(S) -> filename:dirname(filename:absname(S)) end, Suites),
+find_file_dirs(Files) ->
+    AllDirs = lists:map(fun(F) -> filename:dirname(filename:absname(F)) end, Files),
     %% eliminate duplicates
     lists:usort(AllDirs).
 

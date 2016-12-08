@@ -1246,9 +1246,15 @@ testspec(Config) ->
     Name = rebar_test_utils:create_random_name("ct_testspec_"),
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
-    Spec = filename:join([AppDir, "test", "some.spec"]),
-    ok = filelib:ensure_dir(Spec),
-    ok = file:write_file(Spec, "[].\n"),
+    Spec1 = filename:join([AppDir, "test", "some.spec"]),
+    ok = filelib:ensure_dir(Spec1),
+    ok = file:write_file(Spec1, "[].\n"),
+    Spec2 = filename:join([AppDir, "specs", "another.spec"]),
+    ok = filelib:ensure_dir(Spec2),
+    ok = file:write_file(Spec2, "[].\n"),
+
+    {ok,Wd} = file:get_cwd(),
+    ok = file:set_cwd(AppDir),
 
     {ok, State} = rebar_test_utils:run_and_check(C,
                                                  [],
@@ -1263,7 +1269,21 @@ testspec(Config) ->
     {ok, GetOptResult1} = getopt:parse(GetOptSpec, ["--spec","test/some.spec"]),
     State1 = rebar_state:command_parsed_args(State, GetOptResult1),
     Tests1 = rebar_prv_common_test:prepare_tests(State1),
-    {ok, _} = rebar_prv_common_test:compile(State1, Tests1),
+    {ok, NewState1} = rebar_prv_common_test:compile(State1, Tests1),
+    [App1] = rebar_state:project_apps(NewState1),
+    ["test"] = rebar_dir:extra_src_dirs(rebar_app_info:opts(App1)),
+
+    {ok, GetOptResult2} = getopt:parse(GetOptSpec,
+                                       ["--spec","specs/another.spec"]),
+    State2 = rebar_state:command_parsed_args(State, GetOptResult2),
+    Tests2 = rebar_prv_common_test:prepare_tests(State2),
+    {ok, NewState2} = rebar_prv_common_test:compile(State1, Tests2),
+
+    [App2] = rebar_state:project_apps(NewState2),
+    ["specs","test"] =
+        lists:sort(rebar_dir:extra_src_dirs(rebar_app_info:opts(App2))),
+
+    ok = file:set_cwd(Wd),
 
     ok.
 
