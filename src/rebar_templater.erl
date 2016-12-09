@@ -33,7 +33,7 @@
 
 -include("rebar.hrl").
 
--define(TEMPLATE_RE, "^(?!._).*\\.template\$").
+-define(TEMPLATE_RE, "^(?!\\._).*\\.template\$").
 
 %% ===================================================================
 %% Public API
