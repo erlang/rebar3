@@ -1248,10 +1248,10 @@ testspec(Config) ->
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
     Spec1 = filename:join([AppDir, "test", "some.spec"]),
     ok = filelib:ensure_dir(Spec1),
-    ok = file:write_file(Spec1, "[].\n"),
+    ok = file:write_file(Spec1, "{suites,\".\",all}.\n"),
     Spec2 = filename:join([AppDir, "specs", "another.spec"]),
     ok = filelib:ensure_dir(Spec2),
-    ok = file:write_file(Spec2, "[].\n"),
+    ok = file:write_file(Spec2, "{suites,\"../test/\",all}.\n"),
 
     {ok,Wd} = file:get_cwd(),
     ok = file:set_cwd(AppDir),
@@ -1266,22 +1266,41 @@ testspec(Config) ->
     CommandProvider = providers:get_provider(ct, Providers, Namespace),
     GetOptSpec = providers:opts(CommandProvider),
 
+    %% Testspec in "test" directory
     {ok, GetOptResult1} = getopt:parse(GetOptSpec, ["--spec","test/some.spec"]),
     State1 = rebar_state:command_parsed_args(State, GetOptResult1),
     Tests1 = rebar_prv_common_test:prepare_tests(State1),
     {ok, NewState1} = rebar_prv_common_test:compile(State1, Tests1),
+    {ok, T1} = Tests1,
+    Opts1= rebar_prv_common_test:translate_paths(NewState1, T1),
+
+    %% check thath extra src dir is added
     [App1] = rebar_state:project_apps(NewState1),
     ["test"] = rebar_dir:extra_src_dirs(rebar_app_info:opts(App1)),
 
+    %% check that path is translated
+    ExpectedSpec1 = filename:join([AppDir, "_build", "test", "lib", Name,
+                                  "test", "some.spec"]),
+    [ExpectedSpec1] = proplists:get_value(spec, Opts1),
+
+
+    %% Testspec in directory other than "test"
     {ok, GetOptResult2} = getopt:parse(GetOptSpec,
                                        ["--spec","specs/another.spec"]),
     State2 = rebar_state:command_parsed_args(State, GetOptResult2),
-    Tests2 = rebar_prv_common_test:prepare_tests(State2),
-    {ok, NewState2} = rebar_prv_common_test:compile(State1, Tests2),
+    Tests2 = {ok, T2} =rebar_prv_common_test:prepare_tests(State2),
+    {ok, NewState2} = rebar_prv_common_test:compile(State2, Tests2),
+    Opts2= rebar_prv_common_test:translate_paths(NewState2, T2),
 
+    %% check thath extra src dirs are added
     [App2] = rebar_state:project_apps(NewState2),
     ["specs","test"] =
         lists:sort(rebar_dir:extra_src_dirs(rebar_app_info:opts(App2))),
+
+    %% check that paths are translated
+    ExpectedSpec2 = filename:join([AppDir, "_build", "test", "lib", Name,
+                                  "specs", "another.spec"]),
+    [ExpectedSpec2] = proplists:get_value(spec, Opts2),
 
     ok = file:set_cwd(Wd),
 

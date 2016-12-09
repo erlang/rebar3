@@ -513,44 +513,39 @@ inject_test_dir(Opts, Dir) ->
     rebar_opts:set(Opts, extra_src_dirs, ExtraSrcDirs ++ [Dir]).
 
 translate_paths(State, Opts) ->
-    case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
-        {_Suites, undefined} -> translate_suites(State, Opts, []);
-        {undefined, _Dirs}   -> translate_dirs(State, Opts, []);
-        %% both dirs and suites are defined, only translate dir paths
-        _                    -> translate_dirs(State, Opts, [])
+    case proplists:get_value(spec, Opts) of
+        undefined ->
+            case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
+                {_Suites, undefined} -> translate_paths(State, suite, Opts, []);
+                {undefined, _Dirs}   -> translate_paths(State, dir, Opts, []);
+                %% both dirs and suites are defined, only translate dir paths
+                _                    -> translate_paths(State, dir, Opts, [])
+            end;
+        _Specs ->
+            translate_paths(State, spec, Opts, [])
     end.
 
-translate_dirs(_State, [], Acc) -> lists:reverse(Acc);
-translate_dirs(State, [{dir, Dir}|Rest], Acc) when is_integer(hd(Dir)) ->
-    %% single dir
+translate_paths(_State, _Type, [], Acc) -> lists:reverse(Acc);
+translate_paths(State, Type, [{Type, Val}|Rest], Acc) when is_integer(hd(Val)) ->
+    %% single file or dir
+    translate_paths(State, Type, [{Type, [Val]}|Rest], Acc);
+translate_paths(State, dir, [{dir, Dirs}|Rest], Acc) ->
     Apps = rebar_state:project_apps(State),
-    translate_dirs(State, Rest, [{dir, translate(State, Apps, Dir)}|Acc]);
-translate_dirs(State, [{dir, Dirs}|Rest], Acc) ->
-    %% multiple dirs
+    New = {dir, lists:map(fun(Dir) -> translate(State, Apps, Dir) end, Dirs)},
+    translate_paths(State, dir, Rest, [New|Acc]);
+translate_paths(State, Type, [{Type, Files}|Rest], Acc) ->
+    %% Type = suites | specs
     Apps = rebar_state:project_apps(State),
-    NewDirs = {dir, lists:map(fun(Dir) -> translate(State, Apps, Dir) end, Dirs)},
-    translate_dirs(State, Rest, [NewDirs|Acc]);
-translate_dirs(State, [Test|Rest], Acc) ->
-    translate_dirs(State, Rest, [Test|Acc]).
+    New = {Type, lists:map(fun(File) -> translate_file(State, Apps, File) end, Files)},
+    translate_paths(State, Type, Rest, [New|Acc]);
+translate_paths(State, Type, [Test|Rest], Acc) ->
+    translate_paths(State, Type, Rest, [Test|Acc]).
 
-translate_suites(_State, [], Acc) -> lists:reverse(Acc);
-translate_suites(State, [{suite, Suite}|Rest], Acc) when is_integer(hd(Suite)) ->
-    %% single suite
-    Apps = rebar_state:project_apps(State),
-    translate_suites(State, Rest, [{suite, translate_suite(State, Apps, Suite)}|Acc]);
-translate_suites(State, [{suite, Suites}|Rest], Acc) ->
-    %% multiple suites
-    Apps = rebar_state:project_apps(State),
-    NewSuites = {suite, lists:map(fun(Suite) -> translate_suite(State, Apps, Suite) end, Suites)},
-    translate_suites(State, Rest, [NewSuites|Acc]);
-translate_suites(State, [Test|Rest], Acc) ->
-    translate_suites(State, Rest, [Test|Acc]).
-
-translate_suite(State, Apps, Suite) ->
-    Dirname = filename:dirname(Suite),
-    Basename = filename:basename(Suite),
+translate_file(State, Apps, File) ->
+    Dirname = filename:dirname(File),
+    Basename = filename:basename(File),
     case Dirname of
-        "." -> Suite;
+        "." -> File;
         _   -> filename:join([translate(State, Apps, Dirname), Basename])
     end.
 
