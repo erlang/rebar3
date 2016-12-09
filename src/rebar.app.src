@@ -52,6 +52,7 @@
                      rebar_prv_edoc,
                      rebar_prv_escriptize,
                      rebar_prv_eunit,
+                     rebar_prv_get_deps,
                      rebar_prv_help,
                      rebar_prv_install_deps,
                      rebar_prv_local_install,
