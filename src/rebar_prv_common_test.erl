@@ -529,25 +529,12 @@ translate_paths(_State, _Type, [], Acc) -> lists:reverse(Acc);
 translate_paths(State, Type, [{Type, Val}|Rest], Acc) when is_integer(hd(Val)) ->
     %% single file or dir
     translate_paths(State, Type, [{Type, [Val]}|Rest], Acc);
-translate_paths(State, dir, [{dir, Dirs}|Rest], Acc) ->
-    Apps = rebar_state:project_apps(State),
-    New = {dir, lists:map(fun(Dir) -> translate(State, Apps, Dir) end, Dirs)},
-    translate_paths(State, dir, Rest, [New|Acc]);
 translate_paths(State, Type, [{Type, Files}|Rest], Acc) ->
-    %% Type = suites | specs
     Apps = rebar_state:project_apps(State),
-    New = {Type, lists:map(fun(File) -> translate_file(State, Apps, File) end, Files)},
+    New = {Type, lists:map(fun(File) -> translate(State, Apps, File) end, Files)},
     translate_paths(State, Type, Rest, [New|Acc]);
 translate_paths(State, Type, [Test|Rest], Acc) ->
     translate_paths(State, Type, Rest, [Test|Acc]).
-
-translate_file(State, Apps, File) ->
-    Dirname = filename:dirname(File),
-    Basename = filename:basename(File),
-    case Dirname of
-        "." -> File;
-        _   -> filename:join([translate(State, Apps, Dirname), Basename])
-    end.
 
 translate(State, [App|Rest], Path) ->
     case rebar_file_utils:path_from_ancestor(Path, rebar_app_info:dir(App)) of

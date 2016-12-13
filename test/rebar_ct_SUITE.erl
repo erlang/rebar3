@@ -693,7 +693,33 @@ suite_at_root(Config) ->
     true = filelib:is_dir(DataDir),
 
     DataFile = filename:join([AppDir, "_build", "test", "extras", "root_SUITE_data", "some_data.txt"]),
-    true = filelib:is_file(DataFile).
+    true = filelib:is_file(DataFile),
+
+    %% Same test again, but using relative path to the suite from the
+    %% project root
+    {ok,Cwd} = file:get_cwd(),
+    ok = file:set_cwd(AppDir),
+    rebar_file_utils:rm_rf("_build"),
+
+    {ok, GetOptResult2} = getopt:parse(GetOptSpec, ["--suite=" ++ "root_SUITE"]),
+
+    State3 = rebar_state:command_parsed_args(State1, GetOptResult2),
+
+    Tests2 = rebar_prv_common_test:prepare_tests(State3),
+    {ok, NewState2} = rebar_prv_common_test:compile(State3, Tests2),
+    {ok, T2} = Tests2,
+    Opts2 = rebar_prv_common_test:translate_paths(NewState2, T2),
+
+    ok = file:set_cwd(Cwd),
+
+    Suite2 = proplists:get_value(suite, Opts2),
+    [Expected] = Suite2,
+    true = filelib:is_file(TestHrl),
+    true = filelib:is_file(TestBeam),
+    true = filelib:is_dir(DataDir),
+    true = filelib:is_file(DataFile),
+
+    ok.
 
 suite_at_app_root(Config) ->
     AppDir = ?config(apps, Config),
@@ -730,7 +756,32 @@ suite_at_app_root(Config) ->
     true = filelib:is_dir(DataDir),
 
     DataFile = filename:join([AppDir, "_build", "test", "lib", Name2, "app_root_SUITE_data", "some_data.txt"]),
-    true = filelib:is_file(DataFile).
+    true = filelib:is_file(DataFile),
+
+    %% Same test again using relative path to the suite from the project root
+    {ok,Cwd} = file:get_cwd(),
+    ok = file:set_cwd(AppDir),
+    rebar_file_utils:rm_rf("_build"),
+
+    {ok, GetOptResult2} = getopt:parse(GetOptSpec, ["--suite=" ++ filename:join(["apps", Name2, "app_root_SUITE"])]),
+
+    State3 = rebar_state:command_parsed_args(State1, GetOptResult2),
+
+    Tests2 = rebar_prv_common_test:prepare_tests(State3),
+    {ok, NewState2} = rebar_prv_common_test:compile(State3, Tests2),
+    {ok, T2} = Tests2,
+    Opts2 = rebar_prv_common_test:translate_paths(NewState2, T2),
+
+    ok = file:set_cwd(Cwd),
+
+    Suite2 = proplists:get_value(suite, Opts2),
+    [Expected] = Suite2,
+    true = filelib:is_file(TestHrl),
+    true = filelib:is_file(TestBeam),
+    true = filelib:is_dir(DataDir),
+    true = filelib:is_file(DataFile),
+
+    ok.
 
 %% this test probably only fails when this suite is run via rebar3 with the --cover flag
 data_dir_correct(Config) ->
