@@ -339,7 +339,7 @@ reread_config(State) ->
 boot_apps(Apps) ->
     ?WARN("The rebar3 shell is a development tool; to deploy "
             "applications in production, consider using releases "
-            "(http://www.rebar3.org/v3.0/docs/releases)", []),
+            "(http://www.rebar3.org/docs/releases)", []),
     Normalized = normalize_boot_apps(Apps),
     Res = [application:ensure_all_started(App) || App <- Normalized],
     _ = [?INFO("Booted ~p", [App])
