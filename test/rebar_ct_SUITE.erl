@@ -53,6 +53,7 @@
          misspecified_ct_compile_opts/1,
          misspecified_ct_first_files/1,
          testspec/1,
+         testspec_at_root/1,
          cmd_vs_cfg_opts/1]).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -71,6 +72,7 @@ all() -> [{group, basic_app},
           misspecified_ct_compile_opts,
           misspecified_ct_first_files,
           testspec,
+          testspec_at_root,
           cmd_vs_cfg_opts].
 
 groups() -> [{basic_app, [], [basic_app_default_dirs,
@@ -1302,7 +1304,9 @@ testspec(Config) ->
     ok = file:write_file(Spec1, "{suites,\".\",all}.\n"),
     Spec2 = filename:join([AppDir, "specs", "another.spec"]),
     ok = filelib:ensure_dir(Spec2),
-    ok = file:write_file(Spec2, "{suites,\"../test/\",all}.\n"),
+    Suites2 = filename:join([AppDir,"suites","*"]),
+    ok = filelib:ensure_dir(Suites2),
+    ok = file:write_file(Spec2, "{suites,\"../suites/\",all}.\n"),
 
     {ok,Wd} = file:get_cwd(),
     ok = file:set_cwd(AppDir),
@@ -1325,7 +1329,7 @@ testspec(Config) ->
     {ok, T1} = Tests1,
     Opts1= rebar_prv_common_test:translate_paths(NewState1, T1),
 
-    %% check thath extra src dir is added
+    %% check that extra src dir is added
     [App1] = rebar_state:project_apps(NewState1),
     ["test"] = rebar_dir:extra_src_dirs(rebar_app_info:opts(App1)),
 
@@ -1343,9 +1347,9 @@ testspec(Config) ->
     {ok, NewState2} = rebar_prv_common_test:compile(State2, Tests2),
     Opts2= rebar_prv_common_test:translate_paths(NewState2, T2),
 
-    %% check thath extra src dirs are added
+    %% check that extra src dirs are added
     [App2] = rebar_state:project_apps(NewState2),
-    ["specs","test"] =
+    ["specs","suites","test"] =
         lists:sort(rebar_dir:extra_src_dirs(rebar_app_info:opts(App2))),
 
     %% check that paths are translated
@@ -1354,6 +1358,97 @@ testspec(Config) ->
     [ExpectedSpec2] = proplists:get_value(spec, Opts2),
 
     ok = file:set_cwd(Wd),
+
+    ok.
+
+testspec_at_root(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "ct_testspec_at_root_"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name("ct_testspec_at_root_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    AppDir1 = filename:join([AppDir, "apps", Name]),
+    rebar_test_utils:create_app(AppDir1, Name, Vsn, [kernel, stdlib]),
+
+    Spec1 = filename:join([AppDir, "root.spec"]),
+    ok = filelib:ensure_dir(Spec1),
+    ok = file:write_file(Spec1, "{suites,\"test\",all}."),
+    Spec2 = filename:join([AppDir, "root1.spec"]),
+    ok = file:write_file(Spec2, "{suites,\".\",all}."),
+    Spec3 = filename:join([AppDir, "root2.spec"]),
+    ok = file:write_file(Spec3, "{suites,\"suites\",all}."),
+    Suite1 = filename:join(AppDir,"root_SUITE.erl"),
+    ok = file:write_file(Suite1, test_suite("root")),
+    Suite2 = filename:join([AppDir,"suites","test_SUITE.erl"]),
+    ok = filelib:ensure_dir(Suite2),
+    ok = file:write_file(Suite2, test_suite("test")),
+
+    {ok, State} = rebar_test_utils:run_and_check(C,
+                                                 [],
+                                                 ["as", "test", "lock"],
+                                                 return),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+
+    SpecArg1 = string:join([Spec1,Spec2,Spec3],","),
+    {ok, GetOptResult1} = getopt:parse(GetOptSpec, ["--spec",SpecArg1]),
+    State1 = rebar_state:command_parsed_args(State, GetOptResult1),
+    Tests1 = rebar_prv_common_test:prepare_tests(State1),
+    {ok, NewState1} = rebar_prv_common_test:compile(State1, Tests1),
+    {ok, T1} = Tests1,
+    Opts1= rebar_prv_common_test:translate_paths(NewState1, T1),
+
+    %% check that extra src dir is added
+    ExtraDir = filename:join([AppDir, "_build", "test", "extras"]),
+    [ExtraDir,"suites","test"] =
+        rebar_dir:extra_src_dirs(rebar_state:opts(NewState1)),
+
+    %% check that path is translated
+    ExpectedSpec1 = filename:join([AppDir, "_build", "test",
+                                   "extras", "root.spec"]),
+    ExpectedSpec2 = filename:join([AppDir, "_build", "test",
+                                   "extras", "root1.spec"]),
+    ExpectedSpec3 = filename:join([AppDir, "_build", "test",
+                                   "extras", "root2.spec"]),
+    [ExpectedSpec1,ExpectedSpec2,ExpectedSpec3] =
+        lists:sort(proplists:get_value(spec, Opts1)),
+
+    %% check that test specs are copied
+    [ExpectedSpec1,ExpectedSpec2,ExpectedSpec3] =
+        lists:sort(filelib:wildcard(filename:join([AppDir, "_build", "test",
+                                                   "extras", "*.spec"]))),
+
+    %% Same test again, using relative path
+    {ok,Cwd} = file:get_cwd(),
+    ok = file:set_cwd(AppDir),
+    ok = rebar_file_utils:rm_rf("_build"),
+
+    SpecArg2 = "root.spec,root1.spec,root2.spec",
+    {ok, GetOptResult2} = getopt:parse(GetOptSpec, ["--spec",SpecArg2]),
+    State2 = rebar_state:command_parsed_args(State, GetOptResult2),
+    Tests2 = rebar_prv_common_test:prepare_tests(State2),
+    {ok, NewState2} = rebar_prv_common_test:compile(State2, Tests2),
+    {ok, T2} = Tests2,
+    Opts2= rebar_prv_common_test:translate_paths(NewState2, T2),
+
+    %% check that extra src dir is added
+    [ExtraDir,"suites","test"] =
+        rebar_dir:extra_src_dirs(rebar_state:opts(NewState2)),
+
+    %% check that path is translated
+    [ExpectedSpec1,ExpectedSpec2,ExpectedSpec3] =
+        lists:sort(proplists:get_value(spec, Opts2)),
+
+    %% check that test specs are copied
+    [ExpectedSpec1,ExpectedSpec2,ExpectedSpec3] =
+        lists:sort(filelib:wildcard(filename:join([AppDir, "_build", "test",
+                                                   "extras", "root*.spec"]))),
+
+    ok = file:set_cwd(Cwd),
 
     ok.
 

@@ -429,9 +429,18 @@ test_dirs(State, Apps, Opts) ->
                     set_compile_dirs(State, Apps, join(Suites, Dir));
                 {_Suites, _Dirs}    -> {error, "Only a single directory may be specified when specifying suites"}
             end;
-        Specs ->
-            set_compile_dirs(State, Apps, {spec, Specs})
-
+        Specs0 ->
+            case get_dirs_from_specs(Specs0) of
+                {ok,{Specs,SuiteDirs}} ->
+                    {State1,Apps1} = set_compile_dirs1(State, Apps,
+                                                       {dir, SuiteDirs}),
+                    {State2,Apps2} = set_compile_dirs1(State1, Apps1,
+                                                       {spec, Specs}),
+                    [maybe_copy_spec(State2,Apps2,S) || S <- Specs],
+                    {ok, rebar_state:project_apps(State2, Apps2)};
+                Error ->
+                    Error
+            end
     end.
 
 join(Suite, Dir) when is_integer(hd(Suite)) ->
@@ -439,24 +448,25 @@ join(Suite, Dir) when is_integer(hd(Suite)) ->
 join(Suites, Dir) ->
     {suite, lists:map(fun(S) -> filename:join([Dir, S]) end, Suites)}.
 
-set_compile_dirs(State, Apps, {dir, Dir}) when is_integer(hd(Dir)) ->
+set_compile_dirs(State, Apps, What) ->
+    {NewState,NewApps} = set_compile_dirs1(State, Apps, What),
+    {ok, rebar_state:project_apps(NewState, NewApps)}.
+
+set_compile_dirs1(State, Apps, {dir, Dir}) when is_integer(hd(Dir)) ->
     %% single directory
     %% insert `Dir` into an app if relative, or the base state if not
     %% app relative but relative to the root or not at all if outside
     %% project scope
-    {NewState, NewApps} = maybe_inject_test_dir(State, [], Apps, Dir),
-    {ok, rebar_state:project_apps(NewState, NewApps)};
-set_compile_dirs(State, Apps, {dir, Dirs}) ->
+    maybe_inject_test_dir(State, [], Apps, Dir);
+set_compile_dirs1(State, Apps, {dir, Dirs}) ->
     %% multiple directories
     F = fun(Dir, {S, A}) -> maybe_inject_test_dir(S, [], A, Dir) end,
-    {NewState, NewApps} = lists:foldl(F, {State, Apps}, Dirs),
-    {ok, rebar_state:project_apps(NewState, NewApps)};
-set_compile_dirs(State, Apps, {Type, Files}) when Type==spec; Type==suite ->
+    lists:foldl(F, {State, Apps}, Dirs);
+set_compile_dirs1(State, Apps, {Type, Files}) when Type==spec; Type==suite ->
     %% specs or suites with dir component
     Dirs = find_file_dirs(Files),
     F = fun(Dir, {S, A}) -> maybe_inject_test_dir(S, [], A, Dir) end,
-    {NewState, NewApps} = lists:foldl(F, {State, Apps}, Dirs),
-    {ok, rebar_state:project_apps(NewState, NewApps)}.
+    lists:foldl(F, {State, Apps}, Dirs).
 
 find_file_dirs(Files) ->
     AllDirs = lists:map(fun(F) -> filename:dirname(filename:absname(F)) end, Files),
@@ -507,10 +517,57 @@ copy_bare_suites(From, To) ->
     ok = rebar_file_utils:cp_r(SrcFiles, To),
     rebar_file_utils:cp_r(DataDirs, To).
 
+maybe_copy_spec(State, [App|Apps], Spec) ->
+    case rebar_file_utils:path_from_ancestor(filename:dirname(Spec), rebar_app_info:dir(App)) of
+        {ok, []}   ->
+            ok = rebar_file_utils:cp_r([Spec],rebar_app_info:out_dir(App));
+        {ok,_} ->
+            ok;
+        {error,badparent} ->
+            maybe_copy_spec(State, Apps, Spec)
+    end;
+maybe_copy_spec(State, [], Spec) ->
+    case rebar_file_utils:path_from_ancestor(filename:dirname(Spec), rebar_state:dir(State)) of
+        {ok, []}   ->
+            ExtrasDir = filename:join([rebar_dir:base_dir(State), "extras"]),
+            ok = rebar_file_utils:cp_r([Spec],ExtrasDir);
+        _R ->
+            ok
+    end.
+
 inject_test_dir(Opts, Dir) ->
     %% append specified test targets to app defined `extra_src_dirs`
     ExtraSrcDirs = rebar_opts:get(Opts, extra_src_dirs, []),
     rebar_opts:set(Opts, extra_src_dirs, ExtraSrcDirs ++ [Dir]).
+
+get_dirs_from_specs(Specs) ->
+    case get_tests_from_specs(Specs) of
+        {ok,Tests} ->
+            {SpecLists,NodeRunSkipLists} = lists:unzip(Tests),
+            SpecList = lists:append(SpecLists),
+            NodeRunSkipList = lists:append(NodeRunSkipLists),
+            RunList = lists:append([R || {_,R,_} <- NodeRunSkipList]),
+            DirList = [element(1,R) || R <- RunList],
+            {ok,{SpecList,DirList}};
+        Error ->
+            Error
+    end.
+
+get_tests_from_specs(Specs) ->
+    case erlang:function_exported(ct_testspec,get_tests,1) of
+        true ->
+            ct_testspec:get_tests(Specs);
+        false ->
+            case ct_testspec:collect_tests_from_file(Specs,true) of
+                Tests when is_list(Tests) ->
+                    {ok,[{S,ct_testspec:prepare_tests(R)} || {S,R} <- Tests]};
+                R when is_tuple(R), element(1,R)==testspec ->
+                    %% R15
+                    {ok,[{Specs,ct_testspec:prepare_tests(R)}]};
+                Error ->
+                    Error
+            end
+    end.
 
 translate_paths(State, Opts) ->
     case proplists:get_value(spec, Opts) of
