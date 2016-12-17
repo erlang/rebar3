@@ -7,6 +7,9 @@
 %%%%%%%%%%%%%%%%%%
 %%% PUBLIC API %%%
 %%%%%%%%%%%%%%%%%%
+
+%% @doc allows to pick whether to use a short or long name, and
+%% starts the distributed mode for it.
 -spec either(Name::atom(), SName::atom(), Opts::[{setcookie,term()}]) -> atom().
 either(undefined, undefined, _) ->
     'nonode@nohost';
@@ -19,12 +22,18 @@ either(undefined, SName, Opts) ->
 either(_, _, _) ->
     ?ABORT("Cannot have both short and long node names defined", []).
 
+%% @doc starts a node with a short name.
+-spec short(SName::atom(), Opts::[{setcookie,term()}]) -> term().
 short(Name, Opts) ->
     start(Name, shortnames, Opts).
 
+%% @doc starts a node with a long name.
+-spec long(Name::atom(), Opts::[{setcookie,term()}]) -> term().
 long(Name, Opts) ->
     start(Name, longnames, Opts).
 
+%% @doc utility function to extract all distribution options
+%% from a rebar3 state tuple.
 -spec find_options(rebar_state:t()) -> {Long, Short, Opts} when
       Long :: atom(),
       Short :: atom(),

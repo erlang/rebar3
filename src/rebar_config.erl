@@ -125,9 +125,9 @@ write_lock_file(LockFile, Locks) ->
                                            format_attrs(Attrs)]))
     end.
 
-%% @private Attributes have a special formatting to ensure there's only one per
-%% line in terms of pkg_hash, so we disturb source diffing as little
-%% as possible.
+%% @private Because attributes for packages are fairly large, there is the need
+%% for a special formatting to ensure there's only one entry per lock file
+%% line and that diffs are generally stable.
 -spec format_attrs([term()]) -> iodata().
 format_attrs([]) -> [];
 format_attrs([{pkg_hash, Vals}|T]) ->

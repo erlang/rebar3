@@ -13,7 +13,9 @@
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
-%% @doc from the base directory, 
+%% @doc from the base directory, find all the applications
+%% at the top level and their dependencies based on the configuration
+%% and profile information.
 -spec do(rebar_state:t(), [file:filename()]) -> rebar_state:t().
 do(State, LibDirs) ->
     BaseDir = rebar_state:dir(State),
@@ -158,7 +160,7 @@ project_app_config(AppInfo, State) ->
     Opts = maybe_reset_hooks(Dir, rebar_state:opts(State), State),
     {C, rebar_state:opts(State, Opts)}.
 
-%% @doc Here we check if the app is at the root of the project.
+%% @private Check if the app is at the root of the project.
 %% If it is, then drop the hooks from the config so they aren't run twice
 -spec maybe_reset_hooks(file:filename(), Opts, rebar_state:t()) -> Opts when
       Opts :: rebar_dict().
