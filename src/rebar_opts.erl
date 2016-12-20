@@ -118,6 +118,10 @@ merge_opt({plugins, _}, NewValue, _OldValue) ->
     NewValue;
 merge_opt(profiles, NewValue, OldValue) ->
     dict:to_list(merge_opts(dict:from_list(NewValue), dict:from_list(OldValue)));
+merge_opt(erl_first_files, Value, Value) ->
+    Value;
+merge_opt(erl_first_files, NewValue, OldValue) ->
+    OldValue ++ NewValue;
 merge_opt(mib_first_files, Value, Value) ->
     Value;
 merge_opt(mib_first_files, NewValue, OldValue) ->
