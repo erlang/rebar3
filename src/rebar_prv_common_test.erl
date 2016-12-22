@@ -554,6 +554,7 @@ get_dirs_from_specs(Specs) ->
     end.
 
 get_tests_from_specs(Specs) ->
+    _ = ct_testspec:module_info(), % make sure ct_testspec is loaded
     case erlang:function_exported(ct_testspec,get_tests,1) of
         true ->
             ct_testspec:get_tests(Specs);
