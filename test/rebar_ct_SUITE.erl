@@ -54,6 +54,7 @@
          misspecified_ct_first_files/1,
          testspec/1,
          testspec_at_root/1,
+         testspec_parse_error/1,
          cmd_vs_cfg_opts/1]).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -73,6 +74,7 @@ all() -> [{group, basic_app},
           misspecified_ct_first_files,
           testspec,
           testspec_at_root,
+          testspec_parse_error,
           cmd_vs_cfg_opts].
 
 groups() -> [{basic_app, [], [basic_app_default_dirs,
@@ -1449,6 +1451,51 @@ testspec_at_root(Config) ->
                                                    "extras", "root*.spec"]))),
 
     ok = file:set_cwd(Cwd),
+
+    ok.
+
+testspec_parse_error(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "ct_testspec_error"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name("ct_testspec_error"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    Spec1 = filename:join([AppDir, "test", "nonexisting.spec"]),
+    Spec2 = filename:join([AppDir, "test", "some.spec"]),
+    ok = filelib:ensure_dir(Spec2),
+    ok = file:write_file(Spec2, ".\n"),
+
+    {ok, State} = rebar_test_utils:run_and_check(C,
+                                                 [],
+                                                 ["as", "test", "lock"],
+                                                 return),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+
+    %% Non existing testspec
+    {ok, GetOptResult1} = getopt:parse(GetOptSpec, ["--spec",Spec1]),
+    State1 = rebar_state:command_parsed_args(State, GetOptResult1),
+    Tests1 = rebar_prv_common_test:prepare_tests(State1),
+    {error,
+     {rebar_prv_common_test,
+      {error_reading_testspec,
+       {Spec1,"no such file or directory"}}}} =
+        rebar_prv_common_test:compile(State1, Tests1),
+
+    %% Syntax error
+    {ok, GetOptResult2} = getopt:parse(GetOptSpec, ["--spec",Spec2]),
+    State2 = rebar_state:command_parsed_args(State, GetOptResult2),
+    Tests2 = rebar_prv_common_test:prepare_tests(State2),
+    {error,
+     {rebar_prv_common_test,
+      {error_reading_testspec,
+       {Spec2,"1: syntax error before: '.'"}}}} =
+        rebar_prv_common_test:compile(State2, Tests2),
 
     ok.
 

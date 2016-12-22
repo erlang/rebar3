@@ -100,7 +100,9 @@ format_error({badconfig, Msg}) ->
     io_lib:format(Msg, []);
 format_error({multiple_errors, Errors}) ->
     io_lib:format(lists:concat(["Error running tests:"] ++
-                               lists:map(fun(Error) -> "~n  " ++ Error end, Errors)), []).
+                               lists:map(fun(Error) -> "~n  " ++ Error end, Errors)), []);
+format_error({error_reading_testspec, Reason}) ->
+    io_lib:format("Error reading testspec: ~p", [Reason]).
 
 %% ===================================================================
 %% Internal functions
@@ -549,8 +551,8 @@ get_dirs_from_specs(Specs) ->
             RunList = lists:append([R || {_,R,_} <- NodeRunSkipList]),
             DirList = [element(1,R) || R <- RunList],
             {ok,{SpecList,DirList}};
-        Error ->
-            Error
+        {error,Reason} ->
+            {error,{?MODULE,{error_reading_testspec,Reason}}}
     end.
 
 get_tests_from_specs(Specs) ->
