@@ -100,7 +100,9 @@ format_error({badconfig, Msg}) ->
     io_lib:format(Msg, []);
 format_error({multiple_errors, Errors}) ->
     io_lib:format(lists:concat(["Error running tests:"] ++
-                               lists:map(fun(Error) -> "~n  " ++ Error end, Errors)), []).
+                               lists:map(fun(Error) -> "~n  " ++ Error end, Errors)), []);
+format_error({error_reading_testspec, Reason}) ->
+    io_lib:format("Error reading testspec: ~p", [Reason]).
 
 %% ===================================================================
 %% Internal functions
@@ -227,19 +229,41 @@ select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
     rebar_utils:reread_config(Configs),
     code:set_path(OldPath),
 
-    Merged = lists:ukeymerge(1,
-                             lists:ukeysort(1, CmdOpts),
-                             lists:ukeysort(1, CfgOpts)),
-    %% make sure `dir` and/or `suite` from command line go in as
-    %% a pair overriding both `dir` and `suite` from config if
-    %% they exist
-    Opts = case {proplists:get_value(suite, CmdOpts), proplists:get_value(dir, CmdOpts)} of
-        {undefined, undefined} -> Merged;
-        {_Suite, undefined}    -> lists:keydelete(dir, 1, Merged);
-        {undefined, _Dir}      -> lists:keydelete(suite, 1, Merged);
-        {_Suite, _Dir}         -> Merged
-    end,
+    Opts = merge_opts(CmdOpts,CfgOpts),
     discover_tests(State, ProjectApps, Opts).
+
+%% Merge the option lists from command line and rebar.config:
+%%
+%% - Options set on the command line will replace the same options if
+%%   set in rebar.config.
+%%
+%% - Special care is taken with options that select which tests to
+%%   run - ANY such option on the command line will replace ALL such
+%%   options in the config.
+%%
+%%   Note that if 'spec' is given, common_test will ignore all 'dir',
+%%   'suite', 'group' and 'case', so there is no need to explicitly
+%%   remove any options from the command line.
+%%
+%%   All faulty combinations of options are also handled by
+%%   common_test and are not taken into account here.
+merge_opts(CmdOpts0, CfgOpts0) ->
+    TestSelectOpts = [spec,dir,suite,group,testcase],
+    CmdOpts = lists:ukeysort(1, CmdOpts0),
+    CfgOpts1 = lists:ukeysort(1, CfgOpts0),
+    CfgOpts = case is_any_defined(TestSelectOpts,CmdOpts) of
+                  false ->
+                      CfgOpts1;
+                  true ->
+                       [Opt || Opt={K,_} <- CfgOpts1,
+                               not lists:member(K,TestSelectOpts)]
+              end,
+    lists:ukeymerge(1, CmdOpts, CfgOpts).
+
+is_any_defined([Key|Keys],Opts) ->
+    proplists:is_defined(Key,Opts) orelse is_any_defined(Keys,Opts);
+is_any_defined([],_Opts) ->
+    false.
 
 sys_config_list(CmdOpts, CfgOpts) ->
     CmdSysConfigs = split_string(proplists:get_value(sys_config, CmdOpts, "")),
@@ -253,11 +277,10 @@ sys_config_list(CmdOpts, CfgOpts) ->
     end.
 
 discover_tests(State, ProjectApps, Opts) ->
-    case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
-        %% no dirs or suites defined, try using `$APP/test` and `$ROOT/test`
-        %%  as suites
-        {undefined, undefined} -> {ok, [default_tests(State, ProjectApps)|Opts]};
-        {_, _}                 -> {ok, Opts}
+    case is_any_defined([spec,dir,suite],Opts) of
+        %% no tests defined, try using `$APP/test` and `$ROOT/test` as dirs
+        false -> {ok, [default_tests(State, ProjectApps)|Opts]};
+        true  -> {ok, Opts}
     end.
 
 default_tests(State, ProjectApps) ->
@@ -397,14 +420,29 @@ readable(State) ->
     end.
 
 test_dirs(State, Apps, Opts) ->
-    case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
-        {Suites, undefined} -> set_compile_dirs(State, Apps, {suite, Suites});
-        {undefined, Dirs}   -> set_compile_dirs(State, Apps, {dir, Dirs});
-        {Suites, Dir} when is_integer(hd(Dir)) ->
-            set_compile_dirs(State, Apps, join(Suites, Dir));
-        {Suites, [Dir]} when is_integer(hd(Dir)) ->
-            set_compile_dirs(State, Apps, join(Suites, Dir));
-        {_Suites, _Dirs}    -> {error, "Only a single directory may be specified when specifying suites"}
+    case proplists:get_value(spec, Opts) of
+        undefined ->
+            case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
+                {Suites, undefined} -> set_compile_dirs(State, Apps, {suite, Suites});
+                {undefined, Dirs}   -> set_compile_dirs(State, Apps, {dir, Dirs});
+                {Suites, Dir} when is_integer(hd(Dir)) ->
+                    set_compile_dirs(State, Apps, join(Suites, Dir));
+                {Suites, [Dir]} when is_integer(hd(Dir)) ->
+                    set_compile_dirs(State, Apps, join(Suites, Dir));
+                {_Suites, _Dirs}    -> {error, "Only a single directory may be specified when specifying suites"}
+            end;
+        Specs0 ->
+            case get_dirs_from_specs(Specs0) of
+                {ok,{Specs,SuiteDirs}} ->
+                    {State1,Apps1} = set_compile_dirs1(State, Apps,
+                                                       {dir, SuiteDirs}),
+                    {State2,Apps2} = set_compile_dirs1(State1, Apps1,
+                                                       {spec, Specs}),
+                    [maybe_copy_spec(State2,Apps2,S) || S <- Specs],
+                    {ok, rebar_state:project_apps(State2, Apps2)};
+                Error ->
+                    Error
+            end
     end.
 
 join(Suite, Dir) when is_integer(hd(Suite)) ->
@@ -412,27 +450,28 @@ join(Suite, Dir) when is_integer(hd(Suite)) ->
 join(Suites, Dir) ->
     {suite, lists:map(fun(S) -> filename:join([Dir, S]) end, Suites)}.
 
-set_compile_dirs(State, Apps, {dir, Dir}) when is_integer(hd(Dir)) ->
+set_compile_dirs(State, Apps, What) ->
+    {NewState,NewApps} = set_compile_dirs1(State, Apps, What),
+    {ok, rebar_state:project_apps(NewState, NewApps)}.
+
+set_compile_dirs1(State, Apps, {dir, Dir}) when is_integer(hd(Dir)) ->
     %% single directory
     %% insert `Dir` into an app if relative, or the base state if not
     %% app relative but relative to the root or not at all if outside
     %% project scope
-    {NewState, NewApps} = maybe_inject_test_dir(State, [], Apps, Dir),
-    {ok, rebar_state:project_apps(NewState, NewApps)};
-set_compile_dirs(State, Apps, {dir, Dirs}) ->
+    maybe_inject_test_dir(State, [], Apps, Dir);
+set_compile_dirs1(State, Apps, {dir, Dirs}) ->
     %% multiple directories
     F = fun(Dir, {S, A}) -> maybe_inject_test_dir(S, [], A, Dir) end,
-    {NewState, NewApps} = lists:foldl(F, {State, Apps}, Dirs),
-    {ok, rebar_state:project_apps(NewState, NewApps)};
-set_compile_dirs(State, Apps, {suite, Suites}) ->
-    %% suites with dir component
-    Dirs = find_suite_dirs(Suites),
+    lists:foldl(F, {State, Apps}, Dirs);
+set_compile_dirs1(State, Apps, {Type, Files}) when Type==spec; Type==suite ->
+    %% specs or suites with dir component
+    Dirs = find_file_dirs(Files),
     F = fun(Dir, {S, A}) -> maybe_inject_test_dir(S, [], A, Dir) end,
-    {NewState, NewApps} = lists:foldl(F, {State, Apps}, Dirs),
-    {ok, rebar_state:project_apps(NewState, NewApps)}.
+    lists:foldl(F, {State, Apps}, Dirs).
 
-find_suite_dirs(Suites) ->
-    AllDirs = lists:map(fun(S) -> filename:dirname(filename:absname(S)) end, Suites),
+find_file_dirs(Files) ->
+    AllDirs = lists:map(fun(F) -> filename:dirname(filename:absname(F)) end, Files),
     %% eliminate duplicates
     lists:usort(AllDirs).
 
@@ -480,52 +519,82 @@ copy_bare_suites(From, To) ->
     ok = rebar_file_utils:cp_r(SrcFiles, To),
     rebar_file_utils:cp_r(DataDirs, To).
 
+maybe_copy_spec(State, [App|Apps], Spec) ->
+    case rebar_file_utils:path_from_ancestor(filename:dirname(Spec), rebar_app_info:dir(App)) of
+        {ok, []}   ->
+            ok = rebar_file_utils:cp_r([Spec],rebar_app_info:out_dir(App));
+        {ok,_} ->
+            ok;
+        {error,badparent} ->
+            maybe_copy_spec(State, Apps, Spec)
+    end;
+maybe_copy_spec(State, [], Spec) ->
+    case rebar_file_utils:path_from_ancestor(filename:dirname(Spec), rebar_state:dir(State)) of
+        {ok, []}   ->
+            ExtrasDir = filename:join([rebar_dir:base_dir(State), "extras"]),
+            ok = rebar_file_utils:cp_r([Spec],ExtrasDir);
+        _R ->
+            ok
+    end.
+
 inject_test_dir(Opts, Dir) ->
     %% append specified test targets to app defined `extra_src_dirs`
     ExtraSrcDirs = rebar_opts:get(Opts, extra_src_dirs, []),
     rebar_opts:set(Opts, extra_src_dirs, ExtraSrcDirs ++ [Dir]).
 
+get_dirs_from_specs(Specs) ->
+    case get_tests_from_specs(Specs) of
+        {ok,Tests} ->
+            {SpecLists,NodeRunSkipLists} = lists:unzip(Tests),
+            SpecList = lists:append(SpecLists),
+            NodeRunSkipList = lists:append(NodeRunSkipLists),
+            RunList = lists:append([R || {_,R,_} <- NodeRunSkipList]),
+            DirList = [element(1,R) || R <- RunList],
+            {ok,{SpecList,DirList}};
+        {error,Reason} ->
+            {error,{?MODULE,{error_reading_testspec,Reason}}}
+    end.
+
+get_tests_from_specs(Specs) ->
+    _ = ct_testspec:module_info(), % make sure ct_testspec is loaded
+    case erlang:function_exported(ct_testspec,get_tests,1) of
+        true ->
+            ct_testspec:get_tests(Specs);
+        false ->
+            case ct_testspec:collect_tests_from_file(Specs,true) of
+                Tests when is_list(Tests) ->
+                    {ok,[{S,ct_testspec:prepare_tests(R)} || {S,R} <- Tests]};
+                R when is_tuple(R), element(1,R)==testspec ->
+                    %% R15
+                    {ok,[{Specs,ct_testspec:prepare_tests(R)}]};
+                Error ->
+                    Error
+            end
+    end.
+
 translate_paths(State, Opts) ->
-    case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
-        {_Suites, undefined} -> translate_suites(State, Opts, []);
-        {undefined, _Dirs}   -> translate_dirs(State, Opts, []);
-        %% both dirs and suites are defined, only translate dir paths
-        _                    -> translate_dirs(State, Opts, [])
+    case proplists:get_value(spec, Opts) of
+        undefined ->
+            case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
+                {_Suites, undefined} -> translate_paths(State, suite, Opts, []);
+                {undefined, _Dirs}   -> translate_paths(State, dir, Opts, []);
+                %% both dirs and suites are defined, only translate dir paths
+                _                    -> translate_paths(State, dir, Opts, [])
+            end;
+        _Specs ->
+            translate_paths(State, spec, Opts, [])
     end.
 
-translate_dirs(_State, [], Acc) -> lists:reverse(Acc);
-translate_dirs(State, [{dir, Dir}|Rest], Acc) when is_integer(hd(Dir)) ->
-    %% single dir
+translate_paths(_State, _Type, [], Acc) -> lists:reverse(Acc);
+translate_paths(State, Type, [{Type, Val}|Rest], Acc) when is_integer(hd(Val)) ->
+    %% single file or dir
+    translate_paths(State, Type, [{Type, [Val]}|Rest], Acc);
+translate_paths(State, Type, [{Type, Files}|Rest], Acc) ->
     Apps = rebar_state:project_apps(State),
-    translate_dirs(State, Rest, [{dir, translate(State, Apps, Dir)}|Acc]);
-translate_dirs(State, [{dir, Dirs}|Rest], Acc) ->
-    %% multiple dirs
-    Apps = rebar_state:project_apps(State),
-    NewDirs = {dir, lists:map(fun(Dir) -> translate(State, Apps, Dir) end, Dirs)},
-    translate_dirs(State, Rest, [NewDirs|Acc]);
-translate_dirs(State, [Test|Rest], Acc) ->
-    translate_dirs(State, Rest, [Test|Acc]).
-
-translate_suites(_State, [], Acc) -> lists:reverse(Acc);
-translate_suites(State, [{suite, Suite}|Rest], Acc) when is_integer(hd(Suite)) ->
-    %% single suite
-    Apps = rebar_state:project_apps(State),
-    translate_suites(State, Rest, [{suite, translate_suite(State, Apps, Suite)}|Acc]);
-translate_suites(State, [{suite, Suites}|Rest], Acc) ->
-    %% multiple suites
-    Apps = rebar_state:project_apps(State),
-    NewSuites = {suite, lists:map(fun(Suite) -> translate_suite(State, Apps, Suite) end, Suites)},
-    translate_suites(State, Rest, [NewSuites|Acc]);
-translate_suites(State, [Test|Rest], Acc) ->
-    translate_suites(State, Rest, [Test|Acc]).
-
-translate_suite(State, Apps, Suite) ->
-    Dirname = filename:dirname(Suite),
-    Basename = filename:basename(Suite),
-    case Dirname of
-        "." -> Suite;
-        _   -> filename:join([translate(State, Apps, Dirname), Basename])
-    end.
+    New = {Type, lists:map(fun(File) -> translate(State, Apps, File) end, Files)},
+    translate_paths(State, Type, Rest, [New|Acc]);
+translate_paths(State, Type, [Test|Rest], Acc) ->
+    translate_paths(State, Type, Rest, [Test|Acc]).
 
 translate(State, [App|Rest], Path) ->
     case rebar_file_utils:path_from_ancestor(Path, rebar_app_info:dir(App)) of
