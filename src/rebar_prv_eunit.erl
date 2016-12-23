@@ -195,17 +195,18 @@ gather_src([Dir|Rest], Regex, Srcs) ->
     gather_src(Rest, Regex, Srcs ++ rebar_utils:find_files(Dir, Regex, true)).
 
 dedupe_tests({AppMods, TestMods}) ->
+    UniqueTestMods = lists:usort(TestMods) -- AppMods,
     %% for each modules in TestMods create a test if there is not a module
     %% in AppMods that will trigger it
-    F = fun(Mod) ->
-        M = filename:rootname(filename:basename(Mod)),
-        MatchesTest = fun(Dir) -> filename:rootname(filename:basename(Dir)) ++ "_tests" == M end,
+    F = fun(TestMod) ->
+        M = filename:rootname(filename:basename(TestMod)),
+        MatchesTest = fun(AppMod) -> filename:rootname(filename:basename(AppMod)) ++ "_tests" == M end,
         case lists:any(MatchesTest, AppMods) of
             false -> {true, {module, list_to_atom(M)}};
             true  -> false
         end
     end,
-    lists:usort(rebar_utils:filtermap(F, TestMods)).
+    rebar_utils:filtermap(F, UniqueTestMods).
 
 inject_eunit_state(State, {ok, Tests}) ->
     Apps = rebar_state:project_apps(State),
