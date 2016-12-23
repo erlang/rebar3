@@ -44,10 +44,14 @@
 %% Public API
 %% ===================================================================
 
+%% @doc finds the proper app info record for a given app name in a list of
+%% such records.
 -spec find(binary(), [rebar_app_info:t()]) -> {ok, rebar_app_info:t()} | error.
 find(Name, Apps) ->
     ec_lists:find(fun(App) -> rebar_app_info:name(App) =:= Name end, Apps).
 
+%% @doc finds the proper app info record for a given app name at a given version
+%% in a list of such records.
 -spec find(binary(), binary(), [rebar_app_info:t()]) -> {ok, rebar_app_info:t()} | error.
 find(Name, Vsn, Apps) ->
     ec_lists:find(fun(App) ->
@@ -55,11 +59,18 @@ find(Name, Vsn, Apps) ->
                               andalso rebar_app_info:original_vsn(App) =:= Vsn
                   end, Apps).
 
+%% @doc checks if a given file is .app.src file
 is_app_src(Filename) ->
     %% If removing the extension .app.src yields a shorter name,
     %% this is an .app.src file.
     Filename =/= filename:rootname(Filename, ".app.src").
 
+%% @doc translates the name of the .app.src[.script] file to where
+%% its .app counterpart should be stored.
+-spec app_src_to_app(OutDir, SrcFilename) -> OutFilename when
+      OutDir :: file:filename(),
+      SrcFilename :: file:filename(),
+      OutFilename :: file:filename().
 app_src_to_app(OutDir, Filename) ->
     AppFile =
         case lists:suffix(".app.src", Filename) of
@@ -72,10 +83,16 @@ app_src_to_app(OutDir, Filename) ->
     filelib:ensure_dir(AppFile),
     AppFile.
 
+%% @doc checks whether the .app file has all the required data to be valid,
+%% and cross-references it with compiled modules on disk
 -spec validate_application_info(rebar_app_info:t()) -> boolean().
 validate_application_info(AppInfo) ->
     validate_application_info(AppInfo, rebar_app_info:app_details(AppInfo)).
 
+%% @doc checks whether the .app file has all the required data to be valid
+%% and cross-references it with compiled modules on disk.
+%% The app info is passed explicitly as a second argument.
+-spec validate_application_info(rebar_app_info:t(), list()) -> boolean().
 validate_application_info(AppInfo, AppDetail) ->
     EbinDir = rebar_app_info:ebin_dir(AppInfo),
     case rebar_app_info:app_file(AppInfo) of
@@ -90,13 +107,37 @@ validate_application_info(AppInfo, AppDetail) ->
             end
     end.
 
--spec parse_deps(binary(), list(), rebar_state:t(), list(), integer()) -> [rebar_app_info:t()].
+%% @doc parses all dependencies from the root of the project
+-spec parse_deps(Dir, Deps, State, Locks, Level) -> [rebar_app_info:t()] when
+      Dir :: file:filename(),
+      Deps :: [tuple() | atom() | binary()], % TODO: meta to source() | lock()
+      State :: rebar_state:t(),
+      Locks :: [tuple()], % TODO: meta to [lock()]
+      Level :: non_neg_integer().
 parse_deps(DepsDir, Deps, State, Locks, Level) ->
     parse_deps(root, DepsDir, Deps, State, Locks, Level).
 
+%% @doc runs `parse_dep/6' for a set of dependencies.
+-spec parse_deps(Parent, Dir, Deps, State, Locks, Level) -> [rebar_app_info:t()] when
+      Parent :: root | binary(),
+      Dir :: file:filename(),
+      Deps :: [tuple() | atom() | binary()], % TODO: meta to source() | lock()
+      State :: rebar_state:t(),
+      Locks :: [tuple()], % TODO: meta to [lock()]
+      Level :: non_neg_integer().
 parse_deps(Parent, DepsDir, Deps, State, Locks, Level) ->
     [parse_dep(Dep, Parent, DepsDir, State, Locks, Level) || Dep <- Deps].
 
+%% @doc for a given dep, return its app info record. The function
+%% also has to choose whether to define the dep from its immediate spec
+%% (if it is a newer thing) or from the locks specified in the lockfile.
+-spec parse_dep(Dep, Parent, Dir, State, Locks, Level) -> rebar_app_info:t() when
+      Dep :: tuple() | atom() | binary(), % TODO: meta to source() | lock()
+      Parent :: root | binary(),
+      Dir :: file:filename(),
+      State :: rebar_state:t(),
+      Locks :: [tuple()], % TODO: meta to [lock()]
+      Level :: non_neg_integer().
 parse_dep(Dep, Parent, DepsDir, State, Locks, Level) ->
     Name = case Dep of
                Dep when is_tuple(Dep) ->
@@ -117,6 +158,14 @@ parse_dep(Dep, Parent, DepsDir, State, Locks, Level) ->
             end
     end.
 
+%% @doc converts a dependency definition and a location for it on disk
+%% into an app info tuple representing it.
+-spec parse_dep(Parent, Dep, Dir, IsLock, State) -> rebar_app_info:t() when
+      Parent :: root | binary(),
+      Dep :: tuple() | atom() | binary(), % TODO: meta to source() | lock()
+      Dir :: file:filename(),
+      IsLock :: boolean(),
+      State :: rebar_state:t().
 parse_dep(Parent, {Name, Vsn, {pkg, PkgName}}, DepsDir, IsLock, State) ->
     {PkgName1, PkgVsn} = {ec_cnv:to_binary(PkgName), ec_cnv:to_binary(Vsn)},
     dep_to_app(Parent, DepsDir, Name, PkgVsn, {pkg, PkgName1, PkgVsn, undefined}, IsLock, State);
@@ -152,6 +201,16 @@ parse_dep(Parent, {Name, Source, Level}, DepsDir, IsLock, State) when is_tuple(S
 parse_dep(_, Dep, _, _, _) ->
     throw(?PRV_ERROR({parse_dep, Dep})).
 
+%% @doc convert a dependency that has just been fetched into
+%% an app info record related to it
+-spec dep_to_app(Parent, Dir, Name, Vsn, Source, IsLock, State) -> rebar_app_info:t() when
+      Parent :: root | binary(),
+      Dir :: file:filename(),
+      Name :: binary(),
+      Vsn :: iodata() | undefined,
+      Source :: tuple(),
+      IsLock :: boolean(),
+      State :: rebar_state:t().
 dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
     CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
     AppInfo = case rebar_app_info:discover(CheckoutsDir) of
@@ -166,7 +225,7 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
                                     not_found ->
                                         rebar_app_info:new(Parent, Name, Vsn, Dir, [])
                                 end,
-                            update_source(AppInfo0, Source, State)
+                                update_source(AppInfo0, Source, State)
                     end,
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
     AppInfo1 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
@@ -177,6 +236,11 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
     AppInfo5 = rebar_app_info:profiles(AppInfo4, [default]),
     rebar_app_info:is_lock(AppInfo5, IsLock).
 
+%% @doc sets the source for a given dependency or app along with metadata
+%% around version if required.
+-spec update_source(rebar_app_info:t(), Source, rebar_state:t()) ->
+    rebar_app_info:t() when
+      Source :: tuple() | atom() | binary(). % TODO: meta to source()
 update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
     {PkgName1, PkgVsn1} = case PkgVsn of
                               undefined ->
@@ -203,6 +267,9 @@ update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
 update_source(AppInfo, Source, _State) ->
     rebar_app_info:source(AppInfo, Source).
 
+%% @doc grab the checksum for a given package
+-spec fetch_checksum(atom(), string(), iodata() | undefined, rebar_state:t()) ->
+    iodata() | no_return().
 fetch_checksum(PkgName, PkgVsn, Hash, State) ->
     try
         rebar_packages:registry_checksum({pkg, PkgName, PkgVsn, Hash}, State)
@@ -213,6 +280,8 @@ fetch_checksum(PkgName, PkgVsn, Hash, State) ->
             rebar_packages:registry_checksum({pkg, PkgName, PkgVsn, Hash}, State)
     end.
 
+%% @doc convert a given exception's payload into an io description.
+-spec format_error(any()) -> iolist().
 format_error({missing_package, Package}) ->
     io_lib:format("Package not found in registry: ~s", [Package]);
 format_error({parse_dep, Dep}) ->
@@ -224,6 +293,10 @@ format_error(Error) ->
 %% Internal functions
 %% ===================================================================
 
+%% @private find the correct version of a package based on the version
+%% and name passed in.
+-spec get_package(binary(), binary() | string(), rebar_state:t()) ->
+    term() | no_return().
 get_package(Dep, Vsn, State) ->
     case rebar_packages:find_highest_matching(Dep, Vsn, ?PACKAGE_TABLE, State) of
         {ok, HighestDepVsn} ->
@@ -232,6 +305,8 @@ get_package(Dep, Vsn, State) ->
             throw(?PRV_ERROR({missing_package, ec_cnv:to_binary(Dep)}))
     end.
 
+%% @private checks that all the beam files have been properly
+%% created.
 -spec has_all_beams(file:filename_all(), [module()]) ->
     true | ?PRV_ERROR({missing_module, module()}).
 has_all_beams(EbinDir, [Module | ModuleList]) ->

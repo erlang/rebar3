@@ -1,3 +1,5 @@
+%%% @doc build a digraph of applications in order to figure out dependency
+%%% and compile order.
 -module(rebar_digraph).
 
 -export([compile_order/1
@@ -7,7 +9,9 @@
 
 -include("rebar.hrl").
 
-%% Sort apps with topological sort to get proper build order
+%% @doc Sort apps with topological sort to get proper build order
+-spec compile_order([rebar_app_info:t()]) ->
+    {ok, [rebar_app_info:t()]} | {error, no_sort | {cycles, [[binary(),...]]}}.
 compile_order(Apps) ->
     Graph = digraph:new(),
     lists:foreach(fun(App) ->
@@ -33,6 +37,11 @@ compile_order(Apps) ->
     true = digraph:delete(Graph),
     Order.
 
+%% @private Add a package and its dependencies to an existing digraph
+-spec add(digraph:graph(), {PkgName, [Dep]}) -> ok when
+      PkgName :: binary(),
+      Dep :: {Name, term()} | Name,
+      Name :: atom() | iodata().
 add(Graph, {PkgName, Deps}) ->
     case digraph:vertex(Graph, PkgName) of
         false ->
@@ -57,6 +66,8 @@ add(Graph, {PkgName, Deps}) ->
                           digraph:add_edge(Graph, V, V3)
                   end, Deps).
 
+%% @doc based on a list of vertices and edges, build a digraph.
+-spec restore_graph({[digraph:vertex()], [digraph:edge()]}) -> digraph:graph().
 restore_graph({Vs, Es}) ->
     Graph = digraph:new(),
     lists:foreach(fun({V, LastUpdated}) ->
@@ -67,6 +78,8 @@ restore_graph({Vs, Es}) ->
                   end, Es),
     Graph.
 
+%% @doc convert a given exception's payload into an io description.
+-spec format_error(any()) -> iolist().
 format_error(no_solution) ->
     io_lib:format("No solution for packages found.", []).
 
@@ -74,22 +87,27 @@ format_error(no_solution) ->
 %% Internal Functions
 %%====================================================================
 
+%% @doc alias for `digraph_utils:subgraph/2'.
 subgraph(Graph, Vertices) ->
     digraph_utils:subgraph(Graph, Vertices).
 
+%% @private from a list of app names, fetch the proper app info records
+%% for them.
 -spec names_to_apps([atom()], [rebar_app_info:t()]) -> [rebar_app_info:t()].
 names_to_apps(Names, Apps) ->
     [element(2, App) || App <- [find_app_by_name(Name, Apps) || Name <- Names], App =/= error].
 
+%% @private fetch the proper app info record for a given app name.
 -spec find_app_by_name(atom(), [rebar_app_info:t()]) -> {ok, rebar_app_info:t()} | error.
 find_app_by_name(Name, Apps) ->
     ec_lists:find(fun(App) ->
                           rebar_app_info:name(App) =:= Name
                   end, Apps).
 
-%% The union of all entries in the applications list for an app and
+%% @private The union of all entries in the applications list for an app and
 %% the deps listed in its rebar.config is all deps that may be needed
 %% for building the app.
+-spec all_apps_deps(rebar_app_info:t()) -> [binary()].
 all_apps_deps(App) ->
     Applications = lists:usort([atom_to_binary(X, utf8) || X <- rebar_app_info:applications(App)]),
     Deps = lists:usort(lists:map(fun({Name, _}) -> Name; (Name) -> Name end, rebar_app_info:deps(App))),

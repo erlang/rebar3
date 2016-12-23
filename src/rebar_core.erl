@@ -24,6 +24,8 @@
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
+%% @doc Module providing core functionality about command dispatch, namespacing,
+%% and chaining for rebar3.
 -module(rebar_core).
 
 -export([init_command/2, process_namespace/2, process_command/2, do/2, format_error/1]).
@@ -31,6 +33,12 @@
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
+%% @doc initial command set up; based on the first fragment of the
+%% command, dispatch to special environments. The keywords for
+%% `do' and `as' are implicitly reserved here, barring them from
+%% being used as other commands or namespaces.
+-spec init_command(rebar_state:t(), atom()) ->
+    {ok, rebar_state:t()} | {error, term()}.
 init_command(State, do) ->
     process_command(rebar_state:namespace(State, default), do);
 init_command(State, as) ->
@@ -43,6 +51,14 @@ init_command(State, Command) ->
             {error, Reason}
     end.
 
+%% @doc parse the commands starting at the namespace level;
+%% a namespace is found if the first keyword to match is not
+%% belonging to an existing provider, and iff the keyword also
+%% matches a registered namespace.
+%% The command to run is returned last; for namespaces, some
+%% magic is done implicitly calling `do' as an indirect dispatcher.
+-spec process_namespace(rebar_state:t(), atom()) ->
+    {error, term()} | {ok, rebar_state:t(), atom()}.
 process_namespace(_State, as) ->
     {error, "Namespace 'as' is forbidden"};
 process_namespace(State, Command) ->
@@ -61,7 +77,15 @@ process_namespace(State, Command) ->
             {ok, rebar_state:namespace(State, default), Command}
     end.
 
--spec process_command(rebar_state:t(), atom()) -> {ok, rebar_state:t()} | {error, string()} | {error, {module(), any()}}.
+%% @doc Dispatches a given command based on the current state.
+%% This requires mapping a command name to a specific provider.
+%% `as' and `do' are still treated as special providers here.
+%% Basic profile application may also be run.
+%%
+%% The function also takes care of expanding a provider to its
+%% dependencies in the proper order.
+-spec process_command(rebar_state:t(), atom()) ->
+    {ok, rebar_state:t()} | {error, string()} | {error, {module(), any()}}.
 process_command(State, Command) ->
     %% ? rebar_prv_install_deps:setup_env(State),
     Providers = rebar_state:providers(State),
@@ -104,7 +128,11 @@ process_command(State, Command) ->
             end
     end.
 
--spec do([{atom(), atom()}], rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()} | {error, {module(), any()}}.
+%% @doc execute the selected providers. If a chain of providers
+%% has been returned, run them one after the other, while piping
+%% the state from the first into the next one.
+-spec do([{atom(), atom()}], rebar_state:t()) ->
+    {ok, rebar_state:t()} | {error, string()} | {error, {module(), any()}}.
 do([], State) ->
     {ok, State};
 do([ProviderName | Rest], State) ->
@@ -142,6 +170,8 @@ do([ProviderName | Rest], State) ->
             {error, ProviderName}
     end.
 
+%% @doc convert a given exception's payload into an io description.
+-spec format_error(any()) -> iolist().
 format_error({bad_provider_namespace, {Namespace, Name}}) ->
     io_lib:format("Undefined command ~s in namespace ~s", [Name, Namespace]);
 format_error({bad_provider_namespace, Name}) ->

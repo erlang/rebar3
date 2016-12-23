@@ -46,17 +46,25 @@
 %% Public API
 %% ===================================================================
 
+%% @doc reads the default config file.
 -spec consult() -> [any()].
 consult() ->
     consult_file(config_file()).
 
+%% @doc reads the default config file in a given directory.
 -spec consult(file:name()) -> [any()].
 consult(Dir) ->
     consult_file(filename:join(Dir, config_file())).
 
+%% @doc reads a given app file, including the `.script' variations,
+%% if any can be found.
+-spec consult_app_file(file:filename()) -> [any()].
 consult_app_file(File) ->
     consult_file_(File).
 
+%% @doc reads the lock file for the project, and re-formats its
+%% content to match the internals for rebar3.
+-spec consult_lock_file(file:filename()) -> [any()]. % TODO: refine lock()
 consult_lock_file(File) ->
     Terms = consult_file_(File),
     case Terms of
@@ -80,6 +88,11 @@ consult_lock_file(File) ->
             read_attrs(Vsn, Locks, Attrs)
     end.
 
+%% @private outputs a warning for a newer lockfile format than supported
+%% at most once.
+%% The warning can also be cancelled by configuring the `warn_config_vsn'
+%% OTP env variable.
+-spec warn_vsn_once() -> ok.
 warn_vsn_once() ->
     Warn = application:get_env(rebar, warn_config_vsn) =/= {ok, false},
     application:set_env(rebar, warn_config_vsn, false),
@@ -93,6 +106,11 @@ warn_vsn_once() ->
     end.
 
 
+%% @doc Converts the internal format for locks into the multi-version
+%% compatible one used within rebar3 lock files.
+%% @end
+%% TODO: refine type for lock()
+-spec write_lock_file(file:filename(), [any()]) -> ok | {error, term()}.
 write_lock_file(LockFile, Locks) ->
     {NewLocks, Attrs} = write_attrs(Locks),
     %% Write locks in the beta format, at least until it's been long
@@ -107,27 +125,41 @@ write_lock_file(LockFile, Locks) ->
                                            format_attrs(Attrs)]))
     end.
 
-%% Attributes have a special formatting to ensure there's only one per
-%% line in terms of pkg_hash, so we disturb source diffing as little
-%% as possible.
+%% @private Because attributes for packages are fairly large, there is the need
+%% for a special formatting to ensure there's only one entry per lock file
+%% line and that diffs are generally stable.
+-spec format_attrs([term()]) -> iodata().
 format_attrs([]) -> [];
 format_attrs([{pkg_hash, Vals}|T]) ->
     [io_lib:format("{pkg_hash,[~n",[]), format_hashes(Vals), "]}",
      maybe_comma(T) | format_attrs(T)].
 
+%% @private format hashing in order to disturb source diffing as little
+%% as possible
+-spec format_hashes([term()]) -> iodata().
 format_hashes([]) -> [];
 format_hashes([{Pkg,Hash}|T]) ->
     [" {", io_lib:format("~p",[Pkg]), ", ", io_lib:format("~p", [Hash]), "}",
      maybe_comma(T) | format_hashes(T)].
 
+%% @private add a comma if we're not done with the full list of terms
+%% to convert.
+-spec maybe_comma([term()]) -> iodata().
 maybe_comma([]) -> "";
 maybe_comma([_|_]) -> io_lib:format(",~n", []).
 
+%% @private extract attributes from the lock file and integrate them
+%% into the full-blow internal lock format
+%% @end
+%% TODO: refine typings for lock()
+-spec read_attrs(_, [any()], [any()]) -> [any()].
 read_attrs(_Vsn, Locks, Attrs) ->
     %% Beta copy does not know how to expand attributes, but
     %% is ready to support it.
     expand_locks(Locks, extract_pkg_hashes(Attrs)).
 
+%% @private extract the package hashes from lockfile attributes, if any.
+-spec extract_pkg_hashes(list()) -> [binary()].
 extract_pkg_hashes(Attrs) ->
     Props = case Attrs of
                 [First|_] -> First;
@@ -135,6 +167,11 @@ extract_pkg_hashes(Attrs) ->
             end,
     proplists:get_value(pkg_hash, Props, []).
 
+%% @private extract attributes from the lock file and integrate them
+%% into the full-blow internal lock format
+%% @end
+%% TODO: refine typings for lock()
+-spec expand_locks(list(), list()) -> list().
 expand_locks([], _Hashes) ->
     [];
 expand_locks([{Name, {pkg,PkgName,Vsn}, Lvl} | Locks], Hashes) ->
@@ -143,6 +180,9 @@ expand_locks([{Name, {pkg,PkgName,Vsn}, Lvl} | Locks], Hashes) ->
 expand_locks([Lock|Locks], Hashes) ->
     [Lock | expand_locks(Locks, Hashes)].
 
+%% @private split up extra attributes for locks out of the internal lock
+%% structure for backwards compatibility reasons
+-spec write_attrs(list()) -> {list(), list()}.
 write_attrs(Locks) ->
     %% No attribute known that needs to be taken out of the structure,
     %% just return terms as is.
@@ -152,6 +192,9 @@ write_attrs(Locks) ->
         _ -> {NewLocks, [{pkg_hash, lists:sort(Hashes)}]}
     end.
 
+%% @private split up extra attributes for locks out of the internal lock
+%% structure for backwards compatibility reasons
+-spec split_locks(list(), list(), [{_,binary()}]) -> {list(), list()}.
 split_locks([], Locks, Hashes) ->
     {lists:reverse(Locks), Hashes};
 split_locks([{Name, {pkg,PkgName,Vsn,undefined}, Lvl} | Locks], LAcc, HAcc) ->
@@ -161,11 +204,17 @@ split_locks([{Name, {pkg,PkgName,Vsn,Hash}, Lvl} | Locks], LAcc, HAcc) ->
 split_locks([Lock|Locks], LAcc, HAcc) ->
     split_locks(Locks, [Lock|LAcc], HAcc).
 
+%% @doc reads a given config file, including the `.script' variations,
+%% if any can be found, and asserts that the config format is in
+%% a key-value format.
+-spec consult_file(file:filename()) -> [{_,_}].
 consult_file(File) ->
     Terms = consult_file_(File),
     true = verify_config_format(Terms),
     Terms.
 
+%% @private reads a given file; if the file has a `.script'-postfixed
+%% counterpart, it is evaluated along with the original file.
 -spec consult_file_(file:name()) -> [any()].
 consult_file_(File) when is_binary(File) ->
     consult_file_(binary_to_list(File));
@@ -185,6 +234,9 @@ consult_file_(File) ->
             end
     end.
 
+%% @private checks that a list is in a key-value format.
+%% Raises an exception in any other case.
+-spec verify_config_format([{_,_}]) -> true.
 verify_config_format([]) ->
     true;
 verify_config_format([{_Key, _Value} | T]) ->
@@ -192,11 +244,14 @@ verify_config_format([{_Key, _Value} | T]) ->
 verify_config_format([Term | _]) ->
     throw(?PRV_ERROR({bad_config_format, Term})).
 
-%% no lockfile
+%% @doc takes an existing configuration and the content of a lockfile
+%% and merges the locks into the config.
+-spec merge_locks([{_,_}], list()) -> [{_,_}].
 merge_locks(Config, []) ->
+%% no lockfile
     Config;
-%% lockfile with entries
 merge_locks(Config, Locks) ->
+    %% lockfile with entries
     ConfigDeps = proplists:get_value(deps, Config, []),
     %% We want the top level deps only from the lock file.
     %% This ensures deterministic overrides for configs.
@@ -206,6 +261,8 @@ merge_locks(Config, Locks) ->
     NewDeps = find_newly_added(ConfigDeps, Locks),
     [{{locks, default}, Locks}, {{deps, default}, NewDeps++Deps} | Config].
 
+%% @doc convert a given exception's payload into an io description.
+-spec format_error(any()) -> iolist().
 format_error({bad_config_format, Term}) ->
     io_lib:format("Unable to parse config. Term is not in {Key, Value} format:~n~p", [Term]);
 format_error({bad_dep_name, Dep}) ->
@@ -215,6 +272,8 @@ format_error({bad_dep_name, Dep}) ->
 %% Internal functions
 %% ===================================================================
 
+%% @private consults a consult file, then executes its related script file
+%% with the data returned from the consult.
 -spec consult_and_eval(File::file:name_all(), Script::file:name_all()) ->
                               {ok, Terms::[term()]} |
                               {error, Reason::term()}.
@@ -234,18 +293,26 @@ consult_and_eval(File, Script) ->
             Error
     end.
 
+%% @private drops the .script extension from a filename.
+-spec remove_script_ext(file:filename()) -> file:filename().
 remove_script_ext(F) ->
     filename:rootname(F, ".script").
 
+%% @private sets up bindings for evaluations from a KV list.
+-spec bs([{_,_}]) -> erl_eval:binding_struct().
 bs(Vars) ->
     lists:foldl(fun({K,V}, Bs) ->
                         erl_eval:add_binding(K, V, Bs)
                 end, erl_eval:new_bindings(), Vars).
 
-%% Find deps that have been added to the config after the lock was created
+%% @private Find deps that have been added to the config after the lock was created
+-spec find_newly_added(list(), list()) -> list().
 find_newly_added(ConfigDeps, LockedDeps) ->
     [D || {true, D} <- [check_newly_added(Dep, LockedDeps) || Dep <- ConfigDeps]].
 
+%% @private checks if a given dependency is not within the lock file.
+%% TODO: refine types for dependencies
+-spec check_newly_added(term(), list()) -> false | {true, term()}.
 check_newly_added({_, _}=Dep, LockedDeps) ->
     check_newly_added_(Dep, LockedDeps);
 check_newly_added({_, _, {pkg, _}}=Dep, LockedDeps) ->
@@ -255,6 +322,10 @@ check_newly_added({Name, _, Source}, LockedDeps) ->
 check_newly_added(Dep, LockedDeps) ->
     check_newly_added_(Dep, LockedDeps).
 
+%% @private checks if a given dependency is not within the lock file.
+%% TODO: refine types for dependencies
+%% @end
+-spec check_newly_added_(term(), list()) -> false | {true, term()}.
 %% get [raw] deps out of the way
 check_newly_added_({Name, Source, Opts}, LockedDeps) when is_tuple(Source),
                                                           is_list(Opts) ->
@@ -306,6 +377,9 @@ check_newly_added_(Dep, LockedDeps) when is_atom(Dep) ->
 check_newly_added_(Dep, _) ->
     throw(?PRV_ERROR({bad_dep_name, Dep})).
 
+%% @private returns the name/path of the default config file, or its
+%% override from the OS ENV var `REBAR_CONFIG'.
+-spec config_file() -> file:filename().
 config_file() ->
     case os:getenv("REBAR_CONFIG") of
         false ->

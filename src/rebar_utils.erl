@@ -97,6 +97,12 @@ sort_deps(Deps) ->
 droplast(L) ->
     lists:reverse(tl(lists:reverse(L))).
 
+%% @doc filtermap takes in a function that is either or both
+%% a predicate and a map, and returns the matching and valid elements.
+-spec filtermap(F, [In]) -> [Out] when
+      F :: fun((In) -> boolean() | {true, Out}),
+      In :: term(),
+      Out :: term().
 filtermap(F, [Hd|Tail]) ->
     case F(Hd) of
         true ->
@@ -116,11 +122,16 @@ is_arch(ArchRegex) ->
             false
     end.
 
+%% @doc returns the sytem architecture, in strings like
+%% `"19.0.4-x86_64-unknown-linux-gnu-64"'.
+-spec get_arch() -> string().
 get_arch() ->
     Words = wordsize(),
     otp_release() ++ "-"
         ++ erlang:system_info(system_architecture) ++ "-" ++ Words.
 
+%% @doc returns the size of a word on the system, as a string
+-spec wordsize() -> string().
 wordsize() ->
     try erlang:system_info({wordsize, external}) of
         Val ->
@@ -504,11 +515,10 @@ patch_on_windows(Cmd, Env) ->
             Cmd
     end.
 
-%%
-%% Given env. variable FOO we want to expand all references to
-%% it in InStr. References can have two forms: $FOO and ${FOO}
-%% The end of form $FOO is delimited with whitespace or eol
-%%
+%% @doc Given env. variable `FOO' we want to expand all references to
+%% it in `InStr'. References can have two forms: `$FOO' and `${FOO}'
+%% The end of form `$FOO' is delimited with whitespace or EOL
+-spec expand_env_variable(string(), string(), term()) -> string().
 expand_env_variable(InStr, VarName, RawVarValue) ->
     case string:chr(InStr, $$) of
         0 ->
@@ -750,6 +760,9 @@ remove_from_code_path(Paths) ->
                           code:del_path(Path)
                   end, Paths).
 
+%% @doc Revert to only having the beams necessary for running rebar3 and
+%% plugins in the path
+-spec cleanup_code_path([string()]) -> true | {error, term()}.
 cleanup_code_path(OrigPath) ->
     CurrentPath = code:get_path(),
     AddedPaths = CurrentPath -- OrigPath,

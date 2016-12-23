@@ -101,6 +101,7 @@ do_(State) ->
             {error, Reason}
     end.
 
+%% @doc convert a given exception's payload into an io description.
 -spec format_error(any()) -> iolist().
 format_error({dep_app_not_found, AppDir, AppName}) ->
     io_lib:format("Dependency failure: Application ~s not found at the top level of directory ~s", [AppName, AppDir]);
@@ -125,8 +126,14 @@ format_error({cycles, Cycles}) ->
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
-%% Allows other providers to install deps in a given profile
+%% @doc Allows other providers to install deps in a given profile
 %% manually, outside of what is provided by rebar3's deps tuple.
+-spec handle_deps_as_profile(Profile, State, Deps, Upgrade) -> {Apps, State} when
+      Profile :: atom(),
+      State :: rebar_state:t(),
+      Deps :: [tuple() | atom() | binary()], % TODO: meta to source() | lock()
+      Upgrade :: boolean(),
+      Apps :: [rebar_app_info:t()].
 handle_deps_as_profile(Profile, State, Deps, Upgrade) ->
     Locks = [],
     Level = 0,

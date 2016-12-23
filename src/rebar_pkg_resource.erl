@@ -137,6 +137,9 @@ etag(Path) ->
             false
     end.
 
+%% @doc returns the SSL options adequate for the project based on
+%% its configuration, including for validation of certs.
+-spec ssl_opts(string()) -> [term()].
 ssl_opts(Url) ->
     case get_ssl_config() of
         ssl_verify_enabled ->
@@ -145,6 +148,9 @@ ssl_opts(Url) ->
             [{verify, verify_none}]
     end.
 
+%% @doc returns the SSL options adequate for the project based on
+%% its configuration, including for validation of certs.
+-spec ssl_opts(atom(), string()) -> [term()].
 ssl_opts(ssl_verify_enabled, Url) ->
     case check_ssl_version() of
         true ->
