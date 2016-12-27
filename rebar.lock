@@ -7,7 +7,7 @@
  {<<"eunit_formatters">>,{pkg,<<"eunit_formatters">>,<<"0.3.1">>},0},
  {<<"getopt">>,{pkg,<<"getopt">>,<<"0.8.2">>},0},
  {<<"providers">>,{pkg,<<"providers">>,<<"1.6.0">>},0},
- {<<"relx">>,{pkg,<<"relx">>,<<"3.22.0">>},0},
+ {<<"relx">>,{pkg,<<"relx">>,<<"3.22.1">>},0},
  {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.1">>},0}]}.
 [
 {pkg_hash,[
@@ -19,6 +19,6 @@
  {<<"eunit_formatters">>, <<"7A6FC351EB5B873E2356B8852EB751E20C13A72FBCA03393CF682B8483509573">>},
  {<<"getopt">>, <<"B17556DB683000BA50370B16C0619DF1337E7AF7ECBF7D64FBF8D1D6BCE3109B">>},
  {<<"providers">>, <<"DB0E2F9043AE60C0155205FCD238D68516331D0E5146155E33D1E79DC452964A">>},
- {<<"relx">>, <<"FF7E2B5924B754A63BA1A46BA8C1901A2D6AE1418982E189CFED5937DACE18DA">>},
+ {<<"relx">>, <<"B79C220A0234C4360EE7B7C2FAAA0A07085DC6266712C12C03A073164D795081">>},
  {<<"ssl_verify_fun">>, <<"28A4D65B7F59893BC2C7DE786DEC1E1555BD742D336043FE644AE956C3497FBE">>}]}
 ].
