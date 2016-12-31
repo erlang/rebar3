@@ -280,7 +280,7 @@ fetch_checksum(PkgName, PkgVsn, Hash, Registry, State) ->
     catch
         _:_ ->
             ?INFO("Package ~s-~s not found. Fetching registry updates and trying again...", [PkgName, PkgVsn]),
-            {ok, _} = rebar_prv_update:do(State),
+            ok = rebar_prv_update:do(State),
             rebar_packages:registry_checksum({{pkg, PkgName, PkgVsn, Hash}, Registry}, State)
     end.
 

@@ -5,6 +5,7 @@
         ,load_and_verify_version/2
         ,deps/3
         ,deps_/4
+        ,maybe_verify_registry/3
         ,registry_dir/2
         ,package_dir/2
         ,registry_checksum/2
@@ -128,6 +129,59 @@ handle_missing_package(Dep, State, Fun) ->
             %% Even after an update the package is still missing, time to error out
             throw(?PRV_ERROR({missing_package, Dep}))
     end.
+
+signature(Registry) ->
+    case rebar_utils:url_append_path(Registry, ?REMOTE_REGISTRY_FILE ++ ".signed") of
+        {ok, Url} ->
+            ?DEBUG("Fetching signature from ~p", [Url]),
+            case httpc:request(get, {Url, [{"User-Agent", rebar_utils:user_agent()}]},
+                               [], [{sync, true}, {body_format, binary}], rebar) of
+                {ok, {{_, 200, _}, _, Signature}} ->
+                    {ok, list_to_binary(decode_binary(Signature))};
+                _ ->
+                    signature_fetch_fail
+            end;
+        _ ->
+            signature_fetch_fail
+    end.
+
+decode_binary(Binary) ->
+    [erlang:binary_to_integer(<<C:16>>, 16) || <<C:16>> <= Binary].
+
+-spec public_key(string(), rebar_state:t()) -> {ok, binary()} | {error, atom()}.
+public_key(Registry, State) ->
+    {ok, RegistryDir} = rebar_packages:registry_dir(Registry, State),
+    File = filename:join(RegistryDir, "cert.pem"),
+    case file:read_file(File) of
+        {error, _} when Registry =:= ?DEFAULT_CDN ->
+            %% If we are using the default registry we can fall back to
+            %% the public key included within rebar3 itself.
+            {ok, ?DEFAULT_REPO_PUBLIC_KEY};
+        Result ->
+            Result
+    end.
+
+maybe_verify_registry(Registry, Data, State) ->
+    maybe_verify_registry(os:getenv(?HEX_UNSAFE_REGISTRY), Registry, Data, State).
+
+maybe_verify_registry(false, Registry, Data, State) ->
+    case signature(Registry) of
+        {ok, Signature} ->
+            case public_key(Registry, State) of
+                {ok, PublicKey} ->
+                    [RsaPublicKey] = public_key:pem_decode(PublicKey),
+                    Key = public_key:pem_entry_decode(RsaPublicKey),
+                    public_key:verify(Data, sha512, Signature, Key)
+                        orelse {failed_verify_registry, Registry};
+                {error, Reason} ->
+                    ?DEBUG("Unable to read public key for registry ~p because ~s", [Registry, file:format_error(Reason)]),
+                    {no_public_key, Reason, Registry}
+            end;
+        signature_fetch_fail ->
+            {signature_fetch_fail, Registry}
+    end;
+maybe_verify_registry(_, _, _, _) ->
+    true.
 
 registry_dir(Registry, State) ->
     CacheDir = rebar_dir:global_cache_dir(rebar_state:opts(State)),
@@ -278,6 +332,14 @@ handle_single_vsn(Pkg, PkgVsn, Dep, Vsn, Constraint) ->
             {ok, Vsn}
     end.
 
+format_error({no_public_key, Reason, Registry}) ->
+    io_lib:format("Failed to verify registry ~s, public key could be be read because of error: ~s ."
+                  "Either install the public key or you can disable registry verification by setting `HEX_UNSAFE_REGISTRY=1`",
+                 [Registry, file:format_error(Reason)]);
+format_error({signature_fetch_fail, Registry}) ->
+    io_lib:format("Failed to download signature for registry ~s", [Registry]);
+format_error({failed_verify_registry, Registry}) ->
+    io_lib:format("Could not verify authenticity of fetched registry file for ~s", [Registry]);
 format_error({package_parse_cdn, Uri}) ->
     io_lib:format("Failed to parse registry url: ~p", [Uri]);
 format_error({missing_package, Name, Vsn}) ->

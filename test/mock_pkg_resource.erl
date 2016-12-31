@@ -118,6 +118,8 @@ mock_pkg_index(Opts) ->
     meck:new(rebar_packages, [passthrough, no_link]),
     meck:expect(rebar_packages, packages,
                 fun(_, _State) -> to_index(Deps, Dict) end),
+    meck:expect(rebar_packages, maybe_verify_registry,
+                fun(_, _, _) -> true end),
     meck:expect(rebar_packages, verify_table,
                 fun(_, _State) -> to_index(Deps, Dict) end).
 

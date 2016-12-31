@@ -40,8 +40,18 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    [do(Registry, State) || Registry <- rebar_state:repos(State)],
-    {ok, State}.
+    update_registries(rebar_state:repos(State), State).
+
+-spec update_registries([string()], rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
+update_registries([], State) ->
+    {ok, State};
+update_registries([Registry | Rest], State) ->
+    case do(Registry, State) of
+        {ok, State1} ->
+            update_registries(Rest, State1);
+        Error ->
+            Error
+    end.
 
 do(Registry, State) ->
     try
@@ -60,10 +70,17 @@ do(Registry, State) ->
                                            rebar) of
                             {ok, saved_to_file} ->
                                 {ok, Data} = file:read_file(TmpFile),
-                                Unzipped = zlib:gunzip(Data),
-                                ok = file:write_file(HexFile, Unzipped),
-                                ?INFO("Writing registry to ~s", [HexFile]),
-                                {ok, State};
+                                case rebar_packages:maybe_verify_registry(Registry,
+                                                                          Data,
+                                                                          State) of
+                                    true ->
+                                        Unzipped = zlib:gunzip(Data),
+                                        ok = file:write_file(HexFile, Unzipped),
+                                        ?INFO("Writing registry to ~s", [HexFile]),
+                                        {ok, State};
+                                    Error ->
+                                        ?PRV_ERROR(Error)
+                                end;
                             _ ->
                                 ?PRV_ERROR({package_index_download, Registry})
                         end;
@@ -82,10 +99,10 @@ do(Registry, State) ->
 -spec format_error(any()) -> iolist().
 format_error({package_parse_cdn, Uri}) ->
     io_lib:format("Failed to parse CDN url: ~p", [Uri]);
-format_error(package_index_download) ->
-    "Failed to download package index.";
-format_error(package_index_write) ->
-    "Failed to write package index.".
+format_error({package_index_download, Registry}) ->
+    io_lib:format("Failed to download package index for registry ~s", [Registry]);
+format_error({package_index_write, Registry}) ->
+    io_lib:format("Failed to write package index ~s", [Registry]).
 
 valid_vsn(Vsn) ->
     %% Regepx from https://github.com/sindresorhus/semver-regex/blob/master/index.js
