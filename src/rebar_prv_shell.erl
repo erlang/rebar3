@@ -75,7 +75,10 @@ init(State) ->
                          "A list of apps to boot before starting the "
                          "shell. (E.g. --apps app1,app2,app3) Defaults "
                          "to rebar.config {shell, [{apps, Apps}]} or "
-                         "relx apps if not specified."}]}
+                         "relx apps if not specified."},
+                        {user_drv_args, undefined, "user_drv_args", string,
+                         "Arguments passed to user_drv start function for "
+                         "creating custom shells."}]}
             ])
     ),
     {ok, State1}.
@@ -99,7 +102,9 @@ format_error(Reason) ->
 shell(State) ->
     setup_name(State),
     setup_paths(State),
-    setup_shell(),
+    ShellArgs = debug_get_value(shell_args, rebar_state:get(State, shell, []), undefined,
+                                "Found user_drv args from command line option."),
+    setup_shell(ShellArgs),
     maybe_run_script(State),
     %% apps must be started after the change in shell because otherwise
     %% their application masters never gets the new group leader (held in
@@ -117,13 +122,13 @@ shell(State) ->
 info() ->
     "Start a shell with project and deps preloaded similar to~n'erl -pa ebin -pa deps/*/ebin'.~n".
 
-setup_shell() ->
+setup_shell(ShellArgs) ->
     OldUser = kill_old_user(),
     %% Test for support here
     NewUser = try erlang:open_port({spawn,"tty_sl -c -e"}, []) of
         Port when is_port(Port) ->
             true = port_close(Port),
-            setup_new_shell()
+            setup_new_shell(ShellArgs)
     catch
         error:_ ->
             setup_old_shell()
@@ -153,11 +158,16 @@ wait_for_port_death(N, P) ->
             wait_for_port_death(N-10, P)
     end.
 
-setup_new_shell() ->
+setup_new_shell(ShellArgs) ->
     %% terminate the current user supervision structure, if any
     _ = supervisor:terminate_child(kernel_sup, user),
     %% start a new shell (this also starts a new user under the correct group)
-    _ = user_drv:start(),
+    case ShellArgs of
+        undefined ->
+            _ = user_drv:start();
+        _ ->
+            _ = user_drv:start(ShellArgs)
+    end,
     %% wait until user_drv and user have been registered (max 3 seconds)
     ok = wait_until_user_started(3000),
     whereis(user).
