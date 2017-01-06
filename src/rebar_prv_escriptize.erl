@@ -90,9 +90,9 @@ escriptize(State0, App) ->
     %% Look for a list of other applications (dependencies) to include
     %% in the output file. We then use the .app files for each of these
     %% to pull in all the .beam files.
-    InclApps = lists:usort([ec_cnv:to_atom(AppName) | rebar_state:get(State, escript_incl_apps, [])
-                           ++ all_deps(State)]),
+    TopInclApps = lists:usort([ec_cnv:to_atom(AppName) | rebar_state:get(State, escript_incl_apps, [])]),
     AllApps = rebar_state:all_deps(State)++rebar_state:project_apps(State),
+    InclApps = find_deps(TopInclApps, AllApps),
     InclBeams = get_apps_beams(InclApps, AllApps),
 
     %% Look for a list of extra files to include in the output file.
@@ -219,9 +219,23 @@ usort(List) ->
 get_nonempty(Files) ->
     [{FName,FBin} || {FName,FBin} <- Files, FBin =/= <<>>].
 
-all_deps(State) ->
-    [list_to_existing_atom(binary_to_list(rebar_app_info:name(App)))
-     || App <- rebar_state:all_deps(State)].
+find_deps(AppNames, AllApps) ->
+    BinAppNames = [ec_cnv:to_binary(Name) || Name <- AppNames],
+    [ec_cnv:to_atom(Name) ||
+     Name <- find_deps_of_deps(BinAppNames, AllApps, BinAppNames)].
+
+%% Should look at the app files to find direct dependencies
+find_deps_of_deps([], _, Acc) -> Acc;
+find_deps_of_deps([Name|Names], Apps, Acc) ->
+    ?DEBUG("processing ~p", [Name]),
+    {ok, App} = rebar_app_utils:find(Name, Apps),
+    DepNames = proplists:get_value(applications, rebar_app_info:app_details(App), []),
+    BinDepNames = [ec_cnv:to_binary(Dep) || Dep <- DepNames,
+                   %% ignore system libs; shouldn't include them.
+                   not lists:prefix(code:root_dir(), code:lib_dir(Dep))]
+                -- ([Name|Names]++Acc), % avoid already seen deps
+    ?DEBUG("new deps of ~p found to be ~p", [Name, BinDepNames]),
+    find_deps_of_deps(BinDepNames ++ Names, Apps, BinDepNames ++ Acc).
 
 def(Rm, State, Key, Default) ->
     Value0 = rebar_state:get(State, Key, Default),

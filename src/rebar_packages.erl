@@ -122,7 +122,7 @@ package_dir(State) ->
             Error
     end.
 
-registry_checksum({pkg, Name, Vsn}, State) ->
+registry_checksum({pkg, Name, Vsn, _Hash}, State) ->
     try
         ?MODULE:verify_table(State),
         ets:lookup_element(?PACKAGE_TABLE, {Name, Vsn}, 3)

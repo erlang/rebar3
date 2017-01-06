@@ -67,6 +67,12 @@ needs_update(AppDir, Source, State) ->
 
 format_error({bad_download, CachePath}) ->
     io_lib:format("Download of package does not match md5sum from server: ~s", [CachePath]);
+format_error({unexpected_hash, CachePath, Expected, Found}) ->
+    io_lib:format("The checksum for package at ~s (~s) does not match the "
+                  "checksum previously locked (~s). Either unlock or "
+                  "upgrade the package, or make sure you fetched it from "
+                  "the same index from which it was initially fetched.",
+                  [CachePath, Found, Expected]);
 format_error({failed_extract, CachePath}) ->
     io_lib:format("Failed to extract package: ~s", [CachePath]);
 format_error({bad_etag, Source}) ->

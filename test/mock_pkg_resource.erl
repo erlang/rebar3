@@ -22,8 +22,9 @@ mock() -> mock([]).
             | {not_in_index, [{App, Vsn}]}
             | {pkgdeps, [{{App,Vsn}, [Dep]}]},
     App :: string(),
-    Dep :: {App, string(), {pkg, App, Vsn}},
-    Vsn :: string().
+    Dep :: {App, string(), {pkg, App, Vsn, Hash}},
+    Vsn :: string(),
+    Hash :: string() | undefined.
 mock(Opts) ->
     meck:new(?MOD, [no_link]),
     mock_lock(Opts),
@@ -51,7 +52,7 @@ mock_update(Opts) ->
     ToUpdate = proplists:get_value(upgrade, Opts, []),
     meck:expect(
         ?MOD, needs_update,
-        fun(_Dir, {pkg, App, _Vsn}) ->
+        fun(_Dir, {pkg, App, _Vsn, _Hash}) ->
             lists:member(binary_to_list(App), ToUpdate)
         end).
 
@@ -66,7 +67,7 @@ mock_vsn(_Opts) ->
 %% @doc For each app to download, create a dummy app on disk instead.
 %% The configuration for this one (passed in from `mock/1') includes:
 %%
-%% - Specify a version with `{pkg, _, Vsn}'
+%% - Specify a version with `{pkg, _, Vsn, _}'
 %% - Dependencies for each application must be passed of the form:
 %%   `{pkgdeps, [{"app1", [{app2, ".*", {pkg, ...}}]}]}' -- basically
 %%   the `pkgdeps' option takes a key/value list of terms to output directly
@@ -76,7 +77,7 @@ mock_download(Opts) ->
     Config = proplists:get_value(config, Opts, []),
     meck:expect(
         ?MOD, download,
-        fun (Dir, {pkg, AppBin, Vsn}, _) ->
+        fun (Dir, {pkg, AppBin, Vsn, _}, _) ->
             App = binary_to_list(AppBin),
             filelib:ensure_dir(Dir),
             AppDeps = proplists:get_value({App,Vsn}, Deps, []),
