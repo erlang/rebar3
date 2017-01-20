@@ -127,7 +127,7 @@ others via the plugin ecosystem:
 | Tarballs             | Releases can be packaged into tarballs ready to be deployed. |
 | Templates            | Configurable templates ship out of the box (try `rebar3 new` for a list or `rebar3 new help <template>` for a specific one). [Custom templates](http://www.rebar3.org/docs/using-templates) are also supported, and plugins can also add their own. |
 | Unstable namespace   | We use a namespace to provide commands that are still in flux, allowing to test more experimental features we are working on. See `rebar3 unstable`. |
-| Xref       | Run cross reference analysis on the project with [xref](http://www.erlang.org/doc/apps/tools/xref_chapter.html) by calling `rebar3 xref`. |
+| Xref       | Run cross-reference analysis on the project with [xref](http://www.erlang.org/doc/apps/tools/xref_chapter.html) by calling `rebar3 xref`. |
 
 ## Migrating From rebar2
 
@@ -146,7 +146,7 @@ relx.
 
 ## Additional Resources
 
-In case of problems that cannot be solved through documentation or examples, you
+In the case of problems that cannot be solved through documentation or examples, you
 may want to try to contact members of the community for help. The community is
 also where you want to go for questions about how to extend rebar, fill in bug
 reports, and so on.
@@ -156,7 +156,7 @@ list](http://lists.basho.com/pipermail/rebar_lists.basho.com/). If you need
 quick feedback, you can try the #rebar channel on
 [irc.freenode.net](http://freenode.net). Be sure to check the
 [documentation](http://www.rebar3.org/v3.0/docs) first, just to be sure you're not
-asking about things with well known answers.
+asking about things with well-known answers.
 
 For bug reports, roadmaps, and issues, visit the [github issues
 page](https://github.com/erlang/rebar3/issues).
