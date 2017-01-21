@@ -35,7 +35,6 @@
          error_tuple/4,
          format_error_source/2]).
 
--define(DEFAULT_COMPILER_SOURCE_FORMAT, relative).
 -type desc() :: term().
 -type loc() :: {line(), col()} | line().
 -type line() :: integer().
@@ -138,28 +137,7 @@ error_tuple(Source, Es, Ws, Opts) ->
 -spec format_error_source(file:filename(), rebar_dict() | [{_,_}]) ->
     file:filename().
 format_error_source(Path, Opts) ->
-    Type = case rebar_opts:get(Opts, compiler_source_format,
-                               ?DEFAULT_COMPILER_SOURCE_FORMAT) of
-        V when V == absolute; V == relative; V == build ->
-            V;
-        Other ->
-            ?WARN("Invalid argument ~p for compiler_source_format - "
-                  "assuming ~s~n", [Other, ?DEFAULT_COMPILER_SOURCE_FORMAT]),
-            ?DEFAULT_COMPILER_SOURCE_FORMAT
-    end,
-    case Type of
-        absolute -> resolve_linked_source(Path);
-        build -> Path;
-        relative ->
-            Cwd = rebar_dir:get_cwd(),
-            rebar_dir:make_relative_path(resolve_linked_source(Path), Cwd)
-    end.
-
-%% @private takes a filename and canonicalizes its path if it is a link.
--spec resolve_linked_source(file:filename()) -> file:filename().
-resolve_linked_source(Src) ->
-    {Dir, Base} = rebar_file_utils:split_dirname(Src),
-    filename:join(rebar_file_utils:resolve_link(Dir), Base).
+    rebar_dir:format_source_file_name(Path, Opts).
 
 %% ===================================================================
 %% Internal functions

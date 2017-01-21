@@ -478,7 +478,8 @@ run_dialyzer(State, Opts, Output) ->
                      {check_plt, false} |
                      Opts],
             ?DEBUG("Running dialyzer with options: ~p~n", [Opts2]),
-            Warnings = format_warnings(Output, dialyzer:run(Opts2)),
+            Warnings = format_warnings(rebar_state:opts(State),
+                                       Output, dialyzer:run(Opts2)),
             {Warnings, State};
         false ->
             Opts2 = [{warnings, no_warnings()},
@@ -497,8 +498,8 @@ legacy_warnings(Warnings) ->
             Warnings
     end.
 
-format_warnings(Output, Warnings) ->
-    Warnings1 = rebar_dialyzer_format:format_warnings(Warnings),
+format_warnings(Opts, Output, Warnings) ->
+    Warnings1 = rebar_dialyzer_format:format_warnings(Opts, Warnings),
     console_warnings(Warnings1),
     file_warnings(Output, Warnings),
     length(Warnings).

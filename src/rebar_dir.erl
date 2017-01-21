@@ -26,7 +26,8 @@
          src_dir_opts/2, recursive/2,
          extra_src_dirs/1, extra_src_dirs/2,
          all_src_dirs/1, all_src_dirs/3,
-         retarget_path/2]).
+         retarget_path/2,
+         format_source_file_name/2]).
 
 -include("rebar.hrl").
 
@@ -334,3 +335,39 @@ retarget_path(State, Path, [App|Rest]) ->
         {ok, NewPath}      -> filename:join([rebar_app_info:out_dir(App), NewPath]);
         {error, badparent} -> retarget_path(State, Path, Rest)
     end.
+
+format_source_file_name(Path, Opts) ->
+    Type = case rebar_opts:get(Opts, compiler_source_format,
+                               ?DEFAULT_COMPILER_SOURCE_FORMAT) of
+        V when V == absolute; V == relative; V == build ->
+            V;
+        Other ->
+            warn_source_format_once(Other)
+    end,
+    case Type of
+        absolute -> resolve_linked_source(Path);
+        build -> Path;
+        relative ->
+            Cwd = rebar_dir:get_cwd(),
+            rebar_dir:make_relative_path(resolve_linked_source(Path), Cwd)
+    end.
+
+%% @private displays a warning for the compiler source format option
+%% only once
+-spec warn_source_format_once(term()) -> ok.
+warn_source_format_once(Format) ->
+    Warn = application:get_env(rebar, warn_source_format) =/= {ok, false},
+    application:set_env(rebar, warn_source_format, false),
+    case Warn of
+        false ->
+            ok;
+        true ->
+            ?WARN("Invalid argument ~p for compiler_source_format - "
+                  "assuming ~s~n", [Format, ?DEFAULT_COMPILER_SOURCE_FORMAT])
+    end.
+
+%% @private takes a filename and canonicalizes its path if it is a link.
+-spec resolve_linked_source(file:filename()) -> file:filename().
+resolve_linked_source(Src) ->
+    {Dir, Base} = rebar_file_utils:split_dirname(Src),
+    filename:join(rebar_file_utils:resolve_link(Dir), Base).
