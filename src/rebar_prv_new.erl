@@ -132,10 +132,13 @@ show_template({Name, Type, Location, Description, Vars}) ->
                format_vars(Vars)]).
 
 format_type(escript) -> "built-in";
+format_type(builtin) -> "built-in";
 format_type(plugin) -> "plugin";
 format_type(file) -> "custom".
 
 format_type(escript, _) ->
+    "built-in template";
+format_type(builtin, _) ->
     "built-in template";
 format_type(plugin, Loc) ->
     io_lib:format("plugin template (~s)", [Loc]);

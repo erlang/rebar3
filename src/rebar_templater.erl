@@ -267,8 +267,8 @@ find_templates(State) ->
     PluginTemplates = find_plugin_templates(State),
     {MainTemplates, Files} =
         case rebar_state:escript_path(State) of
-            undefined ->
-                {find_priv_templates(State), []};
+            undefined -> % running in local install
+                {find_localinstall_templates(State), []};
             _ ->
                 %% Cache the files since we'll potentially need to walk it several times
                 %% over the course of a run.
@@ -307,11 +307,10 @@ find_escript_templates(Files) ->
      || {Name, _Bin} <- Files,
         re:run(Name, ?TEMPLATE_RE, [{capture, none}]) == match].
 
-find_priv_templates(State) ->
-    OtherTemplates = rebar_utils:find_files(code:priv_dir(rebar), ?TEMPLATE_RE),
-    HomeFiles = rebar_utils:find_files(rebar_dir:template_dir(State),
-                                       ?TEMPLATE_RE, true), % recursive
-    [{file, F} || F <- OtherTemplates ++ HomeFiles].
+find_localinstall_templates(_State) ->
+    Templates = rebar_utils:find_files(code:priv_dir(rebar), ?TEMPLATE_RE),
+    %% Pretend we're still running escripts; should work transparently.
+    [{builtin, F} || F <- Templates].
 
 %% Fetch template indexes that sit on disk in the user's HOME
 find_disk_templates(State) ->
@@ -354,6 +353,10 @@ prioritize_templates([{Name, Type, File} | Rest], Valid) ->
             ?DEBUG("Skipping template ~p, due to presence of a built-in "
                    "template with the same name", [Name]),
             prioritize_templates(Rest, Valid);
+        {_, builtin, _} ->
+            ?DEBUG("Skipping template ~p, due to presence of a built-in "
+                   "template with the same name", [Name]),
+            prioritize_templates(Rest, Valid);
         {_, plugin, _} ->
             ?DEBUG("Skipping template ~p, due to presence of a plugin "
                    "template with the same name", [Name]),
@@ -368,6 +371,9 @@ prioritize_templates([{Name, Type, File} | Rest], Valid) ->
 %% Read the contents of a file from the appropriate source
 load_file(Files, escript, Name) ->
     {Name, Bin} = lists:keyfind(Name, 1, Files),
+    Bin;
+load_file(_Files, builtin, Name) ->
+    {ok, Bin} = file:read_file(Name),
     Bin;
 load_file(_Files, plugin, Name) ->
     {ok, Bin} = file:read_file(Name),
