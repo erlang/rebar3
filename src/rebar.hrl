@@ -27,6 +27,7 @@
 -define(REMOTE_PACKAGE_DIR, "tarballs").
 -define(REMOTE_REGISTRY_FILE, "registry.ets.gz").
 -define(LOCK_FILE, "rebar.lock").
+-define(DEFAULT_COMPILER_SOURCE_FORMAT, relative).
 
 -define(PACKAGE_INDEX_VERSION, 3).
 -define(PACKAGE_TABLE, package_index).
