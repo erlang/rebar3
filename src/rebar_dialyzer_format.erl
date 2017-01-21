@@ -16,18 +16,19 @@
 
 -include("rebar.hrl").
 
--export([format_warnings/1]).
+-export([format_warnings/2]).
 
 %% Formats a list of warnings in a nice per file way. Note that we reverse
 %% the list at the end to 'undo' the reversal by foldl
-format_warnings(Warnings) ->
-    {_, Res} = lists:foldl(fun format_warning_/2, {undefined, []}, Warnings),
+format_warnings(Opts, Warnings) ->
+    Fold = fun(Warning, Acc) -> format_warning_(Opts, Warning, Acc) end,
+    {_, Res} = lists:foldl(Fold, {undefined, []}, Warnings),
     lists:reverse(Res).
 
 
 %% If the last seen file is and the file of this warning are the same
 %% we skip the file header
-format_warning_(Warning = {_Tag, {File, Line}, Msg}, {File, Acc}) ->
+format_warning_(_Opts, Warning = {_Tag, {File, Line}, Msg}, {File, Acc}) ->
     try
         String = message_to_string(Msg),
         {File, [lists:flatten(fmt("~!c~4w~!!: ~s", [Line, String])) | Acc]}
@@ -39,8 +40,9 @@ format_warning_(Warning = {_Tag, {File, Line}, Msg}, {File, Acc}) ->
     end;
 
 %% With a new file detencted we also write a file header.
-format_warning_(Warning = {_Tag, {File, Line}, Msg}, {_LastFile, Acc}) ->
+format_warning_(Opts, Warning = {_Tag, {SrcFile, Line}, Msg}, {_LastFile, Acc}) ->
     try
+        File = rebar_dir:format_source_file_name(SrcFile, Opts),
         Base = filename:basename(File),
         Dir = filename:dirname(File),
         Root = filename:rootname(Base),
@@ -49,12 +51,12 @@ format_warning_(Warning = {_Tag, {File, Line}, Msg}, {_LastFile, Acc}) ->
         Base1 = fmt("~!_c~s~!!~!__~s", [Root, Ext]),
         F = fmt("~!__~s", [filename:join(Path, Base1)]),
         String = message_to_string(Msg),
-        {File, [lists:flatten(fmt("~n~s~n~!c~4w~!!: ~s", [F, Line, String])) | Acc]}
+        {SrcFile, [lists:flatten(fmt("~n~s~n~!c~4w~!!: ~s", [F, Line, String])) | Acc]}
     catch
         Error:Reason ->
             ?DEBUG("Failed to pretty format warning: ~p:~p~n~p",
                    [Error, Reason, erlang:get_stacktrace()]),
-            {File, [dialyzer:format_warning(Warning, fullpath) | Acc]}
+            {SrcFile, [dialyzer:format_warning(Warning, fullpath) | Acc]}
     end.
 
 fmt(Fmt) ->
