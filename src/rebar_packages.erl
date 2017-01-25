@@ -4,7 +4,7 @@
         ,close_packages/1
         ,load_and_verify_version/2
         ,deps/3
-        ,deps_/4
+        ,deps/4
         ,maybe_verify_registry/3
         ,registry_dir/2
         ,package_dir/2
@@ -69,7 +69,7 @@ load_and_verify_version(Registry, State) ->
 deps(Name, Vsn, State) ->
     try
         find(rebar_state:repos(State),
-            fun(Registry) -> deps_(Name, Vsn, Registry, State) end)
+            fun(Registry) -> deps(Name, Vsn, Registry, State) end)
     catch
         _:_ ->
             handle_missing_package({Name, Vsn}, State, fun(State1) -> deps_(Name, Vsn, State1) end)
@@ -77,9 +77,9 @@ deps(Name, Vsn, State) ->
 
 deps_(Name, Vsn, State) ->
     find(rebar_state:repos(State),
-         fun(Registry) -> deps_(Name, Vsn, Registry, State) end).
+         fun(Registry) -> deps(Name, Vsn, Registry, State) end).
 
-deps_(Name, Vsn, Registry, State) ->
+deps(Name, Vsn, Registry, State) ->
     {ok, T} = ?MODULE:verify_table(Registry, State),
     case ets:lookup_element(T, {ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)}, 2) of
         [Deps | _] ->
@@ -104,12 +104,13 @@ find_package_registry_(Name, Vsn, Registry, State) ->
 find([], _) ->
     error;
 find([X | R], Fun) ->
-    case catch(Fun(X)) of
+    try Fun(X) of
         {ok, Y, Z} ->
             {ok, Y, Z};
         {ok, Y} ->
-            {ok, Y};
-        _ ->
+            {ok, Y}
+    catch
+        _:_ ->
             find(R, Fun)
     end.
 

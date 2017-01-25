@@ -378,7 +378,6 @@ profiles(#app_info_t{profiles=Profiles}) ->
 profiles(AppInfo=#app_info_t{}, Profiles) ->
     AppInfo#app_info_t{profiles=Profiles}.
 
-%% @doc returns the list of dependencies
 -spec registry(t()) -> string().
 registry(#app_info_t{registry=Registry}) ->
     Registry.
@@ -387,6 +386,7 @@ registry(#app_info_t{registry=Registry}) ->
 registry(AppInfo=#app_info_t{}, Registry) ->
     AppInfo#app_info_t{registry=Registry}.
 
+%% @doc returns the list of dependencies
 -spec deps(t()) -> list().
 deps(#app_info_t{deps=Deps}) ->
     Deps.

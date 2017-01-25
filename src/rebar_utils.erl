@@ -852,7 +852,8 @@ url_append_path(Url, ExtraPath) ->
          _ ->
              error
      catch
-         _:_ ->
+         C:T ->
+             ?DEBUG("Failed url_append_path ~p ~p: ~p ~p", [Url, ExtraPath, C, T]),
              error
      end.
 
@@ -888,7 +889,7 @@ list_dir(Dir) ->
 set_proxy_auth([]) ->
     ok;
 set_proxy_auth(UserInfo) ->
-    Idx = string:chr(UserInfo, $:), 
+    Idx = string:chr(UserInfo, $:),
     Username = string:sub_string(UserInfo, 1, Idx-1),
     Password = string:sub_string(UserInfo, Idx+1),
     %% password may contain url encoded characters, need to decode them first
