@@ -168,6 +168,9 @@ parse_dep(Dep, Parent, DepsDir, State, Locks, Level) ->
       Dir :: file:filename(),
       IsLock :: boolean(),
       State :: rebar_state:t().
+parse_dep(Parent, [PkgName, Vsn, _Required, Name], DepsDir, IsLock, State) ->
+    {PkgName1, PkgVsn} = {ec_cnv:to_binary(PkgName), ec_cnv:to_binary(Vsn)},
+    dep_to_app(Parent, DepsDir, Name, PkgVsn, {pkg, PkgName1, PkgVsn, undefined}, IsLock, State);
 parse_dep(Parent, {Name, Vsn, {pkg, PkgName}}, DepsDir, IsLock, State) ->
     {PkgName1, PkgVsn} = {ec_cnv:to_binary(PkgName), ec_cnv:to_binary(Vsn)},
     dep_to_app(Parent, DepsDir, Name, PkgVsn, {pkg, PkgName1, PkgVsn, undefined}, IsLock, State);
@@ -262,10 +265,10 @@ update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
     end,
     AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName1, PkgVsn1, Hash1}),
     AppInfo2 = rebar_app_info:registry(AppInfo1, Registry),
-    {ok, Deps} = rebar_packages:deps_(PkgName1
-                                     ,PkgVsn1
-                                     ,Registry
-                                     ,State),
+    {ok, Deps} = rebar_packages:deps(PkgName1
+                                    ,PkgVsn1
+                                    ,Registry
+                                    ,State),
     AppInfo3 = rebar_app_info:resource_type(rebar_app_info:deps(AppInfo2, Deps), pkg),
     rebar_app_info:original_vsn(AppInfo3, PkgVsn1);
 update_source(AppInfo, Source, _State) ->
