@@ -67,7 +67,7 @@
                   all_plugin_deps     = []          :: [rebar_app_info:t()],
                   all_deps            = []          :: [rebar_app_info:t()],
 
-                  repos                             :: [string()],
+                  repos               = [?DEFAULT_REGISTRY] :: [string()],
 
                   resources           = [],
                   providers           = [],
