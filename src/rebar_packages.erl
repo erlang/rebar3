@@ -165,7 +165,9 @@ public_key(Registry, State) ->
 maybe_verify_registry(Registry, Data, State) ->
     maybe_verify_registry(os:getenv(?HEX_UNSAFE_REGISTRY), Registry, Data, State).
 
-maybe_verify_registry(false, Registry, Data, State) ->
+maybe_verify_registry(Unsafe, Registry, Data, State) when Unsafe =:= "false"
+                                                        ; Unsafe =:= "0"
+                                                        ; Unsafe =:= false ->
     case signature(Registry) of
         {ok, Signature} ->
             case public_key(Registry, State) of

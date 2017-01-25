@@ -40,7 +40,7 @@ main(_) ->
         false ->
             rebar3:run(["update"])
     end,
-    rebar3:run(["update"]),
+
     {ok, State} = rebar3:run(["compile"]),
     reset_env(),
     os:putenv("REBAR_PROFILE", ""),
