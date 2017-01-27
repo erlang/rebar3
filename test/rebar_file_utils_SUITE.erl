@@ -187,7 +187,7 @@ mv_dir(Config) ->
     %% move files from dir to empty dir
     F1 = filename:join(SrcDir, "file1"),
     F2 = filename:join(SrcDir, "subdir/file2"),
-    ec_file:mkdir_p(F2),
+    filelib:ensure_dir(F2),
     file:write_file(F1, "hello"),
     file:write_file(F2, "world"),
     DstDir2 = filename:join(BaseDir, "dst2/"),
@@ -197,17 +197,20 @@ mv_dir(Config) ->
     ?assertEqual(ok, rebar_file_utils:mv(SrcDir, DstDir2)),
     ?assert(filelib:is_file(D2F1)),
     ?assert(filelib:is_file(D2F2)),
-    
-    %% move files from dir to existing dir
-    ec_file:mkdir_p(F2),
+
+    %% move files from dir to existing dir moves it to
+    %% a subdir
+    filelib:ensure_dir(F2),
     file:write_file(F1, "hello"),
     file:write_file(F2, "world"),
     DstDir3 = filename:join(BaseDir, "dst3/"),
-    D3F1 = filename:join(DstDir3, "file1"),
-    D3F2 = filename:join(DstDir3, "subdir/file2"),
+    D3F1 = filename:join(DstDir3, "src/file1"),
+    D3F2 = filename:join(DstDir3, "src/subdir/file2"),
     ec_file:mkdir_p(DstDir3),
     ?assert(filelib:is_dir(DstDir3)),
     ?assertEqual(ok, rebar_file_utils:mv(SrcDir, DstDir3)),
+    ?assertNot(filelib:is_file(F1)),
+    ?assertNot(filelib:is_file(F2)),
     ?assert(filelib:is_file(D3F1)),
     ?assert(filelib:is_file(D3F2)),
     ?assertNot(filelib:is_dir(SrcDir)),
@@ -279,8 +282,9 @@ mv_file_dir_diff(Config) ->
     F = filename:join(SrcDir, "file"),
     file:write_file(F, "hello"),
     DstDir = filename:join(BaseDir, "dst/"),
+    ec_file:mkdir_p(DstDir),
     Dst = filename:join(DstDir, "file-rename"),
-    ?assertNot(filelib:is_dir(DstDir)),
+    ?assert(filelib:is_dir(DstDir)),
     ?assertNot(filelib:is_file(Dst)),
     ?assertEqual(ok, rebar_file_utils:mv(F, Dst)),
     ?assert(filelib:is_file(Dst)),
