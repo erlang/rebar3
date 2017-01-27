@@ -185,31 +185,112 @@ mv(Source, Dest) ->
                     ok
             end;
         {win32, _} ->
-            Cmd = case filelib:is_dir(Source) of
-                      true ->
-                          ?FMT("robocopy /move /e \"~s\" \"~s\" 1> nul",
-                               [rebar_utils:escape_double_quotes(filename:nativename(Source)),
-                                rebar_utils:escape_double_quotes(filename:nativename(Dest))]);
-                      false ->
-                          ?FMT("robocopy /move /e \"~s\" \"~s\" \"~s\" 1> nul",
-                               [rebar_utils:escape_double_quotes(filename:nativename(filename:dirname(Source))),
-                                rebar_utils:escape_double_quotes(filename:nativename(Dest)),
-                                rebar_utils:escape_double_quotes(filename:basename(Source))])
-                  end,
-            Res = rebar_utils:sh(Cmd,
-                        [{use_stdout, false}, return_on_error]),
-            case win32_ok(Res) of
-                true -> ok;
+            case filelib:is_dir(Source) of
+                true ->
+                    SrcDir = filename:nativename(Source),
+                    DestDir = case filelib:is_dir(Dest) of
+                        true ->
+                            %% to simulate unix/posix mv, we have to replicate
+                            %% the same directory movement by moving the whole
+                            %% top-level directory, not just the insides
+                            SrcName = filename:basename(Source),
+                            filename:nativename(filename:join(Dest, SrcName));
+                        false ->
+                            filename:nativename(Dest)
+                    end,
+                    robocopy_dir(SrcDir, DestDir);
                 false ->
-                    {error, lists:flatten(
-                              io_lib:format("Failed to move ~s to ~s~n",
-                                            [Source, Dest]))}
+                    SrcDir = filename:nativename(filename:dirname(Source)),
+                    SrcName = filename:basename(Source),
+                    DestDir = filename:nativename(filename:dirname(Dest)),
+                    DestName = filename:basename(Dest),
+                    IsDestDir = filelib:is_dir(Dest),
+                    if IsDestDir ->
+                        %% if basename and target name are different because
+                        %% we move to a directory, then just move there.
+                        %% Similarly, if they are the same but we're going to
+                        %% a directory, let's just do that directly.
+                        FullDestDir = filename:nativename(Dest),
+                        robocopy_file(SrcDir, FullDestDir, SrcName)
+                    ;  SrcName =:= DestName ->
+                        %% if basename and target name are the same and both are files,
+                        %% we do a regular move with robocopy without rename.
+                        robocopy_file(SrcDir, DestDir, DestName)
+                    ;  SrcName =/= DestName->
+                        robocopy_mv_and_rename(Source, Dest, SrcDir, SrcName, DestDir, DestName)
+                    end
+
             end
+    end.
+
+robocopy_mv_and_rename(Source, Dest, SrcDir, SrcName, DestDir, DestName) ->
+    %% If we're moving a file and the origin and
+    %% destination names are different:
+    %%  - mktmp
+    %%  - robocopy source_dir tmp_dir srcname
+    %%  - rename srcname destname (to avoid clobbering)
+    %%  - robocopy tmp_dir dest_dir destname
+    %%  - remove tmp_dir
+    case ec_file:insecure_mkdtemp() of
+        {error, _Reason} ->
+            {error, lists:flatten(
+                     io_lib:format("Failed to move ~s to ~s (tmpdir failed)~n",
+                                   [Source, Dest]))};
+        TmpPath ->
+            case robocopy_file(SrcDir, TmpPath, SrcName) of
+                {error, Reason} ->
+                    {error, Reason};
+                ok ->
+                    TmpSrc = filename:join(TmpPath, SrcName),
+                    TmpDst = filename:join(TmpPath, DestName),
+                    case file:rename(TmpSrc, TmpDst) of
+                        {error, _} ->
+                            {error, lists:flatten(
+                                      io_lib:format("Failed to move ~s to ~s (via rename)~n",
+                                                    [Source, Dest]))};
+                        ok ->
+                            case robocopy_file(TmpPath, DestDir, DestName) of
+                                Err = {error, _} -> Err;
+                                OK -> rm_rf(TmpPath), OK
+                            end
+                    end
+            end
+    end.
+
+robocopy_file(SrcPath, DestPath, FileName) ->
+    Cmd = ?FMT("robocopy /move /e \"~s\" \"~s\" \"~s\"",
+               [rebar_utils:escape_double_quotes(SrcPath),
+                rebar_utils:escape_double_quotes(DestPath),
+                rebar_utils:escape_double_quotes(FileName)]),
+    Res = rebar_utils:sh(Cmd, [{use_stdout, false}, return_on_error]),
+    case win32_ok(Res) of
+        false ->
+            {error, lists:flatten(
+                        io_lib:format("Failed to move ~s to ~s~n",
+                                      [filename:join(SrcPath, FileName),
+                                       filename:join(DestPath, FileName)]))};
+        true ->
+            ok
+    end.
+
+robocopy_dir(Source, Dest) ->
+    Cmd = ?FMT("robocopy /move /e \"~s\" \"~s\"",
+               [rebar_utils:escape_double_quotes(Source),
+                rebar_utils:escape_double_quotes(Dest)]),
+    Res = rebar_utils:sh(Cmd,
+                         [{use_stdout, false}, return_on_error]),
+    case win32_ok(Res) of
+        true -> ok;
+        false ->
+            {error, lists:flatten(
+                      io_lib:format("Failed to move ~s to ~s~n",
+                                    [Source, Dest]))}
     end.
 
 win32_ok({ok, _}) -> true;
 win32_ok({error, {Rc, _}}) when Rc<9; Rc=:=16 -> true;
 win32_ok(_) -> false.
+
 
 delete_each([]) ->
     ok;
