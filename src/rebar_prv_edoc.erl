@@ -7,6 +7,7 @@
          format_error/1]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 -define(PROVIDER, edoc).
 -define(DEPS, [compile]).
@@ -28,7 +29,8 @@ init(State) ->
                                                                {profiles, [docs]}])),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
+-spec do(rebar_state:t()) ->
+    {ok, rebar_state:t()} | {error, string()} | {error, {module(), any()}}.
 do(State) ->
     code:add_pathsa(rebar_state:code_paths(State, all_deps)),
     ProjectApps = rebar_state:project_apps(State),
@@ -37,26 +39,42 @@ do(State) ->
     ShouldAccPaths = not has_configured_paths(EdocOpts),
     Cwd = rebar_state:dir(State),
     rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
-    lists:foldl(fun(AppInfo, EdocOptsAcc) ->
+    Res = try
+        lists:foldl(fun(AppInfo, EdocOptsAcc) ->
                     rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, AppInfo, State),
                     AppName = ec_cnv:to_list(rebar_app_info:name(AppInfo)),
                     ?INFO("Running edoc for ~s", [AppName]),
                     AppDir = rebar_app_info:dir(AppInfo),
-                    ok = edoc:application(list_to_atom(AppName), AppDir, EdocOptsAcc),
+                    AppRes = (catch edoc:application(list_to_atom(AppName), AppDir, EdocOptsAcc)),
                     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, AppInfo, State),
-                    case ShouldAccPaths of
-                        true ->
+                    case {AppRes, ShouldAccPaths} of
+                        {ok, true} ->
                             %% edoc wants / on all OSes
                             add_to_paths(EdocOptsAcc, AppDir++"/doc");
-                        false ->
-                            EdocOptsAcc
+                        {ok, false} ->
+                            EdocOptsAcc;
+                        {{'EXIT', error}, _} ->
+                            %% EDoc is not very descriptive
+                            %% in terms of failures
+                            throw({app_failed, AppName})
                     end
-                end, EdocOpts, ProjectApps),
+                end, EdocOpts, ProjectApps)
+    catch
+        {app_failed, AppName} ->
+            {app_failed, AppName}
+    end,
     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State),
     rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
-    {ok, State}.
+    case Res of
+        {app_failed, App} ->
+            ?PRV_ERROR({app_failed, App});
+        _ ->
+            {ok, State}
+    end.
 
 -spec format_error(any()) -> iolist().
+format_error({app_failed, AppName}) ->
+    io_lib:format("Failed to generate documentation for app '~s'", [AppName]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
