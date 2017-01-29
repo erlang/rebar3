@@ -1397,6 +1397,9 @@ include_file_in_src_test(Config) ->
                                    ["as", "test", "compile"],
                                    {ok, [{app, Name}]}).
 
+%% this test sets the env var, compiles, records the file last modified timestamp,
+%% recompiles and compares the file last modified timestamp to ensure it hasn't
+%% changed. this test should run on 19.x+
 dont_recompile_when_erl_compiler_options_env_does_not_change(Config) ->
     %% save existing env to restore after test
     ExistingEnv = os:getenv("ERL_COMPILER_OPTIONS"),
@@ -1435,6 +1438,9 @@ dont_recompile_when_erl_compiler_options_env_does_not_change(Config) ->
         _     -> os:putenv("ERL_COMPILER_OPTIONS", ExistingEnv)
     end.
 
+%% this test compiles, records the file last modified timestamp, sets the env
+%% var, recompiles and compares the file last modified timestamp to ensure it
+%% has changed. this test should run on 19.x+
 recompile_when_erl_compiler_options_env_changes(Config) ->
     %% save existing env to restore after test
     ExistingEnv = os:getenv("ERL_COMPILER_OPTIONS"),
@@ -1473,6 +1479,9 @@ recompile_when_erl_compiler_options_env_changes(Config) ->
         _     -> os:putenv("ERL_COMPILER_OPTIONS", ExistingEnv)
     end.
 
+%% this test sets the env var, compiles, records the file last modified
+%% timestamp, recompiles and compares the file last modified timestamp to
+%% ensure it has changed. this test should run on 18.x
 always_recompile_when_erl_compiler_options_set(Config) ->
     %% save existing env to restore after test
     ExistingEnv = os:getenv("ERL_COMPILER_OPTIONS"),
