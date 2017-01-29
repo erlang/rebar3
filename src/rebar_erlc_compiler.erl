@@ -322,6 +322,10 @@ needed_files(G, ErlOpts, RebarOpts, Dir, OutDir, SourceFiles) ->
                          AllOpts = [{outdir, filename:dirname(Target)}
                                    ,{i, filename:join(Dir, "include")}
                                    ,{i, Dir}] ++ PrivIncludes ++ ErlOpts,
+                         %% necessary for erlang:function_exported/3 to work as expected
+                         %% called here for clarity as it's required by both opts_changed/2
+                         %% and erl_compiler_opts_set/0
+                         _ = code:ensure_loaded(compile),
                          digraph:vertex(G, Source) > {Source, filelib:last_modified(Target)}
                               orelse opts_changed(AllOpts, TargetBase)
                               orelse erl_compiler_opts_set()
@@ -342,8 +346,12 @@ maybe_rm_beam_and_edge(G, OutDir, Source) ->
     end.
 
 opts_changed(NewOpts, Target) ->
+    TotalOpts = case erlang:function_exported(compile, env_compiler_options, 0) of
+        true  -> NewOpts ++ compile:env_compiler_options();
+        false -> NewOpts
+    end,
     case compile_info(Target) of
-        {ok, Opts} -> lists:sort(Opts) =/= lists:sort(NewOpts);
+        {ok, Opts} -> lists:sort(Opts) =/= lists:sort(TotalOpts);
         _          -> true
     end.
 
@@ -358,10 +366,12 @@ compile_info(Target) ->
     end.
 
 erl_compiler_opts_set() ->
-    case os:getenv("ERL_COMPILER_OPTIONS") of
+    EnvSet = case os:getenv("ERL_COMPILER_OPTIONS") of
         false -> false;
         _     -> true
-    end.
+    end,
+    %% return false if changed env opts would have been caught in opts_changed/2
+    EnvSet andalso not erlang:function_exported(compile, env_compiler_options, 0).
 
 erlcinfo_file(Dir) ->
     filename:join(rebar_dir:local_cache_dir(Dir), ?ERLCINFO_FILE).

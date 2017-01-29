@@ -44,6 +44,8 @@
          include_file_in_src/1,
          include_file_relative_to_working_directory_test/1,
          include_file_in_src_test/1,
+         dont_recompile_when_erl_compiler_options_env_does_not_change/1,
+         recompile_when_erl_compiler_options_env_changes/1,
          always_recompile_when_erl_compiler_options_set/1,
          recompile_when_parse_transform_inline_changes/1,
          recompile_when_parse_transform_as_opt_changes/1,
@@ -74,10 +76,20 @@ all() ->
      include_file_relative_to_working_directory_test, include_file_in_src_test,
      recompile_when_parse_transform_as_opt_changes,
      recompile_when_parse_transform_inline_changes,
-     recursive, no_recursive] ++
-     case erlang:function_exported(os, unsetenv, 1) of
-         true  -> [always_recompile_when_erl_compiler_options_set];
-         false -> []
+     %% recompile behaviour when `ERL_COMPILER_OPTIONS` differs prior to 19.x
+     recursive, no_recursive] ++ recompile_when_env_changes_test().
+
+recompile_when_env_changes_test() ->
+     _ = code:ensure_loaded(os),
+     UnSetEnv = erlang:function_exported(os, unsetenv, 1),
+     _ = code:ensure_loaded(compile),
+     EnvOpts = erlang:function_exported(compile, env_compiler_options, 0),
+     case {UnSetEnv, EnvOpts} of
+         {true, true}  ->
+           [dont_recompile_when_erl_compiler_options_env_does_not_change,
+            recompile_when_erl_compiler_options_env_changes];
+         {true, false} -> [always_recompile_when_erl_compiler_options_set];
+         {false, _}    -> []
      end.
 
 groups() ->
@@ -1385,7 +1397,51 @@ include_file_in_src_test(Config) ->
                                    ["as", "test", "compile"],
                                    {ok, [{app, Name}]}).
 
-always_recompile_when_erl_compiler_options_set(Config) ->
+%% this test sets the env var, compiles, records the file last modified timestamp,
+%% recompiles and compares the file last modified timestamp to ensure it hasn't
+%% changed. this test should run on 19.x+
+dont_recompile_when_erl_compiler_options_env_does_not_change(Config) ->
+    %% save existing env to restore after test
+    ExistingEnv = os:getenv("ERL_COMPILER_OPTIONS"),
+
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("erl_compiler_options_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    true = os:unsetenv("ERL_COMPILER_OPTIONS"),
+
+    true = os:putenv("ERL_COMPILER_OPTIONS", "[{d, some_macro}]"),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+
+    {ok, Files} = rebar_utils:list_dir(EbinDir),
+    ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+               || F <- Files, filename:extension(F) == ".beam"],
+
+    timer:sleep(1000),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
+    NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+                  || F <- NewFiles, filename:extension(F) == ".beam"],
+
+    ?assert(ModTime == NewModTime),
+
+    %% restore existing env
+    case ExistingEnv of
+        false -> ok;
+        _     -> os:putenv("ERL_COMPILER_OPTIONS", ExistingEnv)
+    end.
+
+%% this test compiles, records the file last modified timestamp, sets the env
+%% var, recompiles and compares the file last modified timestamp to ensure it
+%% has changed. this test should run on 19.x+
+recompile_when_erl_compiler_options_env_changes(Config) ->
     %% save existing env to restore after test
     ExistingEnv = os:getenv("ERL_COMPILER_OPTIONS"),
 
@@ -1408,6 +1464,47 @@ always_recompile_when_erl_compiler_options_set(Config) ->
     timer:sleep(1000),
 
     true = os:putenv("ERL_COMPILER_OPTIONS", "[{d, some_macro}]"),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
+    NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+                  || F <- NewFiles, filename:extension(F) == ".beam"],
+
+    ?assert(ModTime =/= NewModTime),
+
+    %% restore existing env
+    case ExistingEnv of
+        false -> ok;
+        _     -> os:putenv("ERL_COMPILER_OPTIONS", ExistingEnv)
+    end.
+
+%% this test sets the env var, compiles, records the file last modified
+%% timestamp, recompiles and compares the file last modified timestamp to
+%% ensure it has changed. this test should run on 18.x
+always_recompile_when_erl_compiler_options_set(Config) ->
+    %% save existing env to restore after test
+    ExistingEnv = os:getenv("ERL_COMPILER_OPTIONS"),
+
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("erl_compiler_options_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    true = os:unsetenv("ERL_COMPILER_OPTIONS"),
+
+    true = os:putenv("ERL_COMPILER_OPTIONS", "[{d, some_macro}]"),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+
+    {ok, Files} = rebar_utils:list_dir(EbinDir),
+    ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+               || F <- Files, filename:extension(F) == ".beam"],
+
+    timer:sleep(1000),
 
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
 
