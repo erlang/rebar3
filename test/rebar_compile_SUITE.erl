@@ -1671,7 +1671,10 @@ regex_filter_skip(Config) ->
                                              {ok, [{file, Expected}]}),
         throw(should_not_be_found)
     catch
-        error:{assert,_} -> % the file was not found, as desired!
+        %% the file was not found, as desired!
+        error:{assertion_failed,_} -> %% OTP =< 17
+            ok;
+        error:{assert,_} -> %% OTP >= 18
             ok
     end.
 
