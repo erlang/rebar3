@@ -56,7 +56,7 @@ best experience you can get.
 A [getting started guide is maintained on the official documentation website](http://www.rebar3.org/docs/getting-started),
 but installing rebar3 can be done by any of the ways described below
 
-Nightly compiled version:
+Latest stable compiled version:
 ```bash
 $ wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
 ```
@@ -69,7 +69,7 @@ $ cd rebar3
 $ ./bootstrap
 ```
 
-Stable versions can be obtained from the [releases page](https://github.com/erlang/rebar3/releases).
+Stable versions can also be obtained from the [releases page](https://github.com/erlang/rebar3/releases).
 
 The rebar3 escript can also extract itself with a run script under the user's home directory:
 
