@@ -49,7 +49,8 @@
          always_recompile_when_erl_compiler_options_set/1,
          recompile_when_parse_transform_inline_changes/1,
          recompile_when_parse_transform_as_opt_changes/1,
-         recursive/1,no_recursive/1]).
+         recursive/1,no_recursive/1,
+         regex_filter_skip/1, regex_filter_regression/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -76,6 +77,7 @@ all() ->
      include_file_relative_to_working_directory_test, include_file_in_src_test,
      recompile_when_parse_transform_as_opt_changes,
      recompile_when_parse_transform_inline_changes,
+     regex_filter_skip, regex_filter_regression,
      %% recompile behaviour when `ERL_COMPILER_OPTIONS` differs prior to 19.x
      recursive, no_recursive] ++ recompile_when_env_changes_test().
 
@@ -1653,5 +1655,38 @@ no_recursive(Config) ->
                                    {ok, [{app, Name}]}),
     {ok, Files2} = rebar_utils:list_dir(EbinDir),
     ?assert(false==lists:member("rec.beam",Files2)),
-
     ok.
+
+regex_filter_skip(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = rebar_test_utils:create_random_name("regex_skip"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:write_src_file(filename:join(AppDir,src),"._rec.erl"),
+    Expected = filename:join([AppDir, "_build", "default", "lib", Name, "ebin","._rec.beam"]),
+
+    RebarConfig = [],
+    try
+        rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"],
+                                             {ok, [{file, Expected}]}),
+        throw(should_not_be_found)
+    catch
+        %% the file was not found, as desired!
+        error:{assertion_failed,_} -> %% OTP =< 17
+            ok;
+        error:{assert,_} -> %% OTP >= 18
+            ok
+    end.
+
+regex_filter_regression(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = rebar_test_utils:create_random_name("regex_regression"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:write_src_file(filename:join(AppDir,src),"r_f.erl"),
+    Expected = filename:join([AppDir, "_build", "default", "lib", Name, "ebin","r_f.beam"]),
+    RebarConfig = [],
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"],
+                                   {ok, [{file, Expected}]}),
+    ok.
+
