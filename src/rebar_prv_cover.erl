@@ -303,7 +303,8 @@ strip_coverdir(File) ->
                                               2))).
 
 cover_compile(State, apps) ->
-    Apps = filter_checkouts(rebar_state:project_apps(State)),
+    ExclApps = [list_to_binary(A) || A <- rebar_state:get(State, cover_excl_apps, [])],
+    Apps = filter_checkouts_and_excluded(rebar_state:project_apps(State), ExclApps),
     AppDirs = app_dirs(Apps),
     cover_compile(State, lists:filter(fun(D) -> ec_file:is_dir(D) end, AppDirs));
 cover_compile(State, Dirs) ->
@@ -313,7 +314,6 @@ cover_compile(State, Dirs) ->
     %% redirect cover output
     true = redirect_cover_output(State, CoverPid),
     ExclMods = rebar_state:get(State, cover_excl_mods, []),
-
     lists:foreach(fun(Dir) ->
         case file:list_dir(Dir) of
             {ok, Files} ->
@@ -356,13 +356,14 @@ app_dirs(Apps) ->
 app_ebin_dirs(App, Acc) ->
     [rebar_app_info:ebin_dir(App)|Acc].
 
-filter_checkouts(Apps) -> filter_checkouts(Apps, []).
+filter_checkouts_and_excluded(Apps, ExclApps) ->
+    filter_checkouts_and_excluded(Apps, ExclApps, []).
 
-filter_checkouts([], Acc) -> lists:reverse(Acc);
-filter_checkouts([App|Rest], Acc) ->
-    case rebar_app_info:is_checkout(App) of
-        true  -> filter_checkouts(Rest, Acc);
-        false -> filter_checkouts(Rest, [App|Acc])
+filter_checkouts_and_excluded([], _ExclApps, Acc) -> lists:reverse(Acc);
+filter_checkouts_and_excluded([App|Rest], ExclApps, Acc) ->
+    case rebar_app_info:is_checkout(App) orelse lists:member(rebar_app_info:name(App), ExclApps) of
+        true  -> filter_checkouts_and_excluded(Rest, ExclApps, Acc);
+        false -> filter_checkouts_and_excluded(Rest, ExclApps, [App|Acc])
     end.
 
 start_cover() ->
