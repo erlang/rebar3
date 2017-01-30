@@ -23,7 +23,11 @@
          mv_file_diff/1,
          mv_file_dir_same/1,
          mv_file_dir_diff/1,
-         mv_no_clobber/1]).
+         mv_no_clobber/1,
+         symlink_existing_dir/1,
+         create_missing_dir/1,
+         delete_symlink_and_create_dir/1,
+         delete_dir_and_create_symlink/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -38,7 +42,11 @@ all() ->
      canonical_path,
      resolve_link,
      split_dirname,
-     mv_warning_is_ignored].
+     mv_warning_is_ignored,
+     symlink_existing_dir,
+     create_missing_dir,
+     delete_symlink_and_create_dir,
+     delete_dir_and_create_symlink].
 
 groups() ->
     [{tmpdir, [], [raw_tmpdir, empty_tmpdir, simple_tmpdir, multi_tmpdir]},
@@ -329,3 +337,84 @@ mk_base_dir(BasePath, Name) ->
     Path = filename:join(BasePath, atom_to_list(Name) ++ Index),
     ec_file:mkdir_p(Path),
     Path.
+
+
+symlink_existing_dir(Config) ->
+    PrivDir = ?config(priv_dir, Config),
+
+    Source = filename:join([PrivDir, "exists"]),
+    Target = filename:join([PrivDir, "_build", "exists"]),
+    ok = filelib:ensure_dir(filename:join([PrivDir, "_build", "dummy"])),
+
+    ok = filelib:ensure_dir(filename:join([Source, "dummy"])),
+
+    ok = rebar_file_utils:symlink_or_create(Source, Target),
+
+    %% `Target' should be a symlink not a directory, and `Source'
+    %% should exist
+    ?assert(ec_file:is_symlink(Target)),
+    ?assert(ec_file:is_dir(Source)).
+
+create_missing_dir(Config) ->
+    PrivDir = ?config(priv_dir, Config),
+
+    Source = filename:join([PrivDir, "missing"]),
+    Target = filename:join([PrivDir, "_build", "missing"]),
+    ok = filelib:ensure_dir(filename:join([PrivDir, "_build", "dummy"])),
+
+    ok = rebar_file_utils:symlink_or_create(Source, Target),
+
+    %% `Target' should be a directory not a symlink, and `Source'
+    %% should not exist
+    ?assert(ec_file:is_dir(Target)),
+    ?assert(not ec_file:is_symlink(Target)),
+    ?assert(not ec_file:is_dir(Source)).
+
+delete_symlink_and_create_dir(Config) ->
+    PrivDir = ?config(priv_dir, Config),
+
+    Source = filename:join([PrivDir, "gone"]),
+    Target = filename:join([PrivDir, "_build", "gone"]),
+    ok = filelib:ensure_dir(filename:join([PrivDir, "_build", "dummy"])),
+
+    %% create dir temporarily to ensure symlink can be created
+    ok = filelib:ensure_dir(filename:join([Source, "dummy"])),
+
+    ?assert(ec_file:is_dir(Source)),
+
+    ok = rebar_file_utils:symlink(Source, Target),
+
+    %% remove source dir
+    ok = ec_file:remove(Source, [recursive]),
+
+    ?assert(ec_file:is_symlink(Target)),
+    ?assert(not ec_file:is_dir(Source)),
+
+    ok = rebar_file_utils:symlink_or_create(Source, Target),
+
+    %% `Target' should be a directory not a symlink, and `Source'
+    %% should not exist
+    ?assert(not ec_file:is_symlink(Target)),
+    ?assert(ec_file:is_dir(Target)),
+    ?assert(not ec_file:is_dir(Source)).
+
+delete_dir_and_create_symlink(Config) ->
+    PrivDir = ?config(priv_dir, Config),
+
+    Source = filename:join([PrivDir, "created"]),
+    Target = filename:join([PrivDir, "_build", "created"]),
+    ok = filelib:ensure_dir(filename:join([PrivDir, "_build", "dummy"])),
+
+    ok = filelib:ensure_dir(filename:join([Source, "dummy"])),
+    ok = filelib:ensure_dir(filename:join([Target, "dummy"])),
+
+    ?assert(not ec_file:is_symlink(Target)),
+    ?assert(ec_file:is_dir(Target)),
+    ?assert(ec_file:is_dir(Source)),
+
+    ok = rebar_file_utils:symlink_or_create(Source, Target),
+
+    %% `Target' should be a symlink not a directory, and `Source'
+    %% should exist
+    ?assert(ec_file:is_symlink(Target)),
+    ?assert(ec_file:is_dir(Source)).

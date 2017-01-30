@@ -29,6 +29,8 @@
 -export([try_consult/1,
          consult_config/2,
          format_error/1,
+         symlink_or_create/2,
+         symlink/2,
          symlink_or_copy/2,
          rm_rf/1,
          cp_r/2,
@@ -86,6 +88,36 @@ consult_config(State, Filename) ->
 format_error({bad_term_file, AppFile, Reason}) ->
     io_lib:format("Error reading file ~s: ~s", [AppFile, file:format_error(Reason)]).
 
+-spec symlink_or_create(Source, Target) -> Result when
+    Source :: file:filename(),
+    Target :: file:filename(),
+    Result :: Ok | Error,
+    Ok :: ok,
+    Error :: {error, string()}.
+symlink_or_create(Source, Target) ->
+    SourceExists = ec_file:is_dir(Source) orelse ec_file:is_symlink(Source),
+
+    case SourceExists of
+        true  -> force_link(Source, Target);
+        false -> force_shadow_dir(Target)
+    end.
+
+-spec symlink(Source, Target) -> Result when
+    Source :: file:filename(),
+    Target :: file:filename(),
+    Result :: Ok | Error,
+    Ok :: ok,
+    Error :: {error, string()}.
+symlink(Source, Target) ->
+    case os:type() of
+        {win32, _} ->
+            S = unicode:characters_to_list(Source),
+            T = unicode:characters_to_list(Target),
+            win32_symlink(S, T);
+        _          ->
+            file:make_symlink(Source, Target)
+    end.
+
 symlink_or_copy(Source, Target) ->
     Link = case os:type() of
                {win32, _} ->
@@ -118,21 +150,6 @@ symlink_or_copy(Source, Target) ->
                     end
             end
     end.
-
-win32_symlink(Source, Target) ->
-    Res = rebar_utils:sh(
-            ?FMT("cmd /c mklink /j \"~s\" \"~s\"",
-                 [rebar_utils:escape_double_quotes(filename:nativename(Target)),
-                  rebar_utils:escape_double_quotes(filename:nativename(Source))]),
-            [{use_stdout, false}, return_on_error]),
-    case win32_ok(Res) of
-        true -> ok;
-        false ->
-            {error, lists:flatten(
-                      io_lib:format("Failed to symlink ~s to ~s~n",
-                                    [Source, Target]))}
-    end.
-
 
 %% @doc Remove files and directories.
 %% Target is a single filename, directoryname or wildcard expression.
@@ -475,3 +492,39 @@ cp_r_win32(Source,Dest) ->
                           ok = cp_r_win32({filelib:is_dir(Src), Src}, Dst)
                   end, filelib:wildcard(Source)),
     ok.
+
+win32_symlink(Source, Target) ->
+    Res = rebar_utils:sh(
+            ?FMT("cmd /c mklink /j \"~s\" \"~s\"",
+                 [rebar_utils:escape_double_quotes(filename:nativename(Target)),
+                  rebar_utils:escape_double_quotes(filename:nativename(Source))]),
+            [{use_stdout, false}, return_on_error]),
+    case win32_ok(Res) of
+        true -> ok;
+        false ->
+            {error, lists:flatten(
+                      io_lib:format("Failed to symlink ~s to ~s~n",
+                                    [Source, Target]))}
+    end.
+
+force_link(Source, Target) ->
+    %% remove any existing dir
+    ok = case ec_file:is_dir(Target) of
+        true  -> ec_file:remove(Target, [recursive]);
+        false -> ok
+    end,
+    symlink(Source, Target).
+
+force_shadow_dir(Target) ->
+    %% remove any existing symlink
+    ok = case ec_file:is_symlink(Target) of
+        true  -> ec_file:remove(Target);
+        false -> ok
+    end,
+    %% if a directory already exists leave it unaltered, otherwise
+    %% create it
+    case ec_file:is_dir(Target) of
+        true  -> ok;
+        false -> filelib:ensure_dir(filename:join([Target, "dummy"]))
+    end.
+    
