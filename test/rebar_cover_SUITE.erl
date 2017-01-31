@@ -13,7 +13,7 @@
          index_written/1,
          flag_verbose/1,
          config_verbose/1,
-         excl_mods/1,
+         excl_mods_and_apps/1,
          coverdata_is_reset_on_write/1]).
 
 -include_lib("common_test/include/ct.hrl").
@@ -38,7 +38,7 @@ all() ->
      root_extra_src_dirs,
      index_written,
      flag_verbose, config_verbose,
-     excl_mods, coverdata_is_reset_on_write].
+     excl_mods_and_apps, coverdata_is_reset_on_write].
 
 flag_coverdata_written(Config) ->
     AppDir = ?config(apps, Config),
@@ -210,7 +210,7 @@ config_verbose(Config) ->
 
     true = filelib:is_file(filename:join([AppDir, "_build", "test", "cover", "index.html"])).
 
-excl_mods(Config) ->
+excl_mods_and_apps(Config) ->
     AppDir = ?config(apps, Config),
 
     Name1 = rebar_test_utils:create_random_name("relapp1_"),
@@ -221,18 +221,25 @@ excl_mods(Config) ->
     Vsn2 = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(filename:join([AppDir, "apps", Name2]), Name2, Vsn2, [kernel, stdlib]),
 
+    Name3 = rebar_test_utils:create_random_name("excludeme_"),
+    Vsn3 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([AppDir, "apps", Name3]), Name3, Vsn3, [kernel, stdlib]),
+
     Mod1 = list_to_atom(Name1),
     Mod2 = list_to_atom(Name2),
+    Mod3 = list_to_atom(Name3),
     RebarConfig = [{erl_opts, [{d, some_define}]},
-                   {cover_excl_mods, [Mod2]}],
+                   {cover_excl_mods, [Mod2]},
+                   {cover_excl_apps, [Name3]}],
 
     rebar_test_utils:run_and_check(Config,
                                    RebarConfig,
                                    ["eunit", "--cover"],
-                                   {ok, [{app, Name1}, {app, Name2}]}),
+                                   {ok, [{app, Name1}, {app, Name2}, {app, Name3}]}),
 
     {file, _} = cover:is_compiled(Mod1),
-    false = cover:is_compiled(Mod2).
+    false = cover:is_compiled(Mod2),
+    false = cover:is_compiled(Mod3).
 
 coverdata_is_reset_on_write(Config) ->
     AppDir = ?config(apps, Config),
