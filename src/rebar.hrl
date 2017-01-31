@@ -24,14 +24,32 @@
 -define(DEFAULT_RELEASE_DIR, "rel").
 -define(CONFIG_VERSION, "1.1.0").
 -define(DEFAULT_CDN, "https://repo.hex.pm/").
+-define(DEFAULT_REGISTRY, "https://repo.hex.pm/").
+-define(REPOS_TABLE, repos_table).
 -define(REMOTE_PACKAGE_DIR, "tarballs").
 -define(REMOTE_REGISTRY_FILE, "registry.ets.gz").
 -define(LOCK_FILE, "rebar.lock").
 -define(DEFAULT_COMPILER_SOURCE_FORMAT, relative).
 
+%% Hex related OS env vars
+-define(HEX_UNSAFE_REGISTRY, "HEX_UNSAFE_REGISTRY").
+
+%% Public key for the default hex registry at the time of this commit.
+%% Users can update manually and we update the build when a new one
+%% is created.
+-define(DEFAULT_REPO_PUBLIC_KEY,
+<<"-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApqREcFDt5vV21JVe2QNB
+Edvzk6w36aNFhVGWN5toNJRjRJ6m4hIuG4KaXtDWVLjnvct6MYMfqhC79HAGwyF+
+IqR6Q6a5bbFSsImgBJwz1oadoVKD6ZNetAuCIK84cjMrEFRkELtEIPNHblCzUkkM
+3rS9+DPlnfG8hBvGi6tvQIuZmXGCxF/73hU0/MyGhbmEjIKRtG6b0sJYKelRLTPW
+XgK7s5pESgiwf2YC/2MGDXjAJfpfCd0RpLdvd4eRiXtVlE9qO9bND94E7PgQ/xqZ
+J1i2xWFndWa6nfFnRxZmCStCOZWYYPlaxr+FZceFbpMwzTNs4g3d4tLNUcbKAIH4
+0wIDAQAB
+-----END PUBLIC KEY-----">>).
+
 -define(PACKAGE_INDEX_VERSION, 3).
--define(PACKAGE_TABLE, package_index).
--define(INDEX_FILE, "packages.idx").
+-define(INDEX_FILE, "registry"). %"packages.idx").
 -define(REGISTRY_FILE, "registry").
 
 -ifdef(namespaced_types).

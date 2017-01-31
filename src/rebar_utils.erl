@@ -845,11 +845,15 @@ set_httpc_options(Scheme, Proxy) ->
     set_proxy_auth(UserInfo).
 
 url_append_path(Url, ExtraPath) ->
-     case http_uri:parse(Url) of
+     try http_uri:parse(Url) of
          {ok, {Scheme, UserInfo, Host, Port, Path, Query}} ->
              {ok, lists:append([atom_to_list(Scheme), "://", UserInfo, Host, ":", integer_to_list(Port),
                                 filename:join(Path, ExtraPath), "?", Query])};
          _ ->
+             error
+     catch
+         C:T ->
+             ?DEBUG("Failed url_append_path ~p ~p: ~p ~p", [Url, ExtraPath, C, T]),
              error
      end.
 
@@ -885,7 +889,7 @@ list_dir(Dir) ->
 set_proxy_auth([]) ->
     ok;
 set_proxy_auth(UserInfo) ->
-    Idx = string:chr(UserInfo, $:), 
+    Idx = string:chr(UserInfo, $:),
     Username = string:sub_string(UserInfo, 1, Idx-1),
     Password = string:sub_string(UserInfo, Idx+1),
     %% password may contain url encoded characters, need to decode them first

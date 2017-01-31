@@ -39,6 +39,8 @@ do(State) ->
         State2 = rebar_plugins:project_apps_install(State1),
         {ok, State2}
     catch
+        throw:{error, {rebar_prv_update, Error}} ->
+            {error, {rebar_prv_update, Error}};
         throw:{error, {rebar_packages, Error}} ->
             {error, {rebar_packages, Error}};
         throw:{error, {rebar_app_utils, Error}} ->

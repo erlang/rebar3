@@ -28,19 +28,19 @@ needs_update(Dir, {pkg, _Name, Vsn, _Hash}) ->
             true
     end.
 
-download(TmpDir, Pkg={pkg, Name, Vsn, _Hash}, State) ->
-    CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
-    {ok, PackageDir} = rebar_packages:package_dir(State),
+download(TmpDir, Pkg={{pkg, Name, Vsn, _Hash}, Registry}, State) ->
+    %% CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
+    {ok, PackageDir} = rebar_packages:package_dir(Registry, State),
     Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
     CachePath = filename:join(PackageDir, Package),
-    case rebar_utils:url_append_path(CDN, filename:join(?REMOTE_PACKAGE_DIR, Package)) of
+    case rebar_utils:url_append_path(Registry, filename:join(?REMOTE_PACKAGE_DIR, Package)) of
         {ok, Url} ->
             cached_download(TmpDir, CachePath, Pkg, Url, etag(CachePath), State);
         _ ->
             {fetch_fail, Name, Vsn}
     end.
 
-cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash}, Url, ETag, State) ->
+cached_download(TmpDir, CachePath, Pkg={{pkg, Name, Vsn, _Hash}, _Registry}, Url, ETag, State) ->
     case request(Url, ETag) of
         {ok, cached} ->
             ?INFO("Version cached at ~s is up to date, reusing it", [CachePath]),
@@ -95,7 +95,7 @@ extract(TmpDir, CachePath) ->
     {"metadata.config", Meta} = lists:keyfind("metadata.config", 1, Files),
     {Files, Contents, Version, Meta}.
 
-checksums(Pkg={pkg, _Name, _Vsn, Hash}, Files, Contents, Version, Meta, State) ->
+checksums(Pkg={{pkg, _Name, _Vsn, Hash}, _Registry}, Files, Contents, Version, Meta, State) ->
     Blob = <<Version/binary, Meta/binary, Contents/binary>>,
     <<X:256/big-unsigned>> = crypto:hash(sha256, Blob),
     BinChecksum = list_to_binary(string:to_upper(lists:flatten(io_lib:format("~64.16.0b", [X])))),

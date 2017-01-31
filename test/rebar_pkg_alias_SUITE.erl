@@ -10,27 +10,24 @@ all() -> [same_alias, diff_alias, diff_alias_vsn, transitive_alias,
 %% {uuid, {pkg, uuid}} = uuid
 %% {uuid, {pkg, alias}} = uuid on disk
 %% another run should yield the same lock file without error
-init_per_suite(Config) ->
-    mock_config(?MODULE, Config).
-
-end_per_suite(Config) ->
-    unmock_config(Config).
-
-init_per_testcase(same_alias, Config0) ->
-    Config = rebar_test_utils:init_rebar_state(Config0,"same_alias_"),
-    AppDir = ?config(apps, Config),
+init_per_testcase(same_alias, Config) ->
+    Config1 = mock_config(?MODULE, Config),
+    Config2 = rebar_test_utils:init_rebar_state(Config1,"same_alias_"),
+    AppDir = ?config(apps, Config2),
     rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
     RebarConf = rebar_test_utils:create_config(AppDir, [{deps, [{fakelib, {pkg, fakelib}}]}]),
-    [{rebarconfig, RebarConf} | Config];
-init_per_testcase(diff_alias, Config0) ->
-    Config = rebar_test_utils:init_rebar_state(Config0,"diff_alias_"),
-    AppDir = ?config(apps, Config),
+    [{rebarconfig, RebarConf} | Config2];
+init_per_testcase(diff_alias, Config) ->
+    Config1 = mock_config(?MODULE, Config),
+    Config2 = rebar_test_utils:init_rebar_state(Config1,"diff_alias_"),
+    AppDir = ?config(apps, Config2),
     rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
     RebarConf = rebar_test_utils:create_config(AppDir, [{deps, [{fakelib, {pkg, goodpkg}}]}]),
-    [{rebarconfig, RebarConf} | Config];
-init_per_testcase(diff_alias_vsn, Config0) ->
-    Config = rebar_test_utils:init_rebar_state(Config0,"diff_alias_vsn_"),
-    AppDir = ?config(apps, Config),
+    [{rebarconfig, RebarConf} | Config2];
+init_per_testcase(diff_alias_vsn, Config) ->
+    Config1 = mock_config(?MODULE, Config),
+    Config2 = rebar_test_utils:init_rebar_state(Config1,"diff_alias_vsn_"),
+    AppDir = ?config(apps, Config2),
     rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
     RebarConf = rebar_test_utils:create_config(AppDir, [{deps, [{fakelib, "1.0.0", {pkg, goodpkg}}]}]),
     [{rebarconfig, RebarConf} | Config];
@@ -48,7 +45,7 @@ init_per_testcase(transitive_hash_mismatch, Config0) ->
     [{rebarconfig, RebarConf} | Config].
 
 end_per_testcase(_, Config) ->
-    Config.
+    unmock_config(Config).
 
 same_alias(Config) ->
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
@@ -190,15 +187,17 @@ mock_config(Name, Config) ->
         {{<<"transitive">>,<<"1.0.0">>}, [[], ChkTrans, [<<"rebar3">>]]}
     ]),
     ok = ets:tab2file(Tid, filename:join([CacheDir, "registry"])),
-    ets:delete(Tid),
+
+    true = ets:insert(repos_table, {default, Tid}),
+
     %% The state returns us a fake registry
     meck:new(rebar_dir, [passthrough, no_link]),
     meck:expect(rebar_dir, global_cache_dir, fun(_) -> CacheRoot end),
 
     meck:new(rebar_packages, [passthrough, no_link]),
-    meck:expect(rebar_packages, registry_dir, fun(_) -> {ok, CacheDir} end),
-    meck:expect(rebar_packages, package_dir, fun(_) -> {ok, CacheDir} end),
-    rebar_prv_update:hex_to_index(rebar_state:new()),
+    meck:expect(rebar_packages, verify_table, fun(_, _) -> {ok, Tid} end),
+    meck:expect(rebar_packages, registry_dir, fun(_, _) -> {ok, CacheDir} end),
+    meck:expect(rebar_packages, package_dir, fun(_, _) -> {ok, CacheDir} end),
 
     %% Cache fetches are mocked -- we assume the server and clients are
     %% correctly used.
