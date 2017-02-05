@@ -195,13 +195,15 @@ copy_app_dirs(AppInfo, OldAppDir, AppDir) ->
                     %% If mibs exist it means we must ensure priv exists.
                     %% mibs files are compiled to priv/mibs/
                     filelib:ensure_dir(filename:join([OldAppDir, "priv", "dummy"])),
-                    symlink_or_copy(OldAppDir, AppDir, "mibs");
+                    symlink_or_create(OldAppDir, AppDir, "mibs");
                 false ->
                     ok
             end,
             {SrcDirs, ExtraDirs} = resolve_src_dirs(rebar_app_info:opts(AppInfo)),
+            %% some tools depend on 'priv' and/or 'include' existing
+            [symlink_or_create(OldAppDir, AppDir, Dir) || Dir <- ["priv", "include"]],
             %% link to src_dirs to be adjacent to ebin is needed for R15 use of cover/xref
-            [symlink_or_copy(OldAppDir, AppDir, Dir) || Dir <- ["priv", "include"] ++ SrcDirs],
+            [symlink(OldAppDir, AppDir, Dir) || Dir <- SrcDirs],
             %% copy all extra_src_dirs as they build into themselves and linking means they
             %% are shared across profiles
             [copy(OldAppDir, AppDir, Dir) || Dir <- ExtraDirs];
@@ -209,10 +211,15 @@ copy_app_dirs(AppInfo, OldAppDir, AppDir) ->
             ok
     end.
 
-symlink_or_copy(OldAppDir, AppDir, Dir) ->
+symlink_or_create(OldAppDir, AppDir, Dir) ->
     Source = filename:join([OldAppDir, Dir]),
     Target = filename:join([AppDir, Dir]),
     rebar_file_utils:symlink_or_copy(Source, Target).
+
+symlink(OldAppDir, AppDir, Dir) ->
+    Source = filename:join([OldAppDir, Dir]),
+    Target = filename:join([AppDir, Dir]),
+    rebar_file_utils:symlink(Source, Target).
 
 copy(OldAppDir, AppDir, Dir) ->
     Source = filename:join([OldAppDir, Dir]),
