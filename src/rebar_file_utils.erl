@@ -29,7 +29,7 @@
 -export([try_consult/1,
          consult_config/2,
          format_error/1,
-         symlink_or_create/2,
+         symlink_or_create_dir/2,
          symlink/2,
          symlink_or_copy/2,
          rm_rf/1,
@@ -88,13 +88,13 @@ consult_config(State, Filename) ->
 format_error({bad_term_file, AppFile, Reason}) ->
     io_lib:format("Error reading file ~s: ~s", [AppFile, file:format_error(Reason)]).
 
--spec symlink_or_create(Source, Target) -> Result when
+-spec symlink_or_create_dir(Source, Target) -> Result when
     Source :: file:filename(),
     Target :: file:filename(),
     Result :: Ok | Error,
     Ok :: ok,
     Error :: {error, string()}.
-symlink_or_create(Source, Target) ->
+symlink_or_create_dir(Source, Target) ->
     SourceExists = ec_file:is_dir(Source) orelse ec_file:is_symlink(Source),
 
     case SourceExists of
@@ -509,11 +509,15 @@ win32_symlink(Source, Target) ->
 
 force_link(Source, Target) ->
     %% remove any existing dir
-    ok = case ec_file:is_dir(Target) of
+    ok = case ec_file:is_dir(Target) andalso not ec_file:is_symlink(Target) of
         true  -> ec_file:remove(Target, [recursive]);
         false -> ok
     end,
-    symlink(Source, Target).
+    %% symlink only if not already symlinked
+    ok = case ec_file:is_symlink(Target) of
+        true  -> ok;
+        false -> symlink(Source, Target)
+    end.
 
 force_shadow_dir(Target) ->
     %% remove any existing symlink
