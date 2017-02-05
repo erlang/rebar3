@@ -109,13 +109,11 @@ symlink_or_create_dir(Source, Target) ->
     Ok :: ok,
     Error :: {error, string()}.
 symlink(Source, Target) ->
-    case os:type() of
-        {win32, _} ->
-            S = unicode:characters_to_list(Source),
-            T = unicode:characters_to_list(Target),
-            win32_symlink(S, T);
-        _          ->
-            file:make_symlink(Source, Target)
+    SourceExists = ec_file:is_dir(Source) orelse ec_file:is_symlink(Source),
+
+    case SourceExists of
+        true  -> force_link(Source, Target);
+        false -> ok
     end.
 
 symlink_or_copy(Source, Target) ->
@@ -493,20 +491,6 @@ cp_r_win32(Source,Dest) ->
                   end, filelib:wildcard(Source)),
     ok.
 
-win32_symlink(Source, Target) ->
-    Res = rebar_utils:sh(
-            ?FMT("cmd /c mklink /j \"~s\" \"~s\"",
-                 [rebar_utils:escape_double_quotes(filename:nativename(Target)),
-                  rebar_utils:escape_double_quotes(filename:nativename(Source))]),
-            [{use_stdout, false}, return_on_error]),
-    case win32_ok(Res) of
-        true -> ok;
-        false ->
-            {error, lists:flatten(
-                      io_lib:format("Failed to symlink ~s to ~s~n",
-                                    [Source, Target]))}
-    end.
-
 force_link(Source, Target) ->
     %% remove any existing dir
     ok = case ec_file:is_dir(Target) andalso not ec_file:is_symlink(Target) of
@@ -516,7 +500,7 @@ force_link(Source, Target) ->
     %% symlink only if not already symlinked
     ok = case ec_file:is_symlink(Target) of
         true  -> ok;
-        false -> symlink(Source, Target)
+        false -> do_symlink(Source, Target)
     end.
 
 force_shadow_dir(Target) ->
@@ -530,5 +514,29 @@ force_shadow_dir(Target) ->
     case ec_file:is_dir(Target) of
         true  -> ok;
         false -> filelib:ensure_dir(filename:join([Target, "dummy"]))
+    end.
+
+do_symlink(Source, Target) ->
+    case os:type() of
+        {win32, _} ->
+            S = unicode:characters_to_list(Source),
+            T = unicode:characters_to_list(Target),
+            win32_symlink(S, T);
+        _          ->
+            file:make_symlink(Source, Target)
+    end.
+
+win32_symlink(Source, Target) ->
+    Res = rebar_utils:sh(
+            ?FMT("cmd /c mklink /j \"~s\" \"~s\"",
+                 [rebar_utils:escape_double_quotes(filename:nativename(Target)),
+                  rebar_utils:escape_double_quotes(filename:nativename(Source))]),
+            [{use_stdout, false}, return_on_error]),
+    case win32_ok(Res) of
+        true -> ok;
+        false ->
+            {error, lists:flatten(
+                      io_lib:format("Failed to symlink ~s to ~s~n",
+                                    [Source, Target]))}
     end.
     
