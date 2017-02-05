@@ -358,6 +358,15 @@ symlink_existing_dir(Config) ->
     %% should exist
     ?assert(ec_file:is_dir(Target)),
     ?assert(ec_file:is_symlink(Target)),
+    ?assert(ec_file:is_dir(Source)),
+
+    %% repeat to check for idempotence
+    ok = rebar_file_utils:symlink_or_create_dir(Source, Target),
+
+    %% `Target' should be a symlink, and `Source'
+    %% should exist
+    ?assert(ec_file:is_dir(Target)),
+    ?assert(ec_file:is_symlink(Target)),
     ?assert(ec_file:is_dir(Source)).
 
 preserve_existing_symlink(Config) ->
@@ -371,6 +380,15 @@ preserve_existing_symlink(Config) ->
 
     ok = rebar_file_utils:symlink(Source, Target),
 
+    ok = rebar_file_utils:symlink_or_create_dir(Source, Target),
+
+    %% `Target' should be a symlink, and `Source'
+    %% should exist
+    ?assert(ec_file:is_dir(Target)),
+    ?assert(ec_file:is_symlink(Target)),
+    ?assert(ec_file:is_dir(Source)),
+
+    %% repeat to check for idempotence
     ok = rebar_file_utils:symlink_or_create_dir(Source, Target),
 
     %% `Target' should be a symlink, and `Source'
@@ -392,6 +410,15 @@ create_missing_dir(Config) ->
     %% should not exist
     ?assert(ec_file:is_dir(Target)),
     ?assert(not ec_file:is_symlink(Target)),
+    ?assert(not ec_file:is_dir(Source)),
+
+    %% repeat to check for idempotence
+    ok = rebar_file_utils:symlink_or_create_dir(Source, Target),
+
+    %% `Target' should be a directory not a symlink, and `Source'
+    %% should not exist
+    ?assert(ec_file:is_dir(Target)),
+    ?assert(not ec_file:is_symlink(Target)),
     ?assert(not ec_file:is_dir(Source)).
 
 preserve_existing_dir(Config) ->
@@ -403,6 +430,15 @@ preserve_existing_dir(Config) ->
 
     ok = filelib:ensure_dir(filename:join([Target, "dummy"])),
 
+    ok = rebar_file_utils:symlink_or_create_dir(Source, Target),
+
+    %% `Target' should be a directory, and `Source'
+    %% should not exist
+    ?assert(ec_file:is_dir(Target)),
+    ?assert(not ec_file:is_symlink(Target)),
+    ?assert(not ec_file:is_dir(Source)),
+
+    %% repeat to check for idempotence
     ok = rebar_file_utils:symlink_or_create_dir(Source, Target),
 
     %% `Target' should be a directory, and `Source'
@@ -435,6 +471,15 @@ delete_symlink_and_create_dir(Config) ->
     %% should not exist
     ?assert(not ec_file:is_symlink(Target)),
     ?assert(ec_file:is_dir(Target)),
+    ?assert(not ec_file:is_dir(Source)),
+
+    %% repeat to check for idempotence
+    ok = rebar_file_utils:symlink_or_create_dir(Source, Target),
+
+    %% `Target' should be a directory not a symlink, and `Source'
+    %% should not exist
+    ?assert(not ec_file:is_symlink(Target)),
+    ?assert(ec_file:is_dir(Target)),
     ?assert(not ec_file:is_dir(Source)).
 
 delete_dir_and_create_symlink(Config) ->
@@ -451,6 +496,15 @@ delete_dir_and_create_symlink(Config) ->
     ?assert(ec_file:is_dir(Target)),
     ?assert(ec_file:is_dir(Source)),
 
+    ok = rebar_file_utils:symlink_or_create_dir(Source, Target),
+
+    %% `Target' should be a symlink not a directory, and `Source'
+    %% should exist
+    ?assert(ec_file:is_dir(Target)),
+    ?assert(ec_file:is_symlink(Target)),
+    ?assert(ec_file:is_dir(Source)),
+
+    %% repeat to check for idempotence
     ok = rebar_file_utils:symlink_or_create_dir(Source, Target),
 
     %% `Target' should be a symlink not a directory, and `Source'
