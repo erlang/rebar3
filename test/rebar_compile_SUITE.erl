@@ -78,21 +78,10 @@ all() ->
      recompile_when_parse_transform_as_opt_changes,
      recompile_when_parse_transform_inline_changes,
      regex_filter_skip, regex_filter_regression,
-     %% recompile behaviour when `ERL_COMPILER_OPTIONS` differs prior to 19.x
-     recursive, no_recursive] ++ recompile_when_env_changes_test().
-
-recompile_when_env_changes_test() ->
-     _ = code:ensure_loaded(os),
-     UnSetEnv = erlang:function_exported(os, unsetenv, 1),
-     _ = code:ensure_loaded(compile),
-     EnvOpts = erlang:function_exported(compile, env_compiler_options, 0),
-     case {UnSetEnv, EnvOpts} of
-         {true, true}  ->
-           [dont_recompile_when_erl_compiler_options_env_does_not_change,
-            recompile_when_erl_compiler_options_env_changes];
-         {true, false} -> [always_recompile_when_erl_compiler_options_set];
-         {false, _}    -> []
-     end.
+     recursive, no_recursive,
+     always_recompile_when_erl_compiler_options_set,
+     dont_recompile_when_erl_compiler_options_env_does_not_change,
+     recompile_when_erl_compiler_options_env_changes].
 
 groups() ->
     [{basic_app, [], [build_basic_app, paths_basic_app, clean_basic_app]},
@@ -266,7 +255,31 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     ok.
 
-init_per_testcase(_, Config) ->
+init_per_testcase(Test, Config) when
+        Test == dont_recompile_when_erl_compiler_options_env_does_not_change
+    orelse
+        Test == recompile_when_erl_compiler_options_env_changes ->
+    _ = code:ensure_loaded(os),
+    UnSetEnv = erlang:function_exported(os, unsetenv, 1),
+    _ = code:ensure_loaded(compile),
+    EnvOpts = erlang:function_exported(compile, env_compiler_options, 0),
+    case {UnSetEnv, EnvOpts} of
+        {true, true} -> maybe_init_config(Config);
+        _            -> {skip, "compile:env_compiler_options/0 unavailable"}
+    end;
+init_per_testcase(always_recompile_when_erl_compiler_options_set, Config) ->
+    _ = code:ensure_loaded(os),
+    UnSetEnv = erlang:function_exported(os, unsetenv, 1),
+    _ = code:ensure_loaded(compile),
+    EnvOpts = erlang:function_exported(compile, env_compiler_options, 0),
+    case {UnSetEnv, EnvOpts} of
+        {true, true}  -> {skip, "compile:env_compiler_options/0 available"};
+        {true, false} -> maybe_init_config(Config);
+        _             -> {skip, "os:unsetenv/1 unavailable"}
+    end;
+init_per_testcase(_, Config) -> maybe_init_config(Config).
+
+maybe_init_config(Config) ->
     case ?config(apps, Config) of
         undefined -> rebar_test_utils:init_rebar_state(Config);
         _         -> Config
@@ -274,7 +287,6 @@ init_per_testcase(_, Config) ->
 
 end_per_testcase(_, _Config) ->
     catch meck:unload().
-
 
 
 %% test cases
