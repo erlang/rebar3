@@ -83,13 +83,16 @@ run_tests(State, Tests) ->
     EUnitOpts = resolve_eunit_opts(State),
     ?DEBUG("eunit_tests ~p", [T]),
     ?DEBUG("eunit_opts  ~p", [EUnitOpts]),
-    Result = eunit:test(T, EUnitOpts),
-    ok = maybe_write_coverdata(State),
-    case handle_results(Result) of
-        {error, Reason} ->
-            ?PRV_ERROR(Reason);
-        ok ->
-            {ok, State}
+    try eunit:test(T, EUnitOpts) of
+      Result ->
+        ok = maybe_write_coverdata(State),
+        case handle_results(Result) of
+            {error, Reason} ->
+                ?PRV_ERROR(Reason);
+            ok ->
+                {ok, State}
+        end
+    catch error:badarg -> ?PRV_ERROR({error, badarg})
     end.
 
 -spec format_error(any()) -> iolist().
