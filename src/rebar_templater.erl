@@ -334,7 +334,18 @@ find_plugin_templates(State) ->
      || App <- rebar_state:all_plugin_deps(State),
         Priv <- [rebar_app_info:priv_dir(App)],
         Priv =/= undefined,
+        File <- rebar_utils:find_files(Priv, ?TEMPLATE_RE)]
+    ++ %% and add global plugins too
+    [{plugin, File}
+     || PSource <- rebar_state:get(State, {plugins, global}, []),
+        Plugin <- [plugin_provider(PSource)],
+        is_atom(Plugin),
+        Priv <- [code:priv_dir(Plugin)],
+        Priv =/= undefined,
         File <- rebar_utils:find_files(Priv, ?TEMPLATE_RE)].
+
+plugin_provider(P) when is_atom(P) -> P;
+plugin_provider(T) when is_tuple(T) -> element(1, T).
 
 %% Take an existing list of templates and tag them by name the way
 %% the user would enter it from the CLI
