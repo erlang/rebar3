@@ -1,14 +1,24 @@
-sudo: false
 language: erlang
-install: 'true'
-otp_release:
-- 19.1
-- 18.0
-- 17.5
-- R16B03-1
-- R15B03
-before_script: "./bootstrap"
-script: "./rebar3 ct"
+matrix:
+  include:
+    - os: linux
+      otp_release: R15B03
+    - os: linux
+      otp_release: R16B03-1
+    - os: linux
+      otp_release: 17.5
+    - os: linux
+      otp_release: 18.3
+    - os: linux
+      otp_release: 19.2
+    - os: osx
+      language: generic
+before_script:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
+  ## should eventually use a tap that has previous erlang versions here
+  ## as this only uses the latest erlang available via brew
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install erlang; fi
+script: "./bootstrap && ./rebar3 ct"
 branches:
   only:
   - master
@@ -23,7 +33,6 @@ deploy:
     on:
       repo: erlang/rebar3
       tags: true
-
   - provider: s3
     access_key_id: AKIAJAPYAQEFYCYSNL7Q
     secret_access_key:
