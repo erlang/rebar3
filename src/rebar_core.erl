@@ -114,7 +114,10 @@ process_command(State, Command) ->
                     Profiles = providers:profiles(CommandProvider),
                     State1 = rebar_state:apply_profiles(State, Profiles),
                     Opts = providers:opts(CommandProvider)++rebar3:global_option_spec_list(),
-                    case getopt:parse(Opts, rebar_state:command_args(State1)) of
+                    Fold = erlang:atom_to_list(Namespace) ++ "_" ++ erlang:atom_to_list(Command),
+                    DoFold = os:getenv("TRAVIS"),
+                    travis_start(Fold, DoFold),
+                    Ret = case getopt:parse(Opts, rebar_state:command_args(State1)) of
                         {ok, Args} ->
                             State2 = rebar_state:command_parsed_args(State1, Args),
                             do(TargetProviders, State2);
@@ -124,9 +127,22 @@ process_command(State, Command) ->
                             {error, io_lib:format("Invalid argument ~s to option ~s", [Arg, Option])};
                         {error, {missing_option_arg, Option}} ->
                             {error, io_lib:format("Missing argument to option ~s", [Option])}
-                    end
+                    end,
+                    travis_end(Fold, DoFold),
+                    Ret
             end
     end.
+
+travis_start(Str, DoFold) ->
+    travis_fold("start", Str, DoFold).
+
+travis_end(Str, DoFold) ->
+    travis_fold("end", Str, DoFold).
+
+travis_fold(_, _, false) ->
+    ok;
+travis_fold(Evt, Task, _) ->
+    io:format("travis_fold:~s:rebar3_~s~n", [Evt, Task]).
 
 %% @doc execute the selected providers. If a chain of providers
 %% has been returned, run them one after the other, while piping
