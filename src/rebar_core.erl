@@ -116,7 +116,7 @@ process_command(State, Command) ->
                     Opts = providers:opts(CommandProvider)++rebar3:global_option_spec_list(),
                     Fold = erlang:atom_to_list(Namespace) ++ "_" ++ erlang:atom_to_list(Command),
                     DoFold = os:getenv("TRAVIS"),
-                    travis_start(Fold, DoFold),
+                    FoldState = travis_start(Fold, DoFold),
                     Ret = case getopt:parse(Opts, rebar_state:command_args(State1)) of
                         {ok, Args} ->
                             State2 = rebar_state:command_parsed_args(State1, Args),
@@ -128,21 +128,32 @@ process_command(State, Command) ->
                         {error, {missing_option_arg, Option}} ->
                             {error, io_lib:format("Missing argument to option ~s", [Option])}
                     end,
-                    travis_end(Fold, DoFold),
+                    travis_end(Fold, FoldState),
                     Ret
             end
     end.
 
-travis_start(Str, DoFold) ->
-    travis_fold("start", Str, DoFold).
+travis_start(_, false) ->
+    false;
+travis_start(Fold, _) ->
+    Tag = lists:flatten(io_lib:format("~8..0B", [random:uniform(99999999)])),
+    travis_fold("start", Fold),
+    io:format("travis_time:start:~s~n", [Tag]),
+    {unix_nanoseconds(), Tag}.
 
-travis_end(Str, DoFold) ->
-    travis_fold("end", Str, DoFold).
-
-travis_fold(_, _, false) ->
+travis_end(_, false) ->
     ok;
-travis_fold(Evt, Task, _) ->
+travis_end(Fold, {StartTime, Tag}) ->
+    FinishTime = unix_nanoseconds(),
+    io:format("travis_time:end:~s:start=~B,finish=~w,duration=~w~n", [Tag, StartTime, FinishTime, FinishTime - StartTime]),
+    travis_fold("end", Fold).
+
+travis_fold(Evt, Task) ->
     io:format("travis_fold:~s:rebar3_~s~n", [Evt, Task]).
+
+unix_nanoseconds() ->
+    {Mega, Sec, Micro} = os:timestamp(),
+    ((Mega * 1000000 + Sec) * 1000000 + Micro) * 1000.
 
 %% @doc execute the selected providers. If a chain of providers
 %% has been returned, run them one after the other, while piping
