@@ -8,7 +8,7 @@
 -export([create_random_name/1, create_random_vsn/0, write_src_file/2]).
 
 %% Pick the right random module
--ifdef(rand_only).
+-ifdef(rand_module).
 -define(random, rand).
 -else.
 -define(random, random).
@@ -142,7 +142,7 @@ create_random_vsn() ->
                    ".", erlang:integer_to_list(?random:uniform(100)),
                    ".", erlang:integer_to_list(?random:uniform(100))]).
 
--ifdef(rand_only).
+-ifdef(rand_module).
 random_seed() ->
     %% the rand module self-seeds
     ok.

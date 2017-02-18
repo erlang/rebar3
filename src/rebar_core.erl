@@ -33,6 +33,12 @@
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
+-ifdef(rand_module).
+-define(random, rand).
+-else.
+-define(random, random).
+-endif.
+
 %% @doc initial command set up; based on the first fragment of the
 %% command, dispatch to special environments. The keywords for
 %% `do' and `as' are implicitly reserved here, barring them from
@@ -136,7 +142,7 @@ process_command(State, Command) ->
 travis_start(_, false) ->
     false;
 travis_start(Fold, _) ->
-    Tag = lists:flatten(io_lib:format("~8..0B", [random:uniform(99999999)])),
+    Tag = lists:flatten(io_lib:format("~8..0B", [?random:uniform(99999999)])),
     travis_fold("start", Fold),
     io:format("travis_time:start:~s~n", [Tag]),
     {unix_nanoseconds(), Tag}.
