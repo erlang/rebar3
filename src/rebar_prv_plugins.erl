@@ -34,14 +34,17 @@ do(State) ->
     GlobalConfigFile = rebar_dir:global_config(),
     GlobalConfig = rebar_state:new(rebar_config:consult_file(GlobalConfigFile)),
     GlobalPlugins = rebar_state:get(GlobalConfig, plugins, []),
+    GlobalSrcDirs = rebar_state:get(GlobalConfig, src_dirs, ["src"]),
     GlobalPluginsDir = filename:join([rebar_dir:global_cache_dir(rebar_state:opts(State)), "plugins", "*"]),
-    GlobalApps = rebar_app_discover:find_apps([GlobalPluginsDir], all),
+    GlobalApps = rebar_app_discover:find_apps([GlobalPluginsDir], GlobalSrcDirs, all),
     display_plugins("Global plugins", GlobalApps, GlobalPlugins),
 
+    RebarOpts = rebar_state:opts(State),
+    SrcDirs = rebar_dir:src_dirs(RebarOpts, ["src"]),
     Plugins = rebar_state:get(State, plugins, []),
     PluginsDir = filename:join(rebar_dir:plugins_dir(State), "*"),
     CheckoutsDir = filename:join(rebar_dir:checkouts_dir(State), "*"),
-    Apps = rebar_app_discover:find_apps([CheckoutsDir, PluginsDir], all),
+    Apps = rebar_app_discover:find_apps([CheckoutsDir, PluginsDir], SrcDirs, all),
     display_plugins("Local plugins", Apps, Plugins),
     {ok, State}.
 
