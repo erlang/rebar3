@@ -246,7 +246,11 @@ find_app(AppDir, Validate) ->
 -spec find_app(rebar_app_info:t(), file:filename_all(), valid | invalid | all) ->
     {true, rebar_app_info:t()} | false.
 find_app(AppInfo, AppDir, Validate) ->
-    find_app(AppInfo, AppDir, ["src"], Validate).
+    %% if no src dir is passed, figure it out from the app info, with a default
+    %% of src/
+    AppOpts = rebar_app_info:opts(AppInfo),
+    SrcDirs = rebar_dir:src_dirs(AppOpts, ["src"]),
+    find_app(AppInfo, AppDir, SrcDirs, Validate).
 
 %% @doc check that a given app in a directory is there, and whether it's
 %% valid or not based on the second argument. The third argument includes
