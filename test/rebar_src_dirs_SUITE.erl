@@ -11,6 +11,7 @@
          src_dirs_in_erl_opts/1,
          extra_src_dirs_in_erl_opts/1,
          src_dirs_at_root_and_in_erl_opts/1,
+         dupe_src_dirs_at_root_and_in_erl_opts/1,
          extra_src_dirs_at_root_and_in_erl_opts/1,
          build_basic_app/1,
          build_multi_apps/1,
@@ -35,7 +36,9 @@ end_per_testcase(_, _Config) -> ok.
 all() ->
     [src_dirs_at_root, extra_src_dirs_at_root,
      src_dirs_in_erl_opts, extra_src_dirs_in_erl_opts,
-     src_dirs_at_root_and_in_erl_opts, extra_src_dirs_at_root_and_in_erl_opts,
+     src_dirs_at_root_and_in_erl_opts,
+     dupe_src_dirs_at_root_and_in_erl_opts,
+     extra_src_dirs_at_root_and_in_erl_opts,
      build_basic_app, build_multi_apps, src_dir_takes_precedence_over_extra].
 
 src_dirs_at_root(Config) ->
@@ -93,15 +96,47 @@ extra_src_dirs_in_erl_opts(Config) ->
 src_dirs_at_root_and_in_erl_opts(Config) ->
     AppDir = ?config(apps, Config),
 
-    Name = rebar_test_utils:create_random_name("app1_"),
+    Name = rebar_test_utils:create_random_name("src_dirs_root_erlopts_"),
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
     RebarConfig = [{erl_opts, [{src_dirs, ["foo", "bar"]}]}, {src_dirs, ["baz", "qux"]}],
 
+    %% move the .app.src file to one of the subdirs, out of src/
+    filelib:ensure_dir(filename:join([AppDir, "qux", "fake"])),
+    rebar_file_utils:mv(filename:join([AppDir, "src", Name ++ ".app.src"]),
+                        filename:join([AppDir, "qux", Name ++ ".app.src"])),
+
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
 
-    ["bar", "baz", "foo", "qux"] = rebar_dir:src_dirs(rebar_state:opts(State), []).
+    ["bar", "baz", "foo", "qux"] = rebar_dir:src_dirs(rebar_state:opts(State), []),
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"],
+                                   {ok, [{app, Name}]}),
+    ok.
+
+dupe_src_dirs_at_root_and_in_erl_opts(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("dupe_src_dirs_root_erlopts_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{erl_opts, [{src_dirs, ["foo", "bar"]}]}, {src_dirs, ["baz", "qux"]}],
+
+    %% move the .app.src file to one of the subdirs, out of src/
+    filelib:ensure_dir(filename:join([AppDir, "qux", "fake"])),
+    filelib:ensure_dir(filename:join([AppDir, "foo", "fake"])),
+    Src1 = filename:join([AppDir, "qux", Name ++ ".app.src"]),
+    Src2 = filename:join([AppDir, "foo", Name ++ ".app.src"]),
+    rebar_file_utils:mv(filename:join([AppDir, "src", Name ++ ".app.src"]),
+                        Src1),
+    %% Then copy it over to create a conflict with dupes
+    file:copy(Src1, Src2),
+
+    {error, {rebar_prv_app_discovery, {multiple_app_files, [Src2, Src1]}}} =
+      rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+
+    ok.
 
 extra_src_dirs_at_root_and_in_erl_opts(Config) ->
     AppDir = ?config(apps, Config),
