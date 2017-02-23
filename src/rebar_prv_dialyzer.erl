@@ -205,7 +205,7 @@ load_native(State) ->
 
 lookup_native_mods() ->
     ?INFO("Resolving native modules...", []),
-    lists:filtermap(fun lookup_native_mod/1, native_mods()).
+    rebar_utils:filtermap(fun lookup_native_mod/1, native_mods()).
 
 lookup_native_mod(Mod) ->
     _ = code:ensure_loaded(Mod),
