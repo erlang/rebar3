@@ -183,13 +183,31 @@ reset_hooks(Opts) ->
                         rebar_opts:set(OptsAcc, Key, [])
                 end, Opts, [post_hooks, pre_hooks, provider_hooks, artifacts]).
 
-%% @doc find the directories for all apps based on their source dirs
--spec all_app_dirs([file:name()], [file:name()]) -> [file:name()].
+%% @private find the directories for all apps, while detecting their source dirs
+%% Returns the app dir with the respective src_dirs for them, in that order,
+%% for every app found.
+-spec all_app_dirs([file:name()]) -> [{file:name(), [file:name()]}].
+all_app_dirs(LibDirs) ->
+    lists:flatmap(fun(LibDir) ->
+                        SrcDirs = find_config_src(LibDir, ["src"]),
+                        app_dirs(LibDir, SrcDirs)
+                  end, LibDirs).
+
+%% @private find the directories for all apps based on their source dirs
+%% Returns the app dir with the respective src_dirs for them, in that order,
+%% for every app found.
+-spec all_app_dirs([file:name()], [file:name()]) -> [{file:name(), [file:name()]}].
 all_app_dirs(LibDirs, SrcDirs) ->
     lists:flatmap(fun(LibDir) -> app_dirs(LibDir, SrcDirs) end, LibDirs).
 
-%% @doc find the directories based on the library directories
--spec app_dirs([file:name()], [file:name()]) -> [file:name()].
+%% @private find the directories based on the library directories.
+%% Returns the app dir with the respective src_dirs for them, in that order,
+%% for every app found.
+%%
+%% The function returns the src directories since they might have been
+%% detected in a top-level loop and we want to skip further detection
+%% starting now.
+-spec app_dirs([file:name()], [file:name()]) -> [{file:name(), [file:name()]}].
 app_dirs(LibDir, SrcDirs) ->
     Paths = lists:append([
         [filename:join([LibDir, SrcDir, "*.app.src"]),
@@ -199,8 +217,9 @@ app_dirs(LibDir, SrcDirs) ->
     EbinPath = filename:join([LibDir, "ebin", "*.app"]),
 
     lists:usort(lists:foldl(fun(Path, Acc) ->
-                                    Files = filelib:wildcard(ec_cnv:to_list(Path)),
-                                    [app_dir(File) || File <- Files] ++ Acc
+                                Files = filelib:wildcard(ec_cnv:to_list(Path)),
+                                [{app_dir(File), SrcDirs}
+                                 || File <- Files] ++ Acc
                             end, [], [EbinPath | Paths])).
 
 %% @doc find all apps that haven't been built in a list of directories
@@ -212,14 +231,19 @@ find_unbuilt_apps(LibDirs) ->
 %% Returns all the related app info records.
 -spec find_apps([file:filename_all()]) -> [rebar_app_info:t()].
 find_apps(LibDirs) ->
-    find_apps(LibDirs, ["src"], valid).
+    find_apps(LibDirs, valid).
 
 %% @doc for each directory passed, find all apps according
 %% to the validity rule passed in. Returns all the related
 %% app info records.
 -spec find_apps([file:filename_all()], valid | invalid | all) -> [rebar_app_info:t()].
 find_apps(LibDirs, Validate) ->
-    find_apps(LibDirs, ["src"], Validate).
+    rebar_utils:filtermap(
+      fun({AppDir, AppSrcDirs}) ->
+            find_app(rebar_app_info:new(), AppDir, AppSrcDirs, Validate)
+      end,
+      all_app_dirs(LibDirs)
+    ).
 
 %% @doc for each directory passed, with the configured source directories,
 %% find all apps according to the validity rule passed in.
@@ -227,8 +251,8 @@ find_apps(LibDirs, Validate) ->
 -spec find_apps([file:filename_all()], [file:filename_all()], valid | invalid | all) -> [rebar_app_info:t()].
 find_apps(LibDirs, SrcDirs, Validate) ->
     rebar_utils:filtermap(
-      fun(AppDir) ->
-            find_app(rebar_app_info:new(), AppDir, SrcDirs, Validate)
+      fun({AppDir, AppSrcDirs}) ->
+            find_app(rebar_app_info:new(), AppDir, AppSrcDirs, Validate)
       end,
       all_app_dirs(LibDirs, SrcDirs)
     ).
@@ -238,7 +262,8 @@ find_apps(LibDirs, SrcDirs, Validate) ->
 %% app info record.
 -spec find_app(file:filename_all(), valid | invalid | all) -> {true, rebar_app_info:t()} | false.
 find_app(AppDir, Validate) ->
-    find_app(rebar_app_info:new(), AppDir, ["src"], Validate).
+    SrcDirs = find_config_src(AppDir, ["src"]),
+    find_app(rebar_app_info:new(), AppDir, SrcDirs, Validate).
 
 %% @doc check that a given app in a directory is there, and whether it's
 %% valid or not based on the second argument. Returns the related
@@ -385,3 +410,16 @@ enable(State, AppInfo) ->
 -spec to_atom(binary()) -> atom().
 to_atom(Bin) ->
     list_to_atom(binary_to_list(Bin)).
+
+%% @private when looking for unknown apps, it's possible they have a
+%% rebar.config file specifying non-standard src_dirs. Check for a
+%% possible config file and extract src_dirs from it.
+find_config_src(AppDir, Default) ->
+    case rebar_config:consult(AppDir) of
+        [] ->
+            Default;
+        Terms ->
+            %% TODO: handle profiles I guess, but we don't have that info
+            proplists:get_value(src_dirs, Terms, Default)
+    end.
+

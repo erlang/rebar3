@@ -15,7 +15,8 @@
          extra_src_dirs_at_root_and_in_erl_opts/1,
          build_basic_app/1,
          build_multi_apps/1,
-         src_dir_takes_precedence_over_extra/1]).
+         src_dir_takes_precedence_over_extra/1,
+         src_dir_checkout_dep/1]).
 
 -include_lib("common_test/include/ct.hrl").
 
@@ -39,7 +40,8 @@ all() ->
      src_dirs_at_root_and_in_erl_opts,
      dupe_src_dirs_at_root_and_in_erl_opts,
      extra_src_dirs_at_root_and_in_erl_opts,
-     build_basic_app, build_multi_apps, src_dir_takes_precedence_over_extra].
+     build_basic_app, build_multi_apps, src_dir_takes_precedence_over_extra,
+     src_dir_checkout_dep].
 
 src_dirs_at_root(Config) ->
     AppDir = ?config(apps, Config),
@@ -271,3 +273,37 @@ src_dir_takes_precedence_over_extra(Config) ->
     [{application, _, KVs}] = App,
     Mods = proplists:get_value(modules, KVs),
     true = lists:member(extra, Mods).
+
+src_dir_checkout_dep(Config) ->
+    AppDir = ?config(apps, Config),
+    AppName = rebar_test_utils:create_random_name("src_dir_checkout_app"),
+    DepName = rebar_test_utils:create_random_name("src_dir_checkout_dep"),
+    AtomDep = list_to_atom(DepName),
+
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, AppName, Vsn, [kernel, stdlib]),
+    RebarConfig = [{deps, [AtomDep]}],
+
+    DepDir = filename:join([?config(checkouts, Config), DepName]),
+    ct:pal("checkouts dir: ~p", [DepDir]),
+    rebar_test_utils:create_app(DepDir, DepName, Vsn, [kernel, stdlib]),
+
+
+    %% move the .app.src file to one of the subdirs, out of src/
+    rebar_file_utils:mv(filename:join([DepDir, "src"]),
+                        filename:join([DepDir, "qux"])),
+    DepRebarConfig = [{erl_opts, [{src_dirs, ["foo", "bar"]}]},
+                      {src_dirs, ["baz", "qux"]}],
+    file:write_file(filename:join([DepDir, "rebar.config"]),
+                    io_lib:format("~p.~n~p.~n", DepRebarConfig)),
+
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["compile"],
+        {ok, [{checkout, DepName}, {app, AppName}]}
+    ),
+
+   % {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+   % ["bar", "baz", "foo", "qux"] = rebar_dir:src_dirs(rebar_state:opts(State), []),
+   % rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"],
+   %                                {ok, [{app, Name}]}),
+    ok.
