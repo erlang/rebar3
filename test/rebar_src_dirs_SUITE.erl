@@ -16,9 +16,11 @@
          build_basic_app/1,
          build_multi_apps/1,
          src_dir_takes_precedence_over_extra/1,
-         src_dir_checkout_dep/1]).
+         src_dir_checkout_dep/1,
+         app_src_info/1]).
 
 -include_lib("common_test/include/ct.hrl").
+-include_lib("eunit/include/eunit.hrl").
 
 suite() ->
     [].
@@ -41,7 +43,7 @@ all() ->
      dupe_src_dirs_at_root_and_in_erl_opts,
      extra_src_dirs_at_root_and_in_erl_opts,
      build_basic_app, build_multi_apps, src_dir_takes_precedence_over_extra,
-     src_dir_checkout_dep].
+     src_dir_checkout_dep, app_src_info].
 
 src_dirs_at_root(Config) ->
     AppDir = ?config(apps, Config),
@@ -301,9 +303,24 @@ src_dir_checkout_dep(Config) ->
         Config, RebarConfig, ["compile"],
         {ok, [{checkout, DepName}, {app, AppName}]}
     ),
+    ok.
 
-   % {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
-   % ["bar", "baz", "foo", "qux"] = rebar_dir:src_dirs(rebar_state:opts(State), []),
-   % rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"],
-   %                                {ok, [{app, Name}]}),
+app_src_info(Config) ->
+    PrivDir = ?config(priv_dir, Config),
+    AppName1 = rebar_test_utils:create_random_name("app_src_info"),
+    AppDir1 = filename:join(PrivDir, AppName1),
+    {ok, Info1} = rebar_app_info:new(AppName1, "1.0.0", AppDir1),
+    AppSrc1 = filename:join([AppDir1, "src", AppName1 ++ ".app.src"]),
+    ok = filelib:ensure_dir(AppSrc1),
+    ok = file:write_file(AppSrc1, "[]."),
+    ?assertEqual(AppSrc1, rebar_app_info:app_file_src(Info1)),
+
+    AppName2 = rebar_test_utils:create_random_name("app_src_info"),
+    AppDir2 = filename:join(PrivDir, AppName2),
+    {ok, Info2Tmp} = rebar_app_info:new(AppName2, "1.0.0", AppDir2),
+    Info2 = rebar_app_info:set(Info2Tmp, src_dirs, ["foo", "bar", "baz"]),
+    AppSrc2 = filename:join([AppDir2, "bar", AppName2 ++ ".app.src"]),
+    ok = filelib:ensure_dir(AppSrc2),
+    ok = file:write_file(AppSrc2, "[]."),
+    ?assertEqual(AppSrc2, rebar_app_info:app_file_src(Info2)),
     ok.

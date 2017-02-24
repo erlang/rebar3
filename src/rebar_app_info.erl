@@ -248,13 +248,12 @@ set(AppInfo=#app_info_t{opts=Opts}, Key, Value) ->
 
 %% @doc finds the .app.src file for an app, if any.
 -spec app_file_src(t()) -> file:filename_all() | undefined.
-app_file_src(#app_info_t{app_file_src=undefined, dir=Dir, name=Name}) ->
-    AppFileSrc = filename:join([ec_cnv:to_list(Dir), "src", ec_cnv:to_list(Name)++".app.src"]),
-    case filelib:is_file(AppFileSrc) of
-        true ->
-            AppFileSrc;
-        false ->
-            undefined
+app_file_src(#app_info_t{app_file_src=undefined, dir=Dir, name=Name, opts=Opts}) ->
+    CandidatePaths = [filename:join([ec_cnv:to_list(Dir), Src, ec_cnv:to_list(Name)++".app.src"])
+                      || Src <- rebar_opts:get(Opts, src_dirs, ["src"])],
+    case lists:dropwhile(fun(Path) -> not filelib:is_file(Path) end, CandidatePaths) of
+        [] -> undefined;
+        [AppFileSrc|_] -> AppFileSrc
     end;
 app_file_src(#app_info_t{app_file_src=AppFileSrc}) ->
     ec_cnv:to_list(AppFileSrc).
