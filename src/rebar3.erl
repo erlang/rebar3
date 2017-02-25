@@ -176,7 +176,7 @@ init_config() ->
     Verbosity = log_level(),
     ok = rebar_log:init(command_line, Verbosity),
 
-    Config = rebar_config:consult(),
+    Config = rebar_config:consult_root(),
     Config1 = rebar_config:merge_locks(Config, rebar_config:consult_lock_file(?LOCK_FILE)),
 
     %% If $HOME/.config/rebar3/rebar.config exists load and use as global config

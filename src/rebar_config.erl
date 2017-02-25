@@ -26,7 +26,7 @@
 %% -------------------------------------------------------------------
 -module(rebar_config).
 
--export([consult/0
+-export([consult_root/0
         ,consult/1
         ,consult_app_file/1
         ,consult_file/1
@@ -46,15 +46,15 @@
 %% Public API
 %% ===================================================================
 
-%% @doc reads the default config file.
--spec consult() -> [any()].
-consult() ->
+%% @doc reads the default config file at the top of a full project
+-spec consult_root() -> [any()].
+consult_root() ->
     consult_file(config_file()).
 
 %% @doc reads the default config file in a given directory.
 -spec consult(file:name()) -> [any()].
 consult(Dir) ->
-    consult_file(filename:join(Dir, config_file())).
+    consult_file(filename:join(Dir, ?DEFAULT_CONFIG_FILE)).
 
 %% @doc reads a given app file, including the `.script' variations,
 %% if any can be found.
