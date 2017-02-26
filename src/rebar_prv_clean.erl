@@ -44,7 +44,8 @@ do(State) ->
     case All of
         true ->
             DepsDir = rebar_dir:deps_dir(State1),
-            AllApps = rebar_app_discover:find_apps([filename:join(DepsDir, "*")], all),
+            DepsDirs = filelib:wildcard(filename:join(DepsDir, "*")),
+            AllApps = rebar_app_discover:find_apps(DepsDirs, all),
             clean_apps(State1, Providers, AllApps);
         false ->
             ProjectApps = rebar_state:project_apps(State1),
