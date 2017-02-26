@@ -218,7 +218,7 @@ check_results(AppDir, Expected, ProfileRun) ->
     BuildDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib", "*"])),
     PluginDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "plugins", "*"])),
     GlobalPluginDirs = filelib:wildcard(filename:join([AppDir, "global", "plugins", "*"])),
-    CheckoutsDir = filename:join([AppDir, "_checkouts", "*"]),
+    CheckoutsDirs = filelib:wildcard(filename:join([AppDir, "_checkouts", "*"])),
     LockFile = filename:join([AppDir, "rebar.lock"]),
     Locks = lists:flatten(rebar_config:consult_lock_file(LockFile)),
 
@@ -230,7 +230,7 @@ check_results(AppDir, Expected, ProfileRun) ->
 
     Deps = rebar_app_discover:find_apps(BuildDirs, all),
     DepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Deps],
-    Checkouts = rebar_app_discover:find_apps([CheckoutsDir], all),
+    Checkouts = rebar_app_discover:find_apps(CheckoutsDirs, all),
     CheckoutsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Checkouts],
     Plugins = rebar_app_discover:find_apps(PluginDirs, all),
     PluginsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Plugins],
