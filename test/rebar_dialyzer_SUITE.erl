@@ -166,6 +166,14 @@ update_base_plt(Config) ->
     ?assertNot(filelib:is_regular(NativeCache)).
 
 update_app_plt_native(Config) ->
+    case erlang:system_info(hipe_architecture) of
+        undefined ->
+            {skip, "Native compilation not available"};
+        _ ->
+            update_app_plt_native_(Config)
+    end.
+
+update_app_plt_native_(Config) ->
     AppDir = ?config(apps, Config),
     RebarConfig = ?config(rebar_config, Config),
     Plt = ?config(plt, Config),
