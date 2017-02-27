@@ -130,9 +130,15 @@ escriptize(State0, App) ->
             throw(?PRV_ERROR({escript_creation_failed, AppName, EscriptError}))
     end,
 
-    %% Finally, update executable perms for our script
-    {ok, #file_info{mode = Mode}} = file:read_file_info(Filename),
-    ok = file:change_mode(Filename, Mode bor 8#00111),
+    %% Finally, update executable perms for our script on *nix or write out
+    %% script files on win32
+    case os:type() of
+        {unix, _} ->
+            {ok, #file_info{mode = Mode}} = file:read_file_info(Filename),
+            ok = file:change_mode(Filename, Mode bor 8#00111);
+        {win32, _} ->
+            write_windows_script(Filename)
+    end,
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
@@ -258,3 +264,11 @@ def(Rm, State, Key, Default) ->
 
 rm_newline(String) ->
     [C || C <- String, C =/= $\n].
+
+write_windows_script(Target) ->
+    CmdScript=
+        "@echo off\r\n"
+        "setlocal\r\n"
+        "set rebarscript=%~f0\r\n"
+        "escript.exe \"%rebarscript:.cmd=%\" %*\r\n",
+    ok = file:write_file(Target ++ ".cmd", CmdScript).
