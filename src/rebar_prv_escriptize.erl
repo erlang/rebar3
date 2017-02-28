@@ -266,9 +266,12 @@ rm_newline(String) ->
     [C || C <- String, C =/= $\n].
 
 write_windows_script(Target) ->
+    CmdPath = if is_binary(Target) -> <<Target/binary, ".cmd">>;
+                 is_list(Target) -> Target ++ ".cmd"
+              end,
     CmdScript=
         "@echo off\r\n"
         "setlocal\r\n"
         "set rebarscript=%~f0\r\n"
         "escript.exe \"%rebarscript:.cmd=%\" %*\r\n",
-    ok = file:write_file(Target ++ ".cmd", CmdScript).
+    ok = file:write_file(CmdPath, CmdScript).
