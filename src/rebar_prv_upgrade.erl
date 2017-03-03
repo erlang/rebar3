@@ -32,7 +32,7 @@ init(State) ->
                                                    {deps, ?DEPS},
                                                    {example, "rebar3 upgrade [cowboy[,ranch]]"},
                                                    {short_desc, "Upgrade dependencies."},
-                                                   {desc, "Upgrade project dependecies. Mentioning no application "
+                                                   {desc, "Upgrade project dependencies. Mentioning no application "
                                                           "will upgrade all dependencies. To upgrade specific dependencies, "
                                                           "their names can be listed in the command."},
                                                    {opts, [
