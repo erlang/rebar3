@@ -207,10 +207,10 @@ handle_single_vsn(Pkg, PkgVsn, Dep, Vsn, Constraint) ->
         false ->
             case {Pkg, PkgVsn} of
                 {undefined, undefined} ->
-                    ?WARN("Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
+                    ?DEBUG("Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
                           "Using anyway, but it is not guaranteed to work.", [Dep, Vsn, Constraint]);
                 _ ->
-                    ?WARN("[~s:~s] Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
+                    ?DEBUG("[~s:~s] Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
                           "Using anyway, but it is not guaranteed to work.", [Pkg, PkgVsn, Dep, Vsn, Constraint])
             end,
             {ok, Vsn}
