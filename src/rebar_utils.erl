@@ -857,7 +857,7 @@ url_append_path(Url, ExtraPath) ->
 escape_chars(Str) when is_atom(Str) ->
     escape_chars(atom_to_list(Str));
 escape_chars(Str) ->
-    re:replace(Str, "([ ()?`!$&;])", "\\\\&", [global, {return, list}]).
+    re:replace(Str, "([ ()?`!$&;\"\'])", "\\\\&", [global, {return, list}]).
 
 %% "escape inside these"
 escape_double_quotes(Str) ->
