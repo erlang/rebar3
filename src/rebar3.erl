@@ -344,7 +344,7 @@ start_and_load_apps(Caller) ->
     ensure_running(asn1, Caller),
     ensure_running(public_key, Caller),
     ensure_running(ssl, Caller),
-    inets:start(),
+    ensure_running(inets, Caller),
     inets:start(httpc, [{profile, rebar}]).
 
 %% @doc Make sure a required app is running, or display an error message
