@@ -27,7 +27,7 @@ init(State) ->
                                                                {example, "rebar3 path"},
                                                                {short_desc, "Print paths to build dirs in current profile."},
                                                                {desc, "Print paths to build dirs in current profile."},
-                                                               {opts, eunit_opts(State)}])),
+                                                               {opts, path_opts(State)}])),
 
     {ok, State1}.
 
@@ -107,8 +107,8 @@ normalize(AppName) when is_list(AppName) -> AppName;
 normalize(AppName) when is_atom(AppName) -> atom_to_list(AppName);
 normalize(AppName) when is_binary(AppName) -> binary_to_list(AppName).
 
-eunit_opts(_State) ->
-    [{app, undefined, "app", string, help(app)},
+path_opts(_State) ->
+    [{app, undefined, "apps", string, help(app)},
      {base, undefined, "base", boolean, help(base)},
      {bin, undefined, "bin", boolean, help(bin)},
      {ebin, undefined, "ebin", boolean, help(ebin)},
