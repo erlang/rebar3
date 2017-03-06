@@ -431,18 +431,21 @@ test_dirs(State, Apps, Opts) ->
                     set_compile_dirs(State, Apps, join(Suites, Dir));
                 {_Suites, _Dirs}    -> {error, "Only a single directory may be specified when specifying suites"}
             end;
-        Specs0 ->
-            case get_dirs_from_specs(Specs0) of
-                {ok,{Specs,SuiteDirs}} ->
-                    {State1,Apps1} = set_compile_dirs1(State, Apps,
-                                                       {dir, SuiteDirs}),
-                    {State2,Apps2} = set_compile_dirs1(State1, Apps1,
-                                                       {spec, Specs}),
-                    [maybe_copy_spec(State2,Apps2,S) || S <- Specs],
-                    {ok, rebar_state:project_apps(State2, Apps2)};
-                Error ->
-                    Error
-            end
+        Spec when is_integer(hd(Spec)) ->
+            spec_test_dirs(State, Apps, [Spec]);
+        Specs ->
+            spec_test_dirs(State, Apps, Specs)
+    end.
+
+spec_test_dirs(State, Apps, Specs0) ->
+    case get_dirs_from_specs(Specs0) of
+        {ok,{Specs,SuiteDirs}} ->
+            {State1,Apps1} = set_compile_dirs1(State, Apps, {dir, SuiteDirs}),
+            {State2,Apps2} = set_compile_dirs1(State1, Apps1, {spec, Specs}),
+            [maybe_copy_spec(State2,Apps2,S) || S <- Specs],
+            {ok, rebar_state:project_apps(State2, Apps2)};
+        Error ->
+            Error
     end.
 
 join(Suite, Dir) when is_integer(hd(Suite)) ->

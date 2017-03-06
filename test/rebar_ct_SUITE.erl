@@ -55,7 +55,8 @@
          testspec/1,
          testspec_at_root/1,
          testspec_parse_error/1,
-         cmd_vs_cfg_opts/1]).
+         cmd_vs_cfg_opts/1,
+         single_testspec_in_ct_opts/1]).
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("common_test/include/ct.hrl").
@@ -75,7 +76,8 @@ all() -> [{group, basic_app},
           testspec,
           testspec_at_root,
           testspec_parse_error,
-          cmd_vs_cfg_opts].
+          cmd_vs_cfg_opts,
+          single_testspec_in_ct_opts].
 
 groups() -> [{basic_app, [], [basic_app_default_dirs,
                               basic_app_default_beams,
@@ -1546,6 +1548,41 @@ cmd_vs_cfg_opts(Config) ->
     false = lists:keymember(group, 1, TestOpts2),
     false = lists:keymember(testcase, 1, TestOpts2),
 
+    ok.
+
+single_testspec_in_ct_opts(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "ct_testspec_"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name("ct_testspec_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    Spec = filename:join([AppDir, "test", "some.spec"]),
+    ok = filelib:ensure_dir(Spec),
+    ok = file:write_file(Spec, "{suites,\".\",all}.\n"),
+
+    {ok,Wd} = file:get_cwd(),
+    ok = file:set_cwd(AppDir),
+
+    RebarConfig = [{ct_opts, [{spec,"test/some.spec"}]}],
+
+    {ok, State} = rebar_test_utils:run_and_check(C, RebarConfig, ["as", "test", "lock"], return),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+
+    %% Testspec in "test" directory
+    {ok, GetOptResult1} = getopt:parse(GetOptSpec, []),
+    State1 = rebar_state:command_parsed_args(State, GetOptResult1),
+    Tests1 = rebar_prv_common_test:prepare_tests(State1),
+    {ok, T1} = Tests1,
+    "test/some.spec" = proplists:get_value(spec,T1),
+    {ok, _NewState} = rebar_prv_common_test:compile(State1, Tests1),
+
+    ok = file:set_cwd(Wd),
     ok.
 
 %% helper for generating test data
