@@ -108,7 +108,7 @@ normalize(AppName) when is_atom(AppName) -> atom_to_list(AppName);
 normalize(AppName) when is_binary(AppName) -> binary_to_list(AppName).
 
 path_opts(_State) ->
-    [{app, undefined, "apps", string, help(app)},
+    [{app, undefined, "app", string, help(app)},
      {base, undefined, "base", boolean, help(base)},
      {bin, undefined, "bin", boolean, help(bin)},
      {ebin, undefined, "ebin", boolean, help(ebin)},
