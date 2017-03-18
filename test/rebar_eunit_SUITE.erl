@@ -1,7 +1,8 @@
 -module(rebar_eunit_SUITE).
 
 -export([all/0, groups/0]).
--export([init_per_suite/1, init_per_group/2, end_per_group/2]).
+-export([init_per_suite/1, end_per_suite/1]).
+-export([init_per_group/2, end_per_group/2]).
 -export([basic_app_compiles/1, basic_app_files/1]).
 -export([basic_app_exports/1, basic_app_testset/1]).
 -export([basic_app_eunit_macro/1]).
@@ -59,6 +60,8 @@ init_per_suite(Config) ->
     ok = ec_file:copy(filename:join([DataDir, "multi_app.zip"]), filename:join([PrivDir, "multi_app.zip"])),
     {ok, _} = zip:extract(filename:join([PrivDir, "multi_app.zip"]), [{cwd, PrivDir}]),
     Config.
+
+end_per_suite(Config) -> Config.
 
 init_per_group(basic_app, Config) ->
     GroupState = rebar_test_utils:init_rebar_state(Config, "basic_app_"),
