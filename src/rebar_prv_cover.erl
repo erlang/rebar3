@@ -215,18 +215,18 @@ print_analysis(Analysis, true) ->
 format_table(Stats, CoverFiles) ->
     MaxLength = max(lists:foldl(fun max_length/2, 0, Stats), 20),
     Header = header(MaxLength),
-    Seperator = seperator(MaxLength),
+    Separator = separator(MaxLength),
     TotalLabel = format("total", MaxLength),
     TotalCov = format(calculate_total(Stats), 8),
-    [io_lib:format("~ts~n~ts~n~ts~n", [Seperator, Header, Seperator]),
+    [io_lib:format("~ts~n~ts~n~ts~n", [Separator, Header, Separator]),
         lists:map(fun({Mod, Coverage}) ->
             Name = format(Mod, MaxLength),
             Cov = format(Coverage, 8),
             io_lib:format("  |  ~ts  |  ~ts  |~n", [Name, Cov])
         end, Stats),
-        io_lib:format("~ts~n", [Seperator]),
+        io_lib:format("~ts~n", [Separator]),
         io_lib:format("  |  ~ts  |  ~ts  |~n", [TotalLabel, TotalCov]),
-        io_lib:format("~ts~n", [Seperator]),
+        io_lib:format("~ts~n", [Separator]),
         io_lib:format("  coverage calculated from:~n", []),
         lists:map(fun(File) ->
             io_lib:format("    ~ts~n", [File])
@@ -242,7 +242,7 @@ max_length({ModName, _}, Min) ->
 header(Width) ->
     ["  |  ", format("module", Width), "  |  ", format("coverage", 8), "  |"].
 
-seperator(Width) ->
+separator(Width) ->
     ["  |--", io_lib:format("~*c", [Width, $-]), "--|------------|"].
 
 format(String, Width) -> io_lib:format("~*.ts", [Width, String]).

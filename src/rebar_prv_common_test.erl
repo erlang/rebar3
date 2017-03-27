@@ -708,17 +708,17 @@ maybe_write_coverdata(State) ->
     rebar_prv_cover:maybe_write_coverdata(State1, ?PROVIDER).
 
 ct_opts(_State) ->
-    [{dir, undefined, "dir", string, help(dir)}, %% comma-seperated list
-     {suite, undefined, "suite", string, help(suite)}, %% comma-seperated list
-     {group, undefined, "group", string, help(group)}, %% comma-seperated list
-     {testcase, undefined, "case", string, help(testcase)}, %% comma-seperated list
+    [{dir, undefined, "dir", string, help(dir)}, %% comma-separated list
+     {suite, undefined, "suite", string, help(suite)}, %% comma-separated list
+     {group, undefined, "group", string, help(group)}, %% comma-separated list
+     {testcase, undefined, "case", string, help(testcase)}, %% comma-separated list
      {label, undefined, "label", string, help(label)}, %% String
-     {config, undefined, "config", string, help(config)}, %% comma-seperated list
-     {spec, undefined, "spec", string, help(spec)}, %% comma-seperated list
+     {config, undefined, "config", string, help(config)}, %% comma-separated list
+     {spec, undefined, "spec", string, help(spec)}, %% comma-separated list
      {join_specs, undefined, "join_specs", boolean, help(join_specs)},
      {allow_user_terms, undefined, "allow_user_terms", boolean, help(allow_user_terms)}, %% Bool
      {logdir, undefined, "logdir", string, help(logdir)}, %% dir
-     {logopts, undefined, "logopts", string, help(logopts)}, %% comma seperated list
+     {logopts, undefined, "logopts", string, help(logopts)}, %% comma-separated list
      {verbosity, undefined, "verbosity", integer, help(verbosity)}, %% Integer
      {cover, $c, "cover", {boolean, false}, help(cover)},
      {repeat, undefined, "repeat", integer, help(repeat)}, %% integer
@@ -739,7 +739,7 @@ ct_opts(_State) ->
      {name, undefined, "name", atom, help(name)},
      {sname, undefined, "sname", atom, help(sname)},
      {setcookie, undefined, "setcookie", atom, help(setcookie)},
-     {sys_config, undefined, "sys_config", string, help(sys_config)} %% comma-seperated list
+     {sys_config, undefined, "sys_config", string, help(sys_config)} %% comma-separated list
     ].
 
 help(dir) ->

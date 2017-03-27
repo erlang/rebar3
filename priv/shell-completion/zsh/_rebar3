@@ -110,7 +110,7 @@ _rebar3 () {
                 ;;
                 (path)
                     _arguments \
-                        '(--app)--app[Comma seperated list of applications to return paths for.]:apps' \
+                        '(--app)--app[Comma separated list of applications to return paths for.]:apps' \
                         '(--base)--base[Return the `base` path of the current profile.]' \
                         '(--bin)--bin[Return the `bin` path of the current profile.]' \
                         '(--ebin)--ebin[Return all `ebin` paths of the current profile`s applications.]' \

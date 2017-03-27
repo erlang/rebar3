@@ -118,7 +118,7 @@ path_opts(_State) ->
      {src, undefined, "src", boolean, help(src)},
      {rel, undefined, "rel", boolean, help(rel)}].
 
-help(app)       -> "Comma seperated list of applications to return paths for.";
+help(app)       -> "Comma separated list of applications to return paths for.";
 help(base)      -> "Return the `base' path of the current profile.";
 help(bin)       -> "Return the `bin' path of the current profile.";
 help(ebin)      -> "Return all `ebin' paths of the current profile's applications.";
