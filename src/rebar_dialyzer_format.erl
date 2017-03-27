@@ -370,7 +370,7 @@ good_arg(N, Args) ->
 colour_arg(N, C, Args) when is_integer(N) ->
     colour_arg([N], C, Args);
 colour_arg(Ns, C, Args) ->
-    {Args1, Rest} =seperate_args(Args),
+    {Args1, Rest} =separate_args(Args),
     Args2 = highlight(Ns, 1, C, Args1),
     join_args(Args2) ++ Rest.
 
@@ -388,43 +388,43 @@ highlight(Ns, N, C, [Arg | Rest]) ->
 
 %% Arugments to functions and constraints are passed as
 %% strings not as data, this function pulls them apart
-%% to allow interacting with them seperately and not
+%% to allow interacting with them separately and not
 %% as one bug chunk of data.
-seperate_args([$( | S]) ->
-    seperate_args([], S, "", []).
+separate_args([$( | S]) ->
+    separate_args([], S, "", []).
 
 %% We strip this space since dialyzer is inconsistant in adding or not adding
 %% it ....
-seperate_args([], [$,, $\s | R], Arg, Args) ->
-    seperate_args([], R, [], [lists:reverse(Arg) | Args]);
+separate_args([], [$,, $\s | R], Arg, Args) ->
+    separate_args([], R, [], [lists:reverse(Arg) | Args]);
 
-seperate_args([], [$, | R], Arg, Args) ->
-    seperate_args([], R, [], [lists:reverse(Arg) | Args]);
+separate_args([], [$, | R], Arg, Args) ->
+    separate_args([], R, [], [lists:reverse(Arg) | Args]);
 
-seperate_args([], [$) | Rest], Arg, Args) ->
+separate_args([], [$) | Rest], Arg, Args) ->
     {lists:reverse([lists:reverse(Arg) | Args]), Rest};
-seperate_args([C | D], [C | R], Arg, Args) ->
-    seperate_args(D, R, [C | Arg], Args);
+separate_args([C | D], [C | R], Arg, Args) ->
+    separate_args(D, R, [C | Arg], Args);
 %% Brackets
-seperate_args(D, [${ | R], Arg, Args) ->
-    seperate_args([$}|D], R, [${ | Arg], Args);
+separate_args(D, [${ | R], Arg, Args) ->
+    separate_args([$}|D], R, [${ | Arg], Args);
 
-seperate_args(D, [$( | R], Arg, Args) ->
-    seperate_args([$)|D], R, [$( | Arg], Args);
+separate_args(D, [$( | R], Arg, Args) ->
+    separate_args([$)|D], R, [$( | Arg], Args);
 
-seperate_args(D, [$[ | R], Arg, Args) ->
-    seperate_args([$]|D], R, [$[ | Arg], Args);
+separate_args(D, [$[ | R], Arg, Args) ->
+    separate_args([$]|D], R, [$[ | Arg], Args);
 
-seperate_args(D, [$< | R], Arg, Args) ->
-    seperate_args([$>|D], R, [$< | Arg], Args);
+separate_args(D, [$< | R], Arg, Args) ->
+    separate_args([$>|D], R, [$< | Arg], Args);
 %% 'strings'
-seperate_args(D, [$' | R], Arg, Args) ->
-    seperate_args([$'|D], R, [$' | Arg], Args);
-seperate_args(D, [$" | R], Arg, Args) ->
-    seperate_args([$"|D], R, [$" | Arg], Args);
+separate_args(D, [$' | R], Arg, Args) ->
+    separate_args([$'|D], R, [$' | Arg], Args);
+separate_args(D, [$" | R], Arg, Args) ->
+    separate_args([$"|D], R, [$" | Arg], Args);
 
-seperate_args(D, [C | R], Arg, Args) ->
-    seperate_args(D, R, [C | Arg], Args).
+separate_args(D, [C | R], Arg, Args) ->
+    separate_args(D, R, [C | Arg], Args).
 
 join_args(Args) ->
     [$(, string:join(Args, ", "), $)].
