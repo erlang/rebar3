@@ -93,7 +93,7 @@ format_error({error, Reason}) ->
 format_error({error_running_tests, Reason}) ->
     format_error({error, Reason});
 format_error({failures_running_tests, {Failed, AutoSkipped}}) ->
-    io_lib:format("Failures occured running tests: ~b", [Failed+AutoSkipped]);
+    io_lib:format("Failures occurred running tests: ~b", [Failed+AutoSkipped]);
 format_error({badconfig, {Msg, {Value, Key}}}) ->
     io_lib:format(Msg, [Value, Key]);
 format_error({badconfig, Msg}) ->
