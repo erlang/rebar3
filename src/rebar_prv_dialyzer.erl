@@ -118,7 +118,7 @@ maybe_fix_env() ->
 format_error({error_processing_apps, Error}) ->
     io_lib:format("Error in dialyzing apps: ~s", [Error]);
 format_error({dialyzer_warnings, Warnings}) ->
-    io_lib:format("Warnings occured running dialyzer: ~b", [Warnings]);
+    io_lib:format("Warnings occurred running dialyzer: ~b", [Warnings]);
 format_error({unknown_application, App}) ->
     io_lib:format("Could not find application: ~s", [App]);
 format_error({unknown_module, Mod}) ->
