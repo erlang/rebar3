@@ -710,6 +710,22 @@ find_resource_module(Type, Resources) ->
             {ok, Module}
     end.
 
+%% @doc Reset the path to what it looked like before loaded test modules
+cleanup_code_path(OrigPath) ->
+    CurrentPath = code:get_path(),
+    AddedPaths = CurrentPath -- OrigPath,
+    %% If someone has removed paths, it's hard to get them back into
+    %% the right order, but since this is currently rare, we can just
+    %% fall back to code:set_path/1.
+    case CurrentPath -- AddedPaths of
+        OrigPath ->
+            _ = [code:del_path(Path) || Path <- AddedPaths],
+            true;
+        _ ->
+            code:set_path(OrigPath)
+    end.
+
+
 %% @doc ident to the level specified
 -spec indent(non_neg_integer()) -> iolist().
 indent(Amount) when erlang:is_integer(Amount) ->
