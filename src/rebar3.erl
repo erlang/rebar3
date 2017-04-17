@@ -269,9 +269,14 @@ log_level() ->
 %% @doc show version information
 -spec version() -> ok.
 version() ->
-    {ok, Vsn} = application:get_key(rebar, vsn),
-    ?CONSOLE("rebar ~s on Erlang/OTP ~s Erts ~s",
-             [Vsn, erlang:system_info(otp_release), erlang:system_info(version)]).
+    {ok, RebarVsn} = application:get_key(rebar, vsn),
+    {ok, RelxVsn}  = application:get_key(relx, vsn),
+    ?CONSOLE("rebar ~s with relx ~s on Erlang/OTP ~s Erts ~s", [
+             RebarVsn,
+             RelxVsn,
+             erlang:system_info(otp_release),
+             erlang:system_info(version)
+    ]).
 
 %% @private set global flag based on getopt option boolean value
 %% TODO: Actually make it 'global'
@@ -339,6 +344,7 @@ handle_error(Error) ->
 -spec start_and_load_apps(command_line|api) -> term().
 start_and_load_apps(Caller) ->
     _ = application:load(rebar),
+    _ = application:load(relx),
     %% Make sure crypto is running
     ensure_running(crypto, Caller),
     ensure_running(asn1, Caller),
