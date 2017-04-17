@@ -210,7 +210,12 @@ consult_app_file(Filename) ->
                 false ->
                     file:consult(Filename);
                 true ->
-                    {ok, rebar_config:consult_app_file(Filename)}
+                    case rebar_config:consult_app_file(Filename) of
+                        Terms when is_list(Terms) ->
+                            {ok, Terms};
+                        Term when is_tuple(Term) ->
+                            {ok, [Term]}
+                    end
             end
     end.
 
