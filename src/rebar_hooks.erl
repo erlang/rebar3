@@ -96,22 +96,24 @@ run_hooks(Dir, Type, Command, Opts, State) ->
         Hooks ->
             Env = create_env(State, Opts),
             lists:foreach(fun({_, C, _}=Hook) when C =:= Command ->
-                                  apply_hook(Dir, Env, Hook);
+                                  apply_hook(State, Dir, Env, Hook);
                              ({C, _}=Hook) when C =:= Command ->
-                                  apply_hook(Dir, Env, Hook);
+                                  apply_hook(State, Dir, Env, Hook);
                              (_) ->
                                   continue
                           end, Hooks)
     end.
 
-apply_hook(Dir, Env, {Arch, Command, Hook}) ->
+apply_hook(State, Dir, Env, {Arch, Command, Hook}) ->
     case rebar_utils:is_arch(Arch) of
         true ->
-            apply_hook(Dir, Env, {Command, Hook});
+            apply_hook(State, Dir, Env, {Command, Hook});
         false ->
             ok
     end;
-apply_hook(Dir, Env, {Command, Hook}) ->
+apply_hook(State, _Dir, _Env, {_Command, {Module, Function}}) ->
+    Module:Function(State);
+apply_hook(_State, Dir, Env, {Command, Hook}) ->
     Msg = lists:flatten(io_lib:format("Hook for ~p failed!~n", [Command])),
     rebar_utils:sh(Hook, [use_stdout, {cd, Dir}, {env, Env}, {abort_on_error, Msg}]).
 
