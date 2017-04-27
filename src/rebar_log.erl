@@ -57,6 +57,8 @@ intensity() ->
                         high;
                     "low" ->
                         low;
+                    "none" ->
+                        none;
                     _ ->
                         ?DFLT_INTENSITY
                 end,
