@@ -11,7 +11,7 @@ groups() ->
                 triplet_a, triplet_b, triplet_c,
                 tree_a, tree_b, tree_c, tree_c2, tree_cj, tree_ac, tree_all,
                 delete_d, promote, stable_lock, fwd_lock,
-                compile_upgrade_parity, umbrella_config]},
+                compile_upgrade_parity, umbrella_config, profiles]},
      {git, [], [{group, all}]},
      {pkg, [], [{group, all}]}].
 
@@ -78,6 +78,22 @@ setup_project(Case=umbrella_config, Config0, Deps, UpDeps) ->
     [{rebarconfig, TopConf},
      {rebarumbrella, RebarConf},
      {next_top_deps, rebar_test_utils:top_level_deps(UpDeps)} | Config];
+setup_project(Case=profiles, Config0, Deps, UpDeps) ->
+    DepsType = ?config(deps_type, Config0),
+    NameRoot = atom_to_list(Case)++"_"++atom_to_list(DepsType),
+    Config = rebar_test_utils:init_rebar_state(Config0, NameRoot++"_"),
+    AppDir = filename:join([?config(apps, Config), "apps", NameRoot]),
+    rebar_test_utils:create_app(AppDir, "Root", "0.0.0", [kernel, stdlib]),
+    [Top|ProfileDeps] = rebar_test_utils:top_level_deps(Deps),
+    RebarConf = rebar_test_utils:create_config(AppDir, [
+        {deps, [Top]},
+        {profiles, [{fake, [{deps, ProfileDeps}]}]}
+    ]),
+    [NextTop|NextPDeps] = rebar_test_utils:top_level_deps(UpDeps),
+    NextConfig = [{deps, [NextTop]},
+                  {profiles, [{fake, [{deps, NextPDeps}]}]}],
+    [{rebarconfig, RebarConf},
+     {next_config, NextConfig} | Config];
 setup_project(Case, Config0, Deps, UpDeps) ->
     DepsType = ?config(deps_type, Config0),
     Config = rebar_test_utils:init_rebar_state(
@@ -454,7 +470,27 @@ upgrades(umbrella_config) ->
     {[{"A", "1", []}],
      [{"A", "2", []}],
      ["A"],
-     {"A", [{"A","2"}]}}.
+     {"A", [{"A","2"}]}};
+upgrades(profiles) ->
+    %% Ensure that we can unlock deps under a given profile;
+    %% B and C should both be in a custom profile
+    %% and must not be locked.
+    {[{"A", "1", [{"D",[]},
+                  {"E","3",[]}]},
+      {"B", "1", [{"F","1",[]},
+                  {"G",[]}]},
+      {"C", "0", [{"H","3",[]},
+                  {"I",[]}]}],
+     [{"A", "2", [{"D",[]},
+                  {"E","2",[]}]},
+      {"B", "2", [{"F","2",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H","4",[]},
+                  {"I",[]}]}],
+     ["A","B","C","E","F","H"],
+     {"C", [{"A","1"}, "D", {"E","3"},
+            {"B","2"}, {"F","2"}, "G",
+            {"C","1"}, {"H","4"}, "I"]}}.
 
 %% TODO: add a test that verifies that unlocking files and then
 %% running the upgrade code is enough to properly upgrade things.
@@ -612,6 +648,35 @@ umbrella_config(Config) ->
         Config, TopConfig, ["upgrade", App], Expectation
      ),
     meck:unload(rebar_prv_upgrade).
+
+profiles(Config) ->
+    apply(?config(mock, Config), []),
+    {ok, TopConfig} = file:consult(?config(rebarconfig, Config)),
+    %% Install dependencies before re-mocking for an upgrade
+    rebar_test_utils:run_and_check(Config, TopConfig, ["lock"], {ok, []}),
+    %% Install test deps along with them
+    rebar_test_utils:run_and_check(Config, TopConfig, ["as","fake","lock"], {ok, []}),
+    {App, Unlocks} = ?config(expected, Config),
+    ct:pal("Upgrades: ~p -> ~p", [App, Unlocks]),
+    Expectation = case Unlocks of
+        {error, Term} -> {error, Term};
+        _ -> {ok, [T || T <- Unlocks,
+                        element(1,T) == dep orelse
+                        lists:member(element(2,T), ["A","D","E"])]}
+    end,
+
+    meck:new(rebar_prv_app_discovery, [passthrough]),
+    meck:expect(rebar_prv_app_discovery, do, fun(S) ->
+                                               apply(?config(mock_update, Config), []),
+                                               meck:passthrough([S])
+                                       end),
+    NewRebarConf = rebar_test_utils:create_config(?config(apps, Config),
+                                                  ?config(next_config, Config)),
+    {ok, NewRebarConfig} = file:consult(NewRebarConf),
+    rebar_test_utils:run_and_check(
+        Config, NewRebarConfig, ["as","fake","upgrade", App], Expectation
+     ),
+    meck:unload(rebar_prv_app_discovery).
 
 run(Config) ->
     apply(?config(mock, Config), []),
