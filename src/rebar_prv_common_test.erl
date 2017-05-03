@@ -567,9 +567,6 @@ get_tests_from_specs(Specs) ->
             case ct_testspec:collect_tests_from_file(Specs,true) of
                 Tests when is_list(Tests) ->
                     {ok,[{S,ct_testspec:prepare_tests(R)} || {S,R} <- Tests]};
-                R when is_tuple(R), element(1,R)==testspec ->
-                    %% R15
-                    {ok,[{Specs,ct_testspec:prepare_tests(R)}]};
                 Error ->
                     Error
             end
