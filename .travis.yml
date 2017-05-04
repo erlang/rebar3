@@ -2,8 +2,6 @@ language: erlang
 matrix:
   include:
     - os: linux
-      otp_release: R15B03
-    - os: linux
       otp_release: R16B03-1
     - os: linux
       otp_release: 17.5
