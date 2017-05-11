@@ -25,7 +25,8 @@
          test_profile_erl_opts_order_2/1,
          test_profile_erl_opts_order_3/1,
          test_profile_erl_opts_order_4/1,
-         test_profile_erl_opts_order_5/1]).
+         test_profile_erl_opts_order_5/1,
+         first_files_exception/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -46,7 +47,8 @@ all() ->
      test_profile_erl_opts_order_2,
      test_profile_erl_opts_order_3,
      test_profile_erl_opts_order_4,
-     test_profile_erl_opts_order_5].
+     test_profile_erl_opts_order_5,
+     first_files_exception].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -467,6 +469,25 @@ test_profile_erl_opts_order_5(Config) ->
     Opts = get_compiled_profile_erl_opts([loose, strict], Config),
     Opt = last_erl_opt(Opts, [warn_export_all, nowarn_export_all], undefined),
     warn_export_all = Opt.
+
+first_files_exception(_Config) ->
+    RebarConfig = [{erl_first_files, ["c","a","b"]},
+                   {mib_first_files, ["c","a","b"]},
+                   {other, ["c","a","b"]},
+                   {profiles,
+                    [{profile2, [{erl_first_files, ["a","e"]},
+                                 {mib_first_files, ["a","e"]},
+                                 {other, ["a","e"]}
+                                ]}]}],
+    State = rebar_state:new(RebarConfig),
+    State1 = rebar_state:apply_profiles(State, [profile2]),
+
+    %% Combine lists
+    ?assertEqual(["a","b","c","e"], rebar_state:get(State1, other)),
+    %% there is no specific reason not to dedupe "a" here aside from "this is how it is"
+    ?assertEqual(["c","a","b","a","e"], rebar_state:get(State1, erl_first_files)),
+    ?assertEqual(["c","a","b","a","e"], rebar_state:get(State1, mib_first_files)),
+    ok.
 
 get_compiled_profile_erl_opts(Profiles, Config) ->
     AppDir = ?config(apps, Config),
