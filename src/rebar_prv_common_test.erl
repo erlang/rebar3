@@ -650,7 +650,11 @@ handle_results(_) ->
 sum_results({Passed, Failed, {UserSkipped, AutoSkipped}},
             {Passed2, Failed2, {UserSkipped2, AutoSkipped2}}) ->
     {Passed+Passed2, Failed+Failed2,
-     {UserSkipped+UserSkipped2, AutoSkipped+AutoSkipped2}}.
+     {UserSkipped+UserSkipped2, AutoSkipped+AutoSkipped2}};
+sum_results(_, {error, Reason}) ->
+    {error, Reason};
+sum_results(Unknown, _) ->
+    {error, Unknown}.
 
 handle_quiet_results(_, {error, _} = Result) ->
     handle_results(Result);
@@ -673,7 +677,10 @@ format_result({Passed, 0, {0, 0}}) ->
 format_result({Passed, Failed, Skipped}) ->
     Format = [format_failed(Failed), format_skipped(Skipped),
               format_passed(Passed)],
-    ?CONSOLE("~s", [Format]).
+    ?CONSOLE("~s", [Format]);
+format_result(_Unknown) ->
+    %% Happens when CT itself encounters a bug
+    ok.
 
 format_failed(0) ->
     [];
