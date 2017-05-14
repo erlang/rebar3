@@ -287,7 +287,7 @@ mock_config(Name, Config) ->
 
 unmock_config(Config) ->
     meck:unload(),
-    ets:delete(?config(mock_table, Config)).
+    catch ets:delete(?config(mock_table, Config)).
 
 copy_to_cache({Pkg,Vsn}, Config) ->
     Name = <<Pkg/binary, "-", Vsn/binary, ".tar">>,
