@@ -11,6 +11,6 @@
   {modules, []},
 
   {maintainers, []},
-  {licenses, []},
+  {licenses, ["BSD"]},
   {links, []}
  ]}.
