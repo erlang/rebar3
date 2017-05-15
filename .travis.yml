@@ -8,7 +8,7 @@ matrix:
     - os: linux
       otp_release: 18.3
     - os: linux
-      otp_release: 19.2
+      otp_release: 19.3
     - os: osx
       language: generic
 before_script:
