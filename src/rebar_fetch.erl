@@ -46,7 +46,7 @@ download_source_(AppDir, Source, State) ->
         {ok, _} ->
             ec_file:mkdir_p(AppDir1),
             code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
-            ec_file:remove(filename:absname(AppDir1), [recursive]),
+            ok = rebar_file_utils:rm_rf(filename:absname(AppDir1)),
             ?DEBUG("Moving checkout ~p to ~p", [TmpDir, filename:absname(AppDir1)]),
             ok = rebar_file_utils:mv(TmpDir, filename:absname(AppDir1)),
             true;
