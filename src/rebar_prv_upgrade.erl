@@ -70,7 +70,9 @@ do(State) ->
                    is_atom(Dep) orelse is_atom(element(1, Dep))],
     Names = parse_names(ec_cnv:to_binary(proplists:get_value(package, Args, <<"">>)), Locks),
     DepsDict = deps_dict(rebar_state:all_deps(State)),
-    case prepare_locks(Names, Deps, Locks, [], DepsDict) of
+    AltDeps = find_non_default_deps(Deps, State),
+    FilteredNames = cull_default_names_if_profiles(Names, Deps, State),
+    case prepare_locks(FilteredNames, Deps, Locks, [], DepsDict, AltDeps) of
         {error, Reason} ->
             {error, Reason};
         {Locks0, _Unlocks0} ->
@@ -115,20 +117,45 @@ parse_names(Bin, Locks) ->
         Other -> Other
     end.
 
-prepare_locks([], _, Locks, Unlocks, _Dict) ->
+%% Find alternative deps in non-default profiles since they may
+%% need to be passed through (they are never locked)
+find_non_default_deps(Deps, State) ->
+    AltProfiles = rebar_state:current_profiles(State) -- [default],
+    AltProfileDeps = lists:append([
+        rebar_state:get(State, {deps, Profile}, []) || Profile <- AltProfiles]
+    ),
+    [Dep || Dep <- AltProfileDeps,
+            is_atom(Dep) orelse is_atom(element(1, Dep))
+            andalso not lists:member(Dep, Deps)].
+
+%% If any alt profiles are used, remove the default profiles from
+%% the upgrade list and warn about it.
+cull_default_names_if_profiles(Names, Deps, State) ->
+    case rebar_state:current_profiles(State) of
+        [default] ->
+            Names;
+        _ ->
+            ?INFO("Dependencies in the default profile will not be upgraded", []),
+            lists:filter(fun(Name) ->
+                AtomName = binary_to_atom(Name, utf8),
+                rebar_utils:tup_find(AtomName, Deps) == false
+            end, Names)
+    end.
+
+prepare_locks([], _, Locks, Unlocks, _Dict, _AltDeps) ->
     {Locks, Unlocks};
-prepare_locks([Name|Names], Deps, Locks, Unlocks, Dict) ->
+prepare_locks([Name|Names], Deps, Locks, Unlocks, Dict, AltDeps) ->
     AtomName = binary_to_atom(Name, utf8),
     case lists:keyfind(Name, 1, Locks) of
         {_, _, 0} = Lock ->
             case rebar_utils:tup_find(AtomName, Deps) of
                 false ->
                     ?WARN("Dependency ~s has been removed and will not be upgraded", [Name]),
-                    prepare_locks(Names, Deps, Locks, Unlocks, Dict);
+                    prepare_locks(Names, Deps, Locks, Unlocks, Dict, AltDeps);
                 Dep ->
                     {Source, NewLocks, NewUnlocks} = prepare_lock(Dep, Lock, Locks, Dict),
                     prepare_locks(Names, Deps, NewLocks,
-                                  [{Name, Source, 0} | NewUnlocks ++ Unlocks], Dict)
+                                  [{Name, Source, 0} | NewUnlocks ++ Unlocks], Dict, AltDeps)
             end;
         {_, _, Level} = Lock when Level > 0 ->
             case rebar_utils:tup_find(AtomName, Deps) of
@@ -137,10 +164,15 @@ prepare_locks([Name|Names], Deps, Locks, Unlocks, Dict) ->
                 Dep -> % Dep has been promoted
                     {Source, NewLocks, NewUnlocks} = prepare_lock(Dep, Lock, Locks, Dict),
                     prepare_locks(Names, Deps, NewLocks,
-                                  [{Name, Source, 0} | NewUnlocks ++ Unlocks], Dict)
+                                  [{Name, Source, 0} | NewUnlocks ++ Unlocks], Dict, AltDeps)
             end;
         false ->
-            ?PRV_ERROR({unknown_dependency, Name})
+            case rebar_utils:tup_find(AtomName, AltDeps) of
+                false ->
+                    ?PRV_ERROR({unknown_dependency, Name});
+                _ -> % non-default profile dependency found, pass through
+                    prepare_locks(Names, Deps, Locks, Unlocks, Dict, AltDeps)
+            end
     end.
 
 prepare_lock(Dep, Lock, Locks, Dict) ->
