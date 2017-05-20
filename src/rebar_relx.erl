@@ -26,19 +26,21 @@ do(Module, Command, Provider, State) ->
     AllOptions = string:join([Command | Options], " "),
     Cwd = rebar_state:dir(State),
     Providers = rebar_state:providers(State),
+    RebarOpts = rebar_state:opts(State),
+    ErlOpts = rebar_opts:erl_opts(RebarOpts),
     rebar_hooks:run_project_and_app_hooks(Cwd, pre, Provider, Providers, State),
     try
         case rebar_state:get(State, relx, []) of
             [] ->
                 relx:main([{lib_dirs, LibDirs}
                           ,{caller, api}
-                          ,{log_level, LogLevel} | output_dir(OutputDir, Options)], AllOptions);
+                          ,{log_level, LogLevel} | output_dir(OutputDir, Options)] ++ ErlOpts, AllOptions);
             Config ->
                 Config1 = merge_overlays(Config),
                 relx:main([{lib_dirs, LibDirs}
                           ,{config, Config1}
                           ,{caller, api}
-                          ,{log_level, LogLevel} | output_dir(OutputDir, Options)], AllOptions)
+                          ,{log_level, LogLevel} | output_dir(OutputDir, Options)] ++ ErlOpts, AllOptions)
         end,
         rebar_hooks:run_project_and_app_hooks(Cwd, post, Provider, Providers, State),
         {ok, State}
