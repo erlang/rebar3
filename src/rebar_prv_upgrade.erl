@@ -70,16 +70,9 @@ do(State) ->
                    is_atom(Dep) orelse is_atom(element(1, Dep))],
     Names = parse_names(ec_cnv:to_binary(proplists:get_value(package, Args, <<"">>)), Locks),
     DepsDict = deps_dict(rebar_state:all_deps(State)),
-    %% Find alternative deps in non-default profiles since they may
-    %% need to be passed through (they are never locked)
-    AltProfiles = rebar_state:current_profiles(State) -- [default],
-    AltProfileDeps = lists:append([
-        rebar_state:get(State, {deps, Profile}, []) || Profile <- AltProfiles]
-    ),
-    AltDeps = [Dep || Dep <- AltProfileDeps,
-                      is_atom(Dep) orelse is_atom(element(1, Dep))
-                      andalso not lists:member(Dep, Deps)],
-    case prepare_locks(Names, Deps, Locks, [], DepsDict, AltDeps) of
+    AltDeps = find_non_default_deps(Deps, State),
+    FilteredNames = cull_default_names_if_profiles(Names, Deps, State),
+    case prepare_locks(FilteredNames, Deps, Locks, [], DepsDict, AltDeps) of
         {error, Reason} ->
             {error, Reason};
         {Locks0, _Unlocks0} ->
@@ -122,6 +115,31 @@ parse_names(Bin, Locks) ->
         [] -> [Name || {Name, _, 0} <- Locks];
         %% Regular options
         Other -> Other
+    end.
+
+%% Find alternative deps in non-default profiles since they may
+%% need to be passed through (they are never locked)
+find_non_default_deps(Deps, State) ->
+    AltProfiles = rebar_state:current_profiles(State) -- [default],
+    AltProfileDeps = lists:append([
+        rebar_state:get(State, {deps, Profile}, []) || Profile <- AltProfiles]
+    ),
+    [Dep || Dep <- AltProfileDeps,
+            is_atom(Dep) orelse is_atom(element(1, Dep))
+            andalso not lists:member(Dep, Deps)].
+
+%% If any alt profiles are used, remove the default profiles from
+%% the upgrade list and warn about it.
+cull_default_names_if_profiles(Names, Deps, State) ->
+    case rebar_state:current_profiles(State) of
+        [default] ->
+            Names;
+        _ ->
+            ?INFO("Dependencies in the default profile will not be upgraded", []),
+            lists:filter(fun(Name) ->
+                AtomName = binary_to_atom(Name, utf8),
+                rebar_utils:tup_find(AtomName, Deps) == false
+            end, Names)
     end.
 
 prepare_locks([], _, Locks, Unlocks, _Dict, _AltDeps) ->

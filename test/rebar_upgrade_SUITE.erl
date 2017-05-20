@@ -11,7 +11,8 @@ groups() ->
                 triplet_a, triplet_b, triplet_c,
                 tree_a, tree_b, tree_c, tree_c2, tree_cj, tree_ac, tree_all,
                 delete_d, promote, stable_lock, fwd_lock,
-                compile_upgrade_parity, umbrella_config, profiles]},
+                compile_upgrade_parity, umbrella_config,
+                profiles, profiles_exclusion]},
      {git, [], [{group, all}]},
      {pkg, [], [{group, all}]}].
 
@@ -78,7 +79,8 @@ setup_project(Case=umbrella_config, Config0, Deps, UpDeps) ->
     [{rebarconfig, TopConf},
      {rebarumbrella, RebarConf},
      {next_top_deps, rebar_test_utils:top_level_deps(UpDeps)} | Config];
-setup_project(Case=profiles, Config0, Deps, UpDeps) ->
+setup_project(Case, Config0, Deps, UpDeps) when Case == profiles;
+                                                Case == profiles_exclusion ->
     DepsType = ?config(deps_type, Config0),
     NameRoot = atom_to_list(Case)++"_"++atom_to_list(DepsType),
     Config = rebar_test_utils:init_rebar_state(Config0, NameRoot++"_"),
@@ -490,6 +492,26 @@ upgrades(profiles) ->
      ["A","B","C","E","F","H"],
      {"C", [{"A","1"}, "D", {"E","3"},
             {"B","2"}, {"F","2"}, "G",
+            {"C","1"}, {"H","4"}, "I"]}};
+upgrades(profiles_exclusion) ->
+    %% Ensure that we can unlock deps under a given profile;
+    %% B and C should both be in a custom profile
+    %% and must not be locked.
+    {[{"A", "1", [{"D",[]},
+                  {"E","3",[]}]},
+      {"B", "1", [{"F","1",[]},
+                  {"G",[]}]},
+      {"C", "0", [{"H","3",[]},
+                  {"I",[]}]}],
+     [{"A", "2", [{"D",[]},
+                  {"E","2",[]}]},
+      {"B", "2", [{"F","2",[]},
+                  {"G",[]}]},
+      {"C", "1", [{"H","4",[]},
+                  {"I",[]}]}],
+     ["A","B","C","E","F","H"],
+     {"A", [{"A","1"}, "D", {"E","3"},
+            {"B","2"}, {"F","2"}, "G",
             {"C","1"}, {"H","4"}, "I"]}}.
 
 %% TODO: add a test that verifies that unlocking files and then
@@ -677,6 +699,8 @@ profiles(Config) ->
         Config, NewRebarConfig, ["as","fake","upgrade", App], Expectation
      ),
     meck:unload(rebar_prv_app_discovery).
+
+profiles_exclusion(Config) -> profiles(Config).
 
 run(Config) ->
     apply(?config(mock, Config), []),
