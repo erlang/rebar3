@@ -53,24 +53,22 @@ needs_update(Dir, {git, Url, {branch, Branch}}) ->
 needs_update(Dir, {git, Url, "master"}) ->
     needs_update(Dir, {git, Url, {branch, "master"}});
 needs_update(Dir, {git, _, Ref}) ->
-    {ok, Current} = rebar_utils:sh(?FMT("git rev-parse -q HEAD", []),
+    {ok, Current} = rebar_utils:sh(?FMT("git rev-parse --short=7 -q HEAD", []),
                                    [{cd, Dir}]),
     Current1 = string:strip(string:strip(Current, both, $\n), both, $\r),
 
     Ref2 = case Ref of
                {ref, Ref1} ->
                    Length = length(Current1),
-                   if
-                       Length >= 7 ->
-                           lists:sublist(Ref1, Length);
-                       true ->
-                           Ref1
+                   case Length >= 7 of
+                       true -> lists:sublist(Ref1, Length);
+                       false -> Ref1
                    end;
-               Ref1 ->
-                   Ref1
+               _ ->
+                   Ref
            end,
 
-    ?DEBUG("Comparing git ref ~s with ~s", [Ref1, Current1]),
+    ?DEBUG("Comparing git ref ~s with ~s", [Ref2, Current1]),
     (Current1 =/= Ref2).
 
 compare_url(Dir, Url) ->
