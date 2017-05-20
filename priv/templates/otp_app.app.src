@@ -11,6 +11,6 @@
   {modules, []},
 
   {maintainers, []},
-  {licenses, ["BSD"]},
+  {licenses, ["Apache 2.0"]},
   {links, []}
  ]}.
