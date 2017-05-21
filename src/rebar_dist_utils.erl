@@ -51,14 +51,27 @@ find_options(State) ->
 %%% PRIVATE %%%
 %%%%%%%%%%%%%%%
 start(Name, Type, Opts) ->
-    check_epmd(net_kernel:start([Name, Type])),
+    case dist_up(net_kernel:start([Name, Type])) of
+        false ->
+            start_epmd(),
+            dist_up(net_kernel:start([Name, Type])) orelse warn_dist();
+        true ->
+            ok
+    end,
     setup_cookie(Opts).
 
-check_epmd({error,{{shutdown, {_,net_kernel,{'EXIT',nodistribution}}},_}}) ->
-    ?ERROR("Erlang Distribution failed, falling back to nonode@nohost. "
-           "Verify that epmd is running and try again.",[]);
-check_epmd(_) ->
-    ok.
+dist_up({error,{{shutdown,{_,net_kernel,{'EXIT',nodistribution}}},_}}) -> false;
+dist_up(_) -> true.
+
+start_epmd() ->
+    %% Indirectly boot EPMD through calling Erlang so that we don't risk
+    %% attaching it to the current proc
+    ?CONSOLE("Attempting to start epmd...", []),
+    os:cmd("erl -sname a -eval 'halt(0).'").
+
+warn_dist() ->
+    ?ERROR("Erlang Distribution failed, falling back to nonode@nohost.", []).
+
 
 setup_cookie(Opts) ->
     case {node(), proplists:get_value(setcookie, Opts, nocookie)} of
