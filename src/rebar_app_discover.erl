@@ -41,6 +41,7 @@ do(State, LibDirs) ->
                                  ParsedDeps = parse_profile_deps(Profile
                                                                 ,TopLevelApp
                                                                 ,ProfileDeps2
+                                                                ,Apps
                                                                 ,rebar_state:opts(StateAcc1)
                                                                 ,StateAcc1),
                                  rebar_state:set(StateAcc1, {parsed_deps, Profile}, ParsedDeps)
@@ -53,7 +54,7 @@ do(State, LibDirs) ->
                         Name = rebar_app_info:name(AppInfo),
                         case enable(State, AppInfo) of
                             true ->
-                                {AppInfo1, StateAcc1} = merge_deps(AppInfo, StateAcc),
+                                {AppInfo1, StateAcc1} = merge_deps(AppInfo, Apps, StateAcc),
                                 OutDir = filename:join(DepsDir, Name),
                                 AppInfo2 = rebar_app_info:out_dir(AppInfo1, OutDir),
                                 ProjectDeps1 = lists:delete(Name, ProjectDeps),
@@ -90,9 +91,9 @@ format_error({missing_module, Module}) ->
 
 %% @doc handles the merging and application of profiles and overrides
 %% for a given application, within its own context.
--spec merge_deps(rebar_app_info:t(), rebar_state:t()) ->
+-spec merge_deps(rebar_app_info:t(), [rebar_app_info:t()], rebar_state:t()) ->
     {rebar_app_info:t(), rebar_state:t()}.
-merge_deps(AppInfo, State) ->
+merge_deps(AppInfo, Apps, State) ->
     %% These steps make sure that hooks and artifacts are run in the context of
     %% the application they are defined at. If an umbrella structure is used and
     %% they are deifned at the top level they will instead run in the context of
@@ -112,16 +113,16 @@ merge_deps(AppInfo, State) ->
     rebar_app_info:verify_otp_vsn(AppInfo2),
 
     State2 = lists:foldl(fun(Profile, StateAcc) ->
-                                 handle_profile(Profile, Name, AppInfo2, StateAcc)
+                                 handle_profile(Profile, Name, AppInfo2, Apps, StateAcc)
                          end, State1, lists:reverse(CurrentProfiles)),
 
     {AppInfo2, State2}.
 
 %% @doc Applies a given profile for an app, ensuring the deps
 %% match the context it will require.
--spec handle_profile(atom(), binary(), rebar_app_info:t(), rebar_state:t()) ->
+-spec handle_profile(atom(), binary(), rebar_app_info:t(), [rebar_app_info:t()], rebar_state:t()) ->
     rebar_state:t().
-handle_profile(Profile, Name, AppInfo, State) ->
+handle_profile(Profile, Name, AppInfo, Apps, State) ->
     TopParsedDeps = rebar_state:get(State, {parsed_deps, Profile}, {[], []}),
     TopLevelProfileDeps = rebar_state:get(State, {deps, Profile}, []),
     AppProfileDeps = rebar_app_info:get(AppInfo, {deps, Profile}, []),
@@ -133,23 +134,25 @@ handle_profile(Profile, Name, AppInfo, State) ->
     %% Only deps not also specified in the top level config need
     %% to be included in the parsed deps
     NewDeps = ProfileDeps2 -- TopLevelProfileDeps,
-    ParsedDeps = parse_profile_deps(Profile, Name, NewDeps, rebar_app_info:opts(AppInfo), State1),
+    ParsedDeps = parse_profile_deps(Profile, Name, NewDeps, Apps, rebar_app_info:opts(AppInfo), State1),
     State2 = rebar_state:set(State1, {deps, Profile}, ProfileDeps2),
     rebar_state:set(State2, {parsed_deps, Profile}, TopParsedDeps++ParsedDeps).
 
 %% @doc parses all the known dependencies for a given profile
--spec parse_profile_deps(Profile, Name, Deps, Opts, rebar_state:t()) -> [rebar_app_info:t()] when
+-spec parse_profile_deps(Profile, Name, Deps, Opts, Apps, rebar_state:t()) -> [rebar_app_info:t()] when
       Profile :: atom(),
       Name :: binary(),
+      Apps :: [rebar_app_info:t()],
       Deps :: [term()], % TODO: refine types
       Opts :: term(). % TODO: refine types
-parse_profile_deps(Profile, Name, Deps, Opts, State) ->
+parse_profile_deps(Profile, Name, Deps, Apps, Opts, State) ->
     DepsDir = rebar_prv_install_deps:profile_dep_dir(State, Profile),
     Locks = rebar_state:get(State, {locks, Profile}, []),
     rebar_app_utils:parse_deps(Name
                               ,DepsDir
                               ,Deps
                               ,rebar_state:opts(State, Opts)
+                              ,Apps
                               ,Locks
                               ,1).
 
@@ -422,4 +425,3 @@ find_config_src(AppDir, Default) ->
             %% TODO: handle profiles I guess, but we don't have that info
             proplists:get_value(src_dirs, Terms, Default)
     end.
-

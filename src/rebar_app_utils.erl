@@ -32,9 +32,9 @@
          app_src_to_app/2,
          validate_application_info/1,
          validate_application_info/2,
-         parse_deps/5,
          parse_deps/6,
-         dep_to_app/7,
+         parse_deps/7,
+         dep_to_app/8,
          format_error/1]).
 
 -include("rebar.hrl").
@@ -108,37 +108,40 @@ validate_application_info(AppInfo, AppDetail) ->
     end.
 
 %% @doc parses all dependencies from the root of the project
--spec parse_deps(Dir, Deps, State, Locks, Level) -> [rebar_app_info:t()] when
+-spec parse_deps(Dir, Deps, State, Apps, Locks, Level) -> [rebar_app_info:t()] when
       Dir :: file:filename(),
       Deps :: [tuple() | atom() | binary()], % TODO: meta to source() | lock()
       State :: rebar_state:t(),
+      Apps :: [rebar_app_info:t()],
       Locks :: [tuple()], % TODO: meta to [lock()]
       Level :: non_neg_integer().
-parse_deps(DepsDir, Deps, State, Locks, Level) ->
-    parse_deps(root, DepsDir, Deps, State, Locks, Level).
+parse_deps(DepsDir, Deps, State, Apps, Locks, Level) ->
+    parse_deps(root, DepsDir, Deps, State, Apps, Locks, Level).
 
 %% @doc runs `parse_dep/6' for a set of dependencies.
--spec parse_deps(Parent, Dir, Deps, State, Locks, Level) -> [rebar_app_info:t()] when
+-spec parse_deps(Parent, Dir, Deps, State, Apps, Locks, Level) -> [rebar_app_info:t()] when
       Parent :: root | binary(),
       Dir :: file:filename(),
       Deps :: [tuple() | atom() | binary()], % TODO: meta to source() | lock()
       State :: rebar_state:t(),
+      Apps :: [rebar_app_info:t()],
       Locks :: [tuple()], % TODO: meta to [lock()]
       Level :: non_neg_integer().
-parse_deps(Parent, DepsDir, Deps, State, Locks, Level) ->
-    [parse_dep(Dep, Parent, DepsDir, State, Locks, Level) || Dep <- Deps].
+parse_deps(Parent, DepsDir, Deps, State, Apps, Locks, Level) ->
+    [parse_dep(Dep, Parent, DepsDir, State, Apps, Locks, Level) || Dep <- Deps].
 
 %% @doc for a given dep, return its app info record. The function
 %% also has to choose whether to define the dep from its immediate spec
 %% (if it is a newer thing) or from the locks specified in the lockfile.
--spec parse_dep(Dep, Parent, Dir, State, Locks, Level) -> rebar_app_info:t() when
+-spec parse_dep(Dep, Parent, Dir, State, Apps, Locks, Level) -> rebar_app_info:t() when
       Dep :: tuple() | atom() | binary(), % TODO: meta to source() | lock()
       Parent :: root | binary(),
       Dir :: file:filename(),
       State :: rebar_state:t(),
+      Apps :: [rebar_app_info:t()],
       Locks :: [tuple()], % TODO: meta to [lock()]
       Level :: non_neg_integer().
-parse_dep(Dep, Parent, DepsDir, State, Locks, Level) ->
+parse_dep(Dep, Parent, DepsDir, State, Apps, Locks, Level) ->
     Name = case Dep of
                Dep when is_tuple(Dep) ->
                    element(1, Dep);
@@ -147,75 +150,81 @@ parse_dep(Dep, Parent, DepsDir, State, Locks, Level) ->
            end,
     case lists:keyfind(ec_cnv:to_binary(Name), 1, Locks) of
         false ->
-            parse_dep(Parent, Dep, DepsDir, false, State);
+            parse_dep(Parent, Dep, DepsDir, false, Apps, State);
         LockedDep ->
             LockedLevel = element(3, LockedDep),
             case LockedLevel > Level of
                 true ->
-                    parse_dep(Parent, Dep, DepsDir, false, State);
+                    parse_dep(Parent, Dep, DepsDir, false, Apps, State);
                 false ->
-                    parse_dep(Parent, LockedDep, DepsDir, true, State)
+                    parse_dep(Parent, LockedDep, DepsDir, true, Apps, State)
             end
     end.
 
 %% @doc converts a dependency definition and a location for it on disk
 %% into an app info tuple representing it.
--spec parse_dep(Parent, Dep, Dir, IsLock, State) -> rebar_app_info:t() when
+-spec parse_dep(Parent, Dep, Dir, IsLock, Apps, State) -> rebar_app_info:t() when
       Parent :: root | binary(),
       Dep :: tuple() | atom() | binary(), % TODO: meta to source() | lock()
       Dir :: file:filename(),
       IsLock :: boolean(),
+      Apps :: [rebar_app_info:t()],
       State :: rebar_state:t().
-parse_dep(Parent, {Name, Vsn, {pkg, PkgName}}, DepsDir, IsLock, State) ->
+parse_dep(Parent, {Name, Vsn, {pkg, PkgName}}, DepsDir, IsLock, Apps, State) ->
     {PkgName1, PkgVsn} = {ec_cnv:to_binary(PkgName), ec_cnv:to_binary(Vsn)},
-    dep_to_app(Parent, DepsDir, Name, PkgVsn, {pkg, PkgName1, PkgVsn, undefined}, IsLock, State);
-parse_dep(Parent, {Name, {pkg, PkgName}}, DepsDir, IsLock, State) ->
+    dep_to_app(Parent, DepsDir, Name, PkgVsn, {pkg, PkgName1, PkgVsn, undefined}, IsLock, Apps, State);
+parse_dep(Parent, {Name, {pkg, PkgName}}, DepsDir, IsLock, Apps, State) ->
     %% Package dependency with different package name from app name
-    dep_to_app(Parent, DepsDir, Name, undefined, {pkg, ec_cnv:to_binary(PkgName), undefined, undefined}, IsLock, State);
-parse_dep(Parent, {Name, Vsn}, DepsDir, IsLock, State) when is_list(Vsn); is_binary(Vsn) ->
+    dep_to_app(Parent, DepsDir, Name, undefined, {pkg, ec_cnv:to_binary(PkgName), undefined, undefined}, IsLock, Apps, State);
+parse_dep(Parent, {Name, Vsn}, DepsDir, IsLock, Apps, State) when is_list(Vsn); is_binary(Vsn) ->
     %% Versioned Package dependency
     {PkgName, PkgVsn} = {ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)},
-    dep_to_app(Parent, DepsDir, PkgName, PkgVsn, {pkg, PkgName, PkgVsn, undefined}, IsLock, State);
-parse_dep(Parent, Name, DepsDir, IsLock, State) when is_atom(Name); is_binary(Name) ->
+    dep_to_app(Parent, DepsDir, PkgName, PkgVsn, {pkg, PkgName, PkgVsn, undefined}, IsLock, Apps, State);
+parse_dep(Parent, Name, DepsDir, IsLock, Apps, State) when is_atom(Name); is_binary(Name) ->
     %% Unversioned package dependency
-    dep_to_app(Parent, DepsDir, ec_cnv:to_binary(Name), undefined, {pkg, ec_cnv:to_binary(Name), undefined, undefined}, IsLock, State);
-parse_dep(Parent, {Name, Source}, DepsDir, IsLock, State) when is_tuple(Source) ->
-    dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, State);
-parse_dep(Parent, {Name, _Vsn, Source}, DepsDir, IsLock, State) when is_tuple(Source) ->
-    dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, State);
-parse_dep(Parent, {Name, _Vsn, Source, Opts}, DepsDir, IsLock, State) when is_tuple(Source),
+    dep_to_app(Parent, DepsDir, ec_cnv:to_binary(Name), undefined, {pkg, ec_cnv:to_binary(Name), undefined, undefined}, IsLock, Apps, State);
+parse_dep(Parent, {Name, Source}, DepsDir, IsLock, Apps, State) when is_tuple(Source) ->
+    dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, Apps, State);
+parse_dep(Parent, {Name, _Vsn, Source}, DepsDir, IsLock, Apps, State) when is_tuple(Source) ->
+    dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, Apps, State);
+parse_dep(Parent, {Name, _Vsn, Source, Opts}, DepsDir, IsLock, Apps, State) when is_tuple(Source),
                                                                            is_list(Opts) ->
     ?WARN("Dependency option list ~p in ~p is not supported and will be ignored", [Opts, Name]),
-    dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, State);
-parse_dep(Parent, {Name, Source, Opts}, DepsDir, IsLock, State) when is_tuple(Source),
+    dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, Apps, State);
+parse_dep(Parent, {Name, Source, Opts}, DepsDir, IsLock, Apps, State) when is_tuple(Source),
                                                                      is_list(Opts) ->
     ?WARN("Dependency option list ~p in ~p is not supported and will be ignored", [Opts, Name]),
-    dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, State);
-parse_dep(Parent, {Name, {pkg, PkgName, Vsn}, Level}, DepsDir, IsLock, State) when is_integer(Level) ->
-    dep_to_app(Parent, DepsDir, Name, Vsn, {pkg, PkgName, Vsn, undefined}, IsLock, State);
-parse_dep(Parent, {Name, {pkg, PkgName, Vsn, Hash}, Level}, DepsDir, IsLock, State) when is_integer(Level) ->
-    dep_to_app(Parent, DepsDir, Name, Vsn, {pkg, PkgName, Vsn, Hash}, IsLock, State);
-parse_dep(Parent, {Name, Source, Level}, DepsDir, IsLock, State) when is_tuple(Source)
+    dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, Apps, State);
+parse_dep(Parent, {Name, {pkg, PkgName, Vsn}, Level}, DepsDir, IsLock, Apps, State) when is_integer(Level) ->
+    dep_to_app(Parent, DepsDir, Name, Vsn, {pkg, PkgName, Vsn, undefined}, IsLock, Apps, State);
+parse_dep(Parent, {Name, {pkg, PkgName, Vsn, Hash}, Level}, DepsDir, IsLock, Apps, State) when is_integer(Level) ->
+    dep_to_app(Parent, DepsDir, Name, Vsn, {pkg, PkgName, Vsn, Hash}, IsLock, Apps, State);
+parse_dep(Parent, {Name, Source, Level}, DepsDir, IsLock, Apps, State) when is_tuple(Source)
                                                                     , is_integer(Level) ->
-    dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, State);
-parse_dep(_, Dep, _, _, _) ->
+    dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, Apps, State);
+parse_dep(_, Dep, _, _, _, _) ->
     throw(?PRV_ERROR({parse_dep, Dep})).
 
 %% @doc convert a dependency that has just been fetched into
 %% an app info record related to it
--spec dep_to_app(Parent, Dir, Name, Vsn, Source, IsLock, State) -> rebar_app_info:t() when
+-spec dep_to_app(Parent, Dir, Name, Vsn, Source, IsLock, Apps, State) -> rebar_app_info:t() when
       Parent :: root | binary(),
       Dir :: file:filename(),
       Name :: binary(),
       Vsn :: iodata() | undefined,
       Source :: tuple(),
       IsLock :: boolean(),
+      Apps :: [rebar_app_info:t()],
       State :: rebar_state:t().
-dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
-    CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
-    AppInfo = case rebar_app_info:discover(CheckoutsDir) of
+dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, Apps, State) ->
+    AppInfo = case find(Name, Apps) of
+                  {ok, App} ->
+                      rebar_app_info:source(rebar_app_info:is_local(App, true), local);
+                  _ ->
+                      CheckoutsDir = ec_cnv:to_list(rebar_dir:checkouts_dir(State, Name)),
+                      case rebar_app_info:discover(CheckoutsDir) of
                         {ok, App} ->
-                            rebar_app_info:source(rebar_app_info:is_checkout(App, true), checkout);
+                            rebar_app_info:source(rebar_app_info:is_local(App, true), local);
                         not_found ->
                             Dir = ec_cnv:to_list(filename:join(DepsDir, Name)),
                             {ok, AppInfo0} =
@@ -226,7 +235,8 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
                                         rebar_app_info:new(Parent, Name, Vsn, Dir, [])
                                 end,
                                 update_source(AppInfo0, Source, State)
-                    end,
+                    end
+              end,
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
     AppInfo1 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
     Overrides = rebar_state:get(State, overrides, []),
