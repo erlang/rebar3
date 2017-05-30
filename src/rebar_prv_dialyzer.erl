@@ -44,6 +44,10 @@ desc() ->
     "options `dialyzer` in rebar.config:\n"
     "`warnings` - a list of dialyzer warnings\n"
     "`get_warnings` - display warnings when altering a PLT file (boolean)\n"
+    "`native` - use natively compiled key modules (boolean)\n"
+    "`native_location` - the location of the native compiled module cache,"
+    "`global` to store in $HOME/.cache/rebar3 (default) or a custom "
+    "directory.\n"
     "`plt_apps` - the strategy for determining the applications which included "
     "in the PLT file, `top_level_deps` to include just the direct dependencies "
     "or `all_deps` to include all nested dependencies*\n"
@@ -58,7 +62,7 @@ desc() ->
     "`base_plt_mods` - a list of modules to include in the base "
     "PLT file***\n"
     "`base_plt_location` - the location of base PLT file, `global` to store in "
-    "$HOME/.cache/rebar3 (default) or  a custom directory***\n"
+    "$HOME/.cache/rebar3 (default) or a custom directory***\n"
     "`base_plt_prefix` - the prefix to the base PLT file, defaults to "
     "\"rebar3\"** ***\n"
     "`exclude_apps` - a list of applications to exclude from PLT files and "
@@ -102,9 +106,14 @@ do(State) ->
         throw:{duplicate_module, _, _, _} = Error ->
             ?PRV_ERROR(Error);
         throw:{output_file_error, _, _} = Error ->
+            ?PRV_ERROR(Error);
+        throw:{native_cache_error, _, _, _} = Error ->
+            ?PRV_ERROR(Error);
+        throw:{native_module_error, _, _, _, _} = Error ->
             ?PRV_ERROR(Error)
     after
-        rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default))
+        rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+        cleanup_native(State)
     end.
 
 %% This is used to workaround dialyzer quirk discussed here
@@ -128,6 +137,10 @@ format_error({duplicate_module, Mod, File1, File2}) ->
 format_error({output_file_error, File, Error}) ->
     Error1 = file:format_error(Error),
     io_lib:format("Failed to write to ~s: ~s", [File, Error1]);
+format_error({native_cache_error, Cache, Action, Error}) ->
+    io_lib:format("Failed to ~s ~s: ~s", [Action, Cache, Error]);
+format_error({native_module_error, Cache, Action, Mod, Error}) ->
+    io_lib:format("Failed to ~s ~s with ~s: ~s", [Action, Mod, Cache, Error]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -148,6 +161,7 @@ plt_name(Prefix) ->
     Prefix ++ "_" ++ rebar_utils:otp_release() ++ "_plt".
 
 do(State, Plt) ->
+    native(State),
     Output = get_output_file(State),
     {PltWarnings, State1} = update_proj_plt(State, Plt, Output),
     {Warnings, State2} = succ_typings(State1, Plt, Output),
@@ -158,6 +172,186 @@ do(State, Plt) ->
             ?INFO("Warnings written to ~s", [Output]),
             throw({dialyzer_warnings, TotalWarnings})
     end.
+
+native(State) ->
+    case get_config(State, native, true) andalso is_native_available() of
+        true ->
+            load_native(State);
+        false ->
+            ok
+    end.
+
+is_native_available() ->
+    case erlang:system_info(hipe_architecture) of
+        undefined ->
+            false;
+        _ ->
+            true
+    end.
+
+load_native(State) ->
+    Natives = lookup_native_mods(),
+    Cache = native_location(State),
+    case zip:unzip(Cache, [memory]) of
+        {ok, Files} ->
+            load_native(Files, Natives, Cache);
+        {error, enoent} ->
+            compile_native(Natives, Cache);
+        {error, Reason} ->
+            ?DEBUG("Deleting native cache: ~p", [Cache]),
+            _ = file:delete(Cache),
+            throw({native_cache_error, Cache, unzip, Reason})
+    end.
+
+lookup_native_mods() ->
+    ?INFO("Resolving native modules...", []),
+    lists:filtermap(fun lookup_native_mod/1, native_mods()).
+
+lookup_native_mod(Mod) ->
+    _ = code:ensure_loaded(Mod),
+    case code:is_module_native(Mod) of
+        true ->
+            false;
+        false ->
+            {true, {Mod, code:which(Mod)}};
+        undefined ->
+            false
+    end.
+
+%% As used by dialyzer in OTP-19.1
+native_mods() ->
+    [lists, dict, digraph, digraph_utils, ets,
+     cerl, erl_types, cerl_trees, erl_bif_types,
+     dialyzer_analysis_callgraph, dialyzer, dialyzer_behaviours,
+     dialyzer_codeserver, dialyzer_contracts,
+     dialyzer_coordinator, dialyzer_dataflow, dialyzer_dep,
+     dialyzer_plt, dialyzer_succ_typings, dialyzer_typesig,
+     dialyzer_worker].
+
+native_location(State) ->
+    Name = rebar_utils:otp_release() ++ ".dialyzer_modules",
+    case get_config(State, native_location, global) of
+        global ->
+            GlobalCacheDir = rebar_dir:global_cache_dir(rebar_state:opts(State)),
+            filename:join(GlobalCacheDir, Name);
+        Dir ->
+            filename:join(Dir, Name)
+    end.
+
+load_native(Files, Natives, Cache) ->
+    Ext = code:objfile_extension(),
+    NFiles = [{list_to_atom(filename:basename(File, Ext)), File, Binary} ||
+              {File, Binary} <- Files],
+    ?DEBUG("Native cache: ~p", [[{Mod, File} || {Mod, File, _} <- NFiles]]),
+    NFiles2 = [FileInfo ||
+               {Mod, _, _} = FileInfo <- NFiles,
+               lists:keymember(Mod, 1, Natives)],
+    ?INFO("Loading ~b native modules from ~p...", [length(NFiles2), Cache]),
+    ?DEBUG("Loading native modules: ~p", [[{Mod, File} || {Mod, File, _} <- NFiles2]]),
+    load_native_mods(Files, Cache).
+
+load_native_mods(Files, Cache) ->
+    _ = [load_native_mod(Mod, File, Binary, Cache) ||
+         {Mod, File, Binary} <- Files],
+    ok.
+
+load_native_mod(Mod, File, Binary, Cache) ->
+    case code:is_sticky(Mod) of
+        true ->
+            sticky_native_load(Mod, File, Binary, Cache);
+        false ->
+            load_native_binary(Mod, File, Binary, Cache)
+    end.
+
+sticky_native_load(Mod, File, Binary, Cache) ->
+    Dir = filename:dirname(code:which(Mod)),
+    try
+        _ = code:unstick_dir(Dir),
+        load_native_binary(Mod, File, Binary, Cache)
+    after
+        _ = code:stick_dir(Dir)
+    end.
+
+load_native_binary(Mod, File, Binary, Cache) ->
+    case code:load_binary(Mod, File, Binary) of
+        {module, _} ->
+            code:purge(Mod);
+        {error, Reason} ->
+            ?DEBUG("Deleting native cache: ~p", [Cache]),
+            _ = file:delete(Cache),
+            throw({native_module_error, Cache, load, Mod, Reason})
+    end.
+
+compile_native(Files, Cache) ->
+    ?INFO("Compiling ~b native modules to ~p...", [length(Files), Cache]),
+    ?DEBUG("Native cache: ~p", [Files]),
+    NFiles = compile_native_mods(Files, Cache),
+    case zip:zip(Cache, NFiles) of
+        {ok, _} ->
+            ok;
+        {error, Reason} ->
+            throw({native_cache_error, Cache, zip, Reason})
+    end.
+
+compile_native_mods(Files, Cache) ->
+    [compile_native_mod(Mod, File, Cache) || {Mod, File} <- Files].
+
+compile_native_mod(Mod, File, Cache) ->
+    case compile:file(File, [from_beam, native, binary]) of
+        {ok, Mod, Binary} ->
+            Dir = filename:dirname(Cache),
+            NFile = filename:join(Dir, filename:basename(File)),
+            load_native_mod(Mod, NFile, Binary, Cache),
+            {NFile, Binary};
+        Reason ->
+            throw({native_module_error, Cache, compile, Mod, Reason})
+    end.
+
+cleanup_native(State) ->
+    case get_config(State, native, true) andalso is_native_available() of
+        true ->
+            _ = [cleanup_native_mod(Mod) || Mod <- native_mods()],
+            ok;
+        false ->
+            ok
+    end.
+
+cleanup_native_mod(Mod) ->
+    case code:where_is_file(atom_to_list(Mod) ++ code:objfile_extension()) of
+        File when is_list(File) ->
+            ensure_mod(Mod, File);
+        non_existing ->
+            false
+    end.
+
+ensure_mod(Mod, File) ->
+    case code:which(Mod) of
+        File ->
+            false;
+        _ ->
+            load_mod(Mod, File)
+    end.
+
+load_mod(Mod, File) ->
+    case code:is_sticky(Mod) of
+        true ->
+            sticky_load_mod(Mod, File);
+        false ->
+            do_load_mod(Mod, File)
+    end.
+
+sticky_load_mod(Mod, File) ->
+    Dir = filename:dirname(File),
+    try
+        _ = code:unstick_dir(Dir),
+        do_load_mod(Mod, File)
+    after
+        _ = code:stick_dir(Dir)
+    end.
+
+do_load_mod(Mod, File) ->
+    {module, Mod} = code:load_abs(filename:rootname(File)),
+    code:purge(Mod).
 
 get_output_file(State) ->
     BaseDir = rebar_dir:base_dir(State),
