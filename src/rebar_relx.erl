@@ -6,6 +6,10 @@
 -export([do/4,
          format_error/1]).
 
+-ifdef(TEST).
+-export([merge_overlays/1]).
+-endif.
+
 -include("rebar.hrl").
 
 %% ===================================================================
@@ -64,5 +68,5 @@ merge_overlays(Config) ->
                            (_) -> false
                         end, Config),
     %% Have profile overlay entries come before others to match how profiles work elsewhere
-    NewOverlay = lists:reverse(lists:flatmap(fun({overlay, Overlay}) -> Overlay end, Overlays)),
+    NewOverlay = lists:flatmap(fun({overlay, Overlay}) -> Overlay end, lists:reverse(Overlays)),
     [{overlay, NewOverlay} | Others].

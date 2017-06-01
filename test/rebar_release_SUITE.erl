@@ -11,6 +11,7 @@ all() -> [release,
           profile_ordering_sys_config_extend_3_tuple_merge,
           extend_release,
           user_output_dir, profile_overlays,
+          profile_overlay_merge,
           overlay_vars].
 
 init_per_testcase(Case, Config0) ->
@@ -216,6 +217,30 @@ profile_overlays(Config) ->
             {dir, filename:join(ReleaseDir, "otherrandomdir")},
             {dir, filename:join(ReleaseDir, "randomdir")}]}
      ).
+
+profile_overlay_merge (_Config) ->
+    % when profile and relx overlays both exist, the profile overlays should be
+    % first, then the relx overlays, all the rest of the config should come
+    % after, rebar_relx:merge_overlays/1 should do this.
+    RelxOverlay = [{mkdir, "1_from_relx"}, {mkdir, "2_from_relx"}],
+    ProfileOverlay = [{mkdir, "0_from_other_profile"}],
+    OtherConfig = [{other1, config}, {other2, config}],
+
+    % test with no overlays
+    ?assertEqual([{overlay,[]}] ++ OtherConfig,
+                 rebar_relx:merge_overlays(OtherConfig)),
+
+    % test with relx only, just move overlays to the top
+    RelxOnly = OtherConfig ++ [{overlay, RelxOverlay}],
+    ?assertEqual([{overlay, RelxOverlay}]++OtherConfig,
+                 rebar_relx:merge_overlays(RelxOnly)),
+
+    % now test with a profile (profiles end up after relx overlays
+    ProfilesToMerge = OtherConfig ++
+                      [{overlay, RelxOverlay},
+                       {overlay, ProfileOverlay}],
+    ?assertEqual([{overlay, ProfileOverlay ++ RelxOverlay}] ++ OtherConfig,
+                 rebar_relx:merge_overlays(ProfilesToMerge)).
 
 overlay_vars(Config) ->
     AppDir = ?config(apps, Config),
