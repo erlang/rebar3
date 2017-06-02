@@ -68,7 +68,7 @@ do(State, Tests) ->
                     %% Run eunit provider posthooks
                     rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State1),
                     rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
-                    {ok, State1};
+                    {ok, State};
                 Error ->
                     rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
                     Error
