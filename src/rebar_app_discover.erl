@@ -97,11 +97,11 @@ merge_deps(AppInfo, State) ->
     %% the application they are defined at. If an umbrella structure is used and
     %% they are deifned at the top level they will instead run in the context of
     %% the State and at the top level, not as part of an application.
-    Default = reset_hooks(rebar_state:default(State)),
+    CurrentProfiles = rebar_state:current_profiles(State),
+    Default = reset_hooks(rebar_state:default(State), CurrentProfiles),
     {C, State1} = project_app_config(AppInfo, State),
     AppInfo0 = rebar_app_info:update_opts(AppInfo, Default, C),
 
-    CurrentProfiles = rebar_state:current_profiles(State1),
     Name = rebar_app_info:name(AppInfo0),
 
     %% We reset the opts here to default so no profiles are applied multiple times
@@ -171,17 +171,33 @@ project_app_config(AppInfo, State) ->
 maybe_reset_hooks(Dir, Opts, State) ->
     case ec_file:real_dir_path(rebar_dir:root_dir(State)) of
         Dir ->
-            reset_hooks(Opts);
+            CurrentProfiles = rebar_state:current_profiles(State),
+            reset_hooks(Opts, CurrentProfiles);
         _ ->
             Opts
     end.
 
 %% @doc make the hooks empty for a given set of options
--spec reset_hooks(Opts) -> Opts when Opts :: rebar_dict().
-reset_hooks(Opts) ->
-    lists:foldl(fun(Key, OptsAcc) ->
-                        rebar_opts:set(OptsAcc, Key, [])
-                end, Opts, [post_hooks, pre_hooks, provider_hooks, artifacts]).
+-spec reset_hooks(Opts, Profiles) ->
+    Opts when
+      Opts :: rebar_dict(),
+      Profiles :: [atom()].
+reset_hooks(Opts, CurrentProfiles) ->
+    AllHooks = [post_hooks, pre_hooks, provider_hooks, artifacts],
+    Opts1 = lists:foldl(fun(Key, OptsAcc) ->
+                            rebar_opts:set(OptsAcc, Key, [])
+                        end, Opts, AllHooks),
+    Profiles = rebar_opts:get(Opts1, profiles, []),
+    Profiles1 = lists:map(fun({P, ProfileOpts}) ->
+                              case lists:member(P, CurrentProfiles) of
+                                  true ->
+                                      {P, [X || X={Key, _} <- ProfileOpts,
+                                                not lists:member(Key, AllHooks)]};
+                                  false ->
+                                      {P, ProfileOpts}
+                              end
+                          end, Profiles),
+    rebar_opts:set(Opts1, profiles, Profiles1).
 
 %% @private find the directories for all apps, while detecting their source dirs
 %% Returns the app dir with the respective src_dirs for them, in that order,
@@ -422,4 +438,3 @@ find_config_src(AppDir, Default) ->
             %% TODO: handle profiles I guess, but we don't have that info
             proplists:get_value(src_dirs, Terms, Default)
     end.
-
