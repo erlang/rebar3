@@ -23,6 +23,7 @@
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
     Opts = [{update_plt, $u, "update-plt", boolean, "Enable updating the PLT. Default: true"},
+            {update_base_plt, $b, "update-base-plt", boolean, "Enable updating the base PLT. Default: true"},
             {succ_typings, $s, "succ-typings", boolean, "Enable success typing analysis. Default: true"}],
     State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
                                                                {module, ?MODULE},
@@ -193,9 +194,20 @@ do_update_proj_plt(State, Plt, Output) ->
     end.
 
 proj_plt_files(State) ->
-    BasePltApps = base_plt_apps(State),
+    {BasePltApps, BasePltMods} =
+        case is_update_base_plt_active(State) of
+            false ->
+                {ok, BaseFiles} = plt_files(get_base_plt(State)),
+                BaseMods =
+                    lists:map(fun(File) ->
+                                      list_to_atom(filename:basename(File, code:objfile_extension()))
+                              end, BaseFiles),
+                {[], BaseMods};
+            true  ->
+                {base_plt_apps(State), get_config(State, base_plt_mods, [])}
+        end,
+
     PltApps = get_config(State, plt_extra_apps, []) ++ BasePltApps,
-    BasePltMods = get_config(State, base_plt_mods, []),
     PltMods = get_config(State, plt_extra_mods, []) ++ BasePltMods,
     Apps = proj_apps(State),
     DepApps = proj_deps(State),
@@ -374,9 +386,8 @@ run_plt(State, Plt, Output, Analysis, Files) ->
 
 build_proj_plt(State, Plt, Output, Files) ->
     BasePlt = get_base_plt(State),
-    ?INFO("Updating base plt...", []),
-    BaseFiles = base_plt_files(State),
-    {BaseWarnings, State1} = update_base_plt(State, BasePlt, Output, BaseFiles),
+    {BaseWarnings, BaseFiles, State1} = update_base_plt(State, BasePlt, Output),
+
     ?INFO("Copying ~p to ~p...", [BasePlt, Plt]),
     _ = filelib:ensure_dir(Plt),
     case file:copy(BasePlt, Plt) of
@@ -409,13 +420,29 @@ base_plt_files(State) ->
 base_plt_apps(State) ->
     get_config(State, base_plt_apps, [erts, crypto, kernel, stdlib]).
 
-update_base_plt(State, BasePlt, Output, BaseFiles) ->
-    case read_plt(State, BasePlt) of
-        {ok, OldBaseFiles} ->
-            check_plt(State, BasePlt, Output, OldBaseFiles, BaseFiles);
-        error ->
-            _ = filelib:ensure_dir(BasePlt),
-            build_plt(State, BasePlt, Output, BaseFiles)
+update_base_plt(State, BasePlt, Output) ->
+    case is_update_base_plt_active(State) of
+        false ->
+            {ok, BaseFiles} = plt_files(BasePlt),
+            {0, BaseFiles, State};
+        true ->
+            BaseFiles = base_plt_files(State),
+            ?INFO("Updating base plt...", []),
+            {BaseWarns, State1} = case read_plt(State, BasePlt) of
+                                      {ok, OldBaseFiles} ->
+                                          check_plt(State, BasePlt, Output, OldBaseFiles, BaseFiles);
+                                      error ->
+                                          _ = filelib:ensure_dir(BasePlt),
+                                          build_plt(State, BasePlt, Output, BaseFiles)
+                                  end,
+            {BaseWarns, BaseFiles, State1}
+    end.
+
+is_update_base_plt_active(State) ->
+    {Args, _} = rebar_state:command_parsed_args(State),
+    case proplists:get_value(update_base_plt, Args) of
+        false -> false;
+        _     -> true
     end.
 
 build_plt(State, Plt, _, []) ->
