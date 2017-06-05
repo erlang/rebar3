@@ -8,7 +8,7 @@
 
          has_all_artifacts/1,
 
-         code_paths/2, code_paths/3, update_code_paths/3,
+         code_paths/2, code_paths/3, update_code_paths/3, remove_code_path/3,
 
          opts/1, opts/2,
          default/1, default/2,
@@ -38,7 +38,7 @@
 
          to_list/1,
 
-         resources/1, resources/2, add_resource/2,
+         resources/1, resources/2, add_resource/2, replace_resource/2,
          providers/1, providers/2, add_provider/2,
          allow_provider_overrides/1, allow_provider_overrides/2
         ]).
@@ -48,6 +48,7 @@
 
 -record(state_t, {dir                               :: file:name(),
                   opts                = dict:new()  :: rebar_dict(),
+                  % Dictionary keyed off of profile?
                   code_paths          = dict:new()  :: rebar_dict(),
                   default             = dict:new()  :: rebar_dict(),
                   escript_path                      :: undefined | file:filename_all(),
@@ -210,6 +211,17 @@ update_code_paths(State=#state_t{code_paths=CodePaths}, Key, CodePath) ->
             State#state_t{code_paths=dict:store(Key, CodePath, CodePaths)}
     end.
 
+-spec remove_code_path(#state_t{}, atom(), file:filename()) -> #state_t{}.
+remove_code_path(State=#state_t{code_paths=CodePaths}, Key, CodePath) ->
+    % remove the given code path from the given key if it exists.
+    case dict:is_key(Key, CodePaths) of
+        true ->
+            State#state_t{code_paths=dict:store(Key,
+                                                lists:delete(CodePath, dict:fetch(Key, CodePaths)), CodePaths)};
+        false ->
+            State
+    end.
+
 opts(#state_t{opts=Opts}) ->
     Opts.
 
@@ -367,6 +379,38 @@ resources(State, NewResources) ->
 -spec add_resource(t(), {rebar_resource:type(), module()}) -> t().
 add_resource(State=#state_t{resources=Resources}, Resource) ->
     State#state_t{resources=[Resource | Resources]}.
+
+-spec replace_resource(t(), {rebar_resource:type(), module()}) -> t().
+replace_resource(State=#state_t{resources=Resources},{Type,Resource}) ->
+
+    % when replacing a resource, we want to make sure that the resource path
+    % remains in the code path.  Towards this end we will determine the path,
+    % then remove it from the all_plugin_deps path, and add it to the
+    % all_deps path.  This way we are sure it's always in the path
+    ResourcePath =
+        case code:is_loaded (Resource) of
+            {file, FilePath} ->
+                filename:dirname (FilePath);
+            false ->
+                case code:load_file (Resource) of
+                  {module, Resource} ->
+                     {file, FP} = code:is_loaded (Resource),
+                     filename:dirname (FP);
+                  {error, E} ->
+                    {error, E}
+                end
+        end,
+
+    case ResourcePath of
+      {error, Err} ->
+        throw(?PRV_ERROR({resource_not_found, {Type, Resource}, Err}));
+      RP ->
+        State1 = remove_code_path (State, all_plugin_deps, RP),
+        State2 = update_code_paths (State1, all_deps, [RP]),
+        State2#state_t {resources =
+          lists:keyreplace (Type, 1, Resources, {Type, Resource})
+        }
+    end.
 
 providers(#state_t{providers=Providers}) ->
     Providers.
