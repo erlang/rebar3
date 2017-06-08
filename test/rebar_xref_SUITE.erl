@@ -9,7 +9,8 @@
          end_per_testcase/2,
          all/0,
          xref_test/1,
-         xref_ignore_test/1]).
+         xref_ignore_test/1,
+         xref_dep_hook/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -28,6 +29,15 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     ok.
 
+init_per_testcase(xref_dep_hook, Config) ->
+    Src = filename:join([?config(data_dir, Config), "recursive"]),
+    Dst = filename:join([?config(priv_dir, Config), "recursive"]),
+    ok = rebar_file_utils:cp_r([Src], Dst),
+    GlobalDir = filename:join([?config(priv_dir, Config), "cache"]),
+    State = rebar_state:new([{base_dir, filename:join([Dst, "_build"])}
+                            ,{global_rebar_dir, GlobalDir}
+                            ,{root_dir, Dst}]),
+    [{apps, Dst}, {state, State} | Config];
 init_per_testcase(Case, Config) ->
     UpdConfig = rebar_test_utils:init_rebar_state(Config),
     AppDir = ?config(apps, UpdConfig),
@@ -48,7 +58,7 @@ end_per_testcase(_, _Config) ->
     ok.
 
 all() ->
-    [xref_test, xref_ignore_test].
+    [xref_test, xref_ignore_test, xref_dep_hook].
 
 %% ===================================================================
 %% Test cases
@@ -69,6 +79,9 @@ xref_ignore_test(Config) ->
     RebarConfig = ?config(rebar_config, Config),
     Result = rebar3:run(rebar_state:new(State, RebarConfig, AppDir), ["xref"]),
     verify_results(xref_ignore_test, Name, Result).
+
+xref_dep_hook(Config) ->
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, []}).
 
 %% ===================================================================
 %% Helper functions
