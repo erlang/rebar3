@@ -1,0 +1,17 @@
+{application, rebar_issue2,
+ [{description, "An OTP application"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, { rebar_issue2_app, []}},
+  {applications,
+   [kernel,
+    stdlib,
+    rebar_issue1
+   ]},
+  {env,[]},
+  {modules, []},
+
+  {maintainers, []},
+  {licenses, []},
+  {links, []}
+ ]}.

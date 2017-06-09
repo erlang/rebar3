@@ -97,8 +97,11 @@ prepare(State) ->
                              rebar_state:get(State, xref_warnings, false)},
                             {verbose, rebar_log:is_verbose(State)}]),
 
-    [{ok, _} = xref:add_directory(xref, rebar_app_info:ebin_dir(App))
-     || App <- rebar_state:project_apps(State)],
+    [{ok, _} = xref:add_directory(xref, Dir)
+     || App <- rebar_state:project_apps(State),
+        %% the directory may not exist in rare cases of a compile
+        %% hook of a dep running xref prior to the full job being done
+        Dir <- [rebar_app_info:ebin_dir(App)], filelib:is_dir(Dir)],
 
     %% Get list of xref checks we want to run
     ConfXrefChecks = rebar_state:get(State, xref_checks,
