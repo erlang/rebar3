@@ -10,7 +10,8 @@
          all/0,
          xref_test/1,
          xref_ignore_test/1,
-         xref_dep_hook/1]).
+         xref_dep_hook/1,
+         xref_undef_behaviour/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -58,7 +59,7 @@ end_per_testcase(_, _Config) ->
     ok.
 
 all() ->
-    [xref_test, xref_ignore_test, xref_dep_hook].
+    [xref_test, xref_ignore_test, xref_dep_hook, xref_undef_behaviour].
 
 %% ===================================================================
 %% Test cases
@@ -82,6 +83,18 @@ xref_ignore_test(Config) ->
 
 xref_dep_hook(Config) ->
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, []}).
+
+xref_undef_behaviour(Config) ->
+    AppDir = ?config(apps, Config),
+    State = ?config(state, Config),
+    Name = ?config(app_name, Config),
+    RebarConfig = ?config(rebar_config, Config),
+    %% delete one of the behaviours, which should create new warnings
+    delete_src_file(AppDir, Name, behaviour1),
+    %% just ensure this does not crash
+    Result = rebar3:run(rebar_state:new(State, RebarConfig, AppDir), ["xref"]),
+    verify_results(xref_undef_behaviour, Name, Result).
+
 
 %% ===================================================================
 %% Helper functions
@@ -123,6 +136,31 @@ verify_test_results(xref_test, AppName, XrefResults, _QueryResults) ->
     ?assertNot(lists:member({MyMod, bh2_a, 1}, ExportsNotUsed)),
     ?assertNot(lists:member({MyMod, bh2_b, 1}, ExportsNotUsed)),
     ok;
+verify_test_results(xref_undef_behaviour, AppName, XrefResults, _QueryResults) ->
+    AppModules = ["behaviour2", "mymod", "othermod", "somemod"],
+    [Behaviour2Mod, MyMod, OtherMod, SomeMod] =
+        [list_to_atom(AppName ++ "_" ++ Mod) || Mod <- AppModules],
+    UndefFuns = proplists:get_value(undefined_functions, XrefResults),
+    UndefFunCalls = proplists:get_value(undefined_function_calls, XrefResults),
+    LocalsNotUsed = proplists:get_value(locals_not_used, XrefResults),
+    ExportsNotUsed = proplists:get_value(exports_not_used, XrefResults),
+    DeprecatedFuns = proplists:get_value(deprecated_functions, XrefResults),
+    DeprecatedFunCalls = proplists:get_value(deprecated_function_calls, XrefResults),
+    ?assert(lists:member({SomeMod, notavailable, 1}, UndefFuns)),
+    ?assert(lists:member({{OtherMod, somefunc, 0}, {SomeMod, notavailable, 1}},
+                         UndefFunCalls)),
+    ?assert(lists:member({MyMod, fdeprecated, 0}, DeprecatedFuns)),
+    ?assert(lists:member({{OtherMod, somefunc, 0}, {MyMod, fdeprecated, 0}},
+                         DeprecatedFunCalls)),
+    ?assert(lists:member({MyMod, localfunc2, 0}, LocalsNotUsed)),
+    ?assert(lists:member({Behaviour2Mod, behaviour_info, 1}, ExportsNotUsed)),
+    ?assert(lists:member({MyMod, other2, 1}, ExportsNotUsed)),
+    ?assert(lists:member({OtherMod, somefunc, 0}, ExportsNotUsed)),
+    ?assert(lists:member({MyMod, bh1_a, 1}, ExportsNotUsed)),
+    ?assert(lists:member({MyMod, bh1_b, 1}, ExportsNotUsed)),
+    ?assertNot(lists:member({MyMod, bh2_a, 1}, ExportsNotUsed)),
+    ?assertNot(lists:member({MyMod, bh2_b, 1}, ExportsNotUsed)),
+    ok;
 verify_test_results(xref_ignore_test, AppName, XrefResults, _QueryResults) ->
     AppModules = ["behaviour1", "behaviour2", "mymod", "othermod", "somemod"],
     [_Behaviour1Mod, _Behaviour2Mod, _MyMod, _OtherMod, SomeMod] =
@@ -140,6 +178,10 @@ write_src_file(Dir, AppName, Module, IgnoreXref) ->
     Erl = filename:join([Dir, "src", module_name(AppName, Module)]),
     ok = filelib:ensure_dir(Erl),
     ok = ec_file:write(Erl, get_module_body(Module, AppName, IgnoreXref)).
+
+delete_src_file(Dir, AppName, Module) ->
+    Erl = filename:join([Dir, "src", module_name(AppName, Module)]),
+    ok = file:delete(Erl).
 
 module_name(AppName, Module) ->
     lists:flatten([AppName, "_", atom_to_list(Module), ".erl"]).
