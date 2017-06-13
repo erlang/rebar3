@@ -168,8 +168,15 @@ keyall(Key, List) ->
     lists:flatmap(fun({K, L}) when Key =:= K -> L; (_) -> [] end, List).
 
 get_behaviour_callbacks(exports_not_used, Attributes) ->
-    [B:behaviour_info(callbacks) || B <- keyall(behaviour, Attributes) ++
-                                         keyall(behavior, Attributes)];
+    lists:map(fun(Mod) ->
+        try
+            Mod:behaviour_info(callbacks)
+        catch
+            error:undef ->
+                ?WARN("Behaviour ~p is used but cannot be found.", [Mod]),
+                []
+        end
+    end, keyall(behaviour, Attributes) ++ keyall(behavior, Attributes));
 get_behaviour_callbacks(_XrefCheck, _Attributes) ->
     [].
 
