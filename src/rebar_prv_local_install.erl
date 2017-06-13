@@ -90,6 +90,6 @@ extract_escript(State, ScriptPath) ->
                                                   uid=Uid,
                                                   gid=Gid}),
 
-    ?INFO("Add to $PATH for use: export PATH=$PATH:~s", [BinDir]),
+    ?INFO("Add to $PATH for use: export PATH=~s:$PATH", [BinDir]),
 
     {ok, State}.
