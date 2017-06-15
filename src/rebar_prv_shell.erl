@@ -360,8 +360,10 @@ boot_apps(Apps) ->
     ok.
 
 normalize_load_apps([]) -> [];
+normalize_load_apps([{_App, none} | T]) -> normalize_load_apps(T);
 normalize_load_apps([{App, _} | T]) -> [App | normalize_load_apps(T)];
 normalize_load_apps([{App, _Vsn, load} | T]) -> [App | normalize_load_apps(T)];
+normalize_load_apps([{_App, _Vsn, none} | T]) -> normalize_load_apps(T);
 normalize_load_apps([{App, _Vsn, Operator} | T]) when is_atom(Operator) ->
     [App | normalize_load_apps(T)];
 normalize_load_apps([App | T]) when is_atom(App) -> [App | normalize_load_apps(T)].
@@ -369,11 +371,12 @@ normalize_load_apps([App | T]) when is_atom(App) -> [App | normalize_load_apps(T
 normalize_boot_apps([]) -> [];
 normalize_boot_apps([{_App, load} | T]) -> normalize_boot_apps(T);
 normalize_boot_apps([{_App, _Vsn, load} | T]) -> normalize_boot_apps(T);
+normalize_boot_apps([{_App, none} | T]) -> normalize_boot_apps(T);
+normalize_boot_apps([{_App, _Vsn, none} | T]) -> normalize_boot_apps(T);
 normalize_boot_apps([{App, _Vsn, Operator} | T]) when is_atom(Operator) ->
     [App | normalize_boot_apps(T)];
 normalize_boot_apps([{App, _Vsn} | T]) -> [App | normalize_boot_apps(T)];
 normalize_boot_apps([App | T]) when is_atom(App) -> [App | normalize_boot_apps(T)].
-
 
 remove_error_handler(0) ->
     ?WARN("Unable to remove simple error_logger handler", []);
