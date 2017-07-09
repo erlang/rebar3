@@ -7,7 +7,6 @@ environment:
   - erlang_vsn: 19.2
   - erlang_vsn: 18.3
   - erlang_vsn: 17.5
-  - erlang_vsn: 15.3.1
 install:
 - ps: choco install erlang --version $env:erlang_vsn
 build_script:
