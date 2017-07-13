@@ -279,7 +279,7 @@ gather_src(Opts, BaseDirParts, [Dir|Rest], Srcs, CompileOpts) ->
              end,
     DirRecursive = dir_recursive(Opts, RelDir, CompileOpts),
     gather_src(Opts, BaseDirParts, Rest, Srcs ++ rebar_utils:find_files(Dir, ?RE_PREFIX".*\\.erl\$", DirRecursive), CompileOpts).
-    
+
 %% Get files which need to be compiled first, i.e. those specified in erl_first_files
 %% and parse_transform options.  Also produce specific erl_opts for these first
 %% files, so that yet to be compiled parse transformations are excluded from it.
@@ -351,8 +351,23 @@ opts_changed(NewOpts, Target) ->
         false -> NewOpts
     end,
     case compile_info(Target) of
-        {ok, Opts} -> lists:sort(Opts) =/= lists:sort(TotalOpts);
+        {ok, Opts} -> lists:any(fun effects_code_generation/1, lists:usort(TotalOpts) -- lists:usort(Opts));
         _          -> true
+    end.
+
+effects_code_generation(Option) ->
+    case Option of
+        beam -> false;
+        report_warnings -> false;
+        report_errors -> false;
+        return_errors-> false;
+        return_warnings-> false;
+        warnings_as_errors -> false;
+        binary -> false;
+        verbose -> false;
+        {cwd,_} -> false;
+        {outdir, _} -> false;
+        _ -> true
     end.
 
 compile_info(Target) ->
