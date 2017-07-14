@@ -41,7 +41,14 @@ do(State) ->
     Tests = prepare_tests(State),
     case compile(State, Tests) of
         %% successfully compiled apps
-        {ok, S} -> do(S, Tests);
+        {ok, S} ->
+            {RawOpts, _} = rebar_state:command_parsed_args(S),
+            case proplists:get_value(compile_only, RawOpts, false) of
+                true ->
+                    {ok, S};
+                false ->
+                    do(S, Tests)
+            end;
         %% this should look like a compiler error, not a ct error
         Error   -> Error
     end.
@@ -743,9 +750,12 @@ ct_opts(_State) ->
      {name, undefined, "name", atom, help(name)},
      {sname, undefined, "sname", atom, help(sname)},
      {setcookie, undefined, "setcookie", atom, help(setcookie)},
-     {sys_config, undefined, "sys_config", string, help(sys_config)} %% comma-separated list
+     {sys_config, undefined, "sys_config", string, help(sys_config)}, %% comma-separated list
+     {compile_only, undefined, "compile_only", boolean, help(compile_only)}
     ].
 
+help(compile_only) ->
+    "Compile modules in the project with the test configuration but do not run the tests";
 help(dir) ->
     "List of additional directories containing test suites";
 help(suite) ->

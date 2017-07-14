@@ -56,7 +56,8 @@
          testspec_at_root/1,
          testspec_parse_error/1,
          cmd_vs_cfg_opts/1,
-         single_testspec_in_ct_opts/1]).
+         single_testspec_in_ct_opts/1,
+         compile_only/1]).
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("common_test/include/ct.hrl").
@@ -77,7 +78,8 @@ all() -> [{group, basic_app},
           testspec_at_root,
           testspec_parse_error,
           cmd_vs_cfg_opts,
-          single_testspec_in_ct_opts].
+          single_testspec_in_ct_opts,
+          compile_only].
 
 groups() -> [{basic_app, [], [basic_app_default_dirs,
                               basic_app_default_beams,
@@ -1584,6 +1586,22 @@ single_testspec_in_ct_opts(Config) ->
 
     ok = file:set_cwd(Wd),
     ok.
+
+compile_only(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "compile_only_"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name(atom_to_list(basic_app) ++ "_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    Suite = filename:join([AppDir, "test", Name ++ "_SUITE.erl"]),
+    ok = filelib:ensure_dir(Suite),
+    ok = file:write_file(Suite, test_suite(Name)),
+
+    {ok, _State} = rebar_test_utils:run_and_check(C, [], ["ct", "--compile_only"], {ok, [{app,Name}], "test"}).
+
 
 %% helper for generating test data
 test_suite(Name) ->
