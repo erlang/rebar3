@@ -89,4 +89,4 @@ add_to_paths([], Path) ->
 add_to_paths([{doc_path, Paths}|T], Path) ->
     [{doc_path, [Path | Paths]} | T];
 add_to_paths([H|T], Path) ->
-    [H | add_to_paths(Path, T)].
+    [H | add_to_paths(T, Path)].
