@@ -84,8 +84,9 @@ format_error(Reason) ->
 has_configured_paths(EdocOpts) ->
     proplists:get_value(dir, EdocOpts) =/= undefined.
 
-add_to_paths(Opts, Path) ->
-    case proplists:get_value(doc_path, Opts) of
-        undefined -> [{doc_path, [Path]} | Opts];
-        Paths -> lists:keyreplace(doc_path, 1, Opts, {doc_path, [Path | Paths]})
-    end.
+add_to_paths([], Path) ->
+    [{doc_path, [Path]}];
+add_to_paths([{doc_path, Paths}|T], Path) ->
+    [{doc_path, [Path | Paths]} | T];
+add_to_paths([H|T], Path) ->
+    [H | add_to_paths(T, Path)].
