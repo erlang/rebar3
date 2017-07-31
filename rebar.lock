@@ -8,7 +8,7 @@
  {<<"getopt">>,{pkg,<<"getopt">>,<<"0.8.2">>},0},
  {<<"providers">>,{pkg,<<"providers">>,<<"1.6.0">>},0},
  {<<"relx">>,{pkg,<<"relx">>,<<"3.23.1">>},0},
- {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.1">>},0}]}.
+ {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.2">>},0}]}.
 [
 {pkg_hash,[
  {<<"bbmustache">>, <<"2010ADAE78830992A4C69680115ECD7D475DD03A72C076BBADDCCBF2D4B32035">>},
@@ -20,5 +20,5 @@
  {<<"getopt">>, <<"B17556DB683000BA50370B16C0619DF1337E7AF7ECBF7D64FBF8D1D6BCE3109B">>},
  {<<"providers">>, <<"DB0E2F9043AE60C0155205FCD238D68516331D0E5146155E33D1E79DC452964A">>},
  {<<"relx">>, <<"8AF4433934D9BB664E8282D2E45AC5DEAFF44859DDAABBE50CD7D885581CD24D">>},
- {<<"ssl_verify_fun">>, <<"28A4D65B7F59893BC2C7DE786DEC1E1555BD742D336043FE644AE956C3497FBE">>}]}
+ {<<"ssl_verify_fun">>, <<"01289CAD67B280B7F8F7E87117966995FAD19236367386BE2A9D7716E92CE7FF">>}]}
 ].
