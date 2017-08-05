@@ -140,7 +140,9 @@ handle_deps_as_profile(Profile, State, Deps, Upgrade) ->
     DepsDir = profile_dep_dir(State, Profile),
     Deps1 = rebar_app_utils:parse_deps(DepsDir, Deps, State, Locks, Level),
     ProfileLevelDeps = [{Profile, Deps1, Level}],
-    handle_profile_level(ProfileLevelDeps, [], sets:new(), Upgrade, Locks, State).
+    RootSeen = sets:from_list([rebar_app_info:name(AppInfo)
+                               || AppInfo <- rebar_state:project_apps(State)]),
+    handle_profile_level(ProfileLevelDeps, [], RootSeen, RootSeen, Upgrade, Locks, State).
 
 %% ===================================================================
 %% Internal functions
@@ -153,7 +155,9 @@ deps_per_profile(Profiles, Upgrade, State) ->
     Deps = lists:foldl(fun(Profile, DepAcc) ->
                                [parsed_profile_deps(State, Profile, Level) | DepAcc]
                        end, [], Profiles),
-    handle_profile_level(Deps, [], sets:new(), Upgrade, Locks, State).
+    RootSeen = sets:from_list([rebar_app_info:name(AppInfo)
+                               || AppInfo <- rebar_state:project_apps(State)]),
+    handle_profile_level(Deps, [], RootSeen, RootSeen, Upgrade, Locks, State).
 
 parsed_profile_deps(State, Profile, Level) ->
     ParsedDeps = rebar_state:get(State, {parsed_deps, Profile}, []),
@@ -162,17 +166,27 @@ parsed_profile_deps(State, Profile, Level) ->
 %% Level-order traversal of all dependencies, across profiles.
 %% If profiles x,y,z are present, then the traversal will go:
 %% x0, y0, z0, x1, y1, z1, ..., xN, yN, zN.
-handle_profile_level([], Apps, _Seen, _Upgrade, _Locks, State) ->
+%%
+%% There are two 'seen' sets: one for the top-level apps (`RootSeen') and
+%% one for all dependencies (`Seen'). The former is used to know when
+%% to skip the resolving of dependencies altogether (since they're already
+%% top-level apps), while the latter is used to prevent reprocessing
+%% deps more than one.
+handle_profile_level([], Apps, _RootSeen, _Seen, _Upgrade, _Locks, State) ->
     {Apps, State};
-handle_profile_level([{Profile, Deps, Level} | Rest], Apps, Seen, Upgrade, Locks, State) ->
+handle_profile_level([{Profile, Deps, Level} | Rest], Apps, RootSeen, Seen, Upgrade, Locks, State) ->
+    Deps0 = [rebar_app_utils:expand_deps_sources(Dep, State)
+             || Dep <- Deps,
+                %% skip top-level apps being double-declared
+                not sets:is_element(rebar_app_info:name(Dep), RootSeen)],
     {Deps1, Apps1, State1, Seen1} =
-        update_deps(Profile, Level, Deps, Apps
+        update_deps(Profile, Level, Deps0, Apps
                    ,State, Upgrade, Seen, Locks),
     Deps2 = case Deps1 of
         [] -> Rest;
         _ -> Rest ++ [{Profile, Deps1, Level+1}]
     end,
-    handle_profile_level(Deps2, Apps1, sets:union(Seen, Seen1), Upgrade, Locks, State1).
+    handle_profile_level(Deps2, Apps1, RootSeen, sets:union(Seen, Seen1), Upgrade, Locks, State1).
 
 find_cycles(Apps) ->
     case rebar_digraph:compile_order(Apps) of
