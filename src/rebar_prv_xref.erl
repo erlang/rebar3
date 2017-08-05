@@ -281,12 +281,21 @@ find_mfa_source({M, F, A}) ->
     end.
 
 find_function_source(M, F, A, Bin) ->
-    AbstractCode = beam_lib:chunks(Bin, [abstract_code]),
-    {ok, {M, [{abstract_code, {raw_abstract_v1, Code}}]}} = AbstractCode,
+    ChunksLookup = beam_lib:chunks(Bin, [abstract_code]),
+    {ok, {M, [{abstract_code, AbstractCodeLookup}]}} = ChunksLookup,
+    case AbstractCodeLookup of
+        no_abstract_code ->
+            % There isn't much else we can do at this point
+            {module_not_found, function_not_found};
+        {raw_abstract_v1, AbstractCode} ->
+            find_function_source_in_abstract_code(F, A, AbstractCode)
+    end.
+
+find_function_source_in_abstract_code(F, A, AbstractCode) ->
     %% Extract the original source filename from the abstract code
-    [{attribute, _, file, {Source, _}} | _] = Code,
+    [{attribute, _, file, {Source, _}} | _] = AbstractCode,
     %% Extract the line number for a given function def
-    Fn = [E || E <- Code,
+    Fn = [E || E <- AbstractCode,
                safe_element(1, E) == function,
                safe_element(3, E) == F,
                safe_element(4, E) == A],
