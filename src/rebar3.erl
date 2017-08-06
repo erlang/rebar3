@@ -183,11 +183,11 @@ init_config() ->
     GlobalConfigFile = rebar_dir:global_config(),
     State = case filelib:is_regular(GlobalConfigFile) of
                 true ->
-                    ?DEBUG("Load global config file ~s", [GlobalConfigFile]),
+                    ?DEBUG("Load global config file ~ts", [GlobalConfigFile]),
                     try state_from_global_config(Config1, GlobalConfigFile)
                     catch
                         _:_ ->
-                            ?WARN("Global config ~s exists but can not be read. Ignoring global config values.", [GlobalConfigFile]),
+                            ?WARN("Global config ~ts exists but can not be read. Ignoring global config values.", [GlobalConfigFile]),
                             rebar_state:new(Config1)
                     end;
                 false ->
@@ -270,7 +270,7 @@ log_level() ->
 -spec version() -> ok.
 version() ->
     {ok, Vsn} = application:get_key(rebar, vsn),
-    ?CONSOLE("rebar ~s on Erlang/OTP ~s Erts ~s",
+    ?CONSOLE("rebar ~ts on Erlang/OTP ~ts Erts ~ts",
              [Vsn, erlang:system_info(otp_release), erlang:system_info(version)]).
 
 %% @private set global flag based on getopt option boolean value
@@ -311,11 +311,11 @@ handle_error({error, {Module, Reason}}) ->
             ?DEBUG("Uncaught error: ~p ~p", [Module, Reason]),
             ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []);
         _ ->
-            ?ERROR("~s", [Module:format_error(Reason)])
+            ?ERROR("~ts", [Module:format_error(Reason)])
     end,
     erlang:halt(1);
 handle_error({error, Error}) when is_list(Error) ->
-    ?ERROR("~s", [Error]),
+    ?ERROR("~ts", [Error]),
     erlang:halt(1);
 handle_error(Error) ->
     %% Nothing should percolate up from rebar_core;

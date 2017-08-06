@@ -66,7 +66,7 @@ format_error(Reason) ->
 
 handle_unlocks(State, Locks, LockFile) ->
     {Args, _} = rebar_state:command_parsed_args(State),
-    Names = parse_names(ec_cnv:to_binary(proplists:get_value(package, Args, <<"">>))),
+    Names = parse_names(rebar_utils:to_binary(proplists:get_value(package, Args, <<"">>))),
     case [Lock || Lock = {Name, _, _} <- Locks, not lists:member(Name, Names)] of
         [] ->
             file:delete(LockFile);
@@ -77,7 +77,7 @@ handle_unlocks(State, Locks, LockFile) ->
     end.
 
 parse_names(Bin) ->
-    case lists:usort(re:split(Bin, <<" *, *">>, [trim])) of
+    case lists:usort(re:split(Bin, <<" *, *">>, [trim, unicode])) of
         [<<"">>] -> []; % nothing submitted
         Other -> Other
     end.

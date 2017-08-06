@@ -55,6 +55,8 @@
          get_arch/0,
          wordsize/0,
          deps_to_binary/1,
+         to_binary/1,
+         to_list/1,
          tup_dedup/1,
          tup_umerge/2,
          tup_sort/1,
@@ -115,7 +117,7 @@ filtermap(F, [Hd|Tail]) ->
 filtermap(F, []) when is_function(F, 1) -> [].
 
 is_arch(ArchRegex) ->
-    case re:run(get_arch(), ArchRegex, [{capture, none}]) of
+    case re:run(get_arch(), ArchRegex, [{capture, none}, unicode]) of
         match ->
             true;
         nomatch ->
@@ -142,7 +144,7 @@ wordsize() ->
     end.
 
 sh_send(Command0, String, Options0) ->
-    ?INFO("sh_send info:\n\tcwd: ~p\n\tcmd: ~s < ~s\n",
+    ?INFO("sh_send info:\n\tcwd: ~p\n\tcmd: ~ts < ~ts\n",
           [rebar_dir:get_cwd(), Command0, String]),
     ?DEBUG("\topts: ~p\n", [Options0]),
 
@@ -171,7 +173,7 @@ sh_send(Command0, String, Options0) ->
 %% Val = string() | false
 %%
 sh(Command0, Options0) ->
-    ?DEBUG("sh info:\n\tcwd: ~p\n\tcmd: ~s\n", [rebar_dir:get_cwd(), Command0]),
+    ?DEBUG("sh info:\n\tcwd: ~p\n\tcmd: ~ts\n", [rebar_dir:get_cwd(), Command0]),
     ?DEBUG("\topts: ~p\n", [Options0]),
 
     DefaultOptions = [{use_stdout, false}, debug_and_abort_on_error],
@@ -184,7 +186,7 @@ sh(Command0, Options0) ->
     Command = lists:flatten(patch_on_windows(Command0, proplists:get_value(env, Options, []))),
     PortSettings = proplists:get_all_values(port_settings, Options) ++
         [exit_status, {line, 16384}, use_stdio, stderr_to_stdout, hide, eof],
-    ?DEBUG("Port Cmd: ~s\nPort Opts: ~p\n", [Command, PortSettings]),
+    ?DEBUG("Port Cmd: ~ts\nPort Opts: ~p\n", [Command, PortSettings]),
     Port = open_port({spawn, Command}, PortSettings),
 
     try
@@ -232,7 +234,7 @@ deprecated(Old, New, When) ->
       <<"WARNING: deprecated ~p option used~n"
         "Option '~p' has been deprecated~n"
         "in favor of '~p'.~n"
-        "'~p' will be removed ~s.~n">>,
+        "'~p' will be removed ~ts.~n">>,
       [Old, Old, New, Old, When]).
 
 %% for use by `do` task
@@ -244,11 +246,17 @@ args_to_tasks(Args) -> new_task(Args, []).
 deps_to_binary([]) ->
     [];
 deps_to_binary([{Name, _, Source} | T]) ->
-    [{ec_cnv:to_binary(Name), Source} | deps_to_binary(T)];
+    [{to_binary(Name), Source} | deps_to_binary(T)];
 deps_to_binary([{Name, Source} | T]) ->
-    [{ec_cnv:to_binary(Name), Source} | deps_to_binary(T)];
+    [{to_binary(Name), Source} | deps_to_binary(T)];
 deps_to_binary([Name | T]) ->
-    [ec_cnv:to_binary(Name) | deps_to_binary(T)].
+    [to_binary(Name) | deps_to_binary(T)].
+
+to_binary(A) when is_atom(A) -> atom_to_binary(A, unicode);
+to_binary(Str) -> unicode:characters_to_binary(Str).
+
+to_list(A) when is_atom(A) -> atom_to_list(A);
+to_list(Str) -> unicode:characters_to_list(Str).
 
 tup_dedup(List) ->
     tup_dedup_(tup_sort(List)).
@@ -396,10 +404,10 @@ check_min_otp_version(MinOtpVersion) ->
 
     case ParsedVsn >= ParsedMin of
         true ->
-            ?DEBUG("~s satisfies the requirement for minimum OTP version ~s",
+            ?DEBUG("~ts satisfies the requirement for minimum OTP version ~ts",
                    [OtpRelease, MinOtpVersion]);
         false ->
-            ?ABORT("OTP release ~s or later is required. Version in use: ~s",
+            ?ABORT("OTP release ~ts or later is required. Version in use: ~ts",
                    [MinOtpVersion, OtpRelease])
     end.
 
@@ -415,16 +423,16 @@ check_blacklisted_otp_versions(BlacklistedRegexes) ->
 abort_if_blacklisted(BlacklistedRegex, OtpRelease) ->
     case re:run(OtpRelease, BlacklistedRegex, [{capture, none}]) of
         match ->
-            ?ABORT("OTP release ~s matches blacklisted version ~s",
+            ?ABORT("OTP release ~ts matches blacklisted version ~ts",
                    [OtpRelease, BlacklistedRegex]);
         nomatch ->
-            ?DEBUG("~s does not match blacklisted OTP version ~s",
+            ?DEBUG("~ts does not match blacklisted OTP version ~ts",
                    [OtpRelease, BlacklistedRegex])
     end.
 
 user_agent() ->
     {ok, Vsn} = application:get_key(rebar, vsn),
-    ?FMT("Rebar/~s (OTP/~s)", [Vsn, otp_release()]).
+    ?FMT("Rebar/~ts (OTP/~ts)", [Vsn, otp_release()]).
 
 reread_config(ConfigList) ->
     %% NB: we attempt to mimic -config here, which survives app reload,
@@ -457,7 +465,7 @@ version_tuple(OtpRelease) ->
         {match, [_Full, Maj]} ->
             {list_to_integer(Maj), 0, 0};
         nomatch ->
-            ?ABORT("Minimum OTP release unable to be parsed: ~s", [OtpRelease])
+            ?ABORT("Minimum OTP release unable to be parsed: ~ts", [OtpRelease])
     end.
 
 otp_release() ->
@@ -510,7 +518,7 @@ patch_on_windows(Cmd, Env) ->
                                end, Cmd, Env),
             %% Remove left-over vars
             re:replace(Cmd1, "\\\$\\w+|\\\${\\w+}", "",
-                       [global, {return, list}]);
+                       [global, {return, list}, unicode]);
         _ ->
             Cmd
     end.
@@ -529,7 +537,7 @@ expand_env_variable(InStr, VarName, RawVarValue) ->
             VarValue = re:replace(RawVarValue, "\\\\", "\\\\\\\\", ReOpts),
             %% Use a regex to match/replace:
             %% Given variable "FOO": match $FOO\s | $FOOeol | ${FOO}
-            RegEx = io_lib:format("\\\$(~s(\\W|$)|{~s})", [VarName, VarName]),
+            RegEx = io_lib:format("\\\$(~ts(\\W|$)|{~ts})", [VarName, VarName]),
             re:replace(InStr, RegEx, [VarValue, "\\2"], ReOpts)
     end.
 
@@ -554,7 +562,7 @@ expand_sh_flag(use_stdout) ->
     {output_handler,
      fun(Line, Acc) ->
              %% Line already has a newline so don't use ?CONSOLE which adds one
-             io:format("~s", [Line]),
+             io:format("~ts", [Line]),
              [Line | Acc]
      end};
 expand_sh_flag({use_stdout, false}) ->
@@ -577,23 +585,23 @@ log_msg_and_abort(Message) ->
 -spec debug_log_msg_and_abort(string()) -> err_handler().
 debug_log_msg_and_abort(Message) ->
     fun(Command, {Rc, Output}) ->
-            ?DEBUG("sh(~s)~n"
+            ?DEBUG("sh(~ts)~n"
                   "failed with return code ~w and the following output:~n"
-                  "~s", [Command, Rc, Output]),
+                  "~ts", [Command, Rc, Output]),
             ?ABORT(Message, [])
     end.
 
 -spec log_and_abort(string(), {integer(), string()}) -> no_return().
 log_and_abort(Command, {Rc, Output}) ->
-    ?ABORT("sh(~s)~n"
+    ?ABORT("sh(~ts)~n"
           "failed with return code ~w and the following output:~n"
-          "~s", [Command, Rc, Output]).
+          "~ts", [Command, Rc, Output]).
 
 -spec debug_and_abort(string(), {integer(), string()}) -> no_return().
 debug_and_abort(Command, {Rc, Output}) ->
-    ?DEBUG("sh(~s)~n"
+    ?DEBUG("sh(~ts)~n"
           "failed with return code ~w and the following output:~n"
-          "~s", [Command, Rc, Output]),
+          "~ts", [Command, Rc, Output]),
     throw(rebar_abort).
 
 sh_loop(Port, Fun, Acc) ->
@@ -662,7 +670,7 @@ vcs_vsn(Vcs, Dir, Resources) ->
         unknown ->
             ?ABORT("vcs_vsn: Unknown vsn format: ~p", [Vcs]);
         {error, Reason} ->
-            ?ABORT("vcs_vsn: ~s", [Reason])
+            ?ABORT("vcs_vsn: ~ts", [Reason])
     end.
 
 %% Temp work around for repos like relx that use "semver"
@@ -779,7 +787,7 @@ cleanup_code_path(OrigPath) ->
 
 new_task([], Acc) -> lists:reverse(Acc);
 new_task([TaskList|Rest], Acc) ->
-    case re:split(TaskList, ",", [{return, list}, {parts, 2}]) of
+    case re:split(TaskList, ",", [{return, list}, {parts, 2}, unicode]) of
         %% `do` consumes all remaining args
         ["do" = Task] ->
             lists:reverse([{Task, Rest}|Acc]);
@@ -806,7 +814,7 @@ arg_or_flag(["-" ++ _ = Flag|Rest], [{Task, Args}|Acc]) ->
     end;
 %% an argument or a sequence of arguments
 arg_or_flag([ArgList|Rest], [{Task, Args}|Acc]) ->
-    case re:split(ArgList, ",", [{return, list}, {parts, 2}]) of
+    case re:split(ArgList, ",", [{return, list}, {parts, 2}, unicode]) of
         %% single arg terminated by a comma
         [Arg, ""]   -> new_task(Rest, [{Task,
                                         lists:reverse([Arg|Args])}|Acc]);
@@ -857,15 +865,18 @@ url_append_path(Url, ExtraPath) ->
 escape_chars(Str) when is_atom(Str) ->
     escape_chars(atom_to_list(Str));
 escape_chars(Str) ->
-    re:replace(Str, "([ ()?`!$&;\"\'])", "\\\\&", [global, {return, list}]).
+    re:replace(Str, "([ ()?`!$&;\"\'])", "\\\\&",
+               [global, {return, list}, unicode]).
 
 %% "escape inside these"
 escape_double_quotes(Str) ->
-    re:replace(Str, "([\"\\\\`!$&*;])", "\\\\&", [global, {return, list}]).
+    re:replace(Str, "([\"\\\\`!$&*;])", "\\\\&",
+               [global, {return, list}, unicode]).
 
 %% "escape inside these" but allow *
 escape_double_quotes_weak(Str) ->
-    re:replace(Str, "([\"\\\\`!$&;])", "\\\\&", [global, {return, list}]).
+    re:replace(Str, "([\"\\\\`!$&;])", "\\\\&",
+               [global, {return, list}, unicode]).
 
 info_useless(Old, New) ->
     [?INFO("App ~ts is no longer needed and can be deleted.", [Name])

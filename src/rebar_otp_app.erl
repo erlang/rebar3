@@ -58,11 +58,11 @@ compile(State, App) ->
     validate_app(State, App1).
 
 format_error({missing_app_file, Filename}) ->
-    io_lib:format("App file is missing: ~s", [Filename]);
+    io_lib:format("App file is missing: ~ts", [Filename]);
 format_error({file_read, File, Reason}) ->
-    io_lib:format("Failed to read required file ~s for processing: ~s", [File, file:format_error(Reason)]);
+    io_lib:format("Failed to read required file ~ts for processing: ~ts", [File, file:format_error(Reason)]);
 format_error({invalid_name, File, AppName}) ->
-    io_lib:format("Invalid ~s: name of application (~p) must match filename.", [File, AppName]).
+    io_lib:format("Invalid ~ts: name of application (~p) must match filename.", [File, AppName]).
 
 %% ===================================================================
 %% Internal functions
@@ -222,7 +222,7 @@ app_vsn(AppData, AppFile, State) ->
 get_value(Key, AppInfo, AppFile) ->
     case proplists:get_value(Key, AppInfo) of
         undefined ->
-            ?ABORT("Failed to get app value '~p' from '~s'~n", [Key, AppFile]);
+            ?ABORT("Failed to get app value '~p' from '~ts'~n", [Key, AppFile]);
         Value ->
             Value
     end.

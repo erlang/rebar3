@@ -176,7 +176,7 @@ error_on_empty_tasks(Config) ->
 
 warn_match(App, History) ->
     lists:any(
-        fun({_, {rebar_log,log, [warn, "No entry for profile ~s in config.",
+        fun({_, {rebar_log,log, [warn, "No entry for profile ~ts in config.",
             [ArgApp]]}, _}) -> ArgApp =:= App
         ;  (_) ->
             false

@@ -94,7 +94,7 @@ get_level() ->
 
 log(Level = error, Str, Args) ->
     {ok, LogState} = application:get_env(rebar, log),
-    ec_cmd_log:Level(LogState, lists:flatten(cf:format("~!^~s~n", [Str])), Args);
+    ec_cmd_log:Level(LogState, lists:flatten(cf:format("~!^~ts~n", [Str])), Args);
 log(Level, Str, Args) ->
     {ok, LogState} = application:get_env(rebar, log),
     ec_cmd_log:Level(LogState, Str++"~n", Args).

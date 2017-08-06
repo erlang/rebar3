@@ -72,12 +72,12 @@ deps(Name, Vsn, State) ->
 
 deps_(Name, Vsn, State) ->
     ?MODULE:verify_table(State),
-    ets:lookup_element(?PACKAGE_TABLE, {ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)}, 2).
+    ets:lookup_element(?PACKAGE_TABLE, {rebar_utils:to_binary(Name), rebar_utils:to_binary(Vsn)}, 2).
 
 handle_missing_package(Dep, State, Fun) ->
     case Dep of
         {Name, Vsn} ->
-            ?INFO("Package ~s-~s not found. Fetching registry updates and trying again...", [Name, Vsn]);
+            ?INFO("Package ~ts-~ts not found. Fetching registry updates and trying again...", [Name, Vsn]);
         _ ->
             ?INFO("Package ~p not found. Fetching registry updates and trying again...", [Dep])
     end,
@@ -128,7 +128,7 @@ registry_checksum({pkg, Name, Vsn, _Hash}, State) ->
         ets:lookup_element(?PACKAGE_TABLE, {Name, Vsn}, 3)
     catch
         _:_ ->
-            throw(?PRV_ERROR({missing_package, ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)}))
+            throw(?PRV_ERROR({missing_package, rebar_utils:to_binary(Name), rebar_utils:to_binary(Vsn)}))
     end.
 
 %% Hex supports use of ~> to specify the version required for a dependency.
@@ -207,17 +207,17 @@ handle_single_vsn(Pkg, PkgVsn, Dep, Vsn, Constraint) ->
         false ->
             case {Pkg, PkgVsn} of
                 {undefined, undefined} ->
-                    ?DEBUG("Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
+                    ?DEBUG("Only existing version of ~ts is ~ts which does not match constraint ~~> ~ts. "
                           "Using anyway, but it is not guaranteed to work.", [Dep, Vsn, Constraint]);
                 _ ->
-                    ?DEBUG("[~s:~s] Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
+                    ?DEBUG("[~ts:~ts] Only existing version of ~ts is ~ts which does not match constraint ~~> ~ts. "
                           "Using anyway, but it is not guaranteed to work.", [Pkg, PkgVsn, Dep, Vsn, Constraint])
             end,
             {ok, Vsn}
     end.
 
 format_error({missing_package, Name, Vsn}) ->
-    io_lib:format("Package not found in registry: ~s-~s.", [ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)]);
+    io_lib:format("Package not found in registry: ~ts-~ts.", [rebar_utils:to_binary(Name), rebar_utils:to_binary(Vsn)]);
 format_error({missing_package, Dep}) ->
     io_lib:format("Package not found in registry: ~p.", [Dep]).
 

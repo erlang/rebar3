@@ -157,7 +157,7 @@ refresh_paths(RState) ->
                 {ok, Mods} ->
                     case {length(Mods), length(Mods -- Blacklist)} of
                         {X,X} ->
-                            ?DEBUG("reloading ~p from ~s", [Modules, Path]),
+                            ?DEBUG("reloading ~p from ~ts", [Modules, Path]),
                             code:replace_path(App, Path),
                             reload_modules(Modules);
                         {_,_} ->

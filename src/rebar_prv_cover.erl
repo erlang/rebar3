@@ -278,7 +278,7 @@ write_index(State, Coverage) ->
 write_index_section(_F, []) -> ok;
 write_index_section(F, [{Section, DataFile, Mods}|Rest]) ->
     %% Write the report
-    ok = file:write(F, ?FMT("<h1>~s summary</h1>\n", [Section])),
+    ok = file:write(F, ?FMT("<h1>~ts summary</h1>\n", [Section])),
     ok = file:write(F, "coverage calculated from:\n<ul>"),
     ok = lists:foreach(fun(D) -> ok = file:write(F, io_lib:format("<li>~ts</li>", [D])) end,
                        DataFile),
@@ -303,7 +303,7 @@ strip_coverdir(File) ->
                                               2))).
 
 cover_compile(State, apps) ->
-    ExclApps = [list_to_binary(A) || A <- rebar_state:get(State, cover_excl_apps, [])],
+    ExclApps = [rebar_utils:to_binary(A) || A <- rebar_state:get(State, cover_excl_apps, [])],
     Apps = filter_checkouts_and_excluded(rebar_state:project_apps(State), ExclApps),
     AppDirs = app_dirs(Apps),
     cover_compile(State, lists:filter(fun(D) -> ec_file:is_dir(D) end, AppDirs));

@@ -75,23 +75,23 @@ paths([{src, true}|Rest], Apps, State, Acc) ->
 paths([{rel, true}|Rest], Apps, State, Acc) ->
     paths(Rest, Apps, State, [rel_dir(State)|Acc]).
 
-base_dir(State) -> io_lib:format("~s", [rebar_dir:base_dir(State)]).
-bin_dir(State)  -> io_lib:format("~s/bin", [rebar_dir:base_dir(State)]).
-lib_dir(State)  -> io_lib:format("~s", [rebar_dir:deps_dir(State)]).
-rel_dir(State)  -> io_lib:format("~s/rel", [rebar_dir:base_dir(State)]).
+base_dir(State) -> io_lib:format("~ts", [rebar_dir:base_dir(State)]).
+bin_dir(State)  -> io_lib:format("~ts/bin", [rebar_dir:base_dir(State)]).
+lib_dir(State)  -> io_lib:format("~ts", [rebar_dir:deps_dir(State)]).
+rel_dir(State)  -> io_lib:format("~ts/rel", [rebar_dir:base_dir(State)]).
 
 ebin_dirs(Apps, State) ->
-    lists:map(fun(App) -> io_lib:format("~s/~s/ebin", [rebar_dir:deps_dir(State), App]) end, Apps).
+    lists:map(fun(App) -> io_lib:format("~ts/~ts/ebin", [rebar_dir:deps_dir(State), App]) end, Apps).
 priv_dirs(Apps, State) ->
-    lists:map(fun(App) -> io_lib:format("~s/~s/priv", [rebar_dir:deps_dir(State), App]) end, Apps).
+    lists:map(fun(App) -> io_lib:format("~ts/~ts/priv", [rebar_dir:deps_dir(State), App]) end, Apps).
 src_dirs(Apps, State) ->
-    lists:map(fun(App) -> io_lib:format("~s/~s/src", [rebar_dir:deps_dir(State), App]) end, Apps).
+    lists:map(fun(App) -> io_lib:format("~ts/~ts/src", [rebar_dir:deps_dir(State), App]) end, Apps).
 
 print_paths_if_exist(Paths, State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     Sep = proplists:get_value(separator, RawOpts, " "),
     RealPaths = lists:filter(fun(P) -> ec_file:is_dir(P) end, Paths),
-    io:format("~s", [string:join(RealPaths, Sep)]).
+    io:format("~ts", [string:join(RealPaths, Sep)]).
 
 project_deps(State) ->
     Profiles = rebar_state:current_profiles(State),

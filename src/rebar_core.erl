@@ -119,11 +119,11 @@ process_command(State, Command) ->
                             State2 = rebar_state:command_parsed_args(State1, Args),
                             do(TargetProviders, State2);
                         {error, {invalid_option, Option}} ->
-                            {error, io_lib:format("Invalid option ~s on task ~p", [Option, Command])};
+                            {error, io_lib:format("Invalid option ~ts on task ~p", [Option, Command])};
                         {error, {invalid_option_arg, {Option, Arg}}} ->
-                            {error, io_lib:format("Invalid argument ~s to option ~s", [Arg, Option])};
+                            {error, io_lib:format("Invalid argument ~ts to option ~ts", [Arg, Option])};
                         {error, {missing_option_arg, Option}} ->
-                            {error, io_lib:format("Missing argument to option ~s", [Option])}
+                            {error, io_lib:format("Missing argument to option ~ts", [Option])}
                     end
             end
     end.
@@ -173,6 +173,6 @@ do([ProviderName | Rest], State) ->
 %% @doc convert a given exception's payload into an io description.
 -spec format_error(any()) -> iolist().
 format_error({bad_provider_namespace, {Namespace, Name}}) ->
-    io_lib:format("Undefined command ~s in namespace ~s", [Name, Namespace]);
+    io_lib:format("Undefined command ~ts in namespace ~ts", [Name, Namespace]);
 format_error({bad_provider_namespace, Name}) ->
-    io_lib:format("Undefined command ~s", [Name]).
+    io_lib:format("Undefined command ~ts", [Name]).

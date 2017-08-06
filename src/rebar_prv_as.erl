@@ -64,7 +64,7 @@ args_to_profiles_and_tasks(Args) ->
 
 first_profile([]) -> {[], []};
 first_profile([ProfileList|Rest]) ->
-    case re:split(ProfileList, ",", [{return, list}, {parts, 2}]) of
+    case re:split(ProfileList, ",", [{return, list}, {parts, 2}, unicode]) of
         %% `foo, bar`
         [P, ""]   -> profiles(Rest, [P]);
         %% `foo,bar`
@@ -75,7 +75,7 @@ first_profile([ProfileList|Rest]) ->
 
 profiles([], Acc) -> {lists:reverse(Acc), rebar_utils:args_to_tasks([])};
 profiles([ProfileList|Rest], Acc) ->
-    case re:split(ProfileList, ",", [{return, list}, {parts, 2}]) of
+    case re:split(ProfileList, ",", [{return, list}, {parts, 2}, unicode]) of
         %% `foo, bar`
         [P, ""]   -> profiles(Rest, [P|Acc]);
         %% `foo,bar`
@@ -101,5 +101,5 @@ warn_on_empty_profile(Profiles, State) ->
     ProjectApps = rebar_state:project_apps(State),
     DefinedProfiles = rebar_state:get(State, profiles, []) ++
         lists:flatten([rebar_app_info:get(AppInfo, profiles, []) || AppInfo <- ProjectApps]),
-    [?WARN("No entry for profile ~s in config.", [Profile]) ||
+    [?WARN("No entry for profile ~ts in config.", [Profile]) ||
         Profile <- Profiles, not(lists:keymember(list_to_atom(Profile), 1, DefinedProfiles))].

@@ -44,7 +44,7 @@ do(State) ->
 format_error(no_plugin_arg) ->
     io_lib:format("Must give an installed plugin to upgrade as an argument", []);
 format_error({not_found, Plugin}) ->
-    io_lib:format("Plugin to upgrade not found: ~s", [Plugin]);
+    io_lib:format("Plugin to upgrade not found: ~ts", [Plugin]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 

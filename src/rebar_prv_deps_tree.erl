@@ -90,7 +90,7 @@ type(Source, Verbose) when is_tuple(Source) ->
         {pkg, _} ->
             "hex package";
         {Other, false} ->
-            io_lib:format("~s repo", [Other]);
+            io_lib:format("~ts repo", [Other]);
         {_, true} ->
-            io_lib:format("~s", [element(2, Source)])
+            io_lib:format("~ts", [element(2, Source)])
     end.

@@ -30,7 +30,7 @@ do(State) ->
     rebar_packages:packages(State),
     case rebar_state:command_args(State) of
         [Name] ->
-            print_packages(get_packages(iolist_to_binary(Name)));
+            print_packages(get_packages(rebar_utils:to_binary(Name)));
         _ ->
             print_packages(sort_packages())
     end,
@@ -47,7 +47,7 @@ print_packages(Pkgs) ->
                                                                      ,ec_semver:parse(B))
                                                 end, Vsns),
                         VsnStr = join(SortedVsns, <<", ">>),
-                        ?CONSOLE("~s:~n    Versions: ~s~n", [Name, VsnStr])
+                        ?CONSOLE("~ts:~n    Versions: ~ts~n", [Name, VsnStr])
                 end, Pkgs).
 
 sort_packages() ->
@@ -71,4 +71,4 @@ join([Bin | T], Sep) ->
 
 
 info(Description) ->
-    io_lib:format("~s.~n", [Description]).
+    io_lib:format("~ts.~n", [Description]).

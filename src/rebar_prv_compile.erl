@@ -73,7 +73,7 @@ do(State) ->
 
 -spec format_error(any()) -> iolist().
 format_error({missing_artifact, File}) ->
-    io_lib:format("Missing artifact ~s", [File]);
+    io_lib:format("Missing artifact ~ts", [File]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -114,7 +114,7 @@ compile(State, AppInfo) ->
     compile(State, rebar_state:providers(State), AppInfo).
 
 compile(State, Providers, AppInfo) ->
-    ?INFO("Compiling ~s", [rebar_app_info:name(AppInfo)]),
+    ?INFO("Compiling ~ts", [rebar_app_info:name(AppInfo)]),
     AppDir = rebar_app_info:dir(AppInfo),
     AppInfo1 = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, AppInfo, State),
 
@@ -173,8 +173,8 @@ has_all_artifacts(AppInfo1) ->
     end.
 
 copy_app_dirs(AppInfo, OldAppDir, AppDir) ->
-    case ec_cnv:to_binary(filename:absname(OldAppDir)) =/=
-        ec_cnv:to_binary(filename:absname(AppDir)) of
+    case rebar_utils:to_binary(filename:absname(OldAppDir)) =/=
+        rebar_utils:to_binary(filename:absname(AppDir)) of
         true ->
             EbinDir = filename:join([OldAppDir, "ebin"]),
             %% copy all files from ebin if it exists

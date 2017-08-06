@@ -53,9 +53,9 @@ add(Graph, {PkgName, Deps}) ->
     lists:foreach(fun(DepName) ->
                           Name1 = case DepName of
                                       {Name, _Vsn} ->
-                                          ec_cnv:to_binary(Name);
+                                          rebar_utils:to_binary(Name);
                                       Name ->
-                                          ec_cnv:to_binary(Name)
+                                          rebar_utils:to_binary(Name)
                                   end,
                           V3 = case digraph:vertex(Graph, Name1) of
                                    false ->

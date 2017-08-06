@@ -41,7 +41,7 @@ base_dir(State) ->
 %% of profiles.
 -spec profile_dir(rebar_dict(), [atom()]) -> file:filename_all().
 profile_dir(Opts, Profiles) ->
-    {BaseDir, ProfilesStrings} = case [ec_cnv:to_list(P) || P <- Profiles] of
+    {BaseDir, ProfilesStrings} = case [rebar_utils:to_list(P) || P <- Profiles] of
         ["global" | _] -> {?MODULE:global_cache_dir(Opts), [""]};
         ["bootstrap", "default"] -> {rebar_opts:get(Opts, base_dir, ?DEFAULT_BASE_DIR), ["default"]};
         ["default"] -> {rebar_opts:get(Opts, base_dir, ?DEFAULT_BASE_DIR), ["default"]};
@@ -363,7 +363,7 @@ warn_source_format_once(Format) ->
             ok;
         true ->
             ?WARN("Invalid argument ~p for compiler_source_format - "
-                  "assuming ~s~n", [Format, ?DEFAULT_COMPILER_SOURCE_FORMAT])
+                  "assuming ~ts~n", [Format, ?DEFAULT_COMPILER_SOURCE_FORMAT])
     end.
 
 %% @private takes a filename and canonicalizes its path if it is a link.

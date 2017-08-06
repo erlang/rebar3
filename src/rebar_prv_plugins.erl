@@ -55,19 +55,19 @@ format_error(Reason) ->
 display_plugins(_Header, _Apps, []) ->
     ok;
 display_plugins(Header, Apps, Plugins) ->
-    ?CONSOLE("--- ~s ---", [Header]),
+    ?CONSOLE("--- ~ts ---", [Header]),
     display_plugins(Apps, Plugins),
     ?CONSOLE("", []).
 
 display_plugins(Apps, Plugins) ->
     lists:foreach(fun(Plugin) ->
-                          Name = if is_atom(Plugin) -> ec_cnv:to_binary(Plugin);
-                                    is_tuple(Plugin) -> ec_cnv:to_binary(element(1, Plugin))
+                          Name = if is_atom(Plugin) -> atom_to_binary(Plugin, unicode);
+                                    is_tuple(Plugin) -> rebar_utils:to_binary(element(1, Plugin))
                                  end,
                           case rebar_app_utils:find(Name, Apps) of
                               {ok, _App} ->
-                                  ?CONSOLE("~s", [Name]);
+                                  ?CONSOLE("~ts", [Name]);
                               error ->
-                                  ?DEBUG("Unable to find plugin ~s", [Name])
+                                  ?DEBUG("Unable to find plugin ~ts", [Name])
                           end
                   end, Plugins).

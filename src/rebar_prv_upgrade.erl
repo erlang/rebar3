@@ -68,7 +68,7 @@ do(State) ->
     ProfileDeps = rebar_state:get(State, {deps, default}, []),
     Deps = [Dep || Dep <- TopDeps ++ ProfileDeps, % TopDeps > ProfileDeps
                    is_atom(Dep) orelse is_atom(element(1, Dep))],
-    Names = parse_names(ec_cnv:to_binary(proplists:get_value(package, Args, <<"">>)), Locks),
+    Names = parse_names(rebar_utils:to_binary(proplists:get_value(package, Args, <<"">>)), Locks),
     DepsDict = deps_dict(rebar_state:all_deps(State)),
     AltDeps = find_non_default_deps(Deps, State),
     FilteredNames = cull_default_names_if_profiles(Names, Deps, State),
@@ -109,7 +109,7 @@ format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
 parse_names(Bin, Locks) ->
-    case lists:usort(re:split(Bin, <<" *, *">>, [trim])) of
+    case lists:usort(re:split(Bin, <<" *, *">>, [trim, unicode])) of
         %% Nothing submitted, use *all* apps
         [<<"">>] -> [Name || {Name, _, 0} <- Locks];
         [] -> [Name || {Name, _, 0} <- Locks];
@@ -150,7 +150,7 @@ prepare_locks([Name|Names], Deps, Locks, Unlocks, Dict, AltDeps) ->
         {_, _, 0} = Lock ->
             case rebar_utils:tup_find(AtomName, Deps) of
                 false ->
-                    ?WARN("Dependency ~s has been removed and will not be upgraded", [Name]),
+                    ?WARN("Dependency ~ts has been removed and will not be upgraded", [Name]),
                     prepare_locks(Names, Deps, Locks, Unlocks, Dict, AltDeps);
                 Dep ->
                     {Source, NewLocks, NewUnlocks} = prepare_lock(Dep, Lock, Locks, Dict),
@@ -181,7 +181,7 @@ prepare_lock(Dep, Lock, Locks, Dict) ->
         {Name, _, Src} -> {Name, Src};
         _ when is_atom(Dep) ->
             %% version-free package. Must unlock whatever matches in locks
-            {_, Vsn, _} = lists:keyfind(ec_cnv:to_binary(Dep), 1, Locks),
+            {_, Vsn, _} = lists:keyfind(rebar_utils:to_binary(Dep), 1, Locks),
             {Dep, Vsn}
     end,
     Children = all_children(Name1, Dict),
@@ -197,7 +197,7 @@ unlock_children(Children, Locks) ->
 unlock_children(_, [], Locks, Unlocks) ->
     {Locks, Unlocks};
 unlock_children(Children, [App = {Name,_,_} | Apps], Locks, Unlocks) ->
-    case lists:member(ec_cnv:to_binary(Name), Children) of
+    case lists:member(rebar_utils:to_binary(Name), Children) of
         true ->
             unlock_children(Children, Apps, Locks, [App | Unlocks]);
         false ->
@@ -215,7 +215,7 @@ all_children(Name, Dict) ->
     lists:flatten(all_children_(Name, Dict)).
 
 all_children_(Name, Dict) ->
-    case dict:find(ec_cnv:to_binary(Name), Dict) of
+    case dict:find(rebar_utils:to_binary(Name), Dict) of
         {ok, Children} ->
             [Children | [all_children_(Child, Dict) || Child <- Children]];
         error ->
