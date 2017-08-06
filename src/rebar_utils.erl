@@ -103,7 +103,7 @@ droplast(L) ->
       F :: fun((In) -> boolean() | {true, Out}),
       In :: term(),
       Out :: term().
-filtermap(F, [Hd|Tail]) ->
+filtermap(F, [Hd|Tail]) when is_function(F, 1) ->
     case F(Hd) of
         true ->
             [Hd|filtermap(F, Tail)];
@@ -885,7 +885,7 @@ list_dir(Dir) ->
 set_proxy_auth([]) ->
     ok;
 set_proxy_auth(UserInfo) ->
-    Idx = string:chr(UserInfo, $:), 
+    Idx = string:chr(UserInfo, $:),
     Username = string:sub_string(UserInfo, 1, Idx-1),
     Password = string:sub_string(UserInfo, Idx+1),
     %% password may contain url encoded characters, need to decode them first
