@@ -138,7 +138,7 @@ handle_deps_as_profile(Profile, State, Deps, Upgrade) ->
     Locks = [],
     Level = 0,
     DepsDir = profile_dep_dir(State, Profile),
-    Deps1 = rebar_app_utils:parse_deps(DepsDir, Deps, State, Locks, Level),
+    Deps1 = rebar_app_utils:parse_deps(DepsDir, Deps, State, rebar_state:project_apps(State), Locks, Level),
     ProfileLevelDeps = [{Profile, Deps1, Level}],
     handle_profile_level(ProfileLevelDeps, [], sets:new(), Upgrade, Locks, State).
 
@@ -186,7 +186,7 @@ cull_compile(TopSortedDeps, ProjectApps) ->
 
 maybe_lock(Profile, AppInfo, Seen, State, Level) ->
     Name = rebar_app_info:name(AppInfo),
-    case rebar_app_info:is_checkout(AppInfo) of
+    case rebar_app_info:is_local(AppInfo) of
         false ->
             case Profile of
                 default ->
@@ -285,6 +285,7 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     %% Keep all overrides from the global config and this dep when parsing its deps
     Overrides = rebar_app_info:get(AppInfo0, overrides, []),
     Deps1 = rebar_app_utils:parse_deps(Name, DepsDir, Deps, rebar_state:set(State, overrides, Overrides)
+                                      ,rebar_state:project_apps(State)
                                       ,Locks, Level+1),
     {AppInfo4, Deps1, State1}.
 
@@ -292,8 +293,8 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
                   sets:set(binary()), rebar_state:t()) -> {boolean(), rebar_app_info:t()}.
 maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
     AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
-    %% Don't fetch dep if it exists in the _checkouts dir
-    case rebar_app_info:is_checkout(AppInfo) of
+    %% Don't fetch dep if it exists in the _checkouts dir or is a project app
+    case rebar_app_info:is_local(AppInfo) of
         true ->
             {false, AppInfo};
         false ->
@@ -410,6 +411,6 @@ warn_skip_deps(AppInfo, State) ->
     end.
 
 not_needs_compile(App) ->
-    not(rebar_app_info:is_checkout(App))
+    not(rebar_app_info:is_local(App))
         andalso rebar_app_info:valid(App)
           andalso rebar_app_info:has_all_artifacts(App) =:= true.

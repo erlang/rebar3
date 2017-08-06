@@ -49,8 +49,8 @@
          source/2,
          is_lock/1,
          is_lock/2,
-         is_checkout/1,
-         is_checkout/2,
+         is_local/1,
+         is_local/2,
          valid/1,
          valid/2,
 
@@ -84,9 +84,9 @@
                      dir                :: file:name(),
                      out_dir            :: file:name(),
                      resource_type      :: pkg | src | undefined,
-                     source             :: string() | tuple() | checkout | undefined,
+                     source             :: string() | tuple() | local | undefined,
                      is_lock=false      :: boolean(),
-                     is_checkout=false  :: boolean(),
+                     is_local=false  :: boolean(),
                      valid              :: boolean() | undefined}).
 
 %%============================================================================
@@ -447,7 +447,7 @@ source(#app_info_t{source=Source}) ->
     Source.
 
 %% @doc sets the source specification for the app
--spec source(t(), string() | tuple() | checkout) -> t().
+-spec source(t(), string() | tuple() | local) -> t().
 source(AppInfo=#app_info_t{}, Source) ->
     AppInfo#app_info_t{source=Source}.
 
@@ -461,15 +461,15 @@ is_lock(#app_info_t{is_lock=IsLock}) ->
 is_lock(AppInfo=#app_info_t{}, IsLock) ->
     AppInfo#app_info_t{is_lock=IsLock}.
 
-%% @doc returns whether the app is a checkout app or not
--spec is_checkout(t()) -> boolean().
-is_checkout(#app_info_t{is_checkout=IsCheckout}) ->
-    IsCheckout.
+%% @doc returns whether the app is a local app or not
+-spec is_local(t()) -> boolean().
+is_local(#app_info_t{is_local=IsLocal}) ->
+    IsLocal.
 
-%% @doc sets whether the app is a checkout app or not
--spec is_checkout(t(), boolean()) -> t().
-is_checkout(AppInfo=#app_info_t{}, IsCheckout) ->
-    AppInfo#app_info_t{is_checkout=IsCheckout}.
+%% @doc sets whether the app is a local app or not
+-spec is_local(t(), boolean()) -> t().
+is_local(AppInfo=#app_info_t{}, IsLocal) ->
+    AppInfo#app_info_t{is_local=IsLocal}.
 
 %% @doc returns whether the app is valid (built) or not
 -spec valid(t()) -> boolean().
