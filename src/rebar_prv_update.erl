@@ -150,7 +150,7 @@ update_deps_list(Pkg, PkgVsn, Deps, HexRegistry, State) ->
                             %% and doubled since spaces seem not to be
                             %% enforced
                             {false, Vsn} ->
-                                ?WARN("[~s:~s], Bad dependency version for ~s: ~s.",
+                                ?WARN("[~ts:~ts], Bad dependency version for ~ts: ~ts.",
                                       [Pkg, PkgVsn, Dep, Vsn]),
                                 DepsListAcc;
                             {_, <<"~>", Vsn/binary>>} ->
@@ -202,14 +202,14 @@ valid_vsn(Vsn) ->
     SemVerRegExp = "v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*))?"
         "(-[0-9a-z-]+(\\.[0-9a-z-]+)*)?(\\+[0-9a-z-]+(\\.[0-9a-z-]+)*)?",
     SupportedVersions = "^(>=?|<=?|~>|==)?\\s*" ++ SemVerRegExp ++ "$",
-    re:run(Vsn, SupportedVersions) =/= nomatch.
+    re:run(Vsn, SupportedVersions, [unicode]) =/= nomatch.
 
 highest_matching({Pkg, PkgVsn, Dep, App}, Vsn, HexRegistry, State, DepsListAcc) ->
     case rebar_packages:find_highest_matching(Pkg, PkgVsn, Dep, Vsn, HexRegistry, State) of
         {ok, HighestDepVsn} ->
             [{App, {pkg, Dep, HighestDepVsn, undefined}} | DepsListAcc];
         none ->
-            ?WARN("[~s:~s] Missing registry entry for package ~s. Try to fix with `rebar3 update`",
+            ?WARN("[~ts:~ts] Missing registry entry for package ~ts. Try to fix with `rebar3 update`",
                   [Pkg, PkgVsn, Dep]),
             DepsListAcc
     end.
@@ -220,7 +220,7 @@ cmp({_Pkg, _PkgVsn, Dep, _App} = Dep1, Vsn, HexRegistry, State, DepsListAcc, Cmp
 
 
 cmp_(undefined, _MinVsn, [], DepsListAcc, {Pkg, PkgVsn, Dep, _App}, _CmpFun) ->
-    ?WARN("[~s:~s] Missing registry entry for package ~s. Try to fix with `rebar3 update`",
+    ?WARN("[~ts:~ts] Missing registry entry for package ~ts. Try to fix with `rebar3 update`",
           [Pkg, PkgVsn, Dep]),
     DepsListAcc;
 cmp_(HighestDepVsn, _MinVsn, [], DepsListAcc, {_Pkg, _PkgVsn, Dep, App}, _CmpFun) ->
@@ -241,7 +241,7 @@ cmpl({_Pkg, _PkgVsn, Dep, _App} = Dep1, Vsn, HexRegistry, State, DepsListAcc, Cm
     cmpl_(undefined, Vsn, Vsns, DepsListAcc, Dep1, CmpFun).
 
 cmpl_(undefined, _MaxVsn, [], DepsListAcc, {Pkg, PkgVsn, Dep, _App}, _CmpFun) ->
-    ?WARN("[~s:~s] Missing registry entry for package ~s. Try to fix with `rebar3 update`",
+    ?WARN("[~ts:~ts] Missing registry entry for package ~ts. Try to fix with `rebar3 update`",
           [Pkg, PkgVsn, Dep]),
     DepsListAcc;
 

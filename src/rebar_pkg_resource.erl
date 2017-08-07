@@ -21,7 +21,7 @@ lock(_AppDir, Source) ->
 
 needs_update(Dir, {pkg, _Name, Vsn, _Hash}) ->
     [AppInfo] = rebar_app_discover:find_apps([Dir], all),
-    case rebar_app_info:original_vsn(AppInfo) =:= ec_cnv:to_list(Vsn) of
+    case rebar_app_info:original_vsn(AppInfo) =:= rebar_utils:to_list(Vsn) of
         true ->
             false;
         false ->
@@ -43,13 +43,13 @@ download(TmpDir, Pkg={pkg, Name, Vsn, _Hash}, State) ->
 cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash}, Url, ETag, State) ->
     case request(Url, ETag) of
         {ok, cached} ->
-            ?INFO("Version cached at ~s is up to date, reusing it", [CachePath]),
+            ?INFO("Version cached at ~ts is up to date, reusing it", [CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg, State);
         {ok, Body, NewETag} ->
-            ?INFO("Downloaded package, caching at ~s", [CachePath]),
+            ?INFO("Downloaded package, caching at ~ts", [CachePath]),
             serve_from_download(TmpDir, CachePath, Pkg, NewETag, Body, State);
         error when ETag =/= false ->
-            ?INFO("Download error, using cached file at ~s", [CachePath]),
+            ?INFO("Download error, using cached file at ~ts", [CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg, State);
         error ->
             {fetch_fail, Name, Vsn}
@@ -76,13 +76,13 @@ serve_from_cache(TmpDir, CachePath, Pkg, State) ->
     end.
 
 serve_from_download(TmpDir, CachePath, Package, ETag, Binary, State) ->
-    ?DEBUG("Writing ~p to cache at ~s", [Package, CachePath]),
+    ?DEBUG("Writing ~p to cache at ~ts", [Package, CachePath]),
     file:write_file(CachePath, Binary),
     case etag(CachePath) of
         ETag ->
             serve_from_cache(TmpDir, CachePath, Package, State);
         FileETag ->
-            ?DEBUG("Downloaded file ~s ETag ~s doesn't match returned ETag ~s", [CachePath, ETag, FileETag]),
+            ?DEBUG("Downloaded file ~ts ETag ~ts doesn't match returned ETag ~ts", [CachePath, ETag, FileETag]),
             {bad_download, CachePath}
     end.
 
@@ -114,11 +114,11 @@ request(Url, ETag) ->
                        [{body_format, binary}],
                        rebar) of
         {ok, {{_Version, 200, _Reason}, Headers, Body}} ->
-            ?DEBUG("Successfully downloaded ~s", [Url]),
+            ?DEBUG("Successfully downloaded ~ts", [Url]),
             {"etag", ETag1} = lists:keyfind("etag", 1, Headers),
             {ok, Body, string:strip(ETag1, both, $")};
         {ok, {{_Version, 304, _Reason}, _Headers, _Body}} ->
-            ?DEBUG("Cached copy of ~s still valid", [Url]),
+            ?DEBUG("Cached copy of ~ts still valid", [Url]),
             {ok, cached};
         {ok, {{_Version, Code, _Reason}, _Headers, _Body}} ->
             ?DEBUG("Request to ~p failed: status code ~p", [Url, Code]),
@@ -154,7 +154,7 @@ ssl_opts(Url) ->
 ssl_opts(ssl_verify_enabled, Url) ->
     case check_ssl_version() of
         true ->
-            {ok, {_, _, Hostname, _, _, _}} = http_uri:parse(ec_cnv:to_list(Url)),
+            {ok, {_, _, Hostname, _, _, _}} = http_uri:parse(rebar_utils:to_list(Url)),
             VerifyFun = {fun ssl_verify_hostname:verify_fun/3, [{check_hostname, Hostname}]},
             CACerts = certifi:cacerts(),
             [{verify, verify_peer}, {depth, 2}, {cacerts, CACerts}

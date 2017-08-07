@@ -55,7 +55,7 @@ merge(Deps, SourceDeps) ->
 normalize(Name) when is_binary(Name) ->
     Name;
 normalize(Name) when is_atom(Name) ->
-    ec_cnv:to_binary(Name);
+    atom_to_binary(Name, unicode);
 normalize(Dep) when is_tuple(Dep) ->
     Name = element(1, Dep),
     setelement(1, Dep, normalize(Name)).
@@ -87,31 +87,31 @@ display_deps(State, Deps) ->
 
 %% packages
 display_dep(_State, {Name, Vsn}) when is_list(Vsn) ->
-    ?CONSOLE("~s* (package ~s)", [ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)]);
+    ?CONSOLE("~ts* (package ~ts)", [rebar_utils:to_binary(Name), rebar_utils:to_binary(Vsn)]);
 display_dep(_State, Name) when is_binary(Name) ->
-    ?CONSOLE("~s* (package)", [Name]);
+    ?CONSOLE("~ts* (package)", [Name]);
 display_dep(_State, {Name, Source}) when is_tuple(Source) ->
-    ?CONSOLE("~s* (~s source)", [ec_cnv:to_binary(Name), type(Source)]);
+    ?CONSOLE("~ts* (~ts source)", [rebar_utils:to_binary(Name), type(Source)]);
 display_dep(_State, {Name, _Vsn, Source}) when is_tuple(Source) ->
-    ?CONSOLE("~s* (~s source)", [ec_cnv:to_binary(Name), type(Source)]);
+    ?CONSOLE("~ts* (~ts source)", [rebar_utils:to_binary(Name), type(Source)]);
 display_dep(_State, {Name, _Vsn, Source, _Opts}) when is_tuple(Source) ->
-    ?CONSOLE("~s* (~s source)", [ec_cnv:to_binary(Name), type(Source)]);
+    ?CONSOLE("~ts* (~ts source)", [rebar_utils:to_binary(Name), type(Source)]);
 %% Locked
 display_dep(State, {Name, Source={pkg, _, Vsn}, Level}) when is_integer(Level) ->
     DepsDir = rebar_dir:deps_dir(State),
-    AppDir = filename:join([DepsDir, ec_cnv:to_binary(Name)]),
+    AppDir = filename:join([DepsDir, rebar_utils:to_binary(Name)]),
     NeedsUpdate = case rebar_fetch:needs_update(AppDir, Source, State) of
         true -> "*";
         false -> ""
     end,
-    ?CONSOLE("~s~s (locked package ~s)", [Name, NeedsUpdate, Vsn]);
+    ?CONSOLE("~ts~ts (locked package ~ts)", [Name, NeedsUpdate, Vsn]);
 display_dep(State, {Name, Source, Level}) when is_tuple(Source), is_integer(Level) ->
     DepsDir = rebar_dir:deps_dir(State),
-    AppDir = filename:join([DepsDir, ec_cnv:to_binary(Name)]),
+    AppDir = filename:join([DepsDir, rebar_utils:to_binary(Name)]),
     NeedsUpdate = case rebar_fetch:needs_update(AppDir, Source, State) of
         true -> "*";
         false -> ""
     end,
-    ?CONSOLE("~s~s (locked ~s source)", [Name, NeedsUpdate, type(Source)]).
+    ?CONSOLE("~ts~ts (locked ~ts source)", [Name, NeedsUpdate, type(Source)]).
 
 type(Source) when is_tuple(Source) -> element(1, Source).

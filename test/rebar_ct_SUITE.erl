@@ -1611,7 +1611,7 @@ test_suite(Name) ->
                   "some_test(_) -> ok.\n", [Name]).
 
 cmd_sys_config_file(AppName) ->
-    io_lib:format("[{~s, [{key, cmd_value}]}].", [AppName]).
+    io_lib:format("[{~ts, [{key, cmd_value}]}].", [AppName]).
 
 cfg_sys_config_file(AppName) ->
-    io_lib:format("[{~s, [{key, cfg_value}]}].", [AppName]).
+    io_lib:format("[{~ts, [{key, cfg_value}]}].", [AppName]).

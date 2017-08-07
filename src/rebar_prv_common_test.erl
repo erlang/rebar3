@@ -684,7 +684,7 @@ format_result({Passed, 0, {0, 0}}) ->
 format_result({Passed, Failed, Skipped}) ->
     Format = [format_failed(Failed), format_skipped(Skipped),
               format_passed(Passed)],
-    ?CONSOLE("~s", [Format]);
+    ?CONSOLE("~ts", [Format]);
 format_result(_Unknown) ->
     %% Happens when CT itself encounters a bug
     ok.

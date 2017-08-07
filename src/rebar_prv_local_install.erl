@@ -60,7 +60,7 @@ format_error(Reason) ->
 bin_contents(OutputDir) ->
     <<"#!/usr/bin/env sh
 
-erl -pz ", (ec_cnv:to_binary(OutputDir))/binary,"/*/ebin +sbtu +A0 -noshell -boot start_clean -s rebar3 main $REBAR3_ERL_ARGS -extra \"$@\"
+erl -pz ", (rebar_utils:to_binary(OutputDir))/binary,"/*/ebin +sbtu +A0 -noshell -boot start_clean -s rebar3 main $REBAR3_ERL_ARGS -extra \"$@\"
 ">>.
 
 extract_escript(State, ScriptPath) ->
@@ -73,7 +73,7 @@ extract_escript(State, ScriptPath) ->
     OutputDir = filename:join(rebar_dir:global_cache_dir(Opts), "lib"),
     filelib:ensure_dir(filename:join(OutputDir, "empty")),
 
-    ?INFO("Extracting rebar3 libs to ~s...", [OutputDir]),
+    ?INFO("Extracting rebar3 libs to ~ts...", [OutputDir]),
     zip:extract(Archive, [{cwd, OutputDir}]),
 
     BinDir = filename:join(rebar_dir:global_cache_dir(Opts), "bin"),
@@ -84,12 +84,12 @@ extract_escript(State, ScriptPath) ->
                     uid = Uid,
                     gid = Gid}} = file:read_file_info(ScriptPath),
 
-    ?INFO("Writing rebar3 run script ~s...", [BinFile]),
+    ?INFO("Writing rebar3 run script ~ts...", [BinFile]),
     file:write_file(BinFile, bin_contents(OutputDir)),
     ok = file:write_file_info(BinFile, #file_info{mode=33277,
                                                   uid=Uid,
                                                   gid=Gid}),
 
-    ?INFO("Add to $PATH for use: export PATH=~s:$PATH", [BinDir]),
+    ?INFO("Add to $PATH for use: export PATH=~ts:$PATH", [BinDir]),
 
     {ok, State}.

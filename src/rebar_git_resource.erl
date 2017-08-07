@@ -17,7 +17,7 @@
 lock(AppDir, {git, Url, _}) ->
     lock(AppDir, {git, Url});
 lock(AppDir, {git, Url}) ->
-    AbortMsg = lists:flatten(io_lib:format("Locking of git dependency failed in ~s", [AppDir])),
+    AbortMsg = lists:flatten(io_lib:format("Locking of git dependency failed in ~ts", [AppDir])),
     Dir = rebar_utils:escape_double_quotes(AppDir),
     {ok, VsnString} =
         case os:type() of
@@ -38,17 +38,17 @@ needs_update(Dir, {git, Url, {tag, Tag}}) ->
                                    [{cd, Dir}]),
     Current1 = string:strip(string:strip(Current, both, $\n), both, $\r),
 
-    ?DEBUG("Comparing git tag ~s with ~s", [Tag, Current1]),
+    ?DEBUG("Comparing git tag ~ts with ~ts", [Tag, Current1]),
     not ((Current1 =:= Tag) andalso compare_url(Dir, Url));
 needs_update(Dir, {git, Url, {branch, Branch}}) ->
     %% Fetch remote so we can check if the branch has changed
     SafeBranch = rebar_utils:escape_chars(Branch),
-    {ok, _} = rebar_utils:sh(?FMT("git fetch origin ~s", [SafeBranch]),
+    {ok, _} = rebar_utils:sh(?FMT("git fetch origin ~ts", [SafeBranch]),
                              [{cd, Dir}]),
     %% Check for new commits to origin/Branch
-    {ok, Current} = rebar_utils:sh(?FMT("git log HEAD..origin/~s --oneline", [SafeBranch]),
+    {ok, Current} = rebar_utils:sh(?FMT("git log HEAD..origin/~ts --oneline", [SafeBranch]),
                                    [{cd, Dir}]),
-    ?DEBUG("Checking git branch ~s for updates", [Branch]),
+    ?DEBUG("Checking git branch ~ts for updates", [Branch]),
     not ((Current =:= []) andalso compare_url(Dir, Url));
 needs_update(Dir, {git, Url, "master"}) ->
     needs_update(Dir, {git, Url, {branch, "master"}});
@@ -68,7 +68,7 @@ needs_update(Dir, {git, _, Ref}) ->
                    Ref
            end,
 
-    ?DEBUG("Comparing git ref ~s with ~s", [Ref2, Current1]),
+    ?DEBUG("Comparing git ref ~ts with ~ts", [Ref2, Current1]),
     (Current1 =/= Ref2).
 
 compare_url(Dir, Url) ->
@@ -82,7 +82,7 @@ compare_url(Dir, Url) ->
 
 parse_git_url(Url) ->
     %% Checks for standard scp style git remote
-    case re:run(Url, ?SCP_PATTERN, [{capture, [host, path], list}]) of
+    case re:run(Url, ?SCP_PATTERN, [{capture, [host, path], list}, unicode]) of
         {match, [Host, Path]} ->
             {ok, {Host, filename:rootname(Path, ".git")}};
         nomatch ->
@@ -119,41 +119,41 @@ download(Dir, {git, Url, Rev}, _State) ->
 
 %% Use different git clone commands depending on git --version
 git_clone(branch,Vsn,Url,Dir,Branch) when Vsn >= {1,7,10}; Vsn =:= undefined ->
-    rebar_utils:sh(?FMT("git clone ~s ~s -b ~s --single-branch",
+    rebar_utils:sh(?FMT("git clone ~ts ~ts -b ~ts --single-branch",
                         [rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir)),
                          rebar_utils:escape_chars(Branch)]),
                    [{cd, filename:dirname(Dir)}]);
 git_clone(branch,_Vsn,Url,Dir,Branch) ->
-    rebar_utils:sh(?FMT("git clone ~s ~s -b ~s",
+    rebar_utils:sh(?FMT("git clone ~ts ~ts -b ~ts",
                         [rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir)),
                          rebar_utils:escape_chars(Branch)]),
                    [{cd, filename:dirname(Dir)}]);
 git_clone(tag,Vsn,Url,Dir,Tag) when Vsn >= {1,7,10}; Vsn =:= undefined ->
-    rebar_utils:sh(?FMT("git clone ~s ~s -b ~s --single-branch",
+    rebar_utils:sh(?FMT("git clone ~ts ~ts -b ~ts --single-branch",
                         [rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir)),
                          rebar_utils:escape_chars(Tag)]),
                    [{cd, filename:dirname(Dir)}]);
 git_clone(tag,_Vsn,Url,Dir,Tag) ->
-    rebar_utils:sh(?FMT("git clone ~s ~s -b ~s",
+    rebar_utils:sh(?FMT("git clone ~ts ~ts -b ~ts",
                         [rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir)),
                          rebar_utils:escape_chars(Tag)]),
                    [{cd, filename:dirname(Dir)}]);
 git_clone(ref,_Vsn,Url,Dir,Ref) ->
-    rebar_utils:sh(?FMT("git clone -n ~s ~s",
+    rebar_utils:sh(?FMT("git clone -n ~ts ~ts",
                         [rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]),
-    rebar_utils:sh(?FMT("git checkout -q ~s", [Ref]), [{cd, Dir}]);
+    rebar_utils:sh(?FMT("git checkout -q ~ts", [Ref]), [{cd, Dir}]);
 git_clone(rev,_Vsn,Url,Dir,Rev) ->
-    rebar_utils:sh(?FMT("git clone -n ~s ~s",
+    rebar_utils:sh(?FMT("git clone -n ~ts ~ts",
                         [rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]),
-    rebar_utils:sh(?FMT("git checkout -q ~s", [rebar_utils:escape_chars(Rev)]),
+    rebar_utils:sh(?FMT("git checkout -q ~ts", [rebar_utils:escape_chars(Rev)]),
                    [{cd, Dir}]).
 
 git_vsn() ->
@@ -168,7 +168,7 @@ git_vsn() ->
 git_vsn_fetch() ->
     case rebar_utils:sh("git --version",[]) of
         {ok, VsnStr} ->
-            case re:run(VsnStr, "git version\\h+(\\d)\\.(\\d)\\.(\\d).*",[{capture,[1,2,3],list}]) of
+            case re:run(VsnStr, "git version\\h+(\\d)\\.(\\d)\\.(\\d).*", [{capture,[1,2,3],list}, unicode]) of
                 {match,[Maj,Min,Patch]} ->
                     {list_to_integer(Maj),
                      list_to_integer(Min),
@@ -198,7 +198,7 @@ collect_default_refcount(Dir) ->
                         return_on_error,
                         {cd, Dir}]) of
         {error, _} ->
-            ?WARN("Getting log of git dependency failed in ~s. Falling back to version 0.0.0", [rebar_dir:get_cwd()]),
+            ?WARN("Getting log of git dependency failed in ~ts. Falling back to version 0.0.0", [rebar_dir:get_cwd()]),
             {plain, "0.0.0"};
         {ok, String} ->
             RawRef = string:strip(String, both, $\n),
@@ -222,21 +222,20 @@ collect_default_refcount(Dir) ->
 build_vsn_string(Vsn, RawRef, Count) ->
     %% Cleanup the tag and the Ref information. Basically leading 'v's and
     %% whitespace needs to go away.
-    RefTag = [".ref", re:replace(RawRef, "\\s", "", [global])],
+    RefTag = [".ref", re:replace(RawRef, "\\s", "", [global, unicode])],
 
     %% Create the valid [semver](http://semver.org) version from the tag
     case Count of
         0 ->
-            erlang:binary_to_list(erlang:iolist_to_binary(Vsn));
+            rebar_utils:to_list(Vsn);
         _ ->
-            erlang:binary_to_list(erlang:iolist_to_binary([Vsn, "+build.",
-                                                           integer_to_list(Count), RefTag]))
+            rebar_utils:to_list([Vsn, "+build.", integer_to_list(Count), RefTag])
     end.
 
 get_patch_count(Dir, RawRef) ->
     AbortMsg = "Getting rev-list of git dep failed in " ++ Dir,
-    Ref = re:replace(RawRef, "\\s", "", [global]),
-    Cmd = io_lib:format("git rev-list ~s..HEAD",
+    Ref = re:replace(RawRef, "\\s", "", [global, unicode]),
+    Cmd = io_lib:format("git rev-list ~ts..HEAD",
                         [rebar_utils:escape_chars(Ref)]),
     {ok, PatchLines} = rebar_utils:sh(Cmd,
                                         [{use_stdout, false},
@@ -252,7 +251,7 @@ parse_tags(Dir) ->
         {error, _} ->
             {undefined, "0.0.0"};
         {ok, Line} ->
-            case re:run(Line, "(\\(|\\s)(HEAD[^,]*,\\s)tag:\\s(v?([^,\\)]+))", [{capture, [3, 4], list}]) of
+            case re:run(Line, "(\\(|\\s)(HEAD[^,]*,\\s)tag:\\s(v?([^,\\)]+))", [{capture, [3, 4], list}, unicode]) of
                 {match,[Tag, Vsn]} ->
                     {Tag, Vsn};
                 nomatch ->

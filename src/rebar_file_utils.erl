@@ -84,7 +84,7 @@ consult_config(State, Filename) ->
     [JoinedConfig].
 
 format_error({bad_term_file, AppFile, Reason}) ->
-    io_lib:format("Error reading file ~s: ~s", [AppFile, file:format_error(Reason)]).
+    io_lib:format("Error reading file ~ts: ~ts", [AppFile, file:format_error(Reason)]).
 
 symlink_or_copy(Source, Target) ->
     Link = case os:type() of
@@ -121,7 +121,7 @@ symlink_or_copy(Source, Target) ->
 
 win32_symlink(Source, Target) ->
     Res = rebar_utils:sh(
-            ?FMT("cmd /c mklink /j \"~s\" \"~s\"",
+            ?FMT("cmd /c mklink /j \"~ts\" \"~ts\"",
                  [rebar_utils:escape_double_quotes(filename:nativename(Target)),
                   rebar_utils:escape_double_quotes(filename:nativename(Source))]),
             [{use_stdout, false}, return_on_error]),
@@ -129,7 +129,7 @@ win32_symlink(Source, Target) ->
         true -> ok;
         false ->
             {error, lists:flatten(
-                      io_lib:format("Failed to symlink ~s to ~s~n",
+                      io_lib:format("Failed to symlink ~ts to ~ts~n",
                                     [Source, Target]))}
     end.
 
@@ -141,7 +141,7 @@ rm_rf(Target) ->
     case os:type() of
         {unix, _} ->
             EscTarget = rebar_utils:escape_chars(Target),
-            {ok, []} = rebar_utils:sh(?FMT("rm -rf ~s", [EscTarget]),
+            {ok, []} = rebar_utils:sh(?FMT("rm -rf ~ts", [EscTarget]),
                                       [{use_stdout, false}, abort_on_error]),
             ok;
         {win32, _} ->
@@ -161,7 +161,7 @@ cp_r(Sources, Dest) ->
         {unix, _} ->
             EscSources = [rebar_utils:escape_chars(Src) || Src <- Sources],
             SourceStr = string:join(EscSources, " "),
-            {ok, []} = rebar_utils:sh(?FMT("cp -Rp ~s \"~s\"",
+            {ok, []} = rebar_utils:sh(?FMT("cp -Rp ~ts \"~ts\"",
                                            [SourceStr, rebar_utils:escape_double_quotes(Dest)]),
                                       [{use_stdout, false}, abort_on_error]),
             ok;
@@ -176,7 +176,7 @@ mv(Source, Dest) ->
         {unix, _} ->
             EscSource = rebar_utils:escape_chars(Source),
             EscDest = rebar_utils:escape_chars(Dest),
-            case rebar_utils:sh(?FMT("mv ~s ~s", [EscSource, EscDest]),
+            case rebar_utils:sh(?FMT("mv ~ts ~ts", [EscSource, EscDest]),
                                       [{use_stdout, false}, abort_on_error]) of
                 {ok, []} ->
                     ok;
@@ -234,7 +234,7 @@ robocopy_mv_and_rename(Source, Dest, SrcDir, SrcName, DestDir, DestName) ->
     case ec_file:insecure_mkdtemp() of
         {error, _Reason} ->
             {error, lists:flatten(
-                     io_lib:format("Failed to move ~s to ~s (tmpdir failed)~n",
+                     io_lib:format("Failed to move ~ts to ~ts (tmpdir failed)~n",
                                    [Source, Dest]))};
         TmpPath ->
             case robocopy_file(SrcDir, TmpPath, SrcName) of
@@ -246,7 +246,7 @@ robocopy_mv_and_rename(Source, Dest, SrcDir, SrcName, DestDir, DestName) ->
                     case file:rename(TmpSrc, TmpDst) of
                         {error, _} ->
                             {error, lists:flatten(
-                                      io_lib:format("Failed to move ~s to ~s (via rename)~n",
+                                      io_lib:format("Failed to move ~ts to ~ts (via rename)~n",
                                                     [Source, Dest]))};
                         ok ->
                             case robocopy_file(TmpPath, DestDir, DestName) of
@@ -258,7 +258,7 @@ robocopy_mv_and_rename(Source, Dest, SrcDir, SrcName, DestDir, DestName) ->
     end.
 
 robocopy_file(SrcPath, DestPath, FileName) ->
-    Cmd = ?FMT("robocopy /move /e \"~s\" \"~s\" \"~s\"",
+    Cmd = ?FMT("robocopy /move /e \"~ts\" \"~ts\" \"~ts\"",
                [rebar_utils:escape_double_quotes(SrcPath),
                 rebar_utils:escape_double_quotes(DestPath),
                 rebar_utils:escape_double_quotes(FileName)]),
@@ -266,7 +266,7 @@ robocopy_file(SrcPath, DestPath, FileName) ->
     case win32_ok(Res) of
         false ->
             {error, lists:flatten(
-                        io_lib:format("Failed to move ~s to ~s~n",
+                        io_lib:format("Failed to move ~ts to ~ts~n",
                                       [filename:join(SrcPath, FileName),
                                        filename:join(DestPath, FileName)]))};
         true ->
@@ -274,7 +274,7 @@ robocopy_file(SrcPath, DestPath, FileName) ->
     end.
 
 robocopy_dir(Source, Dest) ->
-    Cmd = ?FMT("robocopy /move /e \"~s\" \"~s\"",
+    Cmd = ?FMT("robocopy /move /e \"~ts\" \"~ts\"",
                [rebar_utils:escape_double_quotes(Source),
                 rebar_utils:escape_double_quotes(Dest)]),
     Res = rebar_utils:sh(Cmd,
@@ -283,7 +283,7 @@ robocopy_dir(Source, Dest) ->
         true -> ok;
         false ->
             {error, lists:flatten(
-                      io_lib:format("Failed to move ~s to ~s~n",
+                      io_lib:format("Failed to move ~ts to ~ts~n",
                                     [Source, Dest]))}
     end.
 
@@ -301,12 +301,19 @@ delete_each([File | Rest]) ->
         {error, enoent} ->
             delete_each(Rest);
         {error, Reason} ->
-            ?ERROR("Failed to delete file ~s: ~p\n", [File, Reason]),
+            ?ERROR("Failed to delete file ~ts: ~p\n", [File, Reason]),
             ?FAIL
     end.
 
 write_file_if_contents_differ(Filename, Bytes) ->
-    ToWrite = iolist_to_binary(Bytes),
+    %% first try to convert directly to binaries,
+    %% but if it fails, we likely contain unicode and
+    %% need special treatment
+    ToWrite = try
+                  iolist_to_binary(Bytes)
+              catch
+                  error:badarg -> unicode:characters_to_binary(Bytes)
+              end,
     case file:read_file(Filename) of
         {ok, ToWrite} ->
             ok;
@@ -401,13 +408,13 @@ split_dirname(Path) ->
 
 delete_each_dir_win32([]) -> ok;
 delete_each_dir_win32([Dir | Rest]) ->
-    {ok, []} = rebar_utils:sh(?FMT("rd /q /s \"~s\"",
+    {ok, []} = rebar_utils:sh(?FMT("rd /q /s \"~ts\"",
                                    [rebar_utils:escape_double_quotes(filename:nativename(Dir))]),
                               [{use_stdout, false}, return_on_error]),
     delete_each_dir_win32(Rest).
 
 xcopy_win32(Source,Dest)->
-    %% "xcopy \"~s\" \"~s\" /q /y /e 2> nul", Changed to robocopy to
+    %% "xcopy \"~ts\" \"~ts\" /q /y /e 2> nul", Changed to robocopy to
     %% handle long names. May have issues with older windows.
     Cmd = case filelib:is_dir(Source) of
               true ->
@@ -417,11 +424,11 @@ xcopy_win32(Source,Dest)->
                   %% must manually add the last fragment of a directory to the `Dest`
                   %% in order to properly replicate POSIX platforms
                   NewDest = filename:join([Dest, filename:basename(Source)]),
-                  ?FMT("robocopy \"~s\" \"~s\" /e /is 1> nul",
+                  ?FMT("robocopy \"~ts\" \"~ts\" /e /is 1> nul",
                        [rebar_utils:escape_double_quotes(filename:nativename(Source)),
                         rebar_utils:escape_double_quotes(filename:nativename(NewDest))]);
               false ->
-                  ?FMT("robocopy \"~s\" \"~s\" \"~s\" /e /is 1> nul",
+                  ?FMT("robocopy \"~ts\" \"~ts\" \"~ts\" /e /is 1> nul",
                        [rebar_utils:escape_double_quotes(filename:nativename(filename:dirname(Source))),
                         rebar_utils:escape_double_quotes(filename:nativename(Dest)),
                         rebar_utils:escape_double_quotes(filename:basename(Source))])
@@ -432,7 +439,7 @@ xcopy_win32(Source,Dest)->
                 true -> ok;
                 false ->
                     {error, lists:flatten(
-                              io_lib:format("Failed to copy ~s to ~s~n",
+                              io_lib:format("Failed to copy ~ts to ~ts~n",
                                             [Source, Dest]))}
     end.
 

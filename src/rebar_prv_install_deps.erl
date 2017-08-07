@@ -104,22 +104,22 @@ do_(State) ->
 %% @doc convert a given exception's payload into an io description.
 -spec format_error(any()) -> iolist().
 format_error({dep_app_not_found, AppDir, AppName}) ->
-    io_lib:format("Dependency failure: Application ~s not found at the top level of directory ~s", [AppName, AppDir]);
+    io_lib:format("Dependency failure: Application ~ts not found at the top level of directory ~ts", [AppName, AppDir]);
 format_error({load_registry_fail, Dep}) ->
-    io_lib:format("Error loading registry to resolve version of ~s. Try fixing by running 'rebar3 update'", [Dep]);
+    io_lib:format("Error loading registry to resolve version of ~ts. Try fixing by running 'rebar3 update'", [Dep]);
 format_error({bad_constraint, Name, Constraint}) ->
-    io_lib:format("Unable to parse version for package ~s: ~s", [Name, Constraint]);
+    io_lib:format("Unable to parse version for package ~ts: ~ts", [Name, Constraint]);
 format_error({parse_dep, Dep}) ->
     io_lib:format("Failed parsing dep ~p", [Dep]);
 format_error({not_rebar_package, Package, Version}) ->
-    io_lib:format("Package not buildable with rebar3: ~s-~s", [Package, Version]);
+    io_lib:format("Package not buildable with rebar3: ~ts-~ts", [Package, Version]);
 format_error({missing_package, Package, Version}) ->
-    io_lib:format("Package not found in registry: ~s-~s", [Package, Version]);
+    io_lib:format("Package not found in registry: ~ts-~ts", [Package, Version]);
 format_error({missing_package, Package}) ->
-    io_lib:format("Package not found in registry: ~s", [Package]);
+    io_lib:format("Package not found in registry: ~ts", [Package]);
 format_error({cycles, Cycles}) ->
     Prints = [["applications: ",
-               [io_lib:format("~s ", [Dep]) || Dep <- Cycle],
+               [io_lib:format("~ts ", [Dep]) || Dep <- Cycle],
                "depend on each other\n"]
               || Cycle <- Cycles],
     ["Dependency cycle(s) detected:\n", Prints];
@@ -291,7 +291,7 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
 -spec maybe_fetch(rebar_app_info:t(), atom(), boolean(),
                   sets:set(binary()), rebar_state:t()) -> {boolean(), rebar_app_info:t()}.
 maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
-    AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
+    AppDir = rebar_utils:to_list(rebar_app_info:dir(AppInfo)),
     %% Don't fetch dep if it exists in the _checkouts dir
     case rebar_app_info:is_checkout(AppInfo) of
         true ->
@@ -346,7 +346,7 @@ symlink_dep(State, From, To) ->
         ok ->
             RelativeFrom = make_relative_to_root(State, From),
             RelativeTo = make_relative_to_root(State, To),
-            ?INFO("Linking ~s to ~s", [RelativeFrom, RelativeTo]),
+            ?INFO("Linking ~ts to ~ts", [RelativeFrom, RelativeTo]),
             ok;
         exists ->
             ok
@@ -359,7 +359,7 @@ make_relative_to_root(State, Path) when is_list(Path) ->
     rebar_dir:make_relative_path(Path, Root).
 
 fetch_app(AppInfo, AppDir, State) ->
-    ?INFO("Fetching ~s (~p)", [rebar_app_info:name(AppInfo),
+    ?INFO("Fetching ~ts (~p)", [rebar_app_info:name(AppInfo),
                                format_source(rebar_app_info:source(AppInfo))]),
     Source = rebar_app_info:source(AppInfo),
     true = rebar_fetch:download_source(AppDir, Source, State).
@@ -384,12 +384,12 @@ maybe_upgrade(AppInfo, AppDir, Upgrade, State) ->
         true ->
             case rebar_fetch:needs_update(AppDir, Source, State) of
                 true ->
-                    ?INFO("Upgrading ~s (~p)", [rebar_app_info:name(AppInfo), rebar_app_info:source(AppInfo)]),
+                    ?INFO("Upgrading ~ts (~p)", [rebar_app_info:name(AppInfo), rebar_app_info:source(AppInfo)]),
                     true = rebar_fetch:download_source(AppDir, Source, State);
                 false ->
                     case Upgrade of
                         true ->
-                            ?INFO("No upgrade needed for ~s", [rebar_app_info:name(AppInfo)]),
+                            ?INFO("No upgrade needed for ~ts", [rebar_app_info:name(AppInfo)]),
                             false;
                         false ->
                             false
@@ -400,7 +400,7 @@ maybe_upgrade(AppInfo, AppDir, Upgrade, State) ->
     end.
 
 warn_skip_deps(AppInfo, State) ->
-    Msg = "Skipping ~s (from ~p) as an app of the same name "
+    Msg = "Skipping ~ts (from ~p) as an app of the same name "
           "has already been fetched",
     Args = [rebar_app_info:name(AppInfo),
             rebar_app_info:source(AppInfo)],

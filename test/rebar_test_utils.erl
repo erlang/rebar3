@@ -349,7 +349,7 @@ check_results(AppDir, Expected, ProfileRun) ->
                                      iolist_to_binary(LockVsn))
                 end
         ;  ({release, Name, Vsn, ExpectedDevMode}) ->
-                ct:pal("Release: ~p-~s", [Name, Vsn]),
+                ct:pal("Release: ~p-~ts", [Name, Vsn]),
                 {ok, Cwd} = file:get_cwd(),
                 try
                     file:set_cwd(AppDir),
@@ -377,14 +377,14 @@ check_results(AppDir, Expected, ProfileRun) ->
                     file:set_cwd(Cwd)
                 end
         ;  ({tar, Name, Vsn}) ->
-                ct:pal("Tarball: ~s-~s", [Name, Vsn]),
+                ct:pal("Tarball: ~ts-~ts", [Name, Vsn]),
                 Tarball = filename:join([AppDir, "_build", "rel", Name, Name++"-"++Vsn++".tar.gz"]),
                 ?assertNotEqual([], filelib:is_file(Tarball))
         ;  ({file, Filename}) ->
-                ct:pal("Filename: ~s", [Filename]),
+                ct:pal("Filename: ~ts", [Filename]),
                 ?assert(filelib:is_file(Filename))
         ;  ({dir, Dirname}) ->
-                ct:pal("Directory: ~s", [Dirname]),
+                ct:pal("Directory: ~ts", [Dirname]),
                 ?assert(filelib:is_dir(Dirname))
         end, Expected).
 

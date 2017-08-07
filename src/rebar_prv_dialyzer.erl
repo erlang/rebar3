@@ -116,18 +116,18 @@ maybe_fix_env() ->
 
 -spec format_error(any()) -> iolist().
 format_error({error_processing_apps, Error}) ->
-    io_lib:format("Error in dialyzing apps: ~s", [Error]);
+    io_lib:format("Error in dialyzing apps: ~ts", [Error]);
 format_error({dialyzer_warnings, Warnings}) ->
     io_lib:format("Warnings occurred running dialyzer: ~b", [Warnings]);
 format_error({unknown_application, App}) ->
-    io_lib:format("Could not find application: ~s", [App]);
+    io_lib:format("Could not find application: ~ts", [App]);
 format_error({unknown_module, Mod}) ->
-    io_lib:format("Could not find module: ~s", [Mod]);
+    io_lib:format("Could not find module: ~ts", [Mod]);
 format_error({duplicate_module, Mod, File1, File2}) ->
-    io_lib:format("Duplicates of module ~s: ~s ~s", [Mod, File1, File2]);
+    io_lib:format("Duplicates of module ~ts: ~ts ~ts", [Mod, File1, File2]);
 format_error({output_file_error, File, Error}) ->
     Error1 = file:format_error(Error),
-    io_lib:format("Failed to write to ~s: ~s", [File, Error1]);
+    io_lib:format("Failed to write to ~ts: ~ts", [File, Error1]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -155,7 +155,7 @@ do(State, Plt) ->
         0 ->
             {ok, State2};
         TotalWarnings ->
-            ?INFO("Warnings written to ~s", [Output]),
+            ?INFO("Warnings written to ~ts", [Output]),
             throw({dialyzer_warnings, TotalWarnings})
     end.
 
@@ -229,7 +229,7 @@ apps_files([AppName | DepApps], SkipApps, Files) ->
             apps_files(DepApps, SkipApps, Files);
         false ->
             AppFiles = app_files(AppName),
-            ?DEBUG("~s modules: ~p", [AppName, dict:fetch_keys(AppFiles)]),
+            ?DEBUG("~ts modules: ~p", [AppName, dict:fetch_keys(AppFiles)]),
             Files2 = merge_files(Files, AppFiles),
             apps_files(DepApps, [AppName | SkipApps], Files2)
     end.
@@ -505,7 +505,7 @@ format_warnings(Opts, Output, Warnings) ->
     length(Warnings).
 
 console_warnings(Warnings) ->
-    _ = [?CONSOLE("~s", [Warning]) || Warning <- Warnings],
+    _ = [?CONSOLE("~ts", [Warning]) || Warning <- Warnings],
     ok.
 
 file_warnings(_, []) ->

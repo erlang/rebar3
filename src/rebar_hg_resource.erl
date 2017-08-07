@@ -22,7 +22,7 @@ lock(AppDir, {hg, Url}) ->
 needs_update(Dir, {hg, Url, {tag, Tag}}) ->
     Ref = get_ref(Dir),
     {ClosestTag, Distance} = get_tag_distance(Dir, Ref),
-    ?DEBUG("Comparing hg tag ~s with ref ~s (closest tag is ~s at distance ~s)",
+    ?DEBUG("Comparing hg tag ~ts with ref ~ts (closest tag is ~ts at distance ~ts)",
            [Tag, Ref, ClosestTag, Distance]),
     not ((Distance =:= "0") andalso (Tag =:= ClosestTag)
          andalso compare_url(Dir, Url));
@@ -45,7 +45,7 @@ needs_update(Dir, {hg, Url, Ref}) ->
         Ref1 ->
             Ref1
     end,
-    ?DEBUG("Comparing hg ref ~s with ~s", [Ref1, LocalRef]),
+    ?DEBUG("Comparing hg ref ~ts with ~ts", [Ref1, LocalRef]),
     not ((LocalRef =:= TargetRef) andalso compare_url(Dir, Url)).
 
 download(Dir, {hg, Url}, State) ->
@@ -56,28 +56,28 @@ download(Dir, {hg, Url, ""}, State) ->
     download(Dir, {hg, Url, {branch, "default"}}, State);
 download(Dir, {hg, Url, {branch, Branch}}, _State) ->
     ok = filelib:ensure_dir(Dir),
-    rebar_utils:sh(?FMT("hg clone -q -b ~s ~s ~s",
+    rebar_utils:sh(?FMT("hg clone -q -b ~ts ~ts ~ts",
                        [rebar_utils:escape_chars(Branch),
                         rebar_utils:escape_chars(Url),
                         rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]);
 download(Dir, {hg, Url, {tag, Tag}}, _State) ->
     ok = filelib:ensure_dir(Dir),
-    rebar_utils:sh(?FMT("hg clone -q -u ~s ~s ~s",
+    rebar_utils:sh(?FMT("hg clone -q -u ~ts ~ts ~ts",
                         [rebar_utils:escape_chars(Tag),
                          rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]);
 download(Dir, {hg, Url, {ref, Ref}}, _State) ->
     ok = filelib:ensure_dir(Dir),
-    rebar_utils:sh(?FMT("hg clone -q -r ~s ~s ~s",
+    rebar_utils:sh(?FMT("hg clone -q -r ~ts ~ts ~ts",
                         [rebar_utils:escape_chars(Ref),
                          rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]);
 download(Dir, {hg, Url, Rev}, _State) ->
     ok = filelib:ensure_dir(Dir),
-    rebar_utils:sh(?FMT("hg clone -q -r ~s ~s ~s",
+    rebar_utils:sh(?FMT("hg clone -q -r ~ts ~ts ~ts",
                         [rebar_utils:escape_chars(Rev),
                          rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir))]),
@@ -88,7 +88,7 @@ make_vsn(Dir) ->
     Ref = get_ref(Dir),
     Cmd = BaseHg ++ "log --template \"{latesttag}+build.{latesttagdistance}.rev.{node|short}\""
           " --rev " ++ Ref,
-    AbortMsg = io_lib:format("Version resolution of hg dependency failed in ~s", [Dir]),
+    AbortMsg = io_lib:format("Version resolution of hg dependency failed in ~ts", [Dir]),
     {ok, VsnString} =
         rebar_utils:sh(Cmd,
                        [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
@@ -108,14 +108,14 @@ compare_url(Dir, Url) ->
     parse_hg_url(CurrentUrl1) =:= parse_hg_url(Url).
 
 get_ref(Dir) ->
-    AbortMsg = io_lib:format("Get ref of hg dependency failed in ~s", [Dir]),
+    AbortMsg = io_lib:format("Get ref of hg dependency failed in ~ts", [Dir]),
     {ok, RefString} =
         rebar_utils:sh("hg -R \"" ++ rebar_utils:escape_double_quotes(Dir) ++ "\" --debug id -i",
                        [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
     string:strip(RefString, both, $\n).
 
 get_tag_distance(Dir, Ref) ->
-    AbortMsg = io_lib:format("Get tag distance of hg dependency failed in ~s", [Dir]),
+    AbortMsg = io_lib:format("Get tag distance of hg dependency failed in ~ts", [Dir]),
     {ok, LogString} =
         rebar_utils:sh("hg -R \"" ++ rebar_utils:escape_double_quotes(Dir) ++ "\" "
                       "log --template \"{latesttag}-{latesttagdistance}\n\" "
@@ -123,11 +123,12 @@ get_tag_distance(Dir, Ref) ->
                       [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
     Log = string:strip(LogString,
                        both, $\n),
-    [Tag, Distance] = re:split(Log, "-([0-9]+)$", [{parts,0}, {return, list}]),
+    [Tag, Distance] = re:split(Log, "-([0-9]+)$",
+                               [{parts,0}, {return,list}, unicode]),
     {Tag, Distance}.
 
 get_branch_ref(Dir, Branch) ->
-    AbortMsg = io_lib:format("Get branch ref of hg dependency failed in ~s", [Dir]),
+    AbortMsg = io_lib:format("Get branch ref of hg dependency failed in ~ts", [Dir]),
     {ok, BranchRefString} =
         rebar_utils:sh("hg -R \"" ++ rebar_utils:escape_double_quotes(Dir) ++
                        "\" log --template \"{node}\n\" --rev " ++ rebar_utils:escape_chars(Branch),

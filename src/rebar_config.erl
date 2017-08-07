@@ -120,7 +120,7 @@ write_lock_file(LockFile, Locks) ->
             file:write_file(LockFile, io_lib:format("~p.~n", [NewLocks]));
         _ ->
             file:write_file(LockFile,
-                            io_lib:format("{~p,~n~p}.~n[~n~s~n].~n",
+                            io_lib:format("{~p,~n~p}.~n[~n~ts~n].~n",
                                           [?CONFIG_VERSION, NewLocks,
                                            format_attrs(Attrs)]))
     end.
@@ -359,7 +359,7 @@ check_newly_added_({Name, Source}, LockedDeps) ->
             false
     end;
 check_newly_added_(Dep, LockedDeps) when is_atom(Dep) ->
-    Name = ec_cnv:to_binary(Dep),
+    Name = rebar_utils:to_binary(Dep),
     case lists:keyfind(Name, 1, LockedDeps) of
         false ->
             {true, Name};
@@ -368,8 +368,8 @@ check_newly_added_(Dep, LockedDeps) when is_atom(Dep) ->
                 0 ->
                     {true, Name};
                 _ ->
-                    ?WARN("Newly added dep ~s is locked at a lower level. "
-                          "If you really want to unlock it, use 'rebar3 upgrade ~s'",
+                    ?WARN("Newly added dep ~ts is locked at a lower level. "
+                          "If you really want to unlock it, use 'rebar3 upgrade ~ts'",
                           [Name, Name]),
                     false
             end

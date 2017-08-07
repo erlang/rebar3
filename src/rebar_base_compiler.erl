@@ -199,15 +199,15 @@ compile_each([], _Config, _CompileFn) ->
 compile_each([Source | Rest], Config, CompileFn) ->
     case CompileFn(Source, Config) of
         ok ->
-            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]);
+            ?DEBUG("~tsCompiled ~ts", [rebar_utils:indent(1), filename:basename(Source)]);
         {ok, Warnings} ->
             report(Warnings),
-            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]);
+            ?DEBUG("~tsCompiled ~ts", [rebar_utils:indent(1), filename:basename(Source)]);
         skipped ->
-            ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), filename:basename(Source)]);
+            ?DEBUG("~tsSkipped ~ts", [rebar_utils:indent(1), filename:basename(Source)]);
         Error ->
             NewSource = format_error_source(Source, Config),
-            ?ERROR("Compiling ~s failed", [NewSource]),
+            ?ERROR("Compiling ~ts failed", [NewSource]),
             maybe_report(Error),
             ?DEBUG("Compilation failed: ~p", [Error]),
             ?FAIL
@@ -258,7 +258,7 @@ maybe_report(_) ->
 %% @private Outputs a bunch of strings, including a newline
 -spec report([string()]) -> ok.
 report(Messages) ->
-    lists:foreach(fun(Msg) -> io:format("~s~n", [Msg]) end, Messages).
+    lists:foreach(fun(Msg) -> io:format("~ts~n", [Msg]) end, Messages).
 
 %% private format compiler errors into proper outputtable strings
 -spec format_errors(_, Extra, [err_or_warn()]) -> [string()] when
@@ -274,10 +274,10 @@ format_errors(_MainSource, Extra, Errors) ->
       Extra :: string().
 format_error(Source, Extra, {{Line, Column}, Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
-    ?FMT("~s:~w:~w: ~s~s~n", [Source, Line, Column, Extra, ErrorDesc]);
+    ?FMT("~ts:~w:~w: ~ts~ts~n", [Source, Line, Column, Extra, ErrorDesc]);
 format_error(Source, Extra, {Line, Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
-    ?FMT("~s:~w: ~s~s~n", [Source, Line, Extra, ErrorDesc]);
+    ?FMT("~ts:~w: ~ts~ts~n", [Source, Line, Extra, ErrorDesc]);
 format_error(Source, Extra, {Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
-    ?FMT("~s: ~s~s~n", [Source, Extra, ErrorDesc]).
+    ?FMT("~ts: ~ts~ts~n", [Source, Extra, ErrorDesc]).

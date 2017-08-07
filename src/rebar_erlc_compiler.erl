@@ -92,7 +92,7 @@ compile(AppInfo) when element(1, AppInfo) == app_info_t ->
 %% @doc compile an individual application.
 -spec compile(rebar_app_info:t(), compile_opts()) -> ok.
 compile(AppInfo, CompileOpts) when element(1, AppInfo) == app_info_t ->
-    Dir = ec_cnv:to_list(rebar_app_info:out_dir(AppInfo)),
+    Dir = rebar_utils:to_list(rebar_app_info:out_dir(AppInfo)),
     RebarOpts = rebar_app_info:opts(AppInfo),
 
     SrcOpts = [check_last_mod,
@@ -237,8 +237,8 @@ clean(AppInfo) ->
 
     YrlFiles = rebar_utils:find_files(filename:join([AppDir, "src"]), ?RE_PREFIX".*\\.[x|y]rl\$"),
     rebar_file_utils:delete_each(
-      [ binary_to_list(iolist_to_binary(re:replace(F, "\\.[x|y]rl$", ".erl")))
-        || F <- YrlFiles ]),
+      [rebar_utils:to_list(re:replace(F, "\\.[x|y]rl$", ".erl", [unicode]))
+       || F <- YrlFiles]),
 
     BinDirs = ["ebin"|rebar_dir:extra_src_dirs(rebar_app_info:opts(AppInfo))],
     ok = clean_dirs(AppDir, BinDirs),
@@ -339,7 +339,7 @@ maybe_rm_beam_and_edge(G, OutDir, Source) ->
             false;
         false ->
             Target = target_base(OutDir, Source) ++ ".beam",
-            ?DEBUG("Source ~s is gone, deleting previous beam file if it exists ~s", [Source, Target]),
+            ?DEBUG("Source ~ts is gone, deleting previous beam file if it exists ~ts", [Source, Target]),
             file:delete(Target),
             digraph:del_vertex(G, Source),
             true
@@ -400,7 +400,7 @@ init_erlcinfo(InclDirs, Erls, Dir, OutDir) ->
     try restore_erlcinfo(G, InclDirs, Dir)
     catch
         _:_ ->
-            ?WARN("Failed to restore ~s file. Discarding it.~n", [erlcinfo_file(Dir)]),
+            ?WARN("Failed to restore ~ts file. Discarding it.~n", [erlcinfo_file(Dir)]),
             file:delete(erlcinfo_file(Dir))
     end,
     Dirs = source_and_include_dirs(InclDirs, Erls),

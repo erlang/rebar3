@@ -60,7 +60,7 @@ do(State, LibDirs) ->
                                 rebar_state:project_apps(StateAcc1
                                                         ,rebar_app_info:deps(AppInfo2, ProjectDeps1));
                             false ->
-                                ?INFO("Ignoring ~s", [Name]),
+                                ?INFO("Ignoring ~ts", [Name]),
                                 StateAcc
                         end
                 end, State1, SortedApps).
@@ -233,7 +233,7 @@ app_dirs(LibDir, SrcDirs) ->
     EbinPath = filename:join([LibDir, "ebin", "*.app"]),
 
     lists:usort(lists:foldl(fun(Path, Acc) ->
-                                Files = filelib:wildcard(ec_cnv:to_list(Path)),
+                                Files = filelib:wildcard(rebar_utils:to_list(Path)),
                                 [{app_dir(File), SrcDirs}
                                  || File <- Files] ++ Acc
                             end, [], [EbinPath | Paths])).
@@ -386,7 +386,7 @@ try_handle_app_file(AppInfo0, [File], AppDir, AppSrcFile, _, Validate) ->
             end
     catch
         throw:{error, {Module, Reason}} ->
-            ?DEBUG("Falling back to app.src file because .app failed: ~s", [Module:format_error(Reason)]),
+            ?DEBUG("Falling back to app.src file because .app failed: ~ts", [Module:format_error(Reason)]),
             try_handle_app_src_file(AppInfo0, File, AppDir, AppSrcFile, Validate)
     end;
 try_handle_app_file(_AppInfo, Other, _AppDir, _AppSrcFile, _, _Validate) ->
