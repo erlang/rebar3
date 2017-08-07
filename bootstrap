@@ -16,7 +16,7 @@ main(_) ->
                ,{getopt, []}
                ,{cf, []}
                ,{erlware_commons, ["ec_dictionary.erl", "ec_vsn.erl"]}
-               ,{certifi, []}],
+               ,{certifi, ["certifi_pt.erl"]}],
     Deps = get_deps(),
     [fetch_and_compile(Dep, Deps) || Dep <- BaseDeps],
 
