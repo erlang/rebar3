@@ -7,7 +7,7 @@ all() -> [sub_app_deps, newly_added_dep, newly_added_after_empty_lock,
           http_proxy_settings, https_proxy_settings,
           http_os_proxy_settings, https_os_proxy_settings,
           semver_matching_lt, semver_matching_lte, semver_matching_gt,
-          valid_version, {group, git}, {group, pkg}].
+          valid_version, top_override, {group, git}, {group, pkg}].
 
 groups() ->
     [{all, [], [flat, pick_highest_left, pick_highest_right,
@@ -46,6 +46,8 @@ init_per_testcase(newly_added_after_empty_lock, Config) ->
 init_per_testcase(newly_added_dep, Config) ->
     rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(sub_app_deps, Config) ->
+    rebar_test_utils:init_rebar_state(Config);
+init_per_testcase(top_override, Config) ->
     rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(http_proxy_settings, Config) ->
     %% Create private rebar.config
@@ -254,6 +256,32 @@ pick_smallest2(Config) -> run(Config).
 circular1(Config) -> run(Config).
 circular2(Config) -> run(Config).
 circular_skip(Config) -> run(Config).
+
+%% Test that a top-level application overtakes dependencies, and
+%% works even if said deps do not exist.
+top_override(Config) ->
+    AppDir = ?config(apps, Config),
+    ct:pal("dir: ~p", [AppDir]),
+    Name1 = rebar_test_utils:create_random_name("sub_app1_"),
+    Name2 = rebar_test_utils:create_random_name("sub_app2_"),
+    SubAppsDir1 = filename:join([AppDir, "apps", Name1]),
+    SubAppsDir2 = filename:join([AppDir, "apps", Name2]),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(SubAppsDir1, Name1, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_app(SubAppsDir2, Name2, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_config(
+      SubAppsDir1,
+      [{deps, [list_to_atom(Name2)]}]
+     ),
+    rebar_test_utils:create_config(
+      SubAppsDir2,
+      [{deps, [{list_to_atom(Name1),
+                {git, "https://example.org", {branch, "master"}}}]}]
+    ),
+    rebar_test_utils:run_and_check(
+      Config, [], ["compile"],
+      {ok, [{app, Name1}, {app,Name2}]}
+    ).
 
 %% Test that the deps of project apps that have their own rebar.config
 %% are included, but that top level rebar.config deps take precedence

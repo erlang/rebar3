@@ -34,6 +34,7 @@
          validate_application_info/2,
          parse_deps/5,
          parse_deps/6,
+         expand_deps_sources/2,
          dep_to_app/7,
          format_error/1]).
 
@@ -227,7 +228,7 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
                                     not_found ->
                                         rebar_app_info:new(Parent, Name, Vsn, Dir, [])
                                 end,
-                                update_source(AppInfo0, Source, State)
+                                rebar_app_info:source(AppInfo0, Source)
                     end,
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
     AppInfo1 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
@@ -237,6 +238,13 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
     AppInfo4 = rebar_app_info:apply_profiles(AppInfo3, [default, prod]),
     AppInfo5 = rebar_app_info:profiles(AppInfo4, [default]),
     rebar_app_info:is_lock(AppInfo5, IsLock).
+
+%% @doc Takes a given application app_info record along with the project.
+%% If the app is a package, resolve and expand the package definition.
+-spec expand_deps_sources(rebar_app_info:t(), rebar_state:t()) ->
+    rebar_app_info:t().
+expand_deps_sources(Dep, State) ->
+    update_source(Dep, rebar_app_info:source(Dep), State).
 
 %% @doc sets the source for a given dependency or app along with metadata
 %% around version if required.
