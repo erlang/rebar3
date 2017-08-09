@@ -369,7 +369,7 @@ deduplicated_paths(Config) ->
                                    ["as", "a,b,c,d,e,a,e,b", "compile"],
                                    {ok, [{app, Name}]}),
 
-    Path = filename:join([AppDir, "_build", "c+d+a+e+b", "lib", Name, "ebin"]),
+    Path = filename:join([AppDir, "_build", "c_d_a_e_b", "lib", Name, "ebin"]),
     ?assert(filelib:is_dir(Path)).
 
 test_profile_applied_at_completion(Config) ->
