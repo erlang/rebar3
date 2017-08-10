@@ -248,7 +248,7 @@ calculate_total(Stats) ->
         Stats
     )).
 
-percentage({0, 0}) -> "0%";
+percentage({_, 0}) -> "100%";
 percentage({Cov, Not}) -> integer_to_list(trunc((Cov / (Cov + Not)) * 100)) ++ "%".
 
 write_index(State, Coverage) ->
