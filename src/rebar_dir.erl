@@ -49,7 +49,7 @@ profile_dir(Opts, Profiles) ->
         %%  of profiles to match order passed to `as`
         ["default"|Rest] -> {rebar_opts:get(Opts, base_dir, ?DEFAULT_BASE_DIR), Rest}
     end,
-    ProfilesDir = string:join(ProfilesStrings, "+"),
+    ProfilesDir = string:join(ProfilesStrings, "_"),
     filename:join(BaseDir, ProfilesDir).
 
 %% @doc returns the directory where dependencies should be placed

@@ -121,7 +121,7 @@ as_dir_name(Config) ->
                                    ["as", "foo,bar,baz", "compile"],
                                    {ok, [{app, Name}]}),
 
-    true = filelib:is_dir(filename:join([AppDir, "_build", "foo+bar+baz"])).
+    true = filelib:is_dir(filename:join([AppDir, "_build", "foo_bar_baz"])).
 
 
 as_with_task_args(Config) ->
