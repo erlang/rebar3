@@ -114,7 +114,7 @@ escriptize(State0, App) ->
     EbinFiles = usort(load_files(EbinPrefix, "*", "ebin")),
 
     ExtraFiles = usort(InclBeams ++ InclExtra),
-    Files = get_nonempty(EbinFiles ++ ExtraFiles),
+    Files = get_nonempty(EbinFiles ++ (ExtraFiles -- EbinFiles)), % drop dupes
 
     DefaultEmuArgs = ?FMT("%%! -escript main ~ts -pz ~ts/~ts/ebin\n",
                           [AppNameStr, AppNameStr, AppNameStr]),
