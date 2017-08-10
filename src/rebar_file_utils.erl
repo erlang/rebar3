@@ -105,7 +105,7 @@ symlink_or_copy(Source, Target) ->
                     T = unicode:characters_to_list(Target),
                     case filelib:is_dir(S) of
                         true ->
-                            win32_symlink(S, T);
+                            win32_symlink_or_copy(S, T);
                         false ->
                             cp_r([S], T)
                     end;
@@ -119,20 +119,48 @@ symlink_or_copy(Source, Target) ->
             end
     end.
 
-win32_symlink(Source, Target) ->
+%% @private Compatibility function for windows
+win32_symlink_or_copy(Source, Target) ->
     Res = rebar_utils:sh(
             ?FMT("cmd /c mklink /j \"~ts\" \"~ts\"",
                  [rebar_utils:escape_double_quotes(filename:nativename(Target)),
                   rebar_utils:escape_double_quotes(filename:nativename(Source))]),
             [{use_stdout, false}, return_on_error]),
-    case win32_ok(Res) of
+    case win32_mklink_ok(Res, Target) of
         true -> ok;
-        false ->
-            {error, lists:flatten(
-                      io_lib:format("Failed to symlink ~ts to ~ts~n",
-                                    [Source, Target]))}
+        false -> cp_r_win32(Source, drop_last_dir_from_path(Target))
     end.
 
+%% @private specifically pattern match against the output
+%% of the windows 'mklink' shell call; different values from
+%% what win32_ok/1 handles
+win32_mklink_ok({ok, _}, _) ->
+    true;
+win32_mklink_ok({error,{1,"Local NTFS volumes are required to complete the operation.\n"}}, _) ->
+    false;
+win32_mklink_ok({error,{1,"Cannot create a file when that file already exists.\n"}}, Target) ->
+    % File or dir is already in place; find if it is already a symlink (true) or
+    % if it is a directory (copy-required; false)
+    is_symlink(Target);
+win32_mklink_ok(_, _) ->
+    false.
+
+%% @private
+is_symlink(Filename) ->
+    {ok, Info} = file:read_link_info(Filename),
+    Info#file_info.type == symlink.
+
+%% @private
+%% drops the last 'node' of the filename, presumably the last dir such as 'src'
+%% this is because cp_r_win32/2 automatically adds the dir name, to appease
+%% robocopy and be more uniform with POSIX
+drop_last_dir_from_path([]) ->
+    [];
+drop_last_dir_from_path(Path) ->
+    case lists:droplast(filename:split(Path)) of
+        [] -> [];
+        Dirs -> filename:join(Dirs)
+    end.
 
 %% @doc Remove files and directories.
 %% Target is a single filename, directoryname or wildcard expression.
