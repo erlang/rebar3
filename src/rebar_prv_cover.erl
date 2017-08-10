@@ -196,10 +196,7 @@ mod_to_filename(TaskDir, M) ->
 
 process(Coverage) -> process(Coverage, {0, 0}).
 
-process([], {0, 0}) ->
-    "0%";
-process([], {Cov, Not}) ->
-    integer_to_list(trunc((Cov / (Cov + Not)) * 100)) ++ "%";
+process([], Acc) -> Acc;
 %% line 0 is a line added by eunit and never executed so ignore it
 process([{{_, 0}, _}|Rest], Acc) -> process(Rest, Acc);
 process([{_, {Cov, Not}}|Rest], {Covered, NotCovered}) ->
@@ -208,20 +205,19 @@ process([{_, {Cov, Not}}|Rest], {Covered, NotCovered}) ->
 print_analysis(_, false) -> ok;
 print_analysis(Analysis, true) ->
     {_, CoverFiles, Stats} = lists:keyfind("aggregate", 1, Analysis),
-    ConsoleStats = [ {atom_to_list(M), C} || {M, C, _} <- Stats ],
-    Table = format_table(ConsoleStats, CoverFiles),
+    Table = format_table(Stats, CoverFiles),
     io:format("~ts", [Table]).
 
 format_table(Stats, CoverFiles) ->
-    MaxLength = max(lists:foldl(fun max_length/2, 0, Stats), 20),
+    MaxLength = lists:max([20 | lists:map(fun({M, _, _}) -> mod_length(M) end, Stats)]),
     Header = header(MaxLength),
     Separator = separator(MaxLength),
     TotalLabel = format("total", MaxLength),
     TotalCov = format(calculate_total(Stats), 8),
     [io_lib:format("~ts~n~ts~n~ts~n", [Separator, Header, Separator]),
-        lists:map(fun({Mod, Coverage}) ->
+        lists:map(fun({Mod, Coverage, _}) ->
             Name = format(Mod, MaxLength),
-            Cov = format(Coverage, 8),
+            Cov = format(percentage(Coverage), 8),
             io_lib:format("  |  ~ts  |  ~ts  |~n", [Name, Cov])
         end, Stats),
         io_lib:format("~ts~n", [Separator]),
@@ -232,12 +228,8 @@ format_table(Stats, CoverFiles) ->
             io_lib:format("    ~ts~n", [File])
         end, CoverFiles)].
 
-max_length({ModName, _}, Min) ->
-    Length = length(lists:flatten(ModName)),
-    case Length > Min of
-        true  -> Length;
-        false -> Min
-    end.
+mod_length(Mod) when is_atom(Mod) -> mod_length(atom_to_list(Mod));
+mod_length(Mod) -> length(Mod).
 
 header(Width) ->
     ["  |  ", format("module", Width), "  |  ", format("coverage", 8), "  |"].
@@ -247,17 +239,17 @@ separator(Width) ->
 
 format(String, Width) -> io_lib:format("~*.ts", [Width, String]).
 
-calculate_total(Stats) when length(Stats) =:= 0 ->
-    "0%";
 calculate_total(Stats) ->
-    TotalStats = length(Stats),
-    TotalCovInt = round(lists:foldl(
-                        fun({_Mod, Coverage, _File}, Acc) ->
-                            Acc + (list_to_integer(string:strip(Coverage, right, $%)) / TotalStats);
-                        ({_Mod, Coverage}, Acc) ->
-                            Acc + (list_to_integer(string:strip(Coverage, right, $%)) / TotalStats)
-    end, 0, Stats)),
-    integer_to_list(TotalCovInt) ++ "%".
+    percentage(lists:foldl(
+        fun({_Mod, {Cov, Not}, _File}, {CovAcc, NotAcc}) ->
+            {CovAcc + Cov, NotAcc + Not}
+        end,
+        {0, 0},
+        Stats
+    )).
+
+percentage({0, 0}) -> "0%";
+percentage({Cov, Not}) -> integer_to_list(trunc((Cov / (Cov + Not)) * 100)) ++ "%".
 
 write_index(State, Coverage) ->
     CoverDir = cover_dir(State),
@@ -287,7 +279,7 @@ write_index_section(F, [{Section, DataFile, Mods}|Rest]) ->
     FmtLink =
         fun({Mod, Cov, Report}) ->
                 ?FMT("<tr><td><a href='~ts'>~ts</a></td><td>~ts</td>\n",
-                     [strip_coverdir(Report), Mod, Cov])
+                     [strip_coverdir(Report), Mod, percentage(Cov)])
         end,
     lists:foreach(fun(M) -> ok = file:write(F, FmtLink(M)) end, Mods),
     ok = file:write(F, ?FMT("<tr><td><strong>Total</strong></td><td>~ts</td>\n",
