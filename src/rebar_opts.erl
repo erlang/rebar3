@@ -117,7 +117,10 @@ merge_opt(plugins, NewValue, _OldValue) ->
 merge_opt({plugins, _}, NewValue, _OldValue) ->
     NewValue;
 merge_opt(profiles, NewValue, OldValue) ->
-    dict:to_list(merge_opts(dict:from_list(NewValue), dict:from_list(OldValue)));
+    ToMerge = fill_profile_gaps(lists:sort(NewValue),
+                                lists:sort(OldValue)),
+    [{K,dict:to_list(merge_opts(dict:from_list(New), dict:from_list(Old)))}
+     || {K,New,Old} <- ToMerge];
 merge_opt(erl_first_files, Value, Value) ->
     Value;
 merge_opt(erl_first_files, NewValue, OldValue) ->
@@ -190,3 +193,16 @@ filter_defines([{platform_define, ArchRegex, Key, Value} | Rest], Acc) ->
     end;
 filter_defines([Opt | Rest], Acc) ->
     filter_defines(Rest, [Opt | Acc]).
+
+fill_profile_gaps([], []) ->
+    [];
+fill_profile_gaps([{P,V}|Ps], []) ->
+    [{P,V,[]} | fill_profile_gaps(Ps, [])];
+fill_profile_gaps([], [{P,V}|Ps]) ->
+    [{P,[],V} | fill_profile_gaps([], Ps)];
+fill_profile_gaps([{P,VA}|PAs], [{P,VB}|PBs]) ->
+    [{P,VA,VB} | fill_profile_gaps(PAs, PBs)];
+fill_profile_gaps([{PA,VA}|PAs], [{PB,VB}|PBs]) when PA < PB ->
+    [{PA,VA,[]} | fill_profile_gaps(PAs, [{PB, VB}|PBs])];
+fill_profile_gaps([{PA,VA}|PAs], [{PB,VB}|PBs]) when PA > PB ->
+    [{PB,[],VB} | fill_profile_gaps([{PA,VA}|PAs], PBs)].

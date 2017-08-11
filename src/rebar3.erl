@@ -396,8 +396,8 @@ safe_define_test_macro(Opts) ->
     %% defining a compile macro twice results in an exception so
     %% make sure 'TEST' is only defined once
     case test_defined(Opts) of
-       true  -> [];
-       false -> [{d, 'TEST'}]
+       true  -> Opts;
+       false -> [{d, 'TEST'}|Opts]
     end.
 
 test_defined([{d, 'TEST'}|_]) -> true;
