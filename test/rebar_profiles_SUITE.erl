@@ -7,6 +7,7 @@
          all/0,
          profile_new_key/1,
          profile_merge_keys/1,
+         profile_merge_umbrella_keys/1,
          explicit_profile_deduplicate_deps/1,
          implicit_profile_deduplicate_deps/1,
          all_deps_code_paths/1,
@@ -33,7 +34,8 @@
 -include_lib("kernel/include/file.hrl").
 
 all() ->
-    [profile_new_key, profile_merge_keys, all_deps_code_paths, profile_merges,
+    [profile_new_key, profile_merge_keys, profile_merge_umbrella_keys,
+     all_deps_code_paths, profile_merges,
      explicit_profile_deduplicate_deps, implicit_profile_deduplicate_deps,
      same_profile_deduplication, stack_deduplication,
      add_to_profile, add_to_existing_profile,
@@ -117,6 +119,35 @@ profile_merge_keys(Config) ->
                                    ["as", "ct", "compile"], {ok, [{app, Name}
                                                                  ,{dep, "a", "1.0.0"}
                                                                  ,{dep, "b", "2.0.0"}]}).
+
+profile_merge_umbrella_keys(Config) ->
+    AppDir = ?config(apps, Config),
+    ct:pal("Path: ~s", [AppDir]),
+    Name = rebar_test_utils:create_random_name("profile_merge_umbrella_keys"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    SubAppDir = filename:join([AppDir, "apps", Name]),
+
+    RebarConfig = [{vals, [{a,1},{b,1}]},
+                   {profiles,
+                    [{ct,
+                      [{vals, [{a,1},{b,2}]}]}]}],
+    
+    SubRebarConfig = [{vals, []},
+                       {profiles, [{ct, [{vals, [{c,1}]}]}]}],
+
+    rebar_test_utils:create_app(SubAppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_config(SubAppDir, SubRebarConfig),
+    {ok, RebarConfigRead} = file:consult(rebar_test_utils:create_config(AppDir, RebarConfig)),
+
+    {ok, State} = rebar_test_utils:run_and_check(
+        Config, RebarConfigRead, ["as", "ct", "compile"], return
+    ),
+
+    [ProjectApp] = rebar_state:project_apps(State),
+    ?assertEqual(Name, binary_to_list(rebar_app_info:name(ProjectApp))),
+    Opts = rebar_app_info:opts(ProjectApp),
+    ?assertEqual([{a,1},{b,2},{b,1},{c,1}], dict:fetch(vals, Opts)),
+    ok.
 
 explicit_profile_deduplicate_deps(Config) ->
     AppDir = ?config(apps, Config),
