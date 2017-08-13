@@ -117,8 +117,10 @@ merge_opt(plugins, NewValue, _OldValue) ->
 merge_opt({plugins, _}, NewValue, _OldValue) ->
     NewValue;
 merge_opt(profiles, NewValue, OldValue) ->
-    ToMerge = fill_profile_gaps(lists:sort(NewValue),
-                                lists:sort(OldValue)),
+    %% Merge up sparse pairs of {Profile, Opts} into a joined up
+    %% {Profile, OptsNew, OptsOld} list.
+    ToMerge = normalise_profile_pairs(lists:sort(NewValue),
+                                      lists:sort(OldValue)),
     [{K,dict:to_list(merge_opts(dict:from_list(New), dict:from_list(Old)))}
      || {K,New,Old} <- ToMerge];
 merge_opt(erl_first_files, Value, Value) ->
@@ -194,15 +196,25 @@ filter_defines([{platform_define, ArchRegex, Key, Value} | Rest], Acc) ->
 filter_defines([Opt | Rest], Acc) ->
     filter_defines(Rest, [Opt | Acc]).
 
-fill_profile_gaps([], []) ->
+%% @private takes two lists of profile tuples and merges them
+%% into one list of 3-tuples containing the values of either
+%% profiles.
+%% Any missing profile in one of the keys is replaced by an
+%% empty one.
+-spec normalise_profile_pairs([Profile], [Profile]) -> [Pair] when
+      Profile :: {Name, Opts},
+      Pair :: {Name, Opts, Opts},
+      Name :: atom(),
+      Opts :: [term()].
+normalise_profile_pairs([], []) ->
     [];
-fill_profile_gaps([{P,V}|Ps], []) ->
-    [{P,V,[]} | fill_profile_gaps(Ps, [])];
-fill_profile_gaps([], [{P,V}|Ps]) ->
-    [{P,[],V} | fill_profile_gaps([], Ps)];
-fill_profile_gaps([{P,VA}|PAs], [{P,VB}|PBs]) ->
-    [{P,VA,VB} | fill_profile_gaps(PAs, PBs)];
-fill_profile_gaps([{PA,VA}|PAs], [{PB,VB}|PBs]) when PA < PB ->
-    [{PA,VA,[]} | fill_profile_gaps(PAs, [{PB, VB}|PBs])];
-fill_profile_gaps([{PA,VA}|PAs], [{PB,VB}|PBs]) when PA > PB ->
-    [{PB,[],VB} | fill_profile_gaps([{PA,VA}|PAs], PBs)].
+normalise_profile_pairs([{P,V}|Ps], []) ->
+    [{P,V,[]} | normalise_profile_pairs(Ps, [])];
+normalise_profile_pairs([], [{P,V}|Ps]) ->
+    [{P,[],V} | normalise_profile_pairs([], Ps)];
+normalise_profile_pairs([{P,VA}|PAs], [{P,VB}|PBs]) ->
+    [{P,VA,VB} | normalise_profile_pairs(PAs, PBs)];
+normalise_profile_pairs([{PA,VA}|PAs], [{PB,VB}|PBs]) when PA < PB ->
+    [{PA,VA,[]} | normalise_profile_pairs(PAs, [{PB, VB}|PBs])];
+normalise_profile_pairs([{PA,VA}|PAs], [{PB,VB}|PBs]) when PA > PB ->
+    [{PB,[],VB} | normalise_profile_pairs([{PA,VA}|PAs], PBs)].
