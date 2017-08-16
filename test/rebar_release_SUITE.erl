@@ -200,13 +200,34 @@ profile_overlays(Config) ->
     AppDir = ?config(apps, Config),
     Name = ?config(name, Config),
     Vsn = "1.0.0",
+    file:write_file(filename:join(AppDir, "dev.file"), "dev.\n"),
+    file:write_file(filename:join(AppDir, "prod.file"), "prod.\n"),
+    file:write_file(filename:join(AppDir, "dev.vars"), "{env, \"dev\"}.\n"),
+    file:write_file(filename:join(AppDir, "prod.vars"), "{env, \"prod\"}.\n"),
     {ok, RebarConfig} =
-        file:consult(rebar_test_utils:create_config(AppDir,
-                                                    [{relx, [{release, {list_to_atom(Name), Vsn},
-                                                              [list_to_atom(Name)]},
-                                                             {overlay, [{mkdir, "randomdir"}]},
-                                                             {lib_dirs, [AppDir]}]},
-                                                    {profiles, [{prod, [{relx, [{overlay, [{mkdir, "otherrandomdir"}]}]}]}]}])),
+    file:consult(rebar_test_utils:create_config(AppDir,
+        %% Paths are relative, but to cwd in relx, not the project root as
+        %% seen by rebar3 (in non-test cases, they're the same).
+        %% Work around by being explicit.
+        [{relx, [{release, {list_to_atom(Name), Vsn},
+                 [list_to_atom(Name)]},
+                 {overlay_vars, filename:join(AppDir, "dev.vars")},
+                 {overlay, [{mkdir, "randomdir"},
+                            {copy, filename:join(AppDir,"./dev.file"), "profile.file"},
+                            {copy, filename:join(AppDir,"./dev.file"), "{{env}}.file"},
+                            {chmod, 8#00770, "profile.file"}]},
+                 {lib_dirs, [AppDir]}]},
+         {profiles, [{prod, 
+            [{relx, [
+                {overlay_vars, filename:join(AppDir, "prod.vars")},
+                {overlay, [{mkdir, "otherrandomdir"},
+                           {copy, filename:join(AppDir, "./prod.file"), "{{env}}.file"},
+                           {copy, filename:join(AppDir, "./prod.file"), "profile.file"},
+                           {chmod, 8#00770, "profile.file"}]}
+            
+            ]}]
+         }]}
+        ])),
 
     ReleaseDir = filename:join([AppDir, "./_build/prod/rel/", Name]),
 
@@ -216,7 +237,12 @@ profile_overlays(Config) ->
       {ok, [{release, list_to_atom(Name), Vsn, false},
             {dir, filename:join(ReleaseDir, "otherrandomdir")},
             {dir, filename:join(ReleaseDir, "randomdir")}]}
-     ).
+     ),
+     ?assertMatch({ok,[prod]},
+                  file:consult(filename:join(ReleaseDir, "profile.file"))),
+     ?assertMatch({ok,[prod]},
+                  file:consult(filename:join(ReleaseDir, "prod.file"))),
+     ok.
 
 profile_overlay_merge (_Config) ->
     % when profile and relx overlays both exist, the profile overlays should be
