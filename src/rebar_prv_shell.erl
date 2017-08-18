@@ -322,6 +322,9 @@ find_apps_relx(State) ->
         {_, _, Apps} ->
             ?DEBUG("Found shell apps from relx.", []),
             Apps;
+        {_, _, Apps, _} ->
+            ?DEBUG("Found shell apps from relx.", []),
+            Apps;
         false ->
             no_value
     end.
