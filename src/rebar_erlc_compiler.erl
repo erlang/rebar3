@@ -787,8 +787,9 @@ outdir(RebarOpts) ->
     proplists:get_value(outdir, ErlOpts, ?DEFAULT_OUTDIR).
 
 include_abs_dirs(ErlOpts, BaseDir) ->
-    InclDirs = ["include"|proplists:get_all_values(i, ErlOpts)],
-    lists:map(fun(Incl) -> filename:join([BaseDir, Incl]) end, InclDirs).
+    ErlOptIncludes = proplists:get_all_values(i, ErlOpts),
+    InclDirs = lists:map(fun(Incl) -> filename:absname(Incl) end, ErlOptIncludes),
+    [filename:join([BaseDir, "include"])|InclDirs].
 
 dir_recursive(Opts, Dir, CompileOpts) when is_list(CompileOpts) ->
     case proplists:get_value(recursive,CompileOpts) of
