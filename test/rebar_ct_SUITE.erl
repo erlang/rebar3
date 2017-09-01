@@ -1132,11 +1132,18 @@ cmd_sys_config(Config) ->
     CfgFile = filename:join([AppDir, "config", "cfg_sys.config"]),
     ok = filelib:ensure_dir(CfgFile),
     ok = file:write_file(CfgFile, cfg_sys_config_file(AppName)),
+
+    OtherCfgFile = filename:join([AppDir, "config", "other.config"]),
+    ok = filelib:ensure_dir(OtherCfgFile),
+    ok = file:write_file(OtherCfgFile, other_sys_config_file(AppName)),
+
     RebarConfig = [{ct_opts, [{sys_config, CfgFile}]}],
     {ok, State1} = rebar_test_utils:run_and_check(Config, RebarConfig, ["as", "test", "lock"], return),
 
     {ok, _} = rebar_prv_common_test:prepare_tests(State1),
     ?assertEqual({ok, cfg_value}, application:get_env(AppName, key)),
+
+    ?assertEqual({ok, other_cfg_value}, application:get_env(AppName, other_key)),
 
     Providers = rebar_state:providers(State1),
     Namespace = rebar_state:namespace(State1),
@@ -1614,4 +1621,7 @@ cmd_sys_config_file(AppName) ->
     io_lib:format("[{~ts, [{key, cmd_value}]}].", [AppName]).
 
 cfg_sys_config_file(AppName) ->
-    io_lib:format("[{~ts, [{key, cfg_value}]}].", [AppName]).
+    io_lib:format("[{~ts, [{key, cfg_value}]}, \"config/other\"].", [AppName]).
+
+other_sys_config_file(AppName) ->
+    io_lib:format("[{~ts, [{other_key, other_cfg_value}]}].", [AppName]).
