@@ -75,8 +75,9 @@ consult_config(State, Filename) ->
     JoinedConfig = lists:flatmap(
         fun (SubConfig) when is_list(SubConfig) ->
             case lists:suffix(".config", SubConfig) of
-                false -> consult_config(State, SubConfig ++ ".config");
-                true -> consult_config(State, SubConfig)
+                %% since consult_config returns a list in a list we take the head here
+                false -> hd(consult_config(State, SubConfig ++ ".config"));
+                true -> hd(consult_config(State, SubConfig))
             end;
             (Entry) -> [Entry]
       end, Config),
