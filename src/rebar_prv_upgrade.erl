@@ -102,7 +102,7 @@ do(State) ->
 format_error({unknown_dependency, Name}) ->
     io_lib:format("Dependency ~ts not found", [Name]);
 format_error({transitive_dependency, Name}) ->
-    io_lib:format("Dependency ~ts is transient and cannot be safely upgraded. "
+    io_lib:format("Dependency ~ts is transitive and cannot be safely upgraded. "
                  "Promote it to your top-level rebar.config file to upgrade it.",
                  [Name]);
 format_error(Reason) ->
