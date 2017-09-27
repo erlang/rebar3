@@ -197,8 +197,10 @@ make_normalized_path([], NormalizedPath) ->
     filename:join(lists:reverse(NormalizedPath));
 make_normalized_path([H|T], NormalizedPath) ->
     case H of
+        "." when NormalizedPath == [], T == [] -> make_normalized_path(T, ["."]);
         "."  -> make_normalized_path(T, NormalizedPath);
-        ".." -> make_normalized_path(T, tl(NormalizedPath));
+        ".." when NormalizedPath == [] -> make_normalized_path(T, [".."]);
+        ".." when hd(NormalizedPath) =/= ".." -> make_normalized_path(T, tl(NormalizedPath));
         _    -> make_normalized_path(T, [H|NormalizedPath])
     end.
 
