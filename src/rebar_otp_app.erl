@@ -117,8 +117,11 @@ preprocess(State, AppInfo, AppSrcFile) ->
             %% without a 'registered' value.
             A3 = ensure_registered(A2),
 
+            %% some tools complain if a description is not present.
+            A4 = ensure_description(A3),
+
             %% Build the final spec as a string
-            Spec = io_lib:format("~p.\n", [{application, AppName, A3}]),
+            Spec = io_lib:format("~p.\n", [{application, AppName, A4}]),
 
             %% Setup file .app filename and write new contents
             EbinDir = rebar_app_info:ebin_dir(AppInfo),
@@ -192,6 +195,15 @@ ensure_registered(AppData) ->
             [{registered, []} | AppData];
         {registered, _} ->
             %% We could further check whether the value is a list of atoms.
+            AppData
+    end.
+
+ensure_description(AppData) ->
+    case lists:keyfind(description, 1, AppData) of
+        false ->
+            %% Required for releases to work.
+            [{description, ""} | AppData];
+        {description, _} ->
             AppData
     end.
 
