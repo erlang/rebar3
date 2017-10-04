@@ -166,6 +166,8 @@ mock_config(Name, Config) ->
     {ChkFake, Etag} = create_lib(Name, Config, "fakelib"),
     {ChkTop, _} = create_lib(Name, Config, "topdep"),
     {ChkTrans, _} = create_lib(Name, Config, "transitive_app", "transitive"),
+    ct:pal("{~p, _}",[ChkTop]),
+    ct:pal("{~p, _}",[ChkTrans]),
     Priv = ?config(priv_dir, Config),
     TmpDir = filename:join([Priv, "tmp", atom_to_list(Name)]),
     %% Add an alias for goodpkg -> fakelib by hand
@@ -173,6 +175,7 @@ mock_config(Name, Config) ->
     CacheRoot = filename:join([Priv, "cache", atom_to_list(Name)]),
     CacheDir = filename:join([CacheRoot, "hex", "com", "test", "packages"]),
     rebar_test_utils:create_app(AppDir, "fakelib", "1.0.0", [kernel, stdlib]),
+    ct:pal("{~p, ~p}",[ChkFake, Etag]),
     {ChkFake, Etag} = rebar_test_utils:package_app(AppDir, CacheDir, "goodpkg-1.0.0"),
 
     Tid = ets:new(registry_table, [public]),
