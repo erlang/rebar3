@@ -105,17 +105,31 @@ download(Dir, {git, Url, ""}, State) ->
     download(Dir, {git, Url, {branch, "master"}}, State);
 download(Dir, {git, Url, {branch, Branch}}, _State) ->
     ok = filelib:ensure_dir(Dir),
+    maybe_warn_local_url(Url),
     git_clone(branch, git_vsn(), Url, Dir, Branch);
 download(Dir, {git, Url, {tag, Tag}}, _State) ->
     ok = filelib:ensure_dir(Dir),
+    maybe_warn_local_url(Url),
     git_clone(tag, git_vsn(), Url, Dir, Tag);
 download(Dir, {git, Url, {ref, Ref}}, _State) ->
     ok = filelib:ensure_dir(Dir),
+    maybe_warn_local_url(Url),
     git_clone(ref, git_vsn(), Url, Dir, Ref);
 download(Dir, {git, Url, Rev}, _State) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
     ok = filelib:ensure_dir(Dir),
+    maybe_warn_local_url(Url),
     git_clone(rev, git_vsn(), Url, Dir, Rev).
+
+maybe_warn_local_url(Url) ->
+    WarnStr = "Local git resources (~ts) are unsupported and may have odd behaviour. "
+              "Use remote git resources, or a plugin for local dependencies.",
+    case parse_git_url(Url) of
+        {error, no_scheme} -> ?WARN(WarnStr, [Url]);
+        {error, {no_default_port, _, _}} -> ?WARN(WarnStr, [Url]);
+        {error, {malformed_url, _, _}} -> ?WARN(WarnStr, [Url]);
+        _ -> ok
+    end.
 
 %% Use different git clone commands depending on git --version
 git_clone(branch,Vsn,Url,Dir,Branch) when Vsn >= {1,7,10}; Vsn =:= undefined ->
