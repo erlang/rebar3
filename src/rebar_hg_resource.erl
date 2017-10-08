@@ -56,6 +56,7 @@ download(Dir, {hg, Url, ""}, State) ->
     download(Dir, {hg, Url, {branch, "default"}}, State);
 download(Dir, {hg, Url, {branch, Branch}}, _State) ->
     ok = filelib:ensure_dir(Dir),
+    maybe_warn_local_url(Url),
     rebar_utils:sh(?FMT("hg clone -q -b ~ts ~ts ~ts",
                        [rebar_utils:escape_chars(Branch),
                         rebar_utils:escape_chars(Url),
@@ -63,6 +64,7 @@ download(Dir, {hg, Url, {branch, Branch}}, _State) ->
                    [{cd, filename:dirname(Dir)}]);
 download(Dir, {hg, Url, {tag, Tag}}, _State) ->
     ok = filelib:ensure_dir(Dir),
+    maybe_warn_local_url(Url),
     rebar_utils:sh(?FMT("hg clone -q -u ~ts ~ts ~ts",
                         [rebar_utils:escape_chars(Tag),
                          rebar_utils:escape_chars(Url),
@@ -70,6 +72,7 @@ download(Dir, {hg, Url, {tag, Tag}}, _State) ->
                    [{cd, filename:dirname(Dir)}]);
 download(Dir, {hg, Url, {ref, Ref}}, _State) ->
     ok = filelib:ensure_dir(Dir),
+    maybe_warn_local_url(Url),
     rebar_utils:sh(?FMT("hg clone -q -r ~ts ~ts ~ts",
                         [rebar_utils:escape_chars(Ref),
                          rebar_utils:escape_chars(Url),
@@ -77,6 +80,7 @@ download(Dir, {hg, Url, {ref, Ref}}, _State) ->
                    [{cd, filename:dirname(Dir)}]);
 download(Dir, {hg, Url, Rev}, _State) ->
     ok = filelib:ensure_dir(Dir),
+    maybe_warn_local_url(Url),
     rebar_utils:sh(?FMT("hg clone -q -r ~ts ~ts ~ts",
                         [rebar_utils:escape_chars(Rev),
                          rebar_utils:escape_chars(Url),
@@ -134,6 +138,16 @@ get_branch_ref(Dir, Branch) ->
                        "\" log --template \"{node}\n\" --rev " ++ rebar_utils:escape_chars(Branch),
                        [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
     string:strip(BranchRefString, both, $\n).
+
+
+maybe_warn_local_url(Url) ->
+    try
+        _ = parse_hg_url(Url),
+        ok
+    catch
+        _:_ ->
+            ?WARN("URL format (~ts) unsupported.", [])
+    end.
 
 parse_hg_url("ssh://" ++ HostPath) ->
     [Host | Path] = string:tokens(HostPath, "/"),
