@@ -311,15 +311,22 @@ app_file(AppInfo=#app_info_t{}, AppFile) ->
 app_details(AppInfo=#app_info_t{app_details=[]}) ->
     case app_file(AppInfo) of
         undefined ->
-            rebar_file_utils:try_consult(app_file_src(AppInfo));
+            case rebar_config:consult_app_file(app_file_src(AppInfo)) of
+                [] -> [];
+                [{application, _Name, AppDetails}] -> AppDetails
+            end;
         AppFile ->
-            try
-                rebar_file_utils:try_consult(AppFile)
+            try rebar_file_utils:try_consult(AppFile) of
+                [] -> [];
+                [{application, _Name, AppDetails}] -> AppDetails
             catch
                 throw:{error, {Module, Reason}} ->
                     ?DEBUG("Warning, falling back to .app.src because of: ~ts",
                           [Module:format_error(Reason)]),
-                    rebar_file_utils:try_consult(app_file_src(AppInfo))
+                    case rebar_config:consult_app_file(app_file_src(AppInfo)) of
+                        [] -> [];
+                        [{application, _Name, AppDetails}] -> AppDetails
+                    end
             end
     end;
 app_details(#app_info_t{app_details=AppDetails}) ->
