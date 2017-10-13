@@ -35,6 +35,7 @@
          mv/2,
          delete_each/1,
          write_file_if_contents_differ/2,
+         write_file_if_contents_differ/3,
          system_tmpdir/0,
          system_tmpdir/1,
          reset_dir/1,
@@ -334,15 +335,19 @@ delete_each([File | Rest]) ->
             ?FAIL
     end.
 
+%% @doc backwards compat layer to pre-utf8 support
 write_file_if_contents_differ(Filename, Bytes) ->
-    %% first try to convert directly to binaries,
-    %% but if it fails, we likely contain unicode and
-    %% need special treatment
-    ToWrite = try
-                  iolist_to_binary(Bytes)
-              catch
-                  error:badarg -> unicode:characters_to_binary(Bytes)
-              end,
+    write_file_if_contents_differ(Filename, Bytes, raw).
+
+%% @doc let the user pick the encoding required; there are no good
+%% heuristics for data encoding
+write_file_if_contents_differ(Filename, Bytes, raw) ->
+    write_file_if_contents_differ_(Filename, iolist_to_binary(Bytes));
+write_file_if_contents_differ(Filename, Bytes, utf8) ->
+    write_file_if_contents_differ_(Filename, unicode:characters_to_binary(Bytes, utf8)).
+
+%% @private compare raw strings and check contents
+write_file_if_contents_differ_(Filename, ToWrite) ->
     case file:read_file(Filename) of
         {ok, ToWrite} ->
             ok;

@@ -127,7 +127,7 @@ preprocess(State, AppInfo, AppSrcFile) ->
             EbinDir = rebar_app_info:ebin_dir(AppInfo),
             filelib:ensure_dir(filename:join(EbinDir, "dummy.beam")),
             AppFile = rebar_app_utils:app_src_to_app(OutDir, AppSrcFile),
-            ok = rebar_file_utils:write_file_if_contents_differ(AppFile, Spec),
+            ok = rebar_file_utils:write_file_if_contents_differ(AppFile, Spec, utf8),
 
             AppFile;
         {error, Reason} ->
