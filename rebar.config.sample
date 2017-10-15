@@ -172,6 +172,8 @@
 {overrides, [
     %% Add options to mydep's configurations for each element
     {add, mydep, [{erl_opts, []}]},
+    %% Add options to all dependencies' configurations for each element
+    {add, [{erl_opts, []}]},
     %% replace mydep's configuration option
     {override, mydep, [{erl_opts, []}]},
     %% replace all dependencies' configuration options

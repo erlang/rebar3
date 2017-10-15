@@ -45,36 +45,44 @@ erl_opts(Opts) ->
 apply_overrides(Opts, Name, Overrides) ->
     %% Inefficient. We want the order we get here though.
     Opts1 = lists:foldl(fun({override, O}, OptsAcc) ->
-                                 lists:foldl(fun({deps, Value}, OptsAcc1) ->
-                                                     set(OptsAcc1, {deps,default}, Value);
-                                                ({Key, Value}, OptsAcc1) ->
-                                                     set(OptsAcc1, Key, Value)
-                                             end, OptsAcc, O);
-                            (_, OptsAcc) ->
-                                 OptsAcc
-                         end, Opts, Overrides),
+                                override_opt(O, OptsAcc);
+                           (_, OptsAcc) ->
+                                OptsAcc
+                        end, Opts, Overrides),
 
     Opts2 = lists:foldl(fun({override, N, O}, OptsAcc) when N =:= Name ->
-                                 lists:foldl(fun({deps, Value}, OptsAcc1) ->
-                                                     set(OptsAcc1, {deps,default}, Value);
-                                                ({Key, Value}, OptsAcc1) ->
-                                                     set(OptsAcc1, Key, Value)
-                                             end, OptsAcc, O);
-                            (_, OptsAcc) ->
-                                 OptsAcc
-                         end, Opts1, Overrides),
+                                override_opt(O, OptsAcc);
+                           (_, OptsAcc) ->
+                                OptsAcc
+                        end, Opts1, Overrides),
+
+    Opts3 = lists:foldl(fun({add, O}, OptsAcc) ->
+                                add_opt(O, OptsAcc);
+                           (_, OptsAcc) ->
+                                OptsAcc
+                        end, Opts2, Overrides),
 
     lists:foldl(fun({add, N, O}, OptsAcc) when N =:= Name ->
-                        lists:foldl(fun({deps, Value}, OptsAcc1) ->
-                                            OldValue = ?MODULE:get(OptsAcc1, {deps,default}, []),
-                                            set(OptsAcc1, {deps,default}, Value++OldValue);
-                                       ({Key, Value}, OptsAcc1) ->
-                                            OldValue = ?MODULE:get(OptsAcc1, Key, []),
-                                            set(OptsAcc1, Key, Value++OldValue)
-                                    end, OptsAcc, O);
+                        add_opt(O, OptsAcc);
                    (_, OptsAcc) ->
                         OptsAcc
-                end, Opts2, Overrides).
+                end, Opts3, Overrides).
+
+override_opt(O, OptsAcc) ->
+    lists:foldl(fun({deps, Value}, OptsAcc1) ->
+                        set(OptsAcc1, {deps,default}, Value);
+                   ({Key, Value}, OptsAcc1) ->
+                        set(OptsAcc1, Key, Value)
+                end, OptsAcc, O).
+
+add_opt(O, OptsAcc) ->
+    lists:foldl(fun({deps, Value}, OptsAcc1) ->
+                        OldValue = ?MODULE:get(OptsAcc1, {deps,default}, []),
+                        set(OptsAcc1, {deps,default}, Value++OldValue);
+                   ({Key, Value}, OptsAcc1) ->
+                        OldValue = ?MODULE:get(OptsAcc1, Key, []),
+                        set(OptsAcc1, Key, Value++OldValue)
+                end, OptsAcc, O).
 
 add_to_profile(Opts, Profile, KVs) when is_atom(Profile), is_list(KVs) ->
     Profiles = ?MODULE:get(Opts, profiles, []),
