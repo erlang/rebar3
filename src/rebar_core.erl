@@ -136,6 +136,7 @@ process_command(State, Command) ->
 do([], State) ->
     {ok, State};
 do([ProviderName | Rest], State) ->
+    ?DEBUG("Provider: ~p", [ProviderName]),
     %% Special providers like 'as', 'do' or some hooks may be passed
     %% as a tuple {Namespace, Name}, otherwise not. Handle them
     %% on a per-need basis.

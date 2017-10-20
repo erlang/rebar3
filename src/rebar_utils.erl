@@ -766,7 +766,7 @@ remove_from_code_path(Paths) ->
                                   [begin code:purge(M), code:delete(M) end || M <- Modules]
                           end,
                           code:del_path(Path)
-                  end, Paths).
+                  end, lists:usort(Paths)).
 
 %% @doc Revert to only having the beams necessary for running rebar3 and
 %% plugins in the path
