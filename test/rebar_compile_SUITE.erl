@@ -45,6 +45,7 @@
          include_file_in_src/1,
          include_file_relative_to_working_directory_test/1,
          include_file_in_src_test/1,
+         include_file_in_src_test_multiapp/1,
          dont_recompile_when_erl_compiler_options_env_does_not_change/1,
          recompile_when_erl_compiler_options_env_changes/1,
          always_recompile_when_erl_compiler_options_set/1,
@@ -77,6 +78,7 @@ all() ->
      clean_all, override_deps, profile_override_deps, deps_build_in_prod,
      include_file_relative_to_working_directory, include_file_in_src,
      include_file_relative_to_working_directory_test, include_file_in_src_test,
+     include_file_in_src_test_multiapp,
      recompile_when_parse_transform_as_opt_changes,
      recompile_when_parse_transform_inline_changes,
      regex_filter_skip, regex_filter_regression,
@@ -1459,6 +1461,39 @@ include_file_in_src_test(Config) ->
     rebar_test_utils:run_and_check(Config, RebarConfig,
                                    ["as", "test", "compile"],
                                    {ok, [{app, Name}]}).
+
+%% Same as `include_file_in_src_test/1' but using multiple top-level
+%% apps as dependencies.
+include_file_in_src_test_multiapp(Config) ->
+
+    Name1 = rebar_test_utils:create_random_name("app2_"),
+    Name2 = rebar_test_utils:create_random_name("app1_"),
+    AppDir1 = filename:join([?config(apps, Config), "lib", Name1]),
+    AppDir2 = filename:join([?config(apps, Config), "lib", Name2]),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir1, Name1, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_app(AppDir2, Name2, Vsn, [kernel, stdlib]),
+
+    Src = "-module(test).\n"
+"\n"
+"-include_lib(\"" ++ Name2 ++ "/include/test.hrl\").\n"
+"\n"
+"test() -> ?TEST_MACRO.\n"
+"\n",
+    Include = <<"-define(TEST_MACRO, test).\n">>,
+
+    ok = filelib:ensure_dir(filename:join([AppDir1, "src", "dummy"])),
+    ok = filelib:ensure_dir(filename:join([AppDir1, "test", "dummy"])),
+    ok = filelib:ensure_dir(filename:join([AppDir2, "src", "dummy"])),
+    ok = filelib:ensure_dir(filename:join([AppDir2, "include", "dummy"])),
+    ok = file:write_file(filename:join([AppDir1, "test", "test.erl"]), Src),
+
+    ok = file:write_file(filename:join([AppDir2, "include", "test.hrl"]), Include),
+
+    RebarConfig = [],
+    rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["as", "test", "compile"],
+                                   {ok, [{app, Name1}]}).
 
 %% this test sets the env var, compiles, records the file last modified timestamp,
 %% recompiles and compares the file last modified timestamp to ensure it hasn't

@@ -45,13 +45,13 @@ do(State) ->
     Deps = rebar_state:deps_to_build(State),
     Cwd = rebar_state:dir(State),
 
-    build_apps(State, Providers, Deps),
+    copy_and_build_apps(State, Providers, Deps),
     {ok, ProjectApps1} = rebar_digraph:compile_order(ProjectApps),
 
     %% Run top level hooks *before* project apps compiled but *after* deps are
     rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
-    ProjectApps2 = build_apps(State, Providers, ProjectApps1),
+    ProjectApps2 = copy_and_build_project_apps(State, Providers, ProjectApps1),
     State2 = rebar_state:project_apps(State, ProjectApps2),
 
     %% projects with structures like /apps/foo,/apps/bar,/test
@@ -77,7 +77,7 @@ format_error({missing_artifact, File}) ->
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
-build_apps(State, Providers, Apps) ->
+copy_and_build_apps(State, Providers, Apps) ->
     [build_app(State, Providers, AppInfo) || AppInfo <- Apps].
 
 build_app(State, Providers, AppInfo) ->
@@ -85,6 +85,19 @@ build_app(State, Providers, AppInfo) ->
     OutDir = rebar_app_info:out_dir(AppInfo),
     copy_app_dirs(AppInfo, AppDir, OutDir),
     compile(State, Providers, AppInfo).
+
+copy_and_build_project_apps(State, Providers, Apps) ->
+    %% Top-level apps, because of profile usage and specific orderings (i.e.
+    %% may require an include file from a profile-specific app for an extra_dirs
+    %% entry that only exists in a test context), need to be
+    %% copied and added to the path at once, and not just in compile order.
+    [copy_app_dirs(AppInfo,
+                   rebar_app_info:dir(AppInfo),
+                   rebar_app_info:out_dir(AppInfo))
+     || AppInfo <- Apps],
+    code:add_pathsa([rebar_app_info:out_dir(AppInfo) || AppInfo <- Apps]),
+    [compile(State, Providers, AppInfo) || AppInfo <- Apps].
+
 
 build_extra_dirs(State, Apps) ->
     BaseDir = rebar_state:dir(State),
