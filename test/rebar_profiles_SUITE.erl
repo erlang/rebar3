@@ -542,7 +542,7 @@ get_compiled_profile_erl_opts(Profiles, Config) ->
         [default] ->
             ["compile"];
         _ ->
-            ["as", string:join(PStrs, ","), "compile"]
+            ["as", rebar_string:join(PStrs, ","), "compile"]
     end,
     {ok, State} = rebar_test_utils:run_and_check(
         Config, RebarConfig, Command, {ok, [{app, Name}]}),

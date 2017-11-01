@@ -120,7 +120,8 @@ default_author_and_email() ->
         {ok, Name} ->
             case rebar_utils:sh("git config --global user.email", [return_on_error]) of
                 {ok, Email} ->
-                    {string:strip(Name, both, $\n), string:strip(Email, both, $\n)};
+                    {rebar_string:trim(Name, both, "\n"),
+                     rebar_string:trim(Email, both, "\n")};
                 {error, _} ->
                     %% Use neither if one doesn't exist
                     {"Anonymous", "anonymous@example.org"}

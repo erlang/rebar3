@@ -72,7 +72,7 @@ get_md5(Rebar3Path) ->
     {ok, Rebar3File} = file:read_file(Rebar3Path),
     Digest = crypto:hash(md5, Rebar3File),
     DigestHex = lists:flatten([io_lib:format("~2.16.0B", [X]) || X <- binary_to_list(Digest)]),
-    string:to_lower(DigestHex).
+    rebar_string:lowercase(DigestHex).
 
 maybe_fetch_rebar3(Rebar3Md5) ->
     TmpDir = ec_file:insecure_mkdtemp(),

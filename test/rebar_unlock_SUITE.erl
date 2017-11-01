@@ -33,7 +33,7 @@ pkgunlock(Config) ->
     rebar_test_utils:run_and_check(Config, [], ["unlock", "cf,certifi"], {ok, []}),
     ?assertEqual(Locks -- ["bbmustache","cf","certifi"], read_locks(Config)),
     ?assertEqual(Hashes -- ["bbmustache","cf","certifi"], read_hashes(Config)),
-    rebar_test_utils:run_and_check(Config, [], ["unlock", string:join(Locks,",")], {ok, []}),
+    rebar_test_utils:run_and_check(Config, [], ["unlock", rebar_string:join(Locks,",")], {ok, []}),
     ?assertEqual({error, enoent}, read_locks(Config)),
     ?assertEqual({error, enoent}, read_hashes(Config)),
     ok.
@@ -48,7 +48,7 @@ unlock(Config) ->
     ?assert(false =/= lists:keyfind(<<"itc">>, 1, rebar_state:get(State, {locks, default}))),
     rebar_test_utils:run_and_check(Config, [], ["unlock", "gproc,itc"], {ok, []}),
     ?assertEqual(Locks -- ["uuid","gproc","itc"], read_locks(Config)),
-    rebar_test_utils:run_and_check(Config, [], ["unlock", string:join(Locks,",")], {ok, []}),
+    rebar_test_utils:run_and_check(Config, [], ["unlock", rebar_string:join(Locks,",")], {ok, []}),
     ?assertEqual({error, enoent}, read_locks(Config)),
     ok.
 

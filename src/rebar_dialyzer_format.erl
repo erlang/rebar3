@@ -427,4 +427,4 @@ separate_args(D, [C | R], Arg, Args) ->
     separate_args(D, R, [C | Arg], Args).
 
 join_args(Args) ->
-    [$(, string:join(Args, ", "), $)].
+    [$(, rebar_string:join(Args, ", "), $)].

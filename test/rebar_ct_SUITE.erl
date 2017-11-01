@@ -1407,7 +1407,7 @@ testspec_at_root(Config) ->
     CommandProvider = providers:get_provider(ct, Providers, Namespace),
     GetOptSpec = providers:opts(CommandProvider),
 
-    SpecArg1 = string:join([Spec1,Spec2,Spec3],","),
+    SpecArg1 = rebar_string:join([Spec1,Spec2,Spec3],","),
     {ok, GetOptResult1} = getopt:parse(GetOptSpec, ["--spec",SpecArg1]),
     State1 = rebar_state:command_parsed_args(State, GetOptResult1),
     Tests1 = rebar_prv_common_test:prepare_tests(State1),

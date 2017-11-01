@@ -307,7 +307,7 @@ find_apps_option(State) ->
         no_value -> no_value;
         AppsStr ->
             [ list_to_atom(AppStr)
-              || AppStr <- string:tokens(AppsStr, " ,:") ]
+              || AppStr <- rebar_string:lexemes(AppsStr, " ,:") ]
     end.
 
 -spec find_apps_rebar(rebar_state:t()) -> no_value | list().

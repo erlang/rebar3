@@ -98,7 +98,7 @@ extract(TmpDir, CachePath) ->
 checksums(Pkg={pkg, _Name, _Vsn, Hash}, Files, Contents, Version, Meta, State) ->
     Blob = <<Version/binary, Meta/binary, Contents/binary>>,
     <<X:256/big-unsigned>> = crypto:hash(sha256, Blob),
-    BinChecksum = list_to_binary(string:to_upper(lists:flatten(io_lib:format("~64.16.0b", [X])))),
+    BinChecksum = list_to_binary(rebar_string:uppercase(lists:flatten(io_lib:format("~64.16.0b", [X])))),
     RegistryChecksum = rebar_packages:registry_checksum(Pkg, State),
     {"CHECKSUM", TarChecksum} = lists:keyfind("CHECKSUM", 1, Files),
     {Hash, BinChecksum, RegistryChecksum, TarChecksum}.
@@ -116,7 +116,7 @@ request(Url, ETag) ->
         {ok, {{_Version, 200, _Reason}, Headers, Body}} ->
             ?DEBUG("Successfully downloaded ~ts", [Url]),
             {"etag", ETag1} = lists:keyfind("etag", 1, Headers),
-            {ok, Body, string:strip(ETag1, both, $")};
+            {ok, Body, rebar_string:trim(ETag1, both, [$"])};
         {ok, {{_Version, 304, _Reason}, _Headers, _Body}} ->
             ?DEBUG("Cached copy of ~ts still valid", [Url]),
             {ok, cached};
@@ -132,7 +132,7 @@ etag(Path) ->
     case file:read_file(Path) of
         {ok, Binary} ->
             <<X:128/big-unsigned-integer>> = crypto:hash(md5, Binary),
-            string:to_lower(lists:flatten(io_lib:format("~32.16.0b", [X])));
+            rebar_string:lowercase(lists:flatten(io_lib:format("~32.16.0b", [X])));
         {error, _} ->
             false
     end.
@@ -205,7 +205,7 @@ get_ssl_config() ->
     end.
 
 parse_vsn(Vsn) ->
-    version_pad(string:tokens(Vsn, ".-")).
+    version_pad(rebar_string:lexemes(Vsn, ".-")).
 
 version_pad([Major]) ->
     {list_to_integer(Major), 0, 0};

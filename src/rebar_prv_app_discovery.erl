@@ -49,7 +49,7 @@ do(State) ->
 
 -spec format_error(any()) -> iolist().
 format_error({multiple_app_files, Files}) ->
-    io_lib:format("Multiple app files found in one app dir: ~ts", [string:join(Files, " and ")]);
+    io_lib:format("Multiple app files found in one app dir: ~ts", [rebar_string:join(Files, " and ")]);
 format_error({invalid_app_file, File, Reason}) ->
     case Reason of
         {Line, erl_parse, Description} ->

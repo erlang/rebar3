@@ -2,23 +2,23 @@
 [{<<"bbmustache">>,{pkg,<<"bbmustache">>,<<"1.3.0">>},0},
  {<<"certifi">>,{pkg,<<"certifi">>,<<"2.0.0">>},0},
  {<<"cf">>,{pkg,<<"cf">>,<<"0.2.2">>},0},
- {<<"cth_readable">>,{pkg,<<"cth_readable">>,<<"1.3.0">>},0},
- {<<"erlware_commons">>,{pkg,<<"erlware_commons">>,<<"1.0.0">>},0},
- {<<"eunit_formatters">>,{pkg,<<"eunit_formatters">>,<<"0.4.0">>},0},
- {<<"getopt">>,{pkg,<<"getopt">>,<<"0.8.2">>},0},
- {<<"providers">>,{pkg,<<"providers">>,<<"1.6.0">>},0},
- {<<"relx">>,{pkg,<<"relx">>,<<"3.23.1">>},0},
- {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.2">>},0}]}.
+ {<<"cth_readable">>,{pkg,<<"cth_readable">>,<<"1.3.1">>},0},
+ {<<"erlware_commons">>,{pkg,<<"erlware_commons">>,<<"1.0.3">>},0},
+ {<<"eunit_formatters">>,{pkg,<<"eunit_formatters">>,<<"0.5.0">>},0},
+ {<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},0},
+ {<<"providers">>,{pkg,<<"providers">>,<<"1.7.0">>},0},
+ {<<"relx">>,{pkg,<<"relx">>,<<"3.24.1">>},0},
+ {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.3">>},0}]}.
 [
 {pkg_hash,[
  {<<"bbmustache">>, <<"2010ADAE78830992A4C69680115ECD7D475DD03A72C076BBADDCCBF2D4B32035">>},
  {<<"certifi">>, <<"A0C0E475107135F76B8C1D5BC7EFB33CD3815CB3CF3DEA7AEFDD174DABEAD064">>},
  {<<"cf">>, <<"7F2913FFF90ABCABD0F489896CFEB0B0674F6C8DF6C10B17A83175448029896C">>},
- {<<"cth_readable">>, <<"3F3B4C9CA1C96D5986557A033647A0D7072E25C241AE5EACD894D490EB656706">>},
- {<<"erlware_commons">>, <<"087467DE5833C0BB5B3CCDD387F9E9C1FB816A75B7A709629BF24B5ED3246C51">>},
- {<<"eunit_formatters">>, <<"49B78A45BC06893140DB9FC928307044E0A93794ED90FA181A6F70F2190C1330">>},
- {<<"getopt">>, <<"B17556DB683000BA50370B16C0619DF1337E7AF7ECBF7D64FBF8D1D6BCE3109B">>},
- {<<"providers">>, <<"DB0E2F9043AE60C0155205FCD238D68516331D0E5146155E33D1E79DC452964A">>},
- {<<"relx">>, <<"8AF4433934D9BB664E8282D2E45AC5DEAFF44859DDAABBE50CD7D885581CD24D">>},
- {<<"ssl_verify_fun">>, <<"01289CAD67B280B7F8F7E87117966995FAD19236367386BE2A9D7716E92CE7FF">>}]}
+ {<<"cth_readable">>, <<"53B2C20F823D827A30ABF4F79C93A58DB46934AA038C41792C518BA5FDE9D65B">>},
+ {<<"erlware_commons">>, <<"ABD000FE5893342A405B5F4A2900FF560875B3234E8FE915FDEF172D98EAF250">>},
+ {<<"eunit_formatters">>, <<"6A9133943D36A465D804C1C5B6E6839030434B8879C5600D7DDB5B3BAD4CCB59">>},
+ {<<"getopt">>, <<"C73A9FA687B217F2FF79F68A3B637711BB1936E712B521D8CE466B29CBF7808A">>},
+ {<<"providers">>, <<"BBF730563914328EC2511D205E6477A94831DB7297DE313B3872A2B26C562EAB">>},
+ {<<"relx">>, <<"8211A2C55EA67621C64FDF6A40877D95DA790478B78E3B18496E1C5916046032">>},
+ {<<"ssl_verify_fun">>, <<"6C49665D4326E26CD4A5B7BD54AA442B33DADFB7C5D59A0D0CD0BF5534BBFBD7">>}]}
 ].

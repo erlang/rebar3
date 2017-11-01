@@ -167,14 +167,14 @@ expand_deps(pkg, [{Name, Vsn, Deps} | Rest]) ->
     [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)];
 expand_deps(mixed, [{Name, Deps} | Rest]) ->
     Dep = if hd(Name) >= $a, hd(Name) =< $z ->
-            {pkg, string:to_upper(Name), "0.0.0", undefined}
+            {pkg, rebar_string:uppercase(Name), "0.0.0", undefined}
            ; hd(Name) >= $A, hd(Name) =< $Z ->
             {Name, ".*", {git, "https://example.org/user/"++Name++".git", "master"}}
     end,
     [{Dep, expand_deps(mixed, Deps)} | expand_deps(mixed, Rest)];
 expand_deps(mixed, [{Name, Vsn, Deps} | Rest]) ->
     Dep = if hd(Name) >= $a, hd(Name) =< $z ->
-            {pkg, string:to_upper(Name), Vsn, undefined}
+            {pkg, rebar_string:uppercase(Name), Vsn, undefined}
            ; hd(Name) >= $A, hd(Name) =< $Z ->
             {Name, Vsn, {git, "https://example.org/user/"++Name++".git", {tag, Vsn}}}
     end,
@@ -477,7 +477,7 @@ package_app(AppDir, DestDir, PkgName) ->
     {ok, Contents} = file:read_file(filename:join(DestDir, "contents.tar.gz")),
     Blob = <<"3who cares", Contents/binary>>,
     <<X:256/big-unsigned>> = crypto:hash(sha256, Blob),
-    BinChecksum = list_to_binary(string:to_upper(lists:flatten(io_lib:format("~64.16.0b", [X])))),
+    BinChecksum = list_to_binary(rebar_string:uppercase(lists:flatten(io_lib:format("~64.16.0b", [X])))),
     ok = file:write_file(filename:join(DestDir, "CHECKSUM"), BinChecksum),
     PkgFiles = ["contents.tar.gz", "VERSION", "metadata.config", "CHECKSUM"],
     Archive = filename:join(DestDir, Name),
@@ -485,5 +485,5 @@ package_app(AppDir, DestDir, PkgName) ->
                         lists:zip(PkgFiles, [filename:join(DestDir,F) || F <- PkgFiles])),
     {ok, BinFull} = file:read_file(Archive),
     <<E:128/big-unsigned-integer>> = crypto:hash(md5, BinFull),
-    Etag = string:to_lower(lists:flatten(io_lib:format("~32.16.0b", [E]))),
+    Etag = rebar_string:lowercase(lists:flatten(io_lib:format("~32.16.0b", [E]))),
     {BinChecksum, Etag}.

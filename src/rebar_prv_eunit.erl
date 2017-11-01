@@ -141,7 +141,8 @@ resolve(Flag, RawOpts) -> resolve(Flag, Flag, RawOpts).
 resolve(Flag, EUnitKey, RawOpts) ->
     case proplists:get_value(Flag, RawOpts) of
         undefined -> [];
-        Args      -> lists:map(fun(Arg) -> normalize(EUnitKey, Arg) end, string:tokens(Args, [$,]))
+        Args      -> lists:map(fun(Arg) -> normalize(EUnitKey, Arg) end,
+                               rebar_string:lexemes(Args, [$,]))
     end.
 
 normalize(Key, Value) when Key == dir; Key == file -> {Key, Value};

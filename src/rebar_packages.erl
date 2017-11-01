@@ -102,7 +102,7 @@ registry_dir(State) ->
             case rebar_utils:url_append_path(CDN, ?REMOTE_PACKAGE_DIR) of
                 {ok, Parsed} ->
                     {ok, {_, _, Host, _, Path, _}} = http_uri:parse(Parsed),
-                    CDNHostPath = lists:reverse(string:tokens(Host, ".")),
+                    CDNHostPath = lists:reverse(rebar_string:lexemes(Host, ".")),
                     CDNPath = tl(filename:split(Path)),
                     RegistryDir = filename:join([CacheDir, "hex"] ++ CDNHostPath ++ CDNPath),
                     ok = filelib:ensure_dir(filename:join(RegistryDir, "placeholder")),
