@@ -273,6 +273,9 @@ parse_tags(Dir) ->
                             [{use_stdout, false}, return_on_error, {cd, Dir}]) of
                         {error, _} ->
                             {undefined, "0.0.0"};
+                        %% strip the v prefix if it exists like is done in the above match
+                        {ok, [$v | LatestVsn]} ->
+                            {undefined, string:strip(LatestVsn, both, $\n)};
                         {ok, LatestVsn} ->
                             {undefined, string:strip(LatestVsn, both, $\n)}
                     end
