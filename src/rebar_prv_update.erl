@@ -51,9 +51,10 @@ do(State) ->
                 CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
                 case rebar_utils:url_append_path(CDN, ?REMOTE_REGISTRY_FILE) of
                     {ok, Url} ->
+                        HttpOptions = rebar_utils:get_proxy_auth(),
                         ?DEBUG("Fetching registry from ~p", [Url]),
                         case httpc:request(get, {Url, [{"User-Agent", rebar_utils:user_agent()}]},
-                                           [], [{stream, TmpFile}, {sync, true}],
+                                           HttpOptions, [{stream, TmpFile}, {sync, true}],
                                            rebar) of
                             {ok, saved_to_file} ->
                                 {ok, Data} = file:read_file(TmpFile),
