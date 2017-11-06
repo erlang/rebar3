@@ -35,12 +35,40 @@ erl_opts(Opts) ->
     Defines = [{d, list_to_atom(D)} ||
                   D <- ?MODULE:get(Opts, defines, [])],
     AllOpts = Defines ++ RawErlOpts,
-    case proplists:is_defined(no_debug_info, AllOpts) of
-        true ->
-            [O || O <- AllOpts, O =/= no_debug_info];
-        false ->
-            [debug_info|AllOpts]
-    end.
+    lists:reverse(filter_debug_info(lists:reverse(AllOpts))).
+
+filter_debug_info([]) ->
+    %% Default == ON
+    [debug_info];
+filter_debug_info([debug_info|_] = L) ->
+    %% drop no_debug_info and {debug_info_key, _} since those would
+    %% conflict with a plain debug_info
+    [debug_info |
+     lists:filter(fun(K) ->
+         K =/= no_debug_info andalso K =/= debug_info andalso
+         not (is_tuple(K) andalso element(1,K) =:= debug_info_key)
+     end, L)];
+filter_debug_info([{debug_info, _} = H | T]) ->
+    %% custom debug_info field; keep and filter the rest except
+    %% without no_debug_info. Still have to filter for regular or crypto
+    %% debug_info.
+    [H | filter_debug_info(lists:filter(fun(K) -> K =/= no_debug_info end, T))];
+filter_debug_info([{debug_info_key, _}=H | T]) ->
+    %% Drop no_debug_info and regular debug_info
+    [H | lists:filter(fun(K) ->
+            K =/= no_debug_info andalso K =/= debug_info andalso
+            not (is_tuple(K) andalso element(1,K) =:= debug_info_key)
+         end, T)];
+filter_debug_info([no_debug_info|T]) ->
+    %% Drop all debug info
+    lists:filter(fun(debug_info) -> false
+                 ;  ({debug_info, _}) -> false
+                 ;  ({debug_info_key, _}) -> false
+                 ;  (no_debug_info) -> false
+                 ;  (_Other) -> true
+                 end, T);
+filter_debug_info([H|T]) ->
+    [H|filter_debug_info(T)].
 
 apply_overrides(Opts, Name, Overrides) ->
     %% Inefficient. We want the order we get here though.

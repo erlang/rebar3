@@ -27,6 +27,7 @@
          test_profile_erl_opts_order_3/1,
          test_profile_erl_opts_order_4/1,
          test_profile_erl_opts_order_5/1,
+         test_erl_opts_debug_info/1,
          first_files_exception/1]).
 
 -include_lib("common_test/include/ct.hrl").
@@ -50,6 +51,7 @@ all() ->
      test_profile_erl_opts_order_3,
      test_profile_erl_opts_order_4,
      test_profile_erl_opts_order_5,
+     test_erl_opts_debug_info,
      first_files_exception].
 
 init_per_suite(Config) ->
@@ -500,6 +502,30 @@ test_profile_erl_opts_order_5(Config) ->
     Opts = get_compiled_profile_erl_opts([loose, strict], Config),
     Opt = last_erl_opt(Opts, [warn_export_all, nowarn_export_all], undefined),
     warn_export_all = Opt.
+
+test_erl_opts_debug_info(_Config) ->
+    ToOpts = fun(List) -> rebar_opts:erl_opts(dict:from_list([{erl_opts, List}])) end,
+    ?assertEqual([debug_info,a,b,c],
+                 ToOpts([a,b,c])),
+    ?assertEqual([{debug_info,{mod,123}},a,b,c,debug_info],
+                 ToOpts([{debug_info,{mod,123}},a,b,c,debug_info])),
+    ?assertEqual([a,b,debug_info,c],
+                 ToOpts([no_debug_info,a,b,debug_info,c])),
+    ?assertEqual([a,b,c],
+                 ToOpts([debug_info,a,b,no_debug_info,c])),
+    ?assertEqual([a,b,c,debug_info],
+                 ToOpts([{debug_info_key, "12345"},a,b,
+                         no_debug_info,c,debug_info])),
+    ?assertEqual([a,b,c],
+                 ToOpts([{debug_info,{mod,123}},{debug_info_key, "12345"},
+                         a,no_debug_info,b,c,debug_info,no_debug_info])),
+    ?assertEqual([a,b,c,{debug_info_key,"123"}],
+                 ToOpts([{debug_info_key, "12345"},a,b,no_debug_info,debug_info,
+                         c,{debug_info_key, "123"}])),
+    ?assertEqual([{debug_info_key,"12345"},a,b,c,{debug_info,{mod,"123"}}],
+                 ToOpts([debug_info,{debug_info_key,"12345"},a,
+                         no_debug_info,b,c,{debug_info,{mod,"123"}}])),
+    ok.
 
 first_files_exception(_Config) ->
     RebarConfig = [{erl_first_files, ["c","a","b"]},
