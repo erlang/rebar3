@@ -682,8 +682,12 @@ vcs_vsn_cmd({cmd, _Cmd}=Custom, _, _) ->
     Custom;
 vcs_vsn_cmd(VCS, Dir, Resources) when is_atom(VCS) ->
     case find_resource_module(VCS, Resources) of
-        {ok, Module} ->
-            Module:make_vsn(Dir);
+        {ok, Module, Resources1} ->
+            try
+                Module:make_vsn(Dir)
+            catch _:undef ->
+                vcs_vsn_cmd(VCS, Dir, Resources1)
+            end;
         {error, _} ->
             unknown
     end;
@@ -712,10 +716,10 @@ find_resource_module(Type, Resources) ->
                 non_existing ->
                     {error, unknown};
                 _ ->
-                    {ok, Type}
+                    {ok, Type, Resources}
             end;
         {Type, Module} ->
-            {ok, Module}
+            {ok, Module, lists:keydelete(Type, 1, Resources)}
     end.
 
 %% @doc ident to the level specified
