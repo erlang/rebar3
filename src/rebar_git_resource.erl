@@ -28,7 +28,7 @@ lock(AppDir, {git, Url}) ->
                 rebar_utils:sh("git --git-dir=\"" ++ Dir ++ "/.git\" rev-parse --verify HEAD",
                     [{use_stdout, false}, {debug_abort_on_error, AbortMsg}])
         end,
-    Ref = string:strip(VsnString, both, $\n),
+    Ref = rebar_string:trim(VsnString, both, "\n"),
     {git, Url, {ref, Ref}}.
 
 %% Return true if either the git url or tag/branch/ref is not the same as the currently
@@ -36,8 +36,8 @@ lock(AppDir, {git, Url}) ->
 needs_update(Dir, {git, Url, {tag, Tag}}) ->
     {ok, Current} = rebar_utils:sh(?FMT("git describe --tags --exact-match", []),
                                    [{cd, Dir}]),
-    Current1 = string:strip(string:strip(Current, both, $\n), both, $\r),
-
+    Current1 = rebar_string:trim(rebar_string:trim(Current, both, "\n"),
+                                 both, "\r"),
     ?DEBUG("Comparing git tag ~ts with ~ts", [Tag, Current1]),
     not ((Current1 =:= Tag) andalso compare_url(Dir, Url));
 needs_update(Dir, {git, Url, {branch, Branch}}) ->
@@ -55,8 +55,8 @@ needs_update(Dir, {git, Url, "master"}) ->
 needs_update(Dir, {git, _, Ref}) ->
     {ok, Current} = rebar_utils:sh(?FMT("git rev-parse --short=7 -q HEAD", []),
                                    [{cd, Dir}]),
-    Current1 = string:strip(string:strip(Current, both, $\n), both, $\r),
-
+    Current1 = rebar_string:trim(rebar_string:trim(Current, both, "\n"),
+                                 both, "\r"),
     Ref2 = case Ref of
                {ref, Ref1} ->
                    Length = length(Current1),
@@ -74,7 +74,8 @@ needs_update(Dir, {git, _, Ref}) ->
 compare_url(Dir, Url) ->
     {ok, CurrentUrl} = rebar_utils:sh(?FMT("git config --get remote.origin.url", []),
                                       [{cd, Dir}]),
-    CurrentUrl1 = string:strip(string:strip(CurrentUrl, both, $\n), both, $\r),
+    CurrentUrl1 = rebar_string:trim(rebar_string:trim(CurrentUrl, both, "\n"),
+                                     both, "\r"),
     {ok, ParsedUrl} = parse_git_url(Url),
     {ok, ParsedCurrentUrl} = parse_git_url(CurrentUrl1),
     ?DEBUG("Comparing git url ~p with ~p", [ParsedUrl, ParsedCurrentUrl]),
@@ -215,7 +216,7 @@ collect_default_refcount(Dir) ->
             ?WARN("Getting log of git dependency failed in ~ts. Falling back to version 0.0.0", [rebar_dir:get_cwd()]),
             {plain, "0.0.0"};
         {ok, String} ->
-            RawRef = string:strip(String, both, $\n),
+            RawRef = rebar_string:trim(String, both, "\n"),
 
             {Tag, TagVsn} = parse_tags(Dir),
             {ok, RawCount} =
@@ -275,9 +276,9 @@ parse_tags(Dir) ->
                             {undefined, "0.0.0"};
                         %% strip the v prefix if it exists like is done in the above match
                         {ok, [$v | LatestVsn]} ->
-                            {undefined, string:strip(LatestVsn, both, $\n)};
+                            {undefined, rebar_string:trim(LatestVsn, both, "\n")};
                         {ok, LatestVsn} ->
-                            {undefined, string:strip(LatestVsn, both, $\n)}
+                            {undefined, rebar_string:trim(LatestVsn,both, "\n")}
                     end
             end
     end.

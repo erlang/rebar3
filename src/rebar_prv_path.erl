@@ -49,7 +49,7 @@ format_error(Reason) ->
 
 filter_apps(RawOpts, State) ->
     RawApps = proplists:get_all_values(app, RawOpts),
-    Apps = lists:foldl(fun(String, Acc) -> string:tokens(String, ",") ++ Acc end, [], RawApps),
+    Apps = lists:foldl(fun(String, Acc) -> rebar_string:lexemes(String, ",") ++ Acc end, [], RawApps),
     case Apps of
         [] ->
             ProjectDeps = project_deps(State),
@@ -91,7 +91,7 @@ print_paths_if_exist(Paths, State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     Sep = proplists:get_value(separator, RawOpts, " "),
     RealPaths = lists:filter(fun(P) -> ec_file:is_dir(P) end, Paths),
-    io:format("~ts", [string:join(RealPaths, Sep)]).
+    io:format("~ts", [rebar_string:join(RealPaths, Sep)]).
 
 project_deps(State) ->
     Profiles = rebar_state:current_profiles(State),

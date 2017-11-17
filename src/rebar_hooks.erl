@@ -140,7 +140,7 @@ create_env(State, Opts) ->
     ].
 
 join_dirs(BaseDir, Dirs) ->
-    string:join([ filename:join(BaseDir, Dir) || Dir <- Dirs ], ":").
+    rebar_string:join([filename:join(BaseDir, Dir) || Dir <- Dirs], ":").
 
 re_version(Path) ->
     case re:run(Path, "^.*-(?<VER>[^/-]*)$", [{capture,[1],list}, unicode]) of

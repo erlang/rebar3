@@ -565,7 +565,7 @@ collect_nested_dependent_apps(App, Seen) ->
 dialyzer_version() ->
     _ = application:load(dialyzer),
     {ok, Vsn} = application:get_key(dialyzer, vsn),
-    case string:tokens(Vsn, ".") of
+    case rebar_string:lexemes(Vsn, ".") of
         [Major, Minor] ->
             version_tuple(Major, Minor, "0");
         [Major, Minor, Patch | _] ->

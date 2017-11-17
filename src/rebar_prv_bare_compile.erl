@@ -42,7 +42,7 @@ do(State) ->
     Paths = proplists:get_value(paths, RawOpts),
     Sep = proplists:get_value(separator, RawOpts, " "),
     [ code:add_pathsa(filelib:wildcard(PathWildcard))
-      || PathWildcard <- string:tokens(Paths, Sep) ],
+      || PathWildcard <- rebar_string:lexemes(Paths, Sep) ],
 
     [AppInfo] = rebar_state:project_apps(State),
     AppInfo1 = rebar_app_info:out_dir(AppInfo, rebar_dir:get_cwd()),

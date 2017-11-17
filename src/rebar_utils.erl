@@ -391,7 +391,7 @@ compare({Priority, A}, {Secondary, B}) when not is_tuple(A), is_tuple(B) ->
 
 %% Implements wc -l functionality used to determine patchcount from git output
 line_count(PatchLines) ->
-    Tokenized = string:tokens(PatchLines, "\n"),
+    Tokenized = rebar_string:lexemes(PatchLines, "\n"),
     {ok, length(Tokenized)}.
 
 check_min_otp_version(undefined) ->
@@ -528,7 +528,7 @@ patch_on_windows(Cmd, Env) ->
 %% The end of form `$FOO' is delimited with whitespace or EOL
 -spec expand_env_variable(string(), string(), term()) -> string().
 expand_env_variable(InStr, VarName, RawVarValue) ->
-    case string:chr(InStr, $$) of
+    case rebar_string:chr(InStr, $$) of
         0 ->
             %% No variables to expand
             InStr;
@@ -622,7 +622,7 @@ sh_loop(Port, Fun, Acc) ->
 
 beam_to_mod(Dir, Filename) ->
     [Dir | Rest] = filename:split(Filename),
-    list_to_atom(filename:basename(string:join(Rest, "."), ".beam")).
+    list_to_atom(filename:basename(rebar_string:join(Rest, "."), ".beam")).
 
 beam_to_mod(Filename) ->
     list_to_atom(filename:basename(Filename, ".beam")).
@@ -703,7 +703,7 @@ vcs_vsn_cmd(_, _, _) ->
 
 vcs_vsn_invoke(Cmd, Dir) ->
     {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),
-    string:strip(VsnString, right, $\n).
+    rebar_string:trim(VsnString, trailing, "\n").
 
 find_resource_module(Type, Resources) ->
     case lists:keyfind(Type, 1, Resources) of
@@ -896,9 +896,8 @@ list_dir(Dir) ->
 set_proxy_auth([]) ->
     ok;
 set_proxy_auth(UserInfo) ->
-    Idx = string:chr(UserInfo, $:), 
-    Username = string:sub_string(UserInfo, 1, Idx-1),
-    Password = string:sub_string(UserInfo, Idx+1),
+    [Username, Password] = re:split(UserInfo, ":",
+                                    [{return, list}, {parts,2}, unicode]),
     %% password may contain url encoded characters, need to decode them first
     application:set_env(rebar, proxy_auth, [{proxy_auth, {Username, http_uri:decode(Password)}}]).
 

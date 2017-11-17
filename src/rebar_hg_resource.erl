@@ -96,7 +96,7 @@ make_vsn(Dir) ->
     {ok, VsnString} =
         rebar_utils:sh(Cmd,
                        [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
-    RawVsn = string:strip(VsnString, both, $\n),
+    RawVsn = rebar_string:trim(VsnString, both, "\n"),
 
     Vsn = case RawVsn of
         "null+" ++ Rest -> "0.0.0+" ++ Rest;
@@ -107,8 +107,8 @@ make_vsn(Dir) ->
 %%% Internal functions
 
 compare_url(Dir, Url) ->
-    CurrentUrl = string:strip(os:cmd("hg -R \"" ++ rebar_utils:escape_double_quotes(Dir) ++"\" paths default"), both, $\n),
-    CurrentUrl1 = string:strip(CurrentUrl, both, $\r),
+    CurrentUrl = rebar_string:trim(os:cmd("hg -R \"" ++ rebar_utils:escape_double_quotes(Dir) ++"\" paths default"), both, "\n"),
+    CurrentUrl1 = rebar_string:trim(CurrentUrl, both, "\r"),
     parse_hg_url(CurrentUrl1) =:= parse_hg_url(Url).
 
 get_ref(Dir) ->
@@ -116,7 +116,7 @@ get_ref(Dir) ->
     {ok, RefString} =
         rebar_utils:sh("hg -R \"" ++ rebar_utils:escape_double_quotes(Dir) ++ "\" --debug id -i",
                        [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
-    string:strip(RefString, both, $\n).
+    rebar_string:trim(RefString, both, "\n").
 
 get_tag_distance(Dir, Ref) ->
     AbortMsg = io_lib:format("Get tag distance of hg dependency failed in ~ts", [Dir]),
@@ -125,8 +125,8 @@ get_tag_distance(Dir, Ref) ->
                       "log --template \"{latesttag}-{latesttagdistance}\n\" "
                       "--rev " ++ rebar_utils:escape_chars(Ref),
                       [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
-    Log = string:strip(LogString,
-                       both, $\n),
+    Log = rebar_string:trim(LogString,
+                            both, "\n"),
     [Tag, Distance] = re:split(Log, "-([0-9]+)$",
                                [{parts,0}, {return,list}, unicode]),
     {Tag, Distance}.
@@ -137,7 +137,7 @@ get_branch_ref(Dir, Branch) ->
         rebar_utils:sh("hg -R \"" ++ rebar_utils:escape_double_quotes(Dir) ++
                        "\" log --template \"{node}\n\" --rev " ++ rebar_utils:escape_chars(Branch),
                        [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
-    string:strip(BranchRefString, both, $\n).
+    rebar_string:strip(BranchRefString, both, "\n").
 
 
 maybe_warn_local_url(Url) ->
@@ -150,11 +150,11 @@ maybe_warn_local_url(Url) ->
     end.
 
 parse_hg_url("ssh://" ++ HostPath) ->
-    [Host | Path] = string:tokens(HostPath, "/"),
+    [Host | Path] = rebar_string:lexemes(HostPath, "/"),
     {Host, filename:rootname(filename:join(Path), ".hg")};
 parse_hg_url("http://" ++ HostPath) ->
-    [Host | Path] = string:tokens(HostPath, "/"),
+    [Host | Path] = rebar_string:lexemes(HostPath, "/"),
     {Host, filename:rootname(filename:join(Path), ".hg")};
 parse_hg_url("https://" ++ HostPath) ->
-    [Host | Path] = string:tokens(HostPath, "/"),
+    [Host | Path] = rebar_string:lexemes(HostPath, "/"),
     {Host, filename:rootname(filename:join(Path), ".hg")}.

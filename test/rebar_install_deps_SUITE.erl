@@ -82,12 +82,12 @@ format_expected_mdeps(Deps) ->
     lists:append([
     case Dep of
         {N,V} when hd(N) >= $a, hd(N) =< $z ->
-             UN = string:to_upper(N),
+             UN = rebar_string:uppercase(N),
              [{dep, UN, V}, {lock, pkg, UN, V}];
         {N,V} when hd(N) >= $A, hd(N) =< $Z ->
              [{dep, N, V}, {lock, src, N, V}];
         N when hd(N) >= $a, hd(N) =< $z ->
-             UN = string:to_upper(N),
+             UN = rebar_string:uppercase(N),
              [{dep, UN}, {lock, pkg, UN, "0.0.0"}];
         N when hd(N) >= $A, hd(N) =< $Z ->
              [{dep, N}, {lock, src, N, "0.0.0"}]
@@ -95,9 +95,9 @@ format_expected_mdeps(Deps) ->
 
 format_expected_mixed_warnings(Warnings) ->
     [case W of
-        {N, Vsn} when hd(N) >= $a, hd(N) =< $z -> {pkg, string:to_upper(N), Vsn};
+        {N, Vsn} when hd(N) >= $a, hd(N) =< $z -> {pkg, rebar_string:uppercase(N), Vsn};
         {N, Vsn} when hd(N) >= $A, hd(N) =< $Z -> {git, N, Vsn};
-        N when hd(N) >= $a, hd(N) =< $z -> {pkg, string:to_upper(N), "0.0.0"};
+        N when hd(N) >= $a, hd(N) =< $z -> {pkg, rebar_string:uppercase(N), "0.0.0"};
         N when hd(N) >= $A, hd(N) =< $Z -> {git, N, "0.0.0"}
      end || W <- Warnings].
 

@@ -173,7 +173,7 @@ transform_opts([Opt|Rest], Acc) ->
     transform_opts(Rest, [Opt|Acc]).
 
 split_string(String) ->
-    string:tokens(String, [$,]).
+    rebar_string:lexemes(String, [$,]).
 
 cfgopts(State) ->
     case rebar_state:get(State, ct_opts, []) of

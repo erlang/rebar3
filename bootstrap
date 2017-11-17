@@ -80,7 +80,7 @@ fetch({pkg, Name, Vsn}, App) ->
         false ->
             CDN = "https://repo.hex.pm/tarballs",
             Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
-            Url = string:join([CDN, Package], "/"),
+            Url = join([CDN, Package], "/"),
             case request(Url) of
                 {ok, Binary} ->
                     {ok, Contents} = extract(Binary),
@@ -210,7 +210,7 @@ cp_r(Sources, Dest) ->
     case os:type() of
         {unix, _} ->
             EscSources = [escape_path(Src) || Src <- Sources],
-            SourceStr = string:join(EscSources, " "),
+            SourceStr = join(EscSources, " "),
             os:cmd(?FMT("cp -R ~s \"~s\"", [SourceStr, Dest])),
             ok;
         {win32, _} ->
@@ -336,7 +336,11 @@ format_error(AbsSource, Extra, {Mod, Desc}) ->
     io_lib:format("~s: ~s~s~n", [AbsSource, Extra, ErrorDesc]).
 
 additional_defines() ->
-    [{d, D} || {Re, D} <- [{"^[0-9]+", namespaced_types}, {"^R1[4|5]", deprecated_crypto}, {"^((1[8|9])|2)", rand_module}], is_otp_release(Re)].
+    [{d, D} || {Re, D} <- [{"^[0-9]+", namespaced_types},
+                           {"^R1[4|5]", deprecated_crypto},
+                           {"^2", unicode_str},
+                           {"^((1[8|9])|2)", rand_module}],
+               is_otp_release(Re)].
 
 is_otp_release(ArchRegex) ->
     case re:run(otp_release(), ArchRegex, [{capture, none}]) of
@@ -388,9 +392,8 @@ otp_release1(Rel) ->
 set_proxy_auth([]) ->
     ok;
 set_proxy_auth(UserInfo) ->
-    Idx = string:chr(UserInfo, $:), 
-    Username = string:sub_string(UserInfo, 1, Idx-1),
-    Password = string:sub_string(UserInfo, Idx+1),
+    [Username, Password] = re:split(UserInfo, ":",
+                                    [{return, list}, {parts,2}, unicode]),
     %% password may contain url encoded characters, need to decode them first
     put(proxy_auth, [{proxy_auth, {Username, http_uri:decode(Password)}}]).
 
@@ -400,3 +403,12 @@ get_proxy_auth() ->
         ProxyAuth -> ProxyAuth
     end.
 
+%% string:join/2 copy; string:join/2 is getting obsoleted
+%% and replaced by lists:join/2, but lists:join/2 is too new
+%% for version support (only appeared in 19.0) so it cannot be
+%% used. Instead we just adopt join/2 locally and hope it works
+%% for most unicode use cases anyway.
+join([], Sep) when is_list(Sep) ->
+        [];
+join([H|T], Sep) ->
+    H ++ lists:append([Sep ++ X || X <- T]).
