@@ -419,8 +419,13 @@ warn_skip_deps(AppInfo, State) ->
     Args = [rebar_app_info:name(AppInfo),
             rebar_app_info:source(AppInfo)],
     case rebar_state:get(State, deps_error_on_conflict, false) of
-        false -> ?WARN(Msg, Args);
-        true -> ?ERROR(Msg, Args), ?FAIL
+        false ->
+            case rebar_state:get(State, deps_warning_on_conflict, true) of
+                true  -> ?WARN(Msg, Args);
+                false -> ok
+            end;
+        true ->
+            ?ERROR(Msg, Args), ?FAIL
     end.
 
 not_needs_compile(App) ->
