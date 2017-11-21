@@ -37,7 +37,9 @@ erl_opts(Opts) ->
     AllOpts = Defines ++ RawErlOpts,
     case proplists:is_defined(no_debug_info, AllOpts) of
         true ->
-            [O || O <- AllOpts, O =/= no_debug_info];
+            [O || O <- AllOpts, O =/= no_debug_info, O =/= debug_info, O =/= encrypt_debug_info,
+                                case is_tuple(O) of true -> element(1, O) =/= debug_info; _ -> true end,
+                                case is_tuple(O) of true -> element(1, O) =/= debug_info_key; _ -> true end];
         false ->
             [debug_info|AllOpts]
     end.
