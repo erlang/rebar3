@@ -40,6 +40,7 @@
          clean_all/1,
          override_deps/1,
          profile_override_deps/1,
+         profile_deps/1,
          deps_build_in_prod/1,
          include_file_relative_to_working_directory/1,
          include_file_in_src/1,
@@ -76,6 +77,7 @@ all() ->
      parse_transform_test, erl_first_files_test, mib_test,
      umbrella_mib_first_test, only_default_transitive_deps,
      clean_all, override_deps, profile_override_deps, deps_build_in_prod,
+     profile_override_deps, profile_deps, deps_build_in_prod,
      include_file_relative_to_working_directory, include_file_in_src,
      include_file_relative_to_working_directory_test, include_file_in_src_test,
      include_file_in_src_test_multiapp,
@@ -1288,9 +1290,10 @@ override_deps(Config) ->
     ).
 
 profile_override_deps(Config) ->
-    mock_git_resource:mock([{deps, [{some_dep, "0.0.1"},{other_dep, "0.0.1"}]}]),
     Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
     TopDeps = rebar_test_utils:top_level_deps(Deps),
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
 
     RebarConfig = [
         {deps, TopDeps},
@@ -1305,6 +1308,20 @@ profile_override_deps(Config) ->
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["as", "a", "compile"],
         {ok, [{dep, "some_dep"},{dep_not_exist, "other_dep"}]}
+    ).
+
+profile_deps(Config) ->
+    Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
+
+    RebarConfig = [
+        {deps, TopDeps},
+        {profiles, [{a, []}]}],
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["as", "a", "compile"],
+        {ok, [{dep, "some_dep"},{dep, "other_dep"}]}
     ).
 
 %% verify a deps prod profile is used
