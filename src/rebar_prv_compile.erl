@@ -136,7 +136,18 @@ compile(State, Providers, AppInfo) ->
     AppInfo3 = rebar_hooks:run_all_hooks(AppDir, post, ?ERLC_HOOK, Providers, AppInfo2, State),
 
     AppInfo4 = rebar_hooks:run_all_hooks(AppDir, pre, ?APP_HOOK, Providers, AppInfo3, State),
-    case rebar_otp_app:compile(State, AppInfo4) of
+
+    %% Load plugins back for make_vsn calls in custom resources.
+    %% The rebar_otp_app compilation step is safe regarding the
+    %% overall path management, so we can just load all plugins back
+    %% in memory.
+    PluginDepsPaths = rebar_state:code_paths(State, all_plugin_deps),
+    code:add_pathsa(PluginDepsPaths),
+    AppFileCompileResult = rebar_otp_app:compile(State, AppInfo4),
+    %% Clean up after ourselves, leave things as they were.
+    rebar_utils:remove_from_code_path(PluginDepsPaths),
+
+    case AppFileCompileResult of
         {ok, AppInfo5} ->
             AppInfo6 = rebar_hooks:run_all_hooks(AppDir, post, ?APP_HOOK, Providers, AppInfo5, State),
             AppInfo7 = rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo6, State),
