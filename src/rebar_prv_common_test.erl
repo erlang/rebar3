@@ -213,10 +213,10 @@ add_hooks(Opts, State) ->
         {false, _} ->
             Opts;
         {true, false} ->
-            [{ct_hooks, [cth_readable_failonly, cth_readable_shell]} | Opts];
+            [{ct_hooks, [cth_readable_failonly, cth_readable_shell, cth_retry]} | Opts];
         {true, {ct_hooks, Hooks}} ->
             %% Make sure hooks are there once only.
-            ReadableHooks = [cth_readable_failonly, cth_readable_shell],
+            ReadableHooks = [cth_readable_failonly, cth_readable_shell, cth_retry],
             NewHooks =  (Hooks -- ReadableHooks) ++ ReadableHooks,
             lists:keyreplace(ct_hooks, 1, Opts, {ct_hooks, NewHooks})
     end.
@@ -272,6 +272,15 @@ is_any_defined([Key|Keys],Opts) ->
 is_any_defined([],_Opts) ->
     false.
 
+should_retry(State, Opts) ->
+    case proplists:get_value(retry, Opts, false) of
+        false ->
+            false;
+        true ->
+            Path = filename:join([rebar_dir:base_dir(State), "logs", "retry.spec"]),
+            filelib:is_file(Path) andalso {true, Path}
+    end.
+
 sys_config_list(CmdOpts, CfgOpts) ->
     CmdSysConfigs = split_string(proplists:get_value(sys_config, CmdOpts, "")),
     case proplists:get_value(sys_config, CfgOpts, []) of
@@ -285,9 +294,15 @@ sys_config_list(CmdOpts, CfgOpts) ->
 
 discover_tests(State, ProjectApps, Opts) ->
     case is_any_defined([spec,dir,suite],Opts) of
+        true  -> {ok, Opts};
         %% no tests defined, try using `$APP/test` and `$ROOT/test` as dirs
-        false -> {ok, [default_tests(State, ProjectApps)|Opts]};
-        true  -> {ok, Opts}
+        false ->
+            case should_retry(State, Opts) of
+                false ->
+                    {ok, [default_tests(State, ProjectApps)|Opts]};
+                {true, Path} ->
+                    {ok, [{spec, Path} | Opts]}
+            end
     end.
 
 default_tests(State, ProjectApps) ->
@@ -751,7 +766,8 @@ ct_opts(_State) ->
      {sname, undefined, "sname", atom, help(sname)},
      {setcookie, undefined, "setcookie", atom, help(setcookie)},
      {sys_config, undefined, "sys_config", string, help(sys_config)}, %% comma-separated list
-     {compile_only, undefined, "compile_only", boolean, help(compile_only)}
+     {compile_only, undefined, "compile_only", boolean, help(compile_only)},
+     {retry, undefined, "retry", boolean, help(retry)}
     ].
 
 help(compile_only) ->
@@ -820,5 +836,7 @@ help(sname) ->
     "Gives a short name to the node";
 help(setcookie) ->
     "Sets the cookie if the node is distributed";
+help(retry) ->
+    "Experimental feature. If any specification for previously failing test is found, runs them.";
 help(_) ->
     "".
