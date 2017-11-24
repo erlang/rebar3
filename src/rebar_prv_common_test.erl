@@ -135,7 +135,7 @@ cmdopts(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     %% filter out opts common_test doesn't know about and convert
     %% to ct acceptable forms
-    transform_opts(RawOpts, []).
+    transform_retry(transform_opts(RawOpts, []), State).
 
 transform_opts([], Acc) -> lists:reverse(Acc);
 transform_opts([{dir, Dirs}|Rest], Acc) ->
@@ -171,6 +171,18 @@ transform_opts([{verbose, _}|Rest], Acc) ->
 %% getopt should handle anything else
 transform_opts([Opt|Rest], Acc) ->
     transform_opts(Rest, [Opt|Acc]).
+
+%% @private only retry if specified and if no other spec
+%% is given.
+transform_retry(Opts, State) ->
+    case proplists:get_value(retry, Opts, false) andalso
+         not is_any_defined([spec,dir,suite], Opts) of
+        false ->
+            Opts;
+        true ->
+            Path = filename:join([rebar_dir:base_dir(State), "logs", "retry.spec"]),
+            filelib:is_file(Path) andalso [{spec, Path}|Opts]
+    end.
 
 split_string(String) ->
     rebar_string:lexemes(String, [$,]).
@@ -213,10 +225,10 @@ add_hooks(Opts, State) ->
         {false, _} ->
             Opts;
         {true, false} ->
-            [{ct_hooks, [cth_readable_failonly, cth_readable_shell]} | Opts];
+            [{ct_hooks, [cth_readable_failonly, cth_readable_shell, cth_retry]} | Opts];
         {true, {ct_hooks, Hooks}} ->
             %% Make sure hooks are there once only.
-            ReadableHooks = [cth_readable_failonly, cth_readable_shell],
+            ReadableHooks = [cth_readable_failonly, cth_readable_shell, cth_retry],
             NewHooks =  (Hooks -- ReadableHooks) ++ ReadableHooks,
             lists:keyreplace(ct_hooks, 1, Opts, {ct_hooks, NewHooks})
     end.
@@ -751,7 +763,8 @@ ct_opts(_State) ->
      {sname, undefined, "sname", atom, help(sname)},
      {setcookie, undefined, "setcookie", atom, help(setcookie)},
      {sys_config, undefined, "sys_config", string, help(sys_config)}, %% comma-separated list
-     {compile_only, undefined, "compile_only", boolean, help(compile_only)}
+     {compile_only, undefined, "compile_only", boolean, help(compile_only)},
+     {retry, undefined, "retry", boolean, help(retry)}
     ].
 
 help(compile_only) ->
@@ -820,5 +833,7 @@ help(sname) ->
     "Gives a short name to the node";
 help(setcookie) ->
     "Sets the cookie if the node is distributed";
+help(retry) ->
+    "Experimental feature. If any specification for previously failing test is found, runs them.";
 help(_) ->
     "".
