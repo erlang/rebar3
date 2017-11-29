@@ -261,7 +261,7 @@ get_patch_count(Dir, RawRef) ->
 
 parse_tags(Dir) ->
     %% Don't abort on error, we want the bad return to be turned into 0.0.0
-    case rebar_utils:sh("git log --oneline --no-walk --tags --decorate",
+    case rebar_utils:sh("git -c color.ui=false log --oneline --no-walk --tags --decorate",
                         [{use_stdout, false}, return_on_error, {cd, Dir}]) of
         {error, _} ->
             {undefined, "0.0.0"};
