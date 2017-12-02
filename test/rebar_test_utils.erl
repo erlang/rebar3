@@ -425,15 +425,16 @@ erl_src_file(Name) ->
 
 plugin_src_file(Name) ->
     io_lib:format("-module('~s').\n"
-                 "-export([init/1]).\n"
+                 "-export([init/1, do/1]).\n"
                  "init(State) -> \n"
                  "Provider = providers:create([\n"
                  "{name, '~s'},\n"
                  "{module, '~s'}\n"
                  "]),\n"
-                 "{ok, rebar_state:add_provider(State, Provider)}.\n", [filename:basename(Name, ".erl"),
-                                                                        filename:basename(Name, ".erl"),
-                                                                        filename:basename(Name, ".erl")]).
+                 "{ok, rebar_state:add_provider(State, Provider)}.\n"
+                 "do(State) -> {ok, State}.\n", [filename:basename(Name, ".erl"),
+                                                 filename:basename(Name, ".erl"),
+                                                 filename:basename(Name, ".erl")]).
 
 erl_eunitized_src_file(Name) ->
     io_lib:format("-module('~s').\n"

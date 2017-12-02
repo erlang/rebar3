@@ -14,7 +14,8 @@
          upgrade_project_plugin/1,
          sub_app_plugins/1,
          sub_app_plugin_overrides/1,
-         project_plugins/1]).
+         project_plugins/1,
+         use_checkout_plugins/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -37,7 +38,7 @@ end_per_testcase(_, _Config) ->
 
 all() ->
     [compile_plugins, compile_global_plugins, complex_plugins, list, upgrade, upgrade_project_plugin,
-     sub_app_plugins, sub_app_plugin_overrides, project_plugins].
+     sub_app_plugins, sub_app_plugin_overrides, project_plugins, use_checkout_plugins].
 
 %% Tests that compiling a project installs and compiles the plugins of deps
 compile_plugins(Config) ->
@@ -370,3 +371,26 @@ project_plugins(Config) ->
 
     ?assertEqual(length(Release), 2),
     ?assertEqual(length(Compile), 1).
+
+use_checkout_plugins(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    PluginName = "checkedout",
+    CheckoutsDir = filename:join(AppDir, "_checkouts/checkedout"),
+    rebar_test_utils:create_plugin(CheckoutsDir, PluginName, "1.0.0", []),
+
+    RConfFile =
+        rebar_test_utils:create_config(AppDir,
+                                       [{deps, []},
+                                        {plugins, [list_to_atom(PluginName)]}]),
+    {ok, RConf} = file:consult(RConfFile),
+
+    %% Verify we can run the plugin
+    ?assertMatch({ok, _}, rebar_test_utils:run_and_check(
+                            Config, RConf, ["checkedout"],
+                            {ok, []}
+                           )).
