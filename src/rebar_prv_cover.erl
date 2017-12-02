@@ -12,6 +12,7 @@
          maybe_write_coverdata/2,
          format_error/1]).
 
+-include_lib("providers/include/providers.hrl").
 -include("rebar.hrl").
 
 -define(PROVIDER, cover).
@@ -62,6 +63,9 @@ maybe_write_coverdata(State, Task) ->
     end.
 
 -spec format_error(any()) -> iolist().
+format_error({min_coverage_failed, {PassRate, Total}}) ->
+    io_lib:format("Requiring ~p% coverage to pass. Only ~p% obtained",
+                  [PassRate, Total]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -102,13 +106,13 @@ do_analyze(State) ->
     %% redirect cover output
     true = redirect_cover_output(State, CoverPid),
     %% analyze!
-    ok = case analyze(State, CoverFiles) of
-        [] -> ok;
+    case analyze(State, CoverFiles) of
+        [] -> {ok, State};
         Analysis ->
             print_analysis(Analysis, verbose(State)),
-            write_index(State, Analysis)
-    end,
-    {ok, State}.
+            write_index(State, Analysis),
+            maybe_fail_coverage(Analysis, State)
+    end.
 
 get_all_coverdata(CoverDir) ->
     ok = filelib:ensure_dir(filename:join([CoverDir, "dummy.log"])),
@@ -213,11 +217,11 @@ format_table(Stats, CoverFiles) ->
     Header = header(MaxLength),
     Separator = separator(MaxLength),
     TotalLabel = format("total", MaxLength),
-    TotalCov = format(calculate_total(Stats), 8),
+    TotalCov = format(calculate_total_string(Stats), 8),
     [io_lib:format("~ts~n~ts~n~ts~n", [Separator, Header, Separator]),
         lists:map(fun({Mod, Coverage, _}) ->
             Name = format(Mod, MaxLength),
-            Cov = format(percentage(Coverage), 8),
+            Cov = format(percentage_string(Coverage), 8),
             io_lib:format("  |  ~ts  |  ~ts  |~n", [Name, Cov])
         end, Stats),
         io_lib:format("~ts~n", [Separator]),
@@ -239,6 +243,9 @@ separator(Width) ->
 
 format(String, Width) -> io_lib:format("~*.ts", [Width, String]).
 
+calculate_total_string(Stats) ->
+    integer_to_list(calculate_total(Stats))++"%".
+
 calculate_total(Stats) ->
     percentage(lists:foldl(
         fun({_Mod, {Cov, Not}, _File}, {CovAcc, NotAcc}) ->
@@ -248,8 +255,10 @@ calculate_total(Stats) ->
         Stats
     )).
 
-percentage({_, 0}) -> "100%";
-percentage({Cov, Not}) -> integer_to_list(trunc((Cov / (Cov + Not)) * 100)) ++ "%".
+percentage_string(Data) -> integer_to_list(percentage(Data))++"%".
+
+percentage({_, 0}) -> 100;
+percentage({Cov, Not}) -> trunc((Cov / (Cov + Not)) * 100).
 
 write_index(State, Coverage) ->
     CoverDir = cover_dir(State),
@@ -279,13 +288,24 @@ write_index_section(F, [{Section, DataFile, Mods}|Rest]) ->
     FmtLink =
         fun({Mod, Cov, Report}) ->
                 ?FMT("<tr><td><a href='~ts'>~ts</a></td><td>~ts</td>\n",
-                     [strip_coverdir(Report), Mod, percentage(Cov)])
+                     [strip_coverdir(Report), Mod, percentage_string(Cov)])
         end,
     lists:foreach(fun(M) -> ok = file:write(F, FmtLink(M)) end, Mods),
     ok = file:write(F, ?FMT("<tr><td><strong>Total</strong></td><td>~ts</td>\n",
-                     [calculate_total(Mods)])),
+                     [calculate_total_string(Mods)])),
     ok = file:write(F, "</table>\n"),
     write_index_section(F, Rest).
+
+maybe_fail_coverage(Analysis, State) ->
+    {_, _CoverFiles, Stats} = lists:keyfind("aggregate", 1, Analysis),
+    Total = calculate_total(Stats),
+    PassRate = min_coverage(State),
+    ?DEBUG("Comparing ~p to pass rate ~p", [Total, PassRate]),
+    if Total >= PassRate ->
+        {ok, State}
+    ;  Total < PassRate ->
+        ?PRV_ERROR({min_coverage_failed, {PassRate, Total}})
+    end.
 
 %% fix for r15b which doesn't put the correct path in the `source` section
 %%  of `module_info(compile)`
@@ -401,12 +421,23 @@ verbose(State) ->
         {Verbose, _}           -> Verbose
     end.
 
+min_coverage(State) ->
+    Command = proplists:get_value(min_coverage, command_line_opts(State), undefined),
+    Config = proplists:get_value(min_coverage, config_opts(State), undefined),
+    case {Command, Config} of
+        {undefined, undefined} -> 0;
+        {undefined, Rate}   -> Rate;
+        {Rate, _}           -> Rate
+    end.
+
 cover_dir(State) ->
     filename:join([rebar_dir:base_dir(State), "cover"]).
 
 cover_opts(_State) ->
     [{reset, $r, "reset", boolean, help(reset)},
-     {verbose, $v, "verbose", boolean, help(verbose)}].
+     {verbose, $v, "verbose", boolean, help(verbose)},
+     {min_coverage, $m, "min_coverage", integer, help(min_coverage)}].
 
 help(reset) -> "Reset all coverdata.";
-help(verbose) -> "Print coverage analysis.".
+help(verbose) -> "Print coverage analysis.";
+help(min_coverage) -> "Mandate a coverage percentage required to succeed (0..100)".
