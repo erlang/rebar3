@@ -105,7 +105,7 @@ handle_plugin(Profile, Plugin, State, Upgrade) ->
         %% Add newly built deps and plugin to code path
         State3 = rebar_state:update_all_plugin_deps(State2, Apps),
         NewCodePaths = [rebar_app_info:ebin_dir(A) || A <- ToBuild],
-        code:add_pathsa(CodePaths),
+        code:add_pathsa(NewCodePaths++CodePaths),
 
         %% Store plugin code paths so we can remove them when compiling project apps
         State4 = rebar_state:update_code_paths(State3, all_plugin_deps, CodePaths++NewCodePaths),
