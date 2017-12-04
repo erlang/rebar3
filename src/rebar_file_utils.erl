@@ -458,11 +458,11 @@ xcopy_win32(Source,Dest)->
                   %% must manually add the last fragment of a directory to the `Dest`
                   %% in order to properly replicate POSIX platforms
                   NewDest = filename:join([Dest, filename:basename(Source)]),
-                  ?FMT("robocopy \"~ts\" \"~ts\" /e /is 1> nul",
+                  ?FMT("robocopy \"~ts\" \"~ts\" /e 1> nul",
                        [rebar_utils:escape_double_quotes(filename:nativename(Source)),
                         rebar_utils:escape_double_quotes(filename:nativename(NewDest))]);
               false ->
-                  ?FMT("robocopy \"~ts\" \"~ts\" \"~ts\" /e /is 1> nul",
+                  ?FMT("robocopy \"~ts\" \"~ts\" \"~ts\" /e 1> nul",
                        [rebar_utils:escape_double_quotes(filename:nativename(filename:dirname(Source))),
                         rebar_utils:escape_double_quotes(filename:nativename(Dest)),
                         rebar_utils:escape_double_quotes(filename:basename(Source))])
