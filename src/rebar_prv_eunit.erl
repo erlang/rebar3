@@ -472,7 +472,8 @@ maybe_write_coverdata(State) ->
         true  -> rebar_state:set(State, cover_enabled, true);
         false -> State
     end,
-    rebar_prv_cover:maybe_write_coverdata(State1, ?PROVIDER).
+    Name = proplists:get_value(cover_export_name, RawOpts, ?PROVIDER),
+    rebar_prv_cover:maybe_write_coverdata(State1, Name).
 
 handle_results(ok) -> ok;
 handle_results(error) ->
@@ -484,6 +485,7 @@ eunit_opts(_State) ->
     [{app, undefined, "app", string, help(app)},
      {application, undefined, "application", string, help(app)},
      {cover, $c, "cover", boolean, help(cover)},
+     {cover_export_name, undefined, "cover_export_name", string, help(cover_export_name)},
      {dir, $d, "dir", string, help(dir)},
      {file, $f, "file", string, help(file)},
      {module, $m, "module", string, help(module)},
@@ -495,6 +497,7 @@ eunit_opts(_State) ->
 
 help(app)       -> "Comma separated list of application test suites to run. Equivalent to `[{application, App}]`.";
 help(cover)     -> "Generate cover data. Defaults to false.";
+help(cover_export_name) -> "Base name of the coverdata file to write";
 help(dir)       -> "Comma separated list of dirs to load tests from. Equivalent to `[{dir, Dir}]`.";
 help(file)      -> "Comma separated list of files to load tests from. Equivalent to `[{file, File}]`.";
 help(module)    -> "Comma separated list of modules to load tests from. Equivalent to `[{module, Module}]`.";

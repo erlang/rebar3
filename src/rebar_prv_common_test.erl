@@ -8,8 +8,11 @@
 -export([init/1,
          do/1,
          format_error/1]).
-%% exported for test purposes, consider private
--export([compile/2, prepare_tests/1, translate_paths/2]).
+
+-ifdef(TEST).
+%% exported for test purposes
+-export([compile/2, prepare_tests/1, translate_paths/2, maybe_write_coverdata/1]).
+-endif.
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
@@ -728,7 +731,8 @@ maybe_write_coverdata(State) ->
         true  -> rebar_state:set(State, cover_enabled, true);
         false -> State
     end,
-    rebar_prv_cover:maybe_write_coverdata(State1, ?PROVIDER).
+    Name = proplists:get_value(cover_export_name, RawOpts, ?PROVIDER),
+    rebar_prv_cover:maybe_write_coverdata(State1, Name).
 
 ct_opts(_State) ->
     [{dir, undefined, "dir", string, help(dir)}, %% comma-separated list
@@ -744,6 +748,7 @@ ct_opts(_State) ->
      {logopts, undefined, "logopts", string, help(logopts)}, %% comma-separated list
      {verbosity, undefined, "verbosity", integer, help(verbosity)}, %% Integer
      {cover, $c, "cover", {boolean, false}, help(cover)},
+     {cover_export_name, undefined, "cover_export_name", string, help(cover_export_name)},
      {repeat, undefined, "repeat", integer, help(repeat)}, %% integer
      {duration, undefined, "duration", string, help(duration)}, % format: HHMMSS
      {until, undefined, "until", string, help(until)}, %% format: YYMoMoDD[HHMMSS]
@@ -797,6 +802,8 @@ help(verbosity) ->
     "Verbosity";
 help(cover) ->
     "Generate cover data";
+help(cover_export_name) ->
+    "Base name of the coverdata file to write";
 help(repeat) ->
     "How often to repeat tests";
 help(duration) ->

@@ -372,10 +372,10 @@ redirect_cover_output(State, CoverPid) ->
                         [append]),
     group_leader(F, CoverPid).
 
-write_coverdata(State, Task) ->
+write_coverdata(State, Name) ->
     DataDir = cover_dir(State),
     ok = filelib:ensure_dir(filename:join([DataDir, "dummy.log"])),
-    ExportFile = filename:join([DataDir, atom_to_list(Task) ++ ".coverdata"]),
+    ExportFile = filename:join([DataDir, rebar_utils:to_list(Name) ++ ".coverdata"]),
     case cover:export(ExportFile) of
         ok ->
             %% dump accumulated coverdata after writing

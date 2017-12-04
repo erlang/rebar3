@@ -7,6 +7,7 @@
          all/0,
          flag_coverdata_written/1,
          config_coverdata_written/1,
+         config_coverdata_overridden_name_written/1,
          basic_extra_src_dirs/1,
          release_extra_src_dirs/1,
          root_extra_src_dirs/1,
@@ -34,6 +35,7 @@ init_per_testcase(_, Config) ->
 
 all() ->
     [flag_coverdata_written, config_coverdata_written,
+     config_coverdata_overridden_name_written,
      basic_extra_src_dirs, release_extra_src_dirs,
      root_extra_src_dirs,
      index_written,
@@ -69,6 +71,21 @@ config_coverdata_written(Config) ->
                                    {ok, [{app, Name}]}),
 
     true = filelib:is_file(filename:join([AppDir, "_build", "test", "cover", "eunit.coverdata"])).
+
+config_coverdata_overridden_name_written(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("cover_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{erl_opts, [{d, some_define}]}, {cover_enabled, true}],
+    rebar_test_utils:run_and_check(Config,
+                                   RebarConfig,
+                                   ["eunit", "--cover_export_name=test_name"],
+                                   {ok, [{app, Name}]}),
+
+    true = filelib:is_file(filename:join([AppDir, "_build", "test", "cover", "test_name.coverdata"])).
 
 basic_extra_src_dirs(Config) ->
     AppDir = ?config(apps, Config),
