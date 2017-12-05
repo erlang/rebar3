@@ -391,7 +391,7 @@ add_provider(State=#state_t{providers=Providers, allow_provider_overrides=false}
                            case {providers:impl(P), providers:namespace(P)} of
                                {Name, Namespace} ->
                                    ?DEBUG("Not adding provider ~p ~p from module ~p because it already exists from module ~p",
-                                          [Namespace, Name, providers:module(P), Module]),
+                                          [Namespace, Name, Module, providers:module(P)]),
                                    true;
                                _ ->
                                    false
