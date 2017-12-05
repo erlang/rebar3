@@ -49,6 +49,7 @@
          update_code/1,
          update_code/2,
          remove_from_code_path/1,
+         remove_from_code_path/2,
          cleanup_code_path/1,
          args_to_tasks/1,
          expand_env_variable/3,
@@ -753,6 +754,9 @@ update_code(Paths, Opts) ->
                   end, Paths).
 
 remove_from_code_path(Paths) ->
+    remove_from_code_path(Paths, purge).
+
+remove_from_code_path(Paths, Type) when Type == purge; Type == soft_purge ->
     lists:foreach(fun(Path) ->
                           Name = filename:basename(Path, "/ebin"),
                           App = list_to_atom(Name),
@@ -763,7 +767,7 @@ remove_from_code_path(Paths) ->
                                   ok;
                               {ok, Modules} ->
                                   application:unload(App),
-                                  [begin code:purge(M), code:delete(M) end || M <- Modules]
+                                  [begin code:Type(M), code:delete(M) end || M <- Modules]
                           end,
                           code:del_path(Path)
                   end, lists:usort(Paths)).
