@@ -29,7 +29,7 @@ end_per_testcase(_Name, Config) ->
     Config.
 
 all() ->
-    [noop, resource_plugins].
+    [noop, resource_plugins, alias_clash].
 
 %groups() ->
 %    [{plugins, [shuffle], []},
@@ -53,6 +53,21 @@ resource_plugins(Config) ->
     ct:pal("Rebar3 Output:~n~s",[Output]),
     ok.
 
+alias_clash() ->
+    [{doc, "checking that the provider won't get plugin interference."},
+     {timetrap, 10000}].
+alias_clash(Config) ->
+    {ok, Help} = rebar3("help", Config), % should be redefined, but by the plugin
+    ?assertNotEqual(nomatch,
+        re:run(Help, "Alias help is already the name of a command[a-z ]+and will be ignored")
+    ),
+    {ok, Output} = rebar3("test", Config, [{env, [{"DEBUG", "1"}]}]),
+    ?assertNotEqual(nomatch, re:run(Output, "cover summary written to:")),
+    ?assertNotEqual(nomatch,
+        re:run(Output, "Not adding provider default test from module rebar_prv_alias_test "
+                       "because it already exists from module rebar_prv_alias_test")),
+    ok.
+
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
 %%%%%%%%%%%%%%%
@@ -62,7 +77,9 @@ set_name_config(Atom, Config) ->
                      atom_to_list(?MODULE)++"_data", atom_to_list(Atom)])}
      | Config].
 
-rebar3(Args, Config) ->
+rebar3(Args, Config) -> rebar3(Args, Config, []).
+
+rebar3(Args, Config, UserOpts) ->
     Exec = case os:type() of
         {win32, _} ->
             "rebar3.cmd";
@@ -70,6 +87,7 @@ rebar3(Args, Config) ->
             "rebar3"
     end,
     Cmd = Exec ++ " " ++ Args,
-    Opts = [{cd, ?config(path, Config)}, return_on_error, use_stdout],
+    Opts = [{cd, ?config(path, Config)}, return_on_error, use_stdout
+            | UserOpts],
     ct:pal("Calling rebar3 ~s with options ~p", [Cmd, Opts]),
     rebar_utils:sh(Cmd, Opts).
