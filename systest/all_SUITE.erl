@@ -66,6 +66,7 @@ alias_clash(Config) ->
     ?assertNotEqual(nomatch,
         re:run(Output, "Not adding provider default test from module rebar_prv_alias_test "
                        "because it already exists from module rebar_prv_alias_test")),
+    ok.
 
 grisp_explode() ->
     [{doc, "Don't force purge a plugin that runs the compile job itself"}].

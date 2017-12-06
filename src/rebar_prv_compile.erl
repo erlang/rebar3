@@ -145,7 +145,7 @@ compile(State, Providers, AppInfo) ->
     code:add_pathsa(PluginDepsPaths),
     AppFileCompileResult = rebar_otp_app:compile(State, AppInfo4),
     %% Clean up after ourselves, leave things as they were.
-    rebar_utils:remove_from_code_path(PluginDepsPaths, soft_purge),
+    rebar_utils:remove_from_code_path(PluginDepsPaths),
 
     case AppFileCompileResult of
         {ok, AppInfo5} ->
