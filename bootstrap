@@ -179,6 +179,8 @@ bootstrap_rebar3() ->
 -define(FMT(Str, Args), lists:flatten(io_lib:format(Str, Args))).
 %%/rebar.hrl
 %%rebar_file_utils
+-include_lib("kernel/include/file.hrl").
+
 symlink_or_copy(Source, Target) ->
     Link = case os:type() of
                {win32, _} ->
@@ -190,55 +192,63 @@ symlink_or_copy(Source, Target) ->
         ok ->
             ok;
         {error, eexist} ->
-            ok;
+            exists;
         {error, _} ->
-            cp_r([Source], Target)
+            case os:type() of
+                {win32, _} ->
+                    S = unicode:characters_to_list(Source),
+                    T = unicode:characters_to_list(Target),
+                    case filelib:is_dir(S) of
+                        true ->
+                            win32_symlink_or_copy(S, T);
+                        false ->
+                            cp_r([S], T)
+                    end;
+                _ ->
+                    case filelib:is_dir(Target) of
+                        true ->
+                            ok;
+                        false ->
+                            cp_r([Source], Target)
+                    end
+            end
     end.
 
-make_relative_path(Source, Target) ->
-    do_make_relative_path(filename:split(Source), filename:split(Target)).
-
-do_make_relative_path([H|T1], [H|T2]) ->
-    do_make_relative_path(T1, T2);
-do_make_relative_path(Source, Target) ->
-    Base = lists:duplicate(max(length(Target) - 1, 0), ".."),
-    filename:join(Base ++ Source).
-
+-spec cp_r(list(string()), file:filename()) -> 'ok'.
 cp_r([], _Dest) ->
     ok;
 cp_r(Sources, Dest) ->
     case os:type() of
         {unix, _} ->
-            EscSources = [escape_path(Src) || Src <- Sources],
+            EscSources = [escape_chars(Src) || Src <- Sources],
             SourceStr = join(EscSources, " "),
-            os:cmd(?FMT("cp -R ~s \"~s\"", [SourceStr, Dest])),
+            {ok, []} = sh(?FMT("cp -Rp ~ts \"~ts\"",
+                          [SourceStr, escape_double_quotes(Dest)]),
+                          [{use_stdout, false}, abort_on_error]),
             ok;
         {win32, _} ->
             lists:foreach(fun(Src) -> ok = cp_r_win32(Src,Dest) end, Sources),
             ok
     end.
 
-xcopy_win32(Source,Dest)->
-    R = os:cmd(?FMT("xcopy \"~s\" \"~s\" /q /y /e 2> nul",
-                     [filename:nativename(Source), filename:nativename(Dest)])),
-    case length(R) > 0 of
-        %% when xcopy fails, stdout is empty and and error message is printed
-        %% to stderr (which is redirected to nul)
+%% @private Compatibility function for windows
+win32_symlink_or_copy(Source, Target) ->
+    Res = sh(?FMT("cmd /c mklink /j \"~ts\" \"~ts\"",
+             [escape_double_quotes(filename:nativename(Target)),
+              escape_double_quotes(filename:nativename(Source))]),
+             [{use_stdout, false}, return_on_error]),
+    case win32_mklink_ok(Res, Target) of
         true -> ok;
-        false ->
-            {error, lists:flatten(
-                      io_lib:format("Failed to xcopy from ~s to ~s~n",
-                                    [Source, Dest]))}
+        false -> cp_r_win32(Source, drop_last_dir_from_path(Target))
     end.
 
 cp_r_win32({true, SourceDir}, {true, DestDir}) ->
     %% from directory to directory
-    SourceBase = filename:basename(SourceDir),
-    ok = case file:make_dir(filename:join(DestDir, SourceBase)) of
+     ok = case file:make_dir(DestDir) of
              {error, eexist} -> ok;
              Other -> Other
          end,
-    ok = xcopy_win32(SourceDir, filename:join(DestDir, SourceBase));
+    ok = xcopy_win32(SourceDir, DestDir);
 cp_r_win32({false, Source} = S,{true, DestDir}) ->
     %% from file to directory
     cp_r_win32(S, {false, filename:join(DestDir, filename:basename(Source))});
@@ -272,9 +282,230 @@ cp_r_win32(Source,Dest) ->
                   end, filelib:wildcard(Source)),
     ok.
 
-escape_path(Str) ->
-    re:replace(Str, "([ ()?])", "\\\\&", [global, {return, list}]).
+%% drops the last 'node' of the filename, presumably the last dir such as 'src'
+%% this is because cp_r_win32/2 automatically adds the dir name, to appease
+%% robocopy and be more uniform with POSIX
+drop_last_dir_from_path([]) ->
+    [];
+drop_last_dir_from_path(Path) ->
+    case lists:droplast(filename:split(Path)) of
+        [] -> [];
+        Dirs -> filename:join(Dirs)
+    end.
+
+%% @private specifically pattern match against the output
+%% of the windows 'mklink' shell call; different values from
+%% what win32_ok/1 handles
+win32_mklink_ok({ok, _}, _) ->
+    true;
+win32_mklink_ok({error,{1,"Local NTFS volumes are required to complete the operation.\n"}}, _) ->
+    false;
+win32_mklink_ok({error,{1,"Cannot create a file when that file already exists.\n"}}, Target) ->
+    % File or dir is already in place; find if it is already a symlink (true) or
+    % if it is a directory (copy-required; false)
+    is_symlink(Target);
+win32_mklink_ok(_, _) ->
+    false.
+
+xcopy_win32(Source,Dest)->
+    %% "xcopy \"~ts\" \"~ts\" /q /y /e 2> nul", Changed to robocopy to
+    %% handle long names. May have issues with older windows.
+    Cmd = case filelib:is_dir(Source) of
+              true ->
+                  %% For robocopy, copying /a/b/c/ to /d/e/f/ recursively does not
+                  %% create /d/e/f/c/*, but rather copies all files to /d/e/f/*.
+                  %% The usage we make here expects the former, not the later, so we
+                  %% must manually add the last fragment of a directory to the `Dest`
+                  %% in order to properly replicate POSIX platforms
+                  NewDest = filename:join([Dest, filename:basename(Source)]),
+                  ?FMT("robocopy \"~ts\" \"~ts\" /e 1> nul",
+                       [escape_double_quotes(filename:nativename(Source)),
+                        escape_double_quotes(filename:nativename(NewDest))]);
+              false ->
+                  ?FMT("robocopy \"~ts\" \"~ts\" \"~ts\" /e 1> nul",
+                       [escape_double_quotes(filename:nativename(filename:dirname(Source))),
+                        escape_double_quotes(filename:nativename(Dest)),
+                        escape_double_quotes(filename:basename(Source))])
+          end,
+    Res = sh(Cmd, [{use_stdout, false}, return_on_error]),
+    case win32_ok(Res) of
+        true -> ok;
+        false ->
+            {error, lists:flatten(
+                      io_lib:format("Failed to copy ~ts to ~ts~n",
+                                    [Source, Dest]))}
+    end.
+
+is_symlink(Filename) ->
+    {ok, Info} = file:read_link_info(Filename),
+    Info#file_info.type == symlink.
+
+win32_ok({ok, _}) -> true;
+win32_ok({error, {Rc, _}}) when Rc<9; Rc=:=16 -> true;
+win32_ok(_) -> false.
+
 %%/rebar_file_utils
+
+%%rebar_utils
+
+%% escape\ as\ a\ shell\?
+escape_chars(Str) when is_atom(Str) ->
+    escape_chars(atom_to_list(Str));
+escape_chars(Str) ->
+    re:replace(Str, "([ ()?`!$&;\"\'])", "\\\\&",
+               [global, {return, list}, unicode]).
+
+%% "escape inside these"
+escape_double_quotes(Str) ->
+    re:replace(Str, "([\"\\\\`!$&*;])", "\\\\&",
+               [global, {return, list}, unicode]).
+
+sh(Command0, Options0) ->
+    DefaultOptions = [{use_stdout, false}],
+    Options = [expand_sh_flag(V)
+               || V <- proplists:compact(Options0 ++ DefaultOptions)],
+
+    ErrorHandler = proplists:get_value(error_handler, Options),
+    OutputHandler = proplists:get_value(output_handler, Options),
+
+    Command = lists:flatten(patch_on_windows(Command0, proplists:get_value(env, Options, []))),
+    PortSettings = proplists:get_all_values(port_settings, Options) ++
+        [exit_status, {line, 16384}, use_stdio, stderr_to_stdout, hide, eof],
+    Port = open_port({spawn, Command}, PortSettings),
+
+    try
+        case sh_loop(Port, OutputHandler, []) of
+            {ok, _Output} = Ok ->
+                Ok;
+            {error, {_Rc, _Output}=Err} ->
+                ErrorHandler(Command, Err)
+        end
+    after
+        port_close(Port)
+    end.
+
+sh_loop(Port, Fun, Acc) ->
+    receive
+        {Port, {data, {eol, Line}}} ->
+            sh_loop(Port, Fun, Fun(Line ++ "\n", Acc));
+        {Port, {data, {noeol, Line}}} ->
+            sh_loop(Port, Fun, Fun(Line, Acc));
+        {Port, eof} ->
+            Data = lists:flatten(lists:reverse(Acc)),
+            receive
+                {Port, {exit_status, 0}} ->
+                    {ok, Data};
+                {Port, {exit_status, Rc}} ->
+                    {error, {Rc, Data}}
+            end
+    end.
+
+expand_sh_flag(return_on_error) ->
+    {error_handler,
+     fun(_Command, Err) ->
+             {error, Err}
+     end};
+expand_sh_flag(abort_on_error) ->
+    {error_handler,
+     fun log_and_abort/2};
+expand_sh_flag({use_stdout, false}) ->
+    {output_handler,
+     fun(Line, Acc) ->
+             [Line | Acc]
+     end};
+expand_sh_flag({cd, _CdArg} = Cd) ->
+    {port_settings, Cd};
+expand_sh_flag({env, _EnvArg} = Env) ->
+    {port_settings, Env}.
+
+%% We do the shell variable substitution ourselves on Windows and hope that the
+%% command doesn't use any other shell magic.
+patch_on_windows(Cmd, Env) ->
+    case os:type() of
+        {win32,nt} ->
+            Cmd1 = "cmd /q /c "
+                ++ lists:foldl(fun({Key, Value}, Acc) ->
+                                       expand_env_variable(Acc, Key, Value)
+                               end, Cmd, Env),
+            %% Remove left-over vars
+            re:replace(Cmd1, "\\\$\\w+|\\\${\\w+}", "",
+                       [global, {return, list}, unicode]);
+        _ ->
+            Cmd
+    end.
+
+%% @doc Given env. variable `FOO' we want to expand all references to
+%% it in `InStr'. References can have two forms: `$FOO' and `${FOO}'
+%% The end of form `$FOO' is delimited with whitespace or EOL
+-spec expand_env_variable(string(), string(), term()) -> string().
+expand_env_variable(InStr, VarName, RawVarValue) ->
+    case chr(InStr, $$) of
+        0 ->
+            %% No variables to expand
+            InStr;
+        _ ->
+            ReOpts = [global, unicode, {return, list}],
+            VarValue = re:replace(RawVarValue, "\\\\", "\\\\\\\\", ReOpts),
+            %% Use a regex to match/replace:
+            %% Given variable "FOO": match $FOO\s | $FOOeol | ${FOO}
+            RegEx = io_lib:format("\\\$(~ts(\\W|$)|{~ts})", [VarName, VarName]),
+            re:replace(InStr, RegEx, [VarValue, "\\2"], ReOpts)
+    end.
+
+-spec log_and_abort(string(), {integer(), string()}) -> no_return().
+log_and_abort(Command, {Rc, Output}) ->
+    io:format("sh(~ts)~n"
+              "failed with return code ~w and the following output:~n"
+              "~ts", [Command, Rc, Output]),
+    throw(bootstrap_abort).
+
+%%/rebar_utils
+
+%%rebar_dir
+make_relative_path(Source, Target) ->
+    AbsSource = make_normalized_path(Source),
+    AbsTarget = make_normalized_path(Target),
+    do_make_relative_path(filename:split(AbsSource), filename:split(AbsTarget)).
+
+%% @private based on fragments of paths, replace the number of common
+%% segments by `../' bits, and add the rest of the source alone after it
+-spec do_make_relative_path([string()], [string()]) -> file:filename().
+do_make_relative_path([H|T1], [H|T2]) ->
+    do_make_relative_path(T1, T2);
+do_make_relative_path(Source, Target) ->
+    Base = lists:duplicate(max(length(Target) - 1, 0), ".."),
+    filename:join(Base ++ Source).
+
+make_normalized_path(Path) ->
+    AbsPath = make_absolute_path(Path),
+    Components = filename:split(AbsPath),
+    make_normalized_path(Components, []).
+    
+make_absolute_path(Path) ->
+    case filename:pathtype(Path) of
+        absolute ->
+            Path;
+        relative ->
+            {ok, Dir} = file:get_cwd(),
+            filename:join([Dir, Path]);
+        volumerelative ->
+            Volume = hd(filename:split(Path)),
+            {ok, Dir} = file:get_cwd(Volume),
+            filename:join([Dir, Path])
+    end.
+
+-spec make_normalized_path([string()], [string()]) -> file:filename().
+make_normalized_path([], NormalizedPath) ->
+    filename:join(lists:reverse(NormalizedPath));
+make_normalized_path([H|T], NormalizedPath) ->
+    case H of
+        "." when NormalizedPath == [], T == [] -> make_normalized_path(T, ["."]);
+        "."  -> make_normalized_path(T, NormalizedPath);
+        ".." when NormalizedPath == [] -> make_normalized_path(T, [".."]);
+        ".." when hd(NormalizedPath) =/= ".." -> make_normalized_path(T, tl(NormalizedPath));
+        _    -> make_normalized_path(T, [H|NormalizedPath])
+    end.
+%%/rebar_dir
 
 setup_env() ->
     %% We don't need or want relx providers loaded yet
@@ -412,3 +643,9 @@ join([], Sep) when is_list(Sep) ->
         [];
 join([H|T], Sep) ->
     H ++ lists:append([Sep ++ X || X <- T]).
+
+%% Same for chr; no non-deprecated equivalent in OTP20+ 
+chr(S, C) when is_integer(C) -> chr(S, C, 1).
+chr([C|_Cs], C, I) -> I;
+chr([_|Cs], C, I) -> chr(Cs, C, I+1);
+chr([], _C, _I) -> 0.
