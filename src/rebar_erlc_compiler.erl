@@ -555,7 +555,7 @@ internal_erl_compile(Opts, Dir, Module, OutDir, ErlOpts, RebarOpts) ->
                     || Src <- rebar_dir:all_src_dirs(RebarOpts, ["src"], [])],
     AllOpts = [{outdir, filename:dirname(Target)}] ++ ErlOpts ++ PrivIncludes ++
               [{i, filename:join(Dir, "include")}, {i, Dir}, return],
-    case compile:file(Module, AllOpts) of
+    case compile_cwd(Module, AllOpts) of
         {ok, _Mod} ->
             ok;
         {ok, _Mod, Ws} ->
@@ -564,6 +564,22 @@ internal_erl_compile(Opts, Dir, Module, OutDir, ErlOpts, RebarOpts) ->
         {error, Es, Ws} ->
             error_tuple(Module, Es, Ws, AllOpts, Opts)
     end.
+
+% we change the path to module dir, cause we don't like full pathes in stacktrace!!
+compile_cwd(Module, AllOpts) ->
+    % get current dir
+    {ok, CwdDir} = file:get_cwd(),
+    % set current dir to module dir
+    ok = file:set_cwd(filename:dirname(Module)),
+    % compiling
+    try
+        Res = compile:file(filename:basename(Module), AllOpts)
+    after
+        % back to dir we started
+        ok = file:set_cwd(CwdDir)
+    end,
+    % Result compiled
+    Res.
 
 error_tuple(Module, Es, Ws, AllOpts, Opts) ->
     FormattedEs = format_error_sources(Es, Opts),
