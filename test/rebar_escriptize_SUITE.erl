@@ -7,7 +7,8 @@
          all/0,
          escriptize_with_name/1,
          escriptize_with_bad_name/1,
-         build_and_clean_app/1]).
+         build_and_clean_app/1,
+         escriptize_with_ebin_subdir/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -29,7 +30,8 @@ all() ->
     [
      build_and_clean_app,
      escriptize_with_name,
-     escriptize_with_bad_name
+     escriptize_with_bad_name,
+     escriptize_with_ebin_subdir
     ].
 
 %% Test escriptize builds and runs the app's escript
@@ -59,3 +61,24 @@ escriptize_with_bad_name(Config) ->
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
     rebar_test_utils:run_and_check(Config, [{escript_main_app, boogers}], ["escriptize"],
                                    {error,{rebar_prv_escriptize, {bad_name, boogers}}}).
+
+escriptize_with_ebin_subdir(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    filelib:ensure_dir(filename:join([AppDir, "ebin", "subdir", "subdirfile"])),
+
+    %% To work, this test must run from the AppDir itself. To avoid breaking
+    %% other tests, be careful with cwd
+    Cwd = file:get_cwd(),
+    try
+        file:set_cwd(AppDir),
+        {ok, _} = rebar3:run(rebar_state:new(?config(state,Config), [], AppDir),
+                             ["escriptize"])
+    after
+        file:set_cwd(Cwd) % reset always
+    end,
+    ok.

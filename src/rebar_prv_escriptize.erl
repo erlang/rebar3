@@ -194,7 +194,8 @@ load_files(Wildcard, Dir) ->
 
 load_files(Prefix, Wildcard, Dir) ->
     [read_file(Prefix, Filename, Dir)
-     || Filename <- filelib:wildcard(Wildcard, Dir)].
+     || Filename <- filelib:wildcard(Wildcard, Dir),
+        not filelib:is_dir(filename:join(Dir, Filename))].
 
 read_file(Prefix, Filename, Dir) ->
     Filename1 = case Prefix of
