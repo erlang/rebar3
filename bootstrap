@@ -168,8 +168,9 @@ compile_file(File, Opts) ->
 bootstrap_rebar3() ->
     filelib:ensure_dir("_build/default/lib/rebar/ebin/dummy.beam"),
     code:add_path("_build/default/lib/rebar/ebin/"),
-    ok = symlink_or_copy(filename:absname("src"),
-                         filename:absname("_build/default/lib/rebar/src")),
+    Res = symlink_or_copy(filename:absname("src"),
+                          filename:absname("_build/default/lib/rebar/src")),
+    true = Res == ok orelse Res == exists,
     Sources = ["src/rebar_resource.erl" | filelib:wildcard("src/*.erl")],
     [compile_file(X, [{outdir, "_build/default/lib/rebar/ebin/"}
                      ,return | additional_defines()]) || X <- Sources],
