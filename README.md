@@ -90,7 +90,7 @@ themselves are generally not involved in that process.
 
 If you do not have a full Erlang install, we  using [erln8](http://erln8.github.io/erln8/)
 or [kerl](https://github.com/yrashk/kerl). For binary packages use those provided
-by [Erlang Solutions](https://www.erlang-solutions.com/downloads/download-erlang-otp),
+by [Erlang Solutions](https://www.erlang-solutions.com/resources/download.html),
 but be sure to choose the "Standard" download option or you'll have issues building
 projects.
 
