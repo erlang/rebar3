@@ -12,7 +12,8 @@
          run_hooks_once_profiles/1,
          run_hooks_for_plugins/1,
          eunit_app_hooks/1,
-         deps_hook_namespace/1]).
+         deps_hook_namespace/1,
+         deps_clean_hook_namespace/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -36,7 +37,7 @@ end_per_testcase(_, _Config) ->
 all() ->
     [build_and_clean_app, run_hooks_once, run_hooks_once_profiles,
      escriptize_artifacts, run_hooks_for_plugins, deps_hook_namespace,
-     eunit_app_hooks].
+     deps_clean_hook_namespace, eunit_app_hooks].
 
 %% Test post provider hook cleans compiled project app, leaving it invalid
 build_and_clean_app(Config) ->
@@ -131,6 +132,28 @@ deps_hook_namespace(Config) ->
     ],
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["compile"],
+        {ok, [{dep, "some_dep"}]}
+    ).
+
+deps_clean_hook_namespace(Config) ->
+    mock_git_resource:mock([{deps, [{some_dep, "0.0.1"}]}]),
+    Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", []}]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+
+    RebarConfig = [
+        {deps, TopDeps},
+        {overrides, [
+            {override, some_dep, [
+                {provider_hooks, [
+                    {pre, [
+                        {compile, clean}
+                    ]}
+                ]}
+            ]}
+        ]}
+    ],
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["clean"],
         {ok, [{dep, "some_dep"}]}
     ).
 
