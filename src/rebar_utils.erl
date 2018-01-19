@@ -453,6 +453,24 @@ reread_config(ConfigList) ->
                   "and will be ignored.", [])
     end.
 
+%% @doc Given env. variable `FOO' we want to expand all references to
+%% it in `InStr'. References can have two forms: `$FOO' and `${FOO}'
+%% The end of form `$FOO' is delimited with whitespace or EOL
+-spec expand_env_variable(string(), string(), term()) -> string().
+expand_env_variable(InStr, VarName, RawVarValue) ->
+    case rebar_string:chr(InStr, $$) of
+        0 ->
+            %% No variables to expand
+            InStr;
+        _ ->
+            ReOpts = [global, unicode, {return, list}],
+            VarValue = re:replace(RawVarValue, "\\\\", "\\\\\\\\", ReOpts),
+            %% Use a regex to match/replace:
+            %% Given variable "FOO": match $FOO\s | $FOOeol | ${FOO}
+            RegEx = io_lib:format("\\\$(~ts(\\W|$)|{~ts})", [VarName, VarName]),
+            re:replace(InStr, RegEx, [VarValue, "\\2"], ReOpts)
+    end.
+
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
@@ -521,24 +539,6 @@ patch_on_windows(Cmd, Env) ->
                        [global, {return, list}, unicode]);
         _ ->
             Cmd
-    end.
-
-%% @doc Given env. variable `FOO' we want to expand all references to
-%% it in `InStr'. References can have two forms: `$FOO' and `${FOO}'
-%% The end of form `$FOO' is delimited with whitespace or EOL
--spec expand_env_variable(string(), string(), term()) -> string().
-expand_env_variable(InStr, VarName, RawVarValue) ->
-    case rebar_string:chr(InStr, $$) of
-        0 ->
-            %% No variables to expand
-            InStr;
-        _ ->
-            ReOpts = [global, unicode, {return, list}],
-            VarValue = re:replace(RawVarValue, "\\\\", "\\\\\\\\", ReOpts),
-            %% Use a regex to match/replace:
-            %% Given variable "FOO": match $FOO\s | $FOOeol | ${FOO}
-            RegEx = io_lib:format("\\\$(~ts(\\W|$)|{~ts})", [VarName, VarName]),
-            re:replace(InStr, RegEx, [VarValue, "\\2"], ReOpts)
     end.
 
 expand_sh_flag(return_on_error) ->
