@@ -13,7 +13,7 @@ init_per_testcase(_, Config) ->
 end_per_testcase(_, _Config) ->
     ok.
 
-all() -> [command, args, many, override_default, no_circular].
+all() -> [command, args, many, override_default, no_circular, release].
          %% namespaces: unsupported, untested.
 
 command() ->
@@ -110,4 +110,29 @@ no_circular(Config) ->
     rebar_test_utils:run_and_check(Config, RebarConfig, ["test"],
                 {error, [$C,$o,$m,$m,$a,$n,$d,$ ,"test",$ ,$n,$o,$t,$ ,
                          $f,$o,$u,$n,$d]}),
+    ok.
+
+release() ->
+    [{doc, "An alias for a release command"}].
+release(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("alias_release_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    RebarConfig = [{relx,
+                    [{release, {skipped_release, Vsn}, []},
+                     {release, {the_release, Vsn}, [list_to_atom(Name)]},
+                     {lib_dirs, [AppDir]}]},
+                   {alias,
+                    [{the_rel1, [clean, {release, "-n the_release"}]},
+                     {the_rel2, [clean, {release, "--relname=the_release"}]}]}],
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig,
+      ["the_rel1"],
+      {ok, [{release, the_release, Vsn, false}]}),
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig,
+      ["the_rel2"],
+      {ok, [{release, the_release, Vsn, false}]}),
     ok.
