@@ -3,11 +3,11 @@
  {<<"certifi">>,{pkg,<<"certifi">>,<<"2.0.0">>},0},
  {<<"cf">>,{pkg,<<"cf">>,<<"0.2.2">>},0},
  {<<"cth_readable">>,{pkg,<<"cth_readable">>,<<"1.3.2">>},0},
- {<<"erlware_commons">>,{pkg,<<"erlware_commons">>,<<"1.0.4">>},0},
+ {<<"erlware_commons">>,{pkg,<<"erlware_commons">>,<<"1.0.5">>},0},
  {<<"eunit_formatters">>,{pkg,<<"eunit_formatters">>,<<"0.5.0">>},0},
  {<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},0},
  {<<"providers">>,{pkg,<<"providers">>,<<"1.7.0">>},0},
- {<<"relx">>,{pkg,<<"relx">>,<<"3.24.3">>},0},
+ {<<"relx">>,{pkg,<<"relx">>,<<"3.24.4">>},0},
  {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.3">>},0}]}.
 [
 {pkg_hash,[
@@ -15,10 +15,10 @@
  {<<"certifi">>, <<"A0C0E475107135F76B8C1D5BC7EFB33CD3815CB3CF3DEA7AEFDD174DABEAD064">>},
  {<<"cf">>, <<"7F2913FFF90ABCABD0F489896CFEB0B0674F6C8DF6C10B17A83175448029896C">>},
  {<<"cth_readable">>, <<"44F963C27027EBE92BECBE3194FD9A3798507C7352E2C6F36950DE61CB3C8146">>},
- {<<"erlware_commons">>, <<"8F215709CCB8A99BC0436405CD78A8A92B84AD08969C2B926E239CC3B08AC4DC">>},
+ {<<"erlware_commons">>, <<"FC23D8E304140B65A811F653A76B2FB10B0CE744608CAF86E9125CEB349C9442">>},
  {<<"eunit_formatters">>, <<"6A9133943D36A465D804C1C5B6E6839030434B8879C5600D7DDB5B3BAD4CCB59">>},
  {<<"getopt">>, <<"C73A9FA687B217F2FF79F68A3B637711BB1936E712B521D8CE466B29CBF7808A">>},
  {<<"providers">>, <<"BBF730563914328EC2511D205E6477A94831DB7297DE313B3872A2B26C562EAB">>},
- {<<"relx">>, <<"A7ADA05319D52791FC63BAC8027F464156B52A0453BA5DD09A9386BABF06AF26">>},
+ {<<"relx">>, <<"2132F0ABFA93DB3177E66768DB5A3D4141D4683BB4864B9DD4452EE7123DED07">>},
  {<<"ssl_verify_fun">>, <<"6C49665D4326E26CD4A5B7BD54AA442B33DADFB7C5D59A0D0CD0BF5534BBFBD7">>}]}
 ].
