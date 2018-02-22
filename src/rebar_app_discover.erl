@@ -331,14 +331,19 @@ create_app_info(AppInfo, AppDir, AppFile) ->
     AppInfo2 = rebar_app_info:applications(
                  rebar_app_info:app_details(AppInfo1, AppDetails),
                  IncludedApplications++Applications),
-    Valid = case rebar_app_utils:validate_application_info(AppInfo2) =:= true
-                andalso rebar_app_info:has_all_artifacts(AppInfo2) =:= true of
+    C = rebar_config:consult(AppDir),
+    AppInfo3 = rebar_app_info:update_opts(AppInfo2,
+                                          rebar_app_info:opts(AppInfo2), C),
+    ?DEBUG("create_app_info(~p, ~p, ~p) -> ~n~p~n",
+           [AppInfo, AppDir, AppFile, AppInfo3]),
+    Valid = case rebar_app_utils:validate_application_info(AppInfo3) =:= true
+                andalso rebar_app_info:has_all_artifacts(AppInfo3) =:= true of
                 true ->
                     true;
                 _ ->
                     false
             end,
-    rebar_app_info:dir(rebar_app_info:valid(AppInfo2, Valid), AppDir).
+    rebar_app_info:dir(rebar_app_info:valid(AppInfo3, Valid), AppDir).
 
 %% @doc Read in and parse the .app file if it is availabe. Do the same for
 %% the .app.src file if it exists.

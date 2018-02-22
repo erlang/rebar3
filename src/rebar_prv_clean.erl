@@ -12,7 +12,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, clean).
--define(DEPS, [app_discovery]).
+-define(DEPS, [app_discovery, install_deps]).
 
 %% ===================================================================
 %% Public API
