@@ -38,16 +38,10 @@ init(State) ->
 do(State) ->
     OldPath = code:get_path(),
     code:add_pathsa(rebar_state:code_paths(State, all_deps)),
-    XrefChecks = prepare(State),
-    XrefIgnores = rebar_state:get(State, xref_ignores, []),
     %% Run xref checks
     ?INFO("Running cross reference analysis...", []),
-    XrefResults = xref_checks(XrefChecks, XrefIgnores),
-
-    %% Run custom queries
-    QueryChecks = rebar_state:get(State, xref_queries, []),
-    QueryResults = lists:foldl(fun check_query/2, [], QueryChecks),
-    stopped = xref:stop(xref),
+    ProjectApps = rebar_state:project_apps(State),
+    {XrefResults, QueryResults} = run(State, ProjectApps),
     rebar_utils:cleanup_code_path(OldPath),
     case XrefResults =:= [] andalso QueryResults =:= [] of
         true ->
@@ -55,6 +49,33 @@ do(State) ->
         false ->
             ?PRV_ERROR({xref_issues, XrefResults, QueryResults})
     end.
+
+run(State, AppInfos) ->
+    lists:foldl(
+      fun(AppInfo, {XrefResultsAcc, QueryResultsAcc}) ->
+              {XrefResults, QueryResults} = run_app(AppInfo, State, AppInfo),
+              {XrefResults ++ XrefResultsAcc, QueryResults ++ QueryResultsAcc}
+      end,
+      {[], []},
+      AppInfos).
+
+run_app(AppInfo, State, AppInfo) ->
+    %% xref is (re)started for each app to get a clean context
+    {ok, _} = xref:start(xref),
+    LibPaths = lib_paths(AppInfo, State),
+    XrefChecks = prepare(AppInfo, State, LibPaths),
+
+    %% Run xref checks
+    XrefResults = xref_checks(XrefChecks, []),
+
+    %% Run custom queries
+    QueryChecks = rebar_state:get(State, xref_queries, []),
+    QueryResults = lists:foldl(fun check_query/2, [], QueryChecks),
+    ?DEBUG("Cross reference app ~s, ~p:~n~p",
+           [rebar_app_info:name(AppInfo),
+            LibPaths, {XrefResults, QueryResults}]),
+    stopped = xref:stop(xref),
+    {XrefResults, QueryResults}.
 
 -spec format_error(any()) -> iolist().
 format_error({xref_issues, XrefResults, QueryResults}) ->
@@ -77,9 +98,11 @@ desc() ->
       "  ~p~n"
       "  ~p~n"
       "  ~p~n"
+      "  ~p~n"
       "  ~p~n",
       [short_desc(),
        {xref_warnings, false},
+       {xref_include_all_code, false},
        {xref_extra_paths,[]},
        {xref_checks, [undefined_function_calls, undefined_functions,
                       locals_not_used, exports_not_used,
@@ -89,33 +112,40 @@ desc() ->
           " - (\"mod\":\".*foo\"/\"4\"))",[]}]}
       ]).
 
--spec prepare(rebar_state:t()) -> [atom()].
-prepare(State) ->
-    {ok, _} = xref:start(xref),
-    ok = xref:set_library_path(xref, code_path(State)),
+-spec prepare(rebar_app_info:t(), rebar_state:t(), list()) -> [atom()].
+prepare(AppInfo, State, LibPaths) ->
+    ok = xref:set_library_path(xref, analysis_code_path(AppInfo, State, LibPaths)),
 
     xref:set_default(xref, [{warnings,
                              rebar_state:get(State, xref_warnings, false)},
                             {verbose, rebar_log:is_verbose(State)}]),
 
     [{ok, _} = xref:add_directory(xref, Dir)
-     || App <- rebar_state:project_apps(State),
-        %% the directory may not exist in rare cases of a compile
-        %% hook of a dep running xref prior to the full job being done
-        Dir <- [rebar_app_info:ebin_dir(App)], filelib:is_dir(Dir)],
+     || Dir <- [rebar_app_info:ebin_dir(AppInfo)],
+        filelib:is_dir(Dir)],
 
     %% Get list of xref checks we want to run
     ConfXrefChecks = rebar_state:get(State, xref_checks,
                                      [exports_not_used,
                                       undefined_function_calls]),
 
-    XrefChecks = sets:to_list(sets:intersection(
-                                sets:from_list(?SUPPORTED_XREFS),
-                                sets:from_list(ConfXrefChecks))),
-    XrefChecks.
+    sets:to_list(sets:intersection(
+                   sets:from_list(?SUPPORTED_XREFS),
+                   sets:from_list(ConfXrefChecks))).
 
 xref_checks(XrefChecks, XrefIgnores) ->
     run_xref_checks(XrefChecks, XrefIgnores, []).
+
+lib_paths(AppInfo, State) ->
+    case rebar_state:get(State, xref_include_all_code, false) of
+        false ->
+            AppDetails = rebar_app_info:app_details(AppInfo),
+            Libs = proplists:get_value(applications, AppDetails, []) ++
+                proplists:get_value(included_applications, AppDetails, []),
+            [code:lib_dir(Dep, ebin) || Dep <- Libs];
+        true ->
+            code:get_path()
+    end.
 
 run_xref_checks([], _XrefIgnores, Acc) ->
     Acc;
@@ -137,8 +167,10 @@ check_query({Query, Value}, Acc) ->
             Acc
     end.
 
-code_path(State) ->
-    [P || P <- code:get_path() ++
+analysis_code_path(AppInfo, State, LibPaths) ->
+    ?DEBUG("Cross reference lib paths for ~s:~n~p",
+           [rebar_app_info:name(AppInfo), LibPaths]),
+    [P || P <- LibPaths ++
               rebar_state:get(State, xref_extra_paths, []),
           filelib:is_dir(P)].
 
@@ -225,8 +257,15 @@ display_xref_result_fun(Type) ->
                 end,
             case Type of
                 undefined_function_calls ->
-                    io_lib:format("~tsWarning: ~ts calls undefined function ~ts (Xref)\n",
-                                  [Source, SMFA, TMFA]);
+                    case mfa_exists(MFATarget) of
+                        true ->
+                            io_lib:format(
+                              "~sWarning: ~ts calls ~ts from application not listed in calling applications .app file (Xref)\n",
+                              [Source, SMFA, TMFA]);
+                        false ->
+                            io_lib:format("~tsWarning: ~ts calls undefined function ~ts (Xref)\n",
+                                          [Source, SMFA, TMFA])
+                    end;
                 undefined_functions ->
                     io_lib:format("~tsWarning: ~ts is undefined function (Xref)\n",
                                   [Source, SMFA]);
@@ -247,6 +286,10 @@ display_xref_result_fun(Type) ->
                                   [Source, SMFA, TMFA, Other])
             end
     end.
+
+mfa_exists({M,F,A}) ->
+    code:ensure_loaded(M),
+    erlang:function_exported(M,F,A).
 
 format_mfa({M, F, A}) ->
     ?FMT("~ts:~ts/~w", [M, F, A]).
