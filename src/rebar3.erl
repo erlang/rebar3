@@ -116,6 +116,7 @@ run(RawArgs) ->
 -spec run_aux(rebar_state:t(), [string()]) ->
     {ok, rebar_state:t()} | {error, term()}.
 run_aux(State, RawArgs) ->
+    io:setopts([{encoding, unicode}]),
     %% Profile override; can only support one profile
     State1 = case os:getenv("REBAR_PROFILE") of
                  false ->
