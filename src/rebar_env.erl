@@ -49,7 +49,6 @@ create_env(State, Opts) ->
      {"ERLC",                    filename:join([code:root_dir(), "bin", "erlc"])},
      {"ERLANG_ARCH"  ,           rebar_api:wordsize()},
      {"ERLANG_TARGET",           rebar_api:get_arch()}
-
     ].
 
 %% ====================================================================
