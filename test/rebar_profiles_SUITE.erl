@@ -28,7 +28,8 @@
          test_profile_erl_opts_order_4/1,
          test_profile_erl_opts_order_5/1,
          test_erl_opts_debug_info/1,
-         first_files_exception/1]).
+         first_files_exception/1,
+         deduplication_stability/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -52,7 +53,8 @@ all() ->
      test_profile_erl_opts_order_4,
      test_profile_erl_opts_order_5,
      test_erl_opts_debug_info,
-     first_files_exception].
+     first_files_exception,
+     deduplication_stability].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -133,7 +135,7 @@ profile_merge_umbrella_keys(Config) ->
                    {profiles,
                     [{ct,
                       [{vals, [{a,1},{b,2}]}]}]}],
-    
+
     SubRebarConfig = [{vals, []},
                        {profiles, [{ct, [{vals, [{c,1}]}]}]}],
 
@@ -544,6 +546,17 @@ first_files_exception(_Config) ->
     %% there is no specific reason not to dedupe "a" here aside from "this is how it is"
     ?assertEqual(["c","a","b","a","e"], rebar_state:get(State1, erl_first_files)),
     ?assertEqual(["c","a","b","a","e"], rebar_state:get(State1, mib_first_files)),
+    ok.
+
+deduplication_stability(_Config) ->
+    ?assertEqual([default,all_deps_test], rebar_state:deduplicate([default,all_deps_test])),
+    ?assertEqual([default,profile1,profile2], rebar_state:deduplicate([default,profile1,profile2])),
+    ?assertEqual([default,bar,foo], rebar_state:deduplicate([default,bar,foo,bar])), %% master wants [default,foo,bar]
+    ?assertEqual([default,test,bar], rebar_state:deduplicate([default,test,bar])),
+    ?assertEqual([default,test,bar], rebar_state:deduplicate([default,test,bar,test])),
+    ?assertEqual([default,profile1], rebar_state:deduplicate([default,profile1,profile1,profile1])),
+    ?assertEqual([default,a,b,c,d,e], rebar_state:deduplicate([default,a,b,c,d,e,a,e,b])),
+    ?assertEqual([default,test], rebar_state:deduplicate([default,test])),
     ok.
 
 get_compiled_profile_erl_opts(Profiles, Config) ->
