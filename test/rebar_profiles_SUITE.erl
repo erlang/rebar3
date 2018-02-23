@@ -211,7 +211,7 @@ implicit_profile_deduplicate_deps(Config) ->
     rebar_test_utils:run_and_check(Config, RebarConfig,
                                    ["as", "test,bar", "eunit"], {ok, [{app, Name}
                                                                  ,{dep, "a", "1.0.0"}
-                                                                 ,{dep, "b", "2.0.0"}]}).
+                                                                 ,{dep, "b", "1.0.0"}]}).
 
 all_deps_code_paths(Config) ->
     AppDir = ?config(apps, Config),
