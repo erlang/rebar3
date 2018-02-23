@@ -87,8 +87,8 @@ new(Config) when is_list(Config) ->
                         opts = Opts }.
 
 -spec new(t() | atom(), list()) -> t().
-new(Profile, Config) when is_atom(Profile),
-                          is_list(Config) ->
+new(Profile, Config) when is_atom(Profile)
+                        , is_list(Config) ->
     BaseState = base_state(),
     Opts = base_opts(Config),
     BaseState#state_t { dir = rebar_dir:get_cwd(),
@@ -283,12 +283,11 @@ apply_profiles(State=#state_t{default = Defaults, current_profiles=CurrentProfil
                     end, Defaults, AppliedProfiles),
     State#state_t{current_profiles = AppliedProfiles, opts=NewOpts}.
 
-%% @doc A stable deduplicator.
 deduplicate(Profiles) ->
-    do_deduplicate(Profiles, []).
+    do_deduplicate(lists:reverse(Profiles), []).
 
 do_deduplicate([], Acc) ->
-    lists:reverse(Acc);
+    Acc;
 do_deduplicate([Head | Rest], Acc) ->
     case lists:member(Head, Acc) of
         true -> do_deduplicate(Rest, Acc);
