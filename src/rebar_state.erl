@@ -43,10 +43,6 @@
          allow_provider_overrides/1, allow_provider_overrides/2
         ]).
 
--ifdef(TEST).
--export([deduplicate/1]).
--endif.
-
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
