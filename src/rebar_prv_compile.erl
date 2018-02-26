@@ -30,8 +30,19 @@ init(State) ->
                                                                {example, "rebar3 compile"},
                                                                {short_desc, "Compile apps .app.src and .erl files."},
                                                                {desc, "Compile apps .app.src and .erl files."},
-                                                               {opts, []}])),
+                                                               {opts, [
+                                                                 {only_deps, $d, "deps-only", undefined, "Compile only dependencies."}
+                                                               ]}])),
     {ok, State1}.
+
+
+compile_type(State) ->
+    {Args, _} = rebar_state:command_parsed_args(State),
+    case proplists:get_value(only_deps, Args) of
+        undefined -> all;
+        _ -> only_deps
+    end.
+
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
@@ -40,36 +51,42 @@ do(State) ->
     rebar_utils:remove_from_code_path(PluginDepsPaths),
     code:add_pathsa(DepsPaths),
 
-    ProjectApps = rebar_state:project_apps(State),
     Providers = rebar_state:providers(State),
     Deps = rebar_state:deps_to_build(State),
-    Cwd = rebar_state:dir(State),
 
     copy_and_build_apps(State, Providers, Deps),
-    {ok, ProjectApps1} = rebar_digraph:compile_order(ProjectApps),
+    case compile_type(State) of
+        only_deps ->
+            {ok, State};
+        all ->
+            ProjectApps = rebar_state:project_apps(State),
+            Providers = rebar_state:providers(State),
+            Cwd = rebar_state:dir(State),
+            copy_and_build_apps(State, Providers, Deps),
+            {ok, ProjectApps1} = rebar_digraph:compile_order(ProjectApps),
 
-    %% Run top level hooks *before* project apps compiled but *after* deps are
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
+            %% Run top level hooks *before* project apps compiled but *after* deps are
+            rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
-    ProjectApps2 = copy_and_build_project_apps(State, Providers, ProjectApps1),
-    State2 = rebar_state:project_apps(State, ProjectApps2),
+            ProjectApps2 = copy_and_build_project_apps(State, Providers, ProjectApps1),
+            State2 = rebar_state:project_apps(State, ProjectApps2),
 
-    %% projects with structures like /apps/foo,/apps/bar,/test
-    build_extra_dirs(State, ProjectApps2),
+            %% projects with structures like /apps/foo,/apps/bar,/test
+            build_extra_dirs(State, ProjectApps2),
 
-    State3 = update_code_paths(State2, ProjectApps2, DepsPaths),
+            State3 = update_code_paths(State2, ProjectApps2, DepsPaths),
 
-    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State2),
-    case rebar_state:has_all_artifacts(State3) of
-        {false, File} ->
-            throw(?PRV_ERROR({missing_artifact, File}));
-        true ->
-            true
-    end,
-    rebar_utils:cleanup_code_path(rebar_state:code_paths(State3, default)
-                                 ++ rebar_state:code_paths(State, all_plugin_deps)),
-
-    {ok, State3}.
+            rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State2),
+            case rebar_state:has_all_artifacts(State3) of
+                {false, File} ->
+                    throw(?PRV_ERROR({missing_artifact, File}));
+                true ->
+                    true
+            end,
+            rebar_utils:cleanup_code_path(rebar_state:code_paths(State3, default)
+                                         ++ rebar_state:code_paths(State, all_plugin_deps)),
+            {ok, State3}
+    end.
 
 -spec format_error(any()) -> iolist().
 format_error({missing_artifact, File}) ->
@@ -295,4 +312,3 @@ warn_on_problematic_directories(AllDirs) ->
 is_a_problem("eunit") -> true;
 is_a_problem("common_test") -> true;
 is_a_problem(_) -> false.
-
