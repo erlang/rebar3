@@ -170,8 +170,13 @@ find_highest_matching_(Pkg, PkgVsn, Dep, Constraint, Table, State) ->
     try find_all(Dep, Table, State) of
         {ok, [Vsn]} ->
             handle_single_vsn(Pkg, PkgVsn, Dep, Vsn, Constraint);
-        {ok, [HeadVsn | VsnTail]} ->
-                            {ok, handle_vsns(Constraint, HeadVsn, VsnTail)}
+        {ok, Vsns} ->
+            case handle_vsns(Constraint, Vsns) of
+                none ->
+                    none;
+                FoundVsn ->
+                    {ok, FoundVsn}
+            end
     catch
         error:badarg ->
             none
@@ -189,16 +194,16 @@ find_all(Dep, Table, State) ->
             none
     end.
 
-handle_vsns(Constraint, HeadVsn, VsnTail) ->
+handle_vsns(Constraint, Vsns) ->
     lists:foldl(fun(Version, Highest) ->
                         case ec_semver:pes(Version, Constraint) andalso
-                            ec_semver:gt(Version, Highest) of
+                            (Highest =:= none orelse ec_semver:gt(Version, Highest)) of
                             true ->
                                 Version;
                             false ->
                                 Highest
                         end
-                end, HeadVsn, VsnTail).
+                end, none, Vsns).
 
 handle_single_vsn(Pkg, PkgVsn, Dep, Vsn, Constraint) ->
     case ec_semver:pes(Vsn, Constraint) of
