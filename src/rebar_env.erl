@@ -1,6 +1,7 @@
 -module(rebar_env).
 
--export([create_env/2]).
+-export([create_env/1,
+         create_env/2]).
 
 -include("rebar.hrl").
 
@@ -27,6 +28,12 @@
 %% ERL                          = ERLANG_ROOT_DIR/bin/erl
 %% ERLC                         = ERLANG_ROOT_DIR/bin/erl
 %%
+
+-spec create_env(rebar_state:t()) -> proplists:proplist().
+create_env(State) ->
+    Opts = rebar_state:opts(State),
+    create_env(State, Opts).
+
 -spec create_env(rebar_state:t(), rebar_dict()) -> proplists:proplist().
 create_env(State, Opts) ->
     BaseDir = rebar_dir:base_dir(State),
