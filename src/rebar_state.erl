@@ -182,7 +182,7 @@ all(_, []) ->
 all(Dir, [File|Artifacts]) ->
     case filelib:is_regular(filename:join(Dir, File)) of
         false ->
-            ?DEBUG("Missing artifact ~s", [filename:join(Dir, File)]),
+            ?DEBUG("Missing artifact ~ts", [filename:join(Dir, File)]),
             {false, File};
         true ->
             all(Dir, Artifacts)
@@ -302,9 +302,9 @@ dir(State=#state_t{}, Dir) ->
 
 deps_names(Deps) when is_list(Deps) ->
     lists:map(fun(Dep) when is_tuple(Dep) ->
-                      ec_cnv:to_binary(element(1, Dep));
+                      rebar_utils:to_binary(element(1, Dep));
                  (Dep) when is_atom(Dep) ->
-                      ec_cnv:to_binary(Dep)
+                      rebar_utils:to_binary(Dep)
               end, Deps);
 deps_names(State) ->
     Deps = rebar_state:get(State, deps, []),
@@ -391,7 +391,7 @@ add_provider(State=#state_t{providers=Providers, allow_provider_overrides=false}
                            case {providers:impl(P), providers:namespace(P)} of
                                {Name, Namespace} ->
                                    ?DEBUG("Not adding provider ~p ~p from module ~p because it already exists from module ~p",
-                                          [Namespace, Name, providers:module(P), Module]),
+                                          [Namespace, Name, Module, providers:module(P)]),
                                    true;
                                _ ->
                                    false

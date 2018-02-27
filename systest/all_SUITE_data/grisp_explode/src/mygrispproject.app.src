@@ -1,0 +1,17 @@
+{application, mygrispproject, [
+    {description, "A GRiSP application"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {mygrispproject, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        grisp
+    ]},
+    {env,[]},
+    {modules, []},
+
+    {maintainers, []},
+    {licenses, ["Apache 2.0"]},
+    {links, []}
+]}.

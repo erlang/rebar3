@@ -58,11 +58,11 @@ compile(State, App) ->
     validate_app(State, App1).
 
 format_error({missing_app_file, Filename}) ->
-    io_lib:format("App file is missing: ~s", [Filename]);
+    io_lib:format("App file is missing: ~ts", [Filename]);
 format_error({file_read, File, Reason}) ->
-    io_lib:format("Failed to read required file ~s for processing: ~s", [File, file:format_error(Reason)]);
+    io_lib:format("Failed to read required file ~ts for processing: ~ts", [File, file:format_error(Reason)]);
 format_error({invalid_name, File, AppName}) ->
-    io_lib:format("Invalid ~s: name of application (~p) must match filename.", [File, AppName]).
+    io_lib:format("Invalid ~ts: name of application (~p) must match filename.", [File, AppName]).
 
 %% ===================================================================
 %% Internal functions
@@ -117,14 +117,17 @@ preprocess(State, AppInfo, AppSrcFile) ->
             %% without a 'registered' value.
             A3 = ensure_registered(A2),
 
+            %% some tools complain if a description is not present.
+            A4 = ensure_description(A3),
+
             %% Build the final spec as a string
-            Spec = io_lib:format("~p.\n", [{application, AppName, A3}]),
+            Spec = io_lib:format("~p.\n", [{application, AppName, A4}]),
 
             %% Setup file .app filename and write new contents
             EbinDir = rebar_app_info:ebin_dir(AppInfo),
             filelib:ensure_dir(filename:join(EbinDir, "dummy.beam")),
             AppFile = rebar_app_utils:app_src_to_app(OutDir, AppSrcFile),
-            ok = rebar_file_utils:write_file_if_contents_differ(AppFile, Spec),
+            ok = rebar_file_utils:write_file_if_contents_differ(AppFile, Spec, utf8),
 
             AppFile;
         {error, Reason} ->
@@ -195,6 +198,15 @@ ensure_registered(AppData) ->
             AppData
     end.
 
+ensure_description(AppData) ->
+    case lists:keyfind(description, 1, AppData) of
+        false ->
+            %% Required for releases to work.
+            [{description, ""} | AppData];
+        {description, _} ->
+            AppData
+    end.
+
 %% In the case of *.app.src we want to give the user the ability to
 %% dynamically script the application resource file (think dynamic version
 %% string, etc.), in a way similar to what can be done with the rebar
@@ -222,7 +234,7 @@ app_vsn(AppData, AppFile, State) ->
 get_value(Key, AppInfo, AppFile) ->
     case proplists:get_value(Key, AppInfo) of
         undefined ->
-            ?ABORT("Failed to get app value '~p' from '~s'~n", [Key, AppFile]);
+            ?ABORT("Failed to get app value '~p' from '~ts'~n", [Key, AppFile]);
         Value ->
             Value
     end.

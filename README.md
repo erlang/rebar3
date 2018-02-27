@@ -81,7 +81,8 @@ $ ./rebar3 local install
 ```
 
 To keep it up to date after you've installed rebar3 this way you can use `rebar3 local upgrade` which
-fetches the latest nightly and extracts to the same place as above.
+fetches the latest stable release and extracts to the same place as above. A [nightly version can
+also be obtained](https://s3.amazonaws.com/rebar3-nightly/rebar3) if desired.
 
 Rebar3 may also be available on various OS-specific package managers such as
 FreeBSD Ports. Those are maintained by the community and Rebar3 maintainers
@@ -89,7 +90,7 @@ themselves are generally not involved in that process.
 
 If you do not have a full Erlang install, we  using [erln8](http://erln8.github.io/erln8/)
 or [kerl](https://github.com/yrashk/kerl). For binary packages use those provided
-by [Erlang Solutions](https://www.erlang-solutions.com/downloads/download-erlang-otp),
+by [Erlang Solutions](https://www.erlang-solutions.com/resources/download.html),
 but be sure to choose the "Standard" download option or you'll have issues building
 projects.
 

@@ -52,14 +52,12 @@ print_deps_tree(SrcDeps, Verbose, State) ->
     ProjectAppNames = [{rebar_app_info:name(App)
                        ,rebar_utils:vcs_vsn(rebar_app_info:original_vsn(App), rebar_app_info:dir(App), Resources)
                        ,project} || App <- rebar_state:project_apps(State)],
-    io:setopts([{encoding, unicode}]),
     case dict:find(root, D) of
         {ok, Children} ->
             print_children("", lists:keysort(1, Children++ProjectAppNames), D, Verbose);
         error ->
             print_children("", lists:keysort(1, ProjectAppNames), D, Verbose)
-    end,
-    io:setopts([{encoding, latin1}]).
+    end.
 
 print_children(_, [], _, _) ->
     ok;
@@ -90,7 +88,7 @@ type(Source, Verbose) when is_tuple(Source) ->
         {pkg, _} ->
             "hex package";
         {Other, false} ->
-            io_lib:format("~s repo", [Other]);
+            io_lib:format("~ts repo", [Other]);
         {_, true} ->
-            io_lib:format("~s", [element(2, Source)])
+            io_lib:format("~ts", [element(2, Source)])
     end.

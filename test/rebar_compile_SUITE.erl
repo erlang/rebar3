@@ -24,6 +24,7 @@
          clean_extra_dirs_in_project_root/1,
          recompile_when_hrl_changes/1,
          recompile_when_included_hrl_changes/1,
+         recompile_when_opts_included_hrl_changes/1,
          recompile_when_opts_change/1,
          dont_recompile_when_opts_dont_change/1,
          dont_recompile_yrl_or_xrl/1,
@@ -39,11 +40,13 @@
          clean_all/1,
          override_deps/1,
          profile_override_deps/1,
+         profile_deps/1,
          deps_build_in_prod/1,
          include_file_relative_to_working_directory/1,
          include_file_in_src/1,
          include_file_relative_to_working_directory_test/1,
          include_file_in_src_test/1,
+         include_file_in_src_test_multiapp/1,
          dont_recompile_when_erl_compiler_options_env_does_not_change/1,
          recompile_when_erl_compiler_options_env_changes/1,
          always_recompile_when_erl_compiler_options_set/1,
@@ -66,6 +69,7 @@ all() ->
      {group, basic_extras}, {group, release_extras}, {group, unbalanced_extras},
      {group, root_extras},
      recompile_when_hrl_changes, recompile_when_included_hrl_changes,
+     recompile_when_opts_included_hrl_changes,
      recompile_when_opts_change,
      dont_recompile_when_opts_dont_change, dont_recompile_yrl_or_xrl,
      delete_beam_if_source_deleted,
@@ -73,8 +77,10 @@ all() ->
      parse_transform_test, erl_first_files_test, mib_test,
      umbrella_mib_first_test, only_default_transitive_deps,
      clean_all, override_deps, profile_override_deps, deps_build_in_prod,
+     profile_override_deps, profile_deps, deps_build_in_prod,
      include_file_relative_to_working_directory, include_file_in_src,
      include_file_relative_to_working_directory_test, include_file_in_src_test,
+     include_file_in_src_test_multiapp,
      recompile_when_parse_transform_as_opt_changes,
      recompile_when_parse_transform_inline_changes,
      regex_filter_skip, regex_filter_regression,
@@ -752,6 +758,53 @@ recompile_when_included_hrl_changes(Config) ->
 
     ?assert(ModTime =/= NewModTime).
 
+recompile_when_opts_included_hrl_changes(Config) ->
+    AppsDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    AppDir = filename:join([AppsDir, "apps", Name]),
+
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    ExtraSrc = <<"-module(test_header_include).\n"
+                  "-export([main/0]).\n"
+                  "-include(\"test_header_include.hrl\").\n"
+                  "main() -> ?SOME_DEFINE.\n">>,
+
+    ExtraHeader = <<"-define(SOME_DEFINE, true).\n">>,
+    ok = filelib:ensure_dir(filename:join([AppsDir, "include", "dummy"])),
+    HeaderFile = filename:join([AppsDir, "include", "test_header_include.hrl"]),
+    ok = file:write_file(filename:join([AppDir, "src", "test_header_include.erl"]), ExtraSrc),
+    ok = file:write_file(HeaderFile, ExtraHeader),
+
+    %% Using relative path from the project root
+    RebarConfig = [{erl_opts, [{i, "include/"}]}],
+    {ok,Cwd} = file:get_cwd(),
+    ok = file:set_cwd(AppsDir),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
+
+    EbinDir = filename:join([AppsDir, "_build", "default", "lib", Name, "ebin"]),
+    {ok, Files} = rebar_utils:list_dir(EbinDir),
+    ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+               || F <- Files, filename:extension(F) == ".beam"],
+
+    timer:sleep(1000),
+
+    NewExtraHeader = <<"-define(SOME_DEFINE, false).\n">>,
+    ok = file:write_file(HeaderFile, NewExtraHeader),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
+
+    {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
+    NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+                  || F <- NewFiles, filename:extension(F) == ".beam"],
+
+    ok = file:set_cwd(Cwd),
+
+    ?assert(ModTime =/= NewModTime).
+
 recompile_when_opts_change(Config) ->
     AppDir = ?config(apps, Config),
 
@@ -1237,9 +1290,10 @@ override_deps(Config) ->
     ).
 
 profile_override_deps(Config) ->
-    mock_git_resource:mock([{deps, [{some_dep, "0.0.1"},{other_dep, "0.0.1"}]}]),
     Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
     TopDeps = rebar_test_utils:top_level_deps(Deps),
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
 
     RebarConfig = [
         {deps, TopDeps},
@@ -1254,6 +1308,20 @@ profile_override_deps(Config) ->
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["as", "a", "compile"],
         {ok, [{dep, "some_dep"},{dep_not_exist, "other_dep"}]}
+    ).
+
+profile_deps(Config) ->
+    Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
+
+    RebarConfig = [
+        {deps, TopDeps},
+        {profiles, [{a, []}]}],
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["as", "a", "compile"],
+        {ok, [{dep, "some_dep"},{dep, "other_dep"}]}
     ).
 
 %% verify a deps prod profile is used
@@ -1410,6 +1478,39 @@ include_file_in_src_test(Config) ->
     rebar_test_utils:run_and_check(Config, RebarConfig,
                                    ["as", "test", "compile"],
                                    {ok, [{app, Name}]}).
+
+%% Same as `include_file_in_src_test/1' but using multiple top-level
+%% apps as dependencies.
+include_file_in_src_test_multiapp(Config) ->
+
+    Name1 = rebar_test_utils:create_random_name("app2_"),
+    Name2 = rebar_test_utils:create_random_name("app1_"),
+    AppDir1 = filename:join([?config(apps, Config), "lib", Name1]),
+    AppDir2 = filename:join([?config(apps, Config), "lib", Name2]),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir1, Name1, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_app(AppDir2, Name2, Vsn, [kernel, stdlib]),
+
+    Src = "-module(test).\n"
+"\n"
+"-include_lib(\"" ++ Name2 ++ "/include/test.hrl\").\n"
+"\n"
+"test() -> ?TEST_MACRO.\n"
+"\n",
+    Include = <<"-define(TEST_MACRO, test).\n">>,
+
+    ok = filelib:ensure_dir(filename:join([AppDir1, "src", "dummy"])),
+    ok = filelib:ensure_dir(filename:join([AppDir1, "test", "dummy"])),
+    ok = filelib:ensure_dir(filename:join([AppDir2, "src", "dummy"])),
+    ok = filelib:ensure_dir(filename:join([AppDir2, "include", "dummy"])),
+    ok = file:write_file(filename:join([AppDir1, "test", "test.erl"]), Src),
+
+    ok = file:write_file(filename:join([AppDir2, "include", "test.hrl"]), Include),
+
+    RebarConfig = [],
+    rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["as", "test", "compile"],
+                                   {ok, [{app, Name1}]}).
 
 %% this test sets the env var, compiles, records the file last modified timestamp,
 %% recompiles and compares the file last modified timestamp to ensure it hasn't

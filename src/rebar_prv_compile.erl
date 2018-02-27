@@ -45,13 +45,13 @@ do(State) ->
     Deps = rebar_state:deps_to_build(State),
     Cwd = rebar_state:dir(State),
 
-    build_apps(State, Providers, Deps),
+    copy_and_build_apps(State, Providers, Deps),
     {ok, ProjectApps1} = rebar_digraph:compile_order(ProjectApps),
 
     %% Run top level hooks *before* project apps compiled but *after* deps are
     rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
-    ProjectApps2 = build_apps(State, Providers, ProjectApps1),
+    ProjectApps2 = copy_and_build_project_apps(State, Providers, ProjectApps1),
     State2 = rebar_state:project_apps(State, ProjectApps2),
 
     %% projects with structures like /apps/foo,/apps/bar,/test
@@ -73,11 +73,11 @@ do(State) ->
 
 -spec format_error(any()) -> iolist().
 format_error({missing_artifact, File}) ->
-    io_lib:format("Missing artifact ~s", [File]);
+    io_lib:format("Missing artifact ~ts", [File]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
-build_apps(State, Providers, Apps) ->
+copy_and_build_apps(State, Providers, Apps) ->
     [build_app(State, Providers, AppInfo) || AppInfo <- Apps].
 
 build_app(State, Providers, AppInfo) ->
@@ -85,6 +85,19 @@ build_app(State, Providers, AppInfo) ->
     OutDir = rebar_app_info:out_dir(AppInfo),
     copy_app_dirs(AppInfo, AppDir, OutDir),
     compile(State, Providers, AppInfo).
+
+copy_and_build_project_apps(State, Providers, Apps) ->
+    %% Top-level apps, because of profile usage and specific orderings (i.e.
+    %% may require an include file from a profile-specific app for an extra_dirs
+    %% entry that only exists in a test context), need to be
+    %% copied and added to the path at once, and not just in compile order.
+    [copy_app_dirs(AppInfo,
+                   rebar_app_info:dir(AppInfo),
+                   rebar_app_info:out_dir(AppInfo))
+     || AppInfo <- Apps],
+    code:add_pathsa([rebar_app_info:out_dir(AppInfo) || AppInfo <- Apps]),
+    [compile(State, Providers, AppInfo) || AppInfo <- Apps].
+
 
 build_extra_dirs(State, Apps) ->
     BaseDir = rebar_state:dir(State),
@@ -114,7 +127,7 @@ compile(State, AppInfo) ->
     compile(State, rebar_state:providers(State), AppInfo).
 
 compile(State, Providers, AppInfo) ->
-    ?INFO("Compiling ~s", [rebar_app_info:name(AppInfo)]),
+    ?INFO("Compiling ~ts", [rebar_app_info:name(AppInfo)]),
     AppDir = rebar_app_info:dir(AppInfo),
     AppInfo1 = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, AppInfo, State),
 
@@ -123,7 +136,18 @@ compile(State, Providers, AppInfo) ->
     AppInfo3 = rebar_hooks:run_all_hooks(AppDir, post, ?ERLC_HOOK, Providers, AppInfo2, State),
 
     AppInfo4 = rebar_hooks:run_all_hooks(AppDir, pre, ?APP_HOOK, Providers, AppInfo3, State),
-    case rebar_otp_app:compile(State, AppInfo4) of
+
+    %% Load plugins back for make_vsn calls in custom resources.
+    %% The rebar_otp_app compilation step is safe regarding the
+    %% overall path management, so we can just load all plugins back
+    %% in memory.
+    PluginDepsPaths = rebar_state:code_paths(State, all_plugin_deps),
+    code:add_pathsa(PluginDepsPaths),
+    AppFileCompileResult = rebar_otp_app:compile(State, AppInfo4),
+    %% Clean up after ourselves, leave things as they were.
+    rebar_utils:remove_from_code_path(PluginDepsPaths),
+
+    case AppFileCompileResult of
         {ok, AppInfo5} ->
             AppInfo6 = rebar_hooks:run_all_hooks(AppDir, post, ?APP_HOOK, Providers, AppInfo5, State),
             AppInfo7 = rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo6, State),
@@ -173,8 +197,8 @@ has_all_artifacts(AppInfo1) ->
     end.
 
 copy_app_dirs(AppInfo, OldAppDir, AppDir) ->
-    case ec_cnv:to_binary(filename:absname(OldAppDir)) =/=
-        ec_cnv:to_binary(filename:absname(AppDir)) of
+    case rebar_utils:to_binary(filename:absname(OldAppDir)) =/=
+        rebar_utils:to_binary(filename:absname(AppDir)) of
         true ->
             EbinDir = filename:join([OldAppDir, "ebin"]),
             %% copy all files from ebin if it exists

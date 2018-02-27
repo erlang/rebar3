@@ -68,10 +68,11 @@ default_all_src_dirs(Config) ->
     ["src", "test"] = rebar_dir:all_src_dirs(rebar_state:opts(State), ["src"], ["test"]).
 
 src_dirs(Config) ->
-    RebarConfig = [{erl_opts, [{src_dirs, ["foo", "bar", "baz"]}]}],
+    RebarConfig = [{erl_opts, [{src_dirs, ["foo", "./bar", "bar", "bar/", "./bar/", "baz",
+                                           "./", ".", "../", "..", "./../", "../.", ".././../"]}]}],
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
 
-    ["bar", "baz", "foo"] = rebar_dir:src_dirs(rebar_state:opts(State)).
+    [".", "..", "../..", "bar", "baz", "foo"] = rebar_dir:src_dirs(rebar_state:opts(State)).
 
 src_dirs_with_opts(Config) ->
     RebarConfig = [{erl_opts, [{src_dirs, ["foo", "bar", "baz"]},

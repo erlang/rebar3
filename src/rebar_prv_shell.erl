@@ -307,7 +307,7 @@ find_apps_option(State) ->
         no_value -> no_value;
         AppsStr ->
             [ list_to_atom(AppStr)
-              || AppStr <- string:tokens(AppsStr, " ,:") ]
+              || AppStr <- rebar_string:lexemes(AppsStr, " ,:") ]
     end.
 
 -spec find_apps_rebar(rebar_state:t()) -> no_value | list().
@@ -320,6 +320,9 @@ find_apps_rebar(State) ->
 find_apps_relx(State) ->
     case lists:keyfind(release, 1, rebar_state:get(State, relx, [])) of
         {_, _, Apps} ->
+            ?DEBUG("Found shell apps from relx.", []),
+            Apps;
+        {_, _, Apps, _} ->
             ?DEBUG("Found shell apps from relx.", []),
             Apps;
         false ->
@@ -360,8 +363,10 @@ boot_apps(Apps) ->
     ok.
 
 normalize_load_apps([]) -> [];
+normalize_load_apps([{_App, none} | T]) -> normalize_load_apps(T);
 normalize_load_apps([{App, _} | T]) -> [App | normalize_load_apps(T)];
 normalize_load_apps([{App, _Vsn, load} | T]) -> [App | normalize_load_apps(T)];
+normalize_load_apps([{_App, _Vsn, none} | T]) -> normalize_load_apps(T);
 normalize_load_apps([{App, _Vsn, Operator} | T]) when is_atom(Operator) ->
     [App | normalize_load_apps(T)];
 normalize_load_apps([App | T]) when is_atom(App) -> [App | normalize_load_apps(T)].
@@ -369,11 +374,12 @@ normalize_load_apps([App | T]) when is_atom(App) -> [App | normalize_load_apps(T
 normalize_boot_apps([]) -> [];
 normalize_boot_apps([{_App, load} | T]) -> normalize_boot_apps(T);
 normalize_boot_apps([{_App, _Vsn, load} | T]) -> normalize_boot_apps(T);
+normalize_boot_apps([{_App, none} | T]) -> normalize_boot_apps(T);
+normalize_boot_apps([{_App, _Vsn, none} | T]) -> normalize_boot_apps(T);
 normalize_boot_apps([{App, _Vsn, Operator} | T]) when is_atom(Operator) ->
     [App | normalize_boot_apps(T)];
 normalize_boot_apps([{App, _Vsn} | T]) -> [App | normalize_boot_apps(T)];
 normalize_boot_apps([App | T]) when is_atom(App) -> [App | normalize_boot_apps(T)].
-
 
 remove_error_handler(0) ->
     ?WARN("Unable to remove simple error_logger handler", []);

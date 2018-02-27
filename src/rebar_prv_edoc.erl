@@ -42,8 +42,8 @@ do(State) ->
     Res = try
         lists:foldl(fun(AppInfo, EdocOptsAcc) ->
                     rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, AppInfo, State),
-                    AppName = ec_cnv:to_list(rebar_app_info:name(AppInfo)),
-                    ?INFO("Running edoc for ~s", [AppName]),
+                    AppName = rebar_utils:to_list(rebar_app_info:name(AppInfo)),
+                    ?INFO("Running edoc for ~ts", [AppName]),
                     AppDir = rebar_app_info:dir(AppInfo),
                     AppRes = (catch edoc:application(list_to_atom(AppName), AppDir, EdocOptsAcc)),
                     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, AppInfo, State),
@@ -74,7 +74,7 @@ do(State) ->
 
 -spec format_error(any()) -> iolist().
 format_error({app_failed, AppName}) ->
-    io_lib:format("Failed to generate documentation for app '~s'", [AppName]);
+    io_lib:format("Failed to generate documentation for app '~ts'", [AppName]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -89,4 +89,4 @@ add_to_paths([], Path) ->
 add_to_paths([{doc_path, Paths}|T], Path) ->
     [{doc_path, [Path | Paths]} | T];
 add_to_paths([H|T], Path) ->
-    [H | add_to_paths(Path, T)].
+    [H | add_to_paths(T, Path)].

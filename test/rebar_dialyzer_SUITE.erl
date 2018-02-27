@@ -362,6 +362,6 @@ get_apps_from_beam_files(BeamFiles) ->
     lists:usort(
       [begin
            AppNameVsn = filename:basename(filename:dirname(filename:dirname(File))),
-           [AppName | _] = string:tokens(AppNameVsn ++ "-", "-"),
+           [AppName | _] = rebar_string:lexemes(AppNameVsn ++ "-", "-"),
            ec_cnv:to_atom(AppName)
        end || File <- BeamFiles]).

@@ -96,8 +96,8 @@ handle_plugin(Profile, Plugin, State, Upgrade) ->
         ToBuild = rebar_prv_install_deps:cull_compile(Sorted, []),
 
         %% Add already built plugin deps to the code path
-        CodePaths = [rebar_app_info:ebin_dir(A) || A <- Apps -- ToBuild],
-        code:add_pathsa(CodePaths),
+        PreBuiltPaths = [rebar_app_info:ebin_dir(A) || A <- Apps] -- ToBuild,
+        code:add_pathsa(PreBuiltPaths),
 
         %% Build plugin and its deps
         [build_plugin(AppInfo, Apps, State2) || AppInfo <- ToBuild],
@@ -105,10 +105,12 @@ handle_plugin(Profile, Plugin, State, Upgrade) ->
         %% Add newly built deps and plugin to code path
         State3 = rebar_state:update_all_plugin_deps(State2, Apps),
         NewCodePaths = [rebar_app_info:ebin_dir(A) || A <- ToBuild],
-        code:add_pathsa(CodePaths),
+        AllPluginEbins = filelib:wildcard(filename:join([rebar_dir:plugins_dir(State), "*", "ebin"])),
+        CodePaths = PreBuiltPaths++(AllPluginEbins--ToBuild),
+        code:add_pathsa(NewCodePaths++CodePaths),
 
         %% Store plugin code paths so we can remove them when compiling project apps
-        State4 = rebar_state:update_code_paths(State3, all_plugin_deps, CodePaths++NewCodePaths),
+        State4 = rebar_state:update_code_paths(State3, all_plugin_deps, PreBuiltPaths++NewCodePaths),
 
         {plugin_providers(Plugin), State4}
     catch

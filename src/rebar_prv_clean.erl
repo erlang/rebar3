@@ -12,7 +12,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, clean).
--define(DEPS, [app_discovery]).
+-define(DEPS, [app_discovery, install_deps]).
 
 %% ===================================================================
 %% Public API
@@ -44,7 +44,8 @@ do(State) ->
     case All of
         true ->
             DepsDir = rebar_dir:deps_dir(State1),
-            AllApps = rebar_app_discover:find_apps([filename:join(DepsDir, "*")], all),
+            DepsDirs = filelib:wildcard(filename:join(DepsDir, "*")),
+            AllApps = rebar_app_discover:find_apps(DepsDirs, all),
             clean_apps(State1, Providers, AllApps);
         false ->
             ProjectApps = rebar_state:project_apps(State1),
@@ -67,7 +68,7 @@ format_error(Reason) ->
 
 clean_apps(State, Providers, Apps) ->
     [begin
-         ?INFO("Cleaning out ~s...", [rebar_app_info:name(AppInfo)]),
+         ?INFO("Cleaning out ~ts...", [rebar_app_info:name(AppInfo)]),
          AppDir = rebar_app_info:dir(AppInfo),
          AppInfo1 = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER, Providers, AppInfo, State),
          rebar_erlc_compiler:clean(AppInfo1),

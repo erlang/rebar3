@@ -60,7 +60,7 @@ do(State) ->
 
 -spec format_error(any()) -> iolist().
 format_error({consult, File, Reason}) ->
-    io_lib:format("Error consulting file at ~s for reason ~p", [File, Reason]);
+    io_lib:format("Error consulting file at ~ts for reason ~p", [File, Reason]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -70,7 +70,7 @@ format_error(Reason) ->
 
 list_templates(State) ->
     lists:foldl(fun({error, {consult, File, Reason}}, Acc) ->
-                    ?WARN("Error consulting template file ~s for reason ~p",
+                    ?WARN("Error consulting template file ~ts for reason ~p",
                           [File, Reason]),
                     Acc
                 ;  (Tpl, Acc) ->
@@ -116,16 +116,16 @@ show_short_templates(List) ->
     lists:map(fun show_short_template/1, lists:sort(List)).
 
 show_short_template({Name, Type, _Location, Description, _Vars}) ->
-    io:format("~s (~s): ~s~n",
+    io:format("~ts (~ts): ~ts~n",
               [Name,
                format_type(Type),
                format_description(Description)]).
 
 show_template({Name, Type, Location, Description, Vars}) ->
-    io:format("~s:~n"
-              "\t~s~n"
-              "\tDescription: ~s~n"
-              "\tVariables:~n~s~n",
+    io:format("~ts:~n"
+              "\t~ts~n"
+              "\tDescription: ~ts~n"
+              "\tVariables:~n~ts~n",
               [Name,
                format_type(Type, Location),
                format_description(Description),
@@ -141,9 +141,9 @@ format_type(escript, _) ->
 format_type(builtin, _) ->
     "built-in template";
 format_type(plugin, Loc) ->
-    io_lib:format("plugin template (~s)", [Loc]);
+    io_lib:format("plugin template (~ts)", [Loc]);
 format_type(file, Loc) ->
-    io_lib:format("custom template (~s)", [Loc]).
+    io_lib:format("custom template (~ts)", [Loc]).
 
 format_description(Description) ->
     case Description of
@@ -156,4 +156,4 @@ format_vars(Vars) -> [format_var(Var) || Var <- Vars].
 format_var({Var, Default}) ->
     io_lib:format("\t\t~p=~p~n",[Var, Default]);
 format_var({Var, Default, Doc}) ->
-    io_lib:format("\t\t~p=~p (~s)~n", [Var, Default, Doc]).
+    io_lib:format("\t\t~p=~p (~ts)~n", [Var, Default, Doc]).

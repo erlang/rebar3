@@ -167,14 +167,14 @@ expand_deps(pkg, [{Name, Vsn, Deps} | Rest]) ->
     [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)];
 expand_deps(mixed, [{Name, Deps} | Rest]) ->
     Dep = if hd(Name) >= $a, hd(Name) =< $z ->
-            {pkg, string:to_upper(Name), "0.0.0", undefined}
+            {pkg, rebar_string:uppercase(Name), "0.0.0", undefined}
            ; hd(Name) >= $A, hd(Name) =< $Z ->
             {Name, ".*", {git, "https://example.org/user/"++Name++".git", "master"}}
     end,
     [{Dep, expand_deps(mixed, Deps)} | expand_deps(mixed, Rest)];
 expand_deps(mixed, [{Name, Vsn, Deps} | Rest]) ->
     Dep = if hd(Name) >= $a, hd(Name) =< $z ->
-            {pkg, string:to_upper(Name), Vsn, undefined}
+            {pkg, rebar_string:uppercase(Name), Vsn, undefined}
            ; hd(Name) >= $A, hd(Name) =< $Z ->
             {Name, Vsn, {git, "https://example.org/user/"++Name++".git", {tag, Vsn}}}
     end,
@@ -218,7 +218,7 @@ check_results(AppDir, Expected, ProfileRun) ->
     BuildDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib", "*"])),
     PluginDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "plugins", "*"])),
     GlobalPluginDirs = filelib:wildcard(filename:join([AppDir, "global", "plugins", "*"])),
-    CheckoutsDir = filename:join([AppDir, "_checkouts", "*"]),
+    CheckoutsDirs = filelib:wildcard(filename:join([AppDir, "_checkouts", "*"])),
     LockFile = filename:join([AppDir, "rebar.lock"]),
     Locks = lists:flatten(rebar_config:consult_lock_file(LockFile)),
 
@@ -230,7 +230,7 @@ check_results(AppDir, Expected, ProfileRun) ->
 
     Deps = rebar_app_discover:find_apps(BuildDirs, all),
     DepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Deps],
-    Checkouts = rebar_app_discover:find_apps([CheckoutsDir], all),
+    Checkouts = rebar_app_discover:find_apps(CheckoutsDirs, all),
     CheckoutsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Checkouts],
     Plugins = rebar_app_discover:find_apps(PluginDirs, all),
     PluginsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Plugins],
@@ -349,7 +349,7 @@ check_results(AppDir, Expected, ProfileRun) ->
                                      iolist_to_binary(LockVsn))
                 end
         ;  ({release, Name, Vsn, ExpectedDevMode}) ->
-                ct:pal("Release: ~p-~s", [Name, Vsn]),
+                ct:pal("Release: ~p-~ts", [Name, Vsn]),
                 {ok, Cwd} = file:get_cwd(),
                 try
                     file:set_cwd(AppDir),
@@ -377,14 +377,14 @@ check_results(AppDir, Expected, ProfileRun) ->
                     file:set_cwd(Cwd)
                 end
         ;  ({tar, Name, Vsn}) ->
-                ct:pal("Tarball: ~s-~s", [Name, Vsn]),
+                ct:pal("Tarball: ~ts-~ts", [Name, Vsn]),
                 Tarball = filename:join([AppDir, "_build", "rel", Name, Name++"-"++Vsn++".tar.gz"]),
                 ?assertNotEqual([], filelib:is_file(Tarball))
         ;  ({file, Filename}) ->
-                ct:pal("Filename: ~s", [Filename]),
+                ct:pal("Filename: ~ts", [Filename]),
                 ?assert(filelib:is_file(Filename))
         ;  ({dir, Dirname}) ->
-                ct:pal("Directory: ~s", [Dirname]),
+                ct:pal("Directory: ~ts", [Dirname]),
                 ?assert(filelib:is_dir(Dirname))
         end, Expected).
 
@@ -425,15 +425,16 @@ erl_src_file(Name) ->
 
 plugin_src_file(Name) ->
     io_lib:format("-module('~s').\n"
-                 "-export([init/1]).\n"
+                 "-export([init/1, do/1]).\n"
                  "init(State) -> \n"
                  "Provider = providers:create([\n"
                  "{name, '~s'},\n"
                  "{module, '~s'}\n"
                  "]),\n"
-                 "{ok, rebar_state:add_provider(State, Provider)}.\n", [filename:basename(Name, ".erl"),
-                                                                        filename:basename(Name, ".erl"),
-                                                                        filename:basename(Name, ".erl")]).
+                 "{ok, rebar_state:add_provider(State, Provider)}.\n"
+                 "do(State) -> {ok, State}.\n", [filename:basename(Name, ".erl"),
+                                                 filename:basename(Name, ".erl"),
+                                                 filename:basename(Name, ".erl")]).
 
 erl_eunitized_src_file(Name) ->
     io_lib:format("-module('~s').\n"
@@ -477,7 +478,7 @@ package_app(AppDir, DestDir, PkgName) ->
     {ok, Contents} = file:read_file(filename:join(DestDir, "contents.tar.gz")),
     Blob = <<"3who cares", Contents/binary>>,
     <<X:256/big-unsigned>> = crypto:hash(sha256, Blob),
-    BinChecksum = list_to_binary(string:to_upper(lists:flatten(io_lib:format("~64.16.0b", [X])))),
+    BinChecksum = list_to_binary(rebar_string:uppercase(lists:flatten(io_lib:format("~64.16.0b", [X])))),
     ok = file:write_file(filename:join(DestDir, "CHECKSUM"), BinChecksum),
     PkgFiles = ["contents.tar.gz", "VERSION", "metadata.config", "CHECKSUM"],
     Archive = filename:join(DestDir, Name),
@@ -485,5 +486,5 @@ package_app(AppDir, DestDir, PkgName) ->
                         lists:zip(PkgFiles, [filename:join(DestDir,F) || F <- PkgFiles])),
     {ok, BinFull} = file:read_file(Archive),
     <<E:128/big-unsigned-integer>> = crypto:hash(md5, BinFull),
-    Etag = string:to_lower(lists:flatten(io_lib:format("~32.16.0b", [E]))),
+    Etag = rebar_string:lowercase(lists:flatten(io_lib:format("~32.16.0b", [E]))),
     {BinChecksum, Etag}.

@@ -120,7 +120,8 @@ default_author_and_email() ->
         {ok, Name} ->
             case rebar_utils:sh("git config --global user.email", [return_on_error]) of
                 {ok, Email} ->
-                    {string:strip(Name, both, $\n), string:strip(Email, both, $\n)};
+                    {rebar_string:trim(Name, both, "\n"),
+                     rebar_string:trim(Email, both, "\n")};
                 {error, _} ->
                     %% Use neither if one doesn't exist
                     {"Anonymous", "anonymous@example.org"}
@@ -129,7 +130,7 @@ default_author_and_email() ->
             %% Ok, try mecurial
             case rebar_utils:sh("hg showconfig ui.username", [return_on_error]) of
                 {ok, NameEmail} ->
-                    case re:run(NameEmail, "^(.*) <(.*)>$", [{capture, [1,2], list}]) of
+                    case re:run(NameEmail, "^(.*) <(.*)>$", [{capture, [1,2], list}, unicode]) of
                         {match, [Name, Email]} ->
                             {Name, Email};
                         _ ->
@@ -169,7 +170,7 @@ maybe_warn_about_name(Vars) ->
         invalid ->
            ?WARN("The 'name' variable is often associated with Erlang "
                  "module names and/or file names. The value submitted "
-                 "(~s) isn't an unquoted Erlang atom. Templates "
+                 "(~ts) isn't an unquoted Erlang atom. Templates "
                  "generated may contain errors.",
                  [Name]);
         valid ->
@@ -189,7 +190,7 @@ validate_atom(Str) ->
 
 %% Run template instructions one at a time.
 execute_template([], _, {Template,_,_}, _, _) ->
-    ?DEBUG("Template ~s applied", [Template]),
+    ?DEBUG("Template ~ts applied", [Template]),
     ok;
 %% We can't execute the description
 execute_template([{description, _} | Terms], Files, Template, Vars, Force) ->
@@ -242,7 +243,7 @@ execute_template([{template, From, To} | Terms], Files, {Template, Type, Cwd}, V
     execute_template(Terms, Files, {Template, Type, Cwd}, Vars, Force);
 %% Unknown
 execute_template([Instruction|Terms], Files, Tpl={Template,_,_}, Vars, Force) ->
-    ?WARN("Unknown template instruction ~p in template ~s",
+    ?WARN("Unknown template instruction ~p in template ~ts",
           [Instruction, Template]),
     execute_template(Terms, Files, Tpl, Vars, Force).
 
@@ -305,7 +306,7 @@ cache_escript_files(State) ->
 find_escript_templates(Files) ->
     [{escript, Name}
      || {Name, _Bin} <- Files,
-        re:run(Name, ?TEMPLATE_RE, [{capture, none}]) == match].
+        re:run(Name, ?TEMPLATE_RE, [{capture, none}, unicode]) == match].
 
 find_localinstall_templates(_State) ->
     Templates = rebar_utils:find_files(code:priv_dir(rebar), ?TEMPLATE_RE),
@@ -374,7 +375,7 @@ prioritize_templates([{Name, Type, File} | Rest], Valid) ->
             prioritize_templates(Rest, Valid);
         {_, file, _} ->
             ?DEBUG("Skipping template ~p, due to presence of a custom "
-                   "template at ~s", [Name, File]),
+                   "template at ~ts", [Name, File]),
             prioritize_templates(Rest, Valid)
     end.
 
@@ -429,10 +430,10 @@ write_file(Output, Data, Force) ->
             ok = filelib:ensure_dir(Output),
             case {Force, FileExists} of
                 {true, true} ->
-                    ?INFO("Writing ~s (forcibly overwriting)",
+                    ?INFO("Writing ~ts (forcibly overwriting)",
                              [Output]);
                 _ ->
-                    ?INFO("Writing ~s", [Output])
+                    ?INFO("Writing ~ts", [Output])
             end,
             case file:write_file(Output, Data) of
                 ok ->
@@ -449,4 +450,4 @@ write_file(Output, Data, Force) ->
 %% Render a binary to a string, using mustache and the specified context
 %%
 render(Bin, Context) ->
-    bbmustache:render(ec_cnv:to_binary(Bin), Context, [{key_type, atom}]).
+    bbmustache:render(rebar_utils:to_binary(Bin), Context, [{key_type, atom}]).

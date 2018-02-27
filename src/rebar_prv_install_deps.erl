@@ -104,22 +104,22 @@ do_(State) ->
 %% @doc convert a given exception's payload into an io description.
 -spec format_error(any()) -> iolist().
 format_error({dep_app_not_found, AppDir, AppName}) ->
-    io_lib:format("Dependency failure: Application ~s not found at the top level of directory ~s", [AppName, AppDir]);
+    io_lib:format("Dependency failure: Application ~ts not found at the top level of directory ~ts", [AppName, AppDir]);
 format_error({load_registry_fail, Dep}) ->
-    io_lib:format("Error loading registry to resolve version of ~s. Try fixing by running 'rebar3 update'", [Dep]);
+    io_lib:format("Error loading registry to resolve version of ~ts. Try fixing by running 'rebar3 update'", [Dep]);
 format_error({bad_constraint, Name, Constraint}) ->
-    io_lib:format("Unable to parse version for package ~s: ~s", [Name, Constraint]);
+    io_lib:format("Unable to parse version for package ~ts: ~ts", [Name, Constraint]);
 format_error({parse_dep, Dep}) ->
     io_lib:format("Failed parsing dep ~p", [Dep]);
 format_error({not_rebar_package, Package, Version}) ->
-    io_lib:format("Package not buildable with rebar3: ~s-~s", [Package, Version]);
+    io_lib:format("Package not buildable with rebar3: ~ts-~ts", [Package, Version]);
 format_error({missing_package, Package, Version}) ->
-    io_lib:format("Package not found in registry: ~s-~s", [Package, Version]);
+    io_lib:format("Package not found in registry: ~ts-~ts", [Package, Version]);
 format_error({missing_package, Package}) ->
-    io_lib:format("Package not found in registry: ~s", [Package]);
+    io_lib:format("Package not found in registry: ~ts", [Package]);
 format_error({cycles, Cycles}) ->
     Prints = [["applications: ",
-               [io_lib:format("~s ", [Dep]) || Dep <- Cycle],
+               [io_lib:format("~ts ", [Dep]) || Dep <- Cycle],
                "depend on each other\n"]
               || Cycle <- Cycles],
     ["Dependency cycle(s) detected:\n", Prints];
@@ -140,7 +140,9 @@ handle_deps_as_profile(Profile, State, Deps, Upgrade) ->
     DepsDir = profile_dep_dir(State, Profile),
     Deps1 = rebar_app_utils:parse_deps(DepsDir, Deps, State, Locks, Level),
     ProfileLevelDeps = [{Profile, Deps1, Level}],
-    handle_profile_level(ProfileLevelDeps, [], sets:new(), Upgrade, Locks, State).
+    RootSeen = sets:from_list([rebar_app_info:name(AppInfo)
+                               || AppInfo <- rebar_state:project_apps(State)]),
+    handle_profile_level(ProfileLevelDeps, [], RootSeen, RootSeen, Upgrade, Locks, State).
 
 %% ===================================================================
 %% Internal functions
@@ -153,7 +155,9 @@ deps_per_profile(Profiles, Upgrade, State) ->
     Deps = lists:foldl(fun(Profile, DepAcc) ->
                                [parsed_profile_deps(State, Profile, Level) | DepAcc]
                        end, [], Profiles),
-    handle_profile_level(Deps, [], sets:new(), Upgrade, Locks, State).
+    RootSeen = sets:from_list([rebar_app_info:name(AppInfo)
+                               || AppInfo <- rebar_state:project_apps(State)]),
+    handle_profile_level(Deps, [], RootSeen, RootSeen, Upgrade, Locks, State).
 
 parsed_profile_deps(State, Profile, Level) ->
     ParsedDeps = rebar_state:get(State, {parsed_deps, Profile}, []),
@@ -162,17 +166,27 @@ parsed_profile_deps(State, Profile, Level) ->
 %% Level-order traversal of all dependencies, across profiles.
 %% If profiles x,y,z are present, then the traversal will go:
 %% x0, y0, z0, x1, y1, z1, ..., xN, yN, zN.
-handle_profile_level([], Apps, _Seen, _Upgrade, _Locks, State) ->
+%%
+%% There are two 'seen' sets: one for the top-level apps (`RootSeen') and
+%% one for all dependencies (`Seen'). The former is used to know when
+%% to skip the resolving of dependencies altogether (since they're already
+%% top-level apps), while the latter is used to prevent reprocessing
+%% deps more than one.
+handle_profile_level([], Apps, _RootSeen, _Seen, _Upgrade, _Locks, State) ->
     {Apps, State};
-handle_profile_level([{Profile, Deps, Level} | Rest], Apps, Seen, Upgrade, Locks, State) ->
+handle_profile_level([{Profile, Deps, Level} | Rest], Apps, RootSeen, Seen, Upgrade, Locks, State) ->
+    Deps0 = [rebar_app_utils:expand_deps_sources(Dep, State)
+             || Dep <- Deps,
+                %% skip top-level apps being double-declared
+                not sets:is_element(rebar_app_info:name(Dep), RootSeen)],
     {Deps1, Apps1, State1, Seen1} =
-        update_deps(Profile, Level, Deps, Apps
+        update_deps(Profile, Level, Deps0, Apps
                    ,State, Upgrade, Seen, Locks),
     Deps2 = case Deps1 of
         [] -> Rest;
         _ -> Rest ++ [{Profile, Deps1, Level+1}]
     end,
-    handle_profile_level(Deps2, Apps1, sets:union(Seen, Seen1), Upgrade, Locks, State1).
+    handle_profile_level(Deps2, Apps1, RootSeen, sets:union(Seen, Seen1), Upgrade, Locks, State1).
 
 find_cycles(Apps) ->
     case rebar_digraph:compile_order(Apps) of
@@ -291,7 +305,7 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
 -spec maybe_fetch(rebar_app_info:t(), atom(), boolean(),
                   sets:set(binary()), rebar_state:t()) -> {boolean(), rebar_app_info:t()}.
 maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
-    AppDir = ec_cnv:to_list(rebar_app_info:dir(AppInfo)),
+    AppDir = rebar_utils:to_list(rebar_app_info:dir(AppInfo)),
     %% Don't fetch dep if it exists in the _checkouts dir
     case rebar_app_info:is_checkout(AppInfo) of
         true ->
@@ -346,7 +360,7 @@ symlink_dep(State, From, To) ->
         ok ->
             RelativeFrom = make_relative_to_root(State, From),
             RelativeTo = make_relative_to_root(State, To),
-            ?INFO("Linking ~s to ~s", [RelativeFrom, RelativeTo]),
+            ?INFO("Linking ~ts to ~ts", [RelativeFrom, RelativeTo]),
             ok;
         exists ->
             ok
@@ -359,7 +373,7 @@ make_relative_to_root(State, Path) when is_list(Path) ->
     rebar_dir:make_relative_path(Path, Root).
 
 fetch_app(AppInfo, AppDir, State) ->
-    ?INFO("Fetching ~s (~p)", [rebar_app_info:name(AppInfo),
+    ?INFO("Fetching ~ts (~p)", [rebar_app_info:name(AppInfo),
                                format_source(rebar_app_info:source(AppInfo))]),
     Source = rebar_app_info:source(AppInfo),
     true = rebar_fetch:download_source(AppDir, Source, State).
@@ -384,12 +398,12 @@ maybe_upgrade(AppInfo, AppDir, Upgrade, State) ->
         true ->
             case rebar_fetch:needs_update(AppDir, Source, State) of
                 true ->
-                    ?INFO("Upgrading ~s (~p)", [rebar_app_info:name(AppInfo), rebar_app_info:source(AppInfo)]),
+                    ?INFO("Upgrading ~ts (~p)", [rebar_app_info:name(AppInfo), rebar_app_info:source(AppInfo)]),
                     true = rebar_fetch:download_source(AppDir, Source, State);
                 false ->
                     case Upgrade of
                         true ->
-                            ?INFO("No upgrade needed for ~s", [rebar_app_info:name(AppInfo)]),
+                            ?INFO("No upgrade needed for ~ts", [rebar_app_info:name(AppInfo)]),
                             false;
                         false ->
                             false
@@ -400,13 +414,18 @@ maybe_upgrade(AppInfo, AppDir, Upgrade, State) ->
     end.
 
 warn_skip_deps(AppInfo, State) ->
-    Msg = "Skipping ~s (from ~p) as an app of the same name "
+    Msg = "Skipping ~ts (from ~p) as an app of the same name "
           "has already been fetched",
     Args = [rebar_app_info:name(AppInfo),
             rebar_app_info:source(AppInfo)],
     case rebar_state:get(State, deps_error_on_conflict, false) of
-        false -> ?WARN(Msg, Args);
-        true -> ?ERROR(Msg, Args), ?FAIL
+        false ->
+            case rebar_state:get(State, deps_warning_on_conflict, true) of
+                true  -> ?WARN(Msg, Args);
+                false -> ok
+            end;
+        true ->
+            ?ERROR(Msg, Args), ?FAIL
     end.
 
 not_needs_compile(App) ->

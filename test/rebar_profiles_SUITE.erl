@@ -7,6 +7,7 @@
          all/0,
          profile_new_key/1,
          profile_merge_keys/1,
+         profile_merge_umbrella_keys/1,
          explicit_profile_deduplicate_deps/1,
          implicit_profile_deduplicate_deps/1,
          all_deps_code_paths/1,
@@ -25,14 +26,17 @@
          test_profile_erl_opts_order_2/1,
          test_profile_erl_opts_order_3/1,
          test_profile_erl_opts_order_4/1,
-         test_profile_erl_opts_order_5/1]).
+         test_profile_erl_opts_order_5/1,
+         test_erl_opts_debug_info/1,
+         first_files_exception/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/file.hrl").
 
 all() ->
-    [profile_new_key, profile_merge_keys, all_deps_code_paths, profile_merges,
+    [profile_new_key, profile_merge_keys, profile_merge_umbrella_keys,
+     all_deps_code_paths, profile_merges,
      explicit_profile_deduplicate_deps, implicit_profile_deduplicate_deps,
      same_profile_deduplication, stack_deduplication,
      add_to_profile, add_to_existing_profile,
@@ -46,7 +50,9 @@ all() ->
      test_profile_erl_opts_order_2,
      test_profile_erl_opts_order_3,
      test_profile_erl_opts_order_4,
-     test_profile_erl_opts_order_5].
+     test_profile_erl_opts_order_5,
+     test_erl_opts_debug_info,
+     first_files_exception].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -115,6 +121,35 @@ profile_merge_keys(Config) ->
                                    ["as", "ct", "compile"], {ok, [{app, Name}
                                                                  ,{dep, "a", "1.0.0"}
                                                                  ,{dep, "b", "2.0.0"}]}).
+
+profile_merge_umbrella_keys(Config) ->
+    AppDir = ?config(apps, Config),
+    ct:pal("Path: ~s", [AppDir]),
+    Name = rebar_test_utils:create_random_name("profile_merge_umbrella_keys"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    SubAppDir = filename:join([AppDir, "apps", Name]),
+
+    RebarConfig = [{vals, [{a,1},{b,1}]},
+                   {profiles,
+                    [{ct,
+                      [{vals, [{a,1},{b,2}]}]}]}],
+    
+    SubRebarConfig = [{vals, []},
+                       {profiles, [{ct, [{vals, [{c,1}]}]}]}],
+
+    rebar_test_utils:create_app(SubAppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_config(SubAppDir, SubRebarConfig),
+    {ok, RebarConfigRead} = file:consult(rebar_test_utils:create_config(AppDir, RebarConfig)),
+
+    {ok, State} = rebar_test_utils:run_and_check(
+        Config, RebarConfigRead, ["as", "ct", "compile"], return
+    ),
+
+    [ProjectApp] = rebar_state:project_apps(State),
+    ?assertEqual(Name, binary_to_list(rebar_app_info:name(ProjectApp))),
+    Opts = rebar_app_info:opts(ProjectApp),
+    ?assertEqual([{a,1},{b,2},{b,1},{c,1}], dict:fetch(vals, Opts)),
+    ok.
 
 explicit_profile_deduplicate_deps(Config) ->
     AppDir = ?config(apps, Config),
@@ -468,6 +503,49 @@ test_profile_erl_opts_order_5(Config) ->
     Opt = last_erl_opt(Opts, [warn_export_all, nowarn_export_all], undefined),
     warn_export_all = Opt.
 
+test_erl_opts_debug_info(_Config) ->
+    ToOpts = fun(List) -> rebar_opts:erl_opts(dict:from_list([{erl_opts, List}])) end,
+    ?assertEqual([debug_info,a,b,c],
+                 ToOpts([a,b,c])),
+    ?assertEqual([{debug_info,{mod,123}},a,b,c,debug_info],
+                 ToOpts([{debug_info,{mod,123}},a,b,c,debug_info])),
+    ?assertEqual([a,b,debug_info,c],
+                 ToOpts([no_debug_info,a,b,debug_info,c])),
+    ?assertEqual([a,b,c],
+                 ToOpts([debug_info,a,b,no_debug_info,c])),
+    ?assertEqual([a,b,c,debug_info],
+                 ToOpts([{debug_info_key, "12345"},a,b,
+                         no_debug_info,c,debug_info])),
+    ?assertEqual([a,b,c],
+                 ToOpts([{debug_info,{mod,123}},{debug_info_key, "12345"},
+                         a,no_debug_info,b,c,debug_info,no_debug_info])),
+    ?assertEqual([a,b,c,{debug_info_key,"123"}],
+                 ToOpts([{debug_info_key, "12345"},a,b,no_debug_info,debug_info,
+                         c,{debug_info_key, "123"}])),
+    ?assertEqual([{debug_info_key,"12345"},a,b,c,{debug_info,{mod,"123"}}],
+                 ToOpts([debug_info,{debug_info_key,"12345"},a,
+                         no_debug_info,b,c,{debug_info,{mod,"123"}}])),
+    ok.
+
+first_files_exception(_Config) ->
+    RebarConfig = [{erl_first_files, ["c","a","b"]},
+                   {mib_first_files, ["c","a","b"]},
+                   {other, ["c","a","b"]},
+                   {profiles,
+                    [{profile2, [{erl_first_files, ["a","e"]},
+                                 {mib_first_files, ["a","e"]},
+                                 {other, ["a","e"]}
+                                ]}]}],
+    State = rebar_state:new(RebarConfig),
+    State1 = rebar_state:apply_profiles(State, [profile2]),
+
+    %% Combine lists
+    ?assertEqual(["a","b","c","e"], rebar_state:get(State1, other)),
+    %% there is no specific reason not to dedupe "a" here aside from "this is how it is"
+    ?assertEqual(["c","a","b","a","e"], rebar_state:get(State1, erl_first_files)),
+    ?assertEqual(["c","a","b","a","e"], rebar_state:get(State1, mib_first_files)),
+    ok.
+
 get_compiled_profile_erl_opts(Profiles, Config) ->
     AppDir = ?config(apps, Config),
     PStrs = [atom_to_list(P) || P <- Profiles],
@@ -490,7 +568,7 @@ get_compiled_profile_erl_opts(Profiles, Config) ->
         [default] ->
             ["compile"];
         _ ->
-            ["as", string:join(PStrs, ","), "compile"]
+            ["as", rebar_string:join(PStrs, ","), "compile"]
     end,
     {ok, State} = rebar_test_utils:run_and_check(
         Config, RebarConfig, Command, {ok, [{app, Name}]}),

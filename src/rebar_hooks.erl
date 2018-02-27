@@ -57,9 +57,9 @@ run_provider_hooks_(Dir, Type, Command, Providers, TypeHooks, State) ->
     end.
 
 format_error({bad_provider, Type, Command, {Name, Namespace}}) ->
-    io_lib:format("Unable to run ~s hooks for '~p', command '~p' in namespace '~p' not found.", [Type, Command, Namespace, Name]);
+    io_lib:format("Unable to run ~ts hooks for '~p', command '~p' in namespace '~p' not found.", [Type, Command, Namespace, Name]);
 format_error({bad_provider, Type, Command, Name}) ->
-    io_lib:format("Unable to run ~s hooks for '~p', command '~p' not found.", [Type, Command, Name]).
+    io_lib:format("Unable to run ~ts hooks for '~p', command '~p' not found.", [Type, Command, Name]).
 
 %% @doc The following environment variables are exported when running
 %% a hook (absolute paths):
@@ -140,10 +140,10 @@ create_env(State, Opts) ->
     ].
 
 join_dirs(BaseDir, Dirs) ->
-    string:join([ filename:join(BaseDir, Dir) || Dir <- Dirs ], ":").
+    rebar_string:join([filename:join(BaseDir, Dir) || Dir <- Dirs], ":").
 
 re_version(Path) ->
-    case re:run(Path, "^.*-(?<VER>[^/-]*)$", [{capture, [1], list}]) of
+    case re:run(Path, "^.*-(?<VER>[^/-]*)$", [{capture,[1],list}, unicode]) of
         nomatch -> "";
         {match, [Ver]} -> Ver
     end.

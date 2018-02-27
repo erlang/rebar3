@@ -107,43 +107,43 @@ new() ->
 -spec new(atom() | binary() | string()) ->
                  {ok, t()}.
 new(AppName) ->
-    {ok, #app_info_t{name=ec_cnv:to_binary(AppName)}}.
+    {ok, #app_info_t{name=rebar_utils:to_binary(AppName)}}.
 
 %% @doc Build a new app info value with only the name and version set.
 -spec new(atom() | binary() | string(), binary() | string()) ->
                  {ok, t()}.
 new(AppName, Vsn) ->
-    {ok, #app_info_t{name=ec_cnv:to_binary(AppName),
+    {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
                      original_vsn=Vsn}}.
 
 %% @doc build a complete version of the app info with all fields set.
 -spec new(atom() | binary() | string(), binary() | string(), file:name()) ->
                  {ok, t()}.
 new(AppName, Vsn, Dir) ->
-    {ok, #app_info_t{name=ec_cnv:to_binary(AppName),
+    {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
                      original_vsn=Vsn,
-                     dir=ec_cnv:to_list(Dir),
-                     out_dir=ec_cnv:to_list(Dir)}}.
+                     dir=rebar_utils:to_list(Dir),
+                     out_dir=rebar_utils:to_list(Dir)}}.
 
 %% @doc build a complete version of the app info with all fields set.
 -spec new(atom() | binary() | string(), binary() | string(), file:name(), list()) ->
                  {ok, t()}.
 new(AppName, Vsn, Dir, Deps) ->
-    {ok, #app_info_t{name=ec_cnv:to_binary(AppName),
+    {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
                      original_vsn=Vsn,
-                     dir=ec_cnv:to_list(Dir),
-                     out_dir=ec_cnv:to_list(Dir),
+                     dir=rebar_utils:to_list(Dir),
+                     out_dir=rebar_utils:to_list(Dir),
                      deps=Deps}}.
 
 %% @doc build a complete version of the app info with all fields set.
 -spec new(atom() | binary(), atom() | binary() | string(), binary() | string(), file:name(), list()) ->
                  {ok, t()}.
 new(Parent, AppName, Vsn, Dir, Deps) ->
-    {ok, #app_info_t{name=ec_cnv:to_binary(AppName),
+    {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
                      parent=Parent,
                      original_vsn=Vsn,
-                     dir=ec_cnv:to_list(Dir),
-                     out_dir=ec_cnv:to_list(Dir),
+                     dir=rebar_utils:to_list(Dir),
+                     out_dir=rebar_utils:to_list(Dir),
                      deps=Deps}}.
 
 %% @doc update the opts based on the contents of a config
@@ -199,7 +199,7 @@ name(#app_info_t{name=Name}) ->
 %% @doc set the name of the app.
 -spec name(t(), atom() | binary() | string()) -> t().
 name(AppInfo=#app_info_t{}, AppName) ->
-    AppInfo#app_info_t{name=ec_cnv:to_binary(AppName)}.
+    AppInfo#app_info_t{name=rebar_utils:to_binary(AppName)}.
 
 %% @doc get the dictionary of options for the app.
 -spec opts(t()) -> rebar_dict().
@@ -248,16 +248,15 @@ set(AppInfo=#app_info_t{opts=Opts}, Key, Value) ->
 
 %% @doc finds the .app.src file for an app, if any.
 -spec app_file_src(t()) -> file:filename_all() | undefined.
-app_file_src(#app_info_t{app_file_src=undefined, dir=Dir, name=Name}) ->
-    AppFileSrc = filename:join([ec_cnv:to_list(Dir), "src", ec_cnv:to_list(Name)++".app.src"]),
-    case filelib:is_file(AppFileSrc) of
-        true ->
-            AppFileSrc;
-        false ->
-            undefined
+app_file_src(#app_info_t{app_file_src=undefined, dir=Dir, name=Name, opts=Opts}) ->
+    CandidatePaths = [filename:join([rebar_utils:to_list(Dir), Src, rebar_utils:to_list(Name)++".app.src"])
+                      || Src <- rebar_opts:get(Opts, src_dirs, ["src"])],
+    case lists:dropwhile(fun(Path) -> not filelib:is_file(Path) end, CandidatePaths) of
+        [] -> undefined;
+        [AppFileSrc|_] -> AppFileSrc
     end;
 app_file_src(#app_info_t{app_file_src=AppFileSrc}) ->
-    ec_cnv:to_list(AppFileSrc).
+    rebar_utils:to_list(AppFileSrc).
 
 %% @doc sets the .app.src file for an app. An app without such a file
 %% can explicitly be set with `undefined'.
@@ -265,12 +264,12 @@ app_file_src(#app_info_t{app_file_src=AppFileSrc}) ->
 app_file_src(AppInfo=#app_info_t{}, undefined) ->
     AppInfo#app_info_t{app_file_src=undefined};
 app_file_src(AppInfo=#app_info_t{}, AppFileSrc) ->
-    AppInfo#app_info_t{app_file_src=ec_cnv:to_list(AppFileSrc)}.
+    AppInfo#app_info_t{app_file_src=rebar_utils:to_list(AppFileSrc)}.
 
 %% @doc finds the .app.src.script file for an app, if any.
 -spec app_file_src_script(t()) -> file:filename_all() | undefined.
 app_file_src_script(#app_info_t{app_file_src_script=undefined, dir=Dir, name=Name}) ->
-    AppFileSrcScript = filename:join([ec_cnv:to_list(Dir), "src", ec_cnv:to_list(Name)++".app.src.script"]),
+    AppFileSrcScript = filename:join([rebar_utils:to_list(Dir), "src", rebar_utils:to_list(Name)++".app.src.script"]),
     case filelib:is_file(AppFileSrcScript) of
         true ->
             AppFileSrcScript;
@@ -278,7 +277,7 @@ app_file_src_script(#app_info_t{app_file_src_script=undefined, dir=Dir, name=Nam
             undefined
     end;
 app_file_src_script(#app_info_t{app_file_src_script=AppFileSrcScript}) ->
-    ec_cnv:to_list(AppFileSrcScript).
+    rebar_utils:to_list(AppFileSrcScript).
 
 %% @doc sets the .app.src.script file for an app. An app without such a file
 %% can explicitly be set with `undefined'.
@@ -286,12 +285,12 @@ app_file_src_script(#app_info_t{app_file_src_script=AppFileSrcScript}) ->
 app_file_src_script(AppInfo=#app_info_t{}, undefined) ->
     AppInfo#app_info_t{app_file_src_script=undefined};
 app_file_src_script(AppInfo=#app_info_t{}, AppFileSrcScript) ->
-    AppInfo#app_info_t{app_file_src_script=ec_cnv:to_list(AppFileSrcScript)}.
+    AppInfo#app_info_t{app_file_src_script=rebar_utils:to_list(AppFileSrcScript)}.
 
 %% @doc finds the .app file for an app, if any.
 -spec app_file(t()) -> file:filename_all() | undefined.
 app_file(#app_info_t{app_file=undefined, out_dir=Dir, name=Name}) ->
-    AppFile = filename:join([ec_cnv:to_list(Dir), "ebin", ec_cnv:to_list(Name)++".app"]),
+    AppFile = filename:join([rebar_utils:to_list(Dir), "ebin", rebar_utils:to_list(Name)++".app"]),
     case filelib:is_file(AppFile) of
         true ->
             AppFile;
@@ -312,15 +311,22 @@ app_file(AppInfo=#app_info_t{}, AppFile) ->
 app_details(AppInfo=#app_info_t{app_details=[]}) ->
     case app_file(AppInfo) of
         undefined ->
-            rebar_file_utils:try_consult(app_file_src(AppInfo));
+            case rebar_config:consult_app_file(app_file_src(AppInfo)) of
+                [] -> [];
+                [{application, _Name, AppDetails}] -> AppDetails
+            end;
         AppFile ->
-            try
-                rebar_file_utils:try_consult(AppFile)
+            try rebar_file_utils:try_consult(AppFile) of
+                [] -> [];
+                [{application, _Name, AppDetails}] -> AppDetails
             catch
                 throw:{error, {Module, Reason}} ->
-                    ?DEBUG("Warning, falling back to .app.src because of: ~s",
+                    ?DEBUG("Warning, falling back to .app.src because of: ~ts",
                           [Module:format_error(Reason)]),
-                    rebar_file_utils:try_consult(app_file_src(AppInfo))
+                    case rebar_config:consult_app_file(app_file_src(AppInfo)) of
+                        [] -> [];
+                        [{application, _Name, AppDetails}] -> AppDetails
+                    end
             end
     end;
 app_details(#app_info_t{app_details=AppDetails}) ->
@@ -405,10 +411,10 @@ dir(#app_info_t{dir=Dir}) ->
 %% @doc sets the directory that contains the app.
 -spec dir(t(), file:name()) -> t().
 dir(AppInfo=#app_info_t{out_dir=undefined}, Dir) ->
-    AppInfo#app_info_t{dir=ec_cnv:to_list(Dir),
-                       out_dir=ec_cnv:to_list(Dir)};
+    AppInfo#app_info_t{dir=rebar_utils:to_list(Dir),
+                       out_dir=rebar_utils:to_list(Dir)};
 dir(AppInfo=#app_info_t{}, Dir) ->
-    AppInfo#app_info_t{dir=ec_cnv:to_list(Dir)}.
+    AppInfo#app_info_t{dir=rebar_utils:to_list(Dir)}.
 
 %% @doc returns the directory where build artifacts for the app
 %% should go
@@ -420,17 +426,17 @@ out_dir(#app_info_t{out_dir=OutDir}) ->
 %% should go
 -spec out_dir(t(), file:name()) -> t().
 out_dir(AppInfo=#app_info_t{}, OutDir) ->
-    AppInfo#app_info_t{out_dir=ec_cnv:to_list(OutDir)}.
+    AppInfo#app_info_t{out_dir=rebar_utils:to_list(OutDir)}.
 
 %% @doc gets the directory where ebin files for the app should go
 -spec ebin_dir(t()) -> file:name().
 ebin_dir(#app_info_t{out_dir=OutDir}) ->
-    ec_cnv:to_list(filename:join(OutDir, "ebin")).
+    rebar_utils:to_list(filename:join(OutDir, "ebin")).
 
 %% @doc gets the directory where private files for the app should go
 -spec priv_dir(t()) -> file:name().
 priv_dir(#app_info_t{out_dir=OutDir}) ->
-    ec_cnv:to_list(filename:join(OutDir, "priv")).
+    rebar_utils:to_list(filename:join(OutDir, "priv")).
 
 %% @doc returns whether the app is source app or a package app.
 -spec resource_type(t()) -> pkg | src.
@@ -520,7 +526,7 @@ all(Dir, Context, [File|Artifacts]) ->
     FilePath = filename:join(Dir, rebar_templater:render(File, Context)),
     case filelib:is_regular(FilePath) of
         false ->
-            ?DEBUG("Missing artifact ~s", [FilePath]),
+            ?DEBUG("Missing artifact ~ts", [FilePath]),
             {false, File};
         true ->
             all(Dir, Context, Artifacts)

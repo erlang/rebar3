@@ -2,6 +2,7 @@
 %%% to statefully maintain loaded project state into a running VM.
 -module(rebar_agent).
 -export([start_link/1, do/1, do/2]).
+-export(['$handle_undefined_function'/2]).
 -export([init/1,
          handle_call/3, handle_cast/2, handle_info/2,
          code_change/3, terminate/2]).
@@ -22,13 +23,24 @@ start_link(State) ->
 %% @doc runs a given command in the agent's context.
 -spec do(atom()) -> ok | {error, term()}.
 do(Command) when is_atom(Command) ->
-    gen_server:call(?MODULE, {cmd, Command}, infinity).
+    gen_server:call(?MODULE, {cmd, Command}, infinity);
+do(Args) when is_list(Args) ->
+    gen_server:call(?MODULE, {cmd, default, do, Args}, infinity).
 
 %% @doc runs a given command in the agent's context, under a given
 %% namespace.
 -spec do(atom(), atom()) -> ok | {error, term()}.
 do(Namespace, Command) when is_atom(Namespace), is_atom(Command) ->
-    gen_server:call(?MODULE, {cmd, Namespace, Command}, infinity).
+    gen_server:call(?MODULE, {cmd, Namespace, Command}, infinity);
+do(Namespace, Args) when is_atom(Namespace), is_list(Args) ->
+    gen_server:call(?MODULE, {cmd, Namespace, do, Args}, infinity).
+
+'$handle_undefined_function'(Cmd, [Namespace, Args]) ->
+    gen_server:call(?MODULE, {cmd, Namespace, Cmd, Args}, infinity);
+'$handle_undefined_function'(Cmd, [Args]) ->
+    gen_server:call(?MODULE, {cmd, default, Cmd, Args}, infinity);
+'$handle_undefined_function'(Cmd, []) ->
+    gen_server:call(?MODULE, {cmd, default, Cmd}, infinity).
 
 %%%%%%%%%%%%%%%%%
 %%% CALLBACKS %%%
@@ -42,11 +54,15 @@ init(State) ->
 %% @private
 handle_call({cmd, Command}, _From, State=#state{state=RState, cwd=Cwd}) ->
     MidState = maybe_show_warning(State),
-    {Res, NewRState} = run(default, Command, RState, Cwd),
+    {Res, NewRState} = run(default, Command, "", RState, Cwd),
     {reply, Res, MidState#state{state=NewRState}, hibernate};
 handle_call({cmd, Namespace, Command}, _From, State = #state{state=RState, cwd=Cwd}) ->
     MidState = maybe_show_warning(State),
-    {Res, NewRState} = run(Namespace, Command, RState, Cwd),
+    {Res, NewRState} = run(Namespace, Command, "", RState, Cwd),
+    {reply, Res, MidState#state{state=NewRState}, hibernate};
+handle_call({cmd, Namespace, Command, Args}, _From, State = #state{state=RState, cwd=Cwd}) ->
+    MidState = maybe_show_warning(State),
+    {Res, NewRState} = run(Namespace, Command, Args, RState, Cwd),
     {reply, Res, MidState#state{state=NewRState}, hibernate};
 handle_call(_Call, _From, State) ->
     {noreply, State}.
@@ -72,13 +88,14 @@ terminate(_Reason, _State) ->
 %%%%%%%%%%%%%%%
 
 %% @private runs the actual command and maintains the state changes
--spec run(atom(), atom(), rebar_state:t(), file:filename()) ->
+-spec run(atom(), atom(), string(), rebar_state:t(), file:filename()) ->
     {ok, rebar_state:t()} | {{error, term()}, rebar_state:t()}.
-run(Namespace, Command, RState, Cwd) ->
+run(Namespace, Command, StrArgs, RState, Cwd) ->
     try
         case rebar_dir:get_cwd() of
             Cwd ->
-                Args = [atom_to_list(Namespace), atom_to_list(Command)],
+                PArgs = getopt:tokenize(StrArgs),
+                Args = [atom_to_list(Namespace), atom_to_list(Command)] ++ PArgs,
                 CmdState0 = refresh_state(RState, Cwd),
                 CmdState1 = rebar_state:set(CmdState0, task, atom_to_list(Command)),
                 CmdState = rebar_state:set(CmdState1, caller, api),
@@ -140,7 +157,7 @@ refresh_paths(RState) ->
                 {ok, Mods} ->
                     case {length(Mods), length(Mods -- Blacklist)} of
                         {X,X} ->
-                            ?DEBUG("reloading ~p from ~s", [Modules, Path]),
+                            ?DEBUG("reloading ~p from ~ts", [Modules, Path]),
                             code:replace_path(App, Path),
                             reload_modules(Modules);
                         {_,_} ->

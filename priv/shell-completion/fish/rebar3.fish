@@ -147,7 +147,7 @@ complete -f -c 'rebar3' -n '__fish_rebar3_using_command new' -s f -l force -d "O
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command new' -a help -d "Display all variables and arguments for each template"
 
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a paths -d "Print paths to build dirs in current profile."
-complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l app -d "Comma seperated list of applications to return paths for."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l app -d "Comma separated list of applications to return paths for."
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l base -d "Return the `base` path of the current profile."
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l bin -d "Return the `bin` path of the current profile."
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l ebin -d "Return all `ebin` paths of the current profile`s applications."

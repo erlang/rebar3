@@ -8,8 +8,11 @@
 -export([init/1,
          do/1,
          format_error/1]).
-%% exported for test purposes, consider private
--export([compile/2, prepare_tests/1, translate_paths/2]).
+
+-ifdef(TEST).
+%% exported for test purposes
+-export([compile/2, prepare_tests/1, translate_paths/2, maybe_write_coverdata/1]).
+-endif.
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
@@ -41,7 +44,14 @@ do(State) ->
     Tests = prepare_tests(State),
     case compile(State, Tests) of
         %% successfully compiled apps
-        {ok, S} -> do(S, Tests);
+        {ok, S} ->
+            {RawOpts, _} = rebar_state:command_parsed_args(S),
+            case proplists:get_value(compile_only, RawOpts, false) of
+                true ->
+                    {ok, S};
+                false ->
+                    do(S, Tests)
+            end;
         %% this should look like a compiler error, not a ct error
         Error   -> Error
     end.
@@ -93,7 +103,7 @@ format_error({error, Reason}) ->
 format_error({error_running_tests, Reason}) ->
     format_error({error, Reason});
 format_error({failures_running_tests, {Failed, AutoSkipped}}) ->
-    io_lib:format("Failures occured running tests: ~b", [Failed+AutoSkipped]);
+    io_lib:format("Failures occurred running tests: ~b", [Failed+AutoSkipped]);
 format_error({badconfig, {Msg, {Value, Key}}}) ->
     io_lib:format(Msg, [Value, Key]);
 format_error({badconfig, Msg}) ->
@@ -128,7 +138,7 @@ cmdopts(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     %% filter out opts common_test doesn't know about and convert
     %% to ct acceptable forms
-    transform_opts(RawOpts, []).
+    transform_retry(transform_opts(RawOpts, []), State).
 
 transform_opts([], Acc) -> lists:reverse(Acc);
 transform_opts([{dir, Dirs}|Rest], Acc) ->
@@ -165,8 +175,20 @@ transform_opts([{verbose, _}|Rest], Acc) ->
 transform_opts([Opt|Rest], Acc) ->
     transform_opts(Rest, [Opt|Acc]).
 
+%% @private only retry if specified and if no other spec
+%% is given.
+transform_retry(Opts, State) ->
+    case proplists:get_value(retry, Opts, false) andalso
+         not is_any_defined([spec,dir,suite], Opts) of
+        false ->
+            Opts;
+        true ->
+            Path = filename:join([rebar_dir:base_dir(State), "logs", "retry.spec"]),
+            filelib:is_file(Path) andalso [{spec, Path}|Opts]
+    end.
+
 split_string(String) ->
-    string:tokens(String, [$,]).
+    rebar_string:lexemes(String, [$,]).
 
 cfgopts(State) ->
     case rebar_state:get(State, ct_opts, []) of
@@ -206,10 +228,10 @@ add_hooks(Opts, State) ->
         {false, _} ->
             Opts;
         {true, false} ->
-            [{ct_hooks, [cth_readable_failonly, cth_readable_shell]} | Opts];
+            [{ct_hooks, [cth_readable_failonly, cth_readable_shell, cth_retry]} | Opts];
         {true, {ct_hooks, Hooks}} ->
             %% Make sure hooks are there once only.
-            ReadableHooks = [cth_readable_failonly, cth_readable_shell],
+            ReadableHooks = [cth_readable_failonly, cth_readable_shell, cth_retry],
             NewHooks =  (Hooks -- ReadableHooks) ++ ReadableHooks,
             lists:keyreplace(ct_hooks, 1, Opts, {ct_hooks, NewHooks})
     end.
@@ -431,18 +453,21 @@ test_dirs(State, Apps, Opts) ->
                     set_compile_dirs(State, Apps, join(Suites, Dir));
                 {_Suites, _Dirs}    -> {error, "Only a single directory may be specified when specifying suites"}
             end;
-        Specs0 ->
-            case get_dirs_from_specs(Specs0) of
-                {ok,{Specs,SuiteDirs}} ->
-                    {State1,Apps1} = set_compile_dirs1(State, Apps,
-                                                       {dir, SuiteDirs}),
-                    {State2,Apps2} = set_compile_dirs1(State1, Apps1,
-                                                       {spec, Specs}),
-                    [maybe_copy_spec(State2,Apps2,S) || S <- Specs],
-                    {ok, rebar_state:project_apps(State2, Apps2)};
-                Error ->
-                    Error
-            end
+        Spec when is_integer(hd(Spec)) ->
+            spec_test_dirs(State, Apps, [Spec]);
+        Specs ->
+            spec_test_dirs(State, Apps, Specs)
+    end.
+
+spec_test_dirs(State, Apps, Specs0) ->
+    case get_dirs_from_specs(Specs0) of
+        {ok,{Specs,SuiteDirs}} ->
+            {State1,Apps1} = set_compile_dirs1(State, Apps, {dir, SuiteDirs}),
+            {State2,Apps2} = set_compile_dirs1(State1, Apps1, {spec, Specs}),
+            [maybe_copy_spec(State2,Apps2,S) || S <- Specs],
+            {ok, rebar_state:project_apps(State2, Apps2)};
+        Error ->
+            Error
     end.
 
 join(Suite, Dir) when is_integer(hd(Suite)) ->
@@ -564,9 +589,6 @@ get_tests_from_specs(Specs) ->
             case ct_testspec:collect_tests_from_file(Specs,true) of
                 Tests when is_list(Tests) ->
                     {ok,[{S,ct_testspec:prepare_tests(R)} || {S,R} <- Tests]};
-                R when is_tuple(R), element(1,R)==testspec ->
-                    %% R15
-                    {ok,[{Specs,ct_testspec:prepare_tests(R)}]};
                 Error ->
                     Error
             end
@@ -650,7 +672,11 @@ handle_results(_) ->
 sum_results({Passed, Failed, {UserSkipped, AutoSkipped}},
             {Passed2, Failed2, {UserSkipped2, AutoSkipped2}}) ->
     {Passed+Passed2, Failed+Failed2,
-     {UserSkipped+UserSkipped2, AutoSkipped+AutoSkipped2}}.
+     {UserSkipped+UserSkipped2, AutoSkipped+AutoSkipped2}};
+sum_results(_, {error, Reason}) ->
+    {error, Reason};
+sum_results(Unknown, _) ->
+    {error, Unknown}.
 
 handle_quiet_results(_, {error, _} = Result) ->
     handle_results(Result);
@@ -673,7 +699,10 @@ format_result({Passed, 0, {0, 0}}) ->
 format_result({Passed, Failed, Skipped}) ->
     Format = [format_failed(Failed), format_skipped(Skipped),
               format_passed(Passed)],
-    ?CONSOLE("~s", [Format]).
+    ?CONSOLE("~ts", [Format]);
+format_result(_Unknown) ->
+    %% Happens when CT itself encounters a bug
+    ok.
 
 format_failed(0) ->
     [];
@@ -702,22 +731,24 @@ maybe_write_coverdata(State) ->
         true  -> rebar_state:set(State, cover_enabled, true);
         false -> State
     end,
-    rebar_prv_cover:maybe_write_coverdata(State1, ?PROVIDER).
+    Name = proplists:get_value(cover_export_name, RawOpts, ?PROVIDER),
+    rebar_prv_cover:maybe_write_coverdata(State1, Name).
 
 ct_opts(_State) ->
-    [{dir, undefined, "dir", string, help(dir)}, %% comma-seperated list
-     {suite, undefined, "suite", string, help(suite)}, %% comma-seperated list
-     {group, undefined, "group", string, help(group)}, %% comma-seperated list
-     {testcase, undefined, "case", string, help(testcase)}, %% comma-seperated list
+    [{dir, undefined, "dir", string, help(dir)}, %% comma-separated list
+     {suite, undefined, "suite", string, help(suite)}, %% comma-separated list
+     {group, undefined, "group", string, help(group)}, %% comma-separated list
+     {testcase, undefined, "case", string, help(testcase)}, %% comma-separated list
      {label, undefined, "label", string, help(label)}, %% String
-     {config, undefined, "config", string, help(config)}, %% comma-seperated list
-     {spec, undefined, "spec", string, help(spec)}, %% comma-seperated list
+     {config, undefined, "config", string, help(config)}, %% comma-separated list
+     {spec, undefined, "spec", string, help(spec)}, %% comma-separated list
      {join_specs, undefined, "join_specs", boolean, help(join_specs)},
      {allow_user_terms, undefined, "allow_user_terms", boolean, help(allow_user_terms)}, %% Bool
      {logdir, undefined, "logdir", string, help(logdir)}, %% dir
-     {logopts, undefined, "logopts", string, help(logopts)}, %% comma seperated list
+     {logopts, undefined, "logopts", string, help(logopts)}, %% comma-separated list
      {verbosity, undefined, "verbosity", integer, help(verbosity)}, %% Integer
      {cover, $c, "cover", {boolean, false}, help(cover)},
+     {cover_export_name, undefined, "cover_export_name", string, help(cover_export_name)},
      {repeat, undefined, "repeat", integer, help(repeat)}, %% integer
      {duration, undefined, "duration", string, help(duration)}, % format: HHMMSS
      {until, undefined, "until", string, help(until)}, %% format: YYMoMoDD[HHMMSS]
@@ -736,9 +767,13 @@ ct_opts(_State) ->
      {name, undefined, "name", atom, help(name)},
      {sname, undefined, "sname", atom, help(sname)},
      {setcookie, undefined, "setcookie", atom, help(setcookie)},
-     {sys_config, undefined, "sys_config", string, help(sys_config)} %% comma-seperated list
+     {sys_config, undefined, "sys_config", string, help(sys_config)}, %% comma-separated list
+     {compile_only, undefined, "compile_only", boolean, help(compile_only)},
+     {retry, undefined, "retry", boolean, help(retry)}
     ].
 
+help(compile_only) ->
+    "Compile modules in the project with the test configuration but do not run the tests";
 help(dir) ->
     "List of additional directories containing test suites";
 help(suite) ->
@@ -767,6 +802,8 @@ help(verbosity) ->
     "Verbosity";
 help(cover) ->
     "Generate cover data";
+help(cover_export_name) ->
+    "Base name of the coverdata file to write";
 help(repeat) ->
     "How often to repeat tests";
 help(duration) ->
@@ -803,5 +840,7 @@ help(sname) ->
     "Gives a short name to the node";
 help(setcookie) ->
     "Sets the cookie if the node is distributed";
+help(retry) ->
+    "Experimental feature. If any specification for previously failing test is found, runs them.";
 help(_) ->
     "".

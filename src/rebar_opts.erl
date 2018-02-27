@@ -35,12 +35,40 @@ erl_opts(Opts) ->
     Defines = [{d, list_to_atom(D)} ||
                   D <- ?MODULE:get(Opts, defines, [])],
     AllOpts = Defines ++ RawErlOpts,
-    case proplists:is_defined(no_debug_info, AllOpts) of
-        true ->
-            [O || O <- AllOpts, O =/= no_debug_info];
-        false ->
-            [debug_info|AllOpts]
-    end.
+    lists:reverse(filter_debug_info(lists:reverse(AllOpts))).
+
+filter_debug_info([]) ->
+    %% Default == ON
+    [debug_info];
+filter_debug_info([debug_info|_] = L) ->
+    %% drop no_debug_info and {debug_info_key, _} since those would
+    %% conflict with a plain debug_info
+    [debug_info |
+     lists:filter(fun(K) ->
+         K =/= no_debug_info andalso K =/= debug_info andalso
+         not (is_tuple(K) andalso element(1,K) =:= debug_info_key)
+     end, L)];
+filter_debug_info([{debug_info, _} = H | T]) ->
+    %% custom debug_info field; keep and filter the rest except
+    %% without no_debug_info. Still have to filter for regular or crypto
+    %% debug_info.
+    [H | filter_debug_info(lists:filter(fun(K) -> K =/= no_debug_info end, T))];
+filter_debug_info([{debug_info_key, _}=H | T]) ->
+    %% Drop no_debug_info and regular debug_info
+    [H | lists:filter(fun(K) ->
+            K =/= no_debug_info andalso K =/= debug_info andalso
+            not (is_tuple(K) andalso element(1,K) =:= debug_info_key)
+         end, T)];
+filter_debug_info([no_debug_info|T]) ->
+    %% Drop all debug info
+    lists:filter(fun(debug_info) -> false
+                 ;  ({debug_info, _}) -> false
+                 ;  ({debug_info_key, _}) -> false
+                 ;  (no_debug_info) -> false
+                 ;  (_Other) -> true
+                 end, T);
+filter_debug_info([H|T]) ->
+    [H|filter_debug_info(T)].
 
 apply_overrides(Opts, Name, Overrides) ->
     %% Inefficient. We want the order we get here though.
@@ -117,13 +145,26 @@ merge_opt(plugins, NewValue, _OldValue) ->
 merge_opt({plugins, _}, NewValue, _OldValue) ->
     NewValue;
 merge_opt(profiles, NewValue, OldValue) ->
-    dict:to_list(merge_opts(dict:from_list(NewValue), dict:from_list(OldValue)));
+    %% Merge up sparse pairs of {Profile, Opts} into a joined up
+    %% {Profile, OptsNew, OptsOld} list.
+    ToMerge = normalise_profile_pairs(lists:sort(NewValue),
+                                      lists:sort(OldValue)),
+    [{K,dict:to_list(merge_opts(dict:from_list(New), dict:from_list(Old)))}
+     || {K,New,Old} <- ToMerge];
+merge_opt(erl_first_files, Value, Value) ->
+    Value;
+merge_opt(erl_first_files, NewValue, OldValue) ->
+    OldValue ++ NewValue;
 merge_opt(mib_first_files, Value, Value) ->
     Value;
 merge_opt(mib_first_files, NewValue, OldValue) ->
     OldValue ++ NewValue;
 merge_opt(relx, NewValue, OldValue) ->
-    rebar_utils:tup_umerge(OldValue, NewValue);
+    Partition = fun(C) -> is_tuple(C) andalso element(1, C) =:= overlay end,
+    {NewOverlays, NewOther} = lists:partition(Partition, NewValue),
+    {OldOverlays, OldOther} = lists:partition(Partition, OldValue),
+    rebar_utils:tup_umerge(NewOverlays, OldOverlays)
+    ++ rebar_utils:tup_umerge(OldOther, NewOther);
 merge_opt(Key, NewValue, OldValue)
     when Key == erl_opts; Key == eunit_compile_opts; Key == ct_compile_opts ->
     merge_erl_opts(lists:reverse(OldValue), NewValue);
@@ -186,3 +227,26 @@ filter_defines([{platform_define, ArchRegex, Key, Value} | Rest], Acc) ->
     end;
 filter_defines([Opt | Rest], Acc) ->
     filter_defines(Rest, [Opt | Acc]).
+
+%% @private takes two lists of profile tuples and merges them
+%% into one list of 3-tuples containing the values of either
+%% profiles.
+%% Any missing profile in one of the keys is replaced by an
+%% empty one.
+-spec normalise_profile_pairs([Profile], [Profile]) -> [Pair] when
+      Profile :: {Name, Opts},
+      Pair :: {Name, Opts, Opts},
+      Name :: atom(),
+      Opts :: [term()].
+normalise_profile_pairs([], []) ->
+    [];
+normalise_profile_pairs([{P,V}|Ps], []) ->
+    [{P,V,[]} | normalise_profile_pairs(Ps, [])];
+normalise_profile_pairs([], [{P,V}|Ps]) ->
+    [{P,[],V} | normalise_profile_pairs([], Ps)];
+normalise_profile_pairs([{P,VA}|PAs], [{P,VB}|PBs]) ->
+    [{P,VA,VB} | normalise_profile_pairs(PAs, PBs)];
+normalise_profile_pairs([{PA,VA}|PAs], [{PB,VB}|PBs]) when PA < PB ->
+    [{PA,VA,[]} | normalise_profile_pairs(PAs, [{PB, VB}|PBs])];
+normalise_profile_pairs([{PA,VA}|PAs], [{PB,VB}|PBs]) when PA > PB ->
+    [{PB,[],VB} | normalise_profile_pairs([{PA,VA}|PAs], PBs)].

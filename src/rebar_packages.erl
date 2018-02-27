@@ -72,12 +72,12 @@ deps(Name, Vsn, State) ->
 
 deps_(Name, Vsn, State) ->
     ?MODULE:verify_table(State),
-    ets:lookup_element(?PACKAGE_TABLE, {ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)}, 2).
+    ets:lookup_element(?PACKAGE_TABLE, {rebar_utils:to_binary(Name), rebar_utils:to_binary(Vsn)}, 2).
 
 handle_missing_package(Dep, State, Fun) ->
     case Dep of
         {Name, Vsn} ->
-            ?INFO("Package ~s-~s not found. Fetching registry updates and trying again...", [Name, Vsn]);
+            ?INFO("Package ~ts-~ts not found. Fetching registry updates and trying again...", [Name, Vsn]);
         _ ->
             ?INFO("Package ~p not found. Fetching registry updates and trying again...", [Dep])
     end,
@@ -102,7 +102,7 @@ registry_dir(State) ->
             case rebar_utils:url_append_path(CDN, ?REMOTE_PACKAGE_DIR) of
                 {ok, Parsed} ->
                     {ok, {_, _, Host, _, Path, _}} = http_uri:parse(Parsed),
-                    CDNHostPath = lists:reverse(string:tokens(Host, ".")),
+                    CDNHostPath = lists:reverse(rebar_string:lexemes(Host, ".")),
                     CDNPath = tl(filename:split(Path)),
                     RegistryDir = filename:join([CacheDir, "hex"] ++ CDNHostPath ++ CDNPath),
                     ok = filelib:ensure_dir(filename:join(RegistryDir, "placeholder")),
@@ -128,7 +128,7 @@ registry_checksum({pkg, Name, Vsn, _Hash}, State) ->
         ets:lookup_element(?PACKAGE_TABLE, {Name, Vsn}, 3)
     catch
         _:_ ->
-            throw(?PRV_ERROR({missing_package, ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)}))
+            throw(?PRV_ERROR({missing_package, rebar_utils:to_binary(Name), rebar_utils:to_binary(Vsn)}))
     end.
 
 %% Hex supports use of ~> to specify the version required for a dependency.
@@ -170,8 +170,13 @@ find_highest_matching_(Pkg, PkgVsn, Dep, Constraint, Table, State) ->
     try find_all(Dep, Table, State) of
         {ok, [Vsn]} ->
             handle_single_vsn(Pkg, PkgVsn, Dep, Vsn, Constraint);
-        {ok, [HeadVsn | VsnTail]} ->
-                            {ok, handle_vsns(Constraint, HeadVsn, VsnTail)}
+        {ok, Vsns} ->
+            case handle_vsns(Constraint, Vsns) of
+                none ->
+                    none;
+                FoundVsn ->
+                    {ok, FoundVsn}
+            end
     catch
         error:badarg ->
             none
@@ -189,16 +194,16 @@ find_all(Dep, Table, State) ->
             none
     end.
 
-handle_vsns(Constraint, HeadVsn, VsnTail) ->
+handle_vsns(Constraint, Vsns) ->
     lists:foldl(fun(Version, Highest) ->
                         case ec_semver:pes(Version, Constraint) andalso
-                            ec_semver:gt(Version, Highest) of
+                            (Highest =:= none orelse ec_semver:gt(Version, Highest)) of
                             true ->
                                 Version;
                             false ->
                                 Highest
                         end
-                end, HeadVsn, VsnTail).
+                end, none, Vsns).
 
 handle_single_vsn(Pkg, PkgVsn, Dep, Vsn, Constraint) ->
     case ec_semver:pes(Vsn, Constraint) of
@@ -207,17 +212,17 @@ handle_single_vsn(Pkg, PkgVsn, Dep, Vsn, Constraint) ->
         false ->
             case {Pkg, PkgVsn} of
                 {undefined, undefined} ->
-                    ?WARN("Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
+                    ?DEBUG("Only existing version of ~ts is ~ts which does not match constraint ~~> ~ts. "
                           "Using anyway, but it is not guaranteed to work.", [Dep, Vsn, Constraint]);
                 _ ->
-                    ?WARN("[~s:~s] Only existing version of ~s is ~s which does not match constraint ~~> ~s. "
+                    ?DEBUG("[~ts:~ts] Only existing version of ~ts is ~ts which does not match constraint ~~> ~ts. "
                           "Using anyway, but it is not guaranteed to work.", [Pkg, PkgVsn, Dep, Vsn, Constraint])
             end,
             {ok, Vsn}
     end.
 
 format_error({missing_package, Name, Vsn}) ->
-    io_lib:format("Package not found in registry: ~s-~s.", [ec_cnv:to_binary(Name), ec_cnv:to_binary(Vsn)]);
+    io_lib:format("Package not found in registry: ~ts-~ts.", [rebar_utils:to_binary(Name), rebar_utils:to_binary(Vsn)]);
 format_error({missing_package, Dep}) ->
     io_lib:format("Package not found in registry: ~p.", [Dep]).
 

@@ -49,8 +49,8 @@ do(State) ->
         {ok, _} ->
             Locks = rebar_config:consult_lock_file(LockFile),
             case handle_unlocks(State, Locks, LockFile) of
-                ok ->
-                    {ok, State};
+                {ok, NewLocks} ->
+                    {ok, rebar_state:set(State, {locks, default}, NewLocks)};
                 {error, Reason} ->
                     ?PRV_ERROR({file,Reason})
             end
@@ -66,18 +66,21 @@ format_error(Reason) ->
 
 handle_unlocks(State, Locks, LockFile) ->
     {Args, _} = rebar_state:command_parsed_args(State),
-    Names = parse_names(ec_cnv:to_binary(proplists:get_value(package, Args, <<"">>))),
+    Names = parse_names(rebar_utils:to_binary(proplists:get_value(package, Args, <<"">>))),
     case [Lock || Lock = {Name, _, _} <- Locks, not lists:member(Name, Names)] of
         [] ->
-            file:delete(LockFile);
+            file:delete(LockFile),
+            {ok, []};
         _ when Names =:= [] -> % implicitly all locks
-            file:delete(LockFile);
+            file:delete(LockFile),
+            {ok, []};
         NewLocks ->
-            rebar_config:write_lock_file(LockFile, NewLocks)
+            rebar_config:write_lock_file(LockFile, NewLocks),
+            {ok, NewLocks}
     end.
 
 parse_names(Bin) ->
-    case lists:usort(re:split(Bin, <<" *, *">>, [trim])) of
+    case lists:usort(re:split(Bin, <<" *, *">>, [trim, unicode])) of
         [<<"">>] -> []; % nothing submitted
         Other -> Other
     end.

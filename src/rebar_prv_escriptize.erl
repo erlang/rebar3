@@ -75,7 +75,7 @@ do(State) ->
             end;
         Name ->
             AllApps = rebar_state:all_deps(State)++rebar_state:project_apps(State),
-            case rebar_app_utils:find(ec_cnv:to_binary(Name), AllApps) of
+            case rebar_app_utils:find(rebar_utils:to_binary(Name), AllApps) of
                 {ok, AppInfo} ->
                     escriptize(State, AppInfo);
                 _ ->
@@ -87,12 +87,12 @@ do(State) ->
 
 escriptize(State0, App) ->
     AppName = rebar_app_info:name(App),
-    AppNameStr = ec_cnv:to_list(AppName),
+    AppNameStr = rebar_utils:to_list(AppName),
 
     %% Get the output filename for the escript -- this may include dirs
     Filename = filename:join([rebar_dir:base_dir(State0), "bin",
                               rebar_state:get(State0, escript_name, AppName)]),
-    ?DEBUG("Creating escript file ~s", [Filename]),
+    ?DEBUG("Creating escript file ~ts", [Filename]),
     ok = filelib:ensure_dir(Filename),
     State = rebar_state:escript_path(State0, Filename),
 
@@ -114,9 +114,9 @@ escriptize(State0, App) ->
     EbinFiles = usort(load_files(EbinPrefix, "*", "ebin")),
 
     ExtraFiles = usort(InclBeams ++ InclExtra),
-    Files = get_nonempty(EbinFiles ++ ExtraFiles),
+    Files = get_nonempty(EbinFiles ++ (ExtraFiles -- EbinFiles)), % drop dupes
 
-    DefaultEmuArgs = ?FMT("%%! -escript main ~s -pz ~s/~s/ebin\n",
+    DefaultEmuArgs = ?FMT("%%! -escript main ~ts -pz ~ts/~ts/ebin\n",
                           [AppNameStr, AppNameStr, AppNameStr]),
     EscriptSections =
         [ {shebang,
@@ -130,9 +130,15 @@ escriptize(State0, App) ->
             throw(?PRV_ERROR({escript_creation_failed, AppName, EscriptError}))
     end,
 
-    %% Finally, update executable perms for our script
-    {ok, #file_info{mode = Mode}} = file:read_file_info(Filename),
-    ok = file:change_mode(Filename, Mode bor 8#00111),
+    %% Finally, update executable perms for our script on *nix or write out
+    %% script files on win32
+    case os:type() of
+        {unix, _} ->
+            {ok, #file_info{mode = Mode}} = file:read_file_info(Filename),
+            ok = file:change_mode(Filename, Mode bor 8#00111);
+        {win32, _} ->
+            write_windows_script(Filename)
+    end,
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
@@ -157,7 +163,7 @@ get_apps_beams(Apps, AllApps) ->
 get_apps_beams([], _, Acc) ->
     Acc;
 get_apps_beams([App | Rest], AllApps, Acc) ->
-    case rebar_app_utils:find(ec_cnv:to_binary(App), AllApps) of
+    case rebar_app_utils:find(rebar_utils:to_binary(App), AllApps) of
         {ok, App1} ->
             OutDir = filename:absname(rebar_app_info:ebin_dir(App1)),
             Beams = get_app_beams(App, OutDir),
@@ -188,7 +194,8 @@ load_files(Wildcard, Dir) ->
 
 load_files(Prefix, Wildcard, Dir) ->
     [read_file(Prefix, Filename, Dir)
-     || Filename <- filelib:wildcard(Wildcard, Dir)].
+     || Filename <- filelib:wildcard(Wildcard, Dir),
+        not filelib:is_dir(filename:join(Dir, Filename))].
 
 read_file(Prefix, Filename, Dir) ->
     Filename1 = case Prefix of
@@ -229,7 +236,7 @@ get_nonempty(Files) ->
     [{FName,FBin} || {FName,FBin} <- Files, FBin =/= <<>>].
 
 find_deps(AppNames, AllApps) ->
-    BinAppNames = [ec_cnv:to_binary(Name) || Name <- AppNames],
+    BinAppNames = [rebar_utils:to_binary(Name) || Name <- AppNames],
     [ec_cnv:to_atom(Name) ||
      Name <- find_deps_of_deps(BinAppNames, AllApps, BinAppNames)].
 
@@ -239,7 +246,7 @@ find_deps_of_deps([Name|Names], Apps, Acc) ->
     ?DEBUG("processing ~p", [Name]),
     {ok, App} = rebar_app_utils:find(Name, Apps),
     DepNames = proplists:get_value(applications, rebar_app_info:app_details(App), []),
-    BinDepNames = [ec_cnv:to_binary(Dep) || Dep <- DepNames,
+    BinDepNames = [rebar_utils:to_binary(Dep) || Dep <- DepNames,
                    %% ignore system libs; shouldn't include them.
                    DepDir <- [code:lib_dir(Dep)],
                    DepDir =:= {error, bad_name} orelse % those are all local
@@ -258,3 +265,14 @@ def(Rm, State, Key, Default) ->
 
 rm_newline(String) ->
     [C || C <- String, C =/= $\n].
+
+write_windows_script(Target) ->
+    CmdPath = if is_binary(Target) -> <<Target/binary, ".cmd">>;
+                 is_list(Target) -> Target ++ ".cmd"
+              end,
+    CmdScript=
+        "@echo off\r\n"
+        "setlocal\r\n"
+        "set rebarscript=%~f0\r\n"
+        "escript.exe \"%rebarscript:.cmd=%\" %*\r\n",
+    ok = file:write_file(CmdPath, CmdScript).

@@ -44,7 +44,7 @@ do(State) ->
     {ok, Vsn} = application:get_key(rebar, vsn),
     {ok, Apps} = application:get_key(rebar, applications),
     [application:load(App) || App <- Apps],
-    Vsns = [io_lib:format("~p: ~s~n", [App, AVsn])
+    Vsns = [io_lib:format("~p: ~ts~n", [App, AVsn])
             || App <- lists:sort(Apps),
                {ok, AVsn} <- [application:get_key(App, vsn)]],
     %% Show OS and versions
@@ -59,10 +59,10 @@ do(State) ->
     %%
     ?CONSOLE(
         "Rebar3 report~n"
-        " version ~s~n"
-        " generated at ~s~n"
+        " version ~ts~n"
+        " generated at ~ts~n"
         "=================~n"
-        "Please submit this along with your issue at ~s "
+        "Please submit this along with your issue at ~ts "
         "(and feel free to edit out private information, if any)~n"
         "-----------------~n"
         "Task: ~ts~n"
@@ -75,11 +75,11 @@ do(State) ->
         "Library directory: ~ts~n"
         "-----------------~n"
         "Loaded Applications:~n"
-        "~s~n"
+        "~ts~n"
         "-----------------~n"
         "Escript path: ~ts~n"
         "Providers:~n"
-        "  ~s",
+        "  ~ts",
         [Vsn, time_to_string(UTC),
          ?ISSUES_URL, Command, Task,
          OS, ERTS, Root, Lib,
@@ -100,4 +100,4 @@ time_to_string({{Y,M,D},{H,Min,S}}) ->
                   [Y,M,D,H,Min,S])).
 
 parse_task(Str) ->
-    hd(re:split(Str, " ")).
+    hd(re:split(Str, " ", [unicode])).

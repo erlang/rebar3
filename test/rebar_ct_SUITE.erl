@@ -49,13 +49,16 @@
          cfg_cover_spec/1,
          cfg_atom_suites/1,
          cover_compiled/1,
+         cover_export_name/1,
          misspecified_ct_opts/1,
          misspecified_ct_compile_opts/1,
          misspecified_ct_first_files/1,
          testspec/1,
          testspec_at_root/1,
          testspec_parse_error/1,
-         cmd_vs_cfg_opts/1]).
+         cmd_vs_cfg_opts/1,
+         single_testspec_in_ct_opts/1,
+         compile_only/1]).
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("common_test/include/ct.hrl").
@@ -75,7 +78,9 @@ all() -> [{group, basic_app},
           testspec,
           testspec_at_root,
           testspec_parse_error,
-          cmd_vs_cfg_opts].
+          cmd_vs_cfg_opts,
+          single_testspec_in_ct_opts,
+          compile_only].
 
 groups() -> [{basic_app, [], [basic_app_default_dirs,
                               basic_app_default_beams,
@@ -117,7 +122,8 @@ groups() -> [{basic_app, [], [basic_app_default_dirs,
                             cmd_create_priv_dir,
                             cmd_include_dir,
                             cmd_sys_config]},
-             {cover, [], [cover_compiled]}].
+             {cover, [], [cover_compiled,
+                          cover_export_name]}].
 
 init_per_group(basic_app, Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_"),
@@ -1128,11 +1134,18 @@ cmd_sys_config(Config) ->
     CfgFile = filename:join([AppDir, "config", "cfg_sys.config"]),
     ok = filelib:ensure_dir(CfgFile),
     ok = file:write_file(CfgFile, cfg_sys_config_file(AppName)),
+
+    OtherCfgFile = filename:join([AppDir, "config", "other.config"]),
+    ok = filelib:ensure_dir(OtherCfgFile),
+    ok = file:write_file(OtherCfgFile, other_sys_config_file(AppName)),
+
     RebarConfig = [{ct_opts, [{sys_config, CfgFile}]}],
     {ok, State1} = rebar_test_utils:run_and_check(Config, RebarConfig, ["as", "test", "lock"], return),
 
     {ok, _} = rebar_prv_common_test:prepare_tests(State1),
     ?assertEqual({ok, cfg_value}, application:get_env(AppName, key)),
+
+    ?assertEqual({ok, other_cfg_value}, application:get_env(AppName, other_key)),
 
     Providers = rebar_state:providers(State1),
     Namespace = rebar_state:namespace(State1),
@@ -1239,6 +1252,29 @@ cover_compiled(Config) ->
     Name = ?config(name, Config),
     Mod = list_to_atom(Name),
     {file, _} = cover:is_compiled(Mod).
+
+cover_export_name(Config) ->
+    State = ?config(result, Config),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+    {ok, GetOptResult} = getopt:parse(GetOptSpec, ["--cover", "--cover_export_name=export_name"]),
+
+    NewState = rebar_state:command_parsed_args(State, GetOptResult),
+
+    Tests = rebar_prv_common_test:prepare_tests(NewState),
+    {ok, _} = rebar_prv_common_test:compile(NewState, Tests),
+    rebar_prv_common_test:maybe_write_coverdata(NewState),
+
+    Name = ?config(name, Config),
+    Mod = list_to_atom(Name),
+    {file, _} = cover:is_compiled(Mod),
+
+    Dir = rebar_dir:profile_dir(rebar_state:opts(NewState), [default, test]),
+    ct:pal("DIR ~s", [Dir]),
+    true = filelib:is_file(filename:join([Dir, "cover", "export_name.coverdata"])).
 
 misspecified_ct_opts(Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_atom_suites_"),
@@ -1396,7 +1432,7 @@ testspec_at_root(Config) ->
     CommandProvider = providers:get_provider(ct, Providers, Namespace),
     GetOptSpec = providers:opts(CommandProvider),
 
-    SpecArg1 = string:join([Spec1,Spec2,Spec3],","),
+    SpecArg1 = rebar_string:join([Spec1,Spec2,Spec3],","),
     {ok, GetOptResult1} = getopt:parse(GetOptSpec, ["--spec",SpecArg1]),
     State1 = rebar_state:command_parsed_args(State, GetOptResult1),
     Tests1 = rebar_prv_common_test:prepare_tests(State1),
@@ -1548,6 +1584,57 @@ cmd_vs_cfg_opts(Config) ->
 
     ok.
 
+single_testspec_in_ct_opts(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "ct_testspec_"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name("ct_testspec_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    Spec = filename:join([AppDir, "test", "some.spec"]),
+    ok = filelib:ensure_dir(Spec),
+    ok = file:write_file(Spec, "{suites,\".\",all}.\n"),
+
+    {ok,Wd} = file:get_cwd(),
+    ok = file:set_cwd(AppDir),
+
+    RebarConfig = [{ct_opts, [{spec,"test/some.spec"}]}],
+
+    {ok, State} = rebar_test_utils:run_and_check(C, RebarConfig, ["as", "test", "lock"], return),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+
+    %% Testspec in "test" directory
+    {ok, GetOptResult1} = getopt:parse(GetOptSpec, []),
+    State1 = rebar_state:command_parsed_args(State, GetOptResult1),
+    Tests1 = rebar_prv_common_test:prepare_tests(State1),
+    {ok, T1} = Tests1,
+    "test/some.spec" = proplists:get_value(spec,T1),
+    {ok, _NewState} = rebar_prv_common_test:compile(State1, Tests1),
+
+    ok = file:set_cwd(Wd),
+    ok.
+
+compile_only(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "compile_only_"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name(atom_to_list(basic_app) ++ "_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    Suite = filename:join([AppDir, "test", Name ++ "_SUITE.erl"]),
+    ok = filelib:ensure_dir(Suite),
+    ok = file:write_file(Suite, test_suite(Name)),
+
+    {ok, _State} = rebar_test_utils:run_and_check(C, [], ["ct", "--compile_only"], {ok, [{app,Name}], "test"}).
+
+
 %% helper for generating test data
 test_suite(Name) ->
     io_lib:format("-module(~ts_SUITE).\n"
@@ -1556,7 +1643,10 @@ test_suite(Name) ->
                   "some_test(_) -> ok.\n", [Name]).
 
 cmd_sys_config_file(AppName) ->
-    io_lib:format("[{~s, [{key, cmd_value}]}].", [AppName]).
+    io_lib:format("[{~ts, [{key, cmd_value}]}].", [AppName]).
 
 cfg_sys_config_file(AppName) ->
-    io_lib:format("[{~s, [{key, cfg_value}]}].", [AppName]).
+    io_lib:format("[{~ts, [{key, cfg_value}]}, \"config/other\"].", [AppName]).
+
+other_sys_config_file(AppName) ->
+    io_lib:format("[{~ts, [{other_key, other_cfg_value}]}].", [AppName]).

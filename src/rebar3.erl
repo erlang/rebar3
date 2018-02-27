@@ -116,6 +116,7 @@ run(RawArgs) ->
 -spec run_aux(rebar_state:t(), [string()]) ->
     {ok, rebar_state:t()} | {error, term()}.
 run_aux(State, RawArgs) ->
+    io:setopts([{encoding, unicode}]),
     %% Profile override; can only support one profile
     State1 = case os:getenv("REBAR_PROFILE") of
                  false ->
@@ -176,18 +177,18 @@ init_config() ->
     Verbosity = log_level(),
     ok = rebar_log:init(command_line, Verbosity),
 
-    Config = rebar_config:consult(),
+    Config = rebar_config:consult_root(),
     Config1 = rebar_config:merge_locks(Config, rebar_config:consult_lock_file(?LOCK_FILE)),
 
     %% If $HOME/.config/rebar3/rebar.config exists load and use as global config
     GlobalConfigFile = rebar_dir:global_config(),
     State = case filelib:is_regular(GlobalConfigFile) of
                 true ->
-                    ?DEBUG("Load global config file ~s", [GlobalConfigFile]),
+                    ?DEBUG("Load global config file ~ts", [GlobalConfigFile]),
                     try state_from_global_config(Config1, GlobalConfigFile)
                     catch
                         _:_ ->
-                            ?WARN("Global config ~s exists but can not be read. Ignoring global config values.", [GlobalConfigFile]),
+                            ?WARN("Global config ~ts exists but can not be read. Ignoring global config values.", [GlobalConfigFile]),
                             rebar_state:new(Config1)
                     end;
                 false ->
@@ -270,7 +271,7 @@ log_level() ->
 -spec version() -> ok.
 version() ->
     {ok, Vsn} = application:get_key(rebar, vsn),
-    ?CONSOLE("rebar ~s on Erlang/OTP ~s Erts ~s",
+    ?CONSOLE("rebar ~ts on Erlang/OTP ~ts Erts ~ts",
              [Vsn, erlang:system_info(otp_release), erlang:system_info(version)]).
 
 %% @private set global flag based on getopt option boolean value
@@ -311,11 +312,11 @@ handle_error({error, {Module, Reason}}) ->
             ?DEBUG("Uncaught error: ~p ~p", [Module, Reason]),
             ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []);
         _ ->
-            ?ERROR("~s", [Module:format_error(Reason)])
+            ?ERROR("~ts", [Module:format_error(Reason)])
     end,
     erlang:halt(1);
 handle_error({error, Error}) when is_list(Error) ->
-    ?ERROR("~s", [Error]),
+    ?ERROR("~ts", [Error]),
     erlang:halt(1);
 handle_error(Error) ->
     %% Nothing should percolate up from rebar_core;
@@ -344,7 +345,7 @@ start_and_load_apps(Caller) ->
     ensure_running(asn1, Caller),
     ensure_running(public_key, Caller),
     ensure_running(ssl, Caller),
-    inets:start(),
+    ensure_running(inets, Caller),
     inets:start(httpc, [{profile, rebar}]).
 
 %% @doc Make sure a required app is running, or display an error message
@@ -396,8 +397,8 @@ safe_define_test_macro(Opts) ->
     %% defining a compile macro twice results in an exception so
     %% make sure 'TEST' is only defined once
     case test_defined(Opts) of
-       true  -> [];
-       false -> [{d, 'TEST'}]
+       true  -> Opts;
+       false -> [{d, 'TEST'}|Opts]
     end.
 
 test_defined([{d, 'TEST'}|_]) -> true;

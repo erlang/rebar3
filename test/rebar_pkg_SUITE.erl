@@ -226,7 +226,12 @@ find_highest_matching(_Config) ->
     ?assertEqual(<<"1.1.1">>, Vsn1),
     {ok, Vsn2} = rebar_packages:find_highest_matching(
                    <<"test">>, <<"1.0.0">>, <<"goodpkg">>, <<"2.0">>, package_index, State),
-    ?assertEqual(<<"2.0.0">>, Vsn2).
+    ?assertEqual(<<"2.0.0">>, Vsn2),
+
+    %% regression test. ~> constraints higher than the available packages would result
+    %% in returning the first package version instead of 'none'.
+    ?assertEqual(none, rebar_packages:find_highest_matching(<<"test">>, <<"1.0.0">>, <<"goodpkg">>,
+                                                            <<"~> 5.0">>, package_index, State)).
 
 
 %%%%%%%%%%%%%%%
@@ -267,6 +272,9 @@ mock_config(Name, Config) ->
     meck:expect(rebar_packages, package_dir, fun(_) -> {ok, CacheDir} end),
     rebar_prv_update:hex_to_index(rebar_state:new()),
 
+    meck:new(rebar_prv_update, [passthrough]),
+    meck:expect(rebar_prv_update, do, fun(State) -> {ok, State} end),
+
     %% Cache fetches are mocked -- we assume the server and clients are
     %% correctly used.
     GoodCache = ?config(good_cache, Config),
@@ -287,7 +295,7 @@ mock_config(Name, Config) ->
 
 unmock_config(Config) ->
     meck:unload(),
-    ets:delete(?config(mock_table, Config)).
+    catch ets:delete(?config(mock_table, Config)).
 
 copy_to_cache({Pkg,Vsn}, Config) ->
     Name = <<Pkg/binary, "-", Vsn/binary, ".tar">>,
