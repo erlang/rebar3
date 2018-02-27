@@ -206,7 +206,7 @@ valid_vsn(Vsn) ->
     re:run(Vsn, SupportedVersions, [unicode]) =/= nomatch.
 
 highest_matching({Pkg, PkgVsn, Dep, App}, Vsn, HexRegistry, State, DepsListAcc) ->
-    case rebar_packages:find_highest_matching(Pkg, PkgVsn, Dep, Vsn, HexRegistry, State) of
+    case rebar_packages:find_highest_matching_(Pkg, PkgVsn, Dep, Vsn, HexRegistry, State) of
         {ok, HighestDepVsn} ->
             [{App, {pkg, Dep, HighestDepVsn, undefined}} | DepsListAcc];
         none ->

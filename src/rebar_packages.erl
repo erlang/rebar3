@@ -9,6 +9,7 @@
         ,registry_checksum/2
         ,find_highest_matching/6
         ,find_highest_matching/4
+        ,find_highest_matching_/6
         ,find_all/3
         ,verify_table/1
         ,format_error/1]).
