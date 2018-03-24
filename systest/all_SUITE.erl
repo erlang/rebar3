@@ -29,7 +29,7 @@ end_per_testcase(_Name, Config) ->
     Config.
 
 all() ->
-    [noop, resource_plugins, alias_clash, grisp_explode].
+    [noop, resource_plugins, alias_clash, grisp_explode, compile_deps].
 
 %groups() ->
 %    [{plugins, [shuffle], []},
@@ -79,13 +79,27 @@ grisp_explode(Config) ->
     ),
     ok.
 
+compile_deps() ->
+    [{doc, "Issue #1712"
+           "When compile a project multiple time, the dependency should always be build event if refetch."}].
+compile_deps(Config) ->
+    rebar3("compile", Config),
+    rebar3("compile", Config),
+
+    PrivDir = ?config(path, Config),
+    BeansDir = filename:join([PrivDir, "_build", "default", "lib", "fake_dep", "ebin"]),
+
+    {ok, Beans} = file:list_dir(BeansDir),
+    ?assert(length(Beans) > 1).
+
+
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
 %%%%%%%%%%%%%%%
 set_name_config(Atom, Config) ->
     [{path,
       filename:join([?config(priv_dir, Config),
-                     atom_to_list(?MODULE)++"_data", atom_to_list(Atom)])}
+                     atom_to_list(Atom)])}
      | Config].
 
 rebar3(Args, Config) -> rebar3(Args, Config, []).

@@ -1,0 +1,2 @@
+os:putenv("LOCALDEP_DIR", "./vendored/").
+CONFIG.
