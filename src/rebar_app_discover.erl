@@ -334,8 +334,6 @@ create_app_info(AppInfo, AppDir, AppFile) ->
     C = rebar_config:consult(AppDir),
     AppInfo3 = rebar_app_info:update_opts(AppInfo2,
                                           rebar_app_info:opts(AppInfo2), C),
-    ?DEBUG("create_app_info(~p, ~p, ~p) -> ~n~p~n",
-           [AppInfo, AppDir, AppFile, AppInfo3]),
     Valid = case rebar_app_utils:validate_application_info(AppInfo3) =:= true
                 andalso rebar_app_info:has_all_artifacts(AppInfo3) =:= true of
                 true ->
