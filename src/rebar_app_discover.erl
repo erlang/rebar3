@@ -411,12 +411,13 @@ try_handle_app_src_file(_AppInfo, _, _AppDir, _AppSrcFile, valid) ->
     false;
 try_handle_app_src_file(AppInfo, _, AppDir, [File], Validate) when Validate =:= invalid
                                                                  ; Validate =:= all ->
-    AppInfo1 = create_app_info(AppInfo, AppDir, File),
+    AppInfo1 = rebar_app_info:app_file(AppInfo, undefined),
+    AppInfo2 = create_app_info(AppInfo1, AppDir, File),
     case filename:extension(File) of
         ".script" ->
-            {true, rebar_app_info:app_file_src_script(AppInfo1, File)};
+            {true, rebar_app_info:app_file_src_script(AppInfo2, File)};
         _ ->
-            {true, rebar_app_info:app_file_src(AppInfo1, File)}
+            {true, rebar_app_info:app_file_src(AppInfo2, File)}
     end;
 try_handle_app_src_file(_AppInfo, _, _AppDir, Other, _Validate) ->
     throw({error, {multiple_app_files, Other}}).

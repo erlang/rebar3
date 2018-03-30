@@ -12,7 +12,7 @@ init_per_suite(Config) ->
         ["rebar", Vsn | _] ->
             %% Copy all base cases to priv_dir
             rebar_file_utils:cp_r([?config(data_dir, Config)],
-                                  ?config(priv_dir, Config)),
+                                   ?config(priv_dir, Config)),
             Config;
         _ ->
             {skip, "expected current version "++Vsn++" in path "
@@ -29,7 +29,7 @@ end_per_testcase(_Name, Config) ->
     Config.
 
 all() ->
-    [noop, resource_plugins, alias_clash, grisp_explode].
+    [noop, resource_plugins, alias_clash, grisp_explode, compile_deps].
 
 %groups() ->
 %    [{plugins, [shuffle], []},
@@ -78,6 +78,19 @@ grisp_explode(Config) ->
         re:run(Output, "No releases exist in the system for robot:0.1.0!")
     ),
     ok.
+
+compile_deps() ->
+    [{doc, "When compiling a project multiple times, the deps should always be built event if refetched"}].
+compile_deps(Config) ->
+    rebar3("compile", Config),
+    rebar3("compile", Config),
+
+    PrivDir = ?config(path, Config),
+    EbinDir = filename:join([PrivDir, "_build", "default", "lib", "fake_dep", "ebin"]),
+
+    {ok, Beams} = file:list_dir(EbinDir),
+    ?assert(length(Beams) > 1).
+
 
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
