@@ -12,7 +12,7 @@ init_per_suite(Config) ->
         ["rebar", Vsn | _] ->
             %% Copy all base cases to priv_dir
             rebar_file_utils:cp_r([?config(data_dir, Config)],
-                                  ?config(priv_dir, Config)),
+                                   ?config(priv_dir, Config)),
             Config;
         _ ->
             {skip, "expected current version "++Vsn++" in path "
@@ -80,17 +80,16 @@ grisp_explode(Config) ->
     ok.
 
 compile_deps() ->
-    [{doc, "Issue #1712"
-           "When compile a project multiple time, the dependency should always be build event if refetch."}].
+    [{doc, "When compiling a project multiple times, the deps should always be built event if refetched"}].
 compile_deps(Config) ->
     rebar3("compile", Config),
     rebar3("compile", Config),
 
     PrivDir = ?config(path, Config),
-    BeansDir = filename:join([PrivDir, "_build", "default", "lib", "fake_dep", "ebin"]),
+    EbinDir = filename:join([PrivDir, "_build", "default", "lib", "fake_dep", "ebin"]),
 
-    {ok, Beans} = file:list_dir(BeansDir),
-    ?assert(length(Beans) > 1).
+    {ok, Beams} = file:list_dir(EbinDir),
+    ?assert(length(Beams) > 1).
 
 
 %%%%%%%%%%%%%%%
@@ -99,7 +98,7 @@ compile_deps(Config) ->
 set_name_config(Atom, Config) ->
     [{path,
       filename:join([?config(priv_dir, Config),
-                     atom_to_list(Atom)])}
+                     atom_to_list(?MODULE)++"_data", atom_to_list(Atom)])}
      | Config].
 
 rebar3(Args, Config) -> rebar3(Args, Config, []).
