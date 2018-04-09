@@ -109,7 +109,8 @@ make_vsn(_) ->
 request(Url, ETag) ->
     HttpOptions = [{ssl, ssl_opts(Url)}, {relaxed, true} | rebar_utils:get_proxy_auth()],
 
-    case httpc:request(get, {Url, [{"if-none-match", ETag} || ETag =/= false]++[{"User-Agent", rebar_utils:user_agent()}]},
+    case httpc:request(get, {Url, [{"if-none-match", "\"" ++ ETag ++ "\""} || ETag =/= false]++
+                             [{"User-Agent", rebar_utils:user_agent()}]},
                        HttpOptions,
                        [{body_format, binary}],
                        rebar) of
