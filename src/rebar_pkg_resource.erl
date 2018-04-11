@@ -19,9 +19,26 @@
 -include("rebar.hrl").
 -include_lib("public_key/include/OTP-PUB-KEY.hrl").
 
+-type cached_result()   :: {'bad_checksum',string()} |
+                           {'bad_registry_checksum',string()} |
+                           {'failed_extract',string()} |
+                           {'ok','true'} |
+                           {'unexpected_hash',string(),_,binary()}.
+
+-type download_result() :: {bad_download, binary() | string()} |
+                           {fetch_fail, _, _} | cached_result().
+
+-spec lock(AppDir, Source) -> Res when
+      AppDir :: file:name(),
+      Source :: tuple(),
+      Res :: {atom(), string(), any()}.
 lock(_AppDir, Source) ->
     Source.
 
+-spec needs_update(Dir, Pkg) -> Res when
+      Dir :: file:name(),
+      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
+      Res :: boolean().
 needs_update(Dir, {pkg, _Name, Vsn, _Hash}) ->
     [AppInfo] = rebar_app_discover:find_apps([Dir], all),
     case rebar_app_info:original_vsn(AppInfo) =:= rebar_utils:to_list(Vsn) of
@@ -31,9 +48,20 @@ needs_update(Dir, {pkg, _Name, Vsn, _Hash}) ->
             true
     end.
 
+-spec download(TmpDir, Pkg, State) -> Res when
+      TmpDir :: file:name(),
+      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
+      State :: rebar_state:t(),
+      Res :: {'error',_} | {'ok',_} | {'tarball',binary() | string()}.
 download(TmpDir, Pkg, State) ->
     download(TmpDir, Pkg, State, true).
 
+-spec download(TmpDir, Pkg, State, UpdateETag) -> Res when
+      TmpDir :: file:name(),
+      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
+      State :: rebar_state:t(),
+      UpdateETag :: boolean(),
+      Res :: download_result().
 download(TmpDir, Pkg={pkg, Name, Vsn, _Hash}, State, UpdateETag) ->
     CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
     {ok, PackageDir} = rebar_packages:package_dir(State),
@@ -48,6 +76,16 @@ download(TmpDir, Pkg={pkg, Name, Vsn, _Hash}, State, UpdateETag) ->
             {fetch_fail, Name, Vsn}
     end.
 
+-spec cached_download(TmpDir, CachePath, Pkg, Url, ETag, State, ETagPath, UpdateETag) -> Res when
+      TmpDir :: file:name(),
+      CachePath :: file:name(),
+      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
+      Url :: string(),
+      ETag :: false | string(),
+      State :: rebar_state:t(),
+      ETagPath :: file:name(),
+      UpdateETag :: boolean(),
+      Res :: download_result().
 cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash}, Url, ETag, State, ETagPath, UpdateETag) ->
     case request(Url, ETag) of
         {ok, cached} ->
@@ -65,6 +103,12 @@ cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash}, Url, ETag, State
             {fetch_fail, Name, Vsn}
     end.
 
+-spec serve_from_cache(TmpDir, CachePath, Pkg, State) -> Res when
+      TmpDir :: file:name(),
+      CachePath :: file:name(),
+      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
+      State :: rebar_state:t(),
+      Res :: cached_result().
 serve_from_cache(TmpDir, CachePath, Pkg, State) ->
     {Files, Contents, Version, Meta} = extract(TmpDir, CachePath),
     case checksums(Pkg, Files, Contents, Version, Meta, State) of
@@ -85,6 +129,15 @@ serve_from_cache(TmpDir, CachePath, Pkg, State) ->
             {bad_checksum, CachePath}
     end.
 
+-spec serve_from_download(TmpDir, CachePath, Package, ETag, Binary, State, ETagPath) -> Res when
+      TmpDir :: file:name(),
+      CachePath :: file:name(),
+      Package :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
+      ETag :: string(),
+      Binary :: binary(),
+      State :: rebar_state:t(),
+      ETagPath :: file:name(),
+      Res :: download_result().
 serve_from_download(TmpDir, CachePath, Package, ETag, Binary, State, ETagPath) ->
     ?DEBUG("Writing ~p to cache at ~ts", [Package, CachePath]),
     file:write_file(CachePath, Binary),
@@ -96,6 +149,14 @@ serve_from_download(TmpDir, CachePath, Package, ETag, Binary, State, ETagPath) -
             {bad_download, CachePath}
     end.
 
+-spec extract(TmpDir, CachePath) -> Res when
+      TmpDir :: file:name(),
+      CachePath :: file:name(),
+      Res :: {Files, Contents, Version, Meta},
+      Files :: list({file:name(), binary()}),
+      Contents :: binary(),
+      Version :: binary(),
+      Meta :: binary().
 extract(TmpDir, CachePath) ->
     ec_file:mkdir_p(TmpDir),
     {ok, Files} = erl_tar:extract(CachePath, [memory]),
@@ -104,6 +165,18 @@ extract(TmpDir, CachePath) ->
     {"metadata.config", Meta} = lists:keyfind("metadata.config", 1, Files),
     {Files, Contents, Version, Meta}.
 
+-spec checksums(Pkg, Files, Contents, Version, Meta, State) -> Res when
+      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
+      Files :: list({file:name(), binary()}),
+      Contents :: binary(),
+      Version :: binary(),
+      Meta :: binary(),
+      State :: rebar_state:t(),
+      Res :: {Hash, BinChecksum, RegistryChecksum, TarChecksum},
+      Hash :: binary(),
+      BinChecksum :: binary(),
+      RegistryChecksum :: any(),
+      TarChecksum :: binary().
 checksums(Pkg={pkg, _Name, _Vsn, Hash}, Files, Contents, Version, Meta, State) ->
     Blob = <<Version/binary, Meta/binary, Contents/binary>>,
     <<X:256/big-unsigned>> = crypto:hash(sha256, Blob),
@@ -112,12 +185,18 @@ checksums(Pkg={pkg, _Name, _Vsn, Hash}, Files, Contents, Version, Meta, State) -
     {"CHECKSUM", TarChecksum} = lists:keyfind("CHECKSUM", 1, Files),
     {Hash, BinChecksum, RegistryChecksum, TarChecksum}.
 
+-spec make_vsn(Vsn) -> Res when
+      Vsn :: any(),
+      Res :: {'error',[1..255,...]}.
 make_vsn(_) ->
     {error, "Replacing version of type pkg not supported."}.
 
+-spec request(Url, ETag) -> Res when
+      Url :: string(),
+      ETag :: false | string(),
+      Res :: 'error' | {ok, cached} | {ok, any(), string()}.
 request(Url, ETag) ->
     HttpOptions = [{ssl, ssl_opts(Url)}, {relaxed, true} | rebar_utils:get_proxy_auth()],
-
     case httpc:request(get, {Url, [{"if-none-match", "\"" ++ ETag ++ "\""} || ETag =/= false]++
                              [{"User-Agent", rebar_utils:user_agent()}]},
                        HttpOptions,
@@ -138,6 +217,9 @@ request(Url, ETag) ->
             error
     end.
 
+-spec etag(Path) -> Res when
+      Path :: file:name(),
+      Res :: false | string().
 etag(Path) ->
     case file:read_file(Path) of
         {ok, Bin} ->
@@ -148,7 +230,9 @@ etag(Path) ->
 
 %% @doc returns the SSL options adequate for the project based on
 %% its configuration, including for validation of certs.
--spec ssl_opts(string()) -> [term()].
+-spec ssl_opts(Url) -> Res when
+      Url :: string(),
+      Res :: proplists:proplist().
 ssl_opts(Url) ->
     case get_ssl_config() of
         ssl_verify_enabled ->
@@ -159,7 +243,10 @@ ssl_opts(Url) ->
 
 %% @doc returns the SSL options adequate for the project based on
 %% its configuration, including for validation of certs.
--spec ssl_opts(atom(), string()) -> [term()].
+-spec ssl_opts(Enabled, Url) -> Res when
+      Enabled :: atom(),
+      Url :: string(),
+      Res :: proplists:proplist().
 ssl_opts(ssl_verify_enabled, Url) ->
     case check_ssl_version() of
         true ->
@@ -173,6 +260,9 @@ ssl_opts(ssl_verify_enabled, Url) ->
             [{verify, verify_none}]
     end.
 
+-spec partial_chain(Certs) -> Res when
+      Certs :: list(any()),
+      Res :: unknown_ca | {trusted_ca, any()}.
 partial_chain(Certs) ->
     Certs1 = [{Cert, public_key:pkix_decode_cert(Cert, otp)} || Cert <- Certs],
     CACerts = certifi:cacerts(),
@@ -187,14 +277,23 @@ partial_chain(Certs) ->
             unknown_ca
     end.
 
+-spec extract_public_key_info(Cert) -> Res when
+      Cert :: #'OTPCertificate'{tbsCertificate::#'OTPTBSCertificate'{}},
+      Res :: any().
 extract_public_key_info(Cert) ->
     ((Cert#'OTPCertificate'.tbsCertificate)#'OTPTBSCertificate'.subjectPublicKeyInfo).
 
+-spec check_cert(CACerts, Cert) -> Res when
+      CACerts :: list(any()),
+      Cert :: any(),
+      Res :: boolean().
 check_cert(CACerts, Cert) ->
     lists:any(fun(CACert) ->
                       extract_public_key_info(CACert) == extract_public_key_info(Cert)
               end, CACerts).
 
+-spec check_ssl_version() ->
+      boolean().
 check_ssl_version() ->
     case application:get_key(ssl, vsn) of
         {ok, Vsn} ->
@@ -203,6 +302,8 @@ check_ssl_version() ->
             false
     end.
 
+-spec get_ssl_config() ->
+      ssl_verify_disabled | ssl_verify_enabled.
 get_ssl_config() ->
     GlobalConfigFile = rebar_dir:global_config(),
     Config = rebar_config:consult_file(GlobalConfigFile),
@@ -213,9 +314,14 @@ get_ssl_config() ->
             ssl_verify_enabled
     end.
 
+-spec parse_vsn(Vsn) -> Res when
+      Vsn :: string(),
+      Res :: {integer(), integer(), integer()}.
 parse_vsn(Vsn) ->
     version_pad(rebar_string:lexemes(Vsn, ".-")).
 
+-spec version_pad(list(nonempty_string())) -> Res when
+      Res :: {integer(), integer(), integer()}.
 version_pad([Major]) ->
     {list_to_integer(Major), 0, 0};
 version_pad([Major, Minor]) ->
@@ -225,10 +331,19 @@ version_pad([Major, Minor, Patch]) ->
 version_pad([Major, Minor, Patch | _]) ->
     {list_to_integer(Major), list_to_integer(Minor), list_to_integer(Patch)}.
 
+-spec maybe_store_etag_in_cache(UpdateETag, Path, ETag) -> Res when
+      UpdateETag :: boolean(),
+      Path :: file:name(),
+      ETag :: string(),
+      Res :: ok.
 maybe_store_etag_in_cache(false = _UpdateETag, _Path, _ETag) ->
     ok;
 maybe_store_etag_in_cache(true = _UpdateETag, Path, ETag) ->
     store_etag_in_cache(Path, ETag).
 
+-spec store_etag_in_cache(File, ETag) -> Res when
+      File :: file:name(),
+      ETag :: string(),
+      Res :: ok.
 store_etag_in_cache(Path, ETag) ->
     ok = file:write_file(Path, ETag).
