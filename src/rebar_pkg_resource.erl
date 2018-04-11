@@ -6,12 +6,15 @@
 
 -export([lock/2
         ,download/3
+        ,download/4
         ,needs_update/2
         ,make_vsn/1]).
 
 -export([request/2
         ,etag/1
         ,ssl_opts/1]).
+
+-export([store_etag_in_cache/2]).
 
 -include("rebar.hrl").
 -include_lib("public_key/include/OTP-PUB-KEY.hrl").
@@ -28,27 +31,34 @@ needs_update(Dir, {pkg, _Name, Vsn, _Hash}) ->
             true
     end.
 
-download(TmpDir, Pkg={pkg, Name, Vsn, _Hash}, State) ->
+download(TmpDir, Pkg, State) ->
+    download(TmpDir, Pkg, State, true).
+
+download(TmpDir, Pkg={pkg, Name, Vsn, _Hash}, State, UpdateETag) ->
     CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
     {ok, PackageDir} = rebar_packages:package_dir(State),
     Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
+    ETagFile = binary_to_list(<<Name/binary, "-", Vsn/binary, ".etag">>),
     CachePath = filename:join(PackageDir, Package),
+    ETagPath = filename:join(PackageDir, ETagFile),
     case rebar_utils:url_append_path(CDN, filename:join(?REMOTE_PACKAGE_DIR, Package)) of
         {ok, Url} ->
-            cached_download(TmpDir, CachePath, Pkg, Url, etag(CachePath), State);
+            cached_download(TmpDir, CachePath, Pkg, Url, etag(ETagPath), State, ETagPath, UpdateETag);
         _ ->
             {fetch_fail, Name, Vsn}
     end.
 
-cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash}, Url, ETag, State) ->
+cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash}, Url, ETag, State, ETagPath, UpdateETag) ->
     case request(Url, ETag) of
         {ok, cached} ->
             ?INFO("Version cached at ~ts is up to date, reusing it", [CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg, State);
         {ok, Body, NewETag} ->
             ?INFO("Downloaded package, caching at ~ts", [CachePath]),
-            serve_from_download(TmpDir, CachePath, Pkg, NewETag, Body, State);
+            maybe_store_etag_in_cache(UpdateETag, ETagPath, NewETag),
+            serve_from_download(TmpDir, CachePath, Pkg, NewETag, Body, State, ETagPath);
         error when ETag =/= false ->
+            store_etag_in_cache(ETagPath, ETag),
             ?INFO("Download error, using cached file at ~ts", [CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg, State);
         error ->
@@ -75,17 +85,16 @@ serve_from_cache(TmpDir, CachePath, Pkg, State) ->
             {bad_checksum, CachePath}
     end.
 
-serve_from_download(TmpDir, CachePath, Package, ETag, Binary, State) ->
+serve_from_download(TmpDir, CachePath, Package, ETag, Binary, State, ETagPath) ->
     ?DEBUG("Writing ~p to cache at ~ts", [Package, CachePath]),
     file:write_file(CachePath, Binary),
-    case etag(CachePath) of
+    case etag(ETagPath) of
         ETag ->
             serve_from_cache(TmpDir, CachePath, Package, State);
         FileETag ->
             ?DEBUG("Downloaded file ~ts ETag ~ts doesn't match returned ETag ~ts", [CachePath, ETag, FileETag]),
             {bad_download, CachePath}
     end.
-
 
 extract(TmpDir, CachePath) ->
     ec_file:mkdir_p(TmpDir),
@@ -131,9 +140,8 @@ request(Url, ETag) ->
 
 etag(Path) ->
     case file:read_file(Path) of
-        {ok, Binary} ->
-            <<X:128/big-unsigned-integer>> = crypto:hash(md5, Binary),
-            rebar_string:lowercase(lists:flatten(io_lib:format("~32.16.0b", [X])));
+        {ok, Bin} ->
+            binary_to_list(Bin);
         {error, _} ->
             false
     end.
@@ -216,3 +224,11 @@ version_pad([Major, Minor, Patch]) ->
     {list_to_integer(Major), list_to_integer(Minor), list_to_integer(Patch)};
 version_pad([Major, Minor, Patch | _]) ->
     {list_to_integer(Major), list_to_integer(Minor), list_to_integer(Patch)}.
+
+maybe_store_etag_in_cache(false = _UpdateETag, _Path, _ETag) ->
+    ok;
+maybe_store_etag_in_cache(true = _UpdateETag, Path, ETag) ->
+    store_etag_in_cache(Path, ETag).
+
+store_etag_in_cache(Path, ETag) ->
+    ok = file:write_file(Path, ETag).
