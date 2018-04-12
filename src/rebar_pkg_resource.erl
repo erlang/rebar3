@@ -14,6 +14,7 @@
         ,etag/1
         ,ssl_opts/1]).
 
+%% Exported for ct
 -export([store_etag_in_cache/2]).
 
 -include("rebar.hrl").
@@ -28,6 +29,9 @@
 -type download_result() :: {bad_download, binary() | string()} |
                            {fetch_fail, _, _} | cached_result().
 
+%%==============================================================================
+%% Public API
+%%==============================================================================
 -spec lock(AppDir, Source) -> Res when
       AppDir :: file:name(),
       Source :: tuple(),
@@ -35,6 +39,12 @@
 lock(_AppDir, Source) ->
     Source.
 
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return true if the stored version of the pkg is older than the current
+%% version.
+%% @end
+%%------------------------------------------------------------------------------
 -spec needs_update(Dir, Pkg) -> Res when
       Dir :: file:name(),
       Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
@@ -48,6 +58,11 @@ needs_update(Dir, {pkg, _Name, Vsn, _Hash}) ->
             true
     end.
 
+%%------------------------------------------------------------------------------
+%% @doc
+%% Download the given pkg.
+%% @end
+%%------------------------------------------------------------------------------
 -spec download(TmpDir, Pkg, State) -> Res when
       TmpDir :: file:name(),
       Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
@@ -56,6 +71,13 @@ needs_update(Dir, {pkg, _Name, Vsn, _Hash}) ->
 download(TmpDir, Pkg, State) ->
     download(TmpDir, Pkg, State, true).
 
+%%------------------------------------------------------------------------------
+%% @doc
+%% Download the given pkg. The etag belonging to the pkg file will be updated
+%% only if the UpdateEtag is true and the ETag returned from the hexpm server
+%% is different.
+%% @end
+%%------------------------------------------------------------------------------
 -spec download(TmpDir, Pkg, State, UpdateETag) -> Res when
       TmpDir :: file:name(),
       Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
@@ -69,14 +91,113 @@ download(TmpDir, Pkg={pkg, Name, Vsn, _Hash}, State, UpdateETag) ->
     ETagFile = binary_to_list(<<Name/binary, "-", Vsn/binary, ".etag">>),
     CachePath = filename:join(PackageDir, Package),
     ETagPath = filename:join(PackageDir, ETagFile),
-    case rebar_utils:url_append_path(CDN, filename:join(?REMOTE_PACKAGE_DIR, Package)) of
+    case rebar_utils:url_append_path(CDN, filename:join(?REMOTE_PACKAGE_DIR,
+                                                        Package)) of
         {ok, Url} ->
-            cached_download(TmpDir, CachePath, Pkg, Url, etag(ETagPath), State, ETagPath, UpdateETag);
+            cached_download(TmpDir, CachePath, Pkg, Url, etag(ETagPath), State,
+                            ETagPath, UpdateETag);
         _ ->
             {fetch_fail, Name, Vsn}
     end.
 
--spec cached_download(TmpDir, CachePath, Pkg, Url, ETag, State, ETagPath, UpdateETag) -> Res when
+%%------------------------------------------------------------------------------
+%% @doc
+%% Implementation of rebar_resource make_vsn callback.
+%% Returns {error, string()} as this operation is not supported for pkg sources.
+%% @end
+%%------------------------------------------------------------------------------
+-spec make_vsn(Vsn) -> Res when
+      Vsn :: any(),
+      Res :: {'error',[1..255,...]}.
+make_vsn(_) ->
+    {error, "Replacing version of type pkg not supported."}.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Download the pkg belonging to the given address. If the etag of the pkg
+%% is the same what we stored in the etag file previously return {ok, cached},
+%% if the file has changed (so the etag is not the same anymore) return
+%% {ok, Contents, NewEtag}, otherwise if some error occured return error.
+%% @end
+%%------------------------------------------------------------------------------
+-spec request(Url, ETag) -> Res when
+      Url :: string(),
+      ETag :: false | string(),
+      Res :: 'error' | {ok, cached} | {ok, any(), string()}.
+request(Url, ETag) ->
+    HttpOptions = [{ssl, ssl_opts(Url)},
+                   {relaxed, true} | rebar_utils:get_proxy_auth()],
+    case httpc:request(get, {Url, [{"if-none-match", "\"" ++ ETag ++ "\""}
+                                   || ETag =/= false] ++
+                             [{"User-Agent", rebar_utils:user_agent()}]},
+                       HttpOptions, [{body_format, binary}], rebar) of
+        {ok, {{_Version, 200, _Reason}, Headers, Body}} ->
+            ?DEBUG("Successfully downloaded ~ts", [Url]),
+            {"etag", ETag1} = lists:keyfind("etag", 1, Headers),
+            {ok, Body, rebar_string:trim(ETag1, both, [$"])};
+        {ok, {{_Version, 304, _Reason}, _Headers, _Body}} ->
+            ?DEBUG("Cached copy of ~ts still valid", [Url]),
+            {ok, cached};
+        {ok, {{_Version, Code, _Reason}, _Headers, _Body}} ->
+            ?DEBUG("Request to ~p failed: status code ~p", [Url, Code]),
+            error;
+        {error, Reason} ->
+            ?DEBUG("Request to ~p failed: ~p", [Url, Reason]),
+            error
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Read the etag belonging to the pkg file from the cache directory. The etag
+%% is stored in a separate file when the etag belonging to the package is
+%% returned from the hexpm server. The name is package-vsn.etag.
+%% @end
+%%------------------------------------------------------------------------------
+-spec etag(Path) -> Res when
+      Path :: file:name(),
+      Res :: false | string().
+etag(Path) ->
+    case file:read_file(Path) of
+        {ok, Bin} ->
+            binary_to_list(Bin);
+        {error, _} ->
+            false
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return the SSL options adequate for the project based on
+%% its configuration, including for validation of certs.
+%% @end
+%%------------------------------------------------------------------------------
+-spec ssl_opts(Url) -> Res when
+      Url :: string(),
+      Res :: proplists:proplist().
+ssl_opts(Url) ->
+    case get_ssl_config() of
+        ssl_verify_enabled ->
+            ssl_opts(ssl_verify_enabled, Url);
+        ssl_verify_disabled ->
+            [{verify, verify_none}]
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Store the given etag in the .cache folder. The name is pakckage-vsn.etag.
+%% @end
+%%------------------------------------------------------------------------------
+-spec store_etag_in_cache(File, ETag) -> Res when
+      File :: file:name(),
+      ETag :: string(),
+      Res :: ok.
+store_etag_in_cache(Path, ETag) ->
+    ok = file:write_file(Path, ETag).
+
+%%%=============================================================================
+%%% Private functions
+%%%=============================================================================
+-spec cached_download(TmpDir, CachePath, Pkg, Url, ETag, State, ETagPath,
+                      UpdateETag) -> Res when
       TmpDir :: file:name(),
       CachePath :: file:name(),
       Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
@@ -86,7 +207,8 @@ download(TmpDir, Pkg={pkg, Name, Vsn, _Hash}, State, UpdateETag) ->
       ETagPath :: file:name(),
       UpdateETag :: boolean(),
       Res :: download_result().
-cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash}, Url, ETag, State, ETagPath, UpdateETag) ->
+cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash}, Url, ETag,
+                State, ETagPath, UpdateETag) ->
     case request(Url, ETag) of
         {ok, cached} ->
             ?INFO("Version cached at ~ts is up to date, reusing it", [CachePath]),
@@ -94,7 +216,8 @@ cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash}, Url, ETag, State
         {ok, Body, NewETag} ->
             ?INFO("Downloaded package, caching at ~ts", [CachePath]),
             maybe_store_etag_in_cache(UpdateETag, ETagPath, NewETag),
-            serve_from_download(TmpDir, CachePath, Pkg, NewETag, Body, State, ETagPath);
+            serve_from_download(TmpDir, CachePath, Pkg, NewETag, Body, State,
+                                ETagPath);
         error when ETag =/= false ->
             store_etag_in_cache(ETagPath, ETag),
             ?INFO("Download error, using cached file at ~ts", [CachePath]),
@@ -125,11 +248,13 @@ serve_from_cache(TmpDir, CachePath, Pkg, State) ->
             ?DEBUG("Checksums: registry: ~p, pkg: ~p", [_Reg, Chk]),
             {bad_registry_checksum, CachePath};
         {_Hash, _Bin, _Reg, _Tar} ->
-            ?DEBUG("Checksums: expected: ~p, registry: ~p, pkg: ~p, meta: ~p", [_Hash, _Reg, _Bin, _Tar]),
+            ?DEBUG("Checksums: expected: ~p, registry: ~p, pkg: ~p, meta: ~p",
+                   [_Hash, _Reg, _Bin, _Tar]),
             {bad_checksum, CachePath}
     end.
 
--spec serve_from_download(TmpDir, CachePath, Package, ETag, Binary, State, ETagPath) -> Res when
+-spec serve_from_download(TmpDir, CachePath, Package, ETag, Binary, State,
+                          ETagPath) -> Res when
       TmpDir :: file:name(),
       CachePath :: file:name(),
       Package :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
@@ -145,7 +270,8 @@ serve_from_download(TmpDir, CachePath, Package, ETag, Binary, State, ETagPath) -
         ETag ->
             serve_from_cache(TmpDir, CachePath, Package, State);
         FileETag ->
-            ?DEBUG("Downloaded file ~ts ETag ~ts doesn't match returned ETag ~ts", [CachePath, ETag, FileETag]),
+            ?DEBUG("Downloaded file ~ts ETag ~ts doesn't match returned ETag ~ts",
+                   [CachePath, ETag, FileETag]),
             {bad_download, CachePath}
     end.
 
@@ -180,69 +306,19 @@ extract(TmpDir, CachePath) ->
 checksums(Pkg={pkg, _Name, _Vsn, Hash}, Files, Contents, Version, Meta, State) ->
     Blob = <<Version/binary, Meta/binary, Contents/binary>>,
     <<X:256/big-unsigned>> = crypto:hash(sha256, Blob),
-    BinChecksum = list_to_binary(rebar_string:uppercase(lists:flatten(io_lib:format("~64.16.0b", [X])))),
+    BinChecksum = list_to_binary(
+                    rebar_string:uppercase(
+                      lists:flatten(io_lib:format("~64.16.0b", [X])))),
     RegistryChecksum = rebar_packages:registry_checksum(Pkg, State),
     {"CHECKSUM", TarChecksum} = lists:keyfind("CHECKSUM", 1, Files),
     {Hash, BinChecksum, RegistryChecksum, TarChecksum}.
 
--spec make_vsn(Vsn) -> Res when
-      Vsn :: any(),
-      Res :: {'error',[1..255,...]}.
-make_vsn(_) ->
-    {error, "Replacing version of type pkg not supported."}.
-
--spec request(Url, ETag) -> Res when
-      Url :: string(),
-      ETag :: false | string(),
-      Res :: 'error' | {ok, cached} | {ok, any(), string()}.
-request(Url, ETag) ->
-    HttpOptions = [{ssl, ssl_opts(Url)}, {relaxed, true} | rebar_utils:get_proxy_auth()],
-    case httpc:request(get, {Url, [{"if-none-match", "\"" ++ ETag ++ "\""} || ETag =/= false]++
-                             [{"User-Agent", rebar_utils:user_agent()}]},
-                       HttpOptions,
-                       [{body_format, binary}],
-                       rebar) of
-        {ok, {{_Version, 200, _Reason}, Headers, Body}} ->
-            ?DEBUG("Successfully downloaded ~ts", [Url]),
-            {"etag", ETag1} = lists:keyfind("etag", 1, Headers),
-            {ok, Body, rebar_string:trim(ETag1, both, [$"])};
-        {ok, {{_Version, 304, _Reason}, _Headers, _Body}} ->
-            ?DEBUG("Cached copy of ~ts still valid", [Url]),
-            {ok, cached};
-        {ok, {{_Version, Code, _Reason}, _Headers, _Body}} ->
-            ?DEBUG("Request to ~p failed: status code ~p", [Url, Code]),
-            error;
-        {error, Reason} ->
-            ?DEBUG("Request to ~p failed: ~p", [Url, Reason]),
-            error
-    end.
-
--spec etag(Path) -> Res when
-      Path :: file:name(),
-      Res :: false | string().
-etag(Path) ->
-    case file:read_file(Path) of
-        {ok, Bin} ->
-            binary_to_list(Bin);
-        {error, _} ->
-            false
-    end.
-
-%% @doc returns the SSL options adequate for the project based on
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return the SSL options adequate for the project based on
 %% its configuration, including for validation of certs.
--spec ssl_opts(Url) -> Res when
-      Url :: string(),
-      Res :: proplists:proplist().
-ssl_opts(Url) ->
-    case get_ssl_config() of
-        ssl_verify_enabled ->
-            ssl_opts(ssl_verify_enabled, Url);
-        ssl_verify_disabled ->
-            [{verify, verify_none}]
-    end.
-
-%% @doc returns the SSL options adequate for the project based on
-%% its configuration, including for validation of certs.
+%% @end
+%%------------------------------------------------------------------------------
 -spec ssl_opts(Enabled, Url) -> Res when
       Enabled :: atom(),
       Url :: string(),
@@ -250,13 +326,16 @@ ssl_opts(Url) ->
 ssl_opts(ssl_verify_enabled, Url) ->
     case check_ssl_version() of
         true ->
-            {ok, {_, _, Hostname, _, _, _}} = http_uri:parse(rebar_utils:to_list(Url)),
-            VerifyFun = {fun ssl_verify_hostname:verify_fun/3, [{check_hostname, Hostname}]},
+            {ok, {_, _, Hostname, _, _, _}} =
+                http_uri:parse(rebar_utils:to_list(Url)),
+            VerifyFun = {fun ssl_verify_hostname:verify_fun/3,
+                         [{check_hostname, Hostname}]},
             CACerts = certifi:cacerts(),
-            [{verify, verify_peer}, {depth, 2}, {cacerts, CACerts}
-            ,{partial_chain, fun partial_chain/1}, {verify_fun, VerifyFun}];
+            [{verify, verify_peer}, {depth, 2}, {cacerts, CACerts},
+             {partial_chain, fun partial_chain/1}, {verify_fun, VerifyFun}];
         false ->
-            ?WARN("Insecure HTTPS request (peer verification disabled), please update to OTP 17.4 or later", []),
+            ?WARN("Insecure HTTPS request (peer verification disabled), "
+                  "please update to OTP 17.4 or later", []),
             [{verify, verify_none}]
     end.
 
@@ -267,9 +346,8 @@ partial_chain(Certs) ->
     Certs1 = [{Cert, public_key:pkix_decode_cert(Cert, otp)} || Cert <- Certs],
     CACerts = certifi:cacerts(),
     CACerts1 = [public_key:pkix_decode_cert(Cert, otp) || Cert <- CACerts],
-
     case ec_lists:find(fun({_, Cert}) ->
-                              check_cert(CACerts1, Cert)
+                               check_cert(CACerts1, Cert)
                        end, Certs1) of
         {ok, Trusted} ->
             {trusted_ca, element(1, Trusted)};
@@ -293,7 +371,7 @@ check_cert(CACerts, Cert) ->
               end, CACerts).
 
 -spec check_ssl_version() ->
-      boolean().
+    boolean().
 check_ssl_version() ->
     case application:get_key(ssl, vsn) of
         {ok, Vsn} ->
@@ -340,10 +418,3 @@ maybe_store_etag_in_cache(false = _UpdateETag, _Path, _ETag) ->
     ok;
 maybe_store_etag_in_cache(true = _UpdateETag, Path, ETag) ->
     store_etag_in_cache(Path, ETag).
-
--spec store_etag_in_cache(File, ETag) -> Res when
-      File :: file:name(),
-      ETag :: string(),
-      Res :: ok.
-store_etag_in_cache(Path, ETag) ->
-    ok = file:write_file(Path, ETag).
