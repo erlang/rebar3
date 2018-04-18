@@ -49,7 +49,7 @@ main(_) ->
     code:add_pathsa(DepsPaths),
 
     rebar3:run(["clean", "-a"]),
-    rebar3:run(["escriptize"]),
+    rebar3:run(["as", "prod", "escriptize"]),
 
     %% Done with compile, can turn back on error logger
     error_logger:tty(true).
