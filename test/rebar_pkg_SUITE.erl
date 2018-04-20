@@ -9,6 +9,7 @@
 -define(good_etag, "22e1d7387c9085a462340088a2a8ba67").
 -define(bad_checksum, <<"D576B442A68C7B92BACDE1EFE9C6E54D8D6C74BDB71D8175B9D3C6EC8C7B62A7">>).
 -define(good_checksum, <<"1C6CE379D191FBAB41B7905075E0BF87CBBE23C77CECE775C5A0B786B2244C35">>).
+-define(BADPKG_ETAG, <<"BADETAG">>).
 
 all() -> [good_uncached, good_cached, badindexchk, badpkg,
           badhash_nocache, badhash_cache,
@@ -83,7 +84,7 @@ init_per_testcase(bad_to_good=Name, Config0) ->
     Config;
 init_per_testcase(good_disconnect=Name, Config0) ->
     Pkg = {<<"goodpkg">>, <<"1.0.0">>},
-    Config1 = [{good_cache, true},
+    Config1 = [{good_cache, false},
                {pkg, Pkg}
               | Config0],
     Config = mock_config(Name, Config1),
@@ -147,11 +148,15 @@ badpkg(Config) ->
     Tmp = ?config(tmp_dir, Config),
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
-    ?assertMatch({bad_download, _Path},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum}, State)),
-    %% The cached file is there for forensic purposes
     Cache = ?config(cache_dir, Config),
-    ?assert(filelib:is_regular(filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>))).
+    CachePath = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>),
+    ETagPath = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".etag">>),
+    rebar_pkg_resource:store_etag_in_cache(ETagPath, ?BADPKG_ETAG),
+    ?assertMatch({bad_download, _Path},
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum}, State, false)),
+    %% The cached/etag files are there for forensic purposes
+    ?assert(filelib:is_regular(ETagPath)),
+    ?assert(filelib:is_regular(CachePath)).
 
 badhash_nocache(Config) ->
     Tmp = ?config(tmp_dir, Config),
@@ -196,8 +201,10 @@ good_disconnect(Config) ->
     State = ?config(state, Config),
     Cache = ?config(cache_dir, Config),
     CachedFile = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>),
+    ETagFile = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".etag">>),
     ?assert(filelib:is_regular(CachedFile)),
     {ok, Content} = file:read_file(CachedFile),
+    rebar_pkg_resource:store_etag_in_cache(ETagFile, ?BADPKG_ETAG),
     ?assertEqual({ok, true},
                  rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum}, State)),
     {ok, Content} = file:read_file(CachedFile).
