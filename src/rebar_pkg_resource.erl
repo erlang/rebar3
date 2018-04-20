@@ -231,4 +231,4 @@ maybe_store_etag_in_cache(true = _UpdateETag, Path, ETag) ->
     store_etag_in_cache(Path, ETag).
 
 store_etag_in_cache(Path, ETag) ->
-    ok = file:write_file(Path, ETag).
+    _ = file:write_file(Path, ETag).
