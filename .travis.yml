@@ -38,7 +38,7 @@ deploy:
     secret_access_key:
       secure: "BUv2KQABv0Q4e8DAVNBRTc/lXHWt27yCN46Fdgo1IrcSSIiP+hq2yXzQcXLbPwkEu6pxUZQtL3mvKbt6l7uw3wFrcRfFAi1PGTITAW8MTmxtwcZIBcHSk3XOzDbkK+fYYcaddszmt7hDzzEFPtmYXiNgnaMIVeynhQLgcCcIRRQ="
     skip_cleanup: true
-    local-dir: _build/default/bin
+    local-dir: _build/prod/bin
     bucket: "rebar3-nightly"
     acl: public_read
     on:
