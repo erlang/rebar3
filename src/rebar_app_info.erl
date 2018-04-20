@@ -301,7 +301,7 @@ app_file(#app_info_t{app_file=AppFile}) ->
     AppFile.
 
 %% @doc sets the .app file for an app.
--spec app_file(t(), file:filename_all()) -> t().
+-spec app_file(t(), file:filename_all() | undefined) -> t().
 app_file(AppInfo=#app_info_t{}, AppFile) ->
     AppInfo#app_info_t{app_file=AppFile}.
 

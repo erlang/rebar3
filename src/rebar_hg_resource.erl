@@ -137,7 +137,7 @@ get_branch_ref(Dir, Branch) ->
         rebar_utils:sh("hg -R \"" ++ rebar_utils:escape_double_quotes(Dir) ++
                        "\" log --template \"{node}\n\" --rev " ++ rebar_utils:escape_chars(Branch),
                        [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]),
-    rebar_string:strip(BranchRefString, both, "\n").
+    rebar_string:trim(BranchRefString, both, "\n").
 
 
 maybe_warn_local_url(Url) ->

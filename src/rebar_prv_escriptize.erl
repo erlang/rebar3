@@ -267,9 +267,7 @@ rm_newline(String) ->
     [C || C <- String, C =/= $\n].
 
 write_windows_script(Target) ->
-    CmdPath = if is_binary(Target) -> <<Target/binary, ".cmd">>;
-                 is_list(Target) -> Target ++ ".cmd"
-              end,
+    CmdPath = Target ++ ".cmd",
     CmdScript=
         "@echo off\r\n"
         "setlocal\r\n"
