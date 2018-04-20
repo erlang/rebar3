@@ -854,9 +854,17 @@ set_httpc_options(_, []) ->
     ok;
 
 set_httpc_options(Scheme, Proxy) ->
-    {ok, {_, UserInfo, Host, Port, _, _}} = http_uri:parse(Proxy),
+    URI = normalise_proxy(Scheme, Proxy),
+    {ok, {_, UserInfo, Host, Port, _, _}} = http_uri:parse(URI),
     httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar),
     set_proxy_auth(UserInfo).
+
+normalise_proxy(Scheme, URI) ->
+    case re:run(URI, "://", [unicode]) of
+        nomatch when Scheme =:= https_proxy -> "https://" ++ URI;
+        nomatch when Scheme =:= proxy -> "http://" ++ URI;
+        _ -> URI
+    end.
 
 url_append_path(Url, ExtraPath) ->
      case http_uri:parse(Url) of

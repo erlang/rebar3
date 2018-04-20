@@ -275,11 +275,13 @@ tup_merge(_Config) ->
        )
     ).
 
-proxy_auth(_Config) ->
-	proxy_auth(_Config, "http_proxy"),
-	proxy_auth(_Config, "https_proxy").
+proxy_auth(Config) ->
+    proxy_auth(Config, "http://", "http_proxy"),
+    proxy_auth(Config, "https://", "https_proxy"),
+    proxy_auth(Config, "", "http_proxy"),
+    proxy_auth(Config, "", "https_proxy").
 
-proxy_auth(_Config, ProxyEnvKey) ->
+proxy_auth(_Config, Schema, ProxyEnvKey) ->
 	Host = "host:",
 	Port = "1234",
 
@@ -291,13 +293,13 @@ proxy_auth(_Config, ProxyEnvKey) ->
 	?assertEqual([], rebar_utils:get_proxy_auth()),
 
 	%% proxy auth with regular username/password
-	os:putenv(ProxyEnvKey, "http://Username:Password@" ++ Host ++ Port),
+	os:putenv(ProxyEnvKey, Schema++"Username:Password@" ++ Host ++ Port),
 	rebar_utils:set_httpc_options(),
 	?assertEqual([{proxy_auth, {"Username", "Password"}}],
 				 rebar_utils:get_proxy_auth()),
 
 	%% proxy auth with username missing and url encoded password
-	os:putenv(ProxyEnvKey, "http://:%3F!abc%23%24@" ++ Host ++ Port),
+	os:putenv(ProxyEnvKey, Schema++":%3F!abc%23%24@" ++ Host ++ Port),
 	rebar_utils:set_httpc_options(),
 	?assertEqual([{proxy_auth, {"", "?!abc#$"}}],
 				 rebar_utils:get_proxy_auth()),
