@@ -48,12 +48,8 @@ do(State) ->
             ?PRV_ERROR({file,Reason});
         {ok, _} ->
             Locks = rebar_config:consult_lock_file(LockFile),
-            case handle_unlocks(State, Locks, LockFile) of
-                {ok, NewLocks} ->
-                    {ok, rebar_state:set(State, {locks, default}, NewLocks)};
-                {error, Reason} ->
-                    ?PRV_ERROR({file,Reason})
-            end
+            {ok, NewLocks} = handle_unlocks(State, Locks, LockFile),
+            {ok, rebar_state:set(State, {locks, default}, NewLocks)}
     end.
 
 -spec format_error(any()) -> iolist().
