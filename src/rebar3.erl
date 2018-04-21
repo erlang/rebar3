@@ -389,7 +389,11 @@ state_from_global_config(Config, GlobalConfigFile) ->
     rebar_state:providers(rebar_state:new(GlobalConfig3, Config), GlobalPlugins).
 
 test_state(State) ->
-    ErlOpts = rebar_state:get(State, erl_opts, []),
+    %% Fetch the test profile's erl_opts only
+    Opts = rebar_state:opts(State),
+    Profiles = rebar_opts:get(Opts, profiles, []),
+    ProfileOpts = proplists:get_value(test, Profiles, []),
+    ErlOpts = proplists:get_value(erl_opts, ProfileOpts, []),
     TestOpts = safe_define_test_macro(ErlOpts),
     [{extra_src_dirs, ["test"]}, {erl_opts, TestOpts}].
 
