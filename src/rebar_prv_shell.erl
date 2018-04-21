@@ -271,11 +271,11 @@ maybe_boot_apps(State) ->
     case find_apps_to_boot(State) of
         undefined ->
             %% try to read in sys.config file
-            ok = reread_config(State);
+            ok = reread_config([], State);
         Apps ->
             %% load apps, then check config, then boot them.
             load_apps(Apps),
-            ok = reread_config(State),
+            ok = reread_config(Apps, State),
             boot_apps(Apps)
     end.
 
@@ -340,11 +340,36 @@ load_apps(Apps) ->
             not lists:keymember(App, 1, application:loaded_applications())],
     ok.
 
-reread_config(State) ->
+reread_config(AppsToStart, State) ->
     case find_config(State) of
         no_config ->
             ok;
         ConfigList ->
+            %% This allows people who use applications that are also
+            %% depended on by rebar3 or its plugins to change their
+            %% configuration at runtime based on the configuration files.
+            %%
+            %% To do this, we stop apps that are already started before
+            %% reloading their configuration.
+            %%
+            %% We make an exception for apps that:
+            %%  - are not already running
+            %%  - would not be restarted (and hence would break some
+            %%    compatibility with rebar3)
+            %%  - are not in the config files and would see no config
+            %%    changes
+            %%  - are not in a blacklist, where changing their config
+            %%    would be risky to the shell or the rebar3 agent
+            %%    functionality (i.e. changing inets may break proxy
+            %%    settings, stopping `kernel' would break everything)
+            Running = [App || {App, _, _} <- application:which_applications()],
+            BlackList = [inets, stdlib, kernel, rebar],
+            _ = [application:stop(App)
+                 || Config <- ConfigList,
+                    {App, _} <- Config,
+                    lists:member(App, Running),
+                    lists:member(App, AppsToStart),
+                    not lists:member(App, BlackList)],
             _ = rebar_utils:reread_config(ConfigList),
             ok
     end.
