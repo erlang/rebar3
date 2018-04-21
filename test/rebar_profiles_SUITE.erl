@@ -28,6 +28,7 @@
          test_profile_erl_opts_order_4/1,
          test_profile_erl_opts_order_5/1,
          test_erl_opts_debug_info/1,
+         test_profile_erl_opts_precedence/1,
          first_files_exception/1]).
 
 -include_lib("common_test/include/ct.hrl").
@@ -52,6 +53,7 @@ all() ->
      test_profile_erl_opts_order_4,
      test_profile_erl_opts_order_5,
      test_erl_opts_debug_info,
+     test_profile_erl_opts_precedence,
      first_files_exception].
 
 init_per_suite(Config) ->
@@ -525,6 +527,36 @@ test_erl_opts_debug_info(_Config) ->
     ?assertEqual([{debug_info_key,"12345"},a,b,c,{debug_info,{mod,"123"}}],
                  ToOpts([debug_info,{debug_info_key,"12345"},a,
                          no_debug_info,b,c,{debug_info,{mod,"123"}}])),
+    ok.
+
+test_profile_erl_opts_precedence(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = rebar_test_utils:create_random_name("profile_new_key_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    RebarConfig = [{erl_opts, [no_debug_info]},
+                   {profiles, [
+                     {test, [{erl_opts, [debug_info, {d,'HI'}]}]},
+                     {other, [{erl_opts, [debug_info, {d,'HI'}]}]}
+                   ]}],
+    {ok, State1} = rebar_test_utils:run_and_check(
+      Config, RebarConfig, ["as", "test", "compile"], return
+    ),
+    {ok, State2} = rebar_test_utils:run_and_check(
+      Config, RebarConfig, ["as", "other", "compile"], return
+    ),
+    {ok, State3} = rebar_test_utils:run_and_check(
+      Config, RebarConfig, ["compile"], return
+    ),
+    Opts1 = rebar_state:opts(State1),
+    Opts2 = rebar_state:opts(State2),
+    Opts3 = rebar_state:opts(State3),
+    ErlOpts1 = rebar_opts:erl_opts(Opts1),
+    ErlOpts2 = rebar_opts:erl_opts(Opts2),
+    ErlOpts3 = rebar_opts:erl_opts(Opts3),
+    ?assertEqual([{d,'TEST'}, debug_info, {d,'HI'}], ErlOpts1),
+    ?assertEqual([debug_info, {d,'HI'}], ErlOpts2),
+    ?assertEqual([], ErlOpts3),
     ok.
 
 first_files_exception(_Config) ->
