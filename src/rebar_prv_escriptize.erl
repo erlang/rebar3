@@ -267,7 +267,7 @@ rm_newline(String) ->
     [C || C <- String, C =/= $\n].
 
 write_windows_script(Target) ->
-    CmdPath = Target ++ ".cmd",
+    CmdPath = unicode:characters_to_list(Target) ++ ".cmd",
     CmdScript=
         "@echo off\r\n"
         "setlocal\r\n"
