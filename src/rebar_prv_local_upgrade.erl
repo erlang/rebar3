@@ -80,7 +80,7 @@ maybe_fetch_rebar3(Rebar3Md5) ->
     case rebar_pkg_resource:request("https://s3.amazonaws.com/rebar3/rebar3", Rebar3Md5) of
         {ok, Binary, ETag} ->
             file:write_file(TmpFile, Binary),
-            case rebar_pkg_resource:etag(TmpFile) of
+            case etag(TmpFile) of
                 ETag ->
                     {saved, TmpFile};
                 _ ->
@@ -92,3 +92,12 @@ maybe_fetch_rebar3(Rebar3Md5) ->
             ?CONSOLE("No upgrade available", []),
             up_to_date
     end.
+
+etag(Path) ->
+     case file:read_file(Path) of
+         {ok, Binary} ->
+             <<X:128/big-unsigned-integer>> = crypto:hash(md5, Binary),
+             rebar_string:lowercase(lists:flatten(io_lib:format("~32.16.0b", [X])));
+         {error, _} ->
+             false
+     end.
