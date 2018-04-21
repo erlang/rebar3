@@ -290,6 +290,8 @@ consult_and_eval(File, Script) ->
         {ok, Term} ->
             {ok, [Term]};
         Error ->
+            ?ERROR("Error evaluating configuration script at ~p:~n~p~n",
+                   [Script, Error]),
             Error
     end.
 
