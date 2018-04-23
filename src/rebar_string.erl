@@ -11,7 +11,7 @@
 %% used. Instead we just adopt join/2 locally and hope it works
 %% for most unicode use cases anyway.
 join([], Sep) when is_list(Sep) ->
-        [];
+    [];
 join([H|T], Sep) ->
     H ++ lists:append([Sep ++ X || X <- T]).
 

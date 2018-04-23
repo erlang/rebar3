@@ -5,6 +5,7 @@
 -export([default_src_dirs/1, default_extra_src_dirs/1, default_all_src_dirs/1]).
 -export([src_dirs/1, src_dirs_with_opts/1, extra_src_dirs/1, all_src_dirs/1]).
 -export([src_dir_opts/1, recursive/1]).
+-export([top_src_dirs/1]).
 -export([profile_src_dirs/1, profile_extra_src_dirs/1, profile_all_src_dirs/1]).
 -export([profile_src_dir_opts/1]).
 -export([retarget_path/1, alt_base_dir_abs/1, alt_base_dir_rel/1]).
@@ -18,7 +19,7 @@
 all() -> [default_src_dirs, default_extra_src_dirs, default_all_src_dirs,
           src_dirs, extra_src_dirs, all_src_dirs, src_dir_opts, recursive,
           profile_src_dirs, profile_extra_src_dirs, profile_all_src_dirs,
-          profile_src_dir_opts,
+          profile_src_dir_opts, top_src_dirs,
           retarget_path, alt_base_dir_abs, alt_base_dir_rel, global_cache_dir,
           default_global_cache_dir, overwrite_default_global_cache_dir].
 
@@ -122,6 +123,15 @@ recursive(Config) ->
     true = rebar_dir:recursive(rebar_state:opts(State2), "bar"),
 
     ok.
+
+top_src_dirs(Config) ->
+    %% We can get the same result out of specifying src_dirs from the config root,
+    %% not just the erl_opts
+    RebarConfig = [{src_dirs, ["foo", "./bar", "bar", "bar/", "./bar/", "baz",
+                               "./", ".", "../", "..", "./../", "../.", ".././../"]}],
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+
+    [".", "..", "../..", "bar", "baz", "foo"] = rebar_dir:src_dirs(rebar_state:opts(State)).
 
 profile_src_dirs(Config) ->
     RebarConfig = [
