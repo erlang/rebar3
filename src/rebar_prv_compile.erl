@@ -225,7 +225,11 @@ copy_app_dirs(AppInfo, OldAppDir, AppDir) ->
             end,
             {SrcDirs, ExtraDirs} = resolve_src_dirs(rebar_app_info:opts(AppInfo)),
             %% link to src_dirs to be adjacent to ebin is needed for R15 use of cover/xref
-            [symlink_or_copy(OldAppDir, AppDir, Dir) || Dir <- ["priv", "include"] ++ SrcDirs],
+            %% priv/ and include/ are symlinked unconditionally to allow hooks
+            %% to write to them _after_ compilation has taken place when the
+            %% initial directory did not, and still work
+            [symlink_or_copy(OldAppDir, AppDir, Dir) || Dir <- ["priv", "include"]],
+            [symlink_or_copy_existing(OldAppDir, AppDir, Dir) || Dir <- SrcDirs],
             %% copy all extra_src_dirs as they build into themselves and linking means they
             %% are shared across profiles
             [copy(OldAppDir, AppDir, Dir) || Dir <- ExtraDirs];
@@ -237,6 +241,14 @@ symlink_or_copy(OldAppDir, AppDir, Dir) ->
     Source = filename:join([OldAppDir, Dir]),
     Target = filename:join([AppDir, Dir]),
     rebar_file_utils:symlink_or_copy(Source, Target).
+
+symlink_or_copy_existing(OldAppDir, AppDir, Dir) ->
+    Source = filename:join([OldAppDir, Dir]),
+    Target = filename:join([AppDir, Dir]),
+    case ec_file:is_dir(Source) of
+        true -> rebar_file_utils:symlink_or_copy(Source, Target);
+        false -> ok
+    end.
 
 copy(OldAppDir, AppDir, Dir) ->
     Source = filename:join([OldAppDir, Dir]),
