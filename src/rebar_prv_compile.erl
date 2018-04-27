@@ -236,7 +236,10 @@ copy_app_dirs(AppInfo, OldAppDir, AppDir) ->
 symlink_or_copy(OldAppDir, AppDir, Dir) ->
     Source = filename:join([OldAppDir, Dir]),
     Target = filename:join([AppDir, Dir]),
-    rebar_file_utils:symlink_or_copy(Source, Target).
+    case ec_file:is_dir(Source) of
+        true -> rebar_file_utils:symlink_or_copy(Source, Target);
+        false -> ok
+    end.
 
 copy(OldAppDir, AppDir, Dir) ->
     Source = filename:join([OldAppDir, Dir]),
