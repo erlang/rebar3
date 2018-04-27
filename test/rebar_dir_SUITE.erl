@@ -3,7 +3,7 @@
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
 
 -export([default_src_dirs/1, default_extra_src_dirs/1, default_all_src_dirs/1]).
--export([src_dirs/1, src_dirs_with_opts/1, extra_src_dirs/1, all_src_dirs/1]).
+-export([src_dirs/1, alt_src_dir_nested/1, src_dirs_with_opts/1, extra_src_dirs/1, all_src_dirs/1]).
 -export([src_dir_opts/1, recursive/1]).
 -export([top_src_dirs/1]).
 -export([profile_src_dirs/1, profile_extra_src_dirs/1, profile_all_src_dirs/1]).
@@ -17,7 +17,7 @@
 
 
 all() -> [default_src_dirs, default_extra_src_dirs, default_all_src_dirs,
-          src_dirs, extra_src_dirs, all_src_dirs, src_dir_opts, recursive,
+          src_dirs, alt_src_dir_nested, extra_src_dirs, all_src_dirs, src_dir_opts, recursive,
           profile_src_dirs, profile_extra_src_dirs, profile_all_src_dirs,
           profile_src_dir_opts, top_src_dirs,
           retarget_path, alt_base_dir_abs, alt_base_dir_rel, global_cache_dir,
@@ -74,6 +74,26 @@ src_dirs(Config) ->
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
 
     [".", "..", "../..", "bar", "baz", "foo"] = rebar_dir:src_dirs(rebar_state:opts(State)).
+
+alt_src_dir_nested(Config) ->
+    RebarConfig = [{src_dirs, ["src", "alt/nested"]}],
+    AppsDir = ?config(apps, Config),
+    Name1 = ?config(app_one, Config),
+    Name2 = ?config(app_two, Config),
+    ModDir = filename:join([AppsDir, "apps", Name1, "alt", "nested"]),
+    ModDir2 = filename:join([AppsDir, "apps", Name2, "alt", "nested"]),
+    Mod = "-module(altmod). -export([main/0]). main() -> ok.",
+
+    ec_file:mkdir_path(ModDir),
+    ec_file:mkdir_path(ModDir2),
+    ok = file:write_file(filename:join([ModDir, "altmod.erl"]), Mod),
+
+    Ebin = filename:join([AppsDir, "_build", "default", "lib", Name1, "ebin", "altmod.beam"]),
+    {ok, State} = rebar_test_utils:run_and_check(
+           Config, RebarConfig, ["compile"],
+           {ok, [{file, Ebin}]}
+    ),
+    ["alt/nested", "src"] = rebar_dir:src_dirs(rebar_state:opts(State)).
 
 src_dirs_with_opts(Config) ->
     RebarConfig = [{erl_opts, [{src_dirs, ["foo", "bar", "baz"]},
