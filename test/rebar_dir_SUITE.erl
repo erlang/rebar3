@@ -79,13 +79,10 @@ alt_src_dir_nested(Config) ->
     RebarConfig = [{src_dirs, ["src", "alt/nested"]}],
     AppsDir = ?config(apps, Config),
     Name1 = ?config(app_one, Config),
-    Name2 = ?config(app_two, Config),
     ModDir = filename:join([AppsDir, "apps", Name1, "alt", "nested"]),
-    ModDir2 = filename:join([AppsDir, "apps", Name2, "alt", "nested"]),
     Mod = "-module(altmod). -export([main/0]). main() -> ok.",
 
     ec_file:mkdir_path(ModDir),
-    ec_file:mkdir_path(ModDir2),
     ok = file:write_file(filename:join([ModDir, "altmod.erl"]), Mod),
 
     Ebin = filename:join([AppsDir, "_build", "default", "lib", Name1, "ebin", "altmod.beam"]),
