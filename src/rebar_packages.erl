@@ -97,7 +97,12 @@ registry_dir(State) ->
     case rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN) of
         ?DEFAULT_CDN ->
             RegistryDir = filename:join([CacheDir, "hex", "default"]),
-            ok = filelib:ensure_dir(filename:join(RegistryDir, "placeholder")),
+            case filelib:ensure_dir(filename:join(RegistryDir, "placeholder")) of
+                ok -> ok;
+                {error, Posix} when Posix == eaccess; Posix == enoent ->
+                    ?ABORT("Could not write to ~p. Please ensure the path is writeable.",
+                           [RegistryDir])
+            end,
             {ok, RegistryDir};
         CDN ->
             case rebar_utils:url_append_path(CDN, ?REMOTE_PACKAGE_DIR) of

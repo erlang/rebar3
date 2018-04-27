@@ -12,6 +12,7 @@
 -export([extract_escript/2]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 -include_lib("kernel/include/file.hrl").
 
 -define(PROVIDER, install).
@@ -54,6 +55,9 @@ do(State) ->
     end.
 
 -spec format_error(any()) -> iolist().
+format_error({non_writeable, Dir}) ->
+   io_lib:format("Could not write to ~p. Please ensure the path is writeable.",
+                 [Dir]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -71,7 +75,12 @@ extract_escript(State, ScriptPath) ->
     %% And add a rebar3 bin script to ~/.cache/rebar3/bin
     Opts = rebar_state:opts(State),
     OutputDir = filename:join(rebar_dir:global_cache_dir(Opts), "lib"),
-    filelib:ensure_dir(filename:join(OutputDir, "empty")),
+    case filelib:ensure_dir(filename:join(OutputDir, "empty")) of
+        ok ->
+            ok;
+        {error, Posix} when Posix == eaccess; Posix == enoent ->
+            throw(?PRV_ERROR({non_writeable, OutputDir}))
+    end,
 
     ?INFO("Extracting rebar3 libs to ~ts...", [OutputDir]),
     zip:extract(Archive, [{cwd, OutputDir}]),
