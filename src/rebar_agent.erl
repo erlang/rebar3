@@ -114,8 +114,8 @@ run(Namespace, Command, StrArgs, RState, Cwd) ->
                 {{error, cwd_changed}, RState}
         end
     catch
-        Type:Reason ->
-            ?DEBUG("Agent Stacktrace: ~p", [erlang:get_stacktrace()]),
+        ?WITH_STACKTRACE(Type, Reason, Stacktrace)
+            ?DEBUG("Agent Stacktrace: ~p", [Stacktrace]),
             {{error, {Type, Reason}}, RState}
     end.
 

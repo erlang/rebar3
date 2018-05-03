@@ -157,8 +157,7 @@ do([ProviderName | Rest], State) ->
         {error, Error} ->
             {error, Error}
     catch
-        error:undef ->
-            Stack = erlang:get_stacktrace(),
+        ?WITH_STACKTRACE(error,undef,Stack)
             case Stack of
                 [{ProviderName, do, [_], _}|_] ->
                     %% This should really only happen if a plugin provider doesn't export do/1

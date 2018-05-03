@@ -67,10 +67,10 @@ main(Args) ->
         {ok, _State} ->
             erlang:halt(0);
         Error ->
-            handle_error(Error)
+            handle_error(Error, [])
     catch
-        _:Error ->
-            handle_error(Error)
+        ?WITH_STACKTRACE(_,Error,Stacktrace)
+            handle_error(Error, Stacktrace)
     end.
 
 %% @doc Erlang-API entry point
@@ -299,15 +299,15 @@ global_option_spec_list() ->
 
 %% @private translate unhandled errors and internal return codes into proper
 %% erroneous program exits.
--spec handle_error(term()) -> no_return().
-handle_error(rebar_abort) ->
+-spec handle_error(term(), term()) -> no_return().
+handle_error(rebar_abort, _) ->
     erlang:halt(1);
-handle_error({error, rebar_abort}) ->
+handle_error({error, rebar_abort}, _) ->
     erlang:halt(1);
-handle_error({error, {Module, Reason}}) ->
+handle_error({error, {Module, Reason}}, Stacktrace) ->
     case code:which(Module) of
         non_existing ->
-            ?CRASHDUMP("~p: ~p~n~p~n~n", [Module, Reason, erlang:get_stacktrace()]),
+            ?CRASHDUMP("~p: ~p~n~p~n~n", [Module, Reason, Stacktrace]),
             ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to stacktrace or consult rebar3.crashdump", []),
             ?DEBUG("Uncaught error: ~p ~p", [Module, Reason]),
             ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []);
@@ -315,13 +315,12 @@ handle_error({error, {Module, Reason}}) ->
             ?ERROR("~ts", [Module:format_error(Reason)])
     end,
     erlang:halt(1);
-handle_error({error, Error}) when is_list(Error) ->
+handle_error({error, Error}, _) when is_list(Error) ->
     ?ERROR("~ts", [Error]),
     erlang:halt(1);
-handle_error(Error) ->
+handle_error(Error, StackTrace) ->
     %% Nothing should percolate up from rebar_core;
     %% Dump this error to console
-    StackTrace = erlang:get_stacktrace(),
     ?CRASHDUMP("Error: ~p~n~p~n~n", [Error, StackTrace]),
     ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace or consult rebar3.crashdump", []),
     ?DEBUG("Uncaught error: ~p", [Error]),

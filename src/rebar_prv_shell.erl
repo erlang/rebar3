@@ -210,8 +210,8 @@ rewrite_leaders(OldUser, NewUser) ->
         %% reset the tty handler once more for remote shells
         error_logger:swap_handler(tty)
     catch
-        E:R -> % may fail with custom loggers
-            ?DEBUG("Logger changes failed for ~p:~p (~p)", [E,R,erlang:get_stacktrace()]),
+        ?WITH_STACKTRACE(E,R,S) % may fail with custom loggers
+            ?DEBUG("Logger changes failed for ~p:~p (~p)", [E,R,S]),
             hope_for_best
     end.
 
@@ -235,9 +235,9 @@ maybe_run_script(State) ->
             File = filename:absname(RelFile),
             try run_script_file(File)
             catch
-                C:E ->
+                ?WITH_STACKTRACE(C,E,S)
                     ?ABORT("Couldn't run shell escript ~p - ~p:~p~nStack: ~p",
-                           [File, C, E, erlang:get_stacktrace()])
+                           [File, C, E, S])
             end
     end.
 

@@ -32,8 +32,8 @@ download_source(AppDir, Source, State) ->
         Error ->
             throw(?PRV_ERROR(Error))
     catch
-        C:T ->
-            ?DEBUG("rebar_fetch exception ~p ~p ~p", [C, T, erlang:get_stacktrace()]),
+        ?WITH_STACKTRACE(C,T,S)
+            ?DEBUG("rebar_fetch exception ~p ~p ~p", [C, T, S]),
             throw(?PRV_ERROR({fetch_fail, Source}))
     end.
 
