@@ -201,20 +201,27 @@ rewrite_leaders(OldUser, NewUser) ->
             lists:member(proplists:get_value(group_leader, erlang:process_info(Pid)),
                          OldMasters)],
     try
-        %% enable error_logger's tty output
-        error_logger:swap_handler(tty),
-        %% disable the simple error_logger (which may have been added multiple
-        %% times). removes at most the error_logger added by init and the
-        %% error_logger added by the tty handler
-        remove_error_handler(3),
-        %% reset the tty handler once more for remote shells
-        error_logger:swap_handler(tty)
+        case erlang:function_exported(logger, module_info, 0) of
+            false ->
+                %% Old style logger had a lock-up issue and other problems related
+                %% to group leader handling.
+                %% enable error_logger's tty output
+                error_logger:swap_handler(tty),
+                %% disable the simple error_logger (which may have been added
+                %% multiple times). removes at most the error_logger added by
+                %% init and the error_logger added by the tty handler
+                remove_error_handler(3),
+                %% reset the tty handler once more for remote shells
+                error_logger:swap_handler(tty);
+            true ->
+                %% This is no longer a problem with the logger interface
+                ok
+        end
     catch
         ?WITH_STACKTRACE(E,R,S) % may fail with custom loggers
             ?DEBUG("Logger changes failed for ~p:~p (~p)", [E,R,S]),
             hope_for_best
     end.
-
 
 setup_paths(State) ->
     %% Add deps to path
