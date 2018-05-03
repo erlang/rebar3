@@ -73,8 +73,8 @@ do(State) ->
                 ?PRV_ERROR({package_parse_cdn, CDN})
         end
     catch
-        _E:C ->
-            ?DEBUG("Error creating package index: ~p ~p", [C, erlang:get_stacktrace()]),
+        ?WITH_STACKTRACE(_E, C, S)
+            ?DEBUG("Error creating package index: ~p ~p", [C, S]),
             throw(?PRV_ERROR(package_index_write))
     end.
 

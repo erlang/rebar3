@@ -52,6 +52,12 @@
 -type rebar_set() :: set().
 -endif.
 
+-ifdef(fun_stacktrace).
+-define(WITH_STACKTRACE(T, R, S), T:R -> S = erlang:get_stacktrace(),).
+-else.
+-define(WITH_STACKTRACE(T, R, S), T:R:S ->).
+-endif.
+
 -define(GRAPH_VSN, 2).
 -type v() :: {digraph:vertex(), term()} | 'false'.
 -type e() :: {digraph:vertex(), digraph:vertex()}.

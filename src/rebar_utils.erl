@@ -506,11 +506,10 @@ otp_release1(Rel) ->
             %% It's fine to rely on the binary module here because we can
             %% be sure that it's available when the otp_release string does
             %% not begin with $R.
-            Size = byte_size(Vsn),
             %% The shortest vsn string consists of at least two digits
             %% followed by "\n". Therefore, it's safe to assume Size >= 3.
-            case binary:part(Vsn, {Size, -3}) of
-                <<"**\n">> ->
+            case binary:match(Vsn, <<"**">>) of
+                {Pos, _} ->
                     %% The OTP documentation mentions that a system patched
                     %% using the otp_patch_apply tool available to licensed
                     %% customers will leave a '**' suffix in the version as a
@@ -519,9 +518,9 @@ otp_release1(Rel) ->
                     %% drop the suffix, given for all intents and purposes, we
                     %% cannot obtain relevant information from it as far as
                     %% tooling is concerned.
-                    binary:bin_to_list(Vsn, {0, Size - 3});
-                _ ->
-                    binary:bin_to_list(Vsn, {0, Size - 1})
+                    binary:bin_to_list(Vsn, {0, Pos});
+                nomatch ->
+                    rebar_string:trim(binary:bin_to_list(Vsn), trailing, "\n")
             end
     end.
 

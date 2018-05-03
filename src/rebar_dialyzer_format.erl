@@ -53,9 +53,9 @@ format_warning_(Opts, Warning = {_Tag, {SrcFile, Line}, Msg}, {_LastFile, Acc}) 
         String = message_to_string(Msg),
         {SrcFile, [lists:flatten(fmt("~n~ts~n~!c~4w~!!: ~ts", [F, Line, String])) | Acc]}
     catch
-        Error:Reason ->
+        ?WITH_STACKTRACE(Error, Reason, Stacktrace)
             ?DEBUG("Failed to pretty format warning: ~p:~p~n~p",
-                   [Error, Reason, erlang:get_stacktrace()]),
+                   [Error, Reason, Stacktrace]),
             {SrcFile, [dialyzer:format_warning(Warning, fullpath) | Acc]}
     end.
 

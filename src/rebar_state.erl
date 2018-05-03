@@ -418,9 +418,9 @@ create_logic_providers(ProviderModules, State0) ->
                             end
                     end, State0, ProviderModules)
     catch
-        C:T ->
-            ?DEBUG("~p: ~p ~p", [C, T, erlang:get_stacktrace()]),
-            ?CRASHDUMP("~p: ~p~n~p~n~n~p", [C, T, erlang:get_stacktrace(), State0]),
+        ?WITH_STACKTRACE(C,T,S)
+            ?DEBUG("~p: ~p ~p", [C, T, S]),
+            ?CRASHDUMP("~p: ~p~n~p~n~n~p", [C, T, S, State0]),
             throw({error, "Failed creating providers. Run with DEBUG=1 for stacktrace or consult rebar3.crashdump."})
     end.
 

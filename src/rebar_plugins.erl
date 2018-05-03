@@ -114,8 +114,8 @@ handle_plugin(Profile, Plugin, State, Upgrade) ->
 
         {plugin_providers(Plugin), State4}
     catch
-        C:T ->
-            ?DEBUG("~p ~p ~p", [C, T, erlang:get_stacktrace()]),
+        ?WITH_STACKTRACE(C,T,S)
+            ?DEBUG("~p ~p ~p", [C, T, S]),
             ?WARN("Plugin ~p not available. It will not be used.", [Plugin]),
             {[], State}
     end.
