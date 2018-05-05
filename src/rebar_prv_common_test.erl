@@ -227,14 +227,19 @@ add_hooks(Opts, State) ->
     case {readable(State), lists:keyfind(ct_hooks, 1, Opts)} of
         {false, _} ->
             Opts;
-        {true, false} ->
-            [{ct_hooks, [cth_readable_failonly, cth_readable_shell, cth_retry]} | Opts];
-        {true, {ct_hooks, Hooks}} ->
+        {Other, false} ->
+            [{ct_hooks, [cth_readable_failonly, readable_shell_type(Other), cth_retry]} | Opts];
+        {Other, {ct_hooks, Hooks}} ->
             %% Make sure hooks are there once only.
-            ReadableHooks = [cth_readable_failonly, cth_readable_shell, cth_retry],
-            NewHooks =  (Hooks -- ReadableHooks) ++ ReadableHooks,
+            ReadableHooks = [cth_readable_failonly, readable_shell_type(Other), cth_retry],
+            AllReadableHooks = [cth_readable_failonly, cth_retry,
+                                cth_readable_shell, cth_readable_compact_shell],
+            NewHooks =  (Hooks -- AllReadableHooks) ++ ReadableHooks,
             lists:keyreplace(ct_hooks, 1, Opts, {ct_hooks, NewHooks})
     end.
+
+readable_shell_type(true) -> cth_readable_shell;
+readable_shell_type(compact) -> cth_readable_compact_shell.
 
 select_tests(_, _, _, {error, _} = Error) -> Error;
 select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
@@ -425,20 +430,21 @@ append(A, B) -> A ++ B.
 
 add_transforms(CTOpts, State) when is_list(CTOpts) ->
     case readable(State) of
-        true ->
-            ReadableTransform = [{parse_transform, cth_readable_transform}],
-            (CTOpts -- ReadableTransform) ++ ReadableTransform;
         false ->
-            CTOpts
+            CTOpts;
+        Other when Other == true; Other == compact ->
+            ReadableTransform = [{parse_transform, cth_readable_transform}],
+            (CTOpts -- ReadableTransform) ++ ReadableTransform
     end;
 add_transforms({error, _} = Error, _State) -> Error.
 
 readable(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     case proplists:get_value(readable, RawOpts) of
-        true  -> true;
-        false -> false;
-        undefined -> rebar_state:get(State, ct_readable, true)
+        "true"  -> true;
+        "false" -> false;
+        "compact" -> compact;
+        undefined -> rebar_state:get(State, ct_readable, compact)
     end.
 
 test_dirs(State, Apps, Opts) ->
@@ -762,7 +768,7 @@ ct_opts(_State) ->
      {scale_timetraps, undefined, "scale_timetraps", boolean, help(scale_timetraps)},
      {create_priv_dir, undefined, "create_priv_dir", string, help(create_priv_dir)},
      {include, undefined, "include", string, help(include)},
-     {readable, undefined, "readable", boolean, help(readable)},
+     {readable, undefined, "readable", string, help(readable)},
      {verbose, $v, "verbose", boolean, help(verbose)},
      {name, undefined, "name", atom, help(name)},
      {sname, undefined, "sname", atom, help(sname)},
@@ -831,7 +837,7 @@ help(create_priv_dir) ->
 help(include) ->
     "Directories containing additional include files";
 help(readable) ->
-    "Shows test case names and only displays logs to shell on failures";
+    "Shows test case names and only displays logs to shell on failures (true | compact | false)";
 help(verbose) ->
     "Verbose output";
 help(name) ->
