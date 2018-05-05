@@ -2,8 +2,6 @@ language: erlang
 matrix:
   include:
     - os: linux
-      otp_release: R16B03-1
-    - os: linux
       otp_release: 17.5
     - os: linux
       otp_release: 18.3
@@ -44,4 +42,4 @@ deploy:
     on:
       repo: erlang/rebar3
       branch: master
-      condition: $TRAVIS_OTP_RELEASE = "R16B03-1"
+      condition: $TRAVIS_OTP_RELEASE = "17.5"
