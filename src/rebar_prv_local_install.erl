@@ -64,7 +64,7 @@ format_error(Reason) ->
 bin_contents(OutputDir) ->
     <<"#!/usr/bin/env sh
 
-erl -pz ", (rebar_utils:to_binary(OutputDir))/binary,"/*/ebin +sbtu +A0 -noshell -boot start_clean -s rebar3 main $REBAR3_ERL_ARGS -extra \"$@\"
+erl -pz ", (rebar_utils:to_binary(OutputDir))/binary,"/*/ebin +sbtu +A1 -noshell -boot start_clean -s rebar3 main $REBAR3_ERL_ARGS -extra \"$@\"
 ">>.
 
 extract_escript(State, ScriptPath) ->
