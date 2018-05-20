@@ -6,7 +6,7 @@
 {template, "app.erl", "{{name}}/src/{{name}}_app.erl"}.
 {template, "sup.erl", "{{name}}/src/{{name}}_sup.erl"}.
 {template, "otp_app.app.src", "{{name}}/src/{{name}}.app.src"}.
-{template, "rebar.config", "{{name}}/rebar.config"}.
+{template, "app_rebar.config", "{{name}}/rebar.config"}.
 {template, "gitignore", "{{name}}/.gitignore"}.
 {template, "LICENSE", "{{name}}/LICENSE"}.
 {template, "README.md", "{{name}}/README.md"}.
