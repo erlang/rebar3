@@ -26,7 +26,8 @@ start_link() ->
 %% Supervisor callbacks
 %%====================================================================
 
-%% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
+%% Child :: #{id => Id, start => {M, F, A}}
+%% Optional keys are restart, shutdown, type, modules.
 init([]) ->
     {ok, { {one_for_all, 0, 1}, []} }.
 
