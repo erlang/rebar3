@@ -1272,21 +1272,22 @@ clean_all(Config) ->
                                          {app, PkgName, invalid}]}).
 
 override_deps(Config) ->
-    mock_git_resource:mock([{deps, [{some_dep, "0.0.1"},{other_dep, "0.0.1"}]}]),
     Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
     TopDeps = rebar_test_utils:top_level_deps(Deps),
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
 
     RebarConfig = [
         {deps, TopDeps},
         {overrides, [
             {override, some_dep, [
-                                 {deps, []}
-                                 ]}
-                    ]}
-        ],
+                {deps, []}
+            ]}
+        ]}
+    ],
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["compile"],
-        {ok, [{dep, "some_dep"},{dep_not_exist, "other_dep"}]}
+        {ok, [{dep, "some_dep"}, {dep_not_exist, "other_dep"}]}
     ).
 
 profile_override_deps(Config) ->
