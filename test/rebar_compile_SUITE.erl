@@ -1277,12 +1277,7 @@ override_deps(Config) ->
     TopDeps = rebar_test_utils:top_level_deps(Deps),
 
     RebarConfig = [
-        {deps, TopDeps},
-        {overrides, [
-            {override, some_dep, [
-                                 {deps, []}
-                                 ]}
-                    ]}
+        {deps, TopDeps}
         ],
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["compile"],
