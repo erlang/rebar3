@@ -236,7 +236,7 @@ maybe_run_script(State) ->
             ?DEBUG("No script_file specified.", []),
             ok;
         "none" ->
-            ?DEBUG("Shell script execution skipped (--script none).", []),
+            ?DEBUG("Shell script execution skipped (--script_file none).", []),
             ok;
         RelFile ->
             File = filename:absname(RelFile),
