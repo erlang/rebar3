@@ -43,6 +43,19 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    Cwd = rebar_state:dir(State),
+    Providers = rebar_state:providers(State),
+    rebar_hooks:run_project_and_app_hooks(Cwd, pre, ?PROVIDER, Providers, State),
+    case do_(State) of
+        {ok, NewState} ->
+            rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, NewState),
+            {ok, NewState};
+        Other ->
+            rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State),
+            Other
+    end.
+
+do_(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     Locks = rebar_state:get(State, {locks, default}, []),
     %% We have 3 sources of dependencies to upgrade from:
