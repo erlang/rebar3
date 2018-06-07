@@ -73,7 +73,8 @@
          list_dir/1,
          user_agent/0,
          reread_config/1,
-         get_proxy_auth/0]).
+         get_proxy_auth/0,
+         is_list_of_strings/1]).
 
 
 %% for internal use only
@@ -919,3 +920,11 @@ get_proxy_auth() ->
         undefined -> [];
         {ok, ProxyAuth} -> ProxyAuth
     end.
+
+-spec rebar_utils:is_list_of_strings(term()) -> boolean().
+is_list_of_strings(List) when not is_list(hd(List)) ->
+    false;
+is_list_of_strings(List) when is_list(hd(List)) ->
+    true;
+is_list_of_strings(List) when is_list(List) ->
+    true.

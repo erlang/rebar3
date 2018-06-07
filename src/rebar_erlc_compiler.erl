@@ -285,6 +285,7 @@ gather_src(Opts, BaseDirParts, [Dir|Rest], Srcs, CompileOpts) ->
 %% files, so that yet to be compiled parse transformations are excluded from it.
 erl_first_files(Opts, ErlOpts, Dir, NeededErlFiles) ->
     ErlFirstFilesConf = rebar_opts:get(Opts, erl_first_files, []),
+    valid_erl_first_conf(ErlFirstFilesConf),
     NeededSrcDirs = lists:usort(lists:map(fun filename:dirname/1, NeededErlFiles)),
     %% NOTE: order of files here is important!
     ErlFirstFiles =
@@ -795,4 +796,11 @@ dir_recursive(Opts, Dir, CompileOpts) when is_list(CompileOpts) ->
     case proplists:get_value(recursive,CompileOpts) of
         undefined -> rebar_dir:recursive(Opts, Dir);
         Recursive -> Recursive
+    end.
+
+valid_erl_first_conf(FileList) ->
+    case rebar_utils:is_list_of_strings(FileList) of
+        true -> true;
+        false -> ?ABORT("An invalid file list (~p) was provided as part of your erl_files_first directive",
+                        [FileList])
     end.
