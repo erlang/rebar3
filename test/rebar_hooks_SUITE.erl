@@ -13,6 +13,7 @@
          run_hooks_for_plugins/1,
          eunit_app_hooks/1,
          deps_hook_namespace/1,
+         bare_compile_hooks_default_ns/1,
          deps_clean_hook_namespace/1]).
 
 -include_lib("common_test/include/ct.hrl").
@@ -37,7 +38,7 @@ end_per_testcase(_, _Config) ->
 all() ->
     [build_and_clean_app, run_hooks_once, run_hooks_once_profiles,
      escriptize_artifacts, run_hooks_for_plugins, deps_hook_namespace,
-     deps_clean_hook_namespace, eunit_app_hooks].
+     bare_compile_hooks_default_ns, deps_clean_hook_namespace, eunit_app_hooks].
 
 %% Test post provider hook cleans compiled project app, leaving it invalid
 build_and_clean_app(Config) ->
@@ -133,6 +134,22 @@ deps_hook_namespace(Config) ->
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["compile"],
         {ok, [{dep, "some_dep"}]}
+    ).
+
+%% tests that hooks to compile when running bare compile run in the default namespace
+bare_compile_hooks_default_ns(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RConfFile = rebar_test_utils:create_config(AppDir,
+                                               [{provider_hooks, [{post, [{compile, clean}]}]}]),
+    {ok, RConf} = file:consult(RConfFile),
+    rebar_test_utils:run_and_check(
+        Config, RConf, ["bare", "compile", "--paths", "."],
+        {ok, []}
     ).
 
 deps_clean_hook_namespace(Config) ->
