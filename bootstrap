@@ -16,7 +16,10 @@ main(_) ->
                ,{getopt, []}
                ,{cf, []}
                ,{erlware_commons, ["ec_dictionary.erl", "ec_vsn.erl"]}
-               ,{certifi, ["certifi_pt.erl"]}],
+               ,{parse_trans, ["parse_trans.erl",
+                               "parse_trans_pp.erl",
+                               "parse_trans_codegen.erl"]}
+               ,{certifi, []}],
     Deps = get_deps(),
     [fetch_and_compile(Dep, Deps) || Dep <- BaseDeps],
 
