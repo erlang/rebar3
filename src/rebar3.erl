@@ -54,7 +54,7 @@
 %% ====================================================================
 
 %% @doc For running with:
-%% erl +sbtu +A0 -noinput -mode minimal -boot start_clean -s rebar3 main -extra "$@"
+%% erl +sbtu +A1 -noinput -mode minimal -boot start_clean -s rebar3 main -extra "$@"
 -spec main() -> no_return().
 main() ->
     List = init:get_plain_arguments(),
@@ -93,6 +93,7 @@ run(BaseState, Commands) ->
 %% arguments passed, if they have any relevance; used to translate
 %% from the escript call-site into a common one with the library
 %% usage.
+-spec run([any(), ...]) -> {ok, rebar_state:t()} | {error, term()}.
 run(RawArgs) ->
     start_and_load_apps(command_line),
 
@@ -239,6 +240,7 @@ parse_args([Task | RawRest]) ->
     {list_to_atom(Task), RawRest}.
 
 %% @private actually not too sure what this does anymore.
+-spec set_options(rebar_state:t(),{[any()],[any()]}) -> {rebar_state:t(),[any()]}.
 set_options(State, {Options, NonOptArgs}) ->
     GlobalDefines = proplists:get_all_values(defines, Options),
 
@@ -387,6 +389,7 @@ state_from_global_config(Config, GlobalConfigFile) ->
     GlobalConfig3 = rebar_state:set(GlobalConfig2, {plugins, global}, rebar_state:get(GlobalConfigThrowAway, plugins, [])),
     rebar_state:providers(rebar_state:new(GlobalConfig3, Config), GlobalPlugins).
 
+-spec test_state(rebar_state:t()) -> [{'extra_src_dirs',[string()]} | {'erl_opts',[any()]}].
 test_state(State) ->
     %% Fetch the test profile's erl_opts only
     Opts = rebar_state:opts(State),
@@ -396,6 +399,7 @@ test_state(State) ->
     TestOpts = safe_define_test_macro(ErlOpts),
     [{extra_src_dirs, ["test"]}, {erl_opts, TestOpts}].
 
+-spec safe_define_test_macro([any()]) -> [any()] | [{'d',atom()} | any()].
 safe_define_test_macro(Opts) ->
     %% defining a compile macro twice results in an exception so
     %% make sure 'TEST' is only defined once
@@ -404,6 +408,7 @@ safe_define_test_macro(Opts) ->
        false -> [{d, 'TEST'}|Opts]
     end.
 
+-spec test_defined([{d, atom()} | {d, atom(), term()} | term()]) -> boolean().
 test_defined([{d, 'TEST'}|_]) -> true;
 test_defined([{d, 'TEST', true}|_]) -> true;
 test_defined([_|Rest]) -> test_defined(Rest);

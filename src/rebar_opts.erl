@@ -73,36 +73,42 @@ filter_debug_info([H|T]) ->
 apply_overrides(Opts, Name, Overrides) ->
     %% Inefficient. We want the order we get here though.
     Opts1 = lists:foldl(fun({override, O}, OptsAcc) ->
-                                 lists:foldl(fun({deps, Value}, OptsAcc1) ->
-                                                     set(OptsAcc1, {deps,default}, Value);
-                                                ({Key, Value}, OptsAcc1) ->
-                                                     set(OptsAcc1, Key, Value)
-                                             end, OptsAcc, O);
+                                override_opt(O, OptsAcc);
                             (_, OptsAcc) ->
                                  OptsAcc
-                         end, Opts, Overrides),
+                        end, Opts, Overrides),
 
-    Opts2 = lists:foldl(fun({override, N, O}, OptsAcc) when N =:= Name ->
-                                 lists:foldl(fun({deps, Value}, OptsAcc1) ->
-                                                     set(OptsAcc1, {deps,default}, Value);
-                                                ({Key, Value}, OptsAcc1) ->
-                                                     set(OptsAcc1, Key, Value)
-                                             end, OptsAcc, O);
+    Opts2 = lists:foldl(fun({add, O}, OptsAcc) ->
+                                add_opt(O, OptsAcc);
+                           (_, OptsAcc) ->
+                                OptsAcc
+                        end, Opts1, Overrides),
+
+    Opts3 = lists:foldl(fun({del, O}, OptsAcc) ->
+                                del_opt(O, OptsAcc);
                             (_, OptsAcc) ->
                                  OptsAcc
-                         end, Opts1, Overrides),
+                        end, Opts2, Overrides),
 
-    lists:foldl(fun({add, N, O}, OptsAcc) when N =:= Name ->
-                        lists:foldl(fun({deps, Value}, OptsAcc1) ->
-                                            OldValue = ?MODULE:get(OptsAcc1, {deps,default}, []),
-                                            set(OptsAcc1, {deps,default}, Value++OldValue);
-                                       ({Key, Value}, OptsAcc1) ->
-                                            OldValue = ?MODULE:get(OptsAcc1, Key, []),
-                                            set(OptsAcc1, Key, Value++OldValue)
-                                    end, OptsAcc, O);
-                   (_, OptsAcc) ->
-                        OptsAcc
-                end, Opts2, Overrides).
+    Opts4 = lists:foldl(fun({override, N, O}, OptsAcc) when N =:= Name ->
+                                override_opt(O, OptsAcc);
+                            (_, OptsAcc) ->
+                                 OptsAcc
+                        end, Opts3, Overrides),
+
+    Opts5 = lists:foldl(fun({add, N, O}, OptsAcc) when N =:= Name ->
+                                add_opt(O, OptsAcc);
+                           (_, OptsAcc) ->
+                                OptsAcc
+                        end, Opts4, Overrides),
+
+    Opts6 = lists:foldl(fun({del, N, O}, OptsAcc) when N =:= Name ->
+                                del_opt(O, OptsAcc);
+                            (_, OptsAcc) ->
+                                 OptsAcc
+                        end, Opts5, Overrides),
+
+    Opts6.
 
 add_to_profile(Opts, Profile, KVs) when is_atom(Profile), is_list(KVs) ->
     Profiles = ?MODULE:get(Opts, profiles, []),
@@ -132,6 +138,31 @@ merge_opts(NewOpts, OldOpts) ->
     dict:merge(fun merge_opt/3, NewOpts, OldOpts).
 
 %% Internal functions
+
+add_opt(Opts1, Opts2) ->
+    lists:foldl(fun({deps, Value}, OptsAcc) ->
+                        OldValue = ?MODULE:get(OptsAcc, {deps,default}, []),
+                        set(OptsAcc, {deps,default}, Value++OldValue);
+                    ({Key, Value}, OptsAcc) ->
+                        OldValue = ?MODULE:get(OptsAcc, Key, []),
+                        set(OptsAcc, Key, Value++OldValue)
+                end, Opts2, Opts1).
+
+del_opt(Opts1, Opts2) ->
+    lists:foldl(fun({deps, Value}, OptsAcc) ->
+                        OldValue = ?MODULE:get(OptsAcc, {deps,default}, []),
+                        set(OptsAcc, {deps,default}, OldValue--Value);
+                   ({Key, Value}, OptsAcc) ->
+                        OldValue = ?MODULE:get(OptsAcc, Key, []),
+                        set(OptsAcc, Key, OldValue--Value)
+                end, Opts2, Opts1).
+
+override_opt(Opts1, Opts2) ->
+    lists:foldl(fun({deps, Value}, OptsAcc) ->
+                        set(OptsAcc, {deps,default}, Value);
+                   ({Key, Value}, OptsAcc) ->
+                        set(OptsAcc, Key, Value)
+                end, Opts2, Opts1).
 
 %%
 %% Function for dict:merge/3 (in merge_opts/2) to merge options by priority.

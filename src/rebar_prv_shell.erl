@@ -76,6 +76,9 @@ init(State) ->
                          "shell. (E.g. --apps app1,app2,app3) Defaults "
                          "to rebar.config {shell, [{apps, Apps}]} or "
                          "relx apps if not specified."},
+                        {start_clean, undefined, "start-clean", boolean,
+                         "Cancel any applications in the 'apps' list "
+                         "or release."},
                         {user_drv_args, undefined, "user_drv_args", string,
                          "Arguments passed to user_drv start function for "
                          "creating custom shells."}]}
@@ -311,7 +314,12 @@ find_apps_option(State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
     case debug_get_value(apps, Opts, no_value,
                          "Found shell apps from command line option.") of
-        no_value -> no_value;
+        no_value ->
+            case debug_get_value(start_clean, Opts, false,
+                                "Found start-clean argument to disable apps") of
+                false -> no_value;
+                true -> []
+            end;
         AppsStr ->
             [ list_to_atom(AppStr)
               || AppStr <- rebar_string:lexemes(AppsStr, " ,:") ]

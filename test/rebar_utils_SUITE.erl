@@ -32,7 +32,8 @@
          blacklisted_otp_version/1,
          sh_does_not_miss_messages/1,
          tup_merge/1,
-         proxy_auth/1]).
+         proxy_auth/1,
+        is_list_of_strings/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -48,7 +49,7 @@ all() ->
     [{group, args_to_tasks},
      sh_does_not_miss_messages,
      tup_merge,
-     proxy_auth].
+     proxy_auth, is_list_of_strings].
 
 groups() ->
     [{args_to_tasks, [], [empty_arglist,
@@ -312,3 +313,9 @@ restore_proxy_env(ProxyEnvKey, false) ->
     os:putenv(ProxyEnvKey, "");
 restore_proxy_env(ProxyEnvKey, ProxySpec) ->
     os:putenv(ProxyEnvKey, ProxySpec).
+
+is_list_of_strings(_Config) ->
+    ?assert(rebar_utils:is_list_of_strings(["foo"])),
+    ?assert(rebar_utils:is_list_of_strings([])),
+    ?assert(rebar_utils:is_list_of_strings("")),
+    ?assert(rebar_utils:is_list_of_strings("foo") == false).

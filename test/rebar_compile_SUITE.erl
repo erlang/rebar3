@@ -39,8 +39,18 @@
          only_default_transitive_deps/1,
          clean_all/1,
          override_deps/1,
-         profile_override_deps/1,
+         override_add_deps/1,
+         override_del_deps/1,
+         override_opts/1,
+         override_add_opts/1,
+         override_del_opts/1,
          profile_deps/1,
+         profile_override_deps/1,
+         profile_override_add_deps/1,
+         profile_override_del_deps/1,
+         profile_override_opts/1,
+         profile_override_add_opts/1,
+         profile_override_del_opts/1,
          deps_build_in_prod/1,
          include_file_relative_to_working_directory/1,
          include_file_in_src/1,
@@ -75,9 +85,12 @@ all() ->
      delete_beam_if_source_deleted,
      deps_in_path, checkout_priority, highest_version_of_pkg_dep,
      parse_transform_test, erl_first_files_test, mib_test,
-     umbrella_mib_first_test, only_default_transitive_deps,
-     clean_all, override_deps, profile_override_deps, deps_build_in_prod,
-     profile_override_deps, profile_deps, deps_build_in_prod,
+     umbrella_mib_first_test, only_default_transitive_deps, clean_all,
+     profile_deps, deps_build_in_prod,
+     override_deps, override_add_deps, override_del_deps,
+     override_opts, override_add_opts, override_del_opts,
+     profile_override_deps, profile_override_add_deps, profile_override_del_deps,
+     profile_override_opts, profile_override_add_opts, profile_override_del_opts,
      include_file_relative_to_working_directory, include_file_in_src,
      include_file_relative_to_working_directory_test, include_file_in_src_test,
      include_file_in_src_test_multiapp,
@@ -1272,43 +1285,394 @@ clean_all(Config) ->
                                          {app, PkgName, invalid}]}).
 
 override_deps(Config) ->
-    mock_git_resource:mock([{deps, [{some_dep, "0.0.1"},{other_dep, "0.0.1"}]}]),
     Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
     TopDeps = rebar_test_utils:top_level_deps(Deps),
 
-    RebarConfig = [
-        {deps, TopDeps},
-        {overrides, [
-            {override, some_dep, [
-                                 {deps, []}
-                                 ]}
-                    ]}
-        ],
-    rebar_test_utils:run_and_check(
-        Config, RebarConfig, ["compile"],
-        {ok, [{dep, "some_dep"},{dep_not_exist, "other_dep"}]}
-    ).
-
-profile_override_deps(Config) ->
-    Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
-    TopDeps = rebar_test_utils:top_level_deps(Deps),
     {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
     mock_git_resource:mock([{deps, SrcDeps}]),
 
     RebarConfig = [
         {deps, TopDeps},
-        {profiles, [{a,
-                    [{overrides, [
-                                {override, some_dep, [
-                                                     {deps, []}
-                                                     ]}
-                                ]}
+        {overrides, [
+            {override, some_dep, [
+                {deps, []}
+            ]}
+        ]}
+    ],
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["compile"],
+        {ok, [{dep, "some_dep"},
+              {dep_not_exist, "other_dep"}]}
+    ).
+
+override_add_deps(Config) ->
+    Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+
+    DepA = {dep_a, "0.0.1", {git, "http://site.com/dep_a.git", {tag, "0.0.1"}}},
+    DepB = {dep_b, "0.0.1", {git, "http://site.com/dep_b.git", {tag, "0.0.1"}}},
+    DepC = {dep_c, "0.0.1", {git, "http://site.com/dep_c.git", {tag, "0.0.1"}}},
+
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, [DepA, DepB, DepC | SrcDeps]}]),
+
+    RebarConfig = [
+        {deps, TopDeps},
+        {overrides, [
+            {add, some_dep, [
+                {deps, [DepA, DepB]}
+            ]},
+            {add, [
+                {deps, [DepC]}
+            ]}
+        ]}
+    ],
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["compile"],
+        {ok, [{dep, "some_dep"},
+              {dep, "other_dep"},
+              {dep, "dep_a"},
+              {dep, "dep_b"},
+              {dep, "dep_c"}]}
+    ).
+
+override_del_deps(Config) ->
+    Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"dep_a", "0.0.1", []},
+                                                                     {"dep_b", "0.0.1", []},
+                                                                     {"dep_c", "0.0.1", []}]},
+                                              {"other_dep", "0.0.1", [{"dep_c", "0.0.1", []},
+                                                                      {"dep_d", "0.0.1", []}]}]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+
+    DepA = {dep_a, "0.0.1", {git, "https://example.org/user/dep_a.git", {tag, "0.0.1"}}},
+    DepB = {dep_b, "0.0.1", {git, "https://example.org/user/dep_b.git", {tag, "0.0.1"}}},
+    DepC = {dep_c, "0.0.1", {git, "https://example.org/user/dep_c.git", {tag, "0.0.1"}}},
+
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
+
+    RebarConfig = [
+        {deps, TopDeps},
+        {overrides, [
+            {del, some_dep, [
+                {deps, [DepA, DepB]}
+            ]},
+            {del, [
+                {deps, [DepC]}
+            ]}
+        ]}
+    ],
+
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["compile"],
+        {ok, [{dep, "some_dep"},
+              {dep, "other_dep"},
+              {dep_not_exist, "dep_a"},
+              {dep_not_exist, "dep_b"},
+              {dep_not_exist, "dep_c"},
+              {dep, "dep_d"}]}
+    ).
+
+override_opts(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [
+        {erl_opts, [
+            compressed,
+            warn_missing_spec
+        ]},
+        {overrides, [
+            {override, [
+                {erl_opts, [compressed]}
+            ]}
+        ]}
+    ],
+
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+
+    rebar_test_utils:run_and_check(
+         Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
+
+    Path = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    code:add_patha(Path),
+
+    Mod = list_to_atom("not_a_real_src_" ++ Name),
+
+    true = lists:member(compressed, proplists:get_value(options, Mod:module_info(compile), [])),
+    false = lists:member(warn_missing_spec, proplists:get_value(options, Mod:module_info(compile), [])).
+
+override_add_opts(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [
+        {erl_opts, [
+            warn_missing_spec
+        ]},
+        {overrides, [
+            {add, [
+                {erl_opts, [compressed]}
+            ]}
+        ]}
+    ],
+
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+
+    rebar_test_utils:run_and_check(
+         Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
+
+    Path = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    code:add_patha(Path),
+
+    Mod = list_to_atom("not_a_real_src_" ++ Name),
+
+    true = lists:member(compressed, proplists:get_value(options, Mod:module_info(compile), [])),
+    true = lists:member(warn_missing_spec, proplists:get_value(options, Mod:module_info(compile), [])).
+
+override_del_opts(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [
+        {erl_opts, [
+            compressed,
+            warn_missing_spec
+        ]},
+        {overrides, [
+            {del, [
+                {erl_opts, [warn_missing_spec]}
+            ]}
+        ]}
+    ],
+
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+
+    rebar_test_utils:run_and_check(
+         Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
+
+    Path = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    code:add_patha(Path),
+
+    Mod = list_to_atom("not_a_real_src_" ++ Name),
+
+    true = lists:member(compressed, proplists:get_value(options, Mod:module_info(compile), [])),
+    false = lists:member(warn_missing_spec, proplists:get_value(options, Mod:module_info(compile), [])).
+
+profile_override_deps(Config) ->
+    Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
+
+    RebarConfig = [
+        {deps, TopDeps},
+        {profiles, [
+            {a, [
+                {overrides, [
+                    {override, some_dep, [
+                        {deps, []}
                     ]}
+                ]}
+            ]}
         ]}],
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["as", "a", "compile"],
-        {ok, [{dep, "some_dep"},{dep_not_exist, "other_dep"}]}
+        {ok, [{dep, "some_dep"},
+              {dep_not_exist, "other_dep"}]}
     ).
+
+profile_override_add_deps(Config) ->
+    Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+
+    DepA = {dep_a, "0.0.1", {git, "http://site.com/dep_a.git", {tag, "0.0.1"}}},
+    DepB = {dep_b, "0.0.1", {git, "http://site.com/dep_b.git", {tag, "0.0.1"}}},
+    DepC = {dep_c, "0.0.1", {git, "http://site.com/dep_c.git", {tag, "0.0.1"}}},
+
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, [DepA, DepB, DepC | SrcDeps]}]),
+
+    RebarConfig = [
+        {deps, TopDeps},
+        {profiles, [
+            {a, [
+                {overrides, [
+                    {add, some_dep, [
+                        {deps, [DepA, DepB]}
+                    ]},
+                    {add, [
+                        {deps, [DepC]}
+                    ]}
+                ]}
+            ]}
+        ]}
+    ],
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["as", "a", "compile"],
+        {ok, [{dep, "some_dep"},
+              {dep, "other_dep"},
+              {dep, "dep_a"},
+              {dep, "dep_b"},
+              {dep, "dep_c"}]}
+    ).
+
+profile_override_del_deps(Config) ->
+    Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"dep_a", "0.0.1", []},
+                                                                     {"dep_b", "0.0.1", []},
+                                                                     {"dep_c", "0.0.1", []}]},
+                                              {"other_dep", "0.0.1", [{"dep_c", "0.0.1", []},
+                                                                      {"dep_d", "0.0.1", []}]}]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+
+    DepA = {dep_a, "0.0.1", {git, "https://example.org/user/dep_a.git", {tag, "0.0.1"}}},
+    DepB = {dep_b, "0.0.1", {git, "https://example.org/user/dep_b.git", {tag, "0.0.1"}}},
+    DepC = {dep_c, "0.0.1", {git, "https://example.org/user/dep_c.git", {tag, "0.0.1"}}},
+
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
+
+    RebarConfig = [
+        {deps, TopDeps},
+        {profiles, [
+            {a, [
+                {overrides, [
+                    {del, some_dep, [
+                        {deps, [DepA, DepB]}
+                    ]},
+                    {del, [
+                        {deps, [DepC]}
+                    ]}
+                ]}
+            ]}
+        ]}
+    ],
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["as", "a", "compile"],
+        {ok, [{dep, "some_dep"},
+              {dep, "other_dep"},
+              {dep_not_exist, "dep_a"},
+              {dep_not_exist, "dep_b"},
+              {dep_not_exist, "dep_c"},
+              {dep, "dep_d"}]}
+    ).
+
+profile_override_opts(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [
+        {erl_opts, [
+            compressed,
+            warn_missing_spec
+        ]},
+        {profiles, [
+            {a, [
+                {overrides, [
+                    {override, [
+                        {erl_opts, [compressed]}
+                    ]}
+                ]}
+            ]}
+        ]}
+    ],
+
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+
+    rebar_test_utils:run_and_check(
+         Config, RebarConfig, ["as", "a", "compile"], {ok, [{app, Name}]}),
+
+    Path = filename:join([AppDir, "_build", "a", "lib", Name, "ebin"]),
+    code:add_patha(Path),
+
+    Mod = list_to_atom("not_a_real_src_" ++ Name),
+
+    true = lists:member(compressed, proplists:get_value(options, Mod:module_info(compile), [])),
+    false = lists:member(warn_missing_spec, proplists:get_value(options, Mod:module_info(compile), [])).
+
+profile_override_add_opts(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [
+        {erl_opts, [
+            warn_missing_spec
+        ]},
+        {profiles, [
+            {a, [
+                {overrides, [
+                    {add, [
+                        {erl_opts, [compressed]}
+                    ]}
+                ]}
+            ]}
+        ]}
+    ],
+
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+
+    rebar_test_utils:run_and_check(
+         Config, RebarConfig, ["as", "a", "compile"], {ok, [{app, Name}]}),
+
+    Path = filename:join([AppDir, "_build", "a", "lib", Name, "ebin"]),
+    code:add_patha(Path),
+
+    Mod = list_to_atom("not_a_real_src_" ++ Name),
+
+    true = lists:member(compressed, proplists:get_value(options, Mod:module_info(compile), [])),
+    true = lists:member(warn_missing_spec, proplists:get_value(options, Mod:module_info(compile), [])).
+
+profile_override_del_opts(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [
+        {erl_opts, [
+            compressed,
+            warn_missing_spec
+        ]},
+        {profiles, [
+            {a, [
+                {overrides, [
+                    {del, [
+                        {erl_opts, [warn_missing_spec]}
+                    ]}
+                ]}
+            ]}
+        ]}
+    ],
+
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+
+    rebar_test_utils:run_and_check(
+         Config, RebarConfig, ["as", "a", "compile"], {ok, [{app, Name}]}),
+
+    Path = filename:join([AppDir, "_build", "a", "lib", Name, "ebin"]),
+    code:add_patha(Path),
+
+    Mod = list_to_atom("not_a_real_src_" ++ Name),
+
+    true = lists:member(compressed, proplists:get_value(options, Mod:module_info(compile), [])),
+    false = lists:member(warn_missing_spec, proplists:get_value(options, Mod:module_info(compile), [])).
 
 profile_deps(Config) ->
     Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),

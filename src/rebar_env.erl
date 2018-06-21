@@ -37,26 +37,40 @@ create_env(State) ->
 -spec create_env(rebar_state:t(), rebar_dict()) -> proplists:proplist().
 create_env(State, Opts) ->
     BaseDir = rebar_dir:base_dir(State),
-    [
-     {"REBAR_DEPS_DIR",          filename:absname(rebar_dir:deps_dir(State))},
-     {"REBAR_BUILD_DIR",         filename:absname(rebar_dir:base_dir(State))},
-     {"REBAR_ROOT_DIR",          filename:absname(rebar_dir:root_dir(State))},
-     {"REBAR_CHECKOUTS_DIR",     filename:absname(rebar_dir:checkouts_dir(State))},
-     {"REBAR_PLUGINS_DIR",       filename:absname(rebar_dir:plugins_dir(State))},
-     {"REBAR_GLOBAL_CONFIG_DIR", filename:absname(rebar_dir:global_config_dir(State))},
-     {"REBAR_GLOBAL_CACHE_DIR",  filename:absname(rebar_dir:global_cache_dir(Opts))},
-     {"REBAR_TEMPLATE_DIR",      filename:absname(rebar_dir:template_dir(State))},
-     {"REBAR_APP_DIRS",          join_dirs(BaseDir, rebar_dir:lib_dirs(State))},
-     {"REBAR_SRC_DIRS",          join_dirs(BaseDir, rebar_dir:all_src_dirs(Opts))},
-     {"ERLANG_ERTS_VER",         erlang:system_info(version)},
-     {"ERLANG_ROOT_DIR",         code:root_dir()},
-     {"ERLANG_LIB_DIR_erl_interface", code:lib_dir(erl_interface)},
-     {"ERLANG_LIB_VER_erl_interface", re_version(code:lib_dir(erl_interface))},
-     {"ERL",                     filename:join([code:root_dir(), "bin", "erl"])},
-     {"ERLC",                    filename:join([code:root_dir(), "bin", "erlc"])},
-     {"ERLANG_ARCH"  ,           rebar_api:wordsize()},
-     {"ERLANG_TARGET",           rebar_api:get_arch()}
-    ].
+    EnvVars = [
+        {"REBAR_DEPS_DIR",          filename:absname(rebar_dir:deps_dir(State))},
+        {"REBAR_BUILD_DIR",         filename:absname(rebar_dir:base_dir(State))},
+        {"REBAR_ROOT_DIR",          filename:absname(rebar_dir:root_dir(State))},
+        {"REBAR_CHECKOUTS_DIR",     filename:absname(rebar_dir:checkouts_dir(State))},
+        {"REBAR_PLUGINS_DIR",       filename:absname(rebar_dir:plugins_dir(State))},
+        {"REBAR_GLOBAL_CONFIG_DIR", filename:absname(rebar_dir:global_config_dir(State))},
+        {"REBAR_GLOBAL_CACHE_DIR",  filename:absname(rebar_dir:global_cache_dir(Opts))},
+        {"REBAR_TEMPLATE_DIR",      filename:absname(rebar_dir:template_dir(State))},
+        {"REBAR_APP_DIRS",          join_dirs(BaseDir, rebar_dir:lib_dirs(State))},
+        {"REBAR_SRC_DIRS",          join_dirs(BaseDir, rebar_dir:all_src_dirs(Opts))},
+        {"ERLANG_ERTS_VER",         erlang:system_info(version)},
+        {"ERLANG_ROOT_DIR",         code:root_dir()},
+        {"ERL",                     filename:join([code:root_dir(), "bin", "erl"])},
+        {"ERLC",                    filename:join([code:root_dir(), "bin", "erlc"])},
+        {"ERLANG_ARCH"  ,           rebar_api:wordsize()},
+        {"ERLANG_TARGET",           rebar_api:get_arch()}
+    ],
+    EInterfaceVars = create_erl_interface_env(),
+    lists:append([EnvVars, EInterfaceVars]).
+
+-spec create_erl_interface_env() -> list().
+create_erl_interface_env() ->
+    case code:lib_dir(erl_interface) of
+        {error, bad_name} ->
+            ?WARN("erl_interface is missing. ERLANG_LIB_DIR_erl_interface and "
+            "ERLANG_LIB_VER_erl_interface will not be added to the environment.", []),
+            [];
+        Dir ->
+            [
+             {"ERLANG_LIB_DIR_erl_interface", Dir},
+             {"ERLANG_LIB_VER_erl_interface", re_version(Dir)}
+            ]
+    end.
 
 %% ====================================================================
 %% Internal functions
