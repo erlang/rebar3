@@ -89,15 +89,9 @@ extract_escript(State, ScriptPath) ->
     BinFile = filename:join(BinDir, "rebar3"),
     filelib:ensure_dir(BinFile),
 
-    {ok, #file_info{mode = _,
-                    uid = Uid,
-                    gid = Gid}} = file:read_file_info(ScriptPath),
-
     ?INFO("Writing rebar3 run script ~ts...", [BinFile]),
     file:write_file(BinFile, bin_contents(OutputDir)),
-    ok = file:write_file_info(BinFile, #file_info{mode=33277,
-                                                  uid=Uid,
-                                                  gid=Gid}),
+    ok = file:write_file_info(BinFile, #file_info{mode=33277}),
 
     ?INFO("Add to $PATH for use: export PATH=~ts:$PATH", [BinDir]),
 
