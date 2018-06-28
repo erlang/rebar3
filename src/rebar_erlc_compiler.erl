@@ -799,8 +799,27 @@ dir_recursive(Opts, Dir, CompileOpts) when is_list(CompileOpts) ->
     end.
 
 valid_erl_first_conf(FileList) ->
-    case rebar_utils:is_list_of_strings(FileList) of
+    Strs = filter_file_list(FileList),
+    case rebar_utils:is_list_of_strings(Strs) of
         true -> true;
         false -> ?ABORT("An invalid file list (~p) was provided as part of your erl_files_first directive",
                         [FileList])
     end.
+
+filter_file_list(FileList) ->
+    Atoms = lists:filter( fun(X) -> is_atom(X) end, FileList),
+    case Atoms of
+        [] ->
+            FileList;
+        _ ->
+          atoms_in_erl_first_files_warning(Atoms),
+          lists:filter( fun(X) -> not(is_atom(X)) end, FileList)
+     end.
+
+atoms_in_erl_first_files_warning(Atoms) ->
+  W = "You have provided atoms as file entries in erl_first_files; "
+      "erl_first_files only expects lists of filenames as strings. "
+      "The following modules (~p) may not work as expected and it is advised "
+      "that you change these entires to string format "
+      "(e.g., \"src/module.erl\") ",
+  ?WARN(W, [Atoms]).
