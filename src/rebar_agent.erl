@@ -131,40 +131,80 @@ maybe_show_warning(State) ->
 %% that makes sense.
 -spec refresh_paths(rebar_state:t()) -> ok.
 refresh_paths(RState) ->
-    ToRefresh = (rebar_state:code_paths(RState, all_deps)
-                 ++ [filename:join([rebar_app_info:out_dir(App), "test"])
-                     || App <- rebar_state:project_apps(RState)]
-                %% make sure to never reload self; halt()s the VM
-                ) -- [filename:dirname(code:which(?MODULE))],
+    RefreshPaths = application:get_env(rebar, refresh_paths, [all_deps, test]),
+    ToRefresh = parse_refresh_paths(RefreshPaths, RState, []),
     %% Modules from apps we can't reload without breaking functionality
-    Blacklist = [ec_cmd_log, providers, cf, cth_readable],
+    Blacklist = lists:usort(
+        application:get_env(rebar, refresh_paths_blacklist, [])
+        ++ [rebar, erlware_commons, providers, cf, cth_readable]),
     %% Similar to rebar_utils:update_code/1, but also forces a reload
     %% of used modules. Also forces to reload all of ebin/ instead
     %% of just the modules in the .app file, because 'extra_src_dirs'
     %% allows to load and compile files that are not to be kept
     %% in the app file.
-    lists:foreach(fun(Path) ->
-            Name = filename:basename(Path, "/ebin"),
-            Files = filelib:wildcard(filename:join([Path, "*.beam"])),
-            Modules = [list_to_atom(filename:basename(F, ".beam"))
-                       || F <- Files],
-            App = list_to_atom(Name),
+    [refresh_path(Path, Blacklist) || Path <- ToRefresh],
+    ok.
+
+refresh_path(Path, Blacklist) ->
+    Name = filename:basename(Path, "/ebin"),
+    App = list_to_atom(Name),
+    case App of
+        test -> % skip
+            code:add_patha(Path),
+            ok;
+        _ ->
             application:load(App),
             case application:get_key(App, modules) of
                 undefined ->
-                    code:add_patha(Path),
-                    ok;
-                {ok, Mods} ->
-                    case {length(Mods), length(Mods -- Blacklist)} of
-                        {X,X} ->
-                            ?DEBUG("reloading ~p from ~ts", [Modules, Path]),
-                            code:replace_path(App, Path),
-                            reload_modules(Modules);
-                        {_,_} ->
+                    code:add_patha(Path);
+                {ok, _Mods} ->
+                    case lists:member(App, Blacklist) of
+                        false ->
+                            refresh_path_do(Path, App);
+                        true ->
                             ?DEBUG("skipping app ~p, stable copy required", [App])
                     end
             end
-        end, ToRefresh).
+    end.
+refresh_path_do(Path, App) ->
+    Files = filelib:wildcard(filename:join([Path, "*.beam"])),
+    Modules = [list_to_atom(filename:basename(F, ".beam"))
+        || F <- Files],
+    ?DEBUG("reloading ~p from ~ts", [Modules, Path]),
+    code:replace_path(App, Path),
+    reload_modules(Modules).
+
+%% @private parse refresh_paths option
+%% no_deps means only project_apps's ebin path
+%% no_test means no test path
+%% OtherPath.
+parse_refresh_paths([all_deps | RefreshPaths], RState, Acc) ->
+    Paths = rebar_state:code_paths(RState, all_deps),
+    parse_refresh_paths(RefreshPaths, RState, Paths ++ Acc);
+parse_refresh_paths([project_apps | RefreshPaths], RState, Acc) ->
+    Paths = [filename:join([rebar_app_info:out_dir(App), "ebin"])
+        || App <- rebar_state:project_apps(RState)],
+    parse_refresh_paths(RefreshPaths, RState, Paths ++ Acc);
+parse_refresh_paths([test | RefreshPaths], RState, Acc) ->
+    Paths = [filename:join([rebar_app_info:out_dir(App), "test"])
+        || App <- rebar_state:project_apps(RState)],
+    parse_refresh_paths(RefreshPaths, RState, Paths ++ Acc);
+parse_refresh_paths([RefreshPath0 | RefreshPaths], RState, Acc) when is_list(RefreshPath0) ->
+    case filelib:is_dir(RefreshPath0) of
+        true ->
+            RefreshPath0 =
+            case filename:basename(RefreshPath0) of
+                "ebin" -> RefreshPath0;
+                _ -> filename:join([RefreshPath0, "ebin"])
+            end,
+            parse_refresh_paths(RefreshPaths, RState, [RefreshPath0 | Acc]);
+        false ->
+            parse_refresh_paths(RefreshPaths, RState, Acc)
+    end;
+parse_refresh_paths([_ | RefreshPaths], RState, Acc) ->
+    parse_refresh_paths(RefreshPaths, RState, Acc);
+parse_refresh_paths([], _RState, Acc) ->
+    lists:usort(Acc).
 
 %% @private from a disk config, reload and reapply with the current
 %% profiles; used to find changes in the config from a prior run.
@@ -179,8 +219,29 @@ refresh_state(RState, _Dir) ->
 %% @private takes a list of modules and reloads them
 -spec reload_modules([module()]) -> term().
 reload_modules([]) -> noop;
-reload_modules(Modules) ->
-        reload_modules(Modules, erlang:function_exported(code, prepare_loading, 1)).
+reload_modules(Modules0) ->
+    Modules = [M || M <- Modules0, is_changed(M)],
+    reload_modules(Modules, erlang:function_exported(code, prepare_loading, 1)).
+
+%% @spec is_changed(atom()) -> boolean()
+%% @doc true if the loaded module is a beam with a vsn attribute
+%%      and does not match the on-disk beam file, returns false otherwise.
+is_changed(M) ->
+    try
+        module_vsn(M:module_info(attributes)) =/= module_vsn(code:get_object_code(M))
+    catch _:_ ->
+        false
+    end.
+
+module_vsn({M, Beam, _Fn}) ->
+    % Because the vsn can set by -vsn(X) in module.
+    % So didn't use beam_lib:version/1 to get the vsn.
+    % So if set -vsn(X) in module, it will always reload the module.
+    {ok, {M, <<Vsn:128>>}} = beam_lib:md5(Beam),
+    Vsn;
+module_vsn(Attrs) when is_list(Attrs) ->
+    {_, Vsn} = lists:keyfind(vsn, 1, Attrs),
+    Vsn.
 
 %% @private reloading modules, when there are modules to actually reload
 reload_modules(Modules, true) ->
