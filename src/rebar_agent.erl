@@ -131,10 +131,8 @@ maybe_show_warning(State) ->
 %% that makes sense.
 -spec refresh_paths(rebar_state:t()) -> ok.
 refresh_paths(RState) ->
-    RefreshPaths = lists:usort(
-        application:get_env(rebar, refresh_paths, [])
-        ++ [all_deps, test]),
-    ToRefresh = parse_refresh_paths(RefreshPaths, RState),
+    RefreshPaths = application:get_env(rebar, refresh_paths, [all_deps, test]),
+    ToRefresh = parse_refresh_paths(RefreshPaths, RState, []),
     %% Modules from apps we can't reload without breaking functionality
     Blacklist = lists:usort(
         application:get_env(rebar, refresh_paths_blacklist, [])
@@ -180,22 +178,6 @@ refresh_path_do(Path, App) ->
 %% no_deps means only project_apps's ebin path
 %% no_test means no test path
 %% OtherPath.
-parse_refresh_paths(RefreshPaths0, RState) ->
-    RefreshPaths1 =
-    case lists:member(no_deps, RefreshPaths0) of
-        true ->
-            lists:usort([project_apps | lists:delete(all_deps, RefreshPaths0)]);
-        false ->
-            RefreshPaths0
-    end,
-    RefreshPaths =
-    case lists:member(no_test, RefreshPaths1) of
-        true ->
-            lists:delete(test, RefreshPaths1);
-        false ->
-            RefreshPaths1
-    end,
-    parse_refresh_paths(RefreshPaths, RState, []).
 parse_refresh_paths([all_deps | RefreshPaths], RState, Acc) ->
     Paths = rebar_state:code_paths(RState, all_deps),
     parse_refresh_paths(RefreshPaths, RState, Paths ++ Acc);
@@ -246,16 +228,18 @@ reload_modules(Modules0) ->
 %%      and does not match the on-disk beam file, returns false otherwise.
 is_changed(M) ->
     try
-        module_vsn(M:module_info()) =/= module_vsn(code:get_object_code(M))
+        module_vsn(M:module_info(attributes)) =/= module_vsn(code:get_object_code(M))
     catch _:_ ->
         false
     end.
 
 module_vsn({M, Beam, _Fn}) ->
-    {ok, {M, Vsn}} = beam_lib:version(Beam),
+    % Because the vsn can set by -vsn(X) in module.
+    % So didn't use beam_lib:version/1 to get the vsn.
+    % So if set -vsn(X) in module, it will always reload the module.
+    {ok, {M, <<Vsn:128>>}} = beam_lib:md5(Beam),
     Vsn;
-module_vsn(L) when is_list(L) ->
-    {_, Attrs} = lists:keyfind(attributes, 1, L),
+module_vsn(Attrs) when is_list(Attrs) ->
     {_, Vsn} = lists:keyfind(vsn, 1, Attrs),
     Vsn.
 
