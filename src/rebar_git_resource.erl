@@ -292,8 +292,7 @@ parse_tags(Dir) ->
 git_clone_options() ->
     Option = case os:getenv("REBAR_GIT_CLONE_OPTIONS") of 
         false -> "" ;       %% env var not set
-        [] -> "" ;          %% env var set to empty
-        Opt ->
+        Opt ->              %% env var set to empty or others
             Opt
     end,
 
