@@ -264,14 +264,24 @@ report(Messages) ->
 -spec format_errors(_, Extra, [err_or_warn()]) -> [string()] when
       Extra :: string().
 format_errors(_MainSource, Extra, Errors) ->
-    [begin
-         [format_error(Source, Extra, Desc) || Desc <- Descs]
-     end
+    [[format_error(Source, Extra, Desc) || Desc <- Descs]
      || {Source, Descs} <- Errors].
 
 %% @private format compiler errors into proper outputtable strings
 -spec format_error(file:filename(), Extra, err_or_warn()) -> string() when
       Extra :: string().
+format_error(Source, Extra, {Line, Mod=epp, Desc={include,lib,File}}) ->
+    %% Special case for include file errors, overtaking the default one
+    BaseDesc = Mod:format_error(Desc),
+    Friendly = case filename:split(File) of
+        [Lib, "include", _] ->
+            io_lib:format("; Make sure ~s is in your app "
+                          "file's 'applications' list", [Lib]);
+        _ ->
+            ""
+    end,
+    FriendlyDesc = BaseDesc ++ Friendly,
+    ?FMT("~ts:~w: ~ts~ts~n", [Source, Line, Extra, FriendlyDesc]);
 format_error(Source, Extra, {{Line, Column}, Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
     ?FMT("~ts:~w:~w: ~ts~ts~n", [Source, Line, Column, Extra, ErrorDesc]);
