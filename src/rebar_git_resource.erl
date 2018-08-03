@@ -7,6 +7,7 @@
 -export([lock/2
         ,download/3
         ,needs_update/2
+        ,check_type_support/0
         ,make_vsn/1]).
 
 -include("rebar.hrl").
@@ -203,6 +204,9 @@ make_vsn(Dir) ->
             {plain, build_vsn_string(Vsn, RawRef, RawCount)}
     end.
 
+check_type_support() ->
+    rebar_utils:sh("git --version", [{debug_abort_on_error, "hg not installed"},
+                                     {use_stdout, false}]).
 %% Internal functions
 
 collect_default_refcount(Dir) ->

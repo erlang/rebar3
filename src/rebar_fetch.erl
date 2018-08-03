@@ -26,7 +26,9 @@ lock_source(AppDir, Source, State) ->
 -spec download_source(file:filename_all(), rebar_resource:resource(), rebar_state:t()) ->
                              true | {error, any()}.
 download_source(AppDir, Source, State) ->
-    try download_source_(AppDir, Source, State) of
+    Resources = rebar_state:resources(State),
+    Module = get_resource_type(Source, Resources),
+    try download_source_(Module, AppDir, Source, State) of
         true ->
             true;
         Error ->
@@ -37,9 +39,7 @@ download_source(AppDir, Source, State) ->
             throw(?PRV_ERROR({fetch_fail, Source}))
     end.
 
-download_source_(AppDir, Source, State) ->
-    Resources = rebar_state:resources(State),
-    Module = get_resource_type(Source, Resources),
+download_source_(Module, AppDir, Source, State) ->
     TmpDir = ec_file:insecure_mkdtemp(),
     AppDir1 = rebar_utils:to_list(AppDir),
     case Module:download(TmpDir, Source, State) of
@@ -85,6 +85,7 @@ format_error({bad_checksum, File}) ->
     io_lib:format("Checksum mismatch against tarball in ~ts", [File]);
 format_error({bad_registry_checksum, File}) ->
     io_lib:format("Checksum mismatch against registry in ~ts", [File]).
+% format_error({}) ->
 
 get_resource_type({Type, Location}, Resources) ->
     find_resource_module(Type, Location, Resources);
@@ -103,8 +104,16 @@ find_resource_module(Type, Location, Resources) ->
                     {error, io_lib:format("Cannot handle dependency ~ts.~n"
                                          "     No module for resource type ~p", [Location, Type])};
                 _ ->
+                    check_type_support(Type),
                     Type
             end;
         {Type, Module} ->
+            check_type_support(Module),
             Module
+    end.
+
+check_type_support(Module) ->
+    case lists:member({check_type_support, 0},  Module:module_info(exports)) of
+        false -> ok;
+        true  -> Module:check_type_support()
     end.

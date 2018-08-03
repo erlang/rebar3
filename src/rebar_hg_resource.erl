@@ -7,6 +7,7 @@
 -export([lock/2
         ,download/3
         ,needs_update/2
+        ,check_type_support/0
         ,make_vsn/1]).
 
 -include("rebar.hrl").
@@ -158,3 +159,7 @@ parse_hg_url("http://" ++ HostPath) ->
 parse_hg_url("https://" ++ HostPath) ->
     [Host | Path] = rebar_string:lexemes(HostPath, "/"),
     {Host, filename:rootname(filename:join(Path), ".hg")}.
+
+check_type_support() ->
+    rebar_utils:sh("hg --version",[{debug_abort_on_error, "hg not installed"},
+                                   {use_stdout, false}]).
