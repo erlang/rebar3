@@ -85,7 +85,6 @@ format_error({bad_checksum, File}) ->
     io_lib:format("Checksum mismatch against tarball in ~ts", [File]);
 format_error({bad_registry_checksum, File}) ->
     io_lib:format("Checksum mismatch against registry in ~ts", [File]).
-% format_error({}) ->
 
 get_resource_type({Type, Location}, Resources) ->
     find_resource_module(Type, Location, Resources);
@@ -113,7 +112,13 @@ find_resource_module(Type, Location, Resources) ->
     end.
 
 check_type_support(Module) ->
-    case lists:member({check_type_support, 0},  Module:module_info(exports)) of
-        false -> ok;
-        true  -> Module:check_type_support()
+    case get(Module) of
+        true -> ok;
+        _ ->
+            case lists:member({check_type_support, 0}, Module:module_info(exports)) of
+                false -> ok;
+                true  ->
+                    Module:check_type_support(),
+                    put(Module, true) %% setting the type as available, so it will not checked again.
+            end
     end.
