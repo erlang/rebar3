@@ -22,6 +22,12 @@
     boolean().
 -callback make_vsn(file:filename_all()) ->
     {plain, string()} | {error, string()}.
+
+%% optional callbacks instroduced in OTP 18.0
+-ifdef(optional_callback).
+
 -callback check_type_support() -> {ok, any()} | {error, any()}.
 
 -optional_callbacks([check_type_support/0]).
+
+-endif.
