@@ -802,7 +802,7 @@ valid_erl_first_conf(FileList) ->
     Strs = filter_file_list(FileList),
     case rebar_utils:is_list_of_strings(Strs) of
         true -> true;
-        false -> ?ABORT("An invalid file list (~p) was provided as part of your erl_files_first directive",
+        false -> ?ABORT("An invalid file list (~p) was provided as part of your erl_first_files directive",
                         [FileList])
     end.
 
