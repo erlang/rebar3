@@ -205,7 +205,7 @@ make_vsn(Dir) ->
     end.
 
 check_type_support() ->
-    rebar_utils:sh("git --version", [{debug_abort_on_error, "hg not installed"},
+    rebar_utils:sh("git --version", [{debug_abort_on_error, "git not installed"},
                                      {use_stdout, false}]).
 %% Internal functions
 
