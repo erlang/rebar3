@@ -1,6 +1,6 @@
 # Rebar3
 
-[![Build Status](https://travis-ci.org/erlang/rebar3.svg?branch=master)](https://travis-ci.org/erlang/rebar3) [![Windows build status](https://ci.appveyor.com/api/projects/status/yx4oitd9pvd2kab3?svg=true)](https://ci.appveyor.com/project/TristanSloughter/rebar3)
+[![Backers on Open Collective](https://opencollective.com/rebar3/backers/badge.svg)](#backers) [![Sponsors on Open Collective](https://opencollective.com/rebar3/sponsors/badge.svg)](#sponsors) [![Build Status](https://travis-ci.org/erlang/rebar3.svg?branch=master)](https://travis-ci.org/erlang/rebar3) [![Windows build status](https://ci.appveyor.com/api/projects/status/yx4oitd9pvd2kab3?svg=true)](https://ci.appveyor.com/project/TristanSloughter/rebar3)
 
 1. [What is Rebar3?](#what-is-rebar3)
 2. [Why Rebar3?](#why-rebar3)
@@ -170,4 +170,34 @@ General rebar community resources and links:
 - [Documentation](http://www.rebar3.org/v3.0/docs)
 
 To contribute to rebar3, please refer to [CONTRIBUTING](CONTRIBUTING.md).
+
+
+## Contributors
+
+This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
+<a href="graphs/contributors"><img src="https://opencollective.com/rebar3/contributors.svg?width=890&button=false" /></a>
+
+
+## Backers
+
+Thank you to all our backers! 🙏 [[Become a backer](https://opencollective.com/rebar3#backer)]
+
+<a href="https://opencollective.com/rebar3#backers" target="_blank"><img src="https://opencollective.com/rebar3/backers.svg?width=890"></a>
+
+
+## Sponsors
+
+Support this project by becoming a sponsor. Your logo will show up here with a link to your website. [[Become a sponsor](https://opencollective.com/rebar3#sponsor)]
+
+<a href="https://opencollective.com/rebar3/sponsor/0/website" target="_blank"><img src="https://opencollective.com/rebar3/sponsor/0/avatar.svg"></a>
+<a href="https://opencollective.com/rebar3/sponsor/1/website" target="_blank"><img src="https://opencollective.com/rebar3/sponsor/1/avatar.svg"></a>
+<a href="https://opencollective.com/rebar3/sponsor/2/website" target="_blank"><img src="https://opencollective.com/rebar3/sponsor/2/avatar.svg"></a>
+<a href="https://opencollective.com/rebar3/sponsor/3/website" target="_blank"><img src="https://opencollective.com/rebar3/sponsor/3/avatar.svg"></a>
+<a href="https://opencollective.com/rebar3/sponsor/4/website" target="_blank"><img src="https://opencollective.com/rebar3/sponsor/4/avatar.svg"></a>
+<a href="https://opencollective.com/rebar3/sponsor/5/website" target="_blank"><img src="https://opencollective.com/rebar3/sponsor/5/avatar.svg"></a>
+<a href="https://opencollective.com/rebar3/sponsor/6/website" target="_blank"><img src="https://opencollective.com/rebar3/sponsor/6/avatar.svg"></a>
+<a href="https://opencollective.com/rebar3/sponsor/7/website" target="_blank"><img src="https://opencollective.com/rebar3/sponsor/7/avatar.svg"></a>
+<a href="https://opencollective.com/rebar3/sponsor/8/website" target="_blank"><img src="https://opencollective.com/rebar3/sponsor/8/avatar.svg"></a>
+<a href="https://opencollective.com/rebar3/sponsor/9/website" target="_blank"><img src="https://opencollective.com/rebar3/sponsor/9/avatar.svg"></a>
+
 
