@@ -20,19 +20,20 @@ init(State) ->
                                                                {bare, true},
                                                                {deps, ?DEPS},
                                                                {example, "rebar3 pkgs"},
-                                                               {short_desc, "List available packages."},
-                                                               {desc, info("List available packages")},
+                                                               {short_desc, "List versions of a package."},
+                                                               {desc, info("List versions of a package")},
                                                                {opts, []}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    rebar_packages:packages(State),
+    Resources = rebar_state:resources(State),
+    #{hex_config := HexConfig} = rebar_resource:find_resource_state(pkg, Resources),
     case rebar_state:command_args(State) of
-        [Name] ->
-            print_packages(get_packages(rebar_utils:to_binary(Name)));
+        [Name] ->            
+            print_packages(rebar_packages:get(HexConfig, rebar_utils:to_binary(Name)));
         _ ->
-            print_packages(sort_packages())
+            ?ERROR("Must provide a package name.", [])
     end,
     {ok, State}.
 
@@ -40,28 +41,23 @@ do(State) ->
 format_error(load_registry_fail) ->
     "Failed to load package regsitry. Try running 'rebar3 update' to fix".
 
-print_packages(Pkgs) ->
-    orddict:map(fun(Name, Vsns) ->
-                        SortedVsns = lists:sort(fun(A, B) ->
-                                                        ec_semver:lte(ec_semver:parse(A)
-                                                                     ,ec_semver:parse(B))
-                                                end, Vsns),
-                        VsnStr = join(SortedVsns, <<", ">>),
-                        ?CONSOLE("~ts:~n    Versions: ~ts~n", [Name, VsnStr])
-                end, Pkgs).
-
-sort_packages() ->
-    ets:foldl(fun({package_index_version, _}, Acc) ->
-                      Acc;
-                 ({Pkg, Vsns}, Acc) ->
-                      orddict:store(Pkg, Vsns, Acc);
-                 (_, Acc) ->
-                      Acc
-              end, orddict:new(), ?PACKAGE_TABLE).
-
-get_packages(Name) ->
-    ets:lookup(?PACKAGE_TABLE, Name).
-
+print_packages({ok, #{<<"name">> := Name,
+                      <<"meta">> := Meta,
+                      <<"releases">> := Releases}}) ->
+    Description = maps:get(<<"description">>, Meta, ""),
+    Licenses = join(maps:get(<<"licenses">>, Meta, []), <<", ">>),
+    Links = join_map(maps:get(<<"links">>, Meta, []), <<"\n        ">>),
+    Maintainers = join(maps:get(<<"maintainers">>, Meta, []), <<", ">>),
+    Versions = [V || #{<<"version">> := V} <- Releases],
+    VsnStr = join(Versions, <<", ">>),
+    ?CONSOLE("~ts:~n"
+             "    Description: ~ts~n"
+             "    Licenses: ~ts~n"
+             "    Maintainers: ~ts~n"
+             "    Links:~n        ~ts~n"
+             "    Versions: ~ts~n", [Name, Description, Licenses, Maintainers, Links, VsnStr]);
+print_packages(_) ->
+    ok.
 
 -spec join([binary()], binary()) -> binary().
 join([Bin], _Sep) ->
@@ -69,6 +65,14 @@ join([Bin], _Sep) ->
 join([Bin | T], Sep) ->
     <<Bin/binary, Sep/binary, (join(T, Sep))/binary>>.
 
+-spec join_map(map(), binary()) -> binary().
+join_map(Map, Sep) ->
+    join_tuple_list(maps:to_list(Map), Sep).
+
+join_tuple_list([{K, V}], _Sep) ->
+    <<K/binary, ": ", V/binary>>;
+join_tuple_list([{K, V} | T], Sep) ->
+    <<K/binary, ": ", V/binary, Sep/binary, (join_tuple_list(T, Sep))/binary>>.
 
 info(Description) ->
     io_lib:format("~ts.~n", [Description]).

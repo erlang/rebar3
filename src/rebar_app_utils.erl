@@ -250,50 +250,34 @@ expand_deps_sources(Dep, State) ->
 %% around version if required.
 -spec update_source(rebar_app_info:t(), Source, rebar_state:t()) ->
     rebar_app_info:t() when
-      Source :: tuple() | atom() | binary(). % TODO: meta to source()
+      Source :: rebar_resource:source().
 update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
-    {PkgName1, PkgVsn1} = case PkgVsn of
-                              undefined ->
-                                  get_package(PkgName, "0", State);
-                              <<"~>", Vsn/binary>> ->
-                                  [Vsn1] = [X || X <- binary:split(Vsn, [<<" ">>], [global]), X =/= <<>>],
-                                  get_package(PkgName, Vsn1, State);
-                              _ ->
-                                  {PkgName, PkgVsn}
-                          end,
+    {ok, PkgVsn1} = rebar_packages:resolve_version(PkgName, PkgVsn,
+                                                   ?PACKAGE_TABLE, State),
     %% store the expected hash for the dependency
     Hash1 = case Hash of
-        undefined -> % unknown, define the hash since we know the dep
-            fetch_checksum(PkgName1, PkgVsn1, Hash, State);
-        _ -> % keep as is
-            Hash
-    end,
-    AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName1, PkgVsn1, Hash1}),
-    Deps = rebar_packages:deps(PkgName1
-                              ,PkgVsn1
-                              ,State),
+                undefined -> % unknown, define the hash since we know the dep
+                    fetch_checksum(PkgName, PkgVsn1, State);
+                _ -> % keep as is
+                    Hash
+            end,
+    AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName, PkgVsn1, Hash1}),
+    Deps = rebar_packages:get_package_deps(PkgName
+                                          ,PkgVsn1
+                                          ,State),
     AppInfo2 = rebar_app_info:resource_type(rebar_app_info:deps(AppInfo1, Deps), pkg),
     rebar_app_info:original_vsn(AppInfo2, PkgVsn1);
 update_source(AppInfo, Source, _State) ->
     rebar_app_info:source(AppInfo, Source).
 
 %% @doc grab the checksum for a given package
--spec fetch_checksum(atom(), string(), iodata() | undefined, rebar_state:t()) ->
-    iodata() | no_return().
-fetch_checksum(PkgName, PkgVsn, Hash, State) ->
-    try
-        rebar_packages:registry_checksum({pkg, PkgName, PkgVsn, Hash}, State)
-    catch
-        _:_ ->
-            ?INFO("Package ~ts-~ts not found. Fetching registry updates and trying again...", [PkgName, PkgVsn]),
-            {ok, _} = rebar_prv_update:do(State),
-            rebar_packages:registry_checksum({pkg, PkgName, PkgVsn, Hash}, State)
-    end.
+-spec fetch_checksum(binary(), binary(), rebar_state:t())
+                    -> iodata() | no_return().
+fetch_checksum(PkgName, PkgVsn, State) ->
+    rebar_packages:registry_checksum(PkgName, PkgVsn, State).
 
 %% @doc convert a given exception's payload into an io description.
 -spec format_error(any()) -> iolist().
-format_error({missing_package, Package}) ->
-    io_lib:format("Package not found in registry: ~ts", [Package]);
 format_error({parse_dep, Dep}) ->
     io_lib:format("Failed parsing dep ~p", [Dep]);
 format_error(Error) ->
@@ -302,18 +286,6 @@ format_error(Error) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
-
-%% @private find the correct version of a package based on the version
-%% and name passed in.
--spec get_package(binary(), binary() | string(), rebar_state:t()) ->
-    term() | no_return().
-get_package(Dep, Vsn, State) ->
-    case rebar_packages:find_highest_matching(Dep, Vsn, ?PACKAGE_TABLE, State) of
-        {ok, HighestDepVsn} ->
-            {Dep, HighestDepVsn};
-        none ->
-            throw(?PRV_ERROR({missing_package, rebar_utils:to_binary(Dep)}))
-    end.
 
 %% @private checks that all the beam files have been properly
 %% created.
