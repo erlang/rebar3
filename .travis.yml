@@ -22,6 +22,7 @@ script: "./bootstrap && ./rebar3 ct"
 branches:
   only:
   - master
+  - hex_core
 cache:
   directories:
   - "$HOME/.cache/rebar3/hex/default"
