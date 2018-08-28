@@ -5,7 +5,8 @@
 -export([expand_deps/2, flat_deps/1, top_level_deps/1]).
 -export([create_app/4, create_plugin/4, create_eunit_app/4, create_empty_app/4,
          create_config/2, create_config/3, package_app/3]).
--export([create_random_name/1, create_random_vsn/0, write_src_file/2]).
+-export([create_random_name/1, create_random_vsn/0, write_src_file/2,
+         random_element/1]).
 
 %% Pick the right random module
 -ifdef(rand_only).
@@ -34,8 +35,10 @@ init_rebar_state(Config, Name) ->
     Verbosity = rebar3:log_level(),
     rebar_log:init(command_line, Verbosity),
     GlobalDir = filename:join([DataDir, "cache"]),
+    Repos = proplists:get_value(repos, Config, []),
     State = rebar_state:new([{base_dir, filename:join([AppsDir, "_build"])}
                             ,{global_rebar_dir, GlobalDir}
+                            ,{hex, [{repos, [#{name => R} || R <- Repos]}]}
                             ,{root_dir, AppsDir}]),
     [{apps, AppsDir}, {checkouts, CheckoutsDir}, {state, State} | Config].
 
@@ -488,3 +491,7 @@ package_app(AppDir, DestDir, PkgName) ->
     <<E:128/big-unsigned-integer>> = crypto:hash(md5, BinFull),
     Etag = rebar_string:lowercase(lists:flatten(io_lib:format("~32.16.0b", [E]))),
     {BinChecksum, Etag}.
+
+random_element(Repos) ->
+    Index = ?random:uniform(length(Repos)),
+    lists:nth(Index, Repos).

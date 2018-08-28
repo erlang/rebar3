@@ -252,34 +252,34 @@ expand_deps_sources(Dep, State) ->
     rebar_app_info:t() when
       Source :: rebar_resource:source().
 update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
-    {ok, PkgVsn1} = rebar_packages:resolve_version(PkgName, PkgVsn,
-                                                   ?PACKAGE_TABLE, State),
-    %% store the expected hash for the dependency
-    Hash1 = case Hash of
-                undefined -> % unknown, define the hash since we know the dep
-                    fetch_checksum(PkgName, PkgVsn1, State);
-                _ -> % keep as is
-                    Hash
-            end,
-    AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName, PkgVsn1, Hash1}),
-    Deps = rebar_packages:get_package_deps(PkgName
-                                          ,PkgVsn1
-                                          ,State),
-    AppInfo2 = rebar_app_info:resource_type(rebar_app_info:deps(AppInfo1, Deps), pkg),
-    rebar_app_info:original_vsn(AppInfo2, PkgVsn1);
+    case rebar_packages:resolve_version(PkgName, PkgVsn, Hash,
+                                        ?PACKAGE_TABLE, State) of
+        {ok, Package, RepoConfig} ->
+            #package{key = {_, PkgVsn1, _},
+                     checksum = Hash1,
+                     dependencies = Deps} = Package,
+            AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName, PkgVsn1, Hash1, RepoConfig}),
+            AppInfo2 = rebar_app_info:resource_type(rebar_app_info:deps(AppInfo1, Deps), pkg),
+            rebar_app_info:original_vsn(AppInfo2, PkgVsn1);
+        not_found ->
+            throw(?PRV_ERROR({missing_package, PkgName, PkgVsn}));
+        {error, {invalid_vsn, InvalidVsn}} ->
+            throw(?PRV_ERROR({invalid_vsn, PkgName, InvalidVsn}))
+    end;
 update_source(AppInfo, Source, _State) ->
     rebar_app_info:source(AppInfo, Source).
 
-%% @doc grab the checksum for a given package
--spec fetch_checksum(binary(), binary(), rebar_state:t())
-                    -> iodata() | no_return().
-fetch_checksum(PkgName, PkgVsn, State) ->
-    rebar_packages:registry_checksum(PkgName, PkgVsn, State).
-
 %% @doc convert a given exception's payload into an io description.
 -spec format_error(any()) -> iolist().
+format_error({missing_package, Name, undefined}) ->
+    io_lib:format("Package not found in any repo: ~ts.", [rebar_utils:to_binary(Name)]);
+format_error({missing_package, Name, Vsn}) ->
+    io_lib:format("Package not found in any repo: ~ts-~ts.", [rebar_utils:to_binary(Name),
+                                                              rebar_utils:to_binary(Vsn)]);
 format_error({parse_dep, Dep}) ->
     io_lib:format("Failed parsing dep ~p", [Dep]);
+format_error({invalid_vsn, Dep, InvalidVsn}) ->
+    io_lib:format("Dep ~ts has invalid version ~ts", [Dep, InvalidVsn]);
 format_error(Error) ->
     io_lib:format("~p", [Error]).
 

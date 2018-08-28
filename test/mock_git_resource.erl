@@ -27,7 +27,7 @@ mock(Opts) ->
     mock(Opts, create_app).
 
 mock(Opts, CreateType) ->
-    meck:new(?MOD, [no_link]),
+    meck:new(?MOD, [no_link, passthrough]),
     mock_lock(Opts),
     mock_update(Opts),
     mock_vsn(Opts),

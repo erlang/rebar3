@@ -14,8 +14,10 @@
 -export([request/4
         ,etag/1]).
 
-%% Exported for ct
--export([store_etag_in_cache/2]).
+-ifdef(TEST).
+%% exported for test purposes
+-export([store_etag_in_cache/2, repos/1, merge_repos/1]).
+-endif.
 
 -include("rebar.hrl").
 
@@ -28,37 +30,66 @@
 -type download_result() :: {bad_download, binary() | string()} |
                            {fetch_fail, _, _} | cached_result().
 
+-type repo() :: #{name => unicode:unicode_binary(),
+                  api_url => binary(),
+                  api_key => binary(),
+                  repo_url => binary(),
+                  repo_public_key => binary(),
+                  repo_verify => binary()}.
+
 %%==============================================================================
 %% Public API
 %%==============================================================================
 
 -spec init(rebar_state:t()) -> {ok, term()}.
-init(State) ->    
-    HexConfig=#{api_url := DefaultApiUrl,
-                repo_url := DefaultRepoUrl,
-                repo_public_key := DefaultRepoPublicKey,
-                repo_verify := DefaultRepoVerify} = hex_core:default_config(),
-    ApiUrl = rebar_state:get(State, hex_api_url, DefaultApiUrl),    
-    RepoUrl = rebar_state:get(State, hex_repo_url, 
-                              %% check legacy configuration variable for setting mirrors
-                              rebar_state:get(State, rebar_packages_cdn, DefaultRepoUrl)),
-    RepoPublicKey = rebar_state:get(State, hex_repo_public_key, DefaultRepoPublicKey),
-    RepoVerify = rebar_state:get(State, hex_repo_verify, DefaultRepoVerify),
+init(State) ->
     {ok, Vsn} = application:get_key(rebar, vsn),
-    {ok, #{hex_config => HexConfig#{api_url => ApiUrl,
-                                    repo_url => RepoUrl,
-                                    repo_public_key => RepoPublicKey,
-                                    repo_verify => RepoVerify,
-                                    http_user_agent_fragment => 
-                                        <<"(rebar3/", (list_to_binary(Vsn))/binary, ") (httpc)">>,
-                                    http_adapter_config => #{profile => rebar}}}}.
+    BaseConfig = #{http_adapter => hex_http_httpc,
+                   http_user_agent_fragment =>
+                       <<"(rebar3/", (list_to_binary(Vsn))/binary, ") (httpc)">>,
+                   http_adapter_config => #{profile => rebar}},
+    Repos = repos(State),
+    %% add base config entries that are specific to use by rebar3 and not overridable
+    Repos1 = [maps:merge(Repo, BaseConfig) || Repo <- Repos],
+    {ok, #{repos => Repos1,
+           base_config => BaseConfig}}.
+
+%% A user's list of repos are merged by name while keeping the order
+%% intact. The order is based on the first use of a repo by name in the
+%% list. The default repo is appended to the user's list.
+repos(State) ->
+    Hex = rebar_state:get(State, hex, []),
+    HexDefaultConfig = default_repo(),
+    case lists:keyfind(repos, 1, Hex) of
+        false ->
+            [HexDefaultConfig];
+        {repos, Repos} ->
+            merge_repos(Repos ++ [HexDefaultConfig])
+    end.
+
+-spec merge_repos([repo()]) -> [repo()].
+merge_repos(Repos) ->
+    lists:foldl(fun(R, ReposAcc) ->
+                        update_repo_list(R, ReposAcc)
+                end, [], Repos).
+
+update_repo_list(R=#{name := N}, [H=#{name := HN} | Rest]) when N =:= HN ->
+    [maps:merge(R, H) | Rest];
+update_repo_list(R, [H | Rest]) ->
+    [H | update_repo_list(R, Rest)];
+update_repo_list(R, []) ->
+    [R].
+
+default_repo() ->
+    HexDefaultConfig = hex_core:default_config(),
+    HexDefaultConfig#{name => <<"hexpm">>}.
 
 -spec lock(AppDir, Source) -> Res when
       AppDir :: file:name(),
       Source :: tuple(),
-      Res :: {atom(), string(), any()}.
-lock(_AppDir, Source) ->
-    Source.
+      Res :: {atom(), string(), any(), binary()}.
+lock(_AppDir, {pkg, Name, Vsn, Hash, _RepoConfig}) ->
+    {pkg, Name, Vsn, Hash}.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -68,9 +99,9 @@ lock(_AppDir, Source) ->
 %%------------------------------------------------------------------------------
 -spec needs_update(Dir, Pkg) -> Res when
       Dir :: file:name(),
-      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
+      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: hex_core:config()},
       Res :: boolean().
-needs_update(Dir, {pkg, _Name, Vsn, _Hash}) ->
+needs_update(Dir, {pkg, _Name, Vsn, _Hash, _}) ->
     [AppInfo] = rebar_app_discover:find_apps([Dir], all),
     case rebar_app_info:original_vsn(AppInfo) =:= rebar_utils:to_binary(Vsn) of
         true ->
@@ -86,7 +117,7 @@ needs_update(Dir, {pkg, _Name, Vsn, _Hash}) ->
 %%------------------------------------------------------------------------------
 -spec download(TmpDir, Pkg, State) -> Res when
       TmpDir :: file:name(),
-      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
+      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: hex_core:config()},
       State :: rebar_state:t(),
       Res :: {'error',_} | {'ok',_} | {'tarball',binary() | string()}.
 download(TmpDir, Pkg, State) ->
@@ -101,18 +132,18 @@ download(TmpDir, Pkg, State) ->
 %%------------------------------------------------------------------------------
 -spec download(TmpDir, Pkg, State, UpdateETag) -> Res when
       TmpDir :: file:name(),
-      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
+      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: hex_core:config()},
       State :: rebar_state:t(),
       UpdateETag :: boolean(),
       Res :: download_result().
-download(TmpDir, Pkg={pkg, Name, Vsn, _Hash}, State, UpdateETag) ->
+download(TmpDir, Pkg={pkg, Name, Vsn, _Hash, _}, State, UpdateETag) ->
     {ok, PackageDir} = rebar_packages:package_dir(State),
     Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
     ETagFile = binary_to_list(<<Name/binary, "-", Vsn/binary, ".etag">>),
     CachePath = filename:join(PackageDir, Package),
     ETagPath = filename:join(PackageDir, ETagFile),
-    cached_download(TmpDir, CachePath, Pkg, etag(ETagPath), State,
-                    ETagPath, UpdateETag).
+    cached_download(TmpDir, CachePath, Pkg, etag(ETagPath),
+                    State, ETagPath, UpdateETag).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -138,7 +169,7 @@ make_vsn(_) ->
              -> {ok, cached} | {ok, binary(), binary()} | error.
 request(Config, Name, Version, ETag) ->    
     Config1 = Config#{http_etag => ETag},
-    case hex_repo:get_tarball(Config1, Name, Version) of
+    try hex_repo:get_tarball(Config1, Name, Version) of
         {ok, {200, #{<<"etag">> := ETag1}, Tarball}} ->
             {ok, Tarball, rebar_utils:to_binary(rebar_string:trim(rebar_utils:to_list(ETag1), both, [$"]))};
         {ok, {304, _Headers, _}} ->
@@ -148,6 +179,10 @@ request(Config, Name, Version, ETag) ->
             error;
         {error, Reason} ->
             ?DEBUG("Request for package ~s-~s failed: ~p", [Name, Version, Reason]),
+            error
+    catch
+        _:Exception ->
+            ?DEBUG("hex_repo:get_tarball failed: ~p", [Exception]),
             error
     end.
 
@@ -188,17 +223,15 @@ store_etag_in_cache(Path, ETag) ->
                       UpdateETag) -> Res when
       TmpDir :: file:name(),
       CachePath :: file:name(),
-      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
+      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: hex_core:config()},
       ETag :: binary(),
       State :: rebar_state:t(),
       ETagPath :: file:name(),
       UpdateETag :: boolean(),
       Res :: download_result().
-cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash}, ETag,
+cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash, RepoConfig}, ETag,
                 State, ETagPath, UpdateETag) ->
-    Resources = rebar_state:resources(State),
-    #{hex_config := HexConfig} = rebar_resource:find_resource_state(pkg, Resources),
-    case request(HexConfig, Name, Vsn, ETag) of
+    case request(RepoConfig, Name, Vsn, ETag) of
         {ok, cached} ->
             ?INFO("Version cached at ~ts is up to date, reusing it", [CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg, State);
@@ -218,27 +251,24 @@ cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash}, ETag,
 -spec serve_from_cache(TmpDir, CachePath, Pkg, State) -> Res when
       TmpDir :: file:name(),
       CachePath :: file:name(),
-      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
+      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: hex_core:config()},
       State :: rebar_state:t(),
       Res :: cached_result().
 serve_from_cache(TmpDir, CachePath, Pkg, State) ->
     {Files, Contents, Version, Meta} = extract(TmpDir, CachePath),
     case checksums(Pkg, Files, Contents, Version, Meta, State) of
-        {Chk, Chk, Chk, Chk} ->
+        {Chk, Chk, Chk} ->
             ok = erl_tar:extract({binary, Contents}, [{cwd, TmpDir}, compressed]),
             {ok, true};
-        {_Hash, Chk, Chk, Chk} ->
+        {_Hash, Chk, Chk} ->
             ?DEBUG("Expected hash ~p does not match checksums ~p", [_Hash, Chk]),
             {unexpected_hash, CachePath, _Hash, Chk};
-        {Chk, _Bin, Chk, Chk} ->
+        {Chk, _Bin, Chk} ->
             ?DEBUG("Checksums: registry: ~p, pkg: ~p", [Chk, _Bin]),
             {failed_extract, CachePath};
-        {Chk, Chk, _Reg, Chk} ->
-            ?DEBUG("Checksums: registry: ~p, pkg: ~p", [_Reg, Chk]),
-            {bad_registry_checksum, CachePath};
-        {_Hash, _Bin, _Reg, _Tar} ->
-            ?DEBUG("Checksums: expected: ~p, registry: ~p, pkg: ~p, meta: ~p",
-                   [_Hash, _Reg, _Bin, _Tar]),
+        {_Hash, _Bin, _Tar} ->
+            ?DEBUG("Checksums: expected: ~p, pkg: ~p, meta: ~p",
+                   [_Hash, _Bin, _Tar]),
             {bad_checksum, CachePath}
     end.
 
@@ -246,7 +276,7 @@ serve_from_cache(TmpDir, CachePath, Pkg, State) ->
                           ETagPath) -> Res when
       TmpDir :: file:name(),
       CachePath :: file:name(),
-      Package :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
+      Package :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: hex_core:config()},
       ETag :: binary(),
       Binary :: binary(),
       State :: rebar_state:t(),
@@ -281,26 +311,24 @@ extract(TmpDir, CachePath) ->
     {Files, Contents, Version, Meta}.
 
 -spec checksums(Pkg, Files, Contents, Version, Meta, State) -> Res when
-      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary()},
+      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: hex_core:config()},
       Files :: list({file:name(), binary()}),
       Contents :: binary(),
       Version :: binary(),
       Meta :: binary(),
       State :: rebar_state:t(),
-      Res :: {Hash, BinChecksum, RegistryChecksum, TarChecksum},
+      Res :: {Hash, BinChecksum, TarChecksum},
       Hash :: binary(),
       BinChecksum :: binary(),
-      RegistryChecksum :: any(),
       TarChecksum :: binary().
-checksums({pkg, Name, Vsn, Hash}, Files, Contents, Version, Meta, State) ->
+checksums({pkg, _Name, _Vsn, Hash, _}, Files, Contents, Version, Meta, _State) ->
     Blob = <<Version/binary, Meta/binary, Contents/binary>>,
     <<X:256/big-unsigned>> = crypto:hash(sha256, Blob),
     BinChecksum = list_to_binary(
                     rebar_string:uppercase(
                       lists:flatten(io_lib:format("~64.16.0b", [X])))),
-    RegistryChecksum = rebar_packages:registry_checksum(Name, Vsn, State),
     {"CHECKSUM", TarChecksum} = lists:keyfind("CHECKSUM", 1, Files),
-    {Hash, BinChecksum, RegistryChecksum, TarChecksum}.
+    {Hash, BinChecksum, TarChecksum}.
 
 -spec maybe_store_etag_in_cache(UpdateETag, Path, ETag) -> Res when
       UpdateETag :: boolean(),

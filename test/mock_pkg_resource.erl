@@ -28,7 +28,7 @@ mock() -> mock([]).
     Vsn :: string(),
     Hash :: string() | undefined.
 mock(Opts) ->
-    meck:new(?MOD, [no_link]),
+    meck:new(?MOD, [no_link, passthrough]),
     mock_lock(Opts),
     mock_update(Opts),
     mock_vsn(Opts),
@@ -46,7 +46,7 @@ unmock() ->
 
 %% @doc creates values for a lock file.
 mock_lock(_) ->
-    meck:expect(?MOD, lock, fun(_AppDir, Source) -> Source end).
+    meck:expect(?MOD, lock, fun(_AppDir, {pkg, Name, Vsn, Hash, _RepoConfig}) -> {pkg, Name, Vsn, Hash} end).
 
 %% @doc The config passed to the `mock/2' function can specify which apps
 %% should be updated on a per-name basis: `{update, ["App1", "App3"]}'.
@@ -54,7 +54,7 @@ mock_update(Opts) ->
     ToUpdate = proplists:get_value(upgrade, Opts, []),
     meck:expect(
         ?MOD, needs_update,
-        fun(_Dir, {pkg, App, _Vsn, _Hash}) ->
+        fun(_Dir, {pkg, App, _Vsn, _Hash, _}) ->
             lists:member(binary_to_list(App), ToUpdate)
         end).
 
@@ -79,7 +79,7 @@ mock_download(Opts) ->
     Config = proplists:get_value(config, Opts, []),
     meck:expect(
         ?MOD, download,
-        fun (Dir, {pkg, AppBin, Vsn, _}, _) ->
+        fun (Dir, {pkg, AppBin, Vsn, _, _}, _) ->
             App = binary_to_list(AppBin),
             filelib:ensure_dir(Dir),
             AppDeps = proplists:get_value({App,Vsn}, Deps, []),
@@ -112,16 +112,18 @@ mock_download(Opts) ->
 %% specific applications otherwise listed.
 mock_pkg_index(Opts) ->
     Deps = proplists:get_value(pkgdeps, Opts, []),
+    Repos = proplists:get_value(repos, Opts, [<<"hexpm">>]),
     Skip = proplists:get_value(not_in_index, Opts, []),
     %% Dict: {App, Vsn}: [{<<"link">>, <<>>}, {<<"deps">>, []}]
     %% Index: all apps and deps in the index
 
     Dict = find_parts(Deps, Skip),
+    to_index(Deps, Dict, Repos),
     meck:new(rebar_packages, [passthrough, no_link]),
-    %% meck:expect(rebar_packages, packages,
-    %%             fun(_State) -> to_index(Deps, Dict) end),
+    meck:expect(rebar_packages, update_package,
+                fun(_, _, _State) -> ok end),
     meck:expect(rebar_packages, verify_table,
-                fun(_State) -> to_index(Deps, Dict), true end).
+                fun(_State) -> true end).
 
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
@@ -149,12 +151,12 @@ parse_deps(Deps) ->
     [{maps:get(app, D, Name), {pkg, Name, Constraint, undefined}} || D=#{package := Name,
                                                                          requirement := Constraint} <- Deps].
 
-to_index(AllDeps, Dict) ->
+to_index(AllDeps, Dict, Repos) ->
     catch ets:delete(?PACKAGE_TABLE),
     rebar_packages:new_package_table(),
 
     dict:fold(
-      fun(K, Deps, _) ->
+      fun({N, V}, Deps, _) ->
               DepsList = [#{package => DKB,
                             app => DKB,
                             requirement => DVB,
@@ -162,19 +164,25 @@ to_index(AllDeps, Dict) ->
                           || {DK, DV} <- Deps,
                              DKB <- [ec_cnv:to_binary(DK)],
                              DVB <- [ec_cnv:to_binary(DV)]],
-              ets:insert(?PACKAGE_TABLE, #package{key = K, 
-                                                 dependencies = parse_deps(DepsList), 
-                                                 checksum = <<"checksum">>})
+              Repo = rebar_test_utils:random_element(Repos),
+              ets:insert(?PACKAGE_TABLE, #package{key={N, V, Repo},
+                                                  dependencies=parse_deps(DepsList),
+                                                  retired=false,
+                                                  checksum = <<"checksum">>})
       end, ok, Dict),
 
     lists:foreach(fun({{Name, Vsn}, _}) ->
-                          case ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(Name), Vsn}) of
+                          case lists:any(fun(R) ->
+                                                 ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(Name), Vsn, R})
+                                         end, Repos) of
                               false ->
-                                  ets:insert(?PACKAGE_TABLE, #package{key = 
-                                                                         {ec_cnv:to_binary(Name), Vsn}, 
-                                                                     dependencies = [], 
-                                                                     checksum = <<"checksum">>});
+                                  Repo = rebar_test_utils:random_element(Repos),
+                                  ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(Name), Vsn, Repo},
+                                                                      dependencies=[],
+                                                                      retired=false,
+                                                                      checksum = <<"checksum">>});
                               true ->
                                   ok
                           end
                   end, AllDeps).
+
