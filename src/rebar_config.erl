@@ -74,7 +74,7 @@ consult_lock_file(File) ->
             read_attrs(beta, Locks, []);
         [{Vsn, Locks}|Attrs] when is_list(Locks) -> % versioned lock file
             %% Because this is the first version of rebar3 to introduce a lock
-            %% file, all versionned lock files with a different versions have
+            %% file, all versioned lock files with a different version have
             %% to be newer.
             case Vsn of
                 ?CONFIG_VERSION ->

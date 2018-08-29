@@ -88,4 +88,4 @@ processing_base_dir(State) ->
 %% its configuration, including for validation of certs.
 -spec ssl_opts(string()) -> [term()].
 ssl_opts(Url) ->
-    rebar_pkg_resource:ssl_opts(Url).
+    rebar_utils:ssl_opts(Url).

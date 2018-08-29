@@ -136,7 +136,7 @@ base_state() ->
         {ok, Resources} ->
             Resources
     end,
-    #state_t{resources=Resources}.
+    lists:foldl(fun(R, StateAcc) -> add_resource(StateAcc, R) end, #state_t{}, Resources).
 
 base_opts(Config) ->
     Deps = proplists:get_value(deps, Config, []),
@@ -365,11 +365,22 @@ resources(#state_t{resources=Resources}) ->
 
 -spec resources(t(), [{rebar_resource:type(), module()}]) -> t().
 resources(State, NewResources) ->
-    State#state_t{resources=NewResources}.
+    lists:foldl(fun(Resource, StateAcc) ->
+                        add_resource(StateAcc, Resource)
+                end, State, NewResources).
 
 -spec add_resource(t(), {rebar_resource:type(), module()}) -> t().
-add_resource(State=#state_t{resources=Resources}, Resource) ->
-    State#state_t{resources=[Resource | Resources]}.
+add_resource(State=#state_t{resources=Resources}, {ResourceType, ResourceModule}) ->
+    _ = code:ensure_loaded(ResourceModule),
+    {ok, ResourceState} = case erlang:function_exported(ResourceModule, init, 1) of
+                              true ->
+                                  ResourceModule:init(State);
+                              false ->
+                                  {ok, #{}}
+                          end,
+    State#state_t{resources=[rebar_resource:new(ResourceType,
+                                                ResourceModule,
+                                                ResourceState) | Resources]}.
 
 providers(#state_t{providers=Providers}) ->
     Providers.

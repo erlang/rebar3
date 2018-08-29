@@ -82,17 +82,22 @@ do_(State) ->
     Deps = [Dep || Dep <- TopDeps ++ ProfileDeps, % TopDeps > ProfileDeps
                    is_atom(Dep) orelse is_atom(element(1, Dep))],
     Names = parse_names(rebar_utils:to_binary(proplists:get_value(package, Args, <<"">>)), Locks),
+
     DepsDict = deps_dict(rebar_state:all_deps(State)),
     AltDeps = find_non_default_deps(Deps, State),
     FilteredNames = cull_default_names_if_profiles(Names, Deps, State),
     case prepare_locks(FilteredNames, Deps, Locks, [], DepsDict, AltDeps) of
         {error, Reason} ->
             {error, Reason};
-        {Locks0, _Unlocks0} ->
+        {Locks0, Unlocks0} ->
             Deps0 = top_level_deps(Deps, Locks),
             State1 = rebar_state:set(State, {deps, default}, Deps0),
             DepsDir = rebar_prv_install_deps:profile_dep_dir(State, default),
             D = rebar_app_utils:parse_deps(root, DepsDir, Deps0, State1, Locks0, 0),
+
+            %% first update the package index for the packages to be upgraded
+            update_pkg_deps(Unlocks0, D, State1),
+
             State2 = rebar_state:set(State1, {parsed_deps, default}, D),
             State3 = rebar_state:set(State2, {locks, default}, Locks0),
             State4 = rebar_state:set(State3, upgrade, true),
@@ -120,6 +125,24 @@ format_error({transitive_dependency, Name}) ->
                  [Name]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
+
+%% fetch updates for package deps that have been unlocked for upgrade
+update_pkg_deps([], _, _) ->
+    ok;
+update_pkg_deps([{Name, _, _} | Rest], AppInfos, State) ->
+    case rebar_app_utils:find(Name, AppInfos) of
+        {ok, AppInfo} ->
+            case element(1, rebar_app_info:source(AppInfo)) of
+                pkg ->
+                    rebar_packages:update_package(Name, State);
+                _ ->
+                    skip
+            end;
+        _ ->
+            %% this should be impossible...
+            skip
+    end,
+    update_pkg_deps(Rest, AppInfos, State).
 
 parse_names(Bin, Locks) ->
     case lists:usort(re:split(Bin, <<" *, *">>, [trim, unicode])) of

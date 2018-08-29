@@ -25,14 +25,21 @@
 -define(CONFIG_VERSION, "1.1.0").
 -define(DEFAULT_CDN, "https://repo.hex.pm/").
 -define(REMOTE_PACKAGE_DIR, "tarballs").
--define(REMOTE_REGISTRY_FILE, "registry.ets.gz").
 -define(LOCK_FILE, "rebar.lock").
 -define(DEFAULT_COMPILER_SOURCE_FORMAT, relative).
+-define(PACKAGE_INDEX_VERSION, 4).
+-define(PACKAGE_TABLE, package_index_v4).
+-define(INDEX_FILE, "packages-v4.idx").
 
--define(PACKAGE_INDEX_VERSION, 3).
--define(PACKAGE_TABLE, package_index).
--define(INDEX_FILE, "packages.idx").
--define(REGISTRY_FILE, "registry").
+%% the package record is used in a select match spec which upsets dialyzer
+%% this is the suggested workaround from Tobias
+%% http://erlang.org/pipermail/erlang-questions/2009-February/041445.html
+-type ms_field() :: '$1' | '_'.
+
+-record(package, {key :: {unicode:unicode_binary() | ms_field(), unicode:unicode_binary() | ms_field()},
+                  checksum :: binary() | ms_field(),
+                  dependencies :: [#{package := unicode:unicode_binary(),
+                                     requirement := unicode:unicode_binary()}] | ms_field()}).
 
 -ifdef(namespaced_types).
 -type rebar_dict() :: dict:dict().

@@ -40,6 +40,8 @@
 -define(PROVIDER, shell).
 -define(DEPS, [compile]).
 
+-dialyzer({nowarn_function, rewrite_leaders/2}).
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
