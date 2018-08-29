@@ -72,7 +72,7 @@
                      app_file_src       :: file:filename_all() | undefined,
                      app_file_src_script:: file:filename_all() | undefined,
                      app_file           :: file:filename_all() | undefined,
-                     original_vsn       :: binary() | string() | undefined,
+                     original_vsn       :: binary() | undefined,
                      parent=root        :: binary() | root,
                      app_details=[]     :: list(),
                      applications=[]    :: list(),
@@ -114,14 +114,14 @@ new(AppName) ->
                  {ok, t()}.
 new(AppName, Vsn) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
-                     original_vsn=Vsn}}.
+                     original_vsn=rebar_utils:to_binary(Vsn)}}.
 
 %% @doc build a complete version of the app info with all fields set.
 -spec new(atom() | binary() | string(), binary() | string(), file:name()) ->
                  {ok, t()}.
 new(AppName, Vsn, Dir) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
-                     original_vsn=Vsn,
+                     original_vsn=rebar_utils:to_binary(Vsn),
                      dir=rebar_utils:to_list(Dir),
                      out_dir=rebar_utils:to_list(Dir)}}.
 
@@ -130,7 +130,7 @@ new(AppName, Vsn, Dir) ->
                  {ok, t()}.
 new(AppName, Vsn, Dir, Deps) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
-                     original_vsn=Vsn,
+                     original_vsn=rebar_utils:to_binary(Vsn),
                      dir=rebar_utils:to_list(Dir),
                      out_dir=rebar_utils:to_list(Dir),
                      deps=Deps}}.
@@ -141,7 +141,7 @@ new(AppName, Vsn, Dir, Deps) ->
 new(Parent, AppName, Vsn, Dir, Deps) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
                      parent=Parent,
-                     original_vsn=Vsn,
+                     original_vsn=rebar_utils:to_binary(Vsn),
                      dir=rebar_utils:to_list(Dir),
                      out_dir=rebar_utils:to_list(Dir),
                      deps=Deps}}.
@@ -350,15 +350,15 @@ parent(AppInfo=#app_info_t{}, Parent) ->
 
 %% @doc returns the original version of the app (unevaluated if
 %% asking for a semver)
--spec original_vsn(t()) -> string().
+-spec original_vsn(t()) -> binary().
 original_vsn(#app_info_t{original_vsn=Vsn}) ->
     Vsn.
 
 %% @doc stores the original version of the app (unevaluated if
 %% asking for a semver)
--spec original_vsn(t(), string()) -> t().
+-spec original_vsn(t(), binary() | string()) -> t().
 original_vsn(AppInfo=#app_info_t{}, Vsn) ->
-    AppInfo#app_info_t{original_vsn=Vsn}.
+    AppInfo#app_info_t{original_vsn=rebar_utils:to_binary(Vsn)}.
 
 %% @doc returns the list of applications the app depends on.
 -spec applications(t()) -> list().

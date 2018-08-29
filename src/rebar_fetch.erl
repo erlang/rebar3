@@ -16,15 +16,15 @@
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
--spec lock_source(file:filename_all(), rebar_resource:resource(), rebar_state:t()) ->
-                         rebar_resource:resource() | {error, string()}.
+-spec lock_source(file:filename_all(), rebar_resource:source(), rebar_state:t())
+                 -> rebar_resource:source() | {error, string()}.
 lock_source(AppDir, Source, State) ->
     Resources = rebar_state:resources(State),
     Module = get_resource_type(Source, Resources),
     Module:lock(AppDir, Source).
 
--spec download_source(file:filename_all(), rebar_resource:resource(), rebar_state:t()) ->
-                             true | {error, any()}.
+-spec download_source(file:filename_all(), rebar_resource:source(), rebar_state:t())
+                     -> true | {error, any()}.
 download_source(AppDir, Source, State) ->
     try download_source_(AppDir, Source, State) of
         true ->
@@ -32,6 +32,8 @@ download_source(AppDir, Source, State) ->
         Error ->
             throw(?PRV_ERROR(Error))
     catch
+        throw:{no_resource, Type, Location} ->
+            throw(?PRV_ERROR({no_resource, Location, Type}));
         ?WITH_STACKTRACE(C,T,S)
             ?DEBUG("rebar_fetch exception ~p ~p ~p", [C, T, S]),
             throw(?PRV_ERROR({fetch_fail, Source}))
@@ -54,7 +56,8 @@ download_source_(AppDir, Source, State) ->
             Error
     end.
 
--spec needs_update(file:filename_all(), rebar_resource:resource(), rebar_state:t()) -> boolean() | {error, string()}.
+-spec needs_update(file:filename_all(), rebar_resource:source(), rebar_state:t())
+                  -> boolean() | {error, string()}.
 needs_update(AppDir, Source, State) ->
     Resources = rebar_state:resources(State),
     Module = get_resource_type(Source, Resources),
@@ -84,27 +87,25 @@ format_error({fetch_fail, Source}) ->
 format_error({bad_checksum, File}) ->
     io_lib:format("Checksum mismatch against tarball in ~ts", [File]);
 format_error({bad_registry_checksum, File}) ->
-    io_lib:format("Checksum mismatch against registry in ~ts", [File]).
+    io_lib:format("Checksum mismatch against registry in ~ts", [File]);
+format_error({no_resource, Location, Type}) ->    
+    io_lib:format("Cannot handle dependency ~ts.~n"
+                  "     No module for resource type ~p", [Location, Type]).
 
 get_resource_type({Type, Location}, Resources) ->
-    find_resource_module(Type, Location, Resources);
+    get_resource_module(Type, Location, Resources);
 get_resource_type({Type, Location, _}, Resources) ->
-    find_resource_module(Type, Location, Resources);
+    get_resource_module(Type, Location, Resources);
 get_resource_type({Type, _, _, Location}, Resources) ->
-    find_resource_module(Type, Location, Resources);
+    get_resource_module(Type, Location, Resources);
 get_resource_type(_, _) ->
     rebar_pkg_resource.
 
-find_resource_module(Type, Location, Resources) ->
-    case lists:keyfind(Type, 1, Resources) of
-        false ->
-            case code:which(Type) of
-                non_existing ->
-                    {error, io_lib:format("Cannot handle dependency ~ts.~n"
-                                         "     No module for resource type ~p", [Location, Type])};
-                _ ->
-                    Type
-            end;
-        {Type, Module} ->
+get_resource_module(Type, Location, Resources) ->   
+    case rebar_resource:find_resource_module(Type, Resources) of
+        {error, not_found} ->
+            throw({no_resource, Location, Type});
+        {ok, Module} ->
             Module
     end.
+
