@@ -36,10 +36,13 @@
 %% http://erlang.org/pipermail/erlang-questions/2009-February/041445.html
 -type ms_field() :: '$1' | '_'.
 
--record(package, {key :: {unicode:unicode_binary() | ms_field(), unicode:unicode_binary() | ms_field()},
+%% TODO: change package and requirement keys to be required (:=) after dropping support for OTP-18
+-record(package, {key :: {unicode:unicode_binary() | ms_field(), unicode:unicode_binary() | ms_field(),
+                          unicode:unicode_binary() | ms_field()},
                   checksum :: binary() | ms_field(),
-                  dependencies :: [#{package := unicode:unicode_binary(),
-                                     requirement := unicode:unicode_binary()}] | ms_field()}).
+                  retired :: boolean() | ms_field(),
+                  dependencies :: [#{package => unicode:unicode_binary(),
+                                     requirement => unicode:unicode_binary()}] | ms_field()}).
 
 -ifdef(namespaced_types).
 -type rebar_dict() :: dict:dict().

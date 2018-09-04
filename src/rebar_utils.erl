@@ -683,7 +683,7 @@ vcs_vsn_cmd(VCS, Dir, Resources) when VCS =:= semver ; VCS =:= "semver" ->
 vcs_vsn_cmd({cmd, _Cmd}=Custom, _, _) ->
     Custom;
 vcs_vsn_cmd(VCS, Dir, Resources) when is_atom(VCS) ->
-    case find_resource_module(VCS, Resources) of
+    case rebar_resource:find_resource_module(VCS, Resources) of
         {ok, Module} ->
             Module:make_vsn(Dir);
         {error, _} ->
@@ -706,19 +706,6 @@ vcs_vsn_cmd(_, _, _) ->
 vcs_vsn_invoke(Cmd, Dir) ->
     {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),
     rebar_string:trim(VsnString, trailing, "\n").
-
-find_resource_module(Type, Resources) ->
-    case lists:keyfind(Type, 1, Resources) of
-        false ->
-            case code:which(Type) of
-                non_existing ->
-                    {error, unknown};
-                _ ->
-                    {ok, Type}
-            end;
-        {Type, Module} ->
-            {ok, Module}
-    end.
 
 %% @doc ident to the level specified
 -spec indent(non_neg_integer()) -> iolist().

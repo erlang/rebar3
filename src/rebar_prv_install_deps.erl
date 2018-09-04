@@ -378,7 +378,7 @@ fetch_app(AppInfo, AppDir, State) ->
     Source = rebar_app_info:source(AppInfo),
     true = rebar_fetch:download_source(AppDir, Source, State).
 
-format_source({pkg, Name, Vsn, _Hash}) -> {pkg, Name, Vsn};
+format_source({pkg, Name, Vsn, _Hash, _}) -> {pkg, Name, Vsn};
 format_source(Source) -> Source.
 
 %% This is called after the dep has been downloaded and unpacked, if it hadn't been already.

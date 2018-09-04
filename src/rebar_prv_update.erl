@@ -34,7 +34,11 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     Names = rebar_packages:get_all_names(State),
-    [rebar_packages:update_package(Name, State) || Name <- Names],
+    Resources = rebar_state:resources(State),
+    #{repos := RepoConfigs} = rebar_resource:find_resource_state(pkg, Resources),
+    [[update_package(Name, RepoConfig, State)
+      || Name <- Names]
+     || RepoConfig <- RepoConfigs],
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
@@ -45,3 +49,11 @@ format_error(package_index_download) ->
 format_error(package_index_write) ->
     "Failed to write package index.".
 
+
+update_package(Name, RepoConfig, State) ->
+    case rebar_packages:update_package(Name, RepoConfig, State) of
+        fail ->
+            ?WARN("Failed to fetch updates for package ~ts from repo ~ts", [Name, maps:get(name, RepoConfig)]);
+        _ ->
+            ok
+    end.
