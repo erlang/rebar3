@@ -17,7 +17,7 @@
                    state :: term()}).
 
 -type resource() :: #resource{}.
--type source() :: {type(), location(), ref()}.
+-type source() :: {type(), location(), ref()} | {type(), location(), ref(), binary()}.
 -type type() :: atom().
 -type location() :: string().
 -type ref() :: any().

@@ -217,6 +217,9 @@ mock_config(Name, Config) ->
     meck:expect(rebar_packages, registry_dir, fun(_) -> {ok, CacheDir} end),
     meck:expect(rebar_packages, package_dir, fun(_) -> {ok, CacheDir} end),
 
+    %% TODO: is something else wrong that we need this for transitive_alias to pass
+    meck:expect(rebar_packages, update_package, fun(_, _, _) -> ok end),
+
     meck:new(rebar_prv_update, [passthrough]),
     meck:expect(rebar_prv_update, do, fun(State) -> {ok, State} end),
 
@@ -224,13 +227,12 @@ mock_config(Name, Config) ->
     rebar_packages:new_package_table(),    
 
     lists:foreach(fun({{N, Vsn}, [Deps, Checksum, _]}) ->
-                          case ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(N), Vsn}) of
+                          case ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(N), Vsn, <<"hexpm">>}) of
                               false ->
-                                  ets:insert(?PACKAGE_TABLE, #package{key = 
-                                                                          {ec_cnv:to_binary(N), Vsn}, 
-                                                                      dependencies = [{DAppName, {pkg, DN, DV, undefined}} || {DN, DV, _, DAppName} <- Deps], 
-
-                                                                     checksum = Checksum});
+                                  ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(N), Vsn, <<"hexpm">>},
+                                                                      dependencies=[{DAppName, {pkg, DN, DV, undefined}} || {DN, DV, _, DAppName} <- Deps],
+                                                                      retired=false,
+                                                                      checksum=Checksum});
                               true ->
                                   ok
                           end;
@@ -240,7 +242,7 @@ mock_config(Name, Config) ->
                   end, AllDeps),    
 
     meck:expect(rebar_packages, registry_checksum, 
-                fun(N, V, _) ->
+                fun(N, V, _, _) ->
                         case ets:match_object(Tid, {{N, V}, '_'}) of
                             [{{_, _}, [_, Checksum, _]}] ->
                                 Checksum                                
@@ -257,7 +259,7 @@ mock_config(Name, Config) ->
                                 Releases = 
                                     [#{checksum => Checksum,
                                        version => Vsn,
-                                       dependencies => [{DAppName, {pkg, DN, DV, undefined}} || {DN, DV, _, DAppName} <- Deps]} || 
+                                       dependencies => [{DAppName, {pkg, DN, DV, undefined}} || {DN, DV, _, DAppName} <- Deps]} ||
                                         {{_, Vsn}, [Deps, Checksum, _]} <- Matches],
                                 {ok, {200, #{}, #{releases => Releases}}}%% ;
                             %% _ ->

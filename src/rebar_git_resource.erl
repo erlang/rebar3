@@ -4,7 +4,8 @@
 
 -behaviour(rebar_resource).
 
--export([lock/2
+-export([init/1
+        ,lock/2
         ,download/3
         ,needs_update/2
         ,make_vsn/1]).
@@ -13,6 +14,10 @@
 
 %% Regex used for parsing scp style remote url
 -define(SCP_PATTERN, "\\A(?<username>[^@]+)@(?<host>[^:]+):(?<path>.+)\\z").
+
+-spec init(rebar_state:t()) -> {ok, term()}.
+init(_State) ->
+    {ok, #{}}.
 
 lock(AppDir, {git, Url, _}) ->
     lock(AppDir, {git, Url});

@@ -229,8 +229,10 @@ deps(circular_skip) ->
 
 setup_project(Case, Config0, Deps) ->
     DepsType = ?config(deps_type, Config0),
+    %% spread packages across 3 repos randomly
+    Repos = [<<"test-repo-1">>, <<"test-repo-2">>, <<"hexpm">>],
     Config = rebar_test_utils:init_rebar_state(
-               Config0,
+               [{repos, Repos} | Config0],
                atom_to_list(Case)++"_"++atom_to_list(DepsType)++"_"
               ),
     AppDir = ?config(apps, Config),
@@ -239,7 +241,7 @@ setup_project(Case, Config0, Deps) ->
     RebarConf = rebar_test_utils:create_config(AppDir, [{deps, TopDeps}]),
     {SrcDeps, PkgDeps} = rebar_test_utils:flat_deps(Deps),
     mock_git_resource:mock([{deps, SrcDeps}]),
-    mock_pkg_resource:mock([{pkgdeps, PkgDeps}]),
+    mock_pkg_resource:mock([{pkgdeps, PkgDeps}, {repos, Repos}]),
     [{rebarconfig, RebarConf} | Config].
 
 mock_warnings() ->
@@ -414,27 +416,27 @@ https_os_proxy_settings(_Config) ->
 semver_matching_lt(_Config) ->
     MaxVsn = <<"0.2.0">>,
     Vsns = [<<"0.1.7">>, <<"0.1.9">>, <<"0.1.8">>, <<"0.2.0">>, <<"0.2.1">>],
-    ?assertEqual(<<"0.1.9">>,
+    ?assertEqual({ok, <<"0.1.9">>},
                  rebar_packages:cmpl_(undefined, MaxVsn, Vsns,
                                         fun ec_semver:lt/2)).
 
 semver_matching_lte(_Config) ->
     MaxVsn = <<"0.2.0">>,
     Vsns = [<<"0.1.7">>, <<"0.1.9">>, <<"0.1.8">>, <<"0.2.0">>, <<"0.2.1">>],
-    ?assertEqual(<<"0.2.0">>,
+    ?assertEqual({ok, <<"0.2.0">>},
                  rebar_packages:cmpl_(undefined, MaxVsn, Vsns,
                                         fun ec_semver:lte/2)).
 
 semver_matching_gt(_Config) ->
     MaxVsn = <<"0.2.0">>,
     Vsns = [<<"0.1.7">>, <<"0.1.9">>, <<"0.1.8">>, <<"0.2.0">>, <<"0.2.1">>],
-    ?assertEqual(<<"0.2.1">>,
+    ?assertEqual({ok, <<"0.2.1">>},
                  rebar_packages:cmp_(undefined, MaxVsn, Vsns,
                                        fun ec_semver:gt/2)).
 semver_matching_gte(_Config) ->
     MaxVsn = <<"0.2.0">>,
     Vsns = [<<"0.1.7">>, <<"0.1.9">>, <<"0.1.8">>, <<"0.2.0">>],
-    ?assertEqual(<<"0.2.0">>,
+    ?assertEqual({ok, <<"0.2.0">>},
                  rebar_packages:cmp_(undefined, MaxVsn, Vsns, 
                                        fun ec_semver:gt/2)).
 
@@ -496,5 +498,5 @@ in_warnings(git, Warns, NameRaw, VsnRaw) ->
 in_warnings(pkg, Warns, NameRaw, VsnRaw) ->
     Name = iolist_to_binary(NameRaw),
     Vsn = iolist_to_binary(VsnRaw),
-    1 =< length([1 || {_, [AppName, {pkg, _, AppVsn, _}]} <- Warns,
+    1 =< length([1 || {_, [AppName, {pkg, _, AppVsn, _, _}]} <- Warns,
                       AppName =:= Name, AppVsn =:= Vsn]).

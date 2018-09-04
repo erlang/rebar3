@@ -475,5 +475,5 @@ in_warnings(git, Warns, NameRaw, VsnRaw) ->
 in_warnings(pkg, Warns, NameRaw, VsnRaw) ->
     Name = iolist_to_binary(NameRaw),
     Vsn = iolist_to_binary(VsnRaw),
-    1 =< length([1 || {_, [AppName, {pkg, _, AppVsn, _}]} <- Warns,
+    1 =< length([1 || {_, [AppName, {pkg, _, AppVsn, _, _}]} <- Warns,
                       AppName =:= Name, AppVsn =:= Vsn]).
