@@ -8,7 +8,7 @@
 -include("rebar.hrl").
 
 all() ->
-    [default_repo, repo_merging, {group, resolve_version}].
+    [default_repo, repo_merging, repo_replacing, {group, resolve_version}].
 
 groups() ->
     [{resolve_version, [use_first_repo_match, use_exact_with_hash, fail_repo_update,
@@ -117,10 +117,7 @@ default_repo(_Config) ->
     Repo1 = #{name => <<"hexpm">>,
               api_key => <<"asdf">>},
 
-    State = rebar_state:new(),
-    State1 = rebar_state:set(State, hex, [{repos, [Repo1]}]),
-
-    MergedRepos = rebar_pkg_resource:repos(State1),
+    MergedRepos = rebar_pkg_resource:repos([{repos, [Repo1]}]),
 
     ?assertMatch([#{name := <<"hexpm">>,
                     api_key := <<"asdf">>,
@@ -153,6 +150,28 @@ repo_merging(_Config) ->
                     repo_url := <<"repo-2/repo">>,
                     organization := <<"repo-2-org">>,
                     repo_verify := false}], Result).
+
+repo_replacing(_Config) ->
+    Repo1 = #{name => <<"repo-1">>,
+              api_url => <<"repo-1/api">>},
+    Repo2 = #{name => <<"repo-2">>,
+              repo_url => <<"repo-2/repo">>,
+              repo_verify => false},
+
+    ?assertMatch([Repo1, Repo2, #{name := <<"hexpm">>}],
+                 rebar_pkg_resource:repos([{repos, [Repo1]},
+                                           {repos, [Repo2]}])),
+
+    %% use of replace is ignored if found in later entries than the first
+    ?assertMatch([Repo1, Repo2, #{name := <<"hexpm">>}],
+                 rebar_pkg_resource:repos([{repos, [Repo1]},
+                                           {repos, replace, [Repo2]}])),
+
+    ?assertMatch([Repo1],
+                 rebar_pkg_resource:repos([{repos, replace, [Repo1]},
+                                           {repos, [Repo2]}])).
+
+
 
 use_first_repo_match(Config) ->
     State = ?config(state, Config),

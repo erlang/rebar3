@@ -48,7 +48,8 @@ init(State) ->
                    http_user_agent_fragment =>
                        <<"(rebar3/", (list_to_binary(Vsn))/binary, ") (httpc)">>,
                    http_adapter_config => #{profile => rebar}},
-    Repos = repos(State),
+    HexConfig = rebar_state:get(State, hex, []),
+    Repos = repos(HexConfig),
     %% add base config entries that are specific to use by rebar3 and not overridable
     Repos1 = [maps:merge(Repo, BaseConfig) || Repo <- Repos],
     {ok, #{repos => Repos1,
@@ -57,14 +58,17 @@ init(State) ->
 %% A user's list of repos are merged by name while keeping the order
 %% intact. The order is based on the first use of a repo by name in the
 %% list. The default repo is appended to the user's list.
-repos(State) ->
-    Hex = rebar_state:get(State, hex, []),
+repos(HexConfig) ->
     HexDefaultConfig = default_repo(),
-    case lists:keyfind(repos, 1, Hex) of
-        false ->
+    case [R || R <- HexConfig, element(1, R) =:= repos] of
+        [] ->
             [HexDefaultConfig];
-        {repos, Repos} ->
-            merge_repos(Repos ++ [HexDefaultConfig])
+        %% we only care if the first element is a replace entry
+        [{repos, replace, Repos} | _]->
+            merge_repos(Repos);
+        Repos ->
+            RepoList = repo_list(Repos),
+            merge_repos(RepoList ++ [HexDefaultConfig])
     end.
 
 -spec merge_repos([repo()]) -> [repo()].
@@ -83,6 +87,13 @@ update_repo_list(R, []) ->
 default_repo() ->
     HexDefaultConfig = hex_core:default_config(),
     HexDefaultConfig#{name => <<"hexpm">>}.
+
+repo_list([]) ->
+    [];
+repo_list([{repos, Repos} | T]) ->
+    Repos ++ repo_list(T);
+repo_list([{repos, replace, Repos} | T]) ->
+    Repos ++ repo_list(T).
 
 -spec lock(AppDir, Source) -> Res when
       AppDir :: file:name(),
