@@ -8,7 +8,8 @@
 -include("rebar.hrl").
 
 all() ->
-    [default_repo, repo_merging, repo_replacing, {group, resolve_version}].
+    [default_repo, repo_merging, repo_replacing,
+     auth_merging, organization_merging, {group, resolve_version}].
 
 groups() ->
     [{resolve_version, [use_first_repo_match, use_exact_with_hash, fail_repo_update,
@@ -101,9 +102,21 @@ init_per_testcase(ignore_match_in_excluded_repo, Config) ->
                 fun(_State) -> true end),
 
     [{state, State} | Config];
+init_per_testcase(auth_merging, Config) ->
+    meck:new(file, [passthrough, no_link, unstick]),
+    meck:new(rebar_packages, [passthrough, no_link]),
+    Config;
+init_per_testcase(organization_merging, Config) ->
+    meck:new(file, [passthrough, no_link, unstick]),
+    meck:new(rebar_packages, [passthrough, no_link]),
+    Config;
 init_per_testcase(_, Config) ->
     Config.
 
+end_per_testcase(Case, _Config) when Case =:= auth_merging ;
+                                     Case =:= organization_merging ->
+    meck:unload(file),
+    meck:unload(rebar_packages);
 end_per_testcase(Case, _Config) when Case =:= use_first_repo_match ;
                                      Case =:= use_exact_with_hash ;
                                      Case =:= fail_repo_update ;
@@ -117,7 +130,7 @@ default_repo(_Config) ->
     Repo1 = #{name => <<"hexpm">>,
               api_key => <<"asdf">>},
 
-    MergedRepos = rebar_pkg_resource:repos([{repos, [Repo1]}]),
+    MergedRepos = rebar_hex_repos:repos([{repos, [Repo1]}]),
 
     ?assertMatch([#{name := <<"hexpm">>,
                     api_key := <<"asdf">>,
@@ -130,7 +143,7 @@ repo_merging(_Config) ->
     Repo2 = #{name => <<"repo-2">>,
               repo_url => <<"repo-2/repo">>,
               repo_verify => false},
-    Result = rebar_pkg_resource:merge_repos([Repo1, Repo2,
+    Result = rebar_hex_repos:merge_repos([Repo1, Repo2,
                                              #{name => <<"repo-2">>,
                                                api_url => <<"repo-2/api">>,
                                                repo_url => <<"bad url">>,
@@ -139,7 +152,6 @@ repo_merging(_Config) ->
                                                api_url => <<"bad url">>,
                                                repo_verify => true},
                                              #{name => <<"repo-2">>,
-                                               organization => <<"repo-2-org">>,
                                                api_url => <<"repo-2/api-2">>,
                                                repo_url => <<"other/repo">>}]),
     ?assertMatch([#{name := <<"repo-1">>,
@@ -148,7 +160,6 @@ repo_merging(_Config) ->
                   #{name := <<"repo-2">>,
                     api_url := <<"repo-2/api">>,
                     repo_url := <<"repo-2/repo">>,
-                    organization := <<"repo-2-org">>,
                     repo_verify := false}], Result).
 
 repo_replacing(_Config) ->
@@ -159,19 +170,78 @@ repo_replacing(_Config) ->
               repo_verify => false},
 
     ?assertMatch([Repo1, Repo2, #{name := <<"hexpm">>}],
-                 rebar_pkg_resource:repos([{repos, [Repo1]},
+                 rebar_hex_repos:repos([{repos, [Repo1]},
                                            {repos, [Repo2]}])),
 
     %% use of replace is ignored if found in later entries than the first
     ?assertMatch([Repo1, Repo2, #{name := <<"hexpm">>}],
-                 rebar_pkg_resource:repos([{repos, [Repo1]},
+                 rebar_hex_repos:repos([{repos, [Repo1]},
                                            {repos, replace, [Repo2]}])),
 
     ?assertMatch([Repo1],
-                 rebar_pkg_resource:repos([{repos, replace, [Repo1]},
+                 rebar_hex_repos:repos([{repos, replace, [Repo1]},
                                            {repos, [Repo2]}])).
 
+auth_merging(_Config) ->
+    Repo1 = #{name => <<"repo-1">>,
+              api_url => <<"repo-1/api">>},
+    Repo2 = #{name => <<"repo-2">>,
+              repo_url => <<"repo-2/repo">>,
+              repo_verify => false},
 
+    State = rebar_state:new([{hex, [{repos, [Repo1, Repo2]}]}]),
+    meck:expect(file, consult,
+                fun(_) ->
+                        {ok, [#{<<"repo-1">> => #{read_key => <<"read key">>,
+                                                 write_key => <<"write key">>},
+                               <<"repo-2">> => #{read_key => <<"read key 2">>,
+                                                 repos_key => <<"repos key 2">>,
+                                                 write_key => <<"write key 2">>},
+                                <<"hexpm">> => #{write_key => <<"write key hexpm">>}}]}
+                end),
+
+    ?assertMatch({ok, #{repos := [#{name := <<"repo-1">>,
+                                    read_key := <<"read key">>,
+                                    write_key := <<"write key">>},
+                                  #{name := <<"repo-2">>,
+                                    read_key := <<"read key 2">>,
+                                    repos_key := <<"repos key 2">>,
+                                    write_key := <<"write key 2">>},
+                                  #{name := <<"hexpm">>,
+                                    write_key := <<"write key hexpm">>}]}}, rebar_pkg_resource:init(State)),
+
+    ok.
+
+organization_merging(_Config) ->
+    Repo1 = #{name => <<"hexpm:repo-1">>,
+              api_url => <<"repo-1/api">>},
+    Repo2 = #{name => <<"hexpm:repo-2">>,
+              repo_url => <<"repo-2/repo">>,
+              repo_verify => false},
+
+    State = rebar_state:new([{hex, [{repos, [Repo1, Repo2]}]}]),
+    meck:expect(file, consult,
+                fun(_) ->
+                        {ok, [#{<<"hexpm:repo-1">> => #{read_key => <<"read key">>},
+                                <<"hexpm:repo-2">> => #{read_key => <<"read key 2">>,
+                                                        repos_key => <<"repos key 2">>,
+                                                        write_key => <<"write key 2">>},
+                                <<"hexpm">> => #{write_key => <<"write key hexpm">>}}]}
+                end),
+
+    ?assertMatch({ok, #{repos := [#{name := <<"hexpm:repo-1">>,
+                                    parent := <<"hexpm">>,
+                                    read_key := <<"read key">>,
+                                    write_key := <<"write key hexpm">>},
+                                  #{name := <<"hexpm:repo-2">>,
+                                    parent := <<"hexpm">>,
+                                    read_key := <<"read key 2">>,
+                                    repos_key := <<"repos key 2">>,
+                                    write_key := <<"write key 2">>},
+                                  #{name := <<"hexpm">>,
+                                    write_key := <<"write key hexpm">>}]}}, rebar_pkg_resource:init(State)),
+
+    ok.
 
 use_first_repo_match(Config) ->
     State = ?config(state, Config),
