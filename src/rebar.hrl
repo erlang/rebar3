@@ -30,6 +30,8 @@
 -define(PACKAGE_INDEX_VERSION, 4).
 -define(PACKAGE_TABLE, package_index_v4).
 -define(INDEX_FILE, "packages-v4.idx").
+-define(HEX_AUTH_FILE, "hex.config").
+-define(PUBLIC_HEX_REPO, <<"hexpm">>).
 
 %% the package record is used in a select match spec which upsets dialyzer
 %% this is the suggested workaround from Tobias
