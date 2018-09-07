@@ -363,6 +363,7 @@ effects_code_generation(Option) ->
         report_errors -> false;
         return_errors-> false;
         return_warnings-> false;
+        report -> false;
         warnings_as_errors -> false;
         binary -> false;
         verbose -> false;
