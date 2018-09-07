@@ -16,7 +16,7 @@
 
 -ifdef(TEST).
 %% exported for test purposes
--export([store_etag_in_cache/2, repos/1, merge_repos/1]).
+-export([store_etag_in_cache/2]).
 -endif.
 
 -include("rebar.hrl").
@@ -30,13 +30,6 @@
 -type download_result() :: {bad_download, binary() | string()} |
                            {fetch_fail, _, _} | cached_result().
 
--type repo() :: #{name => unicode:unicode_binary(),
-                  api_url => binary(),
-                  api_key => binary(),
-                  repo_url => binary(),
-                  repo_public_key => binary(),
-                  repo_verify => binary()}.
-
 %%==============================================================================
 %% Public API
 %%==============================================================================
@@ -48,52 +41,9 @@ init(State) ->
                    http_user_agent_fragment =>
                        <<"(rebar3/", (list_to_binary(Vsn))/binary, ") (httpc)">>,
                    http_adapter_config => #{profile => rebar}},
-    HexConfig = rebar_state:get(State, hex, []),
-    Repos = repos(HexConfig),
-    %% add base config entries that are specific to use by rebar3 and not overridable
-    Repos1 = [maps:merge(Repo, BaseConfig) || Repo <- Repos],
-    {ok, #{repos => Repos1,
+    Repos = rebar_hex_repos:from_state(BaseConfig, State),
+    {ok, #{repos => Repos,
            base_config => BaseConfig}}.
-
-%% A user's list of repos are merged by name while keeping the order
-%% intact. The order is based on the first use of a repo by name in the
-%% list. The default repo is appended to the user's list.
-repos(HexConfig) ->
-    HexDefaultConfig = default_repo(),
-    case [R || R <- HexConfig, element(1, R) =:= repos] of
-        [] ->
-            [HexDefaultConfig];
-        %% we only care if the first element is a replace entry
-        [{repos, replace, Repos} | _]->
-            merge_repos(Repos);
-        Repos ->
-            RepoList = repo_list(Repos),
-            merge_repos(RepoList ++ [HexDefaultConfig])
-    end.
-
--spec merge_repos([repo()]) -> [repo()].
-merge_repos(Repos) ->
-    lists:foldl(fun(R, ReposAcc) ->
-                        update_repo_list(R, ReposAcc)
-                end, [], Repos).
-
-update_repo_list(R=#{name := N}, [H=#{name := HN} | Rest]) when N =:= HN ->
-    [maps:merge(R, H) | Rest];
-update_repo_list(R, [H | Rest]) ->
-    [H | update_repo_list(R, Rest)];
-update_repo_list(R, []) ->
-    [R].
-
-default_repo() ->
-    HexDefaultConfig = hex_core:default_config(),
-    HexDefaultConfig#{name => <<"hexpm">>}.
-
-repo_list([]) ->
-    [];
-repo_list([{repos, Repos} | T]) ->
-    Repos ++ repo_list(T);
-repo_list([{repos, replace, Repos} | T]) ->
-    Repos ++ repo_list(T).
 
 -spec lock(AppDir, Source) -> Res when
       AppDir :: file:name(),
