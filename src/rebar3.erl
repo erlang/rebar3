@@ -62,7 +62,8 @@ main() ->
 
 %% @doc escript Entry point
 -spec main(list()) -> no_return().
-main(Args) ->
+main(Args0) ->    
+    Args = [binary_to_list(unicode:characters_to_binary(Arg,  unicode, utf8)) || Arg <- Args0 ],
     try run(Args) of
         {ok, _State} ->
             erlang:halt(0);
