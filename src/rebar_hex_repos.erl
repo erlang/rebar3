@@ -118,5 +118,7 @@ auth_config(State) ->
 -spec update_auth_config(map(), rebar_state:t()) -> ok.
 update_auth_config(Updates, State) ->
     Config = auth_config(State),
+    AuthConfigFile = auth_config_file(State),
+    ok = filelib:ensure_dir(AuthConfigFile),
     NewConfig = iolist_to_binary([io_lib:print(maps:merge(Config, Updates)) | ".\n"]),
-    ok = file:write_file(auth_config_file(State), NewConfig).
+    ok = file:write_file(AuthConfigFile, NewConfig).
