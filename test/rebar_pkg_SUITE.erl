@@ -33,10 +33,6 @@ init_per_testcase(pkgs_provider=Name, Config) ->
     CacheDir = filename:join([CacheRoot, "hex", "com", "test", "packages"]),
     filelib:ensure_dir(filename:join([CacheDir, "registry"])),
     ok = ets:tab2file(Tid, filename:join([CacheDir, "registry"])),
-    %% meck:new(rebar_packages, [passthrough]),
-    %% meck:expect(rebar_packages, registry_dir, fun(_) -> {ok, CacheDir} end),
-    %% meck:expect(rebar_packages, package_dir, fun(_) -> {ok, CacheDir} end),
-    %% rebar_prv_update:hex_to_index(rebar_state:new()),
     Config;
 init_per_testcase(good_uncached=Name, Config0) ->
     Config = [{good_cache, false},
@@ -278,7 +274,7 @@ mock_config(Name, Config) ->
     meck:expect(rebar_dir, global_cache_dir, fun(_) -> CacheRoot end),
 
     meck:expect(rebar_packages, registry_dir, fun(_) -> {ok, CacheDir} end),
-    meck:expect(rebar_packages, package_dir, fun(_) -> {ok, CacheDir} end),
+    meck:expect(rebar_packages, package_dir, fun(_, _) -> {ok, CacheDir} end),
 
     meck:new(rebar_prv_update, [passthrough]),
     meck:expect(rebar_prv_update, do, fun(State) -> {ok, State} end),

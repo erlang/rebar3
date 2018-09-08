@@ -97,8 +97,8 @@ download(TmpDir, Pkg, State) ->
       State :: rebar_state:t(),
       UpdateETag :: boolean(),
       Res :: download_result().
-download(TmpDir, Pkg={pkg, Name, Vsn, _Hash, _}, State, UpdateETag) ->
-    {ok, PackageDir} = rebar_packages:package_dir(State),
+download(TmpDir, Pkg={pkg, Name, Vsn, _Hash, Repo}, State, UpdateETag) ->
+    {ok, PackageDir} = rebar_packages:package_dir(Repo, State),
     Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
     ETagFile = binary_to_list(<<Name/binary, "-", Vsn/binary, ".etag">>),
     CachePath = filename:join(PackageDir, Package),

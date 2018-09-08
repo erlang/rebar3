@@ -374,12 +374,9 @@ make_relative_to_root(State, Path) when is_list(Path) ->
 
 fetch_app(AppInfo, AppDir, State) ->
     ?INFO("Fetching ~ts (~p)", [rebar_app_info:name(AppInfo),
-                               format_source(rebar_app_info:source(AppInfo))]),
+                                rebar_resource:format_source(rebar_app_info:source(AppInfo))]),
     Source = rebar_app_info:source(AppInfo),
     true = rebar_fetch:download_source(AppDir, Source, State).
-
-format_source({pkg, Name, Vsn, _Hash, _}) -> {pkg, Name, Vsn};
-format_source(Source) -> Source.
 
 %% This is called after the dep has been downloaded and unpacked, if it hadn't been already.
 %% So this is the first time for newly downloaded apps that its .app/.app.src data can
@@ -398,7 +395,8 @@ maybe_upgrade(AppInfo, AppDir, Upgrade, State) ->
         true ->
             case rebar_fetch:needs_update(AppDir, Source, State) of
                 true ->
-                    ?INFO("Upgrading ~ts (~p)", [rebar_app_info:name(AppInfo), rebar_app_info:source(AppInfo)]),
+                    ?INFO("Upgrading ~ts (~p)", [rebar_app_info:name(AppInfo),
+                                                 rebar_resource:format_source(rebar_app_info:source(AppInfo))]),
                     true = rebar_fetch:download_source(AppDir, Source, State);
                 false ->
                     case Upgrade of

@@ -7,7 +7,7 @@
         ,new_package_table/0
         ,load_and_verify_version/1        
         ,registry_dir/1
-        ,package_dir/1
+        ,package_dir/2
         ,registry_checksum/4
         ,find_highest_matching/5
         ,find_highest_matching_/5
@@ -162,34 +162,20 @@ handle_missing_package(PkgKey, Repo, State, Fun) ->
 
 registry_dir(State) ->
     CacheDir = rebar_dir:global_cache_dir(rebar_state:opts(State)),
-    case rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN) of
-        ?DEFAULT_CDN ->
-            RegistryDir = filename:join([CacheDir, "hex", "default"]),
-            case filelib:ensure_dir(filename:join(RegistryDir, "placeholder")) of
-                ok -> ok;
-                {error, Posix} when Posix == eaccess; Posix == enoent ->
-                    ?ABORT("Could not write to ~p. Please ensure the path is writeable.",
-                           [RegistryDir])
-            end,
-            {ok, RegistryDir};
-        CDN ->
-            case rebar_utils:url_append_path(CDN, ?REMOTE_PACKAGE_DIR) of
-                {ok, Parsed} ->
-                    {ok, {_, _, Host, _, Path, _}} = http_uri:parse(Parsed),
-                    CDNHostPath = lists:reverse(rebar_string:lexemes(Host, ".")),
-                    CDNPath = tl(filename:split(Path)),
-                    RegistryDir = filename:join([CacheDir, "hex"] ++ CDNHostPath ++ CDNPath),
-                    ok = filelib:ensure_dir(filename:join(RegistryDir, "placeholder")),
-                    {ok, RegistryDir};
-                _ ->
-                    {uri_parse_error, CDN}
-            end
-    end.
+    RegistryDir = filename:join([CacheDir, "hex"]),
+    case filelib:ensure_dir(filename:join(RegistryDir, "placeholder")) of
+        ok -> ok;
+        {error, Posix} when Posix == eaccess; Posix == enoent ->
+            ?ABORT("Could not write to ~p. Please ensure the path is writeable.",
+                   [RegistryDir])
+    end,
+    {ok, RegistryDir}.
 
-package_dir(State) ->
+package_dir(Repo, State) ->
     case registry_dir(State) of
         {ok, RegistryDir} ->
-            PackageDir = filename:join([RegistryDir, "packages"]),
+            RepoName = maps:get(name, Repo),
+            PackageDir = filename:join([RegistryDir, rebar_utils:to_list(RepoName), "packages"]),
             ok = filelib:ensure_dir(filename:join(PackageDir, "placeholder")),
             {ok, PackageDir};
         Error ->
