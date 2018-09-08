@@ -36,7 +36,7 @@ format_error({missing_package, Pkg}) ->
     io_lib:format("Package not found in any repo: ~p.", [Pkg]).
 
 -spec get(hex_core:config(), binary()) -> {ok, map()} | {error, term()}.
-get(Config, Name) ->    
+get(Config, Name) ->
     try hex_api_package:get(Config, Name) of
         {ok, {200, _Headers, PkgInfo}} ->
             {ok, PkgInfo};
@@ -266,12 +266,16 @@ parse_checksum(Checksum) ->
 
 update_package(Name, RepoConfig=#{name := Repo}, State) ->
     ?MODULE:verify_table(State),
-    try hex_repo:get_package(RepoConfig, Name) of
+    try hex_repo:get_package(RepoConfig#{repo_key => maps:get(read_key, RepoConfig, <<>>)}, Name) of
         {ok, {200, _Headers, #{releases := Releases}}} ->
             _ = insert_releases(Name, Releases, Repo, ?PACKAGE_TABLE),
             {ok, RegistryDir} = rebar_packages:registry_dir(State),
             PackageIndex = filename:join(RegistryDir, ?INDEX_FILE),
             ok = ets:tab2file(?PACKAGE_TABLE, PackageIndex);
+        {ok, {403, _Headers, <<>>}} ->
+            not_found;
+        {ok, {404, _Headers, _}} ->
+            not_found;
         Error ->
             ?DEBUG("Hex get_package request failed: ~p", [Error]),
             %% TODO: add better log message. hex_core should export a format_error
@@ -308,11 +312,7 @@ resolve_version(Dep, DepVsn, Hash, HexRegistry, State) when is_binary(Hash) ->
     %% allow retired packages when we have a checksum
     case get_package(Dep, DepVsn, Hash, '_', RepoNames, HexRegistry, State) of
         {ok, Package=#package{key={_, _, RepoName}}} ->
-            {ok, RepoConfig} = ec_lists:find(fun(#{name := N}) when N =:= RepoName ->
-                                                     true;
-                                                (_) ->
-                                                     false
-                                             end, RepoConfigs),
+            {ok, RepoConfig} = rebar_hex_repos:get_repo_config(RepoName, RepoConfigs),
             {ok, Package, RepoConfig};
         _ ->
             Fun = fun(Repo) ->
@@ -365,8 +365,12 @@ handle_missing_no_exception(Fun, Dep, State) ->
     case check_all_repos(Fun, RepoConfigs) of
         not_found ->
             ec_lists:search(fun(Config=#{name := R}) ->
-                                    ?MODULE:update_package(Dep, Config, State),
-                                    Fun(R)
+                                    case ?MODULE:update_package(Dep, Config, State) of
+                                        ok ->
+                                            Fun(R);
+                                        _ ->
+                                            not_found
+                                    end
                             end, RepoConfigs);
         Result ->
             Result
