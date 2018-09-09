@@ -24,6 +24,8 @@ lock(AppDir, {hg, Url}) ->
 
 %% Return `true' if either the hg url or tag/branch/ref is not the same as
 %% the currently checked out repo for the dep
+needs_update(AppInfo, Source) when is_tuple(AppInfo) ->
+    needs_update(rebar_app_info:dir(AppInfo), Source);
 needs_update(Dir, {hg, Url, {tag, Tag}}) ->
     Ref = get_ref(Dir),
     {ClosestTag, Distance} = get_tag_distance(Dir, Ref),

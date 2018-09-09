@@ -38,6 +38,8 @@ lock(AppDir, {git, Url}) ->
 
 %% Return true if either the git url or tag/branch/ref is not the same as the currently
 %% checked out git repo for the dep
+needs_update(AppInfo, Source) when is_tuple(AppInfo) ->
+    needs_update(rebar_app_info:dir(AppInfo), Source);
 needs_update(Dir, {git, Url, {tag, Tag}}) ->
     {ok, Current} = rebar_utils:sh(?FMT("git describe --tags --exact-match", []),
                                    [{cd, Dir}]),

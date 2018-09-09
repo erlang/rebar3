@@ -8,7 +8,7 @@
 -module(rebar_fetch).
 
 -export([lock_source/3,
-         download_source/3,
+         download_source/2,
          needs_update/3]).
 
 -export([format_error/1]).
@@ -23,12 +23,22 @@ lock_source(AppDir, Source, State) ->
     Module = get_resource_type(Source, Resources),
     Module:lock(AppDir, Source).
 
--spec download_source(file:filename_all(), rebar_resource:source(), rebar_state:t())
-                     -> true | {error, any()}.
-download_source(AppDir, Source, State) ->
+-spec download_source(rebar_app_info:t(), rebar_state:t())
+                     -> rebar_app_info:t() | {error, any()}.
+download_source(AppInfo, State) ->
+    AppDir = rebar_app_info:dir(AppInfo),
+    Source = rebar_app_info:source(AppInfo),
     try download_source_(AppDir, Source, State) of
         true ->
-            true;
+            %% freshly downloaded, update the app info opts to reflect the new config
+            Config = rebar_config:consult(AppDir),
+            AppInfo1 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), Config),
+            case rebar_app_discover:find_app(AppInfo1, AppDir, all) of
+                {true, AppInfo2} ->
+                    AppInfo2;
+                false ->
+                    throw(?PRV_ERROR({dep_app_not_found, AppDir, rebar_app_info:name(AppInfo1)}))
+            end;
         Error ->
             throw(?PRV_ERROR(Error))
     catch

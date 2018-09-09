@@ -217,26 +217,23 @@ parse_dep(_, Dep, _, _, _) ->
 dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
     CheckoutsDir = rebar_utils:to_list(rebar_dir:checkouts_dir(State, Name)),
     AppInfo = case rebar_app_info:discover(CheckoutsDir) of
-                        {ok, App} ->
-                            rebar_app_info:source(rebar_app_info:is_checkout(App, true), checkout);
-                        not_found ->
-                            Dir = rebar_utils:to_list(filename:join(DepsDir, Name)),
-                            {ok, AppInfo0} =
-                                case rebar_app_info:discover(Dir) of
-                                    {ok, App} ->
-                                        {ok, rebar_app_info:parent(App, Parent)};
-                                    not_found ->
-                                        rebar_app_info:new(Parent, Name, Vsn, Dir, [])
-                                end,
-                                rebar_app_info:source(AppInfo0, Source)
-                    end,
-    C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
-    AppInfo1 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
-    Overrides = rebar_state:get(State, overrides, []),
-    AppInfo2 = rebar_app_info:set(AppInfo1, overrides, rebar_app_info:get(AppInfo, overrides, [])++Overrides),
-    AppInfo3 = rebar_app_info:apply_overrides(rebar_app_info:get(AppInfo2, overrides, []), AppInfo2),
-    AppInfo4 = rebar_app_info:apply_profiles(AppInfo3, [default, prod]),
-    AppInfo5 = rebar_app_info:profiles(AppInfo4, [default]),
+                  {ok, App} ->
+                      rebar_app_info:source(rebar_app_info:is_checkout(App, true), checkout);
+                  not_found ->
+                      Dir = rebar_utils:to_list(filename:join(DepsDir, Name)),
+                      {ok, AppInfo0} =
+                          case rebar_app_info:discover(Dir) of
+                              {ok, App} ->
+                                  {ok, rebar_app_info:is_available(rebar_app_info:parent(App, Parent),
+                                                                   true)};
+                              not_found ->
+                                  rebar_app_info:new(Parent, Name, Vsn, Dir, [])
+                          end,
+                      rebar_app_info:source(AppInfo0, Source)
+              end,
+    Overrides = rebar_app_info:get(AppInfo, overrides, []) ++ rebar_state:get(State, overrides, []),
+    AppInfo2 = rebar_app_info:set(AppInfo, overrides, Overrides),
+    AppInfo5 = rebar_app_info:profiles(AppInfo2, [default]),
     rebar_app_info:is_lock(AppInfo5, IsLock).
 
 %% @doc Takes a given application app_info record along with the project.
@@ -259,8 +256,9 @@ update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
                      checksum = Hash1,
                      dependencies = Deps} = Package,
             AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName, PkgVsn1, Hash1, RepoConfig}),
-            AppInfo2 = rebar_app_info:resource_type(rebar_app_info:deps(AppInfo1, Deps), pkg),
-            rebar_app_info:original_vsn(AppInfo2, PkgVsn1);
+            AppInfo2 = rebar_app_info:resource_type(AppInfo1, pkg),
+            AppInfo3 = rebar_app_info:update_opts_deps(AppInfo2, Deps),
+            rebar_app_info:original_vsn(AppInfo3, PkgVsn1);
         not_found ->
             throw(?PRV_ERROR({missing_package, PkgName, PkgVsn}));
         {error, {invalid_vsn, InvalidVsn}} ->

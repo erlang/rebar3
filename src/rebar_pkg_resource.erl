@@ -62,8 +62,7 @@ lock(_AppDir, {pkg, Name, Vsn, Hash, _RepoConfig}) ->
       Dir :: file:name(),
       Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: hex_core:config()},
       Res :: boolean().
-needs_update(Dir, {pkg, _Name, Vsn, _Hash, _}) ->
-    [AppInfo] = rebar_app_discover:find_apps([Dir], all),
+needs_update(AppInfo, {pkg, _Name, Vsn, _Hash, _}) when is_tuple(AppInfo) ->
     case rebar_app_info:original_vsn(AppInfo) =:= rebar_utils:to_binary(Vsn) of
         true ->
             false;
