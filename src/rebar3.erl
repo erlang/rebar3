@@ -194,7 +194,7 @@ init_config() ->
                     ?DEBUG("Load global config file ~ts", [GlobalConfigFile]),
                     try state_from_global_config(Config1, GlobalConfigFile)
                     catch
-                        _:_ ->
+                        _:_->
                             ?WARN("Global config ~ts exists but can not be read. Ignoring global config values.", [GlobalConfigFile]),
                             rebar_state:new(Config1)
                     end;

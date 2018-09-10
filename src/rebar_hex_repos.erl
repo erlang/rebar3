@@ -3,7 +3,8 @@
 -export([from_state/2,
          get_repo_config/2,
          auth_config/1,
-         update_auth_config/2]).
+         update_auth_config/2,
+         format_error/1]).
 
 -ifdef(TEST).
 %% exported for test purposes
@@ -11,6 +12,7 @@
 -endif.
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 -type repo() :: #{name => unicode:unicode_binary(),
                   api_url => binary(),
@@ -32,7 +34,12 @@ from_state(BaseConfig, State) ->
 -spec get_repo_config(unicode:unicode_binary(), rebar_state:t() | [hex_core:config()])
                      -> {ok, hex_core:config()} | error.
 get_repo_config(RepoName, Repos) when is_list(Repos) ->
-    ec_lists:find(fun(#{name := N}) -> N =:= RepoName end, Repos);
+    case ec_lists:find(fun(#{name := N}) -> N =:= RepoName end, Repos) of
+        error ->
+            throw(?PRV_ERROR({repo_not_found, RepoName}));
+        {ok, RepoConfig} ->
+            {ok, RepoConfig}
+    end;
 get_repo_config(RepoName, State) ->
     Resources = rebar_state:resources(State),
     #{repos := Repos} = rebar_resource:find_resource_state(pkg, Resources),
@@ -73,9 +80,15 @@ merge_repos(Repos) ->
                 end, [], Repos).
 
 update_organizations(Repos) ->
-    lists:map(fun(Repo=#{parent := ParentName}) ->
+    lists:map(fun(Repo=#{organization := Organization,
+                         parent := ParentName}) ->
                       {ok, Parent} = get_repo_config(ParentName, Repos),
-                      maps:merge(Parent, Repo);
+                      ParentRepoUrl = rebar_utils:to_list(maps:get(repo_url, Parent)),
+                      {ok, RepoUrl} =
+                          rebar_utils:url_append_path(ParentRepoUrl,
+                                                      filename:join("repos", rebar_utils:to_list(Organization))),
+                      %% still let the organization config override this constructed repo url
+                      maps:merge(Parent#{repo_url => rebar_utils:to_binary(RepoUrl)}, Repo);
                  (Repo) ->
                       Repo
               end, Repos).
@@ -97,6 +110,9 @@ repo_list([{repos, Repos} | T]) ->
     Repos ++ repo_list(T);
 repo_list([{repos, replace, Repos} | T]) ->
     Repos ++ repo_list(T).
+
+format_error({repo_not_found, RepoName}) ->
+    io_lib:format("The repo ~ts was not found in the configuration.", [RepoName]).
 
 %% auth functions
 
