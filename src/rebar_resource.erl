@@ -4,7 +4,8 @@
 
 -export([new/3,
          find_resource_module/2,
-         find_resource_state/2]).
+         find_resource_state/2,
+         format_source/1]).
 
 -export_type([resource/0
              ,source/0
@@ -62,3 +63,6 @@ find_resource_state(Type, Resources) ->
         #resource{state=State} ->
             State
     end.
+
+format_source({pkg, Name, Vsn, _Hash, _}) -> {pkg, Name, Vsn};
+format_source(Source) -> Source.

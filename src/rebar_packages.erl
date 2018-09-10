@@ -7,7 +7,7 @@
         ,new_package_table/0
         ,load_and_verify_version/1        
         ,registry_dir/1
-        ,package_dir/1
+        ,package_dir/2
         ,registry_checksum/4
         ,find_highest_matching/5
         ,find_highest_matching_/5
@@ -36,7 +36,7 @@ format_error({missing_package, Pkg}) ->
     io_lib:format("Package not found in any repo: ~p.", [Pkg]).
 
 -spec get(hex_core:config(), binary()) -> {ok, map()} | {error, term()}.
-get(Config, Name) ->    
+get(Config, Name) ->
     try hex_api_package:get(Config, Name) of
         {ok, {200, _Headers, PkgInfo}} ->
             {ok, PkgInfo};
@@ -162,34 +162,20 @@ handle_missing_package(PkgKey, Repo, State, Fun) ->
 
 registry_dir(State) ->
     CacheDir = rebar_dir:global_cache_dir(rebar_state:opts(State)),
-    case rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN) of
-        ?DEFAULT_CDN ->
-            RegistryDir = filename:join([CacheDir, "hex", "default"]),
-            case filelib:ensure_dir(filename:join(RegistryDir, "placeholder")) of
-                ok -> ok;
-                {error, Posix} when Posix == eaccess; Posix == enoent ->
-                    ?ABORT("Could not write to ~p. Please ensure the path is writeable.",
-                           [RegistryDir])
-            end,
-            {ok, RegistryDir};
-        CDN ->
-            case rebar_utils:url_append_path(CDN, ?REMOTE_PACKAGE_DIR) of
-                {ok, Parsed} ->
-                    {ok, {_, _, Host, _, Path, _}} = http_uri:parse(Parsed),
-                    CDNHostPath = lists:reverse(rebar_string:lexemes(Host, ".")),
-                    CDNPath = tl(filename:split(Path)),
-                    RegistryDir = filename:join([CacheDir, "hex"] ++ CDNHostPath ++ CDNPath),
-                    ok = filelib:ensure_dir(filename:join(RegistryDir, "placeholder")),
-                    {ok, RegistryDir};
-                _ ->
-                    {uri_parse_error, CDN}
-            end
-    end.
+    RegistryDir = filename:join([CacheDir, "hex"]),
+    case filelib:ensure_dir(filename:join(RegistryDir, "placeholder")) of
+        ok -> ok;
+        {error, Posix} when Posix == eaccess; Posix == enoent ->
+            ?ABORT("Could not write to ~p. Please ensure the path is writeable.",
+                   [RegistryDir])
+    end,
+    {ok, RegistryDir}.
 
-package_dir(State) ->
+package_dir(Repo, State) ->
     case registry_dir(State) of
         {ok, RegistryDir} ->
-            PackageDir = filename:join([RegistryDir, "packages"]),
+            RepoName = maps:get(name, Repo),
+            PackageDir = filename:join([RegistryDir, rebar_utils:to_list(RepoName), "packages"]),
             ok = filelib:ensure_dir(filename:join(PackageDir, "placeholder")),
             {ok, PackageDir};
         Error ->
@@ -280,12 +266,16 @@ parse_checksum(Checksum) ->
 
 update_package(Name, RepoConfig=#{name := Repo}, State) ->
     ?MODULE:verify_table(State),
-    try hex_repo:get_package(RepoConfig, Name) of
+    try hex_repo:get_package(RepoConfig#{repo_key => maps:get(read_key, RepoConfig, <<>>)}, Name) of
         {ok, {200, _Headers, #{releases := Releases}}} ->
             _ = insert_releases(Name, Releases, Repo, ?PACKAGE_TABLE),
             {ok, RegistryDir} = rebar_packages:registry_dir(State),
             PackageIndex = filename:join(RegistryDir, ?INDEX_FILE),
             ok = ets:tab2file(?PACKAGE_TABLE, PackageIndex);
+        {ok, {403, _Headers, <<>>}} ->
+            not_found;
+        {ok, {404, _Headers, _}} ->
+            not_found;
         Error ->
             ?DEBUG("Hex get_package request failed: ~p", [Error]),
             %% TODO: add better log message. hex_core should export a format_error
@@ -322,11 +312,7 @@ resolve_version(Dep, DepVsn, Hash, HexRegistry, State) when is_binary(Hash) ->
     %% allow retired packages when we have a checksum
     case get_package(Dep, DepVsn, Hash, '_', RepoNames, HexRegistry, State) of
         {ok, Package=#package{key={_, _, RepoName}}} ->
-            {ok, RepoConfig} = ec_lists:find(fun(#{name := N}) when N =:= RepoName ->
-                                                     true;
-                                                (_) ->
-                                                     false
-                                             end, RepoConfigs),
+            {ok, RepoConfig} = rebar_hex_repos:get_repo_config(RepoName, RepoConfigs),
             {ok, Package, RepoConfig};
         _ ->
             Fun = fun(Repo) ->
@@ -379,8 +365,12 @@ handle_missing_no_exception(Fun, Dep, State) ->
     case check_all_repos(Fun, RepoConfigs) of
         not_found ->
             ec_lists:search(fun(Config=#{name := R}) ->
-                                    ?MODULE:update_package(Dep, Config, State),
-                                    Fun(R)
+                                    case ?MODULE:update_package(Dep, Config, State) of
+                                        ok ->
+                                            Fun(R);
+                                        _ ->
+                                            not_found
+                                    end
                             end, RepoConfigs);
         Result ->
             Result

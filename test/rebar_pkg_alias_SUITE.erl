@@ -215,7 +215,7 @@ mock_config(Name, Config) ->
 
     meck:new(rebar_packages, [passthrough, no_link]),
     meck:expect(rebar_packages, registry_dir, fun(_) -> {ok, CacheDir} end),
-    meck:expect(rebar_packages, package_dir, fun(_) -> {ok, CacheDir} end),
+    meck:expect(rebar_packages, package_dir, fun(_, _) -> {ok, CacheDir} end),
 
     %% TODO: is something else wrong that we need this for transitive_alias to pass
     meck:expect(rebar_packages, update_package, fun(_, _, _) -> ok end),
