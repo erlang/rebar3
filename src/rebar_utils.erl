@@ -72,7 +72,7 @@
          info_useless/2,
          list_dir/1,
          user_agent/0,
-         reread_config/1,
+         reread_config/1, reread_config/2,
          get_proxy_auth/0,
          is_list_of_strings/1]).
 
@@ -436,6 +436,18 @@ user_agent() ->
     ?FMT("Rebar/~ts (OTP/~ts)", [Vsn, otp_release()]).
 
 reread_config(ConfigList) ->
+    %% Default to not re-configuring the logger for now;
+    %% this can leak logs in CT redirection when setting up hooks
+    %% for example. If we want to turn it on by default, we may
+    %% want to disable it in CT at the same time or figure out a
+    %% way to silence it.
+    %% The same pattern may apply to other tasks, so let's enable
+    %% case-by-case.
+    reread_config(ConfigList, []).
+
+reread_config(ConfigList, Opts) ->
+    UpdateLoggerConfig = erlang:function_exported(logger, module_info, 0) andalso
+                         proplists:get_value(update_logger, Opts, false),
     %% NB: we attempt to mimic -config here, which survives app reload,
     %% hence {persistent, true}.
     SetEnv = case version_tuple(?MODULE:otp_release()) of
@@ -445,14 +457,51 @@ reread_config(ConfigList) ->
             fun (App, Key, Val) -> application:set_env(App, Key, Val, [{persistent, true}]) end
     end,
     try
+        Res =
         [SetEnv(Application, Key, Val)
         || Config <- ConfigList,
            {Application, Items} <- Config,
-           {Key, Val} <- Items]
+           {Key, Val} <- Items],
+        case UpdateLoggerConfig of
+            true -> reread_logger_config();
+            false -> ok
+        end,
+        Res
     catch _:_ ->
             ?ERROR("The configuration file submitted could not be read "
                   "and will be ignored.", [])
     end.
+
+%% @private since the kernel app is already booted, re-reading its config
+%% requires doing some magic to dynamically patch running handlers to
+%% deal with the current value.
+reread_logger_config() ->
+    KernelCfg = application:get_all_env(kernel),
+    LogCfg = proplists:get_value(logger, KernelCfg),
+    case LogCfg of
+        undefined ->
+            ok;
+        _ ->
+            %% Extract and apply settings related to primary configuration
+            %% -- primary config is used for settings shared across handlers
+            LogLvlPrimary = proplists:get_value(logger_info, KernelCfg, all),
+            {FilterDefault, Filters} =
+              case lists:keyfind(filters, 1, KernelCfg) of
+                  false -> {log, []};
+                  {filters, FoundDef, FoundFilter} -> {FoundDef, FoundFilter}
+              end,
+            Primary = #{level => LogLvlPrimary,
+                        filter_default => FilterDefault,
+                        filters => Filters},
+            %% Load the correct handlers based on their individual config.
+            [case Id of
+                 default -> logger:update_handler_config(Id, Cfg);
+                 _ -> logger:add_handler(Id, Mod, Cfg)
+             end || {handler, Id, Mod, Cfg} <- LogCfg],
+            logger:set_primary_config(Primary),
+            ok
+    end.
+
 
 %% @doc Given env. variable `FOO' we want to expand all references to
 %% it in `InStr'. References can have two forms: `$FOO' and `${FOO}'
