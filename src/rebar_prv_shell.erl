@@ -385,7 +385,7 @@ reread_config(AppsToStart, State) ->
                     lists:member(App, Running),
                     lists:member(App, AppsToStart),
                     not lists:member(App, BlackList)],
-            _ = rebar_utils:reread_config(ConfigList),
+            _ = rebar_utils:reread_config(ConfigList, [update_logger]),
             ok
     end.
 
