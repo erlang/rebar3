@@ -39,18 +39,16 @@ format_error(Reason) ->
 %% Internal functions
 
 print_deps_tree(SrcDeps, Verbose, State) ->
-    Resources = rebar_state:resources(State),
     D = lists:foldl(fun(App, Dict) ->
                             Name = rebar_app_info:name(App),
                             Vsn = rebar_app_info:original_vsn(App),
-                            AppDir = rebar_app_info:dir(App),
-                            Vsn1 = rebar_utils:vcs_vsn(Vsn, AppDir, Resources),
+                            Vsn1 = rebar_utils:vcs_vsn(App, Vsn, State),
                             Source  = rebar_app_info:source(App),
                             Parent = rebar_app_info:parent(App),
                             dict:append_list(Parent, [{Name, Vsn1, Source}], Dict)
                     end, dict:new(), SrcDeps),
     ProjectAppNames = [{rebar_app_info:name(App)
-                       ,rebar_utils:vcs_vsn(rebar_app_info:original_vsn(App), rebar_app_info:dir(App), Resources)
+                       ,rebar_utils:vcs_vsn(App, rebar_app_info:original_vsn(App), State)
                        ,project} || App <- rebar_state:project_apps(State)],
     case dict:find(root, D) of
         {ok, Children} ->

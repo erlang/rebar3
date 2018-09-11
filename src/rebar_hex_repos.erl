@@ -14,6 +14,8 @@
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
+-export_type([repo/0]).
+
 -type repo() :: #{name => unicode:unicode_binary(),
                   api_url => binary(),
                   api_key => binary(),
@@ -31,8 +33,8 @@ from_state(BaseConfig, State) ->
     %% merge organizations parent repo options into each oraganization repo
     update_organizations(Repos1).
 
--spec get_repo_config(unicode:unicode_binary(), rebar_state:t() | [hex_core:config()])
-                     -> {ok, hex_core:config()} | error.
+-spec get_repo_config(unicode:unicode_binary(), rebar_state:t() | [repo()])
+                     -> {ok, repo()} | error.
 get_repo_config(RepoName, Repos) when is_list(Repos) ->
     case ec_lists:find(fun(#{name := N}) -> N =:= RepoName end, Repos) of
         error ->
@@ -42,7 +44,7 @@ get_repo_config(RepoName, Repos) when is_list(Repos) ->
     end;
 get_repo_config(RepoName, State) ->
     Resources = rebar_state:resources(State),
-    #{repos := Repos} = rebar_resource:find_resource_state(pkg, Resources),
+    #{repos := Repos} = rebar_resource_v2:find_resource_state(pkg, Resources),
     get_repo_config(RepoName, Repos).
 
 merge_with_base_and_auth(Repos, BaseConfig, Auth) ->

@@ -9,8 +9,7 @@
          find_apps/2,
          find_apps/3,
          find_app/2,
-         find_app/3,
-         find_app/4]).
+         find_app/3]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
@@ -95,7 +94,7 @@ format_error({missing_module, Module}) ->
 merge_deps(AppInfo, State) ->
     %% These steps make sure that hooks and artifacts are run in the context of
     %% the application they are defined at. If an umbrella structure is used and
-    %% they are deifned at the top level they will instead run in the context of
+    %% they are defined at the top level they will instead run in the context of
     %% the State and at the top level, not as part of an application.
     CurrentProfiles = rebar_state:current_profiles(State),
     Default = reset_hooks(rebar_state:default(State), CurrentProfiles),
@@ -205,7 +204,7 @@ reset_hooks(Opts, CurrentProfiles) ->
 -spec all_app_dirs([file:name()]) -> [{file:name(), [file:name()]}].
 all_app_dirs(LibDirs) ->
     lists:flatmap(fun(LibDir) ->
-                        SrcDirs = find_config_src(LibDir, ["src"]),
+                        {_, SrcDirs} = find_config_src(LibDir, ["src"]),
                         app_dirs(LibDir, SrcDirs)
                   end, LibDirs).
 
@@ -278,8 +277,9 @@ find_apps(LibDirs, SrcDirs, Validate) ->
 %% app info record.
 -spec find_app(file:filename_all(), valid | invalid | all) -> {true, rebar_app_info:t()} | false.
 find_app(AppDir, Validate) ->
-    SrcDirs = find_config_src(AppDir, ["src"]),
-    find_app(rebar_app_info:new(), AppDir, SrcDirs, Validate).
+    {Config, SrcDirs} = find_config_src(AppDir, ["src"]),
+    AppInfo = rebar_app_info:update_opts(rebar_app_info:new(), dict:new(), Config),
+    find_app_(AppInfo, AppDir, SrcDirs, Validate).
 
 %% @doc check that a given app in a directory is there, and whether it's
 %% valid or not based on the second argument. Returns the related
@@ -291,7 +291,7 @@ find_app(AppInfo, AppDir, Validate) ->
     %% of src/
     AppOpts = rebar_app_info:opts(AppInfo),
     SrcDirs = rebar_dir:src_dirs(AppOpts, ["src"]),
-    find_app(AppInfo, AppDir, SrcDirs, Validate).
+    find_app_(AppInfo, AppDir, SrcDirs, Validate).
 
 %% @doc check that a given app in a directory is there, and whether it's
 %% valid or not based on the second argument. The third argument includes
@@ -301,6 +301,14 @@ find_app(AppInfo, AppDir, Validate) ->
                [file:filename_all()], valid | invalid | all) ->
     {true, rebar_app_info:t()} | false.
 find_app(AppInfo, AppDir, SrcDirs, Validate) ->
+    Config = rebar_config:consult(AppDir),
+    AppInfo1 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), Config),
+    find_app_(AppInfo1, AppDir, SrcDirs, Validate).
+
+-spec find_app_(rebar_app_info:t(), file:filename_all(),
+               [file:filename_all()], valid | invalid | all) ->
+    {true, rebar_app_info:t()} | false.
+find_app_(AppInfo, AppDir, SrcDirs, Validate) ->
     AppFile = filelib:wildcard(filename:join([AppDir, "ebin", "*.app"])),
     AppSrcFile = lists:append(
         [filelib:wildcard(filename:join([AppDir, SrcDir, "*.app.src"]))
@@ -331,17 +339,14 @@ create_app_info(AppInfo, AppDir, AppFile) ->
     AppInfo2 = rebar_app_info:applications(
                  rebar_app_info:app_details(AppInfo1, AppDetails),
                  IncludedApplications++Applications),
-    C = rebar_config:consult(AppDir),
-    AppInfo3 = rebar_app_info:update_opts(AppInfo2,
-                                          rebar_app_info:opts(AppInfo2), C),
-    Valid = case rebar_app_utils:validate_application_info(AppInfo3) =:= true
-                andalso rebar_app_info:has_all_artifacts(AppInfo3) =:= true of
+    Valid = case rebar_app_utils:validate_application_info(AppInfo2) =:= true
+                andalso rebar_app_info:has_all_artifacts(AppInfo2) =:= true of
                 true ->
                     true;
                 _ ->
                     false
             end,
-    rebar_app_info:dir(rebar_app_info:valid(AppInfo3, Valid), AppDir).
+    rebar_app_info:dir(rebar_app_info:valid(AppInfo2, Valid), AppDir).
 
 %% @doc Read in and parse the .app file if it is availabe. Do the same for
 %% the .app.src file if it exists.
@@ -408,7 +413,7 @@ try_handle_app_src_file(_AppInfo, _, _AppDir, [], _Validate) ->
 try_handle_app_src_file(_AppInfo, _, _AppDir, _AppSrcFile, valid) ->
     false;
 try_handle_app_src_file(AppInfo, _, AppDir, [File], Validate) when Validate =:= invalid
-                                                                 ; Validate =:= all ->
+                                                                   ; Validate =:= all ->
     AppInfo1 = rebar_app_info:app_file(AppInfo, undefined),
     AppInfo2 = create_app_info(AppInfo1, AppDir, File),
     case filename:extension(File) of
@@ -437,8 +442,8 @@ to_atom(Bin) ->
 find_config_src(AppDir, Default) ->
     case rebar_config:consult(AppDir) of
         [] ->
-            Default;
+            {[], Default};
         Terms ->
             %% TODO: handle profiles I guess, but we don't have that info
-            proplists:get_value(src_dirs, Terms, Default)
+            {Terms, proplists:get_value(src_dirs, Terms, Default)}
     end.

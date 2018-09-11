@@ -35,7 +35,7 @@ init(State) ->
 do(State) ->
     Names = rebar_packages:get_all_names(State),
     Resources = rebar_state:resources(State),
-    #{repos := RepoConfigs} = rebar_resource:find_resource_state(pkg, Resources),
+    #{repos := RepoConfigs} = rebar_resource_v2:find_resource_state(pkg, Resources),
     [[update_package(Name, RepoConfig, State)
       || Name <- Names]
      || RepoConfig <- RepoConfigs],

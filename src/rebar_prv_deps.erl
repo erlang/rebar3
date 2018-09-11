@@ -97,10 +97,11 @@ display_dep(_State, {Name, _Vsn, Source}) when is_tuple(Source) ->
 display_dep(_State, {Name, _Vsn, Source, _Opts}) when is_tuple(Source) ->
     ?CONSOLE("~ts* (~ts source)", [rebar_utils:to_binary(Name), type(Source)]);
 %% Locked
-display_dep(State, {Name, Source={pkg, _, Vsn}, Level}) when is_integer(Level) ->
+display_dep(State, {Name, _Source={pkg, _, Vsn}, Level}) when is_integer(Level) ->
     DepsDir = rebar_dir:deps_dir(State),
     AppDir = filename:join([DepsDir, rebar_utils:to_binary(Name)]),
-    NeedsUpdate = case rebar_fetch:needs_update(AppDir, Source, State) of
+    {ok, AppInfo} = rebar_app_info:discover(AppDir),
+    NeedsUpdate = case rebar_fetch:needs_update(AppInfo, State) of
         true -> "*";
         false -> ""
     end,
@@ -108,7 +109,8 @@ display_dep(State, {Name, Source={pkg, _, Vsn}, Level}) when is_integer(Level) -
 display_dep(State, {Name, Source, Level}) when is_tuple(Source), is_integer(Level) ->
     DepsDir = rebar_dir:deps_dir(State),
     AppDir = filename:join([DepsDir, rebar_utils:to_binary(Name)]),
-    NeedsUpdate = case rebar_fetch:needs_update(AppDir, Source, State) of
+    {ok, AppInfo} = rebar_app_info:discover(AppDir),
+    NeedsUpdate = case rebar_fetch:needs_update(AppInfo, State) of
         true -> "*";
         false -> ""
     end,

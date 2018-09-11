@@ -2,22 +2,16 @@
 
 -export([get/2
         ,get_all_names/1
-        ,get_package_versions/4
-        ,get_package_deps/4
-        ,new_package_table/0
-        ,load_and_verify_version/1        
         ,registry_dir/1
         ,package_dir/2
-        ,registry_checksum/4
         ,find_highest_matching/5
-        ,find_highest_matching_/5
         ,verify_table/1
         ,format_error/1
         ,update_package/3
         ,resolve_version/5]).
 
 -ifdef(TEST).
--export([cmp_/4, cmpl_/4, valid_vsn/1]).
+-export([new_package_table/0, find_highest_matching_/5, cmp_/4, cmpl_/4, valid_vsn/1]).
 -endif.
 
 -export_type([package/0]).
@@ -35,7 +29,7 @@ format_error({missing_package, Name, Vsn}) ->
 format_error({missing_package, Pkg}) ->
     io_lib:format("Package not found in any repo: ~p.", [Pkg]).
 
--spec get(hex_core:config(), binary()) -> {ok, map()} | {error, term()}.
+-spec get(rebar_hex_repos:repo(), binary()) -> {ok, map()} | {error, term()}.
 get(Config, Name) ->
     try hex_api_package:get(Config, Name) of
         {ok, {200, _Headers, PkgInfo}} ->
@@ -79,7 +73,7 @@ get_package(Dep, Vsn, Hash, Repo, Table, State) ->
                  -> {ok, #package{}} | not_found.
 get_package(Dep, Vsn, undefined, Retired, Repo, Table, State) ->
     get_package(Dep, Vsn, '_', Retired, Repo, Table, State);
-get_package(Dep, Vsn, Hash, Retired, Repos, Table, State) when is_list(Repos) ->
+get_package(Dep, Vsn, Hash, Retired, Repos, Table, State) ->
     ?MODULE:verify_table(State),
     case ets:select(Table, [{#package{key={Dep, Vsn, Repo},
                                       checksum=Hash,
@@ -90,34 +84,11 @@ get_package(Dep, Vsn, Hash, Retired, Repos, Table, State) when is_list(Repos) ->
             {ok, Package};
         _ ->
             not_found
-    end;
-get_package(Dep, Vsn, Hash, Retired, Repo, Table, State) ->
-    get_package(Dep, Vsn, Hash, Retired, [Repo], Table, State).
+    end.
 
 new_package_table() ->    
     ?PACKAGE_TABLE = ets:new(?PACKAGE_TABLE, [named_table, public, ordered_set, {keypos, 2}]),
     ets:insert(?PACKAGE_TABLE, {?PACKAGE_INDEX_VERSION, package_index_version}).
-
--spec get_package_deps(unicode:unicode_binary(), unicode:unicode_binary(), vsn(), rebar_state:t())
-                      -> [map()].
-get_package_deps(Name, Vsn, Repo, State) ->
-    try_lookup(?PACKAGE_TABLE, {Name, Vsn, Repo}, #package.dependencies, State).
-
--spec registry_checksum(unicode:unicode_binary(), vsn(), unicode:unicode_binary(), rebar_state:t())
-                       -> binary().
-registry_checksum(Name, Vsn, Repo, State) ->
-    try_lookup(?PACKAGE_TABLE, {Name, Vsn, Repo}, #package.checksum, State).
-
-try_lookup(Table, Key={_, _, Repo}, Element, State) ->
-    ?MODULE:verify_table(State),
-    try
-        ets:lookup_element(Table, Key, Element)       
-    catch
-       _:_ ->
-            handle_missing_package(Key, Repo, State, fun(_) ->
-                                                             ets:lookup_element(Table, Key, Element)
-                                                     end)
-    end.
 
 load_and_verify_version(State) ->
     {ok, RegistryDir} = registry_dir(State),
@@ -171,16 +142,14 @@ registry_dir(State) ->
     end,
     {ok, RegistryDir}.
 
+-spec package_dir(rebar_hex_repos:repo(), rebar_state:t()) -> {ok, filename:filename_all()}.
 package_dir(Repo, State) ->
-    case registry_dir(State) of
-        {ok, RegistryDir} ->
-            RepoName = maps:get(name, Repo),
-            PackageDir = filename:join([RegistryDir, rebar_utils:to_list(RepoName), "packages"]),
-            ok = filelib:ensure_dir(filename:join(PackageDir, "placeholder")),
-            {ok, PackageDir};
-        Error ->
-            Error
-    end.
+    {ok, RegistryDir} = registry_dir(State),
+    RepoName = maps:get(name, Repo),
+    PackageDir = filename:join([RegistryDir, rebar_utils:to_list(RepoName), "packages"]),
+    ok = filelib:ensure_dir(filename:join(PackageDir, "placeholder")),
+    {ok, PackageDir}.
+
 
 %% Hex supports use of ~> to specify the version required for a dependency.
 %% Since rebar3 requires exact versions to choose from we find the highest
@@ -306,7 +275,7 @@ insert_releases(Name, Releases, Repo, Table) ->
 %% if checksum is defined search for any matching repo matching pkg-vsn and checksum
 resolve_version(Dep, DepVsn, Hash, HexRegistry, State) when is_binary(Hash) ->
     Resources = rebar_state:resources(State),
-    #{repos := RepoConfigs} = rebar_resource:find_resource_state(pkg, Resources),
+    #{repos := RepoConfigs} = rebar_resource_v2:find_resource_state(pkg, Resources),
     RepoNames = [RepoName || #{name := RepoName} <- RepoConfigs],
 
     %% allow retired packages when we have a checksum
@@ -358,7 +327,7 @@ check_all_repos(Fun, RepoConfigs) ->
 
 handle_missing_no_exception(Fun, Dep, State) ->
     Resources = rebar_state:resources(State),
-    #{repos := RepoConfigs} = rebar_resource:find_resource_state(pkg, Resources),
+    #{repos := RepoConfigs} = rebar_resource_v2:find_resource_state(pkg, Resources),
 
     %% first check all repos in order for a local match
     %% if none is found then we step through checking after updating the repo registry

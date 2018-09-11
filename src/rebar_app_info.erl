@@ -7,6 +7,7 @@
          new/4,
          new/5,
          update_opts/3,
+         update_opts_deps/2,
          discover/1,
          name/1,
          name/2,
@@ -53,6 +54,8 @@
          is_checkout/2,
          valid/1,
          valid/2,
+         is_available/1,
+         is_available/2,
 
          verify_otp_vsn/1,
          has_all_artifacts/1,
@@ -87,7 +90,8 @@
                      source             :: string() | tuple() | checkout | undefined,
                      is_lock=false      :: boolean(),
                      is_checkout=false  :: boolean(),
-                     valid              :: boolean() | undefined}).
+                     valid              :: boolean() | undefined,
+                     is_available=false :: boolean()}).
 
 %%============================================================================
 %% types
@@ -152,8 +156,10 @@ new(Parent, AppName, Vsn, Dir, Deps) ->
 update_opts(AppInfo, Opts, Config) ->
     LockDeps = case resource_type(AppInfo) of
                    pkg ->
-                       Deps = deps(AppInfo),
-                       [{{locks, default}, Deps}, {{deps, default}, Deps}];
+                       %% Deps are set separate for packages
+                       %% instead of making it seem we have no deps
+                       %% don't set anything here.
+                       [];
                    _ ->
                        deps_from_config(dir(AppInfo), Config)
                end,
@@ -165,8 +171,18 @@ update_opts(AppInfo, Opts, Config) ->
 
     NewOpts = rebar_opts:merge_opts(LocalOpts, Opts),
 
-    AppInfo#app_info_t{opts=NewOpts
-                      ,default=NewOpts}.
+    AppInfo#app_info_t{opts=NewOpts,
+                       default=NewOpts}.
+
+%% @doc update the opts based on new deps, usually from an app's hex registry metadata
+-spec update_opts_deps(t(), [any()]) -> t().
+update_opts_deps(AppInfo=#app_info_t{opts=Opts}, Deps) ->
+    LocalOpts = dict:from_list([{{locks, default}, Deps}, {{deps, default}, Deps}]),
+    NewOpts = rebar_opts:merge_opts(LocalOpts, Opts),
+    AppInfo#app_info_t{opts=NewOpts,
+                       default=NewOpts,
+                       deps=Deps}.
+
 
 %% @private extract the deps for an app in `Dir' based on its config file data
 -spec deps_from_config(file:filename(), [any()]) -> [{tuple(), any()}, ...].
@@ -477,6 +493,17 @@ is_checkout(#app_info_t{is_checkout=IsCheckout}) ->
 -spec is_checkout(t(), boolean()) -> t().
 is_checkout(AppInfo=#app_info_t{}, IsCheckout) ->
     AppInfo#app_info_t{is_checkout=IsCheckout}.
+
+%% @doc returns whether the app source exists in the deps dir
+-spec is_available(t()) -> boolean().
+is_available(#app_info_t{is_available=IsAvailable}) ->
+    IsAvailable.
+
+%% @doc sets whether the app's source is available
+%% only set if the app's source is found in the expected dep directory
+-spec is_available(t(), boolean()) -> t().
+is_available(AppInfo=#app_info_t{}, IsAvailable) ->
+    AppInfo#app_info_t{is_available=IsAvailable}.
 
 %% @doc returns whether the app is valid (built) or not
 -spec valid(t()) -> boolean().
