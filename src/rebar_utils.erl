@@ -663,12 +663,12 @@ escript_foldl(Fun, Acc, File) ->
             Error
     end.
 
-vcs_vsn(Vcs, Dir, Resources) ->
-    case vcs_vsn_cmd(Vcs, Dir, Resources) of
+vcs_vsn(AppInfo, Vcs, State) ->
+    case vcs_vsn_cmd(AppInfo, Vcs, State) of
         {plain, VsnString} ->
             VsnString;
         {cmd, CmdString} ->
-            vcs_vsn_invoke(CmdString, Dir);
+            vcs_vsn_invoke(CmdString, rebar_app_info:dir(AppInfo));
         unknown ->
             ?ABORT("vcs_vsn: Unknown vsn format: ~p", [Vcs]);
         {error, Reason} ->
@@ -676,23 +676,18 @@ vcs_vsn(Vcs, Dir, Resources) ->
     end.
 
 %% Temp work around for repos like relx that use "semver"
-vcs_vsn_cmd(Vsn, _, _) when is_binary(Vsn) ->
+vcs_vsn_cmd(_AppInfo, Vsn, _) when is_binary(Vsn) ->
     {plain, Vsn};
-vcs_vsn_cmd(VCS, Dir, Resources) when VCS =:= semver ; VCS =:= "semver" ->
-    vcs_vsn_cmd(git, Dir, Resources);
-vcs_vsn_cmd({cmd, _Cmd}=Custom, _, _) ->
+vcs_vsn_cmd(AppInfo, VCS, State) when VCS =:= semver ; VCS =:= "semver" ->
+    vcs_vsn_cmd(AppInfo, git, State);
+vcs_vsn_cmd(_AppInfo, {cmd, _Cmd}=Custom, _) ->
     Custom;
-vcs_vsn_cmd(VCS, Dir, Resources) when is_atom(VCS) ->
-    case rebar_resource:find_resource_module(VCS, Resources) of
-        {ok, Module} ->
-            Module:make_vsn(Dir);
-        {error, _} ->
-            unknown
-    end;
-vcs_vsn_cmd(VCS, Dir, Resources) when is_list(VCS) ->
+vcs_vsn_cmd(AppInfo, VCS, State) when is_atom(VCS) ->
+    rebar_resource_v2:make_vsn(AppInfo, VCS, State);
+vcs_vsn_cmd(AppInfo, VCS, State) when is_list(VCS) ->
     try list_to_existing_atom(VCS) of
         AVCS ->
-            case vcs_vsn_cmd(AVCS, Dir, Resources) of
+            case vcs_vsn_cmd(AppInfo, AVCS, State) of
                 unknown -> {plain, VCS};
                 Other -> Other
             end

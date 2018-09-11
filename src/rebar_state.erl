@@ -353,28 +353,44 @@ namespace(#state_t{namespace=Namespace}) ->
 namespace(State=#state_t{}, Namespace) ->
     State#state_t{namespace=Namespace}.
 
--spec resources(t()) -> [{rebar_resource:type(), module()}].
+-spec resources(t()) -> [{rebar_resource_v2:type(), module()}].
 resources(#state_t{resources=Resources}) ->
     Resources.
 
--spec resources(t(), [{rebar_resource:type(), module()}]) -> t().
+-spec resources(t(), [{rebar_resource_v2:type(), module()}]) -> t().
 resources(State, NewResources) ->
     lists:foldl(fun(Resource, StateAcc) ->
                         add_resource(StateAcc, Resource)
                 end, State, NewResources).
 
--spec add_resource(t(), {rebar_resource:type(), module()}) -> t().
+-spec add_resource(t(), {rebar_resource_v2:type(), module()}) -> t().
 add_resource(State=#state_t{resources=Resources}, {ResourceType, ResourceModule}) ->
     _ = code:ensure_loaded(ResourceModule),
-    {ok, ResourceState} = case erlang:function_exported(ResourceModule, init, 1) of
-                              true ->
-                                  ResourceModule:init(State);
-                              false ->
-                                  {ok, #{}}
-                          end,
-    State#state_t{resources=[rebar_resource:new(ResourceType,
-                                                ResourceModule,
-                                                ResourceState) | Resources]}.
+    Resource = case erlang:function_exported(ResourceModule, init, 2) of
+                   true ->
+                       case ResourceModule:init(ResourceType, State) of
+                           {ok, R=#resource{}} ->
+                               R;
+                           _ ->
+                               %% init didn't return a resource
+                               %% must be an old resource
+                               warn_old_resource(ResourceModule),
+                               rebar_resource:new(ResourceType,
+                                                  ResourceModule,
+                                                  #{})
+                       end;
+                   false ->
+                       %% no init, must be initial implementation
+                       warn_old_resource(ResourceModule),
+                       rebar_resource:new(ResourceType,
+                                          ResourceModule,
+                                          #{})
+               end,
+    State#state_t{resources=[Resource | Resources]}.
+
+warn_old_resource(ResourceModule) ->
+    ?WARN("Using custom resource ~s that implements a deprecated api. "
+          "It should be upgraded to rebar_resource_v2.", [ResourceModule]).
 
 create_resources(Resources, State) ->
     lists:foldl(fun(R, StateAcc) ->

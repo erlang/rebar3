@@ -46,7 +46,10 @@ unmock() ->
 
 %% @doc creates values for a lock file.
 mock_lock(_) ->
-    meck:expect(?MOD, lock, fun(_AppDir, {pkg, Name, Vsn, Hash, _RepoConfig}) -> {pkg, Name, Vsn, Hash} end).
+    meck:expect(?MOD, lock, fun(AppInfo, _) ->
+                                {pkg, Name, Vsn, Hash, _RepoConfig} = rebar_app_info:source(AppInfo),
+                                {pkg, Name, Vsn, Hash}
+                            end).
 
 %% @doc The config passed to the `mock/2' function can specify which apps
 %% should be updated on a per-name basis: `{update, ["App1", "App3"]}'.
@@ -54,7 +57,8 @@ mock_update(Opts) ->
     ToUpdate = proplists:get_value(upgrade, Opts, []),
     meck:expect(
         ?MOD, needs_update,
-        fun(_Dir, {pkg, App, _Vsn, _Hash, _}) ->
+        fun(AppInfo, _) ->
+            {pkg, App, _Vsn, _Hash, _} = rebar_app_info:source(AppInfo),
             lists:member(binary_to_list(App), ToUpdate)
         end).
 
@@ -62,7 +66,7 @@ mock_update(Opts) ->
 mock_vsn(_Opts) ->
     meck:expect(
         ?MOD, make_vsn,
-        fun(_Dir) ->
+        fun(_AppInfo, _) ->
             {error, "Replacing version of type pkg not supported."}
         end).
 
@@ -79,19 +83,20 @@ mock_download(Opts) ->
     Config = proplists:get_value(config, Opts, []),
     meck:expect(
         ?MOD, download,
-        fun (Dir, {pkg, AppBin, Vsn, _, _}, _) ->
-            App = binary_to_list(AppBin),
+        fun (Dir, AppInfo, _, _) ->
+            {pkg, AppBin, Vsn, _, _} = rebar_app_info:source(AppInfo),
+            App = rebar_utils:to_list(AppBin),
             filelib:ensure_dir(Dir),
             AppDeps = proplists:get_value({App,Vsn}, Deps, []),
-            {ok, AppInfo} = rebar_test_utils:create_app(
-                Dir, App, binary_to_list(Vsn),
+            {ok, AppInfo1} = rebar_test_utils:create_app(
+                Dir, App, rebar_utils:to_list(Vsn),
                 [kernel, stdlib] ++ [element(1,D) || D  <- AppDeps]
             ),
             rebar_test_utils:create_config(Dir, [{deps, AppDeps}]++Config),
-            TarApp = App++"-"++binary_to_list(Vsn)++".tar",
+            TarApp = App++"-"++rebar_utils:to_list(Vsn)++".tar",
             Tarball = filename:join([Dir, TarApp]),
             Contents = filename:join([Dir, "contents.tar.gz"]),
-            Files = all_files(rebar_app_info:dir(AppInfo)),
+            Files = all_files(rebar_app_info:dir(AppInfo1)),
             ok = erl_tar:create(Contents,
                                 archive_names(Dir, App, Vsn, Files),
                                 [compressed]),

@@ -118,7 +118,7 @@ good_uncached(Config) ->
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
     ?assertEqual({ok, true},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)),
     Cache = ?config(cache_dir, Config),
     ?assert(filelib:is_regular(filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>))).
 
@@ -131,7 +131,7 @@ good_cached(Config) ->
     ?assert(filelib:is_regular(CachedFile)),
     {ok, Content} = file:read_file(CachedFile),
     ?assertEqual({ok, true},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)),
     {ok, Content} = file:read_file(CachedFile).
 
 badpkg(Config) ->
@@ -143,7 +143,7 @@ badpkg(Config) ->
     ETagPath = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".etag">>),
     rebar_pkg_resource:store_etag_in_cache(ETagPath, ?BADPKG_ETAG),
     ?assertMatch({bad_download, _Path},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, false)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, false)),
     %% The cached/etag files are there for forensic purposes
     ?assert(filelib:is_regular(ETagPath)),
     ?assert(filelib:is_regular(CachePath)).
@@ -157,7 +157,7 @@ bad_to_good(Config) ->
     ?assert(filelib:is_regular(CachedFile)),
     {ok, Contents} = file:read_file(CachedFile),
     ?assertEqual({ok, true},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)),
     %% Cache has refreshed
     ?assert({ok, Contents} =/= file:read_file(CachedFile)).
 
@@ -172,7 +172,7 @@ good_disconnect(Config) ->
     {ok, Content} = file:read_file(CachedFile),
     rebar_pkg_resource:store_etag_in_cache(ETagFile, ?BADPKG_ETAG),
     ?assertEqual({ok, true},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)),
     {ok, Content} = file:read_file(CachedFile).
 
 bad_disconnect(Config) ->
@@ -180,7 +180,7 @@ bad_disconnect(Config) ->
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
     ?assertEqual({fetch_fail, Pkg, Vsn},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State)).
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)).
 
 pkgs_provider(Config) ->
     Config1 = rebar_test_utils:init_rebar_state(Config),
@@ -265,9 +265,9 @@ mock_config(Name, Config) ->
     meck:expect(rebar_state, resources,
                 fun(_State) ->
                         DefaultConfig = hex_core:default_config(),
-                        [rebar_resource:new(pkg, rebar_pkg_resource,
-                                            #{repos => [DefaultConfig#{name => <<"hexpm">>}],
-                                              base_config => #{}})]
+                        [rebar_resource_v2:new(pkg, rebar_pkg_resource,
+                                               #{repos => [DefaultConfig#{name => <<"hexpm">>}],
+                                                 base_config => #{}})]
                 end),
 
     meck:new(rebar_dir, [passthrough]),

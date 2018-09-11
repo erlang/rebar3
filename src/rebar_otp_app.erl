@@ -110,7 +110,7 @@ preprocess(State, AppInfo, AppSrcFile) ->
             A1 = apply_app_vars(AppVars, AppData),
 
             %% AppSrcFile may contain instructions for generating a vsn number
-            Vsn = app_vsn(AppData, AppSrcFile, State),
+            Vsn = app_vsn(AppInfo, AppData, AppSrcFile, State),
             A2 = lists:keystore(vsn, 1, A1, {vsn, Vsn}),
 
             %% systools:make_relup/4 fails with {missing_param, registered}
@@ -226,10 +226,8 @@ consult_app_file(Filename) ->
             end
     end.
 
-app_vsn(AppData, AppFile, State) ->
-    AppDir = filename:dirname(filename:dirname(AppFile)),
-    Resources = rebar_state:resources(State),
-    rebar_utils:vcs_vsn(get_value(vsn, AppData, AppFile), AppDir, Resources).
+app_vsn(AppInfo, AppData, AppFile, State) ->
+    rebar_utils:vcs_vsn(AppInfo, get_value(vsn, AppData, AppFile), State).
 
 get_value(Key, AppInfo, AppFile) ->
     case proplists:get_value(Key, AppInfo) of

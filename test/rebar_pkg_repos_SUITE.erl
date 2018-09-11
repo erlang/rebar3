@@ -200,15 +200,17 @@ auth_merging(_Config) ->
                                 <<"hexpm">> => #{write_key => <<"write key hexpm">>}}]}
                 end),
 
-    ?assertMatch({ok, #{repos := [#{name := <<"repo-1">>,
-                                    read_key := <<"read key">>,
-                                    write_key := <<"write key">>},
-                                  #{name := <<"repo-2">>,
-                                    read_key := <<"read key 2">>,
-                                    repos_key := <<"repos key 2">>,
-                                    write_key := <<"write key 2">>},
-                                  #{name := <<"hexpm">>,
-                                    write_key := <<"write key hexpm">>}]}}, rebar_pkg_resource:init(State)),
+    ?assertMatch({ok,
+                  #resource{state=#{repos := [#{name := <<"repo-1">>,
+                                                read_key := <<"read key">>,
+                                                write_key := <<"write key">>},
+                                              #{name := <<"repo-2">>,
+                                                read_key := <<"read key 2">>,
+                                                repos_key := <<"repos key 2">>,
+                                                write_key := <<"write key 2">>},
+                                              #{name := <<"hexpm">>,
+                                                write_key := <<"write key hexpm">>}]}}},
+                 rebar_pkg_resource:init(pkg, State)),
 
     ok.
 
@@ -229,7 +231,8 @@ organization_merging(_Config) ->
                                 <<"hexpm">> => #{write_key => <<"write key hexpm">>}}]}
                 end),
 
-    ?assertMatch({ok, #{repos := [#{name := <<"hexpm:repo-1">>,
+    ?assertMatch({ok,
+                  #resource{state=#{repos := [#{name := <<"hexpm:repo-1">>,
                                     parent := <<"hexpm">>,
                                     read_key := <<"read key">>,
                                     write_key := <<"write key hexpm">>},
@@ -239,7 +242,8 @@ organization_merging(_Config) ->
                                     repos_key := <<"repos key 2">>,
                                     write_key := <<"write key 2">>},
                                   #{name := <<"hexpm">>,
-                                    write_key := <<"write key hexpm">>}]}}, rebar_pkg_resource:init(State)),
+                                    write_key := <<"write key hexpm">>}]}}},
+                 rebar_pkg_resource:init(pkg, State)),
 
     ok.
 

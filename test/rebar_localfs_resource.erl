@@ -2,6 +2,7 @@
 %% ex: ts=4 sw=4 et
 %%
 %% @doc A localfs custom resource (for testing purposes only)
+%% implementing the deprecated rebar_resource instead of v2
 %%
 %% ```
 %% {deps, [
