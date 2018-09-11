@@ -174,7 +174,7 @@ bootstrap_rebar3() ->
     Res = symlink_or_copy(filename:absname("src"),
                           filename:absname("_build/default/lib/rebar/src")),
     true = Res == ok orelse Res == exists,
-    Sources = ["src/rebar_resource.erl" | filelib:wildcard("src/*.erl")],
+    Sources = ["src/rebar_resource_v2.erl", "src/rebar_resource.erl" | filelib:wildcard("src/*.erl")],
     [compile_file(X, [{outdir, "_build/default/lib/rebar/ebin/"}
                      ,return | additional_defines()]) || X <- Sources],
     code:add_patha(filename:absname("_build/default/lib/rebar/ebin")).

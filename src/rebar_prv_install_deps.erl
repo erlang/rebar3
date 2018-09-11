@@ -377,7 +377,7 @@ fetch_app(AppInfo, State) ->
 maybe_upgrade(AppInfo, _AppDir, Upgrade, State) ->
     case Upgrade orelse rebar_app_info:is_lock(AppInfo) of
         true ->
-            case rebar_fetch:needs_update(AppInfo, rebar_app_info:source(AppInfo), State) of
+            case rebar_fetch:needs_update(AppInfo, State) of
                 true ->
                     ?INFO("Upgrading ~ts (~p)", [rebar_app_info:name(AppInfo),
                                                  rebar_resource:format_source(rebar_app_info:source(AppInfo))]),

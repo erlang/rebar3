@@ -5,7 +5,11 @@
 -export([new/3,
          find_resource_module/2,
          find_resource_state/2,
-         format_source/1]).
+         format_source/1,
+         lock/2,
+         download/4,
+         needs_update/2,
+         make_vsn/2]).
 
 -export_type([resource/0
              ,source/0
@@ -13,9 +17,7 @@
              ,location/0
              ,ref/0]).
 
--record(resource, {type :: atom(),
-                   module :: module(),
-                   state :: term()}).
+-include("rebar.hrl").
 
 -type resource() :: #resource{}.
 -type source() :: {type(), location(), ref()} | {type(), location(), ref(), binary()}.
@@ -23,7 +25,6 @@
 -type location() :: string().
 -type ref() :: any().
 
--callback init(rebar_state:t()) -> {ok, term()}.
 -callback lock(file:filename_all(), tuple()) ->
     source().
 -callback download(file:filename_all(), tuple(), rebar_state:t()) ->
@@ -33,13 +34,12 @@
 -callback make_vsn(file:filename_all()) ->
     {plain, string()} | {error, string()}.
 
--optional_callbacks([init/1]).
-
 -spec new(type(), module(), term()) -> resource().
 new(Type, Module, State) ->
     #resource{type=Type,
               module=Module,
-              state=State}.
+              state=State,
+              implementation=?MODULE}.
 
 find_resource_module(Type, Resources) ->
     case lists:keyfind(Type, #resource.type, Resources) of
@@ -66,3 +66,15 @@ find_resource_state(Type, Resources) ->
 
 format_source({pkg, Name, Vsn, _Hash, _}) -> {pkg, Name, Vsn};
 format_source(Source) -> Source.
+
+lock(Module, AppInfo) ->
+    Module:lock(rebar_app_info:dir(AppInfo), rebar_app_info:source(AppInfo)).
+
+download(Module, TmpDir, AppInfo, State) ->
+    Module:download(TmpDir, rebar_app_info:source(AppInfo), State).
+
+needs_update(Module, AppInfo) ->
+    Module:needs_update(rebar_app_info:dir(AppInfo), rebar_app_info:source(AppInfo)).
+
+make_vsn(Module, AppInfo) ->
+    Module:make_vsn(rebar_app_info:dir(AppInfo)).

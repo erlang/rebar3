@@ -7,28 +7,25 @@
 %% -------------------------------------------------------------------
 -module(rebar_fetch).
 
--export([lock_source/3,
+-export([lock_source/2,
          download_source/2,
-         needs_update/3]).
+         needs_update/2]).
 
 -export([format_error/1]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
--spec lock_source(file:filename_all(), rebar_resource:source(), rebar_state:t())
+-spec lock_source(rebar_app_info:t(), rebar_state:t())
                  -> rebar_resource:source() | {error, string()}.
-lock_source(AppDir, Source, State) ->
-    Resources = rebar_state:resources(State),
-    Module = get_resource_type(Source, Resources),
-    Module:lock(AppDir, Source).
+lock_source(AppInfo, State) ->
+    rebar_resource_v2:lock(AppInfo, State).
 
 -spec download_source(rebar_app_info:t(), rebar_state:t())
                      -> rebar_app_info:t() | {error, any()}.
 download_source(AppInfo, State) ->
     AppDir = rebar_app_info:dir(AppInfo),
-    Source = rebar_app_info:source(AppInfo),
-    try download_source_(AppDir, Source, State) of
+    try download_source_(AppInfo, State) of
         true ->
             %% freshly downloaded, update the app info opts to reflect the new config
             Config = rebar_config:consult(AppDir),
@@ -46,15 +43,14 @@ download_source(AppInfo, State) ->
             throw(?PRV_ERROR({no_resource, Location, Type}));
         ?WITH_STACKTRACE(C,T,S)
             ?DEBUG("rebar_fetch exception ~p ~p ~p", [C, T, S]),
-            throw(?PRV_ERROR({fetch_fail, Source}))
+            throw(?PRV_ERROR({fetch_fail, rebar_app_info:source(AppInfo)}))
     end.
 
-download_source_(AppDir, Source, State) ->
-    Resources = rebar_state:resources(State),
-    Module = get_resource_type(Source, Resources),
+download_source_(AppInfo, State) ->
+    AppDir = rebar_app_info:dir(AppInfo),
     TmpDir = ec_file:insecure_mkdtemp(),
     AppDir1 = rebar_utils:to_list(AppDir),
-    case Module:download(TmpDir, Source, State) of
+    case rebar_resource_v2:download(TmpDir, AppInfo, State) of
         {ok, _} ->
             ec_file:mkdir_p(AppDir1),
             code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
@@ -66,13 +62,11 @@ download_source_(AppDir, Source, State) ->
             Error
     end.
 
--spec needs_update(file:filename_all(), rebar_resource:source(), rebar_state:t())
+-spec needs_update(file:filename_all(), rebar_state:t())
                   -> boolean() | {error, string()}.
-needs_update(AppDir, Source, State) ->
-    Resources = rebar_state:resources(State),
-    Module = get_resource_type(Source, Resources),
+needs_update(AppInfo, State) ->
     try
-        Module:needs_update(AppDir, Source)
+        rebar_resource_v2:needs_update(AppInfo, State)
     catch
         _:_ ->
             true
@@ -97,25 +91,4 @@ format_error({fetch_fail, Source}) ->
 format_error({bad_checksum, File}) ->
     io_lib:format("Checksum mismatch against tarball in ~ts", [File]);
 format_error({bad_registry_checksum, File}) ->
-    io_lib:format("Checksum mismatch against registry in ~ts", [File]);
-format_error({no_resource, Location, Type}) ->    
-    io_lib:format("Cannot handle dependency ~ts.~n"
-                  "     No module for resource type ~p", [Location, Type]).
-
-get_resource_type({Type, Location}, Resources) ->
-    get_resource_module(Type, Location, Resources);
-get_resource_type({Type, Location, _}, Resources) ->
-    get_resource_module(Type, Location, Resources);
-get_resource_type({Type, _, _, Location}, Resources) ->
-    get_resource_module(Type, Location, Resources);
-get_resource_type(_, _) ->
-    rebar_pkg_resource.
-
-get_resource_module(Type, Location, Resources) ->   
-    case rebar_resource:find_resource_module(Type, Resources) of
-        {error, not_found} ->
-            throw({no_resource, Location, Type});
-        {ok, Module} ->
-            Module
-    end.
-
+    io_lib:format("Checksum mismatch against registry in ~ts", [File]).

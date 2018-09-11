@@ -29,12 +29,15 @@ init_per_testcase(change_type_upgrade, Config) ->
     TypeStr = atom_to_list(Type),
     DirName = filename:join([?config(priv_dir, Config), "resource_"++TypeStr]),
     ec_file:mkdir_path(DirName),
-    [{path, DirName} | Config].
+
+    {ok, AppInfo} = rebar_app_info:new(test_app, "0.0.1", DirName),
+    AppInfo1 = rebar_app_info:source(AppInfo, ?config(resource, Config)),
+
+    [{app, AppInfo1} | Config].
 
 end_per_testcase(_, Config) ->
     Config.
 
 change_type_upgrade(Config) ->
-    ?assert(rebar_fetch:needs_update(?config(path, Config),
-                                     ?config(resource, Config),
+    ?assert(rebar_fetch:needs_update(?config(app, Config),
                                      ?config(state, Config))).

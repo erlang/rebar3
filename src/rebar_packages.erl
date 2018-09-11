@@ -2,8 +2,6 @@
 
 -export([get/2
         ,get_all_names/1
-        ,get_package_versions/4
-        ,get_package_deps/4
         ,new_package_table/0
         ,load_and_verify_version/1        
         ,registry_dir/1
@@ -97,11 +95,6 @@ get_package(Dep, Vsn, Hash, Retired, Repo, Table, State) ->
 new_package_table() ->    
     ?PACKAGE_TABLE = ets:new(?PACKAGE_TABLE, [named_table, public, ordered_set, {keypos, 2}]),
     ets:insert(?PACKAGE_TABLE, {?PACKAGE_INDEX_VERSION, package_index_version}).
-
--spec get_package_deps(unicode:unicode_binary(), unicode:unicode_binary(), vsn(), rebar_state:t())
-                      -> [map()].
-get_package_deps(Name, Vsn, Repo, State) ->
-    try_lookup(?PACKAGE_TABLE, {Name, Vsn, Repo}, #package.dependencies, State).
 
 -spec registry_checksum(unicode:unicode_binary(), vsn(), unicode:unicode_binary(), rebar_state:t())
                        -> binary().

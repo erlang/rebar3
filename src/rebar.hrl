@@ -46,6 +46,11 @@
                   dependencies :: [#{package => unicode:unicode_binary(),
                                      requirement => unicode:unicode_binary()}] | ms_field()}).
 
+-record(resource, {type :: atom(),
+                   module :: module(),
+                   state :: term(),
+                   implementation :: module()}).
+
 -ifdef(namespaced_types).
 -type rebar_dict() :: dict:dict().
 -else.

@@ -2,14 +2,14 @@
 %% ex: ts=4 sw=4 et
 -module(rebar_pkg_resource).
 
--behaviour(rebar_resource).
+-behaviour(rebar_resource_v2).
 
--export([init/1
+-export([init/2
         ,lock/2
-        ,download/3
         ,download/4
+        ,download/5
         ,needs_update/2
-        ,make_vsn/1]).
+        ,make_vsn/2]).
 
 -export([request/4
         ,etag/1]).
@@ -34,22 +34,26 @@
 %% Public API
 %%==============================================================================
 
--spec init(rebar_state:t()) -> {ok, term()}.
-init(State) ->
+-spec init(atom(), rebar_state:t()) -> {ok, rebar_resource_v2:resource()}.
+init(Type, State) ->
     {ok, Vsn} = application:get_key(rebar, vsn),
     BaseConfig = #{http_adapter => hex_http_httpc,
                    http_user_agent_fragment =>
                        <<"(rebar3/", (list_to_binary(Vsn))/binary, ") (httpc)">>,
                    http_adapter_config => #{profile => rebar}},
     Repos = rebar_hex_repos:from_state(BaseConfig, State),
-    {ok, #{repos => Repos,
-           base_config => BaseConfig}}.
+    Resource = rebar_resource_v2:new(Type, ?MODULE, #{repos => Repos,
+                                                      base_config => BaseConfig}),
+    {ok, Resource}.
 
--spec lock(AppDir, Source) -> Res when
-      AppDir :: file:name(),
-      Source :: tuple(),
+
+
+-spec lock(AppInfo, ResourceState) -> Res when
+      AppInfo :: rebar_app_info:t(),
+      ResourceState :: rebar_resource_v2:resource_state(),
       Res :: {atom(), string(), any(), binary()}.
-lock(_AppDir, {pkg, Name, Vsn, Hash, _RepoConfig}) ->
+lock(AppInfo, _) ->
+    {pkg, Name, Vsn, Hash, _RepoConfig} = rebar_app_info:source(AppInfo),
     {pkg, Name, Vsn, Hash}.
 
 %%------------------------------------------------------------------------------
@@ -58,11 +62,12 @@ lock(_AppDir, {pkg, Name, Vsn, Hash, _RepoConfig}) ->
 %% version.
 %% @end
 %%------------------------------------------------------------------------------
--spec needs_update(Dir, Pkg) -> Res when
-      Dir :: file:name(),
-      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: hex_core:config()},
+-spec needs_update(AppInfo, ResourceState) -> Res when
+      AppInfo :: rebar_app_info:t(),
+      ResourceState :: rebar_resource_v2:resource_state(),
       Res :: boolean().
-needs_update(AppInfo, {pkg, _Name, Vsn, _Hash, _}) when is_tuple(AppInfo) ->
+needs_update(AppInfo, _) ->
+    {pkg, _Name, Vsn, _Hash, _} = rebar_app_info:source(AppInfo),
     case rebar_app_info:original_vsn(AppInfo) =:= rebar_utils:to_binary(Vsn) of
         true ->
             false;
@@ -75,13 +80,14 @@ needs_update(AppInfo, {pkg, _Name, Vsn, _Hash, _}) when is_tuple(AppInfo) ->
 %% Download the given pkg.
 %% @end
 %%------------------------------------------------------------------------------
--spec download(TmpDir, Pkg, State) -> Res when
+-spec download(TmpDir, AppInfo, State, ResourceState) -> Res when
       TmpDir :: file:name(),
-      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: hex_core:config()},
+      AppInfo :: rebar_app_info:t(),
+      ResourceState :: rebar_resource_v2:resource_state(),
       State :: rebar_state:t(),
       Res :: {'error',_} | {'ok',_} | {'tarball',binary() | string()}.
-download(TmpDir, Pkg, State) ->
-    download(TmpDir, Pkg, State, true).
+download(TmpDir, AppInfo, State, ResourceState) ->
+    download(TmpDir, rebar_app_info:source(AppInfo), State, ResourceState, true).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -90,13 +96,14 @@ download(TmpDir, Pkg, State) ->
 %% is different.
 %% @end
 %%------------------------------------------------------------------------------
--spec download(TmpDir, Pkg, State, UpdateETag) -> Res when
+-spec download(TmpDir, Pkg, State, ResourceState, UpdateETag) -> Res when
       TmpDir :: file:name(),
       Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: hex_core:config()},
       State :: rebar_state:t(),
+      ResourceState:: rebar_resource_v2:resource_state(),
       UpdateETag :: boolean(),
       Res :: download_result().
-download(TmpDir, Pkg={pkg, Name, Vsn, _Hash, Repo}, State, UpdateETag) ->
+download(TmpDir, Pkg={pkg, Name, Vsn, _Hash, Repo}, State, _ResourceState, UpdateETag) ->
     {ok, PackageDir} = rebar_packages:package_dir(Repo, State),
     Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
     ETagFile = binary_to_list(<<Name/binary, "-", Vsn/binary, ".etag">>),
@@ -111,10 +118,11 @@ download(TmpDir, Pkg={pkg, Name, Vsn, _Hash, Repo}, State, UpdateETag) ->
 %% Returns {error, string()} as this operation is not supported for pkg sources.
 %% @end
 %%------------------------------------------------------------------------------
--spec make_vsn(Vsn) -> Res when
-      Vsn :: any(),
-      Res :: {'error',[1..255,...]}.
-make_vsn(_) ->
+-spec make_vsn(AppInfo, ResourceState) -> Res when
+      AppInfo :: rebar_app_info:t(),
+      ResourceState :: rebar_resource_v2:resource_state(),
+      Res :: {'error', string()}.
+make_vsn(_, _) ->
     {error, "Replacing version of type pkg not supported."}.
 
 %%------------------------------------------------------------------------------
