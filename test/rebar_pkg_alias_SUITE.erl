@@ -241,30 +241,16 @@ mock_config(Name, Config) ->
                      
                   end, AllDeps),    
 
-    meck:expect(rebar_packages, registry_checksum, 
-                fun(N, V, _, _) ->
-                        case ets:match_object(Tid, {{N, V}, '_'}) of
-                            [{{_, _}, [_, Checksum, _]}] ->
-                                Checksum                                
-                                %% _ ->
-                                %%     {ok, {200, #{}, #{releases => []}}}
-                        end
-                end),
-    
     meck:new(hex_repo, [passthrough]),
     meck:expect(hex_repo, get_package, 
                 fun(_Config, PkgName) ->
-                        case ets:match_object(Tid, {{PkgName,'_'}, '_'}) of
-                            Matches ->
-                                Releases = 
-                                    [#{checksum => Checksum,
-                                       version => Vsn,
-                                       dependencies => [{DAppName, {pkg, DN, DV, undefined}} || {DN, DV, _, DAppName} <- Deps]} ||
-                                        {{_, Vsn}, [Deps, Checksum, _]} <- Matches],
-                                {ok, {200, #{}, #{releases => Releases}}}%% ;
-                            %% _ ->
-                            %%     {ok, {200, #{}, #{releases => []}}}
-                        end
+                        Matches = ets:match_object(Tid, {{PkgName,'_'}, '_'}),
+                        Releases =
+                            [#{checksum => Checksum,
+                               version => Vsn,
+                               dependencies => [{DAppName, {pkg, DN, DV, undefined}} || {DN, DV, _, DAppName} <- Deps]} ||
+                                {{_, Vsn}, [Deps, Checksum, _]} <- Matches],
+                        {ok, {200, #{}, #{releases => Releases}}}
                 end),
 
     meck:expect(hex_repo, get_tarball, fun(_, _, _) ->

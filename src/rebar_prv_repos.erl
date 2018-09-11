@@ -35,7 +35,7 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     Resources = rebar_state:resources(State),
-    #{repos := Repos} = rebar_resource:find_resource_state(pkg, Resources),
+    #{repos := Repos} = rebar_resource_v2:find_resource_state(pkg, Resources),
 
     ?CONSOLE("Repos:", []),
     %%TODO: do some formatting

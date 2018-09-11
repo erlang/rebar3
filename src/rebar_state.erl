@@ -353,17 +353,17 @@ namespace(#state_t{namespace=Namespace}) ->
 namespace(State=#state_t{}, Namespace) ->
     State#state_t{namespace=Namespace}.
 
--spec resources(t()) -> [{rebar_resource:type(), module()}].
+-spec resources(t()) -> [{rebar_resource_v2:type(), module()}].
 resources(#state_t{resources=Resources}) ->
     Resources.
 
--spec resources(t(), [{rebar_resource:type(), module()}]) -> t().
+-spec resources(t(), [{rebar_resource_v2:type(), module()}]) -> t().
 resources(State, NewResources) ->
     lists:foldl(fun(Resource, StateAcc) ->
                         add_resource(StateAcc, Resource)
                 end, State, NewResources).
 
--spec add_resource(t(), {rebar_resource:type(), module()}) -> t().
+-spec add_resource(t(), {rebar_resource_v2:type(), module()}) -> t().
 add_resource(State=#state_t{resources=Resources}, {ResourceType, ResourceModule}) ->
     _ = code:ensure_loaded(ResourceModule),
     Resource = case erlang:function_exported(ResourceModule, init, 2) of

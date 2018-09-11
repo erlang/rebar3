@@ -265,9 +265,9 @@ mock_config(Name, Config) ->
     meck:expect(rebar_state, resources,
                 fun(_State) ->
                         DefaultConfig = hex_core:default_config(),
-                        [rebar_resource:new(pkg, rebar_pkg_resource,
-                                            #{repos => [DefaultConfig#{name => <<"hexpm">>}],
-                                              base_config => #{}})]
+                        [rebar_resource_v2:new(pkg, rebar_pkg_resource,
+                                               #{repos => [DefaultConfig#{name => <<"hexpm">>}],
+                                                 base_config => #{}})]
                 end),
 
     meck:new(rebar_dir, [passthrough]),

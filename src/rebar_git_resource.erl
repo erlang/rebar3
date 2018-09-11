@@ -45,8 +45,6 @@ lock_(AppDir, {git, Url}) ->
 needs_update(AppInfo, _) ->
     needs_update_(rebar_app_info:dir(AppInfo), rebar_app_info:source(AppInfo)).
 
-needs_update_(AppInfo, Source) when is_tuple(AppInfo) ->
-    needs_update_(rebar_app_info:dir(AppInfo), Source);
 needs_update_(Dir, {git, Url, {tag, Tag}}) ->
     {ok, Current} = rebar_utils:sh(?FMT("git describe --tags --exact-match", []),
                                    [{cd, Dir}]),

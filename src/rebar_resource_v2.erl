@@ -3,7 +3,6 @@
 -module(rebar_resource_v2).
 
 -export([new/3,
-         find_resource_module/2,
          find_resource_state/2,
          format_source/1,
          lock/2,
@@ -44,34 +43,19 @@ new(Type, Module, State) ->
               state=State,
               implementation=?MODULE}.
 
-find_resource_module(Type, Resources) ->
-    case lists:keyfind(Type, #resource.type, Resources) of
-        false when is_atom(Type) ->
-            case code:which(Type) of
-                non_existing ->
-                    {error, not_found};
-                _ ->
-                    {ok, rebar_resource, Type}
-            end;
-        false ->
-            {error, not_found};
-        #resource{module=Module,
-                  implementation=ImplModule} ->
-            {ok, ImplModule, Module}
-    end.
-
+-spec find_resource(type(), [resource()]) -> {ok, resource()} | {error, not_found}.
 find_resource(Type, Resources) ->
-    case lists:keyfind(Type, #resource.type, Resources) of
-        false when is_atom(Type) ->
+    case ec_lists:find(fun(#resource{type=T}) -> T =:= Type end, Resources) of
+        error when is_atom(Type) ->
             case code:which(Type) of
                 non_existing ->
                     {error, not_found};
                 _ ->
-                    {ok, rebar_resource, Type}
+                    {ok, rebar_resource:new(Type, Type, #{})}
             end;
-        false ->
+        error ->
             {error, not_found};
-        Resource=#resource{} ->
+        {ok, Resource} ->
             {ok, Resource}
     end.
 
@@ -92,12 +76,15 @@ lock(AppInfo, State) ->
 resource_run(Function, Source, Args, State) ->
     Resources = rebar_state:resources(State),
     case get_resource_type(Source, Resources) of
-        #resource{module=Module,
-                  state=ResourceState,
-                  implementation=?MODULE} ->
+        {ok, #resource{type=_,
+                       module=Module,
+                       state=ResourceState,
+                       implementation=?MODULE}} ->
             erlang:apply(Module, Function, Args++[ResourceState]);
-        #resource{module=Module,
-                  implementation=rebar_resource} ->
+        {ok, #resource{type=_,
+                       module=Module,
+                       state=_,
+                       implementation=rebar_resource}} ->
             erlang:apply(rebar_resource, Function, [Module | Args])
     end.
 
@@ -113,12 +100,15 @@ make_vsn(AppInfo, VcsType, State) ->
     case is_resource_type(VcsType, Resources) of
         true ->
             case find_resource(VcsType, Resources) of
-                #resource{module=Module,
-                          state=ResourceState,
-                          implementation=?MODULE} ->
-                    Module:make_vsn(ResourceState, AppInfo);
-                #resource{module=Module,
-                          implementation=rebar_resource} ->
+                {ok, #resource{type=_,
+                               module=Module,
+                               state=ResourceState,
+                               implementation=?MODULE}} ->
+                    Module:make_vsn(AppInfo, ResourceState);
+                {ok, #resource{type=_,
+                               module=Module,
+                               state=_,
+                               implementation=rebar_resource}} ->
                     rebar_resource:make_vsn(Module, AppInfo)
             end;
         false ->
@@ -135,6 +125,7 @@ format_error({no_resource, Source}) ->
 is_resource_type(Type, Resources) ->
     lists:any(fun(#resource{type=T}) -> T =:= Type end, Resources).
 
+-spec get_resource_type(term(), [resource()]) -> {ok, resource()}.
 get_resource_type({Type, Location}, Resources) ->
     get_resource(Type, Location, Resources);
 get_resource_type({Type, Location, _}, Resources) ->
@@ -146,10 +137,11 @@ get_resource_type(Location={Type, _, _, _, _}, Resources) ->
 get_resource_type(Source, _) ->
     throw(?PRV_ERROR({no_resource, Source})).
 
+-spec get_resource(type(), term(), [resource()]) -> {ok, resource()}.
 get_resource(Type, Location, Resources) ->
     case find_resource(Type, Resources) of
         {error, not_found} ->
             throw(?PRV_ERROR({no_resource, Location, Type}));
         {ok, Resource} ->
-            Resource
+            {ok, Resource}
     end.

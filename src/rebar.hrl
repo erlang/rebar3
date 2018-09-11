@@ -33,6 +33,10 @@
 -define(HEX_AUTH_FILE, "hex.config").
 -define(PUBLIC_HEX_REPO, <<"hexpm">>).
 
+%% ignore this function in all modules
+%% not every module that exports it and relies on it being called implements provider
+-ignore_xref([{format_error, 1}]).
+
 %% the package record is used in a select match spec which upsets dialyzer
 %% this is the suggested workaround from Tobias
 %% http://erlang.org/pipermail/erlang-questions/2009-February/041445.html
@@ -49,7 +53,7 @@
 -record(resource, {type :: atom(),
                    module :: module(),
                    state :: term(),
-                   implementation :: module()}).
+                   implementation :: rebar_resource | rebar_resource_v2}).
 
 -ifdef(namespaced_types).
 -type rebar_dict() :: dict:dict().

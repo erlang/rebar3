@@ -683,7 +683,7 @@ vcs_vsn_cmd(AppInfo, VCS, State) when VCS =:= semver ; VCS =:= "semver" ->
 vcs_vsn_cmd(_AppInfo, {cmd, _Cmd}=Custom, _) ->
     Custom;
 vcs_vsn_cmd(AppInfo, VCS, State) when is_atom(VCS) ->
-    rebar_resource_v2:make_vsn(VCS, AppInfo, State);
+    rebar_resource_v2:make_vsn(AppInfo, VCS, State);
 vcs_vsn_cmd(AppInfo, VCS, State) when is_list(VCS) ->
     try list_to_existing_atom(VCS) of
         AVCS ->

@@ -371,7 +371,7 @@ make_relative_to_root(State, Path) when is_list(Path) ->
 
 fetch_app(AppInfo, State) ->
     ?INFO("Fetching ~ts (~p)", [rebar_app_info:name(AppInfo),
-                                rebar_resource:format_source(rebar_app_info:source(AppInfo))]),
+                                rebar_resource_v2:format_source(rebar_app_info:source(AppInfo))]),
     rebar_fetch:download_source(AppInfo, State).
 
 maybe_upgrade(AppInfo, _AppDir, Upgrade, State) ->
@@ -380,7 +380,7 @@ maybe_upgrade(AppInfo, _AppDir, Upgrade, State) ->
             case rebar_fetch:needs_update(AppInfo, State) of
                 true ->
                     ?INFO("Upgrading ~ts (~p)", [rebar_app_info:name(AppInfo),
-                                                 rebar_resource:format_source(rebar_app_info:source(AppInfo))]),
+                                                 rebar_resource_v2:format_source(rebar_app_info:source(AppInfo))]),
                     rebar_fetch:download_source(AppInfo, State);
                 false ->
                     case Upgrade of

@@ -4,19 +4,16 @@
 
 -behaviour(rebar_resource_v2).
 
--export([init/2
-        ,lock/2
-        ,download/4
-        ,download/5
-        ,needs_update/2
-        ,make_vsn/2]).
-
--export([request/4
-        ,etag/1]).
+-export([init/2,
+         lock/2,
+         download/4,
+         download/5,
+         needs_update/2,
+         make_vsn/2]).
 
 -ifdef(TEST).
 %% exported for test purposes
--export([store_etag_in_cache/2]).
+-export([store_etag_in_cache/2, etag/1, request/4]).
 -endif.
 
 -include("rebar.hrl").
@@ -98,7 +95,7 @@ download(TmpDir, AppInfo, State, ResourceState) ->
 %%------------------------------------------------------------------------------
 -spec download(TmpDir, Pkg, State, ResourceState, UpdateETag) -> Res when
       TmpDir :: file:name(),
-      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: hex_core:config()},
+      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: rebar_hex_repos:repo()},
       State :: rebar_state:t(),
       ResourceState:: rebar_resource_v2:resource_state(),
       UpdateETag :: boolean(),
@@ -133,7 +130,7 @@ make_vsn(_, _) ->
 %% {ok, Contents, NewEtag}, otherwise if some error occured return error.
 %% @end
 %%------------------------------------------------------------------------------
--spec request(hex_core:config(), binary(), binary(), false | binary())
+-spec request(rebar_hex_repos:repo(), binary(), binary(), false | binary())
              -> {ok, cached} | {ok, binary(), binary()} | error.
 request(Config, Name, Version, ETag) ->    
     Config1 = Config#{http_etag => ETag},
@@ -191,7 +188,7 @@ store_etag_in_cache(Path, ETag) ->
                       UpdateETag) -> Res when
       TmpDir :: file:name(),
       CachePath :: file:name(),
-      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: hex_core:config()},
+      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: rebar_hex_repos:repo()},
       ETag :: binary(),
       State :: rebar_state:t(),
       ETagPath :: file:name(),
@@ -219,7 +216,7 @@ cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash, RepoConfig}, ETag
 -spec serve_from_cache(TmpDir, CachePath, Pkg, State) -> Res when
       TmpDir :: file:name(),
       CachePath :: file:name(),
-      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: hex_core:config()},
+      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: rebar_hex_repos:repo()},
       State :: rebar_state:t(),
       Res :: cached_result().
 serve_from_cache(TmpDir, CachePath, Pkg, State) ->
@@ -244,7 +241,7 @@ serve_from_cache(TmpDir, CachePath, Pkg, State) ->
                           ETagPath) -> Res when
       TmpDir :: file:name(),
       CachePath :: file:name(),
-      Package :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: hex_core:config()},
+      Package :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: rebar_hex_repos:repo()},
       ETag :: binary(),
       Binary :: binary(),
       State :: rebar_state:t(),
@@ -279,7 +276,7 @@ extract(TmpDir, CachePath) ->
     {Files, Contents, Version, Meta}.
 
 -spec checksums(Pkg, Files, Contents, Version, Meta, State) -> Res when
-      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: hex_core:config()},
+      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: rebar_hex_repos:repo()},
       Files :: list({file:name(), binary()}),
       Contents :: binary(),
       Version :: binary(),

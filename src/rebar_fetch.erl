@@ -17,13 +17,13 @@
 -include_lib("providers/include/providers.hrl").
 
 -spec lock_source(rebar_app_info:t(), rebar_state:t())
-                 -> rebar_resource:source() | {error, string()}.
-lock_source(AppInfo, State) ->
+                 -> rebar_resource_v2:source() | {error, string()}.
+lock_source(AppInfo, State)      ->
     rebar_resource_v2:lock(AppInfo, State).
 
 -spec download_source(rebar_app_info:t(), rebar_state:t())
                      -> rebar_app_info:t() | {error, any()}.
-download_source(AppInfo, State) ->
+download_source(AppInfo, State)  ->
     AppDir = rebar_app_info:dir(AppInfo),
     try download_source_(AppInfo, State) of
         true ->
@@ -32,7 +32,7 @@ download_source(AppInfo, State) ->
             AppInfo1 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), Config),
             case rebar_app_discover:find_app(AppInfo1, AppDir, all) of
                 {true, AppInfo2} ->
-                    AppInfo2;
+                    rebar_app_info:is_available(AppInfo2, true);
                 false ->
                     throw(?PRV_ERROR({dep_app_not_found, AppDir, rebar_app_info:name(AppInfo1)}))
             end;
@@ -62,7 +62,7 @@ download_source_(AppInfo, State) ->
             Error
     end.
 
--spec needs_update(file:filename_all(), rebar_state:t())
+-spec needs_update(rebar_app_info:t(), rebar_state:t())
                   -> boolean() | {error, string()}.
 needs_update(AppInfo, State) ->
     try

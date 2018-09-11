@@ -495,12 +495,12 @@ is_checkout(AppInfo=#app_info_t{}, IsCheckout) ->
     AppInfo#app_info_t{is_checkout=IsCheckout}.
 
 %% @doc returns whether the app source exists in the deps dir
-%% and profiles/overrides have been applied to the app info opts
 -spec is_available(t()) -> boolean().
 is_available(#app_info_t{is_available=IsAvailable}) ->
     IsAvailable.
 
-%% @doc sets whether the app is a available app or not
+%% @doc sets whether the app's source is available
+%% only set if the app's source is found in the expected dep directory
 -spec is_available(t(), boolean()) -> t().
 is_available(AppInfo=#app_info_t{}, IsAvailable) ->
     AppInfo#app_info_t{is_available=IsAvailable}.

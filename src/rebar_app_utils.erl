@@ -247,7 +247,7 @@ expand_deps_sources(Dep, State) ->
 %% around version if required.
 -spec update_source(rebar_app_info:t(), Source, rebar_state:t()) ->
     rebar_app_info:t() when
-      Source :: rebar_resource:source().
+      Source :: rebar_resource_v2:source().
 update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
     case rebar_packages:resolve_version(PkgName, PkgVsn, Hash,
                                         ?PACKAGE_TABLE, State) of
