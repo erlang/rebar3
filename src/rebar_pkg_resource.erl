@@ -134,8 +134,8 @@ make_vsn(_, _) ->
 %%------------------------------------------------------------------------------
 -spec request(rebar_hex_repos:repo(), binary(), binary(), false | binary())
              -> {ok, cached} | {ok, binary(), binary()} | error.
-request(Config, Name, Version, ETag) ->    
-    Config1 = Config#{http_etag => ETag},
+request(Config, Name, Version, ETag) ->
+    Config1 = Config#{http_etag => <<"\"", ETag/binary, "\"">>},
     try hex_repo:get_tarball(Config1, Name, Version) of
         {ok, {200, #{<<"etag">> := ETag1}, Tarball}} ->
             {ok, Tarball, rebar_utils:to_binary(rebar_string:trim(rebar_utils:to_list(ETag1), both, [$"]))};
