@@ -36,14 +36,6 @@ main(_) ->
 
     setup_env(),
     os:putenv("REBAR_PROFILE", "bootstrap"),
-    RegistryFile = default_registry_file(),
-    case filelib:is_file(RegistryFile) of
-        true ->
-            ok;
-        false ->
-            rebar3:run(["update"])
-    end,
-
     {ok, State} = rebar3:run(["compile"]),
     reset_env(),
     os:putenv("REBAR_PROFILE", ""),
@@ -56,11 +48,6 @@ main(_) ->
 
     %% Done with compile, can turn back on error logger
     error_logger:tty(true).
-
-default_registry_file() ->
-    {ok, [[Home]]} = init:get_argument(home),
-    CacheDir = filename:join([Home, ".cache", "rebar3"]),
-    filename:join([CacheDir, "hex", "default", "registry"]).
 
 fetch_and_compile({Name, ErlFirstFiles}, Deps) ->
     case lists:keyfind(Name, 1, Deps) of

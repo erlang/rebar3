@@ -111,7 +111,14 @@ parse_git_url(not_scp, Url) ->
     end.
 
 download(TmpDir, AppInfo, State, _) ->
-    download_(TmpDir, rebar_app_info:source(AppInfo), State).
+    case download_(TmpDir, rebar_app_info:source(AppInfo), State) of
+        {ok, _} ->
+            ok;
+        {error, Reason} ->
+            {error, Reason};
+        Error ->
+            {error, Error}
+    end.
 
 download_(Dir, {git, Url}, State) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),

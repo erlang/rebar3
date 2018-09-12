@@ -26,7 +26,7 @@ lock_source(AppInfo, State)      ->
 download_source(AppInfo, State)  ->
     AppDir = rebar_app_info:dir(AppInfo),
     try download_source_(AppInfo, State) of
-        true ->
+        ok ->
             %% freshly downloaded, update the app info opts to reflect the new config
             Config = rebar_config:consult(AppDir),
             AppInfo1 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), Config),
@@ -34,10 +34,10 @@ download_source(AppInfo, State)  ->
                 {true, AppInfo2} ->
                     rebar_app_info:is_available(AppInfo2, true);
                 false ->
-                    throw(?PRV_ERROR({dep_app_not_found, AppDir, rebar_app_info:name(AppInfo1)}))
+                    throw(?PRV_ERROR({dep_app_not_found, rebar_app_info:name(AppInfo1)}))
             end;
-        Error ->
-            throw(?PRV_ERROR(Error))
+        {error, Reason} ->
+            throw(?PRV_ERROR(Reason))
     catch
         throw:{no_resource, Type, Location} ->
             throw(?PRV_ERROR({no_resource, Location, Type}));
@@ -51,13 +51,12 @@ download_source_(AppInfo, State) ->
     TmpDir = ec_file:insecure_mkdtemp(),
     AppDir1 = rebar_utils:to_list(AppDir),
     case rebar_resource_v2:download(TmpDir, AppInfo, State) of
-        {ok, _} ->
+        ok ->
             ec_file:mkdir_p(AppDir1),
             code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
             ok = rebar_file_utils:rm_rf(filename:absname(AppDir1)),
             ?DEBUG("Moving checkout ~p to ~p", [TmpDir, filename:absname(AppDir1)]),
-            ok = rebar_file_utils:mv(TmpDir, filename:absname(AppDir1)),
-            true;
+            rebar_file_utils:mv(TmpDir, filename:absname(AppDir1));
         Error ->
             Error
     end.
@@ -91,4 +90,7 @@ format_error({fetch_fail, Source}) ->
 format_error({bad_checksum, File}) ->
     io_lib:format("Checksum mismatch against tarball in ~ts", [File]);
 format_error({bad_registry_checksum, File}) ->
-    io_lib:format("Checksum mismatch against registry in ~ts", [File]).
+    io_lib:format("Checksum mismatch against registry in ~ts", [File]);
+format_error({dep_app_not_found, AppName}) ->
+    io_lib:format("Dependency failure: source for ~ts does not contain a "
+                  "recognizable project and can not be built", [AppName]).

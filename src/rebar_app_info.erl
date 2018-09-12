@@ -44,8 +44,6 @@
          get/2,
          get/3,
          set/3,
-         resource_type/1,
-         resource_type/2,
          source/1,
          source/2,
          is_lock/1,
@@ -86,7 +84,6 @@
                      dep_level=0        :: integer(),
                      dir                :: file:name(),
                      out_dir            :: file:name(),
-                     resource_type      :: pkg | src | undefined,
                      source             :: string() | tuple() | checkout | undefined,
                      is_lock=false      :: boolean(),
                      is_checkout=false  :: boolean(),
@@ -154,8 +151,8 @@ new(Parent, AppName, Vsn, Dir, Deps) ->
 %% file for the app
 -spec update_opts(t(), rebar_dict(), [any()]) -> t().
 update_opts(AppInfo, Opts, Config) ->
-    LockDeps = case resource_type(AppInfo) of
-                   pkg ->
+    LockDeps = case source(AppInfo) of
+                   Tuple when is_tuple(Tuple) andalso element(1, Tuple) =:= pkg ->
                        %% Deps are set separate for packages
                        %% instead of making it seem we have no deps
                        %% don't set anything here.
@@ -453,16 +450,6 @@ ebin_dir(#app_info_t{out_dir=OutDir}) ->
 -spec priv_dir(t()) -> file:name().
 priv_dir(#app_info_t{out_dir=OutDir}) ->
     rebar_utils:to_list(filename:join(OutDir, "priv")).
-
-%% @doc returns whether the app is source app or a package app.
--spec resource_type(t()) -> pkg | src.
-resource_type(#app_info_t{resource_type=ResourceType}) ->
-    ResourceType.
-
-%% @doc sets whether the app is source app or a package app.
--spec resource_type(t(), pkg | src) -> t().
-resource_type(AppInfo=#app_info_t{}, Type) ->
-    AppInfo#app_info_t{resource_type=Type}.
 
 %% @doc finds the source specification for the app
 -spec source(t()) -> string() | tuple().

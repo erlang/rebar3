@@ -61,7 +61,14 @@ needs_update_(Dir, {hg, Url, Ref}) ->
     not ((LocalRef =:= TargetRef) andalso compare_url(Dir, Url)).
 
 download(TmpDir, AppInfo, State, _) ->
-    download_(TmpDir, rebar_app_info:source(AppInfo), State).
+    case download_(TmpDir, rebar_app_info:source(AppInfo), State) of
+        {ok, _} ->
+            ok;
+        {error, Reason} ->
+            {error, Reason};
+        Error ->
+            {error, Error}
+    end.
 
 download_(Dir, {hg, Url}, State) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
