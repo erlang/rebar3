@@ -117,7 +117,7 @@ good_uncached(Config) ->
     Tmp = ?config(tmp_dir, Config),
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
-    ?assertEqual({ok, true},
+    ?assertEqual(ok,
                  rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)),
     Cache = ?config(cache_dir, Config),
     ?assert(filelib:is_regular(filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>))).
@@ -130,7 +130,7 @@ good_cached(Config) ->
     CachedFile = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>),
     ?assert(filelib:is_regular(CachedFile)),
     {ok, Content} = file:read_file(CachedFile),
-    ?assertEqual({ok, true},
+    ?assertEqual(ok,
                  rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)),
     {ok, Content} = file:read_file(CachedFile).
 
@@ -156,7 +156,7 @@ bad_to_good(Config) ->
     CachedFile = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>),
     ?assert(filelib:is_regular(CachedFile)),
     {ok, Contents} = file:read_file(CachedFile),
-    ?assertEqual({ok, true},
+    ?assertEqual(ok,
                  rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)),
     %% Cache has refreshed
     ?assert({ok, Contents} =/= file:read_file(CachedFile)).
@@ -171,7 +171,7 @@ good_disconnect(Config) ->
     ?assert(filelib:is_regular(CachedFile)),
     {ok, Content} = file:read_file(CachedFile),
     rebar_pkg_resource:store_etag_in_cache(ETagFile, ?BADPKG_ETAG),
-    ?assertEqual({ok, true},
+    ?assertEqual(ok,
                  rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)),
     {ok, Content} = file:read_file(CachedFile).
 

@@ -107,7 +107,7 @@ mock_download(Opts) ->
             Cached = filename:join([Cache, TarApp]),
             filelib:ensure_dir(Cached),
             rebar_file_utils:mv(Tarball, Cached),
-            {ok, true}
+            ok
         end).
 
 %% @doc On top of the pkg resource mocking, we need to mock the package

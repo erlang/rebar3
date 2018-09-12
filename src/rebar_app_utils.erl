@@ -252,16 +252,12 @@ update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
     case rebar_packages:resolve_version(PkgName, PkgVsn, Hash,
                                         ?PACKAGE_TABLE, State) of
         {ok, Package, RepoConfig} ->
-            #package{key = {_, PkgVsn1, _},
-                     checksum = Hash1,
-                     dependencies = Deps} = Package,
+            #package{key={_, PkgVsn1, _},
+                     checksum=Hash1,
+                     dependencies=Deps} = Package,
             AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName, PkgVsn1, Hash1, RepoConfig}),
-
-            %% TODO: Remove?
-            AppInfo2 = rebar_app_info:resource_type(AppInfo1, pkg),
-
-            AppInfo3 = rebar_app_info:update_opts_deps(AppInfo2, Deps),
-            rebar_app_info:original_vsn(AppInfo3, PkgVsn1);
+            AppInfo2 = rebar_app_info:update_opts_deps(AppInfo1, Deps),
+            rebar_app_info:original_vsn(AppInfo2, PkgVsn1);
         not_found ->
             throw(?PRV_ERROR({missing_package, PkgName, PkgVsn}));
         {error, {invalid_vsn, InvalidVsn}} ->

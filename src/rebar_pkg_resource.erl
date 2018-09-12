@@ -18,14 +18,11 @@
 
 -include("rebar.hrl").
 
--type cached_result()   :: {'bad_checksum',string()} |
-                           {'bad_registry_checksum',string()} |
-                           {'failed_extract',string()} |
-                           {'ok','true'} |
-                           {'unexpected_hash',string(),_,binary()}.
-
--type download_result() :: {bad_download, binary() | string()} |
-                           {fetch_fail, _, _} | cached_result().
+-type cached_result()   :: ok |
+                           {bad_checksum,string()} |
+                           {bad_registry_checksum,string()} |
+                           {failed_extract,string()} |
+                           {unexpected_hash,string(),_,binary()}.
 
 %%==============================================================================
 %% Public API
@@ -82,9 +79,14 @@ needs_update(AppInfo, _) ->
       AppInfo :: rebar_app_info:t(),
       ResourceState :: rebar_resource_v2:resource_state(),
       State :: rebar_state:t(),
-      Res :: {'error',_} | {'ok',_} | {'tarball',binary() | string()}.
+      Res :: ok | {error,_}.
 download(TmpDir, AppInfo, State, ResourceState) ->
-    download(TmpDir, rebar_app_info:source(AppInfo), State, ResourceState, true).
+    case download(TmpDir, rebar_app_info:source(AppInfo), State, ResourceState, true) of
+        ok ->
+            ok;
+        Error ->
+            {error, Error}
+    end.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -99,7 +101,7 @@ download(TmpDir, AppInfo, State, ResourceState) ->
       State :: rebar_state:t(),
       ResourceState:: rebar_resource_v2:resource_state(),
       UpdateETag :: boolean(),
-      Res :: download_result().
+      Res :: ok | {error,_}.
 download(TmpDir, Pkg={pkg, Name, Vsn, _Hash, Repo}, State, _ResourceState, UpdateETag) ->
     {ok, PackageDir} = rebar_packages:package_dir(Repo, State),
     Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
@@ -193,7 +195,7 @@ store_etag_in_cache(Path, ETag) ->
       State :: rebar_state:t(),
       ETagPath :: file:name(),
       UpdateETag :: boolean(),
-      Res :: download_result().
+      Res :: cached_result() | {fetch_fail, binary(), binary()} | {bad_download, file:name()}.
 cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash, RepoConfig}, ETag,
                 State, ETagPath, UpdateETag) ->
     case request(RepoConfig, Name, Vsn, ETag) of
@@ -223,8 +225,7 @@ serve_from_cache(TmpDir, CachePath, Pkg, State) ->
     {Files, Contents, Version, Meta} = extract(TmpDir, CachePath),
     case checksums(Pkg, Files, Contents, Version, Meta, State) of
         {Chk, Chk, Chk} ->
-            ok = erl_tar:extract({binary, Contents}, [{cwd, TmpDir}, compressed]),
-            {ok, true};
+            erl_tar:extract({binary, Contents}, [{cwd, TmpDir}, compressed]);
         {_Hash, Chk, Chk} ->
             ?DEBUG("Expected hash ~p does not match checksums ~p", [_Hash, Chk]),
             {unexpected_hash, CachePath, _Hash, Chk};
@@ -246,7 +247,7 @@ serve_from_cache(TmpDir, CachePath, Pkg, State) ->
       Binary :: binary(),
       State :: rebar_state:t(),
       ETagPath :: file:name(),
-      Res :: download_result().
+      Res :: ok | {error,_} | {bad_download, file:name()}.
 serve_from_download(TmpDir, CachePath, Package, ETag, Binary, State, ETagPath) ->
     ?DEBUG("Writing ~p to cache at ~ts", [Package, CachePath]),
     file:write_file(CachePath, Binary),

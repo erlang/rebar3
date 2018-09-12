@@ -121,7 +121,7 @@ mock_download(Opts, CreateType) ->
                 [kernel, stdlib] ++ [element(1,D) || D  <- AppDeps]
             ),
             rebar_test_utils:create_config(Dir, [{deps, AppDeps}]++Config),
-            {ok, 'WHATEVER'}
+            ok
         end).
 
 %%%%%%%%%%%%%%%

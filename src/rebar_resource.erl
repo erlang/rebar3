@@ -40,7 +40,12 @@ lock(Module, AppInfo) ->
     Module:lock(rebar_app_info:dir(AppInfo), rebar_app_info:source(AppInfo)).
 
 download(Module, TmpDir, AppInfo, State) ->
-    Module:download(TmpDir, rebar_app_info:source(AppInfo), State).
+    case Module:download(TmpDir, rebar_app_info:source(AppInfo), State) of
+        {ok, _} ->
+            ok;
+        Error ->
+            Error
+    end.
 
 needs_update(Module, AppInfo) ->
     Module:needs_update(rebar_app_info:dir(AppInfo), rebar_app_info:source(AppInfo)).
