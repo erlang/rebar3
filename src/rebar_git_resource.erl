@@ -114,6 +114,8 @@ download(TmpDir, AppInfo, State, _) ->
     case download_(TmpDir, rebar_app_info:source(AppInfo), State) of
         {ok, _} ->
             ok;
+        {error, Reason} ->
+            {error, Reason};
         Error ->
             {error, Error}
     end.

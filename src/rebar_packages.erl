@@ -142,7 +142,7 @@ registry_dir(State) ->
     end,
     {ok, RegistryDir}.
 
--spec package_dir(rebar_hex_repos:repo(), rebar_state:t()) -> {ok, filename:filename_all()}.
+-spec package_dir(rebar_hex_repos:repo(), rebar_state:t()) -> {ok, file:filename_all()}.
 package_dir(Repo, State) ->
     {ok, RegistryDir} = registry_dir(State),
     RepoName = maps:get(name, Repo),

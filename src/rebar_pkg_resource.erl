@@ -101,7 +101,7 @@ download(TmpDir, AppInfo, State, ResourceState) ->
       State :: rebar_state:t(),
       ResourceState:: rebar_resource_v2:resource_state(),
       UpdateETag :: boolean(),
-      Res :: ok | {error,_}.
+      Res :: ok | {error,_} | cached_result() | {fetch_fail, binary(), binary()} | {bad_download, file:name()}.
 download(TmpDir, Pkg={pkg, Name, Vsn, _Hash, Repo}, State, _ResourceState, UpdateETag) ->
     {ok, PackageDir} = rebar_packages:package_dir(Repo, State),
     Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),

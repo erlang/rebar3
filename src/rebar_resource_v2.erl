@@ -31,7 +31,7 @@
 -callback init(type(), rebar_state:t()) -> {ok, resource()}.
 -callback lock(rebar_app_info:t(), resource_state()) -> source().
 -callback download(file:filename_all(), rebar_app_info:t(), resource_state(), rebar_state:t()) ->
-    {ok, rebar_app_info:t()} | {error, any()}.
+    ok | {error, any()}.
 -callback needs_update(rebar_app_info:t(), resource_state()) -> boolean().
 -callback make_vsn(rebar_app_info:t(), resource_state()) ->
     {plain, string()} | {error, string()}.
