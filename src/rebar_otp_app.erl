@@ -59,8 +59,8 @@ compile(State, App) ->
 
 format_error({missing_app_file, Filename}) ->
     io_lib:format("App file is missing: ~ts", [Filename]);
-format_error({file_read, File, Reason}) ->
-    io_lib:format("Failed to read required file ~ts for processing: ~ts", [File, file:format_error(Reason)]);
+format_error({file_read, AppName, File, Reason}) ->
+    io_lib:format("Failed to read required ~ts file for processing the application '~ts': ~ts", [File, AppName, file:format_error(Reason)]);
 format_error({invalid_name, File, AppName}) ->
     io_lib:format("Invalid ~ts: name of application (~p) must match filename.", [File, AppName]).
 
@@ -79,7 +79,7 @@ validate_app(State, App) ->
                     Error
             end;
         {error, Reason} ->
-            ?PRV_ERROR({file_read, AppFile, Reason})
+            ?PRV_ERROR({file_read, rebar_app_info:name(App), ".app", Reason})
     end.
 
 validate_app_modules(State, App, AppData) ->
@@ -131,7 +131,7 @@ preprocess(State, AppInfo, AppSrcFile) ->
 
             AppFile;
         {error, Reason} ->
-            throw(?PRV_ERROR({file_read, AppSrcFile, Reason}))
+            throw(?PRV_ERROR({file_read, rebar_app_info:name(AppInfo), ".app.src", Reason}))
     end.
 
 load_app_vars(State) ->
