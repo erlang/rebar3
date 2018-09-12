@@ -399,7 +399,7 @@ warn_skip_deps(AppInfo, State) ->
     Msg = "Skipping ~ts (from ~p) as an app of the same name "
           "has already been fetched",
     Args = [rebar_app_info:name(AppInfo),
-            rebar_app_info:source(AppInfo)],
+            rebar_resource_v2:format_source(rebar_app_info:source(AppInfo))],
     case rebar_state:get(State, deps_error_on_conflict, false) of
         false ->
             case rebar_state:get(State, deps_warning_on_conflict, true) of
