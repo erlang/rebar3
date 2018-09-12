@@ -408,8 +408,16 @@ try_handle_app_file(_AppInfo, Other, _AppDir, _AppSrcFile, _, _Validate) ->
       AppFile :: file:filename(),
       AppDir :: file:filename(),
       AppSrcFile :: file:filename().
-try_handle_app_src_file(_AppInfo, _, _AppDir, [], _Validate) ->
-    false;
+try_handle_app_src_file(AppInfo, _, _AppDir, [], _Validate) ->
+    %% if .app and .app.src are not found check for a mix config file
+    %% it is assumed a plugin will build the application, including
+    %% a .app after this step
+    case filelib:is_file(filename:join(rebar_app_info:dir(AppInfo), "mix.exs")) of
+        true ->
+            {true, AppInfo};
+        false ->
+            false
+    end;
 try_handle_app_src_file(_AppInfo, _, _AppDir, _AppSrcFile, valid) ->
     false;
 try_handle_app_src_file(AppInfo, _, AppDir, [File], Validate) when Validate =:= invalid
