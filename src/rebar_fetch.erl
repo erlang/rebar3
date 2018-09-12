@@ -34,7 +34,7 @@ download_source(AppInfo, State)  ->
                 {true, AppInfo2} ->
                     rebar_app_info:is_available(AppInfo2, true);
                 false ->
-                    throw(?PRV_ERROR({dep_app_not_found, AppDir, rebar_app_info:name(AppInfo1)}))
+                    throw(?PRV_ERROR({dep_app_not_found, rebar_app_info:name(AppInfo1)}))
             end;
         Error ->
             throw(?PRV_ERROR(Error))
@@ -91,4 +91,7 @@ format_error({fetch_fail, Source}) ->
 format_error({bad_checksum, File}) ->
     io_lib:format("Checksum mismatch against tarball in ~ts", [File]);
 format_error({bad_registry_checksum, File}) ->
-    io_lib:format("Checksum mismatch against registry in ~ts", [File]).
+    io_lib:format("Checksum mismatch against registry in ~ts", [File]);
+format_error({dep_app_not_found, AppName}) ->
+    io_lib:format("Dependency failure: source for ~ts does not contain a "
+                  "recognizable project and can not be built", [AppName]).
