@@ -132,10 +132,9 @@ make_vsn(_, _) ->
 
 format_error({bad_registry_checksum, Name, Vsn, Expected, Found}) ->
     io_lib:format("The checksum for package at ~ts-~ts (~ts) does not match the "
-                  "checksum expected from the registry (~ts). Either unlock and "
-                  "upgrade the package, or make sure you fetched it from "
-                  "the same repo from which the registry was fetched.",
-                  [Name, Vsn, Found, Expected]).
+                  "checksum expected from the registry (~ts). "
+                  "Run `rebar3 do unlock ~ts, update` and then try again.",
+                  [Name, Vsn, Found, Expected, Name]).
 
 %%------------------------------------------------------------------------------
 %% @doc
