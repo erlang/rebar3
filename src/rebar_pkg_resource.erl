@@ -108,11 +108,11 @@ download(TmpDir, Pkg={pkg, Name, Vsn, _Hash, Repo}, State, _ResourceState, Updat
     CachePath = filename:join(PackageDir, Package),
     ETagPath = filename:join(PackageDir, ETagFile),
     case cached_download(TmpDir, CachePath, Pkg, etag(CachePath, ETagPath), ETagPath, UpdateETag) of
-        {unexpected_hash, Expected, Found} ->
+        {bad_registry_checksum, Expected, Found} ->
             %% checksum comparison failed. in case this is from a modified cached package
             %% overwrite the etag if it exists so it is not relied on again
             store_etag_in_cache(ETagPath, <<>>),
-            ?PRV_ERROR({unexpected_hash, CachePath, Expected, Found});
+            ?PRV_ERROR({bad_registry_checksum, Name, Vsn, Expected, Found});
         Result ->
             Result
     end.
@@ -130,12 +130,12 @@ download(TmpDir, Pkg={pkg, Name, Vsn, _Hash, Repo}, State, _ResourceState, Updat
 make_vsn(_, _) ->
     {error, "Replacing version of type pkg not supported."}.
 
-format_error({unexpected_hash, CachePath, Expected, Found}) ->
-    io_lib:format("The checksum for package at ~ts (~ts) does not match the "
-                  "checksum previously locked (~ts). Either unlock, "
+format_error({bad_registry_checksum, Name, Vsn, Expected, Found}) ->
+    io_lib:format("The checksum for package at ~ts-~ts (~ts) does not match the "
+                  "checksum expected from the registry (~ts). Either unlock and "
                   "upgrade the package, or make sure you fetched it from "
-                  "the same index from which it was initially fetched.",
-                  [CachePath, Found, Expected]).
+                  "the same repo from which the registry was fetched.",
+                  [Name, Vsn, Found, Expected]).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -237,7 +237,7 @@ cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash, RepoConfig}, ETag
       TmpDir :: file:name(),
       CachePath :: file:name(),
       Pkg :: package(),
-      Res :: ok | {error,_} | {unexpected_hash, integer(), integer()}.
+      Res :: ok | {error,_} | {bad_registry_checksum, integer(), integer()}.
 serve_from_cache(TmpDir, CachePath, Pkg) ->
     {ok, Binary} = file:read_file(CachePath),
     serve_from_memory(TmpDir, Binary, Pkg).
@@ -246,14 +246,14 @@ serve_from_cache(TmpDir, CachePath, Pkg) ->
       TmpDir :: file:name(),
       Tarball :: binary(),
       Package :: package(),
-      Res :: ok | {error,_} | {unexpected_hash, integer(), integer()}.
+      Res :: ok | {error,_} | {bad_registry_checksum, integer(), integer()}.
 serve_from_memory(TmpDir, Binary, {pkg, _Name, _Vsn, Hash, _RepoConfig}) ->
     RegistryChecksum = list_to_integer(binary_to_list(Hash), 16),
     case hex_tarball:unpack(Binary, TmpDir) of
         {ok, #{checksum := <<Checksum:256/big-unsigned>>}} when RegistryChecksum =/= Checksum ->
             ?DEBUG("Expected hash ~64.16.0B does not match checksum of fetched package ~64.16.0B",
                    [RegistryChecksum, Checksum]),
-            {unexpected_hash, RegistryChecksum, Checksum};
+            {bad_registry_checksum, RegistryChecksum, Checksum};
         {ok, #{checksum := <<RegistryChecksum:256/big-unsigned>>}} ->
             ok;
         {error, Reason} ->
