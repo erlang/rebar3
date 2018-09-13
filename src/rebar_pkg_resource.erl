@@ -14,7 +14,7 @@
 
 -ifdef(TEST).
 %% exported for test purposes
--export([store_etag_in_cache/2, etag/1, request/4]).
+-export([store_etag_in_cache/2]).
 -endif.
 
 -include("rebar.hrl").
@@ -107,8 +107,11 @@ download(TmpDir, Pkg={pkg, Name, Vsn, _Hash, Repo}, State, _ResourceState, Updat
     ETagFile = binary_to_list(<<Name/binary, "-", Vsn/binary, ".etag">>),
     CachePath = filename:join(PackageDir, Package),
     ETagPath = filename:join(PackageDir, ETagFile),
-    case cached_download(TmpDir, CachePath, Pkg, etag(ETagPath), ETagPath, UpdateETag) of
+    case cached_download(TmpDir, CachePath, Pkg, etag(CachePath, ETagPath), ETagPath, UpdateETag) of
         {unexpected_hash, Expected, Found} ->
+            %% checksum comparison failed. in case this is from a modified cached package
+            %% overwrite the etag if it exists so it is not relied on again
+            store_etag_in_cache(ETagPath, <<>>),
             ?PRV_ERROR({unexpected_hash, CachePath, Expected, Found});
         Result ->
             Result
@@ -170,13 +173,21 @@ request(Config, Name, Version, ETag) ->
 %% returned from the hexpm server. The name is package-vsn.etag.
 %% @end
 %%------------------------------------------------------------------------------
--spec etag(Path) -> Res when
-      Path :: file:name(),
+-spec etag(PackagePath, ETagPath) -> Res when
+      PackagePath :: file:name(),
+      ETagPath :: file:name(),
       Res :: binary().
-etag(Path) ->
-    case file:read_file(Path) of
+etag(PackagePath, ETagPath) ->
+    case file:read_file(ETagPath) of
         {ok, Bin} ->
-            Bin;
+            %% just in case a user deleted a cached package but not its etag
+            %% verify the package is also there, and if not, ignore the etag
+            case filelib:is_file(PackagePath) of
+                true ->
+                    Bin;
+                false ->
+                    <<>>
+            end;
         {error, _} ->
             <<>>
     end.
