@@ -9,7 +9,8 @@
          download/4,
          download/5,
          needs_update/2,
-         make_vsn/2]).
+         make_vsn/2,
+         format_error/1]).
 
 -ifdef(TEST).
 %% exported for test purposes
@@ -17,12 +18,9 @@
 -endif.
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
--type cached_result()   :: ok |
-                           {bad_checksum,string()} |
-                           {bad_registry_checksum,string()} |
-                           {failed_extract,string()} |
-                           {unexpected_hash,string(),_,binary()}.
+-type package() :: {pkg, binary(), binary(), binary(), rebar_hex_repos:repo()}.
 
 %%==============================================================================
 %% Public API
@@ -97,19 +95,24 @@ download(TmpDir, AppInfo, State, ResourceState) ->
 %%------------------------------------------------------------------------------
 -spec download(TmpDir, Pkg, State, ResourceState, UpdateETag) -> Res when
       TmpDir :: file:name(),
-      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: rebar_hex_repos:repo()},
+      Pkg :: package(),
       State :: rebar_state:t(),
       ResourceState:: rebar_resource_v2:resource_state(),
       UpdateETag :: boolean(),
-      Res :: ok | {error,_} | cached_result() | {fetch_fail, binary(), binary()} | {bad_download, file:name()}.
+      Res :: ok | {error,_} | {unexpected_hash, string(), integer(), integer()} |
+             {fetch_fail, binary(), binary()}.
 download(TmpDir, Pkg={pkg, Name, Vsn, _Hash, Repo}, State, _ResourceState, UpdateETag) ->
     {ok, PackageDir} = rebar_packages:package_dir(Repo, State),
     Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
     ETagFile = binary_to_list(<<Name/binary, "-", Vsn/binary, ".etag">>),
     CachePath = filename:join(PackageDir, Package),
     ETagPath = filename:join(PackageDir, ETagFile),
-    cached_download(TmpDir, CachePath, Pkg, etag(ETagPath),
-                    State, ETagPath, UpdateETag).
+    case cached_download(TmpDir, CachePath, Pkg, etag(ETagPath), ETagPath, UpdateETag) of
+        {unexpected_hash, Expected, Found} ->
+            ?PRV_ERROR({unexpected_hash, CachePath, Expected, Found});
+        Result ->
+            Result
+    end.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -123,6 +126,13 @@ download(TmpDir, Pkg={pkg, Name, Vsn, _Hash, Repo}, State, _ResourceState, Updat
       Res :: {'error', string()}.
 make_vsn(_, _) ->
     {error, "Replacing version of type pkg not supported."}.
+
+format_error({unexpected_hash, CachePath, Expected, Found}) ->
+    io_lib:format("The checksum for package at ~ts (~ts) does not match the "
+                  "checksum previously locked (~ts). Either unlock, "
+                  "upgrade the package, or make sure you fetched it from "
+                  "the same index from which it was initially fetched.",
+                  [CachePath, Found, Expected]).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -186,115 +196,69 @@ store_etag_in_cache(Path, ETag) ->
 %%%=============================================================================
 %%% Private functions
 %%%=============================================================================
--spec cached_download(TmpDir, CachePath, Pkg, ETag, State, ETagPath,
-                      UpdateETag) -> Res when
+-spec cached_download(TmpDir, CachePath, Pkg, ETag, ETagPath, UpdateETag) -> Res when
       TmpDir :: file:name(),
       CachePath :: file:name(),
-      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: rebar_hex_repos:repo()},
+      Pkg :: package(),
       ETag :: binary(),
-      State :: rebar_state:t(),
       ETagPath :: file:name(),
       UpdateETag :: boolean(),
-      Res :: cached_result() | {fetch_fail, binary(), binary()} | {bad_download, file:name()}.
+      Res :: ok | {unexpected_hash, integer(), integer()} | {fetch_fail, binary(), binary()}.
 cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash, RepoConfig}, ETag,
-                State, ETagPath, UpdateETag) ->
+                ETagPath, UpdateETag) ->
     case request(RepoConfig, Name, Vsn, ETag) of
         {ok, cached} ->
             ?INFO("Version cached at ~ts is up to date, reusing it", [CachePath]),
-            serve_from_cache(TmpDir, CachePath, Pkg, State);
+            serve_from_cache(TmpDir, CachePath, Pkg);
         {ok, Body, NewETag} ->
             ?INFO("Downloaded package, caching at ~ts", [CachePath]),
             maybe_store_etag_in_cache(UpdateETag, ETagPath, NewETag),
-            serve_from_download(TmpDir, CachePath, Pkg, NewETag, Body, 
-                                State, ETagPath);
+            serve_from_download(TmpDir, CachePath, Pkg, Body);
         error when ETag =/= <<>> ->
             store_etag_in_cache(ETagPath, ETag),
             ?INFO("Download error, using cached file at ~ts", [CachePath]),
-            serve_from_cache(TmpDir, CachePath, Pkg, State);
+            serve_from_cache(TmpDir, CachePath, Pkg);
         error ->
             {fetch_fail, Name, Vsn}
     end.
 
--spec serve_from_cache(TmpDir, CachePath, Pkg, State) -> Res when
+-spec serve_from_cache(TmpDir, CachePath, Pkg) -> Res when
       TmpDir :: file:name(),
       CachePath :: file:name(),
-      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: rebar_hex_repos:repo()},
-      State :: rebar_state:t(),
-      Res :: cached_result().
-serve_from_cache(TmpDir, CachePath, Pkg, State) ->
-    {Files, Contents, Version, Meta} = extract(TmpDir, CachePath),
-    case checksums(Pkg, Files, Contents, Version, Meta, State) of
-        {Chk, Chk, Chk} ->
-            erl_tar:extract({binary, Contents}, [{cwd, TmpDir}, compressed]);
-        {_Hash, Chk, Chk} ->
-            ?DEBUG("Expected hash ~p does not match checksums ~p", [_Hash, Chk]),
-            {unexpected_hash, CachePath, _Hash, Chk};
-        {Chk, _Bin, Chk} ->
-            ?DEBUG("Checksums: registry: ~p, pkg: ~p", [Chk, _Bin]),
-            {failed_extract, CachePath};
-        {_Hash, _Bin, _Tar} ->
-            ?DEBUG("Checksums: expected: ~p, pkg: ~p, meta: ~p",
-                   [_Hash, _Bin, _Tar]),
-            {bad_checksum, CachePath}
+      Pkg :: package(),
+      Res :: ok | {error,_} | {unexpected_hash, integer(), integer()}.
+serve_from_cache(TmpDir, CachePath, Pkg) ->
+    {ok, Binary} = file:read_file(CachePath),
+    serve_from_memory(TmpDir, Binary, Pkg).
+
+-spec serve_from_memory(TmpDir, Tarball, Package) -> Res when
+      TmpDir :: file:name(),
+      Tarball :: binary(),
+      Package :: package(),
+      Res :: ok | {error,_} | {unexpected_hash, integer(), integer()}.
+serve_from_memory(TmpDir, Binary, {pkg, _Name, _Vsn, Hash, _RepoConfig}) ->
+    RegistryChecksum = list_to_integer(binary_to_list(Hash), 16),
+    case hex_tarball:unpack(Binary, TmpDir) of
+        {ok, #{checksum := <<Checksum:256/big-unsigned>>}} when RegistryChecksum =/= Checksum ->
+            ?DEBUG("Expected hash ~64.16.0B does not match checksum of fetched package ~64.16.0B",
+                   [RegistryChecksum, Checksum]),
+            {unexpected_hash, RegistryChecksum, Checksum};
+        {ok, #{checksum := <<RegistryChecksum:256/big-unsigned>>}} ->
+            ok;
+        {error, Reason} ->
+            {error, {hex_tarball, Reason}}
     end.
 
--spec serve_from_download(TmpDir, CachePath, Package, ETag, Binary, State,
-                          ETagPath) -> Res when
+-spec serve_from_download(TmpDir, CachePath, Package, Binary) -> Res when
       TmpDir :: file:name(),
       CachePath :: file:name(),
-      Package :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: rebar_hex_repos:repo()},
-      ETag :: binary(),
+      Package :: package(),
       Binary :: binary(),
-      State :: rebar_state:t(),
-      ETagPath :: file:name(),
-      Res :: ok | {error,_} | {bad_download, file:name()}.
-serve_from_download(TmpDir, CachePath, Package, ETag, Binary, State, ETagPath) ->
+      Res :: ok | {error,_}.
+serve_from_download(TmpDir, CachePath, Package, Binary) ->
     ?DEBUG("Writing ~p to cache at ~ts", [Package, CachePath]),
     file:write_file(CachePath, Binary),
-    case etag(ETagPath) of
-        ETag ->
-            serve_from_cache(TmpDir, CachePath, Package, State);
-        FileETag ->            
-            ?DEBUG("Downloaded file ~ts ETag ~ts doesn't match returned ETag ~ts",
-                   [CachePath, ETag, FileETag]),
-            {bad_download, CachePath}
-    end.
-
--spec extract(TmpDir, CachePath) -> Res when
-      TmpDir :: file:name(),
-      CachePath :: file:name(),
-      Res :: {Files, Contents, Version, Meta},
-      Files :: list({file:name(), binary()}),
-      Contents :: binary(),
-      Version :: binary(),
-      Meta :: binary().
-extract(TmpDir, CachePath) ->
-    ec_file:mkdir_p(TmpDir),
-    {ok, Files} = erl_tar:extract(CachePath, [memory]),
-    {"contents.tar.gz", Contents} = lists:keyfind("contents.tar.gz", 1, Files),
-    {"VERSION", Version} = lists:keyfind("VERSION", 1, Files),
-    {"metadata.config", Meta} = lists:keyfind("metadata.config", 1, Files),
-    {Files, Contents, Version, Meta}.
-
--spec checksums(Pkg, Files, Contents, Version, Meta, State) -> Res when
-      Pkg :: {pkg, Name :: binary(), Vsn :: binary(), Hash :: binary(), RepoConfig :: rebar_hex_repos:repo()},
-      Files :: list({file:name(), binary()}),
-      Contents :: binary(),
-      Version :: binary(),
-      Meta :: binary(),
-      State :: rebar_state:t(),
-      Res :: {Hash, BinChecksum, TarChecksum},
-      Hash :: binary(),
-      BinChecksum :: binary(),
-      TarChecksum :: binary().
-checksums({pkg, _Name, _Vsn, Hash, _}, Files, Contents, Version, Meta, _State) ->
-    Blob = <<Version/binary, Meta/binary, Contents/binary>>,
-    <<X:256/big-unsigned>> = crypto:hash(sha256, Blob),
-    BinChecksum = list_to_binary(
-                    rebar_string:uppercase(
-                      lists:flatten(io_lib:format("~64.16.0b", [X])))),
-    {"CHECKSUM", TarChecksum} = lists:keyfind("CHECKSUM", 1, Files),
-    {Hash, BinChecksum, TarChecksum}.
+    serve_from_memory(TmpDir, Binary, Package).
 
 -spec maybe_store_etag_in_cache(UpdateETag, Path, ETag) -> Res when
       UpdateETag :: boolean(),

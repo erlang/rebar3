@@ -71,26 +71,10 @@ needs_update(AppInfo, State) ->
             true
     end.
 
-format_error({bad_download, CachePath}) ->
-    io_lib:format("Download of package does not match md5sum from server: ~ts", [CachePath]);
-format_error({unexpected_hash, CachePath, Expected, Found}) ->
-    io_lib:format("The checksum for package at ~ts (~ts) does not match the "
-                  "checksum previously locked (~ts). Either unlock or "
-                  "upgrade the package, or make sure you fetched it from "
-                  "the same index from which it was initially fetched.",
-                  [CachePath, Found, Expected]);
-format_error({failed_extract, CachePath}) ->
-    io_lib:format("Failed to extract package: ~ts", [CachePath]);
-format_error({bad_etag, Source}) ->
-    io_lib:format("MD5 Checksum comparison failed for: ~ts", [Source]);
 format_error({fetch_fail, Name, Vsn}) ->
     io_lib:format("Failed to fetch and copy dep: ~ts-~ts", [Name, Vsn]);
 format_error({fetch_fail, Source}) ->
     io_lib:format("Failed to fetch and copy dep: ~p", [Source]);
-format_error({bad_checksum, File}) ->
-    io_lib:format("Checksum mismatch against tarball in ~ts", [File]);
-format_error({bad_registry_checksum, File}) ->
-    io_lib:format("Checksum mismatch against registry in ~ts", [File]);
 format_error({dep_app_not_found, AppName}) ->
     io_lib:format("Dependency failure: source for ~ts does not contain a "
                   "recognizable project and can not be built", [AppName]).

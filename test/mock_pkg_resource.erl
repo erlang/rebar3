@@ -93,20 +93,21 @@ mock_download(Opts) ->
                 [kernel, stdlib] ++ [element(1,D) || D  <- AppDeps]
             ),
             rebar_test_utils:create_config(Dir, [{deps, AppDeps}]++Config),
+
             TarApp = App++"-"++rebar_utils:to_list(Vsn)++".tar",
-            Tarball = filename:join([Dir, TarApp]),
-            Contents = filename:join([Dir, "contents.tar.gz"]),
+
+            Metadata = #{<<"app">> => AppBin,
+                         <<"version">> => Vsn},
+
             Files = all_files(rebar_app_info:dir(AppInfo1)),
-            ok = erl_tar:create(Contents,
-                                archive_names(Dir, App, Vsn, Files),
-                                [compressed]),
-            ok = erl_tar:create(Tarball,
-                                [{"contents.tar.gz", Contents}],
-                                []),
+            {ok, {Tarball, _Checksum}} = hex_tarball:create(Metadata, archive_names(Dir, Files)),
+            Archive = filename:join([Dir, TarApp]),
+            file:write_file(Archive, Tarball),
+
             Cache = proplists:get_value(cache_dir, Opts, filename:join(Dir,"cache")),
             Cached = filename:join([Cache, TarApp]),
             filelib:ensure_dir(Cached),
-            rebar_file_utils:mv(Tarball, Cached),
+            rebar_file_utils:mv(Archive, Cached),
             ok
         end).
 
@@ -137,7 +138,7 @@ mock_pkg_index(Opts) ->
 all_files(Dir) ->
     filelib:wildcard(filename:join([Dir, "**"])).
 
-archive_names(Dir, _App, _Vsn, Files) ->
+archive_names(Dir, Files) ->
     [{(F -- Dir) -- "/", F} || F <- Files].
 
 find_parts(Apps, Skip) -> find_parts(Apps, Skip, dict:new()).

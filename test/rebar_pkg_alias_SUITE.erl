@@ -190,7 +190,7 @@ mock_config(Name, Config) ->
     CacheDir = filename:join([CacheRoot, "hex", "com", "test", "packages"]),
     rebar_test_utils:create_app(AppDir, "fakelib", "1.0.0", [kernel, stdlib]),
     ct:pal("{~p, ~p}",[ChkFake, Etag]),
-    {ChkFake, Etag} = rebar_test_utils:package_app(AppDir, CacheDir, "goodpkg-1.0.0"),
+    {ChkGood, EtagGood} = rebar_test_utils:package_app(AppDir, CacheDir, "goodpkg", "1.0.0"),
 
     AllDeps = [
      {<<"fakelib">>,[[<<"1.0.0">>]]},
@@ -198,7 +198,7 @@ mock_config(Name, Config) ->
      {<<"topdep">>,[[<<"1.0.0">>]]},
      {<<"transitive">>, [[<<"1.0.0">>]]},
      {{<<"fakelib">>,<<"1.0.0">>}, [[], ChkFake, [<<"rebar3">>]]},
-     {{<<"goodpkg">>,<<"1.0.0">>}, [[], ChkFake, [<<"rebar3">>]]},
+     {{<<"goodpkg">>,<<"1.0.0">>}, [[], ChkGood, [<<"rebar3">>]]},
      {{<<"topdep">>,<<"1.0.0">>},
       [[
         {<<"transitive">>, <<"1.0.0">>, false, <<"transitive_app">>}
@@ -248,13 +248,14 @@ mock_config(Name, Config) ->
                         Releases =
                             [#{checksum => Checksum,
                                version => Vsn,
-                               dependencies => [{DAppName, {pkg, DN, DV, undefined}} || {DN, DV, _, DAppName} <- Deps]} ||
+                               dependencies => [{DAppName, {pkg, DN, DV, undefined}} ||
+                                                   {DN, DV, _, DAppName} <- Deps]} ||
                                 {{_, Vsn}, [Deps, Checksum, _]} <- Matches],
                         {ok, {200, #{}, #{releases => Releases}}}
                 end),
 
     meck:expect(hex_repo, get_tarball, fun(_, _, _) ->
-                                               {ok, {304, #{<<"etag">> => Etag}, <<>>}}
+                                               {ok, {304, #{<<"etag">> => EtagGood}, <<>>}}
                                        end),   
     
     %% Move all packages to cache
@@ -278,4 +279,4 @@ create_lib(Name, Config, AppName, PkgName) ->
     CacheDir = filename:join([CacheRoot, "hex", "com", "test", "packages"]),
     filelib:ensure_dir(filename:join([CacheDir, "registry"])),
     rebar_test_utils:create_app(AppDir, AppName, "1.0.0", [kernel, stdlib]),
-    rebar_test_utils:package_app(AppDir, CacheDir, PkgName++"-1.0.0").
+    rebar_test_utils:package_app(AppDir, CacheDir, PkgName, "1.0.0").
