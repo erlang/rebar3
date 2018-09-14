@@ -98,8 +98,7 @@ merge_deps(AppInfo, State) ->
     %% the State and at the top level, not as part of an application.
     CurrentProfiles = rebar_state:current_profiles(State),
     Default = reset_hooks(rebar_state:default(State), CurrentProfiles),
-    {C, State1} = project_app_config(AppInfo, State),
-    AppInfo0 = rebar_app_info:update_opts(AppInfo, Default, C),
+    {AppInfo0, State1} = project_app_config(AppInfo, Default, State),
 
     Name = rebar_app_info:name(AppInfo0),
 
@@ -154,27 +153,35 @@ parse_profile_deps(Profile, Name, Deps, Opts, State) ->
 
 %% @doc Find the app-level config and return the state updated
 %% with the relevant app-level data.
--spec project_app_config(rebar_app_info:t(), rebar_state:t()) ->
+-spec project_app_config(rebar_app_info:t(), rebar_dict(), rebar_state:t()) ->
     {Config, rebar_state:t()} when
       Config :: [any()].
-project_app_config(AppInfo, State) ->
+project_app_config(AppInfo, Default, State) ->
     C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
-    Dir = rebar_app_info:dir(AppInfo),
-    Opts = maybe_reset_hooks(Dir, rebar_state:opts(State), State),
-    {C, rebar_state:opts(State, Opts)}.
+    AppInfo1 = rebar_app_info:update_opts(AppInfo, Default, C),
+    {AppInfo2, State1} = maybe_reset_hooks_plugins(AppInfo1, State),
+    {AppInfo2, State1}.
 
-%% @private Check if the app is at the root of the project.
-%% If it is, then drop the hooks from the config so they aren't run twice
--spec maybe_reset_hooks(file:filename(), Opts, rebar_state:t()) -> Opts when
-      Opts :: rebar_dict().
-maybe_reset_hooks(Dir, Opts, State) ->
+-spec maybe_reset_hooks_plugins(AppInfo, State) ->  {AppInfo, State} when
+      AppInfo :: rebar_app_info:t(),
+      State :: rebar_state:t().
+maybe_reset_hooks_plugins(AppInfo, State) ->
+    Dir = rebar_app_info:dir(AppInfo),
     case ec_file:real_dir_path(rebar_dir:root_dir(State)) of
         Dir ->
             CurrentProfiles = rebar_state:current_profiles(State),
-            reset_hooks(Opts, CurrentProfiles);
+            Opts = reset_hooks(rebar_state:opts(State), CurrentProfiles),
+            State1 = rebar_state:opts(State, Opts),
+
+            %% set plugins to empty since this is an app at the top level
+            %% and top level plugins are installed in run_aux
+            AppInfo1 = rebar_app_info:set(rebar_app_info:set(AppInfo, {plugins,default}, []), plugins, []),
+
+            {AppInfo1, State1};
         _ ->
-            Opts
+            {AppInfo, State}
     end.
+
 
 %% @doc make the hooks empty for a given set of options
 -spec reset_hooks(Opts, Profiles) ->
