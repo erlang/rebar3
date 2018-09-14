@@ -150,7 +150,19 @@ compile(State, Providers, AppInfo) ->
     AppInfo1 = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, AppInfo, State),
 
     AppInfo2 = rebar_hooks:run_all_hooks(AppDir, pre, ?ERLC_HOOK, Providers, AppInfo1, State),
-    rebar_erlc_compiler:compile(AppInfo2),
+
+    case rebar_app_info:compile_type(AppInfo) of
+        mix ->
+            rebar_utils:sh("mix compile --no-deps-check --no-protocol-consolidation",
+                           [{cd, AppDir},
+                            {return_on_error, true},
+                            {use_stdout, true},
+                            {env, [{"MIX_BUILD_PATH", filename:join(AppDir, "../../")},
+                                   {"MIX_ENV", "prod"}]}]);
+        _ ->
+            rebar_erlc_compiler:compile(AppInfo2)
+    end,
+
     AppInfo3 = rebar_hooks:run_all_hooks(AppDir, post, ?ERLC_HOOK, Providers, AppInfo2, State),
 
     AppInfo4 = rebar_hooks:run_all_hooks(AppDir, pre, ?APP_HOOK, Providers, AppInfo3, State),

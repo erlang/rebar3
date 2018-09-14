@@ -427,7 +427,7 @@ try_handle_app_src_file(AppInfo, _, _AppDir, [], _Validate) ->
     %% a .app after this step
     case filelib:is_file(filename:join(rebar_app_info:dir(AppInfo), "mix.exs")) of
         true ->
-            {true, AppInfo};
+            {true, rebar_app_info:compile_type(AppInfo, mix)};
         false ->
             false
     end;
