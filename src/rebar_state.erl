@@ -38,6 +38,7 @@
 
          to_list/1,
 
+         create_resources/2,
          resources/1, resources/2, add_resource/2,
          providers/1, providers/2, add_provider/2,
          allow_provider_overrides/1, allow_provider_overrides/2
@@ -75,26 +76,24 @@
 
 -spec new() -> t().
 new() ->
-    BaseState = base_state(),
+    BaseState = base_state(dict:new()),
     BaseState#state_t{dir = rebar_dir:get_cwd()}.
 
 -spec new(list()) -> t().
 new(Config) when is_list(Config) ->
-    BaseState = base_state(),
     Opts = base_opts(Config),
-    BaseState#state_t { dir = rebar_dir:get_cwd(),
-                        default = Opts,
-                        opts = Opts }.
+    BaseState = base_state(Opts),
+    BaseState#state_t{dir=rebar_dir:get_cwd(),
+                      default=Opts}.
 
 -spec new(t() | atom(), list()) -> t().
 new(Profile, Config) when is_atom(Profile)
                         , is_list(Config) ->
-    BaseState = base_state(),
     Opts = base_opts(Config),
-    BaseState#state_t { dir = rebar_dir:get_cwd(),
-                        current_profiles = [Profile],
-                        default = Opts,
-                        opts = Opts };
+    BaseState = base_state(Opts),
+    BaseState#state_t{dir = rebar_dir:get_cwd(),
+                      current_profiles = [Profile],
+                      default = Opts};
 new(ParentState=#state_t{}, Config) ->
     %% Load terms from rebar.config, if it exists
     Dir = rebar_dir:get_cwd(),
@@ -129,20 +128,15 @@ deps_from_config(Dir, Config) ->
             [{{locks, default}, D}, {{deps, default}, Deps}]
     end.
 
-base_state() ->
-    case application:get_env(rebar, resources) of
-        undefined ->
-            Resources = [];
-        {ok, Resources} ->
-            Resources
-    end,
-    #state_t{resources=Resources}.
+base_state(Opts) ->
+    #state_t{opts=Opts}.
 
 base_opts(Config) ->
     Deps = proplists:get_value(deps, Config, []),
     Plugins = proplists:get_value(plugins, Config, []),
     ProjectPlugins = proplists:get_value(project_plugins, Config, []),
-    Terms = [{{deps, default}, Deps}, {{plugins, default}, Plugins}, {{project_plugins, default}, ProjectPlugins} | Config],
+    Terms = [{{deps, default}, Deps}, {{plugins, default}, Plugins},
+             {{project_plugins, default}, ProjectPlugins} | Config],
     true = rebar_config:verify_config_format(Terms),
     dict:from_list(Terms).
 
@@ -359,17 +353,49 @@ namespace(#state_t{namespace=Namespace}) ->
 namespace(State=#state_t{}, Namespace) ->
     State#state_t{namespace=Namespace}.
 
--spec resources(t()) -> [{rebar_resource:type(), module()}].
+-spec resources(t()) -> [{rebar_resource_v2:type(), module()}].
 resources(#state_t{resources=Resources}) ->
     Resources.
 
--spec resources(t(), [{rebar_resource:type(), module()}]) -> t().
+-spec resources(t(), [{rebar_resource_v2:type(), module()}]) -> t().
 resources(State, NewResources) ->
-    State#state_t{resources=NewResources}.
+    lists:foldl(fun(Resource, StateAcc) ->
+                        add_resource(StateAcc, Resource)
+                end, State, NewResources).
 
--spec add_resource(t(), {rebar_resource:type(), module()}) -> t().
-add_resource(State=#state_t{resources=Resources}, Resource) ->
+-spec add_resource(t(), {rebar_resource_v2:type(), module()}) -> t().
+add_resource(State=#state_t{resources=Resources}, {ResourceType, ResourceModule}) ->
+    _ = code:ensure_loaded(ResourceModule),
+    Resource = case erlang:function_exported(ResourceModule, init, 2) of
+                   true ->
+                       case ResourceModule:init(ResourceType, State) of
+                           {ok, R=#resource{}} ->
+                               R;
+                           _ ->
+                               %% init didn't return a resource
+                               %% must be an old resource
+                               warn_old_resource(ResourceModule),
+                               rebar_resource:new(ResourceType,
+                                                  ResourceModule,
+                                                  #{})
+                       end;
+                   false ->
+                       %% no init, must be initial implementation
+                       warn_old_resource(ResourceModule),
+                       rebar_resource:new(ResourceType,
+                                          ResourceModule,
+                                          #{})
+               end,
     State#state_t{resources=[Resource | Resources]}.
+
+warn_old_resource(ResourceModule) ->
+    ?WARN("Using custom resource ~s that implements a deprecated api. "
+          "It should be upgraded to rebar_resource_v2.", [ResourceModule]).
+
+create_resources(Resources, State) ->
+    lists:foldl(fun(R, StateAcc) ->
+                        add_resource(StateAcc, R)
+                end, State, Resources).
 
 providers(#state_t{providers=Providers}) ->
     Providers.

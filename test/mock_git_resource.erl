@@ -27,7 +27,7 @@ mock(Opts) ->
     mock(Opts, create_app).
 
 mock(Opts, CreateType) ->
-    meck:new(?MOD, [no_link]),
+    meck:new(?MOD, [no_link, passthrough]),
     mock_lock(Opts),
     mock_update(Opts),
     mock_vsn(Opts),
@@ -46,8 +46,8 @@ unmock() ->
 mock_lock(_) ->
     meck:expect(
         ?MOD, lock,
-        fun(_AppDir, Git) ->
-            case Git of
+        fun(AppInfo, _) ->
+            case rebar_app_info:source(AppInfo) of
                 {git, Url, {tag, Ref}} -> {git, Url, {ref, Ref}};
                 {git, Url, {ref, Ref}} -> {git, Url, {ref, Ref}};
                 {git, Url} -> {git, Url, {ref, "0.0.0"}};
@@ -62,7 +62,8 @@ mock_update(Opts) ->
 %    ct:pal("TOUp: ~p", [ToUpdate]),
     meck:expect(
         ?MOD, needs_update,
-        fun(_Dir, {git, Url, _Ref}) ->
+        fun(AppInfo, _) ->
+            {git, Url, _Ref} = rebar_app_info:source(AppInfo),
             App = app(Url),
 %            ct:pal("Needed update? ~p (~p) -> ~p", [App, {Url,_Ref}, lists:member(App, ToUpdate)]),
             lists:member(App, ToUpdate)
@@ -78,7 +79,8 @@ mock_vsn(Opts) ->
     Default = proplists:get_value(default_vsn, Opts, "0.0.0"),
     meck:expect(
         ?MOD, make_vsn,
-        fun(Dir) ->
+      fun(AppInfo, _) ->
+            Dir = rebar_app_info:dir(AppInfo),
             case filelib:wildcard("*.app.src", filename:join([Dir,"src"])) of
                 [AppSrc] ->
                     {ok, App} = file:consult(AppSrc),
@@ -108,7 +110,8 @@ mock_download(Opts, CreateType) ->
     Overrides = proplists:get_value(override_vsn, Opts, []),
     meck:expect(
         ?MOD, download,
-        fun (Dir, Git, _) ->
+        fun (Dir, AppInfo, _, _) ->
+            Git = rebar_app_info:source(AppInfo),
             filelib:ensure_dir(Dir),
             {git, Url, {_, Vsn}} = normalize_git(Git, Overrides, Default),
             App = app(Url),
@@ -118,7 +121,7 @@ mock_download(Opts, CreateType) ->
                 [kernel, stdlib] ++ [element(1,D) || D  <- AppDeps]
             ),
             rebar_test_utils:create_config(Dir, [{deps, AppDeps}]++Config),
-            {ok, 'WHATEVER'}
+            ok
         end).
 
 %%%%%%%%%%%%%%%

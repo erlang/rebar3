@@ -74,13 +74,15 @@
          user_agent/0,
          reread_config/1, reread_config/2,
          get_proxy_auth/0,
-         is_list_of_strings/1]).
+         is_list_of_strings/1,
+         ssl_opts/1]).
 
 
 %% for internal use only
 -export([otp_release/0]).
 
 -include("rebar.hrl").
+-include_lib("public_key/include/OTP-PUB-KEY.hrl").
 
 -define(ONE_LEVEL_INDENT, "     ").
 -define(APP_NAME_INDEX, 2).
@@ -710,12 +712,12 @@ escript_foldl(Fun, Acc, File) ->
             Error
     end.
 
-vcs_vsn(Vcs, Dir, Resources) ->
-    case vcs_vsn_cmd(Vcs, Dir, Resources) of
+vcs_vsn(AppInfo, Vcs, State) ->
+    case vcs_vsn_cmd(AppInfo, Vcs, State) of
         {plain, VsnString} ->
             VsnString;
         {cmd, CmdString} ->
-            vcs_vsn_invoke(CmdString, Dir);
+            vcs_vsn_invoke(CmdString, rebar_app_info:dir(AppInfo));
         unknown ->
             ?ABORT("vcs_vsn: Unknown vsn format: ~p", [Vcs]);
         {error, Reason} ->
@@ -723,23 +725,18 @@ vcs_vsn(Vcs, Dir, Resources) ->
     end.
 
 %% Temp work around for repos like relx that use "semver"
-vcs_vsn_cmd(Vsn, _, _) when is_binary(Vsn) ->
+vcs_vsn_cmd(_AppInfo, Vsn, _) when is_binary(Vsn) ->
     {plain, Vsn};
-vcs_vsn_cmd(VCS, Dir, Resources) when VCS =:= semver ; VCS =:= "semver" ->
-    vcs_vsn_cmd(git, Dir, Resources);
-vcs_vsn_cmd({cmd, _Cmd}=Custom, _, _) ->
+vcs_vsn_cmd(AppInfo, VCS, State) when VCS =:= semver ; VCS =:= "semver" ->
+    vcs_vsn_cmd(AppInfo, git, State);
+vcs_vsn_cmd(_AppInfo, {cmd, _Cmd}=Custom, _) ->
     Custom;
-vcs_vsn_cmd(VCS, Dir, Resources) when is_atom(VCS) ->
-    case find_resource_module(VCS, Resources) of
-        {ok, Module} ->
-            Module:make_vsn(Dir);
-        {error, _} ->
-            unknown
-    end;
-vcs_vsn_cmd(VCS, Dir, Resources) when is_list(VCS) ->
+vcs_vsn_cmd(AppInfo, VCS, State) when is_atom(VCS) ->
+    rebar_resource_v2:make_vsn(AppInfo, VCS, State);
+vcs_vsn_cmd(AppInfo, VCS, State) when is_list(VCS) ->
     try list_to_existing_atom(VCS) of
         AVCS ->
-            case vcs_vsn_cmd(AVCS, Dir, Resources) of
+            case vcs_vsn_cmd(AppInfo, AVCS, State) of
                 unknown -> {plain, VCS};
                 Other -> Other
             end
@@ -753,19 +750,6 @@ vcs_vsn_cmd(_, _, _) ->
 vcs_vsn_invoke(Cmd, Dir) ->
     {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),
     rebar_string:trim(VsnString, trailing, "\n").
-
-find_resource_module(Type, Resources) ->
-    case lists:keyfind(Type, 1, Resources) of
-        false ->
-            case code:which(Type) of
-                non_existing ->
-                    {error, unknown};
-                _ ->
-                    {ok, Type}
-            end;
-        {Type, Module} ->
-            {ok, Module}
-    end.
 
 %% @doc ident to the level specified
 -spec indent(non_neg_integer()) -> iolist().
@@ -977,3 +961,116 @@ is_list_of_strings(List) when is_list(hd(List)) ->
     true;
 is_list_of_strings(List) when is_list(List) ->
     true.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return the SSL options adequate for the project based on
+%% its configuration, including for validation of certs.
+%% @end
+%%------------------------------------------------------------------------------
+-spec ssl_opts(Url) -> Res when
+      Url :: string(),
+      Res :: proplists:proplist().
+ssl_opts(Url) ->
+    case get_ssl_config() of
+        ssl_verify_enabled ->
+            ssl_opts(ssl_verify_enabled, Url);
+        ssl_verify_disabled ->
+            [{verify, verify_none}]
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return the SSL options adequate for the project based on
+%% its configuration, including for validation of certs.
+%% @end
+%%------------------------------------------------------------------------------
+-spec ssl_opts(Enabled, Url) -> Res when
+      Enabled :: atom(),
+      Url :: string(),
+      Res :: proplists:proplist().
+ssl_opts(ssl_verify_enabled, Url) ->
+    case check_ssl_version() of
+        true ->
+            {ok, {_, _, Hostname, _, _, _}} =
+                http_uri:parse(rebar_utils:to_list(Url)),
+            VerifyFun = {fun ssl_verify_hostname:verify_fun/3,
+                         [{check_hostname, Hostname}]},
+            CACerts = certifi:cacerts(),
+            [{verify, verify_peer}, {depth, 2}, {cacerts, CACerts},
+             {partial_chain, fun partial_chain/1}, {verify_fun, VerifyFun}];
+        false ->
+            ?WARN("Insecure HTTPS request (peer verification disabled), "
+                  "please update to OTP 17.4 or later", []),
+            [{verify, verify_none}]
+    end.
+
+-spec partial_chain(Certs) -> Res when
+      Certs :: list(any()),
+      Res :: unknown_ca | {trusted_ca, any()}.
+partial_chain(Certs) ->
+    Certs1 = [{Cert, public_key:pkix_decode_cert(Cert, otp)} || Cert <- Certs],
+    CACerts = certifi:cacerts(),
+    CACerts1 = [public_key:pkix_decode_cert(Cert, otp) || Cert <- CACerts],
+    case ec_lists:find(fun({_, Cert}) ->
+                               check_cert(CACerts1, Cert)
+                       end, Certs1) of
+        {ok, Trusted} ->
+            {trusted_ca, element(1, Trusted)};
+        _ ->
+            unknown_ca
+    end.
+
+-spec extract_public_key_info(Cert) -> Res when
+      Cert :: #'OTPCertificate'{tbsCertificate::#'OTPTBSCertificate'{}},
+      Res :: any().
+extract_public_key_info(Cert) ->
+    ((Cert#'OTPCertificate'.tbsCertificate)#'OTPTBSCertificate'.subjectPublicKeyInfo).
+
+-spec check_cert(CACerts, Cert) -> Res when
+      CACerts :: list(any()),
+      Cert :: any(),
+      Res :: boolean().
+check_cert(CACerts, Cert) ->
+    lists:any(fun(CACert) ->
+                      extract_public_key_info(CACert) == extract_public_key_info(Cert)
+              end, CACerts).
+
+-spec check_ssl_version() ->
+    boolean().
+check_ssl_version() ->
+    case application:get_key(ssl, vsn) of
+        {ok, Vsn} ->
+            parse_vsn(Vsn) >= {5, 3, 6};
+        _ ->
+            false
+    end.
+
+-spec get_ssl_config() ->
+      ssl_verify_disabled | ssl_verify_enabled.
+get_ssl_config() ->
+    GlobalConfigFile = rebar_dir:global_config(),
+    Config = rebar_config:consult_file(GlobalConfigFile),
+    case proplists:get_value(ssl_verify, Config, []) of
+        false ->
+            ssl_verify_disabled;
+        _ ->
+            ssl_verify_enabled
+    end.
+
+-spec parse_vsn(Vsn) -> Res when
+      Vsn :: string(),
+      Res :: {integer(), integer(), integer()}.
+parse_vsn(Vsn) ->
+    version_pad(rebar_string:lexemes(Vsn, ".-")).
+
+-spec version_pad(list(nonempty_string())) -> Res when
+      Res :: {integer(), integer(), integer()}.
+version_pad([Major]) ->
+    {list_to_integer(Major), 0, 0};
+version_pad([Major, Minor]) ->
+    {list_to_integer(Major), list_to_integer(Minor), 0};
+version_pad([Major, Minor, Patch]) ->
+    {list_to_integer(Major), list_to_integer(Minor), list_to_integer(Patch)};
+version_pad([Major, Minor, Patch | _]) ->
+    {list_to_integer(Major), list_to_integer(Minor), list_to_integer(Patch)}.

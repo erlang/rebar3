@@ -59,8 +59,8 @@ compile(State, App) ->
 
 format_error({missing_app_file, Filename}) ->
     io_lib:format("App file is missing: ~ts", [Filename]);
-format_error({file_read, File, Reason}) ->
-    io_lib:format("Failed to read required file ~ts for processing: ~ts", [File, file:format_error(Reason)]);
+format_error({file_read, AppName, File, Reason}) ->
+    io_lib:format("Failed to read required ~ts file for processing the application '~ts': ~ts", [File, AppName, file:format_error(Reason)]);
 format_error({invalid_name, File, AppName}) ->
     io_lib:format("Invalid ~ts: name of application (~p) must match filename.", [File, AppName]).
 
@@ -79,7 +79,7 @@ validate_app(State, App) ->
                     Error
             end;
         {error, Reason} ->
-            ?PRV_ERROR({file_read, AppFile, Reason})
+            ?PRV_ERROR({file_read, rebar_app_info:name(App), ".app", Reason})
     end.
 
 validate_app_modules(State, App, AppData) ->
@@ -110,7 +110,7 @@ preprocess(State, AppInfo, AppSrcFile) ->
             A1 = apply_app_vars(AppVars, AppData),
 
             %% AppSrcFile may contain instructions for generating a vsn number
-            Vsn = app_vsn(AppData, AppSrcFile, State),
+            Vsn = app_vsn(AppInfo, AppData, AppSrcFile, State),
             A2 = lists:keystore(vsn, 1, A1, {vsn, Vsn}),
 
             %% systools:make_relup/4 fails with {missing_param, registered}
@@ -131,7 +131,7 @@ preprocess(State, AppInfo, AppSrcFile) ->
 
             AppFile;
         {error, Reason} ->
-            throw(?PRV_ERROR({file_read, AppSrcFile, Reason}))
+            throw(?PRV_ERROR({file_read, rebar_app_info:name(AppInfo), ".app.src", Reason}))
     end.
 
 load_app_vars(State) ->
@@ -226,10 +226,8 @@ consult_app_file(Filename) ->
             end
     end.
 
-app_vsn(AppData, AppFile, State) ->
-    AppDir = filename:dirname(filename:dirname(AppFile)),
-    Resources = rebar_state:resources(State),
-    rebar_utils:vcs_vsn(get_value(vsn, AppData, AppFile), AppDir, Resources).
+app_vsn(AppInfo, AppData, AppFile, State) ->
+    rebar_utils:vcs_vsn(AppInfo, get_value(vsn, AppData, AppFile), State).
 
 get_value(Key, AppInfo, AppFile) ->
     case proplists:get_value(Key, AppInfo) of

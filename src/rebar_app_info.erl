@@ -7,6 +7,7 @@
          new/4,
          new/5,
          update_opts/3,
+         update_opts_deps/2,
          discover/1,
          name/1,
          name/2,
@@ -43,8 +44,6 @@
          get/2,
          get/3,
          set/3,
-         resource_type/1,
-         resource_type/2,
          source/1,
          source/2,
          is_lock/1,
@@ -53,6 +52,8 @@
          is_checkout/2,
          valid/1,
          valid/2,
+         is_available/1,
+         is_available/2,
 
          verify_otp_vsn/1,
          has_all_artifacts/1,
@@ -72,7 +73,7 @@
                      app_file_src       :: file:filename_all() | undefined,
                      app_file_src_script:: file:filename_all() | undefined,
                      app_file           :: file:filename_all() | undefined,
-                     original_vsn       :: binary() | string() | undefined,
+                     original_vsn       :: binary() | undefined,
                      parent=root        :: binary() | root,
                      app_details=[]     :: list(),
                      applications=[]    :: list(),
@@ -83,11 +84,11 @@
                      dep_level=0        :: integer(),
                      dir                :: file:name(),
                      out_dir            :: file:name(),
-                     resource_type      :: pkg | src | undefined,
                      source             :: string() | tuple() | checkout | undefined,
                      is_lock=false      :: boolean(),
                      is_checkout=false  :: boolean(),
-                     valid              :: boolean() | undefined}).
+                     valid              :: boolean() | undefined,
+                     is_available=false :: boolean()}).
 
 %%============================================================================
 %% types
@@ -114,14 +115,14 @@ new(AppName) ->
                  {ok, t()}.
 new(AppName, Vsn) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
-                     original_vsn=Vsn}}.
+                     original_vsn=rebar_utils:to_binary(Vsn)}}.
 
 %% @doc build a complete version of the app info with all fields set.
 -spec new(atom() | binary() | string(), binary() | string(), file:name()) ->
                  {ok, t()}.
 new(AppName, Vsn, Dir) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
-                     original_vsn=Vsn,
+                     original_vsn=rebar_utils:to_binary(Vsn),
                      dir=rebar_utils:to_list(Dir),
                      out_dir=rebar_utils:to_list(Dir)}}.
 
@@ -130,7 +131,7 @@ new(AppName, Vsn, Dir) ->
                  {ok, t()}.
 new(AppName, Vsn, Dir, Deps) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
-                     original_vsn=Vsn,
+                     original_vsn=rebar_utils:to_binary(Vsn),
                      dir=rebar_utils:to_list(Dir),
                      out_dir=rebar_utils:to_list(Dir),
                      deps=Deps}}.
@@ -141,7 +142,7 @@ new(AppName, Vsn, Dir, Deps) ->
 new(Parent, AppName, Vsn, Dir, Deps) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
                      parent=Parent,
-                     original_vsn=Vsn,
+                     original_vsn=rebar_utils:to_binary(Vsn),
                      dir=rebar_utils:to_list(Dir),
                      out_dir=rebar_utils:to_list(Dir),
                      deps=Deps}}.
@@ -150,10 +151,12 @@ new(Parent, AppName, Vsn, Dir, Deps) ->
 %% file for the app
 -spec update_opts(t(), rebar_dict(), [any()]) -> t().
 update_opts(AppInfo, Opts, Config) ->
-    LockDeps = case resource_type(AppInfo) of
-                   pkg ->
-                       Deps = deps(AppInfo),
-                       [{{locks, default}, Deps}, {{deps, default}, Deps}];
+    LockDeps = case source(AppInfo) of
+                   Tuple when is_tuple(Tuple) andalso element(1, Tuple) =:= pkg ->
+                       %% Deps are set separate for packages
+                       %% instead of making it seem we have no deps
+                       %% don't set anything here.
+                       [];
                    _ ->
                        deps_from_config(dir(AppInfo), Config)
                end,
@@ -165,8 +168,18 @@ update_opts(AppInfo, Opts, Config) ->
 
     NewOpts = rebar_opts:merge_opts(LocalOpts, Opts),
 
-    AppInfo#app_info_t{opts=NewOpts
-                      ,default=NewOpts}.
+    AppInfo#app_info_t{opts=NewOpts,
+                       default=NewOpts}.
+
+%% @doc update the opts based on new deps, usually from an app's hex registry metadata
+-spec update_opts_deps(t(), [any()]) -> t().
+update_opts_deps(AppInfo=#app_info_t{opts=Opts}, Deps) ->
+    LocalOpts = dict:from_list([{{locks, default}, Deps}, {{deps, default}, Deps}]),
+    NewOpts = rebar_opts:merge_opts(LocalOpts, Opts),
+    AppInfo#app_info_t{opts=NewOpts,
+                       default=NewOpts,
+                       deps=Deps}.
+
 
 %% @private extract the deps for an app in `Dir' based on its config file data
 -spec deps_from_config(file:filename(), [any()]) -> [{tuple(), any()}, ...].
@@ -350,15 +363,15 @@ parent(AppInfo=#app_info_t{}, Parent) ->
 
 %% @doc returns the original version of the app (unevaluated if
 %% asking for a semver)
--spec original_vsn(t()) -> string().
+-spec original_vsn(t()) -> binary().
 original_vsn(#app_info_t{original_vsn=Vsn}) ->
     Vsn.
 
 %% @doc stores the original version of the app (unevaluated if
 %% asking for a semver)
--spec original_vsn(t(), string()) -> t().
+-spec original_vsn(t(), binary() | string()) -> t().
 original_vsn(AppInfo=#app_info_t{}, Vsn) ->
-    AppInfo#app_info_t{original_vsn=Vsn}.
+    AppInfo#app_info_t{original_vsn=rebar_utils:to_binary(Vsn)}.
 
 %% @doc returns the list of applications the app depends on.
 -spec applications(t()) -> list().
@@ -438,16 +451,6 @@ ebin_dir(#app_info_t{out_dir=OutDir}) ->
 priv_dir(#app_info_t{out_dir=OutDir}) ->
     rebar_utils:to_list(filename:join(OutDir, "priv")).
 
-%% @doc returns whether the app is source app or a package app.
--spec resource_type(t()) -> pkg | src.
-resource_type(#app_info_t{resource_type=ResourceType}) ->
-    ResourceType.
-
-%% @doc sets whether the app is source app or a package app.
--spec resource_type(t(), pkg | src) -> t().
-resource_type(AppInfo=#app_info_t{}, Type) ->
-    AppInfo#app_info_t{resource_type=Type}.
-
 %% @doc finds the source specification for the app
 -spec source(t()) -> string() | tuple().
 source(#app_info_t{source=Source}) ->
@@ -477,6 +480,17 @@ is_checkout(#app_info_t{is_checkout=IsCheckout}) ->
 -spec is_checkout(t(), boolean()) -> t().
 is_checkout(AppInfo=#app_info_t{}, IsCheckout) ->
     AppInfo#app_info_t{is_checkout=IsCheckout}.
+
+%% @doc returns whether the app source exists in the deps dir
+-spec is_available(t()) -> boolean().
+is_available(#app_info_t{is_available=IsAvailable}) ->
+    IsAvailable.
+
+%% @doc sets whether the app's source is available
+%% only set if the app's source is found in the expected dep directory
+-spec is_available(t(), boolean()) -> t().
+is_available(AppInfo=#app_info_t{}, IsAvailable) ->
+    AppInfo#app_info_t{is_available=IsAvailable}.
 
 %% @doc returns whether the app is valid (built) or not
 -spec valid(t()) -> boolean().

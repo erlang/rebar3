@@ -1,69 +1,6 @@
 -module(rebar_compile_SUITE).
 
--export([suite/0,
-         init_per_suite/1,
-         end_per_suite/1,
-         init_per_testcase/2,
-         end_per_testcase/2,
-         init_per_group/2,
-         end_per_group/2,
-         all/0,
-         groups/0,
-         build_basic_app/1, paths_basic_app/1, clean_basic_app/1,
-         build_release_apps/1, paths_release_apps/1, clean_release_apps/1,
-         build_checkout_apps/1, paths_checkout_apps/1,
-         build_checkout_deps/1, paths_checkout_deps/1,
-         build_basic_srcdirs/1, paths_basic_srcdirs/1,
-         build_release_srcdirs/1, paths_release_srcdirs/1,
-         build_unbalanced_srcdirs/1, paths_unbalanced_srcdirs/1,
-         build_basic_extra_dirs/1, paths_basic_extra_dirs/1, clean_basic_extra_dirs/1,
-         build_release_extra_dirs/1, paths_release_extra_dirs/1, clean_release_extra_dirs/1,
-         build_unbalanced_extra_dirs/1, paths_unbalanced_extra_dirs/1,
-         build_extra_dirs_in_project_root/1,
-         paths_extra_dirs_in_project_root/1,
-         clean_extra_dirs_in_project_root/1,
-         recompile_when_hrl_changes/1,
-         recompile_when_included_hrl_changes/1,
-         recompile_when_opts_included_hrl_changes/1,
-         recompile_when_opts_change/1,
-         dont_recompile_when_opts_dont_change/1,
-         dont_recompile_yrl_or_xrl/1,
-         deps_in_path/1,
-         delete_beam_if_source_deleted/1,
-         checkout_priority/1,
-         highest_version_of_pkg_dep/1,
-         parse_transform_test/1,
-         erl_first_files_test/1,
-         mib_test/1,
-         umbrella_mib_first_test/1,
-         only_default_transitive_deps/1,
-         clean_all/1,
-         override_deps/1,
-         override_add_deps/1,
-         override_del_deps/1,
-         override_opts/1,
-         override_add_opts/1,
-         override_del_opts/1,
-         profile_deps/1,
-         profile_override_deps/1,
-         profile_override_add_deps/1,
-         profile_override_del_deps/1,
-         profile_override_opts/1,
-         profile_override_add_opts/1,
-         profile_override_del_opts/1,
-         deps_build_in_prod/1,
-         include_file_relative_to_working_directory/1,
-         include_file_in_src/1,
-         include_file_relative_to_working_directory_test/1,
-         include_file_in_src_test/1,
-         include_file_in_src_test_multiapp/1,
-         dont_recompile_when_erl_compiler_options_env_does_not_change/1,
-         recompile_when_erl_compiler_options_env_changes/1,
-         always_recompile_when_erl_compiler_options_set/1,
-         recompile_when_parse_transform_inline_changes/1,
-         recompile_when_parse_transform_as_opt_changes/1,
-         recursive/1,no_recursive/1,
-         regex_filter_skip/1, regex_filter_regression/1]).
+-compile(export_all).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -89,6 +26,7 @@ all() ->
      profile_deps, deps_build_in_prod,
      override_deps, override_add_deps, override_del_deps,
      override_opts, override_add_opts, override_del_opts,
+     apply_overrides_exactly_once,
      profile_override_deps, profile_override_add_deps, profile_override_del_deps,
      profile_override_opts, profile_override_add_opts, profile_override_del_opts,
      include_file_relative_to_working_directory, include_file_in_src,
@@ -1404,6 +1342,35 @@ override_opts(Config) ->
 
     true = lists:member(compressed, proplists:get_value(options, Mod:module_info(compile), [])),
     false = lists:member(warn_missing_spec, proplists:get_value(options, Mod:module_info(compile), [])).
+
+%% test for fix of https://github.com/erlang/rebar3/issues/1801
+%% only apply overrides once
+%% verify by having an override add the macro TEST to the dep some_dep
+%% building under `ct` will fail if the `add` is applied more than once
+apply_overrides_exactly_once(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{deps, TopDeps},
+                   {overrides, [
+                                {add, some_dep, [
+                                             {erl_opts, [{d, 'TEST'}]}
+                                            ]}
+                               ]}],
+
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig, ["ct", "--compile_only"], {ok, [{app, Name}, {dep, "some_dep"}], "test"}).
 
 override_add_opts(Config) ->
     AppDir = ?config(apps, Config),

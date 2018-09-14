@@ -121,27 +121,27 @@ deps(flat) ->
      [],
      {ok, ["B", "C"]}};
 deps(pick_highest_left) ->
-    {[{"B", [{"C", "2", []}]},
-      {"C", "1", []}],
-     [{"C","2"}],
-     {ok, ["B", {"C", "1"}]}};
+    {[{"B", [{"C", "2.0.0", []}]},
+      {"C", "1.0.0", []}],
+     [{"C","2.0.0"}],
+     {ok, ["B", {"C", "1.0.0"}]}};
 deps(pick_highest_right) ->
-    {[{"B", "1", []},
-      {"C", [{"B", "2", []}]}],
-     [{"B","2"}],
-     {ok, [{"B","1"}, "C"]}};
+    {[{"B", "1.0.0", []},
+      {"C", [{"B", "2.0.0", []}]}],
+     [{"B","2.0.0"}],
+     {ok, [{"B","1.0.0"}, "C"]}};
 deps(pick_smallest1) ->
-    {[{"B", [{"D", "1", []}]},
-      {"C", [{"D", "2", []}]}],
-     [{"D","2"}],
+    {[{"B", [{"D", "1.0.0", []}]},
+      {"C", [{"D", "2.0.0", []}]}],
+     [{"D","2.0.0"}],
      %% we pick D1 because B < C
-     {ok, ["B","C",{"D","1"}]}};
+     {ok, ["B","C",{"D","1.0.0"}]}};
 deps(pick_smallest2) ->
-    {[{"C", [{"D", "2", []}]},
-      {"B", [{"D", "1", []}]}],
-     [{"D","2"}],
+    {[{"C", [{"D", "2.0.0", []}]},
+      {"B", [{"D", "1.0.0", []}]}],
+     [{"D","2.0.0"}],
      %% we pick D1 because B < C
-     {ok, ["B","C",{"D","1"}]}};
+     {ok, ["B","C",{"D","1.0.0"}]}};
 deps(circular1) ->
     {[{"B", [{"A", []}]}, % A is the top-level app
       {"C", []}],
@@ -155,14 +155,14 @@ deps(circular2) ->
 deps(circular_skip) ->
     %% Never spot the circular dep due to being to low in the deps tree
     %% in source deps
-    {[{"B", [{"C", "2", [{"B", []}]}]},
-      {"C", "1", [{"D",[]}]}],
-     [{"C","2"}],
-     {ok, ["B", {"C","1"}, "D"]}};
+    {[{"B", [{"C", "2.0.0", [{"B", []}]}]},
+      {"C", "1.0.0", [{"D",[]}]}],
+     [{"C","2.0.0"}],
+     {ok, ["B", {"C","1.0.0"}, "D"]}};
 deps(fail_conflict) ->
-    {[{"B", [{"C", "2", []}]},
-      {"C", "1", []}],
-     [{"C","2"}],
+    {[{"B", [{"C", "2.0.0", []}]},
+      {"C", "1.0.0", []}],
+     [{"C","2.0.0"}],
      rebar_abort};
 deps(default_profile) ->
     {[{"B", []},
@@ -216,39 +216,39 @@ mdeps(m_pick_source3) ->
      [],
      {ok, ["B"]}};
 mdeps(m_pick_source4) ->
-    {[{"b", [{"d", "1", []}]},
-      {"C", [{"D", "1", []}]}],
-     [{"D", "1"}],
-     {ok, ["b", "C", {"d", "1"}]}};
+    {[{"b", [{"d", "1.0.0", []}]},
+      {"C", [{"D", "1.0.0", []}]}],
+     [{"D", "1.0.0"}],
+     {ok, ["b", "C", {"d", "1.0.0"}]}};
 mdeps(m_pick_source5) ->
-    {[{"B", [{"d", "1", []}]},
-      {"C", [{"D", "1", []}]}],
-     [{"D", "1"}],
-     {ok, ["B", "C", {"d", "1"}]}};
+    {[{"B", [{"d", "1.0.0", []}]},
+      {"C", [{"D", "1.0.0", []}]}],
+     [{"D", "1.0.0"}],
+     {ok, ["B", "C", {"d", "1.0.0"}]}};
 mdeps(m_source_to_pkg) ->
     {[{"B", [{"c",[{"d", []}]}]}],
      [],
      {ok, ["B", "c", "d"]}};
 mdeps(m_pkg_level1) ->
-    {[{"B", [{"D", [{"e", "2", []}]}]},
-      {"C", [{"e", "1", []}]}],
-     [{"e","2"}],
-     {ok, ["B","C","D",{"e","1"}]}};
+    {[{"B", [{"D", [{"e", "2.0.0", []}]}]},
+      {"C", [{"e", "1.0.0", []}]}],
+     [{"e","2.0.0"}],
+     {ok, ["B","C","D",{"e","1.0.0"}]}};
 mdeps(m_pkg_level2) ->
-    {[{"B", [{"e", "1", []}]},
-      {"C", [{"D", [{"e", "2", []}]}]}],
-     [{"e","2"}],
-     {ok, ["B","C","D",{"e","1"}]}};
+    {[{"B", [{"e", "1.0.0", []}]},
+      {"C", [{"D", [{"e", "2.0.0", []}]}]}],
+     [{"e","2.0.0"}],
+     {ok, ["B","C","D",{"e","1.0.0"}]}};
 mdeps(m_pkg_level3_alpha_order) ->
-    {[{"B", [{"d", [{"f", "1", []}]}]},
-      {"C", [{"E", [{"f", "2", []}]}]}],
-     [{"f","2"}],
-     {ok, ["B","C","d","E",{"f","1"}]}};
+    {[{"B", [{"d", [{"f", "1.0.0", []}]}]},
+      {"C", [{"E", [{"f", "2.0.0", []}]}]}],
+     [{"f","2.0.0"}],
+     {ok, ["B","C","d","E",{"f","1.0.0"}]}};
 mdeps(m_pkg_level3) ->
-    {[{"B", [{"d", [{"f", "1", []}]}]},
-      {"C", [{"E", [{"G", [{"f", "2", []}]}]}]}],
-     [{"f","2"}],
-     {ok, ["B","C","d","E","G",{"f","1"}]}}.
+    {[{"B", [{"d", [{"f", "1.0.0", []}]}]},
+      {"C", [{"E", [{"G", [{"f", "2.0.0", []}]}]}]}],
+     [{"f","2.0.0"}],
+     {ok, ["B","C","d","E","G",{"f","1.0.0"}]}}.
 
 setup_project(fail_conflict, Config0, Deps) ->
     DepsType = ?config(deps_type, Config0),
@@ -289,8 +289,8 @@ setup_project(nondefault_pick_highest, Config0, _) ->
     ),
     AppDir = ?config(apps, Config),
     rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
-    DefaultDeps = rebar_test_utils:expand_deps(DepsType, [{"B", [{"C", "1", []}]}]),
-    ProfileDeps = rebar_test_utils:expand_deps(DepsType, [{"C", "2", []}]),
+    DefaultDeps = rebar_test_utils:expand_deps(DepsType, [{"B", [{"C", "1.0.0", []}]}]),
+    ProfileDeps = rebar_test_utils:expand_deps(DepsType, [{"C", "2.0.0", []}]),
     DefaultTop = rebar_test_utils:top_level_deps(DefaultDeps),
     ProfileTop = rebar_test_utils:top_level_deps(ProfileDeps),
     RebarConf = rebar_test_utils:create_config(
@@ -412,19 +412,19 @@ nondefault_pick_highest(Config) ->
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["lock"],
-        {ok, [{dep, "B"}, {lock, "B"}, {lock, "C", "1"}, {dep, "C", "1"}], "default"}
+        {ok, [{dep, "B"}, {lock, "B"}, {lock, "C", "1.0.0"}, {dep, "C", "1.0.0"}], "default"}
     ),
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["as", "nondef", "lock"],
-        {ok, [{dep, "B"}, {lock, "B"}, {lock, "C", "1"}, {dep, "C", "2"}], "nondef"}
+        {ok, [{dep, "B"}, {lock, "B"}, {lock, "C", "1.0.0"}, {dep, "C", "2.0.0"}], "nondef"}
     ),
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["lock"],
-        {ok, [{dep, "B"}, {lock, "B"}, {dep, "C", "1"}, {lock, "C", "1"}], "default"}
+        {ok, [{dep, "B"}, {lock, "B"}, {dep, "C", "1.0.0"}, {lock, "C", "1.0.0"}], "default"}
     ),
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["as", "nondef", "lock"],
-        {ok, [{dep, "B"}, {lock, "B"}, {lock, "C", "1"}, {dep, "C", "2"}], "nondef"}
+        {ok, [{dep, "B"}, {lock, "B"}, {lock, "C", "1.0.0"}, {dep, "C", "2.0.0"}], "nondef"}
     ).
 
 m_flat1(Config) -> run(Config).
@@ -475,5 +475,5 @@ in_warnings(git, Warns, NameRaw, VsnRaw) ->
 in_warnings(pkg, Warns, NameRaw, VsnRaw) ->
     Name = iolist_to_binary(NameRaw),
     Vsn = iolist_to_binary(VsnRaw),
-    1 =< length([1 || {_, [AppName, {pkg, _, AppVsn, _}]} <- Warns,
+    1 =< length([1 || {_, [AppName, {pkg, _, AppVsn}]} <- Warns,
                       AppName =:= Name, AppVsn =:= Vsn]).
