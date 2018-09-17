@@ -30,22 +30,41 @@ init(State) ->
                                                                {example, "rebar3 compile"},
                                                                {short_desc, "Compile apps .app.src and .erl files."},
                                                                {desc, "Compile apps .app.src and .erl files."},
-                                                               {opts, []}])),
+                                                               {opts, [{deps_only, $d, "deps_only", undefined,
+                                                                        "Only compile dependencies, no project apps will be built."}]}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    IsDepsOnly = is_deps_only(State),
     DepsPaths = rebar_state:code_paths(State, all_deps),
     PluginDepsPaths = rebar_state:code_paths(State, all_plugin_deps),
     rebar_utils:remove_from_code_path(PluginDepsPaths),
     code:add_pathsa(DepsPaths),
 
-    ProjectApps = rebar_state:project_apps(State),
     Providers = rebar_state:providers(State),
     Deps = rebar_state:deps_to_build(State),
-    Cwd = rebar_state:dir(State),
-
     copy_and_build_apps(State, Providers, Deps),
+
+    State1 = case IsDepsOnly of
+                 true ->
+                     State;
+                 false ->
+                     handle_project_apps(DepsPaths, Providers, State)
+             end,
+
+    rebar_utils:cleanup_code_path(rebar_state:code_paths(State1, default)
+                                  ++ rebar_state:code_paths(State, all_plugin_deps)),
+
+    {ok, State1}.
+
+is_deps_only(State) ->
+    {Args, _} = rebar_state:command_parsed_args(State),
+    proplists:get_value(deps_only, Args, false).
+
+handle_project_apps(DepsPaths, Providers, State) ->
+    Cwd = rebar_state:dir(State),
+    ProjectApps = rebar_state:project_apps(State),
     {ok, ProjectApps1} = rebar_digraph:compile_order(ProjectApps),
 
     %% Run top level hooks *before* project apps compiled but *after* deps are
@@ -66,10 +85,9 @@ do(State) ->
         true ->
             true
     end,
-    rebar_utils:cleanup_code_path(rebar_state:code_paths(State3, default)
-                                 ++ rebar_state:code_paths(State, all_plugin_deps)),
 
-    {ok, State3}.
+    State3.
+
 
 -spec format_error(any()) -> iolist().
 format_error({missing_artifact, File}) ->

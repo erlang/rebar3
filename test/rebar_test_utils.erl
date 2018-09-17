@@ -266,6 +266,14 @@ check_results(AppDir, Expected, ProfileRun) ->
                         ok
                 end
         ; ({dep_not_exist, Name}) ->
+                ct:pal("Dep Not Exist Name: ~p", [Name]),
+                case lists:keyfind(Name, 1, DepsNames) of
+                    false ->
+                        ok;
+                    {Name, _App} ->
+                        error({app_found, Name})
+                end
+        ; ({app_not_exist, Name}) ->
                 ct:pal("App Not Exist Name: ~p", [Name]),
                 case lists:keyfind(Name, 1, DepsNames) of
                     false ->
