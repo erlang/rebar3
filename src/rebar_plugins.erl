@@ -39,13 +39,18 @@ project_apps_install(State) ->
     Profiles = rebar_state:current_profiles(State),
     ProjectApps = rebar_state:project_apps(State),
     lists:foldl(fun(Profile, StateAcc) ->
-                        Plugins = rebar_state:get(State, {plugins, Profile}, []),
-                        StateAcc1 = handle_plugins(Profile, Plugins, StateAcc),
+                        StateAcc1 = case Profile of
+                                        default ->
+                                            %% default profile top level plugins
+                                            %% are installed in run_aux
+                                            StateAcc;
+                                        _ ->
+                                            Plugins = rebar_state:get(State, {plugins, Profile}, []),
+                                            handle_plugins(Profile, Plugins, StateAcc)
+                                    end,
 
                         lists:foldl(fun(AppInfo, StateAcc2) ->
-                                            C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
-                                            AppInfo0 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
-                                            Plugins2 = rebar_app_info:get(AppInfo0, {plugins, Profile}, []),
+                                            Plugins2 = rebar_app_info:get(AppInfo, {plugins, Profile}, []),
                                             handle_plugins(Profile, Plugins2, StateAcc2)
                                     end, StateAcc1, ProjectApps)
                 end, State, Profiles).
@@ -62,11 +67,24 @@ install(State, AppInfo) ->
 
     State2 = lists:foldl(fun(Profile, StateAcc) ->
                              Plugins = rebar_app_info:get(AppInfo, {plugins, Profile}, []),
-                             handle_plugins(Profile, Plugins, StateAcc)
+                             Plugins1 = filter_existing_plugins(Plugins, StateAcc),
+                             handle_plugins(Profile, Plugins1, StateAcc)
                          end, State1, Profiles),
 
     %% Reset the overrides after processing the dep
     rebar_state:set(State2, overrides, StateOverrides).
+
+filter_existing_plugins(Plugins, State) ->
+    PluginNames = lists:zip(Plugins, rebar_state:deps_names(Plugins)),
+    AllPlugins = rebar_state:all_plugin_deps(State),
+    lists:filtermap(fun({Plugin, PluginName}) ->
+                            case rebar_app_utils:find(PluginName, AllPlugins) of
+                                {ok, _} ->
+                                    false;
+                                _ ->
+                                    {true, Plugin}
+                            end
+                    end, PluginNames).
 
 handle_plugins(Profile, Plugins, State) ->
     handle_plugins(Profile, Plugins, State, false).
@@ -76,7 +94,6 @@ handle_plugins(Profile, Plugins, State, Upgrade) ->
     Locks = rebar_state:lock(State),
     DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
     State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
-
     %% Install each plugin individually so if one fails to install it doesn't effect the others
     {_PluginProviders, State2} =
         lists:foldl(fun(Plugin, {PluginAcc, StateAcc}) ->
@@ -122,8 +139,6 @@ handle_plugin(Profile, Plugin, State, Upgrade) ->
 
 build_plugin(AppInfo, Apps, State) ->
     Providers = rebar_state:providers(State),
-    %Providers1 = rebar_state:providers(rebar_app_info:state(AppInfo)),
-    %rebar_app_info:state_or_new(State, AppInfo)
     S = rebar_state:all_deps(State, Apps),
     S1 = rebar_state:set(S, deps_dir, ?DEFAULT_PLUGINS_DIR),
     rebar_prv_compile:compile(S1, Providers, AppInfo).
