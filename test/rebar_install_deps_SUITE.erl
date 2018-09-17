@@ -17,7 +17,7 @@ groups() ->
      {mixed, [], [
         m_flat1, m_flat2, m_circular1, m_circular2,
         m_pick_source1, m_pick_source2, m_pick_source3,
-        m_pick_source4, m_pick_source5, m_source_to_pkg,
+        m_pick_source4, m_pick_source5, m_pick_source6, m_source_to_pkg,
         m_pkg_level1, m_pkg_level2, m_pkg_level3, m_pkg_level3_alpha_order
      ]}
     ].
@@ -93,6 +93,8 @@ format_expected_mdeps(Deps) ->
              [{dep, N}, {lock, src, N, "0.0.0"}]
     end || Dep <- Deps]).
 
+format_expected_mixed_warnings(none) ->
+    none;
 format_expected_mixed_warnings(Warnings) ->
     [case W of
         {N, Vsn} when hd(N) >= $a, hd(N) =< $z -> {pkg, rebar_string:uppercase(N), Vsn};
@@ -225,6 +227,11 @@ mdeps(m_pick_source5) ->
       {"C", [{"D", "1.0.0", []}]}],
      [{"D", "1.0.0"}],
      {ok, ["B", "C", {"d", "1.0.0"}]}};
+mdeps(m_pick_source6) ->
+    {[{"B", [{"D", "1.0.0", []}]},
+      {"C", [{"D", "1.0.0", []}]}],
+     none,
+     {ok, ["B", "C", {"D", "1.0.0"}]}};
 mdeps(m_source_to_pkg) ->
     {[{"B", [{"c",[{"d", []}]}]}],
      [],
@@ -436,6 +443,7 @@ m_pick_source2(Config) -> run(Config).
 m_pick_source3(Config) -> run(Config).
 m_pick_source4(Config) -> run(Config).
 m_pick_source5(Config) -> run(Config).
+m_pick_source6(Config) -> run(Config).
 m_source_to_pkg(Config) -> run(Config).
 m_pkg_level1(Config) -> run(Config).
 m_pkg_level2(Config) -> run(Config).
@@ -466,7 +474,10 @@ check_warnings(Warns, [{Type, Name, Vsn} | Rest], mixed) ->
 check_warnings(Warns, [{Name, Vsn} | Rest], Type) ->
     ct:pal("Checking for warning ~p in ~p", [{Name,Vsn},Warns]),
     ?assert(in_warnings(Type, Warns, Name, Vsn)),
-    check_warnings(Warns, Rest, Type).
+    check_warnings(Warns, Rest, Type);
+check_warnings(Warns, none, _Type) ->
+    ct:pal("Checking that there were no warnings", []),
+    ?assert(Warns == []).
 
 in_warnings(git, Warns, NameRaw, VsnRaw) ->
     Name = iolist_to_binary(NameRaw),

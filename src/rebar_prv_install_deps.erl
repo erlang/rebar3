@@ -259,9 +259,21 @@ update_seen_dep(AppInfo, _Profile, _Level, Deps, Apps, State, Upgrade, Seen, Loc
     %% If seen from lock file or user requested an upgrade
     %% don't print warning about skipping
     case lists:keymember(Name, 1, Locks) of
-        false when Upgrade -> ok;
-        false when not Upgrade -> warn_skip_deps(AppInfo, State);
-        true -> ok
+        false when Upgrade ->
+            ok;
+        false when not Upgrade ->
+            {ok, SeenApp} = rebar_app_utils:find(Name, Apps),
+            Source = rebar_app_info:source(AppInfo),
+            case rebar_app_info:source(SeenApp) of
+                Source ->
+                    %% dep is the same version and checksum as the one we already saw.
+                    %% meaning there is no conflict, so don't warn about it.
+                    skip;
+                _ ->
+                    warn_skip_deps(Name, Source, State)
+            end;
+        true ->
+            ok
     end,
     {Deps, Apps, State, Seen}.
 
@@ -395,11 +407,11 @@ maybe_upgrade(AppInfo, _AppDir, Upgrade, State) ->
             AppInfo
     end.
 
-warn_skip_deps(AppInfo, State) ->
+warn_skip_deps(Name, Source, State) ->
     Msg = "Skipping ~ts (from ~p) as an app of the same name "
           "has already been fetched",
-    Args = [rebar_app_info:name(AppInfo),
-            rebar_resource_v2:format_source(rebar_app_info:source(AppInfo))],
+    Args = [Name,
+            rebar_resource_v2:format_source(Source)],
     case rebar_state:get(State, deps_error_on_conflict, false) of
         false ->
             case rebar_state:get(State, deps_warning_on_conflict, true) of
