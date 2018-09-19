@@ -23,7 +23,7 @@ all() ->
      deps_in_path, checkout_priority, highest_version_of_pkg_dep,
      parse_transform_test, erl_first_files_test, mib_test,
      umbrella_mib_first_test, only_default_transitive_deps, clean_all,
-     profile_deps, deps_build_in_prod,
+     profile_deps, deps_build_in_prod, only_deps,
      override_deps, override_add_deps, override_del_deps,
      override_opts, override_add_opts, override_del_opts,
      apply_overrides_exactly_once,
@@ -1653,6 +1653,25 @@ profile_deps(Config) ->
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["as", "a", "compile"],
         {ok, [{dep, "some_dep"},{dep, "other_dep"}]}
+    ).
+
+only_deps(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
+
+    RConfFile = rebar_test_utils:create_config(AppDir, [{deps, TopDeps}]),
+    {ok, RConf} = file:consult(RConfFile),
+    rebar_test_utils:run_and_check(
+        Config, RConf, ["compile", "--deps_only"],
+        {ok, [{app_not_exist, Name}, {dep, "some_dep"},{dep, "other_dep"}]}
     ).
 
 %% verify a deps prod profile is used
