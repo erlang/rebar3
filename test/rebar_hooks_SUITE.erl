@@ -1,20 +1,6 @@
 -module(rebar_hooks_SUITE).
 
--export([suite/0,
-         init_per_suite/1,
-         end_per_suite/1,
-         init_per_testcase/2,
-         end_per_testcase/2,
-         all/0,
-         build_and_clean_app/1,
-         escriptize_artifacts/1,
-         run_hooks_once/1,
-         run_hooks_once_profiles/1,
-         run_hooks_for_plugins/1,
-         eunit_app_hooks/1,
-         deps_hook_namespace/1,
-         bare_compile_hooks_default_ns/1,
-         deps_clean_hook_namespace/1]).
+-compile(export_all).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -38,7 +24,8 @@ end_per_testcase(_, _Config) ->
 all() ->
     [build_and_clean_app, run_hooks_once, run_hooks_once_profiles,
      escriptize_artifacts, run_hooks_for_plugins, deps_hook_namespace,
-     bare_compile_hooks_default_ns, deps_clean_hook_namespace, eunit_app_hooks].
+     bare_compile_hooks_default_ns, deps_clean_hook_namespace, eunit_app_hooks,
+     sub_app_hooks, root_hooks].
 
 %% Test post provider hook cleans compiled project app, leaving it invalid
 build_and_clean_app(Config) ->
@@ -97,7 +84,7 @@ run_hooks_once(Config) ->
 
     Name = rebar_test_utils:create_random_name("app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    RebarConfig = [{pre_hooks, [{compile, "mkdir blah"}]}],
+    RebarConfig = [{pre_hooks, [{compile, "mkdir  $REBAR_ROOT_DIR/blah"}]}],
     rebar_test_utils:create_config(AppDir, RebarConfig),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name, valid}]}).
@@ -109,7 +96,7 @@ run_hooks_once_profiles(Config) ->
 
     Name = rebar_test_utils:create_random_name("app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    RebarConfig = [{profiles, [{hooks, [{pre_hooks, [{compile, "mkdir blah"}]}]}]}],
+    RebarConfig = [{profiles, [{hooks, [{pre_hooks, [{compile, "mkdir $REBAR_ROOT_DIR/blah"}]}]}]}],
     rebar_test_utils:create_config(AppDir, RebarConfig),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
     rebar_test_utils:run_and_check(Config, RebarConfig, ["as", "hooks", "compile"], {ok, [{app, Name, valid}]}).
@@ -215,3 +202,45 @@ run_hooks_for_plugins(Config) ->
     rebar_test_utils:run_and_check(Config, RConf, ["compile"], {ok, [{app, Name, valid},
                                                                      {plugin, PluginName},
                                                                      {file, filename:join([AppDir, "_build", "default", "plugins", PluginName, "randomfile"])}]}).
+
+%% test that a subapp of a project keeps its hooks
+sub_app_hooks(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("sub_app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+
+    SubAppsDir = filename:join([AppDir, "apps", Name]),
+
+    rebar_test_utils:create_app(SubAppsDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_config(SubAppsDir, [{provider_hooks, [{post, [{compile, clean}]}]}]),
+
+    RConfFile = rebar_test_utils:create_config(AppDir, []),
+    {ok, RConf} = file:consult(RConfFile),
+
+    %% Build with deps.
+    rebar_test_utils:run_and_check(
+      Config, RConf, ["compile"],
+      {ok, [{app, Name, invalid}]}
+     ).
+
+%% test that hooks at the top level don't run in the subapps
+root_hooks(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("sub_app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+
+    SubAppsDir = filename:join([AppDir, "apps", Name]),
+
+    rebar_test_utils:create_app(SubAppsDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_config(SubAppsDir, [{provider_hooks, [{post, [{compile, clean}]}]}]),
+
+    RConfFile = rebar_test_utils:create_config(AppDir, [{pre_hooks, [{compile, "mkdir $REBAR_ROOT_DIR/blah"}]}]),
+    {ok, RConf} = file:consult(RConfFile),
+
+    %% Build with deps.
+    rebar_test_utils:run_and_check(
+      Config, RConf, ["compile"],
+      {ok, [{app, Name, invalid}]}
+     ).

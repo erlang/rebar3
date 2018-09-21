@@ -7,7 +7,7 @@
          find_unbuilt_apps/1,
          find_apps/1,
          find_apps/2,
-         find_apps/3,
+         find_apps/4,
          find_app/2,
          find_app/3]).
 
@@ -23,7 +23,7 @@ do(State, LibDirs) ->
     Dirs = [filename:join(BaseDir, LibDir) || LibDir <- LibDirs],
     RebarOpts = rebar_state:opts(State),
     SrcDirs = rebar_dir:src_dirs(RebarOpts, ["src"]),
-    Apps = find_apps(Dirs, SrcDirs, all),
+    Apps = find_apps(Dirs, SrcDirs, all, State),
     ProjectDeps = rebar_state:deps_names(State),
     DepsDir = rebar_dir:deps_dir(State),
     CurrentProfiles = rebar_state:current_profiles(State),
@@ -52,7 +52,7 @@ do(State, LibDirs) ->
                         Name = rebar_app_info:name(AppInfo),
                         case enable(State, AppInfo) of
                             true ->
-                                {AppInfo1, StateAcc1} = merge_deps(AppInfo, StateAcc),
+                                {AppInfo1, StateAcc1} = merge_opts(AppInfo, StateAcc),
                                 OutDir = filename:join(DepsDir, Name),
                                 AppInfo2 = rebar_app_info:out_dir(AppInfo1, OutDir),
                                 ProjectDeps1 = lists:delete(Name, ProjectDeps),
@@ -87,33 +87,34 @@ format_error({module_list, File}) ->
 format_error({missing_module, Module}) ->
     io_lib:format("Module defined in app file missing: ~p~n", [Module]).
 
-%% @doc handles the merging and application of profiles and overrides
-%% for a given application, within its own context.
--spec merge_deps(rebar_app_info:t(), rebar_state:t()) ->
+%% @doc merges configuration of a project app and the top level state
+%% some configuration like erl_opts must be merged into a subapp's opts
+%% while plugins and hooks need to be kept defined to only either the
+%% top level state or an individual application.
+-spec merge_opts(rebar_app_info:t(), rebar_state:t()) ->
     {rebar_app_info:t(), rebar_state:t()}.
-merge_deps(AppInfo, State) ->
+merge_opts(AppInfo, State) ->
     %% These steps make sure that hooks and artifacts are run in the context of
     %% the application they are defined at. If an umbrella structure is used and
     %% they are defined at the top level they will instead run in the context of
     %% the State and at the top level, not as part of an application.
     CurrentProfiles = rebar_state:current_profiles(State),
-    Default = reset_hooks(rebar_state:default(State), CurrentProfiles),
-    {AppInfo0, State1} = project_app_config(AppInfo, Default, State),
+    {AppInfo1, State1} = maybe_reset_hooks_plugins(AppInfo, State),
 
-    Name = rebar_app_info:name(AppInfo0),
+    Name = rebar_app_info:name(AppInfo1),
 
     %% We reset the opts here to default so no profiles are applied multiple times
-    AppInfo1 = rebar_app_info:apply_overrides(rebar_state:get(State1, overrides, []), AppInfo0),
-    AppInfo2 = rebar_app_info:apply_profiles(AppInfo1, CurrentProfiles),
+    AppInfo2 = rebar_app_info:apply_overrides(rebar_state:get(State1, overrides, []), AppInfo1),
+    AppInfo3 = rebar_app_info:apply_profiles(AppInfo2, CurrentProfiles),
 
     %% Will throw an exception if checks fail
-    rebar_app_info:verify_otp_vsn(AppInfo2),
+    rebar_app_info:verify_otp_vsn(AppInfo3),
 
     State2 = lists:foldl(fun(Profile, StateAcc) ->
-                                 handle_profile(Profile, Name, AppInfo2, StateAcc)
+                                 handle_profile(Profile, Name, AppInfo3, StateAcc)
                          end, State1, lists:reverse(CurrentProfiles)),
 
-    {AppInfo2, State2}.
+    {AppInfo3, State2}.
 
 %% @doc Applies a given profile for an app, ensuring the deps
 %% match the context it will require.
@@ -151,25 +152,15 @@ parse_profile_deps(Profile, Name, Deps, Opts, State) ->
                               ,Locks
                               ,1).
 
-%% @doc Find the app-level config and return the state updated
-%% with the relevant app-level data.
--spec project_app_config(rebar_app_info:t(), rebar_dict(), rebar_state:t()) ->
-    {Config, rebar_state:t()} when
-      Config :: [any()].
-project_app_config(AppInfo, Default, State) ->
-    C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
-    AppInfo1 = rebar_app_info:update_opts(AppInfo, Default, C),
-    {AppInfo2, State1} = maybe_reset_hooks_plugins(AppInfo1, State),
-    {AppInfo2, State1}.
-
+%% reset the State hooks if there is a top level application
 -spec maybe_reset_hooks_plugins(AppInfo, State) ->  {AppInfo, State} when
       AppInfo :: rebar_app_info:t(),
       State :: rebar_state:t().
 maybe_reset_hooks_plugins(AppInfo, State) ->
     Dir = rebar_app_info:dir(AppInfo),
+    CurrentProfiles = rebar_state:current_profiles(State),
     case ec_file:real_dir_path(rebar_dir:root_dir(State)) of
         Dir ->
-            CurrentProfiles = rebar_state:current_profiles(State),
             Opts = reset_hooks(rebar_state:opts(State), CurrentProfiles),
             State1 = rebar_state:opts(State, Opts),
 
@@ -179,7 +170,11 @@ maybe_reset_hooks_plugins(AppInfo, State) ->
 
             {AppInfo1, State1};
         _ ->
-            {AppInfo, State}
+            %% if not in the top root directory then we need to merge in the
+            %% default state opts to this subapp's opts
+            Default = reset_hooks(rebar_state:default(State), CurrentProfiles),
+            AppInfo1 = rebar_app_info:update_opts(AppInfo, Default),
+            {AppInfo1, State}
     end.
 
 
@@ -211,8 +206,8 @@ reset_hooks(Opts, CurrentProfiles) ->
 -spec all_app_dirs([file:name()]) -> [{file:name(), [file:name()]}].
 all_app_dirs(LibDirs) ->
     lists:flatmap(fun(LibDir) ->
-                        {_, SrcDirs} = find_config_src(LibDir, ["src"]),
-                        app_dirs(LibDir, SrcDirs)
+                          {_, SrcDirs} = find_config_src(LibDir, ["src"]),
+                          app_dirs(LibDir, SrcDirs)
                   end, LibDirs).
 
 %% @private find the directories for all apps based on their source dirs
@@ -270,11 +265,11 @@ find_apps(LibDirs, Validate) ->
 %% @doc for each directory passed, with the configured source directories,
 %% find all apps according to the validity rule passed in.
 %% Returns all the related app info records.
--spec find_apps([file:filename_all()], [file:filename_all()], valid | invalid | all) -> [rebar_app_info:t()].
-find_apps(LibDirs, SrcDirs, Validate) ->
+-spec find_apps([file:filename_all()], [file:filename_all()], valid | invalid | all, rebar_state:t()) -> [rebar_app_info:t()].
+find_apps(LibDirs, SrcDirs, Validate, State) ->
     rebar_utils:filtermap(
       fun({AppDir, AppSrcDirs}) ->
-            find_app(rebar_app_info:new(), AppDir, AppSrcDirs, Validate)
+            find_app(rebar_app_info:new(), AppDir, AppSrcDirs, Validate, State)
       end,
       all_app_dirs(LibDirs, SrcDirs)
     ).
@@ -305,8 +300,19 @@ find_app(AppInfo, AppDir, Validate) ->
 %% the directories where source files can be located. Returns the related
 %% app info record.
 -spec find_app(rebar_app_info:t(), file:filename_all(),
-               [file:filename_all()], valid | invalid | all) ->
+               [file:filename_all()], valid | invalid | all, rebar_state:t()) ->
     {true, rebar_app_info:t()} | false.
+find_app(AppInfo, AppDir, SrcDirs, Validate, State) ->
+    AppInfo1 = case ec_file:real_dir_path(rebar_dir:root_dir(State)) of
+                   AppDir ->
+                       Opts = rebar_state:opts(State),
+                       rebar_app_info:default(rebar_app_info:opts(AppInfo, Opts), Opts);
+                   _ ->
+                       Config = rebar_config:consult(AppDir),
+                       rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), Config)
+               end,
+    find_app_(AppInfo1, AppDir, SrcDirs, Validate).
+
 find_app(AppInfo, AppDir, SrcDirs, Validate) ->
     Config = rebar_config:consult(AppDir),
     AppInfo1 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), Config),

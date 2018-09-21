@@ -38,7 +38,8 @@ all() ->
      recursive, no_recursive,
      always_recompile_when_erl_compiler_options_set,
      dont_recompile_when_erl_compiler_options_env_does_not_change,
-     recompile_when_erl_compiler_options_env_changes].
+     recompile_when_erl_compiler_options_env_changes,
+     rebar_config_os_var].
 
 groups() ->
     [{basic_app, [], [build_basic_app, paths_basic_app, clean_basic_app]},
@@ -774,7 +775,7 @@ recompile_when_opts_change(Config) ->
 
     rebar_test_utils:create_config(AppDir, [{erl_opts, [{d, some_define}]}]),
 
-    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+    rebar_test_utils:run_and_check(Config, [{erl_opts, [{d, some_define}]}], ["compile"], {ok, [{app, Name}]}),
 
     {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
     NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
@@ -1943,6 +1944,29 @@ recompile_when_erl_compiler_options_env_changes(Config) ->
         false -> ok;
         _     -> os:putenv("ERL_COMPILER_OPTIONS", ExistingEnv)
     end.
+
+rebar_config_os_var(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("rebar_config_os_var_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    rebar_test_utils:create_config(AppDir, [{erl_opts, []}]),
+
+    AltConfig = filename:join(AppDir, "test.rebar.config"),
+    file:write_file(AltConfig, "{erl_opts, [compressed]}."),
+    true = os:putenv("REBAR_CONFIG", AltConfig),
+
+    rebar_test_utils:run_and_check(Config, ["compile"], {ok, [{app, Name}]}),
+
+    Path = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    code:add_patha(Path),
+
+    Mod = list_to_atom("not_a_real_src_" ++ Name),
+
+    true = lists:member(compressed, proplists:get_value(options, Mod:module_info(compile), [])),
+    ok.
 
 %% this test sets the env var, compiles, records the file last modified
 %% timestamp, recompiles and compares the file last modified timestamp to

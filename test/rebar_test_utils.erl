@@ -1,7 +1,7 @@
 -module(rebar_test_utils).
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
--export([init_rebar_state/1, init_rebar_state/2, run_and_check/4, check_results/3]).
+-export([init_rebar_state/1, init_rebar_state/2, run_and_check/3, run_and_check/4, check_results/3]).
 -export([expand_deps/2, flat_deps/1, top_level_deps/1]).
 -export([create_app/4, create_plugin/4, create_eunit_app/4, create_empty_app/4,
          create_config/2, create_config/3, package_app/4]).
@@ -80,6 +80,33 @@ run_and_check(Config, RebarConfig, Command, Expect) ->
         end
     catch
         rebar_abort when Expect =:= rebar_abort -> rebar_abort
+    end.
+
+run_and_check(Config, Command, Expect) ->
+    %% Assumes init_rebar_state has run first
+    AppDir = ?config(apps, Config),
+    {ok, Cwd} = file:get_cwd(),
+    try
+        ok = file:set_cwd(AppDir),
+        Res = rebar3:run(Command),
+        case Expect of
+            {error, Reason} ->
+                ?assertEqual({error, Reason}, Res);
+            {ok, Expected} ->
+                {ok, _} = Res,
+                check_results(AppDir, Expected, "*"),
+                Res;
+            {ok, Expected, ProfileRun} ->
+                {ok, _} = Res,
+                check_results(AppDir, Expected, ProfileRun),
+                Res;
+            return ->
+                Res
+        end
+    catch
+        rebar_abort when Expect =:= rebar_abort -> rebar_abort
+    after
+        ok = file:set_cwd(Cwd)
     end.
 
 %% @doc Creates a dummy application including:

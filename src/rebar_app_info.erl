@@ -7,6 +7,7 @@
          new/4,
          new/5,
          update_opts/3,
+         update_opts/2,
          update_opts_deps/2,
          discover/1,
          name/1,
@@ -158,7 +159,7 @@ update_opts(AppInfo, Opts, Config) ->
                        %% don't set anything here.
                        [];
                    _ ->
-                       deps_from_config(dir(AppInfo), Config)
+                       deps_from_config(dir(AppInfo), proplists:get_value(deps, Config, []))
                end,
 
     Plugins = proplists:get_value(plugins, Config, []),
@@ -168,6 +169,13 @@ update_opts(AppInfo, Opts, Config) ->
 
     NewOpts = rebar_opts:merge_opts(LocalOpts, Opts),
 
+    AppInfo#app_info_t{opts=NewOpts,
+                       default=NewOpts}.
+
+%% @doc update current app info opts by merging in a new dict of opts
+-spec update_opts(t(), rebar_dict()) -> t().
+update_opts(AppInfo=#app_info_t{opts=LocalOpts}, Opts) ->
+    NewOpts = rebar_opts:merge_opts(LocalOpts, Opts),
     AppInfo#app_info_t{opts=NewOpts,
                        default=NewOpts}.
 
@@ -183,10 +191,10 @@ update_opts_deps(AppInfo=#app_info_t{opts=Opts}, Deps) ->
 
 %% @private extract the deps for an app in `Dir' based on its config file data
 -spec deps_from_config(file:filename(), [any()]) -> [{tuple(), any()}, ...].
-deps_from_config(Dir, Config) ->
+deps_from_config(Dir, ConfigDeps) ->
     case rebar_config:consult_lock_file(filename:join(Dir, ?LOCK_FILE)) of
         [] ->
-            [{{deps, default}, proplists:get_value(deps, Config, [])}];
+            [{{deps, default}, ConfigDeps}];
         D ->
             %% We want the top level deps only from the lock file.
             %% This ensures deterministic overrides for configs.
