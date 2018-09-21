@@ -99,6 +99,7 @@ compile(AppInfo, CompileOpts) when element(1, AppInfo) == app_info_t ->
                {recursive, dir_recursive(RebarOpts, "src", CompileOpts)}],
     MibsOpts = [check_last_mod,
                 {recursive, dir_recursive(RebarOpts, "mibs", CompileOpts)}],
+
     rebar_base_compiler:run(RebarOpts,
                             check_files([filename:join(Dir, File)
                                          || File <- rebar_opts:get(RebarOpts, xrl_first_files, [])]),
