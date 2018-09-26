@@ -67,11 +67,12 @@ format_error(Reason) ->
 %% ===================================================================
 
 clean_apps(State, Providers, Apps) ->
+    Compilers = rebar_state:compilers(State),
     [begin
          ?INFO("Cleaning out ~ts...", [rebar_app_info:name(AppInfo)]),
          AppDir = rebar_app_info:dir(AppInfo),
          AppInfo1 = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER, Providers, AppInfo, State),
-         rebar_erlc_compiler:clean(AppInfo1),
+         rebar_compiler:clean(Compilers, AppInfo1),
          rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo1, State)
      end || AppInfo <- Apps].
 

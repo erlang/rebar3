@@ -40,6 +40,9 @@
                      {pkg, rebar_pkg_resource},
                      {hg, rebar_hg_resource}]},
 
+        {app_compilers, [{erl, rebar_erlc_compiler}]},
+        {compilers, [rebar_compiler_xrl, rebar_compiler_yrl, rebar_compiler_mib, rebar_compiler_erl]},
+
         {providers, [rebar_prv_app_discovery,
                      rebar_prv_as,
                      rebar_prv_bare_compile,

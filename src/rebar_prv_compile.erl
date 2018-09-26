@@ -137,8 +137,17 @@ build_extra_dir(State, Dir) ->
             OutDir = filename:join([BaseDir, Dir]),
             filelib:ensure_dir(filename:join([OutDir, "dummy.beam"])),
             copy(rebar_state:dir(State), BaseDir, Dir),
-            rebar_erlc_compiler:compile_dir(State, BaseDir, OutDir);
-        false -> ok
+
+            Compilers = rebar_state:compilers(State),
+            FakeApp = rebar_app_info:new(),
+            FakeApp1 = rebar_app_info:out_dir(FakeApp, BaseDir),
+            FakeApp2 = rebar_app_info:ebin_dir(FakeApp1, OutDir),
+            Opts = rebar_state:opts(State),
+            FakeApp3 = rebar_app_info:opts(FakeApp2, Opts),
+            FakeApp4 = rebar_app_info:set(FakeApp3, src_dirs, [OutDir]),
+            rebar_compiler:compile_all(Compilers, FakeApp4);
+        false ->
+            ok
     end.
 
 compile(State, AppInfo) ->
@@ -151,17 +160,8 @@ compile(State, Providers, AppInfo) ->
 
     AppInfo2 = rebar_hooks:run_all_hooks(AppDir, pre, ?ERLC_HOOK, Providers, AppInfo1, State),
 
-    case rebar_app_info:compile_type(AppInfo) of
-        mix ->
-            rebar_utils:sh("mix compile --no-deps-check --no-protocol-consolidation",
-                           [{cd, AppDir},
-                            {return_on_error, true},
-                            {use_stdout, true},
-                            {env, [{"MIX_BUILD_PATH", filename:join(AppDir, "../../")},
-                                   {"MIX_ENV", "prod"}]}]);
-        _ ->
-            rebar_erlc_compiler:compile(AppInfo2)
-    end,
+    Compilers = rebar_state:compilers(State),
+    rebar_compiler:compile_all(Compilers, AppInfo2),
 
     AppInfo3 = rebar_hooks:run_all_hooks(AppDir, post, ?ERLC_HOOK, Providers, AppInfo2, State),
 

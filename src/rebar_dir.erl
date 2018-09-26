@@ -301,9 +301,8 @@ all_src_dirs(Opts, SrcDefault, ExtraDefault) ->
 src_dir_opts(Opts, Dir) ->
     RawSrcDirs = raw_src_dirs(src_dirs, Opts, []),
     RawExtraSrcDirs = raw_src_dirs(extra_src_dirs, Opts, []),
-    AllOpts = [Opt || {D,Opt} <- RawSrcDirs++RawExtraSrcDirs,
-                      D==Dir],
-    lists:ukeysort(1,proplists:unfold(lists:append(AllOpts))).
+    AllOpts = [Opt || {D, Opt} <- RawSrcDirs++RawExtraSrcDirs, D==Dir],
+    lists:ukeysort(1, proplists:unfold(lists:append(AllOpts))).
 
 %%% @doc
 %%% Return the value of the 'recursive' option for the given directory.

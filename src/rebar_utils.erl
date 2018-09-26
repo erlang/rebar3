@@ -37,6 +37,7 @@
          escript_foldl/3,
          find_files/2,
          find_files/3,
+         find_files_in_dirs/3,
          beam_to_mod/1,
          beam_to_mod/2,
          erl_to_mod/1,
@@ -205,6 +206,12 @@ sh(Command0, Options0) ->
 
 find_files(Dir, Regex) ->
     find_files(Dir, Regex, true).
+
+find_files_in_dirs([], _Regex, _Recursive) ->
+    [];
+find_files_in_dirs([Dir | T], Regex, Recursive) ->
+    find_files(Dir, Regex, Recursive) ++ find_files_in_dirs(T, Regex, Recursive).
+
 
 find_files(Dir, Regex, Recursive) ->
     filelib:fold_files(Dir, Regex, Recursive,
