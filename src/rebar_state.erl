@@ -38,6 +38,8 @@
 
          to_list/1,
 
+         compilers/1, compilers/2,
+
          create_resources/2,
          resources/1, resources/2, add_resource/2,
          providers/1, providers/2, add_provider/2,
@@ -66,6 +68,7 @@
                   all_plugin_deps     = []          :: [rebar_app_info:t()],
                   all_deps            = []          :: [rebar_app_info:t()],
 
+                  compilers           = []          :: [{compiler_type(), extension(), extension(), compile_fun()}],
                   resources           = [],
                   providers           = [],
                   allow_provider_overrides = false  :: boolean()}).
@@ -73,6 +76,10 @@
 -export_type([t/0]).
 
 -type t() :: #state_t{}.
+
+-type compiler_type() :: atom().
+-type extension() :: string().
+-type compile_fun() :: fun(([file:filename()], rebar_app_info:t(), list()) -> ok).
 
 -spec new() -> t().
 new() ->
@@ -391,6 +398,12 @@ add_resource(State=#state_t{resources=Resources}, {ResourceType, ResourceModule}
 warn_old_resource(ResourceModule) ->
     ?WARN("Using custom resource ~s that implements a deprecated api. "
           "It should be upgraded to rebar_resource_v2.", [ResourceModule]).
+
+compilers(#state_t{compilers=Compilers}) ->
+    Compilers.
+
+compilers(State, Compilers) ->
+    State#state_t{compilers=Compilers}.
 
 create_resources(Resources, State) ->
     lists:foldl(fun(R, StateAcc) ->

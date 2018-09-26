@@ -24,7 +24,6 @@
          parent/2,
          original_vsn/1,
          original_vsn/2,
-         ebin_dir/1,
          priv_dir/1,
          applications/1,
          applications/2,
@@ -38,6 +37,8 @@
          dir/2,
          out_dir/1,
          out_dir/2,
+         ebin_dir/1,
+         ebin_dir/2,
          default/1,
          default/2,
          opts/1,
@@ -87,6 +88,7 @@
                      dep_level=0        :: integer(),
                      dir                :: file:name(),
                      out_dir            :: file:name(),
+                     ebin_dir           :: file:name(),
                      source             :: string() | tuple() | checkout | undefined,
                      is_lock=false      :: boolean(),
                      is_checkout=false  :: boolean(),
@@ -128,7 +130,8 @@ new(AppName, Vsn, Dir) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
                      original_vsn=rebar_utils:to_binary(Vsn),
                      dir=rebar_utils:to_list(Dir),
-                     out_dir=rebar_utils:to_list(Dir)}}.
+                     out_dir=rebar_utils:to_list(Dir),
+                     ebin_dir=filename:join(rebar_utils:to_list(Dir), "ebin")}}.
 
 %% @doc build a complete version of the app info with all fields set.
 -spec new(atom() | binary() | string(), binary() | string(), file:name(), list()) ->
@@ -138,6 +141,7 @@ new(AppName, Vsn, Dir, Deps) ->
                      original_vsn=rebar_utils:to_binary(Vsn),
                      dir=rebar_utils:to_list(Dir),
                      out_dir=rebar_utils:to_list(Dir),
+                     ebin_dir=filename:join(rebar_utils:to_list(Dir), "ebin"),
                      deps=Deps}}.
 
 %% @doc build a complete version of the app info with all fields set.
@@ -149,6 +153,7 @@ new(Parent, AppName, Vsn, Dir, Deps) ->
                      original_vsn=rebar_utils:to_binary(Vsn),
                      dir=rebar_utils:to_list(Dir),
                      out_dir=rebar_utils:to_list(Dir),
+                     ebin_dir=filename:join(rebar_utils:to_list(Dir), "ebin"),
                      deps=Deps}}.
 
 %% @doc update the opts based on the contents of a config
@@ -450,12 +455,21 @@ out_dir(#app_info_t{out_dir=OutDir}) ->
 %% should go
 -spec out_dir(t(), file:name()) -> t().
 out_dir(AppInfo=#app_info_t{}, OutDir) ->
-    AppInfo#app_info_t{out_dir=rebar_utils:to_list(OutDir)}.
+    AppInfo#app_info_t{out_dir=rebar_utils:to_list(OutDir),
+                       ebin_dir=filename:join(rebar_utils:to_list(OutDir), "ebin")}.
 
 %% @doc gets the directory where ebin files for the app should go
 -spec ebin_dir(t()) -> file:name().
-ebin_dir(#app_info_t{out_dir=OutDir}) ->
-    rebar_utils:to_list(filename:join(OutDir, "ebin")).
+ebin_dir(#app_info_t{ebin_dir=undefined,
+                     out_dir=OutDir}) ->
+    filename:join(rebar_utils:to_list(OutDir), "ebin");
+ebin_dir(#app_info_t{ebin_dir=EbinDir}) ->
+    EbinDir.
+
+%% @doc sets the directory where beam files should go
+-spec ebin_dir(t(), file:name()) -> t().
+ebin_dir(AppInfo, EbinDir) ->
+    AppInfo#app_info_t{ebin_dir=EbinDir}.
 
 %% @doc gets the directory where private files for the app should go
 -spec priv_dir(t()) -> file:name().

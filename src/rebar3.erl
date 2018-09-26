@@ -139,11 +139,14 @@ run_aux(State, RawArgs) ->
                      rebar_state:set(State1, rebar_packages_cdn, CDN)
              end,
 
+    Compilers = application:get_env(rebar, compilers, []),
+    State0 = rebar_state:compilers(State2, Compilers),
+
     %% TODO: this means use of REBAR_PROFILE=profile will replace the repos with
     %% the repos defined in the profile. But it will not work with `as profile`.
     %% Maybe it shouldn't work with either to be consistent?
     Resources = application:get_env(rebar, resources, []),
-    State2_ = rebar_state:create_resources(Resources, State2),
+    State2_ = rebar_state:create_resources(Resources, State0),
 
     %% bootstrap test profile
     State3 = rebar_state:add_to_profile(State2_, test, test_state(State1)),
@@ -408,6 +411,7 @@ test_state(State) ->
     ProfileOpts = proplists:get_value(test, Profiles, []),
     ErlOpts = proplists:get_value(erl_opts, ProfileOpts, []),
     TestOpts = safe_define_test_macro(ErlOpts),
+    %% [{erl_opts, TestOpts}].
     [{extra_src_dirs, ["test"]}, {erl_opts, TestOpts}].
 
 -spec safe_define_test_macro([any()]) -> [any()] | [{'d',atom()} | any()].
