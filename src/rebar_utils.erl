@@ -49,6 +49,7 @@
          update_code/1,
          update_code/2,
          remove_from_code_path/1,
+         remove_from_code_path/2,
          cleanup_code_path/1,
          args_to_tasks/1,
          expand_env_variable/3,
@@ -785,6 +786,21 @@ update_code(Paths, Opts) ->
                           end
                   end, Paths).
 
+-spec remove_from_code_path(Paths, State) -> Res when
+    Paths :: list(string()),
+    State :: rebar_state:t(),
+    Res :: ok.
+remove_from_code_path(Paths, State) ->
+    case unload_plugins(State) of
+        true ->
+            remove_from_code_path(Paths);
+        false ->
+            ok
+    end.
+
+-spec remove_from_code_path(Paths) -> Res when
+    Paths :: list(string()),
+    Res :: ok.
 remove_from_code_path(Paths) ->
     lists:foreach(fun(Path) ->
                           Name = filename:basename(Path, "/ebin"),
@@ -806,6 +822,12 @@ remove_from_code_path(Paths) ->
                           end,
                           code:del_path(Path)
                   end, lists:usort(Paths)).
+
+-spec unload_plugins(State) -> Res when
+      State :: rebar_state:t(),
+      Res :: boolean().
+unload_plugins(State) ->
+    rebar_state:get(State, unload_plugins, true).
 
 %% @doc Revert to only having the beams necessary for running rebar3 and
 %% plugins in the path
