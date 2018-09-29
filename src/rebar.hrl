@@ -27,9 +27,9 @@
 -define(REMOTE_PACKAGE_DIR, "tarballs").
 -define(LOCK_FILE, "rebar.lock").
 -define(DEFAULT_COMPILER_SOURCE_FORMAT, relative).
--define(PACKAGE_INDEX_VERSION, 4).
--define(PACKAGE_TABLE, package_index_v4).
--define(INDEX_FILE, "packages-v4.idx").
+-define(PACKAGE_INDEX_VERSION, 5).
+-define(PACKAGE_TABLE, package_index).
+-define(INDEX_FILE, "packages.idx").
 -define(HEX_AUTH_FILE, "hex.config").
 -define(PUBLIC_HEX_REPO, <<"hexpm">>).
 

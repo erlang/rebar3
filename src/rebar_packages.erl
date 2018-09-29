@@ -24,10 +24,10 @@
 -type package() :: pkg_name() | {pkg_name(), vsn()}.
 
 format_error({missing_package, Name, Vsn}) ->
-    io_lib:format("Package not found in any repo: ~ts-~ts.", [rebar_utils:to_binary(Name),
-                                                              rebar_utils:to_binary(Vsn)]);
+    io_lib:format("Package not found in any repo: ~ts ~ts", [rebar_utils:to_binary(Name),
+                                                             rebar_utils:to_binary(Vsn)]);
 format_error({missing_package, Pkg}) ->
-    io_lib:format("Package not found in any repo: ~p.", [Pkg]).
+    io_lib:format("Package not found in any repo: ~p", [Pkg]).
 
 -spec get(rebar_hex_repos:repo(), binary()) -> {ok, map()} | {error, term()}.
 get(Config, Name) ->
@@ -55,29 +55,25 @@ get_all_names(State) ->
                                                       _='_'}, 
                                              [], ['$1']}])).
 
--spec get_package_versions(unicode:unicode_binary(), unicode:unicode_binary(), ets:tid(), rebar_state:t())
-                          -> [vsn()].
+-spec get_package_versions(unicode:unicode_binary(), unicode:unicode_binary(),
+                           ets:tid(), rebar_state:t()) -> [vsn()].
 get_package_versions(Dep, Repo, Table, State) ->
     ?MODULE:verify_table(State),
-    ets:select(Table, [{#package{key={Dep,'$1', Repo},
-                                 _='_'}, 
-                        [], ['$1']}]).
-
-
-get_package(Dep, Vsn, Hash, Repo, Table, State) ->
-    get_package(Dep, Vsn, Hash, false, [Repo], Table, State).
+    AllowPreRelease = rebar_state:get(State, deps_allow_prerelease, false),
+    ets:select(Table, [{#package{key={Dep,{'$1', '$2'}, Repo},
+                                 _='_'},
+                        [{'==', '$2', {{[],[]}}} || not AllowPreRelease], [{{'$1', '$2'}}]}]).
 
 -spec get_package(unicode:unicode_binary(), unicode:unicode_binary(),
-                  binary() | undefined | '_', boolean() | '_',
-                  unicode:unicode_binary() | '_' | list(), ets:tab(), rebar_state:t())
+                  binary() | undefined | '_',
+                  [unicode:unicode_binary()] | ['_'], ets:tab(), rebar_state:t())
                  -> {ok, #package{}} | not_found.
-get_package(Dep, Vsn, undefined, Retired, Repo, Table, State) ->
-    get_package(Dep, Vsn, '_', Retired, Repo, Table, State);
-get_package(Dep, Vsn, Hash, Retired, Repos, Table, State) ->
+get_package(Dep, Vsn, undefined, Repos, Table, State) ->
+    get_package(Dep, Vsn, '_', Repos, Table, State);
+get_package(Dep, Vsn, Hash, Repos, Table, State) ->
     ?MODULE:verify_table(State),
-    case ets:select(Table, [{#package{key={Dep, Vsn, Repo},
+    case ets:select(Table, [{#package{key={Dep, ec_semver:parse(Vsn), Repo},
                                       checksum=Hash,
-                                      retired=Retired,
                                       _='_'}, [], ['$_']} || Repo <- Repos]) of
         %% have to allow multiple matches in the list for cases that Repo is `_`
         [Package | _] ->
@@ -258,7 +254,7 @@ update_package(Name, RepoConfig=#{name := Repo}, State) ->
 
 insert_releases(Name, Releases, Repo, Table) ->
     [true = ets:insert(Table,
-                       #package{key={Name, Version, Repo},
+                       #package{key={Name, ec_semver:parse(Version), Repo},
                                 checksum=parse_checksum(Checksum),
                                 retired=maps:get(retired, Release, false),
                                 dependencies=parse_deps(Dependencies)})
@@ -279,7 +275,7 @@ resolve_version(Dep, DepVsn, Hash, HexRegistry, State) when is_binary(Hash) ->
     RepoNames = [RepoName || #{name := RepoName} <- RepoConfigs],
 
     %% allow retired packages when we have a checksum
-    case get_package(Dep, DepVsn, Hash, '_', RepoNames, HexRegistry, State) of
+    case get_package(Dep, DepVsn, Hash, RepoNames, HexRegistry, State) of
         {ok, Package=#package{key={_, _, RepoName}}} ->
             {ok, RepoConfig} = rebar_hex_repos:get_repo_config(RepoName, RepoConfigs),
             {ok, Package, RepoConfig};
@@ -289,7 +285,7 @@ resolve_version(Dep, DepVsn, Hash, HexRegistry, State) when is_binary(Hash) ->
                           none ->
                               not_found;
                           {ok, Vsn} ->
-                              get_package(Dep, Vsn, Hash, Repo, HexRegistry, State)
+                              get_package(Dep, Vsn, Hash, [Repo], HexRegistry, State)
                       end
                   end,
             handle_missing_no_exception(Fun, Dep, State)
@@ -300,7 +296,7 @@ resolve_version(Dep, undefined, Hash, HexRegistry, State) ->
                   none ->
                       not_found;
                   {ok, Vsn} ->
-                      get_package(Dep, Vsn, Hash, Repo, HexRegistry, State)
+                      get_package(Dep, Vsn, Hash, [Repo], HexRegistry, State)
               end
           end,
     handle_missing_no_exception(Fun, Dep, State);
@@ -314,7 +310,7 @@ resolve_version(Dep, DepVsn, Hash, HexRegistry, State) ->
                           none ->
                               not_found;
                           {ok, Vsn} ->
-                              get_package(Dep, Vsn, Hash, Repo, HexRegistry, State)
+                              get_package(Dep, Vsn, Hash, [Repo], HexRegistry, State)
                       end
                   end,
             handle_missing_no_exception(Fun, Dep, State)

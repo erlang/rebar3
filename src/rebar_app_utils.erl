@@ -254,10 +254,13 @@ update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
         {ok, Package, RepoConfig} ->
             #package{key={_, PkgVsn1, _},
                      checksum=Hash1,
-                     dependencies=Deps} = Package,
-            AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName, PkgVsn1, Hash1, RepoConfig}),
+                     dependencies=Deps,
+                     retired=Retired} = Package,
+            maybe_warn_retired(PkgName, PkgVsn1, Hash, Retired),
+            PkgVsn2 = list_to_binary(lists:flatten(ec_semver:format(PkgVsn1))),
+            AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName, PkgVsn2, Hash1, RepoConfig}),
             AppInfo2 = rebar_app_info:update_opts_deps(AppInfo1, Deps),
-            rebar_app_info:original_vsn(AppInfo2, PkgVsn1);
+            rebar_app_info:original_vsn(AppInfo2, PkgVsn2);
         not_found ->
             throw(?PRV_ERROR({missing_package, PkgName, PkgVsn}));
         {error, {invalid_vsn, InvalidVsn}} ->
@@ -269,10 +272,10 @@ update_source(AppInfo, Source, _State) ->
 %% @doc convert a given exception's payload into an io description.
 -spec format_error(any()) -> iolist().
 format_error({missing_package, Name, undefined}) ->
-    io_lib:format("Package not found in any repo: ~ts.", [rebar_utils:to_binary(Name)]);
+    io_lib:format("Package not found in any repo: ~ts", [rebar_utils:to_binary(Name)]);
 format_error({missing_package, Name, Vsn}) ->
-    io_lib:format("Package not found in any repo: ~ts-~ts.", [rebar_utils:to_binary(Name),
-                                                              rebar_utils:to_binary(Vsn)]);
+    io_lib:format("Package not found in any repo: ~ts ~ts", [rebar_utils:to_binary(Name),
+                                                             rebar_utils:to_binary(Vsn)]);
 format_error({parse_dep, Dep}) ->
     io_lib:format("Failed parsing dep ~p", [Dep]);
 format_error({invalid_vsn, Dep, InvalidVsn}) ->
@@ -283,6 +286,32 @@ format_error(Error) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+maybe_warn_retired(_, _, _, false) ->
+    ok;
+maybe_warn_retired(_, _, Hash, _) when is_binary(Hash) ->
+    %% don't warn if this is a lock
+    ok;
+maybe_warn_retired(Name, Vsn, _, R=#{reason := Reason}) ->
+    Message = maps:get(message, R, ""),
+    ?WARN("Warning: package ~s-~s is retired: (~s) ~s",
+          [Name, ec_semver:format(Vsn), retire_reason(Reason), Message]);
+maybe_warn_retired(_, _, _, _) ->
+    ok.
+
+%% TODO: move to hex_core
+retire_reason('RETIRED_OTHER') ->
+    "other";
+retire_reason('RETIRED_INVALID') ->
+    "invalid";
+retire_reason('RETIRED_SECURITY') ->
+    "security";
+retire_reason('RETIRED_DEPRECATED') ->
+    "deprecated";
+retire_reason('RETIRED_RENAMED') ->
+    "renamed";
+retire_reason(_Other) ->
+    "other".
 
 %% @private checks that all the beam files have been properly
 %% created.
