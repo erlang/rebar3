@@ -24,7 +24,7 @@
     ok | {ok, [string()]} | {ok, [string()], [string()]}.
 
 -define(DAG_VSN, 2).
--define(DAG_FILE, "erlcinfo").
+-define(DAG_FILE, "source.dag").
 -type dag_v() :: {digraph:vertex(), term()} | 'false'.
 -type dag_e() :: {digraph:vertex(), digraph:vertex()}.
 -type dag() :: {list(dag_v()), list(dag_e()), list(string())}.
@@ -131,7 +131,6 @@ run_on_extra_src_dirs([Dir | Rest], CompilerMod, AppInfo, Fun) ->
             ok
     end,
     run_on_extra_src_dirs(Rest, CompilerMod, AppInfo, Fun).
-
 
 %% These functions are here for the ultimate goal of getting rid of
 %% rebar_base_compiler. This can't be done because of existing plugins.
