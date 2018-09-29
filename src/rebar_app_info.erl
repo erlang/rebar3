@@ -48,8 +48,8 @@
          set/3,
          source/1,
          source/2,
-         compile_type/1,
-         compile_type/2,
+         project_type/1,
+         project_type/2,
          is_lock/1,
          is_lock/2,
          is_checkout/1,
@@ -93,7 +93,7 @@
                      is_lock=false      :: boolean(),
                      is_checkout=false  :: boolean(),
                      valid              :: boolean() | undefined,
-                     compile_type       :: rebar3 | mix | undefined,
+                     project_type       :: rebar3 | mix | undefined,
                      is_available=false :: boolean()}).
 
 %%============================================================================
@@ -518,14 +518,14 @@ is_available(AppInfo=#app_info_t{}, IsAvailable) ->
     AppInfo#app_info_t{is_available=IsAvailable}.
 
 %% @doc
--spec compile_type(t()) -> atom().
-compile_type(#app_info_t{compile_type=CompileType}) ->
-    CompileType.
+-spec project_type(t()) -> atom().
+project_type(#app_info_t{project_type=ProjectType}) ->
+    ProjectType.
 
 %% @doc
--spec compile_type(t(), atom()) -> t().
-compile_type(AppInfo=#app_info_t{}, CompileType) ->
-    AppInfo#app_info_t{compile_type=CompileType}.
+-spec project_type(t(), atom()) -> t().
+project_type(AppInfo=#app_info_t{}, ProjectType) ->
+    AppInfo#app_info_t{project_type=ProjectType}.
 
 
 %% @doc returns whether the app is valid (built) or not

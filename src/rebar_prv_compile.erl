@@ -92,6 +92,12 @@ handle_project_apps(DepsPaths, Providers, State) ->
 -spec format_error(any()) -> iolist().
 format_error({missing_artifact, File}) ->
     io_lib:format("Missing artifact ~ts", [File]);
+format_error({bad_project_builder, Name, Type, Module}) ->
+    io_lib:format("Error building application ~s:~n     Required project builder ~s function "
+                  "~s:build/1 not found", [Name, Type, Module]);
+format_error({unknown_project_type, Name, Type}) ->
+    io_lib:format("Error building application ~s:~n     "
+                  "No project builder is configured for type ~s", [Name, Type]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -135,7 +141,7 @@ build_extra_dir(State, Dir) ->
         true ->
             BaseDir = filename:join([rebar_dir:base_dir(State), "extras"]),
             OutDir = filename:join([BaseDir, Dir]),
-            filelib:ensure_dir(filename:join([OutDir, "dummy.beam"])),
+            rebar_file_utils:ensure_dir(OutDir),
             copy(rebar_state:dir(State), BaseDir, Dir),
 
             Compilers = rebar_state:compilers(State),
@@ -160,8 +166,7 @@ compile(State, Providers, AppInfo) ->
 
     AppInfo2 = rebar_hooks:run_all_hooks(AppDir, pre, ?ERLC_HOOK, Providers, AppInfo1, State),
 
-    Compilers = rebar_state:compilers(State),
-    rebar_compiler:compile_all(Compilers, AppInfo2),
+    build_app(AppInfo2, State),
 
     AppInfo3 = rebar_hooks:run_all_hooks(AppDir, post, ?ERLC_HOOK, Providers, AppInfo2, State),
 
@@ -191,6 +196,26 @@ compile(State, Providers, AppInfo) ->
 %% Internal functions
 %% ===================================================================
 
+build_app(AppInfo, State) ->
+    case rebar_app_info:project_type(AppInfo) of
+        T when T =:= rebar3 ; T =:= undefined ->
+            Compilers = rebar_state:compilers(State),
+            rebar_compiler:compile_all(Compilers, AppInfo);
+        T ->
+            ProjectBuilders = rebar_state:get(State, project_builders, []),
+            case lists:keyfind(T, 1, ProjectBuilders) of
+                {_, Module} ->
+                    _ = code:ensure_loaded(Module),
+                    case erlang:function_exported(Module, build, 1) of
+                        true ->
+                            Module:build(AppInfo);
+                        false ->
+                            throw(?PRV_ERROR({bad_project_builder, rebar_app_info:name(AppInfo), T, Module}))
+                    end;
+                _ ->
+                    throw(?PRV_ERROR({unknown_project_type, rebar_app_info:name(AppInfo), T}))
+            end
+    end.
 update_code_paths(State, ProjectApps, DepsPaths) ->
     ProjAppsPaths = paths_for_apps(ProjectApps),
     ExtrasPaths = paths_for_extras(State, ProjectApps),

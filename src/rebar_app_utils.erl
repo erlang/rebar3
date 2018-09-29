@@ -273,9 +273,8 @@ update_source(AppInfo, Source, _State) ->
 -spec format_error(any()) -> iolist().
 format_error({missing_package, Name, undefined}) ->
     io_lib:format("Package not found in any repo: ~ts", [rebar_utils:to_binary(Name)]);
-format_error({missing_package, Name, Vsn}) ->
-    io_lib:format("Package not found in any repo: ~ts ~ts", [rebar_utils:to_binary(Name),
-                                                             rebar_utils:to_binary(Vsn)]);
+format_error({missing_package, Name, Constraint}) ->
+    io_lib:format("Package not found in any repo: ~ts ~ts", [Name, Constraint]);
 format_error({parse_dep, Dep}) ->
     io_lib:format("Failed parsing dep ~p", [Dep]);
 format_error({invalid_vsn, Dep, InvalidVsn}) ->
