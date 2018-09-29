@@ -411,7 +411,6 @@ test_state(State) ->
     ProfileOpts = proplists:get_value(test, Profiles, []),
     ErlOpts = proplists:get_value(erl_opts, ProfileOpts, []),
     TestOpts = safe_define_test_macro(ErlOpts),
-    %% [{erl_opts, TestOpts}].
     [{extra_src_dirs, ["test"]}, {erl_opts, TestOpts}].
 
 -spec safe_define_test_macro([any()]) -> [any()] | [{'d',atom()} | any()].

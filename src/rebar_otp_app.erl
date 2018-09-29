@@ -125,7 +125,7 @@ preprocess(State, AppInfo, AppSrcFile) ->
 
             %% Setup file .app filename and write new contents
             EbinDir = rebar_app_info:ebin_dir(AppInfo),
-            filelib:ensure_dir(filename:join(EbinDir, "dummy.beam")),
+            rebar_file_utils:ensure_dir(EbinDir),
             AppFile = rebar_app_utils:app_src_to_app(OutDir, AppSrcFile),
             ok = rebar_file_utils:write_file_if_contents_differ(AppFile, Spec, utf8),
 
@@ -163,31 +163,16 @@ validate_name(AppName, File) ->
 
 ebin_modules(AppInfo, Dir) ->
     Beams = lists:sort(rebar_utils:beams(filename:join(Dir, "ebin"))),
-    ExtraDirs = extra_dirs(AppInfo),
-    F = fun(Beam) -> not in_extra_dir(AppInfo, Beam, ExtraDirs) end,
-    Filtered = lists:filter(F, Beams),
+    SrcDirs = rebar_dir:src_dirs(rebar_app_info:opts(AppInfo), ["src"]),
+    FindSourceRules = [{".beam", ".erl",
+                        [{"ebin", SrcDir} || SrcDir <- SrcDirs]}],
+    Filtered = lists:filter(fun(Beam) ->
+                                rebar_utils:find_source(filename:basename(Beam),
+                                                        filename:dirname(Beam),
+                                                        FindSourceRules)
+                                        =/= {error, not_found}
+                            end, Beams),
     [rebar_utils:beam_to_mod(N) || N <- Filtered].
-
-extra_dirs(State) ->
-    Extras = rebar_dir:extra_src_dirs(rebar_app_info:opts(State)),
-    SrcDirs = rebar_dir:src_dirs(rebar_app_info:opts(State), ["src"]),
-    %% remove any dirs that are defined in `src_dirs` from `extra_src_dirs`
-    Extras -- SrcDirs.
-
-in_extra_dir(AppInfo, Beam, Dirs) ->
-    lists:any(fun(Dir) -> lists:prefix(filename:join([rebar_app_info:out_dir(AppInfo), Dir]),
-                                       beam_src(Beam)) end,
-              Dirs).
-
-beam_src(Beam) ->
-    case beam_lib:chunks(Beam, [compile_info]) of
-        {ok, {_mod, Chunks}} ->
-            CompileInfo = proplists:get_value(compile_info, Chunks, []),
-            proplists:get_value(source, CompileInfo, []);
-        {error, beam_lib, Reason} ->
-            ?WARN("Couldn't read debug info from ~p for reason: ~p", [Beam, Reason]),
-            []
-    end.
 
 ensure_registered(AppData) ->
     case lists:keyfind(registered, 1, AppData) of
