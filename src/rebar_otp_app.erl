@@ -60,7 +60,8 @@ compile(State, App) ->
 format_error({missing_app_file, Filename}) ->
     io_lib:format("App file is missing: ~ts", [Filename]);
 format_error({file_read, AppName, File, Reason}) ->
-    io_lib:format("Failed to read required ~ts file for processing the application '~ts': ~ts", [File, AppName, file:format_error(Reason)]);
+    io_lib:format("Failed to read required ~ts file for processing the application '~ts': ~ts",
+                  [File, AppName, file:format_error(Reason)]);
 format_error({invalid_name, File, AppName}) ->
     io_lib:format("Invalid ~ts: name of application (~p) must match filename.", [File, AppName]).
 

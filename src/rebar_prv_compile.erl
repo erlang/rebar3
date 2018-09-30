@@ -198,22 +198,20 @@ compile(State, Providers, AppInfo) ->
 
 build_app(AppInfo, State) ->
     case rebar_app_info:project_type(AppInfo) of
-        T when T =:= rebar3 ; T =:= undefined ->
+        Type when Type =:= rebar3 ; Type =:= undefined ->
             Compilers = rebar_state:compilers(State),
             rebar_compiler:compile_all(Compilers, AppInfo);
-        T ->
-            ProjectBuilders = rebar_state:get(State, project_builders, []),
-            case lists:keyfind(T, 1, ProjectBuilders) of
+        Type ->
+            ProjectBuilders = rebar_state:project_builders(State),
+            case lists:keyfind(Type, 1, ProjectBuilders) of
                 {_, Module} ->
-                    _ = code:ensure_loaded(Module),
-                    case erlang:function_exported(Module, build, 1) of
-                        true ->
-                            Module:build(AppInfo);
-                        false ->
-                            throw(?PRV_ERROR({bad_project_builder, rebar_app_info:name(AppInfo), T, Module}))
-                    end;
+                    %% load plugins since thats where project builders would be
+                    PluginDepsPaths = rebar_state:code_paths(State, all_plugin_deps),
+                    code:add_pathsa(PluginDepsPaths),
+                    Module:build(AppInfo),
+                    rebar_utils:remove_from_code_path(PluginDepsPaths);
                 _ ->
-                    throw(?PRV_ERROR({unknown_project_type, rebar_app_info:name(AppInfo), T}))
+                    throw(?PRV_ERROR({unknown_project_type, rebar_app_info:name(AppInfo), Type}))
             end
     end.
 update_code_paths(State, ProjectApps, DepsPaths) ->
