@@ -201,6 +201,8 @@ build_app(AppInfo, State) ->
         Type when Type =:= rebar3 ; Type =:= undefined ->
             Compilers = rebar_state:compilers(State),
             rebar_compiler:compile_all(Compilers, AppInfo);
+        mix ->
+            rebar_mix_builder:build(AppInfo);
         Type ->
             ProjectBuilders = rebar_state:project_builders(State),
             case lists:keyfind(Type, 1, ProjectBuilders) of
