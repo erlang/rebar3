@@ -71,7 +71,10 @@
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
--export_type([t/0]).
+-export_type([t/0,
+              project_type/0]).
+
+-type project_type() :: rebar3 | mix | undefined.
 
 -record(app_info_t, {name               :: binary() | undefined,
                      app_file_src       :: file:filename_all() | undefined,
@@ -93,7 +96,7 @@
                      is_lock=false      :: boolean(),
                      is_checkout=false  :: boolean(),
                      valid              :: boolean() | undefined,
-                     project_type       :: rebar3 | mix | undefined,
+                     project_type       :: project_type(),
                      is_available=false :: boolean()}).
 
 %%============================================================================

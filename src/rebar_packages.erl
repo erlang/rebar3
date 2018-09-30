@@ -65,7 +65,7 @@ get_package_versions(Dep, Repo, Table, State) ->
 
 
 get_package(Dep, Vsn, Hash, Repo, Table, State) ->
-    get_package(Dep, Vsn, Hash, false, [Repo], Table, State).
+    get_package(Dep, Vsn, Hash, '_', [Repo], Table, State).
 
 -spec get_package(unicode:unicode_binary(), unicode:unicode_binary(),
                   binary() | undefined | '_', boolean() | '_',
