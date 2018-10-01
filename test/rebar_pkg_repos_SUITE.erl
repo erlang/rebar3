@@ -13,7 +13,7 @@ all() ->
 
 groups() ->
     [{resolve_version, [use_first_repo_match, use_exact_with_hash, fail_repo_update,
-                        ignore_match_in_excluded_repo]}].
+                        ignore_match_in_excluded_repo, optional_prereleases]}].
 
 init_per_group(resolve_version, Config) ->
     Repo1 = <<"test-repo-1">>,
@@ -22,14 +22,17 @@ init_per_group(resolve_version, Config) ->
     Hexpm = <<"hexpm">>,
     Repos = [Repo1, Repo2, Repo3, Hexpm],
 
-    Deps = [{"A", "0.1.1", <<"good checksum">>, Repo1},
-            {"A", "0.1.1", <<"good checksum">>, Repo2},
-            {"B", "1.0.0", Repo1},
-            {"B", "2.0.0", Repo2},
-            {"B", "1.4.0", Repo3},
-            {"B", "1.4.3", Hexpm},
-            {"C", "1.3.1", <<"bad checksum">>, Repo1},
-            {"C", "1.3.1", <<"good checksum">>, Repo2}],
+    Deps = [{"A", "0.1.1", <<"good checksum">>, Repo1, false},
+            {"A", "0.1.1", <<"good checksum">>, Repo2, false},
+            {"B", "1.0.0", Repo1, false},
+            {"B", "2.0.0", Repo2, false},
+            {"B", "1.4.0", Repo3, false},
+            {"B", "1.4.3", Hexpm, false},
+            {"B", "1.4.6", Hexpm, #{reason => 'RETIRED_INVALID'}},
+            {"B", "1.5.0", Hexpm, false},
+            {"B", "1.5.6-rc.0", Hexpm, true},
+            {"C", "1.3.1", <<"bad checksum">>, Repo1, false},
+            {"C", "1.3.1", <<"good checksum">>, Repo2, false}],
     [{deps, Deps}, {repos, Repos} | Config];
 init_per_group(_, Config) ->
     Config.
@@ -102,6 +105,20 @@ init_per_testcase(ignore_match_in_excluded_repo, Config) ->
                 fun(_State) -> true end),
 
     [{state, State} | Config];
+init_per_testcase(optional_prereleases, Config) ->
+    Deps = ?config(deps, Config),
+    Repos = ?config(repos, Config),
+
+    State = setup_deps_and_repos(Deps, Repos),
+
+    meck:new(rebar_packages, [passthrough, no_link]),
+
+    meck:expect(rebar_packages, update_package,
+                fun(_, _, _State) -> ok  end),
+    meck:expect(rebar_packages, verify_table,
+                fun(_State) -> true end),
+
+    [{state, State} | Config];
 init_per_testcase(auth_merging, Config) ->
     meck:new(file, [passthrough, no_link, unstick]),
     meck:new(rebar_packages, [passthrough, no_link]),
@@ -120,7 +137,8 @@ end_per_testcase(Case, _Config) when Case =:= auth_merging ;
 end_per_testcase(Case, _Config) when Case =:= use_first_repo_match ;
                                      Case =:= use_exact_with_hash ;
                                      Case =:= fail_repo_update ;
-                                     Case =:= ignore_match_in_excluded_repo ->
+                                     Case =:= ignore_match_in_excluded_repo ;
+                                     Case =:= optional_prereleases ->
     meck:unload(rebar_packages);
 end_per_testcase(_, _) ->
     ok.
@@ -250,14 +268,14 @@ organization_merging(_Config) ->
 use_first_repo_match(Config) ->
     State = ?config(state, Config),
 
-    ?assertMatch({ok,{package,{<<"B">>, <<"2.0.0">>, Repo2},
+    ?assertMatch({ok,{package,{<<"B">>, {{2,0,0}, {[],[]}}, Repo2},
                       <<"some checksum">>, false, []},
                   #{name := Repo2,
                     http_adapter_config := #{profile := rebar}}},
                  rebar_packages:resolve_version(<<"B">>, <<"> 1.4.0">>, undefined,
                                                 ?PACKAGE_TABLE, State)),
 
-    ?assertMatch({ok,{package,{<<"B">>, <<"1.4.0">>, Repo3},
+    ?assertMatch({ok,{package,{<<"B">>, {{1,4,0}, {[],[]}}, Repo3},
                       <<"some checksum">>, false, []},
                   #{name := Repo3,
                     http_adapter_config := #{profile := rebar}}},
@@ -268,7 +286,7 @@ use_first_repo_match(Config) ->
 use_exact_with_hash(Config) ->
     State = ?config(state, Config),
 
-    ?assertMatch({ok,{package,{<<"C">>, <<"1.3.1">>, Repo2},
+    ?assertMatch({ok,{package,{<<"C">>, {{1,3,1}, {[],[]}}, Repo2},
                       <<"good checksum">>, false, []},
                   #{name := Repo2,
                     http_adapter_config := #{profile := rebar}}},
@@ -278,7 +296,7 @@ use_exact_with_hash(Config) ->
 fail_repo_update(Config) ->
     State = ?config(state, Config),
 
-    ?assertMatch({ok,{package,{<<"B">>, <<"1.4.0">>, Repo3},
+    ?assertMatch({ok,{package,{<<"B">>, {{1,4,0}, {[],[]}}, Repo3},
                       <<"some checksum">>, false, []},
                   #{name := Repo3,
                     http_adapter_config := #{profile := rebar}}},
@@ -289,24 +307,51 @@ ignore_match_in_excluded_repo(Config) ->
     State = ?config(state, Config),
     Repos = ?config(repos, Config),
 
-    ?assertMatch({ok,{package,{<<"B">>, <<"1.4.3">>, Hexpm},
-                      <<"some checksum">>, false, []},
+    ?assertMatch({ok,{package,{<<"B">>, {{1,4,6}, {[],[]}}, Hexpm},
+                      <<"some checksum">>, #{reason := 'RETIRED_INVALID'}, []},
                   #{name := Hexpm,
                     http_adapter_config := #{profile := rebar}}},
                  rebar_packages:resolve_version(<<"B">>, <<"~> 1.4.0">>, undefined,
                                                 ?PACKAGE_TABLE, State)),
 
     [_, Repo2 | _] = Repos,
-    ?assertMatch({ok,{package,{<<"A">>, <<"0.1.1">>, Repo2},
+    ?assertMatch({ok,{package,{<<"A">>, {{0,1,1}, {[],[]}}, Repo2},
                       <<"good checksum">>, false, []},
                   #{name := Repo2,
                     http_adapter_config := #{profile := rebar}}},
                  rebar_packages:resolve_version(<<"A">>, <<"0.1.1">>, <<"good checksum">>,
                                                 ?PACKAGE_TABLE, State)).
 
+optional_prereleases(Config) ->
+    State = ?config(state, Config),
+
+    ?assertMatch({ok,{package,{<<"B">>, {{1,5,0}, {[],[]}}, Hexpm},
+                      <<"some checksum">>, false, []},
+                  #{name := Hexpm,
+                    http_adapter_config := #{profile := rebar}}},
+                 rebar_packages:resolve_version(<<"B">>, <<"~> 1.5.0">>, undefined,
+                                                ?PACKAGE_TABLE, State)),
+
+    ?assertMatch({ok,{package,{<<"B">>, {{1,5,6}, {[<<"rc">>,0],[]}}, Hexpm},
+                      <<"some checksum">>, true, []},
+                  #{name := Hexpm,
+                    http_adapter_config := #{profile := rebar}}},
+                 rebar_packages:resolve_version(<<"B">>, <<"1.5.6-rc.0">>, <<"some checksum">>,
+                                                ?PACKAGE_TABLE, State)),
+
+    %% allow prerelease through configuration
+    State1 = rebar_state:set(State, deps_allow_prerelease, true),
+    ?assertMatch({ok,{package,{<<"B">>, {{1,5,6}, {[<<"rc">>,0],[]}}, Hexpm},
+                      <<"some checksum">>, true, []},
+                  #{name := Hexpm,
+                    http_adapter_config := #{profile := rebar}}},
+                 rebar_packages:resolve_version(<<"B">>, <<"~> 1.5.0">>, <<"some checksum">>,
+                                                ?PACKAGE_TABLE, State1)).
+
 %%
 
 setup_deps_and_repos(Deps, Repos) ->
+    catch ets:delete(?PACKAGE_TABLE),
     true = rebar_packages:new_package_table(),
     insert_deps(Deps),
     State = rebar_state:new([{hex, [{repos, [#{name => R} || R <- Repos]}]}]),
@@ -314,18 +359,18 @@ setup_deps_and_repos(Deps, Repos) ->
 
 
 insert_deps(Deps) ->
-    lists:foreach(fun({Name, Version, Repo}) ->
+    lists:foreach(fun({Name, Version, Repo, Retired}) ->
                           ets:insert(?PACKAGE_TABLE, #package{key={rebar_utils:to_binary(Name),
-                                                                   rebar_utils:to_binary(Version),
+                                                                   ec_semver:parse(Version),
                                                                    rebar_utils:to_binary(Repo)},
                                                               dependencies=[],
-                                                              retired=false,
+                                                              retired=Retired,
                                                               checksum = <<"some checksum">>});
-                     ({Name, Version, Checksum, Repo}) ->
+                     ({Name, Version, Checksum, Repo, Retired}) ->
                           ets:insert(?PACKAGE_TABLE, #package{key={rebar_utils:to_binary(Name),
-                                                                   rebar_utils:to_binary(Version),
+                                                                   ec_semver:parse(Version),
                                                                    rebar_utils:to_binary(Repo)},
                                                               dependencies=[],
-                                                              retired=false,
+                                                              retired=Retired,
                                                               checksum = Checksum})
                   end, Deps).

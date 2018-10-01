@@ -226,13 +226,13 @@ find_highest_matching(_Config) ->
     State = rebar_state:new(),
     {ok, Vsn} = rebar_packages:find_highest_matching_(
                   <<"goodpkg">>, <<"1.0.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
-    ?assertEqual(<<"1.0.1">>, Vsn),
+    ?assertEqual({{1,0,1},{[],[]}}, Vsn),
     {ok, Vsn1} = rebar_packages:find_highest_matching(
                    <<"goodpkg">>, <<"1.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
-    ?assertEqual(<<"1.1.1">>, Vsn1),
+    ?assertEqual({{1,1,1},{[],[]}}, Vsn1),
     {ok, Vsn2} = rebar_packages:find_highest_matching(
                    <<"goodpkg">>, <<"2.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
-    ?assertEqual(<<"2.0.0">>, Vsn2),
+    ?assertEqual({{2,0,0},{[],[]}}, Vsn2),
 
     %% regression test. ~> constraints higher than the available packages would result
     %% in returning the first package version instead of 'none'.
@@ -265,7 +265,7 @@ mock_config(Name, Config) ->
     lists:foreach(fun({{N, Vsn}, [Deps, Checksum, _]}) ->
                           case ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(N), Vsn, <<"hexpm">>}) of
                               false ->
-                                  ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(N), Vsn, <<"hexpm">>},
+                                  ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(N), ec_semver:parse(Vsn), <<"hexpm">>},
                                                                       dependencies=Deps,
                                                                       retired=false,
                                                                       checksum=Checksum});
