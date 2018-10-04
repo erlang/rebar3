@@ -239,10 +239,24 @@ consult_file_(File) ->
 -spec verify_config_format([{_,_}]) -> true.
 verify_config_format([]) ->
     true;
+verify_config_format([{_Key, Value} | T] ) when is_list(Value) ->
+    verify_config_format(T) andalso verify_config_format_sub(Value);
 verify_config_format([{_Key, _Value} | T]) ->
     verify_config_format(T);
 verify_config_format([Term | _]) ->
     throw(?PRV_ERROR({bad_config_format, Term})).
+
+%% @private checks that sub lists (in the top level key value pairs)
+%% do not contain empty, or size 1 tuples
+-spec verify_config_format_sub([tuple()]) -> true.
+verify_config_format_sub([]) ->
+    true;
+verify_config_format_sub([{_}=Term | _]) ->
+    throw(?PRV_ERROR({bad_config_format, Term}));
+verify_config_format_sub([{}=Term | _]) ->
+    throw(?PRV_ERROR({bad_config_format, Term}));
+verify_config_format_sub([_Term | T]) ->
+    verify_config_format_sub(T).
 
 %% @doc takes an existing configuration and the content of a lockfile
 %% and merges the locks into the config.
