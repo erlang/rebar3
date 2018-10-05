@@ -60,7 +60,7 @@ get_all_names(State) ->
 get_package_versions(Dep, Repo, Table, State) ->
     ?MODULE:verify_table(State),
     AllowPreRelease = rebar_state:get(State, deps_allow_prerelease, false),
-    ets:select(Table, [{#package{key={Dep,{'$1', '$2'}, Repo},
+    ets:select(Table, [{#package{key={Dep, {'$1', '$2'}, Repo},
                                  _='_'},
                         [{'==', '$2', {{[],[]}}} || not AllowPreRelease], [{{'$1', '$2'}}]}]).
 

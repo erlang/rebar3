@@ -24,7 +24,6 @@
          parent/2,
          original_vsn/1,
          original_vsn/2,
-         ebin_dir/1,
          priv_dir/1,
          applications/1,
          applications/2,
@@ -38,6 +37,8 @@
          dir/2,
          out_dir/1,
          out_dir/2,
+         ebin_dir/1,
+         ebin_dir/2,
          default/1,
          default/2,
          opts/1,
@@ -47,6 +48,8 @@
          set/3,
          source/1,
          source/2,
+         project_type/1,
+         project_type/2,
          is_lock/1,
          is_lock/2,
          is_checkout/1,
@@ -68,7 +71,10 @@
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
--export_type([t/0]).
+-export_type([t/0,
+              project_type/0]).
+
+-type project_type() :: rebar3 | mix | undefined.
 
 -record(app_info_t, {name               :: binary() | undefined,
                      app_file_src       :: file:filename_all() | undefined,
@@ -85,10 +91,12 @@
                      dep_level=0        :: integer(),
                      dir                :: file:name(),
                      out_dir            :: file:name(),
+                     ebin_dir           :: file:name(),
                      source             :: string() | tuple() | checkout | undefined,
                      is_lock=false      :: boolean(),
                      is_checkout=false  :: boolean(),
                      valid              :: boolean() | undefined,
+                     project_type       :: project_type(),
                      is_available=false :: boolean()}).
 
 %%============================================================================
@@ -125,7 +133,8 @@ new(AppName, Vsn, Dir) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
                      original_vsn=rebar_utils:to_binary(Vsn),
                      dir=rebar_utils:to_list(Dir),
-                     out_dir=rebar_utils:to_list(Dir)}}.
+                     out_dir=rebar_utils:to_list(Dir),
+                     ebin_dir=filename:join(rebar_utils:to_list(Dir), "ebin")}}.
 
 %% @doc build a complete version of the app info with all fields set.
 -spec new(atom() | binary() | string(), binary() | string(), file:name(), list()) ->
@@ -135,6 +144,7 @@ new(AppName, Vsn, Dir, Deps) ->
                      original_vsn=rebar_utils:to_binary(Vsn),
                      dir=rebar_utils:to_list(Dir),
                      out_dir=rebar_utils:to_list(Dir),
+                     ebin_dir=filename:join(rebar_utils:to_list(Dir), "ebin"),
                      deps=Deps}}.
 
 %% @doc build a complete version of the app info with all fields set.
@@ -146,6 +156,7 @@ new(Parent, AppName, Vsn, Dir, Deps) ->
                      original_vsn=rebar_utils:to_binary(Vsn),
                      dir=rebar_utils:to_list(Dir),
                      out_dir=rebar_utils:to_list(Dir),
+                     ebin_dir=filename:join(rebar_utils:to_list(Dir), "ebin"),
                      deps=Deps}}.
 
 %% @doc update the opts based on the contents of a config
@@ -447,12 +458,21 @@ out_dir(#app_info_t{out_dir=OutDir}) ->
 %% should go
 -spec out_dir(t(), file:name()) -> t().
 out_dir(AppInfo=#app_info_t{}, OutDir) ->
-    AppInfo#app_info_t{out_dir=rebar_utils:to_list(OutDir)}.
+    AppInfo#app_info_t{out_dir=rebar_utils:to_list(OutDir),
+                       ebin_dir=filename:join(rebar_utils:to_list(OutDir), "ebin")}.
 
 %% @doc gets the directory where ebin files for the app should go
 -spec ebin_dir(t()) -> file:name().
-ebin_dir(#app_info_t{out_dir=OutDir}) ->
-    rebar_utils:to_list(filename:join(OutDir, "ebin")).
+ebin_dir(#app_info_t{ebin_dir=undefined,
+                     out_dir=OutDir}) ->
+    filename:join(rebar_utils:to_list(OutDir), "ebin");
+ebin_dir(#app_info_t{ebin_dir=EbinDir}) ->
+    EbinDir.
+
+%% @doc sets the directory where beam files should go
+-spec ebin_dir(t(), file:name()) -> t().
+ebin_dir(AppInfo, EbinDir) ->
+    AppInfo#app_info_t{ebin_dir=EbinDir}.
 
 %% @doc gets the directory where private files for the app should go
 -spec priv_dir(t()) -> file:name().
@@ -499,6 +519,17 @@ is_available(#app_info_t{is_available=IsAvailable}) ->
 -spec is_available(t(), boolean()) -> t().
 is_available(AppInfo=#app_info_t{}, IsAvailable) ->
     AppInfo#app_info_t{is_available=IsAvailable}.
+
+%% @doc
+-spec project_type(t()) -> atom().
+project_type(#app_info_t{project_type=ProjectType}) ->
+    ProjectType.
+
+%% @doc
+-spec project_type(t(), atom()) -> t().
+project_type(AppInfo=#app_info_t{}, ProjectType) ->
+    AppInfo#app_info_t{project_type=ProjectType}.
+
 
 %% @doc returns whether the app is valid (built) or not
 -spec valid(t()) -> boolean().

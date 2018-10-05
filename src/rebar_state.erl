@@ -38,6 +38,11 @@
 
          to_list/1,
 
+         compilers/1, compilers/2,
+         prepend_compilers/2, append_compilers/2,
+
+         project_builders/1, add_project_builder/3,
+
          create_resources/2,
          resources/1, resources/2, add_resource/2,
          providers/1, providers/2, add_provider/2,
@@ -66,6 +71,8 @@
                   all_plugin_deps     = []          :: [rebar_app_info:t()],
                   all_deps            = []          :: [rebar_app_info:t()],
 
+                  compilers           = []          :: [{compiler_type(), extension(), extension(), compile_fun()}],
+                  project_builders    = []          :: [{rebar_app_info:project_type(), module()}],
                   resources           = [],
                   providers           = [],
                   allow_provider_overrides = false  :: boolean()}).
@@ -73,6 +80,10 @@
 -export_type([t/0]).
 
 -type t() :: #state_t{}.
+
+-type compiler_type() :: atom().
+-type extension() :: string().
+-type compile_fun() :: fun(([file:filename()], rebar_app_info:t(), list()) -> ok).
 
 -spec new() -> t().
 new() ->
@@ -391,6 +402,32 @@ add_resource(State=#state_t{resources=Resources}, {ResourceType, ResourceModule}
 warn_old_resource(ResourceModule) ->
     ?WARN("Using custom resource ~s that implements a deprecated api. "
           "It should be upgraded to rebar_resource_v2.", [ResourceModule]).
+
+compilers(#state_t{compilers=Compilers}) ->
+    Compilers.
+
+prepend_compilers(State=#state_t{compilers=Compilers}, NewCompilers) ->
+    State#state_t{compilers=NewCompilers++Compilers}.
+
+append_compilers(State=#state_t{compilers=Compilers}, NewCompilers) ->
+    State#state_t{compilers=Compilers++NewCompilers}.
+
+compilers(State, Compilers) ->
+    State#state_t{compilers=Compilers}.
+
+project_builders(#state_t{project_builders=ProjectBuilders}) ->
+    ProjectBuilders.
+
+add_project_builder(State=#state_t{project_builders=ProjectBuilders}, Type, Module) ->
+    _ = code:ensure_loaded(Module),
+    case erlang:function_exported(Module, build, 1) of
+        true ->
+            State#state_t{project_builders=[{Type, Module} | ProjectBuilders]};
+        false ->
+            ?WARN("Unable to add project builder for type ~s, required function ~s:build/1 not found.",
+                  [Type, Module]),
+            State
+    end.
 
 create_resources(Resources, State) ->
     lists:foldl(fun(R, StateAcc) ->
