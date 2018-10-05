@@ -32,7 +32,7 @@ init(State) ->
 -spec do(rebar_state:t()) ->
     {ok, rebar_state:t()} | {error, string()} | {error, {module(), any()}}.
 do(State) ->
-    code:add_pathsa(rebar_state:code_paths(State, all_deps)),
+    rebar_paths:set_paths([deps, plugins], State),
     ProjectApps = rebar_state:project_apps(State),
     Providers = rebar_state:providers(State),
     EdocOpts = rebar_state:get(State, edoc_opts, []),
@@ -64,7 +64,7 @@ do(State) ->
             {app_failed, AppName}
     end,
     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State),
-    rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+    rebar_paths:set_paths([plugins, deps], State),
     case Res of
         {app_failed, App} ->
             ?PRV_ERROR({app_failed, App});

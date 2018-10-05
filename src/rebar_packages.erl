@@ -82,7 +82,7 @@ get_package(Dep, Vsn, Hash, Repos, Table, State) ->
             not_found
     end.
 
-new_package_table() ->    
+new_package_table() ->
     ?PACKAGE_TABLE = ets:new(?PACKAGE_TABLE, [named_table, public, ordered_set, {keypos, 2}]),
     ets:insert(?PACKAGE_TABLE, {?PACKAGE_INDEX_VERSION, package_index_version}).
 

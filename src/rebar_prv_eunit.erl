@@ -54,7 +54,7 @@ do(State, Tests) ->
     ?INFO("Performing EUnit tests...", []),
 
     setup_name(State),
-    rebar_utils:update_code(rebar_state:code_paths(State, all_deps), [soft_purge]),
+    rebar_paths:set_paths([deps, plugins], State),
 
     %% Run eunit provider prehooks
     Providers = rebar_state:providers(State),
@@ -67,14 +67,14 @@ do(State, Tests) ->
                 {ok, State1} ->
                     %% Run eunit provider posthooks
                     rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State1),
-                    rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+                    rebar_paths:set_paths([plugins, deps], State),
                     {ok, State1};
                 Error ->
-                    rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+                    rebar_paths:set_paths([plugins, deps], State),
                     Error
             end;
         Error ->
-            rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+            rebar_paths:set_paths([plugins, deps], State),
             Error
     end.
 

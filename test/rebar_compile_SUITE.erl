@@ -1856,7 +1856,7 @@ include_file_in_src_test_multiapp(Config) ->
     AppDir1 = filename:join([?config(apps, Config), "lib", Name1]),
     AppDir2 = filename:join([?config(apps, Config), "lib", Name2]),
     Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir1, Name1, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_app(AppDir1, Name1, Vsn, [kernel, stdlib, list_to_atom(Name2)]),
     rebar_test_utils:create_app(AppDir2, Name2, Vsn, [kernel, stdlib]),
 
     Src = "-module(test).\n"
@@ -1878,7 +1878,8 @@ include_file_in_src_test_multiapp(Config) ->
     RebarConfig = [],
     rebar_test_utils:run_and_check(Config, RebarConfig,
                                    ["as", "test", "compile"],
-                                   {ok, [{app, Name1}]}).
+                                   {ok, [{app, Name1}]}),
+    ok.
 
 %% this test sets the env var, compiles, records the file last modified timestamp,
 %% recompiles and compares the file last modified timestamp to ensure it hasn't

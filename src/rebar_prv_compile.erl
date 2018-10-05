@@ -37,10 +37,7 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     IsDepsOnly = is_deps_only(State),
-    DepsPaths = rebar_state:code_paths(State, all_deps),
-    PluginDepsPaths = rebar_state:code_paths(State, all_plugin_deps),
-    rebar_utils:remove_from_code_path(PluginDepsPaths),
-    code:add_pathsa(DepsPaths),
+    rebar_paths:set_paths([deps, plugins], State),
 
     Providers = rebar_state:providers(State),
     Deps = rebar_state:deps_to_build(State),
@@ -50,11 +47,10 @@ do(State) ->
                  true ->
                      State;
                  false ->
-                     handle_project_apps(DepsPaths, Providers, State)
+                     handle_project_apps(Providers, State)
              end,
 
-    rebar_utils:cleanup_code_path(rebar_state:code_paths(State1, default)
-                                  ++ rebar_state:code_paths(State, all_plugin_deps)),
+    rebar_paths:set_paths([plugins, deps], State1),
 
     {ok, State1}.
 
@@ -62,7 +58,7 @@ is_deps_only(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     proplists:get_value(deps_only, Args, false).
 
-handle_project_apps(DepsPaths, Providers, State) ->
+handle_project_apps(Providers, State) ->
     Cwd = rebar_state:dir(State),
     ProjectApps = rebar_state:project_apps(State),
     {ok, ProjectApps1} = rebar_digraph:compile_order(ProjectApps),
@@ -76,7 +72,7 @@ handle_project_apps(DepsPaths, Providers, State) ->
     %% projects with structures like /apps/foo,/apps/bar,/test
     build_extra_dirs(State, ProjectApps2),
 
-    State3 = update_code_paths(State2, ProjectApps2, DepsPaths),
+    State3 = update_code_paths(State2, ProjectApps2),
 
     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State2),
     case rebar_state:has_all_artifacts(State3) of
@@ -176,11 +172,10 @@ compile(State, Providers, AppInfo) ->
     %% The rebar_otp_app compilation step is safe regarding the
     %% overall path management, so we can just load all plugins back
     %% in memory.
-    PluginDepsPaths = rebar_state:code_paths(State, all_plugin_deps),
-    code:add_pathsa(PluginDepsPaths),
+    rebar_paths:set_paths([plugins, deps], State),
     AppFileCompileResult = rebar_otp_app:compile(State, AppInfo4),
     %% Clean up after ourselves, leave things as they were.
-    rebar_utils:remove_from_code_path(PluginDepsPaths),
+    rebar_paths:set_paths([deps, plugins], State),
 
     case AppFileCompileResult of
         {ok, AppInfo5} ->
@@ -206,21 +201,22 @@ build_app(AppInfo, State) ->
             case lists:keyfind(Type, 1, ProjectBuilders) of
                 {_, Module} ->
                     %% load plugins since thats where project builders would be
-                    PluginDepsPaths = rebar_state:code_paths(State, all_plugin_deps),
-                    code:add_pathsa(PluginDepsPaths),
-                    case Module:build(AppInfo) of
-                        ok ->
-                            rebar_utils:remove_from_code_path(PluginDepsPaths);
-                        {error, Reason} ->
-                            throw({error, {Module, Reason}})
+                    rebar_paths:set_paths([plugins, deps], State),
+                    Res = Module:build(AppInfo),
+                    rebar_paths:set_paths([deps, plugins], State),
+                    case Res of
+                        ok -> ok;
+                        {error, Reason} -> throw({error, {Module, Reason}})
                     end;
                 _ ->
                     throw(?PRV_ERROR({unknown_project_type, rebar_app_info:name(AppInfo), Type}))
             end
     end.
-update_code_paths(State, ProjectApps, DepsPaths) ->
+
+update_code_paths(State, ProjectApps) ->
     ProjAppsPaths = paths_for_apps(ProjectApps),
     ExtrasPaths = paths_for_extras(State, ProjectApps),
+    DepsPaths = rebar_state:code_paths(State, all_deps),
     rebar_state:code_paths(State, all_deps, DepsPaths ++ ProjAppsPaths ++ ExtrasPaths).
 
 paths_for_apps(Apps) -> paths_for_apps(Apps, []).

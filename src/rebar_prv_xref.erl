@@ -36,8 +36,7 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    OldPath = code:get_path(),
-    code:add_pathsa(rebar_state:code_paths(State, all_deps)),
+    rebar_paths:set_paths([deps, plugins], State),
     XrefChecks = prepare(State),
     XrefIgnores = rebar_state:get(State, xref_ignores, []),
     %% Run xref checks
@@ -48,7 +47,7 @@ do(State) ->
     QueryChecks = rebar_state:get(State, xref_queries, []),
     QueryResults = lists:foldl(fun check_query/2, [], QueryChecks),
     stopped = xref:stop(xref),
-    rebar_utils:cleanup_code_path(OldPath),
+    rebar_paths:set_paths([plugins, deps], State),
     case XrefResults =:= [] andalso QueryResults =:= [] of
         true ->
             {ok, State};
