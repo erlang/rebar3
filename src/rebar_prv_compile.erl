@@ -30,22 +30,41 @@ init(State) ->
                                                                {example, "rebar3 compile"},
                                                                {short_desc, "Compile apps .app.src and .erl files."},
                                                                {desc, "Compile apps .app.src and .erl files."},
-                                                               {opts, []}])),
+                                                               {opts, [{deps_only, $d, "deps_only", undefined,
+                                                                        "Only compile dependencies, no project apps will be built."}]}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    IsDepsOnly = is_deps_only(State),
     DepsPaths = rebar_state:code_paths(State, all_deps),
     PluginDepsPaths = rebar_state:code_paths(State, all_plugin_deps),
     rebar_utils:remove_from_code_path(PluginDepsPaths),
     code:add_pathsa(DepsPaths),
 
-    ProjectApps = rebar_state:project_apps(State),
     Providers = rebar_state:providers(State),
     Deps = rebar_state:deps_to_build(State),
-    Cwd = rebar_state:dir(State),
-
     copy_and_build_apps(State, Providers, Deps),
+
+    State1 = case IsDepsOnly of
+                 true ->
+                     State;
+                 false ->
+                     handle_project_apps(DepsPaths, Providers, State)
+             end,
+
+    rebar_utils:cleanup_code_path(rebar_state:code_paths(State1, default)
+                                  ++ rebar_state:code_paths(State, all_plugin_deps)),
+
+    {ok, State1}.
+
+is_deps_only(State) ->
+    {Args, _} = rebar_state:command_parsed_args(State),
+    proplists:get_value(deps_only, Args, false).
+
+handle_project_apps(DepsPaths, Providers, State) ->
+    Cwd = rebar_state:dir(State),
+    ProjectApps = rebar_state:project_apps(State),
     {ok, ProjectApps1} = rebar_digraph:compile_order(ProjectApps),
 
     %% Run top level hooks *before* project apps compiled but *after* deps are
@@ -66,14 +85,19 @@ do(State) ->
         true ->
             true
     end,
-    rebar_utils:cleanup_code_path(rebar_state:code_paths(State3, default)
-                                 ++ rebar_state:code_paths(State, all_plugin_deps)),
 
-    {ok, State3}.
+    State3.
+
 
 -spec format_error(any()) -> iolist().
 format_error({missing_artifact, File}) ->
     io_lib:format("Missing artifact ~ts", [File]);
+format_error({bad_project_builder, Name, Type, Module}) ->
+    io_lib:format("Error building application ~s:~n     Required project builder ~s function "
+                  "~s:build/1 not found", [Name, Type, Module]);
+format_error({unknown_project_type, Name, Type}) ->
+    io_lib:format("Error building application ~s:~n     "
+                  "No project builder is configured for type ~s", [Name, Type]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -117,10 +141,19 @@ build_extra_dir(State, Dir) ->
         true ->
             BaseDir = filename:join([rebar_dir:base_dir(State), "extras"]),
             OutDir = filename:join([BaseDir, Dir]),
-            filelib:ensure_dir(filename:join([OutDir, "dummy.beam"])),
+            rebar_file_utils:ensure_dir(OutDir),
             copy(rebar_state:dir(State), BaseDir, Dir),
-            rebar_erlc_compiler:compile_dir(State, BaseDir, OutDir);
-        false -> ok
+
+            Compilers = rebar_state:compilers(State),
+            FakeApp = rebar_app_info:new(),
+            FakeApp1 = rebar_app_info:out_dir(FakeApp, BaseDir),
+            FakeApp2 = rebar_app_info:ebin_dir(FakeApp1, OutDir),
+            Opts = rebar_state:opts(State),
+            FakeApp3 = rebar_app_info:opts(FakeApp2, Opts),
+            FakeApp4 = rebar_app_info:set(FakeApp3, src_dirs, [OutDir]),
+            rebar_compiler:compile_all(Compilers, FakeApp4);
+        false ->
+            ok
     end.
 
 compile(State, AppInfo) ->
@@ -132,7 +165,9 @@ compile(State, Providers, AppInfo) ->
     AppInfo1 = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, AppInfo, State),
 
     AppInfo2 = rebar_hooks:run_all_hooks(AppDir, pre, ?ERLC_HOOK, Providers, AppInfo1, State),
-    rebar_erlc_compiler:compile(AppInfo2),
+
+    build_app(AppInfo2, State),
+
     AppInfo3 = rebar_hooks:run_all_hooks(AppDir, post, ?ERLC_HOOK, Providers, AppInfo2, State),
 
     AppInfo4 = rebar_hooks:run_all_hooks(AppDir, pre, ?APP_HOOK, Providers, AppInfo3, State),
@@ -161,6 +196,24 @@ compile(State, Providers, AppInfo) ->
 %% Internal functions
 %% ===================================================================
 
+build_app(AppInfo, State) ->
+    case rebar_app_info:project_type(AppInfo) of
+        Type when Type =:= rebar3 ; Type =:= undefined ->
+            Compilers = rebar_state:compilers(State),
+            rebar_compiler:compile_all(Compilers, AppInfo);
+        Type ->
+            ProjectBuilders = rebar_state:project_builders(State),
+            case lists:keyfind(Type, 1, ProjectBuilders) of
+                {_, Module} ->
+                    %% load plugins since thats where project builders would be
+                    PluginDepsPaths = rebar_state:code_paths(State, all_plugin_deps),
+                    code:add_pathsa(PluginDepsPaths),
+                    Module:build(AppInfo),
+                    rebar_utils:remove_from_code_path(PluginDepsPaths);
+                _ ->
+                    throw(?PRV_ERROR({unknown_project_type, rebar_app_info:name(AppInfo), Type}))
+            end
+    end.
 update_code_paths(State, ProjectApps, DepsPaths) ->
     ProjAppsPaths = paths_for_apps(ProjectApps),
     ExtrasPaths = paths_for_extras(State, ProjectApps),

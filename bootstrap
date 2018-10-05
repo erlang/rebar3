@@ -18,7 +18,8 @@ main(_) ->
                ,{erlware_commons, ["ec_dictionary.erl", "ec_vsn.erl"]}
                ,{parse_trans, ["parse_trans.erl", "parse_trans_pp.erl",
                                "parse_trans_codegen.erl"]}
-               ,{certifi, []}],
+               ,{certifi, []}
+               ,{hex_core, []}],
     Deps = get_deps(),
     [fetch_and_compile(Dep, Deps) || Dep <- BaseDeps],
 
@@ -26,7 +27,7 @@ main(_) ->
     bootstrap_rebar3(),
 
     %% Build rebar.app from rebar.app.src
-    {ok, App} = rebar_app_info:new(rebar, "3.6.1", filename:absname("_build/default/lib/rebar/")),
+    {ok, App} = rebar_app_info:new(rebar, "3.7.0-rc1", filename:absname("_build/default/lib/rebar/")),
     rebar_otp_app:compile(rebar_state:new(), App),
 
     %% Because we are compiling files that are loaded already we want to silence
@@ -35,14 +36,6 @@ main(_) ->
 
     setup_env(),
     os:putenv("REBAR_PROFILE", "bootstrap"),
-    RegistryFile = default_registry_file(),
-    case filelib:is_file(RegistryFile) of
-        true ->
-            ok;
-        false ->
-            rebar3:run(["update"])
-    end,
-
     {ok, State} = rebar3:run(["compile"]),
     reset_env(),
     os:putenv("REBAR_PROFILE", ""),
@@ -55,11 +48,6 @@ main(_) ->
 
     %% Done with compile, can turn back on error logger
     error_logger:tty(true).
-
-default_registry_file() ->
-    {ok, [[Home]]} = init:get_argument(home),
-    CacheDir = filename:join([Home, ".cache", "rebar3"]),
-    filename:join([CacheDir, "hex", "default", "registry"]).
 
 fetch_and_compile({Name, ErlFirstFiles}, Deps) ->
     case lists:keyfind(Name, 1, Deps) of
@@ -173,7 +161,7 @@ bootstrap_rebar3() ->
     Res = symlink_or_copy(filename:absname("src"),
                           filename:absname("_build/default/lib/rebar/src")),
     true = Res == ok orelse Res == exists,
-    Sources = ["src/rebar_resource.erl" | filelib:wildcard("src/*.erl")],
+    Sources = ["src/rebar_resource_v2.erl", "src/rebar_resource.erl" | filelib:wildcard("src/*.erl")],
     [compile_file(X, [{outdir, "_build/default/lib/rebar/ebin/"}
                      ,return | additional_defines()]) || X <- Sources],
     code:add_patha(filename:absname("_build/default/lib/rebar/ebin")).

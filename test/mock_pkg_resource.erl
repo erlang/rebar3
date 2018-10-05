@@ -3,6 +3,8 @@
 -export([mock/0, mock/1, unmock/0]).
 -define(MOD, rebar_pkg_resource).
 
+-include("rebar.hrl").
+
 %%%%%%%%%%%%%%%%%
 %%% Interface %%%
 %%%%%%%%%%%%%%%%%
@@ -26,7 +28,7 @@ mock() -> mock([]).
     Vsn :: string(),
     Hash :: string() | undefined.
 mock(Opts) ->
-    meck:new(?MOD, [no_link]),
+    meck:new(?MOD, [no_link, passthrough]),
     mock_lock(Opts),
     mock_update(Opts),
     mock_vsn(Opts),
@@ -44,7 +46,10 @@ unmock() ->
 
 %% @doc creates values for a lock file.
 mock_lock(_) ->
-    meck:expect(?MOD, lock, fun(_AppDir, Source) -> Source end).
+    meck:expect(?MOD, lock, fun(AppInfo, _) ->
+                                {pkg, Name, Vsn, Hash, _RepoConfig} = rebar_app_info:source(AppInfo),
+                                {pkg, Name, Vsn, Hash}
+                            end).
 
 %% @doc The config passed to the `mock/2' function can specify which apps
 %% should be updated on a per-name basis: `{update, ["App1", "App3"]}'.
@@ -52,7 +57,8 @@ mock_update(Opts) ->
     ToUpdate = proplists:get_value(upgrade, Opts, []),
     meck:expect(
         ?MOD, needs_update,
-        fun(_Dir, {pkg, App, _Vsn, _Hash}) ->
+        fun(AppInfo, _) ->
+            {pkg, App, _Vsn, _Hash, _} = rebar_app_info:source(AppInfo),
             lists:member(binary_to_list(App), ToUpdate)
         end).
 
@@ -60,7 +66,7 @@ mock_update(Opts) ->
 mock_vsn(_Opts) ->
     meck:expect(
         ?MOD, make_vsn,
-        fun(_Dir) ->
+        fun(_AppInfo, _) ->
             {error, "Replacing version of type pkg not supported."}
         end).
 
@@ -77,30 +83,32 @@ mock_download(Opts) ->
     Config = proplists:get_value(config, Opts, []),
     meck:expect(
         ?MOD, download,
-        fun (Dir, {pkg, AppBin, Vsn, _}, _) ->
-            App = binary_to_list(AppBin),
+        fun (Dir, AppInfo, _, _) ->
+            {pkg, AppBin, Vsn, _, _} = rebar_app_info:source(AppInfo),
+            App = rebar_utils:to_list(AppBin),
             filelib:ensure_dir(Dir),
             AppDeps = proplists:get_value({App,Vsn}, Deps, []),
-            {ok, AppInfo} = rebar_test_utils:create_app(
-                Dir, App, binary_to_list(Vsn),
+            {ok, AppInfo1} = rebar_test_utils:create_app(
+                Dir, App, rebar_utils:to_list(Vsn),
                 [kernel, stdlib] ++ [element(1,D) || D  <- AppDeps]
             ),
             rebar_test_utils:create_config(Dir, [{deps, AppDeps}]++Config),
-            TarApp = App++"-"++binary_to_list(Vsn)++".tar",
-            Tarball = filename:join([Dir, TarApp]),
-            Contents = filename:join([Dir, "contents.tar.gz"]),
-            Files = all_files(rebar_app_info:dir(AppInfo)),
-            ok = erl_tar:create(Contents,
-                                archive_names(Dir, App, Vsn, Files),
-                                [compressed]),
-            ok = erl_tar:create(Tarball,
-                                [{"contents.tar.gz", Contents}],
-                                []),
+
+            TarApp = App++"-"++rebar_utils:to_list(Vsn)++".tar",
+
+            Metadata = #{<<"app">> => AppBin,
+                         <<"version">> => Vsn},
+
+            Files = all_files(rebar_app_info:dir(AppInfo1)),
+            {ok, {Tarball, _Checksum}} = hex_tarball:create(Metadata, archive_names(Dir, Files)),
+            Archive = filename:join([Dir, TarApp]),
+            file:write_file(Archive, Tarball),
+
             Cache = proplists:get_value(cache_dir, Opts, filename:join(Dir,"cache")),
             Cached = filename:join([Cache, TarApp]),
             filelib:ensure_dir(Cached),
-            rebar_file_utils:mv(Tarball, Cached),
-            {ok, true}
+            rebar_file_utils:mv(Archive, Cached),
+            ok
         end).
 
 %% @doc On top of the pkg resource mocking, we need to mock the package
@@ -110,16 +118,18 @@ mock_download(Opts) ->
 %% specific applications otherwise listed.
 mock_pkg_index(Opts) ->
     Deps = proplists:get_value(pkgdeps, Opts, []),
+    Repos = proplists:get_value(repos, Opts, [<<"hexpm">>]),
     Skip = proplists:get_value(not_in_index, Opts, []),
     %% Dict: {App, Vsn}: [{<<"link">>, <<>>}, {<<"deps">>, []}]
     %% Index: all apps and deps in the index
 
     Dict = find_parts(Deps, Skip),
+    to_index(Deps, Dict, Repos),
     meck:new(rebar_packages, [passthrough, no_link]),
-    meck:expect(rebar_packages, packages,
-                fun(_State) -> to_index(Deps, Dict) end),
+    meck:expect(rebar_packages, update_package,
+                fun(_, _, _State) -> ok end),
     meck:expect(rebar_packages, verify_table,
-                fun(_State) -> to_index(Deps, Dict), true end).
+                fun(_State) -> true end).
 
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
@@ -128,7 +138,7 @@ mock_pkg_index(Opts) ->
 all_files(Dir) ->
     filelib:wildcard(filename:join([Dir, "**"])).
 
-archive_names(Dir, _App, _Vsn, Files) ->
+archive_names(Dir, Files) ->
     [{(F -- Dir) -- "/", F} || F <- Files].
 
 find_parts(Apps, Skip) -> find_parts(Apps, Skip, dict:new()).
@@ -143,24 +153,42 @@ find_parts([{AppName, Deps}|Rest], Skip, Acc) ->
                                 Acc),
             find_parts(Rest, Skip, AccNew)
     end.
+parse_deps(Deps) ->
+    [{maps:get(app, D, Name), {pkg, Name, Constraint, undefined}} || D=#{package := Name,
+                                                                         requirement := Constraint} <- Deps].
 
-to_index(AllDeps, Dict) ->
-    catch ets:delete(package_index),
-    ets:new(package_index, [named_table, public]),
+to_index(AllDeps, Dict, Repos) ->
+    catch ets:delete(?PACKAGE_TABLE),
+    rebar_packages:new_package_table(),
+
     dict:fold(
-      fun(K, Deps, _) ->
-              DepsList = [{DKB, {pkg, DKB, DVB, undefined}}
+      fun({N, V}, Deps, _) ->
+              DepsList = [#{package => DKB,
+                            app => DKB,
+                            requirement => DVB,
+                            source => {pkg, DKB, DVB, undefined}}
                           || {DK, DV} <- Deps,
                              DKB <- [ec_cnv:to_binary(DK)],
                              DVB <- [ec_cnv:to_binary(DV)]],
-              ets:insert(package_index, {K, DepsList, <<"checksum">>})
+              Repo = rebar_test_utils:random_element(Repos),
+              ets:insert(?PACKAGE_TABLE, #package{key={N, ec_semver:parse(V), Repo},
+                                                  dependencies=parse_deps(DepsList),
+                                                  retired=false,
+                                                  checksum = <<"checksum">>})
       end, ok, Dict),
-    ets:insert(package_index, {package_index_version, 3}),
+
     lists:foreach(fun({{Name, Vsn}, _}) ->
-                          case ets:lookup(package_index,  ec_cnv:to_binary(Name)) of
-                              [{_, Vsns}] ->
-                                  ets:insert(package_index, {ec_cnv:to_binary(Name), [ec_cnv:to_binary(Vsn) | Vsns]});
-                              _ ->
-                                  ets:insert(package_index, {ec_cnv:to_binary(Name), [ec_cnv:to_binary(Vsn)]})
+                          case lists:any(fun(R) ->
+                                                 ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(Name), ec_semver:parse(Vsn), R})
+                                         end, Repos) of
+                              false ->
+                                  Repo = rebar_test_utils:random_element(Repos),
+                                  ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(Name), ec_semver:parse(Vsn), Repo},
+                                                                      dependencies=[],
+                                                                      retired=false,
+                                                                      checksum = <<"checksum">>});
+                              true ->
+                                  ok
                           end
                   end, AllDeps).
+

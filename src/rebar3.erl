@@ -103,7 +103,7 @@ run(RawArgs) ->
     case erlang:system_info(version) of
         "6.1" ->
             ?WARN("Due to a filelib bug in Erlang 17.1 it is recommended"
-                 "you update to a newer release.", []);
+                  "you update to a newer release.", []);
         _ ->
             ok
     end,
@@ -139,8 +139,17 @@ run_aux(State, RawArgs) ->
                      rebar_state:set(State1, rebar_packages_cdn, CDN)
              end,
 
+    Compilers = application:get_env(rebar, compilers, []),
+    State0 = rebar_state:compilers(State2, Compilers),
+
+    %% TODO: this means use of REBAR_PROFILE=profile will replace the repos with
+    %% the repos defined in the profile. But it will not work with `as profile`.
+    %% Maybe it shouldn't work with either to be consistent?
+    Resources = application:get_env(rebar, resources, []),
+    State2_ = rebar_state:create_resources(Resources, State0),
+
     %% bootstrap test profile
-    State3 = rebar_state:add_to_profile(State2, test, test_state(State1)),
+    State3 = rebar_state:add_to_profile(State2_, test, test_state(State1)),
 
     %% Process each command, resetting any state between each one
     BaseDir = rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR),
@@ -375,7 +384,11 @@ state_from_global_config(Config, GlobalConfigFile) ->
 
     %% We don't want to worry about global plugin install state effecting later
     %% usage. So we throw away the global profile state used for plugin install.
-    GlobalConfigThrowAway = rebar_state:current_profiles(GlobalConfig, [global]),
+    GlobalConfigThrowAway0 = rebar_state:current_profiles(GlobalConfig, [global]),
+
+    Resources = application:get_env(rebar, resources, []),
+    GlobalConfigThrowAway = rebar_state:create_resources(Resources, GlobalConfigThrowAway0),
+
     GlobalState = case rebar_state:get(GlobalConfigThrowAway, plugins, []) of
                       [] ->
                           GlobalConfigThrowAway;
@@ -386,7 +399,8 @@ state_from_global_config(Config, GlobalConfigFile) ->
                   end,
     GlobalPlugins = rebar_state:providers(GlobalState),
     GlobalConfig2 = rebar_state:set(GlobalConfig, plugins, []),
-    GlobalConfig3 = rebar_state:set(GlobalConfig2, {plugins, global}, rebar_state:get(GlobalConfigThrowAway, plugins, [])),
+    GlobalConfig3 = rebar_state:set(GlobalConfig2, {plugins, global},
+                                    rebar_state:get(GlobalConfigThrowAway, plugins, [])),
     rebar_state:providers(rebar_state:new(GlobalConfig3, Config), GlobalPlugins).
 
 -spec test_state(rebar_state:t()) -> [{'extra_src_dirs',[string()]} | {'erl_opts',[any()]}].

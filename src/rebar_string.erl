@@ -1,7 +1,7 @@
 %%% @doc Compatibility module for string functionality
 %%% for pre- and post-unicode support.
 -module(rebar_string).
--export([join/2, lexemes/2, trim/3, uppercase/1, lowercase/1, chr/2]).
+-export([join/2, split/2, lexemes/2, trim/3, uppercase/1, lowercase/1, chr/2]).
 
 -ifdef(unicode_str).
 
@@ -15,6 +15,7 @@ join([], Sep) when is_list(Sep) ->
 join([H|T], Sep) ->
     H ++ lists:append([Sep ++ X || X <- T]).
 
+split(Str, SearchPattern) -> string:split(Str, SearchPattern).
 lexemes(Str, SepList) -> string:lexemes(Str, SepList).
 trim(Str, Direction, Cluster=[_]) -> string:trim(Str, Direction, Cluster).
 uppercase(Str) -> string:uppercase(Str).
@@ -27,6 +28,8 @@ chr([], _C, _I) -> 0.
 -else.
 
 join(Strings, Separator) -> string:join(Strings, Separator).
+split(Str, SearchPattern) when is_list(Str) -> string:split(Str, SearchPattern);
+split(Str, SearchPattern) when is_binary(Str) -> binary:split(Str, SearchPattern).
 lexemes(Str, SepList) -> string:tokens(Str, SepList).
 trim(Str, Direction, [Char]) ->
     Dir = case Direction of

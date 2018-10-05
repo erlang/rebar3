@@ -2,6 +2,7 @@
 %% ex: ts=4 sw=4 et
 %%
 %% @doc A localfs custom resource (for testing purposes only)
+%% implementing the deprecated rebar_resource instead of v2
 %%
 %% ```
 %% {deps, [
@@ -13,12 +14,17 @@
 
 -behaviour(rebar_resource).
 
--export([lock/2
+-export([init/1
+        ,lock/2
         ,download/3
         ,needs_update/2
         ,make_vsn/1]).
 
 -include_lib("eunit/include/eunit.hrl").
+
+-spec init(rebar_state:t()) -> {ok, term()}.
+init(_State) ->
+    {ok, #{}}.
 
 lock(AppDir, {localfs, Path, _Ref}) ->
     lock(AppDir, {localfs, Path});

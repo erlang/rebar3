@@ -4,17 +4,19 @@
 -compile(export_all).
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include("rebar.hrl").
 
--define(bad_etag, "abcdef").
--define(good_etag, "22e1d7387c9085a462340088a2a8ba67").
+-define(bad_etag, <<"abcdef">>).
+-define(good_etag, <<"22e1d7387c9085a462340088a2a8ba67">>).
+-define(badpkg_checksum, <<"A14E3718B33F8124E98004433193509EC6660F6CA03302657CAB8785751D77A0">>).
+-define(badindex_checksum, <<"7B2CBED315C89F3126B5BF553DD7FF0FB5FE94B064888DD1B095CE8BF4B6A16A">>).
 -define(bad_checksum, <<"D576B442A68C7B92BACDE1EFE9C6E54D8D6C74BDB71D8175B9D3C6EC8C7B62A7">>).
--define(good_checksum, <<"1C6CE379D191FBAB41B7905075E0BF87CBBE23C77CECE775C5A0B786B2244C35">>).
+-define(good_checksum, <<"12726BDE1F65583A0817A7E8AADCA73F03FD8CB06F01E6CD29117C4A0DA0AFCF">>).
 -define(BADPKG_ETAG, <<"BADETAG">>).
 
-all() -> [good_uncached, good_cached, badindexchk, badpkg,
-          badhash_nocache, badhash_cache,
-          bad_to_good, good_disconnect, bad_disconnect, pkgs_provider,
-          find_highest_matching].
+all() -> [good_uncached, good_cached, badpkg, badhash_nocache,
+          badindexchk, badhash_cache, bad_to_good, good_disconnect,
+          bad_disconnect, pkgs_provider, find_highest_matching].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -32,10 +34,6 @@ init_per_testcase(pkgs_provider=Name, Config) ->
     CacheDir = filename:join([CacheRoot, "hex", "com", "test", "packages"]),
     filelib:ensure_dir(filename:join([CacheDir, "registry"])),
     ok = ets:tab2file(Tid, filename:join([CacheDir, "registry"])),
-    meck:new(rebar_packages, [passthrough]),
-    meck:expect(rebar_packages, registry_dir, fun(_) -> {ok, CacheDir} end),
-    meck:expect(rebar_packages, package_dir, fun(_) -> {ok, CacheDir} end),
-    rebar_prv_update:hex_to_index(rebar_state:new()),
     Config;
 init_per_testcase(good_uncached=Name, Config0) ->
     Config = [{good_cache, false},
@@ -89,9 +87,9 @@ init_per_testcase(good_disconnect=Name, Config0) ->
               | Config0],
     Config = mock_config(Name, Config1),
     copy_to_cache(Pkg, Config),
-    meck:unload(httpc),
+    %% meck:unload(httpc),
     meck:new(httpc, [passthrough, unsticky]),
-    meck:expect(httpc, request, fun(_, _, _, _, _) -> {error, econnrefused} end),
+    meck:expect(httpc, request, fun(_, _, _, _) -> {error, econnrefused} end),
     Config;
 init_per_testcase(bad_disconnect=Name, Config0) ->
     Pkg = {<<"goodpkg">>, <<"1.0.0">>},
@@ -99,9 +97,9 @@ init_per_testcase(bad_disconnect=Name, Config0) ->
                {pkg, Pkg}
               | Config0],
     Config = mock_config(Name, Config1),
-    meck:unload(httpc),
-    meck:new(httpc, [passthrough, unsticky]),
-    meck:expect(httpc, request, fun(_, _, _, _, _) -> {error, econnrefused} end),
+    meck:expect(hex_repo, get_tarball, fun(_, _, _) ->
+                                               {error, econnrefused}
+                                       end),                
     Config;
 init_per_testcase(Name, Config0) ->
     Config = [{good_cache, false},
@@ -117,8 +115,8 @@ good_uncached(Config) ->
     Tmp = ?config(tmp_dir, Config),
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
-    ?assertEqual({ok, true},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum}, State)),
+    ?assertEqual(ok,
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)),
     Cache = ?config(cache_dir, Config),
     ?assert(filelib:is_regular(filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>))).
 
@@ -130,16 +128,17 @@ good_cached(Config) ->
     CachedFile = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>),
     ?assert(filelib:is_regular(CachedFile)),
     {ok, Content} = file:read_file(CachedFile),
-    ?assertEqual({ok, true},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum}, State)),
+    ?assertEqual(ok,
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)),
     {ok, Content} = file:read_file(CachedFile).
+
 
 badindexchk(Config) ->
     Tmp = ?config(tmp_dir, Config),
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
-    ?assertMatch({bad_registry_checksum, _Path},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum}, State)),
+    ?assertMatch({error, {rebar_pkg_resource, {bad_registry_checksum, _, _, _, _}}},
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?bad_checksum, #{}}, State, #{}, true)),
     %% The cached file is there for forensic purposes
     Cache = ?config(cache_dir, Config),
     ?assert(filelib:is_regular(filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>))).
@@ -152,8 +151,8 @@ badpkg(Config) ->
     CachePath = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>),
     ETagPath = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".etag">>),
     rebar_pkg_resource:store_etag_in_cache(ETagPath, ?BADPKG_ETAG),
-    ?assertMatch({bad_download, _Path},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum}, State, false)),
+    ?assertMatch({error, {hex_tarball, {tarball, {checksum_mismatch, _, _}}}},
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?badpkg_checksum, #{}}, State, #{}, false)),
     %% The cached/etag files are there for forensic purposes
     ?assert(filelib:is_regular(ETagPath)),
     ?assert(filelib:is_regular(CachePath)).
@@ -162,8 +161,8 @@ badhash_nocache(Config) ->
     Tmp = ?config(tmp_dir, Config),
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
-    ?assertMatch({unexpected_hash, _Path, ?bad_checksum, ?good_checksum},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?bad_checksum}, State)),
+    ?assertMatch({error, {rebar_pkg_resource, {bad_registry_checksum, _, _, _, _}}},
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?bad_checksum, #{}}, State, #{}, true)),
     %% The cached file is there for forensic purposes
     Cache = ?config(cache_dir, Config),
     ?assert(filelib:is_regular(filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>))).
@@ -176,8 +175,8 @@ badhash_cache(Config) ->
     CachedFile = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>),
     ?assert(filelib:is_regular(CachedFile)),
     {ok, Content} = file:read_file(CachedFile),
-    ?assertMatch({unexpected_hash, _Path, ?bad_checksum, ?good_checksum},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?bad_checksum}, State)),
+    ?assertMatch({error, {rebar_pkg_resource, {bad_registry_checksum, _, _, _, _}}},
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?bad_checksum, #{}}, State, #{}, true)),
     %% The cached file is there still, unchanged.
     ?assert(filelib:is_regular(CachedFile)),
     ?assertEqual({ok, Content}, file:read_file(CachedFile)).
@@ -190,8 +189,8 @@ bad_to_good(Config) ->
     CachedFile = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>),
     ?assert(filelib:is_regular(CachedFile)),
     {ok, Contents} = file:read_file(CachedFile),
-    ?assertEqual({ok, true},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum}, State)),
+    ?assertEqual(ok,
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)),
     %% Cache has refreshed
     ?assert({ok, Contents} =/= file:read_file(CachedFile)).
 
@@ -205,8 +204,8 @@ good_disconnect(Config) ->
     ?assert(filelib:is_regular(CachedFile)),
     {ok, Content} = file:read_file(CachedFile),
     rebar_pkg_resource:store_etag_in_cache(ETagFile, ?BADPKG_ETAG),
-    ?assertEqual({ok, true},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum}, State)),
+    ?assertEqual(ok,
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)),
     {ok, Content} = file:read_file(CachedFile).
 
 bad_disconnect(Config) ->
@@ -214,32 +213,31 @@ bad_disconnect(Config) ->
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
     ?assertEqual({fetch_fail, Pkg, Vsn},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum}, State)).
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)).
 
 pkgs_provider(Config) ->
     Config1 = rebar_test_utils:init_rebar_state(Config),
     rebar_test_utils:run_and_check(
-      Config1, [], ["pkgs"],
+      Config1, [], ["pkgs", "relx"],
         {ok, []}
     ).
 
 find_highest_matching(_Config) ->
     State = rebar_state:new(),
-    {ok, Vsn} = rebar_packages:find_highest_matching(
-                  <<"test">>, <<"1.0.0">>, <<"goodpkg">>, <<"1.0.0">>, package_index, State),
-    ?assertEqual(<<"1.0.1">>, Vsn),
+    {ok, Vsn} = rebar_packages:find_highest_matching_(
+                  <<"goodpkg">>, <<"1.0.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
+    ?assertEqual({{1,0,1},{[],[]}}, Vsn),
     {ok, Vsn1} = rebar_packages:find_highest_matching(
-                   <<"test">>, <<"1.0.0">>, <<"goodpkg">>, <<"1.0">>, package_index, State),
-    ?assertEqual(<<"1.1.1">>, Vsn1),
+                   <<"goodpkg">>, <<"1.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
+    ?assertEqual({{1,1,1},{[],[]}}, Vsn1),
     {ok, Vsn2} = rebar_packages:find_highest_matching(
-                   <<"test">>, <<"1.0.0">>, <<"goodpkg">>, <<"2.0">>, package_index, State),
-    ?assertEqual(<<"2.0.0">>, Vsn2),
+                   <<"goodpkg">>, <<"2.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
+    ?assertEqual({{2,0,0},{[],[]}}, Vsn2),
 
     %% regression test. ~> constraints higher than the available packages would result
     %% in returning the first package version instead of 'none'.
-    ?assertEqual(none, rebar_packages:find_highest_matching(<<"test">>, <<"1.0.0">>, <<"goodpkg">>,
-                                                            <<"~> 5.0">>, package_index, State)).
-
+    ?assertEqual(none, rebar_packages:find_highest_matching_(<<"goodpkg">>, <<"~> 5.0">>,
+                                                             #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State)).
 
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
@@ -249,35 +247,67 @@ mock_config(Name, Config) ->
     CacheRoot = filename:join([Priv, "cache", atom_to_list(Name)]),
     TmpDir = filename:join([Priv, "tmp", atom_to_list(Name)]),
     Tid = ets:new(registry_table, [public]),
-    ets:insert_new(Tid, [
-        {<<"badindexchk">>,[[<<"1.0.0">>]]},
-        {<<"goodpkg">>,[[<<"1.0.0">>, <<"1.0.1">>, <<"1.1.1">>, <<"2.0.0">>]]},
-        {<<"badpkg">>,[[<<"1.0.0">>]]},
+    AllDeps = [        
         {{<<"badindexchk">>,<<"1.0.0">>}, [[], ?bad_checksum, [<<"rebar3">>]]},
         {{<<"goodpkg">>,<<"1.0.0">>}, [[], ?good_checksum, [<<"rebar3">>]]},
         {{<<"goodpkg">>,<<"1.0.1">>}, [[], ?good_checksum, [<<"rebar3">>]]},
         {{<<"goodpkg">>,<<"1.1.1">>}, [[], ?good_checksum, [<<"rebar3">>]]},
         {{<<"goodpkg">>,<<"2.0.0">>}, [[], ?good_checksum, [<<"rebar3">>]]},
-        {{<<"badpkg">>,<<"1.0.0">>}, [[], ?good_checksum, [<<"rebar3">>]]}
-    ]),
+        {{<<"badpkg">>,<<"1.0.0">>}, [[], ?badpkg_checksum, [<<"rebar3">>]]}
+    ],
+    ets:insert_new(Tid, AllDeps),
     CacheDir = filename:join([CacheRoot, "hex", "com", "test", "packages"]),
     filelib:ensure_dir(filename:join([CacheDir, "registry"])),
     ok = ets:tab2file(Tid, filename:join([CacheDir, "registry"])),
+
+    catch ets:delete(?PACKAGE_TABLE),
+    rebar_packages:new_package_table(),    
+    lists:foreach(fun({{N, Vsn}, [Deps, Checksum, _]}) ->
+                          case ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(N), Vsn, <<"hexpm">>}) of
+                              false ->
+                                  ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(N), ec_semver:parse(Vsn), <<"hexpm">>},
+                                                                      dependencies=Deps,
+                                                                      retired=false,
+                                                                      checksum=Checksum});
+                              true ->
+                                  ok
+                          end
+                  end, AllDeps),
+    
+
+    meck:new(hex_repo, [passthrough]),
+    meck:expect(hex_repo, get_package, 
+                fun(_Config, PkgName) ->
+                        Matches = ets:match_object(Tid, {{PkgName,'_'}, '_'}),
+                        Releases = 
+                            [#{checksum => Checksum,
+                               version => Vsn,
+                               dependencies => Deps} || 
+                                {{_, Vsn}, [Deps, Checksum, _]} <- Matches],
+                        {ok, {200, #{}, #{releases => Releases}}}
+                end),
 
     %% The state returns us a fake registry
     meck:new(rebar_state, [passthrough]),
     meck:expect(rebar_state, get,
                 fun(_State, rebar_packages_cdn, _Default) ->
-                    "http://test.com/"
+                        "http://test.com/";
+                   (_, _, Default) ->
+                        Default
+                end),
+    meck:expect(rebar_state, resources,
+                fun(_State) ->
+                        DefaultConfig = hex_core:default_config(),
+                        [rebar_resource_v2:new(pkg, rebar_pkg_resource,
+                                               #{repos => [DefaultConfig#{name => <<"hexpm">>}],
+                                                 base_config => #{}})]
                 end),
 
     meck:new(rebar_dir, [passthrough]),
     meck:expect(rebar_dir, global_cache_dir, fun(_) -> CacheRoot end),
 
-    meck:new(rebar_packages, [passthrough]),
     meck:expect(rebar_packages, registry_dir, fun(_) -> {ok, CacheDir} end),
-    meck:expect(rebar_packages, package_dir, fun(_) -> {ok, CacheDir} end),
-    rebar_prv_update:hex_to_index(rebar_state:new()),
+    meck:expect(rebar_packages, package_dir, fun(_, _) -> {ok, CacheDir} end),
 
     meck:new(rebar_prv_update, [passthrough]),
     meck:expect(rebar_prv_update, do, fun(State) -> {ok, State} end),
@@ -285,16 +315,16 @@ mock_config(Name, Config) ->
     %% Cache fetches are mocked -- we assume the server and clients are
     %% correctly used.
     GoodCache = ?config(good_cache, Config),
-    {Pkg,Vsn} = ?config(pkg, Config),
+    {Pkg,Vsn} = ?config(pkg, Config), 
     PkgFile = <<Pkg/binary, "-", Vsn/binary, ".tar">>,
     {ok, PkgContents} = file:read_file(filename:join(?config(data_dir, Config), PkgFile)),
-    meck:new(httpc, [passthrough, unsticky]),
-    meck:expect(httpc, request,
-            fun(get, {_Url, _Opts}, _, _, _) when GoodCache ->
-                {ok, {{Vsn, 304, <<"Not Modified">>}, [{"etag", ?good_etag}], <<>>}};
-               (get, {_Url, _Opts}, _, _, _) ->
-                {ok, {{Vsn, 200, <<"OK">>}, [{"etag", ?good_etag}], PkgContents}}
-            end),
+
+    meck:expect(hex_repo, get_tarball, fun(_, _, _) when GoodCache ->
+                                               {ok, {304, #{<<"etag">> => ?good_etag}, <<>>}};
+                                          (_, _, _) ->
+                                               {ok, {200, #{<<"etag">> => ?good_etag}, PkgContents}}
+                                       end),   
+ 
     [{cache_root, CacheRoot},
      {cache_dir, CacheDir},
      {tmp_dir, TmpDir},

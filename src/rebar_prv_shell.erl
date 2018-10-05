@@ -40,6 +40,8 @@
 -define(PROVIDER, shell).
 -define(DEPS, [compile]).
 
+-dialyzer({nowarn_function, rewrite_leaders/2}).
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -385,7 +387,7 @@ reread_config(AppsToStart, State) ->
                     lists:member(App, Running),
                     lists:member(App, AppsToStart),
                     not lists:member(App, BlackList)],
-            _ = rebar_utils:reread_config(ConfigList),
+            _ = rebar_utils:reread_config(ConfigList, [update_logger]),
             ok
     end.
 

@@ -37,8 +37,9 @@
          escript_foldl/3,
          find_files/2,
          find_files/3,
+         find_files_in_dirs/3,
+         find_source/3,
          beam_to_mod/1,
-         beam_to_mod/2,
          erl_to_mod/1,
          beams/1,
          find_executable/1,
@@ -72,15 +73,17 @@
          info_useless/2,
          list_dir/1,
          user_agent/0,
-         reread_config/1,
+         reread_config/1, reread_config/2,
          get_proxy_auth/0,
-         is_list_of_strings/1]).
+         is_list_of_strings/1,
+         ssl_opts/1]).
 
 
 %% for internal use only
 -export([otp_release/0]).
 
 -include("rebar.hrl").
+-include_lib("public_key/include/OTP-PUB-KEY.hrl").
 
 -define(ONE_LEVEL_INDENT, "     ").
 -define(APP_NAME_INDEX, 2).
@@ -203,6 +206,12 @@ sh(Command0, Options0) ->
 
 find_files(Dir, Regex) ->
     find_files(Dir, Regex, true).
+
+find_files_in_dirs([], _Regex, _Recursive) ->
+    [];
+find_files_in_dirs([Dir | T], Regex, Recursive) ->
+    find_files(Dir, Regex, Recursive) ++ find_files_in_dirs(T, Regex, Recursive).
+
 
 find_files(Dir, Regex, Recursive) ->
     filelib:fold_files(Dir, Regex, Recursive,
@@ -436,6 +445,18 @@ user_agent() ->
     ?FMT("Rebar/~ts (OTP/~ts)", [Vsn, otp_release()]).
 
 reread_config(ConfigList) ->
+    %% Default to not re-configuring the logger for now;
+    %% this can leak logs in CT redirection when setting up hooks
+    %% for example. If we want to turn it on by default, we may
+    %% want to disable it in CT at the same time or figure out a
+    %% way to silence it.
+    %% The same pattern may apply to other tasks, so let's enable
+    %% case-by-case.
+    reread_config(ConfigList, []).
+
+reread_config(ConfigList, Opts) ->
+    UpdateLoggerConfig = erlang:function_exported(logger, module_info, 0) andalso
+                         proplists:get_value(update_logger, Opts, false),
     %% NB: we attempt to mimic -config here, which survives app reload,
     %% hence {persistent, true}.
     SetEnv = case version_tuple(?MODULE:otp_release()) of
@@ -445,14 +466,51 @@ reread_config(ConfigList) ->
             fun (App, Key, Val) -> application:set_env(App, Key, Val, [{persistent, true}]) end
     end,
     try
+        Res =
         [SetEnv(Application, Key, Val)
         || Config <- ConfigList,
            {Application, Items} <- Config,
-           {Key, Val} <- Items]
+           {Key, Val} <- Items],
+        case UpdateLoggerConfig of
+            true -> reread_logger_config();
+            false -> ok
+        end,
+        Res
     catch _:_ ->
             ?ERROR("The configuration file submitted could not be read "
                   "and will be ignored.", [])
     end.
+
+%% @private since the kernel app is already booted, re-reading its config
+%% requires doing some magic to dynamically patch running handlers to
+%% deal with the current value.
+reread_logger_config() ->
+    KernelCfg = application:get_all_env(kernel),
+    LogCfg = proplists:get_value(logger, KernelCfg),
+    case LogCfg of
+        undefined ->
+            ok;
+        _ ->
+            %% Extract and apply settings related to primary configuration
+            %% -- primary config is used for settings shared across handlers
+            LogLvlPrimary = proplists:get_value(logger_info, KernelCfg, all),
+            {FilterDefault, Filters} =
+              case lists:keyfind(filters, 1, KernelCfg) of
+                  false -> {log, []};
+                  {filters, FoundDef, FoundFilter} -> {FoundDef, FoundFilter}
+              end,
+            Primary = #{level => LogLvlPrimary,
+                        filter_default => FilterDefault,
+                        filters => Filters},
+            %% Load the correct handlers based on their individual config.
+            [case Id of
+                 default -> logger:update_handler_config(Id, Cfg);
+                 _ -> logger:add_handler(Id, Mod, Cfg)
+             end || {handler, Id, Mod, Cfg} <- LogCfg],
+            logger:set_primary_config(Primary),
+            ok
+    end.
+
 
 %% @doc Given env. variable `FOO' we want to expand all references to
 %% it in `InStr'. References can have two forms: `$FOO' and `${FOO}'
@@ -620,10 +678,6 @@ sh_loop(Port, Fun, Acc) ->
             end
     end.
 
-beam_to_mod(Dir, Filename) ->
-    [Dir | Rest] = filename:split(Filename),
-    list_to_atom(filename:basename(rebar_string:join(Rest, "."), ".beam")).
-
 beam_to_mod(Filename) ->
     list_to_atom(filename:basename(Filename, ".beam")).
 
@@ -661,12 +715,12 @@ escript_foldl(Fun, Acc, File) ->
             Error
     end.
 
-vcs_vsn(Vcs, Dir, Resources) ->
-    case vcs_vsn_cmd(Vcs, Dir, Resources) of
+vcs_vsn(AppInfo, Vcs, State) ->
+    case vcs_vsn_cmd(AppInfo, Vcs, State) of
         {plain, VsnString} ->
             VsnString;
         {cmd, CmdString} ->
-            vcs_vsn_invoke(CmdString, Dir);
+            vcs_vsn_invoke(CmdString, rebar_app_info:dir(AppInfo));
         unknown ->
             ?ABORT("vcs_vsn: Unknown vsn format: ~p", [Vcs]);
         {error, Reason} ->
@@ -674,23 +728,18 @@ vcs_vsn(Vcs, Dir, Resources) ->
     end.
 
 %% Temp work around for repos like relx that use "semver"
-vcs_vsn_cmd(Vsn, _, _) when is_binary(Vsn) ->
+vcs_vsn_cmd(_AppInfo, Vsn, _) when is_binary(Vsn) ->
     {plain, Vsn};
-vcs_vsn_cmd(VCS, Dir, Resources) when VCS =:= semver ; VCS =:= "semver" ->
-    vcs_vsn_cmd(git, Dir, Resources);
-vcs_vsn_cmd({cmd, _Cmd}=Custom, _, _) ->
+vcs_vsn_cmd(AppInfo, VCS, State) when VCS =:= semver ; VCS =:= "semver" ->
+    vcs_vsn_cmd(AppInfo, git, State);
+vcs_vsn_cmd(_AppInfo, {cmd, _Cmd}=Custom, _) ->
     Custom;
-vcs_vsn_cmd(VCS, Dir, Resources) when is_atom(VCS) ->
-    case find_resource_module(VCS, Resources) of
-        {ok, Module} ->
-            Module:make_vsn(Dir);
-        {error, _} ->
-            unknown
-    end;
-vcs_vsn_cmd(VCS, Dir, Resources) when is_list(VCS) ->
+vcs_vsn_cmd(AppInfo, VCS, State) when is_atom(VCS) ->
+    rebar_resource_v2:make_vsn(AppInfo, VCS, State);
+vcs_vsn_cmd(AppInfo, VCS, State) when is_list(VCS) ->
     try list_to_existing_atom(VCS) of
         AVCS ->
-            case vcs_vsn_cmd(AVCS, Dir, Resources) of
+            case vcs_vsn_cmd(AppInfo, AVCS, State) of
                 unknown -> {plain, VCS};
                 Other -> Other
             end
@@ -704,19 +753,6 @@ vcs_vsn_cmd(_, _, _) ->
 vcs_vsn_invoke(Cmd, Dir) ->
     {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),
     rebar_string:trim(VsnString, trailing, "\n").
-
-find_resource_module(Type, Resources) ->
-    case lists:keyfind(Type, 1, Resources) of
-        false ->
-            case code:which(Type) of
-                non_existing ->
-                    {error, unknown};
-                _ ->
-                    {ok, Type}
-            end;
-        {Type, Module} ->
-            {ok, Module}
-    end.
 
 %% @doc ident to the level specified
 -spec indent(non_neg_integer()) -> iolist().
@@ -928,3 +964,190 @@ is_list_of_strings(List) when is_list(hd(List)) ->
     true;
 is_list_of_strings(List) when is_list(List) ->
     true.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return the SSL options adequate for the project based on
+%% its configuration, including for validation of certs.
+%% @end
+%%------------------------------------------------------------------------------
+-spec ssl_opts(Url) -> Res when
+      Url :: string(),
+      Res :: proplists:proplist().
+ssl_opts(Url) ->
+    case get_ssl_config() of
+        ssl_verify_enabled ->
+            ssl_opts(ssl_verify_enabled, Url);
+        ssl_verify_disabled ->
+            [{verify, verify_none}]
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return the SSL options adequate for the project based on
+%% its configuration, including for validation of certs.
+%% @end
+%%------------------------------------------------------------------------------
+-spec ssl_opts(Enabled, Url) -> Res when
+      Enabled :: atom(),
+      Url :: string(),
+      Res :: proplists:proplist().
+ssl_opts(ssl_verify_enabled, Url) ->
+    case check_ssl_version() of
+        true ->
+            {ok, {_, _, Hostname, _, _, _}} =
+                http_uri:parse(rebar_utils:to_list(Url)),
+            VerifyFun = {fun ssl_verify_hostname:verify_fun/3,
+                         [{check_hostname, Hostname}]},
+            CACerts = certifi:cacerts(),
+            [{verify, verify_peer}, {depth, 2}, {cacerts, CACerts},
+             {partial_chain, fun partial_chain/1}, {verify_fun, VerifyFun}];
+        false ->
+            ?WARN("Insecure HTTPS request (peer verification disabled), "
+                  "please update to OTP 17.4 or later", []),
+            [{verify, verify_none}]
+    end.
+
+-spec partial_chain(Certs) -> Res when
+      Certs :: list(any()),
+      Res :: unknown_ca | {trusted_ca, any()}.
+partial_chain(Certs) ->
+    Certs1 = [{Cert, public_key:pkix_decode_cert(Cert, otp)} || Cert <- Certs],
+    CACerts = certifi:cacerts(),
+    CACerts1 = [public_key:pkix_decode_cert(Cert, otp) || Cert <- CACerts],
+    case ec_lists:find(fun({_, Cert}) ->
+                               check_cert(CACerts1, Cert)
+                       end, Certs1) of
+        {ok, Trusted} ->
+            {trusted_ca, element(1, Trusted)};
+        _ ->
+            unknown_ca
+    end.
+
+-spec extract_public_key_info(Cert) -> Res when
+      Cert :: #'OTPCertificate'{tbsCertificate::#'OTPTBSCertificate'{}},
+      Res :: any().
+extract_public_key_info(Cert) ->
+    ((Cert#'OTPCertificate'.tbsCertificate)#'OTPTBSCertificate'.subjectPublicKeyInfo).
+
+-spec check_cert(CACerts, Cert) -> Res when
+      CACerts :: list(any()),
+      Cert :: any(),
+      Res :: boolean().
+check_cert(CACerts, Cert) ->
+    lists:any(fun(CACert) ->
+                      extract_public_key_info(CACert) == extract_public_key_info(Cert)
+              end, CACerts).
+
+-spec check_ssl_version() ->
+    boolean().
+check_ssl_version() ->
+    case application:get_key(ssl, vsn) of
+        {ok, Vsn} ->
+            parse_vsn(Vsn) >= {5, 3, 6};
+        _ ->
+            false
+    end.
+
+-spec get_ssl_config() ->
+      ssl_verify_disabled | ssl_verify_enabled.
+get_ssl_config() ->
+    GlobalConfigFile = rebar_dir:global_config(),
+    Config = rebar_config:consult_file(GlobalConfigFile),
+    case proplists:get_value(ssl_verify, Config, []) of
+        false ->
+            ssl_verify_disabled;
+        _ ->
+            ssl_verify_enabled
+    end.
+
+-spec parse_vsn(Vsn) -> Res when
+      Vsn :: string(),
+      Res :: {integer(), integer(), integer()}.
+parse_vsn(Vsn) ->
+    version_pad(rebar_string:lexemes(Vsn, ".-")).
+
+-spec version_pad(list(nonempty_string())) -> Res when
+      Res :: {integer(), integer(), integer()}.
+version_pad([Major]) ->
+    {list_to_integer(Major), 0, 0};
+version_pad([Major, Minor]) ->
+    {list_to_integer(Major), list_to_integer(Minor), 0};
+version_pad([Major, Minor, Patch]) ->
+    {list_to_integer(Major), list_to_integer(Minor), list_to_integer(Patch)};
+version_pad([Major, Minor, Patch | _]) ->
+    {list_to_integer(Major), list_to_integer(Minor), list_to_integer(Patch)}.
+
+
+-ifdef(filelib_find_source).
+find_source(Filename, Dir, Rules) ->
+    filelib:find_source(Filename, Dir, Rules).
+-else.
+%% Looks for a file relative to a given directory
+
+-type find_file_rule() :: {ObjDirSuffix::string(), SrcDirSuffix::string()}.
+
+%% Looks for a source file relative to the object file name and directory
+
+-type find_source_rule() :: {ObjExtension::string(), SrcExtension::string(),
+                             [find_file_rule()]}.
+
+keep_suffix_search_rules(Rules) ->
+    [T || {_,_,_}=T <- Rules].
+
+-spec find_source(file:filename(), file:filename(), [find_source_rule()]) ->
+        {ok, file:filename()} | {error, not_found}.
+find_source(Filename, Dir, Rules) ->
+    try_suffix_rules(keep_suffix_search_rules(Rules), Filename, Dir).
+
+try_suffix_rules(Rules, Filename, Dir) ->
+    Ext = filename:extension(Filename),
+    try_suffix_rules(Rules, filename:rootname(Filename, Ext), Dir, Ext).
+
+try_suffix_rules([{Ext,Src,Rules}|Rest], Root, Dir, Ext)
+  when is_list(Src), is_list(Rules) ->
+    case try_dir_rules(add_local_search(Rules), Root ++ Src, Dir) of
+        {ok, File} -> {ok, File};
+        _Other ->
+            try_suffix_rules(Rest, Root, Dir, Ext)
+    end;
+try_suffix_rules([_|Rest], Root, Dir, Ext) ->
+    try_suffix_rules(Rest, Root, Dir, Ext);
+try_suffix_rules([], _Root, _Dir, _Ext) ->
+    {error, not_found}.
+
+%% ensuring we check the directory of the object file before any other directory
+add_local_search(Rules) ->
+    Local = {"",""},
+    [Local] ++ lists:filter(fun (X) -> X =/= Local end, Rules).
+
+try_dir_rules([{From, To}|Rest], Filename, Dir)
+  when is_list(From), is_list(To) ->
+    case try_dir_rule(Dir, Filename, From, To) of
+	{ok, File} -> {ok, File};
+	error      -> try_dir_rules(Rest, Filename, Dir)
+    end;
+try_dir_rules([], _Filename, _Dir) ->
+    {error, not_found}.
+
+try_dir_rule(Dir, Filename, From, To) ->
+    case lists:suffix(From, Dir) of
+	true ->
+	    NewDir = lists:sublist(Dir, 1, length(Dir)-length(From))++To,
+	    Src = filename:join(NewDir, Filename),
+	    case filelib:is_regular(Src) of
+		true -> {ok, Src};
+		false -> find_regular_file(filelib:wildcard(Src))
+	    end;
+	false ->
+	    error
+    end.
+
+find_regular_file([]) ->
+    error;
+find_regular_file([File|Files]) ->
+    case filelib:is_regular(File) of
+        true -> {ok, File};
+        false -> find_regular_file(Files)
+    end.
+-endif.
