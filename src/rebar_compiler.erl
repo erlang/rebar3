@@ -34,11 +34,10 @@
 -define(RE_PREFIX, "^(?!\\._)").
 
 compile_all(Compilers, AppInfo) ->
-    OutDir = rebar_utils:to_list(rebar_app_info:out_dir(AppInfo)),
-
+    EbinDir = rebar_utils:to_list(rebar_app_info:ebin_dir(AppInfo)),
     %% Make sure that outdir is on the path
-    ok = rebar_file_utils:ensure_dir(OutDir),
-    true = code:add_patha(filename:absname(OutDir)),
+    ok = rebar_file_utils:ensure_dir(EbinDir),
+    true = code:add_patha(filename:absname(EbinDir)),
 
     %% necessary for erlang:function_exported/3 to work as expected
     %% called here for clarity as it's required by both opts_changed/2

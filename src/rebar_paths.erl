@@ -130,11 +130,10 @@ misloaded_modules(Mods, GoodAppPaths, ModPaths) ->
     %% Identify paths that are invalid; i.e. app paths that cover an
     %% app in the desired group, but are not in the desired group.
     lists:usort(
-        [purge_mod(Mod)
-         || Mod <- Mods,
-            {_, Path} <- [lists:keyfind(Mod, 1, ModPaths)],
-            is_list(Path), % not 'preloaded' or mocked
-            not any_prefix(Path, GoodAppPaths)]
+        [Mod || Mod <- Mods,
+                {_, Path} <- [lists:keyfind(Mod, 1, ModPaths)],
+                is_list(Path), % not 'preloaded' or mocked
+                not any_prefix(Path, GoodAppPaths)]
     ).
 
 any_prefix(Path, Paths) ->
@@ -168,10 +167,10 @@ get_apps(deps, State) ->
     %% The code paths for deps also include the top level apps
     %% and the extras, which we don't have here; we have to
     %% add the apps by hand
-    rebar_state:all_deps(State) ++
     case rebar_state:project_apps(State) of
         undefined -> [];
         List -> List
-    end;
+    end ++
+    rebar_state:all_deps(State);
 get_apps(plugins, State) ->
     rebar_state:all_plugin_deps(State).

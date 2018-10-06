@@ -115,7 +115,7 @@ copy_and_build_project_apps(State, Providers, Apps) ->
                    rebar_app_info:dir(AppInfo),
                    rebar_app_info:out_dir(AppInfo))
      || AppInfo <- Apps],
-    code:add_pathsa([rebar_app_info:out_dir(AppInfo) || AppInfo <- Apps]),
+    code:add_pathsa([rebar_app_info:ebin_dir(AppInfo) || AppInfo <- Apps]),
     [compile(State, Providers, AppInfo) || AppInfo <- Apps].
 
 
