@@ -832,19 +832,36 @@ dont_recompile_yrl_or_xrl(Config) ->
         "Erlang code.",
     ok = ec_file:write(Xrl, XrlBody),
 
+    Yrl = filename:join([AppDir, "src", "not_a_real_yrl_" ++ Name ++ ".yrl"]),
+    ok = filelib:ensure_dir(Yrl),
+    YrlBody = ["Nonterminals E T F.\n"
+               "Terminals '+' '*' '(' ')' number.\n"
+               "Rootsymbol E.\n"
+               "E -> E '+' T: {'$2', '$1', '$3'}.\n"
+               "E -> T : '$1'.\n"
+               "T -> T '*' F: {'$2', '$1', '$3'}.\n"
+               "T -> F : '$1'.\n"
+               "F -> '(' E ')' : '$2'.\n"
+               "F -> number : '$1'.\n"],
+    ok = ec_file:write(Yrl, YrlBody),
+
     XrlBeam = filename:join([AppDir, "ebin", filename:basename(Xrl, ".xrl") ++ ".beam"]),
+    YrlBeam = filename:join([AppDir, "ebin", filename:basename(Yrl, ".yrl") ++ ".beam"]),
 
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
 
-    ModTime = filelib:last_modified(XrlBeam),
+    XrlModTime = filelib:last_modified(XrlBeam),
+    YrlModTime = filelib:last_modified(YrlBeam),
 
     timer:sleep(1000),
 
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
 
-    NewModTime = filelib:last_modified(XrlBeam),
+    NewXrlModTime = filelib:last_modified(XrlBeam),
+    NewYrlModTime = filelib:last_modified(YrlBeam),
 
-    ?assert(ModTime == NewModTime).
+    ?assert(XrlModTime == NewXrlModTime),
+    ?assert(YrlModTime == NewYrlModTime).
 
 delete_beam_if_source_deleted(Config) ->
     AppDir = ?config(apps, Config),
