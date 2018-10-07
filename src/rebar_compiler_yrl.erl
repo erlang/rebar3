@@ -34,7 +34,7 @@ compile(Source, [{_, OutDir}], _, Opts) ->
     AllOpts = [{parserfile, Target} | Opts],
     AllOpts1 = [{includefile, filename:join(OutDir, I)} || {includefile, I} <- AllOpts,
                                                            filename:pathtype(I) =:= relative],
-    case yeec:file(Source, AllOpts1 ++ [{return, true}]) of
+    case yecc:file(Source, AllOpts1 ++ [{return, true}]) of
         {ok, _} ->
             ok;
         {ok, _Mod, Ws} ->
