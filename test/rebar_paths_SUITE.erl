@@ -4,10 +4,15 @@
 -compile(export_all).
 
 all() ->
-    [%clashing_apps,
+    [clashing_apps,
      check_modules,
-     set_paths
+     set_paths,
+     misloaded_mods
     ].
+
+%%%%%%%%%%%%%%%%%%
+%%% TEST SETUP %%%
+%%%%%%%%%%%%%%%%%%
 
 init_per_testcase(Case, Config) ->
     BasePaths = code:get_path(),
@@ -90,13 +95,17 @@ compile_fake_appmod(App) ->
     {ok, _, Bin} = compile:forms(Mod),
     ok = file:write_file(filename:join([OutDir, <<Name/binary, ".beam">>]), Bin).
 
+%%%%%%%%%%%%%
+%%% TESTS %%%
+%%%%%%%%%%%%%
+
 clashing_apps(Config) ->
     Clashes = rebar_paths:clashing_apps([deps, plugins],
                                         ?config(state, Config)),
     ct:pal("Clashes: ~p", [Clashes]),
 
     ?assertEqual([<<"relx">>, <<"rp_a">>], lists:sort(proplists:get_value(deps, Clashes))),
-    ?assertEqual(undefined, proplists:get_value(plugins, Clashes)),
+    ?assertEqual([], proplists:get_value(plugins, Clashes)),
     ok.
 
 set_paths(Config) ->
@@ -200,6 +209,28 @@ check_modules(Config) ->
     ?assertEqual(RootDir ++ "_build/default/plugins/lib/relx/ebin", relx:f()),
     ?assertEqual(3, length(relx:module_info(exports))), % can't replace bundled
     ok.
+
+misloaded_mods(_Config) ->
+    Res = rebar_paths:misloaded_modules(
+      [a,b,c,d,e,f],
+      ["/1/2/3/4",
+       "/1/2/4",
+       "/2/1/1",
+       "/3/4/5"],
+      [{a, "/0/1/2/file.beam"},
+       {aa, "/1/2/3/4/file.beam"},
+       {b, "/1/2/3/4/file.beam"},
+       {c, "/2/1/file.beam"},
+       {f, preloaded},
+       {d, "/3/5/7/file.beam"},
+       {e, "/3/4/5/file.beam"}]
+    ),
+    ?assertEqual([a,c,d], Res),
+    ok.
+
+%%%%%%%%%%%%%%%
+%%% HELPERS %%%
+%%%%%%%%%%%%%%%
 
 find_first_instance(Frag, []) ->
     {not_found, Frag};

@@ -5,6 +5,11 @@
 -type targets() :: [target(), ...].
 -export_type([target/0, targets/0]).
 -export([set_paths/2, unset_paths/2]).
+-export([clashing_apps/2]).
+
+-ifdef(TEST).
+-export([misloaded_modules/3]).
+-endif.
 
 -spec set_paths(targets(), rebar_state:t()) -> ok.
 set_paths(UserTargets, State) ->
@@ -13,8 +18,8 @@ set_paths(UserTargets, State) ->
     Paths = lists:append([P || {_, P} <- GroupPaths]),
     [code:del_path(P) || P <- Paths],
     code:add_pathsa(lists:reverse(Paths)),
-    % set path breaks with escripts
-    %true = code:set_path(lists:append([P || {_, P} <- GroupPaths])),
+    % set path breaks with escripts; we gotta do it by hand
+    % true = code:set_path(lists:append([P || {_, P} <- GroupPaths])),
     AppGroups = app_groups(Targets, State),
     purge_and_load(AppGroups, code:all_loaded(), sets:new()),
     ok.
@@ -28,6 +33,16 @@ unset_paths(UserTargets, State) ->
     purge(Paths, code:all_loaded()),
     ok.
 
+clashing_apps(Targets, State) ->
+    AppGroups = app_groups(Targets, State),
+    AppNames = [{G, sets:from_list(
+                    [rebar_app_info:name(App) || App <- Apps]
+                )} || {G, Apps} <- AppGroups],
+    clashing_app_names(sets:new(), AppNames, []).
+
+%%%%%%%%%%%%%%%
+%%% PRIVATE %%%
+%%%%%%%%%%%%%%%
 
 %% The paths are to be set in the reverse order; i.e. the default
 %% path is always last when possible (minimize cases where a build
@@ -77,9 +92,9 @@ purge_and_load([{_Group, Apps}|Rest], ModPaths, Seen) ->
                        App <- Apps,
                        rebar_app_info:name(App) =:= AppName],
     %% 2)
-    %% TODO: add extra dirs (and test), and possibly the stdlib
+    %% (no need for extra_src_dirs since those get put into ebin;
+    %%  also no need for OTP libs; we want to allow overtaking them)
     GoodAppPaths = [rebar_app_info:ebin_dir(App) || App <- GoodApps],
-                %% ++ [code:lib_dir()],
     %% 3)
     [begin
          AtomApp = binary_to_atom(AppName, utf8),
@@ -118,12 +133,12 @@ purge_and_load([{_Group, Apps}|Rest], ModPaths, Seen) ->
     purge_and_load(Rest, ModPaths,
                    sets:union(Seen, sets:from_list(AppNames))).
 
-
 purge(Paths, ModPaths) ->
+    SortedPaths = lists:sort(Paths),
     lists:map(fun purge_mod/1, lists:usort(
         [Mod || {Mod, Path} <- ModPaths,
                 is_list(Path), % not 'preloaded' or mocked
-                any_prefix(Path, Paths)]
+                any_prefix(Path, SortedPaths)]
     )).
 
 misloaded_modules(Mods, GoodAppPaths, ModPaths) ->
@@ -151,6 +166,26 @@ purge_mod(Mod) ->
             code:soft_purge(Mod) andalso
             code:delete(Mod)
     end.
+
+
+%% This is a tricky O(n²) check since we want to
+%% know whether an app clashes with any of the top priority groups.
+%%
+%% For example, let's say we have `[deps, plugins]', then we want
+%% to find the plugins that clash with deps:
+%%
+%% `[{deps, [ClashingPlugins]}, {plugins, []}]'
+%%
+%% In case we'd ever have alternative or additional types, we can
+%% find all clashes from other 'groups'.
+clashing_app_names(_, [], Acc) ->
+    lists:reverse(Acc);
+clashing_app_names(PrevNames, [{G,AppNames} | Rest], Acc) ->
+    CurrentNames = sets:subtract(AppNames, PrevNames),
+    NextNames = sets:subtract(sets:union([A || {_, A} <- Rest]), PrevNames),
+    Clashes = sets:intersection(CurrentNames, NextNames),
+    NewAcc = [{G, sets:to_list(Clashes)} | Acc],
+    clashing_app_names(sets:union(PrevNames, CurrentNames), Rest, NewAcc).
 
 path_groups(Targets, State) ->
     [{Target, get_paths(Target, State)} || Target <- Targets].
