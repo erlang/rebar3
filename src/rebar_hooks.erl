@@ -51,7 +51,7 @@ run_provider_hooks_(Dir, Type, Command, Providers, TypeHooks, State) ->
                     ?DEBUG(format_error({bad_provider, Type, Command, ProviderName}), []),
                     throw(?PRV_ERROR({bad_provider, Type, Command, ProviderName}));
                 {ok, State2} ->
-                    rebar_utils:remove_from_code_path(PluginDepsPaths),
+                    rebar_utils:remove_from_code_path(PluginDepsPaths, State),
                     State2
             end
     end.

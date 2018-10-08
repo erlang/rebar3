@@ -39,7 +39,7 @@ do(State) ->
     IsDepsOnly = is_deps_only(State),
     DepsPaths = rebar_state:code_paths(State, all_deps),
     PluginDepsPaths = rebar_state:code_paths(State, all_plugin_deps),
-    rebar_utils:remove_from_code_path(PluginDepsPaths),
+    rebar_utils:remove_from_code_path(PluginDepsPaths, State),
     code:add_pathsa(DepsPaths),
 
     Providers = rebar_state:providers(State),
@@ -180,7 +180,7 @@ compile(State, Providers, AppInfo) ->
     code:add_pathsa(PluginDepsPaths),
     AppFileCompileResult = rebar_otp_app:compile(State, AppInfo4),
     %% Clean up after ourselves, leave things as they were.
-    rebar_utils:remove_from_code_path(PluginDepsPaths),
+    rebar_utils:remove_from_code_path(PluginDepsPaths, State),
 
     case AppFileCompileResult of
         {ok, AppInfo5} ->
