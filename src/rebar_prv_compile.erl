@@ -208,8 +208,12 @@ build_app(AppInfo, State) ->
                     %% load plugins since thats where project builders would be
                     PluginDepsPaths = rebar_state:code_paths(State, all_plugin_deps),
                     code:add_pathsa(PluginDepsPaths),
-                    Module:build(AppInfo),
-                    rebar_utils:remove_from_code_path(PluginDepsPaths);
+                    case Module:build(AppInfo) of
+                        ok ->
+                            rebar_utils:remove_from_code_path(PluginDepsPaths);
+                        {error, Reason} ->
+                            throw({error, {Module, Reason}})
+                    end;
                 _ ->
                     throw(?PRV_ERROR({unknown_project_type, rebar_app_info:name(AppInfo), Type}))
             end
