@@ -40,7 +40,7 @@ do(Module, Command, Provider, State) ->
                           ,{caller, api}
                           ,{log_level, LogLevel} | output_dir(OutputDir, Options)] ++ ErlOpts, AllOptions);
             Config ->
-                Config1 = [{overlay_vars, [{base_dir, rebar_dir:base_dir(State)}]}
+                Config1 = [{overlay_vars, [rebar_dir:base_dir(State)]}
                            | merge_overlays(Config)],
                 relx:main([{lib_dirs, LibDirs}
                           ,{config, Config1}
