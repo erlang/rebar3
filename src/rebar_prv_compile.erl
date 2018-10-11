@@ -37,7 +37,7 @@ init(State) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
     IsDepsOnly = is_deps_only(State),
-    rebar_paths:set_paths([deps, plugins], State),
+    rebar_paths:set_paths([deps], State),
 
     Providers = rebar_state:providers(State),
     Deps = rebar_state:deps_to_build(State),
@@ -50,7 +50,7 @@ do(State) ->
                      handle_project_apps(Providers, State)
              end,
 
-    rebar_paths:set_paths([plugins, deps], State1),
+    rebar_paths:set_paths([plugins], State1),
 
     {ok, State1}.
 
@@ -172,10 +172,10 @@ compile(State, Providers, AppInfo) ->
     %% The rebar_otp_app compilation step is safe regarding the
     %% overall path management, so we can just load all plugins back
     %% in memory.
-    rebar_paths:set_paths([plugins, deps], State),
+    rebar_paths:set_paths([plugins], State),
     AppFileCompileResult = rebar_otp_app:compile(State, AppInfo4),
-    %% Clean up after ourselves, leave things as they were.
-    rebar_paths:set_paths([deps, plugins], State),
+    %% Clean up after ourselves, leave things as they were with deps first
+    rebar_paths:set_paths([deps], State),
 
     case AppFileCompileResult of
         {ok, AppInfo5} ->
@@ -203,7 +203,7 @@ build_app(AppInfo, State) ->
                     %% load plugins since thats where project builders would be
                     rebar_paths:set_paths([plugins, deps], State),
                     Res = Module:build(AppInfo),
-                    rebar_paths:set_paths([deps, plugins], State),
+                    rebar_paths:set_paths([deps], State),
                     case Res of
                         ok -> ok;
                         {error, Reason} -> throw({error, {Module, Reason}})

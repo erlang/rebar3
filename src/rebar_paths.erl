@@ -1,3 +1,5 @@
+%% BEFORE THIS FIX: rebar3 ct  266.78s user 144.06s system 144% cpu 4:33.70 total
+%% CURRENT TIME:    rebar3 ct  419.30s user 301.00s system 152% cpu 7:51.98 total
 -module(rebar_paths).
 -include("rebar.hrl").
 
@@ -8,20 +10,17 @@
 -export([clashing_apps/2]).
 
 -ifdef(TEST).
--export([misloaded_modules/3]).
+-export([misloaded_modules/2]).
 -endif.
 
 -spec set_paths(targets(), rebar_state:t()) -> ok.
 set_paths(UserTargets, State) ->
     Targets = normalize_targets(UserTargets),
     GroupPaths = path_groups(Targets, State),
-    Paths = lists:append([P || {_, P} <- GroupPaths]),
-    [code:del_path(P) || P <- Paths],
-    code:add_pathsa(lists:reverse(Paths)),
-    % set path breaks with escripts; we gotta do it by hand
-    % true = code:set_path(lists:append([P || {_, P} <- GroupPaths])),
+    Paths = lists:append(lists:reverse([P || {_, P} <- GroupPaths])),
+    code:add_pathsa(Paths),
     AppGroups = app_groups(Targets, State),
-    purge_and_load(AppGroups, code:all_loaded(), sets:new()),
+    purge_and_load(AppGroups, sets:new()),
     ok.
 
 -spec unset_paths(targets(), rebar_state:t()) -> ok.
@@ -33,6 +32,7 @@ unset_paths(UserTargets, State) ->
     purge(Paths, code:all_loaded()),
     ok.
 
+-spec clashing_apps(targets(), rebar_state:t()) -> [{target(), [binary()]}].
 clashing_apps(Targets, State) ->
     AppGroups = app_groups(Targets, State),
     AppNames = [{G, sets:from_list(
@@ -66,9 +66,9 @@ normalize_targets(List) ->
     ),
     lists:reverse(TmpList).
 
-purge_and_load([], _, _) ->
+purge_and_load([], _) ->
     ok;
-purge_and_load([{_Group, Apps}|Rest], ModPaths, Seen) ->
+purge_and_load([{_Group, Apps}|Rest], Seen) ->
     %% We have: a list of all applications in the current priority group,
     %% a list of all loaded modules with their active path, and a list of
     %% seen applications.
@@ -79,7 +79,12 @@ purge_and_load([{_Group, Apps}|Rest], ModPaths, Seen) ->
     %% 3. unload and reload apps that may have changed paths in order
     %%    to get updated module lists and specs
     %%    (we ignore started apps and apps that have not run for this)
-    %% 4. create a list of modules to check from that app list
+    %%    This part turns out to be the bottleneck of this module, so
+    %%    to speed it up, using clash detection proves useful:
+    %%    only reload apps that clashed since others are unlikely to
+    %%    conflict in significant ways
+    %% 4. create a list of modules to check from that app list—only loaded
+    %%    modules make sense to check.
     %% 5. check the modules to match their currently loaded paths with
     %%    the path set from the apps in the current group; modules
     %%    that differ must be purged; others can stay
@@ -126,27 +131,29 @@ purge_and_load([{_Group, Apps}|Rest], ModPaths, Seen) ->
          end || App <- GoodApps,
                 AppName <- [binary_to_atom(rebar_app_info:name(App), utf8)]]
     ),
+    ModPaths = [{Mod,Path} || Mod <- CandidateMods,
+                              erlang:function_exported(Mod, module_info, 0),
+                              {file, Path} <- [code:is_loaded(Mod)]],
 
     %% 5)
-    Mods = misloaded_modules(CandidateMods, GoodAppPaths, ModPaths),
+    Mods = misloaded_modules(GoodAppPaths, ModPaths),
     [purge_mod(Mod) || Mod <- Mods],
-    purge_and_load(Rest, ModPaths,
-                   sets:union(Seen, sets:from_list(AppNames))).
+
+    purge_and_load(Rest, sets:union(Seen, sets:from_list(AppNames))).
 
 purge(Paths, ModPaths) ->
     SortedPaths = lists:sort(Paths),
-    lists:map(fun purge_mod/1, lists:usort(
-        [Mod || {Mod, Path} <- ModPaths,
-                is_list(Path), % not 'preloaded' or mocked
-                any_prefix(Path, SortedPaths)]
-    )).
+    lists:map(fun purge_mod/1,
+              [Mod || {Mod, Path} <- ModPaths,
+                      is_list(Path), % not 'preloaded' or mocked
+                      any_prefix(Path, SortedPaths)]
+             ).
 
-misloaded_modules(Mods, GoodAppPaths, ModPaths) ->
+misloaded_modules(GoodAppPaths, ModPaths) ->
     %% Identify paths that are invalid; i.e. app paths that cover an
     %% app in the desired group, but are not in the desired group.
     lists:usort(
-        [Mod || Mod <- Mods,
-                {_, Path} <- [lists:keyfind(Mod, 1, ModPaths)],
+        [Mod || {Mod, Path} <- ModPaths,
                 is_list(Path), % not 'preloaded' or mocked
                 not any_prefix(Path, GoodAppPaths)]
     ).
@@ -157,15 +164,7 @@ any_prefix(Path, Paths) ->
 %% assume paths currently set are good; only unload a module so next call
 %% uses the correctly set paths
 purge_mod(Mod) ->
-    case erlang:check_process_code(self(), Mod) of
-        false ->
-            code:purge(Mod),
-            code:delete(Mod);
-        _ ->
-            %% cannot purge safely without killing ourselves
-            code:soft_purge(Mod) andalso
-            code:delete(Mod)
-    end.
+    code:soft_purge(Mod) andalso code:delete(Mod).
 
 
 %% This is a tricky O(n²) check since we want to

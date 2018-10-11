@@ -175,7 +175,20 @@ run_aux(State, RawArgs) ->
 
     State10 = rebar_state:code_paths(State9, default, code:get_path()),
 
-    rebar_core:init_command(rebar_state:command_args(State10, Args), Task).
+    case rebar_core:init_command(rebar_state:command_args(State10, Args), Task) of
+        {ok, State11} ->
+            case rebar_state:get(State11, caller, command_line) of
+                api ->
+                    rebar_paths:unset_paths([deps, plugins], State11),
+                    {ok, State11};
+                _ ->
+                    {ok, State11}
+            end;
+        Other ->
+            Other
+    end.
+
+
 
 %% @doc set up base configuration having to do with verbosity, where
 %% to find config files, and so on, and return an internal rebar3 state term.

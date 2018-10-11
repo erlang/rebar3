@@ -125,7 +125,7 @@ handle_plugin(Profile, Plugin, State, Upgrade) ->
 
         %% Store plugin code paths so we can remove them when compiling project apps
         State4 = rebar_state:update_code_paths(State3, all_plugin_deps, PreBuiltPaths++NewCodePaths),
-        rebar_paths:set_paths([plugins, deps], State4),
+        rebar_paths:set_paths([plugins], State4),
 
         {plugin_providers(Plugin), State4}
     catch

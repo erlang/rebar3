@@ -212,13 +212,11 @@ check_modules(Config) ->
 
 misloaded_mods(_Config) ->
     Res = rebar_paths:misloaded_modules(
-      [a,b,c,d,e,f],
       ["/1/2/3/4",
        "/1/2/4",
        "/2/1/1",
        "/3/4/5"],
       [{a, "/0/1/2/file.beam"},
-       {aa, "/1/2/3/4/file.beam"},
        {b, "/1/2/3/4/file.beam"},
        {c, "/2/1/file.beam"},
        {f, preloaded},
