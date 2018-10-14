@@ -43,7 +43,7 @@
 
          project_builders/1, add_project_builder/3,
 
-         create_resources/2,
+         create_resources/2, set_resources/2,
          resources/1, resources/2, add_resource/2,
          providers/1, providers/2, add_provider/2,
          allow_provider_overrides/1, allow_provider_overrides/2
@@ -367,6 +367,10 @@ namespace(State=#state_t{}, Namespace) ->
 -spec resources(t()) -> [{rebar_resource_v2:type(), module()}].
 resources(#state_t{resources=Resources}) ->
     Resources.
+
+-spec set_resources(t(), [{rebar_resource_v2:type(), module()}]) -> t().
+set_resources(State, Resources) ->
+    State#state_t{resources=Resources}.
 
 -spec resources(t(), [{rebar_resource_v2:type(), module()}]) -> t().
 resources(State, NewResources) ->
