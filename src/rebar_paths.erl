@@ -1,5 +1,3 @@
-%% BEFORE THIS FIX: rebar3 ct  266.78s user 144.06s system 144% cpu 4:33.70 total
-%% CURRENT TIME:    rebar3 ct  419.30s user 301.00s system 152% cpu 7:51.98 total
 -module(rebar_paths).
 -include("rebar.hrl").
 
