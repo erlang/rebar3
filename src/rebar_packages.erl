@@ -55,11 +55,13 @@ get_all_names(State) ->
                                                       _='_'}, 
                                              [], ['$1']}])).
 
--spec get_package_versions(unicode:unicode_binary(), unicode:unicode_binary(),
+-spec get_package_versions(unicode:unicode_binary(), ec_semver:semver(),
+                           unicode:unicode_binary(),
                            ets:tid(), rebar_state:t()) -> [vsn()].
-get_package_versions(Dep, Repo, Table, State) ->
+get_package_versions(Dep, {_, AlphaInfo}, Repo, Table, State) ->
     ?MODULE:verify_table(State),
-    AllowPreRelease = rebar_state:get(State, deps_allow_prerelease, false),
+    AllowPreRelease = rebar_state:get(State, deps_allow_prerelease, false)
+        orelse AlphaInfo =/= {[],[]},
     ets:select(Table, [{#package{key={Dep, {'$1', '$2'}, Repo},
                                  _='_'},
                         [{'==', '$2', {{[],[]}}} || not AllowPreRelease], [{{'$1', '$2'}}]}]).
@@ -180,7 +182,7 @@ find_highest_matching(Dep, Constraint, Repo, Table, State) ->
     end.
 
 find_highest_matching_(Dep, Constraint, #{name := Repo}, Table, State) ->
-    try get_package_versions(Dep, Repo, Table, State) of
+    try get_package_versions(Dep, Constraint, Repo, Table, State) of
         [Vsn] ->
             handle_single_vsn(Vsn, Constraint);
         Vsns ->
@@ -292,7 +294,7 @@ resolve_version(Dep, DepVsn, Hash, HexRegistry, State) when is_binary(Hash) ->
     end;
 resolve_version(Dep, undefined, Hash, HexRegistry, State) ->
     Fun = fun(Repo) ->
-              case highest_matching(Dep, "0", Repo, HexRegistry, State) of
+              case highest_matching(Dep, {0,{[],[]}}, Repo, HexRegistry, State) of
                   none ->
                       not_found;
                   {ok, Vsn} ->
@@ -360,9 +362,9 @@ resolve_version_(Dep, DepVsn, Repo, HexRegistry, State) ->
     end.
 
 rm_ws(<<" ", R/binary>>) ->
-    rm_ws(R);
+    ec_semver:parse(rm_ws(R));
 rm_ws(R) ->
-    R.
+    ec_semver:parse(R).
 
 valid_vsn(Vsn) ->
     %% Regepx from https://github.com/sindresorhus/semver-regex/blob/master/index.js
@@ -375,7 +377,7 @@ highest_matching(Dep, Vsn, Repo, HexRegistry, State) ->
     find_highest_matching_(Dep, Vsn, #{name => Repo}, HexRegistry, State).
 
 cmp(Dep, Vsn, Repo, HexRegistry, State, CmpFun) ->
-    case get_package_versions(Dep, Repo, HexRegistry, State) of
+    case get_package_versions(Dep, Vsn, Repo, HexRegistry, State) of
         [] ->
             none;
         Vsns ->
@@ -398,7 +400,7 @@ cmp_(BestMatch, MinVsn, [Vsn | R], CmpFun) ->
 %% We need to treat this differently since we want a version that is LOWER but
 %% the higest possible one.
 cmpl(Dep, Vsn, Repo, HexRegistry, State, CmpFun) ->
-    case get_package_versions(Dep, Repo, HexRegistry, State) of
+    case get_package_versions(Dep, Vsn, Repo, HexRegistry, State) of
         [] ->
             none;
         Vsns ->

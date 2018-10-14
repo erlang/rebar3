@@ -225,19 +225,24 @@ pkgs_provider(Config) ->
 find_highest_matching(_Config) ->
     State = rebar_state:new(),
     {ok, Vsn} = rebar_packages:find_highest_matching_(
-                  <<"goodpkg">>, <<"1.0.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
+                  <<"goodpkg">>, ec_semver:parse(<<"1.0.0">>), #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
     ?assertEqual({{1,0,1},{[],[]}}, Vsn),
     {ok, Vsn1} = rebar_packages:find_highest_matching(
-                   <<"goodpkg">>, <<"1.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
+                   <<"goodpkg">>, ec_semver:parse(<<"1.0">>), #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
     ?assertEqual({{1,1,1},{[],[]}}, Vsn1),
     {ok, Vsn2} = rebar_packages:find_highest_matching(
-                   <<"goodpkg">>, <<"2.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
+                   <<"goodpkg">>, ec_semver:parse(<<"2.0">>), #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
     ?assertEqual({{2,0,0},{[],[]}}, Vsn2),
 
     %% regression test. ~> constraints higher than the available packages would result
     %% in returning the first package version instead of 'none'.
-    ?assertEqual(none, rebar_packages:find_highest_matching_(<<"goodpkg">>, <<"~> 5.0">>,
-                                                             #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State)).
+    ?assertEqual(none, rebar_packages:find_highest_matching_(<<"goodpkg">>, ec_semver:parse(<<"5.0">>),
+                                                             #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State)),
+
+
+    {ok, Vsn3} = rebar_packages:find_highest_matching_(<<"goodpkg">>, ec_semver:parse(<<"3.0.0-rc.0">>),
+                                                       #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
+    ?assertEqual({{3,0,0},{[<<"rc">>,0],[]}}, Vsn3).
 
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
@@ -253,6 +258,7 @@ mock_config(Name, Config) ->
         {{<<"goodpkg">>,<<"1.0.1">>}, [[], ?good_checksum, [<<"rebar3">>]]},
         {{<<"goodpkg">>,<<"1.1.1">>}, [[], ?good_checksum, [<<"rebar3">>]]},
         {{<<"goodpkg">>,<<"2.0.0">>}, [[], ?good_checksum, [<<"rebar3">>]]},
+        {{<<"goodpkg">>,<<"3.0.0-rc.0">>}, [[], ?good_checksum, [<<"rebar3">>]]},
         {{<<"badpkg">>,<<"1.0.0">>}, [[], ?badpkg_checksum, [<<"rebar3">>]]}
     ],
     ets:insert_new(Tid, AllDeps),
