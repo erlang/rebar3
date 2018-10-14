@@ -715,6 +715,15 @@ escript_foldl(Fun, Acc, File) ->
             Error
     end.
 
+%% TODO: this is just for rebar3_hex and maybe other plugins
+%% but eventually it should be dropped
+vcs_vsn(OriginalVsn, Dir, Resources) when is_list(Dir) ,
+                                          is_list(Resources) ->
+    ?WARN("Using deprecated rebar_utils:vcs_vsn/3. Please upgrade your plugins.", []),
+    FakeState = rebar_state:new(),
+    {ok, AppInfo} = rebar_app_info:new(fake, OriginalVsn, Dir),
+    vcs_vsn(AppInfo, OriginalVsn,
+            rebar_state:set_resources(FakeState, Resources));
 vcs_vsn(AppInfo, Vcs, State) ->
     case vcs_vsn_cmd(AppInfo, Vcs, State) of
         {plain, VsnString} ->
@@ -728,7 +737,7 @@ vcs_vsn(AppInfo, Vcs, State) ->
     end.
 
 %% Temp work around for repos like relx that use "semver"
-vcs_vsn_cmd(_AppInfo, Vsn, _) when is_binary(Vsn) ->
+vcs_vsn_cmd(_, Vsn, _) when is_binary(Vsn) ->
     {plain, Vsn};
 vcs_vsn_cmd(AppInfo, VCS, State) when VCS =:= semver ; VCS =:= "semver" ->
     vcs_vsn_cmd(AppInfo, git, State);
