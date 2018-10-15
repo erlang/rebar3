@@ -9,6 +9,8 @@
          expand_env_variable/3,
          get_arch/0,
          wordsize/0,
+         set_paths/2,
+         unset_paths/2,
          add_deps_to_path/1,
          restore_code_path/1,
          processing_base_dir/1,
@@ -66,6 +68,21 @@ get_arch() ->
 -spec wordsize() -> string().
 wordsize() ->
     rebar_utils:wordsize().
+
+%% @doc Set code paths. Takes arguments of the form
+%% `[plugins, deps]' or `[deps, plugins]' and ensures the
+%% project's app and dependencies are set in the right order
+%% for the next bit of execution
+-spec set_paths(rebar_paths:targets(), rebar_state:t()) -> ok.
+set_paths(List, State) ->
+    rebar_paths:set_paths(List, State).
+
+%% @doc Unsets code paths. Takes arguments of the form
+%% `[plugins, deps]' or `[deps, plugins]' and ensures the
+%% paths are no longer active.
+-spec unset_paths(rebar_paths:targets(), rebar_state:t()) -> ok.
+unset_paths(List, State) ->
+    rebar_paths:unset_paths(List, State).
 
 %% @doc Add deps to the code path
 -spec add_deps_to_path(rebar_state:t()) -> ok.
