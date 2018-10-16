@@ -1,69 +1,6 @@
 -module(rebar_compile_SUITE).
 
--export([suite/0,
-         init_per_suite/1,
-         end_per_suite/1,
-         init_per_testcase/2,
-         end_per_testcase/2,
-         init_per_group/2,
-         end_per_group/2,
-         all/0,
-         groups/0,
-         build_basic_app/1, paths_basic_app/1, clean_basic_app/1,
-         build_release_apps/1, paths_release_apps/1, clean_release_apps/1,
-         build_checkout_apps/1, paths_checkout_apps/1,
-         build_checkout_deps/1, paths_checkout_deps/1,
-         build_basic_srcdirs/1, paths_basic_srcdirs/1,
-         build_release_srcdirs/1, paths_release_srcdirs/1,
-         build_unbalanced_srcdirs/1, paths_unbalanced_srcdirs/1,
-         build_basic_extra_dirs/1, paths_basic_extra_dirs/1, clean_basic_extra_dirs/1,
-         build_release_extra_dirs/1, paths_release_extra_dirs/1, clean_release_extra_dirs/1,
-         build_unbalanced_extra_dirs/1, paths_unbalanced_extra_dirs/1,
-         build_extra_dirs_in_project_root/1,
-         paths_extra_dirs_in_project_root/1,
-         clean_extra_dirs_in_project_root/1,
-         recompile_when_hrl_changes/1,
-         recompile_when_included_hrl_changes/1,
-         recompile_when_opts_included_hrl_changes/1,
-         recompile_when_opts_change/1,
-         dont_recompile_when_opts_dont_change/1,
-         dont_recompile_yrl_or_xrl/1,
-         deps_in_path/1,
-         delete_beam_if_source_deleted/1,
-         checkout_priority/1,
-         highest_version_of_pkg_dep/1,
-         parse_transform_test/1,
-         erl_first_files_test/1,
-         mib_test/1,
-         umbrella_mib_first_test/1,
-         only_default_transitive_deps/1,
-         clean_all/1,
-         override_deps/1,
-         override_add_deps/1,
-         override_del_deps/1,
-         override_opts/1,
-         override_add_opts/1,
-         override_del_opts/1,
-         profile_deps/1,
-         profile_override_deps/1,
-         profile_override_add_deps/1,
-         profile_override_del_deps/1,
-         profile_override_opts/1,
-         profile_override_add_opts/1,
-         profile_override_del_opts/1,
-         deps_build_in_prod/1,
-         include_file_relative_to_working_directory/1,
-         include_file_in_src/1,
-         include_file_relative_to_working_directory_test/1,
-         include_file_in_src_test/1,
-         include_file_in_src_test_multiapp/1,
-         dont_recompile_when_erl_compiler_options_env_does_not_change/1,
-         recompile_when_erl_compiler_options_env_changes/1,
-         always_recompile_when_erl_compiler_options_set/1,
-         recompile_when_parse_transform_inline_changes/1,
-         recompile_when_parse_transform_as_opt_changes/1,
-         recursive/1,no_recursive/1,
-         regex_filter_skip/1, regex_filter_regression/1]).
+-compile(export_all).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -86,9 +23,10 @@ all() ->
      deps_in_path, checkout_priority, highest_version_of_pkg_dep,
      parse_transform_test, erl_first_files_test, mib_test,
      umbrella_mib_first_test, only_default_transitive_deps, clean_all,
-     profile_deps, deps_build_in_prod,
+     profile_deps, deps_build_in_prod, only_deps,
      override_deps, override_add_deps, override_del_deps,
      override_opts, override_add_opts, override_del_opts,
+     apply_overrides_exactly_once,
      profile_override_deps, profile_override_add_deps, profile_override_del_deps,
      profile_override_opts, profile_override_add_opts, profile_override_del_opts,
      include_file_relative_to_working_directory, include_file_in_src,
@@ -100,7 +38,8 @@ all() ->
      recursive, no_recursive,
      always_recompile_when_erl_compiler_options_set,
      dont_recompile_when_erl_compiler_options_env_does_not_change,
-     recompile_when_erl_compiler_options_env_changes].
+     recompile_when_erl_compiler_options_env_changes,
+     rebar_config_os_var].
 
 groups() ->
     [{basic_app, [], [build_basic_app, paths_basic_app, clean_basic_app]},
@@ -836,7 +775,7 @@ recompile_when_opts_change(Config) ->
 
     rebar_test_utils:create_config(AppDir, [{erl_opts, [{d, some_define}]}]),
 
-    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+    rebar_test_utils:run_and_check(Config, [{erl_opts, [{d, some_define}]}], ["compile"], {ok, [{app, Name}]}),
 
     {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
     NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
@@ -893,19 +832,36 @@ dont_recompile_yrl_or_xrl(Config) ->
         "Erlang code.",
     ok = ec_file:write(Xrl, XrlBody),
 
+    Yrl = filename:join([AppDir, "src", "not_a_real_yrl_" ++ Name ++ ".yrl"]),
+    ok = filelib:ensure_dir(Yrl),
+    YrlBody = ["Nonterminals E T F.\n"
+               "Terminals '+' '*' '(' ')' number.\n"
+               "Rootsymbol E.\n"
+               "E -> E '+' T: {'$2', '$1', '$3'}.\n"
+               "E -> T : '$1'.\n"
+               "T -> T '*' F: {'$2', '$1', '$3'}.\n"
+               "T -> F : '$1'.\n"
+               "F -> '(' E ')' : '$2'.\n"
+               "F -> number : '$1'.\n"],
+    ok = ec_file:write(Yrl, YrlBody),
+
     XrlBeam = filename:join([AppDir, "ebin", filename:basename(Xrl, ".xrl") ++ ".beam"]),
+    YrlBeam = filename:join([AppDir, "ebin", filename:basename(Yrl, ".yrl") ++ ".beam"]),
 
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
 
-    ModTime = filelib:last_modified(XrlBeam),
+    XrlModTime = filelib:last_modified(XrlBeam),
+    YrlModTime = filelib:last_modified(YrlBeam),
 
     timer:sleep(1000),
 
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
 
-    NewModTime = filelib:last_modified(XrlBeam),
+    NewXrlModTime = filelib:last_modified(XrlBeam),
+    NewYrlModTime = filelib:last_modified(YrlBeam),
 
-    ?assert(ModTime == NewModTime).
+    ?assert(XrlModTime == NewXrlModTime),
+    ?assert(YrlModTime == NewYrlModTime).
 
 delete_beam_if_source_deleted(Config) ->
     AppDir = ?config(apps, Config),
@@ -1405,6 +1361,35 @@ override_opts(Config) ->
     true = lists:member(compressed, proplists:get_value(options, Mod:module_info(compile), [])),
     false = lists:member(warn_missing_spec, proplists:get_value(options, Mod:module_info(compile), [])).
 
+%% test for fix of https://github.com/erlang/rebar3/issues/1801
+%% only apply overrides once
+%% verify by having an override add the macro TEST to the dep some_dep
+%% building under `ct` will fail if the `add` is applied more than once
+apply_overrides_exactly_once(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{deps, TopDeps},
+                   {overrides, [
+                                {add, some_dep, [
+                                             {erl_opts, [{d, 'TEST'}]}
+                                            ]}
+                               ]}],
+
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig, ["ct", "--compile_only"], {ok, [{app, Name}, {dep, "some_dep"}], "test"}).
+
 override_add_opts(Config) ->
     AppDir = ?config(apps, Config),
 
@@ -1688,6 +1673,25 @@ profile_deps(Config) ->
         {ok, [{dep, "some_dep"},{dep, "other_dep"}]}
     ).
 
+only_deps(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
+
+    RConfFile = rebar_test_utils:create_config(AppDir, [{deps, TopDeps}]),
+    {ok, RConf} = file:consult(RConfFile),
+    rebar_test_utils:run_and_check(
+        Config, RConf, ["compile", "--deps_only"],
+        {ok, [{app_not_exist, Name}, {dep, "some_dep"},{dep, "other_dep"}]}
+    ).
+
 %% verify a deps prod profile is used
 %% tested by checking prod hooks run and outputs to default profile dir for dep
 %% and prod deps are installed for dep
@@ -1852,7 +1856,7 @@ include_file_in_src_test_multiapp(Config) ->
     AppDir1 = filename:join([?config(apps, Config), "lib", Name1]),
     AppDir2 = filename:join([?config(apps, Config), "lib", Name2]),
     Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir1, Name1, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_app(AppDir1, Name1, Vsn, [kernel, stdlib, list_to_atom(Name2)]),
     rebar_test_utils:create_app(AppDir2, Name2, Vsn, [kernel, stdlib]),
 
     Src = "-module(test).\n"
@@ -1874,7 +1878,8 @@ include_file_in_src_test_multiapp(Config) ->
     RebarConfig = [],
     rebar_test_utils:run_and_check(Config, RebarConfig,
                                    ["as", "test", "compile"],
-                                   {ok, [{app, Name1}]}).
+                                   {ok, [{app, Name1}]}),
+    ok.
 
 %% this test sets the env var, compiles, records the file last modified timestamp,
 %% recompiles and compares the file last modified timestamp to ensure it hasn't
@@ -1957,6 +1962,29 @@ recompile_when_erl_compiler_options_env_changes(Config) ->
         false -> ok;
         _     -> os:putenv("ERL_COMPILER_OPTIONS", ExistingEnv)
     end.
+
+rebar_config_os_var(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("rebar_config_os_var_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    rebar_test_utils:create_config(AppDir, [{erl_opts, []}]),
+
+    AltConfig = filename:join(AppDir, "test.rebar.config"),
+    file:write_file(AltConfig, "{erl_opts, [compressed]}."),
+    true = os:putenv("REBAR_CONFIG", AltConfig),
+
+    rebar_test_utils:run_and_check(Config, ["compile"], {ok, [{app, Name}]}),
+
+    Path = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    code:add_patha(Path),
+
+    Mod = list_to_atom("not_a_real_src_" ++ Name),
+
+    true = lists:member(compressed, proplists:get_value(options, Mod:module_info(compile), [])),
+    ok.
 
 %% this test sets the env var, compiles, records the file last modified
 %% timestamp, recompiles and compares the file last modified timestamp to

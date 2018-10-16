@@ -1,11 +1,12 @@
 -module(rebar_test_utils).
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
--export([init_rebar_state/1, init_rebar_state/2, run_and_check/4, check_results/3]).
+-export([init_rebar_state/1, init_rebar_state/2, run_and_check/3, run_and_check/4, check_results/3]).
 -export([expand_deps/2, flat_deps/1, top_level_deps/1]).
 -export([create_app/4, create_plugin/4, create_eunit_app/4, create_empty_app/4,
-         create_config/2, create_config/3, package_app/3]).
--export([create_random_name/1, create_random_vsn/0, write_src_file/2]).
+         create_config/2, create_config/3, package_app/4]).
+-export([create_random_name/1, create_random_vsn/0, write_src_file/2,
+         random_element/1]).
 
 %% Pick the right random module
 -ifdef(rand_only).
@@ -34,8 +35,10 @@ init_rebar_state(Config, Name) ->
     Verbosity = rebar3:log_level(),
     rebar_log:init(command_line, Verbosity),
     GlobalDir = filename:join([DataDir, "cache"]),
+    Repos = proplists:get_value(repos, Config, []),
     State = rebar_state:new([{base_dir, filename:join([AppsDir, "_build"])}
                             ,{global_rebar_dir, GlobalDir}
+                            ,{hex, [{repos, [#{name => R} || R <- Repos]}]}
                             ,{root_dir, AppsDir}]),
     [{apps, AppsDir}, {checkouts, CheckoutsDir}, {state, State} | Config].
 
@@ -77,6 +80,33 @@ run_and_check(Config, RebarConfig, Command, Expect) ->
         end
     catch
         rebar_abort when Expect =:= rebar_abort -> rebar_abort
+    end.
+
+run_and_check(Config, Command, Expect) ->
+    %% Assumes init_rebar_state has run first
+    AppDir = ?config(apps, Config),
+    {ok, Cwd} = file:get_cwd(),
+    try
+        ok = file:set_cwd(AppDir),
+        Res = rebar3:run(Command),
+        case Expect of
+            {error, Reason} ->
+                ?assertEqual({error, Reason}, Res);
+            {ok, Expected} ->
+                {ok, _} = Res,
+                check_results(AppDir, Expected, "*"),
+                Res;
+            {ok, Expected, ProfileRun} ->
+                {ok, _} = Res,
+                check_results(AppDir, Expected, ProfileRun),
+                Res;
+            return ->
+                Res
+        end
+    catch
+        rebar_abort when Expect =:= rebar_abort -> rebar_abort
+    after
+        ok = file:set_cwd(Cwd)
     end.
 
 %% @doc Creates a dummy application including:
@@ -263,6 +293,14 @@ check_results(AppDir, Expected, ProfileRun) ->
                         ok
                 end
         ; ({dep_not_exist, Name}) ->
+                ct:pal("Dep Not Exist Name: ~p", [Name]),
+                case lists:keyfind(Name, 1, DepsNames) of
+                    false ->
+                        ok;
+                    {Name, _App} ->
+                        error({app_found, Name})
+                end
+        ; ({app_not_exist, Name}) ->
                 ct:pal("App Not Exist Name: ~p", [Name]),
                 case lists:keyfind(Name, 1, DepsNames) of
                     false ->
@@ -467,24 +505,25 @@ get_app_metadata(Name, Vsn, Deps) ->
       {registered, []},
       {applications, Deps}]}.
 
-package_app(AppDir, DestDir, PkgName) ->
-    Name = PkgName++".tar",
-    {ok, Fs} = rebar_utils:list_dir(AppDir),
-    ok = erl_tar:create(filename:join(DestDir, "contents.tar.gz"),
-                        lists:zip(Fs, [filename:join(AppDir,F) || F <- Fs]),
-                        [compressed]),
-    ok = file:write_file(filename:join(DestDir, "metadata.config"), "who cares"),
-    ok = file:write_file(filename:join(DestDir, "VERSION"), "3"),
-    {ok, Contents} = file:read_file(filename:join(DestDir, "contents.tar.gz")),
-    Blob = <<"3who cares", Contents/binary>>,
-    <<X:256/big-unsigned>> = crypto:hash(sha256, Blob),
-    BinChecksum = list_to_binary(rebar_string:uppercase(lists:flatten(io_lib:format("~64.16.0b", [X])))),
-    ok = file:write_file(filename:join(DestDir, "CHECKSUM"), BinChecksum),
-    PkgFiles = ["contents.tar.gz", "VERSION", "metadata.config", "CHECKSUM"],
+package_app(AppDir, DestDir, PkgName, PkgVsn) ->
+    AppSrc = filename:join(AppDir, "src"),
+    {ok, Fs} = rebar_utils:list_dir(AppSrc),
+    Files = lists:zip([filename:join("src", F) || F <- Fs], [filename:join(AppSrc,F) || F <- Fs]),
+    Metadata = #{<<"app">> => list_to_binary(PkgName),
+                 <<"version">> => list_to_binary(PkgVsn)},
+    {ok, {Tarball, <<Checksum:256/big-unsigned-integer>>}} = hex_tarball:create(Metadata, Files),
+
+    Name = PkgName++"-"++PkgVsn++".tar",
     Archive = filename:join(DestDir, Name),
-    ok = erl_tar:create(Archive,
-                        lists:zip(PkgFiles, [filename:join(DestDir,F) || F <- PkgFiles])),
-    {ok, BinFull} = file:read_file(Archive),
-    <<E:128/big-unsigned-integer>> = crypto:hash(md5, BinFull),
-    Etag = rebar_string:lowercase(lists:flatten(io_lib:format("~32.16.0b", [E]))),
-    {BinChecksum, Etag}.
+    file:write_file(Archive, Tarball),
+
+    <<E:128/big-unsigned-integer>> = crypto:hash(md5, Tarball),
+
+    Checksum1 = list_to_binary(
+                  rebar_string:uppercase(
+                    lists:flatten(io_lib:format("~64.16.0b", [Checksum])))),
+    {Checksum1, E}.
+
+random_element(Repos) ->
+    Index = ?random:uniform(length(Repos)),
+    lists:nth(Index, Repos).

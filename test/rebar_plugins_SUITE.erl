@@ -335,7 +335,7 @@ project_plugins(Config) ->
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
     DepName = rebar_test_utils:create_random_name("dep1_"),
-    PluginName = "compile",
+    PluginName = "compile_plugin",
     PluginName2 = "release",
 
     Plugins = rebar_test_utils:expand_deps(git, [{PluginName, Vsn, []}, {PluginName2, Vsn, []}]),

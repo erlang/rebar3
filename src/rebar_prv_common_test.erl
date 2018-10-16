@@ -58,7 +58,7 @@ do(State) ->
 
 do(State, Tests) ->
     ?INFO("Running Common Test suites...", []),
-    rebar_utils:update_code(rebar_state:code_paths(State, all_deps), [soft_purge]),
+    rebar_paths:set_paths([deps, plugins], State),
 
     %% Run ct provider prehooks
     Providers = rebar_state:providers(State),
@@ -73,14 +73,14 @@ do(State, Tests) ->
                 ok    ->
                     %% Run ct provider post hooks for all project apps and top level project hooks
                     rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State),
-                    rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+                    rebar_paths:set_paths([plugins, deps], State),
                     {ok, State};
                 Error ->
-                    rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+                    rebar_paths:set_paths([plugins, deps], State),
                     Error
             end;
         Error ->
-            rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+            rebar_paths:set_paths([plugins, deps], State),
             Error
     end.
 
@@ -250,11 +250,9 @@ select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
                             end, SysConfigs),
     %% NB: load the applications (from user directories too) to support OTP < 17
     %% to our best ability.
-    OldPath = code:get_path(),
-    code:add_pathsa(rebar_state:code_paths(State, all_deps)),
+    rebar_paths:set_paths([deps, plugins], State),
     [application:load(Application) || Config <- Configs, {Application, _} <- Config],
     rebar_utils:reread_config(Configs),
-    code:set_path(OldPath),
 
     Opts = merge_opts(CmdOpts,CfgOpts),
     discover_tests(State, ProjectApps, Opts).

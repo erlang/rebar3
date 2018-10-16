@@ -144,7 +144,7 @@
 %% == Escript ==
 
 %% name of the main OTP application to boot
-{escript_main_app, application}
+{escript_main_app, application}.
 %% Name of the resulting escript executable
 {escript_name, "application"}.
 %% apps (other than main and deps) to be included
@@ -158,7 +158,7 @@
 %% == EUnit ==
 
 %% eunit:test(Tests)
-{eunit_tests, [{application, rebar3}]}
+{eunit_tests, [{application, rebar3}]}.
 %% Options for eunit:test(Tests, Opts)
 {eunit_opts, [verbose]}.
 %% Additional compile options for eunit. erl_opts is also used
@@ -198,7 +198,7 @@
 %% Only clean, ct, compile, eunit, release, and tar can be hooked around
 
 %% runs 'clean' before 'compile'
-{provider_hooks, [{pre, [{compile, clean}]}]}
+{provider_hooks, [{pre, [{compile, clean}]}]}.
 
 
 %% == Releases ==

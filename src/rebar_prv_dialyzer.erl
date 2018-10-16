@@ -85,7 +85,8 @@ short_desc() ->
 do(State) ->
     maybe_fix_env(),
     ?INFO("Dialyzer starting, this may take a while...", []),
-    code:add_pathsa(rebar_state:code_paths(State, all_deps)),
+    rebar_paths:unset_paths([plugins], State), % no plugins in analysis
+    rebar_paths:set_paths([deps], State),
     Plt = get_plt(State),
 
     try
@@ -104,7 +105,7 @@ do(State) ->
         throw:{output_file_error, _, _} = Error ->
             ?PRV_ERROR(Error)
     after
-        rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default))
+        rebar_paths:set_paths([plugins,deps], State)
     end.
 
 %% This is used to workaround dialyzer quirk discussed here

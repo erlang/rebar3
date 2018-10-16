@@ -33,6 +33,8 @@
          run/8,
          ok_tuple/2,
          error_tuple/4,
+         report/1,
+         maybe_report/1,
          format_error_source/2]).
 
 -type desc() :: term().
@@ -94,14 +96,14 @@ run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
       TargetDir :: file:filename(),
       SourceExt :: string(),
       TargetExt :: string().
-run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
+run(Config, FirstFiles, SourceDirs, SourceExt, TargetDir, TargetExt,
     Compile3Fn, Opts) ->
     %% Convert simple extension to proper regex
     SourceExtRe = "^(?!\\._).*\\" ++ SourceExt ++ [$$],
 
     Recursive = proplists:get_value(recursive, Opts, true),
     %% Find all possible source files
-    FoundFiles = rebar_utils:find_files(SourceDir, SourceExtRe, Recursive),
+    FoundFiles = rebar_utils:find_files_in_dirs(SourceDirs, SourceExtRe, Recursive),
     %% Remove first files from found files
     RestFiles = [Source || Source <- FoundFiles,
                            not lists:member(Source, FirstFiles)],
@@ -111,7 +113,7 @@ run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
 
     run(Config, FirstFiles, RestFiles,
         fun(S, C) ->
-                Target = target_file(S, SourceDir, SourceExt,
+                Target = target_file(S, SourceExt,
                                      TargetDir, TargetExt),
                 simple_compile_wrapper(S, Target, Compile3Fn, C, CheckLastMod)
         end).
@@ -160,32 +162,15 @@ simple_compile_wrapper(Source, Target, Compile3Fn, Config, true) ->
 
 %% @private take a basic source set of file fragments and a target location,
 %% create a file path and name for a compile artifact.
--spec target_file(SourceFile, SourceDir, SourceExt, TargetDir, TargetExt) -> File when
+-spec target_file(SourceFile, SourceExt, TargetDir, TargetExt) -> File when
       SourceFile :: file:filename(),
-      SourceDir :: file:filename(),
       TargetDir :: file:filename(),
       SourceExt :: string(),
       TargetExt :: string(),
       File :: file:filename().
-target_file(SourceFile, SourceDir, SourceExt, TargetDir, TargetExt) ->
-    BaseFile = remove_common_path(SourceFile, SourceDir),
-    filename:join([TargetDir, filename:basename(BaseFile, SourceExt) ++ TargetExt]).
-
-%% @private removes the common prefix between two file paths.
-%% The remainder of the first file path passed will have its ending returned
-%% when either path starts diverging.
--spec remove_common_path(file:filename(), file:filename()) -> file:filename().
-remove_common_path(Fname, Path) ->
-    remove_common_path1(filename:split(Fname), filename:split(Path)).
-
-%% @private given two lists of file fragments, discard the identical
-%% prefixed sections, and return the final bit of the first operand
-%% as a filename.
--spec remove_common_path1([string()], [string()]) -> file:filename().
-remove_common_path1([Part | RestFilename], [Part | RestPath]) ->
-    remove_common_path1(RestFilename, RestPath);
-remove_common_path1(FilenameParts, _) ->
-    filename:join(FilenameParts).
+target_file(SourceFile, SourceExt, TargetDir, TargetExt) ->
+    %% BaseFile = remove_common_path(SourceFile, SourceDir),
+    filename:join([TargetDir, filename:basename(SourceFile, SourceExt) ++ TargetExt]).
 
 %% @private runs the compile function `CompileFn' on every file
 %% passed internally, along with the related project configuration.
@@ -264,14 +249,24 @@ report(Messages) ->
 -spec format_errors(_, Extra, [err_or_warn()]) -> [string()] when
       Extra :: string().
 format_errors(_MainSource, Extra, Errors) ->
-    [begin
-         [format_error(Source, Extra, Desc) || Desc <- Descs]
-     end
+    [[format_error(Source, Extra, Desc) || Desc <- Descs]
      || {Source, Descs} <- Errors].
 
 %% @private format compiler errors into proper outputtable strings
 -spec format_error(file:filename(), Extra, err_or_warn()) -> string() when
       Extra :: string().
+format_error(Source, Extra, {Line, Mod=epp, Desc={include,lib,File}}) ->
+    %% Special case for include file errors, overtaking the default one
+    BaseDesc = Mod:format_error(Desc),
+    Friendly = case filename:split(File) of
+        [Lib, "include", _] ->
+            io_lib:format("; Make sure ~s is in your app "
+                          "file's 'applications' list", [Lib]);
+        _ ->
+            ""
+    end,
+    FriendlyDesc = BaseDesc ++ Friendly,
+    ?FMT("~ts:~w: ~ts~ts~n", [Source, Line, Extra, FriendlyDesc]);
 format_error(Source, Extra, {{Line, Column}, Mod, Desc}) ->
     ErrorDesc = Mod:format_error(Desc),
     ?FMT("~ts:~w:~w: ~ts~ts~n", [Source, Line, Column, Extra, ErrorDesc]);

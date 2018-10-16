@@ -42,8 +42,7 @@ run_provider_hooks_(Dir, Type, Command, Providers, TypeHooks, State) ->
         [] ->
             State;
         HookProviders ->
-            PluginDepsPaths = lists:usort(rebar_state:code_paths(State, all_plugin_deps)),
-            code:add_pathsa(PluginDepsPaths),
+            rebar_paths:set_paths([plugins], State),
             Providers1 = rebar_state:providers(State),
             State1 = rebar_state:providers(rebar_state:dir(State, Dir), Providers++Providers1),
             case rebar_core:do(HookProviders, State1) of
@@ -51,7 +50,7 @@ run_provider_hooks_(Dir, Type, Command, Providers, TypeHooks, State) ->
                     ?DEBUG(format_error({bad_provider, Type, Command, ProviderName}), []),
                     throw(?PRV_ERROR({bad_provider, Type, Command, ProviderName}));
                 {ok, State2} ->
-                    rebar_utils:remove_from_code_path(PluginDepsPaths),
+                    rebar_paths:set_paths([deps], State2),
                     State2
             end
     end.

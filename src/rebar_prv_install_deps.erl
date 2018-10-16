@@ -259,9 +259,21 @@ update_seen_dep(AppInfo, _Profile, _Level, Deps, Apps, State, Upgrade, Seen, Loc
     %% If seen from lock file or user requested an upgrade
     %% don't print warning about skipping
     case lists:keymember(Name, 1, Locks) of
-        false when Upgrade -> ok;
-        false when not Upgrade -> warn_skip_deps(AppInfo, State);
-        true -> ok
+        false when Upgrade ->
+            ok;
+        false when not Upgrade ->
+            {ok, SeenApp} = rebar_app_utils:find(Name, Apps),
+            Source = rebar_app_info:source(AppInfo),
+            case rebar_app_info:source(SeenApp) of
+                Source ->
+                    %% dep is the same version and checksum as the one we already saw.
+                    %% meaning there is no conflict, so don't warn about it.
+                    skip;
+                _ ->
+                    warn_skip_deps(Name, Source, State)
+            end;
+        true ->
+            ok
     end,
     {Deps, Apps, State, Seen}.
 
@@ -277,10 +289,8 @@ update_unseen_dep(AppInfo, Profile, Level, Deps, Apps, State, Upgrade, Seen, Loc
 -spec handle_dep(rebar_state:t(), atom(), file:filename_all(), rebar_app_info:t(), list(), integer()) -> {rebar_app_info:t(), [rebar_app_info:t()], rebar_state:t()}.
 handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     Name = rebar_app_info:name(AppInfo),
-    C = rebar_config:consult(rebar_app_info:dir(AppInfo)),
 
-    AppInfo0 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
-    AppInfo1 = rebar_app_info:apply_overrides(rebar_app_info:get(AppInfo, overrides, []), AppInfo0),
+    AppInfo1 = rebar_app_info:apply_overrides(rebar_app_info:get(AppInfo, overrides, []), AppInfo),
     AppInfo2 = rebar_app_info:apply_profiles(AppInfo1, [default, prod]),
 
     Plugins = rebar_app_info:get(AppInfo2, plugins, []),
@@ -297,34 +307,33 @@ handle_dep(State, Profile, DepsDir, AppInfo, Locks, Level) ->
     AppInfo4 = rebar_app_info:deps(AppInfo3, rebar_state:deps_names(Deps)),
 
     %% Keep all overrides from the global config and this dep when parsing its deps
-    Overrides = rebar_app_info:get(AppInfo0, overrides, []),
+    Overrides = rebar_app_info:get(AppInfo, overrides, []),
     Deps1 = rebar_app_utils:parse_deps(Name, DepsDir, Deps, rebar_state:set(State, overrides, Overrides)
                                       ,Locks, Level+1),
     {AppInfo4, Deps1, State1}.
 
 -spec maybe_fetch(rebar_app_info:t(), atom(), boolean(),
-                  sets:set(binary()), rebar_state:t()) -> {boolean(), rebar_app_info:t()}.
+                  sets:set(binary()), rebar_state:t()) -> {ok, rebar_app_info:t()}.
 maybe_fetch(AppInfo, Profile, Upgrade, Seen, State) ->
     AppDir = rebar_utils:to_list(rebar_app_info:dir(AppInfo)),
     %% Don't fetch dep if it exists in the _checkouts dir
     case rebar_app_info:is_checkout(AppInfo) of
         true ->
-            {false, AppInfo};
+            {ok, AppInfo};
         false ->
-            case rebar_app_discover:find_app(AppInfo, AppDir, all) of
+            case rebar_app_info:is_available(AppInfo) of
                 false ->
-                    true = fetch_app(AppInfo, AppDir, State),
-                    maybe_symlink_default(State, Profile, AppDir, AppInfo),
-                    {true, rebar_app_info:valid(update_app_info(AppDir, AppInfo), false)};
-                {true, AppInfo1} ->
-                    case sets:is_element(rebar_app_info:name(AppInfo1), Seen) of
+                    AppInfo1 = fetch_app(AppInfo, State),
+                    maybe_symlink_default(State, Profile, AppDir, AppInfo1),
+                    {ok, rebar_app_info:is_available(rebar_app_info:valid(AppInfo1, false), true)};
+                true ->
+                    case sets:is_element(rebar_app_info:name(AppInfo), Seen) of
                         true ->
-                            {false, AppInfo1};
+                            {ok, AppInfo};
                         false ->
-                            maybe_symlink_default(State, Profile, AppDir, AppInfo1),
-                            MaybeUpgrade = maybe_upgrade(AppInfo, AppDir, Upgrade, State),
-                            AppInfo2 = update_app_info(AppDir, AppInfo1),
-                            {MaybeUpgrade, AppInfo2}
+                            maybe_symlink_default(State, Profile, AppDir, AppInfo),
+                            AppInfo1 = maybe_upgrade(AppInfo, AppDir, Upgrade, State),
+                            {ok, AppInfo1}
                     end
             end
     end.
@@ -372,52 +381,37 @@ make_relative_to_root(State, Path) when is_list(Path) ->
     Root = rebar_dir:root_dir(State),
     rebar_dir:make_relative_path(Path, Root).
 
-fetch_app(AppInfo, AppDir, State) ->
+fetch_app(AppInfo, State) ->
     ?INFO("Fetching ~ts (~p)", [rebar_app_info:name(AppInfo),
-                               format_source(rebar_app_info:source(AppInfo))]),
-    Source = rebar_app_info:source(AppInfo),
-    true = rebar_fetch:download_source(AppDir, Source, State).
+                                rebar_resource_v2:format_source(rebar_app_info:source(AppInfo))]),
+    rebar_fetch:download_source(AppInfo, State).
 
-format_source({pkg, Name, Vsn, _Hash}) -> {pkg, Name, Vsn};
-format_source(Source) -> Source.
-
-%% This is called after the dep has been downloaded and unpacked, if it hadn't been already.
-%% So this is the first time for newly downloaded apps that its .app/.app.src data can
-%% be read in an parsed.
-update_app_info(AppDir, AppInfo) ->
-    case rebar_app_discover:find_app(AppInfo, AppDir, all) of
-        {true, AppInfo1} ->
-            AppInfo1;
-        false ->
-            throw(?PRV_ERROR({dep_app_not_found, AppDir, rebar_app_info:name(AppInfo)}))
-    end.
-
-maybe_upgrade(AppInfo, AppDir, Upgrade, State) ->
-    Source = rebar_app_info:source(AppInfo),
+maybe_upgrade(AppInfo, _AppDir, Upgrade, State) ->
     case Upgrade orelse rebar_app_info:is_lock(AppInfo) of
         true ->
-            case rebar_fetch:needs_update(AppDir, Source, State) of
+            case rebar_fetch:needs_update(AppInfo, State) of
                 true ->
-                    ?INFO("Upgrading ~ts (~p)", [rebar_app_info:name(AppInfo), rebar_app_info:source(AppInfo)]),
-                    true = rebar_fetch:download_source(AppDir, Source, State);
+                    ?INFO("Upgrading ~ts (~p)", [rebar_app_info:name(AppInfo),
+                                                 rebar_resource_v2:format_source(rebar_app_info:source(AppInfo))]),
+                    rebar_fetch:download_source(AppInfo, State);
                 false ->
                     case Upgrade of
                         true ->
                             ?INFO("No upgrade needed for ~ts", [rebar_app_info:name(AppInfo)]),
-                            false;
+                            AppInfo;
                         false ->
-                            false
+                            AppInfo
                     end
             end;
         false ->
-            false
+            AppInfo
     end.
 
-warn_skip_deps(AppInfo, State) ->
+warn_skip_deps(Name, Source, State) ->
     Msg = "Skipping ~ts (from ~p) as an app of the same name "
           "has already been fetched",
-    Args = [rebar_app_info:name(AppInfo),
-            rebar_app_info:source(AppInfo)],
+    Args = [Name,
+            rebar_resource_v2:format_source(Source)],
     case rebar_state:get(State, deps_error_on_conflict, false) of
         false ->
             case rebar_state:get(State, deps_warning_on_conflict, true) of

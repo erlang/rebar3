@@ -54,12 +54,9 @@ format_error(Reason) ->
 build_locks(State) ->
     AllDeps = rebar_state:lock(State),
     [begin
-        Dir = rebar_app_info:dir(Dep),
-        Source = rebar_app_info:source(Dep),
-
         %% If source is tuple it is a source dep
         %% e.g. {git, "git://github.com/ninenines/cowboy.git", "master"}
-        {rebar_app_info:name(Dep)
-        ,rebar_fetch:lock_source(Dir, Source, State)
-        ,rebar_app_info:dep_level(Dep)}
+        {rebar_app_info:name(Dep),
+         rebar_fetch:lock_source(Dep, State),
+         rebar_app_info:dep_level(Dep)}
      end || Dep <- AllDeps, not(rebar_app_info:is_checkout(Dep))].

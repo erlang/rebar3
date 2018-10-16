@@ -92,6 +92,7 @@ compile(AppInfo) when element(1, AppInfo) == app_info_t ->
 %% @doc compile an individual application.
 -spec compile(rebar_app_info:t(), compile_opts()) -> ok.
 compile(AppInfo, CompileOpts) when element(1, AppInfo) == app_info_t ->
+    warn_deprecated(),
     Dir = rebar_utils:to_list(rebar_app_info:out_dir(AppInfo)),
     RebarOpts = rebar_app_info:opts(AppInfo),
 
@@ -99,6 +100,7 @@ compile(AppInfo, CompileOpts) when element(1, AppInfo) == app_info_t ->
                {recursive, dir_recursive(RebarOpts, "src", CompileOpts)}],
     MibsOpts = [check_last_mod,
                 {recursive, dir_recursive(RebarOpts, "mibs", CompileOpts)}],
+
     rebar_base_compiler:run(RebarOpts,
                             check_files([filename:join(Dir, File)
                                          || File <- rebar_opts:get(RebarOpts, xrl_first_files, [])]),
@@ -147,6 +149,7 @@ compile(RebarOpts, BaseDir, OutDir) ->
 compile(State, BaseDir, OutDir, CompileOpts) when element(1, State) == state_t ->
     compile(rebar_state:opts(State), BaseDir, OutDir, CompileOpts);
 compile(RebarOpts, BaseDir, OutDir, CompileOpts) ->
+    warn_deprecated(),
     SrcDirs = lists:map(fun(SrcDir) -> filename:join(BaseDir, SrcDir) end,
                         rebar_dir:src_dirs(RebarOpts, ["src"])),
     compile_dirs(RebarOpts, BaseDir, SrcDirs, OutDir, CompileOpts),
@@ -363,6 +366,7 @@ effects_code_generation(Option) ->
         report_errors -> false;
         return_errors-> false;
         return_warnings-> false;
+        report -> false;
         warnings_as_errors -> false;
         binary -> false;
         verbose -> false;
@@ -802,7 +806,7 @@ valid_erl_first_conf(FileList) ->
     Strs = filter_file_list(FileList),
     case rebar_utils:is_list_of_strings(Strs) of
         true -> true;
-        false -> ?ABORT("An invalid file list (~p) was provided as part of your erl_files_first directive",
+        false -> ?ABORT("An invalid file list (~p) was provided as part of your erl_first_files directive",
                         [FileList])
     end.
 
@@ -823,3 +827,15 @@ atoms_in_erl_first_files_warning(Atoms) ->
       "that you change these entires to string format "
       "(e.g., \"src/module.erl\") ",
   ?WARN(W, [Atoms]).
+
+warn_deprecated() ->
+    case get({deprecate_warn, ?MODULE}) of
+        undefined ->
+            ?WARN("Calling deprecated ~p compiler module. This module has been "
+                  "replaced by rebar_compiler and rebar_compiler_erl, but will "
+                  "remain available.", [?MODULE]),
+            put({deprecate_warn, ?MODULE}, true),
+            ok;
+        _ ->
+            ok
+    end.
