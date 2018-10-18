@@ -84,7 +84,7 @@ run_hooks_once(Config) ->
 
     Name = rebar_test_utils:create_random_name("app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    RebarConfig = [{pre_hooks, [{compile, "mkdir  $REBAR_ROOT_DIR/blah"}]}],
+    RebarConfig = [{pre_hooks, [{compile, "mkdir  \"$REBAR_ROOT_DIR/blah\""}]}],
     rebar_test_utils:create_config(AppDir, RebarConfig),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name, valid}]}).
@@ -96,7 +96,7 @@ run_hooks_once_profiles(Config) ->
 
     Name = rebar_test_utils:create_random_name("app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
-    RebarConfig = [{profiles, [{hooks, [{pre_hooks, [{compile, "mkdir $REBAR_ROOT_DIR/blah"}]}]}]}],
+    RebarConfig = [{profiles, [{hooks, [{pre_hooks, [{compile, "mkdir \"$REBAR_ROOT_DIR/blah\""}]}]}]}],
     rebar_test_utils:create_config(AppDir, RebarConfig),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
     rebar_test_utils:run_and_check(Config, RebarConfig, ["as", "hooks", "compile"], {ok, [{app, Name, valid}]}).
@@ -236,7 +236,7 @@ root_hooks(Config) ->
     rebar_test_utils:create_app(SubAppsDir, Name, Vsn, [kernel, stdlib]),
     rebar_test_utils:create_config(SubAppsDir, [{provider_hooks, [{post, [{compile, clean}]}]}]),
 
-    RConfFile = rebar_test_utils:create_config(AppDir, [{pre_hooks, [{compile, "mkdir $REBAR_ROOT_DIR/blah"}]}]),
+    RConfFile = rebar_test_utils:create_config(AppDir, [{pre_hooks, [{compile, "mkdir \"$REBAR_ROOT_DIR/blah\""}]}]),
     {ok, RConf} = file:consult(RConfFile),
 
     %% Build with deps.
