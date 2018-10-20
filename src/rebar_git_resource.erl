@@ -21,6 +21,7 @@ init(Type, _State) ->
     {ok, Resource}.
 
 lock(AppInfo, _) ->
+    check_type_support(),
     lock_(rebar_app_info:dir(AppInfo), rebar_app_info:source(AppInfo)).
 
 lock_(AppDir, {git, Url, _}) ->
@@ -43,6 +44,7 @@ lock_(AppDir, {git, Url}) ->
 %% Return true if either the git url or tag/branch/ref is not the same as the currently
 %% checked out git repo for the dep
 needs_update(AppInfo, _) ->
+    check_type_support(),
     needs_update_(rebar_app_info:dir(AppInfo), rebar_app_info:source(AppInfo)).
 
 needs_update_(Dir, {git, Url, {tag, Tag}}) ->
@@ -111,6 +113,7 @@ parse_git_url(not_scp, Url) ->
     end.
 
 download(TmpDir, AppInfo, State, _) ->
+    check_type_support(),
     case download_(TmpDir, rebar_app_info:source(AppInfo), State) of
         {ok, _} ->
             ok;
@@ -307,3 +310,19 @@ parse_tags(Dir) ->
                     end
             end
     end.
+
+check_type_support() ->
+    case get({is_supported, ?MODULE}) of
+        true ->
+            ok;
+        _ ->
+            case rebar_utils:sh("git --version", [{return_on_error, true},
+                                                  {use_stdout, false}]) of
+                {error, _} ->
+                    ?ABORT("git not installed", []);
+                _ ->
+                    put({is_supported, ?MODULE}, true),
+                    ok
+            end
+    end.
+
