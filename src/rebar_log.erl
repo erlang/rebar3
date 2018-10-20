@@ -93,11 +93,18 @@ get_level() ->
     end.
 
 log(Level = error, Str, Args) ->
-    {ok, LogState} = application:get_env(rebar, log),
-    ec_cmd_log:Level(LogState, lists:flatten(cf:format("~!^~ts~n", [Str])), Args);
+    case application:get_env(rebar, log) of
+        {ok, LogState} ->
+            NewStr = lists:flatten(cf:format("~!^~ts~n", [Str])),
+            ec_cmd_log:Level( LogState, NewStr, Args);
+        undefined -> % fallback
+            io:format(standard_error, Str++"~n", Args)
+    end;
 log(Level, Str, Args) ->
-    {ok, LogState} = application:get_env(rebar, log),
-    ec_cmd_log:Level(LogState, Str++"~n", Args).
+    case application:get_env(rebar, log) of
+        {ok, LogState} -> ec_cmd_log:Level(LogState, Str++"~n", Args);
+        undefined -> io:format(Str++"~n", Args)
+    end.
 
 crashdump(Str, Args) ->
     crashdump("rebar3.crashdump", Str, Args).
