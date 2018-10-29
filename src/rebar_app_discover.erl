@@ -280,7 +280,8 @@ find_apps(LibDirs, SrcDirs, Validate, State) ->
 -spec find_app(file:filename_all(), valid | invalid | all) -> {true, rebar_app_info:t()} | false.
 find_app(AppDir, Validate) ->
     {Config, SrcDirs} = find_config_src(AppDir, ["src"]),
-    AppInfo = rebar_app_info:update_opts(rebar_app_info:new(), dict:new(), Config),
+    AppInfo = rebar_app_info:update_opts(rebar_app_info:dir(rebar_app_info:new(), AppDir),
+                                         dict:new(), Config),
     find_app_(AppInfo, AppDir, SrcDirs, Validate).
 
 %% @doc check that a given app in a directory is there, and whether it's
