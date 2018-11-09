@@ -3,7 +3,7 @@
 -behaviour(rebar_compiler).
 
 -export([context/1,
-         needed_files/3,
+         needed_files/4,
          dependencies/3,
          compile/4,
          clean/2]).
@@ -21,7 +21,7 @@ context(AppInfo) ->
       src_ext => ".mib",
       out_mappings => Mappings}.
 
-needed_files(_, FoundFiles, AppInfo) ->
+needed_files(_, FoundFiles, _, AppInfo) ->
     FirstFiles = [],
 
     %% Remove first files from found files

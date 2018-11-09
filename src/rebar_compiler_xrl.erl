@@ -3,7 +3,7 @@
 -behaviour(rebar_compiler).
 
 -export([context/1,
-         needed_files/3,
+         needed_files/4,
          dependencies/3,
          compile/4,
          clean/2]).
@@ -16,11 +16,13 @@ context(AppInfo) ->
       src_ext => ".xrl",
       out_mappings => Mappings}.
 
-needed_files(_, FoundFiles, AppInfo) ->
+needed_files(_, FoundFiles, Mappings, AppInfo) ->
     FirstFiles = [],
 
     %% Remove first files from found files
-    RestFiles = [Source || Source <- FoundFiles, not lists:member(Source, FirstFiles)],
+    RestFiles = [Source || Source <- FoundFiles,
+                           not lists:member(Source, FirstFiles),
+                           rebar_compiler:needs_compile(Source, ".erl", Mappings)],
 
     Opts = rebar_opts:get(rebar_app_info:opts(AppInfo), xrl_opts, []),
 
