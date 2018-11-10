@@ -77,7 +77,7 @@ The rebar3 escript can also extract itself with a run script under the user's ho
 $ ./rebar3 local install
 ===> Extracting rebar3 libs to ~/.cache/rebar3/lib...
 ===> Writing rebar3 run script ~/.cache/rebar3/bin/rebar3...
-===> Add to $PATH for use: export PATH=$PATH:~/.cache/rebar3/bin
+===> Add to $PATH for use: export PATH=~/.cache/rebar3/bin:$PATH
 ```
 
 To keep it up to date after you've installed rebar3 this way you can use `rebar3 local upgrade` which
