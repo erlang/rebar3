@@ -13,8 +13,8 @@ init_per_testcase(_, Config) ->
 end_per_testcase(_, _Config) ->
     ok.
 
-all() -> [command, args, many, override_default, no_circular, release].
-         %% namespaces: unsupported, untested.
+all() -> [command, args, many, override_default, no_circular, release,
+          check_namespaces, create_lib].
 
 command() ->
     [{doc, "Runs multiple regular commands as one alias"}].
@@ -135,4 +135,31 @@ release(Config) ->
       Config, RebarConfig,
       ["the_rel2"],
       {ok, [{release, the_release, Vsn, false}]}),
+    ok.
+
+check_namespaces() ->
+    [{doc, "Test calling commands with namespaces from rebar3"}].
+check_namespaces(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = rebar_test_utils:create_random_name("alias_args_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    RebarConfig = [{alias, [{test, [{eunit,"-c"}, {plugins, list}]}]}],
+    rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["test"], {ok, [{app, Name}]}),
+    ok.
+
+create_lib() ->
+    [{doc, "Test calling commands with namespaces from rebar3"}].
+create_lib(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = rebar_test_utils:create_random_name("create_lib_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    RebarConfig = [{alias, [{test, [compile, {do, "new lib shouldexist"}]}]}],
+    rebar_test_utils:run_and_check(Config, RebarConfig,
+                                   ["test"], {ok, [{app, Name}]}),
+    AppFile = filename:join(?config(apps, Config),
+                            "../../../../shouldexist/src/shouldexist.app.src"),
+    ?assert(filelib:is_file(AppFile)),
     ok.
