@@ -159,38 +159,44 @@ maybe_warn_local_url(Url) ->
 
 %% Use different git clone commands depending on git --version
 git_clone(branch,Vsn,Url,Dir,Branch) when Vsn >= {1,7,10}; Vsn =:= undefined ->
-    rebar_utils:sh(?FMT("git clone ~ts ~ts -b ~ts --single-branch",
-                        [rebar_utils:escape_chars(Url),
+    rebar_utils:sh(?FMT("git clone ~ts ~ts ~ts -b ~ts --single-branch",
+                        [git_clone_options(),
+                         rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir)),
                          rebar_utils:escape_chars(Branch)]),
                    [{cd, filename:dirname(Dir)}]);
 git_clone(branch,_Vsn,Url,Dir,Branch) ->
-    rebar_utils:sh(?FMT("git clone ~ts ~ts -b ~ts",
-                        [rebar_utils:escape_chars(Url),
+    rebar_utils:sh(?FMT("git clone ~ts ~ts ~ts -b ~ts",
+                        [git_clone_options(),
+                         rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir)),
                          rebar_utils:escape_chars(Branch)]),
                    [{cd, filename:dirname(Dir)}]);
 git_clone(tag,Vsn,Url,Dir,Tag) when Vsn >= {1,7,10}; Vsn =:= undefined ->
-    rebar_utils:sh(?FMT("git clone ~ts ~ts -b ~ts --single-branch",
-                        [rebar_utils:escape_chars(Url),
+    rebar_utils:sh(?FMT("git clone ~ts ~ts ~ts -b ~ts --single-branch",
+                        [git_clone_options(),
+                         rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir)),
                          rebar_utils:escape_chars(Tag)]),
                    [{cd, filename:dirname(Dir)}]);
 git_clone(tag,_Vsn,Url,Dir,Tag) ->
-    rebar_utils:sh(?FMT("git clone ~ts ~ts -b ~ts",
-                        [rebar_utils:escape_chars(Url),
+    rebar_utils:sh(?FMT("git clone ~ts ~ts ~ts -b ~ts",
+                        [git_clone_options(),
+                         rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir)),
                          rebar_utils:escape_chars(Tag)]),
                    [{cd, filename:dirname(Dir)}]);
 git_clone(ref,_Vsn,Url,Dir,Ref) ->
-    rebar_utils:sh(?FMT("git clone -n ~ts ~ts",
-                        [rebar_utils:escape_chars(Url),
+    rebar_utils:sh(?FMT("git clone ~ts -n ~ts ~ts",
+                        [git_clone_options(),
+                         rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]),
     rebar_utils:sh(?FMT("git checkout -q ~ts", [Ref]), [{cd, Dir}]);
 git_clone(rev,_Vsn,Url,Dir,Rev) ->
-    rebar_utils:sh(?FMT("git clone -n ~ts ~ts",
-                        [rebar_utils:escape_chars(Url),
+    rebar_utils:sh(?FMT("git clone ~ts -n ~ts ~ts",
+                        [git_clone_options(),
+                         rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]),
     rebar_utils:sh(?FMT("git checkout -q ~ts", [rebar_utils:escape_chars(Rev)]),
@@ -310,6 +316,16 @@ parse_tags(Dir) ->
                     end
             end
     end.
+
+git_clone_options() ->
+    Option = case os:getenv("REBAR_GIT_CLONE_OPTIONS") of 
+        false -> "" ;       %% env var not set
+        Opt ->              %% env var set to empty or others
+            Opt
+    end,
+
+    ?DEBUG("Git clone Option = ~p",[Option]),
+    Option.
 
 check_type_support() ->
     case get({is_supported, ?MODULE}) of
