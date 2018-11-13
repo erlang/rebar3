@@ -402,18 +402,21 @@ state_from_global_config(Config, GlobalConfigFile) ->
     Resources = application:get_env(rebar, resources, []),
     GlobalConfigThrowAway = rebar_state:create_resources(Resources, GlobalConfigThrowAway0),
 
-    GlobalState = case rebar_state:get(GlobalConfigThrowAway, plugins, []) of
+    Compilers = application:get_env(rebar, compilers, []),
+    GlobalConfigThrowAway1 = rebar_state:compilers(GlobalConfigThrowAway, Compilers),
+
+    GlobalState = case rebar_state:get(GlobalConfigThrowAway1, plugins, []) of
                       [] ->
-                          GlobalConfigThrowAway;
+                          GlobalConfigThrowAway1;
                       GlobalPluginsToInstall ->
                           rebar_plugins:handle_plugins(global,
                                                        GlobalPluginsToInstall,
-                                                       GlobalConfigThrowAway)
+                                                       GlobalConfigThrowAway1)
                   end,
     GlobalPlugins = rebar_state:providers(GlobalState),
     GlobalConfig2 = rebar_state:set(GlobalConfig, plugins, []),
     GlobalConfig3 = rebar_state:set(GlobalConfig2, {plugins, global},
-                                    rebar_state:get(GlobalConfigThrowAway, plugins, [])),
+                                    rebar_state:get(GlobalConfigThrowAway1, plugins, [])),
     rebar_state:providers(rebar_state:new(GlobalConfig3, Config), GlobalPlugins).
 
 -spec test_state(rebar_state:t()) -> [{'extra_src_dirs',[string()]} | {'erl_opts',[any()]}].
