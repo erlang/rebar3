@@ -40,14 +40,18 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    Tests = prepare_tests(State),
-    %% inject `eunit_first_files`, `eunit_compile_opts` and any
-    %% directories required by tests into the applications
-    NewState = inject_eunit_state(State, Tests),
-    case compile(NewState) of
-        %% successfully compiled apps
-        {ok, S} -> do(S, Tests);
-        Error   -> Error
+    try
+        Tests = prepare_tests(State),
+        %% inject `eunit_first_files`, `eunit_compile_opts` and any
+        %% directories required by tests into the applications
+        NewState = inject_eunit_state(State, Tests),
+        case compile(NewState) of
+            %% successfully compiled apps
+            {ok, S} -> do(S, Tests);
+            Error   -> Error
+        end
+    catch
+        throw:Reason -> {error, Reason}
     end.
 
 do(State, Tests) ->
@@ -134,17 +138,28 @@ resolve_tests(State) ->
     Files        = resolve(file, RawOpts),
     Modules      = resolve(module, RawOpts),
     Suites       = resolve(suite, module, RawOpts),
-    Apps ++ Applications ++ Dirs ++ Files ++ Modules ++ Suites.
+    Generator    = resolve(generator, RawOpts),
+    Apps ++ Applications ++ Dirs ++ Files ++ Modules ++ Suites ++ Generator.
 
 resolve(Flag, RawOpts) -> resolve(Flag, Flag, RawOpts).
 
 resolve(Flag, EUnitKey, RawOpts) ->
     case proplists:get_value(Flag, RawOpts) of
         undefined -> [];
-        Args      -> lists:map(fun(Arg) -> normalize(EUnitKey, Arg) end,
-                               rebar_string:lexemes(Args, [$,]))
+        Args      ->
+            lists:flatten(lists:map(fun(Arg) -> normalize(EUnitKey, Arg) end,
+                                    rebar_string:lexemes(Args, [$,])))
     end.
 
+normalize(generator, Value) ->
+    case string:tokens(Value, [$:]) of
+        [Module0, Functions] ->
+            Module = list_to_atom(Module0),
+            lists:map(fun(F) -> {generator, Module, list_to_atom(F)} end,
+                      string:tokens(Functions, [$;]));
+        _ ->
+            throw(lists:concat(["Generator `", Value, "' is invalid format."]))
+    end;
 normalize(Key, Value) when Key == dir; Key == file -> {Key, Value};
 normalize(Key, Value) -> {Key, list_to_atom(Value)}.
 
@@ -353,6 +368,8 @@ validate(State, {module, Module}) ->
     validate_module(State, Module);
 validate(State, {suite, Module}) ->
     validate_module(State, Module);
+validate(State, {generator, Module, Function}) ->
+    validate_generator(State, Module, Function);
 validate(State, Module) when is_atom(Module) ->
     validate_module(State, Module);
 validate(State, Path) when is_list(Path) ->
@@ -394,6 +411,9 @@ validate_module(_State, Module) ->
         non_existing -> {error, lists:concat(["Module `", Module, "' not found in project."])};
         _            -> ok
     end.
+
+validate_generator(State, Module, _Function) ->
+    validate_module(State, Module).
 
 resolve_eunit_opts(State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
@@ -490,6 +510,7 @@ eunit_opts(_State) ->
      {file, $f, "file", string, help(file)},
      {module, $m, "module", string, help(module)},
      {suite, $s, "suite", string, help(module)},
+     {generator, $g, "generator", string, help(generator)},
      {verbose, $v, "verbose", boolean, help(verbose)},
      {name, undefined, "name", atom, help(name)},
      {sname, undefined, "sname", atom, help(sname)},
@@ -501,6 +522,7 @@ help(cover_export_name) -> "Base name of the coverdata file to write";
 help(dir)       -> "Comma separated list of dirs to load tests from. Equivalent to `[{dir, Dir}]`.";
 help(file)      -> "Comma separated list of files to load tests from. Equivalent to `[{file, File}]`.";
 help(module)    -> "Comma separated list of modules to load tests from. Equivalent to `[{module, Module}]`.";
+help(generator) -> "Comma separated list of generators (the format is `module:function`) to load tests from. Equivalent to `[{generator, Module, Function}]`.";
 help(verbose)   -> "Verbose output. Defaults to false.";
 help(name)      -> "Gives a long name to the node";
 help(sname)     -> "Gives a short name to the node";

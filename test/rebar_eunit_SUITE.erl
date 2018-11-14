@@ -13,6 +13,7 @@
 -export([single_application_arg/1, multi_application_arg/1, missing_application_arg/1]).
 -export([single_module_arg/1, multi_module_arg/1, missing_module_arg/1]).
 -export([single_suite_arg/1, multi_suite_arg/1, missing_suite_arg/1]).
+-export([single_generator_arg/1, multi_generator_arg/1, missing_generator_arg/1]).
 -export([single_file_arg/1, multi_file_arg/1, missing_file_arg/1]).
 -export([single_dir_arg/1, multi_dir_arg/1, missing_dir_arg/1]).
 -export([multiple_arg_composition/1, multiple_arg_errors/1]).
@@ -47,6 +48,7 @@ groups() ->
                           single_application_arg, multi_application_arg, missing_application_arg,
                           single_module_arg, multi_module_arg, missing_module_arg,
                           single_suite_arg, multi_suite_arg, missing_suite_arg,
+                          single_generator_arg, multi_generator_arg, missing_generator_arg,
                           single_file_arg, multi_file_arg, missing_file_arg,
                           single_dir_arg, multi_dir_arg, missing_dir_arg,
                           multiple_arg_composition, multiple_arg_errors]}].
@@ -239,7 +241,7 @@ multi_app_testset(Config) ->
     Set = {ok, [{application, multi_app_baz},
                 {application, multi_app_bar},
                 {module, multi_app_bar_tests_helper},
-                {module, multi_app_baz_tests_helper}, 
+                {module, multi_app_baz_tests_helper},
                 {module, multi_app_tests},
                 {module, multi_app_tests_helper}]},
     Set = rebar_prv_eunit:prepare_tests(Result).
@@ -402,6 +404,37 @@ missing_suite_arg(Config) ->
     State = rebar_state:command_parsed_args(S, Args),
 
     Error = {error, {rebar_prv_eunit, {eunit_test_errors, ["Module `missing_app' not found in project."]}}},
+    Error = rebar_prv_eunit:validate_tests(State, rebar_prv_eunit:prepare_tests(State)).
+
+%% check that the --generator cmd line opt generates the correct test set
+single_generator_arg(Config) ->
+    S = ?config(result, Config),
+
+    {ok, Args} = getopt:parse(rebar_prv_eunit:eunit_opts(S), ["--generator=module_name:function_name"]),
+    State = rebar_state:command_parsed_args(S, Args),
+
+    {ok, [{generator, module_name, function_name}]} = rebar_prv_eunit:prepare_tests(State).
+
+multi_generator_arg(Config) ->
+    S = ?config(result, Config),
+
+    {ok, Args} = getopt:parse(rebar_prv_eunit:eunit_opts(S), ["--generator=module1:func1;func2,module2:func1;func2"]),
+    State = rebar_state:command_parsed_args(S, Args),
+
+    Generators = [{generator, module1, func1},
+                  {generator, module1, func2},
+                  {generator, module2, func1},
+                  {generator, module2, func2}],
+    {ok, Generators} = rebar_prv_eunit:prepare_tests(State).
+
+%% check that an invalid --suite cmd line opt generates an error
+missing_generator_arg(Config) ->
+    S = ?config(result, Config),
+
+    {ok, Args} = getopt:parse(rebar_prv_eunit:eunit_opts(S), ["--generator=missing_module:func1"]),
+    State = rebar_state:command_parsed_args(S, Args),
+
+    Error = {error, {rebar_prv_eunit, {eunit_test_errors, ["Module `missing_module' not found in project."]}}},
     Error = rebar_prv_eunit:validate_tests(State, rebar_prv_eunit:prepare_tests(State)).
 
 %% check that the --file cmd line opt generates the correct test set
