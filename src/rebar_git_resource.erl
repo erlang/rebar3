@@ -35,7 +35,7 @@ lock_(AppDir, {git, Url}) ->
                 rebar_utils:sh("git --git-dir=\"" ++ Dir ++ "/.git\" --work-tree=\"" ++ Dir ++ "\" rev-parse --verify HEAD",
                     [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]);
             _ ->
-                rebar_utils:sh("git --git-dir=\"" ++ Dir ++ "/.git\" rev-parse --verify HEAD",
+                rebar_utils:sh("git --git-dir=" ++ Dir ++ "/.git rev-parse --verify HEAD",
                     [{use_stdout, false}, {debug_abort_on_error, AbortMsg}])
         end,
     Ref = rebar_string:trim(VsnString, both, "\n"),
