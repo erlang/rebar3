@@ -259,8 +259,7 @@ update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
             maybe_warn_retired(PkgName, PkgVsn1, Hash, Retired),
             PkgVsn2 = list_to_binary(lists:flatten(ec_semver:format(PkgVsn1))),
             AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName, PkgVsn2, Hash1, RepoConfig}),
-            AppInfo2 = rebar_app_info:update_opts_deps(AppInfo1, Deps),
-            rebar_app_info:original_vsn(AppInfo2, PkgVsn2);
+            rebar_app_info:update_opts_deps(AppInfo1, Deps);
         not_found ->
             throw(?PRV_ERROR({missing_package, PkgName, PkgVsn}));
         {error, {invalid_vsn, InvalidVsn}} ->
