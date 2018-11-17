@@ -73,8 +73,12 @@ desc(Cmds) ->
     "Equivalent to running: rebar3 do "
         ++ rebar_string:join(lists:map(fun to_desc/1, Cmds), ",").
 
-to_desc({Cmd, Args}) ->
+to_desc({Cmd, Args}) when is_list(Args) ->
     atom_to_list(Cmd) ++ " " ++ Args;
+to_desc({Namespace, Cmd}) ->
+    atom_to_list(Namespace) ++ " " ++ atom_to_list(Cmd);
+to_desc({Namespace, Cmd, Args}) ->
+    atom_to_list(Namespace) ++ " " ++ atom_to_list(Cmd) ++ " " ++ Args;
 to_desc(Cmd) ->
     atom_to_list(Cmd).
 
@@ -98,6 +102,12 @@ make_args(Cmds) ->
       lists:map(fun make_tuple/1,
                 lists:map(fun make_arg/1, Cmds))).
 
+make_arg({Namespace, Command, Args}) when is_atom(Namespace), is_atom(Command) ->
+    {make_atom(Namespace),
+     make_atom(Command),
+     make_list([make_string(A) || A <- split_args(Args)])};
+make_arg({Namespace, Command}) when is_atom(Namespace), is_atom(Command) ->
+    {make_atom(Namespace), make_atom(Command)};
 make_arg({Cmd, Args}) ->
     {make_string(Cmd), make_list([make_string(A) || A <- split_args(Args)])};
 make_arg(Cmd) ->
@@ -116,6 +126,9 @@ make_string(Atom) when is_atom(Atom) ->
     make_string(atom_to_list(Atom));
 make_string(String) when is_list(String) ->
     {string, 1, String}.
+
+make_atom(Atom) when is_atom(Atom) ->
+    {atom, 1, Atom}.
 
 %% In case someone used the long option format, the option needs to get
 %% separated from its value.
