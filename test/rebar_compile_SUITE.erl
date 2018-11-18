@@ -845,20 +845,33 @@ dont_recompile_yrl_or_xrl(Config) ->
                "F -> number : '$1'.\n"],
     ok = ec_file:write(Yrl, YrlBody),
 
-    XrlBeam = filename:join([AppDir, "ebin", filename:basename(Xrl, ".xrl") ++ ".beam"]),
-    YrlBeam = filename:join([AppDir, "ebin", filename:basename(Yrl, ".yrl") ++ ".beam"]),
+    XrlErl = filename:join([AppDir, "src", filename:basename(Xrl, ".xrl") ++ ".erl"]),
+    YrlErl = filename:join([AppDir, "src", filename:basename(Yrl, ".yrl") ++ ".erl"]),
+
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    XrlBeam = filename:join([EbinDir, filename:basename(Xrl, ".xrl") ++ ".beam"]),
+    YrlBeam = filename:join([EbinDir, filename:basename(Yrl, ".yrl") ++ ".beam"]),
 
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
 
-    XrlModTime = filelib:last_modified(XrlBeam),
-    YrlModTime = filelib:last_modified(YrlBeam),
+    XrlModTime = filelib:last_modified(XrlErl),
+    YrlModTime = filelib:last_modified(YrlErl),
+
+    XrlBeamModTime = filelib:last_modified(XrlBeam),
+    YrlBeamModTime = filelib:last_modified(YrlBeam),
 
     timer:sleep(1000),
 
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
 
-    NewXrlModTime = filelib:last_modified(XrlBeam),
-    NewYrlModTime = filelib:last_modified(YrlBeam),
+    NewXrlModTime = filelib:last_modified(XrlErl),
+    NewYrlModTime = filelib:last_modified(YrlErl),
+
+    NewXrlBeamModTime = filelib:last_modified(XrlBeam),
+    NewYrlBeamModTime = filelib:last_modified(YrlBeam),
+
+    ?assert(XrlBeamModTime == NewXrlBeamModTime),
+    ?assert(YrlBeamModTime == NewYrlBeamModTime),
 
     ?assert(XrlModTime == NewXrlModTime),
     ?assert(YrlModTime == NewYrlModTime).

@@ -3,6 +3,7 @@
 -export([compile_all/2,
          clean/2,
 
+         needs_compile/3,
          ok_tuple/2,
          error_tuple/4,
          maybe_report/1,
@@ -18,7 +19,8 @@
                                            include_dirs => [file:dirname()],
                                            src_ext      => extension(),
                                            out_mappings => out_mappings()}.
--callback needed_files(digraph:graph(), [file:filename()], rebar_app_info:t()) -> [file:filename()].
+-callback needed_files(digraph:graph(), [file:filename()], out_mappings(),
+                       rebar_app_info:t()) -> [file:filename()].
 -callback dependencies(file:filename(), file:dirname(), [file:dirname()]) -> [file:filename()].
 -callback compile(file:filename(), out_mappings(), rebar_dict(), list()) ->
     ok | {ok, [string()]} | {ok, [string()], [string()]}.
@@ -66,7 +68,8 @@ run(CompilerMod, AppInfo) ->
     OutDir = rebar_app_info:out_dir(AppInfo),
     AbsSrcDirs = [filename:join(BaseDir, SrcDir) || SrcDir <- SrcDirs],
     G = init_dag(CompilerMod, AbsInclDirs, AbsSrcDirs, FoundFiles, OutDir, EbinDir),
-    {{FirstFiles, FirstFileOpts}, {RestFiles, Opts}} = CompilerMod:needed_files(G, FoundFiles, AppInfo),
+    {{FirstFiles, FirstFileOpts}, {RestFiles, Opts}} = CompilerMod:needed_files(G, FoundFiles,
+                                                                                Mappings, AppInfo),
     true = digraph:delete(G),
 
     compile_each(FirstFiles, FirstFileOpts, BaseOpts, Mappings, CompilerMod),
@@ -111,6 +114,13 @@ clean_(CompilerMod, AppInfo) ->
     CompilerMod:clean(FoundFiles, AppInfo),
     rebar_file_utils:rm_rf(dag_file(CompilerMod, EbinDir)).
 
+-spec needs_compile(filename:all(), extension(), [{extension(), file:dirname()}]) -> boolean().
+needs_compile(Source, OutExt, Mappings) ->
+    Ext = filename:extension(Source),
+    BaseName = filename:basename(Source, Ext),
+    {_, OutDir} = lists:keyfind(OutExt, 1, Mappings),
+    Target = filename:join(OutDir, BaseName++OutExt),
+    filelib:last_modified(Source) > filelib:last_modified(Target).
 
 run_on_extra_src_dirs(CompilerMod, AppInfo, Fun) ->
     ExtraDirs = rebar_dir:extra_src_dirs(rebar_app_info:opts(AppInfo), []),
