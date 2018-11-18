@@ -19,7 +19,8 @@
                                            include_dirs => [file:dirname()],
                                            src_ext      => extension(),
                                            out_mappings => out_mappings()}.
--callback needed_files(digraph:graph(), [file:filename()], list(), rebar_app_info:t()) -> [file:filename()].
+-callback needed_files(digraph:graph(), [file:filename()], out_mappings(),
+                       rebar_app_info:t()) -> [file:filename()].
 -callback dependencies(file:filename(), file:dirname(), [file:dirname()]) -> [file:filename()].
 -callback compile(file:filename(), out_mappings(), rebar_dict(), list()) ->
     ok | {ok, [string()]} | {ok, [string()], [string()]}.
