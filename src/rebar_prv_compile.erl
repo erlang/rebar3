@@ -191,13 +191,18 @@ compile(State, Providers, AppInfo) ->
 %% Internal functions
 %% ===================================================================
 
+expand_dir_env({Dir, Opts}, State) ->
+  {expand_dir_env(Dir, State), Opts};
+expand_dir_env(Dir, State) ->
+  rebar_utils:expand_env_variables(Dir, State).
+
 expand_source_dirs_env(App, Prop, State) ->
     case rebar_app_info:get(App, Prop, undef) of
         undef ->
             App;
 
         Dirs ->
-            Dirs1 = [rebar_utils:expand_env_variables(D, State) || D <- Dirs],
+            Dirs1 = [expand_dir_env(D, State) || D <- Dirs],
             rebar_app_info:set(App, Prop, Dirs1)
     end.
 
