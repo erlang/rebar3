@@ -191,11 +191,30 @@ compile(State, Providers, AppInfo) ->
 %% Internal functions
 %% ===================================================================
 
+expand_source_dirs_env(App, Prop, State) ->
+    case rebar_app_info:get(App, Prop, undef) of
+        undef ->
+            App;
+
+        Dirs ->
+            Dirs1 = [rebar_utils:expand_env_variables(D, State) || D <- Dirs],
+            rebar_app_info:set(App, Prop, Dirs1)
+    end.
+
+expand_source_dirs_env(AppInfo, State) ->
+    lists:foldl(fun(Prop, App) ->
+                    expand_source_dirs_env(App, Prop, State)
+                end,
+                AppInfo,
+                [src_dirs, extra_src_dirs]).
+
+
 build_app(AppInfo, State) ->
     case rebar_app_info:project_type(AppInfo) of
         Type when Type =:= rebar3 ; Type =:= undefined ->
             Compilers = rebar_state:compilers(State),
-            rebar_compiler:compile_all(Compilers, AppInfo);
+            AppInfo1 = expand_source_dirs_env(AppInfo, State),
+            rebar_compiler:compile_all(Compilers, AppInfo1);
         Type ->
             ProjectBuilders = rebar_state:project_builders(State),
             case lists:keyfind(Type, 1, ProjectBuilders) of

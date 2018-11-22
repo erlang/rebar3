@@ -53,6 +53,7 @@
          cleanup_code_path/1,
          args_to_tasks/1,
          expand_env_variable/3,
+         expand_env_variables/2,
          get_arch/0,
          wordsize/0,
          deps_to_binary/1,
@@ -529,6 +530,16 @@ expand_env_variable(InStr, VarName, RawVarValue) ->
             RegEx = io_lib:format("\\\$(~ts(\\W|$)|{~ts})", [VarName, VarName]),
             re:replace(InStr, RegEx, [VarValue, "\\2"], ReOpts)
     end.
+
+%% @doc Expand all the env. variables provided by rebar_env using `expand_env_variable'
+-spec expand_env_variables(string(), rebar_state:t()) -> string().
+expand_env_variables(Input, State) ->
+  lists:foldl(
+    fun({Var, Value}, Input0) ->
+      expand_env_variable(Input0, Var, Value)
+    end,
+    Input,
+    rebar_env:create_env(State)).
 
 %% ====================================================================
 %% Internal functions
