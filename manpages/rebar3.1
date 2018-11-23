@@ -1,4 +1,4 @@
-.TH "REBAR3" "1" "January 2017" "Erlang"
+.TH "REBAR3" "1" "November 2018" "Erlang"
 
 .SH NAME
 
@@ -62,8 +62,10 @@ Remove compiled beam files from apps.
 .IP
 \fI--profile\fR: Clean under profile. Equivalent to `rebar3 as <profile> clean`
 .TP
-\fBcompile\fR 
+\fBcompile\fR [\fI-d\fR|\fI--deps_only\fR] 
 Compile apps .app.src and .erl files.
+.IP
+\fI--deps_only\fR: Only compile dependencies, no project apps will be built.
 .TP
 \fBcover\fR [\fI-r\fR|\fI--reset\fR] [\fI-v\fR|\fI--verbose\fR] [\fI-m\fR|\fI--min_coverage\fR] 
 Perform coverage analysis.
@@ -131,7 +133,7 @@ Run Common Tests.
 .IP
 \fI--include\fR: Directories containing additional include files
 .IP
-\fI--readable\fR: Shows test case names and only displays logs to shell on failures
+\fI--readable\fR: Shows test case names and only displays logs to shell on failures (true | compact | false)
 .IP
 \fI--verbose\fR: Verbose output
 .IP
@@ -226,7 +228,7 @@ Print paths to build dirs in current profile.
 \fI--rel\fR: Return the `rel' path of the current profile.
 .TP
 \fBpkgs\fR 
-List available packages.
+List information for a package.
 .TP
 \fBrelease\fR [\fI-n\fR|\fI--relname\fR] [\fI-v\fR|\fI--relvsn\fR] [\fI-g\fR|\fI--goal\fR] [\fI-u\fR|\fI--upfrom\fR] [\fI-o\fR|\fI--output-dir\fR] [\fI-h\fR|\fI--help\fR] [\fI-l\fR|\fI--lib-dir\fR] [\fI-p\fR|\fI--path\fR] [\fI--default-libs\fR] [\fI-V\fR|\fI--verbose\fR] [\fI-d\fR|\fI--dev-mode\fR] [\fI-i\fR|\fI--include-erts\fR] [\fI-a\fR|\fI--override\fR] [\fI-c\fR|\fI--config\fR] [\fI--overlay_vars\fR] [\fI--vm_args\fR] [\fI--sys_config\fR] [\fI--system_libs\fR] [\fI--version\fR] [\fI-r\fR|\fI--root\fR] 
 Build release of project.
@@ -317,7 +319,7 @@ Create relup of releases.
 \fBreport\fR 
 Provide a crash report to be sent to the rebar3 issues page.
 .TP
-\fBshell\fR [\fI--config\fR] [\fI--name\fR] [\fI--sname\fR] [\fI--setcookie\fR] [\fI--script\fR] [\fI--apps\fR] [\fI--user_drv_args\fR] 
+\fBshell\fR [\fI--config\fR] [\fI--name\fR] [\fI--sname\fR] [\fI--setcookie\fR] [\fI--script\fR] [\fI--apps\fR] [\fI--start-clean\fR] [\fI--user_drv_args\fR] 
 Run shell with project apps and deps in path.
 .IP
 \fI--config\fR: Path to the config file to use. Defaults to {shell, [{config, File}]} and then the relx sys.config file if not specified.
@@ -331,6 +333,8 @@ Run shell with project apps and deps in path.
 \fI--script\fR: Path to an escript file to run before starting the project apps. Defaults to rebar.config {shell, [{script_file, File}]} if not specified.
 .IP
 \fI--apps\fR: A list of apps to boot before starting the shell. (E.g. --apps app1,app2,app3) Defaults to rebar.config {shell, [{apps, Apps}]} or relx apps if not specified.
+.IP
+\fI--start-clean\fR: Cancel any applications in the 'apps' list or release.
 .IP
 \fI--user_drv_args\fR: Arguments passed to user_drv start function for creating custom shells.
 .TP
@@ -428,6 +432,10 @@ How much color to show in the terminal. Defaults to \fIhigh\fR.
 .TP
 \fBREBAR_CONFIG\fR
 Name of rebar configuration files. Defaults to \fIrebar.config\fR
+
+.TP
+\fBREBAR_GIT_CLONE_OPTIONS\fR
+Arguments to add after each \fIgit clone\fR operation. For example, the value \fI--reference ~/.cache/repos.reference\fR allows to create a cache of all fetched repositories across builds
 
 .SH Configuration File Options
 See \fIhttp://www.rebar3.org/v3.0/docs/configuration\fR
