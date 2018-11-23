@@ -20,10 +20,12 @@
                                            src_ext      => extension(),
                                            out_mappings => out_mappings()}.
 -callback needed_files(digraph:graph(), [file:filename()], out_mappings(),
-                       rebar_app_info:t()) -> [file:filename()].
+                       rebar_app_info:t()) ->
+    {{[file:filename()], term()}, {[file:filename()], term()}}.
 -callback dependencies(file:filename(), file:dirname(), [file:dirname()]) -> [file:filename()].
 -callback compile(file:filename(), out_mappings(), rebar_dict(), list()) ->
     ok | {ok, [string()]} | {ok, [string()], [string()]}.
+-callback clean([file:filename()], rebar_app_info:t()) -> _.
 
 -define(DAG_VSN, 2).
 -define(DAG_FILE, "source.dag").
