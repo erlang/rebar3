@@ -2157,7 +2157,13 @@ recursive(Config) ->
 
     EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
     {ok, Files} = rebar_utils:list_dir(EbinDir),
-    ?assert(lists:member("rec.beam",Files)).
+    ?assert(lists:member("rec.beam",Files)),
+
+    %% check that rec is in modules list of .app file
+    AppFile = filename:join(EbinDir, Name++".app"),
+    {ok, [{application, _, List}]} = file:consult(AppFile),
+    {modules, Modules} = lists:keyfind(modules, 1, List),
+    ?assert(lists:member(rec, Modules)).
 
 no_recursive(Config) ->
     AppDir = ?config(apps, Config),
