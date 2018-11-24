@@ -96,14 +96,14 @@ run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
       TargetDir :: file:filename(),
       SourceExt :: string(),
       TargetExt :: string().
-run(Config, FirstFiles, SourceDirs, SourceExt, TargetDir, TargetExt,
+run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
     Compile3Fn, Opts) ->
     %% Convert simple extension to proper regex
     SourceExtRe = "^(?!\\._).*\\" ++ SourceExt ++ [$$],
 
     Recursive = proplists:get_value(recursive, Opts, true),
     %% Find all possible source files
-    FoundFiles = rebar_utils:find_files_in_dirs(SourceDirs, SourceExtRe, Recursive),
+    FoundFiles = rebar_utils:find_files(SourceDir, SourceExtRe, Recursive),
     %% Remove first files from found files
     RestFiles = [Source || Source <- FoundFiles,
                            not lists:member(Source, FirstFiles)],
