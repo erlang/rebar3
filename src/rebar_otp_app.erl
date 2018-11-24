@@ -166,7 +166,7 @@ ebin_modules(AppInfo, Dir) ->
     Beams = lists:sort(rebar_utils:beams(filename:join(Dir, "ebin"))),
     SrcDirs = rebar_dir:src_dirs(rebar_app_info:opts(AppInfo), ["src"]),
     FindSourceRules = [{".beam", ".erl",
-                        [{"ebin", SrcDir} || SrcDir <- SrcDirs]}],
+                        [{"ebin", filename:join(SrcDir, "**")} || SrcDir <- SrcDirs]}],
     Filtered = lists:filter(fun(Beam) ->
                                 rebar_utils:find_source(filename:basename(Beam),
                                                         filename:dirname(Beam),
