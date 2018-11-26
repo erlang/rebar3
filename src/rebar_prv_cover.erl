@@ -320,7 +320,7 @@ cover_compile(State, apps) ->
     AppDirs = app_dirs(Apps),
     cover_compile(State, lists:filter(fun(D) -> ec_file:is_dir(D) end, AppDirs));
 cover_compile(State, Dirs) ->
-    rebar_utils:update_code(rebar_state:code_paths(State, all_deps), [soft_purge]),
+    rebar_paths:set_paths([deps], State),
     %% start the cover server if necessary
     {ok, CoverPid} = start_cover(),
     %% redirect cover output
@@ -343,7 +343,6 @@ cover_compile(State, Dirs) ->
                 ?WARN("Directory ~p error ~p", [Dir, Reason])
         end
     end, Dirs),
-    rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
     ok.
 
 is_ignored(Dir, File, ExclMods) ->
