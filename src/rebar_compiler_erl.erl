@@ -317,16 +317,7 @@ expand_file_names(Files, Dirs) ->
                   true ->
                       [Incl];
                   false ->
-                      lists:flatmap(
-                        fun(Dir) ->
-                                FullPath = filename:join(Dir, Incl),
-                                case filelib:is_regular(FullPath) of
-                                    true ->
-                                        [FullPath];
-                                    false ->
-                                        []
-                                end
-                        end, Dirs)
+                      rebar_utils:find_files_in_dirs(Dirs, Incl, true)
               end
       end, Files).
 
