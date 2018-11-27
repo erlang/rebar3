@@ -82,7 +82,9 @@ info() ->
       "Create rebar3 project based on template and vars.~n"
       "~n"
       "Valid command line options:~n"
-      "  <template> [var=foo,...]~n", []).
+      "  <template> [var=foo,...]~n"
+      "~n"
+      "See available templates with: `rebar3 new help`~n", []).
 
 strip_flags([]) -> [];
 strip_flags(["-"++_|Opts]) -> strip_flags(Opts);
