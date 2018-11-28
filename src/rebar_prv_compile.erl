@@ -195,6 +195,7 @@ build_app(AppInfo, State) ->
     case rebar_app_info:project_type(AppInfo) of
         Type when Type =:= rebar3 ; Type =:= undefined ->
             Compilers = rebar_state:compilers(State),
+            rebar_paths:set_paths([deps], State),
             rebar_compiler:compile_all(Compilers, AppInfo);
         Type ->
             ProjectBuilders = rebar_state:project_builders(State),
