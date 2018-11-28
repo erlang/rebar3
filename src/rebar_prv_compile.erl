@@ -201,7 +201,7 @@ build_app(AppInfo, State) ->
             case lists:keyfind(Type, 1, ProjectBuilders) of
                 {_, Module} ->
                     %% load plugins since thats where project builders would be
-                    rebar_paths:set_paths([plugins, deps], State),
+                    rebar_paths:set_paths([deps, plugins], State),
                     Res = Module:build(AppInfo),
                     rebar_paths:set_paths([deps], State),
                     case Res of
