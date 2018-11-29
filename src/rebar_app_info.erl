@@ -343,9 +343,12 @@ app_file(AppInfo=#app_info_t{}, AppFile) ->
 app_details(AppInfo=#app_info_t{app_details=[]}) ->
     case app_file(AppInfo) of
         undefined ->
-            case rebar_config:consult_app_file(app_file_src(AppInfo)) of
+            try rebar_config:consult_app_file(app_file_src(AppInfo)) of
                 [] -> [];
                 [{application, _Name, AppDetails}] -> AppDetails
+            catch
+                _:_ ->
+                    []
             end;
         AppFile ->
             try rebar_file_utils:try_consult(AppFile) of
