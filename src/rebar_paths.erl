@@ -111,7 +111,6 @@ purge_and_load([{_Group, Apps}|Rest], Seen) ->
             %% Shouldn't unload ourselves; rebar runs without ever
             %% being started and unloading breaks logging!
             AppName =/= <<"rebar">>],
-
     %% 4)
     CandidateMods = lists:append(
         %% Start by asking the currently loaded app (if loaded)
@@ -121,8 +120,10 @@ purge_and_load([{_Group, Apps}|Rest], Seen) ->
                  Mods;
              undefined ->
                  %% if not found, parse the app file on disk, in case
-                 %% the app's modules are used without it being loaded
-                 case rebar_app_info:app_details(App) of
+                 %% the app's modules are used without it being loaded;
+                 %% invalidate the cache in case we're proceeding during
+                 %% compilation steps by setting the app details to `[]'
+                 case rebar_app_info:app_details(rebar_app_info:app_details(App, [])) of
                      [] -> [];
                      Details -> proplists:get_value(modules, Details, [])
                  end
