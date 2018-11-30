@@ -224,7 +224,8 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
                       {ok, AppInfo0} =
                           case rebar_app_info:discover(Dir) of
                               {ok, App} ->
-                                  {ok, rebar_app_info:is_available(rebar_app_info:parent(App, Parent),
+                                  App1 = rebar_app_info:name(App, Name),
+                                  {ok, rebar_app_info:is_available(rebar_app_info:parent(App1, Parent),
                                                                    true)};
                               not_found ->
                                   rebar_app_info:new(Parent, Name, Vsn, Dir, [])
