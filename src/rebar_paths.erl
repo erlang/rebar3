@@ -122,7 +122,9 @@ purge_and_load([{_Group, Apps}|Rest], Seen) ->
                  %% if not found, parse the app file on disk, in case
                  %% the app's modules are used without it being loaded;
                  %% invalidate the cache in case we're proceeding during
-                 %% compilation steps by setting the app details to `[]'
+                 %% compilation steps by setting the app details to `[]', which
+                 %% is its empty value; the details will then be reloaded
+                 %% from disk when found
                  case rebar_app_info:app_details(rebar_app_info:app_details(App, [])) of
                      [] -> [];
                      Details -> proplists:get_value(modules, Details, [])
