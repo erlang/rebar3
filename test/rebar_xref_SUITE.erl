@@ -46,9 +46,11 @@ init_per_testcase(Case, Config) ->
     Name = rebar_test_utils:create_random_name("xrefapp_"),
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_empty_app(AppDir, Name, Vsn, [kernel, stdlib]),
-    AppModules = [behaviour1, behaviour2, mymod, othermod],
+    AppModules = [behaviour1, behaviour2, mymod, othermod, ignoremod, ignoremod2],
     [write_src_file(AppDir, Name, Module, ignore_xref(Case)) || Module <- AppModules],
+    IgnoreMod = list_to_atom(Name ++ "_" ++ "ignoremod"),
     RebarConfig = [{erl_opts, [debug_info]},
+                   {xref_ignores, [IgnoreMod]},
                    {xref_checks, [deprecated_function_calls,deprecated_functions,
                                   undefined_function_calls,undefined_functions,
                                   exports_not_used,locals_not_used]}],
@@ -94,7 +96,6 @@ xref_undef_behaviour(Config) ->
     %% just ensure this does not crash
     Result = rebar3:run(rebar_state:new(State, RebarConfig, AppDir), ["xref"]),
     verify_results(xref_undef_behaviour, Name, Result).
-
 
 %% ===================================================================
 %% Helper functions
@@ -162,8 +163,9 @@ verify_test_results(xref_undef_behaviour, AppName, XrefResults, _QueryResults) -
     ?assertNot(lists:member({MyMod, bh2_b, 1}, ExportsNotUsed)),
     ok;
 verify_test_results(xref_ignore_test, AppName, XrefResults, _QueryResults) ->
-    AppModules = ["behaviour1", "behaviour2", "mymod", "othermod", "somemod"],
-    [_Behaviour1Mod, _Behaviour2Mod, _MyMod, _OtherMod, SomeMod] =
+    AppModules = ["behaviour1", "behaviour2", "mymod", "othermod", "somemod",
+    "ignoremod", "ignoremod2"],
+    [_Behaviour1Mod, _Behaviour2Mod, _MyMod, _OtherMod, SomeMod, IgnoreMod, IgnoreMod2] =
         [list_to_atom(AppName ++ "_" ++ Mod) || Mod <- AppModules],
     UndefFuns = proplists:get_value(undefined_functions, XrefResults),
     ?assertNot(lists:keymember(undefined_function_calls, 1, XrefResults)),
@@ -171,6 +173,8 @@ verify_test_results(xref_ignore_test, AppName, XrefResults, _QueryResults) ->
     ?assertNot(lists:keymember(exports_not_used, 1, XrefResults)),
     ?assertNot(lists:keymember(deprecated_functions, 1, XrefResults)),
     ?assertNot(lists:keymember(deprecated_function_calls, 1, XrefResults)),
+    ?assertNot(lists:member({IgnoreMod, notavailable, 1}, UndefFuns)),
+    ?assertNot(lists:member({IgnoreMod2, notavailable, 1}, UndefFuns)),
     ?assert(lists:member({SomeMod, notavailable, 1}, UndefFuns)),
     ok.
 
@@ -189,13 +193,15 @@ module_name(AppName, Module) ->
 get_module_body(behaviour1, AppName, IgnoreXref) ->
     ["-module(", AppName, "_behaviour1).\n",
      "-export([behaviour_info/1]).\n",
-     ["-ignore_xref({behaviour_info,1}).\n" || X <- [IgnoreXref], X =:= true],
+     ["-ignore_xref([ignoremod,{behaviour_info,1}]).\n"
+       || X <- [IgnoreXref], X =:= true],
      "behaviour_info(callbacks) -> [{bh1_a,1},{bh1_b,1}];\n",
      "behaviour_info(_Other) -> undefined.\n"];
 get_module_body(behaviour2, AppName, IgnoreXref) ->
     ["-module(", AppName, "_behaviour2).\n",
      "-export([behaviour_info/1]).\n",
-     ["-ignore_xref({behaviour_info,1}).\n" || X <- [IgnoreXref], X =:= true],
+     ["-ignore_xref({behaviour_info,1}).\n"
+       || X <- [IgnoreXref], X =:= true],
      "behaviour_info(callbacks) -> [{bh2_a,1},{bh2_b,1}];\n",
      "behaviour_info(_Other) -> undefined.\n"];
 get_module_body(mymod, AppName, IgnoreXref) ->
@@ -217,6 +223,26 @@ get_module_body(mymod, AppName, IgnoreXref) ->
      "localfunc2() -> ok.\n",               % unused local
      "fdeprecated() -> ok.\n"              % deprecated function
     ];
+get_module_body(ignoremod, AppName, IgnoreXref) ->
+    ["-module(", AppName, "_ignoremod).\n",
+     "-export([]).\n",
+     [["-ignore_xref(",  AppName, "_ignoremod).\n"]
+      || X <- [IgnoreXref], X =:= true],
+     "localfunc1(A, B) -> {A, B}.\n",       % used local
+     "localfunc2() -> ok.\n",               % unused local
+     "fdeprecated() -> ok.\n"              % deprecated function
+
+    ];
+get_module_body(ignoremod2, AppName, IgnoreXref) ->
+    ["-module(", AppName, "_ignoremod2).\n",
+     "-export([]).\n",
+     [["-ignore_xref(",  AppName, "_ignoremod2).\n"]
+      || X <- [IgnoreXref], X =:= true],
+     "localfunc1(A, B) -> {A, B}.\n",       % used local
+     "localfunc2() -> ok.\n",               % unused local
+     "fdeprecated() -> ok.\n"              % deprecated function
+
+    ];
 get_module_body(othermod, AppName, IgnoreXref) ->
     ["-module(", AppName, "_othermod).\n",
      "-export([somefunc/0]).\n",
@@ -226,4 +252,5 @@ get_module_body(othermod, AppName, IgnoreXref) ->
      "somefunc() ->\n",
      "   ", AppName, "_mymod:other1(arg),\n",
      "   ", AppName, "_somemod:notavailable(arg),\n",
-     "   ", AppName, "_mymod:fdeprecated().\n"].
+     "   ", AppName, "_mymod:fdeprecated(),\n",
+     "   ", AppName, "_ignoremod:notavailable().\n"].

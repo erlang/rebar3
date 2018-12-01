@@ -160,7 +160,8 @@ get_xref_ignorelist(Mod, XrefCheck) ->
     %% And create a flat {M,F,A} list
     lists:foldl(
       fun({F, A}, Acc) -> [{Mod,F,A} | Acc];
-         ({M, F, A}, Acc) -> [{M,F,A} | Acc]
+         ({M, F, A}, Acc) -> [{M,F,A} | Acc];
+         (M, Acc) when is_atom(M) -> [M | Acc]
       end, [], lists:flatten([IgnoreXref, BehaviourCallbacks])).
 
 keyall(Key, List) ->
@@ -195,7 +196,8 @@ filter_xref_results(XrefCheck, XrefIgnores, XrefResults) ->
                             end, SearchModules),
 
     [Result || Result <- XrefResults,
-               not lists:member(parse_xref_result(Result), Ignores)].
+               not lists:member(element(1, Result), Ignores)
+               andalso not lists:member(parse_xref_result(Result), Ignores)].
 
 display_results(XrefResults, QueryResults) ->
     [lists:map(fun display_xref_results_for_type/1, XrefResults),
