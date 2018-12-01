@@ -195,13 +195,14 @@ build_app(AppInfo, State) ->
     case rebar_app_info:project_type(AppInfo) of
         Type when Type =:= rebar3 ; Type =:= undefined ->
             Compilers = rebar_state:compilers(State),
+            rebar_paths:set_paths([deps], State),
             rebar_compiler:compile_all(Compilers, AppInfo);
         Type ->
             ProjectBuilders = rebar_state:project_builders(State),
             case lists:keyfind(Type, 1, ProjectBuilders) of
                 {_, Module} ->
                     %% load plugins since thats where project builders would be
-                    rebar_paths:set_paths([plugins, deps], State),
+                    rebar_paths:set_paths([deps, plugins], State),
                     Res = Module:build(AppInfo),
                     rebar_paths:set_paths([deps], State),
                     case Res of
