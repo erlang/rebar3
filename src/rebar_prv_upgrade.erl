@@ -132,11 +132,13 @@ update_pkg_deps([], _, _) ->
 update_pkg_deps([{Name, _, _} | Rest], AppInfos, State) ->
     case rebar_app_utils:find(Name, AppInfos) of
         {ok, AppInfo} ->
-            case element(1, rebar_app_info:source(AppInfo)) of
+            Source = rebar_app_info:source(AppInfo),
+            case element(1, Source) of
                 pkg ->
                     Resources = rebar_state:resources(State),
                     #{repos := RepoConfigs} = rebar_resource_v2:find_resource_state(pkg, Resources),
-                    [update_package(Name, RepoConfig, State) || RepoConfig <- RepoConfigs];
+                    PkgName = element(2, Source),
+                    [update_package(PkgName, RepoConfig, State) || RepoConfig <- RepoConfigs];
                 _ ->
                     skip
             end;
