@@ -22,13 +22,44 @@ context(AppInfo) ->
       out_mappings => Mappings}.
 
 needed_files(_, FoundFiles, _, AppInfo) ->
-    FirstFiles = [],
+    RebarOpts = rebar_app_info:opts(AppInfo),
+    MibFirstConf = rebar_opts:get(RebarOpts, mib_first_files, []),
+    valid_mib_first_conf(MibFirstConf),
+    Dir = rebar_app_info:dir(AppInfo),
+    MibFirstFiles = [filename:join(Dir, File) || File <- MibFirstConf],
 
     %% Remove first files from found files
-    RestFiles = [Source || Source <- FoundFiles, not lists:member(Source, FirstFiles)],
+    RestFiles = [Source || Source <- FoundFiles, not lists:member(Source, MibFirstFiles)],
 
     Opts = rebar_opts:get(rebar_app_info:opts(AppInfo), mib_opts, []),
-    {{FirstFiles, Opts}, {RestFiles, Opts}}.
+    {{MibFirstFiles, Opts}, {RestFiles, Opts}}.
+
+valid_mib_first_conf(FileList) ->
+    Strs = filter_file_list(FileList),
+    case rebar_utils:is_list_of_strings(Strs) of
+        true -> true;
+        false -> ?ABORT("An invalid file list (~p) was provided as part of your mib_first_files directive",
+                        [FileList])
+    end.
+
+filter_file_list(FileList) ->
+    Atoms = lists:filter( fun(X) -> is_atom(X) end, FileList),
+    case Atoms of
+        [] ->
+            FileList;
+        _ ->
+          atoms_in_mib_first_files_warning(Atoms),
+          lists:filter( fun(X) -> not(is_atom(X)) end, FileList)
+     end.
+
+atoms_in_mib_first_files_warning(Atoms) ->
+  W = "You have provided atoms as file entries in mib_first_files; "
+      "mib_first_files only expects lists of filenames as strings. "
+      "The following MIBs (~p) may not work as expected and it is advised "
+      "that you change these entires to string format "
+      "(e.g., \"mibs/SOME-MIB.mib\") ",
+  ?WARN(W, [Atoms]).
+
 
 dependencies(_, _, _) ->
     [].

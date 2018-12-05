@@ -1161,17 +1161,19 @@ umbrella_mib_first_test(Config) ->
 
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
-    MibsSrc = <<"-- SIMPLE-MIB.\n"
+    BExporterSrc = <<"-- BEXPORTER-MIB.\n"
 "-- This is just a simple MIB used for testing!\n"
 "--\n"
-"SIMPLE-MIB DEFINITIONS ::= BEGIN\n"
+"BEXPORTER-MIB DEFINITIONS ::= BEGIN\n"
 "IMPORTS\n"
+"    TEXTUAL-CONVENTION\n"
+"        FROM SNMPv2-TC\n"
 "    MODULE-IDENTITY, enterprises\n"
 "        FROM SNMPv2-SMI;\n"
 "\n"
 "ericsson MODULE-IDENTITY\n"
 "    LAST-UPDATED\n"
-"        \"201403060000Z\"\n"
+"        \"201812050000Z\"\n"
 "    ORGANIZATION\n"
 "        \"rebar\"\n"
 "    CONTACT-INFO\n"
@@ -1183,24 +1185,70 @@ umbrella_mib_first_test(Config) ->
 "        \"This very small module is made available\n"
 "	for mib-compilation testing.\"\n"
 "    ::= { enterprises 999 }\n"
+"\n"
+"Something ::= TEXTUAL-CONVENTION\n"
+"    STATUS current\n"
+"    DESCRIPTION \"\"\n"
+"    SYNTAX      OCTET STRING (SIZE (4))\n"
 "END\n">>,
 
+    AImporterSrc = <<"-- AIMPORTER-MIB.\n"
+"-- This is just a simple MIB used for testing!\n"
+"--\n"
+"AIMPORTER-MIB DEFINITIONS ::= BEGIN\n"
+"IMPORTS\n"
+"    Something\n"
+"        FROM BEXPORTER-MIB\n"
+"    MODULE-IDENTITY, enterprises\n"
+"        FROM SNMPv2-SMI;\n"
+"\n"
+"ericsson MODULE-IDENTITY\n"
+"    LAST-UPDATED\n"
+"        \"201812050000Z\"\n"
+"    ORGANIZATION\n"
+"        \"rebar\"\n"
+"    CONTACT-INFO\n"
+"        \"rebar <rebar@example.com>\n"
+"    or\n"
+"    whoever is currently responsible for the SIMPLE\n"
+"    enterprise MIB tree branch (enterprises.999).\"\n"
+"    DESCRIPTION\n"
+"        \"This very small module is made available\n"
+"	for mib-compilation testing.\"\n"
+"    ::= { enterprises 1000 }\n"
+"END\n">>,
+
+
+
     ok = filelib:ensure_dir(filename:join([AppDir, "mibs", "dummy"])),
-    ok = file:write_file(filename:join([AppDir, "mibs", "SIMPLE-MIB.mib"]), MibsSrc),
+    ok = file:write_file(filename:join([AppDir, "mibs", "AIMPORTER-MIB.mib"]), AImporterSrc),
+    ok = file:write_file(filename:join([AppDir, "mibs", "BEXPORTER-MIB.mib"]), BExporterSrc),
 
-    RebarConfig = [{mib_first_files, ["mibs/SIMPLE-MIB.mib"]}],
+        FailureRebarConfig = [{mib_first_files, ["mibs/AIMPORTER-MIB.mib"]}],
+    SuccessRebarConfig = [{mib_first_files, ["mibs/BEXPORTER-MIB.mib"]}],
 
-    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
+    PrivMibsDir = filename:join([AppsDir, "_build", "default", "lib", Name, "priv", "mibs"]),
+
+    FailureRebarConfig = [{mib_first_files, ["mibs/AIMPORTER-MIB.mib"]}],
+    catch (
+    rebar_test_utils:run_and_check(Config, FailureRebarConfig, ["compile"], {ok, [{app, Name}]}) ),
+
+    %% check that the bin file was NOT cretated
+    false = filelib:is_file(filename:join([PrivMibsDir, "AIMPORTER-MIB.bin"])),
+
+
+    SuccessRebarConfig = [{mib_first_files, ["mibs/BEXPORTER-MIB.mib"]}],
+    rebar_test_utils:run_and_check(Config, SuccessRebarConfig, ["compile"], {ok, [{app, Name}]}),
 
     %% check a bin corresponding to the mib in the mibs dir exists in priv/mibs
-    PrivMibsDir = filename:join([AppsDir, "_build", "default", "lib", Name, "priv", "mibs"]),
-    true = filelib:is_file(filename:join([PrivMibsDir, "SIMPLE-MIB.bin"])),
+    true = filelib:is_file(filename:join([PrivMibsDir, "AIMPORTER-MIB.bin"])),
 
     %% check a hrl corresponding to the mib in the mibs dir exists in include
-    true = filelib:is_file(filename:join([AppDir, "include", "SIMPLE-MIB.hrl"])),
+    true = filelib:is_file(filename:join([AppDir, "include", "AIMPORTER-MIB.hrl"])),
 
     %% check the mibs dir was linked into the _build dir
     true = filelib:is_dir(filename:join([AppsDir, "_build", "default", "lib", Name, "mibs"])).
+
 
 only_default_transitive_deps(Config) ->
     AppDir = ?config(apps, Config),
