@@ -203,7 +203,6 @@ cp_r(Sources, Dest) ->
                 {false, _} ->
                     SourceStr
             end,
-            EscSources = [rebar_utils:escape_chars(Src) || Src <- Sources],
             % ensure destination exists before copying files into it
             {ok, []} = rebar_utils:sh(?FMT("mkdir -p ~ts",
                            [rebar_utils:escape_chars(Dest)]),
