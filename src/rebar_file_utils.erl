@@ -189,16 +189,28 @@ cp_r([], _Dest) ->
     ok;
 cp_r(Sources, Dest) ->
     case os:type() of
-        {unix, _} ->
+        {unix, Os} ->
             EscSources = [rebar_utils:escape_chars(Src) || Src <- Sources],
             SourceStr = rebar_string:join(EscSources, " "),
+            % On darwin the following cp command will cp everything inside
+            % target vs target and everything inside, so we chop the last char
+            % off if it is a '/'
+            Source = case {Os == darwin, lists:last(SourceStr) == 47} of
+                {true, true} ->
+                    string:sub_string(SourceStr, 1, length(SourceStr) - 1);
+                {true, false} ->
+                    SourceStr;
+                {false, _} ->
+                    SourceStr
+            end,
+            EscSources = [rebar_utils:escape_chars(Src) || Src <- Sources],
             % ensure destination exists before copying files into it
             {ok, []} = rebar_utils:sh(?FMT("mkdir -p ~ts",
                            [rebar_utils:escape_chars(Dest)]),
                       [{use_stdout, false}, abort_on_error]),
             {ok, []} = rebar_utils:sh(?FMT("cp -Rp ~ts \"~ts\"",
-                                           [SourceStr, rebar_utils:escape_double_quotes(Dest)]),
-                                      [{use_stdout, false}, abort_on_error]),
+                                           [Source, rebar_utils:escape_double_quotes(Dest)]),
+                                      [{use_stdout, true}, abort_on_error]),
             ok;
         {win32, _} ->
             lists:foreach(fun(Src) -> ok = cp_r_win32(Src,Dest) end, Sources),
