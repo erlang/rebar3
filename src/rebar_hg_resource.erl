@@ -6,6 +6,7 @@
 
 -export([init/2,
          lock/2,
+         download/3,
          download/4,
          needs_update/2,
          make_vsn/2]).
@@ -71,6 +72,9 @@ download(TmpDir, AppInfo, State, _) ->
         Error ->
             {error, Error}
     end.
+
+download(Dir, AppInfo, State) ->
+    download_(Dir, AppInfo, State).
 
 download_(Dir, {hg, Url}, State) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
