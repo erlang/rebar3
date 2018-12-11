@@ -33,7 +33,7 @@
 
 -include("rebar.hrl").
 
--define(TEMPLATE_RE, "^[^._].*\\.template\$").
+-define(TEMPLATE_RE, "^(?!\\._).*\\.template\$").
 
 %% ===================================================================
 %% Public API
@@ -120,7 +120,8 @@ default_author_and_email() ->
         {ok, Name} ->
             case rebar_utils:sh("git config --global user.email", [return_on_error]) of
                 {ok, Email} ->
-                    {string:strip(Name, both, $\n), string:strip(Email, both, $\n)};
+                    {rebar_string:trim(Name, both, "\n"),
+                     rebar_string:trim(Email, both, "\n")};
                 {error, _} ->
                     %% Use neither if one doesn't exist
                     {"Anonymous", "anonymous@example.org"}
@@ -129,7 +130,7 @@ default_author_and_email() ->
             %% Ok, try mecurial
             case rebar_utils:sh("hg showconfig ui.username", [return_on_error]) of
                 {ok, NameEmail} ->
-                    case re:run(NameEmail, "^(.*) <(.*)>$", [{capture, [1,2], list}]) of
+                    case re:run(NameEmail, "^(.*) <(.*)>$", [{capture, [1,2], list}, unicode]) of
                         {match, [Name, Email]} ->
                             {Name, Email};
                         _ ->
@@ -169,7 +170,7 @@ maybe_warn_about_name(Vars) ->
         invalid ->
            ?WARN("The 'name' variable is often associated with Erlang "
                  "module names and/or file names. The value submitted "
-                 "(~s) isn't an unquoted Erlang atom. Templates "
+                 "(~ts) isn't an unquoted Erlang atom. Templates "
                  "generated may contain errors.",
                  [Name]);
         valid ->
@@ -189,7 +190,7 @@ validate_atom(Str) ->
 
 %% Run template instructions one at a time.
 execute_template([], _, {Template,_,_}, _, _) ->
-    ?DEBUG("Template ~s applied", [Template]),
+    ?DEBUG("Template ~ts applied", [Template]),
     ok;
 %% We can't execute the description
 execute_template([{description, _} | Terms], Files, Template, Vars, Force) ->
@@ -242,7 +243,7 @@ execute_template([{template, From, To} | Terms], Files, {Template, Type, Cwd}, V
     execute_template(Terms, Files, {Template, Type, Cwd}, Vars, Force);
 %% Unknown
 execute_template([Instruction|Terms], Files, Tpl={Template,_,_}, Vars, Force) ->
-    ?WARN("Unknown template instruction ~p in template ~s",
+    ?WARN("Unknown template instruction ~p in template ~ts",
           [Instruction, Template]),
     execute_template(Terms, Files, Tpl, Vars, Force).
 
@@ -267,8 +268,8 @@ find_templates(State) ->
     PluginTemplates = find_plugin_templates(State),
     {MainTemplates, Files} =
         case rebar_state:escript_path(State) of
-            undefined ->
-                {find_priv_templates(State), []};
+            undefined -> % running in local install
+                {find_localinstall_templates(State), []};
             _ ->
                 %% Cache the files since we'll potentially need to walk it several times
                 %% over the course of a run.
@@ -305,13 +306,12 @@ cache_escript_files(State) ->
 find_escript_templates(Files) ->
     [{escript, Name}
      || {Name, _Bin} <- Files,
-        re:run(Name, ?TEMPLATE_RE, [{capture, none}]) == match].
+        re:run(Name, ?TEMPLATE_RE, [{capture, none}, unicode]) == match].
 
-find_priv_templates(State) ->
-    OtherTemplates = rebar_utils:find_files(code:priv_dir(rebar), ?TEMPLATE_RE),
-    HomeFiles = rebar_utils:find_files(rebar_dir:template_dir(State),
-                                       ?TEMPLATE_RE, true), % recursive
-    [{file, F} || F <- OtherTemplates ++ HomeFiles].
+find_localinstall_templates(_State) ->
+    Templates = rebar_utils:find_files(code:priv_dir(rebar), ?TEMPLATE_RE),
+    %% Pretend we're still running escripts; should work transparently.
+    [{builtin, F} || F <- Templates].
 
 %% Fetch template indexes that sit on disk in the user's HOME
 find_disk_templates(State) ->
@@ -326,7 +326,7 @@ find_other_templates(State) ->
         undefined ->
             [];
         TemplateDir ->
-            rebar_utils:find_files(TemplateDir, ?TEMPLATE_RE)
+            rebar_utils:find_files(TemplateDir, ?TEMPLATE_RE, true) % recursive
     end.
 
 %% Fetch template indexes that sit on disk in plugins
@@ -335,7 +335,18 @@ find_plugin_templates(State) ->
      || App <- rebar_state:all_plugin_deps(State),
         Priv <- [rebar_app_info:priv_dir(App)],
         Priv =/= undefined,
+        File <- rebar_utils:find_files(Priv, ?TEMPLATE_RE)]
+    ++ %% and add global plugins too
+    [{plugin, File}
+     || PSource <- rebar_state:get(State, {plugins, global}, []),
+        Plugin <- [plugin_provider(PSource)],
+        is_atom(Plugin),
+        Priv <- [code:priv_dir(Plugin)],
+        Priv =/= undefined,
         File <- rebar_utils:find_files(Priv, ?TEMPLATE_RE)].
+
+plugin_provider(P) when is_atom(P) -> P;
+plugin_provider(T) when is_tuple(T) -> element(1, T).
 
 %% Take an existing list of templates and tag them by name the way
 %% the user would enter it from the CLI
@@ -354,13 +365,17 @@ prioritize_templates([{Name, Type, File} | Rest], Valid) ->
             ?DEBUG("Skipping template ~p, due to presence of a built-in "
                    "template with the same name", [Name]),
             prioritize_templates(Rest, Valid);
+        {_, builtin, _} ->
+            ?DEBUG("Skipping template ~p, due to presence of a built-in "
+                   "template with the same name", [Name]),
+            prioritize_templates(Rest, Valid);
         {_, plugin, _} ->
             ?DEBUG("Skipping template ~p, due to presence of a plugin "
                    "template with the same name", [Name]),
             prioritize_templates(Rest, Valid);
         {_, file, _} ->
             ?DEBUG("Skipping template ~p, due to presence of a custom "
-                   "template at ~s", [Name, File]),
+                   "template at ~ts", [Name, File]),
             prioritize_templates(Rest, Valid)
     end.
 
@@ -368,6 +383,9 @@ prioritize_templates([{Name, Type, File} | Rest], Valid) ->
 %% Read the contents of a file from the appropriate source
 load_file(Files, escript, Name) ->
     {Name, Bin} = lists:keyfind(Name, 1, Files),
+    Bin;
+load_file(_Files, builtin, Name) ->
+    {ok, Bin} = file:read_file(Name),
     Bin;
 load_file(_Files, plugin, Name) ->
     {ok, Bin} = file:read_file(Name),
@@ -412,10 +430,10 @@ write_file(Output, Data, Force) ->
             ok = filelib:ensure_dir(Output),
             case {Force, FileExists} of
                 {true, true} ->
-                    ?INFO("Writing ~s (forcibly overwriting)",
+                    ?INFO("Writing ~ts (forcibly overwriting)",
                              [Output]);
                 _ ->
-                    ?INFO("Writing ~s", [Output])
+                    ?INFO("Writing ~ts", [Output])
             end,
             case file:write_file(Output, Data) of
                 ok ->
@@ -432,4 +450,4 @@ write_file(Output, Data, Force) ->
 %% Render a binary to a string, using mustache and the specified context
 %%
 render(Bin, Context) ->
-    bbmustache:render(ec_cnv:to_binary(Bin), Context, [{key_type, atom}]).
+    bbmustache:render(rebar_utils:to_binary(Bin), Context, [{key_type, atom}]).

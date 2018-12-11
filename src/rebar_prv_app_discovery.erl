@@ -49,19 +49,19 @@ do(State) ->
 
 -spec format_error(any()) -> iolist().
 format_error({multiple_app_files, Files}) ->
-    io_lib:format("Multiple app files found in one app dir: ~s", [string:join(Files, " and ")]);
+    io_lib:format("Multiple app files found in one app dir: ~ts", [rebar_string:join(Files, " and ")]);
 format_error({invalid_app_file, File, Reason}) ->
     case Reason of
         {Line, erl_parse, Description} ->
-            io_lib:format("Invalid app file ~s at line ~b: ~p",
+            io_lib:format("Invalid app file ~ts at line ~b: ~p",
                 [File, Line, lists:flatten(Description)]);
         _ ->
-            io_lib:format("Invalid app file ~s: ~p", [File, Reason])
+            io_lib:format("Invalid app file ~ts: ~p", [File, Reason])
     end;
 %% Provide a slightly more informative error message for consult of app file failure
 format_error({rebar_file_utils, {bad_term_file, AppFile, Reason}}) ->
-    io_lib:format("Error in app file ~s: ~s", [rebar_dir:make_relative_path(AppFile,
-                                                                            rebar_dir:get_cwd()),
-                                               file:format_error(Reason)]);
+    io_lib:format("Error in app file ~ts: ~ts", [rebar_dir:make_relative_path(AppFile,
+                                                                              rebar_dir:get_cwd()),
+                                                 file:format_error(Reason)]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).

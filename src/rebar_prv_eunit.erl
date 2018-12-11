@@ -18,6 +18,8 @@
 %% we need to modify app_info state before compile
 -define(DEPS, [lock]).
 
+-define(DEFAULT_TEST_REGEX, "^(?!\\._).*\\.erl\$").
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -52,7 +54,7 @@ do(State, Tests) ->
     ?INFO("Performing EUnit tests...", []),
 
     setup_name(State),
-    rebar_utils:update_code(rebar_state:code_paths(State, all_deps), [soft_purge]),
+    rebar_paths:set_paths([deps, plugins], State),
 
     %% Run eunit provider prehooks
     Providers = rebar_state:providers(State),
@@ -65,14 +67,14 @@ do(State, Tests) ->
                 {ok, State1} ->
                     %% Run eunit provider posthooks
                     rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State1),
-                    rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+                    rebar_paths:set_paths([plugins, deps], State),
                     {ok, State1};
                 Error ->
-                    rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+                    rebar_paths:set_paths([plugins, deps], State),
                     Error
             end;
         Error ->
-            rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+            rebar_paths:set_paths([plugins, deps], State),
             Error
     end.
 
@@ -81,13 +83,16 @@ run_tests(State, Tests) ->
     EUnitOpts = resolve_eunit_opts(State),
     ?DEBUG("eunit_tests ~p", [T]),
     ?DEBUG("eunit_opts  ~p", [EUnitOpts]),
-    Result = eunit:test(T, EUnitOpts),
-    ok = maybe_write_coverdata(State),
-    case handle_results(Result) of
-        {error, Reason} ->
-            ?PRV_ERROR(Reason);
-        ok ->
-            {ok, State}
+    try eunit:test(T, EUnitOpts) of
+      Result ->
+        ok = maybe_write_coverdata(State),
+        case handle_results(Result) of
+            {error, Reason} ->
+                ?PRV_ERROR(Reason);
+            ok ->
+                {ok, State}
+        end
+    catch error:badarg -> ?PRV_ERROR({error, badarg})
     end.
 
 -spec format_error(any()) -> iolist().
@@ -136,7 +141,8 @@ resolve(Flag, RawOpts) -> resolve(Flag, Flag, RawOpts).
 resolve(Flag, EUnitKey, RawOpts) ->
     case proplists:get_value(Flag, RawOpts) of
         undefined -> [];
-        Args      -> lists:map(fun(Arg) -> normalize(EUnitKey, Arg) end, string:tokens(Args, [$,]))
+        Args      -> lists:map(fun(Arg) -> normalize(EUnitKey, Arg) end,
+                               rebar_string:lexemes(Args, [$,]))
     end.
 
 normalize(Key, Value) when Key == dir; Key == file -> {Key, Value};
@@ -151,7 +157,6 @@ cfg_tests(State) ->
             ?PRV_ERROR({badconfig, {"Value `~p' of option `~p' must be a list", {Wrong, eunit_tests}}})
     end.
 
-select_tests(_State, _ProjectApps, {error, _} = Error, _) -> Error;
 select_tests(_State, _ProjectApps, _, {error, _} = Error) -> Error;
 select_tests(State, ProjectApps, [], []) -> {ok, default_tests(State, ProjectApps)};
 select_tests(_State, _ProjectApps, [], Tests)  -> {ok, Tests};
@@ -174,34 +179,38 @@ set_apps([App|Rest], Acc) ->
 set_modules(Apps, State) -> set_modules(Apps, State, {[], []}).
 
 set_modules([], State, {AppAcc, TestAcc}) ->
-    TestSrc = gather_src([filename:join([rebar_state:dir(State), "test"])]),
+    Regex = rebar_state:get(State, eunit_test_regex, ?DEFAULT_TEST_REGEX),
+    BareTestDir = [filename:join([rebar_state:dir(State), "test"])],
+    TestSrc = gather_src(BareTestDir, Regex),
     dedupe_tests({AppAcc, TestAcc ++ TestSrc});
 set_modules([App|Rest], State, {AppAcc, TestAcc}) ->
     F = fun(Dir) -> filename:join([rebar_app_info:dir(App), Dir]) end,
     AppDirs = lists:map(F, rebar_dir:src_dirs(rebar_app_info:opts(App), ["src"])),
-    AppSrc = gather_src(AppDirs),
+    Regex = rebar_state:get(State, eunit_test_regex, ?DEFAULT_TEST_REGEX),
+    AppSrc = gather_src(AppDirs, Regex),
     TestDirs = [filename:join([rebar_app_info:dir(App), "test"])],
-    TestSrc = gather_src(TestDirs),
+    TestSrc = gather_src(TestDirs, Regex),
     set_modules(Rest, State, {AppSrc ++ AppAcc, TestSrc ++ TestAcc}).
 
-gather_src(Dirs) -> gather_src(Dirs, []).
+gather_src(Dirs, Regex) -> gather_src(Dirs, Regex, []).
 
-gather_src([], Srcs) -> Srcs;
-gather_src([Dir|Rest], Srcs) ->
-    gather_src(Rest, Srcs ++ rebar_utils:find_files(Dir, "^[^._].*\\.erl\$", true)).
+gather_src([], _Regex, Srcs) -> Srcs;
+gather_src([Dir|Rest], Regex, Srcs) ->
+    gather_src(Rest, Regex, Srcs ++ rebar_utils:find_files(Dir, Regex, true)).
 
 dedupe_tests({AppMods, TestMods}) ->
+    UniqueTestMods = lists:usort(TestMods) -- AppMods,
     %% for each modules in TestMods create a test if there is not a module
     %% in AppMods that will trigger it
-    F = fun(Mod) ->
-        M = filename:basename(Mod, ".erl"),
-        MatchesTest = fun(Dir) -> filename:basename(Dir, ".erl") ++ "_tests" == M end,
+    F = fun(TestMod) ->
+        M = filename:rootname(filename:basename(TestMod)),
+        MatchesTest = fun(AppMod) -> filename:rootname(filename:basename(AppMod)) ++ "_tests" == M end,
         case lists:any(MatchesTest, AppMods) of
             false -> {true, {module, list_to_atom(M)}};
             true  -> false
         end
     end,
-    lists:usort(rebar_utils:filtermap(F, TestMods)).
+    rebar_utils:filtermap(F, UniqueTestMods).
 
 inject_eunit_state(State, {ok, Tests}) ->
     Apps = rebar_state:project_apps(State),
@@ -306,19 +315,14 @@ maybe_inject_test_dir(State, AppAcc, [], Dir) ->
 
 inject_test_dir(Opts, Dir) ->
     %% append specified test targets to app defined `extra_src_dirs`
-    ExtraSrcDirs = rebar_dir:extra_src_dirs(Opts),
+    ExtraSrcDirs = rebar_opts:get(Opts, extra_src_dirs, []),
     rebar_opts:set(Opts, extra_src_dirs, ExtraSrcDirs ++ [Dir]).
 
 compile({error, _} = Error) -> Error;
 compile(State) ->
-    case rebar_prv_compile:do(State) of
-        %% successfully compiled apps
-        {ok, S} ->
-            ok = maybe_cover_compile(S),
-            {ok, S};
-        %% this should look like a compiler error, not an eunit error
-        Error   -> Error
-    end.
+    {ok, S} = rebar_prv_compile:do(State),
+    ok = maybe_cover_compile(S),
+    {ok, S}.
 
 validate_tests(State, {ok, Tests}) ->
     gather_tests(fun(Elem) -> validate(State, Elem) end, Tests, []);
@@ -448,7 +452,7 @@ translate(State, [], {dir, Dir}) ->
 translate(State, [], {file, FilePath}) ->
     Dir = filename:dirname(FilePath),
     File = filename:basename(FilePath),
-    case rebar_file_utils:path_from_ancestor(Dir, rebar_app_info:dir(State)) of
+    case rebar_file_utils:path_from_ancestor(Dir, rebar_state:dir(State)) of
         {ok, Path}         -> {file, filename:join([rebar_dir:base_dir(State), "extras", Path, File])};
         %% not relative, leave as is
         {error, badparent} -> {file, FilePath}
@@ -468,7 +472,8 @@ maybe_write_coverdata(State) ->
         true  -> rebar_state:set(State, cover_enabled, true);
         false -> State
     end,
-    rebar_prv_cover:maybe_write_coverdata(State1, ?PROVIDER).
+    Name = proplists:get_value(cover_export_name, RawOpts, ?PROVIDER),
+    rebar_prv_cover:maybe_write_coverdata(State1, Name).
 
 handle_results(ok) -> ok;
 handle_results(error) ->
@@ -480,6 +485,7 @@ eunit_opts(_State) ->
     [{app, undefined, "app", string, help(app)},
      {application, undefined, "application", string, help(app)},
      {cover, $c, "cover", boolean, help(cover)},
+     {cover_export_name, undefined, "cover_export_name", string, help(cover_export_name)},
      {dir, $d, "dir", string, help(dir)},
      {file, $f, "file", string, help(file)},
      {module, $m, "module", string, help(module)},
@@ -491,6 +497,7 @@ eunit_opts(_State) ->
 
 help(app)       -> "Comma separated list of application test suites to run. Equivalent to `[{application, App}]`.";
 help(cover)     -> "Generate cover data. Defaults to false.";
+help(cover_export_name) -> "Base name of the coverdata file to write";
 help(dir)       -> "Comma separated list of dirs to load tests from. Equivalent to `[{dir, Dir}]`.";
 help(file)      -> "Comma separated list of files to load tests from. Equivalent to `[{file, File}]`.";
 help(module)    -> "Comma separated list of modules to load tests from. Equivalent to `[{module, Module}]`.";

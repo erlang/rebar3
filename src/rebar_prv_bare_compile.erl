@@ -29,7 +29,8 @@ init(State) ->
                                                   {example, ""},
                                                   {short_desc, ""},
                                                   {desc, ""},
-                                                  {opts, [{paths, $p, "paths", string, "Wildcard path of ebin directories to add to code path"}]}])),
+                                                  {opts, [{paths, $p, "paths", string, "Wildcard paths of ebin directories to add to code path, separated by a colon"},
+                                                          {separator, $s, "separator", string, "In case of multiple return paths, the separator character to use to join them."}]}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
@@ -39,12 +40,15 @@ do(State) ->
     %% Add code paths from --paths to the beginning of the code path
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     Paths = proplists:get_value(paths, RawOpts),
-    CodePaths = filelib:wildcard(Paths),
-    code:add_pathsa(CodePaths),
+    Sep = proplists:get_value(separator, RawOpts, " "),
+    [ code:add_pathsa(filelib:wildcard(PathWildcard))
+      || PathWildcard <- rebar_string:lexemes(Paths, Sep) ],
 
     [AppInfo] = rebar_state:project_apps(State),
     AppInfo1 = rebar_app_info:out_dir(AppInfo, rebar_dir:get_cwd()),
-    rebar_prv_compile:compile(State, AppInfo1),
+
+    %% run compile in the default namespace
+    rebar_prv_compile:compile(rebar_state:namespace(State, default), AppInfo1),
 
     rebar_utils:cleanup_code_path(OrigPath),
 

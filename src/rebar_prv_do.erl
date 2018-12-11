@@ -44,13 +44,31 @@ do(State) ->
             do_tasks(Tasks, State)
     end.
 
+-spec do_tasks(list(Task), State) -> Res when
+      Task :: {string(), string()} |
+              {string(), atom()} |
+              {atom(), atom(), string()},
+      State :: rebar_state:t(),
+      Res :: {ok, rebar_state:t()} |
+             {error, term()}.
 do_tasks([], State) ->
     {ok, State};
-do_tasks([{TaskStr, Args}|Tail], State) ->
+do_tasks([{TaskStr, Args} | Tail], State) when is_list(Args) ->
     Task = list_to_atom(TaskStr),
     State1 = rebar_state:set(State, task, Task),
     State2 = rebar_state:command_args(State1, Args),
     Namespace = rebar_state:namespace(State2),
+    do_task(TaskStr, Args, Tail, State, Namespace);
+do_tasks([{Namespace, Task} | Tail], State) ->
+    do_task(atom_to_list(Task), [], Tail, State, Namespace);
+do_tasks([{Namespace, Task, Args} | Tail], State)
+  when is_atom(Namespace), is_atom(Task) ->
+    do_task(atom_to_list(Task), Args, Tail, State, Namespace).
+
+do_task(TaskStr, Args, Tail, State,  Namespace) ->
+    Task = list_to_atom(TaskStr),
+    State1 = rebar_state:set(State, task, Task),
+    State2 = rebar_state:command_args(State1, Args),
     case Namespace of
         default ->
             %% The first task we hit might be a namespace!
@@ -65,7 +83,8 @@ do_tasks([{TaskStr, Args}|Tail], State) ->
         _ ->
             %% We're already in a non-default namespace, check the
             %% task directly.
-            case rebar_core:process_command(State2, Task) of
+            State3 = rebar_state:namespace(State2, Namespace),
+            case rebar_core:process_command(State3, Task) of
                 {ok, FinalState} when Tail =:= [] ->
                     {ok, FinalState};
                 {ok, _} ->
@@ -74,7 +93,6 @@ do_tasks([{TaskStr, Args}|Tail], State) ->
                     {error, Reason}
             end
     end.
-
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->

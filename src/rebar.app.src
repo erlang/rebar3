@@ -8,6 +8,7 @@
   {registered, []},
   {applications, [kernel,
                   stdlib,
+                  hipe,
                   sasl,
                   compiler,
                   crypto,
@@ -23,12 +24,13 @@
                   erlware_commons,
                   providers,
                   bbmustache,
-                  ssl_verify_hostname,
+                  ssl_verify_fun,
                   certifi,
                   cth_readable,
                   relx,
                   cf,
                   inets,
+                  hex_core,
                   eunit_formatters]},
   {env, [
         %% Default log level
@@ -37,6 +39,9 @@
         {resources, [{git, rebar_git_resource},
                      {pkg, rebar_pkg_resource},
                      {hg, rebar_hg_resource}]},
+
+        {compilers, [rebar_compiler_xrl, rebar_compiler_yrl,
+                     rebar_compiler_mib, rebar_compiler_erl]},
 
         {providers, [rebar_prv_app_discovery,
                      rebar_prv_as,
@@ -52,6 +57,7 @@
                      rebar_prv_edoc,
                      rebar_prv_escriptize,
                      rebar_prv_eunit,
+                     rebar_prv_get_deps,
                      rebar_prv_help,
                      rebar_prv_install_deps,
                      rebar_prv_local_install,
@@ -65,6 +71,7 @@
                      rebar_prv_release,
                      rebar_prv_relup,
                      rebar_prv_report,
+                     rebar_prv_repos,
                      rebar_prv_shell,
                      rebar_prv_state,
                      rebar_prv_tar,
@@ -72,6 +79,7 @@
                      rebar_prv_update,
                      rebar_prv_upgrade,
                      rebar_prv_version,
-                     rebar_prv_xref]}
+                     rebar_prv_xref,
+                     rebar_prv_alias]} % must run last to prevent overloads
         ]}
  ]}.

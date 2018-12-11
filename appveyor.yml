@@ -1,0 +1,20 @@
+version: "{build}"
+branches:
+  only:
+  - master
+environment:
+  matrix:
+  - erlang_vsn: 19.2
+  - erlang_vsn: 18.3
+  - erlang_vsn: 17.5
+install:
+- ps: choco install erlang --version $env:erlang_vsn
+build_script:
+- ps: cmd.exe /c 'bootstrap.bat'
+test_script:
+- ps: cmd.exe /c 'rebar3.cmd ct'
+notifications:
+- provider: GitHubPullRequest
+  on_build_success: true
+  on_build_failure: true
+  on_build_status_changed: false

@@ -162,7 +162,7 @@ $ ./rebar3 ct
 ```
 
 Most tests are named according to their module name followed by the `_SUITE`
-suffi. Providers are made shorter, such that `rebar_prv_new` is tested in
+suffix. Providers are made shorter, such that `rebar_prv_new` is tested in
 `rebar_new_SUITE`.
 
 Most tests in the test suite will rely on calling Rebar3 in its API form,
@@ -285,7 +285,7 @@ The reviewer may ask you to later squash the commits together to provide
 a clean commit history before merging in the feature.
 
 It's important to write a proper commit title and description. The commit title
-should fir around 50 characters; it is the first line of the commit text. The
+should be no more than 50 characters; it is the first line of the commit text. The
 second line of the commit text must be left blank. The third line and beyond is
 the commit message. You should write a commit message. If you do, wrap all
 lines at 72 characters. You should explain what the commit does, what
@@ -299,7 +299,7 @@ maintainers. When opening a pull request, explain what the patch is doing
 and if it makes sense, why the proposed implementation was chosen.
 
 Try to use well-defined commits (one feature per commit) so that reading
-them and testing them is easier for reviewers and while bissecting the code
+them and testing them is easier for reviewers and while bisecting the code
 base for issues.
 
 During the review process, you may be asked to correct or edit a few things

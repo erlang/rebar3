@@ -24,6 +24,8 @@
          data_dir_correct/1,
          cmd_label/1,
          cmd_config/1,
+         cmd_spec/1,
+         cmd_join_specs/1,
          cmd_allow_user_terms/1,
          cmd_logdir/1,
          cmd_logopts/1,
@@ -44,13 +46,19 @@
          cmd_sys_config/1,
          cfg_opts/1,
          cfg_arbitrary_opts/1,
-         cfg_test_spec/1,
          cfg_cover_spec/1,
          cfg_atom_suites/1,
          cover_compiled/1,
+         cover_export_name/1,
          misspecified_ct_opts/1,
          misspecified_ct_compile_opts/1,
-         misspecified_ct_first_files/1]).
+         misspecified_ct_first_files/1,
+         testspec/1,
+         testspec_at_root/1,
+         testspec_parse_error/1,
+         cmd_vs_cfg_opts/1,
+         single_testspec_in_ct_opts/1,
+         compile_only/1]).
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("common_test/include/ct.hrl").
@@ -62,11 +70,17 @@ all() -> [{group, basic_app},
           {group, ct_opts},
           {group, cover},
           cfg_opts, cfg_arbitrary_opts,
-          cfg_test_spec, cfg_cover_spec,
+          cfg_cover_spec,
           cfg_atom_suites,
           misspecified_ct_opts,
           misspecified_ct_compile_opts,
-          misspecified_ct_first_files].
+          misspecified_ct_first_files,
+          testspec,
+          testspec_at_root,
+          testspec_parse_error,
+          cmd_vs_cfg_opts,
+          single_testspec_in_ct_opts,
+          compile_only].
 
 groups() -> [{basic_app, [], [basic_app_default_dirs,
                               basic_app_default_beams,
@@ -88,6 +102,8 @@ groups() -> [{basic_app, [], [basic_app_default_dirs,
              {data_dirs, [], [data_dir_correct]},
              {ct_opts, [], [cmd_label,
                             cmd_config,
+                            cmd_spec,
+                            cmd_join_specs,
                             cmd_allow_user_terms,
                             cmd_logdir,
                             cmd_logopts,
@@ -106,7 +122,8 @@ groups() -> [{basic_app, [], [basic_app_default_dirs,
                             cmd_create_priv_dir,
                             cmd_include_dir,
                             cmd_sys_config]},
-             {cover, [], [cover_compiled]}].
+             {cover, [], [cover_compiled,
+                          cover_export_name]}].
 
 init_per_group(basic_app, Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_"),
@@ -686,7 +703,33 @@ suite_at_root(Config) ->
     true = filelib:is_dir(DataDir),
 
     DataFile = filename:join([AppDir, "_build", "test", "extras", "root_SUITE_data", "some_data.txt"]),
-    true = filelib:is_file(DataFile).
+    true = filelib:is_file(DataFile),
+
+    %% Same test again, but using relative path to the suite from the
+    %% project root
+    {ok,Cwd} = file:get_cwd(),
+    ok = file:set_cwd(AppDir),
+    rebar_file_utils:rm_rf("_build"),
+
+    {ok, GetOptResult2} = getopt:parse(GetOptSpec, ["--suite=" ++ "root_SUITE"]),
+
+    State3 = rebar_state:command_parsed_args(State1, GetOptResult2),
+
+    Tests2 = rebar_prv_common_test:prepare_tests(State3),
+    {ok, NewState2} = rebar_prv_common_test:compile(State3, Tests2),
+    {ok, T2} = Tests2,
+    Opts2 = rebar_prv_common_test:translate_paths(NewState2, T2),
+
+    ok = file:set_cwd(Cwd),
+
+    Suite2 = proplists:get_value(suite, Opts2),
+    [Expected] = Suite2,
+    true = filelib:is_file(TestHrl),
+    true = filelib:is_file(TestBeam),
+    true = filelib:is_dir(DataDir),
+    true = filelib:is_file(DataFile),
+
+    ok.
 
 suite_at_app_root(Config) ->
     AppDir = ?config(apps, Config),
@@ -723,7 +766,32 @@ suite_at_app_root(Config) ->
     true = filelib:is_dir(DataDir),
 
     DataFile = filename:join([AppDir, "_build", "test", "lib", Name2, "app_root_SUITE_data", "some_data.txt"]),
-    true = filelib:is_file(DataFile).
+    true = filelib:is_file(DataFile),
+
+    %% Same test again using relative path to the suite from the project root
+    {ok,Cwd} = file:get_cwd(),
+    ok = file:set_cwd(AppDir),
+    rebar_file_utils:rm_rf("_build"),
+
+    {ok, GetOptResult2} = getopt:parse(GetOptSpec, ["--suite=" ++ filename:join(["apps", Name2, "app_root_SUITE"])]),
+
+    State3 = rebar_state:command_parsed_args(State1, GetOptResult2),
+
+    Tests2 = rebar_prv_common_test:prepare_tests(State3),
+    {ok, NewState2} = rebar_prv_common_test:compile(State3, Tests2),
+    {ok, T2} = Tests2,
+    Opts2 = rebar_prv_common_test:translate_paths(NewState2, T2),
+
+    ok = file:set_cwd(Cwd),
+
+    Suite2 = proplists:get_value(suite, Opts2),
+    [Expected] = Suite2,
+    true = filelib:is_file(TestHrl),
+    true = filelib:is_file(TestBeam),
+    true = filelib:is_dir(DataDir),
+    true = filelib:is_file(DataFile),
+
+    ok.
 
 %% this test probably only fails when this suite is run via rebar3 with the --cover flag
 data_dir_correct(Config) ->
@@ -760,6 +828,36 @@ cmd_config(Config) ->
     {ok, TestOpts} = rebar_prv_common_test:prepare_tests(NewState),
 
     true = lists:member({config, ["config/foo", "config/bar", "config/baz"]}, TestOpts).
+
+cmd_spec(Config) ->
+    State = ?config(result, Config),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+    {ok, GetOptResult} = getopt:parse(GetOptSpec, ["--spec=foo.spec,bar.spec,baz.spec"]),
+
+    NewState = rebar_state:command_parsed_args(State, GetOptResult),
+
+    {ok, TestOpts} = rebar_prv_common_test:prepare_tests(NewState),
+
+    true = lists:member({spec, ["foo.spec", "bar.spec", "baz.spec"]}, TestOpts).
+
+cmd_join_specs(Config) ->
+    State = ?config(result, Config),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+    {ok, GetOptResult} = getopt:parse(GetOptSpec, ["--join_specs=true"]),
+
+    NewState = rebar_state:command_parsed_args(State, GetOptResult),
+
+    {ok, TestOpts} = rebar_prv_common_test:prepare_tests(NewState),
+
+    true = lists:member({join_specs, true}, TestOpts).
 
 cmd_allow_user_terms(Config) ->
     State = ?config(result, Config),
@@ -1036,11 +1134,18 @@ cmd_sys_config(Config) ->
     CfgFile = filename:join([AppDir, "config", "cfg_sys.config"]),
     ok = filelib:ensure_dir(CfgFile),
     ok = file:write_file(CfgFile, cfg_sys_config_file(AppName)),
+
+    OtherCfgFile = filename:join([AppDir, "config", "other.config"]),
+    ok = filelib:ensure_dir(OtherCfgFile),
+    ok = file:write_file(OtherCfgFile, other_sys_config_file(AppName)),
+
     RebarConfig = [{ct_opts, [{sys_config, CfgFile}]}],
     {ok, State1} = rebar_test_utils:run_and_check(Config, RebarConfig, ["as", "test", "lock"], return),
 
     {ok, _} = rebar_prv_common_test:prepare_tests(State1),
     ?assertEqual({ok, cfg_value}, application:get_env(AppName, key)),
+
+    ?assertEqual({ok, other_cfg_value}, application:get_env(AppName, other_key)),
 
     Providers = rebar_state:providers(State1),
     Namespace = rebar_state:namespace(State1),
@@ -1096,23 +1201,6 @@ cfg_arbitrary_opts(Config) ->
     true = lists:member({bar, 2}, TestOpts),
     true = lists:member({baz, 3}, TestOpts).
 
-cfg_test_spec(Config) ->
-    C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_test_spec_opts_"),
-
-    AppDir = ?config(apps, C),
-
-    Name = rebar_test_utils:create_random_name("ct_cfg_test_spec_opts_"),
-    Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
-
-    RebarConfig = [{ct_opts, [Opt = {test_spec, "spec/foo.spec"}]}],
-
-    {ok, State} = rebar_test_utils:run_and_check(C, RebarConfig, ["as", "test", "lock"], return),
-
-    {ok, TestOpts} = rebar_prv_common_test:prepare_tests(State),
-
-    false = lists:member(Opt, TestOpts).
-
 cfg_cover_spec(Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_cover_spec_opts_"),
 
@@ -1164,6 +1252,29 @@ cover_compiled(Config) ->
     Name = ?config(name, Config),
     Mod = list_to_atom(Name),
     {file, _} = cover:is_compiled(Mod).
+
+cover_export_name(Config) ->
+    State = ?config(result, Config),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+    {ok, GetOptResult} = getopt:parse(GetOptSpec, ["--cover", "--cover_export_name=export_name"]),
+
+    NewState = rebar_state:command_parsed_args(State, GetOptResult),
+
+    Tests = rebar_prv_common_test:prepare_tests(NewState),
+    {ok, _} = rebar_prv_common_test:compile(NewState, Tests),
+    rebar_prv_common_test:maybe_write_coverdata(NewState),
+
+    Name = ?config(name, Config),
+    Mod = list_to_atom(Name),
+    {file, _} = cover:is_compiled(Mod),
+
+    Dir = rebar_dir:profile_dir(rebar_state:opts(NewState), [default, test]),
+    ct:pal("DIR ~s", [Dir]),
+    true = filelib:is_file(filename:join([Dir, "cover", "export_name.coverdata"])).
 
 misspecified_ct_opts(Config) ->
     C = rebar_test_utils:init_rebar_state(Config, "ct_cfg_atom_suites_"),
@@ -1218,6 +1329,312 @@ misspecified_ct_first_files(Config) ->
 
     {badconfig, {"Value `~p' of option `~p' must be a list", {some_file, ct_first_files}}} = Error.
 
+testspec(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "ct_testspec_"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name("ct_testspec_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    Spec1 = filename:join([AppDir, "test", "some.spec"]),
+    ok = filelib:ensure_dir(Spec1),
+    ok = file:write_file(Spec1, "{suites,\".\",all}.\n"),
+    Spec2 = filename:join([AppDir, "specs", "another.spec"]),
+    ok = filelib:ensure_dir(Spec2),
+    Suites2 = filename:join([AppDir,"suites","*"]),
+    ok = filelib:ensure_dir(Suites2),
+    ok = file:write_file(Spec2, "{suites,\"../suites/\",all}.\n"),
+
+    {ok,Wd} = file:get_cwd(),
+    ok = file:set_cwd(AppDir),
+
+    {ok, State} = rebar_test_utils:run_and_check(C,
+                                                 [],
+                                                 ["as", "test", "lock"],
+                                                 return),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+
+    %% Testspec in "test" directory
+    {ok, GetOptResult1} = getopt:parse(GetOptSpec, ["--spec","test/some.spec"]),
+    State1 = rebar_state:command_parsed_args(State, GetOptResult1),
+    Tests1 = rebar_prv_common_test:prepare_tests(State1),
+    {ok, NewState1} = rebar_prv_common_test:compile(State1, Tests1),
+    {ok, T1} = Tests1,
+    Opts1= rebar_prv_common_test:translate_paths(NewState1, T1),
+
+    %% check that extra src dir is added
+    [App1] = rebar_state:project_apps(NewState1),
+    ["test"] = rebar_dir:extra_src_dirs(rebar_app_info:opts(App1)),
+
+    %% check that path is translated
+    ExpectedSpec1 = filename:join([AppDir, "_build", "test", "lib", Name,
+                                  "test", "some.spec"]),
+    [ExpectedSpec1] = proplists:get_value(spec, Opts1),
+
+
+    %% Testspec in directory other than "test"
+    {ok, GetOptResult2} = getopt:parse(GetOptSpec,
+                                       ["--spec","specs/another.spec"]),
+    State2 = rebar_state:command_parsed_args(State, GetOptResult2),
+    Tests2 = {ok, T2} =rebar_prv_common_test:prepare_tests(State2),
+    {ok, NewState2} = rebar_prv_common_test:compile(State2, Tests2),
+    Opts2= rebar_prv_common_test:translate_paths(NewState2, T2),
+
+    %% check that extra src dirs are added
+    [App2] = rebar_state:project_apps(NewState2),
+    ["specs","suites","test"] =
+        lists:sort(rebar_dir:extra_src_dirs(rebar_app_info:opts(App2))),
+
+    %% check that paths are translated
+    ExpectedSpec2 = filename:join([AppDir, "_build", "test", "lib", Name,
+                                  "specs", "another.spec"]),
+    [ExpectedSpec2] = proplists:get_value(spec, Opts2),
+
+    ok = file:set_cwd(Wd),
+
+    ok.
+
+testspec_at_root(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "ct_testspec_at_root_"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name("ct_testspec_at_root_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    AppDir1 = filename:join([AppDir, "apps", Name]),
+    rebar_test_utils:create_app(AppDir1, Name, Vsn, [kernel, stdlib]),
+
+    Spec1 = filename:join([AppDir, "root.spec"]),
+    ok = filelib:ensure_dir(Spec1),
+    ok = file:write_file(Spec1, "{suites,\"test\",all}."),
+    Spec2 = filename:join([AppDir, "root1.spec"]),
+    ok = file:write_file(Spec2, "{suites,\".\",all}."),
+    Spec3 = filename:join([AppDir, "root2.spec"]),
+    ok = file:write_file(Spec3, "{suites,\"suites\",all}."),
+    Suite1 = filename:join(AppDir,"root_SUITE.erl"),
+    ok = file:write_file(Suite1, test_suite("root")),
+    Suite2 = filename:join([AppDir,"suites","test_SUITE.erl"]),
+    ok = filelib:ensure_dir(Suite2),
+    ok = file:write_file(Suite2, test_suite("test")),
+
+    {ok, State} = rebar_test_utils:run_and_check(C,
+                                                 [],
+                                                 ["as", "test", "lock"],
+                                                 return),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+
+    SpecArg1 = rebar_string:join([Spec1,Spec2,Spec3],","),
+    {ok, GetOptResult1} = getopt:parse(GetOptSpec, ["--spec",SpecArg1]),
+    State1 = rebar_state:command_parsed_args(State, GetOptResult1),
+    Tests1 = rebar_prv_common_test:prepare_tests(State1),
+    {ok, NewState1} = rebar_prv_common_test:compile(State1, Tests1),
+    {ok, T1} = Tests1,
+    Opts1= rebar_prv_common_test:translate_paths(NewState1, T1),
+
+    %% check that extra src dir is added
+    ExtraDir = filename:join([AppDir, "_build", "test", "extras"]),
+    [ExtraDir,"suites","test"] =
+        rebar_dir:extra_src_dirs(rebar_state:opts(NewState1)),
+
+    %% check that path is translated
+    ExpectedSpec1 = filename:join([AppDir, "_build", "test",
+                                   "extras", "root.spec"]),
+    ExpectedSpec2 = filename:join([AppDir, "_build", "test",
+                                   "extras", "root1.spec"]),
+    ExpectedSpec3 = filename:join([AppDir, "_build", "test",
+                                   "extras", "root2.spec"]),
+    [ExpectedSpec1,ExpectedSpec2,ExpectedSpec3] =
+        lists:sort(proplists:get_value(spec, Opts1)),
+
+    %% check that test specs are copied
+    [ExpectedSpec1,ExpectedSpec2,ExpectedSpec3] =
+        lists:sort(filelib:wildcard(filename:join([AppDir, "_build", "test",
+                                                   "extras", "*.spec"]))),
+
+    %% Same test again, using relative path
+    {ok,Cwd} = file:get_cwd(),
+    ok = file:set_cwd(AppDir),
+    ok = rebar_file_utils:rm_rf("_build"),
+
+    SpecArg2 = "root.spec,root1.spec,root2.spec",
+    {ok, GetOptResult2} = getopt:parse(GetOptSpec, ["--spec",SpecArg2]),
+    State2 = rebar_state:command_parsed_args(State, GetOptResult2),
+    Tests2 = rebar_prv_common_test:prepare_tests(State2),
+    {ok, NewState2} = rebar_prv_common_test:compile(State2, Tests2),
+    {ok, T2} = Tests2,
+    Opts2= rebar_prv_common_test:translate_paths(NewState2, T2),
+
+    %% check that extra src dir is added
+    [ExtraDir,"suites","test"] =
+        rebar_dir:extra_src_dirs(rebar_state:opts(NewState2)),
+
+    %% check that path is translated
+    [ExpectedSpec1,ExpectedSpec2,ExpectedSpec3] =
+        lists:sort(proplists:get_value(spec, Opts2)),
+
+    %% check that test specs are copied
+    [ExpectedSpec1,ExpectedSpec2,ExpectedSpec3] =
+        lists:sort(filelib:wildcard(filename:join([AppDir, "_build", "test",
+                                                   "extras", "root*.spec"]))),
+
+    ok = file:set_cwd(Cwd),
+
+    ok.
+
+testspec_parse_error(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "ct_testspec_error"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name("ct_testspec_error"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    Spec1 = filename:join([AppDir, "test", "nonexisting.spec"]),
+    Spec2 = filename:join([AppDir, "test", "some.spec"]),
+    ok = filelib:ensure_dir(Spec2),
+    ok = file:write_file(Spec2, ".\n"),
+
+    {ok, State} = rebar_test_utils:run_and_check(C,
+                                                 [],
+                                                 ["as", "test", "lock"],
+                                                 return),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+
+    %% Non existing testspec
+    {ok, GetOptResult1} = getopt:parse(GetOptSpec, ["--spec",Spec1]),
+    State1 = rebar_state:command_parsed_args(State, GetOptResult1),
+    Tests1 = rebar_prv_common_test:prepare_tests(State1),
+    {error,
+     {rebar_prv_common_test,
+      {error_reading_testspec,
+       {Spec1,"no such file or directory"}}}} =
+        rebar_prv_common_test:compile(State1, Tests1),
+
+    %% Syntax error
+    {ok, GetOptResult2} = getopt:parse(GetOptSpec, ["--spec",Spec2]),
+    State2 = rebar_state:command_parsed_args(State, GetOptResult2),
+    Tests2 = rebar_prv_common_test:prepare_tests(State2),
+    {error,
+     {rebar_prv_common_test,
+      {error_reading_testspec,
+       {Spec2,"1: syntax error before: '.'"}}}} =
+        rebar_prv_common_test:compile(State2, Tests2),
+
+    ok.
+
+cmd_vs_cfg_opts(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "ct_cmd_vs_cfg_opts_"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name("ct_cmd_vs_cfg_opts_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [{ct_opts, [{spec,"mytest.spec"},
+                              {dir,"test"},
+                              {suite,"some_SUITE"},
+                              {group,"some_group"},
+                              {testcase,"some_test"}]}],
+
+    {ok, State} = rebar_test_utils:run_and_check(C, RebarConfig, ["as", "test", "lock"], return),
+
+    {ok, TestOpts} = rebar_prv_common_test:prepare_tests(State),
+    true = lists:member({spec, "mytest.spec"}, TestOpts),
+    true = lists:member({dir, "test"}, TestOpts),
+    true = lists:member({suite, "some_SUITE"}, TestOpts),
+    true = lists:member({group, "some_group"}, TestOpts),
+    true = lists:member({testcase, "some_test"}, TestOpts),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+
+    {ok, GetOptResult1} = getopt:parse(GetOptSpec, ["--spec","test/some.spec"]),
+    State1 = rebar_state:command_parsed_args(State, GetOptResult1),
+    {ok, TestOpts1} = rebar_prv_common_test:prepare_tests(State1),
+    true = lists:member({spec, ["test/some.spec"]}, TestOpts1),
+    false = lists:keymember(dir, 1, TestOpts1),
+    false = lists:keymember(suite, 1, TestOpts1),
+    false = lists:keymember(group, 1, TestOpts1),
+    false = lists:keymember(testcase, 1, TestOpts1),
+
+    {ok, GetOptResult2} = getopt:parse(GetOptSpec, ["--suite","test/some_SUITE"]),
+    State2 = rebar_state:command_parsed_args(State, GetOptResult2),
+    {ok, TestOpts2} = rebar_prv_common_test:prepare_tests(State2),
+    true = lists:member({suite, ["test/some_SUITE"]}, TestOpts2),
+    false = lists:keymember(spec, 1, TestOpts2),
+    false = lists:keymember(dir, 1, TestOpts2),
+    false = lists:keymember(group, 1, TestOpts2),
+    false = lists:keymember(testcase, 1, TestOpts2),
+
+    ok.
+
+single_testspec_in_ct_opts(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "ct_testspec_"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name("ct_testspec_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    Spec = filename:join([AppDir, "test", "some.spec"]),
+    ok = filelib:ensure_dir(Spec),
+    ok = file:write_file(Spec, "{suites,\".\",all}.\n"),
+
+    {ok,Wd} = file:get_cwd(),
+    ok = file:set_cwd(AppDir),
+
+    RebarConfig = [{ct_opts, [{spec,"test/some.spec"}]}],
+
+    {ok, State} = rebar_test_utils:run_and_check(C, RebarConfig, ["as", "test", "lock"], return),
+
+    Providers = rebar_state:providers(State),
+    Namespace = rebar_state:namespace(State),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+
+    %% Testspec in "test" directory
+    {ok, GetOptResult1} = getopt:parse(GetOptSpec, []),
+    State1 = rebar_state:command_parsed_args(State, GetOptResult1),
+    Tests1 = rebar_prv_common_test:prepare_tests(State1),
+    {ok, T1} = Tests1,
+    "test/some.spec" = proplists:get_value(spec,T1),
+    {ok, _NewState} = rebar_prv_common_test:compile(State1, Tests1),
+
+    ok = file:set_cwd(Wd),
+    ok.
+
+compile_only(Config) ->
+    C = rebar_test_utils:init_rebar_state(Config, "compile_only_"),
+
+    AppDir = ?config(apps, C),
+
+    Name = rebar_test_utils:create_random_name(atom_to_list(basic_app) ++ "_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    Suite = filename:join([AppDir, "test", Name ++ "_SUITE.erl"]),
+    ok = filelib:ensure_dir(Suite),
+    ok = file:write_file(Suite, test_suite(Name)),
+
+    {ok, _State} = rebar_test_utils:run_and_check(C, [], ["ct", "--compile_only"], {ok, [{app,Name}], "test"}).
+
+
 %% helper for generating test data
 test_suite(Name) ->
     io_lib:format("-module(~ts_SUITE).\n"
@@ -1226,7 +1643,10 @@ test_suite(Name) ->
                   "some_test(_) -> ok.\n", [Name]).
 
 cmd_sys_config_file(AppName) ->
-    io_lib:format("[{~s, [{key, cmd_value}]}].", [AppName]).
+    io_lib:format("[{~ts, [{key, cmd_value}]}].", [AppName]).
 
 cfg_sys_config_file(AppName) ->
-    io_lib:format("[{~s, [{key, cfg_value}]}].", [AppName]).
+    io_lib:format("[{~ts, [{key, cfg_value}]}, \"config/other\"].", [AppName]).
+
+other_sys_config_file(AppName) ->
+    io_lib:format("[{~ts, [{other_key, other_cfg_value}]}].", [AppName]).

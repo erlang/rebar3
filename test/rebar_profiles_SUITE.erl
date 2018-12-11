@@ -7,6 +7,7 @@
          all/0,
          profile_new_key/1,
          profile_merge_keys/1,
+         profile_merge_umbrella_keys/1,
          explicit_profile_deduplicate_deps/1,
          implicit_profile_deduplicate_deps/1,
          all_deps_code_paths/1,
@@ -20,14 +21,23 @@
          test_profile_applied_at_completion/1,
          test_profile_applied_before_compile/1,
          test_profile_applied_before_eunit/1,
-         test_profile_applied_to_apps/1]).
+         test_profile_applied_to_apps/1,
+         test_profile_erl_opts_order_1/1,
+         test_profile_erl_opts_order_2/1,
+         test_profile_erl_opts_order_3/1,
+         test_profile_erl_opts_order_4/1,
+         test_profile_erl_opts_order_5/1,
+         test_erl_opts_debug_info/1,
+         test_profile_erl_opts_precedence/1,
+         first_files_exception/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/file.hrl").
 
 all() ->
-    [profile_new_key, profile_merge_keys, all_deps_code_paths, profile_merges,
+    [profile_new_key, profile_merge_keys, profile_merge_umbrella_keys,
+     all_deps_code_paths, profile_merges,
      explicit_profile_deduplicate_deps, implicit_profile_deduplicate_deps,
      same_profile_deduplication, stack_deduplication,
      add_to_profile, add_to_existing_profile,
@@ -36,7 +46,15 @@ all() ->
      test_profile_applied_at_completion,
      test_profile_applied_before_compile,
      test_profile_applied_before_eunit,
-     test_profile_applied_to_apps].
+     test_profile_applied_to_apps,
+     test_profile_erl_opts_order_1,
+     test_profile_erl_opts_order_2,
+     test_profile_erl_opts_order_3,
+     test_profile_erl_opts_order_4,
+     test_profile_erl_opts_order_5,
+     test_erl_opts_debug_info,
+     test_profile_erl_opts_precedence,
+     first_files_exception].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -106,6 +124,35 @@ profile_merge_keys(Config) ->
                                                                  ,{dep, "a", "1.0.0"}
                                                                  ,{dep, "b", "2.0.0"}]}).
 
+profile_merge_umbrella_keys(Config) ->
+    AppDir = ?config(apps, Config),
+    ct:pal("Path: ~s", [AppDir]),
+    Name = rebar_test_utils:create_random_name("profile_merge_umbrella_keys"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    SubAppDir = filename:join([AppDir, "apps", Name]),
+
+    RebarConfig = [{vals, [{a,1},{b,1}]},
+                   {profiles,
+                    [{ct,
+                      [{vals, [{a,1},{b,2}]}]}]}],
+    
+    SubRebarConfig = [{vals, []},
+                       {profiles, [{ct, [{vals, [{c,1}]}]}]}],
+
+    rebar_test_utils:create_app(SubAppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_config(SubAppDir, SubRebarConfig),
+    {ok, RebarConfigRead} = file:consult(rebar_test_utils:create_config(AppDir, RebarConfig)),
+
+    {ok, State} = rebar_test_utils:run_and_check(
+        Config, RebarConfigRead, ["as", "ct", "compile"], return
+    ),
+
+    [ProjectApp] = rebar_state:project_apps(State),
+    ?assertEqual(Name, binary_to_list(rebar_app_info:name(ProjectApp))),
+    Opts = rebar_app_info:opts(ProjectApp),
+    ?assertEqual([{a,1},{b,2},{b,1},{c,1}], dict:fetch(vals, Opts)),
+    ok.
+
 explicit_profile_deduplicate_deps(Config) ->
     AppDir = ?config(apps, Config),
 
@@ -166,7 +213,7 @@ implicit_profile_deduplicate_deps(Config) ->
     rebar_test_utils:run_and_check(Config, RebarConfig,
                                    ["as", "test,bar", "eunit"], {ok, [{app, Name}
                                                                  ,{dep, "a", "1.0.0"}
-                                                                 ,{dep, "b", "2.0.0"}]}).
+                                                                 ,{dep, "b", "1.0.0"}]}).
 
 all_deps_code_paths(Config) ->
     AppDir = ?config(apps, Config),
@@ -432,3 +479,166 @@ test_profile_applied_to_apps(Config) ->
         ErlOpts = dict:fetch(erl_opts, Opts),
         true = lists:member({d, 'TEST'}, ErlOpts)
     end, Apps).
+
+test_profile_erl_opts_order_1(Config) ->
+    Opts = get_compiled_profile_erl_opts([default], Config),
+    Opt = last_erl_opt(Opts, [warn_export_all, nowarn_export_all], undefined),
+    undefined = Opt.
+
+test_profile_erl_opts_order_2(Config) ->
+    Opts = get_compiled_profile_erl_opts([strict], Config),
+    Opt = last_erl_opt(Opts, [warn_export_all, nowarn_export_all], undefined),
+    warn_export_all = Opt.
+
+test_profile_erl_opts_order_3(Config) ->
+    Opts = get_compiled_profile_erl_opts([loose], Config),
+    Opt = last_erl_opt(Opts, [warn_export_all, nowarn_export_all], undefined),
+    nowarn_export_all = Opt.
+
+test_profile_erl_opts_order_4(Config) ->
+    Opts = get_compiled_profile_erl_opts([strict, loose], Config),
+    Opt = last_erl_opt(Opts, [warn_export_all, nowarn_export_all], undefined),
+    nowarn_export_all = Opt.
+
+test_profile_erl_opts_order_5(Config) ->
+    Opts = get_compiled_profile_erl_opts([loose, strict], Config),
+    Opt = last_erl_opt(Opts, [warn_export_all, nowarn_export_all], undefined),
+    warn_export_all = Opt.
+
+test_erl_opts_debug_info(_Config) ->
+    ToOpts = fun(List) -> rebar_opts:erl_opts(dict:from_list([{erl_opts, List}])) end,
+    ?assertEqual([debug_info,a,b,c],
+                 ToOpts([a,b,c])),
+    ?assertEqual([{debug_info,{mod,123}},a,b,c,debug_info],
+                 ToOpts([{debug_info,{mod,123}},a,b,c,debug_info])),
+    ?assertEqual([a,b,debug_info,c],
+                 ToOpts([no_debug_info,a,b,debug_info,c])),
+    ?assertEqual([a,b,c],
+                 ToOpts([debug_info,a,b,no_debug_info,c])),
+    ?assertEqual([a,b,c,debug_info],
+                 ToOpts([{debug_info_key, "12345"},a,b,
+                         no_debug_info,c,debug_info])),
+    ?assertEqual([a,b,c],
+                 ToOpts([{debug_info,{mod,123}},{debug_info_key, "12345"},
+                         a,no_debug_info,b,c,debug_info,no_debug_info])),
+    ?assertEqual([a,b,c,{debug_info_key,"123"}],
+                 ToOpts([{debug_info_key, "12345"},a,b,no_debug_info,debug_info,
+                         c,{debug_info_key, "123"}])),
+    ?assertEqual([{debug_info_key,"12345"},a,b,c,{debug_info,{mod,"123"}}],
+                 ToOpts([debug_info,{debug_info_key,"12345"},a,
+                         no_debug_info,b,c,{debug_info,{mod,"123"}}])),
+    ok.
+
+test_profile_erl_opts_precedence(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = rebar_test_utils:create_random_name("profile_new_key_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    RebarConfig = [{erl_opts, [no_debug_info]},
+                   {profiles, [
+                     {test, [{erl_opts, [debug_info, {d,'HI'}]}]},
+                     {other, [{erl_opts, [debug_info, {d,'HI'}]}]}
+                   ]}],
+    {ok, State1} = rebar_test_utils:run_and_check(
+      Config, RebarConfig, ["as", "test", "compile"], return
+    ),
+    {ok, State2} = rebar_test_utils:run_and_check(
+      Config, RebarConfig, ["as", "other", "compile"], return
+    ),
+    {ok, State3} = rebar_test_utils:run_and_check(
+      Config, RebarConfig, ["compile"], return
+    ),
+    Opts1 = rebar_state:opts(State1),
+    Opts2 = rebar_state:opts(State2),
+    Opts3 = rebar_state:opts(State3),
+    ErlOpts1 = rebar_opts:erl_opts(Opts1),
+    ErlOpts2 = rebar_opts:erl_opts(Opts2),
+    ErlOpts3 = rebar_opts:erl_opts(Opts3),
+    ?assertEqual([{d,'TEST'}, debug_info, {d,'HI'}], ErlOpts1),
+    ?assertEqual([debug_info, {d,'HI'}], ErlOpts2),
+    ?assertEqual([], ErlOpts3),
+    ok.
+
+first_files_exception(_Config) ->
+    RebarConfig = [{erl_first_files, ["c","a","b"]},
+                   {mib_first_files, ["c","a","b"]},
+                   {other, ["c","a","b"]},
+                   {profiles,
+                    [{profile2, [{erl_first_files, ["a","e"]},
+                                 {mib_first_files, ["a","e"]},
+                                 {other, ["a","e"]}
+                                ]}]}],
+    State = rebar_state:new(RebarConfig),
+    State1 = rebar_state:apply_profiles(State, [profile2]),
+
+    %% Combine lists
+    ?assertEqual(["a","b","c","e"], rebar_state:get(State1, other)),
+    %% there is no specific reason not to dedupe "a" here aside from "this is how it is"
+    ?assertEqual(["c","a","b","a","e"], rebar_state:get(State1, erl_first_files)),
+    ?assertEqual(["c","a","b","a","e"], rebar_state:get(State1, mib_first_files)),
+    ok.
+
+get_compiled_profile_erl_opts(Profiles, Config) ->
+    AppDir = ?config(apps, Config),
+    PStrs = [atom_to_list(P) || P <- Profiles],
+
+    Name = rebar_test_utils:create_random_name(
+        lists:flatten(["erl_opts_order_" | [[S, $_] || S <- PStrs]])),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    RebarConfig = [
+        {erl_opts, [warnings_as_errors, {d, profile_default}]},
+        {profiles, [
+            {strict, [{erl_opts, [warn_export_all, {d, profile_strict}]}]},
+            {loose, [{erl_opts, [nowarn_export_all, {d, profile_loose}]}]} ]}],
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+
+    Command = case Profiles of
+        [] ->
+            ["compile"];
+        [default] ->
+            ["compile"];
+        _ ->
+            ["as", rebar_string:join(PStrs, ","), "compile"]
+    end,
+    {ok, State} = rebar_test_utils:run_and_check(
+        Config, RebarConfig, Command, {ok, [{app, Name}]}),
+    code:add_paths(rebar_state:code_paths(State, all_deps)),
+    Mod = list_to_atom(Name),
+    proplists:get_value(options, Mod:module_info(compile), []).
+
+% macro definitions get special handling
+last_erl_opt([{d, Macro} = Opt | Opts], Targets, Last) ->
+    case lists:any(erl_opt_macro_match_fun(Macro), Targets) of
+        true ->
+            last_erl_opt(Opts, Targets, Opt);
+        _ ->
+            last_erl_opt(Opts, Targets, Last)
+    end;
+last_erl_opt([{d, Macro, _} = Opt | Opts], Targets, Last) ->
+    case lists:any(erl_opt_macro_match_fun(Macro), Targets) of
+        true ->
+            last_erl_opt(Opts, Targets, Opt);
+        _ ->
+            last_erl_opt(Opts, Targets, Last)
+    end;
+last_erl_opt([Opt | Opts], Targets, Last) ->
+    case lists:member(Opt, Targets) of
+        true ->
+            last_erl_opt(Opts, Targets, Opt);
+        _ ->
+            last_erl_opt(Opts, Targets, Last)
+    end;
+last_erl_opt([], _, Last) ->
+    Last.
+
+erl_opt_macro_match_fun(Macro) ->
+    fun({d, M}) ->
+            M == Macro;
+        ({d, M, _}) ->
+            M == Macro;
+        (_) ->
+            false
+    end.
+

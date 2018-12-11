@@ -56,7 +56,7 @@ best experience you can get.
 A [getting started guide is maintained on the official documentation website](http://www.rebar3.org/docs/getting-started),
 but installing rebar3 can be done by any of the ways described below
 
-Nightly compiled version:
+Latest stable compiled version:
 ```bash
 $ wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
 ```
@@ -69,7 +69,7 @@ $ cd rebar3
 $ ./bootstrap
 ```
 
-Stable versions can be obtained from the [releases page](https://github.com/erlang/rebar3/releases).
+Stable versions can also be obtained from the [releases page](https://github.com/erlang/rebar3/releases).
 
 The rebar3 escript can also extract itself with a run script under the user's home directory:
 
@@ -77,11 +77,12 @@ The rebar3 escript can also extract itself with a run script under the user's ho
 $ ./rebar3 local install
 ===> Extracting rebar3 libs to ~/.cache/rebar3/lib...
 ===> Writing rebar3 run script ~/.cache/rebar3/bin/rebar3...
-===> Add to $PATH for use: export PATH=$PATH:~/.cache/rebar3/bin
+===> Add to $PATH for use: export PATH=~/.cache/rebar3/bin:$PATH
 ```
 
 To keep it up to date after you've installed rebar3 this way you can use `rebar3 local upgrade` which
-fetches the latest nightly and extracts to the same place as above.
+fetches the latest stable release and extracts to the same place as above. A [nightly version can
+also be obtained](https://s3.amazonaws.com/rebar3-nightly/rebar3) if desired.
 
 Rebar3 may also be available on various OS-specific package managers such as
 FreeBSD Ports. Those are maintained by the community and Rebar3 maintainers
@@ -89,7 +90,7 @@ themselves are generally not involved in that process.
 
 If you do not have a full Erlang install, we  using [erln8](http://erln8.github.io/erln8/)
 or [kerl](https://github.com/yrashk/kerl). For binary packages use those provided
-by [Erlang Solutions](https://www.erlang-solutions.com/downloads/download-erlang-otp),
+by [Erlang Solutions](https://www.erlang-solutions.com/resources/download.html),
 but be sure to choose the "Standard" download option or you'll have issues building
 projects.
 
@@ -127,7 +128,7 @@ others via the plugin ecosystem:
 | Tarballs             | Releases can be packaged into tarballs ready to be deployed. |
 | Templates            | Configurable templates ship out of the box (try `rebar3 new` for a list or `rebar3 new help <template>` for a specific one). [Custom templates](http://www.rebar3.org/docs/using-templates) are also supported, and plugins can also add their own. |
 | Unstable namespace   | We use a namespace to provide commands that are still in flux, allowing to test more experimental features we are working on. See `rebar3 unstable`. |
-| Xref       | Run cross reference analysis on the project with [xref](http://www.erlang.org/doc/apps/tools/xref_chapter.html) by calling `rebar3 xref`. |
+| Xref       | Run cross-reference analysis on the project with [xref](http://www.erlang.org/doc/apps/tools/xref_chapter.html) by calling `rebar3 xref`. |
 
 ## Migrating From rebar2
 
@@ -146,7 +147,7 @@ relx.
 
 ## Additional Resources
 
-In case of problems that cannot be solved through documentation or examples, you
+In the case of problems that cannot be solved through documentation or examples, you
 may want to try to contact members of the community for help. The community is
 also where you want to go for questions about how to extend rebar, fill in bug
 reports, and so on.
@@ -156,7 +157,7 @@ list](http://lists.basho.com/pipermail/rebar_lists.basho.com/). If you need
 quick feedback, you can try the #rebar channel on
 [irc.freenode.net](http://freenode.net). Be sure to check the
 [documentation](http://www.rebar3.org/v3.0/docs) first, just to be sure you're not
-asking about things with well known answers.
+asking about things with well-known answers.
 
 For bug reports, roadmaps, and issues, visit the [github issues
 page](https://github.com/erlang/rebar3/issues).

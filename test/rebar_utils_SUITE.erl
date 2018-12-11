@@ -31,7 +31,9 @@
          nonblacklisted_otp_version/1,
          blacklisted_otp_version/1,
          sh_does_not_miss_messages/1,
-         tup_merge/1]).
+         tup_merge/1,
+         proxy_auth/1,
+        is_list_of_strings/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -46,7 +48,8 @@ end_per_testcase(_, _Config) ->
 all() ->
     [{group, args_to_tasks},
      sh_does_not_miss_messages,
-     tup_merge].
+     tup_merge,
+     proxy_auth, is_list_of_strings].
 
 groups() ->
     [{args_to_tasks, [], [empty_arglist,
@@ -272,3 +275,47 @@ tup_merge(_Config) ->
          rebar_utils:tup_sort([{a,a},{a,a,a},a,{b,a,a},b,{z,a},{z,a,a},{b,a},z])
        )
     ).
+
+proxy_auth(Config) ->
+    proxy_auth(Config, "http://", "http_proxy"),
+    proxy_auth(Config, "https://", "https_proxy"),
+    proxy_auth(Config, "", "http_proxy"),
+    proxy_auth(Config, "", "https_proxy").
+
+proxy_auth(_Config, Schema, ProxyEnvKey) ->
+	Host = "host:",
+	Port = "1234",
+
+	%% remember current proxy specification
+	OldProxySpec = os:getenv(ProxyEnvKey),
+
+	%% proxy auth not set
+	application:unset_env(rebar, proxy_auth),
+	?assertEqual([], rebar_utils:get_proxy_auth()),
+
+	%% proxy auth with regular username/password
+	os:putenv(ProxyEnvKey, Schema++"Username:Password@" ++ Host ++ Port),
+	rebar_utils:set_httpc_options(),
+	?assertEqual([{proxy_auth, {"Username", "Password"}}],
+				 rebar_utils:get_proxy_auth()),
+
+	%% proxy auth with username missing and url encoded password
+	os:putenv(ProxyEnvKey, Schema++":%3F!abc%23%24@" ++ Host ++ Port),
+	rebar_utils:set_httpc_options(),
+	?assertEqual([{proxy_auth, {"", "?!abc#$"}}],
+				 rebar_utils:get_proxy_auth()),
+
+	%% restore original proxy specification if any
+	restore_proxy_env(ProxyEnvKey, OldProxySpec),
+	application:unset_env(rebar, proxy_auth).
+
+restore_proxy_env(ProxyEnvKey, false) ->
+    os:putenv(ProxyEnvKey, "");
+restore_proxy_env(ProxyEnvKey, ProxySpec) ->
+    os:putenv(ProxyEnvKey, ProxySpec).
+
+is_list_of_strings(_Config) ->
+    ?assert(rebar_utils:is_list_of_strings(["foo"])),
+    ?assert(rebar_utils:is_list_of_strings([])),
+    ?assert(rebar_utils:is_list_of_strings("")),
+    ?assert(rebar_utils:is_list_of_strings("foo") == false).

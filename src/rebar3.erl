@@ -24,6 +24,16 @@
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
+%%
+%% @doc Main module for rebar3. Supports two interfaces; one for escripts,
+%% and one for usage as a library (although rebar3 makes a lot of
+%% assumptions about its environment, making it a bit tricky to use as
+%% a lib).
+%%
+%% This module's job is mostly to set up the root environment for rebar3
+%% and handle global options (mostly all from the ENV) and make them
+%% accessible to the rest of the run.
+%% @end
 -module(rebar3).
 
 -export([main/0,
@@ -43,27 +53,28 @@
 %% Public API
 %% ====================================================================
 
-%% For running with:
-%% erl +sbtu +A0 -noinput -mode minimal -boot start_clean -s rebar3 main -extra "$@"
+%% @doc For running with:
+%% erl +sbtu +A1 -noinput -mode minimal -boot start_clean -s rebar3 main -extra "$@"
 -spec main() -> no_return().
 main() ->
     List = init:get_plain_arguments(),
     main(List).
 
-%% escript Entry point
+%% @doc escript Entry point
 -spec main(list()) -> no_return().
 main(Args) ->
     try run(Args) of
         {ok, _State} ->
             erlang:halt(0);
         Error ->
-            handle_error(Error)
+            handle_error(Error, [])
     catch
-        _:Error ->
-            handle_error(Error)
+        ?WITH_STACKTRACE(_,Error,Stacktrace)
+            handle_error(Error, Stacktrace)
     end.
 
-%% Erlang-API entry point
+%% @doc Erlang-API entry point
+-spec run(rebar_state:t(), [string()]) -> {ok, rebar_state:t()} | {error, term()}.
 run(BaseState, Commands) ->
     start_and_load_apps(api),
     BaseState1 = rebar_state:set(BaseState, task, Commands),
@@ -78,6 +89,11 @@ run(BaseState, Commands) ->
 %% Internal functions
 %% ====================================================================
 
+%% @private sets up the rebar3 environment based on the command line
+%% arguments passed, if they have any relevance; used to translate
+%% from the escript call-site into a common one with the library
+%% usage.
+-spec run([any(), ...]) -> {ok, rebar_state:t()} | {error, term()}.
 run(RawArgs) ->
     start_and_load_apps(command_line),
 
@@ -87,7 +103,7 @@ run(RawArgs) ->
     case erlang:system_info(version) of
         "6.1" ->
             ?WARN("Due to a filelib bug in Erlang 17.1 it is recommended"
-                 "you update to a newer release.", []);
+                  "you update to a newer release.", []);
         _ ->
             ok
     end,
@@ -95,7 +111,14 @@ run(RawArgs) ->
     {BaseState2, _Args1} = set_options(BaseState1, {[], []}),
     run_aux(BaseState2, RawArgs).
 
+%% @private Junction point between the CLI and library entry points.
+%% From here on the module's role is a shared path here to finish
+%% up setting the environment for the run.
+-spec run_aux(rebar_state:t(), [string()]) ->
+    {ok, rebar_state:t()} | {error, term()}.
 run_aux(State, RawArgs) ->
+    io:setopts([{encoding, unicode}]),
+    %% Profile override; can only support one profile
     State1 = case os:getenv("REBAR_PROFILE") of
                  false ->
                      State;
@@ -108,6 +131,7 @@ run_aux(State, RawArgs) ->
     rebar_utils:check_min_otp_version(rebar_state:get(State1, minimum_otp_vsn, undefined)),
     rebar_utils:check_blacklisted_otp_versions(rebar_state:get(State1, blacklisted_otp_vsns, undefined)),
 
+    %% Change the default hex CDN
     State2 = case os:getenv("HEX_CDN") of
                  false ->
                      State1;
@@ -115,8 +139,17 @@ run_aux(State, RawArgs) ->
                      rebar_state:set(State1, rebar_packages_cdn, CDN)
              end,
 
+    Compilers = application:get_env(rebar, compilers, []),
+    State0 = rebar_state:compilers(State2, Compilers),
+
+    %% TODO: this means use of REBAR_PROFILE=profile will replace the repos with
+    %% the repos defined in the profile. But it will not work with `as profile`.
+    %% Maybe it shouldn't work with either to be consistent?
+    Resources = application:get_env(rebar, resources, []),
+    State2_ = rebar_state:create_resources(Resources, State0),
+
     %% bootstrap test profile
-    State3 = rebar_state:add_to_profile(State2, test, test_state(State1)),
+    State3 = rebar_state:add_to_profile(State2_, test, test_state(State1)),
 
     %% Process each command, resetting any state between each one
     BaseDir = rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR),
@@ -142,30 +175,43 @@ run_aux(State, RawArgs) ->
 
     State10 = rebar_state:code_paths(State9, default, code:get_path()),
 
-    rebar_core:init_command(rebar_state:command_args(State10, Args), Task).
+    case rebar_core:init_command(rebar_state:command_args(State10, Args), Task) of
+        {ok, State11} ->
+            case rebar_state:get(State11, caller, command_line) of
+                api ->
+                    rebar_paths:unset_paths([deps, plugins], State11),
+                    {ok, State11};
+                _ ->
+                    {ok, State11}
+            end;
+        Other ->
+            Other
+    end.
 
+
+
+%% @doc set up base configuration having to do with verbosity, where
+%% to find config files, and so on, and return an internal rebar3 state term.
+-spec init_config() -> rebar_state:t().
 init_config() ->
+    rebar_utils:set_httpc_options(),
+
     %% Initialize logging system
     Verbosity = log_level(),
     ok = rebar_log:init(command_line, Verbosity),
 
-    Config = case os:getenv("REBAR_CONFIG") of
-                 false ->
-                     rebar_config:consult_file(?DEFAULT_CONFIG_FILE);
-                 ConfigFile ->
-                     rebar_config:consult_file(ConfigFile)
-             end,
+    Config = rebar_config:consult_root(),
     Config1 = rebar_config:merge_locks(Config, rebar_config:consult_lock_file(?LOCK_FILE)),
 
     %% If $HOME/.config/rebar3/rebar.config exists load and use as global config
     GlobalConfigFile = rebar_dir:global_config(),
     State = case filelib:is_regular(GlobalConfigFile) of
                 true ->
-                    ?DEBUG("Load global config file ~s", [GlobalConfigFile]),
+                    ?DEBUG("Load global config file ~ts", [GlobalConfigFile]),
                     try state_from_global_config(Config1, GlobalConfigFile)
                     catch
                         _:_ ->
-                            ?WARN("Global config ~s exists but can not be read. Ignoring global config values.", [GlobalConfigFile]),
+                            ?WARN("Global config ~ts exists but can not be read. Ignoring global config values.", [GlobalConfigFile]),
                             rebar_state:new(Config1)
                     end;
                 false ->
@@ -193,6 +239,17 @@ init_config() ->
     %% Initialize vsn cache
     rebar_state:set(State1, vsn_cache, dict:new()).
 
+%% @doc Parse basic rebar3 arguments to find the top-level task
+%% to be run; this parsing is only partial from the point of view that
+%% runs done with arguments like `as $PROFILE do $TASK' will just
+%% return `as', which is then in charge of doing a more dynamic
+%% dispatch.
+%% If no arguments are given, the `help' task is returned.
+%% If special arguments like `-h' or `-v' are translated to `help'
+%% and `version' tasks.
+%% The unparsed parts of arguments are returned in:
+%% `{Task, Rest}'.
+-spec parse_args([string()]) -> {atom(), [string()]}.
 parse_args([]) ->
     parse_args(["help"]);
 parse_args([H | Rest]) when H =:= "-h"
@@ -204,6 +261,8 @@ parse_args([H | Rest]) when H =:= "-v"
 parse_args([Task | RawRest]) ->
     {list_to_atom(Task), RawRest}.
 
+%% @private actually not too sure what this does anymore.
+-spec set_options(rebar_state:t(),{[any()],[any()]}) -> {rebar_state:t(),[any()]}.
 set_options(State, {Options, NonOptArgs}) ->
     GlobalDefines = proplists:get_all_values(defines, Options),
 
@@ -216,9 +275,8 @@ set_options(State, {Options, NonOptArgs}) ->
 
     {rebar_state:set(State2, task, Task), NonOptArgs}.
 
-%%
-%% get log level based on getopt option
-%%
+%% @doc get log level based on getopt options and ENV
+-spec log_level() -> integer().
 log_level() ->
     case os:getenv("QUIET") of
         Q when Q == false; Q == "" ->
@@ -233,18 +291,16 @@ log_level() ->
             rebar_log:error_level()
     end.
 
-%%
-%% show version information and halt
-%%
+%% @doc show version information
+-spec version() -> ok.
 version() ->
     {ok, Vsn} = application:get_key(rebar, vsn),
-    ?CONSOLE("rebar ~s on Erlang/OTP ~s Erts ~s",
+    ?CONSOLE("rebar ~ts on Erlang/OTP ~ts Erts ~ts",
              [Vsn, erlang:system_info(otp_release), erlang:system_info(version)]).
 
+%% @private set global flag based on getopt option boolean value
 %% TODO: Actually make it 'global'
-%%
-%% set global flag based on getopt option boolean value
-%%
+-spec set_global_flag(rebar_state:t(), list(), term()) -> rebar_state:t().
 set_global_flag(State, Options, Flag) ->
     Value = case proplists:get_bool(Flag, Options) of
                 true ->
@@ -254,9 +310,9 @@ set_global_flag(State, Options, Flag) ->
             end,
     rebar_state:set(State, Flag, Value).
 
-%%
-%% options accepted via getopt
-%%
+
+%% @doc options accepted via getopt
+-spec global_option_spec_list() -> [{atom(), char(), string(), atom(), string()}, ...].
 global_option_spec_list() ->
     [
     %% {Name,  ShortOpt,  LongOpt,    ArgSpec,   HelpMsg}
@@ -265,38 +321,46 @@ global_option_spec_list() ->
     {task,     undefined, undefined,  string,    "Task to run."}
     ].
 
-handle_error(rebar_abort) ->
+%% @private translate unhandled errors and internal return codes into proper
+%% erroneous program exits.
+-spec handle_error(term(), term()) -> no_return().
+handle_error(rebar_abort, _) ->
     erlang:halt(1);
-handle_error({error, rebar_abort}) ->
+handle_error({error, rebar_abort}, _) ->
     erlang:halt(1);
-handle_error({error, {Module, Reason}}) ->
+handle_error({error, {Module, Reason}}, Stacktrace) ->
     case code:which(Module) of
         non_existing ->
-            ?CRASHDUMP("~p: ~p~n~p~n~n", [Module, Reason, erlang:get_stacktrace()]),
+            ?CRASHDUMP("~p: ~p~n~p~n~n", [Module, Reason, Stacktrace]),
             ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to stacktrace or consult rebar3.crashdump", []),
             ?DEBUG("Uncaught error: ~p ~p", [Module, Reason]),
             ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []);
         _ ->
-            ?ERROR("~s", [Module:format_error(Reason)])
+            ?ERROR("~ts", [Module:format_error(Reason)])
     end,
     erlang:halt(1);
-handle_error({error, Error}) when is_list(Error) ->
-    ?ERROR("~s", [Error]),
+handle_error({error, Error}, _) when is_list(Error) ->
+    ?ERROR("~ts", [Error]),
     erlang:halt(1);
-handle_error(Error) ->
+handle_error(Error, StackTrace) ->
     %% Nothing should percolate up from rebar_core;
     %% Dump this error to console
-    ?CRASHDUMP("Error: ~p~n~p~n~n", [Error, erlang:get_stacktrace()]),
+    ?CRASHDUMP("Error: ~p~n~p~n~n", [Error, StackTrace]),
     ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace or consult rebar3.crashdump", []),
     ?DEBUG("Uncaught error: ~p", [Error]),
-    case erlang:get_stacktrace() of
+    case StackTrace of
         [] -> ok;
         Trace ->
-            ?DEBUG("Stack trace to the error location: ~p", [Trace])
+            ?DEBUG("Stack trace to the error location:~n~p", [Trace])
     end,
     ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []),
     erlang:halt(1).
 
+%% @private Boot Erlang dependencies; problem is that escripts don't auto-boot
+%% stuff the way releases do and we have to do it by hand.
+%% This also lets us detect and show nicer errors when a critical lib is
+%% not supported
+-spec start_and_load_apps(command_line|api) -> term().
 start_and_load_apps(Caller) ->
     _ = application:load(rebar),
     %% Make sure crypto is running
@@ -304,9 +368,12 @@ start_and_load_apps(Caller) ->
     ensure_running(asn1, Caller),
     ensure_running(public_key, Caller),
     ensure_running(ssl, Caller),
-    inets:start(),
+    ensure_running(inets, Caller),
     inets:start(httpc, [{profile, rebar}]).
 
+%% @doc Make sure a required app is running, or display an error message
+%% and abort if there's a problem.
+-spec ensure_running(atom(), command_line|api) -> ok | no_return().
 ensure_running(App, Caller) ->
     case application:start(App) of
         ok -> ok;
@@ -323,40 +390,55 @@ ensure_running(App, Caller) ->
             throw(rebar_abort)
     end.
 
+-spec state_from_global_config([term()], file:filename()) -> rebar_state:t().
 state_from_global_config(Config, GlobalConfigFile) ->
-    rebar_utils:set_httpc_options(),
     GlobalConfigTerms = rebar_config:consult_file(GlobalConfigFile),
     GlobalConfig = rebar_state:new(GlobalConfigTerms),
 
     %% We don't want to worry about global plugin install state effecting later
     %% usage. So we throw away the global profile state used for plugin install.
-    GlobalConfigThrowAway = rebar_state:current_profiles(GlobalConfig, [global]),
-    GlobalState = case rebar_state:get(GlobalConfigThrowAway, plugins, []) of
+    GlobalConfigThrowAway0 = rebar_state:current_profiles(GlobalConfig, [global]),
+
+    Resources = application:get_env(rebar, resources, []),
+    GlobalConfigThrowAway = rebar_state:create_resources(Resources, GlobalConfigThrowAway0),
+
+    Compilers = application:get_env(rebar, compilers, []),
+    GlobalConfigThrowAway1 = rebar_state:compilers(GlobalConfigThrowAway, Compilers),
+
+    GlobalState = case rebar_state:get(GlobalConfigThrowAway1, plugins, []) of
                       [] ->
-                          GlobalConfigThrowAway;
+                          GlobalConfigThrowAway1;
                       GlobalPluginsToInstall ->
                           rebar_plugins:handle_plugins(global,
                                                        GlobalPluginsToInstall,
-                                                       GlobalConfigThrowAway)
+                                                       GlobalConfigThrowAway1)
                   end,
     GlobalPlugins = rebar_state:providers(GlobalState),
     GlobalConfig2 = rebar_state:set(GlobalConfig, plugins, []),
-    GlobalConfig3 = rebar_state:set(GlobalConfig2, {plugins, global}, rebar_state:get(GlobalConfigThrowAway, plugins, [])),
+    GlobalConfig3 = rebar_state:set(GlobalConfig2, {plugins, global},
+                                    rebar_state:get(GlobalConfigThrowAway1, plugins, [])),
     rebar_state:providers(rebar_state:new(GlobalConfig3, Config), GlobalPlugins).
 
+-spec test_state(rebar_state:t()) -> [{'extra_src_dirs',[string()]} | {'erl_opts',[any()]}].
 test_state(State) ->
-    ErlOpts = rebar_state:get(State, erl_opts, []),
+    %% Fetch the test profile's erl_opts only
+    Opts = rebar_state:opts(State),
+    Profiles = rebar_opts:get(Opts, profiles, []),
+    ProfileOpts = proplists:get_value(test, Profiles, []),
+    ErlOpts = proplists:get_value(erl_opts, ProfileOpts, []),
     TestOpts = safe_define_test_macro(ErlOpts),
     [{extra_src_dirs, ["test"]}, {erl_opts, TestOpts}].
 
+-spec safe_define_test_macro([any()]) -> [any()] | [{'d',atom()} | any()].
 safe_define_test_macro(Opts) ->
     %% defining a compile macro twice results in an exception so
     %% make sure 'TEST' is only defined once
     case test_defined(Opts) of
-       true  -> [];
-       false -> [{d, 'TEST'}]
+       true  -> Opts;
+       false -> [{d, 'TEST'}|Opts]
     end.
 
+-spec test_defined([{d, atom()} | {d, atom(), term()} | term()]) -> boolean().
 test_defined([{d, 'TEST'}|_]) -> true;
 test_defined([{d, 'TEST', true}|_]) -> true;
 test_defined([_|Rest]) -> test_defined(Rest);

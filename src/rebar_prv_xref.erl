@@ -36,7 +36,7 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    code:add_pathsa(rebar_state:code_paths(State, all_deps)),
+    rebar_paths:set_paths([deps], State),
     XrefChecks = prepare(State),
     XrefIgnores = rebar_state:get(State, xref_ignores, []),
     %% Run xref checks
@@ -47,7 +47,6 @@ do(State) ->
     QueryChecks = rebar_state:get(State, xref_queries, []),
     QueryResults = lists:foldl(fun check_query/2, [], QueryChecks),
     stopped = xref:stop(xref),
-    rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
     case XrefResults =:= [] andalso QueryResults =:= [] of
         true ->
             {ok, State};
@@ -70,7 +69,7 @@ short_desc() ->
 
 desc() ->
     io_lib:format(
-      "~s~n"
+      "~ts~n"
       "~n"
       "Valid rebar.config options:~n"
       "  ~p~n"
@@ -97,8 +96,11 @@ prepare(State) ->
                              rebar_state:get(State, xref_warnings, false)},
                             {verbose, rebar_log:is_verbose(State)}]),
 
-    [{ok, _} = xref:add_directory(xref, rebar_app_info:ebin_dir(App))
-     || App <- rebar_state:project_apps(State)],
+    [{ok, _} = xref:add_directory(xref, Dir)
+     || App <- rebar_state:project_apps(State),
+        %% the directory may not exist in rare cases of a compile
+        %% hook of a dep running xref prior to the full job being done
+        Dir <- [rebar_app_info:ebin_dir(App)], filelib:is_dir(Dir)],
 
     %% Get list of xref checks we want to run
     ConfXrefChecks = rebar_state:get(State, xref_checks,
@@ -158,14 +160,23 @@ get_xref_ignorelist(Mod, XrefCheck) ->
     %% And create a flat {M,F,A} list
     lists:foldl(
       fun({F, A}, Acc) -> [{Mod,F,A} | Acc];
-         ({M, F, A}, Acc) -> [{M,F,A} | Acc]
+         ({M, F, A}, Acc) -> [{M,F,A} | Acc];
+         (M, Acc) when is_atom(M) -> [M | Acc]
       end, [], lists:flatten([IgnoreXref, BehaviourCallbacks])).
 
 keyall(Key, List) ->
     lists:flatmap(fun({K, L}) when Key =:= K -> L; (_) -> [] end, List).
 
 get_behaviour_callbacks(exports_not_used, Attributes) ->
-    [B:behaviour_info(callbacks) || B <- keyall(behaviour, Attributes)];
+    lists:map(fun(Mod) ->
+        try
+            Mod:behaviour_info(callbacks)
+        catch
+            error:undef ->
+                ?WARN("Behaviour ~p is used but cannot be found.", [Mod]),
+                []
+        end
+    end, keyall(behaviour, Attributes) ++ keyall(behavior, Attributes));
 get_behaviour_callbacks(_XrefCheck, _Attributes) ->
     [].
 
@@ -185,14 +196,15 @@ filter_xref_results(XrefCheck, XrefIgnores, XrefResults) ->
                             end, SearchModules),
 
     [Result || Result <- XrefResults,
-               not lists:member(parse_xref_result(Result), Ignores)].
+               not lists:member(element(1, Result), Ignores)
+               andalso not lists:member(parse_xref_result(Result), Ignores)].
 
 display_results(XrefResults, QueryResults) ->
     [lists:map(fun display_xref_results_for_type/1, XrefResults),
      lists:map(fun display_query_result/1, QueryResults)].
 
 display_query_result({Query, Answer, Value}) ->
-    io_lib:format("Query ~s~n answer ~p~n did not match ~p~n",
+    io_lib:format("Query ~ts~n answer ~p~n did not match ~p~n",
                   [Query, Answer, Value]).
 
 display_xref_results_for_type({Type, XrefResults}) ->
@@ -213,37 +225,37 @@ display_xref_result_fun(Type) ->
                 end,
             case Type of
                 undefined_function_calls ->
-                    io_lib:format("~sWarning: ~s calls undefined function ~s (Xref)\n",
+                    io_lib:format("~tsWarning: ~ts calls undefined function ~ts (Xref)\n",
                                   [Source, SMFA, TMFA]);
                 undefined_functions ->
-                    io_lib:format("~sWarning: ~s is undefined function (Xref)\n",
+                    io_lib:format("~tsWarning: ~ts is undefined function (Xref)\n",
                                   [Source, SMFA]);
                 locals_not_used ->
-                    io_lib:format("~sWarning: ~s is unused local function (Xref)\n",
+                    io_lib:format("~tsWarning: ~ts is unused local function (Xref)\n",
                                   [Source, SMFA]);
                 exports_not_used ->
-                    io_lib:format("~sWarning: ~s is unused export (Xref)\n",
+                    io_lib:format("~tsWarning: ~ts is unused export (Xref)\n",
                                   [Source, SMFA]);
                 deprecated_function_calls ->
-                    io_lib:format("~sWarning: ~s calls deprecated function ~s (Xref)\n",
+                    io_lib:format("~tsWarning: ~ts calls deprecated function ~ts (Xref)\n",
                                   [Source, SMFA, TMFA]);
                 deprecated_functions ->
-                    io_lib:format("~sWarning: ~s is deprecated function (Xref)\n",
+                    io_lib:format("~tsWarning: ~ts is deprecated function (Xref)\n",
                                   [Source, SMFA]);
                 Other ->
-                    io_lib:format("~sWarning: ~s - ~s xref check: ~s (Xref)\n",
+                    io_lib:format("~tsWarning: ~ts - ~ts xref check: ~ts (Xref)\n",
                                   [Source, SMFA, TMFA, Other])
             end
     end.
 
 format_mfa({M, F, A}) ->
-    ?FMT("~s:~s/~w", [M, F, A]).
+    ?FMT("~ts:~ts/~w", [M, F, A]).
 
 format_mfa_source(MFA) ->
     case find_mfa_source(MFA) of
         {module_not_found, function_not_found} -> "";
-        {Source, function_not_found} -> ?FMT("~s: ", [Source]);
-        {Source, Line} -> ?FMT("~s:~w: ", [Source, Line])
+        {Source, function_not_found} -> ?FMT("~ts: ", [Source]);
+        {Source, Line} -> ?FMT("~ts:~w: ", [Source, Line])
     end.
 
 %%
@@ -269,12 +281,21 @@ find_mfa_source({M, F, A}) ->
     end.
 
 find_function_source(M, F, A, Bin) ->
-    AbstractCode = beam_lib:chunks(Bin, [abstract_code]),
-    {ok, {M, [{abstract_code, {raw_abstract_v1, Code}}]}} = AbstractCode,
+    ChunksLookup = beam_lib:chunks(Bin, [abstract_code]),
+    {ok, {M, [{abstract_code, AbstractCodeLookup}]}} = ChunksLookup,
+    case AbstractCodeLookup of
+        no_abstract_code ->
+            % There isn't much else we can do at this point
+            {module_not_found, function_not_found};
+        {raw_abstract_v1, AbstractCode} ->
+            find_function_source_in_abstract_code(F, A, AbstractCode)
+    end.
+
+find_function_source_in_abstract_code(F, A, AbstractCode) ->
     %% Extract the original source filename from the abstract code
-    [{attribute, 1, file, {Source, _}} | _] = Code,
+    [{attribute, _, file, {Source, _}} | _] = AbstractCode,
     %% Extract the line number for a given function def
-    Fn = [E || E <- Code,
+    Fn = [E || E <- AbstractCode,
                safe_element(1, E) == function,
                safe_element(3, E) == F,
                safe_element(4, E) == A],

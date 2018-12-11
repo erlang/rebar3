@@ -41,7 +41,10 @@ do(State) ->
         [Name] -> % default namespace
             task_help(default, list_to_atom(Name), State);
         [Namespace, Name] ->
-            task_help(list_to_atom(Namespace), list_to_atom(Name), State)
+            task_help(list_to_atom(Namespace), list_to_atom(Name), State);
+        _ ->
+            {error, "Too many arguments given. " ++
+                 "Usage: rebar3 help [<namespace>] <task>"}
     end.
 
 -spec format_error(any()) -> iolist().
@@ -54,7 +57,7 @@ format_error(Reason) ->
 help(State) ->
     ?CONSOLE("Rebar3 is a tool for working with Erlang projects.~n~n", []),
     OptSpecList = rebar3:global_option_spec_list(),
-    getopt:usage(OptSpecList, "rebar", "", []),
+    getopt:usage(OptSpecList, "rebar3", "", []),
     ?CONSOLE("~nSeveral tasks are available:~n", []),
 
     providers:help(rebar_state:providers(State)),

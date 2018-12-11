@@ -12,10 +12,11 @@
          maybe_write_coverdata/2,
          format_error/1]).
 
+-include_lib("providers/include/providers.hrl").
 -include("rebar.hrl").
 
 -define(PROVIDER, cover).
--define(DEPS, [app_discovery]).
+-define(DEPS, [lock]).
 
 %% ===================================================================
 %% Public API
@@ -62,6 +63,9 @@ maybe_write_coverdata(State, Task) ->
     end.
 
 -spec format_error(any()) -> iolist().
+format_error({min_coverage_failed, {PassRate, Total}}) ->
+    io_lib:format("Requiring ~p% coverage to pass. Only ~p% obtained",
+                  [PassRate, Total]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -84,6 +88,15 @@ reset(State) ->
     {ok, State}.
 
 analyze(State) ->
+    %% modules have to be compiled and then cover compiled
+    %% in order for cover data to be reloaded
+    %% this maybe breaks if modules have been deleted
+    %% since code coverage was collected?
+    {ok, S} = rebar_prv_compile:do(State),
+    ok = cover_compile(S, apps),
+    do_analyze(State).
+
+do_analyze(State) ->
     ?INFO("Performing cover analysis...", []),
     %% figure out what coverdata we have
     CoverDir = cover_dir(State),
@@ -93,13 +106,13 @@ analyze(State) ->
     %% redirect cover output
     true = redirect_cover_output(State, CoverPid),
     %% analyze!
-    ok = case analyze(State, CoverFiles) of
-        [] -> ok;
+    case analyze(State, CoverFiles) of
+        [] -> {ok, State};
         Analysis ->
             print_analysis(Analysis, verbose(State)),
-            write_index(State, Analysis)
-    end,
-    {ok, State}.
+            write_index(State, Analysis),
+            maybe_fail_coverage(Analysis, State)
+    end.
 
 get_all_coverdata(CoverDir) ->
     ok = filelib:ensure_dir(filename:join([CoverDir, "dummy.log"])),
@@ -187,10 +200,7 @@ mod_to_filename(TaskDir, M) ->
 
 process(Coverage) -> process(Coverage, {0, 0}).
 
-process([], {0, 0}) ->
-    "0%";
-process([], {Cov, Not}) ->
-    integer_to_list(trunc((Cov / (Cov + Not)) * 100)) ++ "%";
+process([], Acc) -> Acc;
 %% line 0 is a line added by eunit and never executed so ignore it
 process([{{_, 0}, _}|Rest], Acc) -> process(Rest, Acc);
 process([{_, {Cov, Not}}|Rest], {Covered, NotCovered}) ->
@@ -199,56 +209,56 @@ process([{_, {Cov, Not}}|Rest], {Covered, NotCovered}) ->
 print_analysis(_, false) -> ok;
 print_analysis(Analysis, true) ->
     {_, CoverFiles, Stats} = lists:keyfind("aggregate", 1, Analysis),
-    ConsoleStats = [ {atom_to_list(M), C} || {M, C, _} <- Stats ],
-    Table = format_table(ConsoleStats, CoverFiles),
+    Table = format_table(Stats, CoverFiles),
     io:format("~ts", [Table]).
 
 format_table(Stats, CoverFiles) ->
-    MaxLength = max(lists:foldl(fun max_length/2, 0, Stats), 20),
+    MaxLength = lists:max([20 | lists:map(fun({M, _, _}) -> mod_length(M) end, Stats)]),
     Header = header(MaxLength),
-    Seperator = seperator(MaxLength),
+    Separator = separator(MaxLength),
     TotalLabel = format("total", MaxLength),
-    TotalCov = format(calculate_total(Stats), 8),
-    [io_lib:format("~ts~n~ts~n~ts~n", [Seperator, Header, Seperator]),
-        lists:map(fun({Mod, Coverage}) ->
+    TotalCov = format(calculate_total_string(Stats), 8),
+    [io_lib:format("~ts~n~ts~n~ts~n", [Separator, Header, Separator]),
+        lists:map(fun({Mod, Coverage, _}) ->
             Name = format(Mod, MaxLength),
-            Cov = format(Coverage, 8),
+            Cov = format(percentage_string(Coverage), 8),
             io_lib:format("  |  ~ts  |  ~ts  |~n", [Name, Cov])
         end, Stats),
-        io_lib:format("~ts~n", [Seperator]),
+        io_lib:format("~ts~n", [Separator]),
         io_lib:format("  |  ~ts  |  ~ts  |~n", [TotalLabel, TotalCov]),
-        io_lib:format("~ts~n", [Seperator]),
+        io_lib:format("~ts~n", [Separator]),
         io_lib:format("  coverage calculated from:~n", []),
         lists:map(fun(File) ->
             io_lib:format("    ~ts~n", [File])
         end, CoverFiles)].
 
-max_length({ModName, _}, Min) ->
-    Length = length(lists:flatten(ModName)),
-    case Length > Min of
-        true  -> Length;
-        false -> Min
-    end.
+mod_length(Mod) when is_atom(Mod) -> mod_length(atom_to_list(Mod));
+mod_length(Mod) -> length(Mod).
 
 header(Width) ->
     ["  |  ", format("module", Width), "  |  ", format("coverage", 8), "  |"].
 
-seperator(Width) ->
+separator(Width) ->
     ["  |--", io_lib:format("~*c", [Width, $-]), "--|------------|"].
 
 format(String, Width) -> io_lib:format("~*.ts", [Width, String]).
 
-calculate_total(Stats) when length(Stats) =:= 0 ->
-    "0%";
+calculate_total_string(Stats) ->
+    integer_to_list(calculate_total(Stats))++"%".
+
 calculate_total(Stats) ->
-    TotalStats = length(Stats),
-    TotalCovInt = round(lists:foldl(
-                        fun({_Mod, Coverage, _File}, Acc) ->
-                            Acc + (list_to_integer(string:strip(Coverage, right, $%)) / TotalStats);
-                        ({_Mod, Coverage}, Acc) ->
-                            Acc + (list_to_integer(string:strip(Coverage, right, $%)) / TotalStats)
-    end, 0, Stats)),
-    integer_to_list(TotalCovInt) ++ "%".
+    percentage(lists:foldl(
+        fun({_Mod, {Cov, Not}, _File}, {CovAcc, NotAcc}) ->
+            {CovAcc + Cov, NotAcc + Not}
+        end,
+        {0, 0},
+        Stats
+    )).
+
+percentage_string(Data) -> integer_to_list(percentage(Data))++"%".
+
+percentage({_, 0}) -> 100;
+percentage({Cov, Not}) -> trunc((Cov / (Cov + Not)) * 100).
 
 write_index(State, Coverage) ->
     CoverDir = cover_dir(State),
@@ -269,7 +279,7 @@ write_index(State, Coverage) ->
 write_index_section(_F, []) -> ok;
 write_index_section(F, [{Section, DataFile, Mods}|Rest]) ->
     %% Write the report
-    ok = file:write(F, ?FMT("<h1>~s summary</h1>\n", [Section])),
+    ok = file:write(F, ?FMT("<h1>~ts summary</h1>\n", [Section])),
     ok = file:write(F, "coverage calculated from:\n<ul>"),
     ok = lists:foreach(fun(D) -> ok = file:write(F, io_lib:format("<li>~ts</li>", [D])) end,
                        DataFile),
@@ -278,13 +288,24 @@ write_index_section(F, [{Section, DataFile, Mods}|Rest]) ->
     FmtLink =
         fun({Mod, Cov, Report}) ->
                 ?FMT("<tr><td><a href='~ts'>~ts</a></td><td>~ts</td>\n",
-                     [strip_coverdir(Report), Mod, Cov])
+                     [strip_coverdir(Report), Mod, percentage_string(Cov)])
         end,
     lists:foreach(fun(M) -> ok = file:write(F, FmtLink(M)) end, Mods),
     ok = file:write(F, ?FMT("<tr><td><strong>Total</strong></td><td>~ts</td>\n",
-                     [calculate_total(Mods)])),
+                     [calculate_total_string(Mods)])),
     ok = file:write(F, "</table>\n"),
     write_index_section(F, Rest).
+
+maybe_fail_coverage(Analysis, State) ->
+    {_, _CoverFiles, Stats} = lists:keyfind("aggregate", 1, Analysis),
+    Total = calculate_total(Stats),
+    PassRate = min_coverage(State),
+    ?DEBUG("Comparing ~p to pass rate ~p", [Total, PassRate]),
+    if Total >= PassRate ->
+        {ok, State}
+    ;  Total < PassRate ->
+        ?PRV_ERROR({min_coverage_failed, {PassRate, Total}})
+    end.
 
 %% fix for r15b which doesn't put the correct path in the `source` section
 %%  of `module_info(compile)`
@@ -294,31 +315,51 @@ strip_coverdir(File) ->
                                               2))).
 
 cover_compile(State, apps) ->
-    Apps = filter_checkouts(rebar_state:project_apps(State)),
+    ExclApps = [rebar_utils:to_binary(A) || A <- rebar_state:get(State, cover_excl_apps, [])],
+    Apps = filter_checkouts_and_excluded(rebar_state:project_apps(State), ExclApps),
     AppDirs = app_dirs(Apps),
     cover_compile(State, lists:filter(fun(D) -> ec_file:is_dir(D) end, AppDirs));
 cover_compile(State, Dirs) ->
-    rebar_utils:update_code(rebar_state:code_paths(State, all_deps), [soft_purge]),
+    rebar_paths:set_paths([deps], State),
     %% start the cover server if necessary
     {ok, CoverPid} = start_cover(),
     %% redirect cover output
     true = redirect_cover_output(State, CoverPid),
+    ExclMods = rebar_state:get(State, cover_excl_mods, []),
     lists:foreach(fun(Dir) ->
-        ?DEBUG("cover compiling ~p", [Dir]),
-        case catch(cover:compile_beam_directory(Dir)) of
+        case file:list_dir(Dir) of
+            {ok, Files} ->
+                ?DEBUG("cover compiling ~p", [Dir]),
+                [cover_compile_file(filename:join(Dir, File))
+                 || File <- Files,
+                    filename:extension(File) == ".beam",
+                    not is_ignored(Dir, File, ExclMods)],
+                ok;
             {error, eacces} ->
                 ?WARN("Directory ~p not readable, modules will not be included in coverage", [Dir]);
             {error, enoent} ->
                 ?WARN("Directory ~p not found", [Dir]);
-            {'EXIT', {Reason, _}} ->
-                ?WARN("Cover compilation for directory ~p failed: ~p", [Dir, Reason]);
-            Results ->
-                %% print any warnings about modules that failed to cover compile
-                lists:foreach(fun print_cover_warnings/1, lists:flatten(Results))
+            {error, Reason} ->
+                ?WARN("Directory ~p error ~p", [Dir, Reason])
         end
     end, Dirs),
-    rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
     ok.
+
+is_ignored(Dir, File, ExclMods) ->
+    Ignored = lists:any(fun(Excl) ->
+                             File =:= atom_to_list(Excl) ++ ".beam"
+                        end,
+                        ExclMods),
+    Ignored andalso ?DEBUG("cover ignoring ~p ~p", [Dir, File]),
+    Ignored.
+
+cover_compile_file(FileName) ->
+    case catch(cover:compile_beam(FileName)) of
+        {error, Reason} ->
+            ?WARN("Cover compilation failed: ~p", [Reason]);
+        {ok, _} ->
+            ok
+    end.
 
 app_dirs(Apps) ->
     lists:foldl(fun app_ebin_dirs/2, [], Apps).
@@ -326,13 +367,14 @@ app_dirs(Apps) ->
 app_ebin_dirs(App, Acc) ->
     [rebar_app_info:ebin_dir(App)|Acc].
 
-filter_checkouts(Apps) -> filter_checkouts(Apps, []).
+filter_checkouts_and_excluded(Apps, ExclApps) ->
+    filter_checkouts_and_excluded(Apps, ExclApps, []).
 
-filter_checkouts([], Acc) -> lists:reverse(Acc);
-filter_checkouts([App|Rest], Acc) ->
-    case rebar_app_info:is_checkout(App) of
-        true  -> filter_checkouts(Rest, Acc);
-        false -> filter_checkouts(Rest, [App|Acc])
+filter_checkouts_and_excluded([], _ExclApps, Acc) -> lists:reverse(Acc);
+filter_checkouts_and_excluded([App|Rest], ExclApps, Acc) ->
+    case rebar_app_info:is_checkout(App) orelse lists:member(rebar_app_info:name(App), ExclApps) of
+        true  -> filter_checkouts_and_excluded(Rest, ExclApps, Acc);
+        false -> filter_checkouts_and_excluded(Rest, ExclApps, [App|Acc])
     end.
 
 start_cover() ->
@@ -349,16 +391,14 @@ redirect_cover_output(State, CoverPid) ->
                         [append]),
     group_leader(F, CoverPid).
 
-print_cover_warnings({ok, _}) -> ok;
-print_cover_warnings({error, Error}) ->
-    ?WARN("Cover compilation failed: ~p", [Error]).
-
-write_coverdata(State, Task) ->
+write_coverdata(State, Name) ->
     DataDir = cover_dir(State),
     ok = filelib:ensure_dir(filename:join([DataDir, "dummy.log"])),
-    ExportFile = filename:join([DataDir, atom_to_list(Task) ++ ".coverdata"]),
+    ExportFile = filename:join([DataDir, rebar_utils:to_list(Name) ++ ".coverdata"]),
     case cover:export(ExportFile) of
         ok ->
+            %% dump accumulated coverdata after writing
+            ok = cover:reset(),
             ?DEBUG("Cover data written to ~p.", [ExportFile]);
         {error, Reason} ->
             ?WARN("Cover data export failed: ~p", [Reason])
@@ -380,12 +420,23 @@ verbose(State) ->
         {Verbose, _}           -> Verbose
     end.
 
+min_coverage(State) ->
+    Command = proplists:get_value(min_coverage, command_line_opts(State), undefined),
+    Config = proplists:get_value(min_coverage, config_opts(State), undefined),
+    case {Command, Config} of
+        {undefined, undefined} -> 0;
+        {undefined, Rate}   -> Rate;
+        {Rate, _}           -> Rate
+    end.
+
 cover_dir(State) ->
     filename:join([rebar_dir:base_dir(State), "cover"]).
 
 cover_opts(_State) ->
     [{reset, $r, "reset", boolean, help(reset)},
-     {verbose, $v, "verbose", boolean, help(verbose)}].
+     {verbose, $v, "verbose", boolean, help(verbose)},
+     {min_coverage, $m, "min_coverage", integer, help(min_coverage)}].
 
 help(reset) -> "Reset all coverdata.";
-help(verbose) -> "Print coverage analysis.".
+help(verbose) -> "Print coverage analysis.";
+help(min_coverage) -> "Mandate a coverage percentage required to succeed (0..100)".

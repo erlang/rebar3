@@ -40,6 +40,8 @@
 -define(PROVIDER, shell).
 -define(DEPS, [compile]).
 
+-dialyzer({nowarn_function, rewrite_leaders/2}).
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -75,7 +77,13 @@ init(State) ->
                          "A list of apps to boot before starting the "
                          "shell. (E.g. --apps app1,app2,app3) Defaults "
                          "to rebar.config {shell, [{apps, Apps}]} or "
-                         "relx apps if not specified."}]}
+                         "relx apps if not specified."},
+                        {start_clean, undefined, "start-clean", boolean,
+                         "Cancel any applications in the 'apps' list "
+                         "or release."},
+                        {user_drv_args, undefined, "user_drv_args", string,
+                         "Arguments passed to user_drv start function for "
+                         "creating custom shells."}]}
             ])
     ),
     {ok, State1}.
@@ -99,7 +107,9 @@ format_error(Reason) ->
 shell(State) ->
     setup_name(State),
     setup_paths(State),
-    setup_shell(),
+    ShellArgs = debug_get_value(shell_args, rebar_state:get(State, shell, []), undefined,
+                                "Found user_drv args from command line option."),
+    setup_shell(ShellArgs),
     maybe_run_script(State),
     %% apps must be started after the change in shell because otherwise
     %% their application masters never gets the new group leader (held in
@@ -117,13 +127,13 @@ shell(State) ->
 info() ->
     "Start a shell with project and deps preloaded similar to~n'erl -pa ebin -pa deps/*/ebin'.~n".
 
-setup_shell() ->
+setup_shell(ShellArgs) ->
     OldUser = kill_old_user(),
     %% Test for support here
-    NewUser = try erlang:open_port({spawn,'tty_sl -c -e'}, []) of
+    NewUser = try erlang:open_port({spawn,"tty_sl -c -e"}, []) of
         Port when is_port(Port) ->
             true = port_close(Port),
-            setup_new_shell()
+            setup_new_shell(ShellArgs)
     catch
         error:_ ->
             setup_old_shell()
@@ -153,11 +163,16 @@ wait_for_port_death(N, P) ->
             wait_for_port_death(N-10, P)
     end.
 
-setup_new_shell() ->
+setup_new_shell(ShellArgs) ->
     %% terminate the current user supervision structure, if any
     _ = supervisor:terminate_child(kernel_sup, user),
     %% start a new shell (this also starts a new user under the correct group)
-    _ = user_drv:start(),
+    case ShellArgs of
+        undefined ->
+            _ = user_drv:start();
+        _ ->
+            _ = user_drv:start(ShellArgs)
+    end,
     %% wait until user_drv and user have been registered (max 3 seconds)
     ok = wait_until_user_started(3000),
     whereis(user).
@@ -191,20 +206,27 @@ rewrite_leaders(OldUser, NewUser) ->
             lists:member(proplists:get_value(group_leader, erlang:process_info(Pid)),
                          OldMasters)],
     try
-        %% enable error_logger's tty output
-        error_logger:swap_handler(tty),
-        %% disable the simple error_logger (which may have been added multiple
-        %% times). removes at most the error_logger added by init and the
-        %% error_logger added by the tty handler
-        remove_error_handler(3),
-        %% reset the tty handler once more for remote shells
-        error_logger:swap_handler(tty)
+        case erlang:function_exported(logger, module_info, 0) of
+            false ->
+                %% Old style logger had a lock-up issue and other problems related
+                %% to group leader handling.
+                %% enable error_logger's tty output
+                error_logger:swap_handler(tty),
+                %% disable the simple error_logger (which may have been added
+                %% multiple times). removes at most the error_logger added by
+                %% init and the error_logger added by the tty handler
+                remove_error_handler(3),
+                %% reset the tty handler once more for remote shells
+                error_logger:swap_handler(tty);
+            true ->
+                %% This is no longer a problem with the logger interface
+                ok
+        end
     catch
-        E:R -> % may fail with custom loggers
-            ?DEBUG("Logger changes failed for ~p:~p (~p)", [E,R,erlang:get_stacktrace()]),
+        ?WITH_STACKTRACE(E,R,S) % may fail with custom loggers
+            ?DEBUG("Logger changes failed for ~p:~p (~p)", [E,R,S]),
             hope_for_best
     end.
-
 
 setup_paths(State) ->
     %% Add deps to path
@@ -225,9 +247,9 @@ maybe_run_script(State) ->
             File = filename:absname(RelFile),
             try run_script_file(File)
             catch
-                C:E ->
+                ?WITH_STACKTRACE(C,E,S)
                     ?ABORT("Couldn't run shell escript ~p - ~p:~p~nStack: ~p",
-                           [File, C, E, erlang:get_stacktrace()])
+                           [File, C, E, S])
             end
     end.
 
@@ -261,11 +283,11 @@ maybe_boot_apps(State) ->
     case find_apps_to_boot(State) of
         undefined ->
             %% try to read in sys.config file
-            ok = reread_config(State);
+            ok = reread_config([], State);
         Apps ->
             %% load apps, then check config, then boot them.
             load_apps(Apps),
-            ok = reread_config(State),
+            ok = reread_config(Apps, State),
             boot_apps(Apps)
     end.
 
@@ -294,10 +316,15 @@ find_apps_option(State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
     case debug_get_value(apps, Opts, no_value,
                          "Found shell apps from command line option.") of
-        no_value -> no_value;
+        no_value ->
+            case debug_get_value(start_clean, Opts, false,
+                                "Found start-clean argument to disable apps") of
+                false -> no_value;
+                true -> []
+            end;
         AppsStr ->
             [ list_to_atom(AppStr)
-              || AppStr <- string:tokens(AppsStr, " ,:") ]
+              || AppStr <- rebar_string:lexemes(AppsStr, " ,:") ]
     end.
 
 -spec find_apps_rebar(rebar_state:t()) -> no_value | list().
@@ -310,6 +337,9 @@ find_apps_rebar(State) ->
 find_apps_relx(State) ->
     case lists:keyfind(release, 1, rebar_state:get(State, relx, [])) of
         {_, _, Apps} ->
+            ?DEBUG("Found shell apps from relx.", []),
+            Apps;
+        {_, _, Apps, _} ->
             ?DEBUG("Found shell apps from relx.", []),
             Apps;
         false ->
@@ -327,19 +357,44 @@ load_apps(Apps) ->
             not lists:keymember(App, 1, application:loaded_applications())],
     ok.
 
-reread_config(State) ->
+reread_config(AppsToStart, State) ->
     case find_config(State) of
         no_config ->
             ok;
         ConfigList ->
-            _ = rebar_utils:reread_config(ConfigList),
+            %% This allows people who use applications that are also
+            %% depended on by rebar3 or its plugins to change their
+            %% configuration at runtime based on the configuration files.
+            %%
+            %% To do this, we stop apps that are already started before
+            %% reloading their configuration.
+            %%
+            %% We make an exception for apps that:
+            %%  - are not already running
+            %%  - would not be restarted (and hence would break some
+            %%    compatibility with rebar3)
+            %%  - are not in the config files and would see no config
+            %%    changes
+            %%  - are not in a blacklist, where changing their config
+            %%    would be risky to the shell or the rebar3 agent
+            %%    functionality (i.e. changing inets may break proxy
+            %%    settings, stopping `kernel' would break everything)
+            Running = [App || {App, _, _} <- application:which_applications()],
+            BlackList = [inets, stdlib, kernel, rebar],
+            _ = [application:stop(App)
+                 || Config <- ConfigList,
+                    {App, _} <- Config,
+                    lists:member(App, Running),
+                    lists:member(App, AppsToStart),
+                    not lists:member(App, BlackList)],
+            _ = rebar_utils:reread_config(ConfigList, [update_logger]),
             ok
     end.
 
 boot_apps(Apps) ->
     ?WARN("The rebar3 shell is a development tool; to deploy "
             "applications in production, consider using releases "
-            "(http://www.rebar3.org/v3.0/docs/releases)", []),
+            "(http://www.rebar3.org/docs/releases)", []),
     Normalized = normalize_boot_apps(Apps),
     Res = [application:ensure_all_started(App) || App <- Normalized],
     _ = [?INFO("Booted ~p", [App])
@@ -350,16 +405,23 @@ boot_apps(Apps) ->
     ok.
 
 normalize_load_apps([]) -> [];
+normalize_load_apps([{_App, none} | T]) -> normalize_load_apps(T);
 normalize_load_apps([{App, _} | T]) -> [App | normalize_load_apps(T)];
 normalize_load_apps([{App, _Vsn, load} | T]) -> [App | normalize_load_apps(T)];
+normalize_load_apps([{_App, _Vsn, none} | T]) -> normalize_load_apps(T);
+normalize_load_apps([{App, _Vsn, Operator} | T]) when is_atom(Operator) ->
+    [App | normalize_load_apps(T)];
 normalize_load_apps([App | T]) when is_atom(App) -> [App | normalize_load_apps(T)].
 
 normalize_boot_apps([]) -> [];
 normalize_boot_apps([{_App, load} | T]) -> normalize_boot_apps(T);
 normalize_boot_apps([{_App, _Vsn, load} | T]) -> normalize_boot_apps(T);
+normalize_boot_apps([{_App, none} | T]) -> normalize_boot_apps(T);
+normalize_boot_apps([{_App, _Vsn, none} | T]) -> normalize_boot_apps(T);
+normalize_boot_apps([{App, _Vsn, Operator} | T]) when is_atom(Operator) ->
+    [App | normalize_boot_apps(T)];
 normalize_boot_apps([{App, _Vsn} | T]) -> [App | normalize_boot_apps(T)];
 normalize_boot_apps([App | T]) when is_atom(App) -> [App | normalize_boot_apps(T)].
-
 
 remove_error_handler(0) ->
     ?WARN("Unable to remove simple error_logger handler", []);

@@ -72,15 +72,15 @@ get_md5(Rebar3Path) ->
     {ok, Rebar3File} = file:read_file(Rebar3Path),
     Digest = crypto:hash(md5, Rebar3File),
     DigestHex = lists:flatten([io_lib:format("~2.16.0B", [X]) || X <- binary_to_list(Digest)]),
-    string:to_lower(DigestHex).
+    rebar_string:lowercase(DigestHex).
 
 maybe_fetch_rebar3(Rebar3Md5) ->
     TmpDir = ec_file:insecure_mkdtemp(),
     TmpFile = filename:join(TmpDir, "rebar3"),
-    case rebar_pkg_resource:request("https://s3.amazonaws.com/rebar3/rebar3", Rebar3Md5) of
+    case request("https://s3.amazonaws.com/rebar3/rebar3", Rebar3Md5) of
         {ok, Binary, ETag} ->
             file:write_file(TmpFile, Binary),
-            case rebar_pkg_resource:etag(TmpFile) of
+            case etag(TmpFile) of
                 ETag ->
                     {saved, TmpFile};
                 _ ->
@@ -91,4 +91,39 @@ maybe_fetch_rebar3(Rebar3Md5) ->
         _ ->
             ?CONSOLE("No upgrade available", []),
             up_to_date
+    end.
+
+etag(Path) ->
+     case file:read_file(Path) of
+         {ok, Binary} ->
+             <<X:128/big-unsigned-integer>> = crypto:hash(md5, Binary),
+             rebar_string:lowercase(lists:flatten(io_lib:format("~32.16.0b", [X])));
+         {error, _} ->
+             false
+     end.
+
+-spec request(Url, ETag) -> Res when
+      Url :: string(),
+      ETag :: false | string(),
+      Res :: 'error' | {ok, cached} | {ok, any(), string()}.
+request(Url, ETag) ->
+    HttpOptions = [{ssl, rebar_utils:ssl_opts(Url)},
+                   {relaxed, true} | rebar_utils:get_proxy_auth()],
+    case httpc:request(get, {Url, [{"if-none-match", "\"" ++ ETag ++ "\""}
+                                   || ETag =/= false] ++
+                                 [{"User-Agent", rebar_utils:user_agent()}]},
+                       HttpOptions, [{body_format, binary}], rebar) of
+        {ok, {{_Version, 200, _Reason}, Headers, Body}} ->
+            ?DEBUG("Successfully downloaded ~ts", [Url]),
+            {"etag", ETag1} = lists:keyfind("etag", 1, Headers),
+            {ok, Body, rebar_string:trim(ETag1, both, [$"])};
+        {ok, {{_Version, 304, _Reason}, _Headers, _Body}} ->
+            ?DEBUG("Cached copy of ~ts still valid", [Url]),
+            {ok, cached};
+        {ok, {{_Version, Code, _Reason}, _Headers, _Body}} ->
+            ?DEBUG("Request to ~p failed: status code ~p", [Url, Code]),
+            error;
+        {error, Reason} ->
+            ?DEBUG("Request to ~p failed: ~p", [Url, Reason]),
+            error
     end.

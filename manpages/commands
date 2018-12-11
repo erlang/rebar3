@@ -1,0 +1,25 @@
+f(),
+P = application:get_env(rebar, providers, []),
+S = lists:foldl(fun(P, S) -> {ok, S2} = P:init(S), S2 end, rebar_state:new(), P),
+PS = rebar_state:providers(S),
+DP = lists:keysort(2,providers:get_providers_by_namespace(default, PS)),
+f(Str),
+Str = [begin
+    Name = element(2,Pn),
+    Desc = element(8,Pn),
+    Opts = element(10,Pn),
+    OptShort = [case {Short,Long} of
+                    {undefined,undefined} -> "";
+                    {undefined,_} -> ["[\\fI--",Long,"\\fR] "];
+                    {_,undefined} -> ["[\\fI-",Short,"\\fR] "];
+                    {_,_} ->         ["[\\fI-",Short,"\\fR|\\fI--",Long,"\\fR] "]
+                end || {_,Short,Long,_,_Desc} <- Opts],
+    OptLong = [case {Short,Long} of
+                   {undefined,undefined} -> "";
+                   {_,undefined} -> [".IP\n\\fI-",Short,"\\fR: ", Desc, "\n"];
+                   {_,_} ->         [".IP\n\\fI--",Long,"\\fR: ", Desc, "\n"]
+               end || {_,Short,Long,_,Desc} <- Opts],
+    [".TP\n",
+     "\\fB", atom_to_list(element(2,Pn)), "\\fR ", OptShort, "\n",
+     Desc, "\n", OptLong] end || Pn <- DP, element(5,Pn) == true],
+file:write_file("commands.out", Str).

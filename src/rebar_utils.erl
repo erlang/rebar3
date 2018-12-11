@@ -37,8 +37,9 @@
          escript_foldl/3,
          find_files/2,
          find_files/3,
+         find_files_in_dirs/3,
+         find_source/3,
          beam_to_mod/1,
-         beam_to_mod/2,
          erl_to_mod/1,
          beams/1,
          find_executable/1,
@@ -55,6 +56,8 @@
          get_arch/0,
          wordsize/0,
          deps_to_binary/1,
+         to_binary/1,
+         to_list/1,
          tup_dedup/1,
          tup_umerge/2,
          tup_sort/1,
@@ -70,12 +73,17 @@
          info_useless/2,
          list_dir/1,
          user_agent/0,
-         reread_config/1]).
+         reread_config/1, reread_config/2,
+         get_proxy_auth/0,
+         is_list_of_strings/1,
+         ssl_opts/1]).
+
 
 %% for internal use only
 -export([otp_release/0]).
 
 -include("rebar.hrl").
+-include_lib("public_key/include/OTP-PUB-KEY.hrl").
 
 -define(ONE_LEVEL_INDENT, "     ").
 -define(APP_NAME_INDEX, 2).
@@ -95,6 +103,12 @@ sort_deps(Deps) ->
 droplast(L) ->
     lists:reverse(tl(lists:reverse(L))).
 
+%% @doc filtermap takes in a function that is either or both
+%% a predicate and a map, and returns the matching and valid elements.
+-spec filtermap(F, [In]) -> [Out] when
+      F :: fun((In) -> boolean() | {true, Out}),
+      In :: term(),
+      Out :: term().
 filtermap(F, [Hd|Tail]) ->
     case F(Hd) of
         true ->
@@ -107,18 +121,23 @@ filtermap(F, [Hd|Tail]) ->
 filtermap(F, []) when is_function(F, 1) -> [].
 
 is_arch(ArchRegex) ->
-    case re:run(get_arch(), ArchRegex, [{capture, none}]) of
+    case re:run(get_arch(), ArchRegex, [{capture, none}, unicode]) of
         match ->
             true;
         nomatch ->
             false
     end.
 
+%% @doc returns the sytem architecture, in strings like
+%% `"19.0.4-x86_64-unknown-linux-gnu-64"'.
+-spec get_arch() -> string().
 get_arch() ->
     Words = wordsize(),
     otp_release() ++ "-"
         ++ erlang:system_info(system_architecture) ++ "-" ++ Words.
 
+%% @doc returns the size of a word on the system, as a string
+-spec wordsize() -> string().
 wordsize() ->
     try erlang:system_info({wordsize, external}) of
         Val ->
@@ -129,7 +148,7 @@ wordsize() ->
     end.
 
 sh_send(Command0, String, Options0) ->
-    ?INFO("sh_send info:\n\tcwd: ~p\n\tcmd: ~s < ~s\n",
+    ?INFO("sh_send info:\n\tcwd: ~p\n\tcmd: ~ts < ~ts\n",
           [rebar_dir:get_cwd(), Command0, String]),
     ?DEBUG("\topts: ~p\n", [Options0]),
 
@@ -137,7 +156,7 @@ sh_send(Command0, String, Options0) ->
     Options = [expand_sh_flag(V)
                || V <- proplists:compact(Options0 ++ DefaultOptions)],
 
-    Command = lists:flatten(patch_on_windows(Command0, proplists:get_value(env, Options, []))),
+    Command = lists:flatten(patch_on_windows(Command0, proplists:get_value(env, Options0, []))),
     PortSettings = proplists:get_all_values(port_settings, Options) ++
         [exit_status, {line, 16384}, use_stdio, stderr_to_stdout, hide],
     Port = open_port({spawn, Command}, PortSettings),
@@ -158,7 +177,7 @@ sh_send(Command0, String, Options0) ->
 %% Val = string() | false
 %%
 sh(Command0, Options0) ->
-    ?DEBUG("sh info:\n\tcwd: ~p\n\tcmd: ~s\n", [rebar_dir:get_cwd(), Command0]),
+    ?DEBUG("sh info:\n\tcwd: ~p\n\tcmd: ~ts\n", [rebar_dir:get_cwd(), Command0]),
     ?DEBUG("\topts: ~p\n", [Options0]),
 
     DefaultOptions = [{use_stdout, false}, debug_and_abort_on_error],
@@ -168,10 +187,10 @@ sh(Command0, Options0) ->
     ErrorHandler = proplists:get_value(error_handler, Options),
     OutputHandler = proplists:get_value(output_handler, Options),
 
-    Command = lists:flatten(patch_on_windows(Command0, proplists:get_value(env, Options, []))),
+    Command = lists:flatten(patch_on_windows(Command0, proplists:get_value(env, Options0, []))),
     PortSettings = proplists:get_all_values(port_settings, Options) ++
         [exit_status, {line, 16384}, use_stdio, stderr_to_stdout, hide, eof],
-    ?DEBUG("Port Cmd: ~s\nPort Opts: ~p\n", [Command, PortSettings]),
+    ?DEBUG("Port Cmd: ~ts\nPort Opts: ~p\n", [Command, PortSettings]),
     Port = open_port({spawn, Command}, PortSettings),
 
     try
@@ -187,6 +206,12 @@ sh(Command0, Options0) ->
 
 find_files(Dir, Regex) ->
     find_files(Dir, Regex, true).
+
+find_files_in_dirs([], _Regex, _Recursive) ->
+    [];
+find_files_in_dirs([Dir | T], Regex, Recursive) ->
+    find_files(Dir, Regex, Recursive) ++ find_files_in_dirs(T, Regex, Recursive).
+
 
 find_files(Dir, Regex, Recursive) ->
     filelib:fold_files(Dir, Regex, Recursive,
@@ -219,7 +244,7 @@ deprecated(Old, New, When) ->
       <<"WARNING: deprecated ~p option used~n"
         "Option '~p' has been deprecated~n"
         "in favor of '~p'.~n"
-        "'~p' will be removed ~s.~n">>,
+        "'~p' will be removed ~ts.~n">>,
       [Old, Old, New, Old, When]).
 
 %% for use by `do` task
@@ -231,11 +256,17 @@ args_to_tasks(Args) -> new_task(Args, []).
 deps_to_binary([]) ->
     [];
 deps_to_binary([{Name, _, Source} | T]) ->
-    [{ec_cnv:to_binary(Name), Source} | deps_to_binary(T)];
+    [{to_binary(Name), Source} | deps_to_binary(T)];
 deps_to_binary([{Name, Source} | T]) ->
-    [{ec_cnv:to_binary(Name), Source} | deps_to_binary(T)];
+    [{to_binary(Name), Source} | deps_to_binary(T)];
 deps_to_binary([Name | T]) ->
-    [ec_cnv:to_binary(Name) | deps_to_binary(T)].
+    [to_binary(Name) | deps_to_binary(T)].
+
+to_binary(A) when is_atom(A) -> atom_to_binary(A, unicode);
+to_binary(Str) -> unicode:characters_to_binary(Str).
+
+to_list(A) when is_atom(A) -> atom_to_list(A);
+to_list(Str) -> unicode:characters_to_list(Str).
 
 tup_dedup(List) ->
     tup_dedup_(tup_sort(List)).
@@ -370,7 +401,7 @@ compare({Priority, A}, {Secondary, B}) when not is_tuple(A), is_tuple(B) ->
 
 %% Implements wc -l functionality used to determine patchcount from git output
 line_count(PatchLines) ->
-    Tokenized = string:tokens(PatchLines, "\n"),
+    Tokenized = rebar_string:lexemes(PatchLines, "\n"),
     {ok, length(Tokenized)}.
 
 check_min_otp_version(undefined) ->
@@ -383,10 +414,10 @@ check_min_otp_version(MinOtpVersion) ->
 
     case ParsedVsn >= ParsedMin of
         true ->
-            ?DEBUG("~s satisfies the requirement for minimum OTP version ~s",
+            ?DEBUG("~ts satisfies the requirement for minimum OTP version ~ts",
                    [OtpRelease, MinOtpVersion]);
         false ->
-            ?ABORT("OTP release ~s or later is required. Version in use: ~s",
+            ?ABORT("OTP release ~ts or later is required. Version in use: ~ts",
                    [MinOtpVersion, OtpRelease])
     end.
 
@@ -402,26 +433,101 @@ check_blacklisted_otp_versions(BlacklistedRegexes) ->
 abort_if_blacklisted(BlacklistedRegex, OtpRelease) ->
     case re:run(OtpRelease, BlacklistedRegex, [{capture, none}]) of
         match ->
-            ?ABORT("OTP release ~s matches blacklisted version ~s",
+            ?ABORT("OTP release ~ts matches blacklisted version ~ts",
                    [OtpRelease, BlacklistedRegex]);
         nomatch ->
-            ?DEBUG("~s does not match blacklisted OTP version ~s",
+            ?DEBUG("~ts does not match blacklisted OTP version ~ts",
                    [OtpRelease, BlacklistedRegex])
     end.
 
 user_agent() ->
     {ok, Vsn} = application:get_key(rebar, vsn),
-    ?FMT("Rebar/~s (OTP/~s)", [Vsn, otp_release()]).
+    ?FMT("Rebar/~ts (OTP/~ts)", [Vsn, otp_release()]).
 
 reread_config(ConfigList) ->
+    %% Default to not re-configuring the logger for now;
+    %% this can leak logs in CT redirection when setting up hooks
+    %% for example. If we want to turn it on by default, we may
+    %% want to disable it in CT at the same time or figure out a
+    %% way to silence it.
+    %% The same pattern may apply to other tasks, so let's enable
+    %% case-by-case.
+    reread_config(ConfigList, []).
+
+reread_config(ConfigList, Opts) ->
+    UpdateLoggerConfig = erlang:function_exported(logger, module_info, 0) andalso
+                         proplists:get_value(update_logger, Opts, false),
+    %% NB: we attempt to mimic -config here, which survives app reload,
+    %% hence {persistent, true}.
+    SetEnv = case version_tuple(?MODULE:otp_release()) of
+        {X, _, _} when X =< 17 ->
+            fun application:set_env/3;
+        _ ->
+            fun (App, Key, Val) -> application:set_env(App, Key, Val, [{persistent, true}]) end
+    end,
     try
-        [application:set_env(Application, Key, Val)
+        Res =
+        [SetEnv(Application, Key, Val)
         || Config <- ConfigList,
            {Application, Items} <- Config,
-           {Key, Val} <- Items]
+           {Key, Val} <- Items],
+        case UpdateLoggerConfig of
+            true -> reread_logger_config();
+            false -> ok
+        end,
+        Res
     catch _:_ ->
             ?ERROR("The configuration file submitted could not be read "
                   "and will be ignored.", [])
+    end.
+
+%% @private since the kernel app is already booted, re-reading its config
+%% requires doing some magic to dynamically patch running handlers to
+%% deal with the current value.
+reread_logger_config() ->
+    KernelCfg = application:get_all_env(kernel),
+    LogCfg = proplists:get_value(logger, KernelCfg),
+    case LogCfg of
+        undefined ->
+            ok;
+        _ ->
+            %% Extract and apply settings related to primary configuration
+            %% -- primary config is used for settings shared across handlers
+            LogLvlPrimary = proplists:get_value(logger_info, KernelCfg, all),
+            {FilterDefault, Filters} =
+              case lists:keyfind(filters, 1, KernelCfg) of
+                  false -> {log, []};
+                  {filters, FoundDef, FoundFilter} -> {FoundDef, FoundFilter}
+              end,
+            Primary = #{level => LogLvlPrimary,
+                        filter_default => FilterDefault,
+                        filters => Filters},
+            %% Load the correct handlers based on their individual config.
+            [case Id of
+                 default -> logger:update_handler_config(Id, Cfg);
+                 _ -> logger:add_handler(Id, Mod, Cfg)
+             end || {handler, Id, Mod, Cfg} <- LogCfg],
+            logger:set_primary_config(Primary),
+            ok
+    end.
+
+
+%% @doc Given env. variable `FOO' we want to expand all references to
+%% it in `InStr'. References can have two forms: `$FOO' and `${FOO}'
+%% The end of form `$FOO' is delimited with whitespace or EOL
+-spec expand_env_variable(string(), string(), term()) -> string().
+expand_env_variable(InStr, VarName, RawVarValue) ->
+    case rebar_string:chr(InStr, $$) of
+        0 ->
+            %% No variables to expand
+            InStr;
+        _ ->
+            ReOpts = [global, unicode, {return, list}],
+            VarValue = re:replace(RawVarValue, "\\\\", "\\\\\\\\", ReOpts),
+            %% Use a regex to match/replace:
+            %% Given variable "FOO": match $FOO\s | $FOOeol | ${FOO}
+            RegEx = io_lib:format("\\\$(~ts(\\W|$)|{~ts})", [VarName, VarName]),
+            re:replace(InStr, RegEx, [VarValue, "\\2"], ReOpts)
     end.
 
 %% ====================================================================
@@ -436,7 +542,7 @@ version_tuple(OtpRelease) ->
         {match, [_Full, Maj]} ->
             {list_to_integer(Maj), 0, 0};
         nomatch ->
-            ?ABORT("Minimum OTP release unable to be parsed: ~s", [OtpRelease])
+            ?ABORT("Minimum OTP release unable to be parsed: ~ts", [OtpRelease])
     end.
 
 otp_release() ->
@@ -459,11 +565,10 @@ otp_release1(Rel) ->
             %% It's fine to rely on the binary module here because we can
             %% be sure that it's available when the otp_release string does
             %% not begin with $R.
-            Size = byte_size(Vsn),
             %% The shortest vsn string consists of at least two digits
             %% followed by "\n". Therefore, it's safe to assume Size >= 3.
-            case binary:part(Vsn, {Size, -3}) of
-                <<"**\n">> ->
+            case binary:match(Vsn, <<"**">>) of
+                {Pos, _} ->
                     %% The OTP documentation mentions that a system patched
                     %% using the otp_patch_apply tool available to licensed
                     %% customers will leave a '**' suffix in the version as a
@@ -472,9 +577,9 @@ otp_release1(Rel) ->
                     %% drop the suffix, given for all intents and purposes, we
                     %% cannot obtain relevant information from it as far as
                     %% tooling is concerned.
-                    binary:bin_to_list(Vsn, {0, Size - 3});
-                _ ->
-                    binary:bin_to_list(Vsn, {0, Size - 1})
+                    binary:bin_to_list(Vsn, {0, Pos});
+                nomatch ->
+                    rebar_string:trim(binary:bin_to_list(Vsn), trailing, "\n")
             end
     end.
 
@@ -489,28 +594,9 @@ patch_on_windows(Cmd, Env) ->
                                end, Cmd, Env),
             %% Remove left-over vars
             re:replace(Cmd1, "\\\$\\w+|\\\${\\w+}", "",
-                       [global, {return, list}]);
+                       [global, {return, list}, unicode]);
         _ ->
             Cmd
-    end.
-
-%%
-%% Given env. variable FOO we want to expand all references to
-%% it in InStr. References can have two forms: $FOO and ${FOO}
-%% The end of form $FOO is delimited with whitespace or eol
-%%
-expand_env_variable(InStr, VarName, RawVarValue) ->
-    case string:chr(InStr, $$) of
-        0 ->
-            %% No variables to expand
-            InStr;
-        _ ->
-            ReOpts = [global, unicode, {return, list}],
-            VarValue = re:replace(RawVarValue, "\\\\", "\\\\\\\\", ReOpts),
-            %% Use a regex to match/replace:
-            %% Given variable "FOO": match $FOO\s | $FOOeol | ${FOO}
-            RegEx = io_lib:format("\\\$(~s(\\W|$)|{~s})", [VarName, VarName]),
-            re:replace(InStr, RegEx, [VarValue, "\\2"], ReOpts)
     end.
 
 expand_sh_flag(return_on_error) ->
@@ -534,7 +620,7 @@ expand_sh_flag(use_stdout) ->
     {output_handler,
      fun(Line, Acc) ->
              %% Line already has a newline so don't use ?CONSOLE which adds one
-             io:format("~s", [Line]),
+             io:format("~ts", [Line]),
              [Line | Acc]
      end};
 expand_sh_flag({use_stdout, false}) ->
@@ -557,23 +643,23 @@ log_msg_and_abort(Message) ->
 -spec debug_log_msg_and_abort(string()) -> err_handler().
 debug_log_msg_and_abort(Message) ->
     fun(Command, {Rc, Output}) ->
-            ?DEBUG("sh(~s)~n"
+            ?DEBUG("sh(~ts)~n"
                   "failed with return code ~w and the following output:~n"
-                  "~s", [Command, Rc, Output]),
+                  "~ts", [Command, Rc, Output]),
             ?ABORT(Message, [])
     end.
 
 -spec log_and_abort(string(), {integer(), string()}) -> no_return().
 log_and_abort(Command, {Rc, Output}) ->
-    ?ABORT("sh(~s)~n"
+    ?ABORT("sh(~ts)~n"
           "failed with return code ~w and the following output:~n"
-          "~s", [Command, Rc, Output]).
+          "~ts", [Command, Rc, Output]).
 
 -spec debug_and_abort(string(), {integer(), string()}) -> no_return().
 debug_and_abort(Command, {Rc, Output}) ->
-    ?DEBUG("sh(~s)~n"
+    ?DEBUG("sh(~ts)~n"
           "failed with return code ~w and the following output:~n"
-          "~s", [Command, Rc, Output]),
+          "~ts", [Command, Rc, Output]),
     throw(rebar_abort).
 
 sh_loop(Port, Fun, Acc) ->
@@ -591,10 +677,6 @@ sh_loop(Port, Fun, Acc) ->
                     {error, {Rc, Data}}
             end
     end.
-
-beam_to_mod(Dir, Filename) ->
-    [Dir | Rest] = filename:split(Filename),
-    list_to_atom(filename:basename(string:join(Rest, "."), ".beam")).
 
 beam_to_mod(Filename) ->
     list_to_atom(filename:basename(Filename, ".beam")).
@@ -633,36 +715,40 @@ escript_foldl(Fun, Acc, File) ->
             Error
     end.
 
-vcs_vsn(Vcs, Dir, Resources) ->
-    case vcs_vsn_cmd(Vcs, Dir, Resources) of
+%% TODO: this is just for rebar3_hex and maybe other plugins
+%% but eventually it should be dropped
+vcs_vsn(OriginalVsn, Dir, Resources) when is_list(Dir) ,
+                                          is_list(Resources) ->
+    ?WARN("Using deprecated rebar_utils:vcs_vsn/3. Please upgrade your plugins.", []),
+    FakeState = rebar_state:new(),
+    {ok, AppInfo} = rebar_app_info:new(fake, OriginalVsn, Dir),
+    vcs_vsn(AppInfo, OriginalVsn,
+            rebar_state:set_resources(FakeState, Resources));
+vcs_vsn(AppInfo, Vcs, State) ->
+    case vcs_vsn_cmd(AppInfo, Vcs, State) of
         {plain, VsnString} ->
             VsnString;
         {cmd, CmdString} ->
-            vcs_vsn_invoke(CmdString, Dir);
+            vcs_vsn_invoke(CmdString, rebar_app_info:dir(AppInfo));
         unknown ->
             ?ABORT("vcs_vsn: Unknown vsn format: ~p", [Vcs]);
         {error, Reason} ->
-            ?ABORT("vcs_vsn: ~s", [Reason])
+            ?ABORT("vcs_vsn: ~ts", [Reason])
     end.
 
 %% Temp work around for repos like relx that use "semver"
-vcs_vsn_cmd(Vsn, _, _) when is_binary(Vsn) ->
+vcs_vsn_cmd(_, Vsn, _) when is_binary(Vsn) ->
     {plain, Vsn};
-vcs_vsn_cmd(VCS, Dir, Resources) when VCS =:= semver ; VCS =:= "semver" ->
-    vcs_vsn_cmd(git, Dir, Resources);
-vcs_vsn_cmd({cmd, _Cmd}=Custom, _, _) ->
+vcs_vsn_cmd(AppInfo, VCS, State) when VCS =:= semver ; VCS =:= "semver" ->
+    vcs_vsn_cmd(AppInfo, git, State);
+vcs_vsn_cmd(_AppInfo, {cmd, _Cmd}=Custom, _) ->
     Custom;
-vcs_vsn_cmd(VCS, Dir, Resources) when is_atom(VCS) ->
-    case find_resource_module(VCS, Resources) of
-        {ok, Module} ->
-            Module:make_vsn(Dir);
-        {error, _} ->
-            unknown
-    end;
-vcs_vsn_cmd(VCS, Dir, Resources) when is_list(VCS) ->
+vcs_vsn_cmd(AppInfo, VCS, State) when is_atom(VCS) ->
+    rebar_resource_v2:make_vsn(AppInfo, VCS, State);
+vcs_vsn_cmd(AppInfo, VCS, State) when is_list(VCS) ->
     try list_to_existing_atom(VCS) of
         AVCS ->
-            case vcs_vsn_cmd(AVCS, Dir, Resources) of
+            case vcs_vsn_cmd(AppInfo, AVCS, State) of
                 unknown -> {plain, VCS};
                 Other -> Other
             end
@@ -675,20 +761,7 @@ vcs_vsn_cmd(_, _, _) ->
 
 vcs_vsn_invoke(Cmd, Dir) ->
     {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),
-    string:strip(VsnString, right, $\n).
-
-find_resource_module(Type, Resources) ->
-    case lists:keyfind(Type, 1, Resources) of
-        false ->
-            case code:which(Type) of
-                non_existing ->
-                    {error, unknown};
-                _ ->
-                    {ok, Type}
-            end;
-        {Type, Module} ->
-            {ok, Module}
-    end.
+    rebar_string:trim(VsnString, trailing, "\n").
 
 %% @doc ident to the level specified
 -spec indent(non_neg_integer()) -> iolist().
@@ -735,11 +808,20 @@ remove_from_code_path(Paths) ->
                                   ok;
                               {ok, Modules} ->
                                   application:unload(App),
-                                  [begin code:purge(M), code:delete(M) end || M <- Modules]
+                                  [case erlang:check_process_code(self(), M) of
+                                       false ->
+                                           code:purge(M), code:delete(M);
+                                       _ ->
+                                           ?DEBUG("~p can't purge ~p safely, doing a soft purge", [self(), M]),
+                                           code:soft_purge(M) andalso code:delete(M)
+                                   end || M <- Modules]
                           end,
                           code:del_path(Path)
-                  end, Paths).
+                  end, lists:usort(Paths)).
 
+%% @doc Revert to only having the beams necessary for running rebar3 and
+%% plugins in the path
+-spec cleanup_code_path([string()]) -> true | {error, term()}.
 cleanup_code_path(OrigPath) ->
     CurrentPath = code:get_path(),
     AddedPaths = CurrentPath -- OrigPath,
@@ -756,7 +838,7 @@ cleanup_code_path(OrigPath) ->
 
 new_task([], Acc) -> lists:reverse(Acc);
 new_task([TaskList|Rest], Acc) ->
-    case re:split(TaskList, ",", [{return, list}, {parts, 2}]) of
+    case re:split(TaskList, ",", [{return, list}, {parts, 2}, unicode]) of
         %% `do` consumes all remaining args
         ["do" = Task] ->
             lists:reverse([{Task, Rest}|Acc]);
@@ -783,7 +865,7 @@ arg_or_flag(["-" ++ _ = Flag|Rest], [{Task, Args}|Acc]) ->
     end;
 %% an argument or a sequence of arguments
 arg_or_flag([ArgList|Rest], [{Task, Args}|Acc]) ->
-    case re:split(ArgList, ",", [{return, list}, {parts, 2}]) of
+    case re:split(ArgList, ",", [{return, list}, {parts, 2}, unicode]) of
         %% single arg terminated by a comma
         [Arg, ""]   -> new_task(Rest, [{Task,
                                         lists:reverse([Arg|Args])}|Acc]);
@@ -817,8 +899,17 @@ set_httpc_options(_, []) ->
     ok;
 
 set_httpc_options(Scheme, Proxy) ->
-    {ok, {_, _, Host, Port, _, _}} = http_uri:parse(Proxy),
-    httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar).
+    URI = normalise_proxy(Scheme, Proxy),
+    {ok, {_, UserInfo, Host, Port, _, _}} = http_uri:parse(URI),
+    httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar),
+    set_proxy_auth(UserInfo).
+
+normalise_proxy(Scheme, URI) ->
+    case re:run(URI, "://", [unicode]) of
+        nomatch when Scheme =:= https_proxy -> "https://" ++ URI;
+        nomatch when Scheme =:= proxy -> "http://" ++ URI;
+        _ -> URI
+    end.
 
 url_append_path(Url, ExtraPath) ->
      case http_uri:parse(Url) of
@@ -833,15 +924,18 @@ url_append_path(Url, ExtraPath) ->
 escape_chars(Str) when is_atom(Str) ->
     escape_chars(atom_to_list(Str));
 escape_chars(Str) ->
-    re:replace(Str, "([ ()?`!$&;])", "\\\\&", [global, {return, list}]).
+    re:replace(Str, "([ ()?`!$&;\"\'])", "\\\\&",
+               [global, {return, list}, unicode]).
 
 %% "escape inside these"
 escape_double_quotes(Str) ->
-    re:replace(Str, "([\"\\\\`!$&*;])", "\\\\&", [global, {return, list}]).
+    re:replace(Str, "([\"\\\\`!$&*;])", "\\\\&",
+               [global, {return, list}, unicode]).
 
 %% "escape inside these" but allow *
 escape_double_quotes_weak(Str) ->
-    re:replace(Str, "([\"\\\\`!$&;])", "\\\\&", [global, {return, list}]).
+    re:replace(Str, "([\"\\\\`!$&;])", "\\\\&",
+               [global, {return, list}, unicode]).
 
 info_useless(Old, New) ->
     [?INFO("App ~ts is no longer needed and can be deleted.", [Name])
@@ -857,3 +951,212 @@ list_dir(Dir) ->
         true  -> file:list_dir_all(Dir);
         false -> file:list_dir(Dir)
     end.
+
+set_proxy_auth([]) ->
+    ok;
+set_proxy_auth(UserInfo) ->
+    [Username, Password] = re:split(UserInfo, ":",
+                                    [{return, list}, {parts,2}, unicode]),
+    %% password may contain url encoded characters, need to decode them first
+    application:set_env(rebar, proxy_auth, [{proxy_auth, {Username, http_uri:decode(Password)}}]).
+
+get_proxy_auth() ->
+    case application:get_env(rebar, proxy_auth) of
+        undefined -> [];
+        {ok, ProxyAuth} -> ProxyAuth
+    end.
+
+-spec rebar_utils:is_list_of_strings(term()) -> boolean().
+is_list_of_strings(List) when not is_list(hd(List)) ->
+    false;
+is_list_of_strings(List) when is_list(hd(List)) ->
+    true;
+is_list_of_strings(List) when is_list(List) ->
+    true.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return the SSL options adequate for the project based on
+%% its configuration, including for validation of certs.
+%% @end
+%%------------------------------------------------------------------------------
+-spec ssl_opts(Url) -> Res when
+      Url :: string(),
+      Res :: proplists:proplist().
+ssl_opts(Url) ->
+    case get_ssl_config() of
+        ssl_verify_enabled ->
+            ssl_opts(ssl_verify_enabled, Url);
+        ssl_verify_disabled ->
+            [{verify, verify_none}]
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return the SSL options adequate for the project based on
+%% its configuration, including for validation of certs.
+%% @end
+%%------------------------------------------------------------------------------
+-spec ssl_opts(Enabled, Url) -> Res when
+      Enabled :: atom(),
+      Url :: string(),
+      Res :: proplists:proplist().
+ssl_opts(ssl_verify_enabled, Url) ->
+    case check_ssl_version() of
+        true ->
+            {ok, {_, _, Hostname, _, _, _}} =
+                http_uri:parse(rebar_utils:to_list(Url)),
+            VerifyFun = {fun ssl_verify_hostname:verify_fun/3,
+                         [{check_hostname, Hostname}]},
+            CACerts = certifi:cacerts(),
+            [{verify, verify_peer}, {depth, 2}, {cacerts, CACerts},
+             {partial_chain, fun partial_chain/1}, {verify_fun, VerifyFun}];
+        false ->
+            ?WARN("Insecure HTTPS request (peer verification disabled), "
+                  "please update to OTP 17.4 or later", []),
+            [{verify, verify_none}]
+    end.
+
+-spec partial_chain(Certs) -> Res when
+      Certs :: list(any()),
+      Res :: unknown_ca | {trusted_ca, any()}.
+partial_chain(Certs) ->
+    Certs1 = [{Cert, public_key:pkix_decode_cert(Cert, otp)} || Cert <- Certs],
+    CACerts = certifi:cacerts(),
+    CACerts1 = [public_key:pkix_decode_cert(Cert, otp) || Cert <- CACerts],
+    case ec_lists:find(fun({_, Cert}) ->
+                               check_cert(CACerts1, Cert)
+                       end, Certs1) of
+        {ok, Trusted} ->
+            {trusted_ca, element(1, Trusted)};
+        _ ->
+            unknown_ca
+    end.
+
+-spec extract_public_key_info(Cert) -> Res when
+      Cert :: #'OTPCertificate'{tbsCertificate::#'OTPTBSCertificate'{}},
+      Res :: any().
+extract_public_key_info(Cert) ->
+    ((Cert#'OTPCertificate'.tbsCertificate)#'OTPTBSCertificate'.subjectPublicKeyInfo).
+
+-spec check_cert(CACerts, Cert) -> Res when
+      CACerts :: list(any()),
+      Cert :: any(),
+      Res :: boolean().
+check_cert(CACerts, Cert) ->
+    lists:any(fun(CACert) ->
+                      extract_public_key_info(CACert) == extract_public_key_info(Cert)
+              end, CACerts).
+
+-spec check_ssl_version() ->
+    boolean().
+check_ssl_version() ->
+    case application:get_key(ssl, vsn) of
+        {ok, Vsn} ->
+            parse_vsn(Vsn) >= {5, 3, 6};
+        _ ->
+            false
+    end.
+
+-spec get_ssl_config() ->
+      ssl_verify_disabled | ssl_verify_enabled.
+get_ssl_config() ->
+    GlobalConfigFile = rebar_dir:global_config(),
+    Config = rebar_config:consult_file(GlobalConfigFile),
+    case proplists:get_value(ssl_verify, Config, []) of
+        false ->
+            ssl_verify_disabled;
+        _ ->
+            ssl_verify_enabled
+    end.
+
+-spec parse_vsn(Vsn) -> Res when
+      Vsn :: string(),
+      Res :: {integer(), integer(), integer()}.
+parse_vsn(Vsn) ->
+    version_pad(rebar_string:lexemes(Vsn, ".-")).
+
+-spec version_pad(list(nonempty_string())) -> Res when
+      Res :: {integer(), integer(), integer()}.
+version_pad([Major]) ->
+    {list_to_integer(Major), 0, 0};
+version_pad([Major, Minor]) ->
+    {list_to_integer(Major), list_to_integer(Minor), 0};
+version_pad([Major, Minor, Patch]) ->
+    {list_to_integer(Major), list_to_integer(Minor), list_to_integer(Patch)};
+version_pad([Major, Minor, Patch | _]) ->
+    {list_to_integer(Major), list_to_integer(Minor), list_to_integer(Patch)}.
+
+
+-ifdef(filelib_find_source).
+find_source(Filename, Dir, Rules) ->
+    filelib:find_source(Filename, Dir, Rules).
+-else.
+%% Looks for a file relative to a given directory
+
+-type find_file_rule() :: {ObjDirSuffix::string(), SrcDirSuffix::string()}.
+
+%% Looks for a source file relative to the object file name and directory
+
+-type find_source_rule() :: {ObjExtension::string(), SrcExtension::string(),
+                             [find_file_rule()]}.
+
+keep_suffix_search_rules(Rules) ->
+    [T || {_,_,_}=T <- Rules].
+
+-spec find_source(file:filename(), file:filename(), [find_source_rule()]) ->
+        {ok, file:filename()} | {error, not_found}.
+find_source(Filename, Dir, Rules) ->
+    try_suffix_rules(keep_suffix_search_rules(Rules), Filename, Dir).
+
+try_suffix_rules(Rules, Filename, Dir) ->
+    Ext = filename:extension(Filename),
+    try_suffix_rules(Rules, filename:rootname(Filename, Ext), Dir, Ext).
+
+try_suffix_rules([{Ext,Src,Rules}|Rest], Root, Dir, Ext)
+  when is_list(Src), is_list(Rules) ->
+    case try_dir_rules(add_local_search(Rules), Root ++ Src, Dir) of
+        {ok, File} -> {ok, File};
+        _Other ->
+            try_suffix_rules(Rest, Root, Dir, Ext)
+    end;
+try_suffix_rules([_|Rest], Root, Dir, Ext) ->
+    try_suffix_rules(Rest, Root, Dir, Ext);
+try_suffix_rules([], _Root, _Dir, _Ext) ->
+    {error, not_found}.
+
+%% ensuring we check the directory of the object file before any other directory
+add_local_search(Rules) ->
+    Local = {"",""},
+    [Local] ++ lists:filter(fun (X) -> X =/= Local end, Rules).
+
+try_dir_rules([{From, To}|Rest], Filename, Dir)
+  when is_list(From), is_list(To) ->
+    case try_dir_rule(Dir, Filename, From, To) of
+	{ok, File} -> {ok, File};
+	error      -> try_dir_rules(Rest, Filename, Dir)
+    end;
+try_dir_rules([], _Filename, _Dir) ->
+    {error, not_found}.
+
+try_dir_rule(Dir, Filename, From, To) ->
+    case lists:suffix(From, Dir) of
+	true ->
+	    NewDir = lists:sublist(Dir, 1, length(Dir)-length(From))++To,
+	    Src = filename:join(NewDir, Filename),
+	    case filelib:is_regular(Src) of
+		true -> {ok, Src};
+		false -> find_regular_file(filelib:wildcard(Src))
+	    end;
+	false ->
+	    error
+    end.
+
+find_regular_file([]) ->
+    error;
+find_regular_file([File|Files]) ->
+    case filelib:is_regular(File) of
+        true -> {ok, File};
+        false -> find_regular_file(Files)
+    end.
+-endif.

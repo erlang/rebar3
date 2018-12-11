@@ -8,8 +8,11 @@
 -export([init/1,
          do/1,
          format_error/1]).
-%% exported for test purposes, consider private
--export([compile/2, prepare_tests/1, translate_paths/2]).
+
+-ifdef(TEST).
+%% exported for test purposes
+-export([compile/2, prepare_tests/1, translate_paths/2, maybe_write_coverdata/1]).
+-endif.
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
@@ -41,14 +44,21 @@ do(State) ->
     Tests = prepare_tests(State),
     case compile(State, Tests) of
         %% successfully compiled apps
-        {ok, S} -> do(S, Tests);
+        {ok, S} ->
+            {RawOpts, _} = rebar_state:command_parsed_args(S),
+            case proplists:get_value(compile_only, RawOpts, false) of
+                true ->
+                    {ok, S};
+                false ->
+                    do(S, Tests)
+            end;
         %% this should look like a compiler error, not a ct error
         Error   -> Error
     end.
 
 do(State, Tests) ->
     ?INFO("Running Common Test suites...", []),
-    rebar_utils:update_code(rebar_state:code_paths(State, all_deps), [soft_purge]),
+    rebar_paths:set_paths([deps, plugins], State),
 
     %% Run ct provider prehooks
     Providers = rebar_state:providers(State),
@@ -63,14 +73,14 @@ do(State, Tests) ->
                 ok    ->
                     %% Run ct provider post hooks for all project apps and top level project hooks
                     rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State),
-                    rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+                    rebar_paths:set_paths([plugins, deps], State),
                     {ok, State};
                 Error ->
-                    rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+                    rebar_paths:set_paths([plugins, deps], State),
                     Error
             end;
         Error ->
-            rebar_utils:cleanup_code_path(rebar_state:code_paths(State, default)),
+            rebar_paths:set_paths([plugins, deps], State),
             Error
     end.
 
@@ -93,14 +103,16 @@ format_error({error, Reason}) ->
 format_error({error_running_tests, Reason}) ->
     format_error({error, Reason});
 format_error({failures_running_tests, {Failed, AutoSkipped}}) ->
-    io_lib:format("Failures occured running tests: ~b", [Failed+AutoSkipped]);
+    io_lib:format("Failures occurred running tests: ~b", [Failed+AutoSkipped]);
 format_error({badconfig, {Msg, {Value, Key}}}) ->
     io_lib:format(Msg, [Value, Key]);
 format_error({badconfig, Msg}) ->
     io_lib:format(Msg, []);
 format_error({multiple_errors, Errors}) ->
     io_lib:format(lists:concat(["Error running tests:"] ++
-                               lists:map(fun(Error) -> "~n  " ++ Error end, Errors)), []).
+                               lists:map(fun(Error) -> "~n  " ++ Error end, Errors)), []);
+format_error({error_reading_testspec, Reason}) ->
+    io_lib:format("Error reading testspec: ~p", [Reason]).
 
 %% ===================================================================
 %% Internal functions
@@ -126,7 +138,7 @@ cmdopts(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     %% filter out opts common_test doesn't know about and convert
     %% to ct acceptable forms
-    transform_opts(RawOpts, []).
+    transform_retry(transform_opts(RawOpts, []), State).
 
 transform_opts([], Acc) -> lists:reverse(Acc);
 transform_opts([{dir, Dirs}|Rest], Acc) ->
@@ -139,6 +151,8 @@ transform_opts([{testcase, Cases}|Rest], Acc) ->
     transform_opts(Rest, [{testcase, split_string(Cases)}|Acc]);
 transform_opts([{config, Configs}|Rest], Acc) ->
     transform_opts(Rest, [{config, split_string(Configs)}|Acc]);
+transform_opts([{spec, Specs}|Rest], Acc) ->
+    transform_opts(Rest, [{spec, split_string(Specs)}|Acc]);
 transform_opts([{include, Includes}|Rest], Acc) ->
     transform_opts(Rest, [{include, split_string(Includes)}|Acc]);
 transform_opts([{logopts, LogOpts}|Rest], Acc) ->
@@ -161,8 +175,20 @@ transform_opts([{verbose, _}|Rest], Acc) ->
 transform_opts([Opt|Rest], Acc) ->
     transform_opts(Rest, [Opt|Acc]).
 
+%% @private only retry if specified and if no other spec
+%% is given.
+transform_retry(Opts, State) ->
+    case proplists:get_value(retry, Opts, false) andalso
+         not is_any_defined([spec,dir,suite], Opts) of
+        false ->
+            Opts;
+        true ->
+            Path = filename:join([rebar_dir:base_dir(State), "logs", "retry.spec"]),
+            filelib:is_file(Path) andalso [{spec, Path}|Opts]
+    end.
+
 split_string(String) ->
-    string:tokens(String, [$,]).
+    rebar_string:lexemes(String, [$,]).
 
 cfgopts(State) ->
     case rebar_state:get(State, ct_opts, []) of
@@ -174,9 +200,6 @@ cfgopts(State) ->
     end.
 
 ensure_opts([], Acc) -> lists:reverse(Acc);
-ensure_opts([{test_spec, _}|Rest], Acc) ->
-    ?WARN("Test specs not supported. See http://www.rebar3.org/docs/running-tests#common-test", []),
-    ensure_opts(Rest, Acc);
 ensure_opts([{cover, _}|Rest], Acc) ->
     ?WARN("Cover specs not supported. See http://www.rebar3.org/docs/running-tests#common-test", []),
     ensure_opts(Rest, Acc);
@@ -204,16 +227,20 @@ add_hooks(Opts, State) ->
     case {readable(State), lists:keyfind(ct_hooks, 1, Opts)} of
         {false, _} ->
             Opts;
-        {true, false} ->
-            [{ct_hooks, [cth_readable_failonly, cth_readable_shell]} | Opts];
-        {true, {ct_hooks, Hooks}} ->
+        {Other, false} ->
+            [{ct_hooks, [cth_readable_failonly, readable_shell_type(Other), cth_retry]} | Opts];
+        {Other, {ct_hooks, Hooks}} ->
             %% Make sure hooks are there once only.
-            ReadableHooks = [cth_readable_failonly, cth_readable_shell],
-            NewHooks =  (Hooks -- ReadableHooks) ++ ReadableHooks,
+            ReadableHooks = [cth_readable_failonly, readable_shell_type(Other), cth_retry],
+            AllReadableHooks = [cth_readable_failonly, cth_retry,
+                                cth_readable_shell, cth_readable_compact_shell],
+            NewHooks =  (Hooks -- AllReadableHooks) ++ ReadableHooks,
             lists:keyreplace(ct_hooks, 1, Opts, {ct_hooks, NewHooks})
     end.
 
-select_tests(_, _, {error, _} = Error, _) -> Error;
+readable_shell_type(true) -> cth_readable_shell;
+readable_shell_type(compact) -> cth_readable_compact_shell.
+
 select_tests(_, _, _, {error, _} = Error) -> Error;
 select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
     %% set application env if sys_config argument is provided
@@ -221,22 +248,47 @@ select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
     Configs = lists:flatmap(fun(Filename) ->
                                 rebar_file_utils:consult_config(State, Filename)
                             end, SysConfigs),
-    [application:load(Application) || Config <- SysConfigs, {Application, _} <- Config],
+    %% NB: load the applications (from user directories too) to support OTP < 17
+    %% to our best ability.
+    rebar_paths:set_paths([deps, plugins], State),
+    [application:load(Application) || Config <- Configs, {Application, _} <- Config],
     rebar_utils:reread_config(Configs),
 
-    Merged = lists:ukeymerge(1,
-                             lists:ukeysort(1, CmdOpts),
-                             lists:ukeysort(1, CfgOpts)),
-    %% make sure `dir` and/or `suite` from command line go in as
-    %% a pair overriding both `dir` and `suite` from config if
-    %% they exist
-    Opts = case {proplists:get_value(suite, CmdOpts), proplists:get_value(dir, CmdOpts)} of
-        {undefined, undefined} -> Merged;
-        {_Suite, undefined}    -> lists:keydelete(dir, 1, Merged);
-        {undefined, _Dir}      -> lists:keydelete(suite, 1, Merged);
-        {_Suite, _Dir}         -> Merged
-    end,
+    Opts = merge_opts(CmdOpts,CfgOpts),
     discover_tests(State, ProjectApps, Opts).
+
+%% Merge the option lists from command line and rebar.config:
+%%
+%% - Options set on the command line will replace the same options if
+%%   set in rebar.config.
+%%
+%% - Special care is taken with options that select which tests to
+%%   run - ANY such option on the command line will replace ALL such
+%%   options in the config.
+%%
+%%   Note that if 'spec' is given, common_test will ignore all 'dir',
+%%   'suite', 'group' and 'case', so there is no need to explicitly
+%%   remove any options from the command line.
+%%
+%%   All faulty combinations of options are also handled by
+%%   common_test and are not taken into account here.
+merge_opts(CmdOpts0, CfgOpts0) ->
+    TestSelectOpts = [spec,dir,suite,group,testcase],
+    CmdOpts = lists:ukeysort(1, CmdOpts0),
+    CfgOpts1 = lists:ukeysort(1, CfgOpts0),
+    CfgOpts = case is_any_defined(TestSelectOpts,CmdOpts) of
+                  false ->
+                      CfgOpts1;
+                  true ->
+                       [Opt || Opt={K,_} <- CfgOpts1,
+                               not lists:member(K,TestSelectOpts)]
+              end,
+    lists:ukeymerge(1, CmdOpts, CfgOpts).
+
+is_any_defined([Key|Keys],Opts) ->
+    proplists:is_defined(Key,Opts) orelse is_any_defined(Keys,Opts);
+is_any_defined([],_Opts) ->
+    false.
 
 sys_config_list(CmdOpts, CfgOpts) ->
     CmdSysConfigs = split_string(proplists:get_value(sys_config, CmdOpts, "")),
@@ -250,11 +302,10 @@ sys_config_list(CmdOpts, CfgOpts) ->
     end.
 
 discover_tests(State, ProjectApps, Opts) ->
-    case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
-        %% no dirs or suites defined, try using `$APP/test` and `$ROOT/test`
-        %%  as suites
-        {undefined, undefined} -> {ok, [default_tests(State, ProjectApps)|Opts]};
-        {_, _}                 -> {ok, Opts}
+    case is_any_defined([spec,dir,suite],Opts) of
+        %% no tests defined, try using `$APP/test` and `$ROOT/test` as dirs
+        false -> {ok, [default_tests(State, ProjectApps)|Opts]};
+        true  -> {ok, Opts}
     end.
 
 default_tests(State, ProjectApps) ->
@@ -289,14 +340,9 @@ compile(State, {ok, _} = Tests) ->
 compile(_State, Error) -> Error.
 
 do_compile(State) ->
-    case rebar_prv_compile:do(State) of
-        %% successfully compiled apps
-        {ok, S} ->
-            ok = maybe_cover_compile(S),
-            {ok, S};
-        %% this should look like a compiler error, not an eunit error
-        Error   -> Error
-    end.
+    {ok, S} = rebar_prv_compile:do(State),
+    ok = maybe_cover_compile(S),
+    {ok, S}.
 
 inject_ct_state(State, {ok, Tests}) ->
     Apps = rebar_state:project_apps(State),
@@ -304,8 +350,7 @@ inject_ct_state(State, {ok, Tests}) ->
         {ok, {NewState, ModdedApps}} ->
             test_dirs(NewState, ModdedApps, Tests);
         {error, _} = Error           -> Error
-    end;
-inject_ct_state(_State, Error) -> Error.
+    end.
 
 inject_ct_state(State, Tests, [App|Rest], Acc) ->
     case inject(rebar_app_info:opts(App), State, Tests) of
@@ -383,31 +428,50 @@ append(A, B) -> A ++ B.
 
 add_transforms(CTOpts, State) when is_list(CTOpts) ->
     case readable(State) of
-        true ->
-            ReadableTransform = [{parse_transform, cth_readable_transform}],
-            (CTOpts -- ReadableTransform) ++ ReadableTransform;
         false ->
-            CTOpts
+            CTOpts;
+        Other when Other == true; Other == compact ->
+            ReadableTransform = [{parse_transform, cth_readable_transform}],
+            (CTOpts -- ReadableTransform) ++ ReadableTransform
     end;
 add_transforms({error, _} = Error, _State) -> Error.
 
 readable(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     case proplists:get_value(readable, RawOpts) of
-        true  -> true;
-        false -> false;
-        undefined -> rebar_state:get(State, ct_readable, true)
+        "true"  -> true;
+        "false" -> false;
+        "compact" -> compact;
+        undefined -> rebar_state:get(State, ct_readable, compact)
     end.
 
 test_dirs(State, Apps, Opts) ->
-    case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
-        {Suites, undefined} -> set_compile_dirs(State, Apps, {suite, Suites});
-        {undefined, Dirs}   -> set_compile_dirs(State, Apps, {dir, Dirs});
-        {Suites, Dir} when is_integer(hd(Dir)) ->
-            set_compile_dirs(State, Apps, join(Suites, Dir));
-        {Suites, [Dir]} when is_integer(hd(Dir)) ->
-            set_compile_dirs(State, Apps, join(Suites, Dir));
-        {_Suites, _Dirs}    -> {error, "Only a single directory may be specified when specifying suites"}
+    case proplists:get_value(spec, Opts) of
+        undefined ->
+            case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
+                {Suites, undefined} -> set_compile_dirs(State, Apps, {suite, Suites});
+                {undefined, Dirs}   -> set_compile_dirs(State, Apps, {dir, Dirs});
+                {Suites, Dir} when is_integer(hd(Dir)) ->
+                    set_compile_dirs(State, Apps, join(Suites, Dir));
+                {Suites, [Dir]} when is_integer(hd(Dir)) ->
+                    set_compile_dirs(State, Apps, join(Suites, Dir));
+                {_Suites, _Dirs}    -> {error, "Only a single directory may be specified when specifying suites"}
+            end;
+        Spec when is_integer(hd(Spec)) ->
+            spec_test_dirs(State, Apps, [Spec]);
+        Specs ->
+            spec_test_dirs(State, Apps, Specs)
+    end.
+
+spec_test_dirs(State, Apps, Specs0) ->
+    case get_dirs_from_specs(Specs0) of
+        {ok,{Specs,SuiteDirs}} ->
+            {State1,Apps1} = set_compile_dirs1(State, Apps, {dir, SuiteDirs}),
+            {State2,Apps2} = set_compile_dirs1(State1, Apps1, {spec, Specs}),
+            [maybe_copy_spec(State2,Apps2,S) || S <- Specs],
+            {ok, rebar_state:project_apps(State2, Apps2)};
+        Error ->
+            Error
     end.
 
 join(Suite, Dir) when is_integer(hd(Suite)) ->
@@ -415,27 +479,28 @@ join(Suite, Dir) when is_integer(hd(Suite)) ->
 join(Suites, Dir) ->
     {suite, lists:map(fun(S) -> filename:join([Dir, S]) end, Suites)}.
 
-set_compile_dirs(State, Apps, {dir, Dir}) when is_integer(hd(Dir)) ->
+set_compile_dirs(State, Apps, What) ->
+    {NewState,NewApps} = set_compile_dirs1(State, Apps, What),
+    {ok, rebar_state:project_apps(NewState, NewApps)}.
+
+set_compile_dirs1(State, Apps, {dir, Dir}) when is_integer(hd(Dir)) ->
     %% single directory
     %% insert `Dir` into an app if relative, or the base state if not
     %% app relative but relative to the root or not at all if outside
     %% project scope
-    {NewState, NewApps} = maybe_inject_test_dir(State, [], Apps, Dir),
-    {ok, rebar_state:project_apps(NewState, NewApps)};
-set_compile_dirs(State, Apps, {dir, Dirs}) ->
+    maybe_inject_test_dir(State, [], Apps, Dir);
+set_compile_dirs1(State, Apps, {dir, Dirs}) ->
     %% multiple directories
     F = fun(Dir, {S, A}) -> maybe_inject_test_dir(S, [], A, Dir) end,
-    {NewState, NewApps} = lists:foldl(F, {State, Apps}, Dirs),
-    {ok, rebar_state:project_apps(NewState, NewApps)};
-set_compile_dirs(State, Apps, {suite, Suites}) ->
-    %% suites with dir component
-    Dirs = find_suite_dirs(Suites),
+    lists:foldl(F, {State, Apps}, Dirs);
+set_compile_dirs1(State, Apps, {Type, Files}) when Type==spec; Type==suite ->
+    %% specs or suites with dir component
+    Dirs = find_file_dirs(Files),
     F = fun(Dir, {S, A}) -> maybe_inject_test_dir(S, [], A, Dir) end,
-    {NewState, NewApps} = lists:foldl(F, {State, Apps}, Dirs),
-    {ok, rebar_state:project_apps(NewState, NewApps)}.
+    lists:foldl(F, {State, Apps}, Dirs).
 
-find_suite_dirs(Suites) ->
-    AllDirs = lists:map(fun(S) -> filename:dirname(filename:absname(S)) end, Suites),
+find_file_dirs(Files) ->
+    AllDirs = lists:map(fun(F) -> filename:dirname(filename:absname(F)) end, Files),
     %% eliminate duplicates
     lists:usort(AllDirs).
 
@@ -483,52 +548,79 @@ copy_bare_suites(From, To) ->
     ok = rebar_file_utils:cp_r(SrcFiles, To),
     rebar_file_utils:cp_r(DataDirs, To).
 
+maybe_copy_spec(State, [App|Apps], Spec) ->
+    case rebar_file_utils:path_from_ancestor(filename:dirname(Spec), rebar_app_info:dir(App)) of
+        {ok, []}   ->
+            ok = rebar_file_utils:cp_r([Spec],rebar_app_info:out_dir(App));
+        {ok,_} ->
+            ok;
+        {error,badparent} ->
+            maybe_copy_spec(State, Apps, Spec)
+    end;
+maybe_copy_spec(State, [], Spec) ->
+    case rebar_file_utils:path_from_ancestor(filename:dirname(Spec), rebar_state:dir(State)) of
+        {ok, []}   ->
+            ExtrasDir = filename:join([rebar_dir:base_dir(State), "extras"]),
+            ok = rebar_file_utils:cp_r([Spec],ExtrasDir);
+        _R ->
+            ok
+    end.
+
 inject_test_dir(Opts, Dir) ->
     %% append specified test targets to app defined `extra_src_dirs`
     ExtraSrcDirs = rebar_opts:get(Opts, extra_src_dirs, []),
     rebar_opts:set(Opts, extra_src_dirs, ExtraSrcDirs ++ [Dir]).
 
+get_dirs_from_specs(Specs) ->
+    case get_tests_from_specs(Specs) of
+        {ok,Tests} ->
+            {SpecLists,NodeRunSkipLists} = lists:unzip(Tests),
+            SpecList = lists:append(SpecLists),
+            NodeRunSkipList = lists:append(NodeRunSkipLists),
+            RunList = lists:append([R || {_,R,_} <- NodeRunSkipList]),
+            DirList = [element(1,R) || R <- RunList],
+            {ok,{SpecList,DirList}};
+        {error,Reason} ->
+            {error,{?MODULE,{error_reading_testspec,Reason}}}
+    end.
+
+get_tests_from_specs(Specs) ->
+    _ = ct_testspec:module_info(), % make sure ct_testspec is loaded
+    case erlang:function_exported(ct_testspec,get_tests,1) of
+        true ->
+            ct_testspec:get_tests(Specs);
+        false ->
+            case ct_testspec:collect_tests_from_file(Specs,true) of
+                Tests when is_list(Tests) ->
+                    {ok,[{S,ct_testspec:prepare_tests(R)} || {S,R} <- Tests]};
+                Error ->
+                    Error
+            end
+    end.
+
 translate_paths(State, Opts) ->
-    case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
-        {_Suites, undefined} -> translate_suites(State, Opts, []);
-        {undefined, _Dirs}   -> translate_dirs(State, Opts, []);
-        %% both dirs and suites are defined, only translate dir paths
-        _                    -> translate_dirs(State, Opts, [])
+    case proplists:get_value(spec, Opts) of
+        undefined ->
+            case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
+                {_Suites, undefined} -> translate_paths(State, suite, Opts, []);
+                {undefined, _Dirs}   -> translate_paths(State, dir, Opts, []);
+                %% both dirs and suites are defined, only translate dir paths
+                _                    -> translate_paths(State, dir, Opts, [])
+            end;
+        _Specs ->
+            translate_paths(State, spec, Opts, [])
     end.
 
-translate_dirs(_State, [], Acc) -> lists:reverse(Acc);
-translate_dirs(State, [{dir, Dir}|Rest], Acc) when is_integer(hd(Dir)) ->
-    %% single dir
+translate_paths(_State, _Type, [], Acc) -> lists:reverse(Acc);
+translate_paths(State, Type, [{Type, Val}|Rest], Acc) when is_integer(hd(Val)) ->
+    %% single file or dir
+    translate_paths(State, Type, [{Type, [Val]}|Rest], Acc);
+translate_paths(State, Type, [{Type, Files}|Rest], Acc) ->
     Apps = rebar_state:project_apps(State),
-    translate_dirs(State, Rest, [{dir, translate(State, Apps, Dir)}|Acc]);
-translate_dirs(State, [{dir, Dirs}|Rest], Acc) ->
-    %% multiple dirs
-    Apps = rebar_state:project_apps(State),
-    NewDirs = {dir, lists:map(fun(Dir) -> translate(State, Apps, Dir) end, Dirs)},
-    translate_dirs(State, Rest, [NewDirs|Acc]);
-translate_dirs(State, [Test|Rest], Acc) ->
-    translate_dirs(State, Rest, [Test|Acc]).
-
-translate_suites(_State, [], Acc) -> lists:reverse(Acc);
-translate_suites(State, [{suite, Suite}|Rest], Acc) when is_integer(hd(Suite)) ->
-    %% single suite
-    Apps = rebar_state:project_apps(State),
-    translate_suites(State, Rest, [{suite, translate_suite(State, Apps, Suite)}|Acc]);
-translate_suites(State, [{suite, Suites}|Rest], Acc) ->
-    %% multiple suites
-    Apps = rebar_state:project_apps(State),
-    NewSuites = {suite, lists:map(fun(Suite) -> translate_suite(State, Apps, Suite) end, Suites)},
-    translate_suites(State, Rest, [NewSuites|Acc]);
-translate_suites(State, [Test|Rest], Acc) ->
-    translate_suites(State, Rest, [Test|Acc]).
-
-translate_suite(State, Apps, Suite) ->
-    Dirname = filename:dirname(Suite),
-    Basename = filename:basename(Suite),
-    case Dirname of
-        "." -> Suite;
-        _   -> filename:join([translate(State, Apps, Dirname), Basename])
-    end.
+    New = {Type, lists:map(fun(File) -> translate(State, Apps, File) end, Files)},
+    translate_paths(State, Type, Rest, [New|Acc]);
+translate_paths(State, Type, [Test|Rest], Acc) ->
+    translate_paths(State, Type, Rest, [Test|Acc]).
 
 translate(State, [App|Rest], Path) ->
     case rebar_file_utils:path_from_ancestor(Path, rebar_app_info:dir(App)) of
@@ -584,7 +676,11 @@ handle_results(_) ->
 sum_results({Passed, Failed, {UserSkipped, AutoSkipped}},
             {Passed2, Failed2, {UserSkipped2, AutoSkipped2}}) ->
     {Passed+Passed2, Failed+Failed2,
-     {UserSkipped+UserSkipped2, AutoSkipped+AutoSkipped2}}.
+     {UserSkipped+UserSkipped2, AutoSkipped+AutoSkipped2}};
+sum_results(_, {error, Reason}) ->
+    {error, Reason};
+sum_results(Unknown, _) ->
+    {error, Unknown}.
 
 handle_quiet_results(_, {error, _} = Result) ->
     handle_results(Result);
@@ -607,7 +703,10 @@ format_result({Passed, 0, {0, 0}}) ->
 format_result({Passed, Failed, Skipped}) ->
     Format = [format_failed(Failed), format_skipped(Skipped),
               format_passed(Passed)],
-    ?CONSOLE("~s", [Format]).
+    ?CONSOLE("~ts", [Format]);
+format_result(_Unknown) ->
+    %% Happens when CT itself encounters a bug
+    ok.
 
 format_failed(0) ->
     [];
@@ -636,20 +735,24 @@ maybe_write_coverdata(State) ->
         true  -> rebar_state:set(State, cover_enabled, true);
         false -> State
     end,
-    rebar_prv_cover:maybe_write_coverdata(State1, ?PROVIDER).
+    Name = proplists:get_value(cover_export_name, RawOpts, ?PROVIDER),
+    rebar_prv_cover:maybe_write_coverdata(State1, Name).
 
 ct_opts(_State) ->
-    [{dir, undefined, "dir", string, help(dir)}, %% comma-seperated list
-     {suite, undefined, "suite", string, help(suite)}, %% comma-seperated list
-     {group, undefined, "group", string, help(group)}, %% comma-seperated list
-     {testcase, undefined, "case", string, help(testcase)}, %% comma-seperated list
+    [{dir, undefined, "dir", string, help(dir)}, %% comma-separated list
+     {suite, undefined, "suite", string, help(suite)}, %% comma-separated list
+     {group, undefined, "group", string, help(group)}, %% comma-separated list
+     {testcase, undefined, "case", string, help(testcase)}, %% comma-separated list
      {label, undefined, "label", string, help(label)}, %% String
-     {config, undefined, "config", string, help(config)}, %% comma-seperated list
+     {config, undefined, "config", string, help(config)}, %% comma-separated list
+     {spec, undefined, "spec", string, help(spec)}, %% comma-separated list
+     {join_specs, undefined, "join_specs", boolean, help(join_specs)},
      {allow_user_terms, undefined, "allow_user_terms", boolean, help(allow_user_terms)}, %% Bool
      {logdir, undefined, "logdir", string, help(logdir)}, %% dir
-     {logopts, undefined, "logopts", string, help(logopts)}, %% comma seperated list
+     {logopts, undefined, "logopts", string, help(logopts)}, %% comma-separated list
      {verbosity, undefined, "verbosity", integer, help(verbosity)}, %% Integer
      {cover, $c, "cover", {boolean, false}, help(cover)},
+     {cover_export_name, undefined, "cover_export_name", string, help(cover_export_name)},
      {repeat, undefined, "repeat", integer, help(repeat)}, %% integer
      {duration, undefined, "duration", string, help(duration)}, % format: HHMMSS
      {until, undefined, "until", string, help(until)}, %% format: YYMoMoDD[HHMMSS]
@@ -663,14 +766,18 @@ ct_opts(_State) ->
      {scale_timetraps, undefined, "scale_timetraps", boolean, help(scale_timetraps)},
      {create_priv_dir, undefined, "create_priv_dir", string, help(create_priv_dir)},
      {include, undefined, "include", string, help(include)},
-     {readable, undefined, "readable", boolean, help(readable)},
+     {readable, undefined, "readable", string, help(readable)},
      {verbose, $v, "verbose", boolean, help(verbose)},
      {name, undefined, "name", atom, help(name)},
      {sname, undefined, "sname", atom, help(sname)},
      {setcookie, undefined, "setcookie", atom, help(setcookie)},
-     {sys_config, undefined, "sys_config", string, help(sys_config)} %% comma-seperated list
+     {sys_config, undefined, "sys_config", string, help(sys_config)}, %% comma-separated list
+     {compile_only, undefined, "compile_only", boolean, help(compile_only)},
+     {retry, undefined, "retry", boolean, help(retry)}
     ].
 
+help(compile_only) ->
+    "Compile modules in the project with the test configuration but do not run the tests";
 help(dir) ->
     "List of additional directories containing test suites";
 help(suite) ->
@@ -683,6 +790,10 @@ help(label) ->
     "Test label";
 help(config) ->
     "List of config files";
+help(spec) ->
+    "List of test specifications";
+help(join_specs) ->
+    "Merge all test specifications and perform a single test run";
 help(sys_config) ->
     "List of application config files";
 help(allow_user_terms) ->
@@ -695,6 +806,8 @@ help(verbosity) ->
     "Verbosity";
 help(cover) ->
     "Generate cover data";
+help(cover_export_name) ->
+    "Base name of the coverdata file to write";
 help(repeat) ->
     "How often to repeat tests";
 help(duration) ->
@@ -722,7 +835,7 @@ help(create_priv_dir) ->
 help(include) ->
     "Directories containing additional include files";
 help(readable) ->
-    "Shows test case names and only displays logs to shell on failures";
+    "Shows test case names and only displays logs to shell on failures (true | compact | false)";
 help(verbose) ->
     "Verbose output";
 help(name) ->
@@ -731,5 +844,7 @@ help(sname) ->
     "Gives a short name to the node";
 help(setcookie) ->
     "Sets the cookie if the node is distributed";
+help(retry) ->
+    "Experimental feature. If any specification for previously failing test is found, runs them.";
 help(_) ->
     "".

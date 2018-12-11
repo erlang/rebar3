@@ -12,6 +12,7 @@
 -export([extract_escript/2]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 -include_lib("kernel/include/file.hrl").
 
 -define(PROVIDER, install).
@@ -54,13 +55,16 @@ do(State) ->
     end.
 
 -spec format_error(any()) -> iolist().
+format_error({non_writeable, Dir}) ->
+   io_lib:format("Could not write to ~p. Please ensure the path is writeable.",
+                 [Dir]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
 bin_contents(OutputDir) ->
     <<"#!/usr/bin/env sh
 
-erl -pz ", (ec_cnv:to_binary(OutputDir))/binary,"/*/ebin +sbtu +A0 -noshell -boot start_clean -s rebar3 main $REBAR3_ERL_ARGS -extra \"$@\"
+erl -pz ", (rebar_utils:to_binary(OutputDir))/binary,"/*/ebin +sbtu +A1 -noshell -boot start_clean -s rebar3 main $REBAR3_ERL_ARGS -extra \"$@\"
 ">>.
 
 extract_escript(State, ScriptPath) ->
@@ -71,25 +75,24 @@ extract_escript(State, ScriptPath) ->
     %% And add a rebar3 bin script to ~/.cache/rebar3/bin
     Opts = rebar_state:opts(State),
     OutputDir = filename:join(rebar_dir:global_cache_dir(Opts), "lib"),
-    filelib:ensure_dir(filename:join(OutputDir, "empty")),
+    case filelib:ensure_dir(filename:join(OutputDir, "empty")) of
+        ok ->
+            ok;
+        {error, Posix} when Posix == eaccess; Posix == enoent ->
+            throw(?PRV_ERROR({non_writeable, OutputDir}))
+    end,
 
-    ?INFO("Extracting rebar3 libs to ~s...", [OutputDir]),
+    ?INFO("Extracting rebar3 libs to ~ts...", [OutputDir]),
     zip:extract(Archive, [{cwd, OutputDir}]),
 
     BinDir = filename:join(rebar_dir:global_cache_dir(Opts), "bin"),
     BinFile = filename:join(BinDir, "rebar3"),
     filelib:ensure_dir(BinFile),
 
-    {ok, #file_info{mode = _,
-                    uid = Uid,
-                    gid = Gid}} = file:read_file_info(ScriptPath),
-
-    ?INFO("Writing rebar3 run script ~s...", [BinFile]),
+    ?INFO("Writing rebar3 run script ~ts...", [BinFile]),
     file:write_file(BinFile, bin_contents(OutputDir)),
-    ok = file:write_file_info(BinFile, #file_info{mode=33277,
-                                                  uid=Uid,
-                                                  gid=Gid}),
+    ok = file:write_file_info(BinFile, #file_info{mode=33277}),
 
-    ?INFO("Add to $PATH for use: export PATH=$PATH:~s", [BinDir]),
+    ?INFO("Add to $PATH for use: export PATH=~ts:$PATH", [BinDir]),
 
     {ok, State}.

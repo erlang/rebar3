@@ -14,7 +14,8 @@
          update_base_plt/1,
          update_app_plt/1,
          build_release_plt/1,
-         plt_apps_option/1]).
+         plt_apps_option/1,
+         exclude_and_extra/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -57,7 +58,7 @@ all() ->
 
 groups() ->
     [{empty, [empty_base_plt, empty_app_plt, empty_app_succ_typings]},
-     {build_and_check, [build_release_plt, plt_apps_option]},
+     {build_and_check, [build_release_plt, plt_apps_option, exclude_and_extra]},
      {update, [update_base_plt, update_app_plt]}].
 
 empty_base_plt(Config) ->
@@ -275,6 +276,39 @@ plt_apps_option(Config) ->
     {ok, PltFiles2} = plt_files(Plt),
     ?assertEqual([App1, App2, erts], get_apps_from_beam_files(PltFiles2)).
 
+exclude_and_extra(Config) ->
+    AppDir = ?config(apps, Config),
+    RebarConfig = ?config(rebar_config, Config),
+    BasePlt = ?config(base_plt, Config),
+    Plt = ?config(plt, Config),
+
+    {value, {dialyzer, Opts}, Rest} = lists:keytake(dialyzer, 1, RebarConfig),
+    % Remove erts => []
+    % Add erlang+zlib => [erlang, zlib],
+    % Add erl_prim_loader+init => [erl_prim_loader, init, erlang, zlib]
+    % Remove zlib+init => [erl_prim_loader, erlang]
+    Opts2 = [{exclude_apps, [erts]},
+             {base_plt_mods, [erlang, zlib]},
+             {plt_extra_mods, [erl_prim_loader, init]},
+             {exclude_mods, [zlib, init]} |
+             Opts],
+    RebarConfig2 = [{dialyzer, Opts2} | Rest],
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [erts]),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig2, ["dialyzer"],
+                                   {ok, [{app, Name}]}),
+
+    Erlang = code:where_is_file("erlang.beam"),
+    {ok, BasePltFiles} = plt_files(BasePlt),
+    ?assertEqual([Erlang], BasePltFiles),
+
+    Pair = lists:sort([Erlang, code:where_is_file("erl_prim_loader.beam")]),
+    {ok, PltFiles} = plt_files(Plt),
+    ?assertEqual(Pair, PltFiles).
+
 %% Helpers
 
 erts_files() ->
@@ -328,6 +362,6 @@ get_apps_from_beam_files(BeamFiles) ->
     lists:usort(
       [begin
            AppNameVsn = filename:basename(filename:dirname(filename:dirname(File))),
-           [AppName | _] = string:tokens(AppNameVsn ++ "-", "-"),
+           [AppName | _] = rebar_string:lexemes(AppNameVsn ++ "-", "-"),
            ec_cnv:to_atom(AppName)
        end || File <- BeamFiles]).

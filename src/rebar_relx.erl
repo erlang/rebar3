@@ -6,6 +6,10 @@
 -export([do/4,
          format_error/1]).
 
+-ifdef(TEST).
+-export([merge_overlays/1]).
+-endif.
+
 -include("rebar.hrl").
 
 %% ===================================================================
@@ -23,22 +27,25 @@ do(Module, Command, Provider, State) ->
     LibDirs = rebar_utils:filtermap(fun ec_file:exists/1,
                                    [rebar_dir:checkouts_dir(State), DepsDir | ProjectAppDirs]),
     OutputDir = filename:join(rebar_dir:base_dir(State), ?DEFAULT_RELEASE_DIR),
-    AllOptions = string:join([Command | Options], " "),
+    AllOptions = rebar_string:join([Command | Options], " "),
     Cwd = rebar_state:dir(State),
     Providers = rebar_state:providers(State),
+    RebarOpts = rebar_state:opts(State),
+    ErlOpts = rebar_opts:erl_opts(RebarOpts),
     rebar_hooks:run_project_and_app_hooks(Cwd, pre, Provider, Providers, State),
     try
         case rebar_state:get(State, relx, []) of
             [] ->
                 relx:main([{lib_dirs, LibDirs}
                           ,{caller, api}
-                          ,{log_level, LogLevel} | output_dir(OutputDir, Options)], AllOptions);
+                          ,{log_level, LogLevel} | output_dir(OutputDir, Options)] ++ ErlOpts, AllOptions);
             Config ->
-                Config1 = merge_overlays(Config),
+                Config1 = [{overlay_vars, [{base_dir, rebar_dir:base_dir(State)}]}
+                           | merge_overlays(Config)],
                 relx:main([{lib_dirs, LibDirs}
                           ,{config, Config1}
                           ,{caller, api}
-                          ,{log_level, LogLevel} | output_dir(OutputDir, Options)], AllOptions)
+                          ,{log_level, LogLevel} | output_dir(OutputDir, Options)] ++ ErlOpts, AllOptions)
         end,
         rebar_hooks:run_project_and_app_hooks(Cwd, post, Provider, Providers, State),
         {ok, State}
@@ -62,5 +69,5 @@ merge_overlays(Config) ->
                            (_) -> false
                         end, Config),
     %% Have profile overlay entries come before others to match how profiles work elsewhere
-    NewOverlay = lists:reverse(lists:flatmap(fun({overlay, Overlay}) -> Overlay end, Overlays)),
+    NewOverlay = lists:flatmap(fun({overlay, Overlay}) -> Overlay end, lists:reverse(Overlays)),
     [{overlay, NewOverlay} | Others].
