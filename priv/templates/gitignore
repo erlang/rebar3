@@ -13,11 +13,7 @@ erl_crash.dump
 .rebar
 logs
 _build
-<<<<<<< HEAD
-rebar.lock
-=======
 .idea
 *.iml
 rebar3.crashdump
 *~
->>>>>>> upstream/master
