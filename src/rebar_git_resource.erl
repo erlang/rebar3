@@ -6,10 +6,13 @@
 
 -export([init/2,
          lock/2,
-         download/3,
          download/4,
          needs_update/2,
          make_vsn/2]).
+
+%% For backward compatibilty
+-export ([ download/3
+         ]).
 
 -include("rebar.hrl").
 
@@ -124,6 +127,7 @@ download(TmpDir, AppInfo, State, _) ->
             {error, Error}
     end.
 
+%% For backward compatibilty
 download(Dir, AppInfo, State) ->
     download_(Dir, AppInfo, State).
 
