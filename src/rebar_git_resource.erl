@@ -10,6 +10,10 @@
          needs_update/2,
          make_vsn/2]).
 
+%% For backward compatibilty
+-export ([ download/3
+         ]).
+
 -include("rebar.hrl").
 
 %% Regex used for parsing scp style remote url
@@ -122,6 +126,10 @@ download(TmpDir, AppInfo, State, _) ->
         Error ->
             {error, Error}
     end.
+
+%% For backward compatibilty
+download(Dir, AppInfo, State) ->
+    download_(Dir, AppInfo, State).
 
 download_(Dir, {git, Url}, State) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
