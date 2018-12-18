@@ -171,6 +171,9 @@ transform_opts([{cover, _}|Rest], Acc) ->
 %% drop verbose from opts, ct doesn't care about it
 transform_opts([{verbose, _}|Rest], Acc) ->
     transform_opts(Rest, Acc);
+%% drop fail_fast from opts, ct doesn't care about it
+transform_opts([{fail_fast, _}|Rest], Acc) ->
+    transform_opts(Rest, Acc);
 %% getopt should handle anything else
 transform_opts([Opt|Rest], Acc) ->
     transform_opts(Rest, [Opt|Acc]).
@@ -224,15 +227,21 @@ ensure_opts([V|Rest], Acc) ->
     ensure_opts(Rest, [V|Acc]).
 
 add_hooks(Opts, State) ->
+    FailFast = case fails_fast(State) of
+        true -> [cth_fail_fast];
+        false -> []
+    end,
     case {readable(State), lists:keyfind(ct_hooks, 1, Opts)} of
         {false, _} ->
             Opts;
         {Other, false} ->
-            [{ct_hooks, [cth_readable_failonly, readable_shell_type(Other), cth_retry]} | Opts];
+            [{ct_hooks, [cth_readable_failonly, readable_shell_type(Other),
+                         cth_retry] ++ FailFast} | Opts];
         {Other, {ct_hooks, Hooks}} ->
             %% Make sure hooks are there once only.
-            ReadableHooks = [cth_readable_failonly, readable_shell_type(Other), cth_retry],
-            AllReadableHooks = [cth_readable_failonly, cth_retry,
+            ReadableHooks = [cth_readable_failonly, readable_shell_type(Other),
+                             cth_retry] ++ FailFast,
+            AllReadableHooks = [cth_readable_failonly, cth_retry, cth_fail_fast,
                                 cth_readable_shell, cth_readable_compact_shell],
             NewHooks =  (Hooks -- AllReadableHooks) ++ ReadableHooks,
             lists:keyreplace(ct_hooks, 1, Opts, {ct_hooks, NewHooks})
@@ -444,6 +453,10 @@ readable(State) ->
         "compact" -> compact;
         undefined -> rebar_state:get(State, ct_readable, compact)
     end.
+
+fails_fast(State) ->
+    {RawOpts, _} = rebar_state:command_parsed_args(State),
+    proplists:get_value(fail_fast, RawOpts) == true.
 
 test_dirs(State, Apps, Opts) ->
     case proplists:get_value(spec, Opts) of
@@ -773,7 +786,8 @@ ct_opts(_State) ->
      {setcookie, undefined, "setcookie", atom, help(setcookie)},
      {sys_config, undefined, "sys_config", string, help(sys_config)}, %% comma-separated list
      {compile_only, undefined, "compile_only", boolean, help(compile_only)},
-     {retry, undefined, "retry", boolean, help(retry)}
+     {retry, undefined, "retry", boolean, help(retry)},
+     {fail_fast, undefined, "fail_fast", {boolean, false}, help(fail_fast)}
     ].
 
 help(compile_only) ->
@@ -846,5 +860,9 @@ help(setcookie) ->
     "Sets the cookie if the node is distributed";
 help(retry) ->
     "Experimental feature. If any specification for previously failing test is found, runs them.";
+help(fail_fast) ->
+    "Experimental feature. If any test fails, the run is aborted. Since common test does not "
+    "support this natively, we abort the rebar3 run on a failure. This May break CT's disk logging and "
+    "other rebar3 features.";
 help(_) ->
     "".
