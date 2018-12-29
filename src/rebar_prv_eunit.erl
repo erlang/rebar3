@@ -105,6 +105,8 @@ format_error({eunit_test_errors, Errors}) ->
                                lists:map(fun(Error) -> "~n  " ++ Error end, Errors)), []);
 format_error({badconfig, {Msg, {Value, Key}}}) ->
     io_lib:format(Msg, [Value, Key]);
+format_error({generator, Value}) ->
+    io_lib:format("Generator ~p has an invalid format", [Value]);
 format_error({error, Error}) ->
     format_error({error_running_tests, Error}).
 
@@ -154,7 +156,7 @@ normalize(generator, Value) ->
             lists:map(fun(F) -> {generator, Module, list_to_atom(F)} end,
                       string:tokens(Functions, [$;]));
         _ ->
-            ?PRV_ERROR({generator, {"Generator `~p` is invalid format", {Value}}})
+            ?PRV_ERROR({generator, Value})
     end;
 normalize(Key, Value) when Key == dir; Key == file -> {Key, Value};
 normalize(Key, Value) -> {Key, list_to_atom(Value)}.
