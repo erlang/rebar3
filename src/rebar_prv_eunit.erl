@@ -158,7 +158,7 @@ normalize(generator, Value) ->
             lists:map(fun(F) -> {generator, Module, list_to_atom(F)} end,
                       string:tokens(Functions, [$;]));
         _ ->
-            throw(lists:concat(["Generator `", Value, "' is invalid format."]))
+            ?PRV_ERROR({generator, {"Generator `~p` is invalid format", {Value}}})
     end;
 normalize(Key, Value) when Key == dir; Key == file -> {Key, Value};
 normalize(Key, Value) -> {Key, list_to_atom(Value)}.
