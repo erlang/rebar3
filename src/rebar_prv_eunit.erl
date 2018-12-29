@@ -40,18 +40,14 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    try
-        Tests = prepare_tests(State),
-        %% inject `eunit_first_files`, `eunit_compile_opts` and any
-        %% directories required by tests into the applications
-        NewState = inject_eunit_state(State, Tests),
-        case compile(NewState) of
-            %% successfully compiled apps
-            {ok, S} -> do(S, Tests);
-            Error   -> Error
-        end
-    catch
-        throw:Reason -> {error, Reason}
+    Tests = prepare_tests(State),
+    %% inject `eunit_first_files`, `eunit_compile_opts` and any
+    %% directories required by tests into the applications
+    NewState = inject_eunit_state(State, Tests),
+    case compile(NewState) of
+        %% successfully compiled apps
+        {ok, S} -> do(S, Tests);
+        Error   -> Error
     end.
 
 do(State, Tests) ->
