@@ -136,6 +136,7 @@ complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunut' -s e -l error_on_
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunit' -s f -l file -d "Comma separated list of files to load tests from. Equivalent to `[{file, File}]`"
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunit' -s m -l module -d "Comma separated list of modules to load tests from. Equivalent to `[{module, Module}]`"
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunit' -s s -l suite -d "Comma separated list of modules to load tests from. Equivalent to `[{module, Module}]`"
+complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunit' -s g -l generator -d "Comma separated list of generators (the format is `module:function`) to load tests from. Equivalent to `[{generator, Module, Function}]`"
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunit' -s v -l verbose -d "Verbose output"
 
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command eunit' -l suite -d "Lists of test suites to run"

@@ -95,6 +95,7 @@ _rebar3 () {
                         '(-f --file)'{-f,--file}'[Comma separated list of files to load tests from]:files' \
                         '(-m --module)'{-m,--module}'[Comma separated list of modules to load tests from]:modules' \
                         '(-s --suite)'{-s,--suite}'[Comma separated list of modules to load tests from]:modules' \
+                        '(-g --generator)'{-g,--generator}'[Comma separated list of generators (the format is `module:function`) to load tests from.]:{generator, Module, Function}' \
                         '(-v --verbose)'{-v,--verbose}'[Verbose output]' \
                     && ret=0
                 ;;
