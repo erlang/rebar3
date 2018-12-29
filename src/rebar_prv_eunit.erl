@@ -144,12 +144,16 @@ resolve(Flag, RawOpts) -> resolve(Flag, Flag, RawOpts).
 resolve(Flag, EUnitKey, RawOpts) ->
     case proplists:get_value(Flag, RawOpts) of
         undefined -> [];
-        Args      ->
-            lists:flatten(lists:map(fun(Arg) -> normalize(EUnitKey, Arg) end,
-                                    rebar_string:lexemes(Args, [$,])))
+        Args      -> normalize(EUnitKey,
+                               rebar_string:lexemes(Args, [$,]))
     end.
 
-normalize(generator, Value) ->
+normalize(generator, Args) ->
+    lists:flatmap(fun(Value) -> normalize_(generator, Value) end, Args);
+normalize(EUnitKey, Args) ->
+    lists:map(fun(Arg) -> normalize_(EUnitKey, Arg) end, Args).
+
+normalize_(generator, Value) ->
     case string:tokens(Value, [$:]) of
         [Module0, Functions] ->
             Module = list_to_atom(Module0),
@@ -158,8 +162,8 @@ normalize(generator, Value) ->
         _ ->
             ?PRV_ERROR({generator, Value})
     end;
-normalize(Key, Value) when Key == dir; Key == file -> {Key, Value};
-normalize(Key, Value) -> {Key, list_to_atom(Value)}.
+normalize_(Key, Value) when Key == dir; Key == file -> {Key, Value};
+normalize_(Key, Value) -> {Key, list_to_atom(Value)}.
 
 cfg_tests(State) ->
     case rebar_state:get(State, eunit_tests, []) of
