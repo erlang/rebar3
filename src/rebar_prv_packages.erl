@@ -72,16 +72,14 @@ print_packages({RepoName, {ok, #{<<"name">> := Name,
     Description = maps:get(<<"description">>, Meta, ""),
     Licenses = join(maps:get(<<"licenses">>, Meta, []), <<", ">>),
     Links = join_map(maps:get(<<"links">>, Meta, []), <<"\n        ">>),
-    Maintainers = join(maps:get(<<"maintainers">>, Meta, []), <<", ">>),
     Versions = [V || #{<<"version">> := V} <- Releases],
     VsnStr = join(Versions, <<", ">>),
     ?CONSOLE("~ts:~n"
              "    Name: ~ts~n"
              "    Description: ~ts~n"
              "    Licenses: ~ts~n"
-             "    Maintainers: ~ts~n"
              "    Links:~n        ~ts~n"
-             "    Versions: ~ts~n", [RepoName, Name, Description, Licenses, Maintainers, Links, VsnStr]);
+             "    Versions: ~ts~n", [RepoName, Name, Description, Licenses, Links, VsnStr]);
 print_packages(_) ->
     ok.
 
