@@ -224,7 +224,7 @@ mock_config(Name, Config) ->
     meck:expect(rebar_prv_update, do, fun(State) -> {ok, State} end),
 
     catch ets:delete(?PACKAGE_TABLE),
-    rebar_packages:new_package_table(),    
+    rebar_packages:new_package_table(),
 
     lists:foreach(fun({{N, Vsn}, [Deps, Checksum, _]}) ->
                           case ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(N), Vsn, <<"hexpm">>}) of
@@ -238,11 +238,11 @@ mock_config(Name, Config) ->
                           end;
                      ({_N, _Vsns}) ->
                           ok
-                     
-                  end, AllDeps),    
+
+                  end, AllDeps),
 
     meck:new(hex_repo, [passthrough]),
-    meck:expect(hex_repo, get_package, 
+    meck:expect(hex_repo, get_package,
                 fun(_Config, PkgName) ->
                         Matches = ets:match_object(Tid, {{PkgName,'_'}, '_'}),
                         Releases =
@@ -251,13 +251,13 @@ mock_config(Name, Config) ->
                                dependencies => [{DAppName, {pkg, DN, DV, undefined}} ||
                                                    {DN, DV, _, DAppName} <- Deps]} ||
                                 {{_, Vsn}, [Deps, Checksum, _]} <- Matches],
-                        {ok, {200, #{}, #{releases => Releases}}}
+                        {ok, {200, #{}, Releases}}
                 end),
 
     meck:expect(hex_repo, get_tarball, fun(_, _, _) ->
                                                {ok, {304, #{<<"etag">> => EtagGood}, <<>>}}
-                                       end),   
-    
+                                       end),
+
     %% Move all packages to cache
     NewConf = [{cache_root, CacheRoot},
                {cache_dir, CacheDir},

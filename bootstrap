@@ -135,13 +135,23 @@ compile(App, FirstFiles) ->
     filelib:ensure_dir(filename:join([Dir, "ebin", "dummy.beam"])),
     code:add_path(filename:join(Dir, "ebin")),
     FirstFilesPaths = [filename:join([Dir, "src", Module]) || Module <- FirstFiles],
+    LeexFiles = filelib:wildcard(filename:join([Dir, "src", "*.xrl"])),
+    [compile_xrl_file(X) || X <- LeexFiles],
+    YeccFiles = filelib:wildcard(filename:join([Dir, "src", "*.yrl"])),
+    [compile_yrl_file(X) || X <- YeccFiles],
     Sources = FirstFilesPaths ++ filelib:wildcard(filename:join([Dir, "src", "*.erl"])),
-    [compile_file(X, [{i, filename:join(Dir, "include")}
+    [compile_erl_file(X, [{i, filename:join(Dir, "include")}
                      ,debug_info
                      ,{outdir,  filename:join(Dir, "ebin")}
                      ,return | additional_defines()]) || X <- Sources].
 
-compile_file(File, Opts) ->
+compile_xrl_file(File) ->
+    {ok, _} = leex:file(File).
+
+compile_yrl_file(File) ->
+    {ok, _} = yecc:file(File).
+
+compile_erl_file(File, Opts) ->
     case compile:file(File, Opts) of
         {ok, _Mod} ->
             ok;
@@ -162,7 +172,7 @@ bootstrap_rebar3() ->
                           filename:absname("_build/default/lib/rebar/src")),
     true = Res == ok orelse Res == exists,
     Sources = ["src/rebar_resource_v2.erl", "src/rebar_resource.erl" | filelib:wildcard("src/*.erl")],
-    [compile_file(X, [{outdir, "_build/default/lib/rebar/ebin/"}
+    [compile_erl_file(X, [{outdir, "_build/default/lib/rebar/ebin/"}
                      ,return | additional_defines()]) || X <- Sources],
     code:add_patha(filename:absname("_build/default/lib/rebar/ebin")).
 
@@ -471,7 +481,7 @@ make_normalized_path(Path) ->
     AbsPath = make_absolute_path(Path),
     Components = filename:split(AbsPath),
     make_normalized_path(Components, []).
-    
+
 make_absolute_path(Path) ->
     case filename:pathtype(Path) of
         absolute ->
@@ -636,7 +646,7 @@ join([], Sep) when is_list(Sep) ->
 join([H|T], Sep) ->
     H ++ lists:append([Sep ++ X || X <- T]).
 
-%% Same for chr; no non-deprecated equivalent in OTP20+ 
+%% Same for chr; no non-deprecated equivalent in OTP20+
 chr(S, C) when is_integer(C) -> chr(S, C, 1).
 chr([C|_Cs], C, I) -> I;
 chr([_|Cs], C, I) -> chr(Cs, C, I+1);

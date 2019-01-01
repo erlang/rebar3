@@ -21,7 +21,8 @@
                   api_key => binary(),
                   repo_url => binary(),
                   repo_public_key => binary(),
-                  repo_verify => binary()}.
+                  repo_verify => binary(),
+                  repo_verify_origin => binary()}.
 
 from_state(BaseConfig, State) ->
     HexConfig = rebar_state:get(State, hex, []),
@@ -104,7 +105,13 @@ update_repo_list(R, []) ->
 
 default_repo() ->
     HexDefaultConfig = hex_core:default_config(),
-    HexDefaultConfig#{name => ?PUBLIC_HEX_REPO}.
+    HexDefaultConfig#{name => ?PUBLIC_HEX_REPO, repo_verify_origin => repo_verify_origin()}.
+
+repo_verify_origin() ->
+    case os:getenv("REBAR_NO_VERIFY_REPO_ORIGIN") of
+        "1" -> false;
+        _ -> true
+    end.
 
 repo_list([]) ->
     [];

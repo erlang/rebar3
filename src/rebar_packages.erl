@@ -49,10 +49,10 @@ get(Config, Name) ->
 
 
 -spec get_all_names(rebar_state:t()) -> [binary()].
-get_all_names(State) ->    
+get_all_names(State) ->
     verify_table(State),
     lists:usort(ets:select(?PACKAGE_TABLE, [{#package{key={'$1', '_', '_'},
-                                                      _='_'}, 
+                                                      _='_'},
                                              [], ['$1']}])).
 
 -spec get_package_versions(unicode:unicode_binary(), ec_semver:semver(),
@@ -101,14 +101,14 @@ load_and_verify_version(State) ->
                     ?DEBUG("Package index version mismatch. Current version ~p, this rebar3 expecting ~p",
                            [V, ?PACKAGE_INDEX_VERSION]),
                     (catch ets:delete(?PACKAGE_TABLE)),
-                    new_package_table()                    
+                    new_package_table()
             end;
-        _ ->            
+        _ ->
             new_package_table()
     end.
 
 handle_missing_package(PkgKey, Repo, State, Fun) ->
-    Name = 
+    Name =
         case PkgKey of
             {N, Vsn, _Repo} ->
                 ?DEBUG("Package ~ts-~ts not found. Fetching registry updates for "
@@ -121,8 +121,8 @@ handle_missing_package(PkgKey, Repo, State, Fun) ->
         end,
 
     update_package(Name, Repo, State),
-    try 
-        Fun(State) 
+    try
+        Fun(State)
     catch
         _:_ ->
             %% Even after an update the package is still missing, time to error out
@@ -220,7 +220,7 @@ verify_table(State) ->
     ets:info(?PACKAGE_TABLE, named_table) =:= true orelse load_and_verify_version(State).
 
 parse_deps(Deps) ->
-    [{maps:get(app, D, Name), {pkg, Name, Constraint, undefined}} 
+    [{maps:get(app, D, Name), {pkg, Name, Constraint, undefined}}
      || D=#{package := Name,
             requirement := Constraint} <- Deps].
 
@@ -233,16 +233,19 @@ parse_checksum(Checksum) ->
 
 update_package(Name, RepoConfig=#{name := Repo}, State) ->
     ?MODULE:verify_table(State),
-    try hex_repo:get_package(RepoConfig#{repo_key => maps:get(read_key, RepoConfig, <<>>)}, Name) of
-        {ok, {200, _Headers, #{releases := Releases}}} ->
+    try hex_repo:get_package(get_package_repo_config(RepoConfig), Name) of
+        {ok, {200, _Headers, Releases}} ->
             _ = insert_releases(Name, Releases, Repo, ?PACKAGE_TABLE),
             {ok, RegistryDir} = rebar_packages:registry_dir(State),
             PackageIndex = filename:join(RegistryDir, ?INDEX_FILE),
             ok = ets:tab2file(?PACKAGE_TABLE, PackageIndex);
-        {ok, {403, _Headers, <<>>}} ->
+        {ok, {403, _Headers, _}} ->
             not_found;
         {ok, {404, _Headers, _}} ->
             not_found;
+        {error, unverified} ->
+            ?WARN(unverified_repo_message(), [Repo]),
+            fail;
         Error ->
             ?DEBUG("Hex get_package request failed: ~p", [Error]),
             %% TODO: add better log message. hex_core should export a format_error
@@ -253,6 +256,18 @@ update_package(Name, RepoConfig=#{name := Repo}, State) ->
             ?DEBUG("hex_repo:get_package failed for package ~p: ~p", [Name, Exception]),
             fail
     end.
+
+get_package_repo_config(RepoConfig=#{mirror_of := Repo}) ->
+    get_package_repo_config(maps:remove(mirror_of, RepoConfig#{name => Repo}));
+get_package_repo_config(RepoConfig=#{read_key := Key}) ->
+    get_package_repo_config(maps:remove(read_key, RepoConfig#{repo_key => Key}));
+get_package_repo_config(RepoConfig) ->
+    RepoConfig.
+
+unverified_repo_message() ->
+    "The registry repository ~ts uses a record format that has been deprecated for "
+    "security reasons. The repository should be updated in order to be safer. "
+    "You can disable this check by setting REBAR_NO_VERIFY_REPO_ORIGIN=1".
 
 insert_releases(Name, Releases, Repo, Table) ->
     [true = ets:insert(Table,
