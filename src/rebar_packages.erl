@@ -265,10 +265,9 @@ get_package_repo_config(RepoConfig) ->
     RepoConfig.
 
 unverified_repo_message() ->
-    "Fetched deprecatated registry record version from repo ~ts, for security " ++
-        "reasons this registry version is no longer supported. The repository " ++
-        "you are using should update to fix the security reason. Set " ++
-        "REBAR_NO_VERIFY_REPO_ORIGIN=1 to disable this check.".
+    "The registry repository ~ts uses a record format that has been deprecated for "
+    "security reasons. The repository should be updated in order to be safer. "
+    "You can disable this check by setting REBAR_NO_VERIFY_REPO_ORIGIN=1".
 
 insert_releases(Name, Releases, Repo, Table) ->
     [true = ets:insert(Table,
