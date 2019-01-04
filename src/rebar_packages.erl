@@ -239,10 +239,6 @@ update_package(Name, RepoConfig=#{name := Repo}, State) ->
             {ok, RegistryDir} = rebar_packages:registry_dir(State),
             PackageIndex = filename:join(RegistryDir, ?INDEX_FILE),
             ok = ets:tab2file(?PACKAGE_TABLE, PackageIndex);
-        {ok, {403, _Headers, _}} ->
-            not_found;
-        {ok, {404, _Headers, _}} ->
-            not_found;
         {error, unverified} ->
             ?WARN(unverified_repo_message(), [Repo]),
             fail;
