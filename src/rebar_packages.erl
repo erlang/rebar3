@@ -234,7 +234,7 @@ parse_checksum(Checksum) ->
 update_package(Name, RepoConfig=#{name := Repo}, State) ->
     ?MODULE:verify_table(State),
     try hex_repo:get_package(get_package_repo_config(RepoConfig), Name) of
-        {ok, {200, _Headers, Releases}} ->
+        {ok, {200, _Headers, #{releases := Releases}}} ->
             _ = insert_releases(Name, Releases, Repo, ?PACKAGE_TABLE),
             {ok, RegistryDir} = rebar_packages:registry_dir(State),
             PackageIndex = filename:join(RegistryDir, ?INDEX_FILE),
