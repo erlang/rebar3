@@ -200,7 +200,7 @@ check_type_support() ->
     case get({is_supported, ?MODULE}) of
         true ->
             ok;
-        false ->
+        _ ->
             case rebar_utils:sh("hg --version", [{return_on_error, true},
                                                  {use_stdout, false}]) of
                 {error, _} ->
@@ -210,4 +210,3 @@ check_type_support() ->
                     ok
             end
     end.
-
