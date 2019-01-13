@@ -68,17 +68,20 @@ repos(HexConfig) ->
             merge_repos(RepoList ++ [HexDefaultConfig])
     end.
 
+%% merge repos must add a field repo_name to work with hex_core 0.4.0
 -spec merge_repos([repo()]) -> [repo()].
 merge_repos(Repos) ->
     lists:foldl(fun(R=#{name := Name}, ReposAcc) ->
                         %% private organizations include the parent repo before a :
                         case rebar_string:split(Name, <<":">>) of
                             [Repo, Org] ->
+                                %% hex_core uses repo_name for parent
                                 update_repo_list(R#{name => Name,
+                                                    repo_name => Repo,
                                                     organization => Org,
                                                     parent => Repo}, ReposAcc);
                             _ ->
-                                update_repo_list(R, ReposAcc)
+                                update_repo_list(R#{repo_name => Name}, ReposAcc)
                         end
                 end, [], Repos).
 
