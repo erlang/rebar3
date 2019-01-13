@@ -182,23 +182,25 @@ repo_merging(_Config) ->
 
 repo_replacing(_Config) ->
     Repo1 = #{name => <<"repo-1">>,
+              repo_name => <<"repo-1">>,
               api_url => <<"repo-1/api">>},
     Repo2 = #{name => <<"repo-2">>,
+              repo_name => <<"repo-2">>,
               repo_url => <<"repo-2/repo">>,
               repo_verify => false},
 
     ?assertMatch([Repo1, Repo2, #{name := <<"hexpm">>}],
                  rebar_hex_repos:repos([{repos, [Repo1]},
-                                           {repos, [Repo2]}])),
+                                        {repos, [Repo2]}])),
 
     %% use of replace is ignored if found in later entries than the first
     ?assertMatch([Repo1, Repo2, #{name := <<"hexpm">>}],
                  rebar_hex_repos:repos([{repos, [Repo1]},
-                                           {repos, replace, [Repo2]}])),
+                                        {repos, replace, [Repo2]}])),
 
     ?assertMatch([Repo1],
                  rebar_hex_repos:repos([{repos, replace, [Repo1]},
-                                           {repos, [Repo2]}])).
+                                        {repos, [Repo2]}])).
 
 auth_merging(_Config) ->
     Repo1 = #{name => <<"repo-1">>,
