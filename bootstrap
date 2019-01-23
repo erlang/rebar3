@@ -11,6 +11,10 @@ main(_) ->
     inets:start(httpc, [{profile, rebar}]),
     set_httpc_options(),
 
+    %% Clear directories for builds since bootstrapping may require
+    %% a changed structure from an older one
+    rm_rf("_build/bootstrap"),
+
     %% Fetch and build deps required to build rebar3
     BaseDeps = [{providers, []}
                ,{getopt, []}
@@ -215,6 +219,23 @@ symlink_or_copy(Source, Target) ->
             end
     end.
 
+-spec rm_rf(string()) -> 'ok'.
+rm_rf(Target) ->
+    case os:type() of
+        {unix, _} ->
+            EscTarget = escape_chars(Target),
+            {ok, []} = sh(?FMT("rm -rf ~ts", [EscTarget]),
+                          [{use_stdout, false}, abort_on_error]),
+            ok;
+        {win32, _} ->
+            Filelist = filelib:wildcard(Target),
+            Dirs = [F || F <- Filelist, filelib:is_dir(F)],
+            Files = Filelist -- Dirs,
+            ok = delete_each(Files),
+            ok = delete_each_dir_win32(Dirs),
+            ok
+    end.
+
 -spec cp_r(list(string()), file:filename()) -> 'ok'.
 cp_r([], _Dest) ->
     ok;
@@ -345,6 +366,27 @@ win32_ok({ok, _}) -> true;
 win32_ok({error, {Rc, _}}) when Rc<9; Rc=:=16 -> true;
 win32_ok(_) -> false.
 
+%% @private windows rm_rf helpers
+delete_each([]) ->
+    ok;
+delete_each([File | Rest]) ->
+    case file:delete(File) of
+        ok ->
+            delete_each(Rest);
+        {error, enoent} ->
+            delete_each(Rest);
+        {error, Reason} ->
+            io:format("Failed to delete file ~ts: ~p\n", [File, Reason]),
+            error
+    end.
+
+delete_each_dir_win32([]) -> ok;
+delete_each_dir_win32([Dir | Rest]) ->
+    {ok, []} = sh(?FMT("rd /q /s \"~ts\"",
+                       [escape_double_quotes(filename:nativename(Dir))]),
+                  [{use_stdout, false}, return_on_error]),
+    delete_each_dir_win32(Rest).
+
 %%/rebar_file_utils
 
 %%rebar_utils
@@ -408,7 +450,14 @@ expand_sh_flag(return_on_error) ->
      end};
 expand_sh_flag(abort_on_error) ->
     {error_handler,
-     fun log_and_abort/2};
+     %% moved log_and_abort/2 here because some versions somehow had trouble
+     %% interpreting it and thought `fun log_and_abort/2' was in `erl_eval'
+     fun(Command, {Rc, Output}) ->
+        io:format("sh(~ts)~n"
+                  "failed with return code ~w and the following output:~n"
+                  "~ts", [Command, Rc, Output]),
+        throw(bootstrap_abort)
+     end};
 expand_sh_flag({use_stdout, false}) ->
     {output_handler,
      fun(Line, Acc) ->
@@ -452,13 +501,6 @@ expand_env_variable(InStr, VarName, RawVarValue) ->
             RegEx = io_lib:format("\\\$(~ts(\\W|$)|{~ts})", [VarName, VarName]),
             re:replace(InStr, RegEx, [VarValue, "\\2"], ReOpts)
     end.
-
--spec log_and_abort(string(), {integer(), string()}) -> no_return().
-log_and_abort(Command, {Rc, Output}) ->
-    io:format("sh(~ts)~n"
-              "failed with return code ~w and the following output:~n"
-              "~ts", [Command, Rc, Output]),
-    throw(bootstrap_abort).
 
 %%/rebar_utils
 
