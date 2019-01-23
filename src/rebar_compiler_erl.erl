@@ -317,7 +317,7 @@ expand_file_names(Files, Dirs) ->
                   true ->
                       [Incl];
                   false ->
-                      rebar_utils:find_files_in_dirs(Dirs, Incl, true)
+                      rebar_utils:find_files_in_dirs(Dirs, [$^, Incl, $$], true)
               end
       end, Files).
 
