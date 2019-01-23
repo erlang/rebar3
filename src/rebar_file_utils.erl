@@ -195,9 +195,9 @@ cp_r(Sources, Dest) ->
             % On darwin the following cp command will cp everything inside
             % target vs target and everything inside, so we chop the last char
             % off if it is a '/'
-            Source = case {Os == darwin, lists:last(SourceStr) == 47} of
+            Source = case {Os == darwin, lists:last(SourceStr) == $/} of
                 {true, true} ->
-                    string:sub_string(SourceStr, 1, length(SourceStr) - 1);
+                    rebar_string:trim(SourceStr, trailing, "/");
                 {true, false} ->
                     SourceStr;
                 {false, _} ->
