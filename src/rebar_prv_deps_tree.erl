@@ -52,7 +52,8 @@ print_deps_tree(SrcDeps, Verbose, State) ->
                        ,project} || App <- rebar_state:project_apps(State)],
     case dict:find(root, D) of
         {ok, Children} ->
-            print_children("", lists:keysort(1, Children++ProjectAppNames), D, Verbose);
+            print_children("", lists:keysort(1, ProjectAppNames), D, Verbose),
+            print_children("   ", lists:keysort(1, Children), D, Verbose);
         error ->
             print_children("", lists:keysort(1, ProjectAppNames), D, Verbose)
     end.
