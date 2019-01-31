@@ -207,7 +207,7 @@ init_config() ->
     GlobalConfigFile = rebar_dir:global_config(),
     State = case filelib:is_regular(GlobalConfigFile) of
                 true ->
-                    ?DEBUG("Load global config file ~ts", [GlobalConfigFile]),
+                    ?DEBUG("Loading global config file ~ts", [GlobalConfigFile]),
                     try state_from_global_config(Config1, GlobalConfigFile)
                     catch
                         _:_ ->
@@ -283,9 +283,14 @@ log_level() ->
             DefaultLevel = rebar_log:default_level(),
             case os:getenv("DEBUG") of
                 D when D == false; D == "" ->
-                    DefaultLevel;
+                    case os:getenv("DIAGNOSTIC") of
+                        Di when Di == false; Di == "" ->
+                            DefaultLevel;
+                        _ ->
+                            DefaultLevel + 2
+                    end;
                 _ ->
-                    DefaultLevel + 3
+                    DefaultLevel + 1
             end;
          _ ->
             rebar_log:error_level()
@@ -333,7 +338,7 @@ handle_error({error, {Module, Reason}}, Stacktrace) ->
         non_existing ->
             ?CRASHDUMP("~p: ~p~n~p~n~n", [Module, Reason, Stacktrace]),
             ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to stacktrace or consult rebar3.crashdump", []),
-            ?DEBUG("Uncaught error: ~p ~p", [Module, Reason]),
+            ?DIAGNOSTIC("Uncaught error: ~p ~p", [Module, Reason]),
             ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []);
         _ ->
             ?ERROR("~ts", [Module:format_error(Reason)])
@@ -347,11 +352,11 @@ handle_error(Error, StackTrace) ->
     %% Dump this error to console
     ?CRASHDUMP("Error: ~p~n~p~n~n", [Error, StackTrace]),
     ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace or consult rebar3.crashdump", []),
-    ?DEBUG("Uncaught error: ~p", [Error]),
+    ?DIAGNOSTIC("Uncaught error: ~p", [Error]),
     case StackTrace of
         [] -> ok;
         Trace ->
-            ?DEBUG("Stack trace to the error location:~n~p", [Trace])
+            ?DIAGNOSTIC("Stack trace to the error location:~n~p", [Trace])
     end,
     ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []),
     erlang:halt(1).

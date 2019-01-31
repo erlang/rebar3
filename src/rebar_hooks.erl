@@ -67,17 +67,24 @@ run_hooks(Dir, post, Command, Opts, State) ->
 run_hooks(Dir, Type, Command, Opts, State) ->
     case rebar_opts:get(Opts, Type, []) of
         [] ->
-            ?DEBUG("run_hooks(~p, ~p, ~p) -> no hooks defined\n", [Dir, Type, Command]),
+            ?DEBUG("~p for ~p in ~p: no hooks defined", [Type, Command, Dir]),
+            ?DIAGNOSTIC("run_hooks(~p, ~p, ~p) -> no hooks defined\n", [Dir, Type, Command]),
             ok;
         Hooks ->
-            Env = rebar_env:create_env(State, Opts),
-            lists:foreach(fun({_, C, _}=Hook) when C =:= Command ->
-                                  apply_hook(Dir, Env, Hook);
-                             ({C, _}=Hook) when C =:= Command ->
-                                  apply_hook(Dir, Env, Hook);
-                             (_) ->
-                                  continue
-                          end, Hooks)
+            ValidHooks = lists:filter(fun({_, C, _}) -> C =:= Command;
+                                         ({C, _}) -> C =:= Command;
+                                         (_) -> false
+                                      end, Hooks),
+            case ValidHooks of
+                [] ->
+                    ?DEBUG("~p for ~p in ~p: no matching hooks", [Type, Command, Dir]),
+                    ?DIAGNOSTIC("run_hooks(~p, ~p, ~p) -> no matching hooks\n", [Dir, Type, Command]),
+                    ok;
+                ValidHooks ->
+                    Env = rebar_env:create_env(State, Opts),
+                    ?DEBUG("Adding to hook environment:~n~p~n", [Env]),
+                    lists:foreach(fun(Hook) -> apply_hook(Dir, Env, Hook) end, Hooks)
+            end
     end.
 
 apply_hook(Dir, Env, {Arch, Command, Hook}) ->

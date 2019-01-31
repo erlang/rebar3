@@ -243,7 +243,7 @@ find_deps(AppNames, AllApps) ->
 %% Should look at the app files to find direct dependencies
 find_deps_of_deps([], _, Acc) -> Acc;
 find_deps_of_deps([Name|Names], Apps, Acc) ->
-    ?DEBUG("processing ~p", [Name]),
+    ?DEBUG("processing ~s", [Name]),
     {ok, App} = rebar_app_utils:find(Name, Apps),
     DepNames = proplists:get_value(applications, rebar_app_info:app_details(App), []),
     BinDepNames = [rebar_utils:to_binary(Dep) || Dep <- DepNames,
@@ -252,7 +252,15 @@ find_deps_of_deps([Name|Names], Apps, Acc) ->
                    DepDir =:= {error, bad_name} orelse % those are all local
                    not lists:prefix(code:root_dir(), DepDir)]
                 -- ([Name|Names]++Acc), % avoid already seen deps
-    ?DEBUG("new deps of ~p found to be ~p", [Name, BinDepNames]),
+    case BinDepNames of
+        [] ->
+            ok;
+        _ ->
+            ?DEBUG("new deps of ~s found: ~s", [
+                Name,
+                [io_lib:format("~ts ", [Dep]) || Dep <- BinDepNames]
+            ])
+    end,
     find_deps_of_deps(BinDepNames ++ Names, Apps, BinDepNames ++ Acc).
 
 def(Rm, State, Key, Default) ->
