@@ -128,6 +128,7 @@ info() ->
     "Start a shell with project and deps preloaded similar to~n'erl -pa ebin -pa deps/*/ebin'.~n".
 
 setup_shell(ShellArgs) ->
+    LoggerState = maybe_remove_logger(),
     OldUser = kill_old_user(),
     %% Test for support here
     NewUser = try erlang:open_port({spawn,"tty_sl -c -e"}, []) of
@@ -138,7 +139,28 @@ setup_shell(ShellArgs) ->
         error:_ ->
             setup_old_shell()
     end,
-    rewrite_leaders(OldUser, NewUser).
+    rewrite_leaders(OldUser, NewUser),
+    maybe_reset_logger(LoggerState).
+
+%% @private starting with OTP-21.2.3, there's an oddity where the logger
+%% likely tries to handle system logs while we take down the TTY, which
+%% ends up hanging the default logger. This function (along with
+%% `maybe_reset_logger/1') removes and re-adds the default logger before and
+%% after the TTY subsystem is taken offline, which prevents such hanging.
+maybe_remove_logger() ->
+    case erlang:function_exported(logger, module_info, 0) of
+        false ->
+            ignore;
+        true ->
+            {ok, Cfg} = logger:get_handler_config(default),
+            logger:remove_handler(default),
+            {restart, Cfg}
+    end.
+
+maybe_reset_logger(ignore) ->
+    ok;
+maybe_reset_logger({restart, #{module := Mod, config := Cfg}}) ->
+    logger:add_handler(default, Mod, Cfg).
 
 kill_old_user() ->
     OldUser = whereis(user),
