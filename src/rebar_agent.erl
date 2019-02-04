@@ -167,11 +167,14 @@ maybe_show_warning(State) ->
 %% that makes sense.
 -spec refresh_paths(rebar_state:t()) -> ok.
 refresh_paths(RState) ->
+    
     RefreshPaths = application:get_env(rebar, refresh_paths, [all_deps, test]),
     ToRefresh = parse_refresh_paths(RefreshPaths, RState, []),
     %% Modules from apps we can't reload without breaking functionality
+    ShellOpts = rebar_state:get(RState, shell, []),
+    ShellBlacklist = proplists:get_value(app_reload_blacklist, ShellOpts, []),
     Blacklist = lists:usort(
-        application:get_env(rebar, refresh_paths_blacklist, [])
+        application:get_env(rebar, refresh_paths_blacklist, ShellBlacklist)
         ++ [rebar, erlware_commons, providers, cf, cth_readable]),
     %% Similar to rebar_utils:update_code/1, but also forces a reload
     %% of used modules. Also forces to reload all of ebin/ instead
