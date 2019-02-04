@@ -28,7 +28,8 @@
 -callback clean([file:filename()], rebar_app_info:t()) -> _.
 
 -define(DAG_VSN, 2).
--define(DAG_FILE, "source.dag").
+-define(DAG_ROOT, "source").
+-define(DAG_EXT, ".dag").
 -type dag_v() :: {digraph:vertex(), term()} | 'false'.
 -type dag_e() :: {digraph:vertex(), digraph:vertex()}.
 -type dag() :: {list(dag_v()), list(dag_e()), list(string())}.
@@ -49,12 +50,13 @@ compile_all(Compilers, AppInfo) ->
     _ = code:ensure_loaded(compile),
 
     lists:foreach(fun(CompilerMod) ->
-                          run(CompilerMod, AppInfo),
-                          run_on_extra_src_dirs(CompilerMod, AppInfo, fun run/2)
-                  end, Compilers),
+        run(CompilerMod, AppInfo, undefined),
+        run_on_extra_src_dirs(CompilerMod, AppInfo,
+                              fun(Mod, App) -> run(Mod, App, "extra") end)
+    end, Compilers),
     ok.
 
-run(CompilerMod, AppInfo) ->
+run(CompilerMod, AppInfo, Label) ->
     #{src_dirs := SrcDirs,
       include_dirs := InclDirs,
       src_ext := SrcExt,
@@ -69,7 +71,7 @@ run(CompilerMod, AppInfo) ->
 
     OutDir = rebar_app_info:out_dir(AppInfo),
     AbsSrcDirs = [filename:join(BaseDir, SrcDir) || SrcDir <- SrcDirs],
-    G = init_dag(CompilerMod, AbsInclDirs, AbsSrcDirs, FoundFiles, OutDir, EbinDir),
+    G = init_dag(CompilerMod, AbsInclDirs, AbsSrcDirs, FoundFiles, OutDir, EbinDir, Label),
     {{FirstFiles, FirstFileOpts}, {RestFiles, Opts}} = CompilerMod:needed_files(G, FoundFiles,
                                                                                 Mappings, AppInfo),
     true = digraph:delete(G),
@@ -101,11 +103,12 @@ compile_each([Source | Rest], Opts, Config, Outs, CompilerMod) ->
 -spec clean([module()], rebar_app_info:t()) -> 'ok'.
 clean(Compilers, AppInfo) ->
     lists:foreach(fun(CompilerMod) ->
-                          clean_(CompilerMod, AppInfo),
-                          run_on_extra_src_dirs(CompilerMod, AppInfo, fun clean_/2)
-                  end, Compilers).
+        clean_(CompilerMod, AppInfo, undefined),
+        run_on_extra_src_dirs(CompilerMod, AppInfo,
+                              fun(Mod, App) -> clean_(Mod, App, "extra") end)
+    end, Compilers).
 
-clean_(CompilerMod, AppInfo) ->
+clean_(CompilerMod, AppInfo, Label) ->
     #{src_dirs := SrcDirs,
       src_ext := SrcExt} = CompilerMod:context(AppInfo),
     BaseDir = rebar_app_info:dir(AppInfo),
@@ -114,7 +117,7 @@ clean_(CompilerMod, AppInfo) ->
 
     FoundFiles = find_source_files(BaseDir, SrcExt, SrcDirs, Opts),
     CompilerMod:clean(FoundFiles, AppInfo),
-    rebar_file_utils:rm_rf(dag_file(CompilerMod, EbinDir)).
+    rebar_file_utils:rm_rf(dag_file(CompilerMod, EbinDir, Label)).
 
 -spec needs_compile(filename:all(), extension(), [{extension(), file:dirname()}]) -> boolean().
 needs_compile(Source, OutExt, Mappings) ->
@@ -133,11 +136,17 @@ run_on_extra_src_dirs([], _CompilerMod, _AppInfo, _Fun) ->
 run_on_extra_src_dirs([Dir | Rest], CompilerMod, AppInfo, Fun) ->
     case filelib:is_dir(filename:join(rebar_app_info:dir(AppInfo), Dir)) of
         true ->
+            OldSrcDirs = rebar_app_info:get(AppInfo, src_dirs, ["src"]),
+            AppDir = rebar_app_info:dir(AppInfo),
             EbinDir = filename:join(rebar_app_info:out_dir(AppInfo), Dir),
             AppInfo1 = rebar_app_info:ebin_dir(AppInfo, EbinDir),
             AppInfo2 = rebar_app_info:set(AppInfo1, src_dirs, [Dir]),
-            AppInfo3 = rebar_app_info:set(AppInfo2, extra_src_dirs, ["src"]),
-            Fun(CompilerMod, AppInfo3);
+            AppInfo3 = rebar_app_info:set(AppInfo2, extra_src_dirs, OldSrcDirs),
+            AppInfo4 = add_to_includes( % give access to .hrl in app's src/
+                AppInfo3,
+                [filename:join([AppDir, D]) || D <- OldSrcDirs]
+            ),
+            Fun(CompilerMod, AppInfo4);
         _ ->
             ok
     end,
@@ -170,8 +179,16 @@ find_source_files(BaseDir, SrcExt, SrcDirs, Opts) ->
                       rebar_utils:find_files_in_dirs([filename:join(BaseDir, SrcDir)], SourceExtRe, Recursive)
                   end, SrcDirs).
 
-dag_file(CompilerMod, Dir) ->
-    filename:join([rebar_dir:local_cache_dir(Dir), CompilerMod, ?DAG_FILE]).
+%% @private generate the name for the DAG based on the compiler module and
+%% a custom label, both of which are used to prevent various compiler runs
+%% from clobbering each other. The label `undefined' is kept for a default
+%% run of the compiler, to keep in line with previous versions of the file.
+dag_file(CompilerMod, Dir, undefined) ->
+    filename:join([rebar_dir:local_cache_dir(Dir), CompilerMod,
+                   ?DAG_ROOT ++ ?DAG_EXT]);
+dag_file(CompilerMod, Dir, Label) ->
+    filename:join([rebar_dir:local_cache_dir(Dir), CompilerMod,
+                   ?DAG_ROOT ++ "_" ++ Label ++ ?DAG_EXT]).
 
 %% private graph functions
 
@@ -179,20 +196,22 @@ dag_file(CompilerMod, Dir) ->
 %% parse transforms, behaviours etc.) located in their directories or given
 %% InclDirs. Note that last modification times stored in vertices already respect
 %% dependencies induced by given graph G.
-init_dag(Compiler, InclDirs, SrcDirs, Erls, Dir, EbinDir) ->
+init_dag(Compiler, InclDirs, SrcDirs, Erls, Dir, EbinDir, Label) ->
     G = digraph:new([acyclic]),
-    try restore_dag(Compiler, G, InclDirs, Dir)
+    try restore_dag(Compiler, G, InclDirs, Dir, Label)
     catch
         _:_ ->
-            ?WARN("Failed to restore ~ts file. Discarding it.~n", [dag_file(Compiler, Dir)]),
-            file:delete(dag_file(Compiler, Dir))
+            ?WARN("Failed to restore ~ts file. Discarding it.~n", [dag_file(Compiler, Dir, Label)]),
+            file:delete(dag_file(Compiler, Dir, Label))
     end,
     Dirs = lists:usort(InclDirs ++ SrcDirs),
     %% A source file may have been renamed or deleted. Remove it from the graph
     %% and remove any beam file for that source if it exists.
     Modified = maybe_rm_beams_and_edges(G, EbinDir, Erls),
     Modified1 = lists:foldl(update_dag_fun(G, Compiler, Dirs), Modified, Erls),
-    if Modified1 -> store_dag(Compiler, G, InclDirs, Dir); not Modified1 -> ok end,
+    if Modified1 -> store_dag(Compiler, G, InclDirs, Dir, Label);
+       not Modified1 -> ok
+    end,
     G.
 
 maybe_rm_beams_and_edges(G, Dir, Files) ->
@@ -229,8 +248,8 @@ maybe_rm_beam_and_edge(G, OutDir, Source) ->
 target_base(OutDir, Source) ->
     filename:join(OutDir, filename:basename(Source, ".erl")).
 
-restore_dag(Compiler, G, InclDirs, Dir) ->
-    case file:read_file(dag_file(Compiler, Dir)) of
+restore_dag(Compiler, G, InclDirs, Dir, Label) ->
+    case file:read_file(dag_file(Compiler, Dir, Label)) of
         {ok, Data} ->
             % Since externally passed InclDirs can influence dependency graph (see
             % modify_dag), we have to check here that they didn't change.
@@ -248,10 +267,10 @@ restore_dag(Compiler, G, InclDirs, Dir) ->
             ok
     end.
 
-store_dag(Compiler, G, InclDirs, Dir) ->
+store_dag(Compiler, G, InclDirs, Dir, Label) ->
     Vs = lists:map(fun(V) -> digraph:vertex(G, V) end, digraph:vertices(G)),
     Es = lists:map(fun(E) -> digraph:edge(G, E) end, digraph:edges(G)),
-    File = dag_file(Compiler, Dir),
+    File = dag_file(Compiler, Dir, Label),
     ok = filelib:ensure_dir(File),
     Data = term_to_binary(#dag{info={Vs, Es, InclDirs}}, [{compressed, 2}]),
     file:write_file(File, Data).
@@ -313,3 +332,10 @@ update_max_modified_deps(G, Source) ->
                     end, 0, [Source | digraph:out_neighbours(G, Source)]),
     digraph:add_vertex(G, Source, MaxModified),
     MaxModified.
+
+add_to_includes(AppInfo, Dirs) ->
+    Opts = rebar_app_info:opts(AppInfo),
+    List = rebar_opts:get(Opts, erl_opts, []),
+    NewErlOpts = [{i, Dir} || Dir <- Dirs] ++ List,
+    NewOpts = rebar_opts:set(Opts, erl_opts, NewErlOpts),
+    rebar_app_info:opts(AppInfo, NewOpts).

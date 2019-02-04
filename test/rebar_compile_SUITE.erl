@@ -16,6 +16,7 @@ all() ->
      {group, basic_extras}, {group, release_extras}, {group, unbalanced_extras},
      {group, root_extras},
      recompile_when_hrl_changes, recompile_when_included_hrl_changes,
+     recompile_extra_when_hrl_in_src_changes,
      recompile_when_opts_included_hrl_changes,
      recompile_when_opts_change,
      dont_recompile_when_opts_dont_change, dont_recompile_yrl_or_xrl,
@@ -705,6 +706,49 @@ recompile_when_included_hrl_changes(Config) ->
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
 
     {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
+    NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+                  || F <- NewFiles, filename:extension(F) == ".beam"],
+
+    ?assert(ModTime =/= NewModTime).
+
+recompile_extra_when_hrl_in_src_changes(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    ExtraSrc = <<"-module(test_header_include).\n"
+                  "-export([main/0]).\n"
+                  "-include(\"test_header_include.hrl\").\n"
+                  "main() -> ?SOME_DEFINE.\n">>,
+
+    ExtraHeader = <<"-define(SOME_DEFINE, true).\n">>,
+    HeaderFile = filename:join([AppDir, "src", "test_header_include.hrl"]),
+    SrcFile = filename:join([AppDir, "extra", "test_header_include.erl"]),
+    filelib:ensure_dir(SrcFile),
+    ok = file:write_file(SrcFile, ExtraSrc),
+    ok = file:write_file(HeaderFile, ExtraHeader),
+
+    RebarCfg = [{extra_src_dirs, ["extra"]}],
+    rebar_test_utils:run_and_check(Config, RebarCfg, ["compile"],
+                                   {ok, [{app, Name}]}),
+
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "extra"]),
+    {ok, Files} = rebar_utils:list_dir(EbinDir),
+    ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+               || F <- Files, filename:extension(F) == ".beam"],
+
+    timer:sleep(1000),
+
+    NewExtraHeader = <<"-define(SOME_DEFINE, false).\n">>,
+    ok = file:write_file(HeaderFile, NewExtraHeader, [sync]),
+
+    rebar_test_utils:run_and_check(Config, RebarCfg, ["compile"],
+                                   {ok, [{app, Name}]}),
+
+    {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
+
     NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
                   || F <- NewFiles, filename:extension(F) == ".beam"],
 
