@@ -78,6 +78,12 @@ init(State) ->
                          "shell. (E.g. --apps app1,app2,app3) Defaults "
                          "to rebar.config {shell, [{apps, Apps}]} or "
                          "relx apps if not specified."},
+                        {relname, $r, "relname", atom,
+                         "Name of the release to use as a template for the "
+                         "shell session"},
+                        {relvsn, $v, "relvsn", string,
+                         "Version of the release to use for the shell "
+                         "session"},
                         {start_clean, undefined, "start-clean", boolean,
                          "Cancel any applications in the 'apps' list "
                          "or release."},
@@ -357,15 +363,30 @@ find_apps_rebar(State) ->
 
 -spec find_apps_relx(rebar_state:t()) -> no_value | list().
 find_apps_relx(State) ->
-    case lists:keyfind(release, 1, rebar_state:get(State, relx, [])) of
-        {_, _, Apps} ->
+    {Opts, _} = rebar_state:command_parsed_args(State),
+    RelxOpts = rebar_state:get(State, relx, []),
+    {Defname, Defvsn} = debug_get_value(default_release, RelxOpts,
+                                        {undefined, undefined},
+                                        "Found default release from config"),
+    Relname = debug_get_value(relname, Opts, Defname,
+                              "Found relname from command line option"),
+    Relvsn = debug_get_value(relvsn, Opts, Defvsn,
+                             "Found relvsn from command line option"),
+    Releases = [Rel || Rel <- rebar_state:get(State, relx, []),
+                       is_tuple(Rel), element(1, Rel) =:= release,
+                       tuple_size(Rel) =:= 3 orelse tuple_size(Rel) =:= 4,
+                       {Name, Vsn} <- [element(2, Rel)],
+                       Relname == undefined orelse Name == Relname,
+                       Relvsn == undefined orelse Vsn == Relvsn],
+    case Releases of
+        [] ->
+            no_value;
+        [{_, _, Apps}|_] ->
             ?DEBUG("Found shell apps from relx.", []),
             Apps;
-        {_, _, Apps, _} ->
+        [{_, _, Apps, _}|_] ->
             ?DEBUG("Found shell apps from relx.", []),
-            Apps;
-        false ->
-            no_value
+            Apps
     end.
 
 load_apps(Apps) ->
