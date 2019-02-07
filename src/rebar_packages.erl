@@ -265,6 +265,8 @@ unverified_repo_message() ->
     "security reasons. The repository should be updated in order to be safer. "
     "You can disable this check by setting REBAR_NO_VERIFY_REPO_ORIGIN=1".
 
+insert_releases(Name, #{releases := Releases}, Repo, Table) ->
+    insert_releases(Name, Releases, Repo, Table);
 insert_releases(Name, Releases, Repo, Table) ->
     [true = ets:insert(Table,
                        #package{key={Name, ec_semver:parse(Version), Repo},
