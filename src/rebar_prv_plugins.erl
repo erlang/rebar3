@@ -66,8 +66,8 @@ display_plugins(Apps, Plugins) ->
                                     is_tuple(Plugin) -> rebar_utils:to_binary(element(1, Plugin))
                                  end,
                           case rebar_app_utils:find(Name, Apps) of
-                              {ok, _App} ->
-                                  ?CONSOLE("~ts", [Name]);
+                              {ok, App} ->
+                                  ?CONSOLE("~ts (~s)", [Name, rebar_app_info:original_vsn(App)]);
                               error ->
                                   ?DEBUG("Unable to find plugin ~ts", [Name])
                           end
