@@ -915,7 +915,7 @@ url_append_path(Url, ExtraPath) ->
      case http_uri:parse(Url) of
          {ok, {Scheme, UserInfo, Host, Port, Path, Query}} ->
              {ok, lists:append([atom_to_list(Scheme), "://", UserInfo, Host, ":", integer_to_list(Port),
-                                filename:join(Path, ExtraPath), "?", Query])};
+                                filename:join(Path, ExtraPath), Query])};
          _ ->
              error
      end.

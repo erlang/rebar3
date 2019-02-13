@@ -20,6 +20,7 @@
                   api_url => binary(),
                   api_key => binary(),
                   repo_url => binary(),
+                  repo_key => binary(),
                   repo_public_key => binary(),
                   repo_verify => binary(),
                   repo_verify_origin => binary()}.
@@ -68,17 +69,21 @@ repos(HexConfig) ->
             merge_repos(RepoList ++ [HexDefaultConfig])
     end.
 
-%% merge repos must add a field repo_name to work with hex_core 0.4.0
+%% merge repos must add a field repo_name to work with r3_hex_core 0.5.0
 -spec merge_repos([repo()]) -> [repo()].
 merge_repos(Repos) ->
-    lists:foldl(fun(R=#{name := Name}, ReposAcc) ->
-                        %% private organizations include the parent repo before a :
+    lists:foldl(fun(R = #{name := Name}, ReposAcc) ->
+                        %% private orgs are in the format of <<"parent:org">>
                         case rebar_string:split(Name, <<":">>) of
                             [Repo, Org] ->
-                                %% hex_core uses repo_name for parent
+
+                                %% We set the repo_organization and api_organization to org
+                                %% for fetching and publishing private packages.
                                 update_repo_list(R#{name => Name,
-                                                    repo_name => Repo,
-                                                    organization => Org,
+                                                    repo_name => Org,
+                                                    repo_organization => Org,
+                                                    api_organization => Org,
+                                                    api_repository => Org,
                                                     parent => Repo}, ReposAcc);
                             _ ->
                                 update_repo_list(R#{repo_name => Name}, ReposAcc)
@@ -86,15 +91,15 @@ merge_repos(Repos) ->
                 end, [], Repos).
 
 update_organizations(Repos) ->
-    lists:map(fun(Repo=#{organization := Organization,
+    lists:map(fun(Repo=#{repo_name := RepoName,
                          parent := ParentName}) ->
                       {ok, Parent} = get_repo_config(ParentName, Repos),
                       ParentRepoUrl = rebar_utils:to_list(maps:get(repo_url, Parent)),
-                      {ok, RepoUrl} =
+                      {ok, _RepoUrl} =
                           rebar_utils:url_append_path(ParentRepoUrl,
-                                                      filename:join("repos", rebar_utils:to_list(Organization))),
+                                                      filename:join("repos", rebar_utils:to_list(RepoName))),
                       %% still let the organization config override this constructed repo url
-                      maps:merge(Parent#{repo_url => rebar_utils:to_binary(RepoUrl)}, Repo);
+                      maps:merge(Parent#{repo_url => rebar_utils:to_binary(ParentRepoUrl)}, Repo);
                  (Repo) ->
                       Repo
               end, Repos).
@@ -107,7 +112,7 @@ update_repo_list(R, []) ->
     [R].
 
 default_repo() ->
-    HexDefaultConfig = hex_core:default_config(),
+    HexDefaultConfig = r3_hex_core:default_config(),
     HexDefaultConfig#{name => ?PUBLIC_HEX_REPO, repo_verify_origin => repo_verify_origin()}.
 
 repo_verify_origin() ->

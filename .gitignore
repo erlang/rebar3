@@ -21,3 +21,6 @@ priv/templates/*.dtl.erl
 ebin
 .edts
 env
+
+# hex_core artifact 
+src/r3_safe_erl_term.erl

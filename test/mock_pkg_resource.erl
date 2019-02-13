@@ -100,7 +100,7 @@ mock_download(Opts) ->
                          <<"version">> => Vsn},
 
             Files = all_files(rebar_app_info:dir(AppInfo1)),
-            {ok, {Tarball, _Checksum}} = hex_tarball:create(Metadata, archive_names(Dir, Files)),
+            {ok, {Tarball, _Checksum}} = r3_hex_tarball:create(Metadata, archive_names(Dir, Files)),
             Archive = filename:join([Dir, TarApp]),
             file:write_file(Archive, Tarball),
 
