@@ -136,11 +136,21 @@ auth_config_file(State) ->
 
 -spec auth_config(rebar_state:t()) -> map().
 auth_config(State) ->
-    case file:consult(auth_config_file(State)) of
+    AuthFile = auth_config_file(State),
+    case file:consult(AuthFile) of
         {ok, [Config]} ->
             Config;
-        _ ->
-            #{}
+        {error, Reason} when is_atom(Reason) ->
+            case Reason of
+                enoent ->
+                    #{};
+                _ ->
+                    % TODO: map to an english reason
+                    ?ABORT("Error reading repos auth config (~ts) : ~ts", [AuthFile, atom_to_list(Reason)])
+            end;
+        {error, {_Line, _Mod, _Term} = Err} ->
+            Reason = file:format_error(Err),
+            ?ABORT("Error found in repos auth config (~ts) at line ~ts", [AuthFile, Reason])
     end.
 
 -spec update_auth_config(map(), rebar_state:t()) -> ok.
