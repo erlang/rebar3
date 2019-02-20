@@ -86,15 +86,25 @@ merge_repos(Repos) ->
                 end, [], Repos).
 
 update_organizations(Repos) ->
-    lists:map(fun(Repo=#{organization := Organization,
+    lists:map(fun(Repo=#{repo_name := RepoName,
                          parent := ParentName}) ->
                       {ok, Parent} = get_repo_config(ParentName, Repos),
                       ParentRepoUrl = rebar_utils:to_list(maps:get(repo_url, Parent)),
                       {ok, RepoUrl} =
                           rebar_utils:url_append_path(ParentRepoUrl,
-                                                      filename:join("repos", rebar_utils:to_list(Organization))),
+                                                      filename:join("repos", rebar_utils:to_list(RepoName))),
                       %% still let the organization config override this constructed repo url
-                      maps:merge(Parent#{repo_url => rebar_utils:to_binary(RepoUrl)}, Repo);
+                      Without = [repo_key, read_key, write_key],
+                      Merged = maps:merge(maps:without(Without, Parent#{repo_url => rebar_utils:to_binary(RepoUrl)}),
+                                          Repo),
+                      case maps:is_key(repo_key, Merged) of
+                          true ->
+                              Merged;
+                          false ->
+                              MainMsg = "A repo key is required to read from ~ts:~ts :\n",
+                              Msg = MainMsg ++ "Please add a repo_key entry to your hex auth config file",
+                              ?ABORT(Msg, [ParentName, RepoName])
+                      end;
                  (Repo) ->
                       Repo
               end, Repos).
