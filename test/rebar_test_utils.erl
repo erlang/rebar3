@@ -511,7 +511,7 @@ package_app(AppDir, DestDir, PkgName, PkgVsn) ->
     Files = lists:zip([filename:join("src", F) || F <- Fs], [filename:join(AppSrc,F) || F <- Fs]),
     Metadata = #{<<"app">> => list_to_binary(PkgName),
                  <<"version">> => list_to_binary(PkgVsn)},
-    {ok, {Tarball, <<Checksum:256/big-unsigned-integer>>}} = hex_tarball:create(Metadata, Files),
+    {ok, {Tarball, <<Checksum:256/big-unsigned-integer>>}} = r3_hex_tarball:create(Metadata, Files),
 
     Name = PkgName++"-"++PkgVsn++".tar",
     Archive = filename:join(DestDir, Name),

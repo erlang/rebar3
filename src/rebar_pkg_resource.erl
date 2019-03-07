@@ -29,7 +29,7 @@
 -spec init(atom(), rebar_state:t()) -> {ok, rebar_resource_v2:resource()}.
 init(Type, State) ->
     {ok, Vsn} = application:get_key(rebar, vsn),
-    BaseConfig = #{http_adapter => hex_http_httpc,
+    BaseConfig = #{http_adapter => r3_hex_http_httpc,
                    http_user_agent_fragment =>
                        <<"(rebar3/", (list_to_binary(Vsn))/binary, ") (httpc)">>,
                    http_adapter_config => #{profile => rebar}},
@@ -148,7 +148,7 @@ format_error({bad_registry_checksum, Name, Vsn, Expected, Found}) ->
              -> {ok, cached} | {ok, binary(), binary()} | error.
 request(Config, Name, Version, ETag) ->
     Config1 = Config#{http_etag => ETag},
-    try hex_repo:get_tarball(Config1, Name, Version) of
+    try r3_hex_repo:get_tarball(Config1, Name, Version) of
         {ok, {200, #{<<"etag">> := ETag1}, Tarball}} ->
             {ok, Tarball, ETag1};
         {ok, {304, _Headers, _}} ->
@@ -248,7 +248,7 @@ serve_from_cache(TmpDir, CachePath, Pkg) ->
       Res :: ok | {error,_} | {bad_registry_checksum, integer(), integer()}.
 serve_from_memory(TmpDir, Binary, {pkg, _Name, _Vsn, Hash, _RepoConfig}) ->
     RegistryChecksum = list_to_integer(binary_to_list(Hash), 16),
-    case hex_tarball:unpack(Binary, TmpDir) of
+    case r3_hex_tarball:unpack(Binary, TmpDir) of
         {ok, #{checksum := <<Checksum:256/big-unsigned>>}} when RegistryChecksum =/= Checksum ->
             ?DEBUG("Expected hash ~64.16.0B does not match checksum of fetched package ~64.16.0B",
                    [RegistryChecksum, Checksum]),

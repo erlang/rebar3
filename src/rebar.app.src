@@ -30,7 +30,6 @@
                   relx,
                   cf,
                   inets,
-                  hex_core,
                   eunit_formatters]},
   {env, [
         %% Default log level

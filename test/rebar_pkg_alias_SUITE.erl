@@ -241,8 +241,8 @@ mock_config(Name, Config) ->
 
                   end, AllDeps),
 
-    meck:new(hex_repo, [passthrough]),
-    meck:expect(hex_repo, get_package,
+    meck:new(r3_hex_repo, [passthrough]),
+    meck:expect(r3_hex_repo, get_package,
                 fun(_Config, PkgName) ->
                         Matches = ets:match_object(Tid, {{PkgName,'_'}, '_'}),
                         Releases =
@@ -254,7 +254,7 @@ mock_config(Name, Config) ->
                         {ok, {200, #{}, Releases}}
                 end),
 
-    meck:expect(hex_repo, get_tarball, fun(_, _, _) ->
+    meck:expect(r3_hex_repo, get_tarball, fun(_, _, _) ->
                                                {ok, {304, #{<<"etag">> => EtagGood}, <<>>}}
                                        end),
 

@@ -97,7 +97,7 @@ init_per_testcase(bad_disconnect=Name, Config0) ->
                {pkg, Pkg}
               | Config0],
     Config = mock_config(Name, Config1),
-    meck:expect(hex_repo, get_tarball, fun(_, _, _) ->
+    meck:expect(r3_hex_repo, get_tarball, fun(_, _, _) ->
                                                {error, econnrefused}
                                        end),
     Config;
@@ -281,8 +281,8 @@ mock_config(Name, Config) ->
                   end, AllDeps),
 
 
-    meck:new(hex_repo, [passthrough]),
-    meck:expect(hex_repo, get_package,
+    meck:new(r3_hex_repo, [passthrough]),
+    meck:expect(r3_hex_repo, get_package,
                 fun(_Config, PkgName) ->
                         Matches = ets:match_object(Tid, {{PkgName,'_'}, '_'}),
                         Releases =
@@ -303,7 +303,7 @@ mock_config(Name, Config) ->
                 end),
     meck:expect(rebar_state, resources,
                 fun(_State) ->
-                        DefaultConfig = hex_core:default_config(),
+                        DefaultConfig = r3_hex_core:default_config(),
                         [rebar_resource_v2:new(pkg, rebar_pkg_resource,
                                                #{repos => [DefaultConfig#{name => <<"hexpm">>}],
                                                  base_config => #{}})]
@@ -325,7 +325,7 @@ mock_config(Name, Config) ->
     PkgFile = <<Pkg/binary, "-", Vsn/binary, ".tar">>,
     {ok, PkgContents} = file:read_file(filename:join(?config(data_dir, Config), PkgFile)),
 
-    meck:expect(hex_repo, get_tarball, fun(_, _, _) when GoodCache ->
+    meck:expect(r3_hex_repo, get_tarball, fun(_, _, _) when GoodCache ->
                                                {ok, {304, #{<<"etag">> => ?good_etag}, <<>>}};
                                           (_, _, _) ->
                                                {ok, {200, #{<<"etag">> => ?good_etag}, PkgContents}}

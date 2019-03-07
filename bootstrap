@@ -15,6 +15,11 @@ main(_) ->
     %% a changed structure from an older one
     rm_rf("_build/bootstrap"),
 
+    %% We fetch a few deps from hex for boostraping,
+    %% so we must compile r3_safe_erl_term.xrl which
+    %% is part of hex_core.
+    compile_xrl_file("src/r3_safe_erl_term.xrl"),
+
     %% Fetch and build deps required to build rebar3
     BaseDeps = [{providers, []}
                ,{getopt, []}
@@ -22,8 +27,7 @@ main(_) ->
                ,{erlware_commons, ["ec_dictionary.erl", "ec_vsn.erl"]}
                ,{parse_trans, ["parse_trans.erl", "parse_trans_pp.erl",
                                "parse_trans_codegen.erl"]}
-               ,{certifi, []}
-               ,{hex_core, []}],
+               ,{certifi, []}],
     Deps = get_deps(),
     [fetch_and_compile(Dep, Deps) || Dep <- BaseDeps],
 
@@ -143,7 +147,7 @@ compile(App, FirstFiles) ->
     [compile_xrl_file(X) || X <- LeexFiles],
     YeccFiles = filelib:wildcard(filename:join([Dir, "src", "*.yrl"])),
     [compile_yrl_file(X) || X <- YeccFiles],
-    Sources = FirstFilesPaths ++ filelib:wildcard(filename:join([Dir, "src", "*.erl"])),
+    Sources =  FirstFilesPaths ++ filelib:wildcard(filename:join([Dir, "src", "*.erl"])),
     [compile_erl_file(X, [{i, filename:join(Dir, "include")}
                      ,debug_info
                      ,{outdir,  filename:join(Dir, "ebin")}
@@ -175,7 +179,7 @@ bootstrap_rebar3() ->
     Res = symlink_or_copy(filename:absname("src"),
                           filename:absname("_build/default/lib/rebar/src")),
     true = Res == ok orelse Res == exists,
-    Sources = ["src/rebar_resource_v2.erl", "src/rebar_resource.erl" | filelib:wildcard("src/*.erl")],
+    Sources = ["src/rebar_resource_v2.erl", "src/rebar_resource.erl" | filelib:wildcard("src/*.erl") ],
     [compile_erl_file(X, [{outdir, "_build/default/lib/rebar/ebin/"}
                      ,return | additional_defines()]) || X <- Sources],
     code:add_patha(filename:absname("_build/default/lib/rebar/ebin")).
