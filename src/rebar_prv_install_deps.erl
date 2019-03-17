@@ -283,7 +283,7 @@ update_seen_dep(AppInfo, _Profile, _Level, Deps, Apps, State, Upgrade, Seen, Loc
                     %% meaning there is no conflict, so don't warn about it.
                     skip;
                 _ ->
-                    warn_skip_deps(Name, Source, State)
+                    warn_skip_deps(AppInfo, State)
             end;
         true ->
             ok
@@ -395,8 +395,7 @@ make_relative_to_root(State, Path) when is_list(Path) ->
     rebar_dir:make_relative_path(Path, Root).
 
 fetch_app(AppInfo, State) ->
-    ?INFO("Fetching ~ts (~p)", [rebar_app_info:name(AppInfo),
-                                rebar_resource_v2:format_source(rebar_app_info:source(AppInfo))]),
+    ?INFO("Fetching ~ts", [rebar_resource_v2:format_source(AppInfo)]),
     rebar_fetch:download_source(AppInfo, State).
 
 maybe_upgrade(AppInfo, _AppDir, Upgrade, State) ->
@@ -404,8 +403,7 @@ maybe_upgrade(AppInfo, _AppDir, Upgrade, State) ->
         true ->
             case rebar_fetch:needs_update(AppInfo, State) of
                 true ->
-                    ?INFO("Upgrading ~ts (~p)", [rebar_app_info:name(AppInfo),
-                                                 rebar_resource_v2:format_source(rebar_app_info:source(AppInfo))]),
+                    ?INFO("Upgrading ~ts", [rebar_resource_v2:format_source(AppInfo)]),
                     rebar_fetch:download_source(AppInfo, State);
                 false ->
                     case Upgrade of
@@ -420,11 +418,10 @@ maybe_upgrade(AppInfo, _AppDir, Upgrade, State) ->
             AppInfo
     end.
 
-warn_skip_deps(Name, Source, State) ->
-    Msg = "Skipping ~ts (from ~p) as an app of the same name "
+warn_skip_deps(AppInfo, State) ->
+    Msg = "Skipping ~ts as an app of the same name "
           "has already been fetched",
-    Args = [Name,
-            rebar_resource_v2:format_source(Source)],
+    Args = [rebar_resource_v2:format_source(AppInfo)],
     case rebar_state:get(State, deps_error_on_conflict, false) of
         false ->
             case rebar_state:get(State, deps_warning_on_conflict, true) of
