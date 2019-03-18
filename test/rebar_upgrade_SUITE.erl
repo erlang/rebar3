@@ -12,7 +12,7 @@ groups() ->
                 tree_a, tree_b, tree_c, tree_c2, tree_cj, tree_ac, tree_all,
                 delete_d, promote, stable_lock, fwd_lock,
                 compile_upgrade_parity, umbrella_config,
-                profiles, profiles_exclusion]},
+                profiles, profiles_exclusion, tree_migration]},
      {git, [], [{group, all}]},
      {pkg, [], [{group, all}]}].
 
@@ -512,7 +512,15 @@ upgrades(profiles_exclusion) ->
      ["A","B","C","E","F","H"],
      {"A", [{"A","1.0.0"}, "D", {"E","3.0.0"},
             {"B","2.0.0"}, {"F","2.0.0"}, "G",
-            {"C","1.0.0"}, {"H","4.0.0"}, "I"]}}.
+            {"C","1.0.0"}, {"H","4.0.0"}, "I"]}};
+upgrades(tree_migration) ->
+    {[{"B", "1.0.0", []},
+      {"C", "1.0.0", [{"D","1.0.0",[{"E", "1.0.0", []}]}]}],
+     [{"B", "2.0.0", [{"E","1.0.0",[]}]},
+      {"C", "1.0.0", [{"D","1.0.0",[]}]}],
+     ["B"],
+     {"B", [{"A","1.0.0"}, "D", {"E","1.0.0"},
+            {"B","2.0.0"}]}}.
 
 %% TODO: add a test that verifies that unlocking files and then
 %% running the upgrade code is enough to properly upgrade things.
@@ -701,6 +709,43 @@ profiles(Config) ->
     meck:unload(rebar_prv_app_discovery).
 
 profiles_exclusion(Config) -> profiles(Config).
+
+tree_migration(Config) ->
+    apply(?config(mock, Config), []),
+    ConfigPath = ?config(rebarconfig, Config),
+    {ok, RebarConfig} = file:consult(ConfigPath),
+    %% Install dependencies before re-mocking for an upgrade
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["lock"], {ok, []}),
+    {App, _Unlocks} = ?config(expected, Config),
+
+    meck:new(rebar_prv_upgrade, [passthrough]),
+    meck:expect(rebar_prv_upgrade, do, fun(S) ->
+                                               apply(?config(mock_update, Config), []),
+                                               meck:passthrough([S])
+                                       end),
+    NewRebarConf = rebar_test_utils:create_config(filename:dirname(ConfigPath),
+                                                  [{deps, ?config(next_top_deps, Config)}]),
+    {ok, NewRebarConfig} = file:consult(NewRebarConf),
+    {ok, NewState} = rebar_test_utils:run_and_check(
+        Config, NewRebarConfig, ["upgrade", App], return
+    ),
+    meck:unload(rebar_prv_upgrade),
+    %% Check that the internal state properly has E with a lock-level
+    %% of 1.
+    Locks = rebar_state:lock(NewState),
+    [Locked] = [X || X <- Locks, rebar_app_info:name(X) =:= <<"E">>],
+    ?assertEqual(1, rebar_app_info:dep_level(Locked)),
+    %% Check that the lockfile on disk agrees
+    AppDir = ?config(apps, Config),
+    Lockfile = filename:join([AppDir, "rebar.lock"]),
+    case file:consult(Lockfile) of
+        {ok, [{_Vsn, Prop}|_]} -> % packages
+            ?assertMatch({<<"E">>, _, 1}, lists:keyfind(<<"E">>, 1, Prop));
+        {ok, [Prop]} -> % git source
+            ?assertMatch({<<"E">>, _, 1}, lists:keyfind(<<"E">>, 1, Prop))
+    end,
+    ok.
+
 
 run(Config) ->
     apply(?config(mock, Config), []),
