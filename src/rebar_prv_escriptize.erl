@@ -80,11 +80,16 @@ do(State) ->
                     ?PRV_ERROR({bad_name, Name})
             end
     end,
-    AppInfo1 = rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, AppInfo0, State),
-    ?INFO("Building escript...", []),
-    Res = escriptize(State, AppInfo1),
-    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, AppInfo1, State),
-    Res.
+    case AppInfo0 of
+        {error, _} = Err ->
+            Err;
+        _ ->
+            AppInfo1 = rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, AppInfo0, State),
+            ?INFO("Building escript...", []),
+            Res = escriptize(State, AppInfo1),
+            rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, AppInfo1, State),
+            Res
+    end.
 
 escriptize(State0, App) ->
     AppName = rebar_app_info:name(App),
