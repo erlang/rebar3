@@ -63,13 +63,11 @@ desc() ->
 do(State) ->
     Providers = rebar_state:providers(State),
     Cwd = rebar_state:dir(State),
-    rebar_hooks:run_project_and_app_hooks(Cwd, pre, ?PROVIDER, Providers, State),
-    ?INFO("Building escript...", []),
-    Res = case rebar_state:get(State, escript_main_app, undefined) of
+    AppInfo0 = case rebar_state:get(State, escript_main_app, undefined) of
         undefined ->
             case rebar_state:project_apps(State) of
-                [App] ->
-                    escriptize(State, App);
+                [AppInfo] ->
+                    AppInfo;
                 _ ->
                     ?PRV_ERROR(no_main_app)
             end;
@@ -77,13 +75,21 @@ do(State) ->
             AllApps = rebar_state:all_deps(State)++rebar_state:project_apps(State),
             case rebar_app_utils:find(rebar_utils:to_binary(Name), AllApps) of
                 {ok, AppInfo} ->
-                    escriptize(State, AppInfo);
+                    AppInfo;
                 _ ->
                     ?PRV_ERROR({bad_name, Name})
             end
     end,
-    rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State),
-    Res.
+    case AppInfo0 of
+        {error, _} = Err ->
+            Err;
+        _ ->
+            AppInfo1 = rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, AppInfo0, State),
+            ?INFO("Building escript...", []),
+            Res = escriptize(State, AppInfo1),
+            rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, AppInfo1, State),
+            Res
+    end.
 
 escriptize(State0, App) ->
     AppName = rebar_app_info:name(App),
