@@ -1,0 +1,22 @@
+version: 2.1
+
+executors:
+  aebuilder:
+    docker:
+      - image: aeternity/builder
+        user: builder
+    working_directory: ~/src
+
+jobs:
+  build:
+    executor: aebuilder
+    steps:
+      - checkout
+      - run:
+          name: Build
+          command: ./bootstrap
+      - run:
+          name: Common Tests
+          command: ./rebar3 ct
+      - store_artifacts:
+          path: rebar3
