@@ -55,7 +55,14 @@ needed_files(Graph, FoundFiles, _, AppInfo) ->
     {ErlFirstFiles, ErlOptsFirst} = erl_first_files(RebarOpts, ErlOpts, Dir, NeededErlFiles),
     SubGraph = digraph_utils:subgraph(Graph, NeededErlFiles),
     DepErlsOrdered = digraph_utils:topsort(SubGraph),
-    OtherErls = lists:reverse(DepErlsOrdered),
+    %% Break out the files required by other modules from those
+    %% that none other depend of; the former must be sequentially
+    %% built, the rest is parallelizable.
+    OtherErls = lists:partition(
+        fun(Erl) -> digraph:in_degree(Graph, Erl) > 0 end,
+        lists:reverse([Dep || Dep <- DepErlsOrdered,
+                              not lists:member(Dep, ErlFirstFiles)])
+    ),
 
     PrivIncludes = [{i, filename:join(OutDir, Src)}
                     || Src <- rebar_dir:all_src_dirs(RebarOpts, ["src"], [])],
@@ -64,8 +71,7 @@ needed_files(Graph, FoundFiles, _, AppInfo) ->
     true = digraph:delete(SubGraph),
 
     {{ErlFirstFiles, ErlOptsFirst ++ AdditionalOpts},
-     {[Erl || Erl <- OtherErls,
-              not lists:member(Erl, ErlFirstFiles)], ErlOpts ++ AdditionalOpts}}.
+     {OtherErls, ErlOpts ++ AdditionalOpts}}.
 
 dependencies(Source, SourceDir, Dirs) ->
     {ok, Fd} = file:open(Source, [read]),

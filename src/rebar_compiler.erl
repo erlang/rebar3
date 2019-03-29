@@ -21,7 +21,10 @@
                                            out_mappings => out_mappings()}.
 -callback needed_files(digraph:graph(), [file:filename()], out_mappings(),
                        rebar_app_info:t()) ->
-    {{[file:filename()], term()}, {[file:filename()], term()}}.
+    {{[file:filename()], term()}, % ErlFirstFiles (erl_opts global priority)
+     {[file:filename()] | % [Sequential]
+      {[file:filename()], [file:filename()]}, % {Sequential, Parallel}
+      term()}}.
 -callback dependencies(file:filename(), file:dirname(), [file:dirname()]) -> [file:filename()].
 -callback compile(file:filename(), out_mappings(), rebar_dict(), list()) ->
     ok | {ok, [string()]} | {ok, [string()], [string()]}.
@@ -77,7 +80,13 @@ run(CompilerMod, AppInfo, Label) ->
     true = digraph:delete(G),
 
     compile_each(FirstFiles, FirstFileOpts, BaseOpts, Mappings, CompilerMod),
-    compile_parallel(RestFiles, Opts, BaseOpts, Mappings, CompilerMod).
+    case RestFiles of
+        {Sequential, Parallel} -> % new parallelizable form
+            compile_each(Sequential, Opts, BaseOpts, Mappings, CompilerMod),
+            compile_parallel(Parallel, Opts, BaseOpts, Mappings, CompilerMod);
+        _ when is_list(RestFiles) -> % traditional sequential build
+            compile_each(RestFiles, Opts, BaseOpts, Mappings, CompilerMod)
+    end.
 
 compile_each([], _Opts, _Config, _Outs, _CompilerMod) ->
     ok;
