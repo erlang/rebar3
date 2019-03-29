@@ -28,6 +28,7 @@
 
 -export([try_consult/1,
          consult_config/2,
+         consult_config_terms/2,
          format_error/1,
          symlink_or_copy/2,
          rm_rf/1,
@@ -66,6 +67,8 @@ try_consult(File) ->
             throw(?PRV_ERROR({bad_term_file, File, Reason}))
     end.
 
+%% @doc Parse a sys.config file and return the configuration terms
+%% for all its potentially nested configs.
 -spec consult_config(rebar_state:t(), string()) -> [[tuple()]].
 consult_config(State, Filename) ->
     Fullpath = filename:join(rebar_dir:root_dir(State), Filename),
@@ -74,6 +77,18 @@ consult_config(State, Filename) ->
         [T] -> T;
         [] -> []
     end,
+    consult_config_terms(State, Config).
+
+%% @doc From a parsed sys.config file, expand all the terms to include
+%% its potential nested configs. It is also possible that no sub-terms
+%% (i.e. the config file does not refer to "some/other/file.config")
+%% that the input term is returned as-is.
+%%
+%% This function is added mostly to help with variable substitution
+%% and evaluation of 'sys.config.src' files, giving a way to handle
+%% expansion that is separate from regular config handling.
+-spec consult_config_terms(rebar_state:t(), [tuple()]) -> [[tuple()]].
+consult_config_terms(State, Config) ->
     JoinedConfig = lists:flatmap(
         fun (SubConfig) when is_list(SubConfig) ->
             case lists:suffix(".config", SubConfig) of

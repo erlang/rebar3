@@ -1,7 +1,12 @@
 %%% @doc Compatibility module for string functionality
 %%% for pre- and post-unicode support.
+%%%
+%%% Also contains other useful string functionality.
 -module(rebar_string).
+%% Compatibility exports
 -export([join/2, split/2, lexemes/2, trim/3, uppercase/1, lowercase/1, chr/2]).
+%% Util exports
+-export([consult/1]).
 
 -ifdef(unicode_str).
 
@@ -42,3 +47,27 @@ uppercase(Str) -> string:to_upper(Str).
 lowercase(Str) -> string:to_lower(Str).
 chr(Str, Char) -> string:chr(Str, Char).
 -endif.
+
+%% @doc
+%% Given a string or binary, parse it into a list of terms, ala file:consult/1
+-spec consult(unicode:chardata()) -> {error, term()} | [term()].
+consult(Str) ->
+    consult([], unicode:characters_to_list(Str), []).
+
+consult(Cont, Str, Acc) ->
+    case erl_scan:tokens(Cont, Str, 0) of
+        {done, Result, Remaining} ->
+            case Result of
+                {ok, Tokens, _} ->
+                    case erl_parse:parse_term(Tokens) of
+                        {ok, Term} -> consult([], Remaining, [Term | Acc]);
+                        {error, Reason} -> {error, Reason}
+                    end;
+                {eof, _Other} ->
+                    lists:reverse(Acc);
+                {error, Info, _} ->
+                    {error, Info}
+            end;
+        {more, Cont1} ->
+            consult(Cont1, eof, Acc)
+    end.
