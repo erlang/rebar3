@@ -256,6 +256,7 @@ mock_warnings() ->
 mock_rebar_fetch() ->
     meck:new(rebar_fetch, [no_link, passthrough]).
 
+
 %%% TESTS %%%
 flat(Config) -> run(Config).
 pick_highest_left(Config) -> run(Config).
@@ -508,21 +509,43 @@ deps_cmd_needs_update_called(Config) ->
     {ok, RebarConfig} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, TopDeps}])),
     rebar_test_utils:run_and_check(Config, RebarConfig, ["deps"], {ok, []}),
 
+    [<<"b">>] = rebar_fetch_needs_update_calls_sorted(),
+
     %% Add c to top level
     TopDeps2 = rebar_test_utils:top_level_deps(rebar_test_utils:expand_deps(git, [{"c", "2.0.0", []}
                                                                                  ,{"b", "1.0.0", []}])),
     {ok, RebarConfig2} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, TopDeps2}])),
     rebar_test_utils:run_and_check(Config, RebarConfig2, ["deps"], {ok, []}),
 
-    % Only top level deps are checked for updates
-    UpdateCheckDeps = rebar_fetch_needs_update_calls(),
-    UpdateCheckDepsNames = [rebar_app_info:name(Dep) || Dep <- UpdateCheckDeps],
-    [<<"b">>, <<"b">>, <<"c">>] = lists:sort(UpdateCheckDepsNames).
+    %% Only top level deps are checked for updates
+    [<<"b">>, <<"b">>, <<"c">>] = rebar_fetch_needs_update_calls_sorted(),
+
+    %% Lock deps
+    rebar_test_utils:run_and_check(Config, RebarConfig2, ["lock"], {ok, []}),
+    NeedsUpdate1 = rebar_fetch_needs_update_calls_sorted(),
+
+    %% Switch c for a as top level deps
+    TopDeps3 = rebar_test_utils:top_level_deps(rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
+                                                                                 ,{"b", "1.0.0", []}])),
+
+    {ok, RebarConfig3} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, TopDeps3}])),
+    LockFile = filename:join(AppDir, "rebar.lock"),
+    RebarConfig4 = rebar_config:merge_locks(RebarConfig3,
+                                            rebar_config:consult_lock_file(LockFile)),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig4, ["deps"], {ok, []}),
+
+    NeedsUpdate2 = lists:subtract(rebar_fetch_needs_update_calls_sorted(), NeedsUpdate1),
+
+    %% B and C from lock file  + install_deps and A, B and C from 'deps'
+    [<<"a">>, <<"b">>, <<"b">>, <<"c">>, <<"c">>] = NeedsUpdate2.
 
 
-rebar_fetch_needs_update_calls() ->
+rebar_fetch_needs_update_calls_sorted() ->
     History = meck:history(rebar_fetch),
-    [Dep || {_, {rebar_fetch, needs_update, [Dep, _]}, _} <- History].
+    DepsNames = [rebar_app_info:name(Dep)
+                 || {_, {rebar_fetch, needs_update, [Dep, _]}, _} <- History],
+    lists:sort(DepsNames).
 
 warning_calls() ->
     History = meck:history(rebar_log),
