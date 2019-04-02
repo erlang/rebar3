@@ -79,11 +79,11 @@ locked_deps_map(State, Profile) ->
                         case rebar_app_info:is_lock(Dep) of
                             true ->
                                 DepName = rebar_app_info:name(Dep),
-                                DepsIn#{rebar_utils:to_binary(DepName) => Dep};
+                                maps:put(rebar_utils:to_binary(DepName), Dep, DepsIn);
                             _ ->
                                 DepsIn
                         end
-                end, #{}, ParsedDeps).
+                end, maps:new(), ParsedDeps).
 
 
 display_dep(State, Dep, LockedDeps) ->
