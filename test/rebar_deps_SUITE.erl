@@ -7,7 +7,9 @@ all() -> [sub_app_deps, newly_added_dep, newly_added_after_empty_lock,
           http_proxy_settings, https_proxy_settings,
           http_os_proxy_settings, https_os_proxy_settings,
           semver_matching_lt, semver_matching_lte, semver_matching_gt,
-          valid_version, top_override, {group, git}, {group, pkg}].
+          valid_version, top_override, {group, git}, {group, pkg},
+          deps_cmd_needs_update_called
+         ].
 
 groups() ->
     [{all, [], [flat, pick_highest_left, pick_highest_right,
@@ -131,6 +133,8 @@ init_per_testcase(https_os_proxy_settings, Config) ->
             rebar_test_utils:create_config(GlobalConfigDir, []),
             rebar_test_utils:init_rebar_state(Config)
     end;
+init_per_testcase(deps_cmd_needs_update_called, Config) ->
+    rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(Case, Config) ->
     {Deps, Warnings, Expect} = deps(Case),
     Expected = case Expect of
@@ -248,6 +252,10 @@ mock_warnings() ->
     %% just let it do its thing, we check warnings through
     %% the call log.
     meck:new(rebar_log, [no_link, passthrough]).
+
+mock_rebar_fetch() ->
+    meck:new(rebar_fetch, [no_link, passthrough]).
+
 
 %%% TESTS %%%
 flat(Config) -> run(Config).
@@ -437,7 +445,7 @@ semver_matching_gte(_Config) ->
     MaxVsn = <<"0.2.0">>,
     Vsns = [<<"0.1.7">>, <<"0.1.9">>, <<"0.1.8">>, <<"0.2.0">>],
     ?assertEqual({ok, <<"0.2.0">>},
-                 rebar_packages:cmp_(undefined, MaxVsn, Vsns, 
+                 rebar_packages:cmp_(undefined, MaxVsn, Vsns,
                                        fun ec_semver:gt/2)).
 
 valid_version(_Config) ->
@@ -479,6 +487,65 @@ run(Config) ->
         Config, RebarConfig, ["install_deps"], ?config(expect, Config)
     ),
     check_warnings(warning_calls(), ?config(warnings, Config), ?config(deps_type, Config)).
+
+
+deps_cmd_needs_update_called(Config) ->
+    mock_rebar_fetch(),
+    AppDir = ?config(apps, Config),
+    Deps = rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
+                                             ,{"b", "1.0.0", [{"c", "1.0.0", []}]}
+                                             ,{"c", "2.0.0", []}]),
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
+
+    Name = rebar_test_utils:create_random_name("app_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+
+    SubAppsDir = filename:join([AppDir, "apps", Name]),
+    rebar_test_utils:create_app(SubAppsDir, Name, Vsn, [kernel, stdlib]),
+
+    TopDeps = rebar_test_utils:top_level_deps(
+                rebar_test_utils:expand_deps(git, [{"b", "1.0.0", []}])),
+    {ok, RebarConfig} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, TopDeps}])),
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["deps"], {ok, []}),
+
+    [<<"b">>] = rebar_fetch_needs_update_calls_sorted(),
+
+    %% Add c to top level
+    TopDeps2 = rebar_test_utils:top_level_deps(rebar_test_utils:expand_deps(git, [{"c", "2.0.0", []}
+                                                                                 ,{"b", "1.0.0", []}])),
+    {ok, RebarConfig2} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, TopDeps2}])),
+    rebar_test_utils:run_and_check(Config, RebarConfig2, ["deps"], {ok, []}),
+
+    %% Only top level deps are checked for updates
+    [<<"b">>, <<"b">>, <<"c">>] = rebar_fetch_needs_update_calls_sorted(),
+
+    %% Lock deps
+    rebar_test_utils:run_and_check(Config, RebarConfig2, ["lock"], {ok, []}),
+    NeedsUpdate1 = rebar_fetch_needs_update_calls_sorted(),
+
+    %% Switch c for a as top level deps
+    TopDeps3 = rebar_test_utils:top_level_deps(rebar_test_utils:expand_deps(git, [{"a", "1.0.0", []}
+                                                                                 ,{"b", "1.0.0", []}])),
+
+    {ok, RebarConfig3} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, TopDeps3}])),
+    LockFile = filename:join(AppDir, "rebar.lock"),
+    RebarConfig4 = rebar_config:merge_locks(RebarConfig3,
+                                            rebar_config:consult_lock_file(LockFile)),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig4, ["deps"], {ok, []}),
+
+    NeedsUpdate2 = lists:subtract(rebar_fetch_needs_update_calls_sorted(), NeedsUpdate1),
+
+    %% B and C from lock file  + install_deps and A, B and C from 'deps'
+    [<<"a">>, <<"b">>, <<"b">>, <<"c">>, <<"c">>] = NeedsUpdate2.
+
+
+rebar_fetch_needs_update_calls_sorted() ->
+    History = meck:history(rebar_fetch),
+    DepsNames = [rebar_app_info:name(Dep)
+                 || {_, {rebar_fetch, needs_update, [Dep, _]}, _} <- History],
+    lists:sort(DepsNames).
 
 warning_calls() ->
     History = meck:history(rebar_log),

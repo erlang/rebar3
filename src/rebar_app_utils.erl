@@ -34,6 +34,7 @@
          validate_application_info/2,
          parse_deps/5,
          parse_deps/6,
+         parse_dep/6,
          expand_deps_sources/2,
          dep_to_app/7,
          format_error/1]).
