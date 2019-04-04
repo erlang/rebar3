@@ -238,7 +238,11 @@ update_package(Name, RepoConfig=#{name := Repo}, State) ->
             _ = insert_releases(Name, Releases, Repo, ?PACKAGE_TABLE),
             {ok, RegistryDir} = rebar_packages:registry_dir(State),
             PackageIndex = filename:join(RegistryDir, ?INDEX_FILE),
-            ok = ets:tab2file(?PACKAGE_TABLE, PackageIndex);
+            case ets:tab2file(?PACKAGE_TABLE, PackageIndex) of
+                ok -> ok;
+                {error, Error} ->
+                    ?WARN("Failed to update package index at ~p: ~p", [PackageIndex, Error])
+            end;
         {error, unverified} ->
             ?WARN(unverified_repo_message(), [Repo]),
             fail;
