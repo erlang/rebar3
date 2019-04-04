@@ -347,20 +347,24 @@ create_app_info(AppInfo, AppDir, AppFile) ->
     AppVsn = proplists:get_value(vsn, AppDetails),
     Applications = proplists:get_value(applications, AppDetails, []),
     IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
+    BuildDeps = proplists:get_value(build_deps, AppDetails, []),
     AppInfo1 = rebar_app_info:name(
                  rebar_app_info:original_vsn(
                    rebar_app_info:dir(AppInfo, AppDir), AppVsn), AppName),
     AppInfo2 = rebar_app_info:applications(
                  rebar_app_info:app_details(AppInfo1, AppDetails),
                  IncludedApplications++Applications),
-    Valid = case rebar_app_utils:validate_application_info(AppInfo2) =:= true
-                andalso rebar_app_info:has_all_artifacts(AppInfo2) =:= true of
+    AppInfo3 = rebar_app_info:build_deps(
+                 rebar_app_info:app_details(AppInfo2, AppDetails),
+                 BuildDeps),
+    Valid = case rebar_app_utils:validate_application_info(AppInfo3) =:= true
+                andalso rebar_app_info:has_all_artifacts(AppInfo3) =:= true of
                 true ->
                     true;
                 _ ->
                     false
             end,
-    rebar_app_info:dir(rebar_app_info:valid(AppInfo2, Valid), AppDir).
+    rebar_app_info:dir(rebar_app_info:valid(AppInfo3, Valid), AppDir).
 
 %% @doc Read in and parse the .app file if it is availabe. Do the same for
 %% the .app.src file if it exists.

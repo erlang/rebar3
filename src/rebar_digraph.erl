@@ -109,6 +109,9 @@ find_app_by_name(Name, Apps) ->
 %% for building the app.
 -spec all_apps_deps(rebar_app_info:t()) -> [binary()].
 all_apps_deps(App) ->
-    Applications = lists:usort([atom_to_binary(X, utf8) || X <- rebar_app_info:applications(App)]),
+    Applications = lists:usort([
+        atom_to_binary(X, utf8) ||
+        X <- rebar_app_info:applications(App) ++ rebar_app_info:build_deps(App)
+    ]),
     Deps = lists:usort(lists:map(fun({Name, _}) -> Name; (Name) -> Name end, rebar_app_info:deps(App))),
     lists:umerge(Deps, Applications).

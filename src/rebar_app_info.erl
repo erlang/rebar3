@@ -27,6 +27,8 @@
          priv_dir/1,
          applications/1,
          applications/2,
+         build_deps/1,
+         build_deps/2,
          profiles/1,
          profiles/2,
          deps/1,
@@ -97,7 +99,9 @@
                      is_checkout=false  :: boolean(),
                      valid              :: boolean() | undefined,
                      project_type       :: project_type(),
-                     is_available=false :: boolean()}).
+                     is_available=false :: boolean(),
+                     build_deps=[]      :: list()
+                     }).
 
 %%============================================================================
 %% types
@@ -405,6 +409,17 @@ applications(#app_info_t{applications=Applications}) ->
 -spec applications(t(), list()) -> t().
 applications(AppInfo=#app_info_t{}, Applications) ->
     AppInfo#app_info_t{applications=Applications}.
+
+%% @doc returns the list of build_deps the app depends on.
+-spec build_deps(t()) -> list().
+build_deps(#app_info_t{build_deps=Applications}) ->
+    Applications.
+
+%% @doc sets the list of build_deps the app depends on.
+%% Should be obtained from the app file.
+-spec build_deps(t(), list()) -> t().
+build_deps(AppInfo=#app_info_t{}, Applications) ->
+    AppInfo#app_info_t{build_deps=Applications}.
 
 %% @doc returns the list of active profiles
 -spec profiles(t()) -> list().
