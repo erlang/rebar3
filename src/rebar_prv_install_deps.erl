@@ -196,7 +196,7 @@ find_cycles(Apps) ->
     end.
 
 cull_compile(TopSortedDeps, ProjectApps) ->
-    lists:dropwhile(fun not_needs_compile/1, TopSortedDeps -- ProjectApps).
+    lists:filter(fun needs_compile/1, TopSortedDeps -- ProjectApps).
 
 maybe_lock(Profile, AppInfo, Seen, State, Level) ->
     Name = rebar_app_info:name(AppInfo),
@@ -435,10 +435,10 @@ warn_skip_deps(Name, Source, State) ->
             ?ERROR(Msg, Args), ?FAIL
     end.
 
-not_needs_compile(App) ->
-    not(rebar_app_info:is_checkout(App))
-        andalso rebar_app_info:valid(App)
-          andalso rebar_app_info:has_all_artifacts(App) =:= true.
+needs_compile(App) ->
+    rebar_app_info:is_checkout(App)
+        orelse (not rebar_app_info:valid(App))
+          orelse rebar_app_info:has_all_artifacts(App) =/= true.
 
 find_app_and_level_by_name([], _) ->
     false;
