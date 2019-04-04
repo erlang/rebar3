@@ -21,7 +21,10 @@
                                            out_mappings => out_mappings()}.
 -callback needed_files(digraph:graph(), [file:filename()], out_mappings(),
                        rebar_app_info:t()) ->
-    {{[file:filename()], term()}, {[file:filename()], term()}}.
+    {{[file:filename()], term()}, % ErlFirstFiles (erl_opts global priority)
+     {[file:filename()] | % [Sequential]
+      {[file:filename()], [file:filename()]}, % {Sequential, Parallel}
+      term()}}.
 -callback dependencies(file:filename(), file:dirname(), [file:dirname()]) -> [file:filename()].
 -callback compile(file:filename(), out_mappings(), rebar_dict(), list()) ->
     ok | {ok, [string()]} | {ok, [string()], [string()]}.
@@ -77,7 +80,13 @@ run(CompilerMod, AppInfo, Label) ->
     true = digraph:delete(G),
 
     compile_each(FirstFiles, FirstFileOpts, BaseOpts, Mappings, CompilerMod),
-    compile_each(RestFiles, Opts, BaseOpts, Mappings, CompilerMod).
+    case RestFiles of
+        {Sequential, Parallel} -> % new parallelizable form
+            compile_each(Sequential, Opts, BaseOpts, Mappings, CompilerMod),
+            compile_parallel(Parallel, Opts, BaseOpts, Mappings, CompilerMod);
+        _ when is_list(RestFiles) -> % traditional sequential build
+            compile_each(RestFiles, Opts, BaseOpts, Mappings, CompilerMod)
+    end.
 
 compile_each([], _Opts, _Config, _Outs, _CompilerMod) ->
     ok;
@@ -98,6 +107,60 @@ compile_each([Source | Rest], Opts, Config, Outs, CompilerMod) ->
             ?FAIL
     end,
     compile_each(Rest, Opts, Config, Outs, CompilerMod).
+
+compile_worker(QueuePid, Opts, Config, Outs, CompilerMod) ->
+    QueuePid ! self(),
+    receive
+        {compile, Source} ->
+            Result = CompilerMod:compile(Source, Outs, Config, Opts),
+            QueuePid ! {Result, Source},
+            compile_worker(QueuePid, Opts, Config, Outs, CompilerMod);
+        empty ->
+            ok
+    end.
+
+compile_parallel([], _Opts, _BaseOpts, _Mappings, _CompilerMod) ->
+    ok;
+compile_parallel(Targets, Opts, BaseOpts, Mappings, CompilerMod) ->
+    Self = self(),
+    F = fun() -> compile_worker(Self, Opts, BaseOpts, Mappings, CompilerMod) end,
+    Jobs = min(length(Targets), erlang:system_info(schedulers)),
+    ?DEBUG("Starting ~B compile worker(s)", [Jobs]),
+    Pids = [spawn_monitor(F) || _I <- lists:seq(1, Jobs)],
+    compile_queue(Targets, Pids, Opts, BaseOpts, Mappings, CompilerMod).
+
+compile_queue([], [], _Opts, _Config, _Outs, _CompilerMod) ->
+    ok;
+compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod) ->
+    receive
+        Worker when is_pid(Worker), Targets =:= [] ->
+            Worker ! empty,
+            compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);
+        Worker when is_pid(Worker) ->
+            Worker ! {compile, hd(Targets)},
+            compile_queue(tl(Targets), Pids, Opts, Config, Outs, CompilerMod);
+        {ok, Source} ->
+            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]),
+            compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);
+        {{ok, Warnings}, Source} ->
+            report(Warnings),
+            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]),
+            compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);
+        {skipped, Source} ->
+            ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), filename:basename(Source)]),
+            compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);
+        {Error, Source} ->
+            NewSource = format_error_source(Source, Config),
+            ?ERROR("Compiling ~ts failed", [NewSource]),
+            maybe_report(Error),
+            ?FAIL;
+        {'DOWN', Mref, _, Pid, normal} ->
+            Pids2 = lists:delete({Pid, Mref}, Pids),
+            compile_queue(Targets, Pids2, Opts, Config, Outs, CompilerMod);
+        {'DOWN', _Mref, _, _Pid, Info} ->
+            ?ERROR("Compilation failed: ~p", [Info]),
+            ?FAIL
+    end.
 
 %% @doc remove compiled artifacts from an AppDir.
 -spec clean([module()], rebar_app_info:t()) -> 'ok'.
