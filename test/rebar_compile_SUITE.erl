@@ -40,7 +40,9 @@ all() ->
      always_recompile_when_erl_compiler_options_set,
      dont_recompile_when_erl_compiler_options_env_does_not_change,
      recompile_when_erl_compiler_options_env_changes,
-     rebar_config_os_var].
+     rebar_config_os_var,
+
+     app_file_linting].
 
 groups() ->
     [{basic_app, [], [build_basic_app, paths_basic_app, clean_basic_app]},
@@ -431,7 +433,6 @@ paths_release_apps(Config) ->
     [Vsn1, Vsn2] = ?config(vsns, Config),
 
     {ok, State} = rebar_test_utils:run_and_check(Config, [], ["compile"], return),
-
     code:add_paths(rebar_state:code_paths(State, all_deps)),
     ok = application:load(list_to_atom(Name1)),
     ok = application:load(list_to_atom(Name2)),
@@ -2311,6 +2312,23 @@ regex_filter_regression(Config) ->
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"],
                                    {ok, [{file, Expected}]}),
     ok.
+
+app_file_linting(Config) ->
+    meck:new(rebar_log, [no_link, passthrough]),
+    AppDir = ?config(apps, Config),
+    Name = rebar_test_utils:create_random_name("app_file_linting"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [foo]),
+
+    _ = rebar_test_utils:run_and_check(Config, [], ["compile"], return),
+    History = meck:history(rebar_log),
+    Warnings = [{Str, Args} || {_, {rebar_log, log, [warn, Str, Args]}, _} <- History],
+
+    ct:pal("Warnings Length: ~p", [length(Warnings)]),
+    ct:pal("Warnings: ~p", [Warnings]),
+    ?assert(none /= proplists:lookup("~p is missing description entry", Warnings)),
+    ?assert(none /= proplists:lookup("~p is missing kernel from applications list", Warnings)),
+    ?assert(none /= proplists:lookup("~p is missing stdlib from applications list", Warnings)).
 
 %%
 
