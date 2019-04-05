@@ -424,17 +424,35 @@ resolve_eunit_opts(State) ->
                     true  -> set_verbose(EUnitOpts);
                     false -> EUnitOpts
                  end,
-    IsVerbose = lists:member(verbose, EUnitOpts1),
-    case proplists:get_value(eunit_formatters, EUnitOpts1, not IsVerbose) of
-        true  -> custom_eunit_formatters(EUnitOpts1);
-        false -> EUnitOpts1
+    EUnitOpts2 = case proplists:get_value(profile, Opts, false) of
+                    true  -> set_profile(EUnitOpts1);
+                    false -> EUnitOpts1
+                 end,
+    IsVerbose = lists:member(verbose, EUnitOpts2),
+    case proplists:get_value(eunit_formatters, Opts, not IsVerbose) of
+        true  -> custom_eunit_formatters(EUnitOpts2);
+        false -> EUnitOpts2
     end.
 
 custom_eunit_formatters(Opts) ->
+    ReportOpts = custom_eunit_report_options(Opts),
     %% If `report` is already set then treat that like `eunit_formatters` is false
     case lists:keymember(report, 1, Opts) of
         true -> Opts;
-        false -> [no_tty, {report, {eunit_progress, [colored, profile]}} | Opts]
+        false -> [no_tty, {report, {eunit_progress, ReportOpts}} | Opts]
+    end.
+
+custom_eunit_report_options(Opts) ->
+    case lists:member(profile, Opts) of
+        true -> [colored, profile];
+        false -> [colored]
+    end.
+
+set_profile(Opts) ->
+    %% if `profile` is already set don't set it again
+    case lists:member(profile, Opts) of
+        true  -> Opts;
+        false -> [profile] ++ Opts
     end.
 
 set_verbose(Opts) ->
@@ -508,6 +526,7 @@ eunit_opts(_State) ->
      {application, undefined, "application", string, help(app)},
      {cover, $c, "cover", boolean, help(cover)},
      {cover_export_name, undefined, "cover_export_name", string, help(cover_export_name)},
+     {profile, $p, "profile", boolean, help(profile)},
      {dir, $d, "dir", string, help(dir)},
      {file, $f, "file", string, help(file)},
      {module, $m, "module", string, help(module)},
@@ -521,6 +540,7 @@ eunit_opts(_State) ->
 help(app)       -> "Comma separated list of application test suites to run. Equivalent to `[{application, App}]`.";
 help(cover)     -> "Generate cover data. Defaults to false.";
 help(cover_export_name) -> "Base name of the coverdata file to write";
+help(profile)   -> "Show the slowest tests. Defaults to false.";
 help(dir)       -> "Comma separated list of dirs to load tests from. Equivalent to `[{dir, Dir}]`.";
 help(file)      -> "Comma separated list of files to load tests from. Equivalent to `[{file, File}]`.";
 help(module)    -> "Comma separated list of modules to load tests from. Equivalent to `[{module, Module}]`.";
