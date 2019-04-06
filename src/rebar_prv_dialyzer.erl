@@ -23,7 +23,11 @@
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
     Opts = [{update_plt, $u, "update-plt", boolean, "Enable updating the PLT. Default: true"},
-            {succ_typings, $s, "succ-typings", boolean, "Enable success typing analysis. Default: true"}],
+            {succ_typings, $s, "succ-typings", boolean, "Enable success typing analysis. Default: true"},
+            {base_plt_location, undefined, "base-plt-location", string, "The location of base PLT file, defaults to $HOME/.cache/rebar3"},
+            {plt_location, undefined, "plt-location", string, "The location of the PLT file, defaults to the profile's base directory"},
+            {plt_prefix, undefined, "plt-prefix", string, "The prefix to the PLT file, defaults to \"rebar3\"" },
+            {base_plt_prefix, undefined, "base-plt-prefix", string, "The prefix to the base PLT file, defaults to \"rebar3\"" }],
     State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
                                                                {module, ?MODULE},
                                                                {bare, true},
@@ -87,10 +91,11 @@ do(State) ->
     ?INFO("Dialyzer starting, this may take a while...", []),
     rebar_paths:unset_paths([plugins], State), % no plugins in analysis
     rebar_paths:set_paths([deps], State),
-    Plt = get_plt(State),
+    {Args, _} = rebar_state:command_parsed_args(State),
+    Plt = get_plt(Args, State),
 
     try
-        do(State, Plt)
+        do(Args, State, Plt)
     catch
         throw:{dialyzer_error, Error} ->
             ?PRV_ERROR({error_processing_apps, Error});
@@ -134,10 +139,10 @@ format_error(Reason) ->
 
 %% Internal functions
 
-get_plt(State) ->
-    Prefix = get_config(State, plt_prefix, ?PLT_PREFIX),
+get_plt(Args, State) ->
+    Prefix = proplists:get_value(plt_prefix, Args, get_config(State, plt_prefix, ?PLT_PREFIX)),
     Name = plt_name(Prefix),
-    case get_config(State, plt_location, local) of
+    case proplists:get_value(plt_location, Args, get_config(State, plt_location, local)) of
         local ->
             BaseDir = rebar_dir:base_dir(State),
             filename:join(BaseDir, Name);
@@ -148,10 +153,10 @@ get_plt(State) ->
 plt_name(Prefix) ->
     Prefix ++ "_" ++ rebar_utils:otp_release() ++ "_plt".
 
-do(State, Plt) ->
+do(Args, State, Plt) ->
     Output = get_output_file(State),
-    {PltWarnings, State1} = update_proj_plt(State, Plt, Output),
-    {Warnings, State2} = succ_typings(State1, Plt, Output),
+    {PltWarnings, State1} = update_proj_plt(Args, State, Plt, Output),
+    {Warnings, State2} = succ_typings(Args, State1, Plt, Output),
     case PltWarnings + Warnings of
         0 ->
             {ok, State2};
@@ -174,23 +179,22 @@ get_output_file(State) ->
 default_output_file() ->
     rebar_utils:otp_release() ++ ".dialyzer_warnings".
 
-update_proj_plt(State, Plt, Output) ->
-    {Args, _} = rebar_state:command_parsed_args(State),
+update_proj_plt(Args, State, Plt, Output) ->
     case proplists:get_value(update_plt, Args) of
         false ->
             {0, State};
         _ ->
-            do_update_proj_plt(State, Plt, Output)
+            do_update_proj_plt(Args, State, Plt, Output)
     end.
 
-do_update_proj_plt(State, Plt, Output) ->
+do_update_proj_plt(Args, State, Plt, Output) ->
     ?INFO("Updating plt...", []),
     Files = proj_plt_files(State),
     case read_plt(State, Plt) of
         {ok, OldFiles} ->
             check_plt(State, Plt, Output, OldFiles, Files);
         error ->
-            build_proj_plt(State, Plt, Output, Files)
+            build_proj_plt(Args, State, Plt, Output, Files)
     end.
 
 proj_plt_files(State) ->
@@ -373,8 +377,8 @@ run_plt(State, Plt, Output, Analysis, Files) ->
             {files, Files}],
     run_dialyzer(State, Opts, Output).
 
-build_proj_plt(State, Plt, Output, Files) ->
-    BasePlt = get_base_plt(State),
+build_proj_plt(Args, State, Plt, Output, Files) ->
+    BasePlt = get_base_plt(Args, State),
     ?INFO("Updating base plt...", []),
     BaseFiles = base_plt_files(State),
     {BaseWarnings, State1} = update_base_plt(State, BasePlt, Output, BaseFiles),
@@ -391,10 +395,10 @@ build_proj_plt(State, Plt, Output, Files) ->
             throw({dialyzer_error, Error})
     end.
 
-get_base_plt(State) ->
-    Prefix = get_config(State, base_plt_prefix, ?PLT_PREFIX),
+get_base_plt(Args, State) ->
+    Prefix = proplists:get_value(base_plt_prefix, Args, get_config(State, base_plt_prefix, ?PLT_PREFIX)),
     Name = plt_name(Prefix),
-    case get_config(State, base_plt_location, global) of
+    case proplists:get_value(base_plt_location, Args, get_config(State, base_plt_location, global)) of
         global ->
             GlobalCacheDir = rebar_dir:global_cache_dir(rebar_state:opts(State)),
             filename:join(GlobalCacheDir, Name);
@@ -439,21 +443,20 @@ build_plt(State, Plt, Output, Files) ->
             {files, Files}],
     run_dialyzer(State, Opts, Output).
 
-succ_typings(State, Plt, Output) ->
-    {Args, _} = rebar_state:command_parsed_args(State),
+succ_typings(Args, State, Plt, Output) ->
     case proplists:get_value(succ_typings, Args) of
         false ->
             {0, State};
         _ ->
             ?INFO("Doing success typing analysis...", []),
             Files = proj_files(State),
-            succ_typings(State, Plt, Output, Files)
+            succ_typings_(State, Plt, Output, Files)
     end.
 
-succ_typings(State, Plt, _, []) ->
+succ_typings_(State, Plt, _, []) ->
     ?INFO("Analyzing no files with ~p...", [Plt]),
     {0, State};
-succ_typings(State, Plt, Output, Files) ->
+succ_typings_(State, Plt, Output, Files) ->
     ?INFO("Analyzing ~b files with ~p...", [length(Files), Plt]),
     Opts = [{analysis_type, succ_typings},
             {get_warnings, true},

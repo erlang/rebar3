@@ -15,7 +15,8 @@
          update_app_plt/1,
          build_release_plt/1,
          plt_apps_option/1,
-         exclude_and_extra/1]).
+         exclude_and_extra/1,
+         cli_args/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -58,7 +59,7 @@ all() ->
 
 groups() ->
     [{empty, [empty_base_plt, empty_app_plt, empty_app_succ_typings]},
-     {build_and_check, [build_release_plt, plt_apps_option, exclude_and_extra]},
+     {build_and_check, [cli_args, build_release_plt, plt_apps_option, exclude_and_extra]},
      {update, [update_base_plt, update_app_plt]}].
 
 empty_base_plt(Config) ->
@@ -308,6 +309,42 @@ exclude_and_extra(Config) ->
     Pair = lists:sort([Erlang, code:where_is_file("erl_prim_loader.beam")]),
     {ok, PltFiles} = plt_files(Plt),
     ?assertEqual(Pair, PltFiles).
+
+cli_args(Config) ->
+    AppDir = ?config(apps, Config),
+    [{dialyzer, Opts}] = ?config(rebar_config, Config),
+    BasePlt = ?config(base_plt, Config),
+    Plt = ?config(plt, Config),
+
+    {value, {_, Prefix}, Opts1} = lists:keytake(plt_prefix, 1, Opts),
+    {value, {_, BasePrefix}, Opts2} = lists:keytake(base_plt_prefix, 1, Opts1),
+    {value, {_, Location}, Opts3} = lists:keytake(plt_location, 1, Opts2),
+    {value, {_, BasePltLocation}, Opts4} = lists:keytake(base_plt_location, 1, Opts3),
+    RebarConfig = [{dialyzer, Opts4}],
+
+    Name1 = rebar_test_utils:create_random_name("relapp1_"),
+    Vsn1 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([AppDir,"apps",Name1]), Name1, Vsn1,
+                                [erts]),
+    Name2 = rebar_test_utils:create_random_name("relapp2_"),
+    Vsn2 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([AppDir,"apps",Name2]), Name2, Vsn2,
+                                [erts, ec_cnv:to_atom(Name1)]),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer",
+                                                         "--plt-location=" ++ Location,
+                                                         "--base-plt-location=" ++ BasePltLocation,
+                                                         "--plt-prefix=" ++ Prefix,
+                                                         "--base-plt-prefix=" ++ BasePrefix],
+                                   {ok, [{app, Name1}, {app, Name2}]}),
+
+    ErtsFiles = erts_files(),
+
+    {ok, BasePltFiles} = plt_files(BasePlt),
+    ?assertEqual(ErtsFiles, BasePltFiles),
+
+    {ok, PltFiles} = plt_files(Plt),
+    ?assertEqual(ErtsFiles, PltFiles).
 
 %% Helpers
 
