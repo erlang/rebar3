@@ -1,0 +1,28 @@
+test_task:
+  container:
+    matrix:
+      - image: erlang:21
+      - image: erlang:20
+      - image: erlang:19
+      - image: erlang:18
+      - image: erlang:17
+  test_script: |
+    ./bootstrap
+    ./rebar3 ct
+
+osx_test_task:
+  osx_instance:
+    image: mojave-base
+  install_script: brew install erlang
+  test_script: |
+    ./bootstrap
+    ./rebar3 ct
+
+windows_test_task:
+  windows_container:
+    image: cirrusci/windowsservercore:2019
+    os_version: 2019
+  install_script: choco install -y erlang
+  test_script: |
+    ./bootstrap
+    ./rebar3 ct
