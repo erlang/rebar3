@@ -123,8 +123,8 @@ lint_description(AppDetail, AppFile) ->
 
 -spec lint_applications(list(), file:filename_all()) -> ok.
 lint_applications(AppDetail, AppFile) ->
-    case proplists:get_value(applications, AppDetail, []) of
-        [] -> ?WARN("~p is missing applications entry", [AppFile]);
+    case proplists:get_value(applications, AppDetail) of
+        undefined -> ?WARN("~p is missing applications entry", [AppFile]);
         AppList when is_list(AppList) ->
             case lists:member(kernel, AppList) of
                 false ->
