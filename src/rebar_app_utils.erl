@@ -136,7 +136,7 @@ lint_applications(AppDetail, AppFile) ->
                     ?WARN("~p is missing stdlib from applications list", [AppFile]);
                 true -> ok
             end;
-        _ -> ?WARN("~p requires a list for applications key", [AppFile])
+        _ -> ?WARN("~p requires a list for applications value", [AppFile])
     end.
 
 %% @doc parses all dependencies from the root of the project
