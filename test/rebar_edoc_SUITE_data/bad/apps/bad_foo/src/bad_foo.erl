@@ -1,4 +1,4 @@
--module(foo).
+-module(bad_foo).
 
 -export([foo/0, bar1/0, bar2/0]).
 

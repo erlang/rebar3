@@ -3,7 +3,7 @@
 %% @end
 %%%-------------------------------------------------------------------
 
--module(bar2_sup).
+-module(bad_bar2_sup).
 
 -behaviour(supervisor).
 

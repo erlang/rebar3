@@ -1,12 +1,11 @@
-{application, foo,
+{application, bad_bar2,
  [{description, "An OTP application"},
   {vsn, "0.1.0"},
   {registered, []},
-  {mod, { foo_app, []}},
+  {mod, { bad_bar2_app, []}},
   {applications,
    [kernel,
-    stdlib,
-    bar1, bar2
+    stdlib
    ]},
   {env,[]},
   {modules, []},
