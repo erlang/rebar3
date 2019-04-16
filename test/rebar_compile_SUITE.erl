@@ -2324,8 +2324,6 @@ app_file_linting(Config) ->
     History = meck:history(rebar_log),
     Warnings = [{Str, Args} || {_, {rebar_log, log, [warn, Str, Args]}, _} <- History],
 
-    ct:pal("Warnings Length: ~p", [length(Warnings)]),
-    ct:pal("Warnings: ~p", [Warnings]),
     ?assert(none /= proplists:lookup("~p is missing description entry", Warnings)),
     ?assert(none /= proplists:lookup("~p is missing kernel from applications list", Warnings)),
     ?assert(none /= proplists:lookup("~p is missing stdlib from applications list", Warnings)).
