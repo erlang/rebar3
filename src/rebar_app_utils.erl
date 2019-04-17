@@ -101,12 +101,43 @@ validate_application_info(AppInfo, AppDetail) ->
         undefined ->
             false;
         AppFile ->
+            lint_detail(AppDetail, AppFile),
             case proplists:get_value(modules, AppDetail) of
                 undefined ->
                     ?PRV_ERROR({module_list, AppFile});
                 List ->
                     has_all_beams(EbinDir, List)
             end
+    end.
+
+-spec lint_detail(list(), file:filename_all()) -> ok.
+lint_detail(AppDetail, AppFile) ->
+    lint_description(AppDetail, AppFile),
+    lint_applications(AppDetail, AppFile).
+
+-spec lint_description(list(), file:filename_all()) -> ok.
+lint_description(AppDetail, AppFile) ->
+    case proplists:get_value(description, AppDetail, "") of
+        "" -> ?WARN("~p is missing description entry", [AppFile]);
+        _ -> ok
+    end.
+
+-spec lint_applications(list(), file:filename_all()) -> ok.
+lint_applications(AppDetail, AppFile) ->
+    case proplists:get_value(applications, AppDetail) of
+        undefined -> ?WARN("~p is missing applications entry", [AppFile]);
+        AppList when is_list(AppList) ->
+            case lists:member(kernel, AppList) of
+                false ->
+                    ?WARN("~p is missing kernel from applications list", [AppFile]);
+                true -> ok
+            end,
+            case lists:member(stdlib, AppList) of
+                false ->
+                    ?WARN("~p is missing stdlib from applications list", [AppFile]);
+                true -> ok
+            end;
+        _ -> ?WARN("~p requires a list for applications value", [AppFile])
     end.
 
 %% @doc parses all dependencies from the root of the project
