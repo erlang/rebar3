@@ -140,14 +140,14 @@ compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod) ->
             Worker ! {compile, hd(Targets)},
             compile_queue(tl(Targets), Pids, Opts, Config, Outs, CompilerMod);
         {ok, Source} ->
-            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]),
+            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
             compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);
         {{ok, Warnings}, Source} ->
             report(Warnings),
-            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]),
+            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
             compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);
         {skipped, Source} ->
-            ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), filename:basename(Source)]),
+            ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), Source]),
             compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);
         {Error, Source} ->
             NewSource = format_error_source(Source, Config),

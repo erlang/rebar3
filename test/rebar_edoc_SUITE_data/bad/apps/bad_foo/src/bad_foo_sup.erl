@@ -1,9 +1,9 @@
 %%%-------------------------------------------------------------------
-%% @doc bar1 top level supervisor.
+%% @doc foo top level supervisor.
 %% @end
 %%%-------------------------------------------------------------------
 
--module(bar1_sup).
+-module(bad_foo_sup).
 
 -behaviour(supervisor).
 

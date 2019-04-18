@@ -1,8 +1,8 @@
-{application, bar2,
+{application, bad_bar1,
  [{description, "An OTP application"},
   {vsn, "0.1.0"},
   {registered, []},
-  {mod, { bar2_app, []}},
+  {mod, { bad_bar1_app, []}},
   {applications,
    [kernel,
     stdlib

@@ -1,4 +1,4 @@
--module(bar1).
+-module(bad_bar1).
 -export([bar1/0]).
 -export_type([barer1/0]).
 

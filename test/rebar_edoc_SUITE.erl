@@ -58,7 +58,7 @@ error_survival(Config) ->
     RebarConfig = [],
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["edoc"],
-        {error,{rebar_prv_edoc,{app_failed,"bar2"}}}
+        {error,{rebar_prv_edoc,{app_failed,"bad_bar2"}}}
     ),
     ok.
 
