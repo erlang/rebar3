@@ -107,8 +107,15 @@ home_dir() ->
 %% may be stored.
 -spec global_config_dir(rebar_state:t()) -> file:filename_all().
 global_config_dir(State) ->
-    Home = home_dir(),
-    rebar_state:get(State, global_rebar_dir, filename:join([Home, ".config", "rebar3"])).
+    filename:join([rebar_config_dir(State), ".config", "rebar3"]).
+
+rebar_config_dir(State) ->
+    case os:getenv("REBAR_GLOBAL_CONFIG_DIR") of
+        false ->
+            rebar_state:get(State, global_rebar_dir, home_dir());
+        ConfDir ->
+            ConfDir
+    end.
 
 %% @doc returns the path of the global rebar.config file
 -spec global_config(rebar_state:t()) -> file:filename_all().
