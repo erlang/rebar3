@@ -481,10 +481,13 @@ check_warnings(Warns, none, _Type) ->
 
 in_warnings(git, Warns, NameRaw, VsnRaw) ->
     Name = iolist_to_binary(NameRaw),
-    1 =< length([1 || {_, [AppName, {git, _, {_, Vsn}}]} <- Warns,
-                      AppName =:= Name, Vsn =:= VsnRaw]);
+    Vsn  = iolist_to_binary([$",VsnRaw,$"]),
+    1 =< length([1 || {_, [[AppName, $\s,$(,$f,$r,$o,$m,$\s,[${,["git",$,, _URL, $,,[${,["tag",$,, AppVsn], $}]],$}],$)]]} <- Warns,
+                      iolist_to_binary(AppName) =:= Name,
+                      iolist_to_binary(AppVsn) =:= Vsn]);
 in_warnings(pkg, Warns, NameRaw, VsnRaw) ->
     Name = iolist_to_binary(NameRaw),
     Vsn = iolist_to_binary(VsnRaw),
-    1 =< length([1 || {_, [AppName, {pkg, _, AppVsn}]} <- Warns,
-                      AppName =:= Name, AppVsn =:= Vsn]).
+    1 =< length([1 || {_, [[AppName, $\s,$v, AppVsn]]} <- Warns,
+                      iolist_to_binary(AppName) =:= Name,
+                      iolist_to_binary(AppVsn) =:= Vsn]).
