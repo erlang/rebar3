@@ -18,11 +18,12 @@ osx_test_task:
     ./bootstrap
     ./rebar3 ct
 
-windows_test_task:
-  windows_container:
-    image: cirrusci/windowsservercore:2019
-    os_version: 2019
-  install_script: choco install -y erlang
-  test_script: |
-    ./bootstrap
-    ./rebar3 ct
+# Windows CI appears broken for now and never passes
+#windows_test_task:
+#  windows_container:
+#    image: cirrusci/windowsservercore:2019
+#    os_version: 2019
+#  install_script: choco install -y erlang
+#  test_script: |
+#    ./bootstrap
+#    ./rebar3 ct
