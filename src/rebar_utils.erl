@@ -729,7 +729,7 @@ vcs_vsn(AppInfo, Vcs, State) ->
         {plain, VsnString} ->
             VsnString;
         {cmd, CmdString} ->
-            vcs_vsn_invoke(CmdString, rebar_app_info:dir(AppInfo));
+            cmd_vsn_invoke(CmdString, rebar_app_info:dir(AppInfo));
         unknown ->
             ?ABORT("vcs_vsn: Unknown vsn format: ~p", [Vcs]);
         {error, Reason} ->
@@ -743,8 +743,14 @@ vcs_vsn_cmd(AppInfo, VCS, State) when VCS =:= semver ; VCS =:= "semver" ->
     vcs_vsn_cmd(AppInfo, git, State);
 vcs_vsn_cmd(_AppInfo, {cmd, _Cmd}=Custom, _) ->
     Custom;
+vcs_vsn_cmd(AppInfo, {file, File}, _) ->
+    Path = filename:join(rebar_app_info:dir(AppInfo), File),
+    {ok, Vsn} = file:read_file(Path),
+    {plain, to_list(rebar_string:trim(Vsn))};
 vcs_vsn_cmd(AppInfo, VCS, State) when is_atom(VCS) ->
     rebar_resource_v2:make_vsn(AppInfo, VCS, State);
+vcs_vsn_cmd(AppInfo, {VCS, _}=V, State) when is_atom(VCS) ->
+    rebar_resource_v2:make_vsn(AppInfo, V, State);
 vcs_vsn_cmd(AppInfo, VCS, State) when is_list(VCS) ->
     try list_to_existing_atom(VCS) of
         AVCS ->
@@ -759,7 +765,7 @@ vcs_vsn_cmd(AppInfo, VCS, State) when is_list(VCS) ->
 vcs_vsn_cmd(_, _, _) ->
     unknown.
 
-vcs_vsn_invoke(Cmd, Dir) ->
+cmd_vsn_invoke(Cmd, Dir) ->
     {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),
     rebar_string:trim(VsnString, trailing, "\n").
 
