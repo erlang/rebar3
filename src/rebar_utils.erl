@@ -972,7 +972,7 @@ get_proxy_auth() ->
         {ok, ProxyAuth} -> ProxyAuth
     end.
 
--spec rebar_utils:is_list_of_strings(term()) -> boolean().
+-spec is_list_of_strings(term()) -> boolean().
 is_list_of_strings(List) when not is_list(hd(List)) ->
     false;
 is_list_of_strings(List) when is_list(hd(List)) ->
