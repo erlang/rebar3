@@ -29,7 +29,7 @@ end_per_testcase(_Name, Config) ->
     Config.
 
 all() ->
-    [noop, resource_plugins, alias_clash, grisp_explode, compile_deps].
+    [noop, resource_plugins, alias_clash, grisp_explode, compile_deps, umbrella_deps].
 
 %groups() ->
 %    [{plugins, [shuffle], []},
@@ -90,6 +90,11 @@ compile_deps(Config) ->
 
     {ok, Beams} = file:list_dir(EbinDir),
     ?assert(length(Beams) > 1).
+
+umbrella_deps() ->
+	[{doc, "Allow included projects to depend on each other"}].
+umbrella_deps(Config) ->
+	rebar3("compile", Config).
 
 
 %%%%%%%%%%%%%%%
