@@ -53,10 +53,15 @@ format_error(Reason) ->
 
 build_locks(State) ->
     AllDeps = rebar_state:lock(State),
+    ProjectApps = [rebar_app_info:name(P) || P <- rebar_state:project_apps(State)],
     [begin
         %% If source is tuple it is a source dep
         %% e.g. {git, "git://github.com/ninenines/cowboy.git", "master"}
         {rebar_app_info:name(Dep),
          rebar_fetch:lock_source(Dep, State),
          rebar_app_info:dep_level(Dep)}
-     end || Dep <- AllDeps, not(rebar_app_info:is_checkout(Dep))].
+     end ||
+     Dep <- AllDeps,
+     not rebar_app_info:is_checkout(Dep),
+     not lists:member(rebar_app_info:name(Dep), ProjectApps)
+    ].

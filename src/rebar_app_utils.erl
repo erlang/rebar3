@@ -274,7 +274,14 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
 -spec expand_deps_sources(rebar_app_info:t(), rebar_state:t()) ->
     rebar_app_info:t().
 expand_deps_sources(Dep, State) ->
-    update_source(Dep, rebar_app_info:source(Dep), State).
+    ProjectApps = [rebar_app_info:name(P) || P <- rebar_state:project_apps(State)],
+    DepName = rebar_app_info:name(Dep),
+    case lists:member(DepName, ProjectApps) of
+        true ->
+            Dep;
+        _ ->
+            update_source(Dep, rebar_app_info:source(Dep), State)
+    end.
 
 %% @doc sets the source for a given dependency or app along with metadata
 %% around version if required.
