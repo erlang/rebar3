@@ -111,4 +111,6 @@ find_app_by_name(Name, Apps) ->
 all_apps_deps(App) ->
     Applications = lists:usort([atom_to_binary(X, utf8) || X <- rebar_app_info:applications(App)]),
     Deps = lists:usort(lists:map(fun({Name, _}) -> Name; (Name) -> Name end, rebar_app_info:deps(App))),
+    ?INFO("Deps: ~p", [Deps]),
+    ?INFO("Apps: ~p", [Applications]),
     lists:umerge(Deps, Applications).

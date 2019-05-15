@@ -424,6 +424,9 @@ deps(#app_info_t{deps=Deps}) ->
 %% @doc sets the list of dependencies.
 -spec deps(t(), list()) -> t().
 deps(AppInfo=#app_info_t{}, Deps) ->
+    ?INFO("Setting deps for ~p to ~p",
+        [AppInfo#app_info_t.name, Deps]
+    ),
     AppInfo#app_info_t{deps=Deps}.
 
 %% @doc returns the level the app has in the lock files or in the

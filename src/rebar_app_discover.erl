@@ -56,6 +56,8 @@ do(State, LibDirs) ->
                                 OutDir = filename:join(DepsDir, Name),
                                 AppInfo2 = rebar_app_info:out_dir(AppInfo1, OutDir),
                                 ProjectDeps1 = lists:delete(Name, ProjectDeps),
+                                CurrentDeps = rebar_app_info:deps(AppInfo2),
+                                ?INFO("Deps for ~p: ~p, ~p", [Name, ProjectDeps1, CurrentDeps]),
                                 rebar_state:project_apps(StateAcc1
                                                         ,rebar_app_info:deps(AppInfo2, ProjectDeps1));
                             false ->
@@ -129,7 +131,9 @@ handle_profile(Profile, Name, AppInfo, State) ->
     TopParsedDeps = rebar_state:get(State, {parsed_deps, Profile}, {[], []}),
     TopLevelProfileDeps = rebar_state:get(State, {deps, Profile}, []),
     AppProfileDeps = rebar_app_info:get(AppInfo, {deps, Profile}, []),
-    AppProfileDeps2 = rebar_utils:tup_dedup(AppProfileDeps),
+    AppProfileDeps1 = rebar_app_info:get(AppInfo, deps, []),
+    ?INFO("handle_profile: ~p", [AppProfileDeps1]),
+    AppProfileDeps2 = rebar_utils:tup_dedup(AppProfileDeps ++ AppProfileDeps1),
     ProfileDeps2 = rebar_utils:tup_dedup(rebar_utils:tup_umerge(TopLevelProfileDeps
                                                                ,AppProfileDeps2)),
     State1 = rebar_state:set(State, {deps, Profile}, ProfileDeps2),
@@ -138,6 +142,7 @@ handle_profile(Profile, Name, AppInfo, State) ->
     %% to be included in the parsed deps
     NewDeps = ProfileDeps2 -- TopLevelProfileDeps,
     ParsedDeps = parse_profile_deps(Profile, Name, NewDeps, rebar_app_info:opts(AppInfo), State1),
+    ?INFO("Parsed deps: ~p", [[rebar_app_info:name(T) || T <- ParsedDeps]]),
     State2 = rebar_state:set(State1, {deps, Profile}, ProfileDeps2),
     rebar_state:set(State2, {parsed_deps, Profile}, TopParsedDeps++ParsedDeps).
 
