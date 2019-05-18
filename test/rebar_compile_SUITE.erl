@@ -42,7 +42,8 @@ all() ->
      recompile_when_erl_compiler_options_env_changes,
      rebar_config_os_var,
 
-     app_file_linting].
+     app_file_linting,
+     app_file_linting_config].
 
 groups() ->
     [{basic_app, [], [build_basic_app, paths_basic_app, clean_basic_app]},
@@ -2359,6 +2360,40 @@ app_file_linting(Config) ->
     ?assert(none /= proplists:lookup("~p is missing kernel from applications list", Warnings)),
     ?assert(none /= proplists:lookup("~p is missing stdlib from applications list", Warnings)).
 
+app_file_linting_config(Config) ->
+    meck:new(rebar_log, [no_link, passthrough]),
+    AppDir = ?config(apps, Config),
+    Name = rebar_test_utils:create_random_name("app_file_linting_config"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    %% Create a dependency with empty applications field in app.src
+    DepName = "dep_a",
+    CheckoutsDir = ?config(checkouts, Config),
+    DepDir = filename:join([CheckoutsDir,DepName]),
+    rebar_test_utils:create_app(DepDir, DepName, "1.0.0", []),
+    Deps = [list_to_atom(DepName)],
+
+    %% Disable appfile linting of deps
+    RebarConfig0 = [{deps, Deps},
+                    {overrides, [{override, [{lint_app_file, false}]}]}],
+    _ = rebar_test_utils:run_and_check(Config, RebarConfig0, ["compile"], return),
+    History0 = meck:history(rebar_log),
+    Warnings0 = [{Str, Args} || {_, {rebar_log, log, [warn, Str, Args]}, _} <- History0],
+    %% main app.src is missing description
+    ?assert(none /= proplists:lookup("~p is missing description entry", Warnings0)),
+    %% kernel and stdlib is missing from dep_a.app.src but warning is suppressed
+    ?assert(none =:= proplists:lookup("~p is missing kernel from applications list", Warnings0)),
+    ?assert(none =:= proplists:lookup("~p is missing stdlib from applications list", Warnings0)),
+
+    %% Enable appfile linting of deps (default behaviour)
+    RebarConfig1 = [{deps, Deps}],
+    _ = rebar_test_utils:run_and_check(Config, RebarConfig1, ["compile"], return),
+    History1 = meck:history(rebar_log),
+    Warnings1 = [{Str, Args} || {_, {rebar_log, log, [warn, Str, Args]}, _} <- History1],
+    ?assert(none /= proplists:lookup("~p is missing description entry", Warnings1)),
+    %% Expect warning as kernel and stdlib is missing from dep_a.app.src
+    ?assert(none /= proplists:lookup("~p is missing kernel from applications list", Warnings1)),
+    ?assert(none /= proplists:lookup("~p is missing stdlib from applications list", Warnings1)).
 %%
 
 %% a copy of lib/parsetools/include/yeccpre.hrl so we can test yrl includefile

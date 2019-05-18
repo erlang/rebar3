@@ -75,12 +75,22 @@ validate_app(State, App) ->
         {ok, [{application, AppName, AppData}]} ->
             case validate_name(AppName, AppFile) of
                 ok ->
+                    lint_app_file(App, AppData, AppFile),
                     validate_app_modules(State, App, AppData);
                 Error ->
                     Error
             end;
         {error, Reason} ->
             ?PRV_ERROR({file_read, rebar_app_info:name(App), ".app", Reason})
+    end.
+
+lint_app_file(App, AppData, AppFile) ->
+    AppOpts = rebar_app_info:opts(App),
+    case rebar_opts:get(AppOpts, lint_app_file, true) of
+        true ->
+            rebar_app_utils:lint_app_file(AppData, AppFile);
+        false ->
+            ok
     end.
 
 validate_app_modules(State, App, AppData) ->

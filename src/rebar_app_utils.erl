@@ -32,6 +32,7 @@
          app_src_to_app/2,
          validate_application_info/1,
          validate_application_info/2,
+         lint_app_file/2,
          parse_deps/5,
          parse_deps/6,
          parse_dep/6,
@@ -101,7 +102,6 @@ validate_application_info(AppInfo, AppDetail) ->
         undefined ->
             false;
         AppFile ->
-            lint_detail(AppDetail, AppFile),
             case proplists:get_value(modules, AppDetail) of
                 undefined ->
                     ?PRV_ERROR({module_list, AppFile});
@@ -110,8 +110,8 @@ validate_application_info(AppInfo, AppDetail) ->
             end
     end.
 
--spec lint_detail(list(), file:filename_all()) -> ok.
-lint_detail(AppDetail, AppFile) ->
+-spec lint_app_file(list(), file:filename_all()) -> ok.
+lint_app_file(AppDetail, AppFile) ->
     lint_description(AppDetail, AppFile),
     lint_applications(AppDetail, AppFile).
 
