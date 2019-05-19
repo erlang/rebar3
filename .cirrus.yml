@@ -1,11 +1,11 @@
 test_task:
   container:
     matrix:
+      - image: erlang:22
       - image: erlang:21
       - image: erlang:20
       - image: erlang:19
       - image: erlang:18
-      - image: erlang:17
   test_script: |
     ./bootstrap
     ./rebar3 ct

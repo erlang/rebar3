@@ -55,23 +55,9 @@
                    state :: term(),
                    implementation :: rebar_resource | rebar_resource_v2}).
 
--ifdef(namespaced_types).
 -type rebar_dict() :: dict:dict().
--else.
--type rebar_dict() :: dict().
--endif.
-
--ifdef(namespaced_types).
 -type rebar_digraph() :: digraph:graph().
--else.
--type rebar_digraph() :: digraph().
--endif.
-
--ifdef(namespaced_types).
 -type rebar_set() :: sets:set().
--else.
--type rebar_set() :: set().
--endif.
 
 -ifdef(fun_stacktrace).
 -define(WITH_STACKTRACE(T, R, S), T:R -> S = erlang:get_stacktrace(),).
