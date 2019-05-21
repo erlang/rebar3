@@ -45,6 +45,8 @@ do(State) ->
     ProjectPlugins = rebar_state:get(State, project_plugins, []),
     PluginsDirs = filelib:wildcard(filename:join(rebar_dir:plugins_dir(State), "*")),
     CheckoutsDirs = filelib:wildcard(filename:join(rebar_dir:checkouts_dir(State), "*")),
+    CheckoutsDirs =
+        lists:concat([ filelib:wildcard(filename:join(Dir, "*")) || Dir <- rebar_dir:checkouts_dir(State) ]),
     Apps = rebar_app_discover:find_apps(CheckoutsDirs++PluginsDirs, SrcDirs, all, State),
     display_plugins("Local plugins", Apps, Plugins ++ ProjectPlugins),
     {ok, State}.

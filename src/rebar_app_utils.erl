@@ -247,8 +247,8 @@ parse_dep(_, Dep, _, _, _) ->
       IsLock :: boolean(),
       State :: rebar_state:t().
 dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
-    CheckoutsDir = rebar_utils:to_list(rebar_dir:checkouts_dir(State, Name)),
-    AppInfo = case rebar_app_info:discover(CheckoutsDir) of
+    CheckoutsDirs = [ rebar_utils:to_list(Dir) || Dir <- rebar_dir:checkouts_dir(State, Name) ],
+    AppInfo = case discover(CheckoutsDirs) of
                   {ok, App} ->
                       rebar_app_info:source(rebar_app_info:is_checkout(App, true), checkout);
                   not_found ->
@@ -268,6 +268,14 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
     AppInfo2 = rebar_app_info:set(AppInfo, overrides, Overrides),
     AppInfo5 = rebar_app_info:profiles(AppInfo2, [default]),
     rebar_app_info:is_lock(AppInfo5, IsLock).
+
+-spec discover([file:filename()]) -> {ok, rebar_app_info:t()} | not_found.
+discover([]) -> not_found;
+discover([Dir | Rest]) ->
+    case rebar_app_info:discover(Dir) of
+        {ok, _App} = R -> R;
+        not_found -> discover(Rest)
+    end.
 
 %% @doc Takes a given application app_info record along with the project.
 %% If the app is a package, resolve and expand the package definition.

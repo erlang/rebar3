@@ -70,16 +70,24 @@ deps_dir(DepsDir, App) ->
 root_dir(State) ->
     filename:absname(rebar_state:get(State, root_dir, ?DEFAULT_ROOT_DIR)).
 
-%% @doc returns the expected location of the `_checkouts' directory.
--spec checkouts_dir(rebar_state:t()) -> file:filename_all().
+%% @doc returns the expected locations of the `_checkouts' directories.
+-spec checkouts_dir(rebar_state:t()) -> [file:filename_all()].
 checkouts_dir(State) ->
-    filename:join(root_dir(State), rebar_state:get(State, checkouts_dir, ?DEFAULT_CHECKOUTS_DIR)).
+    case rebar_state:get(State, checkouts_dir, ?DEFAULT_CHECKOUTS_DIRS) of
+        [NoList | _] = SingleDir when not is_list(NoList) ->
+            %% backwards compatibility, having checkouts_dir set to a dir and not a list of dirs
+            [ rebar_file_utils:canonical_path(filename:join(root_dir(State), SingleDir)) ];
+        Dirs ->
+            [ rebar_file_utils:canonical_path(filename:join(root_dir(State), Dir))
+            || Dir <- Dirs ]
+    end.
 
 %% @doc returns the expected location of a given app in the checkouts
 %% directory for the project.
 -spec checkouts_dir(rebar_state:t(), file:filename_all()) -> file:filename_all().
 checkouts_dir(State, App) ->
-    filename:join(checkouts_dir(State), App).
+    [ filename:join(Dir, App)
+    || Dir <- checkouts_dir(State) ].
 
 %% @doc Returns the directory where plugins are located.
 -spec plugins_dir(rebar_state:t()) -> file:filename_all().

@@ -10,6 +10,7 @@
 -export([profile_src_dir_opts/1]).
 -export([retarget_path/1, alt_base_dir_abs/1, alt_base_dir_rel/1]).
 -export([global_cache_dir/1, default_global_cache_dir/1, overwrite_default_global_cache_dir/1]).
+-export([multiple_checkouts_dir/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -21,7 +22,7 @@ all() -> [default_src_dirs, default_extra_src_dirs, default_all_src_dirs,
           profile_src_dirs, profile_extra_src_dirs, profile_all_src_dirs,
           profile_src_dir_opts, top_src_dirs,
           retarget_path, alt_base_dir_abs, alt_base_dir_rel, global_cache_dir,
-          default_global_cache_dir, overwrite_default_global_cache_dir].
+          default_global_cache_dir, overwrite_default_global_cache_dir, multiple_checkouts_dir].
 
 init_per_testcase(default_global_cache_dir, Config) ->
     [{apps, AppsDir}, {checkouts, CheckoutsDir}, {state, _State} | Config] = rebar_test_utils:init_rebar_state(Config),
@@ -34,6 +35,8 @@ init_per_testcase(overwrite_default_global_cache_dir, Config) ->
     NewState = rebar_state:new([{base_dir, filename:join([AppsDir, "_build"])}
                             ,{root_dir, AppsDir}]),
     [{apps, AppsDir}, {checkouts, CheckoutsDir}, {state, NewState} | Config];
+init_per_testcase(multiple_checkouts_dir, Config) ->
+    rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(_, Config) ->
     C = rebar_test_utils:init_rebar_state(Config),
     AppDir = ?config(apps, C),
@@ -282,3 +285,8 @@ overwrite_default_global_cache_dir(Config) ->
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
     Expected = ?config(priv_dir, Config),
     ?assertEqual(Expected, rebar_dir:global_cache_dir(rebar_state:opts(State))).
+
+multiple_checkouts_dir(Config) ->
+    CheckoutsDir = ?config(checkouts, Config),
+    RebarConfig = [{checkouts_dir, [CheckoutsDir, CheckoutsDir]}],
+    {ok, _State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return).

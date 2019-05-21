@@ -41,7 +41,7 @@ create_env(State, Opts) ->
         {"REBAR_DEPS_DIR",          filename:absname(rebar_dir:deps_dir(State))},
         {"REBAR_BUILD_DIR",         filename:absname(rebar_dir:base_dir(State))},
         {"REBAR_ROOT_DIR",          filename:absname(rebar_dir:root_dir(State))},
-        {"REBAR_CHECKOUTS_DIR",     filename:absname(rebar_dir:checkouts_dir(State))},
+        {"REBAR_CHECKOUTS_DIR",     build_checkout_dir_env(State)},
         {"REBAR_PLUGINS_DIR",       filename:absname(rebar_dir:plugins_dir(State))},
         {"REBAR_GLOBAL_CONFIG_DIR", filename:absname(rebar_dir:global_config_dir(State))},
         {"REBAR_GLOBAL_CACHE_DIR",  filename:absname(rebar_dir:global_cache_dir(Opts))},
@@ -57,6 +57,11 @@ create_env(State, Opts) ->
     ],
     EInterfaceVars = create_erl_interface_env(),
     lists:append([EnvVars, EInterfaceVars]).
+
+-spec build_checkout_dir_env(rebar_state:t()) -> string().
+build_checkout_dir_env(State) ->
+    Paths = [filename:absname(Dir) || Dir <- rebar_dir:checkouts_dir(State)],
+    string:join(Paths, ":").
 
 -spec create_erl_interface_env() -> list().
 create_erl_interface_env() ->

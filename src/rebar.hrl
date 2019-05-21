@@ -17,7 +17,7 @@
 -define(DEFAULT_BASE_DIR, "_build").
 -define(DEFAULT_ROOT_DIR, ".").
 -define(DEFAULT_PROJECT_APP_DIRS, ["apps/*", "lib/*", "."]).
--define(DEFAULT_CHECKOUTS_DIR, "_checkouts").
+-define(DEFAULT_CHECKOUTS_DIRS, ["_checkouts"]).
 -define(DEFAULT_DEPS_DIR, "lib").
 -define(DEFAULT_PLUGINS_DIR, "plugins").
 -define(DEFAULT_TEST_DEPS_DIR, "test/lib").
