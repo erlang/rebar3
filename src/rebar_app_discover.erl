@@ -52,7 +52,7 @@ do(State, LibDirs) ->
                         Name = rebar_app_info:name(AppInfo),
                         case enable(State, AppInfo) of
                             true ->
-                                {AppInfo1, StateAcc1} = merge_opts(AppInfo, StateAcc),
+                                {AppInfo1, StateAcc1} = merge_opts(TopLevelApp, AppInfo, StateAcc),
                                 OutDir = filename:join(DepsDir, Name),
                                 AppInfo2 = rebar_app_info:out_dir(AppInfo1, OutDir),
                                 ProjectDeps1 = lists:delete(Name, ProjectDeps),
@@ -91,9 +91,9 @@ format_error({missing_module, Module}) ->
 %% some configuration like erl_opts must be merged into a subapp's opts
 %% while plugins and hooks need to be kept defined to only either the
 %% top level state or an individual application.
--spec merge_opts(rebar_app_info:t(), rebar_state:t()) ->
+-spec merge_opts(root | binary(), rebar_app_info:t(), rebar_state:t()) ->
     {rebar_app_info:t(), rebar_state:t()}.
-merge_opts(AppInfo, State) ->
+merge_opts(TopLevelApp, AppInfo, State) ->
     %% These steps make sure that hooks and artifacts are run in the context of
     %% the application they are defined at. If an umbrella structure is used and
     %% they are defined at the top level they will instead run in the context of
@@ -104,7 +104,12 @@ merge_opts(AppInfo, State) ->
     Name = rebar_app_info:name(AppInfo1),
 
     %% We reset the opts here to default so no profiles are applied multiple times
-    AppInfo2 = rebar_app_info:apply_overrides(rebar_state:get(State1, overrides, []), AppInfo1),
+    AppInfo2 = case TopLevelApp of
+        Name -> % don't apply to the root app
+            AppInfo;
+        _ -> % apply overrides when in an umbrella project or on deps
+            rebar_app_info:apply_overrides(rebar_state:get(State1, overrides, []), AppInfo1)
+    end,
     AppInfo3 = rebar_app_info:apply_profiles(AppInfo2, CurrentProfiles),
 
     %% Will throw an exception if checks fail
