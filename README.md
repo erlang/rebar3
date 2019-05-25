@@ -1,6 +1,6 @@
 # Rebar3
 
-[![Build Status](https://travis-ci.org/erlang/rebar3.svg?branch=master)](https://travis-ci.org/erlang/rebar3) [![Windows build status](https://ci.appveyor.com/api/projects/status/yx4oitd9pvd2kab3?svg=true)](https://ci.appveyor.com/project/TristanSloughter/rebar3)
+[![Build Status](https://api.cirrus-ci.com/github/erlang/rebar3.svg)](https://cirrus-ci.com/github/erlang/rebar3) [![Windows build status](https://ci.appveyor.com/api/projects/status/yx4oitd9pvd2kab3?svg=true)](https://ci.appveyor.com/project/TristanSloughter/rebar3)
 
 1. [What is Rebar3?](#what-is-rebar3)
 2. [Why Rebar3?](#why-rebar3)
