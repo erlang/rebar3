@@ -88,6 +88,9 @@ init(State) ->
                         {start_clean, undefined, "start-clean", boolean,
                          "Cancel any applications in the 'apps' list "
                          "or release."},
+                        {env_file, undefined, "env-file", string,
+                         "Path to file of os environment variables to setup "
+                         "before expanding vars in config files."},
                         {user_drv_args, undefined, "user_drv_args", string,
                          "Arguments passed to user_drv start function for "
                          "creating custom shells."}]}
@@ -309,6 +312,7 @@ run_script_file(File) ->
     Result.
 
 maybe_boot_apps(State) ->
+    _ = maybe_set_env_vars(State),
     case find_apps_to_boot(State) of
         undefined ->
             %% try to read in sys.config file
@@ -576,6 +580,45 @@ consult_env_config(State, Filename) ->
         [Terms] ->
             rebar_file_utils:consult_config_terms(State, Terms)
     end.
+
+maybe_set_env_vars(State) ->
+    EnvFile =debug_get_value(env_file, rebar_state:get(State, shell, []), undefined,
+                             "Found env_file from config."),
+    {Opts, _} = rebar_state:command_parsed_args(State),
+    EnvFile1 = debug_get_value(env_file, Opts, EnvFile,
+                               "Found env_file from command line option."),
+
+    case maybe_read_file(EnvFile1) of
+        ignore ->
+            ok;
+        {error, _} ->
+            ?WARN("Failed to read file with environment variables: ~p", [EnvFile1]);
+        {ok, Bin} ->
+            Lines = string:split(unicode:characters_to_list(Bin), "\n", all),
+            [handle_env_var_line(Line) || Line <- Lines]
+    end.
+
+handle_env_var_line(Line) ->
+    Trimmed = rebar_string:trim(Line, both, [$\s]),
+    %% ignore lines starting with # and
+    %% fail if there are spaces around =
+    case re:run(Trimmed, "^(?<key>[^#][^\s=]*)=(?<value>[^\s]\.*)",
+                [{capture, [key, value], list}, unicode]) of
+        {match, [Key, Value]} ->
+            os:putenv(Key, Value);
+        _ ->
+            case Trimmed of
+                [$# | _] -> ignore;
+                [] -> ignore;
+                Other ->
+                    ?WARN("Unable to parse environment variable from this line: ~ts", [Other])
+            end
+    end.
+
+maybe_read_file(undefined) ->
+    ignore;
+maybe_read_file(EnvFile) ->
+    file:read_file(EnvFile).
 
 %% @doc quick and simple variable substitution writeup.
 %% Supports `${varname}' but not `$varname' nor nested
