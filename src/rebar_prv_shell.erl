@@ -599,7 +599,7 @@ maybe_set_env_vars(State) ->
     end.
 
 handle_env_var_line(Line) ->
-    Trimmed = string:trim(Line, both, [$ ]),
+    Trimmed = rebar_string:trim(Line, both, [$\s]),
     %% ignore lines starting with # and
     %% fail if there are spaces around =
     case re:run(Trimmed, "^(?<key>[^#][^\s=]*)=(?<value>[^\s]\.*)",
