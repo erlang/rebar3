@@ -460,7 +460,7 @@ reread_config(ConfigList, Opts) ->
     %% NB: we attempt to mimic -config here, which survives app reload,
     %% hence {persistent, true}.
     SetEnv = case version_tuple(?MODULE:otp_release()) of
-        {X, _, _} when X =< 17 ->
+        {X, _, _} when X < 17 ->
             fun application:set_env/3;
         _ ->
             fun (App, Key, Val) -> application:set_env(App, Key, Val, [{persistent, true}]) end
