@@ -26,7 +26,8 @@ nightly_task:
     - test
   only_if: $BRANCH == "master"
   script: |
-    apt install s3cmd
+    apt-get update
+    apt-get install -y s3cmd
     ./bootstrap
     s3cmd --access_key=$ACCESS_KEY --secret_key=$SECRET_KEY put ./rebar3 s3://rebar3-nightly
   environment:
@@ -40,7 +41,8 @@ release_task:
     - test
   only_if: $CIRRUS_RELEASE != ""
   script: |
-    apt install s3cmd
+    apt-get update
+    apt-get install -y s3cmd
     ./bootstrap
     s3cmd --access_key=$ACCESS_KEY --secret_key=$SECRET_KEY put ./rebar3 s3://rebar3
 
