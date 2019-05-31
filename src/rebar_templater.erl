@@ -162,7 +162,14 @@ create({Template, Type, File}, Files, UserVars, Force, State) ->
     Vars = drop_var_docs(override_vars(UserVars, get_template_vars(TemplateTerms, State))),
     maybe_warn_about_name(Vars),
     TemplateCwd = filename:dirname(File),
-    execute_template(TemplateTerms, Files, {Template, Type, TemplateCwd}, Vars, Force).
+    Result = execute_template(TemplateTerms, Files, {Template, Type, TemplateCwd}, Vars, Force),
+    maybe_print_final_message(proplists:get_value(message, TemplateTerms, undefined), Vars),
+    Result.
+
+maybe_print_final_message(undefined, _) ->
+    ok;
+maybe_print_final_message(Message, Values) ->
+    io:format("~s~n", [render(Message, Values)]).
 
 maybe_warn_about_name(Vars) ->
     Name = proplists:get_value(name, Vars, "valid"),
@@ -197,6 +204,9 @@ execute_template([{description, _} | Terms], Files, Template, Vars, Force) ->
     execute_template(Terms, Files, Template, Vars, Force);
 %% We can't execute variables
 execute_template([{variables, _} | Terms], Files, Template, Vars, Force) ->
+    execute_template(Terms, Files, Template, Vars, Force);
+%% We can't execute message
+execute_template([{message, _} | Terms], Files, Template, Vars, Force) ->
     execute_template(Terms, Files, Template, Vars, Force);
 %% Create a directory
 execute_template([{dir, Path} | Terms], Files, Template, Vars, Force) ->
