@@ -39,7 +39,7 @@ release_task:
     image: erlang:18
   depends_on:
     - test
-  only_if: $CIRRUS_RELEASE != ""
+  only_if: $CIRRUS_TAG != ''
   script: |
     apt-get update
     apt-get install -y s3cmd
