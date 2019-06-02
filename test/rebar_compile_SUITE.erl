@@ -41,7 +41,6 @@ all() ->
      dont_recompile_when_erl_compiler_options_env_does_not_change,
      recompile_when_erl_compiler_options_env_changes,
      rebar_config_os_var,
-
      app_file_linting].
 
 groups() ->
