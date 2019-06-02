@@ -167,7 +167,6 @@ maybe_show_warning(State) ->
 %% that makes sense.
 -spec refresh_paths(rebar_state:t()) -> ok.
 refresh_paths(RState) ->
-    
     RefreshPaths = application:get_env(rebar, refresh_paths, [all_deps, test]),
     ToRefresh = parse_refresh_paths(RefreshPaths, RState, []),
     %% Modules from apps we can't reload without breaking functionality
@@ -201,17 +200,38 @@ refresh_path(Path, Blacklist) ->
                         false ->
                             refresh_path_do(Path, App);
                         true ->
-                            ?DEBUG("skipping app ~p, stable copy required", [App])
+                            refresh_path_blacklisted(Path)
                     end
             end
     end.
+
 refresh_path_do(Path, App) ->
-    Files = filelib:wildcard(filename:join([Path, "*.beam"])),
-    Modules = [list_to_atom(filename:basename(F, ".beam"))
-        || F <- Files],
+    Modules = mods_in_path(Path),
     ?DEBUG("reloading ~p from ~ts", [Modules, Path]),
     code:replace_path(App, Path),
     reload_modules(Modules).
+
+%% @private blacklisted paths are not reloaded, but if they were not loaded
+%% already, we try and ensure they are loaded once. This is a soft operation
+%% that does not provoke crashes in existing processes, but hides issues
+%% as seen in issue #2013 comments where some loaded modules that are currently
+%% run by no processes get unloaded by rebar_paths, without being loaded back in.
+refresh_path_blacklisted(Path) ->
+    Modules = [M || M <- mods_in_path(Path), not is_loaded(M)],
+    ?DEBUG("ensure ~p loaded", [Modules]),
+    code:add_pathz(Path), % in case the module is only in a new non-clashing path
+     _ = [code:ensure_loaded(M) || M <- Modules],
+    ok.
+
+%% @private fetch module names from a given directory that contains
+%% pre-build beam files.
+mods_in_path(Path) ->
+    Files = filelib:wildcard(filename:join([Path, "*.beam"])),
+    [list_to_atom(filename:basename(F, ".beam")) || F <- Files].
+
+%% @private check that a module is already loaded
+is_loaded(Mod) ->
+    code:is_loaded(Mod) =/= false.
 
 %% @private parse refresh_paths option
 %% no_deps means only project_apps's ebin path
