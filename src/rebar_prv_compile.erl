@@ -247,6 +247,7 @@ has_all_artifacts(AppInfo1) ->
         {false, File} ->
             throw(?PRV_ERROR({missing_artifact, File}));
         true ->
+            rebar_app_utils:lint_app_info(AppInfo1),
             true
     end.
 

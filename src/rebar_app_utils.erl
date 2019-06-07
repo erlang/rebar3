@@ -37,6 +37,7 @@
          parse_dep/6,
          expand_deps_sources/2,
          dep_to_app/7,
+         lint_app_info/1,
          format_error/1]).
 
 -include("rebar.hrl").
@@ -101,7 +102,6 @@ validate_application_info(AppInfo, AppDetail) ->
         undefined ->
             false;
         AppFile ->
-            lint_detail(AppDetail, AppFile),
             case proplists:get_value(modules, AppDetail) of
                 undefined ->
                     ?PRV_ERROR({module_list, AppFile});
@@ -109,6 +109,11 @@ validate_application_info(AppInfo, AppDetail) ->
                     has_all_beams(EbinDir, List)
             end
     end.
+
+lint_app_info(AppInfo) ->
+    AppDetails = rebar_app_info:app_details(AppInfo),
+    AppFile = rebar_app_info:app_file(AppInfo),
+    lint_detail(AppDetails, AppFile).
 
 -spec lint_detail(list(), file:filename_all()) -> ok.
 lint_detail(AppDetail, AppFile) ->
