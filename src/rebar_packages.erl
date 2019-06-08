@@ -74,13 +74,23 @@ get_package(Dep, Vsn, undefined, Repos, Table, State) ->
     get_package(Dep, Vsn, '_', Repos, Table, State);
 get_package(Dep, Vsn, Hash, Repos, Table, State) ->
     ?MODULE:verify_table(State),
-    case ets:select(Table, [{#package{key={Dep, ec_semver:parse(Vsn), Repo},
-                                      checksum=Hash,
-                                      _='_'}, [], ['$_']} || Repo <- Repos]) of
+    MatchingPackages = ets:select(Table, [{#package{key={Dep, ec_semver:parse(Vsn), Repo},
+                                      _='_'}, [], ['$_']} || Repo <- Repos]),
+    PackagesWithProperHash = lists:filter(
+        fun(#package{key = {_Dep, _Vsn, Repo}, checksum = PkgChecksum}) ->
+            if (PkgChecksum =/= Hash) andalso (Hash =/= '_') ->
+                ?WARN("Checksum mismatch for package ~ts-~ts from repo ~ts", [Dep, Vsn, Repo]),
+                false;
+            true ->
+                true
+            end
+        end, MatchingPackages
+    ),
+    case PackagesWithProperHash of
         %% have to allow multiple matches in the list for cases that Repo is `_`
         [Package | _] ->
             {ok, Package};
-        _ ->
+        [] ->
             not_found
     end.
 
@@ -249,7 +259,7 @@ update_package(Name, RepoConfig=#{name := Repo}, State) ->
         Error ->
             ?DEBUG("Hex get_package request failed: ~p", [Error]),
             %% TODO: add better log message. r3_hex_core should export a format_error
-            ?WARN("Failed to update package from repo ~ts", [Repo]),
+            ?WARN("Failed to update package ~ts from repo ~ts", [Name, Repo]),
             fail
     catch
         _:Exception ->
