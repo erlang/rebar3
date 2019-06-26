@@ -74,11 +74,15 @@ needed_files(Graph, FoundFiles, _, AppInfo) ->
      {OtherErls, ErlOpts ++ AdditionalOpts}}.
 
 dependencies(Source, SourceDir, Dirs) ->
-    {ok, Fd} = file:open(Source, [read]),
-    Incls = parse_attrs(Fd, [], SourceDir),
-    AbsIncls = expand_file_names(Incls, Dirs),
-    ok = file:close(Fd),
-    AbsIncls.
+    case file:open(Source, [read]) of
+        {ok, Fd} ->
+            Incls = parse_attrs(Fd, [], SourceDir),
+            AbsIncls = expand_file_names(Incls, Dirs),
+            ok = file:close(Fd),
+            AbsIncls;
+        {error, Reason} ->
+            throw({cannot_read_file, Source, file:format_error(Reason)})
+    end.
 
 compile(Source, [{_, OutDir}], Config, ErlOpts) ->
     case compile:file(Source, [{outdir, OutDir} | ErlOpts]) of
