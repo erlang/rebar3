@@ -6,9 +6,11 @@
          needed_files/4,
          dependencies/3,
          compile/4,
-         clean/2]).
+         clean/2,
+         format_error/1]).
 
 -include("rebar.hrl").
+-include_lib("providers/include/providers.hrl").
 
 context(AppInfo) ->
     EbinDir = rebar_app_info:ebin_dir(AppInfo),
@@ -74,11 +76,15 @@ needed_files(Graph, FoundFiles, _, AppInfo) ->
      {OtherErls, ErlOpts ++ AdditionalOpts}}.
 
 dependencies(Source, SourceDir, Dirs) ->
-    {ok, Fd} = file:open(Source, [read]),
-    Incls = parse_attrs(Fd, [], SourceDir),
-    AbsIncls = expand_file_names(Incls, Dirs),
-    ok = file:close(Fd),
-    AbsIncls.
+    case file:open(Source, [read]) of
+        {ok, Fd} ->
+            Incls = parse_attrs(Fd, [], SourceDir),
+            AbsIncls = expand_file_names(Incls, Dirs),
+            ok = file:close(Fd),
+            AbsIncls;
+        {error, Reason} ->
+            throw(?PRV_ERROR({cannot_read_file, Source, file:format_error(Reason)}))
+    end.
 
 compile(Source, [{_, OutDir}], Config, ErlOpts) ->
     case compile:file(Source, [{outdir, OutDir} | ErlOpts]) of
@@ -363,3 +369,8 @@ warn_and_find_path(File, Dir) ->
                     []
             end
     end.
+
+format_error({cannot_read_file, Source, Reason}) ->
+    lists:flatten(io_lib:format("Cannot read file '~s': ~s", [Source, Reason]));
+format_error(Other) ->
+    io_lib:format("~p", [Other]).
