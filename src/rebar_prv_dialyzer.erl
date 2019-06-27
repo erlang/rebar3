@@ -474,6 +474,13 @@ proj_files(State) ->
     get_files(State, Apps, PltApps, [], PltMods).
 
 run_dialyzer(State, Opts, Output) ->
+    case debug_info(State) of
+        true ->
+            ok;
+        false ->
+            ?WARN("Add {erl_opts, [debug_info]} to rebar.config if Dialyzer fails to load Core Erlang.", []),
+            ok
+    end,
     %% dialyzer may return callgraph warnings when get_warnings is false
     case proplists:get_bool(get_warnings, Opts) of
         true ->
@@ -538,6 +545,10 @@ no_warnings() ->
 get_config(State, Key, Default) ->
     Config = rebar_state:get(State, dialyzer, []),
     proplists:get_value(Key, Config, Default).
+
+debug_info(State) ->
+    Config = rebar_state:get(State, erl_opts, []),
+    proplists:get_value(debug_info, Config, false).
 
 -spec collect_nested_dependent_apps([atom()]) -> [atom()].
 collect_nested_dependent_apps(RootApps) ->
