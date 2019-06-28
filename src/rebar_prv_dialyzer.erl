@@ -478,7 +478,7 @@ run_dialyzer(State, Opts, Output) ->
         true ->
             ok;
         false ->
-            ?WARN("Add {erl_opts, [debug_info]} to rebar.config if Dialyzer fails to load Core Erlang.", []),
+            ?WARN("Add debug_info to compiler options (erl_opts) if Dialyzer fails to load Core Erlang.", []),
             ok
     end,
     %% dialyzer may return callgraph warnings when get_warnings is false
@@ -548,7 +548,7 @@ get_config(State, Key, Default) ->
 
 debug_info(State) ->
     Config = rebar_state:get(State, erl_opts, []),
-    proplists:get_value(debug_info, Config, false).
+    proplists:get_value(debug_info, Config, true).
 
 -spec collect_nested_dependent_apps([atom()]) -> [atom()].
 collect_nested_dependent_apps(RootApps) ->
