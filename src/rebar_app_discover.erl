@@ -86,8 +86,8 @@ format_error({module_list, File}) ->
     io_lib:format("Error reading module list from ~p~n", [File]);
 format_error({missing_module, Module}) ->
     io_lib:format("Module defined in app file missing: ~p~n", [Module]);
-format_error({cannot_find_app_file, AppFile}) ->
-    io_lib:format("Cannot find app file: ~p~n", [AppFile]).
+format_error({cannot_read_app_file, AppFile}) ->
+    io_lib:format("Cannot read app file: ~p~n", [AppFile]).
 
 
 %% @doc merges configuration of a project app and the top level state
@@ -371,7 +371,7 @@ create_app_info(AppInfo, AppDir, AppFile) ->
                     end,
             rebar_app_info:dir(rebar_app_info:valid(AppInfo2, Valid), AppDir);
         [] ->
-            throw({error, {?MODULE, {cannot_find_app_file, AppFile}}})
+            throw({error, {?MODULE, {cannot_read_app_file, AppFile}}})
     end.
 
 %% @doc Read in and parse the .app file if it is availabe. Do the same for
