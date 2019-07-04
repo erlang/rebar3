@@ -71,7 +71,7 @@
                   all_plugin_deps     = []          :: [rebar_app_info:t()],
                   all_deps            = []          :: [rebar_app_info:t()],
 
-                  compilers           = []          :: [{compiler_type(), extension(), extension(), compile_fun()}],
+                  compilers           = []          :: [module()],
                   project_builders    = []          :: [{rebar_app_info:project_type(), module()}],
                   resources           = [],
                   providers           = [],
@@ -80,10 +80,6 @@
 -export_type([t/0]).
 
 -type t() :: #state_t{}.
-
--type compiler_type() :: atom().
--type extension() :: string().
--type compile_fun() :: fun(([file:filename()], rebar_app_info:t(), list()) -> ok).
 
 -spec new() -> t().
 new() ->
@@ -407,15 +403,31 @@ warn_old_resource(ResourceModule) ->
     ?WARN("Using custom resource ~s that implements a deprecated api. "
           "It should be upgraded to rebar_resource_v2.", [ResourceModule]).
 
+%% @doc get a list of all registered compiler modules, which should implement
+%% the `rebar_compiler' behaviour
+-spec compilers(t()) -> [module()].
 compilers(#state_t{compilers=Compilers}) ->
     Compilers.
 
+%% @doc register compiler modules prior to the existing ones. Each compiler
+%% module should implement the `rebar_compiler' behaviour. Use this when
+%% your custom compiler generates .erl files (or files of another type) and
+%% that should run before other compiler modules.
+-spec prepend_compilers(t(), [module()]) -> t().
 prepend_compilers(State=#state_t{compilers=Compilers}, NewCompilers) ->
     State#state_t{compilers=NewCompilers++Compilers}.
 
+%% @doc register compiler modules. Each compiler
+%% module should implement the `rebar_compiler' behaviour. Use this when
+%% your custom compiler generates binary artifacts and does not have
+%% a particular need to run before any other compiler.
+-spec append_compilers(t(), [module()]) -> t().
 append_compilers(State=#state_t{compilers=Compilers}, NewCompilers) ->
     State#state_t{compilers=Compilers++NewCompilers}.
 
+%% @private reset all compiler modules by replacing them by a list of
+%% modules that implement the `rebar_compiler' behaviour.
+-spec compilers(t(), [module()]) -> t().
 compilers(State, Compilers) ->
     State#state_t{compilers=Compilers}.
 
