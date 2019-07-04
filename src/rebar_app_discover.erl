@@ -85,7 +85,10 @@ define_root_app(Apps, State) ->
 format_error({module_list, File}) ->
     io_lib:format("Error reading module list from ~p~n", [File]);
 format_error({missing_module, Module}) ->
-    io_lib:format("Module defined in app file missing: ~p~n", [Module]).
+    io_lib:format("Module defined in app file missing: ~p~n", [Module]);
+format_error({cannot_read_app_file, AppFile}) ->
+    io_lib:format("Cannot read app file: ~p~n", [AppFile]).
+
 
 %% @doc merges configuration of a project app and the top level state
 %% some configuration like erl_opts must be merged into a subapp's opts
@@ -348,24 +351,28 @@ app_dir(AppFile) ->
 %% app file.
 -spec create_app_info(rebar_app_info:t(), file:name(), file:name()) -> rebar_app_info:t().
 create_app_info(AppInfo, AppDir, AppFile) ->
-    [{application, AppName, AppDetails}] = rebar_config:consult_app_file(AppFile),
-    AppVsn = proplists:get_value(vsn, AppDetails),
-    Applications = proplists:get_value(applications, AppDetails, []),
-    IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
-    AppInfo1 = rebar_app_info:name(
-                 rebar_app_info:original_vsn(
-                   rebar_app_info:dir(AppInfo, AppDir), AppVsn), AppName),
-    AppInfo2 = rebar_app_info:applications(
-                 rebar_app_info:app_details(AppInfo1, AppDetails),
-                 IncludedApplications++Applications),
-    Valid = case rebar_app_utils:validate_application_info(AppInfo2) =:= true
-                andalso rebar_app_info:has_all_artifacts(AppInfo2) =:= true of
-                true ->
-                    true;
-                _ ->
-                    false
-            end,
-    rebar_app_info:dir(rebar_app_info:valid(AppInfo2, Valid), AppDir).
+    case rebar_config:consult_app_file(AppFile) of
+        [{application, AppName, AppDetails}] ->
+            AppVsn = proplists:get_value(vsn, AppDetails),
+            Applications = proplists:get_value(applications, AppDetails, []),
+            IncludedApplications = proplists:get_value(included_applications, AppDetails, []),
+            AppInfo1 = rebar_app_info:name(
+                         rebar_app_info:original_vsn(
+                           rebar_app_info:dir(AppInfo, AppDir), AppVsn), AppName),
+            AppInfo2 = rebar_app_info:applications(
+                         rebar_app_info:app_details(AppInfo1, AppDetails),
+                         IncludedApplications++Applications),
+            Valid = case rebar_app_utils:validate_application_info(AppInfo2) =:= true
+                        andalso rebar_app_info:has_all_artifacts(AppInfo2) =:= true of
+                        true ->
+                            true;
+                        _ ->
+                            false
+                    end,
+            rebar_app_info:dir(rebar_app_info:valid(AppInfo2, Valid), AppDir);
+        [] ->
+            throw({error, {?MODULE, {cannot_read_app_file, AppFile}}})
+    end.
 
 %% @doc Read in and parse the .app file if it is availabe. Do the same for
 %% the .app.src file if it exists.
