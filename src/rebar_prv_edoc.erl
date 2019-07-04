@@ -45,7 +45,10 @@ do(State) ->
                     AppName = rebar_utils:to_list(rebar_app_info:name(AppInfo)),
                     ?INFO("Running edoc for ~ts", [AppName]),
                     AppDir = rebar_app_info:dir(AppInfo),
-                    AppRes = (catch edoc:application(list_to_atom(AppName), AppDir, EdocOptsAcc)),
+                    AppOpts = rebar_app_info:opts(AppInfo),
+                    %% order of the merge is important to allow app opts overrides
+                    AppEdocOpts = rebar_opts:get(AppOpts, edoc_opts, []) ++ EdocOptsAcc,
+                    AppRes = (catch edoc:application(list_to_atom(AppName), AppDir, AppEdocOpts)),
                     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, AppInfo, State),
                     case {AppRes, ShouldAccPaths} of
                         {ok, true} ->

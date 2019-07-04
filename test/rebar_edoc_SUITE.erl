@@ -52,7 +52,15 @@ multiapp(Config) ->
               "barer1")),
     ?assert(file_content_matches(
               filename:join([AppsDir, "apps", "foo", "doc", "foo.html"]),
-              "apps/bar1/doc/bar1.html")).
+              "apps/bar1/doc/bar1.html")),
+    %% Options such from rebar.config in the app themselves are
+    %% respected
+    ?assert(file_content_matches(
+        filename:join([AppsDir, "apps", "foo", "doc", "overview-summary.html"]),
+        "foo_custom_title"
+    )),
+    ok.
+
 
 error_survival(Config) ->
     RebarConfig = [],
