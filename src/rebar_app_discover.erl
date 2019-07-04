@@ -87,7 +87,9 @@ format_error({module_list, File}) ->
 format_error({missing_module, Module}) ->
     io_lib:format("Module defined in app file missing: ~p~n", [Module]);
 format_error({cannot_read_app_file, AppFile}) ->
-    io_lib:format("Cannot read app file: ~p~n", [AppFile]).
+    io_lib:format("Cannot read app file: ~p~n", [AppFile]);
+format_error({bad_term_file, _File, _Reason} = Error) ->
+    rebar_file_utils:format_error(Error).
 
 
 %% @doc merges configuration of a project app and the top level state
@@ -351,7 +353,7 @@ app_dir(AppFile) ->
 %% app file.
 -spec create_app_info(rebar_app_info:t(), file:name(), file:name()) -> rebar_app_info:t().
 create_app_info(AppInfo, AppDir, AppFile) ->
-    case rebar_config:consult_app_file(AppFile) of
+    try rebar_config:consult_app_file(AppFile) of
         [{application, AppName, AppDetails}] ->
             AppVsn = proplists:get_value(vsn, AppDetails),
             Applications = proplists:get_value(applications, AppDetails, []),
@@ -370,8 +372,11 @@ create_app_info(AppInfo, AppDir, AppFile) ->
                             false
                     end,
             rebar_app_info:dir(rebar_app_info:valid(AppInfo2, Valid), AppDir);
-        [] ->
+        _Invalid ->
             throw({error, {?MODULE, {cannot_read_app_file, AppFile}}})
+    catch
+        throw:{error, {rebar_file_utils, Err = {bad_term_file, _File, _Reason}}} ->
+            throw({error, {?MODULE, Err}}) % wrap this
     end.
 
 %% @doc Read in and parse the .app file if it is availabe. Do the same for
