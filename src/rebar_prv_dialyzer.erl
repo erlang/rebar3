@@ -155,6 +155,13 @@ plt_name(Prefix) ->
 
 do(Args, State, Plt) ->
     Output = get_output_file(State),
+    case debug_info(State) of
+        true ->
+            ok;
+        false ->
+            ?WARN("Add debug_info to compiler options (erl_opts) "
+                  "if Dialyzer fails to load Core Erlang.", [])
+    end,
     {PltWarnings, State1} = update_proj_plt(Args, State, Plt, Output),
     {Warnings, State2} = succ_typings(Args, State1, Plt, Output),
     case PltWarnings + Warnings of
@@ -474,13 +481,6 @@ proj_files(State) ->
     get_files(State, Apps, PltApps, [], PltMods).
 
 run_dialyzer(State, Opts, Output) ->
-    case debug_info(State) of
-        true ->
-            ok;
-        false ->
-            ?WARN("Add debug_info to compiler options (erl_opts) if Dialyzer fails to load Core Erlang.", []),
-            ok
-    end,
     %% dialyzer may return callgraph warnings when get_warnings is false
     case proplists:get_bool(get_warnings, Opts) of
         true ->
@@ -548,7 +548,9 @@ get_config(State, Key, Default) ->
 
 debug_info(State) ->
     Config = rebar_state:get(State, erl_opts, []),
-    proplists:get_value(debug_info, Config, true).
+    proplists:get_value(debug_info, Config, false) =/= false orelse
+    proplists:get_value(debug_info_key, Config, false) =/= false orelse
+    proplists:get_value(encrypt_debug_info, Config, false) =/= false.
 
 -spec collect_nested_dependent_apps([atom()]) -> [atom()].
 collect_nested_dependent_apps(RootApps) ->
