@@ -75,6 +75,10 @@ run_hooks(Dir, Type, Command, Opts, State) ->
                                   apply_hook(Dir, Env, Hook);
                              ({C, _}=Hook) when C =:= Command ->
                                   apply_hook(Dir, Env, Hook);
+                             ({C, _}=Hook) when is_list(C), is_atom(hd(C)) ->
+                                  lists:member(Command, C) andalso apply_hook(Dir, Env, Hook);
+                             ({_, C, _}=Hook) when is_list(C), is_atom(hd(C)) ->
+                                  lists:member(Command, C) andalso apply_hook(Dir, Env, Hook);
                              (_) ->
                                   continue
                           end, Hooks)
