@@ -78,7 +78,7 @@ needed_files(Graph, FoundFiles, _, AppInfo) ->
 dependencies(Source, SourceDir, Dirs) ->
     case file:open(Source, [read]) of
         {ok, Fd} ->
-            Incls = parse_attrs(Fd, [], SourceDir),
+            Incls = lists:usort(parse_attrs(Fd, [], SourceDir)),
             AbsIncls = expand_file_names(Incls, Dirs),
             ok = file:close(Fd),
             AbsIncls;
