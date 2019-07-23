@@ -78,7 +78,7 @@ needed_files(Graph, FoundFiles, _, AppInfo) ->
 dependencies(Source, SourceDir, Dirs) ->
     case file:open(Source, [read]) of
         {ok, Fd} ->
-            Incls = lists:usort(parse_attrs(Fd, [], SourceDir)),
+            Incls = parse_attrs(Fd, [], SourceDir),
             AbsIncls = expand_file_names(Incls, Dirs),
             ok = file:close(Fd),
             AbsIncls;
@@ -245,20 +245,21 @@ module_to_erl(Mod) ->
     atom_to_list(Mod) ++ ".erl".
 
 parse_attrs(Fd, Includes, Dir) ->
-    case io:parse_erl_form(Fd, "") of
-        {ok, Form, _Line} ->
-            case erl_syntax:type(Form) of
-                attribute ->
-                    NewIncludes = process_attr(Form, Includes, Dir),
-                    parse_attrs(Fd, NewIncludes, Dir);
-                _ ->
-                    parse_attrs(Fd, Includes, Dir)
-            end;
-        {eof, _} ->
-            Includes;
-        _Err ->
-            parse_attrs(Fd, Includes, Dir)
-    end.
+    DupIncludes = case io:parse_erl_form(Fd, "") of
+                      {ok, Form, _Line} ->
+                          case erl_syntax:type(Form) of
+                              attribute ->
+                                  NewIncludes = process_attr(Form, Includes, Dir),
+                                  parse_attrs(Fd, NewIncludes, Dir);
+                              _ ->
+                                  parse_attrs(Fd, Includes, Dir)
+                          end;
+                      {eof, _} ->
+                          Includes;
+                      _Err ->
+                          parse_attrs(Fd, Includes, Dir)
+                  end,
+    lists:usort(DupIncludes).
 
 process_attr(Form, Includes, Dir) ->
     AttrName = erl_syntax:atom_value(erl_syntax:attribute_name(Form)),
