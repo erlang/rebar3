@@ -255,7 +255,7 @@ parse_attrs(Fd, Includes, Dir) ->
                     parse_attrs(Fd, Includes, Dir)
             end;
         {eof, _} ->
-            Includes;
+            lists:usort(Includes);
         _Err ->
             parse_attrs(Fd, Includes, Dir)
     end.
