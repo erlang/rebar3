@@ -245,21 +245,20 @@ module_to_erl(Mod) ->
     atom_to_list(Mod) ++ ".erl".
 
 parse_attrs(Fd, Includes, Dir) ->
-    DupIncludes = case io:parse_erl_form(Fd, "") of
-                      {ok, Form, _Line} ->
-                          case erl_syntax:type(Form) of
-                              attribute ->
-                                  NewIncludes = process_attr(Form, Includes, Dir),
-                                  parse_attrs(Fd, NewIncludes, Dir);
-                              _ ->
-                                  parse_attrs(Fd, Includes, Dir)
-                          end;
-                      {eof, _} ->
-                          Includes;
-                      _Err ->
-                          parse_attrs(Fd, Includes, Dir)
-                  end,
-    lists:usort(DupIncludes).
+    case io:parse_erl_form(Fd, "") of
+        {ok, Form, _Line} ->
+            case erl_syntax:type(Form) of
+                attribute ->
+                    NewIncludes = process_attr(Form, Includes, Dir),
+                    parse_attrs(Fd, NewIncludes, Dir);
+                _ ->
+                    parse_attrs(Fd, Includes, Dir)
+            end;
+        {eof, _} ->
+            lists:usort(Includes);
+        _Err ->
+            parse_attrs(Fd, Includes, Dir)
+    end.
 
 process_attr(Form, Includes, Dir) ->
     AttrName = erl_syntax:atom_value(erl_syntax:attribute_name(Form)),
