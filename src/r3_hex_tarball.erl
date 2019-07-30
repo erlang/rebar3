@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.5.0, do not edit manually
+%% Vendored from hex_core v0.5.1, do not edit manually
 
 -module(r3_hex_tarball).
 -export([create/2, create_docs/1, unpack/2, format_checksum/1, format_error/1]).
