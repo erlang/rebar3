@@ -47,7 +47,7 @@ do(State) ->
                     AppDir = rebar_app_info:dir(AppInfo),
                     AppOpts = rebar_app_info:opts(AppInfo),
                     %% order of the merge is important to allow app opts overrides
-                    AppEdocOpts = rebar_opts:get(AppOpts, edoc_opts, []) ++ EdocOptsAcc,
+                    AppEdocOpts = merge_opts(rebar_opts:get(AppOpts, edoc_opts, []), EdocOptsAcc),
                     AppRes = (catch edoc:application(list_to_atom(AppName), AppDir, AppEdocOpts)),
                     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, AppInfo, State),
                     case {AppRes, ShouldAccPaths} of
@@ -93,3 +93,27 @@ add_to_paths([{doc_path, Paths}|T], Path) ->
     [{doc_path, [Path | Paths]} | T];
 add_to_paths([H|T], Path) ->
     [H | add_to_paths(T, Path)].
+
+merge_opts(AppOpts, BaseOpts) ->
+    merge_epp_macros(rebar_utils:tup_umerge(AppOpts, BaseOpts)).
+
+%% @private the `{macros, ...}' definitions for epp can't be
+%% containing duplicate definitions even if multiple macro lists
+%% are supported, so we need to manually remove duplicates
+%% and merge the many lists into a single one.
+merge_epp_macros([]) ->
+    [];
+merge_epp_macros([{macros, M1}, {macros, M2} | Rest]) ->
+    NewMacros = dedupe_macros(lists:usort(M1), lists:usort(M2)),
+    merge_epp_macros( [{macros, NewMacros} | Rest]);
+merge_epp_macros([H | T]) ->
+    [H | merge_epp_macros(T)].
+
+dedupe_macros([], Bs) -> Bs;
+dedupe_macros(As, []) -> As;
+dedupe_macros([{K, V1} | As], [{K, _} | Bs]) ->
+    [{K, V1} | dedupe_macros(As, Bs)];
+dedupe_macros([{KA, VA} | As], [{KB, VB} | Bs]) ->
+    if KA < KB -> [{KA, VA} | dedupe_macros(As, [{KB, VB} | Bs])];
+       KA > KB -> [{KB, VB} | dedupe_macros([{KA, VA} | As], Bs)]
+    end.
