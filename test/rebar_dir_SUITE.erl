@@ -8,7 +8,7 @@
 -export([top_src_dirs/1]).
 -export([profile_src_dirs/1, profile_extra_src_dirs/1, profile_all_src_dirs/1]).
 -export([profile_src_dir_opts/1]).
--export([retarget_path/1, alt_base_dir_abs/1, alt_base_dir_rel/1]).
+-export([retarget_path/1, alt_base_dir_abs/1, alt_base_dir_env_variable_abs/1, alt_base_dir_rel/1]).
 -export([global_cache_dir/1, default_global_cache_dir/1, overwrite_default_global_cache_dir/1]).
 -export([default_global_config/1, overwrite_default_global_config/1]).
 
@@ -21,8 +21,8 @@ all() -> [default_src_dirs, default_extra_src_dirs, default_all_src_dirs,
           src_dirs, alt_src_dir_nested, extra_src_dirs, all_src_dirs, src_dir_opts, recursive,
           profile_src_dirs, profile_extra_src_dirs, profile_all_src_dirs,
           profile_src_dir_opts, top_src_dirs,
-          retarget_path, alt_base_dir_abs, alt_base_dir_rel, global_cache_dir,
-          default_global_cache_dir, overwrite_default_global_cache_dir,
+          retarget_path, alt_base_dir_abs, alt_base_dir_env_variable_abs, alt_base_dir_rel,
+          global_cache_dir, default_global_cache_dir, overwrite_default_global_cache_dir,
           default_global_config, overwrite_default_global_config].
 
 init_per_testcase(default_global_cache_dir, Config) ->
@@ -247,6 +247,28 @@ alt_base_dir_abs(Config) ->
     AltBaseDir = filename:join(?config(priv_dir, Config), AltName),
     RebarConfig = [{base_dir, AltBaseDir}],
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+
+    BaseDir = rebar_dir:base_dir(State),
+    ?assertEqual(filename:join(AltBaseDir, "default"), BaseDir),
+
+    Name1 = ?config(app_one, Config),
+    Name2 = ?config(app_two, Config),
+
+    ?assert(filelib:is_dir(filename:join([BaseDir, "lib", Name1, "ebin"]))),
+    ?assert(filelib:is_file(filename:join([BaseDir, "lib", Name1, "ebin", Name1++".app"]))),
+    ?assert(filelib:is_file(filename:join([BaseDir, "lib", Name1, "ebin", Name1++".beam"]))),
+    ?assert(filelib:is_dir(filename:join([BaseDir, "lib", Name2, "ebin"]))),
+    ?assert(filelib:is_file(filename:join([BaseDir, "lib", Name2, "ebin", Name2++".app"]))),
+    ?assert(filelib:is_file(filename:join([BaseDir, "lib", Name2, "ebin", Name2++".beam"]))).
+
+alt_base_dir_env_variable_abs(Config) ->
+    AltName = lists:flatten(io_lib:format("~p", [os:timestamp()])),
+    AltBaseDir = filename:join(?config(priv_dir, Config), AltName),
+    RebarConfig = [],
+
+    true = os:putenv("REBAR_BASE_DIR", AltBaseDir),
+    {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
+    true = os:unsetenv("REBAR_BASE_DIR"),
 
     BaseDir = rebar_dir:base_dir(State),
     ?assertEqual(filename:join(AltBaseDir, "default"), BaseDir),
