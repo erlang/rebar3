@@ -151,8 +151,12 @@ run_aux(State, RawArgs) ->
     %% bootstrap test profile
     State3 = rebar_state:add_to_profile(State2_, test, test_state(State1)),
 
-    %% Process each command, resetting any state between each one
-    BaseDir = rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR),
+    BaseDir = case os:getenv("REBAR_BASE_DIR") of
+                  D when D =:= false orelse D =:= "" ->
+                      rebar_state:get(State, base_dir, ?DEFAULT_BASE_DIR);
+                  Dir ->
+                      Dir
+              end,
     State4 = rebar_state:set(State3, base_dir,
                              filename:join(filename:absname(rebar_state:dir(State3)), BaseDir)),
 
