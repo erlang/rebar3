@@ -489,8 +489,11 @@ create_logic_providers(ProviderModules, State0) ->
     try
         lists:foldl(fun(ProviderMod, StateAcc) ->
                             case providers:new(ProviderMod, StateAcc) of
+                                {error, {Mod, Error}} ->
+                                    ?WARN("~ts", [Mod:format_error(Error)]),
+                                    StateAcc;
                                 {error, Reason} ->
-                                    ?ERROR(Reason++"~n", []),
+                                    ?WARN(Reason++"~n", []),
                                     StateAcc;
                                 {ok, StateAcc1} ->
                                     StateAcc1
