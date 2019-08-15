@@ -45,7 +45,7 @@ profile_dir(Opts, Profiles) ->
         ["global" | _] -> {?MODULE:global_cache_dir(Opts), [""]};
         ["bootstrap", "default"] -> {rebar_opts:get(Opts, base_dir, ?DEFAULT_BASE_DIR), ["default"]};
         ["default"] -> {rebar_opts:get(Opts, base_dir, ?DEFAULT_BASE_DIR), ["default"]};
-        %% drop `default` from the profile dir if it's implicit and reverse order
+        %% drop `default' from the profile dir if it's implicit and reverse order
         %%  of profiles to match order passed to `as`
         ["default"|Rest] -> {rebar_opts:get(Opts, base_dir, ?DEFAULT_BASE_DIR), Rest}
     end,
