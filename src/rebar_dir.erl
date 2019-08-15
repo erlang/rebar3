@@ -3,6 +3,7 @@
 
 -export([base_dir/1,
          profile_dir/2,
+         profile_dir_name/1,
          deps_dir/1,
          deps_dir/2,
          root_dir/1,
@@ -39,18 +40,31 @@ base_dir(State) ->
 
 %% @doc returns the directory root for build artifacts for a given set
 %% of profiles.
--spec profile_dir(rebar_dict(), [atom()]) -> file:filename_all().
+-spec profile_dir(rebar_dict(), [atom(), ...]) -> file:filename_all().
 profile_dir(Opts, Profiles) ->
-    {BaseDir, ProfilesStrings} = case [rebar_utils:to_list(P) || P <- Profiles] of
-        ["global" | _] -> {?MODULE:global_cache_dir(Opts), [""]};
-        ["bootstrap", "default"] -> {rebar_opts:get(Opts, base_dir, ?DEFAULT_BASE_DIR), ["default"]};
-        ["default"] -> {rebar_opts:get(Opts, base_dir, ?DEFAULT_BASE_DIR), ["default"]};
+    BasePath =
+        case Profiles of
+            [global | _] -> ?MODULE:global_cache_dir(Opts);
+            [_|_] -> rebar_opts:get(Opts, base_dir, ?DEFAULT_BASE_DIR)
+        end,
+    DirName = profile_dir_name(Profiles),
+    filename:join(BasePath, DirName).
+
+%% @doc returns the directory name for build artifacts for a given set
+%% of profiles.
+-spec profile_dir_name([atom(), ...] | rebar_state:t()) -> file:filename_all().
+profile_dir_name(Profiles)
+  when is_list(Profiles) ->
+    case [rebar_utils:to_list(P) || P <- Profiles] of
+        ["global" | _] -> "";
+        ["bootstrap", "default"] -> "default";
+        ["default"] -> "default";
         %% drop `default' from the profile dir if it's implicit and reverse order
         %%  of profiles to match order passed to `as`
-        ["default"|Rest] -> {rebar_opts:get(Opts, base_dir, ?DEFAULT_BASE_DIR), Rest}
-    end,
-    ProfilesDir = rebar_string:join(ProfilesStrings, "+"),
-    filename:join(BaseDir, ProfilesDir).
+        ["default"|NonDefaultNames] -> rebar_string:join(NonDefaultNames, "+")
+    end;
+profile_dir_name(State) ->
+    profile_dir_name(rebar_state:current_profiles(State)).
 
 %% @doc returns the directory where dependencies should be placed
 %% given the current profile.
