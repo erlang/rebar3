@@ -150,6 +150,10 @@ download_(Dir, {git, Url, {ref, Ref}}, _State) ->
     ok = filelib:ensure_dir(Dir),
     maybe_warn_local_url(Url),
     git_clone(ref, git_vsn(), Url, Dir, Ref);
+download_(Dir, {git, Url, {dir, Path}}, _State) ->
+    ok = filelib:ensure_dir(Dir),
+    maybe_warn_local_url(Url),
+    git_clone(dir, git_vsn(), Url, Dir, Path);
 download_(Dir, {git, Url, Rev}, _State) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
     ok = filelib:ensure_dir(Dir),
@@ -209,6 +213,12 @@ git_clone(rev,_Vsn,Url,Dir,Rev) ->
                          rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]),
     rebar_utils:sh(?FMT("git checkout -q ~ts", [rebar_utils:escape_chars(Rev)]),
+                   [{cd, Dir}]);
+%% To fetch the application directly from gerrit
+git_clone(dir, _Vsn, Url, Dir, Path) ->
+    rebar_utils:sh(?FMT("git archive --remote=~ts HEAD:~ts | tar xf -",
+                        [rebar_utils:escape_chars(Url),
+                         rebar_utils:escape_chars(Path)]),
                    [{cd, Dir}]).
 
 git_vsn() ->

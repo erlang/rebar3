@@ -52,6 +52,8 @@ All contributors and rebar3 maintainers are generally unpaid developers
 working on the project in their own free time with limited resources. We
 ask for respect and understanding and will try to provide the same back.
 
+Pradeep Palaniappan
+
 ## Requesting or implementing a feature
 
 Before requesting or implementing a new feature, please do the following:
