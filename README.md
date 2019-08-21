@@ -88,8 +88,8 @@ Rebar3 may also be available on various OS-specific package managers such as
 FreeBSD Ports. Those are maintained by the community and Rebar3 maintainers
 themselves are generally not involved in that process.
 
-If you do not have a full Erlang install, we  using [erln8](https://erln8.github.io/erln8/)
-or [kerl](https://github.com/yrashk/kerl). For binary packages use those provided
+If you do not have a full Erlang install, we recommend using [erln8](https://erln8.github.io/erln8/)
+or [kerl](https://github.com/yrashk/kerl). For binary packages, use those provided
 by [Erlang Solutions](https://www.erlang-solutions.com/resources/download.html),
 but be sure to choose the "Standard" download option or you'll have issues building
 projects.
