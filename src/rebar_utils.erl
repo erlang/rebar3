@@ -502,14 +502,25 @@ reread_logger_config() ->
             Primary = #{level => LogLvlPrimary,
                         filter_default => FilterDefault,
                         filters => Filters},
-            %% Load the correct handlers based on their individual config.
-            [case Id of
-                 default -> logger:update_handler_config(Id, Cfg);
-                 _ -> logger:add_handler(Id, Mod, Cfg)
-             end || {handler, Id, Mod, Cfg} <- LogCfg],
+            lists:foreach(fun maybe_reset_logger_handler/1, LogCfg),
             logger:set_primary_config(Primary),
             ok
     end.
+
+%% @private add or update handlers based on their individual config,
+%% also remove default handler if needed.
+maybe_reset_logger_handler({handler, Id, Mod, Cfg}) ->
+    case logger:add_handler(Id, Mod, Cfg) of
+        {error, {already_exist, Id}} ->
+            logger:update_handler_config(Id, Cfg);
+        _ ->
+            ok
+    end;
+maybe_reset_logger_handler({handler, default, undefined}) ->
+    _ = logger:remove_handler(default),
+    ok;
+maybe_reset_logger_handler(_) ->
+    ok.
 
 
 %% @doc Given env. variable `FOO' we want to expand all references to
