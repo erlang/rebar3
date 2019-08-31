@@ -301,7 +301,8 @@ overlay_vars(Config) ->
                   {var_bin_string, {{{var_bin_string}}}},
                   {var_tuple, {{{var_tuple}}}},
                   {var_list, {{{var_list}}}},
-                  {var_bin, {{{var_bin}}}}]],
+                  {var_bin, {{{var_bin}}}},
+                  {var_profile_string, {{profile_string}}}]], % this comes from `rebar3'
     rebar_test_utils:create_config(AppDir,
                                    filename:join([AppDir, "config", "app.config"]),
                                    AppConfig),
@@ -318,6 +319,7 @@ overlay_vars(Config) ->
                          {var_bin_string, <<"test">>},
                          {var_tuple, {t, ['atom']}},
                          {var_list, [a, b, c, 'd']},
-                         {var_bin, <<23, 24, 25>>}],
+                         {var_bin, <<23, 24, 25>>},
+                         {var_profile_string, 'default'}],
     {ok, [ExpectedSysconfig]} = file:consult(filename:join([AppDir, "_build/default/rel",
                                                           Name, "releases", Vsn, "sys.config"])).
