@@ -94,7 +94,7 @@ on_tc_skip(Suite, TC, {tc_auto_skip, _}, State=#state{suite=Suite, groups=Groups
         {end_per_group, _} -> Acc;
         init_per_suite -> Acc;
         end_per_suite -> Acc;
-        {_Group, Case} -> [{Suite, Groups, Case}|Acc];
+        {Case, _Group} -> [{Suite, Groups, Case}|Acc];
         TC -> [{Suite, Groups, TC}|Acc]
     end,
     State#state{suite=Suite, acc=NewAcc};
@@ -111,7 +111,7 @@ on_tc_skip(TC, {tc_auto_skip, _}, State=#state{suite=Suite, groups=Groups, acc=A
         {end_per_group, _} -> Acc;
         init_per_suite -> Acc;
         end_per_suite -> Acc;
-        {_Group, Case} -> [{Suite, Groups, Case}|Acc];
+        {Case, _Group} -> [{Suite, Groups, Case}|Acc];
         TC -> [{Suite, Groups, TC}|Acc]
     end,
     State#state{acc=NewAcc};
