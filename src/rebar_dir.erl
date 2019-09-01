@@ -47,13 +47,16 @@ profile_dir(Opts, Profiles) ->
             [global | _] -> ?MODULE:global_cache_dir(Opts);
             [_|_] -> rebar_opts:get(Opts, base_dir, ?DEFAULT_BASE_DIR)
         end,
-    DirName = profile_dir_name(Profiles),
+    DirName = profile_dir_name_(Profiles),
     filename:join(BasePath, DirName).
 
 %% @doc returns the directory name for build artifacts for a given set
 %% of profiles.
--spec profile_dir_name([atom(), ...] | rebar_state:t()) -> file:filename_all().
-profile_dir_name(Profiles)
+profile_dir_name(State) ->
+    profile_dir_name_(rebar_state:current_profiles(State)).
+
+-spec profile_dir_name_([atom(), ...] | rebar_state:t()) -> file:filename_all().
+profile_dir_name_(Profiles)
   when is_list(Profiles) ->
     case [rebar_utils:to_list(P) || P <- Profiles] of
         ["global" | _] -> "";
@@ -62,9 +65,7 @@ profile_dir_name(Profiles)
         %% drop `default' from the profile dir if it's implicit and reverse order
         %%  of profiles to match order passed to `as`
         ["default"|NonDefaultNames] -> rebar_string:join(NonDefaultNames, "+")
-    end;
-profile_dir_name(State) ->
-    profile_dir_name(rebar_state:current_profiles(State)).
+    end.
 
 %% @doc returns the directory where dependencies should be placed
 %% given the current profile.
