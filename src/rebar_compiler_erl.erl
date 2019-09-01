@@ -87,7 +87,15 @@ dependencies(Source, SourceDir, Dirs) ->
     end.
 
 compile(Source, [{_, OutDir}], Config, ErlOpts) ->
-    case compile:file(Source, [{outdir, OutDir} | ErlOpts]) of
+    %% The Erlang compiler relies on the current working directory to find
+    %% the .hrl files in -include or -include_lib instructions. This means
+    %% unless we change directory to pick something that fits the file we have
+    %% to compile, we risk clashing paths with those of the root directory.
+    {ok, Cwd} = file:get_cwd(),
+    file:set_cwd(filename:dirname(Source)),
+    Res = compile:file(Source, [{outdir, OutDir} | ErlOpts]),
+    file:set_cwd(Cwd),
+    case Res of
         {ok, _Mod} ->
             ok;
         {ok, _Mod, []} ->
