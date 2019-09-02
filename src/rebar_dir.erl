@@ -56,7 +56,7 @@ profile_dir(Opts, Profiles) ->
 profile_dir_name(State) ->
     profile_dir_name_(rebar_state:current_profiles(State)).
 
--spec profile_dir_name_([atom(), ...] | rebar_state:t()) -> file:filename_all().
+-spec profile_dir_name_([atom(), ...]) -> file:filename_all().
 profile_dir_name_(Profiles)
   when is_list(Profiles) ->
     case [rebar_utils:to_list(P) || P <- Profiles] of
