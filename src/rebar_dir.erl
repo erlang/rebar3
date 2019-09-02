@@ -52,6 +52,7 @@ profile_dir(Opts, Profiles) ->
 
 %% @doc returns the directory name for build artifacts for a given set
 %% of profiles.
+-spec profile_dir_name(rebar_state:t()) -> file:filename_all().
 profile_dir_name(State) ->
     profile_dir_name_(rebar_state:current_profiles(State)).
 
