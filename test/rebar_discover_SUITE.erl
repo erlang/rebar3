@@ -47,7 +47,7 @@ bad_app_src(Config) ->
     AppSrc = filename:join([AppDir, "src", Name ++ ".app.src"]),
     ok = file:write_file(AppSrc, "bad term file :("),
     ?assertMatch(
-       {error, {rebar_app_discover, {bad_term_file, AppSrc, _}}},
+       {ok, {rebar_app_discover, {bad_term_file, AppSrc, _}}},
        rebar_test_utils:run_and_check(Config, [], ["compile"], return)
     ),
     ok.

@@ -10,6 +10,10 @@ test_task:
   test_script: |
     ./bootstrap
     ./rebar3 ct
+  always:
+    junit_artifacts:
+      path: "_build/test/logs/*/junit_report.xml"
+      format: junit
 
 osx_test_task:
   osx_instance:
