@@ -261,7 +261,7 @@ select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
     %% to our best ability.
     rebar_paths:set_paths([deps, plugins], State),
     [application:load(Application) || Config <- Configs, {Application, _} <- Config],
-    rebar_utils:reread_config(Configs),
+    rebar_utils:reread_config(Configs, [update_logger]),
 
     Opts = merge_opts(CmdOpts,CfgOpts),
     discover_tests(State, ProjectApps, Opts).
