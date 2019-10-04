@@ -27,10 +27,12 @@ do(Module, Command, Provider, State) ->
     LibDirs = rebar_utils:filtermap(fun ec_file:exists/1,
                                    [rebar_dir:checkouts_dir(State), DepsDir | ProjectAppDirs]),
     OutputDir = filename:join(rebar_dir:base_dir(State), ?DEFAULT_RELEASE_DIR),
+    ProfileString = rebar_dir:profile_dir_name(State),
     AllOptions = rebar_string:join([Command | Options], " "),
     Cwd = rebar_state:dir(State),
     Providers = rebar_state:providers(State),
     RebarOpts = rebar_state:opts(State),
+    ExtraOverlays = [{profile_string, ProfileString}],
     ErlOpts = rebar_opts:erl_opts(RebarOpts),
     rebar_hooks:run_project_and_app_hooks(Cwd, pre, Provider, Providers, State),
     try
@@ -38,14 +40,18 @@ do(Module, Command, Provider, State) ->
             [] ->
                 relx:main([{lib_dirs, LibDirs}
                           ,{caller, api}
-                          ,{log_level, LogLevel} | output_dir(OutputDir, Options)] ++ ErlOpts, AllOptions);
+                          ,{log_level, LogLevel}
+                          ,{api_caller_overlays, ExtraOverlays}
+                          | output_dir(OutputDir, Options)] ++ ErlOpts, AllOptions);
             Config ->
                 Config1 = [{overlay_vars, [{base_dir, rebar_dir:base_dir(State)}]}
                            | merge_overlays(Config)],
                 relx:main([{lib_dirs, LibDirs}
                           ,{config, Config1}
                           ,{caller, api}
-                          ,{log_level, LogLevel} | output_dir(OutputDir, Options)] ++ ErlOpts, AllOptions)
+                          ,{log_level, LogLevel}
+                          ,{api_caller_overlays, ExtraOverlays}
+                          | output_dir(OutputDir, Options)] ++ ErlOpts, AllOptions)
         end,
         rebar_hooks:run_project_and_app_hooks(Cwd, post, Provider, Providers, State),
         {ok, State}
