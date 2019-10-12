@@ -9,6 +9,7 @@
 -export([compile/2,
          compile/3]).
 
+-include_lib("kernel/include/file.hrl").
 -include_lib("providers/include/providers.hrl").
 -include("rebar.hrl").
 
@@ -261,7 +262,12 @@ copy_app_dirs(AppInfo, OldAppDir, AppDir) ->
                 true ->
                     OutEbin = filename:join([AppDir, "ebin"]),
                     filelib:ensure_dir(filename:join([OutEbin, "dummy.beam"])),
-                    rebar_file_utils:cp_r(filelib:wildcard(filename:join([EbinDir, "*"])), OutEbin);
+                    case is_symlink_to(EbinDir, OutEbin) of
+                        true ->
+                            ok;
+                        false ->
+                            rebar_file_utils:cp_r(filelib:wildcard(filename:join([EbinDir, "*"])), OutEbin)
+                    end;
                 false ->
                     ok
             end,
@@ -292,6 +298,19 @@ copy_app_dirs(AppInfo, OldAppDir, AppDir) ->
             ok
     end.
 
+is_symlink_to(Ebin, OutEbin) ->
+    case file:read_link_info(Ebin) of
+        {ok, #file_info{type = symlink}} ->
+            case file:read_link(Ebin) of
+                {ok, EbinLinkTo} ->
+                    filename:absname(EbinLinkTo) == filename:absname(OutEbin);
+                _ ->
+                    false
+            end;
+        _ ->
+            false
+    end.
+                    
 symlink_or_copy(OldAppDir, AppDir, Dir) ->
     Source = filename:join([OldAppDir, Dir]),
     Target = filename:join([AppDir, Dir]),

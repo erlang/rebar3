@@ -41,7 +41,7 @@ all() ->
      dont_recompile_when_erl_compiler_options_env_does_not_change,
      recompile_when_erl_compiler_options_env_changes,
      rebar_config_os_var,
-     app_file_linting].
+     app_file_linting, link_ebin_to_build].
 
 groups() ->
     [{basic_app, [], [build_basic_app, paths_basic_app, clean_basic_app]},
@@ -2358,6 +2358,21 @@ app_file_linting(Config) ->
     ?assert(none /= proplists:lookup("~p is missing kernel from applications list", Warnings)),
     ?assert(none /= proplists:lookup("~p is missing stdlib from applications list", Warnings)).
 
+link_ebin_to_build(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    LinkEbinDir = filename:join([AppDir, "ebin"]),
+    %% make symlink in app dir to build dir
+    ok = file:make_symlink(EbinDir, LinkEbinDir),
+    %% run this to create files in LinkEbinDir
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+    %% run this twice to throw error while not check symlink
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+    file:delete(LinkEbinDir),
+    ok.
 %%
 
 %% a copy of lib/parsetools/include/yeccpre.hrl so we can test yrl includefile
