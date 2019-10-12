@@ -3,10 +3,10 @@
 %% ex: ft=erlang ts=4 sw=4 et
 
 main(_) ->
-    application:start(crypto),
-    application:start(asn1),
-    application:start(public_key),
-    application:start(ssl),
+    ensure_app(crypto),
+    ensure_app(asn1),
+    ensure_app(public_key),
+    ensure_app(ssl),
     inets:start(),
     inets:start(httpc, [{profile, rebar}]),
     set_httpc_options(),
@@ -56,6 +56,17 @@ main(_) ->
 
     %% Done with compile, can turn back on error logger
     error_logger:tty(true).
+
+ensure_app(App) ->
+    case application:start(App) of
+        ok ->
+            ok;
+        {error, _} ->
+            io:format("OTP Application ~p not available. Please fix "
+                      "your Erlang install to support it and try "
+                      "again.~n", [App]),
+            halt(1)
+    end.
 
 fetch_and_compile({Name, ErlFirstFiles}, Deps) ->
     case lists:keyfind(Name, 1, Deps) of
