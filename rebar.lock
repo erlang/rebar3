@@ -1,5 +1,5 @@
 {"1.1.0",
-[{<<"bbmustache">>,{pkg,<<"bbmustache">>,<<"1.6.1">>},0},
+[{<<"bbmustache">>,{pkg,<<"bbmustache">>,<<"1.8.0">>},0},
  {<<"certifi">>,{pkg,<<"certifi">>,<<"2.5.1">>},0},
  {<<"cf">>,{pkg,<<"cf">>,<<"0.2.2">>},0},
  {<<"cth_readable">>,{pkg,<<"cth_readable">>,<<"1.4.6">>},0},
@@ -12,7 +12,7 @@
  {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.5">>},0}]}.
 [
 {pkg_hash,[
- {<<"bbmustache">>, <<"9FB63FA60BD53AFBF47F02E6D8BD6B2BEAFC068E02E20975254DC7461FD4F397">>},
+ {<<"bbmustache">>, <<"A268D256B3D5C7CF9FD14ECED58977BC71AADB7CE412E883C3A2CD0A10F3CF27">>},
  {<<"certifi">>, <<"867CE347F7C7D78563450A18A6A28A8090331E77FA02380B4A21962A65D36EE5">>},
  {<<"cf">>, <<"7F2913FFF90ABCABD0F489896CFEB0B0674F6C8DF6C10B17A83175448029896C">>},
  {<<"cth_readable">>, <<"29DF6430584389B30D14B7D68D0EB7BC837ED31E2DF6E9D93598D4EC63B1E3BD">>},
