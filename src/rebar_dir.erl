@@ -102,7 +102,8 @@ checkouts_dir(State, App) ->
 plugins_dir(State) ->
     case lists:member(global, rebar_state:current_profiles(State)) of
         true ->
-            filename:join([base_dir(State), global_config_dir(State), rebar_state:get(State, plugins_dir, ?DEFAULT_PLUGINS_DIR)]);
+            [Major | _] = re:split(rebar_utils:otp_release(), "\\.", [{return, list}]),
+            filename:join([base_dir(State), global_config_dir(State), rebar_state:get(State, plugins_dir, ?DEFAULT_PLUGINS_DIR), Major]);
         false ->
             filename:join(base_dir(State), rebar_state:get(State, plugins_dir, ?DEFAULT_PLUGINS_DIR))
     end.

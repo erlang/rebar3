@@ -93,7 +93,7 @@ handle_plugins(Profile, Plugins, State, Upgrade) ->
     %% Set deps dir to plugins dir so apps are installed there
     Locks = rebar_state:lock(State),
     DepsDir = rebar_state:get(State, deps_dir, ?DEFAULT_DEPS_DIR),
-    State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
+    State1 = rebar_state:set(State, deps_dir, plugins_dir(Profile)),
     %% Install each plugin individually so if one fails to install it doesn't effect the others
     {_PluginProviders, State2} =
         lists:foldl(fun(Plugin, {PluginAcc, StateAcc}) ->
@@ -105,6 +105,12 @@ handle_plugins(Profile, Plugins, State, Upgrade) ->
     %% reset deps dir
     State3 = rebar_state:set(State2, deps_dir, DepsDir),
     rebar_state:lock(State3, Locks).
+
+plugins_dir(global) ->
+    [Major | _] = re:split(rebar_utils:otp_release(), "\\.", [{return, list}]),
+    filename:join([?DEFAULT_PLUGINS_DIR, Major]);
+plugins_dir(_) ->
+    ?DEFAULT_PLUGINS_DIR.
 
 handle_plugin(Profile, Plugin, State, Upgrade) ->
     try
