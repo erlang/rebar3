@@ -56,12 +56,12 @@ app_git_user(Config) ->
     Name = ?config(name, Config),
     rebar_test_utils:run_and_check(
         Config, [],
-        ["new", "test_app", Name, "author_name=some_name"],
+        ["new", "test_app", Name, "author_name=<some_name>"],
         {ok, []}
     ),
     validate_files(
         Config, Name,
-        [{"LICENSE", ["some_name", "git@email.com"]},
+        [{"LICENSE", ["<some_name>", "git@email.com"]},
          {"README.md", [Name]},
          {".gitignore", []},
          {"rebar.config", []},

@@ -431,8 +431,11 @@ write_file(Output, Data, Force) ->
             {error, exists}
     end.
 
-%%
 %% Render a binary to a string, using mustache and the specified context
-%%
 render(Bin, Context) ->
-    bbmustache:render(rebar_utils:to_binary(Bin), Context, [{key_type, atom}]).
+    bbmustache:render(
+      rebar_utils:to_binary(Bin),
+      Context,
+      [{key_type, atom},
+       {escape_fun, fun(X) -> X end}] % disable HTML-style escaping
+    ).
