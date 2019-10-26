@@ -24,7 +24,7 @@ all() ->
      deps_in_path, checkout_priority, highest_version_of_pkg_dep,
      parse_transform_test, erl_first_files_test, mib_test,
      umbrella_mib_first_test, only_default_transitive_deps, clean_all,
-     profile_deps, deps_build_in_prod, only_deps,
+     clean_specific, profile_deps, deps_build_in_prod, only_deps,
      override_deps, override_add_deps, override_del_deps,
      override_opts, override_add_opts, override_del_opts,
      apply_overrides_exactly_once, override_only_deps,
@@ -1350,6 +1350,38 @@ clean_all(Config) ->
                                    {ok, [{app, Name, invalid},
                                          {app, DepName, invalid},
                                          {app, PkgName, invalid}]}).
+
+clean_specific(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    DepName = rebar_test_utils:create_random_name("dep1_"),
+    PkgName = rebar_test_utils:create_random_name("pkg1_"),
+    mock_git_resource:mock([]),
+    mock_pkg_resource:mock([
+        {pkgdeps, [{{iolist_to_binary(PkgName), iolist_to_binary(Vsn)}, []}]}
+    ]),
+
+    RConfFile = rebar_test_utils:create_config(AppDir, [{deps, [
+        {list_to_atom(DepName), {git, "http://site.com/user/"++DepName++".git", {tag, Vsn}}},
+        {list_to_atom(PkgName), Vsn}
+    ]}]),
+    {ok, RConf} = file:consult(RConfFile),
+
+    %% Build things
+    rebar_test_utils:run_and_check(
+        Config, RConf, ["compile"],
+        {ok, [{app, Name}, {app, DepName}, {app, PkgName}]}
+    ),
+
+    %% Clean all
+    rebar_test_utils:run_and_check(Config, [], ["clean", "--apps="++DepName++","++Name],
+                                   {ok, [{app, Name, invalid},
+                                         {app, DepName, invalid},
+                                         {app, PkgName, valid}]}).
 
 override_deps(Config) ->
     Deps = rebar_test_utils:expand_deps(git, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
