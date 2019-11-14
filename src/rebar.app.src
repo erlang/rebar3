@@ -37,7 +37,8 @@
 
         {resources, [{git, rebar_git_resource},
                      {pkg, rebar_pkg_resource},
-                     {hg, rebar_hg_resource}]},
+                     {hg, rebar_hg_resource},
+                     {svn, rebar_svn_resource}]},
 
         {compilers, [rebar_compiler_xrl, rebar_compiler_yrl,
                      rebar_compiler_mib, rebar_compiler_erl]},

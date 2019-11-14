@@ -9,12 +9,14 @@ groups() ->
     [{all, [], [change_type_upgrade]},
      {git, [], [{group, all}]},
      {pkg, [], [{group, all}]},
-     {hg, [], [{group, all}]}].
+     {hg, [], [{group, all}]},
+     {svn, [], [{group, all}]}].
 
 init_per_group(all, Config) ->
     State = rebar_state:resources(rebar_state:new(), [{git, rebar_git_resource},
                                                       {pkg, rebar_pkg_resource},
-                                                      {hg, rebar_hg_resource}]),
+                                                      {hg, rebar_hg_resource},
+                                                      {svn, rebar_svn_resource}]),
     [{state, State} | Config];
 init_per_group(Name, Config) ->
     [{type, Name},
