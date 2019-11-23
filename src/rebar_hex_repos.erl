@@ -50,8 +50,8 @@ get_repo_config(RepoName, State) ->
     get_repo_config(RepoName, Repos).
 
 merge_with_base_and_auth(Repos, BaseConfig, Auth) ->
-    [maps:merge(maps:get(maps:get(name, Repo), Auth, #{}),
-                maps:merge(Repo, BaseConfig)) || Repo <- Repos].
+    [maps:merge(maps:merge(Repo, BaseConfig),
+                maps:get(maps:get(name, Repo), Auth, #{})) || Repo <- Repos].
 
 %% A user's list of repos are merged by name while keeping the order
 %% intact. The order is based on the first use of a repo by name in the
