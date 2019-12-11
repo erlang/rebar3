@@ -67,7 +67,7 @@ start_epmd() ->
     %% Indirectly boot EPMD through calling Erlang so that we don't risk
     %% attaching it to the current proc
     ?CONSOLE("Attempting to start epmd...", []),
-    os:cmd("erl -sname a -eval 'halt(0).'").
+    os:cmd("erl -sname a -noinput -eval \"halt(0).\"").
 
 warn_dist() ->
     ?ERROR("Erlang Distribution failed, falling back to nonode@nohost.", []).
