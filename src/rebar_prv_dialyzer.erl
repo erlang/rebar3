@@ -27,7 +27,8 @@ init(State) ->
             {base_plt_location, undefined, "base-plt-location", string, "The location of base PLT file, defaults to $HOME/.cache/rebar3"},
             {plt_location, undefined, "plt-location", string, "The location of the PLT file, defaults to the profile's base directory"},
             {plt_prefix, undefined, "plt-prefix", string, "The prefix to the PLT file, defaults to \"rebar3\"" },
-            {base_plt_prefix, undefined, "base-plt-prefix", string, "The prefix to the base PLT file, defaults to \"rebar3\"" }],
+            {base_plt_prefix, undefined, "base-plt-prefix", string, "The prefix to the base PLT file, defaults to \"rebar3\"" },
+            {statistics, undefined, "statistics", boolean, "Print information about the progress of execution. Default: false" }],
     State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
                                                                {module, ?MODULE},
                                                                {bare, true},
@@ -481,12 +482,15 @@ proj_files(State) ->
     get_files(State, Apps, PltApps, [], PltMods).
 
 run_dialyzer(State, Opts, Output) ->
+    {Args, _} = rebar_state:command_parsed_args(State),
+    Timing = proplists:get_bool(statistics, Args),
     %% dialyzer may return callgraph warnings when get_warnings is false
     case proplists:get_bool(get_warnings, Opts) of
         true ->
             WarningsList = get_config(State, warnings, []),
             Opts2 = [{warnings, legacy_warnings(WarningsList)},
-                     {check_plt, false} |
+                     {check_plt, false},
+                     {timing, Timing} |
                      Opts],
             ?DEBUG("Running dialyzer with options: ~p~n", [Opts2]),
             Warnings = format_warnings(rebar_state:opts(State),
