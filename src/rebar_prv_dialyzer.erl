@@ -483,6 +483,11 @@ proj_files(State) ->
 
 run_dialyzer(State, Opts, Output) ->
     {Args, _} = rebar_state:command_parsed_args(State),
+    %% dialyzer uses command-line option `--statistics` for enabling
+    %% additional info about progress of execution, but internally
+    %% this option has name `timing`.
+    %% NOTE: Option `timing` accept boolean() or 'debug', but here we support
+    %% only boolean().
     Timing = proplists:get_bool(statistics, Args),
     %% dialyzer may return callgraph warnings when get_warnings is false
     case proplists:get_bool(get_warnings, Opts) of
