@@ -335,7 +335,8 @@ cli_args(Config) ->
                                                          "--plt-location=" ++ Location,
                                                          "--base-plt-location=" ++ BasePltLocation,
                                                          "--plt-prefix=" ++ Prefix,
-                                                         "--base-plt-prefix=" ++ BasePrefix],
+                                                         "--base-plt-prefix=" ++ BasePrefix,
+                                                         "--statistics"],
                                    {ok, [{app, Name1}, {app, Name2}]}),
 
     ErtsFiles = erts_files(),
