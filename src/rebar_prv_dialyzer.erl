@@ -28,7 +28,8 @@ init(State) ->
             {plt_location, undefined, "plt-location", string, "The location of the PLT file, defaults to the profile's base directory"},
             {plt_prefix, undefined, "plt-prefix", string, "The prefix to the PLT file, defaults to \"rebar3\"" },
             {base_plt_prefix, undefined, "base-plt-prefix", string, "The prefix to the base PLT file, defaults to \"rebar3\"" },
-            {statistics, undefined, "statistics", boolean, "Print information about the progress of execution. Default: false" }],
+            {statistics, undefined, "statistics", boolean, "Print information about the progress of execution. Default: false" },
+            {tests, undefined, "tests", boolean, "Include test modules. Default: false" }],
     State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
                                                                {module, ?MODULE},
                                                                {bare, true},
@@ -197,7 +198,7 @@ update_proj_plt(Args, State, Plt, Output) ->
 
 do_update_proj_plt(Args, State, Plt, Output) ->
     ?INFO("Updating plt...", []),
-    Files = proj_plt_files(State),
+    Files = proj_plt_files(Args, State),
     case read_plt(State, Plt) of
         {ok, OldFiles} ->
             check_plt(State, Plt, Output, OldFiles, Files);
@@ -205,14 +206,14 @@ do_update_proj_plt(Args, State, Plt, Output) ->
             build_proj_plt(Args, State, Plt, Output, Files)
     end.
 
-proj_plt_files(State) ->
+proj_plt_files(Args, State) ->
     BasePltApps = base_plt_apps(State),
     PltApps = get_config(State, plt_extra_apps, []) ++ BasePltApps,
     BasePltMods = get_config(State, base_plt_mods, []),
     PltMods = get_config(State, plt_extra_mods, []) ++ BasePltMods,
     Apps = proj_apps(State),
     DepApps = proj_deps(State),
-    get_files(State, DepApps ++ PltApps, Apps -- PltApps, PltMods, []).
+    get_files(Args, State, DepApps ++ PltApps, Apps -- PltApps, PltMods, []).
 
 proj_apps(State) ->
     [ec_cnv:to_atom(rebar_app_info:name(App)) ||
@@ -226,25 +227,30 @@ proj_deps(State) ->
         all_deps       -> collect_nested_dependent_apps(DepApps)
     end.
 
-get_files(State, Apps, SkipApps, Mods, SkipMods) ->
+get_files(Args, State, Apps, SkipApps, Mods, SkipMods) ->
     ?INFO("Resolving files...", []),
     ExcludeApps = get_config(State, exclude_apps, []),
-    Files = apps_files(Apps, ExcludeApps ++ SkipApps, dict:new()),
+    Files = apps_files(Args, Apps, ExcludeApps ++ SkipApps, dict:new()),
     ExcludeMods = get_config(State, exclude_mods, []),
     Files2 = mods_files(Mods, ExcludeMods ++ SkipMods, Files),
     dict:fold(fun(_, File, Acc) -> [File | Acc] end, [], Files2).
 
-apps_files([], _, Files) ->
+apps_files(_Args, [], _, Files) ->
     Files;
-apps_files([AppName | DepApps], SkipApps, Files) ->
+apps_files(Args, [AppName | DepApps], SkipApps, Files) ->
     case lists:member(AppName, SkipApps) of
         true ->
-            apps_files(DepApps, SkipApps, Files);
+            apps_files(Args, DepApps, SkipApps, Files);
         false ->
-            AppFiles = app_files(AppName),
+            AppFiles0 = app_files(AppName),
+            AppFiles =
+                case proplists:get_bool(tests, Args) of
+                    true  -> merge_files(AppFiles0, test_files(AppName));
+                    false -> AppFiles0
+                end,
             ?DEBUG("~ts modules: ~p", [AppName, dict:fetch_keys(AppFiles)]),
             Files2 = merge_files(Files, AppFiles),
-            apps_files(DepApps, [AppName | SkipApps], Files2)
+            apps_files(Args, DepApps, [AppName | SkipApps], Files2)
     end.
 
 app_files(AppName) ->
@@ -253,6 +259,27 @@ app_files(AppName) ->
             ebin_files(EbinDir);
         {error, bad_name} ->
             throw({unknown_application, AppName})
+    end.
+
+test_files(AppName) ->
+    case test_dir(AppName) of
+        {ok, TestDir} ->
+            ebin_files(TestDir);
+        {error, bad_name} ->
+            dict:new()
+    end.
+
+test_dir(AppName) ->
+    case code:lib_dir(AppName, test) of
+        {error, bad_name} = Error ->
+            Error;
+        TestDir ->
+            case filelib:is_dir(TestDir) of
+                true ->
+                    {ok, TestDir};
+                false ->
+                    {error, bad_name}
+            end
     end.
 
 app_ebin(AppName) ->
@@ -388,7 +415,7 @@ run_plt(State, Plt, Output, Analysis, Files) ->
 build_proj_plt(Args, State, Plt, Output, Files) ->
     BasePlt = get_base_plt(Args, State),
     ?INFO("Updating base plt...", []),
-    BaseFiles = base_plt_files(State),
+    BaseFiles = base_plt_files(Args, State),
     {BaseWarnings, State1} = update_base_plt(State, BasePlt, Output, BaseFiles),
     ?INFO("Copying ~p to ~p...", [BasePlt, Plt]),
     _ = filelib:ensure_dir(Plt),
@@ -414,10 +441,10 @@ get_base_plt(Args, State) ->
             filename:join(Dir, Name)
     end.
 
-base_plt_files(State) ->
+base_plt_files(Args, State) ->
     BasePltApps = base_plt_apps(State),
     BasePltMods = get_config(State, base_plt_mods, []),
-    get_files(State, BasePltApps, [], BasePltMods, []).
+    get_files(Args, State, BasePltApps, [], BasePltMods, []).
 
 base_plt_apps(State) ->
     get_config(State, base_plt_apps, [erts, crypto, kernel, stdlib]).
@@ -457,7 +484,7 @@ succ_typings(Args, State, Plt, Output) ->
             {0, State};
         _ ->
             ?INFO("Doing success typing analysis...", []),
-            Files = proj_files(State),
+            Files = proj_files(Args, State),
             succ_typings_(State, Plt, Output, Files)
     end.
 
@@ -473,13 +500,13 @@ succ_typings_(State, Plt, Output, Files) ->
             {init_plt, Plt}],
     run_dialyzer(State, Opts, Output).
 
-proj_files(State) ->
+proj_files(Args, State) ->
     Apps = proj_apps(State),
     BasePltApps = get_config(State, base_plt_apps, []),
     PltApps = get_config(State, plt_extra_apps, []) ++ BasePltApps,
     BasePltMods = get_config(State, base_plt_mods, []),
     PltMods = get_config(State, plt_extra_mods, []) ++ BasePltMods,
-    get_files(State, Apps, PltApps, [], PltMods).
+    get_files(Args, State, Apps, PltApps, [], PltMods).
 
 run_dialyzer(State, Opts, Output) ->
     {Args, _} = rebar_state:command_parsed_args(State),
