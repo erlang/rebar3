@@ -350,14 +350,15 @@ cli_args(Config) ->
 
 tests_option(Config) ->
     AppDir = ?config(apps, Config),
+    State = ?config(state, Config),
     RebarConfig = ?config(rebar_config, Config),
     Name = rebar_test_utils:create_random_name("app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, []),
-    % there are 3 warnings for generated test (guard test for ?some_define and 2 no local returns)
+    % there are few warnings for generated test (see rebar_test_utils:erl_eunit_suite_file/1)
     Command = ["as", "test", "dialyzer", "--tests"],
-    Expect = {error, {rebar_prv_dialyzer, {dialyzer_warnings, 3}}},
-    ok = rebar_test_utils:run_and_check(Config, RebarConfig, Command, Expect).
+    {error, {rebar_prv_dialyzer, {dialyzer_warnings, _}}} =
+        rebar3:run(rebar_state:new(State, RebarConfig, AppDir), Command).
 
 %% Helpers
 
