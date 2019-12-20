@@ -212,7 +212,7 @@ proj_plt_files(State) ->
     PltMods = get_config(State, plt_extra_mods, []) ++ BasePltMods,
     Apps = proj_apps(State),
     DepApps = proj_deps(State),
-    get_files(State, DepApps ++ PltApps, Apps -- PltApps, PltMods, []).
+    get_files(State, DepApps ++ PltApps, Apps -- PltApps, PltMods, [], []).
 
 proj_apps(State) ->
     [ec_cnv:to_atom(rebar_app_info:name(App)) ||
@@ -226,31 +226,33 @@ proj_deps(State) ->
         all_deps       -> collect_nested_dependent_apps(DepApps)
     end.
 
-get_files(State, Apps, SkipApps, Mods, SkipMods) ->
+get_files(State, Apps, SkipApps, Mods, SkipMods, ExtraDirs) ->
     ?INFO("Resolving files...", []),
     ExcludeApps = get_config(State, exclude_apps, []),
-    Files = apps_files(Apps, ExcludeApps ++ SkipApps, dict:new()),
+    Files0 = apps_files(Apps, ExcludeApps ++ SkipApps, ExtraDirs, dict:new()),
+    BaseDir = filename:join(rebar_dir:base_dir(State), "extras"),
+    Files1 = extras_files(BaseDir, ExtraDirs, Files0),
     ExcludeMods = get_config(State, exclude_mods, []),
-    Files2 = mods_files(Mods, ExcludeMods ++ SkipMods, Files),
+    Files2 = mods_files(Mods, ExcludeMods ++ SkipMods, Files1),
     dict:fold(fun(_, File, Acc) -> [File | Acc] end, [], Files2).
 
-apps_files([], _, Files) ->
+apps_files([], _, _ExtraDirs, Files) ->
     Files;
-apps_files([AppName | DepApps], SkipApps, Files) ->
+apps_files([AppName | DepApps], SkipApps, ExtraDirs, Files) ->
     case lists:member(AppName, SkipApps) of
         true ->
-            apps_files(DepApps, SkipApps, Files);
+            apps_files(DepApps, SkipApps, ExtraDirs, Files);
         false ->
-            AppFiles = app_files(AppName),
+            AppFiles = app_files(AppName, ExtraDirs),
             ?DEBUG("~ts modules: ~p", [AppName, dict:fetch_keys(AppFiles)]),
             Files2 = merge_files(Files, AppFiles),
-            apps_files(DepApps, [AppName | SkipApps], Files2)
+            apps_files(DepApps, [AppName | SkipApps], ExtraDirs, Files2)
     end.
 
-app_files(AppName) ->
+app_files(AppName, ExtraDirs) ->
     case app_ebin(AppName) of
         {ok, EbinDir} ->
-            ebin_files(EbinDir);
+            merge_files(ebin_files(EbinDir), extra_files(AppName, ExtraDirs));
         {error, bad_name} ->
             throw({unknown_application, AppName})
     end.
@@ -281,6 +283,21 @@ ebin_files(EbinDir) ->
                     dict:store(Mod, Absname, Mods)
             end,
     lists:foldl(Store, dict:new(), Files).
+
+extras_files(_BaseDir, [], Acc) ->
+    Acc;
+extras_files(BaseDir, [ExtraDir | Rest], Acc) ->
+    Files = ebin_files(filename:join(BaseDir, ExtraDir)),
+    extras_files(BaseDir, Rest, merge_files(Acc, Files)).
+
+extra_files(AppName, ExtraDirs) ->
+    lists:foldl(
+        fun(ExtraDir, Files) ->
+            merge_files(Files, ebin_files(filename:join(code:lib_dir(AppName), ExtraDir)))
+        end,
+        dict:new(),
+        ExtraDirs
+    ).
 
 merge_files(Files1, Files2) ->
     Duplicate = fun(Mod, File1, File2) ->
@@ -417,7 +434,7 @@ get_base_plt(Args, State) ->
 base_plt_files(State) ->
     BasePltApps = base_plt_apps(State),
     BasePltMods = get_config(State, base_plt_mods, []),
-    get_files(State, BasePltApps, [], BasePltMods, []).
+    get_files(State, BasePltApps, [], BasePltMods, [], []).
 
 base_plt_apps(State) ->
     get_config(State, base_plt_apps, [erts, crypto, kernel, stdlib]).
@@ -479,7 +496,8 @@ proj_files(State) ->
     PltApps = get_config(State, plt_extra_apps, []) ++ BasePltApps,
     BasePltMods = get_config(State, base_plt_mods, []),
     PltMods = get_config(State, plt_extra_mods, []) ++ BasePltMods,
-    get_files(State, Apps, PltApps, [], PltMods).
+    ExtraDirs = rebar_dir:extra_src_dirs(rebar_state:opts(State)),
+    get_files(State, Apps, PltApps, [], PltMods, ExtraDirs).
 
 run_dialyzer(State, Opts, Output) ->
     {Args, _} = rebar_state:command_parsed_args(State),
