@@ -28,6 +28,8 @@ put(Config, Path, Body) ->
 delete(Config, Path) ->
     request(Config, delete, Path, undefined).
 
+-compile({nowarn_deprecated_function, [http_uri, encode, 1]}).
+
 %% @private
 encode_query_string(List) ->
     QueryString =
