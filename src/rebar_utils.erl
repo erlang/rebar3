@@ -908,6 +908,9 @@ get_http_vars(Scheme) ->
     Config = rebar_config:consult_file(GlobalConfigFile),
     proplists:get_value(Scheme, Config, OS).
 
+-compile({nowarn_deprecated_function, [{http_uri, parse, 1},
+                                       {http_uri, decode, 1}]}).
+
 set_httpc_options() ->
     set_httpc_options(https_proxy, get_http_vars(https_proxy)),
     set_httpc_options(proxy, get_http_vars(http_proxy)).
