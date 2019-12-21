@@ -4,7 +4,7 @@
 %%% Also contains other useful string functionality.
 -module(rebar_string).
 %% Compatibility exports
--export([join/2, split/2, lexemes/2, trim/3, uppercase/1, lowercase/1, chr/2]).
+-export([join/2, split/2, lexemes/2, trim/1, trim/3, uppercase/1, lowercase/1, chr/2]).
 %% Util exports
 -export([consult/1]).
 
@@ -22,6 +22,7 @@ join([H|T], Sep) ->
 
 split(Str, SearchPattern) -> string:split(Str, SearchPattern).
 lexemes(Str, SepList) -> string:lexemes(Str, SepList).
+trim(Str) -> string:trim(Str).
 trim(Str, Direction, Cluster=[_]) -> string:trim(Str, Direction, Cluster).
 uppercase(Str) -> string:uppercase(Str).
 lowercase(Str) -> string:lowercase(Str).
@@ -36,6 +37,10 @@ join(Strings, Separator) -> string:join(Strings, Separator).
 split(Str, SearchPattern) when is_list(Str) -> string:split(Str, SearchPattern);
 split(Str, SearchPattern) when is_binary(Str) -> binary:split(Str, SearchPattern).
 lexemes(Str, SepList) -> string:tokens(Str, SepList).
+trim(Str) when is_list(Str) ->
+    re:replace(Str, "\\s+", "", [global, {return, list}]);
+trim(Str) when is_binary(Str) ->
+    list_to_binary(trim(binary_to_list(Str))).
 trim(Str, Direction, [Char]) ->
     Dir = case Direction of
               both -> both;
