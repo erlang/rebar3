@@ -201,7 +201,7 @@ do_unpack(Files, Output) ->
 finish_unpack({error, _} = Error) ->
     Error;
 finish_unpack(#{metadata := Metadata, files := Files, output := Output}) ->
-    _Version = maps:get("VERSION", Files),
+    true = maps:is_key("VERSION", Files),
     Checksum = decode_base16(maps:get("CHECKSUM", Files)),
     ContentsBinary = maps:get("contents.tar.gz", Files),
     case unpack_tarball(ContentsBinary, Output) of
