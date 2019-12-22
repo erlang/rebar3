@@ -100,8 +100,12 @@ compare_url(Dir, Url) ->
     ?DEBUG("Comparing git url ~p with ~p", [ParsedUrl, ParsedCurrentUrl]),
     ParsedCurrentUrl =:= ParsedUrl.
 
--compile({nowarn_deprecated_function, [{http_uri, parse, 2},
-                                       {http_uri, scheme_defaults, 0}]}).
+-ifdef (OTP_RELEASE).
+  -if(?OTP_RELEASE >= 23).
+    -compile({nowarn_deprecated_function, [{http_uri, parse, 2},
+                                           {http_uri, scheme_defaults, 0}]}).
+  -endif.
+-endif.
 
 parse_git_url(Url) ->
     %% Checks for standard scp style git remote
