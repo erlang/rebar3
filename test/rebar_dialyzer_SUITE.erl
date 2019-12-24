@@ -336,7 +336,8 @@ cli_args(Config) ->
                                                          "--base-plt-location=" ++ BasePltLocation,
                                                          "--plt-prefix=" ++ Prefix,
                                                          "--base-plt-prefix=" ++ BasePrefix,
-                                                         "--statistics"],
+                                                         "--statistics",
+                                                         "--dump-callgraph=test"],
                                    {ok, [{app, Name1}, {app, Name2}]}),
 
     ErtsFiles = erts_files(),
