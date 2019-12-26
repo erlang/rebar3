@@ -117,8 +117,8 @@ parse_git_url(Url) ->
     end.
 parse_git_url(not_scp, Url) ->
     UriOpts = [{scheme_defaults, [{git, 9418} | http_uri:scheme_defaults()]}],
-    case http_uri:parse(Url, UriOpts) of
-        {ok, {_Scheme, _User, Host, _Port, Path, _Query}} ->
+    case rebar_uri:parse(Url, UriOpts) of
+        #{path := Path, host := Host} ->
             {ok, {Host, filename:rootname(Path, ".git")}};
         {error, Reason} ->
             {error, Reason}

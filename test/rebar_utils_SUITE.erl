@@ -322,6 +322,16 @@ is_list_of_strings(_Config) ->
     ?assert(rebar_utils:is_list_of_strings("foo") == false).
 
 url_append_path(_Config) ->
-    ?assertEqual({ok, "https://repo.hex.pm:443/repos/org"}, rebar_utils:url_append_path("https://repo.hex.pm", "/repos/org")),
-    ?assertEqual({ok, "https://repo.hex.pm:443/repos/org?foo=bar"}, rebar_utils:url_append_path("https://repo.hex.pm",
-                                                                                      "/repos/org?foo=bar")).
+    %% OTP version differences
+    {ok, Val1} = rebar_utils:url_append_path("https://repo.hex.pm", "/repos/org"),
+    ?assert(lists:member(Val1, [
+        "https://repo.hex.pm/repos/org",
+        "https://repo.hex.pm:443/repos/org"
+    ])),
+    {ok, Val2} = rebar_utils:url_append_path("https://repo.hex.pm?foo=bar", "/repos/org"),
+    ?assert(lists:member(Val2, [
+        "https://repo.hex.pm/repos/org?foo=bar",
+        "https://repo.hex.pm:443/repos/org?foo=bar"
+    ])),
+    ?assertEqual({ok, "https://repo.hex.pm:443/repos/org?foo=bar"},
+                 rebar_utils:url_append_path("https://repo.hex.pm:443?foo=bar", "/repos/org")).
