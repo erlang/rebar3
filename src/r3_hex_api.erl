@@ -28,12 +28,17 @@ put(Config, Path, Body) ->
 delete(Config, Path) ->
     request(Config, delete, Path, undefined).
 
+%% OTP 21+
 -ifdef (OTP_RELEASE).
-  -if(?OTP_RELEASE >= 23).
-    -compile({nowarn_deprecated_function, [{http_uri, encode, 1}]}).
-  -endif.
--endif.
-
+encode_query_string(List0) ->
+    %% uri_string:compose_query/1 only accepts proplists where values are lists
+    Pairs = lists:map(fun ({K, V}) when is_atom(V)    -> {K, atom_to_list(V)};
+                          ({K, V}) when is_binary(V)  -> {K, binary_to_list(V)};
+                          ({K, V}) when is_integer(V) -> {K, integer_to_list(V)};
+                          ({K, V}) -> {K, V}
+                          end, List0),
+    list_to_binary(uri_string:compose_query(Pairs)).
+-else.
 %% @private
 encode_query_string(List) ->
     QueryString =
@@ -48,6 +53,8 @@ encode_query_string(List) ->
             end, List)),
     Encoded = http_uri:encode(QueryString),
     list_to_binary(Encoded).
+-endif.
+
 
 %% @private
 build_repository_path(#{api_repository := Repo}, Path) when is_binary(Repo) ->
@@ -61,9 +68,20 @@ build_organization_path(#{api_organization := Org}, Path) when is_binary(Org) ->
 build_organization_path(#{api_organization := undefined}, Path) ->
     Path.
 
+%% OTP 21+
+-ifdef (OTP_RELEASE).
+%% @private
+join_path_segments(Segments) ->
+    Concatenated = join(<<"/">>, Segments),
+    %% uri_string:recompose/1 accepts path segments as a list,
+    %% both strings and binaries
+    list_to_binary(uri_string:recompose(#{path => Concatenated})).
+-else.
 %% @private
 join_path_segments(Segments) ->
     erlang:iolist_to_binary(join(<<"/">>, lists:map(fun encode/1, Segments))).
+-endif.
+
 
 %%====================================================================
 %% Internal functions
@@ -92,10 +110,13 @@ request(Config, Method, Path, Body) when is_binary(Path) and is_map(Config) ->
             Other
     end.
 
+%% OTP < 21
+-ifndef (OTP_RELEASE).
 encode(Binary) when is_binary(Binary) ->
     encode(binary_to_list(Binary));
 encode(String) when is_list(String) ->
     http_uri:encode(String).
+-endif.
 
 build_url(Path, #{api_url := URI}) ->
     <<URI/binary, "/", Path/binary>>.
