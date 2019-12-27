@@ -16,6 +16,8 @@
 ]).
 -define(ERL_CONTENT_TYPE, <<"application/vnd.hex+erlang">>).
 
+-import(rebar_utils, [to_list/1]).
+
 get(Config, Path) ->
     request(Config, get, Path, undefined).
 
@@ -32,10 +34,7 @@ delete(Config, Path) ->
 -ifdef (OTP_RELEASE).
 encode_query_string(List0) ->
     %% uri_string:compose_query/1 only accepts proplists where values are lists
-    Pairs = lists:map(fun ({K, V}) when is_atom(V)    -> {K, atom_to_list(V)};
-                          ({K, V}) when is_binary(V)  -> {K, binary_to_list(V)};
-                          ({K, V}) when is_integer(V) -> {K, integer_to_list(V)};
-                          ({K, V}) -> {K, V}
+    Pairs = lists:map(fun ({K, V}) -> {to_list(K), to_list(V)}
                           end, List0),
     list_to_binary(uri_string:compose_query(Pairs)).
 -else.
@@ -43,13 +42,7 @@ encode_query_string(List0) ->
 encode_query_string(List) ->
     QueryString =
         join("&",
-            lists:map(fun
-                ({K, V}) when is_atom(V) ->
-                    atom_to_list(K) ++ "=" ++ atom_to_list(V);
-                ({K, V}) when is_binary(V) ->
-                    atom_to_list(K) ++ "=" ++ binary_to_list(V);
-                ({K, V}) when is_integer(V) ->
-                    atom_to_list(K) ++ "=" ++ integer_to_list(V)
+            lists:map(fun ({K, V}) -> to_list(K) ++ "=" ++ to_list(V)
             end, List)),
     Encoded = http_uri:encode(QueryString),
     list_to_binary(Encoded).
