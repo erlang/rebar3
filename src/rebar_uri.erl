@@ -1,9 +1,14 @@
 %%% @doc multi-OTP version compatibility shim for working with URIs
 -module(rebar_uri).
 
--ifdef (OTP_RELEASE).
--export([parse/1]).
+-export([
+         parse/1,
+         append_path/2
+]).
 
+-import(rebar_utils, [to_list/1]).
+
+-ifdef (OTP_RELEASE).
 -spec parse(URIString) -> URIMap when
     URIString :: uri_string:uri_string(),
     URIMap :: uri_string:uri_map() | uri_string:error().
@@ -11,8 +16,6 @@
 parse(URIString) ->
     uri_string:parse(URIString).
 -else.
--export([parse/1]).
-
 -spec parse(URIString) -> URIMap when
     URIString :: iodata(),
     URIMap :: map() | {error, atom(), term()}.
@@ -26,7 +29,7 @@ parse(URIString) ->
             {error, Reason, ""};
         {ok, {Scheme, UserInfo, Host, Port, Path, Query}} ->
             #{
-                scheme => Scheme,
+                scheme => rebar_utils:to_list(Scheme),
                 host => Host,
                 port => Port,
                 path => Path,
@@ -42,3 +45,27 @@ parse(URIString) ->
     end.
 -endif.
 
+%% OTP 21+
+-ifdef (OTP_RELEASE).
+append_path(Url, ExtraPath) ->
+     case parse(Url) of
+         #{path := Path} = Map ->
+             FullPath = filename:join(Path, ExtraPath),
+             {ok, uri_string:recompose(maps:update(path, FullPath, Map))};
+         _ ->
+             error
+     end.
+-else.
+append_path(Url, ExtraPath) ->
+     case parse(Url) of
+         #{scheme := Scheme, userinfo := UserInfo, host := Host, port := Port, path := Path, query := Query} ->
+             PrefixedQuery = case Query of
+                               []    -> [];
+                               Other -> lists:append(["?", Other])
+                             end,
+             {ok, lists:append([to_list(Scheme), "://", UserInfo, Host, ":", to_list(Port),
+                                filename:join(Path, ExtraPath), PrefixedQuery])};
+         _ ->
+             error
+     end.
+-endif.

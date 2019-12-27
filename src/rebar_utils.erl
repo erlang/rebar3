@@ -64,7 +64,6 @@
          tup_find/2,
          line_count/1,
          set_httpc_options/0,
-         url_append_path/2,
          escape_chars/1,
          escape_double_quotes/1,
          escape_double_quotes_weak/1,
@@ -266,6 +265,8 @@ to_binary(A) when is_atom(A) -> atom_to_binary(A, unicode);
 to_binary(Str) -> unicode:characters_to_binary(Str).
 
 to_list(A) when is_atom(A) -> atom_to_list(A);
+to_list(B) when is_binary(B) -> unicode:characters_to_list(B);
+to_list(I) when is_integer(I) -> integer_to_list(I);
 to_list(Str) -> unicode:characters_to_list(Str).
 
 tup_dedup(List) ->
@@ -936,31 +937,6 @@ normalise_proxy(Scheme, URI) ->
         nomatch when Scheme =:= proxy -> "http://" ++ URI;
         _ -> URI
     end.
-
-%% OTP 21+
--ifdef (OTP_RELEASE).
-url_append_path(Url, ExtraPath) ->
-     case rebar_uri:parse(Url) of
-         #{path := Path} = Map ->
-             FullPath = filename:join(Path, ExtraPath),
-             {ok, uri_string:recompose(maps:update(path, FullPath, Map))};
-         _ ->
-             error
-     end.
--else.
-url_append_path(Url, ExtraPath) ->
-     case rebar_uri:parse(Url) of
-         #{scheme := Scheme, userinfo := UserInfo, host := Host, port := Port, path := Path, query := Query} ->
-             PrefixedQuery = case Query of
-                               []    -> [];
-                               Other -> lists:append(["?", Other])
-                             end,
-             {ok, lists:append([atom_to_list(Scheme), "://", UserInfo, Host, ":", integer_to_list(Port),
-                                filename:join(Path, ExtraPath), PrefixedQuery])};
-         _ ->
-             error
-     end.
--endif.
 
 %% escape\ as\ a\ shell\?
 escape_chars(Str) when is_atom(Str) ->
