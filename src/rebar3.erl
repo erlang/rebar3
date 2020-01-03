@@ -131,25 +131,17 @@ run_aux(State, RawArgs) ->
     rebar_utils:check_min_otp_version(rebar_state:get(State1, minimum_otp_vsn, undefined)),
     rebar_utils:check_blacklisted_otp_versions(rebar_state:get(State1, blacklisted_otp_vsns, undefined)),
 
-    %% Change the default hex CDN
-    State2 = case os:getenv("HEX_CDN") of
-                 false ->
-                     State1;
-                 CDN ->
-                     rebar_state:set(State1, rebar_packages_cdn, CDN)
-             end,
-
     Compilers = application:get_env(rebar, compilers, []),
-    State0 = rebar_state:compilers(State2, Compilers),
+    State0 = rebar_state:compilers(State1, Compilers),
 
     %% TODO: this means use of REBAR_PROFILE=profile will replace the repos with
     %% the repos defined in the profile. But it will not work with `as profile`.
     %% Maybe it shouldn't work with either to be consistent?
     Resources = application:get_env(rebar, resources, []),
-    State2_ = rebar_state:create_resources(Resources, State0),
+    State1_ = rebar_state:create_resources(Resources, State0),
 
     %% bootstrap test profile
-    State3 = rebar_state:add_to_profile(State2_, test, test_state(State1)),
+    State2 = rebar_state:add_to_profile(State1_, test, test_state(State1)),
 
     BaseDir = case os:getenv("REBAR_BASE_DIR") of
                   D when D =:= false orelse D =:= "" ->
@@ -157,36 +149,36 @@ run_aux(State, RawArgs) ->
                   Dir ->
                       Dir
               end,
-    State4 = rebar_state:set(State3, base_dir,
-                             filename:join(filename:absname(rebar_state:dir(State3)), BaseDir)),
+    State3 = rebar_state:set(State2, base_dir,
+                             filename:join(filename:absname(rebar_state:dir(State2)), BaseDir)),
 
     {ok, Providers} = application:get_env(rebar, providers),
     %% Providers can modify profiles stored in opts, so set default after initializing providers
-    State5 = rebar_state:create_logic_providers(Providers, State4),
+    State4 = rebar_state:create_logic_providers(Providers, State3),
     %% Initializing project_plugins which can override default providers
-    State6 = rebar_plugins:project_plugins_install(State5),
-    State7 = rebar_plugins:top_level_install(State6),
-    State8 = case os:getenv("REBAR_CACHE_DIR") of
+    State5 = rebar_plugins:project_plugins_install(State4),
+    State6 = rebar_plugins:top_level_install(State5),
+    State7 = case os:getenv("REBAR_CACHE_DIR") of
                 false ->
-                    State7;
+                    State6;
                 ConfigFile ->
-                    rebar_state:set(State7, global_rebar_dir, ConfigFile)
+                    rebar_state:set(State6, global_rebar_dir, ConfigFile)
             end,
 
-    State9 = rebar_state:default(State8, rebar_state:opts(State8)),
+    State8 = rebar_state:default(State7, rebar_state:opts(State7)),
 
     {Task, Args} = parse_args(RawArgs),
 
-    State10 = rebar_state:code_paths(State9, default, code:get_path()),
+    State9 = rebar_state:code_paths(State8, default, code:get_path()),
 
-    case rebar_core:init_command(rebar_state:command_args(State10, Args), Task) of
-        {ok, State11} ->
-            case rebar_state:get(State11, caller, command_line) of
+    case rebar_core:init_command(rebar_state:command_args(State9, Args), Task) of
+        {ok, State10} ->
+            case rebar_state:get(State10, caller, command_line) of
                 api ->
-                    rebar_paths:unset_paths([deps, plugins], State11),
-                    {ok, State11};
+                    rebar_paths:unset_paths([deps, plugins], State10),
+                    {ok, State10};
                 _ ->
-                    {ok, State11}
+                    {ok, State10}
             end;
         Other ->
             Other

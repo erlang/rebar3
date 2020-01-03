@@ -42,8 +42,6 @@ do(State) ->
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
-format_error({package_parse_cdn, Uri}) ->
-    io_lib:format("Failed to parse CDN url: ~p", [Uri]);
 format_error(package_index_download) ->
     "Failed to download package index.";
 format_error(package_index_write) ->

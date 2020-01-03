@@ -295,12 +295,6 @@ mock_config(Name, Config) ->
 
     %% The state returns us a fake registry
     meck:new(rebar_state, [passthrough]),
-    meck:expect(rebar_state, get,
-                fun(_State, rebar_packages_cdn, _Default) ->
-                        "http://test.com/";
-                   (_, _, Default) ->
-                        Default
-                end),
     meck:expect(rebar_state, resources,
                 fun(_State) ->
                         DefaultConfig = r3_hex_core:default_config(),
