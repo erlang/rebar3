@@ -1,7 +1,7 @@
 %%% @doc Runs a process that holds a rebar3 state and can be used
 %%% to statefully maintain loaded project state into a running VM.
 -module(rebar_agent).
--export([start_link/1, do/1, do/2, async_do/1, async_do/2]).
+-export([start_link/1, do/1, do/2, do/3, async_do/1, async_do/2, async_do/3]).
 -export(['$handle_undefined_function'/2]).
 -export([init/1,
          handle_call/3, handle_cast/2, handle_info/2,
@@ -21,7 +21,7 @@ start_link(State) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, State, []).
 
 %% @doc runs a given command in the agent's context.
--spec do(atom()) -> ok | {error, term()}.
+-spec do(atom() | string()) -> ok | {error, term()}.
 do(Command) when is_atom(Command) ->
     gen_server:call(?MODULE, {cmd, Command}, infinity);
 do(Args) when is_list(Args) ->
@@ -29,13 +29,17 @@ do(Args) when is_list(Args) ->
 
 %% @doc runs a given command in the agent's context, under a given
 %% namespace.
--spec do(atom(), atom()) -> ok | {error, term()}.
+-spec do(atom(), atom() | string()) -> ok | {error, term()}.
 do(Namespace, Command) when is_atom(Namespace), is_atom(Command) ->
     gen_server:call(?MODULE, {cmd, Namespace, Command}, infinity);
 do(Namespace, Args) when is_atom(Namespace), is_list(Args) ->
     gen_server:call(?MODULE, {cmd, Namespace, do, Args}, infinity).
 
--spec async_do(atom()) -> ok | {error, term()}.
+-spec do(atom(), atom(), string()) -> ok | {error, term()}.
+do(Namespace, Command, Args) when is_atom(Namespace), is_atom(Command), is_list(Args) ->
+    gen_server:call(?MODULE, {cmd, Namespace, Command, Args}, infinity).
+
+-spec async_do(atom()) -> ok.
 async_do(Command) when is_atom(Command) ->
     gen_server:cast(?MODULE, {cmd, Command});
 async_do(Args) when is_list(Args) ->
@@ -46,6 +50,10 @@ async_do(Namespace, Command) when is_atom(Namespace), is_atom(Command) ->
     gen_server:cast(?MODULE, {cmd, Namespace, Command});
 async_do(Namespace, Args) when is_atom(Namespace), is_list(Args) ->
     gen_server:cast(?MODULE, {cmd, Namespace, do, Args}).
+
+-spec async_do(atom(), atom(), string()) -> ok.
+async_do(Namespace, Command, Args) when is_atom(Namespace), is_atom(Command), is_list(Args) ->
+    gen_server:cast(?MODULE, {cmd, Namespace, Command, Args}).
 
 '$handle_undefined_function'(Cmd, [Namespace, Args]) ->
     gen_server:call(?MODULE, {cmd, Namespace, Cmd, Args}, infinity);
