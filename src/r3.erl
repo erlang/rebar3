@@ -1,25 +1,33 @@
 %%% @doc external alias for `rebar_agent' for more convenient
 %%% calls from a shell.
 -module(r3).
--export([do/1, do/2, async_do/1, async_do/2, break/0, resume/0]).
+-export([do/1, do/2, do/3, async_do/1, async_do/2, async_do/3, break/0, resume/0]).
 -export(['$handle_undefined_function'/2]).
 -include("rebar.hrl").
 
 %% @doc alias for `rebar_agent:do/1'
--spec do(atom()) -> ok | {error, term()}.
+-spec do(atom() | string()) -> ok | {error, term()}.
 do(Command) -> rebar_agent:do(Command).
 
 %% @doc alias for `rebar_agent:do/2'
--spec do(atom(), atom()) -> ok | {error, term()}.
+-spec do(atom(), atom() | string()) -> ok | {error, term()}.
 do(Namespace, Command) -> rebar_agent:do(Namespace, Command).
 
+%% @doc alias for `rebar_agent:do/3'
+-spec do(atom(), atom(), string()) -> ok | {error, term()}.
+do(Namespace, Command, Args) -> rebar_agent:do(Namespace, Command, Args).
+
 %% @doc alias for `rebar_agent:async_do/1'
--spec async_do(atom()) -> ok | {error, term()}.
+-spec async_do(atom()) -> ok.
 async_do(Command) -> rebar_agent:async_do(Command).
 
 %% @doc alias for `rebar_agent:async_do/2'
--spec async_do(atom(), atom()) -> ok | {error, term()}.
+-spec async_do(atom(), atom()) -> ok.
 async_do(Namespace, Command) -> rebar_agent:async_do(Namespace, Command).
+
+%% @doc alias for `rebar_agent:async_do/3'
+-spec async_do(atom(), atom(), string()) -> ok.
+async_do(Namespace, Command, Args) -> rebar_agent:async_do(Namespace, Command, Args).
 
 break() ->
     case whereis(rebar_agent) of % is the shell running
