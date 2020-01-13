@@ -107,7 +107,7 @@ download(TmpDir, Pkg={pkg, Name, Vsn, _OldHash, _Hash, Repo}, State, _ResourceSt
     ETagFile = binary_to_list(<<Name/binary, "-", Vsn/binary, ".etag">>),
     CachePath = filename:join(PackageDir, Package),
     ETagPath = filename:join(PackageDir, ETagFile),
-    case cached_download(TmpDir, CachePath, Pkg, etag(CachePath, ETagPath), ETagPath, UpdateETag) of
+    case cached_download(TmpDir, CachePath, Pkg, State, etag(CachePath, ETagPath), ETagPath, UpdateETag) of
         {bad_registry_checksum, Expected, Found} ->
             %% checksum comparison failed. in case this is from a modified cached package
             %% overwrite the etag if it exists so it is not relied on again
@@ -206,17 +206,19 @@ store_etag_in_cache(Path, ETag) ->
 %%%=============================================================================
 %%% Private functions
 %%%=============================================================================
--spec cached_download(TmpDir, CachePath, Pkg, ETag, ETagPath, UpdateETag) -> Res when
+-spec cached_download(TmpDir, CachePath, Pkg, State, ETag, ETagPath, UpdateETag) -> Res when
       TmpDir :: file:name(),
       CachePath :: file:name(),
       Pkg :: package(),
+      State :: rebar_state:t(),
       ETag :: binary(),
       ETagPath :: file:name(),
       UpdateETag :: boolean(),
       Res :: ok | {unexpected_hash, integer(), integer()} | {fetch_fail, binary(), binary()}.
-cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoConfig}, ETag,
+cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoConfig}, State, ETag,
                 ETagPath, UpdateETag) ->
-    case request(RepoConfig, Name, Vsn, ETag) of
+    CDN = maybe_default_cdn(State),
+    case request(RepoConfig#{repo_url => CDN}, Name, Vsn, ETag) of
         {ok, cached} ->
             ?INFO("Version cached at ~ts is up to date, reusing it", [CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg);
@@ -231,6 +233,10 @@ cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoCon
         error ->
             {fetch_fail, Name, Vsn}
     end.
+
+maybe_default_cdn(State) ->
+    CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
+	rebar_utils:to_binary(CDN).
 
 -spec serve_from_cache(TmpDir, CachePath, Pkg) -> Res when
       TmpDir :: file:name(),
