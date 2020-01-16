@@ -162,6 +162,10 @@ compile(State, Providers, AppInfo) ->
 
     AppInfo2 = rebar_hooks:run_all_hooks(AppDir, pre, ?ERLC_HOOK, Providers, AppInfo1, State),
 
+    %% For non-rebar3 built deps the proper app structure should be created by pre-hooks
+    %% by this time. Verify that.
+    ok = verify_app_structure(AppInfo2, AppDir),
+
     build_app(AppInfo2, State),
 
     AppInfo3 = rebar_hooks:run_all_hooks(AppDir, post, ?ERLC_HOOK, Providers, AppInfo2, State),
@@ -212,6 +216,14 @@ build_app(AppInfo, State) ->
                 _ ->
                     throw(?PRV_ERROR({unknown_project_type, rebar_app_info:name(AppInfo), Type}))
             end
+    end.
+
+verify_app_structure(AppInfo, AppDir) ->
+    case rebar_app_discover:find_app(AppInfo, AppDir, all) of
+      {true, _AppInfo1} ->
+        ok;
+      false ->
+        throw(?PRV_ERROR({dep_app_not_found, rebar_app_info:name(AppInfo)}))
     end.
 
 update_code_paths(State, ProjectApps) ->

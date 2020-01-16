@@ -34,7 +34,7 @@ download_source(AppInfo, State)  ->
                 {true, AppInfo2} ->
                     rebar_app_info:is_available(AppInfo2, true);
                 false ->
-                    throw(?PRV_ERROR({dep_app_not_found, rebar_app_info:name(AppInfo1)}))
+                    rebar_app_info:is_available(AppInfo1, true)
             end;
         {error, Reason} ->
             throw(?PRV_ERROR(Reason))
