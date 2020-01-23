@@ -2412,7 +2412,6 @@ split_project_apps_hooks(Config) ->
     ok = file:write_file(filename:join(AppDir2, "rebar.config"),
                          io_lib:format("~p.~n~p.", Cfg("app2"))),
     RebarConfig = Cfg("all"),
-    ct:pal("RebarConfig: ~p~n", [RebarConfig]),
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"],
                                    {ok, [{app, Name1}, {app, Name2}]}),
     %% Now for the big party:
@@ -2429,152 +2428,36 @@ split_project_apps_hooks(Config) ->
     %%   - compile post hook runs for each app individually
     %% - we expect app compile post-hooks to show up in order
     %% - we expect whole post-hooks to run last
-    ?assertEqual({ok, <<"pre-compile-all\n">>},
-                 file:read_file(filename:join(HookDir, "pre-compile-all"))),
-    ?assertEqual({ok, <<
-                        "pre-compile-all\n"
-                        "pre-compile-app2\n"
-                      >>},
-                 file:read_file(filename:join(HookDir, "pre-compile-app2"))),
-    ?assertEqual({ok, <<
-                        "pre-compile-all\n"
-                        "pre-compile-app2\n"
-                        "pre-erlc-app2\n"
-                      >>},
-                 file:read_file(filename:join(HookDir, "pre-erlc-app2"))),
-    ?assertEqual({ok, <<
-                        "pre-compile-all\n"
-                        "pre-compile-app1\n"
-                        "pre-compile-app2\n"
-                        "pre-erlc-app2\n"
-                      >>},
-                 file:read_file(filename:join(HookDir, "pre-compile-app1"))),
-    ?assertEqual({ok, <<
-                        "pre-compile-all\n"
-                        "pre-compile-app1\n"
-                        "pre-compile-app2\n"
-                        "pre-erlc-app1\n"
-                        "pre-erlc-app2\n"
-                      >>},
-                 file:read_file(filename:join(HookDir, "pre-erlc-app1"))),
-    ?assertEqual({ok, <<
-                        "post-erlc-app2\n"
-                        "pre-compile-all\n"
-                        "pre-compile-app1\n"
-                        "pre-compile-app2\n"
-                        "pre-erlc-app1\n"
-                        "pre-erlc-app2\n"
-                      >>},
-                 file:read_file(filename:join(HookDir, "post-erlc-app2"))),
-    ?assertEqual({ok, <<
-                        "post-erlc-app2\n"
-                        "pre-app-app2\n"
-                        "pre-compile-all\n"
-                        "pre-compile-app1\n"
-                        "pre-compile-app2\n"
-                        "pre-erlc-app1\n"
-                        "pre-erlc-app2\n"
-                      >>},
-                 file:read_file(filename:join(HookDir, "pre-app-app2"))),
-    ?assertEqual({ok, <<
-                        "post-app-app2\n"
-                        "post-erlc-app2\n"
-                        "pre-app-app2\n"
-                        "pre-compile-all\n"
-                        "pre-compile-app1\n"
-                        "pre-compile-app2\n"
-                        "pre-erlc-app1\n"
-                        "pre-erlc-app2\n"
-                      >>},
-                 file:read_file(filename:join(HookDir, "post-app-app2"))),
-    ?assertEqual({ok, <<
-                        "post-app-app2\n"
-                        "post-compile-app2\n"
-                        "post-erlc-app2\n"
-                        "pre-app-app2\n"
-                        "pre-compile-all\n"
-                        "pre-compile-app1\n"
-                        "pre-compile-app2\n"
-                        "pre-erlc-app1\n"
-                        "pre-erlc-app2\n"
-                      >>},
-                 file:read_file(filename:join(HookDir, "post-compile-app2"))),
-    ?assertEqual({ok, <<
-                        "post-app-app2\n"
-                        "post-compile-app2\n"
-                        "post-erlc-app1\n"
-                        "post-erlc-app2\n"
-                        "pre-app-app2\n"
-                        "pre-compile-all\n"
-                        "pre-compile-app1\n"
-                        "pre-compile-app2\n"
-                        "pre-erlc-app1\n"
-                        "pre-erlc-app2\n"
-                      >>},
-                 file:read_file(filename:join(HookDir, "post-erlc-app1"))),
-    ?assertEqual({ok, <<
-                        "post-app-app2\n"
-                        "post-compile-app2\n"
-                        "post-erlc-app1\n"
-                        "post-erlc-app2\n"
-                        "pre-app-app1\n"
-                        "pre-app-app2\n"
-                        "pre-compile-all\n"
-                        "pre-compile-app1\n"
-                        "pre-compile-app2\n"
-                        "pre-erlc-app1\n"
-                        "pre-erlc-app2\n"
-                      >>},
-                 file:read_file(filename:join(HookDir, "pre-app-app1"))),
-    ?assertEqual({ok, <<
-                        "post-app-app1\n"
-                        "post-app-app2\n"
-                        "post-compile-app2\n"
-                        "post-erlc-app1\n"
-                        "post-erlc-app2\n"
-                        "pre-app-app1\n"
-                        "pre-app-app2\n"
-                        "pre-compile-all\n"
-                        "pre-compile-app1\n"
-                        "pre-compile-app2\n"
-                        "pre-erlc-app1\n"
-                        "pre-erlc-app2\n"
-                      >>},
-                 file:read_file(filename:join(HookDir, "post-app-app1"))),
-    ?assertEqual({ok, <<
-                        "post-app-app1\n"
-                        "post-app-app2\n"
-                        "post-compile-app1\n"
-                        "post-compile-app2\n"
-                        "post-erlc-app1\n"
-                        "post-erlc-app2\n"
-                        "pre-app-app1\n"
-                        "pre-app-app2\n"
-                        "pre-compile-all\n"
-                        "pre-compile-app1\n"
-                        "pre-compile-app2\n"
-                        "pre-erlc-app1\n"
-                        "pre-erlc-app2\n"
-                      >>},
-                 file:read_file(filename:join(HookDir, "post-compile-app1"))),
-    ?assertEqual({ok, <<
-                        "post-app-app1\n"
-                        "post-app-app2\n"
-                        "post-compile-all\n"
-                        "post-compile-app1\n"
-                        "post-compile-app2\n"
-                        "post-erlc-app1\n"
-                        "post-erlc-app2\n"
-                        "pre-app-app1\n"
-                        "pre-app-app2\n"
-                        "pre-compile-all\n"
-                        "pre-compile-app1\n"
-                        "pre-compile-app2\n"
-                        "pre-erlc-app1\n"
-                        "pre-erlc-app2\n"
-                      >>},
-                 file:read_file(filename:join(HookDir, "post-compile-all"))),
+    CallOrder = [
+        "pre-compile-all",
+        "pre-compile-app2",
+        "pre-erlc-app2",
+        "pre-compile-app1",
+        "pre-erlc-app1",
+        "post-erlc-app2",
+        "pre-app-app2",
+        "post-app-app2",
+        "post-compile-app2",
+        "post-erlc-app1",
+        "pre-app-app1",
+        "post-app-app1",
+        "post-compile-app1",
+        "post-compile-all"
+    ],
+    validate_call_order(CallOrder, HookDir),
     ok.
+
+validate_call_order(Calls, Dir) -> validate_call_order(Calls, Dir, []).
+
+validate_call_order([], _, _) ->
+    ok;
+validate_call_order([Name|T], Dir, Seen) ->
+    {ok, Bin} = file:read_file(filename:join(Dir, Name)),
+    %% weird list of tokens, but works on lexemes/tokens for backwards compat
+    Found = rebar_string:lexemes(binary_to_list(Bin), [$\n, $\r, "\r\n"]),
+    NewSeen = [Name|Seen],
+    ?assertEqual({Name, Found}, {Name, lists:sort(NewSeen)}),
+    validate_call_order(T, Dir, NewSeen).
 
 app_file_linting(Config) ->
     meck:new(rebar_log, [no_link, passthrough]),
