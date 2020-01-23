@@ -6,8 +6,7 @@
          do/1,
          format_error/1]).
 
--export([compile/2,
-         compile/3]).
+-export([compile/2, compile/3]).
 
 -include_lib("providers/include/providers.hrl").
 -include("rebar.hrl").
@@ -98,15 +97,22 @@ format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
 copy_and_build_apps(State, Providers, Apps) ->
-    [build_app(State, Providers, AppInfo) || AppInfo <- Apps].
+    PrepApps = [prepare_app(State, Providers, AppInfo) || AppInfo <- Apps],
+    [compile_prepared(State, Providers, AppInfo) || AppInfo <- PrepApps].
 
-build_app(State, Providers, AppInfo) ->
+prepare_app(State, Providers, AppInfo) ->
     AppDir = rebar_app_info:dir(AppInfo),
     OutDir = rebar_app_info:out_dir(AppInfo),
     copy_app_dirs(AppInfo, AppDir, OutDir),
-    compile(State, Providers, AppInfo).
+    AppDir = rebar_app_info:dir(AppInfo),
+    AppInfo1 = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, AppInfo, State),
+    rebar_hooks:run_all_hooks(AppDir, pre, ?ERLC_HOOK, Providers, AppInfo1, State).
 
 copy_and_build_project_apps(State, Providers, Apps) ->
+    [compile_prepared(State, Providers, AppInfo)
+     || AppInfo <- prepare_project_apps(State, Providers, Apps)].
+
+prepare_project_apps(State, Providers, Apps) ->
     %% Top-level apps, because of profile usage and specific orderings (i.e.
     %% may require an include file from a profile-specific app for an extra_dirs
     %% entry that only exists in a test context), need to be
@@ -116,8 +122,12 @@ copy_and_build_project_apps(State, Providers, Apps) ->
                    rebar_app_info:out_dir(AppInfo))
      || AppInfo <- Apps],
     code:add_pathsa([rebar_app_info:ebin_dir(AppInfo) || AppInfo <- Apps]),
-    [compile(State, Providers, AppInfo) || AppInfo <- Apps].
+    [pre_hooks(State, Providers, AppInfo) || AppInfo <- Apps].
 
+pre_hooks(State, Providers, AppInfo) ->
+    AppDir = rebar_app_info:dir(AppInfo),
+    AppInfo1 = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, AppInfo, State),
+    rebar_hooks:run_all_hooks(AppDir, pre, ?ERLC_HOOK, Providers, AppInfo1, State).
 
 build_extra_dirs(State, Apps) ->
     BaseDir = rebar_state:dir(State),
@@ -156,33 +166,32 @@ compile(State, AppInfo) ->
     compile(State, rebar_state:providers(State), AppInfo).
 
 compile(State, Providers, AppInfo) ->
+    compile_prepared(State, Providers, pre_hooks(State, Providers, AppInfo)).
+
+compile_prepared(State, Providers, AppInfo) ->
     ?INFO("Compiling ~ts", [rebar_app_info:name(AppInfo)]),
     AppDir = rebar_app_info:dir(AppInfo),
-    AppInfo1 = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, AppInfo, State),
 
-    AppInfo2 = rebar_hooks:run_all_hooks(AppDir, pre, ?ERLC_HOOK, Providers, AppInfo1, State),
+    build_app(AppInfo, State),
 
-    build_app(AppInfo2, State),
-
-    AppInfo3 = rebar_hooks:run_all_hooks(AppDir, post, ?ERLC_HOOK, Providers, AppInfo2, State),
-
-    AppInfo4 = rebar_hooks:run_all_hooks(AppDir, pre, ?APP_HOOK, Providers, AppInfo3, State),
+    AppInfo1 = rebar_hooks:run_all_hooks(AppDir, post, ?ERLC_HOOK, Providers, AppInfo, State),
+    AppInfo2 = rebar_hooks:run_all_hooks(AppDir, pre, ?APP_HOOK, Providers, AppInfo1, State),
 
     %% Load plugins back for make_vsn calls in custom resources.
     %% The rebar_otp_app compilation step is safe regarding the
     %% overall path management, so we can just load all plugins back
     %% in memory.
     rebar_paths:set_paths([plugins], State),
-    AppFileCompileResult = rebar_otp_app:compile(State, AppInfo4),
+    AppFileCompileResult = rebar_otp_app:compile(State, AppInfo2),
     %% Clean up after ourselves, leave things as they were with deps first
     rebar_paths:set_paths([deps], State),
 
     case AppFileCompileResult of
-        {ok, AppInfo5} ->
-            AppInfo6 = rebar_hooks:run_all_hooks(AppDir, post, ?APP_HOOK, Providers, AppInfo5, State),
-            AppInfo7 = rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo6, State),
-            has_all_artifacts(AppInfo5),
-            AppInfo7;
+        {ok, AppInfo3} ->
+            AppInfo4 = rebar_hooks:run_all_hooks(AppDir, post, ?APP_HOOK, Providers, AppInfo3, State),
+            AppInfo5 = rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo4, State),
+            has_all_artifacts(AppInfo3),
+            AppInfo5;
         Error ->
             throw(Error)
     end.
