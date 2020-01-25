@@ -16,7 +16,8 @@
          build_release_plt/1,
          plt_apps_option/1,
          exclude_and_extra/1,
-         cli_args/1]).
+         cli_args/1,
+         extra_src_dirs/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -59,7 +60,11 @@ all() ->
 
 groups() ->
     [{empty, [empty_base_plt, empty_app_plt, empty_app_succ_typings]},
-     {build_and_check, [cli_args, build_release_plt, plt_apps_option, exclude_and_extra]},
+     {build_and_check, [cli_args,
+                        build_release_plt,
+                        plt_apps_option,
+                        exclude_and_extra,
+                        extra_src_dirs]},
      {update, [update_base_plt, update_app_plt]}].
 
 empty_base_plt(Config) ->
@@ -346,6 +351,19 @@ cli_args(Config) ->
 
     {ok, PltFiles} = plt_files(Plt),
     ?assertEqual(ErtsFiles, PltFiles).
+
+extra_src_dirs(Config) ->
+    AppDir = ?config(apps, Config),
+    State = ?config(state, Config),
+    RebarConfig = ?config(rebar_config, Config),
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, []),
+    % `test` directory is already in `extra_src_dirs` when run test profile
+    Command = ["as", "test", "dialyzer"],
+    % there are few warnings for generated test (see rebar_test_utils:erl_eunit_suite_file/1)
+    {error, {rebar_prv_dialyzer, {dialyzer_warnings, _}}} =
+        rebar3:run(rebar_state:new(State, RebarConfig, AppDir), Command).
 
 %% Helpers
 
