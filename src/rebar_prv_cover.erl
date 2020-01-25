@@ -164,7 +164,7 @@ analysis(State, Task) ->
               end,
               Mods),
     true = rebar_utils:cleanup_code_path(OldPath),
-    Analysis.
+    lists:sort(Analysis).
 
 restore_cover_paths(State) ->
     lists:foreach(fun(App) ->
