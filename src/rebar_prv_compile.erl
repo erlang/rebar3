@@ -6,8 +6,7 @@
          do/1,
          format_error/1]).
 
--export([compile/2,
-         compile/3]).
+-export([compile/2, compile/3]).
 
 -include_lib("providers/include/providers.hrl").
 -include("rebar.hrl").
@@ -98,26 +97,98 @@ format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
 copy_and_build_apps(State, Providers, Apps) ->
-    [build_app(State, Providers, AppInfo) || AppInfo <- Apps].
+    Apps0 = [prepare_app(State, Providers, App) || App <- Apps],
+    compile(State, Providers, Apps0).
 
-build_app(State, Providers, AppInfo) ->
+copy_and_build_project_apps(State, Providers, Apps) ->
+    Apps0 = [prepare_project_app(State, Providers, App) || App <- Apps],
+    compile(State, Providers, Apps0).
+
+-spec compile(rebar_state:t(), [rebar_app_info:t()]) -> [rebar_app_info:t()]
+      ;      (rebar_state:t(), rebar_app_info:t()) -> rebar_app_info:t().
+compile(State, AppInfo) ->
+    compile(State, rebar_state:providers(State), AppInfo).
+
+-spec compile(rebar_state:t(), [providers:t()],
+              [rebar_app_info:t()]) -> [rebar_app_info:t()]
+      ;      (rebar_state:t(), [providers:t()],
+              rebar_app_info:t()) -> rebar_app_info:t().
+compile(State, Providers, AppInfo) when not is_list(AppInfo) ->
+    [Res] = compile(State, Providers, [AppInfo]),
+    Res;
+compile(State, Providers, Apps) ->
+    Apps1 = [prepare_compile(State, Providers, App) || App <- Apps],
+    Apps2 = [prepare_compilers(State, Providers, App) || App <- Apps1],
+    Apps3 = [run_compilers(State, Providers, App) || App <- Apps2],
+    Apps4 = [finalize_compilers(State, Providers, App) || App <- Apps3],
+    Apps5 = [prepare_app_file(State, Providers, App) || App <- Apps4],
+    Apps6 = compile_app_files(State, Providers, Apps5),
+    Apps7 = [finalize_app_file(State, Providers, App) || App <- Apps6],
+    [finalize_compile(State, Providers, App) || App <- Apps7].
+
+prepare_app(_State, _Providers, AppInfo) ->
     AppDir = rebar_app_info:dir(AppInfo),
     OutDir = rebar_app_info:out_dir(AppInfo),
     copy_app_dirs(AppInfo, AppDir, OutDir),
-    compile(State, Providers, AppInfo).
+    AppInfo.
 
-copy_and_build_project_apps(State, Providers, Apps) ->
-    %% Top-level apps, because of profile usage and specific orderings (i.e.
-    %% may require an include file from a profile-specific app for an extra_dirs
-    %% entry that only exists in a test context), need to be
-    %% copied and added to the path at once, and not just in compile order.
-    [copy_app_dirs(AppInfo,
-                   rebar_app_info:dir(AppInfo),
-                   rebar_app_info:out_dir(AppInfo))
-     || AppInfo <- Apps],
-    code:add_pathsa([rebar_app_info:ebin_dir(AppInfo) || AppInfo <- Apps]),
-    [compile(State, Providers, AppInfo) || AppInfo <- Apps].
+prepare_project_app(_State, _Providers, AppInfo) ->
+    copy_app_dirs(AppInfo,
+                  rebar_app_info:dir(AppInfo),
+                  rebar_app_info:out_dir(AppInfo)),
+    code:add_pathsa([rebar_app_info:ebin_dir(AppInfo)]),
+    AppInfo.
 
+prepare_compile(State, Providers, AppInfo) ->
+    AppDir = rebar_app_info:dir(AppInfo),
+    rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, AppInfo, State).
+
+prepare_compilers(State, Providers, AppInfo) ->
+    AppDir = rebar_app_info:dir(AppInfo),
+    rebar_hooks:run_all_hooks(AppDir, pre, ?ERLC_HOOK, Providers, AppInfo, State).
+
+run_compilers(State, _Providers, AppInfo) ->
+    ?INFO("Compiling ~ts", [rebar_app_info:name(AppInfo)]),
+    build_app(AppInfo, State),
+    AppInfo.
+
+finalize_compilers(State, Providers, AppInfo) ->
+    AppDir = rebar_app_info:dir(AppInfo),
+    rebar_hooks:run_all_hooks(AppDir, post, ?ERLC_HOOK, Providers, AppInfo, State).
+
+prepare_app_file(State, Providers, AppInfo) ->
+    AppDir = rebar_app_info:dir(AppInfo),
+    rebar_hooks:run_all_hooks(AppDir, pre, ?APP_HOOK, Providers, AppInfo, State).
+
+compile_app_files(State, Providers, Apps) ->
+    %% Load plugins back for make_vsn calls in custom resources.
+    %% The rebar_otp_app compilation step is safe regarding the
+    %% overall path management, so we can just load all plugins back
+    %% in memory.
+    rebar_paths:set_paths([plugins], State),
+    NewApps = [compile_app_file(State, Providers, App) || App <- Apps],
+    %% Clean up after ourselves, leave things as they were with deps first
+    rebar_paths:set_paths([deps], State),
+    NewApps.
+
+compile_app_file(State, _Providers, AppInfo) ->
+    case rebar_otp_app:compile(State, AppInfo) of
+        {ok, AppInfo2} -> AppInfo2;
+        Error -> throw(Error)
+    end.
+
+finalize_app_file(State, Providers, AppInfo) ->
+    AppDir = rebar_app_info:dir(AppInfo),
+    rebar_hooks:run_all_hooks(AppDir, post, ?APP_HOOK, Providers, AppInfo, State).
+
+finalize_compile(State, Providers, AppInfo) ->
+    AppDir = rebar_app_info:dir(AppInfo),
+    AppInfo2 = rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo, State),
+    %% Problem if we use a newer AppInfo version? Used to be ran on result of app compile
+    %% directly, but we need the check here to ensure all hooks have run, while the new
+    %% "concurrent" pipeline does not let us go back.
+    has_all_artifacts(AppInfo),
+    AppInfo2.
 
 build_extra_dirs(State, Apps) ->
     BaseDir = rebar_state:dir(State),
@@ -152,41 +223,6 @@ build_extra_dir(State, Dir) ->
             ok
     end.
 
-compile(State, AppInfo) ->
-    compile(State, rebar_state:providers(State), AppInfo).
-
-compile(State, Providers, AppInfo) ->
-    ?INFO("Compiling ~ts", [rebar_app_info:name(AppInfo)]),
-    AppDir = rebar_app_info:dir(AppInfo),
-    AppInfo1 = rebar_hooks:run_all_hooks(AppDir, pre, ?PROVIDER,  Providers, AppInfo, State),
-
-    AppInfo2 = rebar_hooks:run_all_hooks(AppDir, pre, ?ERLC_HOOK, Providers, AppInfo1, State),
-
-    build_app(AppInfo2, State),
-
-    AppInfo3 = rebar_hooks:run_all_hooks(AppDir, post, ?ERLC_HOOK, Providers, AppInfo2, State),
-
-    AppInfo4 = rebar_hooks:run_all_hooks(AppDir, pre, ?APP_HOOK, Providers, AppInfo3, State),
-
-    %% Load plugins back for make_vsn calls in custom resources.
-    %% The rebar_otp_app compilation step is safe regarding the
-    %% overall path management, so we can just load all plugins back
-    %% in memory.
-    rebar_paths:set_paths([plugins], State),
-    AppFileCompileResult = rebar_otp_app:compile(State, AppInfo4),
-    %% Clean up after ourselves, leave things as they were with deps first
-    rebar_paths:set_paths([deps], State),
-
-    case AppFileCompileResult of
-        {ok, AppInfo5} ->
-            AppInfo6 = rebar_hooks:run_all_hooks(AppDir, post, ?APP_HOOK, Providers, AppInfo5, State),
-            AppInfo7 = rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo6, State),
-            has_all_artifacts(AppInfo5),
-            AppInfo7;
-        Error ->
-            throw(Error)
-    end.
-
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
@@ -201,7 +237,8 @@ build_app(AppInfo, State) ->
             ProjectBuilders = rebar_state:project_builders(State),
             case lists:keyfind(Type, 1, ProjectBuilders) of
                 {_, Module} ->
-                    %% load plugins since thats where project builders would be
+                    %% load plugins since thats where project builders would be,
+                    %% prevents parallelism at this level.
                     rebar_paths:set_paths([deps, plugins], State),
                     Res = Module:build(AppInfo),
                     rebar_paths:set_paths([deps], State),
