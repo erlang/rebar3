@@ -232,7 +232,7 @@ mock_config(Name, Config) ->
                                   ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(N), ec_semver:parse(Vsn), <<"hexpm">>},
                                                                       dependencies=[{DAppName, {pkg, DN, DV, undefined}} || {DN, DV, _, DAppName} <- Deps],
                                                                       retired=false,
-                                                                      checksum=Checksum});
+                                                                      outer_checksum=Checksum});
                               true ->
                                   ok
                           end;
@@ -246,7 +246,7 @@ mock_config(Name, Config) ->
                 fun(_Config, PkgName) ->
                         Matches = ets:match_object(Tid, {{PkgName,'_'}, '_'}),
                         Releases =
-                            [#{checksum => Checksum,
+                            [#{outer_checksum => Checksum,
                                version => Vsn,
                                dependencies => [{DAppName, {pkg, DN, DV, undefined}} ||
                                                    {DN, DV, _, DAppName} <- Deps]} ||

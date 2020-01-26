@@ -70,7 +70,7 @@ find_resource_state(Type, Resources) ->
 format_source(AppInfo) ->
     Name = rebar_app_info:name(AppInfo),
     case rebar_app_info:source(AppInfo) of
-        {pkg, _Name, Vsn, _Hash, _} ->
+        {pkg, _Name, Vsn, _OldHash, _Hash, _} ->
             io_lib:format("~ts v~s", [Name, Vsn]);
         Source ->
             io_lib:format("~ts (from ~p)", [Name, Source])
@@ -139,7 +139,7 @@ get_resource_type({Type, Location, _}, Resources) ->
     get_resource(Type, Location, Resources);
 get_resource_type({Type, _, _, Location}, Resources) ->
     get_resource(Type, Location, Resources);
-get_resource_type(Location={Type, _, _, _, _}, Resources) ->
+get_resource_type(Location={Type, _, _, _, _, _}, Resources) ->
     get_resource(Type, Location, Resources);
 get_resource_type(Source, _) ->
     throw(?PRV_ERROR({no_resource, Source})).

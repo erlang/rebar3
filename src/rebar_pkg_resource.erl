@@ -45,8 +45,8 @@ init(Type, State) ->
       ResourceState :: rebar_resource_v2:resource_state(),
       Res :: {atom(), string(), any(), binary()}.
 lock(AppInfo, _) ->
-    {pkg, Name, Vsn, Hash, _RepoConfig} = rebar_app_info:source(AppInfo),
-    {pkg, Name, Vsn, Hash}.
+    {pkg, Name, Vsn, OldHash, Hash, _RepoConfig} = rebar_app_info:source(AppInfo),
+    {pkg, Name, Vsn, OldHash, Hash}.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -59,7 +59,7 @@ lock(AppInfo, _) ->
       ResourceState :: rebar_resource_v2:resource_state(),
       Res :: boolean().
 needs_update(AppInfo, _) ->
-    {pkg, _Name, Vsn, _Hash, _} = rebar_app_info:source(AppInfo),
+    {pkg, _Name, Vsn, _OldHash, _Hash, _} = rebar_app_info:source(AppInfo),
     case rebar_utils:to_binary(rebar_app_info:original_vsn(AppInfo)) =:= rebar_utils:to_binary(Vsn) of
         true ->
             false;
@@ -101,7 +101,7 @@ download(TmpDir, AppInfo, State, ResourceState) ->
       UpdateETag :: boolean(),
       Res :: ok | {error,_} | {unexpected_hash, string(), integer(), integer()} |
              {fetch_fail, binary(), binary()}.
-download(TmpDir, Pkg={pkg, Name, Vsn, _Hash, Repo}, State, _ResourceState, UpdateETag) ->
+download(TmpDir, Pkg={pkg, Name, Vsn, _OldHash, _Hash, Repo}, State, _ResourceState, UpdateETag) ->
     {ok, PackageDir} = rebar_packages:package_dir(Repo, State),
     Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
     ETagFile = binary_to_list(<<Name/binary, "-", Vsn/binary, ".etag">>),
@@ -214,7 +214,7 @@ store_etag_in_cache(Path, ETag) ->
       ETagPath :: file:name(),
       UpdateETag :: boolean(),
       Res :: ok | {unexpected_hash, integer(), integer()} | {fetch_fail, binary(), binary()}.
-cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _Hash, RepoConfig}, ETag,
+cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoConfig}, ETag,
                 ETagPath, UpdateETag) ->
     case request(RepoConfig, Name, Vsn, ETag) of
         {ok, cached} ->
@@ -246,18 +246,34 @@ serve_from_cache(TmpDir, CachePath, Pkg) ->
       Tarball :: binary(),
       Package :: package(),
       Res :: ok | {error,_} | {bad_registry_checksum, integer(), integer()}.
-serve_from_memory(TmpDir, Binary, {pkg, _Name, _Vsn, Hash, _RepoConfig}) ->
+serve_from_memory(TmpDir, Binary, {pkg, _Name, _Vsn, OldHash, Hash, _RepoConfig}) ->
     RegistryChecksum = list_to_integer(binary_to_list(Hash), 16),
+    OldRegistryChecksum =  maybe_old_registry_checksum(OldHash),
     case r3_hex_tarball:unpack(Binary, TmpDir) of
-        {ok, #{checksum := <<Checksum:256/big-unsigned>>}} when RegistryChecksum =/= Checksum ->
-            ?DEBUG("Expected hash ~64.16.0B does not match checksum of fetched package ~64.16.0B",
-                   [RegistryChecksum, Checksum]),
-            {bad_registry_checksum, RegistryChecksum, Checksum};
-        {ok, #{checksum := <<RegistryChecksum:256/big-unsigned>>}} ->
+        {ok, #{outer_checksum := <<Checksum:256/big-unsigned>>} = Res} when RegistryChecksum =/= Checksum ->
+            #{inner_checksum := <<OldChecksum:256/big-unsigned>>} = Res,
+            %% Not triggerable in tests, but code feels logically wrong without it since inner checksums are not hard
+            %% deprecated. This logic should be removed when inner checksums do become hard deprecated and/or no longer
+            %% supported by rebar3.
+            case OldRegistryChecksum == OldChecksum of
+                true ->
+                    ?DEBUG("Expected hash ~64.16.0B does not match outer checksum of fetched package ~64.16.0B, but
+                           matches inner checksum ~64.16.0B",
+                        [RegistryChecksum, Checksum, OldChecksum]),
+                    {bad_registry_checksum, RegistryChecksum, OldChecksum};
+                false ->
+                    ?DEBUG("Expected hash ~64.16.0B does not match outer checksum or inner checksum of fetched package
+                           ~64.16.0B / ~64.16.0B", [RegistryChecksum, Checksum, OldChecksum]),
+                     {bad_registry_checksum, RegistryChecksum, Checksum}
+            end;
+        {ok, #{outer_checksum := <<RegistryChecksum:256/big-unsigned>>}} ->
             ok;
         {error, Reason} ->
             {error, {hex_tarball, Reason}}
     end.
+
+maybe_old_registry_checksum(undefined) -> undefined;
+maybe_old_registry_checksum(Hash) -> list_to_integer(binary_to_list(Hash), 16).
 
 -spec serve_from_download(TmpDir, CachePath, Package, Binary) -> Res when
       TmpDir :: file:name(),

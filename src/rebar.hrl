@@ -22,12 +22,12 @@
 -define(DEFAULT_PLUGINS_DIR, "plugins").
 -define(DEFAULT_TEST_DEPS_DIR, "test/lib").
 -define(DEFAULT_RELEASE_DIR, "rel").
--define(CONFIG_VERSION, "1.1.0").
+-define(CONFIG_VERSION, "1.2.0").
 -define(DEFAULT_CDN, "https://repo.hex.pm/").
 -define(REMOTE_PACKAGE_DIR, "tarballs").
 -define(LOCK_FILE, "rebar.lock").
 -define(DEFAULT_COMPILER_SOURCE_FORMAT, relative).
--define(PACKAGE_INDEX_VERSION, 5).
+-define(PACKAGE_INDEX_VERSION, 6).
 -define(PACKAGE_TABLE, package_index).
 -define(INDEX_FILE, "packages.idx").
 -define(HEX_AUTH_FILE, "hex.config").
@@ -45,7 +45,8 @@
 %% TODO: change package and requirement keys to be required (:=) after dropping support for OTP-18
 -record(package, {key :: {unicode:unicode_binary() | ms_field(), unicode:unicode_binary() | ms_field(),
                           unicode:unicode_binary() | ms_field()},
-                  checksum :: binary() | ms_field(),
+                  inner_checksum :: binary() | ms_field(),
+                  outer_checksum :: binary() | ms_field(),
                   retired :: boolean() | ms_field(),
                   dependencies :: [#{package => unicode:unicode_binary(),
                                      requirement => unicode:unicode_binary()}] | ms_field()}).
