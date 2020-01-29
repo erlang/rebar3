@@ -27,12 +27,12 @@ init(State) ->
                                                                {example, "rebar3 tar"},
                                                                {short_desc, "Tar archive of release built of project."},
                                                                {desc, "Tar archive of release built of project."},
-                                                               {opts, relx:opt_spec_list()}])),
+                                                               {opts, rebar_relx:opt_spec_list()}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    rebar_relx:do(rlx_prv_release, "tar", ?PROVIDER, State).
+    rebar_relx:do(?PROVIDER, State).
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->

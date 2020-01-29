@@ -362,16 +362,16 @@ create_app_info(AppInfo, AppDir, AppFile) ->
                          rebar_app_info:original_vsn(
                            rebar_app_info:dir(AppInfo, AppDir), AppVsn), AppName),
             AppInfo2 = rebar_app_info:applications(
-                         rebar_app_info:app_details(AppInfo1, AppDetails),
-                         IncludedApplications++Applications),
-            Valid = case rebar_app_utils:validate_application_info(AppInfo2) =:= true
-                        andalso rebar_app_info:has_all_artifacts(AppInfo2) =:= true of
+                         rebar_app_info:app_details(AppInfo1, AppDetails), Applications),
+            AppInfo3 = rebar_app_info:included_applications(AppInfo2, IncludedApplications),
+            Valid = case rebar_app_utils:validate_application_info(AppInfo3) =:= true
+                        andalso rebar_app_info:has_all_artifacts(AppInfo3) =:= true of
                         true ->
                             true;
                         _ ->
                             false
                     end,
-            rebar_app_info:dir(rebar_app_info:valid(AppInfo2, Valid), AppDir);
+            rebar_app_info:dir(rebar_app_info:valid(AppInfo3, Valid), AppDir);
         _Invalid ->
             throw({error, {?MODULE, {cannot_read_app_file, AppFile}}})
     catch

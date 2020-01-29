@@ -9,6 +9,7 @@
          do/1,
          format_error/1]).
 
+-include_lib("providers/include/providers.hrl").
 -include("rebar.hrl").
 
 -define(PROVIDER, release).
@@ -27,12 +28,12 @@ init(State) ->
                                                                {example, "rebar3 release"},
                                                                {short_desc, "Build release of project."},
                                                                {desc, "Build release of project."},
-                                                               {opts, relx:opt_spec_list()}])),
+                                                               {opts, rebar_relx:opt_spec_list()}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    rebar_relx:do(rlx_prv_release, "release", ?PROVIDER, State).
+    rebar_relx:do(?PROVIDER, State).
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
