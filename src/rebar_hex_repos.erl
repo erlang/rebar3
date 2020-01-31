@@ -96,8 +96,8 @@ update_organizations(Repos) ->
                       {ok, Parent} = get_repo_config(ParentName, Repos),
                       ParentRepoUrl = rebar_utils:to_list(maps:get(repo_url, Parent)),
                       {ok, _RepoUrl} =
-                          rebar_uri:append_path(ParentRepoUrl,
-                                                filename:join("repos", rebar_utils:to_list(RepoName))),
+                          rebar_utils:url_append_path(ParentRepoUrl,
+                                                      filename:join("repos", rebar_utils:to_list(RepoName))),
                       %% still let the organization config override this constructed repo url
                       maps:merge(Parent#{repo_url => rebar_utils:to_binary(ParentRepoUrl)}, Repo);
                  (Repo) ->

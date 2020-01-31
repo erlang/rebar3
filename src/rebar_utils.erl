@@ -64,6 +64,7 @@
          tup_find/2,
          line_count/1,
          set_httpc_options/0,
+         url_append_path/2,
          escape_chars/1,
          escape_double_quotes/1,
          escape_double_quotes_weak/1,
@@ -265,8 +266,6 @@ to_binary(A) when is_atom(A) -> atom_to_binary(A, unicode);
 to_binary(Str) -> unicode:characters_to_binary(Str).
 
 to_list(A) when is_atom(A) -> atom_to_list(A);
-to_list(B) when is_binary(B) -> unicode:characters_to_list(B);
-to_list(I) when is_integer(I) -> integer_to_list(I);
 to_list(Str) -> unicode:characters_to_list(Str).
 
 tup_dedup(List) ->
@@ -911,7 +910,8 @@ get_http_vars(Scheme) ->
 
 -ifdef (OTP_RELEASE).
   -if(?OTP_RELEASE >= 23).
-    -compile({nowarn_deprecated_function, [{http_uri, decode, 1}]}).
+    -compile({nowarn_deprecated_function, [{http_uri, parse, 1},
+                                           {http_uri, decode, 1}]}).
   -endif.
 -endif.
 
@@ -924,10 +924,7 @@ set_httpc_options(_, []) ->
 
 set_httpc_options(Scheme, Proxy) ->
     URI = normalise_proxy(Scheme, Proxy),
-    Parts = rebar_uri:parse(URI),
-    Host = maps:get(host, Parts, []),
-    Port = maps:get(port, Parts, []),
-    UserInfo = maps:get(userinfo, Parts, []),
+    {ok, {_, UserInfo, Host, Port, _, _}} = http_uri:parse(URI),
     httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar),
     set_proxy_auth(UserInfo).
 
@@ -937,6 +934,15 @@ normalise_proxy(Scheme, URI) ->
         nomatch when Scheme =:= proxy -> "http://" ++ URI;
         _ -> URI
     end.
+
+url_append_path(Url, ExtraPath) ->
+     case http_uri:parse(Url) of
+         {ok, {Scheme, UserInfo, Host, Port, Path, Query}} ->
+             {ok, lists:append([atom_to_list(Scheme), "://", UserInfo, Host, ":", integer_to_list(Port),
+                                filename:join(Path, ExtraPath), Query])};
+         _ ->
+             error
+     end.
 
 %% escape\ as\ a\ shell\?
 escape_chars(Str) when is_atom(Str) ->
@@ -1022,7 +1028,8 @@ ssl_opts(Url) ->
 ssl_opts(ssl_verify_enabled, Url) ->
     case check_ssl_version() of
         true ->
-            #{host := Hostname} = rebar_uri:parse(rebar_utils:to_list(Url)),
+            {ok, {_, _, Hostname, _, _, _}} =
+                http_uri:parse(rebar_utils:to_list(Url)),
             VerifyFun = {fun ssl_verify_hostname:verify_fun/3,
                          [{check_hostname, Hostname}]},
             CACerts = certifi:cacerts(),
