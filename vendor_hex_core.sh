@@ -2,7 +2,7 @@
 set -e
 
 if [[ -z "$1" ]]; then
-  echo "Usage: vendor.sh PATH_TO_HEX_CORE"
+  echo "Usage: vendor_hex_core.sh PATH_TO_HEX_CORE"
   exit 1
 fi
 
