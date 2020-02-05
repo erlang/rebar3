@@ -1,10 +1,10 @@
-%% Vendored from hex_core v0.5.1, do not edit manually
+%% Vendored from hex_core v0.6.8, do not edit manually
 
 -module(r3_hex_api_package).
 -export([get/2, search/3]).
 
 %% @doc
-%% Gets package.
+%% Gets a package.
 %%
 %% Examples:
 %%
@@ -26,7 +26,8 @@
 %%     ]}}}
 %% '''
 %% @end
-get(Config, Name) when is_binary(Name) and is_map(Config) ->
+-spec get(r3_hex_core:config(), binary()) -> r3_hex_api:response().
+get(Config, Name) when is_map(Config) and is_binary(Name)->
     Path = r3_hex_api:build_repository_path(Config, ["packages", Name]),
     r3_hex_api:get(Config, Path).
 
@@ -42,7 +43,8 @@ get(Config, Name) when is_binary(Name) and is_map(Config) ->
 %%     ...
 %% ]}}
 %% '''
-search(Config, Query, SearchParams) when is_binary(Query) and is_list(SearchParams) and is_map(Config) ->
+-spec search(r3_hex_core:config(), binary(), list(binary())) -> r3_hex_api:response().
+search(Config, Query, SearchParams) when is_map(Config) and is_binary(Query) and is_list(SearchParams) ->
     QueryString = r3_hex_api:encode_query_string([{search, Query} | SearchParams]),
     Path = r3_hex_api:join_path_segments(r3_hex_api:build_repository_path(Config, ["packages"])),
     PathQuery = <<Path/binary, "?", QueryString/binary>>,

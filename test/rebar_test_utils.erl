@@ -190,21 +190,21 @@ expand_deps(git, [{Name, Vsn, Deps} | Rest]) ->
     Dep = {Name, Vsn, {git, "https://example.org/user/"++Name++".git", {tag, Vsn}}},
     [{Dep, expand_deps(git, Deps)} | expand_deps(git, Rest)];
 expand_deps(pkg, [{Name, Deps} | Rest]) ->
-    Dep = {pkg, Name, "0.0.0", undefined},
+    Dep = {pkg, Name, "0.0.0", undefined, undefined},
     [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)];
 expand_deps(pkg, [{Name, Vsn, Deps} | Rest]) ->
-    Dep = {pkg, Name, Vsn, undefined},
+    Dep = {pkg, Name, Vsn, undefined, undefined},
     [{Dep, expand_deps(pkg, Deps)} | expand_deps(pkg, Rest)];
 expand_deps(mixed, [{Name, Deps} | Rest]) ->
     Dep = if hd(Name) >= $a, hd(Name) =< $z ->
-            {pkg, rebar_string:uppercase(Name), "0.0.0", undefined}
+            {pkg, rebar_string:uppercase(Name), "0.0.0", undefined, undefined}
            ; hd(Name) >= $A, hd(Name) =< $Z ->
             {Name, ".*", {git, "https://example.org/user/"++Name++".git", "master"}}
     end,
     [{Dep, expand_deps(mixed, Deps)} | expand_deps(mixed, Rest)];
 expand_deps(mixed, [{Name, Vsn, Deps} | Rest]) ->
     Dep = if hd(Name) >= $a, hd(Name) =< $z ->
-            {pkg, rebar_string:uppercase(Name), Vsn, undefined}
+            {pkg, rebar_string:uppercase(Name), Vsn, undefined, undefined}
            ; hd(Name) >= $A, hd(Name) =< $Z ->
             {Name, Vsn, {git, "https://example.org/user/"++Name++".git", {tag, Vsn}}}
     end,
@@ -218,7 +218,7 @@ expand_deps(mixed, [{Name, Vsn, Deps} | Rest]) ->
 flat_deps(Deps) -> flat_deps(Deps, [], []).
 
 flat_deps([], Src, Pkg) -> {Src, Pkg};
-flat_deps([{{pkg, Name, Vsn, undefined}, PkgDeps} | Rest], Src, Pkg) ->
+flat_deps([{{pkg, Name, Vsn, undefined, undefined}, PkgDeps} | Rest], Src, Pkg) ->
     Current = {{iolist_to_binary(Name), iolist_to_binary(Vsn)},
                top_level_deps(PkgDeps)},
     {[], FlatPkgDeps} = flat_deps(PkgDeps),
@@ -236,7 +236,7 @@ vsn_from_ref({git, _, {_, Vsn}}) -> Vsn;
 vsn_from_ref({git, _, Vsn}) -> Vsn.
 
 top_level_deps([]) -> [];
-top_level_deps([{{pkg, Name, Vsn, undefined}, _} | Deps]) ->
+top_level_deps([{{pkg, Name, Vsn, undefined, undefined}, _} | Deps]) ->
     [{list_to_atom(Name), Vsn} | top_level_deps(Deps)];
 top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
     [{list_to_atom(Name), Vsn, Ref} | top_level_deps(Deps)].
@@ -355,10 +355,10 @@ check_results(AppDir, Expected, ProfileRun) ->
                 case lists:keyfind(iolist_to_binary(Name), 1, Locks) of
                     false ->
                         error({lock_not_found, Name});
-                    {_LockName, {pkg, _, LockVsn, Hash}, _} ->
+                    {_LockName, {pkg, _, LockVsn, _InnerHash, OuterHash}, _} ->
                         ?assertEqual(iolist_to_binary(Vsn),
                                      iolist_to_binary(LockVsn)),
-                        ?assertNotEqual(undefined, Hash);
+                        ?assertNotEqual(undefined, OuterHash);
                     {_LockName, {_, _, {ref, LockVsn}}, _} ->
                         ?assertEqual(iolist_to_binary(Vsn),
                                      iolist_to_binary(LockVsn))
@@ -368,10 +368,10 @@ check_results(AppDir, Expected, ProfileRun) ->
                 case lists:keyfind(iolist_to_binary(Name), 1, Locks) of
                     false ->
                         error({lock_not_found, Name});
-                    {_LockName, {pkg, _, LockVsn, Hash}, _} ->
+                    {_LockName, {pkg, _, LockVsn, _InnerHash, OuterHash}, _} ->
                         ?assertEqual(iolist_to_binary(Vsn),
                                      iolist_to_binary(LockVsn)),
-                        ?assertNotEqual(undefined, Hash);
+                        ?assertNotEqual(undefined, OuterHash);
                     {_LockName, {_, _, {ref, LockVsn}}, _} ->
                         error({source_lock, {Name, LockVsn}})
                 end
@@ -511,7 +511,7 @@ package_app(AppDir, DestDir, PkgName, PkgVsn) ->
     Files = lists:zip([filename:join("src", F) || F <- Fs], [filename:join(AppSrc,F) || F <- Fs]),
     Metadata = #{<<"app">> => list_to_binary(PkgName),
                  <<"version">> => list_to_binary(PkgVsn)},
-    {ok, {Tarball, <<Checksum:256/big-unsigned-integer>>}} = r3_hex_tarball:create(Metadata, Files),
+    {ok, #{tarball := Tarball, outer_checksum := <<Checksum:256/big-unsigned-integer>>}} = r3_hex_tarball:create(Metadata, Files),
 
     Name = PkgName++"-"++PkgVsn++".tar",
     Archive = filename:join(DestDir, Name),

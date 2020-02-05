@@ -24,9 +24,10 @@ mock() -> mock([]).
             | {not_in_index, [{App, Vsn}]}
             | {pkgdeps, [{{App,Vsn}, [Dep]}]},
     App :: string(),
-    Dep :: {App, string(), {pkg, App, Vsn, Hash}},
+    Dep :: {App, string(), {pkg, App, Vsn, InnerHash, OuterHash}},
     Vsn :: string(),
-    Hash :: string() | undefined.
+    InnerHash :: string() | undefined,
+    OuterHash :: string() | undefined.
 mock(Opts) ->
     meck:new(?MOD, [no_link, passthrough]),
     mock_lock(Opts),
@@ -47,8 +48,8 @@ unmock() ->
 %% @doc creates values for a lock file.
 mock_lock(_) ->
     meck:expect(?MOD, lock, fun(AppInfo, _) ->
-                                {pkg, Name, Vsn, Hash, _RepoConfig} = rebar_app_info:source(AppInfo),
-                                {pkg, Name, Vsn, Hash}
+                                {pkg, Name, Vsn, InnerHash, OuterHash, _RepoConfig} = rebar_app_info:source(AppInfo),
+                                {pkg, Name, Vsn, InnerHash, OuterHash}
                             end).
 
 %% @doc The config passed to the `mock/2' function can specify which apps
@@ -58,7 +59,7 @@ mock_update(Opts) ->
     meck:expect(
         ?MOD, needs_update,
         fun(AppInfo, _) ->
-            {pkg, App, _Vsn, _Hash, _} = rebar_app_info:source(AppInfo),
+            {pkg, App, _Vsn, _InnerHash, _OuterHash, _} = rebar_app_info:source(AppInfo),
             lists:member(binary_to_list(App), ToUpdate)
         end).
 
@@ -84,7 +85,7 @@ mock_download(Opts) ->
     meck:expect(
         ?MOD, download,
         fun (Dir, AppInfo, _, _) ->
-            {pkg, AppBin, Vsn, _, _} = rebar_app_info:source(AppInfo),
+            {pkg, AppBin, Vsn, _, _, _} = rebar_app_info:source(AppInfo),
             App = rebar_utils:to_list(AppBin),
             filelib:ensure_dir(Dir),
             AppDeps = proplists:get_value({App,Vsn}, Deps, []),
@@ -100,7 +101,7 @@ mock_download(Opts) ->
                          <<"version">> => Vsn},
 
             Files = all_files(rebar_app_info:dir(AppInfo1)),
-            {ok, {Tarball, _Checksum}} = r3_hex_tarball:create(Metadata, archive_names(Dir, Files)),
+            {ok, #{tarball := Tarball}} = r3_hex_tarball:create(Metadata, archive_names(Dir, Files)),
             Archive = filename:join([Dir, TarApp]),
             file:write_file(Archive, Tarball),
 
@@ -153,8 +154,9 @@ find_parts([{AppName, Deps}|Rest], Skip, Acc) ->
                                 Acc),
             find_parts(Rest, Skip, AccNew)
     end.
+
 parse_deps(Deps) ->
-    [{maps:get(app, D, Name), {pkg, Name, Constraint, undefined}} || D=#{package := Name,
+    [{maps:get(app, D, Name), {pkg, Name, Constraint, undefined, undefined}} || D=#{package := Name,
                                                                          requirement := Constraint} <- Deps].
 
 to_index(AllDeps, Dict, Repos) ->
@@ -166,15 +168,17 @@ to_index(AllDeps, Dict, Repos) ->
               DepsList = [#{package => DKB,
                             app => DKB,
                             requirement => DVB,
-                            source => {pkg, DKB, DVB, undefined}}
+                            source => {pkg, DKB, DVB, undefined, undefined}}
                           || {DK, DV} <- Deps,
                              DKB <- [ec_cnv:to_binary(DK)],
                              DVB <- [ec_cnv:to_binary(DV)]],
               Repo = rebar_test_utils:random_element(Repos),
+
               ets:insert(?PACKAGE_TABLE, #package{key={N, ec_semver:parse(V), Repo},
                                                   dependencies=parse_deps(DepsList),
                                                   retired=false,
-                                                  checksum = <<"checksum">>})
+                                                  inner_checksum = <<"inner_checksum">>,
+                                                  outer_checksum = <<"checksum">>})
       end, ok, Dict),
 
     lists:foreach(fun({{Name, Vsn}, _}) ->
@@ -186,7 +190,8 @@ to_index(AllDeps, Dict, Repos) ->
                                   ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(Name), ec_semver:parse(Vsn), Repo},
                                                                       dependencies=[],
                                                                       retired=false,
-                                                                      checksum = <<"checksum">>});
+                                                                      inner_checksum = <<"inner_checksum">>,
+                                                                      outer_checksum = <<"checksum">>});
                               true ->
                                   ok
                           end

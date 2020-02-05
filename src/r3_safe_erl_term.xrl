@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.5.1, do not edit manually
+%% Vendored from hex_core v0.6.8, do not edit manually
 
 %%% Author  : Robert Virding
 %%% Purpose : Token definitions for Erlang.
@@ -9,7 +9,7 @@ D = [0-9]
 U = [A-Z]
 L = [a-z]
 A = ({U}|{L}|{D}|_|@)
-WS = ([\000-\s]|%.*)
+WS = ([\000-\s])
 
 Rules.
 

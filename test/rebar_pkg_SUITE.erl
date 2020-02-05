@@ -11,7 +11,7 @@
 -define(badpkg_checksum, <<"A14E3718B33F8124E98004433193509EC6660F6CA03302657CAB8785751D77A0">>).
 -define(badindex_checksum, <<"7B2CBED315C89F3126B5BF553DD7FF0FB5FE94B064888DD1B095CE8BF4B6A16A">>).
 -define(bad_checksum, <<"D576B442A68C7B92BACDE1EFE9C6E54D8D6C74BDB71D8175B9D3C6EC8C7B62A7">>).
--define(good_checksum, <<"12726BDE1F65583A0817A7E8AADCA73F03FD8CB06F01E6CD29117C4A0DA0AFCF">>).
+-define(good_checksum, <<"ABA3B638A653A2414BF9DFAF76D90C937C53D1BE5B5D51A990C6FCC3A775C6F">>).
 -define(BADPKG_ETAG, <<"BADETAG">>).
 
 all() -> [good_uncached, good_cached, badpkg, badhash_nocache,
@@ -116,7 +116,7 @@ good_uncached(Config) ->
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
     ?assertEqual(ok,
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, ?good_checksum, #{}}, State, #{}, true)),
     Cache = ?config(cache_dir, Config),
     ?assert(filelib:is_regular(filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>))).
 
@@ -129,7 +129,7 @@ good_cached(Config) ->
     ?assert(filelib:is_regular(CachedFile)),
     {ok, Content} = file:read_file(CachedFile),
     ?assertEqual(ok,
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, ?good_checksum, #{}}, State, #{}, true)),
     {ok, Content} = file:read_file(CachedFile).
 
 
@@ -138,7 +138,7 @@ badindexchk(Config) ->
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
     ?assertMatch({error, {rebar_pkg_resource, {bad_registry_checksum, _, _, _, _}}},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?bad_checksum, #{}}, State, #{}, true)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?bad_checksum, ?bad_checksum, #{}}, State, #{}, true)),
     %% The cached file is there for forensic purposes
     Cache = ?config(cache_dir, Config),
     ?assert(filelib:is_regular(filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>))).
@@ -151,8 +151,8 @@ badpkg(Config) ->
     CachePath = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>),
     ETagPath = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".etag">>),
     rebar_pkg_resource:store_etag_in_cache(ETagPath, ?BADPKG_ETAG),
-    ?assertMatch({error, {hex_tarball, {tarball, {checksum_mismatch, _, _}}}},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?badpkg_checksum, #{}}, State, #{}, false)),
+    ?assertMatch({error, {hex_tarball, {tarball, {inner_checksum_mismatch, _, _}}}},
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?badpkg_checksum, ?badpkg_checksum, #{}}, State, #{}, false)),
     %% The cached/etag files are there for forensic purposes
     ?assert(filelib:is_regular(ETagPath)),
     ?assert(filelib:is_regular(CachePath)).
@@ -162,7 +162,7 @@ badhash_nocache(Config) ->
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
     ?assertMatch({error, {rebar_pkg_resource, {bad_registry_checksum, _, _, _, _}}},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?bad_checksum, #{}}, State, #{}, true)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?bad_checksum, ?bad_checksum, #{}}, State, #{}, true)),
     %% The cached file is there for forensic purposes
     Cache = ?config(cache_dir, Config),
     ?assert(filelib:is_regular(filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>))).
@@ -176,7 +176,7 @@ badhash_cache(Config) ->
     ?assert(filelib:is_regular(CachedFile)),
     {ok, Content} = file:read_file(CachedFile),
     ?assertMatch({error, {rebar_pkg_resource, {bad_registry_checksum, _, _, _, _}}},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?bad_checksum, #{}}, State, #{}, true)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?bad_checksum, ?bad_checksum, #{}}, State, #{}, true)),
     %% The cached file is there still, unchanged.
     ?assert(filelib:is_regular(CachedFile)),
     ?assertEqual({ok, Content}, file:read_file(CachedFile)).
@@ -190,7 +190,7 @@ bad_to_good(Config) ->
     ?assert(filelib:is_regular(CachedFile)),
     {ok, Contents} = file:read_file(CachedFile),
     ?assertEqual(ok,
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, ?good_checksum, #{}}, State, #{}, true)),
     %% Cache has refreshed
     ?assert({ok, Contents} =/= file:read_file(CachedFile)).
 
@@ -205,7 +205,7 @@ good_disconnect(Config) ->
     {ok, Content} = file:read_file(CachedFile),
     rebar_pkg_resource:store_etag_in_cache(ETagFile, ?BADPKG_ETAG),
     ?assertEqual(ok,
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)),
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, ?good_checksum, #{}}, State, #{}, true)),
     {ok, Content} = file:read_file(CachedFile).
 
 bad_disconnect(Config) ->
@@ -213,7 +213,7 @@ bad_disconnect(Config) ->
     {Pkg,Vsn} = ?config(pkg, Config),
     State = ?config(state, Config),
     ?assertEqual({fetch_fail, Pkg, Vsn},
-                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, #{}}, State, #{}, true)).
+                 rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, ?good_checksum, #{}}, State, #{}, true)).
 
 pkgs_provider(Config) ->
     Config1 = rebar_test_utils:init_rebar_state(Config),
@@ -253,13 +253,13 @@ mock_config(Name, Config) ->
     TmpDir = filename:join([Priv, "tmp", atom_to_list(Name)]),
     Tid = ets:new(registry_table, [public]),
     AllDeps = [
-        {{<<"badindexchk">>,<<"1.0.0">>}, [[], ?bad_checksum, [<<"rebar3">>]]},
-        {{<<"goodpkg">>,<<"1.0.0">>}, [[], ?good_checksum, [<<"rebar3">>]]},
-        {{<<"goodpkg">>,<<"1.0.1">>}, [[], ?good_checksum, [<<"rebar3">>]]},
-        {{<<"goodpkg">>,<<"1.1.1">>}, [[], ?good_checksum, [<<"rebar3">>]]},
-        {{<<"goodpkg">>,<<"2.0.0">>}, [[], ?good_checksum, [<<"rebar3">>]]},
-        {{<<"goodpkg">>,<<"3.0.0-rc.0">>}, [[], ?good_checksum, [<<"rebar3">>]]},
-        {{<<"badpkg">>,<<"1.0.0">>}, [[], ?badpkg_checksum, [<<"rebar3">>]]}
+        {{<<"badindexchk">>,<<"1.0.0">>}, [[], ?bad_checksum, ?bad_checksum, [<<"rebar3">>]]},
+        {{<<"goodpkg">>,<<"1.0.0">>}, [[], ?good_checksum, ?good_checksum, [<<"rebar3">>]]},
+        {{<<"goodpkg">>,<<"1.0.1">>}, [[], ?good_checksum, ?good_checksum, [<<"rebar3">>]]},
+        {{<<"goodpkg">>,<<"1.1.1">>}, [[], ?good_checksum, ?good_checksum, [<<"rebar3">>]]},
+        {{<<"goodpkg">>,<<"2.0.0">>}, [[], ?good_checksum, ?good_checksum, [<<"rebar3">>]]},
+        {{<<"goodpkg">>,<<"3.0.0-rc.0">>}, [[], ?good_checksum, ?good_checksum, [<<"rebar3">>]]},
+        {{<<"badpkg">>,<<"1.0.0">>}, [[], ?badpkg_checksum, ?badpkg_checksum, [<<"rebar3">>]]}
     ],
     ets:insert_new(Tid, AllDeps),
     CacheDir = filename:join([CacheRoot, "hex", "com", "test", "packages"]),
@@ -268,13 +268,14 @@ mock_config(Name, Config) ->
 
     catch ets:delete(?PACKAGE_TABLE),
     rebar_packages:new_package_table(),
-    lists:foreach(fun({{N, Vsn}, [Deps, Checksum, _]}) ->
+    lists:foreach(fun({{N, Vsn}, [Deps, InnerChecksum, OuterChecksum, _]}) ->
                           case ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(N), Vsn, <<"hexpm">>}) of
                               false ->
                                   ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(N), ec_semver:parse(Vsn), <<"hexpm">>},
                                                                       dependencies=Deps,
                                                                       retired=false,
-                                                                      checksum=Checksum});
+                                                                      inner_checksum=InnerChecksum,
+                                                                      outer_checksum=OuterChecksum});
                               true ->
                                   ok
                           end
@@ -286,10 +287,11 @@ mock_config(Name, Config) ->
                 fun(_Config, PkgName) ->
                         Matches = ets:match_object(Tid, {{PkgName,'_'}, '_'}),
                         Releases =
-                            [#{checksum => Checksum,
+                            [#{outer_checksum => OuterChecksum,
+                               inner_checksum => InnerChecksum,
                                version => Vsn,
                                dependencies => Deps} ||
-                                {{_, Vsn}, [Deps, Checksum, _]} <- Matches],
+                                {{_, Vsn}, [Deps, InnerChecksum, OuterChecksum, _]} <- Matches],
                         {ok, {200, #{}, Releases}}
                 end),
 

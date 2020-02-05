@@ -8,7 +8,7 @@
         ,verify_table/1
         ,format_error/1
         ,update_package/3
-        ,resolve_version/5]).
+        ,resolve_version/6]).
 
 -ifdef(TEST).
 -export([new_package_table/0, find_highest_matching_/5, cmp_/4, cmpl_/4, valid_vsn/1]).
@@ -77,7 +77,7 @@ get_package(Dep, Vsn, Hash, Repos, Table, State) ->
     MatchingPackages = ets:select(Table, [{#package{key={Dep, ec_semver:parse(Vsn), Repo},
                                       _='_'}, [], ['$_']} || Repo <- Repos]),
     PackagesWithProperHash = lists:filter(
-        fun(#package{key = {_Dep, _Vsn, Repo}, checksum = PkgChecksum}) ->
+        fun(#package{key = {_Dep, _Vsn, Repo}, outer_checksum = PkgChecksum}) ->
             if (PkgChecksum =/= Hash) andalso (Hash =/= '_') ->
                 ?WARN("Checksum mismatch for package ~ts-~ts from repo ~ts", [Dep, Vsn, Repo]),
                 false;
@@ -230,7 +230,7 @@ verify_table(State) ->
     ets:info(?PACKAGE_TABLE, named_table) =:= true orelse load_and_verify_version(State).
 
 parse_deps(Deps) ->
-    [{maps:get(app, D, Name), {pkg, Name, Constraint, undefined}}
+    [{maps:get(app, D, Name), {pkg, Name, Constraint, undefined, undefined}}
      || D=#{package := Name,
             requirement := Constraint} <- Deps].
 
@@ -280,21 +280,24 @@ unverified_repo_message() ->
 insert_releases(Name, Releases, Repo, Table) ->
     [true = ets:insert(Table,
                        #package{key={Name, ec_semver:parse(Version), Repo},
-                                checksum=parse_checksum(Checksum),
+                                inner_checksum=parse_checksum(InnerChecksum),
+                                outer_checksum=parse_checksum(OuterChecksum),
                                 retired=maps:get(retired, Release, false),
                                 dependencies=parse_deps(Dependencies)})
-     || Release=#{checksum := Checksum,
+     || Release=#{inner_checksum := InnerChecksum,
+                  outer_checksum := OuterChecksum,
                   version := Version,
                   dependencies := Dependencies} <- Releases].
 
 -spec resolve_version(unicode:unicode_binary(), unicode:unicode_binary() | undefined,
+                      binary() | undefined,
                       binary() | undefined,
                       ets:tab(), rebar_state:t())
                      -> {error, {invalid_vsn, unicode:unicode_binary()}} |
                         not_found |
                         {ok, #package{}, map()}.
 %% if checksum is defined search for any matching repo matching pkg-vsn and checksum
-resolve_version(Dep, DepVsn, Hash, HexRegistry, State) when is_binary(Hash) ->
+resolve_version(Dep, DepVsn, _OldHash, Hash, HexRegistry, State) when is_binary(Hash) ->
     Resources = rebar_state:resources(State),
     #{repos := RepoConfigs} = rebar_resource_v2:find_resource_state(pkg, Resources),
     RepoNames = [RepoName || #{name := RepoName} <- RepoConfigs],
@@ -315,7 +318,7 @@ resolve_version(Dep, DepVsn, Hash, HexRegistry, State) when is_binary(Hash) ->
                   end,
             handle_missing_no_exception(Fun, Dep, State)
     end;
-resolve_version(Dep, undefined, Hash, HexRegistry, State) ->
+resolve_version(Dep, undefined, _OldHash, Hash, HexRegistry, State) ->
     Fun = fun(Repo) ->
               case highest_matching(Dep, {0,{[],[]}}, Repo, HexRegistry, State) of
                   none ->
@@ -325,7 +328,7 @@ resolve_version(Dep, undefined, Hash, HexRegistry, State) ->
               end
           end,
     handle_missing_no_exception(Fun, Dep, State);
-resolve_version(Dep, DepVsn, Hash, HexRegistry, State) ->
+resolve_version(Dep, DepVsn, _OldHash, Hash, HexRegistry, State) ->
     case valid_vsn(DepVsn) of
         false ->
             {error, {invalid_vsn, DepVsn}};

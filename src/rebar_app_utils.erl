@@ -207,7 +207,7 @@ parse_dep(Dep, Parent, DepsDir, State, Locks, Level) ->
 parse_dep(Parent, {Name, Vsn, {pkg, PkgName}}, DepsDir, IsLock, State) ->
     {PkgName1, PkgVsn} = {rebar_utils:to_binary(PkgName),
                           rebar_utils:to_binary(Vsn)},
-    dep_to_app(Parent, DepsDir, Name, PkgVsn, {pkg, PkgName1, PkgVsn, undefined}, IsLock, State);
+    dep_to_app(Parent, DepsDir, Name, PkgVsn, {pkg, PkgName1, PkgVsn, undefined ,undefined}, IsLock, State);
 parse_dep(Parent, {Name, {pkg, PkgName}}, DepsDir, IsLock, State) ->
     %% Package dependency with different package name from app name
     dep_to_app(Parent, DepsDir, Name, undefined, {pkg, rebar_utils:to_binary(PkgName), undefined, undefined}, IsLock, State);
@@ -215,7 +215,7 @@ parse_dep(Parent, {Name, Vsn}, DepsDir, IsLock, State) when is_list(Vsn); is_bin
     %% Versioned Package dependency
     {PkgName, PkgVsn} = {rebar_utils:to_binary(Name),
                          rebar_utils:to_binary(Vsn)},
-    dep_to_app(Parent, DepsDir, PkgName, PkgVsn, {pkg, PkgName, PkgVsn, undefined}, IsLock, State);
+    dep_to_app(Parent, DepsDir, PkgName, PkgVsn, {pkg, PkgName, PkgVsn, undefined, undefined}, IsLock, State);
 parse_dep(Parent, Name, DepsDir, IsLock, State) when is_atom(Name); is_binary(Name) ->
     %% Unversioned package dependency
     dep_to_app(Parent, DepsDir, rebar_utils:to_binary(Name), undefined, {pkg, rebar_utils:to_binary(Name), undefined, undefined}, IsLock, State);
@@ -232,9 +232,9 @@ parse_dep(Parent, {Name, Source, Opts}, DepsDir, IsLock, State) when is_tuple(So
     ?WARN("Dependency option list ~p in ~p is not supported and will be ignored", [Opts, Name]),
     dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, State);
 parse_dep(Parent, {Name, {pkg, PkgName, Vsn}, Level}, DepsDir, IsLock, State) when is_integer(Level) ->
-    dep_to_app(Parent, DepsDir, Name, Vsn, {pkg, PkgName, Vsn, undefined}, IsLock, State);
-parse_dep(Parent, {Name, {pkg, PkgName, Vsn, Hash}, Level}, DepsDir, IsLock, State) when is_integer(Level) ->
-    dep_to_app(Parent, DepsDir, Name, Vsn, {pkg, PkgName, Vsn, Hash}, IsLock, State);
+    dep_to_app(Parent, DepsDir, Name, Vsn, {pkg, PkgName, Vsn, undefined, undefined}, IsLock, State);
+parse_dep(Parent, {Name, {pkg, PkgName, Vsn, OldHash,  Hash}, Level}, DepsDir, IsLock, State) when is_integer(Level) ->
+    dep_to_app(Parent, DepsDir, Name, Vsn, {pkg, PkgName, Vsn, OldHash, Hash}, IsLock, State);
 parse_dep(Parent, {Name, Source, Level}, DepsDir, IsLock, State) when is_tuple(Source)
                                                                     , is_integer(Level) ->
     dep_to_app(Parent, DepsDir, Name, [], Source, IsLock, State);
@@ -287,16 +287,19 @@ expand_deps_sources(Dep, State) ->
     rebar_app_info:t() when
       Source :: rebar_resource_v2:source().
 update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
-    case rebar_packages:resolve_version(PkgName, PkgVsn, Hash,
+    update_source(AppInfo, {pkg, PkgName, PkgVsn, undefined, Hash}, State);
+update_source(AppInfo, {pkg, PkgName, PkgVsn, OldHash, Hash}, State) ->
+    case rebar_packages:resolve_version(PkgName, PkgVsn, OldHash, Hash,
                                         ?PACKAGE_TABLE, State) of
         {ok, Package, RepoConfig} ->
             #package{key={_, PkgVsn1, _},
-                     checksum=Hash1,
+                     inner_checksum=OldHash1,
+                     outer_checksum=Hash1,
                      dependencies=Deps,
                      retired=Retired} = Package,
             maybe_warn_retired(PkgName, PkgVsn1, Hash, Retired),
             PkgVsn2 = list_to_binary(lists:flatten(ec_semver:format(PkgVsn1))),
-            AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName, PkgVsn2, Hash1, RepoConfig}),
+            AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName, PkgVsn2, OldHash1, Hash1, RepoConfig}),
             rebar_app_info:update_opts_deps(AppInfo1, Deps);
         not_found ->
             throw(?PRV_ERROR({missing_package, PkgName, PkgVsn}));

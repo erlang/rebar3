@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.5.1, do not edit manually
+%% Vendored from hex_core v0.6.8, do not edit manually
 
 % Copied from https://github.com/erlang/otp/blob/OTP-20.0.1/lib/stdlib/src/erl_tar.hrl
 
@@ -24,13 +24,13 @@
 %% Options used when adding files to a tar archive.
 -record(add_opts, {
           read_info,          %% Fun to use for read file/link info.
-          chunk_size = 0,     %% For file reading when sending to sftp. 0=do not chunk
-          verbose = false,    %% Verbose on/off.
-          atime = undefined,
-          mtime = undefined,
-          ctime = undefined,
-          uid = 0,
-          gid = 0}).
+          chunk_size = 0 :: integer(),     %% For file reading when sending to sftp. 0=do not chunk
+          verbose = false :: boolean(),    %% Verbose on/off.
+          atime = undefined :: undefined | integer(),
+          mtime = undefined :: undefined | integer(),
+          ctime = undefined :: undefined | integer(),
+          uid = 0 :: integer(),
+          gid = 0 :: integer()}).
 -type add_opts() :: #add_opts{}.
 
 %% Options used when reading a tar archive.
@@ -43,9 +43,15 @@
           verbose = false :: boolean()}).      %% Verbose on/off.
 -type read_opts() :: #read_opts{}.
 
--type add_opt() :: dereference |
-                   verbose |
-                   {chunks, pos_integer()}.
+-type add_opt() ::   dereference
+                   | verbose
+                   | {chunks, pos_integer()}
+                   | {atime, integer()}
+                   | {mtime, integer()}
+                   | {ctime, integer()}
+                   | {uid, integer()}
+                   | {gid, integer()}.
+
 
 -type extract_opt() :: {cwd, string()} |
                        {files, [string()]} |

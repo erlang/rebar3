@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.5.1, do not edit manually
+%% Vendored from hex_core v0.6.8, do not edit manually
 
 -module(r3_hex_registry).
 -export([
@@ -93,7 +93,7 @@ decode_signed(Signed) ->
 
 %% @doc
 %% Decode message created with sign_protobuf/2 and verify it against public key.
--spec decode_and_verify_signed(map(), public_key()) -> {ok, binary()} | {error, term()}.
+-spec decode_and_verify_signed(binary(), public_key()) -> {ok, binary()} | {error, term()}.
 decode_and_verify_signed(Signed, PublicKey) ->
     #{payload := Payload, signature := Signature} = decode_signed(Signed),
     case verify(Payload, Signature, PublicKey) of
