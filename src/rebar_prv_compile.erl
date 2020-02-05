@@ -68,8 +68,8 @@ handle_project_apps(Providers, State) ->
     ProjectApps2 = copy_and_build_project_apps(State, Providers, ProjectApps1),
     State2 = rebar_state:project_apps(State, ProjectApps2),
 
-    %% projects with structures like /apps/foo,/apps/bar,/test
-    build_extra_dirs(State, ProjectApps2),
+    %% build extra_src_dirs in the root of multi-app projects
+    build_root_extras(State, ProjectApps2),
 
     State3 = update_code_paths(State2, ProjectApps2),
 
@@ -98,11 +98,11 @@ format_error(Reason) ->
 
 copy_and_build_apps(State, Providers, Apps) ->
     Apps0 = [prepare_app(State, Providers, App) || App <- Apps],
-    compile(State, Providers, Apps0).
+    compile(State, Providers, Apps0, apps).
 
 copy_and_build_project_apps(State, Providers, Apps) ->
     Apps0 = [prepare_project_app(State, Providers, App) || App <- Apps],
-    compile(State, Providers, Apps0).
+    compile(State, Providers, Apps0, project_apps).
 
 -spec compile(rebar_state:t(), [rebar_app_info:t()]) -> [rebar_app_info:t()]
       ;      (rebar_state:t(), rebar_app_info:t()) -> rebar_app_info:t().
@@ -114,12 +114,18 @@ compile(State, AppInfo) ->
       ;      (rebar_state:t(), [providers:t()],
               rebar_app_info:t()) -> rebar_app_info:t().
 compile(State, Providers, AppInfo) when not is_list(AppInfo) ->
-    [Res] = compile(State, Providers, [AppInfo]),
+    [Res] = compile(State, Providers, [AppInfo], undefined),
     Res;
 compile(State, Providers, Apps) ->
+    compile(State, Providers, Apps, undefined).
+
+-spec compile(rebar_state:t(), [providers:t()],
+              [rebar_app_info:t()], atom() | undefined) -> [rebar_app_info:t()].
+compile(State, Providers, Apps, Tag) ->
+    ?DEBUG("Compile (~p)", [if Tag =:= undefined -> untagged; true -> Tag end]),
     Apps1 = [prepare_compile(State, Providers, App) || App <- Apps],
     Apps2 = [prepare_compilers(State, Providers, App) || App <- Apps1],
-    Apps3 = [run_compilers(State, Providers, App) || App <- Apps2],
+    Apps3 = run_compilers(State, Providers, Apps2, Tag),
     Apps4 = [finalize_compilers(State, Providers, App) || App <- Apps3],
     Apps5 = [prepare_app_file(State, Providers, App) || App <- Apps4],
     Apps6 = compile_app_files(State, Providers, Apps5),
@@ -147,10 +153,32 @@ prepare_compilers(State, Providers, AppInfo) ->
     AppDir = rebar_app_info:dir(AppInfo),
     rebar_hooks:run_all_hooks(AppDir, pre, ?ERLC_HOOK, Providers, AppInfo, State).
 
-run_compilers(State, _Providers, AppInfo) ->
-    ?INFO("Compiling ~ts", [rebar_app_info:name(AppInfo)]),
-    build_app(AppInfo, State),
-    AppInfo.
+run_compilers(State, _Providers, Apps, Tag) ->
+    %% Prepare a compiler digraph to be shared by all compiled applications
+    %% in a given run, providing the ability to combine their dependency
+    %% ordering and resources.
+    %% The Tag allows to create a Label when someone cares about a specific
+    %% run for compilation;
+    DAGLabel = case Tag of
+        undefined -> undefined;
+        _ -> atom_to_list(Tag)
+    end,
+    %% The Dir for the DAG is set to deps_dir so builds taking place
+    %% in different contexts (i.e. plugins) don't risk clobbering regular deps.
+    Dir = rebar_dir:deps_dir(State),
+    CritMeta = [], % used to be incldirs per app
+    DAGs = [{Mod, rebar_compiler_dag:init(Dir, Mod, DAGLabel, CritMeta)}
+            || Mod <- rebar_state:compilers(State)],
+    rebar_paths:set_paths([deps], State),
+    %% Compile all the apps
+    [build_app(DAGs, AppInfo, State) || AppInfo <- Apps],
+    %% Potentially store shared compiler DAGs so next runs can easily
+    %% share the base information for easy re-scans.
+    lists:foreach(fun({Mod, G}) ->
+        rebar_compiler_dag:maybe_store(G, Dir, Mod, DAGLabel, CritMeta),
+        rebar_compiler_dag:terminate(G)
+    end, DAGs),
+    Apps.
 
 finalize_compilers(State, Providers, AppInfo) ->
     AppDir = rebar_app_info:dir(AppInfo),
@@ -184,55 +212,61 @@ finalize_app_file(State, Providers, AppInfo) ->
 finalize_compile(State, Providers, AppInfo) ->
     AppDir = rebar_app_info:dir(AppInfo),
     AppInfo2 = rebar_hooks:run_all_hooks(AppDir, post, ?PROVIDER, Providers, AppInfo, State),
-    %% Problem if we use a newer AppInfo version? Used to be ran on result of app compile
-    %% directly, but we need the check here to ensure all hooks have run, while the new
-    %% "concurrent" pipeline does not let us go back.
     has_all_artifacts(AppInfo),
     AppInfo2.
 
-build_extra_dirs(State, Apps) ->
+build_root_extras(State, Apps) ->
+    %% The root extra src dirs belong to no specific applications;
+    %% because the compiler works on OTP apps, we instead build
+    %% a fake AppInfo record that only contains the root extra_src
+    %% directories, has access to all the top-level apps' public
+    %% include files, and builds to a specific extra outdir.
+    %% TODO: figure out digraph strategy to properly ensure no
+    %%       cross-contamination but proper change detection.
     BaseDir = rebar_state:dir(State),
     F = fun(App) -> rebar_app_info:dir(App) == BaseDir end,
-    %% check that this app hasn't already been dealt with
     case lists:any(F, Apps) of
+        true ->
+            [];
         false ->
             ProjOpts = rebar_state:opts(State),
             Extras = rebar_dir:extra_src_dirs(ProjOpts, []),
-            [build_extra_dir(State, Dir) || Dir <- Extras];
-        true  -> ok
+            {ok, VirtApp} = rebar_app_info:new("extra", "0.0.0", BaseDir, []),
+            VirtApps = extra_virtual_apps(State, VirtApp, Extras),
+            %% re-use the project-apps digraph?
+            run_compilers(State, [], VirtApps, project_apps)
     end.
 
-build_extra_dir(_State, []) -> ok;
-build_extra_dir(State, Dir) ->
-    case ec_file:is_dir(filename:join([rebar_state:dir(State), Dir])) of
+extra_virtual_apps(_, _, []) ->
+    [];
+extra_virtual_apps(State, VApp0, [Dir|Dirs]) ->
+    SrcDir = filename:join([rebar_state:dir(State), Dir]),
+    case ec_file:is_dir(SrcDir) of
+        false ->
+            extra_virtual_apps(State, VApp0, Dirs);
         true ->
             BaseDir = filename:join([rebar_dir:base_dir(State), "extras"]),
             OutDir = filename:join([BaseDir, Dir]),
-            rebar_file_utils:ensure_dir(OutDir),
             copy(rebar_state:dir(State), BaseDir, Dir),
-
-            Compilers = rebar_state:compilers(State),
-            FakeApp = rebar_app_info:new(),
-            FakeApp1 = rebar_app_info:out_dir(FakeApp, BaseDir),
-            FakeApp2 = rebar_app_info:ebin_dir(FakeApp1, OutDir),
+            VApp1 = rebar_app_info:out_dir(VApp0, BaseDir),
+            VApp2 = rebar_app_info:ebin_dir(VApp1, OutDir),
             Opts = rebar_state:opts(State),
-            FakeApp3 = rebar_app_info:opts(FakeApp2, Opts),
-            FakeApp4 = rebar_app_info:set(FakeApp3, src_dirs, [OutDir]),
-            rebar_compiler:compile_all(Compilers, FakeApp4);
-        false ->
-            ok
+            VApp3 = rebar_app_info:opts(VApp2, Opts),
+            [rebar_app_info:set(VApp3, src_dirs, [OutDir])
+             | extra_virtual_apps(State, VApp0, Dirs)]
     end.
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
-build_app(AppInfo, State) ->
+build_app(DAGs, AppInfo, State) ->
+    ?INFO("Compiling ~ts", [rebar_app_info:name(AppInfo)]),
     case rebar_app_info:project_type(AppInfo) of
         Type when Type =:= rebar3 ; Type =:= undefined ->
-            Compilers = rebar_state:compilers(State),
-            rebar_paths:set_paths([deps], State),
-            rebar_compiler:compile_all(Compilers, AppInfo);
+            %% assume the deps paths are already set by the caller (run_compilers/3)
+            %% and shared for multiple apps to save work.
+            rebar_compiler:compile_all(DAGs, AppInfo);
         Type ->
             ProjectBuilders = rebar_state:project_builders(State),
             case lists:keyfind(Type, 1, ProjectBuilders) of
