@@ -69,7 +69,7 @@ consult_lock_file(File) ->
     case Terms of
         [] ->
             [];
-        [Locks] when is_list(Locks) -> % beta lock file
+        [Locks] when is_list(Locks) -> % beta/1.0.0 lock file
             read_attrs(beta, Locks, []);
         [{Vsn, Locks}|Attrs] when is_list(Locks) -> % versioned lock file
             %% Because this is the first version of rebar3 to introduce a lock
@@ -79,10 +79,16 @@ consult_lock_file(File) ->
                 ?CONFIG_VERSION ->
                     ok;
                 _ ->
-                    %% Make sure the warning below is to be shown whenever a version
-                    %% newer than the current one is being used, as we can't parse
-                    %% all the contents of the lock file properly.
-                    warn_vsn_once()
+                    case lists:member(Vsn, ?SUPPORTED_CONFIG_VERSIONS) of
+                        true ->
+                            ok;
+                        false ->
+                            %% Make sure the warning below is to be shown
+                            %% whenever a version newer than the current
+                            %% one is being used, as we can't parse all the
+                            %% contents of the lock file properly.
+                            warn_vsn_once()
+                    end
             end,
             read_attrs(Vsn, Locks, Attrs)
     end.
