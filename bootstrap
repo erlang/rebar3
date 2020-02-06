@@ -14,6 +14,11 @@ main(_) ->
     %% Clear directories for builds since bootstrapping may require
     %% a changed structure from an older one
     rm_rf("_build/bootstrap"),
+    %% When recompiling rebar3 itself, the path swaps and cleaning
+    %% removes the modules in _build/bootstrap, but the VM still
+    %% manages to discover those in _build/prod from previous builds and
+    %% cause weird failures when compilers get modified between releases.
+    rm_rf("_build/prod"),
 
     %% We fetch a few deps from hex for boostraping,
     %% so we must compile r3_safe_erl_term.xrl which
