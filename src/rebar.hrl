@@ -23,6 +23,7 @@
 -define(DEFAULT_TEST_DEPS_DIR, "test/lib").
 -define(DEFAULT_RELEASE_DIR, "rel").
 -define(CONFIG_VERSION, "1.2.0").
+-define(SUPPORTED_CONFIG_VERSIONS, ["1.1.0", "1.2.0"]). % older were untagged
 -define(DEFAULT_CDN, "https://repo.hex.pm/").
 -define(REMOTE_PACKAGE_DIR, "tarballs").
 -define(LOCK_FILE, "rebar.lock").
