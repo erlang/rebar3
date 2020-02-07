@@ -15,10 +15,11 @@
 -type extension() :: string().
 -type out_mappings() :: [{extension(), file:filename()}].
 
--callback context(rebar_app_info:t()) -> #{src_dirs     => [file:dirname()],
-                                           include_dirs => [file:dirname()],
-                                           src_ext      => extension(),
-                                           out_mappings => out_mappings()}.
+-callback context(rebar_app_info:t()) -> #{src_dirs     := [file:dirname()],
+                                           include_dirs := [file:dirname()],
+                                           src_ext      := extension(),
+                                           out_mappings := out_mappings(),
+                                           dependencies_opts => term()}.
 -callback needed_files(digraph:graph(), [file:filename()], out_mappings(),
                        rebar_app_info:t()) ->
     {{[file:filename()], term()}, % ErlFirstFiles (erl_opts global priority)
@@ -26,17 +27,19 @@
       {[file:filename()], [file:filename()]}, % {Sequential, Parallel}
       term()}}.
 -callback dependencies(file:filename(), file:dirname(), [file:dirname()]) -> [file:filename()].
+-callback dependencies(file:filename(), file:dirname(), [file:dirname()], term()) -> [file:filename()].
 -callback compile(file:filename(), out_mappings(), rebar_dict(), list()) ->
     ok | {ok, [string()]} | {ok, [string()], [string()]}.
 -callback clean([file:filename()], rebar_app_info:t()) -> _.
 
+-optional_callbacks([dependencies/4]).
 
 -define(RE_PREFIX, "^(?!\\._)").
 
 -spec compile_all([{module(), digraph:graph()}, ...], rebar_app_info:t()) -> ok
       ;          ([module(), ...], rebar_app_info:t()) -> ok.
 compile_all(DAGs, AppInfo) when is_tuple(hd(DAGs)) -> % > 3.13.0
-    prepare_compiler_env(AppInfo),
+    prepare_compiler_env(DAGs, AppInfo),
     lists:foreach(fun({Compiler, G}) ->
         run(G, Compiler, AppInfo),
         %% TODO: disable default recursivity in extra_src_dirs compiling to
@@ -58,7 +61,7 @@ compile_all(Compilers, AppInfo) -> % =< 3.13.0 interface; plugins use this!
         rebar_compiler_dag:terminate(G)
      end, Compilers).
 
-prepare_compiler_env(AppInfo) ->
+prepare_compiler_env(DAGs, AppInfo) ->
     EbinDir = rebar_utils:to_list(rebar_app_info:ebin_dir(AppInfo)),
     %% Make sure that outdir is on the path
     ok = rebar_file_utils:ensure_dir(EbinDir),
@@ -68,13 +71,16 @@ prepare_compiler_env(AppInfo) ->
     %% called here for clarity as it's required by both opts_changed/2
     %% and erl_compiler_opts_set/0 in needed_files
     _ = code:ensure_loaded(compile),
+    [code:ensure_loaded(Mod) || {Mod, _} <- DAGs],
     ok.
 
 run(G, CompilerMod, AppInfo) ->
+    Ctx = CompilerMod:context(AppInfo),
     #{src_dirs := SrcDirs,
       include_dirs := InclDirs,
       src_ext := SrcExt,
-      out_mappings := Mappings} = CompilerMod:context(AppInfo),
+      out_mappings := Mappings,
+      dependencies_opts := DepOpts} = maps:merge(default_ctx(), Ctx),
 
     BaseDir = rebar_utils:to_list(rebar_app_info:dir(AppInfo)),
     EbinDir = rebar_utils:to_list(rebar_app_info:ebin_dir(AppInfo)),
@@ -88,7 +94,7 @@ run(G, CompilerMod, AppInfo) ->
     InDirs = lists:usort(AbsInclDirs ++ AbsSrcDirs),
 
     rebar_compiler_dag:prune(G, AbsSrcDirs, EbinDir, FoundFiles),
-    rebar_compiler_dag:update(G, CompilerMod, InDirs, FoundFiles),
+    rebar_compiler_dag:update(G, CompilerMod, InDirs, FoundFiles, DepOpts),
     {{FirstFiles, FirstFileOpts},
      {RestFiles, Opts}} = CompilerMod:needed_files(G, FoundFiles, Mappings, AppInfo),
 
@@ -253,3 +259,6 @@ add_to_includes(AppInfo, Dirs) ->
     NewErlOpts = [{i, Dir} || Dir <- Dirs] ++ List,
     NewOpts = rebar_opts:set(Opts, erl_opts, NewErlOpts),
     rebar_app_info:opts(AppInfo, NewOpts).
+
+default_ctx() ->
+    #{dependencies_opts => []}.

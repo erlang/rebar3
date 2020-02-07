@@ -4,7 +4,7 @@
 
 -export([context/1,
          needed_files/4,
-         dependencies/3,
+         dependencies/3, dependencies/4,
          compile/4,
          clean/2,
          format_error/1]).
@@ -26,11 +26,18 @@ context(AppInfo) ->
     ErlOpts = rebar_opts:erl_opts(RebarOpts),
     ErlOptIncludes = proplists:get_all_values(i, ErlOpts),
     InclDirs = lists:map(fun(Incl) -> filename:absname(Incl) end, ErlOptIncludes),
+    AbsIncl = [filename:join([OutDir, "include"]) | InclDirs],
+    Macros = [case Tup of
+                  {d,Name} -> Name;
+                  {d,Name,Val} -> {Name,Val}
+              end || Tup <- ErlOpts,
+                     is_tuple(Tup) andalso element(1,Tup) == d],
 
     #{src_dirs => ExistingSrcDirs,
-      include_dirs => [filename:join([OutDir, "include"]) | InclDirs],
+      include_dirs => AbsIncl,
       src_ext => ".erl",
-      out_mappings => Mappings}.
+      out_mappings => Mappings,
+      dependencies_opts => [{includes, AbsIncl}, {macros, Macros}]}.
 
 
 needed_files(Graph, FoundFiles, _, AppInfo) ->
@@ -84,6 +91,32 @@ dependencies(Source, SourceDir, Dirs) ->
             AbsIncls;
         {error, Reason} ->
             throw(?PRV_ERROR({cannot_read_file, Source, file:format_error(Reason)}))
+    end.
+
+dependencies(Source, _SourceDir, Dirs, DepOpts) ->
+    try rebar_compiler_epp:deps(Source, DepOpts) of
+        #{include := AbsIncls,
+          missing_include_file := _MissIncl,
+          missing_include_lib := _MissInclLib,
+          parse_transform := PTrans,
+          behaviour := Behaviours} ->
+            %% TODO: resolve behaviours cross-app
+            %% TODO: resolve parse_transforms cross-app
+            %% TODO: report on missing files
+            %% TODO: check for core transforms?
+            expand_file_names([module_to_erl(Mod) || Mod <- PTrans], Dirs) ++
+            expand_file_names([module_to_erl(Mod) || Mod <- Behaviours], Dirs) ++
+            AbsIncls
+    catch
+        error:{badmatch, {error, Reason}} ->
+            case file:format_error(Reason) of
+                "unknown POSIX error" ->
+                    throw(?PRV_ERROR({cannot_read_file, Source, Reason}));
+                ReadableReason ->
+                    throw(?PRV_ERROR({cannot_read_file, Source, ReadableReason}))
+            end;
+        error:Reason ->
+            throw(?PRV_ERROR({cannot_read_file, Source, Reason}))
     end.
 
 compile(Source, [{_, OutDir}], Config, ErlOpts) ->

@@ -1,7 +1,7 @@
 %%% Module handling the directed graph required for the analysis
 %%% of all top-level applications by the various compiler plugins.
 -module(rebar_compiler_dag).
--export([init/4, prune/4, update/4, maybe_store/5, terminate/1]).
+-export([init/4, prune/4, update/5, maybe_store/5, terminate/1]).
 
 -include("rebar.hrl").
 
@@ -59,10 +59,11 @@ prune(G, SrcDirs, EbinDir, Erls) ->
 %% to propagate file changes.
 %%
 %% To be replaced by a more declarative EPP-based flow.
--spec update(dag(), module(), [file:filename_all()], [file:filename_all()]) -> ok.
-update(_, _, _, []) ->
+-spec update(dag(), module(), [file:filename_all()], [file:filename_all()],
+             term()) -> ok.
+update(_, _, _, [], _) ->
     ok;
-update(G, Compiler, InDirs, [Source|Erls]) ->
+update(G, Compiler, InDirs, [Source|Erls], DepOpts) ->
     case digraph:vertex(G, Source) of
         {_, LastUpdated} ->
             case filelib:last_modified(Source) of
@@ -72,25 +73,27 @@ update(G, Compiler, InDirs, [Source|Erls]) ->
                     %% All the edges will be erased automatically.
                     digraph:del_vertex(G, Source),
                     mark_dirty(G),
-                    update(G, Compiler, InDirs, Erls);
+                    update(G, Compiler, InDirs, Erls, DepOpts);
                 LastModified when LastUpdated < LastModified ->
-                    add_to_dag(G, Compiler, InDirs, Source, LastModified, filename:dirname(Source)),
-                    update(G, Compiler, InDirs, Erls);
+                    add_to_dag(G, Compiler, InDirs, Source, LastModified,
+                               filename:dirname(Source), DepOpts),
+                    update(G, Compiler, InDirs, Erls, DepOpts);
                 _ ->
                     AltErls = digraph:out_neighbours(G, Source),
                     %% Deps must be explored before the module itself
-                    update(G, Compiler, InDirs, AltErls),
+                    update(G, Compiler, InDirs, AltErls, DepOpts),
                     Modified = is_dirty(G),
                     MaxModified = update_max_modified_deps(G, Source),
                     case Modified orelse MaxModified > LastUpdated of
                         true -> mark_dirty(G);
                         false -> ok
                     end,
-                    update(G, Compiler, InDirs, Erls)
+                    update(G, Compiler, InDirs, Erls, DepOpts)
             end;
         false ->
-            add_to_dag(G, Compiler, InDirs, Source, filelib:last_modified(Source), filename:dirname(Source)),
-            update(G, Compiler, InDirs, Erls)
+            add_to_dag(G, Compiler, InDirs, Source, filelib:last_modified(Source),
+                       filename:dirname(Source), DepOpts),
+            update(G, Compiler, InDirs, Erls, DepOpts)
     end.
 
 maybe_store(G, Dir, Compiler, Label, CritMeta) ->
@@ -165,13 +168,18 @@ target_base(OutDir, Source) ->
 
 %% @private a file has been found to change or wasn't part of the DAG before,
 %% and must be added, along with all its dependencies.
-add_to_dag(G, Compiler, InDirs, Source, LastModified, SourceDir) ->
-    AbsIncls = Compiler:dependencies(Source, SourceDir, InDirs),
+add_to_dag(G, Compiler, InDirs, Source, LastModified, SourceDir, DepOpts) ->
+    AbsIncls = case erlang:function_exported(Compiler, dependencies, 4) of
+        false ->
+            Compiler:dependencies(Source, SourceDir, InDirs);
+        true ->
+            Compiler:dependencies(Source, SourceDir, InDirs, DepOpts)
+    end,
     digraph:add_vertex(G, Source, LastModified),
     digraph:del_edges(G, digraph:out_edges(G, Source)),
     %% Deps must be explored before the module itself
     [begin
-         update(G, Compiler, InDirs, [Incl]),
+         update(G, Compiler, InDirs, [Incl], DepOpts),
          digraph:add_edge(G, Source, Incl)
      end || Incl <- AbsIncls],
     mark_dirty(G),
