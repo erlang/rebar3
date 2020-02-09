@@ -31,6 +31,7 @@
         ,consult_app_file/1
         ,consult_file/1
         ,consult_lock_file/1
+        ,maybe_write_lock_file/3
         ,write_lock_file/2
         ,verify_config_format/1
         ,format_error/1
@@ -109,6 +110,12 @@ warn_vsn_once() ->
                   "information may be missing or lost. It is recommended to "
                   "upgrade Rebar3.", [])
     end.
+
+%% Only call `write_lock_file/2' if the locks have changed.
+maybe_write_lock_file(LockFile, Locks, OldLocks) when Locks =/= OldLocks ->
+    write_lock_file(LockFile, Locks);
+maybe_write_lock_file(_, _, _) ->
+    ok.
 
 %% @doc Converts the internal format for locks into the multi-version
 %% compatible one used within rebar3 lock files.
