@@ -114,8 +114,17 @@ warn_vsn_once() ->
 %% Only call `write_lock_file/2' if the locks have changed.
 maybe_write_lock_file(LockFile, Locks, OldLocks) when Locks =/= OldLocks ->
     write_lock_file(LockFile, Locks);
-maybe_write_lock_file(_, _, _) ->
-    ok.
+maybe_write_lock_file(LockFile, Locks, Locks) ->
+    %% rewrite if the configured format would have changed
+    Terms = consult_file_(LockFile),
+    case Terms of
+        [] ->
+            ok;
+        [{?CONFIG_VERSION, FileLocks}|_] when is_list(FileLocks) ->
+            ok;
+        _ ->
+            write_lock_file(LockFile, Locks)
+    end.
 
 %% @doc Converts the internal format for locks into the multi-version
 %% compatible one used within rebar3 lock files.
