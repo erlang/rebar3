@@ -78,8 +78,8 @@ needed_files(Graph, FoundFiles, _, AppInfo) ->
 dependencies(Source, SourceDir, Dirs) ->
     case file:open(Source, [read]) of
         {ok, Fd} ->
-            Incls = parse_attrs(Fd, [], SourceDir),
-            AbsIncls = expand_file_names(Incls, Dirs),
+            InclsWithClasses = parse_attrs(Fd, [], SourceDir),
+            AbsIncls = expand_file_names(InclsWithClasses, SourceDir, Dirs),
             ok = file:close(Fd),
             AbsIncls;
         {error, Reason} ->
@@ -244,6 +244,9 @@ atoms_in_erl_first_files_warning(Atoms) ->
 module_to_erl(Mod) ->
     atom_to_list(Mod) ++ ".erl".
 
+module_to_erl_with_class(Mod) ->
+    {ebin, module_to_erl(Mod)}.
+
 parse_attrs(Fd, Includes, Dir) ->
     case io:parse_erl_form(Fd, "") of
         {ok, Form, _Line} ->
@@ -267,17 +270,17 @@ process_attr(Form, Includes, Dir) ->
 process_attr(import, Form, Includes, _Dir) ->
     case erl_syntax_lib:analyze_import_attribute(Form) of
         {Mod, _Funs} ->
-            [module_to_erl(Mod)|Includes];
+            [module_to_erl_with_class(Mod)|Includes];
         Mod ->
-            [module_to_erl(Mod)|Includes]
+            [module_to_erl_with_class(Mod)|Includes]
     end;
 process_attr(file, Form, Includes, _Dir) ->
     {File, _} = erl_syntax_lib:analyze_file_attribute(Form),
-    [File|Includes];
+    [{src, File}|Includes];
 process_attr(include, Form, Includes, _Dir) ->
     [FileNode] = erl_syntax:attribute_arguments(Form),
     File = erl_syntax:string_value(FileNode),
-    [File|Includes];
+    [{include, File}|Includes];
 process_attr(include_lib, Form, Includes, Dir) ->
     [FileNode] = erl_syntax:attribute_arguments(Form),
     RawFile = erl_syntax:string_value(FileNode),
@@ -286,21 +289,21 @@ process_attr(behavior, Form, Includes, _Dir) ->
     process_attr(behaviour, Form, Includes, _Dir);
 process_attr(behaviour, Form, Includes, _Dir) ->
     [FileNode] = erl_syntax:attribute_arguments(Form),
-    File = module_to_erl(erl_syntax:atom_value(FileNode)),
-    [File|Includes];
+    FileWithClass = module_to_erl_with_class(erl_syntax:atom_value(FileNode)),
+    [FileWithClass|Includes];
 process_attr(compile, Form, Includes, _Dir) ->
     [Arg] = erl_syntax:attribute_arguments(Form),
     case erl_syntax:concrete(Arg) of
         {parse_transform, Mod} ->
-            [module_to_erl(Mod)|Includes];
+            [module_to_erl_with_class(Mod)|Includes];
         {core_transform, Mod} ->
-            [module_to_erl(Mod)|Includes];
+            [module_to_erl_with_class(Mod)|Includes];
         L when is_list(L) ->
             lists:foldl(
               fun({parse_transform, Mod}, Acc) ->
-                      [module_to_erl(Mod)|Acc];
+                      [module_to_erl_with_class(Mod)|Acc];
                  ({core_transform, Mod}, Acc) ->
-                      [module_to_erl(Mod)|Acc];
+                      [module_to_erl_with_class(Mod)|Acc];
                  (_, Acc) ->
                       Acc
               end, Includes, L);
@@ -317,21 +320,79 @@ process_attr(_, _Form, Includes, _Dir) ->
 %% if gen_server.erl was modified, it's not rebar's task to compile a
 %% new version of the beam file. Therefore, it's reasonable to drop
 %% such entries. Also see process_attr(behaviour, Form, Includes).
--spec expand_file_names([file:filename()],
-                        [file:filename()]) -> [file:filename()].
-expand_file_names(Files, Dirs) ->
+%%
+%% We also add possibly more dependencies than required - it is better
+%% to do more work (recompile on change of non-dependency), than missing
+%% some dependencies (not recompile on change of dependency).
+-spec expand_file_names([{regular | src | ebin | include, file:filename()}],
+                        file:filename(), [file:filename()]) -> [file:filename()].
+expand_file_names(FilesWithClasses, SourceDir, Dirs) ->
     %% We check if Files exist by itself or within the directories
     %% listed in Dirs.
     %% Return the list of files matched.
     lists:flatmap(
-      fun(Incl) ->
-              case filelib:is_regular(Incl) of
+      fun({Class, Incl}) ->
+              expand_file_names(Class, Incl, SourceDir, Dirs)
+      end, FilesWithClasses).
+
+expand_file_names(regular, Incl, _SourceDir, _Dirs) ->
+    [Incl];
+expand_file_names(src, Incl, _SourceDir, Dirs) ->
+    % Generates files are mostly generated from paths like:
+    % - some_src_dir/*/*/generate_file.xyz
+    % to path:
+    % - src/generate_file.erl
+    %
+    % Incl syntax is basename.
+    %
+    % To find source file, we need to recursively search all source dirs
+    %
+    % NOTE: This will also search in include dirs, but we can not change it
+    % without changing rebar_compiler behavior.
+    rebar_utils:find_files_in_dirs(Dirs, [$^, Incl, $$], true);
+expand_file_names(ebin, Incl, _SourceDir, Dirs) ->
+    % Modules (behaviors and transforms) are mostly generated from paths like:
+    % - some_src_dir/*/*/module.erl
+    % to path:
+    % - ebin/module.beam
+    %
+    % Incl syntax is basename.
+    %
+    % To find source file, we need to recursively search all source dirs
+    %
+    % NOTE: This will also search in include dirs, but we can not change it
+    % without changing rebar_compiler behavior.
+    rebar_utils:find_files_in_dirs(Dirs, [$^, Incl, $$], true);
+expand_file_names(include, Incl, SourceDir, Dirs) ->
+    % Erlang compiler tries to find include file in these directories:
+    % - directory of original file
+    % - current directory
+    % (- directory of original file agin )
+    % - includes directories
+    %
+    % Inc syntax can be:
+    % - basename
+    % - absolute path
+    % - relative path (e.g. "sub_dir/file.hrl", "../../include/sub_dir/file.hrl")
+    %
+    % NOTE: This will also search in src dirs, but we can not change it
+    % without changing rebar_compiler behavior.
+    case filelib:is_regular(Incl) of
+        true ->
+            % Handles current directory + absolute path
+            [Incl];
+        false ->
+            []
+    end ++ lists:flatmap(
+      fun(Dir) ->
+              FullPath = filename:join(Dir, Incl),
+              case filelib:is_regular(FullPath) of
                   true ->
-                      [Incl];
+                      [FullPath];
                   false ->
-                      rebar_utils:find_files_in_dirs(Dirs, [$^, Incl, $$], true)
+                      []
               end
-      end, Files).
+      end, [SourceDir | Dirs]).
 
 %% Given a path like "stdlib/include/erl_compile.hrl", return
 %% "OTP_INSTALL_DIR/lib/erlang/lib/stdlib-x.y.z/include/erl_compile.hrl".
@@ -348,7 +409,7 @@ maybe_expand_include_lib_path(File, Dir) ->
                 {error, bad_name} ->
                     warn_and_find_path(File, Dir);
                 AppDir ->
-                    [filename:join(AppDir, File1)]
+                    [{regular, filename:join(AppDir, File1)}]
             end
     end.
 
@@ -358,13 +419,13 @@ warn_and_find_path(File, Dir) ->
     SrcHeader = filename:join(Dir, File),
     case filelib:is_regular(SrcHeader) of
         true ->
-            [SrcHeader];
+            [{regular, SrcHeader}];
         false ->
             IncludeDir = filename:join(rebar_utils:droplast(filename:split(Dir))++["include"]),
             IncludeHeader = filename:join(IncludeDir, File),
             case filelib:is_regular(IncludeHeader) of
                 true ->
-                    [filename:join(IncludeDir, File)];
+                    [{regular, filename:join(IncludeDir, File)}];
                 false ->
                     []
             end
