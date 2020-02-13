@@ -230,7 +230,7 @@ git_vsn() ->
 git_vsn_fetch() ->
     case rebar_utils:sh("git --version",[]) of
         {ok, VsnStr} ->
-            case re:run(VsnStr, "git version\\h+(\\d)\\.(\\d)\\.(\\d).*", [{capture,[1,2,3],list}, unicode]) of
+            case re:run(VsnStr, "git version\\h+(\\d+)\\.(\\d+)\\.(\\d+).*", [{capture,[1,2,3],list}, unicode]) of
                 {match,[Maj,Min,Patch]} ->
                     {list_to_integer(Maj),
                      list_to_integer(Min),
