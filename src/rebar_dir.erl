@@ -89,7 +89,7 @@ root_dir(State) ->
 %% @doc returns the expected location of the `_checkouts' directory.
 -spec checkouts_dir(rebar_state:t()) -> file:filename_all().
 checkouts_dir(State) ->
-    filename:join(root_dir(State), rebar_state:get(State, checkouts_dir, ?DEFAULT_CHECKOUTS_DIR)).
+    rebar_file_utils:canonical_path(filename:join(root_dir(State), rebar_state:get(State, checkouts_dir, ?DEFAULT_CHECKOUTS_DIR))).
 
 %% @doc returns the expected location of a given app in the checkouts
 %% directory for the project.
