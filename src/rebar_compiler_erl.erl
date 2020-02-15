@@ -27,6 +27,8 @@ context(AppInfo) ->
     ErlOptIncludes = proplists:get_all_values(i, ErlOpts),
     InclDirs = lists:map(fun(Incl) -> filename:absname(Incl) end, ErlOptIncludes),
     AbsIncl = [filename:join([OutDir, "include"]) | InclDirs],
+    %% TODO: check that EPP can expand deps' include files
+    %% TODO: Ensure that EPP can expand other project apps' include files
     Macros = [case Tup of
                   {d,Name} -> Name;
                   {d,Name,Val} -> {Name,Val}
@@ -104,6 +106,8 @@ dependencies(Source, _SourceDir, Dirs, DepOpts) ->
             %% TODO: resolve parse_transforms cross-app
             %% TODO: report on missing files
             %% TODO: check for core transforms?
+            {_MissIncl, _MissInclLib} =/= {[],[]} andalso
+            ct:pal("Missing: ~p", [{_MissIncl, _MissInclLib}]),
             expand_file_names([module_to_erl(Mod) || Mod <- PTrans], Dirs) ++
             expand_file_names([module_to_erl(Mod) || Mod <- Behaviours], Dirs) ++
             AbsIncls
@@ -362,7 +366,14 @@ expand_file_names(Files, Dirs) ->
                   true ->
                       [Incl];
                   false ->
-                      rebar_utils:find_files_in_dirs(Dirs, [$^, Incl, $$], true)
+                      Res = rebar_utils:find_files_in_dirs(Dirs, [$^, Incl, $$], true),
+                      case Res of
+                          [] ->
+                              ?DEBUG("FILE ~p NOT FOUND", [Incl]),
+                              [];
+                          _ ->
+                              Res
+                      end
               end
       end, Files).
 

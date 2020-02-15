@@ -169,9 +169,9 @@ run_compilers(State, _Providers, Apps, Tag) ->
     CritMeta = [], % used to be incldirs per app
     DAGs = [{Mod, rebar_compiler_dag:init(Dir, Mod, DAGLabel, CritMeta)}
             || Mod <- rebar_state:compilers(State)],
-    rebar_paths:set_paths([deps], State),
     %% Compile all the apps
-    [build_app(DAGs, AppInfo, State) || AppInfo <- Apps],
+    build_apps(DAGs, Apps, State),
+    %[build_app(DAGs, AppInfo, State) || AppInfo <- Apps],
     %% Potentially store shared compiler DAGs so next runs can easily
     %% share the base information for easy re-scans.
     lists:foreach(fun({Mod, G}) ->
@@ -260,30 +260,41 @@ extra_virtual_apps(State, VApp0, [Dir|Dirs]) ->
 %% Internal functions
 %% ===================================================================
 
-build_app(DAGs, AppInfo, State) ->
-    ?INFO("Compiling ~ts", [rebar_app_info:name(AppInfo)]),
-    case rebar_app_info:project_type(AppInfo) of
-        Type when Type =:= rebar3 ; Type =:= undefined ->
-            %% assume the deps paths are already set by the caller (run_compilers/3)
-            %% and shared for multiple apps to save work.
-            rebar_compiler:compile_all(DAGs, AppInfo);
-        Type ->
-            ProjectBuilders = rebar_state:project_builders(State),
-            case lists:keyfind(Type, 1, ProjectBuilders) of
-                {_, Module} ->
-                    %% load plugins since thats where project builders would be,
-                    %% prevents parallelism at this level.
-                    rebar_paths:set_paths([deps, plugins], State),
-                    Res = Module:build(AppInfo),
-                    rebar_paths:set_paths([deps], State),
-                    case Res of
-                        ok -> ok;
-                        {error, Reason} -> throw({error, {Module, Reason}})
-                    end;
-                _ ->
-                    throw(?PRV_ERROR({unknown_project_type, rebar_app_info:name(AppInfo), Type}))
-            end
+build_apps(DAGs, Apps, State) ->
+    {Rebar3, Custom} = lists:partition(
+        fun(AppInfo) ->
+            Type = rebar_app_info:project_type(AppInfo),
+            Type =:= rebar3 orelse Type =:= undefined
+        end,
+        Apps
+    ),
+    [build_custom_builder_app(AppInfo, State) || AppInfo <- Custom],
+    build_rebar3_apps(DAGs, Rebar3, State).
+
+build_custom_builder_app(AppInfo, State) ->
+    Type = rebar_app_info:project_type(AppInfo),
+    ProjectBuilders = rebar_state:project_builders(State),
+    case lists:keyfind(Type, 1, ProjectBuilders) of
+        {_, Module} ->
+            %% load plugins since thats where project builders would be,
+            %% prevents parallelism at this level.
+            rebar_paths:set_paths([deps, plugins], State),
+            Res = Module:build(AppInfo),
+            rebar_paths:set_paths([deps], State),
+            case Res of
+                ok -> ok;
+                {error, Reason} -> throw({error, {Module, Reason}})
+            end;
+        _ ->
+            throw(?PRV_ERROR({unknown_project_type, rebar_app_info:name(AppInfo), Type}))
     end.
+
+build_rebar3_apps(DAGs, Apps, State) ->
+    rebar_paths:set_paths([deps], State),
+    rebar_compiler:analyze_all(DAGs, Apps),
+    %% TODO: topsort apps here based on DAG data
+    [rebar_compiler:compile_analyzed(DAGs, AppInfo) || AppInfo <- Apps],
+    ok.
 
 update_code_paths(State, ProjectApps) ->
     ProjAppsPaths = paths_for_apps(ProjectApps),

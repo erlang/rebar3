@@ -2,6 +2,8 @@
 %%% of all top-level applications by the various compiler plugins.
 -module(rebar_compiler_dag).
 -export([init/4, prune/4, update/5, maybe_store/5, terminate/1]).
+-export([populate_sources/5, populate_deps/3, propagate_stamps/1,
+         compile_order/2]).
 
 -include("rebar.hrl").
 
@@ -94,6 +96,180 @@ update(G, Compiler, InDirs, [Source|Erls], DepOpts) ->
             add_to_dag(G, Compiler, InDirs, Source, filelib:last_modified(Source),
                        filename:dirname(Source), DepOpts),
             update(G, Compiler, InDirs, Erls, DepOpts)
+    end.
+
+populate_sources(_G, _Compiler, _InDirs, [], _DepOpts) ->
+    ok;
+populate_sources(G, Compiler, InDirs, [Source|Erls], DepOpts) ->
+    case digraph:vertex(G, Source) of
+        {_, LastUpdated} ->
+            case filelib:last_modified(Source) of
+                0 ->
+                    %% The File doesn't exist anymore, delete
+                    %% from the graph.
+                    digraph:del_vertex(G, Source),
+                    mark_dirty(G),
+                    populate_sources(G, Compiler, InDirs, Erls, DepOpts);
+                LastModified when LastUpdated < LastModified ->
+                    digraph:add_vertex(G, Source, LastModified),
+                    prepopulate_deps(G, Compiler, InDirs, Source, DepOpts),
+                    mark_dirty(G);
+                _ -> % unchanged
+                    ok
+            end;
+        false ->
+            LastModified = filelib:last_modified(Source),
+            digraph:add_vertex(G, Source, LastModified),
+            prepopulate_deps(G, Compiler, InDirs, Source, DepOpts),
+            mark_dirty(G)
+    end,
+    populate_sources(G, Compiler, InDirs, Erls, DepOpts).
+
+prepopulate_deps(G, Compiler, InDirs, Source, DepOpts) ->
+    SourceDir = filename:dirname(Source),
+    AbsIncls = case erlang:function_exported(Compiler, dependencies, 4) of
+        false ->
+            Compiler:dependencies(Source, SourceDir, InDirs);
+        true ->
+            Compiler:dependencies(Source, SourceDir, InDirs, DepOpts)
+    end,
+    %% the file hasn't been visited yet; set it to existing, but with
+    %% a last modified value that's null so it gets updated to something new.
+    [digraph:add_vertex(G, Src, 0) || Src <- AbsIncls,
+                                      digraph:vertex(G, Src) =:= false],
+    [digraph:add_edge(G, Source, Incl) || Incl <- AbsIncls],
+    ok.
+
+populate_deps(G, SourceExt, ArtifactExts) ->
+    %% deps are files that are part of the digraph, but couldn't be scanned
+    %% because they are neither source files (`SourceExt') nor mappings
+    %% towards build artifacts (`ArtifactExts'); they will therefore never
+    %% be handled otherwise and need to be re-scanned for accuracy, even
+    %% if they are not being analyzed (we assume `Compiler:deps' did that
+    %% in depth already, and improvements should be driven at that level)
+    IgnoredExts = [SourceExt | ArtifactExts],
+    Vertices = digraph:vertices(G),
+    [refresh_dep(G, File)
+     || File <- Vertices,
+        Ext <- [filename:extension(File)],
+        not lists:member(Ext, IgnoredExts)],
+    ok.
+
+%% Take the timestamps/diff changes and propagate them from a dep to the parent;
+%% given:
+%%   A 0 -> B 1 -> C 3 -> D 2
+%% then we expect to get back:
+%%   A 3 -> B 3 -> C 3 -> D 2
+%% This is going to be safe for the current run of regeneration, but also for the
+%% next one; unless any file in the chain has changed, the stamp won't move up
+%% and there won't be a reason to recompile.
+%% The obvious caveat to this one is that a file changing by restoring an old version
+%% won't be picked up, but this weakness already existed in terms of timestamps.
+propagate_stamps(G) ->
+    case is_dirty(G) of
+        false ->
+            %% no change, no propagation to make
+            ok;
+        true ->
+            %% we can use a topsort, start at the end of it (files with no deps)
+            %% and update them all in order. By doing this, each file only needs to check
+            %% for one level of out-neighbours to set itself to the right appropriate time.
+            DepSort = lists:reverse(digraph_utils:topsort(G)),
+            propagate_stamps(G, DepSort)
+    end.
+
+
+propagate_stamps(_G, []) ->
+    ok;
+propagate_stamps(G, [File|Files]) ->
+    Stamps = [element(2, digraph:vertex(G, F))
+              || F <- digraph:out_neighbours(G, File)],
+    case Stamps of
+        [] ->
+            ok;
+        _ ->
+            Max = lists:max(Stamps),
+            case digraph:vertex(G, File) of
+                {_, Smaller} when Smaller < Max ->
+                    digraph:add_vertex(G, File, Max);
+                _ ->
+                    ok
+            end
+    end,
+    propagate_stamps(G, Files).
+
+
+compile_order(G, AppDefs) ->
+    %% Return the reverse sorting order to get dep-free apps first.
+    %% -- we would usually not need to consider the non-source files for the order to
+    %% be complete, but using them doesn't hurt.
+    Edges = [{V1,V2} || E <- digraph:edges(G),
+                        {_,V1,V2,_} <- [digraph:edge(G, E)]],
+    AppPaths = prepare_app_paths(AppDefs),
+    compile_order(Edges, AppPaths, #{}).
+
+compile_order([], _AppPaths, AppDeps) ->
+    %% use a digraph so we don't reimplement topsort by hand.
+    G = digraph:new([acyclic]), % ignore cycles and hope it works
+    Tups = maps:keys(AppDeps),
+    {Va,Vb} = lists:unzip(Tups),
+    [digraph:add_vertex(G, V) || V <- Va],
+    [digraph:add_vertex(G, V) || V <- Vb],
+    [digraph:add_edge(G, V1, V2) || {V1, V2} <- Tups],
+    Res = lists:reverse(digraph_utils:topsort(G)),
+    digraph:delete(G),
+    Res;
+compile_order([{P1,P2}|T], AppPaths, AppDeps) ->
+    %% Assume most dependencies are between files of the same app
+    %% so ask to see if it's the same before doing a deeper check:
+    {P1App, P1Path} = find_app(P1, AppPaths),
+    {P2App, _} = find_cached_app(P2, {P1App, P1Path}, AppPaths),
+    case {P1App, P2App} of
+        {A, A} ->
+            compile_order(T, AppPaths, AppDeps);
+        {V1, V2} ->
+            compile_order(T, AppPaths, AppDeps#{{V1, V2} => true})
+    end.
+
+prepare_app_paths(AppPaths) ->
+    lists:sort([{filename:split(Path), Name} || {Name, Path} <- AppPaths]).
+
+find_app(Path, AppPaths) ->
+    find_app_(filename:split(Path), AppPaths).
+
+find_cached_app(Path, {Name, AppPath}, AppPaths) ->
+    Split = filename:split(Path),
+    case find_app_(Split, [{AppPath, Name}]) of
+        not_found -> find_app_(Split, AppPaths);
+        LastEntry -> LastEntry
+    end.
+
+find_app_(_Path, []) ->
+    not_found;
+find_app_(Path, [{AppPath, AppName}|Rest]) ->
+    case lists:prefix(AppPath, Path) of
+        true ->
+            {AppName, AppPath};
+        false when AppPath > Path ->
+            not_found;
+        false ->
+            find_app_(Path, Rest)
+    end.
+
+
+refresh_dep(G, File) ->
+    {_, LastUpdated} = digraph:vertex(G, File),
+    case filelib:last_modified(File) of
+        0 ->
+            %% Gone! Erase from the graph
+            digraph:del_vertex(G, File),
+            mark_dirty(G);
+        LastModified when LastUpdated < LastModified ->
+            digraph:add_vertex(G, File, LastModified),
+            mark_dirty(G);
+        _ ->
+            % unchanged
+            ok
     end.
 
 maybe_store(G, Dir, Compiler, Label, CritMeta) ->

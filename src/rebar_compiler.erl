@@ -1,6 +1,8 @@
 -module(rebar_compiler).
 
--export([compile_all/2,
+-export([analyze_all/2,
+         compile_analyzed/2,
+         compile_all/2,
          clean/2,
 
          needs_compile/3,
@@ -36,9 +38,21 @@
 
 -define(RE_PREFIX, "^(?!\\._)").
 
--spec compile_all([{module(), digraph:graph()}, ...], rebar_app_info:t()) -> ok
-      ;          ([module(), ...], rebar_app_info:t()) -> ok.
-compile_all(DAGs, AppInfo) when is_tuple(hd(DAGs)) -> % > 3.13.0
+
+%% @doc analysis by the caller, in order to let an OTP app
+%% find and resolve all its dependencies as part of compile_all's new
+%% API, which presumes a partial analysis is done ahead of time
+-spec analyze_all([DAG], [App, ...]) -> ok when
+      DAG :: {module(), digraph:graph()},
+      App :: rebar_app_info:t().
+analyze_all(_DAGs, _Apps) ->
+    %% Analyze apps one by one
+    %% then cover the include files in the digraph to update them
+    %% then propagate?
+    ok.
+
+-spec compile_analyzed([{module(), digraph:graph()}], rebar_app_info:t()) -> ok.
+compile_analyzed(DAGs, AppInfo) -> % > 3.13.0
     prepare_compiler_env(DAGs, AppInfo),
     lists:foreach(fun({Compiler, G}) ->
         run(G, Compiler, AppInfo),
@@ -49,14 +63,17 @@ compile_all(DAGs, AppInfo) when is_tuple(hd(DAGs)) -> % > 3.13.0
         [run(G, Compiler, ExtraAppInfo) || ExtraAppInfo <- ExtraApps],
         ok
     end,
-    DAGs);
+    DAGs).
+
+-spec compile_all([module(), ...], rebar_app_info:t()) -> ok.
 compile_all(Compilers, AppInfo) -> % =< 3.13.0 interface; plugins use this!
     %% Support the old-style API by re-declaring a local DAG for the
     %% compile steps needed.
     lists:foreach(fun(Compiler) ->
         OutDir = rebar_app_info:out_dir(AppInfo),
         G = rebar_compiler_dag:init(OutDir, Compiler, undefined, []),
-        compile_all([{Compiler, G}], AppInfo),
+        analyze_all([{Compiler, G}], [AppInfo]),
+        compile_analyzed([{Compiler, G}], AppInfo),
         rebar_compiler_dag:maybe_store(G, OutDir, Compiler, undefined, []),
         rebar_compiler_dag:terminate(G)
      end, Compilers).
