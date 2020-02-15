@@ -31,6 +31,7 @@
         ,consult_app_file/1
         ,consult_file/1
         ,consult_lock_file/1
+        ,maybe_write_lock_file/3
         ,write_lock_file/2
         ,verify_config_format/1
         ,format_error/1
@@ -108,6 +109,21 @@ warn_vsn_once() ->
                   "It will be loaded in compatibility mode, but important "
                   "information may be missing or lost. It is recommended to "
                   "upgrade Rebar3.", [])
+    end.
+
+%% Only call `write_lock_file/2' if the locks have changed.
+maybe_write_lock_file(LockFile, Locks, OldLocks) when Locks =/= OldLocks ->
+    write_lock_file(LockFile, Locks);
+maybe_write_lock_file(LockFile, Locks, Locks) ->
+    %% rewrite if the configured format would have changed
+    Terms = consult_file_(LockFile),
+    case Terms of
+        [] ->
+            ok;
+        [{?CONFIG_VERSION, FileLocks}|_] when is_list(FileLocks) ->
+            ok;
+        _ ->
+            write_lock_file(LockFile, Locks)
     end.
 
 %% @doc Converts the internal format for locks into the multi-version
