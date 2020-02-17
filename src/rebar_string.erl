@@ -6,7 +6,7 @@
 %% Compatibility exports
 -export([join/2, split/2, lexemes/2, trim/1, trim/3, uppercase/1, lowercase/1, chr/2]).
 %% Util exports
--export([consult/1]).
+-export([consult/1, consult/2]).
 
 -ifdef(unicode_str).
 
@@ -55,9 +55,17 @@ chr(Str, Char) -> string:chr(Str, Char).
 
 %% @doc
 %% Given a string or binary, parse it into a list of terms, ala file:consult/1
--spec consult(unicode:chardata()) -> {error, term()} | [term()].
-consult(Str) ->
+-spec consult(unicode:chardata(), epp:source_encoding() | none) -> {error, term()} | [term()].
+consult(Str, none) ->
+    consult(Str, epp:default_encoding());
+consult(Bin, latin1) when is_binary(Bin) ->
+    consult([], binary_to_list(Bin), []);
+consult(Str, _) ->
     consult([], unicode:characters_to_list(Str), []).
+
+%% Backward compatibility for plugins.
+-spec consult(unicode:chardata()) -> {error, term()} | [term()].
+consult(Str) -> consult(Str, utf8).
 
 consult(Cont, Str, Acc) ->
     case erl_scan:tokens(Cont, Str, 0) of

@@ -571,7 +571,7 @@ consult_env_config(State, Filename) ->
         {ok, Bin} -> unicode:characters_to_list(Bin)
     end,
     ReplacedStr = replace_env_vars(RawString),
-    case rebar_string:consult(unicode:characters_to_list(ReplacedStr)) of
+    case rebar_string:consult(ReplacedStr, utf8) of
         {error, Reason} ->
             throw(?PRV_ERROR({bad_term_file, Filename, Reason}));
         [Terms] ->
