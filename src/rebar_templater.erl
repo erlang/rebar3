@@ -29,6 +29,9 @@
 -export([new/4,
          list_templates/1,
          render/2]).
+-ifdef(TEST).
+-export([consult_template/3]).
+-endif.
 
 
 -include("rebar.hrl").
@@ -59,7 +62,7 @@ list_templates(State) ->
 
 %% Expand a single template's value
 list_template(Files, {Name, Type, File}, State) ->
-    case rebar_string:consult(binary_to_list(load_file(Files, Type, File))) of
+    case consult_template(Files, Type, File) of
         {error, Reason} ->
             {error, {consult, File, Reason}};
         TemplateTerms ->
@@ -158,7 +161,7 @@ drop_var_docs([{K,V}|Rest]) -> [{K,V} | drop_var_docs(Rest)].
 %% Load the template index, resolve all variables, and then execute
 %% the template.
 create({Template, Type, File}, Files, UserVars, Force, State) ->
-    TemplateTerms = rebar_string:consult(binary_to_list(load_file(Files, Type, File))),
+    TemplateTerms = consult_template(Files, Type, File),
     Vars = drop_var_docs(override_vars(UserVars, get_template_vars(TemplateTerms, State))),
     maybe_warn_about_name(Vars),
     TemplateCwd = filename:dirname(File),
@@ -439,3 +442,12 @@ render(Bin, Context) ->
       [{key_type, atom},
        {escape_fun, fun(X) -> X end}] % disable HTML-style escaping
     ).
+
+consult_template(Files, Type, File) ->
+    TemplateBin = load_file(Files, Type, File),
+    Encoding =
+        case epp:read_encoding_from_binary(TemplateBin) of
+            none -> epp:default_encoding();
+            X -> X
+        end,
+    rebar_string:consult(unicode:characters_to_list(TemplateBin, Encoding)).
