@@ -17,11 +17,11 @@
 -type extension() :: string().
 -type out_mappings() :: [{extension(), file:filename()}].
 
--callback context(rebar_app_info:t()) -> #{src_dirs     := [file:dirname()],
-                                           include_dirs := [file:dirname()],
-                                           src_ext      := extension(),
-                                           out_mappings := out_mappings(),
-                                           dependencies_opts => term()}.
+-callback context(rebar_app_info:t()) -> #{src_dirs     => [file:dirname()], % mandatory
+                                           include_dirs => [file:dirname()], % mandatory
+                                           src_ext      => extension(),      % mandatory
+                                           out_mappings => out_mappings(),   % mandatory
+                                           dependencies_opts => term()}.     % optional
 -callback needed_files(digraph:graph(), [file:filename()], out_mappings(),
                        rebar_app_info:t()) ->
     {{[file:filename()], term()}, % ErlFirstFiles (erl_opts global priority)

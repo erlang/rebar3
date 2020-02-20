@@ -634,6 +634,7 @@ format_error(AbsSource, Extra, {Mod, Desc}) ->
 
 additional_defines() ->
     [{d, D} || {Re, D} <- [{"^[0-9]+", namespaced_types},
+                           {"^18", no_maps_update_with},
                            {"^R1[4|5]", deprecated_crypto},
                            {"^2", unicode_str},
                            {"^(R|1|20)", fun_stacktrace},

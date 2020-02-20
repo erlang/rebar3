@@ -15,12 +15,13 @@
       Opts :: [Opt, ...],
       Opt :: {includes, [file:filename_all()]}
            | {macros, [file:filename_all()]},
-      Attributes :: #{include := [file:filename_all()],
-                      missing_include_file := [file:filename_all()],
-                      missing_include_lib := [file:filename_all()],
-                      behaviour := [atom()],
-                      parse_transform := [atom()],
-                      is_behaviour := boolean()}.
+                      %% following are all required, OTP-18 don't like it though
+      Attributes :: #{include => [file:filename_all()],
+                      missing_include_file => [file:filename_all()],
+                      missing_include_lib => [file:filename_all()],
+                      behaviour => [atom()],
+                      parse_transform => [atom()],
+                      is_behaviour => boolean()}.
 deps(File, Opts) ->
     {EppOpts, ExtraOpts} = split_opts(Opts),
     {ok, Forms} = epp:parse_file(File, EppOpts),
@@ -90,13 +91,13 @@ handle_form({attribute, _Line, file, {Path, Ln}}, Map, Opts) ->
     %% thing.
     case filename:absname(Path) of
         Path ->
-            maps:update_with(include, fun(L) -> [Path|L] end, [Path], Map);
+            update_with(include, fun(L) -> [Path|L] end, [Path], Map);
         _ -> % argh!
             handle_form({error, {Ln, {epp, {include, file, Path}}}}, Map, Opts)
     end;
 %% Include files that EPP couldn't resolve
 handle_form({error, {_Line, epp, {include, file, Name}}}, Map, _Opts) ->
-    maps:update_with(missing_include_file, fun(L) -> [Name|L] end, [Name], Map);
+    update_with(missing_include_file, fun(L) -> [Name|L] end, [Name], Map);
 handle_form({error, {_Line, epp, {include, lib, Path}}}, Map, Opts) ->
     %% This file might still exist in the regular paths not in
     %% code:lib_dir, which depend on options we pass to this module.
@@ -107,15 +108,15 @@ handle_form({error, {_Line, epp, {include, lib, Path}}}, Map, Opts) ->
             %% file because we'd need its own compiler opts and app opts
             %% to do it safely. Tracking that file is still better
             %% than nothing though.
-            maps:update_with(include, fun(L) -> [File|L] end, [File], Map);
+            update_with(include, fun(L) -> [File|L] end, [File], Map);
         {error, not_found} ->
-            maps:update_with(missing_include_lib, fun(L) -> [Path|L] end, [Path], Map)
+            update_with(missing_include_lib, fun(L) -> [Path|L] end, [Path], Map)
     end;
 %% Behaviour implementation declaration
 handle_form({attribute, _Line, behaviour, Name}, Map, _Opts) ->
-    maps:update_with(behaviour, fun(L) -> [Name|L] end, [Name], Map);
+    update_with(behaviour, fun(L) -> [Name|L] end, [Name], Map);
 handle_form({attribute, _Line, behavior, Name}, Map, _Opts) ->
-    maps:update_with(behaviour, fun(L) -> [Name|L] end, [Name], Map);
+    update_with(behaviour, fun(L) -> [Name|L] end, [Name], Map);
 %% Extract parse transforms
 handle_form({attribute, Line, compile, Attr}, Map, _Opts) when not is_list(Attr) ->
     handle_form({attribute, Line, compile, [Attr]}, Map, _Opts);
@@ -124,7 +125,7 @@ handle_form({attribute, _Line, compile, Attrs}, Map, _Opts) ->
                 {_, {M,_}} -> M;
                 {_, M} -> M
             end || T <- proplists:lookup_all(parse_transform, Attrs)],
-    maps:update_with(parse_transform, fun(L) -> Mods++L end, Mods, Map);
+    update_with(parse_transform, fun(L) -> Mods++L end, Mods, Map);
 %% Current style behaviour specification declaration
 handle_form({attribute, _Line, callback, _}, Map, _Opts) ->
     Map#{is_behaviour => true};
@@ -162,4 +163,14 @@ find_include_lib([H|T], File) ->
         false -> find_include_lib(T, File)
     end.
 
+-ifdef(no_maps_update_with).
+update_with(Key, Fun, Default, Map) ->
+    case Map of
+        #{Key := Value} -> Map#{Key := Fun(Value)};
+        _ -> Map#{Key => Default}
+    end.
+-else.
+update_with(Key, Fun, Default, Map) ->
+    maps:update_with(Key, Fun, Default, Map).
+-endif.
 
