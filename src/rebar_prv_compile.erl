@@ -171,7 +171,6 @@ run_compilers(State, _Providers, Apps, Tag) ->
             || Mod <- rebar_state:compilers(State)],
     %% Compile all the apps
     build_apps(DAGs, Apps, State),
-    %[build_app(DAGs, AppInfo, State) || AppInfo <- Apps],
     %% Potentially store shared compiler DAGs so next runs can easily
     %% share the base information for easy re-scans.
     lists:foreach(fun({Mod, G}) ->
@@ -272,6 +271,7 @@ build_apps(DAGs, Apps, State) ->
     build_rebar3_apps(DAGs, Rebar3, State).
 
 build_custom_builder_app(AppInfo, State) ->
+    ?INFO("Compiling ~ts", [rebar_app_info:name(AppInfo)]),
     Type = rebar_app_info:project_type(AppInfo),
     ProjectBuilders = rebar_state:project_builders(State),
     case lists:keyfind(Type, 1, ProjectBuilders) of
@@ -289,11 +289,31 @@ build_custom_builder_app(AppInfo, State) ->
             throw(?PRV_ERROR({unknown_project_type, rebar_app_info:name(AppInfo), Type}))
     end.
 
+build_rebar3_apps(DAGs, Apps, _State) when DAGs =:= []; Apps =:= [] ->
+    %% No apps to actually build, probably just other compile phases
+    %% to run for non-rebar3 apps, someone wanting .app files built,
+    %% or just needing the hooks to run maybe.
+    ok;
 build_rebar3_apps(DAGs, Apps, State) ->
     rebar_paths:set_paths([deps], State),
-    rebar_compiler:analyze_all(DAGs, Apps),
-    %% TODO: topsort apps here based on DAG data
-    [rebar_compiler:compile_analyzed(DAGs, AppInfo) || AppInfo <- Apps],
+    %% To maintain output order, we need to mention each app being compiled
+    %% in order, even if the order isn't really there anymore due to each
+    %% compiler being run in broken sequence. The last compiler tends to be
+    %% the big ERLC one so we use the last compiler for the output.
+    LastDAG = lists:last(DAGs),
+    %% we actually need to compile each DAG one after the other to prevent
+    %% issues where a .yrl file that generates a .erl file gets to be seen.
+    [begin
+         {Ctx, ReorderedApps} = rebar_compiler:analyze_all(DAG, Apps),
+         lists:foreach(
+             fun(AppInfo) ->
+                DAG =:= LastDAG andalso
+                  ?INFO("Compiling ~ts", [rebar_app_info:name(AppInfo)]),
+                rebar_compiler:compile_analyzed(DAG, AppInfo, Ctx)
+             end,
+             ReorderedApps
+         )
+     end || DAG <- DAGs],
     ok.
 
 update_code_paths(State, ProjectApps) ->

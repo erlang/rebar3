@@ -208,7 +208,7 @@ compile_order(G, AppDefs) ->
     AppPaths = prepare_app_paths(AppDefs),
     compile_order(Edges, AppPaths, #{}).
 
-compile_order([], _AppPaths, AppDeps) ->
+compile_order([], AppPaths, AppDeps) ->
     %% use a digraph so we don't reimplement topsort by hand.
     G = digraph:new([acyclic]), % ignore cycles and hope it works
     Tups = maps:keys(AppDeps),
@@ -216,19 +216,23 @@ compile_order([], _AppPaths, AppDeps) ->
     [digraph:add_vertex(G, V) || V <- Va],
     [digraph:add_vertex(G, V) || V <- Vb],
     [digraph:add_edge(G, V1, V2) || {V1, V2} <- Tups],
-    Res = lists:reverse(digraph_utils:topsort(G)),
+    Sorted = lists:reverse(digraph_utils:topsort(G)),
     digraph:delete(G),
-    Res;
+    Standalone = [Name || {_, Name} <- AppPaths] -- Sorted,
+    Standalone ++ Sorted;
 compile_order([{P1,P2}|T], AppPaths, AppDeps) ->
     %% Assume most dependencies are between files of the same app
     %% so ask to see if it's the same before doing a deeper check:
-    {P1App, P1Path} = find_app(P1, AppPaths),
-    {P2App, _} = find_cached_app(P2, {P1App, P1Path}, AppPaths),
-    case {P1App, P2App} of
-        {A, A} ->
+    case find_app(P1, AppPaths) of
+        not_found -> % system lib probably! not in the repo
             compile_order(T, AppPaths, AppDeps);
-        {V1, V2} ->
-            compile_order(T, AppPaths, AppDeps#{{V1, V2} => true})
+        {P1App, P1Path} ->
+            case find_cached_app(P2, {P1App, P1Path}, AppPaths) of
+                {P2App, _} when P2App =/= P1App ->
+                    compile_order(T, AppPaths, AppDeps#{{P1App,P2App} => true});
+                _ ->
+                    compile_order(T, AppPaths, AppDeps)
+            end
     end.
 
 prepare_app_paths(AppPaths) ->

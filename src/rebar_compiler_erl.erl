@@ -27,8 +27,7 @@ context(AppInfo) ->
     ErlOptIncludes = proplists:get_all_values(i, ErlOpts),
     InclDirs = lists:map(fun(Incl) -> filename:absname(Incl) end, ErlOptIncludes),
     AbsIncl = [filename:join([OutDir, "include"]) | InclDirs],
-    %% TODO: check that EPP can expand deps' include files
-    %% TODO: Ensure that EPP can expand other project apps' include files
+    PTrans = proplists:get_all_values(parse_transform, ErlOpts),
     Macros = [case Tup of
                   {d,Name} -> Name;
                   {d,Name,Val} -> {Name,Val}
@@ -39,7 +38,8 @@ context(AppInfo) ->
       include_dirs => AbsIncl,
       src_ext => ".erl",
       out_mappings => Mappings,
-      dependencies_opts => [{includes, AbsIncl}, {macros, Macros}]}.
+      dependencies_opts => [{includes, AbsIncl}, {macros, Macros},
+                            {parse_transforms, PTrans}]}.
 
 
 needed_files(Graph, FoundFiles, _, AppInfo) ->
@@ -96,19 +96,17 @@ dependencies(Source, SourceDir, Dirs) ->
     end.
 
 dependencies(Source, _SourceDir, Dirs, DepOpts) ->
+    OptPTrans = proplists:get_value(parse_transforms, DepOpts, []),
     try rebar_compiler_epp:deps(Source, DepOpts) of
         #{include := AbsIncls,
           missing_include_file := _MissIncl,
           missing_include_lib := _MissInclLib,
           parse_transform := PTrans,
           behaviour := Behaviours} ->
-            %% TODO: resolve behaviours cross-app
-            %% TODO: resolve parse_transforms cross-app
-            %% TODO: report on missing files
             %% TODO: check for core transforms?
             {_MissIncl, _MissInclLib} =/= {[],[]} andalso
-            ct:pal("Missing: ~p", [{_MissIncl, _MissInclLib}]),
-            expand_file_names([module_to_erl(Mod) || Mod <- PTrans], Dirs) ++
+            ?DEBUG("Missing: ~p", [{_MissIncl, _MissInclLib}]),
+            expand_file_names([module_to_erl(Mod) || Mod <- OptPTrans ++ PTrans], Dirs) ++
             expand_file_names([module_to_erl(Mod) || Mod <- Behaviours], Dirs) ++
             AbsIncls
     catch

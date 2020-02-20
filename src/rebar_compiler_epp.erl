@@ -142,8 +142,12 @@ handle_form(_, Map, _Opts) ->
 split_opts(Opts) ->
     %% Extra Opts are options we added to palliate to issues we had
     %% with resolving include_libs and other things in EPP.
-    lists:partition(fun({OptName, _}) -> include_libs =/= OptName end,
-                    Opts).
+    lists:partition(
+        fun({OptName, _}) ->
+            not lists:member(OptName, [include_libs, parse_transforms])
+        end,
+        Opts
+    ).
 
 find_include_with_opts(Path, Opts) ->
     InclPaths = proplists:get_value(include_libs, Opts, []),
