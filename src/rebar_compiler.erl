@@ -96,19 +96,22 @@ gather_in_dirs([{AppInfo, Ctx} | Rest], Acc) ->
 analyze_app({Compiler, G}, Contexts, AppInfo) ->
     AppName = rebar_app_info:name(AppInfo),
     BaseDir = rebar_utils:to_list(rebar_app_info:dir(AppInfo)),
-    EbinDir = rebar_utils:to_list(rebar_app_info:ebin_dir(AppInfo)),
+    OutDir = rebar_utils:to_list(rebar_app_info:out_dir(AppInfo)),
     BaseOpts = rebar_app_info:opts(AppInfo),
     #{src_dirs := SrcDirs,
       src_ext := SrcExt,
+      out_mappings := [{OutExt, OutPath}|_], % prune one dir for now (compat mode!)
       dependencies_opts := DepOpts} = maps:get(AppName, Contexts),
     %% Local resources
+    ArtifactDir = filename:join([OutDir, OutPath]),
     AbsSources = find_source_files(BaseDir, SrcExt, SrcDirs, BaseOpts),
     LocalSrcDirs = [filename:join(BaseDir, SrcDir) || SrcDir <- SrcDirs],
     %% Multi-app resources
     InDirs = maps:get(in_dirs, Contexts),
     %% Prep the analysis
-    rebar_compiler_dag:prune(G, LocalSrcDirs, EbinDir, AbsSources),
-    rebar_compiler_dag:update(G, Compiler, InDirs, AbsSources, DepOpts),
+    rebar_compiler_dag:prune(
+        G, LocalSrcDirs, ArtifactDir, AbsSources, SrcExt, OutExt
+    ),
     %% Run the analysis
     rebar_compiler_dag:populate_sources(
         G, Compiler, InDirs, AbsSources, DepOpts
