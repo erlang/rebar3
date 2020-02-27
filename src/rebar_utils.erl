@@ -64,6 +64,7 @@
          tup_find/2,
          line_count/1,
          set_httpc_options/0,
+         url_append_path/2,
          escape_chars/1,
          escape_double_quotes/1,
          escape_double_quotes_weak/1,
@@ -937,6 +938,9 @@ normalise_proxy(Scheme, URI) ->
         nomatch when Scheme =:= proxy -> "http://" ++ URI;
         _ -> URI
     end.
+
+url_append_path(Url, ExtraPath) ->
+    rebar_uri:append_path(Url, ExtraPath).
 
 %% escape\ as\ a\ shell\?
 escape_chars(Str) when is_atom(Str) ->
