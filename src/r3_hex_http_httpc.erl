@@ -13,10 +13,13 @@
 request(Method, URI, ReqHeaders, Body, AdapterConfig) ->
     Profile = maps:get(profile, AdapterConfig, default),
     Request = build_request(URI, ReqHeaders, Body),
-    {ok, {{_, StatusCode, _}, RespHeaders, RespBody}} =
-        httpc:request(Method, Request, [], [{body_format, binary}], Profile),
-    RespHeaders2 = load_headers(RespHeaders),
-    {ok, {StatusCode, RespHeaders2, RespBody}}.
+    case httpc:request(Method, Request, [{ssl, rebar_utils:ssl_opts(URI)}],
+                       [{body_format, binary}], Profile) of
+        {ok, {{_, StatusCode, _}, RespHeaders, RespBody}} ->
+            RespHeaders2 = load_headers(RespHeaders),
+            {ok, {StatusCode, RespHeaders2, RespBody}};
+        {error, Reason} -> {error, Reason}
+    end.
 
 %%====================================================================
 %% Internal functions

@@ -1010,9 +1010,9 @@ is_list_of_strings(List) when is_list(List) ->
 ssl_opts(Url) ->
     case get_ssl_config() of
         ssl_verify_enabled ->
-            ssl_opts(ssl_verify_enabled, Url);
+            [{versions, ['tlsv1.2']} | ssl_opts(ssl_verify_enabled, Url)];
         ssl_verify_disabled ->
-            [{verify, verify_none}]
+            [{versions, ['tlsv1.2']}, {verify, verify_none}]
     end.
 
 %%------------------------------------------------------------------------------
