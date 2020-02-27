@@ -33,8 +33,7 @@
          sh_does_not_miss_messages/1,
          tup_merge/1,
          proxy_auth/1,
-        is_list_of_strings/1,
-        url_append_path/1]).
+        is_list_of_strings/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -50,7 +49,7 @@ all() ->
     [{group, args_to_tasks},
      sh_does_not_miss_messages,
      tup_merge,
-     proxy_auth, is_list_of_strings, url_append_path].
+     proxy_auth, is_list_of_strings].
 
 groups() ->
     [{args_to_tasks, [], [empty_arglist,
@@ -320,8 +319,3 @@ is_list_of_strings(_Config) ->
     ?assert(rebar_utils:is_list_of_strings([])),
     ?assert(rebar_utils:is_list_of_strings("")),
     ?assert(rebar_utils:is_list_of_strings("foo") == false).
-
-url_append_path(_Config) ->
-    ?assertEqual({ok, "https://repo.hex.pm:443/repos/org"}, rebar_utils:url_append_path("https://repo.hex.pm", "/repos/org")),
-    ?assertEqual({ok, "https://repo.hex.pm:443/repos/org?foo=bar"}, rebar_utils:url_append_path("https://repo.hex.pm",
-                                                                                      "/repos/org?foo=bar")).
