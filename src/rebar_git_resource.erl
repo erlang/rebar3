@@ -100,13 +100,6 @@ compare_url(Dir, Url) ->
     ?DEBUG("Comparing git url ~p with ~p", [ParsedUrl, ParsedCurrentUrl]),
     ParsedCurrentUrl =:= ParsedUrl.
 
--ifdef (OTP_RELEASE).
-  -if(?OTP_RELEASE >= 23).
-    -compile({nowarn_deprecated_function, [{http_uri, parse, 2},
-                                           {http_uri, scheme_defaults, 0}]}).
-  -endif.
--endif.
-
 parse_git_url(Url) ->
     %% Checks for standard scp style git remote
     case re:run(Url, ?SCP_PATTERN, [{capture, [host, path], list}, unicode]) of
@@ -116,9 +109,9 @@ parse_git_url(Url) ->
             parse_git_url(not_scp, Url)
     end.
 parse_git_url(not_scp, Url) ->
-    UriOpts = [{scheme_defaults, [{git, 9418} | http_uri:scheme_defaults()]}],
-    case http_uri:parse(Url, UriOpts) of
-        {ok, {_Scheme, _User, Host, _Port, Path, _Query}} ->
+    UriOpts = [{scheme_defaults, [{git, 9418} | rebar_uri:scheme_defaults()]}],
+    case rebar_uri:parse(Url, UriOpts) of
+        #{path := Path, host := Host} ->
             {ok, {Host, filename:rootname(Path, ".git")}};
         {error, Reason} ->
             {error, Reason}
