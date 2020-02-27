@@ -19,18 +19,30 @@
 
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-    State1 =
-        rebar_state:add_provider(State,
-                                providers:create([{name, ?PROVIDER},
-                                                  {module, ?MODULE},
-                                                  {namespace, ?NAMESPACE},
-                                                  {bare, false},
-                                                  {deps, ?DEPS},
-                                                  {example, ""},
-                                                  {short_desc, ""},
-                                                  {desc, ""},
-                                                  {opts, [{paths, $p, "paths", string, "Wildcard paths of ebin directories to add to code path, separated by a colon"},
-                                                          {separator, $s, "separator", string, "In case of multiple return paths, the separator character to use to join them."}]}])),
+    State1 = rebar_state:add_provider(
+        State,
+        providers:create([
+            {name, ?PROVIDER},
+            {module, ?MODULE},
+            {namespace, ?NAMESPACE},
+            {bare, false},
+            {deps, ?DEPS},
+            {example, ""},
+            {short_desc, ""},
+            {desc, ""},
+            {opts, [
+                {paths, $p, "paths", string,
+                 "Wildcard paths of ebin directories to add to code path, "
+                 "separated by a colon"},
+                {separator, $s, "separator", string,
+                 "In case of multiple return paths, the separator character "
+                 "to use to join them."},
+                {outdir, $o, "outdir", string,
+                 "Path where build artifacts are located. Defaults to the "
+                 "current directory."}
+            ]}
+        ])
+    ),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
@@ -41,11 +53,12 @@ do(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     Paths = proplists:get_value(paths, RawOpts),
     Sep = proplists:get_value(separator, RawOpts, " "),
+    OutDir = proplists:get_value(outdir, RawOpts, rebar_dir:get_cwd()),
     [ code:add_pathsa(filelib:wildcard(PathWildcard))
       || PathWildcard <- rebar_string:lexemes(Paths, Sep) ],
 
     [AppInfo] = rebar_state:project_apps(State),
-    AppInfo1 = rebar_app_info:out_dir(AppInfo, rebar_dir:get_cwd()),
+    AppInfo1 = rebar_app_info:out_dir(AppInfo, OutDir),
 
     %% run compile in the default namespace
     rebar_prv_compile:compile(rebar_state:namespace(State, default), AppInfo1),
