@@ -222,7 +222,8 @@ rewrite_leaders(OldUser, NewUser) ->
     %% liveness check.
     _ = [catch erlang:group_leader(NewUser, Pid)
          || Pid <- erlang:processes(),
-            proplists:get_value(group_leader, erlang:process_info(Pid)) == OldUser,
+            [_|_] = Info <- [erlang:process_info(Pid)],
+            proplists:get_value(group_leader, Info) == OldUser,
             is_process_alive(Pid)],
     %% Application masters have the same problem, but they hold the old group
     %% leader in their state and hold on to it. Re-point the processes whose
