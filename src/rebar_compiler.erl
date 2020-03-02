@@ -51,9 +51,15 @@ analyze_all({Compiler, G}, Apps) ->
     %% then cover the include files in the digraph to update them
     %% then propagate?
     Contexts = gather_contexts(Compiler, Apps),
-    [analyze_app({Compiler, G}, Contexts, AppInfo) || AppInfo <- Apps],
-    rebar_compiler_dag:populate_deps(G, maps:get(src_ext, Contexts),
-                                        maps:get(artifact_exts, Contexts)),
+    AppRes = [analyze_app({Compiler, G}, Contexts, AppInfo) || AppInfo <- Apps],
+    {AppOutPaths, AbsSources} = lists:unzip(AppRes),
+    SrcExt = maps:get(src_ext, Contexts),
+    OutExt = maps:get(artifact_exts, Contexts),
+
+    rebar_compiler_dag:prune(
+        G, SrcExt, OutExt, lists:append(AbsSources), AppOutPaths
+    ),
+    rebar_compiler_dag:populate_deps(G, SrcExt, OutExt),
     rebar_compiler_dag:propagate_stamps(G),
 
     AppPaths = [{rebar_app_info:name(AppInfo),
@@ -100,22 +106,18 @@ analyze_app({Compiler, G}, Contexts, AppInfo) ->
     BaseOpts = rebar_app_info:opts(AppInfo),
     #{src_dirs := SrcDirs,
       src_ext := SrcExt,
-      out_mappings := [{OutExt, OutPath}|_], % prune one dir for now (compat mode!)
+      out_mappings := [{_OutExt, OutPath}|_], % prune one dir for now (compat mode!)
       dependencies_opts := DepOpts} = maps:get(AppName, Contexts),
     %% Local resources
     ArtifactDir = filename:join([OutDir, OutPath]),
     AbsSources = find_source_files(BaseDir, SrcExt, SrcDirs, BaseOpts),
-    LocalSrcDirs = [filename:join(BaseDir, SrcDir) || SrcDir <- SrcDirs],
     %% Multi-app resources
     InDirs = maps:get(in_dirs, Contexts),
-    %% Prep the analysis
-    rebar_compiler_dag:prune(
-        G, LocalSrcDirs, ArtifactDir, AbsSources, SrcExt, OutExt
-    ),
     %% Run the analysis
     rebar_compiler_dag:populate_sources(
         G, Compiler, InDirs, AbsSources, DepOpts
-    ).
+    ),
+    {{BaseDir, ArtifactDir}, AbsSources}.
 
 sort_apps(Names, Apps) ->
     NamedApps = [{rebar_app_info:name(App), App} || App <- Apps],
