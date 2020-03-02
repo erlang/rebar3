@@ -2,7 +2,7 @@
 %%% of all top-level applications by the various compiler plugins.
 -module(rebar_compiler_dag).
 -export([init/4, maybe_store/5, terminate/1]).
--export([prune/6, populate_sources/5, populate_deps/3, propagate_stamps/1,
+-export([prune/5, populate_sources/5, populate_deps/3, propagate_stamps/1,
          compile_order/2]).
 
 -include("rebar.hrl").
@@ -38,22 +38,59 @@ init(Dir, Compiler, Label, CritMeta) ->
     G.
 
 %% @doc Clear up inactive (deleted) source files from a given project.
-%% The `SrcDirs' must be all the directories that may contain source files
+%% The file must be in one of the directories that may contain source files
 %% for an OTP application; source files found in the DAG `G' that lie outside
-%% of this directory will be used.
--spec prune(dag(), file:filename_all(), file:filename_all(),
-            [file:filename_all()], string(), string()) -> ok.
-prune(G, SrcDirs, OutDir, Erls, SrcExt, ArtifactExt) ->
-    %% A source file may have been renamed or deleted. Remove it from the graph
-    %% and remove any beam file for that source if it exists.
-    Vertices = digraph:vertices(G),
-    SrcParts = [filename:split(SrcDir) || SrcDir <- SrcDirs],
-    [maybe_rm_artifact_and_edge(G, OutDir, ArtifactExt, File)
-     || File <- lists:sort(Vertices) -- lists:sort(Erls),
-        filename:extension(File) =:= SrcExt,
-        lists:any(fun(Src) -> lists:prefix(Src, filename:split(File)) end,
-                  SrcParts)],
-    ok.
+%% of these directories may be used in other circumstances (i.e. options affecting
+%% visibility).
+%% Prune out files that have no corresponding sources
+prune(G, SrcExt, ArtifactExt, Sources, AppPaths) ->
+    %% Collect source files that may have been removed. These files:
+    %%  * are not in Sources
+    %%  * have SrcExt
+    %% In the process, prune header files - those don't have ArtifactExt
+    %%  extension - using side effect in is_deleted_source/5.
+    case [Del || Del <- (digraph:vertices(G) -- Sources),
+        is_deleted_source(G, Del, filename:extension(Del), SrcExt, ArtifactExt)] of
+        [] ->
+            ok; %% short circuit without sorting AppPaths
+        Deleted ->
+            prune_source_files(G, SrcExt, ArtifactExt,
+                lists:sort(AppPaths), lists:sort(Deleted))
+    end.
+
+is_deleted_source(_G, _F, Extension, Extension, _ArtifactExt) ->
+    %% source file
+    true;
+is_deleted_source(_G, _F, Extension, _SrcExt, Extension) ->
+    %% artifact file - skip
+    false;
+is_deleted_source(G, F, _Extension, _SrcExt, _ArtifactExt) ->
+    %% must be header file
+    digraph:in_edges(G, F) == [] andalso maybe_rm_vertex(G, F),
+    false.
+
+%% This can be implemented using smarter trie, but since the
+%%  whole procedure is rare, don't bother with optimisations.
+%% AppDirs & Fs are sorted, and to check if File is outside of
+%%  App, lists:prefix is checked. When the App with File in it
+%%  exists, verify file is still there on disk.
+prune_source_files(_G, _SrcExt, _ArtifactExt, [], _) ->
+    ok;
+prune_source_files(_G, _SrcExt, _ArtifactExt, _, []) ->
+    ok;
+prune_source_files(G, SrcExt, ArtifactExt, [AppDir | AppTail], Fs) when is_atom(AppDir) ->
+    %% dirty bit shenanigans
+    prune_source_files(G, SrcExt, ArtifactExt, AppTail, Fs);
+prune_source_files(G, SrcExt, ArtifactExt, [{App, Out} | AppTail] = AppPaths, [File | FTail]) ->
+    case lists:prefix(App, File) of
+        true ->
+            maybe_rm_artifact_and_edge(G, Out, SrcExt, ArtifactExt, File),
+            prune_source_files(G, SrcExt, ArtifactExt, AppPaths, FTail);
+        false when App < File ->
+            prune_source_files(G, SrcExt, ArtifactExt, AppTail, [File|FTail]);
+        false ->
+            prune_source_files(G, SrcExt, ArtifactExt, AppPaths, FTail)
+    end.
 
 %% @doc this function scans all the source files found and looks into
 %% all the `InDirs' for deps (other source files, or files that aren't source
@@ -73,7 +110,7 @@ populate_sources(G, Compiler, InDirs, [Source|Erls], DepOpts) ->
                     populate_sources(G, Compiler, InDirs, Erls, DepOpts);
                 LastModified when LastUpdated < LastModified ->
                     digraph:add_vertex(G, Source, LastModified),
-                    prepopulate_deps(G, Compiler, InDirs, Source, DepOpts),
+                    prepopulate_deps(G, Compiler, InDirs, Source, DepOpts, old),
                     mark_dirty(G);
                 _ -> % unchanged
                     ok
@@ -81,7 +118,7 @@ populate_sources(G, Compiler, InDirs, [Source|Erls], DepOpts) ->
         false ->
             LastModified = filelib:last_modified(Source),
             digraph:add_vertex(G, Source, LastModified),
-            prepopulate_deps(G, Compiler, InDirs, Source, DepOpts),
+            prepopulate_deps(G, Compiler, InDirs, Source, DepOpts, new),
             mark_dirty(G)
     end,
     populate_sources(G, Compiler, InDirs, Erls, DepOpts).
@@ -189,14 +226,14 @@ store_dag(G, File, CritMeta) ->
 
 %% Drop a file from the digraph if it doesn't exist, and if so,
 %% delete its related build artifact
-maybe_rm_artifact_and_edge(G, OutDir, Ext, Source) ->
+maybe_rm_artifact_and_edge(G, OutDir, SrcExt, Ext, Source) ->
     %% This is NOT a double check it is the only check that the source file is actually gone
     case filelib:is_regular(Source) of
         true ->
             %% Actually exists, don't delete
             false;
         false ->
-            Target = target_base(OutDir, Source) ++ Ext,
+            Target = target(OutDir, Source, SrcExt, Ext),
             ?DEBUG("Source ~ts is gone, deleting previous ~ts file if it exists ~ts", [Source, Ext, Target]),
             file:delete(Target),
             digraph:del_vertex(G, Source),
@@ -204,11 +241,20 @@ maybe_rm_artifact_and_edge(G, OutDir, Ext, Source) ->
             true
     end.
 
+maybe_rm_vertex(G, Source) ->
+    case filelib:is_regular(Source) of
+        true ->
+            exists;
+        false ->
+            digraph:del_vertex(G, Source),
+            mark_dirty(G)
+    end.
+
 %% Add dependencies of a given file to the DAG. If the file is not found yet,
 %% mark its timestamp to 0, which means we have no info on it.
 %% Source files will be covered at a later point in their own scan, and
 %% non-source files are going to be covered by `populate_deps/3'.
-prepopulate_deps(G, Compiler, InDirs, Source, DepOpts) ->
+prepopulate_deps(G, Compiler, InDirs, Source, DepOpts, Status) ->
     SourceDir = filename:dirname(Source),
     AbsIncls = case erlang:function_exported(Compiler, dependencies, 4) of
         false ->
@@ -220,6 +266,11 @@ prepopulate_deps(G, Compiler, InDirs, Source, DepOpts) ->
     %% a last modified value that's null so it gets updated to something new.
     [digraph:add_vertex(G, Src, 0) || Src <- AbsIncls,
                                       digraph:vertex(G, Src) =:= false],
+    %% drop edges from deps that aren't included!
+    [digraph:del_edge(G, Source, Path) || Status == old,
+                                          Path <- digraph:out_edges(G, Source),
+                                          not lists:member(Path, AbsIncls)],
+    %% Add the rest
     [digraph:add_edge(G, Source, Incl) || Incl <- AbsIncls],
     ok.
 
@@ -333,9 +384,9 @@ find_app_(Path, [{AppPath, AppName}|Rest]) ->
 
 %% @private Return what should be the base name of an erl file, relocated to the
 %% target directory. For example:
-%% target_base("ebin/", "src/my_module.erl") -> "ebin/my_module"
-target_base(OutDir, Source) ->
-    filename:join(OutDir, filename:basename(Source, ".erl")).
+%% target_base("ebin/", "src/my_module.erl", ".erl", ".beam") -> "ebin/my_module.beam"
+target(OutDir, Source, SrcExt, Ext) ->
+    filename:join(OutDir, filename:basename(Source, SrcExt) ++ Ext).
 
 %% Mark the digraph as having been modified, which is required to
 %% save its updated form on disk after the compiling run.
