@@ -267,9 +267,10 @@ prepopulate_deps(G, Compiler, InDirs, Source, DepOpts, Status) ->
     [digraph:add_vertex(G, Src, 0) || Src <- AbsIncls,
                                       digraph:vertex(G, Src) =:= false],
     %% drop edges from deps that aren't included!
-    [digraph:del_edge(G, Source, Path) || Status == old,
-                                          Path <- digraph:out_edges(G, Source),
-                                          not lists:member(Path, AbsIncls)],
+    [digraph:del_edge(G, Edge) || Status == old,
+                                  Edge <- digraph:out_edges(G, Source),
+                                  {_, _Src, Path, _} <- [digraph:edge(G, Edge)],
+                                  not lists:member(Path, AbsIncls)],
     %% Add the rest
     [digraph:add_edge(G, Source, Incl) || Incl <- AbsIncls],
     ok.
