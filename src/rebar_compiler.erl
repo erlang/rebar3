@@ -1,6 +1,8 @@
 -module(rebar_compiler).
 
--export([compile_all/2,
+-export([analyze_all/2,
+         compile_analyzed/3,
+         compile_all/2,
          clean/2,
 
          needs_compile/3,
@@ -15,10 +17,11 @@
 -type extension() :: string().
 -type out_mappings() :: [{extension(), file:filename()}].
 
--callback context(rebar_app_info:t()) -> #{src_dirs     => [file:dirname()],
-                                           include_dirs => [file:dirname()],
-                                           src_ext      => extension(),
-                                           out_mappings => out_mappings()}.
+-callback context(rebar_app_info:t()) -> #{src_dirs     => [file:dirname()], % mandatory
+                                           include_dirs => [file:dirname()], % mandatory
+                                           src_ext      => extension(),      % mandatory
+                                           out_mappings => out_mappings(),   % mandatory
+                                           dependencies_opts => term()}.     % optional
 -callback needed_files(digraph:graph(), [file:filename()], out_mappings(),
                        rebar_app_info:t()) ->
     {{[file:filename()], term()}, % ErlFirstFiles (erl_opts global priority)
@@ -26,69 +29,153 @@
       {[file:filename()], [file:filename()]}, % {Sequential, Parallel}
       term()}}.
 -callback dependencies(file:filename(), file:dirname(), [file:dirname()]) -> [file:filename()].
+-callback dependencies(file:filename(), file:dirname(), [file:dirname()], term()) -> [file:filename()].
 -callback compile(file:filename(), out_mappings(), rebar_dict(), list()) ->
     ok | {ok, [string()]} | {ok, [string()], [string()]}.
 -callback clean([file:filename()], rebar_app_info:t()) -> _.
 
+-optional_callbacks([dependencies/4]).
 
 -define(RE_PREFIX, "^(?!\\._)").
 
--spec compile_all([{module(), digraph:graph()}, ...], rebar_app_info:t()) -> ok
-      ;          ([module(), ...], rebar_app_info:t()) -> ok.
-compile_all(DAGs, AppInfo) when is_tuple(hd(DAGs)) -> % > 3.13.0
-    prepare_compiler_env(AppInfo),
-    lists:foreach(fun({Compiler, G}) ->
-        run(G, Compiler, AppInfo),
-        %% TODO: disable default recursivity in extra_src_dirs compiling to
-        %% prevent compiling sample modules in _SUITE_data/ directories
-        %% in CT.
-        ExtraApps = annotate_extras(AppInfo),
-        [run(G, Compiler, ExtraAppInfo) || ExtraAppInfo <- ExtraApps],
-        ok
-    end,
-    DAGs);
+
+%% @doc analysis by the caller, in order to let an OTP app
+%% find and resolve all its dependencies as part of compile_all's new
+%% API, which presumes a partial analysis is done ahead of time
+-spec analyze_all(DAG, [App, ...]) -> ok when
+      DAG :: {module(), digraph:graph()},
+      App :: rebar_app_info:t().
+analyze_all({Compiler, G}, Apps) ->
+    prepare_compiler_env(Compiler, Apps),
+    %% Analyze apps one by one
+    %% then cover the include files in the digraph to update them
+    %% then propagate?
+    Contexts = gather_contexts(Compiler, Apps),
+    AppRes = [analyze_app({Compiler, G}, Contexts, AppInfo) || AppInfo <- Apps],
+    {AppOutPaths, AbsSources} = lists:unzip(AppRes),
+    SrcExt = maps:get(src_ext, Contexts),
+    OutExt = maps:get(artifact_exts, Contexts),
+
+    rebar_compiler_dag:prune(
+        G, SrcExt, OutExt, lists:append(AbsSources), AppOutPaths
+    ),
+    rebar_compiler_dag:populate_deps(G, SrcExt, OutExt),
+    rebar_compiler_dag:propagate_stamps(G),
+
+    AppPaths = [{rebar_app_info:name(AppInfo),
+                 rebar_utils:to_list(rebar_app_info:dir(AppInfo))}
+                || AppInfo <- Apps],
+    AppNames = rebar_compiler_dag:compile_order(G, AppPaths),
+    {Contexts, sort_apps(AppNames, Apps)}.
+
+gather_contexts(Compiler, Apps) ->
+    Default = default_ctx(),
+    Contexts = [{rebar_app_info:name(AppInfo),
+                 maps:merge(Default, Compiler:context(AppInfo))}
+                || AppInfo <- Apps],
+    ContextMap = maps:from_list(Contexts),
+    %% only support one extension type at once for now
+    [{_, #{src_ext := SrcExt}} | _] = Contexts,
+    %% gather multi-app stuff once to avoid recomputing it
+    ArtifactExts = lists:usort(
+        [Ext || {_, #{out_mappings := Mappings}} <- Contexts,
+                {Ext, _Dir} <- Mappings]
+    ),
+    InDirs = gather_in_dirs(lists:zip(Apps, [Context || {_, Context} <- Contexts])),
+    ContextMap#{src_ext => SrcExt,
+                artifact_exts => ArtifactExts,
+                in_dirs => InDirs}.
+
+gather_in_dirs(AppCtx) ->
+    gather_in_dirs(AppCtx, []).
+
+gather_in_dirs([], Paths) ->
+    lists:usort(Paths);
+gather_in_dirs([{AppInfo, Ctx} | Rest], Acc) ->
+    #{include_dirs := InclDirs,
+      src_dirs := SrcDirs} = Ctx,
+    BaseDir = rebar_utils:to_list(rebar_app_info:dir(AppInfo)),
+    AbsIncl = [filename:join(BaseDir, InclDir) || InclDir <- InclDirs],
+    AbsSrc = [filename:join(BaseDir, SrcDir) || SrcDir <- SrcDirs],
+    gather_in_dirs(Rest, AbsSrc ++ AbsIncl ++ Acc).
+
+analyze_app({Compiler, G}, Contexts, AppInfo) ->
+    AppName = rebar_app_info:name(AppInfo),
+    BaseDir = rebar_utils:to_list(rebar_app_info:dir(AppInfo)),
+    OutDir = rebar_utils:to_list(rebar_app_info:out_dir(AppInfo)),
+    BaseOpts = rebar_app_info:opts(AppInfo),
+    #{src_dirs := SrcDirs,
+      src_ext := SrcExt,
+      out_mappings := [{_OutExt, OutPath}|_], % prune one dir for now (compat mode!)
+      dependencies_opts := DepOpts} = maps:get(AppName, Contexts),
+    %% Local resources
+    ArtifactDir = filename:join([OutDir, OutPath]),
+    AbsSources = find_source_files(BaseDir, SrcExt, SrcDirs, BaseOpts),
+    %% Multi-app resources
+    InDirs = maps:get(in_dirs, Contexts),
+    %% Run the analysis
+    rebar_compiler_dag:populate_sources(
+        G, Compiler, InDirs, AbsSources, DepOpts
+    ),
+    {{BaseDir, ArtifactDir}, AbsSources}.
+
+sort_apps(Names, Apps) ->
+    NamedApps = [{rebar_app_info:name(App), App} || App <- Apps],
+    [App || Name <- Names,
+            {_, App} <- [lists:keyfind(Name, 1, NamedApps)]].
+
+-spec compile_analyzed({module(), digraph:graph()}, rebar_app_info:t(), map()) -> ok.
+compile_analyzed({Compiler, G}, AppInfo, Contexts) -> % > 3.13.0
+    run(G, Compiler, AppInfo, Contexts),
+    %% Extras are tricky and get their own mini-analysis
+    ExtraApps = annotate_extras(AppInfo),
+    [begin
+         {ExtraCtx, [SortedExtra]} = analyze_all({Compiler, G}, [ExtraAppInfo]),
+         run(G, Compiler, SortedExtra, ExtraCtx)
+     end || ExtraAppInfo <- ExtraApps],
+    ok.
+
+-spec compile_all([module(), ...], rebar_app_info:t()) -> ok.
 compile_all(Compilers, AppInfo) -> % =< 3.13.0 interface; plugins use this!
     %% Support the old-style API by re-declaring a local DAG for the
     %% compile steps needed.
     lists:foreach(fun(Compiler) ->
         OutDir = rebar_app_info:out_dir(AppInfo),
         G = rebar_compiler_dag:init(OutDir, Compiler, undefined, []),
-        compile_all([{Compiler, G}], AppInfo),
+        Ctx = analyze_all({Compiler, G}, [AppInfo]),
+        compile_analyzed({Compiler, G}, AppInfo, Ctx),
         rebar_compiler_dag:maybe_store(G, OutDir, Compiler, undefined, []),
         rebar_compiler_dag:terminate(G)
      end, Compilers).
 
-prepare_compiler_env(AppInfo) ->
-    EbinDir = rebar_utils:to_list(rebar_app_info:ebin_dir(AppInfo)),
-    %% Make sure that outdir is on the path
-    ok = rebar_file_utils:ensure_dir(EbinDir),
-    true = code:add_patha(filename:absname(EbinDir)),
-
+prepare_compiler_env(Compiler, Apps) ->
+    lists:foreach(
+        fun(AppInfo) ->
+            EbinDir = rebar_utils:to_list(rebar_app_info:ebin_dir(AppInfo)),
+            %% Make sure that outdir is on the path
+            ok = rebar_file_utils:ensure_dir(EbinDir),
+            true = code:add_patha(filename:absname(EbinDir))
+        end,
+        Apps
+    ),
     %% necessary for erlang:function_exported/3 to work as expected
     %% called here for clarity as it's required by both opts_changed/2
     %% and erl_compiler_opts_set/0 in needed_files
     _ = code:ensure_loaded(compile),
+    _ = code:ensure_loaded(Compiler),
     ok.
 
-run(G, CompilerMod, AppInfo) ->
+run(G, CompilerMod, AppInfo, Contexts) ->
+    Name = rebar_app_info:name(AppInfo),
     #{src_dirs := SrcDirs,
-      include_dirs := InclDirs,
       src_ext := SrcExt,
-      out_mappings := Mappings} = CompilerMod:context(AppInfo),
+      out_mappings := Mappings} = maps:get(Name, Contexts),
 
     BaseDir = rebar_utils:to_list(rebar_app_info:dir(AppInfo)),
-    EbinDir = rebar_utils:to_list(rebar_app_info:ebin_dir(AppInfo)),
 
     BaseOpts = rebar_app_info:opts(AppInfo),
-    AbsInclDirs = [filename:join(BaseDir, InclDir) || InclDir <- InclDirs],
     FoundFiles = find_source_files(BaseDir, SrcExt, SrcDirs, BaseOpts),
 
-    AbsSrcDirs = [filename:join(BaseDir, SrcDir) || SrcDir <- SrcDirs],
-
-    InDirs = lists:usort(AbsInclDirs ++ AbsSrcDirs),
-
-    rebar_compiler_dag:prune(G, AbsSrcDirs, EbinDir, FoundFiles),
-    rebar_compiler_dag:update(G, CompilerMod, InDirs, FoundFiles),
     {{FirstFiles, FirstFileOpts},
      {RestFiles, Opts}} = CompilerMod:needed_files(G, FoundFiles, Mappings, AppInfo),
 
@@ -253,3 +340,6 @@ add_to_includes(AppInfo, Dirs) ->
     NewErlOpts = [{i, Dir} || Dir <- Dirs] ++ List,
     NewOpts = rebar_opts:set(Opts, erl_opts, NewErlOpts),
     rebar_app_info:opts(AppInfo, NewOpts).
+
+default_ctx() ->
+    #{dependencies_opts => []}.
