@@ -335,7 +335,8 @@ parse_tags(Dir) ->
         {ok, Line} ->
             case re:run(Line, "(\\(|\\s)(HEAD[^,]*,\\s)tag:\\s(v?([^,\\)]+))", [{capture, [3, 4], list}, unicode]) of
                 {match,[Tag, Vsn]} ->
-                    {Tag, Vsn};
+                    %% git tag can be repo_name/proj/05323498<hash>38, only want the hash
+                    {Tag, lists:last(rebar_string:lexemes(Vsn, "/"))};
                 nomatch ->
                     case rebar_utils:sh("git describe --tags --abbrev=0",
                             [{use_stdout, false}, return_on_error, {cd, Dir}]) of
