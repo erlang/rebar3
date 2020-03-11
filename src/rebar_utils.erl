@@ -930,7 +930,23 @@ set_httpc_options(Scheme, Proxy) ->
     Port = maps:get(port, Parts, []),
     UserInfo = maps:get(userinfo, Parts, []),
     httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar),
+    proxy_ipfamily(Host, inet:gethostbyname(Host)),
     set_proxy_auth(UserInfo).
+
+proxy_ipfamily(_Host, {ok, _}) ->
+    ok;
+proxy_ipfamily(Host, {error, nxdomain}) ->
+    maybe_proxy_family(Host, inet_db:res_option(inet6)).
+
+maybe_proxy_family(Host, true) ->
+    maybe_set_ipfamily(inet:gethostbyname(Host, inet), inet);
+maybe_proxy_family(Host, false) ->
+    maybe_set_ipfamily(inet:gethostbyname(Host, inet6), inet6).
+
+maybe_set_ipfamily({ok, _}, Family) ->
+    httpc:set_options([{ipfamily, Family}], rebar);
+maybe_set_ipfamily(_, _Family) ->
+    ok.
 
 normalise_proxy(Scheme, URI) ->
     case re:run(URI, "://", [unicode]) of
