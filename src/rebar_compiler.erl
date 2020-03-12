@@ -31,10 +31,14 @@
 -callback dependencies(file:filename(), file:dirname(), [file:dirname()]) -> [file:filename()].
 -callback dependencies(file:filename(), file:dirname(), [file:dirname()], term()) -> [file:filename()].
 -callback compile(file:filename(), out_mappings(), rebar_dict(), list()) ->
-    ok | {ok, [string()]} | {ok, [string()], [string()]}.
+    ok | {ok, [string()]} | error | {error, [string()], [string()]} | skipped.
+-callback compile_and_track(file:filename(), out_mappings(), rebar_dict(), list()) ->
+    {ok, [{file:filename(), file:filename(), term()}]} |
+    {ok, [{file:filename(), file:filename(), term()}], [string()]} |
+    {error, [string()], [string()]} | error.
 -callback clean([file:filename()], rebar_app_info:t()) -> _.
 
--optional_callbacks([dependencies/4]).
+-optional_callbacks([dependencies/4, compile_and_track/4]).
 
 -define(RE_PREFIX, "^(?!\\._)").
 
