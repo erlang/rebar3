@@ -139,17 +139,18 @@ compile(Source, [{_, OutDir}], Config, ErlOpts) ->
 compile_and_track(Source, [{Ext, OutDir}], Config, ErlOpts) ->
     BuildOpts = [{outdir, OutDir} | ErlOpts],
     Target = target_base(OutDir, Source) ++ Ext,
+    AllOpts = case erlang:function_exported(compile, env_compiler_options, 0) of
+        true  -> BuildOpts ++ compile:env_compiler_options();
+        false -> BuildOpts
+    end,
     case compile:file(Source, BuildOpts) of
         {ok, _Mod} ->
-            AllOpts = BuildOpts ++ compile:env_compiler_options(),
             {ok, [{Source, Target, AllOpts}]};
         {ok, _Mod, []} ->
-            AllOpts = BuildOpts ++ compile:env_compiler_options(),
             {ok, [{Source, Target, AllOpts}]};
         {ok, _Mod, Ws} ->
             FormattedWs = format_error_sources(Ws, Config),
             {ok, Warns} = rebar_compiler:ok_tuple(Source, FormattedWs),
-            AllOpts = BuildOpts ++ compile:env_compiler_options(),
             {ok, [{Source, Target, AllOpts}], Warns};
         {error, Es, Ws} ->
             error_tuple(Source, Es, Ws, Config, ErlOpts);
