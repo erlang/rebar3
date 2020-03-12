@@ -233,9 +233,21 @@ maybe_rm_artifact_and_edge(G, OutDir, SrcExt, Ext, Source) ->
             %% Actually exists, don't delete
             false;
         false ->
-            Target = target(OutDir, Source, SrcExt, Ext),
-            ?DEBUG("Source ~ts is gone, deleting previous ~ts file if it exists ~ts", [Source, Ext, Target]),
-            file:delete(Target),
+            Edges = digraph:out_edges(G, Source),
+            Targets = [V2 || Edge <- Edges,
+                             {_E, _V1, V2, artifact} <- [digraph:edge(G, Edge)]],
+            case Targets of
+                [] ->
+                    Target = target(OutDir, Source, SrcExt, Ext),
+                    ?DEBUG("Source ~ts is gone, deleting previous ~ts file if it exists ~ts", [Source, Ext, Target]),
+                    file:delete(Target);
+                [_|_] ->
+                    lists:foreach(fun(Target) ->
+                        ?DEBUG("Source ~ts is gone, deleting artiface ~ts "
+                                "if it exists ~ts", [Source, Target]),
+                        file:delete(Target)
+                    end, Targets)
+            end,
             digraph:del_vertex(G, Source),
             mark_dirty(G),
             true
@@ -269,7 +281,8 @@ prepopulate_deps(G, Compiler, InDirs, Source, DepOpts, Status) ->
     %% drop edges from deps that aren't included!
     [digraph:del_edge(G, Edge) || Status == old,
                                   Edge <- digraph:out_edges(G, Source),
-                                  {_, _Src, Path, _} <- [digraph:edge(G, Edge)],
+                                  {_, _Src, Path, Label} <- [digraph:edge(G, Edge)],
+                                  Label =/= artifact,
                                   not lists:member(Path, AbsIncls)],
     %% Add the rest
     [digraph:add_edge(G, Source, Incl) || Incl <- AbsIncls],
