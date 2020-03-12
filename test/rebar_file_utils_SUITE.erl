@@ -15,6 +15,8 @@
          reset_dir/1,
          path_from_ancestor/1,
          canonical_path/1,
+         absolute_path/1,
+         normalized_path/1,
          resolve_link/1,
          split_dirname/1,
          mv_warning_is_ignored/1,
@@ -36,6 +38,8 @@ all() ->
      {group, mv},
      path_from_ancestor,
      canonical_path,
+     absolute_path,
+     normalized_path,
      resolve_link,
      split_dirname,
      mv_warning_is_ignored].
@@ -143,6 +147,37 @@ canonical_path(_Config) ->
     ?assertEqual(Root ++ "foo", rebar_file_utils:canonical_path("/foo/./.")),
     ?assertEqual(filename:nativename(Root ++ "foo/bar"),
                  rebar_file_utils:canonical_path("/foo/./bar")).
+
+absolute_path(_Config) ->
+    %% We find the root so that the name works both on unix-likes and
+    %% with Windows.
+    Root = case os:type() of
+               {win32, _} -> filename:nativename(filename:absname("/")); % C:\, with proper drive
+               _ -> "/"
+           end,
+    ?assertEqual(filename:absname(Root), rebar_file_utils:absolute_path("/")),
+    ?assertEqual(Root ++ "foo", rebar_file_utils:absolute_path("/foo")),
+    % casoscon ../ o ./
+    {ok, Cwd} = file:get_cwd(),
+    ?assertEqual(Cwd, rebar_file_utils:absolute_path("./")),
+    ?assertEqual(Cwd ++ "/foo", rebar_file_utils:absolute_path("./foo")),
+    ?assertEqual(Cwd ++ "/foo/bar", rebar_file_utils:absolute_path("foo/bar")).
+
+normalized_path(_Config) ->
+    %% We find the root so that the name works both on unix-likes and
+    %% with Windows.
+    Root = case os:type() of
+               {win32, _} -> filename:nativename(filename:absname("/")); % C:\, with proper drive
+               _ -> "/"
+           end,
+    ?assertEqual(filename:nativename(Root), rebar_file_utils:normalized_path("/")),
+    ?assertEqual("../..", rebar_file_utils:normalized_path("/../../..")),
+    ?assertEqual(Root ++ "foo", rebar_file_utils:normalized_path("/foo/bar/..")),
+    ?assertEqual(Root ++ "foo", rebar_file_utils:normalized_path("/foo/../foo")),
+    ?assertEqual(Root ++ "foo", rebar_file_utils:normalized_path("/foo/.")),
+    ?assertEqual(Root ++ "foo", rebar_file_utils:normalized_path("/foo/./.")),
+    ?assertEqual(filename:nativename(Root ++ "foo/bar"),
+                 rebar_file_utils:normalized_path("/foo/./bar")).
 
 resolve_link(_Config) ->
     TmpDir = rebar_file_utils:system_tmpdir(

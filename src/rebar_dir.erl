@@ -191,42 +191,6 @@ processing_base_dir(State, Dir) ->
     AbsDir = filename:absname(Dir),
     AbsDir =:= rebar_state:get(State, base_dir).
 
-%% @doc make a path absolute
--spec make_absolute_path(file:filename()) -> file:filename().
-make_absolute_path(Path) ->
-    case filename:pathtype(Path) of
-        absolute ->
-            Path;
-        relative ->
-            {ok, Dir} = file:get_cwd(),
-            filename:join([Dir, Path]);
-        volumerelative ->
-            Volume = hd(filename:split(Path)),
-            {ok, Dir} = file:get_cwd(Volume),
-            filename:join([Dir, Path])
-    end.
-
-%% @doc normalizing a path removes all of the `..' and the
-%% `.' segments it may contain.
--spec make_normalized_path(file:filename()) -> file:filename().
-make_normalized_path(Path) ->
-    AbsPath = make_absolute_path(Path),
-    Components = filename:split(AbsPath),
-    make_normalized_path(Components, []).
-
-%% @private drops path fragments for normalization
--spec make_normalized_path([string()], [string()]) -> file:filename().
-make_normalized_path([], NormalizedPath) ->
-    filename:join(lists:reverse(NormalizedPath));
-make_normalized_path([H|T], NormalizedPath) ->
-    case H of
-        "." when NormalizedPath == [], T == [] -> make_normalized_path(T, ["."]);
-        "."  -> make_normalized_path(T, NormalizedPath);
-        ".." when NormalizedPath == [] -> make_normalized_path(T, [".."]);
-        ".." when hd(NormalizedPath) =/= ".." -> make_normalized_path(T, tl(NormalizedPath));
-        _    -> make_normalized_path(T, [H|NormalizedPath])
-    end.
-
 %% @doc take a source and a target path, and relativize the target path
 %% onto the source.
 %%
@@ -239,8 +203,8 @@ make_normalized_path([H|T], NormalizedPath) ->
 %% '''
 -spec make_relative_path(file:filename(), file:filename()) -> file:filename().
 make_relative_path(Source, Target) ->
-    AbsSource = make_normalized_path(Source),
-    AbsTarget = make_normalized_path(Target),
+    AbsSource = rebar_file_utils:normalized_path(Source),
+    AbsTarget = rebar_file_utils:normalized_path(Target),
     do_make_relative_path(filename:split(AbsSource), filename:split(AbsTarget)).
 
 %% @private based on fragments of paths, replace the number of common
@@ -301,7 +265,7 @@ raw_src_dirs(Type, Opts, Default) ->
 
 %% @private normalizes relative paths so that ./a/b/c/ => a/b/c
 normalize_relative_path(Path) ->
-    make_normalized_path(filename:split(Path), []).
+    rebar_file_utils:normalized_path(filename:split(Path), []).
 
 %% @doc returns all the source directories (`src_dirs' and
 %% `extra_src_dirs').
