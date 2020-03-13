@@ -45,7 +45,7 @@
          canonical_path/1,
          absolute_path/1,
          normalized_path/1,
-         normalized_path/2,
+         normalize_relative_path/1,
          resolve_link/1,
          split_dirname/1,
          ensure_dir/1]).
@@ -491,6 +491,11 @@ normalized_path([H|T], NormalizedPath) ->
         ".." when hd(NormalizedPath) =/= ".." -> normalized_path(T, tl(NormalizedPath));
         _    -> normalized_path(T, [H|NormalizedPath])
     end.
+
+%% @doc normalizes relative paths so that ./a/b/c/ => a/b/c
+-spec normalize_relative_path(string()) -> file:filename().
+normalize_relative_path(Path) ->
+    normalized_path(filename:split(Path), []).
 
 %% @doc returns canonical target of path if path is a link, otherwise returns path
 -spec resolve_link(string()) -> string().

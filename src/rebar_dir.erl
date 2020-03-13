@@ -249,8 +249,8 @@ extra_src_dirs(Opts, Default) ->
 src_dirs(Type, Opts, Default) ->
     lists:usort([
         case D0 of
-            {D,_} -> normalize_relative_path(D);
-            _ -> normalize_relative_path(D0)
+            {D,_} -> rebar_file_utils:normalize_relative_path(D);
+            _ -> rebar_file_utils:normalize_relative_path(D0)
         end || D0 <- raw_src_dirs(Type,Opts,Default)]).
 
 %% @private extracts the un-formatted src_dirs or extra_src_dirs
@@ -262,10 +262,6 @@ raw_src_dirs(Type, Opts, Default) ->
         []   -> Default;
         Dirs -> Dirs
     end.
-
-%% @private normalizes relative paths so that ./a/b/c/ => a/b/c
-normalize_relative_path(Path) ->
-    rebar_file_utils:normalized_path(filename:split(Path), []).
 
 %% @doc returns all the source directories (`src_dirs' and
 %% `extra_src_dirs').
