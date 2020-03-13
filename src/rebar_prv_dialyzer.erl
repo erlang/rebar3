@@ -27,6 +27,7 @@ init(State) ->
             {base_plt_location, undefined, "base-plt-location", string, "The location of base PLT file, defaults to $HOME/.cache/rebar3"},
             {plt_location, undefined, "plt-location", string, "The location of the PLT file, defaults to the profile's base directory"},
             {plt_prefix, undefined, "plt-prefix", string, "The prefix to the PLT file, defaults to \"rebar3\"" },
+            {app, $a, "app", string, "Perform success typing analysis of a single application"},
             {base_plt_prefix, undefined, "base-plt-prefix", string, "The prefix to the base PLT file, defaults to \"rebar3\"" },
             {statistics, undefined, "statistics", boolean, "Print information about the progress of execution. Default: false" }],
     State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
@@ -51,7 +52,8 @@ desc() ->
     "`get_warnings` - display warnings when altering a PLT file (boolean)\n"
     "`plt_apps` - the strategy for determining the applications which included "
     "in the PLT file, `top_level_deps` to include just the direct dependencies "
-    "or `all_deps` to include all nested dependencies*\n"
+    "or `all_deps` to include all nested dependencies "
+    "or `all_apps` to include all project apps and nested dependencies*\n"
     "`plt_extra_apps` - a list of extra applications to include in the PLT "
     "file\n"
     "`plt_extra_mods` - a list of extra modules to includes in the PLT file\n"
@@ -210,20 +212,24 @@ proj_plt_files(State) ->
     PltApps = get_config(State, plt_extra_apps, []) ++ BasePltApps,
     BasePltMods = get_config(State, base_plt_mods, []),
     PltMods = get_config(State, plt_extra_mods, []) ++ BasePltMods,
-    Apps = proj_apps(State),
-    DepApps = proj_deps(State),
-    get_files(State, DepApps ++ PltApps, Apps -- PltApps, PltMods, [], []).
+    DepApps = lists:usort(proj_plt_apps(State) ++ PltApps),
+    get_files(State, DepApps, [], PltMods, [], []).
 
 proj_apps(State) ->
     [ec_cnv:to_atom(rebar_app_info:name(App)) ||
      App <- rebar_state:project_apps(State)].
 
-proj_deps(State) ->
+proj_plt_apps(State) ->
     Apps = rebar_state:project_apps(State),
     DepApps = lists:flatmap(fun rebar_app_info:applications/1, Apps),
+    ProjApps = proj_apps(State),
     case get_config(State, plt_apps, top_level_deps) of
-        top_level_deps -> DepApps;
-        all_deps       -> collect_nested_dependent_apps(DepApps)
+        top_level_deps ->
+            DepApps -- ProjApps;
+        all_deps       ->
+            collect_nested_dependent_apps(DepApps) -- ProjApps;
+        all_apps       ->
+            proj_apps(State) ++ collect_nested_dependent_apps(DepApps)
     end.
 
 get_files(State, Apps, SkipApps, Mods, SkipMods, ExtraDirs) ->
@@ -474,7 +480,7 @@ succ_typings(Args, State, Plt, Output) ->
             {0, State};
         _ ->
             ?INFO("Doing success typing analysis...", []),
-            Files = proj_files(State),
+            Files = proj_files(proplists:get_value(app, Args), State),
             succ_typings_(State, Plt, Output, Files)
     end.
 
@@ -490,8 +496,19 @@ succ_typings_(State, Plt, Output, Files) ->
             {init_plt, Plt}],
     run_dialyzer(State, Opts, Output).
 
-proj_files(State) ->
-    Apps = proj_apps(State),
+succ_typing_apps(undefined, ProjApps) ->
+    ProjApps;
+succ_typing_apps(App, ProjApps) ->
+    try
+        true = lists:member(ec_cnv:to_atom(App), ProjApps),
+        [ec_cnv:to_atom(App)]
+    catch
+        error:_ ->
+            throw({unknown_application, App})
+    end.
+
+proj_files(SingleApp, State) ->
+    Apps = succ_typing_apps(SingleApp, proj_apps(State)),
     BasePltApps = get_config(State, base_plt_apps, []),
     PltApps = get_config(State, plt_extra_apps, []) ++ BasePltApps,
     BasePltMods = get_config(State, base_plt_mods, []),

@@ -17,6 +17,7 @@
          plt_apps_option/1,
          exclude_and_extra/1,
          cli_args/1,
+         single_app_succ_typing/1,
          extra_src_dirs/1]).
 
 -include_lib("common_test/include/ct.hrl").
@@ -61,6 +62,7 @@ all() ->
 groups() ->
     [{empty, [empty_base_plt, empty_app_plt, empty_app_succ_typings]},
      {build_and_check, [cli_args,
+                        single_app_succ_typing,
                         build_release_plt,
                         plt_apps_option,
                         exclude_and_extra,
@@ -351,6 +353,54 @@ cli_args(Config) ->
 
     {ok, PltFiles} = plt_files(Plt),
     ?assertEqual(ErtsFiles, PltFiles).
+
+single_app_succ_typing(Config) ->
+    AppDir = ?config(apps, Config),
+    State = ?config(state, Config),
+    Plt = ?config(plt, Config),
+    RebarConfig = ?config(rebar_config, Config),
+    %% test workflow:
+    %% (a) build PLT containing all project apps and dependencies (no success typing yet)!
+    %% (b) perform success-typing for all apps (warnings expected)
+    %% (c) perform success-typing for app with and without warnings
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    %% contains warnings in tests
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, []),
+    %% second app, depending on first, should not produce warnings
+    App1 = ec_cnv:to_atom(Name),
+    %%% second app depends on first
+    Name2 = rebar_test_utils:create_random_name("app2_"),
+    Vsn2 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([AppDir,"apps",Name2]), Name2, Vsn2,
+        [App1]), % App2 depends on App1
+    App2 = ec_cnv:to_atom(Name2),
+
+    %% start with building all apps into PLT
+    RebarConfig2 = merge_config([{dialyzer, [{plt_apps, all_apps}]}],
+        RebarConfig),
+    {ok, _} =
+        rebar3:run(rebar_state:new(State, RebarConfig2, AppDir), ["dialyzer", "--succ-typings=false"]),
+    %% verify all project apps are in PLT
+    {ok, PltFiles} = plt_files(Plt),
+    ?assertEqual([App1, App2, erts], get_apps_from_beam_files(PltFiles)),
+
+    %% warnings when apps are not specified
+    Command0 = ["as", "test", "dialyzer"],
+    % there are few warnings for generated test (see rebar_test_utils:erl_eunit_suite_file/1)
+    {error, {rebar_prv_dialyzer, {dialyzer_warnings, _}}} =
+        rebar3:run(rebar_state:new(State, RebarConfig, AppDir), Command0),
+
+    %% warnings from App
+    Command1 = ["as", "test", "dialyzer", "--app=" ++ Name],
+    % there are few warnings for generated test (see rebar_test_utils:erl_eunit_suite_file/1)
+    {error, {rebar_prv_dialyzer, {dialyzer_warnings, _}}} =
+        rebar3:run(rebar_state:new(State, RebarConfig, AppDir), Command1),
+
+    %% no warnings from App2
+    Command2 = ["as", "test", "dialyzer", "--app=" ++ Name2],
+    {ok, _} =
+        rebar3:run(rebar_state:new(State, RebarConfig, AppDir), Command2).
 
 extra_src_dirs(Config) ->
     AppDir = ?config(apps, Config),
