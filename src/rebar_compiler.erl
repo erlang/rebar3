@@ -246,8 +246,8 @@ store_artifacts(_G, []) ->
     ok;
 store_artifacts(G, [{Source, Target, Meta}|Rest]) ->
     %% Assume the source exists since it was tracked to be compiled
-    digraph:add_vertex(G, Target, Meta),
-    digraph:add_edge(G, Source, Target, artifact),
+    digraph:add_vertex(G, Target, {artifact, Meta}),
+    digraph:add_edge(G, Target, Source, artifact),
     store_artifacts(G, Rest).
 
 compile_worker(QueuePid, Opts, Config, Outs, CompilerMod) ->

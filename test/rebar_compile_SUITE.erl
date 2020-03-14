@@ -939,7 +939,7 @@ recompile_when_dag_opts_change(Config) ->
     DepsDir = filename:join([AppDir, "_build", "default", "lib"]),
     G = rebar_compiler_dag:init(DepsDir, rebar_compiler_erl, "project_apps", []),
     %% change the config in the DAG...
-    [digraph:add_vertex(G, Beam, [{d, some_define}]) || Beam <- Beams],
+    [digraph:add_vertex(G, Beam, {artifact, [{d, some_define}]}) || Beam <- Beams],
     digraph:add_vertex(G, '$r3_dirty_bit', true), % trigger a save
     rebar_compiler_dag:maybe_store(G, DepsDir, rebar_compiler_erl, "project_apps", []),
     rebar_compiler_dag:terminate(G),

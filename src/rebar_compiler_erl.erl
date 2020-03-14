@@ -235,7 +235,7 @@ opts_changed(Graph, NewOpts, Target, TargetBase) ->
         false -> NewOpts
     end,
     TargetOpts = case digraph:vertex(Graph, Target) of
-        {_Target, Opts} -> % tracked dep is found
+        {_Target, {artifact, Opts}} -> % tracked dep is found
             Opts;
         false -> % not found; might be a non-tracked DAG
             case compile_info(TargetBase) of

@@ -233,7 +233,7 @@ maybe_rm_artifact_and_edge(G, OutDir, SrcExt, Ext, Source) ->
             %% Actually exists, don't delete
             false;
         false ->
-            Edges = digraph:out_edges(G, Source),
+            Edges = digraph:in_edges(G, Source),
             Targets = [V2 || Edge <- Edges,
                              {_E, _V1, V2, artifact} <- [digraph:edge(G, Edge)]],
             case Targets of
@@ -281,8 +281,7 @@ prepopulate_deps(G, Compiler, InDirs, Source, DepOpts, Status) ->
     %% drop edges from deps that aren't included!
     [digraph:del_edge(G, Edge) || Status == old,
                                   Edge <- digraph:out_edges(G, Source),
-                                  {_, _Src, Path, Label} <- [digraph:edge(G, Edge)],
-                                  Label =/= artifact,
+                                  {_, _Src, Path, _Label} <- [digraph:edge(G, Edge)],
                                   not lists:member(Path, AbsIncls)],
     %% Add the rest
     [digraph:add_edge(G, Source, Incl) || Incl <- AbsIncls],
@@ -296,11 +295,14 @@ refresh_dep(G, File) ->
             %% Gone! Erase from the graph
             digraph:del_vertex(G, File),
             mark_dirty(G);
+        {artifact, _} ->
+            %% ignore artifacts
+            ok;
         LastModified when LastUpdated < LastModified ->
             digraph:add_vertex(G, File, LastModified),
             mark_dirty(G);
         _ ->
-            % unchanged
+            %% unchanged
             ok
     end.
 
@@ -310,14 +312,18 @@ refresh_dep(G, File) ->
 propagate_stamps(_G, []) ->
     ok;
 propagate_stamps(G, [File|Files]) ->
-    Stamps = [element(2, digraph:vertex(G, F))
-              || F <- digraph:out_neighbours(G, File)],
+    Stamps = [Stamp
+              || F <- digraph:out_neighbours(G, File),
+                 {_, Stamp} <- [digraph:vertex(G, F)],
+                 is_tuple(Stamp) andalso element(1, Stamp) =/= artifact],
     case Stamps of
         [] ->
             ok;
         _ ->
             Max = lists:max(Stamps),
             case digraph:vertex(G, File) of
+                {_, {artifact, _}} ->
+                    ok;
                 {_, Smaller} when Smaller < Max ->
                     digraph:add_vertex(G, File, Max);
                 _ ->
