@@ -78,6 +78,7 @@ do(State, Tests) ->
                     {ok, State};
                 Error ->
                     rebar_paths:set_paths([plugins, deps], State),
+                    symlink_to_last_ct_logs(State),
                     Error
             end;
         Error ->
