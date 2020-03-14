@@ -74,9 +74,11 @@ do(State, Tests) ->
                     %% Run ct provider post hooks for all project apps and top level project hooks
                     rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State),
                     rebar_paths:set_paths([plugins, deps], State),
+                    symlink_to_last_ct_logs(State),
                     {ok, State};
                 Error ->
                     rebar_paths:set_paths([plugins, deps], State),
+                    symlink_to_last_ct_logs(State),
                     Error
             end;
         Error ->
@@ -117,6 +119,26 @@ format_error({error_reading_testspec, Reason}) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+%% @doc Tries to make the symlink `_build/<profile>/logs/last` to the `ct_run` directory
+%% of the last common test run.
+-spec symlink_to_last_ct_logs(rebar_state:t()) -> ok.
+symlink_to_last_ct_logs(State) ->
+    LogDir = filename:join([rebar_dir:base_dir(State), "logs"]),
+    {ok, Filenames} = file:list_dir(LogDir),
+    CtRunDirs = lists:filter(fun(S) -> re:run(S, "ct_run", [unicode]) /= nomatch end, Filenames),
+    NewestDir = lists:last(lists:sort(CtRunDirs)),
+    Target = filename:join([LogDir, "last"]),
+    Existing = filename:join([LogDir, NewestDir]),
+    case rebar_file_utils:symlink_or_copy(Existing, Target) of
+        ok -> ok;
+        exists ->
+            %% in case the symlink already exists we remove it
+            %% and make a new updated one
+            rebar_file_utils:rm_rf(Target),
+            rebar_file_utils:symlink_or_copy(Existing, Target);
+        Reason -> ?DEBUG("Warning, couldn't make a symlink to ~ts, reason: ~p.", [Target, Reason])
+    end.
 
 setup_name(State) ->
     {Long, Short, Opts} = rebar_dist_utils:find_options(State),
