@@ -104,8 +104,7 @@ prepare(State) ->
 
     %% Get list of xref checks we want to run
     ConfXrefChecks = rebar_state:get(State, xref_checks,
-                                     [exports_not_used,
-                                      undefined_function_calls]),
+                                     [undefined_function_calls]),
 
     XrefChecks = sets:to_list(sets:intersection(
                                 sets:from_list(?SUPPORTED_XREFS),
@@ -215,11 +214,15 @@ display_xref_result_fun(Type) ->
             {Source, SMFA, TMFA} =
                 case XrefResult of
                     {MFASource, MFATarget} ->
-                        {format_mfa_source(MFASource),
+                        Cwd = rebar_dir:get_cwd(),
+                        FormattedSource = format_mfa_source(MFASource),
+                        {rebar_dir:make_relative_path(FormattedSource, Cwd),
                          format_mfa(MFASource),
                          format_mfa(MFATarget)};
                     MFATarget ->
-                        {format_mfa_source(MFATarget),
+                        Cwd = rebar_dir:get_cwd(),
+                        FormattedTarget = format_mfa_source(MFATarget),
+                        {rebar_dir:make_relative_path(FormattedTarget, Cwd),
                          format_mfa(MFATarget),
                          undefined}
                 end,
