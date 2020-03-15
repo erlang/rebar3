@@ -73,7 +73,7 @@ needed_files(Graph, FoundFiles, _, AppInfo) ->
         fun(Erl) -> lists:any(
             fun(Edge) ->
                 {_E, _V1, _V2, Kind} = digraph:edge(Graph, Edge),
-                Kind =:= artifact
+                Kind =/= artifact
             end, digraph:in_edges(Graph, Erl)) end,
         lists:reverse([Dep || Dep <- DepErlsOrdered,
                               not lists:member(Dep, ErlFirstFiles)])
