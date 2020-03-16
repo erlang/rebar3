@@ -70,7 +70,11 @@ needed_files(Graph, FoundFiles, _, AppInfo) ->
     %% that none other depend of; the former must be sequentially
     %% built, the rest is parallelizable.
     OtherErls = lists:partition(
-        fun(Erl) -> digraph:in_degree(Graph, Erl) > 0 end,
+        fun(Erl) -> lists:any(
+            fun(Edge) ->
+                {_E, _V1, _V2, Kind} = digraph:edge(Graph, Edge),
+                Kind =/= artifact
+            end, digraph:in_edges(Graph, Erl)) end,
         lists:reverse([Dep || Dep <- DepErlsOrdered,
                               not lists:member(Dep, ErlFirstFiles)])
     ),
