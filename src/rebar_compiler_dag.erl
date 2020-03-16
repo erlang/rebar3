@@ -65,7 +65,7 @@ is_deleted_source(_G, _F, Extension, _SrcExt, Extension) ->
     %% artifact file - skip
     false;
 is_deleted_source(G, F, _Extension, _SrcExt, _ArtifactExt) ->
-    %% must be header file
+    %% must be header file or artifact
     digraph:in_edges(G, F) == [] andalso maybe_rm_vertex(G, F),
     false.
 
@@ -295,9 +295,6 @@ refresh_dep(G, File) ->
             %% Gone! Erase from the graph
             digraph:del_vertex(G, File),
             mark_dirty(G);
-        {artifact, _} ->
-            %% ignore artifacts
-            ok;
         LastModified when LastUpdated < LastModified ->
             digraph:add_vertex(G, File, LastModified),
             mark_dirty(G);
