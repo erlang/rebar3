@@ -104,7 +104,8 @@ prepare(State) ->
 
     %% Get list of xref checks we want to run
     ConfXrefChecks = rebar_state:get(State, xref_checks,
-                                     [undefined_function_calls]),
+                                     [exports_not_used,
+                                      undefined_function_calls]),
 
     XrefChecks = sets:to_list(sets:intersection(
                                 sets:from_list(?SUPPORTED_XREFS),
@@ -211,21 +212,18 @@ display_xref_results_for_type({Type, XrefResults}) ->
 
 display_xref_result_fun(Type) ->
     fun(XrefResult) ->
-            {Source, SMFA, TMFA} =
+            {FormattedSource, SMFA, TMFA} =
                 case XrefResult of
                     {MFASource, MFATarget} ->
-                        Cwd = rebar_dir:get_cwd(),
-                        FormattedSource = format_mfa_source(MFASource),
-                        {rebar_dir:make_relative_path(FormattedSource, Cwd),
+                        {format_mfa_source(MFASource),
                          format_mfa(MFASource),
                          format_mfa(MFATarget)};
                     MFATarget ->
-                        Cwd = rebar_dir:get_cwd(),
-                        FormattedTarget = format_mfa_source(MFATarget),
-                        {rebar_dir:make_relative_path(FormattedTarget, Cwd),
+                        {format_mfa_source(MFATarget),
                          format_mfa(MFATarget),
                          undefined}
                 end,
+            Source = rebar_dir:make_relative_path(FormattedSource, rebar_dir:get_cwd()),
             case Type of
                 undefined_function_calls ->
                     io_lib:format("~tsWarning: ~ts calls undefined function ~ts (Xref)\n",
