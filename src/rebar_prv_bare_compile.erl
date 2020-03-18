@@ -57,16 +57,26 @@ do(State) ->
     [ code:add_pathsa(filelib:wildcard(PathWildcard))
       || PathWildcard <- rebar_string:lexemes(Paths, Sep) ],
 
-    [AppInfo] = rebar_state:project_apps(State),
-    AppInfo1 = rebar_app_info:out_dir(AppInfo, OutDir),
+    case rebar_state:project_apps(State) of
+        [] ->
+            {error, {?MODULE, {not_an_application_structure, OutDir}}};
+        [AppInfo] ->
+            AppInfo1 = rebar_app_info:out_dir(AppInfo, OutDir),
 
-    %% run compile in the default namespace
-    rebar_prv_compile:compile(rebar_state:namespace(State, default), AppInfo1),
+            %% run compile in the default namespace
+            rebar_prv_compile:compile(rebar_state:namespace(State, default), AppInfo1),
 
-    rebar_utils:cleanup_code_path(OrigPath),
+            rebar_utils:cleanup_code_path(OrigPath),
 
-    {ok, State}.
+            {ok, State}
+    end.
 
 -spec format_error(any()) -> iolist().
+format_error({not_an_application_structure, Path}) ->
+    io_lib:format(
+        "Compilation failed: there is no code in this directory (~ts), " ++
+        "it is unreadable or for some other reason " ++
+        "is not a recognizable application structure.",
+        [Path]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
