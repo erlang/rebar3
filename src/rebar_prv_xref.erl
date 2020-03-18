@@ -212,7 +212,7 @@ display_xref_results_for_type({Type, XrefResults}) ->
 
 display_xref_result_fun(Type) ->
     fun(XrefResult) ->
-            {Source, SMFA, TMFA} =
+            {FormattedSource, SMFA, TMFA} =
                 case XrefResult of
                     {MFASource, MFATarget} ->
                         {format_mfa_source(MFASource),
@@ -223,6 +223,7 @@ display_xref_result_fun(Type) ->
                          format_mfa(MFATarget),
                          undefined}
                 end,
+            Source = rebar_dir:make_relative_path(FormattedSource, rebar_dir:get_cwd()),
             case Type of
                 undefined_function_calls ->
                     io_lib:format("~tsWarning: ~ts calls undefined function ~ts (Xref)\n",
