@@ -169,6 +169,8 @@ propagate_stamps(G) ->
 %% @doc Return the reverse sorting order to get dep-free apps first.
 %% -- we would usually not need to consider the non-source files for the order to
 %% be complete, but using them doesn't hurt.
+compile_order(_, AppDefs) when length(AppDefs) =< 1 ->
+    [Name || {Name, _Path} <- AppDefs];
 compile_order(G, AppDefs) ->
     Edges = [{V1,V2} || E <- digraph:edges(G),
                         {_,V1,V2,_} <- [digraph:edge(G, E)]],
