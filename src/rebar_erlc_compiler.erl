@@ -206,7 +206,13 @@ compile_dirs(RebarOpts, BaseDir, SrcDirs, OutDir, CompileOpts) ->
 
     {ErlFirstFiles, ErlOptsFirst} = erl_first_files(RebarOpts, ErlOpts, BaseDir, NeededErlFiles),
     {DepErls, OtherErls} = lists:partition(
-                             fun(Source) -> digraph:in_degree(G, Source) > 0 end,
+                             fun(Source) -> lists:any(
+                                 fun(Edge) ->
+                                     {_E, _V1, _V2, Kind} = digraph:edge(G, Edge),
+                                     Kind =/= artifact
+                                 end,
+                                 digraph:in_edges(G, Source))
+                             end,
                              [File || File <- NeededErlFiles, not lists:member(File, ErlFirstFiles)]),
     SubGraph = digraph_utils:subgraph(G, DepErls),
     DepErlsOrdered = digraph_utils:topsort(SubGraph),

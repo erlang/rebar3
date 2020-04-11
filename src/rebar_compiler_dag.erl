@@ -65,7 +65,7 @@ is_deleted_source(_G, _F, Extension, _SrcExt, Extension) ->
     %% artifact file - skip
     false;
 is_deleted_source(G, F, _Extension, _SrcExt, _ArtifactExt) ->
-    %% must be header file
+    %% must be header file or artifact
     digraph:in_edges(G, F) == [] andalso maybe_rm_vertex(G, F),
     false.
 
@@ -135,7 +135,7 @@ populate_deps(G, SourceExt, ArtifactExts) ->
     %% in depth already, and improvements should be driven at that level)
     IgnoredExts = [SourceExt | ArtifactExts],
     Vertices = digraph:vertices(G),
-    [refresh_dep(G, File)
+    [refresh_dep(G, digraph:vertex(G, File))
      || File <- Vertices,
         Ext <- [filename:extension(File)],
         not lists:member(Ext, IgnoredExts)],
@@ -169,6 +169,8 @@ propagate_stamps(G) ->
 %% @doc Return the reverse sorting order to get dep-free apps first.
 %% -- we would usually not need to consider the non-source files for the order to
 %% be complete, but using them doesn't hurt.
+compile_order(_, AppDefs) when length(AppDefs) =< 1 ->
+    [Name || {Name, _Path} <- AppDefs];
 compile_order(G, AppDefs) ->
     Edges = [{V1,V2} || E <- digraph:edges(G),
                         {_,V1,V2,_} <- [digraph:edge(G, E)]],
@@ -211,7 +213,7 @@ restore_dag(G, File, CritMeta) ->
             %% the whole restore operation.
             #dag{vsn=?DAG_VSN, info={Vs, Es, CritMeta}} = binary_to_term(Data),
             [digraph:add_vertex(G, V, LastUpdated) || {V, LastUpdated} <- Vs],
-            [digraph:add_edge(G, V1, V2) || {_, V1, V2, _} <- Es],
+            [digraph:add_edge(G, V1, V2, Label) || {_, V1, V2, Label} <- Es],
             ok;
         {error, _Err} ->
             ok
@@ -233,9 +235,21 @@ maybe_rm_artifact_and_edge(G, OutDir, SrcExt, Ext, Source) ->
             %% Actually exists, don't delete
             false;
         false ->
-            Target = target(OutDir, Source, SrcExt, Ext),
-            ?DEBUG("Source ~ts is gone, deleting previous ~ts file if it exists ~ts", [Source, Ext, Target]),
-            file:delete(Target),
+            Edges = digraph:in_edges(G, Source),
+            Targets = [V1 || Edge <- Edges,
+                             {_E, V1, _V2, artifact} <- [digraph:edge(G, Edge)]],
+            case Targets of
+                [] ->
+                    Target = target(OutDir, Source, SrcExt, Ext),
+                    ?DEBUG("Source ~ts is gone, deleting previous ~ts file if it exists ~ts", [Source, Ext, Target]),
+                    file:delete(Target);
+                [_|_] ->
+                    lists:foreach(fun(Target) ->
+                        ?DEBUG("Source ~ts is gone, deleting artifact ~ts "
+                                "if it exists", [Source, Target]),
+                        file:delete(Target)
+                    end, Targets)
+            end,
             digraph:del_vertex(G, Source),
             mark_dirty(G),
             true
@@ -269,15 +283,17 @@ prepopulate_deps(G, Compiler, InDirs, Source, DepOpts, Status) ->
     %% drop edges from deps that aren't included!
     [digraph:del_edge(G, Edge) || Status == old,
                                   Edge <- digraph:out_edges(G, Source),
-                                  {_, _Src, Path, _} <- [digraph:edge(G, Edge)],
+                                  {_, _Src, Path, _Label} <- [digraph:edge(G, Edge)],
                                   not lists:member(Path, AbsIncls)],
     %% Add the rest
     [digraph:add_edge(G, Source, Incl) || Incl <- AbsIncls],
     ok.
 
 %% check that a dep file is up to date
-refresh_dep(G, File) ->
-    {_, LastUpdated} = digraph:vertex(G, File),
+refresh_dep(_G, {artifact, _}) ->
+    %% ignore artifacts
+    ok;
+refresh_dep(G, {File, LastUpdated}) ->
     case filelib:last_modified(File) of
         0 ->
             %% Gone! Erase from the graph
@@ -287,7 +303,7 @@ refresh_dep(G, File) ->
             digraph:add_vertex(G, File, LastModified),
             mark_dirty(G);
         _ ->
-            % unchanged
+            %% unchanged
             ok
     end.
 
@@ -297,14 +313,18 @@ refresh_dep(G, File) ->
 propagate_stamps(_G, []) ->
     ok;
 propagate_stamps(G, [File|Files]) ->
-    Stamps = [element(2, digraph:vertex(G, F))
-              || F <- digraph:out_neighbours(G, File)],
+    Stamps = [Stamp
+              || F <- digraph:out_neighbours(G, File),
+                 {_, Stamp} <- [digraph:vertex(G, F)],
+                 is_tuple(Stamp) andalso element(1, Stamp) =/= artifact],
     case Stamps of
         [] ->
             ok;
         _ ->
             Max = lists:max(Stamps),
             case digraph:vertex(G, File) of
+                {_, {artifact, _}} ->
+                    ok;
                 {_, Smaller} when Smaller < Max ->
                     digraph:add_vertex(G, File, Max);
                 _ ->

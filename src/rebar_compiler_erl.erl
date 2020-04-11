@@ -5,7 +5,7 @@
 -export([context/1,
          needed_files/4,
          dependencies/3, dependencies/4,
-         compile/4,
+         compile/4, compile_and_track/4,
          clean/2,
          format_error/1]).
 
@@ -70,7 +70,11 @@ needed_files(Graph, FoundFiles, _, AppInfo) ->
     %% that none other depend of; the former must be sequentially
     %% built, the rest is parallelizable.
     OtherErls = lists:partition(
-        fun(Erl) -> digraph:in_degree(Graph, Erl) > 0 end,
+        fun(Erl) -> lists:any(
+            fun(Edge) ->
+                {_E, _V1, _V2, Kind} = digraph:edge(Graph, Edge),
+                Kind =/= artifact
+            end, digraph:in_edges(Graph, Erl)) end,
         lists:reverse([Dep || Dep <- DepErlsOrdered,
                               not lists:member(Dep, ErlFirstFiles)])
     ),
@@ -136,6 +140,29 @@ compile(Source, [{_, OutDir}], Config, ErlOpts) ->
             error
     end.
 
+compile_and_track(Source, [{Ext, OutDir}], Config, ErlOpts) ->
+    BuildOpts = [{outdir, OutDir} | ErlOpts],
+    Target = target_base(OutDir, Source) ++ Ext,
+    AllOpts = case erlang:function_exported(compile, env_compiler_options, 0) of
+        true  -> BuildOpts ++ compile:env_compiler_options();
+        false -> BuildOpts
+    end,
+    case compile:file(Source, BuildOpts) of
+        {ok, _Mod} ->
+            {ok, [{Source, Target, AllOpts}]};
+        {ok, _Mod, []} ->
+            {ok, [{Source, Target, AllOpts}]};
+        {ok, _Mod, Ws} ->
+            FormattedWs = format_error_sources(Ws, Config),
+            {ok, Warns} = rebar_compiler:ok_tuple(Source, FormattedWs),
+            {ok, [{Source, Target, AllOpts}], Warns};
+        {error, Es, Ws} ->
+            error_tuple(Source, Es, Ws, Config, ErlOpts);
+        error ->
+            error
+    end.
+
+
 clean(Files, AppInfo) ->
     EbinDir = rebar_app_info:ebin_dir(AppInfo),
     [begin
@@ -199,22 +226,29 @@ needed_files(Graph, ErlOpts, RebarOpts, Dir, OutDir, SourceFiles) ->
                                    ,{i, filename:join(Dir, "include")}
                                    ,{i, Dir}] ++ PrivIncludes ++ ErlOpts,
                          digraph:vertex(Graph, Source) > {Source, filelib:last_modified(Target)}
-                              orelse opts_changed(AllOpts, TargetBase)
+                              orelse opts_changed(Graph, AllOpts, Target, TargetBase)
                               orelse erl_compiler_opts_set()
                  end, SourceFiles).
 
 target_base(OutDir, Source) ->
     filename:join(OutDir, filename:basename(Source, ".erl")).
 
-opts_changed(NewOpts, Target) ->
+opts_changed(Graph, NewOpts, Target, TargetBase) ->
     TotalOpts = case erlang:function_exported(compile, env_compiler_options, 0) of
         true  -> NewOpts ++ compile:env_compiler_options();
         false -> NewOpts
     end,
-    case compile_info(Target) of
-        {ok, Opts} -> lists:any(fun effects_code_generation/1, lists:usort(TotalOpts) -- lists:usort(Opts));
-        _          -> true
-    end.
+    TargetOpts = case digraph:vertex(Graph, Target) of
+        {_Target, {artifact, Opts}} -> % tracked dep is found
+            Opts;
+        false -> % not found; might be a non-tracked DAG
+            case compile_info(TargetBase) of
+                {ok, Opts} -> Opts;
+                _ -> []
+            end
+    end,
+    lists:any(fun effects_code_generation/1,
+              lists:usort(TotalOpts) -- lists:usort(TargetOpts)).
 
 effects_code_generation(Option) ->
     case Option of

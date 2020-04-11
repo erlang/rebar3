@@ -31,10 +31,14 @@
 -callback dependencies(file:filename(), file:dirname(), [file:dirname()]) -> [file:filename()].
 -callback dependencies(file:filename(), file:dirname(), [file:dirname()], term()) -> [file:filename()].
 -callback compile(file:filename(), out_mappings(), rebar_dict(), list()) ->
-    ok | {ok, [string()]} | {ok, [string()], [string()]}.
+    ok | {ok, [string()]} | error | {error, [string()], [string()]} | skipped.
+-callback compile_and_track(file:filename(), out_mappings(), rebar_dict(), list()) ->
+    {ok, [{file:filename(), file:filename(), term()}]} |
+    {ok, [{file:filename(), file:filename(), term()}], [string()]} |
+    {error, [string()], [string()]} | error.
 -callback clean([file:filename()], rebar_app_info:t()) -> _.
 
--optional_callbacks([dependencies/4]).
+-optional_callbacks([dependencies/4, compile_and_track/4]).
 
 -define(RE_PREFIX, "^(?!\\._)").
 
@@ -180,17 +184,28 @@ run(G, CompilerMod, AppInfo, Contexts) ->
      {RestFiles, Opts}} = CompilerMod:needed_files(G, FoundFiles, Mappings, AppInfo),
 
     compile_each(FirstFiles, FirstFileOpts, BaseOpts, Mappings, CompilerMod),
-    case RestFiles of
-        {Sequential, Parallel} -> % new parallelizable form
-            compile_each(Sequential, Opts, BaseOpts, Mappings, CompilerMod),
+    Tracked = case RestFiles of
+        {Sequential, Parallel} -> % parallelizable form
+            compile_each(Sequential, Opts, BaseOpts, Mappings, CompilerMod) ++
             compile_parallel(Parallel, Opts, BaseOpts, Mappings, CompilerMod);
         _ when is_list(RestFiles) -> % traditional sequential build
             compile_each(RestFiles, Opts, BaseOpts, Mappings, CompilerMod)
-    end.
+    end,
+    store_artifacts(G, Tracked).
 
 compile_each([], _Opts, _Config, _Outs, _CompilerMod) ->
-    ok;
+    [];
 compile_each([Source | Rest], Opts, Config, Outs, CompilerMod) ->
+    case erlang:function_exported(CompilerMod, compile_and_track, 4) of
+        false ->
+            do_compile(CompilerMod, Source, Outs, Config, Opts),
+            compile_each(Rest, Opts, Config, Outs, CompilerMod);
+        true ->
+            do_compile_and_track(CompilerMod, Source, Outs, Config, Opts)
+            ++ compile_each(Rest, Opts, Config, Outs, CompilerMod)
+    end.
+
+do_compile(CompilerMod, Source, Outs, Config, Opts) ->
     case CompilerMod:compile(Source, Outs, Config, Opts) of
         ok ->
             ?DEBUG("~tsCompiled ~ts", [rebar_utils:indent(1), filename:basename(Source)]);
@@ -205,14 +220,47 @@ compile_each([Source | Rest], Opts, Config, Outs, CompilerMod) ->
             maybe_report(Error),
             ?DEBUG("Compilation failed: ~p", [Error]),
             ?FAIL
-    end,
-    compile_each(Rest, Opts, Config, Outs, CompilerMod).
+    end.
+
+do_compile_and_track(CompilerMod, Source, Outs, Config, Opts) ->
+    case CompilerMod:compile_and_track(Source, Outs, Config, Opts) of
+        {ok, Tracked} ->
+            ?DEBUG("~tsCompiled ~ts", [rebar_utils:indent(1), filename:basename(Source)]),
+            Tracked;
+        {ok, Tracked, Warnings} ->
+            report(Warnings),
+            ?DEBUG("~tsCompiled ~ts", [rebar_utils:indent(1), filename:basename(Source)]),
+            Tracked;
+        skipped ->
+            ?DEBUG("~tsSkipped ~ts", [rebar_utils:indent(1), filename:basename(Source)]),
+            [];
+        Error ->
+            NewSource = format_error_source(Source, Config),
+            ?ERROR("Compiling ~ts failed", [NewSource]),
+            maybe_report(Error),
+            ?DEBUG("Compilation failed: ~p", [Error]),
+            ?FAIL
+    end.
+
+store_artifacts(_G, []) ->
+    ok;
+store_artifacts(G, [{Source, Target, Meta}|Rest]) ->
+    %% Assume the source exists since it was tracked to be compiled
+    digraph:add_vertex(G, Target, {artifact, Meta}),
+    digraph:add_edge(G, Target, Source, artifact),
+    store_artifacts(G, Rest).
 
 compile_worker(QueuePid, Opts, Config, Outs, CompilerMod) ->
     QueuePid ! self(),
     receive
         {compile, Source} ->
-            Result = CompilerMod:compile(Source, Outs, Config, Opts),
+            Result =
+            case erlang:function_exported(CompilerMod, compile_and_track, 4) of
+                false ->
+                    CompilerMod:compile(Source, Outs, Config, Opts);
+                true ->
+                    CompilerMod:compile_and_track(Source, Outs, Config, Opts)
+            end,
             QueuePid ! {Result, Source},
             compile_worker(QueuePid, Opts, Config, Outs, CompilerMod);
         empty ->
@@ -220,7 +268,7 @@ compile_worker(QueuePid, Opts, Config, Outs, CompilerMod) ->
     end.
 
 compile_parallel([], _Opts, _BaseOpts, _Mappings, _CompilerMod) ->
-    ok;
+    [];
 compile_parallel(Targets, Opts, BaseOpts, Mappings, CompilerMod) ->
     Self = self(),
     F = fun() -> compile_worker(Self, Opts, BaseOpts, Mappings, CompilerMod) end,
@@ -230,8 +278,9 @@ compile_parallel(Targets, Opts, BaseOpts, Mappings, CompilerMod) ->
     compile_queue(Targets, Pids, Opts, BaseOpts, Mappings, CompilerMod).
 
 compile_queue([], [], _Opts, _Config, _Outs, _CompilerMod) ->
-    ok;
+    [];
 compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod) ->
+    Tracking = erlang:function_exported(CompilerMod, compile_and_track, 4),
     receive
         Worker when is_pid(Worker), Targets =:= [] ->
             Worker ! empty,
@@ -242,10 +291,19 @@ compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod) ->
         {ok, Source} ->
             ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
             compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);
-        {{ok, Warnings}, Source} ->
+        {{ok, Tracked}, Source} when Tracking ->
+            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
+            Tracked ++
+              compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);
+        {{ok, Warnings}, Source} when not Tracking ->
             report(Warnings),
             ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
             compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);
+        {{ok, Tracked, Warnings}, Source} when Tracking ->
+            report(Warnings),
+            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
+            Tracked ++
+              compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);
         {skipped, Source} ->
             ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), Source]),
             compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);

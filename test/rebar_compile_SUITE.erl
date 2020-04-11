@@ -20,7 +20,7 @@ all() ->
      recompile_when_opts_included_hrl_changes,
      recompile_when_foreign_included_hrl_changes,
      recompile_when_foreign_behaviour_changes,
-     recompile_when_opts_change,
+     recompile_when_opts_change, recompile_when_dag_opts_change,
      dont_recompile_when_opts_dont_change, dont_recompile_yrl_or_xrl,
      delete_beam_if_source_deleted,
      deps_in_path, checkout_priority, highest_version_of_pkg_dep,
@@ -916,6 +916,41 @@ recompile_when_opts_change(Config) ->
     {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
     NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
                   || F <- NewFiles, filename:extension(F) == ".beam"],
+
+    ?assert(ModTime =/= NewModTime).
+
+recompile_when_dag_opts_change(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    {ok, Files} = rebar_utils:list_dir(EbinDir),
+    Beams = [filename:join([EbinDir, F])
+             || F <- Files, filename:extension(F) == ".beam"],
+    ModTime = [filelib:last_modified(Beam) || Beam <- Beams],
+
+    timer:sleep(1000),
+
+    DepsDir = filename:join([AppDir, "_build", "default", "lib"]),
+    G = rebar_compiler_dag:init(DepsDir, rebar_compiler_erl, "project_apps", []),
+    %% change the config in the DAG...
+    [digraph:add_vertex(G, Beam, {artifact, [{d, some_define}]}) || Beam <- Beams],
+    digraph:add_vertex(G, '$r3_dirty_bit', true), % trigger a save
+    rebar_compiler_dag:maybe_store(G, DepsDir, rebar_compiler_erl, "project_apps", []),
+    rebar_compiler_dag:terminate(G),
+    %% ... but don't change the actual rebar3 config...
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    %% ... and checks that it rebuilds anyway due to DAG changes
+    {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
+    NewBeams = [filename:join([EbinDir, F])
+                || F <- NewFiles, filename:extension(F) == ".beam"],
+    NewModTime = [filelib:last_modified(Beam) || Beam <- NewBeams],
 
     ?assert(ModTime =/= NewModTime).
 
