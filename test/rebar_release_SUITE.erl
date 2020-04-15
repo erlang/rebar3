@@ -190,11 +190,7 @@ user_output_dir(Config) ->
       {ok, []}
      ),
 
-    RelxState = rlx_state:new("", [], []),
-    RelxState1 = rlx_state:base_output_dir(RelxState, ReleaseDir),
-    {ok, RelxState2} = rlx_prv_app_discover:do(RelxState1),
-    {ok, RelxState3} = rlx_prv_rel_discover:do(RelxState2),
-    rlx_state:get_realized_release(RelxState3, list_to_atom(Name), Vsn).
+    ?assertNotMatch([], filelib:wildcard(filename:join([ReleaseDir, Name, "releases", Vsn, "*"]))).
 
 profile_overlays(Config) ->
     AppDir = ?config(apps, Config),

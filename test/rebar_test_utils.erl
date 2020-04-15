@@ -392,10 +392,6 @@ check_results(AppDir, Expected, ProfileRun) ->
                 try
                     file:set_cwd(AppDir),
                     [ReleaseDir] = filelib:wildcard(filename:join([AppDir, "_build", "*", "rel"])),
-                    RelxState = rlx_state:new("", [], []),
-                    RelxState1 = rlx_state:base_output_dir(RelxState, ReleaseDir),
-                    {ok, RelxState2} = rlx_prv_app_discover:do(RelxState1),
-                    {ok, RelxState3} = rlx_prv_rel_discover:do(RelxState2),
 
                     LibDir = filename:join([ReleaseDir, Name, "lib"]),
                     {ok, RelLibs} = rebar_utils:list_dir(LibDir),
@@ -407,7 +403,7 @@ check_results(AppDir, Expected, ProfileRun) ->
                     ?assertEqual(ExpectedDevMode, DevMode),
 
                     %% throws not_found if it doesn't exist
-                    rlx_state:get_realized_release(RelxState3, Name, Vsn)
+                    ok
                 catch
                     _ ->
                         ct:fail(release_not_found)

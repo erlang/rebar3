@@ -27,13 +27,13 @@ init(State) ->
                                  {example, "rebar3 relup"},
                                  {short_desc, "Create relup of releases."},
                                  {desc, "Create relup of releases."},
-                                 {opts, relx:opt_spec_list()}]),
+                                 {opts, rebar_relx:opt_spec_list()}]),
     State1 = rebar_state:add_provider(State, Provider),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    rebar_relx:do(rlx_prv_release, "relup", ?PROVIDER, State).
+    rebar_relx:do(?PROVIDER, State).
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->

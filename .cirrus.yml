@@ -2,11 +2,11 @@ test_task:
   use_compute_credits: true
   container:
     matrix:
+      - image: erlang:23
       - image: erlang:22
       - image: erlang:21
       - image: erlang:20
       - image: erlang:19
-      - image: erlang:18
   test_script: |
     ./bootstrap
     ./rebar3 ct

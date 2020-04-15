@@ -6,6 +6,7 @@
          new/3,
          new/4,
          new/5,
+         app_to_map/1,
          update_opts/3,
          update_opts/2,
          update_opts_deps/2,
@@ -27,6 +28,8 @@
          priv_dir/1,
          applications/1,
          applications/2,
+         included_applications/1,
+         included_applications/2,
          profiles/1,
          profiles/2,
          deps/1,
@@ -76,28 +79,29 @@
 
 -type project_type() :: rebar3 | mix | undefined.
 
--record(app_info_t, {name               :: binary() | undefined,
-                     app_file_src       :: file:filename_all() | undefined,
-                     app_file_src_script:: file:filename_all() | undefined,
-                     app_file           :: file:filename_all() | undefined,
-                     original_vsn       :: binary() | undefined,
-                     parent=root        :: binary() | root,
-                     app_details=[]     :: list(),
-                     applications=[]    :: list(),
-                     deps=[]            :: list(),
-                     profiles=[default] :: [atom()],
-                     default=dict:new() :: rebar_dict(),
-                     opts=dict:new()    :: rebar_dict(),
-                     dep_level=0        :: integer(),
-                     dir                :: file:name(),
-                     out_dir            :: file:name(),
-                     ebin_dir           :: file:name(),
-                     source             :: string() | tuple() | checkout | undefined,
-                     is_lock=false      :: boolean(),
-                     is_checkout=false  :: boolean(),
-                     valid              :: boolean() | undefined,
-                     project_type       :: project_type(),
-                     is_available=false :: boolean()}).
+-record(app_info_t, {name                     :: binary() | undefined,
+                     app_file_src             :: file:filename_all() | undefined,
+                     app_file_src_script      :: file:filename_all() | undefined,
+                     app_file                 :: file:filename_all() | undefined,
+                     original_vsn             :: binary() | undefined,
+                     parent=root              :: binary() | root,
+                     app_details=[]           :: list(),
+                     applications=[]          :: list(),
+                     included_applications=[] :: [atom()],
+                     deps=[]                  :: list(),
+                     profiles=[default]       :: [atom()],
+                     default=dict:new()       :: rebar_dict(),
+                     opts=dict:new()          :: rebar_dict(),
+                     dep_level=0              :: integer(),
+                     dir                      :: file:name(),
+                     out_dir                  :: file:name(),
+                     ebin_dir                 :: file:name(),
+                     source                   :: string() | tuple() | checkout | undefined,
+                     is_lock=false            :: boolean(),
+                     is_checkout=false        :: boolean(),
+                     valid                    :: boolean() | undefined,
+                     project_type             :: project_type(),
+                     is_available=false       :: boolean()}).
 
 %%============================================================================
 %% types
@@ -158,6 +162,22 @@ new(Parent, AppName, Vsn, Dir, Deps) ->
                      out_dir=rebar_utils:to_list(Dir),
                      ebin_dir=filename:join(rebar_utils:to_list(Dir), "ebin"),
                      deps=Deps}}.
+
+app_to_map(#app_info_t{name=Name,
+                       original_vsn=Vsn,
+                       applications=Applications,
+                       included_applications=IncludedApplications,
+                       out_dir=OutDir,
+                       ebin_dir=EbinDir}) ->
+    %% TODO: call rlx_app_info to create map
+    #{name => ec_cnv:to_atom(Name),
+      vsn => Vsn,
+      applications => Applications,
+      included_applications => IncludedApplications,
+      dir => OutDir,
+      out_dir => OutDir,
+      ebin_dir => EbinDir,
+      link => false}.
 
 %% @doc update the opts based on the contents of a config
 %% file for the app
@@ -405,6 +425,17 @@ applications(#app_info_t{applications=Applications}) ->
 -spec applications(t(), list()) -> t().
 applications(AppInfo=#app_info_t{}, Applications) ->
     AppInfo#app_info_t{applications=Applications}.
+
+%% @doc returns the list of included_applications the app depends on.
+-spec included_applications(t()) -> list().
+included_applications(#app_info_t{included_applications=Applications}) ->
+    Applications.
+
+%% @doc sets the list of applications the app depends on.
+%% Should be obtained from the app file.
+-spec included_applications(t(), list()) -> t().
+included_applications(AppInfo=#app_info_t{}, Applications) ->
+    AppInfo#app_info_t{included_applications=Applications}.
 
 %% @doc returns the list of active profiles
 -spec profiles(t()) -> list().
