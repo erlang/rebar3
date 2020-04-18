@@ -39,13 +39,19 @@ do(Provider, State) ->
     ProfileString = rebar_dir:profile_dir_name(State),
     ExtraOverlays = [{profile_string, ProfileString}],
 
+    CurrentProfiles = rebar_state:current_profiles(State),
+    RelxMode = case lists:member(prod, CurrentProfiles) of
+                   true ->
+                       [{mode, prod}];
+                   false ->
+                       []
+               end,
     DefaultOutputDir = filename:join(rebar_dir:base_dir(State), ?DEFAULT_RELEASE_DIR),
-    RelxConfig1 = [output_dir(DefaultOutputDir, Opts),
-                   {overlay_vars_values, ExtraOverlays},
-                   {overlay_vars, [{base_dir, rebar_dir:base_dir(State)}]}
-                   | merge_overlays(RelxConfig)],
+    RelxConfig1 = RelxMode ++ [output_dir(DefaultOutputDir, Opts),
+                               {overlay_vars_values, ExtraOverlays},
+                               {overlay_vars, [{base_dir, rebar_dir:base_dir(State)}]}
+                               | merge_overlays(RelxConfig)],
     {ok, RelxState} = rlx_config:to_state(RelxConfig1),
-
 
     Providers = rebar_state:providers(State),
     Cwd = rebar_state:dir(State),
