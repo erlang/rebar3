@@ -215,6 +215,7 @@ profile_overlays(Config) ->
                  {lib_dirs, [AppDir]}]},
          {profiles, [{prod, 
             [{relx, [
+                {debug_info, keep},
                 {overlay_vars, filename:join(AppDir, "prod.vars")},
                 {overlay, [{mkdir, "otherrandomdir"},
                            {copy, filename:join(AppDir, "./prod.file"), "{{env}}.file"},
