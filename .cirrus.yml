@@ -21,7 +21,7 @@ osx_test_task:
 
 nightly_task:
   container:
-    image: erlang:18
+    image: erlang:19
   depends_on:
     - test
   only_if: $BRANCH == "master"
