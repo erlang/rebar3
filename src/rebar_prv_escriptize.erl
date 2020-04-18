@@ -276,7 +276,5 @@ write_windows_script(Target) ->
     CmdPath = unicode:characters_to_list(Target) ++ ".cmd",
     CmdScript=
         "@echo off\r\n"
-        "setlocal\r\n"
-        "set rebarscript=%~f0\r\n"
-        "escript.exe \"%rebarscript:.cmd=%\" %*\r\n",
+        "escript.exe \"%~dpn0\" %*\r\n",
     ok = file:write_file(CmdPath, CmdScript).
