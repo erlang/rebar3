@@ -34,28 +34,30 @@ nightly_task:
     ACCESS_KEY: ENCRYPTED[86c639224b3cfc11ae5dbd48b13de5ff77dd5c75f1bf1808ddbbb5bc60049f16885b4e2e3a7981376cac562f7a2d176b]
     SECRET_KEY: ENCRYPTED[189c3b982c2f846193bb34c3de86e0172b8a4c793699f64dc95bb9a1e6bbe83c252c77d37ea1503928aa9b41a3652ca3]
 
-release_task:
-  container:
-    image: erlang:18
-  depends_on:
-    - test
-  only_if: $CIRRUS_TAG != ''
-  script: |
-    apt-get update
-    apt-get install -y s3cmd
-    ./bootstrap
-    s3cmd --access_key=$ACCESS_KEY --secret_key=$SECRET_KEY put ./rebar3 s3://rebar3
+# Removed while making pre-release -rc versions so they don't override the stable release in s3
 
-    url_to_upload="https://uploads.github.com/repos/$CIRRUS_REPO_FULL_NAME/releases/$CIRRUS_RELEASE/assets?name=rebar3"
-    curl -X POST \
-    --data-binary @rebar3 \
-    --header "Authorization: token $GITHUB_TOKEN" \
-    --header "Content-Type: application/octet-stream" \
-    $url_to_upload
-  environment:
-    ACCESS_KEY: ENCRYPTED[86c639224b3cfc11ae5dbd48b13de5ff77dd5c75f1bf1808ddbbb5bc60049f16885b4e2e3a7981376cac562f7a2d176b]
-    SECRET_KEY: ENCRYPTED[189c3b982c2f846193bb34c3de86e0172b8a4c793699f64dc95bb9a1e6bbe83c252c77d37ea1503928aa9b41a3652ca3]
-    GITUB_TOKEN: ENCRYPTED[ff884c4b0a4f2833b6c22c1fd6398879d58634d0f521e7efbd33f045fb785417f24da953cfbdaee563698501691e5970]
+# release_task:
+#   container:
+#     image: erlang:18
+#   depends_on:
+#     - test
+#   only_if: $CIRRUS_TAG != ''
+#   script: |
+#     apt-get update
+#     apt-get install -y s3cmd
+#     ./bootstrap
+#     s3cmd --access_key=$ACCESS_KEY --secret_key=$SECRET_KEY put ./rebar3 s3://rebar3
+
+#     url_to_upload="https://uploads.github.com/repos/$CIRRUS_REPO_FULL_NAME/releases/$CIRRUS_RELEASE/assets?name=rebar3"
+#     curl -X POST \
+#     --data-binary @rebar3 \
+#     --header "Authorization: token $GITHUB_TOKEN" \
+#     --header "Content-Type: application/octet-stream" \
+#     $url_to_upload
+#   environment:
+#     ACCESS_KEY: ENCRYPTED[86c639224b3cfc11ae5dbd48b13de5ff77dd5c75f1bf1808ddbbb5bc60049f16885b4e2e3a7981376cac562f7a2d176b]
+#     SECRET_KEY: ENCRYPTED[189c3b982c2f846193bb34c3de86e0172b8a4c793699f64dc95bb9a1e6bbe83c252c77d37ea1503928aa9b41a3652ca3]
+#     GITUB_TOKEN: ENCRYPTED[ff884c4b0a4f2833b6c22c1fd6398879d58634d0f521e7efbd33f045fb785417f24da953cfbdaee563698501691e5970]
 
 
 # Windows CI appears broken for now and never passes
