@@ -62,8 +62,9 @@ format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
 bin_contents(OutputDir) ->
+    {ok, Vsn} = application:get_key(rebar, vsn),
     <<"#!/usr/bin/env sh
-
+## Rebar3 ", (iolist_to_binary(Vsn))/binary, "
 erl -pz ", (rebar_utils:to_binary(OutputDir))/binary,"/*/ebin +sbtu +A1 -noshell -boot start_clean -s rebar3 main $REBAR3_ERL_ARGS -extra \"$@\"
 ">>.
 
