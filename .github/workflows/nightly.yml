@@ -10,11 +10,12 @@ jobs:
     name: Publish escript for every merge to master
     runs-on: ubuntu-latest
 
-    container:
-      image: erlang:19
-
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
+
+    - uses: gleam-lang/setup-erlang@v1.0.0
+      with:
+        otp-version: 19.3.6.13
     - name: Compile
       run: ./bootstrap
     - name: CT tests
