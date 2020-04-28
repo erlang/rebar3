@@ -22,7 +22,7 @@ jobs:
       image: erlang:${{ matrix.otp_version }}
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
     - name: Compile
       run: ./bootstrap
     - name: CT tests
