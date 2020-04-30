@@ -289,7 +289,7 @@ collect_default_refcount(Dir) ->
             {ok, RawCount} =
                 case Tag of
                     undefined ->
-                        AbortMsg2 = "Getting rev-list of git depedency failed in " ++ Dir,
+                        AbortMsg2 = "Getting rev-list of git dependency failed in " ++ Dir,
                         {ok, PatchLines} = rebar_utils:sh("git rev-list HEAD",
                                                           [{use_stdout, false},
                                                            {cd, Dir},
