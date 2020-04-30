@@ -131,13 +131,19 @@ bare_compile_hooks_default_ns(Config) ->
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
-    RConfFile = rebar_test_utils:create_config(AppDir,
-                                               [{provider_hooks, [{post, [{compile, clean}]}]}]),
+    HookFile = filename:join([?config(priv_dir, Config), "bare-post.hook"]),
+
+    ConfOpts = [{provider_hooks, [{post, [{compile, clean}]}]},
+                {post_hooks, [{compile, "ls > " ++ HookFile}]}],
+    RConfFile = rebar_test_utils:create_config(AppDir, ConfOpts),
     {ok, RConf} = file:consult(RConfFile),
     rebar_test_utils:run_and_check(
         Config, RConf, ["bare", "compile", "--paths", "."],
         {ok, []}
-    ).
+    ),
+    %% check that hooks did actually run
+    ?assertMatch({ok, _}, file:read_file(HookFile)),
+    ok.
 
 deps_clean_hook_namespace(Config) ->
     mock_git_resource:mock([{deps, [{some_dep, "0.0.1"}]}]),
