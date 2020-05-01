@@ -48,7 +48,7 @@ all() ->
 groups() ->
     [{basic_app, [], [build_basic_app, paths_basic_app, clean_basic_app]},
      {release_apps, [], [build_release_apps, paths_release_apps, clean_release_apps]},
-     {checkout_apps, [], [build_checkout_apps, paths_checkout_apps]},
+     {checkout_apps, [], [paths_checkout_apps]},
      {checkout_deps, [], [build_checkout_deps, paths_checkout_deps]},
      {basic_srcdirs, [], [build_basic_srcdirs, paths_basic_srcdirs]},
      {release_srcdirs, [], [build_release_srcdirs,
@@ -262,13 +262,6 @@ build_release_apps(Config) ->
     rebar_test_utils:run_and_check(
         Config, [], ["compile"],
         {ok, [{app, Name1}, {app, Name2}]}
-    ).
-
-build_checkout_apps(Config) ->
-    [Name1, Name2] = ?config(app_names, Config),
-    rebar_test_utils:run_and_check(
-        Config, [], ["compile"],
-        {ok, [{app, Name1}, {checkout, Name2}]}
     ).
 
 build_checkout_deps(Config) ->
