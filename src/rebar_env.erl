@@ -12,6 +12,7 @@
 %% REBAR_BUILD_DIR         = rebar_dir:base_dir/1
 %% REBAR_ROOT_DIR          = rebar_dir:root_dir/1
 %% REBAR_CHECKOUTS_DIR     = rebar_dir:checkouts_dir/1
+%% REBAR_CHECKOUTS_OUT_DIR = rebar_dir:checkouts_out_dir/1
 %% REBAR_PLUGINS_DIR       = rebar_dir:plugins_dir/1
 %% REBAR_GLOBAL_CONFIG_DIR = rebar_dir:global_config_dir/1
 %% REBAR_GLOBAL_CACHE_DIR  = rebar_dir:global_cache_dir/1
@@ -42,6 +43,7 @@ create_env(State, Opts) ->
         {"REBAR_BUILD_DIR",         filename:absname(rebar_dir:base_dir(State))},
         {"REBAR_ROOT_DIR",          filename:absname(rebar_dir:root_dir(State))},
         {"REBAR_CHECKOUTS_DIR",     filename:absname(rebar_dir:checkouts_dir(State))},
+        {"REBAR_CHECKOUTS_OUT_DIR", filename:absname(rebar_dir:checkouts_out_dir(State))},
         {"REBAR_PLUGINS_DIR",       filename:absname(rebar_dir:plugins_dir(State))},
         {"REBAR_GLOBAL_CONFIG_DIR", filename:absname(rebar_dir:global_config_dir(State))},
         {"REBAR_GLOBAL_CACHE_DIR",  filename:absname(rebar_dir:global_cache_dir(Opts))},

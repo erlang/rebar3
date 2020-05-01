@@ -122,6 +122,8 @@
 {root_dir, "."}.
 %% where checkout dependencies are to be located
 {checkouts_dir, "_checkouts"}.
+%% where, under <base_dir>/<profile> checkout dependencies are to be built
+{checkouts_out_dir, "checkouts"}.
 %% directory in '<base_dir>/<profile>/' where plugins go
 {plugins_dir, "plugins"}.
 %% directories where OTP applications for the project can be located
