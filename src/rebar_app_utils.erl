@@ -255,7 +255,7 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
     CheckoutsDir = rebar_utils:to_list(rebar_dir:checkouts_dir(State, Name)),
     AppInfo = case rebar_app_info:discover(CheckoutsDir) of
                   {ok, App} ->
-                      OutDir = filename:join([DepsDir, "..", "checkouts", Name]),
+                      OutDir = filename:join(rebar_dir:checkouts_out_dir(State), Name),
                       rebar_app_info:out_dir(
                         rebar_app_info:source(
                           rebar_app_info:is_checkout(App, true), checkout), OutDir);
