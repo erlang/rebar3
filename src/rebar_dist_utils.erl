@@ -51,7 +51,7 @@ find_options(State) ->
 %%% PRIVATE %%%
 %%%%%%%%%%%%%%%
 start(Name, Type, Opts) ->
-    case erl_epmd:names() of
+    case net_adm:names() of
         {error, _} ->
             start_epmd();
         {ok, _} ->
