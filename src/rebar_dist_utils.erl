@@ -51,13 +51,13 @@ find_options(State) ->
 %%% PRIVATE %%%
 %%%%%%%%%%%%%%%
 start(Name, Type, Opts) ->
-    case dist_up(net_kernel:start([Name, Type])) of
-        false ->
-            start_epmd(),
-            dist_up(net_kernel:start([Name, Type])) orelse warn_dist();
-        true ->
+    case net_adm:names() of
+        {error, _} ->
+            start_epmd();
+        {ok, _} ->
             ok
     end,
+    dist_up(net_kernel:start([Name, Type])) orelse warn_dist(),
     setup_cookie(Opts).
 
 dist_up({error,{{shutdown,{_,net_kernel,{'EXIT',nodistribution}}},_}}) -> false;
