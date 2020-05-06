@@ -216,8 +216,13 @@ reset_hooks(Opts, CurrentProfiles) ->
 -spec all_app_dirs([file:name()]) -> [{file:name(), [file:name()]}].
 all_app_dirs(LibDirs) ->
     lists:flatmap(fun(LibDir) ->
-                          {_, SrcDirs} = find_config_src(LibDir, ["src"]),
-                          app_dirs(LibDir, SrcDirs)
+                          case filelib:is_dir(LibDir) of
+                              true ->
+                                  {_, SrcDirs} = find_config_src(LibDir, ["src"]),
+                                  app_dirs(LibDir, SrcDirs);
+                              false ->
+                                  []
+                          end
                   end, LibDirs).
 
 %% @private find the directories for all apps based on their source dirs

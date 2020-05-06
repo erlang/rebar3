@@ -260,7 +260,8 @@ top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
 %%%%%%%%%%%%%%%
 check_results(AppDir, Expected, ProfileRun) ->
     BuildDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib", "*"])),
-    BuildSubDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib", "*", "*"])),
+    BuildSubDirs = [D || D <- filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib", "*", "*"])),
+                         filelib:is_dir(D)],
     PluginDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "plugins", "*"])),
     GlobalPluginDirs = filelib:wildcard(filename:join([AppDir, "global", "plugins", "*"])),
     CheckoutsDirs = filelib:wildcard(filename:join([AppDir, "_checkouts", "*"])),
