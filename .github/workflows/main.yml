@@ -9,7 +9,7 @@ on:
       - 'master'
 
 jobs:
-  build:
+  linux:
     name: Test on OTP ${{ matrix.otp_version }} and ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
@@ -27,3 +27,29 @@ jobs:
       run: ./bootstrap
     - name: CT tests
       run: ./rebar3 ct
+
+  macos:
+    name: Test on MacOS
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Erlang
+      run: brew install erlang
+    - name: Compile
+      run: ./bootstrap
+    - name: CT tests
+      run: ./rebar3 ct
+
+  windows:
+    name: Test on Windows
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Erlang
+      run: choco install erlang
+    - name: Compile
+      run: cmd.exe /c 'bootstrap.bat'
+    - name: CT tests
+      run: cmd.exe /c 'rebar3.cmd ct'
