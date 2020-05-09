@@ -1,8 +1,0 @@
-osx_test_task:
-  osx_instance:
-    image: mojave-base
-  install_script: brew install erlang
-  test_script: |
-    ./bootstrap
-    ./rebar3 ct
-
