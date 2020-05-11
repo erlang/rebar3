@@ -12,7 +12,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, path).
--define(DEPS, [compile]).
+-define(DEPS, [app_discovery]).
 
 %% ===================================================================
 %% Public API
@@ -54,10 +54,10 @@ filter_apps(RawOpts, State) ->
         [] ->
             ProjectDeps = project_deps(State),
             ProjectApps = rebar_state:project_apps(State),
-            ProjectApps ++ ProjectDeps;
-        _  ->
-            Apps
+            lists:map(fun(A) -> binary_to_list(rebar_app_info:name(A)) end, ProjectApps) ++ ProjectDeps;
+        _  -> Apps
     end.
+
 
 paths([], _, State, Acc) -> print_paths_if_exist(lists:reverse(Acc), State);
 paths([{base, true}|Rest], Apps, State, Acc) ->
@@ -80,12 +80,12 @@ bin_dir(State)  -> io_lib:format("~ts/bin", [rebar_dir:base_dir(State)]).
 lib_dir(State)  -> io_lib:format("~ts", [rebar_dir:deps_dir(State)]).
 rel_dir(State)  -> io_lib:format("~ts/rel", [rebar_dir:base_dir(State)]).
 
-ebin_dirs(Apps, _State) ->
-    lists:map(fun(App) -> rebar_app_info:ebin_dir(App) end, Apps).
-priv_dirs(Apps, _State) ->
-    lists:map(fun(App) -> rebar_app_info:priv_dir(App) end, Apps).
-src_dirs(Apps, _State) ->
-    lists:map(fun(App) -> filename:join(rebar_app_info:out_dir(App), "src") end, Apps).
+ebin_dirs(Apps, State) ->
+    lists:map(fun(App) -> io_lib:format("~ts/~ts/ebin", [rebar_dir:deps_dir(State), App]) end, Apps).
+priv_dirs(Apps, State) ->
+    lists:map(fun(App) -> io_lib:format("~ts/~ts/priv", [rebar_dir:deps_dir(State), App]) end, Apps).
+src_dirs(Apps, State) ->
+    lists:map(fun(App) -> io_lib:format("~ts/~ts/src", [rebar_dir:deps_dir(State), App]) end, Apps).
 
 print_paths_if_exist(Paths, State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
@@ -94,7 +94,18 @@ print_paths_if_exist(Paths, State) ->
     io:format("~ts", [rebar_string:join(RealPaths, Sep)]).
 
 project_deps(State) ->
-    rebar_state:all_deps(State).
+    Profiles = rebar_state:current_profiles(State),
+    DepList = lists:foldl(fun(Profile, Acc) -> rebar_state:get(State, {deps, Profile}, []) ++ Acc end, [], Profiles),
+    LockList = lists:foldl(fun(Profile, Acc) -> rebar_state:get(State, {locks, Profile}, []) ++ Acc end, [], Profiles),
+    Deps = [normalize(name(Dep)) || Dep <- DepList++LockList],
+    lists:usort(Deps).
+
+name(App) when is_tuple(App) -> element(1, App);
+name(Name) when is_binary(Name); is_list(Name); is_atom(Name) -> Name.
+
+normalize(AppName) when is_list(AppName) -> AppName;
+normalize(AppName) when is_atom(AppName) -> atom_to_list(AppName);
+normalize(AppName) when is_binary(AppName) -> binary_to_list(AppName).
 
 path_opts(_State) ->
     [{app, undefined, "app", string, help(app)},
