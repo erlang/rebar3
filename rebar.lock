@@ -10,7 +10,8 @@
  {<<"providers">>,{pkg,<<"providers">>,<<"1.8.1">>},0},
  {<<"relx">>,
   {git,"https://github.com/erlware/relx.git",
-       {ref,"ac5bb88330e23b29ae0449214af5f62bd16ecdce"}},
+       {ref,"ac5bb88330e23b29ae0449214af5f62bd16ecdce"},
+       []},
   0},
  {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.5">>},0}]}.
 [

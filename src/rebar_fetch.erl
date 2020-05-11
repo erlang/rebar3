@@ -54,9 +54,10 @@ download_source_(AppInfo, State) ->
         ok ->
             ec_file:mkdir_p(AppDir1),
             code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
-            ok = rebar_file_utils:rm_rf(filename:absname(AppDir1)),
-            ?DEBUG("Moving checkout ~p to ~p", [TmpDir, filename:absname(AppDir1)]),
-            rebar_file_utils:mv(TmpDir, filename:absname(AppDir1));
+            FetchDir = rebar_app_info:fetch_dir(AppInfo),
+            ok = rebar_file_utils:rm_rf(filename:absname(FetchDir)),
+            ?DEBUG("Moving checkout ~p to ~p", [TmpDir, filename:absname(FetchDir)]),
+            rebar_file_utils:mv(TmpDir, filename:absname(FetchDir));
         Error ->
             Error
     end.

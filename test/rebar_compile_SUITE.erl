@@ -27,7 +27,7 @@ all() ->
      parse_transform_test, erl_first_files_test, mib_test,
      umbrella_mib_first_test, only_default_transitive_deps, clean_all,
      clean_specific, profile_deps, deps_build_in_prod, only_deps,
-     override_deps, override_add_deps, override_del_deps,
+     override_deps, git_subdir_deps, override_add_deps, override_del_deps,
      override_opts, override_add_opts, override_del_opts,
      apply_overrides_exactly_once, override_only_deps,
      profile_override_deps, profile_override_add_deps, profile_override_del_deps,
@@ -1529,6 +1529,22 @@ override_deps(Config) ->
         Config, RebarConfig, ["compile"],
         {ok, [{dep, "some_dep"},
               {dep_not_exist, "other_dep"}]}
+    ).
+
+git_subdir_deps(Config) ->
+    Deps = rebar_test_utils:expand_deps(git_subdir, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_subdir_resource:mock([{deps, SrcDeps}]),
+
+    RebarConfig = [
+        {deps, TopDeps}
+    ],
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["compile"],
+        {ok, [{subdir_dep, "some_dep"},
+              {subdir_dep, "other_dep"}]}
     ).
 
 override_add_deps(Config) ->

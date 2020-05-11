@@ -251,13 +251,15 @@ parse_dep(_, Dep, _, _, _) ->
       Source :: tuple(),
       IsLock :: boolean(),
       State :: rebar_state:t().
-dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
+dep_to_app(Parent, DepsDir, Name, Vsn, Source0, IsLock, State) ->
+    SubDir = subdir(Source0),
+    FetchDir = rebar_utils:to_list(filename:join([DepsDir, Name])),
     CheckoutsDir = rebar_utils:to_list(rebar_dir:checkouts_dir(State, Name)),
     AppInfo = case rebar_app_info:discover(CheckoutsDir) of
                   {ok, App} ->
                       rebar_app_info:source(rebar_app_info:is_checkout(App, true), checkout);
                   not_found ->
-                      Dir = rebar_utils:to_list(filename:join(DepsDir, Name)),
+                      Dir = rebar_utils:to_list(filename:join([DepsDir, Name, SubDir])),
                       {ok, AppInfo0} =
                           case rebar_app_info:discover(Dir) of
                               {ok, App} ->
@@ -267,12 +269,24 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source, IsLock, State) ->
                               not_found ->
                                   rebar_app_info:new(Parent, Name, Vsn, Dir, [])
                           end,
-                      rebar_app_info:source(AppInfo0, Source)
+                      rebar_app_info:source(AppInfo0, Source0)
               end,
     Overrides = rebar_app_info:get(AppInfo, overrides, []) ++ rebar_state:get(State, overrides, []),
     AppInfo2 = rebar_app_info:set(AppInfo, overrides, Overrides),
     AppInfo5 = rebar_app_info:profiles(AppInfo2, [default]),
-    rebar_app_info:is_lock(AppInfo5, IsLock).
+    AppInfo6 = rebar_app_info:fetch_dir(AppInfo5, FetchDir),
+    rebar_app_info:is_lock(AppInfo6, IsLock).
+
+%% git has to have special treatment.
+%% unlike a resource that simply copies files the git resource needs to be able
+%% to access the .git directory and run `git' commands to check against the lock
+%% and optionally get the version. Because of this we must keep the clone as a
+%% usable git repo clone and using a subdir can not be copied out of it but must
+%% have the app info set its directory to be a sub directory of the repo.
+subdir({git_subdir, _Repo, _Ref, Dir}) ->
+    Dir;
+subdir(_) ->
+    "".
 
 %% @doc Takes a given application app_info record along with the project.
 %% If the app is a package, resolve and expand the package definition.

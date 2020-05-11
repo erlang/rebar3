@@ -36,6 +36,7 @@
         {log_level, warn},
 
         {resources, [{git, rebar_git_resource},
+                     {git_subdir, rebar_git_subdir_resource},
                      {pkg, rebar_pkg_resource},
                      {hg, rebar_hg_resource}]},
 

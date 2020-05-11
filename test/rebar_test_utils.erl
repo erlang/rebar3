@@ -183,6 +183,12 @@ random_seed() ->
 -endif.
 
 expand_deps(_, []) -> [];
+expand_deps(git_subdir, [{Name, Deps} | Rest]) ->
+    Dep = {Name, {git_subdir, "https://example.org/user/"++Name++".git", {branch, "master"}, "appsubdir"}},
+    [{Dep, expand_deps(git_subdir, Deps)} | expand_deps(git_subdir, Rest)];
+expand_deps(git_subdir, [{Name, Vsn, Deps} | Rest]) ->
+    Dep = {Name, Vsn, {git_subdir, "https://example.org/user/"++Name++".git", {tag, Vsn}, "appsubdir"}},
+    [{Dep, expand_deps(git_subdir, Deps)} | expand_deps(git_subdir, Rest)];
 expand_deps(git, [{Name, Deps} | Rest]) ->
     Dep = {Name, ".*", {git, "https://example.org/user/"++Name++".git", "master"}},
     [{Dep, expand_deps(git, Deps)} | expand_deps(git, Rest)];
@@ -230,10 +236,18 @@ flat_deps([{{Name,_Vsn,Ref}, Deps} | Rest], Src, Pkg) ->
     {FlatDeps, FlatPkgDeps} = flat_deps(Deps),
     flat_deps(Rest,
               Src ++ [Current | FlatDeps],
+              Pkg ++ FlatPkgDeps);
+flat_deps([{{Name,Ref}, Deps} | Rest], Src, Pkg) ->
+    Current = {{Name,vsn_from_ref(Ref)}, top_level_deps(Deps)},
+    {FlatDeps, FlatPkgDeps} = flat_deps(Deps),
+    flat_deps(Rest,
+              Src ++ [Current | FlatDeps],
               Pkg ++ FlatPkgDeps).
 
 vsn_from_ref({git, _, {_, Vsn}}) -> Vsn;
-vsn_from_ref({git, _, Vsn}) -> Vsn.
+vsn_from_ref({git, _, Vsn}) -> Vsn;
+vsn_from_ref({git_subdir, _, {_, Vsn}, _}) -> Vsn;
+vsn_from_ref({git_subdir, _, Vsn, _}) -> Vsn.
 
 top_level_deps([]) -> [];
 top_level_deps([{{pkg, Name, Vsn, undefined, undefined}, _} | Deps]) ->
@@ -246,6 +260,8 @@ top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
 %%%%%%%%%%%%%%%
 check_results(AppDir, Expected, ProfileRun) ->
     BuildDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib", "*"])),
+    BuildSubDirs = [D || D <- filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib", "*", "*"])),
+                         filelib:is_dir(D)],
     PluginDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "plugins", "*"])),
     GlobalPluginDirs = filelib:wildcard(filename:join([AppDir, "global", "plugins", "*"])),
     CheckoutsDirs = filelib:wildcard(filename:join([AppDir, "_checkouts", "*"])),
@@ -259,7 +275,9 @@ check_results(AppDir, Expected, ProfileRun) ->
     ValidDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- ValidApps],
 
     Deps = rebar_app_discover:find_apps(BuildDirs, all),
+    SubDeps = rebar_app_discover:find_apps(BuildSubDirs, all),
     DepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Deps],
+    SubDirDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- SubDeps],
     Checkouts = rebar_app_discover:find_apps(CheckoutsDirs, all),
     CheckoutsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Checkouts],
     Plugins = rebar_app_discover:find_apps(PluginDirs, all),
@@ -317,6 +335,18 @@ check_results(AppDir, Expected, ProfileRun) ->
         ;  ({dep, Name, Vsn}) ->
                 ct:pal("Dep Name: ~p, Vsn: ~p", [Name, Vsn]),
                 case lists:keyfind(Name, 1, DepsNames) of
+                    false ->
+                        error({dep_not_found, Name});
+                    {Name, App} ->
+                        ?assertEqual(iolist_to_binary(Vsn),
+                                     iolist_to_binary(rebar_app_info:original_vsn(App)))
+                end
+        ;  ({subdir_dep, Name}) ->
+                ct:pal("Subdir Dep Name: ~p", [Name]),
+                ?assertNotEqual(false, lists:keyfind(Name, 1, SubDirDepsNames))
+        ;  ({subdir_dep, Name, Vsn}) ->
+                ct:pal("Subdir Dep Name: ~p, Vsn: ~p", [Name, Vsn]),
+                case lists:keyfind(Name, 1, SubDirDepsNames) of
                     false ->
                         error({dep_not_found, Name});
                     {Name, App} ->
