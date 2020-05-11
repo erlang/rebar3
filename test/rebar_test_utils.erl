@@ -264,7 +264,7 @@ check_results(AppDir, Expected, ProfileRun) ->
                          filelib:is_dir(D)],
     PluginDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "plugins", "*"])),
     GlobalPluginDirs = filelib:wildcard(filename:join([AppDir, "global", "plugins", "*"])),
-    CheckoutsDirs = filelib:wildcard(filename:join([AppDir, "_checkouts", "*"])),
+    CheckoutsDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "checkouts", "*"])),
     LockFile = filename:join([AppDir, "rebar.lock"]),
     Locks = lists:flatten(rebar_config:consult_lock_file(LockFile)),
 

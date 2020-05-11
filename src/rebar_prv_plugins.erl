@@ -44,6 +44,10 @@ do(State) ->
     Plugins = rebar_state:get(State, plugins, []),
     ProjectPlugins = rebar_state:get(State, project_plugins, []),
     PluginsDirs = filelib:wildcard(filename:join(rebar_dir:plugins_dir(State), "*")),
+
+    %% use `checkouts_dir' and not `checkouts_out_dir'. Since we use `all' in `find_apps'
+    %% so it doesn't need to be built and the apps in `checkouts_dir' could be old
+    %% because the user removing from `_checkouts/' doesn't cause removal of the output
     CheckoutsDirs = filelib:wildcard(filename:join(rebar_dir:checkouts_dir(State), "*")),
     Apps = rebar_app_discover:find_apps(CheckoutsDirs++PluginsDirs, SrcDirs, all, State),
     display_plugins("Local plugins", Apps, Plugins ++ ProjectPlugins),

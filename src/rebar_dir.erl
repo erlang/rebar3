@@ -9,6 +9,8 @@
          root_dir/1,
          checkouts_dir/1,
          checkouts_dir/2,
+         checkouts_out_dir/1,
+         checkouts_out_dir/2,
          plugins_dir/1,
          lib_dirs/1,
          home_dir/0,
@@ -96,6 +98,17 @@ checkouts_dir(State) ->
 -spec checkouts_dir(rebar_state:t(), file:filename_all()) -> file:filename_all().
 checkouts_dir(State, App) ->
     filename:join(checkouts_dir(State), App).
+
+%% @doc returns the location of the directory checkouts are built to
+-spec checkouts_out_dir(rebar_state:t()) -> file:filename_all().
+checkouts_out_dir(State) ->
+    filename:join(base_dir(State), rebar_state:get(State, checkouts_out_dir, ?DEFAULT_CHECKOUTS_OUT_DIR)).
+
+%% @doc returns the expected location of a given app in the checkouts
+%% directory for the project.
+-spec checkouts_out_dir(rebar_state:t(), file:filename_all()) -> file:filename_all().
+checkouts_out_dir(State, App) ->
+    filename:join(checkouts_out_dir(State), App).
 
 %% @doc Returns the directory where plugins are located.
 -spec plugins_dir(rebar_state:t()) -> file:filename_all().
