@@ -405,8 +405,6 @@ find_app_(Path, [{AppPath, AppName}|Rest]) ->
             find_app_(Path, Rest)
     end.
 
-
-
 %% @private Return what should be the base name of an erl file, relocated to the
 %% target directory. For example:
 %% target_base("ebin/", "src/my_module.erl", ".erl", ".beam") -> "ebin/my_module.beam"
