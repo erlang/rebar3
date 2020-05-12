@@ -251,7 +251,13 @@ extra_virtual_apps(State, VApp0, [Dir|Dirs]) ->
             VApp2 = rebar_app_info:ebin_dir(VApp1, OutDir),
             Opts = rebar_state:opts(State),
             VApp3 = rebar_app_info:opts(VApp2, Opts),
-            [rebar_app_info:set(VApp3, src_dirs, [OutDir])
+            %% ensure we don't end up running a similar extra fake app while
+            %% compiling root-level extras by marking it explicitly null
+            VApp4 = rebar_app_info:set(VApp3, extra_src_dirs, []),
+            %% need a unique name to prevent lookup issues that clobber entries
+            AppName = unicode:characters_to_binary(["extra_", Dir]),
+            VApp5 = rebar_app_info:name(VApp4, AppName),
+            [rebar_app_info:set(VApp5, src_dirs, [OutDir])
              | extra_virtual_apps(State, VApp0, Dirs)]
     end.
 
@@ -303,6 +309,7 @@ build_rebar3_apps(DAGs, Apps, State) ->
     LastDAG = lists:last(DAGs),
     %% we actually need to compile each DAG one after the other to prevent
     %% issues where a .yrl file that generates a .erl file gets to be seen.
+    ?INFO("Analyzing applications", []),
     [begin
          {Ctx, ReorderedApps} = rebar_compiler:analyze_all(DAG, Apps),
          lists:foreach(
@@ -312,6 +319,13 @@ build_rebar3_apps(DAGs, Apps, State) ->
                 rebar_compiler:compile_analyzed(DAG, AppInfo, Ctx)
              end,
              ReorderedApps
+         ),
+         {ExtraCtx, ReorderedExtraApps} = rebar_compiler:analyze_all_extras(DAG, Apps),
+         lists:foreach(
+             fun(AppInfo) ->
+                rebar_compiler:compile_analyzed(DAG, AppInfo, ExtraCtx)
+             end,
+             ReorderedExtraApps
          )
      end || DAG <- DAGs],
     ok.

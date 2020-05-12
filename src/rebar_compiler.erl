@@ -1,6 +1,7 @@
 -module(rebar_compiler).
 
 -export([analyze_all/2,
+         analyze_all_extras/2,
          compile_analyzed/3,
          compile_all/2,
          clean/2,
@@ -61,7 +62,7 @@ analyze_all({Compiler, G}, Apps) ->
     OutExt = maps:get(artifact_exts, Contexts),
 
     rebar_compiler_dag:prune(
-        G, SrcExt, OutExt, lists:append(AbsSources), AppOutPaths
+        G, SrcExt, OutExt, lists:append(AbsSources), lists:append(AppOutPaths)
     ),
     rebar_compiler_dag:populate_deps(G, SrcExt, OutExt),
     rebar_compiler_dag:propagate_stamps(G),
@@ -71,6 +72,78 @@ analyze_all({Compiler, G}, Apps) ->
                 || AppInfo <- Apps],
     AppNames = rebar_compiler_dag:compile_order(G, AppPaths),
     {Contexts, sort_apps(AppNames, Apps)}.
+
+%% @doc same as analyze_all/2, but over extra_src_apps,
+%% which are a big cheat.
+-spec analyze_all_extras(DAG, [App, ...]) -> {map(), [App]} when
+      DAG :: {module(), digraph:graph()},
+      App :: rebar_app_info:t().
+analyze_all_extras(DAG, Apps) ->
+    case lists:append([annotate_extras(App) || App <- Apps]) of
+        [] -> {#{}, []};
+        ExtraApps -> analyze_all(DAG, ExtraApps)
+    end.
+
+-spec compile_analyzed({module(), digraph:graph()}, rebar_app_info:t(), map()) -> ok.
+compile_analyzed({Compiler, G}, AppInfo, Contexts) -> % > 3.13.2
+    run(G, Compiler, AppInfo, Contexts),
+    ok.
+
+-spec compile_all([module(), ...], rebar_app_info:t()) -> ok.
+compile_all(Compilers, AppInfo) -> % =< 3.13.0 interface; plugins use this!
+    %% Support the old-style API by re-declaring a local DAG for the
+    %% compile steps needed.
+    lists:foreach(fun(Compiler) ->
+        OutDir = rebar_app_info:out_dir(AppInfo),
+        G = rebar_compiler_dag:init(OutDir, Compiler, undefined, []),
+        {Ctx, _} = analyze_all({Compiler, G}, [AppInfo]),
+        compile_analyzed({Compiler, G}, AppInfo, Ctx),
+        rebar_compiler_dag:maybe_store(G, OutDir, Compiler, undefined, []),
+        rebar_compiler_dag:terminate(G)
+     end, Compilers).
+
+%% @doc remove compiled artifacts from an AppDir.
+-spec clean([module()], rebar_app_info:t()) -> 'ok'.
+clean(Compilers, AppInfo) ->
+    lists:foreach(fun(CompilerMod) ->
+        clean_(CompilerMod, AppInfo, undefined),
+        Extras = annotate_extras(AppInfo),
+        [clean_(CompilerMod, ExtraApp, "extra") || ExtraApp <- Extras]
+    end, Compilers).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% COMPILER UTIL EXPORTS %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% These functions are here for the ultimate goal of getting rid of
+%% rebar_base_compiler. This can't be done because of existing plugins.
+
+-spec needs_compile(filename:all(), extension(), [{extension(), file:dirname()}]) -> boolean().
+needs_compile(Source, OutExt, Mappings) ->
+    Ext = filename:extension(Source),
+    BaseName = filename:basename(Source, Ext),
+    {_, OutDir} = lists:keyfind(OutExt, 1, Mappings),
+    Target = filename:join(OutDir, BaseName++OutExt),
+    filelib:last_modified(Source) > filelib:last_modified(Target).
+
+ok_tuple(Source, Ws) ->
+    rebar_base_compiler:ok_tuple(Source, Ws).
+
+error_tuple(Source, Es, Ws, Opts) ->
+    rebar_base_compiler:error_tuple(Source, Es, Ws, Opts).
+
+maybe_report(Reportable) ->
+    rebar_base_compiler:maybe_report(Reportable).
+
+format_error_source(Path, Opts) ->
+    rebar_base_compiler:format_error_source(Path, Opts).
+
+report(Messages) ->
+    rebar_base_compiler:report(Messages).
+
+%%%%%%%%%%%%%%%
+%%% PRIVATE %%%
+%%%%%%%%%%%%%%%
 
 gather_contexts(Compiler, Apps) ->
     Default = default_ctx(),
@@ -121,36 +194,13 @@ analyze_app({Compiler, G}, Contexts, AppInfo) ->
     rebar_compiler_dag:populate_sources(
         G, Compiler, InDirs, AbsSources, DepOpts
     ),
-    {{BaseDir, ArtifactDir}, AbsSources}.
+    {[{filename:join([BaseDir, SrcDir]), ArtifactDir} || SrcDir <- SrcDirs],
+     AbsSources}.
 
 sort_apps(Names, Apps) ->
     NamedApps = [{rebar_app_info:name(App), App} || App <- Apps],
     [App || Name <- Names,
             {_, App} <- [lists:keyfind(Name, 1, NamedApps)]].
-
--spec compile_analyzed({module(), digraph:graph()}, rebar_app_info:t(), map()) -> ok.
-compile_analyzed({Compiler, G}, AppInfo, Contexts) -> % > 3.13.2
-    run(G, Compiler, AppInfo, Contexts),
-    %% Extras are tricky and get their own mini-analysis
-    ExtraApps = annotate_extras(AppInfo),
-    [begin
-         {ExtraCtx, [SortedExtra]} = analyze_all({Compiler, G}, [ExtraAppInfo]),
-         run(G, Compiler, SortedExtra, ExtraCtx)
-     end || ExtraAppInfo <- ExtraApps],
-    ok.
-
--spec compile_all([module(), ...], rebar_app_info:t()) -> ok.
-compile_all(Compilers, AppInfo) -> % =< 3.13.0 interface; plugins use this!
-    %% Support the old-style API by re-declaring a local DAG for the
-    %% compile steps needed.
-    lists:foreach(fun(Compiler) ->
-        OutDir = rebar_app_info:out_dir(AppInfo),
-        G = rebar_compiler_dag:init(OutDir, Compiler, undefined, []),
-        {Ctx, _} = analyze_all({Compiler, G}, [AppInfo]),
-        compile_analyzed({Compiler, G}, AppInfo, Ctx),
-        rebar_compiler_dag:maybe_store(G, OutDir, Compiler, undefined, []),
-        rebar_compiler_dag:terminate(G)
-     end, Compilers).
 
 prepare_compiler_env(Compiler, Apps) ->
     lists:foreach(
@@ -293,16 +343,6 @@ compile_handler({Error, Source}, [Config | _Rest]) ->
     maybe_report(Error),
     ?FAIL.
 
-
-%% @doc remove compiled artifacts from an AppDir.
--spec clean([module()], rebar_app_info:t()) -> 'ok'.
-clean(Compilers, AppInfo) ->
-    lists:foreach(fun(CompilerMod) ->
-        clean_(CompilerMod, AppInfo, undefined),
-        Extras = annotate_extras(AppInfo),
-        [clean_(CompilerMod, ExtraApp, "extra") || ExtraApp <- Extras]
-    end, Compilers).
-
 clean_(CompilerMod, AppInfo, _Label) ->
     #{src_dirs := SrcDirs,
       src_ext := SrcExt} = CompilerMod:context(AppInfo),
@@ -313,21 +353,18 @@ clean_(CompilerMod, AppInfo, _Label) ->
     CompilerMod:clean(FoundFiles, AppInfo),
     ok.
 
--spec needs_compile(filename:all(), extension(), [{extension(), file:dirname()}]) -> boolean().
-needs_compile(Source, OutExt, Mappings) ->
-    Ext = filename:extension(Source),
-    BaseName = filename:basename(Source, Ext),
-    {_, OutDir} = lists:keyfind(OutExt, 1, Mappings),
-    Target = filename:join(OutDir, BaseName++OutExt),
-    filelib:last_modified(Source) > filelib:last_modified(Target).
-
 annotate_extras(AppInfo) ->
     ExtraDirs = rebar_dir:extra_src_dirs(rebar_app_info:opts(AppInfo), []),
     OldSrcDirs = rebar_app_info:get(AppInfo, src_dirs, ["src"]),
     AppDir = rebar_app_info:dir(AppInfo),
     lists:map(fun(Dir) ->
         EbinDir = filename:join(rebar_app_info:out_dir(AppInfo), Dir),
-        AppInfo1 = rebar_app_info:ebin_dir(AppInfo, EbinDir),
+        %% need a unique name to prevent lookup issues that clobber entries
+        AppName = unicode:characters_to_binary(
+            [rebar_app_info:name(AppInfo), "_", Dir]
+        ),
+        AppInfo0 = rebar_app_info:name(AppInfo, AppName),
+        AppInfo1 = rebar_app_info:ebin_dir(AppInfo0, EbinDir),
         AppInfo2 = rebar_app_info:set(AppInfo1, src_dirs, [Dir]),
         AppInfo3 = rebar_app_info:set(AppInfo2, extra_src_dirs, OldSrcDirs),
         add_to_includes( % give access to .hrl in app's src/
@@ -338,26 +375,6 @@ annotate_extras(AppInfo) ->
     [ExtraDir || ExtraDir <- ExtraDirs,
                  filelib:is_dir(filename:join(AppDir, ExtraDir))]
     ).
-
-%% These functions are here for the ultimate goal of getting rid of
-%% rebar_base_compiler. This can't be done because of existing plugins.
-
-ok_tuple(Source, Ws) ->
-    rebar_base_compiler:ok_tuple(Source, Ws).
-
-error_tuple(Source, Es, Ws, Opts) ->
-    rebar_base_compiler:error_tuple(Source, Es, Ws, Opts).
-
-maybe_report(Reportable) ->
-    rebar_base_compiler:maybe_report(Reportable).
-
-format_error_source(Path, Opts) ->
-    rebar_base_compiler:format_error_source(Path, Opts).
-
-report(Messages) ->
-    rebar_base_compiler:report(Messages).
-
-%%% private functions
 
 find_source_files(BaseDir, SrcExt, SrcDirs, Opts) ->
     SourceExtRe = "^(?!\\._).*\\" ++ SrcExt ++ [$$],

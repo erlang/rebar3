@@ -41,7 +41,7 @@ init(Dir, Compiler, Label, CritMeta) ->
 %% The file must be in one of the directories that may contain source files
 %% for an OTP application; source files found in the DAG `G' that lie outside
 %% of these directories may be used in other circumstances (i.e. options affecting
-%% visibility).
+%% visibility, extra_src_dirs).
 %% Prune out files that have no corresponding sources
 prune(G, SrcExt, ArtifactExt, Sources, AppPaths) ->
     %% Collect source files that may have been removed. These files:
@@ -50,13 +50,27 @@ prune(G, SrcExt, ArtifactExt, Sources, AppPaths) ->
     %% In the process, prune header files - those don't have ArtifactExt
     %%  extension - using side effect in is_deleted_source/5.
     case [Del || Del <- (digraph:vertices(G) -- Sources),
-        is_deleted_source(G, Del, filename:extension(Del), SrcExt, ArtifactExt)] of
+          is_deleted_source(G, Del, filename:extension(Del), SrcExt, ArtifactExt)] of
         [] ->
             ok; %% short circuit without sorting AppPaths
         Deleted ->
-            prune_source_files(G, SrcExt, ArtifactExt,
-                lists:sort(AppPaths), lists:sort(Deleted))
+            SafeAppPaths = safe_dirs(AppPaths),
+            OutFiles = filter_prefix(G, lists:sort(SafeAppPaths), lists:sort(Deleted)),
+            [maybe_rm_artifact_and_edge(G, Out, SrcExt, ArtifactExt, File)
+             || {File, Out} <- OutFiles],
+            ok
     end.
+
+%% Some app paths may be prefixes of one another; for example,
+%% `/some/app/directory' may be seen as a prefix
+%% of `/some/app/directory_trick' and cause pruning outside
+%% of the proper scopes.
+safe_dirs(AppPaths) ->
+    [{safe_dir(AppDir), Path} || {AppDir, Path} <- AppPaths].
+
+safe_dir([]) -> "/";
+safe_dir("/") -> "/";
+safe_dir([H|T]) -> [H|safe_dir(T)].
 
 is_deleted_source(_G, _F, Extension, Extension, _ArtifactExt) ->
     %% source file
@@ -74,22 +88,21 @@ is_deleted_source(G, F, _Extension, _SrcExt, _ArtifactExt) ->
 %% AppDirs & Fs are sorted, and to check if File is outside of
 %%  App, lists:prefix is checked. When the App with File in it
 %%  exists, verify file is still there on disk.
-prune_source_files(_G, _SrcExt, _ArtifactExt, [], _) ->
-    ok;
-prune_source_files(_G, _SrcExt, _ArtifactExt, _, []) ->
-    ok;
-prune_source_files(G, SrcExt, ArtifactExt, [AppDir | AppTail], Fs) when is_atom(AppDir) ->
+filter_prefix(_G, [], _) ->
+    [];
+filter_prefix(_G, _, []) ->
+    [];
+filter_prefix(G, Apps, [F|Fs]) when is_atom(F) ->
     %% dirty bit shenanigans
-    prune_source_files(G, SrcExt, ArtifactExt, AppTail, Fs);
-prune_source_files(G, SrcExt, ArtifactExt, [{App, Out} | AppTail] = AppPaths, [File | FTail]) ->
+    filter_prefix(G, Apps, Fs);
+filter_prefix(G, [{App, Out} | AppTail] = AppPaths, [File | FTail]) ->
     case lists:prefix(App, File) of
         true ->
-            maybe_rm_artifact_and_edge(G, Out, SrcExt, ArtifactExt, File),
-            prune_source_files(G, SrcExt, ArtifactExt, AppPaths, FTail);
+            [{File, Out} | filter_prefix(G, AppPaths, FTail)];
         false when App < File ->
-            prune_source_files(G, SrcExt, ArtifactExt, AppTail, [File|FTail]);
+            filter_prefix(G, AppTail, [File|FTail]);
         false ->
-            prune_source_files(G, SrcExt, ArtifactExt, AppPaths, FTail)
+            filter_prefix(G, AppPaths, FTail)
     end.
 
 %% @doc this function scans all the source files found and looks into
