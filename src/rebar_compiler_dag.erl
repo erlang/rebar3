@@ -3,7 +3,7 @@
 -module(rebar_compiler_dag).
 -export([init/4, maybe_store/5, terminate/1]).
 -export([prune/5, populate_sources/5, populate_deps/3, propagate_stamps/1,
-         compile_order/2]).
+         compile_order/2, store_artifact/4]).
 
 -include("rebar.hrl").
 
@@ -191,6 +191,10 @@ maybe_store(G, Dir, Compiler, Label, CritMeta) ->
 %% Get rid of the live state for the digraph; leave disk stuff in place.
 terminate(G) ->
     true = digraph:delete(G).
+
+store_artifact(G, Source, Target, Meta) ->
+    digraph:add_vertex(G, Target, {artifact, Meta}),
+    digraph:add_edge(G, Target, Source, artifact).
 
 %%%%%%%%%%%%%%%
 %%% PRIVATE %%%

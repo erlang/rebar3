@@ -129,7 +129,7 @@ sort_apps(Names, Apps) ->
             {_, App} <- [lists:keyfind(Name, 1, NamedApps)]].
 
 -spec compile_analyzed({module(), digraph:graph()}, rebar_app_info:t(), map()) -> ok.
-compile_analyzed({Compiler, G}, AppInfo, Contexts) -> % > 3.13.0
+compile_analyzed({Compiler, G}, AppInfo, Contexts) -> % > 3.13.2
     run(G, Compiler, AppInfo, Contexts),
     %% Extras are tricky and get their own mini-analysis
     ExtraApps = annotate_extras(AppInfo),
@@ -183,8 +183,9 @@ run(G, CompilerMod, AppInfo, Contexts) ->
     {{FirstFiles, FirstFileOpts},
      {RestFiles, Opts}} = CompilerMod:needed_files(G, FoundFiles, Mappings, AppInfo),
 
-    compile_each(FirstFiles, FirstFileOpts, BaseOpts, Mappings, CompilerMod),
-    Tracked = case RestFiles of
+    Tracked =
+    compile_each(FirstFiles, FirstFileOpts, BaseOpts, Mappings, CompilerMod)
+     ++ case RestFiles of
         {Sequential, Parallel} -> % parallelizable form
             compile_each(Sequential, Opts, BaseOpts, Mappings, CompilerMod) ++
             compile_parallel(Parallel, Opts, BaseOpts, Mappings, CompilerMod);
@@ -246,8 +247,7 @@ store_artifacts(_G, []) ->
     ok;
 store_artifacts(G, [{Source, Target, Meta}|Rest]) ->
     %% Assume the source exists since it was tracked to be compiled
-    digraph:add_vertex(G, Target, {artifact, Meta}),
-    digraph:add_edge(G, Target, Source, artifact),
+    rebar_compiler_dag:store_artifact(G, Source, Target, Meta),
     store_artifacts(G, Rest).
 
 compile_worker(QueuePid, Opts, Config, Outs, CompilerMod) ->
