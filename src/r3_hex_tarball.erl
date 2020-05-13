@@ -223,7 +223,7 @@ do_unpack(Files, OuterChecksum, Output) ->
 finish_unpack({error, _} = Error) ->
     Error;
 finish_unpack(#{metadata := Metadata, files := Files, inner_checksum := InnerChecksum, outer_checksum := OuterChecksum, output := Output}) ->
-    _Version = maps:get("VERSION", Files),
+    _ = maps:get("VERSION", Files),
     ContentsBinary = maps:get("contents.tar.gz", Files),
     filelib:ensure_dir(filename:join(Output, "*")),
     case unpack_tarball(ContentsBinary, Output) of
