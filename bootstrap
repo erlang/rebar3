@@ -116,7 +116,7 @@ extract(Binary) ->
     {ok, Contents}.
 
 request(Url) ->
-    HttpOptions = [{ssl, [{versions, ['tlsv1.2']}]}, {relaxed, true} | get_proxy_auth()],
+    HttpOptions = [{relaxed, true} | get_proxy_auth()],
 
     case httpc:request(get, {Url, []},
                        HttpOptions,
