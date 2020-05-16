@@ -309,7 +309,7 @@ build_rebar3_apps(DAGs, Apps, State) ->
     LastDAG = lists:last(DAGs),
     %% we actually need to compile each DAG one after the other to prevent
     %% issues where a .yrl file that generates a .erl file gets to be seen.
-    ?INFO("Analyzing applications", []),
+    ?INFO("Analyzing applications...", []),
     [begin
          {Ctx, ReorderedApps} = rebar_compiler:analyze_all(DAG, Apps),
          lists:foreach(
