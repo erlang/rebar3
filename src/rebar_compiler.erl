@@ -1,6 +1,7 @@
 -module(rebar_compiler).
 
 -export([analyze_all/2,
+         analyze_all_extras/2,
          compile_analyzed/3,
          compile_all/2,
          clean/2,
@@ -46,7 +47,7 @@
 %% @doc analysis by the caller, in order to let an OTP app
 %% find and resolve all its dependencies as part of compile_all's new
 %% API, which presumes a partial analysis is done ahead of time
--spec analyze_all(DAG, [App, ...]) -> ok when
+-spec analyze_all(DAG, [App, ...]) -> {map(), [App]} when
       DAG :: {module(), digraph:graph()},
       App :: rebar_app_info:t().
 analyze_all({Compiler, G}, Apps) ->
@@ -61,7 +62,7 @@ analyze_all({Compiler, G}, Apps) ->
     OutExt = maps:get(artifact_exts, Contexts),
 
     rebar_compiler_dag:prune(
-        G, SrcExt, OutExt, lists:append(AbsSources), AppOutPaths
+        G, SrcExt, OutExt, lists:append(AbsSources), lists:append(AppOutPaths)
     ),
     rebar_compiler_dag:populate_deps(G, SrcExt, OutExt),
     rebar_compiler_dag:propagate_stamps(G),
@@ -71,6 +72,78 @@ analyze_all({Compiler, G}, Apps) ->
                 || AppInfo <- Apps],
     AppNames = rebar_compiler_dag:compile_order(G, AppPaths),
     {Contexts, sort_apps(AppNames, Apps)}.
+
+%% @doc same as analyze_all/2, but over extra_src_apps,
+%% which are a big cheat.
+-spec analyze_all_extras(DAG, [App, ...]) -> {map(), [App]} when
+      DAG :: {module(), digraph:graph()},
+      App :: rebar_app_info:t().
+analyze_all_extras(DAG, Apps) ->
+    case lists:append([annotate_extras(App) || App <- Apps]) of
+        [] -> {#{}, []};
+        ExtraApps -> analyze_all(DAG, ExtraApps)
+    end.
+
+-spec compile_analyzed({module(), digraph:graph()}, rebar_app_info:t(), map()) -> ok.
+compile_analyzed({Compiler, G}, AppInfo, Contexts) -> % > 3.13.2
+    run(G, Compiler, AppInfo, Contexts),
+    ok.
+
+-spec compile_all([module(), ...], rebar_app_info:t()) -> ok.
+compile_all(Compilers, AppInfo) -> % =< 3.13.0 interface; plugins use this!
+    %% Support the old-style API by re-declaring a local DAG for the
+    %% compile steps needed.
+    lists:foreach(fun(Compiler) ->
+        OutDir = rebar_app_info:out_dir(AppInfo),
+        G = rebar_compiler_dag:init(OutDir, Compiler, undefined, []),
+        {Ctx, _} = analyze_all({Compiler, G}, [AppInfo]),
+        compile_analyzed({Compiler, G}, AppInfo, Ctx),
+        rebar_compiler_dag:maybe_store(G, OutDir, Compiler, undefined, []),
+        rebar_compiler_dag:terminate(G)
+     end, Compilers).
+
+%% @doc remove compiled artifacts from an AppDir.
+-spec clean([module()], rebar_app_info:t()) -> 'ok'.
+clean(Compilers, AppInfo) ->
+    lists:foreach(fun(CompilerMod) ->
+        clean_(CompilerMod, AppInfo, undefined),
+        Extras = annotate_extras(AppInfo),
+        [clean_(CompilerMod, ExtraApp, "extra") || ExtraApp <- Extras]
+    end, Compilers).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% COMPILER UTIL EXPORTS %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% These functions are here for the ultimate goal of getting rid of
+%% rebar_base_compiler. This can't be done because of existing plugins.
+
+-spec needs_compile(filename:all(), extension(), [{extension(), file:dirname()}]) -> boolean().
+needs_compile(Source, OutExt, Mappings) ->
+    Ext = filename:extension(Source),
+    BaseName = filename:basename(Source, Ext),
+    {_, OutDir} = lists:keyfind(OutExt, 1, Mappings),
+    Target = filename:join(OutDir, BaseName++OutExt),
+    filelib:last_modified(Source) > filelib:last_modified(Target).
+
+ok_tuple(Source, Ws) ->
+    rebar_base_compiler:ok_tuple(Source, Ws).
+
+error_tuple(Source, Es, Ws, Opts) ->
+    rebar_base_compiler:error_tuple(Source, Es, Ws, Opts).
+
+maybe_report(Reportable) ->
+    rebar_base_compiler:maybe_report(Reportable).
+
+format_error_source(Path, Opts) ->
+    rebar_base_compiler:format_error_source(Path, Opts).
+
+report(Messages) ->
+    rebar_base_compiler:report(Messages).
+
+%%%%%%%%%%%%%%%
+%%% PRIVATE %%%
+%%%%%%%%%%%%%%%
 
 gather_contexts(Compiler, Apps) ->
     Default = default_ctx(),
@@ -121,36 +194,13 @@ analyze_app({Compiler, G}, Contexts, AppInfo) ->
     rebar_compiler_dag:populate_sources(
         G, Compiler, InDirs, AbsSources, DepOpts
     ),
-    {{BaseDir, ArtifactDir}, AbsSources}.
+    {[{filename:join([BaseDir, SrcDir]), ArtifactDir} || SrcDir <- SrcDirs],
+     AbsSources}.
 
 sort_apps(Names, Apps) ->
     NamedApps = [{rebar_app_info:name(App), App} || App <- Apps],
     [App || Name <- Names,
             {_, App} <- [lists:keyfind(Name, 1, NamedApps)]].
-
--spec compile_analyzed({module(), digraph:graph()}, rebar_app_info:t(), map()) -> ok.
-compile_analyzed({Compiler, G}, AppInfo, Contexts) -> % > 3.13.0
-    run(G, Compiler, AppInfo, Contexts),
-    %% Extras are tricky and get their own mini-analysis
-    ExtraApps = annotate_extras(AppInfo),
-    [begin
-         {ExtraCtx, [SortedExtra]} = analyze_all({Compiler, G}, [ExtraAppInfo]),
-         run(G, Compiler, SortedExtra, ExtraCtx)
-     end || ExtraAppInfo <- ExtraApps],
-    ok.
-
--spec compile_all([module(), ...], rebar_app_info:t()) -> ok.
-compile_all(Compilers, AppInfo) -> % =< 3.13.0 interface; plugins use this!
-    %% Support the old-style API by re-declaring a local DAG for the
-    %% compile steps needed.
-    lists:foreach(fun(Compiler) ->
-        OutDir = rebar_app_info:out_dir(AppInfo),
-        G = rebar_compiler_dag:init(OutDir, Compiler, undefined, []),
-        Ctx = analyze_all({Compiler, G}, [AppInfo]),
-        compile_analyzed({Compiler, G}, AppInfo, Ctx),
-        rebar_compiler_dag:maybe_store(G, OutDir, Compiler, undefined, []),
-        rebar_compiler_dag:terminate(G)
-     end, Compilers).
 
 prepare_compiler_env(Compiler, Apps) ->
     lists:foreach(
@@ -183,11 +233,14 @@ run(G, CompilerMod, AppInfo, Contexts) ->
     {{FirstFiles, FirstFileOpts},
      {RestFiles, Opts}} = CompilerMod:needed_files(G, FoundFiles, Mappings, AppInfo),
 
-    compile_each(FirstFiles, FirstFileOpts, BaseOpts, Mappings, CompilerMod),
-    Tracked = case RestFiles of
+    Tracked =
+    compile_each(FirstFiles, FirstFileOpts, BaseOpts, Mappings, CompilerMod)
+     ++ case RestFiles of
         {Sequential, Parallel} -> % parallelizable form
             compile_each(Sequential, Opts, BaseOpts, Mappings, CompilerMod) ++
-            compile_parallel(Parallel, Opts, BaseOpts, Mappings, CompilerMod);
+            lists:append(
+              compile_parallel(Parallel, Opts, BaseOpts, Mappings, CompilerMod)
+            );
         _ when is_list(RestFiles) -> % traditional sequential build
             compile_each(RestFiles, Opts, BaseOpts, Mappings, CompilerMod)
     end,
@@ -246,88 +299,49 @@ store_artifacts(_G, []) ->
     ok;
 store_artifacts(G, [{Source, Target, Meta}|Rest]) ->
     %% Assume the source exists since it was tracked to be compiled
-    digraph:add_vertex(G, Target, {artifact, Meta}),
-    digraph:add_edge(G, Target, Source, artifact),
+    rebar_compiler_dag:store_artifact(G, Source, Target, Meta),
     store_artifacts(G, Rest).
 
-compile_worker(QueuePid, Opts, Config, Outs, CompilerMod) ->
-    QueuePid ! self(),
-    receive
-        {compile, Source} ->
-            Result =
-            case erlang:function_exported(CompilerMod, compile_and_track, 4) of
-                false ->
-                    CompilerMod:compile(Source, Outs, Config, Opts);
-                true ->
-                    CompilerMod:compile_and_track(Source, Outs, Config, Opts)
-            end,
-            QueuePid ! {Result, Source},
-            compile_worker(QueuePid, Opts, Config, Outs, CompilerMod);
-        empty ->
-            ok
-    end.
-
-compile_parallel([], _Opts, _BaseOpts, _Mappings, _CompilerMod) ->
-    [];
 compile_parallel(Targets, Opts, BaseOpts, Mappings, CompilerMod) ->
-    Self = self(),
-    F = fun() -> compile_worker(Self, Opts, BaseOpts, Mappings, CompilerMod) end,
-    Jobs = min(length(Targets), erlang:system_info(schedulers)),
-    ?DEBUG("Starting ~B compile worker(s)", [Jobs]),
-    Pids = [spawn_monitor(F) || _I <- lists:seq(1, Jobs)],
-    compile_queue(Targets, Pids, Opts, BaseOpts, Mappings, CompilerMod).
-
-compile_queue([], [], _Opts, _Config, _Outs, _CompilerMod) ->
-    [];
-compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod) ->
     Tracking = erlang:function_exported(CompilerMod, compile_and_track, 4),
-    receive
-        Worker when is_pid(Worker), Targets =:= [] ->
-            Worker ! empty,
-            compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);
-        Worker when is_pid(Worker) ->
-            Worker ! {compile, hd(Targets)},
-            compile_queue(tl(Targets), Pids, Opts, Config, Outs, CompilerMod);
-        {ok, Source} ->
-            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
-            compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);
-        {{ok, Tracked}, Source} when Tracking ->
-            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
-            Tracked ++
-              compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);
-        {{ok, Warnings}, Source} when not Tracking ->
-            report(Warnings),
-            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
-            compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);
-        {{ok, Tracked, Warnings}, Source} when Tracking ->
-            report(Warnings),
-            ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
-            Tracked ++
-              compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);
-        {skipped, Source} ->
-            ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), Source]),
-            compile_queue(Targets, Pids, Opts, Config, Outs, CompilerMod);
-        {Error, Source} ->
-            NewSource = format_error_source(Source, Config),
-            ?ERROR("Compiling ~ts failed", [NewSource]),
-            maybe_report(Error),
-            ?FAIL;
-        {'DOWN', Mref, _, Pid, normal} ->
-            Pids2 = lists:delete({Pid, Mref}, Pids),
-            compile_queue(Targets, Pids2, Opts, Config, Outs, CompilerMod);
-        {'DOWN', _Mref, _, _Pid, Info} ->
-            ?ERROR("Compilation failed: ~p", [Info]),
-            ?FAIL
-    end.
+    rebar_parallel:queue(
+        Targets,
+        fun compile_worker/2, [Opts, BaseOpts, Mappings, CompilerMod],
+        fun compile_handler/2, [BaseOpts, Tracking]
+    ).
 
-%% @doc remove compiled artifacts from an AppDir.
--spec clean([module()], rebar_app_info:t()) -> 'ok'.
-clean(Compilers, AppInfo) ->
-    lists:foreach(fun(CompilerMod) ->
-        clean_(CompilerMod, AppInfo, undefined),
-        Extras = annotate_extras(AppInfo),
-        [clean_(CompilerMod, ExtraApp, "extra") || ExtraApp <- Extras]
-    end, Compilers).
+compile_worker(Source, [Opts, Config, Outs, CompilerMod]) ->
+    Result = case erlang:function_exported(CompilerMod, compile_and_track, 4) of
+        false ->
+            CompilerMod:compile(Source, Outs, Config, Opts);
+        true ->
+            CompilerMod:compile_and_track(Source, Outs, Config, Opts)
+    end,
+    %% Bundle the source to allow proper reporting in the handler:
+    {Result, Source}.
+
+compile_handler({ok, Source}, _Args) ->
+    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
+    ok;
+compile_handler({{ok, Tracked}, Source}, [_, Tracking]) when Tracking ->
+    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
+    {ok, Tracked};
+compile_handler({{ok, Warnings}, Source}, _Args) ->
+    report(Warnings),
+    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
+    ok;
+compile_handler({{ok, Tracked, Warnings}, Source}, [_, Tracking]) when Tracking ->
+    report(Warnings),
+    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
+    {ok, Tracked};
+compile_handler({skipped, Source}, _Args) ->
+    ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), Source]),
+    ok;
+compile_handler({Error, Source}, [Config | _Rest]) ->
+    NewSource = format_error_source(Source, Config),
+    ?ERROR("Compiling ~ts failed", [NewSource]),
+    maybe_report(Error),
+    ?FAIL.
 
 clean_(CompilerMod, AppInfo, _Label) ->
     #{src_dirs := SrcDirs,
@@ -339,21 +353,18 @@ clean_(CompilerMod, AppInfo, _Label) ->
     CompilerMod:clean(FoundFiles, AppInfo),
     ok.
 
--spec needs_compile(filename:all(), extension(), [{extension(), file:dirname()}]) -> boolean().
-needs_compile(Source, OutExt, Mappings) ->
-    Ext = filename:extension(Source),
-    BaseName = filename:basename(Source, Ext),
-    {_, OutDir} = lists:keyfind(OutExt, 1, Mappings),
-    Target = filename:join(OutDir, BaseName++OutExt),
-    filelib:last_modified(Source) > filelib:last_modified(Target).
-
 annotate_extras(AppInfo) ->
     ExtraDirs = rebar_dir:extra_src_dirs(rebar_app_info:opts(AppInfo), []),
     OldSrcDirs = rebar_app_info:get(AppInfo, src_dirs, ["src"]),
     AppDir = rebar_app_info:dir(AppInfo),
     lists:map(fun(Dir) ->
         EbinDir = filename:join(rebar_app_info:out_dir(AppInfo), Dir),
-        AppInfo1 = rebar_app_info:ebin_dir(AppInfo, EbinDir),
+        %% need a unique name to prevent lookup issues that clobber entries
+        AppName = unicode:characters_to_binary(
+            [rebar_app_info:name(AppInfo), "_", Dir]
+        ),
+        AppInfo0 = rebar_app_info:name(AppInfo, AppName),
+        AppInfo1 = rebar_app_info:ebin_dir(AppInfo0, EbinDir),
         AppInfo2 = rebar_app_info:set(AppInfo1, src_dirs, [Dir]),
         AppInfo3 = rebar_app_info:set(AppInfo2, extra_src_dirs, OldSrcDirs),
         add_to_includes( % give access to .hrl in app's src/
@@ -364,26 +375,6 @@ annotate_extras(AppInfo) ->
     [ExtraDir || ExtraDir <- ExtraDirs,
                  filelib:is_dir(filename:join(AppDir, ExtraDir))]
     ).
-
-%% These functions are here for the ultimate goal of getting rid of
-%% rebar_base_compiler. This can't be done because of existing plugins.
-
-ok_tuple(Source, Ws) ->
-    rebar_base_compiler:ok_tuple(Source, Ws).
-
-error_tuple(Source, Es, Ws, Opts) ->
-    rebar_base_compiler:error_tuple(Source, Es, Ws, Opts).
-
-maybe_report(Reportable) ->
-    rebar_base_compiler:maybe_report(Reportable).
-
-format_error_source(Path, Opts) ->
-    rebar_base_compiler:format_error_source(Path, Opts).
-
-report(Messages) ->
-    rebar_base_compiler:report(Messages).
-
-%%% private functions
 
 find_source_files(BaseDir, SrcExt, SrcDirs, Opts) ->
     SourceExtRe = "^(?!\\._).*\\" ++ SrcExt ++ [$$],

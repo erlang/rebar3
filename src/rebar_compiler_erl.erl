@@ -217,17 +217,18 @@ filename_to_atom(F) -> list_to_atom(filename:rootname(filename:basename(F))).
 %% Get subset of SourceFiles which need to be recompiled, respecting
 %% dependencies induced by given graph G.
 needed_files(Graph, ErlOpts, RebarOpts, Dir, OutDir, SourceFiles) ->
+    PrivIncludes = [{i, filename:join(Dir, Src)}
+                    || Src <- rebar_dir:all_src_dirs(RebarOpts, ["src"], [])],
+    SharedOpts = [{i, filename:join(Dir, "include")},
+                  {i, Dir}] ++ PrivIncludes ++ ErlOpts,
+    CompilerOptsSet = erl_compiler_opts_set(),
     lists:filter(fun(Source) ->
                          TargetBase = target_base(OutDir, Source),
                          Target = TargetBase ++ ".beam",
-                         PrivIncludes = [{i, filename:join(Dir, Src)}
-                                         || Src <- rebar_dir:all_src_dirs(RebarOpts, ["src"], [])],
-                         AllOpts = [{outdir, filename:dirname(Target)}
-                                   ,{i, filename:join(Dir, "include")}
-                                   ,{i, Dir}] ++ PrivIncludes ++ ErlOpts,
+                         AllOpts = [{outdir, filename:dirname(Target)} | SharedOpts],
                          digraph:vertex(Graph, Source) > {Source, filelib:last_modified(Target)}
                               orelse opts_changed(Graph, AllOpts, Target, TargetBase)
-                              orelse erl_compiler_opts_set()
+                              orelse CompilerOptsSet
                  end, SourceFiles).
 
 target_base(OutDir, Source) ->
