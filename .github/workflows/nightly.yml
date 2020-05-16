@@ -30,4 +30,4 @@ jobs:
 
     - name: Copy rebar3 escript to S3
       run: |
-        aws s3 sync ./rebar3 s3://rebar3-nightly
+        aws s3 cp ./rebar3 s3://rebar3-nightly
