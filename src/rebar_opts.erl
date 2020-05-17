@@ -151,10 +151,10 @@ add_opt(Opts1, Opts2) ->
 del_opt(Opts1, Opts2) ->
     lists:foldl(fun({deps, Value}, OptsAcc) ->
                         OldValue = ?MODULE:get(OptsAcc, {deps,default}, []),
-                        set(OptsAcc, {deps,default}, OldValue--Value);
+                        set(OptsAcc, {deps,default}, del_dep(OldValue, Value));
                    ({Key, Value}, OptsAcc) ->
                         OldValue = ?MODULE:get(OptsAcc, Key, []),
-                        set(OptsAcc, Key, OldValue--Value)
+                        set(OptsAcc, Key, del_dep(OldValue, Value))
                 end, Opts2, Opts1).
 
 override_opt(Opts1, Opts2) ->
@@ -163,6 +163,25 @@ override_opt(Opts1, Opts2) ->
                    ({Key, Value}, OptsAcc) ->
                         set(OptsAcc, Key, Value)
                 end, Opts2, Opts1).
+
+%% @private
+del_dep(OldValue, [Value]) when is_atom(Value) ->
+    NewValue = lists:keydelete(atom_to_binary(Value, utf8), 1, OldValue),
+    del_dep(NewValue, OldValue, [Value]);
+del_dep(OldValue, [{Value, _Version, _Source}]) ->
+    NewValue = lists:keydelete(atom_to_binary(Value, utf8), 1, OldValue),
+    del_dep(NewValue, OldValue, [{Value, _Version, _Source}]);
+del_dep(OldValue, [Value|Values]) ->
+    NewValue = del_dep(del_dep(OldValue, [Value]), OldValue, [Value]),
+    del_dep(NewValue, Values).
+
+%% @private
+%% If the initial deletion did not work remove it as always
+%% to ensure rebar3 at least maintains its old behaviour.
+del_dep(OldValue, OldValue, Value) ->
+    OldValue--Value;
+del_dep(NewValue, _OldValue, _Value) ->
+    NewValue.
 
 %%
 %% Function for dict:merge/3 (in merge_opts/2) to merge options by priority.
