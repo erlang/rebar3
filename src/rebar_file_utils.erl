@@ -322,7 +322,7 @@ robocopy_mv_and_rename(Source, Dest, SrcDir, SrcName, DestDir, DestName) ->
     end.
 
 robocopy_file(SrcPath, DestPath, FileName) ->
-    Cmd = ?FMT("robocopy /move /e \"~ts\" \"~ts\" \"~ts\"",
+    Cmd = ?FMT("robocopy /move /e \"~ts\" \"~ts\" \"~ts\" 1> nul",
                [rebar_utils:escape_double_quotes(SrcPath),
                 rebar_utils:escape_double_quotes(DestPath),
                 rebar_utils:escape_double_quotes(FileName)]),
@@ -338,7 +338,7 @@ robocopy_file(SrcPath, DestPath, FileName) ->
     end.
 
 robocopy_dir(Source, Dest) ->
-    Cmd = ?FMT("robocopy /move /e \"~ts\" \"~ts\"",
+    Cmd = ?FMT("robocopy /move /e \"~ts\" \"~ts\" 1> nul",
                [rebar_utils:escape_double_quotes(Source),
                 rebar_utils:escape_double_quotes(Dest)]),
     Res = rebar_utils:sh(Cmd,
