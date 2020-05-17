@@ -150,9 +150,11 @@ canonical_path(_Config) ->
 
 absolute_path(_Config) ->
     %% We find the root so that the name works both on unix-likes and
-    %% with Windows.
+    %% with Windows. Starting on OTP-22, filename:join/1 drops the drive letter,
+    %% and split/1 and absname both normalize c:\\ to c:/ -- going onwards, we
+    %% start normalizing the same way as well to prevent issues.
     Root = case os:type() of
-               {win32, _} -> filename:nativename(filename:absname("/")); % C:\, with proper drive
+               {win32, _} -> filename:absname(filename:nativename("/")); % C:\, with proper drive
                _ -> "/"
            end,
     ?assertEqual(filename:absname(Root), rebar_file_utils:absolute_path("/")),
@@ -165,18 +167,20 @@ absolute_path(_Config) ->
 
 normalized_path(_Config) ->
     %% We find the root so that the name works both on unix-likes and
-    %% with Windows.
+    %% with Windows. Starting on OTP-22, filename:join/1 drops the drive letter,
+    %% and split/1 and absname both normalize c:\\ to c:/ -- going onwards, we
+    %% start normalizing the same way as well to prevent issues.
     Root = case os:type() of
-               {win32, _} -> filename:nativename(filename:absname("/")); % C:\, with proper drive
+               {win32, _} -> filename:absname(filename:nativename("/")); % c:/, with proper drive
                _ -> "/"
            end,
-    ?assertEqual(filename:nativename(Root), rebar_file_utils:normalized_path("/")),
+    ?assertEqual(Root, rebar_file_utils:normalized_path("/")),
     ?assertEqual("../..", rebar_file_utils:normalized_path("/../../..")),
     ?assertEqual(Root ++ "foo", rebar_file_utils:normalized_path("/foo/bar/..")),
     ?assertEqual(Root ++ "foo", rebar_file_utils:normalized_path("/foo/../foo")),
     ?assertEqual(Root ++ "foo", rebar_file_utils:normalized_path("/foo/.")),
     ?assertEqual(Root ++ "foo", rebar_file_utils:normalized_path("/foo/./.")),
-    ?assertEqual(filename:nativename(Root ++ "foo/bar"),
+    ?assertEqual(Root ++ "foo/bar",
                  rebar_file_utils:normalized_path("/foo/./bar")).
 
 resolve_link(_Config) ->

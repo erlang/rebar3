@@ -2534,13 +2534,17 @@ split_project_apps_hooks(Config) ->
     ok = filelib:ensure_dir(filename:join([AppDir2, "src", "dummy"])),
     ok = filelib:ensure_dir(filename:join([AppDir2, "include", "dummy"])),
     ok = filelib:ensure_dir(filename:join([HookDir, "dummy"])),
+    Cmd = case os:type() of
+        {win32, _} -> "dir /B";
+        _ -> "ls"
+    end,
     Cfg = fun(Name) ->
-        [{pre_hooks, [{compile, "ls "++HookDir++" > "++filename:join(HookDir, "pre-compile-"++Name)},
-                      {erlc_compile, "ls "++HookDir++" > "++filename:join(HookDir, "pre-erlc-"++Name)},
-                      {app_compile, "ls "++HookDir++" > "++filename:join(HookDir, "pre-app-"++Name)}]},
-         {post_hooks, [{compile, "ls "++HookDir++" > "++filename:join(HookDir, "post-compile-"++Name)},
-                       {erlc_compile, "ls "++HookDir++" > "++filename:join(HookDir, "post-erlc-"++Name)},
-                       {app_compile, "ls "++HookDir++" > "++filename:join(HookDir, "post-app-"++Name)}]}
+        [{pre_hooks, [{compile,      Cmd++" \""++HookDir++"\" > \""++filename:join(HookDir, "pre-compile-"++Name)++"\""},
+                      {erlc_compile, Cmd++" \""++HookDir++"\" > \""++filename:join(HookDir, "pre-erlc-"++Name)++"\""},
+                      {app_compile,  Cmd++" \""++HookDir++"\" > \""++filename:join(HookDir, "pre-app-"++Name)++"\""}]},
+         {post_hooks, [{compile,      Cmd++" \""++HookDir++"\" > \""++filename:join(HookDir, "post-compile-"++Name)++"\""},
+                       {erlc_compile, Cmd++" \""++HookDir++"\" > \""++filename:join(HookDir, "post-erlc-"++Name)++"\""},
+                       {app_compile,  Cmd++" \""++HookDir++"\" > \""++filename:join(HookDir, "post-app-"++Name)++"\""}]}
         ]
     end,
     ok = file:write_file(filename:join(AppDir1, "rebar.config"),

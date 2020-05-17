@@ -466,9 +466,10 @@ absolute_path(Path) ->
             {ok, Dir} = file:get_cwd(),
             filename:join([Dir, Path]);
         volumerelative ->
-            Volume = hd(filename:split(Path)),
+            [Letter, $: | _] = filename:nativename(filename:absname(Path)),
+            Volume = [Letter, $:],
             {ok, Dir} = file:get_cwd(Volume),
-            filename:join([Dir, Path])
+            Volume ++ filename:join([Dir, Path])
     end.
 
 %% @doc normalizing a path removes all of the `..' and the
