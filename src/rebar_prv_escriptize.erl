@@ -85,7 +85,7 @@ do(State) ->
             Err;
         _ ->
             AppInfo1 = rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, AppInfo0, State),
-            ?INFO("Building escript...", []),
+            ?INFO("Building escript for ~s...", [rebar_app_info:name(AppInfo0)]),
             Res = escriptize(State, AppInfo1),
             rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, AppInfo1, State),
             Res
