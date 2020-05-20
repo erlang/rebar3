@@ -34,11 +34,9 @@ lock(AppInfo, _) ->
     check_type_support(),
     lock_(rebar_app_info:dir(AppInfo), rebar_app_info:source(AppInfo)).
 
+lock_(AppDir, {git, Url, _}) ->
+    lock_(AppDir, {git, Url});
 lock_(AppDir, {git, Url}) ->
-    lock_(AppDir, {git, Url, [], []});
-lock_(AppDir, {git, Url, Ref}) ->
-    lock_(AppDir, {git, Url, Ref, []});
-lock_(AppDir, {git, Url, _, Opts}) ->
     AbortMsg = lists:flatten(io_lib:format("Locking of git dependency failed in ~ts", [AppDir])),
     Dir = rebar_utils:escape_double_quotes(AppDir),
     {ok, VsnString} =
@@ -52,13 +50,13 @@ lock_(AppDir, {git, Url, _, Opts}) ->
                     [{use_stdout, false}, {debug_abort_on_error, AbortMsg}])
         end,
     Ref = rebar_string:trim(VsnString, both, "\n"),
-    {git, Url, {ref, Ref}, Opts}.
+    {git, Url, {ref, Ref}}.
 
 %% Return true if either the git url or tag/branch/ref is not the same as the currently
 %% checked out git repo for the dep
 needs_update(AppInfo, _) ->
     check_type_support(),
-    needs_update_(rebar_app_info:dir(AppInfo), rm_source_opts(rebar_app_info:source(AppInfo))).
+    needs_update_(rebar_app_info:dir(AppInfo), rebar_app_info:source(AppInfo)).
 
 needs_update_(Dir, {git, Url, {tag, Tag}}) ->
     {ok, Current} = rebar_utils:sh(?FMT("git describe --tags --exact-match", []),
@@ -138,37 +136,29 @@ download(TmpDir, AppInfo, State, _) ->
             {error, Error}
     end.
 
-rm_source_opts({Type, Url, Ref}) ->
-    {Type, Url, Ref};
-rm_source_opts({Type, Url, Ref, _Opts}) ->
-    {Type, Url, Ref}.
-
 %% For backward compatibilty
 download(Dir, AppInfo, State) ->
     download_(Dir, AppInfo, State).
 
 download_(Dir, {git, Url}, State) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
-    download_(Dir, {git, Url, {branch, "master"}, []}, State);
+    download_(Dir, {git, Url, {branch, "master"}}, State);
 download_(Dir, {git, Url, ""}, State) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
-    download_(Dir, {git, Url, {branch, "master"}, []}, State);
-download_(Dir, {git, Url, Checkout}, _State) ->
-    %% add an empty opts element to the tupel if there is none
-    download_(Dir, {git, Url, Checkout, []}, _State);
-download_(Dir, {git, Url, {branch, Branch}, _Opts}, _State) ->
+    download_(Dir, {git, Url, {branch, "master"}}, State);
+download_(Dir, {git, Url, {branch, Branch}}, _State) ->
     ok = filelib:ensure_dir(Dir),
     maybe_warn_local_url(Url),
     git_clone(branch, git_vsn(), Url, Dir, Branch);
-download_(Dir, {git, Url, {tag, Tag}, _Opts}, _State) ->
+download_(Dir, {git, Url, {tag, Tag}}, _State) ->
     ok = filelib:ensure_dir(Dir),
     maybe_warn_local_url(Url),
     git_clone(tag, git_vsn(), Url, Dir, Tag);
-download_(Dir, {git, Url, {ref, Ref}, _Opts}, _State) ->
+download_(Dir, {git, Url, {ref, Ref}}, _State) ->
     ok = filelib:ensure_dir(Dir),
     maybe_warn_local_url(Url),
     git_clone(ref, git_vsn(), Url, Dir, Ref);
-download_(Dir, {git, Url, Rev, _Opts}, _State) ->
+download_(Dir, {git, Url, Rev}, _State) ->
     ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
     ok = filelib:ensure_dir(Dir),
     maybe_warn_local_url(Url),
