@@ -28,7 +28,7 @@ all() ->
      umbrella_mib_first_test, only_default_transitive_deps, clean_all,
      clean_specific, profile_deps, deps_build_in_prod, only_deps,
      override_deps, git_subdir_deps, override_add_deps, override_del_deps,
-     override_opts, override_add_opts, override_del_opts,
+     override_del_pkg_deps, override_opts, override_add_opts, override_del_opts,
      apply_overrides_exactly_once, override_only_deps,
      profile_override_deps, profile_override_add_deps, profile_override_del_deps,
      profile_override_opts, profile_override_add_opts, profile_override_del_opts,
@@ -1606,6 +1606,28 @@ override_del_deps(Config) ->
               {dep_not_exist, "dep_b"},
               {dep_not_exist, "dep_c"},
               {dep, "dep_d"}]}
+    ).
+
+override_del_pkg_deps(Config) ->
+    Deps = rebar_test_utils:expand_deps(pkg, [{"some_dep", "0.0.1", [{"other_dep", "0.0.1", []}]}]),
+    TopDeps = rebar_test_utils:top_level_deps(Deps),
+
+    {_, PkgDeps} = rebar_test_utils:flat_deps(Deps),
+    mock_pkg_resource:mock([{pkgdeps, PkgDeps}]),
+
+    RebarConfig = [
+        {deps, TopDeps},
+        {overrides, [
+            {del, some_dep, [
+                {deps, [other_dep]}
+            ]}
+        ]}
+    ],
+
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["compile"],
+        {ok, [{dep, "some_dep"},
+              {dep_not_exist, "other_dep"}]}
     ).
 
 override_opts(Config) ->
