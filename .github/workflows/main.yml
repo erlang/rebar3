@@ -50,6 +50,6 @@ jobs:
     - name: Install Erlang
       run: choco install erlang
     - name: Compile
-      run: bootstrap.ps1
+      run: .\bootstrap.ps1
     - name: CT tests
-      run: rebar3.ps1 ct
+      run: .\rebar3.ps1 ct
