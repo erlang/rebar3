@@ -277,7 +277,7 @@ write_windows_scripts(Target, Wrappers) ->
 
 write_windows_script(Target, "powershell") ->
     CmdPath = unicode:characters_to_list(Target) ++ ".ps1",
-    CmdScript="& escript.exe (Get-Item $PSCommandPath).Basename @args\r\n",
+    CmdScript="& escript.exe \"$PSScriptRoot\\$((Get-Item $PSCommandPath).Basename)\" @args\r\n",
     ok = file:write_file(CmdPath, CmdScript);
 write_windows_script(Target, _) ->
     CmdPath = unicode:characters_to_list(Target) ++ ".cmd",

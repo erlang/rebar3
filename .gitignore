@@ -2,6 +2,7 @@ _checkouts
 .rebar3
 rebar3
 rebar3.cmd
+rebar3.ps1
 _build
 .depsolver_plt
 *.beam
