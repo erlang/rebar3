@@ -149,6 +149,8 @@
 {escript_main_app, application}.
 %% Name of the resulting escript executable
 {escript_name, "application"}.
+%% Wrapper type(s) for escript executable on windows
+{escript_wrappers_windows, ["cmd","powershell"]}.
 %% apps (other than main and deps) to be included
 {escript_incl_apps, []}.
 %% Executable escript lines

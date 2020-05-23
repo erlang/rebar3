@@ -50,6 +50,6 @@ jobs:
     - name: Install Erlang
       run: choco install erlang
     - name: Compile
-      run: cmd.exe /c 'bootstrap.bat'
+      run: .\bootstrap.ps1
     - name: CT tests
-      run: cmd.exe /c 'rebar3.cmd ct'
+      run: .\rebar3.ps1 ct

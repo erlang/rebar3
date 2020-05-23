@@ -143,7 +143,7 @@ escriptize(State0, App) ->
             {ok, #file_info{mode = Mode}} = file:read_file_info(Filename),
             ok = file:change_mode(Filename, Mode bor 8#00111);
         {win32, _} ->
-            write_windows_script(Filename)
+            write_windows_scripts(Filename, rebar_state:get(State, escript_wrappers_windows, ["cmd"]))
     end,
     {ok, State}.
 
@@ -272,9 +272,17 @@ def(Rm, State, Key, Default) ->
 rm_newline(String) ->
     [C || C <- String, C =/= $\n].
 
-write_windows_script(Target) ->
+write_windows_scripts(Target, Wrappers) ->
+    lists:foreach(fun(Wrapper) -> write_windows_script(Target, Wrapper) end, Wrappers).
+
+write_windows_script(Target, "powershell") ->
+    CmdPath = unicode:characters_to_list(Target) ++ ".ps1",
+    CmdScript="& escript.exe \"$PSScriptRoot\\$((Get-Item $PSCommandPath).Basename)\" @args\r\n",
+    ok = file:write_file(CmdPath, CmdScript);
+write_windows_script(Target, _) ->
     CmdPath = unicode:characters_to_list(Target) ++ ".cmd",
     CmdScript=
         "@echo off\r\n"
         "escript.exe \"%~dpn0\" %*\r\n",
     ok = file:write_file(CmdPath, CmdScript).
+
