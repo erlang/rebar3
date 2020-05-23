@@ -1,0 +1,1 @@
+& escript.exe bootstrap @args
