@@ -21,18 +21,6 @@
 -spec do(atom(), rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(Provider, State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
-    Release = case proplists:get_value(relname, Opts, undefined) of
-                  undefined ->
-                      undefined;
-                  R ->
-                      case proplists:get_value(relvsn, Opts, undefined) of
-                          undefined ->
-                              list_to_atom(R);
-                          RelVsn ->
-                              {list_to_atom(R), RelVsn}
-                      end
-              end,
-
     %% TODO: read in ./relx.config if it exists or --config value
     RelxConfig = rebar_state:get(State, relx, []),
 
@@ -57,15 +45,16 @@ do(Provider, State) ->
     Cwd = rebar_state:dir(State),
     rebar_hooks:run_project_and_app_hooks(Cwd, pre, Provider, Providers, State),
 
+    Releases = releases_to_build(Provider, Opts, RelxState),
+
     case Provider of
-        release ->
-            relx:build_release(Release, all_apps(State), RelxState);
-        tar ->
-            relx:build_tar(Release, all_apps(State), RelxState);
         relup ->
             ToVsn = proplists:get_value(relvsn, Opts, undefined),
             UpFromVsn = proplists:get_value(upfrom, Opts, undefined),
-            relx:build_relup(Release, ToVsn, UpFromVsn, RelxState)
+            %% hd/1 can't fail because --all is not a valid option to relup
+            relx:build_relup(hd(Releases), ToVsn, UpFromVsn, RelxState);
+        _ ->
+            parallel_run(Provider, Releases, all_apps(State), RelxState)
     end,
 
     rebar_hooks:run_project_and_app_hooks(Cwd, post, Provider, Providers, State),
@@ -73,8 +62,79 @@ do(Provider, State) ->
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
+format_error(all_relup) ->
+    "Option --all can not be applied to `relup` command";
 format_error(Error) ->
     io_lib:format("~p", [Error]).
+
+%%
+
+parallel_run(release, [Release], AllApps, RelxState) ->
+    relx:build_release(Release, AllApps, RelxState);
+parallel_run(tar, [Release], AllApps, RelxState) ->
+    relx:build_tar(Release, AllApps, RelxState);
+parallel_run(Provider, Releases, AllApps, RelxState) ->
+    rebar_parallel:queue(Releases, fun rel_worker/2, [Provider, AllApps, RelxState], fun rel_handler/2, []).
+
+rel_worker(Release, [Provider, Apps, RelxState]) ->
+    try
+        case Provider of
+            release ->
+                relx:build_release(Release, Apps, RelxState);
+            tar ->
+                relx:build_tar(Release, Apps, RelxState)
+        end
+    catch
+        error:Error ->
+            {Release, Error}
+    end.
+
+rel_handler({{Name, Vsn}, {error, {Module, Reason}}}, _Args) ->
+    ?ERROR("Error building release ~ts-~ts:~n~ts~ts", [Name, Vsn, rebar_utils:indent(1),
+                                                       Module:format_error(Reason)]),
+    ok;
+rel_handler(_, _Args) ->
+    ok.
+
+releases_to_build(Provider, Opts, RelxState)->
+    case proplists:get_value(all, Opts, undefined) of
+        undefined ->
+            case proplists:get_value(relname, Opts, undefined) of
+                undefined ->
+                    [undefined];
+                R ->
+                    case proplists:get_value(relvsn, Opts, undefined) of
+                        undefined ->
+                            [list_to_atom(R)];
+                        RelVsn ->
+                            [{list_to_atom(R), RelVsn}]
+                    end
+            end;
+        true when Provider =:= relup ->
+            erlang:error(?PRV_ERROR(all_relup));
+        true ->
+            highest_unique_releases(rlx_state:configured_releases(RelxState))
+    end.
+
+%% takes a map of relx configured releases and returns a list of the highest
+%% version for each unique release name
+-spec highest_unique_releases(rlx_state:releases()) -> [{atom(), string() | undefined}].
+highest_unique_releases(Releases) ->
+    Unique = maps:fold(fun({Name, Vsn}, _, Acc) ->
+                               update_map_if_higher(Name, Vsn, Acc)
+                       end, #{}, Releases),
+    maps:to_list(Unique).
+
+update_map_if_higher(Name, Vsn, Acc) ->
+    maps:update_with(Name, fun(Vsn1) ->
+                                   case rlx_util:parsed_vsn_lte(rlx_util:parse_vsn(Vsn1),
+                                                                rlx_util:parse_vsn(Vsn)) of
+                                       true ->
+                                           Vsn;
+                                       false ->
+                                           Vsn1
+                                   end
+                           end, Vsn, Acc).
 
 %% Don't override output_dir if the user passed one on the command line
 output_dir(DefaultOutputDir, Options) ->
@@ -104,7 +164,9 @@ all_apps(State) ->
 
 -spec opt_spec_list() -> [getopt:option_spec()].
 opt_spec_list() ->
-    [{relname,  $n, "relname",  string,
+    [{all, undefined, "all",  boolean,
+      "If true runs the command against all configured  releases"},
+    {relname,  $n, "relname",  string,
       "Specify the name for the release that will be generated"},
      {relvsn, $v, "relvsn", string, "Specify the version for the release"},
      {upfrom, $u, "upfrom", string,
