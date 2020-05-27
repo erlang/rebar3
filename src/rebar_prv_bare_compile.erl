@@ -53,7 +53,11 @@ do(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     Paths = proplists:get_value(paths, RawOpts),
     Sep = proplists:get_value(separator, RawOpts, " "),
-    OutDir = proplists:get_value(outdir, RawOpts, rebar_dir:get_cwd()),
+    %% Because mix won't check for versions, it instead sets this variable
+    %% that it knows older rebar3 version will ignore so we play nice and
+    %% honor it.
+    DefaultOutDir = os:getenv("REBAR_BARE_COMPILER_OUTPUT_DIR", rebar_dir:get_cwd()),
+    OutDir = proplists:get_value(outdir, RawOpts, DefaultOutDir),
     [ code:add_pathsa(filelib:wildcard(PathWildcard))
       || PathWildcard <- rebar_string:lexemes(Paths, Sep) ],
 
