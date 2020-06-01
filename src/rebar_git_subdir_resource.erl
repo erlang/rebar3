@@ -22,7 +22,7 @@ init(Type, _State) ->
 
 lock(AppInfo, _) ->
     {git_subdir, Url, Checkout, Dir} = rebar_app_info:source(AppInfo),
-    {git, Url1, {ref, Ref}, _Opts} =
+    {git, Url1, {ref, Ref}} =
         rebar_git_resource:lock_(rebar_app_info:dir(AppInfo), {git, Url, Checkout}),
     {git_subdir, Url1, {ref, Ref}, Dir}.
 
