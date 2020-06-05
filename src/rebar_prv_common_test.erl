@@ -46,6 +46,7 @@ do(State) ->
         %% successfully compiled apps
         {ok, S} ->
             {RawOpts, _} = rebar_state:command_parsed_args(S),
+            ?DEBUG("CT OPTS: ~p~n", [RawOpts]),
             case proplists:get_value(compile_only, RawOpts, false) of
                 true ->
                     {ok, S};
@@ -77,6 +78,7 @@ do(State, Tests) ->
                     symlink_to_last_ct_logs(State),
                     {ok, State};
                 Error ->
+                    ?DEBUG("ERR: ~p", [Error]),
                     rebar_paths:set_paths([plugins, deps], State),
                     symlink_to_last_ct_logs(State),
                     Error
@@ -147,6 +149,7 @@ setup_name(State) ->
 prepare_tests(State) ->
     %% command line test options
     CmdOpts = cmdopts(State),
+    ?DEBUG("CMDOPTS: ~p", [CmdOpts]),
     %% rebar.config test options
     CfgOpts = cfgopts(State),
     ProjectApps = rebar_state:project_apps(State),
@@ -286,6 +289,7 @@ select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
     rebar_utils:reread_config(Configs, [update_logger]),
 
     Opts = merge_opts(CmdOpts,CfgOpts),
+    ?DEBUG("OPTS AFTER SELECT: ~p", [Opts]),
     discover_tests(State, ProjectApps, Opts).
 
 %% Merge the option lists from command line and rebar.config:
@@ -335,7 +339,7 @@ sys_config_list(CmdOpts, CfgOpts) ->
 discover_tests(State, ProjectApps, Opts) ->
     case is_any_defined([spec,dir,suite],Opts) of
         %% no tests defined, try using `$APP/test` and `$ROOT/test` as dirs
-        false -> {ok, [default_tests(State, ProjectApps)|Opts]};
+        false -> {ok, default_tests(State, ProjectApps) ++ Opts};
         true  -> {ok, Opts}
     end.
 
@@ -346,9 +350,18 @@ default_tests(State, ProjectApps) ->
     case filelib:is_dir(BareTest) andalso not lists:any(F, ProjectApps) of
         %% `test` dir at root of project is already scheduled to be
         %%  included or `test` does not exist
-        false -> {dir, AppTests};
+        false ->
+            %% The rest of the call-chain expects the list of tests to no be
+            %% empty, thus we drop the parameter in that case entirely.
+            case AppTests of
+                [] ->
+                    [];
+                _ ->
+                    [{dir, AppTests}]
+            end;
         %% need to add `test` dir at root to dirs to be included
-        true  -> {dir, AppTests ++ [BareTest]}
+        true  ->
+            [{dir, AppTests ++ [BareTest]}]
     end.
 
 application_dirs([], []) -> [];
@@ -484,6 +497,7 @@ test_dirs(State, Apps, Opts) ->
     case proplists:get_value(spec, Opts) of
         undefined ->
             case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
+                {undefined, undefined}  -> {error, "One of the common_test parameters suite and dir must be set"};
                 {Suites, undefined} -> set_compile_dirs(State, Apps, {suite, Suites});
                 {undefined, Dirs}   -> set_compile_dirs(State, Apps, {dir, Dirs});
                 {Suites, Dir} when is_integer(hd(Dir)) ->
