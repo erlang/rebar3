@@ -25,6 +25,8 @@
          parent/2,
          original_vsn/1,
          original_vsn/2,
+         vsn/1,
+         vsn/2,
          priv_dir/1,
          applications/1,
          applications/2,
@@ -86,6 +88,7 @@
                      app_file_src_script:: file:filename_all() | undefined,
                      app_file           :: file:filename_all() | undefined,
                      original_vsn       :: binary() | undefined,
+                     vsn                :: binary() | undefined,
                      parent=root        :: binary() | root,
                      app_details=[]     :: list(),
                      applications=[]    :: list(),
@@ -131,6 +134,7 @@ new(AppName) ->
                  {ok, t()}.
 new(AppName, Vsn) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
+                     vsn=Vsn,
                      original_vsn=Vsn}}.
 
 %% @doc build a complete version of the app info with all fields set.
@@ -138,6 +142,7 @@ new(AppName, Vsn) ->
                  {ok, t()}.
 new(AppName, Vsn, Dir) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
+                     vsn=Vsn,
                      original_vsn=Vsn,
                      fetch_dir=rebar_utils:to_list(Dir),
                      dir=rebar_utils:to_list(Dir),
@@ -149,6 +154,7 @@ new(AppName, Vsn, Dir) ->
                  {ok, t()}.
 new(AppName, Vsn, Dir, Deps) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
+                     vsn=Vsn,
                      original_vsn=Vsn,
                      fetch_dir=rebar_utils:to_list(Dir),
                      dir=rebar_utils:to_list(Dir),
@@ -162,6 +168,7 @@ new(AppName, Vsn, Dir, Deps) ->
 new(Parent, AppName, Vsn, Dir, Deps) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
                      parent=Parent,
+                     vsn=Vsn,
                      original_vsn=Vsn,
                      fetch_dir=rebar_utils:to_list(Dir),
                      dir=rebar_utils:to_list(Dir),
@@ -170,7 +177,7 @@ new(Parent, AppName, Vsn, Dir, Deps) ->
                      deps=Deps}}.
 
 app_to_map(#app_info_t{name=Name,
-                       original_vsn=Vsn,
+                       vsn=Vsn,
                        applications=Applications,
                        included_applications=IncludedApplications,
                        out_dir=OutDir,
@@ -420,6 +427,16 @@ original_vsn(#app_info_t{original_vsn=Vsn}) ->
 -spec original_vsn(t(), binary() | string()) -> t().
 original_vsn(AppInfo=#app_info_t{}, Vsn) ->
     AppInfo#app_info_t{original_vsn=Vsn}.
+
+%% @doc returns the version of the app after evaluation
+-spec vsn(t()) -> binary().
+vsn(#app_info_t{vsn=Vsn}) ->
+    Vsn.
+
+%% @doc sets the evaluated vsn of the app
+-spec vsn(t(), binary() | string()) -> t().
+vsn(AppInfo=#app_info_t{}, Vsn) ->
+    AppInfo#app_info_t{vsn=Vsn}.
 
 %% @doc returns the list of applications the app depends on.
 -spec applications(t()) -> list().

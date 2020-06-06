@@ -46,12 +46,10 @@ compile(State, App) ->
                        undefined ->
                            App;
                        AppFileSrc ->
-                           File = preprocess(State, App, AppFileSrc),
-                           rebar_app_info:app_file(App, File)
+                           preprocess(State, App, AppFileSrc)
                    end;
                AppFileSrcScript ->
-                   File = preprocess(State, App, AppFileSrcScript),
-                   rebar_app_info:app_file(App, File)
+                   preprocess(State, App, AppFileSrcScript)
            end,
 
     %% Load the app file and validate it.
@@ -92,12 +90,12 @@ validate_app_modules(State, App, AppData) ->
         true ->
             case rebar_app_utils:validate_application_info(App, AppData) of
                 true ->
-                    {ok, rebar_app_info:original_vsn(App, AppVsn)};
+                    {ok, rebar_app_info:original_vsn(rebar_app_info:vsn(App, AppVsn), AppVsn)};
                 Error ->
                     Error
             end;
         false ->
-            {ok, rebar_app_info:original_vsn(App, AppVsn)}
+            {ok, rebar_app_info:original_vsn(rebar_app_info:vsn(App, AppVsn), AppVsn)}
     end.
 
 preprocess(State, AppInfo, AppSrcFile) ->
@@ -130,7 +128,7 @@ preprocess(State, AppInfo, AppSrcFile) ->
             AppFile = rebar_app_utils:app_src_to_app(OutDir, AppSrcFile),
             ok = rebar_file_utils:write_file_if_contents_differ(AppFile, Spec, utf8),
 
-            AppFile;
+            rebar_app_info:app_file(rebar_app_info:vsn(AppInfo, Vsn), AppFile);
         {error, Reason} ->
             throw(?PRV_ERROR({file_read, rebar_app_info:name(AppInfo), ".app.src", Reason}))
     end.
