@@ -85,17 +85,16 @@ validate_app_modules(State, App, AppData) ->
     %% In general, the list of modules is an important thing to validate
     %% for compliance with OTP guidelines and upgrade procedures.
     %% However, some people prefer not to validate this list.
-    AppVsn = proplists:get_value(vsn, AppData),
     case rebar_state:get(State, validate_app_modules, true) of
         true ->
             case rebar_app_utils:validate_application_info(App, AppData) of
                 true ->
-                    {ok, rebar_app_info:original_vsn(rebar_app_info:vsn(App, AppVsn), AppVsn)};
+                    {ok, App};
                 Error ->
                     Error
             end;
         false ->
-            {ok, rebar_app_info:original_vsn(rebar_app_info:vsn(App, AppVsn), AppVsn)}
+            {ok, App}
     end.
 
 preprocess(State, AppInfo, AppSrcFile) ->
