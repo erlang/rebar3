@@ -46,12 +46,10 @@ compile(State, App) ->
                        undefined ->
                            App;
                        AppFileSrc ->
-                           File = preprocess(State, App, AppFileSrc),
-                           rebar_app_info:app_file(App, File)
+                           preprocess(State, App, AppFileSrc)
                    end;
                AppFileSrcScript ->
-                   File = preprocess(State, App, AppFileSrcScript),
-                   rebar_app_info:app_file(App, File)
+                   preprocess(State, App, AppFileSrcScript)
            end,
 
     %% Load the app file and validate it.
@@ -87,17 +85,16 @@ validate_app_modules(State, App, AppData) ->
     %% In general, the list of modules is an important thing to validate
     %% for compliance with OTP guidelines and upgrade procedures.
     %% However, some people prefer not to validate this list.
-    AppVsn = proplists:get_value(vsn, AppData),
     case rebar_state:get(State, validate_app_modules, true) of
         true ->
             case rebar_app_utils:validate_application_info(App, AppData) of
                 true ->
-                    {ok, rebar_app_info:original_vsn(App, AppVsn)};
+                    {ok, App};
                 Error ->
                     Error
             end;
         false ->
-            {ok, rebar_app_info:original_vsn(App, AppVsn)}
+            {ok, App}
     end.
 
 preprocess(State, AppInfo, AppSrcFile) ->
@@ -130,7 +127,7 @@ preprocess(State, AppInfo, AppSrcFile) ->
             AppFile = rebar_app_utils:app_src_to_app(OutDir, AppSrcFile),
             ok = rebar_file_utils:write_file_if_contents_differ(AppFile, Spec, utf8),
 
-            AppFile;
+            rebar_app_info:app_file(rebar_app_info:vsn(AppInfo, Vsn), AppFile);
         {error, Reason} ->
             throw(?PRV_ERROR({file_read, rebar_app_info:name(AppInfo), ".app.src", Reason}))
     end.
