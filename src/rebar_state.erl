@@ -31,7 +31,7 @@
          project_apps/1, project_apps/2,
          deps_to_build/1, deps_to_build/2,
          all_plugin_deps/1, all_plugin_deps/2, update_all_plugin_deps/2,
-         all_deps/1, all_deps/2, update_all_deps/2,
+         all_deps/1, all_deps/2, update_all_deps/2, merge_all_deps/2,
          namespace/1, namespace/2,
 
          deps_names/1,
@@ -353,6 +353,9 @@ update_all_plugin_deps(State=#state_t{all_plugin_deps=Apps}, NewApps) ->
 
 update_all_deps(State=#state_t{all_deps=Apps}, NewApps) ->
     State#state_t{all_deps=Apps++NewApps}.
+
+merge_all_deps(State=#state_t{all_deps=Apps}, UpdatedApps) when is_list(UpdatedApps) ->
+    State#state_t{all_deps=lists:ukeymerge(2, lists:keysort(2, UpdatedApps), lists:keysort(2, Apps))}.
 
 namespace(#state_t{namespace=Namespace}) ->
     Namespace.

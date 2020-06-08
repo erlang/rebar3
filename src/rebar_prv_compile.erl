@@ -40,13 +40,14 @@ do(State) ->
 
     Providers = rebar_state:providers(State),
     Deps = rebar_state:deps_to_build(State),
-    copy_and_build_apps(State, Providers, Deps),
+    CompiledDeps = copy_and_build_apps(State, Providers, Deps),
+    State0 = rebar_state:merge_all_deps(State, CompiledDeps),
 
     State1 = case IsDepsOnly of
                  true ->
-                     State;
+                     State0;
                  false ->
-                     handle_project_apps(Providers, State)
+                     handle_project_apps(Providers, State0)
              end,
 
     rebar_paths:set_paths([plugins], State1),
