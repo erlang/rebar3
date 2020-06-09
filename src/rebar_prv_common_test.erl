@@ -46,7 +46,6 @@ do(State) ->
         %% successfully compiled apps
         {ok, S} ->
             {RawOpts, _} = rebar_state:command_parsed_args(S),
-            ?DEBUG("CT OPTS: ~p~n", [RawOpts]),
             case proplists:get_value(compile_only, RawOpts, false) of
                 true ->
                     {ok, S};
@@ -78,7 +77,6 @@ do(State, Tests) ->
                     symlink_to_last_ct_logs(State),
                     {ok, State};
                 Error ->
-                    ?DEBUG("ERR: ~p", [Error]),
                     rebar_paths:set_paths([plugins, deps], State),
                     symlink_to_last_ct_logs(State),
                     Error
@@ -129,17 +127,23 @@ symlink_to_last_ct_logs(State) ->
     LogDir = filename:join([rebar_dir:base_dir(State), "logs"]),
     {ok, Filenames} = file:list_dir(LogDir),
     CtRunDirs = lists:filter(fun(S) -> re:run(S, "ct_run", [unicode]) /= nomatch end, Filenames),
-    NewestDir = lists:last(lists:sort(CtRunDirs)),
-    Target = filename:join([LogDir, "last"]),
-    Existing = filename:join([LogDir, NewestDir]),
-    case rebar_file_utils:symlink_or_copy(Existing, Target) of
-        ok -> ok;
-        exists ->
-            %% in case the symlink already exists we remove it
-            %% and make a new updated one
-            rebar_file_utils:rm_rf(Target),
-            rebar_file_utils:symlink_or_copy(Existing, Target);
-        Reason -> ?DEBUG("Warning, couldn't make a symlink to ~ts, reason: ~p.", [Target, Reason])
+    case CtRunDirs of
+        [] ->
+            % If for some reason there are no such directories, we should not try to set up a link either.
+            ok;
+        _ ->
+            NewestDir = lists:last(lists:sort(CtRunDirs)),
+            Target = filename:join([LogDir, "last"]),
+            Existing = filename:join([LogDir, NewestDir]),
+            case rebar_file_utils:symlink_or_copy(Existing, Target) of
+                ok -> ok;
+                exists ->
+                    %% in case the symlink already exists we remove it
+                    %% and make a new updated one
+                    rebar_file_utils:rm_rf(Target),
+                    rebar_file_utils:symlink_or_copy(Existing, Target);
+                Reason -> ?DEBUG("Warning, couldn't make a symlink to ~ts, reason: ~p.", [Target, Reason])
+            end
     end.
 
 setup_name(State) ->
@@ -149,7 +153,6 @@ setup_name(State) ->
 prepare_tests(State) ->
     %% command line test options
     CmdOpts = cmdopts(State),
-    ?DEBUG("CMDOPTS: ~p", [CmdOpts]),
     %% rebar.config test options
     CfgOpts = cfgopts(State),
     ProjectApps = rebar_state:project_apps(State),
@@ -289,7 +292,6 @@ select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
     rebar_utils:reread_config(Configs, [update_logger]),
 
     Opts = merge_opts(CmdOpts,CfgOpts),
-    ?DEBUG("OPTS AFTER SELECT: ~p", [Opts]),
     discover_tests(State, ProjectApps, Opts).
 
 %% Merge the option lists from command line and rebar.config:
@@ -351,7 +353,7 @@ default_tests(State, ProjectApps) ->
         %% `test` dir at root of project is already scheduled to be
         %%  included or `test` does not exist
         false ->
-            %% The rest of the call-chain expects the list of tests to no be
+            %% The rest of the call-chain expects the list of tests to not be
             %% empty, thus we drop the parameter in that case entirely.
             case AppTests of
                 [] ->
@@ -497,7 +499,8 @@ test_dirs(State, Apps, Opts) ->
     case proplists:get_value(spec, Opts) of
         undefined ->
             case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
-                {undefined, undefined}  -> {error, "One of the common_test parameters suite and dir must be set"};
+                {undefined, undefined}  ->
+                    {ok, rebar_state:project_apps(State, Apps)};
                 {Suites, undefined} -> set_compile_dirs(State, Apps, {suite, Suites});
                 {undefined, Dirs}   -> set_compile_dirs(State, Apps, {dir, Dirs});
                 {Suites, Dir} when is_integer(hd(Dir)) ->

@@ -10,6 +10,7 @@
          multi_app_default_dirs/1,
          multi_app_default_beams/1,
          multi_app_ct_macro/1,
+         no_ct_suite/1,
          single_app_dir/1,
          single_extra_dir/1,
          single_unmanaged_dir/1,
@@ -80,7 +81,8 @@ all() -> [{group, basic_app},
           testspec_parse_error,
           cmd_vs_cfg_opts,
           single_testspec_in_ct_opts,
-          compile_only].
+          compile_only,
+          no_ct_suite].
 
 groups() -> [{basic_app, [], [basic_app_default_dirs,
                               basic_app_default_beams,
@@ -338,6 +340,16 @@ multi_app_ct_macro(Config) ->
         ErlOpts = dict:fetch(erl_opts, Opts),
         true = lists:member({d, 'COMMON_TEST'}, ErlOpts)
     end, Apps).
+
+no_ct_suite(Config0) ->
+    Config = rebar_test_utils:init_rebar_state(Config0),
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("no_ct_suite_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    rebar_test_utils:run_and_check(Config, [], ["ct"], {ok, [{app, Name, valid}]}).
 
 single_app_dir(Config) ->
     AppDir = ?config(apps, Config),
