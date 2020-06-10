@@ -349,7 +349,14 @@ no_ct_suite(Config0) ->
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
-    rebar_test_utils:run_and_check(Config, [], ["ct"], {ok, [{app, Name, valid}]}).
+    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["as", "test", "lock"], return),
+
+    {ok, Opts} = rebar_prv_common_test:prepare_tests(State),
+
+    undefined = proplists:get_value(dir, Opts),
+    undefined = proplists:get_value(suite, Opts),
+    undefined = proplists:get_value(spec, Opts),
+    ok.
 
 single_app_dir(Config) ->
     AppDir = ?config(apps, Config),
