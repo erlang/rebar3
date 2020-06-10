@@ -127,17 +127,23 @@ symlink_to_last_ct_logs(State) ->
     LogDir = filename:join([rebar_dir:base_dir(State), "logs"]),
     {ok, Filenames} = file:list_dir(LogDir),
     CtRunDirs = lists:filter(fun(S) -> re:run(S, "ct_run", [unicode]) /= nomatch end, Filenames),
-    NewestDir = lists:last(lists:sort(CtRunDirs)),
-    Target = filename:join([LogDir, "last"]),
-    Existing = filename:join([LogDir, NewestDir]),
-    case rebar_file_utils:symlink_or_copy(Existing, Target) of
-        ok -> ok;
-        exists ->
-            %% in case the symlink already exists we remove it
-            %% and make a new updated one
-            rebar_file_utils:rm_rf(Target),
-            rebar_file_utils:symlink_or_copy(Existing, Target);
-        Reason -> ?DEBUG("Warning, couldn't make a symlink to ~ts, reason: ~p.", [Target, Reason])
+    case CtRunDirs of
+        [] ->
+            % If for some reason there are no such directories, we should not try to set up a link either.
+            ok;
+        _ ->
+            NewestDir = lists:last(lists:sort(CtRunDirs)),
+            Target = filename:join([LogDir, "last"]),
+            Existing = filename:join([LogDir, NewestDir]),
+            case rebar_file_utils:symlink_or_copy(Existing, Target) of
+                ok -> ok;
+                exists ->
+                    %% in case the symlink already exists we remove it
+                    %% and make a new updated one
+                    rebar_file_utils:rm_rf(Target),
+                    rebar_file_utils:symlink_or_copy(Existing, Target);
+                Reason -> ?DEBUG("Warning, couldn't make a symlink to ~ts, reason: ~p.", [Target, Reason])
+            end
     end.
 
 setup_name(State) ->
@@ -335,7 +341,7 @@ sys_config_list(CmdOpts, CfgOpts) ->
 discover_tests(State, ProjectApps, Opts) ->
     case is_any_defined([spec,dir,suite],Opts) of
         %% no tests defined, try using `$APP/test` and `$ROOT/test` as dirs
-        false -> {ok, [default_tests(State, ProjectApps)|Opts]};
+        false -> {ok, default_tests(State, ProjectApps) ++ Opts};
         true  -> {ok, Opts}
     end.
 
@@ -346,9 +352,18 @@ default_tests(State, ProjectApps) ->
     case filelib:is_dir(BareTest) andalso not lists:any(F, ProjectApps) of
         %% `test` dir at root of project is already scheduled to be
         %%  included or `test` does not exist
-        false -> {dir, AppTests};
+        false ->
+            %% The rest of the call-chain expects the list of tests to not be
+            %% empty, thus we drop the parameter in that case entirely.
+            case AppTests of
+                [] ->
+                    [];
+                _ ->
+                    [{dir, AppTests}]
+            end;
         %% need to add `test` dir at root to dirs to be included
-        true  -> {dir, AppTests ++ [BareTest]}
+        true  ->
+            [{dir, AppTests ++ [BareTest]}]
     end.
 
 application_dirs([], []) -> [];
@@ -484,6 +499,8 @@ test_dirs(State, Apps, Opts) ->
     case proplists:get_value(spec, Opts) of
         undefined ->
             case {proplists:get_value(suite, Opts), proplists:get_value(dir, Opts)} of
+                {undefined, undefined}  ->
+                    {ok, rebar_state:project_apps(State, Apps)};
                 {Suites, undefined} -> set_compile_dirs(State, Apps, {suite, Suites});
                 {undefined, Dirs}   -> set_compile_dirs(State, Apps, {dir, Dirs});
                 {Suites, Dir} when is_integer(hd(Dir)) ->
