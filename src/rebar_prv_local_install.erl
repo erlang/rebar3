@@ -83,6 +83,9 @@ extract_escript(State, ScriptPath) ->
             throw(?PRV_ERROR({non_writeable, OutputDir}))
     end,
 
+    ?INFO("Removing existing rebar3 libs from ~ts...", [OutputDir]),
+    rebar_file_utils:rm_rf(filename:join(OutputDir, "*")),
+
     ?INFO("Extracting rebar3 libs to ~ts...", [OutputDir]),
     zip:extract(Archive, [{cwd, OutputDir}]),
 
