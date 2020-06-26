@@ -61,11 +61,11 @@ format_error({non_writeable, Dir}) ->
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
-bin_contents(OutputDir) ->
-    {ok, Vsn} = application:get_key(rebar, vsn),
+bin_contents(OutputDir, Vsn) ->
     <<"#!/usr/bin/env sh
 ## Rebar3 ", (iolist_to_binary(Vsn))/binary, "
-erl -pz ", (rebar_utils:to_binary(OutputDir))/binary,"/*/ebin +sbtu +A1 -noshell -boot start_clean -s rebar3 main $REBAR3_ERL_ARGS -extra \"$@\"
+VSN=${VSN:-", (iolist_to_binary(Vsn))/binary, "}
+erl -pz ", (rebar_utils:to_binary(OutputDir))/binary,"/${VSN}/lib/*/ebin +sbtu +A1 -noshell -boot start_clean -s rebar3 main $REBAR3_ERL_ARGS -extra \"$@\"
 ">>.
 
 extract_escript(State, ScriptPath) ->
@@ -75,16 +75,15 @@ extract_escript(State, ScriptPath) ->
     %% Extract contents of Archive to ~/.cache/rebar3/lib
     %% And add a rebar3 bin script to ~/.cache/rebar3/bin
     Opts = rebar_state:opts(State),
-    OutputDir = filename:join(rebar_dir:global_cache_dir(Opts), "lib"),
-    case filelib:ensure_dir(filename:join(OutputDir, "empty")) of
+    {ok, Vsn} = application:get_key(rebar, vsn),
+    VersionsDir = filename:join(rebar_dir:global_cache_dir(Opts), "vsns"),
+    OutputDir = filename:join([VersionsDir, Vsn, "lib"]),
+    case filelib:ensure_dir(filename:join([OutputDir, "empty"])) of
         ok ->
             ok;
         {error, Posix} when Posix == eaccess; Posix == enoent ->
             throw(?PRV_ERROR({non_writeable, OutputDir}))
     end,
-
-    ?INFO("Removing existing rebar3 libs from ~ts...", [OutputDir]),
-    rebar_file_utils:rm_rf(filename:join(OutputDir, "*")),
 
     ?INFO("Extracting rebar3 libs to ~ts...", [OutputDir]),
     zip:extract(Archive, [{cwd, OutputDir}]),
@@ -94,7 +93,7 @@ extract_escript(State, ScriptPath) ->
     filelib:ensure_dir(BinFile),
 
     ?INFO("Writing rebar3 run script ~ts...", [BinFile]),
-    file:write_file(BinFile, bin_contents(OutputDir)),
+    file:write_file(BinFile, bin_contents(VersionsDir, Vsn)),
     ok = file:write_file_info(BinFile, #file_info{mode=33277}),
 
     ?INFO("Add to $PATH for use: export PATH=~ts:$PATH", [BinDir]),
