@@ -235,7 +235,8 @@ execute_template([{chmod, File, Perm} | Terms], Files, Template, Vars, Force) ->
 %% Create a raw untemplated file
 execute_template([{file, From, To} | Terms], Files, {Template, Type, Cwd}, Vars, Force) ->
     ?DEBUG("Creating file ~p", [To]),
-    Data = load_file(Files, Type, filename:join(Cwd, From)),
+    In = expand_path(From, Vars),
+    Data = load_file(Files, Type, filename:join(Cwd, In)),
     Out = expand_path(To,Vars),
     case write_file(Out, Data, Force) of
         ok -> ok;
@@ -245,8 +246,9 @@ execute_template([{file, From, To} | Terms], Files, {Template, Type, Cwd}, Vars,
 %% Operate on a django template
 execute_template([{template, From, To} | Terms], Files, {Template, Type, Cwd}, Vars, Force) ->
     ?DEBUG("Executing template file ~p", [From]),
+    In = expand_path(From, Vars),
     Out = expand_path(To, Vars),
-    Tpl = load_file(Files, Type, filename:join(Cwd, From)),
+    Tpl = load_file(Files, Type, filename:join(Cwd, In)),
     case write_file(Out, render(Tpl, Vars), Force) of
         ok ->
             ok;
@@ -404,8 +406,11 @@ load_file(_Files, plugin, Name) ->
     {ok, Bin} = file:read_file(Name),
     Bin;
 load_file(_Files, file, Name) ->
-    {ok, Bin} = file:read_file(Name),
-    Bin.
+    case file:read_file(Name) of
+        {ok, Bin} -> Bin;
+        {error, Reason} -> 
+            ?ABORT("Failed to load file ~p: ~p\n", [Name, Reason])
+    end.
 
 write_file(Output, Data, Force) ->
     %% determine if the target file already exists
