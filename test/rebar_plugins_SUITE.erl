@@ -191,13 +191,17 @@ upgrade(Config) ->
                    {{iolist_to_binary(PkgName), <<"0.1.1">>}, []}]}
     ]),
 
+    %% beam file to verify plugin is acutally compiled
+    PluginBeam = filename:join([AppDir, "_build", "default", "plugins",
+                                PkgName, "ebin", [PkgName, ".beam"]]),
+
     RConfFile = rebar_test_utils:create_config(AppDir, [{plugins, [list_to_atom(PkgName)]}]),
     {ok, RConf} = file:consult(RConfFile),
 
     %% Build with deps.
     rebar_test_utils:run_and_check(
         Config, RConf, ["compile"],
-        {ok, [{app, Name}, {plugin, PkgName, <<"0.1.1">>}]}
+        {ok, [{app, Name, valid}, {file, PluginBeam}, {plugin, PkgName, <<"0.1.1">>}]}
      ),
 
     catch mock_pkg_resource:unmock(),
@@ -212,7 +216,7 @@ upgrade(Config) ->
     %% Build with deps.
     rebar_test_utils:run_and_check(
         Config, RConf, ["plugins", "upgrade", PkgName],
-        {ok, [{app, Name}, {plugin, PkgName, <<"0.1.3">>}]}
+        {ok, [{app, Name, valid}, {file, PluginBeam}, {plugin, PkgName, <<"0.1.3">>}]}
      ).
 
 upgrade_project_plugin(Config) ->

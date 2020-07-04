@@ -62,7 +62,7 @@ upgrade(Plugin, State) ->
             ?PRV_ERROR({not_found, Plugin});
         {ok, P, Profile} ->
             State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
-            {Apps, _State2} = rebar_prv_install_deps:handle_deps_as_profile(Profile, State1, [P], true),
+            {Apps, State2} = rebar_prv_install_deps:handle_deps_as_profile(Profile, State1, [P], true),
 
             {no_cycle, Sorted} = rebar_prv_install_deps:find_cycles(Apps),
             ToBuild = rebar_prv_install_deps:cull_compile(Sorted, []),
@@ -72,7 +72,8 @@ upgrade(Plugin, State) ->
             code:add_pathsa(CodePaths),
 
             %% Build plugin and its deps
-            [build_plugin(AppInfo, Apps, State) || AppInfo <- ToBuild],
+            _ = build_plugin(ToBuild, State2),
+
             {ok, State}
     end.
 
@@ -88,11 +89,6 @@ find_plugin(Plugin, Profiles, State) ->
                         end
                     end, Profiles).
 
-build_plugin(AppInfo, Apps, State) ->
+build_plugin(ToBuild, State) ->
     Providers = rebar_state:providers(State),
-    Resources = rebar_state:resources(State),
-    AppDir = rebar_app_info:dir(AppInfo),
-    C = rebar_config:consult(AppDir),
-    S = rebar_state:new(rebar_state:all_deps(rebar_state:new(), Apps), C, AppDir),
-    AppInfo1 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), C),
-    rebar_prv_compile:compile(rebar_state:set_resources(S, Resources), Providers, AppInfo1).
+    rebar_prv_compile:compile(State, Providers, ToBuild, plugins).
