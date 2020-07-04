@@ -6,7 +6,7 @@
          do/1,
          format_error/1]).
 
--export([compile/2, compile/3]).
+-export([compile/2, compile/3, compile/4]).
 
 -include_lib("providers/include/providers.hrl").
 -include("rebar.hrl").
