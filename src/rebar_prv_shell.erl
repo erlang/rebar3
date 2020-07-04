@@ -104,6 +104,8 @@ do(Config) ->
     {ok, Config}.
 
 -spec format_error(any()) -> iolist().
+format_error({unknown_app, Unknown}) ->
+    io_lib:format("Applications list for shell contains an unrecognizable application definition: ~p", [Unknown]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -457,7 +459,9 @@ normalize_load_apps([{App, _Vsn, load} | T]) -> [App | normalize_load_apps(T)];
 normalize_load_apps([{_App, _Vsn, none} | T]) -> normalize_load_apps(T);
 normalize_load_apps([{App, _Vsn, Operator} | T]) when is_atom(Operator) ->
     [App | normalize_load_apps(T)];
-normalize_load_apps([App | T]) when is_atom(App) -> [App | normalize_load_apps(T)].
+normalize_load_apps([App | T]) when is_atom(App) -> [App | normalize_load_apps(T)];
+normalize_load_apps([Unknown | _]) ->
+    erlang:error(?PRV_ERROR({unknown_app, Unknown})).
 
 normalize_boot_apps([]) -> [];
 normalize_boot_apps([{_App, load} | T]) -> normalize_boot_apps(T);
@@ -467,7 +471,9 @@ normalize_boot_apps([{_App, _Vsn, none} | T]) -> normalize_boot_apps(T);
 normalize_boot_apps([{App, _Vsn, Operator} | T]) when is_atom(Operator) ->
     [App | normalize_boot_apps(T)];
 normalize_boot_apps([{App, _Vsn} | T]) -> [App | normalize_boot_apps(T)];
-normalize_boot_apps([App | T]) when is_atom(App) -> [App | normalize_boot_apps(T)].
+normalize_boot_apps([App | T]) when is_atom(App) -> [App | normalize_boot_apps(T)];
+normalize_boot_apps([Unknown | _]) ->
+    erlang:error(?PRV_ERROR({unknown_app, Unknown})).
 
 remove_error_handler(0) ->
     ?WARN("Unable to remove simple error_logger handler", []);
