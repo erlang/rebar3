@@ -430,7 +430,18 @@ test_state(State) ->
     ProfileOpts = proplists:get_value(test, Profiles, []),
     ErlOpts = proplists:get_value(erl_opts, ProfileOpts, []),
     TestOpts = safe_define_test_macro(ErlOpts),
-    [{extra_src_dirs, ["test"]}, {erl_opts, TestOpts}].
+    %% Only define the test directory if it wasn't set by the user already,
+    %% otherwise our definition may clash with theirs
+    Extras = rebar_opts:get(Opts, extra_src_dirs, []),
+    ExtrasTest = proplists:get_value(extra_src_dirs, ProfileOpts, []),
+    IsDefined = lists:any(fun({"test", _}) -> true
+                          ;  ("test") -> true
+                          ;  (_) -> false
+                          end, Extras ++ ExtrasTest),
+    case IsDefined of
+        true -> [];
+        false -> [{extra_src_dirs, [{"test", [{recursive, false}]}]}]
+    end ++ [{erl_opts, TestOpts}].
 
 -spec safe_define_test_macro([any()]) -> [any()] | [{'d',atom()} | any()].
 safe_define_test_macro(Opts) ->

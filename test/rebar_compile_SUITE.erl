@@ -38,7 +38,7 @@ all() ->
      recompile_when_parse_transform_as_opt_changes,
      recompile_when_parse_transform_inline_changes,
      regex_filter_skip, regex_filter_regression,
-     recursive, no_recursive,
+     recursive, no_recursive, extra_recursion,
      always_recompile_when_erl_compiler_options_set,
      dont_recompile_when_erl_compiler_options_env_does_not_change,
      recompile_when_erl_compiler_options_env_changes,
@@ -2498,6 +2498,40 @@ no_recursive(Config) ->
                                    {ok, [{app, Name}]}),
     {ok, Files2} = rebar_utils:list_dir(EbinDir),
     ?assert(false==lists:member("rec.beam",Files2)),
+    ok.
+
+extra_recursion(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:write_src_file(filename:join([AppDir, "src", "src2"]), "rec.erl"),
+    rebar_test_utils:write_src_file(filename:join([AppDir, "test", "test2"]), "rectest.erl"),
+
+    %% Default for src directories: recursive
+    %% default for extra_src directories: non-recursive
+    RebarConfig1 = [],
+    rebar_test_utils:run_and_check(Config, RebarConfig1, ["as", "test", "compile"],
+                                   {ok, [{app, Name}]}),
+    EbinDir = filename:join([AppDir, "_build", "test", "lib", Name, "ebin"]),
+    {ok, Files1} = rebar_utils:list_dir(EbinDir),
+    ?assert(lists:member("rec.beam", Files1)),
+    file:delete(filename:join(EbinDir, "rec.beam")),
+
+    TestEbinDir = filename:join([AppDir, "_build", "test", "lib", Name, "test"]),
+    {ok, TestFiles1} = rebar_utils:list_dir(TestEbinDir),
+    ?assertNot(lists:member("rectest.beam", TestFiles1)),
+
+    RebarConfig2 = [{src_dirs,[{"src",[{recursive,false}]}]},
+                    {extra_src_dirs, [{"test", [{recursive, true}]}]}],
+    rebar_test_utils:run_and_check(Config, RebarConfig2, ["as", "test", "compile"],
+                                   {ok, [{app, Name}]}),
+    {ok, Files2} = rebar_utils:list_dir(EbinDir),
+    ?assertNot(lists:member("rec.beam",Files2)),
+
+    {ok, TestFiles2} = rebar_utils:list_dir(TestEbinDir),
+    ?assert(lists:member("rectest.beam", TestFiles2)),
     ok.
 
 regex_filter_skip(Config) ->

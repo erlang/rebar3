@@ -354,10 +354,24 @@ clean_(CompilerMod, AppInfo, _Label) ->
     ok.
 
 annotate_extras(AppInfo) ->
-    ExtraDirs = rebar_dir:extra_src_dirs(rebar_app_info:opts(AppInfo), []),
-    OldSrcDirs = rebar_app_info:get(AppInfo, src_dirs, ["src"]),
+    AppOpts = rebar_app_info:opts(AppInfo),
+    ExtraDirs = rebar_dir:extra_src_dirs(AppOpts, []),
+    OldSrcDirs = rebar_dir:src_dirs(AppOpts, ["src"]),
+    %% Re-annotate the directories with non-default options if it is the
+    %% case; otherwise, later down the line, the options get dropped with
+    %% profiles. All of this must be done with the rebar_dir functionality
+    %% which properly tracks and handles the various legacy formats for
+    %% recursion setting (erl_opts vs. dir options and profiles)
+    ExtraDirsOpts = [case rebar_dir:recursive(AppOpts, Dir) of
+                         false -> {Dir, [{recursive, false}]};
+                         true -> Dir
+                     end || Dir <- ExtraDirs],
+    OldSrcDirsOpts = [case rebar_dir:recursive(AppOpts, Dir) of
+                          false -> {Dir, [{recursive, false}]};
+                          true -> Dir
+                      end || Dir <- OldSrcDirs],
     AppDir = rebar_app_info:dir(AppInfo),
-    lists:map(fun(Dir) ->
+    lists:map(fun({DirOpt, Dir}) ->
         EbinDir = filename:join(rebar_app_info:out_dir(AppInfo), Dir),
         %% need a unique name to prevent lookup issues that clobber entries
         AppName = unicode:characters_to_binary(
@@ -365,15 +379,15 @@ annotate_extras(AppInfo) ->
         ),
         AppInfo0 = rebar_app_info:name(AppInfo, AppName),
         AppInfo1 = rebar_app_info:ebin_dir(AppInfo0, EbinDir),
-        AppInfo2 = rebar_app_info:set(AppInfo1, src_dirs, [Dir]),
-        AppInfo3 = rebar_app_info:set(AppInfo2, extra_src_dirs, OldSrcDirs),
+        AppInfo2 = rebar_app_info:set(AppInfo1, src_dirs, [DirOpt]),
+        AppInfo3 = rebar_app_info:set(AppInfo2, extra_src_dirs, OldSrcDirsOpts),
         add_to_includes( % give access to .hrl in app's src/
             AppInfo3,
             [filename:join([AppDir, D]) || D <- OldSrcDirs]
         )
     end,
-    [ExtraDir || ExtraDir <- ExtraDirs,
-                 filelib:is_dir(filename:join(AppDir, ExtraDir))]
+    [T || T = {_DirOpt, ExtraDir} <- lists:zip(ExtraDirsOpts, ExtraDirs),
+          filelib:is_dir(filename:join(AppDir, ExtraDir))]
     ).
 
 find_source_files(BaseDir, SrcExt, SrcDirs, Opts) ->
