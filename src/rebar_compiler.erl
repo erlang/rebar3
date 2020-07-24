@@ -215,6 +215,7 @@ prepare_compiler_env(Compiler, Apps) ->
     %% necessary for erlang:function_exported/3 to work as expected
     %% called here for clarity as it's required by both opts_changed/2
     %% and erl_compiler_opts_set/0 in needed_files
+    application:load(compiler),
     _ = code:ensure_loaded(compile),
     _ = code:ensure_loaded(Compiler),
     ok.

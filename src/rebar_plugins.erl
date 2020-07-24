@@ -113,11 +113,16 @@ handle_plugin(Profile, Plugin, State, Upgrade) ->
         ToBuild = rebar_prv_install_deps:cull_compile(Sorted, []),
 
         %% Add already built plugin deps to the code path
-        PreBuiltPaths = [rebar_app_info:ebin_dir(A) || A <- Apps] -- ToBuild,
+        ToBuildPaths = [rebar_app_info:ebin_dir(A) || A <- ToBuild],
+        PreBuiltApps = [A || A <- Apps,
+                             Ebin <- [rebar_app_info:ebin_dir(A)],
+                             not lists:member(Ebin, ToBuildPaths)],
+        {PreUnsafe, PreSafe} = lists:partition(fun needs_rebuild/1, PreBuiltApps),
+        PreBuiltPaths = [rebar_app_info:ebin_dir(A) || A <- PreSafe],
         code:add_pathsa(PreBuiltPaths),
 
         %% Build plugin and its deps
-        [build_plugin(AppInfo, Apps, State2) || AppInfo <- ToBuild],
+        [build_plugin(AppInfo, Apps, State2) || AppInfo <- PreUnsafe++ToBuild],
 
         %% Add newly built deps and plugin to code path
         State3 = rebar_state:update_all_plugin_deps(State2, Apps),
@@ -163,5 +168,41 @@ validate_plugin(Plugin) ->
                     [];
                 true ->
                     [Plugin]
+            end
+    end.
+
+%% @private do a quick validation of whether a plugin is expected to need
+%% to be rebuilt; usually this is handled by the compiler, but since this
+%% module does quick filtering by detection, we need to discriminate against
+%% cases like the compiler version having changed that would otherwise
+%% trigger a rebuild.
+needs_rebuild(AppInfo) ->
+    Ebin = rebar_app_info:ebin_dir(AppInfo),
+    application:load(compiler),
+    {ok, CurrentCompileVsn} = application:get_key(compiler, vsn),
+    case find_some_beam(Ebin) of
+        {ok, Beam} ->
+            case beam_lib:chunks(Beam, [compile_info]) of
+                {ok, {_mod, Chunks}} ->
+                    CompileInfo = proplists:get_value(compile_info, Chunks, []),
+                    CompileVsn = proplists:get_value(version, CompileInfo, "unknown"),
+                    CurrentCompileVsn =/= CompileVsn;
+                _ ->
+                    %% could be built without debug_info
+                    false
+            end;
+        _ ->
+            %% well we would expect a plugin to have a beam file
+            true
+    end.
+
+find_some_beam(Path) ->
+    case file:list_dir(Path) of
+        {error, Reason} ->
+            {error, Reason};
+        {ok, Files} ->
+            case lists:dropwhile(fun(P) -> filename:extension(P) =/= ".beam" end, Files) of
+                [Beam|_] -> {ok, filename:join(Path, Beam)};
+                _ -> {error, no_beam}
             end
     end.
