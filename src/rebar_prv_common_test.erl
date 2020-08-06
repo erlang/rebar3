@@ -74,11 +74,11 @@ do(State, Tests) ->
                     %% Run ct provider post hooks for all project apps and top level project hooks
                     rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State),
                     rebar_paths:set_paths([plugins, deps], State),
-                    symlink_to_last_ct_logs(State),
+                    symlink_to_last_ct_logs(State, T),
                     {ok, State};
                 Error ->
                     rebar_paths:set_paths([plugins, deps], State),
-                    symlink_to_last_ct_logs(State),
+                    symlink_to_last_ct_logs(State, T),
                     Error
             end;
         Error ->
@@ -122,9 +122,12 @@ format_error({error_reading_testspec, Reason}) ->
 
 %% @doc Tries to make the symlink `_build/<profile>/logs/last` to the `ct_run` directory
 %% of the last common test run.
--spec symlink_to_last_ct_logs(rebar_state:t()) -> ok.
-symlink_to_last_ct_logs(State) ->
-    LogDir = filename:join([rebar_dir:base_dir(State), "logs"]),
+-spec symlink_to_last_ct_logs(rebar_state:t(), list()) -> ok.
+symlink_to_last_ct_logs(State, Opts) ->
+    LogDir = case proplists:get_value(logdir, Opts) of
+        undefined -> filename:join([rebar_dir:base_dir(State), "logs"]);
+        Dir -> Dir
+    end,
     {ok, Filenames} = file:list_dir(LogDir),
     CtRunDirs = lists:filter(fun(S) -> re:run(S, "ct_run", [unicode]) /= nomatch end, Filenames),
     case CtRunDirs of
