@@ -686,12 +686,38 @@ translate(State, [], Path) ->
         {error, badparent} -> Path
     end.
 
+-spec handle_keep_logs(file:filename(), pos_integer()) -> ok.
+handle_keep_logs(LogDir, N) ->
+    case file:list_dir(LogDir) of
+        {ok, Filenames} ->
+            Dirs = lists:filter(fun(File) ->
+                        filelib:is_dir(filename:join([LogDir, File]))
+                    end, Filenames) -- ["last"], %% we ignore the symlink as we later handle it
+            case Dirs of
+                %% first time running the tests, there are no logs to delete
+                [] -> ok;
+                _ ->
+                    SortedDirs = lists:reverse(lists:sort(Dirs)),
+                    %% sort the log dirs and keep the N - 1 newest
+                    {_Keep, Discard} = lists:split(N - 1, SortedDirs),
+                    ?DEBUG("Removing the following directories because keep_logs option was found: ~p", [Discard]),
+                    [rebar_file_utils:rm_rf(filename:join([LogDir, Dir])) || Dir <- Discard],
+                    ok
+            end;
+        _ -> ok
+    end.
+
 setup_logdir(State, Opts) ->
     Logdir = case proplists:get_value(logdir, Opts) of
         undefined -> filename:join([rebar_dir:base_dir(State), "logs"]);
         Dir       -> Dir
     end,
     filelib:ensure_dir(filename:join([Logdir, "dummy.beam"])),
+    case proplists:get_value(keep_logs, Opts) of
+        all -> ok;
+        undefined -> ok;
+        N -> handle_keep_logs(Logdir, N)
+    end,
     [{logdir, Logdir}|lists:keydelete(logdir, 1, Opts)].
 
 turn_off_auto_compile(Opts) ->
