@@ -699,13 +699,16 @@ handle_keep_logs(LogDir, N) ->
             case Dirs of
                 %% first time running the tests, there are no logs to delete
                 [] -> ok;
-                _ ->
+                %% during the next run we would crash because of keep_logs
+                _ when length(Dirs) >= N ->
                     SortedDirs = lists:reverse(lists:sort(Dirs)),
                     %% sort the log dirs and keep the N - 1 newest
                     {_Keep, Discard} = lists:split(N - 1, SortedDirs),
                     ?DEBUG("Removing the following directories because keep_logs option was found: ~p", [Discard]),
                     [rebar_file_utils:rm_rf(filename:join([LogDir, Dir])) || Dir <- Discard],
-                    ok
+                    ok;
+                %% we still dont have enough log run directories as to crash
+                _ -> ok
             end;
         _ -> ok
     end.
