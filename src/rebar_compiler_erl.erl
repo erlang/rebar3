@@ -100,6 +100,7 @@ dependencies(Source, SourceDir, Dirs) ->
     end.
 
 dependencies(Source, _SourceDir, Dirs, DepOpts) ->
+    rebar_compiler_epp:ensure_started(),
     OptPTrans = proplists:get_value(parse_transforms, DepOpts, []),
     try rebar_compiler_epp:deps(Source, DepOpts) of
         #{include := AbsIncls,
@@ -110,9 +111,9 @@ dependencies(Source, _SourceDir, Dirs, DepOpts) ->
             %% TODO: check for core transforms?
             {_MissIncl, _MissInclLib} =/= {[],[]} andalso
             ?DEBUG("Missing: ~p", [{_MissIncl, _MissInclLib}]),
-            expand_file_names([module_to_erl(Mod) || Mod <- OptPTrans ++ PTrans], Dirs) ++
-            expand_file_names([module_to_erl(Mod) || Mod <- Behaviours], Dirs) ++
-            AbsIncls
+            lists:filtermap(
+                fun (Mod) -> rebar_compiler_epp:resolve_source(Mod, Dirs) end,
+                OptPTrans ++ PTrans ++ Behaviours) ++ AbsIncls
     catch
         error:{badmatch, {error, Reason}} ->
             case file:format_error(Reason) of
@@ -141,6 +142,7 @@ compile(Source, [{_, OutDir}], Config, ErlOpts) ->
     end.
 
 compile_and_track(Source, [{Ext, OutDir}], Config, ErlOpts) ->
+    rebar_compiler_epp:flush(),
     BuildOpts = [{outdir, OutDir} | ErlOpts],
     Target = target_base(OutDir, Source) ++ Ext,
     AllOpts = case erlang:function_exported(compile, env_compiler_options, 0) of
