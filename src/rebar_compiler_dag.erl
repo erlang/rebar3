@@ -7,17 +7,19 @@
 
 -include("rebar.hrl").
 
--define(DAG_VSN, 3).
+-define(DAG_VSN, 4).
 -define(DAG_ROOT, "source").
 -define(DAG_EXT, ".dag").
 
--type dag_v() :: {digraph:vertex(), term()} | 'false'.
--type dag_e() :: {digraph:vertex(), digraph:vertex()}.
--type critical_meta() :: term(). % if this changes, the DAG is invalid
--type dag_rec() :: {list(dag_v()), list(dag_e()), critical_meta()}.
--type dag() :: digraph:graph().
+-type critical_meta() :: term().
+
 -record(dag, {vsn = ?DAG_VSN :: pos_integer(),
-              info = {[], [], []} :: dag_rec()}).
+    meta :: critical_meta(),
+    vtab :: notable | [tuple()],
+    etab :: notable | [tuple()],
+    ntab :: notable | [tuple()]}).
+
+-type dag() :: digraph:graph().
 
 %% @doc You should initialize one DAG per compiler module.
 %% `CritMeta' is any contextual information that, if it is found to change,
@@ -105,13 +107,46 @@ filter_prefix(G, [{App, Out} | AppTail] = AppPaths, [File | FTail]) ->
             filter_prefix(G, AppPaths, FTail)
     end.
 
+finalise_populate_sources(_G, _InDirs, Waiting) when Waiting =:= #{} ->
+    ok;
+finalise_populate_sources(G, InDirs, Waiting) ->
+    %% wait for all deps to complete
+    receive
+        {deps, Pid, AbsIncls} ->
+            {Status, Source} = maps:get(Pid, Waiting),
+            %% the file hasn't been visited yet; set it to existing, but with
+            %% a last modified value that's null so it gets updated to something new.
+            [digraph:add_vertex(G, Src, 0) || Src <- AbsIncls,
+                digraph:vertex(G, Src) =:= false],
+            %% drop edges from deps that aren't included!
+            [digraph:del_edge(G, Edge) || Status == old,
+                Edge <- digraph:out_edges(G, Source),
+                {_, _Src, Path, _Label} <- [digraph:edge(G, Edge)],
+                not lists:member(Path, AbsIncls)],
+            %% Add the rest
+            [digraph:add_edge(G, Source, Incl) || Incl <- AbsIncls],
+            %% mark the digraph dirty when there is any change in
+            %%  dependencies, for any application in the project
+            mark_dirty(G),
+            finalise_populate_sources(G, InDirs, Waiting);
+        {'DOWN', _MRef, process, Pid, normal} ->
+            finalise_populate_sources(G, InDirs, maps:remove(Pid, Waiting));
+        {'DOWN', _MRef, process, Pid, Reason} ->
+            {_Status, Source} = maps:get(Pid, Waiting),
+            ?ERROR("Failed to get dependencies for ~s~n~p", [Source, Reason]),
+            ?FAIL
+    end.
+
 %% @doc this function scans all the source files found and looks into
 %% all the `InDirs' for deps (other source files, or files that aren't source
 %% but still returned by the compiler module) that are related
 %% to them.
-populate_sources(_G, _Compiler, _InDirs, [], _DepOpts) ->
-    ok;
-populate_sources(G, Compiler, InDirs, [Source|Erls], DepOpts) ->
+populate_sources(G, Compiler, InDirs, Sources, DepOpts) ->
+    populate_sources(G, Compiler, InDirs, Sources, DepOpts, #{}).
+
+populate_sources(G, _Compiler, InDirs, [], _DepOpts, Waiting) ->
+    finalise_populate_sources(G, InDirs, Waiting);
+populate_sources(G, Compiler, InDirs, [Source|Erls], DepOpts, Waiting) ->
     case digraph:vertex(G, Source) of
         {_, LastUpdated} ->
             case filelib:last_modified(Source) of
@@ -120,21 +155,20 @@ populate_sources(G, Compiler, InDirs, [Source|Erls], DepOpts) ->
                     %% from the graph.
                     digraph:del_vertex(G, Source),
                     mark_dirty(G),
-                    populate_sources(G, Compiler, InDirs, Erls, DepOpts);
+                    populate_sources(G, Compiler, InDirs, Erls, DepOpts, Waiting);
                 LastModified when LastUpdated < LastModified ->
                     digraph:add_vertex(G, Source, LastModified),
-                    prepopulate_deps(G, Compiler, InDirs, Source, DepOpts, old),
-                    mark_dirty(G);
+                    Worker = prepopulate_deps(Compiler, InDirs, Source, DepOpts, self()),
+                    populate_sources(G, Compiler, InDirs, Erls, DepOpts, Waiting#{Worker => {old, Source}});
                 _ -> % unchanged
-                    ok
+                    populate_sources(G, Compiler, InDirs, Erls, DepOpts, Waiting)
             end;
         false ->
             LastModified = filelib:last_modified(Source),
             digraph:add_vertex(G, Source, LastModified),
-            prepopulate_deps(G, Compiler, InDirs, Source, DepOpts, new),
-            mark_dirty(G)
-    end,
-    populate_sources(G, Compiler, InDirs, Erls, DepOpts).
+            Worker = prepopulate_deps(Compiler, InDirs, Source, DepOpts, self()),
+            populate_sources(G, Compiler, InDirs, Erls, DepOpts, Waiting#{Worker => {new, Source}})
+    end.
 
 %% @doc Scan all files in the digraph that are seen as dependencies, but are
 %% neither source files nor artifacts (i.e. header files that don't produce
@@ -228,9 +262,13 @@ restore_dag(G, File, CritMeta) ->
         {ok, Data} ->
             %% The CritMeta value is checked and if it doesn't match, we fail
             %% the whole restore operation.
-            #dag{vsn=?DAG_VSN, info={Vs, Es, CritMeta}} = binary_to_term(Data),
-            [digraph:add_vertex(G, V, LastUpdated) || {V, LastUpdated} <- Vs],
-            [digraph:add_edge(G, V1, V2, Label) || {_, V1, V2, Label} <- Es],
+            #dag{vsn=?DAG_VSN, meta = CritMeta, vtab = VTab,
+                etab = ETab, ntab = NTab} = binary_to_term(Data),
+            {digraph, VT, ET, NT, false} = G,
+            true = ets:insert_new(VT, VTab),
+            true = ets:insert_new(ET, ETab),
+            true = ets:delete_all_objects(NT),
+            true = ets:insert(NT, NTab),
             ok;
         {error, _Err} ->
             ok
@@ -238,9 +276,9 @@ restore_dag(G, File, CritMeta) ->
 
 store_dag(G, File, CritMeta) ->
     ok = filelib:ensure_dir(File),
-    Vs = lists:map(fun(V) -> digraph:vertex(G, V) end, digraph:vertices(G)),
-    Es = lists:map(fun(E) -> digraph:edge(G, E) end, digraph:edges(G)),
-    Data = term_to_binary(#dag{info={Vs, Es, CritMeta}}, [{compressed, 2}]),
+    {digraph, VT, ET, NT, false} = G,
+    Data = term_to_binary(#dag{meta = CritMeta, vtab = ets:tab2list(VT),
+        etab = ets:tab2list(ET), ntab = ets:select(NT, [{'_',[],['$_']}])}, [{compressed, 2}]),
     file:write_file(File, Data).
 
 %% Drop a file from the digraph if it doesn't exist, and if so,
@@ -285,26 +323,20 @@ maybe_rm_vertex(G, Source) ->
 %% mark its timestamp to 0, which means we have no info on it.
 %% Source files will be covered at a later point in their own scan, and
 %% non-source files are going to be covered by `populate_deps/3'.
-prepopulate_deps(G, Compiler, InDirs, Source, DepOpts, Status) ->
-    SourceDir = filename:dirname(Source),
-    AbsIncls = case erlang:function_exported(Compiler, dependencies, 4) of
-        false ->
-            Compiler:dependencies(Source, SourceDir, InDirs);
-        true ->
-            Compiler:dependencies(Source, SourceDir, InDirs, DepOpts)
-    end,
-    %% the file hasn't been visited yet; set it to existing, but with
-    %% a last modified value that's null so it gets updated to something new.
-    [digraph:add_vertex(G, Src, 0) || Src <- AbsIncls,
-                                      digraph:vertex(G, Src) =:= false],
-    %% drop edges from deps that aren't included!
-    [digraph:del_edge(G, Edge) || Status == old,
-                                  Edge <- digraph:out_edges(G, Source),
-                                  {_, _Src, Path, _Label} <- [digraph:edge(G, Edge)],
-                                  not lists:member(Path, AbsIncls)],
-    %% Add the rest
-    [digraph:add_edge(G, Source, Incl) || Incl <- AbsIncls],
-    ok.
+prepopulate_deps(Compiler, InDirs, Source, DepOpts, Control) ->
+    {Worker, _MRef} = spawn_monitor(
+        fun () ->
+            SourceDir = filename:dirname(Source),
+            AbsIncls = case erlang:function_exported(Compiler, dependencies, 4) of
+                false ->
+                    Compiler:dependencies(Source, SourceDir, InDirs);
+                true ->
+                    Compiler:dependencies(Source, SourceDir, InDirs, DepOpts)
+            end,
+            Control ! {deps, self(), AbsIncls}
+        end
+    ),
+    Worker.
 
 %% check that a dep file is up to date
 refresh_dep(_G, {artifact, _}) ->

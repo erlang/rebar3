@@ -4,7 +4,17 @@
 %%% @end
 -module(rebar_compiler_epp).
 -export([deps/2, resolve_module/2]).
+%% cache (a la code path storage, but for dependencies not in code path)
+-export([ensure_started/0, flush/0, resolve_source/2]).
+-export([init/1, handle_call/3, handle_cast/2]).
+%% remove when OTP 19 support is no longer needed
+-export([handle_info/2, terminate/2, code_change/3]).
+
+-behaviour(gen_server).
+
 -include_lib("kernel/include/file.hrl").
+
+-include("rebar.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Basic File Handling %%%
@@ -36,6 +46,120 @@ resolve_module(Mod, Paths) ->
     catch
         Path -> {ok, Path}
     end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Cache for deps      %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec ensure_started() -> ok.
+ensure_started() ->
+    case whereis(?MODULE) of
+        undefined ->
+            case gen_server:start({local, ?MODULE}, ?MODULE, [], []) of
+                {ok, _Pid} ->
+                    ok;
+                {error, {already_started, _Pid}} ->
+                    ok
+            end;
+        Pid when is_pid(Pid) ->
+            ok
+    end.
+
+flush() ->
+    gen_server:cast(?MODULE, flush).
+
+%% @doc Resolves "Name" erl module to a path, given list of paths to search.
+%% Caches result for subsequent requests.
+-spec resolve_source(atom() | file:filename_all(), [file:filename_all()]) -> {true, file:filename_all()} | false.
+resolve_source(Name, Dirs) when is_atom(Name) ->
+    gen_server:call(?MODULE, {resolve, atom_to_list(Name) ++ ".erl", Dirs});
+resolve_source(Name, Dirs) when is_list(Name) ->
+    gen_server:call(?MODULE, {resolve, Name, Dirs}).
+
+-record(state, {
+    %% filesystem cache, denormalised
+    fs = #{} :: #{file:filename_all() => [file:filename_all()]},
+    %% map of module name => abs path
+    resolved = #{} :: #{file:filename_all() => file:filename_all()}
+}).
+
+init([]) ->
+    {ok, #state{}}.
+
+handle_call({resolve, Name, Dirs}, _From, #state{fs = Fs, resolved = Res} = State) ->
+    case maps:find(Name, Res) of
+        {ok, Found} ->
+            {reply, Found, State};
+        error ->
+            {Resolved, NewFs} = resolve(Name, Fs, Dirs),
+            {reply, Resolved, State#state{resolved = Res#{Name => Resolved}, fs = NewFs}}
+    end.
+
+handle_cast(flush, _State) ->
+    {noreply, #state{}}.
+
+resolve(_Name, Fs, []) ->
+    {false, Fs};
+resolve(Name, Fs, [Dir | Tail]) ->
+    {NewFs, Files} = list_directory(Dir, Fs),
+    case lists:member(Name, Files) of
+        true ->
+            {{true, filename:join(Dir, Name)}, NewFs};
+        false ->
+            resolve(Name, NewFs, Tail)
+    end.
+
+%% list_directory/2 caches files in the directory and all subdirectories,
+%%  to support the behaviour of looking for source files in
+%%  subdirectories of src/* folder.
+%% This may introduce weird dependencies for cases when CT
+%%  test cases contain test data with files named the same
+%%  as requested behaviour/parse_transforms, but let's hope
+%%  it won't happen for many projects. If it does, in fact,
+%%  it won't cause any damage, just extra unexpected recompiles.
+list_directory(Dir, Cache) ->
+    case maps:find(Dir, Cache) of
+        {ok, Files} ->
+            {Cache, Files};
+        error ->
+            case file:list_dir(Dir) of
+                {ok, DirFiles} ->
+                    %% create a full list of *.erl files under Dir.
+                    {NewFs, Files} = lists:foldl(
+                        fun (File, {DirCache, Files} = Acc) ->
+                            %% recurse into subdirs
+                            FullName = filename:join(Dir, File),
+                            case filelib:is_dir(FullName) of
+                                true ->
+                                    {UpdFs, MoreFiles} = list_directory(FullName, DirCache),
+                                    {UpdFs, MoreFiles ++ Files};
+                                false ->
+                                    %% ignore all but *.erl files
+                                    case filename:extension(File) =:= ".erl" of
+                                        true ->
+                                            {DirCache, [File | Files]};
+                                        false ->
+                                            Acc
+                                    end
+                            end
+                        end,
+                        {Cache, []}, DirFiles),
+                    {NewFs#{Dir => Files}, Files};
+                {error, Reason} ->
+                    ?DEBUG("Failed to list ~s, ~p", [Dir, Reason]),
+                    {Cache, []}
+            end
+    end.
+
+%%%%%%%%%%%%%%%
+%%% OTP 19  %%%
+handle_info(_Request, State) ->
+    {noreply, State}.
+
+terminate(_Reason, _State) ->
+    ok.
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
 
 %%%%%%%%%%%%%%%
 %%% PRIVATE %%%
