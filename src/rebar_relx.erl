@@ -155,12 +155,25 @@ merge_overlays(Config) ->
 %% This means the project apps and dependencies but not OTP libraries.
 -spec all_apps(rebar_state:t()) -> #{atom() => rlx_app_info:t()}.
 all_apps(State) ->
-    lists:foldl(fun(AppInfo, Acc) ->
-                        Acc#{binary_to_atom(rebar_app_info:name(AppInfo), utf8)
-                             => rebar_app_info:app_to_map(AppInfo)}
-                end, #{}, rebar_state:project_apps(State) ++ rebar_state:all_deps(State)).
+    maps:merge(app_infos_to_relx(rebar_state:project_apps(State), project),
+               app_infos_to_relx(rebar_state:all_deps(State), dep)).
 
 %%
+
+-spec app_infos_to_relx([rlx_app_info:t()], rlx_app_info:app_type()) -> #{atom() => rlx_app_info:t()}.
+app_infos_to_relx(AppInfos, AppType) ->
+    lists:foldl(fun(AppInfo, Acc) ->
+                        Acc#{binary_to_atom(rebar_app_info:name(AppInfo), utf8)
+                             => app_info_to_relx(rebar_app_info:app_to_map(AppInfo), AppType)}
+                end, #{}, AppInfos).
+
+app_info_to_relx(#{name := Name,
+                   vsn := Vsn,
+                   applications := Applications,
+                   included_applications := IncludedApplications,
+                   dir := Dir,
+                   link := false}, AppType) ->
+    rlx_app_info:new(Name, Vsn, Dir, Applications, IncludedApplications, AppType).
 
 -spec opt_spec_list() -> [getopt:option_spec()].
 opt_spec_list() ->

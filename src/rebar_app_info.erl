@@ -176,13 +176,20 @@ new(Parent, AppName, Vsn, Dir, Deps) ->
                      ebin_dir=filename:join(rebar_utils:to_list(Dir), "ebin"),
                      deps=Deps}}.
 
+-spec app_to_map(t()) -> #{name := atom(),
+                           vsn := string(),
+                           applications := [atom()],
+                           included_applications := [atom()],
+                           dir := file:name(),
+                           out_dir := file:name(),
+                           ebin_dir := file:name(),
+                           link := boolean()}.
 app_to_map(#app_info_t{name=Name,
                        vsn=Vsn,
                        applications=Applications,
                        included_applications=IncludedApplications,
                        out_dir=OutDir,
                        ebin_dir=EbinDir}) ->
-    %% TODO: call rlx_app_info to create map
     #{name => ec_cnv:to_atom(Name),
       vsn => Vsn,
       applications => Applications,
