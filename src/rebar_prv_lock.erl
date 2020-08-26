@@ -40,6 +40,8 @@ do(State) ->
 
             OldLockNames = [element(1,L) || L <- OldLocks],
             NewLockNames = [element(1,L) || L <- Locks],
+
+            %% TODO: don't output this message if the dep is now a checkout
             rebar_utils:info_useless(OldLockNames, NewLockNames),
 
             {ok, State1};

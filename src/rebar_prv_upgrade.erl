@@ -217,6 +217,7 @@ prepare_locks([Name|Names], Deps, Locks, Unlocks, Dict, AltDeps) ->
         false ->
             case rebar_utils:tup_find(AtomName, AltDeps) of
                 false ->
+                    %% TODO: output a different error if the app is a checkout
                     ?PRV_ERROR({unknown_dependency, Name});
                 _ -> % non-default profile dependency found, pass through
                     prepare_locks(Names, Deps, Locks, Unlocks, Dict, AltDeps)
