@@ -32,6 +32,7 @@
          deps_to_build/1, deps_to_build/2,
          all_plugin_deps/1, all_plugin_deps/2, update_all_plugin_deps/2,
          all_deps/1, all_deps/2, update_all_deps/2, merge_all_deps/2,
+         all_checkout_deps/1,
          namespace/1, namespace/2,
 
          deps_names/1,
@@ -341,6 +342,9 @@ all_deps(#state_t{all_deps=Apps}) ->
 
 all_deps(State=#state_t{}, NewApps) ->
     State#state_t{all_deps=NewApps}.
+
+all_checkout_deps(#state_t{all_deps=Apps}) ->
+    [App || App <- Apps, rebar_app_info:is_checkout(App)].
 
 all_plugin_deps(#state_t{all_plugin_deps=Apps}) ->
     Apps.

@@ -38,8 +38,7 @@ do(State) ->
             rebar_config:maybe_write_lock_file(filename:join(Dir, ?LOCK_FILE), Locks, OldLocks),
             State1 = rebar_state:set(State, {locks, default}, Locks),
 
-            Checkouts = [rebar_app_info:name(Dep)
-                            || Dep <- rebar_state:all_deps(State), rebar_app_info:is_checkout(Dep)],
+            Checkouts = [rebar_app_info:name(Dep) || Dep <- rebar_state:all_checkout_deps(State)],
             %% Remove the checkout dependencies from the old lock info
             %% so that they do not appear in the rebar_utils:info_useless/1 warning.
             OldLockNames = [element(1,L) || L <- OldLocks] -- Checkouts,

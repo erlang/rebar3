@@ -461,6 +461,10 @@ paths_checkout_deps(Config) ->
 
     {ok, State} = rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], return),
 
+    [AppName2] = rebar_state:all_checkout_deps(State),
+    Name2Bin = binary:list_to_bin(Name2),
+    Name2Bin = rebar_app_info:name(AppName2),
+
     code:add_paths(rebar_state:code_paths(State, all_deps)),
     ok = application:load(list_to_atom(Name2)),
     Loaded = application:loaded_applications(),

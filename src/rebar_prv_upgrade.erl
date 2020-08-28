@@ -86,8 +86,7 @@ do_(State) ->
     DepsDict = deps_dict(rebar_state:all_deps(State)),
     AltDeps = find_non_default_deps(Deps, State),
     FilteredNames = cull_default_names_if_profiles(Names, Deps, State),
-    Checkouts = [rebar_app_info:name(Dep)
-                            || Dep <- rebar_state:all_deps(State), rebar_app_info:is_checkout(Dep)],
+    Checkouts = [rebar_app_info:name(Dep) || Dep <- rebar_state:all_checkout_deps(State)],
     case prepare_locks(FilteredNames, Deps, Locks, [], DepsDict, AltDeps, Checkouts) of
         {error, Reason} ->
             {error, Reason};
@@ -126,7 +125,8 @@ format_error({transitive_dependency, Name}) ->
                  "Promote it to your top-level rebar.config file to upgrade it.",
                  [Name]);
 format_error({checkout_dependency, Name}) ->
-    io_lib:format("Dependency ~ts is a checkout dependency and cannot be upgraded.", [Name]);
+    io_lib:format("Dependency ~ts is a checkout dependency under _checkouts/ and checkouts cannot be upgraded.",
+                  [Name]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
