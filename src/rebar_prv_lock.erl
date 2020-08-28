@@ -38,9 +38,13 @@ do(State) ->
             rebar_config:maybe_write_lock_file(filename:join(Dir, ?LOCK_FILE), Locks, OldLocks),
             State1 = rebar_state:set(State, {locks, default}, Locks),
 
-            OldLockNames = [element(1,L) || L <- OldLocks],
+            Checkouts = [rebar_app_info:name(Dep) || Dep <- rebar_state:all_checkout_deps(State)],
+            %% Remove the checkout dependencies from the old lock info
+            %% so that they do not appear in the rebar_utils:info_useless/1 warning.
+            OldLockNames = [element(1,L) || L <- OldLocks] -- Checkouts,
             NewLockNames = [element(1,L) || L <- Locks],
             rebar_utils:info_useless(OldLockNames, NewLockNames),
+            info_checkout_deps(Checkouts),
 
             {ok, State1};
         _ ->
@@ -60,3 +64,7 @@ build_locks(State) ->
          rebar_fetch:lock_source(Dep, State),
          rebar_app_info:dep_level(Dep)}
      end || Dep <- AllDeps, not(rebar_app_info:is_checkout(Dep))].
+
+info_checkout_deps(Checkouts) ->
+    [?INFO("App ~ts is a checkout dependency and cannot be locked.", [CheckoutDep])
+        || CheckoutDep <- Checkouts].
