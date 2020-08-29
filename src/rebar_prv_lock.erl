@@ -43,6 +43,8 @@ do(State) ->
             %% so that they do not appear in the rebar_utils:info_useless/1 warning.
             OldLockNames = [element(1,L) || L <- OldLocks] -- Checkouts,
             NewLockNames = [element(1,L) || L <- Locks],
+
+            %% TODO: don't output this message if the dep is now a checkout
             rebar_utils:info_useless(OldLockNames, NewLockNames),
             info_checkout_deps(Checkouts),
 
