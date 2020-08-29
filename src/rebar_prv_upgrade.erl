@@ -86,7 +86,8 @@ do_(State) ->
     DepsDict = deps_dict(rebar_state:all_deps(State)),
     AltDeps = find_non_default_deps(Deps, State),
     FilteredNames = cull_default_names_if_profiles(Names, Deps, State),
-    case prepare_locks(FilteredNames, Deps, Locks, [], DepsDict, AltDeps) of
+    Checkouts = [rebar_app_info:name(Dep) || Dep <- rebar_state:all_checkout_deps(State)],
+    case prepare_locks(FilteredNames, Deps, Locks, [], DepsDict, AltDeps, Checkouts) of
         {error, Reason} ->
             {error, Reason};
         {Locks0, Unlocks0} ->
@@ -123,6 +124,9 @@ format_error({transitive_dependency, Name}) ->
     io_lib:format("Dependency ~ts is transitive and cannot be safely upgraded. "
                  "Promote it to your top-level rebar.config file to upgrade it.",
                  [Name]);
+format_error({checkout_dependency, Name}) ->
+    io_lib:format("Dependency ~ts is a checkout dependency under _checkouts/ and checkouts cannot be upgraded.",
+                  [Name]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -190,20 +194,20 @@ cull_default_names_if_profiles(Names, Deps, State) ->
             end, Names)
     end.
 
-prepare_locks([], _, Locks, Unlocks, _Dict, _AltDeps) ->
+prepare_locks([], _, Locks, Unlocks, _Dict, _AltDeps, _Checkouts) ->
     {Locks, Unlocks};
-prepare_locks([Name|Names], Deps, Locks, Unlocks, Dict, AltDeps) ->
+prepare_locks([Name|Names], Deps, Locks, Unlocks, Dict, AltDeps, Checkouts) ->
     AtomName = binary_to_atom(Name, utf8),
     case lists:keyfind(Name, 1, Locks) of
         {_, _, 0} = Lock ->
             case rebar_utils:tup_find(AtomName, Deps) of
                 false ->
                     ?WARN("Dependency ~ts has been removed and will not be upgraded", [Name]),
-                    prepare_locks(Names, Deps, Locks, Unlocks, Dict, AltDeps);
+                    prepare_locks(Names, Deps, Locks, Unlocks, Dict, AltDeps, Checkouts);
                 Dep ->
                     {Source, NewLocks, NewUnlocks} = prepare_lock(Dep, Lock, Locks, Dict),
                     prepare_locks(Names, Deps, NewLocks,
-                                  [{Name, Source, 0} | NewUnlocks ++ Unlocks], Dict, AltDeps)
+                                  [{Name, Source, 0} | NewUnlocks ++ Unlocks], Dict, AltDeps, Checkouts)
             end;
         {_, _, Level} = Lock when Level > 0 ->
             case rebar_utils:tup_find(AtomName, Deps) of
@@ -212,15 +216,19 @@ prepare_locks([Name|Names], Deps, Locks, Unlocks, Dict, AltDeps) ->
                 Dep -> % Dep has been promoted
                     {Source, NewLocks, NewUnlocks} = prepare_lock(Dep, Lock, Locks, Dict),
                     prepare_locks(Names, Deps, NewLocks,
-                                  [{Name, Source, 0} | NewUnlocks ++ Unlocks], Dict, AltDeps)
+                                  [{Name, Source, 0} | NewUnlocks ++ Unlocks], Dict, AltDeps, Checkouts)
             end;
         false ->
-            case rebar_utils:tup_find(AtomName, AltDeps) of
+            case lists:member(atom_to_binary(AtomName, utf8), Checkouts) of
+                true ->
+                    ?PRV_ERROR({checkout_dependency, Name});
                 false ->
-                    %% TODO: output a different error if the app is a checkout
-                    ?PRV_ERROR({unknown_dependency, Name});
-                _ -> % non-default profile dependency found, pass through
-                    prepare_locks(Names, Deps, Locks, Unlocks, Dict, AltDeps)
+                    case rebar_utils:tup_find(AtomName, AltDeps) of
+                        false ->
+                            ?PRV_ERROR({unknown_dependency, Name});
+                        _ -> % non-default profile dependency found, pass through
+                            prepare_locks(Names, Deps, Locks, Unlocks, Dict, AltDeps, Checkouts)
+                    end
             end
     end.
 
