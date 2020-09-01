@@ -101,9 +101,9 @@ resolve(_Name, Fs, []) ->
     {false, Fs};
 resolve(Name, Fs, [Dir | Tail]) ->
     {NewFs, Files} = list_directory(Dir, Fs),
-    case lists:member(Name, Files) of
-        true ->
-            {{true, filename:join(Dir, Name)}, NewFs};
+    case lists:keyfind(Name, 2, Files) of
+        {FullDir, _} ->
+            {{true, filename:join(FullDir, Name)}, NewFs};
         false ->
             resolve(Name, NewFs, Tail)
     end.
@@ -136,7 +136,7 @@ list_directory(Dir, Cache) ->
                                     %% ignore all but *.erl files
                                     case filename:extension(File) =:= ".erl" of
                                         true ->
-                                            {DirCache, [File | Files]};
+                                            {DirCache, [{Dir, File} | Files]};
                                         false ->
                                             Acc
                                     end
