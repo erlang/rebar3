@@ -19,16 +19,16 @@ jobs:
     - name: CT tests
       run: ./rebar3 ct
 
-    - name: Upload Release Asset
-      id: upload-release-asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./rebar3
-        asset_name: rebar3
-        asset_content_type: application/zip
+    # - name: Upload Release Asset
+    #   id: upload-release-asset
+    #   uses: actions/upload-release-asset@v1
+    #   env:
+    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    #   with:
+    #     upload_url: ${{ github.event.release.upload_url }}
+    #     asset_path: ./rebar3
+    #     asset_name: rebar3
+    #     asset_content_type: application/zip
 
     - name: Configure AWS credentials
       if: "!github.event.release.prerelease"
