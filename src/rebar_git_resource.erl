@@ -37,20 +37,25 @@ lock(AppInfo, _) ->
 lock_(AppDir, {git, Url, _}) ->
     lock_(AppDir, {git, Url});
 lock_(AppDir, {git, Url}) ->
-    AbortMsg = lists:flatten(io_lib:format("Locking of git dependency failed in ~ts", [AppDir])),
-    Dir = rebar_utils:escape_double_quotes(AppDir),
-    {ok, VsnString} =
-        case os:type() of
-            {win32, _} ->
-                rebar_utils:sh("git -C \"" ++ Dir ++ "\" "
-                               "--work-tree=\"" ++ Dir ++ "\" rev-parse --verify HEAD",
-                    [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]);
-            _ ->
-                rebar_utils:sh("git -C '" ++ Dir ++ "' rev-parse --verify HEAD",
-                    [{use_stdout, false}, {debug_abort_on_error, AbortMsg}])
-        end,
-    Ref = rebar_string:trim(VsnString, both, "\n"),
-    {git, Url, {ref, Ref}}.
+    case git_vsn() of
+        GitVsn when GitVsn >= {1,8,5} ->
+            AbortMsg = lists:flatten(io_lib:format("Locking of git dependency failed in ~ts", [AppDir])),
+            Dir = rebar_utils:escape_double_quotes(AppDir),
+            {ok, VsnString} =
+                case os:type() of
+                    {win32, _} ->
+                        rebar_utils:sh("git -C \"" ++ Dir ++ "\" "
+                                       "--work-tree=\"" ++ Dir ++ "\" rev-parse --verify HEAD",
+                                       [{use_stdout, false}, {debug_abort_on_error, AbortMsg}]);
+                    _ ->
+                        rebar_utils:sh("git -C '" ++ Dir ++ "' rev-parse --verify HEAD",
+                                       [{use_stdout, false}, {debug_abort_on_error, AbortMsg}])
+                end,
+            Ref = rebar_string:trim(VsnString, both, "\n"),
+            {git, Url, {ref, Ref}};
+        _ ->
+            ?ABORT("Can't lock git dependency: git version must be 1.8.5 or higher.", [])
+    end.
 
 %% Return true if either the git url or tag/branch/ref is not the same as the currently
 %% checked out git repo for the dep
@@ -377,9 +382,8 @@ check_type_support() ->
         true ->
             ok;
         _ ->
-            case rebar_utils:sh("git --version", [{return_on_error, true},
-                                                  {use_stdout, false}]) of
-                {error, _} ->
+            case git_vsn() of
+                undefined ->
                     ?ABORT("git not installed", []);
                 _ ->
                     put({is_supported, ?MODULE}, true),
