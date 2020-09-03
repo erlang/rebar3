@@ -184,10 +184,10 @@ random_seed() ->
 
 expand_deps(_, []) -> [];
 expand_deps(git_subdir, [{Name, Deps} | Rest]) ->
-    Dep = {Name, {git_subdir, "https://example.org/user/"++Name++".git", {branch, "master"}, "appsubdir"}},
+    Dep = {Name, {git_subdir, "https://example.org/user/"++Name++".git", {branch, "master"}, filename:join("appsubdir", Name)}},
     [{Dep, expand_deps(git_subdir, Deps)} | expand_deps(git_subdir, Rest)];
 expand_deps(git_subdir, [{Name, Vsn, Deps} | Rest]) ->
-    Dep = {Name, Vsn, {git_subdir, "https://example.org/user/"++Name++".git", {tag, Vsn}, "appsubdir"}},
+    Dep = {Name, Vsn, {git_subdir, "https://example.org/user/"++Name++".git", {tag, Vsn}, filename:join("appsubdir", Name)}},
     [{Dep, expand_deps(git_subdir, Deps)} | expand_deps(git_subdir, Rest)];
 expand_deps(git, [{Name, Deps} | Rest]) ->
     Dep = {Name, ".*", {git, "https://example.org/user/"++Name++".git", "master"}},
@@ -260,7 +260,7 @@ top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
 %%%%%%%%%%%%%%%
 check_results(AppDir, Expected, ProfileRun) ->
     BuildDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib", "*"])),
-    BuildSubDirs = [D || D <- filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib", "*", "*"])),
+    BuildSubDirs = [D || D <- filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib", "*", "*", "*"])),
                          filelib:is_dir(D)],
     PluginDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "plugins", "*"])),
     GlobalPluginDirs = filelib:wildcard(filename:join([AppDir, "global", "plugins", "*"])),

@@ -39,6 +39,9 @@ download_source(AppInfo, State)  ->
         {error, Reason} ->
             throw(?PRV_ERROR(Reason))
     catch
+        %% if already a PRV_ERROR format just re-raise it
+        ?WITH_STACKTRACE(error, {error, {Module, Reason}}, S)
+            erlang:raise(error, {error, {Module, Reason}}, S);
         throw:{no_resource, Type, Location} ->
             throw(?PRV_ERROR({no_resource, Location, Type}));
         ?WITH_STACKTRACE(C,T,S)

@@ -252,7 +252,7 @@ parse_dep(_, Dep, _, _, _) ->
       IsLock :: boolean(),
       State :: rebar_state:t().
 dep_to_app(Parent, DepsDir, Name, Vsn, Source0, IsLock, State) ->
-    SubDir = subdir(Source0),
+    {SubDir, Source1} = subdir(Name, Source0),
     FetchDir = rebar_utils:to_list(filename:join([DepsDir, Name])),
     CheckoutsDir = rebar_utils:to_list(rebar_dir:checkouts_dir(State, Name)),
     AppInfo = case rebar_app_info:discover(CheckoutsDir) of
@@ -272,7 +272,7 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source0, IsLock, State) ->
                               not_found ->
                                   rebar_app_info:new(Parent, Name, Vsn, Dir, [])
                           end,
-                      rebar_app_info:source(AppInfo0, Source0)
+                      rebar_app_info:source(AppInfo0, Source1)
               end,
     Overrides = rebar_app_info:get(AppInfo, overrides, []) ++ rebar_state:get(State, overrides, []),
     AppInfo2 = rebar_app_info:set(AppInfo, overrides, Overrides),
@@ -286,10 +286,23 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source0, IsLock, State) ->
 %% and optionally get the version. Because of this we must keep the clone as a
 %% usable git repo clone and using a subdir can not be copied out of it but must
 %% have the app info set its directory to be a sub directory of the repo.
-subdir({git_subdir, _Repo, _Ref, Dir}) ->
-    Dir;
-subdir(_) ->
-    "".
+subdir(Name, {git_subdir, _Repo, _Ref, Dir}=Source) ->
+    NameList = rebar_utils:to_list(Name),
+
+    %% To work with Erlang's `code' server the directory the application is in
+    %% must be the same name as the application.
+    %% Here we append the name of the application if it isn't already the last
+    %% part of the path.
+    Base = filename:basename(Dir),
+    case NameList =:= Base of
+        true ->
+            {Dir, Source};
+        false ->
+            NewDir = filename:join(Dir, NameList),
+            {NewDir, {git_subdir, _Repo, _Ref, NewDir}}
+    end;
+subdir(_, Source) ->
+    {"", Source}.
 
 %% @doc Takes a given application app_info record along with the project.
 %% If the app is a package, resolve and expand the package definition.
