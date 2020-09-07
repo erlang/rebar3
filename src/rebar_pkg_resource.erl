@@ -218,7 +218,8 @@ store_etag_in_cache(Path, ETag) ->
 cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoConfig}, State, ETag,
                 ETagPath, UpdateETag) ->
     CDN = maybe_default_cdn(State),
-    case request(RepoConfig#{repo_url => CDN}, Name, Vsn, ETag) of
+    RepoConfigWithURL = maybe_fill_url_with_cdn(RepoConfig, CDN),
+    case request(RepoConfigWithURL, Name, Vsn, ETag) of
         {ok, cached} ->
             ?INFO("Version cached at ~ts is up to date, reusing it", [CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg);
@@ -237,6 +238,11 @@ cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoCon
 maybe_default_cdn(State) ->
     CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
 	rebar_utils:to_binary(CDN).
+
+maybe_fill_url_with_cdn(RepoConfig = #{repo_url := _}, _CDN) ->
+    RepoConfig;
+maybe_fill_url_with_cdn(RepoConfig, CDN) ->
+    RepoConfig#{repo_url => CDN}.
 
 -spec serve_from_cache(TmpDir, CachePath, Pkg) -> Res when
       TmpDir :: file:name(),
