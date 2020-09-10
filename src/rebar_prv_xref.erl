@@ -212,7 +212,7 @@ display_xref_results_for_type({Type, XrefResults}) ->
 
 display_xref_result_fun(Type) ->
     fun(XrefResult) ->
-            {FormattedSource, SMFA, TMFA} =
+            {Source, SMFA, TMFA} =
                 case XrefResult of
                     {MFASource, MFATarget} ->
                         {format_mfa_source(MFASource),
@@ -223,7 +223,6 @@ display_xref_result_fun(Type) ->
                          format_mfa(MFATarget),
                          undefined}
                 end,
-            Source = rebar_dir:make_relative_path(FormattedSource, rebar_dir:get_cwd()),
             case Type of
                 undefined_function_calls ->
                     io_lib:format("~tsWarning: ~ts calls undefined function ~ts (Xref)\n",
@@ -294,7 +293,8 @@ find_function_source(M, F, A, Bin) ->
 
 find_function_source_in_abstract_code(F, A, AbstractCode) ->
     %% Extract the original source filename from the abstract code
-    [{attribute, _, file, {Source, _}} | _] = AbstractCode,
+    [{attribute, _, file, {Source0, _}} | _] = AbstractCode,
+    Source = rebar_dir:make_relative_path(Source0, rebar_dir:get_cwd()),
     %% Extract the line number for a given function def
     Fn = [E || E <- AbstractCode,
                safe_element(1, E) == function,
