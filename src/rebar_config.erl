@@ -119,7 +119,10 @@ maybe_write_lock_file(LockFile, Locks, Locks) ->
     Terms = consult_file_(LockFile),
     case Terms of
         [] ->
-            ok;
+            case filelib:is_regular(LockFile) of
+                true -> ok;
+                false -> write_lock_file(LockFile, Locks)
+            end;
         [{?CONFIG_VERSION, FileLocks}|_] when is_list(FileLocks) ->
             ok;
         _ ->
