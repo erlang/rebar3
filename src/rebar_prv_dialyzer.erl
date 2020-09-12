@@ -171,7 +171,7 @@ do(Args, State, Plt) ->
         0 ->
             {ok, State2};
         TotalWarnings ->
-            ?INFO("Warnings written to ~ts", [Output]),
+            ?INFO("Warnings written to ~ts", [rebar_dir:format_source_file_name(Output)]),
             throw({dialyzer_warnings, TotalWarnings})
     end.
 
@@ -346,7 +346,7 @@ read_plt(_State, Plt) ->
         {error, not_valid} ->
             error;
         {error, read_error} ->
-            Error = io_lib:format("Could not read the PLT file ~p", [Plt]),
+            Error = io_lib:format("Could not read the PLT file ~ts", [rebar_dir:format_source_file_name(Plt)]),
             throw({dialyzer_error, Error})
     end.
 
@@ -364,7 +364,7 @@ read_plt_files(Plt, Files) ->
         [] ->
             {ok, Files};
         Missing ->
-            ?INFO("Could not find ~p files in ~p...", [length(Missing), Plt]),
+            ?INFO("Could not find ~p files in ~ts...", [length(Missing), rebar_dir:format_source_file_name(Plt)]),
             ?DEBUG("Could not find files: ~p", [Missing]),
             error
     end.
@@ -383,19 +383,19 @@ check_plt(State, Plt, Output, OldList, FilesList) ->
 remove_plt(State, _Plt, _Output, []) ->
     {0, State};
 remove_plt(State, Plt, Output, Files) ->
-    ?INFO("Removing ~b files from ~p...", [length(Files), Plt]),
+    ?INFO("Removing ~b files from ~ts...", [length(Files), rebar_dir:format_source_file_name(Plt)]),
     run_plt(State, Plt, Output, plt_remove, Files).
 
 check_plt(State, _Plt, _Output, []) ->
     {0, State};
 check_plt(State, Plt, Output, Files) ->
-    ?INFO("Checking ~b files in ~p...", [length(Files), Plt]),
+    ?INFO("Checking ~b files in ~ts...", [length(Files), rebar_dir:format_source_file_name(Plt)]),
     run_plt(State, Plt, Output, plt_check, Files).
 
 add_plt(State, _Plt, _Output, []) ->
     {0, State};
 add_plt(State, Plt, Output, Files) ->
-    ?INFO("Adding ~b files to ~p...", [length(Files), Plt]),
+    ?INFO("Adding ~b files to ~ts...", [length(Files), rebar_dir:format_source_file_name(Plt)]),
     run_plt(State, Plt, Output, plt_add, Files).
 
 run_plt(State, Plt, Output, Analysis, Files) ->
@@ -413,7 +413,8 @@ build_proj_plt(Args, State, Plt, Output, Files) ->
     ?INFO("Updating base plt...", []),
     BaseFiles = base_plt_files(State),
     {BaseWarnings, State1} = update_base_plt(State, BasePlt, Output, BaseFiles),
-    ?INFO("Copying ~p to ~p...", [BasePlt, Plt]),
+    ?INFO("Copying ~ts to ~ts...", [rebar_dir:format_source_file_name(BasePlt),
+                                    rebar_dir:format_source_file_name(Plt)]),
     _ = filelib:ensure_dir(Plt),
     case file:copy(BasePlt, Plt) of
         {ok, _} ->
@@ -421,7 +422,7 @@ build_proj_plt(Args, State, Plt, Output, Files) ->
                                                 Files),
             {BaseWarnings + CheckWarnings, State2};
         {error, Reason} ->
-            Error = io_lib:format("Could not copy PLT from ~p to ~p: ~p",
+            Error = io_lib:format("Could not copy PLT from ~ts to ~ts: ~ts",
                                   [BasePlt, Plt, file:format_error(Reason)]),
             throw({dialyzer_error, Error})
     end.
@@ -455,7 +456,7 @@ update_base_plt(State, BasePlt, Output, BaseFiles) ->
     end.
 
 build_plt(State, Plt, _, []) ->
-    ?INFO("Building with no files in ~p...", [Plt]),
+    ?INFO("Building with no files in ~ts...", [rebar_dir:format_source_file_name(Plt)]),
     Opts = [{get_warnings, false},
             {output_plt, Plt},
             {apps, [erts]}],
@@ -466,7 +467,7 @@ build_plt(State, Plt, _, []) ->
     _ = dialyzer:run([{analysis_type, plt_remove}, {init_plt, Plt} | Opts]),
     {0, State};
 build_plt(State, Plt, Output, Files) ->
-    ?INFO("Building with ~b files in ~p...", [length(Files), Plt]),
+    ?INFO("Building with ~b files in ~ts...", [length(Files), rebar_dir:format_source_file_name(Plt)]),
     GetWarnings = get_config(State, get_warnings, false),
     Opts = [{analysis_type, plt_build},
             {get_warnings, GetWarnings},
@@ -485,10 +486,10 @@ succ_typings(Args, State, Plt, Output) ->
     end.
 
 succ_typings_(State, Plt, _, []) ->
-    ?INFO("Analyzing no files with ~p...", [Plt]),
+    ?INFO("Analyzing no files with ~ts...", [rebar_dir:format_source_file_name(Plt)]),
     {0, State};
 succ_typings_(State, Plt, Output, Files) ->
-    ?INFO("Analyzing ~b files with ~p...", [length(Files), Plt]),
+    ?INFO("Analyzing ~b files with ~ts...", [length(Files), rebar_dir:format_source_file_name(Plt)]),
     Opts = [{analysis_type, succ_typings},
             {get_warnings, true},
             {from, byte_code},
