@@ -3,7 +3,7 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-all() -> [sub_app_deps, newly_added_dep, newly_added_after_empty_lock,
+all() -> [sub_app_deps, newly_added_dep, newly_added_after_empty_lock, no_deps_empty_lock,
           http_proxy_settings, https_proxy_settings,
           http_os_proxy_settings, https_os_proxy_settings,
           semver_matching_lt, semver_matching_lte, semver_matching_gt,
@@ -44,6 +44,8 @@ init_per_testcase(semver_matching_lte, Config) ->
 init_per_testcase(semver_matching_gt, Config) ->
     rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(newly_added_after_empty_lock, Config) ->
+    rebar_test_utils:init_rebar_state(Config);
+init_per_testcase(no_deps_empty_lock, Config) ->
     rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(newly_added_dep, Config) ->
     rebar_test_utils:init_rebar_state(Config);
@@ -384,6 +386,26 @@ newly_added_after_empty_lock(Config) ->
       Config, RebarConfig3, ["compile"],
       {ok, [{app, Name}, {dep, "a", "1.0.0"}]}).
 
+no_deps_empty_lock(Config) ->
+    AppDir = ?config(apps, Config),
+    Deps = rebar_test_utils:expand_deps(git, []),
+    mock_git_resource:mock([{deps, Deps}]),
+
+    {ok, RebarConfig} = file:consult(rebar_test_utils:create_config(AppDir, [{deps, Deps}])),
+    rebar_test_utils:run_and_check(
+      Config, RebarConfig, ["compile"],
+      {ok, []}),
+
+    LockFile = filename:join(AppDir, "rebar.lock"),
+    %% the lock file should exist
+    {ok,_} = file:read_file_info(LockFile),
+
+    %% and just in case, it should be empty
+    ?assertEqual([], rebar_config:consult_lock_file(LockFile)),
+    %% which means that merging that lock file with the current config
+    %% returns the same config
+    ?assertEqual(RebarConfig, rebar_config:merge_locks(RebarConfig,
+                                            rebar_config:consult_lock_file(LockFile))).
 
 http_proxy_settings(_Config) ->
     %% Load config
