@@ -51,12 +51,14 @@ normalize_targets(List) ->
     %% Plan for the eventuality of getting values piped in
     %% from future versions of rebar3, possibly from plugins and so on,
     %% which means we'd risk failing kind of violently. We only support
-    %% deps and plugins
+    %% deps, plugins and runtime deps.
     TmpList = lists:foldl(
       fun(deps, [deps | _] = Acc) -> Acc;
          (plugins, [plugins | _] = Acc) -> Acc;
+         (runtime, [runtime | _] = Acc) -> Acc;
          (deps, Acc) -> [deps | Acc -- [deps]];
          (plugins, Acc) -> [plugins | Acc -- [plugins]];
+         (runtime, Acc) -> [runtime | Acc -- [runtime]];
          (_, Acc) -> Acc
       end,
       [],
@@ -196,7 +198,9 @@ app_groups(Targets, State) ->
 get_paths(deps, State) ->
     rebar_state:code_paths(State, all_deps);
 get_paths(plugins, State) ->
-    rebar_state:code_paths(State, all_plugin_deps).
+    rebar_state:code_paths(State, all_plugin_deps);
+get_paths(runtime, State) ->
+    rebar_state:code_paths(State, all_deps).
 
 get_apps(deps, State) ->
     %% The code paths for deps also include the top level apps
@@ -208,4 +212,27 @@ get_apps(deps, State) ->
     end ++
     rebar_state:all_deps(State);
 get_apps(plugins, State) ->
-    rebar_state:all_plugin_deps(State).
+    rebar_state:all_plugin_deps(State);
+get_apps(runtime, State) ->
+    %% We get all project apps and for each of them we find
+    %% their runtime deps (i.e., `applications' and `included_applications').
+    ProjectApps = rebar_state:project_apps(State),
+    RuntimeApps =
+        [begin
+            Apps = rebar_app_info:applications(App),
+            IncludedApps = rebar_app_info:included_applications(App),
+            lists:foldl(
+              fun(AppName0, Acc) ->
+                  %% If the App is an atom convert it to a binary, otherwise leave it as it is.
+                  AppName1 = if is_atom(AppName0) -> atom_to_binary(AppName0, utf8);
+                                true -> AppName0
+                             end,
+                  %% We only care about those apps we could find in the `State'.
+                  case rebar_app_utils:find(AppName1, ProjectApps) of
+                      {ok, AppInfo} -> [AppInfo|Acc];
+                      error -> Acc
+                  end
+              end, [App], Apps ++ IncludedApps)
+         end || App <- ProjectApps],
+    %% We get rid of duplicated apps from the flattened list.
+    lists:usort(lists:flatten(RuntimeApps)).

@@ -36,7 +36,7 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    rebar_paths:set_paths([deps], State),
+    rebar_paths:set_paths([runtime], State),
     XrefChecks = prepare(State),
     XrefIgnores = rebar_state:get(State, xref_ignores, []),
     %% Run xref checks
