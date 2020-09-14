@@ -200,7 +200,8 @@ get_paths(deps, State) ->
 get_paths(plugins, State) ->
     rebar_state:code_paths(State, all_plugin_deps);
 get_paths(runtime, State) ->
-    rebar_state:code_paths(State, all_deps).
+    RuntimeApps = get_apps(runtime, State),
+    [rebar_app_info:ebin_dir(App) || App <- RuntimeApps].
 
 get_apps(deps, State) ->
     %% The code paths for deps also include the top level apps
@@ -217,22 +218,26 @@ get_apps(runtime, State) ->
     %% We get all project apps and for each of them we find
     %% their runtime deps (i.e., `applications' and `included_applications').
     ProjectApps = rebar_state:project_apps(State),
-    RuntimeApps =
-        [begin
-            Apps = rebar_app_info:applications(App),
-            IncludedApps = rebar_app_info:included_applications(App),
-            lists:foldl(
-              fun(AppName0, Acc) ->
-                  %% If the App is an atom convert it to a binary, otherwise leave it as it is.
-                  AppName1 = if is_atom(AppName0) -> atom_to_binary(AppName0, utf8);
-                                true -> AppName0
-                             end,
-                  %% We only care about those apps we could find in the `State'.
-                  case rebar_app_utils:find(AppName1, ProjectApps) of
-                      {ok, AppInfo} -> [AppInfo|Acc];
-                      error -> Acc
-                  end
-              end, [App], Apps ++ IncludedApps)
-         end || App <- ProjectApps],
-    %% We get rid of duplicated apps from the flattened list.
-    lists:usort(lists:flatten(RuntimeApps)).
+    AppsList = rebar_state:project_apps(State) ++ rebar_state:all_deps(State),
+    get_runtime_apps(ProjectApps, sets:new(), AppsList).
+
+get_runtime_apps([], RuntimeApps, _AppsList) -> sets:to_list(RuntimeApps);
+%% We skip those apps that are not AppInfos.
+get_runtime_apps([App|Rest], AppsAcc0, AppsList) when is_atom(App) orelse is_binary(App) ->
+    get_runtime_apps(Rest, AppsAcc0, AppsList);
+get_runtime_apps([App|Rest0], AppsAcc0, AppsList) ->
+    Apps = rebar_app_info:applications(App),
+    IncludedApps = rebar_app_info:included_applications(App),
+    TotalApps0 = [atom_to_binary(A, utf8) || A <- (Apps ++ IncludedApps)],
+    TotalApps = TotalApps0 -- [rebar_app_info:name(A) || A <- sets:to_list(AppsAcc0)],
+
+    {Rest1, AppsAcc1} =
+        lists:foldl(
+            fun(AppName, {Rest, Acc}) ->
+                %% We only care about those apps we ccould find in the state.
+                case rebar_app_utils:find(AppName, AppsList) of
+                    {ok, AppInfo} -> {[AppInfo|Rest], sets:add_element(AppInfo, Acc)};
+                    error -> {Rest, Acc}
+                end
+            end, {Rest0, sets:add_element(App, AppsAcc0)}, TotalApps),
+    get_runtime_apps(Rest1 ++ TotalApps, AppsAcc1, AppsList).
