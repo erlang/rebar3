@@ -243,3 +243,12 @@
 {xref_queries,
  [{"(XC - UC) || (XU - X - B"
    " - (\"mod\":\".*foo\"/\"4\"))",[]}]}.
+
+%% You might want to exclude certains functions or modules from your
+%% rebar3 xref analysis.
+%% You can do so with the following option, that takes as list items
+%% one or more of a combination of:
+%% * module(),
+%% * {module(), function()},
+%% * {module(), function(), arity()}
+{xref_ignores, []}.
