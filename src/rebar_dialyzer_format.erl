@@ -27,6 +27,21 @@ format_warnings(Opts, Warnings) ->
 
 
 %% If the last seen file is and the file of this warning are the same
+
+%% `dialyzer_cl` returns _Filename = "", _Line = 0 for `unknown`
+format_warning_(_Opts, Warning = {_Tag, {"" = _SrcFile0, 0 = Line}, Msg}, {_LastFile, Acc}) ->
+    SrcFile = "<path unknown>",
+    try
+        F = fmt("~!_c~ts", [SrcFile]),
+        String = message_to_string(Msg),
+        {SrcFile, [lists:flatten(fmt("~n~ts~n~!c~4w~!!: ~ts", [F, Line, String])) | Acc]}
+    catch
+        ?WITH_STACKTRACE(Error, Reason, Stacktrace)
+            ?DEBUG("Failed to pretty format warning: ~p:~p~n~p",
+                   [Error, Reason, Stacktrace]),
+            {SrcFile, [dialyzer:format_warning(Warning, fullpath) | Acc]}
+    end;
+
 %% we skip the file header
 format_warning_(_Opts, Warning = {_Tag, {File, Line}, Msg}, {File, Acc}) ->
     try
