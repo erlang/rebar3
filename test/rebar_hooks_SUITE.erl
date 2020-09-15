@@ -25,7 +25,7 @@ all() ->
     [build_and_clean_app, run_hooks_once, run_hooks_once_profiles,
      escriptize_artifacts, run_hooks_for_plugins, deps_hook_namespace,
      bare_compile_hooks_default_ns, deps_clean_hook_namespace, eunit_app_hooks,
-     sub_app_hooks, root_hooks].
+     sub_app_hooks, root_hooks, run_hooks_with_top_level_cmdargs].
 
 %% Test post provider hook cleans compiled project app, leaving it invalid
 build_and_clean_app(Config) ->
@@ -254,3 +254,17 @@ root_hooks(Config) ->
       Config, RConf, ["compile"],
       {ok, [{app, Name, invalid}]}
      ).
+
+%% test that command-line arguments don't crash provider hooks invocation
+run_hooks_with_top_level_cmdargs(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+
+    RebarConfig = [{pre_hooks, [{compile, ct}]}],
+
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile", "-d"], {ok, [{app, Name, valid}]}).

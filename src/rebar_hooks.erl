@@ -22,9 +22,13 @@ run_all_hooks(Dir, Type, Command, Providers, State) ->
     run_hooks(Dir, Type, Command, rebar_state:opts(State), State).
 
 run_project_and_app_hooks(Dir, Type, Command, Providers, State) ->
-    ProjectApps = rebar_state:project_apps(State),
-    [rebar_hooks:run_all_hooks(Dir, Type, Command, Providers, AppInfo, State) || AppInfo <- ProjectApps],
-    run_all_hooks(Dir, Type, Command, Providers, State).
+    % The command_args which the original invocation of rebar received are most
+    % likely not applicable to the hooks which will be called. Therefore, the
+    % args are discarded to not crash provider hook invocations.
+    State1 = rebar_state:command_args(State, []),
+    ProjectApps = rebar_state:project_apps(State1),
+    [rebar_hooks:run_all_hooks(Dir, Type, Command, Providers, AppInfo, State1) || AppInfo <- ProjectApps],
+    run_all_hooks(Dir, Type, Command, Providers, State1).
 
 run_provider_hooks(Dir, Type, Command, Providers, Opts, State) ->
     case rebar_opts:get(Opts, provider_hooks, []) of
