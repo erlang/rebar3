@@ -258,8 +258,10 @@
 %% When you want a certain combination of operations to be done
 %% as if you were using a rebar3 command. In the example below:
 %% > rebar3 check
+%%   (equivalent to rebar3 do xref, dialyzer)
 %% or
 %% > rebar3 test
+%%   (equivalent to rebar3 do eunit, ct --suite=rebar_alias_SUITE, cover)
 
 {alias, [{check, [xref, dialyzer]},
          {test, [eunit, {ct, "--suite=rebar_alias_SUITE"}, cover]}]}.
