@@ -39,21 +39,25 @@ init_per_testcase(Case, Config) ->
     EPlug = fake_app(<<"rp_e">>, <<"1.0.0">>,
                      InDir("_build/default/plugins/lib/rp_e/")),
 
+    TopApp0 = fake_app(<<"top_app">>, <<"1.0.0">>, InDir("_build/default/lib/top_app/"), [<<"rp_a">>, <<"rp_b">>]),
+    TopApp1 = rebar_app_info:applications(TopApp0, ['rp_a', 'rp_b']),
+
     S0 = rebar_state:new(),
     S1 = rebar_state:all_deps(S0, [ADep, BDep, CDep, DDep, RelxDep]),
     S2 = rebar_state:all_plugin_deps(S1, [APlug, RelxPlug]),
-    S3 = rebar_state:code_paths(S2, default, code:get_path()),
-    S4 = rebar_state:code_paths(
-        S3,
+    S3 = rebar_state:project_apps(S2, [TopApp1]),
+    S4 = rebar_state:code_paths(S3, default, code:get_path()),
+    S5 = rebar_state:code_paths(
+        S4,
         all_deps,
         [rebar_app_info:ebin_dir(A) || A <- [ADep, BDep, CDep, DDep, RelxDep]]
     ),
-    S5 = rebar_state:code_paths(
-        S4,
+    S6 = rebar_state:code_paths(
+        S5,
         all_plugin_deps,
         [rebar_app_info:ebin_dir(A) || A <- [APlug, RelxPlug, EPlug]]
     ),
-    [{base_paths, BasePaths}, {root_dir, Dir}, {state, S5} | Config].
+    [{base_paths, BasePaths}, {root_dir, Dir}, {state, S6} | Config].
 
 end_per_testcase(_, Config) ->
     %% this is deeply annoying because we interfere with rebar3's own
@@ -63,13 +67,19 @@ end_per_testcase(_, Config) ->
 
 fake_app(Name, Vsn, OutDir) ->
     {ok, App} = rebar_app_info:new(Name, Vsn, OutDir),
-    compile_fake_appmod(App),
+    compile_fake_appmod(App, []),
     App.
 
-compile_fake_appmod(App) ->
+fake_app(Name, Vsn, OutDir, Apps) ->
+    {ok, App} = rebar_app_info:new(Name, Vsn, OutDir),
+    compile_fake_appmod(App, Apps),
+    App.
+
+compile_fake_appmod(App, Apps) ->
     OutDir = rebar_app_info:ebin_dir(App),
     Vsn = rebar_app_info:original_vsn(App),
     Name = rebar_app_info:name(App),
+    AppsStr = apps_to_str(Apps),
 
     ok = filelib:ensure_dir(filename:join([OutDir, ".touch"])),
 
@@ -79,7 +89,7 @@ compile_fake_appmod(App) ->
       "  {vsn, \"", Vsn, "\"}, "
       "  {modules, [",Name,"]}, "
       "  {registered, []}, "
-      "  {applications, [stdlib, kernel]} "
+      "  {applications, [" ++ AppsStr ++ "]} "
       " ]}. "],
 
     ok = file:write_file(filename:join([OutDir, <<Name/binary, ".app">>]), AppFile),
@@ -111,60 +121,94 @@ clashing_apps(Config) ->
 set_paths(Config) ->
     State = ?config(state, Config),
     RootDir = filename:split(?config(root_dir, Config)),
+    %% Take a snapshot of runtime deps being set; to see if your test is valid, this should fail
+    %% when you set the [deps] paths here
+    rebar_paths:set_paths([runtime], State),
+    RuntimePaths = code:get_path(),
+    %% Revert back to regular dep paths
     rebar_paths:set_paths([plugins, deps], State),
     PluginPaths = code:get_path(),
     rebar_paths:set_paths([deps, plugins], State),
     DepPaths = code:get_path(),
 
+    %% Plugin related paths checks
     ?assertEqual(
        RootDir ++ ["_build", "default", "plugins", "lib", "rp_a", "ebin"],
-       find_first_instance("rp_a", PluginPaths)
+       find_first_instance(RootDir, "rp_a", PluginPaths)
     ),
     ?assertEqual(
        RootDir ++ ["_build", "default", "lib", "rp_b", "ebin"],
-       find_first_instance("rp_b", PluginPaths)
+       find_first_instance(RootDir, "rp_b", PluginPaths)
     ),
     ?assertEqual(
        RootDir ++ ["_build", "default", "lib", "rp_c", "ebin"],
-       find_first_instance("rp_c", PluginPaths)
+       find_first_instance(RootDir, "rp_c", PluginPaths)
     ),
     ?assertEqual(
        RootDir ++ ["_build", "default", "lib", "rp_d", "ebin"],
-       find_first_instance("rp_d", PluginPaths)
+       find_first_instance(RootDir, "rp_d", PluginPaths)
     ),
     ?assertEqual(
        RootDir ++ ["_build", "default", "plugins", "lib",  "rp_e", "ebin"],
-       find_first_instance("rp_e", PluginPaths)
+       find_first_instance(RootDir, "rp_e", PluginPaths)
     ),
     ?assertEqual(
        RootDir ++ ["_build", "default", "plugins", "lib", "relx", "ebin"],
-       find_first_instance("relx", PluginPaths)
+       find_first_instance(RootDir, "relx", PluginPaths)
     ),
 
 
+    %% Dependency related paths checks
     ?assertEqual(
        RootDir ++ ["_build", "default", "lib", "rp_a", "ebin"],
-       find_first_instance("rp_a", DepPaths)
+       find_first_instance(RootDir, "rp_a", DepPaths)
     ),
     ?assertEqual(
        RootDir ++ ["_build", "default", "lib", "rp_b", "ebin"],
-       find_first_instance("rp_b", DepPaths)
+       find_first_instance(RootDir, "rp_b", DepPaths)
     ),
     ?assertEqual(
        RootDir ++ ["_build", "default", "lib", "rp_c", "ebin"],
-       find_first_instance("rp_c", DepPaths)
+       find_first_instance(RootDir, "rp_c", DepPaths)
     ),
     ?assertEqual(
        RootDir ++ ["_build", "default", "lib", "rp_d", "ebin"],
-       find_first_instance("rp_d", DepPaths)
+       find_first_instance(RootDir, "rp_d", DepPaths)
     ),
     ?assertEqual(
        RootDir ++ ["_build", "default", "plugins", "lib", "rp_e", "ebin"],
-       find_first_instance("rp_e", DepPaths)
+       find_first_instance(RootDir, "rp_e", DepPaths)
     ),
     ?assertEqual(
        RootDir ++ ["_build", "default", "lib", "relx", "ebin"],
-       find_first_instance("relx", DepPaths)
+       find_first_instance(RootDir, "relx", DepPaths)
+    ),
+
+
+    %% Runtime related paths checks
+    ?assertEqual(
+       RootDir ++ ["_build", "default", "lib", "rp_a", "ebin"],
+       find_first_instance(RootDir, "rp_a", RuntimePaths)
+    ),
+    ?assertEqual(
+       RootDir ++ ["_build", "default", "lib", "rp_b", "ebin"],
+       find_first_instance(RootDir, "rp_b", RuntimePaths)
+    ),
+    ?assertMatch(
+       {not_found, _},
+       find_first_instance(RootDir, "rp_c", RuntimePaths)
+    ),
+    ?assertMatch(
+       {not_found, _},
+       find_first_instance(RootDir, "rp_d", RuntimePaths)
+    ),
+    ?assertMatch(
+       {not_found, _},
+       find_first_instance(RootDir, "rp_e", RuntimePaths)
+    ),
+    ?assertMatch(
+       {not_found, _},
+       find_first_instance(RootDir, "relx", RuntimePaths)
     ),
     ok.
 
@@ -230,11 +274,23 @@ misloaded_mods(_Config) ->
 %%% HELPERS %%%
 %%%%%%%%%%%%%%%
 
-find_first_instance(Frag, []) ->
+find_first_instance(_RootDir, Frag, []) ->
     {not_found, Frag};
-find_first_instance(Frag, [Path|Rest]) ->
+find_first_instance(RootDir, Frag, [Path|Rest]) ->
     Frags = filename:split(Path),
     case lists:member(Frag, Frags) of
-        true -> Frags;
-        false -> find_first_instance(Frag, Rest)
+        true ->
+            %% When testing the runtime deps the paths would have
+            %% apps such as `relx' that were not from within the root dir.
+            case re:run(Frags, RootDir) of
+                nomatch -> find_first_instance(RootDir, Frag, Rest);
+                {match, _} -> Frags
+            end;
+        false -> find_first_instance(RootDir, Frag, Rest)
     end.
+
+apps_to_str([]) ->
+    "stdlib, kernel";
+apps_to_str(Apps) ->
+    AppsStr = unicode:characters_to_list(lists:join(", ", Apps)),
+    "stdlib, kernel, " ++ AppsStr.
