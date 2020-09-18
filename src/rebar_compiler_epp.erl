@@ -71,9 +71,9 @@ flush() ->
 %% Caches result for subsequent requests.
 -spec resolve_source(atom() | file:filename_all(), [file:filename_all()]) -> {true, file:filename_all()} | false.
 resolve_source(Name, Dirs) when is_atom(Name) ->
-    gen_server:call(?MODULE, {resolve, atom_to_list(Name) ++ ".erl", Dirs}, 60000);
+    gen_server:call(?MODULE, {resolve, atom_to_list(Name) ++ ".erl", Dirs}, infinity);
 resolve_source(Name, Dirs) when is_list(Name) ->
-    gen_server:call(?MODULE, {resolve, Name, Dirs}, 60000).
+    gen_server:call(?MODULE, {resolve, Name, Dirs}, infinity).
 
 -record(state, {
     %% filesystem cache, denormalised
