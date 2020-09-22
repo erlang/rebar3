@@ -29,7 +29,7 @@ Rebar3 will:
 
 Rebar3 is also a self-contained Erlang script. It is easy to distribute or
 embed directly in a project. Tasks or behaviours can be modified or expanded
-with a [plugin system](https://www.rebar3.org/docs/using-available-plugins)
+with a [plugin system](https://www.rebar3.org/docs/plugins/#available-plugins)
 [flexible enough](https://www.rebar3.org/docs/plugins) that even other languages
 on the Erlang VM will use it as a build tool.
 
