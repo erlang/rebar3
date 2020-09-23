@@ -101,5 +101,7 @@ warn_on_empty_profile(Profiles, State) ->
     ProjectApps = rebar_state:project_apps(State),
     DefinedProfiles = rebar_state:get(State, profiles, []) ++
         lists:flatten([rebar_app_info:get(AppInfo, profiles, []) || AppInfo <- ProjectApps]),
-    [?WARN("No entry for profile ~ts in config.", [Profile]) ||
-        Profile <- Profiles, not(lists:keymember(list_to_atom(Profile), 1, DefinedProfiles))].
+    [?WARN("No entry for profile ~ts in config.", [Profile]) 
+     || Profile <- Profiles,
+        not lists:keymember(list_to_atom(Profile), 1, DefinedProfiles),
+        Profile =/= "global"].
