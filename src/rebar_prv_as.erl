@@ -104,4 +104,5 @@ warn_on_empty_profile(Profiles, State) ->
     [?WARN("No entry for profile ~ts in config.", [Profile]) 
      || Profile <- Profiles,
         not lists:keymember(list_to_atom(Profile), 1, DefinedProfiles),
-        Profile =/= "global"].
+        Profile =/= "global", Profile =/= "default"],
+    ok.
