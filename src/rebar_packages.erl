@@ -370,7 +370,7 @@ handle_missing_no_exception(Fun, Dep, State) ->
     end.
 
 resolve_version_(Dep, DepVsn, Repo, HexRegistry, State) ->
-    case fetch_transitive_vsn(DepVsn) of
+    case select_complex_version(DepVsn) of
         <<"~>", Vsn/binary>> ->
             highest_matching(Dep, rm_ws(Vsn), Repo, HexRegistry, State);
         <<">=", Vsn/binary>> ->
@@ -393,7 +393,7 @@ rm_ws(R) ->
     ec_semver:parse(R).
 
 valid_vsn(Vsn) ->
-    TVsn = fetch_transitive_vsn(Vsn),
+    TVsn = select_complex_version(Vsn),
     %% Regepx from https://github.com/sindresorhus/semver-regex/blob/master/index.js
     SemVerRegExp = "v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*))?"
         "(-[0-9a-z-]+(\\.[0-9a-z-]+)*)?(\\+[0-9a-z-]+(\\.[0-9a-z-]+)*)?",
@@ -403,9 +403,9 @@ valid_vsn(Vsn) ->
 vsn_pre_pattern() ->
     "(>=?|<=?|~>|==)?\\s*".
 
-fetch_transitive_vsn(Vsn) ->
+select_complex_version(Vsn) ->
     %% for removing `and` and `or` from dependecy and getting the highest version
-    case re:split(Vsn, <<"\s*or\s*|\s*and\s*">>) of
+    case re:split(Vsn, <<"\\s+or\\s+|\\s+and\\s+">>) of
         [Vsn] ->
             Vsn;
         Vsns ->
