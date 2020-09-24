@@ -370,7 +370,7 @@ handle_missing_no_exception(Fun, Dep, State) ->
     end.
 
 resolve_version_(Dep, DepVsn, Repo, HexRegistry, State) ->
-    case DepVsn of
+    case fetch_transitive_vsn(DepVsn) of
         <<"~>", Vsn/binary>> ->
             highest_matching(Dep, rm_ws(Vsn), Repo, HexRegistry, State);
         <<">=", Vsn/binary>> ->
@@ -393,11 +393,37 @@ rm_ws(R) ->
     ec_semver:parse(R).
 
 valid_vsn(Vsn) ->
+    TVsn = fetch_transitive_vsn(Vsn),
     %% Regepx from https://github.com/sindresorhus/semver-regex/blob/master/index.js
     SemVerRegExp = "v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*))?"
         "(-[0-9a-z-]+(\\.[0-9a-z-]+)*)?(\\+[0-9a-z-]+(\\.[0-9a-z-]+)*)?",
-    SupportedVersions = "^(>=?|<=?|~>|==)?\\s*" ++ SemVerRegExp ++ "$",
-    re:run(Vsn, SupportedVersions, [unicode]) =/= nomatch.
+    SupportedVersions = "^" ++ vsn_pre_pattern() ++ SemVerRegExp ++ "$",
+    re:run(TVsn, SupportedVersions, [unicode]) =/= nomatch.
+
+vsn_pre_pattern() ->
+    "(>=?|<=?|~>|==)?\\s*".
+
+fetch_transitive_vsn(Vsn) ->
+    %% for removing `and` and `or` from dependecy and getting the highest version
+    case re:split(Vsn, <<"\s*or\s*|\s*and\s*">>) of
+        [Vsn] ->
+            Vsn;
+        Vsns ->
+            highest_version(Vsns)
+    end.
+
+highest_version(Vsns) ->
+    {Highest, _} = lists:foldl(
+        fun(Vsn, {HVsn, HVsnVal} = Acc) ->
+            VsnVal = re:replace(Vsn, vsn_pre_pattern(), "", [{return, binary}]),
+            case (HVsn =:= none orelse ec_semver:gt(VsnVal, HVsnVal)) of
+                true ->
+                    {Vsn, VsnVal};
+                false ->
+                    Acc
+            end
+        end, {none, none}, Vsns),
+    Highest.
 
 highest_matching(Dep, Vsn, Repo, HexRegistry, State) ->
     find_highest_matching_(Dep, Vsn, #{name => Repo}, HexRegistry, State).
