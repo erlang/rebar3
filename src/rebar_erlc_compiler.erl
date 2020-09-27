@@ -620,7 +620,7 @@ compile_mib(AppInfo) ->
                 rebar_file_utils:mv(HrlFilename, AppInclude),
                 ok;
             {error, compilation_failed} ->
-                ?FAIL
+                ?ABORT
         end
     end.
 

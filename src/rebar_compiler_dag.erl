@@ -134,7 +134,7 @@ finalise_populate_sources(G, InDirs, Waiting) ->
         {'DOWN', _MRef, process, Pid, Reason} ->
             {_Status, Source} = maps:get(Pid, Waiting),
             ?ERROR("Failed to get dependencies for ~s~n~p", [Source, Reason]),
-            ?FAIL
+            ?ABORT
     end.
 
 %% @doc this function scans all the source files found and looks into

@@ -429,7 +429,8 @@ warn_skip_deps(AppInfo, State) ->
                 false -> ok
             end;
         true ->
-            ?ERROR(Msg, Args), ?FAIL
+            ?ERROR(Msg, Args),
+            ?ABORT
     end.
 
 not_needs_compile(App) ->

@@ -272,7 +272,7 @@ do_compile(CompilerMod, Source, Outs, Config, Opts) ->
             ?ERROR("Compiling ~ts failed", [NewSource]),
             maybe_report(Error),
             ?DEBUG("Compilation failed: ~p", [Error]),
-            ?FAIL
+            ?ABORT
     end.
 
 do_compile_and_track(CompilerMod, Source, Outs, Config, Opts) ->
@@ -292,7 +292,7 @@ do_compile_and_track(CompilerMod, Source, Outs, Config, Opts) ->
             ?ERROR("Compiling ~ts failed", [NewSource]),
             maybe_report(Error),
             ?DEBUG("Compilation failed: ~p", [Error]),
-            ?FAIL
+            ?ABORT
     end.
 
 store_artifacts(_G, []) ->
@@ -341,7 +341,7 @@ compile_handler({Error, Source}, [Config | _Rest]) ->
     NewSource = format_error_source(Source, Config),
     ?ERROR("Compiling ~ts failed", [NewSource]),
     maybe_report(Error),
-    ?FAIL.
+    ?ABORT.
 
 clean_(CompilerMod, AppInfo, _Label) ->
     #{src_dirs := SrcDirs,
