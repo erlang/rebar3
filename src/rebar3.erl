@@ -283,12 +283,16 @@ set_options(State, {Options, NonOptArgs}) ->
 log_level() ->
     case os:getenv("QUIET") of
         Q when Q == false; Q == "" ->
-            DefaultLevel = rebar_log:default_level(),
-            case os:getenv("DEBUG") of
-                D when D == false; D == "" ->
-                    DefaultLevel;
+            case os:getenv("DIAGNOSTIC") of
+                Di when Di == false; Di == "" ->
+                    case os:getenv("DEBUG") of
+                        D when D == false; D == "" ->
+                            rebar_log:default_level();
+                        _ ->
+                            rebar_log:debug_level()
+                    end;
                 _ ->
-                    DefaultLevel + 3
+                    rebar_log:diagnostic_level()
             end;
          _ ->
             rebar_log:error_level()
