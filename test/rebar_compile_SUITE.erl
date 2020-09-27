@@ -26,7 +26,8 @@ all() ->
      delete_beam_if_source_deleted,
      deps_in_path, checkout_priority, highest_version_of_pkg_dep,
      parse_transform_test, erl_first_files_test, mib_test,
-     umbrella_mib_first_test, only_default_transitive_deps, clean_all,
+     umbrella_mib_first_test, deps_mib_test,
+     only_default_transitive_deps, clean_all,
      clean_specific, profile_deps, deps_build_in_prod, only_deps,
      override_deps, git_subdir_deps, override_add_deps, override_del_deps,
      override_del_pkg_deps, override_opts, override_add_opts, override_del_opts,
@@ -1465,6 +1466,114 @@ umbrella_mib_first_test(Config) ->
     %% check the mibs dir was linked into the _build dir
     true = filelib:is_dir(filename:join([AppsDir, "_build", "default", "lib", Name, "mibs"])).
 
+deps_mib_test() ->
+    [{doc, "reproduces the dependency handling required for the issue "
+           "reported in https://github.com/erlang/rebar3/issues/2372"}].
+deps_mib_test(Config) ->
+    Priv = ?config(priv_dir, Config),
+    CliLvl2Mib =
+        "---\n"
+        "---\n"
+        "---\n"
+        "LVL2-MIB DEFINITIONS ::= BEGIN\n"
+        "IMPORTS\n"
+        "    MODULE-IDENTITY, OBJECT-TYPE\n"
+        "        FROM SNMPv2-SMI\n"
+        "    lvlModules, lvlApplications\n"
+        "        FROM LVL0-REG\n"
+        "    LvlFoo\n"
+        "        FROM LVL0-TC\n"
+        "    ;\n"
+        "\n"
+        "lvl2Module MODULE-IDENTITY\n"
+        "    LAST-UPDATED \"202009261630Z\"\n"
+        "    ORGANIZATION \"'some org'\"\n"
+        "    CONTACT-INFO \"'Contact: some contact'\"\n"
+        "    DESCRIPTION\n"
+        "         \" \"\n"
+        "    ::= { lvlModules 3 }\n"
+        "\n\n\n"
+        "END",
+    CpiLvl0Mib1 =
+        "        \n"
+        "---\n"
+        "---\n\n"
+        "LVL0-TC DEFINITIONS ::= BEGIN\n"
+        "IMPORTS\n"
+        "    lvlModules\n"
+        "        FROM LVL0-REG\n"
+        "    MODULE-IDENTITY\n"
+        "        FROM SNMPv2-SMI\n"
+        "    TEXTUAL-CONVENTION\n"
+        "        FROM SNMPv2-TC\n"
+        "    ;\n\n"
+        "lvlTcModule MODULE-IDENTITY\n"
+        "    LAST-UPDATED \"202009261630Z\"\n"
+        "    ORGANIZATION \"'some org'\"\n"
+        "    CONTACT-INFO \"'Contact: some contact'\"\n"
+        "    DESCRIPTION\n"
+        "         \" This MIB is part of the LVL MIB. It defines common\n"
+        "         Textual Conventions used in other LVL mib modules.\"\n"
+        "    ::= { lvlModules 2 }\n\n\n"
+        "LvlFoo ::= TEXTUAL-CONVENTION\n"
+        "    DISPLAY-HINT \"512a\"\n"
+        "    STATUS current\n"
+        "    DESCRIPTION \"\"\n"
+        "    SYNTAX OCTET STRING (SIZE (1..512))\n\n"
+        "LvlEnum ::= TEXTUAL-CONVENTION\n"
+        "    STATUS	current\n"
+        "    DESCRIPTION	\"\"\n"
+        "    SYNTAX	INTEGER { foo(1), bar(2), baz(3) }\n\n"
+        "END\n",
+    CpiLvl0Mib2 =
+        "---\n---\n---\n\n"
+        "LVL0-REG DEFINITIONS ::= BEGIN\n"
+        "\n"
+        "IMPORTS\n"
+        "    MODULE-IDENTITY, enterprises\n"
+        "        FROM SNMPv2-SMI\n"
+        "    ;\n\n"
+        "lvlRegModule MODULE-IDENTITY\n"
+        "    LAST-UPDATED \"202009261630Z\"\n"
+        "    ORGANIZATION \"'some org'\"\n"
+        "    CONTACT-INFO \"'Contact: some contact'\"\n"
+        "    DESCRIPTION\n"
+        "        \"The root MIB module for LVL\"\n"
+        "    ::= { lvlModules 1 }\n\n"
+        "-- Example Enterprise Number for Documentation use\n"
+        "example OBJECT IDENTIFIER ::= { enterprises 32473 }\n"
+        "\n"
+        "lvl OBJECT IDENTIFIER ::= { example 1 }\n\n"
+        "-- sub-tree for registrations (Modules information)\n"
+        "lvlReg OBJECT IDENTIFIER ::= { lvl 1 }\n"
+        "lvlModules OBJECT IDENTIFIER ::= { lvlReg 1 }\n"
+        "\n"
+        "-- the application subtree\n"
+        "lvlApplications OBJECT IDENTIFIER ::= { lvl 2 }\n"
+        "END\n",
+    CliLvl2Path = filename:join([Priv, "deps_mib", "cli_lvl2", "mibs", "LVL2-MIB.mib"]),
+    CpiLvl0Path1 = filename:join([Priv, "deps_mib", "cpi_lvl0", "mibs", "LVL0-TC.mib"]),
+    CpiLvl0Path2 = filename:join([Priv, "deps_mib", "cpi_lvl0", "mibs", "LVL0-REG.mib"]),
+    NprLvl1Path = filename:join([Priv, "deps_mib", "npr_lvl1", "mibs"]), % no mibs dir
+    FakeLvl1Path = filename:join([Priv, "deps_mib", "fake_lvl1", "mibs", "no_file"]), % no mibs file
+    ok = filelib:ensure_dir(CliLvl2Path),
+    ok = filelib:ensure_dir(CpiLvl0Path1), % CpiLvl0Path2 is the same dir
+    ok = filelib:ensure_dir(NprLvl1Path),
+    ok = filelib:ensure_dir(FakeLvl1Path),
+    ok = file:write_file(CliLvl2Path, CliLvl2Mib),
+    ok = file:write_file(CpiLvl0Path1, CpiLvl0Mib1),
+    ok = file:write_file(CpiLvl0Path2, CpiLvl0Mib2),
+    Res = rebar_compiler_mib:dependencies(
+            CliLvl2Path,
+            filename:dirname(CliLvl2Path),
+            [filename:dirname(CliLvl2Path),
+             filename:dirname(CpiLvl0Path1),
+             NprLvl1Path,
+             filename:dirname(FakeLvl1Path)]
+    ),
+    ?assertEqual(lists:sort([CpiLvl0Path1, CpiLvl0Path2]),
+                 lists:sort(Res)),
+    ok.
 
 only_default_transitive_deps(Config) ->
     AppDir = ?config(apps, Config),
