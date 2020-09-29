@@ -92,7 +92,8 @@ process_command(State, Command) ->
     Namespace = rebar_state:namespace(State),
     TargetProviders = providers:get_target_providers(Command, Providers, Namespace),
     CommandProvider = providers:get_provider(Command, Providers, Namespace),
-    ?DEBUG("Expanded command sequence to be run: ~p", [TargetProviders]),
+    ?DEBUG("Expanded command sequence to be run: ~w",
+           [[friendly_provider(P) || P <- TargetProviders]]),
     case CommandProvider of
         not_found when Command =/= do ->
             case Namespace of
@@ -136,7 +137,7 @@ process_command(State, Command) ->
 do([], State) ->
     {ok, State};
 do([ProviderName | Rest], State) ->
-    ?DEBUG("Provider: ~p", [ProviderName]),
+    ?DEBUG("Running provider: ~p", [friendly_provider(ProviderName)]),
     %% Special providers like 'as', 'do' or some hooks may be passed
     %% as a tuple {Namespace, Name}, otherwise not. Handle them
     %% on a per-need basis.
@@ -176,3 +177,8 @@ format_error({bad_provider_namespace, {Namespace, Name}}) ->
     io_lib:format("Undefined command ~ts in namespace ~ts", [Name, Namespace]);
 format_error({bad_provider_namespace, Name}) ->
     io_lib:format("Undefined command ~ts", [Name]).
+
+%% @private help display a friendlier sequence of provider names by
+%% omitting the default namespace if it's not there
+friendly_provider({default, P}) -> P;
+friendly_provider(P) -> P.
