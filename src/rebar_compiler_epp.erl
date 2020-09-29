@@ -145,7 +145,7 @@ list_directory(Dir, Cache) ->
                         {Cache, []}, DirFiles),
                     {NewFs#{Dir => Files}, Files};
                 {error, Reason} ->
-                    ?DEBUG("Failed to list ~s, ~p", [Dir, Reason]),
+                    ?DIAGNOSTIC("Failed to list ~s, ~p", [Dir, Reason]),
                     {Cache, []}
             end
     end.

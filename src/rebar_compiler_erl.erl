@@ -48,8 +48,8 @@ needed_files(Graph, FoundFiles, _, AppInfo) ->
     EbinDir = rebar_app_info:ebin_dir(AppInfo),
     RebarOpts = rebar_app_info:opts(AppInfo),
     ErlOpts = rebar_opts:erl_opts(RebarOpts),
-    ?DEBUG("erlopts ~p", [ErlOpts]),
-    ?DEBUG("files to compile ~p", [FoundFiles]),
+    ?DEBUG("compile options: {erl_opts, ~p}.", [ErlOpts]),
+    ?DEBUG("files to analyze ~p", [FoundFiles]),
 
     %% Make sure that the ebin dir is on the path
     ok = rebar_file_utils:ensure_dir(EbinDir),

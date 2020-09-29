@@ -321,21 +321,21 @@ compile_worker(Source, [Opts, Config, Outs, CompilerMod]) ->
     {Result, Source}.
 
 compile_handler({ok, Source}, _Args) ->
-    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
+    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]),
     ok;
 compile_handler({{ok, Tracked}, Source}, [_, Tracking]) when Tracking ->
-    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
+    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]),
     {ok, Tracked};
 compile_handler({{ok, Warnings}, Source}, _Args) ->
     report(Warnings),
-    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
+    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]),
     ok;
 compile_handler({{ok, Tracked, Warnings}, Source}, [_, Tracking]) when Tracking ->
     report(Warnings),
-    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
+    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]),
     {ok, Tracked};
 compile_handler({skipped, Source}, _Args) ->
-    ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), Source]),
+    ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), filename:basename(Source)]),
     ok;
 compile_handler({Error, Source}, [Config | _Rest]) ->
     NewSource = format_error_source(Source, Config),
