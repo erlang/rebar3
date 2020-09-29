@@ -220,10 +220,10 @@ cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoCon
     CDN = maybe_default_cdn(State),
     case request(RepoConfig#{repo_url => CDN}, Name, Vsn, ETag) of
         {ok, cached} ->
-            ?INFO("Version cached at ~ts is up to date, reusing it", [CachePath]),
+            ?DEBUG("Version cached at ~ts is up to date, reusing it", [CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg);
         {ok, Body, NewETag} ->
-            ?INFO("Downloaded package, caching at ~ts", [CachePath]),
+            ?DEBUG("Downloaded package, caching at ~ts", [CachePath]),
             maybe_store_etag_in_cache(UpdateETag, ETagPath, NewETag),
             serve_from_download(TmpDir, CachePath, Pkg, Body);
         error when ETag =/= <<>> ->
@@ -236,7 +236,7 @@ cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoCon
 
 maybe_default_cdn(State) ->
     CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
-	rebar_utils:to_binary(CDN).
+    rebar_utils:to_binary(CDN).
 
 -spec serve_from_cache(TmpDir, CachePath, Pkg) -> Res when
       TmpDir :: file:name(),

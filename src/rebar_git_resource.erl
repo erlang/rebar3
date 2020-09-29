@@ -369,12 +369,12 @@ parse_tags(Dir) ->
 
 git_clone_options() ->
     Option = case os:getenv("REBAR_GIT_CLONE_OPTIONS") of
-        false -> "" ;       %% env var not set
-        Opt ->              %% env var set to empty or others
+        false ->
+            "" ;
+        Opt ->
+            ?DEBUG("Git Clone Options: ~p",[Opt]),
             Opt
     end,
-
-    ?DEBUG("Git clone Option = ~p",[Option]),
     Option.
 
 check_type_support() ->

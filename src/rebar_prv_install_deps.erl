@@ -382,7 +382,7 @@ symlink_dep(State, From, To) ->
         ok ->
             RelativeFrom = make_relative_to_root(State, From),
             RelativeTo = make_relative_to_root(State, To),
-            ?INFO("Linking ~ts to ~ts", [RelativeFrom, RelativeTo]),
+            ?DEBUG("Linking ~ts to ~ts", [RelativeFrom, RelativeTo]),
             ok;
         exists ->
             ok
