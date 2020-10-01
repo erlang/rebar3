@@ -162,12 +162,21 @@ drop_var_docs([{K,V}|Rest]) -> [{K,V} | drop_var_docs(Rest)].
 %% the template.
 create({Template, Type, File}, Files, UserVars, Force, State) ->
     TemplateTerms = consult_template(Files, Type, File),
-    Vars = drop_var_docs(override_vars(UserVars, get_template_vars(TemplateTerms, State))),
+    Vars0 = drop_var_docs(override_vars(UserVars, get_template_vars(TemplateTerms, State))),
+    Vars = maybe_handle_author_name(Vars0),
     maybe_warn_about_name(Vars),
     TemplateCwd = filename:dirname(File),
     Result = execute_template(TemplateTerms, Files, {Template, Type, TemplateCwd}, Vars, Force),
     maybe_print_final_message(proplists:get_value(message, TemplateTerms, undefined), Vars),
     Result.
+
+maybe_handle_author_name(Vars) ->
+    case lists:keyfind(author_name, 1, Vars) of
+        false -> Vars;
+        {author_name, Name0} ->
+            Name1 = unicode:characters_to_binary(Name0),
+            lists:keyreplace(author_name, 1, Vars, {author_name, Name1})
+    end.
 
 maybe_print_final_message(undefined, _) ->
     ok;
