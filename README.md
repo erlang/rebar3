@@ -137,7 +137,7 @@ others via the plugin ecosystem:
 The grievances we had with Rebar 2.x were not fixable without breaking
 compatibility in some very important ways.
 
-A full guide titled [From Rebar 2.x to Rebar3](https://www.rebar3.org/docs/from-rebar-2x-to-rebar3)
+A full guide titled [From Rebar 2.x to Rebar3](https://www.rebar3.org/docs/tutorials/from_rebar2_to_rebar3/)
 is provided on the documentation website.
 
 Notable modifications include mandating a more standard set of directory
