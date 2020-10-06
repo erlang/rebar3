@@ -510,7 +510,7 @@ create_logic_providers(ProviderModules, State0) ->
         ?WITH_STACKTRACE(C,T,S)
             ?DEBUG("~p: ~p ~p", [C, T, S]),
             ?CRASHDUMP("~p: ~p~n~p~n~n~p", [C, T, S, State0]),
-            throw({error, "Failed creating providers. Run with DEBUG=1 for stacktrace or consult rebar3.crashdump."})
+            throw({error, "Failed creating providers. Run with DIAGNOSTIC=1 for stacktrace or consult rebar3.crashdump."})
     end.
 
 to_list(#state_t{} = State) ->

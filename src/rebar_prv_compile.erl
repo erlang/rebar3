@@ -378,6 +378,7 @@ copy_app_dirs(AppInfo, OldAppDir, AppDir) ->
                 true ->
                     OutEbin = filename:join([AppDir, "ebin"]),
                     filelib:ensure_dir(filename:join([OutEbin, "dummy.beam"])),
+                    ?DEBUG("Copying existing files from ~ts to ~ts", [EbinDir, OutEbin]),
                     rebar_file_utils:cp_r(filelib:wildcard(filename:join([EbinDir, "*"])), OutEbin);
                 false ->
                     ok

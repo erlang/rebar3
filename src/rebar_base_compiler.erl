@@ -203,7 +203,7 @@ compile_each([Source | Rest], Config, CompileFn) ->
             ?ERROR("Compiling ~ts failed", [NewSource]),
             maybe_report(Error),
             ?DEBUG("Compilation failed: ~p", [Error]),
-            ?FAIL
+            ?ABORT
     end,
     compile_each(Rest, Config, CompileFn).
 

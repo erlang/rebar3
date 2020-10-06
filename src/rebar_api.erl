@@ -24,7 +24,7 @@
 
 %% @doc Interrupts program flow
 -spec abort() -> no_return().
-abort() -> ?FAIL.
+abort() -> ?ABORT.
 
 %% @doc like {@link error/2}, except it also raises an
 %% exception to interrupt program flow.

@@ -31,6 +31,12 @@ do(State, LibDirs) ->
     %% There may be a top level src which is an app and there may not
     %% Find it here if there is, otherwise define the deps parent as root
     TopLevelApp = define_root_app(Apps, State),
+    ?DEBUG("Found top-level apps: [~ts]~n\tusing config: ~p",
+           [case lists:flatten([[",",rebar_app_info:name(App)] || App <- Apps]) of
+                [] -> "";
+                Str -> tl(Str)
+            end,
+            [{src_dirs, SrcDirs}, {lib_dirs, LibDirs}]]),
 
     %% Handle top level deps
     State1 = lists:foldl(fun(Profile, StateAcc) ->

@@ -91,7 +91,7 @@ compile(Source, OutDirs, _, Opts) ->
             rebar_file_utils:mv(HrlFilename, HrlOut),
             ok;
         {error, compilation_failed} ->
-            ?FAIL
+            ?ABORT
     end.
 
 clean(MibFiles, AppInfo) ->

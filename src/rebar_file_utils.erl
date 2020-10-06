@@ -366,7 +366,7 @@ delete_each([File | Rest]) ->
             delete_each(Rest);
         {error, Reason} ->
             ?ERROR("Failed to delete file ~ts: ~p\n", [File, Reason]),
-            ?FAIL
+            ?ABORT
     end.
 
 %% @doc backwards compat layer to pre-utf8 support

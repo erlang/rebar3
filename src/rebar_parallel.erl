@@ -34,7 +34,7 @@ parallel_dispatch(Targets, Pids, Handler, Args) ->
             parallel_dispatch(Targets, NewPids, Handler, Args);
         {'DOWN', _Mref, _, _Pid, Info} ->
             ?ERROR("Task failed: ~p", [Info]),
-            ?FAIL;
+            ?ABORT;
         {result, Result} ->
             case Handler(Result, Args) of
                 ok ->

@@ -150,7 +150,7 @@ wordsize() ->
 sh_send(Command0, String, Options0) ->
     ?INFO("sh_send info:\n\tcwd: ~p\n\tcmd: ~ts < ~ts\n",
           [rebar_dir:get_cwd(), Command0, String]),
-    ?DEBUG("\topts: ~p\n", [Options0]),
+    ?DIAGNOSTIC("\topts: ~p\n", [Options0]),
 
     DefaultOptions = [use_stdout, abort_on_error],
     Options = [expand_sh_flag(V)
@@ -177,8 +177,8 @@ sh_send(Command0, String, Options0) ->
 %% Val = string() | false
 %%
 sh(Command0, Options0) ->
-    ?DEBUG("sh info:\n\tcwd: ~p\n\tcmd: ~ts\n", [rebar_dir:get_cwd(), Command0]),
-    ?DEBUG("\topts: ~p\n", [Options0]),
+    ?DIAGNOSTIC("sh info:\n\tcwd: ~p\n\tcmd: ~ts\n", [rebar_dir:get_cwd(), Command0]),
+    ?DIAGNOSTIC("\topts: ~p\n", [Options0]),
 
     DefaultOptions = [{use_stdout, false}, debug_and_abort_on_error],
     Options = [expand_sh_flag(V)
@@ -190,7 +190,7 @@ sh(Command0, Options0) ->
     Command = lists:flatten(patch_on_windows(Command0, proplists:get_value(env, Options0, []))),
     PortSettings = proplists:get_all_values(port_settings, Options) ++
         [exit_status, {line, 16384}, use_stdio, stderr_to_stdout, hide, eof, binary],
-    ?DEBUG("Port Cmd: ~ts\nPort Opts: ~p\n", [Command, PortSettings]),
+    ?DIAGNOSTIC("Port Cmd: ~ts\nPort Opts: ~p\n", [Command, PortSettings]),
     Port = open_port({spawn, Command}, PortSettings),
 
     try
