@@ -199,7 +199,7 @@ maybe_warn_about_name(Vars) ->
 maybe_warn_about_name_clash(File) ->
     case filename:extension(File) of
         ".erl" ->
-            Module0 = re:replace(filename:basename(File), "\.erl", "", [{return, list}]),
+            Module0 = re:replace(filename:basename(File), "\\.erl$", "", [{return, list}]),
             Module = list_to_atom(Module0),
             try Module:module_info() of
                 _ -> ?WARN("The module definition of '~ts' in file ~ts "
