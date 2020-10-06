@@ -196,6 +196,21 @@ maybe_warn_about_name(Vars) ->
             ok
     end.
 
+maybe_warn_about_name_clash(File) ->
+    case filename:extension(File) of
+        ".erl" ->
+            Module0 = re:replace(filename:basename(File), "\\.erl$", "", [{return, list}]),
+            Module = list_to_atom(Module0),
+            try Module:module_info() of
+                _ -> ?WARN("The module definition of '~ts' in file ~ts "
+                           "will clash with an existing Erlang module.",
+                           [Module, File])
+            catch
+                _:_ -> ok
+            end;
+        _ -> ok
+    end.
+
 validate_atom(Str) ->
     case io_lib:fread("~a", unicode:characters_to_list(Str)) of
         {ok, [Atom], ""} ->
@@ -258,6 +273,7 @@ execute_template([{template, From, To} | Terms], Files, {Template, Type, Cwd}, V
     In = expand_path(From, Vars),
     Out = expand_path(To, Vars),
     Tpl = load_file(Files, Type, filename:join(Cwd, In)),
+    maybe_warn_about_name_clash(Out),
     case write_file(Out, render(Tpl, Vars), Force) of
         ok ->
             ok;
