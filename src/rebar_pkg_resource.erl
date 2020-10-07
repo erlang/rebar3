@@ -60,12 +60,7 @@ lock(AppInfo, _) ->
       Res :: boolean().
 needs_update(AppInfo, _) ->
     {pkg, _Name, Vsn, _OldHash, _Hash, _} = rebar_app_info:source(AppInfo),
-    case rebar_utils:to_binary(rebar_app_info:original_vsn(AppInfo)) =:= rebar_utils:to_binary(Vsn) of
-        true ->
-            false;
-        false ->
-            true
-    end.
+    rebar_utils:to_binary(rebar_app_info:original_vsn(AppInfo)) =/= rebar_utils:to_binary(Vsn).
 
 %%------------------------------------------------------------------------------
 %% @doc
