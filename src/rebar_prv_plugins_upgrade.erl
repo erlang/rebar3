@@ -94,6 +94,8 @@ build_plugin(ToBuild, State) ->
     Providers = rebar_state:providers(State),
     rebar_prv_compile:compile(State, Providers, ToBuild, plugins).
 
+maybe_update_pkg(Tup, State) when is_tuple(Tup) ->
+    maybe_update_pkg(element(1, Tup), State);
 maybe_update_pkg(Name, State) ->
     try rebar_app_utils:parse_dep(root, ?DEFAULT_PLUGINS_DIR, Name, State, [], 0) of
         AppInfo ->
