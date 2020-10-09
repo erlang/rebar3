@@ -120,7 +120,7 @@ format_error({error_reading_testspec, Reason}) ->
 %% Internal functions
 %% ===================================================================
 
-%% @doc Tries to make the symlink `_build/<profile>/logs/last` to the `ct_run` directory
+%% @doc Tries to make the symlink `_build/<profile>/logs/last' to the `ct_run' directory
 %% of the last common test run.
 -spec symlink_to_last_ct_logs(rebar_state:t(), list()) -> ok.
 symlink_to_last_ct_logs(State, Opts) ->

@@ -48,6 +48,7 @@ do(State) ->
                     AppOpts = rebar_app_info:opts(AppInfo),
                     %% order of the merge is important to allow app opts overrides
                     AppEdocOpts = merge_opts(rebar_opts:get(AppOpts, edoc_opts, []), EdocOptsAcc),
+                    ?DEBUG("{edoc_opts, ~p}.", [AppEdocOpts]),
                     AppRes = (catch edoc:application(list_to_atom(AppName), AppDir, AppEdocOpts)),
                     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, AppInfo, State),
                     case {AppRes, ShouldAccPaths} of
