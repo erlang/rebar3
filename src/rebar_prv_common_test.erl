@@ -90,7 +90,7 @@ run_tests(State, Opts) ->
     T = translate_paths(State, Opts),
     Opts1 = setup_logdir(State, T),
     Opts2 = turn_off_auto_compile(Opts1),
-    ?DEBUG("ct_opts ~p", [Opts2]),
+    ?DEBUG("Running tests with {ct_opts, ~p}.", [Opts2]),
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     Result = case proplists:get_value(verbose, RawOpts, false) of
         true  -> run_test_verbose(Opts2);
@@ -145,7 +145,7 @@ symlink_to_last_ct_logs(State, Opts) ->
                     %% and make a new updated one
                     rebar_file_utils:rm_rf(Target),
                     rebar_file_utils:symlink_or_copy(Existing, Target);
-                Reason -> ?DEBUG("Warning, couldn't make a symlink to ~ts, reason: ~p.", [Target, Reason])
+                Reason -> ?DIAGNOSTIC("Warning, couldn't make a symlink to ~ts, reason: ~p.", [Target, Reason])
             end
     end.
 
@@ -235,7 +235,7 @@ cfgopts(State) ->
 
 ensure_opts([], Acc) -> lists:reverse(Acc);
 ensure_opts([{cover, _}|Rest], Acc) ->
-    ?WARN("Cover specs not supported. See http://www.rebar3.org/docs/running-tests#common-test", []),
+    ?WARN("Cover specs not supported. See https://www.rebar3.org/docs/testing/ct/", []),
     ensure_opts(Rest, Acc);
 ensure_opts([{auto_compile, _}|Rest], Acc) ->
     ?WARN("Auto compile not supported", []),
@@ -389,6 +389,7 @@ compile(State, {ok, _} = Tests) ->
 compile(_State, Error) -> Error.
 
 do_compile(State) ->
+    ?DEBUG("Re-compiling the project under the test profile with CT options injected...", []),
     {ok, S} = rebar_prv_compile:do(State),
     ok = maybe_cover_compile(S),
     {ok, S}.
@@ -704,7 +705,7 @@ handle_keep_logs(LogDir, N) ->
                     SortedDirs = lists:reverse(lists:sort(Dirs)),
                     %% sort the log dirs and keep the N - 1 newest
                     {_Keep, Discard} = lists:split(N - 1, SortedDirs),
-                    ?DEBUG("Removing the following directories because keep_logs option was found: ~p", [Discard]),
+                    ?DEBUG("Removing the following directories because keep_logs is in ct_opts: ~p", [Discard]),
                     [rebar_file_utils:rm_rf(filename:join([LogDir, Dir])) || Dir <- Discard],
                     ok;
                 %% we still dont have enough log run directories as to crash
