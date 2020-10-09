@@ -14,7 +14,7 @@ queue(Tasks, WorkF, WArgs, Handler, HArgs) ->
     Parent = self(),
     Worker = fun() -> worker(Parent, WorkF, WArgs) end,
     Jobs = min(length(Tasks), erlang:system_info(schedulers)),
-    ?DEBUG("Starting ~B worker(s)", [Jobs]),
+    ?DIAGNOSTIC("Starting ~B worker(s)", [Jobs]),
     Pids = [spawn_monitor(Worker) || _ <- lists:seq(1, Jobs)],
     parallel_dispatch(Tasks, Pids, Handler, HArgs).
 

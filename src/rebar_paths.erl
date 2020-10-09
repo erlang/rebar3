@@ -14,6 +14,7 @@
 -spec set_paths(targets(), rebar_state:t()) -> ok.
 set_paths(UserTargets, State) ->
     Targets = normalize_targets(UserTargets),
+    ?DIAGNOSTIC("Setting paths to ~p", [Targets]),
     GroupPaths = path_groups(Targets, State),
     Paths = lists:append(lists:reverse([P || {_, P} <- GroupPaths])),
     code:add_pathsa(Paths),
@@ -24,6 +25,7 @@ set_paths(UserTargets, State) ->
 -spec unset_paths(targets(), rebar_state:t()) -> ok.
 unset_paths(UserTargets, State) ->
     Targets = normalize_targets(UserTargets),
+    ?DIAGNOSTIC("Removing ~p paths", [Targets]),
     GroupPaths = path_groups(Targets, State),
     Paths = lists:append([P || {_, P} <- GroupPaths]),
     [code:del_path(P) || P <- Paths],
