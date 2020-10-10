@@ -1,6 +1,6 @@
 # Rebar3
 
-[![Build Status](https://github.com/erlang/rebar3/workflows/Common%20Test/badge.svg)](https://github.com/erlang/rebar3/actions?query=branch%3Amaster+workflow%3A"Common+Test") [![Erlang Versions](https://img.shields.io/badge/Supported%20Erlang%2FOTP-19.0%20to%2023.1-blue)](http://www.erlang.org)
+[![Build Status](https://github.com/erlang/rebar3/workflows/Common%20Test/badge.svg)](https://github.com/erlang/rebar3/actions?query=branch%3Amaster+workflow%3A"Common+Test") [![Erlang Versions](https://img.shields.io/badge/Supported%20Erlang%2FOTP-19.0%20to%2023.0-blue)](http://www.erlang.org)
 
 1. [What is Rebar3?](#what-is-rebar3)
 2. [Why Rebar3?](#why-rebar3)
