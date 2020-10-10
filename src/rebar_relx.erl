@@ -190,8 +190,6 @@ opt_spec_list() ->
       "Print usage"},
      {lib_dir, $l, "lib-dir", string,
       "Additional dir that should be searched for OTP Apps"},
-     {log_level, $V, "verbose", {integer, 2},
-      "Verbosity level, maybe between 0 and 3"},
      {dev_mode, $d, "dev-mode", boolean,
       "Symlink the applications and configuration into the release instead of copying"},
      {include_erts, $i, "include-erts", string,
