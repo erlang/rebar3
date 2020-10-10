@@ -30,7 +30,7 @@ Rebar3 will:
 Rebar3 is also a self-contained Erlang script. It is easy to distribute or
 embed directly in a project. Tasks or behaviours can be modified or expanded
 with a [plugin system](https://rebar3.org/docs/configuration/plugins)
-flexible enough that even other languages
+[flexible enough](https://github.com/lfe-rebar3/rebar3_lfe) that even other languages
 on the Erlang VM will use it as a build tool.
 
 ## Why Rebar3
