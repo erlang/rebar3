@@ -163,12 +163,8 @@ asking about things with well-known answers.
 For bug reports, roadmaps, and issues, visit the [github issues
 page](https://github.com/erlang/rebar3/issues).
 
-General rebar community resources and links:
-
-- #rebar on [irc.freenode.net](https://freenode.net/)
-- #rebar3 on [erlanger.slack.com](https://erlanger.slack.com/)
-- [issues](https://github.com/erlang/rebar3/issues)
-- [Documentation](https://rebar3.org/docs)
+General rebar community resources and links can be found at
+[rebar3.org/docs/about/about-us/#community](https://rebar3.org/docs/about/about-us/#community)
 
 To contribute to rebar3, please refer to [CONTRIBUTING](CONTRIBUTING.md).
 
