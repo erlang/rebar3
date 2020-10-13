@@ -159,7 +159,7 @@ run(Namespace, Command, StrArgs, RState, Cwd) ->
         end
     catch
         ?WITH_STACKTRACE(Type, Reason, Stacktrace)
-            ?DEBUG("Agent Stacktrace: ~p", [Stacktrace]),
+            ?DIAGNOSTIC("Agent Stacktrace: ~p", [Stacktrace]),
             {{error, {Type, Reason}}, RState}
     end.
 
@@ -215,7 +215,7 @@ refresh_path(Path, Blacklist) ->
 
 refresh_path_do(Path, App) ->
     Modules = mods_in_path(Path),
-    ?DEBUG("reloading ~p from ~ts", [Modules, Path]),
+    ?DIAGNOSTIC("reloading ~p from ~ts", [Modules, Path]),
     code:replace_path(App, Path),
     reload_modules(Modules).
 
@@ -226,7 +226,7 @@ refresh_path_do(Path, App) ->
 %% run by no processes get unloaded by rebar_paths, without being loaded back in.
 refresh_path_blacklisted(Path) ->
     Modules = [M || M <- mods_in_path(Path), not is_loaded(M)],
-    ?DEBUG("ensure ~p loaded", [Modules]),
+    ?DIAGNOSTIC("ensure ~p loaded", [Modules]),
     code:add_pathz(Path), % in case the module is only in a new non-clashing path
      _ = [code:ensure_loaded(M) || M <- Modules],
     ok.
@@ -326,7 +326,7 @@ reload_modules(Modules, true) ->
                             reload_modules([ModError], false),
                             [ModError|Acc];
                         _ ->
-                            ?DEBUG("Module ~p failed to atomic load because ~p", [ModError, Error]),
+                            ?DIAGNOSTIC("Module ~p failed to atomic load because ~p", [ModError, Error]),
                             [ModError|Acc]
                     end
                 end,
@@ -342,7 +342,7 @@ reload_modules(Modules, false) ->
             case code:load_file(M) of
                 {module, M} -> ok;
                 {error, Error} ->
-                    ?DEBUG("Module ~p failed to load because ~p", [M, Error])
+                    ?DIAGNOSTIC("Module ~p failed to load because ~p", [M, Error])
             end
         end, Modules
     ).

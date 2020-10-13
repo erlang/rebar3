@@ -110,7 +110,7 @@ dependencies(Source, _SourceDir, Dirs, DepOpts) ->
           behaviour := Behaviours} ->
             %% TODO: check for core transforms?
             {_MissIncl, _MissInclLib} =/= {[],[]} andalso
-            ?DEBUG("Missing: ~p", [{_MissIncl, _MissInclLib}]),
+            ?DIAGNOSTIC("Missing: ~p", [{_MissIncl, _MissInclLib}]),
             lists:filtermap(
                 fun (Mod) -> rebar_compiler_epp:resolve_source(Mod, Dirs) end,
                 OptPTrans ++ PTrans ++ Behaviours) ++ AbsIncls
@@ -404,7 +404,7 @@ expand_file_names(Files, Dirs) ->
                       Res = rebar_utils:find_files_in_dirs(Dirs, [$^, Incl, $$], true),
                       case Res of
                           [] ->
-                              ?DEBUG("FILE ~p NOT FOUND", [Incl]),
+                              ?DIAGNOSTIC("FILE ~p NOT FOUND", [Incl]),
                               [];
                           _ ->
                               Res

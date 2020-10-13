@@ -45,7 +45,7 @@ download_source(AppInfo, State)  ->
         throw:{no_resource, Type, Location} ->
             throw(?PRV_ERROR({no_resource, Location, Type}));
         ?WITH_STACKTRACE(C,T,S)
-            ?DEBUG("rebar_fetch exception ~p ~p ~p", [C, T, S]),
+            ?DIAGNOSTIC("rebar_fetch exception ~p ~p ~p", [C, T, S]),
             throw(?PRV_ERROR({fetch_fail, rebar_app_info:source(AppInfo)}))
     end.
 

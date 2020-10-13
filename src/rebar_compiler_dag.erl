@@ -296,12 +296,12 @@ maybe_rm_artifact_and_edge(G, OutDir, SrcExt, Ext, Source) ->
             case Targets of
                 [] ->
                     Target = target(OutDir, Source, SrcExt, Ext),
-                    ?DEBUG("Source ~ts is gone, deleting previous ~ts file if it exists ~ts", [Source, Ext, Target]),
+                    ?DIAGNOSTIC("Source ~ts is gone, deleting previous ~ts file if it exists ~ts", [Source, Ext, Target]),
                     file:delete(Target);
                 [_|_] ->
                     lists:foreach(fun(Target) ->
-                        ?DEBUG("Source ~ts is gone, deleting artifact ~ts "
-                                "if it exists", [Source, Target]),
+                        ?DIAGNOSTIC("Source ~ts is gone, deleting artifact ~ts "
+                                    "if it exists", [Source, Target]),
                         file:delete(Target)
                     end, Targets)
             end,

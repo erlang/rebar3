@@ -81,8 +81,8 @@ do(State, Tests) ->
 run_tests(State, Tests) ->
     T = translate_paths(State, Tests),
     EUnitOpts = resolve_eunit_opts(State),
-    ?DEBUG("eunit_tests ~p", [T]),
-    ?DEBUG("eunit_opts  ~p", [EUnitOpts]),
+    ?DEBUG("finding tests in:~n\t{eunit_tests, ~p}.", [T]),
+    ?DEBUG("with options:~n\t{eunit_opts, ~p}.", [EUnitOpts]),
     try eunit:test(T, EUnitOpts) of
       Result ->
         ok = maybe_write_coverdata(State),
