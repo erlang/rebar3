@@ -45,7 +45,7 @@ end
 ## help              Display a list of tasks or help for a given task or subtask.
 ## new               Create new project from templates.
 ## path              Print paths to build dirs in current profile.
-## pkgs              List available packages.
+## pkgs              Get information on a given package.
 ## release           Build release of project.
 ## relup             Create relup of releases.
 ## report            Provide a crash report to be sent to the rebar3 issues page.
@@ -158,7 +158,7 @@ complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -s s -l separator
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l src -d "Return the `src` path of the current profile`s applications."
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command paths' -l rel -d "Return the `rel` path of the current profile."
 
-complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a pkgs -d "List available packages."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a pkgs -d "List information for a hex package."
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a release -d "Build release of project."
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a relup -d "Create relup of releases."
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a report -d "Provide a crash report to be sent to the rebar3 issues page."

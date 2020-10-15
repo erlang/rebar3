@@ -121,7 +121,7 @@ others via the plugin ecosystem:
 | Escript generation   | Rebar3 can be used to generate [escripts](http://www.erlang.org/doc/man/escript.html) providing an easy way to run all your applications on a system where Erlang is installed |
 | Eunit                | The test framework can be run by calling `rebar3 eunit` |
 | Locked dependencies  | Dependencies are going to be automatically locked to ensure repeatable builds. Versions can be changed with `rebar3 upgrade` or `rebar3 upgrade <app>`, or locks can be released altogether with `rebar3 unlock`. |
-| Packages             | [Hex packages](https://hex.pm) can be listed with `rebar3 pkgs`. They can be used as dependencies, will be cached locally for faster usage, and a local index will be used and updated with `rebar3 update`. |
+| Packages             | A given [Hex package](https://hex.pm) can be inspected `rebar3 pkgs <name>`. This will output its description and available versions |
 | Path                 | While paths are managed automatically, you can print paths to the current build directories with `rebar3 path`. |
 | Plugins              | Rebar3 can be fully extended with [plugins](https://rebar3.org/docs/configuration/plugins/). List or upgrade plugins by using the plugin namespace (`rebar3 plugins`). |
 | Profiles             | Rebar3 can have subconfiguration options for different profiles, such as `test` or `prod`. These allow specific dependencies or compile options to be used in specific contexts. See [Profiles](https://rebar3.org/docs/configuration/profiles) in the docs. |

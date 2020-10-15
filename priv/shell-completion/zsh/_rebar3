@@ -121,7 +121,7 @@ _rebar3 () {
                     && ret=0
                 ;;
                 (pkgs)
-                    _message 'List available packages.' && ret=0
+                    _message 'List information for a given package.' && ret=0
                 ;;
                 (plugins)
                     _arguments \
@@ -251,7 +251,7 @@ _rebar3_tasks() {
         'eunit:Run EUnit Tests.'
         'help:Display a list of tasks or help for a given task or subtask.'
         'new:Create new project from templates.'
-        'pkgs:List available packages.'
+        'pkgs:List information for a given package.'
         'plugins:List or upgrade plugins.'
         'release:Build release of project.'
         'relup:Create relup from 2 releases.'
