@@ -675,12 +675,20 @@ debug_and_abort(Command, {Rc, Output}) ->
           "~ts", [Command, Rc, Output]),
     throw(rebar_abort).
 
+port_line_to_list(Line) ->
+    case unicode:characters_to_list(Line) of
+        LineList when is_list(LineList) ->
+            LineList;
+        _ ->
+            binary_to_list(Line)
+    end.
+
 sh_loop(Port, Fun, Acc) ->
     receive
         {Port, {data, {eol, Line}}} ->
-            sh_loop(Port, Fun, Fun(unicode:characters_to_list(Line) ++ "\n", Acc));
+            sh_loop(Port, Fun, Fun(port_line_to_list(Line) ++ "\n", Acc));
         {Port, {data, {noeol, Line}}} ->
-            sh_loop(Port, Fun, Fun(unicode:characters_to_list(Line), Acc));
+            sh_loop(Port, Fun, Fun(port_line_to_list(Line), Acc));
         {Port, eof} ->
             Data = lists:flatten(lists:reverse(Acc)),
             receive
