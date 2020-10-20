@@ -9,7 +9,8 @@
 
 all() ->
     [default_repo, repo_merging, repo_replacing,
-     auth_merging, auth_config_errors, organization_merging, {group, resolve_version}].
+     auth_read_write_read, auth_merging, auth_config_errors, organization_merging,
+     {group, resolve_version}].
 
 groups() ->
     [{resolve_version, [use_first_repo_match, use_exact_with_hash, fail_repo_update,
@@ -270,6 +271,11 @@ auth_config_errors(_Config) ->
     ?assertEqual(undefined, maps:get(read_key, UpdatedRepo2, undefined)),
     ?assertEqual(undefined, maps:get(write_key, DefaultRepo, undefined)),
     ok.
+
+auth_read_write_read(_Config) ->
+    State = rebar_state:new([]),
+    rebar_hex_repos:update_auth_config(#{"foo" => <<200>>}, State),
+    rebar_hex_repos:update_auth_config(#{"foo" => <<200>>}, State).
 
 organization_merging(_Config) ->
     Repo1 = #{name => <<"hexpm:repo-1">>,

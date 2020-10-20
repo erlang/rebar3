@@ -163,5 +163,6 @@ update_auth_config(Updates, State) ->
     Config = auth_config(State),
     AuthConfigFile = auth_config_file(State),
     ok = filelib:ensure_dir(AuthConfigFile),
-    NewConfig = iolist_to_binary([io_lib:print(maps:merge(Config, Updates)) | ".\n"]),
-    ok = file:write_file(AuthConfigFile, NewConfig).
+    NewConfig = iolist_to_binary(["%% coding: utf-8", io_lib:nl(),
+                                  io_lib:print(maps:merge(Config, Updates)), ".", io_lib:nl()]),
+    ok = file:write_file(AuthConfigFile, NewConfig, [{encoding, utf8}]).
