@@ -1780,7 +1780,10 @@ override_del_pkg_deps(Config) ->
         {deps, TopDeps},
         {overrides, [
             {del, some_dep, [
-                {deps, [other_dep]}
+                {deps, [other_dep]},
+                %% regression: a non-existing option deletion
+                %% could trigger an infinite loop
+                {provider_hooks, [{post, [{compile, xref}]}]}
             ]}
         ]}
     ],
