@@ -171,6 +171,8 @@ del_dep(OldValue, [Value]) when is_atom(Value) ->
 del_dep(OldValue, [{Value, _Version, _Source}]) ->
     NewValue = lists:keydelete(atom_to_binary(Value, utf8), 1, OldValue),
     del_dep(NewValue, OldValue, [{Value, _Version, _Source}]);
+del_dep(OldValue, [Value]) ->
+    del_dep(OldValue, OldValue, [Value]);
 del_dep(OldValue, [Value|Values]) ->
     NewValue = del_dep(del_dep(OldValue, [Value]), OldValue, [Value]),
     del_dep(NewValue, Values).
