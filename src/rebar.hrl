@@ -39,14 +39,14 @@
 %% the package record is used in a select match spec which upsets dialyzer
 %% this is the suggested workaround from Tobias
 %% http://erlang.org/pipermail/erlang-questions/2009-February/041445.html
--type ms_field() :: '$1' | '_'.
+-type ms_field() :: '$1' | '_' | {'$1', '$2'}.
 
 %% TODO: change package and requirement keys to be required (:=) after dropping support for OTP-18
--record(package, {key :: {unicode:unicode_binary() | ms_field(), unicode:unicode_binary() | ms_field(),
+-record(package, {key :: {unicode:unicode_binary() | ms_field(), unicode:unicode_binary() | ms_field() | ec_semver:semver(),
                           unicode:unicode_binary() | ms_field()},
                   inner_checksum :: binary() | ms_field(),
                   outer_checksum :: binary() | ms_field(),
-                  retired :: boolean() | ms_field(),
+                  retired :: boolean() | ms_field() | #{reason := atom()},
                   dependencies :: [#{package => unicode:unicode_binary(),
                                      requirement => unicode:unicode_binary()}] | ms_field()}).
 

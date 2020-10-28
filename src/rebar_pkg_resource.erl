@@ -20,7 +20,7 @@
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
--type package() :: {pkg, binary(), binary(), binary(), rebar_hex_repos:repo()}.
+-type package() :: {pkg, binary(), binary(), binary(), binary(), rebar_hex_repos:repo()}.
 
 %%==============================================================================
 %% Public API
@@ -43,7 +43,7 @@ init(Type, State) ->
 -spec lock(AppInfo, ResourceState) -> Res when
       AppInfo :: rebar_app_info:t(),
       ResourceState :: rebar_resource_v2:resource_state(),
-      Res :: {atom(), string(), any(), binary()}.
+      Res :: {atom(), string(), any(), binary(), binary()}.
 lock(AppInfo, _) ->
     {pkg, Name, Vsn, OldHash, Hash, _RepoConfig} = rebar_app_info:source(AppInfo),
     {pkg, Name, Vsn, OldHash, Hash}.
@@ -209,7 +209,8 @@ store_etag_in_cache(Path, ETag) ->
       ETag :: binary(),
       ETagPath :: file:name(),
       UpdateETag :: boolean(),
-      Res :: ok | {unexpected_hash, integer(), integer()} | {fetch_fail, binary(), binary()}.
+      Res :: ok | {unexpected_hash, integer(), integer()} | {fetch_fail, binary(), binary()}
+           | {bad_registry_checksum, integer(), integer()} | {error, _}.
 cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoConfig}, State, ETag,
                 ETagPath, UpdateETag) ->
     CDN = maybe_default_cdn(State),

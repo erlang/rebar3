@@ -87,9 +87,9 @@
                      app_file_src       :: file:filename_all() | undefined,
                      app_file_src_script:: file:filename_all() | undefined,
                      app_file           :: file:filename_all() | undefined,
-                     original_vsn       :: binary() | undefined,
-                     vsn                :: binary() | undefined,
-                     parent=root        :: binary() | root,
+                     original_vsn       :: binary() | string() | undefined,
+                     vsn                :: binary() | string() | undefined,
+                     parent=root        :: binary() | root | string(),
                      app_details=[]     :: list(),
                      applications=[]    :: list(),
                      included_applications=[] :: [atom()],
@@ -177,13 +177,13 @@ new(Parent, AppName, Vsn, Dir, Deps) ->
                      deps=Deps}}.
 
 -spec app_to_map(t()) -> #{name := atom(),
-                           vsn := string(),
+                           vsn := binary() | string(),
                            applications := [atom()],
                            included_applications := [atom()],
                            dir := file:name(),
                            out_dir := file:name(),
                            ebin_dir := file:name(),
-                           link := boolean()}.
+                           link := false}.
 app_to_map(#app_info_t{name=Name,
                        vsn=Vsn,
                        applications=Applications,
@@ -414,18 +414,18 @@ app_details(AppInfo=#app_info_t{}, AppDetails) ->
     AppInfo#app_info_t{app_details=AppDetails}.
 
 %% @doc returns the app's parent in the dep tree.
--spec parent(t()) -> root | binary().
+-spec parent(t()) -> root | binary() | string().
 parent(#app_info_t{parent=Parent}) ->
     Parent.
 
 %% @doc sets the app's parent.
--spec parent(t(), binary() | root) -> t().
+-spec parent(t(), binary() | root | string()) -> t().
 parent(AppInfo=#app_info_t{}, Parent) ->
     AppInfo#app_info_t{parent=Parent}.
 
 %% @doc returns the original version of the app (unevaluated if
 %% asking for a semver)
--spec original_vsn(t()) -> binary().
+-spec original_vsn(t()) -> binary() | string().
 original_vsn(#app_info_t{original_vsn=Vsn}) ->
     Vsn.
 
@@ -436,7 +436,7 @@ original_vsn(AppInfo=#app_info_t{}, Vsn) ->
     AppInfo#app_info_t{original_vsn=Vsn}.
 
 %% @doc returns the version of the app after evaluation
--spec vsn(t()) -> binary().
+-spec vsn(t()) -> binary() | string().
 vsn(#app_info_t{vsn=Vsn}) ->
     Vsn.
 
@@ -505,7 +505,7 @@ fetch_dir(#app_info_t{fetch_dir=FetchDir}) ->
     FetchDir.
 
 %% @doc returns the directory to fetch the dep source to
--spec fetch_dir(t(), file:name()) -> file:name().
+ -spec fetch_dir(t(), file:name()) -> t().
 fetch_dir(AppInfo=#app_info_t{}, FetchDir) ->
     AppInfo#app_info_t{fetch_dir=FetchDir}.
 
@@ -559,7 +559,7 @@ source(#app_info_t{source=Source}) ->
     Source.
 
 %% @doc sets the source specification for the app
--spec source(t(), string() | tuple() | checkout) -> t().
+-spec source(t(), string() | tuple() | checkout | undefined) -> t().
 source(AppInfo=#app_info_t{}, Source) ->
     AppInfo#app_info_t{source=Source}.
 

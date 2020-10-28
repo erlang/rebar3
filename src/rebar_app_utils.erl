@@ -171,7 +171,7 @@ parse_deps(Parent, DepsDir, Deps, State, Locks, Level) ->
 %% (if it is a newer thing) or from the locks specified in the lockfile.
 -spec parse_dep(Dep, Parent, Dir, State, Locks, Level) -> rebar_app_info:t() when
       Dep :: tuple() | atom() | binary(), % TODO: meta to source() | lock()
-      Parent :: root | binary(),
+      Parent :: root | binary() | string(),
       Dir :: file:filename(),
       State :: rebar_state:t(),
       Locks :: [tuple()], % TODO: meta to [lock()]
@@ -199,7 +199,7 @@ parse_dep(Dep, Parent, DepsDir, State, Locks, Level) ->
 %% @doc converts a dependency definition and a location for it on disk
 %% into an app info tuple representing it.
 -spec parse_dep(Parent, Dep, Dir, IsLock, State) -> rebar_app_info:t() when
-      Parent :: root | binary(),
+      Parent :: root | binary() | string(),
       Dep :: tuple() | atom() | binary(), % TODO: meta to source() | lock()
       Dir :: file:filename(),
       IsLock :: boolean(),
@@ -244,7 +244,7 @@ parse_dep(_, Dep, _, _, _) ->
 %% @doc convert a dependency that has just been fetched into
 %% an app info record related to it
 -spec dep_to_app(Parent, Dir, Name, Vsn, Source, IsLock, State) -> rebar_app_info:t() when
-      Parent :: root | binary(),
+      Parent :: root | binary() | string(),
       Dir :: file:filename(),
       Name :: binary(),
       Vsn :: iodata() | undefined,
@@ -315,7 +315,9 @@ expand_deps_sources(Dep, State) ->
 %% around version if required.
 -spec update_source(rebar_app_info:t(), Source, rebar_state:t()) ->
     rebar_app_info:t() when
-      Source :: rebar_resource_v2:source().
+      Source :: rebar_resource_v2:source()
+              | {pkg, PkgName::string(), PkgVsn::unicode:unicode_binary(), Hash::undefined|binary()}
+              | {pkg, PkgName::string(), PkgVsn::unicode:unicode_binary(), OldHash::undefined|binary(), Hash::undefined|binary()}.
 update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
     update_source(AppInfo, {pkg, PkgName, PkgVsn, undefined, Hash}, State);
 update_source(AppInfo, {pkg, PkgName, PkgVsn, OldHash, Hash}, State) ->

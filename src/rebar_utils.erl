@@ -1027,7 +1027,7 @@ is_list_of_strings(List) when is_list(List) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec ssl_opts(Url) -> Res when
-      Url :: string(),
+      Url :: string() | binary(),
       Res :: proplists:proplist().
 ssl_opts(Url) ->
     case get_ssl_config() of
@@ -1045,7 +1045,7 @@ ssl_opts(Url) ->
 %%------------------------------------------------------------------------------
 -spec ssl_opts(Enabled, Url) -> Res when
       Enabled :: atom(),
-      Url :: string(),
+      Url :: string() | binary(),
       Res :: proplists:proplist().
 ssl_opts(ssl_verify_enabled, Url) ->
     case check_ssl_version() of

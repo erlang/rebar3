@@ -1,7 +1,7 @@
 -module(rebar_paths).
 -include("rebar.hrl").
 
--type target() :: deps | plugins.
+-type target() :: deps | plugins | runtime.
 -type targets() :: [target(), ...].
 -export_type([target/0, targets/0]).
 -export([set_paths/2, unset_paths/2]).
