@@ -41,9 +41,6 @@
 
 -optional_callbacks([dependencies/4, compile_and_track/4]).
 
--define(RE_PREFIX, "^(?!\\._)").
-
-
 %% @doc analysis by the caller, in order to let an OTP app
 %% find and resolve all its dependencies as part of compile_all's new
 %% API, which presumes a partial analysis is done ahead of time
