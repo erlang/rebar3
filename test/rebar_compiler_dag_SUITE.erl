@@ -6,7 +6,7 @@
 -include_lib("kernel/include/file.hrl").
 
 all() ->
-    [{group, with_project}].
+    [exists, {group, with_project}].
 
 groups() ->
     %% The tests in this group are dirty, the order is specific
@@ -55,6 +55,19 @@ init_per_group(_, Config) ->
 end_per_group(_, Config) ->
     Config.
 
+exists(Config) ->
+    %% Create a DAG
+    Priv = ?config(priv_dir, Config),
+    G = rebar_compiler_dag:init(Priv, compilermod, "label", [crit_meta]),
+    rebar_compiler_dag:store_artifact(G, "somefile", "someartifact", [written]),
+    rebar_compiler_dag:maybe_store(G, Priv, compilermod, "label", [crit_meta]),
+    rebar_compiler_dag:terminate(G),
+
+    ?assertEqual(valid,     rebar_compiler_dag:status(Priv, compilermod, "label", [crit_meta])),
+    ?assertEqual(not_found, rebar_compiler_dag:status(Priv, compilermad, "label", [crit_meta])),
+    ?assertEqual(not_found, rebar_compiler_dag:status(Priv, compilermod, "lobel", [crit_meta])),
+    ?assertEqual(bad_meta,  rebar_compiler_dag:status(Priv, compilermod, "label", [crit_zeta])),
+    ok.
 
 project() ->
     [{app1, [

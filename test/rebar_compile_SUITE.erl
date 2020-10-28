@@ -987,7 +987,12 @@ recompile_when_dag_opts_change(Config) ->
     %% change the config in the DAG...
     [digraph:add_vertex(G, Beam, {artifact, [{d, some_define}]}) || Beam <- Beams],
     digraph:add_vertex(G, '$r3_dirty_bit', true), % trigger a save
-    rebar_compiler_dag:maybe_store(G, DepsDir, rebar_compiler_erl, "project_apps", []),
+    %% the rebar_compiler_erl module is annotated with a compiler version
+    %% to help rebuild deps
+    {ok, CompileVsn} = application:get_key(compiler, vsn),
+    CritMeta = [{compiler, CompileVsn}],
+
+    rebar_compiler_dag:maybe_store(G, DepsDir, rebar_compiler_erl, "project_apps", CritMeta),
     rebar_compiler_dag:terminate(G),
     %% ... but don't change the actual rebar3 config...
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),

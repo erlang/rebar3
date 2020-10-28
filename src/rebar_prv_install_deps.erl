@@ -436,8 +436,7 @@ warn_skip_deps(AppInfo, State) ->
 not_needs_compile(App) ->
     not(rebar_app_info:is_checkout(App))
         andalso rebar_app_info:valid(App)
-          andalso rebar_app_info:has_all_artifacts(App) =:= true
-            andalso not needs_rebuild(App).
+          andalso rebar_app_info:has_all_artifacts(App) =:= true.
 
 find_app_and_level_by_name([], _) ->
     false;
@@ -445,35 +444,4 @@ find_app_and_level_by_name([App|Apps], Name) ->
     case rebar_app_info:name(App) of
         Name -> {ok, App, rebar_app_info:dep_level(App)};
         _ -> find_app_and_level_by_name(Apps, Name)
-    end.
-
-needs_rebuild(AppInfo) ->
-    Ebin = rebar_app_info:ebin_dir(AppInfo),
-    application:load(compiler),
-    {ok, CurrentCompileVsn} = application:get_key(compiler, vsn),
-    case find_some_beam(Ebin) of
-        {ok, Beam} ->
-            case beam_lib:chunks(Beam, [compile_info]) of
-                {ok, {_mod, Chunks}} ->
-                    CompileInfo = proplists:get_value(compile_info, Chunks, []),
-                    CompileVsn = proplists:get_value(version, CompileInfo, "unknown"),
-                    CurrentCompileVsn =/= CompileVsn;
-                _ ->
-                    %% could be built without debug_info
-                    false
-            end;
-        _ ->
-            %% well we would expect a plugin to have a beam file
-            true
-    end.
-
-find_some_beam(Path) ->
-    case file:list_dir(Path) of
-        {error, Reason} ->
-            {error, Reason};
-        {ok, Files} ->
-            case lists:dropwhile(fun(P) -> filename:extension(P) =/= ".beam" end, Files) of
-                [Beam|_] -> {ok, filename:join(Path, Beam)};
-                _ -> {error, no_beam}
-            end
     end.
