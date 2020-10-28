@@ -18,8 +18,8 @@
 -type extension() :: string().
 -type out_mappings() :: [{extension(), file:filename()}].
 
--callback context(rebar_app_info:t()) -> #{src_dirs     => [file:dirname()], % mandatory
-                                           include_dirs => [file:dirname()], % mandatory
+-callback context(rebar_app_info:t()) -> #{src_dirs     => [DirName :: file:filename()], % mandatory
+                                           include_dirs => [DirName :: file:filename()], % mandatory
                                            src_ext      => extension(),      % mandatory
                                            out_mappings => out_mappings(),   % mandatory
                                            dependencies_opts => term()}.     % optional
@@ -29,8 +29,8 @@
      {[file:filename()] | % [Sequential]
       {[file:filename()], [file:filename()]}, % {Sequential, Parallel}
       term()}}.
--callback dependencies(file:filename(), file:dirname(), [file:dirname()]) -> [file:filename()].
--callback dependencies(file:filename(), file:dirname(), [file:dirname()], term()) -> [file:filename()].
+-callback dependencies(file:filename(), DirName :: file:filename(), [DirName :: file:filename()]) -> [file:filename()].
+-callback dependencies(file:filename(), DirName :: file:filename(), [DirName :: file:filename()], term()) -> [file:filename()].
 -callback compile(file:filename(), out_mappings(), rebar_dict(), list()) ->
     ok | {ok, [string()]} | error | {error, [string()], [string()]} | skipped.
 -callback compile_and_track(file:filename(), out_mappings(), rebar_dict(), list()) ->
@@ -115,7 +115,7 @@ clean(Compilers, AppInfo) ->
 %% These functions are here for the ultimate goal of getting rid of
 %% rebar_base_compiler. This can't be done because of existing plugins.
 
--spec needs_compile(filename:all(), extension(), [{extension(), file:dirname()}]) -> boolean().
+-spec needs_compile(file:name_all(), extension(), [{extension(), DirName :: file:filename()}]) -> boolean().
 needs_compile(Source, OutExt, Mappings) ->
     Ext = filename:extension(Source),
     BaseName = filename:basename(Source, Ext),

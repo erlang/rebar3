@@ -516,7 +516,7 @@ resolve_link(Path) ->
 split_dirname(Path) ->
     {filename:dirname(Path), filename:basename(Path)}.
 
--spec ensure_dir(filelib:dirname_all()) -> ok | {error, file:posix()}.
+-spec ensure_dir(file:name_all()) -> ok | {error, file:posix()}.
 ensure_dir(Path) ->
     filelib:ensure_dir(filename:join(Path, "fake_file")).
 
