@@ -247,6 +247,7 @@ compile_order(G, AppDefs) ->
     AppPaths = prepare_app_paths(AppDefs),
     compile_order(Edges, AppPaths, #{}).
 
+-dialyzer({no_opaque, maybe_store/5}). % optimized digraph usage breaks opacity
 %% @doc Store the DAG on disk if it was dirty
 maybe_store(G, Dir, Compiler, Label, CritMeta) ->
     case is_dirty(G) of
@@ -281,6 +282,7 @@ dag_file(Dir, CompilerMod, Label) ->
     filename:join([rebar_dir:local_cache_dir(Dir), CompilerMod,
                    ?DAG_ROOT ++ "_" ++ Label ++ ?DAG_EXT]).
 
+-dialyzer({no_opaque, restore_dag/3}). % optimized digraph usage breaks opacity
 restore_dag(G, File, CritMeta) ->
     case file:read_file(File) of
         {ok, Data} ->
@@ -298,6 +300,7 @@ restore_dag(G, File, CritMeta) ->
             ok
     end.
 
+-dialyzer([{no_opaque, store_dag/3}, {no_return, store_dag/3}]). % optimized digraph usage breaks opacity
 store_dag(G, File, CritMeta) ->
     ok = filelib:ensure_dir(File),
     {digraph, VT, ET, NT, false} = G,
