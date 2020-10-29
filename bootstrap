@@ -20,10 +20,11 @@ main(_) ->
     %% cause weird failures when compilers get modified between releases.
     rm_rf("_build/prod"),
     %% The same pattern happens with default/ as well, particularly when
-    %% developing new things. 
-    %% Keep other deps in default/lib for build environments like Nix
+    %% developing new things.
+    %% Keep other deps in <profile>/lib for build environments like Nix
     %% where internet access is disabled that deps are not downloadable.
     rm_rf("_build/default/lib/rebar"),
+    rm_rf("_build/test/lib/rebar"),
 
     %% We fetch a few deps from hex for boostraping,
     %% so we must compile r3_safe_erl_term.xrl which
