@@ -114,14 +114,13 @@ handle_plugin(Profile, Plugin, State, Upgrade) ->
 
         %% Add already built plugin deps to the code path
         ToBuildPaths = [rebar_app_info:ebin_dir(A) || A <- ToBuild],
-        PreBuiltApps = [A || A <- Apps,
-                             Ebin <- [rebar_app_info:ebin_dir(A)],
-                             not lists:member(Ebin, ToBuildPaths)],
-        PreBuiltPaths = [rebar_app_info:ebin_dir(A) || A <- PreBuiltApps],
+        PreBuiltPaths = [Ebin || A <- Apps,
+                                 Ebin <- [rebar_app_info:ebin_dir(A)],
+                                 not lists:member(Ebin, ToBuildPaths)],
         code:add_pathsa(PreBuiltPaths),
 
         %% Build plugin and its deps
-        build_plugins(ToBuild -- PreBuiltApps, Apps, State2),
+        build_plugins(ToBuild, Apps, State2),
 
         %% Add newly built deps and plugin to code path
         State3 = rebar_state:update_all_plugin_deps(State2, Apps),
