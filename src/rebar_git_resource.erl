@@ -253,16 +253,7 @@ git_vsn_fetch() ->
 
 make_vsn(AppInfo, _) ->
     Dir = rebar_app_info:dir(AppInfo),
-    case rebar_app_info:original_vsn(AppInfo) of
-        {git, short} ->
-            git_ref(Dir, "--short");
-        {git, long} ->
-            git_ref(Dir, "");
-        _ ->
-            %% already parsed in rebar_utils to get here so we know it
-            %% is either for git or "git"
-            make_vsn_(Dir)
-    end.
+    make_vsn_(Dir).
 
 make_vsn_(Dir) ->
     case collect_default_refcount(Dir) of
@@ -273,19 +264,6 @@ make_vsn_(Dir) ->
     end.
 
 %% Internal functions
-
-git_ref(Dir, Arg) ->
-    case rebar_utils:sh("git rev-parse " ++ Arg ++ " HEAD",
-                       [{use_stdout, false},
-                        return_on_error,
-                        {cd, Dir}]) of
-        {error, _} ->
-            ?WARN("Getting ref of git repo failed in ~ts. "
-                  "Falling back to version 0", [Dir]),
-            {plain, "0"};
-        {ok, String} ->
-            {plain, rebar_string:trim(String, both, "\n")}
-    end.
 
 collect_default_refcount(Dir) ->
     %% Get the tag timestamp and minimal ref from the system. The

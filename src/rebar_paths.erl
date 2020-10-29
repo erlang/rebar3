@@ -209,11 +209,7 @@ get_apps(deps, State) ->
     %% The code paths for deps also include the top level apps
     %% and the extras, which we don't have here; we have to
     %% add the apps by hand
-    case rebar_state:project_apps(State) of
-        undefined -> [];
-        List -> List
-    end ++
-    rebar_state:all_deps(State);
+    rebar_state:project_apps(State) ++ rebar_state:all_deps(State);
 get_apps(plugins, State) ->
     rebar_state:all_plugin_deps(State);
 get_apps(runtime, State) ->
