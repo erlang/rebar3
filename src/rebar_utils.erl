@@ -497,7 +497,7 @@ reread_logger_config() ->
             %% -- primary config is used for settings shared across handlers
             LogLvlPrimary = proplists:get_value(logger_level, KernelCfg, all),
             {FilterDefault, Filters} =
-              case lists:keyfind(filters, 1, KernelCfg) of
+              case lists:keyfind(filters, 1, LogCfg) of
                   false -> {log, []};
                   {filters, FoundDef, FoundFilter} -> {FoundDef, FoundFilter}
               end,
