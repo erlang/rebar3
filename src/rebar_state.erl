@@ -492,6 +492,7 @@ add_provider(State=#state_t{providers=Providers, allow_provider_overrides=false}
             State#state_t{providers=[Provider | Providers]}
     end.
 
+-dialyzer({no_match, create_logic_providers/2}). % we want to be permissive with providers:new/2
 create_logic_providers(ProviderModules, State0) ->
     try
         lists:foldl(fun(ProviderMod, StateAcc) ->
