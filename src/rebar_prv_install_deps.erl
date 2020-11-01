@@ -445,4 +445,3 @@ find_app_and_level_by_name([App|Apps], Name) ->
         Name -> {ok, App, rebar_app_info:dep_level(App)};
         _ -> find_app_and_level_by_name(Apps, Name)
     end.
-

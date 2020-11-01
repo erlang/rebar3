@@ -1,7 +1,7 @@
 %%% Module handling the directed graph required for the analysis
 %%% of all top-level applications by the various compiler plugins.
 -module(rebar_compiler_dag).
--export([init/4, maybe_store/5, terminate/1]).
+-export([init/4, status/4, maybe_store/5, terminate/1]).
 -export([prune/5, populate_sources/5, populate_deps/3, propagate_stamps/1,
          compile_order/2, store_artifact/4]).
 
@@ -38,6 +38,29 @@ init(Dir, Compiler, Label, CritMeta) ->
             file:delete(File)
     end,
     G.
+
+%% @doc Quickly validate whether a DAG exists by validating its file name,
+%% version, and CritMeta data, without attempting to actually build it.
+-spec status(file:filename_all(), atom(), string() | undefined, critical_meta()) ->
+    valid | bad_format | bad_vsn | bad_meta | not_found.
+status(Dir, Compiler, Label, CritMeta) ->
+    File = dag_file(Dir, Compiler, Label),
+    case file:read_file(File) of
+        {ok, Data} ->
+            %% The CritMeta value is checked and if it doesn't match, we
+            %% consider things invalid. Same for the version.
+            try binary_to_term(Data) of
+                #dag{vsn = ?DAG_VSN, meta = CritMeta} -> valid;
+                #dag{vsn = ?DAG_VSN} -> bad_meta;
+                #dag{meta = CritMeta} -> bad_vsn;
+                _ -> bad_format
+            catch
+                _:_ ->
+                    bad_format
+            end;
+        {error, _Err} ->
+            not_found
+    end.
 
 %% @doc Clear up inactive (deleted) source files from a given project.
 %% The file must be in one of the directories that may contain source files
@@ -240,6 +263,7 @@ terminate(G) ->
     true = digraph:delete(G).
 
 store_artifact(G, Source, Target, Meta) ->
+    mark_dirty(G),
     digraph:add_vertex(G, Target, {artifact, Meta}),
     digraph:add_edge(G, Target, Source, artifact).
 

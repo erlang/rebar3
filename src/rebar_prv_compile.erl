@@ -39,8 +39,9 @@ do(State) ->
     rebar_paths:set_paths([deps], State),
 
     Providers = rebar_state:providers(State),
-    Deps = rebar_state:deps_to_build(State),
-    CompiledDeps = copy_and_build_apps(State, Providers, Deps),
+    MustBuildDeps = rebar_state:deps_to_build(State),
+    Deps = rebar_state:all_deps(State),
+    CompiledDeps = copy_and_build_deps(State, Providers, MustBuildDeps, Deps),
     State0 = rebar_state:merge_all_deps(State, CompiledDeps),
 
     State1 = case IsDepsOnly of
@@ -97,7 +98,30 @@ format_error({unknown_project_type, Name, Type}) ->
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
-copy_and_build_apps(State, Providers, Apps) ->
+pick_deps_to_build(State, MustBuild, All, Tag) ->
+    InvalidDags = lists:any(
+        fun({_Mod, Status}) ->
+            %% A DAG that is not found can be valid, it just has no matching
+            %% source file. However, bad_vsn, bad_format, and bad_meta should
+            %% all trigger rebuilds.
+            %% Good:
+            %%  lists:member(Status, [valid, not_found])
+            %% Bad:
+            %%  lists:member(Status, [bad_vsn, bad_format, bad_meta])
+            %%
+            %% Since the fastest check is done on smaller lists handling
+            %% the common case first:
+            not lists:member(Status, [valid, not_found])
+        end,
+        check_dags(State, Tag)
+    ),
+    case InvalidDags of
+        true -> All;
+        false -> MustBuild
+    end.
+
+copy_and_build_deps(State, Providers, MustBuildApps, AllApps) ->
+    Apps = pick_deps_to_build(State, MustBuildApps, AllApps, apps),
     Apps0 = [prepare_app(State, Providers, App) || App <- Apps],
     compile(State, Providers, Apps0, apps).
 
@@ -155,30 +179,53 @@ prepare_compilers(State, Providers, AppInfo) ->
     rebar_hooks:run_all_hooks(AppDir, pre, ?ERLC_HOOK, Providers, AppInfo, State).
 
 run_compilers(State, _Providers, Apps, Tag) ->
-    %% Prepare a compiler digraph to be shared by all compiled applications
-    %% in a given run, providing the ability to combine their dependency
-    %% ordering and resources.
-    %% The Tag allows to create a Label when someone cares about a specific
-    %% run for compilation;
-    DAGLabel = case Tag of
-        undefined -> undefined;
-        _ -> atom_to_list(Tag)
-    end,
-    %% The Dir for the DAG is set to deps_dir so builds taking place
-    %% in different contexts (i.e. plugins) don't risk clobbering regular deps.
-    Dir = rebar_dir:deps_dir(State),
-    CritMeta = [], % used to be incldirs per app
-    DAGs = [{Mod, rebar_compiler_dag:init(Dir, Mod, DAGLabel, CritMeta)}
-            || Mod <- rebar_state:compilers(State)],
+    %% Get the compiler graphs for all modules and artifacts, for each
+    %% compiler we run
+    DAGsInfo = load_dags(State, Tag),
+    DAGs = [{Mod, DAG} || {Mod, {DAG, _Meta}} <- DAGsInfo],
     %% Compile all the apps
     build_apps(DAGs, Apps, State),
     %% Potentially store shared compiler DAGs so next runs can easily
     %% share the base information for easy re-scans.
-    lists:foreach(fun({Mod, G}) ->
+    lists:foreach(fun({Mod, {G, {Dir, DAGLabel, CritMeta}}}) ->
         rebar_compiler_dag:maybe_store(G, Dir, Mod, DAGLabel, CritMeta),
         rebar_compiler_dag:terminate(G)
-    end, DAGs),
+    end, DAGsInfo),
     Apps.
+
+load_dags(State, Tag) ->
+    F = fun(Dir, Mod, DAGLabel, CritMeta) ->
+            {rebar_compiler_dag:init(Dir, Mod, DAGLabel, CritMeta),
+             {Dir, DAGLabel, CritMeta}}
+        end,
+    map_dags(F, State, Tag).
+
+check_dags(State, Tag) ->
+    map_dags(fun rebar_compiler_dag:status/4, State, Tag).
+
+map_dags(F, State, Tag) ->
+    DAGLabel = format_label(Tag),
+    %% The Dir for the DAG is set to deps_dir so builds taking place
+    %% in different contexts (i.e. plugins) don't risk clobbering regular deps.
+    Dir = rebar_dir:deps_dir(State),
+    SharedCritMeta = [],
+    [{Mod, F(Dir, Mod, DAGLabel, mod_meta(Mod, SharedCritMeta))}
+     || Mod <- rebar_state:compilers(State)].
+
+mod_meta(rebar_compiler_erl, CritMeta) ->
+    application:load(compiler),
+    {ok, CompileVsn} = application:get_key(compiler, vsn),
+    [{compiler, CompileVsn} | CritMeta];
+mod_meta(_, CritMeta) ->
+    CritMeta.
+
+format_label(Tag) ->
+    %% The Tag allows to create a Label when someone cares about a specific
+    %% run for compilation;
+    case Tag of
+        undefined -> undefined;
+        _ -> atom_to_list(Tag)
+    end.
 
 finalize_compilers(State, Providers, AppInfo) ->
     AppDir = rebar_app_info:dir(AppInfo),

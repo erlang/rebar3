@@ -145,9 +145,10 @@ compile_and_track(Source, [{Ext, OutDir}], Config, ErlOpts) ->
     rebar_compiler_epp:flush(),
     BuildOpts = [{outdir, OutDir} | ErlOpts],
     Target = target_base(OutDir, Source) ++ Ext,
+    {ok, CompileVsn} = application:get_key(compiler, vsn),
     AllOpts = case erlang:function_exported(compile, env_compiler_options, 0) of
-        true  -> BuildOpts ++ compile:env_compiler_options();
-        false -> BuildOpts
+        true  -> [{compiler_version, CompileVsn}] ++ BuildOpts ++ compile:env_compiler_options();
+        false -> [{compiler_version, CompileVsn}] ++ BuildOpts
     end,
     case compile:file(Source, BuildOpts) of
         {ok, _Mod} ->
@@ -237,9 +238,10 @@ target_base(OutDir, Source) ->
     filename:join(OutDir, filename:basename(Source, ".erl")).
 
 opts_changed(Graph, NewOpts, Target, TargetBase) ->
+    {ok, CompileVsn} = application:get_key(compiler, vsn),
     TotalOpts = case erlang:function_exported(compile, env_compiler_options, 0) of
-        true  -> NewOpts ++ compile:env_compiler_options();
-        false -> NewOpts
+        true  -> [{compiler_version, CompileVsn}] ++ NewOpts ++ compile:env_compiler_options();
+        false -> [{compiler_version, CompileVsn}] ++ NewOpts
     end,
     TargetOpts = case digraph:vertex(Graph, Target) of
         {_Target, {artifact, Opts}} -> % tracked dep is found
@@ -273,7 +275,9 @@ compile_info(Target) ->
     case beam_lib:chunks(Target, [compile_info]) of
         {ok, {_mod, Chunks}} ->
             CompileInfo = proplists:get_value(compile_info, Chunks, []),
-            {ok, proplists:get_value(options, CompileInfo, [])};
+            CompileVsn = proplists:get_value(version, CompileInfo, "unknown"),
+            {ok, [{compiler_version, CompileVsn}
+                  | proplists:get_value(options, CompileInfo, [])]};
         {error, beam_lib, Reason} ->
             ?WARN("Couldn't read debug info from ~p for reason: ~p", [Target, Reason]),
             {error, Reason}
