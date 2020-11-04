@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.6.8, do not edit manually
+%% Vendored from hex_core v0.7.0, do not edit manually
 
 %% @doc
 %% hex_core entrypoint module.
@@ -69,7 +69,9 @@ J1i2xWFndWa6nfFnRxZmCStCOZWYYPlaxr+FZceFbpMwzTNs4g3d4tLNUcbKAIH4
     repo_url => binary(),
     repo_organization => binary() | undefined,
     repo_verify => boolean(),
-    repo_verify_origin => boolean()
+    repo_verify_origin => boolean(),
+    tarball_max_size => pos_integer(),
+    tarball_max_uncompressed_size => pos_integer()
 }.
 
 -spec default_config() -> config().
@@ -82,6 +84,7 @@ default_config() ->
         http_adapter => r3_hex_http_httpc,
         http_adapter_config => #{profile => default},
         http_etag => undefined,
+        http_headers => #{},
         http_user_agent_fragment => <<"(httpc)">>,
         repo_key => undefined,
         repo_name => <<"hexpm">>,
@@ -90,5 +93,6 @@ default_config() ->
         repo_organization => undefined,
         repo_verify => true,
         repo_verify_origin => true,
-        http_headers => #{}
+        tarball_max_size => 8 * 1024 * 1024,
+        tarball_max_uncompressed_size => 64 * 1024 * 1024
     }.
