@@ -179,10 +179,9 @@ maybe_set_ipfamily(_, _Family) ->
 compile_vendored() ->
   compile_xrl_file("src/vendored/r3_safe_erl_term.xrl"),
   Sources = filelib:wildcard(filename:join(["src/vendored", "*.erl"])),
-  Dir =  filename:absname("_build/bootstrap/lib/rebar/ebin"),
+  OutDir =  filename:absname("_build/bootstrap/lib/rebar/ebin"),
   code:add_patha(Dir),
-  Ebin = "_build/bootstrap/lib/rebar/ebin",
-  Opts = [debug_info,{outdir, filename:absname(Ebin)}, return | additional_defines()],
+  Opts = [debug_info,{outdir, OutDir}, return | additional_defines()],
   [compile_erl_file(X, Opts) || X <- Sources].
 
 compile(App, FirstFiles) ->
