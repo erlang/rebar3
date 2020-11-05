@@ -26,10 +26,10 @@ main(_) ->
     rm_rf("_build/default/lib/rebar"),
     rm_rf("_build/test/lib/rebar"),
 
-    %% We fetch a few deps from hex for boostraping,
-    %% so we must compile r3_safe_erl_term.xrl which
-    %% is part of hex_core.
-    compile_xrl_file("src/r3_safe_erl_term.xrl"),
+    mkdir_p("_build/bootstrap/lib/rebar/ebin"),
+
+    os:putenv("REBAR_PROFILE", "bootstrap"),
+    compile_vendored(),
 
     %% Fetch and build deps required to build rebar3
     BaseDeps = [{providers, []}
@@ -176,6 +176,15 @@ maybe_set_ipfamily({ok, _}, Family) ->
 maybe_set_ipfamily(_, _Family) ->
     ok.
 
+compile_vendored() ->
+  compile_xrl_file("src/vendored/r3_safe_erl_term.xrl"),
+  Sources = filelib:wildcard(filename:join(["src/vendored", "*.erl"])),
+  Dir =  filename:absname("_build/bootstrap/lib/rebar/ebin"),
+  code:add_patha(Dir),
+  Ebin = "_build/bootstrap/lib/rebar/ebin",
+  Opts = [debug_info,{outdir, filename:absname(Ebin)}, return | additional_defines()],
+  [compile_erl_file(X, Opts) || X <- Sources].
+
 compile(App, FirstFiles) ->
     Dir = filename:join(filename:absname("_build/default/lib/"), App),
     filelib:ensure_dir(filename:join([Dir, "ebin", "dummy.beam"])),
@@ -277,6 +286,14 @@ rm_rf(Target) ->
             ok = delete_each_dir_win32(Dirs),
             ok
     end.
+
+mkdir_p(Target) ->
+  Pred = fun (Dir, Acc) ->
+                  NewAcc = filename:join(filename:absname(Acc), Dir),
+                  file:make_dir(NewAcc),
+                  NewAcc
+              end,
+  lists:foldl(Pred, "", filename:split(Target)).
 
 -spec cp_r(list(string()), file:filename()) -> 'ok'.
 cp_r([], _Dest) ->
