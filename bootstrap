@@ -180,7 +180,7 @@ compile_vendored() ->
   compile_xrl_file("src/vendored/r3_safe_erl_term.xrl"),
   Sources = filelib:wildcard(filename:join(["src/vendored", "*.erl"])),
   OutDir =  filename:absname("_build/bootstrap/lib/rebar/ebin"),
-  code:add_patha(Dir),
+  code:add_patha(OutDir),
   Opts = [debug_info,{outdir, OutDir}, return | additional_defines()],
   [compile_erl_file(X, Opts) || X <- Sources].
 
