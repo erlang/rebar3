@@ -243,8 +243,7 @@ parse_checksum(Checksum) ->
 
 update_package(Name, RepoConfig=#{name := Repo}, State) ->
     ?MODULE:verify_table(State),
-    PkgRepoConfig1 = get_package_repo_config(RepoConfig),
-    try r3_hex_repo:get_package(maps:remove(name, PkgRepoConfig1#{repo_name := Repo}), Name) of
+    try r3_hex_repo:get_package(get_package_repo_config(RepoConfig), Name) of
         {ok, {200, _Headers, Releases}} ->
             _ = insert_releases(Name, Releases, Repo, ?PACKAGE_TABLE),
             {ok, RegistryDir} = rebar_packages:registry_dir(State),
@@ -268,8 +267,8 @@ update_package(Name, RepoConfig=#{name := Repo}, State) ->
             fail
     end.
 
-get_package_repo_config(RepoConfig=#{mirror_of := Repo}) ->
-    get_package_repo_config(maps:remove(mirror_of, RepoConfig#{name => Repo}));
+get_package_repo_config(RepoConfig=#{mirror_of := _}) ->
+    get_package_repo_config(maps:remove(mirror_of, RepoConfig));
 get_package_repo_config(RepoConfig) ->
     RepoConfig.
 
