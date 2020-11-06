@@ -171,7 +171,7 @@ parse_deps(Parent, DepsDir, Deps, State, Locks, Level) ->
 %% (if it is a newer thing) or from the locks specified in the lockfile.
 -spec parse_dep(Dep, Parent, Dir, State, Locks, Level) -> rebar_app_info:t() when
       Dep :: tuple() | atom() | binary(), % TODO: meta to source() | lock()
-      Parent :: root | binary() | string(),
+      Parent :: root | binary(),
       Dir :: file:filename(),
       State :: rebar_state:t(),
       Locks :: [tuple()], % TODO: meta to [lock()]
@@ -199,7 +199,7 @@ parse_dep(Dep, Parent, DepsDir, State, Locks, Level) ->
 %% @doc converts a dependency definition and a location for it on disk
 %% into an app info tuple representing it.
 -spec parse_dep(Parent, Dep, Dir, IsLock, State) -> rebar_app_info:t() when
-      Parent :: root | binary() | string(),
+      Parent :: root | binary(),
       Dep :: tuple() | atom() | binary(), % TODO: meta to source() | lock()
       Dir :: file:filename(),
       IsLock :: boolean(),
@@ -244,7 +244,7 @@ parse_dep(_, Dep, _, _, _) ->
 %% @doc convert a dependency that has just been fetched into
 %% an app info record related to it
 -spec dep_to_app(Parent, Dir, Name, Vsn, Source, IsLock, State) -> rebar_app_info:t() when
-      Parent :: root | binary() | string(),
+      Parent :: root | binary(),
       Dir :: file:filename(),
       Name :: binary(),
       Vsn :: iodata() | undefined,

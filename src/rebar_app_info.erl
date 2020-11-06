@@ -90,7 +90,7 @@
                      app_file           :: file:filename_all() | undefined,
                      original_vsn       :: app_vsn() | undefined,
                      vsn                :: app_vsn() | undefined,
-                     parent=root        :: binary() | root | string(),
+                     parent=root        :: binary() | root,
                      app_details=[]     :: list(),
                      applications=[]    :: list(),
                      included_applications=[] :: [atom()],
@@ -415,12 +415,12 @@ app_details(AppInfo=#app_info_t{}, AppDetails) ->
     AppInfo#app_info_t{app_details=AppDetails}.
 
 %% @doc returns the app's parent in the dep tree.
--spec parent(t()) -> root | binary() | string().
+-spec parent(t()) -> root | binary().
 parent(#app_info_t{parent=Parent}) ->
     Parent.
 
 %% @doc sets the app's parent.
--spec parent(t(), binary() | root | string()) -> t().
+-spec parent(t(), binary() | root) -> t().
 parent(AppInfo=#app_info_t{}, Parent) ->
     AppInfo#app_info_t{parent=Parent}.
 
