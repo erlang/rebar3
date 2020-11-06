@@ -82,13 +82,14 @@
               project_type/0]).
 
 -type project_type() :: rebar3 | mix | undefined.
+-type app_vsn() :: binary() | string() | {git, short} | {git, long}.
 
 -record(app_info_t, {name               :: binary() | undefined,
                      app_file_src       :: file:filename_all() | undefined,
                      app_file_src_script:: file:filename_all() | undefined,
                      app_file           :: file:filename_all() | undefined,
-                     original_vsn       :: binary() | string() | undefined,
-                     vsn                :: binary() | string() | undefined,
+                     original_vsn       :: app_vsn() | undefined,
+                     vsn                :: app_vsn() | undefined,
                      parent=root        :: binary() | root | string(),
                      app_details=[]     :: list(),
                      applications=[]    :: list(),
@@ -130,7 +131,7 @@ new(AppName) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName)}}.
 
 %% @doc Build a new app info value with only the name and version set.
--spec new(atom() | binary() | string(), binary() | string()) ->
+-spec new(atom() | binary() | string(), app_vsn()) ->
                  {ok, t()}.
 new(AppName, Vsn) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
@@ -138,7 +139,7 @@ new(AppName, Vsn) ->
                      original_vsn=Vsn}}.
 
 %% @doc build a complete version of the app info with all fields set.
--spec new(atom() | binary() | string(), binary() | string(), file:name()) ->
+-spec new(atom() | binary() | string(), app_vsn(), file:name()) ->
                  {ok, t()}.
 new(AppName, Vsn, Dir) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
@@ -150,7 +151,7 @@ new(AppName, Vsn, Dir) ->
                      ebin_dir=filename:join(rebar_utils:to_list(Dir), "ebin")}}.
 
 %% @doc build a complete version of the app info with all fields set.
--spec new(atom() | binary() | string(), binary() | string(), file:name(), list()) ->
+-spec new(atom() | binary() | string(), app_vsn(), file:name(), list()) ->
                  {ok, t()}.
 new(AppName, Vsn, Dir, Deps) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
@@ -163,7 +164,7 @@ new(AppName, Vsn, Dir, Deps) ->
                      deps=Deps}}.
 
 %% @doc build a complete version of the app info with all fields set.
--spec new(atom() | binary(), atom() | binary() | string(), binary() | string(), file:name(), list()) ->
+-spec new(atom() | binary(), atom() | binary() | string(), app_vsn(), file:name(), list()) ->
                  {ok, t()}.
 new(Parent, AppName, Vsn, Dir, Deps) ->
     {ok, #app_info_t{name=rebar_utils:to_binary(AppName),
@@ -177,7 +178,7 @@ new(Parent, AppName, Vsn, Dir, Deps) ->
                      deps=Deps}}.
 
 -spec app_to_map(t()) -> #{name := atom(),
-                           vsn := binary() | string(),
+                           vsn := app_vsn(),
                            applications := [atom()],
                            included_applications := [atom()],
                            dir := file:name(),
@@ -425,23 +426,23 @@ parent(AppInfo=#app_info_t{}, Parent) ->
 
 %% @doc returns the original version of the app (unevaluated if
 %% asking for a semver)
--spec original_vsn(t()) -> binary() | string().
+-spec original_vsn(t()) -> app_vsn().
 original_vsn(#app_info_t{original_vsn=Vsn}) ->
     Vsn.
 
 %% @doc stores the original version of the app (unevaluated if
 %% asking for a semver)
--spec original_vsn(t(), binary() | string()) -> t().
+-spec original_vsn(t(), app_vsn()) -> t().
 original_vsn(AppInfo=#app_info_t{}, Vsn) ->
     AppInfo#app_info_t{original_vsn=Vsn}.
 
 %% @doc returns the version of the app after evaluation
--spec vsn(t()) -> binary() | string().
+-spec vsn(t()) -> app_vsn().
 vsn(#app_info_t{vsn=Vsn}) ->
     Vsn.
 
 %% @doc sets the evaluated vsn of the app
--spec vsn(t(), binary() | string()) -> t().
+-spec vsn(t(), app_vsn()) -> t().
 vsn(AppInfo=#app_info_t{}, Vsn) ->
     AppInfo#app_info_t{vsn=Vsn}.
 
