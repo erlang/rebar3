@@ -26,7 +26,7 @@ main(_) ->
     rm_rf("_build/default/lib/rebar"),
     rm_rf("_build/test/lib/rebar"),
 
-    mkdir_p("_build/bootstrap/lib/rebar/ebin"),
+    filelib:ensure_dir("_build/bootstrap/lib/rebar/ebin/"),
 
     os:putenv("REBAR_PROFILE", "bootstrap"),
     compile_vendored(),
@@ -285,14 +285,6 @@ rm_rf(Target) ->
             ok = delete_each_dir_win32(Dirs),
             ok
     end.
-
-mkdir_p(Target) ->
-  Pred = fun (Dir, Acc) ->
-                  NewAcc = filename:join(filename:absname(Acc), Dir),
-                  file:make_dir(NewAcc),
-                  NewAcc
-              end,
-  lists:foldl(Pred, "", filename:split(Target)).
 
 -spec cp_r(list(string()), file:filename()) -> 'ok'.
 cp_r([], _Dest) ->
