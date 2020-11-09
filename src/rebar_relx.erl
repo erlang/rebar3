@@ -49,10 +49,21 @@ do(Provider, State) ->
 
     case Provider of
         relup ->
-            ToVsn = proplists:get_value(relvsn, Opts, undefined),
+            {Release, ToVsn} =
+                %% hd/1 can't fail because --all is not a valid option to relup
+                case Releases of
+                    [{Rel,Vsn}|_] when is_atom(Rel) ->
+                        %% This is returned if --relvsn and --relname are given
+                        {Rel, Vsn};
+                    [undefined|_] ->
+                        erlang:error(?PRV_ERROR(unknown_release));
+                    [Rel|_] when is_atom(Rel) ->
+                        erlang:error(?PRV_ERROR(unknown_vsn))
+                end,
+
             UpFromVsn = proplists:get_value(upfrom, Opts, undefined),
-            %% hd/1 can't fail because --all is not a valid option to relup
-            relx:build_relup(hd(Releases), ToVsn, UpFromVsn, RelxState);
+
+            relx:build_relup(Release, ToVsn, UpFromVsn, RelxState);
         _ ->
             parallel_run(Provider, Releases, all_apps(State), RelxState)
     end,
@@ -62,6 +73,10 @@ do(Provider, State) ->
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
+format_error(unknown_release) ->
+    "Option --relname is missing";
+format_error(unknown_vsn) ->
+    "Option --relvsn is missing";
 format_error(all_relup) ->
     "Option --all can not be applied to `relup` command";
 format_error(Error) ->
