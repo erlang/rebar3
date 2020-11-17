@@ -269,6 +269,8 @@ update_package(Name, RepoConfig=#{name := Repo}, State) ->
 
 get_package_repo_config(RepoConfig=#{mirror_of := _}) ->
     get_package_repo_config(maps:remove(mirror_of, RepoConfig));
+get_package_repo_config(RepoConfig=#{name := _}) ->
+    get_package_repo_config(maps:remove(name, RepoConfig));
 get_package_repo_config(RepoConfig) ->
     RepoConfig.
 
