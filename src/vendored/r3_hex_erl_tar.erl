@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.6.8, do not edit manually
+%% Vendored from hex_core v0.7.0, do not edit manually
 
 %% @private
 %% Copied from https://github.com/erlang/otp/blob/OTP-20.0.1/lib/stdlib/src/erl_tar.erl
@@ -11,6 +11,7 @@
 %% - Add safe_relative_path_links/2 to check directory traversal vulnerability when extracting files,
 %%   it differs from OTP's current fix (2020-02-04) in that it checks regular files instead of
 %%   symlink targets. This allows creating symlinks with relative path targets such as `../tmp/log`
+%% - Remove ram_file usage (backported from OTP master)
 
 %%
 %% %CopyrightBegin%
@@ -335,10 +336,19 @@ do_open(Name, Mode) when is_list(Mode) ->
             {error, {Name, Reason}}
     end.
 
-open1({binary,Bin}, read, _Raw, Opts) when is_binary(Bin) ->
+open1({binary,Bin0}, read, _Raw, Opts) when is_binary(Bin0) ->
+    Bin = case lists:member(compressed, Opts) of
+        true ->
+            try
+              zlib:gunzip(Bin0)
+            catch
+              _:_ -> Bin0
+            end;
+        false ->
+            Bin0
+    end,
     case file:open(Bin, [ram,binary,read]) of
         {ok,File} ->
-            _ = [ram_file:uncompress(File) || Opts =:= [compressed]],
             {ok, #reader{handle=File,access=read,func=fun file_op/2}};
         Error ->
             Error

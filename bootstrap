@@ -26,10 +26,10 @@ main(_) ->
     rm_rf("_build/default/lib/rebar"),
     rm_rf("_build/test/lib/rebar"),
 
-    %% We fetch a few deps from hex for boostraping,
-    %% so we must compile r3_safe_erl_term.xrl which
-    %% is part of hex_core.
-    compile_xrl_file("src/r3_safe_erl_term.xrl"),
+    filelib:ensure_dir("_build/bootstrap/lib/rebar/ebin/"),
+
+    os:putenv("REBAR_PROFILE", "bootstrap"),
+    compile_vendored(),
 
     %% Fetch and build deps required to build rebar3
     BaseDeps = [{providers, []}
@@ -175,6 +175,14 @@ maybe_set_ipfamily({ok, _}, Family) ->
     httpc:set_options([{ipfamily, Family}], rebar);
 maybe_set_ipfamily(_, _Family) ->
     ok.
+
+compile_vendored() ->
+  compile_xrl_file("src/vendored/r3_safe_erl_term.xrl"),
+  Sources = filelib:wildcard(filename:join(["src/vendored", "*.erl"])),
+  OutDir =  filename:absname("_build/bootstrap/lib/rebar/ebin"),
+  code:add_patha(OutDir),
+  Opts = [debug_info,{outdir, OutDir}, return | additional_defines()],
+  [compile_erl_file(X, Opts) || X <- Sources].
 
 compile(App, FirstFiles) ->
     Dir = filename:join(filename:absname("_build/default/lib/"), App),

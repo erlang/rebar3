@@ -7,7 +7,7 @@ if [[ -z "$1" ]]; then
 fi
 
 source_dir=$1/src
-target_dir=src
+target_dir=src/vendored
 prefix=r3_
 hex_core_version=`cat $source_dir/hex_core.hrl | grep HEX_CORE_VERSION | cut -d'"' -f2`
 
