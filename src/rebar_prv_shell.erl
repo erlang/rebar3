@@ -171,8 +171,8 @@ maybe_remove_logger() ->
 
 maybe_reset_logger(ignore) ->
     ok;
-maybe_reset_logger({restart, #{module := Mod, config := Cfg}}) ->
-    logger:add_handler(default, Mod, Cfg).
+maybe_reset_logger({restart, Config = #{module := Mod}}) ->
+    logger:add_handler(default, Mod, Config).
 
 kill_old_user() ->
     OldUser = whereis(user),
