@@ -14,5 +14,5 @@ TARGET_ERLANG_VERSION=19
 export TARGET_ERLANG_VERSION
 rebar3 as dev compile
 ./vendor.sh src r3_
-find src -regex '.*r3_.*' -exec mv -f {} "$REBAR3_TOP/src" \;
+find src -regex '.*r3_.*' -exec mv -f {} "$REBAR3_TOP/src/vendored" \;
 popd

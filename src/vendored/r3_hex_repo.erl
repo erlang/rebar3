@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.7.0, do not edit manually
+%% Vendored from hex_core v0.7.1, do not edit manually
 
 -module(r3_hex_repo).
 -export([
@@ -94,7 +94,7 @@ get_package(Config, Name) when is_binary(Name) and is_map(Config) ->
 %% Examples:
 %%
 %% ```
-%% > {ok, {200, _, Tarball}} = r3_hex_repo:get_tarball(<<"package1">>, <<"1.0.0">>, r3_hex_core:default_config()),
+%% > {ok, {200, _, Tarball}} = r3_hex_repo:get_tarball(r3_hex_core:default_config(), <<"package1">>, <<"1.0.0">>),
 %% > {ok, #{metadata := Metadata}} = r3_hex_tarball:unpack(Tarball, memory).
 %% '''
 %% @end

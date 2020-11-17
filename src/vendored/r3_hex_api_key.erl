@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.7.0, do not edit manually
+%% Vendored from hex_core v0.7.1, do not edit manually
 
 -module(r3_hex_api_key).
 -export([
