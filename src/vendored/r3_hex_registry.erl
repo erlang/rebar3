@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.7.0, do not edit manually
+%% Vendored from hex_core v0.7.1, do not edit manually
 
 -module(r3_hex_registry).
 -export([
@@ -16,8 +16,8 @@
 ]).
 -include_lib("public_key/include/public_key.hrl").
 
--type private_key() :: public_key:rsa_private_key() | binary().
--type public_key() :: public_key:rsa_public_key() | binary().
+-type private_key() :: #'RSAPrivateKey'{} | binary().
+-type public_key() :: #'RSAPublicKey'{} | binary().
 
 %%====================================================================
 %% API functions

@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.7.0, do not edit manually
+%% Vendored from hex_core v0.7.1, do not edit manually
 
 -module(r3_hex_tarball).
 -export([create/2, create/3, create_docs/1, create_docs/2, unpack/2, unpack/3,
@@ -31,7 +31,7 @@
 %% Creates a package tarball.
 %%
 %% Returns the binary of the tarball the "inner checksum" and "outer checksum".
-%% The inner checksum is deprecated in favor of the inner checksum.
+%% The inner checksum is deprecated in favor of the outer checksum.
 %%
 %% Examples:
 %%

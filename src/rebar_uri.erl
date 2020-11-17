@@ -17,12 +17,13 @@ parse(URIString) ->
 parse(URIString, URIOpts) ->
     case uri_string:parse(URIString) of
         #{path := ""} = Map -> apply_opts(Map#{path => "/"}, URIOpts);
-        Map -> apply_opts(Map, URIOpts)
+        Map when is_map(Map) -> apply_opts(Map, URIOpts);
+        {error, _, _} = E -> E
     end.
 -else.
 -spec parse(URIString) -> URIMap when
     URIString :: iodata(),
-    URIMap :: map() | {error, atom(), term()}.
+    URIMap :: map() | {error, term(), term()}.
 
 parse(URIString) ->
     parse(URIString, []).
@@ -33,7 +34,7 @@ parse(URIString, URIOpts) ->
             %% no additional parser/term info available to us,
             %% e.g. see what uri_string returns in
             %% uri_string:parse(<<"h$ttp:::://////lolz">>).
-            {error, Reason, ""};
+            {error, "", Reason};
         {ok, {Scheme, UserInfo, Host, Port, Path, Query}} ->
             #{
                 scheme => rebar_utils:to_list(Scheme),

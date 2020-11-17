@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.7.0, do not edit manually
+%% Vendored from hex_core v0.7.1, do not edit manually
 
 -module(r3_hex_api_release).
 -export([
@@ -108,7 +108,7 @@ publish(Config, Tarball) -> publish(Config, Tarball, []).
 %%      }}}
 %% '''
 %% @end
--spec publish(hexcore:config(), binary(), publish_params()) -> r3_hex_api:response().
+-spec publish(r3_hex_core:config(), binary(), publish_params()) -> r3_hex_api:response().
 publish(Config, Tarball, Params) when is_map(Config) andalso is_binary(Tarball) andalso is_list(Params)->
     QueryString = r3_hex_api:encode_query_string([{replace, proplists:get_value(replace, Params, false)}]),
     Path = r3_hex_api:join_path_segments(r3_hex_api:build_repository_path(Config, ["publish"])),
