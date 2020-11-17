@@ -1,0 +1,7 @@
+.DS_Store
+.gitignore
+_build
+_checkouts
+Dockerfile
+.dockerignore
+
