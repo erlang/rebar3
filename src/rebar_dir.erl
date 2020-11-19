@@ -30,6 +30,7 @@
          extra_src_dirs/1, extra_src_dirs/2,
          all_src_dirs/1, all_src_dirs/3,
          retarget_path/2,
+         format_source_file_name/1,
          format_source_file_name/2]).
 
 -include("rebar.hrl").
@@ -339,6 +340,9 @@ retarget_path(State, Path, [App|Rest]) ->
         {ok, NewPath}      -> filename:join([rebar_app_info:out_dir(App), NewPath]);
         {error, badparent} -> retarget_path(State, Path, Rest)
     end.
+
+format_source_file_name(Path) ->
+    format_source_file_name(Path, dict:new()).
 
 format_source_file_name(Path, Opts) ->
     Type = case rebar_opts:get(Opts, compiler_source_format,
