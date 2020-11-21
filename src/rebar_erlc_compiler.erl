@@ -564,7 +564,8 @@ internal_erl_compile(Opts, Dir, Module, OutDir, ErlOpts, RebarOpts) ->
     ok = filelib:ensure_dir(Target),
     PrivIncludes = [{i, filename:join(Dir, Src)}
                     || Src <- rebar_dir:all_src_dirs(RebarOpts, ["src"], [])],
-    AllOpts = [{outdir, filename:dirname(Target)}] ++ ErlOpts ++ PrivIncludes ++
+    AllOpts = [{outdir, filename:dirname(Target)}, no_spawn_compiler_process]
+              ++ ErlOpts ++ PrivIncludes ++
               [{i, filename:join(Dir, "include")}, {i, Dir}, return],
     case compile:file(Module, AllOpts) of
         {ok, _Mod} ->
