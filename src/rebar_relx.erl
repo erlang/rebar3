@@ -75,7 +75,8 @@ read_relx_config(State, Options) ->
     ConfigFile = proplists:get_value(config, Options, []),
     case ConfigFile of
         "" ->
-            case {rebar_state:get(State, relx, []), file:consult("relx.config")} of
+            ConfigPath = filename:join([rebar_dir:root_dir(State), "relx.config"]),
+            case {rebar_state:get(State, relx, []), file:consult(ConfigPath)} of
                 {[], {ok, Config}} ->
                     ?DEBUG("Configuring releases with relx.config", []),
                     Config;
