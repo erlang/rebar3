@@ -77,21 +77,23 @@ read_relx_config(State, Options) ->
         "" ->
             case {rebar_state:get(State, relx, []), file:consult("relx.config")} of
                 {[], {ok, Config}} ->
-                    ?DEBUG("Using relx.config", []),
+                    ?DEBUG("Configuring releases with relx.config", []),
                     Config;
                 {Config, {error, enoent}} ->
-                    ?DEBUG("Using relx config from rebar.config", []),
+                    ?DEBUG("Configuring releases the {relx, ...} entry"
+                           " from rebar.config", []),
                     Config;
                 {_, {error, Reason}} ->
                     erlang:error(?PRV_ERROR({config_file, "relx.config", Reason}));
                 {RebarConfig, {ok, _RelxConfig}} ->
-                    ?WARN("Found conflicting relx configs, using rebar.config", []),
+                    ?WARN("Found conflicting relx configs, configuring releases"
+                          " with rebar.config", []),
                     RebarConfig
             end;
         ConfigFile ->
             case file:consult(ConfigFile) of
                 {ok, Config} ->
-                    ?DEBUG("Using relx config file: ~p", [ConfigFile]),
+                    ?DEBUG("Configuring releases with: ~ts", [ConfigFile]),
                     Config;
                 {error, Reason} ->
                     erlang:error(?PRV_ERROR({config_file, ConfigFile, Reason}))
@@ -106,7 +108,7 @@ format_error(unknown_vsn) ->
 format_error(all_relup) ->
     "Option --all can not be applied to `relup` command";
 format_error({config_file, Filename, Error}) ->
-    io_lib:format("Failed to read config file ~s: ~p", [Filename, Error]);
+    io_lib:format("Failed to read config file ~ts: ~p", [Filename, Error]);
 format_error(Error) ->
     io_lib:format("~p", [Error]).
 
