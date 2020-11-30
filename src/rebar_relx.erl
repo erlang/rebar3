@@ -21,8 +21,7 @@
 -spec do(atom(), rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(Provider, State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
-    %% TODO: read in ./relx.config if it exists or --config value
-    RelxConfig = rebar_state:get(State, relx, []),
+    RelxConfig = read_relx_config(State, Opts),
 
     ProfileString = rebar_dir:profile_dir_name(State),
     ExtraOverlays = [{profile_string, ProfileString}],
@@ -72,6 +71,36 @@ do(Provider, State) ->
 
     {ok, State}.
 
+read_relx_config(State, Options) ->
+    ConfigFile = proplists:get_value(config, Options, []),
+    case ConfigFile of
+        "" ->
+            ConfigPath = filename:join([rebar_dir:root_dir(State), "relx.config"]),
+            case {rebar_state:get(State, relx, []), file:consult(ConfigPath)} of
+                {[], {ok, Config}} ->
+                    ?DEBUG("Configuring releases with relx.config", []),
+                    Config;
+                {Config, {error, enoent}} ->
+                    ?DEBUG("Configuring releases the {relx, ...} entry"
+                           " from rebar.config", []),
+                    Config;
+                {_, {error, Reason}} ->
+                    erlang:error(?PRV_ERROR({config_file, "relx.config", Reason}));
+                {RebarConfig, {ok, _RelxConfig}} ->
+                    ?WARN("Found conflicting relx configs, configuring releases"
+                          " with rebar.config", []),
+                    RebarConfig
+            end;
+        ConfigFile ->
+            case file:consult(ConfigFile) of
+                {ok, Config} ->
+                    ?DEBUG("Configuring releases with: ~ts", [ConfigFile]),
+                    Config;
+                {error, Reason} ->
+                    erlang:error(?PRV_ERROR({config_file, ConfigFile, Reason}))
+            end
+    end.
+
 -spec format_error(any()) -> iolist().
 format_error(unknown_release) ->
     "Option --relname is missing";
@@ -79,6 +108,8 @@ format_error(unknown_vsn) ->
     "Option --relvsn is missing";
 format_error(all_relup) ->
     "Option --all can not be applied to `relup` command";
+format_error({config_file, Filename, Error}) ->
+    io_lib:format("Failed to read config file ~ts: ~p", [Filename, Error]);
 format_error(Error) ->
     io_lib:format("~p", [Error]).
 
