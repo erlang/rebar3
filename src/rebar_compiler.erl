@@ -64,8 +64,9 @@ analyze_all({Compiler, G}, Apps) ->
     rebar_compiler_dag:populate_deps(G, SrcExt, OutExt),
     rebar_compiler_dag:propagate_stamps(G),
 
+    [$a, Sep, $b] = filename:join("a", "b"),
     AppPaths = [{rebar_app_info:name(AppInfo),
-                 rebar_utils:to_list(rebar_app_info:dir(AppInfo))}
+                 rebar_utils:to_list(rebar_app_info:dir(AppInfo)) ++ [Sep]}
                 || AppInfo <- Apps],
     AppNames = rebar_compiler_dag:compile_order(G, AppPaths),
     {Contexts, sort_apps(AppNames, Apps)}.
@@ -205,7 +206,7 @@ prepare_compiler_env(Compiler, Apps) ->
             EbinDir = rebar_utils:to_list(rebar_app_info:ebin_dir(AppInfo)),
             %% Make sure that outdir is on the path
             ok = rebar_file_utils:ensure_dir(EbinDir),
-            true = code:add_patha(filename:absname(EbinDir))
+            true = code:add_pathz(filename:absname(EbinDir))
         end,
         Apps
     ),

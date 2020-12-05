@@ -242,10 +242,40 @@ propagate_stamps(G) ->
 compile_order(_, AppDefs) when length(AppDefs) =< 1 ->
     [Name || {Name, _Path} <- AppDefs];
 compile_order(G, AppDefs) ->
-    Edges = [{V1,V2} || E <- digraph:edges(G),
-                        {_,V1,V2,_} <- [digraph:edge(G, E)]],
-    AppPaths = prepare_app_paths(AppDefs),
-    compile_order(Edges, AppPaths, #{}).
+    %% Build a digraph for following topo-sort, and populate
+    %%  FileToApp map as a side effect for caching
+    AppDAG = digraph:new([acyclic]), % ignore cycles and hope it works
+    lists:foldl(
+        fun(E, FileToApp) ->
+            case digraph:edge(G, E) of
+                {_, _, _, artifact} ->
+                    %% skip artifacts, they don't affect compile order
+                    FileToApp;
+                {_, V1, V2, _} ->
+                    %% V1 depends on V2, and we know V1 is in our repo,
+                    %%  otherwise this edge would've never appeared
+                    {App, FTA1} = find_and_cache(V1, AppDefs, FileToApp),
+                    case find_and_cache(V2, AppDefs, FTA1) of
+                        {[], FTA2} ->
+                            %% dependency on a file outside of the repo
+                            FTA2;
+                        {App, FTA2} ->
+                            %% dependency within the same app
+                            FTA2;
+                        {AnotherApp, FTA2} ->
+                            %% actual dependency
+                            %% unfortunately digraph has non-functional API depending on side effects
+                            digraph:add_vertex(AppDAG, App), %% ignore errors for duplicate inserts
+                            digraph:add_vertex(AppDAG, AnotherApp),
+                            digraph:add_edge(AppDAG, App, AnotherApp),
+                            FTA2
+                    end
+            end
+        end, #{}, digraph:edges(G)),
+    Sorted = lists:reverse(digraph_utils:topsort(AppDAG)),
+    digraph:delete(AppDAG),
+    Standalone = [Name || {Name, _} <- AppDefs] -- Sorted,
+    Standalone ++ Sorted.
 
 -dialyzer({no_opaque, maybe_store/5}). % optimized digraph usage breaks opacity
 %% @doc Store the DAG on disk if it was dirty
@@ -409,72 +439,23 @@ propagate_stamps(G, [File|Files]) ->
     end,
     propagate_stamps(G, Files).
 
-%% Do the actual reversal; be aware that only working from the edges
-%% may omit files, so we have to add all non-dependant apps manually
-%% to make sure we don't drop em. Since they have no deps, they're
-%% safer to put first (and compile first)
-compile_order([], AppPaths, AppDeps) ->
-    %% use a digraph so we don't reimplement topsort by hand.
-    G = digraph:new([acyclic]), % ignore cycles and hope it works
-    Tups = maps:keys(AppDeps),
-    {Va,Vb} = lists:unzip(Tups),
-    [digraph:add_vertex(G, V) || V <- Va],
-    [digraph:add_vertex(G, V) || V <- Vb],
-    [digraph:add_edge(G, V1, V2) || {V1, V2} <- Tups],
-    Sorted = lists:reverse(digraph_utils:topsort(G)),
-    digraph:delete(G),
-    Standalone = [Name || {_, Name} <- AppPaths] -- Sorted,
-    Standalone ++ Sorted;
-compile_order([{P1,P2}|T], AppPaths, AppDeps) ->
-    %% Assume most dependencies are between files of the same app
-    %% so ask to see if it's the same before doing a deeper check:
-    case find_app(P1, AppPaths) of
-        not_found -> % system lib probably! not in the repo
-            compile_order(T, AppPaths, AppDeps);
-        {P1App, P1Path} ->
-            case find_cached_app(P2, {P1App, P1Path}, AppPaths) of
-                {P2App, _} when P2App =/= P1App ->
-                    compile_order(T, AppPaths, AppDeps#{{P1App,P2App} => true});
-                _ ->
-                    compile_order(T, AppPaths, AppDeps)
-            end
+find_and_cache(File, AppDefs, FileToApp) ->
+    case maps:find(File, FileToApp) of
+        error ->
+            App = find(File, AppDefs),
+            {App, FileToApp#{File => App}};
+        {ok, App} ->
+            {App, FileToApp}
     end.
 
-%% Swap app name with paths in the order, and sort there; this lets us
-%% bail out early in a search where a file won't be found.
-prepare_app_paths(AppPaths) ->
-    lists:sort([{filename:split(Path), Name} || {Name, Path} <- AppPaths]).
-
-%% Look for the app to which the path belongs; needed to
-%% go from an edge between files in the DAG to building
-%% app-related orderings
-find_app(Path, AppPaths) ->
-    find_app_(filename:split(Path), AppPaths).
-
-%% A cached search for the app to which a path belongs;
-%% the assumption is that sorted edges and common relationships
-%% are going to be between local files within an app most
-%% of the time; so we first look for the same path as a
-%% prior match to avoid searching _all_ potential candidates.
-%% If it doesn't work, go for the normal search.
-find_cached_app(Path, {Name, AppPath}, AppPaths) ->
-    Split = filename:split(Path),
-    case find_app_(Split, [{AppPath, Name}]) of
-        not_found -> find_app_(Split, AppPaths);
-        LastEntry -> LastEntry
-    end.
-
-%% Do the actual recursive search
-find_app_(_Path, []) ->
-    not_found;
-find_app_(Path, [{AppPath, AppName}|Rest]) ->
-    case lists:prefix(AppPath, Path) of
+find(_File, []) ->
+    [];
+find(File, [{App, Dir} | Tail]) ->
+    case lists:prefix(Dir, File) of
         true ->
-            {AppName, AppPath};
-        false when AppPath > Path ->
-            not_found;
+            App;
         false ->
-            find_app_(Path, Rest)
+            find(File, Tail)
     end.
 
 %% @private Return what should be the base name of an erl file, relocated to the
