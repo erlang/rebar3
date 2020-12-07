@@ -167,7 +167,11 @@ prepare_project_app(_State, _Providers, AppInfo) ->
     copy_app_dirs(AppInfo,
                   rebar_app_info:dir(AppInfo),
                   rebar_app_info:out_dir(AppInfo)),
-    code:add_pathsa([rebar_app_info:ebin_dir(AppInfo)]),
+    %% application code path must be added to the source
+    %%  otherwise code_server will remember 'lib_dir' for
+    %%  this application, and all `-include_lib` directives
+    %%  will actually go into _build/profile/lib/...
+    code:add_pathsz([rebar_app_info:dir(AppInfo)]),
     AppInfo.
 
 prepare_compile(State, Providers, AppInfo) ->

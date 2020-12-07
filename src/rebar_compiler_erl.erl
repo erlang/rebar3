@@ -53,7 +53,9 @@ needed_files(Graph, FoundFiles, _, AppInfo) ->
 
     %% Make sure that the ebin dir is on the path
     ok = rebar_file_utils:ensure_dir(EbinDir),
-    true = code:add_patha(filename:absname(EbinDir)),
+    %% this is only needed to provide behaviours/parse_transforms for
+    %%  applications that will be compiled next
+    true = code:add_pathz(filename:absname(EbinDir)),
 
     {ParseTransforms, Rest} = split_source_files(FoundFiles, ErlOpts),
     NeededErlFiles = case needed_files(Graph, ErlOpts, RebarOpts, OutDir, EbinDir, ParseTransforms) of
