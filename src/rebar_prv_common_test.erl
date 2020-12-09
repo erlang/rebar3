@@ -177,7 +177,7 @@ transform_opts([{dir, Dirs}|Rest], Acc) ->
 transform_opts([{suite, Suites}|Rest], Acc) ->
     transform_opts(Rest, [{suite, split_string(Suites)}|Acc]);
 transform_opts([{group, Groups}|Rest], Acc) ->
-    transform_opts(Rest, [{group, split_string(Groups)}|Acc]);
+    transform_opts(Rest, [{group, transform_group(Groups)}|Acc]);
 transform_opts([{testcase, Cases}|Rest], Acc) ->
     transform_opts(Rest, [{testcase, split_string(Cases)}|Acc]);
 transform_opts([{config, Configs}|Rest], Acc) ->
@@ -223,6 +223,17 @@ transform_retry(Opts, State) ->
 
 split_string(String) ->
     rebar_string:lexemes(String, [$,]).
+
+transform_group(String) ->
+    case rebar_string:consult([$[, String, $], $.]) of
+        [Terms] when is_list(Terms) ->
+            Terms;
+        Terms when is_list(Terms) ->
+            Terms;
+        {error, _} ->
+            %% try a normal string split
+            split_string(String)
+    end.
 
 cfgopts(State) ->
     case rebar_state:get(State, ct_opts, []) of
