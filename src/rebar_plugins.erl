@@ -113,11 +113,14 @@ handle_plugin(Profile, Plugin, State, Upgrade) ->
         ToBuild = rebar_prv_install_deps:cull_compile(Sorted, []),
 
         %% Add already built plugin deps to the code path
-        PreBuiltPaths = [rebar_app_info:ebin_dir(A) || A <- Apps] -- ToBuild,
+        ToBuildPaths = [rebar_app_info:ebin_dir(A) || A <- ToBuild],
+        PreBuiltPaths = [Ebin || A <- Apps,
+                                 Ebin <- [rebar_app_info:ebin_dir(A)],
+                                 not lists:member(Ebin, ToBuildPaths)],
         code:add_pathsa(PreBuiltPaths),
 
         %% Build plugin and its deps
-        [build_plugin(AppInfo, Apps, State2) || AppInfo <- ToBuild],
+        build_plugins(ToBuild, Apps, State2),
 
         %% Add newly built deps and plugin to code path
         State3 = rebar_state:update_all_plugin_deps(State2, Apps),
@@ -135,11 +138,14 @@ handle_plugin(Profile, Plugin, State, Upgrade) ->
             {[], State}
     end.
 
-build_plugin(AppInfo, Apps, State) ->
-    Providers = rebar_state:providers(State),
-    S = rebar_state:all_deps(State, Apps),
-    S1 = rebar_state:set(S, deps_dir, ?DEFAULT_PLUGINS_DIR),
-    rebar_prv_compile:compile(S1, Providers, AppInfo).
+build_plugins(MustBuildApps, AllApps, State) ->
+    State1 = rebar_state:deps_to_build(State, MustBuildApps),
+    State2 = rebar_state:all_deps(State1, AllApps),
+    State3 = rebar_state:set(State2, deps_dir, ?DEFAULT_PLUGINS_DIR),
+    {Args, Extra} = rebar_state:command_parsed_args(State),
+    State4 = rebar_state:command_parsed_args(State3, {[{deps_only, true}|Args], Extra}),
+    rebar_prv_compile:do(State4),
+    ok.
 
 plugin_providers({Plugin, _, _, _}) when is_atom(Plugin) ->
     validate_plugin(Plugin);
@@ -165,3 +171,4 @@ validate_plugin(Plugin) ->
                     [Plugin]
             end
     end.
+

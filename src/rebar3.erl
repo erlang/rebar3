@@ -283,12 +283,16 @@ set_options(State, {Options, NonOptArgs}) ->
 log_level() ->
     case os:getenv("QUIET") of
         Q when Q == false; Q == "" ->
-            DefaultLevel = rebar_log:default_level(),
-            case os:getenv("DEBUG") of
-                D when D == false; D == "" ->
-                    DefaultLevel;
+            case os:getenv("DIAGNOSTIC") of
+                Di when Di == false; Di == "" ->
+                    case os:getenv("DEBUG") of
+                        D when D == false; D == "" ->
+                            rebar_log:default_level();
+                        _ ->
+                            rebar_log:debug_level()
+                    end;
                 _ ->
-                    DefaultLevel + 3
+                    rebar_log:diagnostic_level()
             end;
          _ ->
             rebar_log:error_level()
@@ -335,7 +339,7 @@ handle_error({error, {Module, Reason}}, Stacktrace) ->
     case code:which(Module) of
         non_existing ->
             ?CRASHDUMP("~p: ~p~n~p~n~n", [Module, Reason, Stacktrace]),
-            ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to stacktrace or consult rebar3.crashdump", []),
+            ?ERROR("Uncaught error in rebar_core. Run with DIAGNOSTIC=1 to stacktrace or consult rebar3.crashdump", []),
             ?DEBUG("Uncaught error: ~p ~p", [Module, Reason]),
             ?INFO("When submitting a bug report, please include the output of `rebar3 report \"your command\"`", []);
         _ ->
@@ -349,7 +353,7 @@ handle_error(Error, StackTrace) ->
     %% Nothing should percolate up from rebar_core;
     %% Dump this error to console
     ?CRASHDUMP("Error: ~p~n~p~n~n", [Error, StackTrace]),
-    ?ERROR("Uncaught error in rebar_core. Run with DEBUG=1 to see stacktrace or consult rebar3.crashdump", []),
+    ?ERROR("Uncaught error in rebar_core. Run with DIAGNOSTIC=1 to see stacktrace or consult rebar3.crashdump", []),
     ?DEBUG("Uncaught error: ~p", [Error]),
     case StackTrace of
         [] -> ok;

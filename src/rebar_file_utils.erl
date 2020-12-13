@@ -163,13 +163,17 @@ win32_mklink_ok({error,{1,"Cannot create a file when that file already exists.\n
     % File or dir is already in place; find if it is already a symlink (true) or
     % if it is a directory (copy-required; false)
     is_symlink(Target);
-win32_mklink_ok(_, _) ->
-    false.
+win32_mklink_ok(_, Target) ->
+    is_symlink(Target).
 
 %% @private
 is_symlink(Filename) ->
-    {ok, Info} = file:read_link_info(Filename),
-    Info#file_info.type == symlink.
+    case file:read_link_info(Filename) of
+        {ok, Info} ->
+            Info#file_info.type == symlink;
+        _ ->
+            false
+    end.
 
 %% @private
 %% drops the last 'node' of the filename, presumably the last dir such as 'src'
@@ -366,7 +370,7 @@ delete_each([File | Rest]) ->
             delete_each(Rest);
         {error, Reason} ->
             ?ERROR("Failed to delete file ~ts: ~p\n", [File, Reason]),
-            ?FAIL
+            ?ABORT
     end.
 
 %% @doc backwards compat layer to pre-utf8 support
@@ -512,7 +516,7 @@ resolve_link(Path) ->
 split_dirname(Path) ->
     {filename:dirname(Path), filename:basename(Path)}.
 
--spec ensure_dir(filelib:dirname_all()) -> ok | {error, file:posix()}.
+-spec ensure_dir(file:name_all()) -> ok | {error, file:posix()}.
 ensure_dir(Path) ->
     filelib:ensure_dir(filename:join(Path, "fake_file")).
 

@@ -22,7 +22,8 @@
 -include_lib("providers/include/providers.hrl").
 
 -type resource() :: #resource{}.
--type source() :: {type(), location(), ref()} | {type(), location(), ref(), binary()}.
+-type source() :: {type(), location(), ref()} | {type(), location(), ref(), binary()}
+                | {type(), location(), ref(), binary(), binary()}.
 -type type() :: atom().
 -type location() :: string().
 -type ref() :: any().
@@ -30,7 +31,7 @@
 
 -callback init(type(), rebar_state:t()) -> {ok, resource()}.
 -callback lock(rebar_app_info:t(), resource_state()) -> source().
--callback download(file:filename_all(), rebar_app_info:t(), resource_state(), rebar_state:t()) ->
+-callback download(file:filename_all(), rebar_app_info:t(), rebar_state:t(), resource_state()) ->
     ok | {error, any()}.
 -callback needs_update(rebar_app_info:t(), resource_state()) -> boolean().
 -callback make_vsn(rebar_app_info:t(), resource_state()) ->

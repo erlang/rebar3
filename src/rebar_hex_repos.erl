@@ -3,6 +3,7 @@
 -export([from_state/2,
          get_repo_config/2,
          auth_config/1,
+         remove_from_auth_config/2,
          update_auth_config/2,
          format_error/1]).
 
@@ -158,10 +159,19 @@ auth_config(State) ->
             ?ABORT("Error found in repos auth config (~ts) at line ~ts", [AuthFile, Reason])
     end.
 
+-spec remove_from_auth_config(term(), rebar_state:t()) -> ok.
+remove_from_auth_config(Key, State) ->
+    Updated = maps:remove(Key, auth_config(State)),
+    write_auth_config(Updated, State).
+
 -spec update_auth_config(map(), rebar_state:t()) -> ok.
 update_auth_config(Updates, State) ->
-    Config = auth_config(State),
+    Updated = maps:merge(auth_config(State), Updates),
+    write_auth_config(Updated, State).
+
+write_auth_config(Config, State) ->
     AuthConfigFile = auth_config_file(State),
     ok = filelib:ensure_dir(AuthConfigFile),
-    NewConfig = iolist_to_binary([io_lib:print(maps:merge(Config, Updates)) | ".\n"]),
-    ok = file:write_file(AuthConfigFile, NewConfig).
+    NewConfig = iolist_to_binary(["%% coding: utf-8", io_lib:nl(),
+                                  io_lib:print(Config), ".", io_lib:nl()]),
+    ok = file:write_file(AuthConfigFile, NewConfig, [{encoding, utf8}]).

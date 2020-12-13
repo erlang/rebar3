@@ -61,8 +61,9 @@ atoms_in_mib_first_files_warning(Atoms) ->
   ?WARN(W, [Atoms]).
 
 
-dependencies(_, _, _) ->
-    [].
+dependencies(File, _Dir, SrcDirs) ->
+    SrcFiles = lists:append([src_files(SrcDir) || SrcDir <- SrcDirs]),
+    file_deps(File, SrcFiles).
 
 compile(Source, OutDirs, _, Opts) ->
     {_, BinOut} = lists:keyfind(".bin", 1, OutDirs),
@@ -90,7 +91,7 @@ compile(Source, OutDirs, _, Opts) ->
             rebar_file_utils:mv(HrlFilename, HrlOut),
             ok;
         {error, compilation_failed} ->
-            ?FAIL
+            ?ABORT
     end.
 
 clean(MibFiles, AppInfo) ->
@@ -99,3 +100,64 @@ clean(MibFiles, AppInfo) ->
     rebar_file_utils:delete_each(
       [filename:join([AppDir, "include", MIB++".hrl"]) || MIB <- MIBs]),
     ok = rebar_file_utils:rm_rf(filename:join([AppDir, "priv/mibs/*.bin"])).
+
+src_files(Dir) ->
+    %% .mib extension is assumed to be valid here
+    case file:list_dir(Dir) of
+        {ok, Files} ->
+            [filename:join(Dir, File)
+             || File <- Files,
+                filename:extension(File) =:= ".mib"];
+        _ ->
+            []
+    end.
+
+file_deps(File, Files) ->
+    DepMods = imports_in_file(File),
+    lists:filter(
+        fun(F) ->
+            Mods = modules_in_file(F),
+            lists:any(fun(M) -> lists:member(M, Mods) end, DepMods)
+        end,
+        Files
+    ).
+
+modules_in_file(File) ->
+    {ok, Bin} = file:read_file(File),
+    Res = re:run(
+        Bin,
+        "^([a-zA-Z0-9_-]+)\\s+DEFINITIONS\\s+::=\\s+BEGIN",
+        [multiline, {capture, all_but_first, list}, global, unicode]
+    ),
+    case Res of
+        nomatch ->
+            [];
+        {match, List} ->
+            lists:usort(lists:append(List))
+    end.
+
+imports_in_file(File) ->
+    {ok, Bin} = file:read_file(File),
+    ImportMatch = re:run(
+        Bin,
+        "IMPORTS\\s+(.*);",
+        [multiline, dotall, ungreedy, {capture, all_but_first, list}, global]
+    ),
+    case ImportMatch of
+        nomatch ->
+            [];
+        {match, ImportSections} ->
+            Modules = re:run(
+                ImportSections,
+                "FROM\\s+([a-zA-Z0-9_-]+)\\s+",
+                [multiline, {capture, all_but_first, list}, global]
+            ),
+            case Modules of
+                nomatch ->
+                    [];
+                {match, List} ->
+                    lists:usort(lists:append(List))
+            end
+    end.
+
+

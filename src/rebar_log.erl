@@ -32,15 +32,19 @@
          get_level/0,
          error_level/0,
          default_level/0,
+         debug_level/0,
+         diagnostic_level/0,
          intensity/0,
          log/3,
          is_verbose/1,
-         valid_level/1]).
+         valid_level/1,
+         truncate/1]).
 
 -define(ERROR_LEVEL, 0).
 -define(WARN_LEVEL,  1).
 -define(INFO_LEVEL,  2).
 -define(DEBUG_LEVEL, 3).
+-define(DIAGNOSTIC_LEVEL, 4).
 -define(DFLT_INTENSITY, high).
 
 %% ===================================================================
@@ -73,7 +77,8 @@ init(Caller, Verbosity) ->
                 ?ERROR_LEVEL -> error;
                 ?WARN_LEVEL  -> warn;
                 ?INFO_LEVEL  -> info;
-                ?DEBUG_LEVEL -> debug
+                ?DEBUG_LEVEL -> debug;
+                ?DIAGNOSTIC_LEVEL -> debug
             end,
     Intensity = intensity(),
     application:set_env(rebar, log_caller, Caller),
@@ -92,6 +97,17 @@ get_level() ->
             Level
     end.
 
+log(diagnostic, Str, Args) ->
+    %% The diagnostic level is intended for debug info
+    %% that is useful for rebar3 developers and implementers who
+    %% understand the internal structure; the debug level
+    %% itself should aim to be useful for users themselves.
+    %% The underlying library only supports debug at its lowest
+    %% level, so we filter on our end of the lib.
+    case get_level() of
+        ?DIAGNOSTIC_LEVEL -> log(debug, Str, Args);
+        _ -> ok
+    end;
 log(Level = error, Str, Args) ->
     case application:get_env(rebar, log) of
         {ok, LogState} ->
@@ -118,13 +134,33 @@ crashdump(File, Str, Args) ->
 
 error_level() -> ?ERROR_LEVEL.
 default_level() -> ?INFO_LEVEL.
+debug_level() -> ?DEBUG_LEVEL.
+diagnostic_level() -> ?DIAGNOSTIC_LEVEL.
 
 is_verbose(State) ->
     rebar_state:get(State, is_verbose, false).
 
 valid_level(Level) ->
-    erlang:max(?ERROR_LEVEL, erlang:min(Level, ?DEBUG_LEVEL)).
+    erlang:max(?ERROR_LEVEL, erlang:min(Level, ?DIAGNOSTIC_LEVEL)).
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+truncate(IoData) ->
+    Size = iolist_size(IoData),
+    if Size > 4096 -> [take_bytes(4096, IoData), "[...]"];
+       Size =< 4096 -> IoData
+    end.
+
+take_bytes(0, _) -> [];
+take_bytes(N, Bin) when is_binary(Bin), byte_size(Bin) > N ->
+    <<B:N/binary, _>> = Bin,
+    binary:copy(B); % avoid holding on to large refs
+take_bytes(_, Bin) when is_binary(Bin) ->
+    Bin;
+take_bytes(_, []) -> [];
+take_bytes(N, [H|T]) when is_integer(H) ->
+    [H | take_bytes(N-1, T)];
+take_bytes(N, [H|T]) when is_binary(H); is_list(H) ->
+    Res = take_bytes(N, H),
+    [Res | take_bytes(N-byte_size(Res), T)].

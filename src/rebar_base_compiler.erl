@@ -96,9 +96,17 @@ run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
       TargetDir :: file:filename(),
       SourceExt :: string(),
       TargetExt :: string().
-run(Config, FirstFiles, SourceDir, SourceExt, TargetDir, TargetExt,
+run(Config, FirstFiles, SourceDir, SourceExt0, TargetDir, TargetExt,
     Compile3Fn, Opts) ->
-    %% Convert simple extension to proper regex
+    %% Convert simple extension to proper regex.
+    %% If the extension has a leading dot (e.g.: `.peg')
+    %% we escape it.
+    %% Otherwise, if the extension doesn't have a leading dot
+    %% we add it ourselves (e.g.: `peg' -> `.peg')
+    SourceExt = case SourceExt0 of
+        [$.|_Ext] -> SourceExt0;
+        _ -> [$.] ++ SourceExt0
+    end,
     SourceExtRe = "^(?!\\._).*\\" ++ SourceExt ++ [$$],
 
     Recursive = proplists:get_value(recursive, Opts, true),
@@ -195,7 +203,7 @@ compile_each([Source | Rest], Config, CompileFn) ->
             ?ERROR("Compiling ~ts failed", [NewSource]),
             maybe_report(Error),
             ?DEBUG("Compilation failed: ~p", [Error]),
-            ?FAIL
+            ?ABORT
     end,
     compile_each(Rest, Config, CompileFn).
 

@@ -162,12 +162,21 @@ drop_var_docs([{K,V}|Rest]) -> [{K,V} | drop_var_docs(Rest)].
 %% the template.
 create({Template, Type, File}, Files, UserVars, Force, State) ->
     TemplateTerms = consult_template(Files, Type, File),
-    Vars = drop_var_docs(override_vars(UserVars, get_template_vars(TemplateTerms, State))),
+    Vars0 = drop_var_docs(override_vars(UserVars, get_template_vars(TemplateTerms, State))),
+    Vars = maybe_handle_author_name(Vars0),
     maybe_warn_about_name(Vars),
     TemplateCwd = filename:dirname(File),
     Result = execute_template(TemplateTerms, Files, {Template, Type, TemplateCwd}, Vars, Force),
     maybe_print_final_message(proplists:get_value(message, TemplateTerms, undefined), Vars),
     Result.
+
+maybe_handle_author_name(Vars) ->
+    case lists:keyfind(author_name, 1, Vars) of
+        false -> Vars;
+        {author_name, Name0} ->
+            Name1 = unicode:characters_to_binary(Name0),
+            lists:keyreplace(author_name, 1, Vars, {author_name, Name1})
+    end.
 
 maybe_print_final_message(undefined, _) ->
     ok;
@@ -185,6 +194,21 @@ maybe_warn_about_name(Vars) ->
                  [Name]);
         valid ->
             ok
+    end.
+
+maybe_warn_about_name_clash(File) ->
+    case filename:extension(File) of
+        ".erl" ->
+            Module0 = re:replace(filename:basename(File), "\\.erl$", "", [{return, list}]),
+            Module = list_to_atom(Module0),
+            try Module:module_info() of
+                _ -> ?WARN("The module definition of '~ts' in file ~ts "
+                           "will clash with an existing Erlang module.",
+                           [Module, File])
+            catch
+                _:_ -> ok
+            end;
+        _ -> ok
     end.
 
 validate_atom(Str) ->
@@ -249,6 +273,7 @@ execute_template([{template, From, To} | Terms], Files, {Template, Type, Cwd}, V
     In = expand_path(From, Vars),
     Out = expand_path(To, Vars),
     Tpl = load_file(Files, Type, filename:join(Cwd, In)),
+    maybe_warn_about_name_clash(Out),
     case write_file(Out, render(Tpl, Vars), Force) of
         ok ->
             ok;

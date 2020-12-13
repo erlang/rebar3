@@ -1,11 +1,9 @@
-%% TODO: rename FAIL to ABORT once we require at least R13B04 for
-%% building rebar. Macros with different arity were not supported by the
-%% compiler before 13B04.
--define(FAIL, rebar_utils:abort()).
+-define(ABORT, rebar_utils:abort()).
 -define(ABORT(Str, Args), rebar_utils:abort(Str, Args)).
 
 -define(CONSOLE(Str, Args), io:format(Str++"~n", Args)).
 
+-define(DIAGNOSTIC(Str, Args), rebar_log:log(diagnostic, Str, Args)).
 -define(DEBUG(Str, Args), rebar_log:log(debug, Str, Args)).
 -define(INFO(Str, Args), rebar_log:log(info, Str, Args)).
 -define(WARN(Str, Args), rebar_log:log(warn, Str, Args)).
@@ -26,7 +24,6 @@
 -define(CONFIG_VERSION, "1.2.0").
 -define(SUPPORTED_CONFIG_VERSIONS, ["1.1.0", "1.2.0"]). % older were untagged
 -define(DEFAULT_CDN, "https://repo.hex.pm").
--define(REMOTE_PACKAGE_DIR, "tarballs").
 -define(LOCK_FILE, "rebar.lock").
 -define(DEFAULT_COMPILER_SOURCE_FORMAT, relative).
 -define(PACKAGE_INDEX_VERSION, 6).
@@ -42,14 +39,14 @@
 %% the package record is used in a select match spec which upsets dialyzer
 %% this is the suggested workaround from Tobias
 %% http://erlang.org/pipermail/erlang-questions/2009-February/041445.html
--type ms_field() :: '$1' | '_'.
+-type ms_field() :: '$1' | '_' | {'$1', '$2'}.
 
 %% TODO: change package and requirement keys to be required (:=) after dropping support for OTP-18
--record(package, {key :: {unicode:unicode_binary() | ms_field(), unicode:unicode_binary() | ms_field(),
+-record(package, {key :: {unicode:unicode_binary() | ms_field(), unicode:unicode_binary() | ms_field() | ec_semver:semver(),
                           unicode:unicode_binary() | ms_field()},
                   inner_checksum :: binary() | ms_field(),
                   outer_checksum :: binary() | ms_field(),
-                  retired :: boolean() | ms_field(),
+                  retired :: boolean() | ms_field() | #{reason := atom()},
                   dependencies :: [#{package => unicode:unicode_binary(),
                                      requirement => unicode:unicode_binary()}] | ms_field()}).
 

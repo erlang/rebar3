@@ -21,8 +21,7 @@
 -spec do(atom(), rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(Provider, State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
-    %% TODO: read in ./relx.config if it exists or --config value
-    RelxConfig = rebar_state:get(State, relx, []),
+    RelxConfig = read_relx_config(State, Opts),
 
     ProfileString = rebar_dir:profile_dir_name(State),
     ExtraOverlays = [{profile_string, ProfileString}],
@@ -49,10 +48,21 @@ do(Provider, State) ->
 
     case Provider of
         relup ->
-            ToVsn = proplists:get_value(relvsn, Opts, undefined),
+            {Release, ToVsn} =
+                %% hd/1 can't fail because --all is not a valid option to relup
+                case Releases of
+                    [{Rel,Vsn}|_] when is_atom(Rel) ->
+                        %% This is returned if --relvsn and --relname are given
+                        {Rel, Vsn};
+                    [undefined|_] ->
+                        erlang:error(?PRV_ERROR(unknown_release));
+                    [Rel|_] when is_atom(Rel) ->
+                        erlang:error(?PRV_ERROR(unknown_vsn))
+                end,
+
             UpFromVsn = proplists:get_value(upfrom, Opts, undefined),
-            %% hd/1 can't fail because --all is not a valid option to relup
-            relx:build_relup(hd(Releases), ToVsn, UpFromVsn, RelxState);
+
+            relx:build_relup(Release, ToVsn, UpFromVsn, RelxState);
         _ ->
             parallel_run(Provider, Releases, all_apps(State), RelxState)
     end,
@@ -61,9 +71,45 @@ do(Provider, State) ->
 
     {ok, State}.
 
+read_relx_config(State, Options) ->
+    ConfigFile = proplists:get_value(config, Options, []),
+    case ConfigFile of
+        "" ->
+            ConfigPath = filename:join([rebar_dir:root_dir(State), "relx.config"]),
+            case {rebar_state:get(State, relx, []), file:consult(ConfigPath)} of
+                {[], {ok, Config}} ->
+                    ?DEBUG("Configuring releases with relx.config", []),
+                    Config;
+                {Config, {error, enoent}} ->
+                    ?DEBUG("Configuring releases the {relx, ...} entry"
+                           " from rebar.config", []),
+                    Config;
+                {_, {error, Reason}} ->
+                    erlang:error(?PRV_ERROR({config_file, "relx.config", Reason}));
+                {RebarConfig, {ok, _RelxConfig}} ->
+                    ?WARN("Found conflicting relx configs, configuring releases"
+                          " with rebar.config", []),
+                    RebarConfig
+            end;
+        ConfigFile ->
+            case file:consult(ConfigFile) of
+                {ok, Config} ->
+                    ?DEBUG("Configuring releases with: ~ts", [ConfigFile]),
+                    Config;
+                {error, Reason} ->
+                    erlang:error(?PRV_ERROR({config_file, ConfigFile, Reason}))
+            end
+    end.
+
 -spec format_error(any()) -> iolist().
+format_error(unknown_release) ->
+    "Option --relname is missing";
+format_error(unknown_vsn) ->
+    "Option --relvsn is missing";
 format_error(all_relup) ->
     "Option --all can not be applied to `relup` command";
+format_error({config_file, Filename, Error}) ->
+    io_lib:format("Failed to read config file ~ts: ~p", [Filename, Error]);
 format_error(Error) ->
     io_lib:format("~p", [Error]).
 
@@ -190,8 +236,6 @@ opt_spec_list() ->
       "Print usage"},
      {lib_dir, $l, "lib-dir", string,
       "Additional dir that should be searched for OTP Apps"},
-     {log_level, $V, "verbose", {integer, 2},
-      "Verbosity level, maybe between 0 and 3"},
      {dev_mode, $d, "dev-mode", boolean,
       "Symlink the applications and configuration into the release instead of copying"},
      {include_erts, $i, "include-erts", string,

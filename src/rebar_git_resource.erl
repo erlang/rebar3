@@ -124,7 +124,7 @@ parse_git_url(not_scp, Url) ->
     case rebar_uri:parse(Url, UriOpts) of
         #{path := Path, host := Host} ->
             {ok, {Host, filename:rootname(Path, ".git")}};
-        {error, Reason} ->
+        {error, _, Reason} ->
             {error, Reason}
     end.
 
@@ -174,7 +174,7 @@ maybe_warn_local_url(Url) ->
               "Use remote git resources, or a plugin for local dependencies.",
     case parse_git_url(Url) of
         {error, no_scheme} -> ?WARN(WarnStr, [Url]);
-        {error, {no_default_port, _, _}} -> ?WARN(WarnStr, [Url]);
+        {error, no_default_port} -> ?WARN(WarnStr, [Url]);
         {error, {malformed_url, _, _}} -> ?WARN(WarnStr, [Url]);
         _ -> ok
     end.
@@ -369,12 +369,12 @@ parse_tags(Dir) ->
 
 git_clone_options() ->
     Option = case os:getenv("REBAR_GIT_CLONE_OPTIONS") of
-        false -> "" ;       %% env var not set
-        Opt ->              %% env var set to empty or others
+        false ->
+            "" ;
+        Opt ->
+            ?DEBUG("Git Clone Options: ~p",[Opt]),
             Opt
     end,
-
-    ?DEBUG("Git clone Option = ~p",[Option]),
     Option.
 
 check_type_support() ->

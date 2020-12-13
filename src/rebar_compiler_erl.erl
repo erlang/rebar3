@@ -48,12 +48,14 @@ needed_files(Graph, FoundFiles, _, AppInfo) ->
     EbinDir = rebar_app_info:ebin_dir(AppInfo),
     RebarOpts = rebar_app_info:opts(AppInfo),
     ErlOpts = rebar_opts:erl_opts(RebarOpts),
-    ?DEBUG("erlopts ~p", [ErlOpts]),
-    ?DEBUG("files to compile ~p", [FoundFiles]),
+    ?DEBUG("compile options: {erl_opts, ~p}.", [ErlOpts]),
+    ?DEBUG("files to analyze ~p", [FoundFiles]),
 
     %% Make sure that the ebin dir is on the path
     ok = rebar_file_utils:ensure_dir(EbinDir),
-    true = code:add_patha(filename:absname(EbinDir)),
+    %% this is only needed to provide behaviours/parse_transforms for
+    %%  applications that will be compiled next
+    true = code:add_pathz(filename:absname(EbinDir)),
 
     {ParseTransforms, Rest} = split_source_files(FoundFiles, ErlOpts),
     NeededErlFiles = case needed_files(Graph, ErlOpts, RebarOpts, OutDir, EbinDir, ParseTransforms) of
@@ -110,7 +112,7 @@ dependencies(Source, _SourceDir, Dirs, DepOpts) ->
           behaviour := Behaviours} ->
             %% TODO: check for core transforms?
             {_MissIncl, _MissInclLib} =/= {[],[]} andalso
-            ?DEBUG("Missing: ~p", [{_MissIncl, _MissInclLib}]),
+            ?DIAGNOSTIC("Missing: ~p", [{_MissIncl, _MissInclLib}]),
             lists:filtermap(
                 fun (Mod) -> rebar_compiler_epp:resolve_source(Mod, Dirs) end,
                 OptPTrans ++ PTrans ++ Behaviours) ++ AbsIncls
@@ -145,9 +147,10 @@ compile_and_track(Source, [{Ext, OutDir}], Config, ErlOpts) ->
     rebar_compiler_epp:flush(),
     BuildOpts = [{outdir, OutDir} | ErlOpts],
     Target = target_base(OutDir, Source) ++ Ext,
+    {ok, CompileVsn} = application:get_key(compiler, vsn),
     AllOpts = case erlang:function_exported(compile, env_compiler_options, 0) of
-        true  -> BuildOpts ++ compile:env_compiler_options();
-        false -> BuildOpts
+        true  -> [{compiler_version, CompileVsn}] ++ BuildOpts ++ compile:env_compiler_options();
+        false -> [{compiler_version, CompileVsn}] ++ BuildOpts
     end,
     case compile:file(Source, BuildOpts) of
         {ok, _Mod} ->
@@ -237,9 +240,10 @@ target_base(OutDir, Source) ->
     filename:join(OutDir, filename:basename(Source, ".erl")).
 
 opts_changed(Graph, NewOpts, Target, TargetBase) ->
+    {ok, CompileVsn} = application:get_key(compiler, vsn),
     TotalOpts = case erlang:function_exported(compile, env_compiler_options, 0) of
-        true  -> NewOpts ++ compile:env_compiler_options();
-        false -> NewOpts
+        true  -> [{compiler_version, CompileVsn}] ++ NewOpts ++ compile:env_compiler_options();
+        false -> [{compiler_version, CompileVsn}] ++ NewOpts
     end,
     TargetOpts = case digraph:vertex(Graph, Target) of
         {_Target, {artifact, Opts}} -> % tracked dep is found
@@ -273,7 +277,9 @@ compile_info(Target) ->
     case beam_lib:chunks(Target, [compile_info]) of
         {ok, {_mod, Chunks}} ->
             CompileInfo = proplists:get_value(compile_info, Chunks, []),
-            {ok, proplists:get_value(options, CompileInfo, [])};
+            CompileVsn = proplists:get_value(version, CompileInfo, "unknown"),
+            {ok, [{compiler_version, CompileVsn}
+                  | proplists:get_value(options, CompileInfo, [])]};
         {error, beam_lib, Reason} ->
             ?WARN("Couldn't read debug info from ~p for reason: ~p", [Target, Reason]),
             {error, Reason}
@@ -404,7 +410,7 @@ expand_file_names(Files, Dirs) ->
                       Res = rebar_utils:find_files_in_dirs(Dirs, [$^, Incl, $$], true),
                       case Res of
                           [] ->
-                              ?DEBUG("FILE ~p NOT FOUND", [Incl]),
+                              ?DIAGNOSTIC("FILE ~p NOT FOUND", [Incl]),
                               [];
                           _ ->
                               Res

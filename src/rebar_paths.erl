@@ -1,7 +1,7 @@
 -module(rebar_paths).
 -include("rebar.hrl").
 
--type target() :: deps | plugins.
+-type target() :: deps | plugins | runtime.
 -type targets() :: [target(), ...].
 -export_type([target/0, targets/0]).
 -export([set_paths/2, unset_paths/2]).
@@ -14,6 +14,7 @@
 -spec set_paths(targets(), rebar_state:t()) -> ok.
 set_paths(UserTargets, State) ->
     Targets = normalize_targets(UserTargets),
+    ?DIAGNOSTIC("Setting paths to ~p", [Targets]),
     GroupPaths = path_groups(Targets, State),
     Paths = lists:append(lists:reverse([P || {_, P} <- GroupPaths])),
     code:add_pathsa(Paths),
@@ -24,6 +25,7 @@ set_paths(UserTargets, State) ->
 -spec unset_paths(targets(), rebar_state:t()) -> ok.
 unset_paths(UserTargets, State) ->
     Targets = normalize_targets(UserTargets),
+    ?DIAGNOSTIC("Removing ~p paths", [Targets]),
     GroupPaths = path_groups(Targets, State),
     Paths = lists:append([P || {_, P} <- GroupPaths]),
     [code:del_path(P) || P <- Paths],
@@ -207,11 +209,7 @@ get_apps(deps, State) ->
     %% The code paths for deps also include the top level apps
     %% and the extras, which we don't have here; we have to
     %% add the apps by hand
-    case rebar_state:project_apps(State) of
-        undefined -> [];
-        List -> List
-    end ++
-    rebar_state:all_deps(State);
+    rebar_state:project_apps(State) ++ rebar_state:all_deps(State);
 get_apps(plugins, State) ->
     rebar_state:all_plugin_deps(State);
 get_apps(runtime, State) ->

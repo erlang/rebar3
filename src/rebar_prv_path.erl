@@ -81,11 +81,14 @@ lib_dir(State)  -> io_lib:format("~ts", [rebar_dir:deps_dir(State)]).
 rel_dir(State)  -> io_lib:format("~ts/rel", [rebar_dir:base_dir(State)]).
 
 ebin_dirs(Apps, State) ->
-    lists:map(fun(App) -> io_lib:format("~ts/~ts/ebin", [rebar_dir:deps_dir(State), App]) end, Apps).
+    lists:flatmap(fun(App) -> [io_lib:format("~ts/~ts/ebin", [rebar_dir:checkouts_out_dir(State), App]),
+                               io_lib:format("~ts/~ts/ebin", [rebar_dir:deps_dir(State), App]) ] end, Apps).
 priv_dirs(Apps, State) ->
-    lists:map(fun(App) -> io_lib:format("~ts/~ts/priv", [rebar_dir:deps_dir(State), App]) end, Apps).
+    lists:flatmap(fun(App) -> [io_lib:format("~ts/~ts/priv", [rebar_dir:checkouts_out_dir(State), App]),
+                               io_lib:format("~ts/~ts/priv", [rebar_dir:deps_dir(State), App]) ] end, Apps).
 src_dirs(Apps, State) ->
-    lists:map(fun(App) -> io_lib:format("~ts/~ts/src", [rebar_dir:deps_dir(State), App]) end, Apps).
+    lists:flatmap(fun(App) -> [io_lib:format("~ts/~ts/src", [rebar_dir:checkouts_out_dir(State), App]),
+                               io_lib:format("~ts/~ts/src", [rebar_dir:deps_dir(State), App]) ] end, Apps).
 
 print_paths_if_exist(Paths, State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),

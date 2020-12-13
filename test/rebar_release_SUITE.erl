@@ -4,6 +4,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 all() -> [release,
+          config_file,
           dev_mode_release,
           profile_dev_mode_override_release,
           tar,
@@ -44,6 +45,34 @@ release(Config) ->
       ["release"],
       {ok, [{release, list_to_atom(Name), Vsn, false}]}
      ).
+
+config_file(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = list_to_atom(?config(name, Config)),
+    %% Relase build fails if no relx config exists
+    ?assertError({error, {relx, no_releases_in_system}},
+                 rebar_test_utils:run_and_check(Config, [], ["release"], result)),
+    %% Write relx.config
+    RelxConfig = fun(Vsn) -> [{release, {Name, Vsn}, [Name]}, {lib_dirs, [AppDir]}] end,
+    rebar_test_utils:create_config(AppDir, "relx.config", RelxConfig("1.0.0")),
+    %% Release is built with relx.config (default)
+    rebar_test_utils:run_and_check(Config, [], ["release"],
+                                   {ok, [{release, Name, "1.0.0", false}]}),
+    %% Release is built with custom.config (--config)
+    rebar_test_utils:create_config(AppDir, "custom.config", RelxConfig("2.0.0")),
+    rebar_test_utils:run_and_check(Config, [], ["release", "--config", "custom.config"],
+                                   {ok, [{release, Name, "2.0.0", false}]}),
+    %% Fail due to non-existing file
+    ?assertError({error, {rebar_relx, {config_file, "no_exist.config", enoent}}},
+                 rebar_test_utils:run_and_check(Config, [],
+                                                ["release", "--config", "no_exist.config"], result)),
+    %% Fail due to non-existing file, even with relx config in rebar.config
+    ?assertError({error, {rebar_relx, {config_file, "no_exist.config", enoent}}},
+                 rebar_test_utils:run_and_check(Config, [{relx, RelxConfig("3.0.0")}],
+                                                ["release", "--config", "no_exist.config"], result)),
+    %% rebar.config overrides relx.config if both exist
+    rebar_test_utils:run_and_check(Config, [{relx, RelxConfig("4.0.0")}], ["release"],
+                                   {ok, [{release, Name, "4.0.0", false}]}).
 
 dev_mode_release(Config) ->
     AppDir = ?config(apps, Config),

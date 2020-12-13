@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.6.8, do not edit manually
+%% Vendored from hex_core v0.7.1, do not edit manually
 
 -module(r3_hex_http).
 -export([request/5]).
@@ -9,7 +9,9 @@
 
 -type method() :: get | post | put | patch | delete.
 -type status() :: non_neg_integer().
+-export_type([status/0]).
 -type headers() :: #{binary() => binary()}.
+-export_type([headers/0]).
 -type body() :: {ContentType :: binary(), Body :: binary()} | undefined.
 -type adapter_config() :: map().
 
@@ -20,10 +22,18 @@
 -spec request(r3_hex_core:config(), method(), URI :: binary(), headers(), body()) ->
     {ok, {status(), headers(), binary()}} | {error, term()}.
 request(Config, Method, URI, Headers, Body) when is_binary(URI) and is_map(Headers) ->
-    Adapter = maps:get(http_adapter, Config),
+    {Adapter, AdapterConfig} = case maps:get(http_adapter, Config, {r3_hex_http_httpc, #{}}) of
+        {Adapter0, AdapterConfig0} ->
+            {Adapter0, AdapterConfig0};
+        %% TODO: remove in v0.9
+        Adapter0 when is_atom(Adapter0) ->
+            AdapterConfig0 = maps:get(http_adapter_config, Config, #{}),
+            io:format("[r3_hex_http] setting #{http_adapter => Module, http_adapter_config => Map} "
+                      "is deprecated in favour of #{http_adapter => {Module, Map}}~n"),
+            {Adapter0, AdapterConfig0}
+    end,
     UserAgentFragment = maps:get(http_user_agent_fragment, Config),
     Headers2 = put_new(<<"user-agent">>, user_agent(UserAgentFragment), Headers),
-    AdapterConfig = maps:get(http_adapter_config, Config, #{}),
     Adapter:request(Method, URI, Headers2, Body, AdapterConfig).
 
 user_agent(UserAgentFragment) ->

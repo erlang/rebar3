@@ -14,7 +14,7 @@ queue(Tasks, WorkF, WArgs, Handler, HArgs) ->
     Parent = self(),
     Worker = fun() -> worker(Parent, WorkF, WArgs) end,
     Jobs = min(length(Tasks), erlang:system_info(schedulers)),
-    ?DEBUG("Starting ~B worker(s)", [Jobs]),
+    ?DIAGNOSTIC("Starting ~B worker(s)", [Jobs]),
     Pids = [spawn_monitor(Worker) || _ <- lists:seq(1, Jobs)],
     parallel_dispatch(Tasks, Pids, Handler, HArgs).
 
@@ -34,7 +34,7 @@ parallel_dispatch(Targets, Pids, Handler, Args) ->
             parallel_dispatch(Targets, NewPids, Handler, Args);
         {'DOWN', _Mref, _, _Pid, Info} ->
             ?ERROR("Task failed: ~p", [Info]),
-            ?FAIL;
+            ?ABORT;
         {result, Result} ->
             case Handler(Result, Args) of
                 ok ->

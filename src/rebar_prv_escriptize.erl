@@ -108,6 +108,7 @@ escriptize(State0, App) ->
     TopInclApps = lists:usort([ec_cnv:to_atom(AppName) | rebar_state:get(State, escript_incl_apps, [])]),
     AllApps = rebar_state:all_deps(State)++rebar_state:project_apps(State),
     InclApps = find_deps(TopInclApps, AllApps),
+    ?DEBUG("bundled applications:~n\t~p", [InclApps]),
     InclBeams = get_apps_beams(InclApps, AllApps),
 
     %% Look for a list of extra files to include in the output file.
@@ -130,6 +131,8 @@ escriptize(State0, App) ->
         , {comment, def("%%", State, escript_comment, "%%\n")}
         , {emu_args, def("%%!", State, escript_emu_args, DefaultEmuArgs)}
         , {archive, Files, []} ],
+    ?DEBUG("escript options:", []),
+    [?DEBUG("\t{escript_~p, ~p}.", [K, V]) || {K, V} <- lists:droplast(EscriptSections)],
     case escript:create(Filename, EscriptSections) of
         ok -> ok;
         {error, EscriptError} ->
@@ -249,7 +252,7 @@ find_deps(AppNames, AllApps) ->
 %% Should look at the app files to find direct dependencies
 find_deps_of_deps([], _, Acc) -> Acc;
 find_deps_of_deps([Name|Names], Apps, Acc) ->
-    ?DEBUG("processing ~p", [Name]),
+    ?DIAGNOSTIC("processing ~p", [Name]),
     {ok, App} = rebar_app_utils:find(Name, Apps),
     DepNames = proplists:get_value(applications, rebar_app_info:app_details(App), []),
     BinDepNames = [rebar_utils:to_binary(Dep) || Dep <- DepNames,
@@ -258,7 +261,7 @@ find_deps_of_deps([Name|Names], Apps, Acc) ->
                    DepDir =:= {error, bad_name} orelse % those are all local
                    not lists:prefix(code:root_dir(), DepDir)]
                 -- ([Name|Names]++Acc), % avoid already seen deps
-    ?DEBUG("new deps of ~p found to be ~p", [Name, BinDepNames]),
+    ?DIAGNOSTIC("new deps of ~p found to be ~p", [Name, BinDepNames]),
     find_deps_of_deps(BinDepNames ++ Names, Apps, BinDepNames ++ Acc).
 
 def(Rm, State, Key, Default) ->

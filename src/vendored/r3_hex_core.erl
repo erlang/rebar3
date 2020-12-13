@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.6.8, do not edit manually
+%% Vendored from hex_core v0.7.1, do not edit manually
 
 %% @doc
 %% hex_core entrypoint module.
@@ -18,11 +18,10 @@
 %% * `api_repository' - Name of the repository endpoint in the API, this should
 %%   for example be set when accessing packages from a specific repository.
 %% * `api_url' - URL to the HTTP API (default: `https://hex.pm/api').
-%% * `http_adapter' - Callback module used for HTTP requests, see [`r3_hex_http'](r3_hex_http.html)
-%%   (default: `r3_hex_http_httpc').
+%% * `http_adapter' - A tuple of a callback module used for HTTP requests, see [`r3_hex_http'](r3_hex_http.html)
+%%   (default: `r3_hex_http_httpc') and the configuration to pass to the HTTP adapter.
 %% * `http_etag' - Sets the `if-none-match' HTTP header with the given value to do a
 %%   conditional HTTP request.
-%% * `http_adapter_config' - Configuration to pass to the HTTP adapter.
 %% * `http_user_agent_fragment' - Will be appended to the `user-agent` HTTP header (default: `(httpc)').
 %% * `repo_key' - Authentication key used when accessing the repository.
 %% * `repo_name' - Name of the repository, used for verifying the repository signature
@@ -58,9 +57,8 @@ J1i2xWFndWa6nfFnRxZmCStCOZWYYPlaxr+FZceFbpMwzTNs4g3d4tLNUcbKAIH4
     api_organization => binary() | undefined,
     api_repository => binary() | undefined,
     api_url => binary(),
-    http_adapter => module(),
+    http_adapter => {module(), map()},
     http_etag => binary() | undefined,
-    http_adapter_config => map(),
     http_headers => map(),
     http_user_agent_fragment => binary(),
     repo_key => binary() | undefined,
@@ -69,7 +67,9 @@ J1i2xWFndWa6nfFnRxZmCStCOZWYYPlaxr+FZceFbpMwzTNs4g3d4tLNUcbKAIH4
     repo_url => binary(),
     repo_organization => binary() | undefined,
     repo_verify => boolean(),
-    repo_verify_origin => boolean()
+    repo_verify_origin => boolean(),
+    tarball_max_size => pos_integer(),
+    tarball_max_uncompressed_size => pos_integer()
 }.
 
 -spec default_config() -> config().
@@ -79,9 +79,9 @@ default_config() ->
         api_organization => undefined,
         api_repository => undefined,
         api_url => <<"https://hex.pm/api">>,
-        http_adapter => r3_hex_http_httpc,
-        http_adapter_config => #{profile => default},
+        http_adapter => {r3_hex_http_httpc, #{profile => default}},
         http_etag => undefined,
+        http_headers => #{},
         http_user_agent_fragment => <<"(httpc)">>,
         repo_key => undefined,
         repo_name => <<"hexpm">>,
@@ -90,5 +90,6 @@ default_config() ->
         repo_organization => undefined,
         repo_verify => true,
         repo_verify_origin => true,
-        http_headers => #{}
+        tarball_max_size => 8 * 1024 * 1024,
+        tarball_max_uncompressed_size => 64 * 1024 * 1024
     }.

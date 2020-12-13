@@ -18,8 +18,8 @@
 -type extension() :: string().
 -type out_mappings() :: [{extension(), file:filename()}].
 
--callback context(rebar_app_info:t()) -> #{src_dirs     => [file:dirname()], % mandatory
-                                           include_dirs => [file:dirname()], % mandatory
+-callback context(rebar_app_info:t()) -> #{src_dirs     => [DirName :: file:filename()], % mandatory
+                                           include_dirs => [DirName :: file:filename()], % mandatory
                                            src_ext      => extension(),      % mandatory
                                            out_mappings => out_mappings(),   % mandatory
                                            dependencies_opts => term()}.     % optional
@@ -29,8 +29,8 @@
      {[file:filename()] | % [Sequential]
       {[file:filename()], [file:filename()]}, % {Sequential, Parallel}
       term()}}.
--callback dependencies(file:filename(), file:dirname(), [file:dirname()]) -> [file:filename()].
--callback dependencies(file:filename(), file:dirname(), [file:dirname()], term()) -> [file:filename()].
+-callback dependencies(file:filename(), DirName :: file:filename(), [DirName :: file:filename()]) -> [file:filename()].
+-callback dependencies(file:filename(), DirName :: file:filename(), [DirName :: file:filename()], term()) -> [file:filename()].
 -callback compile(file:filename(), out_mappings(), rebar_dict(), list()) ->
     ok | {ok, [string()]} | error | {error, [string()], [string()]} | skipped.
 -callback compile_and_track(file:filename(), out_mappings(), rebar_dict(), list()) ->
@@ -40,9 +40,6 @@
 -callback clean([file:filename()], rebar_app_info:t()) -> _.
 
 -optional_callbacks([dependencies/4, compile_and_track/4]).
-
--define(RE_PREFIX, "^(?!\\._)").
-
 
 %% @doc analysis by the caller, in order to let an OTP app
 %% find and resolve all its dependencies as part of compile_all's new
@@ -67,8 +64,9 @@ analyze_all({Compiler, G}, Apps) ->
     rebar_compiler_dag:populate_deps(G, SrcExt, OutExt),
     rebar_compiler_dag:propagate_stamps(G),
 
+    [$a, Sep, $b] = filename:join("a", "b"),
     AppPaths = [{rebar_app_info:name(AppInfo),
-                 rebar_utils:to_list(rebar_app_info:dir(AppInfo))}
+                 rebar_utils:to_list(rebar_app_info:dir(AppInfo)) ++ [Sep]}
                 || AppInfo <- Apps],
     AppNames = rebar_compiler_dag:compile_order(G, AppPaths),
     {Contexts, sort_apps(AppNames, Apps)}.
@@ -118,7 +116,7 @@ clean(Compilers, AppInfo) ->
 %% These functions are here for the ultimate goal of getting rid of
 %% rebar_base_compiler. This can't be done because of existing plugins.
 
--spec needs_compile(filename:all(), extension(), [{extension(), file:dirname()}]) -> boolean().
+-spec needs_compile(file:name_all(), extension(), [{extension(), DirName :: file:filename()}]) -> boolean().
 needs_compile(Source, OutExt, Mappings) ->
     Ext = filename:extension(Source),
     BaseName = filename:basename(Source, Ext),
@@ -208,13 +206,14 @@ prepare_compiler_env(Compiler, Apps) ->
             EbinDir = rebar_utils:to_list(rebar_app_info:ebin_dir(AppInfo)),
             %% Make sure that outdir is on the path
             ok = rebar_file_utils:ensure_dir(EbinDir),
-            true = code:add_patha(filename:absname(EbinDir))
+            true = code:add_pathz(filename:absname(EbinDir))
         end,
         Apps
     ),
     %% necessary for erlang:function_exported/3 to work as expected
     %% called here for clarity as it's required by both opts_changed/2
     %% and erl_compiler_opts_set/0 in needed_files
+    application:load(compiler),
     _ = code:ensure_loaded(compile),
     _ = code:ensure_loaded(Compiler),
     ok.
@@ -272,7 +271,7 @@ do_compile(CompilerMod, Source, Outs, Config, Opts) ->
             ?ERROR("Compiling ~ts failed", [NewSource]),
             maybe_report(Error),
             ?DEBUG("Compilation failed: ~p", [Error]),
-            ?FAIL
+            ?ABORT
     end.
 
 do_compile_and_track(CompilerMod, Source, Outs, Config, Opts) ->
@@ -292,7 +291,7 @@ do_compile_and_track(CompilerMod, Source, Outs, Config, Opts) ->
             ?ERROR("Compiling ~ts failed", [NewSource]),
             maybe_report(Error),
             ?DEBUG("Compilation failed: ~p", [Error]),
-            ?FAIL
+            ?ABORT
     end.
 
 store_artifacts(_G, []) ->
@@ -321,27 +320,27 @@ compile_worker(Source, [Opts, Config, Outs, CompilerMod]) ->
     {Result, Source}.
 
 compile_handler({ok, Source}, _Args) ->
-    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
+    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]),
     ok;
 compile_handler({{ok, Tracked}, Source}, [_, Tracking]) when Tracking ->
-    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
+    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]),
     {ok, Tracked};
 compile_handler({{ok, Warnings}, Source}, _Args) ->
     report(Warnings),
-    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
+    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]),
     ok;
 compile_handler({{ok, Tracked, Warnings}, Source}, [_, Tracking]) when Tracking ->
     report(Warnings),
-    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), Source]),
+    ?DEBUG("~sCompiled ~s", [rebar_utils:indent(1), filename:basename(Source)]),
     {ok, Tracked};
 compile_handler({skipped, Source}, _Args) ->
-    ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), Source]),
+    ?DEBUG("~sSkipped ~s", [rebar_utils:indent(1), filename:basename(Source)]),
     ok;
 compile_handler({Error, Source}, [Config | _Rest]) ->
     NewSource = format_error_source(Source, Config),
     ?ERROR("Compiling ~ts failed", [NewSource]),
     maybe_report(Error),
-    ?FAIL.
+    ?ABORT.
 
 clean_(CompilerMod, AppInfo, _Label) ->
     #{src_dirs := SrcDirs,

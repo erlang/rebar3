@@ -492,6 +492,7 @@ add_provider(State=#state_t{providers=Providers, allow_provider_overrides=false}
             State#state_t{providers=[Provider | Providers]}
     end.
 
+-dialyzer({no_match, create_logic_providers/2}). % we want to be permissive with providers:new/2
 create_logic_providers(ProviderModules, State0) ->
     try
         lists:foldl(fun(ProviderMod, StateAcc) ->
@@ -510,7 +511,7 @@ create_logic_providers(ProviderModules, State0) ->
         ?WITH_STACKTRACE(C,T,S)
             ?DEBUG("~p: ~p ~p", [C, T, S]),
             ?CRASHDUMP("~p: ~p~n~p~n~n~p", [C, T, S, State0]),
-            throw({error, "Failed creating providers. Run with DEBUG=1 for stacktrace or consult rebar3.crashdump."})
+            throw({error, "Failed creating providers. Run with DIAGNOSTIC=1 for stacktrace or consult rebar3.crashdump."})
     end.
 
 to_list(#state_t{} = State) ->

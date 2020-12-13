@@ -24,7 +24,7 @@
 
 %% @doc Interrupts program flow
 -spec abort() -> no_return().
-abort() -> ?FAIL.
+abort() -> ?ABORT.
 
 %% @doc like {@link error/2}, except it also raises an
 %% exception to interrupt program flow.
@@ -103,6 +103,6 @@ processing_base_dir(State) ->
 
 %% @doc returns the SSL options adequate for the project based on
 %% its configuration, including for validation of certs.
--spec ssl_opts(string()) -> [term()].
+-spec ssl_opts(string() | binary()) -> [term()].
 ssl_opts(Url) ->
     rebar_utils:ssl_opts(Url).

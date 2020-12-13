@@ -9,7 +9,8 @@
 
 all() ->
     [default_repo, repo_merging, repo_replacing,
-     auth_merging, auth_config_errors, organization_merging, {group, resolve_version}].
+     auth_read_write_read, auth_remove_from_config, auth_merging, auth_config_errors, organization_merging,
+     {group, resolve_version}].
 
 groups() ->
     [{resolve_version, [use_first_repo_match, use_exact_with_hash, fail_repo_update,
@@ -120,7 +121,9 @@ init_per_testcase(optional_prereleases, Config) ->
 
     [{state, State} | Config];
 init_per_testcase(Case, Config) when Case =:= auth_merging ;
-                                     Case =:= auth_config_errors ->
+                                     Case =:= auth_config_errors ;
+                                     Case =:= auth_remove_from_config ;
+                                     Case =:= auth_read_write_read ->
     meck:new(file, [passthrough, no_link, unstick]),
     meck:new(rebar_packages, [passthrough, no_link]),
     Config;
@@ -133,7 +136,9 @@ init_per_testcase(_, Config) ->
 
 end_per_testcase(Case, _Config) when Case =:= auth_merging ;
                                      Case =:= auth_config_errors ;
-                                     Case =:= organization_merging ->
+                                     Case =:= organization_merging ;
+                                     Case =:= auth_remove_from_config ;
+                                     Case =:= auth_read_write_read ->
     meck:unload(file),
     meck:unload(rebar_packages);
 end_per_testcase(Case, _Config) when Case =:= use_first_repo_match ;
@@ -271,6 +276,64 @@ auth_config_errors(_Config) ->
     ?assertEqual(undefined, maps:get(write_key, DefaultRepo, undefined)),
     ok.
 
+auth_read_write_read(_Config) ->
+    Repo1 = #{name => <<"hexpm:repo-1">>,
+              api_url => <<"repo-1/api">>},
+    Repo2 = #{name => <<"hexpm:repo-2">>,
+              repo_url => <<"repo-2/repo">>,
+              repo_verify => false},
+    State = rebar_state:new([{hex, [{repos, [Repo1, Repo2]}]}]),
+
+    meck:expect(file, consult,
+                fun(_) ->
+                        {ok, [#{<<"hexpm:repo-1">> => #{read_key => <<"read key">>},
+                                <<"hexpm:repo-2">> => #{read_key => <<"read key 2">>,
+                                                        repos_key => <<"repos key 2">>,
+                                                        write_key => <<"write key 2">>}}]}
+                end),
+
+    meck:expect(file, write_file,
+                fun(_File, CfgBin, _) ->
+                        case binary:match(CfgBin, <<"foo">>) of
+                            nomatch ->
+                                Err = "expected auth config binary with key <<\"foo\">>",
+                                meck:exception(error, {expected, Err});
+                            _ ->
+                                ok
+                        end
+                end),
+
+    rebar_hex_repos:update_auth_config(#{<<"foo">> => <<200>>}, State).
+
+auth_remove_from_config(_Config) ->
+    Repo1 = #{name => <<"hexpm:repo-1">>,
+              api_url => <<"repo-1/api">>},
+    Repo2 = #{name => <<"hexpm:repo-2">>,
+              repo_url => <<"repo-2/repo">>,
+              repo_verify => false},
+    State = rebar_state:new([{hex, [{repos, [Repo1, Repo2]}]}]),
+
+    meck:expect(file, consult,
+                fun(_) ->
+                        {ok, [#{<<"hexpm:repo-1">> => #{read_key => <<"read key">>},
+                                <<"hexpm:repo-2">> => #{read_key => <<"read key 2">>,
+                                                        repos_key => <<"repos key 2">>,
+                                                        write_key => <<"write key 2">>}}]}
+                end),
+
+    meck:expect(file, write_file,
+                fun(_File, CfgBin, _) ->
+                        case binary:match(CfgBin, <<"hexpm:repo-1">>) of
+                            nomatch ->
+                                ok;
+                            _ ->
+                                Err = "expected auth config binary without key <<\"hexpm:repo-1\">>",
+                                meck:exception(error, {expected, Err})
+                        end
+                end),
+
+    rebar_hex_repos:remove_from_auth_config(<<"hexpm:repo-1">>, State).
+
 organization_merging(_Config) ->
     Repo1 = #{name => <<"hexpm:repo-1">>,
               api_url => <<"repo-1/api">>},
@@ -319,14 +382,14 @@ use_first_repo_match(Config) ->
     ?assertMatch({ok,{package,{<<"B">>, {{2,0,0}, {[],[]}}, Repo2},
                       <<"inner checksum">>,<<"outer checksum">>, false, []},
                   #{name := Repo2,
-                    http_adapter_config := #{profile := rebar}}},
+                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"B">>, <<"> 1.4.0">>, undefined, undefined,
                                                 ?PACKAGE_TABLE, State)),
 
     ?assertMatch({ok,{package,{<<"B">>, {{1,4,0}, {[],[]}}, Repo3},
                     <<"inner checksum">>,<<"outer checksum">>, false, []},
                   #{name := Repo3,
-                    http_adapter_config := #{profile := rebar}}},
+                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"B">>, <<"~> 1.4.0">>, undefined, undefined,
                                                 ?PACKAGE_TABLE, State)).
 
@@ -337,7 +400,7 @@ use_exact_with_hash(Config) ->
     ?assertMatch({ok,{package,{<<"C">>, {{1,3,1}, {[],[]}}, Repo2},
                       <<"inner checksum">>, <<"good outer checksum">>, false, []},
                   #{name := Repo2,
-                    http_adapter_config := #{profile := rebar}}},
+                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"C">>, <<"1.3.1">>, <<"inner checksum">>, <<"good outer checksum">>,
                                                 ?PACKAGE_TABLE, State)).
 
@@ -347,7 +410,7 @@ fail_repo_update(Config) ->
     ?assertMatch({ok,{package,{<<"B">>, {{1,4,0}, {[],[]}}, Repo3},
                       <<"inner checksum">>,<<"outer checksum">>, false, []},
                   #{name := Repo3,
-                    http_adapter_config := #{profile := rebar}}},
+                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"B">>, <<"~> 1.4.0">>, undefined, undefined,
                                                 ?PACKAGE_TABLE, State)).
 
@@ -358,7 +421,7 @@ ignore_match_in_excluded_repo(Config) ->
     ?assertMatch({ok,{package,{<<"B">>, {{1,4,6}, {[],[]}}, Hexpm},
                       <<"inner checksum">>,<<"outer checksum">>, #{reason := 'RETIRED_INVALID'}, []},
                   #{name := Hexpm,
-                    http_adapter_config := #{profile := rebar}}},
+                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"B">>, <<"~> 1.4.0">>, undefined, undefined,
                                                 ?PACKAGE_TABLE, State)),
 
@@ -366,7 +429,7 @@ ignore_match_in_excluded_repo(Config) ->
     ?assertMatch({ok,{package,{<<"A">>, {{0,1,1}, {[],[]}}, Repo2},
                       <<"inner checksum">>,  <<"good outer checksum">>, false, []},
                   #{name := Repo2,
-                    http_adapter_config := #{profile := rebar}}},
+                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"A">>, <<"0.1.1">>, <<"inner checksum">>, <<"good outer checksum">>,
                                                 ?PACKAGE_TABLE, State)).
 
@@ -376,14 +439,14 @@ optional_prereleases(Config) ->
     ?assertMatch({ok,{package,{<<"B">>, {{1,5,0}, {[],[]}}, Hexpm},
                      <<"inner checksum">>,<<"outer checksum">>, false, []},
                   #{name := Hexpm,
-                    http_adapter_config := #{profile := rebar}}},
+                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"B">>, <<"~> 1.5.0">>, undefined, undefined,
                                                 ?PACKAGE_TABLE, State)),
 
     ?assertMatch({ok,{package,{<<"B">>, {{1,5,6}, {[<<"rc">>,0],[]}}, Hexpm},
                       <<"inner checksum">>,<<"outer checksum">>, true, []},
                   #{name := Hexpm,
-                    http_adapter_config := #{profile := rebar}}},
+                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"B">>, <<"1.5.6-rc.0">>, <<"inner checksum">>, <<"outer checksum">>,
                                                 ?PACKAGE_TABLE, State)),
 
@@ -392,7 +455,7 @@ optional_prereleases(Config) ->
     ?assertMatch({ok,{package,{<<"B">>, {{1,5,6}, {[<<"rc">>,0],[]}}, Hexpm},
                       <<"inner checksum">>,<<"outer checksum">>, true, []},
                   #{name := Hexpm,
-                    http_adapter_config := #{profile := rebar}}},
+                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"B">>, <<"~> 1.5.0">>, <<"inner checksum">>, <<"outer checksum">>,
                                                 ?PACKAGE_TABLE, State1)).
 

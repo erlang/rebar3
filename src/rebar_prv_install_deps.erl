@@ -382,7 +382,7 @@ symlink_dep(State, From, To) ->
         ok ->
             RelativeFrom = make_relative_to_root(State, From),
             RelativeTo = make_relative_to_root(State, To),
-            ?INFO("Linking ~ts to ~ts", [RelativeFrom, RelativeTo]),
+            ?DEBUG("Linking ~ts to ~ts", [RelativeFrom, RelativeTo]),
             ok;
         exists ->
             ok
@@ -429,7 +429,8 @@ warn_skip_deps(AppInfo, State) ->
                 false -> ok
             end;
         true ->
-            ?ERROR(Msg, Args), ?FAIL
+            ?ERROR(Msg, Args),
+            ?ABORT
     end.
 
 not_needs_compile(App) ->
@@ -444,4 +445,3 @@ find_app_and_level_by_name([App|Apps], Name) ->
         Name -> {ok, App, rebar_app_info:dep_level(App)};
         _ -> find_app_and_level_by_name(Apps, Name)
     end.
-

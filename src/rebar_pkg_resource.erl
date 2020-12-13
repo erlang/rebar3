@@ -20,7 +20,7 @@
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
--type package() :: {pkg, binary(), binary(), binary(), rebar_hex_repos:repo()}.
+-type package() :: {pkg, binary(), binary(), binary(), binary(), rebar_hex_repos:repo()}.
 
 %%==============================================================================
 %% Public API
@@ -29,10 +29,9 @@
 -spec init(atom(), rebar_state:t()) -> {ok, rebar_resource_v2:resource()}.
 init(Type, State) ->
     {ok, Vsn} = application:get_key(rebar, vsn),
-    BaseConfig = #{http_adapter => r3_hex_http_httpc,
+    BaseConfig = #{http_adapter => {r3_hex_http_httpc, #{profile => rebar}},
                    http_user_agent_fragment =>
-                       <<"(rebar3/", (list_to_binary(Vsn))/binary, ") (httpc)">>,
-                   http_adapter_config => #{profile => rebar}},
+                       <<"(rebar3/", (list_to_binary(Vsn))/binary, ") (httpc)">>},
     Repos = rebar_hex_repos:from_state(BaseConfig, State),
     Resource = rebar_resource_v2:new(Type, ?MODULE, #{repos => Repos,
                                                       base_config => BaseConfig}),
@@ -43,7 +42,7 @@ init(Type, State) ->
 -spec lock(AppInfo, ResourceState) -> Res when
       AppInfo :: rebar_app_info:t(),
       ResourceState :: rebar_resource_v2:resource_state(),
-      Res :: {atom(), string(), any(), binary()}.
+      Res :: {atom(), string(), any(), binary(), binary()}.
 lock(AppInfo, _) ->
     {pkg, Name, Vsn, OldHash, Hash, _RepoConfig} = rebar_app_info:source(AppInfo),
     {pkg, Name, Vsn, OldHash, Hash}.
@@ -60,12 +59,7 @@ lock(AppInfo, _) ->
       Res :: boolean().
 needs_update(AppInfo, _) ->
     {pkg, _Name, Vsn, _OldHash, _Hash, _} = rebar_app_info:source(AppInfo),
-    case rebar_utils:to_binary(rebar_app_info:original_vsn(AppInfo)) =:= rebar_utils:to_binary(Vsn) of
-        true ->
-            false;
-        false ->
-            true
-    end.
+    rebar_utils:to_binary(rebar_app_info:original_vsn(AppInfo)) =/= rebar_utils:to_binary(Vsn).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -214,16 +208,17 @@ store_etag_in_cache(Path, ETag) ->
       ETag :: binary(),
       ETagPath :: file:name(),
       UpdateETag :: boolean(),
-      Res :: ok | {unexpected_hash, integer(), integer()} | {fetch_fail, binary(), binary()}.
+      Res :: ok | {unexpected_hash, integer(), integer()} | {fetch_fail, binary(), binary()}
+           | {bad_registry_checksum, integer(), integer()} | {error, _}.
 cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoConfig}, State, ETag,
                 ETagPath, UpdateETag) ->
     CDN = maybe_default_cdn(State),
     case request(RepoConfig#{repo_url => CDN}, Name, Vsn, ETag) of
         {ok, cached} ->
-            ?INFO("Version cached at ~ts is up to date, reusing it", [CachePath]),
+            ?DEBUG("Version cached at ~ts is up to date, reusing it", [CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg);
         {ok, Body, NewETag} ->
-            ?INFO("Downloaded package, caching at ~ts", [CachePath]),
+            ?DEBUG("Downloaded package, caching at ~ts", [CachePath]),
             maybe_store_etag_in_cache(UpdateETag, ETagPath, NewETag),
             serve_from_download(TmpDir, CachePath, Pkg, Body);
         error when ETag =/= <<>> ->
@@ -236,7 +231,7 @@ cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoCon
 
 maybe_default_cdn(State) ->
     CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
-	rebar_utils:to_binary(CDN).
+    rebar_utils:to_binary(CDN).
 
 -spec serve_from_cache(TmpDir, CachePath, Pkg) -> Res when
       TmpDir :: file:name(),

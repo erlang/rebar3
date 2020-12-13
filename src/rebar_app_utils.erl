@@ -315,7 +315,9 @@ expand_deps_sources(Dep, State) ->
 %% around version if required.
 -spec update_source(rebar_app_info:t(), Source, rebar_state:t()) ->
     rebar_app_info:t() when
-      Source :: rebar_resource_v2:source().
+      Source :: rebar_resource_v2:source()
+              | {pkg, PkgName::string(), PkgVsn::unicode:unicode_binary(), Hash::undefined|binary()}
+              | {pkg, PkgName::string(), PkgVsn::unicode:unicode_binary(), OldHash::undefined|binary(), Hash::undefined|binary()}.
 update_source(AppInfo, {pkg, PkgName, PkgVsn, Hash}, State) ->
     update_source(AppInfo, {pkg, PkgName, PkgVsn, undefined, Hash}, State);
 update_source(AppInfo, {pkg, PkgName, PkgVsn, OldHash, Hash}, State) ->

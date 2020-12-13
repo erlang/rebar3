@@ -22,6 +22,7 @@ init(State) ->
                     end
                 end, {ok, State}, Aliases).
 
+-dialyzer([{no_opaque, init_alias/3}, {no_return, init_alias/3}]). % warnings relate to use of opaque structures in :forms
 init_alias(Alias, Cmds, State) ->
     Module = list_to_atom("rebar_prv_alias_" ++ atom_to_list(Alias)),
 
@@ -65,10 +66,11 @@ validate_provider(Alias, Cmds, State) ->
             false
     end.
 
-
+-dialyzer({no_unused, example/1}). % required since we suppress warnings for init_alias/3
 example(Alias) ->
     "rebar3 " ++ atom_to_list(Alias).
 
+-dialyzer({no_unused, desc/1}). % required since we suppress warnings for init_alias/3
 desc(Cmds) ->
     "Equivalent to running: rebar3 do "
         ++ rebar_string:join(lists:map(fun to_desc/1, Cmds), ",").

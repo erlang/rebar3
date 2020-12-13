@@ -62,6 +62,7 @@ upgrade(Plugin, State) ->
             ?PRV_ERROR({not_found, Plugin});
         {ok, P, Profile} ->
             State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
+            maybe_update_pkg(P, State1),
             {Apps, State2} = rebar_prv_install_deps:handle_deps_as_profile(Profile, State1, [P], true),
 
             {no_cycle, Sorted} = rebar_prv_install_deps:find_cycles(Apps),
@@ -92,3 +93,31 @@ find_plugin(Plugin, Profiles, State) ->
 build_plugin(ToBuild, State) ->
     Providers = rebar_state:providers(State),
     rebar_prv_compile:compile(State, Providers, ToBuild, plugins).
+
+maybe_update_pkg(Tup, State) when is_tuple(Tup) ->
+    maybe_update_pkg(element(1, Tup), State);
+maybe_update_pkg(Name, State) ->
+    try rebar_app_utils:parse_dep(root, unicode:characters_to_binary(?DEFAULT_PLUGINS_DIR), Name, State, [], 0) of
+        AppInfo ->
+            Source = rebar_app_info:source(AppInfo),
+            case element(1, Source) of
+                pkg ->
+                    Resources = rebar_state:resources(State),
+                    #{repos := RepoConfigs} = rebar_resource_v2:find_resource_state(pkg, Resources),
+                    PkgName = element(2, Source),
+                    [update_package(PkgName, RepoConfig, State) || RepoConfig <- RepoConfigs];
+                _ ->
+                    skip
+            end
+    catch
+        throw:?PRV_ERROR({parse_dep, _}) ->
+            skip
+    end.
+
+update_package(Name, RepoConfig, State) ->
+    case rebar_packages:update_package(Name, RepoConfig, State) of
+        fail ->
+            ?WARN("Failed to fetch updates for package ~ts from repo ~ts", [Name, maps:get(name, RepoConfig)]);
+        _ ->
+            ok
+    end.
