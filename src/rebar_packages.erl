@@ -11,7 +11,7 @@
         ,resolve_version/6]).
 
 -ifdef(TEST).
--export([new_package_table/0, find_highest_matching_/5, cmp_/4, cmpl_/4, valid_vsn/1, is_valid_vsn/1]).
+-export([new_package_table/0, find_highest_matching_/5, cmp_/4, cmpl_/4, valid_vsn/1]).
 -endif.
 
 -export_type([package/0]).
@@ -389,27 +389,27 @@ resolve_version_(Dep, DepVsn, Repo, HexRegistry, State) ->
             RVsns = lists:map(fun(DVsn) ->
                 resolve_version_(Dep, DVsn, Repo, HexRegistry, State)
             end, DepVsns),
-            find_highest_resolved_Version(RVsns);
+            find_highest_resolved_version(RVsns);
         Vsn ->
             {ok, Vsn}
     end.
 
-find_highest_resolved_Version(Versions) ->
-    find_highest_resolved_Version(Versions, none).
+find_highest_resolved_version(Versions) ->
+    find_highest_resolved_version(Versions, none).
 
-find_highest_resolved_Version([], none) -> none;
-find_highest_resolved_Version([], HVersion) -> {ok, HVersion};
-find_highest_resolved_Version([none | Versions], HVersion) ->
-    find_highest_resolved_Version(Versions, HVersion);
-find_highest_resolved_Version([{ok, Version} | Versions], HVersion) ->
+find_highest_resolved_version([], none) -> none;
+find_highest_resolved_version([], HVersion) -> {ok, HVersion};
+find_highest_resolved_version([none | Versions], HVersion) ->
+    find_highest_resolved_version(Versions, HVersion);
+find_highest_resolved_version([{ok, Version} | Versions], HVersion) ->
     NHVersion =
-    case (HVersion =:= none orelse ec_semver:gt(Version, HVersion)) of
-        true ->
-            Version;
-        false ->
-            HVersion
-    end,
-    find_highest_resolved_Version(Versions, NHVersion).
+        case (HVersion =:= none orelse ec_semver:gt(Version, HVersion)) of
+            true ->
+                Version;
+            false ->
+                HVersion
+        end,
+    find_highest_resolved_version(Versions, NHVersion).
 
 rm_ws(<<" ", R/binary>>) ->
     ec_semver:parse(rm_ws(R));
@@ -428,7 +428,7 @@ is_valid_vsn(Vsn) ->
     %% Regepx from https://github.com/sindresorhus/semver-regex/blob/master/index.js
     SemVerRegExp = "v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*))?"
         "(-[0-9a-z-]+(\\.[0-9a-z-]+)*)?(\\+[0-9a-z-]+(\\.[0-9a-z-]+)*)?",
-    SupportedVersions = "^" ++ "(>=?|<=?|~>|==)?\\s*" ++ SemVerRegExp ++ "$",
+    SupportedVersions = "^(>=?|<=?|~>|==)?\\s*" ++ SemVerRegExp ++ "$",
     re:run(Vsn, SupportedVersions, [unicode]) =/= nomatch.
 
 select_complex_version(Version) ->
