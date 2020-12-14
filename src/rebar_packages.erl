@@ -11,7 +11,7 @@
         ,resolve_version/6]).
 
 -ifdef(TEST).
--export([new_package_table/0, find_highest_matching_/5, cmp_/4, cmpl_/4, valid_vsn/1]).
+-export([new_package_table/0, find_highest_matching_/5, cmp_/4, cmpl_/4, valid_vsn/1, is_valid_vsn/1]).
 -endif.
 
 -export_type([package/0]).
@@ -385,9 +385,31 @@ resolve_version_(Dep, DepVsn, Repo, HexRegistry, State) ->
             cmpl(Dep, rm_ws(Vsn), Repo, HexRegistry, State, fun ec_semver:lt/2);
         <<"==", Vsn/binary>> ->
             {ok, Vsn};
+        {complex, DepVsns} ->
+            RVsns = lists:map(fun(DVsn) ->
+                resolve_version_(Dep, DVsn, Repo, HexRegistry, State)
+            end, DepVsns),
+            find_highest_resolved_Version(RVsns);
         Vsn ->
             {ok, Vsn}
     end.
+
+find_highest_resolved_Version(Versions) ->
+    find_highest_resolved_Version(Versions, none).
+
+find_highest_resolved_Version([], none) -> none;
+find_highest_resolved_Version([], HVersion) -> {ok, HVersion};
+find_highest_resolved_Version([none | Versions], HVersion) ->
+    find_highest_resolved_Version(Versions, HVersion);
+find_highest_resolved_Version([{ok, Version} | Versions], HVersion) ->
+    NHVersion =
+    case (HVersion =:= none orelse ec_semver:gt(Version, HVersion)) of
+        true ->
+            Version;
+        false ->
+            HVersion
+    end,
+    find_highest_resolved_Version(Versions, NHVersion).
 
 rm_ws(<<" ", R/binary>>) ->
     ec_semver:parse(rm_ws(R));
@@ -395,37 +417,41 @@ rm_ws(R) ->
     ec_semver:parse(R).
 
 valid_vsn(Vsn) ->
-    TVsn = select_complex_version(Vsn),
+    case select_complex_version(Vsn) of
+        {complex, Vsns} ->
+            lists:usort(lists:map(fun is_valid_vsn/1, Vsns)) == [true];
+        Vsn ->
+            is_valid_vsn(Vsn)
+    end.
+
+is_valid_vsn(Vsn) ->
     %% Regepx from https://github.com/sindresorhus/semver-regex/blob/master/index.js
     SemVerRegExp = "v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*))?"
         "(-[0-9a-z-]+(\\.[0-9a-z-]+)*)?(\\+[0-9a-z-]+(\\.[0-9a-z-]+)*)?",
-    SupportedVersions = "^" ++ vsn_pre_pattern() ++ SemVerRegExp ++ "$",
-    re:run(TVsn, SupportedVersions, [unicode]) =/= nomatch.
+    SupportedVersions = "^" ++ "(>=?|<=?|~>|==)?\\s*" ++ SemVerRegExp ++ "$",
+    re:run(Vsn, SupportedVersions, [unicode]) =/= nomatch.
 
-vsn_pre_pattern() ->
-    "(>=?|<=?|~>|==)?\\s*".
+select_complex_version(Version) ->
+    case parse_complex_version(Version) of
+        #{isComplex := true, versions := Versions} ->
+            {complex, Versions};
+        #{isComplex := false} ->
+            Version
+    end. 
 
-select_complex_version(Vsn) ->
-    %% for removing `and` and `or` from dependecy and getting the highest version
-    case re:split(Vsn, <<"\\s+or\\s+|\\s+and\\s+">>) of
-        [Vsn] ->
-            Vsn;
-        Vsns ->
-            highest_version(Vsns)
-    end.
+% checks if the version is in complex format example: "> 0.1.0 and < 0.2.0"
+parse_complex_version(Version) ->
+    parse_complex_version(Version, #{versions => [<<>>], isComplex => false}).
 
-highest_version(Vsns) ->
-    {Highest, _} = lists:foldl(
-        fun(Vsn, {HVsn, HVsnVal} = Acc) ->
-            VsnVal = re:replace(Vsn, vsn_pre_pattern(), "", [{return, binary}]),
-            case (HVsn =:= none orelse ec_semver:gt(VsnVal, HVsnVal)) of
-                true ->
-                    {Vsn, VsnVal};
-                false ->
-                    Acc
-            end
-        end, {none, none}, Vsns),
-    Highest.
+parse_complex_version(<<>>, Acc) -> Acc;
+parse_complex_version(<<" or ", Rest/binary>>, #{versions := Versions} = Acc) ->
+    parse_complex_version(Rest, Acc#{versions => [<<>> | Versions], isComplex => true});
+parse_complex_version(<<" and ", Rest/binary>>, #{versions := Versions} = Acc) ->
+    parse_complex_version(Rest, Acc#{versions => [<<>> | Versions], isComplex => true});
+parse_complex_version(<<" ", Rest/binary>>, Acc) ->
+    parse_complex_version(Rest, Acc);
+parse_complex_version(<<C:1/binary, Rest/binary>>, #{versions := [V | Versions]} = Acc) ->
+    parse_complex_version(Rest, Acc#{versions => [<<V/binary, C/binary>> | Versions]}).
 
 highest_matching(Dep, Vsn, Repo, HexRegistry, State) ->
     find_highest_matching_(Dep, Vsn, #{name => Repo}, HexRegistry, State).
