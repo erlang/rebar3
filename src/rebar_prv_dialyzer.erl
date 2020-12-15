@@ -73,6 +73,8 @@ desc() ->
     "modules from excluded applications\n"
     "`exclude_mods` - a list of modules to exclude from PLT files and "
     "success typing analysis\n"
+    "`output_format` - configure whether the dialyzer_warnings file will have "
+    "the `raw` or `formatted` output\n"
     "\n"
     "For example, to warn on unmatched returns: \n"
     "{dialyzer, [{warnings, [unmatched_returns]}]}.\n"
@@ -400,8 +402,10 @@ add_plt(State, Plt, Output, Files) ->
 
 run_plt(State, Plt, Output, Analysis, Files) ->
     GetWarnings = get_config(State, get_warnings, false),
+    OutputFormat = get_config(State, output_format, formatted),
     Opts = [{analysis_type, Analysis},
             {get_warnings, GetWarnings},
+            {output_format, OutputFormat},
             {init_plt, Plt},
             {output_plt, Plt},
             {from, byte_code},
@@ -469,8 +473,10 @@ build_plt(State, Plt, _, []) ->
 build_plt(State, Plt, Output, Files) ->
     ?INFO("Building with ~b files in ~ts...", [length(Files), rebar_dir:format_source_file_name(Plt)]),
     GetWarnings = get_config(State, get_warnings, false),
+    OutputFormat = get_config(State, output_format, formatted),
     Opts = [{analysis_type, plt_build},
             {get_warnings, GetWarnings},
+            {output_format, OutputFormat},
             {output_plt, Plt},
             {files, Files}],
     run_dialyzer(State, Opts, Output).
@@ -490,8 +496,10 @@ succ_typings_(State, Plt, _, []) ->
     {0, State};
 succ_typings_(State, Plt, Output, Files) ->
     ?INFO("Analyzing ~b files with ~ts...", [length(Files), rebar_dir:format_source_file_name(Plt)]),
+    OutputFormat = get_config(State, output_format, formatted),
     Opts = [{analysis_type, succ_typings},
             {get_warnings, true},
+            {output_format, OutputFormat},
             {from, byte_code},
             {files, Files},
             {init_plt, Plt}],
@@ -534,8 +542,7 @@ run_dialyzer(State, Opts, Output) ->
                      {timing, Timing} |
                      Opts],
             ?DEBUG("Running dialyzer with options: ~p~n", [Opts2]),
-            Warnings = format_warnings(rebar_state:opts(State),
-                                       Output, dialyzer:run(Opts2)),
+            Warnings = format_warnings(State, Output, dialyzer:run(Opts2)),
             {Warnings, State};
         false ->
             Opts2 = [{warnings, no_warnings()},
@@ -554,21 +561,32 @@ legacy_warnings(Warnings) ->
             Warnings
     end.
 
-format_warnings(Opts, Output, Warnings) ->
+format_warnings(State, Output, Warnings) ->
+    Opts = rebar_state:opts(State),
     Warnings1 = rebar_dialyzer_format:format_warnings(Opts, Warnings),
     console_warnings(Warnings1),
-    file_warnings(Output, Warnings),
+
+    OutputFormat = get_config(State, output_format, formatted),
+    file_warnings(Output, Warnings, OutputFormat),
+
     length(Warnings).
 
 console_warnings(Warnings) ->
     _ = [?CONSOLE("~ts", [Warning]) || Warning <- Warnings],
     ok.
 
-file_warnings(_, []) ->
+file_warnings(_, [], _) ->
     ok;
-file_warnings(Output, Warnings) ->
-    Warnings1 = [[dialyzer:format_warning(Warning, fullpath), $\n] || Warning <- Warnings],
-    case file:write_file(Output, Warnings1, [append]) of
+file_warnings(Output, Warnings, raw) ->
+    Warnings1 = [[io_lib:format("~tp. \n", [W]) || W <- Warnings]],
+    write_file_warnings(Output, Warnings1);
+file_warnings(Output, Warnings, formatted) ->
+    Warnings1 = [[dialyzer:format_warning(Warning, fullpath), $\n]
+                 || Warning <- Warnings],
+    write_file_warnings(Output, Warnings1).
+
+write_file_warnings(Output, Warnings) ->
+    case file:write_file(Output, Warnings, [append]) of
         ok ->
             ok;
         {error, Reason} ->
