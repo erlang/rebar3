@@ -56,7 +56,7 @@ ask for respect and understanding and will try to provide the same back.
 
 Before requesting or implementing a new feature, please do the following:
 
-- Take a look at our [list of plugins](http://www.rebar3.org/docs/using-available-plugins)
+- Take a look at our [list of plugins](https://rebar3.org/docs/configuration/plugins#recommended-plugins)
   to know if the feature isn't already supported by the community.
 - Verify in existing [tickets](https://github.com/erlang/rebar3/issues) whether
   the feature might already is in the works, has been moved to a plugin, or
