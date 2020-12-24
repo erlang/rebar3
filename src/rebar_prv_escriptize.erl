@@ -169,21 +169,57 @@ format_error(no_main_app) ->
 get_apps_beams(Apps, AllApps) ->
     get_apps_beams(Apps, AllApps, []).
 
-get_apps_beams([], _, Acc) ->
+-ifdef(OTP_RELEASE).
+    -if(?OTP_RELEASE>=24).
+    get_apps_beams(Names, Apps, Acc) ->
+        get_apps_beams0_on_otp24_plus(Names, Apps, Acc).
+    -else.
+    get_apps_beams(Names, Apps, Acc) ->
+        get_apps_beams0(Names, Apps, Acc).
+    -endif.
+-else.
+get_apps_beams(Names, Apps, Acc) ->
+    get_apps_beams0(Names, Apps, Acc).
+-endif.
+
+-compile({nowarn_unused_function, get_apps_beams0_on_otp24_plus/3}).
+get_apps_beams0_on_otp24_plus([], _, Acc) ->
     Acc;
-get_apps_beams([App | Rest], AllApps, Acc) ->
+%% hipe is not available on Erlang/OTP 24+
+get_apps_beams0_on_otp24_plus([Name|Names], Apps, Acc) when Name =:= hipe ->
+    get_apps_beams0_on_otp24_plus(Names, Apps, Acc);
+get_apps_beams0_on_otp24_plus([App | Rest], AllApps, Acc) ->
     case rebar_app_utils:find(rebar_utils:to_binary(App), AllApps) of
         {ok, App1} ->
             OutDir = filename:absname(rebar_app_info:ebin_dir(App1)),
             Beams = get_app_beams(App, OutDir),
-            get_apps_beams(Rest, AllApps, Beams ++ Acc);
+            get_apps_beams0_on_otp24_plus(Rest, AllApps, Beams ++ Acc);
         _->
             case code:lib_dir(App, ebin) of
                 {error, bad_name} ->
                     throw(?PRV_ERROR({bad_name, App}));
                 Path ->
                     Beams = get_app_beams(App, Path),
-                    get_apps_beams(Rest, AllApps, Beams ++ Acc)
+                    get_apps_beams0_on_otp24_plus(Rest, AllApps, Beams ++ Acc)
+            end
+    end.
+
+-compile({nowarn_unused_function, get_apps_beams0/3}).
+get_apps_beams0([], _, Acc) ->
+    Acc;
+get_apps_beams0([App | Rest], AllApps, Acc) ->
+    case rebar_app_utils:find(rebar_utils:to_binary(App), AllApps) of
+        {ok, App1} ->
+            OutDir = filename:absname(rebar_app_info:ebin_dir(App1)),
+            Beams = get_app_beams(App, OutDir),
+            get_apps_beams0(Rest, AllApps, Beams ++ Acc);
+        _->
+            case code:lib_dir(App, ebin) of
+                {error, bad_name} ->
+                    throw(?PRV_ERROR({bad_name, App}));
+                Path ->
+                    Beams = get_app_beams(App, Path),
+                    get_apps_beams0(Rest, AllApps, Beams ++ Acc)
             end
     end.
 
@@ -246,23 +282,71 @@ get_nonempty(Files) ->
 
 find_deps(AppNames, AllApps) ->
     BinAppNames = [rebar_utils:to_binary(Name) || Name <- AppNames],
+    ?DEBUG("App dependencies: ~p", [BinAppNames]),
     [ec_cnv:to_atom(Name) ||
      Name <- find_deps_of_deps(BinAppNames, AllApps, BinAppNames)].
 
+-ifdef(OTP_RELEASE).
+    -if(?OTP_RELEASE>=24).
+    find_deps_of_deps(Names, Apps, Acc) ->
+        find_deps_of_deps0_on_otp24_plus(Names, Apps, Acc).
+    -else.
+    find_deps_of_deps(Names, Apps, Acc) ->
+        find_deps_of_deps0(Names, Apps, Acc).
+    -endif.
+-else.
+find_deps_of_deps(Names, Apps, Acc) ->
+    find_deps_of_deps0(Names, Apps, Acc).
+-endif.
+
+-compile({nowarn_unused_function, find_deps_of_deps0/3}).
 %% Should look at the app files to find direct dependencies
-find_deps_of_deps([], _, Acc) -> Acc;
-find_deps_of_deps([Name|Names], Apps, Acc) ->
-    ?DIAGNOSTIC("processing ~p", [Name]),
-    {ok, App} = rebar_app_utils:find(Name, Apps),
-    DepNames = proplists:get_value(applications, rebar_app_info:app_details(App), []),
-    BinDepNames = [rebar_utils:to_binary(Dep) || Dep <- DepNames,
-                   %% ignore system libs; shouldn't include them.
-                   DepDir <- [code:lib_dir(Dep)],
-                   DepDir =:= {error, bad_name} orelse % those are all local
-                   not lists:prefix(code:root_dir(), DepDir)]
-                -- ([Name|Names]++Acc), % avoid already seen deps
-    ?DIAGNOSTIC("new deps of ~p found to be ~p", [Name, BinDepNames]),
-    find_deps_of_deps(BinDepNames ++ Names, Apps, BinDepNames ++ Acc).
+find_deps_of_deps0([], _, Acc) -> Acc;
+find_deps_of_deps0([Name|Names], Apps, Acc) ->
+    ?DIAGNOSTIC("processing dependencies ~s", [Name]),
+    ?DEBUG("Looking up dependency ~s, seen: ~p", [Name, Acc]),
+    case rebar_app_utils:find(Name, Apps) of
+        {ok, App} ->
+            DepNames = proplists:get_value(applications, rebar_app_info:app_details(App), []),
+            ?DEBUG("Discovered app dependencies: ~p", [DepNames]),
+
+            BinDepNames = [rebar_utils:to_binary(Dep) || Dep <- DepNames,
+                            %% ignore system libs; shouldn't include them.
+                            DepDir <- [code:lib_dir(Dep)],
+                            DepDir =:= {error, bad_name} orelse % those are all local
+                            not lists:prefix(code:root_dir(), DepDir)]
+                          -- ([Name|Names]++Acc), % avoid already seen deps
+            ?DIAGNOSTIC("new deps of ~p found to be ~p", [Name, BinDepNames]),
+            find_deps_of_deps0(BinDepNames ++ Names, Apps, BinDepNames ++ Acc);
+        error ->
+            ?DEBUG("Could not find dependency ~s!", [Name])
+    end.
+
+-compile({nowarn_unused_function, find_deps_of_deps0_on_otp24_plus/3}).
+find_deps_of_deps0_on_otp24_plus([], _, Acc) -> Acc;
+%% hipe is not available on Erlang/OTP 24+
+find_deps_of_deps0_on_otp24_plus([Name|Names], Apps, Acc) when Name =:= <<"hipe">> ->
+    find_deps_of_deps0_on_otp24_plus(Names, Apps, Acc);
+find_deps_of_deps0_on_otp24_plus([Name|Names], Apps, Acc) ->
+    ?DIAGNOSTIC("processing dependencies ~s", [Name]),
+    ?DEBUG("Looking up dependency ~s, seen: ~p", [Name, Acc]),
+    case rebar_app_utils:find(Name, Apps) of
+        {ok, App} ->
+            DepNames = proplists:get_value(applications, rebar_app_info:app_details(App), []),
+            ?DEBUG("Discovered app dependencies: ~p", [DepNames]),
+
+            BinDepNames = [rebar_utils:to_binary(Dep) || Dep <- DepNames,
+                            %% ignore system libs; shouldn't include them.
+                            DepDir <- [code:lib_dir(Dep)],
+                            DepDir =:= {error, bad_name} orelse % those are all local
+                            not lists:prefix(code:root_dir(), DepDir)]
+                          -- ([Name|Names]++Acc), % avoid already seen deps
+            ?DIAGNOSTIC("new deps of ~p found to be ~p", [Name, BinDepNames]),
+            find_deps_of_deps0_on_otp24_plus(BinDepNames ++ Names, Apps, BinDepNames ++ Acc);
+        error ->
+            ?DEBUG("Could not find dependency ~s!", [Name])
+    end.
+
 
 def(Rm, State, Key, Default) ->
     Value0 = rebar_state:get(State, Key, Default),

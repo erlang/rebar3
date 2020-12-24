@@ -8,6 +8,7 @@
   {registered, []},
   {applications, [kernel,
                   stdlib,
+                  %% note: will be filtered out by rebar_prv_escriptize on Erlang/OTP 24+
                   hipe,
                   sasl,
                   compiler,
