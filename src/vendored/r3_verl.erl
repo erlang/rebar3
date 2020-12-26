@@ -4,11 +4,8 @@
 
 -export([
     compare/2,
-    is_match/2,
-    is_match/3,
     parse/1,
     parse_requirement/1,
-    compile_requirement/1,
     format/1
 ]).
 
@@ -73,7 +70,6 @@ parse(Str) ->
 -spec parse_requirement(requirement()) -> {ok, requirement_t()} | {error, invalid_requirement}.
 parse_requirement(Str) ->
     Lexed = lexer(Str, []),
-    io:format("!!! Lexed : ~p~n", [Lexed]),
     case to_matchspec(Lexed) of
         {ok, Spec} ->
             {ok, #{string => Str, matchspec => Spec, compiled => false}};
@@ -81,56 +77,17 @@ parse_requirement(Str) ->
             {error, invalid_requirement}
     end.
 
-format({Major, Minor, Patch, _Pre, _Build}) ->
-    [integer_to_binary(Major), ".", integer_to_binary(Minor), ".", integer_to_binary(Patch)].
-
 %%% @doc
-%%% Returns true if the dependency is in range of the requirement, otherwise
+%%% Convertes internal version format to semver 
 %%% false.
 %%% @end
--spec is_match(version() | version_t(), requirement() | requirement_t()) ->
-    boolean() | {error, badarg | invalid_requirement | invalid_version}.
-is_match(Version, Requirement) ->
-    is_match(Version, Requirement, []).
-
-%%% @doc
-%%% Exactly like is_match/2 but takes an options argument.
-%%% @end
-is_match(Version, Requirement, Opts) when is_binary(Version) andalso is_binary(Requirement) ->
-    case parse(Version) of
-        {error, invalid_version} ->
-            {error, invalid_version};
-        Ver ->
-            case build_requirement(Requirement) of
-                {ok, Req} ->
-                    is_match(Ver, Req, Opts);
-                {error, invalid_requirement} ->
-                    {error, invalid_requirement}
-            end
-    end;
-is_match(Version, Requirement, Opts) when is_binary(Version) andalso is_map(Requirement) ->
-    case parse(Version) of
-        {error, invalid_version} ->
-            {error, invalid_version};
-        Ver ->
-            is_match(Ver, Requirement, Opts)
-    end;
-is_match(Version, Requirement, Opts) when is_map(Version) andalso is_binary(Requirement) ->
-    case build_requirement(Requirement) of
-        {ok, Req} ->
-            is_match(Version, Req, Opts);
-        {error, invalid_requirement} ->
-            {error, invalid_requirement}
-    end;
-is_match(Version, #{matchspec := Spec, compiled := false} = R, Opts) when is_map(R) ->
-    AllowPre = proplists:get_value(allow_pre, Opts, true),
-    {ok, Result} = ets:test_ms(to_matchable(Version, AllowPre), Spec),
-    Result /= false;
-is_match(Version, #{matchspec := Spec, compiled := true} = R, Opts) when
-    is_map(Version) andalso is_map(R)
-->
-    AllowPre = proplists:get_value(allow_pre, Opts, true),
-    ets:match_spec_run([to_matchable(Version, AllowPre)], Spec) /= [].
+-spec format(version_t()) -> version().
+format({Major, Minor, Patch, Pre, Build}) ->
+    [rebar_utils:to_list(Major), ".", 
+     rebar_utils:to_list(Minor), ".", 
+     rebar_utils:to_list(Patch),
+     format_vsn_rest(<<"-">>, Pre),
+     format_vsn_rest(<<"+">>, Build)].
 
 to_matchable({Major, Minor, Patch, Pre, _Build}, AllowPre) ->
     {Major, Minor, Patch, Pre, AllowPre};
@@ -144,14 +101,6 @@ to_matchable(String, AllowPre) when is_binary(String) ->
 
 %% private
 %%
-build_requirement(Str) ->
-    case parse_requirement(Str) of
-        {ok, Spec} ->
-            {ok, #{string => Str, matchspec => Spec, compiled => false}};
-        {error, invalid_requirement} ->
-            {error, invalid_requirement}
-    end.
-
 build_string(Build) ->
     case Build of
         [] -> undefined;
@@ -623,3 +572,12 @@ is_valid_requirement(A, [B | Next]) when
     is_valid_requirement(B, Next);
 is_valid_requirement(_, _) ->
     false.
+
+-spec format_vsn_rest(binary() | string(), [integer() | binary()] | undefined) -> iolist().
+format_vsn_rest(_TypeMark, []) ->
+    [];
+format_vsn_rest(_TypeMark, undefined) ->
+    [];
+format_vsn_rest(TypeMark, [Head | Rest]) ->
+    [TypeMark, Head |
+     [[".", rebar_utils:to_list(Detail)] || Detail <- Rest]].
