@@ -58,13 +58,26 @@ get_all_names(State) ->
 -spec get_package_versions(unicode:unicode_binary(), ec_semver:semver(),
                            unicode:unicode_binary(),
                            ets:tid(), rebar_state:t()) -> [vsn()].
-get_package_versions(Dep, {_, AlphaInfo}, Repo, Table, State) ->
+get_package_versions(Dep, DepVsn, Repo, Table, State) ->
+    case r3_verl:parse_requirement(DepVsn) of
+        {error, _} ->
+            none;
+        {ok, #{matchspec := MatchSpec}} ->
+            ?INFO("resolving ~p version ~p~n", [Dep, DepVsn]),
+            get_package_versions(Dep, MatchSpec, DepVsn, Repo, Table, State)
+    end.
+    % ?MODULE:verify_table(State),
+    % AllowPreRelease = rebar_state:get(State, deps_allow_prerelease, false)
+    %     orelse AlphaInfo =/= {[],[]},
+    % ets:select(Table, [{#package{key={Dep, {'$1', '$2'}, Repo},
+    %                              _='_'},
+    %                     [{'==', '$2', {{[],[]}}} || not AllowPreRelease], [{{'$1', '$2'}}]}]).
+
+get_package_versions(Dep, [{Head, [Match], _}] = _MatchSpec, _Vsn, Repo, Table, State) ->
     ?MODULE:verify_table(State),
-    AllowPreRelease = rebar_state:get(State, deps_allow_prerelease, false)
-        orelse AlphaInfo =/= {[],[]},
-    ets:select(Table, [{#package{key={Dep, {'$1', '$2'}, Repo},
-                                 _='_'},
-                        [{'==', '$2', {{[],[]}}} || not AllowPreRelease], [{{'$1', '$2'}}]}]).
+    _AllowPreRelease = rebar_state:get(State, deps_allow_prerelease, true),
+    ets:select(Table, [{#package{key={Dep, Head, Repo}, _='_'},
+                        [Match], [{Head}]}]).
 
 -spec get_package(unicode:unicode_binary(), unicode:unicode_binary(),
                   binary() | undefined | '_',
@@ -72,9 +85,11 @@ get_package_versions(Dep, {_, AlphaInfo}, Repo, Table, State) ->
                  -> {ok, #package{}} | not_found.
 get_package(Dep, Vsn, undefined, Repos, Table, State) ->
     get_package(Dep, Vsn, '_', Repos, Table, State);
+get_package(Dep, Vsn, Hash, Repos, Table, State) when is_binary(Vsn) ->
+    get_package(Dep, r3_verl:parse(Vsn), Hash, Repos, Table, State);
 get_package(Dep, Vsn, Hash, Repos, Table, State) ->
     ?MODULE:verify_table(State),
-    MatchingPackages = ets:select(Table, [{#package{key={Dep, ec_semver:parse(Vsn), Repo},
+    MatchingPackages = ets:select(Table, [{#package{key={Dep, Vsn, Repo},
                                       _='_'}, [], ['$_']} || Repo <- Repos]),
     PackagesWithProperHash = lists:filter(
         fun(#package{key = {_Dep, _Vsn, Repo}, outer_checksum = PkgChecksum}) ->
@@ -281,7 +296,7 @@ unverified_repo_message() ->
 
 insert_releases(Name, Releases, Repo, Table) ->
     [true = ets:insert(Table,
-                       #package{key={Name, ec_semver:parse(Version), Repo},
+                       #package{key={Name, r3_verl:parse(Version), Repo},
                                 inner_checksum=parse_checksum(InnerChecksum),
                                 outer_checksum=parse_checksum(OuterChecksum),
                                 retired=maps:get(retired, Release, false),
@@ -372,143 +387,22 @@ handle_missing_no_exception(Fun, Dep, State) ->
     end.
 
 resolve_version_(Dep, DepVsn, Repo, HexRegistry, State) ->
-    case select_complex_version(DepVsn) of
-        <<"~>", Vsn/binary>> ->
-            highest_matching(Dep, rm_ws(Vsn), Repo, HexRegistry, State);
-        <<">=", Vsn/binary>> ->
-            cmp(Dep, rm_ws(Vsn), Repo, HexRegistry, State, fun ec_semver:gte/2);
-        <<">", Vsn/binary>> ->
-            cmp(Dep, rm_ws(Vsn), Repo, HexRegistry, State, fun ec_semver:gt/2);
-        <<"<=", Vsn/binary>> ->
-            cmpl(Dep, rm_ws(Vsn), Repo, HexRegistry, State, fun ec_semver:lte/2);
-        <<"<", Vsn/binary>> ->
-            cmpl(Dep, rm_ws(Vsn), Repo, HexRegistry, State, fun ec_semver:lt/2);
-        <<"==", Vsn/binary>> ->
-            {ok, Vsn};
-        {complex, DepVsns} ->
-            RVsns = lists:map(fun(DVsn) ->
-                resolve_version_(Dep, DVsn, Repo, HexRegistry, State)
-            end, DepVsns),
-            find_highest_resolved_version(RVsns);
-        Vsn ->
-            {ok, Vsn}
+    ?INFO("resolving ~p version ~p~n", [Dep, DepVsn]),
+    case get_package_versions(Dep, DepVsn, Repo, HexRegistry, State) of
+        [] ->
+            ?WARN("!!!! found no matches : ~s : ~s ~n", [Dep, DepVsn]), 
+            none;
+        Vsns ->
+            ?WARN("fetched versions for : ~s : ~s : ~p~n", [Dep, DepVsn, Vsns]),
+            {ok, lists:last(Vsns)}
     end.
-
-find_highest_resolved_version(Versions) ->
-    find_highest_resolved_version(Versions, none).
-
-find_highest_resolved_version([], none) -> none;
-find_highest_resolved_version([], HVersion) -> {ok, HVersion};
-find_highest_resolved_version([none | Versions], HVersion) ->
-    find_highest_resolved_version(Versions, HVersion);
-find_highest_resolved_version([{ok, Version} | Versions], HVersion) ->
-    NHVersion =
-        case (HVersion =:= none orelse ec_semver:gt(Version, HVersion)) of
-            true ->
-                Version;
-            false ->
-                HVersion
-        end,
-    find_highest_resolved_version(Versions, NHVersion).
-
-rm_ws(<<" ", R/binary>>) ->
-    ec_semver:parse(rm_ws(R));
-rm_ws(R) ->
-    ec_semver:parse(R).
 
 valid_vsn(Vsn) ->
-    case select_complex_version(Vsn) of
-        {complex, Vsns} ->
-            lists:usort(lists:map(fun is_valid_vsn/1, Vsns)) == [true];
-        Vsn ->
-            is_valid_vsn(Vsn)
+    ?WARN("!!!! is valid vsn : ~p ", [Vsn]),
+    case r3_verl:parse_requirement(Vsn) of
+        {error, _} -> false;
+        _ -> true
     end.
-
-is_valid_vsn(Vsn) ->
-    %% Regepx from https://github.com/sindresorhus/semver-regex/blob/master/index.js
-    SemVerRegExp = "v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*))?"
-        "(-[0-9a-z-]+(\\.[0-9a-z-]+)*)?(\\+[0-9a-z-]+(\\.[0-9a-z-]+)*)?",
-    SupportedVersions = "^(>=?|<=?|~>|==)?\\s*" ++ SemVerRegExp ++ "$",
-    re:run(Vsn, SupportedVersions, [unicode]) =/= nomatch.
-
-select_complex_version(Version) ->
-    case parse_complex_version(Version) of
-        #{isComplex := true, versions := Versions} ->
-            {complex, Versions};
-        #{isComplex := false} ->
-            Version
-    end. 
-
-% checks if the version is in complex format example: "> 0.1.0 and < 0.2.0"
-parse_complex_version(Version) ->
-    parse_complex_version(Version, #{versions => [<<>>], isComplex => false}).
-
-parse_complex_version(<<>>, Acc) -> Acc;
-parse_complex_version(<<" or ", Rest/binary>>, #{versions := Versions} = Acc) ->
-    parse_complex_version(Rest, Acc#{versions => [<<>> | Versions], isComplex => true});
-parse_complex_version(<<" and ", Rest/binary>>, #{versions := Versions} = Acc) ->
-    parse_complex_version(Rest, Acc#{versions => [<<>> | Versions], isComplex => true});
-parse_complex_version(<<" ", Rest/binary>>, Acc) ->
-    parse_complex_version(Rest, Acc);
-parse_complex_version(<<C:1/binary, Rest/binary>>, #{versions := [V | Versions]} = Acc) ->
-    parse_complex_version(Rest, Acc#{versions => [<<V/binary, C/binary>> | Versions]}).
 
 highest_matching(Dep, Vsn, Repo, HexRegistry, State) ->
     find_highest_matching_(Dep, Vsn, #{name => Repo}, HexRegistry, State).
-
-cmp(Dep, Vsn, Repo, HexRegistry, State, CmpFun) ->
-    case get_package_versions(Dep, Vsn, Repo, HexRegistry, State) of
-        [] ->
-            none;
-        Vsns ->
-            cmp_(undefined, Vsn, Vsns, CmpFun)
-    end.
-
-cmp_(undefined, MinVsn, [], _CmpFun) ->
-    {ok, MinVsn};
-cmp_(HighestDepVsn, _MinVsn, [], _CmpFun) ->
-    {ok, HighestDepVsn};
-
-cmp_(BestMatch, MinVsn, [Vsn | R], CmpFun) ->
-    case CmpFun(Vsn, MinVsn) of
-        true ->
-            cmp_(Vsn, Vsn, R, CmpFun);
-        false  ->
-            cmp_(BestMatch, MinVsn, R, CmpFun)
-    end.
-
-%% We need to treat this differently since we want a version that is LOWER but
-%% the higest possible one.
-cmpl(Dep, Vsn, Repo, HexRegistry, State, CmpFun) ->
-    case get_package_versions(Dep, Vsn, Repo, HexRegistry, State) of
-        [] ->
-            none;
-        Vsns ->
-            cmpl_(undefined, Vsn, Vsns, CmpFun)
-    end.
-
-cmpl_(undefined, MaxVsn, [], _CmpFun) ->
-    {ok, MaxVsn};
-cmpl_(HighestDepVsn, _MaxVsn, [], _CmpFun) ->
-    {ok, HighestDepVsn};
-
-cmpl_(undefined, MaxVsn, [Vsn | R], CmpFun) ->
-    case CmpFun(Vsn, MaxVsn) of
-        true ->
-            cmpl_(Vsn, MaxVsn, R, CmpFun);
-        false  ->
-            cmpl_(undefined, MaxVsn, R, CmpFun)
-    end;
-
-cmpl_(BestMatch, MaxVsn, [Vsn | R], CmpFun) ->
-    case CmpFun(Vsn, MaxVsn) of
-        true ->
-            case ec_semver:gte(Vsn, BestMatch) of
-                true ->
-                    cmpl_(Vsn, MaxVsn, R, CmpFun);
-                false ->
-                    cmpl_(BestMatch, MaxVsn, R, CmpFun)
-            end;
-        false  ->
-            cmpl_(BestMatch, MaxVsn, R, CmpFun)
-    end.
