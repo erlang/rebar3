@@ -311,8 +311,8 @@ pre_condition('<', Pre) ->
 -spec no_pre_condition([binary() | integer()], boolean()) -> tuple().
 no_pre_condition([], AllowPreRelease) ->
     {'orelse', AllowPreRelease, {'==', {length, '$4'}, 0}};
-no_pre_condition(_, AllowPreRelease) ->
-    {const, AllowPreRelease}.
+no_pre_condition(_, _AllowPreRelease) ->
+    {const, true}.
 
 -spec to_matchspec([operator(), ...], boolean()) -> {error, invalid_requirement} | {ok, ets:match_spec()}.
 to_matchspec(Lexed, AllowPreRelease) ->
@@ -370,7 +370,8 @@ to_condition(
 ) ->
     to_condition(
         {'andalso', Current, to_condition([Operator, Version], AllowPreRelease)},
-        Rest
+        Rest,
+        AllowPreRelease
     );
 to_condition(
     Current,
@@ -379,7 +380,8 @@ to_condition(
 ) ->
     to_condition(
         {'orelse', Current, to_condition([Operator, Version], AllowPreRelease)},
-        Rest
+        Rest,
+        AllowPreRelease
     ).
 
 -spec main_condition(any(), tuple()) -> tuple().
