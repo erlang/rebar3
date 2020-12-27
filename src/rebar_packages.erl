@@ -59,7 +59,8 @@ get_all_names(State) ->
                            unicode:unicode_binary(),
                            ets:tid(), rebar_state:t()) -> [vsn()].
 get_package_versions(Dep, DepVsn, Repo, Table, State) ->
-    case r3_verl:parse_requirement(DepVsn) of
+    AllowPreRelease = rebar_state:get(State, deps_allow_prerelease, false),
+    case r3_verl:parse_requirement(DepVsn, AllowPreRelease) of
         {error, _} ->
             none;
         {ok, #{matchspec := MatchSpec}} ->
@@ -68,13 +69,6 @@ get_package_versions(Dep, DepVsn, Repo, Table, State) ->
 
 get_package_versions(Dep, [{Head, [Match], _}] = _MatchSpec, _Vsn, Repo, Table, State) ->
     ?MODULE:verify_table(State),
-    _AllowPreRelease = rebar_state:get(State, deps_allow_prerelease, true),
-    % ?MODULE:verify_table(State),
-    % AllowPreRelease = rebar_state:get(State, deps_allow_prerelease, false)
-    %     orelse AlphaInfo =/= {[],[]},
-    % ets:select(Table, [{#package{key={Dep, {'$1', '$2'}, Repo},
-    %                              _='_'},
-    %                     [{'==', '$2', {{[],[]}}} || not AllowPreRelease], [{{'$1', '$2'}}]}]).
     ets:select(Table, [{#package{key={Dep, Head, Repo}, _='_'},
                         [Match], [{Head}]}]).
 
@@ -93,7 +87,7 @@ get_package(Dep, Vsn, Hash, Repos, Table, State) when is_tuple(Vsn) ->
     PackagesWithProperHash = lists:filter(
         fun(#package{key = {_Dep, _Vsn, Repo}, outer_checksum = PkgChecksum}) ->
             if (PkgChecksum =/= Hash) andalso (Hash =/= '_') ->
-                ?WARN("Checksum mismatch for package ~ts-~ts from repo ~ts", [Dep, Vsn, Repo]),
+                ?WARN("Checksum mismatch for package ~ts-~ts from repo ~ts", [Dep, r3_verl:format(Vsn), Repo]),
                 false;
             true ->
                 true
@@ -188,7 +182,8 @@ package_dir(Repo, State) ->
 %% `~> 2.1.3-dev` | `>= 2.1.3-dev and < 2.2.0`
 %% `~> 2.0` | `>= 2.0.0 and < 3.0.0`
 %% `~> 2.1` | `>= 2.1.0 and < 3.0.0`
-find_highest_matching(Dep, Constraint, Repo, Table, State) ->
+find_highest_matching(Dep, Version, Repo, Table, State) ->
+    Constraint = r3_verl:add_highest_match_prefix(Version),
     try find_highest_matching_(Dep, Constraint, Repo, Table, State) of
         none ->
             handle_missing_package(Dep, Repo, State,

@@ -6,7 +6,9 @@
     compare/2,
     parse/1,
     parse_requirement/1,
-    format/1
+    parse_requirement/2,
+    format/1,
+    add_highest_match_prefix/1
 ]).
 
 -type version() :: binary().
@@ -61,7 +63,7 @@ parse(Str) when is_list(Str) ->
 parse(Str) when is_binary(Str) ->
     case parse_version(Str) of
         {ok, {Major, Minor, Patch, Pre, Build}} ->
-            {Major, Minor, Patch, Pre, build_string(Build), true};
+            {Major, Minor, Patch, Pre, build_string(Build)};
         {error, invalid_version} ->
             {error, invalid_version}
     end.
@@ -73,8 +75,11 @@ parse(Str) when is_binary(Str) ->
 parse_requirement(Str) when is_list(Str) ->
     parse_requirement(list_to_binary(Str));
 parse_requirement(Str) when is_binary(Str) ->
+    parse_requirement(Str, false).
+
+parse_requirement(Str, AllowPreRelease) when is_binary(Str) ->
     Lexed = lexer(Str, []),
-    case to_matchspec(Lexed) of
+    case to_matchspec(Lexed, AllowPreRelease) of
         {ok, Spec} ->
             {ok, #{string => Str, matchspec => Spec, compiled => false}};
         {error, invalid_requirement} ->
@@ -86,14 +91,25 @@ parse_requirement(Str) when is_binary(Str) ->
 %%% false.
 %%% @end
 -spec format(version_t()) -> version().
-format({Major, Minor, Patch, Pre, Build, _}) ->
+format({Major, Minor, Patch, Pre, Build}) ->
     [rebar_utils:to_list(Major), ".", 
      rebar_utils:to_list(Minor), ".", 
      rebar_utils:to_list(Patch),
      format_vsn_rest(<<"-">>, Pre),
      format_vsn_rest(<<"+">>, Build)].
 
-to_matchable({Major, Minor, Patch, Pre, _Build, _}, AllowPre) ->
+add_highest_match_prefix(Version) when is_list(Version) ->
+    add_highest_match_prefix(list_to_binary(Version));
+add_highest_match_prefix(<<"~>", _/binary>> = Version) ->
+    Version;
+add_highest_match_prefix(<<" ", Version/binary>>) ->
+    add_highest_match_prefix(Version);
+add_highest_match_prefix(Version) when is_binary(Version) ->
+    <<"~> ", Version/binary>>.
+
+%% private
+%%
+to_matchable({Major, Minor, Patch, Pre, _Build}, AllowPre) ->
     {Major, Minor, Patch, Pre, AllowPre};
 to_matchable(String, AllowPre) when is_binary(String) ->
     case parse_version(String) of
@@ -103,8 +119,6 @@ to_matchable(String, AllowPre) when is_binary(String) ->
             {error, invalid_version}
     end.
 
-%% private
-%%
 build_string(Build) ->
     case Build of
         [] -> undefined;
@@ -163,13 +177,8 @@ pre_is_eq(Pre1, Pre2) ->
 -spec parse_version(version()) ->
     {ok, {major(), minor(), patch(), [pre()], [build()]}} |
     {error, invalid_version}.
-parse_version(Str) -> parse_version(Str, false).
-
--spec parse_version(version(), boolean()) ->
-    {ok, {major(), minor(), patch(), [pre()], [build()]}} |
-    {error, invalid_version}.
-parse_version(Str, Approximate) when is_binary(Str) ->
-    try parse_and_convert(Str, Approximate) of
+parse_version(Str) when is_binary(Str) ->
+    try parse_and_convert(Str) of
         {ok, {_, _, undefined, _, _}} ->
             {error, invalid_version};
         {ok, _} = V ->
@@ -227,13 +236,9 @@ lexer(<<>>, Acc) ->
 
 -spec parse_condition(version()) ->
     {integer(), integer(), 'undefined' | integer(), [binary() | integer()]}.
-parse_condition(Version) -> parse_condition(Version, false).
-
--spec parse_condition(version(), boolean()) ->
-    {integer(), integer(), 'undefined' | integer(), [binary() | integer()]}.
-parse_condition(Version, Approximate) ->
+parse_condition(Version) ->
     try
-        case parse_and_convert(Version, Approximate) of
+        case parse_and_convert(Version) of
             {ok, {Major, Minor, Patch, Pre, _Bld}} ->
                 {Major, Minor, Patch, Pre};
             _ ->
@@ -303,20 +308,20 @@ pre_condition('<', Pre) ->
             {'orelse', {'<', {length, '$4'}, PreLength},
                 {'andalso', {'==', {length, '$4'}, PreLength}, {'<', '$4', {const, Pre}}}}}}.
 
--spec no_pre_condition([binary() | integer()]) -> tuple().
-no_pre_condition([]) ->
-    {'orelse', '$6', {'==', {length, '$4'}, 0}};
-no_pre_condition(_) ->
-    {const, true}.
+-spec no_pre_condition([binary() | integer()], boolean()) -> tuple().
+no_pre_condition([], AllowPreRelease) ->
+    {'orelse', AllowPreRelease, {'==', {length, '$4'}, 0}};
+no_pre_condition(_, AllowPreRelease) ->
+    {const, AllowPreRelease}.
 
--spec to_matchspec([operator(), ...]) -> {error, invalid_requirement} | {ok, ets:match_spec()}.
-to_matchspec(Lexed) ->
+-spec to_matchspec([operator(), ...], boolean()) -> {error, invalid_requirement} | {ok, ets:match_spec()}.
+to_matchspec(Lexed, AllowPreRelease) ->
     try
         case is_valid_requirement(Lexed) of
             true ->
-                First = to_condition(Lexed),
+                First = to_condition(Lexed, AllowPreRelease),
                 Rest = lists:nthtail(2, Lexed),
-                {ok, [{{'$1', '$2', '$3', '$4', '$5', '$6'}, [to_condition(First, Rest)], ['$_']}]};
+                {ok, [{{'$1', '$2', '$3', '$4', '$5'}, [to_condition(First, Rest, AllowPreRelease)], ['$_']}]};
             false ->
                 {error, invalid_requirement}
         end
@@ -324,54 +329,56 @@ to_matchspec(Lexed) ->
         invalid_matchspec -> {error, invalid_requirement}
     end.
 
--spec to_condition([iodata(), ...]) -> tuple().
-to_condition(['==', Version | _]) ->
+-spec to_condition([iodata(), ...], boolean()) -> tuple().
+to_condition(['==', Version | _], _AllowPreRelease) ->
     Matchable = parse_condition(Version),
     main_condition('==', Matchable);
-to_condition(['!=', Version | _]) ->
+to_condition(['!=', Version | _], _AllowPreRelease) ->
     Matchable = parse_condition(Version),
     main_condition('/=', Matchable);
-to_condition(['~>', Version | _]) ->
-    From = parse_condition(Version, true),
+to_condition(['~>', Version | _], AllowPreRelease) ->
+    From = parse_condition(Version),
     To = approximate_upper(From),
-    {'andalso', to_condition(['>=', matchable_to_string(From)]),
-        to_condition(['<', matchable_to_string(To)])};
-to_condition(['>', Version | _]) ->
+    {'andalso', to_condition(['>=', matchable_to_string(From)], AllowPreRelease),
+        to_condition(['<', matchable_to_string(To)], AllowPreRelease)};
+to_condition(['>', Version | _], AllowPreRelease) ->
     {Major, Minor, Patch, Pre} =
         parse_condition(Version),
     {'andalso',
         {'orelse', main_condition('>', {Major, Minor, Patch}),
             {'andalso', main_condition('==', {Major, Minor, Patch}), pre_condition('>', Pre)}},
-        no_pre_condition(Pre)};
-to_condition(['>=', Version | _]) ->
+        no_pre_condition(Pre, AllowPreRelease)};
+to_condition(['>=', Version | _], AllowPreRelease) ->
     Matchable = parse_condition(Version),
-    {'orelse', main_condition('==', Matchable), to_condition(['>', Version])};
-to_condition(['<', Version | _]) ->
+    {'orelse', main_condition('==', Matchable), to_condition(['>', Version], AllowPreRelease)};
+to_condition(['<', Version | _], _AllowPreRelease) ->
     {Major, Minor, Patch, Pre} =
         parse_condition(Version),
     {'orelse', main_condition('<', {Major, Minor, Patch}),
         {'andalso', main_condition('==', {Major, Minor, Patch}), pre_condition('<', Pre)}};
-to_condition(['<=', Version | _]) ->
+to_condition(['<=', Version | _], AllowPreRelease) ->
     Matchable = parse_condition(Version),
-    {'orelse', main_condition('==', Matchable), to_condition(['<', Version])}.
+    {'orelse', main_condition('==', Matchable), to_condition(['<', Version], AllowPreRelease)}.
 
--spec to_condition(tuple(), list()) -> tuple().
-to_condition(Current, []) ->
+-spec to_condition(tuple(), list(), boolean()) -> tuple().
+to_condition(Current, [], _AllowPreRelease) ->
     Current;
 to_condition(
     Current,
-    ['&&', Operator, Version | Rest]
+    ['&&', Operator, Version | Rest],
+    AllowPreRelease
 ) ->
     to_condition(
-        {'andalso', Current, to_condition([Operator, Version])},
+        {'andalso', Current, to_condition([Operator, Version], AllowPreRelease)},
         Rest
     );
 to_condition(
     Current,
-    ['||', Operator, Version | Rest]
+    ['||', Operator, Version | Rest],
+    AllowPreRelease
 ) ->
     to_condition(
-        {'orelse', Current, to_condition([Operator, Version])},
+        {'orelse', Current, to_condition([Operator, Version], AllowPreRelease)},
         Rest
     ).
 
@@ -430,13 +437,13 @@ join_bins(List, Delim) ->
         List
     ).
 
--spec maybe_patch(undefined | binary() | integer(), boolean()) -> {ok, undefined | integer()}.
-maybe_patch(undefined, _) ->
-    {ok, 0};
-maybe_patch(Patch, _) ->
+-spec maybe_patch(undefined | binary() | integer()) -> {ok, integer()}.
+maybe_patch(undefined) ->
+    {ok, undefined};
+maybe_patch(Patch) ->
     to_digits(Patch).
 
--spec parse_and_convert(version(), boolean()) ->
+-spec parse_and_convert(version()) ->
     {error, invalid_version} |
     {ok,
         {integer(), integer(),
@@ -447,7 +454,7 @@ maybe_patch(Patch, _) ->
                 integer()
             ],
             [binary()]}}.
-parse_and_convert(Str, Approx) ->
+parse_and_convert(Str) ->
     [VerPre, Build] = bisect(Str, <<"+">>, [global]),
     [Ver, Pre] = bisect(VerPre, <<"-">>, []),
     [Maj1, Min1, Patch1, Other] = split_ver(Ver),
@@ -455,7 +462,7 @@ parse_and_convert(Str, Approx) ->
         undefined ->
             {ok, Maj2} = to_digits(Maj1),
             {ok, Min2} = to_digits(Min1),
-            {ok, Patch2} = maybe_patch(Patch1, Approx),
+            {ok, Patch2} = maybe_patch(Patch1),
             {ok, PreParts} = opt_dot_separated(Pre),
             {ok, PreParts1} = parts_to_integers(PreParts, []),
             {ok, Build2} = opt_dot_separated(Build),

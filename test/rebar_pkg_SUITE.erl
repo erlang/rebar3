@@ -224,19 +224,19 @@ pkgs_provider(Config) ->
 
 find_highest_matching(_Config) ->
     State = rebar_state:new(),
-    {ok, Vsn} = rebar_packages:find_highest_matching_(
-                  <<"goodpkg">>, <<"~> 1.0.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
+    {ok, Vsn} = rebar_packages:find_highest_matching(
+                  <<"goodpkg">>, <<"1.0.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
     ?assertEqual(r3_verl:parse(<<"1.0.1">>), Vsn),
     {ok, Vsn1} = rebar_packages:find_highest_matching(
-                   <<"goodpkg">>, <<"~> 1.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
+                   <<"goodpkg">>, <<"1.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
     ?assertEqual(r3_verl:parse(<<"1.1.1">>), Vsn1),
     {ok, Vsn2} = rebar_packages:find_highest_matching(
-                   <<"goodpkg">>, <<"~> 2.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
+                   <<"goodpkg">>, <<"2.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
     ?assertEqual(r3_verl:parse(<<"2.0.0">>), Vsn2),
 
     %% regression test. ~> constraints higher than the available packages would result
     %% in returning the first package version instead of 'none'.
-    ?assertEqual(none, rebar_packages:find_highest_matching_(<<"goodpkg">>, <<"5.0">>,
+    ?assertEqual(none, rebar_packages:find_highest_matching(<<"goodpkg">>, <<"5.0">>,
                                                              #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State)),
 
 
