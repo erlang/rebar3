@@ -6,7 +6,6 @@
 all() -> [sub_app_deps, newly_added_dep, newly_added_after_empty_lock, no_deps_empty_lock,
           http_proxy_settings, https_proxy_settings,
           http_os_proxy_settings, https_os_proxy_settings,
-          semver_matching_lt, semver_matching_lte, semver_matching_gt,
           valid_version, top_override, {group, git}, {group, pkg},
           deps_cmd_needs_update_called
          ].
@@ -442,33 +441,6 @@ https_os_proxy_settings(_Config) ->
     %% Assert variable is right
     ?assertEqual({ok,{{"localhost", 1234}, []}},
                  httpc:get_option(https_proxy, rebar)).
-
-semver_matching_lt(_Config) ->
-    MaxVsn = <<"0.2.0">>,
-    Vsns = [<<"0.1.7">>, <<"0.1.9">>, <<"0.1.8">>, <<"0.2.0">>, <<"0.2.1">>],
-    ?assertEqual({ok, <<"0.1.9">>},
-                 rebar_packages:cmpl_(undefined, MaxVsn, Vsns,
-                                        fun ec_semver:lt/2)).
-
-semver_matching_lte(_Config) ->
-    MaxVsn = <<"0.2.0">>,
-    Vsns = [<<"0.1.7">>, <<"0.1.9">>, <<"0.1.8">>, <<"0.2.0">>, <<"0.2.1">>],
-    ?assertEqual({ok, <<"0.2.0">>},
-                 rebar_packages:cmpl_(undefined, MaxVsn, Vsns,
-                                        fun ec_semver:lte/2)).
-
-semver_matching_gt(_Config) ->
-    MaxVsn = <<"0.2.0">>,
-    Vsns = [<<"0.1.7">>, <<"0.1.9">>, <<"0.1.8">>, <<"0.2.0">>, <<"0.2.1">>],
-    ?assertEqual({ok, <<"0.2.1">>},
-                 rebar_packages:cmp_(undefined, MaxVsn, Vsns,
-                                       fun ec_semver:gt/2)).
-semver_matching_gte(_Config) ->
-    MaxVsn = <<"0.2.0">>,
-    Vsns = [<<"0.1.7">>, <<"0.1.9">>, <<"0.1.8">>, <<"0.2.0">>],
-    ?assertEqual({ok, <<"0.2.0">>},
-                 rebar_packages:cmp_(undefined, MaxVsn, Vsns,
-                                       fun ec_semver:gt/2)).
 
 valid_version(_Config) ->
     ?assert(rebar_packages:valid_vsn(<<"0.1">>)),

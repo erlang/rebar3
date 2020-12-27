@@ -56,10 +56,12 @@ compare(Version1, Version2) ->
 %%% Parses a semantic version returing a version_t() or {error, invalid_version}
 %%% @end
 -spec parse(version()) -> version_t() | {error, invalid_version}.
-parse(Str) ->
+parse(Str) when is_list(Str) ->
+    parse(list_to_binary(Str));
+parse(Str) when is_binary(Str) ->
     case parse_version(Str) of
         {ok, {Major, Minor, Patch, Pre, Build}} ->
-            {Major, Minor, Patch, Pre, build_string(Build)};
+            {Major, Minor, Patch, Pre, build_string(Build), true};
         {error, invalid_version} ->
             {error, invalid_version}
     end.
@@ -68,7 +70,9 @@ parse(Str) ->
 %%% Parses a semantic version requirement, returns a requirement_t()
 %%% @end
 -spec parse_requirement(requirement()) -> {ok, requirement_t()} | {error, invalid_requirement}.
-parse_requirement(Str) ->
+parse_requirement(Str) when is_list(Str) ->
+    parse_requirement(list_to_binary(Str));
+parse_requirement(Str) when is_binary(Str) ->
     Lexed = lexer(Str, []),
     case to_matchspec(Lexed) of
         {ok, Spec} ->
@@ -82,14 +86,14 @@ parse_requirement(Str) ->
 %%% false.
 %%% @end
 -spec format(version_t()) -> version().
-format({Major, Minor, Patch, Pre, Build}) ->
+format({Major, Minor, Patch, Pre, Build, _}) ->
     [rebar_utils:to_list(Major), ".", 
      rebar_utils:to_list(Minor), ".", 
      rebar_utils:to_list(Patch),
      format_vsn_rest(<<"-">>, Pre),
      format_vsn_rest(<<"+">>, Build)].
 
-to_matchable({Major, Minor, Patch, Pre, _Build}, AllowPre) ->
+to_matchable({Major, Minor, Patch, Pre, _Build, _}, AllowPre) ->
     {Major, Minor, Patch, Pre, AllowPre};
 to_matchable(String, AllowPre) when is_binary(String) ->
     case parse_version(String) of
@@ -301,7 +305,7 @@ pre_condition('<', Pre) ->
 
 -spec no_pre_condition([binary() | integer()]) -> tuple().
 no_pre_condition([]) ->
-    {'orelse', '$5', {'==', {length, '$4'}, 0}};
+    {'orelse', '$6', {'==', {length, '$4'}, 0}};
 no_pre_condition(_) ->
     {const, true}.
 
@@ -312,7 +316,7 @@ to_matchspec(Lexed) ->
             true ->
                 First = to_condition(Lexed),
                 Rest = lists:nthtail(2, Lexed),
-                {ok, [{{'$1', '$2', '$3', '$4', '$5'}, [to_condition(First, Rest)], ['$_']}]};
+                {ok, [{{'$1', '$2', '$3', '$4', '$5', '$6'}, [to_condition(First, Rest)], ['$_']}]};
             false ->
                 {error, invalid_requirement}
         end
@@ -580,4 +584,6 @@ format_vsn_rest(_TypeMark, undefined) ->
     [];
 format_vsn_rest(TypeMark, [Head | Rest]) ->
     [TypeMark, Head |
-     [[".", rebar_utils:to_list(Detail)] || Detail <- Rest]].
+     [[".", rebar_utils:to_list(Detail)] || Detail <- Rest]];
+format_vsn_rest(TypeMark, Build) ->
+    [TypeMark, Build].

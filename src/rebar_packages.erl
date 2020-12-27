@@ -86,7 +86,7 @@ get_package(Dep, Vsn, undefined, Repos, Table, State) ->
     get_package(Dep, Vsn, '_', Repos, Table, State);
 get_package(Dep, Vsn, Hash, Repos, Table, State) when is_binary(Vsn) ->
     get_package(Dep, r3_verl:parse(Vsn), Hash, Repos, Table, State);
-get_package(Dep, Vsn, Hash, Repos, Table, State) ->
+get_package(Dep, Vsn, Hash, Repos, Table, State) when is_tuple(Vsn) ->
     ?MODULE:verify_table(State),
     MatchingPackages = ets:select(Table, [{#package{key={Dep, Vsn, Repo},
                                       _='_'}, [], ['$_']} || Repo <- Repos]),
@@ -216,7 +216,7 @@ handle_vsns(Vsns) ->
     Vsn =
         lists:foldl(
             fun(Version, Highest) ->
-                case (Highest =:= none orelse r3_verl:compare(Version, Highest) == gt) of
+                case (Highest =:= none orelse r3_verl:compare(Version, Highest) =:= gt) of
                     true ->
                         Version;
                     false ->
@@ -371,12 +371,14 @@ handle_missing_no_exception(Fun, Dep, State) ->
     end.
 
 resolve_version_(Dep, DepVsn, Repo, HexRegistry, State) ->
+    ?INFO("!!! resolving version for ~p ~p", [Dep, DepVsn]),
     case get_package_versions(Dep, DepVsn, Repo, HexRegistry, State) of
         none ->
             none;
         [] ->
             none;
         Vsns ->
+            ?INFO("@@@@ got multiple versions : ~p", [Vsns]),
             handle_vsns(Vsns)
     end.
 

@@ -366,7 +366,7 @@ maybe_warn_retired(_, _, Hash, _) when is_binary(Hash) ->
 maybe_warn_retired(Name, Vsn, _, R=#{reason := Reason}) ->
     Message = maps:get(message, R, ""),
     ?WARN("Warning: package ~s-~s is retired: (~s) ~s",
-          [Name, ec_semver:format(Vsn), retire_reason(Reason), Message]);
+          [Name, r3_verl:format(Vsn), retire_reason(Reason), Message]);
 maybe_warn_retired(_, _, _, _) ->
     ok.
 
