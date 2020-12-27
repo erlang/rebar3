@@ -366,14 +366,12 @@ handle_missing_no_exception(Fun, Dep, State) ->
     end.
 
 resolve_version_(Dep, DepVsn, Repo, HexRegistry, State) ->
-    ?INFO("!!! resolving version for ~p ~p", [Dep, DepVsn]),
     case get_package_versions(Dep, DepVsn, Repo, HexRegistry, State) of
         none ->
             none;
         [] ->
             none;
         Vsns ->
-            ?INFO("@@@@ got multiple versions : ~p", [Vsns]),
             handle_vsns(Vsns)
     end.
 
