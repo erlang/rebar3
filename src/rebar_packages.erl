@@ -63,14 +63,12 @@ get_package_versions(Dep, DepVsn, Repo, Table, State) ->
     case r3_verl:parse_requirement(DepVsn, AllowPreRelease) of
         {error, _} ->
             none;
-        {ok, #{matchspec := MatchSpec}} ->
-            get_package_versions(Dep, MatchSpec, DepVsn, Repo, Table, State)
+        {ok, #{matchspec := [{Head, [Match], _}]}} ->
+            ?MODULE:verify_table(State),
+            Vsns = ets:select(Table, [{#package{key={Dep, Head, Repo}, _='_'},
+                                       [Match], [{Head}]}]),
+            handle_vsns(Vsns)
     end.
-
-get_package_versions(Dep, [{Head, [Match], _}] = _MatchSpec, _Vsn, Repo, Table, State) ->
-    ?MODULE:verify_table(State),
-    ets:select(Table, [{#package{key={Dep, Head, Repo}, _='_'},
-                        [Match], [{Head}]}]).
 
 -spec get_package(unicode:unicode_binary(), unicode:unicode_binary(),
                   binary() | undefined | '_',
@@ -201,12 +199,13 @@ find_highest_matching(Dep, Version, Repo, Table, State) ->
     end.
 
 find_highest_matching_(Dep, Constraint, #{name := Repo}, Table, State) ->
-    try resolve_version_(Dep, Constraint, Repo, Table, State)
+    try get_package_versions(Dep, Constraint, Repo, Table, State)
     catch
         error:badarg ->
             none
     end.
 
+handle_vsns([]) -> none;
 handle_vsns(Vsns) ->
     Vsn =
         lists:foldl(
@@ -305,7 +304,7 @@ resolve_version(Dep, DepVsn, _OldHash, Hash, HexRegistry, State) when is_binary(
             {ok, Package, RepoConfig};
         _ ->
             Fun = fun(Repo) ->
-                      case resolve_version_(Dep, DepVsn, Repo, HexRegistry, State) of
+                      case get_package_versions(Dep, DepVsn, Repo, HexRegistry, State) of
                           none ->
                               not_found;
                           {ok, Vsn} ->
@@ -330,7 +329,7 @@ resolve_version(Dep, DepVsn, _OldHash, Hash, HexRegistry, State) ->
             {error, {invalid_vsn, DepVsn}};
         _ ->
             Fun = fun(Repo) ->
-                      case resolve_version_(Dep, DepVsn, Repo, HexRegistry, State) of
+                      case get_package_versions(Dep, DepVsn, Repo, HexRegistry, State) of
                           none ->
                               not_found;
                           {ok, Vsn} ->
@@ -365,16 +364,6 @@ handle_missing_no_exception(Fun, Dep, State) ->
             Result
     end.
 
-resolve_version_(Dep, DepVsn, Repo, HexRegistry, State) ->
-    case get_package_versions(Dep, DepVsn, Repo, HexRegistry, State) of
-        none ->
-            none;
-        [] ->
-            none;
-        Vsns ->
-            handle_vsns(Vsns)
-    end.
-
 valid_vsn(Vsn) ->
     case r3_verl:parse_requirement(Vsn) of
         {error, _} -> false;
@@ -383,10 +372,6 @@ valid_vsn(Vsn) ->
 
 get_latest_version(Dep, Repo, HexRegistry, State) ->
     verify_table(State),
-    case ets:select(HexRegistry, [{#package{key={'$1', '$2', '$3'}, _='_'},
-                                    [{'==', '$1', Dep}, {'==', '$3', Repo}], ['$2']}]) of
-        [] ->
-            none;
-        Vsns ->
-            handle_vsns(Vsns)
-    end.
+    Vsns = ets:select(HexRegistry, [{#package{key={'$1', '$2', '$3'}, _='_'},
+                                     [{'==', '$1', Dep}, {'==', '$3', Repo}], ['$2']}]),
+    handle_vsns(Vsns).
