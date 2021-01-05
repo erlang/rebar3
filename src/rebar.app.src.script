@@ -8,7 +8,6 @@
   {registered, []},
   {applications, [kernel,
                   stdlib,
-                  hipe,
                   sasl,
                   compiler,
                   crypto,
@@ -30,7 +29,12 @@
                   relx,
                   cf,
                   inets,
-                  eunit_formatters]},
+                  eunit_formatters
+                    % OTP 24 drops HiPE
+                  | [hipe || _ <- [application:load(dialyzer)],
+                            {ok, Apps} <- [application:get_key(dialyzer, applications)],
+                            lists:member(hipe, Apps)]
+                 ]},
   {env, [
         %% Default log level
         {log_level, warn},

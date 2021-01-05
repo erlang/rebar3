@@ -213,7 +213,10 @@ compile_erl_file(File, Opts) ->
             ok;
         {ok, _Mod, Ws} ->
             io:format("~s~n", [format_warnings(File, Ws)]),
-            halt(1);
+            case lists:member(warnings_as_errors, Opts) of
+                true -> halt(1);
+                false -> ok
+            end;
         {error, Es, Ws} ->
             io:format("~s ~s~n", [format_errors(File, Es), format_warnings(File, Ws)]),
             halt(1)
