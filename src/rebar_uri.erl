@@ -3,8 +3,21 @@
 
 -export([
          parse/1, parse/2, scheme_defaults/0,
-         append_path/2
+         append_path/2, percent_decode/1
 ]).
+
+-type error() :: {error, atom(), term()}.
+
+-define(DEC2HEX(X),
+        if ((X) >= 0) andalso ((X) =< 9) -> (X) + $0;
+           ((X) >= 10) andalso ((X) =< 15) -> (X) + $A - 10
+        end).
+
+-define(HEX2DEC(X),
+        if ((X) >= $0) andalso ((X) =< $9) -> (X) - $0;
+           ((X) >= $A) andalso ((X) =< $F) -> (X) - $A + 10;
+           ((X) >= $a) andalso ((X) =< $f) -> (X) - $a + 10
+        end).
 
 -ifdef(OTP_RELEASE).
 -spec parse(URIString) -> URIMap when
@@ -87,6 +100,33 @@ append_path(Url, ExtraPath) ->
      end.
 -endif.
 
+%% Taken from OTP 23.2
+-spec percent_decode(URI) -> Result when
+      URI :: uri_string:uri_string() | uri_string:uri_map(),
+      Result :: uri_string:uri_string() |
+                uri_string:uri_map() |
+                {error, {invalid, {atom(), {term(), term()}}}}.
+percent_decode(URIMap) when is_map(URIMap)->
+    Fun = fun (K,V) when K =:= userinfo; K =:= host; K =:= path;
+                         K =:= query; K =:= fragment ->
+                  case raw_decode(V) of
+                      {error, Reason, Input} ->
+                          throw({error, {invalid, {K, {Reason, Input}}}});
+                      Else ->
+                          Else
+                  end;
+              %% Handle port and scheme
+              (_,V) ->
+                  V
+          end,
+    try maps:map(Fun, URIMap)
+    catch throw:Return ->
+            Return
+    end;
+percent_decode(URI) when is_list(URI) orelse
+                         is_binary(URI) ->
+    raw_decode(URI).
+
 %% OTP 21+
 -ifdef(OTP_RELEASE).
 scheme_defaults() ->
@@ -129,3 +169,44 @@ maybe_port(Url, Host, Port, PathQ) ->
         false -> Host ++ PathQ % port was implicit
     end.
 -endif.
+
+-spec raw_decode(list()|binary()) -> list() | binary() | error().
+raw_decode(Cs) ->
+    raw_decode(Cs, <<>>).
+
+raw_decode(L, Acc) when is_list(L) ->
+    try
+        B0 = unicode:characters_to_binary(L),
+        B1 = raw_decode(B0, Acc),
+        unicode:characters_to_list(B1)
+    catch
+        throw:{error, Atom, RestData} ->
+            {error, Atom, RestData}
+    end;
+raw_decode(<<$%,C0,C1,Cs/binary>>, Acc) ->
+    case is_hex_digit(C0) andalso is_hex_digit(C1) of
+        true ->
+            B = ?HEX2DEC(C0)*16+?HEX2DEC(C1),
+            raw_decode(Cs, <<Acc/binary, B>>);
+        false ->
+            throw({error,invalid_percent_encoding,<<$%,C0,C1>>})
+    end;
+raw_decode(<<C,Cs/binary>>, Acc) ->
+    raw_decode(Cs, <<Acc/binary, C>>);
+raw_decode(<<>>, Acc) ->
+    check_utf8(Acc).
+
+-spec is_hex_digit(char()) -> boolean().
+is_hex_digit(C)
+  when $0 =< C, C =< $9;$a =< C, C =< $f;$A =< C, C =< $F -> true;
+is_hex_digit(_) -> false.
+
+%% Returns Cs if it is utf8 encoded.
+check_utf8(Cs) ->
+    case unicode:characters_to_list(Cs) of
+        {incomplete,_,_} ->
+            throw({error,invalid_utf8,Cs});
+        {error,_,_} ->
+            throw({error,invalid_utf8,Cs});
+        _ -> Cs
+    end.
