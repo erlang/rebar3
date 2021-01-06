@@ -269,14 +269,22 @@ add_hooks(Opts, State) ->
             [{ct_hooks, [cth_readable_failonly, readable_shell_type(Other),
                          cth_retry] ++ FailFast} | Opts];
         {Other, {ct_hooks, Hooks}} ->
-            %% Make sure hooks are there once only.
+            %% Make sure hooks are there once only and add wanted hooks that are not defined yet
             ReadableHooks = [cth_readable_failonly, readable_shell_type(Other),
                              cth_retry] ++ FailFast,
-            AllReadableHooks = [cth_readable_failonly, cth_retry, cth_fail_fast,
-                                cth_readable_shell, cth_readable_compact_shell],
-            NewHooks =  (Hooks -- AllReadableHooks) ++ ReadableHooks,
+            NewHooks = Hooks ++ [ReadableHook ||
+                ReadableHook <- ReadableHooks,
+                not is_defined(ReadableHook, Hooks)
+            ],
             lists:keyreplace(ct_hooks, 1, Opts, {ct_hooks, NewHooks})
     end.
+
+is_defined(_Key, []) -> false;
+is_defined(Key, [Key | _Hs]) -> true;
+is_defined(Key, [{Key, _Opts} | _Hs]) -> true;
+is_defined(Key, [{Key, _Opts, _Prio} | _Hs]) -> true;
+is_defined(Key, [_ | Hs]) -> is_defined(Key, Hs).
+
 
 readable_shell_type(true) -> cth_readable_shell;
 readable_shell_type(compact) -> cth_readable_compact_shell.
