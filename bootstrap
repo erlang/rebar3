@@ -156,7 +156,7 @@ set_httpc_options(_, []) ->
     ok;
 
 set_httpc_options(Scheme, Proxy) ->
-    {ok, {_, UserInfo, Host, Port, _, _}} = http_uri:parse(Proxy),
+    #{userinfo := UserInfo, host := Host, port := Port} = rebar_uri:parse(Proxy),
     httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar),
     proxy_ipfamily(Host, inet:gethostbyname(Host)),
     set_proxy_auth(UserInfo).
@@ -213,7 +213,10 @@ compile_erl_file(File, Opts) ->
             ok;
         {ok, _Mod, Ws} ->
             io:format("~s~n", [format_warnings(File, Ws)]),
-            halt(1);
+            case lists:member(warnings_as_errors, Opts) of
+                true -> halt(1);
+                false -> ok
+            end;
         {error, Es, Ws} ->
             io:format("~s ~s~n", [format_errors(File, Es), format_warnings(File, Ws)]),
             halt(1)
@@ -721,7 +724,7 @@ set_proxy_auth(UserInfo) ->
     [Username, Password] = re:split(UserInfo, ":",
                                     [{return, list}, {parts,2}, unicode]),
     %% password may contain url encoded characters, need to decode them first
-    put(proxy_auth, [{proxy_auth, {Username, http_uri:decode(Password)}}]).
+    put(proxy_auth, [{proxy_auth, {Username, rebar_uri:percent_decode(Password)}}]).
 
 get_proxy_auth() ->
     case get(proxy_auth) of
