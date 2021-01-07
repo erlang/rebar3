@@ -310,7 +310,7 @@ collect_default_refcount(Dir) ->
                                                           [{use_stdout, false},
                                                            {cd, Dir},
                                                            {debug_abort_on_error, AbortMsg2}]),
-                        {ok, list_to_integer(string:trim(PatchLines))};
+                        {ok, list_to_integer(rebar_string:trim(PatchLines))};
                     _ ->
                         get_patch_count(Dir, Tag)
                 end,
@@ -339,7 +339,7 @@ get_patch_count(Dir, RawRef) ->
                                         [{use_stdout, false},
                                          {cd, Dir},
                                          {debug_abort_on_error, AbortMsg}]),
-    {ok, list_to_integer(string:trim(PatchLines))}.
+    {ok, list_to_integer(rebar_string:trim(PatchLines))}.
 
 
 parse_tags(Dir) ->
