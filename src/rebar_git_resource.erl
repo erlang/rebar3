@@ -306,11 +306,11 @@ collect_default_refcount(Dir) ->
                 case Tag of
                     undefined ->
                         AbortMsg2 = "Getting rev-list of git dependency failed in " ++ Dir,
-                        {ok, PatchLines} = rebar_utils:sh("git rev-list HEAD",
+                        {ok, PatchLines} = rebar_utils:sh("git rev-list --count HEAD",
                                                           [{use_stdout, false},
                                                            {cd, Dir},
                                                            {debug_abort_on_error, AbortMsg2}]),
-                        rebar_utils:line_count(PatchLines);
+                        {ok, list_to_integer(rebar_string:trim(PatchLines))};
                     _ ->
                         get_patch_count(Dir, Tag)
                 end,
@@ -333,13 +333,13 @@ build_vsn_string(Vsn, RawRef, Count) ->
 get_patch_count(Dir, RawRef) ->
     AbortMsg = "Getting rev-list of git dep failed in " ++ Dir,
     Ref = re:replace(RawRef, "\\s", "", [global, unicode]),
-    Cmd = io_lib:format("git rev-list ~ts..HEAD",
+    Cmd = io_lib:format("git rev-list --count ~ts..HEAD",
                         [rebar_utils:escape_chars(Ref)]),
     {ok, PatchLines} = rebar_utils:sh(Cmd,
                                         [{use_stdout, false},
                                          {cd, Dir},
                                          {debug_abort_on_error, AbortMsg}]),
-    rebar_utils:line_count(PatchLines).
+    {ok, list_to_integer(rebar_string:trim(PatchLines))}.
 
 
 parse_tags(Dir) ->
