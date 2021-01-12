@@ -21,12 +21,19 @@ jobs:
     container:
       image: erlang:${{ matrix.otp_version }}
 
+    env:
+      LATEST_OTP_RELEASE: 23
+
     steps:
     - uses: actions/checkout@v2
     - name: Compile
       run: ./bootstrap
     - name: CT tests
       run: ./rebar3 ct
+    - shell: bash
+      name: Dialyzer
+      run: |
+        [[ "${{ matrix.otp_version }}" != "${{ env.LATEST_OTP_RELEASE }}" ]] || (./rebar3 clean -a && ./rebar3 as dialyzer dialyzer)
 
   macos:
     name: Test on MacOS
