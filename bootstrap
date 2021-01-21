@@ -156,7 +156,7 @@ set_httpc_options(_, []) ->
     ok;
 
 set_httpc_options(Scheme, Proxy) ->
-    #{userinfo := UserInfo, host := Host, port := Port} = rebar_uri:parse(Proxy),
+    #{userinfo := UserInfo, host := Host, port := Port} = rebar_uri_parse(Proxy),
     httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar),
     proxy_ipfamily(Host, inet:gethostbyname(Host)),
     set_proxy_auth(UserInfo).
@@ -724,13 +724,14 @@ set_proxy_auth(UserInfo) ->
     [Username, Password] = re:split(UserInfo, ":",
                                     [{return, list}, {parts,2}, unicode]),
     %% password may contain url encoded characters, need to decode them first
-    put(proxy_auth, [{proxy_auth, {Username, rebar_uri:percent_decode(Password)}}]).
+    put(proxy_auth, [{proxy_auth, {Username, rebar_uri_percent_decode(Password)}}]).
 
 get_proxy_auth() ->
     case get(proxy_auth) of
         undefined -> [];
         ProxyAuth -> ProxyAuth
     end.
+
 
 %% string:join/2 copy; string:join/2 is getting obsoleted
 %% and replaced by lists:join/2, but lists:join/2 is too new
@@ -747,3 +748,97 @@ chr(S, C) when is_integer(C) -> chr(S, C, 1).
 chr([C|_Cs], C, I) -> I;
 chr([_|Cs], C, I) -> chr(Cs, C, I+1);
 chr([], _C, _I) -> 0.
+
+%% These two functions are ports of rebar_uri module calls that
+%% can't be called before the app is built; they're utility functions for
+%% forwards and backwards compat so we need them to be current.
+rebar_uri_parse(URIString) ->
+    try
+        %% we drop rebar_uri:apply_opts since it's a noop as called here
+        uri_string:parse(URIString)
+    catch
+        error:undef ->
+            %% Taken from rebar_uri and trimmed down.
+            case http_uri:parse(URIString, []) of
+                {error, Reason} ->
+                    {error, "", Reason};
+                {ok, {Scheme, UserInfo, Host, Port, Path, Query}} ->
+                    #{
+                        scheme => rebar_utils:to_list(Scheme),
+                        host => Host, port => Port, path => Path,
+                        query => case Query of
+                                [] -> "";
+                                _  -> string:substr(Query, 2)
+                                end,
+                        userinfo => UserInfo
+                    }
+            end
+    end.
+
+%% Taken from rebar_uri.erl
+rebar_uri_percent_decode(URIMap) when is_map(URIMap)->
+    Fun = fun (K,V) when K =:= userinfo; K =:= host; K =:= path;
+                         K =:= query; K =:= fragment ->
+                  case raw_decode(V) of
+                      {error, Reason, Input} ->
+                          throw({error, {invalid, {K, {Reason, Input}}}});
+                      Else ->
+                          Else
+                  end;
+              (_,V) ->
+                  V
+          end,
+    try maps:map(Fun, URIMap)
+    catch throw:Return ->
+            Return
+    end;
+rebar_uri_percent_decode(URI) when is_list(URI) orelse
+                         is_binary(URI) ->
+    raw_decode(URI).
+
+%% Taken from rebar_uri
+raw_decode(Cs) ->
+    raw_decode(Cs, <<>>).
+
+raw_decode(L, Acc) when is_list(L) ->
+    try
+        B0 = unicode:characters_to_binary(L),
+        B1 = raw_decode(B0, Acc),
+        unicode:characters_to_list(B1)
+    catch
+        throw:{error, Atom, RestData} ->
+            {error, Atom, RestData}
+    end;
+raw_decode(<<$%,C0,C1,Cs/binary>>, Acc) ->
+    case is_hex_digit(C0) andalso is_hex_digit(C1) of
+        true ->
+            B = hex2dec(C0)*16+hex2dec(C1),
+            raw_decode(Cs, <<Acc/binary, B>>);
+        false ->
+            throw({error,invalid_percent_encoding,<<$%,C0,C1>>})
+    end;
+raw_decode(<<C,Cs/binary>>, Acc) ->
+    raw_decode(Cs, <<Acc/binary, C>>);
+raw_decode(<<>>, Acc) ->
+    check_utf8(Acc).
+
+-spec is_hex_digit(char()) -> boolean().
+is_hex_digit(C)
+  when $0 =< C, C =< $9;$a =< C, C =< $f;$A =< C, C =< $F -> true;
+is_hex_digit(_) -> false.
+
+%% Returns Cs if it is utf8 encoded.
+check_utf8(Cs) ->
+    case unicode:characters_to_list(Cs) of
+        {incomplete,_,_} ->
+            throw({error,invalid_utf8,Cs});
+        {error,_,_} ->
+            throw({error,invalid_utf8,Cs});
+        _ -> Cs
+    end.
+
+hex2dec(X) ->
+    if ((X) >= $0) andalso ((X) =< $9) -> (X) - $0;
+       ((X) >= $A) andalso ((X) =< $F) -> (X) - $A + 10;
+       ((X) >= $a) andalso ((X) =< $f) -> (X) - $a + 10
+    end.
