@@ -753,9 +753,11 @@ chr([], _C, _I) -> 0.
 %% can't be called before the app is built; they're utility functions for
 %% forwards and backwards compat so we need them to be current.
 rebar_uri_parse(URIString) ->
-    try
-        %% we drop rebar_uri:apply_opts since it's a noop as called here
-        uri_string:parse(URIString)
+    %% we drop rebar_uri:apply_opts since it's a noop as called here
+    try uri_string:parse(URIString) of
+        Map = #{userinfo := _} -> Map;
+        Map when is_map(Map) -> Map#{userinfo => ""};
+        Res -> Res
     catch
         error:undef ->
             %% Taken from rebar_uri and trimmed down.
@@ -764,7 +766,7 @@ rebar_uri_parse(URIString) ->
                     {error, "", Reason};
                 {ok, {Scheme, UserInfo, Host, Port, Path, Query}} ->
                     #{
-                        scheme => rebar_utils:to_list(Scheme),
+                        scheme => atom_to_list(Scheme),
                         host => Host, port => Port, path => Path,
                         query => case Query of
                                 [] -> "";
