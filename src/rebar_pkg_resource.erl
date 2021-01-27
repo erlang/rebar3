@@ -218,7 +218,7 @@ cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoCon
             ?DEBUG("Version cached at ~ts is up to date, reusing it", [CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg);
         {ok, Body, NewETag} ->
-            ?DEBUG("Downloaded package, caching at ~ts", [CachePath]),
+            ?DEBUG("Downloaded package from repo ~ts, caching at ~ts", [CDN, CachePath]),
             maybe_store_etag_in_cache(UpdateETag, ETagPath, NewETag),
             serve_from_download(TmpDir, CachePath, Pkg, Body);
         error when ETag =/= <<>> ->
