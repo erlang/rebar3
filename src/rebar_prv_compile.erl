@@ -283,9 +283,15 @@ build_root_extras(State, Apps) ->
             ProjOpts = rebar_state:opts(State),
             Extras = rebar_dir:extra_src_dirs(ProjOpts, []),
             {ok, VirtApp} = rebar_app_info:new("extra", "0.0.0", BaseDir, []),
-            VirtApps = extra_virtual_apps(State, VirtApp, Extras),
-            %% re-use the project-apps digraph?
-            run_compilers(State, [], VirtApps, project_apps)
+
+            case extra_virtual_apps(State, VirtApp, Extras) of
+                %% If there are no virtual apps do nothing.
+                [] ->
+                    [];
+                VirtApps ->
+                    %% re-use the project-apps digraph?
+                    run_compilers(State, [], VirtApps, project_apps)
+            end
     end.
 
 extra_virtual_apps(_, _, []) ->
@@ -531,4 +537,3 @@ warn_on_problematic_directories(AllDirs) ->
 is_a_problem("eunit") -> true;
 is_a_problem("common_test") -> true;
 is_a_problem(_) -> false.
-
