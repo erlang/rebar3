@@ -243,7 +243,8 @@ parse_checksum(Checksum) ->
 
 update_package(Name, RepoConfig=#{name := Repo}, State) ->
     ?MODULE:verify_table(State),
-    try r3_hex_repo:get_package(get_package_repo_config(RepoConfig), Name) of
+    CDN = rebar_state:maybe_default_cdn(State),
+    try r3_hex_repo:get_package(get_package_repo_config(RepoConfig#{repo_url => CDN}), Name) of
         {ok, {200, _Headers, Releases}} ->
             _ = insert_releases(Name, Releases, Repo, ?PACKAGE_TABLE),
             {ok, RegistryDir} = rebar_packages:registry_dir(State),
