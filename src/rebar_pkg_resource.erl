@@ -213,12 +213,13 @@ store_etag_in_cache(Path, ETag) ->
 cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoConfig}, State, ETag,
                 ETagPath, UpdateETag) ->
     CDN = rebar_state:maybe_default_cdn(State),
+    ?DEBUG("Downloading package ~ts from repo ~ts", [Name, CDN]),
     case request(RepoConfig#{repo_url => CDN}, Name, Vsn, ETag) of
         {ok, cached} ->
             ?DEBUG("Version cached at ~ts is up to date, reusing it", [CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg);
         {ok, Body, NewETag} ->
-            ?DEBUG("Downloaded package from repo ~ts, caching at ~ts", [CDN, CachePath]),
+            ?DEBUG("Downloaded package ~ts, caching at ~ts", [Name, CachePath]),
             maybe_store_etag_in_cache(UpdateETag, ETagPath, NewETag),
             serve_from_download(TmpDir, CachePath, Pkg, Body);
         error when ETag =/= <<>> ->
