@@ -210,11 +210,11 @@ store_etag_in_cache(Path, ETag) ->
       UpdateETag :: boolean(),
       Res :: ok | {unexpected_hash, integer(), integer()} | {fetch_fail, binary(), binary()}
            | {bad_registry_checksum, integer(), integer()} | {error, _}.
-cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoConfig}, State, ETag,
+cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoConfig}, _State, ETag,
                 ETagPath, UpdateETag) ->
-    CDN = rebar_state:maybe_default_cdn(State),
-    ?DEBUG("Downloading package ~ts from repo ~ts", [Name, CDN]),
-    case request(RepoConfig#{repo_url => CDN}, Name, Vsn, ETag) of
+    RepoUrl = maps:get(repo_url, RepoConfig, undefined),
+    ?DEBUG("Downloading package ~ts from repo ~ts", [Name, RepoUrl]),
+    case request(RepoConfig, Name, Vsn, ETag) of
         {ok, cached} ->
             ?DEBUG("Version cached at ~ts is up to date, reusing it", [CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg);

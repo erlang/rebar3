@@ -134,6 +134,7 @@ run_aux(State, RawArgs) ->
     %% Maybe change the default hex CDN
     HexCDN = case os:getenv("HEX_CDN") of
                  false -> ?DEFAULT_CDN;
+                 [] -> ?DEFAULT_CDN;
                  CDN -> CDN
              end,
     State2 = rebar_state:set(State1, rebar_packages_cdn, HexCDN),

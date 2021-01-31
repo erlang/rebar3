@@ -243,9 +243,8 @@ parse_checksum(Checksum) ->
 
 update_package(Name, RepoConfig=#{name := Repo}, State) ->
     ?MODULE:verify_table(State),
-    CDN = rebar_state:maybe_default_cdn(State),
-    ?DEBUG("Getting package ~ts resource from repo ~ts", [Name, CDN]),
-    try r3_hex_repo:get_package(get_package_repo_config(RepoConfig#{repo_url => CDN}), Name) of
+    ?DEBUG("Getting package ~ts resource from repo ~ts", [Name, maps:get(repo_url, RepoConfig, undefined)]),
+    try r3_hex_repo:get_package(get_package_repo_config(RepoConfig), Name) of
         {ok, {200, _Headers, Releases}} ->
             _ = insert_releases(Name, Releases, Repo, ?PACKAGE_TABLE),
             {ok, RegistryDir} = rebar_packages:registry_dir(State),
