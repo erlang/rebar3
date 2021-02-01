@@ -237,41 +237,58 @@ propagate_stamps(G) ->
 
 
 %% @doc Return the reverse sorting order to get dep-free apps first.
-%% -- we would usually not need to consider the non-source files for the order to
-%% be complete, but using them doesn't hurt.
+
 compile_order(_, AppDefs) when length(AppDefs) =< 1 ->
     [Name || {Name, _Path} <- AppDefs];
 compile_order(G, AppDefs) ->
     %% Build a digraph for following topo-sort, and populate
     %%  FileToApp map as a side effect for caching
     AppDAG = digraph:new([acyclic]), % ignore cycles and hope it works
-    lists:foldl(
-        fun(E, FileToApp) ->
-            case digraph:edge(G, E) of
-                {_, _, _, artifact} ->
-                    %% skip artifacts, they don't affect compile order
-                    FileToApp;
-                {_, V1, V2, _} ->
-                    %% V1 depends on V2, and we know V1 is in our repo,
-                    %%  otherwise this edge would've never appeared
-                    {App, FTA1} = find_and_cache(V1, AppDefs, FileToApp),
-                    case find_and_cache(V2, AppDefs, FTA1) of
-                        {[], FTA2} ->
-                            %% dependency on a file outside of the repo
-                            FTA2;
-                        {App, FTA2} ->
+    OneDep =
+        fun(V1, V2, Cache) ->
+            %% First resolve the file we depend on so that we can shortcut resolution
+            %% If it is a file outside the repo.
+            case resolve_file_to_app(V2, AppDefs, Cache) of
+                {[], Cache1} ->
+                    %% dependency on a file outside of the repo
+                    Cache1;
+                {App, Cache1} ->
+                    case resolve_file_to_app(V1, AppDefs, Cache1) of
+                        {App, Cache2} ->
                             %% dependency within the same app
-                            FTA2;
-                        {AnotherApp, FTA2} ->
+                            Cache2;
+                        {AnotherApp, Cache2} when AnotherApp =/= [] ->
                             %% actual dependency
                             %% unfortunately digraph has non-functional API depending on side effects
                             digraph:add_vertex(AppDAG, App), %% ignore errors for duplicate inserts
                             digraph:add_vertex(AppDAG, AnotherApp),
-                            digraph:add_edge(AppDAG, App, AnotherApp),
-                            FTA2
+                            digraph:add_edge(AppDAG, AnotherApp, App),
+                            Cache2;
+                        {[], Cache2} ->
+                            %% A dependency from a file which is not part of the current set of apps we're
+                            %% considering. This can happen for example when not all of your apps have
+                            %% extra directories.
+                            Cache2
                     end
             end
-        end, #{}, digraph:edges(G)),
+        end,
+    lists:foldl(
+        fun(E, Cache) ->
+            case digraph:edge(G, E) of
+                {_, _, _, artifact} ->
+                    %% skip artifacts, they don't affect compile order
+                    Cache;
+                {_, V1, V2, _} ->
+                    case resolve_hrl_dependencies(V2, Cache, G) of
+                        {[], NewCache} ->
+                            NewCache;
+                        {ListOfDeps, NewCache} ->
+                            lists:foldl(fun(File, CurrentCache) -> OneDep(V1, File, CurrentCache) end,
+                                        NewCache,
+                                        ListOfDeps)
+                    end
+            end
+        end, new_cache(), digraph:edges(G)),
     Sorted = lists:reverse(digraph_utils:topsort(AppDAG)),
     digraph:delete(AppDAG),
     Standalone = [Name || {Name, _} <- AppDefs] -- Sorted,
@@ -439,24 +456,7 @@ propagate_stamps(G, [File|Files]) ->
     end,
     propagate_stamps(G, Files).
 
-find_and_cache(File, AppDefs, FileToApp) ->
-    case maps:find(File, FileToApp) of
-        error ->
-            App = find(File, AppDefs),
-            {App, FileToApp#{File => App}};
-        {ok, App} ->
-            {App, FileToApp}
-    end.
 
-find(_File, []) ->
-    [];
-find(File, [{App, Dir} | Tail]) ->
-    case lists:prefix(Dir, File) of
-        true ->
-            App;
-        false ->
-            find(File, Tail)
-    end.
 
 %% @private Return what should be the base name of an erl file, relocated to the
 %% target directory. For example:
@@ -484,3 +484,63 @@ is_dirty(G) ->
 %% vertices, clear the flag before serializing it.
 clear_dirty(G) ->
     digraph:del_vertex(G, '$r3_dirty_bit').
+
+%% Resolve all the dependencies of a .hrl file transitively. Use a cache to
+%% memoize the resolution.
+resolve_hrl_dependencies(Name, Cache, G) ->
+    case is_hrl_file(Name) of
+        false ->
+            {[Name], Cache};
+        true ->
+            case lookup_hrl(Name, Cache) of
+                {ok, Deps} -> {Deps, Cache};
+                error ->
+                    {Deps, NewCache} = resolve_full_hrl(Name, Cache, G),
+                    {Deps, add_hrl(Name, Deps, NewCache)}
+            end
+    end.
+
+is_hrl_file(Name) ->
+    filename:extension(Name) == ".hrl".
+
+resolve_full_hrl(Name, Cache, G) ->
+    lists:foldl(fun(Dep, {Found, C}) -> {Deps, C1} = resolve_hrl_dependencies(Dep, C, G), {Deps++Found, C1} end,
+                {[], Cache},
+                digraph:out_neighbours(G, Name)).
+
+%% Resolve a file name to an app. Use a cache to
+%% memoize the resolution.
+resolve_file_to_app(File, AppDefs, Cache) ->
+    case lookup_file(File, Cache) of
+        error ->
+            App = resolve_full_file_to_app(File, AppDefs),
+            {App, add_file(File, App, Cache)};
+        {ok, App} ->
+            {App, Cache}
+    end.
+
+resolve_full_file_to_app(_File, []) ->
+    [];
+resolve_full_file_to_app(File, [{App, Dir} | Tail]) ->
+    case lists:prefix(Dir, File) of
+        true ->
+            App;
+        false ->
+            resolve_full_file_to_app(File, Tail)
+    end.
+
+%% This cache remembers resolutions of .hrl file dependencies and file to app resolutions.
+new_cache() ->
+    {#{}, #{}}.
+
+add_file(File, App, {FileCache, HrlCache}) ->
+    {maps:put(File, App, FileCache), HrlCache}.
+
+add_hrl(Hrl, Deps, {FileCache, HrlCache}) ->
+    {FileCache, maps:put(Hrl, Deps, HrlCache)}.
+
+lookup_file(File, {FileCache, _}) ->
+    maps:find(File, FileCache).
+
+lookup_hrl(Hrl, {_, HrlCache}) ->
+    maps:find(Hrl, HrlCache).
