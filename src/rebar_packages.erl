@@ -243,7 +243,8 @@ parse_checksum(Checksum) ->
 
 update_package(Name, RepoConfig=#{name := Repo}, State) ->
     ?MODULE:verify_table(State),
-    ?DEBUG("Getting package ~ts resource from repo ~ts", [Name, maps:get(repo_url, RepoConfig, undefined)]),
+    ?DEBUG("Getting definition for package ~ts from repo ~ts via repo_url ~ts",
+           [Name, maps:get(name, RepoConfig, undefined), maps:get(repo_url, RepoConfig, undefined)]),
     try r3_hex_repo:get_package(get_package_repo_config(RepoConfig), Name) of
         {ok, {200, _Headers, Releases}} ->
             _ = insert_releases(Name, Releases, Repo, ?PACKAGE_TABLE),

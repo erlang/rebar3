@@ -212,8 +212,8 @@ store_etag_in_cache(Path, ETag) ->
            | {bad_registry_checksum, integer(), integer()} | {error, _}.
 cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoConfig}, _State, ETag,
                 ETagPath, UpdateETag) ->
-    RepoUrl = maps:get(repo_url, RepoConfig, undefined),
-    ?DEBUG("Downloading package ~ts from repo ~ts", [Name, RepoUrl]),
+    ?DEBUG("Making request to get package ~ts tarball from repo ~ts via repo_url ~ts",
+           [Name, maps:get(name, RepoConfig, undefined), maps:get(repo_url, RepoConfig, undefined)]),
     case request(RepoConfig, Name, Vsn, ETag) of
         {ok, cached} ->
             ?DEBUG("Version cached at ~ts is up to date, reusing it", [CachePath]),
