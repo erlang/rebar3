@@ -68,7 +68,7 @@ analyze_all({Compiler, G}, Apps) ->
     AppPaths = [{rebar_app_info:name(AppInfo),
                  rebar_utils:to_list(rebar_app_info:dir(AppInfo)) ++ [Sep]}
                 || AppInfo <- Apps],
-    AppNames = rebar_compiler_dag:compile_order(G, AppPaths),
+    AppNames = rebar_compiler_dag:compile_order(G, AppPaths, SrcExt, OutExt),
     {Contexts, sort_apps(AppNames, Apps)}.
 
 %% @doc same as analyze_all/2, but over extra_src_apps,

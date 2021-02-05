@@ -171,7 +171,7 @@ app_sort(Config) ->
     ?assertEqual([lists:nth(2, AppNames),
                   lists:nth(3, AppNames),
                   lists:nth(1, AppNames)],
-                 rebar_compiler_dag:compile_order(G, AppPaths)),
+                 rebar_compiler_dag:compile_order(G, AppPaths, ".erl", ".beam")),
     ok.
 
 propagate_include_app1a() ->
