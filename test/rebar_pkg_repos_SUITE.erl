@@ -378,16 +378,15 @@ organization_merging(_Config) ->
 
 use_first_repo_match(Config) ->
     State = ?config(state, Config),
-    Vsn1 = r3_verl:parse(<<"2.0.0">>),
-    ?assertMatch({ok,{package,{<<"B">>, Vsn1, Repo2},
+
+    ?assertMatch({ok,{package,{<<"B">>, {{2,0,0}, {[],[]}}, Repo2},
                       <<"inner checksum">>,<<"outer checksum">>, false, []},
                   #{name := Repo2,
                     http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"B">>, <<"> 1.4.0">>, undefined, undefined,
                                                 ?PACKAGE_TABLE, State)),
 
-    Vsn2 = r3_verl:parse(<<"1.4.0">>),
-    ?assertMatch({ok,{package,{<<"B">>, Vsn2, Repo3},
+    ?assertMatch({ok,{package,{<<"B">>, {{1,4,0}, {[],[]}}, Repo3},
                     <<"inner checksum">>,<<"outer checksum">>, false, []},
                   #{name := Repo3,
                     http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
@@ -397,8 +396,8 @@ use_first_repo_match(Config) ->
 %% tests that even though an easier repo has C-1.3.1 it doesn't use it since its hash is different
 use_exact_with_hash(Config) ->
     State = ?config(state, Config),
-    Vsn = r3_verl:parse(<<"1.3.1">>),
-    ?assertMatch({ok,{package,{<<"C">>, Vsn, Repo2},
+
+    ?assertMatch({ok,{package,{<<"C">>, {{1,3,1}, {[],[]}}, Repo2},
                       <<"inner checksum">>, <<"good outer checksum">>, false, []},
                   #{name := Repo2,
                     http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
@@ -407,8 +406,8 @@ use_exact_with_hash(Config) ->
 
 fail_repo_update(Config) ->
     State = ?config(state, Config),
-    Vsn = r3_verl:parse(<<"1.4.0">>),
-    ?assertMatch({ok,{package,{<<"B">>, Vsn, Repo3},
+
+    ?assertMatch({ok,{package,{<<"B">>, {{1,4,0}, {[],[]}}, Repo3},
                       <<"inner checksum">>,<<"outer checksum">>, false, []},
                   #{name := Repo3,
                     http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
@@ -418,8 +417,8 @@ fail_repo_update(Config) ->
 ignore_match_in_excluded_repo(Config) ->
     State = ?config(state, Config),
     Repos = ?config(repos, Config),
-    Vsn1 = r3_verl:parse(<<"1.4.6">>),
-    ?assertMatch({ok,{package,{<<"B">>, Vsn1, Hexpm},
+
+    ?assertMatch({ok,{package,{<<"B">>, {{1,4,6}, {[],[]}}, Hexpm},
                       <<"inner checksum">>,<<"outer checksum">>, #{reason := 'RETIRED_INVALID'}, []},
                   #{name := Hexpm,
                     http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
@@ -427,8 +426,7 @@ ignore_match_in_excluded_repo(Config) ->
                                                 ?PACKAGE_TABLE, State)),
 
     [_, Repo2 | _] = Repos,
-    Vsn2 = r3_verl:parse(<<"0.1.1">>),
-    ?assertMatch({ok,{package,{<<"A">>, Vsn2, Repo2},
+    ?assertMatch({ok,{package,{<<"A">>, {{0,1,1}, {[],[]}}, Repo2},
                       <<"inner checksum">>,  <<"good outer checksum">>, false, []},
                   #{name := Repo2,
                     http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
@@ -437,15 +435,15 @@ ignore_match_in_excluded_repo(Config) ->
 
 optional_prereleases(Config) ->
     State = ?config(state, Config),
-    Vsn1 = r3_verl:parse(<<"1.5.0">>),
-    ?assertMatch({ok,{package,{<<"B">>, Vsn1, Hexpm},
+
+    ?assertMatch({ok,{package,{<<"B">>, {{1,5,0}, {[],[]}}, Hexpm},
                      <<"inner checksum">>,<<"outer checksum">>, false, []},
                   #{name := Hexpm,
                     http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"B">>, <<"~> 1.5.0">>, undefined, undefined,
                                                 ?PACKAGE_TABLE, State)),
-    Vsn2 = r3_verl:parse(<<"1.5.6-rc.0">>),
-    ?assertMatch({ok,{package,{<<"B">>, Vsn2, Hexpm},
+
+    ?assertMatch({ok,{package,{<<"B">>, {{1,5,6}, {[<<"rc">>,0],[]}}, Hexpm},
                       <<"inner checksum">>,<<"outer checksum">>, true, []},
                   #{name := Hexpm,
                     http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
@@ -454,7 +452,7 @@ optional_prereleases(Config) ->
 
     %% allow prerelease through configuration
     State1 = rebar_state:set(State, deps_allow_prerelease, true),
-    ?assertMatch({ok,{package,{<<"B">>, Vsn2, Hexpm},
+    ?assertMatch({ok,{package,{<<"B">>, {{1,5,6}, {[<<"rc">>,0],[]}}, Hexpm},
                       <<"inner checksum">>,<<"outer checksum">>, true, []},
                   #{name := Hexpm,
                     http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
@@ -474,7 +472,7 @@ setup_deps_and_repos(Deps, Repos) ->
 insert_deps(Deps) ->
     lists:foreach(fun({Name, Version, Repo, Retired}) ->
                           ets:insert(?PACKAGE_TABLE, #package{key={rebar_utils:to_binary(Name),
-                                                                   r3_verl:parse(Version),
+                                                                   ec_semver:parse(Version),
                                                                    rebar_utils:to_binary(Repo)},
                                                               dependencies=[],
                                                               retired=Retired,
@@ -482,7 +480,7 @@ insert_deps(Deps) ->
                                                               outer_checksum = <<"outer checksum">>});
                      ({Name, Version, InnerChecksum, OuterChecksum, Repo, Retired}) ->
                           ets:insert(?PACKAGE_TABLE, #package{key={rebar_utils:to_binary(Name),
-                                                                   r3_verl:parse(Version),
+                                                                   ec_semver:parse(Version),
                                                                    rebar_utils:to_binary(Repo)},
                                                               dependencies=[],
                                                               retired=Retired,
