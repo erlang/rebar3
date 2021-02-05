@@ -296,6 +296,4 @@ maybe_store_etag_in_cache(true = _UpdateETag, Path, ETag) ->
 
 anon({pkg, PkgName, PkgVsn, OldHash, Hash, RepoConfig}) ->
     {pkg, PkgName, PkgVsn, OldHash, Hash,
-     rebar_hex_repos:anon_repo_config(RepoConfig)};
-anon(Package) ->
-    Package.
+     rebar_hex_repos:anon_repo_config(RepoConfig)}.

@@ -27,7 +27,9 @@
                   repo_key => binary(),
                   repo_public_key => binary(),
                   repo_verify => binary(),
-                  repo_verify_origin => binary()}.
+                  repo_verify_origin => binary(),
+                  mirror_of => _ % legacy field getting stripped
+                 }.
 
 from_state(BaseConfig, State) ->
     HexConfig = rebar_state:get(State, hex, []),
@@ -55,10 +57,11 @@ get_repo_config(RepoName, State) ->
 
 -spec anon_repo_config(repo()) ->
     #{api_url := _, name := _, repo_name => _, repo_organization => _,
-      repo_url := _, repo_verify => _, repo_verify_origin => _}.
+      repo_url := _, repo_verify => _, repo_verify_origin => _,
+      mirror_of => _}.
 anon_repo_config(Map) ->
     maps:with([name, repo_name, api_url, repo_url, repo_organization,
-               repo_verify, repo_verify_origin], Map).
+               mirror_of, repo_verify, repo_verify_origin], Map).
 
 -spec format_repo(repo()) -> unicode:chardata().
 format_repo(RepoConfig) ->
