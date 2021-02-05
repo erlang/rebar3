@@ -210,15 +210,16 @@ store_etag_in_cache(Path, ETag) ->
       UpdateETag :: boolean(),
       Res :: ok | {unexpected_hash, integer(), integer()} | {fetch_fail, binary(), binary()}
            | {bad_registry_checksum, integer(), integer()} | {error, _}.
-cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoConfig}, State, ETag,
+cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoConfig}, _State, ETag,
                 ETagPath, UpdateETag) ->
-    CDN = maybe_default_cdn(State),
-    case request(RepoConfig#{repo_url => CDN}, Name, Vsn, ETag) of
+    ?DEBUG("Making request to get package ~ts tarball from repo ~ts via repo_url ~ts",
+           [Name, maps:get(name, RepoConfig, undefined), maps:get(repo_url, RepoConfig, undefined)]),
+    case request(RepoConfig, Name, Vsn, ETag) of
         {ok, cached} ->
             ?DEBUG("Version cached at ~ts is up to date, reusing it", [CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg);
         {ok, Body, NewETag} ->
-            ?DEBUG("Downloaded package from repo ~ts, caching at ~ts", [CDN, CachePath]),
+            ?DEBUG("Downloaded package ~ts, caching at ~ts", [Name, CachePath]),
             maybe_store_etag_in_cache(UpdateETag, ETagPath, NewETag),
             serve_from_download(TmpDir, CachePath, Pkg, Body);
         error when ETag =/= <<>> ->
@@ -228,10 +229,6 @@ cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoCon
         error ->
             {fetch_fail, Name, Vsn}
     end.
-
-maybe_default_cdn(State) ->
-    CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
-    rebar_utils:to_binary(CDN).
 
 -spec serve_from_cache(TmpDir, CachePath, Pkg) -> Res when
       TmpDir :: file:name(),

@@ -34,7 +34,7 @@ from_state(BaseConfig, State) ->
     %% add base config entries that are specific to use by rebar3 and not overridable
     Repos1 = merge_with_base_and_auth(Repos, BaseConfig, Auth),
     %% merge organizations parent repo options into each oraganization repo
-    update_organizations(Repos1).
+    update_organizations(maybe_override_default_repo_url(Repos1, State)).
 
 -spec get_repo_config(unicode:unicode_binary(), rebar_state:t() | [repo()])
                      -> {ok, repo()} | error.
@@ -101,6 +101,15 @@ update_organizations(Repos) ->
                                                 filename:join("repos", rebar_utils:to_list(RepoName))),
                       %% still let the organization config override this constructed repo url
                       maps:merge(Parent#{repo_url => rebar_utils:to_binary(ParentRepoUrl)}, Repo);
+                 (Repo) ->
+                      Repo
+              end, Repos).
+
+maybe_override_default_repo_url(Repos, State) ->
+    lists:map(fun(Repo=#{repo_name := ?PUBLIC_HEX_REPO}) ->
+                      Repo#{repo_url => rebar_state:default_hex_repo_url_override(State)};
+                 (Repo=#{name := ?PUBLIC_HEX_REPO}) ->
+                      Repo#{repo_url => rebar_state:default_hex_repo_url_override(State)};
                  (Repo) ->
                       Repo
               end, Repos).

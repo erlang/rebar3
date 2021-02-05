@@ -35,6 +35,8 @@
          all_checkout_deps/1,
          namespace/1, namespace/2,
 
+         default_hex_repo_url_override/1,
+
          deps_names/1,
 
          to_list/1,
@@ -491,6 +493,11 @@ add_provider(State=#state_t{providers=Providers, allow_provider_overrides=false}
         false ->
             State#state_t{providers=[Provider | Providers]}
     end.
+
+-spec default_hex_repo_url_override(t()) -> binary().
+default_hex_repo_url_override(State) ->
+    CDN = rebar_state:get(State, rebar_packages_cdn, ?DEFAULT_CDN),
+    rebar_utils:to_binary(CDN).
 
 -dialyzer({no_match, create_logic_providers/2}). % we want to be permissive with providers:new/2
 create_logic_providers(ProviderModules, State0) ->
