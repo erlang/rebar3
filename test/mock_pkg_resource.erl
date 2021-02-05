@@ -174,7 +174,7 @@ to_index(AllDeps, Dict, Repos) ->
                              DVB <- [ec_cnv:to_binary(DV)]],
               Repo = rebar_test_utils:random_element(Repos),
 
-              ets:insert(?PACKAGE_TABLE, #package{key={N, r3_verl:parse(V), Repo},
+              ets:insert(?PACKAGE_TABLE, #package{key={N, ec_semver:parse(V), Repo},
                                                   dependencies=parse_deps(DepsList),
                                                   retired=false,
                                                   inner_checksum = <<"inner_checksum">>,
@@ -183,11 +183,11 @@ to_index(AllDeps, Dict, Repos) ->
 
     lists:foreach(fun({{Name, Vsn}, _}) ->
                           case lists:any(fun(R) ->
-                                                 ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(Name), r3_verl:parse(Vsn), R})
+                                                 ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(Name), ec_semver:parse(Vsn), R})
                                          end, Repos) of
                               false ->
                                   Repo = rebar_test_utils:random_element(Repos),
-                                  ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(Name), r3_verl:parse(Vsn), Repo},
+                                  ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(Name), ec_semver:parse(Vsn), Repo},
                                                                       dependencies=[],
                                                                       retired=false,
                                                                       inner_checksum = <<"inner_checksum">>,
