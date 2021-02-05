@@ -3,7 +3,7 @@
 -module(rebar_compiler_dag).
 -export([init/4, status/4, maybe_store/5, terminate/1]).
 -export([prune/5, populate_sources/5, populate_deps/3, propagate_stamps/1,
-         compile_order/2, store_artifact/4]).
+         compile_order/4, store_artifact/4]).
 
 -include("rebar.hrl").
 
@@ -237,45 +237,69 @@ propagate_stamps(G) ->
 
 
 %% @doc Return the reverse sorting order to get dep-free apps first.
-%% -- we would usually not need to consider the non-source files for the order to
-%% be complete, but using them doesn't hurt.
-compile_order(_, AppDefs) when length(AppDefs) =< 1 ->
+
+compile_order(_, AppDefs, _SrcExt, _ArtifactExt) when length(AppDefs) =< 1 ->
     [Name || {Name, _Path} <- AppDefs];
-compile_order(G, AppDefs) ->
+compile_order(G, AppDefs, SrcExt, ArtifactExt) ->
     %% Build a digraph for following topo-sort, and populate
     %%  FileToApp map as a side effect for caching
     AppDAG = digraph:new([acyclic]), % ignore cycles and hope it works
+    IsHeaderFile = 
+        fun(File) -> 
+            Ext = filename:extension(File),
+            (Ext =/= SrcExt) andalso (Ext =/= ArtifactExt)
+        end,
     lists:foldl(
-        fun(E, FileToApp) ->
+        fun(E, Cache) ->
             case digraph:edge(G, E) of
                 {_, _, _, artifact} ->
                     %% skip artifacts, they don't affect compile order
-                    FileToApp;
+                    Cache;
                 {_, V1, V2, _} ->
-                    %% V1 depends on V2, and we know V1 is in our repo,
-                    %%  otherwise this edge would've never appeared
-                    {App, FTA1} = find_and_cache(V1, AppDefs, FileToApp),
-                    case find_and_cache(V2, AppDefs, FTA1) of
-                        {[], FTA2} ->
-                            %% dependency on a file outside of the repo
-                            FTA2;
-                        {App, FTA2} ->
-                            %% dependency within the same app
-                            FTA2;
-                        {AnotherApp, FTA2} ->
-                            %% actual dependency
-                            %% unfortunately digraph has non-functional API depending on side effects
-                            digraph:add_vertex(AppDAG, App), %% ignore errors for duplicate inserts
-                            digraph:add_vertex(AppDAG, AnotherApp),
-                            digraph:add_edge(AppDAG, App, AnotherApp),
-                            FTA2
+                    case resolve_header_dependencies(V2, IsHeaderFile, Cache, G) of
+                        {[], NewCache} ->
+                            NewCache;
+                        {ListOfDeps, NewCache} ->
+                            lists:foldl(
+                                fun(File, CurrentCache) -> 
+                                    add_one_dependency_to_digraph(V1, File, CurrentCache, AppDefs, AppDAG)
+                                end,
+                                NewCache,
+                                ListOfDeps)
                     end
             end
-        end, #{}, digraph:edges(G)),
+        end, new_cache(), digraph:edges(G)),
     Sorted = lists:reverse(digraph_utils:topsort(AppDAG)),
     digraph:delete(AppDAG),
     Standalone = [Name || {Name, _} <- AppDefs] -- Sorted,
     Standalone ++ Sorted.
+
+add_one_dependency_to_digraph(V1, V2, Cache, AppDefs, AppDAG) ->
+    %% First resolve the file we depend on so that we can shortcut resolution
+    %% If it is a file outside the repo.
+    case resolve_file_to_app(V2, AppDefs, Cache) of
+        {undefined, Cache1} ->
+            %% dependency on a file outside of the repo
+            Cache1;
+        {{ok, App}, Cache1} ->
+            case resolve_file_to_app(V1, AppDefs, Cache1) of
+                {{ok, App}, Cache2} ->
+                    %% dependency within the same app
+                    Cache2;
+                {undefined, Cache2} ->
+                    %% A dependency from a file which is not part of the current set of apps we're
+                    %% considering. This can happen for example when not all of your apps have
+                    %% extra directories.
+                    Cache2;
+                {{ok, AnotherApp}, Cache2} ->
+                    %% actual dependency
+                    %% unfortunately digraph has non-functional API depending on side effects
+                    digraph:add_vertex(AppDAG, App), %% ignore errors for duplicate inserts
+                    digraph:add_vertex(AppDAG, AnotherApp),
+                    digraph:add_edge(AppDAG, AnotherApp, App),
+                    Cache2
+            end
+    end.
 
 -dialyzer({no_opaque, maybe_store/5}). % optimized digraph usage breaks opacity
 %% @doc Store the DAG on disk if it was dirty
@@ -439,24 +463,7 @@ propagate_stamps(G, [File|Files]) ->
     end,
     propagate_stamps(G, Files).
 
-find_and_cache(File, AppDefs, FileToApp) ->
-    case maps:find(File, FileToApp) of
-        error ->
-            App = find(File, AppDefs),
-            {App, FileToApp#{File => App}};
-        {ok, App} ->
-            {App, FileToApp}
-    end.
 
-find(_File, []) ->
-    [];
-find(File, [{App, Dir} | Tail]) ->
-    case lists:prefix(Dir, File) of
-        true ->
-            App;
-        false ->
-            find(File, Tail)
-    end.
 
 %% @private Return what should be the base name of an erl file, relocated to the
 %% target directory. For example:
@@ -484,3 +491,63 @@ is_dirty(G) ->
 %% vertices, clear the flag before serializing it.
 clear_dirty(G) ->
     digraph:del_vertex(G, '$r3_dirty_bit').
+
+%% Resolve all the dependencies of a header file transitively. Use a cache to
+%% memoize the resolution.
+resolve_header_dependencies(Name, IsHeaderFile, Cache, G) ->
+    case IsHeaderFile(Name) of
+        false ->
+            {[Name], Cache};
+        true ->
+            case lookup_header(Name, Cache) of
+                {ok, Deps} -> {Deps, Cache};
+                error ->
+                    {Deps, NewCache} = resolve_full_header_file(Name, IsHeaderFile, Cache, G),
+                    {Deps, add_header(Name, Deps, NewCache)}
+            end
+    end.
+
+resolve_full_header_file(Name, IsHeaderFile, Cache, G) ->
+    lists:foldl(fun(Dep, {Found, C}) -> 
+                    {Deps, C1} = resolve_header_dependencies(Dep, IsHeaderFile, C, G), 
+                    {Deps++Found, C1}
+                end,
+                {[], Cache},
+                digraph:out_neighbours(G, Name)).
+
+%% Resolve a file name to an app. Use a cache to
+%% memoize the resolution.
+resolve_file_to_app(File, AppDefs, Cache) ->
+    case lookup_file(File, Cache) of
+        error ->
+            App = resolve_full_file_to_app(File, AppDefs),
+            {App, add_file(File, App, Cache)};
+        {ok, App} ->
+            {App, Cache}
+    end.
+
+resolve_full_file_to_app(_File, []) ->
+    undefined;
+resolve_full_file_to_app(File, [{App, Dir} | Tail]) ->
+    case lists:prefix(Dir, File) of
+        true ->
+            {ok, App};
+        false ->
+            resolve_full_file_to_app(File, Tail)
+    end.
+
+%% This cache remembers resolutions of .hrl file dependencies and file to app resolutions.
+new_cache() ->
+    {#{}, #{}}.
+
+add_file(File, App, {FileCache, HeaderCache}) ->
+    {maps:put(File, App, FileCache), HeaderCache}.
+
+add_header(Header, Deps, {FileCache, HeaderCache}) ->
+    {FileCache, maps:put(Header, Deps, HeaderCache)}.
+
+lookup_file(File, {FileCache, _}) ->
+    maps:find(File, FileCache).
+
+lookup_header(Hrl, {_, HeaderCache}) ->
+    maps:find(Hrl, HeaderCache).

@@ -110,6 +110,9 @@ project() ->
          "-export([parse_transform/2]).\n"
          "parse_transform(Forms, _Opts) -> Forms.\n"},
         {"src/app3_resolve.hrl",
+         "-behaviour(app2).\n"
+         "-export([cb/0]).\n"
+         "cb() -> {}.\n"
          "%% this file should be found"}
      ]}
     ].
@@ -168,7 +171,7 @@ app_sort(Config) ->
     ?assertEqual([lists:nth(2, AppNames),
                   lists:nth(3, AppNames),
                   lists:nth(1, AppNames)],
-                 rebar_compiler_dag:compile_order(G, AppPaths)),
+                 rebar_compiler_dag:compile_order(G, AppPaths, ".erl", ".beam")),
     ok.
 
 propagate_include_app1a() ->
@@ -273,7 +276,7 @@ propagate_behaviour(Config) ->
         {"/include/app1_b.hrl", S3},
         {"/src/app2.erl", S5},
         {"/include/app2.hrl", S4},
-        {"/src/app3.erl", S4},
+        {"/src/app3.erl", S5},
         {"/src/app3_resolve.hrl", S1}
     ],
     matches(Matches, FileStamps),
@@ -300,7 +303,7 @@ propagate_app1_ptrans(Config) ->
         {"/include/app1_b.hrl", S3},
         {"/src/app2.erl", S5},
         {"/include/app2.hrl", S4},
-        {"/src/app3.erl", S4},
+        {"/src/app3.erl", S5},
         {"/src/app3_resolve.hrl", S1}
     ],
     matches(Matches, FileStamps),
@@ -463,4 +466,3 @@ next_second() ->
     Ms = (trunc(Now / 1000)*1000 + 1000) - Now,
     %% add a 50ms for jitter since the exact amount sometimes causes failures
     timer:sleep(max(Ms+50, 1000)).
-
