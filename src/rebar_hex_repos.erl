@@ -5,7 +5,10 @@
          auth_config/1,
          remove_from_auth_config/2,
          update_auth_config/2,
-         format_error/1]).
+         format_error/1,
+         anon_repo_config/1,
+         format_repo/1
+        ]).
 
 -ifdef(TEST).
 %% exported for test purposes
@@ -24,7 +27,9 @@
                   repo_key => binary(),
                   repo_public_key => binary(),
                   repo_verify => binary(),
-                  repo_verify_origin => binary()}.
+                  repo_verify_origin => binary(),
+                  mirror_of => _ % legacy field getting stripped
+                 }.
 
 from_state(BaseConfig, State) ->
     HexConfig = rebar_state:get(State, hex, []),
@@ -49,6 +54,26 @@ get_repo_config(RepoName, State) ->
     Resources = rebar_state:resources(State),
     #{repos := Repos} = rebar_resource_v2:find_resource_state(pkg, Resources),
     get_repo_config(RepoName, Repos).
+
+-spec anon_repo_config(repo()) ->
+    #{api_url := _, name := _, repo_name => _, repo_organization => _,
+      repo_url := _, repo_verify => _, repo_verify_origin => _,
+      mirror_of => _}.
+anon_repo_config(Map) ->
+    maps:with([name, repo_name, api_url, repo_url, repo_organization,
+               mirror_of, repo_verify, repo_verify_origin], Map).
+
+-spec format_repo(repo()) -> unicode:chardata().
+format_repo(RepoConfig) ->
+    Name = maps:get(name, RepoConfig, undefined),
+    case get({?MODULE, format_repo, Name}) of
+        undefined ->
+            put({?MODULE, format_repo, Name}, true),
+            Anon = anon_repo_config(RepoConfig),
+            io_lib:format("~ts (~p)", [Name, Anon]);
+        true ->
+            io_lib:format("~ts", [Name])
+    end.
 
 merge_with_base_and_auth(Repos, BaseConfig, Auth) ->
     [maps:merge(maps:merge(Repo, BaseConfig),

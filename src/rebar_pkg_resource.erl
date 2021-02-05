@@ -212,8 +212,8 @@ store_etag_in_cache(Path, ETag) ->
            | {bad_registry_checksum, integer(), integer()} | {error, _}.
 cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoConfig}, _State, ETag,
                 ETagPath, UpdateETag) ->
-    ?DEBUG("Making request to get package ~ts tarball from repo ~ts via repo_url ~ts",
-           [Name, maps:get(name, RepoConfig, undefined), maps:get(repo_url, RepoConfig, undefined)]),
+    ?DEBUG("Making request to get package ~ts from repo ~ts",
+           [Name, rebar_hex_repos:format_repo(RepoConfig)]),
     case request(RepoConfig, Name, Vsn, ETag) of
         {ok, cached} ->
             ?DEBUG("Version cached at ~ts is up to date, reusing it", [CachePath]),
@@ -280,7 +280,7 @@ maybe_old_registry_checksum(Hash) -> list_to_integer(binary_to_list(Hash), 16).
       Binary :: binary(),
       Res :: ok | {error,_}.
 serve_from_download(TmpDir, CachePath, Package, Binary) ->
-    ?DEBUG("Writing ~p to cache at ~ts", [Package, CachePath]),
+    ?DEBUG("Writing ~p to cache at ~ts", [catch anon(Package), CachePath]),
     file:write_file(CachePath, Binary),
     serve_from_memory(TmpDir, Binary, Package).
 
@@ -293,3 +293,7 @@ maybe_store_etag_in_cache(false = _UpdateETag, _Path, _ETag) ->
     ok;
 maybe_store_etag_in_cache(true = _UpdateETag, Path, ETag) ->
     store_etag_in_cache(Path, ETag).
+
+anon({pkg, PkgName, PkgVsn, OldHash, Hash, RepoConfig}) ->
+    {pkg, PkgName, PkgVsn, OldHash, Hash,
+     rebar_hex_repos:anon_repo_config(RepoConfig)}.
