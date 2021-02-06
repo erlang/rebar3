@@ -43,11 +43,11 @@ format_warning_(_Opts, Warning = {_Tag, {"" = _SrcFile0, 0 = Line}, Msg}, {_Last
     end;
 
 %% we skip the file header
-format_warning_(_Opts, Warning = {_Tag, {File, LineOrLineCol}, Msg}, {File, Acc}) ->
+format_warning_(_Opts, Warning = {_Tag, {File, Line}, Msg}, {File, Acc}) ->
     try
         String = message_to_string(Msg),
-        Line = line_from_line_col(LineOrLineCol),
-        {File, [lists:flatten(fmt("~!c~ts~!!: ~ts", [Line, String])) | Acc]}
+        {Fmt, Args} = file_location_warning(no_file, Line, String),
+        {File, [lists:flatten(fmt(Fmt, Args)) | Acc]}
     catch
         Error:Reason ->
             ?DEBUG("Failed to pretty format warning: ~p:~p",
@@ -56,7 +56,7 @@ format_warning_(_Opts, Warning = {_Tag, {File, LineOrLineCol}, Msg}, {File, Acc}
     end;
 
 %% With a new file detencted we also write a file header.
-format_warning_(Opts, Warning = {_Tag, {SrcFile, LineOrLineCol}, Msg}, {_LastFile, Acc}) ->
+format_warning_(Opts, Warning = {_Tag, {SrcFile, Line}, Msg}, {_LastFile, Acc}) ->
     try
         File = rebar_dir:format_source_file_name(SrcFile, Opts),
         Base = filename:basename(File),
@@ -67,8 +67,8 @@ format_warning_(Opts, Warning = {_Tag, {SrcFile, LineOrLineCol}, Msg}, {_LastFil
         Base1 = fmt("~!_c~ts~!!~!__~ts", [Root, Ext]),
         F = fmt("~!__~ts", [filename:join(Path, Base1)]),
         String = message_to_string(Msg),
-        Line = line_from_line_col(LineOrLineCol),
-        {SrcFile, [lists:flatten(fmt("~n~ts~n~!c~ts~!!: ~ts", [F, Line, String])) | Acc]}
+        {Fmt, Args} = file_location_warning(F, Line, String),
+        {SrcFile, [lists:flatten(fmt(Fmt, Args)) | Acc]}
     catch
         ?WITH_STACKTRACE(Error, Reason, Stacktrace)
             ?DEBUG("Failed to pretty format warning: ~p:~p~n~p",
@@ -81,10 +81,14 @@ fmt(Fmt) ->
 fmt(Fmt, Args) ->
     cf:format(Fmt, Args).
 
-line_from_line_col({Line, Col}) ->
-    io_lib:format("~w (at column ~w)", [Line, Col]);
-line_from_line_col(Line) ->
-    io_lib:format("~w", [Line]).
+file_location_warning(no_file, {Line, Col}, String) ->
+    {"Line ~!c~w~!! Column ~!c~w~!!: ~ts", [Line, Col, String]};
+file_location_warning(F, {Line, Col}, String) ->
+    {"~n~ts~nLine ~!c~w~!! Column ~!c~w~!!: ~ts", [F, Line, Col, String]};
+file_location_warning(no_file, Line, String) ->
+    {"Line ~!c~w~!!: ~ts", [Line, String]};
+file_location_warning(F, Line, String) ->
+    {"~n~ts~nLine ~!c~w~!!: ~ts", [F, Line, String]}.
 
 %%-----------------------------------------------------------------------------
 %% Message classification and pretty-printing below. Messages appear in
