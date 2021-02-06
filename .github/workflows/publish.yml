@@ -8,12 +8,12 @@ on:
 jobs:
   build:
     name: Create release and publish escript for every new tag
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
 
     steps:
     - uses: actions/checkout@v2
 
-    - uses: bajankristof/setup-erlang@master
+    - uses: gleam-lang/setup-erlang@master
       with:
         otp-version: 19.3.6.13
     - name: Compile
