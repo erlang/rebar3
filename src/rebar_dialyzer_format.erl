@@ -28,7 +28,7 @@ format_warnings(Opts, Warnings) ->
 
 %% If the last seen file is and the file of this warning are the same
 
-%% `dialyzer_cl` returns _Filename = "", _Line = 0 for `unknown`
+%% `dialyzer_cl` returns _Filename = "", _Line = 0 for `unknown` (prior to OTP 24)
 format_warning_(_Opts, Warning = {_Tag, {"" = _SrcFile0, 0 = Line}, Msg}, {_LastFile, Acc}) ->
     SrcFile = "<path unknown>",
     try
@@ -46,7 +46,8 @@ format_warning_(_Opts, Warning = {_Tag, {"" = _SrcFile0, 0 = Line}, Msg}, {_Last
 format_warning_(_Opts, Warning = {_Tag, {File, Line}, Msg}, {File, Acc}) ->
     try
         String = message_to_string(Msg),
-        {File, [lists:flatten(fmt("~!c~4w~!!: ~ts", [Line, String])) | Acc]}
+        {Fmt, Args} = file_location_warning(no_file, Line, String),
+        {File, [lists:flatten(fmt(Fmt, Args)) | Acc]}
     catch
         Error:Reason ->
             ?DEBUG("Failed to pretty format warning: ~p:~p",
@@ -66,7 +67,8 @@ format_warning_(Opts, Warning = {_Tag, {SrcFile, Line}, Msg}, {_LastFile, Acc}) 
         Base1 = fmt("~!_c~ts~!!~!__~ts", [Root, Ext]),
         F = fmt("~!__~ts", [filename:join(Path, Base1)]),
         String = message_to_string(Msg),
-        {SrcFile, [lists:flatten(fmt("~n~ts~n~!c~4w~!!: ~ts", [F, Line, String])) | Acc]}
+        {Fmt, Args} = file_location_warning(F, Line, String),
+        {SrcFile, [lists:flatten(fmt(Fmt, Args)) | Acc]}
     catch
         ?WITH_STACKTRACE(Error, Reason, Stacktrace)
             ?DEBUG("Failed to pretty format warning: ~p:~p~n~p",
@@ -78,6 +80,15 @@ fmt(Fmt) ->
     cf:format(Fmt, []).
 fmt(Fmt, Args) ->
     cf:format(Fmt, Args).
+
+file_location_warning(no_file, {Line, Col}, String) ->
+    {"Line ~!c~w~!! Column ~!c~w~!!: ~ts", [Line, Col, String]};
+file_location_warning(F, {Line, Col}, String) ->
+    {"~n~ts~nLine ~!c~w~!! Column ~!c~w~!!: ~ts", [F, Line, Col, String]};
+file_location_warning(no_file, Line, String) ->
+    {"Line ~!c~w~!!: ~ts", [Line, String]};
+file_location_warning(F, Line, String) ->
+    {"~n~ts~nLine ~!c~w~!!: ~ts", [F, Line, String]}.
 
 %%-----------------------------------------------------------------------------
 %% Message classification and pretty-printing below. Messages appear in
