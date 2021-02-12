@@ -180,9 +180,6 @@ get_behaviour_callbacks(exports_not_used, Attributes) ->
 get_behaviour_callbacks(_XrefCheck, _Attributes) ->
     [].
 
-parse_xref_result({_, MFAt}) -> MFAt;
-parse_xref_result(MFAt) -> MFAt.
-
 filter_xref_results(XrefCheck, XrefIgnores, XrefResults) ->
     SearchModules = lists:usort(
                       lists:map(
@@ -194,10 +191,16 @@ filter_xref_results(XrefCheck, XrefIgnores, XrefResults) ->
     Ignores = XrefIgnores ++ lists:flatmap(fun(Module) ->
                                     get_xref_ignorelist(Module, XrefCheck)
                             end, SearchModules),
+    lists:filter( fun(Result) -> pred_xref_result(Result, Ignores) end, XrefResults).
 
-    [Result || Result <- XrefResults,
-               not lists:member(element(1, Result), Ignores)
-               andalso not lists:member(parse_xref_result(Result), Ignores)].
+pred_xref_result({Src, Dest}, Ignores) -> pred_xref_result1(Src, Ignores)
+    andalso pred_xref_result1(Dest, Ignores);
+pred_xref_result(Vertex, Ignores) -> pred_xref_result1(Vertex, Ignores).
+
+pred_xref_result1(Vertex, Ignores) ->
+    Mod = case Vertex of {Module, _Func, _Arity} -> Module;
+             _ -> Vertex end,
+    not lists:member(Vertex, Ignores) andalso not lists:member(Mod, Ignores).
 
 display_results(XrefResults, QueryResults) ->
     [lists:map(fun display_xref_results_for_type/1, XrefResults),
