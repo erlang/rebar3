@@ -1742,7 +1742,8 @@ override_del_deps(Config) ->
                                                                      {"dep_b", "0.0.1", []},
                                                                      {"dep_c", "0.0.1", []}]},
                                               {"other_dep", "0.0.1", [{"dep_c", "0.0.1", []},
-                                                                      {"dep_d", "0.0.1", []}]}]),
+                                                                      {"dep_d", "0.0.1", []},
+                                                                      {"dep_e", "0.0.1", []}]}]),
     TopDeps = rebar_test_utils:top_level_deps(Deps),
 
     DepA = {dep_a, "0.0.1", {git, "https://example.org/user/dep_a.git", {tag, "0.0.1"}}},
@@ -1759,7 +1760,7 @@ override_del_deps(Config) ->
                 {deps, [DepA, DepB]}
             ]},
             {del, [
-                {deps, [DepC]}
+                {deps, [DepC, dep_e]}
             ]}
         ]}
     ],
@@ -1771,6 +1772,7 @@ override_del_deps(Config) ->
               {dep_not_exist, "dep_a"},
               {dep_not_exist, "dep_b"},
               {dep_not_exist, "dep_c"},
+              {dep_not_exist, "dep_e"},
               {dep, "dep_d"}]}
     ).
 
