@@ -270,6 +270,7 @@ effects_code_generation(Option) ->
         verbose -> false;
         {cwd,_} -> false;
         {outdir, _} -> false;
+        no_spawn_compiler_process -> false;
         _ -> true
     end.
 
