@@ -129,7 +129,7 @@ dependencies(Source, _SourceDir, Dirs, DepOpts) ->
     end.
 
 compile(Source, [{_, OutDir}], Config, ErlOpts) ->
-    case compile:file(Source, [{outdir, OutDir} | ErlOpts]) of
+    case compile:file(Source, [{outdir, OutDir}, no_spawn_compiler_process | ErlOpts]) of
         {ok, _Mod} ->
             ok;
         {ok, _Mod, []} ->
@@ -145,7 +145,7 @@ compile(Source, [{_, OutDir}], Config, ErlOpts) ->
 
 compile_and_track(Source, [{Ext, OutDir}], Config, ErlOpts) ->
     rebar_compiler_epp:flush(),
-    BuildOpts = [{outdir, OutDir} | ErlOpts],
+    BuildOpts = [{outdir, OutDir}, no_spawn_compiler_process | ErlOpts],
     Target = target_base(OutDir, Source) ++ Ext,
     {ok, CompileVsn} = application:get_key(compiler, vsn),
     AllOpts = case erlang:function_exported(compile, env_compiler_options, 0) of
@@ -270,6 +270,7 @@ effects_code_generation(Option) ->
         verbose -> false;
         {cwd,_} -> false;
         {outdir, _} -> false;
+        no_spawn_compiler_process -> false;
         _ -> true
     end.
 
