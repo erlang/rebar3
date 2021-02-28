@@ -301,6 +301,7 @@ find_function_source_in_abstract_code(F, A, AbstractCode) ->
                safe_element(3, E) == F,
                safe_element(4, E) == A],
     case Fn of
+        [{function, {Line, _Column}, F, _, _}] -> {Source, Line};
         [{function, Line, F, _, _}] -> {Source, Line};
         %% do not crash if functions are exported, even though they
         %% are not in the source.
