@@ -78,7 +78,7 @@ diff_alias(Config) ->
         Config, RebarConfig, ["lock"],
         {ok, [{lock, "fakelib"},{dep, "fakelib"}]}
     ),
-    {ok, [{_Vsn, LockData}|_]} = file:consult(Lockfile),
+    {ok, [{Vsn, LockData}|_]} = file:consult(Lockfile),
     ?assert(lists:any(fun({<<"fakelib">>,{pkg,<<"goodpkg">>,_},_}) -> true
                       ;  (_) -> false end, LockData)),
     %% An second run yields the same
@@ -86,13 +86,13 @@ diff_alias(Config) ->
         Config, RebarConfig, ["lock"],
         {ok, [{lock, "fakelib"},{dep, "fakelib"}]}
     ),
-    {ok, [{_Vsn, LockData}|_]} = file:consult(Lockfile),
+    {ok, [{Vsn, LockData}|_]} = file:consult(Lockfile),
     %% So does an upgrade
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["upgrade"],
         {ok, [{lock, "fakelib"},{dep, "fakelib"}]}
     ),
-    {ok, [{_Vsn, LockData}|_]} = file:consult(Lockfile).
+    {ok, [{Vsn, LockData}|_]} = file:consult(Lockfile).
 
 diff_alias_vsn(Config) -> diff_alias(Config).
 
@@ -123,7 +123,7 @@ transitive_alias(Config) ->
         {ok, [{lock, "topdep"},{dep, "topdep"},
               {lock,"transitive_app"},{dep,"transitive_app"}]}
     ),
-    {ok, [{_Vsn, LockData}|_]} = file:consult(Lockfile),
+    {ok, [{Vsn, LockData}|_]} = file:consult(Lockfile),
     ?assert(filelib:is_dir(AliasedName)),
     ?assertNot(filelib:is_dir(PkgName)),
     %% So does an upgrade
@@ -132,7 +132,7 @@ transitive_alias(Config) ->
         {ok, [{lock, "topdep"},{dep, "topdep"},
               {lock,"transitive_app"},{dep,"transitive_app"}]}
     ),
-    {ok, [{_Vsn, LockData}|_]} = file:consult(Lockfile),
+    {ok, [{Vsn, LockData}|_]} = file:consult(Lockfile),
     ?assert(filelib:is_dir(AliasedName)),
     ?assertNot(filelib:is_dir(PkgName)),
     ok.
