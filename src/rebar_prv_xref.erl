@@ -301,7 +301,7 @@ find_function_source_in_abstract_code(F, A, AbstractCode) ->
                safe_element(3, E) == F,
                safe_element(4, E) == A],
     case Fn of
-        [{function, Line, F, _, _}] -> {Source, Line};
+        [{function, Anno, F, _, _}] -> {Source, erl_anno:line(Anno)};
         %% do not crash if functions are exported, even though they
         %% are not in the source.
         %% parameterized modules add new/1 and instance/1 for example.
