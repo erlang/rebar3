@@ -1053,7 +1053,7 @@ ssl_opts(ssl_verify_enabled, Url) ->
             #{host := Hostname} = rebar_uri:parse(rebar_utils:to_list(Url)),
             VerifyFun = {fun ssl_verify_hostname:verify_fun/3,
                          [{check_hostname, Hostname}]},
-            CACerts = certifi:cacerts(),
+            CACerts = r3_certifi:cacerts(),
             [{verify, verify_peer}, {depth, 2}, {cacerts, CACerts},
              {partial_chain, fun partial_chain/1}, {verify_fun, VerifyFun}];
         false ->
@@ -1067,7 +1067,7 @@ ssl_opts(ssl_verify_enabled, Url) ->
       Res :: unknown_ca | {trusted_ca, any()}.
 partial_chain(Certs) ->
     Certs1 = [{Cert, public_key:pkix_decode_cert(Cert, otp)} || Cert <- Certs],
-    CACerts = certifi:cacerts(),
+    CACerts = r3_certifi:cacerts(),
     CACerts1 = [public_key:pkix_decode_cert(Cert, otp) || Cert <- CACerts],
     case ec_lists:find(fun({_, Cert}) ->
                                check_cert(CACerts1, Cert)

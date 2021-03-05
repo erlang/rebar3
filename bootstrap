@@ -29,7 +29,6 @@ main(_) ->
     filelib:ensure_dir("_build/bootstrap/lib/rebar/ebin/"),
 
     os:putenv("REBAR_PROFILE", "bootstrap"),
-    compile_vendored(),
 
     %% Fetch and build deps required to build rebar3
     BaseDeps = [{providers, []}
@@ -37,10 +36,11 @@ main(_) ->
                ,{cf, []}
                ,{erlware_commons, ["ec_dictionary.erl", "ec_vsn.erl"]}
                ,{parse_trans, ["parse_trans.erl", "parse_trans_pp.erl",
-                               "parse_trans_codegen.erl"]}
-               ,{certifi, []}],
+                               "parse_trans_codegen.erl", "ct_expand.erl"]}],
     Deps = get_deps(),
     [fetch_and_compile(Dep, Deps) || Dep <- BaseDeps],
+
+    compile_vendored(),
 
     %% Build rebar3 modules with compile:file
     bootstrap_rebar3(),
@@ -228,6 +228,10 @@ bootstrap_rebar3() ->
     Res = symlink_or_copy(filename:absname("src"),
                           filename:absname("_build/default/lib/rebar/src")),
     true = Res == ok orelse Res == exists,
+    filelib:ensure_dir("_build/default/lib/rebar/priv/cacerts.pem.dummy"),
+    Res2 = symlink_or_copy(filename:absname("priv/cacerts.pem"),
+                           filename:absname("_build/default/lib/rebar/priv/cacerts.pem")),
+    true = Res2 == ok orelse Res2 == exists,
     Sources = ["src/rebar_resource_v2.erl", "src/rebar_resource.erl" | filelib:wildcard("src/*.erl") ],
     [compile_erl_file(X, [{outdir, "_build/default/lib/rebar/ebin/"}
                      ,return | additional_defines()]) || X <- Sources],
