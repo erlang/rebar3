@@ -25,6 +25,8 @@
             {platform_define, "(linux|freebsd)", 'BACKLOG', 128},
             {platform_define, "R13", 'old_inets'}]}.
 
+{minimum_otp_vsn, "19.3"}.
+
 %% MIB Options?
 {mib_opts, []}.
 %% SNMP mibs to compile first?
