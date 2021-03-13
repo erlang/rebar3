@@ -206,7 +206,10 @@ prepare_compiler_env(Compiler, Apps) ->
             EbinDir = rebar_utils:to_list(rebar_app_info:ebin_dir(AppInfo)),
             %% Make sure that outdir is on the path
             ok = rebar_file_utils:ensure_dir(EbinDir),
-            true = code:add_pathz(filename:absname(EbinDir))
+            %% use code:add_patha to go above rebar3's own dependencies
+            %% when they clash to avoid overtaking the project's
+            %% path for includes and priv/
+            true = code:add_patha(filename:absname(EbinDir))
         end,
         Apps
     ),
