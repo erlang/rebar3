@@ -201,12 +201,24 @@ sort_apps(Names, Apps) ->
             {_, App} <- [lists:keyfind(Name, 1, NamedApps)]].
 
 prepare_compiler_env(Compiler, Apps) ->
+    RebarLibs = [rebar_utils:to_binary(Atom)
+                 || {ok, RebarApps} <- [application:get_key(rebar, applications)],
+                    Atom <- RebarApps],
     lists:foreach(
         fun(AppInfo) ->
             EbinDir = rebar_utils:to_list(rebar_app_info:ebin_dir(AppInfo)),
             %% Make sure that outdir is on the path
             ok = rebar_file_utils:ensure_dir(EbinDir),
-            true = code:add_pathz(filename:absname(EbinDir))
+            %% We use code:add_pathz for better caching speed when
+            %% dealing with overall projects and deps under profiles,
+            %% but for correctness' sake, we also have to
+            %% use code:add_patha to go above rebar3's own dependencies
+            %% when they clash to avoid overtaking the project's
+            %% path for includes and priv/
+            case lists:member(rebar_app_info:name(AppInfo), RebarLibs) of
+                true -> true = code:add_patha(filename:absname(EbinDir));
+                false -> true = code:add_pathz(filename:absname(EbinDir))
+            end
         end,
         Apps
     ),
