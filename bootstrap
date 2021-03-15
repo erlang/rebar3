@@ -662,11 +662,8 @@ format_error(AbsSource, Extra, {Mod, Desc}) ->
 
 additional_defines() ->
     [{d, D} || {Re, D} <- [{"^[0-9]+", namespaced_types},
-                           {"^18", no_maps_update_with},
-                           {"^R1[4|5]", deprecated_crypto},
-                           {"^2", unicode_str},
-                           {"^(R|1|20)", fun_stacktrace},
-                           {"^((1[8|9])|2)", rand_module}],
+                           {"^(20)", fun_stacktrace},
+                           {"^(2)", rand_module}],
                is_otp_release(Re)].
 
 is_otp_release(ArchRegex) ->

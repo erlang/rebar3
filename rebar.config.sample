@@ -25,7 +25,7 @@
             {platform_define, "(linux|freebsd)", 'BACKLOG', 128},
             {platform_define, "R13", 'old_inets'}]}.
 
-{minimum_otp_vsn, "19.3"}.
+{minimum_otp_vsn, "21.0"}.
 
 %% MIB Options?
 {mib_opts, []}.
