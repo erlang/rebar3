@@ -35,14 +35,18 @@ do(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     case proplists:get_value(plugin, Args, none) of
         none ->
-            ?PRV_ERROR(no_plugin_arg);
+            {_, LocalPluginsNames} = rebar_prv_plugins:list_local_plugins(State),
+            lists:foldl(
+                fun (LocalPluginName, {ok, StateAcc}) ->
+                    upgrade(atom_to_list(LocalPluginName), StateAcc)
+                end,
+                {ok, State},
+                LocalPluginsNames);
         Plugin ->
             upgrade(Plugin, State)
     end.
 
 -spec format_error(any()) -> iolist().
-format_error(no_plugin_arg) ->
-    io_lib:format("Must give an installed plugin to upgrade as an argument", []);
 format_error({not_found, Plugin}) ->
     io_lib:format("Plugin to upgrade not found: ~ts", [Plugin]);
 format_error(Reason) ->
