@@ -62,9 +62,11 @@ list_local_plugins(State) ->
                        ++ rebar_state:get(State, project_plugins, []),
     LocalPluginsNames = lists:map(
                             fun (LocalPluginDef) ->
-                                if is_atom(LocalPluginDef) -> LocalPluginDef;
-                                   is_tuple(LocalPluginDef) -> element(1, LocalPluginDef)
-                               end
+                                rebar_utils:to_atom(
+                                    if is_tuple(LocalPluginDef) -> element(1, LocalPluginDef);
+                                       LocalPluginDef -> LocalPluginDef
+                                    end
+                                )
                             end,
                             LocalPluginsDefs),
     {LocalPluginsDefs, LocalPluginsNames}.
