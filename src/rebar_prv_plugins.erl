@@ -4,7 +4,8 @@
 
 -export([init/1,
          do/1,
-         format_error/1]).
+         format_error/1,
+         list_local_plugins/1]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
@@ -41,8 +42,7 @@ do(State) ->
 
     RebarOpts = rebar_state:opts(State),
     SrcDirs = rebar_dir:src_dirs(RebarOpts, ["src"]),
-    Plugins = rebar_state:get(State, plugins, []),
-    ProjectPlugins = rebar_state:get(State, project_plugins, []),
+    {LocalPluginsDefs, _} = list_local_plugins(State),
     PluginsDirs = filelib:wildcard(filename:join(rebar_dir:plugins_dir(State), "*")),
 
     %% use `checkouts_dir' and not `checkouts_out_dir'. Since we use `all' in `find_apps'
@@ -50,12 +50,26 @@ do(State) ->
     %% because the user removing from `_checkouts/' doesn't cause removal of the output
     CheckoutsDirs = filelib:wildcard(filename:join(rebar_dir:checkouts_dir(State), "*")),
     Apps = rebar_app_discover:find_apps(CheckoutsDirs++PluginsDirs, SrcDirs, all, State),
-    display_plugins("Local plugins", Apps, Plugins ++ ProjectPlugins),
+    display_plugins("Local plugins", Apps, LocalPluginsDefs),
     {ok, State}.
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
+
+list_local_plugins(State) ->
+    LocalPluginsDefs = rebar_state:get(State, plugins, [])
+                       ++ rebar_state:get(State, project_plugins, []),
+    LocalPluginsNames = lists:map(
+                            fun (LocalPluginDef) ->
+                                rebar_utils:to_atom(
+                                    if is_tuple(LocalPluginDef) -> element(1, LocalPluginDef);
+                                       LocalPluginDef -> LocalPluginDef
+                                    end
+                                )
+                            end,
+                            LocalPluginsDefs),
+    {LocalPluginsDefs, LocalPluginsNames}.
 
 display_plugins(_Header, _Apps, []) ->
     ok;
