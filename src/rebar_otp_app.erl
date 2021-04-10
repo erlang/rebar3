@@ -98,14 +98,16 @@ validate_app_modules(State, App, AppData) ->
             {ok, ensure_vsn(App, AppVsn)}
     end.
 
+%% If a version hasn't been set yet, then set it both for the
+%% original and regular version attributes.
 ensure_vsn(App, Vsn) ->
     ensure_vsn(original_vsn, ensure_vsn(vsn, App, Vsn), Vsn).
 
 ensure_vsn(F, App, AppVsn) ->
     case rebar_app_info:F(App) of
-        V when V=:= undefined orelse V =:= [] ->
+        Vsn when Vsn =:= undefined; Vsn =:= [] ->
             rebar_app_info:F(App, AppVsn);
-        _AlreadySet ->
+        _ ->
             App
     end.
 
