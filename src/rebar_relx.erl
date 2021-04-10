@@ -36,9 +36,13 @@ do(Provider, State) ->
     DefaultOutputDir = filename:join(rebar_dir:base_dir(State), ?DEFAULT_RELEASE_DIR),
     RelxConfig1 = RelxMode ++ [output_dir(DefaultOutputDir, Opts),
                                {overlay_vars_values, ExtraOverlays},
-                               {overlay_vars, [{base_dir, rebar_dir:base_dir(State)}]}
+                               {overlay_vars, [{base_dir, rebar_dir:base_dir(State)} | overlay_vars(Opts)]}
                                | merge_overlays(RelxConfig)],
-    {ok, RelxState} = rlx_config:to_state(RelxConfig1),
+
+    Args = [include_erts, system_libs, vm_args, sys_config],
+    RelxConfig2 = maybe_obey_command_args(RelxConfig1, Opts, Args),
+
+    {ok, RelxState} = rlx_config:to_state(RelxConfig2),
 
     Providers = rebar_state:providers(State),
     Cwd = rebar_state:dir(State),
@@ -194,6 +198,27 @@ merge_overlays(Config) ->
     %% Have profile overlay entries come before others to match how profiles work elsewhere
     NewOverlay = lists:flatmap(fun({overlay, Overlay}) -> Overlay end, lists:reverse(Overlays)),
     [{overlay, NewOverlay} | Others].
+
+overlay_vars(Opts) ->
+    case proplists:get_value(overlay_vars, Opts) of
+        undefined ->
+            [];
+        [] ->
+            [];
+        FileName when is_list(FileName) ->
+            [FileName]
+    end.
+
+maybe_obey_command_args(RelxConfig, Opts, Args) ->
+    lists:foldl(
+        fun(Opt, Acc) ->
+                 case proplists:get_value(Opt, Opts) of
+                     undefined ->
+                     Acc;
+                 V ->
+                     lists:keystore(Opt, 1, Acc, {Opt, V})
+            end
+        end, RelxConfig, Args).
 
 %%
 
