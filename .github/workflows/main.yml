@@ -41,6 +41,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Brew Version Check
+      run: brew --version
+    - name: Keep Brew Fresh
+      run: brew update
     - name: Install Erlang
       run: brew install erlang
     - name: Compile
