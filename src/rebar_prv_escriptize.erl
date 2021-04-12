@@ -50,7 +50,7 @@ init(State) ->
                                 {bare, true},
                                 {deps, ?DEPS},
                                 {example, "rebar3 escriptize"},
-                                {opts, []},
+                                {opts, opt_spec_list()},
                                 {short_desc, "Generate escript archive."},
                                 {desc, desc()}
                                 ]),
@@ -60,10 +60,17 @@ desc() ->
     "Generate an escript executable containing "
         "the project's and its dependencies' BEAM files.".
 
+-spec opt_spec_list() -> [getopt:option_spec()].
+opt_spec_list() ->
+    [{main_app,  $a, "main-app",  string,
+      "Specify the name of the application to build an escript for."}].
+
 do(State) ->
     Providers = rebar_state:providers(State),
     Cwd = rebar_state:dir(State),
-    AppInfo0 = case rebar_state:get(State, escript_main_app, undefined) of
+    {Opts, _} = rebar_state:command_parsed_args(State),
+    ConfiguredMainApp = rebar_state:get(State, escript_main_app, undefined),
+    AppInfo0 = case proplists:get_value(main_app, Opts, ConfiguredMainApp) of
         undefined ->
             case rebar_state:project_apps(State) of
                 [AppInfo] ->
