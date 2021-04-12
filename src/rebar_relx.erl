@@ -143,7 +143,10 @@ rel_handler({{Name, Vsn}, {error, {Module, Reason}}}, _Args) ->
     ?ERROR("Error building release ~ts-~ts:~n~ts~ts", [Name, Vsn, rebar_utils:indent(1),
                                                        Module:format_error(Reason)]),
     ok;
-rel_handler(_, _Args) ->
+rel_handler({{Name, Vsn}, Other}, _Args) ->
+    ?ERROR("Error building release ~ts-~ts:~nUnknown return value: ~p", [Name, Vsn, Other]),
+    ok;
+rel_handler({ok, _}, _) ->
     ok.
 
 releases_to_build(Provider, Opts, RelxState)->
@@ -214,10 +217,10 @@ maybe_obey_command_args(RelxConfig, Opts, Args) ->
         fun(Opt, Acc) ->
                  case proplists:get_value(Opt, Opts) of
                      undefined ->
-                     Acc;
-                 V ->
-                     lists:keystore(Opt, 1, Acc, {Opt, V})
-            end
+                         Acc;
+                     V ->
+                         lists:keystore(Opt, 1, Acc, {Opt, V})
+                 end
         end, RelxConfig, Args).
 
 %%
