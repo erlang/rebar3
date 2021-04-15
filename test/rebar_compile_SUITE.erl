@@ -16,6 +16,7 @@ all() ->
      {group, basic_extras}, {group, release_extras}, {group, unbalanced_extras},
      {group, root_extras},
      recompile_when_hrl_changes, recompile_when_included_hrl_changes,
+     recompile_when_recursive_hrl_changes,
      recompile_extra_when_hrl_in_src_changes,
      recompile_when_opts_included_hrl_changes,
      recompile_when_foreign_included_hrl_changes,
@@ -711,6 +712,48 @@ recompile_when_included_hrl_changes(Config) ->
                   || F <- NewFiles, filename:extension(F) == ".beam"],
 
     ?assert(ModTime =/= NewModTime).
+
+recompile_when_recursive_hrl_changes(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    %% The included path is specifically no specified with a ../<file> to
+    %% check dynamic path search generation for includes
+    RecurSrc = <<"-module(test_recursive_header_include).\n"
+                  "-export([main/0]).\n"
+                  "-include(\"test_header_include.hrl\").\n"
+                  "main() -> ?SOME_DEFINE.\n">>,
+
+    ExtraHeader = <<"-define(SOME_DEFINE, true).\n">>,
+    ok = filelib:ensure_dir(filename:join([AppDir, "src", "recur", "dummy"])),
+    HeaderFile = filename:join([AppDir, "src", "test_header_include.hrl"]),
+    ok = file:write_file(filename:join([AppDir, "src", "recur", "test_recursive_header_include.erl"]), RecurSrc),
+    ok = file:write_file(HeaderFile, ExtraHeader),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    {ok, Files} = rebar_utils:list_dir(EbinDir),
+    ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+               || F <- Files, filename:extension(F) == ".beam"],
+
+    timer:sleep(1000),
+
+    NewExtraHeader = <<"-define(SOME_DEFINE, false).\n">>,
+    ok = file:write_file(HeaderFile, NewExtraHeader),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
+    NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+                  || F <- NewFiles, filename:extension(F) == ".beam"],
+
+    ?assert(ModTime =/= NewModTime),
+    ok.
+
 
 recompile_extra_when_hrl_in_src_changes(Config) ->
     AppDir = ?config(apps, Config),

@@ -126,12 +126,12 @@ list_directory(Dir, Cache) ->
                     %% create a full list of *.erl files under Dir.
                     {NewFs, Files} = lists:foldl(
                         fun (File, {DirCache, Files} = Acc) ->
-                            %% recurse into subdirs
                             FullName = filename:join(Dir, File),
                             case filelib:is_dir(FullName) of
                                 true ->
-                                    {UpdFs, MoreFiles} = list_directory(FullName, DirCache),
-                                    {UpdFs, MoreFiles ++ Files};
+                                    %% We assume the include paths carry all recursive directories
+                                    %% so we don't need this resolution to be recursive.
+                                    Acc;
                                 false ->
                                     %% ignore all but *.erl files
                                     case filename:extension(File) =:= ".erl" of

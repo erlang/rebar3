@@ -244,8 +244,8 @@ compile_order(G, AppDefs, SrcExt, ArtifactExt) ->
     %% Build a digraph for following topo-sort, and populate
     %%  FileToApp map as a side effect for caching
     AppDAG = digraph:new([acyclic]), % ignore cycles and hope it works
-    IsHeaderFile = 
-        fun(File) -> 
+    IsHeaderFile =
+        fun(File) ->
             Ext = filename:extension(File),
             (Ext =/= SrcExt) andalso (Ext =/= ArtifactExt)
         end,
