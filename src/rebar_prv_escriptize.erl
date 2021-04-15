@@ -93,7 +93,11 @@ do(State) ->
         _ ->
             AppInfo1 = rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, AppInfo0, State),
             ?INFO("Building escript for ~s...", [rebar_app_info:name(AppInfo0)]),
-            Res = escriptize(State, AppInfo1),
+            Res = try
+                escriptize(State, AppInfo1)
+            catch
+                throw:Err=?PRV_ERROR(_) -> Err
+            end,
             rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, AppInfo1, State),
             Res
     end.
@@ -165,6 +169,8 @@ format_error({zip_error, AppName, ZipError}) ->
 format_error({bad_name, App}) ->
     io_lib:format("Failed to get ebin/ directory for "
                    "escript_incl_app: ~p", [App]);
+format_error({bad_app, App}) ->
+    io_lib:format("Failed to find application ~p", [App]);
 format_error(no_main_app) ->
     io_lib:format("Multiple project apps and {escript_main_app, atom()}."
                  " not set in rebar.config", []).
@@ -260,7 +266,10 @@ find_deps(AppNames, AllApps) ->
 find_deps_of_deps([], _, Acc) -> Acc;
 find_deps_of_deps([Name|Names], Apps, Acc) ->
     ?DIAGNOSTIC("processing ~p", [Name]),
-    {ok, App} = rebar_app_utils:find(Name, Apps),
+    App = case rebar_app_utils:find(Name, Apps) of
+        {ok, Found} -> Found;
+        error -> throw(?PRV_ERROR({bad_app, binary_to_atom(Name, utf8)}))
+    end,
     DepNames = proplists:get_value(applications, rebar_app_info:app_details(App), []),
     BinDepNames = [rebar_utils:to_binary(Dep) || Dep <- DepNames,
                    %% ignore system libs; shouldn't include them.
