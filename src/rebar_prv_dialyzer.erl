@@ -572,7 +572,7 @@ console_warnings(Warnings) ->
 file_warnings(_, [], _) ->
     ok;
 file_warnings(Output, Warnings, raw) ->
-    Warnings1 = [[io_lib:format("~tp. \n", [W]) || W <- Warnings]],
+    Warnings1 = [[io_lib:format("~tp.\n", [W]) || W <- Warnings]],
     write_file_warnings(Output, Warnings1);
 file_warnings(Output, Warnings, formatted) ->
     Warnings1 = [[dialyzer:format_warning(Warning, fullpath), $\n]
