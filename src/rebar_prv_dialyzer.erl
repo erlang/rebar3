@@ -402,10 +402,8 @@ add_plt(State, Plt, Output, Files) ->
 
 run_plt(State, Plt, Output, Analysis, Files) ->
     GetWarnings = get_config(State, get_warnings, false),
-    OutputFormat = get_config(State, output_format, formatted),
     Opts = [{analysis_type, Analysis},
             {get_warnings, GetWarnings},
-            {output_format, OutputFormat},
             {init_plt, Plt},
             {output_plt, Plt},
             {from, byte_code},
@@ -473,10 +471,8 @@ build_plt(State, Plt, _, []) ->
 build_plt(State, Plt, Output, Files) ->
     ?INFO("Building with ~b files in ~ts...", [length(Files), rebar_dir:format_source_file_name(Plt)]),
     GetWarnings = get_config(State, get_warnings, false),
-    OutputFormat = get_config(State, output_format, formatted),
     Opts = [{analysis_type, plt_build},
             {get_warnings, GetWarnings},
-            {output_format, OutputFormat},
             {output_plt, Plt},
             {files, Files}],
     run_dialyzer(State, Opts, Output).
@@ -496,10 +492,8 @@ succ_typings_(State, Plt, _, []) ->
     {0, State};
 succ_typings_(State, Plt, Output, Files) ->
     ?INFO("Analyzing ~b files with ~ts...", [length(Files), rebar_dir:format_source_file_name(Plt)]),
-    OutputFormat = get_config(State, output_format, formatted),
     Opts = [{analysis_type, succ_typings},
             {get_warnings, true},
-            {output_format, OutputFormat},
             {from, byte_code},
             {files, Files},
             {init_plt, Plt}],
