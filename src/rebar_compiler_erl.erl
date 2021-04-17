@@ -25,8 +25,16 @@ context(AppInfo) ->
     RebarOpts = rebar_app_info:opts(AppInfo),
     ErlOpts = rebar_opts:erl_opts(RebarOpts),
     ErlOptIncludes = proplists:get_all_values(i, ErlOpts),
-    InclDirs = lists:map(fun(Incl) -> filename:absname(Incl) end, ErlOptIncludes),
-    AbsIncl = [filename:join([OutDir, "include"]) | InclDirs],
+    AbsIncl = [filename:join(OutDir, "include") | % standard include path
+               %% includes specified by erl_opts
+               lists:map(fun(Incl) -> filename:absname(Incl) end, ErlOptIncludes)] ++
+              %% all source directories are valid, and might also be recursive
+              lists:append([
+                  find_recursive_incl(OutDir, Src, RebarOpts) ||
+                  Src <- rebar_dir:all_src_dirs(RebarOpts, ["src"], [])
+              ]) ++
+              %% top-level dir for legacy stuff
+              [OutDir],
     PTrans = proplists:get_all_values(parse_transform, ErlOpts),
     Macros = [case Tup of
                   {d,Name} -> Name;
@@ -180,6 +188,22 @@ error_tuple(Module, Es, Ws, AllOpts, Opts) ->
 format_error_sources(Es, Opts) ->
     [{rebar_compiler:format_error_source(Src, Opts), Desc}
      || {Src, Desc} <- Es].
+
+find_recursive_incl(Base, Src, Opts) ->
+    find_recursive_incl(Base, Src, Opts, rebar_dir:recursive(Opts, Src)).
+
+find_recursive_incl(Base, Src, _Opts, false) ->
+    [filename:join(Base, Src)];
+find_recursive_incl(Base, Src, Opts, true) ->
+    Dir = filename:join(Base, Src),
+    case file:list_dir(Dir) of
+        {error, _} ->
+            [Dir];
+        {ok, Files} ->
+            [Dir] ++
+            [find_recursive_incl(Dir, File, Opts)
+             || File <- Files, filelib:is_dir(filename:join(Dir, File))]
+    end.
 
 %% Get files which need to be compiled first, i.e. those specified in erl_first_files
 %% and parse_transform options.  Also produce specific erl_opts for these first
