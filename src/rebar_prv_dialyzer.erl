@@ -536,7 +536,8 @@ run_dialyzer(State, Opts, Output) ->
                      {timing, Timing} |
                      Opts],
             ?DEBUG("Running dialyzer with options: ~p~n", [Opts2]),
-            Warnings = format_warnings(State, Output, dialyzer:run(Opts2)),
+            Warnings = format_warnings(rebar_state:opts(State),
+                                       Output, dialyzer:run(Opts2)),
             {Warnings, State};
         false ->
             Opts2 = [{warnings, no_warnings()},
@@ -555,14 +556,12 @@ legacy_warnings(Warnings) ->
             Warnings
     end.
 
-format_warnings(State, Output, Warnings) ->
-    Opts = rebar_state:opts(State),
+format_warnings(Opts, Output, Warnings) ->
     Warnings1 = rebar_dialyzer_format:format_warnings(Opts, Warnings),
     console_warnings(Warnings1),
-
-    OutputFormat = get_config(State, output_format, formatted),
+    Config = rebar_opts:get(Opts, dialyzer, []),
+    OutputFormat = proplists:get_value(output_format, Config, formatted),
     file_warnings(Output, Warnings, OutputFormat),
-
     length(Warnings).
 
 console_warnings(Warnings) ->
