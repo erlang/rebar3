@@ -73,6 +73,8 @@ desc() ->
     "modules from excluded applications\n"
     "`exclude_mods` - a list of modules to exclude from PLT files and "
     "success typing analysis\n"
+    "`output_format` - configure whether the dialyzer_warnings file will have "
+    "the `raw` or `formatted` output\n"
     "\n"
     "For example, to warn on unmatched returns: \n"
     "{dialyzer, [{warnings, [unmatched_returns]}]}.\n"
@@ -557,18 +559,27 @@ legacy_warnings(Warnings) ->
 format_warnings(Opts, Output, Warnings) ->
     Warnings1 = rebar_dialyzer_format:format_warnings(Opts, Warnings),
     console_warnings(Warnings1),
-    file_warnings(Output, Warnings),
+    Config = rebar_opts:get(Opts, dialyzer, []),
+    OutputFormat = proplists:get_value(output_format, Config, formatted),
+    file_warnings(Output, Warnings, OutputFormat),
     length(Warnings).
 
 console_warnings(Warnings) ->
     _ = [?CONSOLE("~ts", [Warning]) || Warning <- Warnings],
     ok.
 
-file_warnings(_, []) ->
+file_warnings(_, [], _) ->
     ok;
-file_warnings(Output, Warnings) ->
-    Warnings1 = [[dialyzer:format_warning(Warning, fullpath), $\n] || Warning <- Warnings],
-    case file:write_file(Output, Warnings1, [append]) of
+file_warnings(Output, Warnings, raw) ->
+    Warnings1 = [[io_lib:format("~tp.\n", [W]) || W <- Warnings]],
+    write_file_warnings(Output, Warnings1);
+file_warnings(Output, Warnings, formatted) ->
+    Warnings1 = [[dialyzer:format_warning(Warning, fullpath), $\n]
+                 || Warning <- Warnings],
+    write_file_warnings(Output, Warnings1).
+
+write_file_warnings(Output, Warnings) ->
+    case file:write_file(Output, Warnings, [append]) of
         ok ->
             ok;
         {error, Reason} ->
