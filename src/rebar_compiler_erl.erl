@@ -201,8 +201,8 @@ find_recursive_incl(Base, Src, Opts, true) ->
             [Dir];
         {ok, Files} ->
             [Dir] ++
-            [find_recursive_incl(Dir, File, Opts)
-             || File <- Files, filelib:is_dir(filename:join(Dir, File))]
+            lists:append([find_recursive_incl(Dir, File, Opts)
+                          || File <- Files, filelib:is_dir(filename:join(Dir, File))])
     end.
 
 %% Get files which need to be compiled first, i.e. those specified in erl_first_files

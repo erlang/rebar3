@@ -22,6 +22,7 @@ all() ->
      recompile_when_foreign_included_hrl_changes,
      recompile_when_foreign_behaviour_changes,
      recompile_when_recursive_behaviour_changes,
+     recompile_when_parent_behaviour_changes,
      recompile_when_opts_change, recompile_when_dag_opts_change,
      dont_recompile_when_opts_dont_change, dont_recompile_yrl_or_xrl,
      delete_beam_if_source_deleted,
@@ -955,6 +956,55 @@ recompile_when_recursive_behaviour_changes(Config) ->
     ok = filelib:ensure_dir(filename:join([AppsDir, Name1, "src", "sub", "dummy"])),
     BehaviourFile = filename:join([AppsDir, Name1, "src", "sub", "app1_behaviour.erl"]),
     ok = file:write_file(filename:join([AppsDir, Name1, "src", "test_behaviour_include.erl"]), ExtraSrc),
+    ok = file:write_file(BehaviourFile, Behaviour),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name1}]}),
+
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name1, "ebin"]),
+    {ok, Files} = rebar_utils:list_dir(EbinDir),
+    ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+               || F <- Files,
+                  filename:extension(F) == ".beam",
+                  filename:basename(F) =/= "app1_behaviour.beam"],
+
+    timer:sleep(1000),
+
+    NewBehaviour = <<"-module(app1_behaviour).\n"
+                     "-callback main(_) -> term().\n">>,
+    ok = file:write_file(BehaviourFile, NewBehaviour),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name1}]}),
+
+    {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
+    NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+                  || F <- NewFiles,
+                     filename:extension(F) == ".beam",
+                     filename:basename(F) =/= "app1_behaviour.beam"],
+
+    ?assert(ModTime =/= NewModTime).
+
+recompile_when_parent_behaviour_changes(Config) ->
+    AppDir = ?config(apps, Config),
+    AppsDir = filename:join([AppDir, "apps"]),
+
+    Name1 = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join(AppsDir, Name1),
+                                Name1, Vsn, [kernel, stdlib]),
+
+    ExtraSrc = <<"-module(test_behaviour_include).\n"
+                 "-export([main/0]).\n"
+                 "-behaviour(app1_behaviour).\n"
+                 "main() -> 1.\n">>,
+
+    Behaviour = <<"-module(app1_behaviour).\n"
+                  "-callback main() -> term().\n">>,
+    %% fun thing requires 2+ levels of nesting to trigger a regression due to bad path
+    %% merging/appending in lists levels.
+    ok = filelib:ensure_dir(filename:join([AppsDir, Name1, "src", "sub", "dummy"])),
+    ok = filelib:ensure_dir(filename:join([AppsDir, Name1, "src", "sub", "sub", "dummy"])),
+    BehaviourFile = filename:join([AppsDir, Name1, "src", "sub", "app1_behaviour.erl"]),
+    ok = file:write_file(filename:join([AppsDir, Name1, "src", "sub", "sub", "test_behaviour_include.erl"]), ExtraSrc),
     ok = file:write_file(BehaviourFile, Behaviour),
 
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name1}]}),
