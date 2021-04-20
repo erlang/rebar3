@@ -217,6 +217,11 @@ upgrade(Config) ->
     rebar_test_utils:run_and_check(
         Config, RConf, ["plugins", "upgrade", PkgName],
         {ok, [{app, Name, valid}, {file, PluginBeam}, {plugin, PkgName, <<"0.1.3">>}]}
+     ),
+
+    rebar_test_utils:run_and_check(
+        Config, RConf, ["plugins", "upgrade"],
+        {ok, [{app, Name, valid}, {file, PluginBeam}, {plugin, PkgName}]}
      ).
 
 upgrade_project_plugin(Config) ->
