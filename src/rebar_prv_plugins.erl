@@ -64,7 +64,7 @@ list_local_plugins(State) ->
                             fun (LocalPluginDef) ->
                                 rebar_utils:to_atom(
                                     if is_tuple(LocalPluginDef) -> element(1, LocalPluginDef);
-                                       LocalPluginDef -> LocalPluginDef
+                                       true -> LocalPluginDef
                                     end
                                 )
                             end,
