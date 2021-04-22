@@ -798,7 +798,8 @@ vcs_vsn_cmd(_, _, _) ->
     unknown.
 
 cmd_vsn_invoke(Cmd, Dir) ->
-    {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),
+    ErrorOpt = {abort_on_error, "vsn cmd in .app.src failed"},
+    {ok, VsnString} = rebar_utils:sh(Cmd, [ErrorOpt, {cd, Dir}, {use_stdout, false}]),
     rebar_string:trim(VsnString, trailing, "\n").
 
 %% @doc ident to the level specified
