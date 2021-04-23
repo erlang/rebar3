@@ -255,7 +255,7 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source0, IsLock, State) ->
     {SubDir, Source1} = subdir(Name, Source0),
     FetchDir = rebar_utils:to_list(filename:join([DepsDir, Name])),
     CheckoutsDir = rebar_utils:to_list(rebar_dir:checkouts_dir(State, Name)),
-    AppInfo = case rebar_app_info:discover(CheckoutsDir) of
+    AppInfo = case rebar_app_info:discover(CheckoutsDir, State) of
                   {ok, App} ->
                       OutDir = filename:join(rebar_dir:checkouts_out_dir(State), Name),
                       rebar_app_info:out_dir(
@@ -264,7 +264,7 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source0, IsLock, State) ->
                   not_found ->
                       Dir = rebar_utils:to_list(filename:join([DepsDir, Name, SubDir])),
                       {ok, AppInfo0} =
-                          case rebar_app_info:discover(Dir) of
+                          case rebar_app_info:discover(Dir, State) of
                               {ok, App} ->
                                   App1 = rebar_app_info:name(App, Name),
                                   {ok, rebar_app_info:is_available(rebar_app_info:parent(App1, Parent),

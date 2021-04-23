@@ -10,7 +10,7 @@
          update_opts/3,
          update_opts/2,
          update_opts_deps/2,
-         discover/1,
+         discover/2,
          name/1,
          name/2,
          app_file_src/1,
@@ -255,9 +255,9 @@ deps_from_config(Dir, ConfigDeps) ->
     end.
 
 %% @doc discover a complete version of the app info with all fields set.
--spec discover(file:filename_all()) -> {ok, t()} | not_found.
-discover(Dir) ->
-    case rebar_app_discover:find_app(Dir, all) of
+-spec discover(file:filename_all(), rebar_state:t()) -> {ok, t()} | not_found.
+discover(Dir, State) ->
+    case rebar_app_discover:find_app(Dir, all, State) of
         {true, AppInfo} ->
             {ok, AppInfo};
         false ->

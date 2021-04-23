@@ -42,6 +42,14 @@
 %% yecc files to compile first
 {yrl_first_files, []}.
 
+%% == Application Discovery ==
+
+%% Extensions for discovering application resource files. Rebar3 discovers
+%% applications by searching for these files. When building the application
+%% information, rebar will use the first discovered files in the list.
+{application_resource_extensions, [
+    "app.src.script", "app.src", "mix.exs"
+]}
 
 %% == Common Test ==
 
