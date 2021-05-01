@@ -59,7 +59,12 @@ run_provider_hooks_(Dir, Type, Command, Providers, TypeHooks, State) ->
         HookProviders ->
             rebar_paths:set_paths([plugins], State),
             Providers1 = rebar_state:providers(State),
-            State1 = rebar_state:providers(rebar_state:dir(State, Dir), Providers++Providers1),
+            %% Drop CLI arguments from the command for the hook.
+            State0 = rebar_state:command_parsed_args(
+                       rebar_state:command_args(State, []),
+                       {[], []}
+            ),
+            State1 = rebar_state:providers(rebar_state:dir(State0, Dir), Providers++Providers1),
             ?DEBUG("\t{provider_hooks, [{~p, ~p}]}.",
                    [Type, HookProviders]),
             case rebar_core:do(HookProviders, State1) of
