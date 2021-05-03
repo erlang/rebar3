@@ -25,7 +25,7 @@ all() ->
     [build_and_clean_app, run_hooks_once, run_hooks_once_profiles,
      escriptize_artifacts, run_hooks_for_plugins, deps_hook_namespace,
      bare_compile_hooks_default_ns, deps_clean_hook_namespace, eunit_app_hooks,
-     sub_app_hooks, root_hooks].
+     sub_app_hooks, root_hooks, drop_hook_args].
 
 %% Test post provider hook cleans compiled project app, leaving it invalid
 build_and_clean_app(Config) ->
@@ -254,3 +254,14 @@ root_hooks(Config) ->
       Config, RConf, ["compile"],
       {ok, [{app, Name, invalid}]}
      ).
+
+drop_hook_args(Config) ->
+    RebarConfig = [
+        {provider_hooks, [
+            {pre, [{eunit, path}]}
+        ]}
+    ],
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["eunit", "--cover=false"],
+        {ok, []}
+    ).
