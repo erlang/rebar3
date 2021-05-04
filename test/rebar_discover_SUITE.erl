@@ -50,6 +50,7 @@ bad_app_src(Config) ->
        {error, {rebar_app_discover, {bad_term_file, AppSrc, _}}},
        rebar_test_utils:run_and_check(Config, [], ["compile"], return)
     ),
+    ct:pal(""),
     ok.
 
 invalid_app_src() ->
@@ -66,4 +67,3 @@ invalid_app_src(Config) ->
        rebar_test_utils:run_and_check(Config, [], ["compile"], return)
     ),
     ok.
-

@@ -251,7 +251,7 @@ all_app_dirs(LibDirs, SrcDirs, State) ->
 app_dirs(LibDir, SrcDirs, State) ->
     Extensions = rebar_state:get(State, application_resource_extensions, ?DEFAULT_APP_RESOURCE_EXT),
     Paths = lists:append([
-        [filename:join([LibDir, SrcDir, "*." ++ Ext]) || Ext <- Extensions ]
+        [filename:join([LibDir, SrcDir, "*" ++ Ext]) || Ext <- Extensions ]
         || SrcDir <- SrcDirs
     ]),
     EbinPath = filename:join([LibDir, "ebin", "*.app"]),
@@ -345,24 +345,20 @@ find_app_(AppInfo, AppDir, SrcDirs, Validate, State) ->
     ResourceFiles = [
         {app, filelib:wildcard(filename:join([AppDir, "ebin", "*.app"]))} |
         [
-        {extension_type(Ext), lists:append([ filelib:wildcard(filename:join([AppDir, SrcDir, "*." ++ Ext]))
+        {extension_type(Ext), lists:append([ filelib:wildcard(filename:join([AppDir, SrcDir, "*" ++ Ext]))
         || SrcDir <- SrcDirs])}
         || Ext <- Extensions
     ]],
-    % io:format(user, "conf: ~p~n", [{AppDir, SrcDirs}]),
-    % io:format(user, "Extensions: ~p~n", [Extensions]),
-    % io:format(user, "ResourceFiles: ~p~n", [ResourceFiles]),
-    FlattenedResourceFiles = flatten_resource_files(ResourceFiles),
-    % io:format(user, "FlattenedResourceFiles: ~p~n", [FlattenedResourceFiles]),
+    {FlattenedResourceFiles, _} = flatten_resource_files(ResourceFiles),
     try_handle_resource_files(AppInfo, AppDir, FlattenedResourceFiles, Validate).
 
 -spec extension_type(string()) -> app_resource_type().
 extension_type(Extension) ->
     Mapping = [
-        {"app", app},
-        {"src", app_src},
-        {"script", script},
-        {"mix.exs", mix_exs}
+        {".app", app},
+        {".src", app_src},
+        {".script", script},
+        {".exs", mix_exs}
     ],
     extension_type(Mapping, Extension).
 
@@ -384,12 +380,17 @@ extension_type([{Pattern, Type} | Rest], Extension) ->
          FlattenedResourceFiles :: [{app_resource_type(), file:filename()}].
 flatten_resource_files(ResourceFiles) ->
     lists:foldr(
-        fun ({_Type, []}, Acc)      -> Acc;
-            ({Type, [File]}, Acc)   -> [{Type, File} | Acc];
-            ({_Type, Others}, _Acc) -> throw({error, {multiple_app_files, Others}})
-        end,
-        [],
+        fun flatten_resource_impl/2,
+        {[], []},
         ResourceFiles).
+
+flatten_resource_impl({Type, Files}, Acc = {ResAcc, Used}) ->
+    NewFiles = [F || F <- Files, not lists:member(F, Used)],
+    case NewFiles of
+        [] -> Acc;
+        [File] -> {[{Type, File} | ResAcc], [File | Used]};
+        Others -> throw({error, {multiple_app_files, Others}})
+    end.
 
 %% @doc find the directory that an appfile has
 -spec app_dir(file:filename()) -> file:filename().
