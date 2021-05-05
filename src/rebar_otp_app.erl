@@ -138,7 +138,7 @@ preprocess(State, AppInfo, AppSrcFile) ->
             %% Setup file .app filename and write new contents
             EbinDir = rebar_app_info:ebin_dir(AppInfo),
             rebar_file_utils:ensure_dir(EbinDir),
-            AppFile = rebar_app_utils:app_src_to_app(OutDir, AppSrcFile),
+            AppFile = rebar_app_utils:app_src_to_app(OutDir, AppSrcFile, State),
             ok = rebar_file_utils:write_file_if_contents_differ(AppFile, Spec, utf8),
 
             rebar_app_info:app_file(rebar_app_info:vsn(AppInfo, Vsn), AppFile);

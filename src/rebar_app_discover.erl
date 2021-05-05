@@ -383,11 +383,11 @@ extension_type([{Pattern, Type} | Rest], Extension) ->
          FlattenedResourceFiles :: [{app_resource_type(), file:filename()}].
 flatten_resource_files(ResourceFiles) ->
     {Flattened, _} =
-        lists:foldr(
+        lists:foldl(
             fun flatten_resource_impl/2,
             {[], []},
             ResourceFiles),
-    Flattened.
+    lists:reverse(Flattened).
 
 flatten_resource_impl({Type, Files}, Acc = {ResAcc, Used}) ->
     NewFiles = [F || F <- Files, not lists:member(F, Used)],
