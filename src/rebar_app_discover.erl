@@ -254,13 +254,15 @@ app_dirs(LibDir, SrcDirs, State) ->
         [filename:join([LibDir, SrcDir, "*" ++ Ext]) || Ext <- Extensions ]
         || SrcDir <- SrcDirs
     ]),
+
     EbinPath = filename:join([LibDir, "ebin", "*.app"]),
+    MixExsPath = filename:join([LibDir, "src", "mix.exs"]),
 
     lists:usort(lists:foldl(fun(Path, Acc) ->
                                 Files = filelib:wildcard(rebar_utils:to_list(Path)),
                                 [{app_dir(File), SrcDirs}
                                  || File <- Files] ++ Acc
-                            end, [], [EbinPath | Paths])).
+                            end, [], [EbinPath, MixExsPath | Paths])).
 
 %% @doc find all apps that haven't been built in a list of directories
 -spec find_unbuilt_apps([file:filename_all()], rebar_state:t()) -> [rebar_app_info:t()].
@@ -343,13 +345,14 @@ find_app(AppInfo, AppDir, SrcDirs, Validate, State) ->
 find_app_(AppInfo, AppDir, SrcDirs, Validate, State) ->
     Extensions = rebar_state:get(State, application_resource_extensions, ?DEFAULT_APP_RESOURCE_EXT),
     ResourceFiles = [
-        {app, filelib:wildcard(filename:join([AppDir, "ebin", "*.app"]))} |
+        {app, filelib:wildcard(filename:join([AppDir, "ebin", "*.app"]))},
+        {mix_exs, filelib:wildcard(filename:join([AppDir, "src", "mix.exs"]))} |
         [
         {extension_type(Ext), lists:append([ filelib:wildcard(filename:join([AppDir, SrcDir, "*" ++ Ext]))
         || SrcDir <- SrcDirs])}
         || Ext <- Extensions
     ]],
-    {FlattenedResourceFiles, _} = flatten_resource_files(ResourceFiles),
+    FlattenedResourceFiles = flatten_resource_files(ResourceFiles),
     try_handle_resource_files(AppInfo, AppDir, FlattenedResourceFiles, Validate).
 
 -spec extension_type(string()) -> app_resource_type().
@@ -379,10 +382,12 @@ extension_type([{Pattern, Type} | Rest], Extension) ->
     when ResourceFiles :: [{app_resource_type(), [file:filename()]}],
          FlattenedResourceFiles :: [{app_resource_type(), file:filename()}].
 flatten_resource_files(ResourceFiles) ->
-    lists:foldr(
-        fun flatten_resource_impl/2,
-        {[], []},
-        ResourceFiles).
+    {Flattened, _} =
+        lists:foldr(
+            fun flatten_resource_impl/2,
+            {[], []},
+            ResourceFiles),
+    Flattened.
 
 flatten_resource_impl({Type, Files}, Acc = {ResAcc, Used}) ->
     NewFiles = [F || F <- Files, not lists:member(F, Used)],
