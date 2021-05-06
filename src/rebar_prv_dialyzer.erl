@@ -223,7 +223,11 @@ proj_apps(State) ->
 
 proj_plt_apps(State) ->
     Apps = rebar_state:project_apps(State),
-    DepApps = lists:flatmap(fun rebar_app_info:applications/1, Apps),
+    DepApps = lists:flatmap(
+               fun(App) ->
+                       rebar_app_info:applications(App) ++
+                           rebar_app_info:included_applications(App)
+               end, Apps),
     ProjApps = proj_apps(State),
     case get_config(State, plt_apps, top_level_deps) of
         top_level_deps ->
