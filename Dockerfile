@@ -33,6 +33,7 @@ COPY --from=builder /root/rebar3/_build/prod/bin/rebar3 .
 
 # and install it
 RUN HOME=/opt ./rebar3 local install \
+    && rm -f /usr/local/bin/rebar3 \
     && ln /opt/.cache/rebar3/bin/rebar3 /usr/local/bin/rebar3 \
     && rm -rf rebar3
 

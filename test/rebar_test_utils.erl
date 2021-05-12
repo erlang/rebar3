@@ -8,13 +8,6 @@
 -export([create_random_name/1, create_random_vsn/0, write_src_file/2,
          random_element/1]).
 
-%% Pick the right random module
--ifdef(rand_only).
--define(random, rand).
--else.
--define(random, random).
--endif.
-
 %%%%%%%%%%%%%%
 %%% Public %%%
 %%%%%%%%%%%%%%
@@ -162,25 +155,13 @@ create_config(_AppDir, ConfFilename, Contents) ->
 
 %% @doc Util to create a random variation of a given name.
 create_random_name(Name) ->
-    random_seed(),
-    Name ++ erlang:integer_to_list(?random:uniform(1000000)).
+    Name ++ erlang:integer_to_list(rand:uniform(1000000)).
 
 %% @doc Util to create a random variation of a given version.
 create_random_vsn() ->
-    random_seed(),
-    lists:flatten([erlang:integer_to_list(?random:uniform(100)),
-                   ".", erlang:integer_to_list(?random:uniform(100)),
-                   ".", erlang:integer_to_list(?random:uniform(100))]).
-
--ifdef(rand_only).
-random_seed() ->
-    %% the rand module self-seeds
-    ok.
--else.
-random_seed() ->
-    <<A:32, B:32, C:32>> = crypto:rand_bytes(12),
-    random:seed({A,B,C}).
--endif.
+    lists:flatten([erlang:integer_to_list(rand:uniform(100)),
+                   ".", erlang:integer_to_list(rand:uniform(100)),
+                   ".", erlang:integer_to_list(rand:uniform(100))]).
 
 expand_deps(_, []) -> [];
 expand_deps(git_subdir, [{Name, Deps} | Rest]) ->
@@ -552,5 +533,5 @@ package_app(AppDir, DestDir, PkgName, PkgVsn) ->
     {Checksum1, E}.
 
 random_element(Repos) ->
-    Index = ?random:uniform(length(Repos)),
+    Index = rand:uniform(length(Repos)),
     lists:nth(Index, Repos).
