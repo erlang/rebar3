@@ -268,7 +268,10 @@ find_deps_of_deps([Name|Names], Apps, Acc) ->
     ?DIAGNOSTIC("processing ~p", [Name]),
     App = case rebar_app_utils:find(Name, Apps) of
         {ok, Found} -> Found;
-        error -> throw(?PRV_ERROR({bad_app, binary_to_atom(Name, utf8)}))
+        error -> case find_external_app(Name) of
+                     error -> throw(?PRV_ERROR({bad_app, binary_to_atom(Name, utf8)}));
+                     App0 -> App0
+                 end
     end,
     DepNames = proplists:get_value(applications, rebar_app_info:app_details(App), []),
     BinDepNames = [rebar_utils:to_binary(Dep) || Dep <- DepNames,
@@ -279,6 +282,16 @@ find_deps_of_deps([Name|Names], Apps, Acc) ->
                 -- ([Name|Names]++Acc), % avoid already seen deps
     ?DIAGNOSTIC("new deps of ~p found to be ~p", [Name, BinDepNames]),
     find_deps_of_deps(BinDepNames ++ Names, Apps, BinDepNames ++ Acc).
+
+%% This is for apps which are on the code path (ERL_LIBS) but not part of OTP
+find_external_app(Name) ->
+    case code:lib_dir(binary_to_atom(Name, utf8)) of
+        {error, bad_name} -> error;
+        Dir -> case rebar_app_discover:find_app(Dir, valid) of
+                   {true, App} -> App;
+                   false -> error
+               end
+    end.
 
 def(Rm, State, Key, Default) ->
     Value0 = rebar_state:get(State, Key, Default),
