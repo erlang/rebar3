@@ -30,7 +30,7 @@ download_source(AppInfo, State)  ->
             %% freshly downloaded, update the app info opts to reflect the new config
             Config = rebar_config:consult(AppDir),
             AppInfo1 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), Config),
-            case rebar_app_discover:find_app(AppInfo1, AppDir, all) of
+            case rebar_app_discover:find_app(AppInfo1, AppDir, all, State) of
                 {true, AppInfo2} ->
                     rebar_app_info:is_available(AppInfo2, true);
                 false ->

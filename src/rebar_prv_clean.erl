@@ -45,7 +45,7 @@ do(State) ->
     if All; Specific =/= [] ->
         DepsDir = rebar_dir:deps_dir(State1),
         DepsDirs = filelib:wildcard(filename:join(DepsDir, "*")),
-        AllApps = rebar_app_discover:find_apps(DepsDirs, all),
+        AllApps = rebar_app_discover:find_apps(DepsDirs, all, State),
         Filter = case All of
             true -> fun(_) -> true end;
             false -> fun(AppInfo) -> filter_name(AppInfo, Specific) end
