@@ -118,7 +118,7 @@ escriptize(State0, App) ->
     %% to pull in all the .beam files.
     TopInclApps = lists:usort([ec_cnv:to_atom(AppName) | rebar_state:get(State, escript_incl_apps, [])]),
     AllApps = rebar_state:all_deps(State)++rebar_state:project_apps(State),
-    InclApps = find_deps(TopInclApps, AllApps),
+    InclApps = find_deps(TopInclApps, AllApps, State),
     ?DEBUG("bundled applications:~n\t~p", [InclApps]),
     InclBeams = get_apps_beams(InclApps, AllApps),
 
@@ -257,20 +257,20 @@ usort(List) ->
 get_nonempty(Files) ->
     [{FName,FBin} || {FName,FBin} <- Files, FBin =/= <<>>].
 
-find_deps(AppNames, AllApps) ->
+find_deps(AppNames, AllApps, State) ->
     BinAppNames = [rebar_utils:to_binary(Name) || Name <- AppNames],
     [ec_cnv:to_atom(Name) ||
-     Name <- find_deps_of_deps(BinAppNames, AllApps, BinAppNames)].
+     Name <- find_deps_of_deps(BinAppNames, AllApps, State, BinAppNames)].
 
 %% Should look at the app files to find direct dependencies
-find_deps_of_deps([], _, Acc) -> Acc;
-find_deps_of_deps([Name|Names], Apps, Acc) ->
+find_deps_of_deps([], _, _, Acc) -> Acc;
+find_deps_of_deps([Name|Names], Apps, State, Acc) ->
     ?DIAGNOSTIC("processing ~p", [Name]),
     App = case rebar_app_utils:find(Name, Apps) of
         {ok, Found} ->
             Found;
         error ->
-            case find_external_app(Name) of
+            case find_external_app(Name, State) of
                 error -> throw(?PRV_ERROR({bad_app, binary_to_atom(Name, utf8)}));
                 App0 -> App0
             end
@@ -283,15 +283,15 @@ find_deps_of_deps([Name|Names], Apps, Acc) ->
                    not lists:prefix(code:root_dir(), DepDir)]
                 -- ([Name|Names]++Acc), % avoid already seen deps
     ?DIAGNOSTIC("new deps of ~p found to be ~p", [Name, BinDepNames]),
-    find_deps_of_deps(BinDepNames ++ Names, Apps, BinDepNames ++ Acc).
+    find_deps_of_deps(BinDepNames ++ Names, Apps, State, BinDepNames ++ Acc).
 
 %% This is for apps which are on the code path (ERL_LIBS) but not part of OTP
-find_external_app(Name) ->
+find_external_app(Name, State) ->
     case code:lib_dir(binary_to_atom(Name, utf8)) of
         {error, bad_name} ->
             error;
         Dir ->
-            case rebar_app_discover:find_app(Dir, valid) of
+            case rebar_app_discover:find_app(Dir, valid, State) of
                 {true, App} -> App;
                 false -> error
             end
