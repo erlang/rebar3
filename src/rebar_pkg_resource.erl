@@ -29,7 +29,7 @@
 -spec init(atom(), rebar_state:t()) -> {ok, rebar_resource_v2:resource()}.
 init(Type, State) ->
     {ok, Vsn} = application:get_key(rebar, vsn),
-    BaseConfig = #{http_adapter => {r3_hex_http_httpc, #{profile => rebar}},
+    BaseConfig = #{http_adapter => {rebar_httpc_adapter, #{profile => rebar}},
                    http_user_agent_fragment =>
                        <<"(rebar3/", (list_to_binary(Vsn))/binary, ") (httpc)">>},
     Repos = rebar_hex_repos:from_state(BaseConfig, State),
