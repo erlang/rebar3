@@ -382,14 +382,14 @@ use_first_repo_match(Config) ->
     ?assertMatch({ok,{package,{<<"B">>, {{2,0,0}, {[],[]}}, Repo2},
                       <<"inner checksum">>,<<"outer checksum">>, false, []},
                   #{name := Repo2,
-                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
+                    http_adapter := {rebar_httpc_adapter, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"B">>, <<"> 1.4.0">>, undefined, undefined,
                                                 ?PACKAGE_TABLE, State)),
 
     ?assertMatch({ok,{package,{<<"B">>, {{1,4,0}, {[],[]}}, Repo3},
                     <<"inner checksum">>,<<"outer checksum">>, false, []},
                   #{name := Repo3,
-                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
+                    http_adapter := {rebar_httpc_adapter, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"B">>, <<"~> 1.4.0">>, undefined, undefined,
                                                 ?PACKAGE_TABLE, State)).
 
@@ -400,7 +400,7 @@ use_exact_with_hash(Config) ->
     ?assertMatch({ok,{package,{<<"C">>, {{1,3,1}, {[],[]}}, Repo2},
                       <<"inner checksum">>, <<"good outer checksum">>, false, []},
                   #{name := Repo2,
-                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
+                    http_adapter := {rebar_httpc_adapter, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"C">>, <<"1.3.1">>, <<"inner checksum">>, <<"good outer checksum">>,
                                                 ?PACKAGE_TABLE, State)).
 
@@ -410,7 +410,7 @@ fail_repo_update(Config) ->
     ?assertMatch({ok,{package,{<<"B">>, {{1,4,0}, {[],[]}}, Repo3},
                       <<"inner checksum">>,<<"outer checksum">>, false, []},
                   #{name := Repo3,
-                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
+                    http_adapter := {rebar_httpc_adapter, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"B">>, <<"~> 1.4.0">>, undefined, undefined,
                                                 ?PACKAGE_TABLE, State)).
 
@@ -421,7 +421,7 @@ ignore_match_in_excluded_repo(Config) ->
     ?assertMatch({ok,{package,{<<"B">>, {{1,4,6}, {[],[]}}, Hexpm},
                       <<"inner checksum">>,<<"outer checksum">>, #{reason := 'RETIRED_INVALID'}, []},
                   #{name := Hexpm,
-                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
+                    http_adapter := {rebar_httpc_adapter, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"B">>, <<"~> 1.4.0">>, undefined, undefined,
                                                 ?PACKAGE_TABLE, State)),
 
@@ -429,7 +429,7 @@ ignore_match_in_excluded_repo(Config) ->
     ?assertMatch({ok,{package,{<<"A">>, {{0,1,1}, {[],[]}}, Repo2},
                       <<"inner checksum">>,  <<"good outer checksum">>, false, []},
                   #{name := Repo2,
-                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
+                    http_adapter := {rebar_httpc_adapter, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"A">>, <<"0.1.1">>, <<"inner checksum">>, <<"good outer checksum">>,
                                                 ?PACKAGE_TABLE, State)).
 
@@ -439,14 +439,14 @@ optional_prereleases(Config) ->
     ?assertMatch({ok,{package,{<<"B">>, {{1,5,0}, {[],[]}}, Hexpm},
                      <<"inner checksum">>,<<"outer checksum">>, false, []},
                   #{name := Hexpm,
-                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
+                    http_adapter := {rebar_httpc_adapter, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"B">>, <<"~> 1.5.0">>, undefined, undefined,
                                                 ?PACKAGE_TABLE, State)),
 
     ?assertMatch({ok,{package,{<<"B">>, {{1,5,6}, {[<<"rc">>,0],[]}}, Hexpm},
                       <<"inner checksum">>,<<"outer checksum">>, true, []},
                   #{name := Hexpm,
-                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
+                    http_adapter := {rebar_httpc_adapter, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"B">>, <<"1.5.6-rc.0">>, <<"inner checksum">>, <<"outer checksum">>,
                                                 ?PACKAGE_TABLE, State)),
 
@@ -455,7 +455,7 @@ optional_prereleases(Config) ->
     ?assertMatch({ok,{package,{<<"B">>, {{1,5,6}, {[<<"rc">>,0],[]}}, Hexpm},
                       <<"inner checksum">>,<<"outer checksum">>, true, []},
                   #{name := Hexpm,
-                    http_adapter := {r3_hex_http_httpc, #{profile := rebar}}}},
+                    http_adapter := {rebar_httpc_adapter, #{profile := rebar}}}},
                  rebar_packages:resolve_version(<<"B">>, <<"~> 1.5.0">>, <<"inner checksum">>, <<"outer checksum">>,
                                                 ?PACKAGE_TABLE, State1)).
 
