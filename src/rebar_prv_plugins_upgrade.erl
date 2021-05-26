@@ -101,7 +101,7 @@ build_plugin(ToBuild, State) ->
 maybe_update_pkg(Tup, State) when is_tuple(Tup) ->
     maybe_update_pkg(element(1, Tup), State);
 maybe_update_pkg(Name, State) ->
-    try rebar_app_utils:parse_dep(root, unicode:characters_to_binary(?DEFAULT_PLUGINS_DIR), Name, State, [], 0) of
+    try rebar_app_utils:parse_dep(Name, root, unicode:characters_to_list(?DEFAULT_PLUGINS_DIR), State, [], 0) of
         AppInfo ->
             Source = rebar_app_info:source(AppInfo),
             case element(1, Source) of
