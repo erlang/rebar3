@@ -1043,15 +1043,15 @@ ssl_opts(Url) ->
     end.
 
 %% @private Determines which CA Certs to use for the HTTPS request.
-%% If the user sets the value {cacert_path, "path to pem"} in their
+%% If the user sets the value {ssl_cacerts_path, "path to pem"} in their
 %% global rebar.config file, the pem will be encoded and used for the
-%% SSL connection.  Otherwise CA Certs from `certifi` will be used.
-%% This is functionaity is useful for Corporate Proxies that rewrite Certs.
+%% SSL connection.  Otherwise, CA Certs from `certifi` will be used.
+%% This functionality is useful (needed) for Corporate Proxies that rewrite Certs.
 %% See ssl_opts/2
 get_cacerts() ->
     GlobalConfigFile = rebar_dir:global_config(),
     Config = rebar_config:consult_file(GlobalConfigFile),
-    case proplists:get_value(cacert_path, Config) of
+    case proplists:get_value(ssl_cacerts_path, Config) of
         undefined ->
             certifi:cacerts();
         Path ->
