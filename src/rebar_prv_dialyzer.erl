@@ -352,7 +352,7 @@ read_plt(_State, Plt) ->
         {error, not_valid} ->
             error;
         {error, read_error} ->
-            Error = io_lib:format("Could not read the PLT file ~ts", [rebar_dir:format_source_file_name(Plt)]),
+            Error = io_lib:format("Could not read the PLT file ~ts", [format_path(Plt)]),
             throw({dialyzer_error, Error})
     end.
 
@@ -370,7 +370,7 @@ read_plt_files(Plt, Files) ->
         [] ->
             {ok, Files};
         Missing ->
-            ?INFO("Could not find ~p files in ~ts...", [length(Missing), rebar_dir:format_source_file_name(Plt)]),
+            ?INFO("Could not find ~p files in ~ts...", [length(Missing), format_path(Plt)]),
             ?DEBUG("Could not find files: ~p", [Missing]),
             error
     end.
@@ -389,19 +389,19 @@ check_plt(State, Plt, Output, OldList, FilesList) ->
 remove_plt(State, _Plt, _Output, []) ->
     {0, State};
 remove_plt(State, Plt, Output, Files) ->
-    ?INFO("Removing ~b files from ~ts...", [length(Files), rebar_dir:format_source_file_name(Plt)]),
+    ?INFO("Removing ~b files from ~ts...", [length(Files), format_path(Plt)]),
     run_plt(State, Plt, Output, plt_remove, Files).
 
 check_plt(State, _Plt, _Output, []) ->
     {0, State};
 check_plt(State, Plt, Output, Files) ->
-    ?INFO("Checking ~b files in ~ts...", [length(Files), rebar_dir:format_source_file_name(Plt)]),
+    ?INFO("Checking ~b files in ~ts...", [length(Files), format_path(Plt)]),
     run_plt(State, Plt, Output, plt_check, Files).
 
 add_plt(State, _Plt, _Output, []) ->
     {0, State};
 add_plt(State, Plt, Output, Files) ->
-    ?INFO("Adding ~b files to ~ts...", [length(Files), rebar_dir:format_source_file_name(Plt)]),
+    ?INFO("Adding ~b files to ~ts...", [length(Files), format_path(Plt)]),
     run_plt(State, Plt, Output, plt_add, Files).
 
 run_plt(State, Plt, Output, Analysis, Files) ->
@@ -419,8 +419,7 @@ build_proj_plt(Args, State, Plt, Output, Files) ->
     ?INFO("Updating base plt...", []),
     BaseFiles = base_plt_files(State),
     {BaseWarnings, State1} = update_base_plt(State, BasePlt, Output, BaseFiles),
-    ?INFO("Copying ~ts to ~ts...", [rebar_dir:format_source_file_name(BasePlt),
-                                    rebar_dir:format_source_file_name(Plt)]),
+    ?INFO("Copying ~ts to ~ts...", [format_path(BasePlt), format_path(Plt)]),
     _ = filelib:ensure_dir(Plt),
     case file:copy(BasePlt, Plt) of
         {ok, _} ->
@@ -462,7 +461,7 @@ update_base_plt(State, BasePlt, Output, BaseFiles) ->
     end.
 
 build_plt(State, Plt, _, []) ->
-    ?INFO("Building with no files in ~ts...", [rebar_dir:format_source_file_name(Plt)]),
+    ?INFO("Building with no files in ~ts...", [format_path(Plt)]),
     Opts = [{get_warnings, false},
             {output_plt, Plt},
             {apps, [erts]}],
@@ -473,7 +472,7 @@ build_plt(State, Plt, _, []) ->
     _ = dialyzer:run([{analysis_type, plt_remove}, {init_plt, Plt} | Opts]),
     {0, State};
 build_plt(State, Plt, Output, Files) ->
-    ?INFO("Building with ~b files in ~ts...", [length(Files), rebar_dir:format_source_file_name(Plt)]),
+    ?INFO("Building with ~b files in ~ts...", [length(Files), format_path(Plt)]),
     GetWarnings = get_config(State, get_warnings, false),
     Opts = [{analysis_type, plt_build},
             {get_warnings, GetWarnings},
@@ -492,10 +491,10 @@ succ_typings(Args, State, Plt, Output) ->
     end.
 
 succ_typings_(State, Plt, _, []) ->
-    ?INFO("Analyzing no files with ~ts...", [rebar_dir:format_source_file_name(Plt)]),
+    ?INFO("Analyzing no files with ~ts...", [format_path(Plt)]),
     {0, State};
 succ_typings_(State, Plt, Output, Files) ->
-    ?INFO("Analyzing ~b files with ~ts...", [length(Files), rebar_dir:format_source_file_name(Plt)]),
+    ?INFO("Analyzing ~b files with ~ts...", [length(Files), format_path(Plt)]),
     Opts = [{analysis_type, succ_typings},
             {get_warnings, true},
             {from, byte_code},
@@ -660,3 +659,13 @@ dialyzer_version() ->
 
 version_tuple(Major, Minor, Patch) ->
     {list_to_integer(Major), list_to_integer(Minor), list_to_integer(Patch)}.
+
+format_path(Path) ->
+    Normalized = rebar_dir:format_source_file_name(Path),
+    case filelib:is_file(Normalized) of
+        true -> Normalized;
+        false -> rebar_dir:format_source_file_name(Path, abs_path_opts())
+    end.
+
+abs_path_opts() ->
+    dict:from_list([{compiler_source_format, absolute}]).
