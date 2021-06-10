@@ -50,7 +50,7 @@ init(State) ->
                                 {bare, true},
                                 {deps, ?DEPS},
                                 {example, "rebar3 escriptize"},
-                                {opts, []},
+                                {opts, opt_spec_list()},
                                 {short_desc, "Generate escript archive."},
                                 {desc, desc()}
                                 ]),
@@ -60,10 +60,17 @@ desc() ->
     "Generate an escript executable containing "
         "the project's and its dependencies' BEAM files.".
 
+-spec opt_spec_list() -> [getopt:option_spec()].
+opt_spec_list() ->
+    [{main_app,  $a, "main-app",  string,
+      "Specify the name of the application to build an escript for."}].
+
 do(State) ->
     Providers = rebar_state:providers(State),
     Cwd = rebar_state:dir(State),
-    AppInfo0 = case rebar_state:get(State, escript_main_app, undefined) of
+    {Opts, _} = rebar_state:command_parsed_args(State),
+    ConfiguredMainApp = rebar_state:get(State, escript_main_app, undefined),
+    AppInfo0 = case proplists:get_value(main_app, Opts, ConfiguredMainApp) of
         undefined ->
             case rebar_state:project_apps(State) of
                 [AppInfo] ->
@@ -86,7 +93,11 @@ do(State) ->
         _ ->
             AppInfo1 = rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, AppInfo0, State),
             ?INFO("Building escript for ~s...", [rebar_app_info:name(AppInfo0)]),
-            Res = escriptize(State, AppInfo1),
+            Res = try
+                escriptize(State, AppInfo1)
+            catch
+                throw:Err=?PRV_ERROR(_) -> Err
+            end,
             rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, AppInfo1, State),
             Res
     end.
@@ -107,7 +118,7 @@ escriptize(State0, App) ->
     %% to pull in all the .beam files.
     TopInclApps = lists:usort([ec_cnv:to_atom(AppName) | rebar_state:get(State, escript_incl_apps, [])]),
     AllApps = rebar_state:all_deps(State)++rebar_state:project_apps(State),
-    InclApps = find_deps(TopInclApps, AllApps),
+    InclApps = find_deps(TopInclApps, AllApps, State),
     ?DEBUG("bundled applications:~n\t~p", [InclApps]),
     InclBeams = get_apps_beams(InclApps, AllApps),
 
@@ -158,6 +169,8 @@ format_error({zip_error, AppName, ZipError}) ->
 format_error({bad_name, App}) ->
     io_lib:format("Failed to get ebin/ directory for "
                    "escript_incl_app: ~p", [App]);
+format_error({bad_app, App}) ->
+    io_lib:format("Failed to find application ~p", [App]);
 format_error(no_main_app) ->
     io_lib:format("Multiple project apps and {escript_main_app, atom()}."
                  " not set in rebar.config", []).
@@ -244,16 +257,24 @@ usort(List) ->
 get_nonempty(Files) ->
     [{FName,FBin} || {FName,FBin} <- Files, FBin =/= <<>>].
 
-find_deps(AppNames, AllApps) ->
+find_deps(AppNames, AllApps, State) ->
     BinAppNames = [rebar_utils:to_binary(Name) || Name <- AppNames],
     [ec_cnv:to_atom(Name) ||
-     Name <- find_deps_of_deps(BinAppNames, AllApps, BinAppNames)].
+     Name <- find_deps_of_deps(BinAppNames, AllApps, State, BinAppNames)].
 
 %% Should look at the app files to find direct dependencies
-find_deps_of_deps([], _, Acc) -> Acc;
-find_deps_of_deps([Name|Names], Apps, Acc) ->
+find_deps_of_deps([], _, _, Acc) -> Acc;
+find_deps_of_deps([Name|Names], Apps, State, Acc) ->
     ?DIAGNOSTIC("processing ~p", [Name]),
-    {ok, App} = rebar_app_utils:find(Name, Apps),
+    App = case rebar_app_utils:find(Name, Apps) of
+        {ok, Found} ->
+            Found;
+        error ->
+            case find_external_app(Name, State) of
+                error -> throw(?PRV_ERROR({bad_app, binary_to_atom(Name, utf8)}));
+                App0 -> App0
+            end
+    end,
     DepNames = proplists:get_value(applications, rebar_app_info:app_details(App), []),
     BinDepNames = [rebar_utils:to_binary(Dep) || Dep <- DepNames,
                    %% ignore system libs; shouldn't include them.
@@ -262,7 +283,19 @@ find_deps_of_deps([Name|Names], Apps, Acc) ->
                    not lists:prefix(code:root_dir(), DepDir)]
                 -- ([Name|Names]++Acc), % avoid already seen deps
     ?DIAGNOSTIC("new deps of ~p found to be ~p", [Name, BinDepNames]),
-    find_deps_of_deps(BinDepNames ++ Names, Apps, BinDepNames ++ Acc).
+    find_deps_of_deps(BinDepNames ++ Names, Apps, State, BinDepNames ++ Acc).
+
+%% This is for apps which are on the code path (ERL_LIBS) but not part of OTP
+find_external_app(Name, State) ->
+    case code:lib_dir(binary_to_atom(Name, utf8)) of
+        {error, bad_name} ->
+            error;
+        Dir ->
+            case rebar_app_discover:find_app(Dir, valid, State) of
+                {true, App} -> App;
+                false -> error
+            end
+    end.
 
 def(Rm, State, Key, Default) ->
     Value0 = rebar_state:get(State, Key, Default),

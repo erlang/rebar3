@@ -324,7 +324,10 @@ maybe_boot_apps(State) ->
             %% load apps, then check config, then boot them.
             load_apps(Apps),
             ok = reread_config(Apps, State),
-            boot_apps(Apps)
+            ShellOpts = rebar_state:get(State, shell, []),
+            BootLogLevel = debug_get_value(log, ShellOpts, info,
+                "Found boot log verbosity mode from config."),
+            boot_apps(Apps, BootLogLevel)
     end.
 
 simulate_proc_lib() ->
@@ -442,15 +445,19 @@ reread_config(AppsToStart, State) ->
             ok
     end.
 
-boot_apps(Apps) ->
+boot_apps(Apps, BootLogLevel) ->
     Normalized = normalize_boot_apps(Apps),
     Res = [application:ensure_all_started(App) || App <- Normalized],
-    _ = [?INFO("Booted ~p", [App])
-            || {ok, Booted} <- Res,
-            App <- Booted],
+    print_booted([App || {ok, Booted} <- Res, App <- Booted], BootLogLevel),
+    %% errors are not suppressed
     _ = [?ERROR("Failed to boot ~p for reason ~p", [App, Reason])
             || {error, {App, Reason}} <- Res],
     ok.
+
+print_booted(Booted, debug) ->
+    _ = [?DEBUG("Booted ~p", [App]) || App <- Booted];
+print_booted(Booted, info) ->
+    _ = [?INFO("Booted ~p", [App]) || App <- Booted].
 
 normalize_load_apps([]) -> [];
 normalize_load_apps([{_App, none} | T]) -> normalize_load_apps(T);

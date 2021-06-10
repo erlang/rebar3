@@ -8,8 +8,6 @@
 %% Util exports
 -export([consult/1]).
 
--ifdef(unicode_str).
-
 %% string:join/2 copy; string:join/2 is getting obsoleted
 %% and replaced by lists:join/2, but lists:join/2 is too new
 %% for version support (only appeared in 19.0) so it cannot be
@@ -31,27 +29,6 @@ chr(S, C) when is_integer(C) -> chr(S, C, 1).
 chr([C|_Cs], C, I) -> I;
 chr([_|Cs], C, I) -> chr(Cs, C, I+1);
 chr([], _C, _I) -> 0.
--else.
-
-join(Strings, Separator) -> string:join(Strings, Separator).
-split(Str, SearchPattern) when is_list(Str) -> string:split(Str, SearchPattern);
-split(Str, SearchPattern) when is_binary(Str) -> binary:split(Str, SearchPattern).
-lexemes(Str, SepList) -> string:tokens(Str, SepList).
-trim(Str) when is_list(Str) ->
-    re:replace(Str, "\\s+", "", [global, {return, list}]);
-trim(Str) when is_binary(Str) ->
-    list_to_binary(trim(binary_to_list(Str))).
-trim(Str, Direction, [Char]) ->
-    Dir = case Direction of
-              both -> both;
-              leading -> left;
-              trailing -> right
-          end,
-    string:strip(Str, Dir, Char).
-uppercase(Str) -> string:to_upper(Str).
-lowercase(Str) -> string:to_lower(Str).
-chr(Str, Char) -> string:chr(Str, Char).
--endif.
 
 %% @doc
 %% Given a string or binary, parse it into a list of terms, ala file:consult/1

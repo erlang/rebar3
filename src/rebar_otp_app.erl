@@ -85,16 +85,30 @@ validate_app_modules(State, App, AppData) ->
     %% In general, the list of modules is an important thing to validate
     %% for compliance with OTP guidelines and upgrade procedures.
     %% However, some people prefer not to validate this list.
+    AppVsn = proplists:get_value(vsn, AppData),
     case rebar_state:get(State, validate_app_modules, true) of
         true ->
             case rebar_app_utils:validate_application_info(App, AppData) of
                 true ->
-                    {ok, App};
+                    {ok, ensure_vsn(App, AppVsn)};
                 Error ->
                     Error
             end;
         false ->
-            {ok, App}
+            {ok, ensure_vsn(App, AppVsn)}
+    end.
+
+%% If a version hasn't been set yet, then set it both for the
+%% original and regular version attributes.
+ensure_vsn(App, Vsn) ->
+    ensure_vsn(original_vsn, ensure_vsn(vsn, App, Vsn), Vsn).
+
+ensure_vsn(F, App, AppVsn) ->
+    case rebar_app_info:F(App) of
+        Vsn when Vsn =:= undefined; Vsn =:= [] ->
+            rebar_app_info:F(App, AppVsn);
+        _ ->
+            App
     end.
 
 preprocess(State, AppInfo, AppSrcFile) ->
@@ -124,7 +138,7 @@ preprocess(State, AppInfo, AppSrcFile) ->
             %% Setup file .app filename and write new contents
             EbinDir = rebar_app_info:ebin_dir(AppInfo),
             rebar_file_utils:ensure_dir(EbinDir),
-            AppFile = rebar_app_utils:app_src_to_app(OutDir, AppSrcFile),
+            AppFile = rebar_app_utils:app_src_to_app(OutDir, AppSrcFile, State),
             ok = rebar_file_utils:write_file_if_contents_differ(AppFile, Spec, utf8),
 
             rebar_app_info:app_file(rebar_app_info:vsn(AppInfo, Vsn), AppFile);

@@ -31,6 +31,7 @@
 -define(INDEX_FILE, "packages.idx").
 -define(HEX_AUTH_FILE, "hex.config").
 -define(PUBLIC_HEX_REPO, <<"hexpm">>).
+-define(DEFAULT_APP_RESOURCE_EXT, [".app.src.script", ".app.src"]).
 
 %% ignore this function in all modules
 %% not every module that exports it and relies on it being called implements provider

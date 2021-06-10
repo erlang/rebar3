@@ -36,9 +36,7 @@ main(_) ->
                ,{getopt, []}
                ,{cf, []}
                ,{erlware_commons, ["ec_dictionary.erl", "ec_vsn.erl"]}
-               ,{parse_trans, ["parse_trans.erl", "parse_trans_pp.erl",
-                               "parse_trans_codegen.erl"]}
-               ,{certifi, []}],
+               ,{certifi, ["certifi_pt.erl"]}],
     Deps = get_deps(),
     [fetch_and_compile(Dep, Deps) || Dep <- BaseDeps],
 
@@ -46,7 +44,7 @@ main(_) ->
     bootstrap_rebar3(),
 
     %% Build rebar.app from rebar.app.src
-    {ok, App} = rebar_app_info:new(rebar, "3.14.3", filename:absname("_build/default/lib/rebar/")),
+    {ok, App} = rebar_app_info:new(rebar, "3.16.1", filename:absname("_build/default/lib/rebar/")),
     rebar_otp_app:compile(rebar_state:new(), App),
 
     %% Because we are compiling files that are loaded already we want to silence
@@ -664,11 +662,8 @@ format_error(AbsSource, Extra, {Mod, Desc}) ->
 
 additional_defines() ->
     [{d, D} || {Re, D} <- [{"^[0-9]+", namespaced_types},
-                           {"^18", no_maps_update_with},
-                           {"^R1[4|5]", deprecated_crypto},
-                           {"^2", unicode_str},
-                           {"^(R|1|20)", fun_stacktrace},
-                           {"^((1[8|9])|2)", rand_module}],
+                           {"^(20)", fun_stacktrace},
+                           {"^(2)", rand_module}],
                is_otp_release(Re)].
 
 is_otp_release(ArchRegex) ->

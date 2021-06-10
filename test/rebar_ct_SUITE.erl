@@ -1601,6 +1601,15 @@ cmd_vs_cfg_opts(Config) ->
     false = lists:keymember(group, 1, TestOpts2),
     false = lists:keymember(testcase, 1, TestOpts2),
 
+    {ok, GetOptResult3} = getopt:parse(GetOptSpec, ["--group","[g1,g2],g3"]),
+    State3 = rebar_state:command_parsed_args(State, GetOptResult3),
+    {ok, TestOpts3} = rebar_prv_common_test:prepare_tests(State3),
+    true = lists:member({group, [[g1,g2],g3]}, TestOpts3),
+    false = lists:keymember(suite, 1, TestOpts3),
+    false = lists:keymember(spec, 1, TestOpts3),
+    false = lists:keymember(dir, 1, TestOpts3),
+    false = lists:keymember(testcase, 1, TestOpts3),
+
     ok.
 
 single_testspec_in_ct_opts(Config) ->

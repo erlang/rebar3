@@ -83,6 +83,7 @@ run_tests(State, Tests) ->
     EUnitOpts = resolve_eunit_opts(State),
     ?DEBUG("finding tests in:~n\t{eunit_tests, ~p}.", [T]),
     ?DEBUG("with options:~n\t{eunit_opts, ~p}.", [EUnitOpts]),
+    apply_sys_config(State),
     try eunit:test(T, EUnitOpts) of
       Result ->
         ok = maybe_write_coverdata(State),
@@ -498,6 +499,33 @@ translate(State, [], {file, FilePath}) ->
         {error, badparent} -> {file, FilePath}
     end.
 
+apply_sys_config(State) ->
+    CfgSysCfg = case rebar_state:get(State, eunit_opts, []) of
+        Opts when is_list(Opts) ->
+            case proplists:get_value(sys_config, Opts, []) of
+                [] -> [];
+                L when is_list(hd(L)) -> L;
+                S when is_list(S) -> [S]
+            end;
+        _ ->
+            []
+    end,
+    {RawOpts, _} = rebar_state:command_parsed_args(State),
+    SysCfgs = rebar_string:lexemes(
+        proplists:get_value(sys_config, RawOpts, ""),
+        [$,]
+    ) ++ CfgSysCfg,
+    Configs = lists:flatmap(
+        fun(Filename) -> rebar_file_utils:consult_config(State, Filename) end,
+        SysCfgs
+    ),
+    %% NB: load the applications (from user directories too) to support OTP < 17
+    %% to our best ability.
+    rebar_paths:set_paths([deps, plugins], State),
+    [application:load(Application) || Config <- Configs, {Application, _} <- Config],
+    rebar_utils:reread_config(Configs, [update_logger]),
+    ok.
+
 maybe_cover_compile(State) ->
     {RawOpts, _} = rebar_state:command_parsed_args(State),
     State1 = case proplists:get_value(cover, RawOpts, false) of
@@ -535,6 +563,7 @@ eunit_opts(_State) ->
      {verbose, $v, "verbose", boolean, help(verbose)},
      {name, undefined, "name", atom, help(name)},
      {sname, undefined, "sname", atom, help(sname)},
+     {sys_config, undefined, "sys_config", string, help(sys_config)}, %% comma-separated list
      {setcookie, undefined, "setcookie", atom, help(setcookie)}].
 
 help(app)       -> "Comma separated list of application test suites to run. Equivalent to `[{application, App}]`.";
@@ -548,4 +577,5 @@ help(generator) -> "Comma separated list of generators (the format is `module:fu
 help(verbose)   -> "Verbose output. Defaults to false.";
 help(name)      -> "Gives a long name to the node";
 help(sname)     -> "Gives a short name to the node";
-help(setcookie) -> "Sets the cookie if the node is distributed".
+help(setcookie) -> "Sets the cookie if the node is distributed";
+help(sys_config) -> "List of application config files".

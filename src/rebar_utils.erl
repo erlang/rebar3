@@ -58,6 +58,7 @@
          deps_to_binary/1,
          to_binary/1,
          to_list/1,
+         to_atom/1,
          tup_dedup/1,
          tup_umerge/2,
          tup_sort/1,
@@ -269,6 +270,10 @@ to_list(A) when is_atom(A) -> atom_to_list(A);
 to_list(B) when is_binary(B) -> unicode:characters_to_list(B);
 to_list(I) when is_integer(I) -> integer_to_list(I);
 to_list(Str) -> unicode:characters_to_list(Str).
+
+to_atom(B) when is_binary(B) -> binary_to_atom(B, utf8);
+to_atom(Str) when is_list(Str) -> list_to_atom(Str);
+to_atom(A) when is_atom(A) -> A.
 
 tup_dedup(List) ->
     tup_dedup_(tup_sort(List)).
@@ -1037,6 +1042,24 @@ ssl_opts(Url) ->
             [{verify, verify_none}]
     end.
 
+%% @private Determines which CA Certs to use for the HTTPS request.
+%% If the user sets the value {ssl_cacerts_path, "path to pem"} in their
+%% global rebar.config file, the pem will be encoded and used for the
+%% SSL connection.  Otherwise, CA Certs from `certifi` will be used.
+%% This functionality is useful (needed) for Corporate Proxies that rewrite Certs.
+%% See ssl_opts/2
+get_cacerts() ->
+    GlobalConfigFile = rebar_dir:global_config(),
+    Config = rebar_config:consult_file(GlobalConfigFile),
+    case proplists:get_value(ssl_cacerts_path, Config) of
+        undefined ->
+            certifi:cacerts();
+        Path ->
+            {ok, Bin} = file:read_file(Path),
+            Pems = public_key:pem_decode(Bin),
+            [Der || {'Certificate', Der, _} <- Pems]
+    end.
+
 %%------------------------------------------------------------------------------
 %% @doc
 %% Return the SSL options adequate for the project based on
@@ -1053,7 +1076,7 @@ ssl_opts(ssl_verify_enabled, Url) ->
             #{host := Hostname} = rebar_uri:parse(rebar_utils:to_list(Url)),
             VerifyFun = {fun ssl_verify_hostname:verify_fun/3,
                          [{check_hostname, Hostname}]},
-            CACerts = certifi:cacerts(),
+            CACerts = get_cacerts(),
             [{verify, verify_peer}, {depth, 2}, {cacerts, CACerts},
              {partial_chain, fun partial_chain/1}, {verify_fun, VerifyFun}];
         false ->

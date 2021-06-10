@@ -15,14 +15,14 @@ jobs:
 
     strategy:
       matrix:
-        otp_version: [19, 20, 21, 22, 23]
+        otp_version: [22, 23, 24]
         os: [ubuntu-latest]
 
     container:
       image: erlang:${{ matrix.otp_version }}
 
     env:
-      LATEST_OTP_RELEASE: 23
+      LATEST_OTP_RELEASE: 24
 
     steps:
     - uses: actions/checkout@v2
@@ -41,6 +41,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Brew Version Check
+      run: brew --version
+    - name: Keep Brew Fresh
+      run: brew update
     - name: Install Erlang
       run: brew install erlang
     - name: Compile

@@ -15,7 +15,7 @@ jobs:
 
     - uses: gleam-lang/setup-erlang@master
       with:
-        otp-version: 19.3.6.13
+        otp-version: 22.3.4.9
     - name: Compile
       run: ./bootstrap
     - name: CT tests

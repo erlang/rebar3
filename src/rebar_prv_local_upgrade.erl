@@ -52,7 +52,18 @@ do(State) ->
 
             case maybe_fetch_rebar3(Md5) of
                 {saved, TmpRebar3} ->
-                    rebar_prv_local_install:extract_escript(State, TmpRebar3);
+                    {Vsn, Archive} =
+                        try
+                            {ok, Escript} = escript:extract(TmpRebar3, []),
+                            {comment, "Rebar3 " ++ Rebar3Vsn} = lists:keyfind(comment, 1, Escript),
+                            {archive, FullArchive} = lists:keyfind(archive, 1, Escript),
+                            {Rebar3Vsn, FullArchive}
+                        catch
+                            C:T:S ->
+                                ?DIAGNOSTIC("local upgrade version extraction exception: ~p:~p:~p", [C, T, S]),
+                                error(?PRV_ERROR(failed_vsn_lookup))
+                        end,
+                    rebar_prv_local_install:install_escript(State, Vsn, Archive);
                 up_to_date ->
                     {ok, State};
                 Error ->
@@ -61,6 +72,8 @@ do(State) ->
     end.
 
 -spec format_error(any()) -> iolist().
+format_error(failed_vsn_lookup) ->
+    "Failed to extract the version from the downloaded rebar3 escript.\n     Try downloading https://s3.amazonaws.com/rebar3/rebar3 manually and running `chmod +x rebar3 && ./rebar3 local install`";
 format_error(bad_checksum) ->
     "Not updating rebar3, the checksum of download did not match the one provided by s3.";
 format_error(Reason) ->

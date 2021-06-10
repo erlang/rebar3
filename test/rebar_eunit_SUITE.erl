@@ -21,6 +21,7 @@
 -export([misspecified_eunit_compile_opts/1]).
 -export([misspecified_eunit_first_files/1]).
 -export([alternate_test_regex/1]).
+-export([syscfg_app_opts/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -31,7 +32,7 @@ all() ->
      misspecified_eunit_tests,
      misspecified_eunit_compile_opts,
      misspecified_eunit_first_files,
-     alternate_test_regex].
+     alternate_test_regex, syscfg_app_opts].
 
 groups() ->
     [{basic_app, [sequence], [basic_app_compiles, {group, basic_app_results}]},
@@ -61,6 +62,8 @@ init_per_suite(Config) ->
     {ok, _} = zip:extract(filename:join([PrivDir, "basic_app.zip"]), [{cwd, PrivDir}]),
     ok = ec_file:copy(filename:join([DataDir, "multi_app.zip"]), filename:join([PrivDir, "multi_app.zip"])),
     {ok, _} = zip:extract(filename:join([PrivDir, "multi_app.zip"]), [{cwd, PrivDir}]),
+    ok = ec_file:copy(filename:join([DataDir, "syscfg_app.zip"]), filename:join([PrivDir, "syscfg_app.zip"])),
+    {ok, _} = zip:extract(filename:join([PrivDir, "syscfg_app.zip"]), [{cwd, PrivDir}]),
     Config.
 
 end_per_suite(Config) -> Config.
@@ -639,3 +642,26 @@ alternate_test_regex(Config) ->
     Set = {ok, [{application, basic_app},
                 {module, basic_app_tests}]},
     Set = rebar_prv_eunit:prepare_tests(S).
+
+%% check that sys_config files go through
+syscfg_app_opts(Config) ->
+    State = rebar_test_utils:init_rebar_state(Config, "syscfg_"),
+
+    AppDir = ?config(apps, State),
+    PrivDir = ?config(priv_dir, State),
+
+    AppDirs = ["src", "test", "config"],
+
+    lists:foreach(fun(F) -> ec_file:copy(filename:join([PrivDir, "syscfg_app", F]),
+                                         filename:join([AppDir, F]),
+                                         [recursive]) end, AppDirs),
+
+    RebarConfig = [{eunit_opts, [
+        {sys_config, ["config/file1.config", "config/file2.config"]}
+    ]}],
+    Opts = ["--sys_config", "config/cmd1.config,config/cmd2.config"],
+
+    {ok, _} = rebar_test_utils:run_and_check(State, RebarConfig,
+                                             ["eunit" | Opts], return),
+    ok.
+

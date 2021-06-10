@@ -75,7 +75,7 @@ handle_project_apps(Providers, State) ->
 
     State3 = update_code_paths(State2, ProjectApps2),
 
-    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State2),
+    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State3),
     case rebar_state:has_all_artifacts(State3) of
         {false, File} ->
             throw(?PRV_ERROR({missing_artifact, File}));

@@ -1,19 +1,13 @@
 -module(rebar_test_utils).
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
--export([init_rebar_state/1, init_rebar_state/2, run_and_check/3, run_and_check/4, check_results/3]).
+-export([init_rebar_state/1, init_rebar_state/2, run_and_check/3, run_and_check/4,
+         check_results/3, check_results/4]).
 -export([expand_deps/2, flat_deps/1, top_level_deps/1]).
 -export([create_app/4, create_plugin/4, create_eunit_app/4, create_empty_app/4,
          create_config/2, create_config/3, package_app/4]).
 -export([create_random_name/1, create_random_vsn/0, write_src_file/2,
          random_element/1]).
-
-%% Pick the right random module
--ifdef(rand_only).
--define(random, rand).
--else.
--define(random, random).
--endif.
 
 %%%%%%%%%%%%%%
 %%% Public %%%
@@ -162,25 +156,13 @@ create_config(_AppDir, ConfFilename, Contents) ->
 
 %% @doc Util to create a random variation of a given name.
 create_random_name(Name) ->
-    random_seed(),
-    Name ++ erlang:integer_to_list(?random:uniform(1000000)).
+    Name ++ erlang:integer_to_list(rand:uniform(1000000)).
 
 %% @doc Util to create a random variation of a given version.
 create_random_vsn() ->
-    random_seed(),
-    lists:flatten([erlang:integer_to_list(?random:uniform(100)),
-                   ".", erlang:integer_to_list(?random:uniform(100)),
-                   ".", erlang:integer_to_list(?random:uniform(100))]).
-
--ifdef(rand_only).
-random_seed() ->
-    %% the rand module self-seeds
-    ok.
--else.
-random_seed() ->
-    <<A:32, B:32, C:32>> = crypto:rand_bytes(12),
-    random:seed({A,B,C}).
--endif.
+    lists:flatten([erlang:integer_to_list(rand:uniform(100)),
+                   ".", erlang:integer_to_list(rand:uniform(100)),
+                   ".", erlang:integer_to_list(rand:uniform(100))]).
 
 expand_deps(_, []) -> [];
 expand_deps(git_subdir, [{Name, Deps} | Rest]) ->
@@ -259,6 +241,10 @@ top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
 %%% Helpers %%%
 %%%%%%%%%%%%%%%
 check_results(AppDir, Expected, ProfileRun) ->
+    State = rebar_state:new(),
+    check_results(AppDir, Expected, ProfileRun, State).
+
+check_results(AppDir, Expected, ProfileRun, State) ->
     BuildDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib", "*"])),
     BuildSubDirs = [D || D <- filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib", "*", "*", "*"])),
                          filelib:is_dir(D)],
@@ -268,21 +254,21 @@ check_results(AppDir, Expected, ProfileRun) ->
     LockFile = filename:join([AppDir, "rebar.lock"]),
     Locks = lists:flatten(rebar_config:consult_lock_file(LockFile)),
 
-    InvalidApps = rebar_app_discover:find_apps(BuildDirs, invalid),
-    ValidApps = rebar_app_discover:find_apps(BuildDirs, valid),
+    InvalidApps = rebar_app_discover:find_apps(BuildDirs, invalid, State),
+    ValidApps = rebar_app_discover:find_apps(BuildDirs, valid, State),
 
     InvalidDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- InvalidApps],
     ValidDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- ValidApps],
 
-    Deps = rebar_app_discover:find_apps(BuildDirs, all),
-    SubDeps = rebar_app_discover:find_apps(BuildSubDirs, all),
+    Deps = rebar_app_discover:find_apps(BuildDirs, all, State),
+    SubDeps = rebar_app_discover:find_apps(BuildSubDirs, all, State),
     DepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Deps],
     SubDirDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- SubDeps],
-    Checkouts = rebar_app_discover:find_apps(CheckoutsDirs, all),
+    Checkouts = rebar_app_discover:find_apps(CheckoutsDirs, all, State),
     CheckoutsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Checkouts],
-    Plugins = rebar_app_discover:find_apps(PluginDirs, all),
+    Plugins = rebar_app_discover:find_apps(PluginDirs, all, State),
     PluginsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Plugins],
-    GlobalPlugins = rebar_app_discover:find_apps(GlobalPluginDirs, all),
+    GlobalPlugins = rebar_app_discover:find_apps(GlobalPluginDirs, all, State),
     GlobalPluginsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- GlobalPlugins],
 
     lists:foreach(
@@ -552,5 +538,5 @@ package_app(AppDir, DestDir, PkgName, PkgVsn) ->
     {Checksum1, E}.
 
 random_element(Repos) ->
-    Index = ?random:uniform(length(Repos)),
+    Index = rand:uniform(length(Repos)),
     lists:nth(Index, Repos).

@@ -73,6 +73,8 @@ desc() ->
     "modules from excluded applications\n"
     "`exclude_mods` - a list of modules to exclude from PLT files and "
     "success typing analysis\n"
+    "`output_format` - configure whether the dialyzer_warnings file will have "
+    "the `raw` or `formatted` output\n"
     "\n"
     "For example, to warn on unmatched returns: \n"
     "{dialyzer, [{warnings, [unmatched_returns]}]}.\n"
@@ -221,15 +223,19 @@ proj_apps(State) ->
 
 proj_plt_apps(State) ->
     Apps = rebar_state:project_apps(State),
-    DepApps = lists:flatmap(fun rebar_app_info:applications/1, Apps),
+    DepApps = lists:flatmap(
+               fun(App) ->
+                       rebar_app_info:applications(App) ++
+                           rebar_app_info:included_applications(App)
+               end, Apps),
     ProjApps = proj_apps(State),
     case get_config(State, plt_apps, top_level_deps) of
         top_level_deps ->
             DepApps -- ProjApps;
         all_deps       ->
-            collect_nested_dependent_apps(DepApps) -- ProjApps;
+            collect_nested_dependent_apps(DepApps, State) -- ProjApps;
         all_apps       ->
-            proj_apps(State) ++ collect_nested_dependent_apps(DepApps)
+            proj_apps(State) ++ collect_nested_dependent_apps(DepApps, State)
     end.
 
 get_files(State, Apps, SkipApps, Mods, SkipMods, ExtraDirs) ->
@@ -557,18 +563,27 @@ legacy_warnings(Warnings) ->
 format_warnings(Opts, Output, Warnings) ->
     Warnings1 = rebar_dialyzer_format:format_warnings(Opts, Warnings),
     console_warnings(Warnings1),
-    file_warnings(Output, Warnings),
+    Config = rebar_opts:get(Opts, dialyzer, []),
+    OutputFormat = proplists:get_value(output_format, Config, formatted),
+    file_warnings(Output, Warnings, OutputFormat),
     length(Warnings).
 
 console_warnings(Warnings) ->
     _ = [?CONSOLE("~ts", [Warning]) || Warning <- Warnings],
     ok.
 
-file_warnings(_, []) ->
+file_warnings(_, [], _) ->
     ok;
-file_warnings(Output, Warnings) ->
-    Warnings1 = [[dialyzer:format_warning(Warning, fullpath), $\n] || Warning <- Warnings],
-    case file:write_file(Output, Warnings1, [append]) of
+file_warnings(Output, Warnings, raw) ->
+    Warnings1 = [[io_lib:format("~tp.\n", [W]) || W <- Warnings]],
+    write_file_warnings(Output, Warnings1);
+file_warnings(Output, Warnings, formatted) ->
+    Warnings1 = [[dialyzer:format_warning(Warning, fullpath), $\n]
+                 || Warning <- Warnings],
+    write_file_warnings(Output, Warnings1).
+
+write_file_warnings(Output, Warnings) ->
+    case file:write_file(Output, Warnings, [append]) of
         ok ->
             ok;
         {error, Reason} ->
@@ -597,13 +612,24 @@ debug_info(State) ->
     proplists:get_value(debug_info_key, Config, false) =/= false orelse
     proplists:get_value(encrypt_debug_info, Config, false) =/= false.
 
--spec collect_nested_dependent_apps([atom()]) -> [atom()].
-collect_nested_dependent_apps(RootApps) ->
-    Deps = lists:foldl(fun collect_nested_dependent_apps/2, sets:new(), RootApps),
+-spec collect_nested_dependent_apps([atom()], rebar_state:t()) -> [atom()].
+collect_nested_dependent_apps(RootApps, State) ->
+    Deps = collect_nested_dependent_apps(RootApps, sets:new(), State),
     sets:to_list(Deps).
 
--spec collect_nested_dependent_apps(atom(), rebar_set()) -> rebar_set().
-collect_nested_dependent_apps(App, Seen) ->
+-spec collect_nested_dependent_apps([atom()], rebar_set(), rebar_state:t()) -> rebar_set().
+collect_nested_dependent_apps(RootApps, Init, State) ->
+    lists:foldl(
+        fun (App, Seen) ->
+                collect_nested_dependent_app(App, Seen, State)
+        end,
+        Init,
+        RootApps
+    ).
+
+
+-spec collect_nested_dependent_app(atom(), rebar_set(), rebar_state:t()) -> rebar_set().
+collect_nested_dependent_app(App, Seen, State) ->
     case sets:is_element(App, Seen) of
         true ->
             Seen;
@@ -613,13 +639,11 @@ collect_nested_dependent_apps(App, Seen) ->
                 {error, _} ->
                     throw({unknown_application, App});
                 AppDir ->
-                    case rebar_app_discover:find_app(AppDir, all) of
+                    case rebar_app_discover:find_app(AppDir, all, State) of
                         false ->
                             throw({unknown_application, App});
                         {true, AppInfo}  ->
-                            lists:foldl(fun collect_nested_dependent_apps/2,
-                                        Seen1,
-                                        rebar_app_info:applications(AppInfo))
+                            collect_nested_dependent_apps(rebar_app_info:applications(AppInfo), Seen1, State)
                     end
             end
     end.

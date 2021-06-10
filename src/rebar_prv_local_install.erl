@@ -9,7 +9,8 @@
          do/1,
          format_error/1]).
 
--export([extract_escript/2]).
+-export([extract_escript/2,
+         install_escript/3]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
@@ -71,11 +72,13 @@ erl -pz ", (rebar_utils:to_binary(OutputDir))/binary,"/${VSN}/lib/*/ebin +sbtu +
 extract_escript(State, ScriptPath) ->
     {ok, Escript} = escript:extract(ScriptPath, []),
     {archive, Archive} = lists:keyfind(archive, 1, Escript),
+    {ok, Vsn} = application:get_key(rebar, vsn),
+    install_escript(State, Vsn, Archive).
 
-    %% Extract contents of Archive to ~/.cache/rebar3/lib
+install_escript(State, Vsn, Archive) ->
+    %% Extract contents of Archive to ~/.cache/rebar3/vsns/<VSN>/lib
     %% And add a rebar3 bin script to ~/.cache/rebar3/bin
     Opts = rebar_state:opts(State),
-    {ok, Vsn} = application:get_key(rebar, vsn),
     VersionsDir = filename:join(rebar_dir:global_cache_dir(Opts), "vsns"),
     OutputDir = filename:join([VersionsDir, Vsn, "lib"]),
     case filelib:ensure_dir(filename:join([OutputDir, "empty"])) of

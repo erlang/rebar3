@@ -29,7 +29,7 @@
 -export([find/2,
          find/3,
          is_app_src/1,
-         app_src_to_app/2,
+         app_src_to_app/3,
          validate_application_info/1,
          validate_application_info/2,
          parse_deps/5,
@@ -70,20 +70,18 @@ is_app_src(Filename) ->
 
 %% @doc translates the name of the .app.src[.script] file to where
 %% its .app counterpart should be stored.
--spec app_src_to_app(OutDir, SrcFilename) -> OutFilename when
+-spec app_src_to_app(OutDir, SrcFilename, State) -> OutFilename when
       OutDir :: file:filename(),
       SrcFilename :: file:filename(),
+      State :: rebar_state:t(),
       OutFilename :: file:filename().
-app_src_to_app(OutDir, Filename) ->
-    AppFile =
-        case lists:suffix(".app.src", Filename) of
-            true ->
-                filename:join([OutDir, "ebin", filename:basename(Filename, ".app.src") ++ ".app"]);
-            false ->
-                filename:join([OutDir, "ebin", filename:basename(Filename,
-                                                                 ".app.src.script") ++ ".app"])
-        end,
-    filelib:ensure_dir(AppFile),
+app_src_to_app(OutDir, Filename, State) ->
+    Extensions = rebar_state:get(State, application_resource_extensions, ?DEFAULT_APP_RESOURCE_EXT),
+    [AppFile | _] = [
+        filename:join([OutDir, "ebin", filename:basename(Filename, Ext) ++ ".app"])
+        || Ext <- Extensions
+        , lists:suffix(Ext, Filename)
+    ],
     AppFile.
 
 %% @doc checks whether the .app file has all the required data to be valid,
@@ -255,7 +253,7 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source0, IsLock, State) ->
     {SubDir, Source1} = subdir(Name, Source0),
     FetchDir = rebar_utils:to_list(filename:join([DepsDir, Name])),
     CheckoutsDir = rebar_utils:to_list(rebar_dir:checkouts_dir(State, Name)),
-    AppInfo = case rebar_app_info:discover(CheckoutsDir) of
+    AppInfo = case rebar_app_info:discover(CheckoutsDir, State) of
                   {ok, App} ->
                       OutDir = filename:join(rebar_dir:checkouts_out_dir(State), Name),
                       rebar_app_info:out_dir(
@@ -264,7 +262,7 @@ dep_to_app(Parent, DepsDir, Name, Vsn, Source0, IsLock, State) ->
                   not_found ->
                       Dir = rebar_utils:to_list(filename:join([DepsDir, Name, SubDir])),
                       {ok, AppInfo0} =
-                          case rebar_app_info:discover(Dir) of
+                          case rebar_app_info:discover(Dir, State) of
                               {ok, App} ->
                                   App1 = rebar_app_info:name(App, Name),
                                   {ok, rebar_app_info:is_available(rebar_app_info:parent(App1, Parent),

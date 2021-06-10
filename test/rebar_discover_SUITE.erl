@@ -5,7 +5,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 all() ->
-    [empty_app_src, bad_app_src, invalid_app_src].
+    [empty_app_src, bad_app_src, invalid_app_src, overwrite_extension].
      %% note: invalid .app files without a .app.src also present
      %% has rebar3 just ignoring the directory as not OTP-related.
 
@@ -67,3 +67,47 @@ invalid_app_src(Config) ->
     ),
     ok.
 
+overwrite_extension() ->
+    [{doc, "when we overwrite the default extension with "
+           "`[\".test.app.src\", \".app.src\"]` "
+           "check that the right application resource file is used. When "
+           "the order is reversed multiple_app_files should be returned."}].
+
+overwrite_extension(Config) ->
+    AppDir = ?config(apps, Config),
+    [Name] = ?config(app_names, Config),
+    AppSrc = filename:join([AppDir, "src", Name ++ ".app.src"]),
+    TestAppSrc = filename:join([AppDir, "src", Name ++ ".test.app.src"]),
+    AppSrcData =
+        io_lib:format(
+            "{application, ~s, [{description, \"some description\"},  "
+            "{vsn, \"0.1.0\"},  {applications, [kernel,stdlib]} ]}.~n",
+            [Name]
+        ),
+    TestAppSrcData =
+        io_lib:format(
+            "{application, ~s, [{description, \"some description\"},  "
+            "{vsn, \"0.42.0\"},  {applications, [kernel,stdlib]} ]}.~n",
+            [Name]
+        ),
+    ok = file:write_file(AppSrc, AppSrcData),
+    ok = file:write_file(TestAppSrc, TestAppSrcData),
+    {ok, AfterCompileState} =
+        rebar_test_utils:run_and_check(
+            Config,
+            [{application_resource_extensions, [".test.app.src", ".app.src"]}],
+            ["compile"],
+            return
+        ),
+    [App] = rebar_state:project_apps(AfterCompileState),
+    ?assertEqual("0.42.0", rebar_app_info:vsn(App)),
+    %% reverse order now, check that both are reported as conflicting
+    {error, {rebar_prv_app_discovery, {multiple_app_files, Conflicting}}} =
+        rebar_test_utils:run_and_check(
+            Config,
+            [{application_resource_extensions, [".app.src", ".test.app.src"]}],
+            ["compile"],
+            return
+        ),
+    ?assert(lists:member(AppSrc, Conflicting)),
+    ?assert(lists:member(TestAppSrc, Conflicting)).
