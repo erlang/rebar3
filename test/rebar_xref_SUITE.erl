@@ -231,7 +231,7 @@ get_module_body(ignoremod, AppName, IgnoreXref) ->
      "localfunc1(A, B) -> {A, B}.\n",       % used local
      "localfunc2() -> ok.\n",               % unused local
      "fdeprecated() -> ok.\n"              % deprecated function
-
+     "undef_call() -> non_existent_mod:func().\n" % undef function call
     ];
 get_module_body(ignoremod2, AppName, IgnoreXref) ->
     ["-module(", AppName, "_ignoremod2).\n",
@@ -241,7 +241,7 @@ get_module_body(ignoremod2, AppName, IgnoreXref) ->
      "localfunc1(A, B) -> {A, B}.\n",       % used local
      "localfunc2() -> ok.\n",               % unused local
      "fdeprecated() -> ok.\n"              % deprecated function
-
+     "undef_call() -> non_existent_mod:func().\n" % undef function call
     ];
 get_module_body(othermod, AppName, IgnoreXref) ->
     ["-module(", AppName, "_othermod).\n",
