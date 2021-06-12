@@ -1077,13 +1077,23 @@ ssl_opts(ssl_verify_enabled, Url) ->
             VerifyFun = {fun ssl_verify_hostname:verify_fun/3,
                          [{check_hostname, Hostname}]},
             CACerts = get_cacerts(),
-            [{verify, verify_peer}, {depth, 2}, {cacerts, CACerts},
-             {partial_chain, fun partial_chain/1}, {verify_fun, VerifyFun}];
+            SslOpts = [{verify, verify_peer}, {depth, 2}, {cacerts, CACerts},
+                       {partial_chain, fun partial_chain/1}, {verify_fun, VerifyFun}],
+            check_hostname_opt(SslOpts);
         false ->
             ?WARN("Insecure HTTPS request (peer verification disabled), "
                   "please update to OTP 17.4 or later", []),
             [{verify, verify_none}]
     end.
+
+-ifdef(no_customize_hostname_check).
+check_hostname_opt(Opts) ->
+  Opts.
+-else.
+check_hostname_opt(Opts) ->
+  MatchFun = public_key:pkix_verify_hostname_match_fun(https),
+  [{customize_hostname_check, [{match_fun, MatchFun}]} | Opts].
+-endif.
 
 -spec partial_chain(Certs) -> Res when
       Certs :: list(any()),
