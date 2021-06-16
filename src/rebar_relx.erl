@@ -72,8 +72,8 @@ do(Provider, State) ->
     end,
     _XrefCheck = [undefined_function_calls],
     XrefIgnores = rebar_state:get(State, xref_ignores, []),
-    lists:map(
-        fun(ResultRelx) ->
+    XrefWarnings = lists:foldl(
+        fun(ResultRelx, Acc) ->
             RelxStateAfterRun = case ResultRelx of
                 %% Some State will be {ok, rlx_state} (coming from build_relup and build_release)
                 %% while other will be {ok, rlx_release, rlx_state} (coming from build_tar).
@@ -81,15 +81,26 @@ do(Provider, State) ->
                 {ok, _Release, RelxState_} -> RelxState_
             end,
             Warnings = rlx_state:xref_warnings(RelxStateAfterRun),
-            FilterResults = rebar_prv_xref:filter_xref_results(undefined_function_calls, XrefIgnores, Warnings),
-            io:format(standard_error, "~s", [format_error({xref_issues, FilterResults})])
+            Acc ++ rebar_prv_xref:filter_xref_results(undefined_function_calls, XrefIgnores, Warnings)
         end,
+        [],
         ResultXrefs
     ),
+
+    format_xref_warning(XrefWarnings),
 
     rebar_hooks:run_project_and_app_hooks(Cwd, post, Provider, Providers, State),
 
     {ok, State}.
+
+
+format_xref_warning([]) ->
+    ok;
+format_xref_warning(XrefWarnings) ->
+    io:format("There are missing function calls in the release. ~n", []),
+    io:format("Make sure all applications needed at runtime are included in the release. ~n", []),
+    io:format("~s ~n", [rebar_prv_xref:format_error({xref_issues, [{undefined_function_calls, XrefWarnings}], []})]).
+
 
 read_relx_config(State, Options) ->
     ConfigFile = proplists:get_value(config, Options, []),
