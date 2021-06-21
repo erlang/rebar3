@@ -345,7 +345,7 @@ find_app(AppInfo, AppDir, SrcDirs, Validate, State) ->
 find_app_(AppInfo, AppDir, SrcDirs, Validate, State) ->
     Extensions = rebar_state:get(State, application_resource_extensions, ?DEFAULT_APP_RESOURCE_EXT),
     NormSrcDirs = [case SrcDir of
-                       {SrcDir, _Opts} -> SrcDir;
+                       {ActualSrcDir, _Opts} -> ActualSrcDir;
                        _ -> SrcDir
                    end || SrcDir <- SrcDirs],
     ResourceFiles = [
