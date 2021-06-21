@@ -344,14 +344,18 @@ find_app(AppInfo, AppDir, SrcDirs, Validate, State) ->
     {true, rebar_app_info:t()} | false.
 find_app_(AppInfo, AppDir, SrcDirs, Validate, State) ->
     Extensions = rebar_state:get(State, application_resource_extensions, ?DEFAULT_APP_RESOURCE_EXT),
+    NormSrcDirs = [case SrcDir of
+                       {ActualSrcDir, _Opts} -> ActualSrcDir;
+                       _ -> SrcDir
+                   end || SrcDir <- SrcDirs],
     ResourceFiles = [
         {app, filelib:wildcard(filename:join([AppDir, "ebin", "*.app"]))},
-        {mix_exs, filelib:wildcard(filename:join([AppDir, "src", "mix.exs"]))} |
-        [
-        {extension_type(Ext), lists:append([ filelib:wildcard(filename:join([AppDir, SrcDir, "*" ++ Ext]))
-        || SrcDir <- SrcDirs])}
-        || Ext <- Extensions
-    ]],
+        {mix_exs, filelib:wildcard(filename:join([AppDir, "src", "mix.exs"]))}
+        | [{extension_type(Ext),
+            lists:append([filelib:wildcard(filename:join([AppDir, SrcDir, "*" ++ Ext]))
+                          || SrcDir <- NormSrcDirs])}
+           || Ext <- Extensions]
+    ],
     FlattenedResourceFiles = flatten_resource_files(ResourceFiles),
     try_handle_resource_files(AppInfo, AppDir, FlattenedResourceFiles, Validate).
 
