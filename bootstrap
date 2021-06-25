@@ -747,30 +747,32 @@ chr([], _C, _I) -> 0.
 %% These two functions are ports of rebar_uri module calls that
 %% can't be called before the app is built; they're utility functions for
 %% forwards and backwards compat so we need them to be current.
+-ifdef(OTP_RELEASE).
 rebar_uri_parse(URIString) ->
     %% we drop rebar_uri:apply_opts since it's a noop as called here
-    try uri_string:parse(URIString) of
+    case uri_string:parse(URIString) of
         Map = #{userinfo := _} -> Map;
         Map when is_map(Map) -> Map#{userinfo => ""};
         Res -> Res
-    catch
-        error:undef ->
-            %% Taken from rebar_uri and trimmed down.
-            case http_uri:parse(URIString, []) of
-                {error, Reason} ->
-                    {error, "", Reason};
-                {ok, {Scheme, UserInfo, Host, Port, Path, Query}} ->
-                    #{
-                        scheme => atom_to_list(Scheme),
-                        host => Host, port => Port, path => Path,
-                        query => case Query of
-                                [] -> "";
-                                _  -> string:substr(Query, 2)
-                                end,
-                        userinfo => UserInfo
-                    }
-            end
     end.
+-else.
+rebar_uri_parse(URIString) ->
+    %% Taken from rebar_uri and trimmed down.
+    case http_uri:parse(URIString, []) of
+        {error, Reason} ->
+            {error, "", Reason};
+        {ok, {Scheme, UserInfo, Host, Port, Path, Query}} ->
+            #{
+                scheme => atom_to_list(Scheme),
+                host => Host, port => Port, path => Path,
+                query => case Query of
+                        [] -> "";
+                        _  -> string:substr(Query, 2)
+                        end,
+                userinfo => UserInfo
+            }
+    end.
+-endif.
 
 %% Taken from rebar_uri.erl
 rebar_uri_percent_decode(URIMap) when is_map(URIMap)->
