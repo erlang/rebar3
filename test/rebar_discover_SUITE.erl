@@ -66,4 +66,3 @@ invalid_app_src(Config) ->
        rebar_test_utils:run_and_check(Config, [], ["compile"], return)
     ),
     ok.
-
