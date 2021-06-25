@@ -233,9 +233,9 @@ proj_plt_apps(State) ->
         top_level_deps ->
             DepApps -- ProjApps;
         all_deps       ->
-            collect_nested_dependent_apps(DepApps, State) -- ProjApps;
+            collect_nested_dependent_apps(DepApps) -- ProjApps;
         all_apps       ->
-            proj_apps(State) ++ collect_nested_dependent_apps(DepApps, State)
+            proj_apps(State) ++ collect_nested_dependent_apps(DepApps)
     end.
 
 get_files(State, Apps, SkipApps, Mods, SkipMods, ExtraDirs) ->
@@ -611,24 +611,13 @@ debug_info(State) ->
     proplists:get_value(debug_info_key, Config, false) =/= false orelse
     proplists:get_value(encrypt_debug_info, Config, false) =/= false.
 
--spec collect_nested_dependent_apps([atom()], rebar_state:t()) -> [atom()].
-collect_nested_dependent_apps(RootApps, State) ->
-    Deps = collect_nested_dependent_apps(RootApps, sets:new(), State),
+-spec collect_nested_dependent_apps([atom()]) -> [atom()].
+collect_nested_dependent_apps(RootApps) ->
+    Deps = lists:foldl(fun collect_nested_dependent_apps/2, sets:new(), RootApps),
     sets:to_list(Deps).
 
--spec collect_nested_dependent_apps([atom()], rebar_set(), rebar_state:t()) -> rebar_set().
-collect_nested_dependent_apps(RootApps, Init, State) ->
-    lists:foldl(
-        fun (App, Seen) ->
-                collect_nested_dependent_app(App, Seen, State)
-        end,
-        Init,
-        RootApps
-    ).
-
-
--spec collect_nested_dependent_app(atom(), rebar_set(), rebar_state:t()) -> rebar_set().
-collect_nested_dependent_app(App, Seen, State) ->
+-spec collect_nested_dependent_apps(atom(), rebar_set()) -> rebar_set().
+collect_nested_dependent_apps(App, Seen) ->
     case sets:is_element(App, Seen) of
         true ->
             Seen;
@@ -638,11 +627,13 @@ collect_nested_dependent_app(App, Seen, State) ->
                 {error, _} ->
                     throw({unknown_application, App});
                 AppDir ->
-                    case rebar_app_discover:find_app(AppDir, all, State) of
+                    case rebar_app_discover:find_app(AppDir, all) of
                         false ->
                             throw({unknown_application, App});
                         {true, AppInfo}  ->
-                            collect_nested_dependent_apps(rebar_app_info:applications(AppInfo), Seen1, State)
+                            lists:foldl(fun collect_nested_dependent_apps/2,
+                                        Seen1,
+                                        rebar_app_info:applications(AppInfo))
                     end
             end
     end.

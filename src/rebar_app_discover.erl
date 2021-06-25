@@ -4,17 +4,15 @@
 
 -export([do/2,
          format_error/1,
-         find_unbuilt_apps/2,
+         find_unbuilt_apps/1,
+         find_apps/1,
          find_apps/2,
-         find_apps/3,
          find_apps/4,
-         find_app/3,
-         find_app/4]).
+         find_app/2,
+         find_app/3]).
 
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
-
--type app_resource_type() :: app |  app_src | script | mix_exs.
 
 %% @doc from the base directory, find all the applications
 %% at the top level and their dependencies based on the configuration
@@ -221,13 +219,13 @@ reset_hooks(Opts, CurrentProfiles) ->
 %% @private find the directories for all apps, while detecting their source dirs
 %% Returns the app dir with the respective src_dirs for them, in that order,
 %% for every app found.
--spec all_app_dirs([file:name()], rebar_state:t()) -> [{file:name(), [file:name()]}].
-all_app_dirs(LibDirs, State) ->
+-spec all_app_dirs([file:name()]) -> [{file:name(), [file:name()]}].
+all_app_dirs(LibDirs) ->
     lists:flatmap(fun(LibDir) ->
                           case filelib:is_dir(LibDir) of
                               true ->
                                   {_, SrcDirs} = find_config_src(LibDir, ["src"]),
-                                  app_dirs(LibDir, SrcDirs, State);
+                                  app_dirs(LibDir, SrcDirs);
                               false ->
                                   []
                           end
@@ -236,9 +234,9 @@ all_app_dirs(LibDirs, State) ->
 %% @private find the directories for all apps based on their source dirs
 %% Returns the app dir with the respective src_dirs for them, in that order,
 %% for every app found.
--spec all_app_dirs([file:name()], [file:name()], rebar_state:t()) -> [{file:name(), [file:name()]}].
-all_app_dirs(LibDirs, SrcDirs, State) ->
-    lists:flatmap(fun(LibDir) -> app_dirs(LibDir, SrcDirs, State) end, LibDirs).
+-spec all_app_dirs([file:name()], [file:name()]) -> [{file:name(), [file:name()]}].
+all_app_dirs(LibDirs, SrcDirs) ->
+    lists:flatmap(fun(LibDir) -> app_dirs(LibDir, SrcDirs) end, LibDirs).
 
 %% @private find the directories based on the library directories.
 %% Returns the app dir with the respective src_dirs for them, in that order,
@@ -247,44 +245,42 @@ all_app_dirs(LibDirs, SrcDirs, State) ->
 %% The function returns the src directories since they might have been
 %% detected in a top-level loop and we want to skip further detection
 %% starting now.
--spec app_dirs([file:name()], [file:name()], rebar_state:t()) -> [{file:name(), [file:name()]}].
-app_dirs(LibDir, SrcDirs, State) ->
-    Extensions = rebar_state:get(State, application_resource_extensions, ?DEFAULT_APP_RESOURCE_EXT),
+-spec app_dirs([file:name()], [file:name()]) -> [{file:name(), [file:name()]}].
+app_dirs(LibDir, SrcDirs) ->
     Paths = lists:append([
-        [filename:join([LibDir, SrcDir, "*" ++ Ext]) || Ext <- Extensions ]
+        [filename:join([LibDir, SrcDir, "*.app.src"]),
+         filename:join([LibDir, SrcDir, "*.app.src.script"])]
         || SrcDir <- SrcDirs
     ]),
-
     EbinPath = filename:join([LibDir, "ebin", "*.app"]),
-    MixExsPath = filename:join([LibDir, "src", "mix.exs"]),
 
     lists:usort(lists:foldl(fun(Path, Acc) ->
                                 Files = filelib:wildcard(rebar_utils:to_list(Path)),
                                 [{app_dir(File), SrcDirs}
                                  || File <- Files] ++ Acc
-                            end, [], [EbinPath, MixExsPath | Paths])).
+                            end, [], [EbinPath | Paths])).
 
 %% @doc find all apps that haven't been built in a list of directories
--spec find_unbuilt_apps([file:filename_all()], rebar_state:t()) -> [rebar_app_info:t()].
-find_unbuilt_apps(LibDirs, State) ->
-    find_apps(LibDirs, invalid, State).
+-spec find_unbuilt_apps([file:filename_all()]) -> [rebar_app_info:t()].
+find_unbuilt_apps(LibDirs) ->
+    find_apps(LibDirs, invalid).
 
 %% @doc for each directory passed, find all apps that are valid.
 %% Returns all the related app info records.
--spec find_apps([file:filename_all()], rebar_state:t()) -> [rebar_app_info:t()].
-find_apps(LibDirs, State) ->
-    find_apps(LibDirs, valid, State).
+-spec find_apps([file:filename_all()]) -> [rebar_app_info:t()].
+find_apps(LibDirs) ->
+    find_apps(LibDirs, valid).
 
 %% @doc for each directory passed, find all apps according
 %% to the validity rule passed in. Returns all the related
 %% app info records.
--spec find_apps([file:filename_all()], valid | invalid | all, rebar_state:t()) -> [rebar_app_info:t()].
-find_apps(LibDirs, Validate, State) ->
+-spec find_apps([file:filename_all()], valid | invalid | all) -> [rebar_app_info:t()].
+find_apps(LibDirs, Validate) ->
     rebar_utils:filtermap(
       fun({AppDir, AppSrcDirs}) ->
-            find_app(rebar_app_info:new(), AppDir, AppSrcDirs, Validate, State)
+            find_app(rebar_app_info:new(), AppDir, AppSrcDirs, Validate)
       end,
-      all_app_dirs(LibDirs, State)
+      all_app_dirs(LibDirs)
     ).
 
 %% @doc for each directory passed, with the configured source directories,
@@ -296,30 +292,30 @@ find_apps(LibDirs, SrcDirs, Validate, State) ->
       fun({AppDir, AppSrcDirs}) ->
             find_app(rebar_app_info:new(), AppDir, AppSrcDirs, Validate, State)
       end,
-      all_app_dirs(LibDirs, SrcDirs, State)
+      all_app_dirs(LibDirs, SrcDirs)
     ).
 
 %% @doc check that a given app in a directory is there, and whether it's
 %% valid or not based on the second argument. Returns the related
 %% app info record.
--spec find_app(file:filename_all(), valid | invalid | all, rebar_state:t()) -> {true, rebar_app_info:t()} | false.
-find_app(AppDir, Validate, State) ->
+-spec find_app(file:filename_all(), valid | invalid | all) -> {true, rebar_app_info:t()} | false.
+find_app(AppDir, Validate) ->
     {Config, SrcDirs} = find_config_src(AppDir, ["src"]),
     AppInfo = rebar_app_info:update_opts(rebar_app_info:dir(rebar_app_info:new(), AppDir),
                                          dict:new(), Config),
-    find_app_(AppInfo, AppDir, SrcDirs, Validate, State).
+    find_app_(AppInfo, AppDir, SrcDirs, Validate).
 
 %% @doc check that a given app in a directory is there, and whether it's
 %% valid or not based on the second argument. Returns the related
 %% app info record.
--spec find_app(rebar_app_info:t(), file:filename_all(), valid | invalid | all, rebar_state:t()) ->
+-spec find_app(rebar_app_info:t(), file:filename_all(), valid | invalid | all) ->
     {true, rebar_app_info:t()} | false.
-find_app(AppInfo, AppDir, Validate, State) ->
+find_app(AppInfo, AppDir, Validate) ->
     %% if no src dir is passed, figure it out from the app info, with a default
     %% of src/
     AppOpts = rebar_app_info:opts(AppInfo),
     SrcDirs = rebar_dir:src_dirs(AppOpts, ["src"]),
-    find_app_(AppInfo, AppDir, SrcDirs, Validate, State).
+    find_app_(AppInfo, AppDir, SrcDirs, Validate).
 
 %% @doc check that a given app in a directory is there, and whether it's
 %% valid or not based on the second argument. The third argument includes
@@ -337,69 +333,27 @@ find_app(AppInfo, AppDir, SrcDirs, Validate, State) ->
                        Config = rebar_config:consult(AppDir),
                        rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), Config)
                end,
-    find_app_(AppInfo1, AppDir, SrcDirs, Validate, State).
+    find_app_(AppInfo1, AppDir, SrcDirs, Validate).
+
+find_app(AppInfo, AppDir, SrcDirs, Validate) ->
+    Config = rebar_config:consult(AppDir),
+    AppInfo1 = rebar_app_info:update_opts(AppInfo, rebar_app_info:opts(AppInfo), Config),
+    find_app_(AppInfo1, AppDir, SrcDirs, Validate).
 
 -spec find_app_(rebar_app_info:t(), file:filename_all(),
-               [file:filename_all()], valid | invalid | all,  rebar_state:t()) ->
+               [file:filename_all()], valid | invalid | all) ->
     {true, rebar_app_info:t()} | false.
-find_app_(AppInfo, AppDir, SrcDirs, Validate, State) ->
-    Extensions = rebar_state:get(State, application_resource_extensions, ?DEFAULT_APP_RESOURCE_EXT),
-    NormSrcDirs = [case SrcDir of
-                       {ActualSrcDir, _Opts} -> ActualSrcDir;
-                       _ -> SrcDir
-                   end || SrcDir <- SrcDirs],
-    ResourceFiles = [
-        {app, filelib:wildcard(filename:join([AppDir, "ebin", "*.app"]))},
-        {mix_exs, filelib:wildcard(filename:join([AppDir, "src", "mix.exs"]))}
-        | [{extension_type(Ext),
-            lists:append([filelib:wildcard(filename:join([AppDir, SrcDir, "*" ++ Ext]))
-                          || SrcDir <- NormSrcDirs])}
-           || Ext <- Extensions]
-    ],
-    FlattenedResourceFiles = flatten_resource_files(ResourceFiles),
-    try_handle_resource_files(AppInfo, AppDir, FlattenedResourceFiles, Validate).
-
--spec extension_type(string()) -> app_resource_type().
-extension_type(Extension) ->
-    Mapping = [
-        {".app", app},
-        {".src", app_src},
-        {".script", script},
-        {".exs", mix_exs}
-    ],
-    extension_type(Mapping, Extension).
-
--spec extension_type([{string(), Type}], string()) -> Type
-    when Type :: app_resource_type().
-extension_type([], _) ->
-    %% default to app_src
-    app_src;
-extension_type([{Pattern, Type} | Rest], Extension) ->
-    case lists:suffix(Pattern, Extension) of
-        true ->
-            Type;
-        false ->
-            extension_type(Rest, Extension)
-    end.
-
--spec flatten_resource_files(ResourceFiles) -> FlattenedResourceFiles
-    when ResourceFiles :: [{app_resource_type(), [file:filename()]}],
-         FlattenedResourceFiles :: [{app_resource_type(), file:filename()}].
-flatten_resource_files(ResourceFiles) ->
-    {Flattened, _} =
-        lists:foldl(
-            fun flatten_resource_impl/2,
-            {[], []},
-            ResourceFiles),
-    lists:reverse(Flattened).
-
-flatten_resource_impl({Type, Files}, Acc = {ResAcc, Used}) ->
-    NewFiles = [F || F <- Files, not lists:member(F, Used)],
-    case NewFiles of
-        [] -> Acc;
-        [File] -> {[{Type, File} | ResAcc], [File | Used]};
-        Others -> throw({error, {multiple_app_files, Others}})
-    end.
+find_app_(AppInfo, AppDir, SrcDirs, Validate) ->
+    AppFile = filelib:wildcard(filename:join([AppDir, "ebin", "*.app"])),
+    AppSrcFile = lists:append(
+        [filelib:wildcard(filename:join([AppDir, SrcDir, "*.app.src"]))
+         || SrcDir <- SrcDirs]
+    ),
+    AppSrcScriptFile = lists:append(
+        [filelib:wildcard(filename:join([AppDir, SrcDir, "*.app.src.script"]))
+         || SrcDir <- SrcDirs]
+    ),
+    try_handle_app_file(AppInfo, AppFile, AppDir, AppSrcFile, AppSrcScriptFile, Validate).
 
 %% @doc find the directory that an appfile has
 -spec app_dir(file:filename()) -> file:filename().
@@ -437,39 +391,32 @@ create_app_info(AppInfo, AppDir, AppFile) ->
             throw({error, {?MODULE, Err}}) % wrap this
     end.
 
-
 %% @doc Read in and parse the .app file if it is availabe. Do the same for
 %% the .app.src file if it exists.
--spec try_handle_resource_files(AppInfo, AppDir, ResourceFiles, valid | invalid | all) ->
+-spec try_handle_app_file(AppInfo, AppFile, AppDir, AppSrcFile, AppSrcScriptFile, valid | invalid | all) ->
     {true, AppInfo} | false when
       AppInfo :: rebar_app_info:t(),
+      AppFile :: file:filename(),
       AppDir :: file:filename(),
-      ResourceFiles :: [{app_resource_type(), file:filename()}].
-try_handle_resource_files(AppInfo, AppDir, [{app, AppFile} | Rest], Validate) ->
-    AppSrcFile = proplists:get_value(app_src, Rest),
-    try_handle_app_file(AppInfo, AppDir, AppFile, AppSrcFile, Validate);
-try_handle_resource_files(AppInfo, AppDir, [{Type, AppSrcFile} | _Rest], Validate)
-    when Type =:= app_src orelse Type =:= script ->
-    try_handle_app_src_file(AppInfo, AppDir, AppSrcFile, Validate);
-try_handle_resource_files(AppInfo, _AppDir, [{mix_exs, _AppSrcFile} | _Rest], _Validate) ->
-    {true, rebar_app_info:project_type(AppInfo, mix)};
-try_handle_resource_files(_AppInfo, _AppDir, [], _Validate) ->
-    false.
-
-
-%% @doc Read in and parse the .app file if it is availabe. Do the same for
-%% the .app.src file if it exists.
--spec try_handle_app_file(AppInfo, AppDir, File, AppSrcFile, valid | invalid | all) ->
-    {true, AppInfo} | false when
-      AppInfo :: rebar_app_info:t(),
-      AppDir :: file:filename(),
-      File :: file:filename(),
-      AppSrcFile :: file:filename().
-try_handle_app_file(AppInfo0, AppDir, File, AppSrcFile, Validate) ->
+      AppSrcFile :: file:filename(),
+      AppSrcScriptFile :: file:filename().
+try_handle_app_file(AppInfo, [], AppDir, [], AppSrcScriptFile, Validate) ->
+    try_handle_app_src_file(AppInfo, [], AppDir, AppSrcScriptFile, Validate);
+try_handle_app_file(AppInfo, [], AppDir, AppSrcFile, _, Validate) ->
+    try_handle_app_src_file(AppInfo, [], AppDir, AppSrcFile, Validate);
+try_handle_app_file(AppInfo0, [File], AppDir, AppSrcFile, _, Validate) ->
     try create_app_info(AppInfo0, AppDir, File) of
         AppInfo ->
             AppInfo1 = rebar_app_info:app_file(AppInfo, File),
-            AppInfo2 = rebar_app_info:app_file_src(AppInfo1, AppSrcFile),
+            AppInfo2 = case AppSrcFile of
+                           [F] ->
+                               rebar_app_info:app_file_src(AppInfo1, F);
+                           [] ->
+                               %% Set to undefined in case AppInfo previous had a .app.src
+                               rebar_app_info:app_file_src(AppInfo1, undefined);
+                           Other when is_list(Other) ->
+                               throw({error, {multiple_app_files, Other}})
+                      end,
             case Validate of
                 valid ->
                     case rebar_app_utils:validate_application_info(AppInfo2) of
@@ -491,30 +438,43 @@ try_handle_app_file(AppInfo0, AppDir, File, AppSrcFile, Validate) ->
     catch
         throw:{error, {Module, Reason}} ->
             ?DEBUG("Falling back to app.src file because .app failed: ~ts", [Module:format_error(Reason)]),
-            try_handle_app_src_file(AppInfo0, AppDir, AppSrcFile, Validate)
-    end.
+            try_handle_app_src_file(AppInfo0, File, AppDir, AppSrcFile, Validate)
+    end;
+try_handle_app_file(_AppInfo, Other, _AppDir, _AppSrcFile, _, _Validate) ->
+    throw({error, {multiple_app_files, Other}}).
 
 %% @doc Read in the .app.src file if we aren't looking for a valid (already
 %% built) app.
--spec try_handle_app_src_file(AppInfo, AppDir, AppSrcFile, valid | invalid | all) ->
+-spec try_handle_app_src_file(AppInfo, AppFile, AppDir, AppSrcFile, valid | invalid | all) ->
     {true, AppInfo} | false when
       AppInfo :: rebar_app_info:t(),
+      AppFile :: file:filename(),
       AppDir :: file:filename(),
       AppSrcFile :: file:filename().
-try_handle_app_src_file(_AppInfo, _AppDir, undefined, valid) ->
+try_handle_app_src_file(AppInfo, _, _AppDir, [], _Validate) ->
+    %% if .app and .app.src are not found check for a mix config file
+    %% it is assumed a plugin will build the application, including
+    %% a .app after this step
+    case filelib:is_file(filename:join(rebar_app_info:dir(AppInfo), "mix.exs")) of
+        true ->
+            {true, rebar_app_info:project_type(AppInfo, mix)};
+        false ->
+            false
+    end;
+try_handle_app_src_file(_AppInfo, _, _AppDir, _AppSrcFile, valid) ->
     false;
-try_handle_app_src_file(_AppInfo, _AppDir, _AppSrcFile, valid) ->
-    false;
-try_handle_app_src_file(AppInfo, AppDir, AppSrcFile, _) ->
+try_handle_app_src_file(AppInfo, _, AppDir, [File], Validate) when Validate =:= invalid
+                                                                   ; Validate =:= all ->
     AppInfo1 = rebar_app_info:app_file(AppInfo, undefined),
-    AppInfo2 = create_app_info(AppInfo1, AppDir, AppSrcFile),
-    case filename:extension(AppSrcFile) of
+    AppInfo2 = create_app_info(AppInfo1, AppDir, File),
+    case filename:extension(File) of
         ".script" ->
-            {true, rebar_app_info:app_file_src_script(AppInfo2, AppSrcFile)};
+            {true, rebar_app_info:app_file_src_script(AppInfo2, File)};
         _ ->
-            {true, rebar_app_info:app_file_src(AppInfo2, AppSrcFile)}
-    end.
-
+            {true, rebar_app_info:app_file_src(AppInfo2, File)}
+    end;
+try_handle_app_src_file(_AppInfo, _, _AppDir, Other, _Validate) ->
+    throw({error, {multiple_app_files, Other}}).
 
 %% @doc checks whether the given app is not blacklisted in the config.
 -spec enable(rebar_state:t(), rebar_app_info:t()) -> boolean().

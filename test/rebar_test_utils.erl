@@ -1,8 +1,7 @@
 -module(rebar_test_utils).
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
--export([init_rebar_state/1, init_rebar_state/2, run_and_check/3, run_and_check/4,
-         check_results/3, check_results/4]).
+-export([init_rebar_state/1, init_rebar_state/2, run_and_check/3, run_and_check/4, check_results/3]).
 -export([expand_deps/2, flat_deps/1, top_level_deps/1]).
 -export([create_app/4, create_plugin/4, create_eunit_app/4, create_empty_app/4,
          create_config/2, create_config/3, package_app/4]).
@@ -241,10 +240,6 @@ top_level_deps([{{Name, Vsn, Ref}, _} | Deps]) ->
 %%% Helpers %%%
 %%%%%%%%%%%%%%%
 check_results(AppDir, Expected, ProfileRun) ->
-    State = rebar_state:new(),
-    check_results(AppDir, Expected, ProfileRun, State).
-
-check_results(AppDir, Expected, ProfileRun, State) ->
     BuildDirs = filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib", "*"])),
     BuildSubDirs = [D || D <- filelib:wildcard(filename:join([AppDir, "_build", ProfileRun, "lib", "*", "*", "*"])),
                          filelib:is_dir(D)],
@@ -254,21 +249,21 @@ check_results(AppDir, Expected, ProfileRun, State) ->
     LockFile = filename:join([AppDir, "rebar.lock"]),
     Locks = lists:flatten(rebar_config:consult_lock_file(LockFile)),
 
-    InvalidApps = rebar_app_discover:find_apps(BuildDirs, invalid, State),
-    ValidApps = rebar_app_discover:find_apps(BuildDirs, valid, State),
+    InvalidApps = rebar_app_discover:find_apps(BuildDirs, invalid),
+    ValidApps = rebar_app_discover:find_apps(BuildDirs, valid),
 
     InvalidDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- InvalidApps],
     ValidDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- ValidApps],
 
-    Deps = rebar_app_discover:find_apps(BuildDirs, all, State),
-    SubDeps = rebar_app_discover:find_apps(BuildSubDirs, all, State),
+    Deps = rebar_app_discover:find_apps(BuildDirs, all),
+    SubDeps = rebar_app_discover:find_apps(BuildSubDirs, all),
     DepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Deps],
     SubDirDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- SubDeps],
-    Checkouts = rebar_app_discover:find_apps(CheckoutsDirs, all, State),
+    Checkouts = rebar_app_discover:find_apps(CheckoutsDirs, all),
     CheckoutsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Checkouts],
-    Plugins = rebar_app_discover:find_apps(PluginDirs, all, State),
+    Plugins = rebar_app_discover:find_apps(PluginDirs, all),
     PluginsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Plugins],
-    GlobalPlugins = rebar_app_discover:find_apps(GlobalPluginDirs, all, State),
+    GlobalPlugins = rebar_app_discover:find_apps(GlobalPluginDirs, all),
     GlobalPluginsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- GlobalPlugins],
 
     lists:foreach(
