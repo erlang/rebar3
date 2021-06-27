@@ -14,20 +14,22 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - uses: erlef/setup-beam@v1
-        with:
+      with:
           otp-version: '24.0.1'
           elixir-version: '1.12'
     - name: Compile
       run: ./bootstrap
     - name: Install
-      run: cp ./rebar3 /usr/bin/
+      run: |
+        sudo cp ./rebar3 /usr/local/bin/
 
     - name: Checkout shell tests
-      run: git checkout https://github.com/tsloughter/rebar3_tests
+      run: git clone https://github.com/tsloughter/rebar3_tests
 
     - name: Install and run shelltestrunner
       run: |
-        apt-get update
-        apt-get install -y shelltestrunner build-essential
+        sudo apt-get update
+        sudo apt-get install -y shelltestrunner build-essential
+        cd rebar3_tests
         mix local.hex --force
         ./run_tests.sh
