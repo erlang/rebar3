@@ -256,7 +256,7 @@ app_dirs(LibDir, SrcDirs, State) ->
     ]),
 
     EbinPath = filename:join([LibDir, "ebin", "*.app"]),
-    MixExsPath = filename:join([LibDir, "src", "mix.exs"]),
+    MixExsPath = filename:join([LibDir, "mix.exs"]),
 
     lists:usort(lists:foldl(fun(Path, Acc) ->
                                 Files = filelib:wildcard(rebar_utils:to_list(Path)),
@@ -350,7 +350,7 @@ find_app_(AppInfo, AppDir, SrcDirs, Validate, State) ->
                    end || SrcDir <- SrcDirs],
     ResourceFiles = [
         {app, filelib:wildcard(filename:join([AppDir, "ebin", "*.app"]))},
-        {mix_exs, filelib:wildcard(filename:join([AppDir, "src", "mix.exs"]))}
+        {mix_exs, filelib:wildcard(filename:join([AppDir, "mix.exs"]))}
         | [{extension_type(Ext),
             lists:append([filelib:wildcard(filename:join([AppDir, SrcDir, "*" ++ Ext]))
                           || SrcDir <- NormSrcDirs])}
