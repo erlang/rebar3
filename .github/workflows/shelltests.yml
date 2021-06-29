@@ -24,7 +24,7 @@ jobs:
         sudo cp ./rebar3 /usr/local/bin/
 
     - name: Checkout shell tests
-      run: git clone https://github.com/tsloughter/rebar3_tests
+      run: git clone https://github.com/ferd/rebar3_tests
 
     - name: Install and run shelltestrunner
       run: |
@@ -32,4 +32,11 @@ jobs:
         sudo apt-get install -y shelltestrunner build-essential
         cd rebar3_tests
         mix local.hex --force
+        cd rocksdb_test
+        rebar3 compile
+        ls _build/default/lib/
+        ls _build/default/lib/rocksdb/
+        ls _build/default/lib/rocksdb/priv/
+        rm -rf _build
+        cd ..
         ./run_tests.sh
