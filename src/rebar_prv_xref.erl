@@ -296,7 +296,7 @@ find_function_source(M, F, A, Bin) ->
 
 find_function_source_in_abstract_code(F, A, AbstractCode) ->
     %% Extract the original source filename from the abstract code
-    [{attribute, _, file, {Source0, _}} | _] = AbstractCode,
+    [{attribute, _, file, {Source0, _}} | _] = [Attr || Attr = {attribute, _, file, _} <- AbstractCode],
     Source = rebar_dir:make_relative_path(Source0, rebar_dir:get_cwd()),
     %% Extract the line number for a given function def
     Fn = [E || E <- AbstractCode,
