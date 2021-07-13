@@ -71,26 +71,30 @@ end_per_testcase(_Test, Config) ->
     Config.
 
 raw_tmpdir(_Config) ->
+    UnixTmpdir = os:getenv("TMPDIR", "/tmp"),
     case rebar_file_utils:system_tmpdir() of
-        "/tmp"  -> ok;
-        "./tmp" -> ok
+        UnixTmpdir -> ok;
+        "./tmp"    -> ok
     end.
 
 empty_tmpdir(_Config) ->
+    UnixTmpdir = os:getenv("TMPDIR", "/tmp"),
     case rebar_file_utils:system_tmpdir([]) of
-        "/tmp"  -> ok;
-        "./tmp" -> ok
+        UnixTmpdir -> ok;
+        "./tmp"    -> ok
     end.
 
 simple_tmpdir(_Config) ->
+    UnixTmpdir = os:getenv("TMPDIR", "/tmp") ++ "/test",
     case rebar_file_utils:system_tmpdir(["test"]) of
-        "/tmp/test"  -> ok;
+        UnixTmpdir   -> ok;
         "./tmp/test" -> ok
     end.
 
 multi_tmpdir(_Config) ->
+    UnixTmpdir = os:getenv("TMPDIR", "/tmp") ++ "/a/b/c",
     case rebar_file_utils:system_tmpdir(["a", "b", "c"]) of
-        "/tmp/a/b/c"  -> ok;
+        UnixTmpdir    -> ok;
         "./tmp/a/b/c" -> ok
     end.
 
