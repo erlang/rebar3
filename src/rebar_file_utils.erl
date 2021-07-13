@@ -406,7 +406,7 @@ system_tmpdir(PathComponents) ->
         "win32" ->
             "./tmp";
         _SysArch ->
-            "/tmp"
+            os:getenv("TMPDIR", "/tmp")
     end,
     filename:join([Tmp|PathComponents]).
 

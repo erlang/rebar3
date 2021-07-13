@@ -31,6 +31,8 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/file.hrl").
 
+-define(TMPDIR, "/test").
+
 
 all() ->
     [{group, tmpdir},
@@ -52,8 +54,19 @@ groups() ->
 
 init_per_group(reset_dir, Config) ->
     TmpDir = rebar_file_utils:system_tmpdir(["rebar_file_utils_SUITE", "resetable"]),
-    [{tmpdir, TmpDir}|Config];
+    [{tmpdir, TmpDir} | Config];
+init_per_group(tmpdir, Config) ->
+    PreviousTmpDir = os:getenv("TMPDIR"),
+    os:putenv("TMPDIR", ?TMPDIR),
+    [{previous_tmp, PreviousTmpDir} | Config];
 init_per_group(_, Config) -> Config.
+
+end_per_group(tmpdir, Config) ->
+    case ?config(previous_tmp, Config) of
+        false -> os:unsetenv("TMPDIR");
+        Val -> os:putenv("TMPDIR", Val)
+    end,
+    Config;
 end_per_group(_, Config) -> Config.
 
 init_per_testcase(Test, Config) ->
@@ -72,26 +85,26 @@ end_per_testcase(_Test, Config) ->
 
 raw_tmpdir(_Config) ->
     case rebar_file_utils:system_tmpdir() of
-        "/tmp"  -> ok;
+        ?TMPDIR -> ok;
         "./tmp" -> ok
     end.
 
 empty_tmpdir(_Config) ->
     case rebar_file_utils:system_tmpdir([]) of
-        "/tmp"  -> ok;
+        ?TMPDIR -> ok;
         "./tmp" -> ok
     end.
 
 simple_tmpdir(_Config) ->
     case rebar_file_utils:system_tmpdir(["test"]) of
-        "/tmp/test"  -> ok;
-        "./tmp/test" -> ok
+        ?TMPDIR ++ "/test" -> ok;
+        "./tmp/test"       -> ok
     end.
 
 multi_tmpdir(_Config) ->
     case rebar_file_utils:system_tmpdir(["a", "b", "c"]) of
-        "/tmp/a/b/c"  -> ok;
-        "./tmp/a/b/c" -> ok
+        ?TMPDIR ++ "/a/b/c" -> ok;
+        "./tmp/a/b/c"       -> ok
     end.
 
 reset_nonexistent_dir(Config) ->
