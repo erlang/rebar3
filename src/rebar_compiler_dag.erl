@@ -271,8 +271,35 @@ compile_order(G, AppDefs, SrcExt, ArtifactExt) ->
         end, new_cache(), digraph:edges(G)),
     Sorted = lists:reverse(digraph_utils:topsort(AppDAG)),
     digraph:delete(AppDAG),
-    Standalone = [Name || {Name, _} <- AppDefs] -- Sorted,
-    Standalone ++ Sorted.
+    Standalone = [Name || {Name, _} <- AppDefs],
+    interleave(Standalone, Sorted).
+
+%% assume that the standalone app list respects the
+%% rebar.config deps order, and enforce the sorted app
+%% constraints onto it such that we're always respecting
+%% the hard dependency but augment the list with the others
+%%
+%% [a,b,c,d] + [d,a] -> [d,a,b,c]
+%% [a,b,c,d] + [d,c] -> [a,b,d,c]
+%% [a,b,c,d] + [a,d] -> [a,b,c,d]
+%% [a,b,c,d] + [b,d] -> [a,b,c,d]
+%% [a,b,c,d] + [c,a,d] -> [c,a,b,d]
+interleave(L, Sorted) -> interleave(L, Sorted, 1).
+
+interleave([], _, _) -> [];
+interleave(L, [], _) -> L;
+interleave([H|T], Sorted, N) ->
+    case find_at(H, Sorted) of
+        undefined -> [H|interleave(T, Sorted, N)];
+        N -> [H|interleave(T, Sorted, N+1)];
+        M when N > M -> interleave(T, Sorted, N);
+        M -> lists:sublist(Sorted, N, 1+M-N) ++ interleave(T, Sorted, M+1)
+    end.
+
+find_at(X, Sorted) -> find_at(X, Sorted, 1).
+find_at(_, [], _) -> undefined;
+find_at(X, [X|_], N) -> N;
+find_at(X, [_|T], N) -> find_at(X, T, N+1).
 
 add_one_dependency_to_digraph(V1, V2, Cache, AppDefs, AppDAG) ->
     %% First resolve the file we depend on so that we can shortcut resolution
