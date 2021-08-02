@@ -25,9 +25,6 @@ format_warnings(Opts, Warnings) ->
     {_, Res} = lists:foldl(Fold, {undefined, []}, Warnings),
     lists:reverse(Res).
 
-
-%% If the last seen file is and the file of this warning are the same
-
 %% `dialyzer_cl` returns _Filename = "", _Line = 0 for `unknown` (prior to OTP 24)
 format_warning_(_Opts, Warning = {_Tag, {"" = _SrcFile0, 0 = Line}, Msg}, {_LastFile, Acc}) ->
     SrcFile = "<path unknown>",
@@ -42,20 +39,6 @@ format_warning_(_Opts, Warning = {_Tag, {"" = _SrcFile0, 0 = Line}, Msg}, {_Last
             {SrcFile, [dialyzer:format_warning(Warning, fullpath) | Acc]}
     end;
 
-%% we skip the file header
-format_warning_(_Opts, Warning = {_Tag, {File, Line}, Msg}, {File, Acc}) ->
-    try
-        String = message_to_string(Msg),
-        {Fmt, Args} = file_location_warning(no_file, Line, String),
-        {File, [lists:flatten(fmt(Fmt, Args)) | Acc]}
-    catch
-        Error:Reason ->
-            ?DEBUG("Failed to pretty format warning: ~p:~p",
-                   [Error, Reason]),
-            {File, [dialyzer:format_warning(Warning, fullpath) | Acc]}
-    end;
-
-%% With a new file detencted we also write a file header.
 format_warning_(Opts, Warning = {_Tag, {SrcFile, Line}, Msg}, {_LastFile, Acc}) ->
     try
         File = rebar_dir:format_source_file_name(SrcFile, Opts),
@@ -81,14 +64,10 @@ fmt(Fmt) ->
 fmt(Fmt, Args) ->
     cf:format(Fmt, Args).
 
-file_location_warning(no_file, {Line, Col}, String) ->
-    {"Line ~!c~w~!! Column ~!c~w~!!: ~ts", [Line, Col, String]};
 file_location_warning(F, {Line, Col}, String) ->
-    {"~n~ts~nLine ~!c~w~!! Column ~!c~w~!!: ~ts", [F, Line, Col, String]};
-file_location_warning(no_file, Line, String) ->
-    {"Line ~!c~w~!!: ~ts", [Line, String]};
+    {"~ts:~!c~w~!!:~!c~w~!!: ~ts", [F, Line, Col, String]};
 file_location_warning(F, Line, String) ->
-    {"~n~ts~nLine ~!c~w~!!: ~ts", [F, Line, String]}.
+    {"~ts:~!c~w~!!: ~ts", [F, Line, String]}.
 
 %%-----------------------------------------------------------------------------
 %% Message classification and pretty-printing below. Messages appear in
