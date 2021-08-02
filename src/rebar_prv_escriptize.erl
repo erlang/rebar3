@@ -206,10 +206,26 @@ get_app_beams(App, Path) ->
         load_files(Prefix, "*.app", Path).
 
 get_extra(State) ->
-    Extra = rebar_state:get(State, escript_incl_extra, []),
+    AllApps = rebar_state:all_deps(State) ++ rebar_state:project_apps(State),
+    InclPriv = rebar_state:get(State, escript_incl_priv, []),
+    InclPrivPaths = lists:map(fun(Entry) ->
+                                      resolve_incl_priv(Entry, AllApps)
+                              end, InclPriv),
+    % `escript_incl_extra` is kept for historical reasons as its internal use in
+    % rebar3 has been replaced with `escript_incl_priv`.
+    InclExtraPaths = rebar_state:get(State, escript_incl_extra, []),
     lists:foldl(fun({Wildcard, Dir}, Files) ->
                         load_files(Wildcard, Dir) ++ Files
-                end, [], Extra).
+                end, [], InclPrivPaths ++ InclExtraPaths).
+
+% Converts a wildcard path relative to an app (e.g., `priv/*`) into a wildcard
+% path with with the app name included (e.g., `relx/priv/*`).
+resolve_incl_priv({AppName, PrivWildcard}, AllApps) when is_atom(AppName) ->
+    {ok, AppInfo} =
+        rebar_app_utils:find(rebar_utils:to_binary(AppName), AllApps),
+    AppOutDir = rebar_app_info:out_dir(AppInfo),
+    Wildcard = filename:join([atom_to_list(AppName), "priv", PrivWildcard]),
+    {Wildcard, filename:dirname(AppOutDir)}.
 
 load_files(Wildcard, Dir) ->
     load_files("", Wildcard, Dir).
