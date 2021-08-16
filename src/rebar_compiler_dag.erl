@@ -269,37 +269,53 @@ compile_order(G, AppDefs, SrcExt, ArtifactExt) ->
                     end
             end
         end, new_cache(), digraph:edges(G)),
-    Sorted = lists:reverse(digraph_utils:topsort(AppDAG)),
-    digraph:delete(AppDAG),
     Standalone = [Name || {Name, _} <- AppDefs],
-    interleave(Standalone, Sorted).
+    Sorted = interleave(Standalone, AppDAG),
+    digraph:delete(AppDAG),
+    Sorted.
 
-%% assume that the standalone app list respects the
+%% Assume that the standalone app list respects the
 %% rebar.config deps order, and enforce the sorted app
 %% constraints onto it such that we're always respecting
-%% the hard dependency but augment the list with the others
+%% the hard dependencies.
 %%
-%% [a,b,c,d] + [d,a] -> [d,a,b,c]
-%% [a,b,c,d] + [d,c] -> [a,b,d,c]
-%% [a,b,c,d] + [a,d] -> [a,b,c,d]
-%% [a,b,c,d] + [b,d] -> [a,b,c,d]
-%% [a,b,c,d] + [c,a,d] -> [c,a,b,d]
-interleave(L, Sorted) -> interleave(L, Sorted, 1).
+%% What we do here is a sort of run-length reordering based
+%% on DAG information, which preserves the original dependency
+%% order as declared, but successfully interleaves hard deps
+%% to come first.
+%%
+%% Note that this approach is required as opposed to topsort
+%% because when the original DAG reports two distinct set of
+%% app dependencies that are joined by an invisible compile-time
+%% one (e.g. a parse_transform runtime dep between both sets),
+%% then the topological sort can't provide the right ordering
+%% information because it's flattened into one list, but
+%% this one can.
+interleave(Apps, DAG) ->
+     interleave(Apps, DAG, #{}).
 
-interleave([], _, _) -> [];
-interleave(L, [], _) -> L;
-interleave([H|T], Sorted, N) ->
-    case find_at(H, Sorted) of
-        undefined -> [H|interleave(T, Sorted, N)];
-        N -> [H|interleave(T, Sorted, N+1)];
-        M when N > M -> interleave(T, Sorted, N);
-        M -> lists:sublist(Sorted, N, 1+M-N) ++ interleave(T, Sorted, M+1)
+interleave([], _, _) ->
+    [];
+interleave([App|Apps], DAG, Expanded) ->
+    case Expanded of
+        #{App := _} ->
+            [App|interleave(Apps, DAG, Expanded)];
+        _ ->
+            %% The DAG functions don't make it easy on insert to check for
+            %% duplicate edges across apps, so we clean them up here.
+            Deps = dedupe(digraph:out_neighbours(DAG, App)) -- maps:keys(Expanded),
+            interleave(Deps ++ [App|Apps -- Deps], DAG, Expanded#{App => true})
     end.
 
-find_at(X, Sorted) -> find_at(X, Sorted, 1).
-find_at(_, [], _) -> undefined;
-find_at(X, [X|_], N) -> N;
-find_at(X, [_|T], N) -> find_at(X, T, N+1).
+dedupe(L) -> dedupe(L, #{}).
+
+dedupe([], _) -> 
+    [];
+dedupe([H|T], Map) ->
+    case Map of
+        #{H := _} -> dedupe(T, Map);
+        _ -> [H|dedupe(T, Map#{H => true})]
+    end.
 
 add_one_dependency_to_digraph(V1, V2, Cache, AppDefs, AppDAG) ->
     %% First resolve the file we depend on so that we can shortcut resolution
