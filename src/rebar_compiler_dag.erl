@@ -269,10 +269,53 @@ compile_order(G, AppDefs, SrcExt, ArtifactExt) ->
                     end
             end
         end, new_cache(), digraph:edges(G)),
-    Sorted = lists:reverse(digraph_utils:topsort(AppDAG)),
+    Standalone = [Name || {Name, _} <- AppDefs],
+    Sorted = interleave(Standalone, AppDAG),
     digraph:delete(AppDAG),
-    Standalone = [Name || {Name, _} <- AppDefs] -- Sorted,
-    Standalone ++ Sorted.
+    Sorted.
+
+%% Assume that the standalone app list respects the
+%% rebar.config deps order, and enforce the sorted app
+%% constraints onto it such that we're always respecting
+%% the hard dependencies.
+%%
+%% What we do here is a sort of run-length reordering based
+%% on DAG information, which preserves the original dependency
+%% order as declared, but successfully interleaves hard deps
+%% to come first.
+%%
+%% Note that this approach is required as opposed to topsort
+%% because when the original DAG reports two distinct set of
+%% app dependencies that are joined by an invisible compile-time
+%% one (e.g. a parse_transform runtime dep between both sets),
+%% then the topological sort can't provide the right ordering
+%% information because it's flattened into one list, but
+%% this one can.
+interleave(Apps, DAG) ->
+     interleave(Apps, DAG, sets:new()).
+
+interleave([], _, _) ->
+    [];
+interleave([App|Apps], DAG, Expanded) ->
+    case sets:is_element(App, Expanded) of
+        true ->
+            [App|interleave(Apps, DAG, Expanded)];
+        false ->
+            %% The DAG functions don't make it easy on insert to check for
+            %% duplicate edges across apps, so we clean them up here.
+            Deps = dedupe(digraph:out_neighbours(DAG, App)) -- sets:to_list(Expanded),
+            interleave(Deps ++ [App|Apps -- Deps], DAG, sets:add_element(App, Expanded))
+    end.
+
+dedupe(L) -> dedupe(L, sets:new()).
+
+dedupe([], _) -> 
+    [];
+dedupe([H|T], Set) ->
+    case sets:is_element(H, Set) of
+        true -> dedupe(T, Set);
+        false -> [H|dedupe(T, sets:add_element(H, Set))]
+    end.
 
 add_one_dependency_to_digraph(V1, V2, Cache, AppDefs, AppDAG) ->
     %% First resolve the file we depend on so that we can shortcut resolution
