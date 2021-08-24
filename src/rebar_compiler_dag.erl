@@ -292,29 +292,29 @@ compile_order(G, AppDefs, SrcExt, ArtifactExt) ->
 %% information because it's flattened into one list, but
 %% this one can.
 interleave(Apps, DAG) ->
-     interleave(Apps, DAG, #{}).
+     interleave(Apps, DAG, sets:new()).
 
 interleave([], _, _) ->
     [];
 interleave([App|Apps], DAG, Expanded) ->
-    case Expanded of
-        #{App := _} ->
+    case sets:is_element(App, Expanded) of
+        true ->
             [App|interleave(Apps, DAG, Expanded)];
-        _ ->
+        false ->
             %% The DAG functions don't make it easy on insert to check for
             %% duplicate edges across apps, so we clean them up here.
-            Deps = dedupe(digraph:out_neighbours(DAG, App)) -- maps:keys(Expanded),
-            interleave(Deps ++ [App|Apps -- Deps], DAG, Expanded#{App => true})
+            Deps = dedupe(digraph:out_neighbours(DAG, App)) -- sets:to_list(Expanded),
+            interleave(Deps ++ [App|Apps -- Deps], DAG, sets:add_element(App, Expanded))
     end.
 
-dedupe(L) -> dedupe(L, #{}).
+dedupe(L) -> dedupe(L, sets:new()).
 
 dedupe([], _) -> 
     [];
-dedupe([H|T], Map) ->
-    case Map of
-        #{H := _} -> dedupe(T, Map);
-        _ -> [H|dedupe(T, Map#{H => true})]
+dedupe([H|T], Set) ->
+    case sets:is_element(H, Set) of
+        true -> dedupe(T, Set);
+        false -> [H|dedupe(T, sets:add_element(H, Set))]
     end.
 
 add_one_dependency_to_digraph(V1, V2, Cache, AppDefs, AppDAG) ->
