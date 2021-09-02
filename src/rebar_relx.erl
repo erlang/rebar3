@@ -42,7 +42,11 @@ do(Provider, State) ->
     Args = [include_erts, system_libs, vm_args, sys_config],
     RelxConfig2 = maybe_obey_command_args(RelxConfig1, Opts, Args),
 
-    {ok, RelxState} = rlx_config:to_state(RelxConfig2),
+    {ok, RelxState_0} = rlx_config:to_state(RelxConfig2),
+    XrefIgnores = rebar_state:get(State, xref_ignores, []),
+    RelxState = rlx_state:filter_xref_warning(RelxState_0,
+        fun(Warnings) ->
+            rebar_prv_xref:filter_xref_results(undefined_function_calls, XrefIgnores, Warnings) end),
 
     Providers = rebar_state:providers(State),
     Cwd = rebar_state:dir(State),
