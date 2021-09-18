@@ -481,8 +481,9 @@ add_provider(State=#state_t{providers=Providers, allow_provider_overrides=false}
     case lists:any(fun(P) ->
                            case {providers:impl(P), providers:namespace(P)} of
                                {Name, Namespace} ->
-                                   ?DEBUG("Not adding provider ~p ~p from module ~p because it already exists from module ~p",
-                                          [Namespace, Name, Module, providers:module(P)]),
+                                   ?DEBUG("Not adding provider ~ts ~ts from module ~ts because it already exists from module ~ts",
+                                          [atom_to_list(Namespace), atom_to_list(Name),
+                                           atom_to_list(Module), atom_to_list(providers:module(P))]),
                                    true;
                                _ ->
                                    false
