@@ -262,9 +262,10 @@ app_info_to_relx(#{name := Name,
                    vsn := Vsn,
                    applications := Applications,
                    included_applications := IncludedApplications,
+                   optional_applications := OptionalApplications,
                    dir := Dir,
                    link := false}, AppType) ->
-    rlx_app_info:new(Name, Vsn, Dir, Applications, IncludedApplications, AppType).
+    rlx_app_info:new(Name, Vsn, Dir, Applications, IncludedApplications, OptionalApplications, AppType).
 
 -spec opt_spec_list() -> [getopt:option_spec()].
 opt_spec_list() ->
