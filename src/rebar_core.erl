@@ -68,7 +68,7 @@ process_namespace(State, Command) ->
         not_found ->
             case providers:get_providers_by_namespace(Command, Providers) of
                 [] ->
-                    {error, io_lib:format("Command ~p not found", [Command])};
+                    {error, io_lib:format("Command ~ts not found", [atom_to_list(Command)])};
                 _ ->
                     %% Replay 'do' as a command of that namespace
                     {ok, rebar_state:namespace(State, Command), do}
@@ -98,10 +98,10 @@ process_command(State, Command) ->
         not_found when Command =/= do ->
             case Namespace of
                 default ->
-                    {error, io_lib:format("Command ~p not found", [Command])};
+                    {error, io_lib:format("Command ~ts not found", [atom_to_list(Command)])};
                 _ ->
-                    {error, io_lib:format("Command ~p not found in namespace ~p",
-                                          [Command, Namespace])}
+                    {error, io_lib:format("Command ~ts not found in namespace ~ts",
+                                          [atom_to_list(Command), atom_to_list(Namespace)])}
             end;
         not_found when Command =:= do, Namespace =/= default ->
             do([{default, do} | TargetProviders], State);
@@ -120,7 +120,7 @@ process_command(State, Command) ->
                             State2 = rebar_state:command_parsed_args(State1, Args),
                             do(TargetProviders, State2);
                         {error, {invalid_option, Option}} ->
-                            {error, io_lib:format("Invalid option ~ts on task ~p", [Option, Command])};
+                            {error, io_lib:format("Invalid option ~ts on task ~ts", [Option, atom_to_list(Command)])};
                         {error, {invalid_option_arg, {Option, Arg}}} ->
                             {error, io_lib:format("Invalid argument ~ts to option ~ts", [Arg, Option])};
                         {error, {missing_option_arg, Option}} ->
@@ -137,7 +137,7 @@ process_command(State, Command) ->
 do([], State) ->
     {ok, State};
 do([ProviderName | Rest], State) ->
-    ?DEBUG("Running provider: ~p", [friendly_provider(ProviderName)]),
+    ?DEBUG("Running provider: ~tp", [friendly_provider(ProviderName)]),
     %% Special providers like 'as', 'do' or some hooks may be passed
     %% as a tuple {Namespace, Name}, otherwise not. Handle them
     %% on a per-need basis.
