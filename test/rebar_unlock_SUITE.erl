@@ -54,7 +54,7 @@ unlock(Config) ->
 
 unlock_all(Config) ->
     [_|_] = read_locks(Config),
-    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["unlock"], return),
+    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["unlock", "--all"], return),
     ?assertEqual({error, enoent}, read_locks(Config)),
     ?assertEqual([], rebar_state:get(State, {locks, default})),
     ok.
