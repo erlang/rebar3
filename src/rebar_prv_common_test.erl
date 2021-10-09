@@ -45,6 +45,12 @@ do(State) ->
     case compile(State, Tests) of
         %% successfully compiled apps
         {ok, S} ->
+            {ok, T} = Tests,
+            TestSources = proplists:get_value(dir, T),
+            AllDeps = rebar_state:code_paths(S, all_deps),
+            IsTestDir = fun(Path) -> string:slice(Path, length(Path) - 4, 4) == "test" end,
+            CompiledTestsDirs = lists:filter(IsTestDir, AllDeps),
+            cleanup_unused_test_files(CompiledTestsDirs, TestSources),
             {RawOpts, _} = rebar_state:command_parsed_args(S),
             case proplists:get_value(compile_only, RawOpts, false) of
                 true ->
@@ -85,6 +91,38 @@ do(State, Tests) ->
             rebar_paths:set_paths([plugins, deps], State),
             Error
     end.
+
+cleanup_unused_test_files(CompiledTestsDirs, TestSources) ->
+    GetModulesFun = fun(Dir, Acc) ->
+        Suites = rebar_utils:find_files(Dir, ".*_SUITE\.erl\$", false),
+        Modules = sets:from_list(lists:map(fun rebar_utils:erl_to_mod/1, Suites)),
+        sets:union(Acc, Modules)
+    end,
+    PresentTestModules = lists:foldl(GetModulesFun, sets:new(), TestSources),
+    CleanupFun = fun(Dir) ->
+        cleanup_unused_test_files_dir(Dir, PresentTestModules)
+    end,
+    lists:foreach(CleanupFun, CompiledTestsDirs).
+
+cleanup_unused_test_files_dir(Dir, PresentTestModules) ->
+    Mapping = create_module_to_files_mapping(Dir),
+    RemoveFun = fun(Module, {SrcPath, BeamPath}) ->
+        case sets:is_element(Module, PresentTestModules) of
+            true -> ok;
+            false -> file:delete(SrcPath), file:delete(BeamPath)
+        end
+    end,
+    _ = maps:map(RemoveFun, Mapping),
+    ok.
+
+create_module_to_files_mapping(Dir) ->
+    SrcFiles = rebar_utils:find_files(Dir, ".*_SUITE\.erl\$", false),
+    MappingFun = fun(SrcFile, Acc) ->
+        Module = rebar_utils:erl_to_mod(SrcFile),
+        BeamFile = filename:join([Dir, Module]) ++ ".beam",
+        Acc#{Module => {SrcFile, BeamFile}}
+    end,
+    lists:foldl(MappingFun, #{}, SrcFiles).
 
 run_tests(State, Opts) ->
     T = translate_paths(State, Opts),
