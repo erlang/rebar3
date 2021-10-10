@@ -46,7 +46,7 @@ do(State) ->
         %% successfully compiled apps
         {ok, S} ->
             {ok, T} = Tests,
-            TestSources = proplists:get_value(dir, T),
+            TestSources = proplists:get_value(dir, T, []),
             AllDeps = rebar_state:code_paths(S, all_deps),
             IsTestDir = fun(Path) -> string:slice(Path, length(Path) - 4, 4) == "test" end,
             CompiledTestsDirs = lists:filter(IsTestDir, AllDeps),
