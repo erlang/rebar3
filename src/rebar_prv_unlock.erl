@@ -63,7 +63,6 @@ format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
 handle_unlocks(State, Locks, LockFile) ->
-    {_All, Names} = handle_args(State),
     case handle_args(State) of
         %% a list of dependencies or --all is required
         {false, []} -> 
