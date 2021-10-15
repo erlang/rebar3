@@ -122,7 +122,22 @@ needs_compile(Source, OutExt, Mappings) ->
     BaseName = filename:basename(Source, Ext),
     {_, OutDir} = lists:keyfind(OutExt, 1, Mappings),
     Target = filename:join(OutDir, BaseName++OutExt),
-    filelib:last_modified(Source) > filelib:last_modified(Target).
+    filelib:last_modified(Source) > filelib:last_modified(Target) andalso
+        file_cheksum(Source) =/= file_cheksum(Target).
+
+file_cheksum(Path) ->
+    case file:open(Path, [read, binary]) of
+        {ok, File} ->
+            file_handle_checksum(File, 0);
+        {error, _Reason} -> 0
+    end.
+
+file_handle_checksum(File, ChecksumBefore) ->
+    case file:read(File, 1024) of
+        eof -> ChecksumBefore;
+        {ok, Data} -> Checksum = erlang:crc32(Data),
+        file_handle_checksum(File, Checksum)
+    end.
 
 ok_tuple(Source, Ws) ->
     rebar_base_compiler:ok_tuple(Source, Ws).

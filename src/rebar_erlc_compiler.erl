@@ -660,7 +660,22 @@ compile_xrl_yrl(_Opts, Source, Target, AllOpts, Mod) ->
     end.
 
 needs_compile(Source, Target) ->
-    filelib:last_modified(Source) > filelib:last_modified(Target).
+    filelib:last_modified(Source) > filelib:last_modified(Target) andalso
+        file_cheksum(Source) =/= file_cheksum(Target).
+
+file_cheksum(Path) ->
+    case file:open(Path, [read, binary]) of
+        {ok, File} ->
+            file_handle_checksum(File, 0);
+        {error, _Reason} -> 0
+    end.
+
+file_handle_checksum(File, ChecksumBefore) ->
+    case file:read(File, 1024) of
+        eof -> ChecksumBefore;
+        {ok, Data} -> Checksum = erlang:crc32(Data),
+        file_handle_checksum(File, Checksum)
+    end.
 
 
 
