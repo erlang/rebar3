@@ -84,8 +84,8 @@ do_(State) ->
         {false, undefined} -> throw(?PRV_ERROR(no_arg));
         {true, _} -> [Name || {Name, _, 0} <- Locks];
         {false, Packages} -> Bin = rebar_utils:to_binary(Packages),
-            lists:usort(re:split(Bin, <<" *, *">>, [trim, unicode]))
-        end,
+                             lists:usort(re:split(Bin, <<" *, *">>, [trim, unicode]))
+    end,
     DepsDict = deps_dict(rebar_state:all_deps(State)),
     AltDeps = find_non_default_deps(Deps, State),
     FilteredNames = cull_default_names_if_profiles(Names, Deps, State),
