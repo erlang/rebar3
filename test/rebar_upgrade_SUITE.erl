@@ -646,7 +646,7 @@ compile_upgrade_parity(Config) ->
     Lockfile = filename:join([AppDir, "rebar.lock"]),
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, []}),
     {ok, CompileLockData1} = file:read_file(Lockfile),
-    rebar_test_utils:run_and_check(Config, RebarConfig, ["upgrade"], {ok, []}),
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["upgrade", "--all"], {ok, []}),
     {ok, UpgradeLockData} = file:read_file(Lockfile),
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, []}),
     {ok, CompileLockData2} = file:read_file(Lockfile),
@@ -781,7 +781,7 @@ novsn_pkg(Config) ->
     Expectation = ?config(expected, Config),
     apply(?config(mock_update, Config), []),
     rebar_test_utils:run_and_check(
-        Config, RebarConfig, ["upgrade"], Expectation
+        Config, RebarConfig, ["upgrade", "--all"], Expectation
     ),
     ok.
 
