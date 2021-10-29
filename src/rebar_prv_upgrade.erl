@@ -131,7 +131,7 @@ format_error({checkout_dependency, Name}) ->
     io_lib:format("Dependency ~ts is a checkout dependency under _checkouts/ and checkouts cannot be upgraded.",
                   [Name]);
 format_error(no_arg) -> 
-    "Specify a list of dependencies to unlock, or --all to unlock them all";
+    "Specify a list of dependencies to upgrade, or --all to upgrade them all";
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
