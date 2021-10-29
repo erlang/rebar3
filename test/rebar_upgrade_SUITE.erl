@@ -768,8 +768,12 @@ run(Config) ->
     NewRebarConf = rebar_test_utils:create_config(filename:dirname(ConfigPath),
                                                   [{deps, ?config(next_top_deps, Config)}]),
     {ok, NewRebarConfig} = file:consult(NewRebarConf),
+    App1 = case App of
+        <<>> -> "--all";
+        _ -> App
+    end,
     rebar_test_utils:run_and_check(
-        Config, NewRebarConfig, ["upgrade", App], Expectation
+        Config, NewRebarConfig, ["upgrade", App1], Expectation
      ),
     meck:unload(rebar_prv_upgrade).
 
