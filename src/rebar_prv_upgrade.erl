@@ -111,10 +111,30 @@ do_(State) ->
                       [element(1,Lock) || Lock <- Locks],
                       [rebar_app_info:name(App) || App <- rebar_state:lock(State5)]
                      ),
-                    rebar_prv_lock:do(State5);
+                    State6 = maybe_ignore_checkouts(State5, Checkouts),
+                    rebar_prv_lock:do(State6);
                 _ ->
                     Res
             end
+    end.
+
+-spec maybe_ignore_checkouts(rebar_state:t(), [binary()]) -> rebar_state:t().
+maybe_ignore_checkouts(State, Checkouts) ->
+    OldLocks = rebar_state:get(State, {locks, default}, []),
+    OldLockNames = [element(1,L) || L <- OldLocks],
+    case OldLockNames -- Checkouts of
+        %% If there aren't any checkout dependencies in the old lock info,
+        %% we can safely "ignore" them to avoid a duplicated message from
+        %% `rebar_prv_lock:info_checkout_deps/1`.
+        OldLockNames ->
+            DepsIgnoringCheckout =
+                [case rebar_app_info:is_checkout(Dep) of
+                        true -> rebar_app_info:is_checkout(Dep, false);
+                        false -> Dep
+                 end || Dep <- rebar_state:all_deps(State)],
+            rebar_state:all_deps(State, DepsIgnoringCheckout);
+        _ ->
+            State
     end.
 
 -spec format_error(any()) -> iolist().
