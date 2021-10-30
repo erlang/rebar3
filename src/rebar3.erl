@@ -160,18 +160,19 @@ run_aux(State, RawArgs) ->
     State4 = rebar_state:set(State3, base_dir,
                              filename:join(filename:absname(rebar_state:dir(State3)), BaseDir)),
 
+    State5 = case os:getenv("REBAR_CACHE_DIR") of
+                false ->
+                    State4;
+                ConfigFile ->
+                    rebar_state:set(State4, global_rebar_dir, ConfigFile)
+            end,
+
     {ok, Providers} = application:get_env(rebar, providers),
     %% Providers can modify profiles stored in opts, so set default after initializing providers
-    State5 = rebar_state:create_logic_providers(Providers, State4),
+    State6 = rebar_state:create_logic_providers(Providers, State5),
     %% Initializing project_plugins which can override default providers
-    State6 = rebar_plugins:project_plugins_install(State5),
-    State7 = rebar_plugins:top_level_install(State6),
-    State8 = case os:getenv("REBAR_CACHE_DIR") of
-                false ->
-                    State7;
-                ConfigFile ->
-                    rebar_state:set(State7, global_rebar_dir, ConfigFile)
-            end,
+    State7 = rebar_plugins:project_plugins_install(State6),
+    State8 = rebar_plugins:top_level_install(State7),
 
     State9 = rebar_state:default(State8, rebar_state:opts(State8)),
 
