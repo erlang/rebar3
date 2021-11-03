@@ -27,7 +27,8 @@ init(State) ->
                     {short_desc, "Upgrade plugins"},
                     {desc, "List or upgrade plugins"},
                     {opts, [{plugin, undefined, undefined, string,
-                             "Plugin to upgrade"}]}])),
+                             "Plugin to upgrade"},
+                            {all, $a, "all", undefined, "Upgrade all plugins."}]}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
