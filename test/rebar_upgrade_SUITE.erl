@@ -545,6 +545,9 @@ mock_deps(pkg, OldDeps, Deps, Upgrades) ->
     {_, PkgDeps} = rebar_test_utils:flat_deps(Deps++OldDeps),
     mock_pkg_resource:mock([{pkgdeps, PkgDeps}, {upgrade, Upgrades}]).
 
+normalize_unlocks({[], Locks}) ->
+    {"--all",
+     normalize_unlocks_expect(Locks)};
 normalize_unlocks({App, Locks}) ->
     {iolist_to_binary(App),
      normalize_unlocks_expect(Locks)};
@@ -770,12 +773,8 @@ run(Config) ->
     NewRebarConf = rebar_test_utils:create_config(filename:dirname(ConfigPath),
                                                   [{deps, ?config(next_top_deps, Config)}]),
     {ok, NewRebarConfig} = file:consult(NewRebarConf),
-    App1 = case App of
-        <<>> -> "--all";
-        _ -> App
-    end,
     rebar_test_utils:run_and_check(
-        Config, NewRebarConfig, ["upgrade", App1], Expectation
+        Config, NewRebarConfig, ["upgrade", App], Expectation
      ),
     meck:unload(rebar_prv_upgrade).
 
