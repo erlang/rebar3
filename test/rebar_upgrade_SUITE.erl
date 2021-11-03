@@ -3,7 +3,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -compile(export_all).
 
-all() -> [{group, git}, {group, pkg}, novsn_pkg].
+all() -> [{group, git}, {group, pkg}, novsn_pkg, upgrade_no_args].
 
 groups() ->
     [{all, [], [top_a, top_b, top_c, top_d1, top_d2, top_e,
@@ -53,6 +53,8 @@ init_per_testcase(novsn_pkg, Config0) ->
       end},
      {expected, {ok, [{dep, "fakeapp", "1.1.0"}, {lock, "fakeapp", "1.1.0"}]}}
      | Config];
+init_per_testcase(upgrade_no_args, Config0) ->
+    rebar_test_utils:init_rebar_state(Config0, "upgrade_no_args_");
 init_per_testcase(Case, Config) ->
     DepsType = ?config(deps_type, Config),
     {Deps, UpDeps, ToUp, Expectations} = upgrades(Case),
@@ -812,3 +814,10 @@ rewrite_locks({ok, Expectations}, Config) ->
         end, [], Locks),
     ct:pal("rewriting locks from ~p to~n~p", [Locks, NewLocks]),
     file:write_file(LockFile, io_lib:format("~p.~n", [NewLocks])).
+
+upgrade_no_args(Config) ->
+    try rebar_test_utils:run_and_check(Config, [], ["upgrade"], return)
+    catch {error, {rebar_prv_upgrade, no_arg}} ->
+        ok
+    end,
+    ok.
