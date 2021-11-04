@@ -12,6 +12,7 @@
          list/1,
          upgrade/1,
          upgrade_project_plugin/1,
+         upgrade_no_args/1,
          sub_app_plugins/1,
          sub_app_plugin_overrides/1,
          project_plugins/1,
@@ -220,7 +221,7 @@ upgrade(Config) ->
      ),
 
     rebar_test_utils:run_and_check(
-        Config, RConf, ["plugins", "upgrade"],
+        Config, RConf, ["plugins", "upgrade", "--all"],
         {ok, [{app, Name, valid}, {file, PluginBeam}, {plugin, PkgName}]}
      ).
 
@@ -262,6 +263,13 @@ upgrade_project_plugin(Config) ->
         Config, RConf, ["plugins", "upgrade", PkgName],
         {ok, [{app, Name}, {plugin, PkgName, <<"0.1.3">>}]}
      ).
+
+upgrade_no_args(Config) ->
+    try rebar_test_utils:run_and_check(Config, [], ["plugins", "upgrade"], return)
+    catch {error, {rebar_prv_plugins_upgrade, no_arg}} ->
+        ok
+    end,
+    ok.
 
 sub_app_plugins(Config) ->
     AppDir = ?config(apps, Config),
