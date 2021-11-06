@@ -9,6 +9,18 @@
 %%====================================================================
 
 request(Method, URI, ReqHeaders, Body, AdapterConfig) ->
+    case os:getenv("REBAR_OFFLINE") of
+        "1" ->
+            {error, {offline, URI}};
+        _ ->
+            request_online(Method, URI, ReqHeaders, Body, AdapterConfig)
+    end.
+
+%%====================================================================
+%% Internal functions
+%%====================================================================
+
+request_online(Method, URI, ReqHeaders, Body, AdapterConfig) ->
     Profile = maps:get(profile, AdapterConfig, default),
     Request = build_request(URI, ReqHeaders, Body),
     SSLOpts = [{ssl, rebar_utils:ssl_opts(URI)}],
@@ -18,10 +30,6 @@ request(Method, URI, ReqHeaders, Body, AdapterConfig) ->
             {ok, {StatusCode, RespHeaders2, RespBody}};
         {error, Reason} -> {error, Reason}
     end.
-
-%%====================================================================
-%% Internal functions
-%%====================================================================
 
 build_request(URI, ReqHeaders, Body) ->
     build_request2(binary_to_list(URI), dump_headers(ReqHeaders), Body).

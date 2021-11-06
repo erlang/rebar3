@@ -177,6 +177,12 @@ run_aux(State, RawArgs) ->
     State9 = rebar_state:default(State8, rebar_state:opts(State8)),
 
     {Task, Args} = parse_args(RawArgs),
+    case lists:member("--offline", Args) of
+        true ->
+            os:putenv("REBAR_OFFLINE", "1");
+        false ->
+            ok
+    end,
 
     State10 = rebar_state:code_paths(State9, default, code:get_path()),
 
@@ -377,9 +383,14 @@ start_and_load_apps(Caller) ->
     ensure_running(crypto, Caller),
     ensure_running(asn1, Caller),
     ensure_running(public_key, Caller),
-    ensure_running(ssl, Caller),
-    ensure_running(inets, Caller),
-    inets:start(httpc, [{profile, rebar}]).
+    case os:getenv("REBAR_OFFLINE") of
+        "1" ->
+            ok;
+        _ ->
+            ensure_running(ssl, Caller),
+            ensure_running(inets, Caller),
+            inets:start(httpc, [{profile, rebar}])
+    end.
 
 %% @doc Make sure a required app is running, or display an error message
 %% and abort if there's a problem.
