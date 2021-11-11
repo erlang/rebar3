@@ -118,6 +118,8 @@ format_error(all_relup) ->
     "Option --all can not be applied to `relup` command";
 format_error({config_file, Filename, Error}) ->
     io_lib:format("Failed to read config file ~ts: ~p", [Filename, Error]);
+format_error({release_not_found, Relname}) ->
+    io_lib:format("No releases exists in the system for ~s!", [Relname]);
 format_error(Error) ->
     io_lib:format("~p", [Error]).
 
@@ -154,8 +156,9 @@ rel_handler({ok, _}, _) ->
     ok.
 
 releases_to_build(Provider, Opts, RelxState)->
-    case proplists:get_value(all, Opts, undefined) of
-        undefined ->
+    case {proplists:get_value(all, Opts, undefined),
+          proplists:get_value(relnames, Opts, undefined)} of
+        {undefined, undefined} ->
             case proplists:get_value(relname, Opts, undefined) of
                 undefined ->
                     [undefined];
@@ -167,10 +170,20 @@ releases_to_build(Provider, Opts, RelxState)->
                             [{list_to_atom(R), RelVsn}]
                     end
             end;
-        true when Provider =:= relup ->
+        {true, _} when Provider =:= relup ->
             erlang:error(?PRV_ERROR(all_relup));
-        true ->
-            highest_unique_releases(rlx_state:configured_releases(RelxState))
+        {true, _} ->
+            highest_unique_releases(rlx_state:configured_releases(RelxState));
+        {_, Filter} ->
+            Releases = highest_unique_releases(rlx_state:configured_releases(RelxState)),
+            WantReleases = [list_to_atom(Rel) || Rel <- string:split(Filter, ",", all)],
+            [
+                case proplists:lookup(Relname, Releases) of
+                    none -> erlang:error(?PRV_ERROR({release_not_found, Relname}));
+                    Rel -> Rel
+                end
+                || Relname <- WantReleases
+            ]
     end.
 
 %% takes a map of relx configured releases and returns a list of the highest
@@ -280,4 +293,5 @@ opt_spec_list() ->
      {sys_config, undefined, "sys_config", string, "Path to a file to use for sys.config"},
      {system_libs, undefined, "system_libs", string, "Boolean or path to dir of Erlang system libs"},
      {version, undefined, "version", undefined, "Print relx version"},
-     {root_dir, $r, "root", string, "The project root directory"}].
+     {root_dir, $r, "root", string, "The project root directory"},
+     {relnames, $m, "relnames", string, "Like --all, but only build the releases in the list, e.g. --relnames rel1,rel2"}].
