@@ -7,7 +7,7 @@ main(Args) ->
         true ->
             os:putenv("REBAR_OFFLINE", "1");
         false ->
-            _
+            ok
     end,
     ensure_app(crypto),
     ensure_app(asn1),

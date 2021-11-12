@@ -122,7 +122,7 @@ etag(Path) ->
 request(Url, ETag) ->
     case os:getenv("REBAR_OFFLINE") of
         "1" ->
-            ?DEBUG("Rebar is in offline mode"),
+            ?DEBUG("Rebar is in offline mode", []),
             error;
         _ ->
             request_online(Url, ETag)
