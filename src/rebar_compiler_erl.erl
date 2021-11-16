@@ -63,7 +63,7 @@ needed_files(Graph, FoundFiles, _, AppInfo) ->
     NeededErlFiles = case needed_files(Graph, ErlOpts, RebarOpts, OutDir, EbinDir, ParseTransforms) of
                          [] ->
                              needed_files(Graph, ErlOpts, RebarOpts, OutDir, EbinDir, Rest);
-                         _  ->
+                         _ ->
                              %% at least one parse transform in the opts needs updating, so recompile all
                              FoundFiles
                      end,
@@ -258,6 +258,7 @@ target_base(OutDir, Source) ->
     filename:join(OutDir, filename:basename(Source, ".erl")).
 
 opts_changed(Graph, NewOpts, Target, TargetBase) ->
+    ModuleName = list_to_atom(filename:basename(TargetBase)),
     {ok, CompileVsn} = application:get_key(compiler, vsn),
     TotalOpts = case erlang:function_exported(compile, env_compiler_options, 0) of
         true  -> [{compiler_version, CompileVsn}] ++ NewOpts ++ compile:env_compiler_options();
@@ -272,10 +273,10 @@ opts_changed(Graph, NewOpts, Target, TargetBase) ->
                 _ -> []
             end
     end,
-    lists:any(fun effects_code_generation/1,
+    lists:any(fun(Option) -> effects_code_generation(ModuleName, Option) end,
               lists:usort(TotalOpts) -- lists:usort(TargetOpts)).
 
-effects_code_generation(Option) ->
+effects_code_generation(ModuleName, Option) ->
     case Option of
         beam -> false;
         report_warnings -> false;
@@ -288,6 +289,7 @@ effects_code_generation(Option) ->
         verbose -> false;
         {cwd,_} -> false;
         {outdir, _} -> false;
+        {parse_transform, ModuleName} -> false;
         no_spawn_compiler_process -> false;
         _ -> true
     end.
