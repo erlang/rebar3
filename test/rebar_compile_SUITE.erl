@@ -40,6 +40,7 @@ all() ->
      include_file_relative_to_working_directory_test, include_file_in_src_test,
      include_file_in_src_test_multiapp,
      recompile_when_parse_transform_as_opt_changes,
+     dont_recompile_when_parse_transform_as_opt_unchanged,
      recompile_when_parse_transform_inline_changes,
      regex_filter_skip, regex_filter_regression,
      recursive, no_recursive, extra_recursion,
@@ -2719,6 +2720,48 @@ recompile_when_parse_transform_as_opt_changes(Config) ->
                   || F <- NewFiles, filename:basename(F, ".beam") == "example"],
 
     ?assert(ModTime =/= NewModTime).
+
+dont_recompile_when_parse_transform_as_opt_unchanged(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("parse_transform_opt_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    ok = filelib:ensure_dir(filename:join([AppDir, "src", "dummy"])),
+
+    ModSrc = <<"-module(example).\n"
+               "-export([foo/2]).\n"
+               "foo(_, _) -> ok.">>,
+
+    ok = file:write_file(filename:join([AppDir, "src", "example.erl"]),
+                         ModSrc),
+
+    ParseTransform = <<"-module(example_parse_transform).\n"
+                       "-export([parse_transform/2]).\n"
+                       "parse_transform(AST, _) -> AST.">>,
+
+    ok = file:write_file(filename:join([AppDir, "src", "example_parse_transform.erl"]),
+                         ParseTransform),
+
+    RebarConfig = [{erl_opts, [{parse_transform, example_parse_transform}]}],
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
+
+    EbinDir = filename:join([AppDir, "_build", "default", "lib", Name, "ebin"]),
+    {ok, Files} = rebar_utils:list_dir(EbinDir),
+    ModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+               || F <- Files, filename:basename(F, ".beam") == "example"],
+
+    timer:sleep(1000),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
+
+    {ok, NewFiles} = rebar_utils:list_dir(EbinDir),
+    NewModTime = [filelib:last_modified(filename:join([EbinDir, F]))
+                  || F <- NewFiles, filename:basename(F, ".beam") == "example"],
+
+    ?assert(ModTime =:= NewModTime).
 
 recursive(Config) ->
     AppDir = ?config(apps, Config),
