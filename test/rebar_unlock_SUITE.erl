@@ -3,7 +3,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -compile(export_all).
 
-all() -> [pkgunlock, unlock, unlock_all].
+all() -> [pkgunlock, unlock, unlock_all, unlock_no_args].
 
 init_per_testcase(pkgunlock, Config0) ->
     Config = rebar_test_utils:init_rebar_state(Config0, "pkgunlock"),
@@ -54,9 +54,16 @@ unlock(Config) ->
 
 unlock_all(Config) ->
     [_|_] = read_locks(Config),
-    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["unlock"], return),
+    {ok, State} = rebar_test_utils:run_and_check(Config, [], ["unlock", "--all"], return),
     ?assertEqual({error, enoent}, read_locks(Config)),
     ?assertEqual([], rebar_state:get(State, {locks, default})),
+    ok.
+
+unlock_no_args(Config) ->
+    try rebar_test_utils:run_and_check(Config, [], ["unlock"], return)
+    catch {error, {rebar_prv_unlock, no_arg}} ->
+        ok
+    end,
     ok.
 
 read_locks(Config) ->

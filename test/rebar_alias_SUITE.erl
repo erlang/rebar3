@@ -24,7 +24,7 @@ command(Config) ->
     Name = rebar_test_utils:create_random_name("alias_command_"),
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
-    RebarConfig = [{alias, [{test, [compile, unlock]}]}],
+    RebarConfig = [{alias, [{test, [compile, {unlock,"-a"}]}]}],
 
     %% compile job ran
     rebar_test_utils:run_and_check(Config, RebarConfig,
@@ -64,7 +64,7 @@ many(Config) ->
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
     RebarConfig = [{alias, [{test, [{eunit,"-c"}, cover]},
-                            {nolock, [compile, unlock]}]}],
+                            {nolock, [compile, {unlock,"-a"}]}]}],
 
     %% test job ran (compiled and succeeded)
     rebar_test_utils:run_and_check(Config, RebarConfig,
