@@ -3,7 +3,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -compile(export_all).
 
-all() -> [{group, git}, {group, pkg}, novsn_pkg].
+all() -> [{group, git}, {group, pkg}, novsn_pkg, upgrade_no_args].
 
 groups() ->
     [{all, [], [top_a, top_b, top_c, top_d1, top_d2, top_e,
@@ -53,6 +53,8 @@ init_per_testcase(novsn_pkg, Config0) ->
       end},
      {expected, {ok, [{dep, "fakeapp", "1.1.0"}, {lock, "fakeapp", "1.1.0"}]}}
      | Config];
+init_per_testcase(upgrade_no_args, Config0) ->
+    rebar_test_utils:init_rebar_state(Config0, "upgrade_no_args_");
 init_per_testcase(Case, Config) ->
     DepsType = ?config(deps_type, Config),
     {Deps, UpDeps, ToUp, Expectations} = upgrades(Case),
@@ -543,6 +545,9 @@ mock_deps(pkg, OldDeps, Deps, Upgrades) ->
     {_, PkgDeps} = rebar_test_utils:flat_deps(Deps++OldDeps),
     mock_pkg_resource:mock([{pkgdeps, PkgDeps}, {upgrade, Upgrades}]).
 
+normalize_unlocks({[], Locks}) ->
+    {"--all",
+     normalize_unlocks_expect(Locks)};
 normalize_unlocks({App, Locks}) ->
     {iolist_to_binary(App),
      normalize_unlocks_expect(Locks)};
@@ -646,7 +651,7 @@ compile_upgrade_parity(Config) ->
     Lockfile = filename:join([AppDir, "rebar.lock"]),
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, []}),
     {ok, CompileLockData1} = file:read_file(Lockfile),
-    rebar_test_utils:run_and_check(Config, RebarConfig, ["upgrade"], {ok, []}),
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["upgrade", "--all"], {ok, []}),
     {ok, UpgradeLockData} = file:read_file(Lockfile),
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, []}),
     {ok, CompileLockData2} = file:read_file(Lockfile),
@@ -781,7 +786,7 @@ novsn_pkg(Config) ->
     Expectation = ?config(expected, Config),
     apply(?config(mock_update, Config), []),
     rebar_test_utils:run_and_check(
-        Config, RebarConfig, ["upgrade"], Expectation
+        Config, RebarConfig, ["upgrade", "--all"], Expectation
     ),
     ok.
 
@@ -808,3 +813,10 @@ rewrite_locks({ok, Expectations}, Config) ->
         end, [], Locks),
     ct:pal("rewriting locks from ~p to~n~p", [Locks, NewLocks]),
     file:write_file(LockFile, io_lib:format("~p.~n", [NewLocks])).
+
+upgrade_no_args(Config) ->
+    try rebar_test_utils:run_and_check(Config, [], ["upgrade"], return)
+    catch {error, {rebar_prv_upgrade, no_arg}} ->
+        ok
+    end,
+    ok.

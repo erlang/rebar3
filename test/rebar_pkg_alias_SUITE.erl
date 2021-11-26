@@ -89,7 +89,7 @@ diff_alias(Config) ->
     {ok, [{Vsn, LockData}|_]} = file:consult(Lockfile),
     %% So does an upgrade
     rebar_test_utils:run_and_check(
-        Config, RebarConfig, ["upgrade"],
+        Config, RebarConfig, ["upgrade", "--all"],
         {ok, [{lock, "fakelib"},{dep, "fakelib"}]}
     ),
     {ok, [{Vsn, LockData}|_]} = file:consult(Lockfile).
@@ -128,7 +128,7 @@ transitive_alias(Config) ->
     ?assertNot(filelib:is_dir(PkgName)),
     %% So does an upgrade
     rebar_test_utils:run_and_check(
-        Config, RebarConfig, ["upgrade"],
+        Config, RebarConfig, ["upgrade", "--all"],
         {ok, [{lock, "topdep"},{dep, "topdep"},
               {lock,"transitive_app"},{dep,"transitive_app"}]}
     ),

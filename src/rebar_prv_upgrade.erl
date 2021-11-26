@@ -32,12 +32,12 @@ init(State) ->
                                                    {deps, ?DEPS},
                                                    {example, "rebar3 upgrade [cowboy[,ranch]]"},
                                                    {short_desc, "Upgrade dependencies."},
-                                                   {desc, "Upgrade project dependencies. Mentioning no application "
-                                                          "will upgrade all dependencies. To upgrade specific dependencies, "
+                                                   {desc, "Upgrade project dependencies. Use the -a/--all option to "
+                                                          "upgrade all dependencies. To upgrade specific dependencies, "
                                                           "their names can be listed in the command."},
-                                                   {opts, [
+                                                   {opts, [{all, $a, "all", undefined, "Upgrade all dependencies."},
                                                           {package, undefined, undefined, string,
-                                                           "List of packages to upgrade. If not specified, all dependencies are upgraded."}
+                                                           "List of packages to upgrade."}
                                                           ]}])),
     {ok, State1}.
 
@@ -56,7 +56,6 @@ do(State) ->
     end.
 
 do_(State) ->
-    {Args, _} = rebar_state:command_parsed_args(State),
     Locks = rebar_state:get(State, {locks, default}, []),
     %% We have 3 sources of dependencies to upgrade from:
     %% 1. the top-level rebar.config (in `deps', dep name is an atom)
@@ -81,8 +80,12 @@ do_(State) ->
     ProfileDeps = rebar_state:get(State, {deps, default}, []),
     Deps = [Dep || Dep <- TopDeps ++ ProfileDeps, % TopDeps > ProfileDeps
                    is_atom(Dep) orelse is_atom(element(1, Dep))],
-    Names = parse_names(rebar_utils:to_binary(proplists:get_value(package, Args, <<"">>)), Locks),
-
+    Names = case handle_args(State) of
+        {false, undefined} -> throw(?PRV_ERROR(no_arg));
+        {true, _} -> [Name || {Name, _, 0} <- Locks];
+        {false, Packages} -> Bin = rebar_utils:to_binary(Packages),
+                             lists:usort(re:split(Bin, <<" *, *">>, [trim, unicode]))
+    end,
     DepsDict = deps_dict(rebar_state:all_deps(State)),
     AltDeps = find_non_default_deps(Deps, State),
     FilteredNames = cull_default_names_if_profiles(Names, Deps, State),
@@ -127,8 +130,16 @@ format_error({transitive_dependency, Name}) ->
 format_error({checkout_dependency, Name}) ->
     io_lib:format("Dependency ~ts is a checkout dependency under _checkouts/ and checkouts cannot be upgraded.",
                   [Name]);
+format_error(no_arg) -> 
+    "Specify a list of dependencies to upgrade, or --all to upgrade them all";
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
+
+handle_args(State) -> 
+    {Args, _} = rebar_state:command_parsed_args(State),
+    All = proplists:get_value(all, Args, false),
+    Package = proplists:get_value(package, Args),
+    {All, Package}.
 
 %% fetch updates for package deps that have been unlocked for upgrade
 update_pkg_deps([], _, _) ->
@@ -158,15 +169,6 @@ update_package(Name, RepoConfig, State) ->
             ?WARN("Failed to fetch updates for package ~ts from repo ~ts", [Name, maps:get(name, RepoConfig)]);
         _ ->
             ok
-    end.
-
-parse_names(Bin, Locks) ->
-    case lists:usort(re:split(Bin, <<" *, *">>, [trim, unicode])) of
-        %% Nothing submitted, use *all* apps
-        [<<"">>] -> [Name || {Name, _, 0} <- Locks];
-        [] -> [Name || {Name, _, 0} <- Locks];
-        %% Regular options
-        Other -> Other
     end.
 
 %% Find alternative deps in non-default profiles since they may
