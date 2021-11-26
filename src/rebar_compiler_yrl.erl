@@ -32,10 +32,16 @@ needed_files(_, FoundFiles, Mappings, AppInfo) ->
 dependencies(_, _, _) ->
     [].
 
-compile(Source, [{_, OutDir}], _, Opts) ->
-    BaseName = filename:basename(Source, ".yrl"),
-    Target = filename:join([OutDir, BaseName]),
-    AllOpts = [{parserfile, Target}, {return, true} | Opts],
+compile(Source, [{_, OutDir}], _, Opts0) ->
+    Opts = case proplists:get_value(parserfile, Opts0) of
+        undefined ->
+            BaseName = filename:basename(Source, ".yrl"),
+            Target = filename:join([OutDir, BaseName]),
+            [{parserfile, Target} | Opts0];
+        _ ->
+            Opts0
+    end,
+    AllOpts = [{return, true} | Opts],
     case yecc:file(Source, AllOpts) of
         {ok, _} ->
             ok;
