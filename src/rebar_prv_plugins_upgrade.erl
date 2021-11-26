@@ -25,16 +25,18 @@ init(State) ->
                     {deps, ?DEPS},
                     {example, "rebar3 plugins upgrade <plugin>"},
                     {short_desc, "Upgrade plugins"},
-                    {desc, "List or upgrade plugins"},
+                    {desc, "List or upgrade plugins. Use the -a/--all option to upgrade"
+                           " all plugins."},
                     {opts, [{plugin, undefined, undefined, string,
-                             "Plugin to upgrade"}]}])),
+                             "Plugin to upgrade"},
+                            {all, $a, "all", undefined, "Upgrade all plugins."}]}])),
     {ok, State1}.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    {Args, _} = rebar_state:command_parsed_args(State),
-    case proplists:get_value(plugin, Args, none) of
-        none ->
+    case handle_args(State) of 
+        {false, undefined} -> throw(?PRV_ERROR(no_arg));
+        {true, _} -> 
             {_, LocalPluginsNames} = rebar_prv_plugins:list_local_plugins(State),
             lists:foldl(
                 fun (LocalPluginName, {ok, StateAcc}) ->
@@ -42,15 +44,22 @@ do(State) ->
                 end,
                 {ok, State},
                 LocalPluginsNames);
-        Plugin ->
-            upgrade(Plugin, State)
+        {false, Plugin} -> upgrade(Plugin, State)
     end.
 
 -spec format_error(any()) -> iolist().
 format_error({not_found, Plugin}) ->
     io_lib:format("Plugin to upgrade not found: ~ts", [Plugin]);
+format_error(no_arg) -> 
+     "Specify a plugin to upgrade, or --all to upgrade them all";
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
+
+handle_args(State) -> 
+     {Args, _} = rebar_state:command_parsed_args(State),
+     All = proplists:get_value(all, Args, false),
+     Plugin = proplists:get_value(plugin, Args),
+     {All, Plugin}.
 
 upgrade(Plugin, State) ->
     Profiles = rebar_state:current_profiles(State),
