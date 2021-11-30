@@ -335,11 +335,17 @@ get_patch_count(Dir, RawRef) ->
     Ref = re:replace(RawRef, "\\s", "", [global, unicode]),
     Cmd = io_lib:format("git rev-list --count ~ts..HEAD",
                         [rebar_utils:escape_chars(Ref)]),
-    {ok, PatchLines} = rebar_utils:sh(Cmd,
-                                        [{use_stdout, false},
-                                         {cd, Dir},
-                                         {debug_abort_on_error, AbortMsg}]),
-    {ok, list_to_integer(rebar_string:trim(PatchLines))}.
+    {ok, Output} = rebar_utils:sh(Cmd,
+                                  [{use_stdout, false},
+                                   {cd, Dir},
+                                   {debug_abort_on_error, AbortMsg}]),
+    case rebar_string:split(Output, "\n") of
+        [PatchLines, []] ->
+            {ok, list_to_integer(PatchLines)};
+        [Warning, PatchLines] ->
+            ?WARN("Extra message from git rev-list: ~ts", [Warning]),
+            {ok, list_to_integer(rebar_string:trim(PatchLines))}
+    end.
 
 
 parse_tags(Dir) ->
