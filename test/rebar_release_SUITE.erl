@@ -49,7 +49,7 @@ release(Config) ->
 config_file(Config) ->
     AppDir = ?config(apps, Config),
     Name = list_to_atom(?config(name, Config)),
-    %% Relase build fails if no relx config exists
+    %% Release build fails if no relx config exists
     ?assertError({error, {relx, no_releases_in_system}},
                  rebar_test_utils:run_and_check(Config, [], ["release"], result)),
     %% Write relx.config

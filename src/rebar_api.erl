@@ -58,7 +58,7 @@ error(Str, Args) -> ?ERROR(Str, Args).
 expand_env_variable(InStr, VarName, RawVarValue) ->
     rebar_utils:expand_env_variable(InStr, VarName, RawVarValue).
 
-%% @doc returns the sytem architecture, in strings like
+%% @doc returns the system architecture, in strings like
 %% `"19.0.4-x86_64-unknown-linux-gnu-64"'.
 -spec get_arch() -> string().
 get_arch() ->

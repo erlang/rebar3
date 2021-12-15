@@ -8,7 +8,7 @@
 %%%          out the cody bits
 %%% * red:   things that went bad, i.e. the wrong argument in a
 %%%          call. It allows to quickly catching where in the code
-%%%          ane error is.
+%%%          and error is.
 %%% * green: the 'good' stuff, i.e. what was expected as an argument
 %%%          the 'red vs green' resambles the diff view 'remove vs add'
 %%% * blue:  argument positions.
@@ -412,14 +412,14 @@ highlight([N | Nr], N, r, [Arg | Rest]) ->
 highlight(Ns, N, C, [Arg | Rest]) ->
     [Arg | highlight(Ns, N + 1, C, Rest)].
 
-%% Arugments to functions and constraints are passed as
+%% Arguments to functions and constraints are passed as
 %% strings not as data, this function pulls them apart
 %% to allow interacting with them separately and not
 %% as one bug chunk of data.
 separate_args([$( | S]) ->
     separate_args([], S, "", []).
 
-%% We strip this space since dialyzer is inconsistant in adding or not adding
+%% We strip this space since dialyzer is inconsistent in adding or not adding
 %% it ....
 separate_args([], [$,, $\s | R], Arg, Args) ->
     separate_args([], R, [], [lists:reverse(Arg) | Args]);

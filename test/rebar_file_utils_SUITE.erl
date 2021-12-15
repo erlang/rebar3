@@ -53,7 +53,7 @@ groups() ->
                mv_file_dir_same, mv_file_dir_diff, mv_no_clobber]}].
 
 init_per_group(reset_dir, Config) ->
-    TmpDir = rebar_file_utils:system_tmpdir(["rebar_file_utils_SUITE", "resetable"]),
+    TmpDir = rebar_file_utils:system_tmpdir(["rebar_file_utils_SUITE", "resettable"]),
     [{tmpdir, TmpDir} | Config];
 init_per_group(tmpdir, Config) ->
     PreviousTmpDir = os:getenv("TMPDIR"),

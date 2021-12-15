@@ -11,7 +11,7 @@
          make_vsn/2]).
 
 
-%% For backward compatibilty
+%% For backward compatibility
 -export([ download/3
         ]).
 
@@ -77,7 +77,7 @@ download(TmpDir, AppInfo, State, _) ->
             {error, Error}
     end.
 
-%% For backward compatibilty
+%% For backward compatibility
 download(Dir, AppInfo, State) ->
     download_(Dir, AppInfo, State).
 

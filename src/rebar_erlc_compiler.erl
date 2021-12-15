@@ -831,7 +831,7 @@ atoms_in_erl_first_files_warning(Atoms) ->
   W = "You have provided atoms as file entries in erl_first_files; "
       "erl_first_files only expects lists of filenames as strings. "
       "The following modules (~p) may not work as expected and it is advised "
-      "that you change these entires to string format "
+      "that you change these entries to string format "
       "(e.g., \"src/module.erl\") ",
   ?WARN(W, [Atoms]).
 

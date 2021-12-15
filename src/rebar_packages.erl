@@ -428,7 +428,7 @@ cmp_(BestMatch, MinVsn, [Vsn | R], CmpFun) ->
     end.
 
 %% We need to treat this differently since we want a version that is LOWER but
-%% the higest possible one.
+%% the highest possible one.
 cmpl(Dep, Vsn, Repo, HexRegistry, State, CmpFun) ->
     case get_package_versions(Dep, Vsn, Repo, HexRegistry, State) of
         [] ->

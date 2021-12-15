@@ -54,7 +54,7 @@ do(State, LibDirs) ->
                          end, State, lists:reverse(CurrentProfiles)),
 
     %% Handle sub project apps deps
-    %% Sort apps so we get the same merged deps config everytime
+    %% Sort apps so we get the same merged deps config every time
     SortedApps = rebar_utils:sort_deps(Apps),
     lists:foldl(fun(AppInfo, StateAcc) ->
                         Name = rebar_app_info:name(AppInfo),
@@ -438,7 +438,7 @@ create_app_info(AppInfo, AppDir, AppFile) ->
     end.
 
 
-%% @doc Read in and parse the .app file if it is availabe. Do the same for
+%% @doc Read in and parse the .app file if it is available. Do the same for
 %% the .app.src file if it exists.
 -spec try_handle_resource_files(AppInfo, AppDir, ResourceFiles, valid | invalid | all) ->
     {true, AppInfo} | false when
@@ -463,7 +463,7 @@ try_handle_resource_files(_AppInfo, _AppDir, [], _Validate) ->
     false.
 
 
-%% @doc Read in and parse the .app file if it is availabe. Do the same for
+%% @doc Read in and parse the .app file if it is available. Do the same for
 %% the .app.src file if it exists.
 -spec try_handle_app_file(AppInfo, AppDir, File, AppSrcFile, valid | invalid | all) ->
     {true, AppInfo} | false when

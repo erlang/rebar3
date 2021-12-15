@@ -90,7 +90,7 @@ get_template_vars(TemplateTerms, State) ->
 
 %% Provide a way to merge a set of variables with another one. The left-hand
 %% set of variables takes precedence over the right-hand set.
-%% In the case where left-hand variable description contains overriden defaults, but
+%% In the case where left-hand variable description contains overridden defaults, but
 %% the right-hand one contains additional data such as documentation, the resulting
 %% variable description will contain the widest set of information possible.
 override_vars([], General) -> General;

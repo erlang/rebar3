@@ -119,7 +119,7 @@
 %% API
 %% ============================================================================
 %% @doc Build a new, empty, app info value. This is not of a lot of use and you
-%% probably wont be doing this much.
+%% probably won't be doing this much.
 -spec new() -> t().
 new() ->
     #app_info_t{}.
