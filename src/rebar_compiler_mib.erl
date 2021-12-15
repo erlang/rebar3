@@ -56,7 +56,7 @@ atoms_in_mib_first_files_warning(Atoms) ->
   W = "You have provided atoms as file entries in mib_first_files; "
       "mib_first_files only expects lists of filenames as strings. "
       "The following MIBs (~p) may not work as expected and it is advised "
-      "that you change these entires to string format "
+      "that you change these entries to string format "
       "(e.g., \"mibs/SOME-MIB.mib\") ",
   ?WARN(W, [Atoms]).
 

@@ -97,7 +97,7 @@ sort_deps(Deps) ->
     %% We need a sort stable, based on the name. So that for multiple deps on
     %% the same level with the same name, we keep the order the parents had.
     %% `lists:keysort/2' is documented as stable in the stdlib.
-    %% The list of deps is revered when we get it. For the proper stable
+    %% The list of deps is reversed when we get it. For the proper stable
     %% result, re-reverse it.
     lists:keysort(?APP_NAME_INDEX, lists:reverse(Deps)).
 
@@ -129,7 +129,7 @@ is_arch(ArchRegex) ->
             false
     end.
 
-%% @doc returns the sytem architecture, in strings like
+%% @doc returns the system architecture, in strings like
 %% `"19.0.4-x86_64-unknown-linux-gnu-64"'.
 -spec get_arch() -> string().
 get_arch() ->

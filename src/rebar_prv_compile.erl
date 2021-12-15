@@ -340,7 +340,7 @@ build_custom_builder_app(AppInfo, State) ->
     ProjectBuilders = rebar_state:project_builders(State),
     case lists:keyfind(Type, 1, ProjectBuilders) of
         {_, Module} ->
-            %% load plugins since thats where project builders would be,
+            %% load plugins since that's where project builders would be,
             %% prevents parallelism at this level.
             rebar_paths:set_paths([deps, plugins], State),
             Res = Module:build(AppInfo),

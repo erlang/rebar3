@@ -292,8 +292,8 @@ all_src_dirs(Opts, SrcDefault, ExtraDefault) ->
 %%% @doc
 %%% Return the list of options for the given src directory
 %%% If the same option is given multiple times for a directory in the
-%%% config, the priority order is: first occurence of `src_dirs'
-%%% followed by first occurence of `extra_src_dirs'.
+%%% config, the priority order is: first occurrence of `src_dirs'
+%%% followed by first occurrence of `extra_src_dirs'.
 -spec src_dir_opts(rebar_dict(), file:filename_all()) -> [{atom(),term()}].
 src_dir_opts(Opts, Dir) ->
     RawSrcDirs = raw_src_dirs(src_dirs, Opts, []),

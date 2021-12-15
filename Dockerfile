@@ -6,7 +6,7 @@ FROM erlang:20.3.8.1-alpine as builder
 #   "The LABEL instruction adds metadata to an image."
 LABEL stage=builder
 
-# Install git for fetching non-hex depenencies. Also allows rebar3
+# Install git for fetching non-hex dependencies. Also allows rebar3
 # to find it's own git version.
 # Add any other Alpine libraries needed to compile the project here.
 # See https://wiki.alpinelinux.org/wiki/Local_APK_cache for details

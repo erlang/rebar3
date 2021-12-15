@@ -17,7 +17,7 @@
          make_vsn_/1,
          git_vsn/0]).
 
-%% For backward compatibilty
+%% For backward compatibility
 -export ([download/3]).
 
 -include("rebar.hrl").
@@ -141,7 +141,7 @@ download(TmpDir, AppInfo, State, _) ->
             {error, Error}
     end.
 
-%% For backward compatibilty
+%% For backward compatibility
 download(Dir, AppInfo, State) ->
     download_(Dir, AppInfo, State).
 

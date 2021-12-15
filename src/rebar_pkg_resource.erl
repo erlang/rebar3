@@ -135,7 +135,7 @@ format_error({bad_registry_checksum, Name, Vsn, Expected, Found}) ->
 %% Download the pkg belonging to the given address. If the etag of the pkg
 %% is the same what we stored in the etag file previously return {ok, cached},
 %% if the file has changed (so the etag is not the same anymore) return
-%% {ok, Contents, NewEtag}, otherwise if some error occured return error.
+%% {ok, Contents, NewEtag}, otherwise if some error occurred return error.
 %% @end
 %%------------------------------------------------------------------------------
 -spec request(rebar_hex_repos:repo(), binary(), binary(), false | binary())

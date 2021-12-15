@@ -192,7 +192,7 @@ upgrade(Config) ->
                    {{iolist_to_binary(PkgName), <<"0.1.1">>}, []}]}
     ]),
 
-    %% beam file to verify plugin is acutally compiled
+    %% beam file to verify plugin is actually compiled
     PluginBeam = filename:join([AppDir, "_build", "default", "plugins",
                                 PkgName, "ebin", [PkgName, ".beam"]]),
 

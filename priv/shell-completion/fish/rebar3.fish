@@ -61,7 +61,7 @@ end
 ##
 ## plugins <task>:
 ##   list           List local and global plugins for this project
-##   upgrade        Uprade plugins
+##   upgrade        Upgrade plugins
 ##
 ## Run 'rebar3 help <TASK>' for details.
 # general options
@@ -190,7 +190,7 @@ complete -f -c 'rebar3' -n '__fish_rebar3_using_command tar' -l system_libs     
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command tar' -l version            -d "Print relx version"
 complete -f -c 'rebar3' -n '__fish_rebar3_using_command tar' -s r -l root          -d "The project root directory"
 
-complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a tree -d "Print depdency tree."
+complete -f -c 'rebar3' -n '__fish_rebar3_needs_command' -a tree -d "Print dependency tree."
 
 complete -f -c 'rebar3' -n '__fish_rebar3_needs_command tree' -s v -l verbose  -d "Print repo and branch/tag/ref for git and hg deps."
 
