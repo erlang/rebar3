@@ -180,7 +180,16 @@ maybe_warn_local_url(Url) ->
     end.
 
 %% Use different git clone commands depending on git --version
-git_clone(branch, GitVsn, Url, Dir, Branch) when GitVsn >= {1,7,10}; GitVsn =:= undefined ->
+git_clone(branch, GitVsn, Url, Dir, Branch) when GitVsn >= {2,3,0}; GitVsn =:= undefined ->
+    rebar_utils:sh(?FMT("git clone ~ts ~ts ~ts -b ~ts --single-branch",
+                        [git_clone_options(),
+                         rebar_utils:escape_chars(Url),
+                         rebar_utils:escape_chars(filename:basename(Dir)),
+                         rebar_utils:escape_chars(Branch)]),
+                   [{cd, filename:dirname(Dir)},
+                    {env, [{"GIT_TERMINAL_PROMPT", "0"}]}]),
+    ok;
+git_clone(branch, GitVsn, Url, Dir, Branch) when GitVsn >= {1,7,10} ->
     rebar_utils:sh(?FMT("git clone ~ts ~ts ~ts -b ~ts --single-branch",
                         [git_clone_options(),
                          rebar_utils:escape_chars(Url),
@@ -196,7 +205,16 @@ git_clone(branch, _GitVsn, Url, Dir, Branch) ->
                          rebar_utils:escape_chars(Branch)]),
                    [{cd, filename:dirname(Dir)}]),
     ok;
-git_clone(tag, GitVsn, Url, Dir, Tag) when GitVsn >= {1,7,10}; GitVsn =:= undefined ->
+git_clone(tag, GitVsn, Url, Dir, Tag) when GitVsn >= {2,3,0}; GitVsn =:= undefined ->
+    rebar_utils:sh(?FMT("git clone ~ts ~ts ~ts -b ~ts --single-branch",
+                        [git_clone_options(),
+                         rebar_utils:escape_chars(Url),
+                         rebar_utils:escape_chars(filename:basename(Dir)),
+                         rebar_utils:escape_chars(Tag)]),
+                   [{cd, filename:dirname(Dir)},
+                    {env, [{"GIT_TERMINAL_PROMPT", "0"}]}]),
+    ok;
+git_clone(tag, GitVsn, Url, Dir, Tag) when GitVsn >= {1,7,10} ->
     rebar_utils:sh(?FMT("git clone ~ts ~ts ~ts -b ~ts --single-branch",
                         [git_clone_options(),
                          rebar_utils:escape_chars(Url),
@@ -396,4 +414,3 @@ check_type_support() ->
                     ok
             end
     end.
-
