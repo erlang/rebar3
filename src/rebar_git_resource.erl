@@ -84,6 +84,18 @@ needs_update_(Dir, {git, Url, "main"}) ->
     needs_update_(Dir, {git, Url, {branch, "main"}});
 needs_update_(Dir, {git, Url, "master"}) ->
     needs_update_(Dir, {git, Url, {branch, "master"}});
+needs_update_(Dir, {git, _Url}) ->
+    {ok, _} = rebar_utils:sh("git fetch origin", [{cd, Dir}]),
+    {ok, Head} = rebar_utils:sh("git rev-parse --short=7 -q HEAD", [{cd, Dir}]),
+    Head1 = rebar_string:trim(rebar_string:trim(Head, both, "\n"), both, "\r"),
+    {ok, OriginHead} = rebar_utils:sh("git rev-parse --short=7 -q origin/HEAD",
+                                      [{cd, Dir}]),
+    OriginHead1 = rebar_string:trim(rebar_string:trim(OriginHead, both, "\n"),
+                                    both, "\r"),
+    ?DEBUG("Comparing git origin/HEAD ~ts with HEAD ~ts", [OriginHead1, Head1]),
+    (OriginHead1 =/= Head1);
+needs_update_(Dir, {git, Url, ""}) ->
+    needs_update_(Dir, {git, Url});
 needs_update_(Dir, {git, _, Ref}) ->
     {ok, Current} = rebar_utils:sh(?FMT("git rev-parse --short=7 -q HEAD", []),
                                    [{cd, Dir}]),
@@ -148,11 +160,10 @@ download(Dir, AppInfo, State) ->
     download_(Dir, AppInfo, State).
 
 download_(Dir, {git, Url}, State) ->
-    ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
-    download_(Dir, {git, Url, {branch, "master"}}, State);
+    ?DEBUG("Git revision is not specified, using origin/HEAD", []),
+    download_(Dir, {git, Url, {ref, "origin/HEAD"}}, State);
 download_(Dir, {git, Url, ""}, State) ->
-    ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
-    download_(Dir, {git, Url, {branch, "master"}}, State);
+    download_(Dir, {git, Url}, State);
 download_(Dir, {git, Url, {branch, Branch}}, _State) ->
     ok = filelib:ensure_dir(Dir),
     maybe_warn_local_url(Url),
