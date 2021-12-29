@@ -112,6 +112,8 @@ warn_vsn_once() ->
     end.
 
 %% Only call `write_lock_file/2' if the locks have changed.
+maybe_write_lock_file(_LockFile, [], []) ->
+    ok;
 maybe_write_lock_file(LockFile, Locks, OldLocks) when Locks =/= OldLocks ->
     write_lock_file(LockFile, Locks);
 maybe_write_lock_file(LockFile, Locks, Locks) ->
