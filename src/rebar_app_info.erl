@@ -32,6 +32,8 @@
          applications/2,
          included_applications/1,
          included_applications/2,
+         optional_applications/1,
+         optional_applications/2,
          profiles/1,
          profiles/2,
          deps/1,
@@ -94,6 +96,7 @@
                      app_details=[]     :: list(),
                      applications=[]    :: list(),
                      included_applications=[] :: [atom()],
+                     optional_applications=[] :: [atom()],
                      deps=[]            :: list(),
                      profiles=[default] :: [atom()],
                      default=dict:new() :: rebar_dict(),
@@ -181,6 +184,7 @@ new(Parent, AppName, Vsn, Dir, Deps) ->
                            vsn := app_vsn(),
                            applications := [atom()],
                            included_applications := [atom()],
+                           optional_applications := [atom()],
                            dir := file:name(),
                            out_dir := file:name(),
                            ebin_dir := file:name(),
@@ -189,12 +193,14 @@ app_to_map(#app_info_t{name=Name,
                        vsn=Vsn,
                        applications=Applications,
                        included_applications=IncludedApplications,
+                       optional_applications=OptionalApplications,
                        out_dir=OutDir,
                        ebin_dir=EbinDir}) ->
     #{name => ec_cnv:to_atom(Name),
       vsn => Vsn,
       applications => Applications,
       included_applications => IncludedApplications,
+      optional_applications => OptionalApplications,
       dir => OutDir,
       out_dir => OutDir,
       ebin_dir => EbinDir,
@@ -467,6 +473,17 @@ included_applications(#app_info_t{included_applications=Applications}) ->
 -spec included_applications(t(), list()) -> t().
 included_applications(AppInfo=#app_info_t{}, Applications) ->
     AppInfo#app_info_t{included_applications=Applications}.
+
+%% @doc returns the list of optional_applications the app depends on.
+-spec optional_applications(t()) -> list().
+optional_applications(#app_info_t{optional_applications=Applications}) ->
+    Applications.
+
+%% @doc sets the list of optional applications the app depends on.
+%% Should be obtained from the app file.
+-spec optional_applications(t(), list()) -> t().
+optional_applications(AppInfo=#app_info_t{}, Applications) ->
+    AppInfo#app_info_t{optional_applications=Applications}.
 
 %% @doc returns the list of active profiles
 -spec profiles(t()) -> list().
