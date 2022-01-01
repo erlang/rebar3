@@ -13,9 +13,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - uses: gleam-lang/setup-erlang@master
+    - uses: erlef/setup-beam@v1
       with:
-        otp-version: 22.3.4.9
+          otp-version: '22.3.4.9'
     - name: Compile
       run: ./bootstrap
     - name: CT tests
