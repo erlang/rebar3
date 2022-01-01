@@ -307,7 +307,7 @@ before a final rebase to merge things. Do send edits as individual commits
 to allow for gradual and partial reviews to be done by reviewers. Once the +1s
 are given, rebasing is appreciated but not mandatory.
 
-Please work in feature branches, and do not commit to `master` in your fork.
+Please work in feature branches, and do not commit to `main` in your fork.
 
 Provide a clean branch without merge commits.
 

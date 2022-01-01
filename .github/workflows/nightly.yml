@@ -3,11 +3,11 @@ name: Nightly
 on:
   push:
     branches:
-      - 'master'
+      - 'main'
 
 jobs:
   build:
-    name: Publish escript for every merge to master
+    name: Publish escript for every merge to main
     runs-on: ubuntu-18.04
 
     steps:

@@ -166,13 +166,13 @@ create_random_vsn() ->
 
 expand_deps(_, []) -> [];
 expand_deps(git_subdir, [{Name, Deps} | Rest]) ->
-    Dep = {Name, {git_subdir, "https://example.org/user/"++Name++".git", {branch, "master"}, filename:join("appsubdir", Name)}},
+    Dep = {Name, {git_subdir, "https://example.org/user/"++Name++".git", {branch, "main"}, filename:join("appsubdir", Name)}},
     [{Dep, expand_deps(git_subdir, Deps)} | expand_deps(git_subdir, Rest)];
 expand_deps(git_subdir, [{Name, Vsn, Deps} | Rest]) ->
     Dep = {Name, Vsn, {git_subdir, "https://example.org/user/"++Name++".git", {tag, Vsn}, filename:join("appsubdir", Name)}},
     [{Dep, expand_deps(git_subdir, Deps)} | expand_deps(git_subdir, Rest)];
 expand_deps(git, [{Name, Deps} | Rest]) ->
-    Dep = {Name, ".*", {git, "https://example.org/user/"++Name++".git", "master"}},
+    Dep = {Name, ".*", {git, "https://example.org/user/"++Name++".git", "main"}},
     [{Dep, expand_deps(git, Deps)} | expand_deps(git, Rest)];
 expand_deps(git, [{Name, Vsn, Deps} | Rest]) ->
     Dep = {Name, Vsn, {git, "https://example.org/user/"++Name++".git", {tag, Vsn}}},
@@ -187,7 +187,7 @@ expand_deps(mixed, [{Name, Deps} | Rest]) ->
     Dep = if hd(Name) >= $a, hd(Name) =< $z ->
             {pkg, rebar_string:uppercase(Name), "0.0.0", undefined, undefined}
            ; hd(Name) >= $A, hd(Name) =< $Z ->
-            {Name, ".*", {git, "https://example.org/user/"++Name++".git", "master"}}
+            {Name, ".*", {git, "https://example.org/user/"++Name++".git", "main"}}
     end,
     [{Dep, expand_deps(mixed, Deps)} | expand_deps(mixed, Rest)];
 expand_deps(mixed, [{Name, Vsn, Deps} | Rest]) ->

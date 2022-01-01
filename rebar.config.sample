@@ -86,10 +86,10 @@
 {deps, [
     app_name,         % latest version of package
     {rebar, "1.0.0"}, % version 1.0.0 of a package
-    {rebar,           % git, master branch of app, explicit
-     {git, "git://github.com/rebar/rebar.git", {branch, "master"}}},
+    {rebar,           % git, main branch of app, explicit
+     {git, "git://github.com/rebar/rebar.git", {branch, "main"}}},
     {rebar,           % git, over HTTPS
-     {git, "https://github.com/rebar/rebar.git", {branch, "master"}}},
+     {git, "https://github.com/rebar/rebar.git", {branch, "main"}}},
     {rebar,           % git, tag
      {git, "https://github.com/rebar/rebar.git", {tag, "1.0.0"}}},
     {rebar,           % git, specific reference/hash
@@ -97,14 +97,14 @@
     {rebar,           % mercurial is also supported
      {hg, "https://github.com/rebar/rebar.git", {tag, "1.0.0"}}},
     %% Alternative formats, backwards compatible declarations
-    {rebar,           % implicit master, will warn recommending explicit branch
+    {rebar,           % implicit main, will warn recommending explicit branch
      {git, "git://github.com/rebar/rebar.git"}},
     {rebar, "1.0.*",  % regex version check, ignored
      {git, "git://github.com/rebar/rebar.git"}},
     {rebar, "1.0.*",  % literal branch/ref/tag, will warn for explicit reference
      {git, "git://github.com/rebar/rebar.git", "Rev"}},
     {rebar, ".*",     % 'raw' dependency, argument ignored
-     {git, "git://github.com/rebar/rebar.git", {branch, "master"}},
+     {git, "git://github.com/rebar/rebar.git", {branch, "main"}},
      [raw]}
 ]}.
 
