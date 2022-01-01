@@ -288,7 +288,7 @@ top_override(Config) ->
     rebar_test_utils:create_config(
       SubAppsDir2,
       [{deps, [{list_to_atom(Name1),
-                {git, "https://example.org", {branch, "master"}}}]}]
+                {git, "https://example.org", {branch, "main"}}}]}]
     ),
     rebar_test_utils:run_and_check(
       Config, [], ["compile"],

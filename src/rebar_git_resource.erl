@@ -80,6 +80,8 @@ needs_update_(Dir, {git, Url, {branch, Branch}}) ->
                                    [{cd, Dir}]),
     ?DEBUG("Checking git branch ~ts for updates", [Branch]),
     not ((Current =:= []) andalso compare_url(Dir, Url));
+needs_update_(Dir, {git, Url, "main"}) ->
+    needs_update_(Dir, {git, Url, {branch, "main"}});
 needs_update_(Dir, {git, Url, "master"}) ->
     needs_update_(Dir, {git, Url, {branch, "master"}});
 needs_update_(Dir, {git, _, Ref}) ->
