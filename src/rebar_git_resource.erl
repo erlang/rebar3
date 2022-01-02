@@ -84,16 +84,12 @@ needs_update_(Dir, {git, Url, "main"}) ->
     needs_update_(Dir, {git, Url, {branch, "main"}});
 needs_update_(Dir, {git, Url, "master"}) ->
     needs_update_(Dir, {git, Url, {branch, "master"}});
-needs_update_(Dir, {git, _Url}) ->
+needs_update_(Dir, {git, Url}) ->
     {ok, _} = rebar_utils:sh("git fetch origin", [{cd, Dir}]),
-    {ok, Head} = rebar_utils:sh("git rev-parse --short=7 -q HEAD", [{cd, Dir}]),
-    Head1 = rebar_string:trim(rebar_string:trim(Head, both, "\n"), both, "\r"),
-    {ok, OriginHead} = rebar_utils:sh("git rev-parse --short=7 -q origin/HEAD",
-                                      [{cd, Dir}]),
-    OriginHead1 = rebar_string:trim(rebar_string:trim(OriginHead, both, "\n"),
-                                    both, "\r"),
-    ?DEBUG("Comparing git origin/HEAD ~ts with HEAD ~ts", [OriginHead1, Head1]),
-    (OriginHead1 =/= Head1);
+    {ok, Current} = rebar_utils:sh("git log HEAD..origin/HEAD --oneline",
+                                   [{cd, Dir}]),
+    ?DEBUG("Checking new commits from HEAD to origin/HEAD: ~.7ts", [Current]),
+    not ((Current =:= []) andalso compare_url(Dir, Url));
 needs_update_(Dir, {git, Url, ""}) ->
     needs_update_(Dir, {git, Url});
 needs_update_(Dir, {git, _, Ref}) ->
