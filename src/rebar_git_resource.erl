@@ -84,6 +84,14 @@ needs_update_(Dir, {git, Url, "main"}) ->
     needs_update_(Dir, {git, Url, {branch, "main"}});
 needs_update_(Dir, {git, Url, "master"}) ->
     needs_update_(Dir, {git, Url, {branch, "master"}});
+needs_update_(Dir, {git, Url}) ->
+    {ok, _} = rebar_utils:sh("git fetch origin", [{cd, Dir}]),
+    {ok, Current} = rebar_utils:sh("git log HEAD..origin/HEAD --oneline",
+                                   [{cd, Dir}]),
+    ?DEBUG("Checking new commits from HEAD to origin/HEAD: ~.7ts", [Current]),
+    not ((Current =:= []) andalso compare_url(Dir, Url));
+needs_update_(Dir, {git, Url, ""}) ->
+    needs_update_(Dir, {git, Url});
 needs_update_(Dir, {git, _, Ref}) ->
     {ok, Current} = rebar_utils:sh(?FMT("git rev-parse --short=7 -q HEAD", []),
                                    [{cd, Dir}]),
@@ -148,11 +156,10 @@ download(Dir, AppInfo, State) ->
     download_(Dir, AppInfo, State).
 
 download_(Dir, {git, Url}, State) ->
-    ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
-    download_(Dir, {git, Url, {branch, "master"}}, State);
+    ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref} since default branch selection is not consistent across all versions of rebar.", []),
+    download_(Dir, {git, Url, {ref, "origin/HEAD"}}, State);
 download_(Dir, {git, Url, ""}, State) ->
-    ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
-    download_(Dir, {git, Url, {branch, "master"}}, State);
+    download_(Dir, {git, Url}, State);
 download_(Dir, {git, Url, {branch, Branch}}, _State) ->
     ok = filelib:ensure_dir(Dir),
     maybe_warn_local_url(Url),
