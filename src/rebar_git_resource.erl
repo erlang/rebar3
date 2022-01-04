@@ -156,7 +156,7 @@ download(Dir, AppInfo, State) ->
     download_(Dir, AppInfo, State).
 
 download_(Dir, {git, Url}, State) ->
-    ?DEBUG("Git revision is not specified, using origin/HEAD", []),
+    ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref} since default branch selection is not consistent across all versions of rebar.", []),
     download_(Dir, {git, Url, {ref, "origin/HEAD"}}, State);
 download_(Dir, {git, Url, ""}, State) ->
     download_(Dir, {git, Url}, State);

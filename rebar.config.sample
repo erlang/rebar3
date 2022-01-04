@@ -97,7 +97,7 @@
     {rebar,           % mercurial is also supported
      {hg, "https://github.com/rebar/rebar.git", {tag, "1.0.0"}}},
     %% Alternative formats, backwards compatible declarations
-    {rebar,           % implicit main, will warn recommending explicit branch
+    {rebar,           % default branch, will warn recommending explicit branch
      {git, "git://github.com/rebar/rebar.git"}},
     {rebar, "1.0.*",  % regex version check, ignored
      {git, "git://github.com/rebar/rebar.git"}},
