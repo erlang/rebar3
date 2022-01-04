@@ -155,8 +155,13 @@ global_config(State) ->
 %% @doc returns the default path of the global rebar.config file
 -spec global_config() -> file:filename_all().
 global_config() ->
-    Home = home_dir(),
-    filename:join([Home, ".config", "rebar3", "rebar.config"]).
+    GlobalConfigDir = case os:getenv("REBAR_GLOBAL_CONFIG_DIR") of
+        false ->
+            filename:join([home_dir(), ".config", "rebar3"]);
+        ConfDir ->
+            ConfDir
+    end,
+    filename:join(GlobalConfigDir, "rebar.config").
 
 %% @doc returns the location for the global cache directory
 -spec global_cache_dir(rebar_dict()) -> file:filename_all().
