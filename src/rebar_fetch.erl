@@ -71,7 +71,9 @@ needs_update(AppInfo, State) ->
     try
         rebar_resource_v2:needs_update(AppInfo, State)
     catch
-        _:_ ->
+        Error:Reason ->
+            ?DEBUG("Failed checking if dependency needs updates : ~p:~p",
+                   [Error, Reason]),
             true
     end.
 
