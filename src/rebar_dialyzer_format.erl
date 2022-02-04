@@ -55,7 +55,7 @@ format_warning_(_Opts, Warning = {_Tag, {File, Line}, Msg}, {File, Acc}) ->
             {File, [dialyzer:format_warning(Warning, fullpath) | Acc]}
     end;
 
-%% With a new file detencted we also write a file header.
+%% With a new file detected we also write a file header.
 format_warning_(Opts, Warning = {_Tag, {SrcFile, Line}, Msg}, {_LastFile, Acc}) ->
     try
         File = rebar_dir:format_source_file_name(SrcFile, Opts),
