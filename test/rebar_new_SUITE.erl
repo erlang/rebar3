@@ -7,7 +7,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 all() -> [app_git_user, app_hg_user, app_with_fallbacks,
-          app_with_flags1, app_with_flags2, plugin_tpl].
+          app_with_flags1, app_with_flags2, plugin_tpl, unknown_template].
 
 
 init_per_testcase(plugin_tpl, Config) ->
@@ -159,6 +159,14 @@ plugin_tpl(Config) ->
     {ok, Bin} = file:read_file(Result),
     {match, _} = re:run(Bin, Name, [multiline,global]).
 
+unknown_template(Config) ->
+    Name = float_to_list(rand:uniform()),
+    rebar_test_utils:run_and_check(Config, [], ["new", Name],
+                                   {error, {rebar_prv_new, {template_not_found, Name}}}),
+    rebar_test_utils:run_and_check(Config, [], ["new", "help", Name],
+                                   {error, {rebar_prv_new, {template_not_found, Name}}}),
+    ok.
+
 validate_files(_Config, Name, Checks) ->
     [begin
         Path = filename:join([Name, File]),
@@ -168,4 +176,3 @@ validate_files(_Config, Name, Checks) ->
          || Pattern <- Patterns]
      end || {File, Patterns} <- Checks],
     ok.
-
