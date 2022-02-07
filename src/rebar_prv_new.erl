@@ -40,19 +40,21 @@ do(State) ->
             {ok, State};
         ["help", TemplateName] ->
             case lists:keyfind(TemplateName, 1, list_templates(State)) of
-                false -> ?CONSOLE("template not found.", []);
-                Term -> show_template(Term)
-            end,
-            {ok, State};
+                false ->
+                    ?PRV_ERROR({template_not_found, TemplateName});
+                Term ->
+                    show_template(Term),
+                    {ok, State}
+            end;
         [TemplateName | Opts] ->
             case lists:keyfind(TemplateName, 1, list_templates(State)) of
                 false ->
-                    ?CONSOLE("template not found.", []);
+                    ?PRV_ERROR({template_not_found, TemplateName});
                 _ ->
                     Force = is_forced(State),
-                    ok = rebar_templater:new(TemplateName, parse_opts(Opts), Force, State)
-            end,
-            {ok, State};
+                    ok = rebar_templater:new(TemplateName, parse_opts(Opts), Force, State),
+                    {ok, State}
+            end;
         [] ->
             show_short_templates(list_templates(State)),
             {ok, State}
@@ -61,6 +63,8 @@ do(State) ->
 -spec format_error(any()) -> iolist().
 format_error({consult, File, Reason}) ->
     io_lib:format("Error consulting file at ~ts for reason ~p", [File, Reason]);
+format_error({template_not_found, Name}) ->
+    io_lib:format("Template '~ts' not found.", [Name]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
