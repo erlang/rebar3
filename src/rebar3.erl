@@ -163,8 +163,8 @@ run_aux(State, RawArgs) ->
     State5 = case os:getenv("REBAR_CACHE_DIR") of
                 false ->
                     State4;
-                ConfigFile ->
-                    rebar_state:set(State4, global_rebar_dir, ConfigFile)
+                CachePath ->
+                    rebar_state:set(State4, global_rebar_dir, CachePath)
             end,
 
     {ok, Providers} = application:get_env(rebar, providers),
@@ -403,7 +403,14 @@ ensure_running(App, Caller) ->
 -spec state_from_global_config([term()], file:filename()) -> rebar_state:t().
 state_from_global_config(Config, GlobalConfigFile) ->
     GlobalConfigTerms = rebar_config:consult_file(GlobalConfigFile),
-    GlobalConfig = rebar_state:new(GlobalConfigTerms),
+    GlobalConfigTmp = rebar_state:new(GlobalConfigTerms),
+
+    GlobalConfig = case os:getenv("REBAR_CACHE_DIR") of
+                false ->
+                    GlobalConfigTmp;
+                CachePath ->
+                    rebar_state:set(GlobalConfigTmp, global_rebar_dir, CachePath)
+            end,
 
     %% We don't want to worry about global plugin install state effecting later
     %% usage. So we throw away the global profile state used for plugin install.
