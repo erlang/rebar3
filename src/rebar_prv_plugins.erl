@@ -32,7 +32,7 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    GlobalConfigFile = rebar_dir:global_config(),
+    GlobalConfigFile = rebar_dir:global_config(State),
     GlobalConfig = rebar_state:new(rebar_config:consult_file(GlobalConfigFile)),
     GlobalPlugins = rebar_state:get(GlobalConfig, plugins, []),
     GlobalSrcDirs = rebar_state:get(GlobalConfig, src_dirs, ["src"]),
