@@ -163,8 +163,8 @@ run_aux(State, RawArgs) ->
     State5 = case os:getenv("REBAR_CACHE_DIR") of
                 false ->
                     State4;
-                ConfigFile ->
-                    rebar_state:set(State4, global_rebar_dir, ConfigFile)
+                CachePath ->
+                    rebar_state:set(State4, global_rebar_dir, CachePath)
             end,
 
     {ok, Providers} = application:get_env(rebar, providers),
@@ -207,9 +207,10 @@ init_config() ->
 
     Config = rebar_config:consult_root(),
     Config1 = rebar_config:merge_locks(Config, rebar_config:consult_lock_file(?LOCK_FILE)),
+    InitState = rebar_state:new(Config1),
 
     %% If $HOME/.config/rebar3/rebar.config exists load and use as global config
-    GlobalConfigFile = rebar_dir:global_config(),
+    GlobalConfigFile = rebar_dir:global_config(InitState),
     State = case filelib:is_regular(GlobalConfigFile) of
                 true ->
                     ?DEBUG("Load global config file ~ts", [GlobalConfigFile]),
@@ -217,10 +218,10 @@ init_config() ->
                     catch
                         _:_ ->
                             ?WARN("Global config ~ts exists but can not be read. Ignoring global config values.", [GlobalConfigFile]),
-                            rebar_state:new(Config1)
+                            InitState
                     end;
                 false ->
-                    rebar_state:new(Config1)
+                    InitState
             end,
 
     %% Determine the location of the rebar executable; important for pulling
@@ -402,7 +403,14 @@ ensure_running(App, Caller) ->
 -spec state_from_global_config([term()], file:filename()) -> rebar_state:t().
 state_from_global_config(Config, GlobalConfigFile) ->
     GlobalConfigTerms = rebar_config:consult_file(GlobalConfigFile),
-    GlobalConfig = rebar_state:new(GlobalConfigTerms),
+    GlobalConfigTmp = rebar_state:new(GlobalConfigTerms),
+
+    GlobalConfig = case os:getenv("REBAR_CACHE_DIR") of
+                false ->
+                    GlobalConfigTmp;
+                CachePath ->
+                    rebar_state:set(GlobalConfigTmp, global_rebar_dir, CachePath)
+            end,
 
     %% We don't want to worry about global plugin install state effecting later
     %% usage. So we throw away the global profile state used for plugin install.

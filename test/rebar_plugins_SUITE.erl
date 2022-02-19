@@ -84,6 +84,7 @@ compile_global_plugins(Config) ->
 
     meck:new(rebar_dir, [passthrough]),
     meck:expect(rebar_dir, global_config, fun() -> GlobalConfig end),
+    meck:expect(rebar_dir, global_config, fun(_) -> GlobalConfig end),
     meck:expect(rebar_dir, global_cache_dir, fun(_) -> GlobalDir end),
 
     Name = rebar_test_utils:create_random_name("app1_"),
