@@ -136,9 +136,11 @@ resolve_tests(State) ->
     Dirs         = resolve(dir, RawOpts),
     Files        = resolve(file, RawOpts),
     Modules      = resolve(module, RawOpts),
+    Tests        = resolve(test, RawOpts),
     Suites       = resolve(suite, module, RawOpts),
-    Generator    = resolve(generator, RawOpts),
-    Apps ++ Applications ++ Dirs ++ Files ++ Modules ++ Suites ++ Generator.
+    Generators   = resolve(generator, RawOpts),
+    lists:append([Apps, Applications, Dirs, Files, Modules, Tests, Suites,
+        		  Generators]).
 
 resolve(Flag, RawOpts) -> resolve(Flag, Flag, RawOpts).
 
@@ -149,22 +151,23 @@ resolve(Flag, EUnitKey, RawOpts) ->
                                rebar_string:lexemes(Args, [$,]))
     end.
 
-normalize(generator, Args) ->
-    lists:flatmap(fun(Value) -> normalize_(generator, Value) end, Args);
 normalize(EUnitKey, Args) ->
-    lists:map(fun(Arg) -> normalize_(EUnitKey, Arg) end, Args).
+    lists:flatmap(fun(Arg) -> normalize_(EUnitKey, Arg) end, Args).
 
-normalize_(generator, Value) ->
+normalize_(generator, Value) -> tokenize(generator, Value);
+normalize_(test, Value) -> tokenize(test, Value);
+normalize_(Key, Value) when Key == dir; Key == file -> [{Key, Value}];
+normalize_(Key, Value) -> [{Key, list_to_atom(Value)}].
+
+tokenize(Type, Value) ->
     case string:tokens(Value, [$:]) of
         [Module0, Functions] ->
             Module = list_to_atom(Module0),
-            lists:map(fun(F) -> {generator, Module, list_to_atom(F)} end,
-                      string:tokens(Functions, [$;]));
+            lists:map(fun(F) -> {Type, Module, list_to_atom(F)} end,
+                      string:tokens(Functions, [$;, $+]));
         _ ->
-            ?PRV_ERROR({generator, Value})
-    end;
-normalize_(Key, Value) when Key == dir; Key == file -> {Key, Value};
-normalize_(Key, Value) -> {Key, list_to_atom(Value)}.
+            ?PRV_ERROR({Type, Value})
+    end.
 
 cfg_tests(State) ->
     case rebar_state:get(State, eunit_tests, []) of
@@ -369,6 +372,8 @@ validate(State, {file, File}) ->
     validate_file(State, File);
 validate(State, {module, Module}) ->
     validate_module(State, Module);
+validate(State, {test, Module, Function}) ->
+    validate_test(State, Module, Function);
 validate(State, {suite, Module}) ->
     validate_module(State, Module);
 validate(State, {generator, Module, Function}) ->
@@ -416,6 +421,9 @@ validate_module(_State, Module) ->
     end.
 
 validate_generator(State, Module, _Function) ->
+    validate_module(State, Module).
+
+validate_test(State, Module, _Function) ->
     validate_module(State, Module).
 
 resolve_eunit_opts(State) ->
@@ -558,6 +566,7 @@ eunit_opts(_State) ->
      {dir, $d, "dir", string, help(dir)},
      {file, $f, "file", string, help(file)},
      {module, $m, "module", string, help(module)},
+     {test, $t, "test", string, help(test)},
      {suite, $s, "suite", string, help(module)},
      {generator, $g, "generator", string, help(generator)},
      {verbose, $v, "verbose", boolean, help(verbose)},
@@ -573,7 +582,8 @@ help(profile)   -> "Show the slowest tests. Defaults to false.";
 help(dir)       -> "Comma separated list of dirs to load tests from. Equivalent to `[{dir, Dir}]`.";
 help(file)      -> "Comma separated list of files to load tests from. Equivalent to `[{file, File}]`.";
 help(module)    -> "Comma separated list of modules to load tests from. Equivalent to `[{module, Module}]`.";
-help(generator) -> "Comma separated list of generators (the format is `module:function`) to load tests from. Equivalent to `[{generator, Module, Function}]`.";
+help(test)      -> "Comma separated list of tests to run. The format is `Module:Func1+Func2`. Equivalent to `[{test, Module, Function}]`.";
+help(generator) -> "Comma separated list of generators to load tests from. The format is `Module:Func1+Func2`. Equivalent to `[{generator, Module, Function}]`.";
 help(verbose)   -> "Verbose output. Defaults to false.";
 help(name)      -> "Gives a long name to the node";
 help(sname)     -> "Gives a short name to the node";
