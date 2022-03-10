@@ -1077,7 +1077,7 @@ ssl_opts(ssl_verify_enabled, Url) ->
             VerifyFun = {fun ssl_verify_hostname:verify_fun/3,
                          [{check_hostname, Hostname}]},
             CACerts = get_cacerts(),
-            SslOpts = [{verify, verify_peer}, {depth, 2}, {cacerts, CACerts},
+            SslOpts = [{verify, verify_peer}, {depth, 10}, {cacerts, CACerts},
                        {partial_chain, fun partial_chain/1}, {verify_fun, VerifyFun}],
             check_hostname_opt(SslOpts);
         false ->
