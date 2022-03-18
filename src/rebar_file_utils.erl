@@ -326,7 +326,7 @@ robocopy_mv_and_rename(Source, Dest, SrcDir, SrcName, DestDir, DestName) ->
     end.
 
 robocopy_file(SrcPath, DestPath, FileName) ->
-    Cmd = ?FMT("robocopy /move /e \"~ts\" \"~ts\" \"~ts\" 1> nul",
+    Cmd = ?FMT("robocopy \"~ts\" \"~ts\" \"~ts\" /move /e",
                [rebar_utils:escape_double_quotes(SrcPath),
                 rebar_utils:escape_double_quotes(DestPath),
                 rebar_utils:escape_double_quotes(FileName)]),
@@ -342,7 +342,7 @@ robocopy_file(SrcPath, DestPath, FileName) ->
     end.
 
 robocopy_dir(Source, Dest) ->
-    Cmd = ?FMT("robocopy /move /e \"~ts\" \"~ts\" 1> nul",
+    Cmd = ?FMT("robocopy \"~ts\" \"~ts\" /move /e",
                [rebar_utils:escape_double_quotes(Source),
                 rebar_utils:escape_double_quotes(Dest)]),
     Res = rebar_utils:sh(Cmd,
@@ -526,7 +526,7 @@ ensure_dir(Path) ->
 
 delete_each_dir_win32([]) -> ok;
 delete_each_dir_win32([Dir | Rest]) ->
-    {ok, []} = rebar_utils:sh(?FMT("rd /q /s \"~ts\"",
+    {ok, []} = rebar_utils:sh(?FMT("rm \"~ts\" -r -fo",
                                    [rebar_utils:escape_double_quotes(filename:nativename(Dir))]),
                               [{use_stdout, false}, return_on_error]),
     delete_each_dir_win32(Rest).
@@ -542,11 +542,11 @@ xcopy_win32(Source,Dest)->
                   %% must manually add the last fragment of a directory to the `Dest`
                   %% in order to properly replicate POSIX platforms
                   NewDest = filename:join([Dest, filename:basename(Source)]),
-                  ?FMT("robocopy \"~ts\" \"~ts\" /e 1> nul",
+                  ?FMT("robocopy \"~ts\" \"~ts\" /e | Out-Null",
                        [rebar_utils:escape_double_quotes(filename:nativename(Source)),
                         rebar_utils:escape_double_quotes(filename:nativename(NewDest))]);
               false ->
-                  ?FMT("robocopy \"~ts\" \"~ts\" \"~ts\" /e 1> nul",
+                  ?FMT("robocopy \"~ts\" \"~ts\" \"~ts\" /e | Out-Null",
                        [rebar_utils:escape_double_quotes(filename:nativename(filename:dirname(Source))),
                         rebar_utils:escape_double_quotes(filename:nativename(Dest)),
                         rebar_utils:escape_double_quotes(filename:basename(Source))])

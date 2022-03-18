@@ -134,11 +134,11 @@ bare_compile_hooks_default_ns(Config) ->
     HookFile = filename:join([?config(priv_dir, Config), "bare-post.hook"]),
 
     Cmd = case os:type() of
-        {win32, _} -> "dir";
+        {win32, _} -> "ls -Name";
         _ -> "ls"
     end,
     ConfOpts = [{provider_hooks, [{post, [{compile, clean}]}]},
-                {post_hooks, [{compile, Cmd ++ " > " ++ HookFile}]}],
+                {post_hooks, [{compile, Cmd ++ " > \"" ++ HookFile ++ "\""}]}],
     RConfFile = rebar_test_utils:create_config(AppDir, ConfOpts),
     {ok, RConf} = file:consult(RConfFile),
     rebar_test_utils:run_and_check(

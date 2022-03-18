@@ -606,12 +606,18 @@ otp_release1(Rel) ->
 patch_on_windows(Cmd, Env) ->
     case os:type() of
         {win32,nt} ->
-            Cmd1 = "cmd /q /c "
+            % We need to escape double quotes.
+            % Since the command is wrapped in a powershell script,
+            % it is going to be parsed 2 times.
+            Cmd1 = re:replace(Cmd, "\\\"", "\\\\\"", 
+                       [global, {return, list}, unicode]),
+            Cmd2 = "powershell -Command \"& {"
                 ++ lists:foldl(fun({Key, Value}, Acc) ->
                                        expand_env_variable(Acc, Key, Value)
-                               end, Cmd, Env),
+                               end, Cmd1, Env)
+                ++ "}\"",
             %% Remove left-over vars
-            re:replace(Cmd1, "\\\$\\w+|\\\${\\w+}", "",
+            re:replace(Cmd2, "\\\$\\w+|\\\${\\w+}", "",
                        [global, {return, list}, unicode]);
         _ ->
             Cmd
