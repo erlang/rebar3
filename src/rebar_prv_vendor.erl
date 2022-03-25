@@ -88,12 +88,20 @@ do_(InitState) ->
     State1 = rebar_state:set(InitState, project_app_dirs, NewAppDirs),
     {ok, State1}.
 
+%% ignore the badmatch there; the error value is real, but comes from
+%% exceptions at the call-sites of sub-functions within
+%% `rebar_app_discovery:do/1' and Dialyzer loses track of this being
+%% a possibility and elides the `{error, _}' return tuple from the
+%% signature while it is real.
+-dialyzer({no_match, check_project_layout/1}).
 check_project_layout(State) ->
     %% Do a project_app_discover run, look for the project root,
     %% then drop the state.
     %% No need to drop the vendor config here if it exists because it
     %% only exists if we have the right structure.
     case rebar_prv_app_discovery:do(State) of
+        {error, Reason} ->
+            {error, Reason};
         {ok, TmpState} ->
             Apps = rebar_state:project_apps(TmpState),
             %% Code duplicated from rebar_prv_lock:define_root_app/2
@@ -106,8 +114,6 @@ check_project_layout(State) ->
                     non_umbrella;
                 error ->
                     umbrella
-            end;
-        Other ->
-            Other
+            end
     end.
 
