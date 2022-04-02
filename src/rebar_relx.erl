@@ -236,9 +236,13 @@ maybe_obey_command_args(RelxConfig, Opts, Args) ->
                      undefined ->
                          Acc;
                      V ->
-                         lists:keystore(Opt, 1, Acc, {Opt, V})
+                         replace_all_instance(Opt, V, Acc)
                  end
         end, RelxConfig, Args).
+
+replace_all_instance(Opt, Value, RelxConfig) ->
+    lists:map(fun({K, _}) when K =:= Opt -> {K, Value};
+            (Other) -> Other end, RelxConfig).
 
 %%
 
