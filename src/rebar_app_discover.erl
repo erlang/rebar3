@@ -19,7 +19,7 @@
 %% @doc from the base directory, find all the applications
 %% at the top level and their dependencies based on the configuration
 %% and profile information.
--spec do(rebar_state:t(), [file:filename()]) -> rebar_state:t().
+-spec do(rebar_state:t(), [file:filename()]) -> rebar_state:t() | no_return().
 do(State, LibDirs) ->
     BaseDir = rebar_state:dir(State),
     Dirs = [filename:join(BaseDir, LibDir) || LibDir <- LibDirs],

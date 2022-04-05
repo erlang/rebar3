@@ -82,6 +82,7 @@
                      rebar_prv_unlock,
                      rebar_prv_update,
                      rebar_prv_upgrade,
+                     rebar_prv_vendor,
                      rebar_prv_version,
                      rebar_prv_xref,
                      rebar_prv_alias]} % must run last to prevent overloads
