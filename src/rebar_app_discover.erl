@@ -64,8 +64,8 @@ do(State, LibDirs) ->
                                 OutDir = filename:join(DepsDir, Name),
                                 AppInfo2 = rebar_app_info:out_dir(AppInfo1, OutDir),
                                 ProjectDeps1 = lists:delete(Name, ProjectDeps),
-                                rebar_state:project_apps(StateAcc1
-                                                        ,rebar_app_info:deps(AppInfo2, ProjectDeps1));
+                                rebar_state:project_apps(StateAcc1,
+                                                         rebar_app_info:deps(AppInfo2, ProjectDeps1));
                             false ->
                                 ?INFO("Ignoring ~ts", [Name]),
                                 StateAcc

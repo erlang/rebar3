@@ -638,7 +638,8 @@ valid(#app_info_t{valid=Valid}) ->
 
 %% @doc sets whether the app is valid (built) or not. If left unset,
 %% rebar3 will do the detection of the status itself.
--spec valid(t(), boolean()) -> t().
+%% Explicitly setting the value to `undefined' can force a re-evaluation.
+-spec valid(t(), boolean() | undefined) -> t().
 valid(AppInfo=#app_info_t{}, Valid) ->
     AppInfo#app_info_t{valid=Valid}.
 
