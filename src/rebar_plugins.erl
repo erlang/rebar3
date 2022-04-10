@@ -187,10 +187,11 @@ discover_plugins([], _) ->
     %% don't search if nothing is declared
     [];
 discover_plugins(_, State) ->
-    %% TODO: only support this mode in an umbrella project to avoid cases where
+    %% only support this mode in an umbrella project to avoid cases where
     %% this is used in a project intended to be an installed dependency and accidentally
-    %% relies on vendoring when not intended.
-    case lists:member(global, rebar_state:current_profiles(State)) of
+    %% relies on vendoring when not intended. Also skip for global plugins, this would
+    %% make no sense.
+    case lists:member(global, rebar_state:current_profiles(State)) orelse not is_umbrella(State) of
         true ->
             [];
         false ->
@@ -212,6 +213,24 @@ discover_plugins(_, State) ->
             end, Found),
             rebar_utils:sort_deps(SetUp)
     end.
+
+is_umbrella(State) ->
+    %% We can't know if this is an umbrella project before running app discovery,
+    %% but plugins are installed before app discovery. So we do a heuristic.
+    %% The lib dirs we search contain things such as apps/, lib/, etc.
+    %% which contain sub-applications. Then there's a final search for the
+    %% local directory ("."), which finds the top-level app in a non-umbrella
+    %% project.
+    %%
+    %% So what we do here is look for the library directories without the ".",
+    %% and if none of these paths exist but one of the src_dirs exist, then
+    %% we know this is not an umbrella application.
+    Root = rebar_dir:root_dir(State),
+    LibPaths = lists:usort(rebar_dir:lib_dirs(State)) -- ["."],
+    SrcPaths = rebar_dir:src_dirs(rebar_state:opts(State), ["src"]),
+    lists:any(fun(Dir) -> [] == filelib:wildcard(filename:join(Root, Dir)) end, LibPaths)
+    andalso
+    lists:all(fun(Dir) -> not filelib:is_dir(filename:join(Root, Dir)) end, SrcPaths).
 
 prepare_plugin(AppInfo) ->
     %% We need to handle plugins as dependencies to avoid re-building them
