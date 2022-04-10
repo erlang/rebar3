@@ -203,12 +203,14 @@ discover_plugins(State) ->
             %% top-level declarations
             BaseDir = rebar_state:dir(State),
             LibDirs = rebar_dir:project_plugin_dirs(State),
-            ?DIAGNOSTIC("Discovering local plugins in {project_plugin_dirs, ~p}", [LibDirs]),
             Dirs = [filename:join(BaseDir, LibDir) || LibDir <- LibDirs],
             RebarOpts = rebar_state:opts(State),
             SrcDirs = rebar_dir:src_dirs(RebarOpts, ["src"]),
             Found = rebar_app_discover:find_apps(Dirs, SrcDirs, all, State),
-            ?DIAGNOSTIC("    Found: ~p", [[rebar_app_info:name(F) || F <- Found]]),
+            ?DEBUG("Found local plugins: ~p~n"
+                   "\tusing config: {project_plugin_dirs, ~p}",
+                   [[rebar_utils:to_atom(rebar_app_info:name(F)) || F <- Found],
+                    LibDirs]),
             PluginsDir = rebar_dir:plugins_dir(State),
             SetUp = lists:map(fun(App) ->
                 Name = rebar_app_info:name(App),
