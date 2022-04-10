@@ -246,8 +246,10 @@ prepare_plugin(AppInfo) ->
     OutDir = rebar_app_info:out_dir(AppInfo),
     rebar_prv_compile:copy_app_dirs(AppInfo, AppDir, OutDir),
     Relocated = rebar_app_info:dir(AppInfo, OutDir),
-    %% Force a revalidation from the new paths
-    rebar_app_info:valid(Relocated, undefined).
+    case needs_rebuild(AppInfo) of
+        true -> rebar_app_info:valid(Relocated, false);     % force recompilation
+        false -> rebar_app_info:valid(Relocated, undefined) % force revalidation
+    end.
 
 top_level_deps(Apps) ->
     RawDeps = lists:foldl(fun(App, Acc) ->
@@ -259,3 +261,21 @@ top_level_deps(Apps) ->
                                  {deps, prod}]]) ++ Acc
     end, [], Apps),
     rebar_utils:tup_dedup(RawDeps).
+
+needs_rebuild(AppInfo) ->
+    %% if source files are newer than built files then the code was edited
+    %% and can't be considered valid -- force a rebuild.
+    %%
+    %% we do this by reusing the compiler code for Erlang as a heuristic for
+    %% files to check. The actual compiler provider will do an in-depth
+    %% validation of each module that may or may not need recompiling.
+    #{src_dirs := SrcD, include_dirs := InclD,
+      out_mappings := List} = rebar_compiler_erl:context(AppInfo),
+    SrcDirs = SrcD++InclD,
+    OutDirs = [Dir || {_Ext, Dir} <- List],
+    newest_stamp(OutDirs) < newest_stamp(SrcDirs).
+
+newest_stamp(DirList) ->
+    lists:max([0] ++
+              [filelib:last_modified(F)
+               || F <- rebar_utils:find_files_in_dirs(DirList, ".+", true)]).
