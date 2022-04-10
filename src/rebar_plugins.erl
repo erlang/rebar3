@@ -227,7 +227,10 @@ prepare_plugin(AppInfo) ->
 top_level_deps(Apps) ->
     RawDeps = lists:foldl(fun(App, Acc) ->
         %% Only support the profiles we would with regular plugins?
+        rebar_app_info:get(App, {plugins, default}, []) ++
+        rebar_app_info:get(App, {plugins, prod}, []) ++
         rebar_app_info:get(App, {deps, default}, []) ++
-        rebar_app_info:get(App, {deps, prod}, []) ++ Acc
+        rebar_app_info:get(App, {deps, prod}, []) ++
+        Acc
     end, [], Apps),
     rebar_utils:tup_dedup(RawDeps).

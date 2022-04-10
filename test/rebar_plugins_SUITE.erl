@@ -16,7 +16,10 @@
          sub_app_plugins/1,
          sub_app_plugin_overrides/1,
          project_plugins/1,
-         use_checkout_plugins/1]).
+         use_checkout_plugins/1,
+         %% project-local plugins
+         complex_local_plugins/1
+        ]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -39,7 +42,8 @@ end_per_testcase(_, _Config) ->
 
 all() ->
     [compile_plugins, compile_global_plugins, complex_plugins, list, upgrade, upgrade_project_plugin,
-     sub_app_plugins, sub_app_plugin_overrides, project_plugins, use_checkout_plugins].
+     sub_app_plugins, sub_app_plugin_overrides, project_plugins, use_checkout_plugins,
+     complex_local_plugins].
 
 %% Tests that compiling a project installs and compiles the plugins of deps
 compile_plugins(Config) ->
@@ -412,3 +416,57 @@ use_checkout_plugins(Config) ->
                             Config, RConf, ["checkedout"],
                             {ok, []}
                            )).
+
+complex_local_plugins(Config) ->
+    UmbrellaDir = ?config(apps, Config),
+    AppName = rebar_test_utils:create_random_name("app1_"),
+    AppDir = filename:join([UmbrellaDir, "apps", AppName]),
+    LocalPluginName = rebar_test_utils:create_random_name("localplugin1_"),
+    PluginDir = filename:join([UmbrellaDir, "plugins", LocalPluginName]),
+
+    meck:new(rebar_dir, [passthrough]),
+
+    Vsn = rebar_test_utils:create_random_vsn(),
+    Vsn2 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, AppName, Vsn, [kernel, stdlib]),
+    rebar_test_utils:create_app(PluginDir, LocalPluginName, Vsn, [kernel, stdlib]),
+
+    DepName = rebar_test_utils:create_random_name("dep1_"),
+    DepName2 = rebar_test_utils:create_random_name("dep2_"),
+    DepName3 = rebar_test_utils:create_random_name("dep3_"),
+    DepName4 = rebar_test_utils:create_random_name("dep4_"),
+    PluginName = rebar_test_utils:create_random_name("plugin1_"),
+
+    Deps = rebar_test_utils:expand_deps(git, [{PluginName, Vsn2, [{DepName2, Vsn,
+                                                                  [{DepName3, Vsn, []}]}]}
+                                             ,{DepName, Vsn, [{DepName4, Vsn, []}]}]),
+    {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
+    mock_git_resource:mock([{deps, SrcDeps}]),
+
+    RootConfFile =
+        rebar_test_utils:create_config(UmbrellaDir,
+                                       [{plugins, [list_to_atom(LocalPluginName)]}]),
+    rebar_test_utils:create_config(
+        PluginDir,
+        [{deps, [{list_to_atom(DepName),
+                  {git, "http://site.com/user/"++DepName++".git", {tag, Vsn}}}]},
+         {plugins, [{list_to_atom(PluginName),
+                     {git, "http://site.com/user/"++PluginName++".git", {tag, Vsn2}}}
+                   ]}]
+    ),
+    {ok, RConf} = file:consult(RootConfFile),
+
+    %% Build with deps.
+    rebar_test_utils:run_and_check(
+        Config, RConf, ["compile"],
+        {ok, [{app, AppName},
+              {plugin, LocalPluginName},
+              {plugin, PluginName, Vsn2},
+              %% deps of plugins also remain plugin apps
+              {plugin, DepName2},
+              {plugin, DepName3},
+              {plugin, DepName4},
+              {plugin, DepName}]}
+     ),
+
+    meck:unload(rebar_dir).
