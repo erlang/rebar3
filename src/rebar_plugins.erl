@@ -8,7 +8,8 @@
         ,project_apps_install/1
         ,install/2
         ,handle_plugins/3
-        ,handle_plugins/4]).
+        ,handle_plugins/4
+        ,discover_plugins/1]).
 
 -include("rebar.hrl").
 
@@ -187,6 +188,9 @@ discover_plugins([], _) ->
     %% don't search if nothing is declared
     [];
 discover_plugins(_, State) ->
+    discover_plugins(State).
+
+discover_plugins(State) ->
     %% only support this mode in an umbrella project to avoid cases where
     %% this is used in a project intended to be an installed dependency and accidentally
     %% relies on vendoring when not intended. Also skip for global plugins, this would

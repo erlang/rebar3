@@ -69,27 +69,37 @@ upgrade(Plugin, State) ->
         Dep ->
             Dep
     end,
-
+    LocalPlugins = [rebar_utils:to_atom(rebar_app_info:name(App))
+                    || App <- rebar_plugins:discover_plugins(State)],
     case Dep of
         not_found ->
             ?PRV_ERROR({not_found, Plugin});
         {ok, P, Profile} ->
-            State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
-            maybe_update_pkg(P, State1),
-            {Apps, State2} = rebar_prv_install_deps:handle_deps_as_profile(Profile, State1, [P], true),
-
-            {no_cycle, Sorted} = rebar_prv_install_deps:find_cycles(Apps),
-            ToBuild = rebar_prv_install_deps:cull_compile(Sorted, []),
-
-            %% Add already built plugin deps to the code path
-            CodePaths = [rebar_app_info:ebin_dir(A) || A <- Apps -- ToBuild],
-            code:add_pathsa(CodePaths),
-
-            %% Build plugin and its deps
-            _ = build_plugin(ToBuild, State2),
-
-            {ok, State}
+            case lists:member(P, LocalPlugins) of
+                true ->
+                    ?INFO("Plugin ~p is defined locally and does not need upgrading", [P]),
+                    {ok, State};
+                false ->
+                    do_upgrade(State, P, Profile)
+            end
     end.
+
+do_upgrade(State, P, Profile) ->
+    State1 = rebar_state:set(State, deps_dir, ?DEFAULT_PLUGINS_DIR),
+    maybe_update_pkg(P, State1),
+    {Apps, State2} = rebar_prv_install_deps:handle_deps_as_profile(Profile, State1, [P], true),
+
+    {no_cycle, Sorted} = rebar_prv_install_deps:find_cycles(Apps),
+    ToBuild = rebar_prv_install_deps:cull_compile(Sorted, []),
+
+    %% Add already built plugin deps to the code path
+    CodePaths = [rebar_app_info:ebin_dir(A) || A <- Apps -- ToBuild],
+    code:add_pathsa(CodePaths),
+
+    %% Build plugin and its deps
+    _ = build_plugin(ToBuild, State2),
+
+    {ok, State}.
 
 find_plugin(Plugin, Profiles, State) ->
     ec_lists:search(fun(Profile) ->
