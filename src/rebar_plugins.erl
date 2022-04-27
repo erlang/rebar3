@@ -116,7 +116,7 @@ handle_plugin(Profile, Plugin, State, SrcPlugins, Upgrade) ->
         State0 = rebar_state:project_apps(State, SrcPlugins),
         %% We however have to pick the deps of top-level apps and promote them
         %% directly to make sure they are installed if they were not also at the top level
-        TopDeps = top_level_deps(SrcPlugins),
+        TopDeps = top_level_deps(State, SrcPlugins),
         %% Install the plugins
         {Apps, State1} = rebar_prv_install_deps:handle_deps_as_profile(Profile, State0, [Plugin|TopDeps], Upgrade),
         {no_cycle, Sorted} = rebar_prv_install_deps:find_cycles(SrcPlugins++Apps),
@@ -251,14 +251,12 @@ prepare_plugin(AppInfo) ->
         false -> rebar_app_info:valid(Relocated, undefined) % force revalidation
     end.
 
-top_level_deps(Apps) ->
+top_level_deps(State, Apps) ->
+    CurrentProfiles = rebar_state:current_profiles(State),
+    Keys = lists:append([[{plugins, P}, {deps, P}] || P <- CurrentProfiles]),
     RawDeps = lists:foldl(fun(App, Acc) ->
         %% Only support the profiles we would with regular plugins?
-        lists:append([rebar_app_info:get(App, Key, [])
-                      || Key <- [{plugins, default},
-                                 {plugins, prod},
-                                 {deps, default},
-                                 {deps, prod}]]) ++ Acc
+        lists:append([rebar_app_info:get(App, Key, []) || Key <- Keys]) ++ Acc
     end, [], Apps),
     rebar_utils:tup_dedup(RawDeps).
 
