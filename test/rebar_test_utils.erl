@@ -351,6 +351,14 @@ check_results(AppDir, Expected, ProfileRun, State) ->
                         ?assertEqual(iolist_to_binary(Vsn),
                                      iolist_to_binary(rebar_app_info:original_vsn(App)))
                 end
+        ; ({plugin_not_exist, Name}) ->
+                ct:pal("Plugin Not Exist Name: ~p", [Name]),
+                case lists:keyfind(Name, 1, PluginsNames) of
+                    false ->
+                        ok;
+                    {Name, _App} ->
+                        error({plugin_found, Name})
+                end
         ;  ({global_plugin, Name}) ->
                 ct:pal("Global Plugin Name: ~p", [Name]),
                 ?assertNotEqual(false, lists:keyfind(Name, 1, GlobalPluginsNames))

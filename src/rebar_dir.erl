@@ -13,6 +13,7 @@
          checkouts_out_dir/2,
          plugins_dir/1,
          lib_dirs/1,
+         project_plugin_dirs/1,
          home_dir/0,
          global_config_dir/1,
          global_config/1,
@@ -126,6 +127,12 @@ plugins_dir(State) ->
 -spec lib_dirs(rebar_state:t()) -> file:filename_all().
 lib_dirs(State) ->
     rebar_state:get(State, project_app_dirs, ?DEFAULT_PROJECT_APP_DIRS).
+
+%% @doc returns the list of relative path where the project plugins can
+%% be located.
+-spec project_plugin_dirs(rebar_state:t()) -> [file:filename_all()].
+project_plugin_dirs(State) ->
+    rebar_state:get(State, project_plugin_dirs, ?DEFAULT_PROJECT_PLUGIN_DIRS).
 
 %% @doc returns the user's home directory.
 -spec home_dir() -> file:filename_all().
