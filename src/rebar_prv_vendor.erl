@@ -57,19 +57,34 @@ do_(InitState) ->
     RootDir = rebar_dir:root_dir(InitState),
     VendorDir = filename:join(RootDir, "vendor"),
     VendorBak = filename:join(RootDir, "_vendor"),
-    catch rebar_file_utils:rm_rf(VendorBak),
-    catch rebar_file_utils:mv(VendorDir, VendorBak),
+    PluginVDir = filename:join(RootDir, "vendor_plugins"),
+    PluginVBak = filename:join(RootDir, "_vendor_plugins"),
+    filelib:is_dir(VendorBak) andalso rebar_file_utils:rm_rf(VendorBak),
+    filelib:is_dir(VendorDir) andalso rebar_file_utils:mv(VendorDir, VendorBak),
+    filelib:is_dir(PluginVBak) andalso rebar_file_utils:rm_rf(PluginVBak),
+    filelib:is_dir(PluginVDir) andalso rebar_file_utils:mv(PluginVDir, PluginVBak),
     filelib:ensure_dir(filename:join(VendorDir, ".touch")),
+    filelib:ensure_dir(filename:join(PluginVDir, ".touch")),
     %% remove the src_dirs option for vendored files
     CleanDirs = rebar_dir:lib_dirs(InitState) -- ["vendor/*"],
-    CleanState = rebar_state:set(InitState, project_app_dirs, CleanDirs),
+    CleanStateTmp = rebar_state:set(InitState, project_app_dirs, CleanDirs),
+    CleanPlugins = rebar_dir:project_plugin_dirs(InitState) -- ["vendor_plugins/*"],
+    CleanState = rebar_state:set(CleanStateTmp, project_plugin_dirs, CleanPlugins),
+    %% re-install non-local plugins, assume the already-loaded project plugins
+    %% we dropped are fine in memory
+    TmpState1 = rebar_plugins:top_level_install(CleanState),
     %% re-run discovery
-    {ok, TmpState1} = rebar_prv_app_discovery:do(CleanState),
+    {ok, TmpState2} = rebar_prv_app_discovery:do(TmpState1),
     %% run a full fetch (which implicitly upgrades, since the lock file
     %% should be unset for any vendored app)
-    {ok, TmpState2} = rebar_prv_install_deps:do(TmpState1),
+    {ok, TmpState3} = rebar_prv_install_deps:do(TmpState2),
+    %% move the plugins to the vendor path
+    %% The plugins aren't tracked as nicely as the deps (no lock file) and
+    %% there isn't a preset function to grab them all, so we'll instead
+    %% copy everything that was in the plugin directory.
+    vendor_plugins(TmpState3, PluginVDir),
     %% move the libs to the vendor path
-    AllDeps = rebar_state:lock(TmpState2),
+    AllDeps = rebar_state:lock(TmpState3),
     [begin
         AppDir = rebar_app_info:dir(Dep),
         NewAppDir = filename:join(VendorDir, filename:basename(AppDir)),
@@ -79,12 +94,15 @@ do_(InitState) ->
     %% -- we don't actually want to mess with the user's file so we have to
     %% let them know what it should be:
     NewAppDirs = CleanDirs ++ ["vendor/*"],
+    NewPluginDirs = CleanPlugins ++ ["vendor_plugins/*"],
     ?CONSOLE("Vendoring in place. To use the vendored libraries, configure "
              "the source application directories for your project with:~n~n"
-             "{project_app_dirs, ~p}.~n~n"
+             "{project_app_dirs, ~p}.~n"
+             "{project_plugin_dirs, ~p}.~n"
+             "~n"
              "and move the {deps, ...} tuple to the rebar.config files "
              "of the proper top-level applications rather than the project root.",
-             [NewAppDirs]),
+             [NewAppDirs, NewPluginDirs]),
     State1 = rebar_state:set(InitState, project_app_dirs, NewAppDirs),
     {ok, State1}.
 
@@ -117,3 +135,11 @@ check_project_layout(State) ->
             end
     end.
 
+vendor_plugins(State, PluginVDir) ->
+    PluginDir = rebar_dir:plugins_dir(State),
+    {ok, Files} = file:list_dir_all(PluginDir),
+    [rebar_file_utils:mv(Path, filename:join(PluginVDir, PathPart))
+     || PathPart <- Files,
+        Path <- [filename:join(PluginDir, PathPart)],
+        filelib:is_dir(Path)],
+    ok.
