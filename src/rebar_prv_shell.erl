@@ -582,7 +582,7 @@ is_src_config(Filename) ->
 consult_env_config(State, Filename) ->
     RawString = case file:read_file(Filename) of
         {error, _} -> "[].";
-        {ok, Bin} -> unicode:characters_to_list(Bin)
+        {ok, Bin} -> unicode:characters_to_list(Bin, latin1)
     end,
     ReplacedStr = replace_env_vars(RawString),
     case rebar_string:consult(unicode:characters_to_list(ReplacedStr)) of
