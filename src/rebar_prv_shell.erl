@@ -59,10 +59,13 @@ init(State) ->
                 {example, "rebar3 shell"},
                 {short_desc, "Run shell with project apps and deps in path."},
                 {desc, info()},
-                {opts, [{config, undefined, "config", string,
-                         "Path to the config file to use. Defaults to "
-                         "{shell, [{config, File}]} and then the relx "
+                {opts, [{config_src, undefined, "config_src", string,
+                         "Path to the config.src file to use. Defaults to "
+                         "{shell, [{config_src, File}]} and then "
+                         "{shell, [{config, File}]}, finally the relx "
                          "sys.config file if not specified."},
+                        {config, undefined, "config", string,
+                         "Path to the config file to use."},
                         {name, undefined, "name", atom,
                          "Gives a long name to the node."},
                         {sname, undefined, "sname", atom,
@@ -551,13 +554,28 @@ debug_get_value(Key, List, Default, Description) ->
 -spec find_config_option(rebar_state:t()) -> Filename::list() | no_value.
 find_config_option(State) ->
     {Opts, _} = rebar_state:command_parsed_args(State),
-    debug_get_value(config, Opts, no_value,
-                    "Found config from command line option.").
+    Src = debug_get_value(config_src, Opts, no_value,
+                          "Found config.src from command line option."),
+    case Src of
+        no_value ->
+            debug_get_value(config, Opts, no_value,
+                            "Found config from command line option.");
+        _ ->
+            Src
+    end.
 
 -spec find_config_rebar(rebar_state:t()) -> [tuple()] | no_value.
 find_config_rebar(State) ->
-    debug_get_value(config, rebar_state:get(State, shell, []), no_value,
-                    "Found config from rebar config file.").
+    ShellCfg = rebar_state:get(State, shell, []),
+    Src = debug_get_value(config_src, ShellCfg, no_value,
+                          "Found config.src from shell."),
+    case Src of
+        no_value ->
+            debug_get_value(config, ShellCfg, no_value,
+                            "Found config from rebar config file.");
+        _ ->
+            Src
+    end.
 
 -spec find_config_relx(rebar_state:t()) -> [tuple()] | no_value.
 find_config_relx(State) ->
