@@ -15,14 +15,14 @@ jobs:
 
     strategy:
       matrix:
-        otp_version: [22, 23, 24]
+        otp_version: [23, 24, 25]
         os: [ubuntu-latest]
 
     container:
       image: erlang:${{ matrix.otp_version }}
 
     env:
-      LATEST_OTP_RELEASE: 24
+      LATEST_OTP_RELEASE: 25
 
     steps:
     - uses: actions/checkout@v2
