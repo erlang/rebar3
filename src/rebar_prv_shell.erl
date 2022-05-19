@@ -98,10 +98,9 @@ init(State) ->
     ),
     {ok, State1}.
 
--spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
+-spec do(rebar_state:t()) -> no_return().
 do(Config) ->
-    shell(Config),
-    {ok, Config}.
+    shell(Config).
 
 -spec format_error(any()) -> iolist().
 format_error({unknown_app, Unknown}) ->
