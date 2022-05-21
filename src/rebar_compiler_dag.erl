@@ -100,13 +100,15 @@ safe_dir([H|T]) -> [H|safe_dir(T)].
 is_deleted_source(_G, _F, Extension, Extension, _ArtifactExt) ->
     %% source file
     true;
-is_deleted_source(_G, _F, Extension, _SrcExt, Extension) ->
-    %% artifact file - skip
-    false;
-is_deleted_source(G, F, _Extension, _SrcExt, _ArtifactExt) ->
-    %% must be header file or artifact
-    digraph:in_edges(G, F) == [] andalso maybe_rm_vertex(G, F),
-    false.
+is_deleted_source(G, F, Extension, _SrcExt, ArtifactExt) ->
+    case lists:member(Extension, ArtifactExt) of
+        true -> % artifact file, skip
+            false;
+        false ->
+            %% must be header file or artifact
+            digraph:in_edges(G, F) == [] andalso maybe_rm_vertex(G, F),
+            false
+    end.
 
 %% This can be implemented using smarter trie, but since the
 %%  whole procedure is rare, don't bother with optimisations.
