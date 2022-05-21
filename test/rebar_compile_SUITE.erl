@@ -1563,7 +1563,19 @@ umbrella_mib_first_test(Config) ->
     true = filelib:is_file(filename:join([AppDir, "include", "AIMPORTER-MIB.hrl"])),
 
     %% check the mibs dir was linked into the _build dir
-    true = filelib:is_dir(filename:join([AppsDir, "_build", "default", "lib", Name, "mibs"])).
+    true = filelib:is_dir(filename:join([AppsDir, "_build", "default", "lib", Name, "mibs"])),
+
+    %% Check that files are tracked and not rebuilt multiple times
+    BinMod = filelib:last_modified(filename:join([PrivMibsDir, "AIMPORTER-MIB.bin"])),
+    HrlMod = filelib:last_modified(filename:join([AppDir, "include", "AIMPORTER-MIB.hrl"])),
+    timer:sleep(1000),
+
+    rebar_test_utils:run_and_check(Config, SuccessRebarConfig, ["compile"], {ok, [{app, Name}]}),
+
+    ?assertEqual(BinMod, filelib:last_modified(filename:join([PrivMibsDir, "AIMPORTER-MIB.bin"]))),
+    ?assertEqual(HrlMod, filelib:last_modified(filename:join([AppDir, "include", "AIMPORTER-MIB.hrl"]))),
+
+    ok.
 
 deps_mib_test() ->
     [{doc, "reproduces the dependency handling required for the issue "
