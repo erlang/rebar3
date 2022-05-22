@@ -428,6 +428,7 @@ maybe_rm_artifact_and_edge(G, OutDir, SrcExt, Ext, Source) ->
                     lists:foreach(fun(Target) ->
                         ?DIAGNOSTIC("Source ~ts is gone, deleting artifact ~ts "
                                     "if it exists", [Source, Target]),
+                        digraph:del_vertex(G, Target),
                         file:delete(Target)
                     end, Targets)
             end,
