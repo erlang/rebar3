@@ -6,7 +6,7 @@
 -include_lib("kernel/include/file.hrl").
 
 all() ->
-    [exists, {group, with_project}].
+    [exists, {group, with_project}, prune_preserve_artifacts].
 
 groups() ->
     %% The tests in this group are dirty, the order is specific
@@ -363,6 +363,42 @@ propagate_app2_ptrans_hrl(Config) ->
         {"/src/app3_resolve.hrl", S8}
     ],
     matches(Matches, FileStamps),
+    ok.
+
+prune_preserve_artifacts() ->
+    [{doc, "Build artifacts are kept through the pruning process, even with multiple "
+           "artifact types."}].
+prune_preserve_artifacts(Config) ->
+    Priv = ?config(priv_dir, Config),
+    Source = filename:join(Priv, "file.src"),
+    %% The source file must exist not to get the artifacts pruned
+    ok = file:write_file(Source, <<"hello, world!">>),
+    Opts = [some_option, {with, terms}],
+    G = digraph:new([acyclic]),
+    digraph:add_vertex(G, Source, 123),
+    %% The artifact names are prefixed with z- to sort nicer with windows tests that
+    %% prefix a drive letter to paths, so we sort the same on all filesystems...
+    rebar_compiler_dag:store_artifact(G, Source, "z-artifact.type1", Opts),
+    rebar_compiler_dag:store_artifact(G, Source, "z-artifact.type2", Opts),
+    rebar_compiler_dag:store_artifact(G, Source, "z-derived.type3", Opts),
+    AppPaths = [{Priv, filename:join(Priv, "out")}],
+    ct:pal("all vertices: ~p~n", [digraph:vertices(G)]),
+    %% Prune with all types being valid aside from the source file;
+    %% expect all of the artifacts to be kept
+    rebar_compiler_dag:prune(G, ".src", [".type1",".type2",".type3"], [Source], AppPaths),
+    ?assertEqual([Source, "z-artifact.type1", "z-artifact.type2", "z-derived.type3"],
+                 lists:sort(digraph:vertices(G) -- ['$r3_dirty_bit'])),
+    %% Prune artifacts that no longer belong to the compiler definition
+    rebar_compiler_dag:prune(G, ".src", [".type1",".type2"], [Source], AppPaths),
+    ?assertEqual([Source, "z-artifact.type1", "z-artifact.type2"],
+                 lists:sort(digraph:vertices(G) -- ['$r3_dirty_bit'])),
+    %% if the source file is gone, prune everything
+    ok = file:delete(Source),
+    rebar_compiler_dag:prune(G, ".src", [".type1",".type2"], [Source], AppPaths),
+    ?assertEqual([Source, "z-artifact.type1", "z-artifact.type2"],
+                 lists:sort(digraph:vertices(G) -- ['$r3_dirty_bit'])),
+    rebar_compiler_dag:prune(G, ".src", [".type1",".type2"], [], AppPaths),
+    ?assertEqual([], lists:sort(digraph:vertices(G) -- ['$r3_dirty_bit'])),
     ok.
 
 %%%%%%%%%%%%%%%

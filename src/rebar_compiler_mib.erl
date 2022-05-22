@@ -5,7 +5,7 @@
 -export([context/1,
          needed_files/4,
          dependencies/3,
-         compile/4,
+         compile/4, compile_and_track/4,
          clean/2]).
 
 -include("rebar.hrl").
@@ -21,7 +21,7 @@ context(AppInfo) ->
       src_ext => ".mib",
       out_mappings => Mappings}.
 
-needed_files(_, FoundFiles, _, AppInfo) ->
+needed_files(Graph, FoundFiles, Mappings, AppInfo) ->
     RebarOpts = rebar_app_info:opts(AppInfo),
     MibFirstConf = rebar_opts:get(RebarOpts, mib_first_files, []),
     valid_mib_first_conf(MibFirstConf),
@@ -32,7 +32,29 @@ needed_files(_, FoundFiles, _, AppInfo) ->
     RestFiles = [Source || Source <- FoundFiles, not lists:member(Source, MibFirstFiles)],
 
     Opts = rebar_opts:get(rebar_app_info:opts(AppInfo), mib_opts, []),
-    {{MibFirstFiles, Opts}, {RestFiles, Opts}}.
+    {{[F || F <- MibFirstFiles,
+            needs_rebuild(Graph, F, Mappings, Opts)], Opts},
+     {[F || F <- RestFiles,
+            needs_rebuild(Graph, F, Mappings, Opts)], Opts}}.
+
+needs_rebuild(Graph, Source, Mappings, Opts) ->
+    {_, BinOut} = lists:keyfind(".bin", 1, Mappings),
+    BaseName = filename:basename(Source, ".mib"),
+    AllOpts = [{outdir, BinOut}, {i, [BinOut]}] ++ Opts,
+    OutFiles = [filename:join(OutDir, BaseName) ++ Ext || {Ext, OutDir} <- Mappings],
+    Stamp = digraph:vertex(Graph, Source),
+    lists:any(fun(OutFile) ->
+        Stamp > {Source, filelib:last_modified(OutFile)}
+        orelse opts_changed(Graph, AllOpts, OutFile)
+    end, OutFiles).
+
+opts_changed(Graph, NewOpts, Target) ->
+    case digraph:vertex(Graph, filename:basename(Target)) of
+        {_Target, {artifact, Opts}} ->
+            lists:usort(NewOpts) =/= lists:usort(Opts);
+        _Other ->
+            true
+end.
 
 valid_mib_first_conf(FileList) ->
     Strs = filter_file_list(FileList),
@@ -90,6 +112,36 @@ compile(Source, OutDirs, _, Opts) ->
             ok = snmpc:mib_to_hrl(Mib, Mib, MibToHrlOpts),
             rebar_file_utils:mv(HrlFilename, HrlOut),
             ok;
+        {error, compilation_failed} ->
+            ?ABORT
+    end.
+
+compile_and_track(Source, OutDirs, _Config, Opts) ->
+    {_, BinOut} = lists:keyfind(".bin", 1, OutDirs),
+    {_, HrlOut} = lists:keyfind(".hrl", 1, OutDirs),
+
+    ok = rebar_file_utils:ensure_dir(BinOut),
+    ok = rebar_file_utils:ensure_dir(HrlOut),
+    Mib = filename:join(BinOut, filename:basename(Source, ".mib")),
+    HrlFilename = Mib ++ ".hrl",
+
+    AllOpts = [{outdir, BinOut}, {i, [BinOut]}] ++ Opts,
+
+    case snmpc:compile(Source, AllOpts) of
+        {ok, BinName} ->
+            MibToHrlOpts =
+                case proplists:get_value(verbosity, AllOpts, undefined) of
+                    undefined ->
+                        #options{specific = [],
+                                 cwd = rebar_dir:get_cwd()};
+                    Verbosity ->
+                        #options{specific = [{verbosity, Verbosity}],
+                                 cwd = rebar_dir:get_cwd()}
+                end,
+            ok = snmpc:mib_to_hrl(Mib, Mib, MibToHrlOpts),
+            rebar_file_utils:mv(HrlFilename, HrlOut),
+            {ok, [{Source, filename:basename(BinName), AllOpts},
+                  {Source, filename:basename(HrlFilename), AllOpts}]};
         {error, compilation_failed} ->
             ?ABORT
     end.
