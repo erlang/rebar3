@@ -242,7 +242,7 @@ profile_overlays(Config) ->
                             {copy, filename:join(AppDir,"./dev.file"), "{{env}}.file"},
                             {chmod, 8#00770, "profile.file"}]},
                  {lib_dirs, [AppDir]}]},
-         {profiles, [{prod, 
+         {profiles, [{prod,
             [{relx, [
                 {debug_info, keep},
                 {overlay_vars, filename:join(AppDir, "prod.vars")},
@@ -250,7 +250,6 @@ profile_overlays(Config) ->
                            {copy, filename:join(AppDir, "./prod.file"), "{{env}}.file"},
                            {copy, filename:join(AppDir, "./prod.file"), "profile.file"},
                            {chmod, 8#00770, "profile.file"}]}
-            
             ]}]
          }]}
         ])),
