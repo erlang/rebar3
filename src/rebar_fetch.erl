@@ -50,10 +50,10 @@ download_source(AppInfo, State)  ->
     end.
 
 download_source_(AppInfo, State) ->
-    case os:getenv("REBAR_OFFLINE") of
-        "1" ->
+    case rebar_state:get(State, offline, false) of
+        true ->
             {error, {?MODULE, offline}};
-        _ ->
+        false ->
             download_source_online(AppInfo, State)
     end.
 
@@ -76,11 +76,11 @@ download_source_online(AppInfo, State) ->
 -spec needs_update(rebar_app_info:t(), rebar_state:t())
                   -> boolean() | {error, string()}.
 needs_update(AppInfo, State) ->
-    case os:getenv("REBAR_OFFLINE") of
-        "1" ->
+    case rebar_state:get(State, offline, false) of
+        true ->
             ?DEBUG("Can't check if dependency needs updates in offline mode", []),
             false;
-        _ ->
+        false ->
             needs_update_online(AppInfo, State)
     end.
 

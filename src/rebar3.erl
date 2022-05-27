@@ -177,23 +177,27 @@ run_aux(State, RawArgs) ->
     State9 = rebar_state:default(State8, rebar_state:opts(State8)),
 
     {Task, Args} = parse_args(RawArgs),
-    case lists:member("--offline", Args) of
-        true ->
-            os:putenv("REBAR_OFFLINE", "1");
-        false ->
-            ok
-    end,
+    Offline = case lists:member("--offline", Args) of
+                  true ->
+                      %% We store this redundantly in env, because some APIs
+                      %% don't get a state.
+                      os:putenv("REBAR_OFFLINE", "1"),
+                      true;
+                  false ->
+                      os:getenv("REBAR_OFFLINE") =:= "1"
+              end,
+    State10 = rebar_state:set(State9, offline, Offline);
 
-    State10 = rebar_state:code_paths(State9, default, code:get_path()),
+    State11 = rebar_state:code_paths(State10, default, code:get_path()),
 
-    case rebar_core:init_command(rebar_state:command_args(State10, Args), Task) of
-        {ok, State11} ->
+    case rebar_core:init_command(rebar_state:command_args(State11, Args), Task) of
+        {ok, State12} ->
             case rebar_state:get(State11, caller, command_line) of
                 api ->
                     rebar_paths:unset_paths([deps, plugins], State11),
-                    {ok, State11};
+                    {ok, State12};
                 _ ->
-                    {ok, State11}
+                    {ok, State12}
             end;
         Other ->
             Other
