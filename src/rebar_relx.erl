@@ -36,7 +36,7 @@ do(Provider, State) ->
     DefaultOutputDir = filename:join(rebar_dir:base_dir(State), ?DEFAULT_RELEASE_DIR),
     RelxConfig1 = RelxMode ++ [output_dir(DefaultOutputDir, Opts),
                                {overlay_vars_values, ExtraOverlays},
-                               {overlay_vars, [{base_dir, rebar_dir:base_dir(State)} | overlay_vars(Opts)]}
+                               {overlay_vars, [{base_dir, rebar_dir:base_dir(State)} | overlay_vars(RelxConfig, Opts)]}
                                | merge_overlays(RelxConfig)],
 
     Args = [include_erts, system_libs, vm_args, sys_config],
@@ -219,10 +219,9 @@ merge_overlays(Config) ->
     NewOverlay = lists:flatmap(fun({overlay, Overlay}) -> Overlay end, lists:reverse(Overlays)),
     [{overlay, NewOverlay} | Others].
 
-overlay_vars(Opts) ->
-    case proplists:get_value(overlay_vars, Opts) of
-        undefined ->
-            [];
+overlay_vars(RelxConfig, Opts) ->
+    case proplists:get_value(overlay_vars, Opts, []) ++
+         proplists:get_value(overlay_vars, RelxConfig, []) of
         [] ->
             [];
         FileName when is_list(FileName) ->
