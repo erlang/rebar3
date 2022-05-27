@@ -186,7 +186,7 @@ run_aux(State, RawArgs) ->
                   false ->
                       os:getenv("REBAR_OFFLINE") =:= "1"
               end,
-    State10 = rebar_state:set(State9, offline, Offline);
+    State10 = rebar_state:set(State9, offline, Offline),
 
     State11 = rebar_state:code_paths(State10, default, code:get_path()),
 
