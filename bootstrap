@@ -2,14 +2,25 @@
 %% -*- mode: erlang;erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ft=erlang ts=4 sw=4 et
 
-main(_) ->
+main(Args) ->
+    case lists:member("--offline", Args) of
+        true ->
+            os:putenv("REBAR_OFFLINE", "1");
+        false ->
+            ok
+    end,
     ensure_app(crypto),
     ensure_app(asn1),
     ensure_app(public_key),
-    ensure_app(ssl),
-    inets:start(),
-    inets:start(httpc, [{profile, rebar}]),
-    set_httpc_options(),
+    case os:getenv("REBAR_OFFLINE") of
+        "1" ->
+            ok;
+        _ ->
+            ensure_app(ssl),
+            inets:start(),
+            inets:start(httpc, [{profile, rebar}]),
+            set_httpc_options()
+    end,
 
     %% Clear directories for builds since bootstrapping may require
     %% a changed structure from an older one
@@ -117,6 +128,14 @@ extract(Binary) ->
     {ok, Contents}.
 
 request(Url) ->
+    case os:getenv("REBAR_OFFLINE") of
+        "1" ->
+            {error, {offline, Url}};
+        _ ->
+            request_online(Url)
+    end.
+
+request_online(Url) ->
     HttpOptions = [{relaxed, true} | get_proxy_auth()],
 
     case httpc:request(get, {Url, []},

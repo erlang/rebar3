@@ -120,6 +120,19 @@ etag(Path) ->
       ETag :: false | string(),
       Res :: 'error' | {ok, cached} | {ok, any(), string()}.
 request(Url, ETag) ->
+    case os:getenv("REBAR_OFFLINE") of
+        "1" ->
+            ?DEBUG("Rebar is in offline mode", []),
+            error;
+        _ ->
+            request_online(Url, ETag)
+    end.
+
+-spec request_online(Url, ETag) -> Res when
+      Url :: string(),
+      ETag :: false | string(),
+      Res :: 'error' | {ok, cached} | {ok, any(), string()}.
+request_online(Url, ETag) ->
     HttpOptions = [{ssl, rebar_utils:ssl_opts(Url)},
                    {relaxed, true} | rebar_utils:get_proxy_auth()],
     case httpc:request(get, {Url, [{"if-none-match", "\"" ++ ETag ++ "\""}

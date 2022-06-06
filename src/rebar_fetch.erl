@@ -50,6 +50,14 @@ download_source(AppInfo, State)  ->
     end.
 
 download_source_(AppInfo, State) ->
+    case rebar_state:get(State, offline, false) of
+        true ->
+            {error, {?MODULE, offline}};
+        false ->
+            download_source_online(AppInfo, State)
+    end.
+
+download_source_online(AppInfo, State) ->
     AppDir = rebar_app_info:dir(AppInfo),
     TmpDir = ec_file:insecure_mkdtemp(),
     AppDir1 = rebar_utils:to_list(AppDir),
@@ -68,6 +76,17 @@ download_source_(AppInfo, State) ->
 -spec needs_update(rebar_app_info:t(), rebar_state:t())
                   -> boolean() | {error, string()}.
 needs_update(AppInfo, State) ->
+    case rebar_state:get(State, offline, false) of
+        true ->
+            ?DEBUG("Can't check if dependency needs updates in offline mode", []),
+            false;
+        false ->
+            needs_update_online(AppInfo, State)
+    end.
+
+-spec needs_update_online(rebar_app_info:t(), rebar_state:t())
+                         -> boolean() | {error, string()}.
+needs_update_online(AppInfo, State) ->
     try
         rebar_resource_v2:needs_update(AppInfo, State)
     catch
