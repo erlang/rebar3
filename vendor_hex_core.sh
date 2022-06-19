@@ -6,7 +6,7 @@ if [[ -z "$1" ]]; then
   exit 1
 fi
 
-REBAR3_TOP=$(pwd)
+REBAR3_TOP=$(pwd)/apps/rebar
 export REBAR3_TOP
 pushd "$1"
 touch proto/* # force re-generation of protobuf elements

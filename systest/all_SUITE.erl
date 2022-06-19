@@ -72,10 +72,10 @@ grisp_explode() ->
     [{doc, "Don't force purge a plugin that runs the compile job itself"}].
 grisp_explode(Config) ->
     %% When the purge handling is wrong, the run fails violently.
-    {error, {_,Output}} = rebar3("grisp deploy -n robot -v 0.1.0", Config),
+    {error, {_,Output}} = rebar3("grisp deploy -n mygrispproject -v 0.1.0", Config),
     ct:pal("Rebar3 Output:~n~s",[Output]),
     ?assertNotEqual(nomatch,
-        re:run(Output, "No releases exist in the system for robot:0.1.0!")
+        re:run(Output, "No releases exist in the system for mygrispproject:0.1.0!")
     ),
     ok.
 

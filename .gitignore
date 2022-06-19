@@ -24,4 +24,4 @@ ebin
 env
 
 # hex_core artifact
-src/vendored/r3_safe_erl_term.erl
+apps/rebar/src/vendored/r3_safe_erl_term.erl
