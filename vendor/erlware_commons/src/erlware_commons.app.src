@@ -1,0 +1,11 @@
+{application,erlware_commons,
+             [{description,"Additional standard library for Erlang"},
+              {vsn,"1.5.0"},
+              {modules,[]},
+              {registered,[]},
+              {applications,[kernel,stdlib,cf]},
+              {maintainers,["Eric Merritt","Tristan Sloughter",
+                            "Jordan Wilberding","Martin Logan"]},
+              {licenses,["Apache","MIT"]},
+              {links,[{"Github",
+                       "https://github.com/erlware/erlware_commons"}]}]}.

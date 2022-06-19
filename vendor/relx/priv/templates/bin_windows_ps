@@ -1,0 +1,48 @@
+#! /usr/bin/pwsh
+# This is a simple start script file that runs the release in an Erlang shell
+
+# Terminate on error
+$ErrorActionPreference = "Stop"
+
+# Set variables that describe the release
+$rel_name = '{{ rel_name }}'
+$rel_vsn = '{{ rel_vsn }}'
+$erts_vsn = '{{ erts_vsn }}'
+$erl_opts = '{{ erl_opts }}'
+
+# export these to match mix release environment variables
+$RELEASE_NAME = '{{ rel_name }}'
+$RELEASE_VERSION = '{{ rel_vsn }}'
+$RELEASE_PROG = $MyInvocation.MyCommand.Name
+
+# Ensure we have PSScriptRoot
+if (!(Test-Path variable:global:PSScriptRoot)) {
+    # Support for powershell 2.0
+    $PSScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+}
+
+# Import psutil helper functions
+. $PSScriptRoot\psutil.ps1
+
+# Set the root release directory based on the location of this script
+$rootdir = Split-Path -Parent -Path $PSScriptRoot
+$rel_dir = "$rootdir\releases\$rel_vsn"
+
+$erts_root, $erts_dir = Find-ERTS -RelRoot $rootdir -Vsn $erts_vsn
+$sys_config = Find-FormatConfig -RelDir $rel_dir -File 'sys.config'
+$vm_args = Find-FormatConfig -RelDir $rel_dir -File 'vm.args'
+$boot_script = Find-BootScript -RelDir $rel_dir -RelName $rel_name
+$werl = "$erts_dir\bin\werl.exe"
+
+# Set the ERL_LIBS environment variable
+$env:ERL_LIBS = "$rootdir\lib"
+
+# Start the release in an `erl` shell
+$params = @($erl_opts, '-boot', $boot_script)
+if (![string]::IsNullOrEmpty($sys_config)) { $params += '-config', $sys_config }
+if (![string]::IsNullOrEmpty($vm_args))    { $params += '-args_file', $vm_args }
+$params += $args
+& $werl $params
+
+# Cleanup
+$env:ERL_LIBS = ''

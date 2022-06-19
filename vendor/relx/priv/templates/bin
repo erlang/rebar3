@@ -1,0 +1,95 @@
+#!/bin/sh
+
+set -e
+
+SCRIPT=$(readlink "$0" || true)
+if [ -z "$SCRIPT" ]; then
+    SCRIPT=$0
+fi;
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT")" && pwd -P)"
+RELEASE_ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+export REL_NAME="{{ rel_name }}"
+REL_VSN="{{ rel_vsn }}"
+
+# export these to match mix release environment variables
+export RELEASE_NAME="{{ rel_name }}"
+export RELEASE_VSN="{{ rel_vsn }}"
+export RELEASE_PROG="${SCRIPT}"
+
+ERTS_VSN="{{ erts_vsn }}"
+REL_DIR="$RELEASE_ROOT_DIR/releases/$REL_VSN"
+ERL_OPTS="{{ erl_opts }}"
+export ESCRIPT_NAME="${ESCRIPT_NAME-$SCRIPT}"
+
+find_erts_dir() {
+    __erts_dir="$RELEASE_ROOT_DIR/erts-$ERTS_VSN"
+    if [ -d "$__erts_dir" ]; then
+        ERTS_DIR="$__erts_dir";
+    else
+        __erl="$(command -v erl)"
+        code="io:format(\"~s\", [code:root_dir()]), halt()."
+        __erl_root="$("$__erl" -boot no_dot_erlang -noshell -eval "$code")"
+        ERTS_DIR="$__erl_root/erts-$ERTS_VSN"
+    fi
+}
+
+find_sys_config() {
+    __possible_sys="$REL_DIR/sys.config"
+    if [ -f "$__possible_sys" ]; then
+        SYS_CONFIG="$__possible_sys"
+    else 
+       if [ -L "$__possible_sys".orig ]; then
+          mv "$__possible_sys".orig "$__possible_sys"  
+          SYS_CONFIG="$__possible_sys"
+       fi
+    fi
+}
+
+find_vm_args() {
+    __possible_vm_args="$REL_DIR/vm.args"
+    if [ -f "$__possible_vm_args" ]; then
+        VM_ARGS="$__possible_vm_args"
+    else 
+       if [ -L "$__possible_vm_args".orig ]; then
+          mv "$__possible_vm_args".orig "$__possible_vm_args"  
+          VM_ARGS="$__possible_vm_args"
+       fi
+    fi
+}
+
+find_erts_dir
+find_sys_config
+find_vm_args
+export ROOTDIR="$RELEASE_ROOT_DIR"
+export BINDIR="$ERTS_DIR/bin"
+export EMU="beam"
+export PROGNAME="erl"
+export LD_LIBRARY_PATH="$ERTS_DIR/lib:$LD_LIBRARY_PATH"
+SYSTEM_LIB_DIR="$(dirname "$ERTS_DIR")/lib"
+[ -f "$REL_DIR/$REL_NAME.boot" ] && BOOTFILE="$REL_NAME" || BOOTFILE=start
+cd "$ROOTDIR"
+
+{{! Define alternative field separator using ASCII US (unit separator). US is
+    not expected to appear in any argument. }}
+IFS_NORM="$IFS"
+IFS_ARGS="$(printf '\x1f')"
+
+# Save extra arguments
+{{! Join extra arguments into a US-delimited string. }}
+IFS="$IFS_ARGS"
+ARGS="$*"
+IFS="$IFS_NORM"
+
+# Build arguments for erlexec
+set --
+[ "$ERL_OPTS" ] && set -- "$@" "$ERL_OPTS"
+[ "$SYS_CONFIG" ] && set -- "$@" -config "$SYS_CONFIG"
+[ "$VM_ARGS" ] && set -- "$@" -args_file "$VM_ARGS"
+set -- "$@" -boot_var SYSTEM_LIB_DIR "$SYSTEM_LIB_DIR" -boot "$REL_DIR/$BOOTFILE"
+{{! Split string with extra arguments back into an argument list. }}
+IFS="$IFS_ARGS"
+# shellcheck disable=SC2086
+set -- "$@" $ARGS
+IFS="$IFS_NORM"
+
+exec "$BINDIR/erlexec" "$@"

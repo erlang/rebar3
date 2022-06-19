@@ -1,0 +1,108 @@
+@echo off
+:: This is a simple start batch file that runs the release in an Erlang shell
+
+:: Set variables that describe the release
+set rel_name={{ rel_name }}
+set rel_vsn={{ rel_vsn }}
+set erts_vsn={{ erts_vsn }}
+set erl_opts={{ erl_opts }}
+
+:: export these to match mix release environment variables
+set RELEASE_NAME={{ rel_name }}
+set RELEASE_VSN={{ rel_vsn }}
+set RELEASE_PROG=%~nx0
+
+:: Set the root release directory based on the location of this batch file
+set script_dir=%~dp0
+for %%A in ("%script_dir%\..") do (
+  set "release_root_dir=%%~fA"
+)
+set "rel_dir=%release_root_dir%\releases\%rel_vsn%"
+
+call :find_erts_dir
+call :find_sys_config
+call :set_boot_script_var
+
+set "rootdir=%release_root_dir%"
+set "bindir=%erts_dir%\bin"
+set progname=erl
+set erl=%bindir%\erl
+
+cd %rootdir%
+
+:: Write the erl.ini file
+set erl_ini=%erts_dir%\bin\erl.ini
+set converted_bindir=%bindir:\=\\%
+set converted_rootdir=%rootdir:\=\\%
+echo [erlang] > "%erl_ini%"
+echo Bindir=%converted_bindir% >> "%erl_ini%"
+echo Progname=%progname% >> "%erl_ini%"
+echo Rootdir=%converted_rootdir% >> "%erl_ini%"
+
+:: Start the release in an `erl` shell
+set boot=-boot "%boot_script%" -boot_var RELEASE_DIR "%release_root_dir%"
+"%erl%" %erl_opts% %sys_config% %boot% %*
+
+goto :eof
+
+:: Find the ERTS dir
+:find_erts_dir
+set "erts_dir=%release_root_dir%\erts-%erts_vsn%"
+if exist %erts_dir% (
+  goto :set_erts_dir_from_default
+) else (
+  goto :set_erts_dir_from_erl
+)
+goto :eof
+
+:: Set the ERTS dir from the passed in erts_vsn
+:set_erts_dir_from_default
+set erts_dir=%erts_dir%
+set root_dir=%release_root_dir%
+goto :eof
+
+:: Set the ERTS dir from erl
+:set_erts_dir_from_erl
+for /f "delims=" %%i in ('where erl') do (
+  set erl=%%i
+)
+for /f "delims=" %%i in ('call "%erl%" -boot no_dot_erlang -boot_var RELEASE_DIR "%release_root_dir%" -noshell -eval "io:format(\"~s\", [filename:nativename(code:root_dir())])." -s init stop') do (
+  set erl_root=%%i
+)
+set "erts_dir=%erl_root%\erts-%erts_vsn%"
+set rootdir=%erl_root%
+goto :eof
+
+:: Find the sys.config file
+:find_sys_config
+set "possible_sys=%rel_dir%\sys.config"
+if exist "%possible_sys%" (
+  set sys_config=-config "%possible_sys%"
+) else (
+  if exist "%possible_sys%.orig" (
+    ren "%possible_sys%.orig" sys.config
+    set sys_config=-config "%possible_sys%"
+  )
+)
+
+:: Find the vm.args file
+:find_vm_args
+set "possible_vm_args=%rel_dir%\vm.args"
+if exist "%possible_vm_args%" (
+  set vm_args="%possible_vm_args%"
+) else (
+  if exist "%possible_vm_args%.orig" (
+    ren "%possible_vm_args%.orig" vm.args
+    set vm_args="%possible_vm_args%"
+  )
+)
+goto :eof
+
+:: set boot_script variable
+:set_boot_script_var
+if exist "%rel_dir%\%rel_name%.boot" (
+  set "boot_script=%rel_dir%\%rel_name%"
+) else (
+  set "boot_script=%rel_dir%\start"
+)
+goto :eof

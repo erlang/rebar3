@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# loop until the VM starts responding to pings
+while ! erl_rpc erlang is_alive > /dev/null
+do
+    sleep 1
+done
+
+# loop until the name provided as argument gets
+# registered
+while true
+do
+    if [ "$(erl_eval "whereis($1).")" != "undefined" ]
+    then
+        break
+    fi
+done

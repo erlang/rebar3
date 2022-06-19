@@ -1,0 +1,9 @@
+{application,cth_readable,
+             [{description,"Common Test hooks for more readable logs"},
+              {vsn,"1.5.1"},
+              {registered,[cth_readable_failonly,cth_readable_logger]},
+              {applications,[kernel,stdlib,syntax_tools,cf]},
+              {env,[]},
+              {modules,[]},
+              {licenses,["BSD"]},
+              {links,[{"Github","https://github.com/ferd/cth_readable"}]}]}.

@@ -1,0 +1,197 @@
+#!/usr/bin/env escript
+%% -*- mode: erlang;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% ex: ft=erlang ts=4 sw=4 et
+%% -------------------------------------------------------------------
+%%
+%% nodetool: Helper Script for interacting with live nodes
+%%
+%% On releases running with OTP-23+ this escript is not used. Instead,
+%% the `erl_call' command is used. This escript will be removed from
+%% relx when OTP-23 becomes the earliest support version of OTP.
+%%
+%% -------------------------------------------------------------------
+
+main(Args) ->
+    %% Extract the args
+    {RestArgs, TargetNode, StartEpmd} = process_args(Args, [], undefined, true),
+
+    ok = start_epmd(StartEpmd),
+
+    %% See if the node is currently running  -- if it's not, we'll bail
+    case {net_kernel:hidden_connect_node(TargetNode), net_adm:ping(TargetNode)} of
+        {true, pong} ->
+            ok;
+        {_, pang} ->
+            io:format("Node ~p not responding to pings.~n", [TargetNode]),
+            halt(1)
+    end,
+
+    Timeout =
+        case os:getenv("RELX_RPC_TIMEOUT") of
+            false ->
+                60000;
+            StrVal ->
+                try
+                    %% RELX_RPC_TIMEOUT is in seconds
+                    list_to_integer(StrVal) * 1000
+                catch _:_ ->
+                        60000
+                end
+        end,
+
+    case RestArgs of
+        ["rpc", Module, Function | ArgsAsString] ->
+            case consult(lists:flatten(ArgsAsString)) of
+                {error, Reason} ->
+                    io:format("Error parsing arguments `~s`, failed with reason: ~s~n", [ArgsAsString, Reason]);
+                {ok, ParsedArgs} when is_list(ParsedArgs) ->
+                    case rpc:call(TargetNode, list_to_atom(Module),
+                                  list_to_atom(Function), ParsedArgs, Timeout) of
+                        {badrpc, Reason} ->
+                            io:format("RPC to ~p failed: ~p~n", [TargetNode, Reason]),
+                            halt(1);
+                        rpc_ok ->
+                            %% code doesn't want any output
+                            ok;
+                        {rpc_error, Code} when is_integer(Code) ->
+                            %% code failed, halt with a supplied code
+                            halt(Code);
+                        {rpc_error, Code, Output} when is_integer(Code) ->
+                            %% code failed, halt with a supplied code
+                            %% and log output to stderr
+                            io:format(standard_error, "~p~n", [Output]),
+                            halt(Code);
+                        Other ->
+                            io:format("~p~n", [Other])
+                    end;
+                {ok, ParsedArgs} ->
+                    io:format("Error: args `~p` not a list.~n"
+                              "Example to call `foo:bar(1,2,3)` pass `foo bar \"[1, 2, 3].\"`~n", [ParsedArgs])
+            end;
+        ["eval" | ListOfArgs] ->
+            % shells may process args into more than one, and end up stripping
+            % spaces, so this converts all of that to a single string to parse
+            String = binary_to_list(
+                      list_to_binary(
+                        join(ListOfArgs," ")
+                      )
+                    ),
+
+            % then scan and parse the string
+            {ok, Scanned, _} = erl_scan:string(String),
+            {ok, Parsed } = erl_parse:parse_exprs(Scanned),
+
+            % and evaluate it on the remote node
+            case rpc:call(TargetNode, erl_eval, exprs, [Parsed, [] ]) of
+                {value, Value, _} ->
+                    io:format ("~p~n",[Value]);
+                {badrpc, Reason} ->
+                    io:format("RPC to ~p failed: ~p~n", [TargetNode, Reason]),
+                    halt(1)
+            end;
+        Other ->
+            io:format("Other: ~p~n", [Other]),
+            io:format("Usage: nodetool {ping|stop|restart|reboot|rpc|rpcterms|eval [Terms]} [RPC]~n")
+    end,
+    net_kernel:stop().
+
+process_args([], Acc, TargetNode, StartEpmd) ->
+    {lists:reverse(Acc), TargetNode, StartEpmd};
+process_args(["-setcookie", Cookie | Rest], Acc, TargetNode, StartEpmd) ->
+    erlang:set_cookie(node(), list_to_atom(Cookie)),
+    process_args(Rest, Acc, TargetNode, StartEpmd);
+process_args(["-start_epmd", StartEpmd | Rest], Acc, TargetNode, _StartEpmd) ->
+    process_args(Rest, Acc, TargetNode, list_to_atom(StartEpmd));
+process_args(["-name", TargetName | Rest], Acc, _, StartEpmd) ->
+    maybe_start_node(TargetName, longnames),
+    process_args(Rest, Acc, nodename(TargetName), StartEpmd);
+process_args(["-sname", TargetName | Rest], Acc, _, StartEpmd) ->
+    maybe_start_node(TargetName, shortnames),
+    process_args(Rest, Acc, nodename(TargetName), StartEpmd);
+process_args([Arg | Rest], Acc, Opts, StartEpmd) ->
+    process_args(Rest, [Arg | Acc], Opts, StartEpmd).
+
+maybe_start_node(TargetName, Names) ->
+    case erlang:node() of
+        'nonode@nohost' ->
+            ThisNode = append_node_suffix(TargetName, "_maint_"),
+            {ok, _} = net_kernel:start([ThisNode, Names]);
+        _ ->
+            ok
+    end.
+
+start_epmd(true) ->
+    [] = os:cmd("\"" ++ epmd_path() ++ "\" -daemon"),
+    ok;
+start_epmd(_) ->
+    ok.
+
+epmd_path() ->
+    ErtsBinDir = filename:dirname(escript:script_name()),
+    Name = "epmd",
+    case os:find_executable(Name, ErtsBinDir) of
+        false ->
+            case os:find_executable(Name) of
+                false ->
+                    io:format("Could not find epmd.~n"),
+                    halt(1);
+                GlobalEpmd ->
+                    GlobalEpmd
+            end;
+        Epmd ->
+            Epmd
+    end.
+
+
+nodename(Name) ->
+    case re:split(Name, "@", [unicode, {return, list}]) of
+        [_Node, _Host] ->
+            list_to_atom(Name);
+        [Node] ->
+            [_, Host] = re:split(atom_to_list(node()), "@", [{return, list}, unicode]),
+            list_to_atom(lists:concat([Node, "@", Host]))
+    end.
+
+append_node_suffix(Name, Suffix) ->
+    rand:seed(exsss, os:timestamp()),
+    case re:split(Name, "@", [{return, list}, unicode]) of
+        [Node, Host] ->
+            list_to_atom(lists:concat([Node, Suffix, rand:uniform(1000), "@", Host]));
+        [Node] ->
+            list_to_atom(lists:concat([Node, Suffix, rand:uniform(1000)]))
+    end.
+
+%% convert string to erlang term
+consult([]) ->
+    {ok, []};
+consult(Bin) when is_binary(Bin)->
+    consult(binary_to_list(Bin));
+consult(Str) when is_list(Str) ->
+    %% add '.' if the string doesn't end in one
+    Normalized =
+        case lists:reverse(Str) of
+            [$. | _] -> Str;
+            R -> lists:reverse([$. | R])
+        end,
+
+    case erl_scan:string(Normalized) of
+        {ok, Tokens, _} ->
+            case erl_parse:parse_term(Tokens) of
+                {ok, Args} ->
+                    {ok, Args};
+                {error, {_, _, ErrorDescriptor}} ->
+                    {error, erl_parse:format_error(ErrorDescriptor)}
+            end;
+        {error, {_, _, ErrorDescriptor}} ->
+            {error, erl_scan:format_error(ErrorDescriptor)}
+    end.
+
+%% string:join/2 copy; string:join/2 is getting obsoleted
+%% and replaced by lists:join/2, but lists:join/2 is too new
+%% for version support (only appeared in 19.0) so it cannot be
+%% used. Instead we just adopt join/2 locally and hope it works
+%% for most unicode use cases anyway.
+join([], Sep) when is_list(Sep) ->
+    [];
+join([H|T], Sep) ->
+    H ++ lists:append([Sep ++ X || X <- T]).

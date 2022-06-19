@@ -1,0 +1,9 @@
+%% Thanks to Ulf Wiger at Ericcson for these comments:
+%%
+%% This file is identified via the erl command line option -config File.
+%% Note that File should have no extension, e.g.
+%% erl -config .../sys (if this file is called sys.config)
+%%
+%% In this file, you can redefine application environment variables.
+%% This way, you don't have to modify the .app files of e.g. OTP applications.
+[].

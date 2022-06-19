@@ -1,0 +1,9 @@
+semver <- major_minor_patch_min_patch ("-" alpha_part ("." alpha_part)*)? ("+" alpha_part ("." alpha_part)*)?  !.
+       ` ec_semver:internal_parse_version(Node) ` ;
+
+major_minor_patch_min_patch <- ("v"? numeric_part / alpha_part)  ("." version_part)? ("." version_part)? ("." version_part)? ;
+
+version_part <- numeric_part / alpha_part ;
+
+numeric_part <- [0-9]+ `erlang:list_to_integer(erlang:binary_to_list(erlang:iolist_to_binary(Node)))` ;
+alpha_part <- [A-Za-z0-9]+ `erlang:iolist_to_binary(Node)` ;

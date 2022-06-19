@@ -246,6 +246,8 @@ get_files(State, Apps, SkipApps, Mods, SkipMods, ExtraDirs) ->
     Files1 = extras_files(BaseDir, ExtraDirs, Files0),
     ExcludeMods = get_config(State, exclude_mods, []),
     Files2 = mods_files(Mods, ExcludeMods ++ SkipMods, Files1),
+    ?DEBUG("{dialyzer, [{exclude_apps, ~p}, {exclude_mods, ~p}]}.",
+           [ExcludeApps, ExcludeMods]),
     dict:fold(fun(_, File, Acc) -> [File | Acc] end, [], Files2).
 
 apps_files([], _, _ExtraDirs, Files) ->

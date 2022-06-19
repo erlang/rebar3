@@ -1,0 +1,465 @@
+#! /usr/bin/pwsh
+# This script handles managing an Erlang node as a Windows service.
+#
+# Commands provided:
+#
+# * install - install the release as a Windows service
+# * start - start the service and Erlang node
+# * stop - stop the service and Erlang node
+# * restart - run the stop command and start command
+# * uninstall - uninstall the service and kill a running node
+# * ping - check if the node is running
+# * console - start the Erlang release in a `werl` Windows shell
+# * attach - connect to a running node and open an interactive console
+# * remote_console - alias for attach
+# * list - display a listing of installed Erlang services
+# * usage - display available commands
+param (
+    [string] $Command
+)
+
+# Terminate on error
+$ErrorActionPreference = "Stop"
+
+# Set variables that describe the release
+$rel_name = '{{ rel_name }}'
+$rel_vsn = '{{ rel_vsn }}'
+$erts_vsn = '{{ erts_vsn }}'
+$erl_opts = '{{ erl_opts }}'
+
+# export these to match mix release environment variables
+$RELEASE_NAME = '{{ rel_name }}'
+$RELEASE_VERSION = '{{ rel_vsn }}'
+$RELEASE_PROG = $MyInvocation.MyCommand.Name
+
+# Ensure we have PSScriptRoot
+if (!(Test-Path variable:global:PSScriptRoot)) {
+    # Support powershell 2.0
+    $PSScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+}
+
+# Ensure we have PSCommandPath
+if (!(Test-Path variable:global:PSCommandPath)) {
+    # Support powershell 2.0
+    $PSCommandPath = $MyInvocation.PSCommandPath
+}
+
+$PSCriptName = Split-Path -Leaf -Path $PSCommandPath
+
+# Import psutil helper functions
+. $PSScriptRoot\psutil.ps1
+
+# Set the root release directory based on the location of this batch file
+$rootdir = Split-Path -Parent -Path $PSScriptRoot
+$rel_dir = "$rootdir\releases\$rel_vsn"
+
+$erts_root, $erts_dir = Find-ERTS -RelRoot $rootdir -Vsn $erts_vsn
+$sys_config = Find-FormatConfig -RelDir $rel_dir -File 'sys.config'
+$vm_args = Find-FormatConfig -RelDir $rel_dir -File 'vm.args'
+$boot_script = Find-BootScript -RelDir $rel_dir -RelName $rel_name
+
+$service_name = "${rel_name}_${rel_vsn}"
+$nodetool = "$rootdir\bin\nodetool"
+
+$bindir = "$erts_dir\bin"
+$werl = "$bindir\werl.exe"
+$erl = "$bindir\erl.exe"
+$erlsrv = "$bindir\erlsrv.exe"
+$escript = "$bindir\escript.exe"
+
+# Added in OTP-23
+$erl_call = "$bindir\erl_call.exe"
+
+# if RELX_RPC_TIMEOUT is set then use that
+# otherwise check for NODETOOL_TIMEOUT and convert to seconds
+if (Test-Path env:RELX_RPC_TIMEOUT) {
+    $relx_rpc_timeout = $env:RELX_RPC_TIMEOUT
+}
+elseif (Test-Path env:NODETOOL_TIMEOUT) {
+    # will exit the script if NODETOOL_TIMEOUT isn't a number
+    $relx_rpc_timeout = $env:NODETOOL_TIMEOUT / 1000
+}
+else {
+    $relx_rpc_timeout = 60
+}
+
+$extensions = @("{{ extensions }}" -split '[|]' | Where-Object { $_ -ne 'undefined' })
+
+# Run extension script
+function RunExtension() {
+    param(
+        [string]$Name
+    )
+    # Manifest xxx_extension as local variable
+    "{{ extension_declarations }}" -split ";" | ForEach-Object { Invoke-Expression "`$$_" }
+    # Manifest value of xxx_extension as $script
+    $script = Invoke-Expression "`$${Name}_extension"
+    # Execute
+    & "$PSScriptRoot\$script" @args
+}
+
+# Extract node type and name from vm.args
+$node_type, $node_name, $hostname = Get-NodeAndHost $vm_args
+
+# Extract the target cookie
+# Do this before relx_get_nodename so we can use it and not create a ~/.erlang.cookie
+$cookie = Get-Cookie $vm_args
+
+# Collect additional (allowed) VM args into erl_opts for erlsrv/start_erl
+$opts = Get-Content $vm_args `
+    | Select-String '^(#|-name|-sname|-setcookie|-noinput|-noshell)' -NotMatch `
+    | ForEach-Object { $_.line } `
+    | Where-Object { $_.length -gt 0 }
+$erl_opts += "$opts"
+
+# If a start.boot file is not present, copy one from the named .boot file
+if (!(Test-Path "$rel_dir\start.boot")) {
+    Copy-Item "$rel_dir\$rel_name.boot" "$rel_dir\start.boot" | Out-Null
+}
+
+# List of supported commands, help, etc
+$commands = @{
+    'help' = @{
+        'ShortHelp' = 'Show help';
+        'LongHelp' = 'Shows help for <command>';
+        'Usage' = '<command>';
+        'Invoke' = 'Usage';
+        'PassArgs' = $true
+`    };
+    'install' = @{
+        'ShortHelp' = 'Install the service';
+        'LongHelp' = 'Installs release <version> as a windows service';
+        'Usage' = '<version>';
+        'Invoke' = 'Install';
+        'PassArgs' = $true
+`    };
+    'uninstall' = @{
+        'ShortHelp' = 'Uninstall the service';
+        'LongHelp' = 'Uninstalls release <version> as a windows service';
+        'Usage' = '<version>';
+        'Invoke' = 'Uninstall';
+        'PassArgs' = $true
+    };
+    'start' = @{
+        'ShortHelp' = 'Start the service';
+        'LongHelp' = 'Starts the installed windows service';
+        'Usage' = '';
+        'Invoke' = 'Start-SVC';
+        'Aliases' = @('daemon')
+    };
+    'stop' = @{
+        'ShortHelp' = 'Stop the service';
+        'LongHelp' = 'Stops the installed windows service';
+        'Usage' = '';
+        'Invoke' = 'Stop-SVC'
+    };
+    'restart' = @{
+        'ShortHelp' = 'Restart the service';
+        'LongHelp' = 'Restarts the installed windows service';
+        'Usage' = '';
+        'Invoke' = @('Stop-SVC','Start-SVC')
+    };
+    'upgrade' = @{
+        'ShortHelp' = 'Upgrade the running service';
+        'LongHelp' = 'Upgrades the service to release <version>';
+        'Usage' = '<version> [--no-permanent]';
+        'Invoke' = 'Relup';
+        'PassArgs' = $true
+    };
+    'downgrade' = @{
+        'ShortHelp' = 'Downgrade the running service';
+        'LongHelp' = 'Downgrades the service to release <version>';
+        'Usage' = '<version>';
+        'Invoke' = 'Relup';
+        'PassArgs' = $true
+    };
+    'console' = @{
+        'ShortHelp' = 'Start the release with an interactive shell';
+        'LongHelp' = 'Starts release VERSION with an interactive shell';
+        'Usage' = '';
+        'Invoke' = 'Console'
+    };
+    'foreground' = @{
+        'ShortHelp' = 'Start the release with a non-interactive shell';
+        'LongHelp' = 'Starts the release with a non-interactive shell';
+        'Usage' = '';
+        'Invoke' = 'Foreground'
+    };
+    'ping' = @{
+        'ShortHelp' = 'Print pong if the node is alive';
+        'LongHelp' = 'Checks if the service (or console) is running';
+        'Usage' = '';
+        'Invoke' = 'Ping'
+    };
+    'list' = @{
+        'ShortHelp' = 'List installed Erlang services';
+        'LongHelp' = 'Lists all Erlang services installed on this machine';
+        'Usage' = '';
+        'Invoke' = 'List'
+    };
+    'attach' = @{
+        'ShortHelp' = 'Connect remote shell to running node';
+        'LongHelp' = 'Connects to running service or console shell';
+        'Usage' = '';
+        'Invoke' = 'Attach';
+        'Aliases' = @('remote_console', 'remote', 'remsh', 'daemon_attach')
+    };
+    'rpc' = @{
+        'ShortHelp' = 'Applies the specified function and returns the result';
+        'LongHelp' = "Applies the specified function and returns the result.`n" `
+                   + "Mod must be specified. However, start and [] are assumed`n" `
+                   + "for unspecified Fun and Args, respectively. Args is to`n" `
+                   + "be in the same format as for erlang:apply/3 in ERTS."
+        'Usage' = '<mod> [<func> [<args>]]';
+        'Invoke' = @('PingOrExit', 'Rpc');
+        'PassArgs' = $true
+    };
+    'eval' = @{
+        'ShortHelp' = 'Executes a sequence of Erlang expressions';
+        'LongHelp' = 'Executes a sequence of Erlang expressions, separated by`n' `
+                   + 'comma (,) and ended with a full stop (.)'
+        'Usage' = '[<exprs>]';
+        'Invoke' = @('PingOrExit', 'Eval');
+        'PassArgs' = $true
+    };
+    'versions' = @{
+        'ShortHelp' = 'Print versions of the release available';
+        'LongHelp' = 'Print versions of the release available'
+        'Usage' = '';
+        'Invoke' = 'Versions'
+    }
+}
+
+# Build easy aliases
+$aliases = @{}
+$commands.GetEnumerator() | 
+    Where-Object { $_.Value.ContainsKey('Aliases') } | 
+    ForEach-Object { $target = $_.Key; $_.Value.Aliases | Foreach-Object { $aliases += @{ $_ = $target } }; }
+
+# Output usage
+function Usage() {
+    param(
+        [string]$Command
+    )
+    switch ($Command) {
+        {$commands.ContainsKey($Command)} {
+            $cmd = $commands.item($_)
+            "Usage: $PSCriptName $Command $($cmd.Usage)"
+            ""
+            "$($cmd.LongHelp)"
+            ""
+        }
+        {$aliases.ContainsKey($Command)} {
+            $cmd = $commands.item($aliases.item($_))
+            "Usage: $PSCriptName $Command $($cmd.Usage)"
+            ""
+            "$($cmd.LongHelp)"
+            ""
+        }
+        {$extensions -contains $_} { RunExtension $_ help }
+        Default {
+            "Usage: $($MyInvocation.MyCommand.Name) <command> <args>"
+            "Commands:"
+            $commands.keys | Sort-Object | ForEach-Object {
+                @{"$_" = $commands.item($_).ShortHelp }
+            } | Format-Table -HideTableHeaders
+        }
+    }
+}
+
+# Install the service
+function Install() {
+    param(
+        [string]$Version
+    )
+    if (![string]::IsNullOrWhiteSpace($Version)) {
+        # relup and reldown
+        Relup $Version
+        return
+    }
+    # Install the service
+    $args = "$erl_opts -setcookie $cookie ++ -rootdir `"`"$erts_root`"`" -reldir `"`"$rootdir\releases`"`""
+    $start_erl = "$erts_dir\bin\start_erl.exe"
+    $description = "Erlang node ${node_name}${hostname} in $rootdir"
+    $params = @('add', $service_name, $node_type, "${node_name}${hostname}", `
+        '-c', $description, `
+        '-w', $rootdir, `
+        '-m', $start_erl, `
+        #'-d', 'reuse', ` # Add this to debug startup
+        '-e', "ERL_LIBS=$rootdir\lib", `
+        '-stopaction', 'init:stop().', `
+        '-args', $args)
+    & $erlsrv $params
+}
+
+# Uninstall the Windows service
+function Uninstall() {
+    param(
+        [string]$Version
+    )
+    if (![string]::IsNullOrWhiteSpace($Version)) {
+        # relup and reldown
+        Relup $Version
+        return
+    }
+    # Uninstall the Windows service
+    & $erlsrv remove $service_name
+}
+
+# Start the Windows service
+function Start-SVC() {
+    & $erlsrv start $service_name
+}
+
+# Stop the Windows service
+function Stop-SVC() {
+    & $erlsrv stop $service_name
+}
+
+# Relup and reldown
+function Relup() {
+    param(
+        [string]$Version
+    )
+    PingOrExit
+    $params = @("$rootdir/bin/install_upgrade.escript", 'install', "{'$rel_name', `"$node_type`", '${node_name}${hostname}', '$cookie'}", $Version)
+    & $escript $params @args
+}
+
+# Start a console
+function Console() {
+    # Set the ERL_LIBS environment variable
+    $env:ERL_LIBS = "$rootdir\lib"
+
+    # Start the release in an `erl` shell
+    $params = @($erl_opts, '-boot', $boot_script)
+    if (![string]::IsNullOrEmpty($sys_config)) { $params += '-config', $sys_config }
+    if (![string]::IsNullOrEmpty($vm_args))    { $params += '-args_file', $vm_args }
+    & $werl $params
+}
+
+# Start a non-interactive console
+function Foreground() {
+    # Set the ERL_LIBS environment variable
+    $env:ERL_LIBS = "$rootdir\lib"
+
+    # Start the release in an `erl` shell
+    $params = @($erl_opts, '-boot', $boot_script, '-noinput', '+Bd')
+    if (![string]::IsNullOrEmpty($sys_config)) { $params += '-config', $sys_config }
+    if (![string]::IsNullOrEmpty($vm_args))    { $params += '-args_file', $vm_args }
+    & $erl $params
+}
+
+# Execute erl_call.exe
+function ErlCall()
+{
+    param(
+        [string]$Type
+    )
+    $params = @($node_type, $node_name, '-R', '-c', $cookie, '-timeout', $relx_rpc_timeout)
+    switch($Type) {
+        '-a' { & $erl_call $params '-a' "`"$args`"" }
+        '-e' { "$args" | & $erl_call $params '-e' }
+        Default {
+            Write-Error "Unsupported erlcall ($_)"
+        }
+    }
+}
+
+# Execute escript.exe nodetool
+function Nodetool()
+{
+    $params = @($node_type, $node_name, '-setcookie', $cookie)
+    & $escript $nodetool $params @args
+}
+
+# Execute an RPC call
+function Rpc()
+{
+    if (Test-Path $erl_call) {
+        ErlCall '-a' @args
+    }
+    else {
+        Nodetool rpc @args
+    }
+}
+
+function Eval()
+{
+    if (Test-Path $erl_call) {
+        ErlCall '-e' @args
+    }
+    else {
+        Nodetool eval @args
+    }
+}
+
+# Ping node and error (exit) if not running
+function PingOrExit() {
+    $result = (Rpc erlang is_alive)
+    if ($result -ne "true") {
+        Write-Error "Node is not running! ($result)"
+    }
+}
+
+# Ping the running node
+function Ping() {
+    PingOrExit
+    "pong"
+}
+
+# List installed Erlang services
+function List() {
+    & $erlsrv 'list' $service_name
+}
+
+# Attach to a running node
+function Attach() {
+    PingOrExit
+    $params = @('-boot', "$rel_dir\start_clean", `
+        '-remsh', "${node_name}${hostname}", `
+        $node_type, "console_${node_name}_$(Get-Random -maximum 99999)", `
+        '-setcookie', $cookie)
+    & $werl $params
+}
+
+# Print versions of the release available
+function Versions()
+{
+    PingOrExit
+    $params = @("$rootdir\bin\install_upgrade.escript", 'versions', "{'$rel_name', `"$node_type`", '${node_name}${hostname}', '$cookie'}")
+    & $escript $params @args
+}
+
+
+# Run a command
+function RunCommand()
+{
+    param(
+        [string]$Name
+    )
+    $cmd = $commands.item($Name)
+    if ($cmd.PassArgs) { $pass_args = $args }
+    $cmd.Invoke | ForEach-Object {
+        & $_ @pass_args
+    }
+}
+
+# Finally, here is where we run the command
+switch ($Command)
+{
+    "" { Usage }
+    {$commands.ContainsKey($_)} {
+        RunCommand $_ @args
+    }
+    {$aliases.ContainsKey($Command)} {
+        RunCommand $aliases.item($_) @args
+    }
+    {$extensions -contains $_} {
+        RunExtension $_ @args
+    }
+    Default {
+        Write-Warning "Unknown command: `"$_`""
+        Usage
+    }
+}

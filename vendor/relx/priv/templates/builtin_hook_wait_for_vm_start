@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# loop until the VM starts responding to pings
+while ! erl_rpc erlang is_alive > /dev/null
+do
+    sleep 1
+done

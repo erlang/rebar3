@@ -1,0 +1,175 @@
+#! /usr/bin/pwsh
+# Utility functions for powershell script files
+
+function Find-ERTS()
+{
+    param (
+        [Parameter(Mandatory=$true, Position=0)]
+        [string] $RelRoot,
+        [Parameter(Mandatory=$true, Position=1)]
+        [string] $Vsn
+    )
+
+    if (Test-Path "$RelRoot\erts-$Vsn") {
+        # Set the ERTS dir from the passed in erts_vsn
+        return @($RelRoot, "$RelRoot\erts-$Vsn")
+    }
+
+    # Get the ERTS dir from erl
+    $erl = (Get-Command erl).source
+    $erl_root = & $erl -boot no_dot_erlang -noshell -eval 'io:format(\"~s\", [filename:nativename(code:root_dir())]), halt().'
+    if (Test-Path "$erl_root\erts-$Vsn") {
+        return @($erl_root, "$erl_root\erts-$Vsn")
+    }
+
+    # Expected $vsn but not found, get ERTS version installed
+    $erts_vsn = & $erl -boot no_dot_erlang -noshell -eval 'io:format(\"~s\", [erlang:system_info(version)]), halt().'
+    if (!(Test-Path "$erl_root\erts-$erts_vsn")) {
+        Write-Error "Can not run the release. There is no ERTS bundled with the release or found on the system."
+        # Terminates here due to $ErrorActionPreference = "Stop"
+    }
+
+    Write-Warning "Exact ERTS version ($Vsn) match not found, instead using $erts_vsn}. The release may fail to run."
+    return @($erl_root, "$erl_root\erts-$erts_vsn")
+}
+
+function Find-BootScript()
+{
+    param (
+        [Parameter(Mandatory=$true, Position=0)]
+        [string] $RelDir,
+        [Parameter(Mandatory=$true, Position=1)]
+        [string] $RelName
+    )
+
+    if (Test-Path "$RelDir\$RelName.boot") {
+        return "$RelDir\$RelName"
+    }
+
+    if (Test-Path "$RelDir\start.boot") {
+        return "$RelDir\start"
+    }
+
+    Write-Error "No boot script found in $RelDir"
+}
+
+function Find-FormatConfig()
+{
+    param (
+        [Parameter(Mandatory=$true, Position=0)]
+        [string] $RelDir,
+        [Parameter(Mandatory=$true, Position=1)]
+        [string] $File
+    )
+
+    $in = $out = "$RelDir\$File"
+    if (Test-Path "$in.src") {
+        # apply the environment variable substitution
+        Format-OSVars "$in.src" $out
+    }
+    elseif (Test-Path env:RELX_REPLACE_OS_VARS) {
+        # If vm.args.orig or sys.config.orig is present then use that
+        if (Test-Path "$in.orig") {
+            $in = "$in.orig"
+        }
+        # if they are both the same, then ensure that we don't clobber
+        # the file by saving a backup with the .orig extension
+        if ($in -eq $out) {
+            Copy-Item $in "$in.orig"
+        }
+        # apply the environment variable substitution
+        Format-OSVars $in $out
+    }
+    else {
+        # If vm.arg.orig or sys.config.orig is present then use that
+        if (Test-Path "$in.orig") {
+            $in = "$in.orig"
+        }
+        if ($in -ne $out) {
+            Copy-Item $in $out
+        }
+    }
+
+    return $out
+}
+
+function Format-OSVars()
+{
+    param(
+        [Parameter(Mandatory=$true, Position=0)]
+        [string] $In,
+        [Parameter(Mandatory=$true, Position=1)]
+        [string] $Out
+    )
+
+    $content = Get-Content $In
+    $matches = ([regex]'[$]{(?<var>[^}]*)}').Matches($content)
+    foreach ($match in $matches) {
+        $var = $match.groups['var'].value
+        $val = Invoke-Expression "`$env:${var}"
+        $content = $content.replace("`${$var}", $val)
+    }
+    Set-Content -Path $Out -Value $content -Encoding ASCII
+}
+
+function Get-NodeAndHost()
+{
+    param(
+        [string]$vmargs
+    )
+
+    $node_type, $node_name = Get-Content $vmargs `
+        | Select-String '(-s{0,1}name)\s+([^\s]+)' `
+        | ForEach-Object { `
+            @($_.matches[0].groups[1].value, `
+            $_.matches[0].groups[2].value) `
+        }
+
+    if ($node_name -match '@') {
+        $node_name, $hostname = $node_name -split '@' 
+    }
+
+    # if no hostname is set, attempt to pick one from the env
+    if ([string]::IsNullOrEmpty($hostname) -and (Test-Path env:COMPUTERNAME)) {
+        if ($node_type -eq '-sname') {
+            $hostname = $env:COMPUTERNAME
+        }
+        elseif (Test-Path env:USERDNSDOMAIN) {
+            $hostname = "$env:COMPUTERNAME.$env:USERDNSDOMAIN"
+        }
+    }
+
+    # Add @ to hostname if not empty so that we can just concatenate values safely
+    if (![string]::IsNullOrEmpty($hostname)) {
+        $hostname = "@$hostname"
+    }
+
+    # Return to caller
+    @($node_type, $node_name, $hostname)
+}
+
+function Get-Cookie()
+{
+    param(
+        [string]$vmargs
+    )
+
+    $cookie = Get-Content $vmargs `
+        | Select-String '-setcookie\s+([^\s]+)' `
+        | ForEach-Object { `
+            @($_.matches[0].groups[1].value) `
+        }
+
+    if ([string]::IsNullOrEmpty($cookie)) {
+        $default_cookie_file = "$env:USERPROFILE\.erlang.cookie"
+        if (Test-Path $default_cookie_file) {
+            $cookie = Get-Content $default_cookie_file | Select-Object -First 1
+        }
+        else {
+            Write-Warning "No cookie is set or found. This limits the scripts functionality, installing, upgrading, rpc and getting a list of versions will not work."
+            return $null
+        }
+    }
+
+    return $cookie
+}

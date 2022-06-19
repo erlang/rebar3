@@ -137,9 +137,13 @@ check_project_layout(State) ->
 
 vendor_plugins(State, PluginVDir) ->
     PluginDir = rebar_dir:plugins_dir(State),
-    {ok, Files} = file:list_dir_all(PluginDir),
-    [rebar_file_utils:mv(Path, filename:join(PluginVDir, PathPart))
-     || PathPart <- Files,
-        Path <- [filename:join(PluginDir, PathPart)],
-        filelib:is_dir(Path)],
-    ok.
+    case file:list_dir_all(PluginDir) of
+        {ok, Files} ->
+            [rebar_file_utils:mv(Path, filename:join(PluginVDir, PathPart))
+            || PathPart <- Files,
+                Path <- [filename:join(PluginDir, PathPart)],
+                filelib:is_dir(Path)],
+            ok;
+        {error, enoent} ->
+            ok
+    end.
