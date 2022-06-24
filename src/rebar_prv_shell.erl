@@ -93,7 +93,12 @@ init(State) ->
                          "before expanding vars in config files."},
                         {user_drv_args, undefined, "user_drv_args", string,
                          "Arguments passed to user_drv start function for "
-                         "creating custom shells."}]}
+                         "creating custom shells."},
+                        {eval, undefined, "eval", string,
+                         "Erlang term(s) to execute after the apps have been
+                          started, but before the shell is presented to the 
+                          user"}
+                    ]}
             ])
     ),
     {ok, State1}.
@@ -127,6 +132,7 @@ shell(State) ->
     %% their internal state)
     maybe_boot_apps(State),
     simulate_proc_lib(),
+    maybe_run_eval(State),
     true = register(rebar_agent, self()),
     {ok, GenState} = rebar_agent:init(State),
     %% Hack to fool the init process into thinking we have stopped and the normal
@@ -333,6 +339,24 @@ simulate_proc_lib() ->
     FakeParent = spawn_link(fun() -> timer:sleep(infinity) end),
     put('$ancestors', [FakeParent]),
     put('$initial_call', {rebar_agent, init, 1}).
+
+maybe_run_eval(State) ->
+    Exprs = find_evals_to_run(State),
+    lists:map(fun(Expr) ->
+        ?INFO("Evaluating: ~p",[Expr]),
+        eval(Expr)
+    end, Exprs).
+
+find_evals_to_run(State) ->
+    {Opts, _} = rebar_state:command_parsed_args(State),
+    debug_get_all_values(eval, Opts,
+        "Found shell evals from command line option.").
+
+eval(Expression) ->
+    {ok, Tokens, _} = erl_scan:string(Expression),
+    {ok, Parsed} = erl_parse:parse_exprs(Tokens),
+    {value, Result, _} = erl_eval:exprs(Parsed, []),
+    Result.
 
 setup_name(State) ->
     {Long, Short, Opts} = rebar_dist_utils:find_options(State),
@@ -545,6 +569,14 @@ debug_get_value(Key, List, Default, Description) ->
         Value ->
             ?DEBUG(Description, []),
             Value
+    end.
+
+debug_get_all_values(Key, List, Description) ->
+    case proplists:get_all_values(Key, List) of
+        [] -> [];
+        Values ->
+            ?DEBUG(Description, []),
+            Values
     end.
 
 -spec find_config_option(rebar_state:t()) -> Filename::list() | no_value.
