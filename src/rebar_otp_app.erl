@@ -118,7 +118,7 @@ preprocess(State, AppInfo, AppSrcFile) ->
             %% substitute. Note that we include the list of modules available in
             %% ebin/ and update the app data accordingly.
             OutDir = rebar_app_info:out_dir(AppInfo),
-            AppVars = load_app_vars(State) ++ [{modules, ebin_modules(AppInfo, OutDir)}],
+            AppVars = load_app_vars(AppName, State) ++ [{modules, ebin_modules(AppInfo, OutDir)}],
             A1 = apply_app_vars(AppVars, AppData),
 
             %% AppSrcFile may contain instructions for generating a vsn number
@@ -146,14 +146,37 @@ preprocess(State, AppInfo, AppSrcFile) ->
             throw(?PRV_ERROR({file_read, rebar_app_info:name(AppInfo), ".app.src", Reason}))
     end.
 
-load_app_vars(State) ->
-    case rebar_state:get(State, app_vars_file, undefined) of
+load_app_vars(AppName, State) ->
+    case get_app_vars_file_from_state(AppName, State) of
         undefined ->
             [];
         Filename ->
             ?INFO("Loading app vars from ~p", [Filename]),
             {ok, Vars} = file:consult(Filename),
             Vars
+    end.
+
+get_app_vars_file_from_state(AppName, State) ->
+    case rebar_state:get(State, app_vars_file, undefined) of
+        undefined ->
+            undefined;
+        AppVarsProplist=[T|_] when is_tuple(T) ->
+            %% When `apps_vars_file' is a proplist, assume that each key
+            %% of the proplist corresponds to an app name (atom). This
+            %% allows the developer to provide any number of `app_vars_file's
+            %% and apply the vars in any application's .app file specifically.
+            case proplists:get_value(AppName, AppVarsProplist) of
+                undefined ->
+                    undefined;
+                Filename ->
+                    Filename
+            end;
+        Filename ->
+            %% When app_vars_file is not a proplist, assume that it is
+            %% a filename. When a filename is provided, the env vars
+            %% contained within will be applied to all apps being
+            %% compiled by rebar.
+            Filename
     end.
 
 apply_app_vars([], AppData) ->
