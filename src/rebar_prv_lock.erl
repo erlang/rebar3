@@ -44,7 +44,6 @@ do(State) ->
             OldLockNames = [element(1,L) || L <- OldLocks] -- Checkouts,
             NewLockNames = [element(1,L) || L <- Locks],
 
-            %% TODO: don't output this message if the dep is now a checkout
             rebar_utils:info_useless(OldLockNames, NewLockNames),
             info_checkout_deps(Checkouts),
 
@@ -67,6 +66,7 @@ build_locks(State) ->
          rebar_app_info:dep_level(Dep)}
      end || Dep <- AllDeps, not(rebar_app_info:is_checkout(Dep))].
 
-info_checkout_deps(Checkouts) ->
+info_checkout_deps(Checkouts0) ->
+    Checkouts = lists:usort(Checkouts0),
     [?INFO("App ~ts is a checkout dependency and cannot be locked.", [CheckoutDep])
         || CheckoutDep <- Checkouts].

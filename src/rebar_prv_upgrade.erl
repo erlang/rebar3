@@ -114,10 +114,44 @@ do_(State) ->
                       [element(1,Lock) || Lock <- Locks],
                       [rebar_app_info:name(App) || App <- rebar_state:lock(State5)]
                      ),
-                    rebar_prv_lock:do(State5);
+                    AllDeps = rebar_state:all_deps(State),
+                    {Modified, State6} = maybe_unmark_checkouts(State5, AllDeps, Checkouts),
+                    {ok, State7} = rebar_prv_lock:do(State6),
+                    State8 = maybe_mark_checkouts_again(Modified, State7, AllDeps),
+                    {ok, State8};
                 _ ->
                     Res
             end
+    end.
+
+-spec maybe_mark_checkouts_again(Modified :: boolean(),
+                                 State0   :: rebar_state:t(),
+                                 AllDeps  :: [rebar_app_info:t()]) -> State1 :: rebar_state:t().
+maybe_mark_checkouts_again(true, State, AllDeps) ->
+    rebar_state:all_deps(State, AllDeps);
+maybe_mark_checkouts_again(false, State, _AllDeps) ->
+    State.
+
+-spec maybe_unmark_checkouts(State0    :: rebar_state:t(),
+                             AllDeps   :: [rebar_app_info:t()],
+                             Checkouts :: [binary()]) ->
+                                {Modified :: boolean(), State1 :: rebar_state:t()}.
+maybe_unmark_checkouts(State, AllDeps, Checkouts) ->
+    OldLocks = rebar_state:get(State, {locks, default}, []),
+    OldLockNames = [element(1,L) || L <- OldLocks],
+    case OldLockNames -- Checkouts of
+        %% If there aren't any checkout dependencies in the old lock info,
+        %% we can safely "ignore" them to avoid a duplicated message from
+        %% `rebar_prv_lock:info_checkout_deps/1`.
+        OldLockNames ->
+            DepsIgnoringCheckout =
+                [case rebar_app_info:is_checkout(Dep) of
+                        true -> rebar_app_info:is_checkout(Dep, false);
+                        false -> Dep
+                 end || Dep <- AllDeps],
+            {true, rebar_state:all_deps(State, DepsIgnoringCheckout)};
+        _ ->
+            {false, State}
     end.
 
 -spec format_error(any()) -> iolist().
