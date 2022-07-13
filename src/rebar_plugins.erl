@@ -231,15 +231,15 @@ is_umbrella(State) ->
     %% So what we do here is look for the library directories without the ".",
     %% and if none of these paths exist but one of the src_dirs exist, then
     %% we know this is not an umbrella application.
-    case rebar_dir:lib_dirs(State) of
-        ?DEFAULT_PROJECT_APP_DIRS ->
+    case rebar_state:get(State, is_umbrella, ?DEFAULT_UMBRELLA) of
+        ?DEFAULT_UMBRELLA ->
             Root = rebar_dir:root_dir(State),
             LibPaths = lists:usort(rebar_dir:lib_dirs(State)) -- ["."],
             SrcPaths = rebar_dir:src_dirs(rebar_state:opts(State), ["src"]),
             lists:any(fun(Dir) -> [] == filelib:wildcard(filename:join(Root, Dir)) end, LibPaths)
-                andalso
+            andalso
             lists:all(fun(Dir) -> not filelib:is_dir(filename:join(Root, Dir)) end, SrcPaths);
-        _ ->
+        true ->
             true
     end.
 
