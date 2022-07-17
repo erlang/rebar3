@@ -110,6 +110,11 @@ do(Config) ->
 -spec format_error(any()) -> iolist().
 format_error({unknown_app, Unknown}) ->
     io_lib:format("Applications list for shell contains an unrecognizable application definition: ~p", [Unknown]);
+format_error({eval_parse, Exp, Msg}) ->
+    io_lib:format("Failed to parse -eval expression: \"~ts\". Error message: ~ts", [Exp, Msg]);
+format_error({eval_exprs, Exp, {C, E, S}}) ->
+    ?DEBUG("--eval failure details: ~p:~p~nStacktrace: ~p", [C, E, S]),
+    io_lib:format("Failed to evaluate expression: \"~ts\". Error: ~p:~p. Run with DIAGNOSTIC=1 to stacktrace or consult rebar3.crashdump", [Exp, C, E]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -344,7 +349,7 @@ maybe_run_eval(State) ->
     Exprs = find_evals_to_run(State),
     lists:map(fun(Expr) ->
         ?INFO("Evaluating: ~p",[Expr]),
-        eval(Expr)
+        {ok, _} = eval(Expr)
     end, Exprs).
 
 find_evals_to_run(State) ->
@@ -354,9 +359,18 @@ find_evals_to_run(State) ->
 
 eval(Expression) ->
     {ok, Tokens, _} = erl_scan:string(Expression),
-    {ok, Parsed} = erl_parse:parse_exprs(Tokens),
-    {value, Result, _} = erl_eval:exprs(Parsed, []),
-    Result.
+    case erl_parse:parse_exprs(Tokens) of
+        {error, {_, _, Msg}} ->
+            throw(?PRV_ERROR({eval_parse, Expression, Msg}));
+        {ok, Parsed} ->
+            try erl_eval:exprs(Parsed, []) of
+                {value, Result, _} ->
+                    {ok, Result}
+            catch
+                C:E:S ->
+                    throw(?PRV_ERROR({eval_exprs, Expression, {C, E, S}}))
+            end
+    end.
 
 setup_name(State) ->
     {Long, Short, Opts} = rebar_dist_utils:find_options(State),
