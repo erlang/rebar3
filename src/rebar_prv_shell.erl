@@ -93,7 +93,12 @@ init(State) ->
                          "before expanding vars in config files."},
                         {user_drv_args, undefined, "user_drv_args", string,
                          "Arguments passed to user_drv start function for "
-                         "creating custom shells."}]}
+                         "creating custom shells."},
+                        {eval, undefined, "eval", string,
+                         "Erlang term(s) to execute after the apps have been
+                          started, but before the shell is presented to the 
+                          user"}
+                    ]}
             ])
     ),
     {ok, State1}.
@@ -105,6 +110,11 @@ do(Config) ->
 -spec format_error(any()) -> iolist().
 format_error({unknown_app, Unknown}) ->
     io_lib:format("Applications list for shell contains an unrecognizable application definition: ~p", [Unknown]);
+format_error({eval_parse, Exp, Msg}) ->
+    io_lib:format("Failed to parse -eval expression: \"~ts\". Error message: ~ts", [Exp, Msg]);
+format_error({eval_exprs, Exp, {C, E, S}}) ->
+    ?DEBUG("--eval failure details: ~p:~p~nStacktrace: ~p", [C, E, S]),
+    io_lib:format("Failed to evaluate expression: \"~ts\". Error: ~p:~p. Run with DIAGNOSTIC=1 to stacktrace or consult rebar3.crashdump", [Exp, C, E]);
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
@@ -127,6 +137,7 @@ shell(State) ->
     %% their internal state)
     maybe_boot_apps(State),
     simulate_proc_lib(),
+    maybe_run_eval(State),
     true = register(rebar_agent, self()),
     {ok, GenState} = rebar_agent:init(State),
     %% Hack to fool the init process into thinking we have stopped and the normal
@@ -333,6 +344,33 @@ simulate_proc_lib() ->
     FakeParent = spawn_link(fun() -> timer:sleep(infinity) end),
     put('$ancestors', [FakeParent]),
     put('$initial_call', {rebar_agent, init, 1}).
+
+maybe_run_eval(State) ->
+    Exprs = find_evals_to_run(State),
+    lists:map(fun(Expr) ->
+        ?INFO("Evaluating: ~p",[Expr]),
+        {ok, _} = eval(Expr)
+    end, Exprs).
+
+find_evals_to_run(State) ->
+    {Opts, _} = rebar_state:command_parsed_args(State),
+    debug_get_all_values(eval, Opts,
+        "Found shell evals from command line option.").
+
+eval(Expression) ->
+    {ok, Tokens, _} = erl_scan:string(Expression),
+    case erl_parse:parse_exprs(Tokens) of
+        {error, {_, _, Msg}} ->
+            throw(?PRV_ERROR({eval_parse, Expression, Msg}));
+        {ok, Parsed} ->
+            try erl_eval:exprs(Parsed, []) of
+                {value, Result, _} ->
+                    {ok, Result}
+            catch
+                C:E:S ->
+                    throw(?PRV_ERROR({eval_exprs, Expression, {C, E, S}}))
+            end
+    end.
 
 setup_name(State) ->
     {Long, Short, Opts} = rebar_dist_utils:find_options(State),
@@ -545,6 +583,14 @@ debug_get_value(Key, List, Default, Description) ->
         Value ->
             ?DEBUG(Description, []),
             Value
+    end.
+
+debug_get_all_values(Key, List, Description) ->
+    case proplists:get_all_values(Key, List) of
+        [] -> [];
+        Values ->
+            ?DEBUG(Description, []),
+            Values
     end.
 
 -spec find_config_option(rebar_state:t()) -> Filename::list() | no_value.
