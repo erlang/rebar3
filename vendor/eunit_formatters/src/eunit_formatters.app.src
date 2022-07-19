@@ -1,0 +1,9 @@
+{application,eunit_formatters,
+             [{description,"Better output for eunit suites"},
+              {vsn,"0.5.0"},
+              {applications,[kernel,stdlib,eunit]},
+              {env,[]},
+              {maintainers,["Sean Cribbs","Tristan Sloughter"]},
+              {licenses,["Apache2"]},
+              {links,[{"Github",
+                       "https://github.com/seancribbs/eunit_formatters"}]}]}.

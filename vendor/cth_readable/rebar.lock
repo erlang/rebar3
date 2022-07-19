@@ -1,0 +1,8 @@
+{"1.2.0",
+[{<<"cf">>,{pkg,<<"cf">>,<<"0.2.1">>},0}]}.
+[
+{pkg_hash,[
+ {<<"cf">>, <<"69D0B1349FD4D7D4DC55B7F407D29D7A840BF9A1EF5AF529F1EBE0CE153FC2AB">>}]},
+{pkg_hash_ext,[
+ {<<"cf">>, <<"BAEE9AA7EC2DFA3CB4486B67211177CAA293F876780F0B313B45718EDEF6A0A5">>}]}
+].

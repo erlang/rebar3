@@ -89,12 +89,12 @@ ensure_app(App) ->
     end.
 
 fetch_and_compile({Name, ErlFirstFiles}, Deps) ->
-    case lists:keyfind(Name, 1, Deps) of
-        {Name, Vsn} ->
-            ok = fetch({pkg, atom_to_binary(Name, utf8), list_to_binary(Vsn)}, Name);
-        {Name, _, Source} ->
-            ok = fetch(Source, Name)
-    end,
+    %% Use vendored dependencies, don't hit the network; to update
+    %% dependencies first bootstrap, then use the escript to do
+    %% fancier dep management.
+    filelib:ensure_dir("_build/default/lib/.touch"),
+    [cp_r([DepDir], "_build/default/lib/")
+     || {Dep, DepDir} <- Deps, atom_to_list(Name) =:= Dep],
 
     %% Hack: erlware_commons depends on a .script file to check if it is being built with
     %% rebar2 or rebar3. But since rebar3 isn't built yet it can't get the vsn with get_key.
@@ -102,51 +102,6 @@ fetch_and_compile({Name, ErlFirstFiles}, Deps) ->
     file:delete("_build/default/lib/erlware_commons/rebar.config.script"),
 
     compile(Name, ErlFirstFiles).
-
-fetch({pkg, Name, Vsn}, App) ->
-    Dir = filename:join([filename:absname("_build/default/lib/"), App]),
-    case filelib:is_dir(Dir) of
-        false ->
-            CDN = "https://repo.hex.pm/tarballs",
-            Package = binary_to_list(<<Name/binary, "-", Vsn/binary, ".tar">>),
-            Url = join([CDN, Package], "/"),
-            case request(Url) of
-                {ok, Binary} ->
-                    {ok, Contents} = extract(Binary),
-                    ok = erl_tar:extract({binary, Contents}, [{cwd, Dir}, compressed]);
-                {error, {Reason, _}} ->
-                    ReasonText = re:replace(atom_to_list(Reason), "_", " ", [global,{return,list}]),
-                    io:format("Error: Unable to fetch package ~s ~s: ~s~n", [Name, Vsn, ReasonText])
-            end;
-        true ->
-            io:format("Dependency ~s already exists~n", [Name])
-    end.
-
-extract(Binary) ->
-    {ok, Files} = erl_tar:extract({binary, Binary}, [memory]),
-    {"contents.tar.gz", Contents} = lists:keyfind("contents.tar.gz", 1, Files),
-    {ok, Contents}.
-
-request(Url) ->
-    case os:getenv("REBAR_OFFLINE") of
-        "1" ->
-            {error, {offline, Url}};
-        _ ->
-            request_online(Url)
-    end.
-
-request_online(Url) ->
-    HttpOptions = [{relaxed, true} | get_proxy_auth()],
-
-    case httpc:request(get, {Url, []},
-                       HttpOptions,
-                       [{body_format, binary}],
-                       rebar) of
-        {ok, {{_Version, 200, _Reason}, _Headers, Body}} ->
-            {ok, Body};
-        Error ->
-            Error
-    end.
 
 get_rebar_config() ->
     {ok, [[Home]]} = init:get_argument(home),
@@ -194,8 +149,8 @@ maybe_set_ipfamily(_, _Family) ->
     ok.
 
 compile_vendored() ->
-  compile_xrl_file("src/vendored/r3_safe_erl_term.xrl"),
-  Sources = filelib:wildcard(filename:join(["src/vendored", "*.erl"])),
+  compile_xrl_file("apps/rebar/src/vendored/r3_safe_erl_term.xrl"),
+  Sources = filelib:wildcard(filename:join(["apps/rebar/src/vendored", "*.erl"])),
   OutDir =  filename:absname("_build/bootstrap/lib/rebar/ebin"),
   code:add_patha(OutDir),
   Opts = [debug_info,{outdir, OutDir}, return | additional_defines()],
@@ -242,10 +197,11 @@ compile_erl_file(File, Opts) ->
 bootstrap_rebar3() ->
     filelib:ensure_dir("_build/default/lib/rebar/ebin/dummy.beam"),
     code:add_path("_build/default/lib/rebar/ebin/"),
-    Res = symlink_or_copy(filename:absname("src"),
+    Res = symlink_or_copy(filename:absname("apps/rebar/src"),
                           filename:absname("_build/default/lib/rebar/src")),
     true = Res == ok orelse Res == exists,
-    Sources = ["src/rebar_resource_v2.erl", "src/rebar_resource.erl" | filelib:wildcard("src/*.erl") ],
+    Sources = ["apps/rebar/src/rebar_resource_v2.erl", "apps/rebar/src/rebar_resource.erl"
+               | filelib:wildcard("apps/rebar/src/*.erl") ],
     [compile_erl_file(X, [{outdir, "_build/default/lib/rebar/ebin/"}
                      ,return | additional_defines()]) || X <- Sources],
     code:add_patha(filename:absname("_build/default/lib/rebar/ebin")).
@@ -636,19 +592,8 @@ reset_env() ->
     application:load(rebar).
 
 get_deps() ->
-    case file:consult("rebar.lock") of
-        {ok, [[]]} ->
-            %% Something went wrong in a previous build, lock file shouldn't be empty
-            io:format("Empty list in lock file, deleting rebar.lock~n"),
-            ok = file:delete("rebar.lock"),
-            {ok, Config} = file:consult("rebar.config"),
-            proplists:get_value(deps, Config);
-        {ok, [Deps]} ->
-            [{binary_to_atom(Name, utf8), "", Source} || {Name, Source, _Level} <- Deps];
-        _ ->
-            {ok, Config} = file:consult("rebar.config"),
-            proplists:get_value(deps, Config)
-    end.
+    {ok, Deps} = file:list_dir("vendor"),
+    [{Dep, filename:join("vendor", Dep)} || Dep <- Deps].
 
 format_errors(Source, Errors) ->
     format_errors(Source, "", Errors).
@@ -740,11 +685,11 @@ set_proxy_auth(UserInfo) ->
     %% password may contain url encoded characters, need to decode them first
     put(proxy_auth, [{proxy_auth, {Username, rebar_uri_percent_decode(Password)}}]).
 
-get_proxy_auth() ->
-    case get(proxy_auth) of
-        undefined -> [];
-        ProxyAuth -> ProxyAuth
-    end.
+%get_proxy_auth() ->
+%    case get(proxy_auth) of
+%        undefined -> [];
+%        ProxyAuth -> ProxyAuth
+%    end.
 
 
 %% string:join/2 copy; string:join/2 is getting obsoleted

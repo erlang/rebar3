@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# loop until the VM starts responding to pings
+while ! erl_rpc erlang is_alive > /dev/null
+do
+    sleep 1
+done
+
+# get the beam pid and write it to the file passed as
+# argument
+PID="$(relx_get_pid)"
+echo "$PID" > "$1"

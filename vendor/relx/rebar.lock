@@ -1,0 +1,8 @@
+{"1.2.0",
+[{<<"bbmustache">>,{pkg,<<"bbmustache">>,<<"1.10.0">>},0}]}.
+[
+{pkg_hash,[
+ {<<"bbmustache">>, <<"DDC927463F0E95D66CDAC889153AF08015D609124D6D79006C248AD2DE7F6ECD">>}]},
+{pkg_hash_ext,[
+ {<<"bbmustache">>, <<"43EFFA3FD4BB9523157AF5A9E2276C493495B8459FC8737144AA186CB13CE2EE">>}]}
+].
