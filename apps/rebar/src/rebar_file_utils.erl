@@ -33,6 +33,7 @@
          symlink_or_copy/2,
          rm_rf/1,
          cp_r/2,
+         cp_r/3,
          mv/2,
          delete_each/1,
          write_file_if_contents_differ/2,
@@ -207,9 +208,16 @@ rm_rf(Target) ->
     end.
 
 -spec cp_r(list(string()), file:filename()) -> 'ok'.
-cp_r([], _Dest) ->
-    ok;
 cp_r(Sources, Dest) ->
+    cp_r(Sources, Dest, false).
+
+%% @doc Copies files and directories.
+%% If Dereference is true, it follows the Sources symbolic link and copies
+%% the content
+-spec cp_r(list(string()), file:filename(), boolean()) -> 'ok'.
+cp_r([], _Dest, _Dereference) ->
+    ok;
+cp_r(Sources, Dest, Dereference) ->
     case os:type() of
         {unix, Os} ->
             EscSources = [rebar_utils:escape_chars(Src) || Src <- Sources],
@@ -229,8 +237,14 @@ cp_r(Sources, Dest) ->
             {ok, []} = rebar_utils:sh(?FMT("mkdir -p ~ts",
                            [rebar_utils:escape_chars(Dest)]),
                       [{use_stdout, false}, abort_on_error]),
-            {ok, []} = rebar_utils:sh(?FMT("cp -Rp ~ts \"~ts\"",
-                                           [Source, rebar_utils:escape_double_quotes(Dest)]),
+
+            Opt = case Dereference of
+                true -> "-RpL";
+                false -> "-Rp"
+            end,
+
+            {ok, []} = rebar_utils:sh(?FMT("cp ~s ~ts \"~ts\"",
+                                           [Opt, Source, rebar_utils:escape_double_quotes(Dest)]),
                                       [{use_stdout, true}, abort_on_error]),
             ok;
         {win32, _} ->
