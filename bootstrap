@@ -32,10 +32,8 @@ main(Args) ->
     rm_rf("_build/prod"),
     %% The same pattern happens with default/ as well, particularly when
     %% developing new things.
-    %% Keep other deps in <profile>/lib for build environments like Nix
-    %% where internet access is disabled that deps are not downloadable.
-    rm_rf("_build/default/lib/rebar"),
-    rm_rf("_build/test/lib/rebar"),
+    rm_rf("_build/default/"),
+    rm_rf("_build/test/"),
 
     filelib:ensure_dir("_build/bootstrap/lib/rebar/ebin/"),
 
