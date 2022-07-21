@@ -301,6 +301,10 @@ compile_info(Target) ->
             CompileVsn = proplists:get_value(version, CompileInfo, "unknown"),
             {ok, [{compiler_version, CompileVsn}
                   | proplists:get_value(options, CompileInfo, [])]};
+        {error, beam_lib, {file_error, _, enoent}=Reason} ->
+            %% It's normal not to find a given file if this is a first build
+            ?DEBUG("Couldn't read debug info from ~p for reason: ~p", [Target, Reason]),
+            {error, Reason};
         {error, beam_lib, Reason} ->
             ?WARN("Couldn't read debug info from ~p for reason: ~p", [Target, Reason]),
             {error, Reason}
