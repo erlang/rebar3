@@ -209,15 +209,17 @@ rm_rf(Target) ->
 
 -spec cp_r(list(string()), file:filename()) -> 'ok'.
 cp_r(Sources, Dest) ->
-    cp_r(Sources, Dest, false).
+    cp_r(Sources, Dest, []).
 
 %% @doc Copies files and directories.
-%% If Dereference is true, it follows the Sources symbolic link and copies
-%% the content
--spec cp_r(list(string()), file:filename(), boolean()) -> 'ok'.
-cp_r([], _Dest, _Dereference) ->
+%% Options is a proplist with the options to be added to the copy command.
+%% It options are:
+%% - [{dereference, true|false}]: When true, if the file is a symbolic link
+%% it dereferences and copies the original content in Dest
+-spec cp_r(list(string()), file:filename(), proplists:proplist()) -> 'ok'.
+cp_r([], _Dest, _Options) ->
     ok;
-cp_r(Sources, Dest, Dereference) ->
+cp_r(Sources, Dest, Options) ->
     case os:type() of
         {unix, Os} ->
             EscSources = [rebar_utils:escape_chars(Src) || Src <- Sources],
@@ -238,13 +240,14 @@ cp_r(Sources, Dest, Dereference) ->
                            [rebar_utils:escape_chars(Dest)]),
                       [{use_stdout, false}, abort_on_error]),
 
-            Opt = case Dereference of
-                true -> "-RpL";
-                false -> "-Rp"
+            DefaultOptStr = "-Rp",
+            OptStr = case proplists:get_value(dereference, Options, false) of
+                true -> DefaultOptStr ++ "L";
+                false -> DefaultOptStr
             end,
 
             {ok, []} = rebar_utils:sh(?FMT("cp ~s ~ts \"~ts\"",
-                                           [Opt, Source, rebar_utils:escape_double_quotes(Dest)]),
+                                           [OptStr, Source, rebar_utils:escape_double_quotes(Dest)]),
                                       [{use_stdout, true}, abort_on_error]),
             ok;
         {win32, _} ->
