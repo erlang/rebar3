@@ -390,64 +390,99 @@ cp_r_copies_files(Config) ->
     % Checks that the files in src/ are copied to dest/
     PrivDir = ?config(priv_dir, Config),
     BaseDir = mk_base_dir(PrivDir, cp_r_copies_files),
-    #{
-        src_list := SrcList,
-        dest_dir := DestDir,
-        dest_file := DestFile,
-        dest_sym := DestSym,
-        dest_subdir := DestSubDir
-    } = create_dir_tree_helper(BaseDir),
-    rebar_file_utils:cp_r(SrcList, DestDir),
+    {SrcList, DestDir} = create_dir_tree_helper(BaseDir),
+
+    rebar_file_utils:cp_r(SrcList, DestDir, []),
+    
+    % dest/file
+    DestFile = filename:join(DestDir, "file"),
     ?assert(filelib:is_file(DestFile)),
     ?assertEqual({ok, <<"hello">>}, file:read_file(DestFile)),
+    % dest/symbolic
+    DestSym = filename:join(DestDir, "symbolic"),
     {ok, #file_info{type = symlink}} = file:read_link_info(DestSym),
-    ?assertEqual({ok, <<"hello">>}, file:read_file(DestSym)),
-    ?assert(filelib:is_dir(DestSubDir)).
+    % dest/sub_dir
+    DestSubDir = filename:join(DestDir, "sub_dir"),
+    ?assert(filelib:is_dir(DestSubDir)),
+    % dest/sub_dir/sub_file
+    DestSubFile = filename:join(DestSubDir, "sub_file"),
+    ?assert(filelib:is_file(DestSubFile)),
+    ?assertEqual({ok, <<"hello">>}, file:read_file(DestSubFile)),
+    % dest/sub_dir/sub_symbolic
+    DestSubSymbolic = filename:join(DestSubDir, "sub_symbolic"),
+    {ok, #file_info{type = symlink}} = file:read_link_info(DestSubSymbolic),
+    ?assertEqual({ok, <<"hello">>}, file:read_file(DestSubSymbolic)).
 
 cp_r_dereferences_symbolic_links(Config) ->
     % Checks that the files in src/ are copied to dest/ AND symbolic file has been dereference
     PrivDir = ?config(priv_dir, Config),
     BaseDir = mk_base_dir(PrivDir, cp_r_dereferences_symbolic_links),
-    #{
-        src_list := SrcList,
-        dest_dir := DestDir,
-        dest_file := DestFile,
-        dest_sym := DestSym,
-        dest_subdir := DestSubDir
-    } = create_dir_tree_helper(BaseDir),
+    {SrcList, DestDir} = create_dir_tree_helper(BaseDir),
+
     rebar_file_utils:cp_r(SrcList, DestDir, [{dereference, true}]),
+    
+    % dest/file
+    DestFile = filename:join(DestDir, "file"),
     ?assert(filelib:is_file(DestFile)),
     ?assertEqual({ok, <<"hello">>}, file:read_file(DestFile)),
+    % dest/symbolic
     % At this point symbolic is not anymore a symbolic link but a regular file
+    DestSym = filename:join(DestDir, "symbolic"),
     {ok, #file_info{type = regular}} = file:read_link_info(DestSym),
     ?assertEqual({ok, <<"hello">>}, file:read_file(DestSym)),
-    ?assert(filelib:is_dir(DestSubDir)).
+    % dest/sub_dir
+    DestSubDir = filename:join(DestDir, "sub_dir"),
+    ?assert(filelib:is_dir(DestSubDir)),
+    % dest/sub_dir/sub_file
+    DestSubFile = filename:join(DestSubDir, "sub_file"),
+    ?assert(filelib:is_file(DestSubFile)),
+    ?assertEqual({ok, <<"hello">>}, file:read_file(DestSubFile)),
+    % dest/sub_dir/sub_symbolic
+    % At this point sub_symbolic is not anymore a symbolic link but a regular file
+    DestSubSymbolic = filename:join(DestSubDir, "sub_symbolic"),
+    {ok, #file_info{type = regular}} = file:read_link_info(DestSubSymbolic),
+    ?assertEqual({ok, <<"hello">>}, file:read_file(DestSubSymbolic)).
 
 create_dir_tree_helper(BaseDir) ->
     % Give a directory path, it creates the tree directory below and returns a map
-    % with the expected paths in dest/ aftercopying them
+    % with the expected paths in dest/ aftercopying them.
+    %
+    % sub_dir is it needed so try all the win32 copy options  
+    %
     % |-- src
     %   |-- file
-    %   |-- sub_dir
     %   |-- symbolic -> file
+    %   |-- sub_dir
+    %       |-- sub_file
+    %       |-- sub_symbolic
     % |-- dest
-    SrcDir = filename:join(BaseDir, "src"),
-    ec_file:mkdir_p(SrcDir),
+    Dir = [
+        {folder, ["src"]},
+        {folder, ["dest"]},
+        {file, ["src", "file"], <<"hello">>},
+        {symbolic, ["src", "symbolic"], ["src", "file"]},
+        {folder, ["src", "sub_dir"]},
+        {file, ["src", "sub_dir", "sub_file"], <<"hello">>},
+        {symbolic, ["src", "sub_dir", "sub_symbolic"], ["src", "file"]}
+    ],
+    ok = create_by_type(Dir, BaseDir),
+    SrcList = [
+        filename:join([BaseDir,"src", File])
+        || File <- ["file", "symbolic", "sub_dir"]
+    ],
     DestDir = filename:join(BaseDir, "dest"),
-    ec_file:mkdir_p(DestDir),
-    CreatePaths = fun(Name) ->
-        {filename:join(SrcDir, Name), filename:join(DestDir, Name)}
-    end,
-    {SrcFile, DestFile} = CreatePaths("file"),
-    file:write_file(SrcFile, <<"hello">>),
-    {SrcSubDir, DestSubDir} = CreatePaths("sub_dir"),
-    ec_file:mkdir_p(SrcSubDir),
-    {SrcSym, DestSym} = CreatePaths("symbolic"),
-    file:make_symlink(SrcFile, SrcSym),
-    #{
-        src_list => [SrcFile, SrcSubDir, SrcSym],
-        dest_dir => DestDir,
-        dest_file => DestFile,
-        dest_sym => DestSym,
-        dest_subdir => DestSubDir
-    }.
+    {SrcList, DestDir}.
+
+create_by_type([], _) ->
+    ok;
+create_by_type([{folder, Path} |Rest], BaseDir) ->
+    ok = ec_file:mkdir_p(filename:join([BaseDir | Path])),
+    create_by_type(Rest, BaseDir);
+create_by_type([{file, Path, Content} |Rest], BaseDir) ->
+    ok = file:write_file(filename:join([BaseDir | Path]), Content),
+    create_by_type(Rest, BaseDir);
+create_by_type([{symbolic, Path, TargetFile} |Rest], BaseDir) ->
+    Target = filename:join([BaseDir | TargetFile]),
+    Symbolic = filename:join([BaseDir | Path]),
+    ok = file:make_symlink(Target, Symbolic),
+    create_by_type(Rest, BaseDir).
