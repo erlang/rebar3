@@ -621,7 +621,7 @@ copy_bare_suites(From, To) ->
     DataDirs = lists:filter(fun filelib:is_dir/1,
                             filelib:wildcard(filename:join([From, "*_SUITE_data"]))),
     ok = rebar_file_utils:cp_r(SrcFiles, To),
-    rebar_file_utils:cp_r(DataDirs, To).
+    rebar_file_utils:cp_r(DataDirs, To, [{dereference, true}]).
 
 maybe_copy_spec(State, [App|Apps], Spec) ->
     case rebar_file_utils:path_from_ancestor(filename:dirname(Spec), rebar_app_info:dir(App)) of

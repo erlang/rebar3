@@ -33,6 +33,7 @@
          symlink_or_copy/2,
          rm_rf/1,
          cp_r/2,
+         cp_r/3,
          mv/2,
          delete_each/1,
          write_file_if_contents_differ/2,
@@ -149,7 +150,7 @@ win32_symlink_or_copy(Source, Target) ->
             [{use_stdout, false}, return_on_error]),
     case win32_mklink_ok(Res, Target) of
         true -> ok;
-        false -> cp_r_win32(Source, drop_last_dir_from_path(Target))
+        false -> cp_r_win32(Source, drop_last_dir_from_path(Target), [])
     end.
 
 %% @private specifically pattern match against the output
@@ -207,9 +208,18 @@ rm_rf(Target) ->
     end.
 
 -spec cp_r(list(string()), file:filename()) -> 'ok'.
-cp_r([], _Dest) ->
-    ok;
 cp_r(Sources, Dest) ->
+    cp_r(Sources, Dest, []).
+
+%% @doc Copies files and directories.
+%% Options is a proplist with the options to be added to the copy command.
+%% It options are:
+%% - [{dereference, true|false}]: When true, if the file is a symbolic link
+%% it dereferences and copies the original content in Dest
+-spec cp_r(list(string()), file:filename(), proplists:proplist()) -> 'ok'.
+cp_r([], _Dest, _Options) ->
+    ok;
+cp_r(Sources, Dest, Options) ->
     case os:type() of
         {unix, Os} ->
             EscSources = [rebar_utils:escape_chars(Src) || Src <- Sources],
@@ -229,12 +239,19 @@ cp_r(Sources, Dest) ->
             {ok, []} = rebar_utils:sh(?FMT("mkdir -p ~ts",
                            [rebar_utils:escape_chars(Dest)]),
                       [{use_stdout, false}, abort_on_error]),
-            {ok, []} = rebar_utils:sh(?FMT("cp -Rp ~ts \"~ts\"",
-                                           [Source, rebar_utils:escape_double_quotes(Dest)]),
+
+            DefaultOptStr = "-Rp",
+            OptStr = case proplists:get_value(dereference, Options, false) of
+                true -> DefaultOptStr ++ "L";
+                false -> DefaultOptStr
+            end,
+
+            {ok, []} = rebar_utils:sh(?FMT("cp ~s ~ts \"~ts\"",
+                                           [OptStr, Source, rebar_utils:escape_double_quotes(Dest)]),
                                       [{use_stdout, true}, abort_on_error]),
             ok;
         {win32, _} ->
-            lists:foreach(fun(Src) -> ok = cp_r_win32(Src,Dest) end, Sources),
+            lists:foreach(fun(Src) -> ok = cp_r_win32(Src,Dest,Options) end, Sources),
             ok
     end.
 
@@ -531,9 +548,24 @@ delete_each_dir_win32([Dir | Rest]) ->
                               [{use_stdout, false}, return_on_error]),
     delete_each_dir_win32(Rest).
 
-xcopy_win32(Source,Dest)->
+xcopy_win32(Source,Dest, Options)->
     %% "xcopy \"~ts\" \"~ts\" /q /y /e 2> nul", Changed to robocopy to
     %% handle long names. May have issues with older windows.
+    
+    CopySubdirectories = "/e",
+    DontFollow = "/sl",
+    
+    Opt = [CopySubdirectories],
+    % By default Windows follows symbolic links except if the "/sl" options is given.
+    % Add "/sl" for default so it doesn't follow symbolic links and behaves more like unix
+    OptStr = case proplists:get_value(dereference, Options, false) of
+        true -> 
+            string:join(Opt, " ");
+        false -> 
+            % Default option
+            string:join([DontFollow|Opt], " ")
+    end,
+
     Cmd = case filelib:is_dir(Source) of
               true ->
                   %% For robocopy, copying /a/b/c/ to /d/e/f/ recursively does not
@@ -542,14 +574,16 @@ xcopy_win32(Source,Dest)->
                   %% must manually add the last fragment of a directory to the `Dest`
                   %% in order to properly replicate POSIX platforms
                   NewDest = filename:join([Dest, filename:basename(Source)]),
-                  ?FMT("robocopy \"~ts\" \"~ts\" /e 1> nul",
+                  ?FMT("robocopy \"~ts\" \"~ts\" ~s 1> nul",
                        [rebar_utils:escape_double_quotes(filename:nativename(Source)),
-                        rebar_utils:escape_double_quotes(filename:nativename(NewDest))]);
+                        rebar_utils:escape_double_quotes(filename:nativename(NewDest)),
+                        OptStr]);
               false ->
-                  ?FMT("robocopy \"~ts\" \"~ts\" \"~ts\" /e 1> nul",
+                  ?FMT("robocopy \"~ts\" \"~ts\" \"~ts\" ~s 1> nul",
                        [rebar_utils:escape_double_quotes(filename:nativename(filename:dirname(Source))),
                         rebar_utils:escape_double_quotes(filename:nativename(Dest)),
-                        rebar_utils:escape_double_quotes(filename:basename(Source))])
+                        rebar_utils:escape_double_quotes(filename:basename(Source)),
+                        OptStr])
           end,
     Res = rebar_utils:sh(Cmd,
                 [{use_stdout, false}, return_on_error]),
@@ -561,21 +595,32 @@ xcopy_win32(Source,Dest)->
                                             [Source, Dest]))}
     end.
 
-cp_r_win32({true, SourceDir}, {true, DestDir}) ->
+cp_r_win32({true, SourceDir}, {true, DestDir}, Options) ->
     %% from directory to directory
      ok = case file:make_dir(DestDir) of
              {error, eexist} -> ok;
              Other -> Other
          end,
-    ok = xcopy_win32(SourceDir, DestDir);
-cp_r_win32({false, Source} = S,{true, DestDir}) ->
+    ok = xcopy_win32(SourceDir, DestDir, Options);
+cp_r_win32({false, Source} = S,{true, DestDir}, Options) ->
     %% from file to directory
-    cp_r_win32(S, {false, filename:join(DestDir, filename:basename(Source))});
-cp_r_win32({false, Source},{false, Dest}) ->
+    cp_r_win32(S, {false, filename:join(DestDir, filename:basename(Source))}, Options);
+cp_r_win32({false, Source},{false, Dest}, Options) ->
     %% from file to file
-    {ok,_} = file:copy(Source, Dest),
+    case file:read_link(Source) of
+        {ok, OriginalFile} -> case proplists:get_value(dereference, Options, false) of
+            true ->
+                {ok, _} = file:copy(Source, Dest),
+                ok;
+            false -> 
+                file:make_symlink(OriginalFile, Dest)
+            end;
+        _ -> 
+            {ok, _} = file:copy(Source, Dest),
+            ok
+    end,
     ok;
-cp_r_win32({true, SourceDir}, {false, DestDir}) ->
+cp_r_win32({true, SourceDir}, {false, DestDir}, Options) ->
     case filelib:is_regular(DestDir) of
         true ->
             %% From directory to file? This shouldn't happen
@@ -587,16 +632,16 @@ cp_r_win32({true, SourceDir}, {false, DestDir}) ->
             %% So let's attempt to create this directory
             case ensure_dir(DestDir) of
                 ok ->
-                    ok = xcopy_win32(SourceDir, DestDir);
+                    ok = xcopy_win32(SourceDir, DestDir, Options);
                 {error, Reason} ->
                     {error, lists:flatten(
                               io_lib:format("Unable to create dir ~p: ~p\n",
                                             [DestDir, Reason]))}
             end
     end;
-cp_r_win32(Source,Dest) ->
+cp_r_win32(Source, Dest, Options) ->
     Dst = {filelib:is_dir(Dest), Dest},
     lists:foreach(fun(Src) ->
-                          ok = cp_r_win32({filelib:is_dir(Src), Src}, Dst)
+                          ok = cp_r_win32({filelib:is_dir(Src), Src}, Dst, Options)
                   end, filelib:wildcard(Source)),
     ok.
