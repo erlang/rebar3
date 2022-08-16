@@ -12,6 +12,9 @@
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
+%% Waiting on fix in OTP: https://github.com/erlang/otp/pull/6207
+-dialyzer({no_return, incremental/4}).
+
 -define(PROVIDER, dialyzer).
 -define(DEPS, [compile]).
 -define(PLT_PREFIX, "rebar3").
@@ -30,6 +33,14 @@ init(State) ->
             {app, $a, "app", string, "Perform success typing analysis of a single application"},
             {base_plt_prefix, undefined, "base-plt-prefix", string, "The prefix to the base PLT file, defaults to \"rebar3\"" },
             {statistics, undefined, "statistics", boolean, "Print information about the progress of execution. Default: false" }],
+    Opts1 =
+        case is_incremental_available() of
+            true ->
+                IncrOpt = {incremental, $i, "incremental", boolean, "Enable incremental analysis mode. Default: false"},
+                [IncrOpt|Opts];
+            false ->
+                Opts
+        end,
     State1 = rebar_state:add_provider(State, providers:create([{name, ?PROVIDER},
                                                                {module, ?MODULE},
                                                                {bare, true},
@@ -37,7 +48,7 @@ init(State) ->
                                                                {example, "rebar3 dialyzer"},
                                                                {short_desc, short_desc()},
                                                                {desc, desc()},
-                                                               {opts, Opts}])),
+                                                               {opts, Opts1}])),
     {ok, State1}.
 
 desc() ->
@@ -123,7 +134,8 @@ do(State) ->
 %% Dialyzer gets default plt location wrong way by peeking HOME environment
 %% variable which usually is not defined on Windows.
 maybe_fix_env() ->
-    os:putenv("DIALYZER_PLT", filename:join(rebar_dir:home_dir(), ".dialyzer_plt")).
+    os:putenv("DIALYZER_PLT", filename:join(rebar_dir:home_dir(), ".dialyzer_plt")),
+    os:putenv("DIALYZER_IPLT", filename:join(rebar_dir:home_dir(), ".dialyzer_iplt")).
 
 -spec format_error(any()) -> iolist().
 format_error({error_processing_apps, Error}) ->
@@ -146,7 +158,7 @@ format_error(Reason) ->
 
 get_plt(Args, State) ->
     Prefix = proplists:get_value(plt_prefix, Args, get_config(State, plt_prefix, ?PLT_PREFIX)),
-    Name = plt_name(Prefix),
+    Name = plt_name(Prefix, Args, State),
     case proplists:get_value(plt_location, Args, get_config(State, plt_location, local)) of
         local ->
             BaseDir = rebar_dir:base_dir(State),
@@ -155,8 +167,13 @@ get_plt(Args, State) ->
             filename:join(Dir, Name)
     end.
 
-plt_name(Prefix) ->
-    Prefix ++ "_" ++ rebar_utils:otp_release() ++ "_plt".
+plt_name(Prefix, Args, State) ->
+    Suffix =
+        case proplists:get_value(incremental, Args, get_config(State, incremental, false)) of
+            true -> "_iplt";
+            false -> "_plt"
+        end,
+    Prefix ++ "_" ++ rebar_utils:otp_release() ++ Suffix.
 
 do(Args, State, Plt) ->
     Output = get_output_file(State),
@@ -167,11 +184,18 @@ do(Args, State, Plt) ->
             ?WARN("Add debug_info to compiler options (erl_opts) "
                   "if Dialyzer fails to load Core Erlang.", [])
     end,
-    {PltWarnings, State1} = update_proj_plt(Args, State, Plt, Output),
-    {Warnings, State2} = succ_typings(Args, State1, Plt, Output),
-    case PltWarnings + Warnings of
+    {Warnings, StateAfter} =
+        case proplists:get_value(incremental, Args, get_config(State, incremental, false)) of
+            true ->
+                incremental(Args, State, Plt, Output);
+            false ->
+                {PltWarnings, State1} = update_proj_plt(Args, State, Plt, Output),
+                {SuccWarnings, State2} = succ_typings(Args, State1, Plt, Output),
+                {PltWarnings + SuccWarnings, State2}
+        end,
+    case Warnings of
         0 ->
-            {ok, State2};
+            {ok, StateAfter};
         TotalWarnings ->
             ?INFO("Warnings written to ~ts", [rebar_dir:format_source_file_name(Output)]),
             throw({dialyzer_warnings, TotalWarnings})
@@ -215,7 +239,7 @@ proj_plt_files(State) ->
     BasePltMods = get_config(State, base_plt_mods, []),
     PltMods = get_config(State, plt_extra_mods, []) ++ BasePltMods,
     DepApps = lists:usort(proj_plt_apps(State) ++ PltApps),
-    get_files(State, DepApps, [], PltMods, [], []).
+    get_files(State, "project", DepApps, [], PltMods, [], []).
 
 proj_apps(State) ->
     [ec_cnv:to_atom(rebar_app_info:name(App)) ||
@@ -238,8 +262,8 @@ proj_plt_apps(State) ->
             proj_apps(State) ++ collect_nested_dependent_apps(DepApps, State)
     end.
 
-get_files(State, Apps, SkipApps, Mods, SkipMods, ExtraDirs) ->
-    ?INFO("Resolving files...", []),
+get_files(State, Reason, Apps, SkipApps, Mods, SkipMods, ExtraDirs) ->
+    ?INFO("Resolving ~s files...", [Reason]),
     ExcludeApps = get_config(State, exclude_apps, []),
     Files0 = apps_files(Apps, ExcludeApps ++ SkipApps, ExtraDirs, dict:new()),
     BaseDir = filename:join(rebar_dir:base_dir(State), "extras"),
@@ -276,7 +300,12 @@ app_ebin(AppName) ->
         {error, bad_name} = Error ->
             Error;
         EbinDir ->
-            check_ebin(EbinDir)
+            case check_ebin(EbinDir) of
+                {error, bad_name} ->
+                    check_ebin(filename:join(code:lib_dir(AppName), "preloaded/ebin"));
+                Response ->
+                    Response
+            end
     end.
 
 check_ebin(EbinDir) ->
@@ -436,7 +465,7 @@ build_proj_plt(Args, State, Plt, Output, Files) ->
 
 get_base_plt(Args, State) ->
     Prefix = proplists:get_value(base_plt_prefix, Args, get_config(State, base_plt_prefix, ?PLT_PREFIX)),
-    Name = plt_name(Prefix),
+    Name = plt_name(Prefix, Args, State),
     case proplists:get_value(base_plt_location, Args, get_config(State, base_plt_location, global)) of
         global ->
             GlobalCacheDir = rebar_dir:global_cache_dir(rebar_state:opts(State)),
@@ -448,7 +477,7 @@ get_base_plt(Args, State) ->
 base_plt_files(State) ->
     BasePltApps = base_plt_apps(State),
     BasePltMods = get_config(State, base_plt_mods, []),
-    get_files(State, BasePltApps, [], BasePltMods, [], []).
+    get_files(State, "base", BasePltApps, [], BasePltMods, [], []).
 
 base_plt_apps(State) ->
     get_config(State, base_plt_apps, [erts, crypto, kernel, stdlib]).
@@ -480,6 +509,18 @@ build_plt(State, Plt, Output, Files) ->
             {get_warnings, GetWarnings},
             {output_plt, Plt},
             {files, Files}],
+    run_dialyzer(State, Opts, Output).
+
+incremental(Args, State, Plt, Output) ->
+    ?INFO("Running incremental analysis...", []),
+    PLTFiles = proj_plt_files(State),
+    WarningFiles = proj_files(proplists:get_value(app, Args), State),
+    Opts = [{analysis_type, incremental},
+            {get_warnings, true},
+            {from, byte_code},
+            {files, ordsets:from_list(PLTFiles ++ WarningFiles)},
+            {warning_files, WarningFiles},
+            {init_plt, Plt}],
     run_dialyzer(State, Opts, Output).
 
 succ_typings(Args, State, Plt, Output) ->
@@ -522,7 +563,7 @@ proj_files(SingleApp, State) ->
     BasePltMods = get_config(State, base_plt_mods, []),
     PltMods = get_config(State, plt_extra_mods, []) ++ BasePltMods,
     ExtraDirs = rebar_dir:extra_src_dirs(rebar_state:opts(State)),
-    get_files(State, Apps, PltApps, [], PltMods, ExtraDirs).
+    get_files(State, "project warning", Apps, PltApps, [], PltMods, ExtraDirs).
 
 run_dialyzer(State, Opts, Output) ->
     {Args, _} = rebar_state:command_parsed_args(State),
@@ -671,3 +712,10 @@ format_path(Path) ->
 
 abs_path_opts() ->
     dict:from_list([{compiler_source_format, absolute}]).
+
+-spec is_incremental_available() -> boolean().
+is_incremental_available() ->
+    case code:ensure_loaded(dialyzer_incremental) of
+        {error, _} -> false;
+        {module, _} -> true
+    end.
