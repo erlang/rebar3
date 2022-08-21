@@ -132,12 +132,12 @@ run_aux(State, RawArgs) ->
     rebar_utils:check_blacklisted_otp_versions(rebar_state:get(State1, blacklisted_otp_vsns, undefined)),
 
     %% Maybe change the default hex CDN
-    HexCDN = case os:getenv("HEX_CDN") of
-                 false -> ?DEFAULT_CDN;
-                 [] -> ?DEFAULT_CDN;
-                 CDN -> CDN
+    State2 = case os:getenv("HEX_CDN", "") of
+                 "" ->
+                     State1;
+                 CDN ->
+                     rebar_state:set(State1, rebar_packages_cdn, CDN)
              end,
-    State2 = rebar_state:set(State1, rebar_packages_cdn, HexCDN),
 
     Compilers = application:get_env(rebar, compilers, []),
     State0 = rebar_state:compilers(State2, Compilers),
