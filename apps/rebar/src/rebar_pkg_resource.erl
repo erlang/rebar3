@@ -138,7 +138,7 @@ format_error({bad_registry_checksum, Name, Vsn, Expected, Found}) ->
 %% {ok, Contents, NewEtag}, otherwise if some error occurred return error.
 %% @end
 %%------------------------------------------------------------------------------
--spec request(rebar_hex_repos:repo(), binary(), binary(), false | binary())
+-spec request(rebar_hex_repos:repo(), binary(), binary(), binary() | undefined)
              -> {ok, cached} | {ok, binary(), binary()} | error.
 request(Config, Name, Version, ETag) ->
     Config1 = Config#{http_etag => ETag},
@@ -169,7 +169,7 @@ request(Config, Name, Version, ETag) ->
 -spec etag(PackagePath, ETagPath) -> Res when
       PackagePath :: file:name(),
       ETagPath :: file:name(),
-      Res :: binary().
+      Res :: binary() | undefined.
 etag(PackagePath, ETagPath) ->
     case file:read_file(ETagPath) of
         {ok, Bin} ->
@@ -179,10 +179,10 @@ etag(PackagePath, ETagPath) ->
                 true ->
                     Bin;
                 false ->
-                    <<>>
+                    undefined
             end;
         {error, _} ->
-            <<>>
+            undefined
     end.
 
 %%------------------------------------------------------------------------------
@@ -205,7 +205,7 @@ store_etag_in_cache(Path, ETag) ->
       CachePath :: file:name(),
       Pkg :: package(),
       State :: rebar_state:t(),
-      ETag :: binary(),
+      ETag :: binary() | undefined,
       ETagPath :: file:name(),
       UpdateETag :: boolean(),
       Res :: ok | {unexpected_hash, integer(), integer()} | {fetch_fail, binary(), binary()}
@@ -222,7 +222,7 @@ cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoCon
             ?DEBUG("Downloaded package ~ts, caching at ~ts", [Name, CachePath]),
             maybe_store_etag_in_cache(UpdateETag, ETagPath, NewETag),
             serve_from_download(TmpDir, CachePath, Pkg, Body);
-        error when ETag =/= <<>> ->
+        error when ETag =/= undefined ->
             store_etag_in_cache(ETagPath, ETag),
             ?INFO("Download error, using cached file at ~ts", [CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg);
