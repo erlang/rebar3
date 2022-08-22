@@ -117,6 +117,8 @@ good_uncached(Config) ->
     State = ?config(state, Config),
     ?assertEqual(ok,
                  rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, ?good_checksum, #{}}, State, #{}, true)),
+    ?assert(meck:called(r3_hex_repo, get_tarball,
+                        [meck:is(fun(#{http_etag := T}) -> T =:= undefined end), '_', '_'])),
     Cache = ?config(cache_dir, Config),
     ?assert(filelib:is_regular(filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>))).
 
@@ -127,9 +129,13 @@ good_cached(Config) ->
     Cache = ?config(cache_dir, Config),
     CachedFile = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".tar">>),
     ?assert(filelib:is_regular(CachedFile)),
+    ETagPath = filename:join(Cache, <<Pkg/binary, "-", Vsn/binary, ".etag">>),
+    rebar_pkg_resource:store_etag_in_cache(ETagPath, ?good_etag),
     {ok, Content} = file:read_file(CachedFile),
     ?assertEqual(ok,
                  rebar_pkg_resource:download(Tmp, {pkg, Pkg, Vsn, ?good_checksum, ?good_checksum, #{}}, State, #{}, true)),
+    ?assert(meck:called(r3_hex_repo, get_tarball,
+                        [meck:is(fun(#{http_etag := T}) -> T =:= ?good_etag end), '_', '_'])),
     {ok, Content} = file:read_file(CachedFile).
 
 
