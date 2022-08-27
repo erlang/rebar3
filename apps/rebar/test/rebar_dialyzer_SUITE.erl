@@ -18,7 +18,10 @@
          exclude_and_extra/1,
          cli_args/1,
          single_app_succ_typing/1,
-         extra_src_dirs/1]).
+         extra_src_dirs/1,
+         no_existing_incremental_plt/1,
+         update_incremental_plt/1,
+         incremental_cli_args/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -35,8 +38,8 @@ end_per_suite(_Config) ->
 
 init_per_group(empty, Config) ->
     [{base_plt_apps, []} | Config];
-init_per_group(_Group, Config) ->
-    [{base_plt_apps, [erts]} | Config].
+init_per_group(Group, Config) ->
+    [{group, Group}, {base_plt_apps, [erts]}] ++ Config.
 
 end_per_group(_Group, _Config) ->
     ok.
@@ -50,14 +53,28 @@ init_per_testcase(Testcase, Config) ->
             {base_plt_prefix, BasePrefix},
             {base_plt_location, PrivDir},
             {base_plt_apps, ?config(base_plt_apps, Config)}],
-    Suffix = "_" ++ rebar_utils:otp_release() ++ "_plt",
-    [{plt, filename:join(PrivDir, Prefix ++ Suffix)},
-     {base_plt, filename:join(PrivDir, BasePrefix ++ Suffix)},
-     {rebar_config, [{dialyzer, Opts}]} |
-     rebar_test_utils:init_rebar_state(Config)].
+    Suffix =
+      case ?config(group, Config) of
+          incremental -> "_" ++ rebar_utils:otp_release() ++ "_iplt";
+          _ -> "_" ++ rebar_utils:otp_release() ++ "_plt"
+      end,
+    case {?config(group, Config), is_incremental_available()} of
+        {incremental, false} ->
+            {skip,
+             "Skipping incremental mode tests because the current " ++
+             "OTP version doesn't support it"};
+        _ ->
+          [{plt, filename:join(PrivDir, Prefix ++ Suffix)},
+           {base_plt, filename:join(PrivDir, BasePrefix ++ Suffix)},
+           {rebar_config, [{dialyzer, Opts}]} |
+           rebar_test_utils:init_rebar_state(Config)]
+    end.
 
 all() ->
-    [{group, empty}, {group, build_and_check}, {group, update}].
+    [{group, empty},
+     {group, build_and_check},
+     {group, update},
+     {group, incremental}].
 
 groups() ->
     [{empty, [empty_base_plt, empty_app_plt, empty_app_succ_typings]},
@@ -67,7 +84,10 @@ groups() ->
                         plt_apps_option,
                         exclude_and_extra,
                         extra_src_dirs]},
-     {update, [update_base_plt, update_app_plt]}].
+     {update, [update_base_plt, update_app_plt]},
+     {incremental, [no_existing_incremental_plt,
+                    update_incremental_plt,
+                    incremental_cli_args]}].
 
 empty_base_plt(Config) ->
     AppDir = ?config(apps, Config),
@@ -415,7 +435,112 @@ extra_src_dirs(Config) ->
     {error, {rebar_prv_dialyzer, {dialyzer_warnings, _}}} =
         rebar3:run(rebar_state:new(State, RebarConfig, AppDir), Command).
 
+no_existing_incremental_plt(Config) ->
+    AppDir = ?config(apps, Config),
+    [{dialyzer, Opts}] = ?config(rebar_config, Config),
+    RebarConfig = [{dialyzer,[incremental|Opts]}],
+    Plt = ?config(plt, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [erts]),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
+                                   {ok, [{app, Name}]}),
+
+    ErtsModules = erts_modules(),
+    {ok, PltModules} = plt_modules(Plt),
+    ?assertEqual(ErtsModules, PltModules),
+
+    ok.
+
+update_incremental_plt(Config) ->
+    AppDir = ?config(apps, Config),
+    [{dialyzer, Opts}] = ?config(rebar_config, Config),
+    RebarConfig = [{dialyzer,[incremental|Opts]}],
+    Plt = ?config(plt, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    {ok, App} = rebar_test_utils:create_app(AppDir, Name, Vsn, [erts]),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
+                                   {ok, [{app, Name}]}),
+
+    Files = app_files(App),
+
+    ErtsModules = erts_modules(),
+
+    {ok, PltModules} = plt_modules(Plt),
+    ?assertEqual(ErtsModules, PltModules),
+
+    alter_incremental_plt(Plt, Files),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
+                                   {ok, [{app, Name}]}),
+
+    {ok, PltModules2} = plt_modules(Plt),
+    ?assertEqual(ErtsModules, PltModules2),
+
+    ok = file:delete(Plt),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
+                                   {ok, [{app, Name}]}),
+
+    {ok, PltModules3} = plt_modules(Plt),
+    ?assertEqual(ErtsModules, PltModules3),
+
+    add_missing_file_incremental(Plt, Files),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
+                                   {ok, [{app, Name}]}),
+
+    {ok, PltModules4} = plt_modules(Plt),
+    ?assertEqual(ErtsModules, PltModules4).
+
+incremental_cli_args(Config) ->
+    AppDir = ?config(apps, Config),
+    [{dialyzer, Opts}] = ?config(rebar_config, Config),
+    Plt = ?config(plt, Config),
+
+    {value, {_, Prefix}, Opts1} = lists:keytake(plt_prefix, 1, Opts),
+    {value, {_, BasePrefix}, Opts2} = lists:keytake(base_plt_prefix, 1, Opts1),
+    {value, {_, Location}, Opts3} = lists:keytake(plt_location, 1, Opts2),
+    {value, {_, BasePltLocation}, Opts4} = lists:keytake(base_plt_location, 1, Opts3),
+    RebarConfig = [{dialyzer, Opts4}],
+
+    Name1 = rebar_test_utils:create_random_name("relapp1_"),
+    Vsn1 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([AppDir,"apps",Name1]), Name1, Vsn1,
+                                [erts]),
+    Name2 = rebar_test_utils:create_random_name("relapp2_"),
+    Vsn2 = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(filename:join([AppDir,"apps",Name2]), Name2, Vsn2,
+                                [erts, ec_cnv:to_atom(Name1)]),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer",
+                                                         "--incremental",
+                                                         "--plt-location=" ++ Location,
+                                                         "--base-plt-location=" ++ BasePltLocation,
+                                                         "--plt-prefix=" ++ Prefix,
+                                                         "--base-plt-prefix=" ++ BasePrefix,
+                                                         "--statistics"],
+                                   {ok, [{app, Name1}, {app, Name2}]}),
+
+    ErtsModules = erts_modules(),
+
+    {ok, PltModules} = plt_modules(Plt),
+    ?assertEqual(ErtsModules, PltModules).
+
 %% Helpers
+
+-spec app_files(rebar_app_info:t()) -> [file:name()].
+app_files(AppInfo) ->
+    Dir = rebar_app_info:ebin_dir(AppInfo),
+    Beams = filelib:wildcard("*.beam", Dir),
+    Files = lists:map(fun(Beam) -> filename:join(Dir, Beam) end,
+                          Beams),
+    lists:sort(Files).
 
 erts_files() ->
     ErtsDir = code:lib_dir(erts, ebin),
@@ -424,11 +549,27 @@ erts_files() ->
                           ErtsBeams),
     lists:sort(ErtsFiles).
 
+erts_modules() ->
+    ErtsDir = code:lib_dir(erts, ebin),
+    ErtsBeams = filelib:wildcard("*.beam", ErtsDir),
+    ErtsModules = lists:map(fun(Beam) -> filename:basename(Beam, ".beam") end,
+                          ErtsBeams),
+    lists:sort(ErtsModules).
+
 plt_files(Plt) ->
     case dialyzer:plt_info(Plt) of
         {ok, Info} ->
             Files = proplists:get_value(files, Info),
             {ok, lists:sort(Files)};
+        Other ->
+            Other
+    end.
+
+plt_modules(Plt) ->
+    case dialyzer:plt_info(Plt) of
+        {ok, {incremental, Info}} ->
+            Modules = proplists:get_value(modules, Info),
+            {ok, lists:sort(Modules)};
         Other ->
             Other
     end.
@@ -443,6 +584,12 @@ alter_plt(Plt) ->
                       {files, [code:which(dialyzer)]}]),
     ok.
 
+alter_incremental_plt(Plt, Files) ->
+    _ = dialyzer:run([{analysis_type, incremental},
+                      {init_plt, Plt},
+                      {files, [code:which(dialyzer)] ++ tl(Files)}]),
+    ok.
+
 add_missing_file(Plt) ->
     Source = code:which(dialyzer),
     Dest = filename:join(filename:dirname(Plt), "dialyzer.beam"),
@@ -451,6 +598,19 @@ add_missing_file(Plt) ->
             dialyzer:run([{analysis_type, plt_add},
                           {init_plt, Plt},
                           {files, [Dest]}])
+        after
+            ok = file:delete(Dest)
+        end,
+    ok.
+
+add_missing_file_incremental(Plt, Files) ->
+    Source = code:which(dialyzer),
+    Dest = filename:join(filename:dirname(Plt), "dialyzer.beam"),
+    {ok, _} = file:copy(Source, Dest),
+    _ = try
+            dialyzer:run([{analysis_type, incremental},
+                          {init_plt, Plt},
+                          {files, [Dest|Files]}])
         after
             ok = file:delete(Dest)
         end,
@@ -471,3 +631,10 @@ get_apps_from_beam_files(BeamFiles) ->
            [AppName | _] = rebar_string:lexemes(AppNameVsn ++ "-", "-"),
            ec_cnv:to_atom(AppName)
        end || File <- BeamFiles]).
+
+-spec is_incremental_available() -> boolean().
+is_incremental_available() ->
+    case code:ensure_loaded(dialyzer_incremental) of
+        {error, _} -> false;
+        {module, _} -> true
+    end.
