@@ -42,6 +42,7 @@
 -define(DEPS, [compile]).
 
 -dialyzer({nowarn_function, rewrite_leaders/2}).
+-dialyzer({nowarn_function, start_interactive/0}).
 
 %% ===================================================================
 %% Public API
@@ -150,19 +151,28 @@ info() ->
     "Start a shell with project and deps preloaded similar to~n'erl -pa ebin -pa deps/*/ebin'.~n".
 
 setup_shell(ShellArgs) ->
-    LoggerState = maybe_remove_logger(),
-    OldUser = kill_old_user(),
-    %% Test for support here
-    NewUser = try erlang:open_port({spawn,"tty_sl -c -e"}, []) of
-        Port when is_port(Port) ->
-            true = port_close(Port),
-            setup_new_shell(ShellArgs)
-    catch
-        error:_ ->
-            setup_old_shell()
-    end,
-    rewrite_leaders(OldUser, NewUser),
-    maybe_reset_logger(LoggerState).
+    code:ensure_loaded(shell),
+    case erlang:function_exported(shell, start_interactive, 0) of
+        false ->
+            LoggerState = maybe_remove_logger(),
+            OldUser = kill_old_user(),
+            %% Test for support here
+            NewUser = try erlang:open_port({spawn,"tty_sl -c -e"}, []) of
+                          Port when is_port(Port) ->
+                              true = port_close(Port),
+                              setup_new_shell(ShellArgs)
+                      catch
+                          error:_ ->
+                              setup_old_shell()
+                      end,
+            rewrite_leaders(OldUser, NewUser),
+            maybe_reset_logger(LoggerState);
+        true ->
+            ok = start_interactive()
+    end.
+
+start_interactive() ->
+    shell:start_interactive().
 
 %% @private starting with OTP-21.2.3, there's an oddity where the logger
 %% likely tries to handle system logs while we take down the TTY, which
