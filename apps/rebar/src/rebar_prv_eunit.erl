@@ -40,6 +40,7 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
+    warn_version(),
     Tests = prepare_tests(State),
     %% inject `eunit_first_files`, `eunit_compile_opts` and any
     %% directories required by tests into the applications
@@ -114,6 +115,19 @@ format_error({error, Error}) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+warn_version() ->
+    application:start(eunit),
+    case application:get_key(eunit, vsn) of
+        {ok, "2.8"} ->
+            %% See https://github.com/erlang/otp/pull/6322
+            ?WARN("The EUnit version 2.8 (OTP-25.1) contains a "
+                  "regression in its interface that may cause "
+                  "runtime errors. Older or newer versions are "
+                  "not impacted.", []);
+        _ ->
+            ok
+    end.
 
 setup_name(State) ->
     {Long, Short, Opts} = rebar_dist_utils:find_options(State),
