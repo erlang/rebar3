@@ -132,7 +132,7 @@ run_aux(State, RawArgs) ->
     rebar_utils:check_blacklisted_otp_versions(rebar_state:get(State1, blacklisted_otp_vsns, undefined)),
 
     %% Maybe change the default hex CDN
-    State2 = case os:getenv("HEX_CDN", "") of
+    State2 = case hex_cdn() of
                  "" ->
                      State1;
                  CDN ->
@@ -486,3 +486,14 @@ test_defined([{d, 'TEST'}|_]) -> true;
 test_defined([{d, 'TEST', true}|_]) -> true;
 test_defined([_|Rest]) -> test_defined(Rest);
 test_defined([]) -> false.
+
+-spec hex_cdn() -> os:env_var_value().
+hex_cdn() ->
+    case os:getenv("HEX_CDN") of
+        false ->
+            %% Checking HEX_MIRROR can be useful when compiling dependencies
+            %% in a project managed by Mix.
+            os:getenv("HEX_MIRROR", "");
+        CDN ->
+            CDN
+    end.
