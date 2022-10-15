@@ -53,7 +53,7 @@ main(Args) ->
     bootstrap_rebar3(),
 
     %% Build rebar.app from rebar.app.src
-    {ok, App} = rebar_app_info:new(rebar, "3.19.0", filename:absname("_build/default/lib/rebar/")),
+    {ok, App} = rebar_app_info:new(rebar, "3.20.0", filename:absname("_build/default/lib/rebar/")),
     rebar_otp_app:compile(rebar_state:new(), App),
 
     %% Because we are compiling files that are loaded already we want to silence
