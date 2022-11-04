@@ -84,6 +84,8 @@ print_packages(_) ->
     ok.
 
 -spec join([binary()], binary()) -> binary().
+join([], _Sep) ->
+    <<>>;
 join([Bin], _Sep) ->
     <<Bin/binary>>;
 join([Bin | T], Sep) ->
@@ -93,6 +95,8 @@ join([Bin | T], Sep) ->
 join_map(Map, Sep) ->
     join_tuple_list(maps:to_list(Map), Sep).
 
+join_tuple_list([], _Sep) ->
+    <<>>;
 join_tuple_list([{K, V}], _Sep) ->
     <<K/binary, ": ", V/binary>>;
 join_tuple_list([{K, V} | T], Sep) ->
