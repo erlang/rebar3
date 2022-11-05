@@ -34,3 +34,17 @@ Path = certifi:cacertfile().
 ```shell
 $ rebar3 eunit
 ```
+
+## Documentation generation
+
+### Edoc
+
+#### Generate public API
+`rebar3 edoc`
+
+#### Generate private API
+`rebar3 as edoc_private edoc`
+
+### ExDoc
+
+`rebar3 ex_doc --output edoc`
