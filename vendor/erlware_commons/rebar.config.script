@@ -1,0 +1,17 @@
+IsRebar3 = case application:get_key(rebar, vsn) of
+               {ok, Vsn} ->
+                   [MajorVersion|_] = string:tokens(Vsn, "."),
+                   (list_to_integer(MajorVersion) >= 3);
+               undefined ->
+                   false
+           end,
+
+Rebar2Deps = [
+              {cf, ".*", {git, "https://github.com/project-fifo/cf", {tag, "0.2.2"}}}
+             ],
+
+case IsRebar3 of
+    true -> CONFIG;
+    false ->
+        lists:keyreplace(deps, 1, CONFIG, {deps, Rebar2Deps})
+end.

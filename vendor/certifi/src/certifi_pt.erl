@@ -15,11 +15,16 @@ replace_cacerts({function, Ann, cacerts, 0, [_]}) ->
 replace_cacerts(Other) ->
   Other.
 
+-spec cert_file() -> Result when
+	Result :: file:filename_all().
 cert_file() ->
   AppDir = filename:dirname(
              filename:dirname(code:which(?MODULE))
             ),
   filename:join([AppDir, "priv", "cacerts.pem"]).
 
+-spec cert_to_bin_ast(Cert) -> Result when
+	Cert :: binary(),
+	Result :: {bin, 0, [{bin_element, 0, {string, 0, list()}, default, default}]}.
 cert_to_bin_ast(Cert) ->
   {bin, 0, [{bin_element, 0, {string, 0, binary_to_list(Cert)}, default, default}]}.
