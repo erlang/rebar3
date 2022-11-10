@@ -64,6 +64,7 @@ _rebar3()
             edoc \
             escriptize \
             eunit \
+            experimental \
             help \
             new \
             path \
@@ -138,6 +139,10 @@ _rebar3()
     elif [[ ${prev} == eunit ]] ; then
         sopts="-c -e -v -d -f -m -s -g"
         lopts="--app --application --cover --dir --error_on_warning --file --module --suite --generator --verbose"
+    elif [[ ${prev} == experimental ]] ; then
+        cmdsnvars=" \
+            vendor \
+            "
     elif [[ ${prev} == help ]] ; then
         :
     elif [[ ${prev} == new ]] ; then
@@ -261,6 +266,7 @@ _rebar3()
             edoc \
             escriptize \
             eunit \
+            experimental \
             help \
             new \
             path \
