@@ -182,7 +182,10 @@ _rebar3()
     elif [[ ${prev} == pkgs ]] ; then
         :
     elif [[ ${prev} == plugins ]] ; then
-        :
+        cmdsnvars=" \
+            list \
+            upgrade \
+            "
     elif [[ ${prev} == release ]] ; then
         sopts="-n -v -g -u -o -h -l -p -V -d -i -a -c -r"
         lopts=" \
