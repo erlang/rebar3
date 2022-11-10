@@ -89,8 +89,8 @@ _rebar3()
         get_profiles
         cmdsnvars="$profiles"
     elif [[ ${prev} == clean ]] ; then
-        sopts="-a"
-        lopts="--all"
+        sopts="-a -p"
+        lopts="--all --profile"
     elif [[ ${prev} == compile ]] ; then
         :
     elif [[ ${prev} == cover ]] ; then
@@ -305,6 +305,10 @@ _rebar3()
             version \
             xref \
             "
+    elif [[ ${first} == clean && (${prev} == "--profile" ||
+                                  ${prev} == "-p") ]] ; then
+        get_profiles
+        cmdsnvars="${profiles}"
     fi
 
     COMPREPLY=( $(compgen -W "${sopts} ${lopts} ${cmdsnvars}" -- ${cur}) )
