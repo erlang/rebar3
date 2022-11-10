@@ -4,8 +4,10 @@ _rebar3()
 {
     local cur prev sopts lopts cmdsnvars profiles rebarconf="rebar.config"
     COMPREPLY=()
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    curindex="${COMP_CWORD}"
+    cur="${COMP_WORDS[curindex]}"
+    prev="${COMP_WORDS[curindex-1]}"
+    first="${COMP_WORDS[1]}"
 
     get_profiles()
     {
@@ -247,6 +249,36 @@ _rebar3()
         :
     elif [[ ${prev} == xref ]] ; then
         :
+    elif [[ ${first} == as && ${curindex} == 3 ]] ; then
+        cmdsnvars=" \
+            clean \
+            compile \
+            cover \
+            ct \
+            deps \
+            dialyzer \
+            do \
+            edoc \
+            escriptize \
+            eunit \
+            help \
+            new \
+            path \
+            pkgs \
+            plugins \
+            release \
+            relup \
+            report \
+            shell \
+            tar \
+            tree \
+            unlock \
+            unstable \
+            update \
+            upgrade \
+            version \
+            xref \
+            "
     fi
 
     COMPREPLY=( $(compgen -W "${sopts} ${lopts} ${cmdsnvars}" -- ${cur}) )
