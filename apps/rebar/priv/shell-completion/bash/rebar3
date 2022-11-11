@@ -19,7 +19,7 @@ _rebar3()
 
         if [ -f "$rebarconf" ]; then
             profconfig=$( cat "$rebarconf" \
-                          | grep -oPz '(?s){profiles.*?(?<=\.)' \
+                          | grep -oPz '(?s){profiles,\s*(\r\n)*\n*\r*\[\s*(\r\n)*\n*\r*.*?(?<=\s*(\r\n)*\n*\r*\}\s*(\r\n)*\n*\r*\.)' \
                           | tr -d '\0' \
                           | tr -d '\n' )
         fi
