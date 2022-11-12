@@ -9,6 +9,21 @@ _rebar3()
     prev="${COMP_WORDS[curindex-1]}"
     first="${COMP_WORDS[1]}"
 
+    get_config_regex()
+    {
+        eval "$1=\"(?:{\s*$2\s*,\s*(\r\n)*\n*\r*\[).*?(?:\s*(\r\n)*\n*\r*}\s*(\r\n)*\n*\r*\.)\""
+    }
+
+    get_config()
+    {
+        local regex
+        get_config_regex regex "$3"
+        eval "$1=\"$( cat $2 \
+                  | grep -oPz "(?s)${regex}" \
+                  | tr -d '\0' \
+                  | tr -d '\n' )\""
+    }
+
     get_profiles()
     {
         if [ -n "${profiles}" ]; then
@@ -18,10 +33,7 @@ _rebar3()
         local profconfig depth profile naming ch
 
         if [ -f "$rebarconf" ]; then
-            profconfig=$( cat "$rebarconf" \
-                          | grep -oPz '(?s){profiles,\s*(\r\n)*\n*\r*\[\s*(\r\n)*\n*\r*.*?(?<=\s*(\r\n)*\n*\r*\}\s*(\r\n)*\n*\r*\.)' \
-                          | tr -d '\0' \
-                          | tr -d '\n' )
+            get_config profconfig "${rebarconf}" "profiles"
         fi
 
         if [ -n "$profconfig" ]; then
