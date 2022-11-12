@@ -9,19 +9,38 @@ _rebar3()
     prev="${COMP_WORDS[curindex-1]}"
     first="${COMP_WORDS[1]}"
 
-    get_config_regex()
-    {
-        eval "$1=\"(?:{\s*$2\s*,\s*(\r\n)*\n*\r*\[).*?(?:\s*(\r\n)*\n*\r*}\s*(\r\n)*\n*\r*\.)\""
-    }
-
     get_config()
     {
-        local regex
-        get_config_regex regex "$3"
         eval "$1=\"$( cat $2 \
-                  | grep -oPz "(?s)${regex}" \
-                  | tr -d '\0' \
-                  | tr -d '\n' )\""
+                    | grep -oPz "(?s)(?:{\s*$3\s*,\s*(\r\n)*\n*\r*\[).*?(?:\s*(\r\n)*\n*\r*}\s*(\r\n)*\n*\r*\.)" \
+                    | tr -d '\0' \
+                    | tr -d '\n' \
+                    | grep -oPz '(?s)(?<=\[).*(?=\])' \
+                    | tr -d '\0' \
+                    | sed -e 's/^[[:space:]]*//' )\""
+    }
+
+    get_config_keys()
+    {
+        local picking acc key ch depth=0
+
+        while read -n1 ch; do
+            if [[ $depth == 0 && $ch == "{" ]]; then
+                picking=true
+            elif [[ $picking && ($ch == "," || $ch == " ") ]]; then
+                acc+=" $key"
+                unset key
+                unset picking
+            elif [[ $picking ]]; then
+                key+="$ch"
+            elif [[ $ch == "]" ]]; then
+                ((depth++))
+            elif [[ $ch == "[" ]]; then
+                ((depth--))
+            fi
+        done < <( echo -n "$1" )
+
+        eval "$2=\"${acc}\""
     }
 
     get_profiles()
@@ -30,32 +49,14 @@ _rebar3()
             return
         fi
 
-        local profconfig depth profile naming ch
+        local profconfig
 
         if [ -f "$rebarconf" ]; then
             get_config profconfig "${rebarconf}" "profiles"
         fi
 
         if [ -n "$profconfig" ]; then
-            depth=0;
-            while read -n1 ch; do
-                if [[ $depth == 0 && $ch == "{" ]]; then
-                    naming=true
-                elif [[ $naming && ($ch == "," || $ch == " ") ]]; then
-                    profiles+=" $profile"
-                    unset profile
-                    unset naming
-                elif [[ $naming ]]; then
-                    profile+="$ch"
-                elif [[ $ch == "]" ]]; then
-                    ((depth++))
-                elif [[ $ch == "[" ]]; then
-                    ((depth--))
-                fi
-            done < <( echo -n "$profconfig" \
-                      | grep -oPz '(?s)(?<=\[).*(?=\])' \
-                      | tr -d '\0' \
-                      | sed -e 's/^[[:space:]]*//' )
+            get_config_keys "${profconfig}" profiles
         else
             profiles="default"
         fi
