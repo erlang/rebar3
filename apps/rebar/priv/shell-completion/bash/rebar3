@@ -12,6 +12,7 @@ _rebar3()
     get_config()
     {
         eval "$3=\"$( cat $1 \
+                    | grep -v '\s*%.*' \
                     | grep -oPz "(?s)(?:{\s*$2\s*,\s*(\r\n)*\n*\r*\[).*?(?:\s*(\r\n)*\n*\r*}\s*(\r\n)*\n*\r*\.)" \
                     | tr -d '\0' \
                     | tr -d '\n' \
