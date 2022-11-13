@@ -51,7 +51,7 @@
 %% files by prefixing extensions.
 {application_resource_extensions, [
     ".app.src.script", ".app.src"
-]}
+]}.
 
 %% == Common Test ==
 
