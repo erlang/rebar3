@@ -96,9 +96,9 @@ init(State) ->
                          "Arguments passed to user_drv start function for "
                          "creating custom shells."},
                         {eval, undefined, "eval", string,
-                         "Erlang term(s) to execute after the apps have been
-                          started, but before the shell is presented to the 
-                          user"}
+                         "Erlang term(s) to execute after the apps have been "
+                         "started, but before the shell is presented to the "
+                         "user."}
                     ]}
             ])
     ),
