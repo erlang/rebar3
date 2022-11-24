@@ -98,7 +98,7 @@ init(State) ->
                         {eval, undefined, "eval", string,
                          "Erlang term(s) to execute after the apps have been "
                          "started, but before the shell is presented to the "
-                         "user"}
+                         "user."}
                     ]}
             ])
     ),
