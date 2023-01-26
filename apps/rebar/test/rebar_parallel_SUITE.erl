@@ -37,7 +37,7 @@ same_results(_) ->
                                         fun(X,_) -> {ok, X} end, []))),
     P = rebar_parallel:pool(fun(X,_) -> X*2 end, [],
                             fun(X,_) -> {ok, X} end, []),
-    _ = [rebar_parallel:pool_task(P, N) || N <- [1,2,3,4,5,6,7]],
+    _ = [rebar_parallel:pool_task_async(P, N) || N <- [1,2,3,4,5,6,7]],
     ?assertEqual([2,4,6,8,10,12,14],
                  lists:sort(rebar_parallel:pool_terminate(P))),
     ok.
@@ -49,7 +49,7 @@ pool_fetcher(_) ->
     Parent = self(),
     P = rebar_parallel:pool(fun(X,_) -> X*2 end, [],
                             fun(X,_) -> {ok, X} end, []),
-    _ = [rebar_parallel:pool_task(P, N) || N <- [1,2,3,4,5,6,7]],
+    _ = [rebar_parallel:pool_task_async(P, N) || N <- [1,2,3,4,5,6,7]],
     spawn_link(fun() -> Parent ! {res, lists:sort(rebar_parallel:pool_terminate(P))} end),
     receive
         {res, X} -> ?assertEqual([2,4,6,8,10,12,14], X)
@@ -64,11 +64,11 @@ pool_misuse(_) ->
     Parent = self(),
     P = rebar_parallel:pool(fun(_,_) -> timer:sleep(1000) end, [],
                             fun(X,_) -> {ok, X} end, []),
-    _ = [rebar_parallel:pool_task(P, N) || N <- [1,2,3,4,5,6,7]],
+    _ = [rebar_parallel:pool_task_async(P, N) || N <- [1,2,3,4,5,6,7]],
     spawn(fun() -> Parent ! ok, rebar_parallel:pool_terminate(P) end),
     receive ok -> timer:sleep(100) end,
     Old = process_flag(trap_exit, true),
-    rebar_parallel:pool_task(P, 0),
+    rebar_parallel:pool_task_async(P, 0),
     receive
         {'EXIT', P, {{nocatch, rebar_abort}, _Stack}} ->
             process_flag(trap_exit, Old)

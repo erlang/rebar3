@@ -179,7 +179,7 @@ populate_sources(G, Compiler, InDirs, [Source|Erls], DepOpts, Pool) ->
                 LastModified when LastUpdated < LastModified ->
                     digraph:add_vertex(G, Source, LastModified),
                     Work = fun() -> {old, prepopulate_deps(Compiler, InDirs, Source, DepOpts)} end,
-                    rebar_parallel:pool_task(Pool, Work),
+                    rebar_parallel:pool_task_async(Pool, Work),
                     populate_sources(G, Compiler, InDirs, Erls, DepOpts, Pool);
                 _ -> % unchanged
                     populate_sources(G, Compiler, InDirs, Erls, DepOpts, Pool)
@@ -188,7 +188,7 @@ populate_sources(G, Compiler, InDirs, [Source|Erls], DepOpts, Pool) ->
             LastModified = filelib:last_modified(Source),
             digraph:add_vertex(G, Source, LastModified),
             Work = fun() -> {new, prepopulate_deps(Compiler, InDirs, Source, DepOpts)} end,
-            rebar_parallel:pool_task(Pool, Work),
+            rebar_parallel:pool_task_async(Pool, Work),
             populate_sources(G, Compiler, InDirs, Erls, DepOpts, Pool)
     end.
 
