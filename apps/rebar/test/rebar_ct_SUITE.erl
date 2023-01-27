@@ -22,6 +22,7 @@
          single_dir_and_single_suite/1,
          suite_at_root/1,
          suite_at_app_root/1,
+         data_in_app_test_folder/1,
          data_dir_correct/1,
          cmd_label/1,
          cmd_config/1,
@@ -63,6 +64,8 @@
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("common_test/include/ct.hrl").
+-include_lib("kernel/include/file.hrl").
+
 
 all() -> [{group, basic_app},
           {group, multi_app},
@@ -100,7 +103,8 @@ groups() -> [{basic_app, [], [basic_app_default_dirs,
                                     all_suite,
                                     single_dir_and_single_suite,
                                     suite_at_root,
-                                    suite_at_app_root]},
+                                    suite_at_app_root,
+                                    data_in_app_test_folder]},
              {data_dirs, [], [data_dir_correct]},
              {ct_opts, [], [cmd_label,
                             cmd_config,
@@ -193,6 +197,11 @@ init_per_group(dirs_and_suites, Config) ->
     AppDir1 = filename:join([AppDir, "apps", Name1]),
     rebar_test_utils:create_app(AppDir1, Name1, Vsn1, [kernel, stdlib]),
 
+    ok = file:write_file(
+        filename:join([AppDir, "some_data_in_root.txt"]),
+        <<"I'm the content of a file in the root folder">>
+    ),
+
     Suite1 = filename:join([AppDir1, "test", Name1 ++ "_SUITE.erl"]),
     ok = filelib:ensure_dir(Suite1),
     ok = file:write_file(Suite1, test_suite(Name1)),
@@ -205,6 +214,13 @@ init_per_group(dirs_and_suites, Config) ->
     Suite2 = filename:join([AppDir2, "test", Name2 ++ "_SUITE.erl"]),
     ok = filelib:ensure_dir(Suite2),
     ok = file:write_file(Suite2, test_suite(Name2)),
+    ok = filelib:ensure_dir(filename:join([AppDir2, "test", Name2 ++ "_SUITE_data", "dummy.txt"])),
+    ok = file:write_file(filename:join([AppDir2, "test", Name2 ++ "_SUITE_data", "some_data.txt"]), <<"hello">>),
+    ok = file:make_symlink(
+        filename:join([AppDir, "some_data_in_root.txt"]),
+        filename:join([AppDir2, "test", Name2 ++ "_SUITE_data", "symlink_some_data_in_root.txt"])
+    ),
+
 
     Suite3 = filename:join([AppDir, "test", "extras_SUITE.erl"]),
     ok = filelib:ensure_dir(Suite3),
@@ -225,6 +241,10 @@ init_per_group(dirs_and_suites, Config) ->
 
     ok = filelib:ensure_dir(filename:join([AppDir, "apps", Name2, "app_root_SUITE_data", "dummy.txt"])),
     ok = file:write_file(filename:join([AppDir, "apps", Name2, "app_root_SUITE_data", "some_data.txt"]), <<>>),
+    ok = file:make_symlink(
+        filename:join([AppDir, "some_data_in_root.txt"]), 
+        filename:join([AppDir, "apps", Name2, "app_root_SUITE_data", "symlink_some_data_in_root.txt"])
+    ),
 
     {ok, State} = rebar_test_utils:run_and_check(C, [], ["as", "test", "lock"], return),
 
@@ -787,6 +807,12 @@ suite_at_app_root(Config) ->
     DataFile = filename:join([AppDir, "_build", "test", "lib", Name2, "app_root_SUITE_data", "some_data.txt"]),
     true = filelib:is_file(DataFile),
 
+    SymFile = filename:join([AppDir, "_build", "test", "lib", Name2, "app_root_SUITE_data", "symlink_some_data_in_root.txt"]),
+    true = filelib:is_file(SymFile),
+    % At this point, the symbolic link should have been dereference and it is a regular file
+    {ok, #file_info{type = regular}} = file:read_link_info(SymFile),
+    ?assertEqual({ok, <<"I'm the content of a file in the root folder">>}, file:read_file(SymFile)),
+
     %% Same test again using relative path to the suite from the project root
     {ok,Cwd} = file:get_cwd(),
     ok = file:set_cwd(AppDir),
@@ -811,6 +837,54 @@ suite_at_app_root(Config) ->
     true = filelib:is_file(DataFile),
 
     ok.
+
+data_in_app_test_folder(Config) ->
+    % the ct data folder in app_name/test is properly copied to destination
+    AppDir = ?config(apps, Config),
+    [_Name1, Name2] = ?config(appnames, Config),
+    State = ?config(s, Config),
+
+    LibDirs = rebar_dir:lib_dirs(State),
+    State1 = rebar_app_discover:do(State, LibDirs),
+
+    Providers = rebar_state:providers(State1),
+    Namespace = rebar_state:namespace(State1),
+    CommandProvider = providers:get_provider(ct, Providers, Namespace),
+    GetOptSpec = providers:opts(CommandProvider),
+    {ok, GetOptResult} = getopt:parse(GetOptSpec,
+                                       ["--suite=" ++ filename:join([AppDir,
+                                                                     "apps",
+                                                                     Name2,
+                                                                     "test",
+                                                                     Name2 ++ "_SUITE"])]),
+    State2 = rebar_state:command_parsed_args(State1, GetOptResult),
+    Tests = rebar_prv_common_test:prepare_tests(State2),
+    {ok, NewState} = rebar_prv_common_test:compile(State2, Tests),
+    {ok, T} = Tests,
+    _Opts = rebar_prv_common_test:translate_paths(NewState, T),
+    DataFile = filename:join([AppDir,
+                             "_build",
+                             "test",
+                             "lib",
+                             Name2,
+                             "test",
+                             Name2 ++ "_SUITE_data",
+                             "some_data.txt"]),
+
+    true = filelib:is_file(DataFile),
+    ?assertEqual({ok, <<"hello">>}, file:read_file(DataFile)),
+
+    SymFile = filename:join([AppDir,
+                             "_build",
+                             "test",
+                             "lib",
+                             Name2,
+                             "test", 
+                             Name2 ++ "_SUITE_data",
+                             "symlink_some_data_in_root.txt"]),
+    % At this point, the symbolic link should have been dereference and it is a regular file
+    {ok, #file_info{type = regular}} = file:read_link_info(SymFile),
+    ?assertEqual({ok, <<"I'm the content of a file in the root folder">>}, file:read_file(SymFile)).
 
 %% this test probably only fails when this suite is run via rebar3 with the --cover flag
 data_dir_correct(Config) ->
