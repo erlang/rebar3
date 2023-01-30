@@ -503,7 +503,7 @@ copy(Source, Target) ->
     {ok, Files} = rebar_utils:list_dir(Source),
     case [filename:join([Source, F]) || F <- Files] of
         []    -> ok;
-        Paths -> rebar_file_utils:cp_r(Paths, Target)
+        Paths -> rebar_file_utils:cp_r(Paths, Target, [{dereference, true}])
     end.
 
 delete_if_symlink(Path) ->
