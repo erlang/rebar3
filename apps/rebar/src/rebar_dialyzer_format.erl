@@ -130,6 +130,9 @@ message_to_string({guard_fail, []}) ->
 message_to_string({guard_fail, [Arg1, Infix, Arg2]}) ->
     fmt("~!^Guard test ~!!~ts ~ts ~ts~!^ can never succeed",
         [Arg1, Infix, Arg2]);
+message_to_string({map_update, [Type, Key]}) ->
+    fmt("~!^A key of type ~!!~ts~!^ cannot exist in a map of type ~!!~ts",
+        [Key, Type]);
 message_to_string({neg_guard_fail, [Arg1, Infix, Arg2]}) ->
     fmt("~!^Guard test not(~!!~ts ~ts ~ts~!^) can never succeed",
         [Arg1, Infix, Arg2]);
@@ -202,9 +205,17 @@ message_to_string({contract_range, [Contract, M, F, ArgStrings, Line, CRet]}) ->
 message_to_string({invalid_contract, [M, F, A, Sig]}) ->
     fmt("~!^Invalid type specification for function~!! ~w:~w/~w."
         "~!^ The success typing is~!! ~ts", [M, F, A, Sig]);
+message_to_string({contract_with_opaque, [M, F, A, OpaqueType, SigType]}) ->
+  fmt("~!^The specification for ~!!~w:~w/~w~!^ has an opaque"
+      " subtype ~!!~ts~!^ which is violated by the success typing ~!!~ts",
+      [M, F, A, OpaqueType, SigType]);
 message_to_string({extra_range, [M, F, A, ExtraRanges, SigRange]}) ->
     fmt("~!^The specification for ~!!~w:~w/~w~!^ states that the function"
         " might also return ~!!~ts~!^ but the inferred return is ~!!~ts",
+        [M, F, A, ExtraRanges, SigRange]);
+message_to_string({missing_range, [M, F, A, ExtraRanges, SigRange]}) ->
+    fmt("~!^The success typing for ~!!~w:~w/~w~!^ implies that the function"
+        " might also return ~!!~ts~!^ but the specification return is ~!!~ts",
         [M, F, A, ExtraRanges, SigRange]);
 message_to_string({overlapping_contract, [M, F, A]}) ->
     fmt("~!^Overloaded contract for ~!!~w:~w/~w~!^ has overlapping"
@@ -276,6 +287,9 @@ message_to_string({callback_spec_arg_type_mismatch, [B, F, A, N, ST, CT]}) ->
 message_to_string({callback_missing, [B, F, A]}) ->
     fmt("~!^Undefined callback function ~!!~w/~w~!^ (behaviour ~!!"
         "'~w'~!^)",[F, A, B]);
+message_to_string({callback_not_exported, [B, F, A]}) ->
+    fmt("~!^Callback function ~!!~w/~w~!^ exists but is not exported"
+        " (behaviour ~!!'~w'~!^)", [F, A, B]);
 message_to_string({callback_info_missing, [B]}) ->
     fmt("~!^Callback info about the ~!r~w~!!~!^"
         " behaviour is not available", [B]);
