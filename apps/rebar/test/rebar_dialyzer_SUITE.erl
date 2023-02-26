@@ -121,7 +121,16 @@ empty_app_plt(Config) ->
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, []),
 
-    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
+    %% For this test to pass, ignore warnings for unknown calls
+    DialyzerOpts = lists:keystore(
+        warnings,
+        1,
+        proplists:get_value(dialyzer, RebarConfig, []),
+        {warnings, [no_unknown]}
+    ),
+    RCfg = lists:keystore(dialyzer, 1, RebarConfig, {dialyzer, DialyzerOpts}),
+
+    rebar_test_utils:run_and_check(Config, RCfg, ["dialyzer"],
                                    {ok, [{app, Name}]}),
 
     {ok, BasePltFiles} = plt_files(BasePlt),
@@ -438,27 +447,9 @@ extra_src_dirs(Config) ->
 no_existing_incremental_plt(Config) ->
     AppDir = ?config(apps, Config),
     [{dialyzer, Opts}] = ?config(rebar_config, Config),
-    RebarConfig = [{dialyzer,[incremental|Opts]}],
+    RebarConfig = [{dialyzer, [incremental|Opts]}],
     Plt = ?config(plt, Config),
-
-    Name = rebar_test_utils:create_random_name("app1_"),
-    Vsn = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(AppDir, Name, Vsn, [erts]),
-
-    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
-                                   {ok, [{app, Name}]}),
-
-    ErtsModules = erts_modules(),
-    {ok, PltModules} = plt_modules(Plt),
-    ?assertEqual(ErtsModules, PltModules),
-
-    ok.
-
-update_incremental_plt(Config) ->
-    AppDir = ?config(apps, Config),
-    [{dialyzer, Opts}] = ?config(rebar_config, Config),
-    RebarConfig = [{dialyzer,[incremental|Opts]}],
-    Plt = ?config(plt, Config),
+    BasePlt = ?config(base_plt, Config),
 
     Name = rebar_test_utils:create_random_name("app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
@@ -467,41 +458,83 @@ update_incremental_plt(Config) ->
     rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
                                    {ok, [{app, Name}]}),
 
-    Files = app_files(App),
+    %% An incremental analysis will reuse and keep modifying the same PLT
+    %% and will therefore have the project's modules mixed in as soon as the
+    %% OTP version supports it. The base PLT should however be clean
+    case is_incremental_available() of
+        false ->
+            ErtsModules = erts_modules(),
+            {ok, PltModules} = plt_modules(Plt),
+            ?assertEqual(ErtsModules, PltModules);
+        true ->
+            ErtsModules = erts_modules(),
+            {ok, BasePltModules} = plt_modules(BasePlt),
+            ?assertEqual(ErtsModules, BasePltModules),
+            {ok, PltModules} = plt_modules(Plt),
+            ?assertEqual(lists:sort(ErtsModules ++ app_modules(App)), PltModules)
+    end,
+    ok.
 
-    ErtsModules = erts_modules(),
+update_incremental_plt(Config) ->
+    AppDir = ?config(apps, Config),
+    [{dialyzer, Opts}] = ?config(rebar_config, Config),
+    RebarConfig = [{dialyzer,[incremental|Opts]}],
+    Plt = ?config(plt, Config),
+    BasePlt = ?config(base_plt, Config),
 
-    {ok, PltModules} = plt_modules(Plt),
-    ?assertEqual(ErtsModules, PltModules),
-
-    alter_incremental_plt(Plt, Files),
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    {ok, App} = rebar_test_utils:create_app(AppDir, Name, Vsn, [erts]),
 
     rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
                                    {ok, [{app, Name}]}),
 
-    {ok, PltModules2} = plt_modules(Plt),
-    ?assertEqual(ErtsModules, PltModules2),
-
-    ok = file:delete(Plt),
-
+    %% An incremental analysis will reuse and keep modifying the same PLT
+    %% and will therefore have the project's modules mixed in as soon as the
+    %% OTP version supports it. The base PLT should however be clean
+    case is_incremental_available() of
+        false ->
+            ErtsModules = erts_modules(),
+            {ok, PltModules} = plt_modules(Plt),
+            ?assertEqual(ErtsModules, PltModules);
+        true ->
+            ErtsModules = erts_modules(),
+            {ok, BasePltModules} = plt_modules(BasePlt),
+            ?assertEqual(ErtsModules, BasePltModules),
+            {ok, PltModules} = plt_modules(Plt),
+            ?assertEqual(lists:sort(ErtsModules ++ app_modules(App)), PltModules)
+    end,
+    %% Delete one of the app modules, run again
+    OldMods = app_modules(App),
+    SrcDir = filename:dirname(rebar_app_info:app_file_src(App)),
+    SrcFiles = [filename:join(SrcDir, File)
+                || File <- filelib:wildcard("*.erl", SrcDir)],
+    ok = file:delete(hd(SrcFiles)),
+    ok = file:write_file(filename:join(SrcDir, "fake.erl"),
+                       "-module(fake).\n"),
     rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
                                    {ok, [{app, Name}]}),
 
-    {ok, PltModules3} = plt_modules(Plt),
-    ?assertEqual(ErtsModules, PltModules3),
-
-    add_missing_file_incremental(Plt, Files),
-
-    rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer"],
-                                   {ok, [{app, Name}]}),
-
-    {ok, PltModules4} = plt_modules(Plt),
-    ?assertEqual(ErtsModules, PltModules4).
+    case is_incremental_available() of
+        false ->
+            ErtsModules1 = erts_modules(),
+            {ok, PltModules1} = plt_modules(Plt),
+            ?assertEqual(ErtsModules1, PltModules1);
+        true ->
+            ErtsModules1 = erts_modules(),
+            {ok, BasePltModules1} = plt_modules(BasePlt),
+            ?assertEqual(ErtsModules1, BasePltModules1),
+            {ok, PltModules1} = plt_modules(Plt),
+            ?assertNotEqual(lists:sort(ErtsModules1 ++ OldMods), PltModules1),
+            ?assertEqual(lists:sort(ErtsModules1 ++ app_modules(App)), PltModules1)
+    end,
+    ok.
 
 incremental_cli_args(Config) ->
     AppDir = ?config(apps, Config),
     [{dialyzer, Opts}] = ?config(rebar_config, Config),
     Plt = ?config(plt, Config),
+    BasePlt = ?config(base_plt, Config),
 
     {value, {_, Prefix}, Opts1} = lists:keytake(plt_prefix, 1, Opts),
     {value, {_, BasePrefix}, Opts2} = lists:keytake(base_plt_prefix, 1, Opts1),
@@ -511,12 +544,12 @@ incremental_cli_args(Config) ->
 
     Name1 = rebar_test_utils:create_random_name("relapp1_"),
     Vsn1 = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(filename:join([AppDir,"apps",Name1]), Name1, Vsn1,
-                                [erts]),
+    {ok, App1} = rebar_test_utils:create_app(filename:join([AppDir,"apps",Name1]), Name1, Vsn1,
+                                             [erts]),
     Name2 = rebar_test_utils:create_random_name("relapp2_"),
     Vsn2 = rebar_test_utils:create_random_vsn(),
-    rebar_test_utils:create_app(filename:join([AppDir,"apps",Name2]), Name2, Vsn2,
-                                [erts, ec_cnv:to_atom(Name1)]),
+    {ok, App2} = rebar_test_utils:create_app(filename:join([AppDir,"apps",Name2]), Name2, Vsn2,
+                                             [erts, ec_cnv:to_atom(Name1)]),
 
     rebar_test_utils:run_and_check(Config, RebarConfig, ["dialyzer",
                                                          "--incremental",
@@ -527,20 +560,27 @@ incremental_cli_args(Config) ->
                                                          "--statistics"],
                                    {ok, [{app, Name1}, {app, Name2}]}),
 
-    ErtsModules = erts_modules(),
-
-    {ok, PltModules} = plt_modules(Plt),
-    ?assertEqual(ErtsModules, PltModules).
+    %% An incremental analysis will reuse and keep modifying the same PLT
+    %% and will therefore have the project's modules mixed in as soon as the
+    %% OTP version supports it. The base PLT should however be clean
+    case is_incremental_available() of
+        false ->
+            ErtsModules = erts_modules(),
+            {ok, PltModules} = plt_modules(Plt),
+            ?assertEqual(ErtsModules, PltModules);
+        true ->
+            ErtsModules = erts_modules(),
+            {ok, BasePltModules} = plt_modules(BasePlt),
+            ?assertEqual(ErtsModules, BasePltModules),
+            {ok, PltModules} = plt_modules(Plt),
+            ?assertEqual(
+               lists:sort(ErtsModules ++ app_modules(App1) ++ app_modules(App2)),
+               PltModules
+            )
+    end,
+    ok.
 
 %% Helpers
-
--spec app_files(rebar_app_info:t()) -> [file:name()].
-app_files(AppInfo) ->
-    Dir = rebar_app_info:ebin_dir(AppInfo),
-    Beams = filelib:wildcard("*.beam", Dir),
-    Files = lists:map(fun(Beam) -> filename:join(Dir, Beam) end,
-                          Beams),
-    lists:sort(Files).
 
 erts_files() ->
     ErtsDir = code:lib_dir(erts, ebin),
@@ -556,6 +596,25 @@ erts_modules() ->
                           ErtsBeams),
     lists:sort(ErtsModules).
 
+app_modules(AppInfo) ->
+    Dir = rebar_app_info:ebin_dir(AppInfo),
+    Beams = filelib:wildcard("*.beam", Dir),
+    %% Same thing for app setups
+    ProjDir = filename:join([rebar_app_info:dir(AppInfo),
+                             "_build", "default", "lib",
+                             rebar_app_info:name(AppInfo),
+                             "ebin"]),
+    ProjBeams = filelib:wildcard("*.beam", unicode:characters_to_list(ProjDir)),
+    %% Same thing for umbrella setups
+    UmbrDir = filename:join([filename:dirname(filename:dirname(rebar_app_info:dir(AppInfo))),
+                             "_build", "default", "lib",
+                             rebar_app_info:name(AppInfo),
+                             "ebin"]),
+    UmbrBeams = filelib:wildcard("*.beam", unicode:characters_to_list(UmbrDir)),
+    Modules = lists:map(fun(Beam) -> filename:basename(Beam, ".beam") end,
+                        Beams++ProjBeams++UmbrBeams),
+    lists:sort(Modules).
+
 plt_files(Plt) ->
     case dialyzer:plt_info(Plt) of
         {ok, Info} ->
@@ -569,7 +628,7 @@ plt_modules(Plt) ->
     case dialyzer:plt_info(Plt) of
         {ok, {incremental, Info}} ->
             Modules = proplists:get_value(modules, Info),
-            {ok, lists:sort(Modules)};
+            {ok, normalize_modules(lists:sort(Modules))};
         Other ->
             Other
     end.
@@ -584,12 +643,6 @@ alter_plt(Plt) ->
                       {files, [code:which(dialyzer)]}]),
     ok.
 
-alter_incremental_plt(Plt, Files) ->
-    _ = dialyzer:run([{analysis_type, incremental},
-                      {init_plt, Plt},
-                      {files, [code:which(dialyzer)] ++ tl(Files)}]),
-    ok.
-
 add_missing_file(Plt) ->
     Source = code:which(dialyzer),
     Dest = filename:join(filename:dirname(Plt), "dialyzer.beam"),
@@ -598,19 +651,6 @@ add_missing_file(Plt) ->
             dialyzer:run([{analysis_type, plt_add},
                           {init_plt, Plt},
                           {files, [Dest]}])
-        after
-            ok = file:delete(Dest)
-        end,
-    ok.
-
-add_missing_file_incremental(Plt, Files) ->
-    Source = code:which(dialyzer),
-    Dest = filename:join(filename:dirname(Plt), "dialyzer.beam"),
-    {ok, _} = file:copy(Source, Dest),
-    _ = try
-            dialyzer:run([{analysis_type, incremental},
-                          {init_plt, Plt},
-                          {files, [Dest|Files]}])
         after
             ok = file:delete(Dest)
         end,
@@ -638,3 +678,15 @@ is_incremental_available() ->
         {error, _} -> false;
         {module, _} -> true
     end.
+
+%% the file paths are allowed to be atoms or even binaries,
+%% and this representation changes across versions. Ensure we use strings
+%% for all tests and assertions.
+normalize_modules([]) ->
+    [];
+normalize_modules([H|T]) when is_list(H) ->
+    [H|normalize_modules(T)];
+normalize_modules([H|T]) when is_binary(H) ->
+    [unicode:characters_to_list(H)|normalize_modules(T)];
+normalize_modules([H|T]) when is_atom(H) ->
+    [atom_to_list(H)|normalize_modules(T)].
