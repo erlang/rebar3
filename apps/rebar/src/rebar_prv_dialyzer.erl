@@ -14,6 +14,7 @@
 
 %% Waiting on fix in OTP: https://github.com/erlang/otp/pull/6207
 -dialyzer({no_return, incremental/4}).
+-dialyzer({no_return, incremental_base_plt/3}).
 
 -define(PROVIDER, dialyzer).
 -define(DEPS, [compile]).
@@ -463,6 +464,18 @@ build_proj_plt(Args, State, Plt, Output, Files) ->
             throw({dialyzer_error, Error})
     end.
 
+ensure_incremental_base_plt(Args, State) ->
+    BasePlt = get_base_plt(Args, State),
+    case dialyzer:plt_info(BasePlt) of
+        {ok, _} ->
+            {0, BasePlt, State};
+        {error, _} ->
+            ?INFO("Creating base plt...", []),
+            BaseFiles = base_plt_files(State),
+            {BaseWarnings, State1} = incremental_base_plt(State, BasePlt, BaseFiles),
+            {BaseWarnings, BasePlt, State1}
+    end.
+
 get_base_plt(Args, State) ->
     Prefix = proplists:get_value(base_plt_prefix, Args, get_config(State, base_plt_prefix, ?PLT_PREFIX)),
     Name = plt_name(Prefix, Args, State),
@@ -491,6 +504,17 @@ update_base_plt(State, BasePlt, Output, BaseFiles) ->
             build_plt(State, BasePlt, Output, BaseFiles)
     end.
 
+incremental_base_plt(State, BasePlt, BaseFiles) ->
+    ?INFO("Building incremental PLT with ~b files in ~ts...",
+          [length(BaseFiles), format_path(BasePlt)]),
+    Opts = [{analysis_type, incremental},
+            {get_warnings, false},
+            {from, byte_code},
+            {files, BaseFiles},
+            {output_plt, BasePlt}],
+    _ = dialyzer:run(Opts),
+    {0, State}.
+
 build_plt(State, Plt, _, []) ->
     ?INFO("Building with no files in ~ts...", [format_path(Plt)]),
     Opts = [{get_warnings, false},
@@ -512,16 +536,28 @@ build_plt(State, Plt, Output, Files) ->
     run_dialyzer(State, Opts, Output).
 
 incremental(Args, State, Plt, Output) ->
+    %% If a project PLT exists, use it both as input and output;
+    %% If no project PLT exists, start from a base PLT as input, and output to project
+    %% If neither exists, then:
+    %%  - run a base incremental PLT in a global dir
+    %%  - use it as a base PLT and output to the project
     ?INFO("Running incremental analysis...", []),
     PLTFiles = proj_plt_files(State),
     WarningFiles = proj_files(proplists:get_value(app, Args), State),
+    {_BaseWarnings, BaseIncrPlt, State1} = ensure_incremental_base_plt(Args, State),
+    PltOpts = case dialyzer:plt_info(Plt) of
+        {ok, _} -> % Exists
+            [{init_plt, Plt}, {output_plt, Plt}];
+        {error, _} ->
+            [{init_plt, BaseIncrPlt}, {output_plt, Plt}]
+    end,
     Opts = [{analysis_type, incremental},
             {get_warnings, true},
             {from, byte_code},
             {files, ordsets:from_list(PLTFiles ++ WarningFiles)},
-            {warning_files, WarningFiles},
-            {init_plt, Plt}],
-    run_dialyzer(State, Opts, Output).
+            {warning_files, WarningFiles}
+            | PltOpts],
+    run_dialyzer(State1, Opts, Output).
 
 succ_typings(Args, State, Plt, Output) ->
     case proplists:get_value(succ_typings, Args) of
@@ -597,7 +633,10 @@ run_dialyzer(State, Opts, Output) ->
 legacy_warnings(Warnings) ->
     case dialyzer_version() of
        TupleVsn when TupleVsn < {2, 8, 0} ->
-            [Warning || Warning <- Warnings, Warning =/= unknown];
+            [Warning || Warning <- Warnings,
+                        Warning =/= unknown, Warning =/= no_unknown];
+       TupleVsn when TupleVsn < {5, 1, 0} ->
+            [Warning || Warning <- Warnings, Warning =/= no_unknown];
         _ ->
             Warnings
     end.
