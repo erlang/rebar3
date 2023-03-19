@@ -10,6 +10,6 @@
 {template, "sys.config", "{{name}}/config/sys.config"}.
 {template, "vm.args", "{{name}}/config/vm.args"}.
 {template, "gitignore", "{{name}}/.gitignore"}.
-{template, "LICENSE", "{{name}}/LICENSE"}.
+{template, "LICENSE.md", "{{name}}/LICENSE.md"}.
 {template, "README.md", "{{name}}/README.md"}.
 
