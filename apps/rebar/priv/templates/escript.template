@@ -7,5 +7,5 @@
 {template, "otp_lib.app.src", "{{name}}/src/{{name}}.app.src"}.
 {template, "escript_rebar.config", "{{name}}/rebar.config"}.
 {template, "gitignore", "{{name}}/.gitignore"}.
-{template, "LICENSE", "{{name}}/LICENSE"}.
+{template, "LICENSE.md", "{{name}}/LICENSE.md"}.
 {template, "escript_README.md", "{{name}}/README.md"}.
