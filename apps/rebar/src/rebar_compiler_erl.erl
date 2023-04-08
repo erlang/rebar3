@@ -183,7 +183,7 @@ clean(Files, AppInfo) ->
 error_tuple(Module, Es, Ws, AllOpts, Opts) ->
     FormattedEs = format_error_sources(Es, AllOpts),
     FormattedWs = format_error_sources(Ws, AllOpts),
-    rebar_compiler:error_tuple(Module, FormattedEs, FormattedWs, Opts).
+    rebar_compiler:error_tuple(Module, FormattedEs, FormattedWs, AllOpts, Opts).
 
 format_error_sources(Es, Opts) ->
     [{rebar_compiler:format_error_source(Src, Opts), Desc}
