@@ -472,7 +472,7 @@ setup_deps_and_repos(Deps, Repos) ->
 insert_deps(Deps) ->
     lists:foreach(fun({Name, Version, Repo, Retired}) ->
                           ets:insert(?PACKAGE_TABLE, #package{key={rebar_utils:to_binary(Name),
-                                                                   ec_semver:parse(Version),
+                                                                   verl:parse(Version),
                                                                    rebar_utils:to_binary(Repo)},
                                                               dependencies=[],
                                                               retired=Retired,
@@ -480,7 +480,7 @@ insert_deps(Deps) ->
                                                               outer_checksum = <<"outer checksum">>});
                      ({Name, Version, InnerChecksum, OuterChecksum, Repo, Retired}) ->
                           ets:insert(?PACKAGE_TABLE, #package{key={rebar_utils:to_binary(Name),
-                                                                   ec_semver:parse(Version),
+                                                                   verl:parse(Version),
                                                                    rebar_utils:to_binary(Repo)},
                                                               dependencies=[],
                                                               retired=Retired,
