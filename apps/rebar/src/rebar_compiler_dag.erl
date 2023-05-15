@@ -132,46 +132,41 @@ filter_prefix(G, [{App, Out} | AppTail] = AppPaths, [File | FTail]) ->
             filter_prefix(G, AppPaths, FTail)
     end.
 
-finalise_populate_sources(_G, _InDirs, Waiting) when Waiting =:= #{} ->
+finalise_populate_sources(G, InDirs, Pool) ->
+    Res = rebar_parallel:pool_terminate(Pool),
+    finalise_populate_sources_(G, InDirs, Res).
+
+finalise_populate_sources_(_G, _InDirs, []) ->
     ok;
-finalise_populate_sources(G, InDirs, Waiting) ->
-    %% wait for all deps to complete
-    receive
-        {deps, Pid, AbsIncls} ->
-            {Status, Source} = maps:get(Pid, Waiting),
-            %% the file hasn't been visited yet; set it to existing, but with
-            %% a last modified value that's null so it gets updated to something new.
-            [digraph:add_vertex(G, Src, 0) || Src <- AbsIncls,
-                digraph:vertex(G, Src) =:= false],
-            %% drop edges from deps that aren't included!
-            [digraph:del_edge(G, Edge) || Status == old,
-                Edge <- digraph:out_edges(G, Source),
-                {_, _Src, Path, _Label} <- [digraph:edge(G, Edge)],
-                not lists:member(Path, AbsIncls)],
-            %% Add the rest
-            [digraph:add_edge(G, Source, Incl) || Incl <- AbsIncls],
-            %% mark the digraph dirty when there is any change in
-            %%  dependencies, for any application in the project
-            mark_dirty(G),
-            finalise_populate_sources(G, InDirs, Waiting);
-        {'DOWN', _MRef, process, Pid, normal} ->
-            finalise_populate_sources(G, InDirs, maps:remove(Pid, Waiting));
-        {'DOWN', _MRef, process, Pid, Reason} ->
-            {_Status, Source} = maps:get(Pid, Waiting),
-            ?ERROR("Failed to get dependencies for ~s~n~p", [Source, Reason]),
-            ?ABORT
-    end.
+finalise_populate_sources_(G, InDirs, [{Status, {deps, Source, AbsIncls}}|Acc]) ->
+    %% the file hasn't been visited yet; set it to existing, but with
+    %% a last modified value that's null so it gets updated to something new.
+    [digraph:add_vertex(G, Src, 0) || Src <- AbsIncls,
+                                      digraph:vertex(G, Src) =:= false],
+    %% drop edges from deps that aren't included!
+    [digraph:del_edge(G, Edge) || Status == old,
+                                  Edge <- digraph:out_edges(G, Source),
+                                  {_, _Src, Path, _Label} <- [digraph:edge(G, Edge)],
+                                  not lists:member(Path, AbsIncls)],
+    %% Add the rest
+    [digraph:add_edge(G, Source, Incl) || Incl <- AbsIncls],
+    %% mark the digraph dirty when there is any change in
+    %%  dependencies, for any application in the project
+    mark_dirty(G),
+    finalise_populate_sources_(G, InDirs, Acc).
 
 %% @doc this function scans all the source files found and looks into
 %% all the `InDirs' for deps (other source files, or files that aren't source
 %% but still returned by the compiler module) that are related
 %% to them.
 populate_sources(G, Compiler, InDirs, Sources, DepOpts) ->
-    populate_sources(G, Compiler, InDirs, Sources, DepOpts, #{}).
+    Pool = rebar_parallel:pool(fun erlang:apply/2, [],
+                               fun(Res, _) -> {ok, Res} end, []),
+    populate_sources(G, Compiler, InDirs, Sources, DepOpts, Pool).
 
-populate_sources(G, _Compiler, InDirs, [], _DepOpts, Waiting) ->
-    finalise_populate_sources(G, InDirs, Waiting);
-populate_sources(G, Compiler, InDirs, [Source|Erls], DepOpts, Waiting) ->
+populate_sources(G, _Compiler, InDirs, [], _DepOpts, Pool) ->
+    finalise_populate_sources(G, InDirs, Pool);
+populate_sources(G, Compiler, InDirs, [Source|Erls], DepOpts, Pool) ->
     case digraph:vertex(G, Source) of
         {_, LastUpdated} ->
             case filelib:last_modified(Source) of
@@ -180,19 +175,21 @@ populate_sources(G, Compiler, InDirs, [Source|Erls], DepOpts, Waiting) ->
                     %% from the graph.
                     digraph:del_vertex(G, Source),
                     mark_dirty(G),
-                    populate_sources(G, Compiler, InDirs, Erls, DepOpts, Waiting);
+                    populate_sources(G, Compiler, InDirs, Erls, DepOpts, Pool);
                 LastModified when LastUpdated < LastModified ->
                     digraph:add_vertex(G, Source, LastModified),
-                    Worker = prepopulate_deps(Compiler, InDirs, Source, DepOpts, self()),
-                    populate_sources(G, Compiler, InDirs, Erls, DepOpts, Waiting#{Worker => {old, Source}});
+                    Work = fun() -> {old, prepopulate_deps(Compiler, InDirs, Source, DepOpts)} end,
+                    rebar_parallel:pool_task_async(Pool, Work),
+                    populate_sources(G, Compiler, InDirs, Erls, DepOpts, Pool);
                 _ -> % unchanged
-                    populate_sources(G, Compiler, InDirs, Erls, DepOpts, Waiting)
+                    populate_sources(G, Compiler, InDirs, Erls, DepOpts, Pool)
             end;
         false ->
             LastModified = filelib:last_modified(Source),
             digraph:add_vertex(G, Source, LastModified),
-            Worker = prepopulate_deps(Compiler, InDirs, Source, DepOpts, self()),
-            populate_sources(G, Compiler, InDirs, Erls, DepOpts, Waiting#{Worker => {new, Source}})
+            Work = fun() -> {new, prepopulate_deps(Compiler, InDirs, Source, DepOpts)} end,
+            rebar_parallel:pool_task_async(Pool, Work),
+            populate_sources(G, Compiler, InDirs, Erls, DepOpts, Pool)
     end.
 
 %% @doc Scan all files in the digraph that are seen as dependencies, but are
@@ -450,20 +447,15 @@ maybe_rm_vertex(G, Source) ->
 %% mark its timestamp to 0, which means we have no info on it.
 %% Source files will be covered at a later point in their own scan, and
 %% non-source files are going to be covered by `populate_deps/3'.
-prepopulate_deps(Compiler, InDirs, Source, DepOpts, Control) ->
-    {Worker, _MRef} = spawn_monitor(
-        fun () ->
-            SourceDir = filename:dirname(Source),
-            AbsIncls = case erlang:function_exported(Compiler, dependencies, 4) of
-                false ->
-                    Compiler:dependencies(Source, SourceDir, InDirs);
-                true ->
-                    Compiler:dependencies(Source, SourceDir, InDirs, DepOpts)
-            end,
-            Control ! {deps, self(), AbsIncls}
-        end
-    ),
-    Worker.
+prepopulate_deps(Compiler, InDirs, Source, DepOpts) ->
+    SourceDir = filename:dirname(Source),
+    AbsIncls = case erlang:function_exported(Compiler, dependencies, 4) of
+        false ->
+            Compiler:dependencies(Source, SourceDir, InDirs);
+        true ->
+            Compiler:dependencies(Source, SourceDir, InDirs, DepOpts)
+    end,
+    {deps, Source, AbsIncls}.
 
 %% check that a dep file is up to date
 refresh_dep(_G, {artifact, _}) ->
