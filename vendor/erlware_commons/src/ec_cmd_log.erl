@@ -126,7 +126,7 @@ debug(LogState, Fun)
                                      colorize(LogState, ?CYAN, false, Fun())
                              end);
 debug(LogState, String) ->
-    debug(LogState, "~s~n", [String]).
+    debug(LogState, "~ts~n", [String]).
 
 %% @doc log at the debug level given the current log state with a format string
 %% and argements @see io:format/2
@@ -143,7 +143,7 @@ info(LogState, Fun)
                                     colorize(LogState, ?GREEN, false, Fun())
                             end);
 info(LogState, String) ->
-    info(LogState, "~s~n", [String]).
+    info(LogState, "~ts~n", [String]).
 
 %% @doc log at the info level given the current log state with a format string
 %% and argements @see io:format/2
@@ -160,7 +160,7 @@ error(LogState, Fun)
                                      colorize(LogState, ?RED, false, Fun())
                              end);
 error(LogState, String) ->
-    error(LogState, "~s~n", [String]).
+    error(LogState, "~ts~n", [String]).
 
 %% @doc log at the error level given the current log state with a format string
 %% and argements @see io:format/2
@@ -175,7 +175,7 @@ warn(LogState, Fun)
     when erlang:is_function(Fun) ->
     log(LogState, ?EC_WARN, fun() -> colorize(LogState, ?MAGENTA, false, Fun()) end);
 warn(LogState, String) ->
-    warn(LogState, "~s~n", [String]).
+    warn(LogState, "~ts~n", [String]).
 
 %% @doc log at the warn level given the current log state with a format string
 %% and argements @see io:format/2
@@ -187,7 +187,7 @@ warn(LogState, FormatString, Args) ->
 -spec log(t(), int_log_level(), log_fun()) -> ok.
 log(#state_t{log_level=DetailLogLevel}, LogLevel, Fun)
     when DetailLogLevel >= LogLevel ->
-    io:format("~s~n", [Fun()]);
+    io:format("~ts~n", [Fun()]);
 log(_, _, _) ->
     ok.
 
@@ -254,10 +254,10 @@ colorize(State, Color, true, Msg) when ?VALID_COLOR(Color) ->
     colorize(State, Color - 32, false, Msg);
 colorize(#state_t{caller=command_line, intensity = high},
          Color, false, Msg) when ?VALID_COLOR(Color) ->
-    lists:flatten(cf:format("~!" ++ [Color] ++"~s~s", [?PREFIX, Msg]));
+    lists:flatten(cf:format("~!" ++ [Color] ++"~ts~ts", [?PREFIX, Msg]));
 colorize(#state_t{caller=command_line, intensity = low},
          Color, false, Msg) when ?VALID_COLOR(Color) ->
-    lists:flatten(cf:format("~!" ++ [Color] ++"~s~!!~s", [?PREFIX, Msg]));
+    lists:flatten(cf:format("~!" ++ [Color] ++"~ts~!!~ts", [?PREFIX, Msg]));
 colorize(_LogState, _Color, _Bold, Msg) ->
     Msg.
 

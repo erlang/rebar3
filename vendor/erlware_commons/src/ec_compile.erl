@@ -38,7 +38,7 @@ beam_to_erl_source(BeamFName, ErlFName) ->
           Src =
               erl_prettypr:format(erl_syntax:form_list(tl(Forms))),
           {ok, Fd} = file:open(ErlFName, [write]),
-          io:fwrite(Fd, "~s~n", [Src]),
+          io:fwrite(Fd, "~ts~n", [Src]),
           file:close(Fd);
       Error ->
           Error
