@@ -667,8 +667,13 @@ include_erts(State, Release, OutputDir, RelDir) ->
                         unix ->
                             DynErl = filename:join([LocalErtsBin, "dyn_erl"]),
                             Erl = filename:join([LocalErtsBin, "erl"]),
-                            ok = rlx_file_utils:ensure_writable(Erl),
-                            rlx_file_utils:copy(DynErl, Erl);
+                            case filelib:is_regular(DynErl) of
+                                true ->
+                                    ok = rlx_file_utils:ensure_writable(Erl),
+                                    rlx_file_utils:copy(DynErl, Erl);
+                                false ->
+                                    ok
+                            end;
                         win32 ->
                             ok
                     end,

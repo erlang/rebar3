@@ -24,10 +24,10 @@ To build the (very) limited documentation run `rebar edoc`.
 
 To use getopt in your project you can just add it as a dependency in your
 `rebar.config` file in the following way:
-```sh
+```erlang
 {deps,
  [
-  {getopt, "1.0.1"}
+  {getopt, "1.0.2"}
  ]
 }
 ```
@@ -57,7 +57,7 @@ The `parse/2` function receives a list of tuples with the command line option
 specifications. The type specification for the tuple is:
 
 ```erlang
--type arg_type() :: 'atom' | 'binary' | 'boolean' | 'float' | 'integer' | 'string'.
+-type arg_type() :: 'atom' | 'binary' | 'utf8_binary' | 'boolean' | 'float' | 'integer' | 'string'.
 
 -type arg_value() :: atom() | binary() | boolean() | float() | integer() | string().
 
@@ -244,7 +244,8 @@ A long option can have the following syntax:
 Argument Types
 --------------
 
-The arguments allowed for options are: *atom*; *binary*; *boolean*; *float*; *integer*; *string*.
+The arguments allowed for options are: *atom*; *binary*; *utf8_binary*; *boolean*;
+*float*; *integer*; *string*.
 The `getopt` module checks every argument to see if it can be converted to its
 correct type.
 
@@ -255,6 +256,17 @@ These ones are considered `false`: *false*; *f*; *no*; *n*; *off*; *disabled*; *
 Numeric arguments can only be negative when passed as part of an assignment expression.
 
 e.g. `--increment=-100` is a valid expression; whereas `--increment -100` is invalid
+
+Arguments of `utf8_binary` type allow proper binary encoding of arguments containing
+code points greater than 255. The resulting value is a normalized UTF-8 binary.
+
+As of Erlang/20, `standard_error` device has `unicode` option set to `false`.
+It prevents correct printing of usage for arguments containing unicode
+binaries/strings as default values. To fix this, one needs to enable unicode:
+
+```erlang
+io:setopts(standard_error, [{unicode, true}]).
+```
 
 
 Implicit Arguments

@@ -75,7 +75,7 @@ build_vsn_string(Vsn, RawRef, RawCount) ->
 
 get_patch_count(RawRef) ->
     Ref = re:replace(RawRef, "\\s", "", [global]),
-    Cmd = io_lib:format("git rev-list --count ~s..HEAD",
+    Cmd = io_lib:format("git rev-list --count ~ts..HEAD",
                          [Ref]),
     case os:cmd(Cmd) of
         "fatal: " ++ _ ->
@@ -88,7 +88,7 @@ get_patch_count(RawRef) ->
 parse_tags({}) ->
     parse_tags("");
 parse_tags(Pattern) ->
-    Cmd = io_lib:format("git describe --abbrev=0 --tags --match \"~s*\"", [Pattern]),
+    Cmd = io_lib:format("git describe --abbrev=0 --tags --match \"~ts*\"", [Pattern]),
     Tag = os:cmd(Cmd),
     case Tag of
         "fatal: " ++ _ ->

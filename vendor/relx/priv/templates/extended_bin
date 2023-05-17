@@ -388,14 +388,14 @@ relx_nodetool() {
     nodetool_id="maint$(relx_gen_id)-${NAME}"
 
     if [ -z "${START_EPMD}" ]; then
-        ERL_FLAGS="${ERL_FLAGS} ${DIST_ARGS} ${EXTRA_DIST_ARGS} ${NAME_TYPE} $nodetool_id -setcookie ${COOKIE}" \
+        ERL_FLAGS="${ERL_FLAGS} ${DIST_ARGS} ${EXTRA_DIST_ARGS} ${NAME_TYPE} $nodetool_id -setcookie ${COOKIE} -dist_listen false" \
                  "$ERTS_DIR/bin/escript" \
                  "$ROOTDIR/bin/nodetool" \
                  "$NAME_TYPE" "$NAME" \
                  "$command" "$@"
     else
         # shellcheck disable=SC2086
-        ERL_FLAGS="${ERL_FLAGS} ${DIST_ARGS} ${EXTRA_DIST_ARGS} ${NAME_TYPE} $nodetool_id -setcookie ${COOKIE}" \
+        ERL_FLAGS="${ERL_FLAGS} ${DIST_ARGS} ${EXTRA_DIST_ARGS} ${NAME_TYPE} $nodetool_id -setcookie ${COOKIE} -dist_listen false" \
                  "$ERTS_DIR/bin/escript" \
                  "$ROOTDIR/bin/nodetool" \
                  $START_EPMD "$NAME_TYPE" "$NAME" "$command" "$@"
@@ -724,6 +724,11 @@ if [ "$ERL_DIST_PORT" ]; then
         fi
         EXTRA_DIST_ARGS="-kernel inet_dist_listen_min ${ERL_DIST_PORT} -kernel inet_dist_listen_max ${ERL_DIST_PORT}"
     fi
+fi
+
+# Force use of nodetool if proto_dist set as erl_call doesn't support proto_dist
+if [ "$PROTO_DIST" ]; then
+    ERL_RPC=relx_nodetool
 fi
 
 # Extract the target cookie

@@ -13,7 +13,7 @@
 
 -export([parse/2, check/2, parse_and_check/2, format_error/2,
          usage/2, usage/3, usage/4, usage/6, tokenize/1]).
--export([usage_cmd_line/2]).
+-export([usage_cmd_line/2, usage_options/1]).
 
 -define(LINE_LENGTH, 75).
 -define(MIN_USAGE_COMMAND_LINE_OPTION_LENGTH, 25).
@@ -30,7 +30,7 @@
                               (Char) =:= $\n orelse (Char) =:= $\r)).
 
 %% Atom indicating the data type that an argument can be converted to.
--type arg_type()                                :: 'atom' | 'binary' | 'boolean' | 'float' | 'integer' | 'string'.
+-type arg_type()                                :: 'atom' | 'binary' | 'utf8_binary' | 'boolean' | 'float' | 'integer' | 'string'.
 %% Data type that an argument can be converted to.
 -type arg_value()                               :: atom() | binary() | boolean() | float() | integer() | string().
 %% Argument specification.
@@ -149,12 +149,7 @@ parse(OptSpecList, OptAcc, ArgAcc, _ArgPos, []) ->
 format_error(OptSpecList, {error, Reason}) ->
     format_error(OptSpecList, Reason);
 format_error(OptSpecList, {missing_required_option, Name}) ->
-    OptStr = case lists:keyfind(Name, 1, OptSpecList) of
-                 {Name,  undefined, undefined, _Type, _Help} -> ["<", to_string(Name), ">"];
-                 {_Name, undefined,      Long, _Type, _Help} -> ["--", Long];
-                 {_Name,     Short, undefined, _Type, _Help} -> ["-", Short];
-                 {_Name,     Short,      Long, _Type, _Help} -> ["-", Short, " (", Long, ")"]
-             end,
+    OptStr = opt_to_list(lists:keyfind(Name, 1, OptSpecList)),
     lists:flatten(["missing required option: ", OptStr]);
 format_error(_OptSpecList, {invalid_option, OptStr}) ->
     lists:flatten(["invalid option: ", to_string(OptStr)]);
@@ -162,8 +157,20 @@ format_error(_OptSpecList, {invalid_option_arg, {Name, Arg}}) ->
     lists:flatten(["option \'", to_string(Name) ++ "\' has invalid argument: ", to_string(Arg)]);
 format_error(_OptSpecList, {invalid_option_arg, OptStr}) ->
     lists:flatten(["invalid option argument: ", to_string(OptStr)]);
+format_error(OptSpecList, {missing_option_arg, Name}) ->
+    OptStr = opt_to_list(lists:keyfind(Name, 1, OptSpecList)),
+    lists:flatten(["missing option argument: ", OptStr, " <", to_string(Name), $>]);
 format_error(_OptSpecList, {Reason, Data}) ->
     lists:flatten([to_string(Reason), " ", to_string(Data)]).
+
+opt_to_list({Name, undefined, undefined, _Type, _Help}) ->
+    [$<, to_string(Name), $>];
+opt_to_list({_Name, undefined, Long, _Type, _Help}) ->
+    [$-, $-, Long];
+opt_to_list({_Name, Short, undefined, _Type, _Help}) ->
+    [$-, Short];
+opt_to_list({_Name, Short, Long, _Type, _Help}) ->
+    [$-, Short, $\s, $(, Long, $)].
 
 
 %% @doc Parse a long option, add it to the option accumulator and continue
@@ -435,6 +442,8 @@ to_type({Type, _DefaultArg}, Arg) ->
     to_type(Type, Arg);
 to_type(binary, Arg) ->
     list_to_binary(Arg);
+to_type(utf8_binary, Arg) ->
+    unicode:characters_to_binary(Arg);
 to_type(atom, Arg) ->
     list_to_atom(Arg);
 to_type(integer, Arg) ->
@@ -730,8 +739,8 @@ usage_option_text({_Name, Short, Long, _ArgSpec, _Help}) ->
 
 
 -spec usage_help_text(option_spec()) -> string().
-usage_help_text({_Name, _Short, _Long, {_ArgType, ArgValue}, [_ | _] = Help}) ->
-    Help ++ " [default: " ++ default_arg_value_to_string(ArgValue) ++ "]";
+usage_help_text({_Name, _Short, _Long, {ArgType, ArgValue}, [_ | _] = Help}) ->
+    Help ++ " [default: " ++ default_arg_value_to_string(ArgType, ArgValue) ++ "]";
 usage_help_text({_Name, _Short, _Long, _ArgSpec, Help}) ->
     Help.
 
@@ -804,15 +813,17 @@ wrap_text_line(_Length, [], Acc, _Count, _CurrentLineAcc) ->
     lists:reverse(Acc).
 
 
-default_arg_value_to_string(Value) when is_atom(Value) ->
+default_arg_value_to_string(_, Value) when is_atom(Value) ->
     atom_to_list(Value);
-default_arg_value_to_string(Value) when is_binary(Value) ->
+default_arg_value_to_string(binary, Value) when is_binary(Value) ->
     binary_to_list(Value);
-default_arg_value_to_string(Value) when is_integer(Value) ->
+default_arg_value_to_string(utf8_binary, Value) when is_binary(Value) ->
+    unicode:characters_to_list(Value);
+default_arg_value_to_string(_, Value) when is_integer(Value) ->
     integer_to_list(Value);
-default_arg_value_to_string(Value) when is_float(Value) ->
+default_arg_value_to_string(_, Value) when is_float(Value) ->
     lists:flatten(io_lib:format("~w", [Value]));
-default_arg_value_to_string(Value) ->
+default_arg_value_to_string(_, Value) ->
     Value.
 
 

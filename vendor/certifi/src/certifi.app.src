@@ -1,6 +1,6 @@
 {application,certifi,
              [{description,"CA bundle adapted from Mozilla by https://certifi.io"},
-              {vsn,"2.10.0"},
+              {vsn,"2.11.0"},
               {registered,[]},
               {applications,[kernel,stdlib]},
               {env,[]},
