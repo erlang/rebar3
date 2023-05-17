@@ -1,6 +1,6 @@
 # Rebar3
 
-[![Build Status](https://github.com/erlang/rebar3/workflows/Common%20Test/badge.svg)](https://github.com/erlang/rebar3/actions?query=branch%3Amaster+workflow%3A"Common+Test") [![Erlang Versions](https://img.shields.io/badge/Supported%20Erlang%2FOTP-23.0%20to%2025.0-blue)](http://www.erlang.org)
+[![Build Status](https://github.com/erlang/rebar3/workflows/Common%20Test/badge.svg)](https://github.com/erlang/rebar3/actions?query=branch%3Amaster+workflow%3A"Common+Test") [![Erlang Versions](https://img.shields.io/badge/Supported%20Erlang%2FOTP-24.0%20to%2026.0-blue)](http://www.erlang.org)
 
 1. [What is Rebar3?](#what-is-rebar3)
 2. [Why Rebar3?](#why-rebar3)
@@ -94,7 +94,7 @@ by [Erlang Solutions](https://www.erlang-solutions.com/resources/download.html),
 but be sure to choose the "Standard" download option or you'll have issues building
 projects.
 
-Do note that if you are planning to work with multiple Erlang versions on the same machine, you will want to build Rebar3 with the oldest one of them. The 3 newest major Erlang releases are supported at any given time: if the newest version is OTP-24, building with versions as old as OTP-22 will be supported, and produce an executable that will work with those that follow.
+Do note that if you are planning to work with multiple Erlang versions on the same machine, you will want to build Rebar3 with the oldest one of them. The 3 newest major Erlang releases are supported at any given time: if the newest version is OTP-26, building with versions as old as OTP-24 will be supported, and produce an executable that will work with those that follow.
 
 ## Documentation
 
