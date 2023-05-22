@@ -14,12 +14,16 @@ format(Source, {Line, Column}, Extra, Desc, Config) ->
     CompilerErrFmt = compiler_error_format(Config),
     case CompilerErrFmt == rich andalso find_line(Line, Source) of
         {ok, LnBin} ->
-            ?FMT("~ts: ~w:~w:~n"
-                 "  ~ts~n"
-                 "  ~s^-- ~ts~ts~n",
-                 [Source, Line, Column,
-                  LnBin,
-                  lists:duplicate(max(0, Column-1), " "), Extra, Desc]);
+            LnPad = lists:duplicate(length(integer_to_list(Line)), " "),
+            Arrow = cf:format("~!R~ts~!!",["╰──"]),
+            ?FMT(" ~ts ┌─ ~ts:~n"
+                 " ~ts │~n"
+                  " ~w │  ~ts~n"
+                 " ~ts │  ~s~ts ~ts~ts~n~n",
+                 [LnPad, Source,
+                  LnPad,
+                  Line, colorize(LnBin, Column),
+                  LnPad, lists:duplicate(max(0, Column-1), " "), Arrow, Extra, Desc]);
         _ ->
             ?FMT("~ts:~w:~w: ~ts~ts~n", [Source, Line, Column, Extra, Desc])
     end.
@@ -47,3 +51,22 @@ compiler_error_format(Opts) ->
         minimal -> minimal;
         rich -> rich
     end.
+
+%% @private try to colorize data based on common ways to end terminators
+%% in Erlang-like languages. Any character that isn't one of the following
+%% is considered to end a "word" of some type:
+%%
+%% - letters
+%% - numbers
+%% - underscore
+%% - quotations
+%%
+%% This will have false positives in some cases and if that becomes annoying
+%% we'll need to allow per-compiler module configurations here, but it should
+%% generally lead to proper colorization.
+colorize(Str, Col) ->
+    Pre = string:slice(Str, 0, max(0,Col-1)),
+    At = string:slice(Str, max(0,Col-1)),
+    [Bad | Tail] = [B || B <- re:split(At, "([^[A-Za-z0-9_#\"]+)", []),
+                         B =/= <<>>],
+    cf:format("~ts~!R~ts~!!~ts", [Pre,Bad,Tail]).
