@@ -287,17 +287,8 @@ format_error(Source, Extra, {Line, Mod=epp, Desc={include,lib,File}}, _Opts) ->
     FriendlyDesc = BaseDesc ++ Friendly,
     ?FMT("~ts:~w: ~ts~ts~n", [Source, Line, Extra, FriendlyDesc]);
 format_error(Source, Extra, {{Line, Column}, Mod, Desc}, Opts) ->
-    CompilerErrFmt = compiler_error_format(Opts),
-    LineDesc = case find_line(Line, Source) of
-        {ok, LnBin} when CompilerErrFmt == rich ->
-            ?FMT("~n  ~ts~n"
-                 "  ~s^--", [LnBin, lists:duplicate(max(0,Column-1), " ")]);
-        _ ->
-            ""
-    end,
     ErrorDesc = Mod:format_error(Desc),
-    ?FMT("~ts:~w:~w:~ts ~ts~ts~n", [Source, Line, Column, LineDesc,
-                                    Extra, ErrorDesc]);
+    rebar_compiler_format:format(Source, {Line, Column}, Extra, ErrorDesc, Opts);
 format_error(Source, Extra, {Line, Mod, Desc}, _Opts) ->
     ErrorDesc = Mod:format_error(Desc),
     ?FMT("~ts:~w: ~ts~ts~n", [Source, Line, Extra, ErrorDesc]);
@@ -305,26 +296,3 @@ format_error(Source, Extra, {Mod, Desc}, _Opts) ->
     ErrorDesc = Mod:format_error(Desc),
     ?FMT("~ts: ~ts~ts~n", [Source, Extra, ErrorDesc]).
 
-compiler_error_format(Opts) ->
-    %% `Opts' can be passed in both as a list or a dictionary depending
-    %% on whether the first call to rebar_erlc_compiler was done with
-    %% the type `rebar_dict()' or `rebar_state:t()'.
-    LookupFn = if is_list(Opts) -> fun(K,L) -> lists:keyfind(K, 1, L) end
-                ; true          -> fun(K,O) -> rebar_opts:get(O, K, false) end
-               end,
-    case LookupFn(compiler_error_format, Opts) of
-        false -> ?DEFAULT_COMPILER_ERROR_FORMAT;
-        {ok, minimal} -> minimal;
-        {ok, rich} -> rich;
-        minimal -> minimal;
-        rich -> rich
-    end.
-
-find_line(Nth, Source) ->
-  try
-      {ok, Bin} = file:read_file(Source),
-      Splits = re:split(Bin, "(?:\n|\r\n|\r)", [{newline, anycrlf}]),
-      {ok, lists:nth(Nth, Splits)}
-  catch
-      error:X -> {error, X}
-  end.
