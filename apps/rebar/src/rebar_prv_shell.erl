@@ -660,7 +660,7 @@ maybe_set_env_vars(State) ->
         {error, _} ->
             ?WARN("Failed to read file with environment variables: ~p", [EnvFile1]);
         {ok, Bin} ->
-            Lines = string:split(unicode:characters_to_list(Bin), "\n", all),
+            Lines = re:split(unicode:characters_to_list(Bin), "\n|\r\n", [{return, list}]),
             [handle_env_var_line(Line) || Line <- Lines]
     end.
 
