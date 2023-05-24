@@ -32,6 +32,7 @@
          run/7,
          run/8,
          ok_tuple/2,
+         ok_tuple/4,
          error_tuple/4,
          error_tuple/5,
          report/1,
@@ -132,6 +133,12 @@ run(Config, FirstFiles, SourceDir, SourceExt0, TargetDir, TargetExt,
 -spec ok_tuple(file:filename(), [string()]) -> {ok, [string()]}.
 ok_tuple(Source, Ws) ->
     {ok, format_warnings(Source, Ws)}.
+
+%% @doc Format good compiler results with warnings to work with
+%% module internals. Assumes that warnings are not treated as errors.
+-spec ok_tuple(file:filename(), [string()], rebar_dict(), [{_,_}]) -> {ok, [string()]}.
+ok_tuple(Source, Ws, Config, Opts) ->
+    {ok, format_warnings(Source, Ws, Config, Opts)}.
 
 %% @doc format error and warning strings for a given source file
 %% according to user preferences.

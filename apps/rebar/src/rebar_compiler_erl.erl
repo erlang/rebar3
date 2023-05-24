@@ -138,7 +138,7 @@ compile(Source, [{_, OutDir}], Config, ErlOpts) ->
             ok;
         {ok, _Mod, Ws} ->
             FormattedWs = format_error_sources(Ws, Config),
-            rebar_compiler:ok_tuple(Source, FormattedWs);
+            rebar_compiler:ok_tuple(Source, FormattedWs, Config, ErlOpts);
         {error, Es, Ws} ->
             error_tuple(Source, Es, Ws, Config, ErlOpts);
         error ->
@@ -161,7 +161,7 @@ compile_and_track(Source, [{Ext, OutDir}], Config, ErlOpts) ->
             {ok, [{Source, Target, AllOpts}]};
         {ok, _Mod, Ws} ->
             FormattedWs = format_error_sources(Ws, Config),
-            {ok, Warns} = rebar_compiler:ok_tuple(Source, FormattedWs),
+            {ok, Warns} = rebar_compiler:ok_tuple(Source, FormattedWs, Config, ErlOpts),
             {ok, [{Source, Target, AllOpts}], Warns};
         {error, Es, Ws} ->
             error_tuple(Source, Es, Ws, Config, ErlOpts);

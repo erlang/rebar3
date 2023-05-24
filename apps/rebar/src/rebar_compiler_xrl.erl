@@ -39,7 +39,7 @@ compile(Source, [{_, _}], Config, Opts) ->
         {ok, _} ->
             ok;
         {ok, _Mod, Ws} ->
-            rebar_compiler:ok_tuple(Source, Ws);
+            rebar_compiler:ok_tuple(Source, Ws, Config, Opts);
         {error, Es, Ws} ->
             rebar_compiler:error_tuple(Source, Es, Ws, Config, Opts)
     end.
