@@ -117,7 +117,13 @@ run(RawArgs) ->
 -spec run_aux(rebar_state:t(), [string()]) ->
     {ok, rebar_state:t()} | {error, term()}.
 run_aux(State, RawArgs) ->
-    io:setopts([{encoding, unicode}]),
+    %% The shell is already set to Unicode from Erlang/OTP 26+.
+    %% Skipping this also avoids a regression on Erlang/OTP 26.0.0.
+    case code:ensure_loaded(prim_tty) of
+      {module, _} -> ok;
+      {error, _} -> io:setopts([{encoding, unicode}])
+    end,
+
     %% Profile override; can only support one profile
     State1 = case os:getenv("REBAR_PROFILE") of
                  false ->
