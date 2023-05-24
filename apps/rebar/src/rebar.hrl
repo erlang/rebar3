@@ -27,6 +27,7 @@
 -define(DEFAULT_CDN, "https://repo.hex.pm").
 -define(LOCK_FILE, "rebar.lock").
 -define(DEFAULT_COMPILER_SOURCE_FORMAT, relative).
+-define(DEFAULT_COMPILER_ERROR_FORMAT, minimal). % 'rich' for multiline values
 -define(PACKAGE_INDEX_VERSION, 6).
 -define(PACKAGE_TABLE, package_index).
 -define(INDEX_FILE, "packages.idx").

@@ -27,6 +27,9 @@
 
 {minimum_otp_vsn, "21.0"}.
 
+%% Should errors be in a rich format, or a minimal one (tool-friendly)
+{compiler_error_format, rich}.
+
 %% MIB Options?
 {mib_opts, []}.
 %% SNMP mibs to compile first?

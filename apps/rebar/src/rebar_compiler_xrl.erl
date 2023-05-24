@@ -34,14 +34,14 @@ needed_files(_, FoundFiles, Mappings, AppInfo) ->
 dependencies(_, _, _) ->
     [].
 
-compile(Source, [{_, _}], _, Opts) ->
+compile(Source, [{_, _}], Config, Opts) ->
     case leex:file(Source, [{return, true} | Opts]) of
         {ok, _} ->
             ok;
         {ok, _Mod, Ws} ->
             rebar_compiler:ok_tuple(Source, Ws);
         {error, Es, Ws} ->
-            rebar_compiler:error_tuple(Source, Es, Ws, Opts)
+            rebar_compiler:error_tuple(Source, Es, Ws, Config, Opts)
     end.
 
 clean(XrlFiles, _AppInfo) ->

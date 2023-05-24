@@ -33,6 +33,7 @@
          run/8,
          ok_tuple/2,
          error_tuple/4,
+         error_tuple/5,
          report/1,
          maybe_report/1,
          format_error_source/2]).
@@ -139,8 +140,18 @@ ok_tuple(Source, Ws) ->
       Err :: string(),
       Warn :: string().
 error_tuple(Source, Es, Ws, Opts) ->
-    {error, format_errors(Source, Es),
-     format_warnings(Source, Ws, Opts)}.
+    {error, format_errors(Source, Es, []),
+     format_warnings(Source, Ws, dict:new(), Opts)}.
+
+%% @doc format error and warning strings for a given source file
+%% according to user preferences.
+-spec error_tuple(file:filename(), [Err], [Warn], rebar_dict(), [{_,_}]) ->
+    error_tuple() when
+      Err :: string(),
+      Warn :: string().
+error_tuple(Source, Es, Ws, Config, Opts) ->
+    {error, format_errors(Source, Es, Config),
+     format_warnings(Source, Ws, Config, Opts)}.
 
 %% @doc from a given path, and based on the user-provided options,
 %% format the file path according to the preferences.
@@ -208,19 +219,19 @@ compile_each([Source | Rest], Config, CompileFn) ->
     compile_each(Rest, Config, CompileFn).
 
 %% @private Formats and returns errors ready to be output.
--spec format_errors(string(), [err_or_warn()]) -> [string()].
-format_errors(Source, Errors) ->
-    format_errors(Source, "", Errors).
+-spec format_errors(string(), [err_or_warn()], rebar_dict() | [{_,_}]) -> [string()].
+format_errors(Source, Errors, Opts) ->
+    format_errors(Source, "", Errors, Opts).
 
 %% @private Formats and returns warning strings ready to be output.
 -spec format_warnings(string(), [err_or_warn()]) -> [string()].
 format_warnings(Source, Warnings) ->
-    format_warnings(Source, Warnings, []).
+    format_warnings(Source, Warnings, dict:new(), []).
 
 %% @private Formats and returns warnings; chooses the distinct format they
 %% may have based on whether `warnings_as_errors' option is on.
--spec format_warnings(string(), [err_or_warn()], rebar_dict() | [{_,_}]) -> [string()].
-format_warnings(Source, Warnings, Opts) ->
+-spec format_warnings(string(), [err_or_warn()], rebar_dict(), rebar_dict() | [{_,_}]) -> [string()].
+format_warnings(Source, Warnings, Config, Opts) ->
     %% `Opts' can be passed in both as a list or a dictionary depending
     %% on whether the first call to rebar_erlc_compiler was done with
     %% the type `rebar_dict()' or `rebar_state:t()'.
@@ -231,7 +242,7 @@ format_warnings(Source, Warnings, Opts) ->
                  true -> "";
                  false -> "Warning: "
              end,
-    format_errors(Source, Prefix, Warnings).
+    format_errors(Source, Prefix, Warnings, Config).
 
 %% @private output compiler errors if they're judged to be reportable.
 -spec maybe_report(Reportable | term()) -> ok when
@@ -254,16 +265,16 @@ report(Messages) ->
     lists:foreach(fun(Msg) -> io:format("~ts~n", [Msg]) end, Messages).
 
 %% private format compiler errors into proper outputtable strings
--spec format_errors(_, Extra, [err_or_warn()]) -> [string()] when
+-spec format_errors(_, Extra, [err_or_warn()], rebar_dict() | [{_,_}]) -> [string()] when
       Extra :: string().
-format_errors(_MainSource, Extra, Errors) ->
-    [[format_error(Source, Extra, Desc) || Desc <- Descs]
+format_errors(_MainSource, Extra, Errors, Opts) ->
+    [[format_error(Source, Extra, Desc, Opts) || Desc <- Descs]
      || {Source, Descs} <- Errors].
 
 %% @private format compiler errors into proper outputtable strings
--spec format_error(file:filename(), Extra, err_or_warn()) -> string() when
+-spec format_error(file:filename(), Extra, err_or_warn(), rebar_dict() | [{_,_}]) -> string() when
       Extra :: string().
-format_error(Source, Extra, {Line, Mod=epp, Desc={include,lib,File}}) ->
+format_error(Source, Extra, {Line, Mod=epp, Desc={include,lib,File}}, _Opts) ->
     %% Special case for include file errors, overtaking the default one
     BaseDesc = Mod:format_error(Desc),
     Friendly = case filename:split(File) of
@@ -275,12 +286,13 @@ format_error(Source, Extra, {Line, Mod=epp, Desc={include,lib,File}}) ->
     end,
     FriendlyDesc = BaseDesc ++ Friendly,
     ?FMT("~ts:~w: ~ts~ts~n", [Source, Line, Extra, FriendlyDesc]);
-format_error(Source, Extra, {{Line, Column}, Mod, Desc}) ->
+format_error(Source, Extra, {{Line, Column}, Mod, Desc}, Opts) ->
     ErrorDesc = Mod:format_error(Desc),
-    ?FMT("~ts:~w:~w: ~ts~ts~n", [Source, Line, Column, Extra, ErrorDesc]);
-format_error(Source, Extra, {Line, Mod, Desc}) ->
+    rebar_compiler_format:format(Source, {Line, Column}, Extra, ErrorDesc, Opts);
+format_error(Source, Extra, {Line, Mod, Desc}, _Opts) ->
     ErrorDesc = Mod:format_error(Desc),
     ?FMT("~ts:~w: ~ts~ts~n", [Source, Line, Extra, ErrorDesc]);
-format_error(Source, Extra, {Mod, Desc}) ->
+format_error(Source, Extra, {Mod, Desc}, _Opts) ->
     ErrorDesc = Mod:format_error(Desc),
     ?FMT("~ts: ~ts~ts~n", [Source, Extra, ErrorDesc]).
+
