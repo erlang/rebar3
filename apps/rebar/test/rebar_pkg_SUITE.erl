@@ -231,24 +231,24 @@ pkgs_provider(Config) ->
 find_highest_matching(_Config) ->
     State = rebar_state:new(),
     {ok, Vsn} = rebar_packages:find_highest_matching_(
-                  <<"goodpkg">>,rebar_verl:parse_version(<<"1.0.0">>), #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
-    ?assertEqual({{1,0,1},{[],[]}}, Vsn),
+                  <<"goodpkg">>, <<"~> 1.0.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
+    ?assertMatch({1,0,1,[],_}, Vsn),
     {ok, Vsn1} = rebar_packages:find_highest_matching(
-                   <<"goodpkg">>,rebar_verl:parse_version(<<"1.0">>), #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
-    ?assertEqual({{1,1,1},{[],[]}}, Vsn1),
+                   <<"goodpkg">>, <<"~> 1.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
+    ?assertMatch({1,1,1,[],_}, Vsn1),
     {ok, Vsn2} = rebar_packages:find_highest_matching(
-                   <<"goodpkg">>,rebar_verl:parse_version(<<"2.0">>), #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
-    ?assertEqual({{2,0,0},{[],[]}}, Vsn2),
+                   <<"goodpkg">>, <<"~> 2.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
+    ?assertMatch({2,0,0,[],_}, Vsn2),
 
     %% regression test. ~> constraints higher than the available packages would result
     %% in returning the first package version instead of 'none'.
-    ?assertEqual(none, rebar_packages:find_highest_matching_(<<"goodpkg">>,rebar_verl:parse_version(<<"5.0">>),
+    ?assertMatch(none, rebar_packages:find_highest_matching_(<<"goodpkg">>, <<"5.0">>,
                                                              #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State)),
 
 
-    {ok, Vsn3} = rebar_packages:find_highest_matching_(<<"goodpkg">>,rebar_verl:parse_version(<<"3.0.0-rc.0">>),
+    {ok, Vsn3} = rebar_packages:find_highest_matching_(<<"goodpkg">>, <<"== 3.0.0-rc.0">>,
                                                        #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
-    ?assertEqual({{3,0,0},{[<<"rc">>,0],[]}}, Vsn3).
+    ?assertMatch({3,0,0,[<<"rc">>,0],_}, Vsn3).
 
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
@@ -277,7 +277,8 @@ mock_config(Name, Config) ->
     lists:foreach(fun({{N, Vsn}, [Deps, InnerChecksum, OuterChecksum, _]}) ->
                           case ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(N), Vsn, <<"hexpm">>}) of
                               false ->
-                                  ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(N), rebar_verl:parse_version(Vsn), <<"hexpm">>},
+                                  V = rebar_verl:parse_as_matchable(Vsn),
+                                  ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(N), V, <<"hexpm">>},
                                                                       dependencies=Deps,
                                                                       retired=false,
                                                                       inner_checksum=InnerChecksum,

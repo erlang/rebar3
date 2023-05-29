@@ -55,20 +55,17 @@ get_all_names(State) ->
                                                       _='_'},
                                              [], ['$1']}])).
 
--spec get_package_versions(unicode:unicode_binary(), verl:semver(),
+-spec get_package_versions(unicode:unicode_binary(), verl:version(),
                            unicode:unicode_binary(),
                            ets:tid(), rebar_state:t()) -> [vsn()].
 get_package_versions(Dep, DepVsn, Repo, Table, State) ->
-    _AllowPreRelease = rebar_state:get(State, deps_allow_prerelease, false),
-    case rebar_verl:parse_requirement(DepVsn) of
-        {error, _} ->
-            none;
-        {ok, #{matchspec := [{Head, [Match], _}]}} ->
-            ?MODULE:verify_table(State),
-            Vsns = ets:select(Table, [{#package{key={Dep, Head, Repo}, _='_'},
-                                       [Match], [{Head}]}]),
-            handle_vsns(Vsns)
-    end.
+    AllowPreRelease = rebar_state:get(State, deps_allow_prerelease, false),
+    #{matchspec := [{Head, [Match], _}]} = rebar_verl:parse_requirement(DepVsn),
+
+    ?MODULE:verify_table(State),
+    Vsns = ets:select(Table, [{#package{key={Dep, Head, Repo}, _='_'},
+                               [Match], [{Head}]}]),
+    handle_vsns(Vsns, AllowPreRelease).
 
 -spec get_package(unicode:unicode_binary(), unicode:unicode_binary(),
                   binary() | undefined | '_',
@@ -76,12 +73,19 @@ get_package_versions(Dep, DepVsn, Repo, Table, State) ->
                  -> {ok, #package{}} | not_found.
 get_package(Dep, Vsn, undefined, Repos, Table, State) ->
     get_package(Dep, Vsn, '_', Repos, Table, State);
-get_package(Dep, Vsn, Hash, Repos, Table, State) when is_binary(Vsn) ->
-    get_package(Dep, r3_verl:parse(Vsn), Hash, Repos, Table, State);
 get_package(Dep, Vsn, Hash, Repos, Table, State) ->
+    MatchSpec =
+        case is_binary(Vsn) of
+            true ->
+                #{matchspec := [{Head, [Match], _}]} = rebar_verl:parse_requirement(Vsn),
+                [{#package{key={Dep, Head, Repo}, _='_'}, [Match], ['$_']} || Repo <- Repos];
+            false ->
+                [{#package{key={Dep, Vsn, Repo}, _='_'}, [], ['$_']} || Repo <- Repos]
+        end,
+
     ?MODULE:verify_table(State),
-    MatchingPackages = ets:select(Table, [{#package{key={Dep, Vsn, Repo},
-                                      _='_'}, [], ['$_']} || Repo <- Repos]),
+
+    MatchingPackages = ets:select(Table, MatchSpec),
     PackagesWithProperHash = lists:filter(
         fun(#package{key = {_Dep, _Vsn, Repo}, outer_checksum = PkgChecksum}) ->
             if (PkgChecksum =/= Hash) andalso (Hash =/= '_') ->
@@ -92,7 +96,19 @@ get_package(Dep, Vsn, Hash, Repos, Table, State) ->
             end
         end, MatchingPackages
     ),
-    case PackagesWithProperHash of
+    PackagesAdjustedForPrerelease =
+    case rebar_state:get(State, deps_allow_prerelease, false) of
+        true ->
+            PackagesWithProperHash;
+        false ->
+            lists:filter(
+                fun(#package{key = {_, {_, _, _, Pre, _}, _}}) ->
+                    Pre =:= []
+                end,
+                PackagesWithProperHash
+            )
+    end,
+    case lists:reverse(PackagesAdjustedForPrerelease) of
         %% have to allow multiple matches in the list for cases that Repo is `_`
         [Package | _] ->
             {ok, Package};
@@ -181,12 +197,11 @@ package_dir(Repo, State) ->
 %% `~> 2.0` | `>= 2.0.0 and < 3.0.0`
 %% `~> 2.1` | `>= 2.1.0 and < 3.0.0`
 find_highest_matching(Dep, Version, Repo, Table, State) ->
-    Constraint = verl:add_highest_matching_prefix(Version),
-    try find_highest_matching_(Dep, Constraint, Repo, Table, State) of
+    try find_highest_matching_(Dep, Version, Repo, Table, State) of
         none ->
             handle_missing_package(Dep, Repo, State,
                                    fun(State1) ->
-                                       find_highest_matching_(Dep, Constraint, Repo, Table, State1)
+                                       find_highest_matching_(Dep, Version, Repo, Table, State1)
                                    end);
         Result ->
             Result
@@ -194,7 +209,7 @@ find_highest_matching(Dep, Version, Repo, Table, State) ->
         _:_ ->
             handle_missing_package(Dep, Repo, State,
                                    fun(State1) ->
-                                       find_highest_matching_(Dep, Constraint, Repo, Table, State1)
+                                       find_highest_matching_(Dep, Version, Repo, Table, State1)
                                    end)
     end.
 
@@ -206,17 +221,19 @@ find_highest_matching_(Dep, Constraint, #{name := Repo}, Table, State) ->
             none
     end.
 
-handle_vsns([]) -> none;
-handle_vsns(Vsns) ->
+handle_vsns([], _) -> none;
+handle_vsns(Vsns, AllowPreRelease) ->
     Vsn =
         lists:foldl(
-            fun(Version, Highest) ->
-                case (Highest =:= none orelse r3_verl:compare(Version, Highest) =:= gt) of
+            fun(Version, Highest) when AllowPreRelease orelse length(element(4, Version)) =:= 0 ->
+                case (Highest =:= none orelse verl:compare(Version, Highest) =:= gt) of
                     true ->
                         Version;
                     false ->
                         Highest
-                end
+                end;
+               (_, Highest) ->
+                    Highest
             end, none, Vsns),
     {ok, Vsn}.
 
@@ -276,10 +293,7 @@ unverified_repo_message() ->
     "You can disable this check by setting REBAR_NO_VERIFY_REPO_ORIGIN=1".
 
 insert_releases(Name, Releases, Repo, Table) ->
-    Parse = fun (V) ->
-        {ok, Res} = verl:parse(V),
-        Res
-    end,
+    Parse = fun rebar_verl:parse_as_matchable/1,
     [true = ets:insert(Table,
                        #package{key={Name, Parse(Version), Repo},
                                 inner_checksum=parse_checksum(InnerChecksum),
@@ -378,4 +392,4 @@ get_latest_version(Dep, Repo, HexRegistry, State) ->
     verify_table(State),
     Vsns = ets:select(HexRegistry, [{#package{key={'$1', '$2', '$3'}, _='_'},
                                      [{'==', '$1', Dep}, {'==', '$3', Repo}], ['$2']}]),
-    handle_vsns(Vsns).
+    handle_vsns(Vsns, true).
