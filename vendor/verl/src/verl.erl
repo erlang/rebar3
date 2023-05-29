@@ -6,6 +6,7 @@
     is_match/2,
     is_match/3,
     parse/1,
+    to_matchable/2,
     parse_requirement/1,
     compile_requirement/1
 ]).
@@ -35,6 +36,7 @@
     pre => pre(),
     build => build()
 }.
+-type matchable() :: {major(), minor(), patch(), pre(), boolean()}.
 
 -type requirement_t() :: #{
     string => requirement(),
@@ -58,6 +60,7 @@
     patch/0,
     pre/0,
     build/0,
+    matchable/0,
     version_t/0,
     requirement_t/0,
     compiled_requirement/0
@@ -69,9 +72,11 @@
 %%% Compares two versions, returning whether the first argument is greater, equal, or
 %%% less than the second argument.
 %%% @end
--spec compare(version(), version()) -> gt | eq | lt | {error, invalid_version}.
+-spec compare(version() | matchable() | version_t(), version() | matchable() | version_t()) -> gt | eq | lt | {error, invalid_version}.
+compare({_, _, _, _, _} = Version1, {_, _, _, _, _} = Version2) ->
+    ver_cmp(Version1, Version2);
 compare(Version1, Version2) ->
-    ver_cmp(to_matchable(Version1, true), to_matchable(Version2, true)).
+    compare(to_matchable(Version1, true), to_matchable(Version2, true)).
 
 %%% @doc
 %%% Parses a semantic version, returning {ok, version_t()} or {error, invalid_version}
@@ -152,6 +157,7 @@ is_match(Version, #{matchspec := Spec, compiled := true} = R, Opts) when
     AllowPre = proplists:get_value(allow_pre, Opts, true),
     ets:match_spec_run([to_matchable(Version, AllowPre)], Spec) /= [].
 
+-spec to_matchable(version() | version_t(), boolean()) -> {_, _, _, _, _}.
 to_matchable(#{major := Major, minor := Minor, patch := Patch, pre := Pre}, AllowPre) ->
     {Major, Minor, Patch, Pre, AllowPre};
 to_matchable(String, AllowPre) when is_binary(String) ->
