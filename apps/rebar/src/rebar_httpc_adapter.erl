@@ -21,10 +21,19 @@ request(Method, URI, ReqHeaders, Body, AdapterConfig) ->
 %%====================================================================
 
 request_online(Method, URI, ReqHeaders, Body, AdapterConfig) ->
+    request_online2(Method, URI, ReqHeaders, Body, AdapterConfig, 0).
+
+request_online2(_Method, _URI, _ReqHeaders, _Body, _AdapterConfig, RedirectCount) when RedirectCount > 5 ->
+    {error, "Too many redirects (>5)"};
+
+request_online2(Method, URI, ReqHeaders, Body, AdapterConfig, RedirectCount) ->
     Profile = maps:get(profile, AdapterConfig, default),
     Request = build_request(URI, ReqHeaders, Body),
-    SSLOpts = [{ssl, rebar_utils:ssl_opts(URI)}],
-    case httpc:request(Method, Request, SSLOpts, [{body_format, binary}], Profile) of
+    HTTPOpts = [{ssl, rebar_utils:ssl_opts(URI)}, {autoredirect, false}],
+    case httpc:request(Method, Request, HTTPOpts, [{body_format, binary}], Profile) of
+        {ok, {{_, StatusCode, _}, RespHeaders, _RespBody}} when (StatusCode < 400) and (StatusCode >= 300) and (StatusCode /= 304) ->
+            #{<<"location">> := RedirectURI} = load_headers(RespHeaders),
+            request_online2(Method, RedirectURI, ReqHeaders, Body, AdapterConfig, RedirectCount + 1);
         {ok, {{_, StatusCode, _}, RespHeaders, RespBody}} ->
             RespHeaders2 = load_headers(RespHeaders),
             {ok, {StatusCode, RespHeaders2, RespBody}};
