@@ -43,6 +43,10 @@ jobs:
     - uses: actions/checkout@v2
     - name: Brew Version Check
       run: brew --version
+    - name: Brew Cleanup
+      run: brew cleanup
+    - name: Debug Brew
+      run: brew doctor
     - name: Keep Brew Fresh
       run: brew update
     - name: Install Erlang
