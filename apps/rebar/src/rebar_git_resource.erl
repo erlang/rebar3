@@ -317,13 +317,17 @@ git_ref(Dir, Arg) ->
 collect_default_refcount(Dir) ->
     %% Get the tag timestamp and minimal ref from the system. The
     %% timestamp is really important from an ordering perspective.
-    case rebar_utils:sh("git log -n 1 --pretty=format:\"%h\n\" ",
+    Command = "git log -n 1 --pretty=format:\"%h\n\" ",
+    case rebar_utils:sh(Command,
                        [{use_stdout, false},
                         return_on_error,
                         {cd, Dir}]) of
-        {error, _} ->
+        {error, {Rc, Error}} ->
             ?WARN("Getting log of git repo failed in ~ts. "
                   "Falling back to version 0.0.0", [Dir]),
+            ?DIAGNOSTIC("Command sh(~ts)~n"
+                        "returned error code ~w with the following output:~n"
+                        "~ts", [Command, Rc, Error]),
             {plain, "0.0.0"};
         {ok, String} ->
             RawRef = rebar_string:trim(String, both, "\n"),
