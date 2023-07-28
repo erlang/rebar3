@@ -648,7 +648,9 @@ valid(AppInfo=#app_info_t{}, Valid) ->
 %% an exception and displays an error.
 -spec verify_otp_vsn(t()) -> ok | no_return().
 verify_otp_vsn(AppInfo) ->
-    rebar_utils:check_min_otp_version(rebar_app_info:get(AppInfo, minimum_otp_vsn, undefined)),
+    MinimumOTPVsn = rebar_app_info:get(AppInfo, minimum_otp_vsn, undefined),
+    App = rebar_app_info:name(AppInfo),
+    rebar_utils:check_min_otp_version(MinimumOTPVsn, App),
     rebar_utils:check_blacklisted_otp_versions(rebar_app_info:get(AppInfo, blacklisted_otp_vsns, [])).
 
 %% @doc checks whether all the build artifacts for an app to be considered
