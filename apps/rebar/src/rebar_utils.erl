@@ -891,9 +891,20 @@ arg_or_flag(["," ++ Task|Rest], Acc) -> new_task([Task|Rest], Acc);
 %% a flag
 arg_or_flag(["-" ++ _ = Flag|Rest], [{Task, Args}|Acc]) ->
     case maybe_ends_in_comma(Flag) of
-        false   -> arg_or_flag(Rest, [{Task, [Flag|Args]}|Acc]);
-        NewFlag -> new_task(Rest, [{Task,
-                                    lists:reverse([NewFlag|Args])}|Acc])
+        false   ->
+            case rest_arg_self_contains_comma(Rest) of
+                false ->
+                    arg_or_flag(Rest, [{Task, [Flag|Args]}|Acc]);
+                {ExtraArg,NewRest} ->
+                    case maybe_ends_in_comma(ExtraArg) of
+                        false ->
+                            arg_or_flag(NewRest, [{Task, [ExtraArg,Flag|Args]}|Acc]);
+                        TrimmedArg ->
+                            new_task(NewRest, [{Task, [Flag,TrimmedArg|Args]}|Acc])
+                    end
+            end;
+        NewFlag ->
+            new_task(Rest, [{Task, lists:reverse([NewFlag|Args])}|Acc])
     end;
 %% an argument or a sequence of arguments
 arg_or_flag([ArgList|Rest], [{Task, Args}|Acc]) ->
@@ -913,6 +924,23 @@ maybe_ends_in_comma(H) ->
         "," ++ Flag -> lists:reverse(Flag);
         _           -> false
     end.
+
+%% looks whether a sequence of arguments comes with a comma inside of it.
+%% For example `-a a,b' would match here, but `-a x' or `-a x,' wouldn't.
+%% This is used by the caller to know whether to break up a task or assume
+%% the comma is part of the argument itself.
+rest_arg_self_contains_comma([]) -> false;
+rest_arg_self_contains_comma([ArgList|Rest]) ->
+    case re:split(ArgList, ",", [{return, list}, {parts, 2}, unicode]) of
+        [_Arg, ""] ->
+            false;
+        [_Arg, _More] ->
+            {ArgList, Rest};
+        [_Arg] ->
+            false
+    end.
+
+
 
 get_http_vars(Scheme) ->
     OS = case os:getenv(atom_to_list(Scheme)) of
