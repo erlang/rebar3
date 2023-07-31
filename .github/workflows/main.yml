@@ -45,6 +45,8 @@ jobs:
       run: brew --version
     - name: Brew Cleanup
       run: brew cleanup
+    - name: Brew Untap Casks
+      run: brew untap homebrew/cask homebrew/core
     - name: Debug Brew
       run: brew doctor
     - name: Keep Brew Fresh
