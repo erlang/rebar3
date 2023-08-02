@@ -134,7 +134,13 @@ run_aux(State, RawArgs) ->
                      rebar_state:apply_profiles(State, [list_to_atom(Profile)])
              end,
 
-    rebar_utils:check_min_otp_version(rebar_state:get(State1, minimum_otp_vsn, undefined)),
+    MinimumOTPVsn = rebar_state:get(State1, minimum_otp_vsn, undefined),
+    App0 = rebar_state:current_app(State1),
+    App = case App0 of
+              undefined -> undefined;
+              _ -> rebar_app_info:name(App0)
+          end,
+    rebar_utils:check_min_otp_version(MinimumOTPVsn, App),
     rebar_utils:check_blacklisted_otp_versions(rebar_state:get(State1, blacklisted_otp_vsns, undefined)),
 
     %% Maybe change the default hex CDN

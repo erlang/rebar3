@@ -70,6 +70,7 @@
          escape_double_quotes/1,
          escape_double_quotes_weak/1,
          check_min_otp_version/1,
+         check_min_otp_version/2,
          check_blacklisted_otp_versions/1,
          info_useless/2,
          list_dir/1,
@@ -412,8 +413,13 @@ line_count(PatchLines) ->
     {ok, length(Tokenized)}.
 
 check_min_otp_version(undefined) ->
-    ok;
+    check_min_otp_version(undefined, undefined);
 check_min_otp_version(MinOtpVersion) ->
+    check_min_otp_version(MinOtpVersion, undefined).
+
+check_min_otp_version(undefined, _App) ->
+    ok;
+check_min_otp_version(MinOtpVersion, App) ->
     %% Fully-qualify with ?MODULE so the function can be meck'd in rebar_utils_SUITE
     OtpRelease = ?MODULE:otp_release(),
     ParsedMin = version_tuple(MinOtpVersion),
@@ -423,9 +429,12 @@ check_min_otp_version(MinOtpVersion) ->
         true ->
             ?DEBUG("~ts satisfies the requirement for minimum OTP version ~ts",
                    [OtpRelease, MinOtpVersion]);
-        false ->
+        false when App =:= undefined ->
             ?ABORT("OTP release ~ts or later is required. Version in use: ~ts",
-                   [MinOtpVersion, OtpRelease])
+                   [MinOtpVersion, OtpRelease]);
+        false ->
+            ?ABORT("OTP release ~ts or later is required by ~ts. Version in use: ~ts",
+                   [MinOtpVersion, App, OtpRelease])
     end.
 
 check_blacklisted_otp_versions(undefined) ->
