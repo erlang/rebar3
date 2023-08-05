@@ -168,11 +168,11 @@ setup_shell(ShellArgs) ->
             rewrite_leaders(OldUser, NewUser),
             maybe_reset_logger(LoggerState);
         true ->
-            ok = start_interactive()
+            ok = start_interactive(ShellArgs)
     end.
 
-start_interactive() ->
-    shell:start_interactive().
+start_interactive(ShellArgs) ->
+    apply(shell, start_interactive, ShellArgs).
 
 %% @private starting with OTP-21.2.3, there's an oddity where the logger
 %% likely tries to handle system logs while we take down the TTY, which
