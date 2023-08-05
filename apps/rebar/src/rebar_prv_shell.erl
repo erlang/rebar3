@@ -130,7 +130,7 @@ shell(State) ->
     setup_name(State),
     setup_paths(State),
     ShellArgs = debug_get_value(shell_args, rebar_state:get(State, shell, []), undefined,
-                                "Found user_drv args from command line option."),
+                                "Found shell args from command line option or plugin."),
     setup_shell(ShellArgs),
     maybe_run_script(State),
     %% apps must be started after the change in shell because otherwise
