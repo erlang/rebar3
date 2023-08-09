@@ -97,8 +97,8 @@ init(State) ->
                          "can be used to pass arguments to the user_drv start "
                          "function for creating custom shells. Starting "
                          "with Erlang 26, the arguments defined with this "
-                         "option will instead be applied to the shell "
-                         "start_interactive function."},
+                         "option are applied to the shell start_interactive "
+                         "function."},
                         {eval, undefined, "eval", string,
                          "Erlang term(s) to execute after the apps have been "
                          "started, but before the shell is presented to the "
