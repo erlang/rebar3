@@ -42,7 +42,7 @@
 -define(DEPS, [compile]).
 
 -dialyzer({nowarn_function, rewrite_leaders/2}).
--dialyzer({nowarn_function, start_interactive/0}).
+-dialyzer({nowarn_function, start_interactive/1}).
 
 %% ===================================================================
 %% Public API
