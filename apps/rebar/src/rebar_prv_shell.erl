@@ -82,10 +82,10 @@ init(State) ->
                          "relx apps if not specified."},
                         {relname, $r, "relname", atom,
                          "Name of the release to use as a template for the "
-                         "shell session"},
+                         "shell session."},
                         {relvsn, $v, "relvsn", string,
                          "Version of the release to use for the shell "
-                         "session"},
+                         "session."},
                         {start_clean, undefined, "start-clean", boolean,
                          "Cancel any applications in the 'apps' list "
                          "or release."},
