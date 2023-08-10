@@ -42,7 +42,7 @@
 -define(DEPS, [compile]).
 
 -dialyzer({nowarn_function, rewrite_leaders/2}).
--dialyzer({nowarn_function, start_interactive/0}).
+-dialyzer({nowarn_function, start_interactive/1}).
 
 %% ===================================================================
 %% Public API
@@ -82,10 +82,10 @@ init(State) ->
                          "relx apps if not specified."},
                         {relname, $r, "relname", atom,
                          "Name of the release to use as a template for the "
-                         "shell session"},
+                         "shell session."},
                         {relvsn, $v, "relvsn", string,
                          "Version of the release to use for the shell "
-                         "session"},
+                         "session."},
                         {start_clean, undefined, "start-clean", boolean,
                          "Cancel any applications in the 'apps' list "
                          "or release."},
@@ -93,8 +93,12 @@ init(State) ->
                          "Path to file of os environment variables to setup "
                          "before expanding vars in config files."},
                         {user_drv_args, undefined, "user_drv_args", string,
-                         "Arguments passed to user_drv start function for "
-                         "creating custom shells."},
+                         "For versions of Erlang prior to 26, this option "
+                         "can be used to pass arguments to the user_drv start "
+                         "function for creating custom shells. Starting "
+                         "with Erlang 26, the arguments defined with this "
+                         "option are applied to the shell start_interactive "
+                         "function."},
                         {eval, undefined, "eval", string,
                          "Erlang term(s) to execute after the apps have been "
                          "started, but before the shell is presented to the "
@@ -130,7 +134,7 @@ shell(State) ->
     setup_name(State),
     setup_paths(State),
     ShellArgs = debug_get_value(shell_args, rebar_state:get(State, shell, []), undefined,
-                                "Found user_drv args from command line option."),
+                                "Found shell args from command line option or plugin."),
     setup_shell(ShellArgs),
     maybe_run_script(State),
     %% apps must be started after the change in shell because otherwise
@@ -168,11 +172,11 @@ setup_shell(ShellArgs) ->
             rewrite_leaders(OldUser, NewUser),
             maybe_reset_logger(LoggerState);
         true ->
-            ok = start_interactive()
+            ok = start_interactive(ShellArgs)
     end.
 
-start_interactive() ->
-    shell:start_interactive().
+start_interactive(ShellArgs) ->
+    apply(shell, start_interactive, ShellArgs).
 
 %% @private starting with OTP-21.2.3, there's an oddity where the logger
 %% likely tries to handle system logs while we take down the TTY, which
