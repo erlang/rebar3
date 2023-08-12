@@ -175,6 +175,8 @@ setup_shell(ShellArgs) ->
             ok = start_interactive(ShellArgs)
     end.
 
+start_interactive(undefined) ->
+    start_interactive([]);
 start_interactive(ShellArgs) ->
     apply(shell, start_interactive, ShellArgs).
 
