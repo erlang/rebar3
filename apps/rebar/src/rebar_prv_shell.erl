@@ -133,7 +133,7 @@ format_error(Reason) ->
 shell(State) ->
     setup_name(State),
     setup_paths(State),
-    ShellArgs = debug_get_value(shell_args, rebar_state:get(State, shell, []), undefined,
+    ShellArgs = debug_get_value(shell_args, rebar_state:get(State, shell, []), [],
                                 "Found shell args from command line option or plugin."),
     setup_shell(ShellArgs),
     maybe_run_script(State),
@@ -175,8 +175,6 @@ setup_shell(ShellArgs) ->
             ok = start_interactive(ShellArgs)
     end.
 
-start_interactive(undefined) ->
-    start_interactive([]);
 start_interactive(ShellArgs) ->
     apply(shell, start_interactive, ShellArgs).
 
@@ -228,7 +226,7 @@ setup_new_shell(ShellArgs) ->
     _ = supervisor:terminate_child(kernel_sup, user),
     %% start a new shell (this also starts a new user under the correct group)
     case ShellArgs of
-        undefined ->
+        [] ->
             _ = user_drv:start();
         _ ->
             _ = user_drv:start(ShellArgs)
