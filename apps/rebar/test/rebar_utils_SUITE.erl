@@ -24,6 +24,7 @@
          task_with_flag_with_commas/1,
          task_with_multiple_flags/1,
          special_task_do/1,
+         special_task_as_with_commas/1,
          valid_otp_version/1,
          valid_old_format_otp_version/1,
          valid_otp_version_equal/1,
@@ -70,6 +71,7 @@ groups() ->
                           task_with_flag_with_commas,
                           task_with_multiple_flags,
                           special_task_do,
+                          special_task_as_with_commas,
                           valid_otp_version,
                           valid_old_format_otp_version,
                           valid_otp_version_equal,
@@ -145,6 +147,20 @@ special_task_do(_Config) ->
                                                                         "do",
                                                                         "bar,",
                                                                         "baz"]).
+special_task_as_with_commas(_Config) ->
+    [{"as", ["profile"]}, {"bar", ["--x=y,z"]}, {"baz", ["--arg=a,b"]}] =
+      rebar_utils:args_to_tasks(["as", "profile,",
+                                 "bar", "--x=y,z,",
+                                 "baz", "--arg=a,b"]),
+    [{"as", ["profile"]}, {"bar", ["-x", "y,z"]}, {"baz", ["--a", "a,b"]}] =
+      rebar_utils:args_to_tasks(["as", "profile,",
+                                 "bar", "-x", "y,z,",
+                                 "baz", "--a", "a,b"]),
+    [{"as", ["profile"]}, {"bar", ["-x", "y"]}, {"z", []}, {"baz", ["--a", "a"]}, {"b",[]}] =
+      rebar_utils:args_to_tasks(["as", "profile,",
+                                 "bar", "-x", "y,", "z,",
+                                 "baz", "--a", "a,", "b"]),
+    ok.
 
 valid_otp_version(_Config) ->
     meck:new(rebar_utils, [passthrough]),
