@@ -7,19 +7,26 @@
 
 -define(OK(Suite, CasePat, CaseArgs),
         ?CASE(Suite, CasePat, ?OKC, "OK", CaseArgs)).
--define(SKIP(Suite, CasePat, CaseArgs, Reason),
-        ?STACK(Suite, CasePat, CaseArgs, Reason, ?SKIPC, "SKIPPED")).
+-define(SKIP(Suite, CasePat, CaseArgs, Reason, Verbose),
+        ?STACK(Suite, CasePat, CaseArgs, Reason, ?SKIPC, "SKIPPED", Verbose)).
 -define(FAIL(Suite, CasePat, CaseArgs, Reason),
         ?STACK(Suite, CasePat, CaseArgs, Reason, ?FAILC, "FAILED")).
 -define(STACK(Suite, CasePat, CaseArgs, Reason, Color, Label),
+        ?STACK(Suite, CasePat, CaseArgs, Reason, Color, Label, true)).
+-define(STACK(Suite, CasePat, CaseArgs, Reason, Color, Label, Verbose),
         begin
-         ?CASE(Suite, CasePat, Color, Label, CaseArgs),
-         io:format(user, "%%% ~p ==> "++colorize(Color, maybe_eunit_format(Reason))++"~n", [Suite])
+          case Verbose of
+            true ->
+              ?CASE(Suite, CasePat, Color, Label, CaseArgs),
+               io:format(user, "%%% ~p ==> ~ts~n", [Suite,colorize(Color, maybe_eunit_format(Reason))]);
+            false ->
+              io:format(user, colorize(Color, "*"), [])
+          end
         end).
 -define(CASE(Suite, CasePat, Color, Res, Args),
         case Res of
-            "OK" -> io:format(user, colorize(Color, "."), []);
-            _ -> io:format(user, "~n%%% ~p ==> "++CasePat++": "++colorize(Color, Res)++"~n", [Suite | Args])
+            "OK" -> io:put_chars(user, colorize(Color, "."));
+            _ -> io:format(user, lists:flatten(["~n%%% ~p ==> ",CasePat,": ",colorize(Color, Res),"~n"]), [Suite | Args])
         end).
 
 %% Callbacks
@@ -44,7 +51,7 @@
 
 -export([terminate/1]).
 
--record(state, {id, suite, groups}).
+-record(state, {id, suite, groups, opts}).
 
 %% @doc Return a unique id for this CTH.
 id(_Opts) ->
@@ -52,8 +59,8 @@ id(_Opts) ->
 
 %% @doc Always called before any other callback function. Use this to initiate
 %% any common state.
-init(Id, _Opts) ->
-    {ok, #state{id=Id}}.
+init(Id, Opts) ->
+    {ok, #state{id=Id, opts=Opts}}.
 
 %% @doc Called before init_per_suite is called.
 pre_init_per_suite(Suite,Config,State) ->
@@ -119,20 +126,24 @@ on_tc_fail(TC, Reason, State=#state{suite=Suite, groups=Groups}) ->
 
 %% @doc Called when a test case is skipped by either user action
 %% or due to an init function failing. (>= 19.3)
-on_tc_skip(Suite, {TC,_Group}, Reason, State=#state{groups=Groups}) ->
-    ?SKIP(Suite, "~s", [format_path(TC,Groups)], Reason),
+on_tc_skip(Suite, {TC,_Group}, Reason, State=#state{groups=Groups, opts=Opts}) ->
+    skip(Suite, TC, Groups, Reason, Opts),
     State#state{suite=Suite};
-on_tc_skip(Suite, TC, Reason, State=#state{groups=Groups}) ->
-    ?SKIP(Suite, "~s", [format_path(TC,Groups)], Reason),
+on_tc_skip(Suite, TC, Reason, State=#state{groups=Groups, opts=Opts}) ->
+    skip(Suite, TC, Groups, Reason, Opts),
     State#state{suite=Suite}.
+
+skip(Suite, TC, Groups, Reason, Opts) ->
+    Verbose = proplists:get_value(verbose, Opts, true),
+    ?SKIP(Suite, "~s", [format_path(TC,Groups)], Reason, Verbose).
 
 %% @doc Called when a test case is skipped by either user action
 %% or due to an init function failing. (Pre-19.3)
 on_tc_skip({TC,Group}, Reason, State=#state{suite=Suite}) ->
-    ?SKIP(Suite, "~p (group ~p)", [TC, Group], Reason),
+    ?SKIP(Suite, "~p (group ~p)", [TC, Group], Reason, true),
     State;
 on_tc_skip(TC, Reason, State=#state{suite=Suite}) ->
-    ?SKIP(Suite, "~p", [TC], Reason),
+    ?SKIP(Suite, "~p", [TC], Reason, true),
     State.
 
 %% @doc Called when the scope of the CTH is done

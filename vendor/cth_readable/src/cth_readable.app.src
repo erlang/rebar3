@@ -1,6 +1,6 @@
 {application,cth_readable,
              [{description,"Common Test hooks for more readable logs"},
-              {vsn,"1.5.1"},
+              {vsn,"1.6.0"},
               {registered,[cth_readable_failonly,cth_readable_logger]},
               {applications,[kernel,stdlib,syntax_tools,cf]},
               {env,[]},

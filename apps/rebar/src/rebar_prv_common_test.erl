@@ -277,11 +277,13 @@ add_hooks(Opts, State) ->
         {false, _} ->
             Opts;
         {Other, false} ->
-            [{ct_hooks, [cth_readable_failonly, readable_shell_type(Other),
+            ShellTypeWithOpts = {readable_shell_type(Other), [verbose(Opts)]},
+            [{ct_hooks, [cth_readable_failonly, ShellTypeWithOpts,
                          cth_retry] ++ FailFast ++ cth_log_redirect()} | Opts];
         {Other, {ct_hooks, Hooks}} ->
             %% Make sure hooks are there once only and add wanted hooks that are not defined yet
-            ReadableHooks = [cth_readable_failonly, readable_shell_type(Other),
+            ShellTypeWithOpts = {readable_shell_type(Other), [verbose(Opts)]},
+            ReadableHooks = [cth_readable_failonly, ShellTypeWithOpts,
                              cth_retry] ++ FailFast,
             NewHooks = Hooks ++ [ReadableHook ||
                 ReadableHook <- ReadableHooks,
@@ -296,6 +298,8 @@ is_defined(Key, [{Key, _Opts} | _Hs]) -> true;
 is_defined(Key, [{Key, _Opts, _Prio} | _Hs]) -> true;
 is_defined(Key, [_ | Hs]) -> is_defined(Key, Hs).
 
+verbose(Opts) ->
+    {verbose, proplists:get_value(verbose, Opts, true)}.
 
 readable_shell_type(true) -> cth_readable_shell;
 readable_shell_type(compact) -> cth_readable_compact_shell.
