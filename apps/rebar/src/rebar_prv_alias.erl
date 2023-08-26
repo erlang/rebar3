@@ -6,8 +6,13 @@
 %%% years of stability. Only some error checks were added
 -module(rebar_prv_alias).
 
--export([init/1]).
+-behaviour(provider).
+
+-export([init/1, do/1, format_error/1]).
 -include("rebar.hrl").
+
+-define(PROVIDER, alias).
+-define(CREATED_ALIASES_KEY, '_rebar_prv_alias_created_aliases').
 
 %% ===================================================================
 %% Public API
@@ -15,12 +20,48 @@
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
     Aliases = rebar_state:get(State, alias, []),
-    lists:foldl(fun({Alias, Cmds}, {ok, StateAcc}) ->
-                    case validate_provider(Alias, Cmds, State) of
-                        true -> init_alias(Alias, Cmds, StateAcc);
-                        false -> {ok, State}
-                    end
-                end, {ok, State}, Aliases).
+    {StateWithAliases, AliasesDefs}
+        = lists:foldl(
+              fun({Alias, Cmds}, {StateAcc, AliasesDefsAcc} = Acc) ->
+                  case validate_provider(Alias, Cmds, State) of
+                      true ->
+                          StateWithAlias = init_alias(Alias, Cmds, StateAcc),
+                          AliasesDefsWithAlias = [{Alias, Cmds} | AliasesDefsAcc],
+                          {StateWithAlias, AliasesDefsWithAlias};
+                      false ->
+                          Acc
+                  end
+              end,
+              {State, []},
+              Aliases
+          ),
+    AliasProvider = providers:create([{name, ?PROVIDER},
+                                      {module, ?MODULE},
+                                      {bare, true},
+                                      {deps, []},
+                                      {example, "rebar3 alias"},
+                                      {short_desc, "List aliases' definitions."},
+                                      {desc, "List aliases' definitions."},
+                                      {opts, []}]),
+    StateWithProvider = rebar_state:add_provider(StateWithAliases, AliasProvider),
+    StateWithAliasesDefs = rebar_state:set(StateWithProvider, ?CREATED_ALIASES_KEY, AliasesDefs),
+    {ok, StateWithAliasesDefs}.
+
+-spec do(rebar_state:t()) -> {ok, rebar_state:t()}.
+do(State) ->
+    lists:foreach(
+        fun ({Alias, Cmds}) ->
+            AliasStr = atom_to_list(Alias),
+            CmdsStr = cmds_string(Cmds),
+            ?CONSOLE("~ts=~ts", [AliasStr, CmdsStr])
+        end,
+        rebar_state:get(State, ?CREATED_ALIASES_KEY, [])
+    ),
+    {ok, State}.
+
+-spec format_error(any()) -> iolist().
+format_error(Reason) ->
+    io_lib:format("~p", [Reason]).
 
 -dialyzer([{no_opaque, init_alias/3}, {no_return, init_alias/3}]). % warnings relate to use of opaque structures in :forms
 init_alias(Alias, Cmds, State) ->
@@ -43,7 +84,7 @@ init_alias(Alias, Cmds, State) ->
             {short_desc, desc(Cmds)},
             {desc, desc(Cmds)}
     ]),
-    {ok, rebar_state:add_provider(State, Provider)}.
+    rebar_state:add_provider(State, Provider).
 
 validate_provider(Alias, Cmds, State) ->
     %% This would be caught and prevented anyway, but the warning
@@ -73,7 +114,10 @@ example(Alias) ->
 -dialyzer({no_unused, desc/1}). % required since we suppress warnings for init_alias/3
 desc(Cmds) ->
     "Equivalent to running: rebar3 do "
-        ++ rebar_string:join(lists:map(fun to_desc/1, Cmds), ",").
+        ++ cmds_string(Cmds).
+
+cmds_string(Cmds) ->
+    rebar_string:join(lists:map(fun to_desc/1, Cmds), ",").
 
 to_desc({Cmd, Args}) when is_list(Args) ->
     atom_to_list(Cmd) ++ " " ++ Args;

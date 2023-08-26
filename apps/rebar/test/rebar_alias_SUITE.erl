@@ -14,7 +14,7 @@ end_per_testcase(_, _Config) ->
     ok.
 
 all() -> [command, args, many, override_default, no_circular, release,
-          check_namespaces, create_lib].
+          check_namespaces, create_lib, command_console].
 
 command() ->
     [{doc, "Runs multiple regular commands as one alias"}].
@@ -163,3 +163,44 @@ create_lib(Config) ->
                             "../../../../shouldexist/src/shouldexist.app.src"),
     ?assert(filelib:is_file(AppFile)),
     ok.
+
+command_console() ->
+    [{doc, "Test console output as per `rebar3 alias`"}].
+command_console(Config) ->
+    State = ?config(state, Config),
+    RebarConfig
+        = [{alias, [
+              {test, [compile, {unlock,"-a"}]},
+              {test, [{eunit,"-c"}, cover]},
+              {nolock, [compile, {unlock,"-a"}]},
+              {compile1, [help]},
+              {test1, [help, {test,"-a"}, compile]},
+              {the_rel1, [clean, {release, "-n the_release"}]},
+              {the_rel2, [clean, {release, "--relname=the_release"}]},
+              {test, [{eunit,"-c"}, {plugins, list}]},
+              {test, [compile, {do, "new lib shouldexist"}]}
+          ]}],
+    AppDir = ?config(apps, Config),
+
+    %% validate output as <alias>=..., as this format is considered part of the interface,
+    %%  for consumption; order is not important though
+    ct:capture_start(),
+    rebar3:run(rebar_state:new(State, RebarConfig, AppDir), ["alias"]),
+    ct:capture_stop(),
+    AllCaptured = ct:capture_get(),
+
+    Aliases = proplists:get_keys(proplists:get_value(alias, RebarConfig)),
+    [] = lists:foldl(
+        fun (Captured, AliasesAcc) ->
+            Match = re:run(Captured, "^([^=]+)=.*", [{capture, all_but_first}]),
+            case Match of
+                no_match ->
+                    AliasesAcc;
+                {match, [{Start, End}]} ->
+                    CapturedPref = string:sub_string(Captured, Start+1, End),
+                    lists:delete(list_to_existing_atom(CapturedPref), AliasesAcc)
+            end
+        end,
+        Aliases,
+        AllCaptured
+    ).
