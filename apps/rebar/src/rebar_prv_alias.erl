@@ -12,7 +12,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, alias).
--define(CREATED_ALIASES_KEY, '_created_aliases').
+-define(CREATED_ALIASES_KEY, '_rebar_prv_alias_created_aliases').
 
 %% ===================================================================
 %% Public API
