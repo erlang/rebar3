@@ -205,6 +205,10 @@ message_to_string({contract_range, [Contract, M, F, ArgStrings, Line, CRet]}) ->
 message_to_string({invalid_contract, [M, F, A, Sig]}) ->
     fmt("~!^Invalid type specification for function~!! ~w:~w/~w."
         "~!^ The success typing is~!! ~ts", [M, F, A, Sig]);
+message_to_string({invalid_contract, [M, F, A, _InvalidContractDetails, Contract, Sig]}) ->
+    fmt("~!^Invalid type specification for function~!! ~w:~w/~w."
+        "~!^ The success typing is~!! ~ts"
+        "~!^ but the spec is~!! ~ts", [M, F, A, Sig, Contract]);
 message_to_string({contract_with_opaque, [M, F, A, OpaqueType, SigType]}) ->
   fmt("~!^The specification for ~!!~w:~w/~w~!^ has an opaque"
       " subtype ~!!~ts~!^ which is violated by the success typing ~!!~ts",
