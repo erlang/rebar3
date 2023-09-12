@@ -297,17 +297,24 @@ find_function_source(M, F, A, Bin) ->
 
 find_function_source_in_abstract_code(F, A, AbstractCode) ->
     %% Extract the original source filename from the abstract code
-    [{attribute, _, file, {Source0, _}} | _] = [Attr || Attr = {attribute, _, file, _} <- AbstractCode],
-    Source = rebar_dir:make_relative_path(Source0, rebar_dir:get_cwd()),
-    %% Extract the line number for a given function def
-    Fn = [E || E <- AbstractCode,
-               safe_element(1, E) == function,
-               safe_element(3, E) == F,
-               safe_element(4, E) == A],
-    case Fn of
-        [{function, Anno, F, _, _}] -> {Source, erl_anno:line(Anno)};
-        %% do not crash if functions are exported, even though they
-        %% are not in the source.
-        %% parameterized modules add new/1 and instance/1 for example.
-        [] -> {Source, function_not_found}
+    case [Attr || Attr = {attribute, _, file, _} <- AbstractCode] of
+        [] ->
+            % Forms compiled from generated code don't get a 'file' attribute
+            % and we don't even want to analyze those since it would be
+            % pointless to try to change them
+            {module_not_found, function_not_found};
+        [{attribute, _, file, {Source0, _}} | _] ->
+            Source = rebar_dir:make_relative_path(Source0, rebar_dir:get_cwd()),
+            %% Extract the line number for a given function def
+            Fn = [E || E <- AbstractCode,
+                       safe_element(1, E) == function,
+                       safe_element(3, E) == F,
+                       safe_element(4, E) == A],
+            case Fn of
+                [{function, Anno, F, _, _}] -> {Source, erl_anno:line(Anno)};
+                %% do not crash if functions are exported, even though they
+                %% are not in the source.
+                %% parameterized modules add new/1 and instance/1 for example.
+                [] -> {Source, function_not_found}
+            end
     end.
