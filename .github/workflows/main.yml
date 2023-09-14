@@ -2,6 +2,9 @@ name: Common Test
 
 on: [pull_request, push]
 
+env:
+  LATEST_OTP_RELEASE: 26
+
 jobs:
   linux:
     name: Test on OTP ${{ matrix.otp_version }} and ${{ matrix.os }}
@@ -14,9 +17,6 @@ jobs:
 
     container:
       image: erlang:${{ matrix.otp_version }}
-
-    env:
-      LATEST_OTP_RELEASE: 26
 
     steps:
     - uses: actions/checkout@v2
@@ -40,15 +40,19 @@ jobs:
     - name: Brew Version Check
       run: brew --version
     - name: Brew Cleanup
-      run: brew cleanup
+      run: |
+        brew cleanup --prune=all -s
+        brew autoremove
     - name: Brew Untap Casks
       run: brew untap homebrew/cask homebrew/core
+    - name: Keep Brew Fresh
+      run: |
+        brew update
+        brew upgrade
     - name: Debug Brew
       run: brew doctor
-    - name: Keep Brew Fresh
-      run: brew update
     - name: Install Erlang
-      run: brew install erlang
+      run: brew install erlang@${{ env.LATEST_OTP_RELEASE }}
     - name: Compile
       run: ./bootstrap
     - name: CT tests
