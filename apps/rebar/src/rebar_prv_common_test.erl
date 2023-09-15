@@ -21,6 +21,8 @@
 %% we need to modify app_info state before compile
 -define(DEPS, [lock]).
 
+-define(VERBOSE_DEFAULT, false).
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -92,7 +94,7 @@ run_tests(State, Opts) ->
     Opts2 = turn_off_auto_compile(Opts1),
     ?DEBUG("Running tests with {ct_opts, ~p}.", [Opts2]),
     CTOpts = rebar_state:get(State, ct_opts, []),
-    VerboseFromConfig = verbose({from_config, State}, _DefaultFromConfig = false, CTOpts),
+    VerboseFromConfig = verbose({from_config, State}, _DefaultFromConfig = ?VERBOSE_DEFAULT, CTOpts),
     Result = case verbose({from_cli, State}, VerboseFromConfig) of
         true  -> run_test_verbose(Opts2);
         false -> run_test_quiet(Opts2)
@@ -274,7 +276,7 @@ add_hooks(Opts, State) ->
         true -> [cth_fail_fast];
         false -> []
     end,
-    VerboseFromConfig = verbose({from_config, State}, _DefaultFromConfig = false, Opts),
+    VerboseFromConfig = verbose({from_config, State}, _DefaultFromConfig = ?VERBOSE_DEFAULT, Opts),
     Verbose = [{verbose, verbose({from_cli, State}, VerboseFromConfig)}],
     case {readable(State), lists:keyfind(ct_hooks, 1, Opts)} of
         {false, _} ->
