@@ -1,12 +1,9 @@
 name: Common Test
 
-on:
-  pull_request:
-    branches:
-      - 'main'
-  push:
-    branches:
-      - 'main'
+on: [pull_request, push]
+
+env:
+  LATEST_OTP_RELEASE: 26
 
 jobs:
   linux:
@@ -15,14 +12,11 @@ jobs:
 
     strategy:
       matrix:
-        otp_version: [24, 25.0, 26]
+        otp_version: [24, 25, 26]
         os: [ubuntu-latest]
 
     container:
       image: erlang:${{ matrix.otp_version }}
-
-    env:
-      LATEST_OTP_RELEASE: 26.0
 
     steps:
     - uses: actions/checkout@v2
@@ -33,7 +27,9 @@ jobs:
     - shell: bash
       name: Dialyzer
       run: |
-        [[ "${{ matrix.otp_version }}" != "${{ env.LATEST_OTP_RELEASE }}" ]] || (./rebar3 clean -a && ./rebar3 as dialyzer dialyzer)
+        ./rebar3 clean -a
+        ./rebar3 as dialyzer dialyzer
+      if: ${{ matrix.otp_version == env.LATEST_OTP_RELEASE }}
 
   macos:
     name: Test on MacOS
@@ -44,15 +40,19 @@ jobs:
     - name: Brew Version Check
       run: brew --version
     - name: Brew Cleanup
-      run: brew cleanup
+      run: |
+        brew cleanup --prune=all -s
+        brew autoremove
     - name: Brew Untap Casks
       run: brew untap homebrew/cask homebrew/core
+    - name: Keep Brew Fresh
+      run: |
+        brew update
+        brew upgrade
     - name: Debug Brew
       run: brew doctor
-    - name: Keep Brew Fresh
-      run: brew update
     - name: Install Erlang
-      run: brew install erlang
+      run: brew install erlang@${{ env.LATEST_OTP_RELEASE }}
     - name: Compile
       run: ./bootstrap
     - name: CT tests
