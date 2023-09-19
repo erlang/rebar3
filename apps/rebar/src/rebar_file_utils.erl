@@ -266,7 +266,7 @@ mv(Source, Dest) ->
                 {ok, []} ->
                     ok;
                 {ok, Warning} ->
-                    ?WARN("mv: ~p", [Warning]),
+                    ?WARN("mv: ~tp", [Warning]),
                     ok
             end;
         {win32, _} ->
