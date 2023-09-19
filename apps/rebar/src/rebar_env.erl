@@ -58,7 +58,8 @@ create_env(State, Opts) ->
         {"ERLANG_TARGET",           rebar_api:get_arch()}
     ],
     EInterfaceVars = create_erl_interface_env(),
-    lists:append([EnvVars, EInterfaceVars]).
+    ConfigVars = rebar_state:get(State, shell_hooks_env, []),
+    lists:append([EnvVars, EInterfaceVars, ConfigVars]).
 
 -spec create_erl_interface_env() -> list().
 create_erl_interface_env() ->

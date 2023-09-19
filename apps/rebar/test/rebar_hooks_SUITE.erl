@@ -25,7 +25,7 @@ all() ->
     [build_and_clean_app, run_hooks_once, run_hooks_once_profiles,
      escriptize_artifacts, run_hooks_for_plugins, deps_hook_namespace,
      bare_compile_hooks_default_ns, deps_clean_hook_namespace, eunit_app_hooks,
-     sub_app_hooks, root_hooks, drop_hook_args].
+     sub_app_hooks, root_hooks, drop_hook_args, env_vars_in_hooks].
 
 %% Test post provider hook cleans compiled project app, leaving it invalid
 build_and_clean_app(Config) ->
@@ -265,3 +265,20 @@ drop_hook_args(Config) ->
         Config, RebarConfig, ["eunit", "--cover=false"],
         {ok, []}
     ).
+
+% Test that env vars are accessible from the hooks
+env_vars_in_hooks(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+
+    HookFile = filename:join([?config(priv_dir, Config), "my-hook.txt"]),
+    RebarConfig = [
+        {shell_hooks_env, [{"VAR", HookFile}]},
+        {pre_hooks, [{compile, "echo test > $VAR"}]}
+    ],
+    rebar_test_utils:create_config(AppDir, RebarConfig),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"],
+                {ok, [{app, Name, valid}, {file, HookFile}]}).
