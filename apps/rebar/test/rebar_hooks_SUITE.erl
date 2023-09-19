@@ -275,7 +275,7 @@ env_vars_in_hooks(Config) ->
 
     HookFile = filename:join([?config(priv_dir, Config), "my-hook.txt"]),
     RebarConfig = [
-        {env, [{"VAR", HookFile}]},
+        {shell_hooks_env, [{"VAR", HookFile}]},
         {pre_hooks, [{compile, "echo test > $VAR"}]}
     ],
     rebar_test_utils:create_config(AppDir, RebarConfig),
