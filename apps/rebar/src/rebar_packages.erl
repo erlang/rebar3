@@ -60,11 +60,11 @@ get_all_names(State) ->
                            ets:tid(), rebar_state:t()) -> [vsn()].
 get_package_versions(Dep, DepVsn, Repo, Table, State) ->
     AllowPreRelease = rebar_state:get(State, deps_allow_prerelease, false),
-    #{matchspec := [{Head, [Match], _}]} = rebar_verl:parse_requirement(DepVsn),
+    {Head, Match} = rebar_verl:parse_req_as_matchspec(DepVsn),
 
     ?MODULE:verify_table(State),
     Vsns = ets:select(Table, [{#package{key={Dep, Head, Repo}, _='_'},
-                               [Match], [{Head}]}]),
+                               [Match], [#{major => '$1', minor => '$2', patch => '$3', pre => '$4', build => '$5'}]}]),
     handle_vsns(Vsns, AllowPreRelease).
 
 -spec get_package(unicode:unicode_binary(), unicode:unicode_binary(),
@@ -77,7 +77,7 @@ get_package(Dep, Vsn, Hash, Repos, Table, State) ->
     MatchSpec =
         case is_binary(Vsn) of
             true ->
-                #{matchspec := [{Head, [Match], _}]} = rebar_verl:parse_requirement(Vsn),
+                {Head, Match} = rebar_verl:parse_req_as_matchspec(Vsn),
                 [{#package{key={Dep, Head, Repo}, _='_'}, [Match], ['$_']} || Repo <- Repos];
             false ->
                 [{#package{key={Dep, Vsn, Repo}, _='_'}, [], ['$_']} || Repo <- Repos]
@@ -102,7 +102,7 @@ get_package(Dep, Vsn, Hash, Repos, Table, State) ->
             PackagesWithProperHash;
         false ->
             lists:filter(
-                fun(#package{key = {_, {_, _, _, Pre, _}, _}}) ->
+                fun(#package{key = {_, {{_, _, _}, {Pre, _}}, _}}) ->
                     Pre =:= []
                 end,
                 PackagesWithProperHash
@@ -226,7 +226,7 @@ handle_vsns(Vsns, AllowPreRelease) ->
     Vsn =
         lists:foldl(
             fun(Version, Highest) when AllowPreRelease orelse length(element(4, Version)) =:= 0 ->
-                case (Highest =:= none orelse verl:compare(Version, Highest) =:= gt) of
+                case (Highest =:= none orelse rebar_verl:compare(Version, Highest) =:= gt) of
                     true ->
                         Version;
                     false ->

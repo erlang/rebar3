@@ -232,13 +232,13 @@ find_highest_matching(_Config) ->
     State = rebar_state:new(),
     {ok, Vsn} = rebar_packages:find_highest_matching_(
                   <<"goodpkg">>, <<"~> 1.0.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
-    ?assertMatch({1,0,1,[],_}, Vsn),
+    ?assertMatch({{1,0,1},{[],_}}, Vsn),
     {ok, Vsn1} = rebar_packages:find_highest_matching(
                    <<"goodpkg">>, <<"~> 1.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
-    ?assertMatch({1,1,1,[],_}, Vsn1),
+    ?assertMatch({{1,1,1},{[],_}}, Vsn1),
     {ok, Vsn2} = rebar_packages:find_highest_matching(
                    <<"goodpkg">>, <<"~> 2.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
-    ?assertMatch({2,0,0,[],_}, Vsn2),
+    ?assertMatch({{2,0,0},{[],_}}, Vsn2),
 
     %% regression test. ~> constraints higher than the available packages would result
     %% in returning the first package version instead of 'none'.
@@ -248,7 +248,7 @@ find_highest_matching(_Config) ->
 
     {ok, Vsn3} = rebar_packages:find_highest_matching_(<<"goodpkg">>, <<"== 3.0.0-rc.0">>,
                                                        #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
-    ?assertMatch({3,0,0,[<<"rc">>,0],_}, Vsn3).
+    ?assertMatch({{3,0,0},{[<<"rc">>,0],_}}, Vsn3).
 
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
