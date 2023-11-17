@@ -510,12 +510,14 @@ reread_logger_config() ->
             %% Extract and apply settings related to primary configuration
             %% -- primary config is used for settings shared across handlers
             LogLvlPrimary = proplists:get_value(logger_level, KernelCfg, all),
+            LogMetaPrimary = proplists:get_value(logger_metadata, KernelCfg, #{}),
             {FilterDefault, Filters} =
               case lists:keyfind(filters, 1, LogCfg) of
                   false -> {log, []};
                   {filters, FoundDef, FoundFilter} -> {FoundDef, FoundFilter}
               end,
             Primary = #{level => LogLvlPrimary,
+                        metadata => LogMetaPrimary,
                         filter_default => FilterDefault,
                         filters => Filters},
             lists:foreach(fun maybe_reset_logger_handler/1, LogCfg),
