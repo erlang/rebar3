@@ -362,7 +362,16 @@ terminate(G) ->
 store_artifact(G, Source, Target, Meta) ->
     mark_dirty(G),
     digraph:add_vertex(G, Target, {artifact, Meta}),
-    digraph:add_edge(G, Target, Source, artifact).
+    %% artifact edges can get duplicated, so see if it exists before doing
+    %% anything with it
+    Edges = [{Beam,Src} || E <- digraph:edges(G, Target),
+                           {_,Beam,Src,artifact} <- [digraph:edge(G,E)]],
+    case lists:member({Target, Source}, Edges) of
+        true ->
+            ok;
+        false ->
+            digraph:add_edge(G, Target, Source, artifact)
+    end.
 
 %%%%%%%%%%%%%%%
 %%% PRIVATE %%%
