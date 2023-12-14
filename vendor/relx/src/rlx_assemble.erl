@@ -782,7 +782,7 @@ add_project_apps_to_xref(Rf, [AppSpec | Rest], State) ->
             of
                 {ok, _} ->
                     ok;
-                {error, _} = Error ->
+                {error, _, _} = Error ->
                     ?log_warn("Error adding application ~s to xref context: ~s",
                               [rlx_app_info:name(App), xref:format_error(Error)])
             end;
