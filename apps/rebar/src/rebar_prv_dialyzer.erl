@@ -87,6 +87,7 @@ desc() ->
     "success typing analysis\n"
     "`output_format` - configure whether the dialyzer_warnings file will have "
     "the `raw` or `formatted` output\n"
+    "`incremental` - incremental analysis mode, defaults to `false`\n"
     "\n"
     "For example, to warn on unmatched returns: \n"
     "{dialyzer, [{warnings, [unmatched_returns]}]}.\n"
