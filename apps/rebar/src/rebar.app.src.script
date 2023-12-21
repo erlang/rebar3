@@ -28,6 +28,7 @@
                   relx,
                   cf,
                   inets,
+                  verl,
                   eunit_formatters
                     % OTP 24 drops HiPE
                   | [hipe || _ <- [application:load(dialyzer)],
