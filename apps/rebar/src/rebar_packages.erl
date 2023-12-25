@@ -392,7 +392,7 @@ resolve_version_(Dep, DepVsn, Repo, HexRegistry, State) ->
     end.
 
 process_vsn(Vsn) ->
-    [Vsn1|_] = string:split(Vsn, <<"or">>),
+    [Vsn1|_] = string:split(Vsn, <<" or ">>),
     Vsn2 = string:trim(Vsn1),
     ec_semver:parse(Vsn2).
 
