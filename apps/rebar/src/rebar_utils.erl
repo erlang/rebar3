@@ -768,7 +768,12 @@ vcs_vsn(AppInfo, Vcs, State) ->
         {cmd, CmdString} ->
             cmd_vsn_invoke(CmdString, rebar_app_info:dir(AppInfo));
         unknown ->
-            ?ABORT("vcs_vsn: Unknown vsn format: ~p", [Vcs]);
+            case vsn_from_hex_metadata(AppInfo) of
+                unknown ->
+                    ?ABORT("vcs_vsn: Unknown vsn format: ~p", [Vcs]);
+                Other ->
+                    Other
+            end;
         {error, Reason} ->
             ?ABORT("vcs_vsn: ~ts", [Reason])
     end.
@@ -801,6 +806,21 @@ vcs_vsn_cmd(AppInfo, VCS, State) when is_list(VCS) ->
     end;
 vcs_vsn_cmd(_, _, _) ->
     unknown.
+
+vsn_from_hex_metadata(AppInfo) ->
+    HexMetadataPath = filename:join(
+                        rebar_app_info:dir(AppInfo),
+                        "hex_metadata.config"
+                       ),
+
+    case filelib:is_regular(HexMetadataPath) of
+        true ->
+            {ok, HexMetadata} = file:consult(HexMetadataPath),
+            binary_to_list(proplists:get_value(<<"version">>, HexMetadata));
+        _ ->
+            unknown
+    end.
+
 
 cmd_vsn_invoke(Cmd, Dir) ->
     {ok, VsnString} = rebar_utils:sh(Cmd, [{cd, Dir}, {use_stdout, false}]),
