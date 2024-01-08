@@ -499,6 +499,8 @@ valid_version(_Config) ->
     ?assert(rebar_packages:valid_vsn(<<"~>0.1.0">>)),
     ?assert(rebar_packages:valid_vsn(<<"~> 0.1.0">>)),
     ?assert(rebar_packages:valid_vsn(<<"~>  0.1.0">>)),
+    ?assert(rebar_packages:valid_vsn(<<"~> 0.1 or 0.5">>)),
+    ?assert(rebar_packages:valid_vsn(<<"~> 0.1-or-something">>)),
     ?assertNot(rebar_packages:valid_vsn(<<"> 0.1.0 and < 0.2.0">>)),
     ok.
 

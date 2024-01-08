@@ -376,31 +376,31 @@ handle_missing_no_exception(Fun, Dep, State) ->
 resolve_version_(Dep, DepVsn, Repo, HexRegistry, State) ->
     case DepVsn of
         <<"~>", Vsn/binary>> ->
-            highest_matching(Dep, rm_ws(Vsn), Repo, HexRegistry, State);
+            highest_matching(Dep, process_vsn(Vsn), Repo, HexRegistry, State);
         <<">=", Vsn/binary>> ->
-            cmp(Dep, rm_ws(Vsn), Repo, HexRegistry, State, fun ec_semver:gte/2);
+            cmp(Dep, process_vsn(Vsn), Repo, HexRegistry, State, fun ec_semver:gte/2);
         <<">", Vsn/binary>> ->
-            cmp(Dep, rm_ws(Vsn), Repo, HexRegistry, State, fun ec_semver:gt/2);
+            cmp(Dep, process_vsn(Vsn), Repo, HexRegistry, State, fun ec_semver:gt/2);
         <<"<=", Vsn/binary>> ->
-            cmpl(Dep, rm_ws(Vsn), Repo, HexRegistry, State, fun ec_semver:lte/2);
+            cmpl(Dep, process_vsn(Vsn), Repo, HexRegistry, State, fun ec_semver:lte/2);
         <<"<", Vsn/binary>> ->
-            cmpl(Dep, rm_ws(Vsn), Repo, HexRegistry, State, fun ec_semver:lt/2);
+            cmpl(Dep, process_vsn(Vsn), Repo, HexRegistry, State, fun ec_semver:lt/2);
         <<"==", Vsn/binary>> ->
             {ok, Vsn};
         Vsn ->
             {ok, Vsn}
     end.
 
-rm_ws(<<" ", R/binary>>) ->
-    ec_semver:parse(rm_ws(R));
-rm_ws(R) ->
-    ec_semver:parse(R).
+process_vsn(Vsn) ->
+    [Vsn1|_] = string:split(Vsn, <<" or ">>),
+    Vsn2 = string:trim(Vsn1),
+    ec_semver:parse(Vsn2).
 
 valid_vsn(Vsn) ->
     %% Regepx from https://github.com/sindresorhus/semver-regex/blob/master/index.js
     SemVerRegExp = "v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*))?"
         "(-[0-9a-z-]+(\\.[0-9a-z-]+)*)?(\\+[0-9a-z-]+(\\.[0-9a-z-]+)*)?",
-    SupportedVersions = "^(>=?|<=?|~>|==)?\\s*" ++ SemVerRegExp ++ "$",
+    SupportedVersions = "^(>=?|<=?|~>|==)?\\s*" ++ SemVerRegExp ++ "( or .*)?$",
     re:run(Vsn, SupportedVersions, [unicode]) =/= nomatch.
 
 highest_matching(Dep, Vsn, Repo, HexRegistry, State) ->
