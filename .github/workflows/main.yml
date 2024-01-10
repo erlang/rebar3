@@ -47,10 +47,10 @@ jobs:
       run: brew untap homebrew/cask homebrew/core
     - name: Keep Brew Fresh
       run: |
-        brew update
-        brew upgrade
+        brew update || true
+        brew upgrade || true
     - name: Debug Brew
-      run: brew doctor
+      run: brew doctor || true
     - name: Install Erlang
       run: brew install erlang@${{ env.LATEST_OTP_RELEASE }}
     - name: Compile
