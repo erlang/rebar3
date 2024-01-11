@@ -361,7 +361,8 @@ simulate_proc_lib() ->
 
 maybe_run_eval(State) ->
     Exprs = find_evals_to_run(State),
-    lists:map(fun(Expr) ->
+    lists:map(fun(Expr0) ->
+        Expr = maybe_append_dot(Expr0),
         ?INFO("Evaluating: ~p",[Expr]),
         {ok, _} = eval(Expr)
     end, Exprs).
@@ -384,6 +385,15 @@ eval(Expression) ->
                 C:E:S ->
                     throw(?PRV_ERROR({eval_exprs, Expression, {C, E, S}}))
             end
+    end.
+
+maybe_append_dot(Expression) ->
+    case re:run(Expression, "\\.\\s*$", [{capture, none}, unicode]) of
+        nomatch ->
+            ?DEBUG("Appending missing '.' to the end of ~p",[Expression]),
+            Expression ++ ".";
+        match ->
+            Expression
     end.
 
 setup_name(State) ->
