@@ -66,6 +66,7 @@
                      rebar_prv_local_install,
                      rebar_prv_local_upgrade,
                      rebar_prv_lock,
+                     rebar_prv_manifest,
                      rebar_prv_new,
                      rebar_prv_packages,
                      rebar_prv_path,
