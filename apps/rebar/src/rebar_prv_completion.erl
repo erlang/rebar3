@@ -137,7 +137,7 @@ write_completion(CompletionStr, State, #{shell:=Shell, file:=Filename}) ->
     Dest = filename:join(BaseDir, Filename),
     case filelib:ensure_dir(Dest) of
         ok ->
-            ?DIAGNOSTIC("Writing completion file for ~p shell to: ~p~n",
+            ?DEBUG("Writing completion file for ~p shell to: ~p~n",
                         [Shell, Dest]),
             case file:write_file(Dest, CompletionStr, [write, raw]) of
                 ok ->
