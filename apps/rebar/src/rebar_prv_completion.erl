@@ -60,7 +60,11 @@ do(State) ->
                 fun(NS,Ps,CmdAcc) -> namespace_to_cmpl_cmds(NS, Ps)++CmdAcc end,
                 [],
                 ByNamespace),
-    Cmds = [oracle(Cmd, CmplOpts, State) || Cmd <- Cmds0],
+    Cmds1 = [oracle(Cmd, CmplOpts, State) || Cmd <- Cmds0],
+    {[Do],RestCmds} = lists:partition(
+                         fun(Cmd) -> maps:get(name, Cmd) =:= "do" end,
+                         Cmds1),
+    Cmds = [Do#{cmds:=RestCmds} | RestCmds],
     Compl = rebar_completion:generate(Cmds, CmplOpts),
     write_completion(Compl,State,CmplOpts),
     {ok, State}.
@@ -88,8 +92,8 @@ namespace_to_cmpl_cmds(default,Providers) ->
 namespace_to_cmpl_cmds(Namespace,Providers) ->
     Name = atom_to_list(Namespace),
     [#{name=>Name,
-      commands=>lists:map(fun(P)->provider_to_cmpl_cmd(P) end, Providers),
-      arguments=>[],
+      cmds=>lists:map(fun(P)->provider_to_cmpl_cmd(P) end, Providers),
+      args=>[],
       help=>Name++" namespace"}].
 
 -spec provider_to_cmpl_cmd(providers:t()) -> rebar_completion:cmpl_cmd().
@@ -107,8 +111,8 @@ getopt_to_cmpl_cmd(Name, Opts) ->
             type=>cmpl_arg_type(Spec),
             help=>H} || {_,S,L,Spec,H} <- Opts],
     #{name => Name,
-    arguments => Args,
-    commands => [],
+    args => Args,
+    cmds => [],
     help => undefined}.
 
 cmpl_arg_type({Type,_Default}) ->
@@ -123,11 +127,11 @@ cmpl_arg_type(Type) ->
 oracle(#{name:="as"}=Cmd, _CmplOpts, State) ->
     %% profile completion
     ConfigProfiles = rebar_opts:get(rebar_state:opts(State), profiles, []),
-    Args = [#{short=>undefined,
-            long=>atom_to_list(ProfileName),
-            help=>undefined,
-            type=>string} || {ProfileName,_} <- ConfigProfiles],
-    Cmd#{arguments=>Args};
+    Cmds = [#{name=>atom_to_list(ProfileName),
+              help=>"",
+              cmds=>[],
+              args=>[]} || {ProfileName,_} <- ConfigProfiles],
+    Cmd#{cmds=>Cmds};
 oracle(Cmd,_,_) ->
     Cmd.
 

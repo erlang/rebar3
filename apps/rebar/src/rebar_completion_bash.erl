@@ -20,7 +20,7 @@ cmd_clause(Cmd) ->
     nested_cmd_clause(Cmd, [], 1).
 
 -spec nested_cmd_clause(rebar_completion:cmpl_cmd(), [string()], pos_integer()) -> iolist().
-nested_cmd_clause(#{name:=Name,arguments:=Args,commands:=Cmds},Prevs,Depth) ->
+nested_cmd_clause(#{name:=Name,args:=Args,cmds:=Cmds},Prevs,Depth) ->
     Opts = [{S,L} || #{short:=S, long:=L} <- Args],
     {Shorts0,Longs0} = lists:unzip(Opts),
     Defined = fun(Opt) -> Opt =/= undefined end,
@@ -100,9 +100,9 @@ prev_definitions(MaxDepth, Cnt) ->
 
 cmd_depth([], _, Max) ->
     Max;
-cmd_depth([#{commands:=[]} | Rest],Depth,Max) ->
+cmd_depth([#{cmds:=[]} | Rest],Depth,Max) ->
     cmd_depth(Rest,Depth,max(Depth,Max));
-cmd_depth([#{commands:=Cmds} | Rest],Depth, Max) ->
+cmd_depth([#{cmds:=Cmds} | Rest],Depth, Max) ->
     D = cmd_depth(Cmds, Depth+1, Max),
     cmd_depth(Rest, Depth, max(D,Max));
 cmd_depth([_ | Rest],Depth,Max) ->

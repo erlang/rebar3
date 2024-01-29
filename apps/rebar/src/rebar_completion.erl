@@ -16,10 +16,8 @@
 
 -type cmpl_opts() :: #{aliases => [string()],
                        file => file:filename(),
-                       hints => boolean(),
                        %% TODO support fish and maybe some more shells
-                       shell => bash | zsh,
-                       type_hints => boolean()}.
+                       shell => bash | zsh}.
 -export([prelude/1]).
 
 -export_type([cmpl_opts/0, cmpl_cmd/0, cmpl_arg/0]).
