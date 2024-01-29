@@ -55,7 +55,7 @@ do(State) ->
 
     Providers0 = rebar_state:providers(State),
     BareProviders = lists:filter(fun(P) -> provider_get(P, bare) end, Providers0),
-    ByNamespace = maps:groups_from_list(fun(P) -> provider_get(P, namespace) end, BareProviders),
+    ByNamespace = group_by_namespace(BareProviders),
     Cmds0 = maps:fold(
                 fun(NS,Ps,CmdAcc) -> namespace_to_cmpl_cmds(NS, Ps)++CmdAcc end,
                 [],
@@ -161,6 +161,22 @@ provider_get(P, short_desc) ->
     element(8, P);
 provider_get(P, namespace) ->
     element(12, P).
+
+-if(?OTP_RELEASE >= 25).
+group_by_namespace(Ps) ->
+    maps:groups_from_list(fun(P) -> provider_get(P, namespace) end, Ps).
+-else.
+group_by_namespace(Ps) ->
+    lists:foldl(fun(P, Acc) ->
+                    K=provider_get(P, namespace),
+                    case Acc of
+                        #{K:=Vs}->Acc#{K:=[P|Vs]};
+                        _ -> Acc#{K=>[P]}
+                    end
+                end,
+                #{},
+                Ps).
+-endif.
 
 -spec format_error(any()) ->  iolist().
 format_error({error_writing_file,File,Err}) ->

@@ -60,7 +60,7 @@ main(Commands, #{shell:=bash, aliases:=Aliases}) ->
     ["_rebar3_ref_idx() {\n",
     "   startc=$1\n",
     "   # is at least one of the two previous words a flag?\n",
-    "    prev=${COMP_CWORD}-${startc}+1\n",
+    "    prev=${COMP_CWORD}-${startc}+",?str(MaxDepth-1),"\n",
     "    if [[ ${COMP_WORDS[${prev}]} == -* || ${COMP_WORDS[${prev}-1]} == -*  ]] ; then\n",
     "        startc=$((startc+1))\n",
     "        _rebar3_ref_idx $startc\n",
