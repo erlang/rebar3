@@ -114,7 +114,7 @@ adapt_context(App) ->
 -spec output_manifest(binary(), string() | undefined) -> ok | {error, term()}.
 output_manifest(Manifest, undefined) ->
     rebar_log:log(info, "Writing manifest to stdout:~n", []),
-    io:fwrite("~s~n", [Manifest]);
+    io:fwrite("~ts~n", [Manifest]);
 output_manifest(Manifest, File) ->
     rebar_log:log(info, "Build info written to: ~ts~n", [File]),
     file:write_file(File, Manifest).
