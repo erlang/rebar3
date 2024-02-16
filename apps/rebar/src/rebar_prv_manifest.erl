@@ -33,11 +33,6 @@
 %% ===================================================================
 -spec init(rebar_state:t()) -> {ok, rebar_state:t()}.
 init(State) ->
-
-  %% By default, the provider outputs the manifest to stdout, so disable logs
-  %% not to interfere.
-  ok = rebar_log:init(api, 0),
-
   State1 = rebar_state:add_provider(
              State,
              providers:create([
