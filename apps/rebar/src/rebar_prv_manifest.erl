@@ -25,8 +25,8 @@
                          dependencies_opts => any()}.
 -type manifest() :: #{ apps := [app_context()],
                        deps := [app_context()],
-                       otp_lib_dir := string(),
-                       source_root := string()}.
+                       otp_lib_dir := file:filename(),
+                       source_root := file:filename()}.
 
 -type format() :: erlang | eetf.
 
