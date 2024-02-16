@@ -6,18 +6,15 @@
          basic_check/1,
          write_to_file_erlang/1,
          write_to_file_eetf/1,
-         non_supported_format/1
-        ]).
+         non_supported_format/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
-all() -> [
-          basic_check,
+all() -> [basic_check,
           write_to_file_erlang,
           write_to_file_eetf,
-          non_supported_format
-         ].
+          non_supported_format].
 
 init_per_testcase(Case, Config0) ->
     %% Create a project directory in the test run's priv_dir
@@ -34,34 +31,34 @@ end_per_testcase(_, Config) ->
     Config.
 
 basic_check(Config) ->
-  rebar_test_utils:run_and_check(Config, [],
-                                 ["manifest"],
-                                 {ok, []}).
+    rebar_test_utils:run_and_check(Config, [],
+                                   ["manifest"],
+                                   {ok, []}).
 
 write_to_file_erlang(Config) ->
-  AppName = proplists:get_value(name, Config),
-  PrivDir = proplists:get_value(priv_dir, Config),
-  FilePath = filename:join([PrivDir, "manifest"]),
-  rebar_test_utils:run_and_check(Config, [],
-                                 ["manifest", "--to", FilePath],
-                                 {ok, []}),
-  {ok, [Manifest]} = file:consult(FilePath),
-  ?assertMatch(#{deps := [], apps := [#{name := AppName}]}, Manifest).
+    AppName = proplists:get_value(name, Config),
+    PrivDir = proplists:get_value(priv_dir, Config),
+    FilePath = filename:join([PrivDir, "manifest"]),
+    rebar_test_utils:run_and_check(Config, [],
+                                   ["manifest", "--to", FilePath],
+                                   {ok, []}),
+    {ok, [Manifest]} = file:consult(FilePath),
+    ?assertMatch(#{deps := [], apps := [#{name := AppName}]}, Manifest).
 
 write_to_file_eetf(Config) ->
-  AppName = proplists:get_value(name, Config),
-  PrivDir = proplists:get_value(priv_dir, Config),
-  FilePath = filename:join([PrivDir, "manifest"]),
-  rebar_test_utils:run_and_check(Config, [],
-                                 ["manifest", "--to", FilePath, "--format", "eetf"],
-                                 {ok, []}),
-  {ok, Content} = file:read_file(FilePath),
-  Manifest = binary_to_term(Content),
-  ?assertMatch(#{deps := [], apps := [#{name := AppName}]}, Manifest).
+    AppName = proplists:get_value(name, Config),
+    PrivDir = proplists:get_value(priv_dir, Config),
+    FilePath = filename:join([PrivDir, "manifest"]),
+    rebar_test_utils:run_and_check(Config, [],
+                                   ["manifest", "--to", FilePath, "--format", "eetf"],
+                                   {ok, []}),
+    {ok, Content} = file:read_file(FilePath),
+    Manifest = binary_to_term(Content),
+    ?assertMatch(#{deps := [], apps := [#{name := AppName}]}, Manifest).
 
 non_supported_format(Config) ->
-  PrivDir = proplists:get_value(priv_dir, Config),
-  FilePath = filename:join([PrivDir, "manifest"]),
-  rebar_test_utils:run_and_check(Config, [],
-                                 ["manifest", "--to", FilePath, "--format", "non-existing"],
-                                 {error,{rebar_prv_manifest,{format_not_supported,'non-existing'}}}).
+    PrivDir = proplists:get_value(priv_dir, Config),
+    FilePath = filename:join([PrivDir, "manifest"]),
+    rebar_test_utils:run_and_check(Config, [],
+                                   ["manifest", "--to", FilePath, "--format", "non-existing"],
+                                   {error,{rebar_prv_manifest,{format_not_supported,'non-existing'}}}).
