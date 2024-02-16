@@ -98,10 +98,15 @@ options() ->
 get_manifest(State) ->
     ProjectApps = rebar_state:project_apps(State),
     DepApps = rebar_state:all_deps(State),
-    #{apps => [adapt_context(App) || App <- ProjectApps],
-      deps => [adapt_context(App) || App <- DepApps],
+    #{apps => [adapt_context(App) || App <- ProjectApps, is_supported(App)],
+      deps => [adapt_context(App) || App <- DepApps, is_supported(App)],
       otp_lib_dir => code:lib_dir(),
       source_root => rebar_state:dir(State)}.
+
+-spec is_supported(rebar_app_info:t()) -> boolean().
+is_supported(App) ->
+    Type = rebar_app_info:project_type(App),
+    Type =:= rebar3 orelse Type =:= undefined.
 
 -spec adapt_context(rebar_app_info:t()) -> app_context().
 adapt_context(App) ->
