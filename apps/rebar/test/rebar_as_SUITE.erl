@@ -198,4 +198,5 @@ clean_as_profile(Config) ->
     rebar_test_utils:run_and_check(Config,
                                    [],
                                    ["clean", "-a", "-p", "foo"],
-                                   {ok, [{app, Name, invalid}]}).
+                                   {ok, [{app, Name, invalid}]}),
+    ok.
