@@ -57,7 +57,7 @@ do(State) ->
     Manifest = get_manifest(State),
     case format(Manifest, Format) of
         {ok, Formatted} ->
-            case output_manifest(Formatted, To) of
+            case output_manifest(Formatted, Format, To) of
                 ok ->
                     {ok, State};
                 {error, Error} ->
@@ -116,11 +116,16 @@ adapt_context(App) ->
                       {Extension, Path} <- maps:get(out_mappings, Context1)],
     maps:put(out_mappings, OutMappings, Context1).
 
--spec output_manifest(binary(), string() | undefined) -> ok | {error, term()}.
-output_manifest(Manifest, undefined) ->
+-spec output_manifest(binary(), format(), string() | undefined) -> ok | {error, term()}.
+output_manifest(Manifest, Format, undefined) ->
     rebar_log:log(info, "Writing manifest to stdout:~n", []),
-    io:fwrite("~ts~n", [Manifest]);
-output_manifest(Manifest, File) ->
+    case Format of
+      erlang ->
+        io:fwrite("~ts~n", [Manifest]);
+      eetf ->
+        io:fwrite("~s~n", [Manifest])
+    end;
+output_manifest(Manifest, _Format, File) ->
     rebar_log:log(info, "Build info written to: ~ts~n", [File]),
     file:write_file(File, Manifest).
 
