@@ -36,7 +36,7 @@
                  ]},
   {env, [
         %% Default log level
-        {log_level, warn},
+        {log_level, info},
 
         {resources, [{git, rebar_git_resource},
                      {git_subdir, rebar_git_subdir_resource},

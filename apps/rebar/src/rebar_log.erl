@@ -34,6 +34,7 @@
          default_level/0,
          debug_level/0,
          diagnostic_level/0,
+         atom_to_level/1,
          intensity/0,
          log/3,
          is_verbose/1,
@@ -142,6 +143,15 @@ is_verbose(State) ->
 
 valid_level(Level) ->
     erlang:max(?ERROR_LEVEL, erlang:min(Level, ?DIAGNOSTIC_LEVEL)).
+
+atom_to_level(Level) ->
+    case Level of
+        error -> ?ERROR_LEVEL;
+        warn  -> ?WARN_LEVEL;
+        info  -> ?INFO_LEVEL;
+        debug -> ?DEBUG_LEVEL;
+        diagnostic -> ?DIAGNOSTIC_LEVEL
+    end.
 
 %% ===================================================================
 %% Internal functions

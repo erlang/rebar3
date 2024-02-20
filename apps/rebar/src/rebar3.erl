@@ -312,7 +312,12 @@ log_level() ->
                 Di when Di == false; Di == "" ->
                     case os:getenv("DEBUG") of
                         D when D == false; D == "" ->
-                            rebar_log:default_level();
+                            try
+                                {ok, L} = application:get_env(rebar, log_level),
+                                 rebar_log:atom_to_level(L)
+                            catch
+                                _:_ -> rebar_log:default_level()
+                            end;
                         _ ->
                             rebar_log:debug_level()
                     end;
