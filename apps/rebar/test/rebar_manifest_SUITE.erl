@@ -11,6 +11,8 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
+-define(NAMESPACE, "experimental").
+
 all() -> [basic_check,
           write_to_file_erlang,
           write_to_file_eetf,
@@ -32,7 +34,7 @@ end_per_testcase(_, Config) ->
 
 basic_check(Config) ->
     rebar_test_utils:run_and_check(Config, [],
-                                   ["manifest"],
+                                   [?NAMESPACE, "manifest"],
                                    {ok, []}).
 
 write_to_file_erlang(Config) ->
@@ -40,7 +42,7 @@ write_to_file_erlang(Config) ->
     PrivDir = proplists:get_value(priv_dir, Config),
     FilePath = filename:join([PrivDir, "manifest"]),
     rebar_test_utils:run_and_check(Config, [],
-                                   ["manifest", "--to", FilePath],
+                                   [?NAMESPACE, "manifest", "--to", FilePath],
                                    {ok, []}),
     {ok, [Manifest]} = file:consult(FilePath),
     ?assertMatch(#{deps := [], apps := [#{name := AppName}]}, Manifest).
@@ -50,7 +52,7 @@ write_to_file_eetf(Config) ->
     PrivDir = proplists:get_value(priv_dir, Config),
     FilePath = filename:join([PrivDir, "manifest"]),
     rebar_test_utils:run_and_check(Config, [],
-                                   ["manifest", "--to", FilePath, "--format", "eetf"],
+                                   [?NAMESPACE, "manifest", "--to", FilePath, "--format", "eetf"],
                                    {ok, []}),
     {ok, Content} = file:read_file(FilePath),
     Manifest = binary_to_term(Content),
@@ -60,5 +62,5 @@ non_supported_format(Config) ->
     PrivDir = proplists:get_value(priv_dir, Config),
     FilePath = filename:join([PrivDir, "manifest"]),
     rebar_test_utils:run_and_check(Config, [],
-                                   ["manifest", "--to", FilePath, "--format", "non-existing"],
-                                   {error,{rebar_prv_manifest,{format_not_supported,'non-existing'}}}).
+                                   [?NAMESPACE, "manifest", "--to", FilePath, "--format", "non-existing"],
+                                   {error, {rebar_prv_manifest, {format_not_supported, 'non-existing'}}}).

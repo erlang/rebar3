@@ -13,6 +13,7 @@
 -include_lib("providers/include/providers.hrl").
 
 -define(PROVIDER, manifest).
+-define(NAMESPACE, experimental).
 -define(DEFAULT_FORMAT, erlang).
 
 -type extension() :: string().
@@ -38,9 +39,10 @@
 init(State) ->
     State1 = rebar_state:add_provider(State,
                                       providers:create([{name, ?PROVIDER},
+                                                        {namespace, ?NAMESPACE},
                                                         {module, ?MODULE},
                                                         {bare, true},
-                                                        {deps, [install_deps]},
+                                                        {deps, [{default, install_deps}]},
                                                         {example, "rebar3 manifest"},
                                                         {short_desc, short_desc()},
                                                         {desc, desc()},
