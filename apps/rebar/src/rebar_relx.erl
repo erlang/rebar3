@@ -72,7 +72,7 @@ do(Provider, State) ->
 
             relx:build_relup(Release, ToVsn, UpFromVsn, RelxState);
         _ ->
-            parallel_run(Provider, Releases, all_apps(State), RelxState)
+            parallel_run(Provider, Releases, recalc_vsn(all_apps(State)), RelxState)
     end,
 
     rebar_hooks:run_project_and_app_hooks(Cwd, post, Provider, Providers, State),
@@ -299,3 +299,13 @@ opt_spec_list() ->
      {version, undefined, "version", undefined, "Print relx version"},
      {root_dir, $r, "root", string, "The project root directory"},
      {relnames, $m, "relnames", string, "Like --all, but only build the releases in the list, e.g. --relnames rel1,rel2"}].
+
+-spec recalc_vsn(#{atom() => rlx_app_info:t()}) -> #{atom() => rlx_app_info:t()}.
+recalc_vsn(Apps) ->
+    maps:map(
+        fun(App, #{dir := Dir} = AppVals) ->
+            AppFile = filename:join([Dir, "ebin", atom_to_list(App) ++ ".app"]),
+            {ok, [{application, App, AppOpts}]} = file:consult(AppFile),
+            {vsn, NewVsn} = lists:keyfind(vsn, 1, AppOpts),
+            maps:put(vsn, NewVsn, AppVals)
+        end, Apps).
