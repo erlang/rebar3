@@ -12,7 +12,7 @@
 -include("rebar.hrl").
 
 -define(PROVIDER, clean).
--define(DEPS, [app_discovery, install_deps]).
+-define(DEPS, []).
 
 %% ===================================================================
 %% Public API
@@ -37,7 +37,16 @@ do(State) ->
     Providers = rebar_state:providers(State),
     {All, Profiles, Specific} = handle_args(State),
 
-    State1 = rebar_state:apply_profiles(State, [list_to_atom(X) || X <- Profiles]),
+    %% Invoke provider deps as the desired profile(s) so the discovery of
+    %% apps respects profile options.
+    Task = if All; Specific =/= [] -> "install_deps";
+              true -> "app_discovery"
+           end,
+    State0 = rebar_state:command_args(
+        State,
+        lists:join(",", ["default"|Profiles]) ++ [Task]
+    ),
+    {ok, State1} = rebar_prv_as:do(State0),
 
     Cwd = rebar_dir:get_cwd(),
     rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State1),
@@ -45,7 +54,14 @@ do(State) ->
     if All; Specific =/= [] ->
         DepsDir = rebar_dir:deps_dir(State1),
         DepsDirs = filelib:wildcard(filename:join(DepsDir, "*")),
-        AllApps = rebar_app_discover:find_apps(DepsDirs, all, State),
+        ProjectApps = rebar_state:project_apps(State1),
+        Deps = rebar_state:all_deps(State1),
+        KnownAppNames = [rebar_app_info:name(App) || App <- ProjectApps++Deps],
+        ParsedApps = rebar_app_discover:find_apps(DepsDirs, all, State1),
+        AllApps = ProjectApps ++ Deps ++
+                  [App || App <- ParsedApps,
+                          not lists:member(rebar_app_info:name(App),
+                                           KnownAppNames)],
         Filter = case All of
             true -> fun(_) -> true end;
             false -> fun(AppInfo) -> filter_name(AppInfo, Specific) end
