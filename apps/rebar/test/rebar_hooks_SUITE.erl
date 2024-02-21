@@ -166,10 +166,17 @@ deps_clean_hook_namespace(Config) ->
             ]}
         ]}
     ],
+    %% Only detect dependencies when asked to parse them.
+    %% Avoids scanning and fetching them only to clean them.
     rebar_test_utils:run_and_check(
         Config, RebarConfig, ["clean"],
+        {ok, [{dep_not_exist, "some_dep"}]}
+    ),
+    rebar_test_utils:run_and_check(
+        Config, RebarConfig, ["clean", "-a"],
         {ok, [{dep, "some_dep"}]}
-    ).
+    ),
+    ok.
 
 %% Checks that a hook that is defined on an app (not a top level hook of a project with subapps) is run
 eunit_app_hooks(Config) ->
