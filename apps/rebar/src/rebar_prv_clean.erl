@@ -39,9 +39,12 @@ do(State) ->
 
     %% Invoke provider deps as the desired profile(s) so the discovery of
     %% apps respects profile options.
+    Task = if All; Specific =/= [] -> "install_deps";
+              true -> "app_discovery"
+           end,
     State0 = rebar_state:command_args(
         State,
-        lists:join(",", ["default"|Profiles]) ++ ["install_deps"]
+        lists:join(",", ["default"|Profiles]) ++ [Task]
     ),
     {ok, State1} = rebar_prv_as:do(State0),
 
