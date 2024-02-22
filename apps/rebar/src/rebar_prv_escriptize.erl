@@ -191,10 +191,11 @@ get_apps_beams([App | Rest], AllApps, Acc) ->
             Beams = get_app_beams(App, OutDir),
             get_apps_beams(Rest, AllApps, Beams ++ Acc);
         _->
-            case code:lib_dir(App, ebin) of
+            case code:lib_dir(App) of
                 {error, bad_name} ->
                     throw(?PRV_ERROR({bad_name, App}));
-                Path ->
+                AppDir ->
+                    Path = filename:join(AppDir, "ebin"),
                     Beams = get_app_beams(App, Path),
                     get_apps_beams(Rest, AllApps, Beams ++ Acc)
             end
