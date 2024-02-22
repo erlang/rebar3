@@ -741,7 +741,7 @@ maybe_check_for_undefined_functions_(State, Release) ->
             %% without adding the erts application there will be warnings about 
             %% missing functions from the preloaded modules even though they 
             %% are in the runtime.
-            ErtsApp = code:lib_dir(erts, ebin),
+            ErtsApp = filename:join(code:lib_dir(erts), "ebin"),
 
             %% xref library path is what is searched for functions used by the 
             %% project apps. 

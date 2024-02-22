@@ -298,13 +298,14 @@ app_files(AppName, ExtraDirs) ->
     end.
 
 app_ebin(AppName) ->
-    case code:lib_dir(AppName, ebin) of
+    case code:lib_dir(AppName) of
         {error, bad_name} = Error ->
             Error;
-        EbinDir ->
+        AppDir ->
+            EbinDir = filename:join(AppDir, "ebin"),
             case check_ebin(EbinDir) of
                 {error, bad_name} ->
-                    check_ebin(filename:join(code:lib_dir(AppName), "preloaded/ebin"));
+                    check_ebin(filename:join(AppDir, "preloaded/ebin"));
                 Response ->
                     Response
             end
