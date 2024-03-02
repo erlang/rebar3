@@ -51,7 +51,7 @@ do(State) ->
     Conf = maps:from_list(rebar_state:get(State, completion, [])),
     %% Opts passed in CLI override config
     CmplOpts0 = maps:merge(DefaultOpts, Conf),
-    CmplOpts = maps:merge(CmplOpts0, CliOpts),
+    CmplOpts = check_opts(maps:merge(CmplOpts0, CliOpts)),
 
     Providers0 = rebar_state:providers(State),
     BareProviders = lists:filter(fun(P) -> provider_get(P, bare) end, Providers0),
@@ -68,6 +68,12 @@ do(State) ->
     Compl = rebar_completion:generate(Cmds, CmplOpts),
     write_completion(Compl,State,CmplOpts),
     {ok, State}.
+
+check_opts(#{shell:=zsh, aliases:=As}=Opts) when As=/=[] ->
+    ?WARN("OS aliases are not supported for `zsh`, they must be added automatically.", []),
+    Opts;
+check_opts(Opts) ->
+    Opts.
 
 detect_shell() ->
     case os:getenv("SHELL") of

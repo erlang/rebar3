@@ -9,13 +9,13 @@ suite() ->
     [].
 
 all() ->
-    [test_competion_gen, check_bash].
+    [test_competion_gen, check_bash, check_zsh].
 
 groups() ->
     [].
 
 init_per_suite(Config) ->
-    Shells = [bash],
+    Shells = [bash, zsh],
     ComplFile = compl_file(Config),
     ok = filelib:ensure_dir(ComplFile),
     [{compl_file, ComplFile}, {shells, Shells} | Config].
@@ -29,6 +29,13 @@ init_per_testcase(check_bash, Config) ->
             rebar_test_utils:init_rebar_state(Config, "completion_");
         false ->
             {skip, "bash not found"}
+    end;
+init_per_testcase(check_zsh, Config) ->
+    case shell_available(zsh) of
+        true ->
+            rebar_test_utils:init_rebar_state(Config, "completion_");
+        false ->
+            {skip, "zsh not found"}
     end;
 init_per_testcase(_, Config) ->
     rebar_test_utils:init_rebar_state(Config, "completion_").
@@ -67,6 +74,18 @@ check_bash(Config) ->
                     ?assertMatch({Alias, {match, _}}, {Alias, re:run(Completion, CompleteCmd++Alias++"\n")})
                   end,
                   ["rebar3" | Aliases]).
+
+check_zsh(Config) ->
+    ComplFile = ?config(compl_file, Config),
+    Opts = #{shell => zsh,
+             file => ComplFile,
+             aliases => []},
+    completion_gen(Config, Opts),
+    {ok, Completion} = file:read_file(ComplFile),
+    %% function definition
+    {match, _} = re:run(Completion, "function _rebar3 {"),
+    CompleteCmd = "#compdef _rebar3 ",
+    ?assertMatch({match, _}, re:run(Completion, CompleteCmd++"rebar3"++"\n")).
 
 %% helpers
 
