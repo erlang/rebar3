@@ -24,7 +24,7 @@
 
 -callback generate([cmpl_cmd()], cmpl_opts()) -> iolist().
 
--spec generate([cmpl_cmd()], cmpl_opts()) -> string().
+-spec generate([cmpl_cmd()], cmpl_opts()) -> iolist().
 generate(Commands, #{shell:=bash}=CmplOpts) ->
     rebar_completion_bash:generate(Commands,CmplOpts);
 generate(Commands, #{shell:=zsh}=CmplOpts) ->

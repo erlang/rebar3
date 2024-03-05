@@ -70,7 +70,7 @@ do(State) ->
     {ok, State}.
 
 check_opts(#{shell:=zsh, aliases:=As}=Opts) when As=/=[] ->
-    ?WARN("OS aliases are not supported for `zsh`, they must be added automatically.", []),
+    ?WARN("OS aliases are not supported for `zsh`, they must be added manually.", []),
     Opts;
 check_opts(Opts) ->
     Opts.
