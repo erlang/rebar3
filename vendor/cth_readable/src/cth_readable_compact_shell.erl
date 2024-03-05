@@ -18,7 +18,7 @@
           case Verbose of
             true ->
               ?CASE(Suite, CasePat, Color, Label, CaseArgs),
-               io:format(user, "%%% ~p ==> ~ts~n", [Suite,colorize(Color, maybe_eunit_format(Reason))]);
+               io:format(user, "~n%%% ~p ==> ~ts", [Suite,colorize(Color, maybe_eunit_format(Reason))]);
             false ->
               io:format(user, colorize(Color, "*"), [])
           end
@@ -26,7 +26,7 @@
 -define(CASE(Suite, CasePat, Color, Res, Args),
         case Res of
             "OK" -> io:put_chars(user, colorize(Color, "."));
-            _ -> io:format(user, lists:flatten(["~n%%% ~p ==> ",CasePat,": ",colorize(Color, Res),"~n"]), [Suite | Args])
+            _ -> io:format(user, lists:flatten(["%%% ~p ==> ",CasePat,": ",colorize(Color, Res)]), [Suite | Args])
         end).
 
 %% Callbacks
@@ -44,14 +44,14 @@
 -export([post_end_per_group/4]).
 
 -export([pre_init_per_testcase/3]).
--export([post_end_per_testcase/4]).
+-export([post_end_per_testcase/5]).
 
 -export([on_tc_fail/3]).
 -export([on_tc_skip/3, on_tc_skip/4]).
 
 -export([terminate/1]).
 
--record(state, {id, suite, groups, opts}).
+-record(state, {id, suite, groups, opts, last_suite}).
 
 %% @doc Return a unique id for this CTH.
 id(_Opts) ->
@@ -60,11 +60,19 @@ id(_Opts) ->
 %% @doc Always called before any other callback function. Use this to initiate
 %% any common state.
 init(Id, Opts) ->
-    {ok, #state{id=Id, opts=Opts}}.
+    {ok, #state{id=Id, opts=Opts, last_suite=undefined}}.
 
 %% @doc Called before init_per_suite is called.
-pre_init_per_suite(Suite,Config,State) ->
-    io:format(user, "%%% ~p: ", [Suite]),
+pre_init_per_suite(Suite,Config,#state{opts = Opts, last_suite = LastSuite} = State) ->
+    IsFirstSuite = LastSuite =:= undefined,
+    IsVerbose = is_verbose(Opts),
+    case IsFirstSuite of
+        false when IsVerbose ->
+            io:format(user, "~n", []);
+        _Else ->
+            ok
+    end,
+    io:format(user, "%%% ~p", [Suite]),
     {Config, State#state{suite=Suite, groups=[]}}.
 
 %% @doc Called after init_per_suite.
@@ -101,10 +109,29 @@ pre_init_per_testcase(_TC,Config,State) ->
     {Config, State}.
 
 %% @doc Called after each test case.
-post_end_per_testcase(TC,_Config,ok,State=#state{suite=Suite, groups=Groups}) ->
+post_end_per_testcase(SuiteName,TC,_Config,ok,State=#state{suite=Suite, groups=Groups, last_suite=LastSuite}) ->
+    IsFirstInSuite = Suite =/= LastSuite,
+    case IsFirstInSuite of
+        true ->
+            io:format(user, ": ", []);
+        _Else ->
+            ok
+    end,
     ?OK(Suite, "~s", [format_path(TC,Groups)]),
-    {ok, State};
-post_end_per_testcase(TC,Config,Error,State=#state{suite=Suite, groups=Groups}) ->
+    {ok, State#state{last_suite = SuiteName}};
+post_end_per_testcase(SuiteName,TC,Config,Error,State=#state{suite=Suite, groups=Groups, opts = Opts, last_suite=LastSuite}) ->
+    IsFirstInSuite = Suite =/= LastSuite,
+    IsVerbose = is_verbose(Opts),
+    case IsFirstInSuite of
+        false when IsVerbose ->
+            io:format(user, "~n%%% ~p ==> ", [SuiteName]);
+        true when IsVerbose ->
+            io:format(user, " ==> ", []);
+        true when IsFirstInSuite ->
+            io:format(user, ": ", []);
+        _Else ->
+            ok
+    end,
     case lists:keyfind(tc_status, 1, Config) of
         {tc_status, ok} ->
             %% Test case passed, but we still ended in an error
@@ -113,7 +140,7 @@ post_end_per_testcase(TC,Config,Error,State=#state{suite=Suite, groups=Groups}) 
             %% Test case failed, in which case on_tc_fail already reports it
             ok
     end,
-    {Error, State}.
+    {Error, State#state{last_suite = SuiteName}}.
 
 %% @doc Called after post_init_per_suite, post_end_per_suite, post_init_per_group,
 %% post_end_per_group and post_end_per_testcase if the suite, group or test case failed.
@@ -134,8 +161,10 @@ on_tc_skip(Suite, TC, Reason, State=#state{groups=Groups, opts=Opts}) ->
     State#state{suite=Suite}.
 
 skip(Suite, TC, Groups, Reason, Opts) ->
-    Verbose = proplists:get_value(verbose, Opts, true),
-    ?SKIP(Suite, "~s", [format_path(TC,Groups)], Reason, Verbose).
+    ?SKIP(Suite, "~s", [format_path(TC,Groups)], Reason, is_verbose(Opts)).
+
+is_verbose(Opts) ->
+    proplists:get_value(verbose, Opts, true).
 
 %% @doc Called when a test case is skipped by either user action
 %% or due to an init function failing. (Pre-19.3)
