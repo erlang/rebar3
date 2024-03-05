@@ -52,6 +52,7 @@
                      rebar_prv_clean,
                      rebar_prv_common_test,
                      rebar_prv_compile,
+                     rebar_prv_completion,
                      rebar_prv_cover,
                      rebar_prv_deps,
                      rebar_prv_deps_tree,
