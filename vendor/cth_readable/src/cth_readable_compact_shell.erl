@@ -63,15 +63,7 @@ init(Id, Opts) ->
     {ok, #state{id=Id, opts=Opts, last_suite=undefined}}.
 
 %% @doc Called before init_per_suite is called.
-pre_init_per_suite(Suite,Config,#state{opts = Opts, last_suite = LastSuite} = State) ->
-    IsFirstSuite = LastSuite =:= undefined,
-    IsVerbose = is_verbose(Opts),
-    case IsFirstSuite of
-        false when IsVerbose ->
-            io:format(user, "~n", []);
-        _Else ->
-            ok
-    end,
+pre_init_per_suite(Suite,Config,State) ->
     io:format(user, "%%% ~p", [Suite]),
     {Config, State#state{suite=Suite, groups=[]}}.
 
@@ -114,7 +106,7 @@ post_end_per_testcase(SuiteName,TC,_Config,ok,State=#state{suite=Suite, groups=G
     case IsFirstInSuite of
         true ->
             io:format(user, ": ", []);
-        _Else ->
+        false ->
             ok
     end,
     ?OK(Suite, "~s", [format_path(TC,Groups)]),
@@ -127,9 +119,9 @@ post_end_per_testcase(SuiteName,TC,Config,Error,State=#state{suite=Suite, groups
             io:format(user, "~n%%% ~p ==> ", [SuiteName]);
         true when IsVerbose ->
             io:format(user, " ==> ", []);
-        true when IsFirstInSuite ->
+        true ->
             io:format(user, ": ", []);
-        _Else ->
+        _Other ->
             ok
     end,
     case lists:keyfind(tc_status, 1, Config) of
