@@ -63,25 +63,7 @@ init(Id, Opts) ->
     {ok, #state{id=Id, opts=Opts, last_suite=undefined, last_suite_skipped=false, last_tc_failed=false}}.
 
 %% @doc Called before init_per_suite is called.
-pre_init_per_suite(Suite,Config,#state{last_suite=LastSuite, last_suite_skipped=LastSuiteSkipped, last_tc_failed=LastTCFailed, opts=Opts}=State) ->
-    IsVerbose = is_verbose(Opts),
-    case LastSuite of
-        undefined -> % first suite
-            ok;
-        _Defined ->
-            case LastTCFailed of
-                true ->
-                    ok;
-                false ->
-                    io:format(user, "~n", [])
-            end,
-            case {IsVerbose, LastSuiteSkipped} of
-                {false, true} ->
-                    io:format(user, "~n", []);
-                _Other ->
-                    ok
-            end
-    end,
+pre_init_per_suite(Suite,Config,State) ->
     io:format(user, "%%% ~p", [Suite]),
     {Config, State#state{suite=Suite, groups=[]}}.
 
@@ -109,7 +91,9 @@ pre_end_per_suite(_Suite,Config,State) ->
 post_end_per_suite(_Suite,_Config,Return,#state{opts=Opts,last_tc_failed=LastTCFailed}=State) ->
     IsVerbose = is_verbose(Opts),
     case {IsVerbose, LastTCFailed} of
-        {false, true} ->
+        {false, _} ->
+            io:format(user, "~n", []);
+        {true, false} ->
             io:format(user, "~n", []);
         _Other ->
             ok
@@ -189,12 +173,29 @@ on_tc_fail(TC, Reason, State=#state{suite=Suite, groups=Groups}) ->
 on_tc_skip(Suite, {TC,_Group}, Reason, State=#state{groups=Groups}) ->
     skip(Suite, TC, Groups, Reason, State),
     State;
-on_tc_skip(Suite, TC, Reason, State=#state{groups=Groups}) ->
+on_tc_skip(Suite, TC, Reason, State=#state{groups=Groups, opts=Opts, last_suite_skipped=LastSuiteSkipped}) ->
     skip(Suite, TC, Groups, Reason, State),
+    IsVerbose = is_verbose(Opts),
+    case {IsVerbose, TC, LastSuiteSkipped} of
+        {false, end_per_suite, _} ->
+            % because post_end_per_suite is not called for a wholly-skipped suite
+            io:format(user, "~n", []);
+        _Other ->
+            ok
+    end,
     State.
 
-skip(Suite, TC, Groups, Reason, #state{opts=Opts, last_suite_skipped=_LastSuiteSkipped}) ->
-    ?SKIP(Suite, "~s", [format_path(TC,Groups)], Reason, is_verbose(Opts)).
+skip(Suite, TC, Groups, Reason, #state{opts=Opts}) ->
+    IsVerbose = is_verbose(Opts),
+    case {IsVerbose, TC} of
+        % In non-verbose we don't print * for these two methods
+        {false, init_per_suite} ->
+            ok;
+        {false, end_per_suite} ->
+            ok;
+        _Other ->
+            ?SKIP(Suite, "~s", [format_path(TC,Groups)], Reason, is_verbose(Opts))
+    end.
 
 is_verbose(Opts) ->
     proplists:get_value(verbose, Opts, true).
