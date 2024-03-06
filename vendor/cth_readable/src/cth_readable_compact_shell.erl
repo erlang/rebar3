@@ -75,10 +75,10 @@ pre_init_per_suite(Suite,Config,#state{last_suite=LastSuite, last_suite_skipped=
                 false ->
                     io:format(user, "~n", [])
             end,
-            case not(IsVerbose) andalso LastSuiteSkipped of
-                true ->
+            case {IsVerbose, LastSuiteSkipped} of
+                {false, true} ->
                     io:format(user, "~n", []);
-                false ->
+                _Other ->
                     ok
             end
     end,
@@ -89,23 +89,15 @@ pre_init_per_suite(Suite,Config,#state{last_suite=LastSuite, last_suite_skipped=
 post_init_per_suite(_Suite,_Config,Return,State=#state{opts=Opts}) ->
     IsVerbose = is_verbose(Opts),
     SuiteSkipped
-        = case IsVerbose of
-              true ->
-                  case Return of
-                      {skip, _} ->
-                          io:format(user, " ==> ", []),
-                          true;
-                      _Other1 ->
-                          false
-                  end;
+        = case {IsVerbose, Return} of
+              {true, {skip, _}} ->
+                  io:format(user, " ==> ", []),
+                  true;
+              {false, {skip, _}} ->
+                  io:format(user, ": ", []),
+                  true;
               _Other ->
-                  case Return of
-                      {skip, _} ->
-                          io:format(user, ": ", []),
-                          true;
-                      _Other2 ->
-                          false
-                  end
+                  false
           end,
     {Return, State#state{last_suite_skipped=SuiteSkipped, last_tc_failed=SuiteSkipped}}.
 
@@ -116,16 +108,11 @@ pre_end_per_suite(_Suite,Config,State) ->
 %% @doc Called after end_per_suite.
 post_end_per_suite(_Suite,_Config,Return,#state{opts=Opts,last_tc_failed=LastTCFailed}=State) ->
     IsVerbose = is_verbose(Opts),
-    case IsVerbose of
-        true ->
-            ok;
-        false ->
-            case LastTCFailed of
-                true ->
-                    io:format(user, "~n", []);
-                false ->
-                    ok
-            end
+    case {IsVerbose, LastTCFailed} of
+        {false, true} ->
+            io:format(user, "~n", []);
+        _Other ->
+            ok
     end,
     {Return, State#state{suite=undefined, groups=[]}}.
 
@@ -153,53 +140,30 @@ pre_init_per_testcase(_TC,Config,State) ->
 post_end_per_testcase(SuiteName,TC,_Config,ok,State=#state{suite=Suite, groups=Groups, last_suite=LastSuite, opts=Opts, last_tc_failed=LastTCFailed}) ->
     IsVerbose = is_verbose(Opts),
     IsFirstInSuite = Suite =/= LastSuite,
-    case IsVerbose of
-        true ->
-            case IsFirstInSuite of
-                true ->
-                    io:format(user, ": ", []);
-                false ->
-                    case LastTCFailed of
-                        true ->
-                            io:format(user, "%%% ~p: ", [SuiteName]);
-                        false ->
-                            ok
-                    end
-            end;
-        false ->
-            case IsFirstInSuite of
-                true ->
-                    io:format(user, ": ", []);
-                false ->
-                    ok
-            end
+    case {IsVerbose, IsFirstInSuite, LastTCFailed} of
+        {_, true, _} ->
+            io:format(user, ": ", []);
+        {true, false, true} ->
+            io:format(user, "%%% ~p: ", [SuiteName]);
+        _Other ->
+            ok
     end,
     ?OK(Suite, "~s", [format_path(TC,Groups)]),
     {ok, State#state{last_suite = SuiteName, last_tc_failed=false}};
 post_end_per_testcase(SuiteName,TC,Config,Error,State=#state{suite=Suite, groups=Groups, opts=Opts, last_suite=LastSuite, last_tc_failed=LastTCFailed}) ->
     IsVerbose = is_verbose(Opts),
     IsFirstInSuite = Suite =/= LastSuite,
-    case IsVerbose of
-        true ->
-            case IsFirstInSuite of
-                true ->
-                    io:format(user, " ==> ", []);
-                false ->
-                    case LastTCFailed of
-                        false ->
-                            io:format(user, "~n", []);
-                        true ->
-                            ok
-                    end,
-                    io:format(user, "%%% ~p ==> ", [SuiteName])
-            end;
-        false ->
-            case IsFirstInSuite of
-                true ->
-                    io:format(user, ": ", []);
-                false ->
-                    ok
-            end
+    case {IsVerbose, IsFirstInSuite, LastTCFailed} of
+        {true, true, _} ->
+            io:format(user, " ==> ", []);
+        {true, false, false} ->
+            io:format(user, "~n%%% ~p ==> ", [SuiteName]);
+        {true, false, true} ->
+            io:format(user, "%%% ~p ==> ", [SuiteName]);
+        {false, true, _} ->
+            io:format(user, ": ", []);
+        _Other ->
+            ok
     end,
     case lists:keyfind(tc_status, 1, Config) of
         {tc_status, ok} ->
