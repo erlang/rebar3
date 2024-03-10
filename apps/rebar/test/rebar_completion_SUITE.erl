@@ -77,15 +77,19 @@ check_bash(Config) ->
 
 check_zsh(Config) ->
     ComplFile = ?config(compl_file, Config),
+    Aliases = ["rebar", "r3"],
     Opts = #{shell => zsh,
              file => ComplFile,
-             aliases => []},
+             aliases => Aliases},
     completion_gen(Config, Opts),
     {ok, Completion} = file:read_file(ComplFile),
     %% function definition
     {match, _} = re:run(Completion, "function _rebar3 {"),
-    CompleteCmd = "#compdef _rebar3 ",
-    ?assertMatch({match, _}, re:run(Completion, CompleteCmd++"rebar3"++"\n")).
+    CompleteCmd = "compdef _rebar3 ",
+    lists:foreach(fun(Alias) ->
+                    ?assertMatch({Alias, {match, _}}, {Alias, re:run(Completion, CompleteCmd++Alias++"\n")})
+                  end,
+                  ["rebar3" | Aliases]).
 
 %% helpers
 

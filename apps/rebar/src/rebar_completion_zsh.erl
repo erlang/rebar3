@@ -7,12 +7,15 @@
 -export([generate/2]).
 
 -spec generate([rebar_completion:cmpl_cmd()], rebar_completion:cmpl_opts()) -> iolist().
-generate(Commands, #{shell:=zsh}=CmplOpts) ->
-    ["#compdef _rebar3 rebar3\n",
-        rebar_completion:prelude(CmplOpts),
+generate(Commands, #{shell:=zsh, aliases:=As}=CmplOpts) ->
+    [rebar_completion:prelude(CmplOpts),
         io_lib:nl(),
         main(Commands, CmplOpts),
-        io_lib:nl()].
+        io_lib:nl(),
+        compdefs(["rebar3" | As])].
+
+compdefs(As) ->
+    [["compdef _rebar3 ", A, io_lib:nl()] || A <- As].
 
 main(Commands, CmplOpts) ->
     H = #{short=>$s,
