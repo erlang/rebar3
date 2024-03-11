@@ -47,11 +47,12 @@ do(State) ->
                     file => "_rebar3",
                     shell => detect_shell()},
     {CliOptsList, _} = rebar_state:command_parsed_args(State),
-    CliOpts = maps:from_list(CliOptsList),
+    CliOpts0 = maps:from_list(CliOptsList),
+    CliOpts = process_cli_opts(CliOpts0),
     Conf = maps:from_list(rebar_state:get(State, completion, [])),
     %% Opts passed in CLI override config
     CmplOpts0 = maps:merge(DefaultOpts, Conf),
-    CmplOpts = check_opts(maps:merge(CmplOpts0, CliOpts)),
+    CmplOpts = maps:merge(CmplOpts0, CliOpts),
 
     Providers0 = rebar_state:providers(State),
     BareProviders = lists:filter(fun(P) -> provider_get(P, bare) end, Providers0),
@@ -69,12 +70,6 @@ do(State) ->
     write_completion(Compl,State,CmplOpts),
     {ok, State}.
 
-check_opts(#{shell:=zsh, aliases:=As}=Opts) when As=/=[] ->
-    ?WARN("OS aliases are not supported for `zsh`, they must be added manually.", []),
-    Opts;
-check_opts(Opts) ->
-    Opts.
-
 detect_shell() ->
     case os:getenv("SHELL") of
         false ->
@@ -91,6 +86,12 @@ to_shell(Unsupp) ->
         ?WARN("Unsupported shell found: ~p, default shell will be used.",
                     [Unsupp]),
         ?DEF_SHELL.
+
+process_cli_opts(#{aliases:=AStr}=Cli) ->
+    As = [string:trim(A) || A <- string:split(AStr, ",", all)],
+    Cli#{aliases:=As};
+process_cli_opts(Cli) ->
+    Cli.
 
 -spec namespace_to_cmpl_cmds(atom(), [providers:t()]) -> [rebar_completion:cmpl_cmd()].
 namespace_to_cmpl_cmds(default,Providers) ->
