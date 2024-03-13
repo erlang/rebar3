@@ -21,6 +21,8 @@
 %% we need to modify app_info state before compile
 -define(DEPS, [lock]).
 
+-define(VERBOSE_DEFAULT, false).
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -91,8 +93,9 @@ run_tests(State, Opts) ->
     Opts1 = setup_logdir(State, T),
     Opts2 = turn_off_auto_compile(Opts1),
     ?DEBUG("Running tests with {ct_opts, ~p}.", [Opts2]),
-    {RawOpts, _} = rebar_state:command_parsed_args(State),
-    Result = case proplists:get_value(verbose, RawOpts, false) of
+    CTOpts = rebar_state:get(State, ct_opts, []),
+    VerboseFromConfig = verbose({from_config, State}, _DefaultFromConfig = ?VERBOSE_DEFAULT, CTOpts),
+    Result = case verbose({from_cli, State}, VerboseFromConfig) of
         true  -> run_test_verbose(Opts2);
         false -> run_test_quiet(Opts2)
     end,
@@ -273,15 +276,19 @@ add_hooks(Opts, State) ->
         true -> [cth_fail_fast];
         false -> []
     end,
+    VerboseFromConfig = verbose({from_config, State}, _DefaultFromConfig = ?VERBOSE_DEFAULT, Opts),
+    Verbose = [{verbose, verbose({from_cli, State}, VerboseFromConfig)}],
     case {readable(State), lists:keyfind(ct_hooks, 1, Opts)} of
         {false, _} ->
             Opts;
         {Other, false} ->
-            [{ct_hooks, [cth_readable_failonly, readable_shell_type(Other),
+            ShellTypeWithOpts = {readable_shell_type(Other), Verbose},
+            [{ct_hooks, [cth_readable_failonly, ShellTypeWithOpts,
                          cth_retry] ++ FailFast ++ cth_log_redirect()} | Opts];
         {Other, {ct_hooks, Hooks}} ->
             %% Make sure hooks are there once only and add wanted hooks that are not defined yet
-            ReadableHooks = [cth_readable_failonly, readable_shell_type(Other),
+            ShellTypeWithOpts = {readable_shell_type(Other), Verbose},
+            ReadableHooks = [cth_readable_failonly, ShellTypeWithOpts,
                              cth_retry] ++ FailFast,
             NewHooks = Hooks ++ [ReadableHook ||
                 ReadableHook <- ReadableHooks,
@@ -296,6 +303,12 @@ is_defined(Key, [{Key, _Opts} | _Hs]) -> true;
 is_defined(Key, [{Key, _Opts, _Prio} | _Hs]) -> true;
 is_defined(Key, [_ | Hs]) -> is_defined(Key, Hs).
 
+verbose({from_cli, State}, Default) ->
+    {Opts, _} = rebar_state:command_parsed_args(State),
+    proplists:get_value(verbose, Opts, Default).
+
+verbose({from_config, _State}, Default, Opts) ->
+    proplists:get_value(verbose, Opts, Default).
 
 readable_shell_type(true) -> cth_readable_shell;
 readable_shell_type(compact) -> cth_readable_compact_shell.
