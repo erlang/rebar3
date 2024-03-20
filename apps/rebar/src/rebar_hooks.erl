@@ -60,10 +60,17 @@ run_provider_hooks_(Dir, Type, Command, Providers, TypeHooks, State) ->
             rebar_paths:set_paths([plugins], State),
             Providers1 = rebar_state:providers(State),
             %% Drop CLI arguments from the command for the hook.
-            State0 = rebar_state:command_parsed_args(
-                       rebar_state:command_args(State, []),
-                       {[], []}
-            ),
+            State0 = case HookProviders of
+                         [{appup,tar}] ->
+                             %% Do not drop cli args for `tar` since
+                             %% it may contain relname and relvsn
+                             State;
+                         _ ->
+                             rebar_state:command_parsed_args(
+                                 rebar_state:command_args(State, []),
+                                 {[], []}
+                             )
+                         end,
             State1 = rebar_state:providers(rebar_state:dir(State0, Dir), Providers++Providers1),
             ?DEBUG("\t{provider_hooks, [{~p, ~p}]}.",
                    [Type, HookProviders]),
