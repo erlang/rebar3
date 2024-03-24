@@ -182,7 +182,7 @@ ebin_modules(AppInfo, Dir) ->
 
 extra_dirs(State) ->
     Extras = rebar_dir:extra_src_dirs(rebar_app_info:opts(State)),
-    SrcDirs = rebar_dir:src_dirs(rebar_app_info:opts(State), ["src"]),
+    SrcDirs = rebar_dir:src_dirs(rebar_app_info:opts(State)),
     %% remove any dirs that are defined in `src_dirs` from `extra_src_dirs`
     Extras -- SrcDirs.
 

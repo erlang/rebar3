@@ -17,7 +17,7 @@ context(AppInfo) ->
     Mappings = [{".beam", EbinDir}],
 
     OutDir = rebar_app_info:dir(AppInfo),
-    SrcDirs = rebar_dir:src_dirs(rebar_app_info:opts(AppInfo), ["src"]),
+    SrcDirs = rebar_dir:src_dirs(rebar_app_info:opts(AppInfo)),
     ExistingSrcDirs = lists:filter(fun(D) ->
                                            ec_file:is_dir(filename:join(OutDir, D))
                                    end, SrcDirs),
@@ -31,7 +31,7 @@ context(AppInfo) ->
               %% all source directories are valid, and might also be recursive
               lists:append([
                   find_recursive_incl(OutDir, Src, RebarOpts) ||
-                  Src <- rebar_dir:all_src_dirs(RebarOpts, ["src"], [])
+                  Src <- rebar_dir:all_src_dirs(RebarOpts)
               ]) ++
               %% top-level dir for legacy stuff
               [OutDir],
@@ -84,7 +84,7 @@ needed_files(Graph, FoundFiles, _, AppInfo) ->
     ),
 
     PrivIncludes = [{i, filename:join(OutDir, Src)}
-                    || Src <- rebar_dir:all_src_dirs(RebarOpts, ["src"], [])],
+                    || Src <- rebar_dir:all_src_dirs(RebarOpts)],
     AdditionalOpts = PrivIncludes ++ [{i, filename:join(OutDir, "include")}, {i, OutDir}, return],
 
     true = digraph:delete(SubGraph),
@@ -241,7 +241,7 @@ filename_to_atom(F) -> list_to_atom(filename:rootname(filename:basename(F))).
 %% dependencies induced by given graph G.
 needed_files(Graph, ErlOpts, RebarOpts, Dir, OutDir, SourceFiles) ->
     PrivIncludes = [{i, filename:join(Dir, Src)}
-                    || Src <- rebar_dir:all_src_dirs(RebarOpts, ["src"], [])],
+                    || Src <- rebar_dir:all_src_dirs(RebarOpts)],
     SharedOpts = [{i, filename:join(Dir, "include")},
                   {i, Dir}] ++ PrivIncludes ++ ErlOpts,
     CompilerOptsSet = erl_compiler_opts_set(),

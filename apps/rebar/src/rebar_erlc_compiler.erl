@@ -118,7 +118,7 @@ compile(AppInfo, CompileOpts) when element(1, AppInfo) == app_info_t ->
                             compile_mib(AppInfo), MibsOpts),
 
     SrcDirs = lists:map(fun(SrcDir) -> filename:join(Dir, SrcDir) end,
-                        rebar_dir:src_dirs(RebarOpts, ["src"])),
+                        rebar_dir:src_dirs(RebarOpts)),
     OutDir = filename:join(Dir, outdir(RebarOpts)),
     compile_dirs(RebarOpts, Dir, SrcDirs, OutDir, CompileOpts),
 
@@ -151,7 +151,7 @@ compile(State, BaseDir, OutDir, CompileOpts) when element(1, State) == state_t -
 compile(RebarOpts, BaseDir, OutDir, CompileOpts) ->
     warn_deprecated(),
     SrcDirs = lists:map(fun(SrcDir) -> filename:join(BaseDir, SrcDir) end,
-                        rebar_dir:src_dirs(RebarOpts, ["src"])),
+                        rebar_dir:src_dirs(RebarOpts)),
     compile_dirs(RebarOpts, BaseDir, SrcDirs, OutDir, CompileOpts),
 
     ExtraDirs = rebar_dir:extra_src_dirs(RebarOpts),
@@ -563,7 +563,7 @@ internal_erl_compile(Opts, Dir, Module, OutDir, ErlOpts, RebarOpts) ->
     Target = target_base(OutDir, Module) ++ ".beam",
     ok = filelib:ensure_dir(Target),
     PrivIncludes = [{i, filename:join(Dir, Src)}
-                    || Src <- rebar_dir:all_src_dirs(RebarOpts, ["src"], [])],
+                    || Src <- rebar_dir:all_src_dirs(RebarOpts)],
     AllOpts = [{outdir, filename:dirname(Target)}, no_spawn_compiler_process]
               ++ ErlOpts ++ PrivIncludes ++
               [{i, filename:join(Dir, "include")}, {i, Dir}, return],

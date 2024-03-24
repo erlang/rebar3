@@ -24,7 +24,7 @@ do(State, LibDirs) ->
     BaseDir = rebar_state:dir(State),
     Dirs = [filename:join(BaseDir, LibDir) || LibDir <- LibDirs],
     RebarOpts = rebar_state:opts(State),
-    SrcDirs = rebar_dir:src_dirs(RebarOpts, ["src"]),
+    SrcDirs = rebar_dir:src_dirs(RebarOpts),
     Apps = find_apps(Dirs, SrcDirs, all, State),
     ProjectDeps = rebar_state:deps_names(State),
     DepsDir = rebar_dir:deps_dir(State),
@@ -318,7 +318,7 @@ find_app(AppInfo, AppDir, Validate, State) ->
     %% if no src dir is passed, figure it out from the app info, with a default
     %% of src/
     AppOpts = rebar_app_info:opts(AppInfo),
-    SrcDirs = rebar_dir:src_dirs(AppOpts, ["src"]),
+    SrcDirs = rebar_dir:src_dirs(AppOpts),
     find_app_(AppInfo, AppDir, SrcDirs, Validate, State).
 
 %% @doc check that a given app in a directory is there, and whether it's

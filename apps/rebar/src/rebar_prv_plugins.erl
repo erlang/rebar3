@@ -41,7 +41,7 @@ do(State) ->
     display_plugins("Global plugins", GlobalApps, GlobalPlugins),
 
     RebarOpts = rebar_state:opts(State),
-    SrcDirs = rebar_dir:src_dirs(RebarOpts, ["src"]),
+    SrcDirs = rebar_dir:src_dirs(RebarOpts),
     {LocalPluginsDefs, _} = list_local_plugins(State),
     PluginsDirs = filelib:wildcard(filename:join(rebar_dir:plugins_dir(State), "*")),
 

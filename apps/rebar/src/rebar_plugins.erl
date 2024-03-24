@@ -205,7 +205,7 @@ discover_plugins(State) ->
             LibDirs = rebar_dir:project_plugin_dirs(State),
             Dirs = [filename:join(BaseDir, LibDir) || LibDir <- LibDirs],
             RebarOpts = rebar_state:opts(State),
-            SrcDirs = rebar_dir:src_dirs(RebarOpts, ["src"]),
+            SrcDirs = rebar_dir:src_dirs(RebarOpts),
             Found = rebar_app_discover:find_apps(Dirs, SrcDirs, all, State),
             ?DEBUG("Found local plugins: ~p~n"
                    "\tusing config: {project_plugin_dirs, ~p}",
@@ -233,7 +233,7 @@ is_umbrella(State) ->
     %% we know this is not an umbrella application.
     Root = rebar_dir:root_dir(State),
     LibPaths = lists:usort(rebar_dir:lib_dirs(State)) -- ["."],
-    SrcPaths = rebar_dir:src_dirs(rebar_state:opts(State), ["src"]),
+    SrcPaths = rebar_dir:src_dirs(rebar_state:opts(State)),
     lists:any(fun(Dir) -> [] == filelib:wildcard(filename:join(Root, Dir)) end, LibPaths)
     andalso
     lists:all(fun(Dir) -> not filelib:is_dir(filename:join(Root, Dir)) end, SrcPaths).

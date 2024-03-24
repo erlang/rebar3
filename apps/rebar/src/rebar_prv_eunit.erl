@@ -220,7 +220,7 @@ set_modules([], State, {AppAcc, TestAcc}) ->
     dedupe_tests({AppAcc, TestAcc ++ TestSrc});
 set_modules([App|Rest], State, {AppAcc, TestAcc}) ->
     F = fun(Dir) -> filename:join([rebar_app_info:dir(App), Dir]) end,
-    AppDirs = lists:map(F, rebar_dir:src_dirs(rebar_app_info:opts(App), ["src"])),
+    AppDirs = lists:map(F, rebar_dir:src_dirs(rebar_app_info:opts(App))),
     Regex = rebar_state:get(State, eunit_test_regex, ?DEFAULT_TEST_REGEX),
     AppSrc = gather_src(AppDirs, Regex),
     TestDirs = [filename:join([rebar_app_info:dir(App), "test"])],

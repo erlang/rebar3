@@ -250,7 +250,7 @@ do_make_relative_path(Source, Target) ->
 %%% the given directory, no matter if it is configured as `src_dirs' or
 %%% `extra_src_dirs'.
 -spec src_dirs(rebar_dict()) -> list(file:filename_all()).
-src_dirs(Opts) -> src_dirs(Opts, []).
+src_dirs(Opts) -> src_dirs(Opts, ?DEFAULT_PROJECT_SRC_DIRS).
 
 %% @doc same as `src_dirs/1', but allows to pass in a list of default options.
 -spec src_dirs(rebar_dict(), list(file:filename_all())) -> list(file:filename_all()).
@@ -287,7 +287,9 @@ raw_src_dirs(Type, Opts, Default) ->
 %% @doc returns all the source directories (`src_dirs' and
 %% `extra_src_dirs').
 -spec all_src_dirs(rebar_dict()) -> list(file:filename_all()).
-all_src_dirs(Opts) -> all_src_dirs(Opts, [], []).
+all_src_dirs(Opts) -> all_src_dirs(Opts,
+                                   ?DEFAULT_PROJECT_SRC_DIRS,
+                                   []).
 
 %% @doc returns all the source directories (`src_dirs' and
 %% `extra_src_dirs') while being able to configure defaults for both.
