@@ -68,8 +68,9 @@ end_per_testcase(_, _Config) -> ok.
 default_src_dirs(Config) ->
     {ok, State} = rebar_test_utils:run_and_check(Config, [], ["compile"], return),
 
-    [] = rebar_dir:src_dirs(rebar_state:opts(State)),
-    ["src"] = rebar_dir:src_dirs(rebar_state:opts(State), ["src"]).
+    [] = rebar_dir:src_dirs(rebar_state:opts(State), []),
+    ["src"] = rebar_dir:src_dirs(rebar_state:opts(State)),
+    ["lib"] = rebar_dir:src_dirs(rebar_state:opts(State), ["lib"]).
 
 default_extra_src_dirs(Config) ->
     {ok, State} = rebar_test_utils:run_and_check(Config, [], ["compile"], return),
@@ -80,7 +81,8 @@ default_extra_src_dirs(Config) ->
 default_all_src_dirs(Config) ->
     {ok, State} = rebar_test_utils:run_and_check(Config, [], ["compile"], return),
 
-    [] = rebar_dir:all_src_dirs(rebar_state:opts(State)),
+    [] = rebar_dir:all_src_dirs(rebar_state:opts(State), [], []),
+    ["src"] = rebar_dir:all_src_dirs(rebar_state:opts(State)),
     ["src", "test"] = rebar_dir:all_src_dirs(rebar_state:opts(State), ["src"], ["test"]).
 
 src_dirs(Config) ->

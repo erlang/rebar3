@@ -513,7 +513,7 @@ delete_if_symlink(Path) ->
     end.
 
 resolve_src_dirs(Opts) ->
-    SrcDirs = rebar_dir:src_dirs(Opts, ["src"]),
+    SrcDirs = rebar_dir:src_dirs(Opts),
     ExtraDirs = rebar_dir:extra_src_dirs(Opts, []),
     normalize_src_dirs(SrcDirs, ExtraDirs).
 

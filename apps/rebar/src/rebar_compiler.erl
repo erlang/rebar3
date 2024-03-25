@@ -375,7 +375,7 @@ clean_(CompilerMod, AppInfo, _Label) ->
 annotate_extras(AppInfo) ->
     AppOpts = rebar_app_info:opts(AppInfo),
     ExtraDirs = rebar_dir:extra_src_dirs(AppOpts, []),
-    OldSrcDirs = rebar_dir:src_dirs(AppOpts, ["src"]),
+    OldSrcDirs = rebar_dir:src_dirs(AppOpts),
     %% Re-annotate the directories with non-default options if it is the
     %% case; otherwise, later down the line, the options get dropped with
     %% profiles. All of this must be done with the rebar_dir functionality

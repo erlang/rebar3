@@ -288,4 +288,18 @@ env_vars_in_hooks(Config) ->
     rebar_test_utils:create_config(AppDir, RebarConfig),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"],
-                {ok, [{app, Name, valid}, {file, HookFile}]}).
+                {ok, [{app, Name, valid}, {file, HookFile}]}),
+
+    State = rebar_state:new(),
+    Env = rebar_env:create_env(State),
+    EnvVars = [Var || {Var,_Value} <- Env],
+    ShOpts = [{env, Env}],
+    [check_env(Var,ShOpts) || Var <- EnvVars].
+
+check_env(EnvName, ShOpts) ->
+    %% check that a variable has a value
+    %% dont use 'echo -n' because it's not portable
+    Resp = rebar_utils:sh("echo $"++EnvName, ShOpts),
+    ?assertMatch({ok,_}, Resp),
+    ?assertNotEqual({ok,"\n"},
+                    Resp).
