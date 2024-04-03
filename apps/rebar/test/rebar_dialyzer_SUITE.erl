@@ -583,14 +583,14 @@ incremental_cli_args(Config) ->
 %% Helpers
 
 erts_files() ->
-    ErtsDir = code:lib_dir(erts, ebin),
+    ErtsDir = filename:join(code:lib_dir(erts), "ebin"),
     ErtsBeams = filelib:wildcard("*.beam", ErtsDir),
     ErtsFiles = lists:map(fun(Beam) -> filename:join(ErtsDir, Beam) end,
                           ErtsBeams),
     lists:sort(ErtsFiles).
 
 erts_modules() ->
-    ErtsDir = code:lib_dir(erts, ebin),
+    ErtsDir = filename:join(code:lib_dir(erts), "ebin"),
     ErtsBeams = filelib:wildcard("*.beam", ErtsDir),
     ErtsModules = lists:map(fun(Beam) -> filename:basename(Beam, ".beam") end,
                           ErtsBeams),

@@ -1,8 +1,8 @@
 {application,relx,
              [{description,"Release assembler for Erlang/OTP Releases"},
-              {vsn,"4.8.0"},
+              {vsn,"4.9.0"},
               {modules,[]},
               {registered,[]},
-              {applications,[kernel,stdlib,bbmustache]},
+              {applications,[kernel,stdlib,bbmustache,sasl,tools]},
               {licenses,["Apache-2.0"]},
               {links,[{"Github","https://github.com/erlware/relx"}]}]}.

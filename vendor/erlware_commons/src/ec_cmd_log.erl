@@ -19,7 +19,7 @@
 %%% @copyright (C) 2012 Erlware, LLC.
 %%%
 %%% @doc This provides simple output functions for command line apps. You should
-%%% use this to talk to the users if you are wrting code for the system
+%%% use this to talk to the users if you are writing code for the system
 -module(ec_cmd_log).
 
 %% Avoid clashing with `error/3` BIF added in Erlang/OTP 24
@@ -129,7 +129,7 @@ debug(LogState, String) ->
     debug(LogState, "~ts~n", [String]).
 
 %% @doc log at the debug level given the current log state with a format string
-%% and argements @see io:format/2
+%% and arguments @see io:format/2
 -spec debug(t(), string(), [any()]) -> ok.
 debug(LogState, FormatString, Args) ->
     log(LogState, ?EC_DEBUG, colorize(LogState, ?CYAN, false, FormatString), Args).
@@ -146,7 +146,7 @@ info(LogState, String) ->
     info(LogState, "~ts~n", [String]).
 
 %% @doc log at the info level given the current log state with a format string
-%% and argements @see io:format/2
+%% and arguments @see io:format/2
 -spec info(t(), string(), [any()]) -> ok.
 info(LogState, FormatString, Args) ->
     log(LogState, ?EC_INFO, colorize(LogState, ?GREEN, false, FormatString), Args).
@@ -163,7 +163,7 @@ error(LogState, String) ->
     error(LogState, "~ts~n", [String]).
 
 %% @doc log at the error level given the current log state with a format string
-%% and argements @see io:format/2
+%% and arguments @see io:format/2
 -spec error(t(), string(), [any()]) -> ok.
 error(LogState, FormatString, Args) ->
     log(LogState, ?EC_ERROR, colorize(LogState, ?RED, false, FormatString), Args).
@@ -178,7 +178,7 @@ warn(LogState, String) ->
     warn(LogState, "~ts~n", [String]).
 
 %% @doc log at the warn level given the current log state with a format string
-%% and argements @see io:format/2
+%% and arguments @see io:format/2
 -spec warn(t(), string(), [any()]) -> ok.
 warn(LogState, FormatString, Args) ->
     log(LogState, ?EC_WARN, colorize(LogState, ?MAGENTA, false, FormatString), Args).
@@ -243,12 +243,12 @@ format(Log) ->
 
 colorize(#state_t{intensity=none}, _, _, Msg) ->
                 Msg;
-%% When it is suposed to be bold and we already have a uppercase
+%% When it is supposed to be bold and we already have a uppercase
 %% (bold color) we don't need to modify the color
 colorize(State, Color, true, Msg)  when ?VALID_COLOR(Color),
                                         Color >= $A, Color =< $Z ->
     colorize(State, Color, false, Msg);
-%% We're sneaky we can substract 32 to get the uppercase character if we want
+%% We're sneaky we can subtract 32 to get the uppercase character if we want
 %% bold but have a non bold color.
 colorize(State, Color, true, Msg) when ?VALID_COLOR(Color) ->
     colorize(State, Color - 32, false, Msg);

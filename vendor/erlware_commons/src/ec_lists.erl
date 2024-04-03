@@ -52,7 +52,7 @@ find(_Fun, []) ->
     error.
 
 %% @doc Fetch a value from the list. If the function returns true the
-%% value is returend. If processing reaches the end of the list and
+%% value is returned. If processing reaches the end of the list and
 %% the function has never returned true an exception not_found is
 %% thrown.
 -spec fetch(fun(), list()) -> term().

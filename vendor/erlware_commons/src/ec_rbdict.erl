@@ -32,7 +32,7 @@
 %%% representation of a dictionary, where a red-black tree is used to
 %%% store the keys and values.
 %%%
-%%% This module implents exactly the same interface as the module
+%%% This module implements exactly the same interface as the module
 %%% ec_dictionary but with a defined representation. One difference is
 %%% that while dict considers two keys as different if they do not
 %%% match (=:=), this module considers two keys as different if and
@@ -296,7 +296,7 @@ to_list(empty, List) -> List;
 to_list({_, A, Xk, Xv, B}, List) ->
     to_list(A, [{Xk, Xv} | to_list(B, List)]).
 
-%% Balance a tree afer (possibly) adding a node to the left/right.
+%% Balance a tree after (possibly) adding a node to the left/right.
 -spec lbalance(color(), dictionary(K, V),
                ec_dictionary:key(K), ec_dictionary:value(V),
                dictionary(K, V)) ->

@@ -759,7 +759,7 @@ maybe_check_for_undefined_functions_(State, Release) ->
                     FilterMethod = rlx_state:filter_xref_warning(State),
                     FilteredWarnings = FilterMethod(Warnings),
                     format_xref_warning(FilteredWarnings);
-                {error, _} = Error ->
+                {error, _, _} = Error ->
                     ?log_warn(
                         "Error running xref analyze: ~s", 
                         [xref:format_error(Error)])
@@ -776,13 +776,13 @@ add_project_apps_to_xref(Rf, [AppSpec | Rest], State) ->
     case maps:find(element(1, AppSpec), rlx_state:available_apps(State)) of
         {ok, App=#{app_type := project}} ->
             case xref:add_application(
-                    Rf,
-                    rlx_app_info:dir(App),
-                    [{name, rlx_app_info:name(App)}, {warnings, false}]) 
+                   Rf,
+                   binary_to_list(rlx_app_info:dir(App)),
+                   [{name, rlx_app_info:name(App)}, {warnings, false}])
             of
                 {ok, _} ->
                     ok;
-                {error, _} = Error ->
+                {error, _, _} = Error ->
                     ?log_warn("Error adding application ~s to xref context: ~s",
                               [rlx_app_info:name(App), xref:format_error(Error)])
             end;
