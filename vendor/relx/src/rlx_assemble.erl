@@ -777,7 +777,7 @@ add_project_apps_to_xref(Rf, [AppSpec | Rest], State) ->
         {ok, App=#{app_type := project}} ->
             case xref:add_application(
                    Rf,
-                   binary_to_list(rlx_app_info:dir(App)),
+                   unicode:characters_to_list(rlx_app_info:dir(App)),
                    [{name, rlx_app_info:name(App)}, {warnings, false}])
             of
                 {ok, _} ->
