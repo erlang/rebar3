@@ -45,8 +45,8 @@
 -define( is_tz_offset(H1,H2,M1,M2), (?is_num(H1) andalso ?is_num(H2) andalso ?is_num(M1) andalso ?is_num(M2)) ).
 
 -define(GREGORIAN_SECONDS_1970, 62167219200).
--define(ISO_8601_DATETIME_FORMAT, "Y-m-dTG:i:sZ").
--define(ISO_8601_DATETIME_WITH_MS_FORMAT, "Y-m-dTG:i:s.fZ").
+-define(ISO_8601_DATETIME_FORMAT, "Y-m-dTH:i:sZ").
+-define(ISO_8601_DATETIME_WITH_MS_FORMAT, "Y-m-dTH:i:s.fZ").
 
 -type year() :: non_neg_integer().
 -type month() :: 1..12 | {?MONTH_TAG, 1..12}.
@@ -101,7 +101,7 @@ parse(Date, Now) ->
     do_parse(Date, Now, []).
 
 do_parse(Date, Now, Opts) ->
-    case filter_hints(parse(tokenise(uppercase(Date), []), Now, Opts)) of
+    case filter_hints(parse(tokenise(string:uppercase(Date), []), Now, Opts)) of
         {error, bad_date} ->
             erlang:throw({?MODULE, {bad_date, Date}});
         {D1, T1} = {{Y, M, D}, {H, M1, S}}
@@ -197,17 +197,6 @@ parse([Day,X,Month,X,Year,Hour,$:,Min,$:,Sec,$., Ms | PAM], _Now, _Opts)
        andalso ?is_year(Year) ->
     {{Year, Month, Day}, {hour(Hour, PAM), Min, Sec}, {Ms}};
 
-parse([Year,X,Month,X,Day,Hour,$:,Min,$:,Sec,$., Ms], _Now, _Opts)
-  when  (?is_us_sep(X) orelse ?is_world_sep(X))
-        andalso ?is_year(Year) ->
-    {{Year, Month, Day}, {hour(Hour,[]), Min, Sec}, {Ms}};
-parse([Month,X,Day,X,Year,Hour,$:,Min,$:,Sec,$., Ms], _Now, _Opts)
-  when ?is_us_sep(X) andalso ?is_month(Month) ->
-    {{Year, Month, Day}, {hour(Hour, []), Min, Sec}, {Ms}};
-parse([Day,X,Month,X,Year,Hour,$:,Min,$:,Sec,$., Ms ], _Now, _Opts)
-  when ?is_world_sep(X) andalso ?is_month(Month) ->
-    {{Year, Month, Day}, {hour(Hour, []), Min, Sec}, {Ms}};
-
 %% Date/Times Dec 1st, 2012 6:25 PM
 parse([Month,Day,Year,Hour,$:,Min,$:,Sec | PAM], _Now, _Opts)
   when ?is_meridian(PAM) andalso ?is_hinted_month(Month) andalso ?is_day(Day) ->
@@ -218,14 +207,6 @@ parse([Month,Day,Year,Hour,$:,Min | PAM], _Now, _Opts)
 parse([Month,Day,Year,Hour | PAM], _Now, _Opts)
   when ?is_meridian(PAM) andalso ?is_hinted_month(Month) andalso ?is_day(Day) ->
     {{Year, Month, Day}, {hour(Hour, PAM), 0, 0}};
-
-%% Date/Times Dec 1st, 2012 18:25:15 (no AM/PM)
-parse([Month,Day,Year,Hour,$:,Min,$:,Sec], _Now, _Opts)
-  when ?is_hinted_month(Month) andalso ?is_day(Day) ->
-    {{Year, Month, Day}, {hour(Hour, []), Min, Sec}};
-parse([Month,Day,Year,Hour,$:,Min], _Now, _Opts)
-  when ?is_hinted_month(Month) andalso ?is_day(Day) ->
-    {{Year, Month, Day}, {hour(Hour, []), Min, 0}};
 
 %% Date/Times Fri Nov 21 14:55:26 +0000 2014 (Twitter format)
 parse([Month, Day, Hour,$:,Min,$:,Sec, Year], _Now, _Opts)
@@ -522,7 +503,7 @@ format([$g|T], {_,{H,_,_}}=Dt, Acc) when H > 12 ->
 format([$g|T], {_,{H,_,_}}=Dt, Acc) ->
     format(T, Dt, [itol(H)|Acc]);
 format([$G|T], {_,{H,_,_}}=Dt, Acc) ->
-    format(T, Dt, [pad2(H)|Acc]);
+    format(T, Dt, [itol(H)|Acc]);
 format([$h|T], {_,{H,_,_}}=Dt, Acc) when H > 12 ->
     format(T, Dt, [pad2(H-12)|Acc]);
 format([$h|T], {_,{H,_,_}}=Dt, Acc) ->
@@ -728,12 +709,6 @@ pad6(X) when is_integer(X) ->
 ltoi(X) ->
     list_to_integer(X).
 
--ifdef(unicode_str).
-uppercase(Str) -> string:uppercase(Str).
--else.
-uppercase(Str) -> string:to_upper(Str).
--endif.
-
 %%%===================================================================
 %%% Tests
 %%%===================================================================
@@ -762,6 +737,8 @@ basic_format_test_() ->
      ?_assertEqual(format("H:i:s",?DATE), "17:16:17"),
      ?_assertEqual(format("z",?DATE), "68"),
      ?_assertEqual(format("D M j G:i:s Y",?DATE), "Sat Mar 10 17:16:17 2001"),
+     ?_assertEqual(format("D M j G:i:s Y", {{2001,3,10},{5,16,17}}), "Sat Mar 10 5:16:17 2001"),
+     ?_assertEqual(format("D M j H:i:s Y", {{2001,3,10},{5,16,17}}), "Sat Mar 10 05:16:17 2001"),
      ?_assertEqual(format("ga",?DATE_NOON), "12pm"),
      ?_assertEqual(format("gA",?DATE_NOON), "12PM"),
      ?_assertEqual(format("ga",?DATE_MIDNIGHT), "12am"),

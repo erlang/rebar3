@@ -42,8 +42,6 @@
 -type key(T) :: T.
 -type value(T) :: T.
 
--ifdef(have_callback_support).
-
 -callback new() -> any().
 -callback has_key(key(any()), any()) -> boolean().
 -callback get(key(any()), any()) -> any().
@@ -54,27 +52,6 @@
 -callback to_list(any()) -> [{key(any()), value(any())}].
 -callback from_list([{key(any()), value(any())}]) -> any().
 -callback keys(any()) -> [key(any())].
-
--else.
-
-%% In the case where R14 or lower is being used to compile the system
-%% we need to export a behaviour info
--export([behaviour_info/1]).
--spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
-behaviour_info(callbacks) ->
-    [{new, 0},
-     {has_key, 2},
-     {get, 2},
-     {add, 3},
-     {remove, 2},
-     {has_value, 2},
-     {size, 1},
-     {to_list, 1},
-     {from_list, 1},
-     {keys, 1}];
-behaviour_info(_Other) ->
-    undefined.
--endif.
 
 %%%===================================================================
 %%% API

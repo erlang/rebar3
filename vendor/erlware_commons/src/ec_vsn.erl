@@ -27,23 +27,8 @@
 %% however you should not rely on the internal representation here
 -type t() :: #t{}.
 
--ifdef(have_callback_support).
-
 -callback new() -> any().
 -callback vsn(any()) -> {ok, string()} | {error, Reason::any()}.
-
--else.
-
-%% In the case where R14 or lower is being used to compile the system
-%% we need to export a behaviour info
--export([behaviour_info/1]).
--spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
-behaviour_info(callbacks) ->
-    [{new, 0},
-     {vsn, 1}];
-behaviour_info(_Other) ->
-    undefined.
--endif.
 
 %%%===================================================================
 %%% API

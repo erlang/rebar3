@@ -69,7 +69,7 @@ href="http://www.erlang.org/doc/man/lists.html">lists</a>, making most
 list operations parallel. It can operate on each element in parallel,
 for IO-bound operations, on sublists in parallel, for taking advantage
 of multi-core machines with CPU-bound operations, and across erlang
-nodes, for parallizing inside a cluster. It handles errors and node
+nodes, for parallelizing inside a cluster. It handles errors and node
 failures. It can be configured, tuned, and tweaked to get optimal
 performance while minimizing overhead.
 
@@ -77,7 +77,7 @@ Almost all the functions are identical to equivalent functions in
 lists, returning exactly the same result, and having both a form with
 an identical syntax that operates on each element in parallel and a
 form which takes an optional "malt", a specification for how to
-parallize the operation.
+parallelize the operation.
 
 fold is the one exception, parallel fold is different from linear
 fold.  This module also include a simple mapreduce implementation, and
@@ -106,7 +106,7 @@ Other languages, have built in support for **Interface** or
 **signature** functionality. Java has Interfaces, SML has
 Signatures. Erlang, though, doesn't currently support this model, at
 least not directly. There are a few ways you can approximate it. We
-have defined a mechnism called *signatures* and several modules that
+have defined a mechanism called *signatures* and several modules that
 to serve as examples and provide a good set of *dictionary*
 signatures. More information about signatures can be found at
 [signature](https://github.com/erlware/erlware_commons/blob/master/doc/signatures.md).

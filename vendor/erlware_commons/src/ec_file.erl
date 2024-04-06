@@ -139,23 +139,20 @@ try_write_owner(To, #file_info{uid=OwnerId}) ->
 try_write_group(To, #file_info{gid=OwnerId}) ->
     file:write_file_info(To, #file_info{gid=OwnerId}).
 
-%% @doc return an md5 checksum string or a binary. Same as unix utility of
-%%      same name.
+%% @doc return the MD5 digest of a string or a binary,
+%%      named after the UNIX utility.
 -spec md5sum(string() | binary()) -> string().
 md5sum(Value) ->
-    hex(binary_to_list(erlang:md5(Value))).
+    bin_to_hex(crypto:hash(md5, Value)).
 
-%% @doc return an sha1sum checksum string or a binary. Same as unix utility of
-%%      same name.
--ifdef(deprecated_crypto).
+%% @doc return the SHA-1 digest of a string or a binary,
+%%      named after the UNIX utility.
 -spec sha1sum(string() | binary()) -> string().
 sha1sum(Value) ->
-    hex(binary_to_list(crypto:sha(Value))).
--else.
--spec sha1sum(string() | binary()) -> string().
-sha1sum(Value) ->
-    hex(binary_to_list(crypto:hash(sha, Value))).
--endif.
+    bin_to_hex(crypto:hash(sha, Value)).
+
+bin_to_hex(Bin) ->
+    hex(binary_to_list(Bin)).
 
 %% @doc delete a file. Use the recursive option for directories.
 %% <pre>
@@ -174,7 +171,7 @@ remove(Path, Options) ->
 remove(Path) ->
     remove(Path, []).
 
-%% @doc indicates witha boolean if the path supplied refers to symlink.
+%% @doc indicates with a boolean if the path supplied refers to symlink.
 -spec is_symlink(file:name()) -> boolean().
 is_symlink(Path) ->
     case file:read_link_info(Path) of
@@ -252,7 +249,7 @@ mkdir_path(Path) ->
     mkdir_p(Path).
 
 
-%% @doc read a file from the file system. Provide UEX exeption on failure.
+%% @doc read a file from the file system. Provide UEX exception on failure.
 -spec read(FilePath::file:filename()) -> {ok, binary()} | {error, Reason::term()}.
 read(FilePath) ->
     %% Now that we are moving away from exceptions again this becomes
@@ -261,7 +258,7 @@ read(FilePath) ->
     file:read_file(FilePath).
 
 
-%% @doc write a file to the file system. Provide UEX exeption on failure.
+%% @doc write a file to the file system. Provide UEX exception on failure.
 -spec write(FileName::file:filename(), Contents::string()) -> ok | {error, Reason::term()}.
 write(FileName, Contents) ->
     %% Now that we are moving away from exceptions again this becomes
@@ -379,14 +376,8 @@ sub_files(From) ->
     {ok, SubFiles} = file:list_dir(From),
     [filename:join(From, SubFile) || SubFile <- SubFiles].
 
--ifdef(rand_module).
 random_uniform() ->
     rand:uniform().
--else.
-random_uniform() ->
-    random:seed(os:timestamp()),
-    random:uniform().
--endif.
 
 %%%===================================================================
 %%% Test Functions

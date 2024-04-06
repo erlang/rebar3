@@ -75,7 +75,7 @@ ask(Prompt) ->
 ask_default(Prompt, Default) ->
     ask_convert(Prompt, fun get_string/1, string, Default).
 
-%% @doc Asks the user to respond to the prompt. Trys to return the
+%% @doc Asks the user to respond to the prompt. Tries to return the
 %% value in the format specified by 'Type'.
 -spec ask(prompt(), type()) ->  supported().
 ask(Prompt, boolean) ->
@@ -85,7 +85,7 @@ ask(Prompt, number) ->
 ask(Prompt, string) ->
     ask_convert(Prompt, fun get_string/1, string, none).
 
-%% @doc Asks the user to respond to the prompt. Trys to return the
+%% @doc Asks the user to respond to the prompt. Tries to return the
 %% value in the format specified by 'Type'.
 -spec ask_default(prompt(), type(), supported()) ->  supported().
 ask_default(Prompt, boolean, Default)  ->
@@ -127,7 +127,7 @@ ask_convert(Prompt, TransFun, Type,  Default) ->
                                                            Default ->
                                                                [" (", io_lib:format("~p", [Default]) , ")"]
                                                        end, "> "])),
-    Data = trim(trim(io:get_line(NewPrompt)), both, [$\n]),
+    Data = string:trim(string:trim(io:get_line(NewPrompt)), both, [$\n]),
     Ret = TransFun(Data),
     case Ret of
         no_data ->
@@ -145,7 +145,7 @@ ask_convert(Prompt, TransFun, Type,  Default) ->
             Ret
     end.
 
-%% @doc Trys to translate the result into a boolean
+%% @doc Tries to translate the result into a boolean
 -spec get_boolean(string()) -> boolean().
 get_boolean([]) ->
     no_data;
@@ -172,7 +172,7 @@ get_boolean([$N | _]) ->
 get_boolean(_) ->
     no_clue.
 
-%% @doc Trys to translate the result into an integer
+%% @doc Tries to translate the result into an integer
 -spec get_integer(string()) -> integer().
 get_integer([]) ->
     no_data;
@@ -196,14 +196,6 @@ get_string(String) ->
         false ->
             no_clue
     end.
-
--ifdef(unicode_str).
-trim(Str) -> string:trim(Str).
-trim(Str, both, Chars) -> string:trim(Str, both, Chars).
--else.
-trim(Str) -> string:strip(Str).
-trim(Str, Dir, [Chars|_]) -> string:strip(Str, Dir, Chars).
--endif.
 
 %%%====================================================================
 %%% tests

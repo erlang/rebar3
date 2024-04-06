@@ -118,7 +118,9 @@ read_overlay_vars(State, OverlayVars, FileNames) ->
             % definitions should be able to be overwritten by both internal
             % and rendered vars, as not to change behaviour in
             % setups preceding the support for overlays from the caller.
-            OverlayVars ++ NewTerms ++ OverlayVarsValues;
+            % Place NewTerms at the start - the last overlays added should be able
+            % to override those that came before
+            NewTerms ++ OverlayVars ++ OverlayVarsValues;
         Error ->
             Error
     end.
@@ -315,6 +317,17 @@ do_individual_overlay(State, Release, Files, OverlayVars, {link, From, To}) ->
             do_individual_overlay(State, Release, Files, OverlayVars, {copy, From, To})
     end;
 do_individual_overlay(State, Release, _Files, OverlayVars, {template, From, To}) ->
+    file_render_do(OverlayVars, From,
+                   fun(FromFile) ->
+                           file_render_do(OverlayVars, To,
+                                          fun(ToFile) ->
+                                                  write_template(OverlayVars,
+                                                                 absolute_path_from(State, FromFile),
+                                                                 absolute_path_to(State, Release, ToFile))
+                                          end)
+                   end);
+do_individual_overlay(State, Release, _Files, OverlayVars0, {template, From, To, OverlayFilename}) ->
+    OverlayVars = read_overlay_vars(State, OverlayVars0, [OverlayFilename]),
     file_render_do(OverlayVars, From,
                    fun(FromFile) ->
                            file_render_do(OverlayVars, To,

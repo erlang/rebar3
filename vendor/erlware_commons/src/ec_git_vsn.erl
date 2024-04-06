@@ -94,21 +94,10 @@ parse_tags(Pattern) ->
         "fatal: " ++ _ ->
             {undefined, ""};
         _ ->
-            Vsn = slice(Tag, len(Pattern)),
-            Vsn1 = trim(trim(Vsn, left, "v"), right, "\n"),
+            Vsn  = string:slice(Tag, string:length(Pattern)),
+            Vsn1 = string:trim(string:trim(Vsn, leading, "v"), trailing, "\n"),
             {Tag, Vsn1}
     end.
-
--ifdef(unicode_str).
-len(Str) -> string:length(Str).
-trim(Str, right, Chars) -> string:trim(Str, trailing, Chars);
-trim(Str, left, Chars) -> string:trim(Str, leading, Chars).
-slice(Str, Len) -> string:slice(Str, Len).
--else.
-len(Str) -> string:len(Str).
-trim(Str, Dir, [Chars|_]) -> string:strip(Str, Dir, Chars).
-slice(Str, Len) -> string:substr(Str, Len + 1).
--endif.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
