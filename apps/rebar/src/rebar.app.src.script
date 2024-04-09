@@ -2,7 +2,7 @@
 %% ex: ts=4 sw=4 ft=erlang et
 {application, rebar,
  [{description, "Rebar: Erlang Build Tool"},
-  {vsn, "git"},
+  {vsn, "3.23.0"},
   {modules, []},
   {registered, []},
   {applications, [kernel,
