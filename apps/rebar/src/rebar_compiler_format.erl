@@ -23,7 +23,7 @@ format(Source, {Line, Column}, Extra, Desc, Config) ->
                  [LnPad, Source,
                   LnPad,
                   Line, colorize(LnBin, Column),
-                  LnPad, lists:duplicate(max(0, Column-1), " "), Arrow, Extra, Desc]);
+                  LnPad, indent(max(0, Column-1), LnBin), Arrow, Extra, Desc]);
         _ ->
             ?FMT("~ts:~w:~w: ~ts~ts~n", [Source, Line, Column, Extra, Desc])
     end.
@@ -36,6 +36,10 @@ find_line(Nth, Source) ->
   catch
       error:X -> {error, X}
   end.
+
+indent(0, _) -> "";
+indent(N, <<"\t", Rest/binary>>) -> [$\t | indent(N-1, Rest)];
+indent(N, <<_/utf8, Rest/binary>>) -> [$\s | indent(N-1, Rest)].
 
 compiler_error_format(Opts) ->
     %% `Opts' can be passed in both as a list or a dictionary depending
