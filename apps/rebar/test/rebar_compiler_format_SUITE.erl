@@ -37,7 +37,7 @@ oracle() ->
     ++ lists:duplicate(9, $\n) ++
     "first character on line 11.\n"
     ++ lists:duplicate(99, $\n) ++
-    "case X of ^whatever % on line 111\n".
+    "case \tX of ^whatever % on line 111\n".
 
 minimal() ->
     [{doc, "showing minimal (default) output"}].
@@ -48,8 +48,8 @@ minimal(Config) ->
                  rebar_compiler_format:format(Path, {1,20}, "=> ", "unexpected token: ;", Conf)),
     ?assertEqual(Path++":11:1: some message"++?EOL,
                  rebar_compiler_format:format(Path, {11,1}, "", "some message", Conf)),
-    ?assertEqual(Path++":111:11: the character '^' is not expected here."++?EOL,
-                 rebar_compiler_format:format(Path, {111,11}, "", "the character '^' is not expected here.", Conf)),
+    ?assertEqual(Path++":111:12: the character '^' is not expected here."++?EOL,
+                 rebar_compiler_format:format(Path, {111,12}, "", "the character '^' is not expected here.", Conf)),
     ?assertEqual(Path++":-23:-42: invalid ranges."++?EOL,
                  rebar_compiler_format:format(Path, {-23,-42}, "", "invalid ranges.", Conf)),
     ?assertEqual(Path++":-23:-42: invalid ranges."++?EOL,
@@ -78,9 +78,9 @@ nocolor(Config) ->
                  rebar_compiler_format:format(Path, {11,1}, "", "some message", Conf)),
     ?assertEqual("     ┌─ "++Path++":"++?EOL++
                  "     │"++?EOL++
-                 " 111 │  case X of ^whatever % on line 111"++?EOL++
-                 "     │            ╰── the character '^' is not expected here."++?EOL++?EOL,
-                 rebar_compiler_format:format(Path, {111,11}, "", "the character '^' is not expected here.", Conf)),
+                 " 111 │  case \tX of ^whatever % on line 111"++?EOL++
+                 "     │       \t     ╰── the character '^' is not expected here."++?EOL++?EOL,
+                 rebar_compiler_format:format(Path, {111,12}, "", "the character '^' is not expected here.", Conf)),
     %% invalid cases fall back to minimal mode
     ?assertEqual(Path++":-23:-42: invalid ranges."++?EOL,
                  rebar_compiler_format:format(Path, {-23,-42}, "", "invalid ranges.", Conf)),
