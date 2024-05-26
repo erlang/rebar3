@@ -982,11 +982,7 @@ get_http_vars(Scheme) ->
     Config = rebar_config:consult_file(GlobalConfigFile),
     proplists:get_value(Scheme, Config, OS).
 
--ifdef (OTP_RELEASE).
-  -if(?OTP_RELEASE >= 23).
-    -compile({nowarn_deprecated_function, [{http_uri, decode, 1}]}).
-  -endif.
--endif.
+-compile({nowarn_deprecated_function, [{http_uri, decode, 1}]}).
 
 set_httpc_options() ->
     set_httpc_options(https_proxy, get_http_vars(https_proxy)),
