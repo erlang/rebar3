@@ -149,11 +149,20 @@ finalise_populate_sources_(G, InDirs, [{Status, {deps, Source, AbsIncls}}|Acc]) 
                                   {_, _Src, Path, _Label} <- [digraph:edge(G, Edge)],
                                   not lists:member(Path, AbsIncls)],
     %% Add the rest
-    [digraph:add_edge(G, Source, Incl) || Incl <- AbsIncls],
+    RemainingEdges = [digraph:edge(G, E) || E <- digraph:out_edges(G, Source),
+                                            AbsIncls =/= []],
+    [digraph:add_edge(G, Source, Incl) || Incl <- AbsIncls,
+                                          not in_edges(Source, Incl, RemainingEdges)],
     %% mark the digraph dirty when there is any change in
     %%  dependencies, for any application in the project
     mark_dirty(G),
     finalise_populate_sources_(G, InDirs, Acc).
+
+%% @private look if two vertices `V1' and `V2' exist in an unsorted set
+%% of DAG edges (in expanded format).
+in_edges(_, _, []) -> false;
+in_edges(V1, V2, [{_, V1, V2, []}|_]) -> true;
+in_edges(V1, V2, [_|T]) -> in_edges(V1, V2, T).
 
 %% @doc this function scans all the source files found and looks into
 %% all the `InDirs' for deps (other source files, or files that aren't source
