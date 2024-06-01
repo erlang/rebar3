@@ -3,7 +3,7 @@ name: Common Test
 on: [pull_request, push]
 
 env:
-  LATEST_OTP_RELEASE: 26
+  LATEST_OTP_RELEASE: 27
 
 jobs:
   linux:
@@ -12,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        otp_version: [24, 25, 26]
+        otp_version: [25, 26, 27]
         os: [ubuntu-latest]
 
     container:
