@@ -16,7 +16,7 @@ jobs:
     - uses: erlef/setup-beam@v1
       with:
           otp-version: '27.0'
-          elixir-version: '1.14'
+          elixir-version: '1.16'
     - name: Compile
       run: ./bootstrap
     - name: Install
