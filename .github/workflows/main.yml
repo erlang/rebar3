@@ -3,7 +3,7 @@ name: Common Test
 on: [pull_request, push]
 
 env:
-  LATEST_OTP_RELEASE: 26
+  LATEST_OTP_RELEASE: 27
 
 jobs:
   linux:
@@ -12,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        otp_version: [24, 25, 26]
+        otp_version: [25, 26, 27]
         os: [ubuntu-latest]
 
     container:
@@ -52,7 +52,9 @@ jobs:
     - name: Debug Brew
       run: brew doctor || true
     - name: Install Erlang
-      run: brew install erlang@${{ env.LATEST_OTP_RELEASE }}
+      #run: brew install erlang@${{ env.LATEST_OTP_RELEASE }}
+      # fall back to OTP-26 since OTP 27.0 doesn't build on homebrew due to manpages issues
+      run: brew install erlang@26
     - name: Compile
       run: ./bootstrap
     - name: CT tests

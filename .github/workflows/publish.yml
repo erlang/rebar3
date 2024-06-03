@@ -18,7 +18,7 @@ jobs:
 
     - uses: erlef/setup-beam@v1
       with:
-          otp-version: '24'
+          otp-version: '25'
     - name: Compile
       run: ./bootstrap
     - name: CT tests
