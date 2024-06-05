@@ -424,16 +424,12 @@ prioritize_templates([{Name, Type, File} | Rest], Valid) ->
 load_file(Files, escript, Name) ->
     {Name, Bin} = lists:keyfind(Name, 1, Files),
     Bin;
-load_file(_Files, builtin, Name) ->
-    {ok, Bin} = file:read_file(Name),
-    Bin;
-load_file(_Files, plugin, Name) ->
-    {ok, Bin} = file:read_file(Name),
-    Bin;
-load_file(_Files, file, Name) ->
+load_file(_Files, Type, Name) when Type =:= builtin;
+                                   Type =:= plugin;
+                                   Type =:= file ->
     case file:read_file(Name) of
         {ok, Bin} -> Bin;
-        {error, Reason} -> 
+        {error, Reason} ->
             ?ABORT("Failed to load file ~p: ~p\n", [Name, Reason])
     end.
 
