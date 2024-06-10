@@ -1138,17 +1138,9 @@ ssl_opts(ssl_verify_enabled, Url) ->
             [{verify, verify_none}]
     end.
 
--ifdef(no_customize_hostname_check).
-check_hostname_opt(Url, Opts) ->
-    #{host := Hostname} = rebar_uri:parse(rebar_utils:to_list(Url)),
-    VerifyFun = {fun ssl_verify_hostname:verify_fun/3,
-                 [{check_hostname, Hostname}]},
-    [{verify_fun, VerifyFun} | Opts].
--else.
 check_hostname_opt(_, Opts) ->
     MatchFun = public_key:pkix_verify_hostname_match_fun(https),
     [{customize_hostname_check, [{match_fun, MatchFun}]} | Opts].
--endif.
 
 -spec partial_chain(Certs) -> Res when
       Certs :: list(any()),
