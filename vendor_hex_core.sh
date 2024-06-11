@@ -10,7 +10,7 @@ REBAR3_TOP=$(pwd)/apps/rebar
 export REBAR3_TOP
 pushd "$1"
 touch proto/* # force re-generation of protobuf elements
-TARGET_ERLANG_VERSION=20
+TARGET_ERLANG_VERSION=25
 export TARGET_ERLANG_VERSION
 rebar3 as dev compile
 ./vendor.sh src r3_
