@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.10.0, do not edit manually
+%% Vendored from hex_core v0.10.1, do not edit manually
 
 %% @doc
 %% `hex_core' entrypoint module.
@@ -48,6 +48,18 @@
 %%
 %% * `repo_verify_origin' - If `true' will verify the repository signature origin,
 %%   requires protobuf messages as of hex_core v0.4.0 (default: `true').
+%%
+%% * `tarball_max_size' - Maximum size of package tarball, defaults to
+%%   `16_777_216' (16 MiB). Set to `infinity' to not enforce the limit.
+%%
+%% * `tarball_max_uncompressed_size' - Maximum size of uncompressed package tarball, defaults to
+%%   `134_217_728' (128 MiB). Set to `infinity' to not enforce the limit.
+%%
+%% * `docs_tarball_max_size' - Maximum size of docs tarball, defaults to
+%%   `16_777_216' (16 MiB). Set to `infinity' to not enforce the limit.
+%%
+%% * `docs_tarball_max_uncompressed_size' - Maximum size of uncompressed docs tarball, defaults to
+%%   `134_217_728' (128 MiB). Set to `infinity' to not enforce the limit.
 
 -module(r3_hex_core).
 -export([default_config/0]).
@@ -83,8 +95,10 @@
     repo_organization => binary() | undefined,
     repo_verify => boolean(),
     repo_verify_origin => boolean(),
-    tarball_max_size => pos_integer(),
-    tarball_max_uncompressed_size => pos_integer()
+    tarball_max_size => pos_integer() | infinity,
+    tarball_max_uncompressed_size => pos_integer() | infinity,
+    docs_tarball_max_size => pos_integer() | infinity,
+    docs_tarball_max_uncompressed_size => pos_integer() | infinity
 }.
 
 -spec default_config() -> config().
@@ -105,6 +119,8 @@ default_config() ->
         repo_organization => undefined,
         repo_verify => true,
         repo_verify_origin => true,
-        tarball_max_size => 8 * 1024 * 1024,
-        tarball_max_uncompressed_size => 64 * 1024 * 1024
+        tarball_max_size => 16 * 1024 * 1024,
+        tarball_max_uncompressed_size => 128 * 1024 * 1024,
+        docs_tarball_max_size => 16 * 1024 * 1024,
+        docs_tarball_max_uncompressed_size => 128 * 1024 * 1024
     }.

@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.10.0, do not edit manually
+%% Vendored from hex_core v0.10.1, do not edit manually
 
 %% @doc
 %% Functions for creating and unpacking Hex tarballs.
@@ -60,6 +60,11 @@
     }}
     | {error, term()}.
 create(Metadata, Files, Config) ->
+    #{
+        tarball_max_size := TarballMaxSize,
+        tarball_max_uncompressed_size := TarballMaxUncompressedSize
+    } = Config,
+
     MetadataBinary = encode_metadata(Metadata),
     ContentsTarball = create_memory_tarball(Files),
     ContentsTarballCompressed = gzip(ContentsTarball),
@@ -75,20 +80,23 @@ create(Metadata, Files, Config) ->
         {"contents.tar.gz", ContentsTarballCompressed}
     ],
 
-    Tarball = create_memory_tarball(OuterFiles),
-    OuterChecksum = checksum(Tarball),
+    case valid_size(ContentsTarball, TarballMaxUncompressedSize) of
+        true ->
+            Tarball = create_memory_tarball(OuterFiles),
+            OuterChecksum = checksum(Tarball),
 
-    UncompressedSize = byte_size(ContentsTarball),
-
-    case {(byte_size(Tarball) > TarballMaxSize), (UncompressedSize > TarballMaxUncompressedSize)} of
-        {_, true} ->
-            {error, {tarball, {too_big_uncompressed, TarballMaxUncompressedSize}}};
-        {true, _} ->
-            {error, {tarball, {too_big_compressed, TarballMaxSize}}};
-        {false, false} ->
-            {ok, #{
-                tarball => Tarball, outer_checksum => OuterChecksum, inner_checksum => InnerChecksum
-            }}
+            case valid_size(Tarball, TarballMaxSize) of
+                true ->
+                    {ok, #{
+                        tarball => Tarball,
+                        outer_checksum => OuterChecksum,
+                        inner_checksum => InnerChecksum
+                    }};
+                false ->
+                    {error, {tarball, {too_big_compressed, TarballMaxSize}}}
+            end;
+        false ->
+            {error, {tarball, {too_big_uncompressed, TarballMaxUncompressedSize}}}
     end.
 
 -spec create(metadata(), files()) ->
@@ -113,21 +121,26 @@ create(Metadata, Files) ->
 %% '''
 %% @end
 -spec create_docs(files(), r3_hex_core:config()) -> {ok, tarball()} | {error, term()}.
-create_docs(Files, #{
-    tarball_max_size := TarballMaxSize, tarball_max_uncompressed_size := TarballMaxUncompressedSize
-}) ->
-    UncompressedTarball = create_memory_tarball(Files),
-    UncompressedSize = byte_size(UncompressedTarball),
-    Tarball = gzip(UncompressedTarball),
-    Size = byte_size(Tarball),
+create_docs(Files, Config) ->
+    #{
+        docs_tarball_max_size := TarballMaxSize,
+        docs_tarball_max_uncompressed_size := TarballMaxUncompressedSize
+    } = Config,
 
-    case {(Size > TarballMaxSize), (UncompressedSize > TarballMaxUncompressedSize)} of
-        {_, true} ->
-            {error, {tarball, {too_big_uncompressed, TarballMaxUncompressedSize}}};
-        {true, _} ->
-            {error, {tarball, {too_big_compressed, TarballMaxSize}}};
-        {false, false} ->
-            {ok, Tarball}
+    UncompressedTarball = create_memory_tarball(Files),
+
+    case valid_size(UncompressedTarball, TarballMaxUncompressedSize) of
+        true ->
+            Tarball = gzip(UncompressedTarball),
+
+            case valid_size(Tarball, TarballMaxSize) of
+                true ->
+                    {ok, Tarball};
+                false ->
+                    {error, {tarball, {too_big_compressed, TarballMaxSize}}}
+            end;
+        false ->
+            {error, {tarball, {too_big_uncompressed, TarballMaxUncompressedSize}}}
     end.
 
 -spec create_docs(files()) -> {ok, tarball()}.
@@ -168,19 +181,20 @@ create_docs(Files) ->
             metadata => metadata()
         }}
         | {error, term()}.
-unpack(Tarball, _, #{tarball_max_size := TarballMaxSize}) when
-    byte_size(Tarball) > TarballMaxSize
-->
-    {error, {tarball, too_big}};
-unpack(Tarball, Output, _Config) ->
-    case r3_hex_erl_tar:extract({binary, Tarball}, [memory]) of
-        {ok, []} ->
-            {error, {tarball, empty}};
-        {ok, FileList} ->
-            OuterChecksum = crypto:hash(sha256, Tarball),
-            do_unpack(maps:from_list(FileList), OuterChecksum, Output);
-        {error, Reason} ->
-            {error, {tarball, Reason}}
+unpack(Tarball, Output, Config) ->
+    case valid_size(Tarball, maps:get(tarball_max_size, Config)) of
+        true ->
+            case r3_hex_erl_tar:extract({binary, Tarball}, [memory]) of
+                {ok, []} ->
+                    {error, {tarball, empty}};
+                {ok, FileList} ->
+                    OuterChecksum = crypto:hash(sha256, Tarball),
+                    do_unpack(maps:from_list(FileList), OuterChecksum, Output);
+                {error, Reason} ->
+                    {error, {tarball, Reason}}
+            end;
+        false ->
+            {error, {tarball, too_big}}
     end.
 
 %% @doc
@@ -221,12 +235,13 @@ unpack(Tarball, Output) ->
 -spec unpack_docs
     (tarball(), memory, r3_hex_core:config()) -> {ok, contents()} | {error, term()};
     (tarball(), filename(), r3_hex_core:config()) -> ok | {error, term()}.
-unpack_docs(Tarball, _, #{tarball_max_size := TarballMaxSize}) when
-    byte_size(Tarball) > TarballMaxSize
-->
-    {error, {tarball, too_big}};
-unpack_docs(Tarball, Output, _Config) ->
-    unpack_tarball(Tarball, Output).
+unpack_docs(Tarball, Output, Config) ->
+    case valid_size(Tarball, maps:get(docs_tarball_max_size, Config)) of
+        true ->
+            unpack_tarball(Tarball, Output);
+        false ->
+            {error, {tarball, too_big}}
+    end.
 
 -spec unpack_docs
     (tarball(), memory) -> {ok, contents()} | {error, term()};
@@ -602,6 +617,12 @@ gzip_no_header(Uncompressed) ->
 %%====================================================================
 %% Helpers
 %%====================================================================
+
+%% @private
+valid_size(Binary, infinity) when is_binary(Binary) ->
+    true;
+valid_size(Binary, Limit) when is_binary(Binary) and is_integer(Limit) ->
+    byte_size(Binary) =< Limit.
 
 %% @private
 binarify(Binary) when is_binary(Binary) -> Binary;
