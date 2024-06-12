@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.7.1, do not edit manually
+%% Vendored from hex_core v0.10.1, do not edit manually
 
 % @private
 % Excerpt from https://github.com/erlang/otp/blob/OTP-20.0.1/lib/stdlib/src/filename.erl#L761-L788
@@ -39,16 +39,16 @@ safe_relative_path(Path) ->
             unsafe
     end.
 
-safe_relative_path_1(["."|T], Acc) ->
+safe_relative_path_1(["." | T], Acc) ->
     safe_relative_path_1(T, Acc);
-safe_relative_path_1([<<".">>|T], Acc) ->
+safe_relative_path_1([<<".">> | T], Acc) ->
     safe_relative_path_1(T, Acc);
-safe_relative_path_1([".."|T], Acc) ->
+safe_relative_path_1([".." | T], Acc) ->
     climb(T, Acc);
-safe_relative_path_1([<<"..">>|T], Acc) ->
+safe_relative_path_1([<<"..">> | T], Acc) ->
     climb(T, Acc);
-safe_relative_path_1([H|T], Acc) ->
-    safe_relative_path_1(T, [H|Acc]);
+safe_relative_path_1([H | T], Acc) ->
+    safe_relative_path_1(T, [H | Acc]);
 safe_relative_path_1([], []) ->
     [];
 safe_relative_path_1([], Acc) ->
@@ -56,5 +56,5 @@ safe_relative_path_1([], Acc) ->
 
 climb(_, []) ->
     unsafe;
-climb(T, [_|Acc]) ->
+climb(T, [_ | Acc]) ->
     safe_relative_path_1(T, Acc).

@@ -1,5 +1,7 @@
-%% Vendored from hex_core v0.7.1, do not edit manually
+%% Vendored from hex_core v0.10.1, do not edit manually
 
+%% @doc
+%% Hex HTTP API - Package Owners.
 -module(r3_hex_api_package_owner).
 -export([
     add/5,
@@ -52,8 +54,12 @@ list(Config, PackageName) when is_binary(PackageName) ->
 %% '''
 %% @end
 -spec get(r3_hex_core:config(), binary(), binary()) -> r3_hex_api:response().
-get(Config, PackageName, UsernameOrEmail) when is_map(Config) and is_binary(PackageName) and is_binary(UsernameOrEmail) ->
-    Path = r3_hex_api:build_repository_path(Config, ["packages", PackageName, "owners", UsernameOrEmail]),
+get(Config, PackageName, UsernameOrEmail) when
+    is_map(Config) and is_binary(PackageName) and is_binary(UsernameOrEmail)
+->
+    Path = r3_hex_api:build_repository_path(Config, [
+        "packages", PackageName, "owners", UsernameOrEmail
+    ]),
     r3_hex_api:get(Config, Path).
 
 %% @doc
@@ -76,11 +82,14 @@ get(Config, PackageName, UsernameOrEmail) when is_map(Config) and is_binary(Pack
 %% '''
 %% @end
 -spec add(r3_hex_core:config(), binary(), binary(), binary(), boolean()) -> r3_hex_api:response().
-add(Config, PackageName, UsernameOrEmail, Level, Transfer)
-when is_binary(PackageName) and is_binary(UsernameOrEmail) and is_map(Config) and is_binary(Level) and is_boolean(Transfer) ->
-    Path = r3_hex_api:build_repository_path(Config, ["packages", PackageName, "owners", UsernameOrEmail]),
+add(Config, PackageName, UsernameOrEmail, Level, Transfer) when
+    is_binary(PackageName) and is_binary(UsernameOrEmail) and is_map(Config) and is_binary(Level) and
+        is_boolean(Transfer)
+->
+    Path = r3_hex_api:build_repository_path(Config, [
+        "packages", PackageName, "owners", UsernameOrEmail
+    ]),
     r3_hex_api:put(Config, Path, #{<<"level">> => Level, <<"transfer">> => Transfer}).
-
 
 %% @doc
 %% Deletes a packages owner.
@@ -93,6 +102,10 @@ when is_binary(PackageName) and is_binary(UsernameOrEmail) and is_map(Config) an
 %% '''
 %% @end
 -spec delete(r3_hex_core:config(), binary(), binary()) -> r3_hex_api:response().
-delete(Config, PackageName, UsernameOrEmail) when is_map(Config) and is_binary(PackageName) and is_binary(UsernameOrEmail) ->
-    Path = r3_hex_api:build_repository_path(Config, ["packages", PackageName, "owners", UsernameOrEmail]),
+delete(Config, PackageName, UsernameOrEmail) when
+    is_map(Config) and is_binary(PackageName) and is_binary(UsernameOrEmail)
+->
+    Path = r3_hex_api:build_repository_path(Config, [
+        "packages", PackageName, "owners", UsernameOrEmail
+    ]),
     r3_hex_api:delete(Config, Path).

@@ -1,5 +1,7 @@
-%% Vendored from hex_core v0.7.1, do not edit manually
+%% Vendored from hex_core v0.10.1, do not edit manually
 
+%% @doc
+%% Hex HTTP API - Users.
 -module(r3_hex_api_user).
 -export([
     create/4,
@@ -51,12 +53,13 @@ me(Config) when is_map(Config) ->
 %% '''
 %% @end
 -spec create(r3_hex_core:config(), binary(), binary(), binary()) -> r3_hex_api:response().
-create(Config, Username, Password, Email)
-when is_map(Config) and is_binary(Username) and is_binary(Password) and is_binary(Email) ->
+create(Config, Username, Password, Email) when
+    is_map(Config) and is_binary(Username) and is_binary(Password) and is_binary(Email)
+->
     Params = #{
-      <<"username">> => Username,
-      <<"password">> => Password,
-      <<"email">> => Email
+        <<"username">> => Username,
+        <<"password">> => Password,
+        <<"email">> => Email
     },
     r3_hex_api:post(Config, ["users"], Params).
 

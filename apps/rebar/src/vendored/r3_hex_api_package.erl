@@ -1,5 +1,7 @@
-%% Vendored from hex_core v0.7.1, do not edit manually
+%% Vendored from hex_core v0.10.1, do not edit manually
 
+%% @doc
+%% Hex HTTP API - Packages.
 -module(r3_hex_api_package).
 -export([get/2, search/3]).
 
@@ -27,7 +29,7 @@
 %% '''
 %% @end
 -spec get(r3_hex_core:config(), binary()) -> r3_hex_api:response().
-get(Config, Name) when is_map(Config) and is_binary(Name)->
+get(Config, Name) when is_map(Config) and is_binary(Name) ->
     Path = r3_hex_api:build_repository_path(Config, ["packages", Name]),
     r3_hex_api:get(Config, Path).
 
@@ -37,14 +39,16 @@ get(Config, Name) when is_map(Config) and is_binary(Name)->
 %% Examples:
 %%
 %% ```
-%% > r3_hex_api_package:search(r3_hex_core:default_config(), <<"package">>, []).
+%% > r3_hex_api_package:search(r3_hex_core:default_config(), <<"package">>, [{page, 1}]).
 %% {ok, {200, ..., [
 %%     #{<<"name">> => <<"package1">>, ...},
 %%     ...
 %% ]}}
 %% '''
--spec search(r3_hex_core:config(), binary(), list(binary())) -> r3_hex_api:response().
-search(Config, Query, SearchParams) when is_map(Config) and is_binary(Query) and is_list(SearchParams) ->
+-spec search(r3_hex_core:config(), binary(), [{term(), term()}]) -> r3_hex_api:response().
+search(Config, Query, SearchParams) when
+    is_map(Config) and is_binary(Query) and is_list(SearchParams)
+->
     QueryString = r3_hex_api:encode_query_string([{search, Query} | SearchParams]),
     Path = r3_hex_api:join_path_segments(r3_hex_api:build_repository_path(Config, ["packages"])),
     PathQuery = <<Path/binary, "?", QueryString/binary>>,

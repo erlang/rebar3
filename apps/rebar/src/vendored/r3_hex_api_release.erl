@@ -1,5 +1,7 @@
-%% Vendored from hex_core v0.7.1, do not edit manually
+%% Vendored from hex_core v0.10.1, do not edit manually
 
+%% @doc
+%% Hex HTTP API - Releases.
 -module(r3_hex_api_release).
 -export([
     delete/3,
@@ -16,11 +18,7 @@
 
 -type retirement_reason() :: other | invalid | security | deprecated | renamed.
 
--ifdef(OTP_19).
 -type retirement_params() :: #{reason := retirement_reason(), message => binary()}.
--else.
--type retirement_params() :: #{reason => retirement_reason(), message => binary()}.
--endif.
 %% @doc
 %% Gets a package release.
 %%
@@ -79,7 +77,6 @@ get(Config, Name, Version) when is_map(Config) and is_binary(Name) and is_binary
 -spec publish(r3_hex_core:config(), binary()) -> r3_hex_api:response().
 publish(Config, Tarball) -> publish(Config, Tarball, []).
 
-
 %% @doc
 %% Publishes a new package release with query parameters.
 %%
@@ -109,8 +106,12 @@ publish(Config, Tarball) -> publish(Config, Tarball, []).
 %% '''
 %% @end
 -spec publish(r3_hex_core:config(), binary(), publish_params()) -> r3_hex_api:response().
-publish(Config, Tarball, Params) when is_map(Config) andalso is_binary(Tarball) andalso is_list(Params)->
-    QueryString = r3_hex_api:encode_query_string([{replace, proplists:get_value(replace, Params, false)}]),
+publish(Config, Tarball, Params) when
+    is_map(Config) andalso is_binary(Tarball) andalso is_list(Params)
+->
+    QueryString = r3_hex_api:encode_query_string([
+        {replace, proplists:get_value(replace, Params, false)}
+    ]),
     Path = r3_hex_api:join_path_segments(r3_hex_api:build_repository_path(Config, ["publish"])),
     PathWithQuery = <<Path/binary, "?", QueryString/binary>>,
     TarballContentType = "application/octet-stream",
@@ -144,7 +145,9 @@ delete(Config, Name, Version) when is_map(Config) and is_binary(Name) and is_bin
 %% '''
 %% @end
 -spec retire(r3_hex_core:config(), binary(), binary(), retirement_params()) -> r3_hex_api:response().
-retire(Config, Name, Version, Params) when is_map(Config) and is_binary(Name) and is_binary(Version) ->
+retire(Config, Name, Version, Params) when
+    is_map(Config) and is_binary(Name) and is_binary(Version)
+->
     Path = r3_hex_api:build_repository_path(Config, ["packages", Name, "releases", Version, "retire"]),
     r3_hex_api:post(Config, Path, Params).
 
@@ -167,6 +170,7 @@ unretire(Config, Name, Version) when is_map(Config) and is_binary(Name) and is_b
 %% Internal functions
 %%====================================================================
 
+%% @private
 put_header(Name, Value, Config) ->
     Headers = maps:get(http_headers, Config, #{}),
     Headers2 = maps:put(Name, Value, Headers),

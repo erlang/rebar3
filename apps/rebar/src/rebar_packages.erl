@@ -246,7 +246,8 @@ update_package(Name, RepoConfig=#{name := Repo}, State) ->
     ?DEBUG("Getting definition for package ~ts from repo ~ts",
            [Name, rebar_hex_repos:format_repo(RepoConfig)]),
     try r3_hex_repo:get_package(get_package_repo_config(RepoConfig), Name) of
-        {ok, {200, _Headers, Releases}} ->
+        {ok, {200, _Headers, Package}} ->
+            #{releases := Releases} = Package,
             _ = insert_releases(Name, Releases, Repo, ?PACKAGE_TABLE),
             {ok, RegistryDir} = rebar_packages:registry_dir(State),
             PackageIndex = filename:join(RegistryDir, ?INDEX_FILE),

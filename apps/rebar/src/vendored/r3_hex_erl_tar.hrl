@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.7.1, do not edit manually
+%% Vendored from hex_core v0.10.1, do not edit manually
 
 % Copied from https://github.com/erlang/otp/blob/OTP-20.0.1/lib/stdlib/src/erl_tar.hrl
 
@@ -36,7 +36,7 @@
 %% Options used when reading a tar archive.
 -record(read_opts, {
           cwd                    :: string(),  %% Current working directory.
-          keep_old_files = false :: boolean(), %% Overwrite or not.
+          keep_old_files = false :: boolean(), %% Owerwrite or not.
           files = all,                         %% Set of files to extract (or all)
           output = file :: 'file' | 'memory',
           open_mode = [],                      %% Open mode options.
@@ -202,7 +202,7 @@
 %% These constants (except S_IFMT) are
 %% used to determine what type of device
 %% a file is. Namely, `S_IFMT band file_info.mode`
-%% will equal one of these constants, and tells us
+%% will equal one of these contants, and tells us
 %% which type it is. The stdlib file_info record
 %% does not differentiate between device types, and
 %% will not allow us to differentiate between sockets

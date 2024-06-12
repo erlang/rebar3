@@ -1,5 +1,7 @@
-%% Vendored from hex_core v0.7.1, do not edit manually
+%% Vendored from hex_core v0.10.1, do not edit manually
 
+%% @doc
+%% Hex HTTP API - Keys.
 -module(r3_hex_api_key).
 -export([
     list/1,
@@ -11,16 +13,7 @@
 
 -export_type([permission/0]).
 
--type permission() :: api_permission() | repo_permission() | repos_permission().
--ifdef(OTP_19).
--type api_permission() :: #{domain := api, resource => read | write}.
--type repo_permission() :: #{domain := repository, resource := binary()}.
--type repos_permission() :: #{domain := repositories}.
--else.
--type api_permission() :: #{domain => api, resource => read | write}.
--type repo_permission() :: #{domain => repository, resource => binary()}.
--type repos_permission() :: #{domain => repositories}.
--endif.
+-type permission() :: #{binary() := binary()}.
 
 %% @doc
 %% Lists the user's or organization's API and repository keys.
@@ -78,6 +71,12 @@ get(Config, Name) when is_map(Config) and is_binary(Name) ->
 
 %% @doc
 %% Adds a new API or repository key.
+%%
+%% A permission is a map of `#{<<"domain">> => Domain, <<"resource"> => Resource}'.
+%%
+%% Valid `Domain' values: `<<"api">> | <<"repository">> | <<"repositories">>'.
+%%
+%% Valid `Resource' values: `<<"read">> | <<"write">>'.
 %%
 %% Examples:
 %%
