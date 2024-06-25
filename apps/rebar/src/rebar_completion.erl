@@ -2,7 +2,7 @@
 
 -export([generate/2]).
 
--type arg_type() :: atom | binary | boolean | float | interger | string.
+-type arg_type() :: atom | binary | boolean | float | integer | string.
 
 -type cmpl_arg() :: #{short => char() | undefined,
                       long => string() | undefined,

@@ -290,7 +290,7 @@ build_root_extras(State, Apps) ->
                 [] ->
                     [];
                 VirtApps ->
-                    %% re-use the project-apps digraph?
+                    %% reuse the project-apps digraph?
                     run_compilers(State, [], VirtApps, project_apps)
             end
     end.

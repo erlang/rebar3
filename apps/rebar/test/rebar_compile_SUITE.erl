@@ -1549,7 +1549,7 @@ umbrella_mib_first_test(Config) ->
     catch (
     rebar_test_utils:run_and_check(Config, FailureRebarConfig, ["compile"], {ok, [{app, Name}]}) ),
 
-    %% check that the bin file was NOT cretated
+    %% check that the bin file was NOT created
     false = filelib:is_file(filename:join([PrivMibsDir, "AIMPORTER-MIB.bin"])),
 
 

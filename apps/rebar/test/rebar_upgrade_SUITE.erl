@@ -121,7 +121,7 @@ upgrades(top_a) ->
      [{"A", "1.0.0", [{"B", [{"D", "3.0.0", []}]},
                   {"C", [{"D", "2.0.0", []}]}]}
      ],
-     %% Modified apps, gobally
+     %% Modified apps, globally
      ["A","B","D"],
      %% upgrade vs. new tree
      {"A", [{"A","1.0.0"}, "B", "C", {"D","3.0.0"}]}};
@@ -134,7 +134,7 @@ upgrades(top_b) ->
      [{"A", "1.0.0", [{"B", [{"D", "3.0.0", []}]},
                   {"C", [{"D", "2.0.0", []}]}]}
      ],
-     %% Modified apps, gobally
+     %% Modified apps, globally
      ["A","B","D"],
      %% upgrade vs. new tree
      {"B", {error, {rebar_prv_upgrade, {transitive_dependency, <<"B">>}}}}};
@@ -147,7 +147,7 @@ upgrades(top_c) ->
      [{"A", "1.0.0", [{"B", [{"D", "3.0.0", []}]},
                   {"C", [{"D", "2.0.0", []}]}]}
      ],
-     %% Modified apps, gobally
+     %% Modified apps, globally
      ["A","B","D"],
      %% upgrade vs. new tree
      {"C", {error, {rebar_prv_upgrade, {transitive_dependency, <<"C">>}}}}};
@@ -160,7 +160,7 @@ upgrades(top_d1) ->
      [{"A", "1.0.0", [{"B", [{"D", "3.0.0", []}]},
                   {"C", [{"D", "2.0.0", []}]}]}
      ],
-     %% Modified apps, gobally
+     %% Modified apps, globally
      ["A","B","D"],
      %% upgrade vs. new tree
      {"D", {error, {rebar_prv_upgrade, {transitive_dependency, <<"D">>}}}}};
@@ -173,7 +173,7 @@ upgrades(top_d2) ->
      [{"A", "1.0.0", [{"B", [{"D", "3.0.0", []}]},
                   {"C", [{"D", "2.0.0", []}]}]}
      ],
-     %% Modified apps, gobally
+     %% Modified apps, globally
      ["A","B","D"],
      %% upgrade vs. new tree
      {"D", {error, {rebar_prv_upgrade, {transitive_dependency, <<"D">>}}}}};
@@ -186,7 +186,7 @@ upgrades(top_e) ->
      [{"A", "1.0.0", [{"B", [{"D", "3.0.0", []}]},
                   {"C", [{"D", "2.0.0", []}]}]}
      ],
-     %% Modified apps, gobally
+     %% Modified apps, globally
      ["A","B","D"],
      %% upgrade vs. new tree
      {"E", {error, {rebar_prv_upgrade, {unknown_dependency, <<"E">>}}}}};
