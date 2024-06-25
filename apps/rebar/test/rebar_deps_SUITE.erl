@@ -93,7 +93,7 @@ init_per_testcase(https_proxy_settings, Config) ->
                                            [{https_proxy, "http://localhost:1234"}
                                            ]),
             %% Add a bad value by default to show config overtakes default
-            os:putenv("https_proxy", "unparseable-garbage"),
+            os:putenv("https_proxy", "unparsable-garbage"),
             rebar_test_utils:init_rebar_state(Config)
     end;
 init_per_testcase(http_os_proxy_settings, Config) ->
