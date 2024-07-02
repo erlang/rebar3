@@ -25,7 +25,7 @@
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
 -module(rebar_utils).
-
+-deprecated({find_source, 3, "Instead, use filelib:find_source/3"}).
 -export([sort_deps/1,
          droplast/1,
          filtermap/2,
