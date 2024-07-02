@@ -9,7 +9,7 @@ suite() ->
     [].
 
 all() ->
-    [test_competion_gen, check_bash, check_zsh].
+    [test_completion_gen, check_bash, check_zsh].
 
 groups() ->
     [].
@@ -48,7 +48,7 @@ shell_available(Shell) ->
 
 %% test cases
 
-test_competion_gen(Config) ->
+test_completion_gen(Config) ->
     Shells = ?config(shells, Config),
     ComplFile = ?config(compl_file, Config),
     lists:foreach(fun(Shell) ->
