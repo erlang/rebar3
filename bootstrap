@@ -623,10 +623,7 @@ format_error(AbsSource, Extra, {Mod, Desc}) ->
     io_lib:format("~s: ~s~s~n", [AbsSource, Extra, ErrorDesc]).
 
 additional_defines() ->
-    [{d, D} || {Re, D} <- [{"^[0-9]+", namespaced_types},
-                           {"^(20)", fun_stacktrace},
-                           {"^(2)", rand_module}],
-               is_otp_release(Re)].
+    [{d, D} || {Re, D} <- [{"^[0-9]+", namespaced_types}], is_otp_release(Re)].
 
 is_otp_release(ArchRegex) ->
     case re:run(otp_release(), ArchRegex, [{capture, none}]) of
