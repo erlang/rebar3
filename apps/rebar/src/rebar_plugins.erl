@@ -78,7 +78,7 @@ install(State, AppInfo) ->
 filter_existing_plugins(Plugins, State) ->
     PluginNames = lists:zip(Plugins, rebar_state:deps_names(Plugins)),
     AllPlugins = rebar_state:all_plugin_deps(State),
-    lists:filtermap(fun({Plugin, PluginName}) ->
+    rebar_utils:filtermap(fun({Plugin, PluginName}) ->
                             case rebar_app_utils:find(PluginName, AllPlugins) of
                                 {ok, _} ->
                                     false;
