@@ -115,7 +115,7 @@ dependencies(Source, _SourceDir, Dirs, DepOpts) ->
             %% TODO: check for core transforms?
             {_MissIncl, _MissInclLib} =/= {[],[]} andalso
             ?DIAGNOSTIC("Missing: ~p", [{_MissIncl, _MissInclLib}]),
-            lists:filtermap(
+            rebar_utils:filtermap(
                 fun (Mod) -> rebar_compiler_epp:resolve_source(Mod, Dirs) end,
                 OptPTrans ++ PTrans ++ Behaviours) ++ AbsIncls
     catch

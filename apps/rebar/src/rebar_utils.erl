@@ -105,22 +105,13 @@ sort_deps(Deps) ->
 droplast(L) ->
     lists:reverse(tl(lists:reverse(L))).
 
-%% @doc filtermap takes in a function that is either or both
-%% a predicate and a map, and returns the matching and valid elements.
+%% @doc wrapper around lists:filtermap/2
 -spec filtermap(F, [In]) -> [Out] when
       F :: fun((In) -> boolean() | {true, Out}),
       In :: term(),
       Out :: term().
-filtermap(F, [Hd|Tail]) ->
-    case F(Hd) of
-        true ->
-            [Hd|filtermap(F, Tail)];
-        {true,Val} ->
-            [Val|filtermap(F, Tail)];
-        false ->
-            filtermap(F, Tail)
-    end;
-filtermap(F, []) when is_function(F, 1) -> [].
+filtermap(F, In) ->
+    lists:filtermap(F, In).
 
 is_arch(ArchRegex) ->
     case re:run(get_arch(), ArchRegex, [{capture, none}, unicode]) of
