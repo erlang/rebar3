@@ -16,18 +16,19 @@
 -define(NAMESPACE, experimental).
 -define(DEFAULT_FORMAT, erlang).
 
--type extension() :: string().
 -type app_context() :: #{name := binary(),
-                         src_dirs := [file:filename()],
-                         include_dirs := [file:filename()],
-                         src_ext := extension(),
-                         out_mappings := [#{extension := extension(),
-                                            path := file:filename()}],
-                         dependencies_opts => any()}.
+                         dir => file:filename_all(),
+                         ebin => file:filename_all(),
+                         src_dirs := [file:filename_all()],
+                         extra_src_dirs := [file:filename_all()],
+                         include_dirs := [file:filename_all()],
+                         macros => [macro()],
+                         parse_transforms => [any()]}.
+-type macro() :: atom() | {atom(), any()}.
 -type manifest() :: #{ apps := [app_context()],
                        deps := [app_context()],
-                       otp_lib_dir := file:filename(),
-                       source_root := file:filename()}.
+                       otp_lib_dir := file:filename_all(),
+                       source_root := file:filename_all()}.
 
 -type format() :: erlang | eetf.
 
@@ -102,8 +103,8 @@ get_manifest(State) ->
     DepApps = rebar_state:all_deps(State),
     #{apps => [adapt_context(App) || App <- ProjectApps, is_supported(App)],
       deps => [adapt_context(App) || App <- DepApps, is_supported(App)],
-      otp_lib_dir => code:lib_dir(),
-      source_root => rebar_state:dir(State)}.
+      otp_lib_dir => to_binary(code:lib_dir()),
+      source_root => to_binary(rebar_state:dir(State))}.
 
 -spec is_supported(rebar_app_info:t()) -> boolean().
 is_supported(App) ->
@@ -112,11 +113,25 @@ is_supported(App) ->
 
 -spec adapt_context(rebar_app_info:t()) -> app_context().
 adapt_context(App) ->
-    Context0 = rebar_compiler_erl:context(App),
-    Context1 = maps:put(name, rebar_app_info:name(App), Context0),
-    OutMappings = [#{extension => Extension, path => Path} ||
-                      {Extension, Path} <- maps:get(out_mappings, Context1)],
-    maps:put(out_mappings, OutMappings, Context1).
+    Context = rebar_compiler_erl:context(App),
+    #{src_dirs := SrcDirs,
+      include_dirs := IncludeDirs,
+      dependencies_opts := DependenciesOpts} = Context,
+    Name = rebar_app_info:name(App),
+    Dir = rebar_app_info:dir(App),
+    EbinDir = rebar_app_info:ebin_dir(App),
+    RebarOpts = rebar_app_info:opts(App),
+    ExtraSrcDirs = rebar_dir:extra_src_dirs(RebarOpts),
+    Macros = proplists:get_value(macros, DependenciesOpts),
+    ParseTransforms = proplists:get_value(parse_transforms, DependenciesOpts),
+    #{name => Name,
+      dir => to_binary(Dir),
+      ebin => to_binary(EbinDir),
+      src_dirs => [to_binary(D) || D <- SrcDirs],
+      extra_src_dirs => [to_binary(D) || D <- ExtraSrcDirs],
+      include_dirs => [to_binary(D) || D <- IncludeDirs],
+      macros => Macros,
+      parse_transforms => ParseTransforms}.
 
 -spec output_manifest(binary(), format(), string() | undefined) -> ok | {error, term()}.
 output_manifest(Manifest, Format, undefined) ->
@@ -138,3 +153,7 @@ format(Manifest, erlang) ->
     {ok, unicode:characters_to_binary(io_lib:format("~p.", [Manifest]))};
 format(_Manifest, Format) ->
     {error, {format_not_supported, Format}}.
+
+-spec to_binary(file:filename()) -> file:filename_all().
+to_binary(Path) ->
+    unicode:characters_to_binary(Path).
