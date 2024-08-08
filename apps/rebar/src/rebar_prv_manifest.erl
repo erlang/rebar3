@@ -8,13 +8,14 @@
 
 -export([init/1,
          do/1,
-         format_error/1]).
+         format_error/1,
+         is_json_available/0]).
 
 -include_lib("providers/include/providers.hrl").
 
 -define(PROVIDER, manifest).
 -define(NAMESPACE, experimental).
--define(DEFAULT_FORMAT, erlang).
+-define(DEFAULT_FORMAT, json).
 
 -type app_context() :: #{name := binary(),
                          dir => file:filename_all(),
@@ -24,13 +25,13 @@
                          include_dirs := [file:filename_all()],
                          macros => [macro()],
                          parse_transforms => [any()]}.
--type macro() :: atom() | {atom(), any()}.
+-type macro() :: #{key := atom(), value => any()}.
 -type manifest() :: #{ apps := [app_context()],
                        deps := [app_context()],
                        otp_lib_dir := file:filename_all(),
                        source_root := file:filename_all()}.
 
--type format() :: erlang | eetf.
+-type format() :: erlang | eetf | json.
 
 %% ===================================================================
 %% Public API
@@ -73,6 +74,8 @@ do(State) ->
 -spec format_error(any()) -> iolist().
 format_error({format_not_supported, Format}) ->
     io_lib:format("Format '~p' is not supported. Try 'erlang' or 'eetf'.", [Format]);
+format_error(no_json_module) ->
+    io_lib:format("The 'json' module is not available. Either upgrade to OTP 27 or use a different format.", []);
 format_error({output_error, To, Error}) ->
     io_lib:format("Could not output manifest to ~p (~p)", [To, Error]);
 format_error(Reason) ->
@@ -93,7 +96,7 @@ desc() ->
 options() ->
     [{format, $f, "format", {atom, ?DEFAULT_FORMAT},
       "Format for the manifest. "
-      "Supported formats are: erlang, eetf (Erlang External Binary Format)"},
+      "Supported formats are: erlang, eetf (Erlang External Binary Format), json"},
      {to, $t, "to", {string, undefined},
       "If specified, write the manifest to file"}].
 
@@ -130,30 +133,54 @@ adapt_context(App) ->
       src_dirs => [to_binary(D) || D <- SrcDirs],
       extra_src_dirs => [to_binary(D) || D <- ExtraSrcDirs],
       include_dirs => [to_binary(D) || D <- IncludeDirs],
-      macros => Macros,
+      macros => [to_macro(M) || M <- Macros],
       parse_transforms => ParseTransforms}.
 
 -spec output_manifest(binary(), format(), string() | undefined) -> ok | {error, term()}.
 output_manifest(Manifest, Format, undefined) ->
     rebar_log:log(info, "Writing manifest to stdout:~n", []),
     case Format of
-      erlang ->
-        io:fwrite("~ts~n", [Manifest]);
-      eetf ->
-        io:fwrite("~s~n", [Manifest])
+        eetf ->
+            io:fwrite("~s~n", [Manifest]);
+        _ ->
+            io:fwrite("~ts~n", [Manifest])
     end;
 output_manifest(Manifest, _Format, File) ->
     rebar_log:log(info, "Build info written to: ~ts~n", [File]),
     file:write_file(File, Manifest).
 
--spec format(manifest(), format()) -> {ok, binary()} | {error, {format_not_supported, term()}}.
+-spec format(manifest(), format()) -> {ok, binary()} | {error, {format_not_supported, term()} | no_json_module}.
 format(Manifest, eetf) ->
     {ok, term_to_binary(Manifest)};
 format(Manifest, erlang) ->
     {ok, unicode:characters_to_binary(io_lib:format("~p.", [Manifest]))};
+format(Manifest, json) ->
+    case is_json_available() of
+        true ->
+            Encoded = erlang:apply(json, encode, [Manifest]),
+            {ok, Encoded};
+        false ->
+            {error, no_json_module}
+    end;
 format(_Manifest, Format) ->
     {error, {format_not_supported, Format}}.
 
 -spec to_binary(file:filename()) -> file:filename_all().
 to_binary(Path) ->
     unicode:characters_to_binary(Path).
+
+-spec to_macro(atom() | {atom() | any()}) -> macro().
+to_macro({Key, Value}) when is_atom(Key) ->
+    #{key => Key, value => Value};
+to_macro(Key) when is_atom(Key) ->
+    #{key => Key, value => true}.
+
+-spec is_json_available() -> boolean().
+is_json_available() ->
+    % Requires OTP 27
+    case code:ensure_loaded(json) of
+        {module, _} ->
+            true;
+        {error, _} ->
+            false
+    end.
