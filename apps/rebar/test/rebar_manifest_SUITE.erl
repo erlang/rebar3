@@ -6,6 +6,7 @@
          basic_check/1,
          write_to_file_erlang/1,
          write_to_file_eetf/1,
+         write_to_file_json/1,
          non_supported_format/1]).
 
 -include_lib("common_test/include/ct.hrl").
@@ -16,6 +17,7 @@
 all() -> [basic_check,
           write_to_file_erlang,
           write_to_file_eetf,
+          write_to_file_json,
           non_supported_format].
 
 init_per_testcase(Case, Config0) ->
@@ -33,16 +35,23 @@ end_per_testcase(_, Config) ->
     Config.
 
 basic_check(Config) ->
-    rebar_test_utils:run_and_check(Config, [],
-                                   [?NAMESPACE, "manifest"],
-                                   {ok, []}).
+    case rebar_prv_manifest:is_json_available() of
+        true ->
+            rebar_test_utils:run_and_check(Config, [],
+                                           [?NAMESPACE, "manifest"],
+                                           {ok, []});
+        false ->
+            rebar_test_utils:run_and_check(Config, [],
+                                           [?NAMESPACE, "manifest"],
+                                           {error, {rebar_prv_manifest, no_json_module}})
+    end.
 
 write_to_file_erlang(Config) ->
     AppName = proplists:get_value(name, Config),
     PrivDir = proplists:get_value(priv_dir, Config),
     FilePath = filename:join([PrivDir, "manifest"]),
     rebar_test_utils:run_and_check(Config, [],
-                                   [?NAMESPACE, "manifest", "--to", FilePath],
+                                   [?NAMESPACE, "manifest", "--to", FilePath, "--format", "erlang"],
                                    {ok, []}),
     {ok, [Manifest]} = file:consult(FilePath),
     ?assertMatch(#{deps := [], apps := [#{name := AppName}]}, Manifest).
@@ -57,6 +66,24 @@ write_to_file_eetf(Config) ->
     {ok, Content} = file:read_file(FilePath),
     Manifest = binary_to_term(Content),
     ?assertMatch(#{deps := [], apps := [#{name := AppName}]}, Manifest).
+
+write_to_file_json(Config) ->
+    AppName = proplists:get_value(name, Config),
+    PrivDir = proplists:get_value(priv_dir, Config),
+    FilePath = filename:join([PrivDir, "manifest"]),
+    case rebar_prv_manifest:is_json_available() of
+        true ->
+            rebar_test_utils:run_and_check(Config, [],
+                                           [?NAMESPACE, "manifest", "--to", FilePath],
+                                           {ok, []}),
+            {ok, Content} = file:read_file(FilePath),
+            Manifest = erlang:apply(json, decode, [Content]),
+            ?assertMatch(#{<<"deps">> := [], <<"apps">> := [#{<<"name">> := AppName}]}, Manifest);
+       false ->
+           rebar_test_utils:run_and_check(Config, [],
+                                          [?NAMESPACE, "manifest", "--to", FilePath, "--format", "json"],
+                                          {error, {rebar_prv_manifest, no_json_module}})
+    end.
 
 non_supported_format(Config) ->
     PrivDir = proplists:get_value(priv_dir, Config),
