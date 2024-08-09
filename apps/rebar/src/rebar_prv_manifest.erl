@@ -75,7 +75,7 @@ do(State) ->
 format_error({format_not_supported, Format}) ->
     io_lib:format("Format '~p' is not supported. Try 'erlang' or 'eetf'.", [Format]);
 format_error(no_json_module) ->
-    io_lib:format("The 'json' module is not available. Either upgrade to OTP 27 or use a different format.", []);
+    io_lib:format("The 'json' module is not available. Either upgrade to OTP 27 or newer, or select a different output format.", []);
 format_error({output_error, To, Error}) ->
     io_lib:format("Could not output manifest to ~p (~p)", [To, Error]);
 format_error(Reason) ->
