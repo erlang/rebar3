@@ -1,6 +1,6 @@
 {application,relx,
              [{description,"Release assembler for Erlang/OTP Releases"},
-              {vsn,"4.9.0"},
+              {vsn,"4.10.0"},
               {modules,[]},
               {registered,[]},
               {applications,[kernel,stdlib,bbmustache,sasl,tools]},
