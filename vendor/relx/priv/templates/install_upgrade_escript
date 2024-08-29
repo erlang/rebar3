@@ -2,6 +2,7 @@
 %%! -noinput
 %% -*- mode: erlang;erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ft=erlang ts=4 sw=4 et
+-mode(interpret).
 
 -define(TIMEOUT, 300000).
 -define(INFO(Fmt,Args), io:format(Fmt,Args)).

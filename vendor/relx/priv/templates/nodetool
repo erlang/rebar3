@@ -10,6 +10,7 @@
 %% relx when OTP-23 becomes the earliest support version of OTP.
 %%
 %% -------------------------------------------------------------------
+-mode(interpret).
 
 main(Args) ->
     %% Extract the args
