@@ -246,7 +246,9 @@ read_file(Prefix, Filename, Dir) ->
     FilePath = filename:join(Dir, Filename),
     {ok, FileInfo0} = file:read_file_info(FilePath),
     DateTime = {{1970, 1, 1}, {0, 0, 1}},
-    FileInfo = FileInfo0#file_info{mtime = DateTime},
+    FileInfo = FileInfo0#file_info{atime = DateTime,
+                                   ctime = DateTime,
+                                   mtime = DateTime},
     [dir_entries(filename:dirname(Filename1)),
      {Filename1, file_contents(FilePath), FileInfo}].
 
