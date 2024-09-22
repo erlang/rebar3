@@ -38,10 +38,10 @@ do(State) ->
     EdocOpts = rebar_state:get(State, edoc_opts, []),
     ShouldAccPaths = not has_configured_paths(EdocOpts),
     Cwd = rebar_state:dir(State),
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
+    State1 = rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
     Res = try
         lists:foldl(fun(AppInfo, EdocOptsAcc) ->
-                    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, AppInfo, State),
+                    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, AppInfo, State1),
                     AppName = rebar_utils:to_list(rebar_app_info:name(AppInfo)),
                     ?INFO("Running edoc for ~ts", [AppName]),
                     AppDir = rebar_app_info:dir(AppInfo),
@@ -50,7 +50,7 @@ do(State) ->
                     AppEdocOpts = merge_opts(rebar_opts:get(AppOpts, edoc_opts, []), EdocOptsAcc),
                     ?DEBUG("{edoc_opts, ~p}.", [AppEdocOpts]),
                     AppRes = (catch edoc:application(list_to_atom(AppName), AppDir, AppEdocOpts)),
-                    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, AppInfo, State),
+                    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, AppInfo, State1),
                     case {AppRes, ShouldAccPaths} of
                         {ok, true} ->
                             %% edoc wants / on all OSes
@@ -67,13 +67,13 @@ do(State) ->
         {app_failed, AppName} ->
             {app_failed, AppName}
     end,
-    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State),
-    rebar_paths:set_paths([plugins, deps], State),
+    State2 = rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State1),
+    rebar_paths:set_paths([plugins, deps], State2),
     case Res of
         {app_failed, App} ->
             ?PRV_ERROR({app_failed, App});
         _ ->
-            {ok, State}
+            {ok, State2}
     end.
 
 -spec format_error(any()) -> iolist().
