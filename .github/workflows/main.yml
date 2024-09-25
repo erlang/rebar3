@@ -19,7 +19,7 @@ jobs:
       image: erlang:${{ matrix.otp_version }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Compile
       run: ./bootstrap
     - name: CT tests
@@ -36,7 +36,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Brew Version Check
       run: brew --version
     - name: Brew Cleanup
@@ -52,9 +52,7 @@ jobs:
     - name: Debug Brew
       run: brew doctor || true
     - name: Install Erlang
-      #run: brew install erlang@${{ env.LATEST_OTP_RELEASE }}
-      # fall back to OTP-26 since OTP 27.0 doesn't build on homebrew due to manpages issues
-      run: brew install erlang@26
+      run: brew install erlang@${{ env.LATEST_OTP_RELEASE }}
     - name: Compile
       run: ./bootstrap
     - name: CT tests
@@ -65,7 +63,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Install Erlang
       run: choco install erlang
     - name: Compile
