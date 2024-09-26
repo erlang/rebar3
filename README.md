@@ -59,7 +59,7 @@ This list presents the known working version combos between Rebar3 and
 Erlang/OTP. Always use the latest version your project can tolerate for latest
 security fixes.
 
-| Rebar3 | OTP Support Range | Notes
+| Rebar3 | Erlang/OTP Support Range | Notes
 |-       |-      | -
 | 3.24.0 | 25-27 |
 | 3.23.0 | 25-27 |
