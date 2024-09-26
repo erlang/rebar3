@@ -56,7 +56,7 @@ best experience you can get.
 ### Compatibility between Rebar3 and Erlang/OTP
 
 This list presents the known working version combos between Rebar3 and
-Erlang/OTP. Always use the latest version you project can tolerate for latest
+Erlang/OTP. Always use the latest version your project can tolerate for latest
 security fixes.
 
 | Rebar3 | OTP Support Range | Notes
