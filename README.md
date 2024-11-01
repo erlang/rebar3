@@ -53,6 +53,27 @@ best experience you can get.
 
 ## Getting Started
 
+### Compatibility between Rebar3 and Erlang/OTP
+
+This list presents the known working version combos between Rebar3 and
+Erlang/OTP. Always use the latest version your project can tolerate for latest
+security fixes.
+
+| Rebar3 | Erlang/OTP Support Range | Notes
+|-       |-      | -
+| 3.24.0 | 25-27 |
+| 3.23.0 | 25-27 |
+| 3.22.1 | 25-27 |
+| 3.21.0 | 24-26 |
+| 3.20.0 | 23-25 |
+| 3.19.0 | 23-25 |
+| 3.18.0 | 22-24 |
+| 3.17.0 | 22-24 |
+| 3.16.1 | 22-24 | Don't use 3.16.0, see https://ferd.ca/you-ve-got-to-upgrade-rebar3.html
+| 3.15.2 | 19-23 | Don't use 3.15.0 or 3.15.1, see https://ferd.ca/you-ve-got-to-upgrade-rebar3.html
+| 3.14.1 | 19-23 | 
+| 3.13.3 | 19-22 | Don't use 3.13.1 or 3.13.2, see https://ferd.ca/you-ve-got-to-upgrade-rebar3.html
+
 A [getting started guide is maintained on the official documentation website](https://rebar3.org/docs/getting-started),
 but installing rebar3 can be done by any of the ways described below
 
@@ -167,4 +188,3 @@ General rebar community resources and links can be found at
 [rebar3.org/docs/about/about-us/#community](https://rebar3.org/docs/about/about-us/#community)
 
 To contribute to rebar3, please refer to [CONTRIBUTING](CONTRIBUTING.md).
-
