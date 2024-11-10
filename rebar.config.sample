@@ -103,7 +103,7 @@
      {git, "https://github.com/rebar/rebar.git", {ref, "7f73b8d6"}}},
     {rebar,           % mercurial is also supported
      {hg, "https://github.com/rebar/rebar.git", {tag, "1.0.0"}}},
-   {rebar,           % git, over HTTPS, from a sub-directory
+    {rebar,           % git, over HTTPS, from a sub-directory
      {git_subdir, "https://github.com/rebar/rebar.git", {branch, "main"}, "subdir"}},
     {rebar,           % git, tag, from a sub-directory
      {git_subdir, "https://github.com/rebar/rebar.git", {tag, "1.0.0"}, "sub/dir"}},
