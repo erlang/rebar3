@@ -87,8 +87,12 @@
 %% type, location and revision).
 %% Rebar3 currently supports git and hg
 {deps, [
-    app_name,         % latest version of package
+    rebar,            % latest version of package
     {rebar, "1.0.0"}, % version 1.0.0 of a package
+    {rebar,           % app under a different pkg name
+     {pkg, rebar_fork}},
+    {rebar,           % versioned app under a different pkg name
+     "1.0.0", {pkg, rebar_fork}},
     {rebar,           % git, main branch of app, explicit
      {git, "git://github.com/rebar/rebar.git", {branch, "main"}}},
     {rebar,           % git, over HTTPS
@@ -99,6 +103,12 @@
      {git, "https://github.com/rebar/rebar.git", {ref, "7f73b8d6"}}},
     {rebar,           % mercurial is also supported
      {hg, "https://github.com/rebar/rebar.git", {tag, "1.0.0"}}},
+    {rebar,           % git, over HTTPS, from a sub-directory
+     {git_subdir, "https://github.com/rebar/rebar.git", {branch, "main"}, "subdir"}},
+    {rebar,           % git, tag, from a sub-directory
+     {git_subdir, "https://github.com/rebar/rebar.git", {tag, "1.0.0"}, "sub/dir"}},
+    {rebar,           % git, specific reference/hash, from a sub-directory
+     {git_subdir, "https://github.com/rebar/rebar.git", {ref, "7f73b8d6"}, "dir"}},
     %% Alternative formats, backwards compatible declarations
     {rebar,           % default branch, will warn recommending explicit branch
      {git, "git://github.com/rebar/rebar.git"}},
