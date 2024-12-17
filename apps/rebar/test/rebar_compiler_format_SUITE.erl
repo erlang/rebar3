@@ -18,8 +18,10 @@ init_per_testcase(_, Config) ->
     application:set_env(cf, colour_term, cf_term:has_color("dumb")),
     FileName = filename:join(?config(priv_dir, Config), "oracle.erl"),
     ok = file:write_file(FileName, oracle()),
+    EmptyFileName = filename:join(?config(priv_dir, Config), "empty.erl"),
+    ok = file:write_file(EmptyFileName, ""),
     Conf = dict:from_list([{compiler_error_format, rich}]),
-    [{conf, Conf}, {file, FileName}, {term, OriginalTerm} | Config].
+    [{conf, Conf}, {file, FileName}, {empty_file, EmptyFileName}, {term, OriginalTerm} | Config].
 
 end_per_testcase(_, Config) ->
     case ?config(term, Config) of
@@ -65,6 +67,7 @@ nocolor() ->
     [{doc, "testing all sorts of planned output"}].
 nocolor(Config) ->
     Path = ?config(file, Config),
+    EmptyPath = ?config(empty_file, Config),
     Conf = ?config(conf, Config),
     ?assertEqual("   ┌─ "++Path++":"++?EOL++
                  "   │"++?EOL++
@@ -90,5 +93,8 @@ nocolor(Config) ->
                  rebar_compiler_format:format(Path, {855,1}, "", "invalid ranges.", Conf)),
     ?assertEqual("/very/fake/path.oof:1:1: unknown file."++?EOL,
                  rebar_compiler_format:format("/very/fake/path.oof", {1,1}, "", "unknown file.", Conf)),
+    %% empty file
+    ?assertEqual(EmptyPath++":1:1: should fallback to the minimal output"++?EOL,
+             rebar_compiler_format:format(EmptyPath, {1,1}, "", "should fallback to the minimal output", Conf)),
     ok.
 

@@ -29,13 +29,21 @@ format(Source, {Line, Column}, Extra, Desc, Config) ->
     end.
 
 find_line(Nth, Source) ->
-  try
-      {ok, Bin} = file:read_file(Source),
-      Splits = re:split(Bin, "(?:\n|\r\n|\r)", [{newline, anycrlf}]),
-      {ok, lists:nth(Nth, Splits)}
-  catch
-      error:X -> {error, X}
-  end.
+    try do_find_line(Nth, Source)
+    catch
+        error:X -> {error, X}
+    end.
+
+do_find_line(Nth, Source) ->
+    case file:read_file(Source) of
+        {ok, <<>>} ->
+            {error, empty_file};
+        {ok, Bin} ->
+            Splits = re:split(Bin, "(?:\n|\r\n|\r)", [{newline, anycrlf}]),
+            {ok, lists:nth(Nth, Splits)};
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
 indent(0, _) -> "";
 indent(N, <<"\t", Rest/binary>>) -> [$\t | indent(N-1, Rest)];
