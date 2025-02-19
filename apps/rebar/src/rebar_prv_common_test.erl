@@ -430,20 +430,20 @@ inject_ct_state(State, {ok, Tests}) ->
 inject_ct_state(State, Tests, [App|Rest], Acc) ->
     case inject(rebar_app_info:opts(App), State, Tests) of
         {error, _} = Error -> Error;
-        NewOpts            ->
+        {ok, NewOpts}      ->
             NewApp = rebar_app_info:opts(App, NewOpts),
             inject_ct_state(State, Tests, Rest, [NewApp|Acc])
     end;
 inject_ct_state(State, Tests, [], Acc) ->
     case inject(rebar_state:opts(State), State, Tests) of
         {error, _} = Error -> Error;
-        NewOpts            ->
+        {ok, NewOpts}      ->
           {ok, {rebar_state:opts(State, NewOpts), lists:reverse(Acc)}}
     end.
 
 opts(Opts, Key, Default) ->
     case rebar_opts:get(Opts, Key, Default) of
-        Vs when is_list(Vs) -> Vs;
+        Vs when is_list(Vs) -> {ok, Vs};
         Wrong ->
             ?PRV_ERROR({badconfig, {"Value `~p' of option `~p' must be a list", {Wrong, Key}}})
     end.
@@ -454,18 +454,18 @@ erl_opts(Opts, State, Tests) ->
     %% append `ct_compile_opts` to app defined `erl_opts`
     ErlOpts = opts(Opts, erl_opts, []),
     CTOpts = opts(Opts, ct_compile_opts, []),
-    case add_transforms(append(CTOpts, ErlOpts), State) of
+    case add_transforms(maybe_append(CTOpts, ErlOpts), State) of
         {error, _} = Error -> Error;
-        NewErlOpts         -> first_files(rebar_opts:set(Opts, erl_opts, NewErlOpts), Tests)
+        {ok, NewErlOpts}   -> first_files(rebar_opts:set(Opts, erl_opts, NewErlOpts), Tests)
     end.
 
 first_files(Opts, Tests) ->
     %% append `ct_first_files` to app defined `erl_first_files`
     FirstFiles = opts(Opts, erl_first_files, []),
     CTFirstFiles = opts(Opts, ct_first_files, []),
-    case append(CTFirstFiles, FirstFiles) of
-        {error, _} = Error -> Error;
-        NewFirstFiles      -> include_files(rebar_opts:set(Opts, erl_first_files, NewFirstFiles), Tests)
+    case maybe_append(CTFirstFiles, FirstFiles) of
+        {error, _} = Error  -> Error;
+        {ok, NewFirstFiles} -> include_files(rebar_opts:set(Opts, erl_first_files, NewFirstFiles), Tests)
     end.
 
 include_files(Opts, Tests) ->
@@ -474,13 +474,13 @@ include_files(Opts, Tests) ->
     ErlOpts = opts(Opts, erl_opts, []),
     Includes = proplists:get_value(include, Tests, []),
     Is = lists:map(fun(I) -> {i, I} end, Includes),
-    case append(Is, ErlOpts) of
+    case maybe_append({ok, Is}, ErlOpts) of
         {error, _} = Error -> Error;
-        NewIncludes        -> ct_macro(rebar_opts:set(Opts, erl_opts, NewIncludes))
+        {ok, NewIncludes}  -> {ok, ct_macro(rebar_opts:set(Opts, erl_opts, NewIncludes))}
     end.
 
 ct_macro(Opts) ->
-    ErlOpts = opts(Opts, erl_opts, []),
+    {ok, ErlOpts} = opts(Opts, erl_opts, []),
     NewOpts = safe_define_ct_macro(ErlOpts),
     rebar_opts:set(Opts, erl_opts, NewOpts).
 
@@ -497,17 +497,17 @@ test_defined([{d, 'COMMON_TEST', true}|_]) -> true;
 test_defined([_|Rest]) -> test_defined(Rest);
 test_defined([]) -> false.
 
-append({error, _} = Error, _) -> Error;
-append(_, {error, _} = Error) -> Error;
-append(A, B) -> A ++ B.
+maybe_append({error, _} = Error, _) -> Error;
+maybe_append(_, {error, _} = Error) -> Error;
+maybe_append({ok, A}, {ok, B}) -> {ok, A ++ B}.
 
-add_transforms(CTOpts, State) when is_list(CTOpts) ->
+add_transforms({ok, CTOpts}, State) when is_list(CTOpts) ->
     case readable(State) of
         false ->
-            CTOpts;
+            {ok, CTOpts};
         Other when Other == true; Other == compact ->
             ReadableTransform = [{parse_transform, cth_readable_transform}],
-            (CTOpts -- ReadableTransform) ++ ReadableTransform
+            {ok, (CTOpts -- ReadableTransform) ++ ReadableTransform}
     end;
 add_transforms({error, _} = Error, _State) -> Error.
 

@@ -259,19 +259,19 @@ inject_eunit_state(_State, Error) -> Error.
 inject_eunit_state(State, [App|Rest], Acc) ->
     case inject(rebar_app_info:opts(App)) of
         {error, _} = Error -> Error;
-        NewOpts            ->
+        {ok, NewOpts}      ->
             NewApp = rebar_app_info:opts(App, NewOpts),
             inject_eunit_state(State, Rest, [NewApp|Acc])
     end;
 inject_eunit_state(State, [], Acc) ->
     case inject(rebar_state:opts(State)) of
         {error, _} = Error -> Error;
-        NewOpts            -> {ok, {rebar_state:opts(State, NewOpts), lists:reverse(Acc)}}
+        {ok, NewOpts}      -> {ok, {rebar_state:opts(State, NewOpts), lists:reverse(Acc)}}
     end.
 
 opts(Opts, Key, Default) ->
     case rebar_opts:get(Opts, Key, Default) of
-        Vs when is_list(Vs) -> Vs;
+        Vs when is_list(Vs) -> {ok, Vs};
         Wrong ->
             ?PRV_ERROR({badconfig, {"Value `~p' of option `~p' must be a list", {Wrong, Key}}})
     end.
@@ -282,22 +282,22 @@ erl_opts(Opts) ->
     %% append `eunit_compile_opts` to app defined `erl_opts`
     ErlOpts = opts(Opts, erl_opts, []),
     EUnitOpts = opts(Opts, eunit_compile_opts, []),
-    case append(EUnitOpts, ErlOpts) of
+    case maybe_append(EUnitOpts, ErlOpts) of
         {error, _} = Error -> Error;
-        NewErlOpts         -> first_files(rebar_opts:set(Opts, erl_opts, NewErlOpts))
+        {ok, NewErlOpts}   -> first_files(rebar_opts:set(Opts, erl_opts, NewErlOpts))
     end.
 
 first_files(Opts) ->
     %% append `eunit_first_files` to app defined `erl_first_files`
     FirstFiles = opts(Opts, erl_first_files, []),
     EUnitFirstFiles = opts(Opts, eunit_first_files, []),
-    case append(EUnitFirstFiles, FirstFiles) of
-        {error, _} = Error -> Error;
-        NewFirstFiles  -> eunit_macro(rebar_opts:set(Opts, erl_first_files, NewFirstFiles))
+    case maybe_append(EUnitFirstFiles, FirstFiles) of
+        {error, _} = Error   -> Error;
+        {ok, NewFirstFiles}  -> {ok, eunit_macro(rebar_opts:set(Opts, erl_first_files, NewFirstFiles))}
     end.
 
 eunit_macro(Opts) ->
-    ErlOpts = opts(Opts, erl_opts, []),
+    {ok, ErlOpts} = opts(Opts, erl_opts, []),
     NewOpts = safe_define_eunit_macro(ErlOpts),
     rebar_opts:set(Opts, erl_opts, NewOpts).
 
@@ -314,9 +314,9 @@ test_defined([{d, 'EUNIT', true}|_]) -> true;
 test_defined([_|Rest]) -> test_defined(Rest);
 test_defined([]) -> false.
 
-append({error, _} = Error, _) -> Error;
-append(_, {error, _} = Error) -> Error;
-append(A, B) -> A ++ B.
+maybe_append({error, _} = Error, _) -> Error;
+maybe_append(_, {error, _} = Error) -> Error;
+maybe_append({ok, A}, {ok, B}) -> {ok, A ++ B}.
 
 test_dirs(State, Apps, []) -> rebar_state:project_apps(State, Apps);
 test_dirs(State, Apps, [{dir, Dir}|Rest]) ->

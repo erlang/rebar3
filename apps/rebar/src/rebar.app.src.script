@@ -11,6 +11,7 @@
                   compiler,
                   crypto,
                   syntax_tools,
+                  parsetools,
                   tools,
                   eunit,
                   common_test,
