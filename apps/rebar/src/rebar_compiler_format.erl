@@ -79,6 +79,10 @@ compiler_error_format(Opts) ->
 colorize(Str, Col) ->
     Pre = string:slice(Str, 0, max(0,Col-1)),
     At = string:slice(Str, max(0,Col-1)),
-    [Bad | Tail] = [B || B <- re:split(At, "([^[A-Za-z0-9_#\"]+)", []),
-                         B =/= <<>>],
-    cf:format("~ts~!R~ts~!!~ts", [Pre,Bad,Tail]).
+    case [B || B <- re:split(At, "([^[A-Za-z0-9_#\"]+)", []),
+                         B =/= <<>>] of
+      [Bad |Tail] ->
+        cf:format("~ts~!R~ts~!!~ts", [Pre,Bad,Tail]);
+     [] ->
+        cf:format("~ts~n", [Str])
+   end.
