@@ -180,12 +180,66 @@ local_cache_dir(Dir) ->
 %% conversions and handling done to be cross-platform compatible.
 -spec get_cwd() -> file:filename_all().
 get_cwd() ->
-    {ok, Dir} = file:get_cwd(),
+    %% This is roughly the same as `pwd -L`: we want a normalized path but
+    %% without resolving symlinks, so we prefer the contents of the $PWD
+    %% environment variable if it expands to the CWD reported by getcwd(3)
+    %% (i.e. `file:get_cwd/0`).
+    {ok, CanonicalCwd} = file:get_cwd(),
+    Dir = case os:getenv("PWD") of
+              false ->
+                  CanonicalCwd;
+              Pwd ->
+                  case canonicalize(Pwd) of
+                      {ok, CanonicalCwd} ->
+                          Pwd;
+                      _ ->
+                          CanonicalCwd
+                  end
+          end,
     %% On windows cwd may return capital letter for drive,
     %% for example C:/foobar. But as said in http://www.erlang.org/doc/man/filename.html#join-1
     %% filename:join/1,2 anyway will convert drive-letter to lowercase, so we have to "internalize"
     %% cwd as soon as it possible.
     filename:join([Dir]).
+
+%% @private Recursively resolves symlinks for the given path.
+%% This function quits after following 20 symlinks in case the links form a
+%% loop.
+%% Adapted from: https://github.com/mk270/realpath/blob/d2630827d8fe7bb19b44bef24eb2e7fd02b306d5/src/realpath.erl#L35-L76.
+-spec canonicalize(file:filename()) -> {ok, file:filename()} | error.
+canonicalize(Path) ->
+    Segments = filename:split(Path),
+    canonicalize(Segments, [], 20).
+
+canonicalize([], CanonicalPath, _) ->
+    {ok, CanonicalPath};
+canonicalize(_, _, 0) ->
+    {error, too_many_symlinks};
+canonicalize([Segment | Rest], Parent, SymlinkBudget) ->
+    case follow_symlink(Parent, Segment) of
+        {ok, ResolvedPath} ->
+            Segments = filename:split(ResolvedPath) ++ Rest,
+            canonicalize(Segments, [], SymlinkBudget - 1);
+        error ->
+            Path = filename:join(Parent, Segment),
+            canonicalize(Rest, Path, SymlinkBudget)
+    end.
+
+follow_symlink(Dirname, Basename) ->
+    case file:read_link(filename:join(Dirname, Basename)) of
+        {ok, Destination} ->
+            case Destination of
+                [$/ | _] ->
+                    %% Absolute link.
+                    {ok, Destination};
+                _ ->
+                    %% Relative link.
+                    {ok, filename:join(Dirname, Destination)}
+            end;
+        _ ->
+            error
+    end.
+
 
 %% @doc returns the file location for the global template
 %% configuration variables file.
