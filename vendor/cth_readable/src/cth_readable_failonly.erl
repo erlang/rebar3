@@ -1,5 +1,13 @@
 -module(cth_readable_failonly).
 
+%% We use configuration patterns for older versions of Erlang/OTP
+%% that do not exist anymore in the modern versions scanned by
+%% Dialyzer, so turn off the warnings for those.
+%%
+%% Also we create an idle fun we know never returns, so turn
+%% that off too.
+-dialyzer([no_return]).
+
 -record(state, {id,
                 sasl_reset,
                 lager_reset,
@@ -109,11 +117,13 @@ init(Id, Opts) ->
             {ok, #state{id=Id, sasl_reset={reset, tty}, lager_reset=LagerReset,
                         handlers=[?MODULE], named=Named, has_logger=HasLogger}};
         {ok, tty} when HasLogger ->
-            logger:add_handler(?MODULE, ?MODULE, Cfg#{sasl => true, max_events => MaxEvents}),
+            SubCfg = maps:get(config, Cfg, #{}),
+            logger:add_handler(?MODULE, ?MODULE, Cfg#{config => SubCfg#{sasl => true, max_events => MaxEvents}}),
             {ok, #state{id=Id, lager_reset=LagerReset, handlers=[?MODULE],
                         named=Named, has_logger=HasLogger}};
         _ when HasLogger ->
-            logger:add_handler(?MODULE, ?MODULE, Cfg#{sasl => false, max_events => MaxEvents}),
+            SubCfg = maps:get(config, Cfg, #{}),
+            logger:add_handler(?MODULE, ?MODULE, Cfg#{config => SubCfg#{sasl => false, max_events => MaxEvents}}),
             {ok, #state{id=Id, lager_reset=LagerReset, handlers=[?MODULE],
                         named=Named, has_logger=HasLogger}};
         _ ->
@@ -309,7 +319,7 @@ flush(Buf, Cfg, ShowSASL, SASLType) ->
 
 
 %%%%%%%%%%%%%%%% LOGGER %%%%%%%%%%%%%%%%%%%
-adding_handler(Config = #{sasl := SASL, max_events := MaxEvents}) ->
+adding_handler(Config = #{config := #{sasl := SASL, max_events := MaxEvents}}) ->
     {ok, Pid} = gen_event:start({local, cth_readable_logger}, []),
     gen_event:add_handler(cth_readable_logger, ?MODULE, [{sasl, SASL}, {max_events, MaxEvents}]),
     {ok, Config#{cth_readable_logger => Pid}}.
@@ -340,12 +350,8 @@ maybe_steal_logger_config() ->
         false ->
             #{};
         true ->
-            case logger:get_handler_config(default) of
-                {ok, {_,Cfg}} -> %% OTP-21.0-rc2 result
-                    maps:with([formatter], Cfg); % only keep the essential
-                 {ok, Cfg} -> %% OTP-21.0 result
-                    maps:with([formatter], Cfg) % only keep the essential
-            end
+            {ok, Cfg} = logger:get_handler_config(default),
+            maps:with([formatter], Cfg) % only keep the essential
     end.
 
 sasl_running() ->
