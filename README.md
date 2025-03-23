@@ -1,6 +1,7 @@
 # Rebar3
 
-[![Build Status](https://github.com/erlang/rebar3/workflows/Common%20Test/badge.svg)](https://github.com/erlang/rebar3/actions) 
+[![Build Status](https://github.com/erlang/rebar3/workflows/Common%20Test/badge.svg)](https://github.com/erlang/rebar3/actions)
+[![License](https://img.shields.io/github/license/erlang/rebar3)](https://github.com/erlang/rebar3/blob/main/LICENSE)
 [![Erlang Versions](https://img.shields.io/badge/Supported%20Erlang%2FOTP-25.0%20to%2027.0-blue)](http://www.erlang.org)
 
 1. [What is Rebar3?](#what-is-rebar3)
