@@ -710,8 +710,8 @@ maybe_read_file(EnvFile) ->
 replace_env_vars("") -> "";
 replace_env_vars("${" ++ Str) ->
     case until_var_end(Str) of
-        {ok, VarName, Rest} ->
-            replace_varname(VarName) ++ replace_env_vars(Rest);
+        {ok, VarName, Default, Rest} ->
+            replace_varname(VarName, Default) ++ replace_env_vars(Rest);
         error ->
             "${" ++ replace_env_vars(Str)
     end;
@@ -719,19 +719,22 @@ replace_env_vars([Char|Str]) ->
     [Char | replace_env_vars(Str)].
 
 until_var_end(Str) ->
-    case re:run(Str, "([a-zA-Z_]+[a-zA-Z0-9_]*)}", [{capture, [1], list}]) of
+    case re:run(Str, "([a-zA-Z_]+[a-zA-Z0-9_]*)(:-[^}]*)?}", [{capture, [1,2], list}]) of
         nomatch ->
             error;
-        {match, [Name]} ->
-            {ok, Name, drop_varname(Name, Str)}
+        {match, [Name,Default]} ->
+            %% the Default part will include the ":-" prefix if present
+            Rest = lists:nthtail(length(Name) + length(Default) + 1, Str),
+            {ok, Name, Default, Rest}
     end.
 
-replace_varname(Var) ->
+replace_varname(Var, Default) ->
     %% os:getenv(Var, "") is only available in OTP-18.0
     case os:getenv(Var) of
-        false -> "";
+        false ->
+            case Default of
+                ":-" ++ Val -> Val;
+                "" -> ""
+            end;
         Val -> Val
     end.
-
-drop_varname("", "}" ++ Str) -> Str;
-drop_varname([_|Var], [_|Str]) -> drop_varname(Var, Str).
