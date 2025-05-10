@@ -580,17 +580,8 @@ find_config(State) ->
         no_value ->
             no_config;
         Filename when is_list(Filename) ->
-            case is_src_config(Filename) of
-                false ->
-                    rebar_file_utils:consult_config(State, Filename);
-                true ->
-                    rebar_file_utils:consult_env_config(State, Filename)
-            end
+            rebar_file_utils:consult_any_config(State, Filename)
     end.
-
--spec is_src_config(file:filename()) -> boolean().
-is_src_config(Filename) ->
-    filename:extension(Filename) =:= ".src".
 
 -spec first_value([Fun], State) -> no_value | Value when
       Value :: any(),
