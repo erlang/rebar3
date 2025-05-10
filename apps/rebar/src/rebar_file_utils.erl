@@ -29,6 +29,7 @@
 -export([try_consult/1,
          consult_config/2,
          consult_env_config/2,
+         consult_any_config/2,
          consult_config_terms/2,
          format_error/1,
          symlink_or_copy/2,
@@ -84,6 +85,23 @@ consult_config(State, Filename) ->
     end,
     consult_config_terms(State, Config).
 
+%% @doc Reads a config file via consult_env_config/2 if the file name has
+%% the suffix `.src`, and with consult_config/2 otherwise
+-spec consult_any_config(rebar_state:t(), file:filename()) -> [[tuple()]].
+consult_any_config(State, Filename) ->
+    case is_src_config(Filename) of
+        false ->
+            consult_config(State, Filename);
+        true ->
+            consult_env_config(State, Filename)
+    end.
+
+-spec is_src_config(file:filename()) -> boolean().
+is_src_config(Filename) ->
+    filename:extension(Filename) =:= ".src".
+
+%% @doc Like consult_config/2 but expanding environment variables
+%% as for a sys.config.src file
 -spec consult_env_config(rebar_state:t(), file:filename()) -> [[tuple()]].
 consult_env_config(State, Filename) ->
     RawString = case file:read_file(Filename) of
