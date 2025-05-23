@@ -2,7 +2,7 @@
 
 [![Build Status](https://github.com/erlang/rebar3/workflows/Common%20Test/badge.svg)](https://github.com/erlang/rebar3/actions)
 [![License](https://img.shields.io/github/license/erlang/rebar3)](https://github.com/erlang/rebar3/blob/main/LICENSE)
-[![Erlang Versions](https://img.shields.io/badge/Supported%20Erlang%2FOTP-25.0%20to%2027.0-blue)](http://www.erlang.org)
+[![Erlang Versions](https://img.shields.io/badge/Supported%20Erlang%2FOTP-26.0%20to%2028.0-blue)](http://www.erlang.org)
 
 1. [What is Rebar3?](#what-is-rebar3)
 2. [Why Rebar3?](#why-rebar3)
@@ -63,6 +63,7 @@ security fixes.
 
 | Rebar3 | Erlang/OTP Support Range | Notes
 |-       |-      | -
+| 3.25.0 | 26-28 |
 | 3.24.0 | 25-27 |
 | 3.23.0 | 25-27 |
 | 3.22.1 | 25-27 |
@@ -73,7 +74,7 @@ security fixes.
 | 3.17.0 | 22-24 |
 | 3.16.1 | 22-24 | Don't use 3.16.0, see https://ferd.ca/you-ve-got-to-upgrade-rebar3.html
 | 3.15.2 | 19-23 | Don't use 3.15.0 or 3.15.1, see https://ferd.ca/you-ve-got-to-upgrade-rebar3.html
-| 3.14.1 | 19-23 | 
+| 3.14.1 | 19-23 |
 | 3.13.3 | 19-22 | Don't use 3.13.1 or 3.13.2, see https://ferd.ca/you-ve-got-to-upgrade-rebar3.html
 
 A [getting started guide is maintained on the official documentation website](https://rebar3.org/docs/getting-started),
