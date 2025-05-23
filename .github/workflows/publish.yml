@@ -11,7 +11,7 @@ permissions:
 jobs:
   build:
     name: Create release and publish escript for every new tag
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
