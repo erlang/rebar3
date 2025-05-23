@@ -42,14 +42,8 @@
          start/1
         ]).
 
--ifdef(namespaced_dicts).
--type euf_dict() :: dict:dict().
--else.
--type euf_dict() :: dict().
--endif.
-
 -record(state, {
-          status = dict:new() :: euf_dict(),
+          status = #{} :: map(),
           failures = [] :: [[pos_integer()]],
           skips = [] :: [[pos_integer()]],
           timings = binomial_heap:new() :: binomial_heap:binomial_heap(),
@@ -73,12 +67,12 @@ init(Options) ->
 
 handle_begin(group, Data, St) ->
     GID = proplists:get_value(id, Data),
-    Dict = St#state.status,
-    St#state{status=dict:store(GID, orddict:from_list([{type, group}|Data]), Dict)};
+    Status = St#state.status,
+    St#state{status=Status#{ GID => orddict:from_list([{type, group}|Data])}};
 handle_begin(test, Data, St) ->
     TID = proplists:get_value(id, Data),
-    Dict = St#state.status,
-    St#state{status=dict:store(TID, orddict:from_list([{type, test}|Data]), Dict)}.
+    Status = St#state.status,
+    St#state{status=Status#{ TID => orddict:from_list([{type, test}|Data])}}.
 
 handle_end(group, Data, St) ->
     St#state{status=merge_on_end(Data, St#state.status)};
@@ -151,12 +145,10 @@ print_progress_skipped(St) ->
 print_progress_failed(_Exc, St) ->
     print_colored("F", ?RED, St).
 
-merge_on_end(Data, Dict) ->
+merge_on_end(Data, Status) ->
     ID = proplists:get_value(id, Data),
-    dict:update(ID,
-                fun(Old) ->
-                        orddict:merge(fun merge_data/3, Old, orddict:from_list(Data))
-                end, Dict).
+    #{ ID := Old } = Status,
+    Status#{ ID := orddict:merge(fun merge_data/3, Old, orddict:from_list(Data)) }.
 
 merge_data(_K, undefined, X) -> X;
 merge_data(_K, X, undefined) -> X;
@@ -175,7 +167,7 @@ print_failures(#state{failures=Fails}=State) ->
 
 print_failure_fun(#state{status=Status}=State) ->
     fun(Key, Count) ->
-            TestData = dict:fetch(Key, Status),
+            #{ Key := TestData } = Status,
             TestId = format_test_identifier(TestData),
             io:fwrite("  ~p) ~ts~n", [Count, TestId]),
             print_failure_reason(proplists:get_value(status, TestData),
@@ -197,13 +189,14 @@ print_failure_reason({error, Reason}, Output, State) ->
     print_failure_output(5, Output, State).
 
 print_failure_output(_, <<>>, _) -> ok;
+print_failure_output(_, [<<>>], _) -> ok;
 print_failure_output(_, undefined, _) -> ok;
 print_failure_output(Indent, Output, State) ->
     print_colored(indent(Indent, "Output: ~ts", [Output]), ?CYAN, State).
 
 print_assertion_failure({Type, Props}, Stack, Output, State) ->
     FailureDesc = format_assertion_failure(Type, Props, 5),
-    {M,F,A,Loc} = lists:last(Stack),
+    {M,F,A,Loc} = lists:last(prune_trace(Stack)),
     LocationText = io_lib:format("     %% ~ts:~p:in `~ts`", [proplists:get_value(file, Loc),
                                                            proplists:get_value(line, Loc),
                                                            format_function_name(M,F,A)]),
@@ -214,13 +207,19 @@ print_assertion_failure({Type, Props}, Stack, Output, State) ->
     print_failure_output(5, Output, State),
     io:nl().
 
+%% This is a simplified version of eunit_test:prune_trace/2
+prune_trace([Entry | _]) when element(1, Entry) =:= eunit_test ->
+    [Entry];
+prune_trace(Stack) ->
+    lists:takewhile(fun(Entry) -> element(1, Entry) =/= eunit_test end, Stack).
+
 print_pending(#state{skips=[]}) ->
     ok;
 print_pending(#state{status=Status, skips=Skips}=State) ->
     io:nl(),
     io:fwrite("Pending:~n", []),
     lists:foreach(fun(ID) ->
-                          Info = dict:fetch(ID, Status),
+                          #{ ID := Info } = Status,
                           case proplists:get_value(reason, Info) of
                               undefined ->
                                   ok;
@@ -244,7 +243,7 @@ print_pending_reason(Reason0, Data, State) ->
 print_profile(#state{timings=T, status=Status, profile=true}=State) ->
     TopN = binomial_heap:take(10, T),
     TopNTime = abs(lists:sum([ Time || {Time, _} <- TopN ])),
-    TLG = dict:fetch([], Status),
+    #{ [] := TLG } = Status,
     TotalTime = proplists:get_value(time, TLG),
     if TotalTime =/= undefined andalso TotalTime > 0 andalso TopN =/= [] ->
             TopNPct = (TopNTime / TotalTime) * 100,
@@ -258,7 +257,7 @@ print_profile(#state{profile=false}) ->
     ok.
 
 print_timing(#state{status=Status}) ->
-    TLG = dict:fetch([], Status),
+    #{ [] := TLG } = Status,
     Time = proplists:get_value(time, TLG),
     io:nl(),
     io:fwrite("Finished in ~ts~n", [format_time(Time)]),
@@ -288,7 +287,7 @@ print_results(Color, Total, Fail, Skip, Cancel, State) ->
 
 print_timing_fun(#state{status=Status}=State) ->
     fun({Time, Key}) ->
-            TestData = dict:fetch(Key, Status),
+            #{ Key := TestData } = Status,
             TestId = format_test_identifier(TestData),
             io:nl(),
             io:fwrite("  ~ts~n", [TestId]),
@@ -350,11 +349,16 @@ format_assertion_failure(Type, Props, I) when Type =:= assertion_failed
     HasHamcrestProps = ([expected, actual, matcher] -- Keys) =:= [],
     if
         HasEUnitProps ->
-            [indent(I, "Failure/Error: ?assert(~ts)~n", [proplists:get_value(expression, Props)]),
-             indent(I, "  expected: true~n", []),
+            Expected = proplists:get_value(expected, Props),
+            AssertMacro = case Expected of
+                              true -> assert;
+                              false -> assertNot
+                          end,
+            [indent(I, "Failure/Error: ?~p(~ts)~n", [AssertMacro, proplists:get_value(expression, Props)]),
+             indent(I, "  expected: ~p~n", [Expected]),
              case proplists:get_value(value, Props) of
-                 false ->
-                     indent(I, "       got: false", []);
+                 Bool when is_boolean(Bool) ->
+                     indent(I, "       got: ~p", [Bool]);
                  {not_a_boolean, V} ->
                      indent(I, "       got: ~p", [V])
              end];

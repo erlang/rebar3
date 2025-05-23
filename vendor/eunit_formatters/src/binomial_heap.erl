@@ -15,6 +15,8 @@
 %% @doc Binomial heap based on Okasaki 6.2.2
 -module(binomial_heap).
 -export([new/0, insert/2, insert/3, merge/2, delete/1, to_list/1, take/2, size/1]).
+-compile({no_auto_import,[link/2]}).
+
 -record(node,{
           rank = 0    :: non_neg_integer(),
           key         :: term(),
