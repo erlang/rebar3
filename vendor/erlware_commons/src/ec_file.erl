@@ -324,13 +324,13 @@ remove_recursive(Path, Options) ->
 
 -spec tmp() -> file:name().
 tmp() ->
-    case erlang:system_info(system_architecture) of
-        "win32" ->
+    case os:type() of
+        {win32, _} ->
             case os:getenv("TEMP") of
                 false -> "./tmp";
                 Val -> Val
             end;
-        _SysArch ->
+        _ ->
             case os:getenv("TMPDIR") of
                 false -> "/tmp";
                 Val -> Val
