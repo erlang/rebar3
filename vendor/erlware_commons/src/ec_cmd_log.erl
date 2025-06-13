@@ -43,8 +43,8 @@
          colorize/4,
          format/1]).
 
--include("include/ec_cmd_log.hrl").
--include("src/ec_cmd_log.hrl").
+-include_lib("erlware_commons/include/ec_cmd_log.hrl").
+-include("ec_cmd_log.hrl").
 
 -define(PREFIX, "===> ").
 
