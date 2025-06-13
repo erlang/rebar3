@@ -212,36 +212,3 @@ to_atom(X)
     erlang:list_to_existing_atom(X);
 to_atom(X) ->
     to_atom(to_list(X)).
-
-%%%===================================================================
-%%% Tests
-%%%===================================================================
-
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
-
-to_integer_test() ->
-    ?assertError(badarg, to_integer(1.5, strict)).
-
-to_float_test() ->
-    ?assertError(badarg, to_float(10, strict)).
-
-to_atom_test() ->
-    ?assertMatch(true, to_atom("true")),
-    ?assertMatch(true, to_atom(<<"true">>)),
-    ?assertMatch(false, to_atom(<<"false">>)),
-    ?assertMatch(false, to_atom(false)),
-    ?assertError(badarg, to_atom("hello_foo_bar_baz")),
-
-    S = erlang:list_to_atom("1"),
-    ?assertMatch(S, to_atom(1)).
-
-to_boolean_test()->
-    ?assertMatch(true, to_boolean(<<"true">>)),
-    ?assertMatch(true, to_boolean("true")),
-    ?assertMatch(true, to_boolean(true)),
-    ?assertMatch(false, to_boolean(<<"false">>)),
-    ?assertMatch(false, to_boolean("false")),
-    ?assertMatch(false, to_boolean(false)).
-
--endif.

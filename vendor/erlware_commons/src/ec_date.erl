@@ -44,7 +44,7 @@
 -define( is_month(X), ( (is_integer(X) andalso X =< 12) orelse ?is_hinted_month(X) ) ).
 -define( is_tz_offset(H1,H2,M1,M2), (?is_num(H1) andalso ?is_num(H2) andalso ?is_num(M1) andalso ?is_num(M2)) ).
 
--define(GREGORIAN_SECONDS_1970, 62167219200).
+-define(GREGORIAN_SECONDS_1970, 62_167_219_200).
 -define(ISO_8601_DATETIME_FORMAT, "Y-m-dTH:i:sZ").
 -define(ISO_8601_DATETIME_WITH_MS_FORMAT, "Y-m-dTH:i:s.fZ").
 
@@ -54,7 +54,7 @@
 -type hour() :: 0..23.
 -type minute() :: 0..59.
 -type second() :: 0..59.
--type microsecond() :: 0..999999.
+-type microsecond() :: 0..999_999.
 
 -type daynum() :: 1..7.
 -type date() :: {year(),month(),day()}.
@@ -138,11 +138,11 @@ nparse(Date) ->
         {DateS, {H, M, S, Ms} } ->
             GSeconds = calendar:datetime_to_gregorian_seconds({DateS, {H, M, S} }),
             ESeconds = GSeconds - ?GREGORIAN_SECONDS_1970,
-            {ESeconds div 1000000, ESeconds rem 1000000, Ms};
+            {ESeconds div 1_000_000, ESeconds rem 1_000_000, Ms};
         DateTime ->
             GSeconds = calendar:datetime_to_gregorian_seconds(DateTime),
             ESeconds = GSeconds - ?GREGORIAN_SECONDS_1970,
-            {ESeconds div 1000000, ESeconds rem 1000000, 0}
+            {ESeconds div 1_000_000, ESeconds rem 1_000_000, 0}
     end.
 
 %%
@@ -151,7 +151,7 @@ nparse(Date) ->
 
 parse([Year, X, Month, X, Day, Hour, $:, Min, $:, Sec, $., Micros, $Z ], _Now, _Opts)
   when ?is_world_sep(X)
-       andalso (Micros >= 0 andalso Micros < 1000000)
+       andalso (Micros >= 0 andalso Micros < 1_000_000)
        andalso Year > 31 ->
     {{Year, Month, Day}, {hour(Hour, []), Min, Sec}, {Micros}};
 
@@ -162,7 +162,7 @@ parse([Year, X, Month, X, Day, Hour, $:, Min, $:, Sec, $Z ], _Now, _Opts)
 
 parse([Year, X, Month, X, Day, Hour, $:, Min, $:, Sec, $., Micros, $+, Off | _Rest ], _Now, _Opts)
   when  (?is_us_sep(X) orelse ?is_world_sep(X))
-        andalso (Micros >= 0 andalso Micros < 1000000)
+        andalso (Micros >= 0 andalso Micros < 1_000_000)
         andalso Year > 31 ->
     {{Year, Month, Day}, {hour(Hour, []) - Off, Min, Sec}, {Micros}};
 
@@ -173,7 +173,7 @@ parse([Year, X, Month, X, Day, Hour, $:, Min, $:, Sec, $+, Off | _Rest ], _Now, 
 
 parse([Year, X, Month, X, Day, Hour, $:, Min, $:, Sec, $., Micros, $-, Off | _Rest ], _Now, _Opts)
   when  (?is_us_sep(X) orelse ?is_world_sep(X))
-        andalso (Micros >= 0 andalso Micros < 1000000)
+        andalso (Micros >= 0 andalso Micros < 1_000_000)
         andalso Year > 31 ->
     {{Year, Month, Day}, {hour(Hour, []) + Off, Min, Sec}, {Micros}};
 
@@ -316,11 +316,11 @@ tokenise([$., N1, N2, N3, N4 | Rest], Acc)
   when ?is_num(N1), ?is_num(N2), ?is_num(N3), ?is_num(N4) ->
     tokenise(Rest, [ ltoi([N1, N2, N3, N4]) * 100, $. | Acc]);
 tokenise([$., N1, N2, N3 | Rest], Acc) when ?is_num(N1), ?is_num(N2), ?is_num(N3) ->
-    tokenise(Rest, [ ltoi([N1, N2, N3]) * 1000, $. | Acc]);
+    tokenise(Rest, [ ltoi([N1, N2, N3]) * 1_000, $. | Acc]);
 tokenise([$., N1, N2 | Rest], Acc) when ?is_num(N1), ?is_num(N2) ->
-    tokenise(Rest, [ ltoi([N1, N2]) * 10000, $. | Acc]);
+    tokenise(Rest, [ ltoi([N1, N2]) * 10_000, $. | Acc]);
 tokenise([$., N1 | Rest], Acc) when ?is_num(N1) ->
-    tokenise(Rest, [ ltoi([N1]) * 100000, $. | Acc]);
+    tokenise(Rest, [ ltoi([N1]) * 100_000, $. | Acc]);
 
 tokenise([N1, N2, N3, N4, N5, N6 | Rest], Acc)
   when ?is_num(N1), ?is_num(N2), ?is_num(N3), ?is_num(N4), ?is_num(N5), ?is_num(N6) ->
@@ -718,7 +718,7 @@ ltoi(X) ->
 
 
 -define(DATE, {{2001,3,10},{17,16,17}}).
--define(DATEMS, {{2001,3,10},{17,16,17,123456}}).
+-define(DATEMS, {{2001,3,10},{17,16,17,123_456}}).
 -define(DATE_NOON, {{2001,3,10},{12,0,0}}).
 -define(DATE_MIDNIGHT, {{2001,3,10},{0,0,0}}).
 -define(ISO, "o \\WW").
@@ -955,7 +955,7 @@ ms_test_() ->
     Now=os:timestamp(),
     [
      ?_assertEqual({{2012,12,12}, {12,12,12,1234}}, parse("2012-12-12T12:12:12.001234")),
-     ?_assertEqual({{2012,12,12}, {12,12,12,123000}}, parse("2012-12-12T12:12:12.123")),
+     ?_assertEqual({{2012,12,12}, {12,12,12,123_000}}, parse("2012-12-12T12:12:12.123")),
      ?_assertEqual(format("H:m:s.f \\m \\i\\s \\m\\o\\n\\t\\h",?DATEMS),
                    "17:03:17.123456 m is month"),
      ?_assertEqual(format("Y-m-d\\TH:i:s.f",?DATEMS),
@@ -994,21 +994,21 @@ format_iso8601_test_() ->
      ?_assertEqual("2001-03-10T17:16:17.000000Z",
                    format_iso8601({{2001,3,10},{17,16,17,0}})),
      ?_assertEqual("2001-03-10T17:16:17.100000Z",
-                   format_iso8601({{2001,3,10},{17,16,17,100000}})),
+                   format_iso8601({{2001,3,10},{17,16,17,100_000}})),
      ?_assertEqual("2001-03-10T17:16:17.120000Z",
-                   format_iso8601({{2001,3,10},{17,16,17,120000}})),
+                   format_iso8601({{2001,3,10},{17,16,17,120_000}})),
      ?_assertEqual("2001-03-10T17:16:17.123000Z",
-                   format_iso8601({{2001,3,10},{17,16,17,123000}})),
+                   format_iso8601({{2001,3,10},{17,16,17,123_000}})),
      ?_assertEqual("2001-03-10T17:16:17.123400Z",
-                   format_iso8601({{2001,3,10},{17,16,17,123400}})),
+                   format_iso8601({{2001,3,10},{17,16,17,123_400}})),
      ?_assertEqual("2001-03-10T17:16:17.123450Z",
-                   format_iso8601({{2001,3,10},{17,16,17,123450}})),
+                   format_iso8601({{2001,3,10},{17,16,17,123_450}})),
      ?_assertEqual("2001-03-10T17:16:17.123456Z",
-                   format_iso8601({{2001,3,10},{17,16,17,123456}})),
+                   format_iso8601({{2001,3,10},{17,16,17,123_456}})),
      ?_assertEqual("2001-03-10T17:16:17.023456Z",
-                   format_iso8601({{2001,3,10},{17,16,17,23456}})),
+                   format_iso8601({{2001,3,10},{17,16,17,23_456}})),
      ?_assertEqual("2001-03-10T17:16:17.003456Z",
-                   format_iso8601({{2001,3,10},{17,16,17,3456}})),
+                   format_iso8601({{2001,3,10},{17,16,17,3_456}})),
      ?_assertEqual("2001-03-10T17:16:17.000456Z",
                    format_iso8601({{2001,3,10},{17,16,17,456}})),
      ?_assertEqual("2001-03-10T17:16:17.000056Z",
@@ -1020,21 +1020,21 @@ format_iso8601_test_() ->
      ?_assertEqual("2001-03-10T07:16:17.000000Z",
                    format_iso8601({{2001,3,10},{07,16,17,0}})),
      ?_assertEqual("2001-03-10T07:16:17.100000Z",
-                   format_iso8601({{2001,3,10},{07,16,17,100000}})),
+                   format_iso8601({{2001,3,10},{07,16,17,100_000}})),
      ?_assertEqual("2001-03-10T07:16:17.120000Z",
-                   format_iso8601({{2001,3,10},{07,16,17,120000}})),
+                   format_iso8601({{2001,3,10},{07,16,17,120_000}})),
      ?_assertEqual("2001-03-10T07:16:17.123000Z",
-                   format_iso8601({{2001,3,10},{07,16,17,123000}})),
+                   format_iso8601({{2001,3,10},{07,16,17,123_000}})),
      ?_assertEqual("2001-03-10T07:16:17.123400Z",
-                   format_iso8601({{2001,3,10},{07,16,17,123400}})),
+                   format_iso8601({{2001,3,10},{07,16,17,123_400}})),
      ?_assertEqual("2001-03-10T07:16:17.123450Z",
-                   format_iso8601({{2001,3,10},{07,16,17,123450}})),
+                   format_iso8601({{2001,3,10},{07,16,17,123_450}})),
      ?_assertEqual("2001-03-10T07:16:17.123456Z",
-                   format_iso8601({{2001,3,10},{07,16,17,123456}})),
+                   format_iso8601({{2001,3,10},{07,16,17,123_456}})),
      ?_assertEqual("2001-03-10T07:16:17.023456Z",
-                   format_iso8601({{2001,3,10},{07,16,17,23456}})),
+                   format_iso8601({{2001,3,10},{07,16,17,23_456}})),
      ?_assertEqual("2001-03-10T07:16:17.003456Z",
-                   format_iso8601({{2001,3,10},{07,16,17,3456}})),
+                   format_iso8601({{2001,3,10},{07,16,17,3_456}})),
      ?_assertEqual("2001-03-10T07:16:17.000456Z",
                    format_iso8601({{2001,3,10},{07,16,17,456}})),
      ?_assertEqual("2001-03-10T07:16:17.000056Z",
@@ -1051,31 +1051,31 @@ parse_iso8601_test_() ->
                    parse("2001-03-10T17:16:17.000Z")),
      ?_assertEqual({{2001,3,10},{17,16,17,0}},
                    parse("2001-03-10T17:16:17.000000Z")),
-     ?_assertEqual({{2001,3,10},{17,16,17,100000}},
+     ?_assertEqual({{2001,3,10},{17,16,17,100_000}},
                    parse("2001-03-10T17:16:17.1Z")),
-     ?_assertEqual({{2001,3,10},{17,16,17,120000}},
+     ?_assertEqual({{2001,3,10},{17,16,17,120_000}},
                    parse("2001-03-10T17:16:17.12Z")),
-     ?_assertEqual({{2001,3,10},{17,16,17,123000}},
+     ?_assertEqual({{2001,3,10},{17,16,17,123_000}},
                    parse("2001-03-10T17:16:17.123Z")),
-     ?_assertEqual({{2001,3,10},{17,16,17,123400}},
+     ?_assertEqual({{2001,3,10},{17,16,17,123_400}},
                    parse("2001-03-10T17:16:17.1234Z")),
-     ?_assertEqual({{2001,3,10},{17,16,17,123450}},
+     ?_assertEqual({{2001,3,10},{17,16,17,123_450}},
                    parse("2001-03-10T17:16:17.12345Z")),
-     ?_assertEqual({{2001,3,10},{17,16,17,123456}},
+     ?_assertEqual({{2001,3,10},{17,16,17,123_456}},
                    parse("2001-03-10T17:16:17.123456Z")),
 
-     ?_assertEqual({{2001,3,10},{15,16,17,100000}},
+     ?_assertEqual({{2001,3,10},{15,16,17,100_000}},
                    parse("2001-03-10T16:16:17.1+01:00")),
-     ?_assertEqual({{2001,3,10},{15,16,17,123456}},
+     ?_assertEqual({{2001,3,10},{15,16,17,123_456}},
                    parse("2001-03-10T16:16:17.123456+01:00")),
-     ?_assertEqual({{2001,3,10},{17,16,17,100000}},
+     ?_assertEqual({{2001,3,10},{17,16,17,100_000}},
                    parse("2001-03-10T16:16:17.1-01:00")),
-     ?_assertEqual({{2001,3,10},{17,16,17,123456}},
+     ?_assertEqual({{2001,3,10},{17,16,17,123_456}},
                    parse("2001-03-10T16:16:17.123456-01:00")),
 
      ?_assertEqual({{2001,3,10},{17,16,17,456}},
                    parse("2001-03-10T17:16:17.000456Z")),
-     ?_assertEqual({{2001,3,10},{17,16,17,123000}},
+     ?_assertEqual({{2001,3,10},{17,16,17,123_000}},
                    parse("2001-03-10T17:16:17.123000Z"))
     ].
 

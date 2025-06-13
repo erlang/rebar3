@@ -4,7 +4,8 @@ Erlware Commons
 Current Status
 --------------
 
-![Tests](https://github.com/erlware/erlware_commons/workflows/EUnit/badge.svg)
+[![Hex.pm](https://img.shields.io/hexpm/v/erlware_commons)](https://hex.pm/packages/erlware_commons)
+[![Tests](https://github.com/erlware/erlware_commons/workflows/EUnit/badge.svg)](https://github.com/erlware/erlware_commons/actions)
 
 Introduction
 ------------

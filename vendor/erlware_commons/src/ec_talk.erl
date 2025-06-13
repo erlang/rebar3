@@ -39,6 +39,11 @@
          say/1,
          say/2]).
 
+-ifdef(TEST).
+-export([get_boolean/1,
+	 get_integer/1]).
+-endif.
+
 -export_type([prompt/0,
               type/0,
               supported/0]).
@@ -196,26 +201,3 @@ get_string(String) ->
         false ->
             no_clue
     end.
-
-%%%====================================================================
-%%% tests
-%%%====================================================================
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
-
-general_test_() ->
-    [?_test(42 == get_integer("42")),
-     ?_test(500211 == get_integer("500211")),
-     ?_test(1234567890 == get_integer("1234567890")),
-     ?_test(12345678901234567890 == get_integer("12345678901234567890")),
-     ?_test(true == get_boolean("true")),
-     ?_test(false == get_boolean("false")),
-     ?_test(true == get_boolean("Ok")),
-     ?_test(true == get_boolean("ok")),
-     ?_test(true == get_boolean("Y")),
-     ?_test(true == get_boolean("y")),
-     ?_test(false == get_boolean("False")),
-     ?_test(false == get_boolean("No")),
-     ?_test(false == get_boolean("no"))].
-
--endif.

@@ -17,6 +17,13 @@
 -export([new/0,
          vsn/1]).
 
+-ifdef(TEST).
+-export([parse_tags/1,
+	 get_patch_count/1,
+	 collect_default_refcount/1
+	]).
+-endif.
+
 -export_type([t/0]).
 
 %%%===================================================================
@@ -98,16 +105,3 @@ parse_tags(Pattern) ->
             Vsn1 = string:trim(string:trim(Vsn, leading, "v"), trailing, "\n"),
             {Tag, Vsn1}
     end.
-
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
-
-parse_tags_test() ->
-    ?assertEqual({undefined, ""}, parse_tags("a.b.c")).
-
-get_patch_count_test() ->
-    ?assertEqual(0, get_patch_count("a.b.c")).
-
-collect_default_refcount_test() ->
-    ?assertMatch({"", _, _}, collect_default_refcount("a.b.c")).
--endif.
