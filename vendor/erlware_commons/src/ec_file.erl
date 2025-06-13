@@ -223,7 +223,7 @@ real_dir_path(Path) ->
 %% function of the same name.
 -spec insecure_mkdtemp() -> TmpDirPath::file:name() | {error, term()}.
 insecure_mkdtemp() ->
-    UniqueNumber = erlang:integer_to_list(erlang:trunc(random_uniform() * 1000000000000)),
+    UniqueNumber = erlang:integer_to_list(erlang:trunc(rand:uniform() * 1_000_000_000_000)),
     TmpDirPath =
         filename:join([tmp(), lists:flatten([".tmp_dir", UniqueNumber])]),
 
@@ -324,13 +324,13 @@ remove_recursive(Path, Options) ->
 
 -spec tmp() -> file:name().
 tmp() ->
-    case erlang:system_info(system_architecture) of
-        "win32" ->
+    case os:type() of
+        {win32, _} ->
             case os:getenv("TEMP") of
                 false -> "./tmp";
                 Val -> Val
             end;
-        _SysArch ->
+        _ ->
             case os:getenv("TMPDIR") of
                 false -> "/tmp";
                 Val -> Val
@@ -375,95 +375,3 @@ hex0(I)  -> $0 + I.
 sub_files(From) ->
     {ok, SubFiles} = file:list_dir(From),
     [filename:join(From, SubFile) || SubFile <- SubFiles].
-
-random_uniform() ->
-    rand:uniform().
-
-%%%===================================================================
-%%% Test Functions
-%%%===================================================================
-
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
-
-setup_test() ->
-    Dir = insecure_mkdtemp(),
-    mkdir_path(Dir),
-    ?assertMatch(false, is_symlink(Dir)),
-    ?assertMatch(true, filelib:is_dir(Dir)).
-
-md5sum_test() ->
-    ?assertMatch("cfcd208495d565ef66e7dff9f98764da", md5sum("0")).
-
-sha1sum_test() ->
-    ?assertMatch("b6589fc6ab0dc82cf12099d1c2d40ab994e8410c", sha1sum("0")).
-
-file_test() ->
-    Dir = insecure_mkdtemp(),
-    TermFile = filename:join(Dir, "ec_file/dir/file.term"),
-    TermFileCopy = filename:join(Dir, "ec_file/dircopy/file.term"),
-    filelib:ensure_dir(TermFile),
-    filelib:ensure_dir(TermFileCopy),
-    write_term(TermFile, "term"),
-    ?assertMatch({ok, <<"\"term\". ">>}, read(TermFile)),
-    copy(filename:dirname(TermFile),
-         filename:dirname(TermFileCopy),
-         [recursive]).
-
-teardown_test() ->
-    Dir = insecure_mkdtemp(),
-    remove(Dir, [recursive]),
-    ?assertMatch(false, filelib:is_dir(Dir)).
-
-setup_base_and_target() ->
-    BaseDir = insecure_mkdtemp(),
-    DummyContents = <<"This should be deleted">>,
-    SourceDir = filename:join([BaseDir, "source"]),
-    ok = file:make_dir(SourceDir),
-    Name1 = filename:join([SourceDir, "fileone"]),
-    Name2 = filename:join([SourceDir, "filetwo"]),
-    Name3 = filename:join([SourceDir, "filethree"]),
-    NoName = filename:join([SourceDir, "noname"]),
-
-    ok = file:write_file(Name1, DummyContents),
-    ok = file:write_file(Name2, DummyContents),
-    ok = file:write_file(Name3, DummyContents),
-    ok = file:write_file(NoName, DummyContents),
-    {BaseDir, SourceDir, {Name1, Name2, Name3, NoName}}.
-
-exists_test() ->
-    BaseDir = insecure_mkdtemp(),
-    SourceDir = filename:join([BaseDir, "source1"]),
-    NoName = filename:join([SourceDir, "noname"]),
-    ok = file:make_dir(SourceDir),
-    Name1 = filename:join([SourceDir, "fileone"]),
-    ok = file:write_file(Name1, <<"Testn">>),
-    ?assertMatch(true, exists(Name1)),
-    ?assertMatch(false, exists(NoName)).
-
-real_path_test() ->
-    BaseDir = "foo",
-    Dir = filename:absname(filename:join(BaseDir, "source1")),
-    LinkDir = filename:join([BaseDir, "link"]),
-    ok = mkdir_p(Dir),
-    file:make_symlink(Dir, LinkDir),
-    ?assertEqual(Dir, real_dir_path(LinkDir)),
-    ?assertEqual(directory, type(Dir)),
-    ?assertEqual(symlink, type(LinkDir)),
-    TermFile = filename:join(BaseDir, "test_file"),
-    ok = write_term(TermFile, foo),
-    ?assertEqual(file, type(TermFile)),
-    ?assertEqual(true, is_symlink(LinkDir)),
-    ?assertEqual(false, is_symlink(Dir)).
-
-find_test() ->
-    %% Create a directory in /tmp for the test. Clean everything afterwards
-    {BaseDir, _SourceDir, {Name1, Name2, Name3, _NoName}} = setup_base_and_target(),
-    Result = find(BaseDir, "file[a-z]+\$"),
-    ?assertMatch(3, erlang:length(Result)),
-    ?assertEqual(true, lists:member(Name1, Result)),
-    ?assertEqual(true, lists:member(Name2, Result)),
-    ?assertEqual(true, lists:member(Name3, Result)),
-    remove(BaseDir, [recursive]).
-
--endif.

@@ -52,9 +52,7 @@ jobs:
     - name: Debug Brew
       run: brew doctor || true
     - name: Install Erlang
-      # fallback to OTP-27 since OTP-28 does not currently build on Brew
-      # run: brew install erlang@${{ env.LATEST_OTP_RELEASE }}
-      run: brew install erlang@27
+      run: brew install erlang@${{ env.LATEST_OTP_RELEASE }}
     - name: Compile
       run: ./bootstrap
     - name: CT tests
