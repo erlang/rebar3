@@ -133,15 +133,16 @@ format_error({no_resource, Source}) ->
 is_resource_type(Type, Resources) ->
     lists:any(fun(#resource{type=T}) -> T =:= Type end, Resources).
 
--spec get_resource_type(term(), [resource()]) -> {ok, resource()}.
+-spec get_resource_type(tuple(), [resource()]) -> {ok, resource()}.
 get_resource_type({Type, Location}, Resources) ->
     get_resource(Type, Location, Resources);
 get_resource_type({Type, Location, _}, Resources) ->
     get_resource(Type, Location, Resources);
 get_resource_type({Type, _, _, Location}, Resources) ->
     get_resource(Type, Location, Resources);
-get_resource_type(Location={Type, _, _, _, _, _}, Resources) ->
-    get_resource(Type, Location, Resources);
+get_resource_type(Source, Resources) when tuple_size(Source) > 3 ->
+    Type = element(1, Source),
+    get_resource(Type, Source, Resources);
 get_resource_type(Source, _) ->
     throw(?PRV_ERROR({no_resource, Source})).
 
