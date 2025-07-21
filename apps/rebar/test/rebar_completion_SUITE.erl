@@ -9,7 +9,7 @@ suite() ->
     [].
 
 all() ->
-    [test_completion_gen, check_bash, check_zsh].
+    [test_completion_gen, check_bash, check_zsh, check_bash_file_completion].
 
 groups() ->
     [].
@@ -24,6 +24,13 @@ end_per_suite(_Config) ->
     ok.
 
 init_per_testcase(check_bash, Config) ->
+    case shell_available(bash) of
+        true ->
+            rebar_test_utils:init_rebar_state(Config, "completion_");
+        false ->
+            {skip, "bash not found"}
+    end;
+init_per_testcase(check_bash_file_completion, Config) ->
     case shell_available(bash) of
         true ->
             rebar_test_utils:init_rebar_state(Config, "completion_");
@@ -69,7 +76,7 @@ check_bash(Config) ->
     %% function definition
     {match, _} = re:run(Completion, "_rebar3\\(\\)\\{"),
     %% aliases
-    CompleteCmd = "complete -o nospace -F _rebar3 ",
+    CompleteCmd = "complete -o filenames -F _rebar3 ",
     lists:foreach(fun(Alias) ->
                     ?assertMatch({Alias, {match, _}}, {Alias, re:run(Completion, CompleteCmd++Alias++"\n")})
                   end,
@@ -90,6 +97,27 @@ check_zsh(Config) ->
                     ?assertMatch({Alias, {match, _}}, {Alias, re:run(Completion, CompleteCmd++Alias++"\n")})
                   end,
                   ["rebar3" | Aliases]).
+
+check_bash_file_completion(Config) ->
+    ComplFile = ?config(compl_file, Config),
+    Opts = #{shell => bash, file => ComplFile},
+    completion_gen(Config, Opts),
+    {ok, Completion} = file:read_file(ComplFile),
+    
+    %% Check that file completion logic is present for ct and eunit
+    {match, _} = re:run(Completion, "\\$\\{prev1\\} == ct \\|\\| \\$\\{prev1\\} == eunit"),
+    
+    %% Check that .erl file completion is included
+    {match, _} = re:run(Completion, "compgen -f -X '!\\*\\.erl'"),
+    
+    %% Check that directory completion is included
+    {match, _} = re:run(Completion, "compgen -d"),
+    
+    %% Check that other file-accepting commands are handled
+    {match, _} = re:run(Completion, "\\$\\{prev1\\} == completion \\|\\| \\$\\{prev1\\} == shell \\|\\| \\$\\{prev1\\} == tar"),
+    
+    %% Check that fallback completion is present
+    {match, _} = re:run(Completion, "If no completions found, fall back to normal completion").
 
 %% helpers
 
