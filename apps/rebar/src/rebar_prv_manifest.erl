@@ -124,7 +124,7 @@ adapt_context(App) ->
     Dir = rebar_app_info:dir(App),
     EbinDir = rebar_app_info:ebin_dir(App),
     RebarOpts = rebar_app_info:opts(App),
-    ExtraSrcDirs = rebar_dir:extra_src_dirs(RebarOpts),
+    ExtraSrcDirs = extra_src_dirs(Dir, RebarOpts),
     Macros = proplists:get_value(macros, DependenciesOpts),
     ParseTransforms = proplists:get_value(parse_transforms, DependenciesOpts),
     #{name => Name,
@@ -184,3 +184,21 @@ is_json_available() ->
         {error, _} ->
             false
     end.
+
+extra_src_dirs(Root, RebarOpts) ->
+    Extra = rebar_dir:extra_src_dirs(RebarOpts),
+    [Dir || E <- Extra, Dir <- expand(Root, E, rebar_dir:recursive(RebarOpts, E))].
+
+expand(_Root, Dir, false) ->
+    [Dir];
+expand(Root, Dir, true) ->
+    SubDirs = [
+        relative_to(Root, Path) ||
+            Path <- filelib:wildcard(filename:join([Root, Dir, "**"])),
+            filelib:is_dir(Path)
+    ],
+    [Dir | SubDirs].
+
+relative_to(Root, Path) ->
+    {ok, Relative} = rebar_file_utils:path_from_ancestor(Path, Root),
+    Relative.
