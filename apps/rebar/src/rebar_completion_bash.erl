@@ -82,13 +82,24 @@ main(Commands, #{shell:=bash, aliases:=Aliases}) ->
     "           cmdsnvars=\"",lists:join(" \\\n", CmdNames),"\"\n",
     "       ",[cmd_clause(Cmd) || Cmd <- Commands],
     "       fi\n",
-    "    COMPREPLY=( $(compgen -W \"${sopts} ${lopts} ${cmdsnvars} \" -- ${cur}) )\n",
-    "    if [ -n \"$COMPREPLY\" ] ; then\n",
-    "        # append space if matched\n",
-    "       COMPREPLY=\"${COMPREPLY} \"\n",
-    "        # remove trailing space after equal sign\n",
-    "        COMPREPLY=${COMPREPLY/%= /=}\n",
+    "    \n",
+    "    # File completion for commands that accept file arguments\n",
+    "    if [[ (${prev1} == ct || ${prev1} == eunit) && \"$cur\" != -* ]]; then\n",
+    "        # Complete with .erl files and directories for test commands\n",
+    "        COMPREPLY=( $(compgen -f -X '!*.erl' -- ${cur}) $(compgen -d -- ${cur}) )\n",
+    "    elif [[ (${prev1} == completion || ${prev1} == shell || ${prev1} == tar) && \"$cur\" != -* ]]; then\n",
+    "        # Complete with files and directories for other file-accepting commands\n",
+    "        COMPREPLY=( $(compgen -f -- ${cur}) $(compgen -d -- ${cur}) )\n",
+    "    else\n",
+    "        COMPREPLY=( $(compgen -W \"${sopts} ${lopts} ${cmdsnvars} \" -- ${cur}) )\n",
     "    fi\n",
+    "    \n",
+    "    # If no completions found, fall back to normal completion\n",
+    "    if [ ${#COMPREPLY[@]} -eq 0 ]; then\n",
+    "        COMPREPLY=( $(compgen -W \"${sopts} ${lopts} ${cmdsnvars} \" -- ${cur}) )\n",
+    "    fi\n",
+    "    \n",
+    "    # Let bash handle spacing naturally\n",
     "    return 0\n",
     "}\n"].
 
@@ -110,4 +121,4 @@ cmd_depth([_ | Rest],Depth,Max) ->
 
 complete(#{shell:=bash, aliases:=Aliases}) ->
     Triggers = ["rebar3" | Aliases],
-    [["complete -o nospace -F _rebar3 ", Trigger, "\n"] || Trigger <- Triggers].
+    [["complete -o filenames -F _rebar3 ", Trigger, "\n"] || Trigger <- Triggers].
