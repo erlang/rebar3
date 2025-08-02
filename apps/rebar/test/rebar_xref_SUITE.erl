@@ -10,6 +10,7 @@
          all/0,
          xref_test/1,
          xref_ignore_test/1,
+         xref_queries_test/1,
          xref_dep_hook/1,
          xref_undef_behaviour/1]).
 
@@ -39,6 +40,12 @@ init_per_testcase(xref_dep_hook, Config) ->
                             ,{global_rebar_dir, GlobalDir}
                             ,{root_dir, Dst}]),
     [{apps, Dst}, {state, State} | Config];
+init_per_testcase(xref_queries_test, Config) ->
+    UpdConfig = rebar_test_utils:init_rebar_state(Config),
+    AppDir = ?config(apps, UpdConfig),
+    Src = filename:join([?config(data_dir, Config), "recursive", "apps"]),
+    ok = rebar_file_utils:cp_r([Src], AppDir),
+    [{apps, AppDir} | UpdConfig ];
 init_per_testcase(Case, Config) ->
     UpdConfig = rebar_test_utils:init_rebar_state(Config),
     AppDir = ?config(apps, UpdConfig),
@@ -61,7 +68,8 @@ end_per_testcase(_, _Config) ->
     ok.
 
 all() ->
-    [xref_test, xref_ignore_test, xref_dep_hook, xref_undef_behaviour].
+    [xref_test, xref_ignore_test, xref_dep_hook, xref_undef_behaviour,
+     xref_queries_test].
 
 %% ===================================================================
 %% Test cases
@@ -74,6 +82,16 @@ xref_test(Config) ->
     RebarConfig = ?config(rebar_config, Config),
     Result = rebar3:run(rebar_state:new(State, RebarConfig, AppDir), ["xref"]),
     verify_results(xref_test, Name, Result).
+
+xref_queries_test(Config) ->
+    AppDir = ?config(apps, Config),
+    State = ?config(state, Config),
+    RebarConfig = [{erl_opts, [debug_info]},
+                   {xref_queries, [{"A", [rebar_issue1, rebar_issue2]},
+                                   {"(Fun) rebar_issue1 -> rebar_issue2", []}
+                                  ]}],
+    {ok, _} = rebar3:run(rebar_state:new(State, RebarConfig, AppDir), ["xref"]),
+    ok.
 
 xref_ignore_test(Config) ->
     AppDir = ?config(apps, Config),
