@@ -24,7 +24,8 @@ jobs:
         sudo cp ./rebar3 /usr/local/bin/
 
     - name: Checkout shell tests
-      run: git clone https://github.com/tsloughter/rebar3_tests
+      # FIXME: change to original repo before merge.
+      run: git clone -b ct/sys-config https://github.com/dmitrivereshchagin/rebar3_tests
 
     - name: Install and run shelltestrunner
       run: |
