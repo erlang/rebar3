@@ -23,9 +23,9 @@
                          src_dirs := [file:filename_all()],
                          extra_src_dirs := [file:filename_all()],
                          include_dirs := [file:filename_all()],
-                         macros => [macro()],
+                         macros => macros(),
                          parse_transforms => [any()]}.
--type macro() :: #{key := atom(), value => any()}.
+-type macros() :: #{atom() => any()}.
 -type manifest() :: #{ apps := [app_context()],
                        deps := [app_context()],
                        otp_lib_dir := file:filename_all(),
@@ -133,7 +133,7 @@ adapt_context(App) ->
       src_dirs => [to_binary(D) || D <- SrcDirs],
       extra_src_dirs => [to_binary(D) || D <- ExtraSrcDirs],
       include_dirs => [to_binary(D) || D <- IncludeDirs],
-      macros => [to_macro(M) || M <- Macros],
+      macros => to_macros(Macros),
       parse_transforms => ParseTransforms}.
 
 -spec output_manifest(binary(), format(), string() | undefined) -> ok | {error, term()}.
@@ -169,11 +169,15 @@ format(_Manifest, Format) ->
 to_binary(Path) ->
     unicode:characters_to_binary(Path).
 
--spec to_macro(atom() | {atom() | any()}) -> macro().
+-spec to_macros(proplists:proplist()) -> macros().
+to_macros(Macros) ->
+    maps:from_list([to_macro(M) || M <- Macros]).
+
+-spec to_macro(atom() | {atom(), any()}) -> {atom(), any()}.
 to_macro({Key, Value}) when is_atom(Key) ->
-    #{key => Key, value => Value};
+    {Key, Value};
 to_macro(Key) when is_atom(Key) ->
-    #{key => Key, value => true}.
+    {Key, <<"true">>}.
 
 -spec is_json_available() -> boolean().
 is_json_available() ->
