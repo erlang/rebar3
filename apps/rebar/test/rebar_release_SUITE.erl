@@ -8,6 +8,7 @@ all() -> [release,
           dev_mode_release,
           profile_dev_mode_override_release,
           tar,
+          command_line_override,
           profile_ordering_sys_config_extend,
           profile_ordering_sys_config_extend_3_tuple_merge,
           extend_release,
@@ -73,6 +74,19 @@ config_file(Config) ->
     %% rebar.config overrides relx.config if both exist
     rebar_test_utils:run_and_check(Config, [{relx, RelxConfig("4.0.0")}], ["release"],
                                    {ok, [{release, Name, "4.0.0", false}]}).
+
+command_line_override(Config) ->
+    %% regression test for #2967
+    AppDir = ?config(apps, Config),
+    Vsn = "0.0.0",
+    Name = list_to_atom(?config(name, Config)),
+    Content = [{Name, [{something, true}]}],
+    InputPath = filename:join([AppDir, "config", "mysysconfig"]),
+    rebar_test_utils:create_config(AppDir, InputPath, Content),
+    RelxConfig = [{release, {Name, Vsn}, [Name]}, {lib_dirs, [AppDir]}],
+    rebar_test_utils:run_and_check(Config, [{relx, RelxConfig}], ["release", "--sys_config=" ++ InputPath],
+                                   {ok, [{release, Name, Vsn, false}]}),
+    {ok, Content} = file:consult(filename:join([AppDir, "_build/default/rel", Name, "releases", Vsn, "sys.config"])).
 
 dev_mode_release(Config) ->
     AppDir = ?config(apps, Config),
