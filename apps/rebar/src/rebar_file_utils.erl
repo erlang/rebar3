@@ -160,11 +160,11 @@ replace_env_vars([Char|Str]) ->
     [Char | replace_env_vars(Str)].
 
 until_var_end(Str) ->
-    case re:run(Str, "([a-zA-Z_]+[a-zA-Z0-9_]*)(:-[^}]*)?}", [{capture, [1,2], list}]) of
+    case re:run(Str, "^([a-zA-Z_]+[a-zA-Z0-9_]*)(:-([^}]*))?}", [{capture, [1,3], list}]) of
         nomatch ->
             error;
         {match, [Name,Default]} ->
-            %% the Default part will include the ":-" prefix if present
+            %% the Default part will be "" if not present
             Rest = lists:nthtail(length(Name) + length(Default) + 1, Str),
             {ok, Name, Default, Rest}
     end.
@@ -172,11 +172,7 @@ until_var_end(Str) ->
 replace_varname(Var, Default) ->
     %% os:getenv(Var, "") is only available in OTP-18.0
     case os:getenv(Var) of
-        false ->
-            case Default of
-                ":-" ++ Val -> Val;
-                "" -> ""
-            end;
+        false -> Default;
         Val -> Val
     end.
 
