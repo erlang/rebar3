@@ -52,7 +52,7 @@ main(Args) ->
     %% Build rebar3 modules with compile:file
     bootstrap_rebar3(),
 
-    %% Build rebar.app from rebar.app.src
+    %% Build rebar.app from rebar.app.src.script
     {ok, App} = rebar_app_info:new(rebar, "3.25.1", filename:absname("_build/default/lib/rebar/")),
     rebar_otp_app:compile(rebar_state:new(), App),
 
