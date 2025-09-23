@@ -28,6 +28,8 @@
 
 -export([try_consult/1,
          consult_config/2,
+         consult_env_config/2,
+         consult_any_config/2,
          consult_config_terms/2,
          format_error/1,
          symlink_or_copy/2,
@@ -83,6 +85,37 @@ consult_config(State, Filename) ->
     end,
     consult_config_terms(State, Config).
 
+%% @doc Reads a config file via consult_env_config/2 if the file name has
+%% the suffix `.src`, and with consult_config/2 otherwise
+-spec consult_any_config(rebar_state:t(), file:filename()) -> [[tuple()]].
+consult_any_config(State, Filename) ->
+    case is_src_config(Filename) of
+        false ->
+            consult_config(State, Filename);
+        true ->
+            consult_env_config(State, Filename)
+    end.
+
+-spec is_src_config(file:filename()) -> boolean().
+is_src_config(Filename) ->
+    filename:extension(Filename) =:= ".src".
+
+%% @doc Like consult_config/2 but expanding environment variables
+%% as for a sys.config.src file
+-spec consult_env_config(rebar_state:t(), file:filename()) -> [[tuple()]].
+consult_env_config(State, Filename) ->
+    RawString = case file:read_file(Filename) of
+        {error, _} -> "[].";
+        {ok, Bin} -> unicode:characters_to_list(Bin)
+    end,
+    ReplacedStr = replace_env_vars(RawString),
+    case rebar_string:consult(unicode:characters_to_list(ReplacedStr)) of
+        {error, Reason} ->
+            throw(?PRV_ERROR({bad_term_file, Filename, Reason}));
+        [Terms] ->
+            consult_config_terms(State, Terms)
+    end.
+
 %% @doc From a parsed sys.config file, expand all the terms to include
 %% its potential nested configs. It is also possible that no sub-terms
 %% (i.e. the config file does not refer to "some/other/file.config")
@@ -107,6 +140,41 @@ consult_config_terms(State, Config) ->
 
 format_error({bad_term_file, AppFile, Reason}) ->
     io_lib:format("Error reading file ~ts: ~ts", [AppFile, file:format_error(Reason)]).
+
+%% @doc quick and simple variable substitution writeup.
+%% Supports `${varname}' but not `$varname' nor nested
+%% values such as `${my_${varname}}'.
+%% The variable are also defined as only supporting
+%% the form `[a-zA-Z_]+[a-zA-Z0-9_]*' as per the POSIX
+%% standard.
+-spec replace_env_vars(string()) -> unicode:charlist().
+replace_env_vars("") -> "";
+replace_env_vars("${" ++ Str) ->
+    case until_var_end(Str) of
+        {ok, VarName, Default, Rest} ->
+            replace_varname(VarName, Default) ++ replace_env_vars(Rest);
+        error ->
+            "${" ++ replace_env_vars(Str)
+    end;
+replace_env_vars([Char|Str]) ->
+    [Char | replace_env_vars(Str)].
+
+until_var_end(Str) ->
+    case re:run(Str, "^([a-zA-Z_]+[a-zA-Z0-9_]*)(:-([^}]*))?}", [{capture, [1,3], list}]) of
+        nomatch ->
+            error;
+        {match, [Name,Default]} ->
+            %% the Default part will be "" if not present
+            Rest = lists:nthtail(length(Name) + length(Default) + 1, Str),
+            {ok, Name, Default, Rest}
+    end.
+
+replace_varname(Var, Default) ->
+    %% os:getenv(Var, "") is only available in OTP-18.0
+    case os:getenv(Var) of
+        false -> Default;
+        Val -> Val
+    end.
 
 symlink_or_copy(Source, Target) ->
     Link = case os:type() of
@@ -551,17 +619,17 @@ delete_each_dir_win32([Dir | Rest]) ->
 xcopy_win32(Source,Dest, Options)->
     %% "xcopy \"~ts\" \"~ts\" /q /y /e 2> nul", Changed to robocopy to
     %% handle long names. May have issues with older windows.
-    
+
     CopySubdirectories = "/e",
     DontFollow = "/sl",
-    
+
     Opt = [CopySubdirectories],
     % By default Windows follows symbolic links except if the "/sl" options is given.
     % Add "/sl" for default so it doesn't follow symbolic links and behaves more like unix
     OptStr = case proplists:get_value(dereference, Options, false) of
-        true -> 
+        true ->
             string:join(Opt, " ");
-        false -> 
+        false ->
             % Default option
             string:join([DontFollow|Opt], " ")
     end,
@@ -612,10 +680,10 @@ cp_r_win32({false, Source},{false, Dest}, Options) ->
             true ->
                 {ok, _} = file:copy(Source, Dest),
                 ok;
-            false -> 
+            false ->
                 file:make_symlink(OriginalFile, Dest)
             end;
-        _ -> 
+        _ ->
             {ok, _} = file:copy(Source, Dest),
             ok
     end,

@@ -311,7 +311,7 @@ select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
     %% set application env if sys_config argument is provided
     SysConfigs = sys_config_list(CmdOpts, CfgOpts),
     Configs = lists:flatmap(fun(Filename) ->
-                                rebar_file_utils:consult_config(State, Filename)
+                                rebar_file_utils:consult_any_config(State, Filename)
                             end, SysConfigs),
     %% NB: load the applications (from user directories too) to support OTP < 17
     %% to our best ability.

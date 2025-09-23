@@ -580,12 +580,7 @@ find_config(State) ->
         no_value ->
             no_config;
         Filename when is_list(Filename) ->
-            case is_src_config(Filename) of
-                false ->
-                    rebar_file_utils:consult_config(State, Filename);
-                true ->
-                    consult_env_config(State, Filename)
-            end
+            rebar_file_utils:consult_any_config(State, Filename)
     end.
 
 -spec first_value([Fun], State) -> no_value | Value when
@@ -643,24 +638,6 @@ find_config_relx(State) ->
             Src
     end.
 
--spec is_src_config(file:filename()) -> boolean().
-is_src_config(Filename) ->
-    filename:extension(Filename) =:= ".src".
-
--spec consult_env_config(rebar_state:t(), file:filename()) -> [[tuple()]].
-consult_env_config(State, Filename) ->
-    RawString = case file:read_file(Filename) of
-        {error, _} -> "[].";
-        {ok, Bin} -> unicode:characters_to_list(Bin)
-    end,
-    ReplacedStr = replace_env_vars(RawString),
-    case rebar_string:consult(unicode:characters_to_list(ReplacedStr)) of
-        {error, Reason} ->
-            throw(?PRV_ERROR({bad_term_file, Filename, Reason}));
-        [Terms] ->
-            rebar_file_utils:consult_config_terms(State, Terms)
-    end.
-
 maybe_set_env_vars(State) ->
     EnvFile =debug_get_value(env_file, rebar_state:get(State, shell, []), undefined,
                              "Found env_file from config."),
@@ -699,39 +676,3 @@ maybe_read_file(undefined) ->
     ignore;
 maybe_read_file(EnvFile) ->
     file:read_file(EnvFile).
-
-%% @doc quick and simple variable substitution writeup.
-%% Supports `${varname}' but not `$varname' nor nested
-%% values such as `${my_${varname}}'.
-%% The variable are also defined as only supporting
-%% the form `[a-zA-Z_]+[a-zA-Z0-9_]*' as per the POSIX
-%% standard.
--spec replace_env_vars(string()) -> unicode:charlist().
-replace_env_vars("") -> "";
-replace_env_vars("${" ++ Str) ->
-    case until_var_end(Str) of
-        {ok, VarName, Rest} ->
-            replace_varname(VarName) ++ replace_env_vars(Rest);
-        error ->
-            "${" ++ replace_env_vars(Str)
-    end;
-replace_env_vars([Char|Str]) ->
-    [Char | replace_env_vars(Str)].
-
-until_var_end(Str) ->
-    case re:run(Str, "([a-zA-Z_]+[a-zA-Z0-9_]*)}", [{capture, [1], list}]) of
-        nomatch ->
-            error;
-        {match, [Name]} ->
-            {ok, Name, drop_varname(Name, Str)}
-    end.
-
-replace_varname(Var) ->
-    %% os:getenv(Var, "") is only available in OTP-18.0
-    case os:getenv(Var) of
-        false -> "";
-        Val -> Val
-    end.
-
-drop_varname("", "}" ++ Str) -> Str;
-drop_varname([_|Var], [_|Str]) -> drop_varname(Var, Str).
