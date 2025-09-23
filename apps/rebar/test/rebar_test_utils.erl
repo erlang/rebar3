@@ -37,9 +37,19 @@ init_rebar_state(Config, Name) ->
     [{apps, AppsDir}, {checkouts, CheckoutsDir}, {state, State} | Config].
 
 %% @doc Takes common test config, a rebar config ([] if empty), a command to
-%% run ("install_deps", "compile", etc.), and a list of expected applications
-%% and/or dependencies to be present, and verifies whether they are all in
-%% place.
+%% run ("install_deps", "compile", etc.), and the expected term to check.
+%%
+%% The expected term can be one of
+%%
+%% - `{ok, ExpectationList}`: The expectation list is matched in the manner
+%%   described below, using "*" for the profile.
+%% - `{ok, ExpectationList, ProfileUsed}`: The expectation list is matched
+%%   in the manner described below for the given profile.
+%% - `{error, Reason}`: We assert that the error matches the expected reason.
+%% - `return`: No assertion is made.
+%%
+%% The expectation list is a list of expected applications and/or dependencies
+%% to be present, and verifies whether they are all in place.
 %%
 %% The expectation list takes elements of the form:
 %% - `{app, Name :: string()}': checks that the app is properly built.
@@ -49,6 +59,7 @@ init_rebar_state(Config, Name) ->
 %%   has been fetched, and that a given version has been chosen. Useful to
 %%   test for conflict resolution. Also ignores the build status of the
 %%   dependency.
+%% - See `CONTRIBUTING.md` for more.
 %%
 %% This function assumes `init_rebar_state/1-2' has run before, in order to
 %% fetch the `apps' and `state' values from the CT config.
