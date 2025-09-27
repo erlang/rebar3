@@ -1,4 +1,5 @@
 -module(cth_fail_fast).
+-moduledoc false.
 
 %% Callbacks
 -export([id/1]).

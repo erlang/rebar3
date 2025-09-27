@@ -1,4 +1,5 @@
 -module(cth_retry).
+-moduledoc false.
 
 %% Callbacks
 -export([id/1]).
