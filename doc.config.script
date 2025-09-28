@@ -1,0 +1,34 @@
+case filelib:is_dir("rebar3.org") of
+    true ->
+        ok;
+    false ->
+        erlang:error("""
+        This demo requires that you clone the rebar3.org repository from GitHub
+        so that we can bundle the documentation together.
+
+            git clone https://github.com/tsloughter/rebar3.org.git
+        """)
+end,
+
+GetRebar3OrgFiles = fun() ->
+    Files = filelib:wildcard("rebar3.org/content/en/docs/**/*.md"),
+    lists:filter(fun(X) -> nomatch =:= re:run(X, "_index", [{capture, none}]) end, Files)
+end,
+
+FixHeader = fun(File) ->
+    io:format("Processing ~p~n", [File]),
+    {ok, Content} = file:read_file(File),
+    NewContent = re:replace(Content, "^---$\n+title: \"(?<title>[^\"]*)\"$.*^---$", "# \\1", [unicode, dotall, anchored, multiline]),
+    file:write_file(File, NewContent),
+    File
+end,
+
+MdFiles = GetRebar3OrgFiles(),
+MdFiles = lists:map(FixHeader, MdFiles),
+
+ExDoc = proplists:get_value(ex_doc, CONFIG),
+Extras = proplists:get_value(extras, ExDoc),
+Extras2 = Extras ++ MdFiles,
+ExDoc2 = lists:keystore(extras, 1, ExDoc, {extras, Extras2}),
+CONFIG2 = lists:keystore(ex_doc, 1, CONFIG, {ex_doc, ExDoc2}),
+CONFIG2.
