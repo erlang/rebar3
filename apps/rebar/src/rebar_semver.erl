@@ -32,7 +32,7 @@ parse_version(Version) ->
 parse_constraint(undefined) ->
     {ok, fun (_) -> true end};
 parse_constraint(Constraint) ->
-    case parse_constraint_ors(binary:split(Constraint, [~" or ", ~"||"], [global]), []) of
+    case parse_constraint_ors(binary:split(Constraint, [<<" or ">>, <<"||">>], [global]), []) of
         nomatch -> {error, {invalid_vsn, Constraint}};
         Match -> {ok, Match}
     end.
@@ -42,7 +42,7 @@ parse_constraint_ors([], [Match]) -> Match;
 parse_constraint_ors([], Matchers) ->
     fun (Vsn) -> lists:any(fun (Match) -> Match(Vsn) end, Matchers) end;
 parse_constraint_ors([And|Ors], Matchers) ->
-    case parse_constraint_ands(binary:split(And, [~" and ", ~"&&"], [global]), []) of
+    case parse_constraint_ands(binary:split(And, [<<" and ">>, <<"&&">>], [global]), []) of
         nomatch -> nomatch;
         Match -> parse_constraint_ors(Ors, [Match|Matchers])
     end.
@@ -90,7 +90,7 @@ is_valid(Vsn) ->
 -spec is_prerelease_or_build(undefined | binary()) -> boolean().
 is_prerelease_or_build(undefined) -> false;
 is_prerelease_or_build(Vsn) ->
-    binary:match(Vsn, [~"-", ~"+"]) =/= nomatch.
+    binary:match(Vsn, [<<"-">>, <<"+">>]) =/= nomatch.
 
 -spec match(version(), constraint()) -> boolean().
 match(Version, Constraint) ->
