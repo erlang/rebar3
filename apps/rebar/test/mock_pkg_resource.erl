@@ -173,8 +173,8 @@ to_index(AllDeps, Dict, Repos) ->
                              DKB <- [ec_cnv:to_binary(DK)],
                              DVB <- [ec_cnv:to_binary(DV)]],
               Repo = rebar_test_utils:random_element(Repos),
-
-              ets:insert(?PACKAGE_TABLE, #package{key={N, ec_semver:parse(V), Repo},
+              {ok, Parsed} = rebar_semver:parse_version(V),
+              ets:insert(?PACKAGE_TABLE, #package{key={N, Parsed, Repo},
                                                   dependencies=parse_deps(DepsList),
                                                   retired=false,
                                                   inner_checksum = <<"inner_checksum">>,
@@ -182,12 +182,13 @@ to_index(AllDeps, Dict, Repos) ->
       end, ok, Dict),
 
     lists:foreach(fun({{Name, Vsn}, _}) ->
+                          {ok, Parsed} = rebar_semver:parse_version(Vsn),
                           case lists:any(fun(R) ->
-                                                 ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(Name), ec_semver:parse(Vsn), R})
+                                                 ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(Name), Parsed, R})
                                          end, Repos) of
                               false ->
                                   Repo = rebar_test_utils:random_element(Repos),
-                                  ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(Name), ec_semver:parse(Vsn), Repo},
+                                  ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(Name), Parsed, Repo},
                                                                       dependencies=[],
                                                                       retired=false,
                                                                       inner_checksum = <<"inner_checksum">>,
