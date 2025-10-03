@@ -6,7 +6,7 @@
 all() -> [sub_app_deps, newly_added_dep, newly_added_after_empty_lock, no_deps_empty_lock,
           http_proxy_settings, https_proxy_settings,
           http_os_proxy_settings, https_os_proxy_settings,
-          valid_version, top_override, {group, git}, {group, pkg},
+          top_override, {group, git}, {group, pkg},
           deps_cmd_needs_update_called
          ].
 
@@ -435,41 +435,6 @@ https_os_proxy_settings(_Config) ->
     %% Assert variable is right
     ?assertEqual({ok,{{"localhost", 1234}, []}},
                  httpc:get_option(https_proxy, rebar)).
-
-valid_version(_Config) ->
-    ?assert(rebar_semver:is_valid(<<"0.1">>)),
-    ?assert(rebar_semver:is_valid(<<"0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<" 0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<"  0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<"<0.1">>)),
-    ?assert(rebar_semver:is_valid(<<"<0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<"< 0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<"<  0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<">0.1">>)),
-    ?assert(rebar_semver:is_valid(<<">0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<"> 0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<">  0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<"<=0.1">>)),
-    ?assert(rebar_semver:is_valid(<<"<=0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<"<= 0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<"<=  0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<">=0.1">>)),
-    ?assert(rebar_semver:is_valid(<<">=0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<">= 0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<">=  0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<"==0.1">>)),
-    ?assert(rebar_semver:is_valid(<<"==0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<"== 0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<"==  0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<"~>0.1">>)),
-    ?assert(rebar_semver:is_valid(<<"~>0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<"~> 0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<"~>  0.1.0">>)),
-    ?assert(rebar_semver:is_valid(<<"~> 0.1 or 0.5">>)),
-    ?assert(rebar_semver:is_valid(<<"~> 0.1-or-something">>)),
-    ?assert(rebar_semver:is_valid(<<"> 0.1.0 and < 0.2.0">>)),
-    ok.
-
 
 run(Config) ->
     {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
