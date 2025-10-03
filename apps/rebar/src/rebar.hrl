@@ -46,7 +46,7 @@
 -type ms_field() :: '$1' | '_' | {'$1', '$2'}.
 
 %% TODO: change package and requirement keys to be required (:=) after dropping support for OTP-18
--record(package, {key :: {unicode:unicode_binary() | ms_field(), unicode:unicode_binary() | ms_field() | ec_semver:semver(),
+-record(package, {key :: {unicode:unicode_binary() | ms_field(), unicode:unicode_binary() | ms_field() | rebar_semver:version(),
                           unicode:unicode_binary() | ms_field()},
                   inner_checksum :: binary() | ms_field(),
                   outer_checksum :: binary() | ms_field(),
