@@ -290,9 +290,9 @@ reload_modules(Modules0) ->
     Modules = [M || M <- Modules0, is_changed(M)],
     reload_modules(Modules, erlang:function_exported(code, prepare_loading, 1)).
 
-%% @spec is_changed(atom()) -> boolean()
 %% @doc true if the loaded module is a beam with a vsn attribute
 %%      and does not match the on-disk beam file, returns false otherwise.
+-spec is_changed(atom()) -> boolean().
 is_changed(M) ->
     try
         module_vsn(M:module_info(attributes)) =/= module_vsn(code:get_object_code(M))
