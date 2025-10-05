@@ -1,4 +1,4 @@
-# Hex Package Management
+# Publishing Packages
 
 For package management `rebar3` uses [hex.pm](https://hex.pm), a package manager for Erlang and Elixir packages.
 
