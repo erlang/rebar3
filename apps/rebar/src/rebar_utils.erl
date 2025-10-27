@@ -976,6 +976,7 @@ get_http_vars(Scheme) ->
 -compile({nowarn_deprecated_function, [{http_uri, decode, 1}]}).
 
 set_httpc_options() ->
+    httpc:set_options([{ipfamily, inet6fb4}], rebar),
     set_httpc_options(https_proxy, get_http_vars(https_proxy)),
     set_httpc_options(proxy, get_http_vars(http_proxy)).
 

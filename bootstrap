@@ -119,6 +119,7 @@ get_http_vars(Scheme) ->
     proplists:get_value(Scheme, get_rebar_config(), OS).
 
 set_httpc_options() ->
+    httpc:set_options([{ipfamily, inet6fb4}], rebar),
     set_httpc_options(https_proxy, get_http_vars(https_proxy)),
     set_httpc_options(proxy, get_http_vars(http_proxy)).
 
