@@ -296,33 +296,30 @@ resolve_version(Dep, DepVsn, _OldHash, Hash, HexRegistry, State) when is_binary(
             {ok, RepoConfig} = rebar_hex_repos:get_repo_config(RepoName, RepoConfigs),
             {ok, Package, RepoConfig};
         _ ->
-            Fun = fun(Repo) ->
-                      case resolve_version_(Dep, DepVsn, Repo, HexRegistry, State) of
-                          none ->
-                              not_found;
-                          {error, Error} ->
-                              {error, Error};
-                          {ok, Vsn} ->
-                              get_package(Dep, Vsn, Hash, [Repo], HexRegistry, State)
-                              
-                      end
-                  end,
-            handle_missing_no_exception(Fun, Dep, State)
+            resolve_version_no_package(Dep, DepVsn, Hash, HexRegistry, State)
     end;
 
 resolve_version(Dep, DepVsn, _OldHash, Hash, HexRegistry, State) ->
-    Fun = fun(Repo) ->
-        case resolve_version_(Dep, DepVsn, Repo, HexRegistry, State) of
-            none ->
-                not_found;
-            {error, Error} ->
-                {error, Error};
-            {ok, Vsn} ->
-                get_package(Dep, Vsn, Hash, [Repo], HexRegistry, State)
-        end
-    end,
-    handle_missing_no_exception(Fun, Dep, State).
+    resolve_version_no_package(Dep, DepVsn, Hash, HexRegistry, State).
 
+resolve_version_no_package(Dep, DepVsn, Hash, HexRegistry, State) ->
+    case rebar_semver:parse_constraint(DepVsn) of
+        {ok, _} ->
+            Fun = fun(Repo) ->
+                case resolve_version_(Dep, DepVsn, Repo, HexRegistry, State) of
+                    none ->
+                        not_found;
+                    {ok, Vsn} ->
+                        get_package(Dep, Vsn, Hash, [Repo], HexRegistry, State)
+                end
+            end,
+            handle_missing_no_exception(Fun, Dep, State);
+        
+        Error ->
+            Error
+    end.
+
+    
 check_all_repos(Fun, RepoConfigs) ->
     ec_lists:search(fun(#{name := R}) ->
                             Fun(R)
