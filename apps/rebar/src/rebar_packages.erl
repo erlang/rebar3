@@ -349,7 +349,8 @@ resolve_version_(Dep, Constraint, Repo, HexRegistry, State) ->
             AllVersions = get_package_versions(Dep, AllowPreRelease, Repo, HexRegistry, State),
             resolve_version_loop(Match, AllVersions, none);
     
-        Error -> Error
+        Error ->
+            Error
     end.
     
 resolve_version_loop(_Constraint, [], none) -> none;

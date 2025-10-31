@@ -25,7 +25,8 @@ parse_version(Version) ->
             {error, {invalid_vsn, Version}};
         {{A, B, C, D}, _} when is_binary(A); is_binary(B); is_binary(C); is_binary(D) ->
             {error, {invalid_vsn, Version}};
-        Parsed -> {ok, Parsed}
+        Parsed ->
+            {ok, Parsed}
     end.
 
 -spec parse_constraint(undefined | binary()) -> {ok, constraint()} | {error, {invalid_vsn, binary()}}.
