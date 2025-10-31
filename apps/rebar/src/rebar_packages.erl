@@ -194,7 +194,13 @@ find_highest_matching(Dep, DepVsn, Repo, Table, State) ->
 find_highest_matching_(Dep, DepVsn, #{name := Repo}, Table, State) when is_tuple(DepVsn) ->
     find_highest_matching_(Dep, rebar_semver:format(DepVsn), Repo, Table, State);
 find_highest_matching_(Dep, DepVsn, #{name := Repo}, Table, State) when is_binary(DepVsn) ->
-    resolve_version_(Dep, <<"~>"/utf8, DepVsn/binary>>, Repo, Table, State).
+    case rebar_semver:parse_version(DepVsn) of
+        {ok, _} ->
+            resolve_version_(Dep, <<"~> "/utf8, DepVsn/binary>>, Repo, Table, State);
+            
+        {error, _} ->
+            resolve_version_(Dep, DepVsn, Repo, Table, State)
+    end.
 
 verify_table(State) ->
     ets:info(?PACKAGE_TABLE, named_table) =:= true orelse load_and_verify_version(State).
