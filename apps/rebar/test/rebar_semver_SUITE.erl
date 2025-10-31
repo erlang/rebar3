@@ -65,8 +65,14 @@ valid_version(_Config) ->
     ?assert_valid(<<"~> 0.1 or 0.5">>),
     ?assert_valid(<<"~> 0.1-or-something">>),
     ?assert_valid(<<"> 0.1.0 and < 0.2.0">>),
+    ?assert_valid(<<"> 0.1.0&&< 0.2.0">>),
+    ?assert_valid(<<"> 0.1.0 && < 0.2.0">>),
+    ?assert_valid(<<"> 0.1.0  &&  < 0.2.0">>),
     ?assert_valid(<<"~> 6.6 or ~> 6.7">>),
     ?assert_valid(<<"0.9.9-rc.1 or > 1.0.0 and < 2.0.0">>),
+    ?assert_valid(<<"~> 6.6||~> 6.7">>),
+    ?assert_valid(<<"~> 6.6 || ~> 6.7">>),
+    ?assert_valid(<<"~> 6.6  ||  ~> 6.7">>),
     ok.
 
 invalid_version(_Config) ->
@@ -174,5 +180,6 @@ complex_precedence(_Config) ->
     ?assert_matches(<<"1.5.0">>, <<"~> 1.0 or ~> 2.0 or ~> 3.0">>),
     ?assert_matches(<<"2.5.0">>, <<"~> 1.0 or ~> 2.0 or ~> 3.0">>),
     ?assert_matches(<<"3.5.0">>, <<"~> 1.0 or ~> 2.0 or ~> 3.0">>),
+    ?assert_matches(<<"3.2.1">>, <<"~> 3.3 || ~> 3.2.1">>),
     ?assert_matchesNot(<<"4.5.0">>, <<"~> 1.0 or ~> 2.0 or ~> 3.0">>),
     ok.
