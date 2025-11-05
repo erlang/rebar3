@@ -25,3 +25,4 @@ env
 
 # hex_core artifact
 apps/rebar/src/vendored/r3_safe_erl_term.erl
+apps/rebar/doc
