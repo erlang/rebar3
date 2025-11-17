@@ -1,6 +1,7 @@
 %% @doc Completion file generator for zsh
 %% @end
 -module(rebar_completion_zsh).
+-moduledoc false.
 
 -behavior(rebar_completion).
 

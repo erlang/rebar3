@@ -5,6 +5,7 @@
 %%% from a plugin at https://github.com/tsloughter/rebar_alias after
 %%% years of stability. Only some error checks were added
 -module(rebar_prv_alias).
+-moduledoc false.
 
 -behaviour(provider).
 

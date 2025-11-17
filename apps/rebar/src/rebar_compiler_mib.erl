@@ -1,4 +1,5 @@
 -module(rebar_compiler_mib).
+-moduledoc false.
 
 -behaviour(rebar_compiler).
 

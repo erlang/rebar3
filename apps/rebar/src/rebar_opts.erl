@@ -1,4 +1,5 @@
 -module(rebar_opts).
+-moduledoc false.
 
 -export([get/2,
          get/3,

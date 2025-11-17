@@ -3,6 +3,7 @@
 %% @doc
 %% Hex HTTP API
 -module(r3_hex_api).
+-moduledoc false.
 
 -export([
     delete/2,

@@ -2,6 +2,7 @@
 %% ex: ts=4 sw=4 et
 
 -module(rebar_prv_clean).
+-moduledoc false.
 
 -behaviour(provider).
 

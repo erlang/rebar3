@@ -25,6 +25,7 @@
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
 -module(rebar_app_utils).
+-moduledoc false.
 
 -export([find/2,
          find/3,

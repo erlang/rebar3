@@ -27,6 +27,7 @@
 %% %CopyrightEnd%
 %%
 -module(rebar_user).
+-moduledoc false.
 -compile(inline).
 
 %% Basic standard i/o server for user interface port.

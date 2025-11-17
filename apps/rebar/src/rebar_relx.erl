@@ -2,6 +2,7 @@
 %% ex: ts=4 sw=4 et
 
 -module(rebar_relx).
+-moduledoc false.
 
 -export([do/2,
          opt_spec_list/0,

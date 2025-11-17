@@ -228,6 +228,6 @@ needs_update_(Dir, {Tag, Path}) ->
   ...
 ```
 
-Note that if you resource really needs the new API to work, backwards compatibility will be difficult to achieve since whenever it will be called, it won't have all the information of the new API.
+Note that if your resource really needs the new API to work, backwards compatibility will be difficult to achieve since whenever it will be called, it won't have all the information of the new API.
 
 This approach is mostly useful when you can provide an acceptable (even if degraded) user experience with the old API.

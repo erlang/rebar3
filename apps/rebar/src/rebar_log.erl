@@ -25,6 +25,7 @@
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
 -module(rebar_log).
+-moduledoc false.
 
 -export([init/2,
          crashdump/2,

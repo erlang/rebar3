@@ -25,6 +25,7 @@
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
 -module(rebar_file_utils).
+-moduledoc false.
 
 -export([try_consult/1,
          consult_config/2,

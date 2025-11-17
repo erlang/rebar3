@@ -1,6 +1,7 @@
 %% @doc Completion file generator for bash
 %% @end
 -module(rebar_completion_bash).
+-moduledoc false.
 
 -behavior(rebar_completion).
 

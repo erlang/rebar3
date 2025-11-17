@@ -26,6 +26,7 @@
 %% -------------------------------------------------------------------
 
 -module(rebar_prv_shell).
+-moduledoc false.
 -author("Kresten Krab Thorup <krab@trifork.com>").
 -author("Fred Hebert <mononcqc@ferd.ca>").
 

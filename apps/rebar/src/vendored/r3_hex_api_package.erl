@@ -3,6 +3,7 @@
 %% @doc
 %% Hex HTTP API - Packages.
 -module(r3_hex_api_package).
+-moduledoc false.
 -export([get/2, search/3]).
 
 %% @doc

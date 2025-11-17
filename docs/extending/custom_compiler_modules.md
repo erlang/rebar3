@@ -56,7 +56,7 @@ needed_files(G, ["/path/to/all/files.erl", ...], [{".beam", "/path/to/ebin"}], A
 
 %% Compilation callback with the ability to track build artifacts in the DAG itself.
 %% Introduced in 3.14. Prior to this version, refer to `compile/4'.
-compile_and_track("/path/to/file.erl", [{".beam, "/path/to/ebin"}],
+compile_and_track("/path/to/file.erl", [{".beam", "/path/to/ebin"}],
                   AppOptDict, CompilerOpts) ->
     %% Successfully built a file, tying it to artifacts with optional metadata
     {ok, [{"/path/to/file.erl", "path/to/ebin/file.beam", Metadata}]} |

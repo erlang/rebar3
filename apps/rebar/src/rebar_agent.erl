@@ -1,6 +1,7 @@
 %%% @doc Runs a process that holds a rebar3 state and can be used
 %%% to statefully maintain loaded project state into a running VM.
 -module(rebar_agent).
+-moduledoc false.
 -export([start_link/1, do/1, do/2, do/3, async_do/1, async_do/2, async_do/3]).
 -export(['$handle_undefined_function'/2]).
 -export([init/1,

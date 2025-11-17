@@ -6,6 +6,7 @@
 %%
 %% -------------------------------------------------------------------
 -module(rebar_fetch).
+-moduledoc false.
 
 -export([lock_source/2,
          download_source/2,
