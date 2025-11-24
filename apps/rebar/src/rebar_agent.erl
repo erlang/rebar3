@@ -1,6 +1,7 @@
 %%% @doc Runs a process that holds a rebar3 state and can be used
 %%% to statefully maintain loaded project state into a running VM.
 -module(rebar_agent).
+-moduledoc false.
 -export([start_link/1, do/1, do/2, do/3, async_do/1, async_do/2, async_do/3]).
 -export(['$handle_undefined_function'/2]).
 -export([init/1,
@@ -290,9 +291,9 @@ reload_modules(Modules0) ->
     Modules = [M || M <- Modules0, is_changed(M)],
     reload_modules(Modules, erlang:function_exported(code, prepare_loading, 1)).
 
-%% @spec is_changed(atom()) -> boolean()
 %% @doc true if the loaded module is a beam with a vsn attribute
 %%      and does not match the on-disk beam file, returns false otherwise.
+-spec is_changed(atom()) -> boolean().
 is_changed(M) ->
     try
         module_vsn(M:module_info(attributes)) =/= module_vsn(code:get_object_code(M))

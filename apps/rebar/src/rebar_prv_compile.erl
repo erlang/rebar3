@@ -1,4 +1,5 @@
 -module(rebar_prv_compile).
+-moduledoc false.
 
 -behaviour(provider).
 

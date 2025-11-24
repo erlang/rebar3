@@ -3,6 +3,7 @@
 %% @doc
 %% Hex HTTP API - Package Owners.
 -module(r3_hex_api_package_owner).
+-moduledoc false.
 -export([
     add/5,
     delete/3,

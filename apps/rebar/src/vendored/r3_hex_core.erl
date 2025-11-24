@@ -62,6 +62,7 @@
 %%   `134_217_728' (128 MiB). Set to `infinity' to not enforce the limit.
 
 -module(r3_hex_core).
+-moduledoc false.
 -export([default_config/0]).
 
 -export_type([config/0]).

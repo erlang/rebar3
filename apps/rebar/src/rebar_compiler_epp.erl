@@ -3,6 +3,7 @@
 %%% build complete and accurate DAGs
 %%% @end
 -module(rebar_compiler_epp).
+-moduledoc false.
 -export([deps/2, resolve_module/2]).
 %% cache (a la code path storage, but for dependencies not in code path)
 -export([ensure_started/0, flush/0, resolve_source/2]).

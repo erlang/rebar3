@@ -25,6 +25,7 @@
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
 -module(rebar_templater).
+-moduledoc false.
 
 -export([new/4,
          list_templates/1,

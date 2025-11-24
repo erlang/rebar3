@@ -1,5 +1,6 @@
 %%% @doc multi-OTP version compatibility shim for working with URIs
 -module(rebar_uri).
+-moduledoc false.
 
 -export([
          parse/1, parse/2, scheme_defaults/0,

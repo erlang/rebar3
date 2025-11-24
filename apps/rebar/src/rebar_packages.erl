@@ -1,4 +1,5 @@
 -module(rebar_packages).
+-moduledoc false.
 
 -export([get/2
         ,get_all_names/1
