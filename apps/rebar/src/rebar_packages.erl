@@ -11,7 +11,7 @@
         ,resolve_version/6]).
 
 -ifdef(TEST).
--export([new_package_table/0, find_highest_matching_/5]).
+-export([new_package_table/0, find_highest_matching_/5, parse_deps/1]).
 -endif.
 
 -export_type([package/0]).
@@ -205,10 +205,16 @@ find_highest_matching_(Dep, DepVsn, #{name := Repo}, Table, State) when is_binar
 verify_table(State) ->
     ets:info(?PACKAGE_TABLE, named_table) =:= true orelse load_and_verify_version(State).
 
+%% Filter out optional dependencies. Rebar3 does not support optional
+%% dependencies, so we simply ignore them. For full parity with Mix, we would
+%% need to check if the dependency is included elsewhere (even transitively)
+%% without the optional flag, and only exclude it if all references are
+%% optional.
 parse_deps(Deps) ->
     [{maps:get(app, D, Name), {pkg, Name, Constraint, undefined, undefined}}
      || D=#{package := Name,
-            requirement := Constraint} <- Deps].
+            requirement := Constraint} <- Deps,
+        not maps:get(optional, D, false)].
 
 parse_checksum(<<Checksum:256/big-unsigned>>) ->
     list_to_binary(
