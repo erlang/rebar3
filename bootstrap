@@ -177,7 +177,7 @@ compile_yrl_file(File) ->
     {ok, _} = yecc:file(File).
 
 compile_erl_file(File, Opts) ->
-    case compile:file(File, Opts) of
+    case compile:file(File, [nowarn_deprecated_catch | Opts]) of
         {ok, _Mod} ->
             ok;
         {ok, _Mod, []} ->
