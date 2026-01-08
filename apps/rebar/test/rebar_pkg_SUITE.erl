@@ -16,7 +16,8 @@
 
 all() -> [good_uncached, good_cached, badpkg, badhash_nocache,
           badindexchk, badhash_cache, bad_to_good, good_disconnect,
-          bad_disconnect, pkgs_provider, find_highest_matching].
+          bad_disconnect, pkgs_provider, find_highest_matching,
+          parse_deps_ignores_optional].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -249,6 +250,23 @@ find_highest_matching(_Config) ->
     {ok, Vsn3} = rebar_packages:find_highest_matching_(<<"goodpkg">>, <<"3.0.0-rc.0">>,
                                                        #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
     ?assertEqual({{3,0,0},{[<<"rc">>,0],[]}}, Vsn3).
+
+parse_deps_ignores_optional(_Config) ->
+    %% Test that optional dependencies are filtered out
+    Deps = [
+        #{package => <<"req">>, requirement => <<"~> 1.0">>},
+        #{package => <<"opt">>, requirement => <<"~> 2.0">>, optional => true},
+        #{package => <<"exp">>, requirement => <<"~> 3.0">>, optional => false},
+        #{package => <<"ali">>, requirement => <<"4.0">>, app => <<"alias">>},
+        #{package => <<"ali_opt">>, requirement => <<"~> 5.0">>,
+          app => <<"alias2">>, optional => true}
+    ],
+    Result = rebar_packages:parse_deps(Deps),
+    ?assertEqual(3, length(Result)),
+    ?assertMatch([{<<"req">>, {pkg, <<"req">>, <<"~> 1.0">>, _, _}},
+                  {<<"exp">>, {pkg, <<"exp">>, <<"~> 3.0">>, _, _}},
+                  {<<"alias">>, {pkg, <<"ali">>, <<"4.0">>, _, _}}],
+                 Result).
 
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
