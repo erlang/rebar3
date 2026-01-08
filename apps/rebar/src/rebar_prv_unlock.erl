@@ -1,4 +1,5 @@
 -module(rebar_prv_unlock).
+-moduledoc false.
 
 -behaviour(provider).
 

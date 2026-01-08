@@ -11,6 +11,7 @@
 %%% without demanding to know all the tasks to run ahead of time.
 %%% @end
 -module(rebar_parallel).
+-moduledoc false.
 -export([queue/5,
          pool/4, pool/5, pool_task_async/2, pool_terminate/1]).
 -include("rebar.hrl").

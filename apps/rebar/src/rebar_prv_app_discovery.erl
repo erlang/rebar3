@@ -2,6 +2,7 @@
 %% ex: ts=4 sw=4 et
 
 -module(rebar_prv_app_discovery).
+-moduledoc false.
 
 -behaviour(provider).
 

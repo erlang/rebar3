@@ -3,6 +3,7 @@
 %% ===================================================================
 
 -module(rebar_prv_manifest).
+-moduledoc false.
 
 -behaviour(provider).
 

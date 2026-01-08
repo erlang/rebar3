@@ -13,6 +13,7 @@
 %%   {@link httpc:request/5} for a list of available HTTP options.
 
 -module(r3_hex_http_httpc).
+-moduledoc false.
 -behaviour(r3_hex_http).
 -export([request/5]).
 

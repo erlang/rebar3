@@ -1,6 +1,7 @@
 %%% Common functions to boot/stop distributed setups for
 %%% the rebar3 script.
 -module(rebar_dist_utils).
+-moduledoc false.
 -export([either/3, short/2, long/2, find_options/1]).
 -include("rebar.hrl").
 

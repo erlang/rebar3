@@ -1,6 +1,7 @@
 %%% @doc external alias for `rebar_agent' for more convenient
 %%% calls from a shell.
 -module(r3).
+-moduledoc false.
 -export([do/1, do/2, do/3, async_do/1, async_do/2, async_do/3, break/0, resume/0]).
 -export(['$handle_undefined_function'/2]).
 -include("rebar.hrl").

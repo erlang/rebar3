@@ -1,6 +1,7 @@
 %%% @doc utility functions to do the basic discovery of apps
 %%% and layout for the project.
 -module(rebar_app_discover).
+-moduledoc false.
 
 -export([do/2,
          format_error/1,

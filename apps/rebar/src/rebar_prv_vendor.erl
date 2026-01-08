@@ -1,4 +1,5 @@
 -module(rebar_prv_vendor).
+-moduledoc false.
 -behaviour(provider).
 
 -export([init/1,

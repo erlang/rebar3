@@ -1,4 +1,5 @@
 -module(rebar_hooks).
+-moduledoc false.
 
 -export([run_all_hooks/5
         ,run_all_hooks/6

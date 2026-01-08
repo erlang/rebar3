@@ -1,4 +1,5 @@
 -module(rebar_hex_repos).
+-moduledoc false.
 
 -export([from_state/2,
          get_repo_config/2,

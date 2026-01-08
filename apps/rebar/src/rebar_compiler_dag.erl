@@ -1,6 +1,7 @@
 %%% Module handling the directed graph required for the analysis
 %%% of all top-level applications by the various compiler plugins.
 -module(rebar_compiler_dag).
+-moduledoc false.
 -export([init/4, status/4, maybe_store/5, terminate/1]).
 -export([prune/5, populate_sources/5, populate_deps/3, propagate_stamps/1,
          compile_order/4, store_artifact/4]).

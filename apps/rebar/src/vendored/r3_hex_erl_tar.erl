@@ -43,6 +43,7 @@
 %%   http://www.gnu.org/software/tar/manual/html_node/Standard.html
 %%   http://pubs.opengroup.org/onlinepubs/9699919799/utilities/pax.html
 -module(r3_hex_erl_tar).
+-moduledoc false.
 
 -export([init/3,
          create/2, create/3,
