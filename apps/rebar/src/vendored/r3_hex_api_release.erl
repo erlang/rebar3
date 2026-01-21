@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.10.1, do not edit manually
+%% Vendored from hex_core v0.12.0, do not edit manually
 
 %% @doc
 %% Hex HTTP API - Releases.
@@ -12,13 +12,11 @@
     unretire/3
 ]).
 
--export_type([publish_params/0, retirement_params/0, retirement_reason/0]).
+-export_type([publish_params/0, retirement_params/0]).
 
 -type publish_params() :: [{replace, boolean()}].
 
--type retirement_reason() :: other | invalid | security | deprecated | renamed.
-
--type retirement_params() :: #{reason := retirement_reason(), message => binary()}.
+-type retirement_params() :: #{binary() := binary()}.
 %% @doc
 %% Gets a package release.
 %%
@@ -109,15 +107,26 @@ publish(Config, Tarball) -> publish(Config, Tarball, []).
 publish(Config, Tarball, Params) when
     is_map(Config) andalso is_binary(Tarball) andalso is_list(Params)
 ->
-    QueryString = r3_hex_api:encode_query_string([
-        {replace, proplists:get_value(replace, Params, false)}
-    ]),
-    Path = r3_hex_api:join_path_segments(r3_hex_api:build_repository_path(Config, ["publish"])),
-    PathWithQuery = <<Path/binary, "?", QueryString/binary>>,
-    TarballContentType = "application/octet-stream",
-    Config2 = put_header(<<"content-length">>, integer_to_binary(byte_size(Tarball)), Config),
-    Body = {TarballContentType, Tarball},
-    r3_hex_api:post(Config2, PathWithQuery, Body).
+    case r3_hex_tarball:unpack(Tarball, memory) of
+        {ok, #{metadata := Metadata}} ->
+            PackageName = maps:get(<<"name">>, Metadata),
+            QueryString = r3_hex_api:encode_query_string([
+                {replace, proplists:get_value(replace, Params, false)}
+            ]),
+            Path = r3_hex_api:join_path_segments(
+                r3_hex_api:build_repository_path(Config, ["packages", PackageName, "releases"])
+            ),
+            PathWithQuery = <<Path/binary, "?", QueryString/binary>>,
+            TarballContentType = "application/octet-stream",
+            Config2 = put_header(
+                <<"content-length">>, integer_to_binary(byte_size(Tarball)), Config
+            ),
+            Config3 = maybe_put_expect_header(Config2),
+            Body = {TarballContentType, Tarball},
+            r3_hex_api:post(Config3, PathWithQuery, Body);
+        {error, Reason} ->
+            {error, {tarball, Reason}}
+    end.
 
 %% @doc
 %% Deletes a package release.
@@ -175,3 +184,10 @@ put_header(Name, Value, Config) ->
     Headers = maps:get(http_headers, Config, #{}),
     Headers2 = maps:put(Name, Value, Headers),
     maps:put(http_headers, Headers2, Config).
+
+%% @private
+maybe_put_expect_header(Config) ->
+    case maps:get(send_100_continue, Config, true) of
+        true -> put_header(<<"expect">>, <<"100-continue">>, Config);
+        false -> Config
+    end.

@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.10.1, do not edit manually
+%% Vendored from hex_core v0.12.0, do not edit manually
 
 %% @doc
 %% HTTP contract.
@@ -15,7 +15,9 @@
 -type headers() :: #{binary() => binary()}.
 -export_type([headers/0]).
 -type body() :: {ContentType :: binary(), Body :: binary()} | undefined.
+-export_type([body/0]).
 -type adapter_config() :: map().
+-export_type([adapter_config/0]).
 
 -callback request(method(), URI :: binary(), headers(), body(), adapter_config()) ->
     {ok, {status(), headers(), binary()}}

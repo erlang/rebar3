@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.10.1, do not edit manually
+%% Vendored from hex_core v0.12.0, do not edit manually
 
 %% @doc
 %% Functions for encoding and decoding Hex registries.
@@ -57,7 +57,7 @@ decode_names(Payload, Repository) ->
         #{repository := Repository, packages := _Packages} = Result ->
             {ok, Result};
         _ ->
-            {error, unverified}
+            {error, bad_repo_name}
     end.
 
 %% @doc
@@ -86,7 +86,7 @@ decode_versions(Payload, Repository) ->
         #{repository := Repository, packages := _Packages} = Result ->
             {ok, Result};
         _ ->
-            {error, unverified}
+            {error, bad_repo_name}
     end.
 
 %% @doc
@@ -115,7 +115,7 @@ decode_package(Payload, Repository, Package) ->
         #{repository := Repository, name := Package, releases := _Releases} = Result ->
             {ok, Result};
         _ ->
-            {error, unverified}
+            {error, bad_repo_name}
     end.
 
 %% @private
@@ -133,7 +133,7 @@ decode_and_verify_signed(Signed, PublicKey) ->
     #{payload := Payload, signature := Signature} = decode_signed(Signed),
     case verify(Payload, Signature, PublicKey) of
         true -> {ok, Payload};
-        false -> {error, unverified};
+        false -> {error, bad_signature};
         {error, Reason} -> {error, Reason}
     end.
 
