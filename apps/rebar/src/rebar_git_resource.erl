@@ -245,7 +245,17 @@ git_clone(ref, _GitVsn, Url, Dir, Ref) ->
                          rebar_utils:escape_chars(Url),
                          rebar_utils:escape_chars(filename:basename(Dir))]),
                    [{cd, filename:dirname(Dir)}]),
-    rebar_utils:sh(?FMT("git checkout -q ~ts", [rebar_utils:escape_chars(Ref)]), [{cd, Dir}]);
+    case rebar_utils:sh(?FMT("git checkout -q ~ts", [rebar_utils:escape_chars(Ref)]),
+                        [{cd, Dir}, return_on_error]) of
+        {ok, _} ->
+            ok;
+        {error, Reason} ->
+            ?DEBUG("Initial git checkout failed for ref ~ts: ~p", [Ref, Reason]),
+            rebar_utils:sh(?FMT("git fetch origin ~ts", [rebar_utils:escape_chars(Ref)]),
+                            [{cd, Dir}]),
+            rebar_utils:sh(?FMT("git checkout -q ~ts", [rebar_utils:escape_chars(Ref)]),
+                            [{cd, Dir}])
+        end;
 git_clone(rev, _GitVsn, Url, Dir, Rev) ->
     rebar_utils:sh(?FMT("git clone ~ts -n ~ts ~ts",
                         [git_clone_options(),
