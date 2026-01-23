@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.10.1, do not edit manually
+%% Vendored from hex_core v0.12.0, do not edit manually
 
 %% @doc
 %% Repo API.
@@ -9,7 +9,8 @@
     get_package/2,
     get_tarball/3,
     get_docs/3,
-    get_public_key/1
+    get_public_key/1,
+    get_hex_installs/1
 ]).
 
 %%====================================================================
@@ -23,11 +24,11 @@
 %%
 %% ```
 %% > r3_hex_repo:get_names(r3_hex_core:default_config()).
-%% {ok, {200, ...,
-%%     [
-%%         #{name => <<"package1">>},
-%%         #{name => <<"package2">>},
-%%     ]}}
+%% {ok,{200, ...,
+%%      #{packages => [
+%%            #{name => <<"package1">>},
+%%            #{name => <<"package2">>},
+%%            ...]}}}
 %% '''
 %% @end
 get_names(Config) when is_map(Config) ->
@@ -44,12 +45,12 @@ get_names(Config) when is_map(Config) ->
 %% ```
 %% > r3_hex_repo:get_versions(Config).
 %% {ok, {200, ...,
-%%     [
-%%         #{name => <<"package1">>, retired => [],
-%%           versions => [<<"1.0.0">>]},
-%%         #{name => <<"package2">>, retired => [<<"0.5.0>>"],
-%%           versions => [<<"0.5.0">>, <<"1.0.0">>]},
-%%     ]}}
+%%       #{packages => [
+%%             #{name => <<"package1">>, retired => [],
+%%               versions => [<<"1.0.0">>]},
+%%             #{name => <<"package2">>, retired => [<<"0.5.0>>"],
+%%               versions => [<<"0.5.0">>, <<"1.0.0">>]},
+%%             ...]}}}
 %% '''
 %% @end
 get_versions(Config) when is_map(Config) ->
@@ -66,12 +67,13 @@ get_versions(Config) when is_map(Config) ->
 %% ```
 %% > r3_hex_repo:get_package(r3_hex_core:default_config(), <<"package1">>).
 %% {ok, {200, ...,
-%%     {
-%%         #{checksum => ..., version => <<"0.5.0">>, dependencies => []},
-%%         #{checksum => ..., version => <<"1.0.0">>, dependencies => [
-%%             #{package => <<"package2">>, optional => true, requirement => <<"~> 0.1">>}
-%%         ]},
-%%     ]}}
+%%       #{name => <<"package1">>,
+%%         releases => [
+%%             #{checksum => ..., version => <<"0.5.0">>, dependencies => []},
+%%             #{checksum => ..., version => <<"1.0.0">>, dependencies => [
+%%                   #{package => <<"package2">>, optional => true, requirement => <<"~> 0.1">>}
+%%             ]},
+%%     ]}}}
 %% '''
 %% @end
 get_package(Config, Name) when is_binary(Name) and is_map(Config) ->
@@ -140,6 +142,27 @@ get_public_key(Config) ->
     case get(Config, URI, ReqHeaders) of
         {ok, {200, RespHeaders, PublicKey}} ->
             {ok, {200, RespHeaders, PublicKey}};
+        Other ->
+            Other
+    end.
+
+%% @doc
+%% Gets Hex installation versions CSV from repository.
+%%
+%% Examples:
+%%
+%% ```
+%% > r3_hex_repo:get_hex_installs(r3_hex_core:default_config()).
+%% {ok, {200, ..., <<"1.0.0,abc123,1.13.0\n1.1.0,def456,1.14.0\n...">>}}
+%% '''
+%% @end
+get_hex_installs(Config) ->
+    ReqHeaders = make_headers(Config),
+    URI = build_url(Config, <<"installs/hex-1.x.csv">>),
+
+    case get(Config, URI, ReqHeaders) of
+        {ok, {200, RespHeaders, CSV}} ->
+            {ok, {200, RespHeaders, CSV}};
         Other ->
             Other
     end.
@@ -233,5 +256,7 @@ set_header(http_etag, ETag, Headers) when is_binary(ETag) ->
     maps:put(<<"if-none-match">>, ETag, Headers);
 set_header(repo_key, Token, Headers) when is_binary(Token) ->
     maps:put(<<"authorization">>, Token, Headers);
+set_header(api_otp, OTP, Headers) when is_binary(OTP) ->
+    maps:put(<<"x-hex-otp">>, OTP, Headers);
 set_header(_, _, Headers) ->
     Headers.

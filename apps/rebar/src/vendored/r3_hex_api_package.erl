@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.10.1, do not edit manually
+%% Vendored from hex_core v0.12.0, do not edit manually
 
 %% @doc
 %% Hex HTTP API - Packages.
