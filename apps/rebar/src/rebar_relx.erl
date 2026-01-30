@@ -41,8 +41,9 @@ do(Provider, State) ->
 
     Args = [include_erts, system_libs, vm_args, sys_config],
     RelxConfig2 = maybe_obey_command_args(RelxConfig1, Opts, Args),
+    RelxConfig3 = put_mode_first(RelxConfig2),
 
-    {ok, RelxState_0} = rlx_config:to_state(RelxConfig2),
+    {ok, RelxState_0} = rlx_config:to_state(RelxConfig3),
     XrefIgnores = rebar_state:get(State, xref_ignores, []),
     RelxState = rlx_state:filter_xref_warning(RelxState_0,
         fun(Warnings) ->
@@ -227,6 +228,10 @@ overlay_vars(RelxConfig, Opts) ->
         FileName when is_list(FileName) ->
             [FileName]
     end.
+
+put_mode_first(RelxConfig) ->
+    Modes = [V || {mode, _} = V <- RelxConfig],
+    Modes ++ (RelxConfig -- Modes).
 
 maybe_obey_command_args(RelxConfig, Opts, Args) ->
     lists:foldl(
