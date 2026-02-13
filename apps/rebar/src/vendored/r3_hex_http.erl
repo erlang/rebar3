@@ -3,6 +3,7 @@
 %% @doc
 %% HTTP contract.
 -module(r3_hex_http).
+-moduledoc false.
 -export([request/5]).
 -ifdef(TEST).
 -export([user_agent/1]).

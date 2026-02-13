@@ -1,4 +1,5 @@
 -module(rebar_compiler_xrl).
+-moduledoc false.
 
 -behaviour(rebar_compiler).
 

@@ -3,6 +3,7 @@
 %% @doc
 %% Hex HTTP API - Users.
 -module(r3_hex_api_user).
+-moduledoc false.
 -export([
     create/4,
     get/2,

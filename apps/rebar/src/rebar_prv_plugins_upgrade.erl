@@ -1,4 +1,5 @@
 -module(rebar_prv_plugins_upgrade).
+-moduledoc false.
 
 -behaviour(provider).
 

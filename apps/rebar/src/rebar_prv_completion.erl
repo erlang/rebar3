@@ -1,6 +1,7 @@
 %% @doc Generates shell completion files based on available providers and their opts.
 %% @end
 -module(rebar_prv_completion).
+-moduledoc false.
 
 -behaviour(provider).
 

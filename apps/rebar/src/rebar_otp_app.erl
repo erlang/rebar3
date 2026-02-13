@@ -25,6 +25,7 @@
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
 -module(rebar_otp_app).
+-moduledoc false.
 
 -export([compile/2,
          format_error/1]).

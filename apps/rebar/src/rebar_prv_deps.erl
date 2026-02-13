@@ -1,4 +1,5 @@
 -module(rebar_prv_deps).
+-moduledoc false.
 
 -behaviour(provider).
 

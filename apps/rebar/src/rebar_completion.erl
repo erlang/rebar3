@@ -1,4 +1,5 @@
 -module(rebar_completion).
+-moduledoc false.
 
 -export([generate/2]).
 

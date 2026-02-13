@@ -24,7 +24,7 @@ Rules.
 {WS}+               : skip_token.
 
 Erlang code.
-
+-moduledoc false.
 -export([terms/1]).
 
 terms(Tokens) ->

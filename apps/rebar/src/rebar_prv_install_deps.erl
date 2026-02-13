@@ -25,6 +25,7 @@
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
 -module(rebar_prv_install_deps).
+-moduledoc false.
 
 -behaviour(provider).
 

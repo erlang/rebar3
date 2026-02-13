@@ -1,6 +1,7 @@
 %%% @doc build a digraph of applications in order to figure out dependency
 %%% and compile order.
 -module(rebar_digraph).
+-moduledoc false.
 
 -export([compile_order/1
         ,restore_graph/1
