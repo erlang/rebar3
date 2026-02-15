@@ -116,7 +116,7 @@ load_and_verify_version(State) ->
                     %% shouldn't notice, so log as a debug message only
                     ?DEBUG("Package index version mismatch. Current version ~p, this rebar3 expecting ~p",
                            [V, ?PACKAGE_INDEX_VERSION]),
-                    (catch ets:delete(?PACKAGE_TABLE)),
+                    try ets:delete(?PACKAGE_TABLE) catch _:_ -> ok end,
                     new_package_table()
             end;
         _ ->
