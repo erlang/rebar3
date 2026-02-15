@@ -246,7 +246,7 @@ rewrite_leaders(OldUser, NewUser) ->
     %% set any process that had a reference to the old user's group leader to the
     %% new user process. Catch the race condition when the Pid exited after the
     %% liveness check.
-    _ = [catch erlang:group_leader(NewUser, Pid)
+    _ = [try erlang:group_leader(NewUser, Pid) catch _:_ -> ok end
          || Pid <- erlang:processes(),
             [_|_] = Info <- [erlang:process_info(Pid)],
             proplists:get_value(group_leader, Info) == OldUser,
@@ -260,7 +260,7 @@ rewrite_leaders(OldUser, NewUser) ->
             Pid < NewUser, % only change old masters
             {_,Dict} <- [erlang:process_info(Pid, dictionary)],
             {application_master,init,4} == proplists:get_value('$initial_call', Dict)],
-    _ = [catch erlang:group_leader(NewUser, Pid)
+    _ = [try erlang:group_leader(NewUser, Pid) catch _:_ -> ok end
          || Pid <- erlang:processes(),
             lists:member(proplists:get_value(group_leader, erlang:process_info(Pid)),
                          OldMasters)],
