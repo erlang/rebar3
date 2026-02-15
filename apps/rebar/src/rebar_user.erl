@@ -99,7 +99,7 @@ catch_loop(Port, Shell) ->
     catch_loop(Port, Shell, queue:new()).
 
 catch_loop(Port, Shell, Q) ->
-    case catch server_loop(Port, Q) of
+    case catcher(fun() -> server_loop(Port, Q) end) of
 	new_shell ->
 	    exit(Shell, kill),
 	    catch_loop(Port, start_new_shell());
@@ -170,11 +170,14 @@ server_loop(Port, Q) ->
 
 
 get_fd_geometry(Port) ->
-    case (catch port_control(Port,?CTRL_OP_GET_WINSIZE,[])) of
+    try port_control(Port,?CTRL_OP_GET_WINSIZE,[]) of
 	List when length(List) =:= 8 ->
 	    <<W:32/native,H:32/native>> = list_to_binary(List),
 	    {W,H};
 	_ ->
+	    error
+    catch
+	_:_ ->
 	    error
     end.
 
@@ -201,7 +204,7 @@ io_request({put_chars,unicode,Chars}, Port, Q) -> % Binary new in R9C
            put_chars(Bin, Port, Q)
     end;
 io_request({put_chars,unicode,Mod,Func,Args}, Port, Q) ->
-    case catch apply(Mod,Func,Args) of
+    case catcher(fun() -> apply(Mod,Func,Args) end) of
         Data when is_list(Data); is_binary(Data) ->
             case wrap_characters_to_binary(Data, unicode, get(encoding)) of
                 Bin when is_binary(Bin) ->
@@ -213,17 +216,17 @@ io_request({put_chars,unicode,Mod,Func,Args}, Port, Q) ->
             put_chars(Undef, Port, Q)
     end;
 io_request({put_chars,latin1,Chars}, Port, Q) -> % Binary new in R9C
-    case catch unicode:characters_to_binary(Chars, latin1, get(encoding)) of
+    case wrap_unicode_characters_to_binary(Chars, latin1, get(encoding)) of
         Data when is_binary(Data) ->
             put_chars(Data, Port, Q);
         _ ->
             {error,{error,put_chars},Q}
     end;
 io_request({put_chars,latin1,Mod,Func,Args}, Port, Q) ->
-    case catch apply(Mod,Func,Args) of
+    case catcher(fun() -> apply(Mod,Func,Args) end) of
         Data when is_list(Data); is_binary(Data) ->
             case
-                catch unicode:characters_to_binary(Data,latin1,get(encoding))
+                wrap_unicode_characters_to_binary(Data,latin1,get(encoding))
             of
                 Bin when is_binary(Bin) ->
                     put_chars(Bin, Port, Q);
@@ -317,10 +320,10 @@ put_chars(Chars, Port, Q) when is_binary(Chars) ->
     ok = put_port(Chars, Port),
     {ok,ok,Q};
 put_chars(Chars, Port, Q) ->
-    case catch list_to_binary(Chars) of
-	Binary when is_binary(Binary) ->
-	    put_chars(Binary, Port, Q);
-	_ ->
+    try list_to_binary(Chars) of
+	Binary ->
+	    put_chars(Binary, Port, Q)
+    catch _:_ ->
 	    {error,{error,put_chars},Q}
     end.
 
@@ -603,7 +606,7 @@ get_chars_bytes(State, M, F, Xa, Port, Q, Bytes, Enc) ->
     end.
 
 get_chars_apply(State0, M, F, Xa, Port, Q, Enc) ->
-    case catch M:F(State0, cast(queue:head(Q),Enc), Enc, Xa) of
+    case catcher(fun() -> M:F(State0, cast(queue:head(Q),Enc), Enc, Xa) end) of
 	{stop,Result,<<>>} ->
 	    {ok,Result,queue:tail(Q)};
 	{stop,Result,[]} ->
@@ -676,36 +679,36 @@ cast(Data, Encoding) ->
 cast(B, binary, latin1, latin1) when is_binary(B) ->
     B;
 cast(L, binary, latin1, latin1) ->
-    case catch erlang:iolist_to_binary(L) of
+    case wrap_erlang_iolist_to_binary(L) of
         Bin when is_binary(Bin) -> Bin;
         _ -> exit({no_translation, latin1, latin1})
     end;
 cast(Data, binary, unicode, latin1) when is_binary(Data); is_list(Data) ->
-    case catch unicode:characters_to_binary(Data, unicode, latin1) of
+    case wrap_unicode_characters_to_binary(Data, unicode, latin1) of
         Bin when is_binary(Bin) -> Bin;
         _ -> exit({no_translation, unicode, latin1})
     end;
 cast(Data, binary, latin1, unicode) when is_binary(Data); is_list(Data) ->
-    case catch unicode:characters_to_binary(Data, latin1, unicode) of
+    case wrap_unicode_characters_to_binary(Data, latin1, unicode) of
         Bin when is_binary(Bin) -> Bin;
         _ -> exit({no_translation, latin1, unicode})
     end;
 cast(B, binary, unicode, unicode) when is_binary(B) ->
     B;
 cast(L, binary, unicode, unicode) ->
-    case catch unicode:characters_to_binary(L, unicode) of
+    case wrap_unicode_characters_to_binary(L, unicode, unicode) of
         Bin when is_binary(Bin) -> Bin;
         _ -> exit({no_translation, unicode, unicode})
     end;
 cast(B, list, latin1, latin1) when is_binary(B) ->
     binary_to_list(B);
 cast(L, list, latin1, latin1) ->
-    case catch erlang:iolist_to_binary(L) of
+    case wrap_erlang_iolist_to_binary(L) of
         Bin when is_binary(Bin) -> binary_to_list(Bin);
         _ -> exit({no_translation, latin1, latin1})
     end;
 cast(Data, list, unicode, latin1) when is_binary(Data); is_list(Data) ->
-    case catch unicode:characters_to_list(Data, unicode) of
+    case wrap_unicode_characters_to_list(Data, unicode) of
         Chars when is_list(Chars) ->
             [ case X of 
                   High when High > 255 -> 
@@ -717,22 +720,22 @@ cast(Data, list, unicode, latin1) when is_binary(Data); is_list(Data) ->
             exit({no_translation, unicode, latin1})
     end;
 cast(Data, list, latin1, unicode) when is_binary(Data); is_list(Data) ->
-    case catch unicode:characters_to_list(Data, latin1) of
+    case wrap_unicode_characters_to_list(Data, latin1) of
         Chars when is_list(Chars) -> Chars;
         _ -> exit({no_translation, latin1, unicode})
     end;
 cast(Data, list, unicode, unicode) when is_binary(Data); is_list(Data) ->
-    case catch unicode:characters_to_list(Data, unicode) of
+    case wrap_unicode_characters_to_list(Data, unicode) of
         Chars when is_list(Chars) -> Chars;
         _ -> exit({no_translation, unicode, unicode})
     end.
 
 wrap_characters_to_binary(Chars, unicode, latin1) ->
-    case catch unicode:characters_to_binary(Chars, unicode, latin1) of
+    case wrap_unicode_characters_to_binary(Chars, unicode, latin1) of
         Bin when is_binary(Bin) ->
             Bin;
         _ ->
-            case catch unicode:characters_to_list(Chars, unicode) of
+            case wrap_unicode_characters_to_list(Chars, unicode) of
                 L when is_list(L) ->
                     list_to_binary(
                       [ case X of
@@ -748,10 +751,33 @@ wrap_characters_to_binary(Chars, unicode, latin1) ->
 wrap_characters_to_binary(Bin, From, From) when is_binary(Bin) ->
     Bin;
 wrap_characters_to_binary(Chars, From, To) ->
-    case catch unicode:characters_to_binary(Chars, From, To) of
+    case wrap_unicode_characters_to_binary(Chars, From, To) of
         Bin when is_binary(Bin) ->
             Bin;
         _ ->
             error
     end.
 
+wrap_erlang_iolist_to_binary(L) ->
+  try erlang:iolist_to_binary(L)
+  catch _:_ -> error
+  end.
+
+wrap_unicode_characters_to_binary(Chars, InEncoding, OutEncoding) ->
+  try unicode:characters_to_binary(Chars, InEncoding, OutEncoding)
+  catch _:_ -> error
+  end.
+
+wrap_unicode_characters_to_list(Chars, InEncoding) ->
+  try unicode:characters_to_list(Chars, InEncoding)
+  catch _:_ -> error
+  end.
+
+%% This module has "interesting" control-flow, so where it's not obvious that
+%% it's not needed, we use this emulation of old-style catches.
+catcher(Fun) ->
+  try Fun()
+  catch throw:Result -> Result;
+        error:Reason:ST -> {'EXIT', {Reason, ST}};
+        exit:Reason -> {'EXIT', Reason}
+  end.
