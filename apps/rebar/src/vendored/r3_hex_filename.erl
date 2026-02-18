@@ -28,6 +28,7 @@
 %%
 
 -module(r3_hex_filename).
+-moduledoc false.
 -export([safe_relative_path/1]).
 
 safe_relative_path(Path) ->

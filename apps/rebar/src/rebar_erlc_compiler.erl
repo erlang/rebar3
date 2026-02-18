@@ -25,6 +25,7 @@
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
 -module(rebar_erlc_compiler).
+-moduledoc false.
 
 -export([compile/1, compile/2, compile/3,
          compile_dir/3, compile_dir/4,

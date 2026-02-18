@@ -3,6 +3,7 @@
 %% @doc
 %% Functions for encoding and decoding Hex registries.
 -module(r3_hex_registry).
+-moduledoc false.
 -export([
     encode_names/1,
     decode_names/2,

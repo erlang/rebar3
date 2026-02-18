@@ -3,6 +3,7 @@
 %% @doc
 %% Hex HTTP API - Keys.
 -module(r3_hex_api_key).
+-moduledoc false.
 -export([
     list/1,
     get/2,

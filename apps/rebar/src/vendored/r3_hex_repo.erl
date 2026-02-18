@@ -3,6 +3,7 @@
 %% @doc
 %% Repo API.
 -module(r3_hex_repo).
+-moduledoc false.
 -export([
     get_names/1,
     get_versions/1,

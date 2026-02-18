@@ -13,6 +13,7 @@
 %%%          the 'red vs green' resambles the diff view 'remove vs add'
 %%% * blue:  argument positions.
 -module(rebar_dialyzer_format).
+-moduledoc false.
 
 -include("rebar.hrl").
 

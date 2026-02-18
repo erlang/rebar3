@@ -1,5 +1,6 @@
 %%% @doc Module handling rich formatting of errors.
 -module(rebar_compiler_format).
+-moduledoc false.
 -export([format/5]).
 
 -include("rebar.hrl").

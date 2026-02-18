@@ -1,4 +1,5 @@
 -module(rebar_prv_edoc).
+-moduledoc false.
 
 -behaviour(provider).
 

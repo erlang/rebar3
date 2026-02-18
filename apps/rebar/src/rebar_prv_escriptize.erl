@@ -25,6 +25,7 @@
 %% THE SOFTWARE.
 %% -------------------------------------------------------------------
 -module(rebar_prv_escriptize).
+-moduledoc false.
 
 -behaviour(provider).
 

@@ -35,6 +35,7 @@
 %% accessible to the rest of the run.
 %% @end
 -module(rebar3).
+-moduledoc false.
 
 -export([main/0,
          main/1,

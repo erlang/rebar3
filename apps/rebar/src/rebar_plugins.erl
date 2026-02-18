@@ -2,6 +2,7 @@
 %% ex: ts=4 sw=4 et
 
 -module(rebar_plugins).
+-moduledoc false.
 
 -export([project_plugins_install/1
         ,top_level_install/1

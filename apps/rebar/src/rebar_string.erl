@@ -3,6 +3,7 @@
 %%%
 %%% Also contains other useful string functionality.
 -module(rebar_string).
+-moduledoc false.
 %% Compatibility exports
 -export([join/2, split/2, lexemes/2, trim/1, trim/3, uppercase/1, lowercase/1, chr/2]).
 %% Util exports

@@ -1,4 +1,5 @@
 -module(rebar_compiler).
+-moduledoc false.
 
 -export([analyze_all/2,
          analyze_all_extras/2,

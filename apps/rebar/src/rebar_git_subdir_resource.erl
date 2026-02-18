@@ -1,6 +1,7 @@
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
 -module(rebar_git_subdir_resource).
+-moduledoc false.
 
 -behaviour(rebar_resource_v2).
 

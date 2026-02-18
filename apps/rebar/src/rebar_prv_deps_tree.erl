@@ -1,4 +1,5 @@
 -module(rebar_prv_deps_tree).
+-moduledoc false.
 
 -behaviour(provider).
 

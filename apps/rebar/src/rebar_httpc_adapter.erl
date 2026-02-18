@@ -1,6 +1,7 @@
 %% Derived from hex_core v0.7.1 for extra flexibility.
 
 -module(rebar_httpc_adapter).
+-moduledoc false.
 -behaviour(r3_hex_http).
 -export([request/5]).
 

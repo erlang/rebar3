@@ -1,4 +1,5 @@
 -module(rebar_env).
+-moduledoc false.
 
 -export([create_env/1,
          create_env/2]).

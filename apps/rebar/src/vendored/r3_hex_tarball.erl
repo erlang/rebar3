@@ -3,6 +3,7 @@
 %% @doc
 %% Functions for creating and unpacking Hex tarballs.
 -module(r3_hex_tarball).
+-moduledoc false.
 -export([
     create/2, create/3,
     create_docs/1, create_docs/2,
