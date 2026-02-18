@@ -49,15 +49,15 @@ do(State) ->
     {ok, State1} = rebar_prv_as:do(State0),
 
     Cwd = rebar_dir:get_cwd(),
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State1),
+    State2 = rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State1),
 
     if All; Specific =/= [] ->
-        DepsDir = rebar_dir:deps_dir(State1),
+        DepsDir = rebar_dir:deps_dir(State2),
         DepsDirs = filelib:wildcard(filename:join(DepsDir, "*")),
-        ProjectApps = rebar_state:project_apps(State1),
-        Deps = rebar_state:all_deps(State1),
+        ProjectApps = rebar_state:project_apps(State2),
+        Deps = rebar_state:all_deps(State2),
         KnownAppNames = [rebar_app_info:name(App) || App <- ProjectApps++Deps],
-        ParsedApps = rebar_app_discover:find_apps(DepsDirs, all, State1),
+        ParsedApps = rebar_app_discover:find_apps(DepsDirs, all, State2),
         AllApps = ProjectApps ++ Deps ++
                   [App || App <- ParsedApps,
                           not lists:member(rebar_app_info:name(App),
@@ -66,17 +66,17 @@ do(State) ->
             true -> fun(_) -> true end;
             false -> fun(AppInfo) -> filter_name(AppInfo, Specific) end
         end,
-        clean_apps(State1, Providers, AllApps, Filter);
+        clean_apps(State2, Providers, AllApps, Filter);
        true ->
-        ProjectApps = rebar_state:project_apps(State1),
-        clean_apps(State1, Providers, ProjectApps, fun(_) -> true end)
+        ProjectApps = rebar_state:project_apps(State2),
+        clean_apps(State2, Providers, ProjectApps, fun(_) -> true end)
     end,
 
-    clean_extras(State1),
+    clean_extras(State2),
 
-    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State1),
+    State3 = rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State2),
 
-    {ok, State1}.
+    {ok, State3}.
 
 -spec format_error(any()) -> iolist().
 format_error(Reason) ->
