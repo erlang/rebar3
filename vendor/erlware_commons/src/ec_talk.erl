@@ -182,11 +182,8 @@ get_boolean(_) ->
 get_integer([]) ->
     no_data;
 get_integer(String) ->
-    case (catch list_to_integer(String)) of
-        {'Exit', _} ->
-            no_clue;
-        Integer ->
-            Integer
+    try list_to_integer(String)
+    catch _:_ -> no_clue
     end.
 
 %% @doc Solely returns a string give the string. This is so the same
