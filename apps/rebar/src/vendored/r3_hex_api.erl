@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.12.0, do not edit manually
+%% Vendored from hex_core v0.12.1, do not edit manually
 
 %% @doc
 %% Hex HTTP API
@@ -106,7 +106,12 @@ request(Config, Method, Path, Body) when is_binary(Path) and is_map(Config) ->
             Response =
                 case binary:match(ContentType, ?ERL_CONTENT_TYPE) of
                     {_, _} ->
-                        {ok, {Status, RespHeaders, binary_to_term(RespBody)}};
+                        case r3_hex_safe_binary_to_term:safe_binary_to_term(RespBody) of
+                            {ok, Term} ->
+                                {ok, {Status, RespHeaders, Term}};
+                            {error, Reason} ->
+                                {error, Reason}
+                        end;
                     nomatch ->
                         {ok, {Status, RespHeaders, nil}}
                 end,

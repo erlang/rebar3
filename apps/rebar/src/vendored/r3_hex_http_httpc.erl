@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.12.0, do not edit manually
+%% Vendored from hex_core v0.12.1, do not edit manually
 
 %% @doc
 %% httpc-based implementation of {@link r3_hex_http} contract.
