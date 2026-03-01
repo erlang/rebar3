@@ -223,7 +223,7 @@ mock_config(Name, Config) ->
     meck:new(rebar_prv_update, [passthrough]),
     meck:expect(rebar_prv_update, do, fun(State) -> {ok, State} end),
 
-    catch ets:delete(?PACKAGE_TABLE),
+    try ets:delete(?PACKAGE_TABLE) catch _:_ -> ok end,
     rebar_packages:new_package_table(),
 
     lists:foreach(fun({{N, Vsn}, [Deps, Checksum, _]}) ->
