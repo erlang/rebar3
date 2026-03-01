@@ -219,10 +219,10 @@ check_modules(Config) ->
     ct:pal("code:get_path() -> ~p", [code:get_path()]),
 
     ?assertEqual(RootDir ++ "_build/default/plugins/lib/rp_a/ebin", rp_a:f()),
-    ct:pal("~p", [try file:list_dir(RootDir ++ "_build/default/lib/") catch _:_ -> error end]),
-    ct:pal("~p", [try file:list_dir(RootDir ++ "_build/default/lib/rp_b/") catch _:_ -> error end]),
-    ct:pal("~p", [try file:list_dir(RootDir ++ "_build/default/lib/rp_b/ebin") catch _:_ -> error end]),
-    ct:pal("~p", [try b:module_info() catch _:_ -> error end]),
+    ct:pal("~p", [safe_list_dir(RootDir ++ "_build/default/lib/")]),
+    ct:pal("~p", [safe_list_dir(RootDir ++ "_build/default/lib/rp_b/")]),
+    ct:pal("~p", [safe_list_dir(RootDir ++ "_build/default/lib/rp_b/ebin")]),
+    ct:pal("~p", [safe_module_info(b)]),
     ?assertEqual(RootDir ++ "_build/default/lib/rp_b/ebin", rp_b:f()),
     ?assertEqual(RootDir ++ "_build/default/lib/rp_c/ebin", rp_c:f()),
     ?assertEqual(RootDir ++ "_build/default/lib/rp_d/ebin", rp_d:f()),
@@ -294,3 +294,13 @@ apps_to_str([]) ->
 apps_to_str(Apps) ->
     AppsStr = unicode:characters_to_list(lists:join(", ", Apps)),
     "stdlib, kernel, " ++ AppsStr.
+
+safe_list_dir(Path) ->
+    try file:list_dir(Path)
+    catch Class:Reason -> {Path, {Class, Reason}}
+    end.
+
+safe_module_info(Mod) ->
+    try Mod:module_info()
+    catch Class:Reason -> {Mod, {Class, Reason}}
+    end.
