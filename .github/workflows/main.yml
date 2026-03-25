@@ -56,7 +56,7 @@ jobs:
     - name: Debug Brew
       run: brew doctor || true
     - name: Install Erlang
-      run: brew install erlang@${{ env.LATEST_OTP_RELEASE }}
+      run: 'brew install "erlang@${LATEST_OTP_RELEASE}"'
     - name: Compile
       run: ./bootstrap
     - name: CT tests
