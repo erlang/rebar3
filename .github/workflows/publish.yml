@@ -15,6 +15,8 @@ jobs:
 
     permissions:
       contents: write
+      id-token: write
+      attestations: write
 
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -29,6 +31,17 @@ jobs:
     - name: CT tests
       run: ./rebar3 ct
 
+    - name: Attest Build Provenance
+      id: attest
+      uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+      with:
+        subject-path: ./rebar3
+
+    - name: Copy Attestation Bundle
+      run: cp "${ATTESTATION}" rebar3.sigstore
+      env:
+        ATTESTATION: ${{ steps.attest.outputs.bundle-path }}
+
     - name: Create Release
       env:
         GITHUB_TOKEN: ${{ github.token }}
@@ -39,13 +52,14 @@ jobs:
           --generate-notes \
           "${GITHUB_REF_NAME}"
 
-    - name: Upload Release Asset
+    - name: Upload Release Assets
       env:
         GITHUB_TOKEN: ${{ github.token }}
       run: |
         gh release upload --clobber "${GITHUB_REF_NAME}" \
           --repo "${GITHUB_REPOSITORY}" \
-          rebar3
+          rebar3 \
+          rebar3.sigstore
 
     - name: Configure AWS credentials
       if: "!github.event.release.prerelease"
