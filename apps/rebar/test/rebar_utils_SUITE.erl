@@ -44,7 +44,7 @@ init_per_testcase(_, Config) ->
     rebar_test_utils:init_rebar_state(Config).
 
 end_per_testcase(_, _Config) ->
-    catch meck:unload().
+    try meck:unload() catch _:_ -> ok end.
 
 all() ->
     [{group, args_to_tasks},
