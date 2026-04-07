@@ -16,7 +16,7 @@ init_per_testcase(plugin_tpl, Config) ->
     PrivDir = ?config(priv_dir, Config),
     Name = rebar_test_utils:create_random_name("plugin_tpl"),
     AppsDir = filename:join([PrivDir, rebar_test_utils:create_random_name(Name)]),
-    ec_file:copy(filename:join([DataDir, "plugin_tpl"]), AppsDir, [recursive]),
+    rebar_file_utils:copy(filename:join([DataDir, "plugin_tpl"]), AppsDir, [recursive]),
     Verbosity = rebar3:log_level(),
     rebar_log:init(command_line, Verbosity),
     GlobalDir = filename:join([DataDir, "cache"]),

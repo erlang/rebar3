@@ -1,3 +1,25 @@
+%% %CopyrightBegin%
+%%
+%% SPDX-License-Identifier: Apache-2.0
+%%
+%% SPDX-FileCopyrightText: Copyright 2015-2026 Rebar3 and its contributors
+%%
+%% SPDX-FileCopyrightText: Copyright 2026 Dipl. Phys. Peer Stritzinger GmbH
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%%
+%% %CopyrightEnd%
+
 -module(rebar_src_dirs_SUITE).
 
 -export([suite/0,
@@ -165,7 +187,7 @@ build_basic_app(Config) ->
     Extra = filename:join([AppDir, "extra", "extra.erl"]),
     ok = filelib:ensure_dir(Extra),
     Src = io_lib:format("-module(extra).~n-export([x/0]).~nx() -> ok.", []),
-    ok = ec_file:write(Extra, Src),
+    ok = file:write_file(Extra, Src),
 
     RebarConfig = [{erl_opts, [{extra_src_dirs, ["extra"]}]}],
 
@@ -200,12 +222,12 @@ build_multi_apps(Config) ->
     Extra1 = filename:join([AppDir, "apps", Name1, "extra", "extra1.erl"]),
     ok = filelib:ensure_dir(Extra1),
     Src1 = io_lib:format("-module(extra1).~n-export([x/0]).~nx() -> ok.", []),
-    ok = ec_file:write(Extra1, Src1),
+    ok = file:write_file(Extra1, Src1),
 
     Extra2 = filename:join([AppDir, "apps", Name2, "extra", "extra2.erl"]),
     ok = filelib:ensure_dir(Extra2),
     Src2 = io_lib:format("-module(extra2).~n-export([x/0]).~nx() -> ok.", []),
-    ok = ec_file:write(Extra2, Src2),
+    ok = file:write_file(Extra2, Src2),
 
     RebarConfig = [{erl_opts, [{extra_src_dirs, ["extra"]}]}],
 
@@ -254,7 +276,7 @@ src_dir_takes_precedence_over_extra(Config) ->
     Extra = filename:join([AppDir, "extra", "extra.erl"]),
     ok = filelib:ensure_dir(Extra),
     Src = io_lib:format("-module(extra).~n-export([x/0]).~nx() -> ok.", []),
-    ok = ec_file:write(Extra, Src),
+    ok = file:write_file(Extra, Src),
 
     RebarConfig = [{erl_opts, [{src_dirs, ["src", "extra"]}, {extra_src_dirs, ["extra"]}]}],
 

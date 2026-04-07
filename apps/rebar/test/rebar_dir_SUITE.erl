@@ -1,3 +1,25 @@
+%% %CopyrightBegin%
+%%
+%% SPDX-License-Identifier: Apache-2.0
+%%
+%% SPDX-FileCopyrightText: Copyright 2015-2026 Rebar3 and its contributors
+%%
+%% SPDX-FileCopyrightText: Copyright 2026 Dipl. Phys. Peer Stritzinger GmbH
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%%
+%% %CopyrightEnd%
+
 -module(rebar_dir_SUITE).
 
 -export([all/0, init_per_testcase/2, end_per_testcase/2]).
@@ -99,7 +121,7 @@ alt_src_dir_nested(Config) ->
     ModDir = filename:join([AppsDir, "apps", Name1, "alt", "nested"]),
     Mod = "-module(altmod). -export([main/0]). main() -> ok.",
 
-    ec_file:mkdir_path(ModDir),
+    filelib:ensure_path(ModDir),
     ok = file:write_file(filename:join([ModDir, "altmod.erl"]), Mod),
 
     Ebin = filename:join([AppsDir, "_build", "default", "lib", Name1, "ebin", "altmod.beam"]),

@@ -1,3 +1,25 @@
+%% %CopyrightBegin%
+%%
+%% SPDX-License-Identifier: Apache-2.0
+%%
+%% SPDX-FileCopyrightText: Copyright 2015-2026 Rebar3 and its contributors
+%%
+%% SPDX-FileCopyrightText: Copyright 2026 Dipl. Phys. Peer Stritzinger GmbH
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%%
+%% %CopyrightEnd%
+
 -module(rebar_pkg_alias_SUITE).
 -compile(export_all).
 -include_lib("common_test/include/ct.hrl").
@@ -165,7 +187,7 @@ transitive_hash_mismatch(Config) ->
     [io:format(Io, "~p.~n", [Attr]) || Attr <- NewLock],
     file:close(Io),
     ct:pal("lock: ~p", [file:consult(Lockfile)]),
-    ec_file:remove(filename:join([AppDir, "_build"]), [recursive]),
+    file:del_dir_r(filename:join([AppDir, "_build"])),
     ?assertMatch(
        {error, {rebar_fetch, {unexpected_hash, _, _, _}}},
        rebar_test_utils:run_and_check(Config, RebarConfig, ["lock"], return)
