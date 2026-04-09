@@ -1169,10 +1169,10 @@ partial_chain(Certs) ->
     Certs1 = [{Cert, public_key:pkix_decode_cert(Cert, otp)} || Cert <- Certs],
     CACerts = certifi:cacerts(),
     CACerts1 = [public_key:pkix_decode_cert(Cert, otp) || Cert <- CACerts],
-    case ec_lists:find(fun({_, Cert}) ->
+    case lists:search(fun({_, Cert}) ->
                                check_cert(CACerts1, Cert)
-                       end, Certs1) of
-        {ok, Trusted} ->
+                      end, Certs1) of
+        {value, Trusted} ->
             {trusted_ca, element(1, Trusted)};
         _ ->
             unknown_ca

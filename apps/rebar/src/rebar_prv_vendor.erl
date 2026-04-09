@@ -128,9 +128,9 @@ check_project_layout(State) ->
                     rebar_file_utils:real_dir_path(rebar_app_info:dir(X)) =:=
                     rebar_file_utils:real_dir_path(RootDir)
                  end, Apps) of
-                {ok, _App} ->
+                {value, _App} ->
                     non_umbrella;
-                error ->
+                false ->
                     umbrella
             end
     end.
