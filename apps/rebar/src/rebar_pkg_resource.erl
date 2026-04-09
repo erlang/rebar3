@@ -141,8 +141,10 @@ format_error({bad_registry_checksum, Name, Vsn, Expected, Found}) ->
 -spec request(rebar_hex_repos:repo(), binary(), binary(), binary() | undefined)
              -> {ok, cached} | {ok, binary(), binary()} | error.
 request(Config, Name, Version, ETag) ->
-    Config1 = Config#{http_etag => ETag},
-    try r3_hex_repo:get_tarball(Config1, Name, Version) of
+    try r3_hex_cli_auth:with_repo(Config, fun(AuthConfig) ->
+        Config1 = AuthConfig#{http_etag => ETag},
+        r3_hex_repo:get_tarball(Config1, Name, Version)
+    end) of
         {ok, {200, #{<<"etag">> := ETag1}, Tarball}} ->
             {ok, Tarball, ETag1};
         {ok, {304, _Headers, _}} ->
