@@ -3,11 +3,14 @@
 -export([from_state/2,
          get_repo_config/2,
          auth_config/1,
+         get_repo_auth_config/2,
+         update_repo_auth_config/3,
          remove_from_auth_config/2,
          update_auth_config/2,
          format_error/1,
          anon_repo_config/1,
-         format_repo/1
+         format_repo/1,
+         apply_env_overrides/1
         ]).
 
 -ifdef(TEST).
@@ -20,16 +23,38 @@
 
 -export_type([repo/0]).
 
--type repo() :: #{name => unicode:unicode_binary(),
-                  api_url => binary(),
-                  api_key => binary(),
-                  repo_url => binary(),
-                  repo_key => binary(),
-                  repo_public_key => binary(),
-                  repo_verify => binary(),
-                  repo_verify_origin => binary(),
-                  mirror_of => _ % legacy field getting stripped
-                 }.
+%% repo() extends r3_hex_core:config() with rebar3-specific fields
+-type repo() :: #{
+    %% rebar3-specific fields
+    name => unicode:unicode_binary(),
+    repo_name => unicode:unicode_binary(),
+    parent => unicode:unicode_binary(),
+    mirror_of => term(),
+    %% r3_hex_core:config() fields
+    api_key => binary() | undefined,
+    api_otp => binary() | undefined,
+    api_organization => binary() | undefined,
+    api_repository => binary() | undefined,
+    api_url => binary(),
+    http_adapter => {module(), map()},
+    http_etag => binary() | undefined,
+    http_headers => map(),
+    http_user_agent_fragment => binary(),
+    repo_key => binary() | undefined,
+    repo_public_key => binary(),
+    repo_url => binary(),
+    repo_organization => binary() | undefined,
+    repo_verify => boolean(),
+    repo_verify_origin => boolean(),
+    send_100_continue => boolean(),
+    tarball_max_size => pos_integer() | infinity,
+    tarball_max_uncompressed_size => pos_integer() | infinity,
+    docs_tarball_max_size => pos_integer() | infinity,
+    docs_tarball_max_uncompressed_size => pos_integer() | infinity,
+    trusted => boolean(),
+    oauth_exchange => boolean(),
+    oauth_exchange_url => binary() | undefined
+}.
 
 from_state(BaseConfig, State) ->
     HexConfig = rebar_state:get(State, hex, []),
@@ -39,21 +64,48 @@ from_state(BaseConfig, State) ->
     %% add base config entries that are specific to use by rebar3 and not overridable
     Repos1 = merge_with_base_and_auth(Repos, BaseConfig, Auth),
     %% merge organizations parent repo options into each oraganization repo
-    update_organizations(maybe_override_default_repo_url(Repos1, State)).
+    Repos2 = update_organizations(maybe_override_default_repo_url(Repos1, State)),
+    %% apply environment variable overrides to all repos
+    [apply_env_overrides(Repo) || Repo <- Repos2].
 
 -spec get_repo_config(unicode:unicode_binary(), rebar_state:t() | [repo()])
-                     -> {ok, repo()} | error.
+                     -> {ok, repo()}.
 get_repo_config(RepoName, Repos) when is_list(Repos) ->
     case ec_lists:find(fun(#{name := N}) -> N =:= RepoName end, Repos) of
-        error ->
-            throw(?PRV_ERROR({repo_not_found, RepoName}));
         {ok, RepoConfig} ->
-            {ok, RepoConfig}
+            {ok, RepoConfig};
+        error ->
+            maybe_create_org_config(RepoName, Repos)
     end;
 get_repo_config(RepoName, State) ->
     Resources = rebar_state:resources(State),
     #{repos := Repos} = rebar_resource_v2:find_resource_state(pkg, Resources),
     get_repo_config(RepoName, Repos).
+
+%% @private
+%% Create a repo config for "parent:org" format repos.
+%% Only succeeds if parent repo exists, otherwise throws repo_not_found.
+-spec maybe_create_org_config(unicode:unicode_binary(), [repo()]) -> {ok, repo()}.
+maybe_create_org_config(RepoName, Repos) ->
+    case rebar_string:split(RepoName, <<":">>) of
+        [ParentName, Org] ->
+            case ec_lists:find(fun(#{name := N}) -> N =:= ParentName end, Repos) of
+                {ok, ParentConfig} ->
+                    OrgConfig = ParentConfig#{
+                        name => RepoName,
+                        repo_name => ParentName,
+                        repo_organization => Org,
+                        api_organization => Org,
+                        api_repository => Org,
+                        parent => ParentName
+                    },
+                    {ok, apply_env_overrides(OrgConfig)};
+                error ->
+                    throw(?PRV_ERROR({repo_not_found, RepoName}))
+            end;
+        _ ->
+            throw(?PRV_ERROR({repo_not_found, RepoName}))
+    end.
 
 -spec anon_repo_config(repo()) ->
     #{api_url := _, name := _, repo_name => _, repo_organization => _,
@@ -106,7 +158,7 @@ merge_repos(Repos) ->
                                 %% We set the repo_organization and api_organization to org
                                 %% for fetching and publishing private packages.
                                 update_repo_list(R#{name => Name,
-                                                    repo_name => Org,
+                                                    repo_name => Repo,
                                                     repo_organization => Org,
                                                     api_organization => Org,
                                                     api_repository => Org,
@@ -193,6 +245,25 @@ auth_config(State) ->
             ?ABORT("Error found in repos auth config (~ts) at line ~ts", [AuthFile, Reason])
     end.
 
+-spec get_repo_auth_config(unicode:unicode_binary(), rebar_state:t()) -> map() | undefined.
+get_repo_auth_config(RepoName, State) ->
+    AuthConfig = auth_config(State),
+    case maps:find(RepoName, AuthConfig) of
+        {ok, RepoAuth} when is_map(RepoAuth) ->
+            RepoAuth;
+        _ ->
+            undefined
+    end.
+
+-spec update_repo_auth_config(map(), unicode:unicode_binary(), rebar_state:t()) -> ok.
+update_repo_auth_config(Updates, RepoName, State) ->
+    ExistingRepoAuth = case get_repo_auth_config(RepoName, State) of
+        undefined -> #{};
+        Auth -> Auth
+    end,
+    UpdatedRepoAuth = maps:merge(ExistingRepoAuth, Updates),
+    update_auth_config(#{RepoName => UpdatedRepoAuth}, State).
+
 -spec remove_from_auth_config(term(), rebar_state:t()) -> ok.
 remove_from_auth_config(Key, State) ->
     Updated = maps:remove(Key, auth_config(State)),
@@ -209,3 +280,103 @@ write_auth_config(Config, State) ->
     NewConfig = iolist_to_binary(["%% coding: utf-8", io_lib:nl(),
                                   io_lib:print(Config), ".", io_lib:nl()]),
     ok = file:write_file(AuthConfigFile, NewConfig, [{encoding, utf8}]).
+
+%% Environment variable overrides
+%% These follow the same pattern as the Elixir hex package
+
+-spec apply_env_overrides(repo()) -> repo().
+apply_env_overrides(Config) ->
+    lists:foldl(fun(F, C) -> F(C) end, Config, [
+        fun apply_api_key_override/1,
+        fun apply_api_url_override/1,
+        fun apply_otp_override/1,
+        fun apply_repos_key_override/1,
+        fun apply_unsafe_registry_override/1,
+        fun apply_no_verify_repo_origin_override/1,
+        fun apply_mirror_override/1
+    ]).
+
+apply_api_key_override(Config) ->
+    case os:getenv("HEX_API_KEY") of
+        false -> Config;
+        "" -> Config;
+        ApiKey -> Config#{api_key => list_to_binary(ApiKey)}
+    end.
+
+apply_api_url_override(Config) ->
+    case os:getenv("HEX_API_URL") of
+        false ->
+            case os:getenv("HEX_API") of
+                false -> Config;
+                "" -> Config;
+                ApiUrl -> Config#{api_url => list_to_binary(ApiUrl)}
+            end;
+        "" -> Config;
+        ApiUrl -> Config#{api_url => list_to_binary(ApiUrl)}
+    end.
+
+apply_otp_override(Config) ->
+    case os:getenv("HEX_OTP") of
+        false -> Config;
+        "" -> Config;
+        Otp -> Config#{api_otp => list_to_binary(Otp)}
+    end.
+
+apply_repos_key_override(Config) ->
+    case os:getenv("HEX_REPOS_KEY") of
+        false -> Config;
+        "" -> Config;
+        Key -> Config#{repo_key => list_to_binary(Key)}
+    end.
+
+apply_unsafe_registry_override(Config) ->
+    case os:getenv("HEX_UNSAFE_REGISTRY") of
+        "1" -> Config#{repo_verify => false};
+        "true" -> Config#{repo_verify => false};
+        _ -> Config
+    end.
+
+apply_no_verify_repo_origin_override(Config) ->
+    case os:getenv("HEX_NO_VERIFY_REPO_ORIGIN") of
+        "1" -> Config#{repo_verify_origin => false};
+        "true" -> Config#{repo_verify_origin => false};
+        _ -> Config
+    end.
+
+apply_mirror_override(Config) ->
+    %% HEX_TRUSTED_MIRROR_URL takes precedence (trusted = auth credentials sent)
+    %% HEX_MIRROR_URL is untrusted (no auth credentials sent, no signature verification)
+    case os:getenv("HEX_TRUSTED_MIRROR_URL") of
+        false ->
+            case os:getenv("HEX_TRUSTED_MIRROR") of
+                false -> apply_untrusted_mirror_override(Config);
+                "" -> apply_untrusted_mirror_override(Config);
+                TrustedMirrorUrl ->
+                    Config#{repo_url => list_to_binary(TrustedMirrorUrl),
+                            trusted => true}
+            end;
+        "" -> apply_untrusted_mirror_override(Config);
+        TrustedMirrorUrl ->
+            Config#{repo_url => list_to_binary(TrustedMirrorUrl),
+                    trusted => true}
+    end.
+
+apply_untrusted_mirror_override(Config) ->
+    case os:getenv("HEX_MIRROR_URL") of
+        false ->
+            case os:getenv("HEX_MIRROR") of
+                false -> Config;
+                "" -> Config;
+                MirrorUrl ->
+                    Config#{repo_url => list_to_binary(MirrorUrl),
+                            trusted => false,
+                            repo_verify => false,
+                            repo_verify_origin => false}
+            end;
+        "" -> Config;
+        MirrorUrl ->
+            Config#{repo_url => list_to_binary(MirrorUrl),
+                    trusted => false,
+                    repo_verify => false,
+                    repo_verify_origin => false}
+    end.

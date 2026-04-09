@@ -12,7 +12,9 @@
     get_docs/3,
     get_docs_to_file/4,
     get_public_key/1,
-    get_hex_installs/1
+    get_hex_installs/1,
+    fingerprint/1,
+    fingerprint_equal/2
 ]).
 
 %%====================================================================
@@ -207,6 +209,66 @@ get_hex_installs(Config) ->
         Other ->
             Other
     end.
+
+%% @doc
+%% Computes a SHA256 fingerprint of a PEM-encoded public key.
+%%
+%% Returns a string in the format "SHA256:<base64>" which can be used
+%% to verify public keys out-of-band.
+%%
+%% Examples:
+%%
+%% ```
+%% > r3_hex_repo:fingerprint(PublicKeyPem).
+%% "SHA256:abc123..."
+%% '''
+%% @end
+-spec fingerprint(binary()) -> string().
+fingerprint(PublicKeyPem) when is_binary(PublicKeyPem) ->
+    [PemEntry] = public_key:pem_decode(PublicKeyPem),
+    PublicKey = public_key:pem_entry_decode(PemEntry),
+    application:ensure_all_started(ssh),
+    ssh:hostkey_fingerprint(sha256, PublicKey).
+
+%% @doc
+%% Compares a PEM-encoded public key against an expected fingerprint.
+%%
+%% Uses constant-time comparison to prevent timing attacks.
+%%
+%% Examples:
+%%
+%% ```
+%% > r3_hex_repo:fingerprint_equal(PublicKeyPem, "SHA256:abc123...").
+%% true
+%% '''
+%% @end
+-spec fingerprint_equal(binary(), iodata()) -> boolean().
+fingerprint_equal(PublicKeyPem, ExpectedFingerprint) when is_binary(PublicKeyPem) ->
+    ActualFingerprint = fingerprint(PublicKeyPem),
+    constant_time_compare(
+        list_to_binary(ActualFingerprint),
+        iolist_to_binary(ExpectedFingerprint)
+    ).
+
+%% @private
+%% Constant-time comparison to prevent timing attacks.
+%% Uses crypto:hash_equals/2 on OTP 25+, falls back to manual comparison on older versions.
+-if(?OTP_RELEASE >= 25).
+constant_time_compare(A, B) when byte_size(A) =/= byte_size(B) ->
+    false;
+constant_time_compare(A, B) ->
+    crypto:hash_equals(A, B).
+-else.
+constant_time_compare(A, B) when byte_size(A) =:= byte_size(B) ->
+    constant_time_compare(A, B, 0);
+constant_time_compare(_, _) ->
+    false.
+
+constant_time_compare(<<X, RestA/binary>>, <<Y, RestB/binary>>, Acc) ->
+    constant_time_compare(RestA, RestB, Acc bor (X bxor Y));
+constant_time_compare(<<>>, <<>>, Acc) ->
+    Acc =:= 0.
+-endif.
 
 %%====================================================================
 %% Internal functions
