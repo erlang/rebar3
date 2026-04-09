@@ -138,11 +138,13 @@ format_error({bad_registry_checksum, Name, Vsn, Expected, Found}) ->
 %% {ok, Contents, NewEtag}, otherwise if some error occurred return error.
 %% @end
 %%------------------------------------------------------------------------------
--spec request(rebar_hex_repos:repo(), binary(), binary(), binary() | undefined)
+-spec request(rebar_hex_repos:repo(), binary(), binary(), binary() | undefined, rebar_state:t())
              -> {ok, cached} | {ok, binary(), binary()} | error.
-request(Config, Name, Version, ETag) ->
-    Config1 = Config#{http_etag => ETag},
-    try r3_hex_repo:get_tarball(Config1, Name, Version) of
+request(Config, Name, Version, ETag, State) ->
+    try rebar_hex_auth:with_repo(Config, State, [], fun(AuthConfig) ->
+        Config1 = AuthConfig#{http_etag => ETag},
+        r3_hex_repo:get_tarball(Config1, Name, Version)
+    end) of
         {ok, {200, #{<<"etag">> := ETag1}, Tarball}} ->
             {ok, Tarball, ETag1};
         {ok, {304, _Headers, _}} ->
@@ -210,11 +212,11 @@ store_etag_in_cache(Path, ETag) ->
       UpdateETag :: boolean(),
       Res :: ok | {unexpected_hash, integer(), integer()} | {fetch_fail, binary(), binary()}
            | {bad_registry_checksum, integer(), integer()} | {error, _}.
-cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoConfig}, _State, ETag,
+cached_download(TmpDir, CachePath, Pkg={pkg, Name, Vsn, _OldHash, _Hash, RepoConfig}, State, ETag,
                 ETagPath, UpdateETag) ->
     ?DEBUG("Making request to get package ~ts from repo ~ts",
            [Name, rebar_hex_repos:format_repo(RepoConfig)]),
-    case request(RepoConfig, Name, Vsn, ETag) of
+    case request(RepoConfig, Name, Vsn, ETag, State) of
         {ok, cached} ->
             ?DEBUG("Version cached at ~ts is up to date, reusing it", [CachePath]),
             serve_from_cache(TmpDir, CachePath, Pkg);

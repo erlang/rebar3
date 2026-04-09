@@ -36,7 +36,7 @@ do(State) ->
         Name ->
             Resources = rebar_state:resources(State),
             #{repos := Repos} = rebar_resource_v2:find_resource_state(pkg, Resources),
-            Results = get_package(rebar_utils:to_binary(Name), Repos),
+            Results = get_package(rebar_utils:to_binary(Name), Repos, State),
             case lists:all(fun({_, {error, not_found}}) -> true; (_) -> false end, Results) of
                 true ->
                     ?PRV_ERROR({not_found, Name});
@@ -46,10 +46,10 @@ do(State) ->
             end
     end.
 
--spec get_package(binary(), [map()]) -> [{binary(), {ok, map()} | {error, term()}}].
-get_package(Name, Repos) ->
+-spec get_package(binary(), [map()], rebar_state:t()) -> [{binary(), {ok, map()} | {error, term()}}].
+get_package(Name, Repos, State) ->
     lists:foldl(fun(RepoConfig, Acc) ->
-                        [{maps:get(name, RepoConfig), rebar_packages:get(RepoConfig, Name)} | Acc]
+                        [{maps:get(name, RepoConfig), rebar_packages:get(RepoConfig, Name, State)} | Acc]
                 end, [], Repos).
 
 
