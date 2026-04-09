@@ -1,11 +1,19 @@
-%% Vendored from hex_core v0.12.2, do not edit manually
+%% Vendored from hex_core v0.15.0, do not edit manually
 
-% Copied from https://github.com/erlang/otp/blob/OTP-20.0.1/lib/stdlib/src/erl_tar.hrl
-
+%% This file is a copy of erl_tar.hrl from OTP with the following modifications:
+%% 1. Added chunk_size field to #read_opts{} for streaming extraction to disk
+%% 2. Added {chunks, pos_integer()} to extract_opt() type
+%% 3. Default chunk_size to 65536 in #add_opts{} instead of 0
+%% 4. Added max_size field to #read_opts{} for zip bomb protection
+%% 5. Added {max_size, pos_integer() | infinity} to extract_opt() type
+%%
+%% OTP commit: 013041bd68c2547848e88963739edea7f0a1a90f
 %%
 %% %CopyrightBegin%
 %%
-%% Copyright Ericsson AB 2017. All Rights Reserved.
+%% SPDX-License-Identifier: Apache-2.0
+%%
+%% Copyright Ericsson AB 1997-2025. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -23,14 +31,15 @@
 
 %% Options used when adding files to a tar archive.
 -record(add_opts, {
-          read_info,          %% Fun to use for read file/link info.
-          chunk_size = 0 :: integer(),     %% For file reading when sending to sftp. 0=do not chunk
-          verbose = false :: boolean(),    %% Verbose on/off.
-          atime = undefined :: undefined | integer(),
-          mtime = undefined :: undefined | integer(),
-          ctime = undefined :: undefined | integer(),
-          uid = 0 :: integer(),
-          gid = 0 :: integer()}).
+	 read_info,          %% Fun to use for read file/link info.
+	 chunk_size = 65536, %% Chunk size for reading files.
+         verbose = false,    %% Verbose on/off.
+         atime = undefined,
+         mtime = undefined,
+         ctime = undefined,
+         mode = 8#100644,
+         uid = 0,
+         gid = 0}).
 -type add_opts() :: #add_opts{}.
 
 %% Options used when reading a tar archive.
@@ -40,21 +49,27 @@
           files = all,                         %% Set of files to extract (or all)
           output = file :: 'file' | 'memory',
           open_mode = [],                      %% Open mode options.
-          verbose = false :: boolean()}).      %% Verbose on/off.
+          verbose = false :: boolean(),        %% Verbose on/off.
+          chunk_size = 65536,                  %% Chunk size for streaming to disk.
+          max_size = infinity :: pos_integer() | 'infinity'}).
 -type read_opts() :: #read_opts{}.
 
--type add_opt() ::   dereference
-                   | verbose
-                   | {chunks, pos_integer()}
-                   | {atime, integer()}
-                   | {mtime, integer()}
-                   | {ctime, integer()}
-                   | {uid, integer()}
-                   | {gid, integer()}.
+-type add_opt() :: dereference |
+                   verbose |
+                   {chunks, pos_integer()} |
+                   {atime, non_neg_integer()} |
+                   {mtime, non_neg_integer()} |
+                   {ctime, non_neg_integer()} |
+                   {mode, non_neg_integer()} |
+                   {uid, non_neg_integer()} |
+                   {gid, non_neg_integer()}.
 
+-type name_in_archive() :: string().
 
 -type extract_opt() :: {cwd, string()} |
-                       {files, [string()]} |
+                       {files, [name_in_archive()]} |
+                       {chunks, pos_integer()} |
+                       {max_size, pos_integer() | infinity} |
                        compressed |
                        cooked |
                        memory |
@@ -67,21 +82,20 @@
                       verbose.
 
 -type filelist() :: [file:filename() |
-                     {string(), binary()} |
-                     {string(), file:filename()}].
+                     {name_in_archive(), file:filename_all()}].
 
 -type tar_time() :: non_neg_integer().
 
 %% The tar header, once fully parsed.
 -record(tar_header, {
-          name = "" :: string(),                %% name of header file entry
+          name = "" :: name_in_archive(),       %% name of header file entry
           mode = 8#100644 :: non_neg_integer(), %% permission and mode bits
           uid = 0 :: non_neg_integer(),         %% user id of owner
           gid = 0 :: non_neg_integer(),         %% group id of owner
           size = 0 :: non_neg_integer(),        %% length in bytes
           mtime :: tar_time(),                  %% modified time
           typeflag :: char(),                   %% type of header entry
-          linkname = "" :: string(),            %% target name of link
+          linkname = "" :: name_in_archive(),   %% target name of link
           uname = "" :: string(),               %% user name of owner
           gname = "" :: string(),               %% group name of owner
           devmajor = 0 :: non_neg_integer(),    %% major number of character or block device
@@ -162,16 +176,18 @@
 %% The overall tar reader, it holds the low-level file handle,
 %% its access, position, and the I/O primitives wrapper.
 -record(reader, {
-          handle :: file:io_device() | term(),
+          handle :: user_data(),
           access :: read | write | ram,
           pos = 0 :: non_neg_integer(),
           func :: file_op()
          }).
--type reader() :: #reader{}.
+-opaque tar_descriptor() :: #reader{}.
+-export_type([tar_descriptor/0]).
+
 %% A reader for a regular file within the tar archive,
 %% It tracks its current state relative to that file.
 -record(reg_file_reader, {
-          handle :: reader(),
+          handle :: tar_descriptor(),
           num_bytes = 0,
           pos = 0,
           size = 0
@@ -180,7 +196,7 @@
 %% A reader for a sparse file within the tar archive,
 %% It tracks its current state relative to that file.
 -record(sparse_file_reader, {
-          handle :: reader(),
+          handle :: tar_descriptor(),
           num_bytes = 0, %% bytes remaining
           pos = 0, %% pos
           size = 0, %% total size of file
@@ -189,13 +205,13 @@
 -type sparse_file_reader() :: #sparse_file_reader{}.
 
 %% Types for the readers
--type reader_type() :: reader() | reg_file_reader() | sparse_file_reader().
--type handle() :: file:io_device() | term().
+-type descriptor_type() :: tar_descriptor() | reg_file_reader() | sparse_file_reader().
+-type user_data() :: term().
 
 %% Type for the I/O primitive wrapper function
 -type file_op() :: fun((write | close | read2 | position,
-                       {handle(), iodata()} | handle() | {handle(), non_neg_integer()}
-                        | {handle(), non_neg_integer()}) ->
+                       {user_data(), iodata()} | user_data() | {user_data(), non_neg_integer()}
+                        | {user_data(), non_neg_integer()}) ->
                               ok | eof | {ok, string() | binary()} | {ok, non_neg_integer()}
                                  | {error, term()}).
 
