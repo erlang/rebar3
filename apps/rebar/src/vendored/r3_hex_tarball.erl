@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.12.2, do not edit manually
+%% Vendored from hex_core v0.15.0, do not edit manually
 
 %% @doc
 %% Functions for creating and unpacking Hex tarballs.
@@ -15,6 +15,10 @@
 -export([do_decode_metadata/1, gzip/1, normalize_requirements/1]).
 -endif.
 -define(VERSION, <<"3">>).
+-define(HASH_CHUNK_SIZE, 65536).
+-define(MAX_VERSION_SIZE, 32).
+-define(MAX_CHECKSUM_SIZE, 128).
+-define(MAX_METADATA_SIZE, 128 * 1024).
 -define(BUILD_TOOL_FILES, [
     {<<"mix.exs">>, <<"mix">>},
     {<<"rebar.config">>, <<"rebar3">>},
@@ -25,7 +29,7 @@
 -include_lib("kernel/include/file.hrl").
 
 -type checksum() :: binary().
--type contents() :: #{filename() => binary()}.
+-type contents() :: [{filename(), binary()}].
 -type filename() :: string().
 -type files() :: [{filename(), filename() | binary()}].
 -type metadata() :: map().
@@ -66,37 +70,41 @@ create(Metadata, Files, Config) ->
     } = Config,
 
     MetadataBinary = encode_metadata(Metadata),
-    ContentsTarball = create_memory_tarball(Files),
-    ContentsTarballCompressed = gzip(ContentsTarball),
-    InnerChecksum = inner_checksum(?VERSION, MetadataBinary, ContentsTarballCompressed),
-    InnerChecksumBase16 = encode_base16(InnerChecksum),
-    TarballMaxSize = maps:get(tarball_max_size, Config),
-    TarballMaxUncompressedSize = maps:get(tarball_max_uncompressed_size, Config),
 
-    OuterFiles = [
-        {"VERSION", ?VERSION},
-        {"CHECKSUM", InnerChecksumBase16},
-        {"metadata.config", MetadataBinary},
-        {"contents.tar.gz", ContentsTarballCompressed}
-    ],
-
-    case valid_size(ContentsTarball, TarballMaxUncompressedSize) of
-        true ->
-            Tarball = create_memory_tarball(OuterFiles),
-            OuterChecksum = checksum(Tarball),
-
-            case valid_size(Tarball, TarballMaxSize) of
-                true ->
-                    {ok, #{
-                        tarball => Tarball,
-                        outer_checksum => OuterChecksum,
-                        inner_checksum => InnerChecksum
-                    }};
-                false ->
-                    {error, {tarball, {too_big_compressed, TarballMaxSize}}}
-            end;
+    case valid_size(MetadataBinary, ?MAX_METADATA_SIZE) of
         false ->
-            {error, {tarball, {too_big_uncompressed, TarballMaxUncompressedSize}}}
+            {error, {tarball, {file_too_big, "metadata.config"}}};
+        true ->
+            ContentsTarball = create_memory_tarball(Files),
+            ContentsTarballCompressed = gzip(ContentsTarball),
+            InnerChecksum = inner_checksum(?VERSION, MetadataBinary, ContentsTarballCompressed),
+            InnerChecksumBase16 = encode_base16(InnerChecksum),
+
+            OuterFiles = [
+                {"VERSION", ?VERSION},
+                {"CHECKSUM", InnerChecksumBase16},
+                {"metadata.config", MetadataBinary},
+                {"contents.tar.gz", ContentsTarballCompressed}
+            ],
+
+            case valid_size(ContentsTarball, TarballMaxUncompressedSize) of
+                true ->
+                    Tarball = create_memory_tarball(OuterFiles),
+                    OuterChecksum = checksum(Tarball),
+
+                    case valid_size(Tarball, TarballMaxSize) of
+                        true ->
+                            {ok, #{
+                                tarball => Tarball,
+                                outer_checksum => OuterChecksum,
+                                inner_checksum => InnerChecksum
+                            }};
+                        false ->
+                            {error, {tarball, {too_big_compressed, TarballMaxSize}}}
+                    end;
+                false ->
+                    {error, {tarball, {too_big_uncompressed, TarballMaxUncompressedSize}}}
+            end
     end.
 
 -spec create(metadata(), files()) ->
@@ -153,6 +161,16 @@ create_docs(Files) ->
 %% Remember to verify the outer tarball checksum against the registry checksum
 %% returned from `r3_hex_repo:get_package(Config, Package)'.
 %%
+%% The first argument is the tarball, either as a binary or `{file, Path}'
+%% to read from a file on disk. Using `{file, Path}' avoids loading the
+%% tarball into memory.
+%%
+%% The second argument controls the output:
+%%
+%% - `memory' - unpack contents into memory and return them
+%% - `none' - only extract metadata and checksums, skip contents
+%% - A path string - extract contents to the given directory
+%%
 %% Examples:
 %%
 %% ```
@@ -161,12 +179,16 @@ create_docs(Files) ->
 %%       contents => [{"src/foo.erl",<<"-module(foo).">>}],
 %%       metadata => #{<<"name">> => <<"foo">>, ...}}}
 %%
+%% > r3_hex_tarball:unpack(Tarball, none).
+%% {ok,#{outer_checksum => <<...>>,
+%%       metadata => #{<<"name">> => <<"foo">>, ...}}}
+%%
 %% > r3_hex_tarball:unpack(Tarball, "path/to/unpack").
 %% {ok,#{outer_checksum => <<...>>,
 %%       metadata => #{<<"name">> => <<"foo">>, ...}}}
 %% '''
 -spec unpack
-    (tarball(), memory, r3_hex_core:config()) ->
+    (tarball() | {file, filename()}, memory, r3_hex_core:config()) ->
         {ok, #{
             outer_checksum => checksum(),
             inner_checksum => checksum(),
@@ -174,24 +196,62 @@ create_docs(Files) ->
             contents => contents()
         }}
         | {error, term()};
-    (tarball(), filename(), r3_hex_core:config()) ->
+    (tarball() | {file, filename()}, none, r3_hex_core:config()) ->
+        {ok, #{
+            outer_checksum => checksum(),
+            inner_checksum => checksum(),
+            metadata => metadata()
+        }}
+        | {error, term()};
+    (tarball() | {file, filename()}, filename(), r3_hex_core:config()) ->
         {ok, #{
             outer_checksum => checksum(),
             inner_checksum => checksum(),
             metadata => metadata()
         }}
         | {error, term()}.
-unpack(Tarball, Output, Config) ->
-    case valid_size(Tarball, maps:get(tarball_max_size, Config)) of
+unpack(Input, memory, Config) ->
+    case check_input_size(Input, Config) of
         true ->
-            case r3_hex_erl_tar:extract({binary, Tarball}, [memory]) of
+            OuterChecksum = outer_checksum(Input),
+            Source = tar_source(Input),
+            case r3_hex_erl_tar:extract(Source, [memory]) of
                 {ok, []} ->
                     {error, {tarball, empty}};
                 {ok, FileList} ->
-                    OuterChecksum = crypto:hash(sha256, Tarball),
-                    do_unpack(maps:from_list(FileList), OuterChecksum, Output);
+                    case validate_outer_file_sizes(maps:from_list(FileList)) of
+                        {ok, Files} ->
+                            do_unpack(Files, OuterChecksum, memory, Config);
+                        {error, _} = Error ->
+                            Error
+                    end;
                 {error, Reason} ->
                     {error, {tarball, Reason}}
+            end;
+        false ->
+            {error, {tarball, too_big}}
+    end;
+unpack(Input, Output, Config) ->
+    case check_input_size(Input, Config) of
+        true ->
+            OuterChecksum = outer_checksum(Input),
+            Source = tar_source(Input),
+            TmpDir = tmp_path(),
+            ok = file:make_dir(TmpDir),
+            try
+                case r3_hex_erl_tar:extract(Source, [{cwd, TmpDir}]) of
+                    ok ->
+                        case read_outer_files(TmpDir) of
+                            {ok, Files} ->
+                                do_unpack(Files, OuterChecksum, Output, Config);
+                            {error, _} = Error ->
+                                Error
+                        end;
+                    {error, Reason} ->
+                        {error, {tarball, Reason}}
+                end
+            after
+                remove_dir(TmpDir)
             end;
         false ->
             {error, {tarball, too_big}}
@@ -202,7 +262,7 @@ unpack(Tarball, Output, Config) ->
 %%
 %% @see unpack/3
 -spec unpack
-    (tarball(), memory) ->
+    (tarball() | {file, filename()}, memory) ->
         {ok, #{
             outer_checksum => checksum(),
             inner_checksum => checksum(),
@@ -210,7 +270,14 @@ unpack(Tarball, Output, Config) ->
             contents => contents()
         }}
         | {error, term()};
-    (tarball(), filename()) ->
+    (tarball() | {file, filename()}, none) ->
+        {ok, #{
+            outer_checksum => checksum(),
+            inner_checksum => checksum(),
+            metadata => metadata()
+        }}
+        | {error, term()};
+    (tarball() | {file, filename()}, filename()) ->
         {ok, #{
             outer_checksum => checksum(),
             inner_checksum => checksum(),
@@ -223,6 +290,10 @@ unpack(Tarball, Output) ->
 %% @doc
 %% Unpacks a documentation tarball.
 %%
+%% The first argument is the tarball, either as a binary or `{file, Path}'
+%% to read from a file on disk. Using `{file, Path}' avoids loading the
+%% tarball into memory.
+%%
 %% Examples:
 %%
 %% ```
@@ -233,21 +304,23 @@ unpack(Tarball, Output) ->
 %% ok
 %% '''
 -spec unpack_docs
-    (tarball(), memory, r3_hex_core:config()) -> {ok, contents()} | {error, term()};
-    (tarball(), filename(), r3_hex_core:config()) -> ok | {error, term()}.
-unpack_docs(Tarball, Output, Config) ->
-    case valid_size(Tarball, maps:get(docs_tarball_max_size, Config)) of
+    (tarball() | {file, filename()}, memory, r3_hex_core:config()) ->
+        {ok, contents()} | {error, term()};
+    (tarball() | {file, filename()}, filename(), r3_hex_core:config()) -> ok | {error, term()}.
+unpack_docs(Input, Output, Config) ->
+    case check_docs_input_size(Input, Config) of
         true ->
-            unpack_tarball(Tarball, Output);
+            MaxSize = maps:get(docs_tarball_max_uncompressed_size, Config),
+            unpack_tarball(tar_source(Input), Output, MaxSize);
         false ->
             {error, {tarball, too_big}}
     end.
 
 -spec unpack_docs
-    (tarball(), memory) -> {ok, contents()} | {error, term()};
-    (tarball(), filename()) -> ok | {error, term()}.
-unpack_docs(Tarball, Output) ->
-    unpack_docs(Tarball, Output, r3_hex_core:default_config()).
+    (tarball() | {file, filename()}, memory) -> {ok, contents()} | {error, term()};
+    (tarball() | {file, filename()}, filename()) -> ok | {error, term()}.
+unpack_docs(Input, Output) ->
+    unpack_docs(Input, Output, r3_hex_core:default_config()).
 
 %% @doc
 %% Returns base16-encoded representation of checksum.
@@ -258,6 +331,8 @@ format_checksum(Checksum) ->
 %% @doc
 %% Converts an error reason term to a human-readable error message string.
 -spec format_error(term()) -> string().
+format_error({tarball, {file_too_big, Name}}) ->
+    io_lib:format("file too big: ~s", [Name]);
 format_error({tarball, empty}) ->
     "empty tarball";
 format_error({tarball, {too_big_uncompressed, Size}}) ->
@@ -296,6 +371,12 @@ format_byte_size(Size) ->
 %%====================================================================
 
 %% @private
+inner_checksum(Version, MetadataBinary, {path, ContentsPath}) ->
+    HashState0 = crypto:hash_init(sha256),
+    HashState1 = crypto:hash_update(HashState0, Version),
+    HashState2 = crypto:hash_update(HashState1, MetadataBinary),
+    HashState3 = stream_file_hash(HashState2, ContentsPath),
+    crypto:hash_final(HashState3);
 inner_checksum(Version, MetadataBinary, ContentsBinary) ->
     Blob = <<Version/binary, MetadataBinary/binary, ContentsBinary/binary>>,
     crypto:hash(sha256, Blob).
@@ -303,6 +384,26 @@ inner_checksum(Version, MetadataBinary, ContentsBinary) ->
 %% @private
 checksum(ContentsBinary) when is_binary(ContentsBinary) ->
     crypto:hash(sha256, ContentsBinary).
+
+%% @private
+tar_source({file, Path}) -> Path;
+tar_source(Tarball) -> {binary, Tarball}.
+
+%% @private
+outer_checksum({file, Path}) -> file_checksum(Path);
+outer_checksum(Tarball) -> crypto:hash(sha256, Tarball).
+
+%% @private
+check_input_size({file, Path}, Config) ->
+    valid_file_size(Path, maps:get(tarball_max_size, Config));
+check_input_size(Tarball, Config) ->
+    valid_size(Tarball, maps:get(tarball_max_size, Config)).
+
+%% @private
+check_docs_input_size({file, Path}, Config) ->
+    valid_file_size(Path, maps:get(docs_tarball_max_size, Config));
+check_docs_input_size(Tarball, Config) ->
+    valid_size(Tarball, maps:get(docs_tarball_max_size, Config)).
 
 %% @private
 encode_metadata(Meta) ->
@@ -316,14 +417,15 @@ encode_metadata(Meta) ->
     iolist_to_binary(Data).
 
 %% @private
-do_unpack(Files, OuterChecksum, Output) ->
+do_unpack(Files, OuterChecksum, Output, Config) ->
     State = #{
         inner_checksum => undefined,
         outer_checksum => OuterChecksum,
         contents => undefined,
         files => Files,
         metadata => undefined,
-        output => Output
+        output => Output,
+        config => Config
     },
     State1 = check_files(State),
     State2 = check_version(State1),
@@ -339,33 +441,61 @@ finish_unpack(#{
     files := Files,
     inner_checksum := InnerChecksum,
     outer_checksum := OuterChecksum,
-    output := Output
+    output := Output,
+    config := Config
 }) ->
     _ = maps:get("VERSION", Files),
-    ContentsBinary = maps:get("contents.tar.gz", Files),
+    Contents = maps:get("contents.tar.gz", Files),
+    MaxUncompressedSize = maps:get(tarball_max_uncompressed_size, Config),
+
+    Result = #{
+        inner_checksum => InnerChecksum,
+        outer_checksum => OuterChecksum,
+        metadata => Metadata
+    },
 
     case Output of
-        memory -> ok;
-        _ -> filelib:ensure_dir(filename:join(Output, "*"))
-    end,
+        none ->
+            {ok, Result};
+        memory ->
+            case unpack_contents(Contents, memory, MaxUncompressedSize) of
+                {ok, UnpackedContents} ->
+                    {ok, Result#{contents => UnpackedContents}};
+                {error, Reason} ->
+                    {error, {inner_tarball, Reason}}
+            end;
+        _ ->
+            filelib:ensure_dir(filename:join(Output, "*")),
+            case unpack_contents(Contents, Output, MaxUncompressedSize) of
+                ok ->
+                    [
+                        try_updating_mtime(filename:join(Output, P))
+                     || P <- filelib:wildcard("**", Output)
+                    ],
+                    copy_metadata_config(Output, maps:get("metadata.config", Files)),
+                    {ok, Result};
+                {error, Reason} ->
+                    {error, {inner_tarball, Reason}}
+            end
+    end.
 
-    case unpack_tarball(ContentsBinary, Output) of
-        ok ->
-            copy_metadata_config(Output, maps:get("metadata.config", Files)),
-            {ok, #{
-                inner_checksum => InnerChecksum,
-                outer_checksum => OuterChecksum,
-                metadata => Metadata
-            }};
-        {ok, Contents} ->
-            {ok, #{
-                inner_checksum => InnerChecksum,
-                outer_checksum => OuterChecksum,
-                metadata => Metadata,
-                contents => Contents
-            }};
-        {error, Reason} ->
-            {error, {inner_tarball, Reason}}
+%% @private
+unpack_contents(Contents, Output, MaxSize) ->
+    Opts =
+        case Output of
+            memory -> [memory, compressed];
+            _ -> [{cwd, Output}, compressed]
+        end,
+    Source =
+        case Contents of
+            {path, ContentsPath} -> ContentsPath;
+            ContentsBinary -> {binary, ContentsBinary}
+        end,
+    case r3_hex_erl_tar:extract(Source, [{max_size, MaxSize} | Opts]) of
+        {error, too_big} ->
+            {error, {too_big_uncompressed, MaxSize}};
+        Other ->
+            Other
     end.
 
 %% @private
@@ -403,8 +533,8 @@ check_inner_checksum(#{files := Files} = State) ->
 
     Version = maps:get("VERSION", Files),
     MetadataBinary = maps:get("metadata.config", Files),
-    ContentsBinary = maps:get("contents.tar.gz", Files),
-    ActualChecksum = inner_checksum(Version, MetadataBinary, ContentsBinary),
+    Contents = maps:get("contents.tar.gz", Files),
+    ActualChecksum = inner_checksum(Version, MetadataBinary, Contents),
 
     if
         byte_size(ExpectedChecksum) /= 32 ->
@@ -502,17 +632,24 @@ guess_build_tools(Metadata) ->
 %%====================================================================
 
 %% @private
-unpack_tarball(ContentsBinary, memory) ->
-    r3_hex_erl_tar:extract({binary, ContentsBinary}, [memory, compressed]);
-unpack_tarball(ContentsBinary, Output) ->
+unpack_tarball(Source, memory, MaxSize) ->
+    case r3_hex_erl_tar:extract(Source, [memory, compressed, {max_size, MaxSize}]) of
+        {error, too_big} ->
+            {error, {tarball, {too_big_uncompressed, MaxSize}}};
+        Other ->
+            Other
+    end;
+unpack_tarball(Source, Output, MaxSize) ->
     filelib:ensure_dir(filename:join(Output, "*")),
-    case r3_hex_erl_tar:extract({binary, ContentsBinary}, [{cwd, Output}, compressed]) of
+    case r3_hex_erl_tar:extract(Source, [{cwd, Output}, compressed, {max_size, MaxSize}]) of
         ok ->
             [
                 try_updating_mtime(filename:join(Output, Path))
              || Path <- filelib:wildcard("**", Output)
             ],
             ok;
+        {error, too_big} ->
+            {error, {tarball, {too_big_uncompressed, MaxSize}}};
         Other ->
             Other
     end.
@@ -567,7 +704,7 @@ add_file(Tar, {Filename, AbsFilename}) when is_list(Filename), is_list(AbsFilena
         _ ->
             Mode = FileInfo#file_info.mode,
             {ok, Contents} = file:read_file(AbsFilename),
-            ok = r3_hex_erl_tar:add(Tar, Contents, Filename, Mode, tar_opts())
+            ok = r3_hex_erl_tar:add(Tar, Contents, Filename, [{mode, Mode} | tar_opts()])
     end.
 
 %% @private
@@ -623,6 +760,115 @@ valid_size(Binary, infinity) when is_binary(Binary) ->
     true;
 valid_size(Binary, Limit) when is_binary(Binary) and is_integer(Limit) ->
     byte_size(Binary) =< Limit.
+
+%% @private
+valid_file_size(_Path, infinity) ->
+    true;
+valid_file_size(Path, Limit) when is_integer(Limit) ->
+    case file:read_file_info(Path) of
+        {ok, #file_info{size = Size}} -> Size =< Limit;
+        {error, _} -> false
+    end.
+
+%% @private
+file_checksum(Path) ->
+    {ok, Fd} = file:open(Path, [read, raw, binary]),
+    try
+        file_checksum_loop(Fd, crypto:hash_init(sha256))
+    after
+        file:close(Fd)
+    end.
+
+%% @private
+file_checksum_loop(Fd, HashState) ->
+    case file:read(Fd, ?HASH_CHUNK_SIZE) of
+        {ok, Data} -> file_checksum_loop(Fd, crypto:hash_update(HashState, Data));
+        eof -> crypto:hash_final(HashState)
+    end.
+
+%% @private
+stream_file_hash(HashState, Path) ->
+    {ok, Fd} = file:open(Path, [read, raw, binary]),
+    try
+        stream_file_hash_loop(Fd, HashState)
+    after
+        file:close(Fd)
+    end.
+
+%% @private
+stream_file_hash_loop(Fd, HashState) ->
+    case file:read(Fd, ?HASH_CHUNK_SIZE) of
+        {ok, Data} -> stream_file_hash_loop(Fd, crypto:hash_update(HashState, Data));
+        eof -> HashState
+    end.
+
+%% @private
+%% Reads outer tar files from a directory after extraction.
+%% Small files (VERSION, CHECKSUM, metadata.config) are read into memory.
+%% contents.tar.gz is referenced by path.
+read_outer_files(Dir) ->
+    RequiredFiles = ["VERSION", "CHECKSUM", "metadata.config", "contents.tar.gz"],
+    case read_outer_files(Dir, RequiredFiles, #{}) of
+        {ok, Files} ->
+            validate_outer_file_sizes(Files);
+        {error, _} = Error ->
+            Error
+    end.
+
+read_outer_files(_Dir, [], Acc) ->
+    {ok, Acc};
+read_outer_files(Dir, ["contents.tar.gz" | Rest], Acc) ->
+    Path = filename:join(Dir, "contents.tar.gz"),
+    case filelib:is_regular(Path) of
+        true ->
+            read_outer_files(Dir, Rest, Acc#{"contents.tar.gz" => {path, Path}});
+        false ->
+            {error, {tarball, {missing_files, ["contents.tar.gz"]}}}
+    end;
+read_outer_files(Dir, [Name | Rest], Acc) ->
+    Path = filename:join(Dir, Name),
+    case file:read_file(Path) of
+        {ok, Data} ->
+            read_outer_files(Dir, Rest, Acc#{Name => Data});
+        {error, _} ->
+            {error, {tarball, {missing_files, [Name]}}}
+    end.
+
+%% @private
+validate_outer_file_sizes(Files) ->
+    case byte_size(maps:get("VERSION", Files, <<>>)) > ?MAX_VERSION_SIZE of
+        true ->
+            {error, {tarball, {file_too_big, "VERSION"}}};
+        false ->
+            case byte_size(maps:get("CHECKSUM", Files, <<>>)) > ?MAX_CHECKSUM_SIZE of
+                true ->
+                    {error, {tarball, {file_too_big, "CHECKSUM"}}};
+                false ->
+                    case byte_size(maps:get("metadata.config", Files, <<>>)) > ?MAX_METADATA_SIZE of
+                        true -> {error, {tarball, {file_too_big, "metadata.config"}}};
+                        false -> {ok, Files}
+                    end
+            end
+    end.
+
+%% @private
+remove_dir(Dir) ->
+    case file:list_dir(Dir) of
+        {ok, Entries} ->
+            lists:foreach(
+                fun(Entry) ->
+                    Path = filename:join(Dir, Entry),
+                    case filelib:is_dir(Path) of
+                        true -> remove_dir(Path);
+                        false -> file:delete(Path)
+                    end
+                end,
+                Entries
+            ),
+            file:del_dir(Dir);
+        {error, _} ->
+            ok
+    end.
 
 %% @private
 binarify(Binary) when is_binary(Binary) -> Binary;

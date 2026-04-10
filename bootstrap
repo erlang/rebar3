@@ -171,10 +171,10 @@ compile(App, FirstFiles) ->
                      ,return | additional_defines()]) || X <- Sources].
 
 compile_xrl_file(File) ->
-    {ok, _} = leex:file(File).
+    {ok, _} = leex:file(File, [{deterministic, true}]).
 
 compile_yrl_file(File) ->
-    {ok, _} = yecc:file(File).
+    {ok, _} = yecc:file(File, [{deterministic, true}]).
 
 compile_erl_file(File, Opts) ->
     case compile:file(File, [nowarn_deprecated_catch | Opts]) of
