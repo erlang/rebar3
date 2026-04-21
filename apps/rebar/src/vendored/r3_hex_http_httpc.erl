@@ -41,15 +41,12 @@ request_to_file(Method, URI, ReqHeaders, Body, Filename, AdapterConfig) when is_
             Method,
             Request,
             HTTPOptions,
-            [{stream, unicode:characters_to_list(Filename)}],
+            [{sync, false}, {stream, self}],
             Profile
         )
     of
-        {ok, saved_to_file} ->
-            {ok, {200, #{}}};
-        {ok, {{_, StatusCode, _}, RespHeaders, _RespBody}} ->
-            RespHeaders2 = load_headers(RespHeaders),
-            {ok, {StatusCode, RespHeaders2}};
+        {ok, RequestId} ->
+            stream_to_file(RequestId, Filename);
         {error, Reason} ->
             {error, Reason}
     end.
@@ -57,6 +54,39 @@ request_to_file(Method, URI, ReqHeaders, Body, Filename, AdapterConfig) when is_
 %%====================================================================
 %% Internal functions
 %%====================================================================
+
+%% @private
+%% httpc streams 200/206 responses as messages and returns non-2xx as
+%% a normal response tuple. stream_start includes the response headers.
+stream_to_file(RequestId, Filename) ->
+    receive
+        {http, {RequestId, stream_start, Headers}} ->
+            {ok, File} = file:open(Filename, [write, binary]),
+            case stream_body(RequestId, File) of
+                ok ->
+                    ok = file:close(File),
+                    {ok, {200, load_headers(Headers)}};
+                {error, Reason} ->
+                    ok = file:close(File),
+                    {error, Reason}
+            end;
+        {http, {RequestId, {{_, StatusCode, _}, RespHeaders, _RespBody}}} ->
+            {ok, {StatusCode, load_headers(RespHeaders)}};
+        {http, {RequestId, {error, Reason}}} ->
+            {error, Reason}
+    end.
+
+%% @private
+stream_body(RequestId, File) ->
+    receive
+        {http, {RequestId, stream, BinBodyPart}} ->
+            ok = file:write(File, BinBodyPart),
+            stream_body(RequestId, File);
+        {http, {RequestId, stream_end, _Headers}} ->
+            ok;
+        {http, {RequestId, {error, Reason}}} ->
+            {error, Reason}
+    end.
 
 %% @private
 http_options(URI, AdapterConfig) ->

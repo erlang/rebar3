@@ -1,6 +1,6 @@
 -module(rebar_packages).
 
--export([get/2
+-export([get/3
         ,get_all_names/1
         ,registry_dir/1
         ,package_dir/2
@@ -29,9 +29,14 @@ format_error({missing_package, Name, Vsn}) ->
 format_error({missing_package, Pkg}) ->
     io_lib:format("Package not found in any repo: ~p", [Pkg]).
 
--spec get(rebar_hex_repos:repo(), binary()) -> {ok, map()} | {error, term()}.
-get(Config, Name) ->
-    try r3_hex_api_package:get(Config, Name) of
+-spec get(rebar_hex_repos:repo(), binary(), rebar_state:t()) -> {ok, map()} | {error, term()}.
+get(Config, Name, State) ->
+    handle_get_result(rebar_hex_auth:with_api(read, Config, State, [{optional, true}], fun(AuthConfig) ->
+        r3_hex_api_package:get(AuthConfig, Name)
+    end)).
+
+handle_get_result(Result) ->
+    try Result of
         {ok, {200, _Headers, PkgInfo}} ->
             {ok, PkgInfo};
         {ok, {404, _, _}} ->
@@ -227,7 +232,9 @@ update_package(Name, RepoConfig=#{name := Repo}, State) ->
     ?MODULE:verify_table(State),
     ?DEBUG("Getting definition for package ~ts from repo ~ts",
            [Name, rebar_hex_repos:format_repo(RepoConfig)]),
-    try r3_hex_repo:get_package(get_package_repo_config(RepoConfig), Name) of
+    try rebar_hex_auth:with_repo(RepoConfig, State, [], fun(AuthConfig) ->
+        r3_hex_repo:get_package(get_package_repo_config(AuthConfig), Name)
+    end) of
         {ok, {200, _Headers, Package}} ->
             #{releases := Releases} = Package,
             _ = insert_releases(Name, Releases, Repo, ?PACKAGE_TABLE),
