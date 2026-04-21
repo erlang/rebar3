@@ -160,7 +160,7 @@ parse_deps(Deps) ->
                                                                          requirement := Constraint} <- Deps].
 
 to_index(AllDeps, Dict, Repos) ->
-    catch ets:delete(?PACKAGE_TABLE),
+    try ets:delete(?PACKAGE_TABLE) catch _:_ -> ok end,
     rebar_packages:new_package_table(),
 
     dict:fold(

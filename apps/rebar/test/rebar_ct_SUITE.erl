@@ -1303,7 +1303,8 @@ cfg_cover_spec(Config) ->
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
 
-    RebarConfig = [{ct_opts, [Opt = {cover, "spec/foo.spec"}]}],
+    Opt = {cover, "spec/foo.spec"},
+    RebarConfig = [{ct_opts, [Opt]}],
 
     {ok, State} = rebar_test_utils:run_and_check(C, RebarConfig, ["as", "test", "lock"], return),
 
