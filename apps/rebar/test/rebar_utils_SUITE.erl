@@ -33,6 +33,7 @@
          blacklisted_otp_version/1,
          sh_does_not_miss_messages/1,
          tup_merge/1,
+         get_no_proxy/1,
          proxy_auth/1,
         is_list_of_strings/1]).
 
@@ -342,3 +343,27 @@ is_list_of_strings(_Config) ->
     ?assert(rebar_utils:is_list_of_strings([])),
     ?assert(rebar_utils:is_list_of_strings("")),
     ?assert(rebar_utils:is_list_of_strings("foo") == false).
+
+get_no_proxy(_Config) ->
+    application:unset_env(rebar, no_proxy),
+    %% Cache hit: when app env is already populated, return it without reading config
+    application:set_env(rebar, no_proxy, ["cached1", "cached2"]),
+    ?assertEqual(["cached1", "cached2"], rebar_utils:get_no_proxy()),
+    application:unset_env(rebar, no_proxy),
+    %% Cache miss with OS env fallback: mock global_config to return a
+    %% nonexistent path so consult_file returns [], forcing the OS env path
+    meck:new(rebar_dir, [passthrough]),
+    meck:expect(rebar_dir, global_config, fun() -> "/nonexistent/rebar.config" end),
+    OldNoProxy = os:getenv("no_proxy"),
+    os:putenv("no_proxy", "localhost,127.0.0.1"),
+    ?assertEqual(["localhost", "127.0.0.1"], rebar_utils:get_no_proxy()),
+    %% Cache is now populated; clearing OS env has no effect on subsequent calls
+    os:putenv("no_proxy", ""),
+    ?assertEqual(["localhost", "127.0.0.1"], rebar_utils:get_no_proxy()),
+    %% Cleanup
+    application:unset_env(rebar, no_proxy),
+    meck:unload(rebar_dir),
+    case OldNoProxy of
+        false -> os:putenv("no_proxy", "");
+        V     -> os:putenv("no_proxy", V)
+    end.

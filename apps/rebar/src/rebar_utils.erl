@@ -973,6 +973,23 @@ get_http_vars(Scheme) ->
     Config = rebar_config:consult_file(GlobalConfigFile),
     proplists:get_value(Scheme, Config, OS).
 
+get_no_proxy() ->
+    case application:get_env(rebar, no_proxy) of
+        {ok, NoProxy} ->
+            NoProxy;
+        undefined ->
+            OS = case os:getenv("no_proxy") of
+                Str when is_list(Str), Str =/= [] ->
+                    string:split(Str, ",", all);
+                _ -> []
+            end,
+            GlobalConfigFile = rebar_dir:global_config(),
+            Config = rebar_config:consult_file(GlobalConfigFile),
+            NoProxy = proplists:get_value(no_proxy, Config, OS),
+            application:set_env(rebar, no_proxy, NoProxy),
+            NoProxy
+    end.
+
 -compile({nowarn_deprecated_function, [{http_uri, decode, 1}]}).
 
 set_httpc_options() ->
@@ -1229,12 +1246,3 @@ version_pad([Major, Minor, Patch | _]) ->
 find_source(Filename, Dir, Rules) ->
     filelib:find_source(Filename, Dir, Rules).
 
-get_no_proxy() ->
-    OS = case os:getenv("no_proxy") of
-        Str when is_list(Str), Str =/= [] ->
-            string:split(Str, ",", all);
-        _ -> []
-    end,
-    GlobalConfigFile = rebar_dir:global_config(),
-    Config = rebar_config:consult_file(GlobalConfigFile),
-    proplists:get_value(no_proxy, Config, OS).
