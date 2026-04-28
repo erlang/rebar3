@@ -6,6 +6,8 @@
 all() -> [sub_app_deps, newly_added_dep, newly_added_after_empty_lock, no_deps_empty_lock,
           http_proxy_settings, https_proxy_settings,
           http_os_proxy_settings, https_os_proxy_settings,
+          http_no_proxy_settings, https_no_proxy_settings,
+          no_proxy_os_env_settings,
           semver_matching_lt, semver_matching_lte, semver_matching_gt,
           valid_version, top_override, {group, git}, {group, pkg},
           deps_cmd_needs_update_called
@@ -137,6 +139,51 @@ init_per_testcase(https_os_proxy_settings, Config) ->
     end;
 init_per_testcase(deps_cmd_needs_update_called, Config) ->
     rebar_test_utils:init_rebar_state(Config);
+init_per_testcase(http_no_proxy_settings, Config) ->
+    Priv = ?config(priv_dir, Config),
+    GlobalDir = filename:join(Priv, "global"),
+    GlobalConfigDir = filename:join([GlobalDir, ".config", "rebar3"]),
+    GlobalConfig = filename:join([GlobalDir, ".config", "rebar3", "rebar.config"]),
+
+    meck:new(rebar_dir, [passthrough]),
+    meck:expect(rebar_dir, global_config, fun() -> GlobalConfig end),
+    meck:expect(rebar_dir, global_cache_dir, fun(_) -> GlobalDir end),
+
+    rebar_test_utils:create_config(GlobalConfigDir,
+                                   [{http_proxy, "http://localhost:1234"},
+                                    {no_proxy, ["localhost", "example.com"]}
+                                   ]),
+    rebar_test_utils:init_rebar_state(Config);
+init_per_testcase(https_no_proxy_settings, Config) ->
+    Priv = ?config(priv_dir, Config),
+    GlobalDir = filename:join(Priv, "global"),
+    GlobalConfigDir = filename:join([GlobalDir, ".config", "rebar3"]),
+    GlobalConfig = filename:join([GlobalDir, ".config", "rebar3", "rebar.config"]),
+
+    meck:new(rebar_dir, [passthrough]),
+    meck:expect(rebar_dir, global_config, fun() -> GlobalConfig end),
+    meck:expect(rebar_dir, global_cache_dir, fun(_) -> GlobalDir end),
+
+    rebar_test_utils:create_config(GlobalConfigDir,
+                                   [{https_proxy, "http://localhost:1234"},
+                                    {no_proxy, ["localhost", "example.com"]}
+                                   ]),
+    rebar_test_utils:init_rebar_state(Config);
+init_per_testcase(no_proxy_os_env_settings, Config) ->
+    Priv = ?config(priv_dir, Config),
+    GlobalDir = filename:join(Priv, "global"),
+    GlobalConfigDir = filename:join([GlobalDir, ".config", "rebar3"]),
+    GlobalConfig = filename:join([GlobalDir, ".config", "rebar3", "rebar.config"]),
+
+    meck:new(rebar_dir, [passthrough]),
+    meck:expect(rebar_dir, global_config, fun() -> GlobalConfig end),
+    meck:expect(rebar_dir, global_cache_dir, fun(_) -> GlobalDir end),
+
+    os:putenv("no_proxy", "localhost,example.com"),
+    rebar_test_utils:create_config(GlobalConfigDir,
+                                   [{http_proxy, "http://localhost:1234"}
+                                   ]),
+    rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(Case, Config) ->
     {Deps, Warnings, Expect} = deps(Case),
     Expected = case Expect of
@@ -151,17 +198,35 @@ init_per_testcase(Case, Config) ->
 
 end_per_testcase(https_proxy_settings, Config) ->
     os:putenv("https_proxy", ""),
+    application:unset_env(rebar, no_proxy),
     meck:unload(rebar_dir),
     Config;
 end_per_testcase(http_proxy_settings, Config) ->
+    application:unset_env(rebar, no_proxy),
     meck:unload(rebar_dir),
     Config;
 end_per_testcase(http_os_proxy_settings, Config) ->
     os:putenv("http_proxy", ""),
+    application:unset_env(rebar, no_proxy),
     meck:unload(rebar_dir),
     Config;
 end_per_testcase(https_os_proxy_settings, Config) ->
     os:putenv("https_proxy", ""),
+    application:unset_env(rebar, no_proxy),
+    meck:unload(rebar_dir),
+    Config;
+end_per_testcase(http_no_proxy_settings, Config) ->
+    application:unset_env(rebar, no_proxy),
+    meck:unload(rebar_dir),
+    Config;
+end_per_testcase(https_no_proxy_settings, Config) ->
+    application:unset_env(rebar, no_proxy),
+    meck:unload(rebar_dir),
+    Config;
+end_per_testcase(no_proxy_os_env_settings, Config) ->
+    os:putenv("no_proxy", ""),
+    os:putenv("http_proxy", ""),
+    application:unset_env(rebar, no_proxy),
     meck:unload(rebar_dir),
     Config;
 end_per_testcase(_, Config) ->
@@ -442,6 +507,33 @@ https_os_proxy_settings(_Config) ->
     %% Assert variable is right
     ?assertEqual({ok,{{"localhost", 1234}, []}},
                  httpc:get_option(https_proxy, rebar)).
+
+http_no_proxy_settings(_Config) ->
+    %% Load config
+    rebar_utils:set_httpc_options(),
+    rebar3:init_config(),
+
+    %% Assert proxy is set with no_proxy list from config
+    ?assertEqual({ok,{{"localhost", 1234}, ["localhost", "example.com"]}},
+                 httpc:get_option(proxy, rebar)).
+
+https_no_proxy_settings(_Config) ->
+    %% Load config
+    rebar_utils:set_httpc_options(),
+    rebar3:init_config(),
+
+    %% Assert https_proxy is set with no_proxy list from config
+    ?assertEqual({ok,{{"localhost", 1234}, ["localhost", "example.com"]}},
+                 httpc:get_option(https_proxy, rebar)).
+
+no_proxy_os_env_settings(_Config) ->
+    %% Load config (no_proxy comes from OS env, proxy from config)
+    rebar_utils:set_httpc_options(),
+    rebar3:init_config(),
+
+    %% Assert proxy is set with no_proxy list parsed from OS env
+    ?assertEqual({ok,{{"localhost", 1234}, ["localhost", "example.com"]}},
+                 httpc:get_option(proxy, rebar)).
 
 semver_matching_lt(_Config) ->
     MaxVsn = <<"0.2.0">>,
