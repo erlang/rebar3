@@ -128,7 +128,14 @@ set_httpc_options(_, []) ->
 
 set_httpc_options(Scheme, Proxy) ->
     #{userinfo := UserInfo, host := Host, port := Port} = rebar_uri_parse(Proxy),
-    httpc:set_options([{Scheme, {{Host, Port}, []}}], rebar),
+    NoProxy = get_no_proxy(),
+    SetResult = httpc:set_options([{Scheme, {{Host, Port}, NoProxy}}], rebar),
+    case SetResult of
+        ok ->
+            ok;
+        {error, Reason} ->
+            io:format("httpc:set_options failed for ~p: ~p", [Scheme, Reason])
+    end,
     proxy_ipfamily(Host, inet:gethostbyname(Host)),
     set_proxy_auth(UserInfo).
 
@@ -801,3 +808,13 @@ hex2dec(X) ->
        ((X) >= $A) andalso ((X) =< $F) -> (X) - $A + 10;
        ((X) >= $a) andalso ((X) =< $f) -> (X) - $a + 10
     end.
+
+get_no_proxy() ->
+    OS = case os:getenv("no_proxy") of
+        Str when is_list(Str), Str =/= [] ->
+            string:split(Str, ",", all);
+        _ -> []
+    end,
+    GlobalConfigFile = rebar_dir:global_config(),
+    Config = rebar_config:consult_file(GlobalConfigFile),
+    proplists:get_value(no_proxy, Config, OS).
