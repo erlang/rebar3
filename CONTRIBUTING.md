@@ -79,6 +79,10 @@ Rebar3 is an escript built around the concept of providers. Providers are the
 modules that do the work to fulfill a user's command. They are documented in
 [the official documentation website](http://www.rebar3.org/docs/plugins#section-provider-interface).
 
+> [!NOTE]
+> The Rebar3 repository uses an [umbrella project structure](https://rebar3.org/docs/basic_usage/).
+> Paths shown here are relative to the directory `apps/rebar`.
+
 Example provider:
 
 ```erlang
@@ -121,7 +125,7 @@ format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 ```
 
-Providers are then listed in `rebar.app.src`, and can be called from
+Providers are then listed in `rebar.app.src.script`, and can be called from
 the command line or as a programmatical API.
 
 All commands are therefore implemented in standalone modules. If you call
@@ -218,6 +222,7 @@ be any of:
 {ok, OKRes}
 {ok, OKRes, ProfilesUsed}
 {error, Reason}
+return
 
 % where:
 ProfilesUsed :: string() % matching the profiles to validate (defaults to "*")

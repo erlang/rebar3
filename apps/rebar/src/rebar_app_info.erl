@@ -572,7 +572,7 @@ priv_dir(#app_info_t{out_dir=OutDir}) ->
     rebar_utils:to_list(filename:join(OutDir, "priv")).
 
 %% @doc finds the source specification for the app
--spec source(t()) -> string() | tuple().
+-spec source(t()) -> string() | tuple() | checkout | undefined.
 source(#app_info_t{source=Source}) ->
     Source.
 

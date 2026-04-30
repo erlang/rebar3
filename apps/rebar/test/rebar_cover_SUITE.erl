@@ -14,6 +14,8 @@
          index_written/1,
          flag_verbose/1,
          config_verbose/1,
+         flag_precision/1,
+         config_precision/1,
          excl_mods_and_apps/1,
          coverdata_is_reset_on_write/1,
          flag_min_coverage/1,
@@ -42,6 +44,7 @@ all() ->
      root_extra_src_dirs,
      index_written,
      flag_verbose, config_verbose,
+     flag_precision, config_precision,
      excl_mods_and_apps, coverdata_is_reset_on_write,
      flag_min_coverage, config_min_coverage].
 
@@ -230,6 +233,32 @@ config_verbose(Config) ->
 
     true = filelib:is_file(filename:join([AppDir, "_build", "test", "cover", "index.html"])).
 
+flag_precision(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("precision_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    [test_flag_precision(Config, AppDir, Name, Precision, ExpectedPrecision)
+        || {Precision, ExpectedPrecision} <- [
+            {0, 0}, {2, 2}, {10, 3}
+        ]
+    ].
+
+config_precision(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("precision_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_eunit_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    [test_config_precision(Config, AppDir, Name, Precision, ExpectedPrecision)
+        || {Precision, ExpectedPrecision} <- [
+            {0, 0}, {2, 2}, {10, 3}
+        ]
+    ].
+
 excl_mods_and_apps(Config) ->
     AppDir = ?config(apps, Config),
 
@@ -320,3 +349,49 @@ config_min_coverage(Config) ->
                    ["do", "eunit", "--cover", ",", "cover"],
                    return)),
     ok.
+
+test_flag_precision(Config, AppDir, Name, Precision, ExpectedPrecision) ->
+    RebarConfig = [{erl_opts, [{d, some_define}]}],
+    rebar_test_utils:run_and_check(Config,
+                                   RebarConfig,
+                                   ["do", "eunit", "--cover", ",", "cover",
+                                        "--precision="++integer_to_list(Precision)],
+                                   {ok, [{app, Name}]}),
+
+    OutFileName = filename:join([AppDir, "_build", "test", "cover", "index.html"]),
+    true = filelib:is_file(OutFileName),
+    true = check_precision_output(OutFileName, ExpectedPrecision).
+
+test_config_precision(Config, AppDir, Name, Precision, ExpectedPrecision) ->
+    RebarConfig = [{erl_opts, [{d, some_define}]}, {cover_opts, [{precision,Precision}]}],
+    rebar_test_utils:run_and_check(Config,
+                                   RebarConfig,
+                                   ["do", "eunit", "--cover", ",", "cover"],
+                                   {ok, [{app, Name}]}),
+
+    OutFileName = filename:join([AppDir, "_build", "test", "cover", "index.html"]),
+    true = filelib:is_file(OutFileName),
+    true = check_precision_output(OutFileName, ExpectedPrecision).
+
+check_precision_output(FileName, Precision) ->
+    {ok, Device} = file:open(FileName, [read]),
+    RegExp = make_regexp(Precision),
+    case find_line("<tr><td><a", Device) of
+        false -> false;
+        Line -> case re:run(Line, RegExp) of
+                    {match, _Capchured} -> true;
+                    _ -> false
+                end
+    end.
+
+make_regexp(0) -> "(?<![\\.|\\d])\\d+%";
+make_regexp(Precision) -> "\\d+\.\\d{"++integer_to_list(Precision)++"}%".
+
+find_line(Match, File) ->
+    case io:get_line(File, "") of
+        eof -> false;
+        Line -> case string:find(Line, Match) of
+                    nomatch -> find_line(Match, File);
+                    _ -> Line
+                end
+    end.

@@ -273,15 +273,22 @@ add_hooks(Opts, State) ->
         true -> [cth_fail_fast];
         false -> []
     end,
+    % cth_readable_failonly hides all ct:pal for successful tests.
+    % When user asks for verbose operation, show these logs
+    {RawOpts, _} = rebar_state:command_parsed_args(State),
+    FailOnlyHook = case proplists:get_value(verbose, RawOpts, false) of
+        true -> [];
+        false -> [cth_readable_failonly]
+    end,
     case {readable(State), lists:keyfind(ct_hooks, 1, Opts)} of
         {false, _} ->
             Opts;
         {Other, false} ->
-            [{ct_hooks, [cth_readable_failonly, readable_shell_type(Other),
+            [{ct_hooks, FailOnlyHook ++ [readable_shell_type(Other),
                          cth_retry] ++ FailFast ++ cth_log_redirect()} | Opts];
         {Other, {ct_hooks, Hooks}} ->
             %% Make sure hooks are there once only and add wanted hooks that are not defined yet
-            ReadableHooks = [cth_readable_failonly, readable_shell_type(Other),
+            ReadableHooks = FailOnlyHook ++ [readable_shell_type(Other),
                              cth_retry] ++ FailFast,
             NewHooks = Hooks ++ [ReadableHook ||
                 ReadableHook <- ReadableHooks,
@@ -311,7 +318,7 @@ select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
     %% set application env if sys_config argument is provided
     SysConfigs = sys_config_list(CmdOpts, CfgOpts),
     Configs = lists:flatmap(fun(Filename) ->
-                                rebar_file_utils:consult_config(State, Filename)
+                                rebar_file_utils:consult_any_config(State, Filename)
                             end, SysConfigs),
     %% NB: load the applications (from user directories too) to support OTP < 17
     %% to our best ability.

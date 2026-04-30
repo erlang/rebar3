@@ -16,7 +16,8 @@
 
 all() -> [good_uncached, good_cached, badpkg, badhash_nocache,
           badindexchk, badhash_cache, bad_to_good, good_disconnect,
-          bad_disconnect, pkgs_provider, find_highest_matching].
+          bad_disconnect, pkgs_provider, find_highest_matching,
+          parse_deps_ignores_optional].
 
 init_per_suite(Config) ->
     application:start(meck),
@@ -231,24 +232,41 @@ pkgs_provider(Config) ->
 find_highest_matching(_Config) ->
     State = rebar_state:new(),
     {ok, Vsn} = rebar_packages:find_highest_matching_(
-                  <<"goodpkg">>, ec_semver:parse(<<"1.0.0">>), #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
+                  <<"goodpkg">>, <<"1.0.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
     ?assertEqual({{1,0,1},{[],[]}}, Vsn),
     {ok, Vsn1} = rebar_packages:find_highest_matching(
-                   <<"goodpkg">>, ec_semver:parse(<<"1.0">>), #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
+                   <<"goodpkg">>, <<"1.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
     ?assertEqual({{1,1,1},{[],[]}}, Vsn1),
     {ok, Vsn2} = rebar_packages:find_highest_matching(
-                   <<"goodpkg">>, ec_semver:parse(<<"2.0">>), #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
+                   <<"goodpkg">>, <<"2.0">>, #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
     ?assertEqual({{2,0,0},{[],[]}}, Vsn2),
 
     %% regression test. ~> constraints higher than the available packages would result
     %% in returning the first package version instead of 'none'.
-    ?assertEqual(none, rebar_packages:find_highest_matching_(<<"goodpkg">>, ec_semver:parse(<<"5.0">>),
+    ?assertEqual(none, rebar_packages:find_highest_matching_(<<"goodpkg">>, <<"5.0">>,
                                                              #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State)),
 
 
-    {ok, Vsn3} = rebar_packages:find_highest_matching_(<<"goodpkg">>, ec_semver:parse(<<"3.0.0-rc.0">>),
+    {ok, Vsn3} = rebar_packages:find_highest_matching_(<<"goodpkg">>, <<"3.0.0-rc.0">>,
                                                        #{name => <<"hexpm">>}, ?PACKAGE_TABLE, State),
     ?assertEqual({{3,0,0},{[<<"rc">>,0],[]}}, Vsn3).
+
+parse_deps_ignores_optional(_Config) ->
+    %% Test that optional dependencies are filtered out
+    Deps = [
+        #{package => <<"req">>, requirement => <<"~> 1.0">>},
+        #{package => <<"opt">>, requirement => <<"~> 2.0">>, optional => true},
+        #{package => <<"exp">>, requirement => <<"~> 3.0">>, optional => false},
+        #{package => <<"ali">>, requirement => <<"4.0">>, app => <<"alias">>},
+        #{package => <<"ali_opt">>, requirement => <<"~> 5.0">>,
+          app => <<"alias2">>, optional => true}
+    ],
+    Result = rebar_packages:parse_deps(Deps),
+    ?assertEqual(3, length(Result)),
+    ?assertMatch([{<<"req">>, {pkg, <<"req">>, <<"~> 1.0">>, _, _}},
+                  {<<"exp">>, {pkg, <<"exp">>, <<"~> 3.0">>, _, _}},
+                  {<<"alias">>, {pkg, <<"ali">>, <<"4.0">>, _, _}}],
+                 Result).
 
 %%%%%%%%%%%%%%%
 %%% Helpers %%%
@@ -277,7 +295,8 @@ mock_config(Name, Config) ->
     lists:foreach(fun({{N, Vsn}, [Deps, InnerChecksum, OuterChecksum, _]}) ->
                           case ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(N), Vsn, <<"hexpm">>}) of
                               false ->
-                                  ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(N), ec_semver:parse(Vsn), <<"hexpm">>},
+                                  {ok, Parsed} = rebar_semver:parse_version(Vsn),
+                                  ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(N), Parsed, <<"hexpm">>},
                                                                       dependencies=Deps,
                                                                       retired=false,
                                                                       inner_checksum=InnerChecksum,

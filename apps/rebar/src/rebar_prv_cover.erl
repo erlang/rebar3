@@ -109,7 +109,7 @@ do_analyze(State) ->
     case analyze(State, CoverFiles) of
         [] -> {ok, State};
         Analysis ->
-            print_analysis(Analysis, verbose(State)),
+            print_analysis(Analysis, precision(State), verbose(State)),
             write_index(State, Analysis),
             maybe_fail_coverage(Analysis, State)
     end.
@@ -206,22 +206,22 @@ process([{{_, 0}, _}|Rest], Acc) -> process(Rest, Acc);
 process([{_, {Cov, Not}}|Rest], {Covered, NotCovered}) ->
     process(Rest, {Covered + Cov, NotCovered + Not}).
 
-print_analysis(_, false) -> ok;
-print_analysis(Analysis, true) ->
+print_analysis(_Analysis, _Precision, false) -> ok;
+print_analysis(Analysis, Precision, _) ->
     {_, CoverFiles, Stats} = lists:keyfind("aggregate", 1, Analysis),
-    Table = format_table(Stats, CoverFiles),
+    Table = format_table(Stats, CoverFiles, Precision),
     io:format("~ts", [Table]).
 
-format_table(Stats, CoverFiles) ->
+format_table(Stats, CoverFiles, Precision) ->
     MaxLength = lists:max([20 | lists:map(fun({M, _, _}) -> mod_length(M) end, Stats)]),
     Header = header(MaxLength),
     Separator = separator(MaxLength),
     TotalLabel = format("total", MaxLength),
-    TotalCov = format(calculate_total_string(Stats), 8),
+    TotalCov = format(calculate_total_string(Stats, Precision), 8),
     [io_lib:format("~ts~n~ts~n~ts~n", [Separator, Header, Separator]),
         lists:map(fun({Mod, Coverage, _}) ->
             Name = format(Mod, MaxLength),
-            Cov = format(percentage_string(Coverage), 8),
+            Cov = format(percentage_string(Coverage, Precision), 8),
             io_lib:format("  |  ~ts  |  ~ts  |~n", [Name, Cov])
         end, Stats),
         io_lib:format("~ts~n", [Separator]),
@@ -243,25 +243,29 @@ separator(Width) ->
 
 format(String, Width) -> io_lib:format("~*.ts", [Width, String]).
 
-calculate_total_string(Stats) ->
-    integer_to_list(calculate_total(Stats))++"%".
+calculate_total_string(Stats, Precision) ->
+    percentage_string(calculate_total(Stats), Precision).
 
 calculate_total(Stats) ->
-    percentage(lists:foldl(
+    lists:foldl(
         fun({_Mod, {Cov, Not}, _File}, {CovAcc, NotAcc}) ->
             {CovAcc + Cov, NotAcc + Not}
         end,
         {0, 0},
         Stats
-    )).
+    ).
 
-percentage_string(Data) -> integer_to_list(percentage(Data))++"%".
+percentage_string(Data, Precision) -> number_to_list(percentage(Data), Precision)++"%".
 
-percentage({_, 0}) -> 100;
-percentage({Cov, Not}) -> trunc((Cov / (Cov + Not)) * 100).
+number_to_list(N, 0) -> integer_to_list(trunc(N));
+number_to_list(N, Precision) -> float_to_list(N, [{decimals, Precision}]).
+
+percentage({_, 0}) -> 100.0;
+percentage({Cov, Not}) -> (Cov / (Cov + Not)) * 100.0.
 
 write_index(State, Coverage) ->
     CoverDir = cover_dir(State),
+    Precision = precision(State),
     FileName = filename:join([CoverDir, "index.html"]),
     {ok, F} = file:open(FileName, [write]),
     ok = file:write(F, "<!DOCTYPE HTML><html>\n"
@@ -270,14 +274,14 @@ write_index(State, Coverage) ->
                     "<body>\n"),
     {Aggregate, Rest} = lists:partition(fun({"aggregate", _, _}) -> true; (_) -> false end,
                                         Coverage),
-    ok = write_index_section(F, Aggregate),
-    ok = write_index_section(F, Rest),
+    ok = write_index_section(F, Aggregate, Precision),
+    ok = write_index_section(F, Rest, Precision),
     ok = file:write(F, "</body></html>"),
     ok = file:close(F),
     io:format("  cover summary written to: ~ts~n", [filename:absname(FileName)]).
 
-write_index_section(_F, []) -> ok;
-write_index_section(F, [{Section, DataFile, Mods}|Rest]) ->
+write_index_section(_F, [], _) -> ok;
+write_index_section(F, [{Section, DataFile, Mods}|Rest], Precision) ->
     %% Write the report
     ok = file:write(F, ?FMT("<h1>~ts summary</h1>\n", [Section])),
     ok = file:write(F, "coverage calculated from:\n<ul>"),
@@ -287,18 +291,18 @@ write_index_section(F, [{Section, DataFile, Mods}|Rest]) ->
     ok = file:write(F, "<table><tr><th>module</th><th>coverage %</th></tr>\n"),
     FmtLink =
         fun({Mod, Cov, Report}) ->
-                ?FMT("<tr><td><a href='~ts'>~ts</a></td><td>~ts</td>\n",
-                     [strip_coverdir(Report), Mod, percentage_string(Cov)])
+                ?FMT("<tr><td><a href='~ts'>~ts</a></td><td>~ts</td></tr>\n",
+                     [strip_coverdir(Report), Mod, percentage_string(Cov, Precision)])
         end,
     lists:foreach(fun(M) -> ok = file:write(F, FmtLink(M)) end, Mods),
-    ok = file:write(F, ?FMT("<tr><td><strong>Total</strong></td><td>~ts</td>\n",
-                     [calculate_total_string(Mods)])),
+    ok = file:write(F, ?FMT("<tr><td><strong>Total</strong></td><td>~ts</td></tr>\n",
+                     [calculate_total_string(Mods, Precision)])),
     ok = file:write(F, "</table>\n"),
-    write_index_section(F, Rest).
+    write_index_section(F, Rest, Precision).
 
 maybe_fail_coverage(Analysis, State) ->
     {_, _CoverFiles, Stats} = lists:keyfind("aggregate", 1, Analysis),
-    Total = calculate_total(Stats),
+    Total = percentage(calculate_total(Stats)),
     PassRate = min_coverage(State),
     ?DEBUG("Comparing ~p to pass rate ~p", [Total, PassRate]),
     if Total >= PassRate ->
@@ -430,14 +434,30 @@ min_coverage(State) ->
         {Rate, _}           -> Rate
     end.
 
+clamp(Min, _Max, Val) when not is_integer(Val) -> Min;
+clamp(Min, _Max, Val) when Val < Min -> Min;
+clamp(_Min, Max, Val) when Val > Max -> Max;
+clamp(_Min, _Max, Val) -> Val.
+
+precision(State) ->
+    Command = proplists:get_value(precision, command_line_opts(State), undefined),
+    Config = proplists:get_value(precision, config_opts(State), undefined),
+    case {Command, Config} of
+        {undefined, undefined} -> 0;
+        {undefined, Precision} -> clamp(0, 3, Precision);
+        {Precision, _}         -> clamp(0, 3, Precision)
+    end.
+
 cover_dir(State) ->
     filename:join([rebar_dir:base_dir(State), "cover"]).
 
 cover_opts(_State) ->
     [{reset, $r, "reset", boolean, help(reset)},
      {verbose, $v, "verbose", boolean, help(verbose)},
-     {min_coverage, $m, "min_coverage", integer, help(min_coverage)}].
+     {min_coverage, $m, "min_coverage", integer, help(min_coverage)},
+     {precision, $p, "precision", integer, help(precision)}].
 
 help(reset) -> "Reset all coverdata.";
 help(verbose) -> "Print coverage analysis.";
-help(min_coverage) -> "Mandate a coverage percentage required to succeed (0..100)".
+help(min_coverage) -> "Mandate a coverage percentage required to succeed (0..100)";
+help(precision) -> "Output coverage percentage with given precision [0..3]".

@@ -2,7 +2,7 @@
 
 -module(rebar_httpc_adapter).
 -behaviour(r3_hex_http).
--export([request/5]).
+-export([request/5, request_to_file/6]).
 
 %%====================================================================
 %% API functions
@@ -14,6 +14,14 @@ request(Method, URI, ReqHeaders, Body, AdapterConfig) ->
             {error, {offline, URI}};
         _ ->
             request_online(Method, URI, ReqHeaders, Body, AdapterConfig)
+    end.
+
+request_to_file(Method, URI, ReqHeaders, Body, Filename, AdapterConfig) when is_binary(URI) ->
+    case os:getenv("REBAR_OFFLINE") of
+        "1" ->
+            {error, {offline, URI}};
+        _ ->
+            request_online_to_file(Method, URI, ReqHeaders, Body, Filename, AdapterConfig)
     end.
 
 %%====================================================================
@@ -29,6 +37,28 @@ request_online(Method, URI, ReqHeaders, Body, AdapterConfig) ->
             RespHeaders2 = load_headers(RespHeaders),
             {ok, {StatusCode, RespHeaders2, RespBody}};
         {error, Reason} -> {error, Reason}
+    end.
+
+request_online_to_file(Method, URI, ReqHeaders, Body, Filename, AdapterConfig) ->
+    Profile = maps:get(profile, AdapterConfig, default),
+    Request = build_request(URI, ReqHeaders, Body),
+    SSLOpts = [{ssl, rebar_utils:ssl_opts(URI)}],
+    case
+        httpc:request(
+            Method,
+            Request,
+            SSLOpts,
+            [{stream, unicode:characters_to_list(Filename)}],
+            Profile
+        )
+    of
+        {ok, saved_to_file} ->
+            {ok, {200, #{}}};
+        {ok, {{_, StatusCode, _}, RespHeaders, _RespBody}} ->
+            RespHeaders2 = load_headers(RespHeaders),
+            {ok, {StatusCode, RespHeaders2}};
+        {error, Reason} ->
+            {error, Reason}
     end.
 
 build_request(URI, ReqHeaders, Body) ->

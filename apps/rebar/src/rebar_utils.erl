@@ -993,6 +993,7 @@ get_no_proxy() ->
 -compile({nowarn_deprecated_function, [{http_uri, decode, 1}]}).
 
 set_httpc_options() ->
+    httpc:set_options([{ipfamily, inet6fb4}], rebar),
     set_httpc_options(https_proxy, get_http_vars(https_proxy)),
     set_httpc_options(proxy, get_http_vars(http_proxy)).
 
@@ -1107,11 +1108,12 @@ is_list_of_strings(List) when is_list(List) ->
       Url :: string() | binary(),
       Res :: proplists:proplist().
 ssl_opts(Url) ->
-    case get_ssl_config() of
+    {SslVerify, MiddleboxCompMode} = get_ssl_config(),
+    case SslVerify of
         ssl_verify_enabled ->
-            ssl_opts(ssl_verify_enabled, Url);
+            ssl_opts(MiddleboxCompMode, Url);
         ssl_verify_disabled ->
-            [{verify, verify_none}]
+            [{middlebox_comp_mode, MiddleboxCompMode == middlebox_comp_mode_enabled}, {verify, verify_none}]
     end.
 
 %% @private Determines which CA Certs to use for the HTTPS request.
@@ -1138,16 +1140,17 @@ get_cacerts() ->
 %% its configuration, including for validation of certs.
 %% @end
 %%------------------------------------------------------------------------------
--spec ssl_opts(Enabled, Url) -> Res when
-      Enabled :: atom(),
+-spec ssl_opts(MiddleboxCompMode, Url) -> Res when
+      MiddleboxCompMode :: atom(),
       Url :: string() | binary(),
       Res :: proplists:proplist().
-ssl_opts(ssl_verify_enabled, Url) ->
+ssl_opts(MiddleboxCompMode, Url) ->
     case check_ssl_version() of
         true ->
             CACerts = get_cacerts(),
             SslOpts = [{verify, verify_peer}, {depth, 10}, {cacerts, CACerts},
-                       {partial_chain, fun partial_chain/1}],
+                       {partial_chain, fun partial_chain/1},
+                       {middlebox_comp_mode, MiddleboxCompMode == middlebox_comp_mode_enabled}],
             check_hostname_opt(Url, SslOpts);
         false ->
             ?WARN("Insecure HTTPS request (peer verification disabled), "
@@ -1200,17 +1203,27 @@ check_ssl_version() ->
             false
     end.
 
--spec get_ssl_config() ->
-      ssl_verify_disabled | ssl_verify_enabled.
+-spec get_ssl_config() -> {SslVerify, MiddleboxCompMode} when
+    SslVerify :: ssl_verify_disabled | ssl_verify_enabled,
+    MiddleboxCompMode :: middlebox_comp_mode_disabled | middlebox_comp_mode_enabled.
 get_ssl_config() ->
     GlobalConfigFile = rebar_dir:global_config(),
     Config = rebar_config:consult_file(GlobalConfigFile),
-    case proplists:get_value(ssl_verify, Config, []) of
-        false ->
-            ssl_verify_disabled;
-        _ ->
-            ssl_verify_enabled
-    end.
+    SslVerify =
+        case proplists:get_value(ssl_verify, Config, true) of
+            false ->
+                ssl_verify_disabled;
+            _ ->
+                ssl_verify_enabled
+        end,
+    MiddleboxCompMode =
+        case proplists:get_value(middlebox_comp_mode, Config, true) of
+            false ->
+                middlebox_comp_mode_disabled;
+            _ ->
+                middlebox_comp_mode_enabled
+        end,
+    {SslVerify, MiddleboxCompMode}.
 
 -spec parse_vsn(Vsn) -> Res when
       Vsn :: string(),

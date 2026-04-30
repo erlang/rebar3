@@ -245,7 +245,8 @@ read_file(Prefix, Filename, Dir) ->
                 end,
     FilePath = filename:join(Dir, Filename),
     {ok, FileInfo0} = file:read_file_info(FilePath),
-    DateTime = {{1970, 1, 1}, {0, 0, 1}},
+    %% escripts are zip files whose epoch is 1980 not 1970
+    DateTime = {{1980, 1, 1}, {0, 0, 1}},
     FileInfo = FileInfo0#file_info{atime = DateTime,
                                    ctime = DateTime,
                                    mtime = DateTime},

@@ -328,7 +328,7 @@ update_source(AppInfo, {pkg, PkgName, PkgVsn, OldHash, Hash}, State) ->
                      dependencies=Deps,
                      retired=Retired} = Package,
             maybe_warn_retired(PkgName, PkgVsn1, Hash, Retired),
-            PkgVsn2 = list_to_binary(lists:flatten(ec_semver:format(PkgVsn1))),
+            PkgVsn2 = rebar_semver:format(PkgVsn1),
             AppInfo1 = rebar_app_info:source(AppInfo, {pkg, PkgName, PkgVsn2, OldHash1, Hash1, RepoConfig}),
             rebar_app_info:update_opts_deps(AppInfo1, Deps);
         not_found ->
@@ -364,7 +364,7 @@ maybe_warn_retired(_, _, Hash, _) when is_binary(Hash) ->
 maybe_warn_retired(Name, Vsn, _, R=#{reason := Reason}) ->
     Message = maps:get(message, R, ""),
     ?WARN("Warning: package ~s-~s is retired: (~s) ~s",
-          [Name, ec_semver:format(Vsn), retire_reason(Reason), Message]);
+          [Name, rebar_semver:format(Vsn), retire_reason(Reason), Message]);
 maybe_warn_retired(_, _, _, _) ->
     ok.
 

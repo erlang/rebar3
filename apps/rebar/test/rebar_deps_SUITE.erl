@@ -39,12 +39,6 @@ end_per_group(_, Config) ->
 
 init_per_testcase(valid_version, Config) ->
     rebar_test_utils:init_rebar_state(Config);
-init_per_testcase(semver_matching_lt, Config) ->
-    rebar_test_utils:init_rebar_state(Config);
-init_per_testcase(semver_matching_lte, Config) ->
-    rebar_test_utils:init_rebar_state(Config);
-init_per_testcase(semver_matching_gt, Config) ->
-    rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(newly_added_after_empty_lock, Config) ->
     rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(no_deps_empty_lock, Config) ->
