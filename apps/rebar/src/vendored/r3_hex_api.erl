@@ -19,7 +19,8 @@
 -export_type([response/0]).
 
 -type response() :: {ok, {r3_hex_http:status(), r3_hex_http:headers(), body() | nil}} | {error, term()}.
--type body() :: [body()] | #{binary() => body() | binary()}.
+-type body() :: #{binary() => value()} | [#{binary() => value()}].
+-type value() :: binary() | boolean() | nil | number() | [value()] | #{binary() => value()}.
 
 %% @private
 get(Config, Path) ->
