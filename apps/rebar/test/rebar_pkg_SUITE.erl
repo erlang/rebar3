@@ -290,7 +290,7 @@ mock_config(Name, Config) ->
     filelib:ensure_dir(filename:join([CacheDir, "registry"])),
     ok = ets:tab2file(Tid, filename:join([CacheDir, "registry"])),
 
-    catch ets:delete(?PACKAGE_TABLE),
+    try ets:delete(?PACKAGE_TABLE) catch _:_ -> ok end,
     rebar_packages:new_package_table(),
     lists:foreach(fun({{N, Vsn}, [Deps, InnerChecksum, OuterChecksum, _]}) ->
                           case ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(N), Vsn, <<"hexpm">>}) of
@@ -365,7 +365,7 @@ mock_config(Name, Config) ->
 
 unmock_config(Config) ->
     meck:unload(),
-    catch ets:delete(?config(mock_table, Config)).
+    try ets:delete(?config(mock_table, Config)) catch _:_ -> ok end.
 
 copy_to_cache({Pkg,Vsn}, Config) ->
     Name = <<Pkg/binary, "-", Vsn/binary, ".tar">>,

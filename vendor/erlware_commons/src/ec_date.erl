@@ -104,7 +104,7 @@ do_parse(Date, Now, Opts) ->
     case filter_hints(parse(tokenise(string:uppercase(Date), []), Now, Opts)) of
         {error, bad_date} ->
             erlang:throw({?MODULE, {bad_date, Date}});
-        {D1, T1} = {{Y, M, D}, {H, M1, S}}
+        {D1 = {Y, M, D}, T1 = {H, M1, S}}
           when is_number(Y), is_number(M),
                is_number(D), is_number(H),
                is_number(M1), is_number(S) ->
@@ -112,7 +112,7 @@ do_parse(Date, Now, Opts) ->
                 true -> {D1, T1};
                 false -> erlang:throw({?MODULE, {bad_date, Date}})
             end;
-        {D1, _T1, {Ms}} = {{Y, M, D}, {H, M1, S},  {Ms}}
+        {D1 = {Y, M, D}, {H, M1, S}, {Ms}}
           when is_number(Y), is_number(M),
                is_number(D), is_number(H),
                is_number(M1), is_number(S),
