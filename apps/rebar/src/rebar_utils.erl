@@ -263,9 +263,10 @@ to_list(B) when is_binary(B) -> unicode:characters_to_list(B);
 to_list(I) when is_integer(I) -> integer_to_list(I);
 to_list(Str) -> unicode:characters_to_list(Str).
 
-to_atom(B) when is_binary(B) -> binary_to_atom(B, utf8);
-to_atom(Str) when is_list(Str) -> list_to_atom(Str);
-to_atom(A) when is_atom(A) -> A.
+to_atom(B) when is_binary(B) -> binary_to_existing_atom(B, utf8);
+to_atom(Str) when is_list(Str) -> list_to_existing_atom(Str);
+to_atom(A) when is_atom(A) -> A;
+to_atom(X) -> to_atom(to_list(X)).
 
 tup_dedup(List) ->
     tup_dedup_(tup_sort(List)).

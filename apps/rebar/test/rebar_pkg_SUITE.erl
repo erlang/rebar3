@@ -315,10 +315,10 @@ mock_config(Name, Config) ->
     catch ets:delete(?PACKAGE_TABLE),
     rebar_packages:new_package_table(),
     lists:foreach(fun({{N, Vsn}, [Deps, InnerChecksum, OuterChecksum, _]}) ->
-                          case ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(N), Vsn, <<"hexpm">>}) of
+                          case ets:member(?PACKAGE_TABLE, {rebar_utils:to_binary(N), Vsn, <<"hexpm">>}) of
                               false ->
                                   {ok, Parsed} = rebar_semver:parse_version(Vsn),
-                                  ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(N), Parsed, <<"hexpm">>},
+                                  ets:insert(?PACKAGE_TABLE, #package{key={rebar_utils:to_binary(N), Parsed, <<"hexpm">>},
                                                                       dependencies=Deps,
                                                                       retired=false,
                                                                       inner_checksum=InnerChecksum,

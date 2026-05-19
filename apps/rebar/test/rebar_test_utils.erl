@@ -291,19 +291,19 @@ check_results(AppDir, Expected, ProfileRun, State) ->
     InvalidApps = rebar_app_discover:find_apps(BuildDirs, invalid, State),
     ValidApps = rebar_app_discover:find_apps(BuildDirs, valid, State),
 
-    InvalidDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- InvalidApps],
-    ValidDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- ValidApps],
+    InvalidDepsNames = [{rebar_utils:to_list(rebar_app_info:name(App)), App} || App <- InvalidApps],
+    ValidDepsNames = [{rebar_utils:to_list(rebar_app_info:name(App)), App} || App <- ValidApps],
 
     Deps = rebar_app_discover:find_apps(BuildDirs, all, State),
     SubDeps = rebar_app_discover:find_apps(BuildSubDirs, all, State),
-    DepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Deps],
-    SubDirDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- SubDeps],
+    DepsNames = [{rebar_utils:to_list(rebar_app_info:name(App)), App} || App <- Deps],
+    SubDirDepsNames = [{rebar_utils:to_list(rebar_app_info:name(App)), App} || App <- SubDeps],
     Checkouts = rebar_app_discover:find_apps(CheckoutsDirs, all, State),
-    CheckoutsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Checkouts],
+    CheckoutsNames = [{rebar_utils:to_list(rebar_app_info:name(App)), App} || App <- Checkouts],
     Plugins = rebar_app_discover:find_apps(PluginDirs, all, State),
-    PluginsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Plugins],
+    PluginsNames = [{rebar_utils:to_list(rebar_app_info:name(App)), App} || App <- Plugins],
     GlobalPlugins = rebar_app_discover:find_apps(GlobalPluginDirs, all, State),
-    GlobalPluginsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- GlobalPlugins],
+    GlobalPluginsNames = [{rebar_utils:to_list(rebar_app_info:name(App)), App} || App <- GlobalPlugins],
 
     lists:foreach(
         fun({app, Name}) ->
@@ -507,13 +507,13 @@ write_eunit_suite_file(Dir, Name) ->
 write_app_file(Dir, Name, Version, Deps) ->
     Filename = filename:join([Dir, "ebin", Name ++ ".app"]),
     ok = filelib:ensure_dir(Filename),
-    Term = get_app_metadata(ec_cnv:to_list(Name), Version, Deps),
+    Term = get_app_metadata(rebar_utils:to_list(Name), Version, Deps),
     ok = file:write_file(Filename, lists:flatten(io_lib:fwrite("~p. ", [Term]))).
 
 write_app_src_file(Dir, Name, Version, Deps) ->
     Filename = filename:join([Dir, "src", Name ++ ".app.src"]),
     ok = filelib:ensure_dir(Filename),
-    Term = get_app_metadata(ec_cnv:to_list(Name), Version, Deps),
+    Term = get_app_metadata(rebar_utils:to_list(Name), Version, Deps),
     ok = file:write_file(Filename, lists:flatten(io_lib:fwrite("~p. ", [Term]))).
 
 erl_src_file(Name) ->

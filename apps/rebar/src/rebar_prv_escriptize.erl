@@ -116,7 +116,7 @@ escriptize(State0, App) ->
     %% Look for a list of other applications (dependencies) to include
     %% in the output file. We then use the .app files for each of these
     %% to pull in all the .beam files.
-    TopInclApps = lists:usort([ec_cnv:to_atom(AppName) | rebar_state:get(State, escript_incl_apps, [])]),
+    TopInclApps = lists:usort([rebar_utils:to_atom(AppName) | rebar_state:get(State, escript_incl_apps, [])]),
     AllApps = rebar_state:all_deps(State)++rebar_state:project_apps(State),
     InclApps = find_deps(TopInclApps, AllApps, State),
     ?DEBUG("bundled applications:~n\t~p", [InclApps]),
@@ -283,7 +283,7 @@ get_nonempty(Files) ->
 
 find_deps(AppNames, AllApps, State) ->
     BinAppNames = [rebar_utils:to_binary(Name) || Name <- AppNames],
-    [ec_cnv:to_atom(Name) ||
+    [rebar_utils:to_atom(Name) ||
      Name <- find_deps_of_deps(BinAppNames, AllApps, State, BinAppNames)].
 
 %% Should look at the app files to find direct dependencies
