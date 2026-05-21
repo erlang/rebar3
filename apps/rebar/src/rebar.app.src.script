@@ -20,7 +20,6 @@
                   edoc,
                   snmp,
                   getopt,
-                  erlware_commons,
                   providers,
                   bbmustache,
                   ssl_verify_fun,
