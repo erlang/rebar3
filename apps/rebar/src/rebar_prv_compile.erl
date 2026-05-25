@@ -66,25 +66,25 @@ handle_project_apps(Providers, State) ->
     {ok, ProjectApps1} = rebar_digraph:compile_order(ProjectApps),
 
     %% Run top level hooks *before* project apps compiled but *after* deps are
-    rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
+    State1 = rebar_hooks:run_all_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
-    ProjectApps2 = copy_and_build_project_apps(State, Providers, ProjectApps1),
-    State2 = rebar_state:project_apps(State, ProjectApps2),
+    ProjectApps2 = copy_and_build_project_apps(State1, Providers, ProjectApps1),
+    State2 = rebar_state:project_apps(State1, ProjectApps2),
 
     %% build extra_src_dirs in the root of multi-app projects
-    build_root_extras(State, ProjectApps2),
+    build_root_extras(State1, ProjectApps2),
 
     State3 = update_code_paths(State2, ProjectApps2),
 
-    rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State3),
-    case rebar_state:has_all_artifacts(State3) of
+    State4 = rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, State3),
+    case rebar_state:has_all_artifacts(State4) of
         {false, File} ->
             throw(?PRV_ERROR({missing_artifact, File}));
         true ->
             true
     end,
 
-    State3.
+    State4.
 
 
 -spec format_error(any()) -> iolist().
