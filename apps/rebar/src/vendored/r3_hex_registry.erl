@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.15.0, do not edit manually
+%% Vendored from hex_core v0.18.0, do not edit manually
 
 %% @doc
 %% Functions for encoding and decoding Hex registries.
@@ -16,6 +16,10 @@
     decode_package/3,
     build_package/2,
     unpack_package/4,
+    encode_policy/1,
+    decode_policy/3,
+    build_policy/2,
+    unpack_policy/4,
     sign_protobuf/2,
     decode_signed/1,
     decode_and_verify_signed/2,
@@ -113,6 +117,35 @@ decode_package(Payload, no_verify, no_verify) ->
 decode_package(Payload, Repository, Package) ->
     case r3_hex_pb_package:decode_msg(Payload, 'Package') of
         #{repository := Repository, name := Package, releases := _Releases} = Result ->
+            {ok, Result};
+        _ ->
+            {error, bad_repo_name}
+    end.
+
+%% @doc
+%% Builds policy resource.
+build_policy(Policy, PrivateKey) ->
+    Payload = encode_policy(Policy),
+    zlib:gzip(sign_protobuf(Payload, PrivateKey)).
+
+%% @doc
+%% Unpacks policy resource.
+unpack_policy(Payload, Repository, Name, PublicKey) ->
+    case decode_and_verify_signed(zlib:gunzip(Payload), PublicKey) of
+        {ok, Policy} -> decode_policy(Policy, Repository, Name);
+        Other -> Other
+    end.
+
+%% @private
+encode_policy(Policy) ->
+    hex_pb_policy:encode_msg(Policy, 'Policy').
+
+%% @private
+decode_policy(Payload, no_verify, no_verify) ->
+    {ok, hex_pb_policy:decode_msg(Payload, 'Policy')};
+decode_policy(Payload, Repository, Name) ->
+    case hex_pb_policy:decode_msg(Payload, 'Policy') of
+        #{repository := Repository, name := Name} = Result ->
             {ok, Result};
         _ ->
             {error, bad_repo_name}

@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.15.0, do not edit manually
+%% Vendored from hex_core v0.18.0, do not edit manually
 
 %% @doc
 %% Hex Licenses.
@@ -667,4 +667,30 @@ valid(<<"xlock">>) -> true;
 valid(<<"xpp">>) -> true;
 valid(<<"xzoom">>) -> true;
 valid(<<"zlib-acknowledgement">>) -> true;
+valid(<<"LicenseRef-", IdString/binary>>) -> valid_license_ref_idstring(IdString);
 valid(_) -> false.
+
+valid_license_ref_idstring(<<>>) ->
+    false;
+valid_license_ref_idstring(IdString) ->
+    valid_license_ref_idstring(IdString, true).
+
+valid_license_ref_idstring(<<>>, Valid) ->
+    Valid;
+valid_license_ref_idstring(_, false) ->
+    false;
+valid_license_ref_idstring(<<Char, Rest/binary>>, true) ->
+    valid_license_ref_idstring(Rest, valid_license_ref_char(Char)).
+
+valid_license_ref_char(Char) when Char >= $A, Char =< $Z ->
+    true;
+valid_license_ref_char(Char) when Char >= $a, Char =< $z ->
+    true;
+valid_license_ref_char(Char) when Char >= $0, Char =< $9 ->
+    true;
+valid_license_ref_char($-) ->
+    true;
+valid_license_ref_char($.) ->
+    true;
+valid_license_ref_char(_) ->
+    false.
