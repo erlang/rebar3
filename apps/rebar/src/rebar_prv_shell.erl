@@ -131,6 +131,16 @@ format_error(Reason) ->
 %% immediately kill the script. ctrl-g, however, works fine
 
 shell(State) ->
+    %% Restore the default `erl` SIGQUIT handling. As an escript, rebar3
+    %% never initializes the break handler, so SIGQUIT (Ctrl+\) is left
+    %% with the OS default action of dumping core instead of being
+    %% ignored/handled like a normal `erl` shell.
+    try
+        os:set_signal(sigquit, handle)
+    catch
+        _:Why ->
+            ?DEBUG("Failed to set signal handler for SIGQUIT!~n  Error: ~p~n", [Why])
+    end,
     setup_name(State),
     setup_paths(State),
     ShellArgs = debug_get_value(shell_args, rebar_state:get(State, shell, []), [],

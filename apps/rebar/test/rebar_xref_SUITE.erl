@@ -193,7 +193,17 @@ verify_test_results(xref_ignore_test, AppName, XrefResults, _QueryResults) ->
     ?assertNot(lists:keymember(deprecated_function_calls, 1, XrefResults)),
     ?assertNot(lists:member({IgnoreMod, notavailable, 1}, UndefFuns)),
     ?assertNot(lists:member({IgnoreMod2, notavailable, 1}, UndefFuns)),
-    ?assert(lists:member({SomeMod, notavailable, 1}, UndefFuns)),
+    case ?OTP_RELEASE >= 29 of
+        true ->
+            %% Since OTP 29, xref itself filters out results covered by
+            %% -ignore_xref attributes, so {SomeMod,notavailable,1} is
+            %% removed from undefined_functions because othermod's
+            %% -ignore_xref([{SomeMod,notavailable,1}, ...]) now applies
+            %% natively, not just to the call site.
+            ?assertNot(lists:member({SomeMod, notavailable, 1}, UndefFuns));
+        false ->
+            ?assert(lists:member({SomeMod, notavailable, 1}, UndefFuns))
+    end,
     ok.
 
 write_src_file(Dir, AppName, Module, IgnoreXref) ->
