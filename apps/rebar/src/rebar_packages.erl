@@ -31,7 +31,12 @@ format_error({missing_package, Pkg}) ->
 
 -spec get(rebar_hex_repos:repo(), binary()) -> {ok, map()} | {error, term()}.
 get(Config, Name) ->
-    try r3_hex_api_package:get(Config, Name) of
+    handle_get_result(r3_hex_cli_auth:with_api(read, Config, fun(AuthConfig) ->
+        r3_hex_api_package:get(AuthConfig, Name)
+    end, [{optional, true}])).
+
+handle_get_result(Result) ->
+    try Result of
         {ok, {200, _Headers, PkgInfo}} ->
             {ok, PkgInfo};
         {ok, {404, _, _}} ->
@@ -227,7 +232,9 @@ update_package(Name, RepoConfig=#{name := Repo}, State) ->
     ?MODULE:verify_table(State),
     ?DEBUG("Getting definition for package ~ts from repo ~ts",
            [Name, rebar_hex_repos:format_repo(RepoConfig)]),
-    try r3_hex_repo:get_package(get_package_repo_config(RepoConfig), Name) of
+    try r3_hex_cli_auth:with_repo(RepoConfig, fun(AuthConfig) ->
+        r3_hex_repo:get_package(get_package_repo_config(AuthConfig), Name)
+    end) of
         {ok, {200, _Headers, Package}} ->
             #{releases := Releases} = Package,
             _ = insert_releases(Name, Releases, Repo, ?PACKAGE_TABLE),
