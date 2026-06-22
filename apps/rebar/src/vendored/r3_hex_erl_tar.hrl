@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.15.0, do not edit manually
+%% Vendored from hex_core v0.18.0, do not edit manually
 
 %% This file is a copy of erl_tar.hrl from OTP with the following modifications:
 %% 1. Added chunk_size field to #read_opts{} for streaming extraction to disk

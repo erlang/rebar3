@@ -45,7 +45,7 @@
 -export([format_error/1]).
 
 %% User code. This is placed here to allow extra attributes.
--file("r3_safe_erl_term.xrl", 26).
+-file("r3_safe_erl_term.xrl", 28).
 
 -export([terms/1]).
 
@@ -742,17 +742,17 @@ yyaction_5(TokenChars, TokenLine) ->
      { token, { list_to_atom (TokenChars), TokenLine } } .
 
 -compile({inline,yyaction_6/1}).
--file("r3_safe_erl_term.xrl", 20).
+-file("r3_safe_erl_term.xrl", 22).
 yyaction_6(TokenLine) ->
-     { token, { dot, TokenLine } } .
+     { end_token, { dot, TokenLine } } .
 
 -compile({inline,yyaction_7/1}).
--file("r3_safe_erl_term.xrl", 21).
+-file("r3_safe_erl_term.xrl", 23).
 yyaction_7(TokenLine) ->
      { token, { '/', TokenLine } } .
 
 -compile({inline,yyaction_8/0}).
--file("r3_safe_erl_term.xrl", 22).
+-file("r3_safe_erl_term.xrl", 24).
 yyaction_8() ->
      skip_token .
 -file("leexinc.hrl", 377).

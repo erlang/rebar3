@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.15.0, do not edit manually
+%% Vendored from hex_core v0.18.0, do not edit manually
 
 %% @doc
 %% `hex_core' entrypoint module.
@@ -68,11 +68,21 @@
 %% * `tarball_max_uncompressed_size' - Maximum size of uncompressed package tarball, defaults to
 %%   `134_217_728' (128 MiB). Set to `infinity' to not enforce the limit.
 %%
+%% * `tarball_files_root' - Root directory for source files when creating tarballs.
+%%   Filesystem source paths must resolve inside this root after following symlinks.
+%%   Relative source paths are resolved from this root and absolute source paths must be
+%%   inside it (default: `"."').
+%%
 %% * `docs_tarball_max_size' - Maximum size of docs tarball, defaults to
 %%   `16_777_216' (16 MiB). Set to `infinity' to not enforce the limit.
 %%
 %% * `docs_tarball_max_uncompressed_size' - Maximum size of uncompressed docs tarball, defaults to
 %%   `134_217_728' (128 MiB). Set to `infinity' to not enforce the limit.
+%%
+%% * `metadata_fields' - Either `all' or a list of metadata.config keys (binaries) to read.
+%%   When set to a list, the metadata decoder streams past unrequested fields without
+%%   buffering their tokens, which keeps peak memory bounded for packages with very
+%%   large fields like `<<"files">>'. Defaults to `all'.
 
 -module(r3_hex_core).
 -export([default_config/0]).
@@ -110,10 +120,12 @@
     repo_verify => boolean(),
     repo_verify_origin => boolean(),
     send_100_continue => boolean(),
+    tarball_files_root => file:filename(),
     tarball_max_size => pos_integer() | infinity,
     tarball_max_uncompressed_size => pos_integer() | infinity,
     docs_tarball_max_size => pos_integer() | infinity,
-    docs_tarball_max_uncompressed_size => pos_integer() | infinity
+    docs_tarball_max_uncompressed_size => pos_integer() | infinity,
+    metadata_fields => all | [binary()]
 }.
 
 -spec default_config() -> config().
@@ -136,8 +148,10 @@ default_config() ->
         repo_verify => true,
         repo_verify_origin => true,
         send_100_continue => true,
+        tarball_files_root => ".",
         tarball_max_size => 16 * 1024 * 1024,
         tarball_max_uncompressed_size => 128 * 1024 * 1024,
         docs_tarball_max_size => 16 * 1024 * 1024,
-        docs_tarball_max_uncompressed_size => 128 * 1024 * 1024
+        docs_tarball_max_uncompressed_size => 128 * 1024 * 1024,
+        metadata_fields => all
     }.
