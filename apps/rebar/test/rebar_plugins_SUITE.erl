@@ -40,7 +40,7 @@ init_per_testcase(_, Config) ->
     rebar_test_utils:init_rebar_state(Config).
 
 end_per_testcase(_, _Config) ->
-    catch meck:unload().
+    try meck:unload() catch _:_ -> ok end.
 
 all() ->
     [compile_plugins, compile_global_plugins, complex_plugins, list, upgrade, upgrade_project_plugin,
@@ -212,7 +212,7 @@ upgrade(Config) ->
         {ok, [{app, Name, valid}, {file, PluginBeam}, {plugin, PkgName, <<"0.1.1">>}]}
      ),
 
-    catch mock_pkg_resource:unmock(),
+    try mock_pkg_resource:unmock() catch _:_ -> ok end,
     mock_pkg_resource:mock([
         {pkgdeps, [{{iolist_to_binary(PkgName), <<"0.1.0">>}, []},
                    {{iolist_to_binary(PkgName), <<"0.0.1">>}, []},
@@ -256,7 +256,7 @@ upgrade_project_plugin(Config) ->
         {ok, [{app, Name}, {plugin, PkgName, <<"0.1.1">>}]}
      ),
 
-    catch mock_pkg_resource:unmock(),
+    try mock_pkg_resource:unmock() catch _:_ -> ok end,
     mock_pkg_resource:mock([
         {pkgdeps, [{{iolist_to_binary(PkgName), <<"0.1.0">>}, []},
                    {{iolist_to_binary(PkgName), <<"0.0.1">>}, []},

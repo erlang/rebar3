@@ -49,7 +49,10 @@ do(State) ->
                     %% order of the merge is important to allow app opts overrides
                     AppEdocOpts = merge_opts(rebar_opts:get(AppOpts, edoc_opts, []), EdocOptsAcc),
                     ?DEBUG("{edoc_opts, ~p}.", [AppEdocOpts]),
-                    AppRes = (catch edoc:application(list_to_atom(AppName), AppDir, AppEdocOpts)),
+                    AppRes =
+                        try edoc:application(list_to_atom(AppName), AppDir, AppEdocOpts)
+                        catch _:_ -> error
+                        end,
                     rebar_hooks:run_all_hooks(Cwd, post, ?PROVIDER, Providers, AppInfo, State),
                     case {AppRes, ShouldAccPaths} of
                         {ok, true} ->
@@ -57,7 +60,7 @@ do(State) ->
                             add_to_paths(EdocOptsAcc, AppDir++"/doc");
                         {ok, false} ->
                             EdocOptsAcc;
-                        {{'EXIT', error}, _} ->
+                        {error, _} ->
                             %% EDoc is not very descriptive
                             %% in terms of failures
                             throw({app_failed, AppName})

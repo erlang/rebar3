@@ -280,7 +280,7 @@ maybe_old_registry_checksum(Hash) -> list_to_integer(binary_to_list(Hash), 16).
       Binary :: binary(),
       Res :: ok | {error,_}.
 serve_from_download(TmpDir, CachePath, Package, Binary) ->
-    ?DEBUG("Writing ~p to cache at ~ts", [catch anon(Package), CachePath]),
+    ?DEBUG("Writing ~p to cache at ~ts", [try anon(Package) catch _:_ -> error end, CachePath]),
     file:write_file(CachePath, Binary),
     serve_from_memory(TmpDir, Binary, Package).
 
