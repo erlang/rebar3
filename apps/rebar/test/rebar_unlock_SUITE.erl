@@ -8,13 +8,13 @@ all() -> [pkgunlock, unlock, unlock_all, unlock_no_args].
 init_per_testcase(pkgunlock, Config0) ->
     Config = rebar_test_utils:init_rebar_state(Config0, "pkgunlock"),
     Lockfile = filename:join(?config(apps, Config), "rebar.lock"),
-    ec_file:copy(filename:join(?config(data_dir, Config), "pkg.rebar.lock"),
+    rebar_file_utils:copy(filename:join(?config(data_dir, Config), "pkg.rebar.lock"),
                  Lockfile),
     [{lockfile, Lockfile} | Config];
 init_per_testcase(Case, Config0) ->
     Config = rebar_test_utils:init_rebar_state(Config0, atom_to_list(Case)),
     Lockfile = filename:join(?config(apps, Config), "rebar.lock"),
-    ec_file:copy(filename:join(?config(data_dir, Config), "rebar.lock"),
+    rebar_file_utils:copy(filename:join(?config(data_dir, Config), "rebar.lock"),
                  Lockfile),
     [{lockfile, Lockfile} | Config].
 

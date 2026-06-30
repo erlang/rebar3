@@ -1,5 +1,28 @@
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
+
+%% %CopyrightBegin%
+%%
+%% SPDX-License-Identifier: Apache-2.0
+%%
+%% SPDX-FileCopyrightText: Copyright 2015-2026 Rebar3 and its contributors
+%%
+%% SPDX-FileCopyrightText: Copyright 2026 Dipl. Phys. Peer Stritzinger GmbH
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%%
+%% %CopyrightEnd%
+
 -module(rebar_resource_v2).
 
 -export([new/3,
@@ -46,17 +69,17 @@ new(Type, Module, State) ->
 
 -spec find_resource(type(), [resource()]) -> {ok, resource()} | {error, not_found}.
 find_resource(Type, Resources) ->
-    case ec_lists:find(fun(#resource{type=T}) -> T =:= Type end, Resources) of
-        error when is_atom(Type) ->
+    case lists:search(fun(#resource{type=T}) -> T =:= Type end, Resources) of
+        false when is_atom(Type) ->
             case code:which(Type) of
                 non_existing ->
                     {error, not_found};
                 _ ->
                     {ok, rebar_resource:new(Type, Type, #{})}
             end;
-        error ->
+        false ->
             {error, not_found};
-        {ok, Resource} ->
+        {value, Resource} ->
             {ok, Resource}
     end.
 

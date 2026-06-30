@@ -244,7 +244,7 @@ proj_plt_files(State) ->
     get_files(State, "project", DepApps, [], PltMods, [], []).
 
 proj_apps(State) ->
-    [ec_cnv:to_atom(rebar_app_info:name(App)) ||
+    [rebar_utils:to_atom(rebar_app_info:name(App)) ||
      App <- rebar_state:project_apps(State)].
 
 proj_plt_apps(State) ->
@@ -587,8 +587,8 @@ succ_typing_apps(undefined, ProjApps) ->
     ProjApps;
 succ_typing_apps(App, ProjApps) ->
     try
-        true = lists:member(ec_cnv:to_atom(App), ProjApps),
-        [ec_cnv:to_atom(App)]
+        true = lists:member(rebar_utils:to_atom(App), ProjApps),
+        [rebar_utils:to_atom(App)]
     catch
         error:_ ->
             throw({unknown_application, App})

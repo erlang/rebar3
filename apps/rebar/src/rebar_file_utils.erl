@@ -1,10 +1,12 @@
-%% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
-%% ex: ts=4 sw=4 et
-%% -------------------------------------------------------------------
+%% %CopyrightBegin%
 %%
-%% rebar: Erlang Build Tools
+%% SPDX-Licence-Identifier: MIT
 %%
-%% Copyright (c) 2009 Dave Smith (dizzyd@dizzyd.com)
+%% SPDX-FileCopyrightText: Copyright 2009 Dave Smith (dizzyd@dizzyd.com)
+%%
+%% SPDX-FileCopyrightText: Copyright 2015-2026 Rebar3 and its contributors
+%%
+%% SPDX-FileCopyrightText: Copyright 2026 Dipl. Phys. Peer Stritzinger GmbH
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a copy
 %% of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +25,8 @@
 %% LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 %% THE SOFTWARE.
-%% -------------------------------------------------------------------
+%% %CopyrightEnd%
+
 -module(rebar_file_utils).
 
 -export([try_consult/1,
@@ -32,6 +35,8 @@
          consult_any_config/2,
          consult_config_terms/2,
          format_error/1,
+         copy/2,
+         copy/3,
          symlink_or_copy/2,
          rm_rf/1,
          cp_r/2,
@@ -51,12 +56,17 @@
          normalize_relative_path/1,
          resolve_link/1,
          split_dirname/1,
-         ensure_dir/1]).
+         ensure_dir/1,
+         real_dir_path/1,
+         insecure_mkdtemp/0]).
 
 -include("rebar.hrl").
 
 -include_lib("providers/include/providers.hrl").
 -include_lib("kernel/include/file.hrl").
+
+-type copy_file_info() :: mode | time | owner | group.
+-type copy_option() :: recursive | {file_info, [copy_file_info()]}.
 
 
 %% ===================================================================
@@ -384,7 +394,7 @@ robocopy_mv_and_rename(Source, Dest, SrcDir, SrcName, DestDir, DestName) ->
     %%  - rename srcname destname (to avoid clobbering)
     %%  - robocopy tmp_dir dest_dir destname
     %%  - remove tmp_dir
-    case ec_file:insecure_mkdtemp() of
+    case insecure_mkdtemp() of
         {error, _Reason} ->
             {error, lists:flatten(
                      io_lib:format("Failed to move ~ts to ~ts (tmpdir failed)~n",
@@ -503,7 +513,7 @@ system_tmpdir(PathComponents) ->
 
 reset_dir(Path) ->
     %% delete the directory if it exists
-    _ = ec_file:remove(Path, [recursive]),
+    _ = file:del_dir_r(Path),
     %% recreate the directory
     ensure_dir(Path).
 
@@ -604,6 +614,159 @@ split_dirname(Path) ->
 -spec ensure_dir(file:name_all()) -> ok | {error, file:posix()}.
 ensure_dir(Path) ->
     filelib:ensure_dir(filename:join(Path, "fake_file")).
+
+%% SPDX-SnippetBegin
+%% SPDX-License-Identifier: MIT
+%% SPDX-SnippetCopyrightText: 2011 Erlware, LLC
+%% SPDX-FileCopyrightText: 2026 Dipl. Phys. Peer Stritzinger GmbH
+%% SPDX-SnippetComment: Functions are adapted from ec_file in erlware_commons.
+-spec real_dir_path(file:name()) -> file:name().
+ real_dir_path(Path) ->
+      {ok, CurCwd} = file:get_cwd(),
+      try
+          ok = file:set_cwd(Path),
+          {ok, RealPath} = file:get_cwd(),
+          filename:absname(RealPath)
+      after
+          ok = file:set_cwd(CurCwd)
+      end.
+
+%% @doc make a unique temporary directory. Similar function to BSD stdlib
+%% function of the same name.
+-spec insecure_mkdtemp() -> TmpDirPath::file:name() | {error, term()}.
+insecure_mkdtemp() ->
+    UniqueNumber = erlang:integer_to_list(erlang:trunc(rand:uniform() * 1_000_000_000_000)),
+    TmpDirPath =
+        filename:join([tmp(), lists:flatten([".tmp_dir", UniqueNumber])]),
+
+    case filelib:ensure_path(TmpDirPath) of
+        ok -> TmpDirPath;
+        Error -> Error
+    end.
+
+-spec tmp() -> file:name().
+tmp() ->
+    case os:type() of
+        {win32, _} ->
+            case os:getenv("TEMP") of
+                false -> "./tmp";
+                Val -> Val
+            end;
+        _ ->
+            case os:getenv("TMPDIR") of
+                false -> "/tmp";
+                Val -> Val
+            end
+    end.
+%%
+%% @doc copy a file including timestamps, ownership and mode etc.
+-spec copy(file:filename(), file:filename()) -> ok | {error, term()}.
+copy(From, To) ->
+    copy_(From, To, [{file_info, [mode, time, owner, group]}]).
+
+%% @doc copy an entire directory to another location.
+-spec copy(file:name(), file:name(), [copy_option()]) -> ok | {error, term()}.
+copy(From, To, []) ->
+    copy_(From, To, []);
+copy(From, To, Options) ->
+    case proplists:get_value(recursive, Options, false) of
+        true ->
+            case is_dir(From) of
+                false ->
+                    copy_(From, To, Options);
+                true ->
+                    make_dir_if_dir(To),
+                    copy_subfiles(From, To, Options)
+            end;
+        false ->
+            copy_(From, To, Options)
+    end.
+
+copy_(From, To, Options) ->
+    Linked =
+        case file:read_link(From) of
+            {ok, Linked0} -> Linked0;
+            {error, _} -> undefined
+        end,
+    case Linked =/= undefined orelse file:copy(From, To) of
+        true ->
+            file:make_symlink(Linked, To);
+        {ok, _} ->
+            copy_file_info(To, From, proplists:get_value(file_info, Options, []));
+        {error, Error} ->
+            {error, {copy_failed, Error}}
+    end.
+
+copy_file_info(To, From, FileInfoToKeep) ->
+    case file:read_file_info(From) of
+        {ok, FileInfo} ->
+            case write_file_info(To, FileInfo, FileInfoToKeep) of
+                [] ->
+                    ok;
+                Errors ->
+                    {error, {write_file_info_failed_for, Errors}}
+            end;
+        {error, RFError} ->
+            {error, {read_file_info_failed, RFError}}
+    end.
+
+write_file_info(To, FileInfo, FileInfoToKeep) ->
+    WriteInfoFuns = [{mode, fun try_write_mode/2},
+                     {time, fun try_write_time/2},
+                     {group, fun try_write_group/2},
+                     {owner, fun try_write_owner/2}],
+    lists:foldl(fun(Info, Acc) ->
+                        case proplists:get_value(Info, WriteInfoFuns, undefined) of
+                            undefined ->
+                                Acc;
+                            F ->
+                                case F(To, FileInfo) of
+                                    ok ->
+                                        Acc;
+                                    {error, Reason} ->
+                                        [{Info, Reason} | Acc]
+                                end
+                        end
+                end, [], FileInfoToKeep).
+
+try_write_mode(To, #file_info{mode=Mode}) ->
+    file:write_file_info(To, #file_info{mode=Mode}).
+
+try_write_time(To, #file_info{atime=Atime, mtime=Mtime}) ->
+    file:write_file_info(To, #file_info{atime=Atime, mtime=Mtime}).
+
+try_write_owner(To, #file_info{uid=OwnerId}) ->
+    file:write_file_info(To, #file_info{uid=OwnerId}).
+
+try_write_group(To, #file_info{gid=OwnerId}) ->
+    file:write_file_info(To, #file_info{gid=OwnerId}).
+
+copy_subfiles(From, To, Options) ->
+    Fun =
+        fun(ChildFrom) ->
+                ChildTo = filename:join([To, filename:basename(ChildFrom)]),
+                copy(ChildFrom, ChildTo, Options)
+        end,
+    lists:foreach(Fun, sub_files(From)).
+
+make_dir_if_dir(File) ->
+    case is_dir(File) of
+        true  -> ok;
+        false -> ensure_dir(File)
+    end.
+
+is_dir(Path) ->
+    case file:read_file_info(Path) of
+        {ok, #file_info{type = directory}} ->
+            true;
+        _ ->
+            false
+    end.
+
+sub_files(From) ->
+    {ok, SubFiles} = file:list_dir(From),
+    [filename:join(From, SubFile) || SubFile <- SubFiles].
+%% SPDX-SnippetEnd
 
 %% ===================================================================
 %% Internal functions

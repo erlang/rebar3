@@ -125,12 +125,12 @@ check_project_layout(State) ->
             %% Code duplicated from rebar_prv_lock:define_root_app/2
             RootDir = rebar_dir:root_dir(TmpState),
             case ec_lists:find(fun(X) ->
-                    ec_file:real_dir_path(rebar_app_info:dir(X)) =:=
-                    ec_file:real_dir_path(RootDir)
+                    rebar_file_utils:real_dir_path(rebar_app_info:dir(X)) =:=
+                    rebar_file_utils:real_dir_path(RootDir)
                  end, Apps) of
-                {ok, _App} ->
+                {value, _App} ->
                     non_umbrella;
-                error ->
+                false ->
                     umbrella
             end
     end.

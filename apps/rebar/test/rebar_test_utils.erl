@@ -1,4 +1,27 @@
+%% %CopyrightBegin%
+%%
+%% SPDX-License-Identifier: Apache-2.0
+%%
+%% SPDX-FileCopyrightText: Copyright 2015-2026 Rebar3 and its contributors
+%%
+%% SPDX-FileCopyrightText: Copyright 2026 Dipl. Phys. Peer Stritzinger GmbH
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%%
+%% %CopyrightEnd%
+
 -module(rebar_test_utils).
+-include_lib("kernel/include/file.hrl").
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -export([init_rebar_state/1, init_rebar_state/2, run_and_check/3, run_and_check/4,
@@ -24,8 +47,8 @@ init_rebar_state(Config, Name) ->
     DataDir = ?config(priv_dir, Config),
     AppsDir = filename:join([DataDir, create_random_name(Name)]),
     CheckoutsDir = filename:join([AppsDir, "_checkouts"]),
-    ok = ec_file:mkdir_p(AppsDir),
-    ok = ec_file:mkdir_p(CheckoutsDir),
+    ok = filelib:ensure_path(AppsDir),
+    ok = filelib:ensure_path(CheckoutsDir),
     Verbosity = rebar3:log_level(),
     rebar_log:init(command_line, Verbosity),
     GlobalDir = filename:join([DataDir, "cache"]),
@@ -162,7 +185,7 @@ create_config(AppDir, Contents) ->
 create_config(_AppDir, ConfFilename, Contents) ->
     ok = filelib:ensure_dir(ConfFilename),
     Config = lists:flatten([io_lib:fwrite("~p.~n", [Term]) || Term <- Contents]),
-    ok = ec_file:write(ConfFilename, Config),
+    ok = file:write_file(ConfFilename, Config),
     ConfFilename.
 
 %% @doc Util to create a random variation of a given name.
@@ -268,19 +291,19 @@ check_results(AppDir, Expected, ProfileRun, State) ->
     InvalidApps = rebar_app_discover:find_apps(BuildDirs, invalid, State),
     ValidApps = rebar_app_discover:find_apps(BuildDirs, valid, State),
 
-    InvalidDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- InvalidApps],
-    ValidDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- ValidApps],
+    InvalidDepsNames = [{rebar_utils:to_list(rebar_app_info:name(App)), App} || App <- InvalidApps],
+    ValidDepsNames = [{rebar_utils:to_list(rebar_app_info:name(App)), App} || App <- ValidApps],
 
     Deps = rebar_app_discover:find_apps(BuildDirs, all, State),
     SubDeps = rebar_app_discover:find_apps(BuildSubDirs, all, State),
-    DepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Deps],
-    SubDirDepsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- SubDeps],
+    DepsNames = [{rebar_utils:to_list(rebar_app_info:name(App)), App} || App <- Deps],
+    SubDirDepsNames = [{rebar_utils:to_list(rebar_app_info:name(App)), App} || App <- SubDeps],
     Checkouts = rebar_app_discover:find_apps(CheckoutsDirs, all, State),
-    CheckoutsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Checkouts],
+    CheckoutsNames = [{rebar_utils:to_list(rebar_app_info:name(App)), App} || App <- Checkouts],
     Plugins = rebar_app_discover:find_apps(PluginDirs, all, State),
-    PluginsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- Plugins],
+    PluginsNames = [{rebar_utils:to_list(rebar_app_info:name(App)), App} || App <- Plugins],
     GlobalPlugins = rebar_app_discover:find_apps(GlobalPluginDirs, all, State),
-    GlobalPluginsNames = [{ec_cnv:to_list(rebar_app_info:name(App)), App} || App <- GlobalPlugins],
+    GlobalPluginsNames = [{rebar_utils:to_list(rebar_app_info:name(App)), App} || App <- GlobalPlugins],
 
     lists:foreach(
         fun({app, Name}) ->
@@ -432,11 +455,14 @@ check_results(AppDir, Expected, ProfileRun, State) ->
                     {ok, RelLibs} = rebar_utils:list_dir(LibDir),
                     IsSymLinkFun =
                         fun(X) ->
-                                ec_file:is_symlink(filename:join(LibDir, X))
+                                case file:read_link_info(filename:join(LibDir, X)) of
+                                    {ok, #file_info{type = symlink}} -> true;
+                                    _ -> false
+                                end
                         end,
                     DevMode = lists:all(IsSymLinkFun, RelLibs),
                     ?assertEqual(ExpectedDevMode, DevMode),
-                    ?assert(ec_file:exists(filename:join([ReleaseDir, Name, "releases", Vsn]))),
+                    ?assert(filelib:is_file(filename:join([ReleaseDir, Name, "releases", Vsn]))),
 
                     %% throws not_found if it doesn't exist
                     ok
@@ -461,32 +487,34 @@ check_results(AppDir, Expected, ProfileRun, State) ->
 write_plugin_file(Dir, Name) ->
     Erl = filename:join([Dir, "src", Name]),
     ok = filelib:ensure_dir(Erl),
-    ok = ec_file:write(Erl, plugin_src_file(Name)).
+    ok = file:write_file(Erl, plugin_src_file(Name)).
 
 write_src_file(Dir, Name) ->
     Erl = filename:join([Dir, "src", Name]),
     ok = filelib:ensure_dir(Erl),
-    ok = ec_file:write(Erl, erl_src_file(Name)).
+    ok = file:write_file(Erl, erl_src_file(Name)).
 
 write_eunitized_src_file(Dir, Name) ->
     Erl = filename:join([Dir, "src", "not_a_real_src_" ++ Name ++ ".erl"]),
     ok = filelib:ensure_dir(Erl),
-    ok = ec_file:write(Erl, erl_eunitized_src_file("not_a_real_src_" ++ Name ++ ".erl")).
+    ok = file:write_file(Erl, erl_eunitized_src_file("not_a_real_src_" ++ Name ++ ".erl")).
 
 write_eunit_suite_file(Dir, Name) ->
     Erl = filename:join([Dir, "test", "not_a_real_src_" ++ Name ++ "_tests.erl"]),
     ok = filelib:ensure_dir(Erl),
-    ok = ec_file:write(Erl, erl_eunit_suite_file("not_a_real_src_" ++ Name ++ ".erl")).
+    ok = file:write_file(Erl, erl_eunit_suite_file("not_a_real_src_" ++ Name ++ ".erl")).
 
 write_app_file(Dir, Name, Version, Deps) ->
     Filename = filename:join([Dir, "ebin", Name ++ ".app"]),
     ok = filelib:ensure_dir(Filename),
-    ok = ec_file:write_term(Filename, get_app_metadata(ec_cnv:to_list(Name), Version, Deps)).
+    Term = get_app_metadata(rebar_utils:to_list(Name), Version, Deps),
+    ok = file:write_file(Filename, lists:flatten(io_lib:fwrite("~p. ", [Term]))).
 
 write_app_src_file(Dir, Name, Version, Deps) ->
     Filename = filename:join([Dir, "src", Name ++ ".app.src"]),
     ok = filelib:ensure_dir(Filename),
-    ok = ec_file:write_term(Filename, get_app_metadata(ec_cnv:to_list(Name), Version, Deps)).
+    Term = get_app_metadata(rebar_utils:to_list(Name), Version, Deps),
+    ok = file:write_file(Filename, lists:flatten(io_lib:fwrite("~p. ", [Term]))).
 
 erl_src_file(Name) ->
     io_lib:format("-module('~s').\n"

@@ -1,10 +1,14 @@
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
-%% -------------------------------------------------------------------
+%% %CopyrightBegin%
 %%
-%% rebar: Erlang Build Tools
+%% SPDX-Licence-Identifier: MIT
 %%
-%% Copyright (c) 2009, 2010 Dave Smith (dizzyd@dizzyd.com)
+%% SPDX-FileCopyrightText: Copyright 2009-2010 Dave Smith (dizzyd@dizzyd.com)
+%%
+%% SPDX-FileCopyrightText: Copyright 2015-2026 Rebar3 and its contributors
+%%
+%% SPDX-FileCopyrightText: Copyright 2026 Dipl. Phys. Peer Stritzinger GmbH
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a copy
 %% of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +27,8 @@
 %% LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 %% THE SOFTWARE.
-%% -------------------------------------------------------------------
+%% %CopyrightEnd%
+
 -module(rebar_erlc_compiler).
 
 -export([compile/1, compile/2, compile/3,
@@ -124,7 +129,7 @@ compile(AppInfo, CompileOpts) when element(1, AppInfo) == app_info_t ->
 
     ExtraDirs = rebar_dir:extra_src_dirs(RebarOpts),
     F = fun(D) ->
-        case ec_file:is_dir(filename:join([Dir, D])) of
+        case filelib:is_dir(filename:join([Dir, D])) of
             true  -> compile_dirs(RebarOpts, Dir, [D], D, CompileOpts);
             false -> ok
         end
@@ -156,7 +161,7 @@ compile(RebarOpts, BaseDir, OutDir, CompileOpts) ->
 
     ExtraDirs = rebar_dir:extra_src_dirs(RebarOpts),
     F = fun(D) ->
-        case ec_file:is_dir(filename:join([BaseDir, D])) of
+        case filelib:is_dir(filename:join([BaseDir, D])) of
             true  -> compile_dirs(RebarOpts, BaseDir, [D], D, CompileOpts);
             false -> ok
         end
