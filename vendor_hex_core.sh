@@ -42,6 +42,7 @@ filenames="hex_core.hrl \
            hex_api_user.erl \
            hex_licenses.erl \
            hex_safe_binary_to_term.erl \
+           hex_cli_auth.erl \
            safe_erl_term.xrl"
 
 search_to_replace="hex_core: \
