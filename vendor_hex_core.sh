@@ -25,6 +25,7 @@ filenames="hex_core.hrl \
            hex_erl_tar.hrl \
            hex_pb_names.erl \
            hex_pb_package.erl \
+           hex_pb_policy.erl \
            hex_pb_signed.erl \
            hex_pb_versions.erl \
            hex_tarball.erl \
@@ -41,6 +42,7 @@ filenames="hex_core.hrl \
            hex_api_user.erl \
            hex_licenses.erl \
            hex_safe_binary_to_term.erl \
+           hex_cli_auth.erl \
            safe_erl_term.xrl"
 
 search_to_replace="hex_core: \
@@ -49,6 +51,7 @@ search_to_replace="hex_core: \
                    hex_erl_tar \
                    hex_pb_names \
                    hex_pb_package \
+                   hex_pb_policy \
                    hex_pb_signed \
                    hex_pb_versions \
                    hex_registry \
@@ -56,6 +59,7 @@ search_to_replace="hex_core: \
                    hex_http \
                    hex_repo \
                    hex_api \
+                   hex_cli_auth \
                    hex_licenses \
                    hex_safe_binary_to_term \
                    safe_erl_term"

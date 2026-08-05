@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.18.0, do not edit manually
+%% Vendored from hex_core v0.19.0, do not edit manually
 
 %% @doc
 %% Repo API.
@@ -94,10 +94,10 @@ get_package(Config, Name) when is_binary(Name) and is_map(Config) ->
 %% @doc
 %% Gets policy resource from the repository.
 %%
-%% Requires `repo_organization' to be set in the config; policies are
-%% always served from the per-organization namespace
-%% (`/repos/<organization>/policies/<name>'). Returns
-%% `{error, missing_repo_organization}' when it is not set.
+%% Like the other resources, the URL is built from `repo_url' (with
+%% `repo_organization' inserting the `/repos/:org' segment when set), so the
+%% caller controls the layout through the config rather than this function
+%% requiring a particular field.
 %%
 %% Examples:
 %%
@@ -111,19 +111,14 @@ get_package(Config, Name) when is_binary(Name) and is_map(Config) ->
 %% '''
 %% @end
 get_policy(Config, Name) when is_binary(Name) and is_map(Config) ->
-    case maps:get(repo_organization, Config, undefined) of
-        undefined ->
-            {error, missing_repo_organization};
-        Org when is_binary(Org) ->
-            Verify = maps:get(repo_verify_origin, Config, true),
-            Decoder = fun(Data) ->
-                case Verify of
-                    true -> r3_hex_registry:decode_policy(Data, Org, Name);
-                    false -> r3_hex_registry:decode_policy(Data, no_verify, no_verify)
-                end
-            end,
-            get_protobuf(Config, <<"policies/", Name/binary>>, Decoder)
-    end.
+    Verify = maps:get(repo_verify_origin, Config, true),
+    Decoder = fun(Data) ->
+        case Verify of
+            true -> r3_hex_registry:decode_policy(Data, repo_name(Config), Name);
+            false -> r3_hex_registry:decode_policy(Data, no_verify, no_verify)
+        end
+    end,
+    get_protobuf(Config, <<"policies/", Name/binary>>, Decoder).
 
 %% @doc
 %% Gets tarball from the repository.
