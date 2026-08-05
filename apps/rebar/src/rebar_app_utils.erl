@@ -1,10 +1,15 @@
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
-%% -------------------------------------------------------------------
+
+%% %CopyrightBegin%
 %%
-%% rebar: Erlang Build Tools
+%% SPDX-License-Identifier: MIT
 %%
-%% Copyright (c) 2009 Dave Smith (dizzyd@dizzyd.com)
+%% SPDX-FileCopyrightText: Copyright 2009 Dave Smith (dizzyd@dizzyd.com)
+%%
+%% SPDX-FileCopyrightText: Copyright 2015-2026 Rebar3 and its contributors
+%%
+%% SPDX-FileCopyrightText: Copyright 2026 Dipl. Phys. Peer Stritzinger GmbH
 %%
 %% Permission is hereby granted, free of charge, to any person obtaining a copy
 %% of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +28,9 @@
 %% LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 %% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 %% THE SOFTWARE.
-%% -------------------------------------------------------------------
+%%
+%% %CopyrightEnd%
+
 -module(rebar_app_utils).
 
 -export([find/2,
@@ -49,15 +56,15 @@
 
 %% @doc finds the proper app info record for a given app name in a list of
 %% such records.
--spec find(binary(), [rebar_app_info:t()]) -> {ok, rebar_app_info:t()} | error.
+-spec find(binary(), [rebar_app_info:t()]) -> {value, rebar_app_info:t()} | false.
 find(Name, Apps) ->
-    ec_lists:find(fun(App) -> rebar_app_info:name(App) =:= Name end, Apps).
+    lists:search(fun(App) -> rebar_app_info:name(App) =:= Name end, Apps).
 
 %% @doc finds the proper app info record for a given app name at a given version
 %% in a list of such records.
--spec find(binary(), binary(), [rebar_app_info:t()]) -> {ok, rebar_app_info:t()} | error.
+-spec find(binary(), binary(), [rebar_app_info:t()]) -> {value, rebar_app_info:t()} | false.
 find(Name, Vsn, Apps) ->
-    ec_lists:find(fun(App) ->
+    lists:search(fun(App) ->
                           rebar_app_info:name(App) =:= Name
                               andalso rebar_app_info:original_vsn(App) =:= Vsn
                   end, Apps).

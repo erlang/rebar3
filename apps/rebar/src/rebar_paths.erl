@@ -1,3 +1,25 @@
+%% %CopyrightBegin%
+%%
+%% SPDX-License-Identifier: Apache-2.0
+%%
+%% SPDX-FileCopyrightText: Copyright 2015-2026 Rebar3 and its contributors
+%%
+%% SPDX-FileCopyrightText: Copyright 2026 Dipl. Phys. Peer Stritzinger GmbH
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%%
+%% %CopyrightEnd%
+
 -module(rebar_paths).
 -include("rebar.hrl").
 
@@ -234,8 +256,8 @@ get_runtime_apps([App|Rest0], AppsAcc0, AppsList) ->
             fun(AppName, {Rest, Acc}) ->
                 %% We only care about those apps we ccould find in the state.
                 case rebar_app_utils:find(AppName, AppsList) of
-                    {ok, AppInfo} -> {[AppInfo|Rest], sets:add_element(AppInfo, Acc)};
-                    error -> {Rest, Acc}
+                    {value, AppInfo} -> {[AppInfo|Rest], sets:add_element(AppInfo, Acc)};
+                    false -> {Rest, Acc}
                 end
             end, {Rest0, sets:add_element(App, AppsAcc0)}, TotalApps),
     get_runtime_apps(Rest1 ++ TotalApps, AppsAcc1, AppsList).

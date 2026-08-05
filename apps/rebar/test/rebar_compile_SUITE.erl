@@ -617,7 +617,7 @@ clean_basic_extra_dirs(Config) ->
     rebar_test_utils:run_and_check(Config, [], ["clean"], {ok, [{app, Name, invalid}]}),
 
     Beam = lists:flatten(io_lib:format("~ts_extra", [Name])),
-    false = ec_file:exists(filename:join([AppDir, "_build", "default", "lib", Name, "extras", Beam])).
+    false = filelib:is_file(filename:join([AppDir, "_build", "default", "lib", Name, "extras", Beam])).
 
 clean_release_extra_dirs(Config) ->
     AppDir = ?config(apps, Config),
@@ -627,9 +627,9 @@ clean_release_extra_dirs(Config) ->
                                    {ok, [{app, Name1, invalid}, {app, Name2, invalid}]}),
 
     Beam1 = lists:flatten(io_lib:format("~ts_extra", [Name1])),
-    false = ec_file:exists(filename:join([AppDir, "_build", "default", "lib", Name1, "extras", Beam1])),
+    false = filelib:is_file(filename:join([AppDir, "_build", "default", "lib", Name1, "extras", Beam1])),
     Beam2 = lists:flatten(io_lib:format("~ts_extra", [Name2])),
-    false = ec_file:exists(filename:join([AppDir, "_build", "default", "lib", Name2, "extras", Beam2])).
+    false = filelib:is_file(filename:join([AppDir, "_build", "default", "lib", Name2, "extras", Beam2])).
 
 clean_extra_dirs_in_project_root(Config) ->
     AppDir = ?config(apps, Config),
@@ -638,7 +638,7 @@ clean_extra_dirs_in_project_root(Config) ->
     rebar_test_utils:run_and_check(Config, [], ["clean"],
                                    {ok, [{app, Name1, invalid}, {app, Name2, invalid}]}),
 
-    false = ec_file:exists(filename:join([AppDir, "_build", "default", "extras"])).
+    false = filelib:is_file(filename:join([AppDir, "_build", "default", "extras"])).
 
 recompile_when_hrl_changes(Config) ->
     AppDir = ?config(apps, Config),
@@ -1146,7 +1146,7 @@ dont_recompile_yrl_or_xrl(Config) ->
         "  {token,{float,TokenLine,list_to_float(TokenChars)}}."
         "\n\n"
         "Erlang code.",
-    ok = ec_file:write(Xrl, XrlBody),
+    ok = file:write_file(Xrl, XrlBody),
 
     Yrl = filename:join([AppDir, "src", "not_a_real_yrl_" ++ Name ++ ".yrl"]),
     ok = filelib:ensure_dir(Yrl),
@@ -1159,7 +1159,7 @@ dont_recompile_yrl_or_xrl(Config) ->
                "T -> F : '$1'.\n"
                "F -> '(' E ')' : '$2'.\n"
                "F -> number : '$1'.\n"],
-    ok = ec_file:write(Yrl, YrlBody),
+    ok = file:write_file(Yrl, YrlBody),
 
     XrlErl = filename:join([AppDir, "src", filename:basename(Xrl, ".xrl") ++ ".erl"]),
     YrlErl = filename:join([AppDir, "src", filename:basename(Yrl, ".yrl") ++ ".erl"]),
@@ -1171,7 +1171,7 @@ dont_recompile_yrl_or_xrl(Config) ->
     Hrl = filename:join([AppDir, "include", "some_header.hrl"]),
     ok = filelib:ensure_dir(Hrl),
     HrlBody = yeccpre_hrl(),
-    ok = ec_file:write(Hrl, HrlBody),
+    ok = file:write_file(Hrl, HrlBody),
     RebarConfig = [{yrl_opts, [{includefile, "include/some_header.hrl"}]}],
 
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
@@ -1257,7 +1257,7 @@ deps_in_path(Config) ->
     ?assertNotEqual([], [Path || Path <- code:get_path(),
                                  {match, _} <- [re:run(Path, PkgName)]]),
 
-    true = code:set_path(lists:filter(fun(P) -> ec_file:exists(P) end, StartPaths)),
+    true = code:set_path(lists:filter(fun(P) -> filelib:is_file(P) end, StartPaths)),
     %% Make sure apps we look for are not visible again
     %% Hope not to find src name
     ?assertEqual([], [Path || Path <- code:get_path(),

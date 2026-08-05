@@ -1,3 +1,25 @@
+%% %CopyrightBegin%
+%%
+%% SPDX-License-Identifier: Apache-2.0
+%%
+%% SPDX-FileCopyrightText: Copyright 2015-2026 Rebar3 and its contributors
+%%
+%% SPDX-FileCopyrightText: Copyright 2026 Dipl. Phys. Peer Stritzinger GmbH
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%%
+%% %CopyrightEnd%
+
 -module(rebar_packages).
 
 -export([get/2
@@ -95,7 +117,7 @@ get_package(Dep, Vsn, Hash, Repos, Table, State) ->
                 [] ->
                     not_found
             end;
-            
+
         _ ->
             not_found
     end.
@@ -197,7 +219,7 @@ find_highest_matching_(Dep, DepVsn, #{name := Repo}, Table, State) when is_binar
     case rebar_semver:parse_version(DepVsn) of
         {ok, _} ->
             resolve_version_(Dep, <<"~> "/utf8, DepVsn/binary>>, Repo, Table, State);
-            
+
         {error, _} ->
             resolve_version_(Dep, DepVsn, Repo, Table, State)
     end.
@@ -311,7 +333,7 @@ resolve_version(Dep, DepVsn, _OldHash, Hash, HexRegistry, State) ->
 resolve_version_no_package(Dep, DepVsn, Hash, HexRegistry, State) ->
     case rebar_semver:parse_constraint(DepVsn) of
         {ok, _} ->
-            Fun = fun(Repo) ->
+            Fun = fun(#{name := Repo}) ->
                 case resolve_version_(Dep, DepVsn, Repo, HexRegistry, State) of
                     none ->
                         not_found;
@@ -320,16 +342,20 @@ resolve_version_no_package(Dep, DepVsn, Hash, HexRegistry, State) ->
                 end
             end,
             handle_missing_no_exception(Fun, Dep, State);
-        
         Error ->
             Error
     end.
 
-    
-check_all_repos(Fun, RepoConfigs) ->
-    ec_lists:search(fun(#{name := R}) ->
-                            Fun(R)
-                    end, RepoConfigs).
+
+check_all_repos(_, []) ->
+    not_found;
+check_all_repos(Fun, [Config | OtherConfigs]) ->
+    case Fun(Config) of
+        {ok, Value} ->
+            {ok, Value, Config};
+        not_found ->
+            check_all_repos(Fun, OtherConfigs)
+    end.
 
 handle_missing_no_exception(Fun, Dep, State) ->
     Resources = rebar_state:resources(State),
@@ -339,14 +365,14 @@ handle_missing_no_exception(Fun, Dep, State) ->
     %% if none is found then we step through checking after updating the repo registry
     case check_all_repos(Fun, RepoConfigs) of
         not_found ->
-            ec_lists:search(fun(Config=#{name := R}) ->
+            check_all_repos(fun(Config) ->
                                     case ?MODULE:update_package(Dep, Config, State) of
                                         ok ->
-                                            Fun(R);
+                                            Fun(Config);
                                         _ ->
                                             not_found
                                     end
-                            end, RepoConfigs);
+                             end, RepoConfigs);
         Result ->
             Result
     end.
@@ -357,11 +383,10 @@ resolve_version_(Dep, Constraint, Repo, HexRegistry, State) ->
             AllowPreRelease = rebar_semver:is_prerelease_or_build(Constraint),
             AllVersions = get_package_versions(Dep, AllowPreRelease, Repo, HexRegistry, State),
             resolve_version_loop(Match, AllVersions, none);
-    
         Error ->
             Error
     end.
-    
+
 resolve_version_loop(_Constraint, [], none) -> none;
 resolve_version_loop(_Constraint, [], BestMatch) -> {ok, BestMatch};
 resolve_version_loop(Constraint, [Vsn|R], none) ->
