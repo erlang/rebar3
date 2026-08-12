@@ -60,11 +60,11 @@ groups() ->
 init_per_suite(Config) ->
     PrivDir = ?config(priv_dir, Config),
     DataDir = ?config(data_dir, Config),
-    ok = ec_file:copy(filename:join([DataDir, "basic_app.zip"]), filename:join([PrivDir, "basic_app.zip"])),
+    ok = rebar_file_utils:copy(filename:join([DataDir, "basic_app.zip"]), filename:join([PrivDir, "basic_app.zip"])),
     {ok, _} = zip:extract(filename:join([PrivDir, "basic_app.zip"]), [{cwd, PrivDir}]),
-    ok = ec_file:copy(filename:join([DataDir, "multi_app.zip"]), filename:join([PrivDir, "multi_app.zip"])),
+    ok = rebar_file_utils:copy(filename:join([DataDir, "multi_app.zip"]), filename:join([PrivDir, "multi_app.zip"])),
     {ok, _} = zip:extract(filename:join([PrivDir, "multi_app.zip"]), [{cwd, PrivDir}]),
-    ok = ec_file:copy(filename:join([DataDir, "syscfg_app.zip"]), filename:join([PrivDir, "syscfg_app.zip"])),
+    ok = rebar_file_utils:copy(filename:join([DataDir, "syscfg_app.zip"]), filename:join([PrivDir, "syscfg_app.zip"])),
     {ok, _} = zip:extract(filename:join([PrivDir, "syscfg_app.zip"]), [{cwd, PrivDir}]),
     Config.
 
@@ -78,7 +78,7 @@ init_per_group(basic_app, Config) ->
 
     AppDirs = ["src", "include", "test"],
 
-    lists:foreach(fun(F) -> ec_file:copy(filename:join([PrivDir, "basic_app", F]),
+    lists:foreach(fun(F) -> rebar_file_utils:copy(filename:join([PrivDir, "basic_app", F]),
                                          filename:join([AppDir, F]),
                                          [recursive]) end, AppDirs),
 
@@ -95,7 +95,7 @@ init_per_group(multi_app, Config) ->
 
     AppDirs = ["apps", "test"],
 
-    lists:foreach(fun(F) -> ec_file:copy(filename:join([PrivDir, "multi_app", F]),
+    lists:foreach(fun(F) -> rebar_file_utils:copy(filename:join([PrivDir, "multi_app", F]),
                                          filename:join([AppDir, F]),
                                          [recursive]) end, AppDirs),
 
@@ -112,7 +112,7 @@ init_per_group(cmd_line_args, Config) ->
 
     AppDirs = ["apps", "test"],
 
-    lists:foreach(fun(F) -> ec_file:copy(filename:join([PrivDir, "multi_app", F]),
+    lists:foreach(fun(F) -> rebar_file_utils:copy(filename:join([PrivDir, "multi_app", F]),
                                          filename:join([AppDir, F]),
                                          [recursive]) end, AppDirs),
 
@@ -149,9 +149,9 @@ basic_app_compiles(Config) ->
 basic_app_files(Config) ->
     AppDir = ?config(apps, Config),
 
-    lists:foreach(fun(F) -> true = ec_file:exists(filename:join([AppDir, "_build", "test", "lib", "basic_app", "ebin", F])) end,
+    lists:foreach(fun(F) -> true = filelib:is_file(filename:join([AppDir, "_build", "test", "lib", "basic_app", "ebin", F])) end,
                   ["basic_app.app", "basic_app.beam"]),
-    lists:foreach(fun(F) -> true = ec_file:exists(filename:join([AppDir, "_build", "test", "lib", "basic_app", "test", F])) end,
+    lists:foreach(fun(F) -> true = filelib:is_file(filename:join([AppDir, "_build", "test", "lib", "basic_app", "test", F])) end,
                   ["basic_app_tests.beam", "basic_app_tests_helper.beam"]).
 
 %% check that the correct tests are exported from modules for project
@@ -208,15 +208,15 @@ multi_app_compiles(Config) ->
 multi_app_files(Config) ->
     AppDir = ?config(apps, Config),
 
-    lists:foreach(fun(F) -> true = ec_file:exists(filename:join([AppDir, "_build", "test", "lib", "multi_app_bar", "ebin", F])) end,
+    lists:foreach(fun(F) -> true = filelib:is_file(filename:join([AppDir, "_build", "test", "lib", "multi_app_bar", "ebin", F])) end,
                   ["multi_app_bar.app", "multi_app_bar.beam"]),
-    lists:foreach(fun(F) -> true = ec_file:exists(filename:join([AppDir, "_build", "test", "lib", "multi_app_baz", "ebin", F])) end,
+    lists:foreach(fun(F) -> true = filelib:is_file(filename:join([AppDir, "_build", "test", "lib", "multi_app_baz", "ebin", F])) end,
                   ["multi_app_baz.app", "multi_app_baz.beam"]),
-    lists:foreach(fun(F) -> true = ec_file:exists(filename:join([AppDir, "_build", "test", "lib", "multi_app_bar", "test", F])) end,
+    lists:foreach(fun(F) -> true = filelib:is_file(filename:join([AppDir, "_build", "test", "lib", "multi_app_bar", "test", F])) end,
                   ["multi_app_bar_tests.beam", "multi_app_bar_tests_helper.beam"]),
-    lists:foreach(fun(F) -> true = ec_file:exists(filename:join([AppDir, "_build", "test", "lib", "multi_app_baz", "test", F])) end,
+    lists:foreach(fun(F) -> true = filelib:is_file(filename:join([AppDir, "_build", "test", "lib", "multi_app_baz", "test", F])) end,
                   ["multi_app_baz_tests.beam", "multi_app_baz_tests_helper.beam"]),
-    lists:foreach(fun(F) -> true = ec_file:exists(filename:join([AppDir, "_build", "test", "extras", "test", F])) end,
+    lists:foreach(fun(F) -> true = filelib:is_file(filename:join([AppDir, "_build", "test", "extras", "test", F])) end,
                   ["multi_app_tests.beam", "multi_app_tests_helper.beam"]).
 
 %% check that the correct tests are exported from modules for project
@@ -604,7 +604,7 @@ misspecified_eunit_tests(Config) ->
 
     AppDirs = ["src", "include", "test"],
 
-    lists:foreach(fun(F) -> ec_file:copy(filename:join([PrivDir, "basic_app", F]),
+    lists:foreach(fun(F) -> rebar_file_utils:copy(filename:join([PrivDir, "basic_app", F]),
                                          filename:join([AppDir, F]),
                                          [recursive]) end, AppDirs),
 
@@ -624,7 +624,7 @@ misspecified_eunit_compile_opts(Config) ->
 
     AppDirs = ["src", "include", "test"],
 
-    lists:foreach(fun(F) -> ec_file:copy(filename:join([PrivDir, "basic_app", F]),
+    lists:foreach(fun(F) -> rebar_file_utils:copy(filename:join([PrivDir, "basic_app", F]),
                                          filename:join([AppDir, F]),
                                          [recursive]) end, AppDirs),
 
@@ -642,7 +642,7 @@ misspecified_eunit_first_files(Config) ->
 
     AppDirs = ["src", "include", "test"],
 
-    lists:foreach(fun(F) -> ec_file:copy(filename:join([PrivDir, "basic_app", F]),
+    lists:foreach(fun(F) -> rebar_file_utils:copy(filename:join([PrivDir, "basic_app", F]),
                                          filename:join([AppDir, F]),
                                          [recursive]) end, AppDirs),
 
@@ -662,7 +662,7 @@ alternate_test_regex(Config) ->
 
     AppDirs = ["src", "include", "test"],
 
-    lists:foreach(fun(F) -> ec_file:copy(filename:join([PrivDir, "basic_app", F]),
+    lists:foreach(fun(F) -> rebar_file_utils:copy(filename:join([PrivDir, "basic_app", F]),
                                          filename:join([AppDir, F]),
                                          [recursive]) end, AppDirs),
 
@@ -685,7 +685,7 @@ syscfg_app_opts(Config) ->
 
     AppDirs = ["src", "test", "config"],
 
-    lists:foreach(fun(F) -> ec_file:copy(filename:join([PrivDir, "syscfg_app", F]),
+    lists:foreach(fun(F) -> rebar_file_utils:copy(filename:join([PrivDir, "syscfg_app", F]),
                                          filename:join([AppDir, F]),
                                          [recursive]) end, AppDirs),
 

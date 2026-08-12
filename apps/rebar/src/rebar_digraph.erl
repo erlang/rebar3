@@ -1,3 +1,25 @@
+%% %CopyrightBegin%
+%%
+%% SPDX-License-Identifier: Apache-2.0
+%%
+%% SPDX-FileCopyrightText: Copyright 2015-2026 Rebar3 and its contributors
+%%
+%% SPDX-FileCopyrightText: Copyright 2026 Dipl. Phys. Peer Stritzinger GmbH
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%%
+%% %CopyrightEnd%
+
 %%% @doc build a digraph of applications in order to figure out dependency
 %%% and compile order.
 -module(rebar_digraph).
@@ -93,16 +115,9 @@ subgraph(Graph, Vertices) ->
 
 %% @private from a list of app names, fetch the proper app info records
 %% for them.
--spec names_to_apps([atom()], [rebar_app_info:t()]) -> [rebar_app_info:t()].
+-spec names_to_apps([binary()], [rebar_app_info:t()]) -> [rebar_app_info:t()].
 names_to_apps(Names, Apps) ->
-    [element(2, App) || App <- [find_app_by_name(Name, Apps) || Name <- Names], App =/= error].
-
-%% @private fetch the proper app info record for a given app name.
--spec find_app_by_name(atom(), [rebar_app_info:t()]) -> {ok, rebar_app_info:t()} | error.
-find_app_by_name(Name, Apps) ->
-    ec_lists:find(fun(App) ->
-                          rebar_app_info:name(App) =:= Name
-                  end, Apps).
+    [element(2, App) || App <- [rebar_app_utils:find(Name, Apps) || Name <- Names], App =/= false].
 
 %% @private The union of all entries in the applications list for an app and
 %% the deps listed in its rebar.config is all deps that may be needed

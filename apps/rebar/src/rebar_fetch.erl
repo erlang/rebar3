@@ -1,10 +1,34 @@
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 et
+
+%% %CopyrightBegin%
+%%
+%% SPDX-License-Identifier: Apache-2.0
+%%
+%% SPDX-FileCopyrightText: Copyright 2015-2026 Rebar3 and its contributors
+%%
+%% SPDX-FileCopyrightText: Copyright 2026 Dipl. Phys. Peer Stritzinger GmbH
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%%
+%% %CopyrightEnd%
+
 %% -------------------------------------------------------------------
 %%
 %% rebar: Erlang Build Tools
 %%
 %% -------------------------------------------------------------------
+
 -module(rebar_fetch).
 
 -export([lock_source/2,
@@ -59,11 +83,11 @@ download_source_(AppInfo, State) ->
 
 download_source_online(AppInfo, State) ->
     AppDir = rebar_app_info:dir(AppInfo),
-    TmpDir = ec_file:insecure_mkdtemp(),
+    TmpDir = rebar_file_utils:insecure_mkdtemp(),
     AppDir1 = rebar_utils:to_list(AppDir),
     case rebar_resource_v2:download(TmpDir, AppInfo, State) of
         ok ->
-            ec_file:mkdir_p(AppDir1),
+            filelib:ensure_path(AppDir1),
             code:del_path(filename:absname(filename:join(AppDir1, "ebin"))),
             FetchDir = rebar_app_info:fetch_dir(AppInfo),
             ok = rebar_file_utils:rm_rf(filename:absname(FetchDir)),

@@ -81,7 +81,7 @@ do(State) ->
         Name ->
             AllApps = rebar_state:all_deps(State)++rebar_state:project_apps(State),
             case rebar_app_utils:find(rebar_utils:to_binary(Name), AllApps) of
-                {ok, AppInfo} ->
+                {value, AppInfo} ->
                     AppInfo;
                 _ ->
                     ?PRV_ERROR({bad_name, Name})
@@ -116,7 +116,7 @@ escriptize(State0, App) ->
     %% Look for a list of other applications (dependencies) to include
     %% in the output file. We then use the .app files for each of these
     %% to pull in all the .beam files.
-    TopInclApps = lists:usort([ec_cnv:to_atom(AppName) | rebar_state:get(State, escript_incl_apps, [])]),
+    TopInclApps = lists:usort([rebar_utils:to_atom(AppName) | rebar_state:get(State, escript_incl_apps, [])]),
     AllApps = rebar_state:all_deps(State)++rebar_state:project_apps(State),
     InclApps = find_deps(TopInclApps, AllApps, State),
     ?DEBUG("bundled applications:~n\t~p", [InclApps]),
@@ -186,7 +186,7 @@ get_apps_beams([], _, Acc) ->
     Acc;
 get_apps_beams([App | Rest], AllApps, Acc) ->
     case rebar_app_utils:find(rebar_utils:to_binary(App), AllApps) of
-        {ok, App1} ->
+        {value, App1} ->
             OutDir = filename:absname(rebar_app_info:ebin_dir(App1)),
             Beams = get_app_beams(App, OutDir),
             get_apps_beams(Rest, AllApps, Beams ++ Acc);
@@ -222,7 +222,7 @@ get_extra(State) ->
 % Converts a wildcard path relative to an app (e.g., `priv/*`) into a wildcard
 % path with with the app name included (e.g., `relx/priv/*`).
 resolve_incl_priv({AppName, PrivWildcard}, AllApps) when is_atom(AppName) ->
-    {ok, AppInfo} =
+    {value, AppInfo} =
         rebar_app_utils:find(rebar_utils:to_binary(AppName), AllApps),
     AppOutDir = rebar_app_info:out_dir(AppInfo),
     Wildcard = filename:join([atom_to_list(AppName), "priv", PrivWildcard]),
@@ -283,7 +283,7 @@ get_nonempty(Files) ->
 
 find_deps(AppNames, AllApps, State) ->
     BinAppNames = [rebar_utils:to_binary(Name) || Name <- AppNames],
-    [ec_cnv:to_atom(Name) ||
+    [rebar_utils:to_atom(Name) ||
      Name <- find_deps_of_deps(BinAppNames, AllApps, State, BinAppNames)].
 
 %% Should look at the app files to find direct dependencies
@@ -291,9 +291,9 @@ find_deps_of_deps([], _, _, Acc) -> Acc;
 find_deps_of_deps([Name|Names], Apps, State, Acc) ->
     ?DIAGNOSTIC("processing ~p", [Name]),
     App = case rebar_app_utils:find(Name, Apps) of
-        {ok, Found} ->
+        {value, Found} ->
             Found;
-        error ->
+        false ->
             case find_external_app(Name, State) of
                 error -> throw(?PRV_ERROR({bad_app, binary_to_atom(Name, utf8)}));
                 App0 -> App0

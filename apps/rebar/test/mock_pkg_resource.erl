@@ -1,3 +1,25 @@
+%% %CopyrightBegin%
+%%
+%% SPDX-License-Identifier: Apache-2.0
+%%
+%% SPDX-FileCopyrightText: Copyright 2015-2026 Rebar3 and its contributors
+%%
+%% SPDX-FileCopyrightText: Copyright 2026 Dipl. Phys. Peer Stritzinger GmbH
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%%
+%% %CopyrightEnd%
+
 %%% Mock a package resource and create an app magically for each URL submitted.
 -module(mock_pkg_resource).
 -export([mock/0, mock/1, unmock/0]).
@@ -171,8 +193,8 @@ to_index(AllDeps, Dict, Repos) ->
                             requirement => DVB,
                             source => {pkg, DKB, DVB, undefined, undefined}}
                           || {DK, DV} <- Deps,
-                             DKB <- [ec_cnv:to_binary(DK)],
-                             DVB <- [ec_cnv:to_binary(DV)]],
+                             DKB <- [rebar_utils:to_binary(DK)],
+                             DVB <- [rebar_utils:to_binary(DV)]],
               Repo = rebar_test_utils:random_element(Repos),
               {ok, Parsed} = rebar_semver:parse_version(V),
               ets:insert(?PACKAGE_TABLE, #package{key={N, Parsed, Repo},
@@ -185,11 +207,11 @@ to_index(AllDeps, Dict, Repos) ->
     lists:foreach(fun({{Name, Vsn}, _}) ->
                           {ok, Parsed} = rebar_semver:parse_version(Vsn),
                           case lists:any(fun(R) ->
-                                                 ets:member(?PACKAGE_TABLE, {ec_cnv:to_binary(Name), Parsed, R})
+                                                 ets:member(?PACKAGE_TABLE, {rebar_utils:to_binary(Name), Parsed, R})
                                          end, Repos) of
                               false ->
                                   Repo = rebar_test_utils:random_element(Repos),
-                                  ets:insert(?PACKAGE_TABLE, #package{key={ec_cnv:to_binary(Name), Parsed, Repo},
+                                  ets:insert(?PACKAGE_TABLE, #package{key={rebar_utils:to_binary(Name), Parsed, Repo},
                                                                       dependencies=[],
                                                                       retired=false,
                                                                       inner_checksum = <<"inner_checksum">>,

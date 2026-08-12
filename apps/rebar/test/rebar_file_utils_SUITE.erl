@@ -1,3 +1,25 @@
+%% %CopyrightBegin%
+%%
+%% SPDX-License-Identifier: Apache-2.0
+%%
+%% SPDX-FileCopyrightText: Copyright 2015-2026 Rebar3 and its contributors
+%%
+%% SPDX-FileCopyrightText: Copyright 2026 Dipl. Phys. Peer Stritzinger GmbH
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%%
+%% %CopyrightEnd%
+
 -module(rebar_file_utils_SUITE).
 
 -export([all/0,
@@ -113,7 +135,7 @@ multi_tmpdir(_Config) ->
 
 reset_nonexistent_dir(Config) ->
     TmpDir = ?config(tmpdir, Config),
-    _ = ec_file:remove(TmpDir, [recursive]),
+    _ = file:del_dir_r(TmpDir),
     ?assertNot(filelib:is_dir(TmpDir)),
     ok = rebar_file_utils:reset_dir(TmpDir),
     ?assert(filelib:is_dir(TmpDir)),
@@ -121,7 +143,7 @@ reset_nonexistent_dir(Config) ->
 
 reset_empty_dir(Config) ->
     TmpDir = ?config(tmpdir, Config),
-    _ = ec_file:remove(TmpDir, [recursive]),
+    _ = file:del_dir_r(TmpDir),
     _ = filelib:ensure_dir(filename:join([TmpDir, "dummy.beam"])),
     ?assert(filelib:is_dir(TmpDir)),
     ok = rebar_file_utils:reset_dir(TmpDir),
@@ -130,7 +152,7 @@ reset_empty_dir(Config) ->
 
 reset_dir(Config) ->
     TmpDir = ?config(tmpdir, Config),
-    _ = ec_file:remove(TmpDir, [recursive]),
+    _ = file:del_dir_r(TmpDir),
     _ = filelib:ensure_dir(filename:join([TmpDir, "dummy.beam"])),
     ?assert(filelib:is_dir(TmpDir)),
     lists:foreach(fun(Name) -> file:write_file(filename:join([TmpDir, Name]), <<>>) end,
@@ -205,7 +227,7 @@ resolve_link(_Config) ->
             ["rebar_file_utils_SUITE", "resolve_link"]),
     Link = filename:join(TmpDir, "link"),
     Target = filename:join(TmpDir, "link-target"),
-    ec_file:remove(TmpDir, [recursive]),
+    file:del_dir_r(TmpDir),
     ok = filelib:ensure_dir(Target),
     ok = file:write_file(Target, <<>>),
     ok = file:make_symlink(Target, Link),
@@ -232,7 +254,7 @@ mv_dir(Config) ->
     PrivDir = ?config(priv_dir, Config),
     BaseDir = mk_base_dir(PrivDir, mv_dir),
     SrcDir = filename:join(BaseDir, "src/"),
-    ec_file:mkdir_p(SrcDir),
+    filelib:ensure_path(SrcDir),
     ?assert(filelib:is_dir(SrcDir)),
     %% empty dir movement
     DstDir1 = filename:join(BaseDir, "dst1/"),
@@ -262,7 +284,7 @@ mv_dir(Config) ->
     DstDir3 = filename:join(BaseDir, "dst3/"),
     D3F1 = filename:join(DstDir3, "src/file1"),
     D3F2 = filename:join(DstDir3, "src/subdir/file2"),
-    ec_file:mkdir_p(DstDir3),
+    filelib:ensure_path(DstDir3),
     ?assert(filelib:is_dir(DstDir3)),
     ?assertEqual(ok, rebar_file_utils:mv(SrcDir, DstDir3)),
     ?assertNot(filelib:is_file(F1)),
@@ -277,12 +299,12 @@ mv_file_same(Config) ->
     PrivDir = ?config(priv_dir, Config),
     BaseDir = mk_base_dir(PrivDir, mv_file_same),
     SrcDir = filename:join(BaseDir, "src/"),
-    ec_file:mkdir_p(SrcDir),
+    filelib:ensure_path(SrcDir),
     ?assert(filelib:is_dir(SrcDir)),
     F = filename:join(SrcDir, "file"),
     file:write_file(F, "hello"),
     DstDir = filename:join(BaseDir, "dst/"),
-    ec_file:mkdir_p(DstDir),
+    filelib:ensure_path(DstDir),
     Dst = filename:join(DstDir, "file"),
     ?assertEqual(ok, rebar_file_utils:mv(F, Dst)),
     ?assert(filelib:is_file(Dst)),
@@ -295,12 +317,12 @@ mv_file_diff(Config) ->
     PrivDir = ?config(priv_dir, Config),
     BaseDir = mk_base_dir(PrivDir, mv_file_diff),
     SrcDir = filename:join(BaseDir, "src/"),
-    ec_file:mkdir_p(SrcDir),
+    filelib:ensure_path(SrcDir),
     ?assert(filelib:is_dir(SrcDir)),
     F = filename:join(SrcDir, "file"),
     file:write_file(F, "hello"),
     DstDir = filename:join(BaseDir, "dst/"),
-    ec_file:mkdir_p(DstDir),
+    filelib:ensure_path(DstDir),
     Dst = filename:join(DstDir, "file-rename"),
     file:write_file(Dst, "not-the-right-content"),
     ?assert(filelib:is_file(Dst)),
@@ -315,12 +337,12 @@ mv_file_dir_same(Config) ->
     PrivDir = ?config(priv_dir, Config),
     BaseDir = mk_base_dir(PrivDir, mv_file_dir_same),
     SrcDir = filename:join(BaseDir, "src/"),
-    ec_file:mkdir_p(SrcDir),
+    filelib:ensure_path(SrcDir),
     ?assert(filelib:is_dir(SrcDir)),
     F = filename:join(SrcDir, "file"),
     file:write_file(F, "hello"),
     DstDir = filename:join(BaseDir, "dst/"),
-    ec_file:mkdir_p(DstDir),
+    filelib:ensure_path(DstDir),
     Dst = filename:join(DstDir, "file"),
     ?assert(filelib:is_dir(DstDir)),
     ?assertEqual(ok, rebar_file_utils:mv(F, DstDir)),
@@ -333,12 +355,12 @@ mv_file_dir_diff(Config) ->
     PrivDir = ?config(priv_dir, Config),
     BaseDir = mk_base_dir(PrivDir, mv_file_dir_diff),
     SrcDir = filename:join(BaseDir, "src/"),
-    ec_file:mkdir_p(SrcDir),
+    filelib:ensure_path(SrcDir),
     ?assert(filelib:is_dir(SrcDir)),
     F = filename:join(SrcDir, "file"),
     file:write_file(F, "hello"),
     DstDir = filename:join(BaseDir, "dst/"),
-    ec_file:mkdir_p(DstDir),
+    filelib:ensure_path(DstDir),
     Dst = filename:join(DstDir, "file-rename"),
     ?assert(filelib:is_dir(DstDir)),
     ?assertNot(filelib:is_file(Dst)),
@@ -352,14 +374,14 @@ mv_no_clobber(Config) ->
     PrivDir = ?config(priv_dir, Config),
     BaseDir = mk_base_dir(PrivDir, mv_no_clobber),
     SrcDir = filename:join(BaseDir, "src/"),
-    ec_file:mkdir_p(SrcDir),
+    filelib:ensure_path(SrcDir),
     ?assert(filelib:is_dir(SrcDir)),
     F = filename:join(SrcDir, "file"),
     file:write_file(F, "hello"),
     FBad = filename:join(SrcDir, "file-alt"),
     file:write_file(FBad, "wrong-data"),
     DstDir = filename:join(BaseDir, "dst/"),
-    ec_file:mkdir_p(DstDir),
+    filelib:ensure_path(DstDir),
     Dst = filename:join(DstDir, "file-alt"),
     DstBad = filename:join(DstDir, "file"),
     file:write_file(DstBad, "wrong-data"),
@@ -383,7 +405,7 @@ mk_base_dir(BasePath, Name) ->
     {_,_,Micro} = os:timestamp(),
     Index = integer_to_list(Micro),
     Path = filename:join(BasePath, atom_to_list(Name) ++ Index),
-    ec_file:mkdir_p(Path),
+    filelib:ensure_path(Path),
     Path.
 
 cp_r_copies_files(Config) ->
@@ -393,7 +415,7 @@ cp_r_copies_files(Config) ->
     {SrcList, DestDir} = create_dir_tree_helper(BaseDir),
 
     rebar_file_utils:cp_r(SrcList, DestDir, []),
-    
+
     % dest/file
     DestFile = filename:join(DestDir, "file"),
     ?assert(filelib:is_file(DestFile)),
@@ -420,7 +442,7 @@ cp_r_dereferences_symbolic_links(Config) ->
     {SrcList, DestDir} = create_dir_tree_helper(BaseDir),
 
     rebar_file_utils:cp_r(SrcList, DestDir, [{dereference, true}]),
-    
+
     % dest/file
     DestFile = filename:join(DestDir, "file"),
     ?assert(filelib:is_file(DestFile)),
@@ -447,7 +469,7 @@ create_dir_tree_helper(BaseDir) ->
     % Give a directory path, it creates the tree directory below and returns a map
     % with the expected paths in dest/ aftercopying them.
     %
-    % sub_dir is it needed so try all the win32 copy options  
+    % sub_dir is it needed so try all the win32 copy options
     %
     % |-- src
     %   |-- file
@@ -476,7 +498,7 @@ create_dir_tree_helper(BaseDir) ->
 create_by_type([], _) ->
     ok;
 create_by_type([{folder, Path} |Rest], BaseDir) ->
-    ok = ec_file:mkdir_p(filename:join([BaseDir | Path])),
+    ok = filelib:ensure_path(filename:join([BaseDir | Path])),
     create_by_type(Rest, BaseDir);
 create_by_type([{file, Path, Content} |Rest], BaseDir) ->
     ok = file:write_file(filename:join([BaseDir | Path]), Content),

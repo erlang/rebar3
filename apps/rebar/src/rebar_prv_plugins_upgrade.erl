@@ -34,9 +34,9 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(State) ->
-    case handle_args(State) of 
+    case handle_args(State) of
         {false, undefined} -> throw(?PRV_ERROR(no_arg));
-        {true, _} -> 
+        {true, _} ->
             {_, LocalPluginsNames} = rebar_prv_plugins:list_local_plugins(State),
             lists:foldl(
                 fun (LocalPluginName, {ok, StateAcc}) ->
@@ -50,12 +50,12 @@ do(State) ->
 -spec format_error(any()) -> iolist().
 format_error({not_found, Plugin}) ->
     io_lib:format("Plugin to upgrade not found: ~ts", [Plugin]);
-format_error(no_arg) -> 
+format_error(no_arg) ->
      "Specify a plugin to upgrade, or --all to upgrade them all";
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
-handle_args(State) -> 
+handle_args(State) ->
      {Args, _} = rebar_state:command_parsed_args(State),
      All = proplists:get_value(all, Args, false),
      Plugin = proplists:get_value(plugin, Args),
@@ -101,17 +101,16 @@ do_upgrade(State, P, Profile) ->
 
     {ok, State}.
 
-find_plugin(Plugin, Profiles, State) ->
-    ec_lists:search(fun(Profile) ->
-                        Plugins = rebar_state:get(State, {plugins, Profile}, []) ++
-                            rebar_state:get(State, {project_plugins, Profile}, []),
-                        case rebar_utils:tup_find(list_to_atom(Plugin), Plugins) of
-                            false ->
-                                not_found;
-                            P ->
-                                {ok, P}
-                        end
-                    end, Profiles).
+find_plugin(_, [], _) ->
+    not_found;
+find_plugin(Plugin, [Profile | OtherProfiles], State) ->
+    Plugins = rebar_state:get(State, {plugins, Profile}, []) ++ rebar_state:get(State, {project_plugins, Profile}, []),
+    case rebar_utils:tup_find(list_to_atom(Plugin), Plugins) of
+        false ->
+            find_plugin(Plugin, OtherProfiles, State);
+        P ->
+            {ok, P, Profile}
+    end.
 
 build_plugin(ToBuild, State) ->
     Providers = rebar_state:providers(State),
