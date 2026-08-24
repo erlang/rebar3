@@ -17,6 +17,7 @@
                   common_test,
                   dialyzer,
                   public_key,
+                  ssh,
                   edoc,
                   snmp,
                   getopt,
