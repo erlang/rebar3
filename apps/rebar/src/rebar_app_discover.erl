@@ -404,7 +404,7 @@ flatten_resource_impl({Type, Files}, Acc = {ResAcc, Used}) ->
 %% @doc find the directory that an appfile has
 -spec app_dir(file:filename()) -> file:filename().
 app_dir(AppFile) ->
-    filename:join(rebar_utils:droplast(filename:split(filename:dirname(AppFile)))).
+    filename:join(lists:droplast(filename:split(filename:dirname(AppFile)))).
 
 %% @doc populates an app info record based on an app directory and its
 %% app file.

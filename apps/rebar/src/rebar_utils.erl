@@ -27,7 +27,6 @@
 -module(rebar_utils).
 
 -export([sort_deps/1,
-         droplast/1,
          filtermap/2,
          is_arch/1,
          sh/2,
@@ -101,9 +100,6 @@ sort_deps(Deps) ->
     %% The list of deps is reversed when we get it. For the proper stable
     %% result, re-reverse it.
     lists:keysort(?APP_NAME_INDEX, lists:reverse(Deps)).
-
-droplast(L) ->
-    lists:reverse(tl(lists:reverse(L))).
 
 %% @doc wrapper around lists:filtermap/2
 -spec filtermap(F, [In]) -> [Out] when
