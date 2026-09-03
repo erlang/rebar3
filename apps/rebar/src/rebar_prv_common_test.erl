@@ -320,10 +320,6 @@ select_tests(State, ProjectApps, CmdOpts, CfgOpts) ->
     Configs = lists:flatmap(fun(Filename) ->
                                 rebar_file_utils:consult_any_config(State, Filename)
                             end, SysConfigs),
-    %% NB: load the applications (from user directories too) to support OTP < 17
-    %% to our best ability.
-    rebar_paths:set_paths([deps, plugins], State),
-    [application:load(Application) || Config <- Configs, {Application, _} <- Config],
     rebar_utils:reread_config(Configs, [update_logger]),
 
     Opts = merge_opts(CmdOpts,CfgOpts),
