@@ -66,7 +66,9 @@ nested_cmds(Cmds,Prev,CmplOpts) ->
     "  esac\n"].
 
 cmd_str(#{name:=N,help:=H}, _CmplOpts) ->
-    ["\"",N,":",help(H),"\""].
+    %% single quotes: the description is data, and must not be
+    %% expanded by the shell that sources the completion file
+    ["'",N,":",help(H),"'"].
 
 cmd_call_case(#{name:=Name}, Prev, _CmplOpts) ->
     ["  ",Name,")\n",
@@ -107,6 +109,8 @@ help(H) -> help_escape(H).
 
 help_escape([]) ->
     [];
+help_escape([$\\ | Rest]) ->
+    ["\\\\",help_escape(Rest)];
 help_escape([40 | Rest]) ->
     ["\\(",help_escape(Rest)];
 help_escape([41 | Rest]) ->
@@ -115,8 +119,8 @@ help_escape([91| Rest]) ->
     ["\\[",help_escape(Rest)];
 help_escape([93| Rest]) ->
     ["\\]",help_escape(Rest)];
-%% escaping single quotes by doubling them
+%% close the quoted string, emit an escaped quote, reopen it
 help_escape([$' | Rest]) ->
-    ["''",help_escape(Rest)];
+    ["'\\''",help_escape(Rest)];
 help_escape([C | Rest]) ->
     [C | help_escape(Rest)].

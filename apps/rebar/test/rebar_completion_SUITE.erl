@@ -9,7 +9,8 @@ suite() ->
     [].
 
 all() ->
-    [test_completion_gen, check_bash, check_zsh, check_bash_file_completion].
+    [test_completion_gen, check_bash, check_zsh, check_bash_file_completion,
+     check_zsh_escaping, check_zsh_valid_syntax].
 
 groups() ->
     [].
@@ -41,6 +42,13 @@ init_per_testcase(check_zsh, Config) ->
     case shell_available(zsh) of
         true ->
             rebar_test_utils:init_rebar_state(Config, "completion_");
+        false ->
+            {skip, "zsh not found"}
+    end;
+init_per_testcase(check_zsh_valid_syntax, Config) ->
+    case shell_available(zsh) of
+        true ->
+            Config;
         false ->
             {skip, "zsh not found"}
     end;
@@ -119,7 +127,38 @@ check_bash_file_completion(Config) ->
     %% Check that fallback completion is present
     {match, _} = re:run(Completion, "If no completions found, fall back to normal completion").
 
+%% Descriptions are data: whatever quoting they contain has to survive
+%% into the completion menu unchanged.
+check_zsh_escaping(Config) ->
+    Compl = quoted_completion(Config),
+    Escaped = "Shell type, '\\''bash'\\'' or '\\''zsh'\\''.",
+    %% command descriptions are handed to _describe as "<name>:<description>"
+    ?assertNotEqual(nomatch, string:find(Compl, "'quoted:" ++ Escaped ++ "'")),
+    %% option descriptions are handed to _arguments inside "[...]"
+    ?assertNotEqual(nomatch, string:find(Compl, "[" ++ Escaped ++ "]")).
+
+check_zsh_valid_syntax(Config) ->
+    ComplFile = ?config(compl_file, Config),
+    ok = file:write_file(ComplFile, quoted_completion(Config)),
+    ?assertMatch({ok, _}, rebar_utils:sh("zsh -n " ++ ComplFile,
+                                         [return_on_error])).
+
 %% helpers
+
+%% a command and an option whose descriptions both contain single quotes
+quoted_completion(Config) ->
+    Help = "Shell type, 'bash' or 'zsh'.",
+    Cmds = [#{name => "quoted",
+              help => Help,
+              cmds => [],
+              args => [#{short => $s,
+                         long => "shell",
+                         type => atom,
+                         help => Help}]}],
+    CmplOpts = #{shell => zsh,
+                 aliases => [],
+                 file => ?config(compl_file, Config)},
+    unicode:characters_to_list(rebar_completion:generate(Cmds, CmplOpts)).
 
 completion_gen(Config, CmplOpts) ->
     CmplConf = maps:to_list(CmplOpts),
