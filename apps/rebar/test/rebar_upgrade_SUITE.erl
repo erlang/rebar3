@@ -44,11 +44,11 @@ init_per_testcase(novsn_pkg, Config0) ->
 
     [{rebarconfig, RebarConf},
      {mock, fun() ->
-        catch mock_pkg_resource:unmock(),
+        try mock_pkg_resource:unmock() catch _:_ -> ok end,
         mock_pkg_resource:mock([{pkgdeps, Deps}, {upgrade, []}])
       end},
      {mock_update, fun() ->
-        catch mock_pkg_resource:unmock(),
+        try mock_pkg_resource:unmock() catch _:_ -> ok end,
         mock_pkg_resource:mock([{pkgdeps, UpDeps++Deps}, {upgrade, Upgrades}])
       end},
      {expected, {ok, [{dep, "fakeapp", "1.1.0"}, {lock, "fakeapp", "1.1.0"}]}}
@@ -528,20 +528,20 @@ upgrades(tree_migration) ->
 %% running the upgrade code is enough to properly upgrade things.
 
 mock_deps(git, Deps, Upgrades) ->
-    catch mock_git_resource:unmock(),
+    try mock_git_resource:unmock() catch _:_ -> ok end,
     {SrcDeps, _} = rebar_test_utils:flat_deps(Deps),
     mock_git_resource:mock([{deps, SrcDeps}, {upgrade, Upgrades}]);
 mock_deps(pkg, Deps, Upgrades) ->
-    catch mock_pkg_resource:unmock(),
+    try mock_pkg_resource:unmock() catch _:_ -> ok end,
     {_, PkgDeps} = rebar_test_utils:flat_deps(Deps),
     mock_pkg_resource:mock([{pkgdeps, PkgDeps}, {upgrade, Upgrades}]).
 
 mock_deps(git, OldDeps, Deps, Upgrades) ->
-    catch mock_git_resource:unmock(),
+    try mock_git_resource:unmock() catch _:_ -> ok end,
     {SrcDeps, _} = rebar_test_utils:flat_deps(Deps++OldDeps),
     mock_git_resource:mock([{deps, SrcDeps}, {upgrade, Upgrades}]);
 mock_deps(pkg, OldDeps, Deps, Upgrades) ->
-    catch mock_pkg_resource:unmock(),
+    try mock_pkg_resource:unmock() catch _:_ -> ok end,
     {_, PkgDeps} = rebar_test_utils:flat_deps(Deps++OldDeps),
     mock_pkg_resource:mock([{pkgdeps, PkgDeps}, {upgrade, Upgrades}]).
 
