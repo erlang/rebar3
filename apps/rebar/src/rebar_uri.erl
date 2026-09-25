@@ -29,7 +29,8 @@ parse(URIString) ->
 parse(URIString, URIOpts) ->
     case uri_string:parse(URIString) of
         #{path := ""} = Map -> apply_opts(Map#{path => "/"}, URIOpts);
-        Map when is_map(Map) -> apply_opts(Map, URIOpts);
+        #{path := _} = Map -> apply_opts(Map, URIOpts);
+        Map when is_map(Map) -> apply_opts(Map#{path => "/"}, URIOpts);
         {error, _, _} = E -> E
     end.
 
