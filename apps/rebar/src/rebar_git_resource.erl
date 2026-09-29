@@ -23,7 +23,12 @@
 -include("rebar.hrl").
 
 %% Regex used for parsing scp style remote url
--define(SCP_PATTERN, "\\A(?<username>[^@]+)@(?<host>[^:]+):(?<path>.+)\\z").
+-define(SCP_PATTERN, "(?<scp_user>[^@]+)@(?<scp_host>[^:]+):(?<scp_path>.+)").
+%% Regex used for parsing ssh://user@host:port/path/repo.git remote url
+-define(SSH_PROTO_PATTERN, "ssh://((?<ssh_user>[^@]+)@)?"
+                           "(?<ssh_host>[^:/]+)(:(?<ssh_port>\\d+))?"
+                           "(?<ssh_path>.+)").
+-define(SSH_PATTERN, "\\A(" ?SCP_PATTERN "|" ?SSH_PROTO_PATTERN ")\\z").
 
 -spec init(atom(), rebar_state:t()) -> {ok, rebar_resource_v2:resource()}.
 init(Type, _State) ->
@@ -122,14 +127,22 @@ compare_url(Dir, Url) ->
     ParsedCurrentUrl =:= ParsedUrl.
 
 parse_git_url(Url) ->
-    %% Checks for standard scp style git remote
-    case re:run(Url, ?SCP_PATTERN, [{capture, [host, path], list}, unicode]) of
-        {match, [Host, Path]} ->
+    %% Checks for standard scp or ssh style git remote
+    case
+        re:run(Url, ?SSH_PATTERN, [{capture,
+                                    [scp_host, scp_path,
+                                     ssh_host, ssh_path],
+                                    list},
+                                   unicode])
+    of
+        {match, [[], [], Host, Path]} ->
+            {ok, {Host, filename:rootname(Path, ".git")}};
+        {match, [Host, Path, [], []]} ->
             {ok, {Host, filename:rootname(Path, ".git")}};
         nomatch ->
-            parse_git_url(not_scp, Url)
+            parse_git_url(not_ssh, Url)
     end.
-parse_git_url(not_scp, Url) ->
+parse_git_url(not_ssh, Url) ->
     UriOpts = [{scheme_defaults, [{git, 9418} | rebar_uri:scheme_defaults()]}],
     case rebar_uri:parse(Url, UriOpts) of
         #{path := Path, host := Host} ->
