@@ -5,7 +5,8 @@
 -include_lib("kernel/include/file.hrl").
 -include("rebar.hrl").
 
-all() -> [same_alias, diff_alias, diff_alias_vsn, transitive_alias%% ,
+all() -> [same_alias, diff_alias, diff_alias_vsn, transitive_alias,
+          invalid_transitive_alias%% ,
           %% transitive_hash_mismatch
          ].
 
@@ -47,6 +48,13 @@ init_per_testcase(transitive_alias, Config0) ->
     AppDir = ?config(apps, Config),
     rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
     RebarConf = rebar_test_utils:create_config(AppDir, [{deps, [{topdep, "1.0.0", {pkg, topdep}}]}]),
+    [{rebarconfig, RebarConf} | Config];
+init_per_testcase(invalid_transitive_alias, Config0) ->
+    mock_config(?MODULE, Config0),
+    Config = rebar_test_utils:init_rebar_state(Config0,"invalid_transitive_alias_"),
+    AppDir = ?config(apps, Config),
+    rebar_test_utils:create_app(AppDir, "A", "0.0.0", [kernel, stdlib]),
+    RebarConf = rebar_test_utils:create_config(AppDir, [{deps, [{evildep, "1.0.0", {pkg, evildep}}]}]),
     [{rebarconfig, RebarConf} | Config];
 init_per_testcase(transitive_hash_mismatch, Config0) ->
     mock_config(?MODULE, Config0),
@@ -137,6 +145,24 @@ transitive_alias(Config) ->
     ?assertNot(filelib:is_dir(PkgName)),
     ok.
 
+invalid_transitive_alias(Config) ->
+    %% the registry entry of a package names the directory of each of its
+    %% deps, ensure that a name escaping the deps dir is rejected before
+    %% anything outside of it is deleted or written
+    AppDir = ?config(apps, Config),
+    Escaped = filename:join([AppDir, "_build", "default", "lib", "..", "..", "..", "..", "escaped"]),
+    Canary = filename:join(Escaped, "canary"),
+    ok = filelib:ensure_dir(Canary),
+    ok = file:write_file(Canary, <<"canary">>),
+    {ok, RebarConfig} = file:consult(?config(rebarconfig, Config)),
+    ?assertMatch(
+       {error, {rebar_app_utils, {invalid_dep_name, <<"evildep">>, <<"../../../../escaped">>}}},
+       rebar_test_utils:run_and_check(Config, RebarConfig, ["get-deps"], return)
+    ),
+    ?assertEqual({ok, <<"canary">>}, file:read_file(Canary)),
+    ?assertEqual({ok, ["canary"]}, file:list_dir(Escaped)),
+    ok.
+
 transitive_hash_mismatch(Config) ->
     %% ensure that the apps fetched under transitive aliases are
     %% locked properly, but also that they are stored in the right
@@ -180,6 +206,7 @@ mock_config(Name, Config) ->
     {ChkFake, Etag} = create_lib(Name, Config, "fakelib"),
     {ChkTop, _} = create_lib(Name, Config, "topdep"),
     {ChkTrans, _} = create_lib(Name, Config, "transitive_app", "transitive"),
+    {ChkEvil, _} = create_lib(Name, Config, "evildep"),
     ct:pal("{~p, _}",[ChkTop]),
     ct:pal("{~p, _}",[ChkTrans]),
     Priv = ?config(priv_dir, Config),
@@ -197,13 +224,18 @@ mock_config(Name, Config) ->
      {<<"goodpkg">>,[[<<"1.0.0">>]]},
      {<<"topdep">>,[[<<"1.0.0">>]]},
      {<<"transitive">>, [[<<"1.0.0">>]]},
+     {<<"evildep">>, [[<<"1.0.0">>]]},
      {{<<"fakelib">>,<<"1.0.0">>}, [[], ChkFake, [<<"rebar3">>]]},
      {{<<"goodpkg">>,<<"1.0.0">>}, [[], ChkGood, [<<"rebar3">>]]},
      {{<<"topdep">>,<<"1.0.0">>},
       [[
         {<<"transitive">>, <<"1.0.0">>, false, <<"transitive_app">>}
        ], ChkTop, [<<"rebar3">>]]},
-     {{<<"transitive">>,<<"1.0.0">>}, [[], ChkTrans, [<<"rebar3">>]]}
+     {{<<"transitive">>,<<"1.0.0">>}, [[], ChkTrans, [<<"rebar3">>]]},
+     {{<<"evildep">>,<<"1.0.0">>},
+      [[
+        {<<"transitive">>, <<"1.0.0">>, false, <<"../../../../escaped">>}
+       ], ChkEvil, [<<"rebar3">>]]}
     ],
     Tid = ets:new(registry_table, [public]),
     ets:insert_new(Tid, AllDeps),
