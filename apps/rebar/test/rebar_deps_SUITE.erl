@@ -9,7 +9,8 @@ all() -> [sub_app_deps, newly_added_dep, newly_added_after_empty_lock, no_deps_e
           http_no_proxy_settings, https_no_proxy_settings,
           no_proxy_os_env_settings,
           top_override, {group, git}, {group, pkg},
-          deps_cmd_needs_update_called
+          deps_cmd_needs_update_called, valid_dep_names, invalid_dep_names,
+          invalid_dep_name
          ].
 
 groups() ->
@@ -47,6 +48,12 @@ init_per_testcase(newly_added_dep, Config) ->
 init_per_testcase(sub_app_deps, Config) ->
     rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(top_override, Config) ->
+    rebar_test_utils:init_rebar_state(Config);
+init_per_testcase(valid_dep_names, Config) ->
+    Config;
+init_per_testcase(invalid_dep_names, Config) ->
+    Config;
+init_per_testcase(invalid_dep_name, Config) ->
     rebar_test_utils:init_rebar_state(Config);
 init_per_testcase(http_proxy_settings, Config) ->
     %% Create private rebar.config
@@ -352,6 +359,33 @@ top_override(Config) ->
       Config, [], ["compile"],
       {ok, [{app, Name1}, {app,Name2}]}
     ).
+
+valid_dep_names(_Config) ->
+    [?assertEqual(ok, rebar_app_utils:validate_dep_name(<<"parent">>, Name))
+     || Name <- [<<"child_2">>, <<"B58">>, <<"lfe-Dep">>, child, "child"]].
+
+invalid_dep_names(_Config) ->
+    [?assertThrow({error, {rebar_app_utils, {invalid_dep_name, <<"parent">>, Name}}},
+                  rebar_app_utils:validate_dep_name(<<"parent">>, Name))
+     || Name <- [<<"../child">>, <<"child/..">>, <<"child\\..">>, <<"..">>, <<".">>,
+                 <<".child">>, <<"">>, <<"_child">>, <<"1child">>, <<"-child">>,
+                 <<"child\n">>, <<"*">>, <<"x\\`{touch,PWNED}\\`">>,
+                 <<"ch", 195, 182, "ld">>, '../child']].
+
+%% Test that a dep name which isn't a plain directory name is rejected
+%% before it is used as the dep's directory
+invalid_dep_name(Config) ->
+    AppDir = ?config(apps, Config),
+    Name = rebar_test_utils:create_random_name("app_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    RebarConfig = [{deps, [{'../escaped', {git, "https://example.org", {branch, "main"}}}]}],
+    Parent = list_to_binary(Name),
+    ?assertMatch(
+      {error, {rebar_app_utils, {invalid_dep_name, Parent, '../escaped'}}},
+      rebar_test_utils:run_and_check(Config, RebarConfig, ["get-deps"], return)
+    ),
+    ?assertNot(filelib:is_dir(filename:join([AppDir, "_build", "default", "escaped"]))).
 
 %% Test that the deps of project apps that have their own rebar.config
 %% are included, but that top level rebar.config deps take precedence

@@ -40,6 +40,10 @@
          lint_app_info/1,
          format_error/1]).
 
+-ifdef(TEST).
+-export([validate_dep_name/2]).
+-endif.
+
 -include("rebar.hrl").
 -include_lib("providers/include/providers.hrl").
 
@@ -250,6 +254,7 @@ parse_dep(_, Dep, _, _, _) ->
       IsLock :: boolean(),
       State :: rebar_state:t().
 dep_to_app(Parent, DepsDir, Name, Vsn, Source0, IsLock, State) ->
+    validate_dep_name(Parent, Name),
     {SubDir, Source1} = subdir(Name, Source0),
     FetchDir = rebar_utils:to_list(filename:join([DepsDir, Name])),
     CheckoutsDir = rebar_utils:to_list(rebar_dir:checkouts_dir(State, Name)),
@@ -349,12 +354,44 @@ format_error({parse_dep, Dep}) ->
     io_lib:format("Failed parsing dep ~p", [Dep]);
 format_error({invalid_vsn, Dep, InvalidVsn}) ->
     io_lib:format("Dep ~ts has invalid version ~ts", [Dep, InvalidVsn]);
+format_error({invalid_dep_name, root, Name}) ->
+    io_lib:format("Dep name ~tp is invalid, it must start with a letter and "
+                  "contain only letters, digits, \"_\" and \"-\"",
+                  [rebar_utils:to_list(Name)]);
+format_error({invalid_dep_name, Parent, Name}) ->
+    io_lib:format("Dep name ~tp required by ~ts is invalid, it must start with "
+                  "a letter and contain only letters, digits, \"_\" and \"-\"",
+                  [rebar_utils:to_list(Name), Parent]);
 format_error(Error) ->
     io_lib:format("~p", [Error]).
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+%% @private the dep name becomes the dep's directory under the deps dir
+%% and is passed to shell commands, so it has to be a plain directory name.
+%% Package dep names come from the `app' field in the registry, which the
+%% package publisher chooses.
+-spec validate_dep_name(root | binary(), atom() | binary() | string()) -> ok.
+validate_dep_name(Parent, Name) ->
+    case valid_dep_name(rebar_utils:to_binary(Name)) of
+        true -> ok;
+        false -> throw(?PRV_ERROR({invalid_dep_name, Parent, Name}))
+    end.
+
+valid_dep_name(<<C, Rest/binary>>) when C >= $a, C =< $z; C >= $A, C =< $Z ->
+    valid_dep_name_rest(Rest);
+valid_dep_name(_) ->
+    false.
+
+valid_dep_name_rest(<<C, Rest/binary>>) when C >= $a, C =< $z; C >= $A, C =< $Z;
+                                              C >= $0, C =< $9; C =:= $_; C =:= $- ->
+    valid_dep_name_rest(Rest);
+valid_dep_name_rest(<<>>) ->
+    true;
+valid_dep_name_rest(_) ->
+    false.
 
 maybe_warn_retired(_, _, _, false) ->
     ok;
