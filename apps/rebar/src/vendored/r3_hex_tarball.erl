@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.19.0, do not edit manually
+%% Vendored from hex_core v0.20.0, do not edit manually
 
 %% @doc
 %% Functions for creating and unpacking Hex tarballs.
@@ -12,7 +12,9 @@
     format_error/1
 ]).
 -ifdef(TEST).
--export([do_decode_metadata/1, do_decode_metadata/2, gzip/1, normalize_requirements/1]).
+-export([
+    do_decode_metadata/1, do_decode_metadata/2, gzip/1, make_tmp_dir/1, normalize_requirements/1
+]).
 -endif.
 -define(VERSION, <<"3">>).
 -define(HASH_CHUNK_SIZE, 65536).
@@ -20,6 +22,7 @@
 -define(MAX_CHECKSUM_SIZE, 128).
 -define(MAX_METADATA_SIZE, 1024 * 1024).
 -define(METADATA_CHUNK_SIZE, 4096).
+-define(METADATA_LINE_LENGTH, 80).
 -define(BUILD_TOOL_FILES, [
     {<<"mix.exs">>, <<"mix">>},
     {<<"rebar.config">>, <<"rebar3">>},
@@ -32,7 +35,11 @@
 -type checksum() :: binary().
 -type contents() :: [{filename(), binary()}].
 -type filename() :: string().
--type files() :: [{filename(), filename() | binary()}].
+-type file_options() :: #{executable => boolean()}.
+-type files() :: [
+    {filename(), filename() | binary()}
+    | {filename(), filename() | binary(), file_options()}
+].
 -type metadata() :: map().
 -type tarball() :: binary().
 
@@ -45,6 +52,13 @@
 %%
 %% Returns the binary of the tarball the "inner checksum" and "outer checksum".
 %% The inner checksum is deprecated in favor of the outer checksum.
+%%
+%% Each file is given as `{Name, Contents}' with the contents as a binary, or
+%% `{Name, Path}' with the path of a file, directory or symbolic link on disk.
+%% Regular files are stored with mode 0755 when the owner execute bit is set
+%% on disk and with mode 0644 otherwise. `{Name, ContentsOrPath, #{executable
+%% => boolean()}}' sets the mode of a regular file regardless of the file
+%% system, the option doesn't apply to directories and symbolic links.
 %%
 %% Examples:
 %%
@@ -71,49 +85,54 @@ create(Metadata, Files, Config) ->
     } = Config,
     FilesRoot = maps:get(tarball_files_root, Config, "."),
 
-    MetadataBinary = encode_metadata(Metadata),
+    case encode_metadata(Metadata) of
+        {ok, MetadataBinary} ->
+            case valid_size(MetadataBinary, ?MAX_METADATA_SIZE) of
+                false ->
+                    {error, {tarball, {file_too_big, "metadata.config"}}};
+                true ->
+                    case prepare_files(Files, FilesRoot) of
+                        {ok, PreparedFiles} ->
+                            ContentsTarball = create_memory_tarball(PreparedFiles),
+                            ContentsTarballCompressed = gzip(ContentsTarball),
+                            InnerChecksum = inner_checksum(
+                                ?VERSION, MetadataBinary, ContentsTarballCompressed
+                            ),
+                            InnerChecksumBase16 = encode_base16(InnerChecksum),
 
-    case valid_size(MetadataBinary, ?MAX_METADATA_SIZE) of
-        false ->
-            {error, {tarball, {file_too_big, "metadata.config"}}};
-        true ->
-            case validate_create_files(Files, FilesRoot) of
-                {ok, ValidatedFiles} ->
-                    ContentsTarball = create_memory_tarball(ValidatedFiles),
-                    ContentsTarballCompressed = gzip(ContentsTarball),
-                    InnerChecksum = inner_checksum(
-                        ?VERSION, MetadataBinary, ContentsTarballCompressed
-                    ),
-                    InnerChecksumBase16 = encode_base16(InnerChecksum),
+                            OuterFiles = [
+                                {"VERSION", ?VERSION},
+                                {"CHECKSUM", InnerChecksumBase16},
+                                {"metadata.config", MetadataBinary},
+                                {"contents.tar.gz", ContentsTarballCompressed}
+                            ],
 
-                    OuterFiles = [
-                        {"VERSION", ?VERSION},
-                        {"CHECKSUM", InnerChecksumBase16},
-                        {"metadata.config", MetadataBinary},
-                        {"contents.tar.gz", ContentsTarballCompressed}
-                    ],
-
-                    case valid_size(ContentsTarball, TarballMaxUncompressedSize) of
-                        true ->
-                            Tarball = create_memory_tarball(OuterFiles),
-                            OuterChecksum = checksum(Tarball),
-
-                            case valid_size(Tarball, TarballMaxSize) of
+                            case valid_size(ContentsTarball, TarballMaxUncompressedSize) of
                                 true ->
-                                    {ok, #{
-                                        tarball => Tarball,
-                                        outer_checksum => OuterChecksum,
-                                        inner_checksum => InnerChecksum
-                                    }};
+                                    Tarball = create_memory_tarball(OuterFiles),
+                                    OuterChecksum = checksum(Tarball),
+
+                                    case valid_size(Tarball, TarballMaxSize) of
+                                        true ->
+                                            {ok, #{
+                                                tarball => Tarball,
+                                                outer_checksum => OuterChecksum,
+                                                inner_checksum => InnerChecksum
+                                            }};
+                                        false ->
+                                            {error, {tarball, {too_big_compressed, TarballMaxSize}}}
+                                    end;
                                 false ->
-                                    {error, {tarball, {too_big_compressed, TarballMaxSize}}}
+                                    {error,
+                                        {tarball,
+                                            {too_big_uncompressed, TarballMaxUncompressedSize}}}
                             end;
-                        false ->
-                            {error, {tarball, {too_big_uncompressed, TarballMaxUncompressedSize}}}
-                    end;
-                {error, _} = Error ->
-                    Error
-            end
+                        {error, _} = Error ->
+                            Error
+                    end
+            end;
+        {error, _} = Error ->
+            Error
     end.
 
 -spec create(metadata(), files()) ->
@@ -145,9 +164,9 @@ create_docs(Files, Config) ->
     } = Config,
     FilesRoot = maps:get(tarball_files_root, Config, "."),
 
-    case validate_create_files(Files, FilesRoot) of
-        {ok, ValidatedFiles} ->
-            UncompressedTarball = create_memory_tarball(ValidatedFiles),
+    case prepare_files(Files, FilesRoot) of
+        {ok, PreparedFiles} ->
+            UncompressedTarball = create_memory_tarball(PreparedFiles),
 
             case valid_size(UncompressedTarball, TarballMaxUncompressedSize) of
                 true ->
@@ -251,22 +270,30 @@ unpack(Input, Output, Config) ->
         true ->
             OuterChecksum = outer_checksum(Input),
             Source = tar_source(Input),
-            TmpDir = tmp_path(),
-            ok = file:make_dir(TmpDir),
-            try
-                case r3_hex_erl_tar:extract(Source, [{cwd, TmpDir}]) of
-                    ok ->
-                        case read_outer_files(TmpDir) of
-                            {ok, Files} ->
-                                do_unpack(Files, OuterChecksum, Output, Config);
-                            {error, _} = Error ->
-                                Error
-                        end;
-                    {error, Reason} ->
-                        {error, {tarball, Reason}}
-                end
-            after
-                remove_dir(TmpDir)
+            TmpDir = filename:join(tmp_parent(Output), tmp_path()),
+            case make_tmp_dir(TmpDir) of
+                ok ->
+                    try
+                        case r3_hex_erl_tar:extract(Source, [{cwd, TmpDir}]) of
+                            ok ->
+                                case read_outer_files(TmpDir) of
+                                    {ok, Files} ->
+                                        do_unpack(Files, OuterChecksum, Output, Config);
+                                    {error, _} = Error ->
+                                        Error
+                                end;
+                            {error, Reason} ->
+                                {error, {tarball, Reason}}
+                        end
+                    after
+                        remove_dir(TmpDir)
+                    end;
+                {error, Reason} when Output =:= none ->
+                    {error, {tarball, Reason}};
+                {error, Reason} ->
+                    %% The output directory can't be written to, which is
+                    %% reported the same as failing to extract into it.
+                    {error, {inner_tarball, Reason}}
             end;
         false ->
             {error, {tarball, too_big}}
@@ -366,6 +393,10 @@ format_error({tarball, {unsafe_symlink, Name, LinkTarget}}) ->
     io_lib:format("unsafe symlink in tarball: ~s -> ~s", [Name, LinkTarget]);
 format_error({tarball, {unsupported_file_type, Name, Type}}) ->
     io_lib:format("unsupported file type in tarball: ~s (~p)", [Name, Type]);
+format_error({tarball, {duplicate_file, Name}}) ->
+    io_lib:format("duplicate file in tarball: ~ts", [Name]);
+format_error({tarball, {invalid_file_options, Name, Options}}) ->
+    io_lib:format("invalid options for file ~ts: ~tp", [Name, Options]);
 format_error({tarball, Reason}) ->
     "tarball error, " ++ r3_hex_erl_tar:format_error(Reason);
 format_error({inner_tarball, Reason}) ->
@@ -374,6 +405,12 @@ format_error({metadata, invalid_terms}) ->
     "error reading package metadata: invalid terms";
 format_error({metadata, not_key_value}) ->
     "error reading package metadata: not in key-value format";
+format_error({metadata, {duplicate_key, Key}}) ->
+    io_lib:format("duplicate key in package metadata: ~tp", [Key]);
+format_error({metadata, {unsupported_term, Term}}) ->
+    io_lib:format("unsupported value in package metadata: ~tp", [Term]);
+format_error({metadata, {invalid_file, File}}) ->
+    io_lib:format("invalid file name in package metadata: ~tp", [File]);
 format_error({metadata, Reason}) ->
     "error reading package metadata" ++ r3_safe_erl_term:format_error(Reason);
 format_error({checksum_mismatch, ExpectedChecksum, ActualChecksum}) ->
@@ -427,15 +464,136 @@ check_docs_input_size(Tarball, Config) ->
     valid_size(Tarball, maps:get(docs_tarball_max_size, Config)).
 
 %% @private
+%% The encoding only depends on the metadata, not on the VM, so it doesn't use
+%% io_lib_pretty whose output depends on io:printable_range/0 (the +pc flag)
 encode_metadata(Meta) ->
-    Data = lists:map(
-        fun(MetaPair) ->
-            String = io_lib_pretty:print(binarify(MetaPair), [{encoding, utf8}]),
-            unicode:characters_to_binary([String, ".\n"])
-        end,
-        maps:to_list(Meta)
-    ),
-    iolist_to_binary(Data).
+    try
+        Data = [[encode_term(normalize_files(MetaPair), 0), ".\n"] || MetaPair <- binarify(Meta)],
+        {ok, unicode:characters_to_binary(Data)}
+    catch
+        throw:{metadata, _} = Reason ->
+            {error, Reason}
+    end.
+
+%% @private
+normalize_files({<<"files">>, Files}) when is_list(Files) ->
+    {<<"files">>, lists:sort([normalize_file(File) || File <- Files])};
+normalize_files(MetaPair) ->
+    MetaPair.
+
+%% @private
+normalize_file(File) when is_binary(File) ->
+    case unicode:characters_to_nfc_binary(File) of
+        Normalized when is_binary(Normalized) -> Normalized;
+        _ -> throw({metadata, {invalid_file, File}})
+    end;
+normalize_file(File) ->
+    throw({metadata, {invalid_file, File}}).
+
+%% @private
+encode_term(Term, Column) ->
+    Flat = encode_flat(Term),
+    case Column + length(Flat) =< ?METADATA_LINE_LENGTH of
+        true -> Flat;
+        false -> encode_multiline(Term, Column, Flat)
+    end.
+
+%% @private
+encode_multiline({Key, Value}, Column, _Flat) ->
+    ["{", encode_flat(Key), ",\n", indent(Column + 1), encode_term(Value, Column + 1), "}"];
+encode_multiline([_ | _] = List, Column, Flat) ->
+    case printable_string(List) of
+        true ->
+            Flat;
+        false ->
+            Separator = [",\n", indent(Column + 1)],
+            ["[", lists:join(Separator, [encode_term(Element, Column + 1) || Element <- List]), "]"]
+    end;
+encode_multiline(_Term, _Column, Flat) ->
+    Flat.
+
+%% @private
+indent(Column) ->
+    lists:duplicate(Column, $\s).
+
+%% @private
+encode_flat(Binary) when is_binary(Binary) ->
+    encode_binary(Binary);
+encode_flat(Integer) when is_integer(Integer) ->
+    integer_to_list(Integer);
+encode_flat(Atom) when is_atom(Atom) ->
+    atom_to_list(Atom);
+encode_flat({Key, Value}) ->
+    "{" ++ encode_flat(Key) ++ "," ++ encode_flat(Value) ++ "}";
+encode_flat(List) when is_list(List) ->
+    case printable_string(List) of
+        true -> "\"" ++ escape_string(List) ++ "\"";
+        false -> "[" ++ join_flat([encode_flat(Element) || Element <- List]) ++ "]"
+    end.
+
+%% @private
+printable_string([_ | _] = List) ->
+    lists:all(fun(Char) -> is_integer(Char) andalso printable_char(Char) end, List);
+printable_string(_List) ->
+    false.
+
+%% @private
+join_flat(Strings) ->
+    lists:append(lists:join(",", Strings)).
+
+%% @private
+%% Binaries and lists are written as strings only when all characters are in
+%% the Latin-1 printable range, the same as io_lib_pretty with the default
+%% printable range, so every existing metadata reader can decode them. Other
+%% binaries are written as bytes and other lists as elements.
+encode_binary(<<>>) ->
+    "<<>>";
+encode_binary(Binary) ->
+    case unicode:characters_to_list(Binary) of
+        Chars when is_list(Chars) ->
+            case lists:all(fun printable_char/1, Chars) of
+                true when byte_size(Binary) =:= length(Chars) ->
+                    "<<\"" ++ escape_string(Chars) ++ "\">>";
+                true ->
+                    "<<\"" ++ escape_string(Chars) ++ "\"/utf8>>";
+                false ->
+                    encode_bytes(Binary)
+            end;
+        _ ->
+            encode_bytes(Binary)
+    end.
+
+%% @private
+encode_bytes(Binary) ->
+    "<<" ++ join_flat([integer_to_list(Byte) || <<Byte>> <= Binary]) ++ ">>".
+
+%% @private
+printable_char(Char) when Char >= $\s, Char =< $~ -> true;
+printable_char(Char) when Char >= 16#A0, Char =< 16#FF -> true;
+printable_char(Char) -> lists:member(Char, "\n\r\t\v\b\f\e").
+
+%% @private
+%% The metadata lexer in released Hex clients and hex_core versions reads \\
+%% at the end of a string as a backslash followed by an escaped closing quote
+%% and fails to decode the metadata, so a backslash that ends a string is
+%% written as \134 instead
+escape_string(Chars) ->
+    case lists:reverse(Chars) of
+        [$\\ | Rest] -> lists:flatmap(fun escape_char/1, lists:reverse(Rest)) ++ "\\134";
+        _ -> lists:flatmap(fun escape_char/1, Chars)
+    end.
+
+%% @private
+escape_char($") -> "\\\"";
+escape_char($\\) -> "\\\\";
+escape_char($\n) -> "\\n";
+escape_char($\r) -> "\\r";
+escape_char($\t) -> "\\t";
+escape_char($\v) -> "\\v";
+escape_char($\b) -> "\\b";
+escape_char($\f) -> "\\f";
+escape_char($\e) -> "\\e";
+escape_char(Char) -> [Char].
 
 %% @private
 do_unpack(Files, OuterChecksum, Output, Config) ->
@@ -489,10 +647,7 @@ finish_unpack(#{
             filelib:ensure_dir(filename:join(Output, "*")),
             case unpack_contents(Contents, Output, MaxUncompressedSize) of
                 ok ->
-                    [
-                        try_updating_mtime(filename:join(Output, P))
-                     || P <- filelib:wildcard("**", Output)
-                    ],
+                    update_mtimes(Output),
                     copy_metadata_config(Output, maps:get("metadata.config", Files)),
                     {ok, Result};
                 {error, Reason} ->
@@ -521,7 +676,7 @@ unpack_contents(Contents, Output, MaxSize) ->
 
 %% @private
 copy_metadata_config(Output, MetadataBinary) ->
-    ok = file:write_file(filename:join(Output, "hex_metadata.config"), MetadataBinary).
+    ok = file:write_file(filename:join(Output, "hex_metadata.config"), MetadataBinary, [raw]).
 
 %% @private
 check_files(#{files := Files} = State) ->
@@ -865,12 +1020,25 @@ normalize_metadata(Metadata1) ->
 
 %% @private
 normalize_requirements(Requirements) ->
-    case is_list(Requirements) andalso (Requirements /= []) andalso is_list(hd(Requirements)) of
+    case is_legacy_requirements(Requirements) of
         true ->
             maps:from_list(lists:map(fun normalize_legacy_requirement/1, Requirements));
         false ->
             try_into_map(fun normalize_normal_requirement/1, Requirements)
     end.
+
+%% @private
+%% Legacy requirements are property lists that each name their dependency.
+%% Anything else is left as it is for the caller to reject.
+is_legacy_requirements([_ | _] = Requirements) ->
+    lists:all(
+        fun(Requirement) ->
+            has_map_shape(Requirement) andalso lists:keymember(<<"name">>, 1, Requirement)
+        end,
+        Requirements
+    );
+is_legacy_requirements(_) ->
+    false.
 
 %% @private
 normalize_normal_requirement({Name, Requirement}) ->
@@ -885,10 +1053,12 @@ normalize_legacy_requirement(Requirement) ->
 %% @private
 guess_build_tools(#{<<"build_tools">> := BuildTools} = Metadata) when is_list(BuildTools) ->
     Metadata;
-guess_build_tools(#{<<"files">> := Filenames} = Metadata) ->
+guess_build_tools(#{<<"files">> := Filenames} = Metadata) when is_list(Filenames) ->
     BaseFiles = [
         Filename
-     || Filename <- Filenames, filename:dirname(binary_to_list(Filename)) == "."
+     || Filename <- Filenames,
+        is_binary(Filename),
+        filename:dirname(binary_to_list(Filename)) == "."
     ],
     BuildTools = lists:usort([
         Tool
@@ -903,6 +1073,56 @@ guess_build_tools(Metadata) ->
 %%====================================================================
 
 %% @private
+%% Validates the files and resolves each one to an entry that doesn't depend on
+%% the order of the given files, on file system permissions beyond the owner
+%% execute bit, or on files on disk that were not given
+prepare_files(Files, FilesRoot) ->
+    case validate_create_files(Files, FilesRoot) of
+        {ok, ValidatedFiles} ->
+            SortedFiles = lists:keysort(1, ValidatedFiles),
+            Keys = lists:sort([archive_path_key(Name) || {Name, _} <- SortedFiles]),
+            case duplicate_key(Keys) of
+                {ok, Key} -> {error, {tarball, {duplicate_file, Key}}};
+                error -> {ok, drop_non_empty_directories(SortedFiles)}
+            end;
+        {error, _} = Error ->
+            Error
+    end.
+
+duplicate_key([Key, Key | _]) ->
+    {ok, Key};
+duplicate_key([_ | Keys]) ->
+    duplicate_key(Keys);
+duplicate_key([]) ->
+    error.
+
+drop_non_empty_directories(Files) ->
+    Parents = sets:from_list(lists:flatmap(fun({Name, _}) -> archive_parents(Name) end, Files)),
+    [
+        File
+     || {Name, Entry} = File <- Files,
+        Entry =/= directory orelse not sets:is_element(archive_path_key(Name), Parents)
+    ].
+
+archive_parents(Name) ->
+    Parts = archive_path_parts(Name),
+    [string:join(lists:sublist(Parts, N), "/") || N <- lists:seq(1, length(Parts) - 1)].
+
+archive_path_key(Name) ->
+    string:join(archive_path_parts(Name), "/").
+
+archive_path_parts(Name) ->
+    Parts = lists:foldl(
+        fun
+            (".", Acc) -> Acc;
+            ("..", [_ | Acc]) -> Acc;
+            (Part, Acc) -> [Part | Acc]
+        end,
+        [],
+        archive_path_split(Name)
+    ),
+    lists:reverse(Parts).
+
 validate_create_files(Files, FilesRoot) when is_list(Files) ->
     validate_create_files(Files, FilesRoot, []).
 
@@ -914,11 +1134,21 @@ validate_create_files([File | Rest], FilesRoot, Acc) ->
         {error, _} = Error -> Error
     end.
 
+validate_create_file({Filename, Source, Options}, FilesRoot) when is_map(Options) ->
+    case validate_create_file({Filename, Source}, FilesRoot) of
+        {ok, {ArchiveName, Entry}} ->
+            case apply_file_options(Entry, Options) of
+                {ok, NewEntry} -> {ok, {ArchiveName, NewEntry}};
+                error -> {error, {tarball, {invalid_file_options, ArchiveName, Options}}}
+            end;
+        {error, _} = Error ->
+            Error
+    end;
 validate_create_file({Filename, Contents}, _FilesRoot) when
     is_list(Filename), is_binary(Contents)
 ->
     case validate_archive_path(Filename) of
-        ok -> {ok, {Filename, Contents}};
+        {ok, ArchiveName} -> {ok, {ArchiveName, {regular, {contents, Contents}, file_mode(false)}}};
         {error, _} = Error -> Error
     end;
 validate_create_file(Filename, FilesRoot) when is_list(Filename) ->
@@ -927,14 +1157,19 @@ validate_create_file({Filename, AbsFilename}, FilesRoot) when
     is_list(Filename), is_list(AbsFilename)
 ->
     case validate_archive_path(Filename) of
-        ok -> validate_source_file(Filename, AbsFilename, FilesRoot);
+        {ok, ArchiveName} -> validate_source_file(ArchiveName, AbsFilename, FilesRoot);
         {error, _} = Error -> Error
     end.
 
 validate_archive_path(Filename) ->
-    case safe_relative_archive_path(Filename) of
-        false -> {error, {tarball, {unsafe_path, Filename}}};
-        true -> ok
+    case normalize_name(Filename) of
+        {ok, ArchiveName} ->
+            case safe_relative_archive_path(ArchiveName) of
+                false -> {error, {tarball, {unsafe_path, Filename}}};
+                true -> {ok, ArchiveName}
+            end;
+        error ->
+            {error, {tarball, {unsafe_path, Filename}}}
     end.
 
 validate_source_file(ArchiveName, SourcePath, FilesRoot) ->
@@ -999,31 +1234,71 @@ strip_root_path(_PathParts, _RootParts) ->
 
 validate_source_file_root(ArchiveName, DiskPath, RelativePath, Root) ->
     case file:read_link_info(DiskPath, []) of
-        {ok, #file_info{type = Type}} when Type =:= regular; Type =:= directory ->
-            case validate_source_root(ArchiveName, RelativePath, Root) of
-                ok -> {ok, {ArchiveName, DiskPath}};
-                {error, _} = Error -> Error
-            end;
+        {ok, #file_info{type = regular, mode = Mode}} ->
+            %% Only the owner execute bit is kept, other permission bits depend on the umask
+            Entry = {regular, {file, DiskPath}, file_mode(Mode band 8#100 =/= 0)},
+            validate_source_entry(ArchiveName, RelativePath, Root, Entry);
+        {ok, #file_info{type = directory}} ->
+            validate_source_entry(ArchiveName, RelativePath, Root, directory);
         {ok, #file_info{type = symlink}} ->
-            {ok, LinkTarget} = file:read_link(DiskPath),
-            ResolvedTarget = archive_join(archive_dirname(ArchiveName), LinkTarget),
-            case safe_relative_archive_path(ResolvedTarget) of
-                false ->
-                    {error, {tarball, {unsafe_symlink, ArchiveName, LinkTarget}}};
-                true ->
-                    case validate_source_root(ArchiveName, RelativePath, Root) of
-                        ok -> {ok, {ArchiveName, DiskPath}};
-                        {error, _} = Error -> Error
-                    end
+            {ok, NativeTarget} = file:read_link(DiskPath),
+            case symlink_target(NativeTarget) of
+                {ok, LinkTarget} ->
+                    ResolvedTarget = archive_join(archive_dirname(ArchiveName), LinkTarget),
+                    case safe_relative_archive_path(ResolvedTarget) of
+                        false ->
+                            {error, {tarball, {unsafe_symlink, ArchiveName, LinkTarget}}};
+                        true ->
+                            validate_source_entry(
+                                ArchiveName, RelativePath, Root, {symlink, LinkTarget}
+                            )
+                    end;
+                error ->
+                    {error, {tarball, {unsafe_symlink, ArchiveName, NativeTarget}}}
             end;
         {ok, #file_info{type = Type}} ->
             {error, {tarball, {unsupported_file_type, ArchiveName, Type}}};
-        _ ->
+        {error, Reason} ->
             case validate_source_root(ArchiveName, RelativePath, Root) of
-                ok -> {ok, {ArchiveName, DiskPath}};
+                ok -> {error, {tarball, {ArchiveName, Reason}}};
                 {error, _} = Error -> Error
             end
     end.
+
+apply_file_options(Entry, Options) when map_size(Options) =:= 0 ->
+    {ok, Entry};
+apply_file_options({regular, Source, _Mode}, #{executable := Executable} = Options) when
+    is_boolean(Executable), map_size(Options) =:= 1
+->
+    {ok, {regular, Source, file_mode(Executable)}};
+apply_file_options(Entry, #{executable := Executable} = Options) when
+    is_boolean(Executable), map_size(Options) =:= 1
+->
+    {ok, Entry};
+apply_file_options(_Entry, _Options) ->
+    error.
+
+validate_source_entry(ArchiveName, RelativePath, Root, Entry) ->
+    case validate_source_root(ArchiveName, RelativePath, Root) of
+        ok -> {ok, {ArchiveName, Entry}};
+        {error, _} = Error -> Error
+    end.
+
+%% With the latin1 file name encoding every character read from the file
+%% system is one byte of the name, archives always store UTF-8 names
+symlink_target(NativeTarget) ->
+    case file:native_name_encoding() of
+        utf8 -> normalize_name(NativeTarget);
+        latin1 -> normalize_name(unicode:characters_to_list(list_to_binary(NativeTarget)))
+    end.
+
+normalize_name(Name) when is_list(Name) ->
+    case unicode:characters_to_nfc_list(Name) of
+        Normalized when is_list(Normalized) -> {ok, Normalized};
+        _ -> error
+    end;
+normalize_name(_Name) ->
+    error.
 
 validate_source_root(ArchiveName, SourcePath, FilesRoot) ->
     case filelib:safe_relative_path(SourcePath, FilesRoot) of
@@ -1101,10 +1376,7 @@ unpack_tarball(Source, Output, MaxSize) ->
     filelib:ensure_dir(filename:join(Output, "*")),
     case r3_hex_erl_tar:extract(Source, [{cwd, Output}, compressed, {max_size, MaxSize}]) of
         ok ->
-            [
-                try_updating_mtime(filename:join(Output, Path))
-             || Path <- filelib:wildcard("**", Output)
-            ],
+            update_mtimes(Output),
             ok;
         {error, too_big} ->
             {error, {tarball, {too_big_uncompressed, MaxSize}}};
@@ -1113,29 +1385,120 @@ unpack_tarball(Source, Output, MaxSize) ->
     end.
 
 %% @private
-%% let it silently fail for bad symlinks
-try_updating_mtime(Path) ->
-    Time = calendar:universal_time(),
-    _ = file:write_file_info(Path, #file_info{mtime = Time}, [{time, universal}]),
-    ok.
+%% Skips symlinks: write_file_info/3 follows them, and descending into
+%% symlinked directories loops on link cycles. Failures are ignored.
+update_mtimes(Dir) ->
+    update_mtimes(Dir, calendar:universal_time()).
+
+update_mtimes(Dir, Time) ->
+    case file:list_dir(Dir) of
+        {ok, Names} ->
+            lists:foreach(fun(Name) -> update_mtime(filename:join(Dir, Name), Time) end, Names);
+        {error, _} ->
+            ok
+    end.
+
+update_mtime(Path, Time) ->
+    case file:read_link_info(Path, [raw, {time, universal}]) of
+        {ok, #file_info{type = directory}} ->
+            _ = file:write_file_info(Path, #file_info{mtime = Time}, [raw, {time, universal}]),
+            update_mtimes(Path, Time);
+        {ok, #file_info{type = regular}} ->
+            _ = file:write_file_info(Path, #file_info{mtime = Time}, [raw, {time, universal}]),
+            ok;
+        _ ->
+            ok
+    end.
 
 %% @private
 create_memory_tarball(Files) ->
-    Path = tmp_path(),
-    {ok, Tar} = r3_hex_erl_tar:open(Path, [write]),
+    {ok, Fd} = file:open(<<>>, [ram, read, write, binary]),
 
     try
-        add_files(Tar, Files)
+        {ok, Tar} = r3_hex_erl_tar:init(Fd, write, fun ram_file_op/2),
+
+        try
+            add_files(Tar, Files)
+        after
+            ok = r3_hex_erl_tar:close(Tar)
+        end,
+        {ok, Size} = file:position(Fd, eof),
+        {ok, Tarball} = file:pread(Fd, 0, Size),
+        Tarball
     after
-        ok = r3_hex_erl_tar:close(Tar)
-    end,
-    {ok, Tarball} = file:read_file(Path),
-    ok = file:delete(Path),
-    Tarball.
+        ok = file:close(Fd)
+    end.
+
+%% @private
+%% The outer tarball is extracted inside the output directory, so unpacking
+%% needs no write access outside it and doesn't depend on the current
+%% directory. Without an output it goes to the system temporary directory.
+tmp_parent(none) ->
+    system_tmp_dir();
+tmp_parent(Output) ->
+    Output.
+
+%% @private
+%% The first writable directory of TMPDIR, TEMP, TMP and /tmp, the same
+%% candidates as Elixir's System.tmp_dir/0, falling back to the current
+%% directory.
+system_tmp_dir() ->
+    EnvDirs = [Dir || Var <- ["TMPDIR", "TEMP", "TMP"], Dir <- [os:getenv(Var)], is_list(Dir)],
+    case lists:search(fun is_writable_dir/1, EnvDirs ++ ["/tmp"]) of
+        {value, Dir} ->
+            Dir;
+        false ->
+            case file:get_cwd() of
+                {ok, Cwd} -> Cwd;
+                {error, _} -> "."
+            end
+    end.
+
+is_writable_dir(Dir) ->
+    case file:read_file_info(Dir, [raw]) of
+        {ok, #file_info{type = directory, access = Access}} ->
+            Access =:= read_write orelse Access =:= write;
+        _ ->
+            false
+    end.
+
+%% @private
+%% Readable only by the owner, since with the none output it is in a shared
+%% temporary directory and holds the package contents.
+make_tmp_dir(TmpDir) ->
+    case create_dir(TmpDir) of
+        ok ->
+            case file:write_file_info(TmpDir, #file_info{mode = 8#700}, [raw]) of
+                ok ->
+                    ok;
+                {error, _} = Error ->
+                    _ = file:del_dir(TmpDir),
+                    Error
+            end;
+        {error, _} = Error ->
+            Error
+    end.
+
+create_dir(Dir) ->
+    case file:make_dir(Dir) of
+        {error, enoent} ->
+            case filelib:ensure_dir(Dir) of
+                ok -> file:make_dir(Dir);
+                {error, _} = Error -> Error
+            end;
+        Result ->
+            Result
+    end.
 
 %% @private
 tmp_path() ->
     "tmp_" ++ binary_to_list(encode_base16(crypto:strong_rand_bytes(32))).
+
+%% @private
+ram_file_op(write, {Fd, Data}) -> file:write(Fd, Data);
+ram_file_op(position, {Fd, Position}) -> file:position(Fd, Position);
+ram_file_op(read2, {Fd, Size}) -> file:read(Fd, Size);
+ram_file_op(close, _Fd) -> ok.
 
 %% @private
 add_files(Tar, Files) when is_list(Files) ->
@@ -1144,26 +1507,19 @@ add_files(Tar, Files) when is_list(Files) ->
 %% @private
 add_file(Tar, {Filename, Contents}) when is_list(Filename) and is_binary(Contents) ->
     ok = r3_hex_erl_tar:add(Tar, Contents, Filename, tar_opts());
-add_file(Tar, Filename) when is_list(Filename) ->
-    add_file(Tar, {Filename, Filename});
-add_file(Tar, {Filename, AbsFilename}) when is_list(Filename), is_list(AbsFilename) ->
-    {ok, FileInfo} = file:read_link_info(AbsFilename, []),
+add_file(Tar, {Filename, {regular, {contents, Contents}, Mode}}) ->
+    ok = r3_hex_erl_tar:add(Tar, Contents, Filename, [{mode, Mode} | tar_opts()]);
+add_file(Tar, {Filename, {regular, {file, Path}, Mode}}) ->
+    {ok, Contents} = file:read_file(Path),
+    ok = r3_hex_erl_tar:add(Tar, Contents, Filename, [{mode, Mode} | tar_opts()]);
+add_file(Tar, {Filename, {symlink, LinkTarget}}) ->
+    ok = r3_hex_erl_tar:add(Tar, {symlink, LinkTarget}, Filename, [{mode, 8#120777} | tar_opts()]);
+add_file(Tar, {Filename, directory}) ->
+    ok = r3_hex_erl_tar:add(Tar, directory, Filename, [{mode, 8#40755} | tar_opts()]).
 
-    case FileInfo#file_info.type of
-        symlink ->
-            ok = r3_hex_erl_tar:add(Tar, {Filename, AbsFilename}, tar_opts());
-        directory ->
-            case file:list_dir(AbsFilename) of
-                {ok, []} ->
-                    r3_hex_erl_tar:add(Tar, {Filename, AbsFilename}, tar_opts());
-                {ok, _} ->
-                    ok
-            end;
-        _ ->
-            Mode = FileInfo#file_info.mode,
-            {ok, Contents} = file:read_file(AbsFilename),
-            ok = r3_hex_erl_tar:add(Tar, Contents, Filename, [{mode, Mode} | tar_opts()])
-    end.
+%% @private
+file_mode(true) -> 8#100755;
+file_mode(false) -> 8#100644.
 
 %% @private
 tar_opts() ->
@@ -1189,25 +1545,12 @@ tar_opts() ->
 %% |     CRC32     |     ISIZE     |
 %% +---+---+---+---+---+---+---+---+
 gzip(Uncompressed) ->
-    Compressed = gzip_no_header(Uncompressed),
+    Compressed = r3_hex_deflate:compress(Uncompressed),
     Header = <<31, 139, 8, 0, 0, 0, 0, 0, 0, 0>>,
     Crc = erlang:crc32(Uncompressed),
     Size = byte_size(Uncompressed),
     Trailer = <<Crc:32/little, Size:32/little>>,
     iolist_to_binary([Header, Compressed, Trailer]).
-
-%% @private
-gzip_no_header(Uncompressed) ->
-    Zstream = zlib:open(),
-
-    try
-        zlib:deflateInit(Zstream, default, deflated, -15, 8, default),
-        Compressed = zlib:deflate(Zstream, Uncompressed, finish),
-        zlib:deflateEnd(Zstream),
-        iolist_to_binary(Compressed)
-    after
-        zlib:close(Zstream)
-    end.
 
 %%====================================================================
 %% Helpers
@@ -1330,7 +1673,7 @@ remove_dir(Dir) ->
 
 %% @private
 binarify(Binary) when is_binary(Binary) -> Binary;
-binarify(Number) when is_number(Number) -> Number;
+binarify(Integer) when is_integer(Integer) -> Integer;
 binarify(Atom) when Atom == undefined orelse is_boolean(Atom) -> Atom;
 binarify(Atom) when is_atom(Atom) -> atom_to_binary(Atom, utf8);
 binarify(List) when is_list(List) ->
@@ -1338,8 +1681,19 @@ binarify(List) when is_list(List) ->
 binarify({Key, Value}) ->
     {binarify(Key), binarify(Value)};
 binarify(Map) when is_map(Map) ->
-    List = maps:to_list(Map),
-    lists:map(fun({K, V}) -> binarify({K, V}) end, List).
+    Pairs = lists:keysort(1, [binarify({K, V}) || {K, V} <- maps:to_list(Map)]),
+    ok = check_duplicate_keys(Pairs),
+    Pairs;
+binarify(Term) ->
+    throw({metadata, {unsupported_term, Term}}).
+
+%% @private
+check_duplicate_keys([{Key, _}, {Key, _} | _]) ->
+    throw({metadata, {duplicate_key, Key}});
+check_duplicate_keys([_ | Pairs]) ->
+    check_duplicate_keys(Pairs);
+check_duplicate_keys([]) ->
+    ok.
 
 %% @private
 diff_keys(Map, RequiredKeys, OptionalKeys) ->

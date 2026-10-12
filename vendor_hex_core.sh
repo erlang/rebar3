@@ -43,6 +43,8 @@ filenames="hex_core.hrl \
            hex_licenses.erl \
            hex_safe_binary_to_term.erl \
            hex_cli_auth.erl \
+           hex_deflate.erl \
+           hex_oidc.erl \
            safe_erl_term.xrl"
 
 search_to_replace="hex_core: \
@@ -60,6 +62,8 @@ search_to_replace="hex_core: \
                    hex_repo \
                    hex_api \
                    hex_cli_auth \
+                   hex_deflate \
+                   hex_oidc \
                    hex_licenses \
                    hex_safe_binary_to_term \
                    safe_erl_term"

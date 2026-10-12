@@ -1,9 +1,10 @@
-%% Vendored from hex_core v0.19.0, do not edit manually
+%% Vendored from hex_core v0.20.0, do not edit manually
 
 %% @hidden
 %% Safe deserialization of Erlang terms from binary.
 %%
 %% This module provides a restricted version of `binary_to_term/1' that:
+%% - Rejects compressed terms, which can decompress to any size (DoS protection)
 %% - Uses the `safe' option to prevent creation of new atoms (DoS protection)
 %% - Validates that the term contains no executable code (RCE protection)
 %%
@@ -17,6 +18,8 @@
 -type error_reason() :: invalid_term | {unsafe_term, unsafe_term()}.
 
 -spec safe_binary_to_term(binary()) -> {ok, term()} | {error, error_reason()}.
+safe_binary_to_term(<<131, 80, _/binary>>) ->
+    {error, invalid_term};
 safe_binary_to_term(Binary) when is_binary(Binary) ->
     try binary_to_term(Binary, [safe]) of
         Term ->
