@@ -221,7 +221,7 @@
 }.
 
 -type workload_identity_error() ::
-    hex_oidc:fetch_error()
+    r3_hex_oidc:fetch_error()
     | {oidc_audience_failed, r3_hex_api:response()}
     | {token_exchange_failed, r3_hex_api:response()}.
 
@@ -622,7 +622,7 @@ workload_identity_auth(Config, Scope) ->
         {ok, _ApiKey, _AuthContext} ->
             none;
         _NoUsableCredentials ->
-            case hex_oidc:detect_provider() of
+            case r3_hex_oidc:detect_provider() of
                 {ok, Provider} ->
                     case authenticate_workload_identity(Config, Provider, Scope) of
                         {ok, #{access_token := AccessToken}} ->
@@ -636,12 +636,12 @@ workload_identity_auth(Config, Scope) ->
     end.
 
 %% @private
--spec authenticate_workload_identity(r3_hex_core:config(), hex_oidc:provider(), binary()) ->
+-spec authenticate_workload_identity(r3_hex_core:config(), r3_hex_oidc:provider(), binary()) ->
     {ok, oauth_tokens()} | {error, workload_identity_error()}.
 authenticate_workload_identity(Config, Provider, Scope) ->
     case r3_hex_api_oauth:oidc_audience(Config) of
         {ok, {200, _Headers, #{<<"audience">> := Audience}}} when is_binary(Audience) ->
-            case hex_oidc:fetch_token(Config, Provider, Audience) of
+            case r3_hex_oidc:fetch_token(Config, Provider, Audience) of
                 {ok, OidcToken} ->
                     exchange_workload_identity_token(Config, OidcToken, Scope);
                 {error, _Reason} = Error ->
@@ -876,7 +876,7 @@ workload_identity_provider(#{cli_auth_callbacks := Callbacks}) ->
         is_map_key(get_workload_identity_token, Callbacks) andalso
             is_map_key(persist_workload_identity_token, Callbacks)
     of
-        true -> hex_oidc:detect_provider();
+        true -> r3_hex_oidc:detect_provider();
         false -> none
     end.
 

@@ -1545,7 +1545,7 @@ tar_opts() ->
 %% |     CRC32     |     ISIZE     |
 %% +---+---+---+---+---+---+---+---+
 gzip(Uncompressed) ->
-    Compressed = hex_deflate:compress(Uncompressed),
+    Compressed = r3_hex_deflate:compress(Uncompressed),
     Header = <<31, 139, 8, 0, 0, 0, 0, 0, 0, 0>>,
     Crc = erlang:crc32(Uncompressed),
     Size = byte_size(Uncompressed),
