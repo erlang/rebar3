@@ -1,18 +1,26 @@
-%% Vendored from hex_core v0.19.0, do not edit manually
+%% Vendored from hex_core v0.20.0, do not edit manually
 
 %% This file is a copy of erl_tar.erl from OTP with the following modifications:
 %% 1. Module renamed from erl_tar to r3_hex_erl_tar
 %% 2. -include changed from erl_tar.hrl to r3_hex_erl_tar.hrl
 %% 3. -doc and -moduledoc attributes removed for OTP 24 compatibility
-%% 4. safe_link_name/2 fixed to validate symlink targets relative to symlink's
-%%    parent directory instead of in isolation
-%% 5. When extracting to disk (cwd option), stream file entries in chunks
-%%    instead of loading them fully into memory
-%% 6. Default chunk_size to 65536 in add_opts instead of 0 with special case
-%% 7. Use compressed instead of compressed_one for file:open for OTP 24 compat
-%% 8. Added {max_size, N} extraction option for zip bomb protection
+%% 4. Use compressed instead of compressed_one for file:open for OTP 24 compat
+%% 5. When extracting to disk, make_safe_path/2 and safe_link_name/2 return
+%%    binary file names so the UTF-8 bytes of member names and symlink targets
+%%    are written unchanged when the native file name encoding is latin1
+%% 6. add/4 accepts {symlink, Linkname} and directory to add entries without
+%%    reading them from disk
+%% 7. PAX record lengths are counted in bytes instead of characters
+%% 8. The ustar prefix check counts the separator between path components
+%% 9. parse_string/1 drops the zero padding of names that end in an incomplete
+%%    UTF-8 sequence
+%% 10. Extraction reads and writes files and file info with the raw option so
+%%     concurrent extractions are not serialized through the file server
+%% 11. Compressed binary input is inflated in reset mode instead of cut mode,
+%%     so it reads concatenated gzip members like file input opened with
+%%     compressed does
 %%
-%% OTP commit: 013041bd68c2547848e88963739edea7f0a1a90f
+%% OTP commit: ad05823719d77c8faee87348ea39513d4e2f99c5 (OTP-29.1.1)
 %%
 %% %CopyrightBegin%
 %%
@@ -175,7 +183,7 @@ maybe_inflate_with_limit(Handle, Opts) ->
 inflate_with_limit(Bin, MaxSize) ->
     Z = zlib:open(),
     try
-        zlib:inflateInit(Z, 31, cut),
+        zlib:inflateInit(Z, 31, reset),
         inflate_with_limit_loop(Z, Bin, MaxSize, 0, [])
     catch
         _:_ -> {ok, Bin}
@@ -281,7 +289,7 @@ stream_to_file(Name, Reader0, Opts) ->
     Write =
         case Opts#read_opts.keep_old_files of
             true ->
-                case file:read_file_info(Name) of
+                case file:read_file_info(Name, [raw]) of
                     {ok, _} -> false;
                     _ -> true
                 end;
@@ -504,9 +512,9 @@ do_open(Name, Mode) when is_list(Mode) ->
 open1({binary,Bin0}=Handle, read, _Raw, Opts) when is_binary(Bin0) ->
     Bin = case lists:member(compressed, Opts) of
         true ->
-            %% emulate file:open with Modes = [compressed_one ...]
+            %% emulate file:open with Modes = [compressed ...]
             Z = zlib:open(),
-            zlib:inflateInit(Z, 31, cut),
+            zlib:inflateInit(Z, 31, reset),
             try
                 IoList = zlib:inflate(Z, Bin0),
                 zlib:inflateEnd(Z),
@@ -659,9 +667,15 @@ add(Reader, Name, Opts) when is_list(Name) ->
 -spec add(TarDescriptor, Filename, NameInArchive, Options) ->
         ok | {error, term()} when
     TarDescriptor :: tar_descriptor(),
-    Filename :: file:filename_all(),
+    Filename :: file:filename_all() | {symlink, string()} | directory,
     NameInArchive :: name_in_archive(),
     Options :: [add_opt()].
+add(Reader, {symlink, Linkname}, NameInArchive, Options)
+  when is_list(Linkname), is_list(NameInArchive), is_list(Options) ->
+    do_add(Reader, {symlink, Linkname}, NameInArchive, Options);
+add(Reader, directory, NameInArchive, Options)
+  when is_list(NameInArchive), is_list(Options) ->
+    do_add(Reader, directory, NameInArchive, Options);
 add(Reader, NameOrBin, NameInArchive, Options)
   when is_list(NameOrBin); is_binary(NameOrBin),
        is_list(NameInArchive), is_list(Options) ->
@@ -761,23 +775,40 @@ add1(#reader{}=Reader, Name, NameInArchive, #add_opts{read_info=ReadInfo}=Opts)
     end;
 add1(Reader, Bin, NameInArchive, Opts) when is_binary(Bin) ->
     add_verbose(Opts, "a ~ts~n", [NameInArchive]),
-    Now = os:system_time(seconds),
-    Header = #tar_header{
-                name = NameInArchive,
-                size = byte_size(Bin),
-                typeflag = ?TYPE_REGULAR,
-                atime = add_opts_time(Opts#add_opts.atime, Now),
-                mtime = add_opts_time(Opts#add_opts.mtime, Now),
-                ctime = add_opts_time(Opts#add_opts.ctime, Now),
-                uid = Opts#add_opts.uid,
-                gid = Opts#add_opts.gid,
-                mode = Opts#add_opts.mode},
+    Header = opts_to_header(NameInArchive, ?TYPE_REGULAR, byte_size(Bin), Opts),
     {ok, Reader2} = add_header(Reader, Header, Opts),
     Padding = skip_padding(byte_size(Bin)),
     Data = [Bin, <<0:Padding/unit:8>>],
     case do_write(Reader2, Data) of
         {ok, _Reader3} -> ok;
         {error, Reason} -> {error, {NameInArchive, Reason}}
+    end;
+add1(Reader, {symlink, Linkname}, NameInArchive, Opts) ->
+    add_verbose(Opts, "a ~ts~n", [NameInArchive]),
+    Header = opts_to_header(NameInArchive, ?TYPE_SYMLINK, 0, Opts),
+    add_header_entry(Reader, Header#tar_header{linkname=Linkname}, Opts);
+add1(Reader, directory, NameInArchive, Opts) ->
+    add_verbose(Opts, "a ~ts~n", [NameInArchive]),
+    Header = opts_to_header(NameInArchive ++ "/", ?TYPE_DIR, 0, Opts),
+    add_header_entry(Reader, Header, Opts).
+
+opts_to_header(NameInArchive, Typeflag, Size, Opts) ->
+    Now = os:system_time(seconds),
+    #tar_header{
+       name = NameInArchive,
+       size = Size,
+       typeflag = Typeflag,
+       atime = add_opts_time(Opts#add_opts.atime, Now),
+       mtime = add_opts_time(Opts#add_opts.mtime, Now),
+       ctime = add_opts_time(Opts#add_opts.ctime, Now),
+       uid = Opts#add_opts.uid,
+       gid = Opts#add_opts.gid,
+       mode = Opts#add_opts.mode}.
+
+add_header_entry(Reader, Header, Opts) ->
+    case add_header(Reader, Header, Opts) of
+        {ok, _Reader2} -> ok;
+        {error, Reason} -> {error, {Header#tar_header.name, Reason}}
     end.
 
 add_opts_time(undefined, Now) -> Now;
@@ -965,30 +996,24 @@ build_pax_entry(Header, PaxAttrs, Opts) ->
 build_pax_file(Keys, PaxAttrs) ->
     build_pax_file(Keys, PaxAttrs, []).
 build_pax_file([], _, Acc) ->
-    unicode:characters_to_binary(Acc);
+    iolist_to_binary(Acc);
 build_pax_file([K|Rest], Attrs, Acc) ->
-    V = maps:get(K, Attrs),
-    Size = sizeof(K) + sizeof(V) + 3,
-    Size2 = sizeof(Size) + Size,
-    Key = to_string(K),
-    Value = to_string(V),
-    Record = unicode:characters_to_binary(io_lib:format("~B ~ts=~ts\n", [Size2, Key, Value])),
-    if byte_size(Record) =/= Size2 ->
-            Size3 = byte_size(Record),
-            Record2 = io_lib:format("~B ~ts=~ts\n", [Size3, Key, Value]),
-            build_pax_file(Rest, Attrs, [Acc, Record2]);
-       true ->
-            build_pax_file(Rest, Attrs, [Acc, Record])
-    end.
+    Key = unicode:characters_to_binary(to_string(K)),
+    Value = unicode:characters_to_binary(to_string(maps:get(K, Attrs))),
+    %% The record length includes its own decimal digits, the separating
+    %% space, "=" and the trailing newline, all counted in bytes
+    Size = pax_record_size(byte_size(Key) + byte_size(Value) + 3),
+    Record = [integer_to_binary(Size), $\s, Key, $=, Value, $\n],
+    build_pax_file(Rest, Attrs, [Acc, Record]).
 
-sizeof(Bin) when is_binary(Bin) ->
-    byte_size(Bin);
-sizeof(List) when is_list(List) ->
-    length(List);
-sizeof(N) when is_integer(N) ->
-    byte_size(integer_to_binary(N));
-sizeof(N) when is_float(N) ->
-    byte_size(float_to_binary(N)).
+pax_record_size(Base) ->
+    pax_record_size(Base, Base).
+
+pax_record_size(Base, Size) ->
+    case Base + byte_size(integer_to_binary(Size)) of
+        Size -> Size;
+        NewSize -> pax_record_size(Base, NewSize)
+    end.
 
 to_string(Bin) when is_binary(Bin) ->
     unicode:characters_to_list(Bin);
@@ -1026,7 +1051,7 @@ join_split_ustar_path([Part|_], {ok, _, nil})
   when byte_size(Part) > ?USTAR_PREFIX_LEN ->
     false;
 join_split_ustar_path([Part|_], {ok, _Name, Acc})
-  when (byte_size(Part)+byte_size(Acc)) > ?USTAR_PREFIX_LEN ->
+  when (byte_size(Acc)+1+byte_size(Part)) > ?USTAR_PREFIX_LEN ->
     false;
 join_split_ustar_path([Part|Rest], {ok, Name, nil}) ->
     join_split_ustar_path(Rest, {ok, Name, Part});
@@ -1477,7 +1502,7 @@ parse_string(Bin) when is_binary(Bin) ->
         Str when is_list(Str) ->
             Str;
         {incomplete, _Str, _Rest} ->
-            binary_to_list(Bin);
+            binary_to_list(Prefix);
         {error, _Str, _Rest} ->
             throw({error, {bad_header, invalid_string}})
     end.
@@ -1856,17 +1881,18 @@ write_extracted_element(#tar_header{name=Name0}=Header, Bin, Opts) ->
 make_safe_path([$/|Path], Opts) ->
     make_safe_path(Path, Opts);
 make_safe_path(Path0, #read_opts{cwd=Cwd}) ->
-    case filelib:safe_relative_path(Path0, Cwd) of
+    case filelib:safe_relative_path(unicode:characters_to_binary(Path0), Cwd) of
         unsafe -> throw({error,{Path0,unsafe_path}});
         Path -> filename:absname(Path, Cwd)
     end.
 
 safe_link_name(#tar_header{name=Name,linkname=Path0},#read_opts{cwd=Cwd} ) ->
-    ParentDir = filename:dirname(Name),
-    ResolvedTarget = filename:join(ParentDir, Path0),
+    Path1 = unicode:characters_to_binary(Path0),
+    ParentDir = filename:dirname(unicode:characters_to_binary(Name)),
+    ResolvedTarget = filename:join(ParentDir, Path1),
     case filelib:safe_relative_path(ResolvedTarget, Cwd) of
         unsafe -> throw({error,{Path0,unsafe_symlink}});
-        _Path -> Path0
+        _Path -> Path1
     end.
 
 create_regular(Name, NameInArchive, Bin, Opts) ->
@@ -1905,7 +1931,7 @@ write_extracted_file(Name, Bin, Opts) ->
     Write =
         case Opts#read_opts.keep_old_files of
             true ->
-                case file:read_file_info(Name) of
+                case file:read_file_info(Name, [raw]) of
                     {ok, _} -> false;
                     _ -> true
                 end;
@@ -1917,7 +1943,7 @@ write_extracted_file(Name, Bin, Opts) ->
     end.
 
 write_file(Name, Bin) ->
-    case file:write_file(Name, Bin) of
+    case file:write_file(Name, Bin, [raw]) of
         ok -> ok;
         {error,enoent} ->
             case make_dirs(Name, file) of
@@ -1938,7 +1964,7 @@ set_extracted_file_info(Name, #tar_header{typeflag = ?TYPE_BLOCK}=Header) ->
     set_device_info(Name, Header);
 set_extracted_file_info(Name, #tar_header{mtime=Mtime,mode=Mode}) ->
     Info = #file_info{mode=Mode, mtime=Mtime},
-    file:write_file_info(Name, Info, [{time, posix}]).
+    file:write_file_info(Name, Info, [raw, {time, posix}]).
 
 set_device_info(Name, #tar_header{}=Header) ->
     Mtime = Header#tar_header.mtime,
@@ -1951,7 +1977,7 @@ set_device_info(Name, #tar_header{}=Header) ->
               major_device=Devmajor,
               minor_device=Devminor
              },
-    file:write_file_info(Name, Info).
+    file:write_file_info(Name, Info, [raw]).
 
 %% Makes all directories leading up to the file.
 

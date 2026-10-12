@@ -1,13 +1,8 @@
-%% Vendored from hex_core v0.19.0, do not edit manually
+%% Vendored from hex_core v0.20.0, do not edit manually
 
-%% This file is a copy of erl_tar.hrl from OTP with the following modifications:
-%% 1. Added chunk_size field to #read_opts{} for streaming extraction to disk
-%% 2. Added {chunks, pos_integer()} to extract_opt() type
-%% 3. Default chunk_size to 65536 in #add_opts{} instead of 0
-%% 4. Added max_size field to #read_opts{} for zip bomb protection
-%% 5. Added {max_size, pos_integer() | infinity} to extract_opt() type
+%% This file is a copy of erl_tar.hrl from OTP without modifications.
 %%
-%% OTP commit: 013041bd68c2547848e88963739edea7f0a1a90f
+%% OTP commit: ad05823719d77c8faee87348ea39513d4e2f99c5 (OTP-29.1.1)
 %%
 %% %CopyrightBegin%
 %%
@@ -31,8 +26,8 @@
 
 %% Options used when adding files to a tar archive.
 -record(add_opts, {
-	 read_info,          %% Fun to use for read file/link info.
-	 chunk_size = 65536, %% Chunk size for reading files.
+         read_info,          %% Fun to use for read file/link info.
+         chunk_size = 65536, %% Chunk size for reading files.
          verbose = false,    %% Verbose on/off.
          atime = undefined,
          mtime = undefined,
@@ -209,11 +204,10 @@
 -type user_data() :: term().
 
 %% Type for the I/O primitive wrapper function
--type file_op() :: fun((write | close | read2 | position,
-                       {user_data(), iodata()} | user_data() | {user_data(), non_neg_integer()}
-                        | {user_data(), non_neg_integer()}) ->
-                              ok | eof | {ok, string() | binary()} | {ok, non_neg_integer()}
-                                 | {error, term()}).
+-type file_op() :: fun((close, file:io_device()) -> ok | {error, term()})
+                 | fun((position, {file:io_device(), file:location()}) -> {ok, integer()} | {error, term()})
+                 | fun((read2, {file:io_device(), non_neg_integer()}) -> {ok, string() | binary()} | eof | {error, term()})
+                 | fun((write, {file:io_device(), iodata()}) -> ok | {error, term()}).
 
 %% These constants (except S_IFMT) are
 %% used to determine what type of device

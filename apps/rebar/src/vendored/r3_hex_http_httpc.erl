@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.19.0, do not edit manually
+%% Vendored from hex_core v0.20.0, do not edit manually
 
 %% @doc
 %% httpc-based implementation of {@link r3_hex_http} contract.
@@ -10,11 +10,18 @@
 %%    options on profiles.
 %%
 %% * `http_options' - a list of HTTP options, defaults to `[]'. See
-%%   {@link httpc:request/5} for a list of available HTTP options.
+%%   {@link httpc:request/5} for a list of available HTTP options. Without
+%%   an `{ssl, SslOpts}' option, HTTPS requests verify the server certificate
+%%   against the CA certificates from `public_key:cacerts_get/0', and fail with
+%%   `{error, {cacerts_unavailable, Reason}}' when those can't be loaded,
+%%   which is always the case on OTP 24.
 
 -module(r3_hex_http_httpc).
 -behaviour(r3_hex_http).
 -export([request/5, request_to_file/6]).
+-ifdef(TEST).
+-export([http_options/3]).
+-endif.
 
 %%====================================================================
 %% API functions
@@ -22,31 +29,39 @@
 
 request(Method, URI, ReqHeaders, Body, AdapterConfig) when is_binary(URI) ->
     Profile = maps:get(profile, AdapterConfig, default),
-    HTTPOptions = http_options(URI, AdapterConfig),
-    Request = build_request(URI, ReqHeaders, Body),
-    case httpc:request(Method, Request, HTTPOptions, [{body_format, binary}], Profile) of
-        {ok, {{_, StatusCode, _}, RespHeaders, RespBody}} ->
-            RespHeaders2 = load_headers(RespHeaders),
-            {ok, {StatusCode, RespHeaders2, RespBody}};
+    case http_options(URI, AdapterConfig) of
+        {ok, HTTPOptions} ->
+            Request = build_request(URI, ReqHeaders, Body),
+            case httpc:request(Method, Request, HTTPOptions, [{body_format, binary}], Profile) of
+                {ok, {{_, StatusCode, _}, RespHeaders, RespBody}} ->
+                    RespHeaders2 = load_headers(RespHeaders),
+                    {ok, {StatusCode, RespHeaders2, RespBody}};
+                {error, Reason} ->
+                    {error, Reason}
+            end;
         {error, Reason} ->
             {error, Reason}
     end.
 
 request_to_file(Method, URI, ReqHeaders, Body, Filename, AdapterConfig) when is_binary(URI) ->
     Profile = maps:get(profile, AdapterConfig, default),
-    HTTPOptions = http_options(URI, AdapterConfig),
-    Request = build_request(URI, ReqHeaders, Body),
-    case
-        httpc:request(
-            Method,
-            Request,
-            HTTPOptions,
-            [{sync, false}, {stream, self}],
-            Profile
-        )
-    of
-        {ok, RequestId} ->
-            stream_to_file(RequestId, Filename);
+    case http_options(URI, AdapterConfig) of
+        {ok, HTTPOptions} ->
+            Request = build_request(URI, ReqHeaders, Body),
+            case
+                httpc:request(
+                    Method,
+                    Request,
+                    HTTPOptions,
+                    [{sync, false}, {stream, self}],
+                    Profile
+                )
+            of
+                {ok, RequestId} ->
+                    stream_to_file(RequestId, Filename);
+                {error, Reason} ->
+                    {error, Reason}
+            end;
         {error, Reason} ->
             {error, Reason}
     end.
@@ -90,41 +105,49 @@ stream_body(RequestId, File) ->
 
 %% @private
 http_options(URI, AdapterConfig) ->
+    http_options(URI, AdapterConfig, fun public_key:cacerts_get/0).
+
+%% @private
+%% Requests that aren't plain HTTP verify the server certificate unless
+%% http_options has an ssl option list. httpc reads the scheme without
+%% regard to case. Without the CA certificates the request fails, because
+%% httpc's ssl defaults before OTP 26 don't verify the server certificate.
+http_options(URI, AdapterConfig, GetCACerts) ->
     HTTPOptions0 = maps:get(http_options, AdapterConfig, []),
 
-    HTTPS =
-        case URI of
-            <<"https", _/binary>> -> true;
-            _ -> false
-        end,
-    SSLOpts0 = proplists:get_value(ssl, HTTPOptions0),
-
-    if
-        HTTPS == true andalso SSLOpts0 == undefined ->
-            try
-                [
-                    {ssl, [
+    case plain_http(URI) orelse has_ssl_options(HTTPOptions0) of
+        true ->
+            {ok, HTTPOptions0};
+        false ->
+            try GetCACerts() of
+                CACerts ->
+                    SSLOpts = [
                         {verify, verify_peer},
-                        {cacerts, public_key:cacerts_get()},
+                        {cacerts, CACerts},
                         {depth, 3},
                         {customize_hostname_check, [
                             {match_fun, public_key:pkix_verify_hostname_match_fun(https)}
                         ]}
-                    ]}
-                    | HTTPOptions0
-                ]
+                    ],
+                    {ok, [{ssl, SSLOpts} | proplists:delete(ssl, HTTPOptions0)]}
             catch
-                _:_ ->
-                    io:format(
-                        "[r3_hex_http_httpc] using default ssl options which are insecure.~n"
-                        "Configure your adapter with: "
-                        "{r3_hex_http_httpc, #{http_options => [{ssl, SslOpts}]}}~n"
-                        "or upgrade Erlang/OTP to OTP-25 or later.~n"
-                    ),
-                    HTTPOptions0
-            end;
-        true ->
-            HTTPOptions0
+                _:Reason ->
+                    {error, {cacerts_unavailable, Reason}}
+            end
+    end.
+
+%% @private
+plain_http(URI) ->
+    case uri_string:parse(URI) of
+        #{scheme := Scheme} -> string:lowercase(Scheme) =:= <<"http">>;
+        _ -> false
+    end.
+
+%% @private
+has_ssl_options(HTTPOptions) ->
+    case lists:keyfind(ssl, 1, HTTPOptions) of
+        {ssl, SSLOpts} when is_list(SSLOpts) -> true;
+        _ -> false
     end.
 
 %% @private

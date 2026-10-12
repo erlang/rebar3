@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.19.0, do not edit manually
+%% Vendored from hex_core v0.20.0, do not edit manually
 
 %% @doc
 %% Repo API.
@@ -319,10 +319,14 @@ get_protobuf(Config, Path, Decoder) ->
 
     case get(Config, build_url(Config, Path), ReqHeaders) of
         {ok, {200, RespHeaders, Compressed}} ->
-            Signed = zlib:gunzip(Compressed),
-            case decode(Signed, PublicKey, Decoder, Config) of
-                {ok, Decoded} ->
-                    {ok, {200, RespHeaders, Decoded}};
+            case r3_hex_registry:gunzip(Compressed, registry_max_uncompressed_size(Config)) of
+                {ok, Signed} ->
+                    case decode(Signed, PublicKey, Decoder, Config) of
+                        {ok, Decoded} ->
+                            {ok, {200, RespHeaders, Decoded}};
+                        {error, _} = Error ->
+                            Error
+                    end;
                 {error, _} = Error ->
                     Error
             end;
@@ -346,6 +350,13 @@ decode(Signed, PublicKey, Decoder, Config) ->
             #{payload := Payload} = r3_hex_registry:decode_signed(Signed),
             Decoder(Payload)
     end.
+
+%% @private
+%% Configs aren't always built from r3_hex_core:default_config/0, for example
+%% rebar3 builds configs for custom repositories from the user's settings
+registry_max_uncompressed_size(Config) ->
+    Default = maps:get(registry_max_uncompressed_size, r3_hex_core:default_config()),
+    maps:get(registry_max_uncompressed_size, Config, Default).
 
 %% @private
 verify_repo(Config) ->

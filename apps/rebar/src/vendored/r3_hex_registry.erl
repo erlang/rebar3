@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.19.0, do not edit manually
+%% Vendored from hex_core v0.20.0, do not edit manually
 
 %% @doc
 %% Functions for encoding and decoding Hex registries.
@@ -21,6 +21,7 @@
     build_policy/2,
     unpack_policy/4,
     sign_protobuf/2,
+    gunzip/2,
     decode_signed/1,
     decode_and_verify_signed/2,
     sign/2,
@@ -44,7 +45,7 @@ build_names(Names, PrivateKey) ->
 %% @doc
 %% Unpacks names resource.
 unpack_names(Payload, Repository, PublicKey) ->
-    case decode_and_verify_signed(zlib:gunzip(Payload), PublicKey) of
+    case gunzip_and_verify(Payload, PublicKey) of
         {ok, Names} -> decode_names(Names, Repository);
         Other -> Other
     end.
@@ -73,7 +74,7 @@ build_versions(Versions, PrivateKey) ->
 %% @doc
 %% Unpacks versions resource.
 unpack_versions(Payload, Repository, PublicKey) ->
-    case decode_and_verify_signed(zlib:gunzip(Payload), PublicKey) of
+    case gunzip_and_verify(Payload, PublicKey) of
         {ok, Versions} -> decode_versions(Versions, Repository);
         Other -> Other
     end.
@@ -102,7 +103,7 @@ build_package(Package, PrivateKey) ->
 %% @doc
 %% Unpacks package resource.
 unpack_package(Payload, Repository, Name, PublicKey) ->
-    case decode_and_verify_signed(zlib:gunzip(Payload), PublicKey) of
+    case gunzip_and_verify(Payload, PublicKey) of
         {ok, Package} -> decode_package(Package, Repository, Name);
         Other -> Other
     end.
@@ -131,7 +132,7 @@ build_policy(Policy, PrivateKey) ->
 %% @doc
 %% Unpacks policy resource.
 unpack_policy(Payload, Repository, Name, PublicKey) ->
-    case decode_and_verify_signed(zlib:gunzip(Payload), PublicKey) of
+    case gunzip_and_verify(Payload, PublicKey) of
         {ok, Policy} -> decode_policy(Policy, Repository, Name);
         Other -> Other
     end.
@@ -155,6 +156,21 @@ decode_policy(Payload, Repository, Name) ->
 sign_protobuf(Payload, PrivateKey) ->
     Signature = sign(Payload, PrivateKey),
     r3_hex_pb_signed:encode_msg(#{payload => Payload, signature => Signature}, 'Signed').
+
+%% @private
+%% Decompresses a gzipped registry resource, stopping as soon as the output
+%% exceeds `MaxSize' bytes. Registry resources are decompressed before their
+%% signature is verified, so the limit applies to unauthenticated data.
+-spec gunzip(binary(), pos_integer() | infinity) ->
+    {ok, binary()} | {error, {too_big_uncompressed, pos_integer()}}.
+gunzip(Compressed, MaxSize) ->
+    Z = zlib:open(),
+    try
+        ok = zlib:inflateInit(Z, 31, reset),
+        gunzip_loop(Z, zlib:safeInflate(Z, Compressed), MaxSize, <<>>)
+    after
+        zlib:close(Z)
+    end.
 
 %% @private
 decode_signed(Signed) ->
@@ -187,6 +203,39 @@ verify(Binary, Signature, PublicKey) ->
 %%====================================================================
 %% Internal functions
 %%====================================================================
+
+%% @private
+gunzip_and_verify(Payload, PublicKey) ->
+    MaxSize = maps:get(registry_max_uncompressed_size, r3_hex_core:default_config()),
+    case gunzip(Payload, MaxSize) of
+        {ok, Signed} -> decode_and_verify_signed(Signed, PublicKey);
+        {error, _} = Error -> Error
+    end.
+
+%% @private
+%% Each output is appended to one binary, which the runtime grows in place,
+%% so memory use follows the output size however many gzip members the input
+%% has, and the binary is returned without another copy
+gunzip_loop(Z, {Status, Output}, MaxSize, Acc0) ->
+    Acc = gunzip_append(Output, Acc0),
+    case is_integer(MaxSize) andalso byte_size(Acc) > MaxSize of
+        true ->
+            {error, {too_big_uncompressed, MaxSize}};
+        false when Status =:= continue ->
+            gunzip_loop(Z, zlib:safeInflate(Z, []), MaxSize, Acc);
+        false when Status =:= finished ->
+            %% Raises data_error when the input ends before the gzip stream does
+            zlib:inflateEnd(Z),
+            {ok, Acc}
+    end.
+
+%% @private
+gunzip_append([], Acc) ->
+    Acc;
+gunzip_append([Output | Rest], Acc) ->
+    gunzip_append(Rest, gunzip_append(Output, Acc));
+gunzip_append(Output, Acc) when is_binary(Output) ->
+    <<Acc/binary, Output/binary>>.
 
 %% @private
 key(#'RSAPublicKey'{} = Key) ->

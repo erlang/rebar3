@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.19.0, do not edit manually
+%% Vendored from hex_core v0.20.0, do not edit manually
 
 %% -*- coding: utf-8 -*-
 %% % this file is @generated
@@ -56,7 +56,7 @@
 
 %% enumerated types
 -type 'Visibility'() :: 'VISIBILITY_PRIVATE' | 'VISIBILITY_PUBLIC'.
--type 'OverrideAction'() :: 'OVERRIDE_ACTION_ALLOW' | 'OVERRIDE_ACTION_DENY'.
+-type 'OverrideAction'() :: 'OVERRIDE_ACTION_ALLOW' | 'OVERRIDE_ACTION_DENY' | 'OVERRIDE_ACTION_ADVISORY' | 'OVERRIDE_ACTION_RETIREMENT' | 'OVERRIDE_ACTION_COOLDOWN'.
 -type 'RetirementReason'() :: 'RETIRED_OTHER' | 'RETIRED_INVALID' | 'RETIRED_SECURITY' | 'RETIRED_DEPRECATED' | 'RETIRED_RENAMED'.
 -type 'AdvisorySeverity'() :: 'SEVERITY_NONE' | 'SEVERITY_LOW' | 'SEVERITY_MEDIUM' | 'SEVERITY_HIGH' | 'SEVERITY_CRITICAL'.
 -export_type(['Visibility'/0, 'OverrideAction'/0, 'RetirementReason'/0, 'AdvisorySeverity'/0]).
@@ -88,8 +88,11 @@
        }.
 
 -type 'Override'() ::
-      #{action                  => 'OVERRIDE_ACTION_ALLOW' | 'OVERRIDE_ACTION_DENY' | integer(), % = 1, required, enum OverrideAction
-        ref                     => 'PackageRef'()   % = 2, required
+      #{action                  => 'OVERRIDE_ACTION_ALLOW' | 'OVERRIDE_ACTION_DENY' | 'OVERRIDE_ACTION_ADVISORY' | 'OVERRIDE_ACTION_RETIREMENT' | 'OVERRIDE_ACTION_COOLDOWN' | integer(), % = 1, required, enum OverrideAction
+        ref                     => 'PackageRef'(),  % = 2, required
+        advisory_id             => unicode:chardata(), % = 3, optional
+        retirement_reason       => 'RETIRED_OTHER' | 'RETIRED_INVALID' | 'RETIRED_SECURITY' | 'RETIRED_DEPRECATED' | 'RETIRED_RENAMED' | integer(), % = 4, optional, enum RetirementReason
+        comment                 => unicode:chardata() % = 5, optional
        }.
 
 -type 'Package'() ::
@@ -242,9 +245,21 @@ encode_msg_PackageRef(#{package := F1} = M, Bin, TrUserData) ->
 encode_msg_Override(Msg, TrUserData) -> encode_msg_Override(Msg, <<>>, TrUserData).
 
 
-encode_msg_Override(#{action := F1, ref := F2}, Bin, TrUserData) ->
+encode_msg_Override(#{action := F1, ref := F2} = M, Bin, TrUserData) ->
     B1 = begin TrF1 = id(F1, TrUserData), e_enum_OverrideAction(TrF1, <<Bin/binary, 8>>, TrUserData) end,
-    begin TrF2 = id(F2, TrUserData), e_mfield_Override_ref(TrF2, <<B1/binary, 18>>, TrUserData) end.
+    B2 = begin TrF2 = id(F2, TrUserData), e_mfield_Override_ref(TrF2, <<B1/binary, 18>>, TrUserData) end,
+    B3 = case M of
+             #{advisory_id := F3} -> begin TrF3 = id(F3, TrUserData), e_type_string(TrF3, <<B2/binary, 26>>, TrUserData) end;
+             _ -> B2
+         end,
+    B4 = case M of
+             #{retirement_reason := F4} -> begin TrF4 = id(F4, TrUserData), e_enum_RetirementReason(TrF4, <<B3/binary, 32>>, TrUserData) end;
+             _ -> B3
+         end,
+    case M of
+        #{comment := F5} -> begin TrF5 = id(F5, TrUserData), e_type_string(TrF5, <<B4/binary, 42>>, TrUserData) end;
+        _ -> B4
+    end.
 
 encode_msg_Package(Msg, TrUserData) -> encode_msg_Package(Msg, <<>>, TrUserData).
 
@@ -470,6 +485,9 @@ e_enum_Visibility(V, Bin, _TrUserData) -> e_varint(V, Bin).
 
 e_enum_OverrideAction('OVERRIDE_ACTION_ALLOW', Bin, _TrUserData) -> <<Bin/binary, 0>>;
 e_enum_OverrideAction('OVERRIDE_ACTION_DENY', Bin, _TrUserData) -> <<Bin/binary, 1>>;
+e_enum_OverrideAction('OVERRIDE_ACTION_ADVISORY', Bin, _TrUserData) -> <<Bin/binary, 2>>;
+e_enum_OverrideAction('OVERRIDE_ACTION_RETIREMENT', Bin, _TrUserData) -> <<Bin/binary, 3>>;
+e_enum_OverrideAction('OVERRIDE_ACTION_COOLDOWN', Bin, _TrUserData) -> <<Bin/binary, 4>>;
 e_enum_OverrideAction(V, Bin, _TrUserData) -> e_varint(V, Bin).
 
 e_enum_RetirementReason('RETIRED_OTHER', Bin, _TrUserData) -> <<Bin/binary, 0>>;
@@ -935,45 +953,69 @@ skip_32_PackageRef(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> 
 
 skip_64_PackageRef(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dfp_read_field_def_PackageRef(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
 
-decode_msg_Override(Bin, TrUserData) -> dfp_read_field_def_Override(Bin, 0, 0, 0, id('$undef', TrUserData), id('$undef', TrUserData), TrUserData).
+decode_msg_Override(Bin, TrUserData) -> dfp_read_field_def_Override(Bin, 0, 0, 0, id('$undef', TrUserData), id('$undef', TrUserData), id('$undef', TrUserData), id('$undef', TrUserData), id('$undef', TrUserData), TrUserData).
 
-dfp_read_field_def_Override(<<8, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> d_field_Override_action(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
-dfp_read_field_def_Override(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> d_field_Override_ref(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
-dfp_read_field_def_Override(<<>>, 0, 0, _, F@_1, F@_2, _) ->
+dfp_read_field_def_Override(<<8, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_Override_action(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+dfp_read_field_def_Override(<<18, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_Override_ref(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+dfp_read_field_def_Override(<<26, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_Override_advisory_id(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+dfp_read_field_def_Override(<<32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_Override_retirement_reason(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+dfp_read_field_def_Override(<<42, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> d_field_Override_comment(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+dfp_read_field_def_Override(<<>>, 0, 0, _, F@_1, F@_2, F@_3, F@_4, F@_5, _) ->
     S1 = #{action => F@_1},
-    if F@_2 == '$undef' -> S1;
-       true -> S1#{ref => F@_2}
+    S2 = if F@_2 == '$undef' -> S1;
+            true -> S1#{ref => F@_2}
+         end,
+    S3 = if F@_3 == '$undef' -> S2;
+            true -> S2#{advisory_id => F@_3}
+         end,
+    S4 = if F@_4 == '$undef' -> S3;
+            true -> S3#{retirement_reason => F@_4}
+         end,
+    if F@_5 == '$undef' -> S4;
+       true -> S4#{comment => F@_5}
     end;
-dfp_read_field_def_Override(Other, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dg_read_field_def_Override(Other, Z1, Z2, F, F@_1, F@_2, TrUserData).
+dfp_read_field_def_Override(Other, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> dg_read_field_def_Override(Other, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
 
-dg_read_field_def_Override(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 32 - 7 -> dg_read_field_def_Override(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
-dg_read_field_def_Override(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, TrUserData) ->
+dg_read_field_def_Override(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 32 - 7 -> dg_read_field_def_Override(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+dg_read_field_def_Override(<<0:1, X:7, Rest/binary>>, N, Acc, _, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) ->
     Key = X bsl N + Acc,
     case Key of
-        8 -> d_field_Override_action(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
-        18 -> d_field_Override_ref(Rest, 0, 0, 0, F@_1, F@_2, TrUserData);
+        8 -> d_field_Override_action(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+        18 -> d_field_Override_ref(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+        26 -> d_field_Override_advisory_id(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+        32 -> d_field_Override_retirement_reason(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+        42 -> d_field_Override_comment(Rest, 0, 0, 0, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
         _ ->
             case Key band 7 of
-                0 -> skip_varint_Override(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
-                1 -> skip_64_Override(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
-                2 -> skip_length_delimited_Override(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
-                3 -> skip_group_Override(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData);
-                5 -> skip_32_Override(Rest, 0, 0, Key bsr 3, F@_1, F@_2, TrUserData)
+                0 -> skip_varint_Override(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+                1 -> skip_64_Override(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+                2 -> skip_length_delimited_Override(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+                3 -> skip_group_Override(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+                5 -> skip_32_Override(Rest, 0, 0, Key bsr 3, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData)
             end
     end;
-dg_read_field_def_Override(<<>>, 0, 0, _, F@_1, F@_2, _) ->
+dg_read_field_def_Override(<<>>, 0, 0, _, F@_1, F@_2, F@_3, F@_4, F@_5, _) ->
     S1 = #{action => F@_1},
-    if F@_2 == '$undef' -> S1;
-       true -> S1#{ref => F@_2}
+    S2 = if F@_2 == '$undef' -> S1;
+            true -> S1#{ref => F@_2}
+         end,
+    S3 = if F@_3 == '$undef' -> S2;
+            true -> S2#{advisory_id => F@_3}
+         end,
+    S4 = if F@_4 == '$undef' -> S3;
+            true -> S3#{retirement_reason => F@_4}
+         end,
+    if F@_5 == '$undef' -> S4;
+       true -> S4#{comment => F@_5}
     end.
 
-d_field_Override_action(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> d_field_Override_action(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
-d_field_Override_action(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, TrUserData) ->
+d_field_Override_action(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_Override_action(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+d_field_Override_action(<<0:1, X:7, Rest/binary>>, N, Acc, F, _, F@_2, F@_3, F@_4, F@_5, TrUserData) ->
     {NewFValue, RestF} = {id(d_enum_OverrideAction(begin <<Res:32/signed-native>> = <<(X bsl N + Acc):32/unsigned-native>>, id(Res, TrUserData) end), TrUserData), Rest},
-    dfp_read_field_def_Override(RestF, 0, 0, F, NewFValue, F@_2, TrUserData).
+    dfp_read_field_def_Override(RestF, 0, 0, F, NewFValue, F@_2, F@_3, F@_4, F@_5, TrUserData).
 
-d_field_Override_ref(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> d_field_Override_ref(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
-d_field_Override_ref(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, TrUserData) ->
+d_field_Override_ref(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_Override_ref(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+d_field_Override_ref(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, F@_3, F@_4, F@_5, TrUserData) ->
     {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bs:Len/binary, Rest2/binary>> = Rest, {id(decode_msg_PackageRef(Bs, TrUserData), TrUserData), Rest2} end,
     dfp_read_field_def_Override(RestF,
                                 0,
@@ -983,24 +1025,42 @@ d_field_Override_ref(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, Prev, TrUserDat
                                 if Prev == '$undef' -> NewFValue;
                                    true -> merge_msg_PackageRef(Prev, NewFValue, TrUserData)
                                 end,
+                                F@_3,
+                                F@_4,
+                                F@_5,
                                 TrUserData).
 
-skip_varint_Override(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> skip_varint_Override(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData);
-skip_varint_Override(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dfp_read_field_def_Override(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+d_field_Override_advisory_id(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_Override_advisory_id(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+d_field_Override_advisory_id(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, _, F@_4, F@_5, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
+    dfp_read_field_def_Override(RestF, 0, 0, F, F@_1, F@_2, NewFValue, F@_4, F@_5, TrUserData).
 
-skip_length_delimited_Override(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) when N < 57 -> skip_length_delimited_Override(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, TrUserData);
-skip_length_delimited_Override(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, TrUserData) ->
+d_field_Override_retirement_reason(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_Override_retirement_reason(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+d_field_Override_retirement_reason(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, _, F@_5, TrUserData) ->
+    {NewFValue, RestF} = {id(d_enum_RetirementReason(begin <<Res:32/signed-native>> = <<(X bsl N + Acc):32/unsigned-native>>, id(Res, TrUserData) end), TrUserData), Rest},
+    dfp_read_field_def_Override(RestF, 0, 0, F, F@_1, F@_2, F@_3, NewFValue, F@_5, TrUserData).
+
+d_field_Override_comment(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> d_field_Override_comment(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+d_field_Override_comment(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, _, TrUserData) ->
+    {NewFValue, RestF} = begin Len = X bsl N + Acc, <<Bytes:Len/binary, Rest2/binary>> = Rest, Bytes2 = binary:copy(Bytes), {id(Bytes2, TrUserData), Rest2} end,
+    dfp_read_field_def_Override(RestF, 0, 0, F, F@_1, F@_2, F@_3, F@_4, NewFValue, TrUserData).
+
+skip_varint_Override(<<1:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> skip_varint_Override(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+skip_varint_Override(<<0:1, _:7, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> dfp_read_field_def_Override(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
+
+skip_length_delimited_Override(<<1:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) when N < 57 -> skip_length_delimited_Override(Rest, N + 7, X bsl N + Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData);
+skip_length_delimited_Override(<<0:1, X:7, Rest/binary>>, N, Acc, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) ->
     Length = X bsl N + Acc,
     <<_:Length/binary, Rest2/binary>> = Rest,
-    dfp_read_field_def_Override(Rest2, 0, 0, F, F@_1, F@_2, TrUserData).
+    dfp_read_field_def_Override(Rest2, 0, 0, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
 
-skip_group_Override(Bin, _, Z2, FNum, F@_1, F@_2, TrUserData) ->
+skip_group_Override(Bin, _, Z2, FNum, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) ->
     {_, Rest} = read_group(Bin, FNum),
-    dfp_read_field_def_Override(Rest, 0, Z2, FNum, F@_1, F@_2, TrUserData).
+    dfp_read_field_def_Override(Rest, 0, Z2, FNum, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
 
-skip_32_Override(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dfp_read_field_def_Override(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+skip_32_Override(<<_:32, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> dfp_read_field_def_Override(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
 
-skip_64_Override(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, TrUserData) -> dfp_read_field_def_Override(Rest, Z1, Z2, F, F@_1, F@_2, TrUserData).
+skip_64_Override(<<_:64, Rest/binary>>, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData) -> dfp_read_field_def_Override(Rest, Z1, Z2, F, F@_1, F@_2, F@_3, F@_4, F@_5, TrUserData).
 
 decode_msg_Package(Bin, TrUserData) -> dfp_read_field_def_Package(Bin, 0, 0, 0, id([], TrUserData), id('$undef', TrUserData), id('$undef', TrUserData), id([], TrUserData), TrUserData).
 
@@ -1560,6 +1620,9 @@ d_enum_Visibility(V) -> V.
 
 d_enum_OverrideAction(0) -> 'OVERRIDE_ACTION_ALLOW';
 d_enum_OverrideAction(1) -> 'OVERRIDE_ACTION_DENY';
+d_enum_OverrideAction(2) -> 'OVERRIDE_ACTION_ADVISORY';
+d_enum_OverrideAction(3) -> 'OVERRIDE_ACTION_RETIREMENT';
+d_enum_OverrideAction(4) -> 'OVERRIDE_ACTION_COOLDOWN';
 d_enum_OverrideAction(V) -> V.
 
 d_enum_RetirementReason(0) -> 'RETIRED_OTHER';
@@ -1713,7 +1776,23 @@ merge_msg_PackageRef(#{} = PMsg, #{package := NFpackage} = NMsg, _) ->
     end.
 
 -compile({nowarn_unused_function,merge_msg_Override/3}).
-merge_msg_Override(#{ref := PFref}, #{action := NFaction, ref := NFref}, TrUserData) -> #{action => NFaction, ref => merge_msg_PackageRef(PFref, NFref, TrUserData)}.
+merge_msg_Override(#{ref := PFref} = PMsg, #{action := NFaction, ref := NFref} = NMsg, TrUserData) ->
+    S1 = #{action => NFaction, ref => merge_msg_PackageRef(PFref, NFref, TrUserData)},
+    S2 = case {PMsg, NMsg} of
+             {_, #{advisory_id := NFadvisory_id}} -> S1#{advisory_id => NFadvisory_id};
+             {#{advisory_id := PFadvisory_id}, _} -> S1#{advisory_id => PFadvisory_id};
+             _ -> S1
+         end,
+    S3 = case {PMsg, NMsg} of
+             {_, #{retirement_reason := NFretirement_reason}} -> S2#{retirement_reason => NFretirement_reason};
+             {#{retirement_reason := PFretirement_reason}, _} -> S2#{retirement_reason => PFretirement_reason};
+             _ -> S2
+         end,
+    case {PMsg, NMsg} of
+        {_, #{comment := NFcomment}} -> S3#{comment => NFcomment};
+        {#{comment := PFcomment}, _} -> S3#{comment => PFcomment};
+        _ -> S3
+    end.
 
 -compile({nowarn_unused_function,merge_msg_Package/3}).
 merge_msg_Package(#{} = PMsg, #{name := NFname, repository := NFrepository} = NMsg, TrUserData) ->
@@ -1962,8 +2041,23 @@ v_submsg_Override(Msg, Path, TrUserData) -> v_msg_Override(Msg, Path, TrUserData
 v_msg_Override(#{action := F1, ref := F2} = M, Path, TrUserData) ->
     v_enum_OverrideAction(F1, [action | Path], TrUserData),
     v_submsg_PackageRef(F2, [ref | Path], TrUserData),
+    case M of
+        #{advisory_id := F3} -> v_type_string(F3, [advisory_id | Path], TrUserData);
+        _ -> ok
+    end,
+    case M of
+        #{retirement_reason := F4} -> v_enum_RetirementReason(F4, [retirement_reason | Path], TrUserData);
+        _ -> ok
+    end,
+    case M of
+        #{comment := F5} -> v_type_string(F5, [comment | Path], TrUserData);
+        _ -> ok
+    end,
     lists:foreach(fun (action) -> ok;
                       (ref) -> ok;
+                      (advisory_id) -> ok;
+                      (retirement_reason) -> ok;
+                      (comment) -> ok;
                       (OtherKey) -> mk_type_error({extraneous_key, OtherKey}, M, Path)
                   end,
                   maps:keys(M)),
@@ -2183,6 +2277,9 @@ v_enum_Visibility(X, Path, _TrUserData) -> mk_type_error({invalid_enum, 'Visibil
 -dialyzer({nowarn_function,v_enum_OverrideAction/3}).
 v_enum_OverrideAction('OVERRIDE_ACTION_ALLOW', _Path, _TrUserData) -> ok;
 v_enum_OverrideAction('OVERRIDE_ACTION_DENY', _Path, _TrUserData) -> ok;
+v_enum_OverrideAction('OVERRIDE_ACTION_ADVISORY', _Path, _TrUserData) -> ok;
+v_enum_OverrideAction('OVERRIDE_ACTION_RETIREMENT', _Path, _TrUserData) -> ok;
+v_enum_OverrideAction('OVERRIDE_ACTION_COOLDOWN', _Path, _TrUserData) -> ok;
 v_enum_OverrideAction(V, _Path, _TrUserData) when -2147483648 =< V, V =< 2147483647, is_integer(V) -> ok;
 v_enum_OverrideAction(X, Path, _TrUserData) -> mk_type_error({invalid_enum, 'OverrideAction'}, X, Path).
 
@@ -2297,7 +2394,7 @@ cons(Elem, Acc, _TrUserData) -> [Elem | Acc].
 
 get_msg_defs() ->
     [{{enum, 'Visibility'}, [{'VISIBILITY_PRIVATE', 0}, {'VISIBILITY_PUBLIC', 1}]},
-     {{enum, 'OverrideAction'}, [{'OVERRIDE_ACTION_ALLOW', 0}, {'OVERRIDE_ACTION_DENY', 1}]},
+     {{enum, 'OverrideAction'}, [{'OVERRIDE_ACTION_ALLOW', 0}, {'OVERRIDE_ACTION_DENY', 1}, {'OVERRIDE_ACTION_ADVISORY', 2}, {'OVERRIDE_ACTION_RETIREMENT', 3}, {'OVERRIDE_ACTION_COOLDOWN', 4}]},
      {{enum, 'RetirementReason'}, [{'RETIRED_OTHER', 0}, {'RETIRED_INVALID', 1}, {'RETIRED_SECURITY', 2}, {'RETIRED_DEPRECATED', 3}, {'RETIRED_RENAMED', 4}]},
      {{enum, 'AdvisorySeverity'}, [{'SEVERITY_NONE', 0}, {'SEVERITY_LOW', 1}, {'SEVERITY_MEDIUM', 2}, {'SEVERITY_HIGH', 3}, {'SEVERITY_CRITICAL', 4}]},
      {{msg, 'Policy'},
@@ -2315,7 +2412,12 @@ get_msg_defs() ->
        #{name => retirement_reasons, fnum => 2, rnum => 3, type => {enum, 'RetirementReason'}, occurrence => repeated, opts => [packed]},
        #{name => cooldown, fnum => 3, rnum => 4, type => string, occurrence => optional, opts => []}]},
      {{msg, 'PackageRef'}, [#{name => package, fnum => 1, rnum => 2, type => string, occurrence => required, opts => []}, #{name => requirement, fnum => 2, rnum => 3, type => string, occurrence => optional, opts => []}]},
-     {{msg, 'Override'}, [#{name => action, fnum => 1, rnum => 2, type => {enum, 'OverrideAction'}, occurrence => required, opts => []}, #{name => ref, fnum => 2, rnum => 3, type => {msg, 'PackageRef'}, occurrence => required, opts => []}]},
+     {{msg, 'Override'},
+      [#{name => action, fnum => 1, rnum => 2, type => {enum, 'OverrideAction'}, occurrence => required, opts => []},
+       #{name => ref, fnum => 2, rnum => 3, type => {msg, 'PackageRef'}, occurrence => required, opts => []},
+       #{name => advisory_id, fnum => 3, rnum => 4, type => string, occurrence => optional, opts => []},
+       #{name => retirement_reason, fnum => 4, rnum => 5, type => {enum, 'RetirementReason'}, occurrence => optional, opts => []},
+       #{name => comment, fnum => 5, rnum => 6, type => string, occurrence => optional, opts => []}]},
      {{msg, 'Package'},
       [#{name => releases, fnum => 1, rnum => 2, type => {msg, 'Release'}, occurrence => repeated, opts => []},
        #{name => name, fnum => 2, rnum => 3, type => string, occurrence => required, opts => []},
@@ -2388,7 +2490,12 @@ find_msg_def('Restriction') ->
      #{name => retirement_reasons, fnum => 2, rnum => 3, type => {enum, 'RetirementReason'}, occurrence => repeated, opts => [packed]},
      #{name => cooldown, fnum => 3, rnum => 4, type => string, occurrence => optional, opts => []}];
 find_msg_def('PackageRef') -> [#{name => package, fnum => 1, rnum => 2, type => string, occurrence => required, opts => []}, #{name => requirement, fnum => 2, rnum => 3, type => string, occurrence => optional, opts => []}];
-find_msg_def('Override') -> [#{name => action, fnum => 1, rnum => 2, type => {enum, 'OverrideAction'}, occurrence => required, opts => []}, #{name => ref, fnum => 2, rnum => 3, type => {msg, 'PackageRef'}, occurrence => required, opts => []}];
+find_msg_def('Override') ->
+    [#{name => action, fnum => 1, rnum => 2, type => {enum, 'OverrideAction'}, occurrence => required, opts => []},
+     #{name => ref, fnum => 2, rnum => 3, type => {msg, 'PackageRef'}, occurrence => required, opts => []},
+     #{name => advisory_id, fnum => 3, rnum => 4, type => string, occurrence => optional, opts => []},
+     #{name => retirement_reason, fnum => 4, rnum => 5, type => {enum, 'RetirementReason'}, occurrence => optional, opts => []},
+     #{name => comment, fnum => 5, rnum => 6, type => string, occurrence => optional, opts => []}];
 find_msg_def('Package') ->
     [#{name => releases, fnum => 1, rnum => 2, type => {msg, 'Release'}, occurrence => repeated, opts => []},
      #{name => name, fnum => 2, rnum => 3, type => string, occurrence => required, opts => []},
@@ -2422,7 +2529,7 @@ find_msg_def(_) -> error.
 
 
 find_enum_def('Visibility') -> [{'VISIBILITY_PRIVATE', 0}, {'VISIBILITY_PUBLIC', 1}];
-find_enum_def('OverrideAction') -> [{'OVERRIDE_ACTION_ALLOW', 0}, {'OVERRIDE_ACTION_DENY', 1}];
+find_enum_def('OverrideAction') -> [{'OVERRIDE_ACTION_ALLOW', 0}, {'OVERRIDE_ACTION_DENY', 1}, {'OVERRIDE_ACTION_ADVISORY', 2}, {'OVERRIDE_ACTION_RETIREMENT', 3}, {'OVERRIDE_ACTION_COOLDOWN', 4}];
 find_enum_def('RetirementReason') -> [{'RETIRED_OTHER', 0}, {'RETIRED_INVALID', 1}, {'RETIRED_SECURITY', 2}, {'RETIRED_DEPRECATED', 3}, {'RETIRED_RENAMED', 4}];
 find_enum_def('AdvisorySeverity') -> [{'SEVERITY_NONE', 0}, {'SEVERITY_LOW', 1}, {'SEVERITY_MEDIUM', 2}, {'SEVERITY_HIGH', 3}, {'SEVERITY_CRITICAL', 4}];
 find_enum_def(_) -> error.
@@ -2448,11 +2555,17 @@ enum_value_by_symbol_Visibility('VISIBILITY_PRIVATE') -> 0;
 enum_value_by_symbol_Visibility('VISIBILITY_PUBLIC') -> 1.
 
 enum_symbol_by_value_OverrideAction(0) -> 'OVERRIDE_ACTION_ALLOW';
-enum_symbol_by_value_OverrideAction(1) -> 'OVERRIDE_ACTION_DENY'.
+enum_symbol_by_value_OverrideAction(1) -> 'OVERRIDE_ACTION_DENY';
+enum_symbol_by_value_OverrideAction(2) -> 'OVERRIDE_ACTION_ADVISORY';
+enum_symbol_by_value_OverrideAction(3) -> 'OVERRIDE_ACTION_RETIREMENT';
+enum_symbol_by_value_OverrideAction(4) -> 'OVERRIDE_ACTION_COOLDOWN'.
 
 
 enum_value_by_symbol_OverrideAction('OVERRIDE_ACTION_ALLOW') -> 0;
-enum_value_by_symbol_OverrideAction('OVERRIDE_ACTION_DENY') -> 1.
+enum_value_by_symbol_OverrideAction('OVERRIDE_ACTION_DENY') -> 1;
+enum_value_by_symbol_OverrideAction('OVERRIDE_ACTION_ADVISORY') -> 2;
+enum_value_by_symbol_OverrideAction('OVERRIDE_ACTION_RETIREMENT') -> 3;
+enum_value_by_symbol_OverrideAction('OVERRIDE_ACTION_COOLDOWN') -> 4.
 
 enum_symbol_by_value_RetirementReason(0) -> 'RETIRED_OTHER';
 enum_symbol_by_value_RetirementReason(1) -> 'RETIRED_INVALID';
