@@ -39,7 +39,7 @@ _rebar3 () {
                 ;;
                 (ct)
                     _arguments \
-                        '(--dir)--dir[List of additional directories containing test suites]:test directory:_files -/' \
+                        '(--dir)--dir[Run all test suites in the specified directories]:test directory:_files -/' \
                         '(--suite)--suite[List of test suites to run]:suites' \
                         '(--group)--group[List of test groups to run]:groups' \
                         '(--case)--case[List of test cases to run]:cases' \

@@ -897,7 +897,7 @@ ct_opts(_State) ->
 help(compile_only) ->
     "Compile modules in the project with the test configuration but do not run the tests";
 help(dir) ->
-    "List of additional directories containing test suites";
+    "Run all test suites in the specified directories";
 help(suite) ->
     "List of test suites to run";
 help(group) ->
