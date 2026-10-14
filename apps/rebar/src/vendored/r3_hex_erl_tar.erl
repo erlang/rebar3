@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.20.0, do not edit manually
+%% Vendored from hex_core v0.20.1, do not edit manually
 
 %% This file is a copy of erl_tar.erl from OTP with the following modifications:
 %% 1. Module renamed from erl_tar to r3_hex_erl_tar
@@ -20,13 +20,13 @@
 %%     so it reads concatenated gzip members like file input opened with
 %%     compressed does
 %%
-%% OTP commit: ad05823719d77c8faee87348ea39513d4e2f99c5 (OTP-29.1.1)
+%% OTP commit: d199a49a01a2079afb6f2c5c9ae047cd4555e68d (OTP-29.1.2)
 %%
 %% %CopyrightBegin%
 %%
 %% SPDX-License-Identifier: Apache-2.0
 %%
-%% Copyright Ericsson AB 1997-2025. All Rights Reserved.
+%% Copyright Ericsson AB 1997-2026. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -2088,6 +2088,8 @@ do_read(#reader{pos=Pos,handle=Handle,func=Fun}=Reader, Len)
 do_sparse_read(Reader, Len) ->
     do_sparse_read(Reader, Len, <<>>).
 
+do_sparse_read(#sparse_file_reader{}=Reader, 0, Acc) ->
+    {ok, Acc, Reader};
 do_sparse_read(#sparse_file_reader{sparse_map=[#sparse_entry{num_bytes=0}|Entries]
                                   }=Reader0, Len, Acc) ->
     %% skip all empty fragments
@@ -2103,12 +2105,10 @@ do_sparse_read(#sparse_file_reader{sparse_map=[],
     do_sparse_read(Reader1, Len-byte_size(Bin), <<Acc/binary,Bin/binary>>);
 do_sparse_read(#sparse_file_reader{sparse_map=[]}=Reader, _Len, Acc) ->
     {ok, Acc, Reader};
-do_sparse_read(#sparse_file_reader{}=Reader, 0, Acc) ->
-    {ok, Acc, Reader};
 do_sparse_read(#sparse_file_reader{sparse_map=[#sparse_entry{offset=Offset}|_],
                                    pos=Pos}=Reader0, Len, Acc)
   when Pos < Offset ->
-    {ok, Bin, Reader1} = read_sparse_hole(Reader0, Offset, Offset-Pos),
+    {ok, Bin, Reader1} = read_sparse_hole(Reader0, Offset, Len),
     do_sparse_read(Reader1, Len-byte_size(Bin), <<Acc/binary,Bin/binary>>);
 do_sparse_read(#sparse_file_reader{sparse_map=[Entry|Entries],
                                    pos=Pos}=Reader0, Len, Acc) ->

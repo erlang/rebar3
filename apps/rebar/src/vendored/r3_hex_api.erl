@@ -1,4 +1,4 @@
-%% Vendored from hex_core v0.20.0, do not edit manually
+%% Vendored from hex_core v0.20.1, do not edit manually
 
 %% @doc
 %% Hex HTTP API
@@ -41,18 +41,7 @@ delete(Config, Path) ->
 %% @private
 encode_query_string(List) ->
     Pairs = lists:map(fun({K, V}) -> {to_list(K), to_list(V)} end, List),
-    list_to_binary(compose_query(Pairs)).
-
-%% OTP 21+
-%% @private
--ifdef(OTP_RELEASE).
-compose_query(Pairs) ->
-    uri_string:compose_query(Pairs).
--else.
-compose_query(Pairs) ->
-    String = join("&", lists:map(fun({K, V}) -> K ++ "=" ++ V end, Pairs)),
-    http_uri:encode(String).
--endif.
+    list_to_binary(uri_string:compose_query(Pairs)).
 
 %% @private
 build_repository_path(#{api_repository := Repo}, Path) when is_binary(Repo) ->
@@ -67,26 +56,46 @@ build_organization_path(#{api_organization := undefined}, Path) ->
     Path.
 
 %% @private
+%% Percent-encodes each segment on its own, so a `/' inside a segment stays
+%% inside that segment. The dot segments `.' and `..' are encoded in full
+%% because a server resolves them against the parent path otherwise.
 join_path_segments(Segments) ->
-    iolist_to_binary(recompose(Segments)).
+    iolist_to_binary(lists:join(<<"/">>, lists:map(fun encode_path_segment/1, Segments))).
 
-%% OTP 21+
 %% @private
--ifdef(OTP_RELEASE).
-recompose(Segments) ->
-    Concatenated = join(<<"/">>, Segments),
-    %% uri_string:recompose/1 accepts path segments as a list,
-    %% both strings and binaries
-    uri_string:recompose(#{path => Concatenated}).
+%% Raises `badarg' for a segment that is not valid UTF-8, so every OTP release
+%% rejects the same input.
+encode_path_segment(Segment) ->
+    case unicode:characters_to_binary(Segment) of
+        <<".">> -> <<"%2E">>;
+        <<"..">> -> <<"%2E%2E">>;
+        Binary when is_binary(Binary) -> quote(Binary);
+        _ -> error(badarg, [Segment])
+    end.
+
+-if(?OTP_RELEASE >= 25).
+quote(Segment) ->
+    uri_string:quote(Segment).
 -else.
-recompose(Segments) ->
-    join(<<"/">>, lists:map(fun encode_segment/1, Segments)).
+quote(Segment) ->
+    <<<<(encode_path_byte(Byte))/binary>> || <<Byte>> <= Segment>>.
 
-%% @private
-encode_segment(Binary) when is_binary(Binary) ->
-    encode_segment(binary_to_list(Binary));
-encode_segment(String) when is_list(String) ->
-    http_uri:encode(String).
+%% The unreserved set of RFC 3986 section 2.3.
+encode_path_byte(Byte) when
+    Byte >= $a andalso Byte =< $z;
+    Byte >= $A andalso Byte =< $Z;
+    Byte >= $0 andalso Byte =< $9;
+    Byte =:= $-;
+    Byte =:= $.;
+    Byte =:= $_;
+    Byte =:= $~
+->
+    <<Byte>>;
+encode_path_byte(Byte) ->
+    <<$%, (hex_digit(Byte bsr 4)), (hex_digit(Byte band 15))>>.
+
+hex_digit(N) when N < 10 -> $0 + N;
+hex_digit(N) -> $A + N - 10.
 -endif.
 
 %%====================================================================
@@ -155,17 +164,6 @@ put_new(Key, Value, Map) ->
         {ok, _} -> Map;
         error -> maps:put(Key, Value, Map)
     end.
-
-%% TODO: not needed after exdoc is fixed
-%% @private
-%% https://github.com/erlang/otp/blob/OTP-20.3/lib/stdlib/src/lists.erl#L1449:L1453
-join(_Sep, []) -> [];
-join(Sep, [H | T]) -> [H | join_prepend(Sep, T)].
-
-%% TODO: not needed after exdoc is fixed
-%% @private
-join_prepend(_Sep, []) -> [];
-join_prepend(Sep, [H | T]) -> [Sep, H | join_prepend(Sep, T)].
 
 %% TODO: not needed after exdoc is fixed
 %% @private
