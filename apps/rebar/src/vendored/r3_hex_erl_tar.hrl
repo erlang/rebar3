@@ -1,8 +1,8 @@
-%% Vendored from hex_core v0.20.0, do not edit manually
+%% Vendored from hex_core v0.20.1, do not edit manually
 
 %% This file is a copy of erl_tar.hrl from OTP without modifications.
 %%
-%% OTP commit: ad05823719d77c8faee87348ea39513d4e2f99c5 (OTP-29.1.1)
+%% OTP commit: d199a49a01a2079afb6f2c5c9ae047cd4555e68d (OTP-29.1.2)
 %%
 %% %CopyrightBegin%
 %%
