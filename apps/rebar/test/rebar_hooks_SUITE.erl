@@ -19,7 +19,7 @@ init_per_testcase(_, Config) ->
     rebar_test_utils:init_rebar_state(Config).
 
 end_per_testcase(_, _Config) ->
-    catch meck:unload().
+    try meck:unload() catch _:_ -> ok end.
 
 all() ->
     [build_and_clean_app, run_hooks_once, run_hooks_once_profiles,

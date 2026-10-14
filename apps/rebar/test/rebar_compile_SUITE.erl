@@ -253,7 +253,7 @@ maybe_init_config(Config) ->
     end.
 
 end_per_testcase(_, _Config) ->
-    catch meck:unload().
+    try meck:unload() catch _:_ -> ok end.
 
 
 %% test cases
@@ -1546,8 +1546,9 @@ umbrella_mib_first_test(Config) ->
     PrivMibsDir = filename:join([AppsDir, "_build", "default", "lib", Name, "priv", "mibs"]),
 
     FailureRebarConfig = [{mib_first_files, ["mibs/AIMPORTER-MIB.mib"]}],
-    catch (
-    rebar_test_utils:run_and_check(Config, FailureRebarConfig, ["compile"], {ok, [{app, Name}]}) ),
+    try
+        rebar_test_utils:run_and_check(Config, FailureRebarConfig, ["compile"], {ok, [{app, Name}]})
+    catch _:_ -> ok end,
 
     %% check that the bin file was NOT created
     false = filelib:is_file(filename:join([PrivMibsDir, "AIMPORTER-MIB.bin"])),

@@ -483,7 +483,7 @@ or_in_prerelease(Config) ->
 %%
 
 setup_deps_and_repos(Deps, Repos) ->
-    catch ets:delete(?PACKAGE_TABLE),
+    try ets:delete(?PACKAGE_TABLE) catch _:_ -> ok end,
     true = rebar_packages:new_package_table(),
     insert_deps(Deps),
     State = rebar_state:new([{hex, [{repos, [#{name => R} || R <- Repos]}]}]),
