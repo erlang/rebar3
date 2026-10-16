@@ -50,7 +50,7 @@ do(Provider, State) ->
 
     Providers = rebar_state:providers(State),
     Cwd = rebar_state:dir(State),
-    rebar_hooks:run_project_and_app_hooks(Cwd, pre, Provider, Providers, State),
+    State1 = rebar_hooks:run_project_and_app_hooks(Cwd, pre, Provider, Providers, State),
 
     Releases = releases_to_build(Provider, Opts, RelxState),
 
@@ -72,12 +72,12 @@ do(Provider, State) ->
 
             relx:build_relup(Release, ToVsn, UpFromVsn, RelxState);
         _ ->
-            parallel_run(Provider, Releases, all_apps(State), RelxState)
+            parallel_run(Provider, Releases, all_apps(State1), RelxState)
     end,
 
-    rebar_hooks:run_project_and_app_hooks(Cwd, post, Provider, Providers, State),
+    State2 = rebar_hooks:run_project_and_app_hooks(Cwd, post, Provider, Providers, State1),
 
-    {ok, State}.
+    {ok, State2}.
 
 read_relx_config(State, Options) ->
     ConfigFile = proplists:get_value(config, Options, []),

@@ -21,8 +21,9 @@ run_all_hooks(Dir, Type, Command, Providers, AppInfo, State) ->
 
 run_all_hooks(Dir, Type, Command, Providers, State) ->
     ?DEBUG("Running hooks for ~p with configuration:", [Command]),
-    run_provider_hooks(Dir, Type, Command, Providers, rebar_state:opts(State), State),
-    run_hooks(Dir, Type, Command, rebar_state:opts(State), State).
+    State1 = run_provider_hooks(Dir, Type, Command, Providers, rebar_state:opts(State), State),
+    run_hooks(Dir, Type, Command, rebar_state:opts(State1), State1),
+    State1.
 
 run_project_and_app_hooks(Dir, Type, Command, Providers, State) ->
     ProjectApps = rebar_state:project_apps(State),

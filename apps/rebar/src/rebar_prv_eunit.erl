@@ -60,22 +60,22 @@ do(State, Tests) ->
     %% Run eunit provider prehooks
     Providers = rebar_state:providers(State),
     Cwd = rebar_dir:get_cwd(),
-    rebar_hooks:run_project_and_app_hooks(Cwd, pre, ?PROVIDER, Providers, State),
+    State0 = rebar_hooks:run_project_and_app_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
-    case validate_tests(State, Tests) of
+    case validate_tests(State0, Tests) of
         {ok, T} ->
-            case run_tests(State, T) of
+            case run_tests(State0, T) of
                 {ok, State1} ->
                     %% Run eunit provider posthooks
-                    rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State1),
-                    rebar_paths:set_paths([plugins, deps], State),
-                    {ok, State1};
+                    State2 = rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State1),
+                    rebar_paths:set_paths([plugins, deps], State2),
+                    {ok, State2};
                 Error ->
-                    rebar_paths:set_paths([plugins, deps], State),
+                    rebar_paths:set_paths([plugins, deps], State0),
                     Error
             end;
         Error ->
-            rebar_paths:set_paths([plugins, deps], State),
+            rebar_paths:set_paths([plugins, deps], State0),
             Error
     end.
 
