@@ -63,6 +63,7 @@ security fixes.
 
 | Rebar3 | Erlang/OTP Support Range | Notes
 |-       |-      | -
+| 3.28.0 | 27-29 | Use 3.28.0 for a safe version. Multiple CVEs fixed starting with 3.27.x
 | 3.25.1 | 26-28 | issues with newer Windows versions were reported on 3.25.0 and OTP-28
 | 3.24.0 | 25-27 |
 | 3.23.0 | 25-27 |
