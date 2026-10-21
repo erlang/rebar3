@@ -13,7 +13,7 @@ awk -v url=$url '
     /^commit / {mode="new"}
 
     # merge commit default message
-    mode=="new" && / +Merge pull request/ {
+    mode=="new" && / +Merge pull request/ && !/codeql-action/ {
         page_id=substr($4, 2, length($4)-1);
         mode="started";
         next;
