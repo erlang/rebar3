@@ -35,7 +35,9 @@
          tup_merge/1,
          get_no_proxy/1,
          proxy_auth/1,
-        is_list_of_strings/1]).
+        is_list_of_strings/1,
+         ssl_opts_os_trust_store/1,
+         ssl_opts_custom_cacerts_path/1]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -51,7 +53,8 @@ all() ->
     [{group, args_to_tasks},
      sh_does_not_miss_messages,
      tup_merge,
-     proxy_auth, is_list_of_strings].
+     proxy_auth, is_list_of_strings,
+     ssl_opts_os_trust_store, ssl_opts_custom_cacerts_path].
 
 groups() ->
     [{args_to_tasks, [], [empty_arglist,
@@ -367,3 +370,48 @@ get_no_proxy(_Config) ->
         false -> os:putenv("no_proxy", "");
         V     -> os:putenv("no_proxy", V)
     end.
+
+ssl_opts_os_trust_store(Config) ->
+    GlobalConfig = filename:join(?config(priv_dir, Config), "no_such_rebar.config"),
+    meck:new(rebar_dir, [passthrough]),
+    try
+        meck:expect(rebar_dir, global_config, fun() -> GlobalConfig end),
+        Opts = rebar_utils:ssl_opts("https://repo.hex.pm"),
+        ?assertEqual(verify_peer, proplists:get_value(verify, Opts)),
+        CACerts = proplists:get_value(cacerts, Opts),
+        ?assertEqual(public_key:cacerts_get(), CACerts),
+        ?assertNotEqual([], CACerts),
+        PartialChain = proplists:get_value(partial_chain, Opts),
+        [{cert, OsCADer, _} | _] = CACerts,
+        ?assertEqual({trusted_ca, OsCADer}, PartialChain([OsCADer])),
+        ?assertEqual(unknown_ca, PartialChain([test_root_cert_der()]))
+    after
+        meck:unload(rebar_dir)
+    end.
+
+ssl_opts_custom_cacerts_path(Config) ->
+    PrivDir = ?config(priv_dir, Config),
+    CustomDer = test_root_cert_der(),
+    PemFile = filename:join(PrivDir, "custom_cacerts.pem"),
+    ok = file:write_file(PemFile,
+                         public_key:pem_encode([{'Certificate', CustomDer, not_encrypted}])),
+    GlobalConfig = filename:join(PrivDir, "rebar.config"),
+    ok = file:write_file(GlobalConfig,
+                         io_lib:format("{ssl_cacerts_path, ~p}.~n", [PemFile])),
+    meck:new(rebar_dir, [passthrough]),
+    try
+        meck:expect(rebar_dir, global_config, fun() -> GlobalConfig end),
+        Opts = rebar_utils:ssl_opts("https://repo.hex.pm"),
+        ?assertEqual([CustomDer], proplists:get_value(cacerts, Opts)),
+        PartialChain = proplists:get_value(partial_chain, Opts),
+        ?assertEqual({trusted_ca, CustomDer}, PartialChain([CustomDer])),
+        %% The OS trust store is not consulted when a custom path is set.
+        [{cert, OsCADer, _} | _] = public_key:cacerts_get(),
+        ?assertEqual(unknown_ca, PartialChain([OsCADer]))
+    after
+        meck:unload(rebar_dir)
+    end.
+
+test_root_cert_der() ->
+    #{cert := Der} = public_key:pkix_test_root_cert("rebar3 test root", []),
+    Der.
