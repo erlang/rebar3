@@ -1115,7 +1115,8 @@ ssl_opts(Url) ->
 %% @private Determines which CA Certs to use for the HTTPS request.
 %% If the user sets the value {ssl_cacerts_path, "path to pem"} in their
 %% global rebar.config file, the pem will be encoded and used for the
-%% SSL connection.  Otherwise, CA Certs from `certifi` will be used.
+%% SSL connection.  Otherwise, the CA Certs from the operating system's
+%% trust store, as loaded by `public_key:cacerts_get/0', will be used.
 %% This functionality is useful (needed) for Corporate Proxies that rewrite Certs.
 %% See ssl_opts/2
 get_cacerts() ->
@@ -1123,7 +1124,15 @@ get_cacerts() ->
     Config = rebar_config:consult_file(GlobalConfigFile),
     case proplists:get_value(ssl_cacerts_path, Config) of
         undefined ->
-            certifi:cacerts();
+            try
+                public_key:cacerts_get()
+            catch
+                _:Reason ->
+                    abort("Could not load the CA certificates from the operating "
+                          "system's trust store (~p). Install the system CA "
+                          "certificates, or set {ssl_cacerts_path, \"/path/to/cacerts.pem\"} "
+                          "in your global rebar.config.", [Reason])
+            end;
         Path ->
             {ok, Bin} = file:read_file(Path),
             Pems = public_key:pem_decode(Bin),
@@ -1141,30 +1150,34 @@ get_cacerts() ->
       Url :: string() | binary(),
       Res :: proplists:proplist().
 ssl_opts(MiddleboxCompMode, Url) ->
-    case check_ssl_version() of
-        true ->
-            CACerts = get_cacerts(),
-            SslOpts = [{verify, verify_peer}, {depth, 10}, {cacerts, CACerts},
-                       {partial_chain, fun partial_chain/1},
-                       {middlebox_comp_mode, MiddleboxCompMode == middlebox_comp_mode_enabled}],
-            check_hostname_opt(Url, SslOpts);
-        false ->
-            ?WARN("Insecure HTTPS request (peer verification disabled), "
-                  "please update to OTP 17.4 or later", []),
-            [{verify, verify_none}]
-    end.
+    CACerts = get_cacerts(),
+    SslOpts = [{verify, verify_peer}, {depth, 10}, {cacerts, CACerts},
+               {partial_chain, partial_chain_fun(CACerts)},
+               {middlebox_comp_mode, MiddleboxCompMode == middlebox_comp_mode_enabled}],
+    check_hostname_opt(Url, SslOpts).
 
 check_hostname_opt(_, Opts) ->
     MatchFun = public_key:pkix_verify_hostname_match_fun(https),
     [{customize_hostname_check, [{match_fun, MatchFun}]} | Opts].
 
--spec partial_chain(Certs) -> Res when
+-spec partial_chain_fun(CACerts) -> Res when
+      CACerts :: [public_key:der_encoded() | public_key:combined_cert()],
+      Res :: fun((list(any())) -> unknown_ca | {trusted_ca, any()}).
+partial_chain_fun(CACerts) ->
+    CACerts1 = [decode_cacert(Cert) || Cert <- CACerts],
+    fun(Certs) -> partial_chain(Certs, CACerts1) end.
+
+%% `public_key:cacerts_get/0' returns `combined_cert()' records holding both
+%% the DER and decoded forms, while certs read from a PEM file are plain DER.
+decode_cacert({cert, _Der, OtpCert}) -> OtpCert;
+decode_cacert(Der) when is_binary(Der) -> public_key:pkix_decode_cert(Der, otp).
+
+-spec partial_chain(Certs, CACerts) -> Res when
       Certs :: list(any()),
+      CACerts :: list(any()),
       Res :: unknown_ca | {trusted_ca, any()}.
-partial_chain(Certs) ->
+partial_chain(Certs, CACerts1) ->
     Certs1 = [{Cert, public_key:pkix_decode_cert(Cert, otp)} || Cert <- Certs],
-    CACerts = certifi:cacerts(),
-    CACerts1 = [public_key:pkix_decode_cert(Cert, otp) || Cert <- CACerts],
     case ec_lists:find(fun({_, Cert}) ->
                                check_cert(CACerts1, Cert)
                        end, Certs1) of
@@ -1189,16 +1202,6 @@ check_cert(CACerts, Cert) ->
                       extract_public_key_info(CACert) == extract_public_key_info(Cert)
               end, CACerts).
 
--spec check_ssl_version() ->
-    boolean().
-check_ssl_version() ->
-    case application:get_key(ssl, vsn) of
-        {ok, Vsn} ->
-            parse_vsn(Vsn) >= {5, 3, 6};
-        _ ->
-            false
-    end.
-
 -spec get_ssl_config() -> {SslVerify, MiddleboxCompMode} when
     SslVerify :: ssl_verify_disabled | ssl_verify_enabled,
     MiddleboxCompMode :: middlebox_comp_mode_disabled | middlebox_comp_mode_enabled.
@@ -1220,24 +1223,6 @@ get_ssl_config() ->
                 middlebox_comp_mode_enabled
         end,
     {SslVerify, MiddleboxCompMode}.
-
--spec parse_vsn(Vsn) -> Res when
-      Vsn :: string(),
-      Res :: {integer(), integer(), integer()}.
-parse_vsn(Vsn) ->
-    version_pad(rebar_string:lexemes(Vsn, ".-")).
-
--spec version_pad(list(nonempty_string())) -> Res when
-      Res :: {integer(), integer(), integer()}.
-version_pad([Major]) ->
-    {list_to_integer(Major), 0, 0};
-version_pad([Major, Minor]) ->
-    {list_to_integer(Major), list_to_integer(Minor), 0};
-version_pad([Major, Minor, Patch]) ->
-    {list_to_integer(Major), list_to_integer(Minor), list_to_integer(Patch)};
-version_pad([Major, Minor, Patch | _]) ->
-    {list_to_integer(Major), list_to_integer(Minor), list_to_integer(Patch)}.
-
 
 find_source(Filename, Dir, Rules) ->
     filelib:find_source(Filename, Dir, Rules).
