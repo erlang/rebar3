@@ -45,13 +45,13 @@ init(State) ->
 do(State) ->
     Cwd = rebar_state:dir(State),
     Providers = rebar_state:providers(State),
-    rebar_hooks:run_project_and_app_hooks(Cwd, pre, ?PROVIDER, Providers, State),
-    case do_(State) of
+    State1 = rebar_hooks:run_project_and_app_hooks(Cwd, pre, ?PROVIDER, Providers, State),
+    case do_(State1) of
         {ok, NewState} ->
-            rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, NewState),
-            {ok, NewState};
+            NewState1 = rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, NewState),
+            {ok, NewState1};
         Other ->
-            rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State),
+            _IgnoredState = rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State1),
             Other
     end.
 
@@ -130,12 +130,12 @@ format_error({transitive_dependency, Name}) ->
 format_error({checkout_dependency, Name}) ->
     io_lib:format("Dependency ~ts is a checkout dependency under _checkouts/ and checkouts cannot be upgraded.",
                   [Name]);
-format_error(no_arg) -> 
+format_error(no_arg) ->
     "Specify a list of dependencies to upgrade, or --all to upgrade them all";
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
-handle_args(State) -> 
+handle_args(State) ->
     {Args, _} = rebar_state:command_parsed_args(State),
     All = proplists:get_value(all, Args, false),
     Package = proplists:get_value(package, Args),
