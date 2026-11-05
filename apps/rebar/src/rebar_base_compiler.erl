@@ -179,7 +179,9 @@ format_error_source(Path, Opts) ->
 simple_compile_wrapper(Source, Target, Compile3Fn, Config, false) ->
     Compile3Fn(Source, Target, Config);
 simple_compile_wrapper(Source, Target, Compile3Fn, Config, true) ->
-    case filelib:last_modified(Target) < filelib:last_modified(Source) of
+    %% `=<': stamps have one-second resolution, so a source written in the
+    %% same second as its target may be the newer one
+    case filelib:last_modified(Target) =< filelib:last_modified(Source) of
         true ->
             Compile3Fn(Source, Target, Config);
         false ->

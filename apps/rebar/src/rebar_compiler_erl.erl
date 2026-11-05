@@ -249,7 +249,9 @@ needed_files(Graph, ErlOpts, RebarOpts, Dir, OutDir, SourceFiles) ->
                          TargetBase = target_base(OutDir, Source),
                          Target = TargetBase ++ ".beam",
                          AllOpts = [{outdir, filename:dirname(Target)} | SharedOpts],
-                         digraph:vertex(Graph, Source) > {Source, filelib:last_modified(Target)}
+                         %% `>=': stamps have one-second resolution, so a source written in the
+                         %% same second as its beam may be the newer one
+                         digraph:vertex(Graph, Source) >= {Source, filelib:last_modified(Target)}
                               orelse opts_changed(Graph, AllOpts, Target, TargetBase)
                               orelse CompilerOptsSet
                  end, SourceFiles).
