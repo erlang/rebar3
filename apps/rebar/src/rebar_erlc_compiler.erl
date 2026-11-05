@@ -336,7 +336,7 @@ needed_files(G, ErlOpts, RebarOpts, Dir, OutDir, SourceFiles) ->
                          %% called here for clarity as it's required by both opts_changed/2
                          %% and erl_compiler_opts_set/0
                          _ = code:ensure_loaded(compile),
-                         digraph:vertex(G, Source) > {Source, filelib:last_modified(Target)}
+                         digraph:vertex(G, Source) >= {Source, filelib:last_modified(Target)}
                               orelse opts_changed(AllOpts, TargetBase)
                               orelse erl_compiler_opts_set()
                  end, SourceFiles).
@@ -660,7 +660,9 @@ compile_xrl_yrl(_Opts, Source, Target, AllOpts, Mod) ->
     end.
 
 needs_compile(Source, Target) ->
-    filelib:last_modified(Source) > filelib:last_modified(Target).
+    %% `>=': stamps have one-second resolution, so a source written in the
+    %% same second as its target may be the newer one
+    filelib:last_modified(Source) >= filelib:last_modified(Target).
 
 
 

@@ -124,7 +124,9 @@ needs_compile(Source, OutExt, Mappings) ->
     BaseName = filename:basename(Source, Ext),
     {_, OutDir} = lists:keyfind(OutExt, 1, Mappings),
     Target = filename:join(OutDir, BaseName++OutExt),
-    filelib:last_modified(Source) > filelib:last_modified(Target).
+    %% `>=': stamps have one-second resolution, so a source written in the
+    %% same second as its target may be the newer one
+    filelib:last_modified(Source) >= filelib:last_modified(Target).
 
 ok_tuple(Source, Ws) ->
     rebar_base_compiler:ok_tuple(Source, Ws).

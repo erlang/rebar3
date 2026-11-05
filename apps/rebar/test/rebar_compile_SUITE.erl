@@ -16,6 +16,8 @@ all() ->
      {group, basic_extras}, {group, release_extras}, {group, unbalanced_extras},
      {group, root_extras},
      recompile_when_hrl_changes, recompile_when_included_hrl_changes,
+     recompile_when_src_changes_in_the_same_second,
+     recompile_when_hrl_changes_in_the_same_second,
      recompile_when_recursive_hrl_changes,
      recompile_extra_when_hrl_in_src_changes,
      recompile_when_opts_included_hrl_changes,
@@ -677,6 +679,68 @@ recompile_when_hrl_changes(Config) ->
 
     ?assert(ModTime =/= NewModTime).
 
+%% Stamps have one-second resolution: a source rewritten in the same second
+%% as its beam was written has the beam's stamp, and must still be recompiled.
+recompile_when_src_changes_in_the_same_second(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    Src = filename:join([AppDir, "src", "same_second.erl"]),
+    ok = file:write_file(Src, <<"-module(same_second).\n"
+                                "-export([version/0]).\n"
+                                "version() -> 1.\n">>),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    Beam = filename:join([AppDir, "_build", "default", "lib", Name, "ebin",
+                          "same_second.beam"]),
+    {ok, {same_second, Md5}} = beam_lib:md5(Beam),
+    {ok, #file_info{mtime = BeamTime}} = file:read_file_info(Beam),
+
+    ok = file:write_file(Src, <<"-module(same_second).\n"
+                                "-export([version/0]).\n"
+                                "version() -> 2.\n">>),
+    ok = file:write_file_info(Src, #file_info{mtime = BeamTime}),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    {ok, {same_second, NewMd5}} = beam_lib:md5(Beam),
+    ?assertNotEqual(Md5, NewMd5).
+
+%% As above, for a header rewritten in the same second as an including beam.
+recompile_when_hrl_changes_in_the_same_second(Config) ->
+    AppDir = ?config(apps, Config),
+
+    Name = rebar_test_utils:create_random_name("app1_"),
+    Vsn = rebar_test_utils:create_random_vsn(),
+    rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+
+    Hrl = filename:join([AppDir, "src", "same_second.hrl"]),
+    ok = file:write_file(filename:join([AppDir, "src", "same_second_hrl.erl"]),
+                         <<"-module(same_second_hrl).\n"
+                           "-export([version/0]).\n"
+                           "-include(\"same_second.hrl\").\n"
+                           "version() -> ?VERSION.\n">>),
+    ok = file:write_file(Hrl, <<"-define(VERSION, 1).\n">>),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    Beam = filename:join([AppDir, "_build", "default", "lib", Name, "ebin",
+                          "same_second_hrl.beam"]),
+    {ok, {same_second_hrl, Md5}} = beam_lib:md5(Beam),
+    {ok, #file_info{mtime = BeamTime}} = file:read_file_info(Beam),
+
+    ok = file:write_file(Hrl, <<"-define(VERSION, 2).\n">>),
+    ok = file:write_file_info(Hrl, #file_info{mtime = BeamTime}),
+
+    rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
+
+    {ok, {same_second_hrl, NewMd5}} = beam_lib:md5(Beam),
+    ?assertNotEqual(Md5, NewMd5).
+
 recompile_when_included_hrl_changes(Config) ->
     AppDir = ?config(apps, Config),
 
@@ -1105,6 +1169,7 @@ dont_recompile_when_opts_dont_change(Config) ->
     Name = rebar_test_utils:create_random_name("app1_"),
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    backdate_sources(AppDir),
 
     rebar_test_utils:run_and_check(Config, [], ["compile"], {ok, [{app, Name}]}),
 
@@ -1174,6 +1239,13 @@ dont_recompile_yrl_or_xrl(Config) ->
     ok = ec_file:write(Hrl, HrlBody),
     RebarConfig = [{yrl_opts, [{includefile, "include/some_header.hrl"}]}],
 
+    backdate_sources(AppDir),
+
+    rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
+    %% the generated .erl files and their beams are written by the same build,
+    %% usually in the same second, so the next build compiles them once more
+    %% (equal stamps count as a change); measure from the settled state
+    timer:sleep(1000),
     rebar_test_utils:run_and_check(Config, RebarConfig, ["compile"], {ok, [{app, Name}]}),
 
     XrlModTime = filelib:last_modified(XrlErl),
@@ -1539,6 +1611,7 @@ umbrella_mib_first_test(Config) ->
     ok = filelib:ensure_dir(filename:join([AppDir, "mibs", "dummy"])),
     ok = file:write_file(filename:join([AppDir, "mibs", "AIMPORTER-MIB.mib"]), AImporterSrc),
     ok = file:write_file(filename:join([AppDir, "mibs", "BEXPORTER-MIB.mib"]), BExporterSrc),
+    backdate_sources(AppDir),
 
         FailureRebarConfig = [{mib_first_files, ["mibs/AIMPORTER-MIB.mib"]}],
     SuccessRebarConfig = [{mib_first_files, ["mibs/BEXPORTER-MIB.mib"]}],
@@ -2500,6 +2573,7 @@ dont_recompile_when_erl_compiler_options_env_does_not_change(Config) ->
     Name = rebar_test_utils:create_random_name("erl_compiler_options_"),
     Vsn = rebar_test_utils:create_random_vsn(),
     rebar_test_utils:create_app(AppDir, Name, Vsn, [kernel, stdlib]),
+    backdate_sources(AppDir),
 
     true = os:unsetenv("ERL_COMPILER_OPTIONS"),
 
@@ -2755,6 +2829,8 @@ dont_recompile_when_parse_transform_as_opt_unchanged(Config) ->
 
     ok = file:write_file(filename:join([AppDir, "src", "example_parse_transform.erl"]),
                          ParseTransform),
+
+    backdate_sources(AppDir),
 
     RebarConfig = [{erl_opts, [{parse_transform, example_parse_transform}]}],
 
@@ -3127,3 +3203,13 @@ yecctoken2string({Other, _}) when is_atom(Other) ->
 yecctoken2string(Other) ->
     io_lib:format(\"~p\", [Other]).
 ">>.
+
+%% Stamps have one-second resolution and a source with its beam's stamp counts
+%% as changed, so a test that asserts no recompilation dates its sources before
+%% the first build.
+backdate_sources(AppDir) ->
+    Now = calendar:datetime_to_gregorian_seconds(calendar:local_time()),
+    Then = calendar:gregorian_seconds_to_datetime(Now - 10),
+    Files = filelib:wildcard(filename:join(AppDir, "**/*.{erl,hrl,xrl,yrl,mib,app.src}")),
+    [ok = file:write_file_info(F, #file_info{mtime = Then}) || F <- Files],
+    ok.
