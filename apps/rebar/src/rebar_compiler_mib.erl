@@ -44,7 +44,7 @@ needs_rebuild(Graph, Source, Mappings, Opts) ->
     OutFiles = [filename:join(OutDir, BaseName) ++ Ext || {Ext, OutDir} <- Mappings],
     Stamp = digraph:vertex(Graph, Source),
     lists:any(fun(OutFile) ->
-        Stamp > {Source, filelib:last_modified(OutFile)}
+        Stamp >= {Source, filelib:last_modified(OutFile)}
         orelse opts_changed(Graph, AllOpts, OutFile)
     end, OutFiles).
 

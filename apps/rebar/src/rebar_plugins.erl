@@ -271,7 +271,11 @@ needs_rebuild(AppInfo) ->
       out_mappings := List} = rebar_compiler_erl:context(AppInfo),
     SrcDirs = SrcD++InclD,
     OutDirs = [Dir || {_Ext, Dir} <- List],
-    newest_stamp(OutDirs) < newest_stamp(SrcDirs).
+    %% `=<': stamps have one-second resolution, so a source written in the
+    %% same second as the newest output may be the newer one; no sources at
+    %% all is never a reason to rebuild
+    SrcStamp = newest_stamp(SrcDirs),
+    SrcStamp =/= 0 andalso newest_stamp(OutDirs) =< SrcStamp.
 
 newest_stamp(DirList) ->
     lists:max([0] ++
