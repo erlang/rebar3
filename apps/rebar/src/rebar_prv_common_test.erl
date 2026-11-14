@@ -65,24 +65,24 @@ do(State, Tests) ->
     Cwd = rebar_dir:get_cwd(),
 
     %% Run ct provider pre hooks for all project apps and top level project hooks
-    rebar_hooks:run_project_and_app_hooks(Cwd, pre, ?PROVIDER, Providers, State),
+    State1 = rebar_hooks:run_project_and_app_hooks(Cwd, pre, ?PROVIDER, Providers, State),
 
     case Tests of
         {ok, T} ->
             case run_tests(State, T) of
                 ok    ->
                     %% Run ct provider post hooks for all project apps and top level project hooks
-                    rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State),
-                    rebar_paths:set_paths([plugins, deps], State),
-                    symlink_to_last_ct_logs(State, T),
-                    {ok, State};
+                    State2 = rebar_hooks:run_project_and_app_hooks(Cwd, post, ?PROVIDER, Providers, State1),
+                    rebar_paths:set_paths([plugins, deps], State2),
+                    symlink_to_last_ct_logs(State2, T),
+                    {ok, State2};
                 Error ->
-                    rebar_paths:set_paths([plugins, deps], State),
-                    symlink_to_last_ct_logs(State, T),
+                    rebar_paths:set_paths([plugins, deps], State1),
+                    symlink_to_last_ct_logs(State1, T),
                     Error
             end;
         Error ->
-            rebar_paths:set_paths([plugins, deps], State),
+            rebar_paths:set_paths([plugins, deps], State1),
             Error
     end.
 
