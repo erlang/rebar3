@@ -77,7 +77,7 @@ needs rewriting.
 
 Rebar3 is an escript built around the concept of providers. Providers are the
 modules that do the work to fulfill a user's command. They are documented in
-[the official documentation website](http://www.rebar3.org/docs/plugins#section-provider-interface).
+[the official documentation website](https://rebar3.org/docs/tutorials/building_plugins/#provider-interface).
 
 > [!NOTE]
 > The Rebar3 repository uses an [umbrella project structure](https://rebar3.org/docs/basic_usage/).
