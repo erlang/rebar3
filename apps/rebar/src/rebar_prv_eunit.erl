@@ -79,6 +79,17 @@ do(State, Tests) ->
             Error
     end.
 
+%% functions ending in `_' are test generators per the eunit naming
+%% convention, running them as a plain `test' would never run the generated
+%% tests.
+function_type(test, Function) ->
+    case lists:suffix("_", Function) of
+        true -> generator;
+        false -> test
+    end;
+function_type(Type, _Function) ->
+    Type.
+
 run_tests(State, Tests) ->
     T = translate_paths(State, Tests),
     EUnitOpts = resolve_eunit_opts(State),
@@ -177,7 +188,7 @@ tokenize(Type, Value) ->
     case string:tokens(Value, [$:]) of
         [Module0, Functions] ->
             Module = list_to_atom(Module0),
-            lists:map(fun(F) -> {Type, Module, list_to_atom(F)} end,
+            lists:map(fun(F) -> {function_type(Type, F), Module, list_to_atom(F)} end,
                       string:tokens(Functions, [$;, $+]));
         _ ->
             ?PRV_ERROR({Type, Value})
