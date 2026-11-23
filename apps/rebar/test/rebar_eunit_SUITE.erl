@@ -12,7 +12,7 @@
 -export([eunit_tests/1, eunit_opts/1, eunit_first_files/1]).
 -export([single_application_arg/1, multi_application_arg/1, missing_application_arg/1]).
 -export([single_module_arg/1, multi_module_arg/1, missing_module_arg/1]).
--export([single_test_arg/1, multi_test_arg/1, missing_test_arg/1]).
+-export([single_test_arg/1, multi_test_arg/1, missing_test_arg/1, generator_test_arg/1]).
 -export([single_suite_arg/1, multi_suite_arg/1, missing_suite_arg/1]).
 -export([single_generator_arg/1, multi_generator_arg/1, missing_generator_arg/1]).
 -export([single_file_arg/1, multi_file_arg/1, missing_file_arg/1]).
@@ -49,7 +49,7 @@ groups() ->
      {cmd_line_args, [], [eunit_tests, eunit_opts, eunit_first_files,
                           single_application_arg, multi_application_arg, missing_application_arg,
                           single_module_arg, multi_module_arg, missing_module_arg,
-                          single_test_arg, multi_test_arg, missing_test_arg,
+                          single_test_arg, multi_test_arg, missing_test_arg, generator_test_arg,
                           single_suite_arg, multi_suite_arg, missing_suite_arg,
                           single_generator_arg, multi_generator_arg, missing_generator_arg,
                           single_file_arg, multi_file_arg, missing_file_arg,
@@ -366,6 +366,15 @@ missing_module_arg(Config) ->
 
     Error = {error, {rebar_prv_eunit, {eunit_test_errors, ["Module `missing_app' not found in project."]}}},
     Error = Tests.
+
+%% functions ending in `_' passed to --test are generators, not plain tests
+generator_test_arg(Config) ->
+    S = ?config(result, Config),
+
+    {ok, Args} = getopt:parse(rebar_prv_eunit:eunit_opts(S), ["--test=mod:many_test_+one_test"]),
+    State = rebar_state:command_parsed_args(S, Args),
+
+    {ok, [{generator, mod, many_test_}, {test, mod, one_test}]} = rebar_prv_eunit:prepare_tests(State).
 
 %% check that the --test cmd line opt generates the correct test set
 single_test_arg(Config) ->
